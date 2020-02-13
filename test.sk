@@ -1,0 +1,196 @@
+module ReactDB;
+
+class MultipleValues(Array<String>) extends Exception
+class NotFound() extends Exception
+class PathAlreadyDefined(String) extends Exception
+
+class FileName(String, String)
+
+mutable class ReadContext(reads: mutable Vector<FileName> = mutable Vector[])
+
+mutable class Context(
+  mutable dirs: SortedMap<String, Dir> = SortedMap[],
+  updates: mutable Vector<untracked (mutable this) ~> void> = mutable Vector[],
+  deps: Reactive.Table<FileName, FileName, FileName> = Reactive.Table::create(),
+) {
+  static fun create(): mutable Context {
+    mutable Context()
+  }
+  mutable fun set(path: String, dir: Dir): void {
+    this.dirs.maybeGet(path) match {
+    | None() -> this.!dirs = this.dirs.add(path, dir)
+    | Some(_) -> throw PathAlreadyDefined(path)
+    }
+  }
+}
+
+base class Dir {
+  fun getFile(String): Array<String>;
+}
+
+untracked fun launch(init: untracked () ~> void): void {
+  loop {
+    invariant_violation("TODO");
+    msg = read_line();
+    debug(msg);
+    init();
+  }
+}
+
+class Table<Value: frozen & Show>{
+  path: String,
+  data: Reactive.Table<String, String, Value>,
+  keys: Reactive.Table<String, String, String>,
+} extends Dir {
+  untracked static fun createFromValues(
+    context: mutable Context,
+    path: String,
+    values: Array<(String, Value)>,
+  ): Table<Value> {
+    static::createFromMultiValues(
+      context,
+      path,
+      values.map(kv ~> {
+        (k, v) = kv;
+        (k, Array[v])
+      }),
+    )
+  }
+
+  untracked static fun createFromMultiValues(
+    context: mutable Context,
+    path: String,
+    values: Array<(String, Array<Value>)>,
+  ): Table<Value> {
+    data = Reactive.Table::create();
+    keysTable = Reactive.Table::create();
+    keys = mutable Set[];
+    for (elt in values) {
+      (key, value) = elt;
+      data.set(key.toString(), key, value);
+      keys.add(key)
+    };
+    keysTable.set("key", "keys", freeze(keys).collect(Array));
+    table = Table{path, data, keys => keysTable};
+    context![path] = table;
+    table
+  }
+
+  untracked fun map<Value2: frozen & Show & Orderable>(
+    context: mutable Context,
+    resultPath: String,
+    f: (mutable ReadContext, String, Value) ~> Value2,
+  ): Table<Value2> {
+    this.multiMap(context, resultPath, (context, key, values) ~> {
+      values.map(v -> (key, Array[f(context, key, v)]))
+    });
+  }
+
+  untracked fun multiMap<Value2: frozen & Show & Orderable>(
+    context: mutable Context,
+    resultPath: String,
+    f: (mutable ReadContext, String, Array<Value>) ~> Array<
+      (String, Array<Value2>),
+    >,
+  ): Table<Value2> {
+    outData = Reactive.Table::create();
+    outKeys = Reactive.Table::create();
+    update = untracked (context) ~> {
+      mapped = this.keys["keys"].parallelMap(source ~> {
+        readContext = mutable ReadContext();
+        arr = f(readContext, source, this.data[source]);
+        keys = mutable Set[];
+        for (kv in arr) {
+          (k, v) = kv;
+          if (outData.setWithStatus(source, k, v)) {
+            keys.add(k);
+          }
+        };
+        (freeze(keys), (source, freeze(readContext.reads)))
+      });
+      keys = mutable Set[];
+      for (elt in mapped) {
+        (newKeys, (source, reads)) = elt;
+        for (read in reads) {
+          reader = FileName(this.path, source);
+          context.deps.set(reader, read, Array[reader]);
+        };
+        keys.extend(newKeys);
+      };
+      outKeys.set("keys", "keys", keys.collect(Array));
+    };
+    context.updates.push(update);
+    newTable = Table{path => resultPath, data => outData, keys => outKeys};
+    context![resultPath] = newTable;
+    newTable
+  }
+
+  @debug
+  fun getMulti(context: mutable ReadContext, key: String): Array<Value> {
+    context.reads.push(FileName(this.path, key));
+    this.data[key]
+  }
+
+  @debug
+  fun maybeGet(context: mutable ReadContext, key: String): ?Value {
+    vals = this.getMulti(context, key);
+    if (vals.size() == 0) {
+      return None();
+    };
+    if (vals.size() == 1) {
+      return Some(vals[0]);
+    };
+    throw MultipleValues(vals.map(x -> x.toString()));
+  }
+
+  @debug
+  fun get(context: mutable ReadContext, key: String): Value {
+    this.maybeGet(context, key) match {
+    | None() -> throw NotFound()
+    | Some(x) -> x
+    }
+  }
+
+  untracked fun set(context: mutable Context, key: String, value: Value): void {
+    this.data.set(key, key, Array[value]);
+    this.keys.set("keys", "keys", Array[key]);
+    for (fileName in context.deps[FileName(this.path, key)]) {
+      debug(fileName);
+    }
+  }
+
+  fun getFile[String: Show](key: String): Array<String> {
+    this.data[key].map(x -> x.toString())
+  }
+}
+
+module end;
+
+class User{name: String, age: Int} uses Show, Orderable {
+  fun toString(): String {
+    `User{age => ${this.age}`
+  }
+}
+
+untracked fun main(): void {
+  context = ReactDB.Context::create();
+  ages = Array[("user1", 25), ("user2", 32)];
+  names = Array[("user1", "Pierre"), ("user2", "Paul")];
+  usersAge = ReactDB.Table::createFromValues(context, "/tmp/usersAges/", ages);
+  usersName = ReactDB.Table::createFromValues(
+    context,
+    "/tmp/usersNames/",
+    names,
+  );
+  myUsers = usersName.map(context, "/users/", (context, userAges, name) ~> {
+    User{name, age => usersAge.get(context, userAges)}
+  });
+  for (x in context.updates) {
+    x(context)
+  };
+  usersAge.set(context, "user1", 33);
+  for (x in context.updates) {
+    x(context)
+  };
+  debug(myUsers.get(mutable ReactDB.ReadContext(), "user1"));
+}
