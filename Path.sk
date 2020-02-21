@@ -1,0 +1,217 @@
+/*****************************************************************************/
+/* File logic.
+ *
+ * This code validates files and directory names. So we check that we use
+ * the right characters (a-zA-Z0-9_) and that the paths are properly separated
+ * with '/'.
+ *
+ */
+/*****************************************************************************/
+
+module SKFS;
+
+const root: DirName = DirName::create("/");
+
+base class FileName extends File
+
+class Path private (dirName: DirName, baseName: BaseName) extends FileName {
+  static fun create(dirName: DirName, baseName: BaseName): this {
+    intern(Path(dirName, baseName))
+  }
+
+  static fun fromString(path: String): this {
+    chars = path.chars();
+    i = chars.size() - 1;
+    lastSlashOpt = loop {
+      if (i < 0) {
+        break None();
+      };
+      if (chars[i] == '/') {
+        break Some(i);
+      };
+      !i = i - 1;
+    };
+    lastSlash = lastSlashOpt match {
+    | None() -> error(path, "Invalid path, no '/' found")
+    | Some(x) -> x
+    };
+    dirNameChars = mutable Vector[];
+    baseNameChars = mutable Vector[];
+    for (j in Range(0, chars.size())) {
+      if (j <= lastSlash) {
+        dirNameChars.push(chars[j]);
+      } else {
+        baseNameChars.push(chars[j])
+      }
+    };
+    dirName = DirName::create(String::fromChars(dirNameChars.toArray()));
+    baseName = BaseName::create(String::fromChars(baseNameChars.toArray()));
+    Path::create(dirName, baseName)
+  }
+
+  fun toString(): String {
+    this.dirName.toString() + this.baseName
+  }
+}
+
+class DirName private (dirName: String) extends FileName {
+  static fun create(dirName: String): DirName {
+    static::validateDirName(dirName);
+    intern(static(dirName))
+  }
+
+  static private fun validateDirName(dirName: String): void {
+    validator = mutable SKFSImpl.NameValidator(dirName, dirName.chars(), 0);
+    validator.go()
+  }
+
+  fun toString(): String {
+    this.dirName
+  }
+}
+
+class BaseName private (baseName: String) extends FileName {
+  static fun create(baseName: String): BaseName {
+    static::validateBaseName(baseName);
+    intern(static(baseName))
+  }
+
+  static private fun validateBaseName(baseName: String): void {
+    validator = mutable SKFSImpl.NameValidator(baseName, baseName.chars(), 0);
+    validator.mustBeBaseName();
+    if (!validator.reachedEnd()) {
+      validator.error("Unexpected characters after file name");
+    }
+  }
+
+  fun toString(): String {
+    this.baseName
+  }
+}
+
+base class Exception extends .Exception uses Show
+class InvalidPathExn(dirName: String, reason: String) extends SKFS.Exception {
+  fun toString(): String {
+    `Invalid path(${this.dirName}): ${this.reason}`
+  }
+}
+
+fun error<T>(fileName: String, msg: String): T {
+  throw (SKFS.InvalidPathExn(fileName, msg))
+}
+
+module end;
+
+/*****************************************************************************/
+/* Implementation details. */
+/*****************************************************************************/
+
+module SKFSImpl;
+
+// This is a state machine that walks the string and checks that is it a
+// correct dirName.
+
+mutable class NameValidator(
+  dirName: String,
+  chars: Vector<Char>,
+  mutable idx: Int,
+) {
+  readonly fun error(msg: String): void {
+    SKFS.error(this.dirName, msg)
+  }
+
+  readonly fun current(): Char {
+    this.chars[this.idx]
+  }
+
+  readonly fun reachedEnd(): Bool {
+    this.idx >= this.chars.size()
+  }
+
+  mutable fun next(): void {
+    this.!idx = this.idx + 1
+  }
+
+  mutable fun go(): void {
+    if (this.reachedEnd()) {
+      this.error("path is empty");
+    };
+    while (this.idx < this.chars.size() - 1) {
+      this.mustBeSlash();
+      this.mustBeBaseName();
+    };
+    this.mustBeSlash();
+    if (!this.reachedEnd()) {
+      this.error("Unexpected characters at the end of the path");
+    };
+  }
+
+  mutable fun mustBeSlash(): void {
+    if (this.reachedEnd()) {
+      this.error("Expected a slash, reached the end of the path instead");
+    };
+    c = this.current();
+    if (c == '/') {
+      this.next()
+    } else {
+      this.error(`Expected a slash, found '${c}' instead`);
+    }
+  }
+
+  mutable fun mustBeBaseName(): void {
+    if (this.reachedEnd() || this.current() == '/') {
+      this.error("Empty baseName");
+    };
+    while (!this.reachedEnd()) {
+      c = this.current();
+      if (
+        (c >= 'a' && c <= 'z') ||
+        c >= 'A' && c <= 'Z' ||
+        c >= '0' && c <= '9' ||
+        c == '_'
+      ) {
+        this.next();
+      } else {
+        break void
+      };
+    }
+  }
+}
+
+module end;
+
+module SKFSTest;
+
+fun testDirName(): void {
+  dirFail = (path) -> expectFail(path, () -> _ = SKFS.DirName::create(path));
+  dirPass = (path) -> expectPass(path, () -> _ = SKFS.DirName::create(path));
+  dirFail(" ");
+  dirFail("??$");
+  dirFail(".");
+  dirFail("//");
+  dirFail("\n");
+  dirPass("/");
+  dirFail("/missingTrailingSlash");
+  dirPass("/1223/");
+  dirPass("/dir/");
+  dirPass("/dir1/dir2/");
+}
+
+fun testBaseName(): void {
+  fileFail = (path) -> expectFail(path, () -> _ = SKFS.BaseName::create(path));
+  filePass = (path) -> expectPass(path, () -> _ = SKFS.BaseName::create(path));
+  fileFail("");
+  fileFail(" ");
+  filePass("aa");
+  fileFail("aa/");
+  fileFail("abc ");
+  filePass("123");
+  filePass("__");
+}
+
+fun testPath(): void {
+  testDirName();
+  testBaseName();
+}
+
+module end;

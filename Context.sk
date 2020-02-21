@@ -1,0 +1,125 @@
+module SKFS;
+
+fun run(f: (mutable Context) -> void): mutable Context {
+  context = mutable Context{
+    initDeps => mutable Map[],
+    deps => mutable Vector[],
+  };
+  f(context);
+  for (dirName => deps in context.initDeps) {
+    deps.sort();
+    dirRef = DirRef<File>(dirName);
+    dir = context.state.dirs[dirRef];
+    context.setDir(dirRef, dir);
+  };
+  context
+}
+
+mutable class Context{
+  mutable state: State = State{},
+  initDeps: mutable Map<DirName, mutable Vector<FixedRow<Path>>>,
+  deps: mutable Vector<Path>,
+  mutable time: Int = 0,
+  mutable toUpdate: SortedMap<Int, (mutable Context) ~> void> = SortedMap[],
+} {
+  mutable fun debug(pathStr: String): void {
+    path = Path::fromString(pathStr);
+    dirRef = DirRef<File>(path.dirName);
+    dir = this.state.dirs[dirRef];
+    values = dir.getArray(this, path.baseName);
+    debug(values)
+  }
+
+  mutable fun update(): void {
+    loop {
+      this.toUpdate.minimum() match {
+      | None() -> return void
+      | Some((_, updateFun)) -> updateFun(this)
+      }
+    }
+  }
+
+  mutable fun timeStamp(): Int {
+    this.!time = this.time + 1;
+    this.time
+  }
+
+  mutable fun mkdir<Value: File>(
+    dirNameStr: String,
+    content: Array<(String, Value)>,
+  ): Dir<Value> {
+    dirName = DirName::create(dirNameStr);
+    vector = mutable Vector[];
+    for (kv in content) {
+      (key, value) = kv;
+      baseName = BaseName::create(key);
+      vector.push(FixedRow(baseName, value));
+    };
+    vector.sort();
+    fixedData = FixedData{dirName, data => vector.toArray()};
+    fixedMap = FixedData{dirName, data => Array[]};
+    dir = Dir{time => this.timeStamp(), dirName, fixedData, fixedMap};
+    dirRef: DirRef<Value> = DirRef(dirName);
+    this.!state = this.state.setDir(dirRef, dir);
+    dir
+  }
+
+  mutable fun setDir<T: File>(dirRef: DirRef<T>, dir: Dir<T>): void {
+    this.!state = this.state.setDir(dirRef, dir);
+  }
+
+  mutable fun setFun<T1: File, T2: File>(
+    funRef: FunRef<T1, T2>,
+    mapFun: MapFun<T1, T2>,
+  ): void {
+    this.!state = this.state.setFun(funRef, mapFun);
+  }
+
+  mutable fun addDep(path: Path): void {
+    this.deps.push(path)
+  }
+}
+
+class State{dirs: Dirs = Dirs{}, funs: Funs = Funs{}} {
+  fun setDir<T: File>(dirRef: DirRef<T>, dir: Dir<T>): this {
+    !this.dirs = this.dirs.set(dirRef, dir);
+    this
+  }
+
+  fun setFun<T1: File, T2: File>(
+    funRef: FunRef<T1, T2>,
+    mapFun: MapFun<T1, T2>,
+  ): this {
+    !this.funs = this.funs.set(funRef, mapFun);
+    this
+  }
+}
+
+value class DirRef<T>(dirName: DirName)
+
+class Dirs{state: SortedMap<DirName, File> = SortedMap[]} {
+  fun set<T: File>(key: DirRef<T>, value: Dir<T>): this {
+    !this.state = this.state.set(key.dirName, unsafeToFile(intern(value)));
+    this
+  }
+  fun get<T: File>(key: DirRef<T>): Dir<T> {
+    unsafeFromFile(this.state.get(key.dirName));
+  }
+}
+
+value class FunRef<T1, T2>(dirName: DirName)
+
+class Funs{state: SortedMap<DirName, File> = SortedMap[]} {
+  fun set<T1: File, T2: File>(
+    key: FunRef<T1, T2>,
+    value: MapFun<T1, T2>,
+  ): this {
+    !this.state = this.state.add(key.dirName, unsafeToFile(value));
+    this
+  }
+  fun get<T1: File, T2: File>(key: FunRef<T1, T2>): MapFun<T1, T2> {
+    unsafeFromFile(this.state.get(key.dirName));
+  }
+}
+
+module end;

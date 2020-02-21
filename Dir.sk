@@ -1,0 +1,254 @@
+module SKFS;
+
+const debugMode: Bool = true;
+
+base class File uses Hashable, Orderable, Show {}
+
+type MapFun<Value, Value2> = (mutable Context, BaseName, Array<Value>) ~> Array<
+  (BaseName, Array<Value2>),
+>;
+
+class FileNotFound(path: Path) extends SKFS.Exception {
+  fun toString(): String {
+    `File not found: ${this.path}`
+  }
+}
+class DuplicateValues(path: Path) extends SKFS.Exception {
+  fun toString(): String {
+    `Duplicate values found for path: ${this.path}`
+  }
+}
+
+value class FixedRow<T: Orderable>(key: BaseName, value: T) uses Orderable
+
+class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
+  fun getPos(key: BaseName, i: Int, j: Int): Int {
+    if (i > j) {
+      return i;
+    };
+    pivot = (i + j) / 2;
+    key.compare(this.data[pivot].key) match {
+    | LT()
+    | EQ() ->
+      this.getPos(key, i, pivot - 1)
+    | GT() -> this.getPos(key, pivot + 1, j)
+    }
+  }
+
+  fun getArray(key: BaseName): Array<T> {
+    pos = this.getPos(key, 0, this.data.size() - 1);
+    result = mutable Vector[];
+    while (pos < this.data.size() && this.data[pos].key == key) {
+      result.push(this.data[pos].value);
+      !pos = pos + 1;
+    };
+    result.toArray();
+  }
+
+  fun maybeGet(key: BaseName): ?T {
+    arr = this.getArray(key);
+    if (arr.size() > 2) {
+      path = Path::create(this.dirName, key);
+      throw (DuplicateValues(path))
+    };
+    if (arr.size() == 0) {
+      return None();
+    };
+    Some(arr[0])
+  }
+
+  fun get(key: BaseName): T {
+    this.maybeGet(key) match {
+    | None() ->
+      path = Path::create(this.dirName, key);
+      throw (FileNotFound(path))
+    | Some(x) -> x
+    }
+  }
+}
+
+class Dir<Value: File>{
+  time: Int,
+  dirName: DirName,
+  fixedData: FixedData<Value>,
+  fixedMap: FixedData<Path>,
+  data: Table<File> = Table::create(),
+  map: SortedMap<BaseName, Array<Path>> = SortedMap[],
+  childDirs: List<DirName> = List[],
+  dirty: SortedSet<BaseName> = SortedSet[],
+} {
+  fun getDirName(): DirName {
+    this.dirName
+  }
+
+  fun getThis(context: mutable Context): this {
+    !this = if (context.state.dirs.state.containsKey(this.dirName)) {
+      context.state.dirs[DirRef<Value>(this.dirName)];
+    } else {
+      this
+    };
+    this
+  }
+
+  fun getMap(key: BaseName): Array<Path> {
+    if (this.map.containsKey(key)) {
+      this.map[key]
+    } else {
+      this.fixedMap.getArray(key)
+    }
+  }
+
+  fun getArray(context: mutable Context, key: BaseName): Array<Value> {
+    !this = this.getThis(context);
+    path = Path::create(this.dirName, key);
+    context.addDep(path);
+    if (this.data.containsKey(key)) {
+      this.data[key].map(x -> unsafeFromFile(x));
+    } else {
+      this.fixedData.getArray(key);
+    }
+  }
+
+  fun multiMap<Value2: File>(
+    context: mutable Context,
+    dirNameStr: String,
+    f: MapFun<Value, Value2>,
+  ): Dir<Value2> {
+    dirName = DirName::create(dirNameStr);
+    state = context.state;
+    invariant(context.deps.isEmpty());
+    mapped = this.fixedData.data.map(row ~> {
+      localContext = mutable Context{
+        state,
+        initDeps => mutable Map[],
+        deps => mutable Vector[],
+      };
+      key = row.key;
+      values = this.fixedData.getArray(key);
+      //      root = (Path::create(this.dirName, key), dirName);
+      kvArray = f(localContext, key, values);
+      rows = kvArray
+        .map(kv2 -> {
+          (k2, v2) = kv2;
+          v2.map(x -> FixedRow(k2, x))
+        })
+        .flatten();
+      invariant(localContext.initDeps.isEmpty());
+      (key, freeze(localContext.deps), rows)
+    });
+    rowVec = mutable Vector[];
+    mapVec = mutable Vector[];
+    for (elt in mapped) {
+      (key, deps, rows) = elt;
+      for (row in rows) {
+        mapVec.push(FixedRow(key, Path::create(dirName, row.key)));
+        rowVec.push(row);
+      };
+      for (readPath in deps) {
+        readDir = readPath.dirName;
+        if (!context.initDeps.containsKey(readDir)) {
+          context.initDeps![readDir] = mutable Vector[];
+        };
+        readRoot = Path::create(this.dirName, key);
+        context.initDeps[readDir].push(FixedRow(readPath.baseName, readRoot));
+      };
+    };
+    rowVec.sort();
+    mapVec.sort();
+    fixedData = FixedData{dirName, data => rowVec.toArray()};
+    fixedMap = FixedData{dirName, data => Array[]};
+    parentFixedMap = FixedData{dirName, data => mapVec.toArray()};
+    dir = Dir{time => context.timeStamp(), dirName, fixedData, fixedMap};
+    parent = this with {fixedMap => parentFixedMap};
+    !parent.childDirs = List.Cons(dirName, parent.childDirs);
+    context.setDir(DirRef<Value>(parent.dirName), parent);
+    context.setDir(DirRef<Value2>(dirName), dir);
+    context.setFun(FunRef<File, Value2>(dirName), (context, key, values) ~>
+      f(context, key, values.map(unsafeFromFile))
+    );
+    dir
+  }
+
+  fun update(context: mutable Context): void {
+    newThis = context.state.dirs.get(DirRef<Value>(this.dirName));
+    context.!toUpdate = context.toUpdate.remove(newThis.time);
+    oldMap = mutable Map[];
+    for (key in newThis.dirty) {
+      for (path in newThis.getMap(key)) {
+        if (!oldMap.containsKey(path.dirName)) {
+          oldMap![path.dirName] = mutable Set[];
+        };
+        oldMap[path.dirName].insert(path.baseName);
+      }
+    };
+    for (key in newThis.dirty) {
+      for (childName in newThis.childDirs) {
+        child = context.state.dirs.get(DirRef<File>(childName));
+        values = newThis.getArray(context, key);
+        source = Source(Path::create(newThis.dirName, key), child.dirName);
+        oldKeys = oldMap[childName];
+        !child = child.updateChildForKey(context, oldKeys, source, key, values);
+        context.setDir(DirRef<File>(child.dirName), child);
+      };
+    };
+  }
+
+  private fun updateChildForKey<T: File>(
+    context: mutable Context,
+    oldKeys: mutable Set<BaseName>,
+    source: Source,
+    key: BaseName,
+    values: Array<T>,
+  ): this {
+    mapFun = context.state.funs.get(FunRef<T, Value>(this.dirName));
+    mapped = mapFun(context, key, values);
+    for (kv in mapped) {
+      (k, rvalues) = kv;
+      if (oldKeys.contains(k)) {
+        oldKeys.remove(k);
+      };
+      !this = this.writeEntry(context, source, k, rvalues);
+    };
+    // Let's remove the keys that no longer exist.
+    for (k in oldKeys) {
+      !this = this.writeEntry(context, source, k, Array[]);
+    };
+    this
+  }
+
+  fun writeEntry(
+    context: mutable Context,
+    source: Source,
+    k: BaseName,
+    rvalues: Array<Value>,
+  ): this {
+    // The object is still in fixedData
+    if (!this.data.containsKey(k)) {
+      array = this.fixedData.getArray(k);
+      !this.data = this.data.set(source, k, array);
+    };
+    irvalues = rvalues.map(x -> unsafeToFile(intern(x)));
+    (data, wasUpdated) = this.data.setWithStatus(source, k, irvalues);
+    if (wasUpdated) {
+      dirty = this.dirty.set(k);
+      !this = this with {data, dirty};
+      newThis = this;
+      updateFun = context ~> newThis.update(context);
+      context.!toUpdate = context.toUpdate.set(newThis.time, updateFun);
+    };
+    this
+  }
+
+  fun writeArray(
+    context: mutable Context,
+    key: BaseName,
+    values: Array<Value>,
+  ): void {
+    !this = context.state.dirs.get(DirRef<Value>(this.dirName));
+    source = Source(Path::create(this.dirName, key), this.dirName);
+    !this = this.writeEntry(context, source, key, values);
+    context.setDir(DirRef<Value>(this.dirName), this);
+  }
+}
+
+module end;

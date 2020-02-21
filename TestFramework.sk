@@ -1,0 +1,60 @@
+fun todo(): _ {
+  invariant_violation("TODO");
+}
+
+module SKFSTest;
+
+const FAILED: String = "FAILED";
+const FAILED_SIZE: Int = "FAILED".length();
+
+const OK: String = "OK";
+const OK_SIZE: Int = "OK".length();
+
+fun printFAILEDAfterMsg(msg: String): void {
+  for (_ in Range(msg.length(), 80 - FAILED_SIZE)) {
+    print_raw(" ");
+  };
+  print_string(FAILED);
+}
+
+fun printOKAfterMsg(msg: String): void {
+  for (_ in Range(msg.length(), 80 - OK_SIZE)) {
+    print_raw(" ");
+  };
+  print_string(OK);
+}
+
+fun expectFail(msg: String, f: () -> void): void {
+  !msg = msg.replace("\n", "\\n");
+  print_raw(msg);
+  try {
+    f();
+    printFAILEDAfterMsg(msg);
+  } catch {
+  | _ -> printOKAfterMsg(msg)
+  };
+}
+
+fun expectPass(msg: String, f: () -> void): void {
+  !msg = msg.replace("\n", "\\n");
+  print_raw(msg);
+  try {
+    f();
+    printOKAfterMsg(msg);
+  } catch {
+  | exn @ SKFS.Exception _ ->
+    printFAILEDAfterMsg(msg);
+    print_string("\t\t" + exn.toString() + "\n")
+  };
+}
+
+class NotEqExn<T>(T, T) extends Exception
+
+fun expectEq<T: Equality>(msg: String, x: T, f: () -> T): void {
+  expectPass(msg + " (expect ==)", () -> {
+    y = f();
+    if (x != y) throw NotEqExn(x, y);
+  });
+}
+
+module end;

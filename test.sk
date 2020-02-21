@@ -1,25 +1,116 @@
-module ReactDB;
+/*module SKFS;
 
 class MultipleValues(Array<String>) extends Exception
 class NotFound() extends Exception
 class PathAlreadyDefined(String) extends Exception
 
-class FileName(String, String)
+mutable class ReadContext(reads: mutable Vector<BaseName> = mutable Vector[])
 
-mutable class ReadContext(reads: mutable Vector<FileName> = mutable Vector[])
+mutable base class Context {
+  mutable fun addToRecompute(file: BaseName): void;
+  mutable fun mkdir(path: String, dir: Dir): void;
+  mutable fun addUpdateFunction(path: String, (mutable Context) ~> void): void;
+  readonly fun getFilesToRecompute(path: String): Array<String>;
+  mutable fun readAccess(source: BaseName, fileRead: BaseName): void;
+  mutable fun set(BaseName): void;
+  mutable fun update(): void;
+  mutable fun subscribe(file: BaseName): void;
 
-mutable class Context(
-  mutable dirs: SortedMap<String, Dir> = SortedMap[],
-  updates: mutable Vector<untracked (mutable this) ~> void> = mutable Vector[],
-  deps: Reactive.Table<FileName, FileName, FileName> = Reactive.Table::create(),
-) {
-  static fun create(): mutable Context {
-    mutable Context()
+  static fun run(f: (mutable ReadContext, mutable Context) -> void): void {
+    context: mutable Context = mutable ContextImpl{};
+    f(mutable ReadContext(), context)
   }
-  mutable fun set(path: String, dir: Dir): void {
+}
+
+type DepsTable = SKFSTable.Table<BaseName, BaseName, BaseName>;
+
+mutable class ContextImpl{
+  mutable dirs: SortedMap<String, Dir> = SortedMap[],
+  updates: mutable Map<String, (mutable Context) ~> void> = mutable Map[],
+  mutable deps: DepsTable = SKFSTable.Table::create(),
+  toRecompute: mutable Set<BaseName> = mutable Set[],
+  mutable toRecomputePaths: Map<String, Set<String>> = Map[],
+  subscribed: mutable Set<BaseName> = mutable Set[],
+  notifications: mutable Vector<BaseName> = mutable Vector[],
+} extends Context {
+  static fun create(): mutable Context {
+    mutable ContextImpl{}
+  }
+  mutable fun mkdir(path: String, dir: Dir): void {
     this.dirs.maybeGet(path) match {
-    | None() -> this.!dirs = this.dirs.add(path, dir)
+    | None() -> this.!dirs = this.dirs.set(path, dir)
     | Some(_) -> throw PathAlreadyDefined(path)
+    }
+  }
+
+  mutable fun addToRecompute(file: BaseName): void {
+    this.toRecompute.insert(file);
+    if (this.subscribed.contains(file)) {
+      this.notifications.push(file);
+    }
+  }
+
+  mutable fun addUpdateFunction(
+    path: String,
+    updateFunction: (mutable Context) ~> void,
+  ): void {
+    this.updates![path] = updateFunction;
+  }
+
+  mutable fun fixPointRecompute(): void {
+    keepGoing = true;
+    while (keepGoing) {
+      !keepGoing = false;
+      for (file in this.toRecompute) {
+        for (dep in this.deps[file]) {
+          if (!this.toRecompute.contains(dep)) {
+            !keepGoing = true;
+            this.addToRecompute(dep);
+          }
+        }
+      }
+    };
+  }
+
+  readonly fun getFilesToRecompute(path: String): Array<String> {
+    if (!this.toRecomputePaths.containsKey(path)) {
+      return Array[]
+    };
+    this.toRecomputePaths[path].collect(Array)
+  }
+
+  mutable fun update(): void {
+    this.fixPointRecompute();
+    paths = mutable Map[];
+    for (file in this.toRecompute) {
+      path = file.path;
+      if (!paths.containsKey(path)) {
+        paths![path] = mutable Set[];
+      };
+      paths[path].insert(file.filename);
+    };
+    this.!toRecomputePaths = freeze(paths);
+    this.toRecompute.clear();
+    for (f in this.updates) {
+      f(this);
+    };
+    for (file in this.notifications) {
+      print_string("File changed: " + file);
+    };
+    this.notifications.clear();
+  }
+
+  mutable fun subscribe(file: BaseName): void {
+    this.subscribed.insert(file);
+  }
+
+  mutable fun readAccess(source: BaseName, fileRead: BaseName): void {
+    this.!deps = this.deps.set(source, fileRead, Array[source]);
+  }
+
+  mutable fun set(file: BaseName): void {
+    for (fileName in this.deps[file]) {
+      this.addToRecompute(fileName);
     }
   }
 }
@@ -28,21 +119,11 @@ base class Dir {
   fun getFile(String): Array<String>;
 }
 
-untracked fun launch(init: untracked () ~> void): void {
-  loop {
-    invariant_violation("TODO");
-    msg = read_line();
-    debug(msg);
-    init();
-  }
-}
-
 class Table<Value: frozen & Show>{
   path: String,
-  data: Reactive.Table<String, String, Value>,
-  keys: Reactive.Table<String, String, String>,
+  data: SKFSTable.Table<String, String, Value>,
 } extends Dir {
-  untracked static fun createFromValues(
+  static fun createFromValues(
     context: mutable Context,
     path: String,
     values: Array<(String, Value)>,
@@ -57,26 +138,23 @@ class Table<Value: frozen & Show>{
     )
   }
 
-  untracked static fun createFromMultiValues(
+  static fun createFromMultiValues(
     context: mutable Context,
     path: String,
     values: Array<(String, Array<Value>)>,
   ): Table<Value> {
-    data = Reactive.Table::create();
-    keysTable = Reactive.Table::create();
-    keys = mutable Set[];
+    data = SKFSTable.Table::create();
     for (elt in values) {
       (key, value) = elt;
-      data.set(key.toString(), key, value);
-      keys.add(key)
+      this.!data = data.set(key.toString(), key, value);
+      context.addToRecompute(BaseName::create(path, key));
     };
-    keysTable.set("key", "keys", freeze(keys).collect(Array));
-    table = Table{path, data, keys => keysTable};
-    context![path] = table;
+    table = Table{path, data};
+    context.mkdir(path, table);
     table
   }
 
-  untracked fun map<Value2: frozen & Show & Orderable>(
+  fun map<Value2: frozen & Show & Orderable>(
     context: mutable Context,
     resultPath: String,
     f: (mutable ReadContext, String, Value) ~> Value2,
@@ -86,48 +164,50 @@ class Table<Value: frozen & Show>{
     });
   }
 
-  untracked fun multiMap<Value2: frozen & Show & Orderable>(
+  fun multiMap<Value2: frozen & Show & Orderable>(
     context: mutable Context,
     resultPath: String,
     f: (mutable ReadContext, String, Array<Value>) ~> Array<
       (String, Array<Value2>),
     >,
   ): Table<Value2> {
-    outData = Reactive.Table::create();
-    outKeys = Reactive.Table::create();
-    update = untracked (context) ~> {
-      mapped = this.keys["keys"].parallelMap(source ~> {
-        readContext = mutable ReadContext();
-        arr = f(readContext, source, this.data[source]);
-        keys = mutable Set[];
-        for (kv in arr) {
-          (k, v) = kv;
-          if (outData.setWithStatus(source, k, v)) {
-            keys.add(k);
-          }
-        };
-        (freeze(keys), (source, freeze(readContext.reads)))
-      });
-      keys = mutable Set[];
+    outData = SKFSTable.Table::create();
+    update = (context) ~> {
+      mapped = context
+        .getFilesToRecompute(this.path)
+        .collect(Array)
+        .map(source ~> {
+          readContext = mutable ReadContext();
+          arr = f(readContext, source, this.data[source]);
+          keys = mutable Set[];
+          for (kv in arr) {
+            (k, v) = kv;
+            if (outData.setWithStatus(source, k, v)) {
+              keys.add(k);
+            }
+          };
+          (freeze(keys), (source, freeze(readContext.reads)))
+        });
       for (elt in mapped) {
         (newKeys, (source, reads)) = elt;
         for (read in reads) {
-          reader = FileName(this.path, source);
-          context.deps.set(reader, read, Array[reader]);
+          reader = BaseName::create(this.path, source);
+          context.readAccess(reader, read);
         };
-        keys.extend(newKeys);
+        for (key in newKeys) {
+          context.addToRecompute(BaseName::create(resultPath, key))
+        }
       };
-      outKeys.set("keys", "keys", keys.collect(Array));
     };
-    context.updates.push(update);
-    newTable = Table{path => resultPath, data => outData, keys => outKeys};
-    context![resultPath] = newTable;
+    context.addUpdateFunction(this.path, update);
+    newTable = Table{path => resultPath, data => outData};
+    context.mkdir(resultPath, newTable);
     newTable
   }
 
   @debug
   fun getMulti(context: mutable ReadContext, key: String): Array<Value> {
-    context.reads.push(FileName(this.path, key));
+    context.reads.push(BaseName::create(this.path, key));
     this.data[key]
   }
 
@@ -151,16 +231,73 @@ class Table<Value: frozen & Show>{
     }
   }
 
-  untracked fun set(context: mutable Context, key: String, value: Value): void {
+  fun set(context: mutable Context, key: String, value: Value): void {
     this.data.set(key, key, Array[value]);
-    this.keys.set("keys", "keys", Array[key]);
-    for (fileName in context.deps[FileName(this.path, key)]) {
-      debug(fileName);
-    }
+    context.set(BaseName::create(this.path, key));
   }
 
   fun getFile[String: Show](key: String): Array<String> {
     this.data[key].map(x -> x.toString())
+  }
+}
+
+module end;
+*/
+
+module Data;
+
+const size: Int = 10;
+
+class Order(
+  orderID: String,
+  customerID: String,
+  orderDate: String,
+) extends SKFS.File {
+  fun toString(): String {
+    `Order(${this.orderID}, ${this.customerID}, ${this.orderDate})`
+  }
+}
+
+fun makeOrderTable(): Array<(String, Order)> {
+  result = mutable Vector[];
+  for (i in Range(0, size)) {
+    key = i.toString();
+    order = Order(key, key, "1996-09-18");
+    result.push((key, order));
+  };
+  result.toArray()
+}
+
+class Customer(
+  customerID: String,
+  customerName: String,
+  contactName: String,
+  country: String,
+) extends SKFS.File {
+  fun toString(): String {
+    `Customer(${this.customerID}, ${this.customerName}, ` +
+      `${this.contactName}, ${this.country})`
+  }
+}
+
+fun makeCustomerTable(): Array<(String, Customer)> {
+  result = mutable Vector[];
+  for (i in Range(0, size)) {
+    key = i.toString();
+    order = Customer(
+      key,
+      "Alfred" + key,
+      "Futterkiste Maria Anders",
+      "Germany",
+    );
+    result.push((key, order));
+  };
+  result.toArray()
+}
+
+class Join(x: String, y: String, date: String) extends SKFS.File {
+  fun toString(): String {
+    "(" + this.x + ", " + this.y + ", " + this.date + ")"
   }
 }
 
@@ -171,26 +308,66 @@ class User{name: String, age: Int} uses Show, Orderable {
     `User{age => ${this.age}`
   }
 }
+base class Boo
+class MyObj(String, i1: String, String) extends Boo uses Show {
+  fun toString(): String {
+    this.i1
+  }
+}
 
-untracked fun main(): void {
-  context = ReactDB.Context::create();
-  ages = Array[("user1", 25), ("user2", 32)];
-  names = Array[("user1", "Pierre"), ("user2", "Paul")];
-  usersAge = ReactDB.Table::createFromValues(context, "/tmp/usersAges/", ages);
-  usersName = ReactDB.Table::createFromValues(
-    context,
-    "/tmp/usersNames/",
-    names,
-  );
-  myUsers = usersName.map(context, "/users/", (context, userAges, name) ~> {
-    User{name, age => usersAge.get(context, userAges)}
+fun main(): void {
+  context = SKFS.run(context -> {
+    orderTable = context.mkdir("/tmp/orders/", Data.makeOrderTable());
+    customerTable = context.mkdir("/tmp/customers/", Data.makeCustomerTable());
+    join = orderTable.multiMap(
+      context,
+      "/queries/",
+      (context, orderID, orders) ~> {
+        if (orders.size() == 0) return Array[];
+        order = orders[0];
+        customers = customerTable.getArray(
+          context,
+          SKFS.BaseName::create(order.customerID),
+        );
+        if (customers.size() == 0) return Array[];
+        customer = customers[0];
+        result = Array[
+          Data.Join(order.orderID, customer.customerName, order.orderDate),
+        ];
+        Array[(orderID, result)]
+      },
+    );
+    _ = join.multiMap<Data.Join>(
+      context,
+      "/juju/",
+      (_context, orderID, joinArr) ~> {
+        Array[
+          (
+            orderID,
+            joinArr.map(join -> {
+              !join.date = "DATE" + join.date;
+              join
+            }),
+          ),
+        ]
+      },
+    );
+    debug(join.getArray(context, SKFS.BaseName::create("2")));
   });
-  for (x in context.updates) {
-    x(context)
-  };
-  usersAge.set(context, "user1", 33);
-  for (x in context.updates) {
-    x(context)
-  };
-  debug(myUsers.get(mutable ReactDB.ReadContext(), "user1"));
+  //// UPDATE
+  orders = context.state.dirs[
+    SKFS.DirRef<Data.Order>(SKFS.DirName::create("/tmp/orders/")),
+  ];
+  orders.writeArray(
+    context,
+    SKFS.BaseName::create("2"),
+    Array[Data.Order("2", "2", "1996-09-19")],
+  );
+  orders.update(context);
+
+  //  orders.writeArray(context, SKFS.BaseName::create("2"), Array[]);
+
+  context.update();
+  context.debug("/queries/2");
+  context.debug("/juju/2");
 }
