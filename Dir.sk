@@ -18,10 +18,18 @@ class DuplicateValues(path: Path) extends SKFS.Exception {
 }
 
 value class FixedRow<T: Orderable>(key: BaseName, value: T) uses Orderable
+
 value class RowMapped<T: File>(
   key: BaseName,
   reads: Vector<Path>,
   values: Array<FixedRow<T>>,
+  error: ?String,
+)
+
+value class GroupedRows<T: File>(
+  rows: Array<FixedRow<T>>,
+  maps: Array<FixedRow<Path>>,
+  errors: Table<MapError>,
 )
 
 class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
@@ -127,14 +135,44 @@ class Dir<Value: File>{
     localContext = mutable Context{state, deps => mutable Vector[]};
     key = row.key;
     values = this.fixedData.getArray(key);
-    kvArray = f(localContext, key, values);
+    (kvArray, error) = try {
+      (f(localContext, key, values), None())
+    } catch {
+    | e -> (Array[], Some(e.getMessage()))
+    };
     rows = kvArray
       .map(kv2 -> {
         (k2, v2) = kv2;
         v2.map(x -> FixedRow(k2, x))
       })
       .flatten();
-    RowMapped(key, freeze(localContext.deps), rows)
+    RowMapped(key, freeze(localContext.deps), rows, error)
+  }
+
+  fun regroupMap<Value2: File>(
+    dirName: DirName,
+    mapped: Array<RowMapped<Value2>>,
+  ): GroupedRows<Value2> {
+    rowVec = mutable Vector[];
+    mapVec = mutable Vector[];
+    errors = Table::create();
+    for (rowMapped in mapped) {
+      key = rowMapped.key;
+      rows = rowMapped.values;
+      for (row in rows) {
+        mapVec.push(FixedRow(key, Path::create(dirName, row.key)));
+        rowVec.push(row);
+      };
+      rowMapped.error match {
+      | None() -> void
+      | Some(error) ->
+        source = Source(Path::create(this.dirName, key), dirName);
+        !errors = errors.set(source, key, Array[MapError(error)])
+      }
+    };
+    rowVec.sort();
+    mapVec.sort();
+    GroupedRows(rowVec.toArray(), mapVec.toArray(), errors)
   }
 
   fun multiMap<Value2: File>(
@@ -146,22 +184,13 @@ class Dir<Value: File>{
     state = context.state;
     invariant(context.deps.isEmpty());
     mapped = this.fixedData.data.map(row ~> this.mapFixedRow(state, row, f));
-    rowVec = mutable Vector[];
-    mapVec = mutable Vector[];
-    for (rowMapped in mapped) {
-      key = rowMapped.key;
-      rows = rowMapped.values;
-      for (row in rows) {
-        mapVec.push(FixedRow(key, Path::create(dirName, row.key)));
-        rowVec.push(row);
-      };
-    };
-    rowVec.sort();
-    mapVec.sort();
-    fixedData = FixedData{dirName, data => rowVec.toArray()};
+    grouped = this.regroupMap(dirName, mapped);
+    time = context.timeStamp();
+    fixedData = FixedData{dirName, data => grouped.rows};
     fixedMap = FixedData{dirName, data => Array[]};
-    parentFixedMap = FixedData{dirName, data => mapVec.toArray()};
-    dir = Dir{time => context.timeStamp(), dirName, fixedData, fixedMap};
+    parentFixedMap = FixedData{dirName, data => grouped.maps};
+    errors = grouped.errors;
+    dir = Dir{time, dirName, fixedData, fixedMap, errors};
     parent = this with {fixedMap => parentFixedMap};
     !parent.childDirs = List.Cons(dirName, parent.childDirs);
     context.setDir(DirRef<Value>(parent.dirName), parent);
