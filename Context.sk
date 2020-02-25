@@ -1,23 +1,13 @@
 module SKFS;
 
 fun run(f: (mutable Context) -> void): mutable Context {
-  context = mutable Context{
-    initDeps => mutable Map[],
-    deps => mutable Vector[],
-  };
+  context = mutable Context{deps => mutable Vector[]};
   f(context);
-  for (dirName => deps in context.initDeps) {
-    deps.sort();
-    dirRef = DirRef<File>(dirName);
-    dir = context.state.dirs[dirRef];
-    context.setDir(dirRef, dir);
-  };
   context
 }
 
 mutable class Context{
   mutable state: State = State{},
-  initDeps: mutable Map<DirName, mutable Vector<FixedRow<Path>>>,
   deps: mutable Vector<Path>,
   mutable time: Int = 0,
   mutable toUpdate: SortedMap<Int, (mutable Context) ~> void> = SortedMap[],

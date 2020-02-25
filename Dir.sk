@@ -116,11 +116,7 @@ class Dir<Value: File>{
     state = context.state;
     invariant(context.deps.isEmpty());
     mapped = this.fixedData.data.map(row ~> {
-      localContext = mutable Context{
-        state,
-        initDeps => mutable Map[],
-        deps => mutable Vector[],
-      };
+      localContext = mutable Context{state, deps => mutable Vector[]};
       key = row.key;
       values = this.fixedData.getArray(key);
       kvArray = f(localContext, key, values);
@@ -130,24 +126,15 @@ class Dir<Value: File>{
           v2.map(x -> FixedRow(k2, x))
         })
         .flatten();
-      invariant(localContext.initDeps.isEmpty());
       (key, freeze(localContext.deps), rows)
     });
     rowVec = mutable Vector[];
     mapVec = mutable Vector[];
     for (elt in mapped) {
-      (key, deps, rows) = elt;
+      (key, _deps, rows) = elt;
       for (row in rows) {
         mapVec.push(FixedRow(key, Path::create(dirName, row.key)));
         rowVec.push(row);
-      };
-      for (readPath in deps) {
-        readDir = readPath.dirName;
-        if (!context.initDeps.containsKey(readDir)) {
-          context.initDeps![readDir] = mutable Vector[];
-        };
-        readRoot = Path::create(this.dirName, key);
-        context.initDeps[readDir].push(FixedRow(readPath.baseName, readRoot));
       };
     };
     rowVec.sort();
