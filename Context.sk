@@ -58,6 +58,10 @@ mutable class Context{
     this.!state = this.state.setDir(dirRef, dir);
   }
 
+  readonly fun getDir<T: File>(dirRef: DirRef<T>): Dir<T> {
+    this.state.getDir(dirRef);
+  }
+
   mutable fun setFun<T1: File, T2: File>(
     funRef: FunRef<T1, T2>,
     mapFun: MapFun<T1, T2>,
@@ -74,6 +78,10 @@ class State{dirs: Dirs = Dirs{}, funs: Funs = Funs{}} {
   fun setDir<T: File>(dirRef: DirRef<T>, dir: Dir<T>): this {
     !this.dirs = this.dirs.set(dirRef, dir);
     this
+  }
+
+  fun getDir<T: File>(dirRef: DirRef<T>): Dir<T> {
+    this.dirs.get(dirRef)
   }
 
   fun setFun<T1: File, T2: File>(

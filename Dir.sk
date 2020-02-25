@@ -93,6 +93,7 @@ class Dir<Value: File>{
   errors: Table<MapError> = Table::create(),
   map: SortedMap<BaseName, Array<Path>> = SortedMap[],
   childDirs: List<DirName> = List[],
+  readers: SortedMap<BaseName, Source> = SortedMap[],
   dirty: SortedSet<BaseName> = SortedSet[],
 } {
   fun getDirName(): DirName {
@@ -175,6 +176,26 @@ class Dir<Value: File>{
     GroupedRows(rowVec.toArray(), mapVec.toArray(), errors)
   }
 
+  fun updateReadDeps<Value2>(
+    context: mutable Context,
+    dirName: DirName,
+    mapped: Array<RowMapped<Value2>>,
+  ): void {
+    dirs = mutable Map[];
+    for (row in mapped) {
+      for (path in row.reads) {
+        if (!dirs.containsKey(path.dirName)) {
+          dirs![path.dirName] = context.getDir(DirRef<Value>(path.dirName));
+        };
+        dir = dirs[path.dirName];
+        sourcePath = Path::create(this.dirName, row.key);
+        source = Source(sourcePath, dirName);
+        !dir.readers[path.baseName] = source;
+        dirs![path.dirName] = dir;
+      }
+    };
+  }
+
   fun multiMap<Value2: File>(
     context: mutable Context,
     dirNameStr: String,
@@ -185,6 +206,7 @@ class Dir<Value: File>{
     invariant(context.reads.isEmpty());
     mapped = this.fixedData.data.map(row ~> this.mapFixedRow(state, row, f));
     grouped = this.regroupMap(dirName, mapped);
+    this.updateReadDeps(context, dirName, mapped);
     time = context.timeStamp();
     fixedData = FixedData{dirName, data => grouped.rows};
     fixedMap = FixedData{dirName, data => Array[]};
