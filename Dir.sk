@@ -132,7 +132,7 @@ class Dir<Value: File>{
     row: FixedRow<Value>,
     f: MapFun<Value, Value2>,
   ): RowMapped<Value2> {
-    localContext = mutable Context{state, deps => mutable Vector[]};
+    localContext = mutable Context{state, reads => mutable Vector[]};
     key = row.key;
     values = this.fixedData.getArray(key);
     (kvArray, error) = try {
@@ -146,7 +146,7 @@ class Dir<Value: File>{
         v2.map(x -> FixedRow(k2, x))
       })
       .flatten();
-    RowMapped(key, freeze(localContext.deps), rows, error)
+    RowMapped(key, freeze(localContext.reads), rows, error)
   }
 
   fun regroupMap<Value2: File>(
@@ -182,7 +182,7 @@ class Dir<Value: File>{
   ): Dir<Value2> {
     dirName = DirName::create(dirNameStr);
     state = context.state;
-    invariant(context.deps.isEmpty());
+    invariant(context.reads.isEmpty());
     mapped = this.fixedData.data.map(row ~> this.mapFixedRow(state, row, f));
     grouped = this.regroupMap(dirName, mapped);
     time = context.timeStamp();
@@ -202,22 +202,42 @@ class Dir<Value: File>{
   }
 
   fun update(context: mutable Context): void {
-    newThis = context.state.dirs.get(DirRef<Value>(this.dirName));
-    context.!toUpdate = context.toUpdate.remove(newThis.time);
+    invariant(context.toUpdate.containsKey(this.time));
+
+    // Remove ourselves from the list of directories to process.
+    context.!toUpdate = context.toUpdate.remove(this.time);
+
+    // We have been removed from the set of directories.
+    // This can happen when an old dependency changed.
+    // Because of the change, the directory gets added
+    // to the list of directories to update. But in the mean time
+    // the source no longer creates this directory.
+    if (!context.state.dirs.state.containsKey(this.dirName)) {
+      return void;
+    };
+
+    // We need to get the most up to date version of ourselves.
+    // So "this" might be outdated ...
+    !this = context.state.dirs.get(DirRef<Value>(this.dirName));
+
+    // The oldMap contains a map of the keys that were produced
+    // the last time around. This is going to be useful to determine
+    // which keys need to be removed.
     oldMap = mutable Map[];
-    for (key in newThis.dirty) {
-      for (path in newThis.getMap(key)) {
+    for (key in this.dirty) {
+      for (path in this.getMap(key)) {
         if (!oldMap.containsKey(path.dirName)) {
           oldMap![path.dirName] = mutable Set[];
         };
         oldMap[path.dirName].insert(path.baseName);
       }
     };
-    for (key in newThis.dirty) {
-      for (childName in newThis.childDirs) {
+
+    for (key in this.dirty) {
+      for (childName in this.childDirs) {
         child = context.state.dirs.get(DirRef<File>(childName));
-        values = newThis.getArray(context, key);
-        source = Source(Path::create(newThis.dirName, key), child.dirName);
+        values = this.getArray(context, key);
+        source = Source(Path::create(this.dirName, key), child.dirName);
         oldKeys = oldMap[childName];
         !child = child.updateChildForKey(context, oldKeys, source, key, values);
         context.setDir(DirRef<File>(child.dirName), child);
