@@ -18,6 +18,11 @@ class DuplicateValues(path: Path) extends SKFS.Exception {
 }
 
 value class FixedRow<T: Orderable>(key: BaseName, value: T) uses Orderable
+value class RowMapped<T: File>(
+  key: BaseName,
+  reads: Vector<Path>,
+  values: Array<FixedRow<T>>,
+)
 
 class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
   fun getPos(key: BaseName, i: Int, j: Int): Int {
@@ -65,12 +70,19 @@ class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
   }
 }
 
+class MapError(msg: String) extends File {
+  fun toString(): String {
+    "Error: " + this.msg
+  }
+}
+
 class Dir<Value: File>{
   time: Int,
   dirName: DirName,
   fixedData: FixedData<Value>,
   fixedMap: FixedData<Path>,
   data: Table<File> = Table::create(),
+  errors: Table<MapError> = Table::create(),
   map: SortedMap<BaseName, Array<Path>> = SortedMap[],
   childDirs: List<DirName> = List[],
   dirty: SortedSet<BaseName> = SortedSet[],
@@ -107,6 +119,24 @@ class Dir<Value: File>{
     }
   }
 
+  fun mapFixedRow<Value2: File>(
+    state: State,
+    row: FixedRow<Value>,
+    f: MapFun<Value, Value2>,
+  ): RowMapped<Value2> {
+    localContext = mutable Context{state, deps => mutable Vector[]};
+    key = row.key;
+    values = this.fixedData.getArray(key);
+    kvArray = f(localContext, key, values);
+    rows = kvArray
+      .map(kv2 -> {
+        (k2, v2) = kv2;
+        v2.map(x -> FixedRow(k2, x))
+      })
+      .flatten();
+    RowMapped(key, freeze(localContext.deps), rows)
+  }
+
   fun multiMap<Value2: File>(
     context: mutable Context,
     dirNameStr: String,
@@ -115,23 +145,12 @@ class Dir<Value: File>{
     dirName = DirName::create(dirNameStr);
     state = context.state;
     invariant(context.deps.isEmpty());
-    mapped = this.fixedData.data.map(row ~> {
-      localContext = mutable Context{state, deps => mutable Vector[]};
-      key = row.key;
-      values = this.fixedData.getArray(key);
-      kvArray = f(localContext, key, values);
-      rows = kvArray
-        .map(kv2 -> {
-          (k2, v2) = kv2;
-          v2.map(x -> FixedRow(k2, x))
-        })
-        .flatten();
-      (key, freeze(localContext.deps), rows)
-    });
+    mapped = this.fixedData.data.map(row ~> this.mapFixedRow(state, row, f));
     rowVec = mutable Vector[];
     mapVec = mutable Vector[];
-    for (elt in mapped) {
-      (key, _deps, rows) = elt;
+    for (rowMapped in mapped) {
+      key = rowMapped.key;
+      rows = rowMapped.values;
       for (row in rows) {
         mapVec.push(FixedRow(key, Path::create(dirName, row.key)));
         rowVec.push(row);
