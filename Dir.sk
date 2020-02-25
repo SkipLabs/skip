@@ -90,6 +90,7 @@ class Dir<Value: File>{
   fixedData: FixedData<Value>,
   fixedMap: FixedData<Path>,
   data: Table<File> = Table::create(),
+  keys: SortedSet<BaseName>,
   errors: Table<MapError> = Table::create(),
   map: SortedMap<BaseName, Array<Path>> = SortedMap[],
   childDirs: List<DirName> = List[],
@@ -212,7 +213,8 @@ class Dir<Value: File>{
     fixedMap = FixedData{dirName, data => Array[]};
     parentFixedMap = FixedData{dirName, data => grouped.maps};
     errors = grouped.errors;
-    dir = Dir{time, dirName, fixedData, fixedMap, errors};
+    keys = fixedData.data.map(row ~> row.key).collect(SortedSet);
+    dir = Dir{time, dirName, fixedData, fixedMap, keys, errors};
     parent = this with {fixedMap => parentFixedMap};
     !parent.childDirs = List.Cons(dirName, parent.childDirs);
     context.setDir(DirRef<Value>(parent.dirName), parent);
@@ -302,6 +304,9 @@ class Dir<Value: File>{
       !this.data = this.data.set(source, k, array);
     };
     irvalues = rvalues.map(x -> unsafeToFile(intern(x)));
+    if (!this.data.containsKey(k)) {
+      !this.keys = this.keys.set(k);
+    };
     (data, wasUpdated) = this.data.setWithStatus(source, k, irvalues);
     if (wasUpdated) {
       dirty = this.dirty.set(k);
