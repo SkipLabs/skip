@@ -17,7 +17,10 @@ class DuplicateValues(path: Path) extends SKFS.Exception {
   }
 }
 
-value class FixedRow<T: Orderable>(key: BaseName, value: T) uses Orderable
+value class FixedRow<T: Hashable & Orderable>(
+  key: BaseName,
+  value: T,
+) uses Hashable, Orderable
 
 value class RowMapped<T: File>(
   key: BaseName,
@@ -93,6 +96,7 @@ class Dir<Value: File>{
   errors: Table<MapError> = Table::create(),
   map: SortedMap<BaseName, Array<Path>> = SortedMap[],
   childDirs: List<DirName> = List[],
+  fixedReaders: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
   readers: SortedMap<BaseName, Source> = SortedMap[],
   dirty: SortedSet<BaseName> = SortedSet[],
 } {
@@ -179,24 +183,30 @@ class Dir<Value: File>{
     GroupedRows(rowVec.toArray(), mapVec.toArray(), errors)
   }
 
-  fun updateReadDeps<Value2>(
+  fun updateFixedReaders<Value2>(
     context: mutable Context,
     dirName: DirName,
     mapped: Array<RowMapped<Value2>>,
   ): void {
-    dirs = mutable Map[];
+    readDirs = mutable Map[];
     for (row in mapped) {
-      for (path in row.reads) {
-        if (!dirs.containsKey(path.dirName)) {
-          dirs![path.dirName] = context.getDir(DirRef<Value>(path.dirName));
+      for (read in row.reads) {
+        if (!readDirs.containsKey(read.dirName)) {
+          readDirs![read.dirName] = mutable Vector[];
         };
-        dir = dirs[path.dirName];
-        sourcePath = Path::create(this.dirName, row.key);
-        source = Source(sourcePath, dirName);
-        !dir.readers[path.baseName] = source;
-        dirs![path.dirName] = dir;
+        readDirs[read.dirName].push(FixedRow(read.baseName, row.key));
       }
     };
+    for (readDirName => reads in readDirs) {
+      reads.sort();
+      uniqReads = reads.unique();
+      readDir = context.state.dirs.get(DirRef<File>(readDirName));
+      !readDir.fixedReaders[dirName] = FixedData{
+        dirName,
+        data => uniqReads.toArray(),
+      };
+      context.setDir(DirRef<File>(readDirName), readDir);
+    }
   }
 
   fun multiMap<Value2: File>(
@@ -207,13 +217,10 @@ class Dir<Value: File>{
     dirName = DirName::create(dirNameStr);
     state = context.state;
     invariant(context.reads.isEmpty());
-    fixedMapped = this.fixedData.data.filter(row ->
-      !this.data.containsKey(row.key)
-    ).map(row ~> this.mapRow(state, row.key, f));
-    diffMapped = this.data.keys().map(key -> this.mapRow(state, key, f));
-    mapped = fixedMapped.concat(diffMapped.collect(Array));
+    invariant(this.data.isEmpty());
+    mapped = this.fixedData.data.map(row ~> this.mapRow(state, row.key, f));
     grouped = this.regroupMap(dirName, mapped);
-    this.updateReadDeps(context, dirName, mapped);
+    this.updateFixedReaders(context, dirName, mapped);
     time = context.timeStamp();
     fixedData = FixedData{dirName, data => grouped.rows};
     fixedMap = FixedData{dirName, data => Array[]};
