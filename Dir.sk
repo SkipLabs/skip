@@ -90,7 +90,6 @@ class Dir<Value: File>{
   fixedData: FixedData<Value>,
   fixedMap: FixedData<Path>,
   data: Table<File> = Table::create(),
-  keys: SortedSet<BaseName>,
   errors: Table<MapError> = Table::create(),
   map: SortedMap<BaseName, Array<Path>> = SortedMap[],
   childDirs: List<DirName> = List[],
@@ -118,10 +117,7 @@ class Dir<Value: File>{
     }
   }
 
-  fun getArray(context: mutable Context, key: BaseName): Array<Value> {
-    !this = this.getThis(context);
-    path = Path::create(this.dirName, key);
-    context.addDep(path);
+  private fun getArrayRaw(key: BaseName): Array<Value> {
     if (this.data.containsKey(key)) {
       this.data[key].map(x -> unsafeFromFile(x));
     } else {
@@ -129,14 +125,20 @@ class Dir<Value: File>{
     }
   }
 
-  fun mapFixedRow<Value2: File>(
+  fun getArray(context: mutable Context, key: BaseName): Array<Value> {
+    !this = this.getThis(context);
+    path = Path::create(this.dirName, key);
+    context.addDep(path);
+    this.getArrayRaw(key)
+  }
+
+  fun mapRow<Value2: File>(
     state: State,
-    row: FixedRow<Value>,
+    key: BaseName,
     f: MapFun<Value, Value2>,
   ): RowMapped<Value2> {
     localContext = mutable Context{state, reads => mutable Vector[]};
-    key = row.key;
-    values = this.fixedData.getArray(key);
+    values = this.getArrayRaw(key);
     (kvArray, error) = try {
       (f(localContext, key, values), None())
     } catch {
@@ -205,7 +207,11 @@ class Dir<Value: File>{
     dirName = DirName::create(dirNameStr);
     state = context.state;
     invariant(context.reads.isEmpty());
-    mapped = this.fixedData.data.map(row ~> this.mapFixedRow(state, row, f));
+    fixedMapped = this.fixedData.data.filter(row ->
+      !this.data.containsKey(row.key)
+    ).map(row ~> this.mapRow(state, row.key, f));
+    diffMapped = this.data.keys().map(key -> this.mapRow(state, key, f));
+    mapped = fixedMapped.concat(diffMapped.collect(Array));
     grouped = this.regroupMap(dirName, mapped);
     this.updateReadDeps(context, dirName, mapped);
     time = context.timeStamp();
@@ -213,8 +219,7 @@ class Dir<Value: File>{
     fixedMap = FixedData{dirName, data => Array[]};
     parentFixedMap = FixedData{dirName, data => grouped.maps};
     errors = grouped.errors;
-    keys = fixedData.data.map(row ~> row.key).collect(SortedSet);
-    dir = Dir{time, dirName, fixedData, fixedMap, keys, errors};
+    dir = Dir{time, dirName, fixedData, fixedMap, errors};
     parent = this with {fixedMap => parentFixedMap};
     !parent.childDirs = List.Cons(dirName, parent.childDirs);
     context.setDir(DirRef<Value>(parent.dirName), parent);
@@ -304,9 +309,6 @@ class Dir<Value: File>{
       !this.data = this.data.set(source, k, array);
     };
     irvalues = rvalues.map(x -> unsafeToFile(intern(x)));
-    if (!this.data.containsKey(k)) {
-      !this.keys = this.keys.set(k);
-    };
     (data, wasUpdated) = this.data.setWithStatus(source, k, irvalues);
     if (wasUpdated) {
       dirty = this.dirty.set(k);

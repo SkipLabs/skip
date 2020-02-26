@@ -10,13 +10,13 @@ private native fun unsafeFromFile<T>(File): T;
 private native fun unsafeToFile<T>(T): File;
 
 private class RefCountedTable<T: File>(
-  cache: SortedMap<FileName, Map<T, Int>>,
+  cache: SortedMap<BaseName, Map<T, Int>>,
 ) {
   fun create(): this {
     static(SortedMap[])
   }
 
-  fun add(key: FileName, values: Array<T>): this {
+  fun add(key: BaseName, values: Array<T>): this {
     newMap = this.cache.maybeGet(key) match {
     | None() ->
       newMap = mutable Map[];
@@ -41,7 +41,7 @@ private class RefCountedTable<T: File>(
     this
   }
 
-  fun remove(key: FileName, values: Array<T>): this {
+  fun remove(key: BaseName, values: Array<T>): this {
     newMap = this.cache.maybeGet(key) match {
     | None() -> invariant_violation("Cannot remove a nonexistent entry")
     | Some(map) ->
@@ -63,11 +63,11 @@ private class RefCountedTable<T: File>(
     this
   }
 
-  fun containsKey(key: FileName): Bool {
+  fun containsKey(key: BaseName): Bool {
     this.cache.containsKey(key)
   }
 
-  fun get(key: FileName): Array<T> {
+  fun get(key: BaseName): Array<T> {
     result = mutable Vector[];
     this.cache.maybeGet(key).each(map ->
       map.each((key, refCount) -> {
@@ -79,6 +79,10 @@ private class RefCountedTable<T: File>(
     );
     result.sort();
     result.toArray()
+  }
+
+  fun keys(): mutable Iterator<BaseName> {
+    this.cache.keys()
   }
 }
 
@@ -160,7 +164,7 @@ class Table<Value: File> private {
 
   fun setWithStatus(
     source: Source,
-    key: FileName,
+    key: BaseName,
     values: Array<Value>,
   ): (this, Bool) {
     !values = values.map(x -> intern(x));
@@ -193,17 +197,21 @@ class Table<Value: File> private {
     }
   }
 
-  fun set(source: Source, key: FileName, values: Array<Value>): this {
+  fun set(source: Source, key: BaseName, values: Array<Value>): this {
     (!this, _) = this.setWithStatus(source, key, values);
     this
   }
 
-  fun get(key: FileName): Array<Value> {
+  fun get(key: BaseName): Array<Value> {
     this.refCountedTable.get(key)
   }
 
-  fun containsKey(key: FileName): Bool {
+  fun containsKey(key: BaseName): Bool {
     this.refCountedTable.containsKey(key);
+  }
+
+  fun keys(): mutable Iterator<BaseName> {
+    this.refCountedTable.keys()
   }
 }
 
@@ -221,7 +229,7 @@ class SBox(value: String) extends SKFS.File {
 
 fun testTable(
   rtable: SKFS.Table<SBox>,
-  map: readonly Map<(SKFS.Source, SKFS.FileName), Array<SBox>>,
+  map: readonly Map<(SKFS.Source, SKFS.BaseName), Array<SBox>>,
   keyRange: Int,
 ): void {
   for (keyNbr in Range(0, keyRange)) {
@@ -262,7 +270,7 @@ fun test(): void {
   try {
     r = Random::mcreate(23);
     rtable = SKFS.Table::create();
-    map = mutable Map<(SKFS.Source, SKFS.FileName), Array<SBox>>[];
+    map = mutable Map<(SKFS.Source, SKFS.BaseName), Array<SBox>>[];
     for (_ in Range(0, iterations)) {
       root = SKFS.DirName::create("/");
       source = SKFS.Source(

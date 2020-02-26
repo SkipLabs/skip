@@ -48,8 +48,7 @@ mutable class Context{
     vector.sort();
     fixedData = FixedData{dirName, data => vector.toArray()};
     fixedMap = FixedData{dirName, data => Array[]};
-    keys = fixedData.data.map(row ~> row.key).collect(SortedSet);
-    dir = Dir{time => this.timeStamp(), dirName, fixedData, fixedMap, keys};
+    dir = Dir{time => this.timeStamp(), dirName, fixedData, fixedMap};
     dirRef: DirRef<Value> = DirRef(dirName);
     this.!state = this.state.setDir(dirRef, dir);
     dir
