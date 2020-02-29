@@ -1,5 +1,20 @@
 module SKFS;
 
+@cpp_extern("SKIP_unsafe")
+private native fun unsafeFromFile<T>(File): T;
+
+@cpp_extern("SKIP_unsafe")
+private native fun unsafeToFile<T>(T): File;
+
+value class Source(
+  origKey: Path,
+  targetDir: DirName,
+) uses Hashable, Orderable, Show {
+  fun toString(): String {
+    "Source(" + this.origKey + ", " + this.targetDir + ")"
+  }
+}
+
 base class File uses Hashable, Orderable, Show {}
 
 type MapFun<Value, Value2> = (mutable Context, BaseName, Array<Value>) ~> Array<
@@ -317,7 +332,7 @@ class Dir<Value: File>{
       array = this.fixedData.getArray(k);
       !this.data = this.data.set(k, array);
     };
-    irvalues = rvalues.map(x -> unsafeToFile(intern(x)));
+    irvalues = rvalues.map(x -> unsafeToFile(x));
     data = this.data.set(k, irvalues);
     dirty = this.dirty.set(k);
     !this = this with {data, dirty};
