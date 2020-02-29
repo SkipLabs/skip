@@ -32,7 +32,7 @@ value class RowMapped<T: File>(
 value class GroupedRows<T: File>(
   rows: Array<FixedRow<T>>,
   old: Array<FixedRow<BaseName>>,
-  errors: Table<MapError>,
+  errors: SortedMap<BaseName, Array<MapError>>,
 )
 
 class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
@@ -92,8 +92,8 @@ class Dir<Value: File>{
   dirName: DirName,
   fixedData: FixedData<Value>,
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
-  data: Table<File> = Table::create(),
-  errors: Table<MapError> = Table::create(),
+  data: SortedMap<BaseName, Array<File>> = SortedMap[],
+  errors: SortedMap<BaseName, Array<MapError>> = SortedMap[],
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
   childDirs: List<DirName> = List[],
   fixedReaders: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
@@ -158,12 +158,11 @@ class Dir<Value: File>{
   }
 
   fun regroupMap<Value2: File>(
-    dirName: DirName,
     mapped: Array<RowMapped<Value2>>,
   ): GroupedRows<Value2> {
     rowVec = mutable Vector[];
     oldVec = mutable Vector[];
-    errors = Table::create();
+    errors = SortedMap[];
     for (rowMapped in mapped) {
       key = rowMapped.key;
       rows = rowMapped.values;
@@ -173,9 +172,7 @@ class Dir<Value: File>{
       };
       rowMapped.error match {
       | None() -> void
-      | Some(error) ->
-        source = Source(Path::create(this.dirName, key), dirName);
-        !errors = errors.set(source, key, Array[MapError(error)])
+      | Some(error) -> !errors = errors.set(key, Array[MapError(error)])
       }
     };
     rowVec.sort();
@@ -219,7 +216,7 @@ class Dir<Value: File>{
     invariant(context.reads.isEmpty());
     invariant(this.data.isEmpty());
     mapped = this.fixedData.data.map(row ~> this.mapRow(state, row.key, f));
-    grouped = this.regroupMap(dirName, mapped);
+    grouped = this.regroupMap(mapped);
     this.updateFixedReaders(context, dirName, mapped);
     time = context.timeStamp();
     fixedData = FixedData{dirName, data => grouped.rows};
@@ -311,24 +308,22 @@ class Dir<Value: File>{
 
   fun writeEntry(
     context: mutable Context,
-    source: Source,
+    _source: Source,
     k: BaseName,
     rvalues: Array<Value>,
   ): this {
     // The object is still in fixedData
     if (!this.data.containsKey(k)) {
       array = this.fixedData.getArray(k);
-      !this.data = this.data.set(source, k, array);
+      !this.data = this.data.set(k, array);
     };
     irvalues = rvalues.map(x -> unsafeToFile(intern(x)));
-    (data, wasUpdated) = this.data.setWithStatus(source, k, irvalues);
-    if (wasUpdated) {
-      dirty = this.dirty.set(k);
-      !this = this with {data, dirty};
-      newThis = this;
-      updateFun = context ~> newThis.update(context);
-      context.!toUpdate = context.toUpdate.set(newThis.time, updateFun);
-    };
+    data = this.data.set(k, irvalues);
+    dirty = this.dirty.set(k);
+    !this = this with {data, dirty};
+    newThis = this;
+    updateFun = context ~> newThis.update(context);
+    context.!toUpdate = context.toUpdate.set(newThis.time, updateFun);
     this
   }
 
