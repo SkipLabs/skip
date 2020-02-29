@@ -93,40 +93,32 @@ fun main(): void {
     );
     _ = join.multiMap<Data.Join>(
       context,
-      "/juju/",
+      "/daniel/",
       (_context, orderID, joinArr) ~> {
         Array[
           (
             orderID,
             joinArr.map(join -> {
-              !join.date = "DATE" + join.date;
+              !join.date = "DANIEL " + join.date;
               join
             }),
           ),
         ]
       },
     );
-    debug(join.getArray(context, SKFS.BaseName::create("2")));
   });
-  //// UPDATE
+  ///////////////////////////////// UPDATE
   orders = context.state.dirs[
     SKFS.DirRef<Data.Order>(SKFS.DirName::create("/tmp/orders/")),
   ];
-  orders.write(context, "2", Data.Order("2", "2", "1996-09-19"));
-  orders.update(context);
+  context.debug("/tmp/orders/2");
+  context.debug("/queries/2");
+  context.debug("/daniel/2");
 
-  //  orders.writeArray(context, SKFS.BaseName::create("2"), Array[]);
-
+  orders.write(context, "2", Data.Order("2", "2", "UNE NOUVELLE DATE"));
   context.update();
 
-  orders.remove(context, "2");
-
-  context.update();
-
-  orders.write(context, "11", Data.Order("11", "8", "1999"));
-  orders.write(context, "11", Data.Order("11", "8", "1998"));
-  context.update();
-
-  context.debug("/queries/11");
-  context.debug("/juju/11");
+  context.debug("/tmp/orders/2");
+  context.debug("/queries/2");
+  context.debug("/daniel/2");
 }
