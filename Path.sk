@@ -14,11 +14,7 @@ const root: DirName = DirName::create("/");
 
 base class FileName extends File
 
-class Path private (dirName: DirName, baseName: BaseName) extends FileName {
-  static fun create(dirName: DirName, baseName: BaseName): this {
-    Path(dirName, baseName)
-  }
-
+class Path(dirName: DirName, baseName: BaseName) extends FileName {
   static fun fromString(path: String): this {
     chars = path.chars();
     i = chars.size() - 1;
@@ -46,7 +42,7 @@ class Path private (dirName: DirName, baseName: BaseName) extends FileName {
     };
     dirName = DirName::create(String::fromChars(dirNameChars.toArray()));
     baseName = BaseName::create(String::fromChars(baseNameChars.toArray()));
-    Path::create(dirName, baseName)
+    Path(dirName, baseName)
   }
 
   fun toString(): String {
