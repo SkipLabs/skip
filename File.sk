@@ -1,0 +1,71 @@
+module SKFS;
+
+base class File uses Hashable, Orderable, Show {
+  overridable fun toString(): String {
+    strings = mutable Vector[];
+    print = x -> strings.push(x);
+    writer = mutable Debug.BufferedWriter(print);
+    inspect(this).print(writer);
+    writer.write("\n");
+    writer.flush();
+    "".join(strings)
+  }
+
+  overridable fun rules(): Array<Rule> {
+    Array[]
+  }
+
+  fun canSee(vc: mutable ViewerContext): Bool {
+    if (vc.isSuperUser) {
+      return true;
+    };
+    for (rule in this.rules()) {
+      if (!rule.canSee(vc)) {
+        return false;
+      }
+    };
+    true
+  }
+}
+
+class User{
+  id: BaseName,
+  firstName: String,
+  lastName: String,
+  age: Int,
+  groupIDs: Array<SKFS.BaseName>,
+} extends SKFS.File
+
+class Group{id: BaseName, name: String, description: String} extends SKFS.File {
+  fun rules(): Array<Rule> {
+    Array[AllowIf((vc) ~> vc.isMemberOfGroup(this.id)), AlwaysDeny()]
+  }
+}
+class GroupPost{groupID: BaseName, data: String} extends SKFS.File
+
+mutable class ViewerContext{
+  context: mutable Context,
+  isSuperUser: Bool = false,
+  groupMembers: Dir<BaseName>,
+} {
+  readonly fun isMemberOfGroup(_gid: BaseName): Bool {
+    if (this.isSuperUser) return true;
+    false
+  }
+}
+
+base class Rule {
+  children =
+  | AllowIf((mutable ViewerContext) ~> Bool)
+  | DenyIf((mutable ViewerContext) ~> Bool)
+  | AlwaysAllow()
+  | AlwaysDeny()
+
+  fun canSee(vc: mutable ViewerContext): Bool
+  | AllowIf(f) -> f(vc)
+  | DenyIf(f) -> !f(vc)
+  | AlwaysAllow() -> true
+  | AlwaysDeny() -> false
+}
+
+module end;

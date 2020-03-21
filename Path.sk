@@ -40,8 +40,11 @@ class Path(dirName: DirName, baseName: BaseName) extends FileName {
         baseNameChars.push(chars[j])
       }
     };
+    if (baseNameChars.size() == 0) {
+      error(path, "Invalid path, missing BaseName");
+    };
     dirName = DirName::create(String::fromChars(dirNameChars.toArray()));
-    baseName = BaseName::create(String::fromChars(baseNameChars.toArray()));
+    baseName = SID::create(String::fromChars(baseNameChars.toArray()));
     Path(dirName, baseName)
   }
 
@@ -66,22 +69,29 @@ class DirName private (dirName: String) extends FileName {
   }
 }
 
-class BaseName private (baseName: String) extends FileName {
-  static fun create(baseName: String): BaseName {
-    static::validateBaseName(baseName);
-    static(baseName)
-  }
+base class BaseName extends FileName
 
+class IID(value: Int) extends BaseName {
+  fun toString(): String {
+    this.value.toString()
+  }
+}
+class SID private (value: String) extends BaseName {
   static private fun validateBaseName(baseName: String): void {
     validator = mutable SKFSImpl.NameValidator(baseName, baseName.chars(), 0);
-    validator.mustBeBaseName();
+    validator.mustBeBaseName{mustStartWithLetter => true};
     if (!validator.reachedEnd()) {
       validator.error("Unexpected characters after file name");
     }
   }
 
+  static fun create(value: String): BaseName {
+    static::validateBaseName(value);
+    SID(value)
+  }
+
   fun toString(): String {
-    this.baseName
+    this.value
   }
 }
 
@@ -134,7 +144,7 @@ mutable class NameValidator(
     };
     while (this.idx < this.chars.size() - 1) {
       this.mustBeSlash();
-      this.mustBeBaseName();
+      this.mustBeBaseName{};
     };
     this.mustBeSlash();
     if (!this.reachedEnd()) {
@@ -154,9 +164,17 @@ mutable class NameValidator(
     }
   }
 
-  mutable fun mustBeBaseName(): void {
+  mutable fun mustBeBaseName{mustStartWithLetter: Bool = false}: void {
     if (this.reachedEnd() || this.current() == '/') {
       this.error("Empty baseName");
+    };
+    if (mustStartWithLetter) {
+      c = this.current();
+      if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+        this.next();
+      } else {
+        this.error("Name must start with [a-zA-Z]");
+      };
     };
     while (!this.reachedEnd()) {
       c = this.current();
@@ -194,8 +212,8 @@ fun testDirName(): void {
 }
 
 fun testBaseName(): void {
-  fileFail = (path) -> expectFail(path, () -> _ = SKFS.BaseName::create(path));
-  filePass = (path) -> expectPass(path, () -> _ = SKFS.BaseName::create(path));
+  fileFail = (path) -> expectFail(path, () -> _ = SKFS.SID::create(path));
+  filePass = (path) -> expectPass(path, () -> _ = SKFS.SID::create(path));
   fileFail("");
   fileFail(" ");
   filePass("aa");

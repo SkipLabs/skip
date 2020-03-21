@@ -1,55 +1,57 @@
+/*
 module Data;
 
-const size: Int = 100000;
 
-class Order(
+const size: Int = 3;
+
+class Order{
   orderID: String,
   customerID: String,
   orderDate: String,
-) extends SKFS.File {
+} extends SKFS.File {
   fun toString(): String {
     `Order(${this.orderID}, ${this.customerID}, ${this.orderDate})`
   }
 }
 
-fun makeOrderTable(): Array<(String, Order)> {
+fun makeOrderTable(): Array<(String, Array<Order>)> {
   result = mutable Vector[];
   for (i in Range(0, size)) {
     key = i.toString();
-    order = Order(key, key, "1996-09-18");
-    result.push((key, order));
+    order = Order("order" + key, "customer" + key, "1996-09-18");
+    result.push(("order" + key, Array[order]));
   };
   result.toArray()
 }
 
-class Customer(
+class Customer{
   customerID: String,
   customerName: String,
   contactName: String,
   country: String,
-) extends SKFS.File {
+} extends SKFS.File {
   fun toString(): String {
     `Customer(${this.customerID}, ${this.customerName}, ` +
       `${this.contactName}, ${this.country})`
   }
 }
 
-fun makeCustomerTable(): Array<(String, Customer)> {
+fun makeCustomerTable(): Array<(String, Array<Customer>)> {
   result = mutable Vector[];
   for (i in Range(0, size)) {
-    key = i.toString();
-    order = Customer(
+    key = "customer" + i.toString();
+    order = Customer{
       key,
       "Alfred" + key,
       "Futterkiste Maria Anders",
       "Germany",
-    );
-    result.push((key, order));
+    };
+    result.push((key, Array[order]));
   };
   result.toArray()
 }
 
-class Join(x: String, y: String, date: String) extends SKFS.File {
+class Join{x: String, y: String, date: String} extends SKFS.File {
   fun toString(): String {
     "(" + this.x + ", " + this.y + ", " + this.date + ")"
   }
@@ -69,7 +71,7 @@ class MyObj(String, i1: String, String) extends Boo uses Show {
   }
 }
 
-fun main(): void {
+fun testDB(): void {
   context = SKFS.run(context -> {
     orderTable = context.mkdir("/tmp/orders/", Data.makeOrderTable());
     customerTable = context.mkdir("/tmp/customers/", Data.makeCustomerTable());
@@ -79,9 +81,12 @@ fun main(): void {
       (context, orderID, orders) ~> {
         if (orders.size() == 0) return Array[];
         order = orders[0];
+        customerID = if (order.orderDate == "9") "customer0" else {
+          order.customerID
+        };
         customers = customerTable.getArray(
           context,
-          SKFS.BaseName::create(order.customerID),
+          SKFS.BaseName::create(customerID),
         );
         if (customers.size() == 0) return Array[];
         customer = customers[0];
@@ -111,14 +116,331 @@ fun main(): void {
   orders = context.state.dirs[
     SKFS.DirRef<Data.Order>(SKFS.DirName::create("/tmp/orders/")),
   ];
-  context.debug("/tmp/orders/2");
-  context.debug("/queries/2");
-  context.debug("/daniel/2");
+  context.debug("/tmp/orders/order2");
+  context.debug("/tmp/customers/customer2");
+  context.debug("/queries/order2");
+  context.debug("/daniel/order2");
 
-  orders.write(context, "2", Data.Order("2", "2", "UNE NOUVELLE DATE"));
+  queries = context.state.dirs[
+    SKFS.DirRef<Data.Order>(SKFS.DirName::create("/queries/")),
+  ];
+
+  debug(queries.fixedData);
+
+  orders.write(context, "order2", Data.Order("order2", "customer2", "9"));
   context.update();
 
-  context.debug("/tmp/orders/2");
-  context.debug("/queries/2");
-  context.debug("/daniel/2");
+  context.debug("/tmp/orders/order2");
+  context.debug("/queries/order2");
+  context.debug("/daniel/order2");
+}
+
+class IntFile{value: Int} extends SKFS.File {
+  fun toString(): String {
+    this.value.toString()
+  }
+}
+
+fun makeDirName(n: Int): String {
+  "/random" + n + "/"
+}
+
+fun genDir{
+  context: mutable SKFS.Context,
+  origRandom: mutable Random,
+  dirs: SortedMap<String, SKFS.Dir<IntFile>>,
+  dirName: String,
+  maxNbrDirDep: Int,
+  maxReadPerDir: Int,
+  size: Int,
+}: SKFS.Dir<IntFile> {
+  invariant(dirs.size() > 0);
+  dirNameStr = makeDirName(origRandom.random(0, dirs.size()));
+  origin = dirs[dirNameStr];
+  seed = origRandom.next();
+  resultDirName = dirName;
+  origin.multiMap(context, resultDirName, (context, key, values) ~> {
+    random = Random::mcreate(seed);
+    dirDeps = mutable Vector[];
+    nbrDirDeps = random.random(0, maxNbrDirDep);
+    for (_ in Range(0, nbrDirDeps)) {
+      dirIdx = random.random(0, dirs.size());
+      dirDeps.push(dirs[makeDirName(dirIdx)]);
+    };
+    readKeys = mutable Set[key];
+    readValues = mutable Vector[(key, values)];
+    for (i in Range(0, nbrDirDeps)) {
+      dir = dirDeps[i];
+      nbrRead = random.random(0, maxReadPerDir);
+      for (_ in Range(0, nbrRead)) {
+        readKey = random.random(0, dir.fixedData.data.size());
+        fileName = SKFS.BaseName::create(readKey.toString());
+        if (readKeys.contains(fileName)) continue;
+        readKeys.add(fileName);
+        readValues.push((fileName, dir.getArray(context, fileName)));
+      };
+    };
+    readValues.toArray()
+  })
+}
+
+fun genInput{
+  context: mutable SKFS.Context,
+  random: mutable Random,
+  inputName: String,
+  size: Int,
+  valueMaxSize: Int,
+  valueRange: Int,
+}: SKFS.Dir<IntFile> {
+  result = mutable Vector[];
+  for (i in Range(0, size)) {
+    key = i.toString();
+    values = mutable Vector[];
+    valueSize = random.random(1, valueMaxSize - 1);
+    for (_ in Range(0, valueSize)) {
+      values.push(IntFile(random.random(0, valueRange)));
+    };
+    result.push((key, values.toArray()));
+  };
+  dirValues = result.toArray();
+  dir = context.mkdir(inputName, dirValues);
+  dir
+}
+
+fun testGen(): void {
+  dirs = SortedMap[];
+  inputDirSize = 10;
+  mappedDirSize = 10;
+  nbrInputDirs = 5;
+  nbrMappedDirs = 10;
+  valueMaxSize = 3;
+  valueRange = 9;
+  maxNbrDirDep = 10;
+  maxReadPerDir = 10;
+  random = Random::mcreate(23);
+
+  context = SKFS.run(context -> {
+    for (i in Range(0, nbrInputDirs)) {
+      dirName = makeDirName(i);
+      inputDir = genInput{
+        context,
+        random,
+        inputName => dirName,
+        size => inputDirSize,
+        valueMaxSize,
+        valueRange,
+      };
+      !dirs = dirs.add(dirName, inputDir);
+    };
+
+    for (i in Range(nbrInputDirs, nbrInputDirs + nbrMappedDirs)) {
+      dirName = makeDirName(i);
+      dir = genDir{
+        context,
+        origRandom => random,
+        dirs,
+        dirName,
+        maxNbrDirDep,
+        maxReadPerDir,
+        size => mappedDirSize,
+      };
+      !dirs = dirs.add(dirName, dir);
+    }
+  });
+  savedDirs = mutable Map[];
+  for (i in Range(0, nbrInputDirs + nbrMappedDirs)) {
+    dirName = makeDirName(i);
+    dir = context.getDir(SKFS.DirRef<IntFile>(SKFS.DirName::create(dirName)));
+    saveState = mutable Map<String, Array<IntFile>>[];
+    for (key in Range(0, inputDirSize)) {
+      keyStr = key.toString();
+      baseName = SKFS.BaseName::create(keyStr);
+      arr = dir.getArray(context, baseName);
+      saveState![keyStr] = arr;
+    };
+    savedDirs![dirName] = saveState;
+  };
+  for (i in Range(0, nbrInputDirs)) {
+    dirName = makeDirName(i);
+    dir = context.getDir(SKFS.DirRef<IntFile>(SKFS.DirName::create(dirName)));
+    for (key in Range(0, inputDirSize)) {
+      keyStr = key.toString();
+      print_string("************************************************");
+      dir.writeArray(context, keyStr, Array[]);
+      context.update();
+      print_string("************************************************");
+      dir.writeArray(context, keyStr, savedDirs[dirName][keyStr]);
+      context.update();
+    };
+  };
+  for (i in Range(nbrInputDirs, nbrInputDirs + nbrMappedDirs)) {
+    dirName = makeDirName(i);
+    dir = context.getDir(SKFS.DirRef<IntFile>(SKFS.DirName::create(dirName)));
+    for (key in Range(0, inputDirSize)) {
+      keyStr = key.toString();
+      baseName = SKFS.BaseName::create(keyStr);
+      arr = dir.getArray(context, baseName);
+      if (savedDirs[dirName][keyStr] != arr) {
+        print_string("Error: should be equal in " + dirName + keyStr);
+        print_string(`Saved value was: ${savedDirs[dirName][keyStr]}`);
+        print_string(`But computed values was: ${arr}`);
+        exit(2);
+      }
+    };
+  }
+}
+
+fun testUpdate(): void {
+  context = SKFS.run(context -> {
+    nat = context.mkdir(
+      "/nat/",
+      Array[("0", Array[IntFile(0)]), ("1", Array[IntFile(1)])],
+    );
+    nat2 = context.mkdir(
+      "/nat2/",
+      Array[("0", Array[IntFile(0)]), ("1", Array[IntFile(1)])],
+    );
+    _mapped = nat.multiMap(context, "/natMap/", (context, key, file) ~> {
+      file2 = nat2.getArray(context, key);
+      debug(file[0]);
+      if (file2[0] == IntFile(22)) {
+        Array[
+          (key, Array[IntFile(file[0].value + file2[0].value)]),
+          (SKFS.BaseName::create("22"), Array[IntFile(22)]),
+        ]
+      } else {
+        Array[(key, Array[IntFile(file[0].value + file2[0].value)])]
+      }
+    });
+  });
+  _nat = context.state.dirs[
+    SKFS.DirRef<IntFile>(SKFS.DirName::create("/nat/")),
+  ];
+  nat2 = context.state.dirs[
+    SKFS.DirRef<IntFile>(SKFS.DirName::create("/nat2/")),
+  ];
+  context.debug("/natMap/0");
+  nat2.writeArray(context, "0", Array[IntFile(22), IntFile(23)]);
+  context.update();
+  nat = context.state.dirs[SKFS.DirRef<IntFile>(SKFS.DirName::create("/nat/"))];
+  debug((nat.fixedOld, nat.old, nat.compact().fixedOld));
+  context.debug("/natMap/0");
+}
+
+*/
+
+module TestServer;
+
+class NoValue{} extends SKFS.File
+
+class BoolFile{data: String} extends SKFS.File
+const trueFile: BoolFile = BoolFile{data => "true"};
+const falseFile: BoolFile = BoolFile{data => "false"};
+
+class IDFile{} extends SKFS.File
+
+class IntFile(value: Int) extends SKFS.File uses SKFS.HasKey {
+  fun getKey(): SKFS.BaseName {
+    SKFS.SID::create("K" + this.value)
+  }
+}
+
+class CalendarEvent{
+  userID: SKFS.BaseName,
+  start: Int,
+  end: Int,
+  description: String,
+} extends SKFS.File
+
+fun testAfterModification(): void {
+  (context, (_dir1, dir2)) = SKFS.start(context -> {
+    dir1 = context.mkdirMulti(
+      "/tmp/",
+      Array[("I1", Array[IntFile(1)]), ("I3", Array[IntFile(23)])],
+    );
+    dir2 = context.mkdirMulti(
+      "/tmp2/",
+      Array[("I1", Array[IntFile(1)]), ("I3", Array[IntFile(23), IntFile(23)])],
+    );
+    _dirs = dir2.partition(context, "/partition/");
+    (dir1, dir2)
+  });
+  context.debug("/partition/I3/K23");
+  dir2.writeArray(context, "I5", Array[IntFile(33), IntFile(33)]);
+  dir2.writeArray(context, "I4", Array[IntFile(25)]);
+  context.update();
+}
+
+fun testUsers(): void {
+  (context, (groupRequest, groupBlocked)) = SKFS.start(context -> {
+    beSport = SKFS.Group{
+      id => SKFS.SID::create("GID_1"),
+      name => "BeSport!",
+      description => "For people who like sport!",
+    };
+    user1 = SKFS.User{
+      id => SKFS.SID::create("UID_1"),
+      firstName => "Julien",
+      lastName => "Verlaguet",
+      age => 38,
+      groupIDs => Array[beSport.id],
+    };
+    user2 = SKFS.User{
+      id => SKFS.SID::create("UID_2"),
+      firstName => "Daniel",
+      lastName => "Lopes",
+      age => 42,
+      groupIDs => Array[beSport.id],
+    };
+    _users = context.mkdirMulti(
+      "/users/",
+      Array[
+        (user1.id.toString(), Array[user1]),
+        (user2.id.toString(), Array[user2]),
+      ],
+    );
+    _groups = context.mkdirMulti(
+      "/groups/",
+      Array[(beSport.id.toString(), Array[beSport])],
+    );
+    groupRequests = context.mkdirMulti<SKFS.User>(
+      "/groups/" + beSport.id + "/requests/",
+    );
+    groupBlocked = context.mkdirMulti<SKFS.User>(
+      "/groups/" + beSport.id + "/blocked/",
+    );
+    _groupMembers = groupRequests.multiMap(
+      context,
+      "/groups/" + beSport.id + "/members/",
+      (context, uid, values) ~> {
+        arr = groupBlocked.getArray(context, uid);
+        if (arr.size() > 0) {
+          return Array[];
+        };
+        Array[(uid, values)]
+      },
+    );
+    (groupRequests, groupBlocked)
+  });
+  context.debug("/users/1_UID");
+  user = SKFS.User{
+    id => SKFS.SID::create("UID_2"),
+    firstName => "Daniel",
+    lastName => "Lopes",
+    age => 42,
+    groupIDs => Array[],
+  };
+  groupRequest.writeArray(context, user.id.toString(), Array[user]);
+  groupBlocked.writeArray(context, user.id.toString(), Array[user]);
+  context.update();
+  context.debug("/groups/1_GID/members/2_UID");
+  groupBlocked.writeArray(context, user.id.toString(), Array[]);
+  context.update();
+  context.debug("/groups/1_GID/members/2_UID")
+}
+
+module end;
+
+fun main(): void {
+  TestServer.testAfterModification();
 }

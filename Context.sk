@@ -1,9 +1,16 @@
 module SKFS;
 
-fun run(f: (mutable Context) -> void): mutable Context {
+class DirAlreadyExists(dirName: DirName) extends Exception {
+  fun toString(): String {
+    `Directory ${this.dirName} already exists`
+  }
+}
+
+fun start<T>(f: (mutable Context) -> T): (mutable Context, T) {
   context = mutable Context{reads => mutable Vector[]};
-  f(context);
-  context
+  result = f(context);
+  context.updateFixedDeps();
+  (context, result)
 }
 
 mutable class Context{
@@ -11,16 +18,76 @@ mutable class Context{
   reads: mutable Vector<Path>,
   mutable time: Int = 0,
   mutable toUpdate: SortedMap<Int, (mutable Context) ~> void> = SortedMap[],
+  mutable deps: List<Vector<(Path, DirName, DirName, BaseName)>> = List[],
+  mutable fixedDeps: Map<Path, Set<(DirName, DirName, BaseName)>> = Map[],
+  mutable newDeps: SortedMap<
+    Path,
+    SortedSet<(DirName, DirName, BaseName)>,
+  > = SortedMap[],
+  debugMode: Bool = true,
 } {
+  readonly fun getDeps(path: Path): Set<(DirName, DirName, BaseName)> {
+    set = if (!this.fixedDeps.containsKey(path)) {
+      Set[]
+    } else {
+      this.fixedDeps[path]
+    };
+    this.newDeps.maybeGet(path) match {
+    | None() -> set
+    | Some(newDeps) ->
+      mset = Set::mcreateFromItems(set);
+      for (dep in newDeps) {
+        mset.insert(dep);
+      };
+      freeze(mset)
+    }
+  }
+
   mutable fun debug(pathStr: String): void {
     path = Path::fromString(pathStr);
     dirRef = DirRef<File>(path.dirName);
     dir = this.state.dirs[dirRef];
-    values = dir.getArray(this, path.baseName);
+    values = dir.getArrayRaw(path.baseName);
     debug(values)
   }
 
+  mutable fun updateFixedDeps(): void {
+    fixedDeps = mutable Map[];
+    invariant(this.fixedDeps.isEmpty());
+    for (depVector in this.deps) {
+      for (read in depVector) {
+        (path, sourceDir, targetDir, baseName) = read;
+        if (!fixedDeps.containsKey(path)) {
+          fixedDeps![path] = mutable Set[];
+        };
+        fixedDeps[path].add((sourceDir, targetDir, baseName));
+      }
+    };
+    this.!deps = List[];
+    this.!fixedDeps = freeze(fixedDeps);
+  }
+
+  mutable fun updateNewDeps(): void {
+    for (depVector in this.deps) {
+      for (read in depVector) {
+        (path, sourceDir, targetDir, baseName) = read;
+        reader = (sourceDir, targetDir, baseName);
+        if (this.fixedDeps.containsKey(path)) {
+          if (this.fixedDeps[path].contains(reader)) {
+            continue;
+          };
+        };
+        if (!this.newDeps.containsKey(path)) {
+          !this.newDeps[path] = SortedSet[];
+        };
+        !this.newDeps[path] = this.newDeps[path].add(reader);
+      }
+    };
+    this.!deps = List[];
+  }
+
   mutable fun update(): void {
+    this.updateNewDeps();
     loop {
       this.toUpdate.minimum() match {
       | None() -> return void
@@ -36,14 +103,31 @@ mutable class Context{
 
   mutable fun mkdir<Value: File>(
     dirNameStr: String,
-    content: Array<(String, Value)>,
+    content: Array<(String, Value)> = Array[],
+  ): Dir<Value> {
+    this.mkdirMulti(
+      dirNameStr,
+      content.map(kv -> {
+        (key, value) = kv;
+        (key, Array[value])
+      }),
+    )
+  }
+
+  mutable fun mkdirMulti<Value: File>(
+    dirNameStr: String,
+    content: Array<(String, Array<Value>)> = Array[],
   ): Dir<Value> {
     dirName = DirName::create(dirNameStr);
+    if (this.state.dirs.state.containsKey(dirName)) {
+      throw DirAlreadyExists(dirName);
+    };
     vector = mutable Vector[];
     for (kv in content) {
-      (key, value) = kv;
-      baseName = BaseName::create(key);
-      vector.push(FixedRow(baseName, value));
+      (key, values) = kv;
+      baseName = SID::create(key);
+      path = Path(dirName, baseName);
+      vector.push(FixedRow(baseName, (path, values)));
     };
     vector.sort();
     fixedData = FixedData{dirName, data => vector.toArray()};
@@ -58,7 +142,11 @@ mutable class Context{
   }
 
   readonly fun getDir<T: File>(dirRef: DirRef<T>): Dir<T> {
-    this.state.getDir(dirRef);
+    this.state.getDir(freeze(dirRef));
+  }
+
+  readonly fun maybeGetDir<T: File>(dirRef: DirRef<T>): ?Dir<T> {
+    this.state.maybeGetDir(freeze(dirRef));
   }
 
   mutable fun setFun<T1: File, T2: File>(
@@ -83,6 +171,10 @@ class State{dirs: Dirs = Dirs{}, funs: Funs = Funs{}} {
     this.dirs.get(dirRef)
   }
 
+  fun maybeGetDir<T: File>(dirRef: DirRef<T>): ?Dir<T> {
+    this.dirs.maybeGet(dirRef)
+  }
+
   fun setFun<T1: File, T2: File>(
     funRef: FunRef<T1, T2>,
     mapFun: MapFun<T1, T2>,
@@ -92,7 +184,7 @@ class State{dirs: Dirs = Dirs{}, funs: Funs = Funs{}} {
   }
 }
 
-value class DirRef<T>(dirName: DirName)
+class DirRef<Value: File>(dirName: DirName)
 
 class Dirs{state: SortedMap<DirName, File> = SortedMap[]} {
   fun set<T: File>(key: DirRef<T>, value: Dir<T>): this {
@@ -101,6 +193,9 @@ class Dirs{state: SortedMap<DirName, File> = SortedMap[]} {
   }
   fun get<T: File>(key: DirRef<T>): Dir<T> {
     unsafeFromFile(this.state.get(key.dirName));
+  }
+  fun maybeGet<T: File>(key: DirRef<T>): ?Dir<T> {
+    this.state.maybeGet(key.dirName).map(unsafeFromFile)
   }
 }
 
