@@ -7,15 +7,44 @@ class DirAlreadyExists(dirName: DirName) extends Exception {
 }
 
 fun start<T>(f: (mutable Context) -> T): (mutable Context, T) {
-  context = mutable Context{reads => mutable Vector[]};
+  context = mutable Context{};
   result = f(context);
   context.updateFixedDeps();
   (context, result)
 }
 
+mutable class Handle<Value>{
+  mutable state: State = State{},
+  reads: mutable Vector<Path> = mutable Vector[],
+  private writes: mutable Map<BaseName, Array<Value>> = mutable Map[],
+} {
+  readonly fun getDir<T: File>(dirRef: DirRef<T>): Dir<T> {
+    this.state.getDir(freeze(dirRef));
+  }
+
+  mutable fun writeArray(key: BaseName, values: Array<Value>): void {
+    this.writes![key] = values;
+  }
+
+  fun getModifs(): (Array<(BaseName, Array<Value>)>, Vector<Path>) {
+    result = mutable Vector[];
+    for (key => values in this.writes) {
+      result.push((key, values));
+    };
+    (result.toArray(), this.reads)
+  }
+
+  mutable fun remove(key: BaseName): void {
+    this.writes![key] = Array[];
+  }
+
+  mutable fun addDep(path: Path): void {
+    this.reads.push(path)
+  }
+}
+
 mutable class Context{
   mutable state: State = State{},
-  reads: mutable Vector<Path>,
   mutable time: Int = 0,
   mutable toUpdate: SortedMap<Int, (mutable Context) ~> void> = SortedMap[],
   mutable deps: List<Vector<(Path, DirName, DirName, BaseName)>> = List[],
@@ -154,10 +183,6 @@ mutable class Context{
     mapFun: MapFun<T1, T2>,
   ): void {
     this.!state = this.state.setFun(funRef, mapFun);
-  }
-
-  mutable fun addDep(path: Path): void {
-    this.reads.push(path)
   }
 }
 
