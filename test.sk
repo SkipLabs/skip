@@ -422,7 +422,7 @@ fun testUsers(): void {
     );
     (groupRequests, groupBlocked)
   });
-  context.debug("/users/1_UID");
+  context.debug("/users/UID_1");
   user = SKFS.User{
     id => SKFS.SID::create("UID_2"),
     firstName => "Daniel",
@@ -433,14 +433,10 @@ fun testUsers(): void {
   groupRequest.writeArray(context, user.id.toString(), Array[user]);
   groupBlocked.writeArray(context, user.id.toString(), Array[user]);
   context.update();
-  context.debug("/groups/1_GID/members/2_UID");
-  groupBlocked.writeArray(context, user.id.toString(), Array[]);
-  context.update();
-  context.debug("/groups/1_GID/members/2_UID")
 }
 
 module end;
 
 fun main(): void {
-  TestServer.testAfterModification();
+  TestServer.testUsers();
 }

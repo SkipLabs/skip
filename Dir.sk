@@ -6,6 +6,9 @@ private native fun unsafeFromFile<T>(File): T;
 @cpp_extern("SKIP_unsafe")
 private native fun unsafeToFile<T>(T): File;
 
+@cpp_extern("SKIP_unsafe")
+private native fun unsafe<T1, T2>(T1): T2;
+
 value class Source(
   origKey: Path,
   targetDir: DirName,
@@ -15,11 +18,7 @@ value class Source(
   }
 }
 
-type MapFun<Value, Value2> = (
-  mutable Handle<Value2>,
-  BaseName,
-  Array<Value>,
-) ~> void;
+type MapFun = (mutable Handle, BaseName, Array<File>) ~> void;
 
 class FileNotFound(path: Path) extends SKFS.Exception {
   fun toString(): String {
@@ -247,18 +246,18 @@ class Dir<Value: File>{
     }
   }
 
-  fun getArray<T>(handle: mutable Handle<T>, key: BaseName): Array<Value> {
+  fun getArray(handle: mutable Handle, key: BaseName): Array<Value> {
     !this = this.getThis(handle.state);
     path = Path(this.dirName, key);
     handle.addDep(path);
     this.getArrayRaw(key)
   }
 
-  fun mapRow<Value2: File>(
+  fun mapRow(
     key: BaseName,
     values: Array<Value>,
-    f: MapFun<Value, Value2>,
-  ): RowMapped<(Path, Array<Value2>)> {
+    f: MapFun,
+  ): RowMapped<(Path, Array<File>)> {
     handle = mutable Handle{};
     error = try {
       f(handle, key, values);
@@ -328,8 +327,8 @@ class Dir<Value: File>{
 
   fun mapData<Value2: File>(
     context: mutable Context,
-    f: MapFun<Value, Value2>,
-  ): Vector<RowMapped<(SKFS.Path, Array<Value2>)>> {
+    f: MapFun,
+  ): Vector<RowMapped<(SKFS.Path, Array<File>)>> {
     !this = this.getThis(context.state);
     current = 0;
     mapped = mutable Vector[];
@@ -370,7 +369,7 @@ class Dir<Value: File>{
   fun multiMap<Value2: File>(
     context: mutable Context,
     dirNameStr: String,
-    f: MapFun<Value, Value2>,
+    f: MapFun,
     extraDirs: Array<Dir<Value>> = Array[],
   ): Dir<Value2> {
     dirName = DirName::create(dirNameStr);
@@ -387,8 +386,8 @@ class Dir<Value: File>{
     fixedData = FixedData{dirName, data => grouped.rows};
     errors = grouped.errors;
     dir = Dir{time, dirName, fixedData, errors};
-    context.setDir(DirRef<Value2>(dirName), dir);
-    context.setFun(FunRef<File, Value2>(dirName), (context, key, values) ~>
+    context.setDir(DirRef<File>(dirName), dir);
+    context.setFun(dirName, (context, key, values) ~>
       f(context, key, values.map(unsafeFromFile))
     );
     for (parent in dirs) {
@@ -396,7 +395,7 @@ class Dir<Value: File>{
       !parent.childDirs = List.Cons(dirName, parent.childDirs);
       context.setDir(DirRef<Value>(parent.dirName), parent);
     };
-    dir
+    unsafe(dir)
   }
 
   fun update(context: mutable Context): void {
@@ -588,7 +587,7 @@ class Dir<Value: File>{
     key: BaseName,
     values: Array<T>,
   ): (this, Array<BaseName>) {
-    mapFun = context.state.funs.get(FunRef<T, Value>(this.dirName));
+    mapFun = context.state.funs.get(this.dirName);
     handle = mutable Handle{};
     mapFun(handle, key, values);
     (mapped, reads) = freeze(handle).getModifs();
@@ -611,7 +610,7 @@ class Dir<Value: File>{
       if (oldKeys.contains(k)) {
         oldKeys.remove(k);
       };
-      !this = this.writeEntry(context, source, k, rvalues);
+      !this = this.writeEntry(context, source, k, rvalues.map(unsafeFromFile));
     };
 
     // Let's remove the keys that no longer exist.
