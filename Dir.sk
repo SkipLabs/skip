@@ -15,9 +15,11 @@ value class Source(
   }
 }
 
-type MapFun<Value, Value2> = (mutable Context, BaseName, Array<Value>) ~> Array<
-  (BaseName, Array<Value2>),
->;
+type MapFun<Value, Value2> = (
+  mutable Handle<Value2>,
+  BaseName,
+  Array<Value>,
+) ~> void;
 
 class FileNotFound(path: Path) extends SKFS.Exception {
   fun toString(): String {
@@ -203,9 +205,9 @@ class Dir<Value: File>{
     this.dirName
   }
 
-  fun getThis(context: mutable Context): this {
-    !this = if (context.state.dirs.state.containsKey(this.dirName)) {
-      context.state.dirs[DirRef<Value>(this.dirName)];
+  fun getThis(state: State): this {
+    !this = if (state.dirs.state.containsKey(this.dirName)) {
+      state.dirs[DirRef<Value>(this.dirName)];
     } else {
       this
     };
@@ -245,31 +247,32 @@ class Dir<Value: File>{
     }
   }
 
-  fun getArray(context: mutable Context, key: BaseName): Array<Value> {
-    !this = this.getThis(context);
+  fun getArray<T>(handle: mutable Handle<T>, key: BaseName): Array<Value> {
+    !this = this.getThis(handle.state);
     path = Path(this.dirName, key);
-    context.addDep(path);
+    handle.addDep(path);
     this.getArrayRaw(key)
   }
 
   fun mapRow<Value2: File>(
-    state: State,
     key: BaseName,
     values: Array<Value>,
     f: MapFun<Value, Value2>,
   ): RowMapped<(Path, Array<Value2>)> {
-    localContext = mutable Context{state, reads => mutable Vector[]};
-    (kvArray, error) = try {
-      (f(localContext, key, values), None())
+    handle = mutable Handle{};
+    error = try {
+      f(handle, key, values);
+      None()
     } catch {
-    | e -> (Array[], Some(e.getMessage()))
+    | e -> Some(e.getMessage())
     };
+    (kvArray, reads) = freeze(handle).getModifs();
     rows = kvArray.map(kv2 -> {
       (k2, v2) = kv2;
       path = Path(this.dirName, key);
       FixedRow(k2, (path, v2))
     });
-    RowMapped(key, freeze(localContext.reads), rows, error)
+    RowMapped(key, reads, rows, error)
   }
 
   fun regroupMap<Value2>(
@@ -327,8 +330,7 @@ class Dir<Value: File>{
     context: mutable Context,
     f: MapFun<Value, Value2>,
   ): Vector<RowMapped<(SKFS.Path, Array<Value2>)>> {
-    !this = this.getThis(context);
-    state = context.state;
+    !this = this.getThis(context.state);
     current = 0;
     mapped = mutable Vector[];
     addFixed = (fixedRow: FixedRow<(SKFS.Path, Array<Value>)>) -> {
@@ -342,7 +344,7 @@ class Dir<Value: File>{
         !current = current + 1;
       };
       fixedValues = valueAcc.map(x -> x.i1).flatten().toArray();
-      mapped.push(this.mapRow(state, key, fixedValues, f));
+      mapped.push(this.mapRow(key, fixedValues, f));
     };
     for (key => _ in this.data) {
       while (
@@ -357,7 +359,7 @@ class Dir<Value: File>{
       ) {
         !current = current + 1;
       };
-      mapped.push(this.mapRow(state, key, this.getArrayRaw(key), f));
+      mapped.push(this.mapRow(key, this.getArrayRaw(key), f));
     };
     while (current < this.fixedData.data.size()) {
       addFixed(this.fixedData.data[current]);
@@ -372,7 +374,6 @@ class Dir<Value: File>{
     extraDirs: Array<Dir<Value>> = Array[],
   ): Dir<Value2> {
     dirName = DirName::create(dirNameStr);
-    invariant(context.reads.isEmpty());
     dirs = mutable Vector[this];
     mappedAcc = mutable Vector[this.mapData(context, f)];
     extraDirs.each(dir -> {
@@ -481,14 +482,6 @@ class Dir<Value: File>{
           key,
           values,
         );
-        for (read in context.reads) {
-          readSet = context.newDeps.maybeGet(read) match {
-          | None() -> SortedSet[]
-          | Some(x) -> x
-          };
-          !readSet = readSet.set((this.dirName, childName, key));
-          context.!newDeps[read] = readSet;
-        };
         // We need to remember what keys we produced for the next
         // time around.
         oldKeysMap = this.old.maybeGet(source.targetDir) match {
@@ -510,7 +503,7 @@ class Dir<Value: File>{
     name: String,
     dirs: Array<Dir<Value>>,
   ): Dir<Value> {
-    this.multiMap(context, name, (_, id, file) ~> Array[(id, file)], dirs)
+    this.multiMap(context, name, (h, x, y) ~> h.writeArray(x, y), dirs)
   }
 
   fun partition[Value: HasKey](
@@ -521,7 +514,7 @@ class Dir<Value: File>{
     | Some(partition) -> return partition.dirs
     | _ -> void
     };
-    !this = this.getThis(context);
+    !this = this.getThis(context.state);
     current = 0;
     dirs = SortedMap[];
     getFixedValues = (fixedRow: FixedRow<(SKFS.Path, Array<Value>)>) -> {
@@ -596,7 +589,19 @@ class Dir<Value: File>{
     values: Array<T>,
   ): (this, Array<BaseName>) {
     mapFun = context.state.funs.get(FunRef<T, Value>(this.dirName));
-    mapped = mapFun(context, key, values);
+    handle = mutable Handle{};
+    mapFun(handle, key, values);
+    (mapped, reads) = freeze(handle).getModifs();
+
+    for (read in reads) {
+      readSet = context.newDeps.maybeGet(read) match {
+      | None() -> SortedSet[]
+      | Some(x) -> x
+      };
+      !readSet = readSet.set((source.dirName, this.dirName, key));
+      context.!newDeps[read] = readSet;
+    };
+
     keys = mutable Vector[];
 
     for (kv in mapped) {

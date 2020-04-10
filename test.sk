@@ -412,12 +412,12 @@ fun testUsers(): void {
     _groupMembers = groupRequests.multiMap(
       context,
       "/groups/" + beSport.id + "/members/",
-      (context, uid, values) ~> {
-        arr = groupBlocked.getArray(context, uid);
+      (handle, uid, values) ~> {
+        arr = groupBlocked.getArray(handle, uid);
         if (arr.size() > 0) {
-          return Array[];
+          return void;
         };
-        Array[(uid, values)]
+        handle.writeArray(uid, values);
       },
     );
     (groupRequests, groupBlocked)
