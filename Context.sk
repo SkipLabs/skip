@@ -13,20 +13,24 @@ fun start<T>(f: (mutable Context) -> T): (mutable Context, T) {
   (context, result)
 }
 
-mutable class Handle<Value>{
+mutable class Handle{
   mutable state: State = State{},
   reads: mutable Vector<Path> = mutable Vector[],
-  private writes: mutable Map<BaseName, Array<Value>> = mutable Map[],
+  private writes: mutable Map<BaseName, Array<File>> = mutable Map[],
 } {
   readonly fun getDir<T: File>(dirRef: DirRef<T>): Dir<T> {
     this.state.getDir(freeze(dirRef));
   }
 
-  mutable fun writeArray(key: BaseName, values: Array<Value>): void {
+  mutable fun writeArray(key: BaseName, values: Array<File>): void {
     this.writes![key] = values;
   }
 
-  fun getModifs(): (Array<(BaseName, Array<Value>)>, Vector<Path>) {
+  mutable fun write(key: BaseName, value: File): void {
+    this.writes![key] = Array[value];
+  }
+
+  fun getModifs(): (Array<(BaseName, Array<File>)>, Vector<Path>) {
     result = mutable Vector[];
     for (key => values in this.writes) {
       result.push((key, values));
@@ -178,10 +182,7 @@ mutable class Context{
     this.state.maybeGetDir(freeze(dirRef));
   }
 
-  mutable fun setFun<T1: File, T2: File>(
-    funRef: FunRef<T1, T2>,
-    mapFun: MapFun<T1, T2>,
-  ): void {
+  mutable fun setFun(funRef: DirName, mapFun: MapFun): void {
     this.!state = this.state.setFun(funRef, mapFun);
   }
 }
@@ -200,10 +201,7 @@ class State{dirs: Dirs = Dirs{}, funs: Funs = Funs{}} {
     this.dirs.maybeGet(dirRef)
   }
 
-  fun setFun<T1: File, T2: File>(
-    funRef: FunRef<T1, T2>,
-    mapFun: MapFun<T1, T2>,
-  ): this {
+  fun setFun(funRef: DirName, mapFun: MapFun): this {
     !this.funs = this.funs.set(funRef, mapFun);
     this
   }
@@ -224,18 +222,13 @@ class Dirs{state: SortedMap<DirName, File> = SortedMap[]} {
   }
 }
 
-value class FunRef<T1, T2>(dirName: DirName)
-
 class Funs{state: SortedMap<DirName, File> = SortedMap[]} {
-  fun set<T1: File, T2: File>(
-    key: FunRef<T1, T2>,
-    value: MapFun<T1, T2>,
-  ): this {
-    !this.state = this.state.add(key.dirName, unsafeToFile(value));
+  fun set<T1: File, T2: File>(key: DirName, value: MapFun): this {
+    !this.state = this.state.add(key, unsafeToFile(value));
     this
   }
-  fun get<T1: File, T2: File>(key: FunRef<T1, T2>): MapFun<T1, T2> {
-    unsafeFromFile(this.state.get(key.dirName));
+  fun get(key: DirName): MapFun {
+    unsafeFromFile(this.state.get(key));
   }
 }
 
