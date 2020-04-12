@@ -1,30 +1,116 @@
 module SKFS;
 
-base class File uses Hashable, Orderable, Show {
-  overridable fun toString(): String {
-    strings = mutable Vector[];
-    print = x -> strings.push(x);
-    writer = mutable Debug.BufferedWriter(print);
-    inspect(this).print(writer);
-    writer.write("\n");
-    writer.flush();
-    "".join(strings)
-  }
-
-  overridable fun rules(): Array<Rule> {
-    Array[]
-  }
-
-  fun canSee(vc: mutable ViewerContext): Bool {
-    if (vc.isSuperUser) {
-      return true;
+extension base class .Inspect {
+  fun simplePrint(o: String -> void): void
+  | .InspectSpecial(v) -> o("'" + v + "'")
+  | .InspectString(v) -> o("\"" + v + "\"")
+  | .InspectLiteral(v) -> o(v)
+  | .InspectVector(name, values) ->
+    o(name + "[");
+    if (values.size() == 0) {
+      o("]");
+      return void;
     };
-    for (rule in this.rules()) {
-      if (!rule.canSee(vc)) {
-        return false;
-      }
+    for (i in Range(0, values.size() - 1)) {
+      elt = values[i];
+      elt.simplePrint(o);
+      o(",");
     };
-    true
+    values[values.size() - 1].simplePrint(o);
+    o("]")
+  | .InspectMap(name, values) ->
+    o(name + "[");
+    if (values.size() == 0) {
+      o("]");
+      return void;
+    };
+    for (i in Range(0, values.size() - 1)) {
+      (elt, value) = values[i];
+      elt.simplePrint(o);
+      o("=>");
+      value.simplePrint(o);
+      o(",");
+    };
+    (elt, value) = values[values.size() - 1];
+    elt.simplePrint(o);
+    o("=>");
+    value.simplePrint(o);
+    o(",");
+    o("]")
+  | .InspectCall(name, values) ->
+    o(name + "(");
+    if (values.size() == 0) {
+      o(")");
+      return void;
+    };
+    for (i in Range(0, values.size() - 1)) {
+      elt = values[i];
+      elt.simplePrint(o);
+      o(",");
+    };
+    values[values.size() - 1].simplePrint(o);
+    o(")")
+  | .InspectObject(name, values) ->
+    o(name + "{");
+    if (values.size() == 0) {
+      o("}");
+      return void;
+    };
+    for (i in Range(0, values.size() - 1)) {
+      (key, value) = values[i];
+      o(key);
+      o("=>");
+      value.simplePrint(o);
+      o(",");
+    };
+    (key, value) = values[values.size() - 1];
+    o(key);
+    o("=>");
+    value.simplePrint(o);
+    o(",");
+    o("}")
+
+  fun toString(): String {
+    buffer = mutable Vector[];
+    o = (x) -> buffer.push(x);
+    this.simplePrint(o);
+    "".join(buffer);
+  }
+}
+
+class ErrorTrace(origDir: String, key: String, msg: String)
+class ErrorFile(trace: List<ErrorTrace>) extends File, Exception {
+  fun toString(): String {
+    result = mutable Vector[];
+    for (elt in this.trace) {
+      result.push(`${elt.origDir}${elt.key}: ${elt.msg}\n`)
+    };
+    "".join(result)
+  }
+}
+
+class IntFile(value: Int) extends File
+
+trait Cast {
+  macro static fun fromFile(obj: File): this {
+    obj match {
+    | x @ #ThisClass _ -> x
+    | exn @ ErrorFile _ -> throw (exn)
+    | _ -> invariant_violation("Invalid cast")
+    }
+  }
+}
+base class File uses Cast
+
+class GroupRequest{userID: IID, groupID: IID} extends File {
+  fun getKey(): BaseName {
+    this.userID
+  }
+}
+
+class BlockRequest{userID: IID, groupID: IID} extends File {
+  fun getKey(): BaseName {
+    this.userID
   }
 }
 
@@ -46,7 +132,8 @@ class GroupPost{groupID: BaseName, data: String} extends SKFS.File
 mutable class ViewerContext{
   context: mutable Context,
   isSuperUser: Bool = false,
-  groupMembers: Dir<BaseName>,
+  groupRequests: Dir,
+  blockRequests: Dir,
 } {
   readonly fun isMemberOfGroup(_gid: BaseName): Bool {
     if (this.isSuperUser) return true;
@@ -66,6 +153,18 @@ base class Rule {
   | DenyIf(f) -> !f(vc)
   | AlwaysAllow() -> true
   | AlwaysDeny() -> false
+}
+
+untracked fun loadData(fileName: String): Array<(BaseName, String)> {
+  content = FileSystem.readTextFile(fileName);
+  id = 0;
+  result = mutable Vector[];
+  content.split("\n").each(x -> {
+    if (x == "") return void;
+    result.push((IID(id), x));
+    !id = id + 1;
+  });
+  result.toArray()
 }
 
 module end;

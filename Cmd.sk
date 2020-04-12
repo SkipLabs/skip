@@ -1,0 +1,219 @@
+module SKFS;
+
+fun countSlash(str: String): Int {
+  n = 0;
+  for (elt in str) {
+    if (elt == '/') !n = n + 1;
+  };
+  n
+}
+
+fun cutAfter(level: Int, str: String): String {
+  n = 0;
+  i = 0;
+  for (elt in str) {
+    !i = i + 1;
+    if (elt == '/') !n = n + 1;
+    if (n == level + 1) return str.take(i);
+  };
+  str
+}
+
+fun listSubDirs(prefix: String, dmap: DMap<Dir>): Array<(FileName, Dir)> {
+  dmap.visit(node -> {
+    keyStr = node.key.toString();
+    keyStrLen = keyStr.length();
+    prefixLen = prefix.length();
+    dir = if (keyStrLen < prefixLen) {
+      if (prefix < keyStr) Left() else Right()
+    } else {
+      sub = keyStr.take(prefixLen);
+      if (sub < prefix) {
+        Right()
+      } else if (sub > prefix) {
+        Left()
+      } else {
+        Both()
+      }
+    };
+    dir
+  });
+}
+
+fun listDirs(prefix: String, dmap: DMap<Dir>): Array<(DirName, String)> {
+  visited = listSubDirs(prefix, dmap);
+  level = countSlash(prefix);
+  visitedNames = visited
+    .map(x -> cutAfter(level, x.i0.toString()))
+    .map(x -> (DirName::create(x), x.stripPrefix(prefix)));
+  names = Vector::mcreateFromItems(visitedNames);
+  names.sort();
+  names.toArray()
+}
+
+fun makeLexer(str: String): () -> (String, Int) {
+  chars = str.chars();
+  i = 0;
+  () -> {
+    tok = mutable Vector[];
+    while (i < chars.size() && (chars[i] == ' ' || chars[i] == '\t')) {
+      !i = i + 1;
+    };
+    while (i < chars.size() && chars[i] != ' ' && chars[i] != '\t') {
+      tok.push(chars[i]);
+      !i = i + 1;
+    };
+    (String::fromChars(tok.toArray()), i)
+  }
+}
+
+mutable class CmdEnv{context: mutable Context, mutable pwd: String}
+
+fun backwardsSlash(pwd: String): String {
+  chars = pwd.chars();
+  last = chars.size();
+  nbrSlash = 0;
+  while (last >= 0 && nbrSlash < 2) {
+    !last = last - 1;
+    if (chars[last] == '/') !nbrSlash = nbrSlash + 1;
+  };
+  pwd.sub(pwd.getIter(), last + 1)
+}
+
+fun absolutePath(pwd: String, cmd: String): String {
+  if (cmd.startsWith("..")) {
+    !cmd = cmd.stripPrefix("..");
+    !pwd = backwardsSlash(pwd);
+    return pwd + cmd;
+  };
+  if (cmd.startsWith(".")) {
+    !cmd = cmd.stripPrefix(".");
+    return pwd + cmd;
+  };
+  if (cmd.startsWith("/")) {
+    return cmd;
+  };
+  pwd + cmd
+}
+
+fun writeCmd(env: mutable CmdEnv, pathStr: String, cmd: String): void {
+  if (cmd != "") {
+    !cmd = cmd.stripPrefix(cmd.take(1));
+  };
+  path = Path::fromString(pathStr);
+  env.context.maybeGetDir(path.dirName) match {
+  | None() -> print_error("Could not find input directory: " + path.dirName)
+  | Some(dir) if (!dir.isInput) ->
+    print_error("Not an input Dir: " + path.dirName)
+  | Some(dir) ->
+    if (cmd == "") {
+      dir.writeArray(env.context, path.baseName.toString(), Array[]);
+    } else {
+      dir.writeArray(
+        env.context,
+        path.baseName.toString(),
+        Array[StringFile(cmd)],
+      );
+    }
+  };
+  env.context.update()
+}
+
+fun eval(env: mutable CmdEnv, cmd: String): void {
+  nextToken = makeLexer(cmd);
+  token = nextToken();
+  token.i0 match {
+  | "ls" ->
+    result = mutable Set[];
+    subDirs = listDirs(env.pwd, env.context.state.dirs.state);
+    for (kv in subDirs) {
+      (dirName, relDirName) = kv;
+      subSubDirs = listSubDirs(
+        dirName.toString(),
+        env.context.state.dirs.state,
+      );
+      if (subSubDirs.size() > 0) result.insert(relDirName) else {
+        env.context.maybeGetDir(dirName) match {
+        | None() -> void
+        | Some(dir) ->
+          files = dir.files();
+          if (files.size() > 0 && dirName.toString() != env.pwd) {
+            result.insert(relDirName);
+          }
+        }
+      }
+    };
+    env.context.maybeGetDir(DirName::create(env.pwd)) match {
+    | None() -> void
+    | Some(dir) ->
+      files = dir.files();
+      for (file in files) {
+        if (dir.getArrayRaw(file).size() > 0) {
+          result.insert(file.toString());
+        }
+      }
+    };
+    result.each(x -> print_string(x))
+  | "cd" ->
+    tok = nextToken().i0;
+    dirName = absolutePath(env.pwd, tok);
+    if (!dirName.endsWith("/")) {
+      !dirName = dirName + "/";
+    };
+    if (dirName == "") {
+      print_error("Error: expected directory name\n");
+      return void;
+    };
+    env.!pwd = dirName
+  | "cat" ->
+    files = mutable Vector[];
+    tok = nextToken().i0;
+    while (tok != "") {
+      files.push(tok);
+      !tok = nextToken().i0;
+    };
+    if (files.size() == 0) {
+      print_error("Error: expected file name\n");
+      return void;
+    };
+    files.each(entry -> {
+      pathStr = absolutePath(env.pwd, entry);
+      path = Path::fromString(pathStr);
+      env.context.maybeGetDir(path.dirName) match {
+      | None() -> print_string(`<EMPTY:${path}>`)
+      | Some(dir) ->
+        arr = dir.getArrayRaw(path.baseName);
+        if (arr.size() == 0) {
+          print_string(`<EMPTY:${path}>`)
+        } else if (arr.size() == 1) {
+          arr[0] match {
+          | StringFile(x) -> print_string(x)
+          | y -> debug(y)
+          }
+        } else {
+          debug(arr);
+        }
+      };
+    })
+  | "write" ->
+    (pathStr, idx) = nextToken();
+    !pathStr = absolutePath(env.pwd, pathStr);
+    !cmd = cmd.stripPrefix(cmd.take(idx));
+    writeCmd(env, pathStr, cmd)
+  | "rm" ->
+    (pathStr, idx) = nextToken();
+    !pathStr = absolutePath(env.pwd, pathStr);
+    !cmd = cmd.stripPrefix(cmd.take(idx));
+    writeCmd(env, pathStr, "")
+  | _ -> print_string("Unknown command")
+  }
+}
+
+untracked fun toplevel(context: mutable Context): void {
+  env = mutable CmdEnv{context, pwd => "/"};
+  loop {
+    print_raw(env.pwd + "$ ");
+    cmd = read_line();
+    eval(env, cmd);
+  }
+}

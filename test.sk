@@ -339,7 +339,7 @@ const falseFile: BoolFile = BoolFile{data => "false"};
 
 class IDFile{} extends SKFS.File
 
-class IntFile(value: Int) extends SKFS.File uses SKFS.HasKey {
+class IntFile(value: Int) extends SKFS.File {
   fun getKey(): SKFS.BaseName {
     SKFS.SID::create("K" + this.value)
   }
@@ -351,9 +351,9 @@ class CalendarEvent{
   end: Int,
   description: String,
 } extends SKFS.File
-
+/*
 fun testAfterModification(): void {
-  (context, (_dir1, dir2)) = SKFS.start(context -> {
+  (context, (_dir1, _dir2, _dirs)) = SKFS.start(context -> {
     dir1 = context.mkdirMulti(
       "/tmp/",
       Array[("I1", Array[IntFile(1)]), ("I3", Array[IntFile(23)])],
@@ -362,17 +362,17 @@ fun testAfterModification(): void {
       "/tmp2/",
       Array[("I1", Array[IntFile(1)]), ("I3", Array[IntFile(23), IntFile(23)])],
     );
-    _dirs = dir2.partition(context, "/partition/");
-    (dir1, dir2)
+    dirs = dir2.partition(context, "/partition/");
+    (dir1, dir2, dirs)
   });
-  context.debug("/partition/I3/K23");
-  dir2.writeArray(context, "I5", Array[IntFile(33), IntFile(33)]);
-  dir2.writeArray(context, "I4", Array[IntFile(25)]);
   context.update();
 }
+*/
+
+/*
 
 fun testUsers(): void {
-  (context, (groupRequest, groupBlocked)) = SKFS.start(context -> {
+  (context, (_groupRequests, _groupBlocked)) = SKFS.start(context -> {
     beSport = SKFS.Group{
       id => SKFS.SID::create("GID_1"),
       name => "BeSport!",
@@ -409,34 +409,147 @@ fun testUsers(): void {
     groupBlocked = context.mkdirMulti<SKFS.User>(
       "/groups/" + beSport.id + "/blocked/",
     );
-    _groupMembers = groupRequests.multiMap(
+    _groupMembers = groupRequests.apply(
       context,
       "/groups/" + beSport.id + "/members/",
-      (handle, uid, values) ~> {
-        arr = groupBlocked.getArray(handle, uid);
+      (context, writer, uid, values) ~> {
+        arr = groupBlocked.getArray(context, uid);
         if (arr.size() > 0) {
           return void;
         };
-        handle.writeArray(uid, values);
+        writer.writeArray(uid, values);
       },
     );
     (groupRequests, groupBlocked)
   });
-  context.debug("/users/UID_1");
-  user = SKFS.User{
+  user: SKFS.File = SKFS.User{
     id => SKFS.SID::create("UID_2"),
     firstName => "Daniel",
     lastName => "Lopes",
     age => 42,
     groupIDs => Array[],
   };
-  groupRequest.writeArray(context, user.id.toString(), Array[user]);
-  groupBlocked.writeArray(context, user.id.toString(), Array[user]);
+  groupRequests = context.getDir(
+    SKFS.DirName::create("/groups/GID_1/requests/"),
+  );
+  groupRequests.writeArray(context, "UID_2", Array[user]);
   context.update();
 }
+*/
+
 
 module end;
 
-fun main(): void {
-  TestServer.testUsers();
+module SKFSTest;
+
+fun error<T>(): T {
+  invariant_violation("ERROR");
+}
+
+class JsonFile(JSON.Value) extends SKFS.File
+
+class User{
+  id: Int,
+  firstName: String,
+  lastName: String,
+  age: Int,
+} extends SKFS.File {
+  static fun fromString(str: String): User {
+    data = JSON.decode(str).expectObject();
+    id = data["id"].expectInt();
+    firstName = data["firstName"].expectString();
+    lastName = data["lastName"].expectString();
+    age = data["age"].expectInt();
+    User{id, firstName, lastName, age}
+  }
+}
+
+class FullUser{
+  id: Int,
+  firstName: String,
+  lastName: String,
+  age: Int,
+  friends: Array<User>,
+} extends SKFS.File
+
+class Request{askingID: Int, askedID: Int} extends SKFS.File {
+  static fun fromString(str: String): Request {
+    data = JSON.decode(str).expectObject();
+    askingID = data["askingUserID"].expectInt();
+    askedID = data["askedUserID"].expectInt();
+    Request{askingID, askedID}
+  }
+}
+
+untracked fun .main(): void {
+  userData = SKFS.loadData("/tmp/users.json");
+  friendRequestsData = SKFS.loadData("/tmp/friendRequests.json");
+  acceptedRequestsData = SKFS.loadData("/tmp/acceptedFriendRequests.json");
+  SKFS.run(context ~> {
+    rawUsers = context.mkdir("/inputs/users/", userData);
+    rawFriendRequests = context.mkdir("/inputs/requests/", friendRequestsData);
+    rawAcceptedRequests = context.mkdir(
+      "/inputs/accepted/",
+      acceptedRequestsData,
+    );
+    users = rawUsers.map(
+      User::fromFile,
+      context,
+      "/parsed/users/",
+      User::fromString,
+    );
+    friendRequests = rawFriendRequests.map(
+      Request::fromFile,
+      context,
+      "/parsed/requests/",
+      Request::fromString,
+    );
+    acceptedRequests = rawAcceptedRequests.map(
+      Request::fromFile,
+      context,
+      "/parsed/accepted/",
+      Request::fromString,
+    );
+    groupedRequests = acceptedRequests.split(
+      context,
+      "/parsed/accepted/grouped/",
+      request ~> SKFS.IID(request.askingID),
+    );
+    friends = friendRequests.contextWriterMap(
+      SKFS.IntFile::fromFile,
+      context,
+      "/users/friends/",
+      (context, writer, request) ~> {
+        askingID = SKFS.IID(request.askingID);
+        askedID = SKFS.IID(request.askedID);
+        groupedRequests.maybeGet(context, askingID) match {
+        | None() -> void
+        | Some(dir) ->
+          if (dir.containsKey(context, askedID)) {
+            users1 = users.get(context, askingID);
+            writer.write(askedID, SKFS.IntFile(users1.id));
+            users2 = users.get(context, askedID);
+            writer.write(askingID, SKFS.IntFile(users2.id))
+          }
+        }
+      },
+    );
+    _fullUsers = users.contextMap(
+      FullUser::fromFile,
+      context,
+      "/users/",
+      (context, user) ~> {
+        userFriends = friends.getArray(context, SKFS.IID(user.id)).map(x -> {
+          users.get(context, SKFS.IID(x.value))
+        });
+        FullUser{
+          id => user.id,
+          firstName => user.firstName,
+          lastName => user.lastName,
+          age => user.age,
+          friends => userFriends,
+        }
+      },
+    )
+  })
 }
