@@ -1,0 +1,218 @@
+module SKFSTest;
+
+class IBox(value: Int) extends SKFS.File
+
+fun convertIBox(file: SKFS.File): IBox {
+  file match {
+  | x @ IBox _ -> x
+  | _ -> invariant_violation("Was expecting an IBox")
+  }
+}
+
+fun convertSFile(file: SKFS.File): IBox {
+  file match {
+  | SKFS.StringFile(v) -> IBox(v.toInt())
+  | _ -> invariant_violation("Was expecting an IBox")
+  }
+}
+
+fun convertDir(file: SKFS.File): SKFS.Dir {
+  file match {
+  | x @ SKFS.Dir _ -> x
+  | _ -> invariant_violation("Was expecting an Dir")
+  }
+}
+
+fun make(
+  context: mutable SKFS.Context,
+  name: String,
+  values: Array<Int>,
+): SKFS.Handle<String> {
+  kvArray = values.map(x -> (SKFS.IID(x), x.toString()));
+  context.mkdir(name, kvArray)
+}
+
+fun compareResults(
+  context: mutable SKFS.Context,
+  kind: String,
+  path: String,
+  values: Array<Int>,
+): void {
+  readV = context.getValue(path);
+  try {
+    expectEq(kind + " test for path " + path, readV, () ->
+      values.map(x -> IBox(x))
+    );
+  } catch {
+  | _ ->
+    print_error("Compare result failed\n");
+    debug(readV);
+    debug(values)
+  }
+}
+
+fun testUpdate(
+  context: mutable SKFS.Context,
+  writes: Array<(String, Array<Int>)>,
+  expects: Array<(String, Array<Int>)>,
+): void {
+  for (kv in writes) {
+    (key, values) = kv;
+    path = SKFS.Path::fromString(key);
+    dir = context.getDir(path.dirName);
+    dir.writeArray(context, path.baseName.toString(), values.map(x -> IBox(x)));
+  };
+  context.update();
+  for (kv in expects) {
+    (key, values) = kv;
+    compareResults(context, "Update", key, values);
+  };
+}
+
+fun testUnion(): void {
+  // Base case
+  (context, _) = SKFS.start(context ~> {
+    dir1 = make(context, "/tmp1/", Array[1]);
+    dir2 = make(context, "/tmp2/", Array[2]);
+    _dir3 = dir1.union(context, "/tmp3/", Array[dir2]);
+    compareResults(context, "Union", "/tmp3/1", Array[1]);
+    compareResults(context, "Union", "/tmp3/2", Array[2]);
+  });
+
+  testUpdate(
+    context,
+    Array[("/tmp1/1", Array[22])],
+    Array[("/tmp3/1", Array[22])],
+  );
+
+  testUpdate(
+    context,
+    Array[("/tmp1/3", Array[22]), ("/tmp2/3", Array[23])],
+    Array[("/tmp3/3", Array[22, 23])],
+  );
+
+  testUpdate(
+    context,
+    Array[("/tmp1/3", Array[24])],
+    Array[("/tmp3/3", Array[24, 23])],
+  );
+
+  testUpdate(
+    context,
+    Array[("/tmp1/3", Array[])],
+    Array[("/tmp3/3", Array[23])],
+  );
+
+  testUpdate(context, Array[("/tmp2/3", Array[])], Array[("/tmp3/3", Array[])]);
+}
+/*
+
+fun testMap(): void {
+  // Base case
+  (context, _) = SKFS.start(context ~> {
+    dir1 = make(context, "/tmp1/", Array[1, 2, 3]);
+    dir2 = dir1.apply(context, "/tmp2/", (_, writer, key, values) ~> {
+      writer.writeArray(
+        key,
+        values.map(x -> {
+          x match {
+          | IBox(v) -> IBox(v + 1)
+          | _ -> IBox(0)
+          }
+        }),
+      )
+    });
+    _dir3 = dir1.apply(
+      context,
+      "/tmp3/",
+      (context, writer, key, origValues2) ~> {
+        values1 = dir2.getArray(context, key).map(convertIBox);
+        values2 = origValues2.map(convertIBox);
+        size = min(values1.size(), values2.size());
+        result = mutable Vector[];
+        for (i in Range(0, size)) {
+          result.push(IBox(values1[i].value + values2[i].value));
+        };
+        writer.writeArray(key, result.toArray());
+      },
+    );
+    compareResults(context, "Map", "/tmp2/1", Array[2]);
+    compareResults(context, "Map", "/tmp2/2", Array[3]);
+    compareResults(context, "Map", "/tmp2/3", Array[4]);
+  });
+
+  testUpdate(context, Array[("/tmp1/2", Array[])], Array[("/tmp2/2", Array[])]);
+  testUpdate(
+    context,
+    Array[("/tmp1/2", Array[22])],
+    Array[("/tmp2/2", Array[23])],
+  );
+  context.debug("/tmp3/2");
+  testUpdate(
+    context,
+    Array[("/tmp1/2", Array[24])],
+    Array[("/tmp3/2", Array[49])],
+  );
+  testUpdate(context, Array[("/tmp1/2", Array[])], Array[("/tmp3/2", Array[])]);
+}
+
+fun testPartition(): void {
+  (context, _) = SKFS.start(context ~> {
+    dir1 = make(context, "/tmp1/", Array[1, 2, 3]);
+    dir2 = dir1.apply(context, "/tmp2/", (_context, writer, _key, values) ~> {
+      if (values.size() == 0) return void;
+      writer.writeArray(SKFS.IID(1), values);
+    });
+    dir3 = dir2.partition(context, "/tmp3/", x ~>
+      SKFS.IID(convertIBox(x).value)
+    );
+    _ = dir3.apply(context, "/tmp4/", (context, writer, key, dirs) ~> {
+      if (dirs.size() == 0) return void;
+      dir = convertDir(dirs[0]);
+      subDirName = "M" + key;
+      newDirName = "/tmpMapped/" + subDirName + "/";
+      newDir = dir.apply(
+        context,
+        newDirName,
+        (_context, writer, key, iboxes) ~> {
+          !iboxes = iboxes.map(origV -> {
+            v = convertIBox(origV);
+            !v.value = v.value + 1;
+            v
+          });
+          writer.writeArray(key, iboxes)
+        },
+      );
+      writer.write(SKFS.SID::create(subDirName), newDir);
+    });
+  });
+  testUpdate(
+    context,
+    Array[("/tmp1/1", Array[2])],
+    Array[("/tmp3/1/2", Array[2, 2])],
+  );
+
+  testUpdate(
+    context,
+    Array[("/tmp1/1", Array[1])],
+    Array[("/tmp3/1/2", Array[2]), ("/tmp3/1/1", Array[1])],
+  );
+
+  testUpdate(
+    context,
+    Array[("/tmp1/1", Array[])],
+    Array[("/tmp3/1/2", Array[2]), ("/tmp3/1/1", Array[])],
+  );
+  context.debug("/tmpMapped/M1/3");
+}
+
+
+fun testDirs(): void {
+  //  testUnion();
+  // testMap();
+  testPartition();
+}
+*/
+
+
+module end;
