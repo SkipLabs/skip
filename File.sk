@@ -155,13 +155,13 @@ base class Rule {
   | AlwaysDeny() -> false
 }
 
-untracked fun loadData(fileName: String): Array<(BaseName, String)> {
+untracked fun loadData(fileName: String): Array<(BaseName, StringFile)> {
   content = FileSystem.readTextFile(fileName);
   id = 0;
   result = mutable Vector[];
   content.split("\n").each(x -> {
     if (x == "") return void;
-    result.push((IID(id), x));
+    result.push((IID(id), StringFile(x)));
     !id = id + 1;
   });
   result.toArray()
