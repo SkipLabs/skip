@@ -27,9 +27,14 @@ fun make(
   context: mutable SKFS.Context,
   name: String,
   values: Array<Int>,
-): SKFS.Handle<String> {
-  kvArray = values.map(x -> (SKFS.IID(x), x.toString()));
-  context.mkdir(name, kvArray)
+): SKFS.Handle<SKFS.StringFile> {
+  kvArray = values.map(x -> (SKFS.IID(x), SKFS.StringFile(x.toString())));
+  conv = x ~>
+    x match {
+    | y @ SKFS.StringFile _ -> y
+    | _ -> invariant_violation("impossible")
+    };
+  context.mkdir(conv, name, kvArray)
 }
 
 fun compareResults(

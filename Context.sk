@@ -1,6 +1,6 @@
 module SKFS;
 
-class StringFile(.String) extends File
+class StringFile(value: .String) extends File
 
 class DirAlreadyExists(dirName: DirName) extends Exception {
   fun toString(): String {
@@ -139,10 +139,11 @@ mutable class Context{
     this.time
   }
 
-  mutable fun mkdir(
+  mutable fun mkdir<T: File>(
+    conv: File ~> T,
     dirNameStr: String,
-    content: Array<(BaseName, String)> = Array[],
-  ): Handle<String> {
+    content: Array<(BaseName, T)> = Array[],
+  ): Handle<T> {
     dir = this.mkdirMulti(
       dirNameStr,
       content.map(kv -> {
@@ -150,17 +151,12 @@ mutable class Context{
         (key, Array[value])
       }),
     );
-    conv = file ~>
-      file match {
-      | StringFile(x) -> x
-      | _ -> invariant_violation("Expected StringFile")
-      };
     Handle(conv, dir)
   }
 
-  mutable fun mkdirMulti(
+  mutable fun mkdirMulti<T: File>(
     dirNameStr: String,
-    content: Array<(BaseName, Array<String>)> = Array[],
+    content: Array<(BaseName, Array<T>)> = Array[],
   ): Dir {
     dirName = DirName::create(dirNameStr);
     if (this.state.dirs.state.containsKey(dirName)) {
@@ -170,9 +166,7 @@ mutable class Context{
     for (kv in content) {
       (key, values) = kv;
       path = Path(dirName, key);
-      vector.push(
-        FixedRow(key, (path, values.map(x -> (StringFile(x) : File)))),
-      );
+      vector.push(FixedRow(key, (path, values.map(x -> (x : File)))));
     };
     vector.sort();
     fixedData = FixedData{dirName, data => vector.toArray()};

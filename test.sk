@@ -454,7 +454,8 @@ class User{
   lastName: String,
   age: Int,
 } extends SKFS.File {
-  static fun fromString(str: String): User {
+  static fun fromString(strFile: SKFS.StringFile): User {
+    str = strFile.value;
     data = JSON.decode(str).expectObject();
     id = data["id"].expectInt();
     firstName = data["firstName"].expectString();
@@ -473,7 +474,8 @@ class FullUser{
 } extends SKFS.File
 
 class Request{askingID: Int, askedID: Int} extends SKFS.File {
-  static fun fromString(str: String): Request {
+  static fun fromString(strFile: SKFS.StringFile): Request {
+    str = strFile.value;
     data = JSON.decode(str).expectObject();
     askingID = data["askingUserID"].expectInt();
     askedID = data["askedUserID"].expectInt();
@@ -486,9 +488,19 @@ untracked fun .main(): void {
   friendRequestsData = SKFS.loadData("/tmp/friendRequests.json");
   acceptedRequestsData = SKFS.loadData("/tmp/acceptedFriendRequests.json");
   SKFS.run(context ~> {
-    rawUsers = context.mkdir("/inputs/users/", userData);
-    rawFriendRequests = context.mkdir("/inputs/requests/", friendRequestsData);
+    conv = x ~>
+      x match {
+      | y @ SKFS.StringFile _ -> y
+      | _ -> invariant_violation("impossible")
+      };
+    rawUsers = context.mkdir(conv, "/inputs/users/", userData);
+    rawFriendRequests = context.mkdir(
+      conv,
+      "/inputs/requests/",
+      friendRequestsData,
+    );
     rawAcceptedRequests = context.mkdir(
+      conv,
       "/inputs/accepted/",
       acceptedRequestsData,
     );
