@@ -24,19 +24,33 @@ mutable class Writer{
   }
 }
 
-class Handle<T: frozen>(conv: File ~> T, dir: Dir) {
+class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
+  static fun lazy<T: File>(
+    conv: File ~> T,
+    context: mutable Context,
+    dirNameStr: String,
+    f: (mutable Context, Handle<T>, BaseName) ~> T,
+  ): Handle<T> {
+    dirName = DirName::create(dirNameStr);
+    dir = Dir::lazy(context, dirName, (context, dirName, key) ~> {
+      f(context, Handle(conv, dirName), key)
+    });
+    Handle(conv, dir.dirName)
+  }
+
   fun split(
     context: mutable Context,
     dirNameStr: String,
     f: T ~> BaseName,
   ): Handle<Handle<T>> {
-    dir = this.dir.partition(context, dirNameStr, value ~> f(this.conv(value)));
+    thisDir = context.getDir(this.dirName);
+    dir = thisDir.partition(context, dirNameStr, value ~> f(this.conv(value)));
     conv = (file: File) ~>
       file match {
-      | subDir @ Dir _ -> Handle(this.conv, subDir)
+      | subDir @ Dir _ -> Handle(this.conv, subDir.dirName)
       | _ -> invariant_violation("Expected a directory")
       };
-    Handle(conv, dir)
+    Handle(conv, dir.dirName)
   }
 
   fun union(
@@ -44,10 +58,13 @@ class Handle<T: frozen>(conv: File ~> T, dir: Dir) {
     dirNameStr: String,
     others: Array<Handle<T>>,
   ): Handle<T> {
-    Handle(
-      this.conv,
-      this.dir.union(context, dirNameStr, others.map(x -> x.dir)),
-    )
+    thisDir = context.getDir(this.dirName);
+    dir = thisDir.union(
+      context,
+      dirNameStr,
+      others.map(handle -> context.getDir(handle.dirName)),
+    );
+    Handle(this.conv, dir.dirName)
   }
 
   private fun genericMap<T2: File>(
@@ -56,14 +73,23 @@ class Handle<T: frozen>(conv: File ~> T, dir: Dir) {
     dirNameStr: String,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
   ): Handle<T2> {
-    dir = this.dir.apply(context, dirNameStr, (context, writer, key, files) ~> {
+    thisDir = context.getDir(this.dirName);
+    dir = thisDir.apply(context, dirNameStr, (context, writer, key, files) ~> {
       try {
         if (files.size() == 0) return void;
-        f(context, writer, key, files.map(this.conv));
+        f(
+          context,
+          writer,
+          key,
+          files.map(x -> {
+            debug(x);
+            this.conv(x)
+          }),
+        );
       } catch {
       | ErrorFile(trace) ->
         traceElt = ErrorTrace(
-          this.dir.dirName.toString(),
+          thisDir.dirName.toString(),
           key.toString(),
           "propagated",
         );
@@ -71,7 +97,7 @@ class Handle<T: frozen>(conv: File ~> T, dir: Dir) {
         writer.write(key, ErrorFile(trace))
       | exn ->
         traceElt = ErrorTrace(
-          this.dir.dirName.toString(),
+          thisDir.dirName.toString(),
           key.toString(),
           exn.getMessage(),
         );
@@ -79,12 +105,12 @@ class Handle<T: frozen>(conv: File ~> T, dir: Dir) {
         writer.write(key, ErrorFile(trace))
       }
     });
-    Handle(conv, dir)
+    Handle(conv, dir.dirName)
   }
 
   fun duplicateError(key: BaseName, files: Array<T>): ErrorFile {
     traceElt = ErrorTrace(
-      this.dir.dirName.toString(),
+      this.dirName.toString(),
       key.toString(),
       "duplicate keys: " + inspect(files).toString(),
     );
@@ -142,8 +168,26 @@ class Handle<T: frozen>(conv: File ~> T, dir: Dir) {
     })
   }
 
+  fun contextWriterKeyMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirNameStr: String,
+    f: (mutable Context, mutable Writer, BaseName, T) ~> void,
+  ): Handle<T2> {
+    this.genericMap(conv, context, dirNameStr, (context, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        errFile = this.duplicateError(key, files);
+        writer.write(key, errFile);
+        return void;
+      };
+      f(context, writer, key, files[0]);
+    })
+  }
+
   fun getArray(context: mutable Context, key: BaseName): Array<T> {
-    this.dir.getArray(context, key).map(this.conv)
+    dir = context.getDir(this.dirName);
+    results = dir.getArray(context, key).map(this.conv);
+    results
   }
 
   fun get(context: mutable Context, key: BaseName): T {
