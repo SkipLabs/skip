@@ -473,6 +473,8 @@ class FullUser{
   friends: Array<User>,
 } extends SKFS.File
 
+class TestFile(age: Int, User) extends SKFS.File
+
 class Request{askingID: Int, askedID: Int} extends SKFS.File {
   static fun fromString(strFile: SKFS.StringFile): Request {
     str = strFile.value;
@@ -483,85 +485,121 @@ class Request{askingID: Int, askedID: Int} extends SKFS.File {
   }
 }
 
-untracked fun .main(): void {
-  userData = SKFS.loadData("/tmp/users.json");
-  friendRequestsData = SKFS.loadData("/tmp/friendRequests.json");
-  acceptedRequestsData = SKFS.loadData("/tmp/acceptedFriendRequests.json");
+class Def{v: Int, parents: Array<Int>} extends SKFS.File {
+  fun toString(): String {
+    JSON.Object(
+      Map[
+        "v" => JSON.IntNumber(this.v),
+        "parents" => JSON.Array(
+          this.parents.map(x -> JSON.IntNumber(x)).collect(Vector),
+        ),
+      ],
+    ).toString()
+  }
+
+  static fun fromStringFile(x: SKFS.StringFile): this {
+    json = JSON.decode(x.value).expectObject();
+    Def{
+      v => json["v"].expectInt(),
+      parents => json["parents"]
+        .expectArray()
+        .value.map(x -> x.expectInt())
+        .toArray(),
+    }
+  }
+}
+
+base class Tree {
+  children =
+  | TEmpty()
+  | TNode(v: Int, parents: Array<Tree>)
+}
+
+class TreeFile(value: Tree) extends SKFS.File
+
+fun makeTrees(acc: mutable Vector<Def>, size: Int): void {
+  if (size == 0 || size == 1) {
+    acc.push(Def{v => 0, parents => Array[]});
+    acc.push(Def{v => 1, parents => Array[]});
+    return void;
+  };
+  makeTrees(acc, size - 1);
+  parents = Array[size - 1, size - 2];
+  tree = Def{v => size, parents};
+  acc.push(tree)
+}
+
+untracked fun .testLazy(): void {
   SKFS.run(context ~> {
-    conv = x ~>
-      x match {
-      | y @ SKFS.StringFile _ -> y
-      | _ -> invariant_violation("impossible")
-      };
-    rawUsers = context.mkdir(conv, "/inputs/users/", userData);
-    rawFriendRequests = context.mkdir(
-      conv,
-      "/inputs/requests/",
-      friendRequestsData,
-    );
-    rawAcceptedRequests = context.mkdir(
-      conv,
-      "/inputs/accepted/",
-      acceptedRequestsData,
-    );
-    users = rawUsers.map(
-      User::fromFile,
+    acc = mutable Vector[];
+    makeTrees(acc, 3);
+    debug(acc);
+    inputData = acc
+      .map(x -> (SKFS.IID(x.v), SKFS.StringFile(x.toString())))
+      .toArray();
+    srcDir = context.mkdir(SKFS.StringFile::fromFile, "/src/", inputData);
+    defDir = srcDir.map(Def::fromFile, context, "/defs/", Def::fromStringFile);
+    treeDir = SKFS.Handle::lazy(
+      TreeFile::fromFile,
       context,
-      "/parsed/users/",
-      User::fromString,
-    );
-    friendRequests = rawFriendRequests.map(
-      Request::fromFile,
-      context,
-      "/parsed/requests/",
-      Request::fromString,
-    );
-    acceptedRequests = rawAcceptedRequests.map(
-      Request::fromFile,
-      context,
-      "/parsed/accepted/",
-      Request::fromString,
-    );
-    groupedRequests = acceptedRequests.split(
-      context,
-      "/parsed/accepted/grouped/",
-      request ~> SKFS.IID(request.askingID),
-    );
-    friends = friendRequests.contextWriterMap(
-      SKFS.IntFile::fromFile,
-      context,
-      "/users/friends/",
-      (context, writer, request) ~> {
-        askingID = SKFS.IID(request.askingID);
-        askedID = SKFS.IID(request.askedID);
-        groupedRequests.maybeGet(context, askingID) match {
-        | None() -> void
-        | Some(dir) ->
-          if (dir.containsKey(context, askedID)) {
-            users1 = users.get(context, askingID);
-            writer.write(askedID, SKFS.IntFile(users1.id));
-            users2 = users.get(context, askedID);
-            writer.write(askingID, SKFS.IntFile(users2.id))
-          }
-        }
+      "/lazyTrees/",
+      (context, self, key) ~> {
+        def = defDir.get(context, key);
+        parents = def.parents.map(id -> self.get(context, SKFS.IID(id)).value);
+        TreeFile(TNode(def.v, parents))
       },
     );
-    _fullUsers = users.contextMap(
-      FullUser::fromFile,
+    _unfoldedTrees = defDir.contextMap(
+      TreeFile::fromFile,
       context,
-      "/users/",
-      (context, user) ~> {
-        userFriends = friends.getArray(context, SKFS.IID(user.id)).map(x -> {
-          users.get(context, SKFS.IID(x.value))
-        });
-        FullUser{
-          id => user.id,
-          firstName => user.firstName,
-          lastName => user.lastName,
-          age => user.age,
-          friends => userFriends,
-        }
+      "/trees/",
+      (context, x) ~> {
+        debug(x);
+        treeDir.get(context, SKFS.IID(x.v))
       },
-    )
+    );
+    context.reads.clear();
+    context.update();
+    context.update();
+  })
+}
+
+untracked fun .main(): void {
+  SKFS.run(context ~> {
+    acc = mutable Vector[];
+    makeTrees(acc, 3);
+    debug(acc);
+    inputData = acc
+      .map(x -> (SKFS.IID(x.v), SKFS.StringFile(x.toString())))
+      .toArray();
+    srcDir = context.mkdir(SKFS.StringFile::fromFile, "/src/", inputData);
+    defDir = srcDir.map(Def::fromFile, context, "/defs/", Def::fromStringFile);
+    _ = defDir.map(Def::fromFile, context, "/defs0/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs1/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs2/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs3/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs4/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs5/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs6/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs7/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs8/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs9/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs10/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs11/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs12/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs13/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs14/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs15/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs16/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs17/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs18/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs19/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs20/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs21/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs22/", x ~> Def::fromFile(x));
+    _ = defDir.map(Def::fromFile, context, "/defs23/", x ~> Def::fromFile(x));
+    context.reads.clear();
+    context.update();
+    context.update();
   })
 }
