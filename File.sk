@@ -91,16 +91,14 @@ class ErrorFile(trace: List<ErrorTrace>) extends File, Exception {
 
 class IntFile(value: Int) extends File
 
-trait Cast {
-  macro static fun fromFile(obj: File): this {
+base class File {
+  deferred macro static fun fromFile(obj: File): this {
     obj match {
+    | error @ ErrorFile _ -> throw (error)
     | x @ #ThisClass _ -> x
-    | exn @ ErrorFile _ -> throw (exn)
-    | _ -> invariant_violation("Invalid cast")
     }
   }
 }
-base class File uses Cast
 
 class GroupRequest{userID: IID, groupID: IID} extends File {
   fun getKey(): BaseName {

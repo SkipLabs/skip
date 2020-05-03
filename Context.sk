@@ -26,9 +26,9 @@ untracked fun run(f: (mutable Context) -> void): void {
 
 mutable class Context{
   mutable state: State = State{},
-  reads: mutable Vector<Path> = mutable Vector[],
+  mutable reads: mutable Vector<Path> = mutable Vector[],
   mutable time: Int = 0,
-  mutable toUpdate: SortedMap<Int, (mutable Context) ~> void> = SortedMap[],
+  mutable toUpdate: SortedMap<Int, DirName> = SortedMap[],
   mutable deps: List<Vector<(Path, DirName, DirName, BaseName)>> = List[],
   mutable fixedDeps: Map<Path, Set<(DirName, DirName, BaseName)>> = Map[],
   mutable newDeps: SortedMap<
@@ -121,7 +121,10 @@ mutable class Context{
       | None() ->
         this.flushErrorLog();
         return void
-      | Some((_, updateFun)) -> updateFun(this)
+      | Some((time, dirName)) ->
+        this.!toUpdate = this.toUpdate.remove(time);
+        dir = this.getDir(dirName);
+        dir.update(this)
       }
     }
   }
@@ -151,7 +154,8 @@ mutable class Context{
         (key, Array[value])
       }),
     );
-    Handle(conv, dir)
+    this.setDir(dir.dirName, dir);
+    Handle(conv, dir.dirName)
   }
 
   mutable fun mkdirMulti<T: File>(
