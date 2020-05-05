@@ -33,7 +33,34 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
   ): Handle<T> {
     dirName = DirName::create(dirNameStr);
     dir = Dir::lazy(context, dirName, (context, dirName, key) ~> {
-      f(context, Handle(conv, dirName), key)
+      if (context.lazyVisitedSet.contains(Path(dirName, key))) {
+        msg = "Error: cyclic lazy data " + " ".join(context.lazyVisitedList);
+        return ErrorFile(
+          List[ErrorTrace(dirName.toString(), key.toString(), msg)],
+        )
+      };
+      oldLazyVisitedList = context.lazyVisitedList;
+      oldLazyVisitedSet = context.lazyVisitedSet;
+      onExit = () -> {
+        context.!lazyVisitedList = oldLazyVisitedList;
+        context.!lazyVisitedSet = oldLazyVisitedSet;
+      };
+      context.!lazyVisitedList = List.Cons(
+        Path(dirName, key),
+        oldLazyVisitedList,
+      );
+      context.!lazyVisitedSet = context.lazyVisitedSet.add(Path(dirName, key));
+      try {
+        result = f(context, Handle(conv, dirName), key);
+        onExit();
+        result
+      } catch {
+      | exn ->
+        onExit();
+        msg = exn.getMessage();
+        trace = ErrorTrace(dirName.toString(), key.toString(), msg);
+        ErrorFile(List[trace])
+      }
     });
     Handle(conv, dir.dirName)
   }
@@ -77,15 +104,7 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     dir = thisDir.apply(context, dirNameStr, (context, writer, key, files) ~> {
       try {
         if (files.size() == 0) return void;
-        f(
-          context,
-          writer,
-          key,
-          files.map(x -> {
-            debug(x);
-            this.conv(x)
-          }),
-        );
+        f(context, writer, key, files.map(x -> this.conv(x)));
       } catch {
       | ErrorFile(trace) ->
         traceElt = ErrorTrace(
@@ -207,6 +226,17 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     values = this.getArray(context, key);
     if (values.size() == 0) return None();
     Some(values[0])
+  }
+
+  fun pre(context: mutable Context): ?Handle<T> {
+    if (!context.hasPre.contains(this.dirName)) {
+      context.!hasPre = context.hasPre.add(this.dirName);
+      return None();
+    };
+    context.maybeGetDir(this.dirName.prev()) match {
+    | None() -> None()
+    | Some(dir) -> Some(Handle(this.conv, dir.dirName))
+    }
   }
 }
 

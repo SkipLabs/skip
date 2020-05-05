@@ -1,5 +1,13 @@
 module SKFS;
 
+fun reduceCapacity<T>(capacity: Int, prevList: List<T>): List<T> {
+  if (capacity == 0) return List.Nil();
+  prevList match {
+  | nil @ List.Nil() -> nil
+  | List.Cons(x, rl) -> List.Cons(x, reduceCapacity(capacity - 1, rl))
+  }
+}
+
 type MapFun = (mutable Context, mutable Writer, BaseName, Array<File>) ~> void;
 
 class FileNotFound(path: Path) extends SKFS.Exception {
@@ -97,6 +105,13 @@ class Partition{
   static fun dirName(baseDirName: String, key: BaseName): DirName {
     DirName::create(baseDirName + key.toString() + "/");
   }
+}
+
+base class PlaceHolder {
+  children =
+  | PHEmpty()
+  | PHProcessing()
+  | PHDone(File)
 }
 
 class Dir{
@@ -240,7 +255,6 @@ class Dir{
     lazyFun = (context: mutable Context, dirName: DirName, key: BaseName) ~> {
       reads = context.reads;
       context.!reads = mutable Vector[];
-      debug(("HERE", dirName, key));
 
       result = try {
         f(context, dirName, key)
@@ -536,6 +550,12 @@ class Dir{
       });
       for (path in dirtyReaders) {
         key = path.baseName;
+        map = SortedMap[path => Array[]];
+        !this.data = this.data.set(key, map);
+      };
+      context.setDir(this.dirName, this);
+      for (path in dirtyReaders) {
+        key = path.baseName;
         _ = f(context, this.dirName, key);
       };
       !this = context.getDir(this.dirName);
@@ -552,7 +572,6 @@ class Dir{
     };
 
     for (childName in this.childDirs) {
-      debug(("CHILD", childName));
       child = context.state.dirs.get(childName);
       dirty = if (dirtyDeps.containsKey(childName)) {
         dirtyDeps[childName]
