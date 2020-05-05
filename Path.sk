@@ -59,6 +59,10 @@ class DirName private (dirName: String) extends FileName {
     static(dirName)
   }
 
+  fun prev(): this {
+    DirName(this.dirName + "pre/")
+  }
+
   static private fun validateDirName(dirName: String): void {
     validator = mutable SKFSImpl.NameValidator(dirName, dirName.chars(), 0);
     validator.go()
@@ -126,6 +130,7 @@ class InvalidPathExn(dirName: String, reason: String) extends SKFS.Exception {
 }
 
 fun error<T>(fileName: String, msg: String): T {
+  print_error("Error: " + msg + "\n");
   throw (SKFS.InvalidPathExn(fileName, msg))
 }
 

@@ -476,7 +476,6 @@ class FullUser{
 class TestFile(age: Int, User) extends SKFS.File
 
 class Request{askingID: Int, askedID: Int} extends SKFS.File {
-
   static fun fromString(strFile: SKFS.StringFile): Request {
     str = strFile.value;
     data = JSON.decode(str).expectObject();
@@ -530,16 +529,30 @@ fun makeTrees(acc: mutable Vector<Def>, size: Int): void {
   acc.push(tree)
 }
 
-untracked fun .testLazy(): void {
+untracked fun .main(): void {
   SKFS.run(context ~> {
     acc = mutable Vector[];
     makeTrees(acc, 3);
-    debug(acc);
     inputData = acc
       .map(x -> (SKFS.IID(x.v), SKFS.StringFile(x.toString())))
       .toArray();
     srcDir = context.mkdir(SKFS.StringFile::fromFile, "/src/", inputData);
     defDir = srcDir.map(Def::fromFile, context, "/defs/", Def::fromStringFile);
+    _defDiff = defDir.contextWriterKeyMap(
+      SKFS.IntFile::fromFile,
+      context,
+      "/defDiffs/",
+      (context, writer, key, value) ~> {
+        prevDir = defDir.pre(context);
+        prevDir match {
+        | None() -> writer.write(key, SKFS.IntFile(0))
+        | Some(preDir) ->
+          _prevDir2 = preDir.pre(context);
+          def = preDir.get(context, key);
+          writer.write(key, SKFS.IntFile(def.v - value.v))
+        }
+      },
+    );
     treeDir = SKFS.Handle::lazy(
       TreeFile::fromFile,
       context,
@@ -555,50 +568,23 @@ untracked fun .testLazy(): void {
       context,
       "/trees/",
       (context, x) ~> {
-        debug(x);
         treeDir.get(context, SKFS.IID(x.v))
       },
     );
+
     context.reads.clear();
-    context.update();
-    context.update();
   })
 }
 
-untracked fun .main(): void {
+untracked fun testOld(): void {
   SKFS.run(context ~> {
     acc = mutable Vector[];
     makeTrees(acc, 3);
-    debug(acc);
     inputData = acc
       .map(x -> (SKFS.IID(x.v), SKFS.StringFile(x.toString())))
       .toArray();
     srcDir = context.mkdir(SKFS.StringFile::fromFile, "/src/", inputData);
-    defDir = srcDir.map(Def::fromFile, context, "/defs/", Def::fromStringFile);
-    _ = defDir.map(Def::fromFile, context, "/defs0/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs1/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs2/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs3/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs4/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs5/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs6/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs7/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs8/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs9/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs10/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs11/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs12/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs13/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs14/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs15/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs16/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs17/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs18/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs19/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs20/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs21/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs22/", x ~> Def::fromFile(x));
-    _ = defDir.map(Def::fromFile, context, "/defs23/", x ~> Def::fromFile(x));
+    _defDir = srcDir.map(Def::fromFile, context, "/defs/", Def::fromStringFile);
     context.reads.clear();
     context.update();
     context.update();

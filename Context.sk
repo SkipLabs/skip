@@ -12,7 +12,6 @@ fun start<T>(f: (mutable Context) -> T): (mutable Context, T) {
   context = mutable Context{};
   result = f(context);
   context.updateFixedDeps();
-  context.flushErrorLog();
   (context, result)
 }
 
@@ -20,12 +19,13 @@ untracked fun run(f: (mutable Context) -> void): void {
   context = mutable Context{};
   f(context);
   context.updateFixedDeps();
-  context.flushErrorLog();
   toplevel(context)
 }
 
 mutable class Context{
   mutable state: State = State{},
+  mutable lazyVisitedList: List<Path> = List[],
+  mutable lazyVisitedSet: SortedSet<Path> = SortedSet[],
   mutable reads: mutable Vector<Path> = mutable Vector[],
   mutable time: Int = 0,
   mutable toUpdate: SortedMap<Int, DirName> = SortedMap[],
@@ -36,7 +36,7 @@ mutable class Context{
     SortedSet<(DirName, DirName, BaseName)>,
   > = SortedMap[],
   debugMode: Bool = true,
-  errorLog: mutable Vector<String> = mutable Vector[],
+  mutable hasPre: SortedSet<DirName> = SortedSet[],
 } {
   mutable fun getReads(): Vector<Path> {
     reads = freeze(this.reads);
@@ -116,25 +116,24 @@ mutable class Context{
 
   mutable fun update(): void {
     this.updateNewDeps();
+
+    state = this.state;
+
+    for (dirName in this.hasPre) {
+      dir = state.getDir(dirName);
+      !dir.dirName = dirName.prev();
+      this.setDir(dir.dirName, dir)
+    };
+
     loop {
       this.toUpdate.minimum() match {
-      | None() ->
-        this.flushErrorLog();
-        return void
+      | None() -> return void
       | Some((time, dirName)) ->
         this.!toUpdate = this.toUpdate.remove(time);
         dir = this.getDir(dirName);
         dir.update(this)
       }
-    }
-  }
-
-  mutable fun flushErrorLog(): void {
-    for (msg in this.errorLog) {
-      print_error(msg);
-      print_error("\n");
     };
-    this.errorLog.clear();
   }
 
   mutable fun timeStamp(): Int {
