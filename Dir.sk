@@ -120,7 +120,7 @@ class Dir{
   isInput: Bool,
   fixedData: FixedData<Array<File>>,
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
-  data: SortedMap<BaseName, SortedMap<Path, Array<File>>> = SortedMap[],
+  data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
   childDirs: SortedMap<Int, DirName> = SortedMap[],
   dirty: SortedSet<BaseName> = SortedSet[],
@@ -267,7 +267,7 @@ class Dir{
       dir = context.getDir(dirName);
       results = Array[result];
       map = SortedMap[Path(dirName, key) => results];
-      !dir.data = dir.data.set(key, map);
+      !dir.data = dir.data.set(context.tick, key, map);
       updateReaders(dirName, context, key);
       context.setDir(dirName, dir);
       if (context.debugMode) {
@@ -551,7 +551,7 @@ class Dir{
       for (path in dirtyReaders) {
         key = path.baseName;
         map = SortedMap[path => Array[]];
-        !this.data = this.data.set(key, map);
+        !this.data = this.data.set(context.tick, key, map);
       };
       context.setDir(this.dirName, this);
       for (path in dirtyReaders) {
@@ -749,7 +749,11 @@ class Dir{
         childName == dir.dirName &&
         childName != this.dirName
       ) {
-        !dir.data = dir.data.remove(baseName);
+        !dir.data = dir.data.set(
+          context.tick,
+          baseName,
+          SortedMap[(Path(childName, baseName), Array[])],
+        );
       };
       context.setDir(dirName, dir);
       context.!toUpdate = context.toUpdate.set(dir.time, dirName);
@@ -768,7 +772,7 @@ class Dir{
     };
     irvalues = rvalues.map(x -> x);
     !map = map.set(source, irvalues);
-    data = this.data.set(k, map);
+    data = this.data.set(context.tick, k, map);
     dirty = this.dirty.set(k);
     path = Path(this.dirName, k);
     this.updateDirtyReaders(context, path);

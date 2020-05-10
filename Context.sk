@@ -28,6 +28,7 @@ mutable class Context{
   mutable lazyVisitedSet: SortedSet<Path> = SortedSet[],
   mutable reads: mutable Vector<Path> = mutable Vector[],
   mutable time: Int = 0,
+  mutable tick: Int = 0,
   mutable toUpdate: SortedMap<Int, DirName> = SortedMap[],
   mutable deps: List<Vector<(Path, DirName, DirName, BaseName)>> = List[],
   mutable fixedDeps: Map<Path, Set<(DirName, DirName, BaseName)>> = Map[],
@@ -37,6 +38,7 @@ mutable class Context{
   > = SortedMap[],
   debugMode: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
+  mutable hasNext: SortedSet<DirName> = SortedSet[],
 } {
   mutable fun getReads(): Vector<Path> {
     reads = freeze(this.reads);
@@ -120,9 +122,25 @@ mutable class Context{
     state = this.state;
 
     for (dirName in this.hasPre) {
+      preDirName = dirName.pre();
       dir = state.getDir(dirName);
-      !dir.dirName = dirName.prev();
-      this.setDir(dir.dirName, dir)
+      preDir = state.maybeGetDir(preDirName) match {
+      | None() ->
+        preDir = Dir{
+          time => this.timeStamp(),
+          isInput => false,
+          dirName => preDirName,
+          fixedData => FixedData{dirName => preDirName, data => Array[]},
+        };
+        this.setDir(preDirName, preDir);
+        preDir
+      | Some(preDir) -> preDir
+      };
+      for (kv in dir.data.getChangesAfter(this.tick - 1)) {
+        (key, _) = kv;
+        values = dir.getArrayRaw(key);
+        _ = preDir.writeEntry(this, Path(preDir.dirName, key), key, values);
+      }
     };
 
     loop {
@@ -210,7 +228,7 @@ class State{dirs: Dirs = Dirs{}} {
   }
 }
 
-class Dirs{state: DMap<Dir> = DMap::empty()} {
+class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   fun set<T: File>(time: Int, key: DirName, value: Dir): this {
     !this.state = this.state.set(time, key, value);
     this

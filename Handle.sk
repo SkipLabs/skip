@@ -233,10 +233,26 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
       context.!hasPre = context.hasPre.add(this.dirName);
       return None();
     };
-    context.maybeGetDir(this.dirName.prev()) match {
+    context.maybeGetDir(this.dirName.pre()) match {
     | None() -> None()
     | Some(dir) -> Some(Handle(this.conv, dir.dirName))
     }
+  }
+
+  fun next(context: mutable Context): Handle<T> {
+    dirName = this.dirName.next();
+    if (!context.hasNext.contains(this.dirName)) {
+      fixedData = FixedData{dirName, data => Array[]};
+      dir = Dir{
+        time => context.timeStamp(),
+        isInput => true,
+        dirName,
+        fixedData,
+      };
+      context.setDir(dirName, dir);
+      return Handle(this.conv, dirName)
+    };
+    Handle(this.conv, dirName)
   }
 }
 
