@@ -17,21 +17,21 @@ base class VisitDirection {
   | Both()
 }
 
-base class DMap<Value> {
+base class DMap<Key: FileName, Value> {
   children =
   | Nil()
   | Node{
     time: Int,
     height: Int,
-    key: FileName,
+    key: Key,
     value: Value,
-    left: DMap<Value>,
-    right: DMap<Value>,
+    left: DMap<Key, Value>,
+    right: DMap<Key, Value>,
   }
 
   fun visitAcc(
-    f: Node<Value> -> VisitDirection,
-    acc: mutable Vector<(FileName, Value)>,
+    f: Node<Key, Value> -> VisitDirection,
+    acc: mutable Vector<(Key, Value)>,
   ): void
   | Nil() -> void
   | x @ Node{key, value, left, right} ->
@@ -46,11 +46,15 @@ base class DMap<Value> {
     }
 
   fun visit(
-    f: Node<Value> -> VisitDirection = (_) -> Both(),
-  ): Array<(FileName, Value)> {
+    f: Node<Key, Value> -> VisitDirection = (_) -> Both(),
+  ): Array<(Key, Value)> {
     acc = mutable Vector[];
     this.visitAcc(f, acc);
     acc.toArray()
+  }
+
+  fun items(): mutable Iterator<(Key, Value)> {
+    this.visit().collect(Map).items()
   }
 
   fun getTime(): Int
@@ -61,11 +65,11 @@ base class DMap<Value> {
   | Nil() -> 0
   | Node{height} -> height
 
-  static fun empty<Value>(): DMap<Value> {
+  static fun empty<Key: FileName, Value>(): DMap<Key, Value> {
     Nil()
   }
 
-  fun getChangesAcc(after: Int, acc: mutable Vector<(FileName, Value)>): void
+  fun getChangesAcc(after: Int, acc: mutable Vector<(Key, Value)>): void
   | Nil() -> void
   | Node{time, key, value, left, right} ->
     if (time <= after) return void;
@@ -73,7 +77,7 @@ base class DMap<Value> {
     left.getChangesAcc(after, acc);
     right.getChangesAcc(after, acc)
 
-  fun getChangesAfter(time: Int): Vector<(FileName, Value)> {
+  fun getChangesAfter(time: Int): Vector<(Key, Value)> {
     acc = mutable Vector[];
     this.getChangesAcc(time, acc);
     unsafe_chill_trust_me(acc)
@@ -81,17 +85,17 @@ base class DMap<Value> {
 
   static fun node(
     time: Int,
-    key: FileName,
+    key: Key,
     value: Value,
-    left: DMap<Value>,
-    right: DMap<Value>,
-  ): DMap<Value> {
+    left: DMap<Key, Value>,
+    right: DMap<Key, Value>,
+  ): DMap<Key, Value> {
     !time = max(time, max(left.getTime(), right.getTime()));
     height = 1 + max(left.getHeight(), right.getHeight());
     Node{time, height, key, value, left, right}
   }
 
-  fun set(time: Int, key: FileName, value: Value): DMap<Value>
+  fun set(time: Int, key: Key, value: Value): DMap<Key, Value>
   | Nil() -> static::node(time, key, value, Nil(), Nil())
   | Node{time => t, left => l, right => r, key => k, value => v} ->
     !t = max(time, t);
@@ -101,7 +105,7 @@ base class DMap<Value> {
     | GT() -> static::balance(t, k, v, l, r.set(time, key, value))
     }
 
-  fun containsKey(k: FileName): Bool
+  fun containsKey(k: Key): Bool
   | Nil() -> false
   | Node{key, left, right} ->
     k.compare(key) match {
@@ -110,7 +114,7 @@ base class DMap<Value> {
     | GT() -> right.containsKey(k)
     }
 
-  fun maybeGet(k: FileName): ?Value
+  fun maybeGet(k: Key): ?Value
   | Nil() -> None()
   | Node{key, value, left, right} ->
     k.compare(key) match {
@@ -121,11 +125,11 @@ base class DMap<Value> {
 
   protected static fun balance(
     t: Int,
-    k: FileName,
+    k: Key,
     v: Value,
-    l: DMap<Value>,
-    r: DMap<Value>,
-  ): DMap<Value> {
+    l: DMap<Key, Value>,
+    r: DMap<Key, Value>,
+  ): DMap<Key, Value> {
     hl = l.getHeight();
     hr = r.getHeight();
     if (hl > hr + 2) {

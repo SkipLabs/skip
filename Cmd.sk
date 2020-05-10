@@ -19,7 +19,10 @@ fun cutAfter(level: Int, str: String): String {
   str
 }
 
-fun listSubDirs(prefix: String, dmap: DMap<Dir>): Array<(FileName, Dir)> {
+fun listSubDirs(
+  prefix: String,
+  dmap: DMap<DirName, Dir>,
+): Array<(FileName, Dir)> {
   dmap.visit(node -> {
     keyStr = node.key.toString();
     keyStrLen = keyStr.length();
@@ -40,7 +43,10 @@ fun listSubDirs(prefix: String, dmap: DMap<Dir>): Array<(FileName, Dir)> {
   });
 }
 
-fun listDirs(prefix: String, dmap: DMap<Dir>): Array<(DirName, String)> {
+fun listDirs(
+  prefix: String,
+  dmap: DMap<DirName, Dir>,
+): Array<(DirName, String)> {
   visited = listSubDirs(prefix, dmap);
   level = countSlash(prefix);
   visitedNames = visited
