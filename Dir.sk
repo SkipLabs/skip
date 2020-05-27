@@ -404,14 +404,14 @@ class Dir{
   ): Vector<RowMapped<Array<File>>> {
     current = 0;
     mapped = mutable Vector[];
-    addFixed = (fixedRow: FixedRow<Array<File>>) -> {
-      key = fixedRow.key;
+    addFixed = () -> {
+      key = this.fixedData.data[current].key;
       valueAcc = mutable Vector<(Path, Array<File>)>[];
       while (
         current < this.fixedData.data.size() &&
         this.fixedData.data[current].key == key
       ) {
-        valueAcc.push(fixedRow.value);
+        valueAcc.push(this.fixedData.data[current].value);
         !current = current + 1;
       };
       fixedFiles = valueAcc.map(x -> x.i1).flatten().toArray();
@@ -422,7 +422,7 @@ class Dir{
         current < this.fixedData.data.size() &&
         this.fixedData.data[current].key < key
       ) {
-        addFixed(this.fixedData.data[current]);
+        addFixed();
       };
       while (
         current < this.fixedData.data.size() &&
@@ -433,7 +433,7 @@ class Dir{
       mapped.push(this.mapRow(context, key, this.getArrayRaw(key), f));
     };
     while (current < this.fixedData.data.size()) {
-      addFixed(this.fixedData.data[current]);
+      addFixed();
     };
     freeze(mapped)
   }
@@ -572,7 +572,6 @@ class Dir{
     };
 
     for (childName in this.childDirs) {
-      debug(("CHILD", childName));
       child = context.state.dirs.get(childName);
       dirty = if (dirtyDeps.containsKey(childName)) {
         dirtyDeps[childName]

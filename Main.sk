@@ -1,0 +1,24 @@
+module SKFS;
+
+const args: Array<String> = arguments();
+const testMode: Bool = args.size() > 0;
+
+module end;
+
+untracked fun main(): void {
+  if (SKFS.args.size() == 0) {
+    SKFSTest.testSearch()
+  } else {
+    SKFS.args[0] match {
+    | "testAll" -> SKFSTest.testAll()
+    | "testWikipedia" ->
+      if (SKFS.args.size() != 2) {
+        print_error("ERROR: wrong usage of testWikipedia, expected a path");
+        return void;
+      };
+      SKFSTest.testWikipedia(SKFS.args[1])
+    | "testMap" -> SKFSTest.testMap()
+    | cmd -> print_error("Invalid command: " + cmd)
+    }
+  }
+}

@@ -1,0 +1,76 @@
+module SKFSTest;
+
+class WikiPage{content: String} extends SKFS.File
+
+untracked fun testWikipedia(path: String): void {
+  id = 0;
+  files = FileSystem.readFilesRecursive(path)
+    .map(fileName -> FileSystem.readTextFile(fileName))
+    .map(content -> {
+      mcontent = mutable Vector[];
+      lastWasSpace = true;
+      for (x in content) {
+        x match {
+        | '<' | '>' | '!' | '"' | '\'' | '.' | '/' | '\\' | '=' | ';' | '-'
+        | '(' | ')' | ':' | '\n' | '\t' | '[' | ']' ->
+          if (lastWasSpace) continue;
+          !lastWasSpace = true;
+          mcontent.push(' ')
+        | c ->
+          !lastWasSpace = false;
+          mcontent.push(c)
+        }
+      };
+      WikiPage{content => String::fromChars(mcontent.toArray())}
+    })
+    .filter(page -> page.content != "")
+    .map(page -> {
+      !id = id + 1;
+      (SKFS.IID(id), page)
+    })
+    .toArray();
+  debug("Loaded the files");
+  SKFS.run(context ~> {
+    pages = context.mkdir(WikiPage::fromFile, "/input/", files);
+    queries = context.mkdir(SKFS.StringFile::fromFile, "/queries/", Array[]);
+    index = pages.contextWriterKeyMap(
+      SKFS.IntFile::fromFile,
+      context,
+      "/index/",
+      (_context, writer, id, value) ~> {
+        tokens = mutable Set[];
+        for (token in value.content.split(" ")) {
+          tokens.insert(token.hash());
+        };
+        for (token in tokens) {
+          writer.write(SKFS.IID(token), id);
+        }
+      },
+    );
+    _results = queries.contextMap(
+      QueryResult::fromFile,
+      context,
+      "/results/",
+      (context, query) ~> {
+        first = true;
+        results = mutable Set[];
+        for (token in query.value.split(" ")) {
+          newResults = index.getArray(context, SKFS.IID(token.hash()));
+          if (first) {
+            !first = false;
+            !results = Set::mcreateFromItems(newResults.map(x -> x.value));
+          } else {
+            newSet = mutable Set[];
+            for (result in newResults) {
+              if (results.contains(result.value)) {
+                newSet.insert(result.value);
+              }
+            };
+            !results = newSet;
+          }
+        };
+        QueryResult(results.toArray())
+      },
+    );
+  })
+}
