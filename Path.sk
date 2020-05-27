@@ -80,7 +80,7 @@ class DirName private (dirName: String) extends FileName {
 base class BaseName extends FileName {
   static overridable fun create(str: String): this {
     for (char in str) {
-      if (char >= '0' && char <= '9') {
+      if (char >= '0' && char <= '9' || char == '-') {
         return IID::create(str);
       } else {
         return SID::create(str);
@@ -97,6 +97,10 @@ class IID(value: Int) extends BaseName {
     base = 1;
     n = 0;
     for (c in chars) {
+      if (c == '-') {
+        !n = -n;
+        continue;
+      };
       !n = n + (c.code() - '0'.code()) * base;
       !base = base * 10;
     };
@@ -134,7 +138,9 @@ class InvalidPathExn(dirName: String, reason: String) extends SKFS.Exception {
 }
 
 fun error<T>(fileName: String, msg: String): T {
-  print_error("Error: " + msg + "\n");
+  if (!testMode) {
+    print_error("Error: " + msg + "\n");
+  };
   throw (SKFS.InvalidPathExn(fileName, msg))
 }
 
@@ -196,12 +202,20 @@ mutable class NameValidator(
     }
   }
 
+  static fun validChar(c: Char): Bool {
+    c match {
+    | '_' | '-' -> true
+    | _ -> false
+    }
+  }
+
   mutable fun mustBeBaseName(): void {
     if (this.reachedEnd() || this.current() == '/') {
       this.error("Empty baseName");
     };
     c = this.current();
-    if (c >= '0' && c <= '9') {
+    if (c >= '0' && c <= '9' || c == '-') {
+      this.next();
       while (!this.reachedEnd()) {
         !c = this.current();
         if (c >= '0' && c <= '9') {
@@ -212,14 +226,18 @@ mutable class NameValidator(
       }
     } else {
       !c = this.current();
-      if ((c >= 'a' && c <= 'z') || c >= 'A' && c <= 'Z' || c == '_') {
+      if (
+        (c >= 'a' && c <= 'z') ||
+        c >= 'A' && c <= 'Z' ||
+        static::validChar(c)
+      ) {
         while (!this.reachedEnd()) {
           !c = this.current();
           if (
             (c >= 'a' && c <= 'z') ||
             c >= 'A' && c <= 'Z' ||
             c >= '0' && c <= '9' ||
-            c == '_'
+            static::validChar(c)
           ) {
             this.next();
           } else {
@@ -235,36 +253,45 @@ module end;
 
 module SKFSTest;
 
+fun testDirNameFail(str: String): void {
+  expectFail(`Test DirName: '${str}'`, () -> _ = SKFS.DirName::create(str));
+}
+
+fun testDirNamePass(str: String): void {
+  expectPass(`Test DirName: '${str}'`, () -> _ = SKFS.DirName::create(str));
+}
+
+fun testBaseNameFail(str: String): void {
+  expectFail(`Test BaseName: '${str}'`, () -> _ = SKFS.BaseName::create(str));
+}
+
+fun testBaseNamePass(str: String): void {
+  expectPass(`Test BaseName: '${str}'`, () -> _ = SKFS.BaseName::create(str));
+}
+
 fun testDirName(): void {
-  dirFail = (path) -> expectFail(path, () -> _ = SKFS.DirName::create(path));
-  dirPass = (path) -> expectPass(path, () -> _ = SKFS.DirName::create(path));
-  dirFail(" ");
-  dirFail("??$");
-  dirFail(".");
-  dirFail("//");
-  dirFail("\n");
-  dirPass("/");
-  dirFail("/missingTrailingSlash");
-  dirPass("/1223/");
-  dirPass("/dir/");
-  dirPass("/dir1/dir2/");
+  testDirNameFail(" ");
+  testDirNameFail("??$");
+  testDirNameFail(".");
+  testDirNameFail("//");
+  testDirNameFail("\n");
+  testDirNamePass("/");
+  testDirNameFail("/missingTrailingSlash");
+  testDirNamePass("/1223/");
+  testDirNamePass("/dir/");
+  testDirNamePass("/dir1/dir2/");
 }
 
 fun testBaseName(): void {
-  fileFail = (path) -> expectFail(path, () -> _ = SKFS.SID::create(path));
-  filePass = (path) -> expectPass(path, () -> _ = SKFS.SID::create(path));
-  fileFail("");
-  fileFail(" ");
-  filePass("aa");
-  fileFail("aa/");
-  fileFail("abc ");
-  filePass("123");
-  filePass("__");
-}
-
-fun testPath(): void {
-  testDirName();
-  testBaseName();
+  testBaseNameFail("");
+  testBaseNameFail(" ");
+  testBaseNamePass("aa");
+  testBaseNameFail("aa/");
+  testBaseNameFail("abc ");
+  testBaseNamePass("123");
+  testBaseNamePass("__");
+  testBaseNamePass("-123");
+  testBaseNamePass("hello-world");
 }
 
 module end;

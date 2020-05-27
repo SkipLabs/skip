@@ -529,7 +529,7 @@ fun makeTrees(acc: mutable Vector<Def>, size: Int): void {
   acc.push(tree)
 }
 
-untracked fun .main(): void {
+untracked fun testLazy(): void {
   SKFS.run(context ~> {
     acc = mutable Vector[];
     makeTrees(acc, 3);
@@ -589,4 +589,53 @@ untracked fun testOld(): void {
     context.update();
     context.update();
   })
+}
+
+class Page{id: Int, text: String} extends SKFS.File
+class QueryResult(Array<Int>) extends SKFS.File
+
+untracked fun testSearch(): void {
+  pagesData = Array[
+    Page{id => 1, text => "hello world"},
+    Page{id => 2, text => "hello"},
+  ].map(x -> (SKFS.IID(x.id), x));
+  SKFS.run(context ~> {
+    pages = context.mkdir(Page::fromFile, "/pages/", pagesData);
+    queries = context.mkdir(SKFS.StringFile::fromFile, "/queries/", Array[]);
+    index = pages.contextWriterMap(
+      SKFS.IntFile::fromFile,
+      context,
+      "/index/",
+      (_context, writer, value) ~> {
+        for (token in value.text.split(" ")) {
+          writer.write(SKFS.IID(token.hash()), SKFS.IntFile(value.id))
+        }
+      },
+    );
+    _results = queries.contextMap(
+      QueryResult::fromFile,
+      context,
+      "/results/",
+      (context, query) ~> {
+        first = true;
+        results = mutable Set[];
+        for (token in query.value.split(" ")) {
+          newResults = index.getArray(context, SKFS.IID(token.hash()));
+          if (first) {
+            !first = false;
+            !results = Set::mcreateFromItems(newResults.map(x -> x.value));
+          } else {
+            newSet = mutable Set[];
+            for (result in newResults) {
+              if (results.contains(result.value)) {
+                newSet.insert(result.value);
+              }
+            };
+            !results = newSet;
+          }
+        };
+        QueryResult(results.toArray())
+      },
+    );
+  });
 }

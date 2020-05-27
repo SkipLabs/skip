@@ -200,8 +200,9 @@ fun testDMap(): void {
   !x = x.set(1, SKFS.IID(2), 2);
   !x = x.set(1, SKFS.IID(3), 3);
   !x = x.set(2, SKFS.IID(1), 23);
-  debug(x);
-  debug(x.getChangesAfter(1));
+  expectEq("Changes after", Array[1, 2, 3], () ->
+    x.getChangesAfter(1).toArray().map(x -> x.i0.value)
+  );
   void
 }
 

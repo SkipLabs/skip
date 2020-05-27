@@ -203,6 +203,17 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     })
   }
 
+  fun contextWriterKeyValues<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirNameStr: String,
+    f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
+  ): Handle<T2> {
+    this.genericMap(conv, context, dirNameStr, (context, writer, key, files) ~> {
+      f(context, writer, key, files);
+    })
+  }
+
   fun getArray(context: mutable Context, key: BaseName): Array<T> {
     dir = context.getDir(this.dirName);
     results = dir.getArray(context, key).map(this.conv);

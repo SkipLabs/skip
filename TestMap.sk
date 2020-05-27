@@ -1,0 +1,22 @@
+module SKFSTest;
+
+untracked fun testMap(): void {
+  data = Array[(SKFS.IID(1), SKFS.IntFile(1)), (SKFS.IID(2), SKFS.IntFile(2))];
+  SKFS.run(context ~> {
+    dir1 = context.mkdir(SKFS.IntFile::fromFile, "/dir1/", data);
+    dir2 = dir1.contextWriterMap(
+      SKFS.IntFile::fromFile,
+      context,
+      "/dir2/",
+      (_context, writer, v) ~> writer.write(SKFS.IID(0), v),
+    );
+    _dir3 = dir2.contextWriterKeyValues(
+      SKFS.IntFile::fromFile,
+      context,
+      "/dir3/",
+      (_context, writer, _key, v) ~> {
+        writer.writeArray(SKFS.IID(1), v)
+      },
+    );
+  });
+}
