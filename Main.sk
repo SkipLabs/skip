@@ -7,19 +7,28 @@ module end;
 
 untracked fun main(): void {
   if (SKFS.args.size() == 0) {
-    SKFSTest.testSearch()
-  } else {
-    SKFS.args[0] match {
-    | "testAll" -> SKFSTest.testAll()
-    | "testWikipedia" ->
-      if (SKFS.args.size() != 2) {
-        print_error("ERROR: wrong usage of testWikipedia, expected a path");
-        return void;
-      };
-      SKFSTest.testWikipedia(SKFS.args[1])
-    | "testMap" -> SKFSTest.testMap()
-    | "testMap2" -> SKFSTest.testMap2()
-    | cmd -> print_error("Invalid command: " + cmd)
+    print_error("Wrong usage: sk command args\n");
+    exit(2);
+  };
+  SKFS.args[0] match {
+  | "search" ->
+    context = SKFSTest.testSearch();
+    SKFS.toplevel(context)
+  | "toplevel" | "test" ->
+    if (SKFS.args.size() <= 1) {
+      print_error("Error: missing test name");
+      exit(3);
+    };
+    testFuns = SKFSTest.getAllTests();
+    testName = SKFS.args[1];
+    if (!testFuns.containsKey(testName)) {
+      print_error("Error: unknown test " + testName);
+      exit(4);
+    };
+    context = testFuns[testName]();
+    if (SKFS.args[0] == "toplevel") {
+      SKFS.toplevel(context)
     }
+  | cmd -> print_error("Error: unknown command " + cmd)
   }
 }

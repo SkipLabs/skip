@@ -15,11 +15,11 @@ fun start<T>(f: (mutable Context) -> T): (mutable Context, T) {
   (context, result)
 }
 
-untracked fun run(f: (mutable Context) -> void): void {
+fun run(f: (mutable Context) -> void): mutable Context {
   context = mutable Context{};
   f(context);
   context.updateFixedDeps();
-  toplevel(context)
+  context
 }
 
 mutable class Context{
