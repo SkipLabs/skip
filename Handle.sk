@@ -65,21 +65,6 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     Handle(conv, dir.dirName)
   }
 
-  fun split(
-    context: mutable Context,
-    dirNameStr: String,
-    f: T ~> BaseName,
-  ): Handle<Handle<T>> {
-    thisDir = context.getDir(this.dirName);
-    dir = thisDir.partition(context, dirNameStr, value ~> f(this.conv(value)));
-    conv = (file: File) ~>
-      file match {
-      | subDir @ Dir _ -> Handle(this.conv, subDir.dirName)
-      | _ -> invariant_violation("Expected a directory")
-      };
-    Handle(conv, dir.dirName)
-  }
-
   fun union(
     context: mutable Context,
     dirNameStr: String,

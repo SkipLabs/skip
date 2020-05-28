@@ -95,18 +95,6 @@ class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
   }
 }
 
-class Partition{
-  time: Int,
-  baseDirName: String,
-  dirs: Dir,
-  getKey: File ~> BaseName,
-  keys: SortedMap<BaseName, SortedSet<BaseName>>,
-} {
-  static fun dirName(baseDirName: String, key: BaseName): DirName {
-    DirName::create(baseDirName + key.toString() + "/");
-  }
-}
-
 base class PlaceHolder {
   children =
   | PHEmpty()
@@ -125,30 +113,9 @@ class Dir{
   childDirs: SortedMap<Int, DirName> = SortedMap[],
   dirty: SortedSet<BaseName> = SortedSet[],
   dirtyReaders: SortedSet<Path> = SortedSet[],
-  partitions: SortedMap<Int, Partition> = SortedMap[],
   mapFun: ?MapFun = None(),
   lazyFun: ?((mutable Context, DirName, BaseName) ~> File) = None(),
 } extends File {
-  private fun compactData(): FixedData<Array<File>> {
-    fixedData = this.fixedData.data;
-    current = 0;
-    newData = mutable Vector[];
-    for (newKey => values in this.data) {
-      while (current < fixedData.size() && fixedData[current].key < newKey) {
-        newData.push(fixedData[current]);
-      };
-      for (path => array in values) {
-        newData.push(FixedRow(fixedData[current].key, (path, array)));
-      };
-      !current = current + 1;
-    };
-    while (current < fixedData.size()) {
-      newData.push(fixedData[current]);
-      !current = current + 1;
-    };
-    this.fixedData with {data => newData.toArray()}
-  }
-
   fun files(): Set<BaseName> {
     fixedData = this.fixedData.data;
     current = 0;
@@ -175,60 +142,6 @@ class Dir{
     };
     freeze(keys)
   }
-
-  /*
-
-    private fun compactOld(): SortedMap<DirName, FixedData<BaseName>> {
-      fixedOld = this.fixedOld;
-      !fixedOld = fixedOld.map((dirName, fixed) -> {
-        if (!this.old.containsKey(dirName)) {
-          return fixed;
-        };
-        fixedData = fixed.data;
-        old = this.old[dirName];
-        current = 0;
-        newOld = mutable Vector[];
-        for (newKey => values in old) {
-          while (current < fixedData.size() && fixedData[current].key < newKey) {
-            newOld.push(fixedData[current]);
-          };
-          for (value in values) {
-            newOld.push(FixedRow(fixedData[current].key, value));
-          };
-          !current = current + 1;
-        };
-        while (current < fixedData.size()) {
-          newOld.push(fixedData[current]);
-          !current = current + 1;
-        };
-        fixed with {data => newOld.toArray()}
-      });
-      for (dirName => map in this.old) {
-        if (fixedOld.containsKey(dirName)) {
-          continue;
-        };
-        newOld = mutable Vector[];
-        for (baseName => values in map) {
-          for (value in values) {
-            newOld.push(FixedRow(baseName, value));
-          }
-        };
-        !fixedOld = fixedOld.add(
-          dirName,
-          FixedData{dirName, data => newOld.toArray()},
-        );
-      };
-      fixedOld
-    }
-
-    fun compact(): this {
-      invariant(this.dirty.isEmpty());
-      invariant(this.dirtyReaders.isEmpty());
-      fixedOld = this.compactOld();
-      fixedData = this.compactData();
-      this with {fixedOld, fixedData, old => SortedMap[], data => SortedMap[]}
-    }
-  */
 
   static fun lazy(
     context: mutable Context,
@@ -466,55 +379,6 @@ class Dir{
     dir
   }
 
-  fun updatePartition(context: mutable Context, partition: Partition): void {
-    for (key in this.dirty) {
-      dirName = Partition::dirName(partition.baseDirName, key);
-      source = Path(this.dirName, key);
-      values = this.getArrayRaw(key);
-      oldKeys = partition.keys.maybeGet(key) match {
-      | None() -> SortedSet[]
-      | Some(x) -> x
-      };
-      newKeys = SortedSet[];
-      mdata = mutable Map[];
-      for (value in values) {
-        subKey = partition.getKey(value);
-        !oldKeys = oldKeys.remove(subKey);
-        !newKeys = newKeys.set(subKey);
-      };
-      for (oldKey in oldKeys) {
-        mdata![oldKey] = mutable Vector[];
-      };
-      for (value in values) {
-        subKey = partition.getKey(value);
-        if (!mdata.containsKey(subKey)) {
-          mdata![subKey] = mutable Vector[];
-        };
-        mdata[subKey].push(value);
-      };
-      for (subKey => valueVec in mdata) {
-        dir = context.maybeGetDir(dirName) match {
-        | None() ->
-          time = context.timeStamp();
-          fixedData = FixedData{dirName, data => Array[]};
-          Dir{time, dirName, isInput => false, fixedData}
-        | Some(x) -> x
-        };
-        !dir = dir.writeEntry(context, source, subKey, valueVec.toArray());
-        context.setDir(dirName, dir);
-        !partition.keys[key] = newKeys;
-        !partition.dirs = partition.dirs.writeEntry(
-          context,
-          source,
-          key,
-          Array[dir],
-        );
-        !this.partitions[partition.time] = partition;
-        context.setDir(this.dirName, this);
-      }
-    };
-  }
-
   fun update(context: mutable Context): void {
     // We have been removed from the set of directories.
     // This can happen when an old dependency changed.
@@ -567,10 +431,6 @@ class Dir{
       )
     };
 
-    for (partition in this.partitions) {
-      this.updatePartition(context, partition)
-    };
-
     for (childName in this.childDirs) {
       child = context.state.dirs.get(childName);
       dirty = if (dirtyDeps.containsKey(childName)) {
@@ -616,82 +476,6 @@ class Dir{
 
   fun union(context: mutable Context, name: String, dirs: Array<Dir>): Dir {
     this.apply(context, name, (_, w, x, y) ~> w.writeArray(x, y), dirs)
-  }
-
-  fun partition(
-    context: mutable Context,
-    baseDirName: String,
-    getKey: (File) ~> BaseName,
-  ): Dir {
-    current = 0;
-    dirs = mutable Vector[];
-    keys = SortedMap[];
-    getFixedFiles = (fixedRow: FixedRow<Array<File>>) -> {
-      key = fixedRow.key;
-      subKeys = SortedSet[];
-      rows = mutable Vector<FixedRow<Array<File>>>[];
-      while (
-        current < this.fixedData.data.size() &&
-        this.fixedData.data[current].key == key
-      ) {
-        (_path, values) = this.fixedData.data[current].value;
-        path = Path(this.dirName, key);
-        for (value in values) {
-          subKey = getKey(value);
-          !subKeys = subKeys.set(subKey);
-          rows.push(FixedRow(subKey, (path, Array[value])));
-        };
-        !current = current + 1;
-      };
-      !keys[key] = subKeys;
-      rows.sort();
-      rows.toArray()
-    };
-    addDir = (key: BaseName, rows: Array<FixedRow<Array<File>>>) -> {
-      time = context.timeStamp();
-      dirName = Partition::dirName(baseDirName, key);
-      source = Path(this.dirName, key);
-      fixedData = FixedData{dirName, data => rows};
-      dir = Dir{time, dirName, isInput => false, fixedData};
-      context.setDir(dirName, dir);
-      dirs.push(FixedRow(key, (source, Array<File>[dir])));
-    };
-    for (key => values in this.data) {
-      while (
-        current < this.fixedData.data.size() &&
-        this.fixedData.data[current].key < key
-      ) {
-        fixedRow = this.fixedData.data[current];
-        fixedFiles = getFixedFiles(fixedRow);
-        addDir(fixedRow.key, fixedFiles);
-      };
-      while (
-        current < this.fixedData.data.size() &&
-        this.fixedData.data[current].key == key
-      ) {
-        !current = current + 1;
-      };
-      {
-        rows = mutable Vector[];
-        for (path => value in values) {
-          rows.push(FixedRow(key, (path, value)));
-        };
-        addDir(key, rows.toArray())
-      }
-    };
-    while (current < this.fixedData.data.size()) {
-      fixedRow = this.fixedData.data[current];
-      fixedFiles = getFixedFiles(fixedRow);
-      addDir(fixedRow.key, fixedFiles);
-    };
-    dirName = DirName::create(baseDirName);
-    time = context.timeStamp();
-    fixedData = FixedData<Array<File>>{dirName, data => dirs.toArray()};
-    subDirs = Dir{time, dirName, isInput => false, fixedData};
-    partition = Partition{time, baseDirName, dirs => subDirs, getKey, keys};
-    !this.partitions = this.partitions.add(time, partition);
-    context.setDir(this.dirName, this);
-    subDirs
   }
 
   private fun updateChildForKey<T: File>(
