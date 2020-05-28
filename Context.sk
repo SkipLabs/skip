@@ -23,7 +23,7 @@ fun run(f: (mutable Context) -> void): mutable Context {
 }
 
 mutable class Context{
-  mutable state: State = State{},
+  mutable dirs: Dirs = Dirs{},
   mutable lazyVisitedList: List<Path> = List[],
   mutable lazyVisitedSet: SortedSet<Path> = SortedSet[],
   mutable reads: mutable Vector<Path> = mutable Vector[],
@@ -66,7 +66,7 @@ mutable class Context{
   readonly fun debug(pathStr: String): void {
     print_string("Debug " + pathStr + ":");
     path = Path::fromString(pathStr);
-    this.state.dirs.maybeGet(path.dirName) match {
+    this.dirs.maybeGet(path.dirName) match {
     | None() -> print_string("Directory does not exist")
     | Some(dir) ->
       values = dir.getArrayRaw(path.baseName);
@@ -76,7 +76,7 @@ mutable class Context{
 
   readonly fun getValue(pathStr: String): Array<File> {
     path = Path::fromString(pathStr);
-    dir = this.state.dirs[path.dirName];
+    dir = this.dirs[path.dirName];
     values = dir.getArrayRaw(path.baseName);
     values
   }
@@ -119,12 +119,12 @@ mutable class Context{
   mutable fun update(): void {
     this.updateNewDeps();
 
-    state = this.state;
+    dirs = this.dirs;
 
     for (dirName in this.hasPre) {
       preDirName = dirName.pre();
-      dir = state.getDir(dirName);
-      preDir = state.maybeGetDir(preDirName) match {
+      dir = dirs.get(dirName);
+      preDir = dirs.maybeGet(preDirName) match {
       | None() ->
         preDir = Dir{
           time => this.timeStamp(),
@@ -180,7 +180,7 @@ mutable class Context{
     content: Array<(BaseName, Array<T>)> = Array[],
   ): Dir {
     dirName = DirName::create(dirNameStr);
-    if (this.state.dirs.state.containsKey(dirName)) {
+    if (this.dirs.state.containsKey(dirName)) {
       throw DirAlreadyExists(dirName);
     };
     vector = mutable Vector[];
@@ -192,39 +192,24 @@ mutable class Context{
     vector.sort();
     fixedData = FixedData{dirName, data => vector.toArray()};
     dir = Dir{time => this.timeStamp(), isInput => true, dirName, fixedData};
-    this.!state = this.state.setDir(dir.time, dirName, dir);
+    this.!dirs = this.dirs.set(dir.time, dirName, dir);
     dir
   }
 
   mutable fun setDir(dirName: DirName, dir: Dir): void {
-    this.!state = this.state.setDir(dir.time, dirName, dir);
+    this.!dirs = this.dirs.set(dir.time, dirName, dir);
   }
 
   readonly fun getDir(dirName: DirName): Dir {
-    this.state.getDir(freeze(dirName));
+    this.dirs.get(freeze(dirName));
   }
 
   readonly fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.state.maybeGetDir(freeze(dirName));
+    this.dirs.maybeGet(freeze(dirName));
   }
 
   mutable fun addDep(path: Path): void {
     this.reads.push(path)
-  }
-}
-
-class State{dirs: Dirs = Dirs{}} {
-  fun setDir<T: File>(time: Int, dirName: DirName, dir: Dir): this {
-    !this.dirs = this.dirs.set(time, dirName, dir);
-    this
-  }
-
-  fun getDir(dirName: DirName): Dir {
-    this.dirs.get(dirName)
-  }
-
-  fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.dirs.maybeGet(dirName)
   }
 }
 

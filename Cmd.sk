@@ -131,13 +131,10 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
   token.i0 match {
   | "ls" ->
     result = mutable Set[];
-    subDirs = listDirs(env.pwd, env.context.state.dirs.state);
+    subDirs = listDirs(env.pwd, env.context.dirs.state);
     for (kv in subDirs) {
       (dirName, relDirName) = kv;
-      subSubDirs = listSubDirs(
-        dirName.toString(),
-        env.context.state.dirs.state,
-      );
+      subSubDirs = listSubDirs(dirName.toString(), env.context.dirs.state);
       if (subSubDirs.size() > 0) result.insert(relDirName) else {
         env.context.maybeGetDir(dirName) match {
         | None() -> void
