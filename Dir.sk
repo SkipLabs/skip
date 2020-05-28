@@ -351,31 +351,19 @@ class Dir{
     freeze(mapped)
   }
 
-  fun apply(
-    context: mutable Context,
-    dirNameStr: String,
-    f: MapFun,
-    extraDirs: Array<Dir> = Array[],
-  ): Dir {
+  fun apply(context: mutable Context, dirNameStr: String, f: MapFun): Dir {
     dirName = DirName::create(dirNameStr);
-    dirs = mutable Vector[this];
-    mappedAcc = mutable Vector[this.mapData(context, f)];
-    extraDirs.each(dir -> {
-      dirs.push(dir);
-      mappedAcc.push(dir.mapData(context, f))
-    });
-    mapped = mappedAcc.flatten();
+    parent = this;
+    mapped = this.mapData(context, f);
     grouped = this.regroupMap(mapped);
     this.updateReaders(context, dirName, mapped);
     time = context.timeStamp();
     fixedData = FixedData{dirName, data => grouped.rows};
     dir = Dir{time, dirName, isInput => false, fixedData, mapFun => Some(f)};
     context.setDir(dirName, dir);
-    for (parent in dirs) {
-      !parent.fixedOld[dirName] = FixedData{dirName, data => grouped.old};
-      !parent.childDirs = parent.childDirs.add(time, dirName);
-      context.setDir(parent.dirName, parent);
-    };
+    !parent.fixedOld[dirName] = FixedData{dirName, data => grouped.old};
+    !parent.childDirs = parent.childDirs.add(time, dirName);
+    context.setDir(parent.dirName, parent);
     dir
   }
 
@@ -472,10 +460,6 @@ class Dir{
     !this.dirty = SortedSet[];
     !this.dirtyReaders = SortedSet[];
     context.setDir(this.dirName, this);
-  }
-
-  fun union(context: mutable Context, name: String, dirs: Array<Dir>): Dir {
-    this.apply(context, name, (_, w, x, y) ~> w.writeArray(x, y), dirs)
   }
 
   private fun updateChildForKey<T: File>(

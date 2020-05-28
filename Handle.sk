@@ -65,20 +65,6 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     Handle(conv, dir.dirName)
   }
 
-  fun union(
-    context: mutable Context,
-    dirNameStr: String,
-    others: Array<Handle<T>>,
-  ): Handle<T> {
-    thisDir = context.getDir(this.dirName);
-    dir = thisDir.union(
-      context,
-      dirNameStr,
-      others.map(handle -> context.getDir(handle.dirName)),
-    );
-    Handle(this.conv, dir.dirName)
-  }
-
   private fun genericMap<T2: File>(
     conv: File ~> T2,
     context: mutable Context,
