@@ -42,14 +42,20 @@ value class RowMapped<T>(
   key: BaseName,
   reads: Vector<Path>,
   values: Array<FixedRow<T>>,
+  newDirs: SortedSet<DirName>,
 )
 
 value class GroupedRows<T>(
   rows: Array<FixedRow<T>>,
   old: Array<FixedRow<BaseName>>,
+  newDirs: SortedMap<BaseName, SortedSet<DirName>>,
 )
 
 class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
+  static fun empty(dirName: DirName): this {
+    FixedData{dirName, data => Array[]}
+  }
+
   fun getPos(key: BaseName, i: Int, j: Int): Int {
     if (i > j) {
       return i;
@@ -110,6 +116,7 @@ class Dir{
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
+  newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
   childDirs: SortedMap<Int, DirName> = SortedMap[],
   dirty: SortedSet<BaseName> = SortedSet[],
   dirtyReaders: SortedSet<Path> = SortedSet[],
@@ -169,6 +176,7 @@ class Dir{
       reads = context.reads;
       context.!reads = mutable Vector[];
 
+      context.!newDirs = SortedSet[];
       result = try {
         f(context, dirName, key)
       } catch {
@@ -185,11 +193,12 @@ class Dir{
       context.setDir(dirName, dir);
       if (context.debugMode) {
         name = "" + dir.dirName + key;
-        print_string(`WRITTEN1:  ${name}`);
+        print_string(`WRITTEN LAZY:  ${name} => ${inspect(result)}`);
       };
       context.!reads = reads;
       result
     };
+    context.!newDirs = context.newDirs.add(dirName);
     newDir = Dir{
       time,
       dirName,
@@ -238,6 +247,22 @@ class Dir{
     }
   }
 
+  fun callLazy(
+    context: mutable Context,
+    f: (mutable Context, DirName, BaseName) ~> File,
+    key: BaseName,
+  ): Array<File> {
+    newDirsCopy = context.newDirs;
+    context.!newDirs = SortedSet[];
+    value = f(context, this.dirName, key);
+    newDirs = context.newDirs;
+    context.!newDirs = newDirsCopy.union(newDirs);
+    !this = context.getDir(this.dirName);
+    !this = this.updateNewDirs(context, key, newDirs);
+    context.setDir(this.dirName, this);
+    Array[value]
+  }
+
   fun getArray(context: mutable Context, key: BaseName): Array<File> {
     path = Path(this.dirName, key);
     context.addDep(path);
@@ -245,7 +270,7 @@ class Dir{
     if (values.size() != 0) return values;
     this.lazyFun match {
     | None() -> values
-    | Some(f) -> Array[f(context, this.dirName, key)]
+    | Some(f) -> this.callLazy(context, f, key)
     }
   }
 
@@ -256,7 +281,11 @@ class Dir{
     f: MapFun,
   ): RowMapped<Array<File>> {
     writer = mutable Writer{};
+    newDirsCopy = context.newDirs;
+    context.!newDirs = SortedSet[];
     f(context, writer, key, values);
+    newDirs = context.newDirs;
+    context.!newDirs = newDirsCopy;
     kvArray = freeze(writer).getWrites();
     reads = context.getReads();
     rows = kvArray.map(kv2 -> {
@@ -264,12 +293,13 @@ class Dir{
       path = Path(this.dirName, key);
       FixedRow(k2, (path, v2))
     });
-    RowMapped(key, reads, rows)
+    RowMapped(key, reads, rows, newDirs)
   }
 
   fun regroupMap<File2>(mapped: Vector<RowMapped<File2>>): GroupedRows<File2> {
     rowVec = mutable Vector[];
     oldVec = mutable Vector[];
+    newDirs = SortedMap[];
     for (rowMapped in mapped) {
       key = rowMapped.key;
       rows = rowMapped.values;
@@ -277,10 +307,11 @@ class Dir{
         oldVec.push(FixedRow(key, (Path(this.dirName, key), row.key)));
         rowVec.push(row);
       };
+      !newDirs = newDirs.set(key, rowMapped.newDirs);
     };
     rowVec.sort();
     oldVec.sort();
-    GroupedRows(rowVec.toArray(), oldVec.toArray())
+    GroupedRows(rowVec.toArray(), oldVec.toArray(), newDirs)
   }
 
   fun updateReaders(
@@ -353,13 +384,31 @@ class Dir{
 
   fun apply(context: mutable Context, dirNameStr: String, f: MapFun): Dir {
     dirName = DirName::create(dirNameStr);
+    context.!newDirs = context.newDirs.add(dirName);
+    context.maybeGetDir(dirName) match {
+    | None() -> void
+    | Some(oldDir) ->
+      if (inspect(oldDir.mapFun) == inspect(Some(f))) {
+        if (context.debugMode) {
+          print_string("Reusing dir: " + dirName);
+        };
+        return oldDir with {childDirs => SortedMap[]};
+      }
+    };
     parent = this;
     mapped = this.mapData(context, f);
     grouped = this.regroupMap(mapped);
     this.updateReaders(context, dirName, mapped);
     time = context.timeStamp();
     fixedData = FixedData{dirName, data => grouped.rows};
-    dir = Dir{time, dirName, isInput => false, fixedData, mapFun => Some(f)};
+    dir = Dir{
+      time,
+      dirName,
+      isInput => false,
+      fixedData,
+      mapFun => Some(f),
+      newDirs => grouped.newDirs,
+    };
     context.setDir(dirName, dir);
     !parent.fixedOld[dirName] = FixedData{dirName, data => grouped.old};
     !parent.childDirs = parent.childDirs.add(time, dirName);
@@ -379,27 +428,15 @@ class Dir{
 
     if (this.dirty.isEmpty() && this.dirtyReaders.isEmpty()) return void;
 
-    dirtyDeps = mutable Map[];
-
-    for (reader in this.dirtyReaders) {
-      dirName = reader.dirName;
-      baseName = reader.baseName;
-      if (!dirtyDeps.containsKey(dirName)) {
-        dirtyDeps![dirName] = mutable Set[];
-      };
-      dirtyDeps[dirName].insert(baseName);
-    };
-
     this.lazyFun match {
     | None() -> void
     | Some(f) ->
-      dirtyReaders = fixPoint(this.dirtyReaders, key -> {
-        context
-          .getDeps(key)
-          .filter(path -> path.i1 == this.dirName)
-          .map(x -> Path(x.i1, x.i2))
-          .collect(Set);
-      });
+      dirtyReaders = fixPoint(
+        this.dirtyReaders.union(this.dirty.map(x -> Path(this.dirName, x))),
+        key -> {
+          context.getDeps(key).map(x -> Path(x.i1, x.i2)).collect(Set);
+        },
+      );
       for (path in dirtyReaders) {
         key = path.baseName;
         map = SortedMap[path => Array[]];
@@ -408,7 +445,7 @@ class Dir{
       context.setDir(this.dirName, this);
       for (path in dirtyReaders) {
         key = path.baseName;
-        _ = f(context, this.dirName, key);
+        _ = this.callLazy(context, f, key);
       };
       !this = context.getDir(this.dirName);
       for (path in dirtyReaders) {
@@ -420,6 +457,16 @@ class Dir{
     };
 
     for (childName in this.childDirs) {
+      dirtyDeps = mutable Map[];
+
+      for (reader in context.getDir(this.dirName).dirtyReaders) {
+        dirName = reader.dirName;
+        baseName = reader.baseName;
+        if (!dirtyDeps.containsKey(dirName)) {
+          dirtyDeps![dirName] = mutable Set[];
+        };
+        dirtyDeps[dirName].insert(baseName);
+      };
       child = context.dirs.get(childName);
       dirty = if (dirtyDeps.containsKey(childName)) {
         dirtyDeps[childName]
@@ -434,7 +481,7 @@ class Dir{
         source = Path(this.dirName, key);
         oldKeys = Set::mcreateFromItems(this.getOld(childName, key));
         mapFun = child.mapFun match {
-        | None() -> invariant_violation("Could no find mapFun")
+        | None() -> continue
         | Some(f) -> f
         };
         (!child, newKeys) = child.updateChildForKey(
@@ -462,6 +509,23 @@ class Dir{
     context.setDir(this.dirName, this);
   }
 
+  private fun updateNewDirs(
+    context: mutable Context,
+    key: BaseName,
+    newDirs: SortedSet<DirName>,
+  ): this {
+    this.newDirs.maybeGet(key) match {
+    | None() -> if (newDirs.isEmpty()) return this
+    | Some(lastRoundDirs) ->
+      for (dirName in lastRoundDirs) {
+        if (newDirs.contains(dirName)) continue;
+        context.removeDir(dirName);
+      }
+    };
+    !this.newDirs = this.newDirs.set(key, newDirs);
+    this
+  }
+
   private fun updateChildForKey<T: File>(
     mapFun: MapFun,
     context: mutable Context,
@@ -471,7 +535,18 @@ class Dir{
     values: Array<T>,
   ): (this, Array<BaseName>) {
     writer = mutable Writer{};
-    mapFun(context, writer, key, values);
+    newDirsCopy = context.newDirs;
+    context.!newDirs = SortedSet[];
+
+    if (values.size() != 0) {
+      mapFun(context, writer, key, values);
+    };
+
+    newDirs = context.newDirs;
+    context.!newDirs = newDirsCopy;
+
+    !this = this.updateNewDirs(context, key, newDirs);
+
     mapped = freeze(writer).getWrites();
     reads = context.getReads();
 
@@ -542,17 +617,18 @@ class Dir{
     data = this.data.set(context.tick, k, map);
     dirty = this.dirty.set(k);
     path = Path(this.dirName, k);
+    !this = this with {data, dirty};
+    context.setDir(this.dirName, this);
+
     this.updateDirtyReaders(context, path);
 
-    !this = this with {data, dirty};
-    newThis = this;
-    context.setDir(this.dirName, this);
-    context.!toUpdate = context.toUpdate.set(newThis.time, this.dirName);
+    context.!toUpdate = context.toUpdate.set(this.time, this.dirName);
     if (context.debugMode) {
       name = "" + this.dirName + k;
-      print_string(`WRITTEN:  ${name}`);
+      print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
     };
-    this
+
+    context.getDir(this.dirName);
   }
 
   fun writeArray(
@@ -572,6 +648,10 @@ class Dir{
 
   fun remove(context: mutable Context, baseName: String): void {
     this.writeArray(context, baseName, Array[]);
+  }
+
+  fun isEmpty(): Bool {
+    this.data is Nil _ && this.fixedData.data.size() == 0
   }
 }
 

@@ -133,26 +133,20 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
     result = mutable Set[];
     subDirs = listDirs(env.pwd, env.context.dirs.state);
     for (kv in subDirs) {
-      (dirName, relDirName) = kv;
-      subSubDirs = listSubDirs(dirName.toString(), env.context.dirs.state);
-      if (subSubDirs.size() > 0) result.insert(relDirName) else {
-        env.context.maybeGetDir(dirName) match {
-        | None() -> void
-        | Some(dir) ->
-          files = dir.files();
-          if (files.size() > 0 && dirName.toString() != env.pwd) {
-            result.insert(relDirName);
-          }
-        }
-      }
+      (_, relDirName) = kv;
+      if (relDirName != "") result.insert(relDirName);
     };
-    env.context.maybeGetDir(DirName::create(env.pwd)) match {
-    | None() -> void
-    | Some(dir) ->
-      files = dir.files();
-      for (file in files) {
-        if (dir.getArrayRaw(file).size() > 0) {
-          result.insert(file.toString());
+    (path, _) = nextToken();
+    dirName = if (path == "") env.pwd else absolutePath(env.pwd, path);
+    if (dirName != "/") {
+      env.context.maybeGetDir(DirName::create(dirName)) match {
+      | None() -> print_error("Dir not found: " + dirName)
+      | Some(dir) ->
+        files = dir.files();
+        for (file in files) {
+          if (dir.getArrayRaw(file).size() > 0) {
+            result.insert(file.toString());
+          }
         }
       }
     };
@@ -167,7 +161,12 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
       print_error("Error: expected directory name\n");
       return void;
     };
-    env.!pwd = dirName
+    if (dirName == "/") env.!pwd = dirName else {
+      env.context.maybeGetDir(DirName::create(dirName)) match {
+      | None() -> print_error("Dir not found: " + dirName)
+      | Some _ -> env.!pwd = dirName
+      }
+    }
   | "cat" ->
     files = mutable Vector[];
     tok = nextToken().i0;

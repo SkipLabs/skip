@@ -36,9 +36,10 @@ mutable class Context{
     Path,
     SortedSet<(DirName, DirName, BaseName)>,
   > = SortedMap[],
-  debugMode: Bool = true,
+  mutable debugMode: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable hasNext: SortedSet<DirName> = SortedSet[],
+  mutable newDirs: SortedSet<DirName> = SortedSet[],
 } {
   mutable fun getReads(): Vector<Path> {
     reads = freeze(this.reads);
@@ -126,6 +127,7 @@ mutable class Context{
       dir = dirs.get(dirName);
       preDir = dirs.maybeGet(preDirName) match {
       | None() ->
+        this.!newDirs = this.newDirs.add(preDirName);
         preDir = Dir{
           time => this.timeStamp(),
           isInput => false,
@@ -171,6 +173,7 @@ mutable class Context{
         (key, Array[value])
       }),
     );
+    this.!newDirs = this.newDirs.add(dir.dirName);
     this.setDir(dir.dirName, dir);
     Handle(conv, dir.dirName)
   }
@@ -201,7 +204,26 @@ mutable class Context{
   }
 
   readonly fun getDir(dirName: DirName): Dir {
-    this.dirs.get(freeze(dirName));
+    this.dirs.get(dirName);
+  }
+
+  mutable fun removeDir(dirName: DirName): void {
+    dir = this.getDir(dirName);
+    for (childName in dir.childDirs) {
+      this.removeDir(childName);
+    };
+    if (this.debugMode) {
+      print_string("REMOVED: " + dirName);
+    };
+    this.setDir(
+      dirName,
+      Dir{
+        time => this.timeStamp(),
+        dirName => dirName,
+        isInput => false,
+        fixedData => FixedData::empty(dirName),
+      },
+    );
   }
 
   readonly fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
