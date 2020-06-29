@@ -1,0 +1,92 @@
+module SKFSTest;
+
+fun testSubDir(): mutable SKFS.Context {
+  dataStr1 = Array[
+    (SKFS.IID(1), SKFS.StringFile("1")),
+    (SKFS.IID(2), SKFS.StringFile("2")),
+  ];
+  context = SKFS.run(context ~> {
+    context.!debugMode = true;
+    dirStr1 = context.mkdir(SKFS.StringFile::fromFile, "/dirStr1/", dataStr1);
+    dirSingle = context.mkdir(
+      SKFS.StringFile::fromFile,
+      "/dirSingle/",
+      Array[(SKFS.IID(0), SKFS.StringFile("0"))],
+    );
+    dir1 = dirStr1.map(
+      SKFS.IntFile::fromFile,
+      context,
+      "/dir1/",
+      (v ~> SKFS.IntFile(v.value.toInt())),
+    );
+    _dir2 = dir1.contextWriterKeyMap(
+      SKFS.IntFile::fromFile,
+      context,
+      "/dir2/",
+      (context, _writer, _key, v) ~> {
+        dirName = "/dir2/" + v.value + "/";
+        _ = dir1.map(SKFS.IntFile::fromFile, context, dirName, x ~> x);
+      },
+    );
+    dir3 = SKFS.Handle::lazy(
+      SKFS.StringFile::fromFile,
+      context,
+      "/dir3/",
+      (context, _self, key) ~> {
+        keyStr = key.toString();
+        dirName = "/dir3/" + keyStr + "/";
+        _ = dirStr1.map(SKFS.StringFile::fromFile, context, dirName, x ~> x);
+        SKFS.StringFile(keyStr)
+      },
+    );
+    _dir4 = dir1.contextWriterKeyMap(
+      SKFS.IntFile::fromFile,
+      context,
+      "/dir4/",
+      (context, _writer, _, value) ~> {
+        v = dir3.get(context, SKFS.IID(value.value));
+        dirName = "/dir4/" + v.value + "/";
+        toAdd = dirSingle.get(context, SKFS.IID(0)).value;
+        _ = dir1.map(SKFS.IntFile::fromFile, context, dirName, x ~>
+          SKFS.IntFile(x.value + toAdd.toInt())
+        );
+      },
+    );
+  });
+  SKFSTest.expectPass("Testing subdir exists", () -> {
+    invariant(context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) is Some _)
+  });
+  SKFSTest.expectPass("Testing lazy subdir exists", () -> {
+    invariant(context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) is Some _)
+  });
+  inputDir = context.getDir(SKFS.DirName::create("/dirStr1/"));
+  inputSingle = context.getDir(SKFS.DirName::create("/dirSingle/"));
+  inputDir.writeArray(context, "1", Array[SKFS.StringFile("23")]);
+  context.update();
+  SKFSTest.expectPass("Testing subdir has been removed", () -> {
+    context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) match {
+    | None() -> invariant_violation("Expected an empty directory, not None")
+    | Some(dir) -> invariant(dir.isEmpty())
+    }
+  });
+  SKFSTest.expectPass("Testing lazy subdir has been removed", () -> {
+    context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) match {
+    | None() -> invariant_violation("Expected an empty directory, not None")
+    | Some(dir) -> invariant(dir.isEmpty())
+    }
+  });
+  SKFSTest.expectPass("Testing new subdir exists", () -> {
+    invariant(context.maybeGetDir(SKFS.DirName::create("/dir2/23/")) is Some _)
+  });
+  SKFSTest.expectPass("Testing new lazy subdir exists", () -> {
+    invariant(context.maybeGetDir(SKFS.DirName::create("/dir3/23/")) is Some _)
+  });
+  inputDir.writeArray(context, "255", Array[SKFS.StringFile("255")]);
+  context.update();
+  inputDir.writeArray(context, "255", Array[SKFS.StringFile("255")]);
+  context.update();
+  inputSingle.writeArray(context, "0", Array[SKFS.StringFile("1")]);
+  inputDir.writeArray(context, "255", Array[SKFS.StringFile("255")]);
+  context.update();
+  context
+}

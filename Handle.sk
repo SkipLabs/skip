@@ -65,35 +65,6 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     Handle(conv, dir.dirName)
   }
 
-  fun split(
-    context: mutable Context,
-    dirNameStr: String,
-    f: T ~> BaseName,
-  ): Handle<Handle<T>> {
-    thisDir = context.getDir(this.dirName);
-    dir = thisDir.partition(context, dirNameStr, value ~> f(this.conv(value)));
-    conv = (file: File) ~>
-      file match {
-      | subDir @ Dir _ -> Handle(this.conv, subDir.dirName)
-      | _ -> invariant_violation("Expected a directory")
-      };
-    Handle(conv, dir.dirName)
-  }
-
-  fun union(
-    context: mutable Context,
-    dirNameStr: String,
-    others: Array<Handle<T>>,
-  ): Handle<T> {
-    thisDir = context.getDir(this.dirName);
-    dir = thisDir.union(
-      context,
-      dirNameStr,
-      others.map(handle -> context.getDir(handle.dirName)),
-    );
-    Handle(this.conv, dir.dirName)
-  }
-
   private fun genericMap<T2: File>(
     conv: File ~> T2,
     context: mutable Context,
@@ -101,25 +72,18 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
   ): Handle<T2> {
     thisDir = context.getDir(this.dirName);
+    thisDirName = this.dirName.toString();
     dir = thisDir.apply(context, dirNameStr, (context, writer, key, files) ~> {
       try {
         if (files.size() == 0) return void;
         f(context, writer, key, files.map(x -> this.conv(x)));
       } catch {
       | ErrorFile(trace) ->
-        traceElt = ErrorTrace(
-          thisDir.dirName.toString(),
-          key.toString(),
-          "propagated",
-        );
+        traceElt = ErrorTrace(thisDirName, key.toString(), "propagated");
         !trace = List.Cons(traceElt, trace);
         writer.write(key, ErrorFile(trace))
       | exn ->
-        traceElt = ErrorTrace(
-          thisDir.dirName.toString(),
-          key.toString(),
-          exn.getMessage(),
-        );
+        traceElt = ErrorTrace(thisDirName, key.toString(), exn.getMessage());
         trace = List.Cons(traceElt, List.Nil());
         writer.write(key, ErrorFile(trace))
       }

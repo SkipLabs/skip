@@ -73,43 +73,6 @@ fun testUpdate(
     compareResults(context, "Update", key, values);
   };
 }
-
-fun testUnion(): void {
-  // Base case
-  (context, _) = SKFS.start(context ~> {
-    dir1 = make(context, "/tmp1/", Array[1]);
-    dir2 = make(context, "/tmp2/", Array[2]);
-    _dir3 = dir1.union(context, "/tmp3/", Array[dir2]);
-    compareResults(context, "Union", "/tmp3/1", Array[1]);
-    compareResults(context, "Union", "/tmp3/2", Array[2]);
-  });
-
-  testUpdate(
-    context,
-    Array[("/tmp1/1", Array[22])],
-    Array[("/tmp3/1", Array[22])],
-  );
-
-  testUpdate(
-    context,
-    Array[("/tmp1/3", Array[22]), ("/tmp2/3", Array[23])],
-    Array[("/tmp3/3", Array[22, 23])],
-  );
-
-  testUpdate(
-    context,
-    Array[("/tmp1/3", Array[24])],
-    Array[("/tmp3/3", Array[24, 23])],
-  );
-
-  testUpdate(
-    context,
-    Array[("/tmp1/3", Array[])],
-    Array[("/tmp3/3", Array[23])],
-  );
-
-  testUpdate(context, Array[("/tmp2/3", Array[])], Array[("/tmp3/3", Array[])]);
-}
 /*
 
 fun testMap(): void {
