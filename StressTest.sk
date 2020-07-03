@@ -20,9 +20,9 @@ class Config{
   nbrDirs: RNbr = RRange(2, 10),
   funBodySize: RNbr = RRange(1, 5),
   mergeSize: RNbr = RRange(1, 4),
-  keyChange: RNbr = RProb(50),
-  keyChangeRemoved: RNbr = RProb(50),
-  lazyDirProb: RNbr = RProb(50),
+  probKeyChange: RNbr = RProb(50),
+  probLazyDir: RNbr = RProb(50),
+  probKeyChangeRemoved: RNbr = RProb(50),
   nbrRounds: Int = 1000,
 }
 
@@ -31,11 +31,11 @@ const VALUE_SIZE: Int = 10;
 class Program(
   inputs: List<Input>,
   diffs: Map<String, Map<Int, List<SKFS.IntFile>>>,
-  mDirs: List<Dir>,
+  mDirs: List<DirValue>,
 )
 
 class Input{name: String, data: Map<Int, List<SKFS.IntFile>>}
-base class Dir{name: String} {
+base class DirValue{name: String} {
   children =
   | MDir{input: String, readDirs: List<String>}
   | LDir{readDirs: List<String>}
@@ -91,7 +91,7 @@ fun makeEnv(context: mutable SKFS.Context, inputs: List<Input>): void {
   }
 }
 
-fun evalDirs(context: mutable SKFS.Context, dirs: List<Dir>): void {
+fun evalDirs(context: mutable SKFS.Context, dirs: List<DirValue>): void {
   for (dir in dirs) {
     dir match {
     | mDir @ MDir _ -> evalMDir(context, mDir)
@@ -336,12 +336,12 @@ fun genLDir(rand: RNbr -> Int, config: Config, dirs: GenDirs, nbr: Int): LDir {
   ldir
 }
 
-fun genDirs(rand: RNbr -> Int, config: Config, dirs: GenDirs): List<Dir> {
+fun genDirs(rand: RNbr -> Int, config: Config, dirs: GenDirs): List<DirValue> {
   mdirs = Vector::mcreateFromItems(dirs);
   result = List[];
   size = dirs.size() + rand(config.nbrDirs);
   for (i in Range(dirs.size(), size)) {
-    dir = if (i == size - 1 || rand(config.lazyDirProb) == 0) {
+    dir = if (i == size - 1 || rand(config.probLazyDir) == 0) {
       genMDir(rand, config, dirs, mdirs, i)
     } else {
       genLDir(rand, config, dirs, i)
@@ -360,8 +360,8 @@ fun genDiffs(
   for (input in inputs) {
     data = mutable Map[];
     for (key => _ in input.data) {
-      if (rand(config.keyChange) == 1) {
-        newValues = if (rand(config.keyChangeRemoved) == 1) List[] else {
+      if (rand(config.probKeyChange) == 1) {
+        newValues = if (rand(config.probKeyChangeRemoved) == 1) List[] else {
           genValues(rand, config)
         };
         data![key] = newValues;
