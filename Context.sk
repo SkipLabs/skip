@@ -23,6 +23,7 @@ fun run(f: (mutable Context) -> void): mutable Context {
 }
 
 mutable class Context{
+  mutable pwd: List<String> = List["/"],
   mutable dirs: Dirs = Dirs{},
   mutable lazyVisitedList: List<Path> = List[],
   mutable lazyVisitedSet: SortedSet<Path> = SortedSet[],
@@ -200,6 +201,16 @@ mutable class Context{
   }
 
   mutable fun setDir(dirName: DirName, dir: Dir): void {
+    dirNamePwdStr = this.pwd.join("/");
+    dirNameStr = dirName.toString();
+    dirNameArr = dirNameStr.split("/");
+    if (dirNameArr.size() < 2) {
+      error(`Invalid directory name: ${dirNameStr}`);
+    };
+    lastDirName = dirNameArr[dirNameArr.size() - 2];
+    if (dirNamePwdStr + lastDirName + "/" != dirNameStr) {
+      error(`Cannot create directory ${dirNameStr} from path ${dirNamePwdStr}`);
+    };
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
   }
 

@@ -14,37 +14,45 @@ const root: DirName = DirName::create("/");
 
 base class FileName extends File uses Hashable, Orderable, Show
 
+// Decomposes the string into the tuple: (directory name, base name).
+fun splitPath(path: String): (String, String) {
+  chars = path.chars();
+  i = chars.size() - 1;
+  lastSlashOpt = loop {
+    if (i < 0) {
+      break None();
+    };
+    if (chars[i] == '/') {
+      break Some(i);
+    };
+    !i = i - 1;
+  };
+  lastSlash = lastSlashOpt match {
+  | None() -> error("Invalid path, no '/' found")
+  | Some(x) -> x
+  };
+  dirNameChars = mutable Vector[];
+  baseNameChars = mutable Vector[];
+  for (j in Range(0, chars.size())) {
+    if (j <= lastSlash) {
+      dirNameChars.push(chars[j]);
+    } else {
+      baseNameChars.push(chars[j])
+    }
+  };
+  if (baseNameChars.size() == 0) {
+    error("Invalid path, missing BaseName");
+  };
+  dirName = String::fromChars(dirNameChars.toArray());
+  baseName = String::fromChars(baseNameChars.toArray());
+  (dirName, baseName)
+}
+
 class Path(dirName: DirName, baseName: BaseName) extends FileName {
   static fun fromString(path: String): this {
-    chars = path.chars();
-    i = chars.size() - 1;
-    lastSlashOpt = loop {
-      if (i < 0) {
-        break None();
-      };
-      if (chars[i] == '/') {
-        break Some(i);
-      };
-      !i = i - 1;
-    };
-    lastSlash = lastSlashOpt match {
-    | None() -> error(path, "Invalid path, no '/' found")
-    | Some(x) -> x
-    };
-    dirNameChars = mutable Vector[];
-    baseNameChars = mutable Vector[];
-    for (j in Range(0, chars.size())) {
-      if (j <= lastSlash) {
-        dirNameChars.push(chars[j]);
-      } else {
-        baseNameChars.push(chars[j])
-      }
-    };
-    if (baseNameChars.size() == 0) {
-      error(path, "Invalid path, missing BaseName");
-    };
-    dirName = DirName::create(String::fromChars(dirNameChars.toArray()));
-    baseName = BaseName::create(String::fromChars(baseNameChars.toArray()));
+    (dirNameStr, baseNameStr) = splitPath(path);
+    dirName = DirName::create(dirNameStr);
+    baseName = BaseName::create(baseNameStr);
     Path(dirName, baseName)
   }
 
@@ -131,17 +139,17 @@ class SID private (value: String) extends BaseName {
 }
 
 base class Exception extends .Exception uses Show
-class InvalidPathExn(dirName: String, reason: String) extends SKFS.Exception {
+class InvalidPathExn(reason: String) extends SKFS.Exception {
   fun toString(): String {
-    `Invalid path(${this.dirName}): ${this.reason}`
+    `Invalid path: ${this.reason}`
   }
 }
 
-fun error<T>(fileName: String, msg: String): T {
+fun error<T>(msg: String): T {
   if (!testMode) {
     print_error("Error: " + msg + "\n");
   };
-  throw (SKFS.InvalidPathExn(fileName, msg))
+  throw (SKFS.InvalidPathExn(msg))
 }
 
 module end;
@@ -161,7 +169,7 @@ mutable class NameValidator(
   mutable idx: Int,
 ) {
   readonly fun error(msg: String): void {
-    SKFS.error(this.dirName, msg)
+    SKFS.error(msg)
   }
 
   readonly fun current(): Char {
