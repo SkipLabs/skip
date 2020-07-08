@@ -146,10 +146,14 @@ class InvalidPathExn(reason: String) extends SKFS.Exception {
 }
 
 fun error<T>(msg: String): T {
-  if (!testMode) {
-    print_error("Error: " + msg + "\n");
-  };
-  throw (SKFS.InvalidPathExn(msg))
+  print_error("Error: " + msg + "\n");
+  throw Error(msg)
+}
+
+class Error(msg: String) extends Exception {
+  fun toString(): String {
+    this.msg
+  }
 }
 
 module end;
@@ -200,13 +204,17 @@ mutable class NameValidator(
 
   mutable fun mustBeSlash(): void {
     if (this.reachedEnd()) {
-      this.error("Expected a slash, reached the end of the path instead");
+      this.error(
+        `Expected a slash, reached the end of the path instead (${
+          this.dirName
+        })`,
+      );
     };
     c = this.current();
     if (c == '/') {
       this.next()
     } else {
-      this.error(`Expected a slash, found '${c}' instead`);
+      this.error(`Expected a slash, found '${c}' instead (${this.dirName})`);
     }
   }
 
@@ -219,7 +227,7 @@ mutable class NameValidator(
 
   mutable fun mustBeBaseName(): void {
     if (this.reachedEnd() || this.current() == '/') {
-      this.error("Empty baseName");
+      this.error(`Empty baseName ${this.dirName}`);
     };
     c = this.current();
     if (c >= '0' && c <= '9' || c == '-') {

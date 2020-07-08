@@ -163,6 +163,16 @@ mutable base class .List<+T>
     this.compare(x) != LT()
   }
 
+  // Expects the list to be sorted
+  fun unique[T: Orderable](): List<T> {
+    this match {
+    | Nil() -> Nil()
+    | l @ Cons(_, Nil()) -> l
+    | Cons(x1, rl @ Cons(x2, _)) if (x1 == x2) -> rl.unique()
+    | Cons(x, rl) -> Cons(x, rl.unique())
+    }
+  }
+
   readonly fun eqBy<T2>[T: T2](
     other: readonly List<T2>,
     eq: (T2, T2) -> Bool,

@@ -110,16 +110,18 @@ base class PlaceHolder {
 
 class Dir{
   time: Int,
+  tick: Int,
   dirName: DirName,
   isInput: Bool,
   fixedData: FixedData<Array<File>>,
+  parent: ?(Int, DirName) = None(),
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
   childDirs: SortedMap<Int, DirName> = SortedMap[],
   dirty: SortedSet<BaseName> = SortedSet[],
-  dirtyReaders: SortedSet<Path> = SortedSet[],
+  dirtyReaders: SortedMap<DirName, SortedSet<BaseName>> = SortedMap[],
   mapFun: ?MapFun = None(),
   lazyFun: ?((mutable Context, DirName, BaseName) ~> File) = None(),
 } extends File {
@@ -201,6 +203,7 @@ class Dir{
     context.!newDirs = context.newDirs.add(dirName);
     newDir = Dir{
       time,
+      tick => context.tick,
       dirName,
       isInput => false,
       fixedData => FixedData{dirName, data => Array[]},
@@ -280,6 +283,9 @@ class Dir{
     values: Array<File>,
     f: MapFun,
   ): RowMapped<Array<File>> {
+    if (values.size() == 0) {
+      return RowMapped(key, Vector[], Array[], SortedSet[]);
+    };
     writer = mutable Writer{};
     newDirsCopy = context.newDirs;
     context.!newDirs = SortedSet[];
@@ -382,46 +388,63 @@ class Dir{
     freeze(mapped)
   }
 
-  fun apply(context: mutable Context, dirNameStr: String, f: MapFun): Dir {
-    dirName = DirName::create(dirNameStr);
-    context.!newDirs = context.newDirs.add(dirName);
-    context.maybeGetDir(dirName) match {
-    | None() -> void
-    | Some(oldDir) ->
-      if (inspect(oldDir.mapFun) == inspect(Some(f))) {
-        if (context.debugMode) {
-          print_string("Reusing dir: " + dirName);
-        };
-        return oldDir with {childDirs => SortedMap[]};
-      }
+  fun apply(context: mutable Context, dirName: DirName, f: MapFun): void {
+    if (this.lazyFun is Some _) {
+      error(`Cannot apply over a lazy directory ${this.dirName}`);
     };
-    parent = this;
+    context.maybeGetDir(dirName) match {
+    | Some(dir) if (dir.tick == context.tick) ->
+      error(
+        `Error: directory ${dirName.toString()} already exists (parent: ${
+          this.dirName
+        })`,
+      )
+    | Some(dir) ->
+      if (
+        dir.parent is Some _ &&
+        dir.parent.fromSome() == (this.time, this.dirName) &&
+        inspect(dir.mapFun.fromSome()) == inspect(f)
+      ) {
+        if (context.debugMode) {
+          print_string(`REUSING: ${dir.dirName}`);
+        };
+        context.!newDirs = context.newDirs.add(dir.dirName);
+        this.update(context, dir.dirName);
+        return void;
+      }
+    | _ -> void
+    };
+    time = context.timeStamp();
+    context.!newDirs = context.newDirs.add(dirName);
     mapped = this.mapData(context, f);
     grouped = this.regroupMap(mapped);
     this.updateReaders(context, dirName, mapped);
-    time = context.timeStamp();
     fixedData = FixedData{dirName, data => grouped.rows};
     dir = Dir{
       time,
+      tick => context.tick,
       dirName,
       isInput => false,
+      parent => Some((this.time, this.dirName)),
       fixedData,
       mapFun => Some(f),
       newDirs => grouped.newDirs,
     };
     context.setDir(dirName, dir);
+    parent = context.getDir(this.dirName);
     !parent.fixedOld[dirName] = FixedData{dirName, data => grouped.old};
     !parent.childDirs = parent.childDirs.add(time, dirName);
     context.setDir(parent.dirName, parent);
-    dir
+    if (context.debugMode) {
+      print_string(
+        `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${
+          this.dirName
+        })`,
+      );
+    };
   }
 
-  fun update(context: mutable Context): void {
-    // We have been removed from the set of directories.
-    // This can happen when an old dependency changed.
-    // Because of the change, the directory gets added
-    // to the list of directories to update. But in the mean time
-    // the source no longer creates this directory.
+  fun updateLazy(context: mutable Context): void {
     if (!context.dirs.state.containsKey(this.dirName)) {
       return void;
     };
@@ -431,8 +454,16 @@ class Dir{
     this.lazyFun match {
     | None() -> void
     | Some(f) ->
+      thisDirtyReaders = SortedSet[];
+      for (dirtyReaderDirName => dirtyReaderBaseNames in this.dirtyReaders) {
+        for (dirtyReaderBaseName in dirtyReaderBaseNames) {
+          !thisDirtyReaders = thisDirtyReaders.add(
+            Path(dirtyReaderDirName, dirtyReaderBaseName),
+          );
+        }
+      };
       dirtyReaders = fixPoint(
-        this.dirtyReaders.union(this.dirty.map(x -> Path(this.dirName, x))),
+        thisDirtyReaders.union(this.dirty.map(x -> Path(this.dirName, x))),
         key -> {
           context.getDeps(key).map(x -> Path(x.i1, x.i2)).collect(Set);
         },
@@ -455,57 +486,56 @@ class Dir{
         dirtyReaders.map(x -> x.baseName),
       )
     };
+  }
 
-    for (childName in this.childDirs) {
-      dirtyDeps = mutable Map[];
-
-      for (reader in context.getDir(this.dirName).dirtyReaders) {
-        dirName = reader.dirName;
-        baseName = reader.baseName;
-        if (!dirtyDeps.containsKey(dirName)) {
-          dirtyDeps![dirName] = mutable Set[];
-        };
-        dirtyDeps[dirName].insert(baseName);
-      };
-      child = context.dirs.get(childName);
-      dirty = if (dirtyDeps.containsKey(childName)) {
-        dirtyDeps[childName]
-      } else {
-        mutable Set[]
-      };
-      for (key in this.dirty) {
-        dirty.insert(key);
-      };
-      for (key in dirty) {
-        values = this.getArrayRaw(key);
-        source = Path(this.dirName, key);
-        oldKeys = Set::mcreateFromItems(this.getOld(childName, key));
-        mapFun = child.mapFun match {
-        | None() -> continue
-        | Some(f) -> f
-        };
-        (!child, newKeys) = child.updateChildForKey(
-          mapFun,
-          context,
-          oldKeys,
-          source,
-          key,
-          values,
-        );
-        // We need to remember what keys we produced for the next
-        // time around.
-        oldKeysMap = this.old.maybeGet(child.dirName) match {
-        | None() -> SortedMap[]
-        | Some(x) -> x
-        };
-        !oldKeysMap[key] = newKeys;
-        !this.old[child.dirName] = oldKeysMap;
-      };
-      context.setDir(child.dirName, child);
+  fun update(context: mutable Context, childName: DirName): void {
+    // We have been removed from the set of directories.
+    // This can happen when an old dependency changed.
+    // Because of the change, the directory gets added
+    // to the list of directories to update. But in the mean time
+    // the source no longer creates this directory.
+    if (!context.dirs.state.containsKey(this.dirName)) {
+      return void;
     };
 
-    !this.dirty = SortedSet[];
-    !this.dirtyReaders = SortedSet[];
+    if (this.dirty.isEmpty() && this.dirtyReaders.isEmpty()) return void;
+
+    child = context.dirs.get(childName);
+    dirty = mutable Set[];
+    if (this.dirtyReaders.containsKey(childName)) {
+      for (elt in this.dirtyReaders[childName]) {
+        dirty.add(elt)
+      }
+    };
+    for (key in this.dirty) {
+      dirty.insert(key);
+    };
+    for (key in dirty) {
+      values = this.getArrayRaw(key);
+      source = Path(this.dirName, key);
+      oldKeys = Set::mcreateFromItems(this.getOld(childName, key));
+      mapFun = child.mapFun match {
+      | None() -> continue
+      | Some(f) -> f
+      };
+      (!child, newKeys) = child.updateChildForKey(
+        mapFun,
+        context,
+        oldKeys,
+        source,
+        key,
+        values,
+      );
+      // We need to remember what keys we produced for the next
+      // time around.
+      oldKeysMap = this.old.maybeGet(child.dirName) match {
+      | None() -> SortedMap[]
+      | Some(x) -> x
+      };
+      !oldKeysMap[key] = newKeys;
+      !this.old[child.dirName] = oldKeysMap;
+    };
+    context.setDir(child.dirName, child);
     context.setDir(this.dirName, this);
   }
 
@@ -580,12 +610,22 @@ class Dir{
   }
 
   fun updateDirtyReaders(context: mutable Context, path: Path): void {
+    invariant(path.dirName == this.dirName);
     readers = context.getDeps(path);
 
     for (reader in readers) {
       (dirName, childName, baseName) = reader;
       dir = context.getDir(dirName);
-      !dir.dirtyReaders = dir.dirtyReaders.set(Path(childName, baseName));
+      child = context.getDir(childName);
+
+      if (child.time < this.time) {
+        print_string(`SKIPPING: ${path} ${child.dirName}`);
+        continue;
+      };
+      if (!dir.dirtyReaders.containsKey(childName)) {
+        !dir.dirtyReaders[childName] = SortedSet[];
+      };
+      !dir.dirtyReaders[childName] = dir.dirtyReaders[childName].set(baseName);
       if (
         dir.lazyFun is Some _ &&
         childName == dir.dirName &&
@@ -598,7 +638,7 @@ class Dir{
         );
       };
       context.setDir(dirName, dir);
-      context.!toUpdate = context.toUpdate.set(dir.time, dirName);
+      context.!toUpdate = context.toUpdate.set(child.time, childName);
     };
   }
 
@@ -622,7 +662,10 @@ class Dir{
 
     this.updateDirtyReaders(context, path);
 
-    context.!toUpdate = context.toUpdate.set(this.time, this.dirName);
+    for (childName in this.childDirs) {
+      child = context.getDir(childName);
+      context.!toUpdate = context.toUpdate.set(child.time, childName);
+    };
     if (context.debugMode) {
       name = "" + this.dirName + k;
       print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
@@ -639,6 +682,7 @@ class Dir{
     key = BaseName::create(baseName);
     source = Path(this.dirName, key);
     !this = this.writeEntry(context, source, key, values);
+    context.!toReset = context.toReset.set(this.dirName);
     context.setDir(this.dirName, this);
   }
 
