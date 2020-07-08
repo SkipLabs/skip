@@ -41,6 +41,7 @@ mutable class Context{
   mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable hasNext: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
+  mutable toReset: SortedSet<DirName> = SortedSet[],
 } {
   mutable fun getReads(): Vector<Path> {
     reads = freeze(this.reads);
@@ -131,6 +132,7 @@ mutable class Context{
         this.!newDirs = this.newDirs.add(preDirName);
         preDir = Dir{
           time => this.timeStamp(),
+          tick => this.tick,
           isInput => false,
           dirName => preDirName,
           fixedData => FixedData{dirName => preDirName, data => Array[]},
@@ -146,14 +148,30 @@ mutable class Context{
       }
     };
 
+    this.!tick = this.tick + 1;
     loop {
-      this.toUpdate.minimum() match {
-      | None() -> return void
+      toUpdate = this.toUpdate.minimum();
+      toUpdate match {
+      | None() ->
+        for (dirName in this.toReset) {
+          dir = this.getDir(dirName);
+          !dir.dirty = SortedSet[];
+          !dir.dirtyReaders = SortedMap[];
+          this.setDir(dir.dirName, dir);
+        };
+        this.!toReset = SortedSet[];
+        return void
       | Some((time, dirName)) ->
+        this.!toReset = this.toReset.set(dirName);
         this.!toUpdate = this.toUpdate.remove(time);
         dir = this.getDir(dirName);
-        dir.update(this)
-      }
+        dir.parent match {
+        | None() -> dir.updateLazy(this)
+        | Some((_, parentName)) ->
+          parent = this.getDir(parentName);
+          parent.update(this, dirName)
+        }
+      };
     };
   }
 
@@ -195,12 +213,19 @@ mutable class Context{
     };
     vector.sort();
     fixedData = FixedData{dirName, data => vector.toArray()};
-    dir = Dir{time => this.timeStamp(), isInput => true, dirName, fixedData};
+    dir = Dir{
+      time => this.timeStamp(),
+      tick => this.tick,
+      isInput => true,
+      dirName,
+      fixedData,
+    };
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
     dir
   }
 
   mutable fun setDir(dirName: DirName, dir: Dir): void {
+    /*
     dirNamePwdStr = this.pwd.join("/");
     dirNameStr = dirName.toString();
     dirNameArr = dirNameStr.split("/");
@@ -211,6 +236,8 @@ mutable class Context{
     if (dirNamePwdStr + lastDirName + "/" != dirNameStr) {
       error(`Cannot create directory ${dirNameStr} from path ${dirNamePwdStr}`);
     };
+    */
+    // TODO: re-enable this when the dirNames are represented as lists
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
   }
 
@@ -230,6 +257,7 @@ mutable class Context{
       dirName,
       Dir{
         time => this.timeStamp(),
+        tick => this.tick,
         dirName => dirName,
         isInput => false,
         fixedData => FixedData::empty(dirName),

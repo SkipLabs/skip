@@ -12,16 +12,16 @@ base class RNbr {
 }
 
 class Config{
-  nbrInputs: RNbr = RRange(1, 4),
+  nbrInputs: RNbr = RRange(1, 2),
   inputSize: RNbr = RRange(1, 10),
   missingKey: RNbr = RProb(10),
   valueWidth: RNbr = RRange(1, 10),
   valueRange: RNbr = RRange(0, 10),
-  nbrDirs: RNbr = RRange(2, 10),
+  nbrDirs: RNbr = RRange(1, 10),
   funBodySize: RNbr = RRange(1, 5),
-  mergeSize: RNbr = RRange(1, 4),
+  mergeSize: RNbr = RRange(1, 3),
   probKeyChange: RNbr = RProb(50),
-  probLazyDir: RNbr = RProb(50),
+  probLazyDir: RNbr = RProb(0),
   probKeyChangeRemoved: RNbr = RProb(50),
   nbrRounds: Int = 1000,
 }
@@ -105,10 +105,14 @@ fun evalMDir(context: mutable SKFS.Context, dir: MDir): void {
   input = dir.input;
   readDirs = dir.readDirs;
   inputDir = context.getDir(SKFS.DirName::create(input));
-  _ = inputDir.apply(context, name, (context, writer, key, values) ~> {
-    if (values.size() == 0) return void;
-    evalFun(context, writer, readDirs, key, values)
-  })
+  _ = inputDir.apply(
+    context,
+    SKFS.DirName::create(name),
+    (context, writer, key, values) ~> {
+      if (values.size() == 0) return void;
+      evalFun(context, writer, name.toString(), readDirs, key, values)
+    },
+  )
 }
 
 fun evalLDir(context: mutable SKFS.Context, dir: LDir): void {
@@ -162,12 +166,47 @@ fun evalLFun(
 fun evalFun(
   context: mutable SKFS.Context,
   writer: mutable SKFS.Writer,
+  thisDirName: String,
   readDirs: List<String>,
   currentKey: SKFS.BaseName,
   currentValues: Array<SKFS.File>,
 ): void {
+  sumAcc = 0;
+
+  for (elt in currentValues) {
+    !sumAcc = sumAcc + SKFS.IntFile::fromFile(elt).value;
+  };
+
+  sum = sumAcc;
+
+  subDirs = List[];
+
+  for (dirName in readDirs.sorted().unique()) {
+    dir = context.getDir(SKFS.DirName::create(dirName));
+    if (dir.lazyFun is Some _) continue;
+    subDirNameStr = dirName + "sub" + currentKey + "_" + sum + thisDirName;
+    subDirName = SKFS.DirName::create(subDirNameStr);
+    !subDirs = List.Cons(subDirNameStr, subDirs);
+    _ = dir.apply(context, subDirName, (context, writer, localKey, values) ~> {
+      localSum = sum;
+      for (readDirName in readDirs) {
+        readDir = context.getDir(SKFS.DirName::create(readDirName));
+        read = readDir.getArray(context, localKey).map(x ->
+          SKFS.IntFile::fromFile(x)
+        );
+        for (value in read) {
+          !localSum = localSum + value.value
+        };
+      };
+      for (value in values) {
+        !localSum = localSum + SKFS.IntFile::fromFile(value).value;
+      };
+      writer.write(localKey, SKFS.IntFile(localSum))
+    })
+  };
+
   reads = List[currentValues];
-  for (dirName in readDirs) {
+  for (dirName in readDirs.concat(subDirs)) {
     dir = context.getDir(SKFS.DirName::create(dirName));
     value = currentValues[0];
     read = dir
@@ -215,8 +254,11 @@ fun compareContext(
   hasError = false;
   for (kv in context1.dirs.state.items()) {
     (dirName, dir) = kv;
+    dirFiles = dir.files();
+    if (dirFiles.isEmpty()) continue;
+
     dir2 = context2.getDir(dirName);
-    for (key in dir.files()) {
+    for (key in dirFiles) {
       values1 = dir.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
       values2 = dir2.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
       if (dir2.lazyFun is Some _) {
@@ -428,12 +470,14 @@ fun testInterpretor(): mutable SKFS.Context {
     newProg = updateProgram(context, origProg);
     context.update();
     !lastContext = Some(context);
-    print_string("Compare contexts (Phase 1)");
+    print_string("Running program from scratch");
     context2 = SKFS.run(context ~> {
       eval(context, newProg);
     });
+    !lastContext = Some(context2);
+    print_string("Compare contexts (Phase 1: updated/scratch)");
     _ = compareContext(context, context2);
-    print_string("Compare contexts (Phase 2)");
+    print_string("Compare contexts (Phase 2: scratch/updated)");
     _ = compareContext(context2, context);
     localGC();
   };

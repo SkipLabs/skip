@@ -182,5 +182,24 @@ fun testDirs(): void {
 }
 */
 
+fun testSubDirUnit(): mutable SKFS.Context {
+  SKFS.run(context ~> {
+    dir1 = context.mkdir(SKFS.StringFile::fromFile, "/dir1/", Array[]);
+    _dir2 = dir1.contextMap(
+      SKFS.StringFile::fromFile,
+      context,
+      "/dir1/dir2/",
+      (context, x) ~> {
+        _ = dir1.map(
+          SKFS.StringFile::fromFile,
+          context,
+          "/dir1/dir2/" + x.value + "/",
+          x ~> x,
+        );
+        x
+      },
+    );
+  });
+}
 
 module end;

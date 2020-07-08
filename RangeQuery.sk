@@ -1,0 +1,106 @@
+module SKFS;
+
+fun baseNameFromFile(file: File): BaseName {
+  file match {
+  | SID(_) -> SID::fromFile(file)
+  | IID(_) -> IID::fromFile(file)
+  | _ -> invariant_violation("Was expecting a baseName")
+  }
+}
+
+class RangeIndex{bitSize: Int, intSize: Int, data: Array<Handle<BaseName>>} {
+  static fun create{
+    context: mutable Context,
+    bitSize: Int,
+    intSize: Int,
+    input: Handle<IntFile>,
+  }: RangeIndex {
+    dirs = mutable Vector[];
+    for (round in Range(0, intSize / bitSize)) {
+      subName = input.dirName.toString() + "rangeIndex" + round + "/";
+      dirs.push(
+        input.contextWriterKeyMap(
+          baseNameFromFile,
+          context,
+          subName,
+          (_context, writer, key, file) ~> {
+            value = file.value;
+            if (round == 0) {
+              writer.write(IID(value), key);
+            } else {
+              !value = value.shr(round * bitSize);
+              if (value != 0 && value != -1) {
+                writer.write(IID(value), key);
+              }
+            }
+          },
+        ),
+      );
+    };
+    RangeIndex{bitSize, intSize, data => dirs.toArray()}
+  }
+
+  private fun lquery(
+    context: mutable Context,
+    acc: mutable Set<BaseName>,
+    level: Int,
+    start: Int,
+    end: Int,
+  ): void {
+    if (start > end) return void;
+    shStart = start.shr(this.bitSize) + 1;
+    shEnd = end.shr(this.bitSize);
+    nextStart = shStart.shl(this.bitSize);
+    nextEnd = shEnd.shl(this.bitSize);
+    while (start < nextStart && start < end) {
+      for (elt in this.data[level].getArray(context, IID(start))) {
+        acc.insert(elt);
+      };
+      !start = start + 1;
+    };
+    if (shStart != 0 && shStart != -1 && shStart < shEnd) {
+      this.lquery(context, acc, level + 1, shStart, shEnd);
+    };
+    while (nextEnd < end) {
+      for (elt in this.data[level].getArray(context, IID(nextEnd))) {
+        acc.insert(elt);
+      };
+      !nextEnd = nextEnd + 1;
+    }
+  }
+
+  fun query(context: mutable Context, start: Int, end: Int): Set<BaseName> {
+    acc = mutable Set[];
+    this.lquery(context, acc, 0, start, end);
+    freeze(acc)
+  }
+}
+
+fun testIndex(): mutable Context {
+  run(context ~> {
+    sinput = context.mkdir(
+      StringFile::fromFile,
+      "/sinput/",
+      Array[(IID(23), StringFile("44"))],
+    );
+    input = sinput.map(
+      IntFile::fromFile,
+      context,
+      "/input/",
+      (x ~> IntFile(x.value.toInt())),
+    );
+    queries = context.mkdir(StringFile::fromFile, "/queries/", Array[]);
+    rindex = RangeIndex::create{context, intSize => 8, bitSize => 1, input};
+    _queryResults = queries.contextMap(
+      StringFile::fromFile,
+      context,
+      "/qresults/",
+      (context, query) ~> {
+        start = query.value.toInt();
+        StringFile(
+          inspect(rindex.query(context, start, start + 10)).toString(),
+        );
+      },
+    );
+  })
+}
