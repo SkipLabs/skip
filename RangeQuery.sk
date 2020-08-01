@@ -1,5 +1,7 @@
 module SKFS;
 
+class KeySet(value: Set<BaseName>) extends File
+
 fun baseNameFromFile(file: File): BaseName {
   file match {
   | SID(_) -> SID::fromFile(file)
@@ -17,7 +19,7 @@ class RangeIndex{bitSize: Int, intSize: Int, data: Array<Handle<BaseName>>} {
   }: RangeIndex {
     dirs = mutable Vector[];
     for (round in Range(0, intSize / bitSize)) {
-      subName = input.dirName.toString() + "rangeIndex" + round + "/";
+      subName = input.dirName.toString() + "rindex" + round + "/";
       dirs.push(
         input.contextWriterKeyMap(
           baseNameFromFile,
@@ -29,7 +31,7 @@ class RangeIndex{bitSize: Int, intSize: Int, data: Array<Handle<BaseName>>} {
               writer.write(IID(value), key);
             } else {
               !value = value.shr(round * bitSize);
-              if (value != 0 && value != -1) {
+              if (value != 0) {
                 writer.write(IID(value), key);
               }
             }
@@ -52,7 +54,15 @@ class RangeIndex{bitSize: Int, intSize: Int, data: Array<Handle<BaseName>>} {
     shEnd = end.shr(this.bitSize);
     nextStart = shStart.shl(this.bitSize);
     nextEnd = shEnd.shl(this.bitSize);
-    while (start < nextStart && start < end) {
+    if (nextStart >= end) {
+      for (i in Range(start, end)) {
+        for (elt in this.data[level].getArray(context, IID(i))) {
+          acc.insert(elt);
+        };
+      };
+      return void;
+    };
+    while (start < nextStart) {
       for (elt in this.data[level].getArray(context, IID(start))) {
         acc.insert(elt);
       };
@@ -70,37 +80,79 @@ class RangeIndex{bitSize: Int, intSize: Int, data: Array<Handle<BaseName>>} {
   }
 
   fun query(context: mutable Context, start: Int, end: Int): Set<BaseName> {
+    if (start < 0 || end < 0) {
+      error("Negative number not supported in RangeQueries");
+    };
     acc = mutable Set[];
     this.lquery(context, acc, 0, start, end);
     freeze(acc)
   }
 }
 
+fun parseRange(str: String): (Int, Int) {
+  chars = str.chars().filter(c -> c != ' ' && c != '[' && c != ']');
+  toks = String::fromChars(chars.toArray()).split(",");
+  n1 = toks[0].toInt();
+  n2 = toks[1].toInt();
+  (n1, n2)
+}
+
 fun testIndex(): mutable Context {
   run(context ~> {
-    sinput = context.mkdir(
-      StringFile::fromFile,
-      "/sinput/",
-      Array[(IID(23), StringFile("44"))],
-    );
+    ints = mutable Vector[];
+    for (i in Range(0, 256)) {
+      ints.push((IID(i), StringFile(i.toString())));
+    };
+    sinput = context.mkdir(StringFile::fromFile, "/sinput/", ints.toArray());
     input = sinput.map(
       IntFile::fromFile,
       context,
       "/input/",
       (x ~> IntFile(x.value.toInt())),
     );
-    queries = context.mkdir(StringFile::fromFile, "/queries/", Array[]);
-    rindex = RangeIndex::create{context, intSize => 8, bitSize => 1, input};
-    _queryResults = queries.contextMap(
+    queryData = mutable Vector[];
+    for (i in Range(0, 32)) {
+      for (j in Range(i, 32)) {
+        queryData.push(
+          (SID::create("s" + i + "_" + j), StringFile(`[${i}, ${j}]`)),
+        );
+      }
+    };
+    queries = context.mkdir(
       StringFile::fromFile,
+      "/queries/",
+      queryData.toArray(),
+    );
+    rindex = RangeIndex::create{context, intSize => 16, bitSize => 5, input};
+    _queryResults = queries.contextMap(
+      KeySet::fromFile,
       context,
       "/qresults/",
-      (context, query) ~> {
-        start = query.value.toInt();
-        StringFile(
-          inspect(rindex.query(context, start, start + 10)).toString(),
-        );
+      (context, queryStr) ~> {
+        (start, end) = parseRange(queryStr.value);
+        KeySet(rindex.query(context, start, end + 1));
       },
     );
+    /*
+        _ = queryResults.contextWriterKeyMap(
+          IntFile::fromFile,
+          context,
+          "/dumbCheck/",
+          (context, _writer, qid, immSet) ~> {
+            set = Set::mcreateFromItems(immSet.value);
+            (start, end) = parseRange(queries.get(context, qid).value);
+            for (i in Range(start, end + 1)) {
+              key = IID(i);
+              if (!set.contains(key)) {
+                print_error("Missing: " + i + " from " + qid + "\n")
+              };
+              set.remove(key);
+            };
+            if (!set.isEmpty()) {
+              print_error("Set too big for " + qid + " " + set + "\n");
+            }
+          },
+        );
+    */
   })
 }
