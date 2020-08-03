@@ -359,7 +359,7 @@ fun genInputData(
     if (rand(config.missingKey) == 1) continue;
     data![i] = genValues(rand, config);
   };
-  freeze(data)
+  data.chill()
 }
 
 fun genInputs(rand: RNbr -> Int, config: Config): (List<Input>, GenDirs) {
@@ -449,9 +449,9 @@ fun genDiffs(
         data![key] = newValues;
       }
     };
-    diffs![input.name] = freeze(data);
+    diffs![input.name] = data.chill();
   };
-  freeze(diffs)
+  diffs.chill()
 }
 
 fun genProgram(config: Config, round: Int): Program {
@@ -488,7 +488,7 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
         data![key] = values;
       }
     };
-    input with {data => freeze(data)}
+    input with {data => data.chill()}
   });
   prog
 }

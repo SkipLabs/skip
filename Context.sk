@@ -31,7 +31,7 @@ mutable class Context{
   mutable time: Int = 0,
   mutable tick: Int = 0,
   mutable toUpdate: SortedMap<Int, DirName> = SortedMap[],
-  mutable deps: List<Vector<(Path, DirName, DirName, BaseName)>> = List[],
+  mutable deps: List<Array<(Path, DirName, DirName, BaseName)>> = List[],
   mutable fixedDeps: Map<Path, Set<(DirName, DirName, BaseName)>> = Map[],
   mutable newDeps: SortedMap<
     Path,
@@ -44,7 +44,7 @@ mutable class Context{
   mutable toReset: SortedSet<DirName> = SortedSet[],
 } {
   mutable fun getReads(): Vector<Path> {
-    reads = freeze(this.reads);
+    reads = this.reads.chill();
     this.reads.clear();
     reads
   }
@@ -62,7 +62,7 @@ mutable class Context{
       for (dep in newDeps) {
         mset.insert(dep);
       };
-      freeze(mset)
+      mset.chill()
     }
   }
 
@@ -97,7 +97,7 @@ mutable class Context{
       }
     };
     this.!deps = List[];
-    this.!fixedDeps = freeze(fixedDeps);
+    this.!fixedDeps = fixedDeps.chill().map((_, v) -> v.chill());
   }
 
   mutable fun updateNewDeps(): void {
@@ -264,7 +264,7 @@ mutable class Context{
   }
 
   readonly fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.dirs.maybeGet(freeze(dirName));
+    this.dirs.maybeGet(dirName);
   }
 
   mutable fun addDep(path: Path): void {

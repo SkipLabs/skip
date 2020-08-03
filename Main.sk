@@ -5,12 +5,12 @@ const testMode: Bool = args.size() > 0;
 
 module end;
 
+@cpp_extern("print_int")
+native fun print_int(Int): void;
+
 untracked fun main(): void {
-  if (SKFS.args.size() == 0) {
-    print_error("Wrong usage: sk command args\n");
-    exit(2);
-  };
   SKFS.args[0] match {
+  | "runtime" -> SKFSTest.testRuntime()
   | "query" -> SKFS.toplevel(SKFS.testIndex())
   | "search" ->
     context = SKFSTest.testSearch();

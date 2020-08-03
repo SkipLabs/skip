@@ -76,7 +76,9 @@ mutable class .Vector<+T> private (
   static fun mcreateFromIterator<I: mutable Iterator<T>>(
     items: I,
   ): mutable this {
-    sizeHint = items.sizeHint().default(0); // estimate of capacity, if accurate will avoid resizing.
+    // estimate of capacity, if accurate will avoid resizing.
+    sizeHint = items.sizeHint().default(0);
+
     invariant(
       sizeHint >= 0,
       "Vector::mcreateFromIterator: Expected items sizeHint() to be nonnegative.",
