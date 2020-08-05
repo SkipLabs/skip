@@ -14,15 +14,15 @@ base class RNbr {
 class Config{
   nbrInputs: RNbr = RRange(1, 2),
   inputSize: RNbr = RRange(1, 10),
-  missingKey: RNbr = RProb(10),
+  missingKey: RNbr = RProb(0),
   valueWidth: RNbr = RRange(1, 10),
   valueRange: RNbr = RRange(0, 10),
   nbrDirs: RNbr = RRange(1, 10),
-  funBodySize: RNbr = RRange(1, 5),
+  funBodySize: RNbr = RRange(1, 10),
   mergeSize: RNbr = RRange(1, 3),
   probKeyChange: RNbr = RProb(50),
-  probLazyDir: RNbr = RProb(0),
-  probKeyChangeRemoved: RNbr = RProb(50),
+  probLazyDir: RNbr = RProb(50),
+  probKeyChangeRemoved: RNbr = RProb(0),
   nbrRounds: Int = 1000,
 }
 
@@ -257,6 +257,10 @@ fun compareContext(
     dirFiles = dir.files();
     if (dirFiles.isEmpty()) continue;
 
+    if (context2.maybeGetDir(dirName) is None _) {
+      print_string(`Error: missing directory ${dirName}`);
+      continue;
+    };
     dir2 = context2.getDir(dirName);
     for (key in dirFiles) {
       values1 = dir.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));

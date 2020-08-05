@@ -465,7 +465,11 @@ class Dir{
       dirtyReaders = fixPoint(
         thisDirtyReaders.union(this.dirty.map(x -> Path(this.dirName, x))),
         key -> {
-          context.getDeps(key).map(x -> Path(x.i1, x.i2)).collect(Set);
+          context
+            .getDeps(key)
+            .filter(x -> x.i1 == this.dirName)
+            .map(x -> Path(x.i1, x.i2))
+            .collect(Set);
         },
       );
       for (path in dirtyReaders) {
@@ -536,7 +540,10 @@ class Dir{
       !this.old[child.dirName] = oldKeysMap;
     };
     context.setDir(child.dirName, child);
-    context.setDir(this.dirName, this);
+    context.setDir(
+      this.dirName,
+      context.getDir(this.dirName) with {old => this.old},
+    );
   }
 
   private fun updateNewDirs(
