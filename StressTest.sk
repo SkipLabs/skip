@@ -13,16 +13,16 @@ base class RNbr {
 
 class Config{
   nbrInputs: RNbr = RRange(1, 2),
-  inputSize: RNbr = RRange(1, 10),
+  inputSize: RNbr = RRange(1, 5),
   missingKey: RNbr = RProb(10),
   valueWidth: RNbr = RRange(1, 10),
   valueRange: RNbr = RRange(0, 10),
   nbrDirs: RNbr = RRange(1, 10),
-  funBodySize: RNbr = RRange(1, 5),
+  funBodySize: RNbr = RRange(1, 10),
   mergeSize: RNbr = RRange(1, 3),
   probKeyChange: RNbr = RProb(50),
-  probLazyDir: RNbr = RProb(0),
-  probKeyChangeRemoved: RNbr = RProb(50),
+  probLazyDir: RNbr = RProb(50),
+  probKeyChangeRemoved: RNbr = RProb(0),
   nbrRounds: Int = 1000,
 }
 
@@ -120,57 +120,18 @@ fun evalLDir(context: mutable SKFS.Context, dir: LDir): void {
     context,
     SKFS.DirName::create(dir.name),
     (context, _self, key) ~> {
-      evalLFun(context, dir.readDirs, key)
+      evalLFun(context, dir.name, dir.readDirs, key)
     },
   )
 }
 
-fun evalLFun(
+fun evalSub(
   context: mutable SKFS.Context,
-  readDirs: List<String>,
-  key: SKFS.BaseName,
-): SKFS.File {
-  reads = List[];
-  for (dirName in readDirs) {
-    dir = context.getDir(SKFS.DirName::create(dirName));
-    value = key match {
-    | SKFS.IID(x) -> SKFS.IntFile(x)
-    | _ -> error()
-    };
-    read = dir
-      .getArray(context, SKFS.IID(SKFS.IntFile::fromFile(value).value))
-      .map(x -> SKFS.IntFile::fromFile(x));
-    !reads = List.Cons(read, reads);
-  };
-
-  result = 0;
-  for (ilist in reads) {
-    for (x in ilist) {
-      !result = result + SKFS.IntFile::fromFile(x).value;
-    }
-  };
-  keyValue = key match {
-  | SKFS.IID(x) -> x
-  | _ -> error()
-  };
-  if (keyValue % 2 == 1) {
-    !result =
-      result +
-      SKFS.IntFile::fromFile(
-        evalLFun(context, readDirs, SKFS.IID(keyValue / 2)),
-      ).value;
-  };
-  SKFS.IntFile(result)
-}
-
-fun evalFun(
-  context: mutable SKFS.Context,
-  writer: mutable SKFS.Writer,
   thisDirName: String,
   readDirs: List<String>,
   currentKey: SKFS.BaseName,
   currentValues: Array<SKFS.File>,
-): void {
+): List<String> {
   sumAcc = 0;
 
   for (elt in currentValues) {
@@ -204,6 +165,74 @@ fun evalFun(
       writer.write(localKey, SKFS.IntFile(localSum))
     })
   };
+
+  subDirs
+}
+
+fun evalLFun(
+  context: mutable SKFS.Context,
+  thisDirName: String,
+  readDirs: List<String>,
+  key: SKFS.BaseName,
+): SKFS.File {
+  subDirs = evalSub(
+    context,
+    thisDirName + "LAZY_" + key + "/",
+    readDirs,
+    key,
+    Array[
+      SKFS.IntFile(
+        key match {
+        | SKFS.IID(x) -> x
+        | _ -> 0
+        },
+      ),
+    ],
+  );
+
+  reads = List[];
+  for (dirName in readDirs.concat(subDirs)) {
+    dir = context.getDir(SKFS.DirName::create(dirName));
+    value = key match {
+    | SKFS.IID(x) -> SKFS.IntFile(x)
+    | _ -> error()
+    };
+    read = dir
+      .getArray(context, SKFS.IID(SKFS.IntFile::fromFile(value).value))
+      .map(x -> SKFS.IntFile::fromFile(x));
+    !reads = List.Cons(read, reads);
+  };
+
+  result = 0;
+  for (ilist in reads) {
+    for (x in ilist) {
+      !result = result + SKFS.IntFile::fromFile(x).value;
+    }
+  };
+  keyValue = key match {
+  | SKFS.IID(x) -> x
+  | _ -> error()
+  };
+  if (keyValue > 10) {
+    thisDir = context.getDir(SKFS.DirName::create(thisDirName));
+    !result =
+      result +
+      SKFS.IntFile::fromFile(
+        thisDir.getArray(context, SKFS.IID(keyValue / 2))[0],
+      ).value;
+  };
+  SKFS.IntFile(result)
+}
+
+fun evalFun(
+  context: mutable SKFS.Context,
+  writer: mutable SKFS.Writer,
+  thisDirName: String,
+  readDirs: List<String>,
+  currentKey: SKFS.BaseName,
+  currentValues: Array<SKFS.File>,
+): void {
+  subDirs = evalSub(context, thisDirName, readDirs, currentKey, currentValues);
 
   reads = List[currentValues];
   for (dirName in readDirs.concat(subDirs)) {
@@ -257,7 +286,14 @@ fun compareContext(
     dirFiles = dir.files();
     if (dirFiles.isEmpty()) continue;
 
+    if (context2.maybeGetDir(dirName) is None _) {
+      if (!dirName.toString().contains("LAZY")) {
+        print_string(`Error: missing directory ${dirName}`);
+      };
+      continue;
+    };
     dir2 = context2.getDir(dirName);
+    isLazy = dir2.dirName.toString().contains("LAZY");
     for (key in dirFiles) {
       values1 = dir.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
       values2 = dir2.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
@@ -265,6 +301,10 @@ fun compareContext(
         if (values1 == Array[] || values2 == Array[]) continue;
       };
       if (values1 != values2) {
+        if (isLazy && (values1.isEmpty() || values2.isEmpty())) {
+          continue
+        };
+        debug((dir2.lazyFun, values1.isEmpty(), values2.isEmpty()));
         !hasError = true;
         print_string(`Error: values differ for ${dirName}${key}`);
         print_string(`       ${values1}`);

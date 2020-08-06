@@ -168,6 +168,7 @@ mutable class Context{
         dir.parent match {
         | None() -> dir.updateLazy(this)
         | Some((_, parentName)) ->
+          this.!toReset = this.toReset.set(parentName);
           parent = this.getDir(parentName);
           parent.update(this, dirName)
         }
