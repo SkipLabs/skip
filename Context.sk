@@ -130,8 +130,10 @@ mutable class Context{
       preDir = dirs.maybeGet(preDirName) match {
       | None() ->
         this.!newDirs = this.newDirs.add(preDirName);
+        time = this.timeStamp();
         preDir = Dir{
-          time => this.timeStamp(),
+          creationTime => time,
+          time => time,
           tick => this.tick,
           isInput => false,
           dirName => preDirName,
@@ -214,8 +216,10 @@ mutable class Context{
     };
     vector.sort();
     fixedData = FixedData{dirName, data => vector.toArray()};
+    time = this.timeStamp();
     dir = Dir{
-      time => this.timeStamp(),
+      creationTime => time,
+      time,
       tick => this.tick,
       isInput => true,
       dirName,
@@ -254,10 +258,12 @@ mutable class Context{
     if (this.debugMode) {
       print_string("REMOVED: " + dirName);
     };
+    time = this.timeStamp();
     this.setDir(
       dirName,
       Dir{
-        time => this.timeStamp(),
+        creationTime => time,
+        time,
         tick => this.tick,
         dirName => dirName,
         isInput => false,
