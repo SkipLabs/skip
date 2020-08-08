@@ -455,45 +455,34 @@ class Dir{
 
     if (this.dirty.isEmpty() && this.dirtyReaders.isEmpty()) return void;
 
-    this.lazyFun match {
-    | None() -> void
-    | Some(f) ->
-      thisDirtyReaders = SortedSet[];
-      for (dirtyReaderDirName => dirtyReaderBaseNames in this.dirtyReaders) {
-        for (dirtyReaderBaseName in dirtyReaderBaseNames) {
-          !thisDirtyReaders = thisDirtyReaders.add(
-            Path(dirtyReaderDirName, dirtyReaderBaseName),
-          );
-        }
-      };
-      dirtyReaders = fixPoint(
-        thisDirtyReaders.union(this.dirty.map(x -> Path(this.dirName, x))),
-        key -> {
-          context
-            .getDeps(key)
-            .filter(x -> x.i1 == this.dirName)
-            .map(x -> Path(x.i1, x.i2))
-            .collect(Set);
-        },
-      );
-      for (path in dirtyReaders) {
-        key = path.baseName;
-        map = SortedMap[path => Array[]];
-        !this.data = this.data.set(context.tick, key, map);
-      };
-      context.setDir(this.dirName, this);
-      for (path in dirtyReaders) {
-        key = path.baseName;
-        _ = this.callLazy(context, f, key);
-      };
-      !this = context.getDir(this.dirName);
-      for (path in dirtyReaders) {
-        this.updateDirtyReaders(context, path);
-      };
-      !this.dirty = SortedSet::createFromItems(
-        dirtyReaders.map(x -> x.baseName),
-      )
+    thisDirtyReaders = SortedSet[];
+    for (dirtyReaderDirName => dirtyReaderBaseNames in this.dirtyReaders) {
+      for (dirtyReaderBaseName in dirtyReaderBaseNames) {
+        !thisDirtyReaders = thisDirtyReaders.add(
+          Path(dirtyReaderDirName, dirtyReaderBaseName),
+        );
+      }
     };
+    dirtyReaders = fixPoint(
+      thisDirtyReaders.union(this.dirty.map(x -> Path(this.dirName, x))),
+      key -> {
+        context
+          .getDeps(key)
+          .filter(x -> x.i1 == this.dirName)
+          .map(x -> Path(x.i1, x.i2))
+          .collect(Set);
+      },
+    );
+    for (path in dirtyReaders) {
+      key = path.baseName;
+      map = SortedMap[path => Array[]];
+      !this.data = this.data.set(context.tick, key, map);
+    };
+    context.setDir(this.dirName, this);
+    !this = context.getDir(this.dirName);
+    for (path in dirtyReaders) {
+      this.updateDirtyReaders(context, path);
+    }
   }
 
   fun update(context: mutable Context, childName: DirName): void {
@@ -629,8 +618,10 @@ class Dir{
       dir = context.getDir(dirName);
       child = context.getDir(childName);
 
-      if (child.time < this.time) {
-        print_string(`SKIPPING: ${path} ${child.dirName}`);
+      if (child.time <= this.time) {
+        if (context.debugMode) {
+          print_string(`SKIPPING: ${path} ${child.dirName}`);
+        };
         continue;
       };
       if (!dir.dirtyReaders.containsKey(childName)) {
