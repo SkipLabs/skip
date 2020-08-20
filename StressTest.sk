@@ -15,14 +15,14 @@ class Config{
   nbrInputs: RNbr = RRange(1, 2),
   inputSize: RNbr = RRange(1, 5),
   missingKey: RNbr = RProb(10),
-  valueWidth: RNbr = RRange(1, 10),
-  valueRange: RNbr = RRange(0, 10),
+  valueWidth: RNbr = RRange(1, 5),
+  valueRange: RNbr = RRange(0, 20),
   nbrDirs: RNbr = RRange(1, 10),
-  funBodySize: RNbr = RRange(1, 10),
+  funBodySize: RNbr = RRange(1, 5),
   mergeSize: RNbr = RRange(1, 3),
   probKeyChange: RNbr = RProb(50),
   probLazyDir: RNbr = RProb(50),
-  probKeyChangeRemoved: RNbr = RProb(0),
+  probKeyChangeRemoved: RNbr = RProb(10),
   nbrRounds: Int = 1000,
 }
 
@@ -175,8 +175,23 @@ fun evalLFun(
   readDirs: List<String>,
   key: SKFS.BaseName,
 ): SKFS.File {
+  subDirs = evalSub(
+    context,
+    thisDirName + "LAZY_" + key + "/",
+    readDirs,
+    key,
+    Array[
+      SKFS.IntFile(
+        key match {
+        | SKFS.IID(x) -> x
+        | _ -> 0
+        },
+      ),
+    ],
+  );
+
   reads = List[];
-  for (dirName in readDirs) {
+  for (dirName in readDirs.concat(subDirs)) {
     dir = context.getDir(SKFS.DirName::create(dirName));
     value = key match {
     | SKFS.IID(x) -> SKFS.IntFile(x)
