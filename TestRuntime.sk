@@ -1,0 +1,79 @@
+base class CatchResult<T> {
+  children =
+  | CSuccess(T)
+  | CError(Exception)
+}
+
+class BoxException() extends Exception
+
+base class BoxN<+T> {
+  children =
+  | Box(value: T)
+  | Box2(value1: T, value2: T)
+  | Box3(value1: T, value2: T, value3: T)
+}
+
+@cpp_export
+fun call0(f: () -> Box<Int>): Box<Int> {
+  f()
+}
+
+@cpp_export
+fun call1(f: Box<Exception> -> Box<Int>, v: Box<Exception>): Box<Int> {
+  f(v)
+}
+
+@cpp_extern
+native fun etry<T>(f: () -> Box<T>, onError: Box<Exception> -> Box<T>): Box<T>;
+
+fun vtry<T>(f: () -> T, onError: Exception -> T): T {
+  etry(() -> Box(f()), exn -> Box(onError(exn.value))).value
+}
+
+module SKFSTest;
+
+class MyEx(value: Int) extends Exception
+
+fun makeExn(): Int {
+  throw MyEx(22);
+}
+
+fun testRuntime(): void {
+  _ = call0(() -> Box(0));
+  _ = call1((_) -> Box(12), Box(MyEx(0)));
+  chars = Array['a', 'b', 'c'];
+  expectEq("String::replace", "xbc", () ->
+    String::fromChars(chars).replace("a", "x")
+  );
+  str = "abc";
+  str2 = "123";
+  expectEq("String LT", (LT() : Order), () -> str.compare(str2));
+  expectEq("String LT", (EQ() : Order), () -> str.compare("abc"));
+  expectEq("String LT", (GT() : Order), () -> str2.compare(str));
+  expectEq("String.concat2", "abc123", () -> str + str2);
+  expectEq("String.byteSize", 3, () -> String.byteSize(str));
+
+  expectEq("throw", 22, () -> {
+    vtry(
+      (() -> Box(makeExn())),
+      (exn ->
+        exn match {
+        | MyEx(x) -> Box(x)
+        | e -> throw e
+        }),
+    ).value
+  });
+  arr = Array[Array[1], Array[2], Array[3]];
+  expectEq("getArraySize", 3, () -> getArraySize(arr));
+  expectEq("hash", 96354, () -> str.hash());
+  expectEq("String.getByte", 'b'.code(), () -> String.getByte(str, 1).toInt());
+  expectEq("substring", "c", () -> {
+    iter = str.getIter();
+    str.substring(iter.drop(2));
+  });
+  expectEq("ArrayEach", 6, () -> {
+    result = 0;
+    Array[1, 2, 3].each(x -> !result = result + x);
+    result
+  });
+}

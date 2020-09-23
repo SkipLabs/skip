@@ -15,14 +15,14 @@ class Config{
   nbrInputs: RNbr = RRange(1, 2),
   inputSize: RNbr = RRange(1, 5),
   missingKey: RNbr = RProb(10),
-  valueWidth: RNbr = RRange(1, 10),
-  valueRange: RNbr = RRange(0, 10),
+  valueWidth: RNbr = RRange(1, 5),
+  valueRange: RNbr = RRange(0, 20),
   nbrDirs: RNbr = RRange(1, 10),
-  funBodySize: RNbr = RRange(1, 10),
+  funBodySize: RNbr = RRange(1, 5),
   mergeSize: RNbr = RRange(1, 3),
   probKeyChange: RNbr = RProb(50),
   probLazyDir: RNbr = RProb(50),
-  probKeyChangeRemoved: RNbr = RProb(0),
+  probKeyChangeRemoved: RNbr = RProb(10),
   nbrRounds: Int = 1000,
 }
 
@@ -344,7 +344,7 @@ fun genInputData(
     if (rand(config.missingKey) == 1) continue;
     data![i] = genValues(rand, config);
   };
-  freeze(data)
+  data.chill()
 }
 
 fun genInputs(rand: RNbr -> Int, config: Config): (List<Input>, GenDirs) {
@@ -434,9 +434,9 @@ fun genDiffs(
         data![key] = newValues;
       }
     };
-    diffs![input.name] = freeze(data);
+    diffs![input.name] = data.chill();
   };
-  freeze(diffs)
+  diffs.chill()
 }
 
 fun genProgram(config: Config, round: Int): Program {
@@ -473,7 +473,7 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
         data![key] = values;
       }
     };
-    input with {data => freeze(data)}
+    input with {data => data.chill()}
   });
   prog
 }

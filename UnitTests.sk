@@ -44,16 +44,18 @@ fun compareResults(
   values: Array<Int>,
 ): void {
   readV = context.getValue(path);
-  try {
-    expectEq(kind + " test for path " + path, readV, () ->
-      values.map(x -> IBox(x))
-    );
-  } catch {
-  | _ ->
-    print_error("Compare result failed\n");
-    debug(readV);
-    debug(values)
-  }
+  vtry(
+    () -> {
+      expectEq(kind + " test for path " + path, readV, () ->
+        values.map(x -> IBox(x))
+      );
+    },
+    _ -> {
+      print_error("Compare result failed\n");
+      debug(readV);
+      debug(values)
+    },
+  )
 }
 
 fun testUpdate(

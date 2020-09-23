@@ -27,25 +27,28 @@ fun printOKAfterMsg(msg: String): void {
 fun expectFail(msg: String, f: () -> void): void {
   !msg = msg.replace("\n", "\\n");
   print_raw(msg);
-  try {
-    f();
-    printFAILEDAfterMsg(msg);
-  } catch {
-  | _ -> printOKAfterMsg(msg)
-  };
+  vtry(
+    () -> {
+      f();
+      printFAILEDAfterMsg(msg);
+    },
+    _ -> printOKAfterMsg(msg),
+  );
 }
 
 fun expectPass(msg: String, f: () -> void): void {
   !msg = msg.replace("\n", "\\n");
   print_raw(msg);
-  try {
-    f();
-    printOKAfterMsg(msg);
-  } catch {
-  | exn @ SKFS.Exception _ ->
-    printFAILEDAfterMsg(msg);
-    print_string("\t\t" + exn.toString() + "\n")
-  };
+  vtry(
+    () -> {
+      f();
+      printOKAfterMsg(msg);
+    },
+    exn -> {
+      printFAILEDAfterMsg(msg);
+      print_string("\t\t" + exn.getMessage() + "\n")
+    },
+  );
 }
 
 class NotEqExn<T>(T, T) extends Exception

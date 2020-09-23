@@ -19,14 +19,12 @@ native class .String uses Hashable, Show, Orderable {
     String::fromChars(Array::createFromIterator(gen()))
   }
 
-  @cpp_runtime
-  native fun length(): Int;
   @intrinsic
   private native fun concat(String): String;
   @cpp_runtime
   native private fun toFloat_raw(): Float;
   @cpp_runtime
-  native private fun compare_raw(other: String): Int;
+  native fun compare_raw(other: String): Int;
 
   fun take(len: Int): String {
     this.getIter().collectString(len)
@@ -104,7 +102,6 @@ native class .String uses Hashable, Show, Orderable {
     })
   }
 
-  @cpp_runtime
   fun isEmpty(): Bool {
     this == ""
   }
@@ -273,8 +270,35 @@ native class .String uses Hashable, Show, Orderable {
     }
   }
 
-  @cpp_runtime
-  native fun contains(search: String): Bool;
+  // Very naive implementation.
+  // We should implemented KMP or something like that.
+  fun contains(s: String): Bool {
+    chars1 = this.chars();
+    chars2 = s.chars();
+    for (i in Range(0, chars1.size())) {
+      j = 0;
+      while (j < chars2.size()) {
+        if (chars1[i + j] != chars2[j]) {
+          break void;
+        };
+        !j = j + 1;
+      };
+      if (j == chars2.size()) {
+        return true;
+      }
+    };
+    false
+  }
+
+  fun length(): Int {
+    iter = this.getIter();
+    i = 0;
+    loop {
+      c = iter.next();
+      if (c is None()) return i;
+      !i = i + 1;
+    }
+  }
 
   fun replace(search: String, replacement: String): String {
     if (search.isEmpty()) {
@@ -347,39 +371,51 @@ native class .String uses Hashable, Show, Orderable {
     });
   }
 
+  private fun compareUtf8(other: String): Int {
+    iter1 = this.getIter();
+    iter2 = other.getIter();
+    loop {
+      c1 = iter1.nextCode();
+      c2 = iter2.nextCode();
+      if (c1 == -1 && c2 == -1) return 0;
+      if (c1 == -1) return -1;
+      if (c2 == -1) return 1;
+      if (c1 != c2) return c1 - c2;
+    }
+  }
+
   fun ==(other: String): Bool {
-    this.compare_raw(other) == 0
+    this.compareUtf8(other) == 0
   }
 
   fun !=(other: String): Bool {
-    this.compare_raw(other) != 0
+    this.compareUtf8(other) != 0
   }
 
   fun <(other: String): Bool {
-    this.compare_raw(other) < 0
+    this.compareUtf8(other) < 0
   }
 
   fun >(other: String): Bool {
-    this.compare_raw(other) > 0
+    this.compareUtf8(other) > 0
   }
 
   fun <=(other: String): Bool {
-    this.compare_raw(other) <= 0
+    this.compareUtf8(other) <= 0
   }
 
   fun >=(other: String): Bool {
-    this.compare_raw(other) >= 0
+    this.compareUtf8(other) >= 0
   }
 
   fun compare(other: String): Order {
-    compare(this.compare_raw(other), 0)
+    compare(this.compareUtf8(other), 0)
   }
 
   fun toString(): String {
     this
   }
 
-  @cpp_runtime
   fun hash(): Int {
     this.foldl((acc, c) -> Hashable.combine(acc, c.hash()), 37)
   }
@@ -462,8 +498,6 @@ private fun toIntHelperRest(i: mutable StringIterator, value: Int): Int {
 }
 
 @no_inline
-@no_throw
-@cpp_runtime
 private fun toIntOptionHelper(s: String): (Int, Int) {
   i = s.getIter();
   i.next() match {

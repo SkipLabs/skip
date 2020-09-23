@@ -15,7 +15,7 @@ mutable class Writer{
     this.writes![key] = Array[];
   }
 
-  fun getWrites(): Array<(BaseName, Array<File>)> {
+  readonly fun getWrites(): Array<(BaseName, Array<File>)> {
     result = mutable Vector[];
     for (key => values in this.writes) {
       result.push((key, values));
@@ -50,17 +50,19 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
         oldLazyVisitedList,
       );
       context.!lazyVisitedSet = context.lazyVisitedSet.add(Path(dirName, key));
-      try {
-        result = f(context, Handle(conv, dirName), key);
-        onExit();
-        result
-      } catch {
-      | exn ->
-        onExit();
-        msg = exn.getMessage();
-        trace = ErrorTrace(dirName.toString(), key.toString(), msg);
-        ErrorFile(List[trace])
-      }
+      vtry<File>(
+        () -> {
+          result = f(context, Handle(conv, dirName), key);
+          onExit();
+          result
+        },
+        exn -> {
+          onExit();
+          msg = exn.getMessage();
+          trace = ErrorTrace(dirName.toString(), key.toString(), msg);
+          ErrorFile(List[trace])
+        },
+      )
     });
     Handle(conv, dir.dirName)
   }
@@ -75,19 +77,28 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     thisDirName = this.dirName.toString();
     dirName = DirName::create(dirNameStr);
     thisDir.apply(context, dirName, (context, writer, key, files) ~> {
-      try {
-        if (files.size() == 0) return void;
-        f(context, writer, key, files.map(x -> this.conv(x)));
-      } catch {
-      | ErrorFile(trace) ->
-        traceElt = ErrorTrace(thisDirName, key.toString(), "propagated");
-        !trace = List.Cons(traceElt, trace);
-        writer.write(key, ErrorFile(trace))
-      | exn ->
-        traceElt = ErrorTrace(thisDirName, key.toString(), exn.getMessage());
-        trace = List.Cons(traceElt, List.Nil());
-        writer.write(key, ErrorFile(trace))
-      }
+      vtry(
+        () -> {
+          if (files.size() == 0) return void;
+          f(context, writer, key, files.map(x -> this.conv(x)));
+        },
+        e ->
+          e match {
+          | ErrorFile(trace) ->
+            traceElt = ErrorTrace(thisDirName, key.toString(), "propagated");
+            !trace = List.Cons(traceElt, trace);
+            writer.write(key, ErrorFile(trace))
+          | exn ->
+            traceElt = ErrorTrace(
+              thisDirName,
+              key.toString(),
+              exn.getMessage(),
+            );
+            trace = List.Cons(traceElt, List.Nil());
+            writer.write(key, ErrorFile(trace))
+          }
+        ,
+      )
     });
     Handle(conv, dirName)
   }
@@ -221,7 +232,6 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
       fixedData = FixedData{dirName, data => Array[]};
       time = context.timeStamp();
       dir = Dir{
-        creationTime => time,
         time,
         tick => context.tick,
         isInput => true,

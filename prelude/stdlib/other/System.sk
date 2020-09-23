@@ -119,11 +119,35 @@ fun print_error_ln<T: readonly Show>(value: T): void {
   print_error("\n");
 }
 
-// Command line arguments without the name of the current executable.
+/*@debug
 @no_throw
 @cpp_runtime
-@may_alloc
-native fun arguments(): Array<String>;
+native
+*/
+fun getArgc(): UInt32 {
+  UInt32::truncate(1)
+}
+
+/*@debug
+@no_throw
+@cpp_runtime
+native */
+fun getArgN(Int): String {
+  "query"
+}
+
+// Command line arguments without the name of the current executable.
+fun arguments(): Array<String> {
+  /*
+  size = getArgc();
+  result = mutable Vector[];
+  for (i in Range(0, size.toInt())) {
+    result.push(getArgN(i));
+  };
+  result.toArray();
+  */
+  Array["query"]
+}
 
 @debug
 @no_throw

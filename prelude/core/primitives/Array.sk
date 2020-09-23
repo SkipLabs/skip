@@ -663,7 +663,7 @@ mutable native class .Array<+T>
     count: Int,
   ): (Array<Int>, Int) {
     if (i >= this.size()) {
-      (freeze(indices), count)
+      (indices.chill(), count)
     } else if (p(this[i])) {
       indices.set(count, i);
       this.packIndex(p, indices, i + 1, count + 1)
@@ -803,9 +803,7 @@ private mutable class ReversedValuesIterator<V>
   }
 }
 
-@cpp_runtime
-@may_alloc // XXX weird. for SKIP_Array_concatStringArray
-private fun concatStringArray(v: readonly Array<String>): String {
+fun concatStringArray(v: readonly Array<String>): String {
   // Count characters.
   numChars = 0;
   for (i in Range(0, v.size())) !numChars = numChars + v[i].length();

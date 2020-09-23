@@ -150,7 +150,7 @@ class Dir{
       };
       !current = current + 1;
     };
-    freeze(keys)
+    keys.chill()
   }
 
   static fun lazy(
@@ -180,14 +180,18 @@ class Dir{
       context.!reads = mutable Vector[];
 
       context.!newDirs = SortedSet[];
-      result = try {
-        f(context, dirName, key)
-      } catch {
-      | e ->
-        ErrorFile(
-          List[ErrorTrace(dirName.toString(), key.toString(), e.getMessage())],
-        )
-      };
+      result = vtry<File>(
+        () -> {
+          f(context, dirName, key)
+        },
+        e ->
+          ErrorFile(
+            List[
+              ErrorTrace(dirName.toString(), key.toString(), e.getMessage()),
+            ],
+          )
+        ,
+      );
       dir = context.getDir(dirName);
       results = Array[result];
       map = SortedMap[Path(dirName, key) => results];
@@ -294,7 +298,7 @@ class Dir{
     f(context, writer, key, values);
     newDirs = context.newDirs;
     context.!newDirs = newDirsCopy;
-    kvArray = freeze(writer).getWrites();
+    kvArray = writer.getWrites();
     reads = context.getReads();
     rows = kvArray.map(kv2 -> {
       (k2, v2) = kv2;
@@ -347,7 +351,7 @@ class Dir{
         deps.push((readerPath, this.dirName, dirName, readKey));
       };
     };
-    context.!deps = List.Cons(freeze(deps), context.deps);
+    context.!deps = List.Cons(deps.toArray(), context.deps);
   }
 
   fun mapData<File2: File>(
@@ -387,7 +391,7 @@ class Dir{
     while (current < this.fixedData.data.size()) {
       addFixed();
     };
-    freeze(mapped)
+    mapped.chill()
   }
 
   fun apply(context: mutable Context, dirName: DirName, f: MapFun): void {
@@ -577,7 +581,7 @@ class Dir{
 
     !this = this.updateNewDirs(context, key, newDirs);
 
-    mapped = freeze(writer).getWrites();
+    mapped = writer.getWrites();
     reads = context.getReads();
 
     for (read in reads) {

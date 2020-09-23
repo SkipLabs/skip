@@ -85,7 +85,7 @@ class RangeIndex{bitSize: Int, intSize: Int, data: Array<Handle<BaseName>>} {
     };
     acc = mutable Set[];
     this.lquery(context, acc, 0, start, end);
-    freeze(acc)
+    acc.chill()
   }
 }
 
@@ -100,9 +100,10 @@ fun parseRange(str: String): (Int, Int) {
 fun testIndex(): mutable Context {
   run(context ~> {
     ints = mutable Vector[];
-    for (i in Range(0, 256)) {
-      ints.push((IID(i), StringFile(i.toString())));
-    };
+    /*    for (i in Range(0, 256)) {
+          ints.push((IID(i), StringFile(i.toString())));
+        };
+    */
     sinput = context.mkdir(StringFile::fromFile, "/sinput/", ints.toArray());
     input = sinput.map(
       IntFile::fromFile,
@@ -118,6 +119,7 @@ fun testIndex(): mutable Context {
         );
       }
     };
+
     queries = context.mkdir(
       StringFile::fromFile,
       "/queries/",
