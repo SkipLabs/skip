@@ -6,7 +6,7 @@ var instance = null;
 
 function wasmStringToJS(wasmPointer) {
   var i32 = new Int32Array(instance.exports.memory.buffer);
-  var size = i32[wasmPointer-8 >> 2];
+  var size = instance.exports['getStringSize'](wasmPointer);
   var i8 = new Int8Array(instance.exports.memory.buffer);
   var substring = new Int8Array(size);
   var i;
@@ -15,6 +15,28 @@ function wasmStringToJS(wasmPointer) {
   }
   var utf8decoder = new util.TextDecoder();
   return utf8decoder.decode(substring);
+}
+
+function wasmToJS(wptr) {
+  switch(instance.exports['objectKind'](wptr)) {
+  case 0:
+    return wasmStringToJS(instance.exports['getLeafValue'](wptr));
+  case 1:
+    var size = instance.exports['getCompositeSize'](wptr);
+    var arr = new Array();
+    var i;
+    for(i = 0; i < size; i++) {
+        arr[i] = wasmToJS(instance.exports['getCompositeAt'](wptr, i));
+    }
+    var objName = wasmStringToJS(instance.exports['getCompositeName'](wptr));
+    if(objName == '') {
+      return arr;
+    }
+    return [objName, arr];
+  default:
+    console.log('Error unknown JSObject type');
+    return undefined;
+  }
 }
 
 var mymemcpy = null;

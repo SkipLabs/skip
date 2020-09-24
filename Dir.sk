@@ -109,7 +109,6 @@ base class PlaceHolder {
 }
 
 class Dir{
-  creationTime: Int,
   time: Int,
   tick: Int,
   dirName: DirName,
@@ -207,7 +206,6 @@ class Dir{
     };
     context.!newDirs = context.newDirs.add(dirName);
     newDir = Dir{
-      creationTime => time,
       time,
       tick => context.tick,
       dirName,
@@ -408,7 +406,7 @@ class Dir{
     | Some(dir) ->
       if (
         dir.parent is Some _ &&
-        dir.parent.fromSome() == (this.creationTime, this.dirName) &&
+        dir.parent.fromSome() == (this.time, this.dirName) &&
         inspect(dir.mapFun.fromSome()) == inspect(f)
       ) {
         if (context.debugMode) {
@@ -428,12 +426,11 @@ class Dir{
     this.updateReaders(context, dirName, mapped);
     fixedData = FixedData{dirName, data => grouped.rows};
     dir = Dir{
-      creationTime => time,
       time,
       tick => context.tick,
       dirName,
       isInput => false,
-      parent => Some((this.creationTime, this.dirName)),
+      parent => Some((this.time, this.dirName)),
       fixedData,
       mapFun => Some(f),
       newDirs => grouped.newDirs,
