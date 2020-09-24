@@ -2,15 +2,20 @@ const util = require('util');
 const fs = require('fs');
 var source = fs.readFileSync('./build/out.wasm');
 
-var memory = new WebAssembly.Memory({
-    initial: 256
-});
-var args = Array['query'];
+var instance = null;
 
-var table = new WebAssembly.Table({
-    initial: 0,
-    element: 'anyfunc',
-});
+function wasmStringToJS(wasmPointer) {
+  var i32 = new Int32Array(instance.exports.memory.buffer);
+  var size = i32[wasmPointer-8 >> 2];
+  var i8 = new Int8Array(instance.exports.memory.buffer);
+  var substring = new Int8Array(size);
+  var i;
+  for(i = 0; i < size; i++) {
+    substring[i] = i8[wasmPointer+i];
+  }
+  var utf8decoder = new util.TextDecoder();
+  return utf8decoder.decode(substring);
+}
 
 var mymemcpy = null;
 var getExn = null;
@@ -29,8 +34,8 @@ var line = null;
 const env = {
     memoryBase: 0,
     tableBase: 0,
-    memory: memory,
-    table: table,
+    memory: new WebAssembly.Memory({initial: 256}),
+    table: new WebAssembly.Table({initial: 0, element: 'anyfunc'}),
     _ZSt9terminatev:function() {
         console.log("_ZSt9terminatev");
         throw 1;
@@ -95,13 +100,9 @@ WebAssembly.instantiate(typedArray, {
 }).then(result => {
   mymemcpy = result.instance.exports.mymemcpy;
   getExn = result.instance.exports.getExn;
-  console.log(util.inspect(result, true, 0));
-  for(elt in result.instance.exports) {
-    console.log(elt);
-    console.log(result.instance.exports[elt]);
-  }
   SKIP_call0 = result.instance.exports['sk.call0'];
   SKIP_call1 = result.instance.exports['sk.call1'];
+  instance = result.instance;
   result.instance.exports.SKIP_initializeSkip();
   result.instance.exports.skip_main();
 }).catch(e => {
