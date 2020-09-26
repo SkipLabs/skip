@@ -75,7 +75,7 @@ void SKIP_throw(char* exc) {
   __cxa_throw(0, 0, 0);
 }
 
-void* getExn() {
+void* SKIP_getExn() {
   return exn;
 }
 
@@ -341,4 +341,3 @@ char* SKIP_read_line() {
   SKIP_print_char('\n');
   return result;
 }
-
