@@ -55,16 +55,12 @@ void print_int(uint64_t x) {
 extern unsigned char __heap_base;
 
 unsigned char* bump_pointer = &__heap_base;
-void* heap_end = NULL;
 
 void* malloc(size_t size) {
   unsigned char* r = bump_pointer;
   bump_pointer += size;
   return (void*)r;
 }
-
-void SKIP_toto(uint32_t);
-
 
 void* exn = NULL;
 
