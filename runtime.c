@@ -1,7 +1,9 @@
+/*****************************************************************************/
 /* We are really trying to keep it to a bare minimum when it comes to C/C++
  * dependencies. We need the runtime to compile to webassembly, and each
  * additional dependency makes it more challenging.
  */
+/*****************************************************************************/
 
 #define NULL ((void*)0)
 
@@ -10,13 +12,16 @@ typedef unsigned int uint32_t;
 typedef unsigned long size_t;
 typedef uint64_t SkipInt;
 
+void* malloc(size_t);
+void SKIP_throw(void*);
+
 
 SkipInt SKIP_getArraySize(char*);
-SkipInt SKIP_computeEmbeddedStringHash(const char*, SkipInt);
-char* SKIP_getEmptyString();
 void SKIP_print_char(uint32_t);
 uint32_t SKIP_read_line_fill();
 uint32_t SKIP_read_line_get(uint32_t);
+char* SKIP_get_free_slot(uint32_t);
+void SKIP_add_free_slot(char*, uint32_t);
 
 void *mymemcpy(char* dest, const char* src, size_t size) {
   char* end = dest + size;
@@ -57,35 +62,12 @@ void print_int(uint64_t x) {
   SKIP_print_char('\n');
 }
 
-extern unsigned char __heap_base;
-
-unsigned char* bump_pointer = &__heap_base;
-
-void* malloc(size_t size) {
-  unsigned char* r = bump_pointer;
-  bump_pointer += size;
-  return (void*)r;
-}
-
-void* exn = NULL;
-
-void __cxa_throw(void*, void*, void*);
-
-void SKIP_throw(char* exc) {
-  exn = exc;
-  __cxa_throw(0, 0, 0);
-}
-
-void* SKIP_getExn() {
-  return exn;
+SkipInt SKIP_String_byteSize(char* str) {
+  return (SkipInt)*((uint32_t*)str-2);
 }
 
 void todo() {
-  SKIP_throw((char*)NULL);
-}
-
-SkipInt SKIP_String_byteSize(char* str) {
-  return (SkipInt)*((uint32_t*)str-2);
+  SKIP_throw(NULL);
 }
 
 void throw_Invalid_utf8() {
@@ -120,8 +102,8 @@ char* SKIP_Obstack_alloc(size_t size) {
   return (char*)malloc(size);
 }
 void SKIP_Obstack_auto_collect() {
-  todo();
 }
+
 void* SKIP_Obstack_calloc(size_t size) {
   unsigned char* result = (unsigned char*)SKIP_Obstack_alloc(size);
   SkipInt i;
@@ -158,7 +140,6 @@ char* create_String(const char* buffer, uint32_t size) {
 }
 
 void SKIP_Regex_initialize() {
-  todo();
 }
 
 uint32_t SKIP_String_getByte(unsigned char* str, SkipInt idx) {

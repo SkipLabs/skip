@@ -1,6 +1,6 @@
 const util = require('util');
 const fs = require('fs');
-var source = fs.readFileSync('./build/out.wasm');
+var source = fs.readFileSync('./build/out32.wasm');
 
 var instance = null;
 
@@ -119,7 +119,7 @@ WebAssembly.instantiate(typedArray, {
   env: env
 }).then(result => {
   mymemcpy = result.instance.exports.mymemcpy;
-  SKIP_call0 = result.instance.exports['sk.call0'];
+  SKIP_call0 = result.instance.exports['SKIP_call0'];
   instance = result.instance;
   result.instance.exports.SKIP_initializeSkip();
   result.instance.exports.skip_main();
