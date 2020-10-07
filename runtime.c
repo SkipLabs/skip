@@ -1,11 +1,16 @@
+/* We are really trying to keep it to a bare minimum when it comes to C/C++
+ * dependencies. We need the runtime to compile to webassembly, and each
+ * additional dependency makes it more challenging.
+ */
+
+#define NULL ((void*)0)
+
 typedef long long uint64_t;
 typedef unsigned int uint32_t;
 typedef unsigned long size_t;
-
-#define SBRK_NUM_PAGES 1
-#define NULL ((void*)0)
-
 typedef uint64_t SkipInt;
+
+
 SkipInt SKIP_getArraySize(char*);
 SkipInt SKIP_computeEmbeddedStringHash(const char*, SkipInt);
 char* SKIP_getEmptyString();
