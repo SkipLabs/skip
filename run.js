@@ -108,7 +108,10 @@ const env = {
         console.log("TOTO: " + ptr);
     },
     memcpy: function(src, dest, size) {
-       return mymemcpy(src, dest, size);
+        return mymemcpy(src, dest, size);
+    },
+    SKIP_get_free: function(size) {
+        return 0;
     },
   }
 

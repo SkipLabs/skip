@@ -22,6 +22,7 @@ uint32_t SKIP_read_line_fill();
 uint32_t SKIP_read_line_get(uint32_t);
 char* SKIP_get_free_slot(uint32_t);
 void SKIP_add_free_slot(char*, uint32_t);
+char* SKIP_Obstack_alloc(size_t size);
 
 void *mymemcpy(char* dest, const char* src, size_t size) {
   char* end = dest + size;
@@ -97,12 +98,9 @@ void SKIP_print_error(char* str) {
   SKIP_print_raw((unsigned char*)str);
   SKIP_print_char((uint32_t)10);
 }
-
-char* SKIP_Obstack_alloc(size_t size) {
-  return (char*)malloc(size);
-}
 void SKIP_Obstack_auto_collect() {
 }
+
 
 void* SKIP_Obstack_calloc(size_t size) {
   unsigned char* result = (unsigned char*)SKIP_Obstack_alloc(size);
@@ -302,9 +300,10 @@ void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
 }
 
 char* SKIP_Obstack_shallowClone(size_t size, char* obj) {
+  size = size + sizeof(void*);
   char* mem = SKIP_Obstack_alloc(size);
-  mymemcpy(mem, obj, size);
-  return mem;
+  mymemcpy(mem, obj-sizeof(void*), size);
+  return mem+sizeof(void*);
 }
 
 extern void skip_main(void);
@@ -322,4 +321,9 @@ char* SKIP_read_line() {
   SKIP_print_raw((unsigned char*)result);
   SKIP_print_char('\n');
   return result;
+}
+
+uint32_t SKIP_sizeof(char* objp) {
+  uint32_t*** obj = (uint32_t***)objp;
+  return *(*(*(obj-1)+1)+2);
 }
