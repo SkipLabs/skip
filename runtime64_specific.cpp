@@ -1,8 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <cstdint>
 #include <exception>
 #include <string>
 #include <iostream>
+#include <vector>
+
+#define PAGE_SIZE (1024 * 1024)
 
 namespace skip {
 struct SkipException : std::exception {
@@ -51,6 +55,28 @@ void SKIP_saveExn(void* e) {
   exn = e;
 }
 
+thread_local std::vector<char*>* pages = new std::vector<char*>();
+thread_local char* head = NULL;
+thread_local char* end = NULL;
+
+char* SKIP_Obstack_alloc(size_t size) {
+  if(head + size > end) {
+    size_t block_size = std::max(size, (size_t)PAGE_SIZE);
+    head = (char*)malloc(block_size);
+    end = head + block_size;
+    pages->push_back(head);
+  }
+  char* result = head;
+  head += size;
+  return result;
+}
+
+void SKIP_Obstack_free() {
+  while(!pages->empty()) {
+    free(pages->back());
+    pages->pop_back();
+  }
+}
 
 int main() {
   SKIP_initializeSkip();
