@@ -36,6 +36,7 @@ declare i8* @SKIP_getArgN(i64)
 declare i64 @SKIP_getArgc()
 declare i32 @SKIP_String_getByte(i8*, i64)
 declare i64 @SKIP_String_byteSize(i8*)
+declare void @SKIP_etry(i8*, i8*)
 
 ; LLVM
 

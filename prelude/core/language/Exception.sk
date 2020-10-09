@@ -64,3 +64,27 @@ class RuntimeError(msg: String) extends Exception {
     this.msg
   }
 }
+
+@cpp_extern("SKIP_getExn")
+native fun getExn(): Exception;
+
+@cpp_export("SKIP_call0")
+fun call0(f: () -> void): void {
+  f()
+}
+
+@cpp_runtime
+native fun etry<T>(f: () -> void, onError: () -> void): void;
+
+fun vtry<T>(f: () -> T, onError: Exception -> T): T {
+  result: ?T = None();
+  etry(
+    () -> {
+      !result = Some(f());
+    },
+    () -> {
+      !result = Some(onError(getExn()));
+    },
+  );
+  result.fromSome()
+}

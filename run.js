@@ -1,6 +1,6 @@
 const util = require('util');
 const fs = require('fs');
-var source = fs.readFileSync('./build/out.wasm');
+var source = fs.readFileSync('./build/out32.wasm');
 
 var instance = null;
 
@@ -40,9 +40,7 @@ function wasmToJS(wptr) {
 }
 
 var mymemcpy = null;
-var getExn = null;
 var SKIP_call0 = null;
-var SKIP_call1 = null;
 var current_line = 0;
 var lines = [
     'ls',
@@ -83,7 +81,7 @@ const env = {
         try {
             return SKIP_call0(f);
         } catch(_) {
-            return SKIP_call1(exn_handler, getExn());
+            return SKIP_call0(exn_handler);
         }
     },
     __setErrNo: function(err) {
@@ -121,9 +119,7 @@ WebAssembly.instantiate(typedArray, {
   env: env
 }).then(result => {
   mymemcpy = result.instance.exports.mymemcpy;
-  getExn = result.instance.exports.getExn;
-  SKIP_call0 = result.instance.exports['sk.call0'];
-  SKIP_call1 = result.instance.exports['sk.call1'];
+  SKIP_call0 = result.instance.exports['SKIP_call0'];
   instance = result.instance;
   result.instance.exports.SKIP_initializeSkip();
   result.instance.exports.skip_main();
