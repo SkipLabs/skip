@@ -14,16 +14,16 @@ base class RNbr {
 class Config{
   nbrInputs: RNbr = RRange(1, 2),
   inputSize: RNbr = RRange(1, 5),
-  missingKey: RNbr = RProb(10),
-  valueWidth: RNbr = RRange(1, 5),
-  valueRange: RNbr = RRange(0, 20),
-  nbrDirs: RNbr = RRange(1, 10),
-  funBodySize: RNbr = RRange(1, 5),
+  missingKey: RNbr = RProb(0),
+  valueWidth: RNbr = RRange(1, 2),
+  valueRange: RNbr = RRange(0, 1),
+  nbrDirs: RNbr = RRange(7, 8),
+  funBodySize: RNbr = RRange(3, 4),
   mergeSize: RNbr = RRange(1, 3),
-  probKeyChange: RNbr = RProb(50),
-  probLazyDir: RNbr = RProb(50),
-  probKeyChangeRemoved: RNbr = RProb(10),
-  nbrRounds: Int = 1000,
+  probKeyChange: RNbr = RProb(0),
+  probLazyDir: RNbr = RProb(0),
+  probKeyChangeRemoved: RNbr = RProb(0),
+  nbrRounds: Int = 300,
 }
 
 const VALUE_SIZE: Int = 10;
@@ -440,6 +440,7 @@ fun genDiffs(
 }
 
 fun genProgram(config: Config, round: Int): Program {
+  !round = 14;
   random = Random::mcreate(1 + round);
   rand = (rnbr: RNbr) ->
     rnbr match {
@@ -484,27 +485,31 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
 
 fun testInterpretor(): mutable SKFS.Context {
   config = Config{};
-  lastContext: ?mutable SKFS.Context = None();
+  SKFS.gContextInit(SKFS.Context{});
   for (i in Range(0, config.nbrRounds)) {
+    pos = SKFS.newObstack();
     print_string("Round: " + i);
     origProg = genProgram(config, i);
     context = SKFS.run(context ~> {
       eval(context, origProg);
     });
-    print_string("Initialization finished");
+    if (context.debugMode) print_string("Initialization finished");
     newProg = updateProgram(context, origProg);
     context.update();
-    !lastContext = Some(context);
-    print_string("Running program from scratch");
+    SKFS.gContextSync(context.clone());
+    if (context.debugMode) print_string("Running program from scratch");
     context2 = SKFS.run(context ~> {
       eval(context, newProg);
     });
-    !lastContext = Some(context2);
-    print_string("Compare contexts (Phase 1: updated/scratch)");
+    if (context.debugMode) {
+      print_string("Compare contexts (Phase 1: updated/scratch)")
+    };
     _ = compareContext(context, context2);
-    print_string("Compare contexts (Phase 2: scratch/updated)");
+    if (context.debugMode) {
+      print_string("Compare contexts (Phase 2: scratch/updated)")
+    };
     _ = compareContext(context2, context);
-    localGC();
+    SKFS.destroyObstack(pos);
   };
-  lastContext.fromSome()
+  SKFS.Context::fromSaved(SKFS.gContextGet())
 }

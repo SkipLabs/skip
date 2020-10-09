@@ -211,11 +211,15 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
   }
 }
 
-untracked fun toplevel(context: mutable Context): void {
-  env = mutable CmdEnv{context, pwd => "/"};
-  loop {
-    print_raw(env.pwd + "$ ");
+untracked fun toplevel(topContext: mutable Context): void {
+  runWithGc(topContext.clone(), savedContext ~> {
+    context = Context::fromSaved(savedContext);
+    env = mutable CmdEnv{context, pwd => context.pwd};
+    prompt = env.pwd + "$ ";
+    print_raw(prompt);
     cmd = read_line();
     eval(env, cmd);
-  }
+    context.!pwd = env.pwd;
+    context.clone()
+  })
 }

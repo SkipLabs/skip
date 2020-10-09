@@ -23,7 +23,7 @@ fun run(f: (mutable Context) -> void): mutable Context {
 }
 
 mutable class Context{
-  mutable pwd: List<String> = List["/"],
+  mutable pwd: String = "/",
   mutable dirs: Dirs = Dirs{},
   mutable lazyVisitedList: List<Path> = List[],
   mutable lazyVisitedSet: SortedSet<Path> = SortedSet[],
@@ -42,7 +42,50 @@ mutable class Context{
   mutable hasNext: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
+  mutable globals: SortedMap<String, File> = SortedMap[],
 } {
+  readonly fun clone(): this {
+    static{
+      pwd => this.pwd,
+      dirs => this.dirs,
+      lazyVisitedList => this.lazyVisitedList,
+      lazyVisitedSet => this.lazyVisitedSet,
+      reads => Vector[],
+      time => this.time,
+      tick => this.tick,
+      toUpdate => this.toUpdate,
+      deps => this.deps,
+      fixedDeps => this.fixedDeps,
+      newDeps => this.newDeps,
+      debugMode => this.debugMode,
+      hasPre => this.hasPre,
+      hasNext => this.hasNext,
+      newDirs => this.newDirs,
+      toReset => this.toReset,
+    }
+  }
+
+  static fun fromSaved(ctx: Context): mutable this {
+    mutable static{
+      pwd => ctx.pwd,
+      dirs => ctx.dirs,
+      lazyVisitedList => ctx.lazyVisitedList,
+      lazyVisitedSet => ctx.lazyVisitedSet,
+      reads => mutable Vector[],
+      time => ctx.time,
+      tick => ctx.tick,
+      toUpdate => ctx.toUpdate,
+      deps => ctx.deps,
+      fixedDeps => ctx.fixedDeps,
+      newDeps => ctx.newDeps,
+      debugMode => ctx.debugMode,
+      hasPre => ctx.hasPre,
+      hasNext => ctx.hasNext,
+      newDirs => ctx.newDirs,
+      toReset => ctx.toReset,
+    }
+  }
+
   mutable fun getReads(): Vector<Path> {
     reads = this.reads.chill();
     this.reads.clear();
@@ -270,6 +313,14 @@ mutable class Context{
   mutable fun addDep(path: Path): void {
     this.reads.push(path)
   }
+
+  mutable fun setGlobal(name: String, file: File): void {
+    this.!globals = this.globals.set(name, file);
+  }
+
+  readonly fun getGlobal(name: String): ?File {
+    this.globals.maybeGet(name)
+  }
 }
 
 class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
@@ -285,6 +336,37 @@ class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
     | None() -> invariant_violation("Directory not found: " + key)
     | Some(x) -> x
     }
+  }
+}
+
+@cpp_extern
+private native base class Obstack
+
+@cpp_extern("SKIP_new_Obstack")
+private native fun newObstack(): Obstack;
+
+@cpp_extern("SKIP_destroy_Obstack")
+private native fun destroyObstack(Obstack): void;
+
+@cpp_extern("SKIP_context_sync")
+private native fun gContextSync(Context): void;
+
+@cpp_extern("SKIP_context_init")
+private native fun gContextInit(Context): void;
+
+@cpp_extern("SKIP_context_get")
+native fun gContextGet(): Context;
+
+fun runWithGc(origContext: Context, f: Context ~> Context): void {
+  !f = intern(f);
+  gContextInit(origContext);
+  context = origContext;
+  loop {
+    pos = newObstack();
+    newContext = f(context);
+    gContextSync(newContext);
+    !context = gContextGet();
+    destroyObstack(pos);
   }
 }
 

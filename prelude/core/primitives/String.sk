@@ -416,9 +416,8 @@ native class .String uses Hashable, Show, Orderable {
     this
   }
 
-  fun hash(): Int {
-    this.foldl((acc, c) -> Hashable.combine(acc, c.hash()), 37)
-  }
+  @intrinsic
+  native fun hash(): Int;
 
   fun getIter(): mutable StringIterator {
     StringIterator::make(this)

@@ -1052,11 +1052,14 @@ mutable class .Map<+K: Hashable & Equality, +V>(
   // concurrent modification. Only use when the callback cannot
   // modify this map.
   @always_inline
-  private readonly fun unsafeEach(f: MapEntry<K, V> -> void): void {
-    for (entry in this.slots) {
+  readonly fun unsafeEach(f: MapEntry<K, V> -> void): void {
+    i = 0;
+    while (i < this.used) {
+      entry = this.slots[i];
       if (!entry.isEmpty()) {
         f(entry)
-      }
+      };
+      !i = i + 1;
     }
   }
 

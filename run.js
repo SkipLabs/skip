@@ -42,6 +42,7 @@ function wasmToJS(wptr) {
 var mymemcpy = null;
 var SKIP_call0 = null;
 var current_line = 0;
+var freeTable = {};
 var lines = [
     'ls',
     'cd queries',
@@ -88,7 +89,7 @@ const env = {
         throw new Error('ErrNo ' + err);
     },
     SKIP_print_char: function(c) {
-        process.stdout.write(String.fromCharCode(c));
+//        process.stdout.write(String.fromCharCode(c));
     },
     SKIP_read_line_fill: function() {
         line = lines[current_line];
@@ -111,7 +112,22 @@ const env = {
         return mymemcpy(src, dest, size);
     },
     SKIP_get_free: function(size) {
-        return 0;
+        if(!freeTable[size]) {
+            return 0;
+        }
+        if(freeTable[size].length == 0) {
+            return 0;
+        }
+        var res = freeTable[size].pop();
+        return res;
+    },
+    SKIP_add_free: function(ptr, size) {
+        if(!freeTable[size]) {
+            freeTable[size] = [];
+        }
+        freeTable[size].push(ptr);
+    },
+    printf: function(ptr) {
     },
   }
 

@@ -7,35 +7,30 @@ typedef uint64_t SkipInt;
 
 void SKIP_add_free(void* ptr, uint32_t size);
 void* SKIP_get_free(uint32_t size);
+void __cxa_throw(void*, void*, void*);
+void print_int(uint64_t);
 
 extern unsigned char __heap_base;
 
 unsigned char* bump_pointer = &__heap_base;
 
 void* malloc(size_t size) {
+  size = (size + (sizeof(long) - 1)) & ~(sizeof(long)-1);
   void* res = SKIP_get_free(size);
   if(res != NULL) {
     return res;
   }
-  uint32_t* r = (uint32_t*)bump_pointer;
-  bump_pointer += size + sizeof(uint32_t);
-  *r = size;
-  r++;
-  return (void*)r;
+  void* result = bump_pointer;
+  bump_pointer += size;
+  return result;
 }
 
-void free(uint32_t* ptr) {
-  uint32_t size = *(ptr-1);
+void free_size(uint32_t* ptr, size_t size) {
+  size = (size + (sizeof(long) - 1)) & ~(sizeof(long)-1);
   SKIP_add_free(ptr, size);
 }
 
-char* SKIP_Obstack_alloc(size_t size) {
-  return (char*)malloc(size);
-}
-
 void* exn = NULL;
-
-void __cxa_throw(void*, void*, void*);
 
 void SKIP_throw(char* exc) {
   exn = exc;

@@ -6,6 +6,33 @@ fun makeExn(): Int {
   throw MyEx(22);
 }
 
+@cpp_extern("SKIP_SKFSTest_Obstack")
+native fun testObstack<T: frozen>(T): void;
+
+value class Foo(X, X, Int)
+
+class X(Int, Int) extends SKFS.File
+class T(Int, X) extends SKFS.File
+class Y(X, Int) extends SKFS.File
+class Z(Foo, Foo) extends SKFS.File
+
+fun makeX(x: Int): X {
+  X(x, x)
+}
+
+fun makeY(x: Int): Y {
+  Y(X(x, x), x)
+}
+
+fun makeZ(n: Int): Z {
+  x = X(n, n);
+  Z(Foo(x, x, 22), Foo(x, x, 22))
+}
+
+fun makeT(x: Int): T {
+  T(x + 1, makeX(x))
+}
+
 fun testRuntime(): void {
   chars = Array['a', 'b', 'c'];
   expectEq("String::replace", "xbc", () ->
@@ -18,7 +45,6 @@ fun testRuntime(): void {
   expectEq("String LT", (GT() : Order), () -> str2.compare(str));
   expectEq("String.concat2", "abc123", () -> str + str2);
   expectEq("String.byteSize", 3, () -> String.byteSize(str));
-
   expectEq("throw", 22, () -> {
     vtry(
       () -> makeExn(),
