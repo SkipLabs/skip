@@ -1,63 +1,79 @@
+CC=clang-10
+CPP=clang++-10
+SKC=~/skip/build/bin/skip_to_llvm
+BCLINK=llvm-link-10
+MEMSIZE32=134217728
+
+OLEVEL=-O3
+CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
+CC64FLAGS=$(OLEVEL) -DSKIP64
+SKFLAGS=
+CFILES=\
+	runtime/free.c \
+	runtime/hashtable.c \
+	runtime/intern.c \
+	runtime/obstack.c \
+	runtime/runtime.c \
+	runtime/stdlib.c \
+	runtime/stack.c \
+	runtime/string.c
+
+CFILES32=$(CFILES) runtime/runtime32_specific.c
+CFILES64=$(CFILES) runtime/runtime64_specific.cpp
+BCFILES32=$(addprefix build/,$(CFILES32:.c=.bc))
+OFILES=$(addprefix build/,$(CFILES:.c=.o))
+
+SKFUNS=\
+	getCompositeName \
+	getCompositeSize \
+	getCompositeAt \
+  SKIP_String_byteSize \
+	getLeafValue \
+	objectKind \
+	SKIP_call0 \
+	SKIP_Obstack_alloc \
+	skip_main \
+	sk_string_create \
+	SKIP_initializeSkip
+
+EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
 default: build/out32.wasm build/a.out
 
 build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	cat preamble32.ll build/out32.ll > build/preamble_and_out32.ll
 	llvm-link-10 build/full_runtime32.bc build/preamble_and_out32.ll -o build/all.bc
-	llc-10 -mtriple=wasm32-unknown-unknown -O3 -filetype=obj build/all.bc -o build/out32.o
-	wasm-ld-10 --initial-memory=67108864 -export=getCompositeName -export=getCompositeSize -export=getCompositeAt -export=getStringSize -export=getLeafValue -export=objectKind -export=SKIP_call0 -export=mymemcpy -export=malloc -export=skip_main -export=SKIP_initializeSkip build/out32.o -o build/out32.wasm --no-entry -allow-undefined
+	llc-10 -mtriple=wasm32-unknown-unknown $(OLEVEL) -filetype=obj build/all.bc -o build/out32.o
+	wasm-ld-10 --initial-memory=$(MEMSIZE32) $(EXPORTJS) build/out32.o -o build/out32.wasm --no-entry -allow-undefined
 
 build/out32.ll: *.sk
-	~/skip/build/bin/skip_to_llvm --embedded32 . --export-function-as main=skip_main --no-inline --output build/out32.ll
+	mkdir -p build/
+	$(SKC) --embedded32 . --export-function-as main=skip_main $(SKFLAGS) --output build/out32.ll
 
-build/full_runtime32.bc: build/runtime32.bc build/hashtable32.bc build/runtime32_specific.bc
-	llvm-link-10 build/runtime32.bc build/runtime32_specific.bc build/hashtable32.bc -o build/full_runtime32.bc
+build/full_runtime32.bc: $(BCFILES32)
+	$(BCLINK) $(BCFILES32) -o build/full_runtime32.bc
 
-build/runtime32.bc: runtime.h runtime.c
-	/usr/bin/clang-10 -DSKIP32 --target=wasm32 -emit-llvm -c runtime.c -c -o build/runtime32.bc
-
-build/hashtable32.bc: runtime.h hashtable.c
-	/usr/bin/clang-10 -DSKIP32 --target=wasm32 -emit-llvm -c hashtable.c -c -o build/hashtable32.bc
-
-build/runtime32_specific.bc: runtime32_specific.c
-	/usr/bin/clang-10 --target=wasm32 -emit-llvm -c runtime32_specific.c -c -o build/runtime32_specific.bc
-
+build/%.bc: %.c
+	mkdir -p build/runtime
+	$(CC) $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
 
 build/a.out: build/out64.ll build/libskip_runtime64.a
 	cat preamble64.ll build/out64.ll > build/preamble_and_out64.ll
-	clang++-10 -O2 build/preamble_and_out64.ll build/libskip_runtime64.a -o build/a.out
+	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -o build/a.out
 
 build/out64.ll: *.sk
-	~/skip/build/bin/skip_to_llvm --embedded64 . --export-function-as main=skip_main --no-inline --output build/out64.ll
+	mkdir -p build/
+	$(SKC) --embedded64 . --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
 
-build/libskip_runtime64.a: build/runtime64_specific.o build/runtime64.o build/hashtable64.o
-	ar rcs build/libskip_runtime64.a build/runtime64_specific.o build/hashtable64.o build/runtime64.o
+build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o
+	ar rcs build/libskip_runtime64.a $(OFILES) build/runtime/runtime64_specific.o
 
-build/runtime64.o: runtime.h runtime.c
-	/usr/bin/clang-10 -O2 -DSKIP64 -c runtime.c -o build/runtime64.o
+build/runtime/runtime64_specific.o: runtime/runtime64_specific.cpp
+	$(CPP) $(OLEVEL) -c runtime/runtime64_specific.cpp -o build/runtime/runtime64_specific.o
 
-build/hashtable64.o: runtime.h hashtable.c
-	/usr/bin/clang-10 -O2 -DSKIP64 -c hashtable.c -o build/hashtable64.o
-
-build/runtime64_specific.o: runtime64_specific.cpp
-	/usr/bin/clang++-10 -O2 -c runtime64_specific.cpp -o build/runtime64_specific.o
-
-build/debug.out: build/out64.ll build/libdskip_runtime64.a
-	cat preamble64.ll build/out64.ll > build/preamble_and_out64.ll
-	clang++-10 -O0 -g -gno-embed-source build/preamble_and_out64.ll build/libdskip_runtime64.a -o build/debug.out
-
-build/libdskip_runtime64.a: build/druntime64_specific.o build/druntime64.o build/dhashtable64.o
-	ar rcs build/libdskip_runtime64.a build/druntime64_specific.o build/dhashtable64.o build/druntime64.o
-
-build/druntime64.o: runtime.h runtime.c
-	/usr/bin/clang-10 -O0 -g -DSKIP64 -c runtime.c -o build/druntime64.o
-
-build/dhashtable64.o: runtime.h hashtable.c
-	/usr/bin/clang-10 -O0 -g -DSKIP64 -c hashtable.c -o build/dhashtable64.o
-
-build/druntime64_specific.o: runtime64_specific.cpp
-	/usr/bin/clang++-10 -O0 -g -c runtime64_specific.cpp -o build/druntime64_specific.o
-
+build/%.o: %.c
+	mkdir -p build/runtime
+	$(CC) $(CC64FLAGS) -o $@ -c $<
 
 clean:
-	rm -Rf build && mkdir build
+	rm -Rf build

@@ -1,0 +1,27 @@
+module SKFSTest;
+
+const str: String = "123";
+
+@cpp_extern("SKIP_utf8_test_string")
+native fun getUtf8(): String;
+
+@cpp_extern("SKIP_invalid_utf8_test_string")
+native fun getInvalidUtf8(): String;
+
+fun testString(): mutable SKFS.Context {
+  utf8 = getUtf8();
+  iter = str.getIter();
+  sub = str.sub(iter, 3);
+  sub2 = str.substring(iter);
+  expectEq("Compare strings", str, () -> sub);
+  expectEq("Compare hashes", str.hash(), () -> sub.hash());
+  expectEq("Compare strings sub", str, () -> sub2);
+  expectEq("Compare hashes sub", str.hash(), () -> sub2.hash());
+  expectEq("Compare sub", "3", () -> str.substring(iter.forward(2)));
+  expectEq("Utf8 length", utf8.length(), () -> 24);
+  expectEq("Utf8 byteSize", String.byteSize(utf8), () -> UInt32::truncate(66));
+  expectEq("Utf8 from/to chars", utf8, () ->
+    String::fromChars(utf8.chars().toArray())
+  );
+  mutable SKFS.Context{}
+}

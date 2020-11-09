@@ -29,10 +29,10 @@ declare void @SKIP_internalExit(i64)
 declare void @SKIP_llvm_memcpy(i8*, i8*, i64)
 declare i8* @SKIP_read_line()
 declare void @SKIP_drop(i8*)
-declare i8* @SKIP_getArgN(i64)
-declare i64 @SKIP_getArgc()
+declare i8* @SKIP_getArgN(i32)
+declare i32 @SKIP_getArgc()
 declare i32 @SKIP_String_getByte(i8*, i64)
-declare i64 @SKIP_String_byteSize(i8*)
+declare i32 @SKIP_String_byteSize(i8*)
 
 ; LLVM
 

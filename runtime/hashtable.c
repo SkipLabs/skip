@@ -1,19 +1,19 @@
 #include "runtime.h"
 
 void sk_htbl_init(sk_htbl_t* table, size_t bitcapacity) {
-  size_t new_bitcapacity = bitcapacity + 1;
-  size_t new_capacity = 1 << new_bitcapacity;
-  sk_cell_t* new_data = malloc(sizeof(sk_cell_t) * new_capacity);
+  size_t capacity = 1 << bitcapacity;
+  sk_cell_t* data = malloc(sizeof(sk_cell_t) * capacity);
   size_t i;
 
  // Sets the unused keys to zero.
-  for(i = 0; i < new_capacity; i++) {
-    new_data[i].key = 0;
+  for(i = 0; i < capacity; i++) {
+    data[i].key = 0;
   }
 
   table->size = 0;
-  table->bitcapacity = new_bitcapacity;
-  table->data = new_data;
+  table->rsize = 0;
+  table->bitcapacity = bitcapacity;
+  table->data = data;
 }
 
 void sk_htbl_free(sk_htbl_t* table) {
@@ -21,9 +21,18 @@ void sk_htbl_free(sk_htbl_t* table) {
   free_size(table->data, sizeof(sk_cell_t) * capacity);
 }
 
+void print_int(uint64_t);
+
 void sk_htbl_resize(sk_htbl_t* table) {
+  size_t table_size = 1 << table->bitcapacity;
+  size_t bitcapacity = table->bitcapacity;
+
+  if(table->rsize > table_size/2) {
+    bitcapacity++;
+  }
+
   sk_htbl_t new_table;
-  sk_htbl_init(&new_table, table->bitcapacity + 1);
+  sk_htbl_init(&new_table, bitcapacity);
 
   size_t i;
 
@@ -40,7 +49,6 @@ void sk_htbl_resize(sk_htbl_t* table) {
 void sk_htbl_add(sk_htbl_t* table, void* key, void* value) {
   size_t capacity = 1 << table->bitcapacity;
 
-  // If the size reaches half of the capacity then grow.
   if(table->size >= capacity/2) {
     sk_htbl_resize(table);
   }
@@ -56,6 +64,7 @@ void sk_htbl_add(sk_htbl_t* table, void* key, void* value) {
   }
 
   table->size++;
+  table->rsize++;
   table->data[ikey].key = key;
   table->data[ikey].value = value;
 }
@@ -94,6 +103,7 @@ void sk_htbl_remove(sk_htbl_t* table, void* key) {
     return;
   }
 
+  table->rsize--;
   cell->value = NULL;
 }
 

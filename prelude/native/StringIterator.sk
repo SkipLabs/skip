@@ -15,7 +15,7 @@ fun igetByte(str: String, n: Int): Int {
 }
 
 @cpp_runtime
-native fun byteSize(String): Int;
+native fun byteSize(String): UInt32;
 
 mutable class StringIterator private (
   // This object is manipulated by the native methods directly.  It's important
@@ -68,7 +68,7 @@ mutable class StringIterator private (
 
   readonly fun currentCode(): Int {
     str = this.s;
-    size = byteSize(str);
+    size = byteSize(str).toInt();
     i = this.i;
 
     if (i >= size || i < 0) {
@@ -108,7 +108,7 @@ mutable class StringIterator private (
 
   mutable fun nextCode(): Int {
     str = this.s;
-    size = byteSize(str);
+    size = byteSize(str).toInt();
     i = this.i;
 
     if (i >= size) {
@@ -116,28 +116,27 @@ mutable class StringIterator private (
     };
 
     if ((igetByte(str, i).and(0x80)) == 0) {
+      c = this.currentCode();
       this.!i = i + 1;
-      return igetByte(str, i);
+      return c;
     };
     if (i + 1 >= size) return -1;
     if ((igetByte(str, i).and(0x20)) == 0) {
+      c = this.currentCode();
       this.!i = i + 2;
-      return (igetByte(str, i) - 192) * 64 + (igetByte(str, i + 1) - 128);
+      return c;
     };
     if (i + 2 >= size) return -1;
     if ((igetByte(str, i).and(0x10)) == 0) {
+      c = this.currentCode();
       this.!i = i + 3;
-      return (igetByte(str, i) - 224) * 4096 +
-        (igetByte(str, i + 1) - 128) * 64 +
-        (igetByte(str, i + 2) - 128);
+      return c;
     };
     if (i + 3 >= size) return -1;
     if ((igetByte(str, i).and(0x8)) == 0) {
+      c = this.currentCode();
       this.!i = i + 4;
-      return (igetByte(str, i) - 240) * 262144 +
-        (igetByte(str, i + 1) - 128) * 4096 +
-        (igetByte(str, i + 2) - 128) * 64 +
-        (igetByte(str, i + 3) - 128);
+      return c;
     };
 
     -1;
@@ -158,7 +157,7 @@ mutable class StringIterator private (
 
   mutable fun prevCode(): Int {
     str = this.s;
-    size = byteSize(str);
+    size = byteSize(str).toInt();
     i = this.i;
     if (size == 0) return -1;
     if (i < 0) return -1;
