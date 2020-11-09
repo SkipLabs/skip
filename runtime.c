@@ -104,6 +104,7 @@ void SKIP_print_error(char* str) {
 void SKIP_Obstack_auto_collect() {
 }
 
+
 void* SKIP_Obstack_calloc(size_t size) {
   unsigned char* result = (unsigned char*)SKIP_Obstack_alloc(size);
   SkipInt i;
@@ -303,6 +304,7 @@ char* SKIP_read_line() {
   result = create_String(result, size);
   return result;
 }
+
 
 /*****************************************************************************/
 /* Obstack allocation. */
