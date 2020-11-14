@@ -62,6 +62,7 @@ mutable class Context{
       hasNext => this.hasNext,
       newDirs => this.newDirs,
       toReset => this.toReset,
+      globals => this.globals,
     }
   }
 
@@ -83,6 +84,7 @@ mutable class Context{
       hasNext => ctx.hasNext,
       newDirs => ctx.newDirs,
       toReset => ctx.toReset,
+      globals => ctx.globals,
     }
   }
 
@@ -293,16 +295,9 @@ mutable class Context{
     if (this.debugMode) {
       print_string("REMOVED: " + dirName);
     };
-    time = this.timeStamp();
     this.setDir(
       dirName,
-      Dir{
-        time,
-        tick => dir.tick,
-        dirName => dirName,
-        isInput => false,
-        fixedData => FixedData::empty(dirName),
-      },
+      dir with {tick => this.tick, fixedData => FixedData::empty(dirName)},
     );
   }
 
@@ -342,18 +337,23 @@ class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
 @cpp_extern
 private native base class Obstack
 
+@debug
 @cpp_extern("SKIP_new_Obstack")
 private native fun newObstack(): Obstack;
 
+@debug
 @cpp_extern("SKIP_destroy_Obstack")
 private native fun destroyObstack(Obstack): void;
 
+@debug
 @cpp_extern("SKIP_context_sync")
 private native fun gContextSync(Context): void;
 
+@debug
 @cpp_extern("SKIP_context_init")
 private native fun gContextInit(Context): void;
 
+@debug
 @cpp_extern("SKIP_context_get")
 native fun gContextGet(): Context;
 

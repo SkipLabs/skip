@@ -47,10 +47,12 @@ void sk_htbl_add(sk_htbl_t* table, void* key, void* value) {
 
   uintptr_t ikey = (uintptr_t)key;
   ikey = ikey & (capacity-1);
+  uintptr_t n = 1;
 
   while(table->data[ikey].key != 0 &&
        !(table->data[ikey].key == key && table->data[ikey].value == NULL)) {
-    ikey = (ikey + 1) & (capacity-1);
+    ikey = (ikey + n * n) & (capacity-1);
+    n++;
   }
 
   table->size++;
@@ -62,12 +64,14 @@ sk_cell_t* sk_htbl_find(sk_htbl_t* table, void* key) {
   size_t capacity = 1 << table->bitcapacity;
   uintptr_t ikey = (uintptr_t)key;
   ikey = ikey & (capacity-1);
+  uintptr_t n = 1;
 
   while(table->data[ikey].key != 0) {
     if(table->data[ikey].key == key) {
       return &table->data[ikey];
     }
-    ikey = (ikey + 1) & (capacity-1);
+    ikey = (ikey + n * n) & (capacity-1);
+    n++;
   }
 
   return NULL;

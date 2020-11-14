@@ -182,8 +182,8 @@ char* SKIP_String__fromChars(const char* dumb, char* _src) {
       throw_Invalid_utf8();
     }
   };
-  uint32_t* iresult = (uint32_t*)SKIP_Obstack_alloc(size + 2 * sizeof(int));
-  *iresult = (uint32_t)size;
+  uint32_t* iresult = (uint32_t*)SKIP_Obstack_alloc(resultSize + 2 * sizeof(int));
+  *iresult = (uint32_t)resultSize;
   iresult++;
   iresult++;
   char* result = (char*)iresult;
@@ -252,7 +252,7 @@ SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2) {
     unsigned char c1 = *str1;
     unsigned char c2 = *str2;
     int diff = c1 - c2;
-    if(diff != 0) return c;
+    if(diff != 0) return diff;
     str1++;
     str2++;
   }
@@ -415,7 +415,7 @@ static void add_itable(char* mem) {
     itable = &itable_holder;
     sk_htbl_init(itable, 10);
   }
-  sk_htbl_add(itable, mem, mem);
+  sk_htbl_add(itable, mem, (void*)1);
 }
 
 static sk_cell_t* find_itable(char* mem) {
@@ -441,12 +441,15 @@ static void free_intern(char* obj, size_t memsize, size_t leftsize) {
   if(cell == NULL || cell->value == NULL) {
     return;
   }
-  cell->value = NULL;
+  cell->value = (void*)(((uintptr_t)cell->value)-1);
   memsize += leftsize;
-  free_size(obj-leftsize, memsize);
+
+  if(cell->value == NULL) {
+    free_size(obj-leftsize, memsize);
+  }
 }
 
-char* SKIP_intern_class(sk_htbl_t* ht, stack_t* st, char* obj) {
+char* SKIP_intern_class(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
@@ -478,7 +481,7 @@ char* SKIP_intern_class(sk_htbl_t* ht, stack_t* st, char* obj) {
   return (char*)result;
 }
 
-char* SKIP_intern_array(sk_htbl_t* ht, stack_t* st, char* obj) {
+char* SKIP_intern_array(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
@@ -526,7 +529,7 @@ uint32_t SKIP_is_string(char* obj) {
   return *(((uint32_t*)obj)-1) & 0x80000000;
 }
 
-char* SKIP_intern_obj(sk_htbl_t* ot, sk_htbl_t* ht, stack_t* st, char* obj) {
+char* SKIP_intern_obj(stack_t* st, char* obj) {
 
   if(obj == NULL) {
     return NULL;
@@ -535,17 +538,8 @@ char* SKIP_intern_obj(sk_htbl_t* ot, sk_htbl_t* ht, stack_t* st, char* obj) {
   sk_cell_t* icell = find_itable(obj);
 
   if(icell != NULL && icell->value != NULL) {
-    if(!sk_htbl_mem(ot, obj)) {
-      sk_htbl_add(ot, obj, obj);
-    }
+    icell->value = (void*)(((uintptr_t)icell->value) + 1);
     return obj;
-  }
-
-  sk_cell_t* cell = sk_htbl_find(ht, (void*)obj);
-
-  // We already copied this object
-  if(cell != NULL) {
-    return cell->value;
   }
 
   char* result;
@@ -553,7 +547,6 @@ char* SKIP_intern_obj(sk_htbl_t* ot, sk_htbl_t* ht, stack_t* st, char* obj) {
   // Check if we are dealing with a string
   if(SKIP_is_string(obj)) {
     result = SKIP_intern_string(obj);
-    sk_htbl_add(ht, obj, result);
     return result;
   }
 
@@ -561,52 +554,34 @@ char* SKIP_intern_obj(sk_htbl_t* ot, sk_htbl_t* ht, stack_t* st, char* obj) {
 
   switch(ty->m_kind) {
   case 0:
-    result = SKIP_intern_class(ht, st, obj);
+    result = SKIP_intern_class(st, obj);
     break;
   case 1:
-    result = SKIP_intern_array(ht, st, obj);
+    result = SKIP_intern_array(st, obj);
     break;
   default:
     // NOT SUPPORTED
     SKIP_internalExit();
   }
 
-  sk_htbl_add(ht, obj, result);
-
   return (char*)result;
 }
 
-static char* intern_with_table(sk_htbl_t* ot, char* obj) {
-  sk_htbl_t ht_holder;
-  sk_htbl_t* ht = &ht_holder;
-
+char* SKIP_intern(char* obj) {
   stack_t st_holder;
   stack_t* st = &st_holder;
 
-  sk_htbl_init(ht, 10);
   SKIP_stack_init(st, 1024);
 
-  char* result = SKIP_intern_obj(ot, ht, st, obj);
+  char* result = SKIP_intern_obj(st, obj);
 
   while(st->head > 0) {
     value_t delayed = SKIP_stack_pop(st);
     void* toCopy = *delayed.value;
-    *delayed.slot = SKIP_intern_obj(ot, ht, st, toCopy);
+    *delayed.slot = SKIP_intern_obj(st, toCopy);
   }
 
   SKIP_stack_free(st);
-  sk_htbl_free(ht);
-
-  return result;
-}
-
-char* SKIP_intern(char* obj) {
-  sk_htbl_t ot_holder;
-  sk_htbl_t* ot = &ot_holder;
-
-  sk_htbl_init(ot, 10);
-  char* result = intern_with_table(ot, obj);
-  sk_htbl_free(ot);
 
   return result;
 }
@@ -615,7 +590,15 @@ char* SKIP_intern(char* obj) {
 /* Freeing primitive. */
 /*****************************************************************************/
 
-void SKIP_free_class(sk_htbl_t* ht, stack_t* st, char* obj) {
+void SKIP_free_class(stack_t* st, char* obj) {
+  sk_cell_t* cell = find_itable(obj);
+  if(cell == NULL || cell->value == NULL) {
+    return;
+  }
+  if(cell->value > (void*)1) {
+    return;
+  }
+
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
@@ -647,7 +630,14 @@ void SKIP_free_class(sk_htbl_t* ht, stack_t* st, char* obj) {
   return;
 }
 
-void SKIP_free_array(sk_htbl_t* ht, stack_t* st, char* obj) {
+void SKIP_free_array(stack_t* st, char* obj) {
+  sk_cell_t* cell = find_itable(obj);
+  if(cell == NULL || cell->value == NULL) {
+    return;
+  }
+  if(cell->value > (void*)1) {
+    return;
+  }
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
@@ -683,23 +673,9 @@ void SKIP_free_array(sk_htbl_t* ht, stack_t* st, char* obj) {
   return;
 }
 
-void SKIP_free(sk_htbl_t* ot, sk_htbl_t* ht, stack_t* st, char* obj) {
+void SKIP_free(stack_t* st, char* obj) {
 
   if(obj == NULL) {
-    return;
-  }
-
-  // Checking if we already freed this object.
-  sk_cell_t* cell = sk_htbl_find(ht, (void*)obj);
-  if(cell != NULL) {
-    return;
-  }
-
-  sk_htbl_add(ht, obj, obj);
-
-  // We have been told to keep this object around
-  cell = sk_htbl_find(ot, (void*)obj);
-  if(cell != NULL) {
     return;
   }
 
@@ -715,10 +691,10 @@ void SKIP_free(sk_htbl_t* ot, sk_htbl_t* ht, stack_t* st, char* obj) {
 
   switch(ty->m_kind) {
   case 0:
-    SKIP_free_class(ht, st, obj);
+    SKIP_free_class(st, obj);
     break;
   case 1:
-    SKIP_free_array(ht, st, obj);
+    SKIP_free_array(st, obj);
     break;
   default:
     // NOT SUPPORTED
@@ -739,32 +715,19 @@ char* SKIP_context_get() {
 }
 
 void SKIP_context_sync(char* new) {
-  sk_htbl_t ot_holder;
-  sk_htbl_t* ot = &ot_holder;
-
-  sk_htbl_init(ot, 10);
-  char* new_obj = intern_with_table(ot, new);
-
-  sk_htbl_t ht_holder;
-  sk_htbl_t* ht = &ht_holder;
-
+  char* new_obj = SKIP_intern(new);
   stack_t st_holder;
   stack_t* st = &st_holder;
 
-  sk_htbl_init(ht, 10);
   SKIP_stack_init(st, 1024);
-
-  SKIP_free(ot, ht, st, context);
+  SKIP_free(st, context);
 
   while(st->head > 0) {
     value_t delayed = SKIP_stack_pop(st);
     void* toFree = delayed.value;
-    SKIP_free(ot, ht, st, toFree);
+    SKIP_free(st, toFree);
   }
 
   SKIP_stack_free(st);
-  sk_htbl_free(ht);
-  sk_htbl_free(ot);
-
   context = new_obj;
 }
