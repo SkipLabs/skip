@@ -1,0 +1,150 @@
+module SKSQL;
+
+base class Test {
+  children =
+  | HashThreshold(Int)
+  | TestStmt{expect: String, posBegin: Int, stmt: Stmt, posEnd: Int}
+  | TestSkip()
+  | TestQuery{
+    qtype: String,
+    sort: String,
+    posBegin: Int,
+    query: Query,
+    posEnd: Int,
+  }
+
+  fun getStmt(): ?Stmt {
+    this match {
+    | TestStmt{stmt} -> Some(stmt)
+    | TestQuery{query => stmt @ Select _} -> Some(stmt)
+    | _ -> None()
+    }
+  }
+}
+
+base class Stmt {
+  children =
+  | Table{name: String, schema: Array<TypeDescr>}
+  | View{name: String, query: Query}
+  | Drop{kind: TableKind, name: String}
+  | Delete{colName: ?String, name: String, where: ?Expr}
+  | Index{name: String, fields: (String, Array<(String, IKind)>)}
+  | Insert{
+    pos: Int,
+    name: String,
+    paramsOpt: ?Array<String>,
+    values: InsertValues,
+  }
+  | Update{name: String, sets: Array<(String, Expr)>, where: ?Expr}
+  | Replace{name: String, values: InsertValues}
+}
+
+class TableName(name: FromName, asName: ?String, indexed: Bool = true)
+
+base class TableKind {
+  children =
+  | TView()
+  | TIndex()
+  | TTable()
+}
+
+base class InsertValues {
+  children =
+  | IValues(Array<Value>)
+  | IQuery(Query)
+}
+
+base class IKind {
+  children =
+  | INONE()
+  | IASC()
+  | IDESC()
+}
+
+base class FromName {
+  children =
+  | FName(String)
+  | FQuery(Query)
+}
+
+base class Query
+
+class Select{
+  id: String,
+  pos: Int,
+  kind: SelectKind,
+  params: ?Array<(Expr, ?String)>,
+  from: ?Array<TableName>,
+  join: ?Join,
+  where: ?Expr,
+  in_: ?Array<Expr>,
+  groupBy: ?Array<(Expr, ?String)>,
+  having: ?Expr,
+  orderBy: ?Array<(Expr, IKind)>,
+  rest: Array<(QueryKind, Select)>,
+} extends Query, Stmt
+
+class Join{
+  kind: JoinKind,
+  names: Array<TableName>,
+  on: ?Array<(Expr, ?String)>,
+}
+
+base class JoinKind {
+  children =
+  | JLeft(Bool)
+  | JCross()
+  | JOuter()
+  | JInner()
+  | JNone()
+}
+
+base class SelectKind {
+  children =
+  | SAll()
+  | SDistinct()
+  | SNone()
+}
+
+base class QueryKind {
+  children =
+  | QExcept()
+  | QUnion(Bool)
+  | QIntersect()
+}
+
+base class Value {
+  children =
+  | VNull()
+  | VInt(Int)
+  | VLShift(Int, Int)
+  | VFloat(Int, Int)
+  | VString(String)
+}
+
+base class Expr {
+  children =
+  | Literal(String)
+  | Not(Expr)
+  | All(Expr)
+  | Distinct(Expr)
+  | In(Expr, Array<Expr>)
+  | Between(Expr)
+  | Binop(String, Expr, Expr)
+  | EQuery(Query)
+  | Exists(Query)
+  | UMinus(Expr)
+  | UPlus(Expr)
+  | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
+  | Call(Expr, ?Array<Expr>)
+}
+
+class TypeDescr{name: String, ty: Type, primary: Bool, unique: Bool}
+
+base class Type {
+  children =
+  | FLOAT()
+  | INTEGER()
+  | TEXT()
+  | VARCHAR(Int)
+}

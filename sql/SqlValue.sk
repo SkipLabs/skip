@@ -1,0 +1,72 @@
+module SKSQL;
+
+base class SValue uses Hashable, Orderable, Show {
+  children =
+  | SVNull()
+  | SVInt(Int)
+  | SVBool(Bool)
+  | SVString(String)
+
+  fun toString(): String
+  | SVNull() -> "null"
+  | SVInt(n) -> n.toString()
+  | SVBool(b) -> if (b) "true" else "false"
+  | SVString(s) -> "\"" + s + "\""
+
+  fun isTrue(): Bool {
+    this match {
+    | SVInt(1)
+    | SVBool(true)
+    | SVString("TRUE") ->
+      true
+    | _ -> false
+    }
+  }
+}
+
+class RowKey(
+  values: Array<SValue>,
+  kinds: ?Array<(Int, IKind)> = None(),
+) extends SKFS.BaseName {
+  fun toString(): String {
+    inspect(this).toString();
+  }
+
+  fun hash(): Int {
+    if (this.values.size() == 0) return 0;
+    acc = this.values[0].hash();
+    for (i in Range(1, this.values.size())) {
+      !acc = Hashable.combine(acc, this.values[i]);
+    };
+    acc
+  }
+
+  fun compare(file: SKFS.FileName): Order {
+    file match {
+    | y @ RowKey _ ->
+      this.kinds match {
+      | None() -> this.values.compare(y.values)
+      | Some(kinds) ->
+        for (i in Range(0, kinds.size())) {
+          (idx, direction) = kinds[i];
+          value1 = this.values[idx];
+          value2 = y.values[idx];
+          cmp = direction match {
+          | INONE()
+          | IASC() ->
+            value1.compare(value2)
+          | IDESC() -> value2.compare(value1)
+          };
+          if (cmp != EQ()) return cmp;
+        };
+        EQ()
+      }
+    | _ -> LT()
+    }
+  }
+}
+
+class Row(
+  values: Array<SValue>,
+  kinds: ?Array<(Int, IKind)> = None(),
+) extends SKFS.File

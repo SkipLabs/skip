@@ -343,7 +343,7 @@ class IDFile{} extends SKFS.File
 
 class IntFile(value: Int) extends SKFS.File {
   fun getKey(): SKFS.BaseName {
-    SKFS.SID::create("K" + this.value)
+    SKFS.SID("K" + this.value)
   }
 }
 
@@ -538,12 +538,21 @@ fun testLazy(): mutable SKFS.Context {
     inputData = acc
       .map(x -> (SKFS.IID(x.v), SKFS.StringFile(x.toString())))
       .toArray();
-    srcDir = context.mkdir(SKFS.StringFile::fromFile, "/src/", inputData);
-    defDir = srcDir.map(Def::fromFile, context, "/defs/", Def::fromStringFile);
+    srcDir = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/src/"),
+      inputData,
+    );
+    defDir = srcDir.map(
+      Def::fromFile,
+      context,
+      SKFS.DirName::create("/defs/"),
+      Def::fromStringFile,
+    );
     _defDiff = defDir.contextWriterKeyMap(
       SKFS.IntFile::fromFile,
       context,
-      "/defDiffs/",
+      SKFS.DirName::create("/defDiffs/"),
       (context, writer, key, value) ~> {
         prevDir = defDir.pre(context);
         prevDir match {
@@ -558,7 +567,7 @@ fun testLazy(): mutable SKFS.Context {
     treeDir = SKFS.Handle::lazy(
       TreeFile::fromFile,
       context,
-      "/lazyTrees/",
+      SKFS.DirName::create("/lazyTrees/"),
       (context, self, key) ~> {
         def = defDir.get(context, key);
         parents = def.parents.map(id -> self.get(context, SKFS.IID(id)).value);
@@ -568,7 +577,7 @@ fun testLazy(): mutable SKFS.Context {
     _unfoldedTrees = defDir.contextMap(
       TreeFile::fromFile,
       context,
-      "/trees/",
+      SKFS.DirName::create("/trees/"),
       (context, x) ~> {
         treeDir.get(context, SKFS.IID(x.v))
       },
@@ -585,8 +594,17 @@ fun testOld(): mutable SKFS.Context {
     inputData = acc
       .map(x -> (SKFS.IID(x.v), SKFS.StringFile(x.toString())))
       .toArray();
-    srcDir = context.mkdir(SKFS.StringFile::fromFile, "/src/", inputData);
-    _defDir = srcDir.map(Def::fromFile, context, "/defs/", Def::fromStringFile);
+    srcDir = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/src/"),
+      inputData,
+    );
+    _defDir = srcDir.map(
+      Def::fromFile,
+      context,
+      SKFS.DirName::create("/defs/"),
+      Def::fromStringFile,
+    );
     context.reads.clear();
     context.update();
     context.update();
@@ -602,12 +620,20 @@ fun testSearch(): mutable SKFS.Context {
     Page{id => 2, text => "hello"},
   ].map(x -> (SKFS.IID(x.id), x));
   SKFS.run(context ~> {
-    pages = context.mkdir(Page::fromFile, "/pages/", pagesData);
-    queries = context.mkdir(SKFS.StringFile::fromFile, "/queries/", Array[]);
+    pages = context.mkdir(
+      Page::fromFile,
+      SKFS.DirName::create("/pages/"),
+      pagesData,
+    );
+    queries = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/queries/"),
+      Array[],
+    );
     index = pages.contextWriterMap(
       SKFS.IntFile::fromFile,
       context,
-      "/index/",
+      SKFS.DirName::create("/index/"),
       (_context, writer, value) ~> {
         for (token in value.text.split(" ")) {
           writer.write(SKFS.IID(token.hash()), SKFS.IntFile(value.id))
@@ -617,7 +643,7 @@ fun testSearch(): mutable SKFS.Context {
     _results = queries.contextMap(
       QueryResult::fromFile,
       context,
-      "/results/",
+      SKFS.DirName::create("/results/"),
       (context, query) ~> {
         first = true;
         results = mutable Set[];

@@ -1,0 +1,140 @@
+module SKSQL;
+
+class Lexer(idRoot: Int, content: Array<Char>) {
+  fun next(pos: Int): (Int, Token) {
+    tok = this.token(pos);
+    (tok.posEnd, tok)
+  }
+
+  fun skipSpaces(pos: Int): Int {
+    // skip whitespaces
+    loop {
+      if (pos >= this.content.size()) {
+        return pos;
+      };
+      currentChar = this.content[pos];
+      currentChar match {
+      | ' ' | '\n' | '\r' ->
+        !pos = pos + 1;
+        continue
+      | '#' ->
+        while (pos < this.content.size() && this.content[pos] != '\n') {
+          !pos = pos + 1;
+        };
+        continue
+      | _ -> break void
+      }
+    };
+    pos
+  }
+
+  fun token(posBegin: Int, size: Int = this.content.size()): Token {
+    !size = min(size, this.content.size());
+    !posBegin = this.skipSpaces(posBegin);
+    pos = posBegin;
+    if (pos >= this.content.size()) {
+      error(this.content.size() - 1, "Unexpected end of file");
+    };
+    !posBegin = pos;
+    currentChar = this.content[pos];
+    !pos = pos + 1;
+    currentChar match {
+    | _ if (pos >= this.content.size()) -> void
+    | _ if (Chars.isDigit(currentChar)) ->
+      while (pos < size && Chars.isDigit(this.content[pos])) {
+        !pos = pos + 1
+      }
+    | _ if (isLetter(currentChar)) ->
+      while (pos < size && isLetterOrDigit(this.content[pos])) {
+        !pos = pos + 1
+      }
+    | _ -> void
+    };
+    posEnd = pos;
+    Token(posBegin, posEnd)
+  }
+
+  fun isEqAtF(token: Token, str: String, f: Char ~> Char): Bool {
+    strIter = str.getIter();
+    for (pos in Range(token.posBegin, token.posEnd)) {
+      c1 = this.content[pos];
+      strIter.next() match {
+      | Some(c2) if (f(c1) == f(c2)) -> continue
+      | _ -> return false
+      }
+    };
+    strIter.atEnd()
+  }
+
+  fun isEqAt(token: Token, str: String): Bool {
+    this.isEqAtF(token, str, x ~> x)
+  }
+
+  fun isEqUpperAt(token: Token, str: String): Bool {
+    this.isEqAtF(token, str, x ~> x.capitalize())
+  }
+
+  fun isEq(pos: Int, str: String): Bool {
+    !pos = this.skipSpaces(pos);
+    if (pos >= this.content.size()) return false;
+    this.isEqAt(this.token(pos), str)
+  }
+
+  fun isKeyword(pos: Int): Bool {
+    !pos = this.skipSpaces(pos);
+    if (pos >= this.content.size()) return false;
+    isKeyword(this.word(pos))
+  }
+
+  fun isEqUpper(pos: Int, str: String): Bool {
+    !pos = this.skipSpaces(pos);
+    if (pos >= this.content.size()) return false;
+    this.isEqUpperAt(this.token(pos), str)
+  }
+
+  fun expect(pos: Int, str: String): Int {
+    (!pos, tok) = this.next(pos);
+    if (!this.isEqAt(tok, str)) {
+      word = this.wordAt(tok);
+      error(
+        tok.posBegin,
+        "Expected token: '" + str + "' found '" + word + "' instead",
+      );
+    };
+    pos
+  }
+
+  fun expectUpper(pos: Int, str: String): Int {
+    (!pos, tok) = this.next(pos);
+    if (!this.isEqUpperAt(tok, str)) {
+      word = this.wordAt(tok);
+      error(
+        tok.posBegin,
+        "Expected token: '" + str + "' found '" + word + "' instead",
+      );
+    };
+    pos
+  }
+
+  fun word(pos: Int): String {
+    tok = this.token(pos);
+    this.wordAt(tok)
+  }
+
+  fun nextWord(pos: Int): (Int, String) {
+    (!pos, tok) = this.next(pos);
+    (pos, this.wordAt(tok));
+  }
+
+  fun wordAt(tok: Token): String {
+    String::fromChars(this.content.slice(tok.posBegin, tok.posEnd))
+  }
+
+  fun nextInt(pos: Int): (Int, Int) {
+    (!pos, str) = this.nextWord(pos);
+    vtry(
+      () -> (pos, str.toInt()),
+      _ -> error(pos, "Expected integer, found: " + str),
+    )
+  }
+}

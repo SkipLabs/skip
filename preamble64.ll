@@ -33,6 +33,8 @@ declare i8* @SKIP_getArgN(i32)
 declare i32 @SKIP_getArgc()
 declare i32 @SKIP_String_getByte(i8*, i64)
 declare i32 @SKIP_String_byteSize(i8*)
+declare i8* @SKIP_Float_toString(double)
+declare double @SKIP_String__toFloat_raw(i8*)
 
 ; LLVM
 

@@ -3,17 +3,21 @@ module SKFSTest;
 fun testMap(): mutable SKFS.Context {
   data = Array[(SKFS.IID(1), SKFS.IntFile(1)), (SKFS.IID(2), SKFS.IntFile(2))];
   SKFS.run(context ~> {
-    dir1 = context.mkdir(SKFS.IntFile::fromFile, "/dir1/", data);
+    dir1 = context.mkdir(
+      SKFS.IntFile::fromFile,
+      SKFS.DirName::create("/dir1/"),
+      data,
+    );
     dir2 = dir1.contextWriterMap(
       SKFS.IntFile::fromFile,
       context,
-      "/dir2/",
+      SKFS.DirName::create("/dir2/"),
       (_context, writer, v) ~> writer.write(SKFS.IID(0), v),
     );
     _dir3 = dir2.contextWriterKeyValues(
       SKFS.IntFile::fromFile,
       context,
-      "/dir3/",
+      SKFS.DirName::create("/dir3/"),
       (_context, writer, _key, v) ~> {
         writer.writeArray(SKFS.IID(1), v)
       },
@@ -31,26 +35,34 @@ fun testMap2(): mutable SKFS.Context {
     (SKFS.IID(2), SKFS.StringFile("4")),
   ];
   SKFS.run(context ~> {
-    dirStr1 = context.mkdir(SKFS.StringFile::fromFile, "/dirStr1/", dataStr1);
-    dirStr2 = context.mkdir(SKFS.StringFile::fromFile, "/dirStr2/", dataStr2);
+    dirStr1 = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/dirStr1/"),
+      dataStr1,
+    );
+    dirStr2 = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/dirStr2/"),
+      dataStr2,
+    );
     dir1 = dirStr1.map(
       SKFS.IntFile::fromFile,
       context,
-      "/dir1/",
+      SKFS.DirName::create("/dir1/"),
       (v ~> SKFS.IntFile(v.value.toInt())),
     );
     dir2 = dirStr2.map(
       SKFS.IntFile::fromFile,
       context,
-      "/dir2/",
+      SKFS.DirName::create("/dir2/"),
       (v ~> SKFS.IntFile(v.value.toInt())),
     );
     _dir3 = dir1.contextWriterKeyMap(
       SKFS.IntFile::fromFile,
       context,
-      "/dir3/",
+      SKFS.DirName::create("/dir3/"),
       (context, writer, key, v) ~> {
-        dirName = "/dir3/" + key + "/";
+        dirName = SKFS.DirName::create("/dir3/" + key + "/");
         _ = dir2.map(SKFS.IntFile::fromFile, context, dirName, (v) ~> v);
         writer.write(key, v);
       },

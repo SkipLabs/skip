@@ -87,7 +87,11 @@ fun makeEnv(context: mutable SKFS.Context, inputs: List<Input>): void {
         data.push((SKFS.IID(key), value));
       }
     };
-    _ = context.mkdir(SKFS.IntFile::fromFile, input.name, data.toArray());
+    _ = context.mkdir(
+      SKFS.IntFile::fromFile,
+      SKFS.DirName::create(input.name),
+      data.toArray(),
+    );
   }
 }
 
@@ -468,7 +472,7 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
         newValues = diff[key];
         dir = context.getDir(dirName);
         valuesArr = Array::createFromItems(newValues);
-        dir.writeArray(context, key.toString(), valuesArr);
+        dir.writeArray(context, SKFS.IID(key), valuesArr);
         data![key] = diff[key];
       } else {
         data![key] = values;

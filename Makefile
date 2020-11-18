@@ -8,6 +8,8 @@ OLEVEL=-O3
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
+
+SKIP_FILES=$(wildcard *.sk) $(wildcard */*.sk)
 CFILES=\
 	runtime/free.c \
 	runtime/hashtable.c \
@@ -46,7 +48,7 @@ build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	llc-10 -mtriple=wasm32-unknown-unknown $(OLEVEL) -filetype=obj build/all.bc -o build/out32.o
 	wasm-ld-10 --initial-memory=$(MEMSIZE32) $(EXPORTJS) build/out32.o -o build/out32.wasm --no-entry -allow-undefined
 
-build/out32.ll: *.sk
+build/out32.ll: $(SKIP_FILES)
 	mkdir -p build/
 	$(SKC) --embedded32 . --export-function-as main=skip_main $(SKFLAGS) --output build/out32.ll
 
@@ -61,7 +63,7 @@ build/a.out: build/out64.ll build/libskip_runtime64.a
 	cat preamble64.ll build/out64.ll > build/preamble_and_out64.ll
 	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -o build/a.out
 
-build/out64.ll: *.sk
+build/out64.ll: $(SKIP_FILES)
 	mkdir -p build/
 	$(SKC) --embedded64 . --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
 

@@ -4,13 +4,13 @@ fun testLazyUnit(): mutable SKFS.Context {
   SKFS.run(context ~> {
     dirInput = context.mkdir(
       SKFS.IntFile::fromFile,
-      "/input/",
+      SKFS.DirName::create("/input/"),
       Array[(SKFS.IID(0), SKFS.IntFile(23))],
     );
     dir = SKFS.Handle::lazy(
       SKFS.IntFile::fromFile,
       context,
-      "/lazy/",
+      SKFS.DirName::create("/lazy/"),
       (context, _self, x) ~>
         SKFS.IntFile(
           x match {

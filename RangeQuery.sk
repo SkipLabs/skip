@@ -19,7 +19,9 @@ class RangeIndex{bitSize: Int, intSize: Int, data: Array<Handle<BaseName>>} {
   }: RangeIndex {
     dirs = mutable Vector[];
     for (round in Range(0, intSize / bitSize)) {
-      subName = input.dirName.toString() + "rindex" + round + "/";
+      subName = DirName::create(
+        input.dirName.toString() + "rindex" + round + "/",
+      );
       dirs.push(
         input.contextWriterKeyMap(
           baseNameFromFile,
@@ -104,32 +106,34 @@ fun testIndex(): mutable Context {
           ints.push((IID(i), StringFile(i.toString())));
         };
     */
-    sinput = context.mkdir(StringFile::fromFile, "/sinput/", ints.toArray());
+    sinput = context.mkdir(
+      StringFile::fromFile,
+      SKFS.DirName::create("/sinput/"),
+      ints.toArray(),
+    );
     input = sinput.map(
       IntFile::fromFile,
       context,
-      "/input/",
+      DirName::create("/input/"),
       (x ~> IntFile(x.value.toInt())),
     );
     queryData = mutable Vector[];
     for (i in Range(0, 32)) {
       for (j in Range(i, 32)) {
-        queryData.push(
-          (SID::create("s" + i + "_" + j), StringFile(`[${i}, ${j}]`)),
-        );
+        queryData.push((SID("s" + i + "_" + j), StringFile(`[${i}, ${j}]`)));
       }
     };
 
     queries = context.mkdir(
       StringFile::fromFile,
-      "/queries/",
+      SKFS.DirName::create("/queries/"),
       queryData.toArray(),
     );
     rindex = RangeIndex::create{context, intSize => 16, bitSize => 5, input};
     _queryResults = queries.contextMap(
       KeySet::fromFile,
       context,
-      "/qresults/",
+      DirName::create("/qresults/"),
       (context, queryStr) ~> {
         (start, end) = parseRange(queryStr.value);
         KeySet(rindex.query(context, start, end + 1));

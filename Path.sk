@@ -52,7 +52,11 @@ class Path(dirName: DirName, baseName: BaseName) extends FileName {
   static fun fromString(path: String): this {
     (dirNameStr, baseNameStr) = splitPath(path);
     dirName = DirName::create(dirNameStr);
-    baseName = BaseName::create(baseNameStr);
+    baseName = baseNameStr.getIter().next() match {
+    | None() -> invariant_violation("Expected a path")
+    | Some(c) if (c == '-' || Chars.isDigit(c)) -> IID(baseNameStr.toInt())
+    | _ -> SID(baseNameStr)
+    };
     Path(dirName, baseName)
   }
 
@@ -80,23 +84,23 @@ class DirName private (dirName: String) extends FileName {
     validator.go()
   }
 
+  static fun isValidDirName(dirName: String): Bool {
+    validator = mutable SKFSImpl.NameValidator(dirName, dirName.chars(), 0);
+    vtry(
+      () -> {
+        validator.go();
+        true
+      },
+      _ -> false,
+    )
+  }
+
   fun toString(): String {
     this.dirName
   }
 }
 
-base class BaseName extends FileName {
-  static overridable fun create(str: String): this {
-    for (char in str) {
-      if (char >= '0' && char <= '9' || char == '-') {
-        return IID::create(str);
-      } else {
-        return SID::create(str);
-      }
-    };
-    SID::create(str)
-  }
-}
+base class BaseName extends FileName
 
 class IID(value: Int) extends BaseName {
   static fun create(key: String): IID {
@@ -119,20 +123,7 @@ class IID(value: Int) extends BaseName {
     this.value.toString()
   }
 }
-class SID private (value: String) extends BaseName {
-  static private fun validateBaseName(baseName: String): void {
-    validator = mutable SKFSImpl.NameValidator(baseName, baseName.chars(), 0);
-    validator.mustBeBaseName();
-    if (!validator.reachedEnd()) {
-      validator.error("Unexpected characters after file name");
-    }
-  }
-
-  static fun create(value: String): BaseName {
-    static::validateBaseName(value);
-    SID(value)
-  }
-
+class SID(value: String) extends BaseName {
   fun toString(): String {
     this.value
   }
@@ -277,14 +268,6 @@ fun testDirNamePass(str: String): void {
   expectPass(`Test DirName: '${str}'`, () -> _ = SKFS.DirName::create(str));
 }
 
-fun testBaseNameFail(str: String): void {
-  expectFail(`Test BaseName: '${str}'`, () -> _ = SKFS.BaseName::create(str));
-}
-
-fun testBaseNamePass(str: String): void {
-  expectPass(`Test BaseName: '${str}'`, () -> _ = SKFS.BaseName::create(str));
-}
-
 fun testDirName(): void {
   testDirNameFail(" ");
   testDirNameFail("??$");
@@ -296,18 +279,6 @@ fun testDirName(): void {
   testDirNamePass("/1223/");
   testDirNamePass("/dir/");
   testDirNamePass("/dir1/dir2/");
-}
-
-fun testBaseName(): void {
-  testBaseNameFail("");
-  testBaseNameFail(" ");
-  testBaseNamePass("aa");
-  testBaseNameFail("aa/");
-  testBaseNameFail("abc ");
-  testBaseNamePass("123");
-  testBaseNamePass("__");
-  testBaseNamePass("-123");
-  testBaseNamePass("hello-world");
 }
 
 module end;

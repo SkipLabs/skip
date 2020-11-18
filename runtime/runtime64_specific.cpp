@@ -24,6 +24,7 @@ void SKIP_initializeSkip();
 void skip_main();
 uint32_t SKIP_String_byteSize(char*);
 char* sk_string_create(const char* buffer, uint32_t size);
+void SKIP_throw_EndOfFile();
 
 void SKIP_print_char(uint32_t x) {
   printf("%c", x);
@@ -38,8 +39,7 @@ thread_local std::string lineBuffer;
 uint32_t SKIP_read_line_fill(void) {
   std::getline(std::cin, lineBuffer);
   if (std::cin.fail()) {
-    fprintf(stderr, "Error: read_line fail");
-    exit(23);
+    SKIP_throw_EndOfFile();
   }
   return lineBuffer.size();
 }

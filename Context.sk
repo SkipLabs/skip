@@ -38,12 +38,17 @@ mutable class Context{
     SortedSet<(DirName, DirName, BaseName)>,
   > = SortedMap[],
   mutable debugMode: Bool = false,
+  mutable failOnExn: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable hasNext: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
 } {
+  readonly fun vtry<T>(f: () -> T, onError: .Exception -> T): T {
+    if (this.failOnExn) f() else vtry(f, onError)
+  }
+
   readonly fun clone(): this {
     static{
       pwd => this.pwd,
@@ -111,9 +116,7 @@ mutable class Context{
     }
   }
 
-  readonly fun debug(pathStr: String): void {
-    print_string("Debug " + pathStr + ":");
-    path = Path::fromString(pathStr);
+  readonly fun debug(path: Path): void {
     this.dirs.maybeGet(path.dirName) match {
     | None() -> print_string("Directory does not exist")
     | Some(dir) ->
@@ -122,8 +125,7 @@ mutable class Context{
     }
   }
 
-  readonly fun getValue(pathStr: String): Array<File> {
-    path = Path::fromString(pathStr);
+  readonly fun getValue(path: Path): Array<File> {
     dir = this.dirs[path.dirName];
     values = dir.getArrayRaw(path.baseName);
     values
@@ -229,11 +231,11 @@ mutable class Context{
 
   mutable fun mkdir<T: File>(
     conv: File ~> T,
-    dirNameStr: String,
+    dirName: DirName,
     content: Array<(BaseName, T)> = Array[],
   ): Handle<T> {
     dir = this.mkdirMulti(
-      dirNameStr,
+      dirName,
       content.map(kv -> {
         (key, value) = kv;
         (key, Array[value])
@@ -245,10 +247,9 @@ mutable class Context{
   }
 
   mutable fun mkdirMulti<T: File>(
-    dirNameStr: String,
+    dirName: DirName,
     content: Array<(BaseName, Array<T>)> = Array[],
   ): Dir {
-    dirName = DirName::create(dirNameStr);
     if (this.dirs.state.containsKey(dirName)) {
       throw DirAlreadyExists(dirName);
     };
@@ -361,16 +362,20 @@ private native fun gContextInit(Context): void;
 @cpp_extern("SKIP_context_get")
 native fun gContextGet(): Context;
 
-fun runWithGc(origContext: Context, f: Context ~> Context): void {
+fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
   !f = intern(f);
   gContextInit(origContext);
   context = origContext;
   loop {
     pos = newObstack();
-    newContext = f(context);
-    gContextSync(newContext);
-    !context = gContextGet();
-    destroyObstack(pos);
+    newContextOpt = f(context);
+    newContextOpt match {
+    | None() -> return void
+    | Some(newContext) ->
+      gContextSync(newContext);
+      !context = gContextGet();
+      destroyObstack(pos)
+    }
   }
 }
 

@@ -180,7 +180,7 @@ class Dir{
       context.!reads = mutable Vector[];
 
       context.!newDirs = SortedSet[];
-      result = vtry<File>(
+      result = context.vtry<File>(
         () -> {
           f(context, dirName, key)
         },
@@ -354,44 +354,44 @@ class Dir{
     context.!deps = List.Cons(deps.toArray(), context.deps);
   }
 
-  fun mapData<File2: File>(
+  static fun mapData(
     context: mutable Context,
+    dir: Dir,
     f: MapFun,
-  ): Vector<RowMapped<Array<File>>> {
+    acc: mutable Vector<RowMapped<Array<File>>>,
+  ): void {
     current = 0;
-    mapped = mutable Vector[];
     addFixed = () -> {
-      key = this.fixedData.data[current].key;
+      key = dir.fixedData.data[current].key;
       valueAcc = mutable Vector<(Path, Array<File>)>[];
       while (
-        current < this.fixedData.data.size() &&
-        this.fixedData.data[current].key == key
+        current < dir.fixedData.data.size() &&
+        dir.fixedData.data[current].key == key
       ) {
-        valueAcc.push(this.fixedData.data[current].value);
+        valueAcc.push(dir.fixedData.data[current].value);
         !current = current + 1;
       };
       fixedFiles = valueAcc.map(x -> x.i1).flatten().toArray();
-      mapped.push(this.mapRow(context, key, fixedFiles, f));
+      acc.push(dir.mapRow(context, key, fixedFiles, f));
     };
-    for (key => _ in this.data) {
+    for (key => _ in dir.data) {
       while (
-        current < this.fixedData.data.size() &&
-        this.fixedData.data[current].key < key
+        current < dir.fixedData.data.size() &&
+        dir.fixedData.data[current].key < key
       ) {
         addFixed();
       };
       while (
-        current < this.fixedData.data.size() &&
-        this.fixedData.data[current].key == key
+        current < dir.fixedData.data.size() &&
+        dir.fixedData.data[current].key == key
       ) {
         !current = current + 1;
       };
-      mapped.push(this.mapRow(context, key, this.getArrayRaw(key), f));
+      acc.push(dir.mapRow(context, key, dir.getArrayRaw(key), f));
     };
-    while (current < this.fixedData.data.size()) {
+    while (current < dir.fixedData.data.size()) {
       addFixed();
     };
-    mapped.chill()
   }
 
   fun apply(context: mutable Context, dirName: DirName, f: MapFun): void {
@@ -423,7 +423,9 @@ class Dir{
     };
     time = context.timeStamp();
     context.!newDirs = context.newDirs.add(dirName);
-    mapped = this.mapData(context, f);
+    acc = mutable Vector[];
+    static::mapData(context, this, f, acc);
+    mapped = acc.chill();
     grouped = this.regroupMap(mapped);
     this.updateReaders(context, dirName, mapped);
     fixedData = FixedData{dirName, data => grouped.rows};
@@ -685,21 +687,20 @@ class Dir{
 
   fun writeArray(
     context: mutable Context,
-    baseName: String,
+    key: BaseName,
     values: Array<File>,
   ): void {
-    key = BaseName::create(baseName);
     source = Path(this.dirName, key);
     !this = this.writeEntry(context, source, key, values);
     context.!toReset = context.toReset.set(this.dirName);
     context.setDir(this.dirName, this);
   }
 
-  fun write(context: mutable Context, baseName: String, value: File): void {
+  fun write(context: mutable Context, baseName: BaseName, value: File): void {
     this.writeArray(context, baseName, Array[value]);
   }
 
-  fun remove(context: mutable Context, baseName: String): void {
+  fun remove(context: mutable Context, baseName: BaseName): void {
     this.writeArray(context, baseName, Array[]);
   }
 

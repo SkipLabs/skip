@@ -73,7 +73,11 @@ fun makeLexer(str: String): () -> (String, Int) {
   }
 }
 
-mutable class CmdEnv{context: mutable Context, mutable pwd: String}
+mutable class CmdEnv{
+  context: mutable Context,
+  mutable pwd: String,
+  evaluator: mutable SKSQL.Evaluator,
+}
 
 fun backwardsSlash(pwd: String): String {
   chars = pwd.chars();
@@ -113,13 +117,9 @@ fun writeCmd(env: mutable CmdEnv, pathStr: String, cmd: String): void {
     print_error("Not an input Dir: " + path.dirName)
   | Some(dir) ->
     if (cmd == "") {
-      dir.writeArray(env.context, path.baseName.toString(), Array[]);
+      dir.writeArray(env.context, path.baseName, Array[]);
     } else {
-      dir.writeArray(
-        env.context,
-        path.baseName.toString(),
-        Array[StringFile(cmd)],
-      );
+      dir.writeArray(env.context, path.baseName, Array[StringFile(cmd)]);
     }
   };
   env.context.update();
@@ -138,6 +138,10 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
     };
     (path, _) = nextToken();
     dirName = if (path == "") env.pwd else absolutePath(env.pwd, path);
+    if (!DirName::isValidDirName(dirName)) {
+      print_error("Invalid dir name: " + dirName);
+      return void;
+    };
     if (dirName != "/") {
       env.context.maybeGetDir(DirName::create(dirName)) match {
       | None() -> print_error("Dir not found: " + dirName)
@@ -211,15 +215,67 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
   }
 }
 
+fun isSQL(str: String): Bool {
+  chars = str.chars().toArray();
+  lex = SKSQL.Lexer(0, chars);
+  if (SKSQL.isEOF(lex, 0)) return false;
+  lex.word(0).uppercase() match {
+  | "CREATE" | "INSERT" | "UPDATE" | "DROP" | "DELETE" | "REPLACE" | "SELECT" ->
+    true
+  | _ -> false
+  }
+}
+
+fun parseSQLStmt(idRoot: Int, cmd: String): ?SKSQL.Stmt {
+  chars = cmd.chars().toArray();
+  lex = SKSQL.Lexer(idRoot, chars);
+  (_, stmtAst) = SKSQL.parseStmt(lex, 0);
+  Some(stmtAst)
+}
+
 untracked fun toplevel(topContext: mutable Context): void {
   runWithGc(topContext.clone(), savedContext ~> {
     context = Context::fromSaved(savedContext);
-    env = mutable CmdEnv{context, pwd => context.pwd};
+    evaluator = context.getGlobal("SQLEvaluator") match {
+    | Some(x @ SKSQL.EvaluatorSaved _) -> SKSQL.Evaluator::fromSaved(context, x)
+    | _ ->
+      evaluator = SKSQL.Evaluator::create(context);
+      context.setGlobal("Evaluator", evaluator.save());
+      evaluator
+    };
+    env = mutable CmdEnv{context, pwd => context.pwd, evaluator};
     prompt = env.pwd + "$ ";
     print_raw(prompt);
-    cmd = read_line();
-    eval(env, cmd);
+    cmd = vtry(() -> read_line(), _exn -> "");
+    if (cmd == "") return None();
+    if (isSQL(cmd)) {
+      vtry(
+        () -> {
+          sqlOpt = parseSQLStmt(evaluator.idRoot, cmd);
+          sqlOpt match {
+          | None() -> void
+          | Some(sql) ->
+            env.evaluator.stmt(sql);
+            evaluator.!idRoot = evaluator.idRoot + 1;
+            sql match {
+            | select @ SKSQL.Select _ -> SKSQL.showSelect(context, select)
+            | _ -> void
+            }
+          }
+        },
+        exn ->
+          exn match {
+          | SKSQL.Error(_, msg) -> print_error(msg)
+          | _ -> print_error("Unknown error")
+          }
+        ,
+      );
+    } else {
+      eval(env, cmd);
+    };
+    context.setGlobal("SQLEvaluator", evaluator.save());
     context.!pwd = env.pwd;
-    context.clone()
+    context.update();
+    Some(context.clone())
   })
 }

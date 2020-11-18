@@ -1,0 +1,865 @@
+module SKSQL;
+
+fun parseTests(lex: Lexer): Array<Test> {
+  pos = 0;
+  testStmts = mutable Vector[];
+  loop {
+    if (isEOF(lex, pos)) {
+      return testStmts.toArray();
+    };
+    (!pos, stmt) = parseTest(lex, pos);
+    testStmts.push(stmt);
+  }
+}
+
+fun parseTestResult(lex: Lexer, pos: Int): Int {
+  if (isEOF(lex, pos)) {
+    return pos;
+  };
+  !pos = lex.expect(pos, "-");
+  !pos = lex.expect(pos, "-");
+  !pos = lex.expect(pos, "-");
+  !pos = lex.expect(pos, "-");
+  lastWasNL = false;
+  while (pos < lex.content.size()) {
+    if (lex.content[pos] == '\n') {
+      if (lastWasNL) break void;
+      !lastWasNL = true;
+    } else {
+      if (lex.content[pos] != '\r') {
+        !lastWasNL = false;
+      };
+    };
+    !pos = pos + 1;
+  };
+  pos
+}
+
+fun parseTest(lex: Lexer, pos: Int): (Int, Test) {
+  (!pos, tok) = lex.next(pos);
+  if (lex.isEqAt(tok, "hash")) {
+    !pos = lex.expect(pos, "-");
+    !pos = lex.expect(pos, "threshold");
+    (!pos, n) = lex.nextInt(pos);
+    return (pos, HashThreshold(n));
+  };
+  if (lex.isEqAt(tok, "statement")) {
+    posValue = pos;
+    (!pos, expect) = lex.nextWord(pos);
+    if (expect != "ok" && expect != "error") {
+      error(posValue, "Unsupported statement return");
+    };
+    posBegin = lex.token(pos).posBegin;
+    (!pos, stmt) = parseStmt(lex, pos);
+    posEnd = pos;
+    return (pos, TestStmt{expect, posBegin, stmt, posEnd});
+  };
+  if (lex.isEqAt(tok, "onlyif") || lex.isEqAt(tok, "skipif")) {
+    while (pos + 1 < lex.content.size()) {
+      if (lex.content[pos] == '-' && lex.content[pos + 1] == '-') {
+        !pos = parseTestResult(lex, pos);
+        break void;
+      };
+      !pos = pos + 1;
+    };
+    return (pos, TestSkip());
+  };
+  if (lex.isEqAt(tok, "query")) {
+    (!pos, qtype) = lex.nextWord(pos);
+    sortPos = pos;
+    (!pos, sortStr) = lex.nextWord(pos);
+    sort = sortStr match {
+    | "nosort" | "sort" | "rowsort" | "valuesort" -> sortStr
+    | _ -> error(sortPos, "Expected sort/nosort/rowsort/valuesort")
+    };
+    while (pos < lex.content.size() && lex.content[pos] != '\n') {
+      !pos = pos + 1;
+    };
+    posBegin = lex.token(pos).posBegin;
+    (!pos, query) = parseQuery(lex, pos);
+    posEnd = pos;
+    !pos = parseTestResult(lex, pos);
+    return (pos, TestQuery{qtype, sort, posBegin, query, posEnd})
+  };
+  error(tok.posBegin, "Invalid test statement: " + lex.wordAt(tok))
+}
+
+fun parseStmt(lex: Lexer, pos: Int): (Int, Stmt) {
+  (!pos, tok) = lex.next(pos);
+  str = lex.wordAt(tok);
+  (!pos, result) = str.uppercase() match {
+  | "CREATE" -> parseCreate(lex, pos)
+  | "INSERT" -> parseInsert(lex, pos)
+  | "UPDATE" -> parseUpdate(lex, pos)
+  | "DROP" -> parseDrop(lex, pos)
+  | "DELETE" -> parseDelete(lex, pos)
+  | "REPLACE" -> parseReplace(lex, pos)
+  | "SELECT" -> parseSelect(lex, pos)
+  | _ ->
+    error(tok.posBegin, "Unexpected SQL statement starting with '" + str + "'")
+  };
+  if (lex.isEq(pos, ";")) {
+    !pos = lex.expect(pos, ";");
+  };
+  (pos, result)
+}
+
+fun parseReplace(lex: Lexer, pos: Int): (Int, Replace) {
+  !pos = lex.expectUpper(pos, "INTO");
+  (!pos, name) = lex.nextWord(pos);
+  (!pos, values) = parseValues(lex, pos);
+  (pos, Replace{name, values})
+}
+
+fun parseUpdate(lex: Lexer, pos: Int): (Int, Update) {
+  (!pos, name) = lex.nextWord(pos);
+  !pos = lex.expectUpper(pos, "SET");
+  (!pos, sets) = parseSets(lex, pos);
+  where = if (lex.isEqUpper(pos, "WHERE")) {
+    !pos = lex.expectUpper(pos, "WHERE");
+    (!pos, cond) = parseExpr(lex, pos);
+    Some(cond)
+  } else {
+    None()
+  };
+  (pos, Update{name, sets, where})
+}
+
+fun parseSets(lex: Lexer, pos: Int): (Int, Array<(String, Expr)>) {
+  (!pos, firstName) = lex.nextWord(pos);
+  !pos = lex.expect(pos, "=");
+  (!pos, firstValue) = parseExpr(lex, pos);
+  result = mutable Vector[(firstName, firstValue)];
+  loop {
+    if (!lex.isEq(pos, ",")) {
+      break void;
+    };
+    (!pos, name) = lex.nextWord(pos);
+    !pos = lex.expect(pos, "=");
+    (!pos, value) = parseExpr(lex, pos);
+    result.push((name, value));
+  };
+  (pos, result.toArray())
+}
+
+fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
+  colName = if (lex.isEqUpper(pos, "FROM")) {
+    !pos = lex.expectUpper(pos, "FROM");
+    None()
+  } else {
+    (!pos, name) = lex.nextWord(pos);
+    !pos = lex.expectUpper(pos, "FROM");
+    Some(name)
+  };
+  (!pos, name) = lex.nextWord(pos);
+  where = if (lex.isEqUpper(pos, "WHERE")) {
+    !pos = lex.expectUpper(pos, "WHERE");
+    (!pos, cond) = parseExpr(lex, pos);
+    Some(cond)
+  } else {
+    None()
+  };
+  (pos, Delete{colName, name, where})
+}
+
+fun parseDrop(lex: Lexer, pos: Int): (Int, Drop) {
+  kind = if (lex.isEqUpper(pos, "VIEW")) {
+    !pos = lex.expectUpper(pos, "VIEW");
+    TView()
+  } else if (lex.isEqUpper(pos, "INDEX")) {
+    !pos = lex.expectUpper(pos, "INDEX");
+    TIndex()
+  } else {
+    !pos = lex.expectUpper(pos, "TABLE");
+    TTable()
+  };
+  (!pos, name) = lex.nextWord(pos);
+  (pos, Drop{kind, name})
+}
+
+fun parseQuery(lex: Lexer, pos: Int): (Int, Query) {
+  !pos = lex.expectUpper(pos, "SELECT");
+  (!pos, first) = parseSelect(lex, pos);
+  restVector = mutable Vector[];
+  loop {
+    kind = if (lex.isEqUpper(pos, "EXCEPT")) {
+      !pos = lex.expectUpper(pos, "EXCEPT");
+      QExcept()
+    } else if (lex.isEqUpper(pos, "UNION")) {
+      !pos = lex.expectUpper(pos, "UNION");
+      all = if (lex.isEqUpper(pos, "ALL")) {
+        !pos = lex.expectUpper(pos, "ALL");
+        true
+      } else {
+        false
+      };
+      QUnion(all)
+    } else if (lex.isEqUpper(pos, "INTERSECT")) {
+      !pos = lex.expectUpper(pos, "INTERSECT");
+      QIntersect()
+    } else {
+      break void;
+    };
+    !pos = lex.expectUpper(pos, "SELECT");
+    (!pos, select) = parseSelect(lex, pos);
+    restVector.push((kind, select));
+  };
+  (pos, first with {rest => restVector.toArray()})
+}
+
+fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
+  posBegin = lex.token(pos).posBegin;
+  kind = if (lex.isEqUpper(pos, "ALL")) {
+    !pos = lex.expectUpper(pos, "ALL");
+    SAll()
+  } else if (lex.isEqUpper(pos, "DISTINCT")) {
+    !pos = lex.expectUpper(pos, "DISTINCT");
+    SDistinct()
+  } else {
+    SNone()
+  };
+  (!pos, params) = parseColNames(lex, pos);
+  (from, join) = if (lex.isEqUpper(pos, "FROM")) {
+    (!pos, from, join) = parseFromJoin(lex, pos);
+    (Some(from), join)
+  } else {
+    (None(), None())
+  };
+  where = if (lex.isEqUpper(pos, "WHERE")) {
+    !pos = lex.expectUpper(pos, "WHERE");
+    (!pos, e) = parseExpr(lex, pos);
+    Some(e)
+  } else {
+    None()
+  };
+  in_ = if (lex.isEqUpper(pos, "IN")) {
+    !pos = lex.expectUpper(pos, "IN");
+    !pos = lex.expect(pos, "(");
+    (!pos, values) = parseExprList(lex, pos);
+    Some(values)
+  } else {
+    None()
+  };
+  groupBy = if (lex.isEqUpper(pos, "GROUP")) {
+    !pos = lex.expectUpper(pos, "GROUP");
+    !pos = lex.expectUpper(pos, "BY");
+    (!pos, groupBy) = parseColNames(lex, pos);
+    groupBy
+  } else {
+    None()
+  };
+  having = if (lex.isEqUpper(pos, "HAVING")) {
+    !pos = lex.expectUpper(pos, "HAVING");
+    (!pos, cond) = parseExpr(lex, pos);
+    Some(cond)
+  } else {
+    None()
+  };
+  orderBy = if (lex.isEqUpper(pos, "ORDER")) {
+    (!pos, orderBy) = parseOrderBy(lex, pos);
+    Some(orderBy)
+  } else {
+    None()
+  };
+  query = Select{
+    id => "SELECT_" + lex.idRoot + "_" + posBegin.toString(),
+    pos => posBegin,
+    kind,
+    params,
+    from,
+    join,
+    where,
+    in_,
+    groupBy,
+    having,
+    orderBy,
+    rest => Array[],
+  };
+  (pos, query)
+}
+
+fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?String)>) {
+  (_, tok) = lex.next(pos);
+  if (lex.isEqAt(tok, "*")) {
+    return (tok.posEnd, None());
+  };
+  params = mutable Vector[];
+  loop {
+    (!pos, param) = parseExpr(lex, pos);
+    asParamOpt: ?String = None();
+    if (lex.isEqUpper(pos, "AS")) {
+      !pos = lex.expectUpper(pos, "AS");
+      (!pos, asParam) = lex.nextWord(pos);
+      !asParamOpt = Some(asParam);
+    };
+    !pos = lex.skipSpaces(pos);
+    if (isEOF(lex, pos)) {
+      params.push((param, asParamOpt));
+      break void;
+    };
+    if (isLetter(lex.content[pos]) && !lex.isKeyword(pos)) {
+      (!pos, asParam) = lex.nextWord(pos);
+      !asParamOpt = Some(asParam);
+    };
+    params.push((param, asParamOpt));
+    if (lex.isEq(pos, ",")) {
+      !pos = lex.expect(pos, ",");
+    } else {
+      break void
+    };
+  };
+  (pos, Some(params.toArray()))
+}
+
+fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
+  sfrom = if (lex.isEq(pos, "(")) {
+    !pos = lex.expect(pos, "(");
+    (!pos, query) = parseQuery(lex, pos);
+    !pos = lex.expect(pos, ")");
+    FQuery(query);
+  } else {
+    (!pos, sfrom) = lex.nextWord(pos);
+    FName(sfrom)
+  };
+  posMark = pos;
+  if (isEOF(lex, pos)) {
+    return (posMark, TableName(sfrom, None()));
+  };
+  (!pos, tok) = lex.next(pos);
+  if (isSymbol(lex.content[tok.posBegin])) {
+    return (posMark, TableName(sfrom, None()))
+  };
+  word = lex.wordAt(tok);
+  wordUpper = word.uppercase();
+  asStr = wordUpper match {
+  | "AS" ->
+    (!pos, !word) = lex.nextWord(pos);
+    Some(word)
+  | _ if (isKeyword(word)) ->
+    !pos = posMark;
+    None()
+  | _ ->
+    foundNewLine = false;
+    cursor = posMark;
+    while (cursor < tok.posBegin) {
+      if (lex.content[cursor] == '\n') {
+        !foundNewLine = true;
+        break void;
+      };
+      !cursor = cursor + 1;
+    };
+    if (foundNewLine) {
+      !pos = posMark;
+      None()
+    } else {
+      Some(word)
+    }
+  };
+  indexed = if (lex.isEqUpper(pos, "NOT")) {
+    !pos = lex.expectUpper(pos, "NOT");
+    !pos = lex.expectUpper(pos, "INDEXED");
+    false
+  } else {
+    true
+  };
+  (pos, TableName(sfrom, asStr, indexed))
+}
+
+fun parseTableNames(lex: Lexer, pos: Int): (Int, Array<TableName>) {
+  (!pos, first) = parseTableName(lex, pos);
+  tableNames = mutable Vector[first];
+  loop {
+    if (lex.isEq(pos, ",")) {
+      !pos = lex.expect(pos, ",");
+    } else {
+      break void;
+    };
+    (!pos, tableName) = parseTableName(lex, pos);
+    tableNames.push(tableName);
+  };
+  (pos, tableNames.toArray())
+}
+
+fun parseJoin(lex: Lexer, pos: Int, kind: JoinKind): (Int, Join) {
+  !pos = lex.expectUpper(pos, "JOIN");
+  (!pos, names) = parseTableNames(lex, pos);
+  on = if (lex.isEqUpper(pos, "ON")) {
+    !pos = lex.expectUpper(pos, "ON");
+    (!pos, e) = parseColNames(lex, pos);
+    e
+  } else {
+    None()
+  };
+  (pos, Join{kind, names, on})
+}
+
+fun parseFromJoin(lex: Lexer, pos: Int): (Int, Array<TableName>, ?Join) {
+  !pos = lex.expectUpper(pos, "FROM");
+  posBeforeParen = pos;
+  hasParen = lex.isEq(pos, "(");
+  if (hasParen) {
+    !pos = lex.expect(pos, "(");
+    if (lex.isEqUpper(pos, "SELECT")) {
+      !pos = posBeforeParen;
+      !hasParen = false;
+    }
+  };
+  (!pos, result) = parseTableNames(lex, pos);
+  join = if (lex.isEqUpper(pos, "CROSS")) {
+    !pos = lex.expectUpper(pos, "CROSS");
+    (!pos, join) = parseJoin(lex, pos, JCross());
+    Some(join)
+  } else if (lex.isEqUpper(pos, "LEFT")) {
+    !pos = lex.expectUpper(pos, "LEFT");
+    outer = if (lex.isEqUpper(pos, "OUTER")) {
+      !pos = lex.expectUpper(pos, "OUTER");
+      true
+    } else {
+      false
+    };
+    (!pos, join) = parseJoin(lex, pos, JLeft(outer));
+    Some(join)
+  } else if (lex.isEqUpper(pos, "INNER")) {
+    !pos = lex.expectUpper(pos, "INNER");
+    (!pos, join) = parseJoin(lex, pos, JInner());
+    Some(join)
+  } else if (lex.isEqUpper(pos, "JOIN")) {
+    (!pos, join) = parseJoin(lex, pos, JNone());
+    Some(join)
+  } else if (lex.isEqUpper(pos, "FULL")) {
+    !pos = lex.expectUpper(pos, "FULL");
+    !pos = lex.expectUpper(pos, "OUTER");
+    (!pos, join) = parseJoin(lex, pos, JOuter());
+    Some(join)
+  } else {
+    None()
+  };
+  if (hasParen) !pos = lex.expect(pos, ")");
+  (pos, result, join)
+}
+
+fun parseOrderByElt(lex: Lexer, pos: Int): (Int, (Expr, IKind)) {
+  (!pos, orderBy) = parseExpr(lex, pos);
+  kind = if (lex.isEqUpper(pos, "DESC")) {
+    !pos = lex.expectUpper(pos, "DESC");
+    IDESC()
+  } else if (lex.isEqUpper(pos, "ASC")) {
+    !pos = lex.expectUpper(pos, "ASC");
+    IASC()
+  } else {
+    INONE()
+  };
+  (pos, (orderBy, kind))
+}
+
+fun parseOrderBy(lex: Lexer, pos: Int): (Int, Array<(Expr, IKind)>) {
+  !pos = lex.expectUpper(pos, "ORDER");
+  !pos = lex.expectUpper(pos, "BY");
+  orders = mutable Vector[];
+  (!pos, orderByElt) = parseOrderByElt(lex, pos);
+  orders.push(orderByElt);
+  while (lex.isEq(pos, ",")) {
+    !pos = lex.expect(pos, ",");
+    (!pos, !orderByElt) = parseOrderByElt(lex, pos);
+    orders.push(orderByElt);
+  };
+  (pos, orders.toArray())
+}
+
+fun parseWhenCases(lex: Lexer, pos: Int): (Int, Array<(Expr, Expr)>) {
+  cases = mutable Vector[];
+  loop {
+    (_, tok) = lex.next(pos);
+    if (lex.isEqUpperAt(tok, "ELSE") || lex.isEqUpperAt(tok, "END")) {
+      return (tok.posBegin, cases.toArray());
+    };
+    !pos = lex.expectUpper(pos, "WHEN");
+    (!pos, cond) = parseExpr(lex, pos);
+    !pos = lex.expectUpper(pos, "THEN");
+    (!pos, then) = parseExpr(lex, pos);
+    cases.push((cond, then));
+  }
+}
+
+fun parseElseCase(lex: Lexer, pos: Int): (Int, ?Expr) {
+  if (lex.isEqUpper(pos, "ELSE")) {
+    !pos = lex.expectUpper(pos, "ELSE");
+    (!pos, e) = parseExpr(lex, pos);
+    (pos, Some(e))
+  } else {
+    (pos, None())
+  }
+}
+
+fun parseExpr(lex: Lexer, pos: Int): (Int, Expr) {
+  parseExprWithPrio(9, lex, pos)
+}
+
+fun isEOF(lex: Lexer, pos: Int): Bool {
+  !pos = lex.skipSpaces(pos);
+  pos >= lex.content.size()
+}
+
+fun parseOperator(lex: Lexer, pos: Int): ?(Int, String) {
+  if (isEOF(lex, pos)) return None();
+  (!pos, tok1) = lex.next(pos);
+  if (isEOF(lex, pos)) return None();
+  (_, tok2) = lex.next(pos);
+
+  if (
+    (isSymbol(lex.content[tok1.posBegin]) &&
+      isSymbol(lex.content[tok2.posBegin])) &&
+    tok2.posBegin == tok1.posEnd &&
+    lex.content[tok2.posBegin] != '\'' &&
+    lex.content[tok2.posBegin] != '('
+  ) {
+    op = lex.wordAt(Token(tok1.posBegin, tok2.posEnd));
+    return Some((tok2.posEnd, op))
+  };
+  if (
+    lex.wordAt(tok1).uppercase() == "NOT" &&
+    lex.wordAt(tok2).uppercase() == "BETWEEN"
+  ) {
+    return Some((tok2.posEnd, "NOT BETWEEN"));
+  };
+  Some((pos, lex.wordAt(tok1).uppercase()))
+}
+
+fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
+  (!pos, tok) = lex.next(pos);
+  left = if (lex.isEqAt(tok, "(")) {
+    (!pos, e) = parseExprWithPrio(9, lex, pos);
+    !pos = lex.expect(pos, ")");
+    e
+  } else if (lex.isEqAt(tok, "'")) {
+    (!pos, str) = parseString(lex, tok.posBegin);
+    Literal(str)
+  } else if (lex.isEqUpperAt(tok, "x") && lex.isEq(pos, "'")) {
+    (!pos, str) = parseString(lex, pos);
+    Literal("x" + str)
+  } else if (lex.isEqUpperAt(tok, "NOT")) {
+    (!pos, e) = parseExprWithPrio(5, lex, pos);
+    Not(e)
+  } else if (lex.isEqUpperAt(tok, "ALL")) {
+    (!pos, e) = parseExprWithPrio(7, lex, pos);
+    All(e)
+  } else if (lex.isEqUpperAt(tok, "DISTINCT")) {
+    (!pos, e) = parseExprWithPrio(7, lex, pos);
+    Distinct(e)
+  } else if (lex.isEqUpperAt(tok, "SELECT")) {
+    (!pos, select) = parseSelect(lex, pos);
+    EQuery(select)
+  } else if (lex.isEqUpperAt(tok, "EXISTS")) {
+    !pos = lex.expect(pos, "(");
+    (!pos, q) = parseQuery(lex, pos);
+    !pos = lex.expect(pos, ")");
+    Exists(q)
+  } else if (lex.isEqUpperAt(tok, "CASE")) {
+    condOpt = if (!lex.isEqUpper(pos, "WHEN")) {
+      (!pos, cond) = parseExpr(lex, pos);
+      Some(cond)
+    } else {
+      None()
+    };
+    (!pos, whenCases) = parseWhenCases(lex, pos);
+    (!pos, elseCase) = parseElseCase(lex, pos);
+    !pos = lex.expectUpper(pos, "END");
+    Case(condOpt, whenCases, elseCase)
+  } else if (lex.isEqAt(tok, "-")) {
+    (!pos, e) = parseExprWithPrio(1, lex, pos);
+    UMinus(e)
+  } else if (lex.isEqAt(tok, "+")) {
+    (!pos, e) = parseExprWithPrio(1, lex, pos);
+    UPlus(e)
+  } else {
+    if (lex.wordAt(tok) == ">") invariant_violation("WTF?");
+    Literal(lex.wordAt(tok));
+  };
+
+  loop {
+    posLeft = (pos, left);
+
+    if (isEOF(lex, pos)) {
+      return posLeft;
+    };
+
+    if (lex.isEq(pos, "(")) {
+      !pos = lex.expect(pos, "(");
+      if (lex.isEq(pos, "*")) {
+        !pos = lex.expect(pos, "*");
+        !pos = lex.expect(pos, ")");
+        !left = Call(left, None());
+      } else {
+        (!pos, params) = parseExprList(lex, pos);
+        !left = Call(left, Some(params));
+      }
+    } else {
+      opOpt = parseOperator(lex, pos);
+      op = opOpt match {
+      | None() -> return posLeft
+      | Some((newPos, op)) ->
+        !pos = newPos;
+        op
+      };
+      if (op == "IN") {
+        !pos = lex.expect(pos, "(");
+        (!pos, el) = parseExprList(lex, pos);
+        !left = In(left, el);
+      } else {
+        opPriority.maybeGet(op) match {
+        | None() -> return posLeft
+        | Some(opPrio) ->
+          if (opPrio < priority) {
+            (!pos, right) = parseExprWithPrio(opPrio, lex, pos);
+            !left = Binop(op, left, right);
+          } else {
+            return posLeft;
+          }
+        }
+      }
+    }
+  }
+}
+
+fun parseExprList(lex: Lexer, pos: Int): (Int, Array<Expr>) {
+  acc = mutable Vector[];
+  loop {
+    if (lex.isEq(pos, ")")) {
+      !pos = lex.expect(pos, ")");
+      return (pos, acc.toArray());
+    };
+    (!pos, e) = parseExpr(lex, pos);
+    acc.push(e);
+    if (lex.isEq(pos, ")")) {
+      !pos = lex.expect(pos, ")");
+      return (pos, acc.toArray());
+    };
+    !pos = lex.expect(pos, ",");
+  }
+}
+
+fun parseCreate(lex: Lexer, pos: Int): (Int, Stmt) {
+  if (lex.isEqUpper(pos, "TABLE")) {
+    !pos = lex.expectUpper(pos, "TABLE");
+    return parseCreateTable(lex, pos);
+  };
+  if (lex.isEqUpper(pos, "UNIQUE")) {
+    !pos = lex.expectUpper(pos, "UNIQUE");
+    !pos = lex.expectUpper(pos, "INDEX");
+    return parseCreateIndex(lex, pos);
+  };
+  if (lex.isEqUpper(pos, "INDEX")) {
+    !pos = lex.expectUpper(pos, "INDEX");
+    return parseCreateIndex(lex, pos);
+  };
+  if (lex.isEqUpper(pos, "VIEW")) {
+    !pos = lex.expectUpper(pos, "VIEW");
+    return parseView(lex, pos);
+  };
+  error(pos, "Unexpected token");
+}
+
+fun parseView(lex: Lexer, pos: Int): (Int, View) {
+  (!pos, name) = lex.nextWord(pos);
+  if (lex.isEqUpper(pos, "AS")) {
+    !pos = lex.expectUpper(pos, "AS");
+  };
+  !pos = lex.expectUpper(pos, "SELECT");
+  (!pos, query) = parseSelect(lex, pos);
+  (pos, View{name, query})
+}
+
+fun parseCreateIndex(lex: Lexer, pos: Int): (Int, Index) {
+  (!pos, name) = lex.nextWord(pos);
+  !pos = lex.expectUpper(pos, "ON");
+  (!pos, fields) = parseIndexOn(lex, pos);
+  (pos, Index{name, fields})
+}
+
+fun parseIndexOn(
+  lex: Lexer,
+  pos: Int,
+): (Int, (String, Array<(String, IKind)>)) {
+  (!pos, name) = lex.nextWord(pos);
+  !pos = lex.expect(pos, "(");
+  colDescs = mutable Vector[];
+  loop {
+    (!pos, colName) = lex.nextWord(pos);
+    kind = if (lex.isEqUpper(pos, "DESC")) {
+      !pos = lex.expectUpper(pos, "DESC");
+      IDESC()
+    } else if (lex.isEqUpper(pos, "ASC")) {
+      !pos = lex.expectUpper(pos, "ASC");
+      IASC()
+    } else {
+      INONE()
+    };
+    colDescs.push((colName, kind));
+    if (lex.isEq(pos, ",")) {
+      !pos = lex.expect(pos, ",");
+    } else {
+      !pos = lex.expect(pos, ")");
+      break void;
+    }
+  };
+  (pos, (name, colDescs.toArray()))
+}
+
+fun parseInsert(lex: Lexer, pos: Int): (Int, Stmt) {
+  !pos = lex.expectUpper(pos, "INTO");
+  posName = lex.token(pos).posBegin;
+  (!pos, name) = lex.nextWord(pos);
+  (!pos, paramsOpt) = parseParamsOpt(lex, pos);
+  (!pos, values) = parseValues(lex, pos);
+  (pos, Insert{pos => posName, name, paramsOpt, values})
+}
+
+fun parseParamsOpt(lex: Lexer, pos: Int): (Int, ?Array<String>) {
+  if (lex.isEq(pos, "(")) {
+    !pos = lex.expect(pos, "(");
+    names = mutable Vector[];
+    loop {
+      (!pos, name) = lex.nextWord(pos);
+      names.push(name);
+      if (lex.isEq(pos, ")")) {
+        !pos = lex.expect(pos, ")");
+        break void;
+      };
+      !pos = lex.expect(pos, ",");
+    };
+    (pos, Some(names.toArray()))
+  } else {
+    (pos, None())
+  }
+}
+
+fun parseValues(lex: Lexer, pos: Int): (Int, InsertValues) {
+  if (lex.isEqUpper(pos, "SELECT")) {
+    !pos = lex.expectUpper(pos, "SELECT");
+    (!pos, select) = parseSelect(lex, pos);
+    return (pos, IQuery(select));
+  };
+  !pos = lex.expectUpper(pos, "VALUES");
+  !pos = lex.expect(pos, "(");
+  values = mutable Vector[];
+  loop {
+    (!pos, value) = parseValue(lex, pos);
+    values.push(value);
+    if (lex.isEq(pos, ")")) {
+      !pos = lex.expect(pos, ")");
+      break void;
+    };
+    !pos = lex.expect(pos, ",");
+  };
+  (pos, IValues(values.toArray()))
+}
+
+fun parseString(lex: Lexer, pos: Int): (Int, String) {
+  posBegin = pos;
+  !pos = pos + 1;
+  while (pos < lex.content.size() && lex.content[pos] != '\'') {
+    if (lex.content[pos] == '\\') {
+      !pos = pos + 1;
+    };
+    !pos = pos + 1;
+  };
+  !pos = pos + 1;
+  if (pos >= lex.content.size()) {
+    error(posBegin, "Unterminated string");
+  };
+  str = String::fromChars(lex.content.slice(posBegin, pos));
+  (pos, str)
+}
+
+fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
+  (_, tok) = lex.next(pos);
+  if (lex.isEqUpperAt(tok, "NULL")) {
+    return (tok.posEnd, VNull());
+  };
+  if (lex.isEqAt(tok, "-")) {
+    !pos = lex.expect(pos, "-");
+    (!pos, n) = lex.nextInt(pos);
+    return (pos, VInt(-n));
+  };
+  if (Chars.isDigit(lex.content[tok.posBegin])) {
+    (!pos, n) = lex.nextInt(pos);
+    if (lex.isEq(pos, ".")) {
+      !pos = lex.expect(pos, ".");
+      (!pos, n2) = lex.nextInt(pos);
+      return (pos, VFloat(n, n2));
+    };
+    if (lex.isEq(pos, "<")) {
+      !pos = lex.expect(pos, "<");
+      !pos = lex.expect(pos, "<");
+      (_, tokAfterShift) = lex.next(pos);
+      (!pos, right) = parseValue(lex, pos);
+      right match {
+      | VInt(n2) -> return (pos, VLShift(n, n2))
+      | _ -> error(tokAfterShift.posBegin, "Expected integer")
+      }
+    };
+    return (pos, VInt(n));
+  };
+  if (lex.content[tok.posBegin] == '\'') {
+    (!pos, str) = parseString(lex, tok.posBegin);
+    return (pos, VString(str))
+  };
+  error(pos, "Invalid value")
+}
+
+fun parseCreateTable(lex: Lexer, pos: Int): (Int, Table) {
+  (!pos, name) = lex.nextWord(pos);
+  (!pos, schema) = parseTableSchema(lex, pos);
+  (pos, Table{name, schema})
+}
+
+fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
+  !pos = lex.expect(pos, "(");
+  schema = mutable Vector[];
+  loop {
+    (!pos, name) = lex.nextWord(pos);
+    (!pos, ty, primary, unique) = parseType(lex, pos);
+    schema.push(TypeDescr{name, ty, primary, unique});
+    if (lex.isEq(pos, ")")) {
+      !pos = lex.expect(pos, ")");
+      break void;
+    };
+    !pos = lex.expect(pos, ",");
+  };
+  (pos, schema.toArray())
+}
+
+fun parseType(lex: Lexer, pos: Int): (Int, Type, Bool, Bool) {
+  ty = if (lex.isEqUpper(pos, "FLOAT")) {
+    !pos = lex.expectUpper(pos, "FLOAT");
+    FLOAT()
+  } else if (lex.isEqUpper(pos, "INTEGER")) {
+    !pos = lex.expectUpper(pos, "INTEGER");
+    INTEGER()
+  } else if (lex.isEqUpper(pos, "TEXT")) {
+    !pos = lex.expectUpper(pos, "TEXT");
+    TEXT()
+  } else if (lex.isEqUpper(pos, "VARCHAR")) {
+    !pos = lex.expectUpper(pos, "VARCHAR");
+    !pos = lex.expect(pos, "(");
+    (!pos, n) = lex.nextInt(pos);
+    !pos = lex.expect(pos, ")");
+    VARCHAR(n)
+  } else {
+    error(pos, "Unknown type");
+  };
+  isPrimaryKey = if (lex.isEqUpper(pos, "PRIMARY")) {
+    !pos = lex.expectUpper(pos, "PRIMARY");
+    !pos = lex.expectUpper(pos, "KEY");
+    true
+  } else {
+    false
+  };
+  isUnique = if (lex.isEqUpper(pos, "UNIQUE")) {
+    !pos = lex.expectUpper(pos, "UNIQUE");
+    true
+  } else {
+    false
+  };
+  (pos, ty, isPrimaryKey, isUnique)
+}

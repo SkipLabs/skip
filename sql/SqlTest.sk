@@ -1,0 +1,32 @@
+module SKFSTest;
+
+const tableStr: String = "CREATE TABLE t1(a INTEGER, b INTEGER);";
+
+fun evalStmt(evaluator: mutable SKSQL.Evaluator, str: String): void {
+  chars = str.chars().toArray();
+  lex = SKSQL.Lexer(0, chars);
+  (_, stmtAst) = SKSQL.parseStmt(lex, 0);
+  evaluator.stmt(stmtAst)
+}
+
+fun testSql(): mutable SKFS.Context {
+  SKFS.run(context ~> {
+    context.!debugMode = false;
+    evaluator = SKSQL.Evaluator::create(context);
+    _table = evalStmt(evaluator, tableStr);
+    expectFail("INSERT in non-existent table", () -> {
+      evalStmt(evaluator, "INSERT INTO tdumb(e,c) VALUES(103,102)");
+    });
+    expectFail("INSERT params/values size mismatch", () -> {
+      evalStmt(evaluator, "INSERT INTO t1(e) VALUES(103,102)");
+    });
+    expectFail("INSERT schema/values size mismatch", () -> {
+      evalStmt(evaluator, "INSERT INTO t1(e) VALUES(103)");
+    });
+    expectPass("INSERT success", () -> {
+      evalStmt(evaluator, "INSERT INTO t1(b,a) VALUES(103,102)");
+    })
+  });
+}
+
+module end;

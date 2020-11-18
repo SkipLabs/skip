@@ -31,12 +31,20 @@ fun testWikipedia(path: String): mutable SKFS.Context {
     .toArray();
   debug("Loaded the files");
   SKFS.run(context ~> {
-    pages = context.mkdir(WikiPage::fromFile, "/input/", files);
-    queries = context.mkdir(SKFS.StringFile::fromFile, "/queries/", Array[]);
+    pages = context.mkdir(
+      WikiPage::fromFile,
+      SKFS.DirName::create("/input/"),
+      files,
+    );
+    queries = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/queries/"),
+      Array[],
+    );
     index = pages.contextWriterKeyMap(
       SKFS.IntFile::fromFile,
       context,
-      "/index/",
+      SKFS.DirName::create("/index/"),
       (_context, writer, id, value) ~> {
         tokens = mutable Set[];
         for (token in value.content.split(" ")) {
@@ -50,7 +58,7 @@ fun testWikipedia(path: String): mutable SKFS.Context {
     _results = queries.contextMap(
       QueryResult::fromFile,
       context,
-      "/results/",
+      SKFS.DirName::create("/results/"),
       (context, query) ~> {
         first = true;
         results = mutable Set[];

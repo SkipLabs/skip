@@ -127,6 +127,28 @@ char* SKIP_String_concat2(char* str1, char* str2) {
   return result;
 }
 
+char* SKIP_String_concatN(char** arr) {
+  uint32_t arr_size = SKIP_getArraySize((char*)arr);
+  SkipInt byte_size = 0;
+  int i;
+
+  for(i = 0; i < arr_size; i++) {
+    byte_size += SKIP_String_byteSize(arr[i]);
+  }
+
+  char* result = sk_string_alloc(byte_size);
+  char* buffer = result;
+
+  for(i = 0; i < arr_size; i++) {
+    SkipInt str_size = SKIP_String_byteSize(arr[i]);
+    memcpy(buffer, (const char*)arr[i], str_size);
+    buffer += str_size;
+  }
+
+  sk_string_set_hash(result);
+  return result;
+}
+
 SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2) {
   SkipInt size1 = SKIP_String_byteSize((char*)str1);
   SkipInt size2 = SKIP_String_byteSize((char*)str2);

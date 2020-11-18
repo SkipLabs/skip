@@ -34,7 +34,7 @@ fun make(
     | y @ SKFS.StringFile _ -> y
     | _ -> invariant_violation("impossible")
     };
-  context.mkdir(conv, name, kvArray)
+  context.mkdir(conv, SKFS.DirName::create(name), kvArray)
 }
 
 fun compareResults(
@@ -43,7 +43,7 @@ fun compareResults(
   path: String,
   values: Array<Int>,
 ): void {
-  readV = context.getValue(path);
+  readV = context.getValue(SKFS.Path::fromString(path));
   vtry(
     () -> {
       expectEq(kind + " test for path " + path, readV, () ->
@@ -67,7 +67,7 @@ fun testUpdate(
     (key, values) = kv;
     path = SKFS.Path::fromString(key);
     dir = context.getDir(path.dirName);
-    dir.writeArray(context, path.baseName.toString(), values.map(x -> IBox(x)));
+    dir.writeArray(context, path.baseName, values.map(x -> IBox(x)));
   };
   context.update();
   for (kv in expects) {
@@ -186,16 +186,20 @@ fun testDirs(): void {
 
 fun testSubDirUnit(): mutable SKFS.Context {
   SKFS.run(context ~> {
-    dir1 = context.mkdir(SKFS.StringFile::fromFile, "/dir1/", Array[]);
+    dir1 = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/dir1/"),
+      Array[],
+    );
     _dir2 = dir1.contextMap(
       SKFS.StringFile::fromFile,
       context,
-      "/dir1/dir2/",
+      SKFS.DirName::create("/dir1/dir2/"),
       (context, x) ~> {
         _ = dir1.map(
           SKFS.StringFile::fromFile,
           context,
-          "/dir1/dir2/" + x.value + "/",
+          SKFS.DirName::create("/dir1/dir2/" + x.value + "/"),
           x ~> x,
         );
         x
