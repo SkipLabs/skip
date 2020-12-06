@@ -6,36 +6,35 @@ module end;
 
 untracked fun main(): void {
   //  SKFS.toplevel(mutable SKFS.Context{});
-  SKSQL.eval(SKFS.args);
+  //  SKSQL.eval(SKFS.args);
   //_ = SKFSTest.testSql();
-  /*
-    SKFS.args[0] match {
-    | "runtime" -> SKFSTest.testRuntime()
-    | "query" -> SKFS.toplevel(SKFS.testIndex())
-    | "search" ->
-      context = SKFSTest.testSearch();
+
+  SKFS.args[0] match {
+  | "runtime" -> SKFSTest.testRuntime()
+  | "query" -> SKFS.toplevel(SKFS.testIndex())
+  | "search" ->
+    context = SKFSTest.testSearch();
+    SKFS.toplevel(context)
+  | "stress" -> _ = SKFSTest.testInterpretor()
+  | "sql" -> _ = SKSQL.eval(SKFS.args)
+  | "toplevel" | "test" ->
+    if (SKFS.args.size() <= 1) {
+      print_error("Error: missing test name");
+      exit(3);
+    };
+    testFuns = SKFSTest.getAllTests();
+    testName = SKFS.args[1];
+    if (!testFuns.containsKey(testName)) {
+      print_error("Error: unknown test " + testName + "\n");
+      for (key => _ in testFuns) {
+        print_error("  " + key + "\n");
+      };
+      exit(4);
+    };
+    context = testFuns[testName]();
+    if (SKFS.args[0] == "toplevel") {
       SKFS.toplevel(context)
-    | "stress" -> _ = SKFSTest.testInterpretor()
-    | "sql" -> _ = SKSQL.eval(SKFS.args)
-    | "toplevel" | "test" ->
-      if (SKFS.args.size() <= 1) {
-        print_error("Error: missing test name");
-        exit(3);
-      };
-      testFuns = SKFSTest.getAllTests();
-      testName = SKFS.args[1];
-      if (!testFuns.containsKey(testName)) {
-        print_error("Error: unknown test " + testName + "\n");
-        for (key => _ in testFuns) {
-          print_error("  " + key + "\n");
-        };
-        exit(4);
-      };
-      context = testFuns[testName]();
-      if (SKFS.args[0] == "toplevel") {
-        SKFS.toplevel(context)
-      }
-    | cmd -> print_error("Error: unknown command " + cmd + "\n")
     }
-  */
+  | cmd -> print_error("Error: unknown command " + cmd + "\n")
+  }
 }

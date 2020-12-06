@@ -1,0 +1,62 @@
+module SKFSTest;
+
+fun testProduct(): mutable SKFS.Context {
+  SKFS.run(context ~> {
+    getData = (dir, key) -> context.getDir(dir.dirName).getArrayRaw(key);
+    write = (
+      dir: SKFS.Handle<SKFS.IntFile>,
+      key: SKFS.BaseName,
+      values: Array<SKFS.IntFile>,
+    ) -> {
+      context.getDir(dir.dirName).writeArray(context, key, values);
+    };
+
+    dirInput1 = context.mkdir(
+      SKFS.IntFile::fromFile,
+      SKFS.DirName::create("/input1/"),
+      Array[(SKFS.IID(0), SKFS.IntFile(23)), (SKFS.IID(1), SKFS.IntFile(35))],
+    );
+    dirInput2 = context.mkdir(
+      SKFS.IntFile::fromFile,
+      SKFS.DirName::create("/input2/"),
+      Array[(SKFS.IID(0), SKFS.IntFile(24)), (SKFS.IID(2), SKFS.IntFile(36))],
+    );
+    product = dirInput1.product(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/product/"),
+      dirInput2,
+      (_context, _key1, files1, _key2, files2) ~> files1.concat(files2),
+    );
+
+    expectEq("Product test1", context.getDir(product.dirName).files(), () ->
+      Set[
+        SKFS.PID(Array[SKFS.IID(0), SKFS.IID(0)]),
+        SKFS.PID(Array[SKFS.IID(0), SKFS.IID(2)]),
+        SKFS.PID(Array[SKFS.IID(1), SKFS.IID(0)]),
+        SKFS.PID(Array[SKFS.IID(1), SKFS.IID(2)]),
+      ]
+    );
+
+    write(dirInput1, SKFS.IID(2), Array[SKFS.IntFile(44)]);
+    context.update();
+    expectEq(
+      "Product test2",
+      getData(product, SKFS.PID(Array[SKFS.IID(2), SKFS.IID(0)])),
+      () -> Array[SKFS.IntFile(44), SKFS.IntFile(24)],
+    );
+
+    context.!debugMode = true;
+    write(dirInput1, SKFS.IID(0), Array[]);
+    context.update();
+    expectEq(
+      "Product test3",
+      getData(product, SKFS.PID(Array[SKFS.IID(0), SKFS.IID(0)])),
+      () -> Array[],
+    );
+
+    write(dirInput2, SKFS.IID(3), Array[SKFS.IntFile(55)]);
+    context.update();
+    debug(getData(product, SKFS.PID(Array[SKFS.IID(1), SKFS.IID(3)])));
+  });
+}

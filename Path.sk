@@ -95,6 +95,12 @@ class DirName private (dirName: String) extends FileName {
     )
   }
 
+  fun sub(str: String): this {
+    validator = mutable SKFSImpl.NameValidator(str, str.chars(), 0);
+    validator.mustBeBaseName();
+    DirName(this.dirName + str + "/")
+  }
+
   fun toString(): String {
     this.dirName
   }
@@ -126,6 +132,12 @@ class IID(value: Int) extends BaseName {
 class SID(value: String) extends BaseName {
   fun toString(): String {
     this.value
+  }
+}
+
+class PID(Array<BaseName>) extends BaseName {
+  fun toString(): String {
+    inspect(this).toString()
   }
 }
 

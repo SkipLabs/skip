@@ -213,12 +213,14 @@ mutable class Context{
         this.!toReset = this.toReset.set(dirName);
         this.!toUpdate = this.toUpdate.remove(time);
         dir = this.getDir(dirName);
-        dir.parent match {
+        dir.parents match {
         | None() -> dir.updateLazy(this)
-        | Some((_, parentName)) ->
-          this.!toReset = this.toReset.set(parentName);
-          parent = this.getDir(parentName);
-          parent.update(this, dirName)
+        | Some(parents) ->
+          for (parentName in parents) {
+            this.!toReset = this.toReset.set(parentName);
+            parent = this.getDir(parentName);
+            parent.update(this, dirName)
+          }
         }
       };
     };

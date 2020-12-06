@@ -51,6 +51,12 @@ value class GroupedRows<T>(
   newDirs: SortedMap<BaseName, SortedSet<DirName>>,
 )
 
+class ProductRow(
+  key1: BaseName,
+  key2: BaseName,
+  values: Array<File>,
+) extends File
+
 class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
   static fun empty(dirName: DirName): this {
     FixedData{dirName, data => Array[]}
@@ -114,7 +120,7 @@ class Dir{
   dirName: DirName,
   isInput: Bool,
   fixedData: FixedData<Array<File>>,
-  parent: ?(Int, DirName) = None(),
+  parents: ?Array<DirName> = None(),
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
@@ -394,7 +400,12 @@ class Dir{
     };
   }
 
-  fun apply(context: mutable Context, dirName: DirName, f: MapFun): void {
+  fun apply(
+    context: mutable Context,
+    dirName: DirName,
+    f: MapFun,
+    extraDirs: Array<Dir> = Array[],
+  ): void {
     if (this.lazyFun is Some _) {
       error(`Cannot apply over a lazy directory ${this.dirName}`);
     };
@@ -407,8 +418,7 @@ class Dir{
       )
     | Some(dir) ->
       if (
-        dir.parent is Some _ &&
-        dir.parent.fromSome() == (this.time, this.dirName) &&
+        dir.parents is Some _ &&
         inspect(dir.mapFun.fromSome()) == inspect(f)
       ) {
         if (context.debugMode) {
@@ -425,25 +435,32 @@ class Dir{
     context.!newDirs = context.newDirs.add(dirName);
     acc = mutable Vector[];
     static::mapData(context, this, f, acc);
+    for (dir in extraDirs) {
+      static::mapData(context, dir, f, acc);
+    };
     mapped = acc.chill();
     grouped = this.regroupMap(mapped);
     this.updateReaders(context, dirName, mapped);
     fixedData = FixedData{dirName, data => grouped.rows};
+    parents = mutable Vector[this.dirName];
+    for (dir in extraDirs) {
+      parents.push(dir.dirName);
+    };
     dir = Dir{
       time,
       tick => context.tick,
       dirName,
       isInput => false,
-      parent => Some((this.time, this.dirName)),
+      parents => Some(parents.toArray()),
       fixedData,
       mapFun => Some(f),
       newDirs => grouped.newDirs,
     };
     context.setDir(dirName, dir);
-    parent = context.getDir(this.dirName);
-    !parent.fixedOld[dirName] = FixedData{dirName, data => grouped.old};
-    !parent.childDirs = parent.childDirs.add(time, dirName);
-    context.setDir(parent.dirName, parent);
+    static::addParent(context, time, dirName, this.dirName, grouped.old);
+    for (parent in extraDirs) {
+      static::addParent(context, time, dirName, parent.dirName, grouped.old);
+    };
     if (context.debugMode) {
       print_string(
         `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${
@@ -451,6 +468,54 @@ class Dir{
         })`,
       );
     };
+  }
+
+  static fun addParent(
+    context: mutable Context,
+    time: Int,
+    dirName: DirName,
+    parentName: DirName,
+    old: Array<FixedRow<BaseName>>,
+  ): void {
+    parent = context.getDir(parentName);
+    !parent.fixedOld[dirName] = FixedData{dirName, data => old};
+    !parent.childDirs = parent.childDirs.add(time, dirName);
+    context.setDir(parent.dirName, parent);
+  }
+
+  fun product(
+    context: mutable Context,
+    productDirName: DirName,
+    dir2: Dir,
+    f: (mutable Context, BaseName, Array<File>, BaseName, Array<File>) ~> Array<
+      File,
+    >,
+  ): void {
+    this.apply(context, productDirName, (context, writer, key1, values1) ~> {
+      hash1 = key1.hash();
+      hash2 = (23, key1).hash();
+      name = hash1.toString() + hash2;
+      subProductDirName = productDirName.sub(name);
+      dir2.apply(
+        context,
+        subProductDirName,
+        (context, writer, key2, values2) ~> {
+          if (values2.size() == 0) return void;
+          values = f(context, key1, values1, key2, values2);
+          writer.write(IID(0), ProductRow(key1, key2, values));
+        },
+      );
+      subDir = context.getDir(subProductDirName);
+      values = subDir.getArray(context, IID(0));
+      if (values.size() == 0) {
+        return void;
+      };
+      for (file in values) {
+        row = ProductRow::fromFile(file);
+        key = PID(Array[row.key1, row.key2]);
+        writer.writeArray(key, row.values);
+      }
+    });
   }
 
   fun updateLazy(context: mutable Context): void {
@@ -619,8 +684,8 @@ class Dir{
     readers = context.getDeps(path);
 
     for (reader in readers) {
-      (dirName, childName, baseName) = reader;
-      dir = context.getDir(dirName);
+      (parentName, childName, baseName) = reader;
+      parent = context.getDir(parentName);
       child = context.getDir(childName);
 
       if (child.time < this.time) {
@@ -629,22 +694,24 @@ class Dir{
         };
         continue;
       };
-      if (!dir.dirtyReaders.containsKey(childName)) {
-        !dir.dirtyReaders[childName] = SortedSet[];
+      if (!parent.dirtyReaders.containsKey(childName)) {
+        !parent.dirtyReaders[childName] = SortedSet[];
       };
-      !dir.dirtyReaders[childName] = dir.dirtyReaders[childName].set(baseName);
+      !parent.dirtyReaders[childName] = parent.dirtyReaders[childName].set(
+        baseName,
+      );
       if (
-        dir.lazyFun is Some _ &&
-        childName == dir.dirName &&
+        parent.lazyFun is Some _ &&
+        childName == parent.dirName &&
         childName != this.dirName
       ) {
-        !dir.data = dir.data.set(
+        !parent.data = parent.data.set(
           context.tick,
           baseName,
           SortedMap[(Path(childName, baseName), Array[])],
         );
       };
-      context.setDir(dirName, dir);
+      context.setDir(parentName, parent);
       context.!toUpdate = context.toUpdate.set(child.time, childName);
     };
   }
