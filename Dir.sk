@@ -124,6 +124,7 @@ class Dir{
   dirtyReaders: SortedMap<DirName, SortedSet<BaseName>> = SortedMap[],
   mapFun: ?MapFun = None(),
   lazyFun: ?((mutable Context, DirName, BaseName) ~> File) = None(),
+  deleted: Bool = false,
 } extends File {
   fun files(): Set<BaseName> {
     fixedData = this.fixedData.data;
@@ -620,7 +621,7 @@ class Dir{
       dir = context.getDir(dirName);
       child = context.getDir(childName);
 
-      if (child.time <= this.time) {
+      if (child.time < this.time) {
         if (context.debugMode) {
           print_string(`SKIPPING: ${path} ${child.dirName}`);
         };
@@ -652,6 +653,10 @@ class Dir{
     k: BaseName,
     rvalues: Array<File>,
   ): this {
+    if (this.deleted) {
+      return this;
+    };
+
     map = this.data.maybeGet(k) match {
     | None() -> SortedMap[]
     | Some(x) -> x
@@ -698,8 +703,8 @@ class Dir{
     this.writeArray(context, baseName, Array[]);
   }
 
-  fun isEmpty(): Bool {
-    this.data is Nil _ && this.fixedData.data.size() == 0
+  fun isRemoved(): Bool {
+    this.deleted
   }
 }
 

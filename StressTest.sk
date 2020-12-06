@@ -13,13 +13,13 @@ base class RNbr {
 
 class Config{
   nbrInputs: RNbr = RRange(1, 5),
-  inputSize: RNbr = RRange(1, 5),
-  missingKey: RNbr = RProb(10),
-  valueWidth: RNbr = RRange(1, 5),
-  valueRange: RNbr = RRange(0, 1),
+  inputSize: RNbr = RRange(1, 10),
+  missingKey: RNbr = RProb(20),
+  valueWidth: RNbr = RRange(1, 10),
+  valueRange: RNbr = RRange(0, 10),
   nbrDirs: RNbr = RRange(1, 5),
-  funBodySize: RNbr = RRange(1, 5),
-  mergeSize: RNbr = RRange(1, 5),
+  funBodySize: RNbr = RRange(1, 4),
+  mergeSize: RNbr = RRange(1, 3),
   probKeyChange: RNbr = RProb(50),
   probLazyDir: RNbr = RProb(50),
   probKeyChangeRemoved: RNbr = RProb(10),
@@ -274,6 +274,7 @@ fun compareContext(
     if (context2.maybeGetDir(dirName) is None _) {
       if (!dirName.toString().contains("LAZY")) {
         print_string(`Error: missing directory ${dirName}`);
+        return false;
       };
       continue;
     };
@@ -396,7 +397,7 @@ fun genMDir(
 }
 
 fun genLDir(rand: RNbr -> Int, config: Config, dirs: GenDirs, nbr: Int): LDir {
-  name = "/dir" + nbr + "/";
+  name = "/dir" + nbr + "LAZY/";
   readDirs = genReadDirs(rand, config, dirs);
   dirs.push(name);
   ldir = LDir{name, readDirs};
