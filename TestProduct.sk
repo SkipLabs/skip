@@ -2,6 +2,7 @@ module SKFSTest;
 
 fun testProduct(): mutable SKFS.Context {
   SKFS.run(context ~> {
+    context.!debugMode = true;
     getData = (dir, key) -> context.getDir(dir.dirName).getArrayRaw(key);
     write = (
       dir: SKFS.Handle<SKFS.IntFile>,
@@ -38,25 +39,41 @@ fun testProduct(): mutable SKFS.Context {
       ]
     );
 
-    write(dirInput1, SKFS.IID(2), Array[SKFS.IntFile(44)]);
     context.update();
-    expectEq(
-      "Product test2",
-      getData(product, SKFS.PID(Array[SKFS.IID(2), SKFS.IID(0)])),
-      () -> Array[SKFS.IntFile(44), SKFS.IntFile(24)],
-    );
 
-    context.!debugMode = true;
-    write(dirInput1, SKFS.IID(0), Array[]);
-    context.update();
-    expectEq(
-      "Product test3",
-      getData(product, SKFS.PID(Array[SKFS.IID(0), SKFS.IID(0)])),
-      () -> Array[],
-    );
+    /*
+        write(dirInput1, SKFS.IID(2), Array[SKFS.IntFile(44)]);
+        context.update();
+        expectEq(
+          "Product test2",
+          getData(product, SKFS.PID(Array[SKFS.IID(2), SKFS.IID(0)])),
+          () -> Array[SKFS.IntFile(44), SKFS.IntFile(24)],
+        );
+
+        context.!debugMode = true;
+        write(dirInput1, SKFS.IID(0), Array[]);
+        context.update();
+        expectEq(
+          "Product test3",
+          getData(product, SKFS.PID(Array[SKFS.IID(0), SKFS.IID(0)])),
+          () -> Array[],
+        );
+    */
 
     write(dirInput2, SKFS.IID(3), Array[SKFS.IntFile(55)]);
     context.update();
     debug(getData(product, SKFS.PID(Array[SKFS.IID(1), SKFS.IID(3)])));
+    debug(
+      SKFS.Path::fromString(
+        "/product/-70458804514041440414354834367919055910/0",
+      ),
+    );
+    debug(
+      context.getDeps(
+        SKFS.Path::fromString(
+          "/product/-70458804514041440414354834367919055910/0",
+        ),
+      ),
+    );
   });
 }

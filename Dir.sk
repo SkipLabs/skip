@@ -116,7 +116,6 @@ base class PlaceHolder {
 
 class Dir{
   time: Int,
-  tick: Int,
   dirName: DirName,
   isInput: Bool,
   fixedData: FixedData<Array<File>>,
@@ -214,7 +213,6 @@ class Dir{
     context.!newDirs = context.newDirs.add(dirName);
     newDir = Dir{
       time,
-      tick => context.tick,
       dirName,
       isInput => false,
       fixedData => FixedData{dirName, data => Array[]},
@@ -406,16 +404,17 @@ class Dir{
     f: MapFun,
     extraDirs: Array<Dir> = Array[],
   ): void {
-    if (this.lazyFun is Some _) {
-      error(`Cannot apply over a lazy directory ${this.dirName}`);
-    };
-    context.maybeGetDir(dirName) match {
-    | Some(dir) if (dir.tick == context.tick) ->
+    if (context.newDirs.contains(dirName)) {
       error(
         `Error: directory ${dirName.toString()} already exists (parent: ${
           this.dirName
         })`,
-      )
+      );
+    };
+    if (this.lazyFun is Some _) {
+      error(`Cannot apply over a lazy directory ${this.dirName}`);
+    };
+    context.maybeGetDir(dirName) match {
     | Some(dir) ->
       if (
         dir.parents is Some _ &&
@@ -425,13 +424,10 @@ class Dir{
           print_string(`REUSING: ${dir.dirName}`);
         };
         context.!newDirs = context.newDirs.add(dir.dirName);
-        !dir.time = context.timeStamp();
-        this.update(context, dir.dirName);
         return void;
       }
     | _ -> void
     };
-    time = context.timeStamp();
     context.!newDirs = context.newDirs.add(dirName);
     acc = mutable Vector[];
     static::mapData(context, this, f, acc);
@@ -446,9 +442,9 @@ class Dir{
     for (dir in extraDirs) {
       parents.push(dir.dirName);
     };
+    time = context.timeStamp();
     dir = Dir{
       time,
-      tick => context.tick,
       dirName,
       isInput => false,
       parents => Some(parents.toArray()),
@@ -688,12 +684,13 @@ class Dir{
       parent = context.getDir(parentName);
       child = context.getDir(childName);
 
-      if (child.time < this.time) {
+      if (child.time <= this.time) {
         if (context.debugMode) {
           print_string(`SKIPPING: ${path} ${child.dirName}`);
         };
         continue;
       };
+
       if (!parent.dirtyReaders.containsKey(childName)) {
         !parent.dirtyReaders[childName] = SortedSet[];
       };

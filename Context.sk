@@ -37,7 +37,7 @@ mutable class Context{
     Path,
     SortedSet<(DirName, DirName, BaseName)>,
   > = SortedMap[],
-  mutable debugMode: Bool = false,
+  mutable debugMode: Bool = true,
   mutable failOnExn: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable hasNext: SortedSet<DirName> = SortedSet[],
@@ -158,9 +158,9 @@ mutable class Context{
           };
         };
         if (!this.newDeps.containsKey(path)) {
-          !this.newDeps[path] = SortedSet[];
+          this.!newDeps[path] = SortedSet[];
         };
-        !this.newDeps[path] = this.newDeps[path].add(reader);
+        this.!newDeps[path] = this.newDeps[path].add(reader);
       }
     };
     this.!deps = List[];
@@ -180,7 +180,6 @@ mutable class Context{
         time = this.timeStamp();
         preDir = Dir{
           time,
-          tick => this.tick,
           isInput => false,
           dirName => preDirName,
           fixedData => FixedData{dirName => preDirName, data => Array[]},
@@ -193,7 +192,7 @@ mutable class Context{
         (key, _) = kv;
         values = dir.getArrayRaw(key);
         _ = preDir.writeEntry(this, Path(preDir.dirName, key), key, values);
-      }
+      };
     };
 
     this.!tick = this.tick + 1;
@@ -264,7 +263,7 @@ mutable class Context{
     vector.sort();
     fixedData = FixedData{dirName, data => vector.toArray()};
     time = this.timeStamp();
-    dir = Dir{time, tick => this.tick, isInput => true, dirName, fixedData};
+    dir = Dir{time, isInput => true, dirName, fixedData};
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
     dir
   }
@@ -300,11 +299,7 @@ mutable class Context{
     };
     this.setDir(
       dirName,
-      dir with {
-        deleted => true,
-        tick => this.tick,
-        fixedData => FixedData::empty(dirName),
-      },
+      dir with {deleted => true, fixedData => FixedData::empty(dirName)},
     );
   }
 
