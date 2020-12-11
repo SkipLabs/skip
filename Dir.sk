@@ -296,6 +296,16 @@ class Dir{
     if (values.size() == 0) {
       return RowMapped(key, Vector[], Array[], SortedSet[]);
     };
+    if (context.debugMode) {
+      print_string(
+        "MAPROW: " +
+          this.dirName +
+          " " +
+          key +
+          " " +
+          inspect(values).toString(),
+      );
+    };
     writer = mutable Writer{};
     newDirsCopy = context.newDirs;
     context.!newDirs = SortedSet[];
@@ -684,13 +694,6 @@ class Dir{
       parent = context.getDir(parentName);
       child = context.getDir(childName);
 
-      if (child.time <= this.time) {
-        if (context.debugMode) {
-          print_string(`SKIPPING: ${path} ${child.dirName}`);
-        };
-        continue;
-      };
-
       if (!parent.dirtyReaders.containsKey(childName)) {
         !parent.dirtyReaders[childName] = SortedSet[];
       };
@@ -719,10 +722,6 @@ class Dir{
     k: BaseName,
     rvalues: Array<File>,
   ): this {
-    if (this.deleted) {
-      return this;
-    };
-
     map = this.data.maybeGet(k) match {
     | None() -> SortedMap[]
     | Some(x) -> x

@@ -13,18 +13,35 @@ base class RNbr {
 
 class Config{
   nbrInputs: RNbr = RRange(1, 5),
-  inputSize: RNbr = RRange(1, 10),
-  missingKey: RNbr = RProb(20),
-  valueWidth: RNbr = RRange(1, 10),
-  valueRange: RNbr = RRange(0, 10),
+  inputSize: RNbr = RRange(1, 5),
+  missingKey: RNbr = RProb(40),
+  valueWidth: RNbr = RRange(1, 5),
+  valueRange: RNbr = RRange(0, 5),
   nbrDirs: RNbr = RRange(1, 5),
-  funBodySize: RNbr = RRange(1, 4),
-  mergeSize: RNbr = RRange(1, 3),
+  funBodySize: RNbr = RRange(1, 5),
+  mergeSize: RNbr = RRange(1, 4),
   probKeyChange: RNbr = RProb(50),
   probLazyDir: RNbr = RProb(50),
   probKeyChangeRemoved: RNbr = RProb(10),
   nbrRounds: Int = 1000,
 }
+
+/*
+class Config{
+  nbrInputs: RNbr = RRange(1, 2),
+  inputSize: RNbr = RRange(1, 2),
+  missingKey: RNbr = RProb(30),
+  valueWidth: RNbr = RRange(1, 2),
+  valueRange: RNbr = RRange(0, 2),
+  nbrDirs: RNbr = RRange(1, 2),
+  funBodySize: RNbr = RRange(1, 2),
+  mergeSize: RNbr = RRange(1, 2),
+  probKeyChange: RNbr = RProb(50),
+  probLazyDir: RNbr = RProb(0),
+  probKeyChangeRemoved: RNbr = RProb(0),
+  nbrRounds: Int = 1000,
+}
+*/
 
 const VALUE_SIZE: Int = 10;
 
@@ -276,9 +293,10 @@ fun compareContext(
     if (dirFiles.isEmpty()) continue;
 
     if (context2.maybeGetDir(dirName) is None _) {
-      if (!dirName.toString().contains("LAZY")) {
-        print_string(`Error: missing directory ${dirName}`);
-        return false;
+      if (dirName.toString().contains("LAZY")) continue;
+      if (!dir.deleted) {
+        print_error(`missing directory ${dirName}`);
+        error();
       };
       continue;
     };
@@ -487,10 +505,11 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
 /* Test. */
 /*****************************************************************************/
 
-fun testInterpretor(): mutable SKFS.Context {
+fun testInterpretor(round: ?Int): mutable SKFS.Context {
   config = Config{};
   SKFS.gContextInit(SKFS.Context{});
   for (i in Range(0, config.nbrRounds)) {
+    !i = if (round is Some _) round.fromSome() else i;
     pos = SKFS.newObstack();
     print_string("Round: " + i);
     origProg = genProgram(config, i);
@@ -513,6 +532,7 @@ fun testInterpretor(): mutable SKFS.Context {
       print_string("Compare contexts (Phase 2: scratch/updated)")
     };
     _ = compareContext(context2, context);
+    if (round is Some _) break void;
     SKFS.destroyObstack(pos);
   };
   SKFS.Context::fromSaved(SKFS.gContextGet())

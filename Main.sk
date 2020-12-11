@@ -15,7 +15,9 @@ untracked fun main(): void {
   | "search" ->
     context = SKFSTest.testSearch();
     SKFS.toplevel(context)
-  | "stress" -> _ = SKFSTest.testInterpretor()
+  | "stress" ->
+    round = if (SKFS.args.size() > 1) Some(SKFS.args[1].toInt()) else None();
+    _ = SKFSTest.testInterpretor(round)
   | "sql" -> _ = SKSQL.eval(SKFS.args)
   | "toplevel" | "test" ->
     if (SKFS.args.size() <= 1) {

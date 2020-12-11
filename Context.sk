@@ -37,7 +37,7 @@ mutable class Context{
     Path,
     SortedSet<(DirName, DirName, BaseName)>,
   > = SortedMap[],
-  mutable debugMode: Bool = true,
+  mutable debugMode: Bool = false,
   mutable failOnExn: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable hasNext: SortedSet<DirName> = SortedSet[],
@@ -299,7 +299,11 @@ mutable class Context{
     };
     this.setDir(
       dirName,
-      dir with {deleted => true, fixedData => FixedData::empty(dirName)},
+      dir with {
+        deleted => true,
+        fixedData => FixedData::empty(dirName),
+        data => DMap::empty(),
+      },
     );
   }
 
