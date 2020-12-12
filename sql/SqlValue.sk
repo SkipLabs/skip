@@ -24,9 +24,11 @@ base class SValue uses Hashable, Orderable, Show {
   }
 }
 
+class KeyRow(key: SKFS.BaseName, values: Array<Row>) extends SKFS.File
+
 class RowKey(
   values: Array<SValue>,
-  kinds: ?Array<(Int, IKind)> = None(),
+  kinds: Array<(Int, IKind)>,
 ) extends SKFS.BaseName {
   fun toString(): String {
     inspect(this).toString();
@@ -44,29 +46,22 @@ class RowKey(
   fun compare(file: SKFS.FileName): Order {
     file match {
     | y @ RowKey _ ->
-      this.kinds match {
-      | None() -> this.values.compare(y.values)
-      | Some(kinds) ->
-        for (i in Range(0, kinds.size())) {
-          (idx, direction) = kinds[i];
-          value1 = this.values[idx];
-          value2 = y.values[idx];
-          cmp = direction match {
-          | INONE()
-          | IASC() ->
-            value1.compare(value2)
-          | IDESC() -> value2.compare(value1)
-          };
-          if (cmp != EQ()) return cmp;
+      for (i in Range(0, this.kinds.size())) {
+        (idx, direction) = this.kinds[i];
+        value1 = this.values[idx];
+        value2 = y.values[idx];
+        cmp = direction match {
+        | INONE()
+        | IASC() ->
+          value1.compare(value2)
+        | IDESC() -> value2.compare(value1)
         };
-        EQ()
-      }
+        if (cmp != EQ()) return cmp;
+      };
+      EQ()
     | _ -> LT()
     }
   }
 }
 
-class Row(
-  values: Array<SValue>,
-  kinds: ?Array<(Int, IKind)> = None(),
-) extends SKFS.File
+class Row(values: Array<SValue>) extends SKFS.File

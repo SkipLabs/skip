@@ -5,10 +5,10 @@ const args: Array<String> = arguments();
 module end;
 
 untracked fun main(): void {
-  //  SKFS.toplevel(mutable SKFS.Context{});
-  //  SKSQL.eval(SKFS.args);
-  //_ = SKFSTest.testSql();
-
+  if (SKFS.args.size() == 0) {
+    print_error("Command parameters missing");
+    exit(2);
+  };
   SKFS.args[0] match {
   | "runtime" -> SKFSTest.testRuntime()
   | "query" -> SKFS.toplevel(SKFS.testIndex())
@@ -18,7 +18,11 @@ untracked fun main(): void {
   | "stress" ->
     round = if (SKFS.args.size() > 1) Some(SKFS.args[1].toInt()) else None();
     _ = SKFSTest.testInterpretor(round)
-  | "sql" -> _ = SKSQL.eval(SKFS.args)
+  | "sql" ->
+    context = SKSQL.eval(SKFS.args);
+    if (SKFS.args.size() > 1 && SKFS.args[1] == "--toplevel") {
+      SKFS.toplevel(context)
+    }
   | "toplevel" | "test" ->
     if (SKFS.args.size() <= 1) {
       print_error("Error: missing test name");
