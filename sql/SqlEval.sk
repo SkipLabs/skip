@@ -84,7 +84,7 @@ class ExprEvaluator{
   pos: Int,
   env: Map<String, ?SValue>,
   //  cols: Map<String, Int>,
-  dir: SKFS.Handle<Row>,
+  //  dir: SKFS.Handle<Row>,
 } {
   fun binop(
     context: mutable SKFS.Context,
@@ -172,18 +172,18 @@ class ExprEvaluator{
       }
     | Binop(op, e1, e2) -> this.binop(context, op, e1, e2)
     | EQuery(q) -> this.evalQuery(context, q)
-    | Call(Literal(funName), None()) ->
-      funName.uppercase() match {
-      | "COUNT" -> SVInt(this.countAll(context))
-      | _ ->
-        debug(funName);
-        error(this.pos, "Invalid function: " + funName)
-      }
+    /*    | Call(Literal(funName), None()) ->
+          funName.uppercase() match {
+          | "COUNT" -> SVInt(this.countAll(context))
+          | _ ->
+            debug(funName);
+            error(this.pos, "Invalid function: " + funName)
+          }
+    */
     | Call(Literal(funName), Some(args)) ->
       funName.uppercase() match {
       | "AVG" -> todo()
-      /*
-              (sum, size) = this.sum(context, args);
+      /*        (sum, size) = this.sum(context, args);
               if (sum == 0) SVInt(0) else SVInt(sum / size)
       */
       | "SUM" -> todo()
@@ -262,7 +262,6 @@ class ExprEvaluator{
       | _ -> error(this.pos, "'AVG' expects a column name")
       };
       avgName = makeAvgName(this.dir.dirName, colName);
-      colNumber = this.cols[colName];
       zero = SKFS.IID(0);
       reducer = makeDir(Row::fromFile, context, avgName, () -> {
         this.dir.contextWriterMap(
@@ -270,7 +269,10 @@ class ExprEvaluator{
           context,
           avgName,
           (_context, writer, row) ~> {
-            writer.write(zero, Row(Array[this.getCol(row, colNumber)]));
+            this.env[colName] match {
+            | None() -> void
+            | Some(value) -> writer.write(zero, Row(Array[value]))
+            }
           },
         )
       });
@@ -285,29 +287,30 @@ class ExprEvaluator{
       };
       (acc, elts.size())
     }
-
   */
 
-  fun countAll(context: mutable SKFS.Context): Int {
-    zero = SKFS.IID(0);
-    countName = makeCountName(this.dir.dirName);
-    reducer = makeDir(Row::fromFile, context, countName, () -> {
-      this.dir.contextWriterMap(
-        Row::fromFile,
-        context,
-        countName,
-        (_context, writer, _row) ~> {
-          writer.write(zero, Row(Array[]));
-        },
-      )
-    });
-    elts = reducer.getArray(context, zero);
-    acc = 0;
-    for (_elt in elts) {
-      !acc = acc + 1;
-    };
-    acc
-  }
+  /*
+    fun countAll(context: mutable SKFS.Context): Int {
+      zero = SKFS.IID(0);
+      countName = makeCountName(this.dir.dirName);
+      reducer = makeDir(Row::fromFile, context, countName, () -> {
+        this.dir.contextWriterMap(
+          Row::fromFile,
+          context,
+          countName,
+          (_context, writer, _row) ~> {
+            writer.write(zero, Row(Array[]));
+          },
+        )
+      });
+      elts = reducer.getArray(context, zero);
+      acc = 0;
+      for (_elt in elts) {
+        !acc = acc + 1;
+      };
+      acc
+    }
+  */
 
   fun getCol(row: Row, colNumber: Int): SValue {
     values = row.values;
@@ -412,7 +415,7 @@ fun evalSelectBody(
                 }
               });
               env = menv.chill();
-              evaluator = ExprEvaluator{pos, env, dir};
+              evaluator = ExprEvaluator{pos, env};
               row = Row(
                 params.map(param -> {
                   (e, _) = param;
