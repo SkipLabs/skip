@@ -726,8 +726,7 @@ class Dir{
     | None() -> SortedMap[]
     | Some(x) -> x
     };
-    irvalues = rvalues.map(x -> x);
-    !map = map.set(source, irvalues);
+    !map = map.set(source, rvalues);
     data = this.data.set(context.tick, k, map);
     dirty = this.dirty.set(k);
     path = Path(this.dirName, k);
@@ -745,7 +744,7 @@ class Dir{
       print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
     };
 
-    context.getDir(this.dirName);
+    context.getDir(this.dirName)
   }
 
   fun writeArray(

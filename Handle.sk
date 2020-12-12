@@ -148,6 +148,12 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     ErrorFile(trace)
   }
 
+  fun noValueError(key: BaseName): ErrorFile {
+    traceElt = ErrorTrace(this.dirName.toString(), key.toString(), "no value");
+    trace = List.Cons(traceElt, List.Nil());
+    ErrorFile(trace)
+  }
+
   fun map<T2: File>(
     conv: File ~> T2,
     context: mutable Context,
@@ -237,6 +243,10 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
       errFile = this.duplicateError(key, values);
       throw (errFile);
     };
+    if (values.size() == 0) {
+      errFile = this.noValueError(key);
+      throw (errFile);
+    };
     values[0]
   }
 
@@ -250,14 +260,16 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     Some(values[0])
   }
 
-  fun pre(context: mutable Context): ?Handle<T> {
-    if (!context.hasPre.contains(this.dirName)) {
-      context.!hasPre = context.hasPre.add(this.dirName);
-      return None();
-    };
-    context.maybeGetDir(this.dirName.pre()) match {
-    | None() -> None()
-    | Some(dir) -> Some(Handle(this.conv, dir.dirName))
+  fun pre(): (mutable Context ~> ?Handle<T>) {
+    context ~> {
+      if (!context.hasPre.contains(this.dirName)) {
+        context.!hasPre = context.hasPre.add(this.dirName);
+        return None();
+      };
+      context.maybeGetDir(this.dirName.pre()) match {
+      | None() -> None()
+      | Some(dir) -> Some(Handle(this.conv, dir.dirName))
+      }
     }
   }
 

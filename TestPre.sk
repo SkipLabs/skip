@@ -1,0 +1,41 @@
+module SKFSTest;
+
+fun testPre(): mutable SKFS.Context {
+  SKFS.run(context ~> {
+    //    getData = (dir, key) -> context.getDir(dir.dirName).getArrayRaw(key);
+    context.!debugMode = true;
+    dirSInput = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/sinput/"),
+      Array[
+        (SKFS.IID(0), SKFS.StringFile("23")),
+        (SKFS.IID(1), SKFS.StringFile("35")),
+      ],
+    );
+
+    dirInput = dirSInput.map(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/input/"),
+      x ~> SKFS.IntFile(x.value.toInt()),
+    );
+    getPre = dirInput.pre();
+    _dir = dirInput.contextWriterKeyMap(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/diff/"),
+      (context, writer, key, valueFile) ~> {
+        getPre(context) match {
+        | None() -> writer.write(key, SKFS.IntFile(0))
+        | Some(pre) ->
+          pre.maybeGet(context, key) match {
+          | None() -> writer.write(key, SKFS.IntFile(0))
+          | Some(old) ->
+            diff = old.value - valueFile.value;
+            writer.write(key, SKFS.IntFile(diff))
+          }
+        }
+      },
+    );
+  });
+}
