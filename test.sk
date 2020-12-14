@@ -554,11 +554,11 @@ fun testLazy(): mutable SKFS.Context {
       context,
       SKFS.DirName::create("/defDiffs/"),
       (context, writer, key, value) ~> {
-        prevDir = defDir.pre();
-        prevDir(context) match {
+        prevDir = defDir.pre(context);
+        prevDir match {
         | None() -> writer.write(key, SKFS.IntFile(0))
         | Some(preDir) ->
-          _prevDir2 = preDir.pre();
+          _prevDir2 = preDir.pre(context);
           def = preDir.get(context, key);
           writer.write(key, SKFS.IntFile(def.v - value.v))
         }

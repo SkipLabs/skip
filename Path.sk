@@ -79,6 +79,10 @@ class DirName private (dirName: String) extends FileName {
     DirName(this.dirName + "next/")
   }
 
+  fun tag(): this {
+    DirName(this.dirName + "tag/")
+  }
+
   static private fun validateDirName(dirName: String): void {
     validator = mutable SKFSImpl.NameValidator(dirName, dirName.chars(), 0);
     validator.go()
@@ -107,6 +111,12 @@ class DirName private (dirName: String) extends FileName {
 }
 
 base class BaseName extends FileName
+
+class DirTag() extends BaseName {
+  fun toString(): String {
+    "DirTag()"
+  }
+}
 
 class IID(value: Int) extends BaseName {
   static fun create(key: String): IID {

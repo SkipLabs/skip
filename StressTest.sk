@@ -292,7 +292,7 @@ fun compareContext(
     dirFiles = dir.files();
     if (dirFiles.isEmpty()) continue;
 
-    if (context2.maybeGetDir(dirName) is None _) {
+    if (context2.unsafeMaybeGetDir(dirName) is None _) {
       if (dirName.toString().contains("LAZY")) continue;
       if (!dir.deleted) {
         print_error(`missing directory ${dirName}`);
@@ -300,7 +300,7 @@ fun compareContext(
       };
       continue;
     };
-    dir2 = context2.getDir(dirName);
+    dir2 = context2.unsafeGetDir(dirName);
     isLazy = dir2.dirName.toString().contains("LAZY");
     for (key in dirFiles) {
       values1 = dir.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));

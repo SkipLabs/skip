@@ -218,6 +218,7 @@ class Dir{
       fixedData => FixedData{dirName, data => Array[]},
       lazyFun => Some(lazyFun),
     };
+    static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, newDir);
     newDir
   }
@@ -462,6 +463,7 @@ class Dir{
       mapFun => Some(f),
       newDirs => grouped.newDirs,
     };
+    static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, dir);
     static::addParent(context, time, dirName, this.dirName, grouped.old);
     for (parent in extraDirs) {
@@ -557,7 +559,7 @@ class Dir{
     context.setDir(this.dirName, this);
     !this = context.getDir(this.dirName);
     for (path in dirtyReaders) {
-      this.updateDirtyReaders(context, path);
+      static::updateDirtyReaders(context, path);
     }
   }
 
@@ -626,6 +628,7 @@ class Dir{
       for (dirName in lastRoundDirs) {
         if (newDirs.contains(dirName)) continue;
         context.removeDir(dirName);
+        static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
       }
     };
     !this.newDirs = this.newDirs.set(key, newDirs);
@@ -685,8 +688,7 @@ class Dir{
     (this, keys.toArray())
   }
 
-  fun updateDirtyReaders(context: mutable Context, path: Path): void {
-    invariant(path.dirName == this.dirName);
+  static fun updateDirtyReaders(context: mutable Context, path: Path): void {
     readers = context.getDeps(path);
 
     for (reader in readers) {
@@ -703,7 +705,7 @@ class Dir{
       if (
         parent.lazyFun is Some _ &&
         childName == parent.dirName &&
-        childName != this.dirName
+        childName != path.dirName
       ) {
         !parent.data = parent.data.set(
           context.tick,
@@ -733,7 +735,7 @@ class Dir{
     !this = this with {data, dirty};
     context.setDir(this.dirName, this);
 
-    this.updateDirtyReaders(context, path);
+    static::updateDirtyReaders(context, path);
 
     for (childName in this.childDirs) {
       child = context.getDir(childName);

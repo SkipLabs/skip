@@ -182,8 +182,13 @@ mutable class Context{
           time,
           isInput => false,
           dirName => preDirName,
-          fixedData => FixedData{dirName => preDirName, data => Array[]},
+          fixedData => FixedData{
+            dirName => preDirName,
+            data => dir.fixedData.data,
+          },
+          data => dir.data,
         };
+        Dir::updateDirtyReaders(this, Path(preDirName.tag(), DirTag()));
         this.setDir(preDirName, preDir);
         preDir
       | Some(preDir) -> preDir
@@ -285,7 +290,12 @@ mutable class Context{
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
   }
 
-  readonly fun getDir(dirName: DirName): Dir {
+  mutable fun getDir(dirName: DirName): Dir {
+    this.addDep(Path(dirName.tag(), DirTag()));
+    this.dirs.get(dirName);
+  }
+
+  readonly fun unsafeGetDir(dirName: DirName): Dir {
     this.dirs.get(dirName);
   }
 
@@ -307,7 +317,12 @@ mutable class Context{
     );
   }
 
-  readonly fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
+  mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
+    this.addDep(Path(dirName.tag(), DirTag()));
+    this.dirs.maybeGet(dirName);
+  }
+
+  readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
     this.dirs.maybeGet(dirName);
   }
 

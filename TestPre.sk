@@ -13,25 +13,34 @@ fun testPre(): mutable SKFS.Context {
       ],
     );
 
+    _dirSInput2 = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/sinput2/"),
+      Array[
+        (SKFS.IID(0), SKFS.StringFile("44")),
+        (SKFS.IID(1), SKFS.StringFile("45")),
+      ],
+    );
+
     dirInput = dirSInput.map(
       SKFS.IntFile::fromFile,
       context,
       SKFS.DirName::create("/input/"),
       x ~> SKFS.IntFile(x.value.toInt()),
     );
-    getPre = dirInput.pre();
     _dir = dirInput.contextWriterKeyMap(
       SKFS.IntFile::fromFile,
       context,
       SKFS.DirName::create("/diff/"),
       (context, writer, key, valueFile) ~> {
-        getPre(context) match {
+        preOpt = dirInput.pre(context);
+        preOpt match {
         | None() -> writer.write(key, SKFS.IntFile(0))
         | Some(pre) ->
           pre.maybeGet(context, key) match {
           | None() -> writer.write(key, SKFS.IntFile(0))
           | Some(old) ->
-            diff = old.value - valueFile.value;
+            diff = valueFile.value - old.value;
             writer.write(key, SKFS.IntFile(diff))
           }
         }
