@@ -200,7 +200,7 @@ class Dir{
       dir = context.getDir(dirName);
       results = Array[result];
       map = SortedMap[Path(dirName, key) => results];
-      !dir.data = dir.data.set(context.tick, key, map);
+      !dir.data = dir.data.set(TimeTag::create(context.tick), key, map);
       updateReaders(dirName, context, key);
       context.setDir(dirName, dir);
       if (context.debugMode) {
@@ -554,7 +554,7 @@ class Dir{
     for (path in dirtyReaders) {
       key = path.baseName;
       map = SortedMap[path => Array[]];
-      !this.data = this.data.set(context.tick, key, map);
+      !this.data = this.data.set(TimeTag::create(context.tick), key, map);
     };
     context.setDir(this.dirName, this);
     !this = context.getDir(this.dirName);
@@ -708,7 +708,7 @@ class Dir{
         childName != path.dirName
       ) {
         !parent.data = parent.data.set(
-          context.tick,
+          TimeTag::create(context.tick),
           baseName,
           SortedMap[(Path(childName, baseName), Array[])],
         );
@@ -729,7 +729,7 @@ class Dir{
     | Some(x) -> x
     };
     !map = map.set(source, rvalues);
-    data = this.data.set(context.tick, k, map);
+    data = this.data.set(TimeTag::create(context.tick), k, map);
     dirty = this.dirty.set(k);
     path = Path(this.dirName, k);
     !this = this with {data, dirty};

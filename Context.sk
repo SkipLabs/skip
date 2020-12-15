@@ -28,8 +28,8 @@ mutable class Context{
   mutable lazyVisitedList: List<Path> = List[],
   mutable lazyVisitedSet: SortedSet<Path> = SortedSet[],
   mutable reads: mutable Vector<Path> = mutable Vector[],
-  mutable time: Int = 0,
-  mutable tick: Int = 0,
+  mutable time: Int = 1,
+  mutable tick: Int = 1,
   mutable toUpdate: SortedMap<Int, DirName> = SortedMap[],
   mutable deps: List<Array<(Path, DirName, DirName, BaseName)>> = List[],
   mutable fixedDeps: Map<Path, Set<(DirName, DirName, BaseName)>> = Map[],
@@ -182,22 +182,25 @@ mutable class Context{
           time,
           isInput => false,
           dirName => preDirName,
-          fixedData => FixedData{
-            dirName => preDirName,
-            data => dir.fixedData.data,
-          },
-          data => dir.data,
+          fixedData => FixedData{dirName => preDirName, data => Array[]},
         };
         Dir::updateDirtyReaders(this, Path(preDirName.tag(), DirTag()));
         this.setDir(preDirName, preDir);
         preDir
       | Some(preDir) -> preDir
       };
+      debug((this.tick, dir.data));
       for (kv in dir.data.getChangesAfter(this.tick - 1)) {
         (key, _) = kv;
+        debug(("INSERT PRE", dir.dirName, kv));
         values = dir.getArrayRaw(key);
-        _ = preDir.writeEntry(this, Path(preDir.dirName, key), key, values);
-      };
+        !preDir = preDir.writeEntry(
+          this,
+          Path(preDir.dirName, key),
+          key,
+          values,
+        );
+      }
     };
 
     this.!tick = this.tick + 1;
@@ -341,7 +344,7 @@ mutable class Context{
 
 class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   fun set<T: File>(time: Int, key: DirName, value: Dir): this {
-    !this.state = this.state.set(time, key, value);
+    !this.state = this.state.set(TimeTag::create(time), key, value);
     this
   }
   fun maybeGet(key: DirName): ?Dir {

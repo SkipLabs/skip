@@ -17,11 +17,17 @@ base class VisitDirection {
   | Both()
 }
 
+value class TimeTag(max: Int, current: Int) {
+  static fun create(time: Int): this {
+    TimeTag(time, time)
+  }
+}
+
 base class DMap<Key: FileName, Value> {
   children =
   | Nil()
   | Node{
-    time: Int,
+    time: TimeTag,
     height: Int,
     key: Key,
     value: Value,
@@ -57,9 +63,9 @@ base class DMap<Key: FileName, Value> {
     this.visit().collect(Map).items()
   }
 
-  fun getTime(): Int
-  | Nil() -> Int::max
-  | Node{time} -> time
+  fun getMaxTime(): Int
+  | Nil() -> 0
+  | Node{time} -> time.max
 
   fun getHeight(): Int
   | Nil() -> 0
@@ -72,8 +78,10 @@ base class DMap<Key: FileName, Value> {
   fun getChangesAcc(after: Int, acc: mutable Vector<(Key, Value)>): void
   | Nil() -> void
   | Node{time, key, value, left, right} ->
-    if (time <= after) return void;
-    acc.push((key, value));
+    if (time.max <= after) return void;
+    if (time.current > after) {
+      acc.push((key, value));
+    };
     left.getChangesAcc(after, acc);
     right.getChangesAcc(after, acc)
 
@@ -84,21 +92,21 @@ base class DMap<Key: FileName, Value> {
   }
 
   static fun node(
-    time: Int,
+    time: TimeTag,
     key: Key,
     value: Value,
     left: DMap<Key, Value>,
     right: DMap<Key, Value>,
   ): DMap<Key, Value> {
-    !time = max(time, max(left.getTime(), right.getTime()));
+    !time.max = max(time.max, max(left.getMaxTime(), right.getMaxTime()));
     height = 1 + max(left.getHeight(), right.getHeight());
     Node{time, height, key, value, left, right}
   }
 
-  fun set(time: Int, key: Key, value: Value): DMap<Key, Value>
+  fun set(time: TimeTag, key: Key, value: Value): DMap<Key, Value>
   | Nil() -> static::node(time, key, value, Nil(), Nil())
   | Node{time => t, left => l, right => r, key => k, value => v} ->
-    !t = max(time, t);
+    !t.max = max(time.max, t.max);
     compare(key, this.key) match {
     | LT() -> static::balance(t, k, v, l.set(time, key, value), r)
     | EQ() -> static::node(t, k, value, l, r)
@@ -124,7 +132,7 @@ base class DMap<Key: FileName, Value> {
     }
 
   protected static fun balance(
-    t: Int,
+    t: TimeTag,
     k: Key,
     v: Value,
     l: DMap<Key, Value>,
@@ -196,10 +204,10 @@ module SKFSTest;
 
 fun testDMap(): void {
   x = SKFS.DMap::empty();
-  !x = x.set(1, SKFS.IID(1), 1);
-  !x = x.set(1, SKFS.IID(2), 2);
-  !x = x.set(1, SKFS.IID(3), 3);
-  !x = x.set(2, SKFS.IID(1), 23);
+  !x = x.set(SKFS.TimeTag::create(1), SKFS.IID(1), 1);
+  !x = x.set(SKFS.TimeTag::create(1), SKFS.IID(2), 2);
+  !x = x.set(SKFS.TimeTag::create(1), SKFS.IID(3), 3);
+  !x = x.set(SKFS.TimeTag::create(2), SKFS.IID(1), 23);
   expectEq("Changes after", Array[1, 2, 3], () ->
     x.getChangesAfter(1).toArray().map(x -> x.i0.value)
   );
