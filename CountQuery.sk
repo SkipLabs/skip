@@ -6,7 +6,6 @@ fun count<T: frozen>(
   proj: Array<T> ~> Int,
 ): Int {
   diffCountDirName = DirName::create(dir.dirName.toString() + "diffCount/");
-  diffCountDir = Handle(IntFile::fromFile, diffCountDirName);
   countDirName = DirName::create(dir.dirName.toString() + "count/");
   context
     .unsafeGetDir(dir.dirName)
@@ -26,22 +25,19 @@ fun count<T: frozen>(
       }
     });
   countDir = Handle(IntFile::fromFile, countDirName);
-  _ = diffCountDir.contextWriterKeyValues(
-    IntFile::fromFile,
-    context,
-    countDirName,
-    (context, writer, _, diffs) ~> {
+  context
+    .unsafeGetDir(diffCountDirName)
+    .apply(context, countDirName, (context, writer, _, diffs) ~> {
       oldSums = countDir.pre(context) match {
       | None() -> Array[]
       | Some(preDir) -> preDir.getArray(context, IID(0))
       };
       acc = if (oldSums.size() == 0) 0 else oldSums[0].value;
       for (diff in diffs) {
-        !acc = acc + diff.value;
+        !acc = acc + IntFile::fromFile(diff).value;
       };
       writer.write(IID(0), IntFile(acc))
-    },
-  );
+    });
   countDir.maybeGet(context, IID(0)) match {
   | None() -> 0
   | Some(x) -> x.value
