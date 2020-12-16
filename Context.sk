@@ -166,15 +166,20 @@ mutable class Context{
     this.!deps = List[];
   }
 
-  mutable fun update(): void {
-    this.updateNewDeps();
+  mutable fun initPre(): void {
+    this.updatePre(this.dirs.state.visit().map(x -> x.i0).collect(SortedSet));
+  }
 
-    dirs = this.dirs;
+  mutable fun updatePre(toUpdate: SortedSet<DirName>): void {
+    if (this.debugMode) {
+      print_string(`------------ UPDATE PRE ------------`);
+    };
 
-    for (dirName in this.hasPre) {
+    for (dirName in toUpdate) {
+      if (!this.hasPre.contains(dirName)) continue;
       preDirName = dirName.pre();
-      dir = dirs.get(dirName);
-      preDir = dirs.maybeGet(preDirName) match {
+      dir = this.dirs.get(dirName);
+      this.dirs.maybeGet(preDirName) match {
       | None() ->
         this.!newDirs = this.newDirs.add(preDirName);
         time = this.timeStamp();
@@ -184,24 +189,38 @@ mutable class Context{
           dirName => preDirName,
           fixedData => FixedData{dirName => preDirName, data => Array[]},
         };
+        dir.unsafeIterKeys((key, _time) -> {
+          values = dir.getArrayRaw(key);
+          !preDir = preDir.writeEntry(
+            this,
+            Path(preDir.dirName, key),
+            key,
+            values,
+          );
+        });
         Dir::updateDirtyReaders(this, Path(preDirName.tag(), DirTag()));
-        this.setDir(preDirName, preDir);
-        preDir
-      | Some(preDir) -> preDir
-      };
-      debug((this.tick, dir.data));
-      for (kv in dir.data.getChangesAfter(this.tick - 1)) {
-        (key, _) = kv;
-        debug(("INSERT PRE", dir.dirName, kv));
-        values = dir.getArrayRaw(key);
-        !preDir = preDir.writeEntry(
-          this,
-          Path(preDir.dirName, key),
-          key,
-          values,
-        );
+        this.setDir(preDirName, preDir)
+      | Some(preDir) ->
+        for (kv in dir.data.getChangesAfter(this.tick - 1)) {
+          (key, _) = kv;
+          values = dir.getArrayRaw(key);
+          !preDir = preDir.writeEntry(
+            this,
+            Path(preDir.dirName, key),
+            key,
+            values,
+          );
+        }
       }
+    }
+  }
+
+  mutable fun update(): void {
+    if (this.debugMode) {
+      print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
+
+    this.updateNewDeps();
 
     this.!tick = this.tick + 1;
     loop {
@@ -214,6 +233,7 @@ mutable class Context{
           !dir.dirtyReaders = SortedMap[];
           this.setDir(dir.dirName, dir);
         };
+        this.updatePre(this.toReset);
         this.!toReset = SortedSet[];
         return void
       | Some((time, dirName)) ->

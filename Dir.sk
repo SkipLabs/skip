@@ -36,6 +36,11 @@ value class FixedRow<T>(
   fun hash(): Int {
     this.toKeyPath().hash()
   }
+
+  fun changeSource(source: Path): this {
+    !this.value.i0 = source;
+    this
+  }
 }
 
 value class RowMapped<T>(
@@ -131,6 +136,25 @@ class Dir{
   lazyFun: ?((mutable Context, DirName, BaseName) ~> File) = None(),
   deleted: Bool = false,
 } extends File {
+  fun unsafeIterKeys(f: (BaseName, Int) -> void): void {
+    fixedData = this.fixedData.data;
+    current = 0;
+    this.data.eachWithTime((newKey, time) -> {
+      while (current < fixedData.size() && fixedData[current].key < newKey) {
+        row = fixedData[current];
+        f(row.key, 0);
+        !current = current + 1;
+      };
+      f(newKey, time);
+      !current = current + 1;
+    });
+    while (current < fixedData.size()) {
+      row = fixedData[current];
+      f(row.key, 0);
+      !current = current + 1;
+    };
+  }
+
   fun files(): Set<BaseName> {
     fixedData = this.fixedData.data;
     current = 0;
@@ -294,9 +318,10 @@ class Dir{
     values: Array<File>,
     f: MapFun,
   ): RowMapped<Array<File>> {
-    if (values.size() == 0) {
-      return RowMapped(key, Vector[], Array[], SortedSet[]);
-    };
+    /*    if (values.size() == 0) {
+          return RowMapped(key, Vector[], Array[], SortedSet[]);
+        };
+    */
     if (context.debugMode) {
       print_string(
         "MAPROW: " +
@@ -647,9 +672,9 @@ class Dir{
     newDirsCopy = context.newDirs;
     context.!newDirs = SortedSet[];
 
-    if (values.size() != 0) {
-      mapFun(context, writer, key, values);
-    };
+    //    if (values.size() != 0) {
+    mapFun(context, writer, key, values);
+    //    };
 
     newDirs = context.newDirs;
     context.!newDirs = newDirsCopy;

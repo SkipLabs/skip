@@ -1,0 +1,86 @@
+module SKFS;
+
+fun count<T: frozen>(
+  context: mutable Context,
+  dir: Handle<T>,
+  proj: Array<T> ~> Int,
+): Int {
+  diffCountDirName = DirName::create(dir.dirName.toString() + "diffCount/");
+  diffCountDir = Handle(IntFile::fromFile, diffCountDirName);
+  countDirName = DirName::create(dir.dirName.toString() + "count/");
+  context
+    .unsafeGetDir(dir.dirName)
+    .apply(context, diffCountDirName, (context, writer, key, newValues) ~> {
+      preDiffOpt = Handle(dir.conv, dir.dirName).pre(context);
+      oldValues = preDiffOpt match {
+      | None() -> Array[]
+      | Some(preDir) -> preDir.getArray(context, key)
+      };
+      oldCount = if (oldValues.size() == 0) 0 else proj(oldValues);
+      newCount = if (newValues.size() == 0) 0 else {
+        proj(newValues.map(dir.conv))
+      };
+      cmp = newCount - oldCount;
+      if (cmp != 0) {
+        writer.write(IID(0), IntFile(cmp))
+      }
+    });
+  countDir = Handle(IntFile::fromFile, countDirName);
+  _ = diffCountDir.contextWriterKeyValues(
+    IntFile::fromFile,
+    context,
+    countDirName,
+    (context, writer, _, diffs) ~> {
+      oldSums = countDir.pre(context) match {
+      | None() -> Array[]
+      | Some(preDir) -> preDir.getArray(context, IID(0))
+      };
+      acc = if (oldSums.size() == 0) 0 else oldSums[0].value;
+      for (diff in diffs) {
+        !acc = acc + diff.value;
+      };
+      writer.write(IID(0), IntFile(acc))
+    },
+  );
+  countDir.maybeGet(context, IID(0)) match {
+  | None() -> 0
+  | Some(x) -> x.value
+  }
+}
+
+module end;
+
+module SKFSTest;
+
+fun testCount(): mutable SKFS.Context {
+  SKFS.run(context ~> {
+    //    getData = (dir, key) -> context.getDir(dir.dirName).getArrayRaw(key);
+    context.!debugMode = true;
+    dirSInput = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/sinput/"),
+      Array[
+        (SKFS.IID(0), SKFS.StringFile("23")),
+        (SKFS.IID(1), SKFS.StringFile("35")),
+      ],
+    );
+
+    dirSInput2 = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/sinput2/"),
+      Array[
+        (SKFS.IID(0), SKFS.StringFile("1File")),
+        (SKFS.IID(1), SKFS.StringFile("2File")),
+      ],
+    );
+
+    _ = dirSInput2.contextMap(
+      SKFS.StringFile::fromFile,
+      context,
+      SKFS.DirName::create("/sinput2_map/"),
+      (context, value) ~>
+        SKFS.StringFile(value.value + SKFS.count(context, dirSInput, _ ~> 1))
+      ,
+    );
+  });
+}

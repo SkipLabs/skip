@@ -51,6 +51,13 @@ base class DMap<Key: FileName, Value> {
       right.visitAcc(f, acc)
     }
 
+  fun eachWithTime(f: (Key, Int) -> void): void
+  | Nil() -> void
+  | Node{key, time, left, right} ->
+    left.eachWithTime(f);
+    f(key, time.current);
+    right.eachWithTime(f)
+
   fun visit(
     f: Node<Key, Value> -> VisitDirection = (_) -> Both(),
   ): Array<(Key, Value)> {
@@ -78,8 +85,8 @@ base class DMap<Key: FileName, Value> {
   fun getChangesAcc(after: Int, acc: mutable Vector<(Key, Value)>): void
   | Nil() -> void
   | Node{time, key, value, left, right} ->
-    if (time.max <= after) return void;
-    if (time.current > after) {
+    if (time.max < after) return void;
+    if (time.current >= after) {
       acc.push((key, value));
     };
     left.getChangesAcc(after, acc);
@@ -88,6 +95,26 @@ base class DMap<Key: FileName, Value> {
   fun getChangesAfter(time: Int): Vector<(Key, Value)> {
     acc = mutable Vector[];
     this.getChangesAcc(time, acc);
+    unsafe_chill_trust_me(acc)
+  }
+
+  fun getChangesRangeAcc(
+    timeStart: Int,
+    timeEnd: Int,
+    acc: mutable Vector<(Key, Value)>,
+  ): void
+  | Nil() -> void
+  | Node{time, key, value, left, right} ->
+    if (time.max < timeStart) return void;
+    if (time.current >= timeStart && time.current < timeEnd) {
+      acc.push((key, value));
+    };
+    left.getChangesRangeAcc(timeStart, timeEnd, acc);
+    right.getChangesRangeAcc(timeStart, timeEnd, acc)
+
+  fun getChangesRange(timeStart: Int, timeEnd: Int): Vector<(Key, Value)> {
+    acc = mutable Vector[];
+    this.getChangesRangeAcc(timeStart, timeEnd, acc);
     unsafe_chill_trust_me(acc)
   }
 
@@ -107,9 +134,10 @@ base class DMap<Key: FileName, Value> {
   | Nil() -> static::node(time, key, value, Nil(), Nil())
   | Node{time => t, left => l, right => r, key => k, value => v} ->
     !t.max = max(time.max, t.max);
+    !time.max = t.max;
     compare(key, this.key) match {
     | LT() -> static::balance(t, k, v, l.set(time, key, value), r)
-    | EQ() -> static::node(t, k, value, l, r)
+    | EQ() -> static::node(time, k, value, l, r)
     | GT() -> static::balance(t, k, v, l, r.set(time, key, value))
     }
 

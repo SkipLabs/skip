@@ -170,6 +170,7 @@ fun evalSub(
     subDirName = SKFS.DirName::create(subDirNameStr);
     !subDirs = List.Cons(subDirNameStr, subDirs);
     _ = dir.apply(context, subDirName, (context, writer, localKey, values) ~> {
+      if (values.size() == 0) return void;
       localSum = sum;
       for (readDirName in readDirs) {
         readDir = context.getDir(SKFS.DirName::create(readDirName));

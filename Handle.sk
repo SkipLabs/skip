@@ -24,7 +24,7 @@ mutable class Writer{
   }
 }
 
-class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
+class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
   static fun lazy<T: File>(
     conv: File ~> T,
     context: mutable Context,
@@ -66,10 +66,10 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     Handle(conv, dir.dirName)
   }
 
-  fun union(
+  fun union<U>[T: U](
     context: mutable Context,
     dirName: DirName,
-    dirs: Array<Handle<T>>,
+    dirs: Array<Handle<U>>,
   ): Handle<T> {
     thisDir = context.getDir(this.dirName);
     thisDir.apply(
@@ -138,7 +138,7 @@ class Handle<T: frozen>(conv: File ~> T, dirName: DirName) {
     Handle(conv, dirName)
   }
 
-  fun duplicateError(key: BaseName, files: Array<T>): ErrorFile {
+  fun duplicateError(key: BaseName, files: Array<_>): ErrorFile {
     traceElt = ErrorTrace(
       this.dirName.toString(),
       key.toString(),
