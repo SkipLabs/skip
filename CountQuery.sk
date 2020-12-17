@@ -1,10 +1,10 @@
 module SKFS;
 
-fun count<T: frozen>(
+fun getCountDir<T: frozen>(
   context: mutable Context,
   dir: Handle<T>,
   proj: Array<T> ~> Int,
-): Int {
+): Handle<IntFile> {
   diffCountDirName = DirName::create(dir.dirName.toString() + "diffCount/");
   countDirName = DirName::create(dir.dirName.toString() + "count/");
   context
@@ -38,10 +38,7 @@ fun count<T: frozen>(
       };
       writer.write(IID(0), IntFile(acc))
     });
-  countDir.maybeGet(context, IID(0)) match {
-  | None() -> 0
-  | Some(x) -> x.value
-  }
+  countDir
 }
 
 module end;
@@ -50,33 +47,107 @@ module SKFSTest;
 
 fun testCount(): mutable SKFS.Context {
   SKFS.run(context ~> {
-    //    getData = (dir, key) -> context.getDir(dir.dirName).getArrayRaw(key);
-    context.!debugMode = true;
+    inputFiles = mutable Map[
+      SKFS.IID(0) => SKFS.StringFile("23"),
+      SKFS.IID(1) => SKFS.StringFile("35"),
+    ];
+
+    testNbr = 0;
+    incrTestNbr = () -> {
+      !testNbr = testNbr + 1;
+      testNbr
+    };
+
+    sinput = SKFS.DirName::create("/sinput/");
     dirSInput = context.mkdir(
       SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/sinput/"),
-      Array[
-        (SKFS.IID(0), SKFS.StringFile("23")),
-        (SKFS.IID(1), SKFS.StringFile("35")),
-      ],
+      sinput,
+      inputFiles.items().collect(Array),
     );
 
-    dirSInput2 = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/sinput2/"),
-      Array[
-        (SKFS.IID(0), SKFS.StringFile("1File")),
-        (SKFS.IID(1), SKFS.StringFile("2File")),
-      ],
-    );
+    countDir = SKFS.getCountDir(context, dirSInput, _ ~> 1);
+    size = 10;
 
-    _ = dirSInput2.contextMap(
-      SKFS.StringFile::fromFile,
-      context,
-      SKFS.DirName::create("/sinput2_map/"),
-      (context, value) ~>
-        SKFS.StringFile(value.value + SKFS.count(context, dirSInput, _ ~> 1))
-      ,
-    );
+    for (i in Range(0, size)) {
+      files = Array[SKFS.StringFile(i.toString())];
+      write(context, dirSInput, SKFS.IID(i), files);
+      context.update();
+      expectEq(
+        `TestCount: ${incrTestNbr()}`,
+        Array<SKFS.File>[SKFS.IntFile(if (i < 2) 2 else i + 1)],
+        () -> {
+          getData(context, countDir.dirName, SKFS.IID(0));
+        },
+      );
+    };
+    for (j in Range(0, size / 2)) {
+      write(context, dirSInput, SKFS.IID(size - j - 1), Array[]);
+      context.update();
+      expectEq(
+        `TestCount: ${incrTestNbr()}`,
+        Array<SKFS.File>[SKFS.IntFile(size - j - 1)],
+        () -> {
+          getData(context, countDir.dirName, SKFS.IID(0))
+        },
+      );
+    };
+
+    for (j in Range(0, size / 2)) {
+      write(
+        context,
+        dirSInput,
+        SKFS.IID(size - j - 1),
+        Array[SKFS.StringFile("x")],
+      );
+      context.update();
+      expectEq(
+        `TestCount: ${incrTestNbr()}`,
+        Array<SKFS.File>[SKFS.IntFile(size / 2 + j + 1)],
+        () -> {
+          getData(context, countDir.dirName, SKFS.IID(0))
+        },
+      );
+    };
+
+    for (j in Range(0, size / 2)) {
+      write(context, dirSInput, SKFS.IID(size - j - 1), Array[]);
+      context.update();
+      expectEq(
+        `TestCount: ${incrTestNbr()}`,
+        Array<SKFS.File>[SKFS.IntFile(size - j - 1)],
+        () -> {
+          getData(context, countDir.dirName, SKFS.IID(0))
+        },
+      );
+    };
+
+    for (j in Range(0, size / 2)) {
+      write(context, dirSInput, SKFS.IID(size - j - 1), Array[]);
+      context.update();
+      expectEq(
+        `TestCount: ${incrTestNbr()}`,
+        Array<SKFS.File>[SKFS.IntFile(size / 2)],
+        () -> {
+          getData(context, countDir.dirName, SKFS.IID(0))
+        },
+      );
+    };
+
+    for (j in Range(0, size / 2)) {
+      write(
+        context,
+        dirSInput,
+        SKFS.IID(size - j - 1),
+        Array[SKFS.StringFile("x")],
+      );
+      context.update();
+      expectEq(
+        `TestCount: ${incrTestNbr()}`,
+        Array<SKFS.File>[SKFS.IntFile(size / 2 + j + 1)],
+        () -> {
+          getData(context, countDir.dirName, SKFS.IID(0))
+        },
+      );
+    };
   });
 }

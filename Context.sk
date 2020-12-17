@@ -11,6 +11,7 @@ class DirAlreadyExists(dirName: DirName) extends Exception {
 fun start<T>(f: (mutable Context) -> T): (mutable Context, T) {
   context = mutable Context{};
   result = f(context);
+  context.initPre();
   context.updateFixedDeps();
   (context, result)
 }
@@ -18,6 +19,7 @@ fun start<T>(f: (mutable Context) -> T): (mutable Context, T) {
 fun run(f: (mutable Context) -> void): mutable Context {
   context = mutable Context{};
   f(context);
+  context.initPre();
   context.updateFixedDeps();
   context
 }
