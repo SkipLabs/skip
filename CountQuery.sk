@@ -1,12 +1,15 @@
 module SKFS;
 
-fun getCountDir<T: frozen>(
+fun sumDir<T: frozen>(
   context: mutable Context,
   dir: Handle<T>,
   proj: Array<T> ~> Int,
+  name: String,
 ): Handle<IntFile> {
-  diffCountDirName = DirName::create(dir.dirName.toString() + "diffCount/");
-  countDirName = DirName::create(dir.dirName.toString() + "count/");
+  diffCountDirName = DirName::create(
+    dir.dirName.toString() + "diff" + name + "/",
+  );
+  countDirName = DirName::create(dir.dirName.toString() + name + "/");
   context
     .unsafeGetDir(dir.dirName)
     .apply(context, diffCountDirName, (context, writer, key, newValues) ~> {
@@ -33,13 +36,7 @@ fun getCountDir<T: frozen>(
       | Some(preDir) -> preDir.getArray(context, IID(0))
       };
       acc = if (oldSums.size() == 0) 0 else oldSums[0].value;
-      if (context.debugMode) {
-        debug(("ACC", acc));
-      };
       for (diff in diffs) {
-        if (context.debugMode) {
-          debug(("ACC+", diff));
-        };
         !acc = acc + IntFile::fromFile(diff).value;
       };
       writer.write(IID(0), IntFile(acc))
@@ -65,7 +62,7 @@ fun testCount(): mutable SKFS.Context {
       inputFiles.items().collect(Array),
     );
 
-    _countDir = SKFS.getCountDir(context, dirSInput, _ ~> 1);
+    _countDir = SKFS.sumDir(context, dirSInput, _ ~> 1, "count");
 
     inputSumFiles = mutable Map[
       SKFS.IID(0) => SKFS.StringFile("0"),
@@ -78,7 +75,7 @@ fun testCount(): mutable SKFS.Context {
       sumInput,
       inputSumFiles.items().collect(Array),
     );
-    _sumDir = SKFS.getCountDir(context, dirSumInput, x ~> x[0].value.toInt());
+    _sumDir = SKFS.sumDir(context, dirSumInput, x ~> x[0].value.toInt(), "sum");
   });
 
   testNbr = 0;
@@ -192,7 +189,7 @@ fun testCount(): mutable SKFS.Context {
 
   sumDir = SKFS.Handle(
     SKFS.IntFile::fromFile,
-    SKFS.DirName::create("/sumInput/count/"),
+    SKFS.DirName::create("/sumInput/sum/"),
   );
 
   for (i in Range(0, size)) {
