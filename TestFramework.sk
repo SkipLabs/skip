@@ -58,7 +58,10 @@ extension base class .Inspect uses Equality {}
 fun expectEq<T: frozen>(msg: String, x: T, f: () -> T): void {
   expectPass(msg + " (expect ==)", () -> {
     y = f();
-    if (inspect(x) != inspect(y)) {
+    ix = inspect(x);
+    iy = inspect(y);
+    if (ix != iy) {
+      print_error(`${ix.toString()} != ${iy.toString()}`);
       throw NotEqExn(x, y);
     }
   });
