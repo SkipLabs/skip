@@ -9,14 +9,6 @@
 
 module SKFS;
 
-base class VisitDirection {
-  children =
-  | Cut()
-  | Left()
-  | Right()
-  | Both()
-}
-
 value class TimeTag(max: Int, current: Int) {
   static fun create(time: Int): this {
     TimeTag(time, time)
@@ -35,21 +27,23 @@ base class DMap<Key: FileName, Value> {
     right: DMap<Key, Value>,
   }
 
-  fun visitAcc(
-    f: Node<Key, Value> -> VisitDirection,
-    acc: mutable Vector<(Key, Value)>,
-  ): void
-  | Nil() -> void
-  | x @ Node{key, value, left, right} ->
-    f(x) match {
-    | Cut() -> void
-    | Left() -> left.visitAcc(f, acc)
-    | Right() -> right.visitAcc(f, acc)
-    | Both() ->
-      left.visitAcc(f, acc);
-      acc.push((key, value));
-      right.visitAcc(f, acc)
+  fun items(): mutable Iterator<(Key, Value)> {
+    this match {
+    | Nil() -> void
+    | Node{key, value, left, right} ->
+      for (x in left.items()) {
+        yield x;
+      };
+      yield (key, value);
+      for (x in right.items()) {
+        yield x;
+      }
     }
+  }
+
+  fun minKey(cond: ((Key, Value)) -> Bool): ?Key {
+    this.items().filter(cond).next().map(x -> x.i0)
+  }
 
   fun eachWithTime(f: (Key, Int) -> void): void
   | Nil() -> void
@@ -57,18 +51,6 @@ base class DMap<Key: FileName, Value> {
     left.eachWithTime(f);
     f(key, time.current);
     right.eachWithTime(f)
-
-  fun visit(
-    f: Node<Key, Value> -> VisitDirection = (_) -> Both(),
-  ): Array<(Key, Value)> {
-    acc = mutable Vector[];
-    this.visitAcc(f, acc);
-    acc.toArray()
-  }
-
-  fun items(): mutable Iterator<(Key, Value)> {
-    this.visit().collect(Map).items()
-  }
 
   fun getMaxTime(): Int
   | Nil() -> 0

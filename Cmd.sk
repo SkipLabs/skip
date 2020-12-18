@@ -23,24 +23,15 @@ fun listSubDirs(
   prefix: String,
   dmap: DMap<DirName, Dir>,
 ): Array<(FileName, Dir)> {
-  dmap.visit(node -> {
-    keyStr = node.key.toString();
-    keyStrLen = keyStr.length();
-    prefixLen = prefix.length();
-    dir = if (keyStrLen < prefixLen) {
-      if (prefix < keyStr) Left() else Right()
-    } else {
-      sub = keyStr.take(prefixLen);
-      if (sub < prefix) {
-        Right()
-      } else if (sub > prefix) {
-        Left()
-      } else {
-        Both()
-      }
-    };
-    dir
-  });
+  prefixLen = prefix.length();
+  dmap
+    .items()
+    .filter(kv -> {
+      (key, _) = kv;
+      keyStr = key.toString();
+      keyStr.take(prefixLen) == prefix
+    })
+    .collect(Array);
 }
 
 fun listDirs(
