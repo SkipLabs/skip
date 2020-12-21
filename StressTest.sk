@@ -171,7 +171,6 @@ fun evalSub(
       continue
     | x @ SKFS.EagerDir _ -> x
     };
-    if (dir.lazyFun is Some _) continue;
     subDirNameStr = dirName + "sub" + currentKey + "_" + sum + thisDirName;
     subDirName = SKFS.DirName::create(subDirNameStr);
     !subDirs = List.Cons(subDirNameStr, subDirs);
@@ -312,14 +311,13 @@ fun compareContext(
     for (key in dirFiles) {
       values1 = dir.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
       values2 = dir2.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
-      if (dir2.lazyFun is Some _) {
+      if (dir2 is SKFS.LazyDir _) {
         if (values1 == Array[] || values2 == Array[]) continue;
       };
       if (values1 != values2) {
         if (isLazy && (values1.isEmpty() || values2.isEmpty())) {
           continue
         };
-        debug((dir2.lazyFun, values1.isEmpty(), values2.isEmpty()));
         !hasError = true;
         print_string(`Error: values differ for ${dirName}${key}`);
         print_string(`       ${values1}`);
