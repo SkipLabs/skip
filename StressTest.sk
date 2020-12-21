@@ -125,7 +125,7 @@ fun evalMDir(context: mutable SKFS.Context, dir: MDir): void {
   name = dir.name;
   input = dir.input;
   readDirs = dir.readDirs;
-  inputDir = context.unsafeGetDir(SKFS.DirName::create(input));
+  inputDir = context.unsafeGetEagerDir(SKFS.DirName::create(input));
   _ = inputDir.apply(
     context,
     SKFS.DirName::create(name),
@@ -164,7 +164,13 @@ fun evalSub(
   subDirs = List[];
 
   for (dirName in readDirs.sorted().unique()) {
-    dir = context.unsafeGetDir(SKFS.DirName::create(dirName));
+    genericDir = context.unsafeGetDir(SKFS.DirName::create(dirName));
+    dir = genericDir match {
+    | SKFS.LazyDir _
+    | SKFS.DeletedDir _ ->
+      continue
+    | x @ SKFS.EagerDir _ -> x
+    };
     if (dir.lazyFun is Some _) continue;
     subDirNameStr = dirName + "sub" + currentKey + "_" + sum + thisDirName;
     subDirName = SKFS.DirName::create(subDirNameStr);

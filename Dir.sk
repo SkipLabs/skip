@@ -375,124 +375,6 @@ base class Dir{
     };
   }
 
-  fun apply(
-    context: mutable Context,
-    dirName: DirName,
-    f: MapFun,
-    extraDirs: Array<Dir> = Array[],
-  ): void {
-    if (context.newDirs.contains(dirName)) {
-      error(
-        `Error: directory ${dirName.toString()} already exists (parent: ${
-          this.dirName
-        })`,
-      );
-    };
-    if (this.lazyFun is Some _) {
-      error(`Cannot apply over a lazy directory ${this.dirName}`);
-    };
-    context.unsafeMaybeGetEagerDir(dirName) match {
-    | Some(dir) ->
-      if (
-        dir.parents is Some _ &&
-        inspect(dir.mapFun.fromSome()) == inspect(f)
-      ) {
-        if (context.debugMode) {
-          print_string(`REUSING: ${dir.dirName}`);
-        };
-        context.!newDirs = context.newDirs.add(dir.dirName);
-        return void;
-      }
-    | _ -> void
-    };
-    context.!newDirs = context.newDirs.add(dirName);
-    acc = mutable Vector[];
-    static::mapData(context, this, f, acc);
-    for (dir in extraDirs) {
-      static::mapData(context, dir, f, acc);
-    };
-    mapped = acc.chill();
-    grouped = this.regroupMap(mapped);
-    this.updateReaders(context, dirName, mapped);
-    fixedData = FixedData{dirName, data => grouped.rows};
-    parents = mutable Vector[this.dirName];
-    for (dir in extraDirs) {
-      parents.push(dir.dirName);
-    };
-    time = context.timeStamp();
-    dir = EagerDir{
-      time,
-      dirName,
-      isInput => false,
-      parents => Some(parents.toArray()),
-      fixedData,
-      mapFun => Some(f),
-      newDirs => grouped.newDirs,
-    };
-    static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
-    context.setDir(dirName, dir);
-    static::addParent(context, time, dirName, this.dirName, grouped.old);
-    for (parent in extraDirs) {
-      static::addParent(context, time, dirName, parent.dirName, grouped.old);
-    };
-    if (context.debugMode) {
-      print_string(
-        `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${
-          this.dirName
-        })`,
-      );
-    };
-  }
-
-  static fun addParent(
-    context: mutable Context,
-    time: Int,
-    dirName: DirName,
-    parentName: DirName,
-    old: Array<FixedRow<BaseName>>,
-  ): void {
-    parent = context.unsafeGetDir(parentName);
-    !parent.fixedOld[dirName] = FixedData{dirName, data => old};
-    !parent.childDirs = parent.childDirs.add(time, dirName);
-    context.setDir(parent.dirName, parent);
-  }
-
-  fun product(
-    context: mutable Context,
-    productDirName: DirName,
-    dir2: Dir,
-    f: (mutable Context, BaseName, Array<File>, BaseName, Array<File>) ~> Array<
-      File,
-    >,
-  ): void {
-    this.apply(context, productDirName, (context, writer, key1, values1) ~> {
-      if (values1.size() == 0) return void;
-      hash1 = key1.hash();
-      hash2 = (23, key1).hash();
-      name = hash1.toString() + hash2;
-      subProductDirName = productDirName.sub(name);
-      dir2.apply(
-        context,
-        subProductDirName,
-        (context, writer, key2, values2) ~> {
-          if (values2.size() == 0) return void;
-          values = f(context, key1, values1, key2, values2);
-          writer.write(IID(0), ProductRow(key1, key2, values));
-        },
-      );
-      subDir = context.getDir(subProductDirName);
-      values = subDir.getArray(context, IID(0));
-      if (values.size() == 0) {
-        return void;
-      };
-      for (file in values) {
-        row = ProductRow::fromFile(file);
-        key = PID(Array[row.key1, row.key2]);
-        writer.writeArray(key, row.values);
-      }
-    });
-  }
-
   fun updateNewDirs(
     context: mutable Context,
     key: BaseName,
@@ -696,6 +578,124 @@ class LazyDir{} extends Dir {
 }
 
 class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
+  fun product(
+    context: mutable Context,
+    productDirName: DirName,
+    dir2: EagerDir,
+    f: (mutable Context, BaseName, Array<File>, BaseName, Array<File>) ~> Array<
+      File,
+    >,
+  ): void {
+    this.apply(context, productDirName, (context, writer, key1, values1) ~> {
+      if (values1.size() == 0) return void;
+      hash1 = key1.hash();
+      hash2 = (23, key1).hash();
+      name = hash1.toString() + hash2;
+      subProductDirName = productDirName.sub(name);
+      dir2.apply(
+        context,
+        subProductDirName,
+        (context, writer, key2, values2) ~> {
+          if (values2.size() == 0) return void;
+          values = f(context, key1, values1, key2, values2);
+          writer.write(IID(0), ProductRow(key1, key2, values));
+        },
+      );
+      subDir = context.getDir(subProductDirName);
+      values = subDir.getArray(context, IID(0));
+      if (values.size() == 0) {
+        return void;
+      };
+      for (file in values) {
+        row = ProductRow::fromFile(file);
+        key = PID(Array[row.key1, row.key2]);
+        writer.writeArray(key, row.values);
+      }
+    });
+  }
+
+  fun apply(
+    context: mutable Context,
+    dirName: DirName,
+    f: MapFun,
+    extraDirs: Array<Dir> = Array[],
+  ): void {
+    if (context.newDirs.contains(dirName)) {
+      error(
+        `Error: directory ${dirName.toString()} already exists (parent: ${
+          this.dirName
+        })`,
+      );
+    };
+    if (this.lazyFun is Some _) {
+      error(`Cannot apply over a lazy directory ${this.dirName}`);
+    };
+    context.unsafeMaybeGetEagerDir(dirName) match {
+    | Some(dir) ->
+      if (
+        dir.parents is Some _ &&
+        inspect(dir.mapFun.fromSome()) == inspect(f)
+      ) {
+        if (context.debugMode) {
+          print_string(`REUSING: ${dir.dirName}`);
+        };
+        context.!newDirs = context.newDirs.add(dir.dirName);
+        return void;
+      }
+    | _ -> void
+    };
+    context.!newDirs = context.newDirs.add(dirName);
+    acc = mutable Vector[];
+    static::mapData(context, this, f, acc);
+    for (dir in extraDirs) {
+      static::mapData(context, dir, f, acc);
+    };
+    mapped = acc.chill();
+    grouped = this.regroupMap(mapped);
+    this.updateReaders(context, dirName, mapped);
+    fixedData = FixedData{dirName, data => grouped.rows};
+    parents = mutable Vector[this.dirName];
+    for (dir in extraDirs) {
+      parents.push(dir.dirName);
+    };
+    time = context.timeStamp();
+    dir = EagerDir{
+      time,
+      dirName,
+      isInput => false,
+      parents => Some(parents.toArray()),
+      fixedData,
+      mapFun => Some(f),
+      newDirs => grouped.newDirs,
+    };
+    static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+    context.setDir(dirName, dir);
+    static::addParent(context, time, dirName, this.dirName, grouped.old);
+    for (parent in extraDirs) {
+      static::addParent(context, time, dirName, parent.dirName, grouped.old);
+    };
+    if (context.debugMode) {
+      print_string(
+        `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${
+          this.dirName
+        })`,
+      );
+    };
+  }
+
+  static fun addParent(
+    context: mutable Context,
+    time: Int,
+    dirName: DirName,
+    parentName: DirName,
+    old: Array<FixedRow<BaseName>>,
+  ): void {
+    parent = context.unsafeGetDir(parentName);
+    !parent.fixedOld[dirName] = FixedData{dirName, data => old};
+    !parent.childDirs = parent.childDirs.add(time, dirName);
+    context.setDir(parent.dirName, parent);
+  }
+
   fun getArrayRaw(key: BaseName): Array<File> {
     fixed = this.fixedData.getArray(key);
     this.data.maybeGet(key) match {

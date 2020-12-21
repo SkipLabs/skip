@@ -15,7 +15,7 @@ fun minDir<T: frozen>(
   );
   minDirName = DirName::create(dirHandle.dirName.toString() + name + "/");
   context
-    .unsafeGetDir(dirHandle.dirName)
+    .unsafeGetEagerDir(dirHandle.dirName)
     .apply(context, diffMinDirName, (context, writer, key, newValues) ~> {
       preDiffOpt = Handle(dirHandle.conv, dirHandle.dirName).pre(context);
       oldValues = preDiffOpt match {
@@ -30,7 +30,7 @@ fun minDir<T: frozen>(
       }
     });
   minDir = Handle(BaseNameOptionFile::fromFile, minDirName);
-  diffDir = context.unsafeGetDir(diffMinDirName);
+  diffDir = context.unsafeGetEagerDir(diffMinDirName);
   diffDir.apply(context, minDirName, (context, writer, _, diffs) ~> {
     acc: ?BaseName = minDir.pre(context) match {
     | None() -> None()

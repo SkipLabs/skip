@@ -10,7 +10,7 @@ fun sumDir<T: frozen>(
   diffCountDirName = DirName::create(dir.dirName.toString() + diffName + "/");
   countDirName = DirName::create(dir.dirName.toString() + name + "/");
   context
-    .unsafeGetDir(dir.dirName)
+    .unsafeGetEagerDir(dir.dirName)
     .apply(context, diffCountDirName, (context, writer, key, newValues) ~> {
       preDiffOpt = Handle(dir.conv, dir.dirName).pre(context);
       oldValues = preDiffOpt match {
@@ -28,7 +28,7 @@ fun sumDir<T: frozen>(
     });
   countDir = Handle(IntFile::fromFile, countDirName);
   context
-    .unsafeGetDir(diffCountDirName)
+    .unsafeGetEagerDir(diffCountDirName)
     .apply(context, countDirName, (context, writer, _, diffs) ~> {
       oldSums = countDir.pre(context) match {
       | None() -> Array[]
