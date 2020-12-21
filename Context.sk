@@ -246,6 +246,7 @@ mutable class Context{
         this.!toReset = this.toReset.set(dirName);
         this.!toUpdate = this.toUpdate.remove(time);
         this.unsafeGetDir(dirName) match {
+        | DeletedDir _ -> void
         | dir @ LazyDir _ -> dir.updateLazy(this)
         | dir @ EagerDir _ ->
           dir.parents match {
@@ -371,7 +372,10 @@ mutable class Context{
     };
     this.setDir(
       dirName,
-      dir with {
+      DeletedDir{
+        dirName,
+        time => this.timeStamp(),
+        isInput => dir.isInput,
         deleted => true,
         fixedData => FixedData::empty(dirName),
         data => DMap::empty(),
