@@ -122,11 +122,13 @@ base class Dir{
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
-  childDirs: SortedMap<Int, DirName> = SortedMap[],
   dirty: SortedSet<BaseName> = SortedSet[],
   dirtyReaders: SortedMap<DirName, SortedSet<BaseName>> = SortedMap[],
+  childDirs: SortedMap<Int, DirName> = SortedMap[],
   mapFun: ?MapFun = None(),
 } extends File {
+  fun getChildren(): Array<DirName>;
+
   fun getArray(context: mutable Context, key: BaseName): Array<File>;
 
   fun getArrayRaw(key: BaseName): Array<File>;
@@ -266,6 +268,9 @@ base class Dir{
 }
 
 class DeletedDir{} extends Dir {
+  fun getChildren(): Array<DirName> {
+    Array[]
+  }
   fun getArrayRaw(BaseName): Array<File> {
     Array[]
   }
@@ -280,8 +285,12 @@ class DeletedDir{} extends Dir {
 }
 
 class LazyDir{
-  lazyFun: ?((mutable Context, DirName, BaseName) ~> File) = None(),
+  lazyFun: ((mutable Context, DirName, BaseName) ~> File),
 } extends Dir {
+  fun getChildren(): Array<DirName> {
+    Array[]
+  }
+
   static fun updateDirtyReaders(context: mutable Context, path: Path): void {
     readers = context.getDeps(path);
 
@@ -366,7 +375,7 @@ class LazyDir{
       dirName,
       isInput => false,
       fixedData => FixedData{dirName, data => Array[]},
-      lazyFun => Some(lazyFun),
+      lazyFun,
     };
     static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, newDir);
@@ -385,14 +394,10 @@ class LazyDir{
     }
   }
 
-  fun callLazy(
-    context: mutable Context,
-    f: (mutable Context, DirName, BaseName) ~> File,
-    key: BaseName,
-  ): Array<File> {
+  fun callLazy(context: mutable Context, key: BaseName): Array<File> {
     newDirsCopy = context.newDirs;
     context.!newDirs = SortedSet[];
-    value = f(context, this.dirName, key);
+    value = this.lazyFun(context, this.dirName, key);
     newDirs = context.newDirs;
     context.!newDirs = newDirsCopy.union(newDirs);
     !this = context.unsafeGetLazyDir(this.dirName);
@@ -447,10 +452,7 @@ class LazyDir{
     context.addDep(path);
     values = this.getArrayRaw(key);
     if (values.size() != 0) return values;
-    this.lazyFun match {
-    | None() -> values
-    | Some(f) -> this.callLazy(context, f, key)
-    }
+    this.callLazy(context, key)
   }
 
   fun writeEntry(
@@ -471,7 +473,7 @@ class LazyDir{
 
     static::updateDirtyReaders(context, path);
 
-    for (childName in this.childDirs) {
+    for (childName in this.getChildren()) {
       child = context.unsafeGetDir(childName);
       context.!toUpdate = context.toUpdate.set(child.time, childName);
     };
@@ -485,6 +487,10 @@ class LazyDir{
 }
 
 class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
+  fun getChildren(): Array<DirName> {
+    this.childDirs.items().map(x -> x.i1).collect(Array)
+  }
+
   static fun updateDirtyReaders(context: mutable Context, path: Path): void {
     readers = context.getDeps(path);
 
@@ -707,7 +713,7 @@ class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
     parentName: DirName,
     old: Array<FixedRow<BaseName>>,
   ): void {
-    parent = context.unsafeGetDir(parentName);
+    parent = context.unsafeGetEagerDir(parentName);
     !parent.fixedOld[dirName] = FixedData{dirName, data => old};
     !parent.childDirs = parent.childDirs.add(time, dirName);
     context.setDir(parent.dirName, parent);
