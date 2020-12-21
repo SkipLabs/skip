@@ -506,13 +506,15 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
 /* Test. */
 /*****************************************************************************/
 
-fun testInterpretor(round: ?Int): mutable SKFS.Context {
+fun testStress(): mutable SKFS.Context {
   config = Config{};
   SKFS.gContextInit(SKFS.Context{});
+  print_string("Stress Test Begin");
   for (i in Range(0, config.nbrRounds)) {
-    !i = if (round is Some _) round.fromSome() else i;
     pos = SKFS.newObstack();
-    print_string("Round: " + i);
+    if (SKFS.debugMode) {
+      print_string("Round: " + i);
+    };
     origProg = genProgram(config, i);
     context = SKFS.run(context ~> {
       eval(context, origProg);
@@ -533,8 +535,8 @@ fun testInterpretor(round: ?Int): mutable SKFS.Context {
       print_string("Compare contexts (Phase 2: scratch/updated)")
     };
     _ = compareContext(context2, context);
-    if (round is Some _) break void;
     SKFS.destroyObstack(pos);
   };
+  print_string("Stress Test end");
   SKFS.Context::fromSaved(SKFS.gContextGet())
 }

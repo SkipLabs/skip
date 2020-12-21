@@ -11,14 +11,14 @@ const OK: String = "OK";
 const OK_SIZE: Int = "OK".length();
 
 fun printFAILEDAfterMsg(msg: String): void {
-  for (_ in Range(msg.length(), 80 - FAILED_SIZE)) {
+  for (_ in Range(msg.length(), 79 - FAILED_SIZE)) {
     print_raw(" ");
   };
   print_string(FAILED);
 }
 
 fun printOKAfterMsg(msg: String): void {
-  for (_ in Range(msg.length(), 80 - OK_SIZE)) {
+  for (_ in Range(msg.length(), 79 - OK_SIZE)) {
     print_raw(" ");
   };
   print_string(OK);
@@ -46,12 +46,17 @@ fun expectPass(msg: String, f: () -> void): void {
     },
     exn -> {
       printFAILEDAfterMsg(msg);
-      print_string("\t\t" + exn.getMessage() + "\n")
+      exn match {
+      | NotEqExn(x, y) ->
+        print_error(`     ===> Expected ${x.toString()} != Got ${y.toString()}`)
+      | _ -> print_string("\t\t" + exn.getMessage())
+      };
+      print_string("");
     },
   );
 }
 
-class NotEqExn<T>(T, T) extends Exception
+class NotEqExn(Inspect, Inspect) extends Exception
 
 extension base class .Inspect uses Equality {}
 
@@ -61,8 +66,7 @@ fun expectEq<T: frozen>(msg: String, x: T, f: () -> T): void {
     ix = inspect(x);
     iy = inspect(y);
     if (ix != iy) {
-      print_error(`${ix.toString()} != ${iy.toString()}`);
-      throw NotEqExn(x, y);
+      throw NotEqExn(ix, iy);
     }
   });
 }

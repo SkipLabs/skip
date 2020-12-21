@@ -1,6 +1,7 @@
 module SKFS;
 
 const args: Array<String> = arguments();
+const isSqlMode: Bool = args.size() > 1 && args[0] == "sql";
 
 module end;
 
@@ -10,16 +11,23 @@ untracked fun main(): void {
     exit(2);
   };
   SKFS.args[0] match {
-  | "search" ->
-    context = SKFSTest.testSearch();
-    SKFS.toplevel(context)
-  | "stress" ->
-    round = if (SKFS.args.size() > 1) Some(SKFS.args[1].toInt()) else None();
-    _ = SKFSTest.testInterpretor(round)
   | "sql" ->
     context = SKSQL.eval(SKFS.args);
     if (SKFS.args.size() > 1 && SKFS.args[1] == "--toplevel") {
       SKFS.toplevel(context)
+    }
+  | "all" ->
+    testFuns = SKFSTest.getAllTests();
+    for (testName => testFun in testFuns) {
+      print_string(
+        "/*****************************************************************************/",
+      );
+      print_string("/* " + testName + " */");
+      print_string(
+        "/*****************************************************************************/",
+      );
+      _ = testFun();
+      print_string("");
     }
   | "toplevel" | "test" ->
     if (SKFS.args.size() <= 1) {

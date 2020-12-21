@@ -98,12 +98,6 @@ fun testMin(): mutable SKFS.Context {
     _minDir = SKFS.minDir(context, dirSInput, "diffMin", "min");
   });
 
-  testNbr = 0;
-  incrTestNbr = () -> {
-    !testNbr = testNbr + 1;
-    testNbr
-  };
-
   dirSInput = SKFS.Handle(
     SKFS.StringFile::fromFile,
     SKFS.DirName::create("/sinput/"),
@@ -112,7 +106,7 @@ fun testMin(): mutable SKFS.Context {
   minDir = SKFS.DirName::create("/sinput/min/");
 
   expectEq(
-    "MinDir test " + incrTestNbr(),
+    "MinDir test 1",
     Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(23)))],
     () -> {
       getData(context, minDir, SKFS.IID(0))
@@ -122,7 +116,7 @@ fun testMin(): mutable SKFS.Context {
   write(context, dirSInput, SKFS.IID(23), Array[]);
   context.update();
   expectEq(
-    "MinDir test " + incrTestNbr(),
+    "MinDir test 2",
     Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(35)))],
     () -> {
       getData(context, minDir, SKFS.IID(0))
@@ -132,7 +126,7 @@ fun testMin(): mutable SKFS.Context {
   write(context, dirSInput, SKFS.IID(35), Array[]);
   context.update();
   expectEq(
-    "MinDir test " + incrTestNbr(),
+    "MinDir test 3",
     Array<SKFS.File>[SKFS.BaseNameOptionFile(None())],
     () -> {
       getData(context, minDir, SKFS.IID(0))
@@ -142,7 +136,7 @@ fun testMin(): mutable SKFS.Context {
   write(context, dirSInput, SKFS.IID(3), Array[SKFS.StringFile("3")]);
   context.update();
   expectEq(
-    "MinDir test " + incrTestNbr(),
+    "MinDir test 4",
     Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(3)))],
     () -> {
       getData(context, minDir, SKFS.IID(0))
@@ -152,7 +146,7 @@ fun testMin(): mutable SKFS.Context {
   write(context, dirSInput, SKFS.IID(4), Array[SKFS.StringFile("4")]);
   context.update();
   expectEq(
-    "MinDir test " + incrTestNbr(),
+    "MinDir test 5",
     Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(3)))],
     () -> {
       getData(context, minDir, SKFS.IID(0))
@@ -162,7 +156,7 @@ fun testMin(): mutable SKFS.Context {
   write(context, dirSInput, SKFS.IID(3), Array[SKFS.StringFile("3")]);
   context.update();
   expectEq(
-    "MinDir test " + incrTestNbr(),
+    "MinDir test 6",
     Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(3)))],
     () -> {
       getData(context, minDir, SKFS.IID(0))
@@ -172,7 +166,7 @@ fun testMin(): mutable SKFS.Context {
   write(context, dirSInput, SKFS.IID(2), Array[SKFS.StringFile("2")]);
   context.update();
   expectEq(
-    "MinDir test " + incrTestNbr(),
+    "MinDir test 7",
     Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(2)))],
     () -> {
       getData(context, minDir, SKFS.IID(0))
@@ -182,8 +176,8 @@ fun testMin(): mutable SKFS.Context {
   write(context, dirSInput, SKFS.IID(2), Array[]);
   context.update();
   expectEq(
-    "MinDir test " + incrTestNbr(),
-    Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(2)))],
+    "MinDir test 8",
+    Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(3)))],
     () -> {
       getData(context, minDir, SKFS.IID(0))
     },
@@ -192,7 +186,17 @@ fun testMin(): mutable SKFS.Context {
   write(context, dirSInput, SKFS.IID(3), Array[]);
   context.update();
   expectEq(
-    "MinDir test " + incrTestNbr(),
+    "MinDir test 9",
+    Array<SKFS.File>[SKFS.BaseNameOptionFile(Some(SKFS.IID(4)))],
+    () -> {
+      getData(context, minDir, SKFS.IID(0))
+    },
+  );
+
+  write(context, dirSInput, SKFS.IID(4), Array[]);
+  context.update();
+  expectEq(
+    "MinDir test 10",
     Array<SKFS.File>[SKFS.BaseNameOptionFile(None())],
     () -> {
       getData(context, minDir, SKFS.IID(0))

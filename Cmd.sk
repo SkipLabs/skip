@@ -64,11 +64,7 @@ fun makeLexer(str: String): () -> (String, Int) {
   }
 }
 
-mutable class CmdEnv{
-  context: mutable Context,
-  mutable pwd: String,
-  evaluator: mutable SKSQL.Evaluator,
-}
+mutable class CmdEnv{context: mutable Context, mutable pwd: String}
 
 fun backwardsSlash(pwd: String): String {
   chars = pwd.chars();
@@ -227,26 +223,33 @@ fun parseSQLStmt(idRoot: Int, cmd: String): ?SKSQL.Stmt {
 untracked fun toplevel(topContext: mutable Context): void {
   runWithGc(topContext.clone(), savedContext ~> {
     context = Context::fromSaved(savedContext);
-    evaluator = context.getGlobal("SQLEvaluator") match {
-    | Some(x @ SKSQL.EvaluatorSaved _) -> SKSQL.Evaluator::fromSaved(context, x)
-    | _ ->
-      evaluator = SKSQL.Evaluator::create(context);
-      context.setGlobal("Evaluator", evaluator.save());
-      evaluator
-    };
-    env = mutable CmdEnv{context, pwd => context.pwd, evaluator};
+    env = mutable CmdEnv{context, pwd => context.pwd};
     prompt = env.pwd + "$ ";
     print_raw(prompt);
     cmd = vtry(() -> read_line(), _exn -> "");
     if (cmd == "") return None();
     if (isSQL(cmd)) {
+      if (!SKFS.isSqlMode) {
+        print_error("You cannot run an SQL query when not in SQL MODE");
+        return None();
+      };
+      evaluator = context.getGlobal("SQLEvaluator") match {
+      | Some(x @ SKSQL.EvaluatorSaved _) ->
+        SKSQL.Evaluator::fromSaved(context, x)
+      | Some(_) -> invariant_violation("Unexpected type for SKSQL.Evaluator")
+      | None() ->
+        evaluator = SKSQL.Evaluator::create(context);
+        context.setGlobal("Evaluator", evaluator.save());
+        evaluator
+      };
+
       vtry(
         () -> {
           sqlOpt = parseSQLStmt(evaluator.idRoot, cmd);
           sqlOpt match {
           | None() -> void
           | Some(sql) ->
-            env.evaluator.stmt(sql);
+            evaluator.stmt(sql);
             evaluator.!idRoot = evaluator.idRoot + 1;
             sql match {
             | select @ SKSQL.Select _ -> SKSQL.showSelect(context, select)
@@ -261,10 +264,10 @@ untracked fun toplevel(topContext: mutable Context): void {
           }
         ,
       );
+      context.setGlobal("SQLEvaluator", evaluator.save());
     } else {
       eval(env, cmd);
     };
-    context.setGlobal("SQLEvaluator", evaluator.save());
     context.!pwd = env.pwd;
     Some(context.clone())
   })
