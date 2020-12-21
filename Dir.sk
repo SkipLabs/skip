@@ -176,71 +176,6 @@ base class Dir{
     keys.chill()
   }
 
-  static fun lazy(
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, DirName, BaseName) ~> File,
-  ): Dir {
-    time = context.timeStamp();
-    updateReaders = (
-      dirName: DirName,
-      context: mutable Context,
-      key: BaseName,
-    ) ~> {
-      reads = context.getReads();
-
-      for (read in reads) {
-        readSet = context.newDeps.maybeGet(read) match {
-        | None() -> SortedSet[]
-        | Some(x) -> x
-        };
-        !readSet = readSet.set((dirName, dirName, key));
-        context.!newDeps[read] = readSet;
-      };
-    };
-    lazyFun = (context: mutable Context, dirName: DirName, key: BaseName) ~> {
-      reads = context.reads;
-      context.!reads = mutable Vector[];
-
-      context.!newDirs = SortedSet[];
-      result = context.vtry<File>(
-        () -> {
-          f(context, dirName, key)
-        },
-        e ->
-          ErrorFile(
-            List[
-              ErrorTrace(dirName.toString(), key.toString(), e.getMessage()),
-            ],
-          )
-        ,
-      );
-      dir = context.unsafeGetDir(dirName);
-      results = Array[result];
-      map = SortedMap[Path(dirName, key) => results];
-      !dir.data = dir.data.set(TimeTag::create(context.tick), key, map);
-      updateReaders(dirName, context, key);
-      context.setDir(dirName, dir);
-      if (context.debugMode) {
-        name = "" + dir.dirName + key;
-        print_string(`WRITTEN LAZY:  ${name} => ${inspect(result)}`);
-      };
-      context.!reads = reads;
-      result
-    };
-    context.!newDirs = context.newDirs.add(dirName);
-    newDir = LazyDir{
-      time,
-      dirName,
-      isInput => false,
-      fixedData => FixedData{dirName, data => Array[]},
-      lazyFun => Some(lazyFun),
-    };
-    static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
-    context.setDir(dirName, newDir);
-    newDir
-  }
-
   fun getDirName(): DirName {
     this.dirName
   }
@@ -469,6 +404,71 @@ class DeletedDir{} extends Dir {
 }
 
 class LazyDir{} extends Dir {
+  static fun create(
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, DirName, BaseName) ~> File,
+  ): Dir {
+    time = context.timeStamp();
+    updateReaders = (
+      dirName: DirName,
+      context: mutable Context,
+      key: BaseName,
+    ) ~> {
+      reads = context.getReads();
+
+      for (read in reads) {
+        readSet = context.newDeps.maybeGet(read) match {
+        | None() -> SortedSet[]
+        | Some(x) -> x
+        };
+        !readSet = readSet.set((dirName, dirName, key));
+        context.!newDeps[read] = readSet;
+      };
+    };
+    lazyFun = (context: mutable Context, dirName: DirName, key: BaseName) ~> {
+      reads = context.reads;
+      context.!reads = mutable Vector[];
+
+      context.!newDirs = SortedSet[];
+      result = context.vtry<File>(
+        () -> {
+          f(context, dirName, key)
+        },
+        e ->
+          ErrorFile(
+            List[
+              ErrorTrace(dirName.toString(), key.toString(), e.getMessage()),
+            ],
+          )
+        ,
+      );
+      dir = context.unsafeGetDir(dirName);
+      results = Array[result];
+      map = SortedMap[Path(dirName, key) => results];
+      !dir.data = dir.data.set(TimeTag::create(context.tick), key, map);
+      updateReaders(dirName, context, key);
+      context.setDir(dirName, dir);
+      if (context.debugMode) {
+        name = "" + dir.dirName + key;
+        print_string(`WRITTEN LAZY:  ${name} => ${inspect(result)}`);
+      };
+      context.!reads = reads;
+      result
+    };
+    context.!newDirs = context.newDirs.add(dirName);
+    newDir = LazyDir{
+      time,
+      dirName,
+      isInput => false,
+      fixedData => FixedData{dirName, data => Array[]},
+      lazyFun => Some(lazyFun),
+    };
+    static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+    context.setDir(dirName, newDir);
+    newDir
+  }
+
   fun getArrayRaw(key: BaseName): Array<File> {
     this.data.maybeGet(key) match {
     | None() -> Array[]

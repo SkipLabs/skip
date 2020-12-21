@@ -31,7 +31,7 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
     dirName: DirName,
     f: (mutable Context, Handle<T>, BaseName) ~> T,
   ): Handle<T> {
-    dir = Dir::lazy(context, dirName, (context, dirName, key) ~> {
+    dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
       if (context.lazyVisitedSet.contains(Path(dirName, key))) {
         msg = "Error: cyclic lazy data " + " ".join(context.lazyVisitedList);
         return ErrorFile(
