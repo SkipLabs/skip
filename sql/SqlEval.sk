@@ -153,7 +153,7 @@ mutable class Evaluator{
     key: SKFS.BaseName,
     value: SKFS.File,
   ): void {
-    this.context.getDir2(dirName).write(this.context, key, value);
+    this.context.getDir(dirName).write(this.context, key, value);
   }
 
   mutable fun writeArray(
@@ -161,7 +161,7 @@ mutable class Evaluator{
     key: SKFS.BaseName,
     values: Array<SKFS.File>,
   ): void {
-    this.context.getDir2(dirName).writeArray(this.context, key, values);
+    this.context.getDir(dirName).writeArray(this.context, key, values);
   }
 
   mutable fun stmt(stmt: Stmt): void {
@@ -198,7 +198,7 @@ mutable class Evaluator{
     dir = getDir(table);
     key = this.newKey(name);
     row = computeInsert(pos, paramsOpt, rawValues, table);
-    this.context.getDir2(dir.dirName).write(this.context, key, row);
+    this.context.getDir(dir.dirName).write(this.context, key, row);
   }
 
   mutable fun createTable(
@@ -208,7 +208,7 @@ mutable class Evaluator{
   ): void {
     _ = this.context.mkdir(Row::fromFile, dirDescr.dirName, init);
     tables = getTableDir(this.context);
-    this.context.getDir2(tables.dirName).write(
+    this.context.getDir(tables.dirName).write(
       this.context,
       SKFS.SID(name),
       dirDescr,
@@ -313,7 +313,7 @@ fun printRow(row: SKSQL.Row): void {
 fun showSelect(context: mutable SKFS.Context, select: Select): void {
   outputDir = getSelectOutputDir(context);
   dirName = outputDir.get(context, SKFS.SID(select.id));
-  dir = context.getDir2(dirName);
+  dir = context.getDir(dirName);
   files = dir.files();
   for (file in files) {
     rows = dir.getArrayRaw(file);
