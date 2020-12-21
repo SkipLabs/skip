@@ -792,7 +792,6 @@ class LazyDir{} extends Dir {
     dirty = this.dirty.set(k);
     path = Path(this.dirName, k);
     !this = this with {data, dirty};
-    context.setDir(this.dirName, this);
 
     static::updateDirtyReaders(context, path);
 
@@ -805,7 +804,7 @@ class LazyDir{} extends Dir {
       print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
     };
 
-    context.unsafeGetLazyDir(this.dirName)
+    this
   }
 }
 
@@ -833,7 +832,6 @@ class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
     dirty = this.dirty.set(k);
     path = Path(this.dirName, k);
     !this = this with {data, dirty};
-    context.setDir(this.dirName, this);
 
     static::updateDirtyReaders(context, path);
 
@@ -846,7 +844,7 @@ class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
       print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
     };
 
-    context.unsafeGetEagerDir(this.dirName)
+    this
   }
 }
 
