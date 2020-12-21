@@ -40,9 +40,9 @@ fun testRuntime(): mutable SKFS.Context {
   );
   str = "abc";
   str2 = "123";
-  expectEq("String LT", (LT() : Order), () -> str.compare(str2));
+  expectEq("String GT", (GT() : Order), () -> str.compare(str2));
   expectEq("String LT", (EQ() : Order), () -> str.compare("abc"));
-  expectEq("String LT", (GT() : Order), () -> str2.compare(str));
+  expectEq("String LT", (LT() : Order), () -> str2.compare(str));
   expectEq("String.concat2", "abc123", () -> str + str2);
   expectEq("String.byteSize", 3, () -> String.byteSize(str).toInt());
   expectEq("throw", 22, () -> {
@@ -58,7 +58,7 @@ fun testRuntime(): mutable SKFS.Context {
   });
   arr = Array[Array[1], Array[2], Array[3]];
   expectEq("getArraySize", 3, () -> getArraySize(arr));
-  expectEq("hash", 96354, () -> str.hash());
+  expectEq("hash", 2147580002, () -> str.hash());
   expectEq("String.getByte", 'b'.code(), () -> String.getByte(str, 1).toInt());
   expectEq("substring", "c", () -> {
     iter = str.getIter();
