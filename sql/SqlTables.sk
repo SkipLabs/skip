@@ -1,0 +1,85 @@
+/*****************************************************************************/
+/* SQL tables.*/
+/*****************************************************************************/
+
+module SKSQL;
+
+const tableInfo: SKFS.DirName = SKFS.DirName::create("/tablesInfo/");
+const selectInput: SKFS.DirName = SKFS.DirName::create("/selectInput/");
+const selectOutput: SKFS.DirName = SKFS.DirName::create("/selectOutput/");
+
+extension class TypeDescr extends SKFS.File
+
+class DirDescr{
+  name: String,
+  schema: Array<TypeDescr>,
+  cols: Map<String, Int>,
+  dirName: SKFS.DirName,
+} extends SKFS.File
+
+fun makeSelectName(id: String): SKFS.DirName {
+  SKFS.DirName::create("/" + id + "/");
+}
+
+fun makeAvgName(dir: SKFS.DirName, colName: String): SKFS.DirName {
+  SKFS.DirName::create(dir.toString() + "avg/" + colName + "/")
+}
+
+fun makeCountName(dir: SKFS.DirName): SKFS.DirName {
+  SKFS.DirName::create(dir.toString() + "count/")
+}
+
+fun getDir(dirDescr: DirDescr): SKFS.Handle<Row> {
+  SKFS.Handle(Row::fromFile, dirDescr.dirName)
+}
+
+fun makeDir<T: frozen>(
+  fromFile: SKFS.File ~> T,
+  context: mutable SKFS.Context,
+  dirName: SKFS.DirName,
+  make: () -> SKFS.Handle<T>,
+): SKFS.Handle<T> {
+  context.maybeGetDir(dirName) match {
+  | None() -> make()
+  | Some(dir) -> SKFS.Handle(fromFile, dir.dirName)
+  };
+}
+
+fun getTableDir(context: mutable SKFS.Context): SKFS.Handle<DirDescr> {
+  makeDir(DirDescr::fromFile, context, tableInfo, () ->
+    context.mkdir(DirDescr::fromFile, tableInfo, Array[])
+  )
+}
+
+extension class Select extends SKFS.File
+
+fun getSelectInputDir(context: mutable SKFS.Context): SKFS.Handle<Select> {
+  makeDir(Select::fromFile, context, selectInput, () ->
+    context.mkdir(Select::fromFile, selectInput, Array[])
+  )
+}
+
+fun getSelectOutputDir(
+  context: mutable SKFS.Context,
+): SKFS.Handle<SKFS.DirName> {
+  makeDir(SKFS.DirName::fromFile, context, selectOutput, () -> {
+    input = getSelectInputDir(context);
+    input.contextMap(
+      SKFS.DirName::fromFile,
+      context,
+      selectOutput,
+      (context, request) ~> evalSelect(context, request),
+    )
+  })
+}
+
+fun getTable(
+  context: mutable SKFS.Context,
+  pos: Int,
+  name: SKFS.BaseName,
+): DirDescr {
+  getTableDir(context).maybeGet(context, name) match {
+  | None() -> error(pos, "Table '" + name + "' does not exist")
+  | Some(x) -> x
+  }
+}

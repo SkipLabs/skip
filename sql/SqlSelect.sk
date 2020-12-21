@@ -1,0 +1,191 @@
+/*****************************************************************************/
+/* SQL SELECT */
+/*****************************************************************************/
+module SKSQL;
+
+fun computeAggregates(
+  genSym: () -> Int,
+  aggrV: mutable Vector<(String, ?Array<Expr>)>,
+  expr: Expr,
+): Expr {
+  k = x -> computeAggregates(genSym, aggrV, x);
+  expr match {
+  | Literal _ -> expr
+  | Not(e) -> Not(k(e))
+  | All _ -> todo()
+  | Distinct _ -> todo()
+  | In _ -> todo()
+  | Between _ -> todo()
+  | Binop(bop, e1, e2) -> Binop(bop, k(e1), k(e2))
+  | EQuery _ -> expr
+  | Exists _ -> todo()
+  | UMinus(e) -> UMinus(k(e))
+  | UPlus(e) -> UPlus(k(e))
+  | Case(condOpt, whenCases, elseCase) ->
+    !condOpt = condOpt.map(k);
+    !whenCases = whenCases.map(pair -> (k(pair.i0), k(pair.i1)));
+    !elseCase = elseCase.map(k);
+    Case(condOpt, whenCases, elseCase)
+  | Call(Literal(count), args) if (count.uppercase() == "COUNT") ->
+    name = "$count" + genSym();
+    aggrV.push((name, args.map(x -> x.map(y -> k(y)))));
+    Literal(name)
+  | Call _ -> todo()
+  }
+}
+
+fun getAggregates(arr: Array<Expr>): Array<Expr> {
+  symCount = 0;
+  genSym = () -> {
+    result = symCount;
+    !symCount = symCount + 1;
+    result
+  };
+  aggrV = mutable Vector[];
+  debug(arr.map(x -> computeAggregates(genSym, aggrV, x)));
+  arr
+}
+
+fun evalSelect(context: mutable SKFS.Context, select: Select): SKFS.DirName {
+  tables = select.from match {
+  | Some(tableNames) ->
+    tableNames.map(fromCol ->
+      fromCol match {
+      | TableName(FName(tableName), asName, _) ->
+        fromName = SKFS.SID(tableName);
+        table = getTable(context, select.pos, fromName);
+        (table, asName)
+      | _ -> todo()
+      }
+    )
+  | _ -> todo()
+  };
+  params = select.params match {
+  | None() -> todo()
+  | Some(x) -> x
+  };
+  _ = getAggregates(params.map(x -> x.i0));
+  selectName = makeSelectName(select.id);
+  kinds = select.orderBy match {
+  | None() ->
+    i = 0;
+    params.map(_ -> {
+      result = (i, IASC());
+      !i = i + 1;
+      result
+    })
+  | Some(ekinds) -> computeKinds(select.pos, params.size(), ekinds)
+  };
+  evalSelectBody(
+    context,
+    select,
+    params,
+    selectName,
+    kinds,
+    List::createFromItems(tables),
+    List[],
+  )
+}
+
+fun evalSelectBody(
+  context: mutable SKFS.Context,
+  select: Select,
+  params: Array<(SKSQL.Expr, ?String)>,
+  selectName: SKFS.DirName,
+  kinds: Array<(Int, SKSQL.IKind)>,
+  tables: List<(DirDescr, ?String)>,
+  envl: List<Map<String, SValue>>,
+): SKFS.DirName {
+  tables match {
+  | List.Nil() -> invariant_violation("empty select")
+  | List.Cons((table, asNameOpt), rl) ->
+    dir = getDir(table);
+    makeDir(Row::fromFile, context, selectName, () ->
+      dir.contextWriterKeyValues(
+        Row::fromFile,
+        context,
+        selectName,
+        (context, writer, key, inputRows) ~> {
+          pos = select.pos;
+          cols = table.cols;
+          round = 0;
+          for (inputRow in inputRows) {
+            envs = List.Cons(cols.map((_k, idx) -> inputRow.values[idx]), envl);
+            !envs = List.Cons(
+              cols.mapItems((colName, idx) -> {
+                (table.name + "." + colName, inputRow.values[idx])
+              }),
+              envs,
+            );
+            asNameOpt match {
+            | None() -> void
+            | Some(asName) ->
+              !envs = List.Cons(
+                cols.mapItems((colName, idx) -> {
+                  (asName + "." + colName, inputRow.values[idx])
+                }),
+                envs,
+              )
+            };
+            rl match {
+            | List.Nil() ->
+              menv = mutable Map<String, ?SValue>[];
+              envs.each(subEnv -> {
+                for (name => value in subEnv) {
+                  if (menv.containsKey(name)) {
+                    menv![name] = None();
+                  } else {
+                    menv![name] = Some(value);
+                  }
+                }
+              });
+              env = menv.chill();
+              evaluator = ExprEvaluator{pos, env};
+              row = Row(
+                params.map(param -> {
+                  (e, _) = param;
+                  evaluator.evalExpr(context, e)
+                }),
+              );
+              select.where match {
+              | None() -> void
+              | Some(where) ->
+                if (!evaluator.evalExpr(context, where).isTrue()) return void
+              };
+              writer.write(RowKey(row.values, kinds), row)
+            | _ ->
+              subStr = selectName.toString() + "sub_" + round + "_" + key;
+              subSelectName = SKFS.DirName::create(subStr + "/");
+              subSelectProj = SKFS.DirName::create(subStr + "/proj/");
+              resultName = evalSelectBody(
+                context,
+                select,
+                params,
+                subSelectName,
+                kinds,
+                rl,
+                envs,
+              );
+              handle = SKFS.Handle(Row::fromFile, resultName);
+              proj = handle.contextWriterKeyValues(
+                KeyRow::fromFile,
+                context,
+                subSelectProj,
+                (_context, writer, key, values) ~> {
+                  writer.write(SKFS.IID(0), KeyRow(key, values))
+                },
+              );
+              for (keyRow in proj.getArray(context, SKFS.IID(0))) {
+                writer.writeArray(
+                  RowKey(keyRow.values[0].values, kinds),
+                  keyRow.values,
+                )
+              }
+            };
+            !round = round + 1;
+          }
+        },
+      )
+    ).dirName
+  }
+}
