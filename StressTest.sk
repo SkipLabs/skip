@@ -125,7 +125,7 @@ fun evalMDir(context: mutable SKFS.Context, dir: MDir): void {
   name = dir.name;
   input = dir.input;
   readDirs = dir.readDirs;
-  inputDir = context.getDir(SKFS.DirName::create(input));
+  inputDir = context.unsafeGetDir(SKFS.DirName::create(input));
   _ = inputDir.apply(
     context,
     SKFS.DirName::create(name),
@@ -164,7 +164,7 @@ fun evalSub(
   subDirs = List[];
 
   for (dirName in readDirs.sorted().unique()) {
-    dir = context.getDir(SKFS.DirName::create(dirName));
+    dir = context.unsafeGetDir(SKFS.DirName::create(dirName));
     if (dir.lazyFun is Some _) continue;
     subDirNameStr = dirName + "sub" + currentKey + "_" + sum + thisDirName;
     subDirName = SKFS.DirName::create(subDirNameStr);
@@ -173,7 +173,7 @@ fun evalSub(
       if (values.size() == 0) return void;
       localSum = sum;
       for (readDirName in readDirs) {
-        readDir = context.getDir(SKFS.DirName::create(readDirName));
+        readDir = context.unsafeGetDir(SKFS.DirName::create(readDirName));
         read = readDir.getArray(context, localKey).map(x ->
           SKFS.IntFile::fromFile(x)
         );
@@ -199,7 +199,7 @@ fun evalLFun(
 ): SKFS.File {
   reads = List[];
   for (dirName in readDirs) {
-    dir = context.getDir(SKFS.DirName::create(dirName));
+    dir = context.unsafeGetDir(SKFS.DirName::create(dirName));
     value = key match {
     | SKFS.IID(x) -> SKFS.IntFile(x)
     | _ -> error()
@@ -221,7 +221,7 @@ fun evalLFun(
   | _ -> error()
   };
   if (keyValue > 10) {
-    thisDir = context.getDir(SKFS.DirName::create(thisDirName));
+    thisDir = context.unsafeGetDir(SKFS.DirName::create(thisDirName));
     !result =
       result +
       SKFS.IntFile::fromFile(
@@ -243,7 +243,7 @@ fun evalFun(
 
   reads = List[currentValues];
   for (dirName in readDirs.concat(subDirs)) {
-    dir = context.getDir(SKFS.DirName::create(dirName));
+    dir = context.unsafeGetDir(SKFS.DirName::create(dirName));
     value = currentValues[0];
     read = dir
       .getArray(context, SKFS.IID(SKFS.IntFile::fromFile(value).value))
@@ -489,7 +489,7 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
     for (key => values in input.data) {
       if (diff.containsKey(key)) {
         newValues = diff[key];
-        dir = context.getDir(dirName);
+        dir = context.unsafeGetDir(dirName);
         valuesArr = Array::createFromItems(newValues);
         dir.writeArray(context, SKFS.IID(key), valuesArr);
         data![key] = diff[key];

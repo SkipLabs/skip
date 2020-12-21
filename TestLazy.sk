@@ -21,7 +21,7 @@ fun testLazyUnit(): mutable SKFS.Context {
       ,
     );
     arr1 = dir.getArray(context, SKFS.IID(23));
-    arr2 = context.getDir(dir.dirName).getArrayRaw(SKFS.IID(23)).map(x ->
+    arr2 = context.unsafeGetDir(dir.dirName).getArrayRaw(SKFS.IID(23)).map(x ->
       SKFS.IntFile::fromFile(x)
     );
     expectEq("Lazy unit", arr1, () -> arr2);

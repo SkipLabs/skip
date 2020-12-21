@@ -119,7 +119,6 @@ base class Dir{
   deleted: Bool = false,
   fixedData: FixedData<Array<File>>,
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
-  parents: ?Array<DirName> = None(),
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
@@ -206,7 +205,7 @@ base class Dir{
     context.setDir(child.dirName, child);
     context.setDir(
       this.dirName,
-      context.getDir(this.dirName) with {old => this.old},
+      context.unsafeGetDir(this.dirName) with {old => this.old},
     );
   }
   fun unsafeIterKeys(f: (BaseName, Int) -> void): void {
@@ -292,7 +291,7 @@ base class Dir{
           )
         ,
       );
-      dir = context.getDir(dirName);
+      dir = context.unsafeGetDir(dirName);
       results = Array[result];
       map = SortedMap[Path(dirName, key) => results];
       !dir.data = dir.data.set(TimeTag::create(context.tick), key, map);
@@ -468,7 +467,7 @@ base class Dir{
     if (this.lazyFun is Some _) {
       error(`Cannot apply over a lazy directory ${this.dirName}`);
     };
-    context.maybeGetDir(dirName) match {
+    context.unsafeMaybeGetEagerDir(dirName) match {
     | Some(dir) ->
       if (
         dir.parents is Some _ &&
@@ -528,7 +527,7 @@ base class Dir{
     parentName: DirName,
     old: Array<FixedRow<BaseName>>,
   ): void {
-    parent = context.getDir(parentName);
+    parent = context.unsafeGetDir(parentName);
     !parent.fixedOld[dirName] = FixedData{dirName, data => old};
     !parent.childDirs = parent.childDirs.add(time, dirName);
     context.setDir(parent.dirName, parent);
@@ -556,7 +555,7 @@ base class Dir{
           writer.write(IID(0), ProductRow(key1, key2, values));
         },
       );
-      subDir = context.getDir(subProductDirName);
+      subDir = context.getDir2(subProductDirName);
       values = subDir.getArray(context, IID(0));
       if (values.size() == 0) {
         return void;
@@ -645,8 +644,8 @@ base class Dir{
 
     for (reader in readers) {
       (parentName, childName, baseName) = reader;
-      parent = context.getDir(parentName);
-      child = context.getDir(childName);
+      parent = context.unsafeGetDir(parentName);
+      child = context.unsafeGetDir(childName);
 
       if (!parent.dirtyReaders.containsKey(childName)) {
         !parent.dirtyReaders[childName] = SortedSet[];
@@ -712,7 +711,7 @@ class LazyDir{} extends Dir {
     value = f(context, this.dirName, key);
     newDirs = context.newDirs;
     context.!newDirs = newDirsCopy.union(newDirs);
-    !this = context.getLazyDir(this.dirName);
+    !this = context.unsafeGetLazyDir(this.dirName);
     !this = this.updateNewDirs(context, key, newDirs);
     context.setDir(this.dirName, this);
     result = intern(Array[value]);
@@ -750,7 +749,7 @@ class LazyDir{} extends Dir {
       !this.data = this.data.set(TimeTag::create(context.tick), key, map);
     };
     context.setDir(this.dirName, this);
-    !this = context.getLazyDir(this.dirName);
+    !this = context.unsafeGetLazyDir(this.dirName);
     for (path in dirtyReaders) {
       static::updateDirtyReaders(context, path);
     }
@@ -787,7 +786,7 @@ class LazyDir{} extends Dir {
     static::updateDirtyReaders(context, path);
 
     for (childName in this.childDirs) {
-      child = context.getDir(childName);
+      child = context.unsafeGetDir(childName);
       context.!toUpdate = context.toUpdate.set(child.time, childName);
     };
     if (context.debugMode) {
@@ -795,11 +794,11 @@ class LazyDir{} extends Dir {
       print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
     };
 
-    context.getLazyDir(this.dirName)
+    context.unsafeGetLazyDir(this.dirName)
   }
 }
 
-class EagerDir{} extends Dir {
+class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
   fun getArray(context: mutable Context, key: BaseName): Array<File> {
     path = Path(this.dirName, key);
     context.addDep(path);
@@ -828,7 +827,7 @@ class EagerDir{} extends Dir {
     static::updateDirtyReaders(context, path);
 
     for (childName in this.childDirs) {
-      child = context.getDir(childName);
+      child = context.unsafeGetDir(childName);
       context.!toUpdate = context.toUpdate.set(child.time, childName);
     };
     if (context.debugMode) {
@@ -836,7 +835,7 @@ class EagerDir{} extends Dir {
       print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
     };
 
-    context.getEagerDir(this.dirName)
+    context.unsafeGetEagerDir(this.dirName)
   }
 }
 

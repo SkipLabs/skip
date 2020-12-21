@@ -232,7 +232,7 @@ mutable class Context{
       toUpdate match {
       | None() ->
         for (dirName in this.toReset) {
-          dir = this.getDir(dirName);
+          dir = this.unsafeGetDir(dirName);
           !dir.dirty = SortedSet[];
           !dir.dirtyReaders = SortedMap[];
           this.setDir(dir.dirName, dir);
@@ -243,18 +243,17 @@ mutable class Context{
       | Some((time, dirName)) ->
         this.!toReset = this.toReset.set(dirName);
         this.!toUpdate = this.toUpdate.remove(time);
-        dir = this.getDir(dirName);
-        dir.parents match {
-        | None() ->
-          dir match {
-          | d @ LazyDir _ -> d.updateLazy(this)
-          | _ -> invariant_violation("Was expecting a lazy directory")
-          }
-        | Some(parents) ->
-          for (parentName in parents) {
-            this.!toReset = this.toReset.set(parentName);
-            parent = this.getDir(parentName);
-            parent.update(this, dirName)
+        this.unsafeGetDir(dirName) match {
+        | dir @ LazyDir _ -> dir.updateLazy(this)
+        | dir @ EagerDir _ ->
+          dir.parents match {
+          | None() -> void
+          | Some(parents) ->
+            for (parentName in parents) {
+              this.!toReset = this.toReset.set(parentName);
+              parent = this.unsafeGetDir(parentName);
+              parent.update(this, dirName)
+            }
           }
         }
       };
@@ -321,21 +320,37 @@ mutable class Context{
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
   }
 
-  mutable fun getDir(dirName: DirName): Dir {
+  mutable fun getDir2(dirName: DirName): Dir {
     this.addDep(Path(dirName.tag(), DirTag()));
     this.dirs.get(dirName);
   }
 
-  mutable fun getLazyDir(dirName: DirName): LazyDir {
-    this.getDir(dirName) match {
+  mutable fun unsafeGetLazyDir(dirName: DirName): LazyDir {
+    this.unsafeGetDir(dirName) match {
     | d @ LazyDir _ -> d
     | _ -> invariant_violation("Was expecting LazyDir")
     }
   }
 
-  mutable fun getEagerDir(dirName: DirName): EagerDir {
-    this.getDir(dirName) match {
+  mutable fun unsafeGetEagerDir(dirName: DirName): EagerDir {
+    this.unsafeGetDir(dirName) match {
     | d @ EagerDir _ -> d
+    | _ -> invariant_violation("Was expecting EagerDir")
+    }
+  }
+
+  mutable fun unsafeMaybeGetLazyDir(dirName: DirName): ?LazyDir {
+    this.unsafeMaybeGetDir(dirName) match {
+    | None() -> None()
+    | Some(d @ LazyDir _) -> Some(d)
+    | _ -> invariant_violation("Was expecting LazyDir")
+    }
+  }
+
+  mutable fun unsafeMaybeGetEagerDir(dirName: DirName): ?EagerDir {
+    this.unsafeMaybeGetDir(dirName) match {
+    | None() -> None()
+    | Some(d @ EagerDir _) -> Some(d)
     | _ -> invariant_violation("Was expecting EagerDir")
     }
   }
@@ -345,7 +360,7 @@ mutable class Context{
   }
 
   mutable fun removeDir(dirName: DirName): void {
-    dir = this.getDir(dirName);
+    dir = this.getDir2(dirName);
     for (childName in dir.childDirs) {
       this.removeDir(childName);
     };

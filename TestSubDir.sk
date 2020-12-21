@@ -63,8 +63,8 @@ fun testSubDir(): mutable SKFS.Context {
   SKFSTest.expectPass("Testing lazy subdir exists", () -> {
     invariant(context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) is Some _)
   });
-  inputDir = context.getDir(SKFS.DirName::create("/dirStr1/"));
-  inputSingle = context.getDir(SKFS.DirName::create("/dirSingle/"));
+  inputDir = context.unsafeGetDir(SKFS.DirName::create("/dirStr1/"));
+  inputSingle = context.unsafeGetDir(SKFS.DirName::create("/dirSingle/"));
   inputDir.writeArray(context, SKFS.IID(1), Array[SKFS.StringFile("23")]);
   context.update();
   SKFSTest.expectPass("Testing subdir has been removed", () -> {
@@ -124,7 +124,7 @@ fun testSubSubDirUnit(): mutable SKFS.Context {
       },
     )
   });
-  dir2 = context.getDir(SKFS.DirName::create("/dir2/"));
+  dir2 = context.unsafeGetDir(SKFS.DirName::create("/dir2/"));
   dir2.writeArray(context, SKFS.IID(0), Array[SKFS.IntFile(1)]);
   context.update();
   context

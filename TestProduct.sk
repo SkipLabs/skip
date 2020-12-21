@@ -2,13 +2,13 @@ module SKFSTest;
 
 fun testProduct(): mutable SKFS.Context {
   SKFS.run(context ~> {
-    getData = (dir, key) -> context.getDir(dir.dirName).getArrayRaw(key);
+    getData = (dir, key) -> context.unsafeGetDir(dir.dirName).getArrayRaw(key);
     write = (
       dir: SKFS.Handle<SKFS.IntFile>,
       key: SKFS.BaseName,
       values: Array<SKFS.IntFile>,
     ) -> {
-      context.getDir(dir.dirName).writeArray(context, key, values);
+      context.unsafeGetDir(dir.dirName).writeArray(context, key, values);
     };
 
     dirInput1 = context.mkdir(
@@ -29,13 +29,17 @@ fun testProduct(): mutable SKFS.Context {
       (_context, _key1, files1, _key2, files2) ~> files1.concat(files2),
     );
 
-    expectEq("Product test1", context.getDir(product.dirName).files(), () ->
-      Set[
-        SKFS.PID(Array[SKFS.IID(0), SKFS.IID(0)]),
-        SKFS.PID(Array[SKFS.IID(0), SKFS.IID(2)]),
-        SKFS.PID(Array[SKFS.IID(1), SKFS.IID(0)]),
-        SKFS.PID(Array[SKFS.IID(1), SKFS.IID(2)]),
-      ]
+    expectEq(
+      "Product test1",
+      context.unsafeGetDir(product.dirName).files(),
+      () ->
+        Set[
+          SKFS.PID(Array[SKFS.IID(0), SKFS.IID(0)]),
+          SKFS.PID(Array[SKFS.IID(0), SKFS.IID(2)]),
+          SKFS.PID(Array[SKFS.IID(1), SKFS.IID(0)]),
+          SKFS.PID(Array[SKFS.IID(1), SKFS.IID(2)]),
+        ]
+      ,
     );
 
     context.update();

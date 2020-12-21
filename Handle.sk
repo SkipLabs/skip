@@ -71,7 +71,7 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
     dirName: DirName,
     dirs: Array<Handle<U>>,
   ): Handle<T> {
-    thisDir = context.getDir(this.dirName);
+    thisDir = context.unsafeGetDir(this.dirName);
     thisDir.apply(
       context,
       dirName,
@@ -79,7 +79,7 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
         if (files.size() == 0) return void;
         writer.writeArray(key, files);
       },
-      dirs.map(x -> context.getDir(x.dirName)),
+      dirs.map(x -> context.getDir2(x.dirName)),
     );
     Handle(this.conv, dirName)
   }
@@ -91,11 +91,11 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
     dir2: Handle<T2>,
     f: (mutable Context, BaseName, Array<T>, BaseName, Array<T2>) ~> Array<T3>,
   ): Handle<T3> {
-    thisDir = context.getDir(this.dirName);
+    thisDir = context.unsafeGetDir(this.dirName);
     thisDir.product(
       context,
       dirName,
-      context.getDir(dir2.dirName),
+      context.getDir2(dir2.dirName),
       (context, key1, files1, key2, files2) ~> {
         f(context, key1, files1.map(this.conv), key2, files2.map(dir2.conv))
       },
@@ -109,7 +109,7 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
   ): Handle<T2> {
-    thisDir = context.getDir(this.dirName);
+    thisDir = context.unsafeGetDir(this.dirName);
     thisDirName = this.dirName.toString();
     thisDir.apply(context, dirName, (context, writer, key, files) ~> {
       context.vtry(
@@ -232,7 +232,7 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
   }
 
   fun getArray(context: mutable Context, key: BaseName): Array<T> {
-    dir = context.getDir(this.dirName);
+    dir = context.unsafeGetDir(this.dirName);
     results = dir.getArray(context, key).map(this.conv);
     results
   }

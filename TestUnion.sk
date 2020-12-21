@@ -2,7 +2,7 @@ module SKFSTest;
 
 fun testUnion(): mutable SKFS.Context {
   SKFS.run(context ~> {
-    getData = (dir, key) -> context.getDir(dir.dirName).getArrayRaw(key);
+    getData = (dir, key) -> context.unsafeGetDir(dir.dirName).getArrayRaw(key);
 
     dirInput1 = context.mkdir(
       SKFS.IntFile::fromFile,
@@ -32,7 +32,7 @@ fun testUnion(): mutable SKFS.Context {
       key: SKFS.BaseName,
       values: Array<SKFS.IntFile>,
     ) -> {
-      context.getDir(dirInput1.dirName).writeArray(context, key, values);
+      context.unsafeGetDir(dirInput1.dirName).writeArray(context, key, values);
     };
 
     write(dirInput1, SKFS.IID(0), Array[]);
