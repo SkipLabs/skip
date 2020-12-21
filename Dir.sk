@@ -130,30 +130,7 @@ base class Dir{
 } extends File {
   fun getArray(context: mutable Context, key: BaseName): Array<File>;
 
-  fun getArrayRaw(key: BaseName): Array<File> {
-    fixed = this.fixedData.getArray(key);
-    this.data.maybeGet(key) match {
-    | None() -> fixed.map(x -> x.i1).flatten()
-    | Some(modified) ->
-      result = mutable Vector<(Path, Array<File>)>[];
-      current = 0;
-      for (path => values in modified) {
-        while (current < fixed.size() && fixed[current].i0 < path) {
-          result.push(fixed[current]);
-          !current = current + 1;
-        };
-        while (current < fixed.size() && fixed[current].i0 == path) {
-          !current = current + 1;
-        };
-        result.push((path, values));
-      };
-      while (current < fixed.size()) {
-        result.push(fixed[current]);
-        !current = current + 1;
-      };
-      result.map(x -> x.i1).flatten().toArray()
-    }
-  }
+  fun getArrayRaw(key: BaseName): Array<File>;
 
   fun unsafeIterKeys(f: (BaseName, Int) -> void): void {
     fixedData = this.fixedData.data;
@@ -596,6 +573,10 @@ base class Dir{
 }
 
 class DeletedDir{} extends Dir {
+  fun getArrayRaw(BaseName): Array<File> {
+    Array[]
+  }
+
   fun getArray(mutable Context, BaseName): Array<File> {
     Array[]
   }
@@ -606,6 +587,18 @@ class DeletedDir{} extends Dir {
 }
 
 class LazyDir{} extends Dir {
+  fun getArrayRaw(key: BaseName): Array<File> {
+    this.data.maybeGet(key) match {
+    | None() -> Array[]
+    | Some(modified) ->
+      result = mutable Vector<(Path, Array<File>)>[];
+      for (path => values in modified) {
+        result.push((path, values));
+      };
+      result.map(x -> x.i1).flatten().toArray()
+    }
+  }
+
   fun callLazy(
     context: mutable Context,
     f: (mutable Context, DirName, BaseName) ~> File,
@@ -703,6 +696,31 @@ class LazyDir{} extends Dir {
 }
 
 class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
+  fun getArrayRaw(key: BaseName): Array<File> {
+    fixed = this.fixedData.getArray(key);
+    this.data.maybeGet(key) match {
+    | None() -> fixed.map(x -> x.i1).flatten()
+    | Some(modified) ->
+      result = mutable Vector<(Path, Array<File>)>[];
+      current = 0;
+      for (path => values in modified) {
+        while (current < fixed.size() && fixed[current].i0 < path) {
+          result.push(fixed[current]);
+          !current = current + 1;
+        };
+        while (current < fixed.size() && fixed[current].i0 == path) {
+          !current = current + 1;
+        };
+        result.push((path, values));
+      };
+      while (current < fixed.size()) {
+        result.push(fixed[current]);
+        !current = current + 1;
+      };
+      result.map(x -> x.i1).flatten().toArray()
+    }
+  }
+
   private fun updateChildForKey<T: File>(
     mapFun: MapFun,
     context: mutable Context,
