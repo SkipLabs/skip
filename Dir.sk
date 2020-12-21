@@ -188,60 +188,6 @@ base class Dir{
     }
   }
 
-  fun mapRow(
-    context: mutable Context,
-    key: BaseName,
-    values: Array<File>,
-    f: MapFun,
-  ): RowMapped<Array<File>> {
-    /*    if (values.size() == 0) {
-          return RowMapped(key, Vector[], Array[], SortedSet[]);
-        };
-    */
-    if (context.debugMode) {
-      print_string(
-        "MAPROW: " +
-          this.dirName +
-          " " +
-          key +
-          " " +
-          inspect(values).toString(),
-      );
-    };
-    writer = mutable Writer{};
-    newDirsCopy = context.newDirs;
-    context.!newDirs = SortedSet[];
-    f(context, writer, key, values);
-    newDirs = context.newDirs;
-    context.!newDirs = newDirsCopy;
-    kvArray = writer.getWrites();
-    reads = context.getReads();
-    rows = kvArray.map(kv2 -> {
-      (k2, v2) = kv2;
-      path = Path(this.dirName, key);
-      FixedRow(k2, (path, v2))
-    });
-    RowMapped(key, reads, rows, newDirs)
-  }
-
-  fun regroupMap<File2>(mapped: Vector<RowMapped<File2>>): GroupedRows<File2> {
-    rowVec = mutable Vector[];
-    oldVec = mutable Vector[];
-    newDirs = SortedMap[];
-    for (rowMapped in mapped) {
-      key = rowMapped.key;
-      rows = rowMapped.values;
-      for (row in rows) {
-        oldVec.push(FixedRow(key, (Path(this.dirName, key), row.key)));
-        rowVec.push(row);
-      };
-      !newDirs = newDirs.set(key, rowMapped.newDirs);
-    };
-    rowVec.sort();
-    oldVec.sort();
-    GroupedRows(rowVec.toArray(), oldVec.toArray(), newDirs)
-  }
-
   fun updateReaders(
     context: mutable Context,
     dirName: DirName,
@@ -268,46 +214,6 @@ base class Dir{
       };
     };
     context.!deps = List.Cons(deps.toArray(), context.deps);
-  }
-
-  static fun mapData(
-    context: mutable Context,
-    dir: Dir,
-    f: MapFun,
-    acc: mutable Vector<RowMapped<Array<File>>>,
-  ): void {
-    current = 0;
-    addFixed = () -> {
-      key = dir.fixedData.data[current].key;
-      valueAcc = mutable Vector<(Path, Array<File>)>[];
-      while (
-        current < dir.fixedData.data.size() &&
-        dir.fixedData.data[current].key == key
-      ) {
-        valueAcc.push(dir.fixedData.data[current].value);
-        !current = current + 1;
-      };
-      fixedFiles = valueAcc.map(x -> x.i1).flatten().toArray();
-      acc.push(dir.mapRow(context, key, fixedFiles, f));
-    };
-    for (key => _ in dir.data) {
-      while (
-        current < dir.fixedData.data.size() &&
-        dir.fixedData.data[current].key < key
-      ) {
-        addFixed();
-      };
-      while (
-        current < dir.fixedData.data.size() &&
-        dir.fixedData.data[current].key == key
-      ) {
-        !current = current + 1;
-      };
-      acc.push(dir.mapRow(context, key, dir.getArrayRaw(key), f));
-    };
-    while (current < dir.fixedData.data.size()) {
-      addFixed();
-    };
   }
 
   fun updateNewDirs(
@@ -578,6 +484,100 @@ class LazyDir{} extends Dir {
 }
 
 class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
+  static fun mapData(
+    context: mutable Context,
+    dir: EagerDir,
+    f: MapFun,
+    acc: mutable Vector<RowMapped<Array<File>>>,
+  ): void {
+    current = 0;
+    addFixed = () -> {
+      key = dir.fixedData.data[current].key;
+      valueAcc = mutable Vector<(Path, Array<File>)>[];
+      while (
+        current < dir.fixedData.data.size() &&
+        dir.fixedData.data[current].key == key
+      ) {
+        valueAcc.push(dir.fixedData.data[current].value);
+        !current = current + 1;
+      };
+      fixedFiles = valueAcc.map(x -> x.i1).flatten().toArray();
+      acc.push(dir.mapRow(context, key, fixedFiles, f));
+    };
+    for (key => _ in dir.data) {
+      while (
+        current < dir.fixedData.data.size() &&
+        dir.fixedData.data[current].key < key
+      ) {
+        addFixed();
+      };
+      while (
+        current < dir.fixedData.data.size() &&
+        dir.fixedData.data[current].key == key
+      ) {
+        !current = current + 1;
+      };
+      acc.push(dir.mapRow(context, key, dir.getArrayRaw(key), f));
+    };
+    while (current < dir.fixedData.data.size()) {
+      addFixed();
+    };
+  }
+
+  fun mapRow(
+    context: mutable Context,
+    key: BaseName,
+    values: Array<File>,
+    f: MapFun,
+  ): RowMapped<Array<File>> {
+    /*    if (values.size() == 0) {
+          return RowMapped(key, Vector[], Array[], SortedSet[]);
+        };
+    */
+    if (context.debugMode) {
+      print_string(
+        "MAPROW: " +
+          this.dirName +
+          " " +
+          key +
+          " " +
+          inspect(values).toString(),
+      );
+    };
+    writer = mutable Writer{};
+    newDirsCopy = context.newDirs;
+    context.!newDirs = SortedSet[];
+    f(context, writer, key, values);
+    newDirs = context.newDirs;
+    context.!newDirs = newDirsCopy;
+    kvArray = writer.getWrites();
+    reads = context.getReads();
+    rows = kvArray.map(kv2 -> {
+      (k2, v2) = kv2;
+      path = Path(this.dirName, key);
+      FixedRow(k2, (path, v2))
+    });
+    RowMapped(key, reads, rows, newDirs)
+  }
+
+  fun regroupMap<File2>(mapped: Vector<RowMapped<File2>>): GroupedRows<File2> {
+    rowVec = mutable Vector[];
+    oldVec = mutable Vector[];
+    newDirs = SortedMap[];
+    for (rowMapped in mapped) {
+      key = rowMapped.key;
+      rows = rowMapped.values;
+      for (row in rows) {
+        oldVec.push(FixedRow(key, (Path(this.dirName, key), row.key)));
+        rowVec.push(row);
+      };
+      !newDirs = newDirs.set(key, rowMapped.newDirs);
+    };
+    rowVec.sort();
+    oldVec.sort();
+    GroupedRows(rowVec.toArray(), oldVec.toArray(), newDirs)
+  }
+
   fun product(
     context: mutable Context,
     productDirName: DirName,
@@ -618,7 +618,7 @@ class EagerDir{parents: ?Array<DirName> = None()} extends Dir {
     context: mutable Context,
     dirName: DirName,
     f: MapFun,
-    extraDirs: Array<Dir> = Array[],
+    extraDirs: Array<EagerDir> = Array[],
   ): void {
     if (context.newDirs.contains(dirName)) {
       error(
