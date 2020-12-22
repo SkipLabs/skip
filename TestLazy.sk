@@ -20,7 +20,7 @@ fun testLazy(): mutable SKFS.Context {
         )
       },
     );
-    _dir2 = SKFS.Handle::lazy(
+    dir2 = SKFS.Handle::lazy(
       SKFS.IntFile::fromFile,
       context,
       SKFS.DirName::create("/lazy2/"),
@@ -28,10 +28,19 @@ fun testLazy(): mutable SKFS.Context {
         SKFS.IntFile(dir1.getArray(context, key)[0].value)
       },
     );
+    _dir3 = dirInput.contextWriterKeyMap(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/eager/"),
+      (context, writer, key, _) ~> {
+        writer.write(key, dir2.getArray(context, key)[0]);
+      },
+    )
   });
 
   input = SKFS.DirName::create("/input/");
   dir2 = SKFS.DirName::create("/lazy2/");
+  dir3 = SKFS.DirName::create("/eager/");
 
   expectEq("Lazy basic", Array<SKFS.File>[SKFS.IntFile(23)], () ->
     getData(context, dir2, SKFS.IID(0))
@@ -41,6 +50,10 @@ fun testLazy(): mutable SKFS.Context {
 
   expectEq("Lazy after update", Array<SKFS.File>[SKFS.IntFile(22)], () ->
     getData(context, dir2, SKFS.IID(0))
+  );
+
+  expectEq("Eeager after update", Array<SKFS.File>[SKFS.IntFile(22)], () ->
+    getData(context, dir3, SKFS.IID(0))
   );
 
   context
