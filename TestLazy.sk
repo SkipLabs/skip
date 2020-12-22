@@ -1,34 +1,47 @@
 module SKFSTest;
 
-fun testLazyUnit(): mutable SKFS.Context {
-  SKFS.run(context ~> {
+fun testLazy(): mutable SKFS.Context {
+  context = SKFS.run(context ~> {
     dirInput = context.mkdir(
       SKFS.IntFile::fromFile,
       SKFS.DirName::create("/input/"),
       Array[(SKFS.IID(0), SKFS.IntFile(23))],
     );
-    dir = SKFS.Handle::lazy(
+    dir1 = SKFS.Handle::lazy(
       SKFS.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/lazy/"),
-      (context, _self, x) ~>
+      SKFS.DirName::create("/lazy1/"),
+      (context, _self, x) ~> {
         SKFS.IntFile(
           x match {
           | SKFS.IID(v) -> dirInput.getArray(context, SKFS.IID(0))[0].value + v
           | _ -> error()
           },
         )
-      ,
+      },
     );
-    arr1 = dir.getArray(context, SKFS.IID(23));
-    arr2 = context.unsafeGetDir(dir.dirName).getArrayRaw(SKFS.IID(23)).map(x ->
-      SKFS.IntFile::fromFile(x)
+    _dir2 = SKFS.Handle::lazy(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/lazy2/"),
+      (context, _self, key) ~> {
+        SKFS.IntFile(dir1.getArray(context, key)[0].value)
+      },
     );
-    expectEq("Lazy unit", arr1, () -> arr2);
-    /*        context
-              .getDir(dirInput.dirName)
-              .writeArray(context, "0", Array[SKFS.IntFile(12)]);
-            context.update();
-        */
   });
+
+  input = SKFS.DirName::create("/input/");
+  dir2 = SKFS.DirName::create("/lazy2/");
+
+  expectEq("Lazy basic", Array<SKFS.File>[SKFS.IntFile(23)], () ->
+    getData(context, dir2, SKFS.IID(0))
+  );
+  write(context, input, SKFS.IID(0), Array[SKFS.IntFile(22)]);
+  context.update();
+
+  expectEq("Lazy after update", Array<SKFS.File>[SKFS.IntFile(22)], () ->
+    getData(context, dir2, SKFS.IID(0))
+  );
+
+  context
 }

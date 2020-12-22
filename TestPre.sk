@@ -2,11 +2,11 @@ module SKFSTest;
 
 fun write(
   context: mutable SKFS.Context,
-  dirInput: SKFS.Handle<SKFS.StringFile>,
+  dirInput: SKFS.DirName,
   key: SKFS.BaseName,
-  values: Array<SKFS.StringFile>,
+  values: Array<SKFS.File>,
 ): void {
-  context.unsafeGetDir(dirInput.dirName).writeArray(context, key, values);
+  context.unsafeGetDir(dirInput).writeArray(context, key, values);
 }
 
 fun getData(
@@ -14,11 +14,16 @@ fun getData(
   dirName: SKFS.DirName,
   key: SKFS.BaseName,
 ): Array<SKFS.File> {
-  context.unsafeGetDir(dirName).getArrayRaw(key);
+  context.unsafeGetDir(dirName) match {
+  | SKFS.DeletedDir _ ->
+    invariant_violation("Trying to write to an empty directory")
+  | edir @ SKFS.EagerDir _ -> edir.getArrayRaw(key)
+  | ldir @ SKFS.LazyDir _ -> ldir.getArray(context, key)
+  }
 }
 
 fun testPre(): mutable SKFS.Context {
-  SKFS.run(context ~> {
+  context = SKFS.run(context ~> {
     dirSInput1 = context.mkdir(
       SKFS.StringFile::fromFile,
       SKFS.DirName::create("/sinput/"),
@@ -61,23 +66,43 @@ fun testPre(): mutable SKFS.Context {
         }
       },
     );
-
-    write(context, dirSInput1, SKFS.IID(3), Array[SKFS.StringFile("3")]);
-    context.update();
-    write(context, dirSInput1, SKFS.IID(4), Array[SKFS.StringFile("4")]);
-    context.update();
-    expectEq("Test pre 1", Array<SKFS.File>[SKFS.IntFile(3)], () ->
-      getData(context, dirInput.pre(context).fromSome().dirName, SKFS.IID(3))
-    );
-    write(context, dirSInput1, SKFS.IID(3), Array[]);
-    context.update();
-    expectEq("Test pre 2", Array<SKFS.File>[SKFS.IntFile(4)], () ->
-      getData(context, dirInput.pre(context).fromSome().dirName, SKFS.IID(4))
-    );
-    write(context, dirSInput1, SKFS.IID(4), Array[]);
-    context.update();
-    expectEq("Test pre 3", Array<SKFS.File>[], () ->
-      getData(context, dirInput.pre(context).fromSome().dirName, SKFS.IID(3))
-    )
   });
+
+  /***************************************************************************/
+  // STARTING TESTS
+
+  dirSInput1 = SKFS.DirName::create("/sinput/");
+  dirInput = SKFS.DirName::create("/input/");
+  dirInputHandle = SKFS.Handle(SKFS.IntFile::fromFile, dirInput);
+
+  write(context, dirSInput1, SKFS.IID(3), Array[SKFS.StringFile("3")]);
+  context.update();
+  write(context, dirSInput1, SKFS.IID(4), Array[SKFS.StringFile("4")]);
+  context.update();
+  expectEq("Test pre 1", Array<SKFS.File>[SKFS.IntFile(3)], () ->
+    getData(
+      context,
+      dirInputHandle.pre(context).fromSome().dirName,
+      SKFS.IID(3),
+    )
+  );
+  write(context, dirSInput1, SKFS.IID(3), Array[]);
+  context.update();
+  expectEq("Test pre 2", Array<SKFS.File>[SKFS.IntFile(4)], () ->
+    getData(
+      context,
+      dirInputHandle.pre(context).fromSome().dirName,
+      SKFS.IID(4),
+    )
+  );
+  write(context, dirSInput1, SKFS.IID(4), Array[]);
+  context.update();
+  expectEq("Test pre 3", Array<SKFS.File>[], () ->
+    getData(
+      context,
+      dirInputHandle.pre(context).fromSome().dirName,
+      SKFS.IID(3),
+    )
+  );
+  context
 }

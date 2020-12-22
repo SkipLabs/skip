@@ -1,13 +1,13 @@
 /*****************************************************************************/
 /* Lazy directories. */
 /*****************************************************************************/
+module SKFS;
 
 class LazyDir{
   time: Int,
   dirName: DirName,
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
-  dirty: SortedSet<BaseName> = SortedSet[],
   dirtyReaders: SortedMap<DirName, SortedSet<BaseName>> = SortedMap[],
   lazyFun: ((mutable Context, DirName, BaseName) ~> File),
 } extends Dir {
@@ -45,7 +45,6 @@ class LazyDir{
   }
 
   fun reset(context: mutable Context): void {
-    !this.dirty = SortedSet[];
     !this.dirtyReaders = SortedMap[];
     context.setDir(this.dirName, this);
   }
@@ -236,7 +235,7 @@ class LazyDir{
       return void;
     };
 
-    if (this.dirty.isEmpty() && this.dirtyReaders.isEmpty()) return void;
+    if (this.dirtyReaders.isEmpty()) return void;
 
     thisDirtyReaders = SortedSet[];
     for (dirtyReaderDirName => dirtyReaderBaseNames in this.dirtyReaders) {
@@ -246,16 +245,13 @@ class LazyDir{
         );
       }
     };
-    dirtyReaders = fixPoint(
-      thisDirtyReaders.union(this.dirty.map(x -> Path(this.dirName, x))),
-      key -> {
-        context
-          .getDeps(key)
-          .filter(x -> x.i1 == this.dirName)
-          .map(x -> Path(x.i1, x.i2))
-          .collect(Set);
-      },
-    );
+    dirtyReaders = fixPoint(thisDirtyReaders, key -> {
+      context
+        .getDeps(key)
+        .filter(x -> x.i1 == this.dirName)
+        .map(x -> Path(x.i1, x.i2))
+        .collect(Set);
+    });
     for (path in dirtyReaders) {
       key = path.baseName;
       map = SortedMap[path => Array[]];
@@ -288,9 +284,8 @@ class LazyDir{
     };
     !map = map.set(source, rvalues);
     data = this.data.set(TimeTag::create(context.tick), k, map);
-    dirty = this.dirty.set(k);
     path = Path(this.dirName, k);
-    !this = this with {data, dirty};
+    !this = this with {data};
 
     static::updateDirtyReaders(context, path);
 
