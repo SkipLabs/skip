@@ -7,6 +7,12 @@ fun testLazy(): mutable SKFS.Context {
       SKFS.DirName::create("/input/"),
       Array[(SKFS.IID(0), SKFS.IntFile(23))],
     );
+
+    dirInput2 = context.mkdir(
+      SKFS.IntFile::fromFile,
+      SKFS.DirName::create("/input2/"),
+      Array[(SKFS.IID(0), SKFS.IntFile(44))],
+    );
     dir1 = SKFS.Handle::lazy(
       SKFS.IntFile::fromFile,
       context,
@@ -28,7 +34,7 @@ fun testLazy(): mutable SKFS.Context {
         SKFS.IntFile(dir1.getArray(context, key)[0].value)
       },
     );
-    _dir3 = dirInput.contextWriterKeyMap(
+    _dir3 = dirInput2.contextWriterKeyMap(
       SKFS.IntFile::fromFile,
       context,
       SKFS.DirName::create("/eager/"),
