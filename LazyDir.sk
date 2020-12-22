@@ -73,34 +73,6 @@ class LazyDir{
     this.dirName
   }
 
-  fun updateReaders(
-    context: mutable Context,
-    dirName: DirName,
-    mapped: readonly Vector<RowMapped<Array<File>>>,
-  ): void {
-    readDirs = mutable Map[];
-    deps = mutable Vector[];
-    for (row in mapped) {
-      for (read in row.reads) {
-        if (!readDirs.containsKey(read.dirName)) {
-          readDirs![read.dirName] = mutable Vector[];
-        };
-        readDirs[read.dirName].push((read.baseName, row.key));
-      }
-    };
-    for (readDirName => reads in readDirs) {
-      reads.sort();
-      uniqReads = reads.unique();
-      for (row in uniqReads) {
-        readerKey = row.i0;
-        readKey = row.i1;
-        readerPath = Path(readDirName, readerKey);
-        deps.push((readerPath, this.dirName, dirName, readKey));
-      };
-    };
-    context.!deps = List.Cons(deps.toArray(), context.deps);
-  }
-
   fun updateNewDirs(
     context: mutable Context,
     key: BaseName,
