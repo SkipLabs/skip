@@ -121,7 +121,6 @@ base class Dir extends File {
   fun unsafeIterKeys(f: (BaseName, Int) -> void): void;
   fun files(): Set<BaseName>;
   fun getDirName(): DirName;
-  fun getOld(dirName: DirName, key: BaseName): Array<BaseName>;
   fun updateReaders(
     context: mutable Context,
     dirName: DirName,
@@ -227,12 +226,9 @@ class LazyDir{
   time: Int,
   dirName: DirName,
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
-  old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
   dirty: SortedSet<BaseName> = SortedSet[],
   dirtyReaders: SortedMap<DirName, SortedSet<BaseName>> = SortedMap[],
-  mapFun: ?MapFun = None(),
-
   lazyFun: ((mutable Context, DirName, BaseName) ~> File),
 } extends Dir {
   static fun updateDirtyReaders(context: mutable Context, path: Path): void {
@@ -296,14 +292,6 @@ class LazyDir{
 
   fun getDirName(): DirName {
     this.dirName
-  }
-
-  fun getOld(dirName: DirName, key: BaseName): Array<BaseName> {
-    if (this.old.containsKey(dirName) && this.old[dirName].containsKey(key)) {
-      this.old[dirName][key]
-    } else {
-      Array[]
-    }
   }
 
   fun updateReaders(

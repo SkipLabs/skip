@@ -4,10 +4,10 @@ SKC=~/skip/build/bin/skip_to_llvm
 BCLINK=llvm-link-10
 MEMSIZE32=134217728
 
-OLEVEL=-O3
+OLEVEL=-O0
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
-SKFLAGS=
+SKFLAGS=--no-inline
 
 SKIP_FILES=$(wildcard *.sk) $(wildcard */*.sk)
 CFILES=\
@@ -43,7 +43,7 @@ EXPORTJS=$(addprefix -export=,$(SKFUNS))
 default: build/out32.wasm build/a.out
 
 test: build/out32.wasm build/a.out
-	node run.js 
+	node run.js
 	build/a.out all
 
 build/out32.wasm: build/out32.ll build/full_runtime32.bc
