@@ -300,14 +300,14 @@ fun compareContext(
 
     if (context2.unsafeMaybeGetDir(dirName) is None _) {
       if (dirName.toString().contains("LAZY")) continue;
-      if (!dir.deleted) {
+      if (!dir.isDeleted()) {
         print_error(`missing directory ${dirName}`);
         error();
       };
       continue;
     };
     dir2 = context2.unsafeGetDir(dirName);
-    isLazy = dir2.dirName.toString().contains("LAZY");
+    isLazy = dir2.getDirName().toString().contains("LAZY");
     for (key in dirFiles) {
       values1 = dir.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
       values2 = dir2.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
@@ -321,25 +321,38 @@ fun compareContext(
         !hasError = true;
         print_string(`Error: values differ for ${dirName}${key}`);
         print_string(`       ${values1}`);
-        for (fixed in dir.fixedData.getArray(key)) {
-          (k, files) = fixed;
-          intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
-          print_string(`FIXED  ${k} => ${intFiles}`)
-        };
-        dir.data.maybeGet(key) match {
-        | None() -> print_string("EMPTY DATA")
-        | Some(sources) ->
-          for (k => files in sources) {
+        dir match {
+        | SKFS.EagerDir{fixedData} ->
+          for (fixed in fixedData.getArray(key)) {
+            (k, files) = fixed;
             intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
-            print_string(`       ${k} => ${intFiles}`)
+            print_string(`FIXED  ${k} => ${intFiles}`)
           }
+        | _ -> void
+        };
+        dir match {
+        | SKFS.EagerDir{data}
+        | SKFS.LazyDir{data} ->
+          data.maybeGet(key) match {
+          | None() -> print_string("EMPTY DATA")
+          | Some(sources) ->
+            for (k => files in sources) {
+              intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
+              print_string(`       ${k} => ${intFiles}`)
+            }
+          }
+        | _ -> void
         };
         print_string("");
         print_string(`       ${values2}`);
-        for (fixed in dir2.fixedData.getArray(key)) {
-          (k, files) = fixed;
-          intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
-          print_string(`FIXED  ${k} => ${intFiles}`)
+        dir2 match {
+        | SKFS.EagerDir{fixedData} ->
+          for (fixed in fixedData.getArray(key)) {
+            (k, files) = fixed;
+            intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
+            print_string(`FIXED  ${k} => ${intFiles}`)
+          }
+        | _ -> void
         };
         print_string("");
       }

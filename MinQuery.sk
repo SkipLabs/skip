@@ -41,7 +41,7 @@ fun minDir<T: frozen>(
       if (keyFile.cmp < 0) {
         if (acc is None _) continue;
         if (acc is Some _ && acc.fromSome() < keyFile.key) continue;
-        dir = context.unsafeGetDir(dirHandle.dirName);
+        dir = context.unsafeGetEagerDir(dirHandle.dirName);
         minData = dir.data.minKey(kv ~> {
           (key, _) = kv;
           dir.getArrayRaw(key).size() > 0

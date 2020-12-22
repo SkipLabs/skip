@@ -69,13 +69,13 @@ fun testSubDir(): mutable SKFS.Context {
   SKFSTest.expectPass("Testing subdir has been removed", () -> {
     context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) match {
     | None() -> invariant_violation("Expected an empty directory, not None")
-    | Some(dir) -> invariant(dir.isRemoved())
+    | Some(dir) -> invariant(dir.isDeleted())
     }
   });
   SKFSTest.expectPass("Testing lazy subdir has been removed", () -> {
     context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) match {
     | None() -> invariant_violation("Expected an empty directory, not None")
-    | Some(dir) -> invariant(dir.isRemoved())
+    | Some(dir) -> invariant(dir.isDeleted())
     }
   });
   SKFSTest.expectPass("Testing new subdir exists", () -> {

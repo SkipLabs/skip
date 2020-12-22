@@ -63,7 +63,7 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
         },
       )
     });
-    Handle(conv, dir.dirName)
+    Handle(conv, dir.getDirName())
   }
 
   fun union<U>[T: U](
@@ -266,7 +266,7 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
     };
     context.maybeGetDir(this.dirName.pre()) match {
     | None() -> None()
-    | Some(dir) -> Some(Handle(this.conv, dir.dirName))
+    | Some(dir) -> Some(Handle(this.conv, dir.getDirName()))
     }
   }
 
@@ -275,7 +275,13 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
     if (!context.hasNext.contains(this.dirName)) {
       fixedData = FixedData{dirName, data => Array[]};
       time = context.timeStamp();
-      dir = EagerDir{time, isInput => true, dirName, fixedData};
+      dir = EagerDir{
+        time,
+        input => true,
+        dirName,
+        fixedData,
+        childDirs => SortedMap[],
+      };
       context.setDir(dirName, dir);
       return Handle(this.conv, dirName)
     };

@@ -184,16 +184,17 @@ mutable class Context{
     for (dirName in toUpdate) {
       if (!this.hasPre.contains(dirName)) continue;
       preDirName = dirName.pre();
-      dir = this.dirs.get(dirName);
-      this.dirs.maybeGet(preDirName) match {
+      dir = this.unsafeGetEagerDir(dirName);
+      this.unsafeMaybeGetEagerDir(preDirName) match {
       | None() ->
         this.!newDirs = this.newDirs.add(preDirName);
         time = this.timeStamp();
         preDir = EagerDir{
           time,
-          isInput => false,
+          input => false,
           dirName => preDirName,
           fixedData => FixedData{dirName => preDirName, data => Array[]},
+          childDirs => SortedMap[],
         };
         dir.unsafeIterKeys((key, _time) -> {
           values = dir.getArrayRaw(key);
@@ -237,9 +238,7 @@ mutable class Context{
       | None() ->
         for (dirName in this.toReset) {
           dir = this.unsafeGetDir(dirName);
-          !dir.dirty = SortedSet[];
-          !dir.dirtyReaders = SortedMap[];
-          this.setDir(dir.dirName, dir);
+          dir.reset(this);
         };
         this.updatePre(this.toReset);
         this.!toReset = SortedSet[];
@@ -282,9 +281,9 @@ mutable class Context{
         (key, Array[value])
       }),
     );
-    this.!newDirs = this.newDirs.add(dir.dirName);
-    this.setDir(dir.dirName, dir);
-    Handle(conv, dir.dirName)
+    this.!newDirs = this.newDirs.add(dir.getDirName());
+    this.setDir(dir.getDirName(), dir);
+    Handle(conv, dir.getDirName())
   }
 
   mutable fun mkdirMulti<T: File>(
@@ -303,7 +302,13 @@ mutable class Context{
     vector.sort();
     fixedData = FixedData{dirName, data => vector.toArray()};
     time = this.timeStamp();
-    dir = EagerDir{time, isInput => true, dirName, fixedData};
+    dir = EagerDir{
+      time,
+      input => true,
+      dirName,
+      fixedData,
+      childDirs => SortedMap[],
+    };
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
     dir
   }
@@ -322,7 +327,7 @@ mutable class Context{
     };
     */
     // TODO: re-enable this when the dirNames are represented as lists
-    this.!dirs = this.dirs.set(dir.time, dirName, dir);
+    this.!dirs = this.dirs.set(dir.getTime(), dirName, dir);
   }
 
   mutable fun getDir(dirName: DirName): Dir {
@@ -402,17 +407,7 @@ mutable class Context{
     if (this.debugMode) {
       print_string("REMOVED: " + dirName);
     };
-    this.setDir(
-      dirName,
-      DeletedDir{
-        dirName,
-        time => this.timeStamp(),
-        isInput => dir.isInput,
-        deleted => true,
-        fixedData => FixedData::empty(dirName),
-        data => DMap::empty(),
-      },
-    );
+    this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()});
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {

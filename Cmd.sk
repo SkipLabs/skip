@@ -100,7 +100,7 @@ fun writeCmd(env: mutable CmdEnv, pathStr: String, cmd: String): void {
   path = Path::fromString(pathStr);
   env.context.maybeGetDir(path.dirName) match {
   | None() -> print_error("Could not find input directory: " + path.dirName)
-  | Some(dir) if (!dir.isInput) ->
+  | Some(dir) if (!dir.isInput()) ->
     print_error("Not an input Dir: " + path.dirName)
   | Some(dir) ->
     if (cmd == "") {
