@@ -3,7 +3,7 @@ const fs = require('fs');
 var source = fs.readFileSync('./build/out32.wasm');
 
 var instance = null;
-var args = ['stress'];
+var args = ['all'];
 
 function encodeUTF8(s) {
   var data = new Uint8Array(instance.exports.memory.buffer);
@@ -159,9 +159,6 @@ const env = {
   _ZNKSt9exception4whatEv: function() {
     throw "TODO _ZNKSt9exception4whatEv";
   },
-  SKIP_print_pointer: function (ptr) {
-    console.log("TOTO: " + ptr);
-  },
   SKIP_get_free: function(size) {
     if(!freeTable[size]) {
       return 0;
@@ -181,13 +178,13 @@ const env = {
   printf: function(ptr) {
   },
   SKIP_print_error: function(str) {
-//    console.log(wasmStringToJS(str));
+    console.log(wasmStringToJS(str));
   },
   SKIP_print_raw: function(str) {
-//    process.stdout.write(wasmStringToJS(str));
+    process.stdout.write(wasmStringToJS(str));
   },
   SKIP_print_string: function(str) {
-//    console.log(stringFromUTF8Array(str));
+    console.log(stringFromUTF8Array(str));
   },
   SKIP_getArgc: function(i) {
     return args.length;
