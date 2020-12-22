@@ -92,25 +92,6 @@ class LazyDir{
     (this, removed.chill())
   }
 
-  fun writeArray(
-    context: mutable Context,
-    key: BaseName,
-    values: Array<File>,
-  ): void {
-    source = Path(this.dirName, key);
-    !this = this.writeEntry(context, source, key, values);
-    context.!toReset = context.toReset.set(this.dirName);
-    context.setDir(this.dirName, this);
-  }
-
-  fun write(context: mutable Context, baseName: BaseName, value: File): void {
-    this.writeArray(context, baseName, Array[value]);
-  }
-
-  fun remove(context: mutable Context, baseName: BaseName): void {
-    this.writeArray(context, baseName, Array[]);
-  }
-
   fun isDeleted(): Bool {
     false
   }
@@ -232,25 +213,5 @@ class LazyDir{
     values = this.getArrayRaw(key);
     if (values.size() != 0) return values;
     this.callLazy(context, key)
-  }
-
-  fun writeEntry(
-    context: mutable Context,
-    source: Path,
-    k: BaseName,
-    values: Array<File>,
-  ): this {
-    data = this.data.set(TimeTag::create(context.tick), k, values);
-    path = Path(this.dirName, k);
-    !this = this with {data};
-
-    static::updateDirtyReaders(context, path);
-
-    if (context.debugMode) {
-      name = "" + this.dirName + k;
-      print_string(`WRITTEN:  ${name} => ${inspect(values)} (${source})`);
-    };
-
-    this
   }
 }

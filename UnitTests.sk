@@ -66,7 +66,7 @@ fun testUpdate(
   for (kv in writes) {
     (key, values) = kv;
     path = SKFS.Path::fromString(key);
-    dir = context.unsafeGetDir(path.dirName);
+    dir = context.unsafeGetEagerDir(path.dirName);
     dir.writeArray(context, path.baseName, values.map(x -> IBox(x)));
   };
   context.update();
