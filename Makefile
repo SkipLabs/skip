@@ -42,6 +42,10 @@ EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
 default: build/out32.wasm build/a.out
 
+test: build/out32.wasm build/a.out
+	node run.js 
+	build/a.out all
+
 build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	cat preamble32.ll build/out32.ll > build/preamble_and_out32.ll
 	llvm-link-10 build/full_runtime32.bc build/preamble_and_out32.ll -o build/all.bc
