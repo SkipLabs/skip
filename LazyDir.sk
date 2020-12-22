@@ -6,7 +6,7 @@ module SKFS;
 class LazyDir{
   time: Int,
   dirName: DirName,
-  data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
+  data: DMap<BaseName, Array<File>> = Nil(),
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
   dirtyReaders: SortedMap<DirName, SortedSet<BaseName>> = SortedMap[],
   lazyFun: ((mutable Context, DirName, BaseName) ~> File),
@@ -155,9 +155,11 @@ class LazyDir{
         ,
       );
       dir = context.unsafeGetLazyDir(dirName);
-      results = Array[result];
-      map = SortedMap[Path(dirName, key) => results];
-      !dir.data = dir.data.set(TimeTag::create(context.tick), key, map);
+      !dir.data = dir.data.set(
+        TimeTag::create(context.tick),
+        key,
+        Array[result],
+      );
       updateReaders(dirName, context, key);
       context.setDir(dirName, dir);
       if (context.debugMode) {
@@ -177,12 +179,7 @@ class LazyDir{
   fun getArrayRaw(key: BaseName): Array<File> {
     this.data.maybeGet(key) match {
     | None() -> Array[]
-    | Some(modified) ->
-      result = mutable Vector<(Path, Array<File>)>[];
-      for (path => values in modified) {
-        result.push((path, values));
-      };
-      result.map(x -> x.i1).flatten().toArray()
+    | Some(arr) -> arr
     }
   }
 
@@ -220,8 +217,7 @@ class LazyDir{
     });
     for (path in dirtyReaders) {
       key = path.baseName;
-      map = SortedMap[path => Array[]];
-      !this.data = this.data.set(TimeTag::create(context.tick), key, map);
+      !this.data = this.data.set(TimeTag::create(context.tick), key, Array[]);
     };
     context.setDir(this.dirName, this);
     !this = context.unsafeGetLazyDir(this.dirName);
@@ -242,26 +238,17 @@ class LazyDir{
     context: mutable Context,
     source: Path,
     k: BaseName,
-    rvalues: Array<File>,
+    values: Array<File>,
   ): this {
-    map = this.data.maybeGet(k) match {
-    | None() -> SortedMap[]
-    | Some(x) -> x
-    };
-    !map = map.set(source, rvalues);
-    data = this.data.set(TimeTag::create(context.tick), k, map);
+    data = this.data.set(TimeTag::create(context.tick), k, values);
     path = Path(this.dirName, k);
     !this = this with {data};
 
     static::updateDirtyReaders(context, path);
 
-    for (childName in this.getChildren()) {
-      child = context.unsafeGetDir(childName);
-      context.!toUpdate = context.toUpdate.set(child.getTime(), childName);
-    };
     if (context.debugMode) {
       name = "" + this.dirName + k;
-      print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
+      print_string(`WRITTEN:  ${name} => ${inspect(values)} (${source})`);
     };
 
     this

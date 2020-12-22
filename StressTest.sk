@@ -331,8 +331,14 @@ fun compareContext(
         | _ -> void
         };
         dir match {
-        | SKFS.EagerDir{data}
         | SKFS.LazyDir{data} ->
+          data.maybeGet(key) match {
+          | None() -> print_string("EMPTY DATA")
+          | Some(files) ->
+            intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
+            print_string(`       ${intFiles}`)
+          }
+        | SKFS.EagerDir{data} ->
           data.maybeGet(key) match {
           | None() -> print_string("EMPTY DATA")
           | Some(sources) ->
