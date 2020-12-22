@@ -226,7 +226,6 @@ class DeletedDir{time: Int, dirName: DirName} extends Dir {
 class LazyDir{
   time: Int,
   dirName: DirName,
-  fixedData: FixedData<Array<File>>,
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
@@ -281,45 +280,17 @@ class LazyDir{
   }
 
   fun unsafeIterKeys(f: (BaseName, Int) -> void): void {
-    fixedData = this.fixedData.data;
-    current = 0;
     this.data.eachWithTime((newKey, time) -> {
-      while (current < fixedData.size() && fixedData[current].key < newKey) {
-        row = fixedData[current];
-        f(row.key, 0);
-        !current = current + 1;
-      };
       f(newKey, time);
     });
-    while (current < fixedData.size()) {
-      row = fixedData[current];
-      f(row.key, 0);
-      !current = current + 1;
-    };
   }
 
   fun files(): Set<BaseName> {
-    fixedData = this.fixedData.data;
-    current = 0;
     keys = mutable Set[];
     for (newKey => newValues in this.data) {
-      while (current < fixedData.size() && fixedData[current].key < newKey) {
-        row = fixedData[current];
-        if (row.value.i1.size() > 0) {
-          keys.insert(row.key);
-        };
-        !current = current + 1;
-      };
       if (newValues.size() > 0) {
         keys.insert(newKey);
       };
-    };
-    while (current < fixedData.size()) {
-      row = fixedData[current];
-      if (row.value.i1.size() > 0) {
-        keys.insert(row.key);
-      };
-      !current = current + 1;
     };
     keys.chill()
   }
@@ -459,12 +430,7 @@ class LazyDir{
       result
     };
     context.!newDirs = context.newDirs.add(dirName);
-    newDir = LazyDir{
-      time,
-      dirName,
-      fixedData => FixedData{dirName, data => Array[]},
-      lazyFun,
-    };
+    newDir = LazyDir{time, dirName, lazyFun};
     static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, newDir);
     newDir
