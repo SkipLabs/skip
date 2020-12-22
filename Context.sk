@@ -28,6 +28,9 @@ fun run(f: (mutable Context) -> void): mutable Context {
 
 const debugMode: Bool = false;
 
+const dummyDirty: Map<DirName, Set<BaseName>> = Map[];
+const dummyDirtyReaders: Map<DirName, Map<DirName, Set<BaseName>>> = Map[];
+
 mutable class Context{
   mutable pwd: String = "/",
   mutable dirs: Dirs = Dirs{},
@@ -50,6 +53,11 @@ mutable class Context{
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
+  dirty: mutable Map<DirName, mutable Set<BaseName>> = mutable Map[],
+  dirtyReaders: mutable Map<
+    DirName,
+    mutable Map<DirName, mutable Set<BaseName>>,
+  > = mutable Map[],
 } {
   readonly fun vtry<T>(f: () -> T, onError: .Exception -> T): T {
     if (this.failOnExn) f() else vtry(f, onError)
@@ -236,10 +244,8 @@ mutable class Context{
       toUpdate = this.toUpdate.minimum();
       toUpdate match {
       | None() ->
-        for (dirName in this.toReset) {
-          dir = this.unsafeGetDir(dirName);
-          dir.reset(this);
-        };
+        this.dirty.clear();
+        this.dirtyReaders.clear();
         this.updatePre(this.toReset);
         this.!toReset = SortedSet[];
         return void

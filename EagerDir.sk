@@ -12,8 +12,6 @@ class EagerDir{
   fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
   old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
-  dirty: SortedSet<BaseName> = SortedSet[],
-  dirtyReaders: SortedMap<DirName, SortedSet<BaseName>> = SortedMap[],
   mapFun: ?MapFun = None(),
 
   parents: ?Array<DirName> = None(),
@@ -37,11 +35,14 @@ class EagerDir{
     childName: DirName,
     baseName: BaseName,
   ): void {
-    if (!this.dirtyReaders.containsKey(childName)) {
-      !this.dirtyReaders[childName] = SortedSet[];
+    if (!context.dirtyReaders.containsKey(this.dirName)) {
+      context.dirtyReaders![this.dirName] = mutable Map[];
     };
-    !this.dirtyReaders[childName] = this.dirtyReaders[childName].set(baseName);
-    context.setDir(this.dirName, this);
+
+    if (!context.dirtyReaders[this.dirName].containsKey(childName)) {
+      context.dirtyReaders[this.dirName]![childName] = mutable Set[];
+    };
+    context.dirtyReaders[this.dirName][childName].insert(baseName);
   }
 
   fun isInput(): Bool {
@@ -49,11 +50,6 @@ class EagerDir{
   }
   fun getTime(): Int {
     this.time
-  }
-  fun reset(context: mutable Context): void {
-    !this.dirty = SortedSet[];
-    !this.dirtyReaders = SortedMap[];
-    context.setDir(this.dirName, this);
   }
 
   fun getChildren(): Array<DirName> {
@@ -353,26 +349,19 @@ class EagerDir{
   }
 
   fun update(context: mutable Context, childName: DirName): void {
-    // We have been removed from the set of directories.
-    // This can happen when an old dependency changed.
-    // Because of the change, the directory gets added
-    // to the list of directories to update. But in the mean time
-    // the source no longer creates this directory.
-    if (!context.dirs.state.containsKey(this.dirName)) {
-      return void;
-    };
-
-    if (this.dirty.isEmpty() && this.dirtyReaders.isEmpty()) return void;
-
     child = context.unsafeGetEagerDir(childName);
     dirty = mutable Set[];
-    if (this.dirtyReaders.containsKey(childName)) {
-      for (elt in this.dirtyReaders[childName]) {
-        dirty.add(elt)
-      }
+    if (context.dirtyReaders.containsKey(this.dirName)) {
+      if (context.dirtyReaders[this.dirName].containsKey(childName)) {
+        for (elt in context.dirtyReaders[this.dirName][childName]) {
+          dirty.add(elt)
+        }
+      };
     };
-    for (key in this.dirty) {
-      dirty.insert(key);
+    if (context.dirty.containsKey(this.dirName)) {
+      for (key in context.dirty[this.dirName]) {
+        dirty.insert(key);
+      };
     };
     for (key in dirty) {
       values = this.getArrayRaw(key);
@@ -426,9 +415,13 @@ class EagerDir{
     };
     !map = map.set(source, rvalues);
     data = this.data.set(TimeTag::create(context.tick), k, map);
-    dirty = this.dirty.set(k);
+    if (!context.dirty.containsKey(this.dirName)) {
+      context.dirty![this.dirName] = mutable Set[];
+    };
+    context.dirty[this.dirName].insert(k);
+
     path = Path(this.dirName, k);
-    !this = this with {data, dirty};
+    !this = this with {data};
 
     static::updateDirtyReaders(context, path);
 
