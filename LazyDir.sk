@@ -10,34 +10,6 @@ class LazyDir{
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
   lazyFun: ((mutable Context, DirName, BaseName) ~> File),
 } extends Dir {
-  static fun updateDirtyReaders(context: mutable Context, path: Path): void {
-    readers = context.getDeps(path);
-
-    for (reader in readers) {
-      (parentName, childName, baseName) = reader;
-      child = context.unsafeGetDir(childName);
-
-      static::addDirtyReader(context, parentName, childName, baseName);
-      context.!toUpdate = context.toUpdate.set(child.getTime(), childName);
-    };
-  }
-
-  static fun addDirtyReader(
-    context: mutable Context,
-    parentName: DirName,
-    childName: DirName,
-    baseName: BaseName,
-  ): void {
-    if (!context.dirtyReaders.containsKey(parentName)) {
-      context.dirtyReaders![parentName] = mutable Map[];
-    };
-
-    if (!context.dirtyReaders[parentName].containsKey(childName)) {
-      context.dirtyReaders[parentName]![childName] = mutable Set[];
-    };
-    context.dirtyReaders[parentName][childName].insert(baseName);
-  }
-
   fun isInput(): Bool {
     false
   }
@@ -153,7 +125,7 @@ class LazyDir{
     };
     context.!newDirs = context.newDirs.add(dirName);
     newDir = LazyDir{time, dirName, lazyFun};
-    static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+    updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, newDir);
     newDir
   }
@@ -174,7 +146,7 @@ class LazyDir{
     !this = context.unsafeGetLazyDir(this.dirName);
     (!this, removed) = this.updateNewDirs(context, key, newDirs);
     for (dirName in removed) {
-      static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+      updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     };
     context.setDir(this.dirName, this);
     result = intern(Array[value]);
@@ -209,7 +181,7 @@ class LazyDir{
     context.setDir(this.dirName, this);
     !this = context.unsafeGetLazyDir(this.dirName);
     for (path in dirtyReaders) {
-      static::updateDirtyReaders(context, path);
+      updateDirtyReaders(context, path);
     }
   }
 

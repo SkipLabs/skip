@@ -17,34 +17,6 @@ class EagerDir{
   parents: ?Array<DirName> = None(),
   childDirs: SortedMap<Int, DirName>,
 } extends Dir {
-  static fun updateDirtyReaders(context: mutable Context, path: Path): void {
-    readers = context.getDeps(path);
-
-    for (reader in readers) {
-      (parentName, childName, baseName) = reader;
-      child = context.unsafeGetDir(childName);
-      static::addDirtyReader(context, parentName, childName, baseName);
-
-      context.!toUpdate = context.toUpdate.set(child.getTime(), childName)
-    };
-  }
-
-  static fun addDirtyReader(
-    context: mutable Context,
-    parentName: DirName,
-    childName: DirName,
-    baseName: BaseName,
-  ): void {
-    if (!context.dirtyReaders.containsKey(parentName)) {
-      context.dirtyReaders![parentName] = mutable Map[];
-    };
-
-    if (!context.dirtyReaders[parentName].containsKey(childName)) {
-      context.dirtyReaders[parentName]![childName] = mutable Set[];
-    };
-    context.dirtyReaders[parentName][childName].insert(baseName);
-  }
-
   fun isInput(): Bool {
     this.input
   }
@@ -235,7 +207,7 @@ class EagerDir{
       newDirs => grouped.newDirs,
       childDirs => SortedMap[],
     };
-    static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+    updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, dir);
     static::addParent(context, time, dirName, this.dirName, grouped.old);
     for (parent in extraDirs) {
@@ -344,7 +316,7 @@ class EagerDir{
 
     (!this, removed) = this.updateNewDirs(context, key, newDirs);
     for (dirName in removed) {
-      static::updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+      updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     };
 
     mapped = writer.getWrites();
@@ -454,7 +426,7 @@ class EagerDir{
     path = Path(this.dirName, k);
     !this = this with {data};
 
-    static::updateDirtyReaders(context, path);
+    updateDirtyReaders(context, path);
 
     for (childName in this.getChildren()) {
       context.unsafeGetDir(childName) match {
