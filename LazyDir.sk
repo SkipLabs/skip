@@ -8,7 +8,6 @@ class LazyDir{
   dirName: DirName,
   data: DMap<BaseName, Array<File>> = Nil(),
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
-  dirtyReaders: SortedMap<DirName, SortedSet<BaseName>> = SortedMap[],
   lazyFun: ((mutable Context, DirName, BaseName) ~> File),
 } extends Dir {
   static fun updateDirtyReaders(context: mutable Context, path: Path): void {
@@ -29,11 +28,14 @@ class LazyDir{
     childName: DirName,
     baseName: BaseName,
   ): void {
-    if (!this.dirtyReaders.containsKey(childName)) {
-      !this.dirtyReaders[childName] = SortedSet[];
+    if (!context.dirtyReaders.containsKey(this.dirName)) {
+      context.dirtyReaders![this.dirName] = mutable Map[];
     };
-    !this.dirtyReaders[childName] = this.dirtyReaders[childName].set(baseName);
-    context.setDir(this.dirName, this);
+
+    if (!context.dirtyReaders[this.dirName].containsKey(childName)) {
+      context.dirtyReaders[this.dirName]![childName] = mutable Set[];
+    };
+    context.dirtyReaders[this.dirName][childName].insert(baseName);
   }
 
   fun isInput(): Bool {
@@ -45,7 +47,6 @@ class LazyDir{
   }
 
   fun reset(context: mutable Context): void {
-    !this.dirtyReaders = SortedMap[];
     context.setDir(this.dirName, this);
   }
 
@@ -182,7 +183,12 @@ class LazyDir{
 
   fun updateLazy(context: mutable Context): void {
     thisDirtyReaders = SortedSet[];
-    for (dirtyReaderDirName => dirtyReaderBaseNames in this.dirtyReaders) {
+    firstDirtyReaders = context.dirtyReaders.maybeGet(this.dirName) match {
+    | None() -> mutable Map[]
+    | Some(m) -> m
+    };
+
+    for (dirtyReaderDirName => dirtyReaderBaseNames in firstDirtyReaders) {
       for (dirtyReaderBaseName in dirtyReaderBaseNames) {
         !thisDirtyReaders = thisDirtyReaders.add(
           Path(dirtyReaderDirName, dirtyReaderBaseName),
