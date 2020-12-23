@@ -15,27 +15,27 @@ class LazyDir{
 
     for (reader in readers) {
       (parentName, childName, baseName) = reader;
-      parent = context.unsafeGetDir(parentName);
       child = context.unsafeGetDir(childName);
 
-      parent.addDirtyReader(context, childName, baseName);
+      static::addDirtyReader(context, parentName, childName, baseName);
       context.!toUpdate = context.toUpdate.set(child.getTime(), childName);
     };
   }
 
-  fun addDirtyReader(
+  static fun addDirtyReader(
     context: mutable Context,
+    parentName: DirName,
     childName: DirName,
     baseName: BaseName,
   ): void {
-    if (!context.dirtyReaders.containsKey(this.dirName)) {
-      context.dirtyReaders![this.dirName] = mutable Map[];
+    if (!context.dirtyReaders.containsKey(parentName)) {
+      context.dirtyReaders![parentName] = mutable Map[];
     };
 
-    if (!context.dirtyReaders[this.dirName].containsKey(childName)) {
-      context.dirtyReaders[this.dirName]![childName] = mutable Set[];
+    if (!context.dirtyReaders[parentName].containsKey(childName)) {
+      context.dirtyReaders[parentName]![childName] = mutable Set[];
     };
-    context.dirtyReaders[this.dirName][childName].insert(baseName);
+    context.dirtyReaders[parentName][childName].insert(baseName);
   }
 
   fun isInput(): Bool {
