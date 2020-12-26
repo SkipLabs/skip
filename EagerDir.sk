@@ -191,7 +191,7 @@ class EagerDir{
     mapped = acc.chill();
     grouped = this.regroupMap(mapped);
     this.updateReaders(context, dirName, mapped);
-    fixedData = FixedData{dirName, data => grouped.rows};
+    fixedData = FixedData{data => grouped.rows};
     parents = mutable Vector[this.dirName];
     for (dir in extraDirs) {
       parents.push(dir.dirName);
@@ -230,7 +230,7 @@ class EagerDir{
     old: Array<FixedRow<BaseName>>,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
-    !parent.fixedOld[dirName] = FixedData{dirName, data => old};
+    !parent.fixedOld[dirName] = FixedData{data => old};
     !parent.childDirs = parent.childDirs.add(time, dirName);
     context.setDir(parent.dirName, parent);
   }

@@ -62,11 +62,7 @@ class ProductRow(
   values: Array<File>,
 ) extends File
 
-class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
-  static fun empty(dirName: DirName): this {
-    FixedData{dirName, data => Array[]}
-  }
-
+class FixedData<T>{data: Array<FixedRow<T>> = Array[]} {
   fun getPos(key: BaseName, i: Int, j: Int): Int {
     if (i > j) {
       return i;
@@ -88,27 +84,6 @@ class FixedData<T>{dirName: DirName, data: Array<FixedRow<T>> = Array[]} {
       !pos = pos + 1;
     };
     result.toArray();
-  }
-
-  fun maybeGet(key: BaseName): ?(Path, T) {
-    arr = this.getArray(key);
-    if (arr.size() > 2) {
-      path = Path(this.dirName, key);
-      throw (DuplicateFiles(path))
-    };
-    if (arr.size() == 0) {
-      return None();
-    };
-    Some(arr[0])
-  }
-
-  fun get(key: BaseName): (Path, T) {
-    this.maybeGet(key) match {
-    | None() ->
-      path = Path(this.dirName, key);
-      throw (FileNotFound(path))
-    | Some(x) -> x
-    }
   }
 }
 
