@@ -8,9 +8,9 @@ class EagerDir{
   dirName: DirName,
   input: Bool,
   fixedData: FixedData<Array<File>>,
+  fixedOld: FixedData<BaseName> = FixedData{},
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
-  fixedOld: SortedMap<DirName, FixedData<BaseName>> = SortedMap[],
-  old: SortedMap<DirName, SortedMap<BaseName, Array<BaseName>>> = SortedMap[],
+  old: SortedMap<BaseName, Array<BaseName>> = SortedMap[],
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
   mapFun: ?MapFun = None(),
 
@@ -192,13 +192,14 @@ class EagerDir{
       input => false,
       parents => Some(parents.toArray()),
       fixedData,
+      fixedOld => FixedData{data => grouped.old},
       mapFun => Some(f),
       newDirs => grouped.newDirs,
       childDirs => SortedMap[],
     };
     updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, dir);
-    static::addParent(context, time, dirName, this.dirName, grouped.old);
+    static::addParent(context, time, dirName, this.dirName);
     if (context.debugMode) {
       print_string(
         `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${
@@ -213,10 +214,8 @@ class EagerDir{
     time: Int,
     dirName: DirName,
     parentName: DirName,
-    old: Array<FixedRow<BaseName>>,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
-    !parent.fixedOld[dirName] = FixedData{data => old};
     !parent.childDirs = parent.childDirs.add(time, dirName);
     context.setDir(parent.dirName, parent);
   }
@@ -326,7 +325,7 @@ class EagerDir{
     for (key in dirty) {
       values = this.getArrayRaw(key);
       source = Path(this.dirName, key);
-      oldKeys = Set::mcreateFromItems(this.getOld(childName, key));
+      oldKeys = Set::mcreateFromItems(child.getOld(key));
       mapFun = child.mapFun match {
       | None() -> continue
       | Some(f) -> f
@@ -341,18 +340,9 @@ class EagerDir{
       );
       // We need to remember what keys we produced for the next
       // time around.
-      oldKeysMap = this.old.maybeGet(child.dirName) match {
-      | None() -> SortedMap[]
-      | Some(x) -> x
-      };
-      !oldKeysMap[key] = newKeys;
-      !this.old[child.dirName] = oldKeysMap;
+      !child.old[key] = newKeys;
     };
     context.setDir(child.dirName, child);
-    context.setDir(
-      this.dirName,
-      context.unsafeGetEagerDir(this.dirName) with {old => this.old},
-    );
   }
 
   fun getArray(context: mutable Context, key: BaseName): Array<File> {
@@ -449,11 +439,11 @@ class EagerDir{
     this.dirName
   }
 
-  fun getOld(dirName: DirName, key: BaseName): Array<BaseName> {
-    if (this.old.containsKey(dirName) && this.old[dirName].containsKey(key)) {
-      this.old[dirName][key]
+  fun getOld(key: BaseName): Array<BaseName> {
+    if (this.old.containsKey(key)) {
+      this.old[key]
     } else {
-      this.fixedOld[dirName].getArray(key).map(x -> x.i1)
+      this.fixedOld.getArray(key).map(x -> x.i1)
     }
   }
 
