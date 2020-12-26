@@ -155,12 +155,7 @@ class EagerDir{
     });
   }
 
-  fun apply(
-    context: mutable Context,
-    dirName: DirName,
-    f: MapFun,
-    extraDirs: Array<EagerDir> = Array[],
-  ): void {
+  fun apply(context: mutable Context, dirName: DirName, f: MapFun): void {
     if (context.newDirs.contains(dirName)) {
       error(
         `Error: directory ${dirName.toString()} already exists (parent: ${
@@ -185,17 +180,11 @@ class EagerDir{
     context.!newDirs = context.newDirs.add(dirName);
     acc = mutable Vector[];
     static::mapData(context, this, f, acc);
-    for (dir in extraDirs) {
-      static::mapData(context, dir, f, acc);
-    };
     mapped = acc.chill();
     grouped = this.regroupMap(mapped);
     this.updateReaders(context, dirName, mapped);
     fixedData = FixedData{data => grouped.rows};
     parents = mutable Vector[this.dirName];
-    for (dir in extraDirs) {
-      parents.push(dir.dirName);
-    };
     time = context.timeStamp();
     dir = EagerDir{
       time,
@@ -210,9 +199,6 @@ class EagerDir{
     updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, dir);
     static::addParent(context, time, dirName, this.dirName, grouped.old);
-    for (parent in extraDirs) {
-      static::addParent(context, time, dirName, parent.dirName, grouped.old);
-    };
     if (context.debugMode) {
       print_string(
         `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${

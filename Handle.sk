@@ -66,23 +66,25 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
     Handle(conv, dir.getDirName())
   }
 
-  fun union<U>[T: U](
-    context: mutable Context,
-    dirName: DirName,
-    dirs: Array<Handle<U>>,
-  ): Handle<T> {
-    thisDir = context.unsafeGetEagerDir(this.dirName);
-    thisDir.apply(
-      context,
-      dirName,
-      (_context, writer, key, files) ~> {
-        if (files.size() == 0) return void;
-        writer.writeArray(key, files);
-      },
-      dirs.map(x -> context.getEagerDir(x.dirName)),
-    );
-    Handle(this.conv, dirName)
-  }
+  /*
+    fun union<U>[T: U](
+      context: mutable Context,
+      dirName: DirName,
+      dirs: Array<Handle<U>>,
+    ): Handle<T> {
+      thisDir = context.unsafeGetEagerDir(this.dirName);
+      thisDir.apply(
+        context,
+        dirName,
+        (_context, writer, key, files) ~> {
+          if (files.size() == 0) return void;
+          writer.writeArray(key, files);
+        },
+        dirs.map(x -> context.getEagerDir(x.dirName)),
+      );
+      Handle(this.conv, dirName)
+    }
+  */
 
   fun product<T2: File, T3: File>(
     conv: File ~> T3,
