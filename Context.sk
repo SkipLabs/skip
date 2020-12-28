@@ -321,7 +321,7 @@ mutable class Context{
     conv: File ~> T,
     dirName: DirName,
     content: Array<(BaseName, T)> = Array[],
-  ): Handle<T> {
+  ): EHandle<T> {
     dir = this.mkdirMulti(
       dirName,
       content.map(kv -> {
@@ -331,7 +331,7 @@ mutable class Context{
     );
     this.!newDirs = this.newDirs.add(dir.getDirName());
     this.setDir(dir.getDirName(), dir);
-    Handle(conv, dir.getDirName())
+    EHandle(conv, dir.getDirName())
   }
 
   mutable fun mkdirMulti<T: File>(

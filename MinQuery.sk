@@ -6,18 +6,18 @@ class DiffKeyFile(cmp: Int, key: BaseName) extends File
 
 fun minDir<T: frozen>(
   context: mutable Context,
-  dirHandle: Handle<T>,
+  dirEHandle: EHandle<T>,
   diffName: String,
   name: String,
-): Handle<BaseNameOptionFile> {
+): EHandle<BaseNameOptionFile> {
   diffMinDirName = DirName::create(
-    dirHandle.dirName.toString() + diffName + "/",
+    dirEHandle.dirName.toString() + diffName + "/",
   );
-  minDirName = DirName::create(dirHandle.dirName.toString() + name + "/");
+  minDirName = DirName::create(dirEHandle.dirName.toString() + name + "/");
   context
-    .unsafeGetEagerDir(dirHandle.dirName)
+    .unsafeGetEagerDir(dirEHandle.dirName)
     .apply(context, diffMinDirName, (context, writer, key, newValues) ~> {
-      preDiffOpt = Handle(dirHandle.conv, dirHandle.dirName).pre(context);
+      preDiffOpt = EHandle(dirEHandle.conv, dirEHandle.dirName).pre(context);
       oldValues = preDiffOpt match {
       | None() -> Array[]
       | Some(preDir) -> preDir.getArray(context, key)
@@ -29,7 +29,7 @@ fun minDir<T: frozen>(
         writer.write(IID(0), DiffKeyFile(cmp, key))
       }
     });
-  minDir = Handle(BaseNameOptionFile::fromFile, minDirName);
+  minDir = EHandle(BaseNameOptionFile::fromFile, minDirName);
   diffDir = context.unsafeGetEagerDir(diffMinDirName);
   diffDir.apply(context, minDirName, (context, writer, _, diffs) ~> {
     acc: ?BaseName = minDir.pre(context) match {
@@ -41,7 +41,7 @@ fun minDir<T: frozen>(
       if (keyFile.cmp < 0) {
         if (acc is None _) continue;
         if (acc is Some _ && acc.fromSome() < keyFile.key) continue;
-        dir = context.unsafeGetEagerDir(dirHandle.dirName);
+        dir = context.unsafeGetEagerDir(dirEHandle.dirName);
         minData = dir.data.minKey(kv ~> {
           (key, _) = kv;
           dir.getArrayRaw(key).size() > 0

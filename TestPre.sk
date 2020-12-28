@@ -73,7 +73,7 @@ fun testPre(): mutable SKFS.Context {
 
   dirSInput1 = SKFS.DirName::create("/sinput/");
   dirInput = SKFS.DirName::create("/input/");
-  dirInputHandle = SKFS.Handle(SKFS.IntFile::fromFile, dirInput);
+  dirInputEHandle = SKFS.EHandle(SKFS.IntFile::fromFile, dirInput);
 
   write(context, dirSInput1, SKFS.IID(3), Array[SKFS.StringFile("3")]);
   context.update();
@@ -82,7 +82,7 @@ fun testPre(): mutable SKFS.Context {
   expectEq("Test pre 1", Array<SKFS.File>[SKFS.IntFile(3)], () ->
     getData(
       context,
-      dirInputHandle.pre(context).fromSome().dirName,
+      dirInputEHandle.pre(context).fromSome().dirName,
       SKFS.IID(3),
     )
   );
@@ -91,7 +91,7 @@ fun testPre(): mutable SKFS.Context {
   expectEq("Test pre 2", Array<SKFS.File>[SKFS.IntFile(4)], () ->
     getData(
       context,
-      dirInputHandle.pre(context).fromSome().dirName,
+      dirInputEHandle.pre(context).fromSome().dirName,
       SKFS.IID(4),
     )
   );
@@ -100,7 +100,7 @@ fun testPre(): mutable SKFS.Context {
   expectEq("Test pre 3", Array<SKFS.File>[], () ->
     getData(
       context,
-      dirInputHandle.pre(context).fromSome().dirName,
+      dirInputEHandle.pre(context).fromSome().dirName,
       SKFS.IID(3),
     )
   );

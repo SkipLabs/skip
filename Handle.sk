@@ -24,218 +24,18 @@ mutable class Writer{
   }
 }
 
-class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
-  static fun lazy<T: File>(
-    conv: File ~> T,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, Handle<T>, BaseName) ~> T,
-  ): Handle<T> {
-    dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
-      if (context.lazyVisitedSet.contains(Path(dirName, key))) {
-        msg = "Error: cyclic lazy data " + " ".join(context.lazyVisitedList);
-        return ErrorFile(
-          List[ErrorTrace(dirName.toString(), key.toString(), msg)],
-        )
-      };
-      oldLazyVisitedList = context.lazyVisitedList;
-      oldLazyVisitedSet = context.lazyVisitedSet;
-      onExit = () -> {
-        context.!lazyVisitedList = oldLazyVisitedList;
-        context.!lazyVisitedSet = oldLazyVisitedSet;
-      };
-      context.!lazyVisitedList = List.Cons(
-        Path(dirName, key),
-        oldLazyVisitedList,
-      );
-      context.!lazyVisitedSet = context.lazyVisitedSet.add(Path(dirName, key));
-      context.vtry<File>(
-        () -> {
-          result = f(context, Handle(conv, dirName), key);
-          onExit();
-          result
-        },
-        exn -> {
-          onExit();
-          msg = exn.getMessage();
-          trace = ErrorTrace(dirName.toString(), key.toString(), msg);
-          ErrorFile(List[trace])
-        },
-      )
-    });
-    Handle(conv, dir.getDirName())
+base class Handle<+T: frozen> {
+  macro fun getDirName(): DirName {
+    this.dirName
   }
 
-  /*
-    fun union<U>[T: U](
-      context: mutable Context,
-      dirName: DirName,
-      dirs: Array<Handle<U>>,
-    ): Handle<T> {
-      thisDir = context.unsafeGetEagerDir(this.dirName);
-      thisDir.apply(
-        context,
-        dirName,
-        (_context, writer, key, files) ~> {
-          if (files.size() == 0) return void;
-          writer.writeArray(key, files);
-        },
-        dirs.map(x -> context.getEagerDir(x.dirName)),
-      );
-      Handle(this.conv, dirName)
-    }
-  */
-
-  fun product<T2: File, T3: File>(
-    conv: File ~> T3,
-    context: mutable Context,
-    dirName: DirName,
-    dir2: Handle<T2>,
-    f: (mutable Context, BaseName, Array<T>, BaseName, Array<T2>) ~> Array<T3>,
-  ): Handle<T3> {
-    thisDir = context.unsafeGetEagerDir(this.dirName);
-    thisDir.product(
-      context,
-      dirName,
-      context.getEagerDir(dir2.dirName),
-      (context, key1, files1, key2, files2) ~> {
-        f(context, key1, files1.map(this.conv), key2, files2.map(dir2.conv))
-      },
-    );
-    Handle(conv, dirName)
-  }
-
-  private fun genericMap<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
-  ): Handle<T2> {
-    thisDir = context.unsafeGetEagerDir(this.dirName);
-    thisDirName = this.dirName.toString();
-    thisDir.apply(context, dirName, (context, writer, key, files) ~> {
-      context.vtry(
-        () -> {
-          if (files.size() == 0) return void;
-          f(context, writer, key, files.map(x -> this.conv(x)));
-        },
-        e ->
-          e match {
-          | ErrorFile(trace) ->
-            traceElt = ErrorTrace(thisDirName, key.toString(), "propagated");
-            !trace = List.Cons(traceElt, trace);
-            writer.write(key, ErrorFile(trace))
-          | exn ->
-            traceElt = ErrorTrace(
-              thisDirName,
-              key.toString(),
-              exn.getMessage(),
-            );
-            trace = List.Cons(traceElt, List.Nil());
-            writer.write(key, ErrorFile(trace))
-          }
-        ,
-      )
-    });
-    Handle(conv, dirName)
-  }
-
-  fun duplicateError(key: BaseName, files: Array<_>): ErrorFile {
-    traceElt = ErrorTrace(
-      this.dirName.toString(),
-      key.toString(),
-      "duplicate keys: " + inspect(files).toString(),
-    );
-    trace = List.Cons(traceElt, List.Nil());
-    ErrorFile(trace)
-  }
-
-  fun noValueError(key: BaseName): ErrorFile {
-    traceElt = ErrorTrace(this.dirName.toString(), key.toString(), "no value");
-    trace = List.Cons(traceElt, List.Nil());
-    ErrorFile(trace)
-  }
-
-  fun map<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (T) ~> T2,
-  ): Handle<T2> {
-    this.genericMap(conv, context, dirName, (_, writer, key, files) ~> {
-      if (files.size() >= 2) {
-        errFile = this.duplicateError(key, files);
-        writer.write(key, errFile);
-        return void;
-      };
-      result = f(files[0]);
-      writer.write(key, result);
-    })
-  }
-
-  fun contextMap<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, T) ~> T2,
-  ): Handle<T2> {
-    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
-      if (files.size() >= 2) {
-        errFile = this.duplicateError(key, files);
-        writer.write(key, errFile);
-        return void;
-      };
-      result = f(context, files[0]);
-      writer.write(key, result);
-    })
-  }
-
-  fun contextWriterMap<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, T) ~> void,
-  ): Handle<T2> {
-    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
-      if (files.size() >= 2) {
-        errFile = this.duplicateError(key, files);
-        writer.write(key, errFile);
-        return void;
-      };
-      f(context, writer, files[0]);
-    })
-  }
-
-  fun contextWriterKeyMap<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, BaseName, T) ~> void,
-  ): Handle<T2> {
-    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
-      if (files.size() >= 2) {
-        errFile = this.duplicateError(key, files);
-        writer.write(key, errFile);
-        return void;
-      };
-      f(context, writer, key, files[0]);
-    })
-  }
-
-  fun contextWriterKeyValues<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
-  ): Handle<T2> {
-    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
-      f(context, writer, key, files);
-    })
+  macro fun getConv(): SKFS.File ~> T {
+    this.conv
   }
 
   fun getArray(context: mutable Context, key: BaseName): Array<T> {
-    dir = context.unsafeGetDir(this.dirName);
-    results = dir.getArray(context, key).map(this.conv);
+    dir = context.unsafeGetDir(this.getDirName());
+    results = dir.getArray(context, key).map(this.getConv());
     results
   }
 
@@ -262,17 +62,235 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
     Some(values[0])
   }
 
-  fun pre(context: mutable Context): ?Handle<T> {
+  fun duplicateError(key: BaseName, files: Array<_>): ErrorFile {
+    traceElt = ErrorTrace(
+      this.getDirName().toString(),
+      key.toString(),
+      "duplicate keys: " + inspect(files).toString(),
+    );
+    trace = List.Cons(traceElt, List.Nil());
+    ErrorFile(trace)
+  }
+
+  fun noValueError(key: BaseName): ErrorFile {
+    traceElt = ErrorTrace(
+      this.getDirName().toString(),
+      key.toString(),
+      "no value",
+    );
+    trace = List.Cons(traceElt, List.Nil());
+    ErrorFile(trace)
+  }
+}
+
+// Lazy Handle
+class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
+  static fun create<T: File>(
+    conv: File ~> T,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, EHandle<T>, BaseName) ~> T,
+  ): EHandle<T> {
+    dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
+      if (context.lazyVisitedSet.contains(Path(dirName, key))) {
+        msg = "Error: cyclic lazy data " + " ".join(context.lazyVisitedList);
+        return ErrorFile(
+          List[ErrorTrace(dirName.toString(), key.toString(), msg)],
+        )
+      };
+      oldLazyVisitedList = context.lazyVisitedList;
+      oldLazyVisitedSet = context.lazyVisitedSet;
+      onExit = () -> {
+        context.!lazyVisitedList = oldLazyVisitedList;
+        context.!lazyVisitedSet = oldLazyVisitedSet;
+      };
+      context.!lazyVisitedList = List.Cons(
+        Path(dirName, key),
+        oldLazyVisitedList,
+      );
+      context.!lazyVisitedSet = context.lazyVisitedSet.add(Path(dirName, key));
+      context.vtry<File>(
+        () -> {
+          result = f(context, EHandle(conv, dirName), key);
+          onExit();
+          result
+        },
+        exn -> {
+          onExit();
+          msg = exn.getMessage();
+          trace = ErrorTrace(dirName.toString(), key.toString(), msg);
+          ErrorFile(List[trace])
+        },
+      )
+    });
+    EHandle(conv, dir.getDirName())
+  }
+}
+
+// Eager Handle
+class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
+  /*
+    fun union<U>[T: U](
+      context: mutable Context,
+      dirName: DirName,
+      dirs: Array<EHandle<U>>,
+    ): EHandle<T> {
+      thisDir = context.unsafeGetEagerDir(this.dirName);
+      thisDir.apply(
+        context,
+        dirName,
+        (_context, writer, key, files) ~> {
+          if (files.size() == 0) return void;
+          writer.writeArray(key, files);
+        },
+        dirs.map(x -> context.getEagerDir(x.dirName)),
+      );
+      EHandle(this.conv, dirName)
+    }
+  */
+
+  fun product<T2: File, T3: File>(
+    conv: File ~> T3,
+    context: mutable Context,
+    dirName: DirName,
+    dir2: EHandle<T2>,
+    f: (mutable Context, BaseName, Array<T>, BaseName, Array<T2>) ~> Array<T3>,
+  ): EHandle<T3> {
+    thisDir = context.unsafeGetEagerDir(this.dirName);
+    thisDir.product(
+      context,
+      dirName,
+      context.getEagerDir(dir2.dirName),
+      (context, key1, files1, key2, files2) ~> {
+        f(context, key1, files1.map(this.conv), key2, files2.map(dir2.conv))
+      },
+    );
+    EHandle(conv, dirName)
+  }
+
+  private fun genericMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
+  ): EHandle<T2> {
+    thisDir = context.unsafeGetEagerDir(this.dirName);
+    thisDirName = this.dirName.toString();
+    thisDir.apply(context, dirName, (context, writer, key, files) ~> {
+      context.vtry(
+        () -> {
+          if (files.size() == 0) return void;
+          f(context, writer, key, files.map(x -> this.conv(x)));
+        },
+        e ->
+          e match {
+          | ErrorFile(trace) ->
+            traceElt = ErrorTrace(thisDirName, key.toString(), "propagated");
+            !trace = List.Cons(traceElt, trace);
+            writer.write(key, ErrorFile(trace))
+          | exn ->
+            traceElt = ErrorTrace(
+              thisDirName,
+              key.toString(),
+              exn.getMessage(),
+            );
+            trace = List.Cons(traceElt, List.Nil());
+            writer.write(key, ErrorFile(trace))
+          }
+        ,
+      )
+    });
+    EHandle(conv, dirName)
+  }
+
+  fun map<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (T) ~> T2,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (_, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        errFile = this.duplicateError(key, files);
+        writer.write(key, errFile);
+        return void;
+      };
+      result = f(files[0]);
+      writer.write(key, result);
+    })
+  }
+
+  fun contextMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, T) ~> T2,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        errFile = this.duplicateError(key, files);
+        writer.write(key, errFile);
+        return void;
+      };
+      result = f(context, files[0]);
+      writer.write(key, result);
+    })
+  }
+
+  fun contextWriterMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, T) ~> void,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        errFile = this.duplicateError(key, files);
+        writer.write(key, errFile);
+        return void;
+      };
+      f(context, writer, files[0]);
+    })
+  }
+
+  fun contextWriterKeyMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, BaseName, T) ~> void,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        errFile = this.duplicateError(key, files);
+        writer.write(key, errFile);
+        return void;
+      };
+      f(context, writer, key, files[0]);
+    })
+  }
+
+  fun contextWriterKeyValues<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
+      f(context, writer, key, files);
+    })
+  }
+
+  fun pre(context: mutable Context): ?EHandle<T> {
     if (!context.hasPre.contains(this.dirName)) {
       context.!hasPre = context.hasPre.add(this.dirName);
     };
     context.maybeGetDir(this.dirName.pre()) match {
     | None() -> None()
-    | Some(dir) -> Some(Handle(this.conv, dir.getDirName()))
+    | Some(dir) -> Some(EHandle(this.conv, dir.getDirName()))
     }
   }
 
-  fun next(context: mutable Context): Handle<T> {
+  fun next(context: mutable Context): EHandle<T> {
     dirName = this.dirName.next();
     if (!context.hasNext.contains(this.dirName)) {
       fixedData = FixedData{data => Array[]};
@@ -285,9 +303,9 @@ class Handle<+T: frozen>(conv: File ~> T, dirName: DirName) {
         childDirs => SortedMap[],
       };
       context.setDir(dirName, dir);
-      return Handle(this.conv, dirName)
+      return EHandle(this.conv, dirName)
     };
-    Handle(this.conv, dirName)
+    EHandle(this.conv, dirName)
   }
 }
 

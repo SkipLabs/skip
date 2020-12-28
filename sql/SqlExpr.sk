@@ -7,7 +7,7 @@ class ExprEvaluator{
   pos: Int,
   env: Map<String, ?SValue>,
   //  cols: Map<String, Int>,
-  //  dir: SKFS.Handle<Row>,
+  //  dir: SKFS.EHandle<Row>,
 } {
   fun binop(
     context: mutable SKFS.Context,
@@ -152,7 +152,7 @@ class ExprEvaluator{
     };
     selectName = evalSelect(context, select);
     dirName = SKFS.DirName::create("/" + select.id + "/files/");
-    handle = SKFS.Handle(Row::fromFile, selectName);
+    handle = SKFS.EHandle(Row::fromFile, selectName);
     files = makeDir(Row::fromFile, context, dirName, () ->
       handle.contextWriterMap(
         Row::fromFile,

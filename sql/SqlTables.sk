@@ -29,23 +29,23 @@ fun makeCountName(dir: SKFS.DirName): SKFS.DirName {
   SKFS.DirName::create(dir.toString() + "count/")
 }
 
-fun getDir(dirDescr: DirDescr): SKFS.Handle<Row> {
-  SKFS.Handle(Row::fromFile, dirDescr.dirName)
+fun getDir(dirDescr: DirDescr): SKFS.EHandle<Row> {
+  SKFS.EHandle(Row::fromFile, dirDescr.dirName)
 }
 
 fun makeDir<T: frozen>(
   fromFile: SKFS.File ~> T,
   context: mutable SKFS.Context,
   dirName: SKFS.DirName,
-  make: () -> SKFS.Handle<T>,
-): SKFS.Handle<T> {
+  make: () -> SKFS.EHandle<T>,
+): SKFS.EHandle<T> {
   context.maybeGetDir(dirName) match {
   | None() -> make()
-  | Some(dir) -> SKFS.Handle(fromFile, dir.getDirName())
+  | Some(dir) -> SKFS.EHandle(fromFile, dir.getDirName())
   };
 }
 
-fun getTableDir(context: mutable SKFS.Context): SKFS.Handle<DirDescr> {
+fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
   makeDir(DirDescr::fromFile, context, tableInfo, () ->
     context.mkdir(DirDescr::fromFile, tableInfo, Array[])
   )
@@ -53,7 +53,7 @@ fun getTableDir(context: mutable SKFS.Context): SKFS.Handle<DirDescr> {
 
 extension class Select extends SKFS.File
 
-fun getSelectInputDir(context: mutable SKFS.Context): SKFS.Handle<Select> {
+fun getSelectInputDir(context: mutable SKFS.Context): SKFS.EHandle<Select> {
   makeDir(Select::fromFile, context, selectInput, () ->
     context.mkdir(Select::fromFile, selectInput, Array[])
   )
@@ -61,7 +61,7 @@ fun getSelectInputDir(context: mutable SKFS.Context): SKFS.Handle<Select> {
 
 fun getSelectOutputDir(
   context: mutable SKFS.Context,
-): SKFS.Handle<SKFS.DirName> {
+): SKFS.EHandle<SKFS.DirName> {
   makeDir(SKFS.DirName::fromFile, context, selectOutput, () -> {
     input = getSelectInputDir(context);
     input.contextMap(
