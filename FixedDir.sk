@@ -1,0 +1,68 @@
+/*****************************************************************************/
+/* Definition of the "fixed" part of a directory.
+ *
+ * Every Eager Directory defines a "fixed" part. Meaning, the values defined
+ * at initialization time. After the initialization, the directory is defined
+ * as the difference between the initialization data (that never changes) and
+ * the changes made to the directory since its inception.
+ *
+ * So for example:
+ * dir = mkdir(..., Array[(1, 1), (2, 2), (3, 3)]);
+ * fixedData => FixedRow((1, (src, 1)), (2, (src, 2)), (3, (src, 3)))
+ *
+ * Then later someone removes the key 2.
+ * data => DMap[2 => SortedMap(src, Array[])]
+ *
+ * And the value associated with the key "2" is defined as the difference
+ * between fixedData and data. So in this case, because the source is the same
+ * the key 2 is associated with an empty array.
+ */
+/*****************************************************************************/
+module SKFS;
+
+value class FixedRow<T>(
+  key: BaseName,
+  value: (Path, T),
+) uses Hashable, Orderable {
+  fun toKeyPath(): (BaseName, Path) {
+    (this.key, this.value.i0);
+  }
+
+  fun compare(row: FixedRow<T>): Order {
+    this.toKeyPath().compare(row.toKeyPath())
+  }
+
+  fun hash(): Int {
+    this.toKeyPath().hash()
+  }
+
+  fun changeSource(source: Path): this {
+    !this.value.i0 = source;
+    this
+  }
+}
+
+class FixedData<T>{data: Array<FixedRow<T>> = Array[]} {
+  fun getPos(key: BaseName, i: Int, j: Int): Int {
+    if (i > j) {
+      return i;
+    };
+    pivot = (i + j) / 2;
+    key.compare(this.data[pivot].key) match {
+    | LT()
+    | EQ() ->
+      this.getPos(key, i, pivot - 1)
+    | GT() -> this.getPos(key, pivot + 1, j)
+    }
+  }
+
+  fun getArray(key: BaseName): Array<(Path, T)> {
+    pos = this.getPos(key, 0, this.data.size() - 1);
+    result = mutable Vector[];
+    while (pos < this.data.size() && this.data[pos].key == key) {
+      result.push(this.data[pos].value);
+      !pos = pos + 1;
+    };
+    result.toArray();
+  }
+}
