@@ -1,16 +1,59 @@
 /*****************************************************************************/
-/* The interface defined by directories. */
+/* The interface for directories. */
 /*****************************************************************************/
 
 module SKFS;
 
-type MapFun = (mutable Context, mutable Writer, BaseName, Array<File>) ~> void;
+base class Dir extends File {
+  /**
+   * Returns true is the directory was deleted.
+   */
+  fun isDeleted(): Bool;
 
-class FileNotFound(path: Path) extends SKFS.Exception {
-  fun toString(): String {
-    `File not found: ${this.path}`
-  }
+  /**
+   * Returns true is the directory is an Input.
+   */
+  fun isInput(): Bool;
+
+  /**
+   * Returns the list of children.
+   * A child directory is a directory that was the result of a map applied
+   * to a parent directory.
+   */
+  fun getChildren(): Array<DirName>;
+
+  /**
+   * Returns an array of files associated with a key.
+   * The array is empty if the key does not exist.
+   */
+  fun getArray(context: mutable Context, key: BaseName): Array<File>;
+
+  /**
+   * Same as getArray but does not create a dependency, which will break in
+   * incremental mode. This should only be used for testing.
+   */
+  fun getArrayRaw(key: BaseName): Array<File>;
+
+  /**
+   * Returns the list of files in a directory. Should only be used for testing.
+   */
+  fun files(): Set<BaseName>;
+
+  /**
+   * Returns the directory name
+   */
+  fun getDirName(): DirName;
+
+  /**
+   * Returns the creation time of that directory.
+   */
+  fun getTime(): Int;
 }
+
+/*****************************************************************************/
+/* Exception thrown by map */
+/*****************************************************************************/
+
 class DuplicateFiles(path: Path) extends SKFS.Exception {
   fun toString(): String {
     `Duplicate values found for path: ${this.path}`
@@ -81,17 +124,6 @@ class FixedData<T>{data: Array<FixedRow<T>> = Array[]} {
     };
     result.toArray();
   }
-}
-
-base class Dir extends File {
-  fun isDeleted(): Bool;
-  fun isInput(): Bool;
-  fun getChildren(): Array<DirName>;
-  fun getArray(context: mutable Context, key: BaseName): Array<File>;
-  fun getArrayRaw(key: BaseName): Array<File>;
-  fun files(): Set<BaseName>;
-  fun getDirName(): DirName;
-  fun getTime(): Int;
 }
 
 module end;
