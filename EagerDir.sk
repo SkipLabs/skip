@@ -3,7 +3,46 @@
 /*****************************************************************************/
 module SKFS;
 
+/*****************************************************************************/
+/* The signature of a function used by apply. */
+/*****************************************************************************/
+
 type MapFun = (mutable Context, mutable Writer, BaseName, Array<File>) ~> void;
+
+/*****************************************************************************/
+/* The result of a map. */
+/*****************************************************************************/
+
+value class RowMapped<T>(
+  key: BaseName,
+  reads: Vector<Path>,
+  values: Array<FixedRow<T>>,
+  newDirs: SortedSet<DirName>,
+)
+
+/*****************************************************************************/
+/* The result of a map, after the sorting and grouping. */
+/*****************************************************************************/
+
+value class GroupedRows<T>(
+  rows: Array<FixedRow<T>>,
+  old: Array<FixedRow<BaseName>>,
+  newDirs: SortedMap<BaseName, SortedSet<DirName>>,
+)
+
+/*****************************************************************************/
+/* Intermediate representation needed to compute the product. */
+/*****************************************************************************/
+
+class ProductRow(
+  key1: BaseName,
+  key2: BaseName,
+  values: Array<File>,
+) extends File
+
+/*****************************************************************************/
+/* An Eager Directory. */
+/*****************************************************************************/
 
 class EagerDir{
   time: Int,
