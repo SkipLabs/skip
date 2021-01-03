@@ -1,4 +1,42 @@
+/*****************************************************************************/
+/* Module exposing a typed interface to the file system.
+ *
+ * The code implementing the file system is not statically typed. A first
+ * version attempted to do that, but it became clear very quickly that it
+ * would require to bend the type-system in ways that were counter-productive.
+ *
+ * Moreover, remote-directories, because of their nature break the static
+ * type-checking.
+ *
+ * Hence the idea of an implementation where every file in the system has the
+ * same type "File" and every key the type "BaseName".
+ *
+ * However, type-checking is nice! So how do we get the best of both worlds?
+ * By exposing a typed API!
+ *
+ * This is what the Handle module is for. The idea is to add a layer of type-
+ * checking and expose that to the user.
+ *
+ * Concretely, let's say we want to manipulate a directory where the files are
+ * all of type IntFile. The type Handle<IntFile> is there to the rescue! Every
+ * operation will be type-checked (statically) against the type IntFile.
+ *
+ * So if I try to write a SringFile instead of an IntFile I get a static error.
+ * The other important part is that all the higher order operations are also
+ * typed. So applying a map to a Handle also produces a handle.
+ *
+ * What's nice about that is that it becomes relatively straightforward to
+ * write a program that is fully type-checked. The dynamic nature of the file-
+ * system becomes an implementation detail. All you need to do is to stick with
+ * Handles. Never try to manipulate "Dir" directly and you will be safe!
+ */
+/*****************************************************************************/
+
 module SKFS;
+
+/*****************************************************************************/
+/* The class handed over to the closures mapping over a directory. */
+/*****************************************************************************/
 
 mutable class Writer{
   private writes: mutable Map<BaseName, Array<File>> = mutable Map[],
@@ -23,6 +61,10 @@ mutable class Writer{
     result.toArray()
   }
 }
+
+/*****************************************************************************/
+/* The preferred way of accessing the file-system. */
+/*****************************************************************************/
 
 base class Handle<+T: frozen> {
   macro fun getDirName(): DirName {
