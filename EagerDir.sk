@@ -227,13 +227,13 @@ class EagerDir{
   static fun apply(
     context: mutable Context,
     parentName: DirName,
-    dirName: DirName,
+    childName: DirName,
     f: MapFun,
   ): void {
-    if (context.newDirs.contains(dirName)) {
-      error(`Error: directory ${dirName.toString()} already exists`);
+    if (context.newDirs.contains(childName)) {
+      error(`Error: directory ${childName.toString()} already exists`);
     };
-    context.unsafeMaybeGetEagerDir(dirName) match {
+    context.unsafeMaybeGetEagerDir(childName) match {
     | Some(dir) ->
       if (
         dir.parent is Some _ &&
@@ -249,20 +249,20 @@ class EagerDir{
     };
     acc = mutable Vector[];
     parent = context.getEagerDir(parentName);
-    context.!newDirs = context.newDirs.add(dirName);
+    context.!newDirs = context.newDirs.add(childName);
     static::mapData(context, parent, f, acc);
     mapped = acc.chill();
     dataVec = mutable Vector[];
     oldVec = mutable Vector[];
     newDirs = mutable Ref(SortedMap[]);
     static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
-    static::updateReaders(context, parentName, dirName, mapped);
+    static::updateReaders(context, parentName, childName, mapped);
     grouped = static::sortGroup(dataVec, oldVec, newDirs);
     fixedData = FixedData{data => grouped.rows};
     time = context.timeStamp();
     dir = EagerDir{
       time,
-      dirName,
+      dirName => childName,
       input => false,
       parent => Some(parentName),
       fixedData,
@@ -271,12 +271,12 @@ class EagerDir{
       newDirs => grouped.newDirs,
       childDirs => SortedMap[],
     };
-    updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
-    context.setDir(dirName, dir);
-    static::addParent(context, time, dirName, parentName);
+    updateDirtyReaders(context, Path(childName.tag(), DirTag()));
+    context.setDir(childName, dir);
+    static::addParent(context, time, childName, parentName);
     if (context.debugMode) {
       print_string(
-        `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${parentName})`,
+        `CREATED:  ${childName} (time: ${time}, parent: ${parentName})`,
       );
     };
   }
@@ -335,7 +335,7 @@ class EagerDir{
     if (context.dirtyReaders.containsKey(parent.dirName)) {
       if (context.dirtyReaders[parent.dirName].containsKey(childName)) {
         for (elt in context.dirtyReaders[parent.dirName][childName]) {
-          dirty.add(elt)
+          dirty.insert(elt)
         }
       };
     };
