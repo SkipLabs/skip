@@ -239,16 +239,21 @@ class EagerDir{
       }
     | _ -> void
     };
-    parent = context.getEagerDir(parents[0]);
-    context.!newDirs = context.newDirs.add(dirName);
     acc = mutable Vector[];
-    static::mapData(context, parent, f, acc);
+    for (parentName in parents) {
+      parent = context.getEagerDir(parentName);
+      context.!newDirs = context.newDirs.add(dirName);
+      static::mapData(context, parent, f, acc);
+    };
     mapped = acc.chill();
     dataVec = mutable Vector[];
     oldVec = mutable Vector[];
     newDirs = mutable Ref(SortedMap[]);
-    static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
-    parent.updateReaders(context, dirName, mapped);
+    for (parentName in parents) {
+      parent = context.getEagerDir(parentName);
+      static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
+      parent.updateReaders(context, dirName, mapped);
+    };
     grouped = static::sortGroup(dataVec, oldVec, newDirs);
     fixedData = FixedData{data => grouped.rows};
     time = context.timeStamp();
@@ -265,12 +270,12 @@ class EagerDir{
     };
     updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, dir);
-    static::addParent(context, time, dirName, parent.dirName);
+    for (parentName in parents) {
+      static::addParent(context, time, dirName, parentName);
+    };
     if (context.debugMode) {
       print_string(
-        `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${
-          parent.dirName
-        })`,
+        `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${parents})`,
       );
     };
   }
