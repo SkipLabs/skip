@@ -7,7 +7,6 @@ class LazyDir{
   time: Int,
   dirName: DirName,
   data: DMap<BaseName, Array<File>> = Nil(),
-  newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
   lazyFun: ((mutable Context, DirName, BaseName) ~> File),
 } extends Dir {
   fun isInput(): Bool {
@@ -40,25 +39,6 @@ class LazyDir{
     this.dirName
   }
 
-  fun updateNewDirs(
-    context: mutable Context,
-    key: BaseName,
-    newDirs: SortedSet<DirName>,
-  ): (this, Vector<DirName>) {
-    removed = mutable Vector[];
-    this.newDirs.maybeGet(key) match {
-    | None() -> if (newDirs.isEmpty()) return (this, Vector[])
-    | Some(lastRoundDirs) ->
-      for (dirName in lastRoundDirs) {
-        if (newDirs.contains(dirName)) continue;
-        context.removeDir(dirName);
-        removed.push(dirName);
-      }
-    };
-    !this.newDirs = this.newDirs.set(key, newDirs);
-    (this, removed.chill())
-  }
-
   fun isDeleted(): Bool {
     false
   }
@@ -86,10 +66,8 @@ class LazyDir{
       };
     };
     lazyFun = (context: mutable Context, dirName: DirName, key: BaseName) ~> {
-      reads = context.reads;
+      readsCopy = context.reads;
       context.!reads = mutable Vector[];
-
-      context.!newDirs = SortedSet[];
       result = context.vtry<File>(
         () -> {
           f(context, dirName, key)
@@ -114,10 +92,9 @@ class LazyDir{
         name = "" + dir.dirName + key;
         print_string(`WRITTEN LAZY:  ${name} => ${inspect(result)}`);
       };
-      context.!reads = reads;
+      context.!reads = readsCopy;
       result
     };
-    context.!newDirs = context.newDirs.add(dirName);
     newDir = LazyDir{time, dirName, lazyFun};
     updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, newDir);
@@ -132,16 +109,8 @@ class LazyDir{
   }
 
   fun callLazy(context: mutable Context, key: BaseName): Array<File> {
-    newDirsCopy = context.newDirs;
-    context.!newDirs = SortedSet[];
     value = this.lazyFun(context, this.dirName, key);
-    newDirs = context.newDirs;
-    context.!newDirs = newDirsCopy.union(newDirs);
     !this = context.unsafeGetLazyDir(this.dirName);
-    (!this, removed) = this.updateNewDirs(context, key, newDirs);
-    for (dirName in removed) {
-      updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
-    };
     context.setDir(this.dirName, this);
     result = intern(Array[value]);
     result

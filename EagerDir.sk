@@ -132,12 +132,16 @@ class EagerDir{
     };
     writer = mutable Writer{};
     newDirsCopy = context.newDirs;
+    readsCopy = context.reads;
     context.!newDirs = SortedSet[];
+    context.!reads = mutable Vector[];
+
     f(context, writer, key, values);
     newDirs = context.newDirs;
-    context.!newDirs = newDirsCopy;
-    kvArray = writer.getWrites();
     reads = context.getReads();
+    context.!newDirs = newDirsCopy;
+    context.!reads = readsCopy;
+    kvArray = writer.getWrites();
     rows = kvArray.map(kv2 -> {
       (k2, v2) = kv2;
       path = Path(parentName, key);
@@ -330,16 +334,19 @@ class EagerDir{
   ): this {
     writer = mutable Writer{};
     newDirsCopy = context.newDirs;
+    readsCopy = context.reads;
     context.!newDirs = SortedSet[];
+    context.!reads = mutable Vector[];
 
     mapFun(context, writer, key, values);
 
     newDirs = context.newDirs;
+    reads = context.getReads();
     context.!newDirs = newDirsCopy;
+    context.!reads = readsCopy;
 
     !child = child.updateNewDirs(context, key, newDirs);
     mapped = writer.getWrites();
-    reads = context.getReads();
 
     for (read in reads) {
       readSet = context.newDeps.maybeGet(read) match {
