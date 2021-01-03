@@ -352,13 +352,7 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     if (!context.hasNext.contains(this.dirName)) {
       fixedData = FixedData{data => Array[]};
       time = context.timeStamp();
-      dir = EagerDir{
-        time,
-        input => true,
-        dirName,
-        fixedData,
-        childDirs => SortedMap[],
-      };
+      dir = EagerDir{time, input => true, dirName, fixedData};
       context.setDir(dirName, dir);
       return EHandle(this.conv, dirName)
     };

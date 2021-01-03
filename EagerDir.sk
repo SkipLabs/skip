@@ -56,18 +56,13 @@ class EagerDir{
   mapFun: ?MapFun = None(),
 
   parent: ?DirName = None(),
-  childDirs: SortedMap<Int, DirName>,
+  childDirs: SortedMap<Int, DirName> = SortedMap[],
 } extends Dir {
   fun isInput(): Bool {
     this.input
   }
   fun getTime(): Int {
     this.time
-  }
-
-  fun getChildren(): Array<DirName> {
-    result = this.childDirs.items().map(x -> x.i1).collect(Array);
-    result
   }
 
   private static fun mapData(
@@ -433,7 +428,7 @@ class EagerDir{
 
     updateDirtyReaders(context, path);
 
-    for (childName in this.getChildren()) {
+    for (childName in this.childDirs) {
       context.unsafeGetDir(childName) match {
       | child @ EagerDir _ ->
         context.!toUpdate = context.toUpdate.set(child.time, childName)

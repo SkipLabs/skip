@@ -243,7 +243,6 @@ mutable class Context{
           input => false,
           dirName => preDirName,
           fixedData => FixedData{data => Array[]},
-          childDirs => SortedMap[],
         };
         dir.unsafeIterKeys((key, _time) -> {
           values = dir.getArrayRaw(key);
@@ -346,13 +345,7 @@ mutable class Context{
     vector.sort();
     fixedData = FixedData{data => vector.toArray()};
     time = this.timeStamp();
-    dir = EagerDir{
-      time,
-      input => true,
-      dirName,
-      fixedData,
-      childDirs => SortedMap[],
-    };
+    dir = EagerDir{time, input => true, dirName, fixedData};
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
     dir
   }
@@ -444,10 +437,6 @@ mutable class Context{
   }
 
   mutable fun removeDir(dirName: DirName): void {
-    dir = this.getDir(dirName);
-    for (childName in dir.getChildren()) {
-      this.removeDir(childName);
-    };
     if (this.debugMode) {
       print_string("REMOVED: " + dirName);
     };
