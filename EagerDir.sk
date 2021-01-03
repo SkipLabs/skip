@@ -323,65 +323,6 @@ class EagerDir{
     }
   }
 
-  private static fun updateKey(
-    context: mutable Context,
-    child: EagerDir,
-    mapFun: MapFun,
-    oldKeys: mutable Set<BaseName>,
-    parentName: DirName,
-    key: BaseName,
-    values: Array<File>,
-  ): this {
-    writer = mutable Writer{};
-    newDirsCopy = context.newDirs;
-    readsCopy = context.reads;
-    context.!newDirs = SortedSet[];
-    context.!reads = mutable Vector[];
-
-    mapFun(context, writer, key, values);
-
-    newDirs = context.newDirs;
-    reads = context.getReads();
-    context.!newDirs = newDirsCopy;
-    context.!reads = readsCopy;
-
-    !child = child.updateNewDirs(context, key, newDirs);
-    mapped = writer.getWrites();
-
-    for (read in reads) {
-      readSet = context.newDeps.maybeGet(read) match {
-      | None() -> SortedSet[]
-      | Some(x) -> x
-      };
-      !readSet = readSet.set((parentName, child.dirName, key));
-      context.!newDeps[read] = readSet;
-    };
-
-    keys = mutable Vector[];
-    source = Path(parentName, key);
-
-    for (kv in mapped) {
-      (k, rvalues) = kv;
-
-      keys.push(k);
-      if (oldKeys.contains(k)) {
-        oldKeys.remove(k);
-      };
-      !child = child.writeEntry(context, source, k, rvalues);
-    };
-
-    // Let's remove the keys that no longer exist.
-    for (k in oldKeys) {
-      !child = child.writeEntry(context, source, k, Array[]);
-    };
-
-    // We need to remember what keys we produced for the next
-    // time around.
-    !child.old[key] = keys.toArray();
-
-    child
-  }
-
   static fun update(
     context: mutable Context,
     parentName: DirName,
@@ -412,15 +353,52 @@ class EagerDir{
     for (key in dirty) {
       values = parent.getArrayRaw(key);
       oldKeys = Set::mcreateFromItems(static::getOld(child, key));
-      !child = static::updateKey(
-        context,
-        child,
-        mapFun,
-        oldKeys,
-        parentName,
-        key,
-        values,
-      );
+      writer = mutable Writer{};
+      newDirsCopy = context.newDirs;
+      readsCopy = context.reads;
+      context.!newDirs = SortedSet[];
+      context.!reads = mutable Vector[];
+
+      mapFun(context, writer, key, values);
+
+      newDirs = context.newDirs;
+      reads = context.getReads();
+      context.!newDirs = newDirsCopy;
+      context.!reads = readsCopy;
+
+      !child = child.updateNewDirs(context, key, newDirs);
+      mapped = writer.getWrites();
+
+      for (read in reads) {
+        readSet = context.newDeps.maybeGet(read) match {
+        | None() -> SortedSet[]
+        | Some(x) -> x
+        };
+        !readSet = readSet.set((parentName, child.dirName, key));
+        context.!newDeps[read] = readSet;
+      };
+
+      keys = mutable Vector[];
+      source = Path(parentName, key);
+
+      for (kv in mapped) {
+        (k, rvalues) = kv;
+
+        keys.push(k);
+        if (oldKeys.contains(k)) {
+          oldKeys.remove(k);
+        };
+        !child = child.writeEntry(context, source, k, rvalues);
+      };
+
+      // Let's remove the keys that no longer exist.
+      for (k in oldKeys) {
+        !child = child.writeEntry(context, source, k, Array[]);
+      };
+
+      // We need to remember what keys we produced for the next
+      // time around.
+      !child.old[key] = keys.toArray();
     };
     context.setDir(child.dirName, child);
   }
