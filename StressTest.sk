@@ -125,9 +125,9 @@ fun evalMDir(context: mutable SKFS.Context, dir: MDir): void {
   name = dir.name;
   input = dir.input;
   readDirs = dir.readDirs;
-  inputDir = context.unsafeGetEagerDir(SKFS.DirName::create(input));
-  _ = inputDir.apply(
+  SKFS.EagerDir::apply(
     context,
+    Array[SKFS.DirName::create(input)],
     SKFS.DirName::create(name),
     (context, writer, key, values) ~> {
       if (values.size() == 0) return void;
@@ -174,23 +174,28 @@ fun evalSub(
     subDirNameStr = dirName + "sub" + currentKey + "_" + sum + thisDirName;
     subDirName = SKFS.DirName::create(subDirNameStr);
     !subDirs = List.Cons(subDirNameStr, subDirs);
-    _ = dir.apply(context, subDirName, (context, writer, localKey, values) ~> {
-      if (values.size() == 0) return void;
-      localSum = sum;
-      for (readDirName in readDirs) {
-        readDir = context.unsafeGetDir(SKFS.DirName::create(readDirName));
-        read = readDir.getArray(context, localKey).map(x ->
-          SKFS.IntFile::fromFile(x)
-        );
-        for (value in read) {
-          !localSum = localSum + value.value
+    SKFS.EagerDir::apply(
+      context,
+      Array[dir.dirName],
+      subDirName,
+      (context, writer, localKey, values) ~> {
+        if (values.size() == 0) return void;
+        localSum = sum;
+        for (readDirName in readDirs) {
+          readDir = context.unsafeGetDir(SKFS.DirName::create(readDirName));
+          read = readDir.getArray(context, localKey).map(x ->
+            SKFS.IntFile::fromFile(x)
+          );
+          for (value in read) {
+            !localSum = localSum + value.value
+          };
         };
-      };
-      for (value in values) {
-        !localSum = localSum + SKFS.IntFile::fromFile(value).value;
-      };
-      writer.write(localKey, SKFS.IntFile(localSum))
-    })
+        for (value in values) {
+          !localSum = localSum + SKFS.IntFile::fromFile(value).value;
+        };
+        writer.write(localKey, SKFS.IntFile(localSum))
+      },
+    )
   };
 
   subDirs

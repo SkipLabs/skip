@@ -14,9 +14,11 @@ fun minDir<T: frozen>(
     dirEHandle.dirName.toString() + diffName + "/",
   );
   minDirName = DirName::create(dirEHandle.dirName.toString() + name + "/");
-  context
-    .unsafeGetEagerDir(dirEHandle.dirName)
-    .apply(context, diffMinDirName, (context, writer, key, newValues) ~> {
+  SKFS.EagerDir::apply(
+    context,
+    Array[dirEHandle.dirName],
+    diffMinDirName,
+    (context, writer, key, newValues) ~> {
       preDiffOpt = EHandle(dirEHandle.conv, dirEHandle.dirName).pre(context);
       oldValues = preDiffOpt match {
       | None() -> Array[]
@@ -28,52 +30,57 @@ fun minDir<T: frozen>(
       if (cmp != 0) {
         writer.write(IID(0), DiffKeyFile(cmp, key))
       }
-    });
+    },
+  );
   minDir = EHandle(BaseNameOptionFile::fromFile, minDirName);
-  diffDir = context.unsafeGetEagerDir(diffMinDirName);
-  diffDir.apply(context, minDirName, (context, writer, _, diffs) ~> {
-    acc: ?BaseName = minDir.pre(context) match {
-    | None() -> None()
-    | Some(preDir) -> preDir.getArray(context, IID(0))[0].value
-    };
-    for (diff in diffs) {
-      keyFile = DiffKeyFile::fromFile(diff);
-      if (keyFile.cmp < 0) {
-        if (acc is None _) continue;
-        if (acc is Some _ && acc.fromSome() < keyFile.key) continue;
-        dir = context.unsafeGetEagerDir(dirEHandle.dirName);
-        minData = dir.data.minKey(kv ~> {
-          (key, _) = kv;
-          dir.getArrayRaw(key).size() > 0
-        });
-        current = 0;
-        minFixedData = while (current < dir.fixedData.data.size()) {
-          row = dir.fixedData.data[current];
-          values = dir.getArrayRaw(row.key);
-          if (values.size() != 0) {
-            break (Some(row.key));
-          };
-          !current = current + 1;
-        } else {
-          None()
-        };
-        (minData, minFixedData) match {
-        | (None(), None()) -> !acc = None()
-        | (x @ Some _, None())
-        | (None(), x @ Some _) ->
-          !acc = x
-        | (Some _, Some _) -> !acc = min(minData, minFixedData)
-        }
-      } else {
-        invariant(keyFile.cmp == 1);
-        !acc = acc match {
-        | None() -> Some(keyFile.key)
-        | Some(y) -> Some(min(y, keyFile.key))
-        }
+  SKFS.EagerDir::apply(
+    context,
+    Array[diffMinDirName],
+    minDirName,
+    (context, writer, _, diffs) ~> {
+      acc: ?BaseName = minDir.pre(context) match {
+      | None() -> None()
+      | Some(preDir) -> preDir.getArray(context, IID(0))[0].value
       };
-    };
-    writer.write(IID(0), BaseNameOptionFile(acc));
-  });
+      for (diff in diffs) {
+        keyFile = DiffKeyFile::fromFile(diff);
+        if (keyFile.cmp < 0) {
+          if (acc is None _) continue;
+          if (acc is Some _ && acc.fromSome() < keyFile.key) continue;
+          dir = context.unsafeGetEagerDir(dirEHandle.dirName);
+          minData = dir.data.minKey(kv ~> {
+            (key, _) = kv;
+            dir.getArrayRaw(key).size() > 0
+          });
+          current = 0;
+          minFixedData = while (current < dir.fixedData.data.size()) {
+            row = dir.fixedData.data[current];
+            values = dir.getArrayRaw(row.key);
+            if (values.size() != 0) {
+              break (Some(row.key));
+            };
+            !current = current + 1;
+          } else {
+            None()
+          };
+          (minData, minFixedData) match {
+          | (None(), None()) -> !acc = None()
+          | (x @ Some _, None())
+          | (None(), x @ Some _) ->
+            !acc = x
+          | (Some _, Some _) -> !acc = min(minData, minFixedData)
+          }
+        } else {
+          invariant(keyFile.cmp == 1);
+          !acc = acc match {
+          | None() -> Some(keyFile.key)
+          | Some(y) -> Some(min(y, keyFile.key))
+          }
+        };
+      };
+      writer.write(IID(0), BaseNameOptionFile(acc));
+    },
+  );
   minDir
 }
 

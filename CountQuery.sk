@@ -9,9 +9,11 @@ fun sumDir<T: frozen>(
 ): EHandle<IntFile> {
   diffCountDirName = DirName::create(dir.dirName.toString() + diffName + "/");
   countDirName = DirName::create(dir.dirName.toString() + name + "/");
-  context
-    .unsafeGetEagerDir(dir.dirName)
-    .apply(context, diffCountDirName, (context, writer, key, newValues) ~> {
+  SKFS.EagerDir::apply(
+    context,
+    Array[dir.dirName],
+    diffCountDirName,
+    (context, writer, key, newValues) ~> {
       preDiffOpt = EHandle(dir.conv, dir.dirName).pre(context);
       oldValues = preDiffOpt match {
       | None() -> Array[]
@@ -25,11 +27,14 @@ fun sumDir<T: frozen>(
       if (cmp != 0) {
         writer.write(IID(0), IntFile(cmp))
       }
-    });
+    },
+  );
   countDir = EHandle(IntFile::fromFile, countDirName);
-  context
-    .unsafeGetEagerDir(diffCountDirName)
-    .apply(context, countDirName, (context, writer, _, diffs) ~> {
+  SKFS.EagerDir::apply(
+    context,
+    Array[diffCountDirName],
+    countDirName,
+    (context, writer, _, diffs) ~> {
       oldSums = countDir.pre(context) match {
       | None() -> Array[]
       | Some(preDir) -> preDir.getArray(context, IID(0))
@@ -39,7 +44,8 @@ fun sumDir<T: frozen>(
         !acc = acc + IntFile::fromFile(diff).value;
       };
       writer.write(IID(0), IntFile(acc))
-    });
+    },
+  );
   countDir
 }
 

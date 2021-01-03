@@ -168,41 +168,48 @@ class EagerDir{
       File,
     >,
   ): void {
-    this.apply(context, productDirName, (context, writer, key1, values1) ~> {
-      if (values1.size() == 0) return void;
-      hash1 = key1.hash();
-      hash2 = (23, key1).hash();
-      name = hash1.toString() + hash2;
-      subProductDirName = productDirName.sub(name);
-      dir2.apply(
-        context,
-        subProductDirName,
-        (context, writer, key2, values2) ~> {
-          if (values2.size() == 0) return void;
-          values = f(context, key1, values1, key2, values2);
-          writer.write(IID(0), ProductRow(key1, key2, values));
-        },
-      );
-      subDir = context.getDir(subProductDirName);
-      values = subDir.getArray(context, IID(0));
-      if (values.size() == 0) {
-        return void;
-      };
-      for (file in values) {
-        row = ProductRow::fromFile(file);
-        key = PID(Array[row.key1, row.key2]);
-        writer.writeArray(key, row.values);
-      }
-    });
+    static::apply(
+      context,
+      Array[this.dirName],
+      productDirName,
+      (context, writer, key1, values1) ~> {
+        if (values1.size() == 0) return void;
+        hash1 = key1.hash();
+        hash2 = (23, key1).hash();
+        name = hash1.toString() + hash2;
+        subProductDirName = productDirName.sub(name);
+        static::apply(
+          context,
+          Array[dir2.dirName],
+          subProductDirName,
+          (context, writer, key2, values2) ~> {
+            if (values2.size() == 0) return void;
+            values = f(context, key1, values1, key2, values2);
+            writer.write(IID(0), ProductRow(key1, key2, values));
+          },
+        );
+        subDir = context.getDir(subProductDirName);
+        values = subDir.getArray(context, IID(0));
+        if (values.size() == 0) {
+          return void;
+        };
+        for (file in values) {
+          row = ProductRow::fromFile(file);
+          key = PID(Array[row.key1, row.key2]);
+          writer.writeArray(key, row.values);
+        }
+      },
+    );
   }
 
-  fun apply(context: mutable Context, dirName: DirName, f: MapFun): void {
+  static fun apply(
+    context: mutable Context,
+    parents: Array<DirName>,
+    dirName: DirName,
+    f: MapFun,
+  ): void {
     if (context.newDirs.contains(dirName)) {
-      error(
-        `Error: directory ${dirName.toString()} already exists (parent: ${
-          this.dirName
-        })`,
-      );
+      error(`Error: directory ${dirName.toString()} already exists`);
     };
     context.unsafeMaybeGetEagerDir(dirName) match {
     | Some(dir) ->
@@ -218,20 +225,20 @@ class EagerDir{
       }
     | _ -> void
     };
+    parent = context.getEagerDir(parents[0]);
     context.!newDirs = context.newDirs.add(dirName);
     acc = mutable Vector[];
-    static::mapData(context, this, f, acc);
+    static::mapData(context, parent, f, acc);
     mapped = acc.chill();
-    grouped = this.regroupMap(mapped);
-    this.updateReaders(context, dirName, mapped);
+    grouped = parent.regroupMap(mapped);
+    parent.updateReaders(context, dirName, mapped);
     fixedData = FixedData{data => grouped.rows};
-    parents = mutable Vector[this.dirName];
     time = context.timeStamp();
     dir = EagerDir{
       time,
       dirName,
       input => false,
-      parents => Some(parents.toArray()),
+      parents => Some(parents),
       fixedData,
       fixedOld => FixedData{data => grouped.old},
       mapFun => Some(f),
@@ -240,11 +247,11 @@ class EagerDir{
     };
     updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, dir);
-    static::addParent(context, time, dirName, this.dirName);
+    static::addParent(context, time, dirName, parent.dirName);
     if (context.debugMode) {
       print_string(
         `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${
-          this.dirName
+          parent.dirName
         })`,
       );
     };

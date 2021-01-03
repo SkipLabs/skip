@@ -125,7 +125,12 @@ base class Handle<+T: frozen> {
   }
 }
 
-// Lazy Handle
+/*****************************************************************************/
+/* A lazy handle is updated "lazily", in other words, an entry is computed
+ * only when someone tries to access it.
+ */
+/*****************************************************************************/
+
 class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   static fun create<T: File>(
     conv: File ~> T,
@@ -169,7 +174,10 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   }
 }
 
-// Eager Handle
+/*****************************************************************************/
+/* Eager handles. */
+/*****************************************************************************/
+
 class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   /*
     fun union<U>[T: U](
@@ -216,32 +224,39 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
   ): EHandle<T2> {
-    thisDir = context.unsafeGetEagerDir(this.dirName);
-    thisDirName = this.dirName.toString();
-    thisDir.apply(context, dirName, (context, writer, key, files) ~> {
-      context.vtry(
-        () -> {
-          if (files.size() == 0) return void;
-          f(context, writer, key, files.map(x -> this.conv(x)));
-        },
-        e ->
-          e match {
-          | ErrorFile(trace) ->
-            traceElt = ErrorTrace(thisDirName, key.toString(), "propagated");
-            !trace = List.Cons(traceElt, trace);
-            writer.write(key, ErrorFile(trace))
-          | exn ->
-            traceElt = ErrorTrace(
-              thisDirName,
-              key.toString(),
-              exn.getMessage(),
-            );
-            trace = List.Cons(traceElt, List.Nil());
-            writer.write(key, ErrorFile(trace))
-          }
-        ,
-      )
-    });
+    EagerDir::apply(
+      context,
+      Array[this.dirName],
+      dirName,
+      (context, writer, key, files) ~> {
+        context.vtry(
+          () -> {
+            if (files.size() == 0) return void;
+            f(context, writer, key, files.map(x -> this.conv(x)));
+          },
+          e ->
+            e match {
+            | ErrorFile(trace) ->
+              traceElt = ErrorTrace(
+                this.dirName.toString(),
+                key.toString(),
+                "propagated",
+              );
+              !trace = List.Cons(traceElt, trace);
+              writer.write(key, ErrorFile(trace))
+            | exn ->
+              traceElt = ErrorTrace(
+                this.dirName.toString(),
+                key.toString(),
+                exn.getMessage(),
+              );
+              trace = List.Cons(traceElt, List.Nil());
+              writer.write(key, ErrorFile(trace))
+            }
+          ,
+        )
+      },
+    );
     EHandle(conv, dirName)
   }
 
