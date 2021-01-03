@@ -286,31 +286,39 @@ class EagerDir{
   }
 
   fun getArrayRaw(key: BaseName): Array<File> {
-    fixed = this.fixedData.getArray(key);
+    fixedIter = this.fixedData.getIter(key);
     this.data.maybeGet(key) match {
-    | None() -> fixed.map(x -> x.i1).flatten()
+    | None() ->
+      acc = mutable Vector[];
+      for (rows in fixedIter) {
+        for (row in rows.i1) {
+          acc.push(row);
+        }
+      };
+      acc.toArray()
     | Some(modified) ->
+      fixed = FixedDataIterator::create(this.fixedData.getIter(key));
       result = mutable Vector<File>[];
-      current = 0;
+
       for (path => values in modified) {
-        while (current < fixed.size() && fixed[current].i0 < path) {
-          for (file in fixed[current].i1) {
+        while (!fixed.isEnd() && fixed.current().i0 < path) {
+          for (file in fixed.current().i1) {
             result.push(file);
           };
-          !current = current + 1;
+          fixed.next();
         };
-        while (current < fixed.size() && fixed[current].i0 == path) {
-          !current = current + 1;
+        while (!fixed.isEnd() && fixed.current().i0 == path) {
+          fixed.next();
         };
         for (file in values) {
           result.push(file);
         }
       };
-      while (current < fixed.size()) {
-        for (file in fixed[current].i1) {
+      while (!fixed.isEnd()) {
+        for (file in fixed.current().i1) {
           result.push(file);
         };
-        !current = current + 1;
+        fixed.next();
       };
       result.toArray()
     }

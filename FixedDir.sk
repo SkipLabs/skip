@@ -65,4 +65,36 @@ class FixedData<T>{data: Array<FixedRow<T>> = Array[]} {
     };
     result.toArray();
   }
+
+  fun getIter(key: BaseName): mutable Iterator<(Path, T)> {
+    pos = this.getPos(key, 0, this.data.size() - 1);
+    while (pos < this.data.size() && this.data[pos].key == key) {
+      yield this.data[pos].value;
+      !pos = pos + 1;
+    };
+  }
+}
+
+mutable class FixedDataIterator<T> private {
+  iter: mutable Iterator<(Path, T)>,
+  mutable currentOpt: ?(Path, T) = None(),
+} {
+  static fun create(iter: mutable Iterator<(Path, T)>): mutable this {
+    mutable static{currentOpt => iter.next(), iter => iter}
+  }
+
+  readonly fun isEnd(): Bool {
+    this.currentOpt is None _
+  }
+
+  readonly fun current(): (Path, T) {
+    this.currentOpt match {
+    | None() -> invariant_violation("Cannot access current")
+    | Some(x) -> x
+    }
+  }
+
+  mutable fun next(): void {
+    this.!currentOpt = this.iter.next();
+  }
 }
