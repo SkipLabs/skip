@@ -142,22 +142,36 @@ class EagerDir{
     RowMapped(key, reads, rows, newDirs)
   }
 
-  fun regroupMap<File2>(mapped: Vector<RowMapped<File2>>): GroupedRows<File2> {
-    rowVec = mutable Vector[];
-    oldVec = mutable Vector[];
-    newDirs = SortedMap[];
+  static fun regroupMap(
+    parentName: DirName,
+    mapped: Vector<RowMapped<Array<File>>>,
+    rowVec: mutable Vector<FixedRow<Array<File>>>,
+    oldVec: mutable Vector<FixedRow<SKFS.BaseName>>,
+    newDirsRef: mutable Ref<SortedMap<BaseName, SortedSet<DirName>>>,
+  ): void {
     for (rowMapped in mapped) {
       key = rowMapped.key;
       rows = rowMapped.values;
       for (row in rows) {
-        oldVec.push(FixedRow(key, (Path(this.dirName, key), row.key)));
+        oldVec.push(FixedRow(key, (Path(parentName, key), row.key)));
         rowVec.push(row);
       };
-      !newDirs = newDirs.set(key, rowMapped.newDirs);
+      if (!rowMapped.newDirs.isEmpty()) {
+        newDirs = newDirsRef.get();
+        !newDirs = newDirs.set(key, rowMapped.newDirs);
+        newDirsRef.set(newDirs);
+      }
     };
+  }
+
+  static fun sortGroup(
+    rowVec: mutable Vector<FixedRow<Array<File>>>,
+    oldVec: mutable Vector<FixedRow<SKFS.BaseName>>,
+    newDirs: mutable Ref<SortedMap<BaseName, SortedSet<DirName>>>,
+  ): GroupedRows<Array<File>> {
     rowVec.sort();
     oldVec.sort();
-    GroupedRows(rowVec.toArray(), oldVec.toArray(), newDirs)
+    GroupedRows(rowVec.toArray(), oldVec.toArray(), newDirs.get())
   }
 
   fun product(
@@ -230,8 +244,12 @@ class EagerDir{
     acc = mutable Vector[];
     static::mapData(context, parent, f, acc);
     mapped = acc.chill();
-    grouped = parent.regroupMap(mapped);
+    dataVec = mutable Vector[];
+    oldVec = mutable Vector[];
+    newDirs = mutable Ref(SortedMap[]);
+    static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
     parent.updateReaders(context, dirName, mapped);
+    grouped = static::sortGroup(dataVec, oldVec, newDirs);
     fixedData = FixedData{data => grouped.rows};
     time = context.timeStamp();
     dir = EagerDir{
