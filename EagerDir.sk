@@ -273,7 +273,7 @@ class EagerDir{
     };
     updateDirtyReaders(context, Path(childName.tag(), DirTag()));
     context.setDir(childName, dir);
-    static::addParent(context, time, childName, parentName);
+    static::addChildToParent(context, time, parentName, childName);
     if (context.debugMode) {
       print_string(
         `CREATED:  ${childName} (time: ${time}, parent: ${parentName})`,
@@ -281,14 +281,14 @@ class EagerDir{
     };
   }
 
-  private static fun addParent(
+  private static fun addChildToParent(
     context: mutable Context,
     time: Int,
-    dirName: DirName,
     parentName: DirName,
+    childName: DirName,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
-    !parent.childDirs = parent.childDirs.add(time, dirName);
+    !parent.childDirs = parent.childDirs.add(time, childName);
     context.setDir(parent.dirName, parent);
   }
 
