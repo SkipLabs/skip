@@ -70,60 +70,64 @@ class EagerDir{
     result
   }
 
-  static fun mapData(
+  private static fun mapData(
     context: mutable Context,
-    dir: EagerDir,
+    parent: EagerDir,
     f: MapFun,
     acc: mutable Vector<RowMapped<Array<File>>>,
   ): void {
     current = 0;
     addFixed = () -> {
-      key = dir.fixedData.data[current].key;
+      key = parent.fixedData.data[current].key;
       valueAcc = mutable Vector<(Path, Array<File>)>[];
       while (
-        current < dir.fixedData.data.size() &&
-        dir.fixedData.data[current].key == key
+        current < parent.fixedData.data.size() &&
+        parent.fixedData.data[current].key == key
       ) {
-        valueAcc.push(dir.fixedData.data[current].value);
+        valueAcc.push(parent.fixedData.data[current].value);
         !current = current + 1;
       };
       fixedFiles = valueAcc.map(x -> x.i1).flatten().toArray();
-      acc.push(dir.mapRow(context, key, fixedFiles, f));
+      acc.push(static::mapRow(context, parent.dirName, key, fixedFiles, f));
     };
-    for (key => _ in dir.data) {
+    for (key => _ in parent.data) {
       while (
-        current < dir.fixedData.data.size() &&
-        dir.fixedData.data[current].key < key
+        current < parent.fixedData.data.size() &&
+        parent.fixedData.data[current].key < key
       ) {
         addFixed();
       };
       while (
-        current < dir.fixedData.data.size() &&
-        dir.fixedData.data[current].key == key
+        current < parent.fixedData.data.size() &&
+        parent.fixedData.data[current].key == key
       ) {
         !current = current + 1;
       };
-      acc.push(dir.mapRow(context, key, dir.getArrayRaw(key), f));
+      acc.push(
+        static::mapRow(
+          context,
+          parent.dirName,
+          key,
+          parent.getArrayRaw(key),
+          f,
+        ),
+      );
     };
-    while (current < dir.fixedData.data.size()) {
+    while (current < parent.fixedData.data.size()) {
       addFixed();
     };
   }
 
-  fun mapRow(
+  private static fun mapRow(
     context: mutable Context,
+    parentName: DirName,
     key: BaseName,
     values: Array<File>,
     f: MapFun,
   ): RowMapped<Array<File>> {
     if (context.debugMode) {
       print_string(
-        "MAPROW: " +
-          this.dirName +
-          " " +
-          key +
-          " " +
-          inspect(values).toString(),
+        "MAPROW: " + parentName + " " + key + " " + inspect(values).toString(),
       );
     };
     writer = mutable Writer{};
@@ -136,13 +140,13 @@ class EagerDir{
     reads = context.getReads();
     rows = kvArray.map(kv2 -> {
       (k2, v2) = kv2;
-      path = Path(this.dirName, key);
+      path = Path(parentName, key);
       FixedRow(k2, (path, v2))
     });
     RowMapped(key, reads, rows, newDirs)
   }
 
-  static fun regroupMap(
+  private static fun regroupMap(
     parentName: DirName,
     mapped: Vector<RowMapped<Array<File>>>,
     rowVec: mutable Vector<FixedRow<Array<File>>>,
@@ -164,7 +168,7 @@ class EagerDir{
     };
   }
 
-  static fun sortGroup(
+  private static fun sortGroup(
     rowVec: mutable Vector<FixedRow<Array<File>>>,
     oldVec: mutable Vector<FixedRow<SKFS.BaseName>>,
     newDirs: mutable Ref<SortedMap<BaseName, SortedSet<DirName>>>,
@@ -248,7 +252,7 @@ class EagerDir{
     oldVec = mutable Vector[];
     newDirs = mutable Ref(SortedMap[]);
     static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
-    parent.updateReaders(context, dirName, mapped);
+    static::updateReaders(context, parentName, dirName, mapped);
     grouped = static::sortGroup(dataVec, oldVec, newDirs);
     fixedData = FixedData{data => grouped.rows};
     time = context.timeStamp();
@@ -273,7 +277,7 @@ class EagerDir{
     };
   }
 
-  static fun addParent(
+  private static fun addParent(
     context: mutable Context,
     time: Int,
     dirName: DirName,
@@ -317,10 +321,10 @@ class EagerDir{
 
   private static fun updateKey(
     context: mutable Context,
-    dir: EagerDir,
+    child: EagerDir,
     mapFun: MapFun,
     oldKeys: mutable Set<BaseName>,
-    source: Path,
+    parentName: DirName,
     key: BaseName,
     values: Array<File>,
   ): this {
@@ -333,11 +337,7 @@ class EagerDir{
     newDirs = context.newDirs;
     context.!newDirs = newDirsCopy;
 
-    (!dir, removed) = dir.updateNewDirs(context, key, newDirs);
-    for (dirName in removed) {
-      updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
-    };
-
+    !child = child.updateNewDirs(context, key, newDirs);
     mapped = writer.getWrites();
     reads = context.getReads();
 
@@ -346,11 +346,12 @@ class EagerDir{
       | None() -> SortedSet[]
       | Some(x) -> x
       };
-      !readSet = readSet.set((source.dirName, dir.dirName, key));
+      !readSet = readSet.set((parentName, child.dirName, key));
       context.!newDeps[read] = readSet;
     };
 
     keys = mutable Vector[];
+    source = Path(parentName, key);
 
     for (kv in mapped) {
       (k, rvalues) = kv;
@@ -359,50 +360,57 @@ class EagerDir{
       if (oldKeys.contains(k)) {
         oldKeys.remove(k);
       };
-      !dir = dir.writeEntry(context, source, k, rvalues);
+      !child = child.writeEntry(context, source, k, rvalues);
     };
 
     // Let's remove the keys that no longer exist.
     for (k in oldKeys) {
-      !dir = dir.writeEntry(context, source, k, Array[]);
+      !child = child.writeEntry(context, source, k, Array[]);
     };
 
     // We need to remember what keys we produced for the next
     // time around.
-    !dir.old[key] = keys.toArray();
+    !child.old[key] = keys.toArray();
 
-    dir
+    child
   }
 
-  fun update(context: mutable Context, childName: DirName): void {
+  static fun update(
+    context: mutable Context,
+    parentName: DirName,
+    childName: DirName,
+  ): void {
+    parent = context.unsafeGetEagerDir(parentName);
     child = context.unsafeGetEagerDir(childName);
+
     dirty = mutable Set[];
-    if (context.dirtyReaders.containsKey(this.dirName)) {
-      if (context.dirtyReaders[this.dirName].containsKey(childName)) {
-        for (elt in context.dirtyReaders[this.dirName][childName]) {
+    if (context.dirtyReaders.containsKey(parent.dirName)) {
+      if (context.dirtyReaders[parent.dirName].containsKey(childName)) {
+        for (elt in context.dirtyReaders[parent.dirName][childName]) {
           dirty.add(elt)
         }
       };
     };
-    if (context.dirty.containsKey(this.dirName)) {
-      for (key in context.dirty[this.dirName]) {
+    if (context.dirty.containsKey(parent.dirName)) {
+      for (key in context.dirty[parent.dirName]) {
         dirty.insert(key);
       };
     };
+
+    mapFun = child.mapFun match {
+    | None() -> invariant_violation("Cannot update an input Directory")
+    | Some(f) -> f
+    };
+
     for (key in dirty) {
-      values = this.getArrayRaw(key);
-      source = Path(this.dirName, key);
-      oldKeys = Set::mcreateFromItems(child.getOld(key));
-      mapFun = child.mapFun match {
-      | None() -> continue
-      | Some(f) -> f
-      };
+      values = parent.getArrayRaw(key);
+      oldKeys = Set::mcreateFromItems(static::getOld(child, key));
       !child = static::updateKey(
         context,
         child,
         mapFun,
         oldKeys,
-        source,
+        parentName,
         key,
         values,
       );
@@ -504,17 +512,18 @@ class EagerDir{
     this.dirName
   }
 
-  fun getOld(key: BaseName): Array<BaseName> {
-    if (this.old.containsKey(key)) {
-      this.old[key]
+  static fun getOld(child: EagerDir, key: BaseName): Array<BaseName> {
+    if (child.old.containsKey(key)) {
+      child.old[key]
     } else {
-      this.fixedOld.getArray(key).map(x -> x.i1)
+      child.fixedOld.getArray(key).map(x -> x.i1)
     }
   }
 
-  fun updateReaders(
+  private static fun updateReaders(
     context: mutable Context,
-    dirName: DirName,
+    parentName: DirName,
+    childName: DirName,
     mapped: readonly Vector<RowMapped<Array<File>>>,
   ): void {
     readDirs = mutable Map[];
@@ -534,7 +543,7 @@ class EagerDir{
         readerKey = row.i0;
         readKey = row.i1;
         readerPath = Path(readDirName, readerKey);
-        deps.push((readerPath, this.dirName, dirName, readKey));
+        deps.push((readerPath, parentName, childName, readKey));
       };
     };
     context.!deps = List.Cons(deps.toArray(), context.deps);
@@ -544,10 +553,10 @@ class EagerDir{
     context: mutable Context,
     key: BaseName,
     newDirs: SortedSet<DirName>,
-  ): (this, Vector<DirName>) {
+  ): this {
     removed = mutable Vector[];
     this.newDirs.maybeGet(key) match {
-    | None() -> if (newDirs.isEmpty()) return (this, Vector[])
+    | None() -> if (newDirs.isEmpty()) return this
     | Some(lastRoundDirs) ->
       for (dirName in lastRoundDirs) {
         if (newDirs.contains(dirName)) continue;
@@ -556,7 +565,10 @@ class EagerDir{
       }
     };
     !this.newDirs = this.newDirs.set(key, newDirs);
-    (this, removed.chill())
+    for (dirName in removed) {
+      updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+    };
+    this
   }
 
   fun writeArray(
