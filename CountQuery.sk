@@ -11,7 +11,7 @@ fun sumDir<T: frozen>(
   countDirName = DirName::create(dir.dirName.toString() + name + "/");
   SKFS.EagerDir::apply(
     context,
-    Array[dir.dirName],
+    dir.dirName,
     diffCountDirName,
     (context, writer, key, newValues) ~> {
       preDiffOpt = EHandle(dir.conv, dir.dirName).pre(context);
@@ -32,7 +32,7 @@ fun sumDir<T: frozen>(
   countDir = EHandle(IntFile::fromFile, countDirName);
   SKFS.EagerDir::apply(
     context,
-    Array[diffCountDirName],
+    diffCountDirName,
     countDirName,
     (context, writer, _, diffs) ~> {
       oldSums = countDir.pre(context) match {

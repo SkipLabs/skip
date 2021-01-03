@@ -127,7 +127,7 @@ fun evalMDir(context: mutable SKFS.Context, dir: MDir): void {
   readDirs = dir.readDirs;
   SKFS.EagerDir::apply(
     context,
-    Array[SKFS.DirName::create(input)],
+    SKFS.DirName::create(input),
     SKFS.DirName::create(name),
     (context, writer, key, values) ~> {
       if (values.size() == 0) return void;
@@ -176,7 +176,7 @@ fun evalSub(
     !subDirs = List.Cons(subDirNameStr, subDirs);
     SKFS.EagerDir::apply(
       context,
-      Array[dir.dirName],
+      dir.dirName,
       subDirName,
       (context, writer, localKey, values) ~> {
         if (values.size() == 0) return void;

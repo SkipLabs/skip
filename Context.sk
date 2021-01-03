@@ -298,14 +298,12 @@ mutable class Context{
         | DeletedDir _ -> void
         | dir @ LazyDir _ -> dir.updateLazy(this)
         | dir @ EagerDir _ ->
-          dir.parents match {
+          dir.parent match {
           | None() -> void
-          | Some(parents) ->
-            for (parentName in parents) {
-              this.!toReset = this.toReset.set(parentName);
-              parent = this.unsafeGetEagerDir(parentName);
-              parent.update(this, dirName)
-            }
+          | Some(parentName) ->
+            this.!toReset = this.toReset.set(parentName);
+            parent = this.unsafeGetEagerDir(parentName);
+            parent.update(this, dirName)
           }
         }
       };

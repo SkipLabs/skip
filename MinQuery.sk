@@ -16,7 +16,7 @@ fun minDir<T: frozen>(
   minDirName = DirName::create(dirEHandle.dirName.toString() + name + "/");
   SKFS.EagerDir::apply(
     context,
-    Array[dirEHandle.dirName],
+    dirEHandle.dirName,
     diffMinDirName,
     (context, writer, key, newValues) ~> {
       preDiffOpt = EHandle(dirEHandle.conv, dirEHandle.dirName).pre(context);
@@ -35,7 +35,7 @@ fun minDir<T: frozen>(
   minDir = EHandle(BaseNameOptionFile::fromFile, minDirName);
   SKFS.EagerDir::apply(
     context,
-    Array[diffMinDirName],
+    diffMinDirName,
     minDirName,
     (context, writer, _, diffs) ~> {
       acc: ?BaseName = minDir.pre(context) match {

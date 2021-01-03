@@ -55,7 +55,7 @@ class EagerDir{
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
   mapFun: ?MapFun = None(),
 
-  parents: ?Array<DirName> = None(),
+  parent: ?DirName = None(),
   childDirs: SortedMap<Int, DirName>,
 } extends Dir {
   fun isInput(): Bool {
@@ -184,7 +184,7 @@ class EagerDir{
   ): void {
     static::apply(
       context,
-      Array[this.dirName],
+      this.dirName,
       productDirName,
       (context, writer, key1, values1) ~> {
         if (values1.size() == 0) return void;
@@ -194,7 +194,7 @@ class EagerDir{
         subProductDirName = productDirName.sub(name);
         static::apply(
           context,
-          Array[dir2.dirName],
+          dir2.dirName,
           subProductDirName,
           (context, writer, key2, values2) ~> {
             if (values2.size() == 0) return void;
@@ -218,7 +218,7 @@ class EagerDir{
 
   static fun apply(
     context: mutable Context,
-    parents: Array<DirName>,
+    parentName: DirName,
     dirName: DirName,
     f: MapFun,
   ): void {
@@ -228,7 +228,7 @@ class EagerDir{
     context.unsafeMaybeGetEagerDir(dirName) match {
     | Some(dir) ->
       if (
-        dir.parents is Some _ &&
+        dir.parent is Some _ &&
         inspect(dir.mapFun.fromSome()) == inspect(f)
       ) {
         if (context.debugMode) {
@@ -240,20 +240,15 @@ class EagerDir{
     | _ -> void
     };
     acc = mutable Vector[];
-    for (parentName in parents) {
-      parent = context.getEagerDir(parentName);
-      context.!newDirs = context.newDirs.add(dirName);
-      static::mapData(context, parent, f, acc);
-    };
+    parent = context.getEagerDir(parentName);
+    context.!newDirs = context.newDirs.add(dirName);
+    static::mapData(context, parent, f, acc);
     mapped = acc.chill();
     dataVec = mutable Vector[];
     oldVec = mutable Vector[];
     newDirs = mutable Ref(SortedMap[]);
-    for (parentName in parents) {
-      parent = context.getEagerDir(parentName);
-      static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
-      parent.updateReaders(context, dirName, mapped);
-    };
+    static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
+    parent.updateReaders(context, dirName, mapped);
     grouped = static::sortGroup(dataVec, oldVec, newDirs);
     fixedData = FixedData{data => grouped.rows};
     time = context.timeStamp();
@@ -261,7 +256,7 @@ class EagerDir{
       time,
       dirName,
       input => false,
-      parents => Some(parents),
+      parent => Some(parentName),
       fixedData,
       fixedOld => FixedData{data => grouped.old},
       mapFun => Some(f),
@@ -270,12 +265,10 @@ class EagerDir{
     };
     updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     context.setDir(dirName, dir);
-    for (parentName in parents) {
-      static::addParent(context, time, dirName, parentName);
-    };
+    static::addParent(context, time, dirName, parentName);
     if (context.debugMode) {
       print_string(
-        `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${parents})`,
+        `CREATED:  ${dirName.toString()} (time: ${time}, parent: ${parentName})`,
       );
     };
   }
@@ -322,26 +315,25 @@ class EagerDir{
     }
   }
 
-  private fun updateChildForKey<T: File>(
-    mapFun: MapFun,
+  private static fun updateKey(
     context: mutable Context,
+    dir: EagerDir,
+    mapFun: MapFun,
     oldKeys: mutable Set<BaseName>,
     source: Path,
     key: BaseName,
-    values: Array<T>,
-  ): (this, Array<BaseName>) {
+    values: Array<File>,
+  ): this {
     writer = mutable Writer{};
     newDirsCopy = context.newDirs;
     context.!newDirs = SortedSet[];
 
-    //    if (values.size() != 0) {
     mapFun(context, writer, key, values);
-    //    };
 
     newDirs = context.newDirs;
     context.!newDirs = newDirsCopy;
 
-    (!this, removed) = this.updateNewDirs(context, key, newDirs);
+    (!dir, removed) = dir.updateNewDirs(context, key, newDirs);
     for (dirName in removed) {
       updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
     };
@@ -354,7 +346,7 @@ class EagerDir{
       | None() -> SortedSet[]
       | Some(x) -> x
       };
-      !readSet = readSet.set((source.dirName, this.dirName, key));
+      !readSet = readSet.set((source.dirName, dir.dirName, key));
       context.!newDeps[read] = readSet;
     };
 
@@ -367,15 +359,19 @@ class EagerDir{
       if (oldKeys.contains(k)) {
         oldKeys.remove(k);
       };
-      !this = this.writeEntry(context, source, k, rvalues);
+      !dir = dir.writeEntry(context, source, k, rvalues);
     };
 
     // Let's remove the keys that no longer exist.
     for (k in oldKeys) {
-      !this = this.writeEntry(context, source, k, Array[]);
+      !dir = dir.writeEntry(context, source, k, Array[]);
     };
 
-    (this, keys.toArray())
+    // We need to remember what keys we produced for the next
+    // time around.
+    !dir.old[key] = keys.toArray();
+
+    dir
   }
 
   fun update(context: mutable Context, childName: DirName): void {
@@ -401,17 +397,15 @@ class EagerDir{
       | None() -> continue
       | Some(f) -> f
       };
-      (!child, newKeys) = child.updateChildForKey(
-        mapFun,
+      !child = static::updateKey(
         context,
+        child,
+        mapFun,
         oldKeys,
         source,
         key,
         values,
       );
-      // We need to remember what keys we produced for the next
-      // time around.
-      !child.old[key] = newKeys;
     };
     context.setDir(child.dirName, child);
   }
