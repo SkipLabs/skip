@@ -207,6 +207,17 @@ class EagerDir{
     );
   }
 
+  static fun isReusable(child: EagerDir, f: MapFun): Bool {
+    child.parent is Some _ && inspect(child.mapFun.fromSome()) == inspect(f)
+  }
+
+  static fun reuseDir(context: mutable Context, childName: DirName): void {
+    if (context.debugMode) {
+      print_string(`REUSING: ${childName}`);
+    };
+    context.!newDirs = context.newDirs.add(childName);
+  }
+
   static fun apply(
     context: mutable Context,
     parentName: DirName,
@@ -217,17 +228,9 @@ class EagerDir{
       error(`Error: directory ${childName.toString()} already exists`);
     };
     context.unsafeMaybeGetEagerDir(childName) match {
-    | Some(dir) ->
-      if (
-        dir.parent is Some _ &&
-        inspect(dir.mapFun.fromSome()) == inspect(f)
-      ) {
-        if (context.debugMode) {
-          print_string(`REUSING: ${dir.dirName}`);
-        };
-        context.!newDirs = context.newDirs.add(dir.dirName);
-        return void;
-      }
+    | Some(child) if (static::isReusable(child, f)) ->
+      static::reuseDir(context, childName);
+      return void
     | _ -> void
     };
     acc = mutable Vector[];
