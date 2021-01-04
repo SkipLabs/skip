@@ -112,9 +112,9 @@ class LazyDir{
     result
   }
 
-  static fun update(context: mutable Context, dir: LazyDir): void {
+  fun update(context: mutable Context): void {
     thisDirtyReaders = SortedSet[];
-    firstDirtyReaders = context.dirtyReaders.maybeGet(dir.dirName) match {
+    firstDirtyReaders = context.dirtyReaders.maybeGet(this.dirName) match {
     | None() -> mutable Map[]
     | Some(m) -> m
     };
@@ -129,15 +129,15 @@ class LazyDir{
     dirtyReaders = fixPoint(thisDirtyReaders, key -> {
       context
         .getDeps(key)
-        .filter(x -> x.i1 == dir.dirName)
+        .filter(x -> x.i1 == this.dirName)
         .map(x -> Path(x.i1, x.i2))
         .collect(Set);
     });
     for (path in dirtyReaders) {
       key = path.baseName;
-      !dir.data = dir.data.set(TimeTag::create(context.tick), key, Array[]);
+      !this.data = this.data.set(TimeTag::create(context.tick), key, Array[]);
     };
-    context.setDir(dir.dirName, dir);
+    context.setDir(this.dirName, this);
     for (path in dirtyReaders) {
       updateDirtyReaders(context, path);
     }
