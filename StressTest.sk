@@ -141,7 +141,7 @@ fun evalLDir(context: mutable SKFS.Context, dir: LDir): void {
     context,
     SKFS.DirName::create(dir.name),
     (context, _self, key) ~> {
-      evalLFun(context, dir.name, dir.readDirs, key)
+      Array[evalLFun(context, dir.name, dir.readDirs, key)]
     },
   )
 }
@@ -338,10 +338,14 @@ fun compareContext(
         dir match {
         | SKFS.LazyDir{data} ->
           data.maybeGet(key) match {
-          | None() -> print_string("EMPTY DATA")
-          | Some(files) ->
+          | None()
+          | Some(SKFS.LAbsent()) ->
+            print_string("EMPTY DATA")
+          | Some(SKFS.LDefined(files)) ->
             intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
             print_string(`       ${intFiles}`)
+          | Some(SKFS.LError(errFile)) ->
+            print_string("ERROR Lazy value: " + errFile.toString())
           }
         | SKFS.EagerDir{data} ->
           data.maybeGet(key) match {

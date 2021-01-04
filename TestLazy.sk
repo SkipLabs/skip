@@ -18,12 +18,15 @@ fun testLazy(): mutable SKFS.Context {
       context,
       SKFS.DirName::create("/lazy1/"),
       (context, _self, x) ~> {
-        SKFS.IntFile(
-          x match {
-          | SKFS.IID(v) -> dirInput.getArray(context, SKFS.IID(0))[0].value + v
-          | _ -> error()
-          },
-        )
+        Array[
+          SKFS.IntFile(
+            x match {
+            | SKFS.IID(v) ->
+              dirInput.getArray(context, SKFS.IID(0))[0].value + v
+            | _ -> error()
+            },
+          ),
+        ]
       },
     );
     dir2 = SKFS.LHandle::create(
@@ -31,7 +34,7 @@ fun testLazy(): mutable SKFS.Context {
       context,
       SKFS.DirName::create("/lazy2/"),
       (context, _self, key) ~> {
-        SKFS.IntFile(dir1.getArray(context, key)[0].value)
+        Array[SKFS.IntFile(dir1.getArray(context, key)[0].value)]
       },
     );
     _dir3 = dirInput2.contextWriterKeyMap(

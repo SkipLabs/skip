@@ -136,39 +136,10 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     conv: File ~> T,
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, EHandle<T>, BaseName) ~> T,
+    f: (mutable Context, EHandle<T>, BaseName) ~> Array<T>,
   ): EHandle<T> {
     dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
-      if (context.lazyVisitedSet.contains(Path(dirName, key))) {
-        msg = "Error: cyclic lazy data " + " ".join(context.lazyVisitedList);
-        return ErrorFile(
-          List[ErrorTrace(dirName.toString(), key.toString(), msg)],
-        )
-      };
-      oldLazyVisitedList = context.lazyVisitedList;
-      oldLazyVisitedSet = context.lazyVisitedSet;
-      onExit = () -> {
-        context.!lazyVisitedList = oldLazyVisitedList;
-        context.!lazyVisitedSet = oldLazyVisitedSet;
-      };
-      context.!lazyVisitedList = List.Cons(
-        Path(dirName, key),
-        oldLazyVisitedList,
-      );
-      context.!lazyVisitedSet = context.lazyVisitedSet.add(Path(dirName, key));
-      context.vtry<File>(
-        () -> {
-          result = f(context, EHandle(conv, dirName), key);
-          onExit();
-          result
-        },
-        exn -> {
-          onExit();
-          msg = exn.getMessage();
-          trace = ErrorTrace(dirName.toString(), key.toString(), msg);
-          ErrorFile(List[trace])
-        },
-      )
+      f(context, EHandle(conv, dirName), key);
     });
     EHandle(conv, dir.getDirName())
   }

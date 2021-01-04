@@ -3,11 +3,18 @@
 /*****************************************************************************/
 module SKFS;
 
+base class LazyResult {
+  children =
+  | LDefined(Array<File>)
+  | LError(ErrorFile)
+  | LAbsent()
+}
+
 class LazyDir{
   time: Int,
   dirName: DirName,
-  data: DMap<BaseName, Array<File>> = Nil(),
-  lazyFun: ((mutable Context, BaseName) ~> File),
+  data: DMap<BaseName, LazyResult> = Nil(),
+  lazyFun: ((mutable Context, BaseName) ~> LazyResult),
 } extends Dir {
   fun isInput(): Bool {
     false
@@ -23,8 +30,8 @@ class LazyDir{
 
   fun files(): Set<BaseName> {
     keys = mutable Set[];
-    for (newKey => newValues in this.data) {
-      if (newValues.size() > 0) {
+    for (newKey => value in this.data) {
+      if (value is LDefined _) {
         keys.insert(newKey);
       };
     };
@@ -42,7 +49,7 @@ class LazyDir{
   static fun create(
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, DirName, BaseName) ~> File,
+    f: (mutable Context, DirName, BaseName) ~> Array<File>,
   ): Dir {
     time = context.timeStamp();
     updateReaders = (
@@ -64,24 +71,22 @@ class LazyDir{
     lazyFun = (context: mutable Context, key: BaseName) ~> {
       readsCopy = context.reads;
       context.!reads = mutable Vector[];
-      result = context.vtry<File>(
+      result = context.vtry<LazyResult>(
         () -> {
-          f(context, dirName, key)
+          LDefined(f(context, dirName, key))
         },
         e ->
-          ErrorFile(
-            List[
-              ErrorTrace(dirName.toString(), key.toString(), e.getMessage()),
-            ],
+          LError(
+            ErrorFile(
+              List[
+                ErrorTrace(dirName.toString(), key.toString(), e.getMessage()),
+              ],
+            ),
           )
         ,
       );
       dir = context.unsafeGetLazyDir(dirName);
-      !dir.data = dir.data.set(
-        TimeTag::create(context.tick),
-        key,
-        Array[result],
-      );
+      !dir.data = dir.data.set(TimeTag::create(context.tick), key, result);
       updateReaders(dirName, context, key);
       context.setDir(dirName, dir);
       if (context.debugMode) {
@@ -99,8 +104,9 @@ class LazyDir{
 
   fun getArrayRaw(key: BaseName): Array<File> {
     this.data.maybeGet(key) match {
-    | None() -> Array[]
-    | Some(arr) -> arr
+    | Some(LDefined(arr)) -> arr
+    | Some(LError(err)) -> Array[err]
+    | _ -> Array[]
     }
   }
 
@@ -127,7 +133,7 @@ class LazyDir{
     });
     for (path in dirtyReaders) {
       key = path.baseName;
-      !this.data = this.data.set(TimeTag::create(context.tick), key, Array[]);
+      !this.data = this.data.set(TimeTag::create(context.tick), key, LAbsent());
     };
     context.setDir(this.dirName, this);
     for (path in dirtyReaders) {
@@ -138,9 +144,16 @@ class LazyDir{
   fun getArray(context: mutable Context, key: BaseName): Array<File> {
     path = Path(this.dirName, key);
     context.addDep(path);
-    values = this.getArrayRaw(key);
-    if (values.size() != 0) return values;
-
-    Array[this.lazyFun(context, key)]
+    lazyResult = this.data.maybeGet(key) match {
+    | None()
+    | Some(LAbsent()) ->
+      this.lazyFun(context, key)
+    | Some(x) -> x
+    };
+    lazyResult match {
+    | LDefined(arr) -> arr
+    | LError(err) -> Array[err]
+    | _ -> Array[]
+    }
   }
 }
