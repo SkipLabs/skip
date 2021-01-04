@@ -7,7 +7,7 @@ class LazyDir{
   time: Int,
   dirName: DirName,
   data: DMap<BaseName, Array<File>> = Nil(),
-  lazyFun: ((mutable Context, DirName, BaseName) ~> File),
+  lazyFun: ((mutable Context, BaseName) ~> File),
 } extends Dir {
   fun isInput(): Bool {
     false
@@ -61,7 +61,7 @@ class LazyDir{
         context.!newDeps[read] = readSet;
       };
     };
-    lazyFun = (context: mutable Context, dirName: DirName, key: BaseName) ~> {
+    lazyFun = (context: mutable Context, key: BaseName) ~> {
       readsCopy = context.reads;
       context.!reads = mutable Vector[];
       result = context.vtry<File>(
@@ -104,14 +104,6 @@ class LazyDir{
     }
   }
 
-  fun callLazy(context: mutable Context, key: BaseName): Array<File> {
-    value = this.lazyFun(context, this.dirName, key);
-    !this = context.unsafeGetLazyDir(this.dirName);
-    context.setDir(this.dirName, this);
-    result = intern(Array[value]);
-    result
-  }
-
   fun update(context: mutable Context): void {
     thisDirtyReaders = SortedSet[];
     firstDirtyReaders = context.dirtyReaders.maybeGet(this.dirName) match {
@@ -148,6 +140,7 @@ class LazyDir{
     context.addDep(path);
     values = this.getArrayRaw(key);
     if (values.size() != 0) return values;
-    this.callLazy(context, key)
+
+    Array[this.lazyFun(context, key)]
   }
 }
