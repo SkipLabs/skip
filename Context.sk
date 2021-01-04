@@ -1,6 +1,43 @@
+/*****************************************************************************/
+/* File defining the context.
+ *
+ * The context is almost always mutable (unless it is copied to the shared
+ * heap).
+ *
+ * It keeps track of all the manipulation of the file system. Directories,
+ * dependencies etc ...
+ */
+/*****************************************************************************/
+
 module SKFS;
 
-class StringFile(value: .String) extends File
+/*****************************************************************************/
+/* The types used to manage dependencies. */
+/*****************************************************************************/
+
+// An Arrow represent an operation from a parent to a child.
+// Typically, a map is a tranformation that associates a value from a parent
+// to a child. The association between the two is called an Arrow.
+
+value class Arrow(
+  parentName: DirName,
+  childName: DirName,
+) uses Hashable, Orderable
+
+// An ArrowKey, is an Arrow plus a key (the key is from the parent).
+// This type is used to describe the root of a dependency on an EagerMap.
+// Let's say we have a directory A mapped to B. So B is the result of a map
+// applied to A with a given function.
+
+// If during the transformation from A to B, a key is read in third directory,
+// we will need to remember that the read occured while processing a map
+// from A to B on the key K. Hence the type: ArrowKey(A, B, K).
+
+value class ArrowKey(
+  parentName: DirName,
+  childName: DirName,
+  key: BaseName,
+) uses Hashable, Orderable
 
 class DirAlreadyExists(dirName: DirName) extends Exception {
   fun toString(): String {
@@ -65,21 +102,6 @@ fun addDirtyReader(context: mutable Context, reader: ArrowKey): void {
   };
   context.dirtyReaders[parentName][childName].insert(reader.key);
 }
-
-/*****************************************************************************/
-/* The types used to manage dependencies. */
-/*****************************************************************************/
-
-value class Arrow(
-  parentName: DirName,
-  childName: DirName,
-) uses Hashable, Orderable
-
-value class ArrowKey(
-  parentName: DirName,
-  childName: DirName,
-  key: BaseName,
-) uses Hashable, Orderable
 
 /*****************************************************************************/
 /* The context */
