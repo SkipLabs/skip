@@ -431,7 +431,10 @@ class EagerDir{
     for (childName in this.childDirs) {
       context.unsafeGetDir(childName) match {
       | child @ EagerDir _ ->
-        context.!toUpdate = context.toUpdate.set(child.time, childName)
+        context.!toUpdate = context.toUpdate.set(
+          child.time,
+          (this.dirName, childName),
+        )
       | DeletedDir _ -> void
       | LazyDir _ -> invariant_violation("Unexpected child type")
       }

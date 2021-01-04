@@ -49,7 +49,10 @@ fun updateDirtyReaders(context: mutable Context, path: Path): void {
     child = context.unsafeGetDir(childName);
 
     addDirtyReader(context, parentName, childName, baseName);
-    context.!toUpdate = context.toUpdate.set(child.getTime(), childName);
+    context.!toUpdate = context.toUpdate.set(
+      child.getTime(),
+      (parentName, childName),
+    );
   };
 }
 
@@ -81,7 +84,7 @@ mutable class Context{
   mutable reads: mutable Vector<Path> = mutable Vector[],
   mutable time: Int = 1,
   mutable tick: Int = 1,
-  mutable toUpdate: SortedMap<Int, DirName> = SortedMap[],
+  mutable toUpdate: SortedMap<Int, (DirName, DirName)> = SortedMap[],
   mutable deps: List<Array<(Path, DirName, DirName, BaseName)>> = List[],
   mutable fixedDeps: Map<Path, Set<(DirName, DirName, BaseName)>> = Map[],
   mutable newDeps: SortedMap<
@@ -289,19 +292,15 @@ mutable class Context{
         this.updatePre(this.toReset);
         this.!toReset = SortedSet[];
         return void
-      | Some((time, dirName)) ->
-        this.!toReset = this.toReset.set(dirName);
+      | Some((time, (parentName, childName))) ->
+        this.!toReset = this.toReset.set(childName);
         this.!toUpdate = this.toUpdate.remove(time);
-        this.unsafeGetDir(dirName) match {
+        this.unsafeGetDir(childName) match {
         | DeletedDir _ -> void
         | dir @ LazyDir _ -> dir.updateLazy(this)
-        | dir @ EagerDir _ ->
-          dir.parent match {
-          | None() -> void
-          | Some(parentName) ->
-            this.!toReset = this.toReset.set(parentName);
-            EagerDir::update(this, parentName, dirName)
-          }
+        | EagerDir _ ->
+          this.!toReset = this.toReset.set(parentName);
+          EagerDir::update(this, parentName, childName)
         }
       };
     };
