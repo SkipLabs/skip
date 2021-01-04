@@ -12,6 +12,17 @@
 module SKFS;
 
 /*****************************************************************************/
+/* Constants */
+/*****************************************************************************/
+
+const debugMode: Bool = false;
+
+// Unused constants. Are defined because of a bug in the compiler ... Sigh.
+
+const dummyDirty: Map<DirName, Set<BaseName>> = Map[];
+const dummyDirtyReaders: Map<DirName, Map<DirName, Set<BaseName>>> = Map[];
+
+/*****************************************************************************/
 /* The types used to manage dependencies. */
 /*****************************************************************************/
 
@@ -39,20 +50,9 @@ value class ArrowKey(
   key: BaseName,
 ) uses Hashable, Orderable
 
-class DirAlreadyExists(dirName: DirName) extends Exception {
-  fun toString(): String {
-    `Directory ${this.dirName} already exists`
-  }
-}
-
-fun start<T>(f: (mutable Context) -> T): (mutable Context, T) {
-  context = mutable Context{};
-  result = f(context);
-  context.updateNewDeps();
-  context.initPre();
-  context.updateFixedDeps();
-  (context, result)
-}
+/*****************************************************************************/
+/* The function used to start the system. */
+/*****************************************************************************/
 
 fun run(f: (mutable Context) -> void): mutable Context {
   context = mutable Context{};
@@ -63,18 +63,12 @@ fun run(f: (mutable Context) -> void): mutable Context {
   context
 }
 
-const debugMode: Bool = false;
-
-const dummyDirty: Map<DirName, Set<BaseName>> = Map[];
-const dummyDirtyReaders: Map<DirName, Map<DirName, Set<BaseName>>> = Map[];
-
 /*****************************************************************************/
 /* Primitives used to make a file "dirty" (dirty means that it needs to be
  * recomputed.
  *
  * - dirtyReaders are files that are made dirty because of a read access
  * - dirty are files that are made dirty because of a Map.
- *
  */
 /*****************************************************************************/
 
