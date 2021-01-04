@@ -297,10 +297,10 @@ mutable class Context{
         this.!toUpdate = this.toUpdate.remove(time);
         this.unsafeGetDir(childName) match {
         | DeletedDir _ -> void
-        | dir @ LazyDir _ -> dir.updateLazy(this)
-        | EagerDir _ ->
+        | child @ LazyDir _ -> LazyDir::update(this, child)
+        | child @ EagerDir _ ->
           this.!toReset = this.toReset.set(parentName);
-          EagerDir::update(this, parentName, childName)
+          EagerDir::update(this, parentName, child)
         }
       };
     };
