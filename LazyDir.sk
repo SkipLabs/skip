@@ -57,7 +57,7 @@ class LazyDir{
         | None() -> SortedSet[]
         | Some(x) -> x
         };
-        !readSet = readSet.set((dirName, dirName, key));
+        !readSet = readSet.set(ArrowKey(dirName, dirName, key));
         context.!newDeps[read] = readSet;
       };
     };
@@ -129,8 +129,8 @@ class LazyDir{
     dirtyReaders = fixPoint(thisDirtyReaders, key -> {
       context
         .getDeps(key)
-        .filter(x -> x.i1 == this.dirName)
-        .map(x -> Path(x.i1, x.i2))
+        .filter(x -> x.childName == this.dirName)
+        .map(x -> Path(x.childName, x.key))
         .collect(Set);
     });
     for (path in dirtyReaders) {

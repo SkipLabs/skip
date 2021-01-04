@@ -369,7 +369,7 @@ class EagerDir{
         | None() -> SortedSet[]
         | Some(x) -> x
         };
-        !readSet = readSet.set((parentName, child.dirName, key));
+        !readSet = readSet.set(ArrowKey(parentName, child.dirName, key));
         context.!newDeps[read] = readSet;
       };
 
@@ -433,7 +433,7 @@ class EagerDir{
       | child @ EagerDir _ ->
         context.!toUpdate = context.toUpdate.set(
           child.time,
-          (this.dirName, childName),
+          Arrow(this.dirName, childName),
         )
       | DeletedDir _ -> void
       | LazyDir _ -> invariant_violation("Unexpected child type")
@@ -526,7 +526,7 @@ class EagerDir{
         readerKey = row.i0;
         readKey = row.i1;
         readerPath = Path(readDirName, readerKey);
-        deps.push((readerPath, parentName, childName, readKey));
+        deps.push((readerPath, ArrowKey(parentName, childName, readKey)));
       };
     };
     context.!deps = List.Cons(deps.toArray(), context.deps);

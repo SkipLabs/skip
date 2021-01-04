@@ -42,26 +42,20 @@ const dummyDirtyReaders: Map<DirName, Map<DirName, Set<BaseName>>> = Map[];
 /*****************************************************************************/
 
 fun updateDirtyReaders(context: mutable Context, path: Path): void {
-  readers = context.getDeps(path);
-
-  for (reader in readers) {
-    (parentName, childName, baseName) = reader;
-    child = context.unsafeGetDir(childName);
-
-    addDirtyReader(context, parentName, childName, baseName);
+  for (reader in context.getDeps(path)) {
+    child = context.unsafeGetDir(reader.childName);
+    addDirtyReader(context, reader);
     context.!toUpdate = context.toUpdate.set(
       child.getTime(),
-      (parentName, childName),
+      Arrow(reader.parentName, reader.childName),
     );
   };
 }
 
-fun addDirtyReader(
-  context: mutable Context,
-  parentName: DirName,
-  childName: DirName,
-  baseName: BaseName,
-): void {
+fun addDirtyReader(context: mutable Context, reader: ArrowKey): void {
+  parentName = reader.parentName;
+  childName = reader.childName;
+
   if (!context.dirtyReaders.containsKey(parentName)) {
     context.dirtyReaders![parentName] = mutable Map[];
   };
@@ -69,8 +63,23 @@ fun addDirtyReader(
   if (!context.dirtyReaders[parentName].containsKey(childName)) {
     context.dirtyReaders[parentName]![childName] = mutable Set[];
   };
-  context.dirtyReaders[parentName][childName].insert(baseName);
+  context.dirtyReaders[parentName][childName].insert(reader.key);
 }
+
+/*****************************************************************************/
+/* The types used to manage dependencies. */
+/*****************************************************************************/
+
+value class Arrow(
+  parentName: DirName,
+  childName: DirName,
+) uses Hashable, Orderable
+
+value class ArrowKey(
+  parentName: DirName,
+  childName: DirName,
+  key: BaseName,
+) uses Hashable, Orderable
 
 /*****************************************************************************/
 /* The context */
@@ -84,13 +93,10 @@ mutable class Context{
   mutable reads: mutable Vector<Path> = mutable Vector[],
   mutable time: Int = 1,
   mutable tick: Int = 1,
-  mutable toUpdate: SortedMap<Int, (DirName, DirName)> = SortedMap[],
-  mutable deps: List<Array<(Path, DirName, DirName, BaseName)>> = List[],
-  mutable fixedDeps: Map<Path, Set<(DirName, DirName, BaseName)>> = Map[],
-  mutable newDeps: SortedMap<
-    Path,
-    SortedSet<(DirName, DirName, BaseName)>,
-  > = SortedMap[],
+  mutable toUpdate: SortedMap<Int, Arrow> = SortedMap[],
+  mutable deps: List<Array<(Path, ArrowKey)>> = List[],
+  mutable fixedDeps: Map<Path, Set<ArrowKey>> = Map[],
+  mutable newDeps: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
   mutable debugMode: Bool = debugMode,
   mutable failOnExn: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
@@ -157,7 +163,7 @@ mutable class Context{
     reads
   }
 
-  readonly fun getDeps(path: Path): Set<(DirName, DirName, BaseName)> {
+  readonly fun getDeps(path: Path): Set<ArrowKey> {
     set = if (!this.fixedDeps.containsKey(path)) {
       Set[]
     } else {
@@ -194,11 +200,14 @@ mutable class Context{
     invariant(this.fixedDeps.isEmpty());
     for (depVector in this.deps) {
       for (read in depVector) {
-        (path, sourceDir, targetDir, baseName) = read;
+        (path, arrowKey) = read;
+        sourceDir = arrowKey.parentName;
+        targetDir = arrowKey.childName;
+        baseName = arrowKey.key;
         if (!fixedDeps.containsKey(path)) {
           fixedDeps![path] = mutable Set[];
         };
-        fixedDeps[path].add((sourceDir, targetDir, baseName));
+        fixedDeps[path].add(ArrowKey(sourceDir, targetDir, baseName));
       }
     };
     this.!deps = List[];
@@ -208,8 +217,11 @@ mutable class Context{
   mutable fun updateNewDeps(): void {
     for (depVector in this.deps) {
       for (read in depVector) {
-        (path, sourceDir, targetDir, baseName) = read;
-        reader = (sourceDir, targetDir, baseName);
+        (path, arrowKey) = read;
+        sourceDir = arrowKey.parentName;
+        targetDir = arrowKey.childName;
+        baseName = arrowKey.key;
+        reader = ArrowKey(sourceDir, targetDir, baseName);
         if (this.fixedDeps.containsKey(path)) {
           if (this.fixedDeps[path].contains(reader)) {
             continue;
@@ -292,7 +304,7 @@ mutable class Context{
         this.updatePre(this.toReset);
         this.!toReset = SortedSet[];
         return void
-      | Some((time, (parentName, childName))) ->
+      | Some((time, Arrow(parentName, childName))) ->
         this.!toReset = this.toReset.set(childName);
         this.!toUpdate = this.toUpdate.remove(time);
         this.unsafeGetDir(childName) match {
