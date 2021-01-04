@@ -165,16 +165,6 @@ class EagerDir{
     };
   }
 
-  private static fun sortGroup(
-    rowVec: mutable Vector<FixedRow<Array<File>>>,
-    oldVec: mutable Vector<FixedRow<SKFS.BaseName>>,
-    newDirs: mutable Ref<SortedMap<BaseName, SortedSet<DirName>>>,
-  ): GroupedRows<Array<File>> {
-    rowVec.sort();
-    oldVec.sort();
-    GroupedRows(rowVec.toArray(), oldVec.toArray(), newDirs.get())
-  }
-
   fun product(
     context: mutable Context,
     productDirName: DirName,
@@ -250,8 +240,9 @@ class EagerDir{
     newDirs = mutable Ref(SortedMap[]);
     static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
     static::updateReaders(context, parentName, childName, mapped);
-    grouped = static::sortGroup(dataVec, oldVec, newDirs);
-    fixedData = FixedData{data => grouped.rows};
+    dataVec.sort();
+    oldVec.sort();
+    fixedData = FixedData{data => dataVec.toArray()};
     time = context.timeStamp();
     dir = EagerDir{
       time,
@@ -259,9 +250,9 @@ class EagerDir{
       input => false,
       parent => Some(parentName),
       fixedData,
-      fixedOld => FixedData{data => grouped.old},
+      fixedOld => FixedData{data => oldVec.toArray()},
       mapFun => Some(f),
-      newDirs => grouped.newDirs,
+      newDirs => newDirs.get(),
       childDirs => SortedMap[],
     };
     updateDirtyReaders(context, Path(childName.tag(), DirTag()));
