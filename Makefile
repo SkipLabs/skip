@@ -18,7 +18,8 @@ CFILES=\
 	runtime/runtime.c \
 	runtime/stdlib.c \
 	runtime/stack.c \
-	runtime/string.c
+	runtime/string.c \
+	runtime/native_eq.c
 
 CFILES32=$(CFILES) runtime/runtime32_specific.c
 CFILES64=$(CFILES) runtime/runtime64_specific.cpp

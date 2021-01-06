@@ -13,7 +13,7 @@ base class LazyResult {
 class LazyDir{
   time: Int,
   dirName: DirName,
-  data: DMap<BaseName, LazyResult> = Nil(),
+  data: SortedMap<BaseName, LazyResult> = SortedMap[],
   lazyFun: ((mutable Context, BaseName) ~> LazyResult),
 } extends Dir {
   fun isInput(): Bool {
@@ -86,7 +86,7 @@ class LazyDir{
         ,
       );
       dir = context.unsafeGetLazyDir(dirName);
-      !dir.data = dir.data.set(TimeTag::create(context.tick), key, result);
+      !dir.data[key] = result;
       updateReaders(dirName, context, key);
       context.setDir(dirName, dir);
       if (context.debugMode) {
@@ -133,12 +133,18 @@ class LazyDir{
     });
     for (path in dirtyReaders) {
       key = path.baseName;
-      !this.data = this.data.set(TimeTag::create(context.tick), key, LAbsent());
+      oldData = this.data[key];
+      newData = this.lazyFun(context, key);
+      if (native_eq(oldData, newData) == 0) {
+        if (context.debugMode) {
+          print_string("LAZY REUSING KEY: " + key);
+        };
+        continue;
+      };
+      !this.data[key] = newData;
+      updateDirtyReaders(context, path);
     };
     context.setDir(this.dirName, this);
-    for (path in dirtyReaders) {
-      updateDirtyReaders(context, path);
-    }
   }
 
   fun getArray(context: mutable Context, key: BaseName): Array<File> {

@@ -412,6 +412,8 @@ class EagerDir{
     k: BaseName,
     rvalues: Array<File>,
   ): this {
+    if (native_eq(rvalues, this.getArrayRaw(k)) == 0) return this;
+
     map = this.data.maybeGet(k) match {
     | None() -> SortedMap[]
     | Some(x) -> x

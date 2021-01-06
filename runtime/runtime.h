@@ -68,6 +68,7 @@ void sk_htbl_add(sk_htbl_t* table, void* key, void* value);
 sk_cell_t* sk_htbl_find(sk_htbl_t* table, void* key);
 int sk_htbl_mem(sk_htbl_t* table, void* key);
 void sk_htbl_remove(sk_htbl_t* table, void* key);
+SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2);
 
 /*****************************************************************************/
 /* Stack types. */
@@ -146,6 +147,6 @@ void free_intern(char* obj, size_t memsize, size_t leftsize);
 void SKIP_internalExit();
 uint32_t SKIP_is_string(char* obj);
 void SKIP_free(stack_t* st, char* obj);
+int memcmp(const void * ptr1, const void * ptr2, size_t num);
 
 #endif
-
