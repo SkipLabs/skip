@@ -32,6 +32,21 @@ void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
   return memcpy(dest, val, (size_t)len);
 }
 
+/*****************************************************************************/
+/* Primite used for testing purposes. */
+/*****************************************************************************/
+#define MAGIC_NUMBER 232131
+
+void* SKIP_make_C_object() {
+  uint32_t* obj = (uint32_t*)malloc(sizeof(uint32_t));
+  *obj = MAGIC_NUMBER;
+  return (void*)obj;
+}
+
+uint32_t SKIP_is_C_object(uint32_t* obj) {
+  return (*obj == MAGIC_NUMBER);
+}
+
 extern void skip_main(void);
 
 /*****************************************************************************/

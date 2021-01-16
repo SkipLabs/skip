@@ -127,16 +127,23 @@ uint32_t SKIP_is_string(char* obj) {
   return *(((uint32_t*)obj)-1) & 0x80000000;
 }
 
-char* SKIP_intern_obj(stack_t* st, char* obj) {
+char* SKIP_intern_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj) {
 
   if(obj == NULL) {
     return NULL;
   }
 
-  sk_cell_t* icell = find_itable(obj);
+  int in_obstack = is_in_obstack(obj, pages, page_size);
 
-  if(icell != NULL && icell->value != NULL) {
-    icell->value = (void*)(((uintptr_t)icell->value) + 1);
+  if(!in_obstack) {
+
+    sk_cell_t* icell = find_itable(obj);
+
+    if(icell != NULL && icell->value != NULL) {
+      icell->value = (void*)(((uintptr_t)icell->value) + 1);
+      return obj;
+    }
+
     return obj;
   }
 
@@ -168,17 +175,20 @@ char* SKIP_intern_obj(stack_t* st, char* obj) {
 char* SKIP_intern(char* obj) {
   stack_t st_holder;
   stack_t* st = &st_holder;
+  size_t page_size = nbr_pages();
+  sk_cell_t* pages = get_pages(page_size);
 
   SKIP_stack_init(st, 1024);
 
-  char* result = SKIP_intern_obj(st, obj);
+  char* result = SKIP_intern_obj(st, pages, page_size, obj);
 
   while(st->head > 0) {
     value_t delayed = SKIP_stack_pop(st);
     void* toCopy = *delayed.value;
-    *delayed.slot = SKIP_intern_obj(st, toCopy);
+    *delayed.slot = SKIP_intern_obj(st, pages, page_size, toCopy);
   }
 
+  free_size(pages, sizeof(sk_cell_t*) * page_size);
   SKIP_stack_free(st);
 
   return result;

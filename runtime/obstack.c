@@ -89,6 +89,18 @@ void* SKIP_Obstack_calloc(size_t size) {
   return result;
 }
 
+char* SKIP_Obstack_shallowClone(size_t size, char* obj) {
+  size = size + sizeof(void*);
+  char* mem = SKIP_Obstack_alloc(size);
+  memcpy(mem, obj-sizeof(void*), size);
+  return mem+sizeof(void*);
+}
+
+/*****************************************************************************/
+/* Obstack creation/destruction. */
+/*****************************************************************************/
+
+
 char* SKIP_new_Obstack() {
   char* saved = head;
   return saved;
@@ -106,12 +118,92 @@ void SKIP_destroy_Obstack(char* saved) {
   head = saved;
 }
 
-char* SKIP_Obstack_shallowClone(size_t size, char* obj) {
-  size = size + sizeof(void*);
-  char* mem = SKIP_Obstack_alloc(size);
-  memcpy(mem, obj-sizeof(void*), size);
-  return mem+sizeof(void*);
-}
+/*****************************************************************************/
+/* Collection primitive (disabled). */
+/*****************************************************************************/
 
 void SKIP_Obstack_auto_collect() {
+}
+
+/*****************************************************************************/
+/* Search. */
+/*****************************************************************************/
+
+size_t nbr_pages() {
+  size_t nbr_page = 0;
+  void* cursor = page;
+  while(cursor != NULL) {
+    cursor = *(char**)cursor;
+    nbr_page++;
+  }
+  return nbr_page;
+}
+
+void quicksort(sk_cell_t* arr,int first,int last){
+  int i, j, pivot;
+  sk_cell_t temp;
+
+  if(first < last){
+    pivot = first;
+    i = first;
+    j = last;
+
+    while(i < j){
+      while(arr[i].key <= arr[pivot].key && i<last) {
+        i++;
+      }
+      while(arr[j].key > arr[pivot].key) {
+        j--;
+      }
+      if(i < j){
+        temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+      }
+    }
+
+    temp = arr[pivot];
+    arr[pivot] = arr[j];
+    arr[j] = temp;
+    quicksort(arr, first, j-1);
+    quicksort(arr, j+1, last);
+  }
+}
+
+sk_cell_t* get_pages(size_t size) {
+  sk_cell_t* result = (sk_cell_t*)malloc(sizeof(sk_cell_t) * size);
+  int i = 0;
+  void* cursor = page;
+  while(cursor != NULL) {
+    result[i].key = cursor;
+    result[i].value = cursor + *(size_t*)(cursor + sizeof(char*));
+    cursor = *(char**)cursor;
+    i++;
+  }
+  quicksort(result, 0, size-1);
+  return result;
+}
+
+int binarySearch(sk_cell_t* arr, size_t l, size_t r, void* x) {
+  if (r >= l) {
+    size_t mid = (l + r) / 2;
+
+    if (arr[mid].key <= x && x < arr[mid].value) {
+      return 1;
+    }
+
+    if (x < arr[mid].key)  {
+      if(mid == 0) return 0;
+      return binarySearch(arr, l, mid - 1, x);
+    }
+
+    return binarySearch(arr, mid + 1, r, x);
+  }
+
+  return 0;
+}
+
+
+int is_in_obstack(void* ptr, sk_cell_t* pages, size_t size) {
+  return binarySearch(pages, 0, size-1, ptr);
 }
