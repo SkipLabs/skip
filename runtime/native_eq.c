@@ -174,13 +174,19 @@ SkipInt SKIP_isEq(char* obj1, char* obj2) {
   stack_t* st = &st_holder;
   SKIP_stack_init(st, 1024);
   SkipInt cmp = SKIP_native_eq_helper(st, obj1, obj2);
-  if(cmp != 0) return !!cmp;
+  if(cmp != 0) {
+    SKIP_stack_free(st);
+    return !!cmp;
+  }
   while(st->head > 0) {
     value_t delayed = SKIP_stack_pop(st);
     void* obj1 = delayed.value;
     void* obj2 = delayed.slot;
     SkipInt cmp = SKIP_native_eq_helper(st, obj1, obj2);
-    if(cmp != 0) return !!cmp;
+    if(cmp != 0) {
+      SKIP_stack_free(st);
+      return !!cmp;
+    }
   }
   SKIP_stack_free(st);
   return 0;
