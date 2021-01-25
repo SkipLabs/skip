@@ -57,12 +57,12 @@ __thread char* end = NULL;
 /* Obstack allocation. */
 /*****************************************************************************/
 
-static void new_page(size_t size) {
+void sk_new_page(size_t size) {
   size_t block_size = PAGE_SIZE;
   if(size + sizeof(char*) + sizeof(size_t) > block_size) {
     block_size = size + sizeof(char*) + sizeof(size_t);
   }
-  head = (char*)malloc(block_size);
+  head = (char*)sk_malloc(block_size);
   end = head + block_size;
   *(char**)head = page;
   page = head;
@@ -73,7 +73,7 @@ static void new_page(size_t size) {
 
 char* SKIP_Obstack_alloc(size_t size) {
   if (head + size > end) {
-    new_page(size);
+    sk_new_page(size);
   }
   char* result = head;
   head += size;
@@ -109,11 +109,11 @@ char* SKIP_new_Obstack() {
 void SKIP_destroy_Obstack(char* saved) {
   while(saved < page || saved >= end) {
     char* tofree = page;
-    size_t tofree_size = *(size_t*)(page + sizeof(char*));
+    size_t tosk_free_size = *(size_t*)(page + sizeof(char*));
     page = *(char**)page;
     size_t size = *(size_t*)(page + sizeof(char*));
     end = page + size;
-    free_size(tofree, tofree_size);
+    sk_free_size(tofree, tosk_free_size);
   }
   head = saved;
 }
@@ -171,7 +171,7 @@ void quicksort(sk_cell_t* arr,int first,int last){
 }
 
 sk_cell_t* get_pages(size_t size) {
-  sk_cell_t* result = (sk_cell_t*)malloc(sizeof(sk_cell_t) * size);
+  sk_cell_t* result = (sk_cell_t*)sk_malloc(sizeof(sk_cell_t) * size);
   int i = 0;
   void* cursor = page;
   while(cursor != NULL) {

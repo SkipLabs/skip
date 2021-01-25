@@ -7,22 +7,22 @@
 void SKIP_stack_init(stack_t* st, size_t capacity) {
   st->head = 0;
   st->capacity = capacity;
-  st->values = (value_t*)malloc(sizeof(value_t) * capacity);
+  st->values = (value_t*)sk_malloc(sizeof(value_t) * capacity);
 }
 
 void SKIP_stack_free(stack_t* st) {
-  free_size(st->values, sizeof(value_t) * st->capacity);
+  sk_free_size(st->values, sizeof(value_t) * st->capacity);
 }
 
 void SKIP_stack_grow(stack_t* st) {
   stack_t new_st;
   new_st.head = 0;
   new_st.capacity = st->capacity * 2;
-  new_st.values = (value_t*)malloc(sizeof(value_t) * new_st.capacity);
+  new_st.values = (value_t*)sk_malloc(sizeof(value_t) * new_st.capacity);
   for(; new_st.head < st->capacity; new_st.head++) {
     new_st.values[new_st.head] = st->values[new_st.head];
   }
-  free_size(st->values, sizeof(value_t) * st->capacity);
+  sk_free_size(st->values, sizeof(value_t) * st->capacity);
   st->head = new_st.head;
   st->capacity = new_st.capacity;
   st->values = new_st.values;

@@ -5,7 +5,14 @@ const isSqlMode: Bool = args.size() > 1 && args[0] == "sql";
 
 module end;
 
+@cpp_extern("SKIP_load_context")
+native fun loadContext(): void;
+
+@cpp_extern("SKIP_memory_init")
+native fun memoryInit(): void;
+
 untracked fun main(): void {
+  memoryInit();
   if (SKFS.args.size() == 0) {
     print_error("Command parameters missing");
     exit(2);
@@ -44,6 +51,7 @@ untracked fun main(): void {
       exit(4);
     };
     context = testFuns[testName]();
+    SKFS.gContextSync(context.clone());
     if (SKFS.args[0] == "toplevel") {
       SKFS.toplevel(context)
     }

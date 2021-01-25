@@ -1,74 +1,20 @@
 #include "runtime.h"
 
 /*****************************************************************************/
-/* Interning primitives. */
+/* Computes the size of an object we wish to move. */
 /*****************************************************************************/
 
-extern size_t total_palloc_size;
-
-static char* shallow_intern(char* obj, size_t memsize, size_t leftsize) {
+size_t shallow_size(size_t memsize, size_t leftsize) {
   memsize += leftsize;
-  size_t alloc_size = memsize + sizeof(uintptr_t);
-  char* mem = sk_alloc(alloc_size);
-  *(uintptr_t*)mem = 0;
-  mem += sizeof(uintptr_t);
-  memcpy(mem, obj - leftsize, memsize);
-  mem = mem + leftsize;
-  return mem;
+  return memsize;
 }
 
-void sk_incr_ref_count(void* obj) {
-  uintptr_t* count = obj;
-  if(SKIP_is_string(obj)) {
-    count -= 2;
-  }
-  else {
-    SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
-
-    switch(ty->m_kind) {
-    case 0:
-      count -= 2;
-      break;
-    case 1:
-      count -= 3;
-      break;
-    default:
-      SKIP_internalExit();
-    }
-  }
-  *count = *count + 1;
-}
-
-uintptr_t sk_decr_ref_count(void* obj) {
-  uintptr_t* count = obj;
-  if(SKIP_is_string(obj)) {
-    count -= 2;
-  }
-  else {
-    SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
-
-    switch(ty->m_kind) {
-    case 0:
-      count -= 2;
-      break;
-    case 1:
-      count -= 3;
-      break;
-    default:
-      SKIP_internalExit();
-    }
-  }
-  uintptr_t result = *count;
-  *count = *count - 1;
-  return result;
-}
-
-char* SKIP_intern_class(stack_t* st, char* obj) {
+size_t SKIP_size_class(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
-  void** result = (void**)shallow_intern(obj, memsize, leftsize);
+  size_t result = shallow_size(memsize, leftsize);
 
   if((ty->m_refsHintMask & 1) != 0) {
     size_t size = ty->m_userByteSize / sizeof(void*);
@@ -80,8 +26,7 @@ char* SKIP_intern_class(stack_t* st, char* obj) {
       for(i = 0; i < bitsize && i < size; i++) {
         if(ty->m_refMask[mask_slot] & (1 << i)) {
           void** ptr = ((void**)obj)+(mask_slot * bitsize)+i;
-          void** slot = result+(mask_slot * bitsize)+i;
-          SKIP_stack_push(st, ptr, slot);
+          SKIP_stack_push(st, ptr, (void*)1);
         }
       };
       if(size < bitsize) {
@@ -92,20 +37,19 @@ char* SKIP_intern_class(stack_t* st, char* obj) {
     }
   }
 
-  return (char*)result;
+  return result;
 }
 
-char* SKIP_intern_array(stack_t* st, char* obj) {
+size_t SKIP_size_array(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
-  void** result = (void**)shallow_intern(obj, memsize, leftsize);
+  size_t result = shallow_size(memsize, leftsize);
   size_t bitsize = sizeof(void*) * 8;
 
   if((ty->m_refsHintMask & 1) != 0) {
-    char* rhead = (char*)result;
     char* ohead = obj;
     char* end = obj + memsize;
 
@@ -118,11 +62,9 @@ char* SKIP_intern_array(stack_t* st, char* obj) {
         for(i = 0; i < bitsize && size > 0; i++) {
           if(ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
-            void** slot = (void**)rhead;
-            SKIP_stack_push(st, ptr, slot);
+            SKIP_stack_push(st, ptr, (void*)1);
           }
           ohead += sizeof(void*);
-          rhead += sizeof(void*);
           size -= sizeof(void*);
         };
         mask_slot++;
@@ -130,30 +72,26 @@ char* SKIP_intern_array(stack_t* st, char* obj) {
     }
   }
 
-  return (char*)result;
-}
-
-char* SKIP_intern_string(char* obj) {
-  size_t len = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
-  char* result = shallow_intern(obj, len, 2 * sizeof(uint32_t));
   return result;
 }
 
-uint32_t SKIP_is_string(char* obj) {
-  return *(((uint32_t*)obj)-1) & 0x80000000;
+size_t SKIP_size_string(char* obj) {
+  size_t len = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
+  size_t result = shallow_size(len, 2 * sizeof(uint32_t));
+  return result;
 }
 
-char* SKIP_intern_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj) {
+size_t SKIP_size_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj) {
 
   if(obj == NULL) {
-    return NULL;
+    return 0;
   }
 
-  char* result;
+  size_t result;
 
   // Check if we are dealing with a string
   if(SKIP_is_string(obj)) {
-    result = SKIP_intern_string(obj);
+    result = SKIP_size_string(obj);
     return result;
   }
 
@@ -161,29 +99,28 @@ char* SKIP_intern_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj
 
   switch(ty->m_kind) {
   case 0:
-    result = SKIP_intern_class(st, obj);
+    result = SKIP_size_class(st, obj);
     break;
   case 1:
-    result = SKIP_intern_array(st, obj);
+    result = SKIP_size_array(st, obj);
     break;
   default:
     // NOT SUPPORTED
     SKIP_internalExit();
   }
 
-  return (char*)result;
+  return result;
 }
 
-
-void* SKIP_intern_shared(void* obj) {
+size_t SKIP_size(void* obj) {
   stack_t st_holder;
   stack_t* st = &st_holder;
   size_t page_size = nbr_pages();
   sk_cell_t* pages = get_pages(page_size);
 
   SKIP_stack_init(st, 1024);
-  void* result;
-  SKIP_stack_push(st, &obj, &result);
+  size_t result = 0;
+  SKIP_stack_push(st, &obj, (void*)1);
 
   while(st->head > 0) {
     value_t delayed = SKIP_stack_pop(st);
@@ -191,15 +128,10 @@ void* SKIP_intern_shared(void* obj) {
     int in_obstack = is_in_obstack(toCopy, pages, page_size);
 
     if(!in_obstack) {
-
-      if(!sk_is_static(toCopy)) {
-        sk_incr_ref_count(toCopy);
-      }
-
       continue;
     }
 
-    *delayed.slot = SKIP_intern_obj(st, pages, page_size, toCopy);
+    result += SKIP_size_obj(st, pages, page_size, toCopy);
   }
 
   sk_free_size(pages, sizeof(sk_cell_t*) * page_size);
@@ -208,6 +140,7 @@ void* SKIP_intern_shared(void* obj) {
   return result;
 }
 
-void* SKIP_intern(void* obj) {
-  return obj;
-}
+
+/*****************************************************************************/
+/* Arena objects. */
+/*****************************************************************************/

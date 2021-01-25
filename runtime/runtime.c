@@ -38,7 +38,7 @@ void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
 #define MAGIC_NUMBER 232131
 
 void* SKIP_make_C_object() {
-  uint32_t* obj = (uint32_t*)malloc(sizeof(uint32_t));
+  uint32_t* obj = (uint32_t*)sk_malloc(sizeof(uint32_t));
   *obj = MAGIC_NUMBER;
   return (void*)obj;
 }
@@ -53,30 +53,20 @@ extern void skip_main(void);
 /* Global context synchronization. */
 /*****************************************************************************/
 
-static char* context = NULL;
+void** context;
 
 void SKIP_context_init(char* obj) {
-  context = obj;
+  *context = obj;
 }
 
 char* SKIP_context_get() {
-  return context;
+  return *context;
 }
 
-void SKIP_context_sync(char* new) {
-  char* new_obj = SKIP_intern(new);
-  stack_t st_holder;
-  stack_t* st = &st_holder;
+extern size_t total_palloc_size;
 
-  SKIP_stack_init(st, 1024);
-  SKIP_free(st, context);
-
-  while(st->head > 0) {
-    value_t delayed = SKIP_stack_pop(st);
-    void* toFree = delayed.value;
-    SKIP_free(st, toFree);
-  }
-
-  SKIP_stack_free(st);
-  context = new_obj;
+void SKIP_context_sync(char* obj) {
+  char* new_obj = SKIP_intern_shared(obj);
+  SKIP_free(*context);
+  *context = new_obj;
 }

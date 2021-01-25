@@ -198,6 +198,15 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
     !pathStr = absolutePath(env.pwd, pathStr);
     !cmd = cmd.stripPrefix(cmd.take(idx));
     writeCmd(env, pathStr, "")
+  | "debug" ->
+    (mode, _) = nextToken();
+    if (mode == "true" || mode == "on") {
+      env.context.!debugMode = true;
+    } else if (mode == "false" || mode == "off") {
+      env.context.!debugMode = false;
+    } else {
+      print_string("Error missing parameter (Usage: debug on/off)")
+    }
   | _ -> print_string("Unknown command")
   }
 }

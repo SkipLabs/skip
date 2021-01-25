@@ -191,7 +191,9 @@ const env = {
   },
   SKIP_getArgN: function(n) {
     return encodeUTF8(args[n]);
-  }
+  },
+  SKIP_glock: function(){},
+  SKIP_gunlock: function(){}
 }
 
 
@@ -203,6 +205,7 @@ WebAssembly.instantiate(typedArray, {
   SKIP_call0 = result.instance.exports['SKIP_call0'];
   instance = result.instance;
   result.instance.exports.SKIP_initializeSkip();
+  result.instance.exports.SKIP_skfs_init();
   result.instance.exports.skip_main();
 }).catch(e => {
   // error caught

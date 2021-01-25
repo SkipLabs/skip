@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <pthread.h>
 
 namespace skip {
 struct SkipException : std::exception {
@@ -58,10 +59,6 @@ void SKIP_saveExn(void* e) {
   exn = e;
 }
 
-void free_size(void* ptr, size_t size) {
-  free(ptr);
-}
-
 static int argc = 0;
 static char** argv = NULL;
 
@@ -74,10 +71,19 @@ char* SKIP_getArgN(uint32_t n) {
   return sk_string_create(argv[n], strlen(argv[n]));
 }
 
+pthread_mutex_t glock;
+void sk_memory_init();
+void sk_memory_check_init();
+void sk_memory_check_init_over();
+void sk_new_page(size_t size);
+
 int main(int pargc, char** pargv) {
+  pthread_mutex_init(&glock, NULL);
+  sk_memory_check_init();
   argc = pargc;
   argv = pargv;
   SKIP_initializeSkip();
+  sk_memory_check_init_over();
   skip_main();
 }
 
@@ -104,5 +110,12 @@ void SKIP_print_error(char* str) {
   fprintf(stderr, "\n");
 }
 
+void SKIP_glock() {
+  pthread_mutex_lock(&glock);
+}
+
+void SKIP_gunlock() {
+  pthread_mutex_unlock(&glock);
+}
 
 }

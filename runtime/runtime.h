@@ -49,6 +49,8 @@ typedef struct {
 /* Types used for the hashtable. */
 /*****************************************************************************/
 
+#define TOMB ((void*)-1)
+
 typedef struct {
   void* key;
   void* value;
@@ -60,7 +62,6 @@ typedef struct {
   size_t bitcapacity;
   sk_cell_t* data;
 } sk_htbl_t;
-
 
 void sk_htbl_init(sk_htbl_t* table, size_t bitcapacity);
 void sk_htbl_free(sk_htbl_t* table);
@@ -127,7 +128,7 @@ typedef struct {
 /* Function signatures. */
 /*****************************************************************************/
 
-void* malloc(size_t);
+void* sk_malloc(size_t);
 void SKIP_throw(void*);
 SkipInt SKIP_getArraySize(char*);
 void SKIP_print_char(uint32_t);
@@ -137,19 +138,28 @@ char* SKIP_get_free_slot(uint32_t);
 void SKIP_add_free_slot(char*, uint32_t);
 char* SKIP_Obstack_alloc(size_t size);
 void free(void*);
-void free_size(void*, size_t);
+void sk_free_size(void*, size_t);
+void sk_sk_free_size(void*, size_t);
 void* memcpy(void* dest, const void* src, size_t size);
 void throw_Invalid_utf8();
 uint32_t SKIP_String_byteSize(char* str);
 void todo();
 char* sk_string_create(const char* buffer, uint32_t size);
 void SKIP_invalid_utf8();
-char* SKIP_intern(char* obj);
-sk_cell_t* find_itable(char* mem);
+void* SKIP_intern(void* obj);
+void* SKIP_intern_shared(void* obj);
 void free_intern(char* obj, size_t memsize, size_t leftsize);
 void SKIP_internalExit();
 uint32_t SKIP_is_string(char* obj);
-void SKIP_free(stack_t* st, char* obj);
+void SKIP_free(char* obj);
 int memcmp(const void * ptr1, const void * ptr2, size_t num);
+void* sk_alloc(size_t size);
+void sk_gen_htbl_init(void*(*alloc)(size_t), sk_htbl_t* table, size_t bitcapacity);
+void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), sk_htbl_t* table, void* key, void* value);
+void* sk_malloc(size_t size);
+void sk_check_memory();
+void sk_incr_ref_count(void*);
+uintptr_t sk_decr_ref_count(void*);
+int sk_is_static(void*);
 
 #endif

@@ -4,16 +4,12 @@
 /* Freeing primitive. */
 /*****************************************************************************/
 
-void SKIP_free_class(stack_t* st, char* obj) {
-  sk_cell_t* cell = find_itable(obj);
-  if(cell == NULL || cell->value == NULL) {
-    return;
-  }
-  if(cell->value > (void*)1) {
-    cell->value = (void*)((uintptr_t)cell->value - 1);
-    return;
-  }
+void free_intern(char* obj, size_t memsize, size_t leftsize) {
+  memsize += leftsize;
+  sk_sk_free_size(obj-leftsize-sizeof(uintptr_t), memsize+sizeof(uintptr_t));
+}
 
+void SKIP_free_class(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
@@ -46,14 +42,6 @@ void SKIP_free_class(stack_t* st, char* obj) {
 }
 
 void SKIP_free_array(stack_t* st, char* obj) {
-  sk_cell_t* cell = find_itable(obj);
-  if(cell == NULL || cell->value == NULL) {
-    return;
-  }
-  if(cell->value > (void*)1) {
-    cell->value = (void*)((uintptr_t)cell->value - 1);
-    return;
-  }
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
@@ -89,7 +77,7 @@ void SKIP_free_array(stack_t* st, char* obj) {
   return;
 }
 
-void SKIP_free(stack_t* st, char* obj) {
+void SKIP_free_obj(stack_t* st, char* obj) {
 
   if(obj == NULL) {
     return;
@@ -118,4 +106,26 @@ void SKIP_free(stack_t* st, char* obj) {
   }
 
   return;
+}
+
+void SKIP_free(char* obj) {
+  stack_t st_holder;
+  stack_t* st = &st_holder;
+
+  SKIP_stack_init(st, 1024);
+  SKIP_stack_push(st, (void**)obj, NULL);
+
+  while(st->head > 0) {
+    value_t delayed = SKIP_stack_pop(st);
+    void* toFree = delayed.value;
+    if(sk_is_static(toFree)) {
+      continue;
+    }
+    uintptr_t count = sk_decr_ref_count(toFree);
+    if(count == 0) {
+      SKIP_free_obj(st, toFree);
+    }
+  }
+
+  SKIP_stack_free(st);
 }

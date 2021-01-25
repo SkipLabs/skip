@@ -14,15 +14,17 @@ CFILES=\
 	runtime/free.c \
 	runtime/hashtable.c \
 	runtime/intern.c \
+	runtime/memory.c \
 	runtime/obstack.c \
 	runtime/runtime.c \
 	runtime/stdlib.c \
 	runtime/stack.c \
 	runtime/string.c \
+	runtime/size.c \
 	runtime/native_eq.c
 
 CFILES32=$(CFILES) runtime/runtime32_specific.c
-CFILES64=$(CFILES) runtime/runtime64_specific.cpp
+CFILES64=$(CFILES) runtime/runtime64_specific.cpp runtime/alloc.c
 BCFILES32=$(addprefix build/,$(CFILES32:.c=.bc))
 OFILES=$(addprefix build/,$(CFILES:.c=.o))
 
@@ -37,7 +39,8 @@ SKFUNS=\
 	SKIP_Obstack_alloc \
 	skip_main \
 	sk_string_create \
-	SKIP_initializeSkip
+	SKIP_initializeSkip \
+	SKIP_skfs_init
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
@@ -72,8 +75,8 @@ build/out64.ll: $(SKIP_FILES)
 	mkdir -p build/
 	$(SKC) --embedded64 . --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
 
-build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o
-	ar rcs build/libskip_runtime64.a $(OFILES) build/runtime/runtime64_specific.o
+build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o build/runtime/alloc.o
+	ar rcs build/libskip_runtime64.a $(OFILES) build/runtime/runtime64_specific.o build/runtime/alloc.o
 
 build/runtime/runtime64_specific.o: runtime/runtime64_specific.cpp
 	$(CPP) $(OLEVEL) -c runtime/runtime64_specific.cpp -o build/runtime/runtime64_specific.o

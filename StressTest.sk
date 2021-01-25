@@ -39,7 +39,7 @@ class Config{
   probKeyChange: RNbr = RProb(50),
   probLazyDir: RNbr = RProb(0),
   probKeyChangeRemoved: RNbr = RProb(0),
-  nbrRounds: Int = 1000,
+  nbrRounds: Int = 100,
 }
 */
 
@@ -538,23 +538,36 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
 /* Test. */
 /*****************************************************************************/
 
+fun updateContext(context: mutable SKFS.Context): mutable SKFS.Context {
+  SKFS.gContextSync(context.clone());
+  dirty = context.dirty;
+  dirtyReaders = context.dirtyReaders;
+  !context = SKFS.Context::fromSaved(SKFS.gContextGet());
+  context with {dirty, dirtyReaders}
+}
+
+@cpp_extern("SKIP_check_memory")
+native fun .checkMemory(): void;
+
 fun testStress(): mutable SKFS.Context {
   config = Config{};
   SKFS.gContextInit(SKFS.Context{});
   print_string("Stress Test Begin");
-  for (i in Range(0, config.nbrRounds)) {
+  round = 0;
+  for (_ in Range(0, config.nbrRounds)) {
     pos = SKFS.newObstack();
     if (SKFS.debugMode) {
-      print_string("Round: " + i);
+      print_string("Round: " + round);
     };
-    origProg = genProgram(config, i);
+    origProg = genProgram(config, round);
     context = SKFS.run(context ~> {
       eval(context, origProg);
     });
     if (context.debugMode) print_string("Initialization finished");
     newProg = updateProgram(context, origProg);
+    !context = updateContext(context);
     context.update();
-    SKFS.gContextSync(context.clone());
+    !context = updateContext(context);
     if (context.debugMode) print_string("Running program from scratch");
     context2 = SKFS.run(context ~> {
       eval(context, newProg);
@@ -568,6 +581,8 @@ fun testStress(): mutable SKFS.Context {
     };
     _ = compareContext(context2, context);
     SKFS.destroyObstack(pos);
+    checkMemory();
+    !round = round + 1;
   };
   print_string("Stress Test end");
   SKFS.Context::fromSaved(SKFS.gContextGet())
