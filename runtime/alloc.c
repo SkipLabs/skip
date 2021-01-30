@@ -18,10 +18,13 @@
 /* Detects pointers that come from the binary. */
 /*****************************************************************************/
 
-extern __thread char end;
+__thread char* break_ptr = NULL;
 
 int sk_is_static(void* ptr) {
-  return (char*)ptr < &end;
+  if(break_ptr == NULL) {
+    break_ptr = sbrk(0);
+  }
+  return (char*)ptr < break_ptr;
 }
 
 /*****************************************************************************/

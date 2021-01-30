@@ -2,6 +2,8 @@
 
 #ifdef SKIP64
 
+#define MEMORY_CHECK 1
+
 #ifdef MEMORY_CHECK
 char sk_init_over = 0;
 sk_htbl_t sk_malloc_table_holder;
@@ -109,6 +111,8 @@ int memcmp(const void * ptr1, const void * ptr2, size_t num) {
 /*****************************************************************************/
 
 #ifdef SKIP64
+size_t sk_pow2_size(size_t);
+
 void* sk_malloc(size_t size) {
   size = sk_pow2_size(size);
   void* result = malloc(size);
