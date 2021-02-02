@@ -137,7 +137,7 @@ class EagerDir{
     kvArray = writer.getWrites();
     rows = kvArray.map(kv2 -> {
       (k2, v2) = kv2;
-      path = Path(parentName, key);
+      path = Path::create(parentName, key);
       FixedRow(k2, (path, v2))
     });
     RowMapped(key, reads, rows, newDirs)
@@ -154,7 +154,7 @@ class EagerDir{
       key = rowMapped.key;
       rows = rowMapped.values;
       for (row in rows) {
-        oldVec.push(FixedRow(key, (Path(parentName, key), row.key)));
+        oldVec.push(FixedRow(key, (Path::create(parentName, key), row.key)));
         rowVec.push(row);
       };
       if (!rowMapped.newDirs.isEmpty()) {
@@ -200,7 +200,7 @@ class EagerDir{
         };
         for (file in values) {
           row = ProductRow::fromFile(file);
-          key = PID(Array[row.key1, row.key2]);
+          key = PID::create(Array[row.key1, row.key2]);
           writer.writeArray(key, row.values);
         }
       },
@@ -258,7 +258,10 @@ class EagerDir{
       newDirs => newDirs.get(),
       childDirs => SortedMap[],
     };
-    updateDirtyReaders(context, Path(childName.tag(), DirTag()));
+    updateDirtyReaders(
+      context,
+      Path::create(childName.tag(), DirTag::create()),
+    );
     context.setDir(childName, dir);
     static::addChildToParent(context, time, parentName, childName);
     if (context.debugMode) {
@@ -374,7 +377,7 @@ class EagerDir{
       };
 
       keys = mutable Vector[];
-      source = Path(parentName, key);
+      source = Path::create(parentName, key);
 
       for (kv in mapped) {
         (k, rvalues) = kv;
@@ -399,7 +402,7 @@ class EagerDir{
   }
 
   fun getArray(context: mutable Context, key: BaseName): Array<File> {
-    path = Path(this.dirName, key);
+    path = Path::create(this.dirName, key);
     context.addDep(path);
     values = this.getArrayRaw(key);
     if (values.size() != 0) return values;
@@ -425,7 +428,7 @@ class EagerDir{
     };
     context.dirty[this.dirName].insert(k);
 
-    path = Path(this.dirName, k);
+    path = Path::create(this.dirName, k);
     !this = this with {data};
 
     updateDirtyReaders(context, path);
@@ -527,7 +530,7 @@ class EagerDir{
       for (row in uniqReads) {
         readerKey = row.i0;
         readKey = row.i1;
-        readerPath = Path(readDirName, readerKey);
+        readerPath = Path::create(readDirName, readerKey);
         deps.push((readerPath, ArrowKey(parentName, childName, readKey)));
       };
     };
@@ -551,7 +554,10 @@ class EagerDir{
     };
     !this.newDirs = this.newDirs.set(key, newDirs);
     for (dirName in removed) {
-      updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+      updateDirtyReaders(
+        context,
+        Path::create(dirName.tag(), DirTag::create()),
+      );
     };
     this
   }
@@ -561,7 +567,7 @@ class EagerDir{
     key: BaseName,
     values: Array<File>,
   ): void {
-    source = Path(this.dirName, key);
+    source = Path::create(this.dirName, key);
     !this = this.writeEntry(context, source, key, values);
     context.!toReset = context.toReset.set(this.dirName);
     context.setDir(this.dirName, this);

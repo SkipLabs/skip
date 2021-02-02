@@ -20,7 +20,12 @@ static char* shallow_intern(char* obj, size_t memsize, size_t leftsize) {
 void sk_incr_ref_count(void* obj) {
   uintptr_t* count = obj;
   if(SKIP_is_string(obj)) {
+    #ifdef SKIP64
     count -= 2;
+    #endif
+    #ifdef SKIP32
+    count -= 3;
+    #endif
   }
   else {
     SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
@@ -42,7 +47,12 @@ void sk_incr_ref_count(void* obj) {
 uintptr_t sk_decr_ref_count(void* obj) {
   uintptr_t* count = obj;
   if(SKIP_is_string(obj)) {
+    #ifdef SKIP64
     count -= 2;
+    #endif
+    #ifdef SKIP32
+    count -= 3;
+    #endif
   }
   else {
     SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
@@ -180,8 +190,12 @@ void* SKIP_intern_shared(void* obj) {
   stack_t* st = &st_holder;
   size_t page_size = nbr_pages();
   sk_cell_t* pages = get_pages(page_size);
+  sk_htbl_t ht_holder;
+  sk_htbl_t* ht = &ht_holder;
 
   SKIP_stack_init(st, 1024);
+  sk_htbl_init(ht, 10);
+
   void* result;
   SKIP_stack_push(st, &obj, &result);
 
@@ -199,11 +213,24 @@ void* SKIP_intern_shared(void* obj) {
       continue;
     }
 
-    *delayed.slot = SKIP_intern_obj(st, pages, page_size, toCopy);
+    sk_cell_t* cell = sk_htbl_find(ht, toCopy);
+    void* interned_ptr;
+
+    if(cell == NULL) {
+      interned_ptr = SKIP_intern_obj(st, pages, page_size, toCopy);
+      sk_htbl_add(ht, toCopy, (uint64_t)interned_ptr);
+    }
+    else {
+      interned_ptr = (void*)(cell->value);
+      sk_incr_ref_count(interned_ptr);
+    }
+
+    *delayed.slot = interned_ptr;
   }
 
   sk_free_size(pages, sizeof(sk_cell_t*) * page_size);
   SKIP_stack_free(st);
+  sk_htbl_free(ht);
 
   return result;
 }

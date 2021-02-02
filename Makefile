@@ -12,6 +12,7 @@ SKFLAGS=
 SKIP_FILES=$(wildcard *.sk) $(wildcard */*.sk)
 CFILES=\
 	runtime/free.c \
+	runtime/hash.c \
 	runtime/hashtable.c \
 	runtime/intern.c \
 	runtime/memory.c \

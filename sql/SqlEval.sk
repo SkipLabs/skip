@@ -173,7 +173,7 @@ mutable class Evaluator{
       this.insert(pos, name, paramsOpt, values)
     | select @ Select{} ->
       input = getSelectInputDir(this.context);
-      this.write(input.dirName, SKFS.SID(select.id), select)
+      this.write(input.dirName, SKFS.SID::create(select.id), select)
     | _ -> todo()
     /*
       | View{name: String, query: Query}
@@ -193,7 +193,7 @@ mutable class Evaluator{
     paramsOpt: ?Array<String>,
     rawValues: InsertValues,
   ): void {
-    baseName = SKFS.SID(name);
+    baseName = SKFS.SID::create(name);
     table = getTable(this.context, pos, baseName);
     dir = getDir(table);
     key = this.newKey(name);
@@ -210,7 +210,7 @@ mutable class Evaluator{
     tables = getTableDir(this.context);
     this.context.getEagerDir(tables.dirName).write(
       this.context,
-      SKFS.SID(name),
+      SKFS.SID::create(name),
       dirDescr,
     );
     this.!tableCounters[name] = 0;
@@ -312,7 +312,7 @@ fun printRow(row: SKSQL.Row): void {
 
 fun showSelect(context: mutable SKFS.Context, select: Select): void {
   outputDir = getSelectOutputDir(context);
-  dirName = outputDir.get(context, SKFS.SID(select.id));
+  dirName = outputDir.get(context, SKFS.SID::create(select.id));
   dir = context.getDir(dirName);
   files = dir.files();
   for (file in files) {

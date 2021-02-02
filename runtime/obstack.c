@@ -176,7 +176,7 @@ sk_cell_t* get_pages(size_t size) {
   void* cursor = page;
   while(cursor != NULL) {
     result[i].key = cursor;
-    result[i].value = cursor + *(size_t*)(cursor + sizeof(char*));
+    result[i].value = (uint64_t)(cursor + *(size_t*)(cursor + sizeof(char*)));
     cursor = *(char**)cursor;
     i++;
   }
@@ -188,7 +188,7 @@ int binarySearch(sk_cell_t* arr, size_t l, size_t r, void* x) {
   if (r >= l) {
     size_t mid = (l + r) / 2;
 
-    if (arr[mid].key <= x && x < arr[mid].value) {
+    if (arr[mid].key <= x && x < (void*)(arr[mid].value)) {
       return 1;
     }
 

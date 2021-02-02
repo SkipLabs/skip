@@ -97,7 +97,7 @@ class LazyDir{
       result
     };
     newDir = LazyDir{time, dirName, lazyFun};
-    updateDirtyReaders(context, Path(dirName.tag(), DirTag()));
+    updateDirtyReaders(context, Path::create(dirName.tag(), DirTag::create()));
     context.setDir(dirName, newDir);
     newDir
   }
@@ -120,7 +120,7 @@ class LazyDir{
     for (dirtyReaderDirName => dirtyReaderBaseNames in firstDirtyReaders) {
       for (dirtyReaderBaseName in dirtyReaderBaseNames) {
         !thisDirtyReaders = thisDirtyReaders.add(
-          Path(dirtyReaderDirName, dirtyReaderBaseName),
+          Path::create(dirtyReaderDirName, dirtyReaderBaseName),
         );
       }
     };
@@ -128,7 +128,7 @@ class LazyDir{
       context
         .getDeps(key)
         .filter(x -> x.childName == this.dirName)
-        .map(x -> Path(x.childName, x.key))
+        .map(x -> Path::create(x.childName, x.key))
         .collect(Set);
     });
     for (path in dirtyReaders) {
@@ -148,7 +148,7 @@ class LazyDir{
   }
 
   fun getArray(context: mutable Context, key: BaseName): Array<File> {
-    path = Path(this.dirName, key);
+    path = Path::create(this.dirName, key);
     context.addDep(path);
     lazyResult = this.data.maybeGet(key) match {
     | None()

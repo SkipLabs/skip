@@ -34,10 +34,10 @@ fun testProduct(): mutable SKFS.Context {
       context.unsafeGetDir(product.dirName).files(),
       () ->
         Set[
-          SKFS.PID(Array[SKFS.IID(0), SKFS.IID(0)]),
-          SKFS.PID(Array[SKFS.IID(0), SKFS.IID(2)]),
-          SKFS.PID(Array[SKFS.IID(1), SKFS.IID(0)]),
-          SKFS.PID(Array[SKFS.IID(1), SKFS.IID(2)]),
+          SKFS.PID::create(Array[SKFS.IID(0), SKFS.IID(0)]),
+          SKFS.PID::create(Array[SKFS.IID(0), SKFS.IID(2)]),
+          SKFS.PID::create(Array[SKFS.IID(1), SKFS.IID(0)]),
+          SKFS.PID::create(Array[SKFS.IID(1), SKFS.IID(2)]),
         ]
       ,
     );
@@ -48,7 +48,7 @@ fun testProduct(): mutable SKFS.Context {
     context.update();
     expectEq(
       "Product test2",
-      getData(product, SKFS.PID(Array[SKFS.IID(2), SKFS.IID(0)])),
+      getData(product, SKFS.PID::create(Array[SKFS.IID(2), SKFS.IID(0)])),
       () -> Array[SKFS.IntFile(44), SKFS.IntFile(24)],
     );
 
@@ -56,7 +56,7 @@ fun testProduct(): mutable SKFS.Context {
     context.update();
     expectEq(
       "Product test3",
-      getData(product, SKFS.PID(Array[SKFS.IID(0), SKFS.IID(0)])),
+      getData(product, SKFS.PID::create(Array[SKFS.IID(0), SKFS.IID(0)])),
       () -> Array[],
     );
 
@@ -64,7 +64,7 @@ fun testProduct(): mutable SKFS.Context {
     context.update();
     expectEq(
       "Product test4",
-      getData(product, SKFS.PID(Array[SKFS.IID(1), SKFS.IID(3)])),
+      getData(product, SKFS.PID::create(Array[SKFS.IID(1), SKFS.IID(3)])),
       () -> Array[SKFS.IntFile(35), SKFS.IntFile(55)],
     );
   });

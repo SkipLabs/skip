@@ -52,7 +52,7 @@ fun evalSelect(context: mutable SKFS.Context, select: Select): SKFS.DirName {
     tableNames.map(fromCol ->
       fromCol match {
       | TableName(FName(tableName), asName, _) ->
-        fromName = SKFS.SID(tableName);
+        fromName = SKFS.SID::create(tableName);
         table = getTable(context, select.pos, fromName);
         (table, asName)
       | _ -> todo()
@@ -151,7 +151,7 @@ fun evalSelectBody(
               | Some(where) ->
                 if (!evaluator.evalExpr(context, where).isTrue()) return void
               };
-              writer.write(RowKey(row.values, kinds), row)
+              writer.write(RowKey::create(row.values, kinds), row)
             | _ ->
               subStr = selectName.toString() + "sub_" + round + "_" + key;
               subSelectName = SKFS.DirName::create(subStr + "/");
@@ -176,7 +176,7 @@ fun evalSelectBody(
               );
               for (keyRow in proj.getArray(context, SKFS.IID(0))) {
                 writer.writeArray(
-                  RowKey(keyRow.values[0].values, kinds),
+                  RowKey::create(keyRow.values[0].values, kinds),
                   keyRow.values,
                 )
               }

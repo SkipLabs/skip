@@ -2,8 +2,6 @@
 
 #ifdef SKIP64
 
-#define MEMORY_CHECK 1
-
 #ifdef MEMORY_CHECK
 char sk_init_over = 0;
 sk_htbl_t sk_malloc_table_holder;

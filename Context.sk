@@ -279,13 +279,16 @@ mutable class Context{
           values = dir.getArrayRaw(key);
           !preDir = preDir.writeEntry(
             this,
-            Path(preDir.dirName, key),
+            Path::create(preDir.dirName, key),
             key,
             values,
           );
         });
         this.setDir(preDir.dirName, preDir);
-        updateDirtyReaders(this, Path(preDirName.tag(), DirTag()));
+        updateDirtyReaders(
+          this,
+          Path::create(preDirName.tag(), DirTag::create()),
+        );
         this.setDir(preDirName, preDir)
       | Some(preDir) ->
         for (kv in dir.data.getChangesAfter(this.tick - 1)) {
@@ -293,7 +296,7 @@ mutable class Context{
           values = dir.getArrayRaw(key);
           !preDir = preDir.writeEntry(
             this,
-            Path(preDir.dirName, key),
+            Path::create(preDir.dirName, key),
             key,
             values,
           );
@@ -366,7 +369,7 @@ mutable class Context{
     vector = mutable Vector[];
     for (kv in content) {
       (key, values) = kv;
-      path = Path(dirName, key);
+      path = Path::create(dirName, key);
       vector.push(FixedRow(key, (path, values.map(x -> (x : File)))));
     };
     vector.sort();
@@ -395,7 +398,7 @@ mutable class Context{
   }
 
   mutable fun getDir(dirName: DirName): Dir {
-    this.addDep(Path(dirName.tag(), DirTag()));
+    this.addDep(Path::create(dirName.tag(), DirTag::create()));
     this.dirs.get(dirName);
   }
 
@@ -471,7 +474,7 @@ mutable class Context{
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.addDep(Path(dirName.tag(), DirTag()));
+    this.addDep(Path::create(dirName.tag(), DirTag::create()));
     this.dirs.maybeGet(dirName);
   }
 

@@ -28,22 +28,34 @@ class KeyRow(key: SKFS.BaseName, values: Array<Row>) extends SKFS.File
 
 class RowKey(
   values: Array<SValue>,
-  kinds: Array<(Int, IKind)>,
+  //  kinds: Array<(Int, IKind)>,
 ) extends SKFS.BaseName {
+  static fun create(value: Array<SValue>, _kinds: Array<(Int, IKind)>): this {
+    // TODO reenable kinds
+    acc = 0;
+    for (elt in value) {
+      !acc = Hashable.combine(elt.hash(), acc);
+    };
+    hashTag = acc;
+
+    static(value, hashTag)
+  }
+
   fun toString(): String {
     inspect(this).toString();
   }
+  /*
+    fun hash(): Int {
+      if (this.values.size() == 0) return 0;
+      acc = this.values[0].hash();
+      for (i in Range(1, this.values.size())) {
+        !acc = Hashable.combine(acc, this.values[i]);
+      };
+      acc
+    }
 
-  fun hash(): Int {
-    if (this.values.size() == 0) return 0;
-    acc = this.values[0].hash();
-    for (i in Range(1, this.values.size())) {
-      !acc = Hashable.combine(acc, this.values[i]);
-    };
-    acc
-  }
 
-  fun compare(file: SKFS.FileName): Order {
+  fun compare(_file: SKFS.FileName): Order {
     file match {
     | y @ RowKey _ ->
       for (i in Range(0, this.kinds.size())) {
@@ -62,6 +74,7 @@ class RowKey(
     | _ -> LT()
     }
   }
+  */
 }
 
 class Row(values: Array<SValue>) extends SKFS.File

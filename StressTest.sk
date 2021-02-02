@@ -54,8 +54,8 @@ class Program(
 class Input{name: String, data: Map<Int, List<SKFS.IntFile>>}
 base class DirValue{name: String} {
   children =
-  | MDir{input: String, readDirs: List<String>}
-  | LDir{readDirs: List<String>}
+  | MDir{input: String, readDirs: List<SKFS.DirName>}
+  | LDir{readDirs: List<SKFS.DirName>}
 }
 
 /*****************************************************************************/
@@ -149,10 +149,10 @@ fun evalLDir(context: mutable SKFS.Context, dir: LDir): void {
 fun evalSub(
   context: mutable SKFS.Context,
   thisDirName: String,
-  readDirs: List<String>,
+  readDirs: List<SKFS.DirName>,
   currentKey: SKFS.BaseName,
   currentValues: Array<SKFS.File>,
-): List<String> {
+): List<SKFS.DirName> {
   sumAcc = 0;
 
   for (elt in currentValues) {
@@ -164,14 +164,20 @@ fun evalSub(
   subDirs = List[];
 
   for (dirName in readDirs.sorted().unique()) {
-    genericDir = context.unsafeGetDir(SKFS.DirName::create(dirName));
+    genericDir = context.unsafeGetDir(dirName);
     dir = genericDir match {
     | SKFS.LazyDir _
     | SKFS.DeletedDir _ ->
       continue
     | x @ SKFS.EagerDir _ -> x
     };
-    subDirNameStr = dirName + "sub" + currentKey + "_" + sum + thisDirName;
+    subDirNameStr =
+      dirName.toString() +
+      "sub" +
+      currentKey +
+      "_" +
+      sum +
+      thisDirName;
     subDirName = SKFS.DirName::create(subDirNameStr);
     !subDirs = List.Cons(subDirNameStr, subDirs);
     SKFS.EagerDir::apply(
@@ -182,7 +188,7 @@ fun evalSub(
         if (values.size() == 0) return void;
         localSum = sum;
         for (readDirName in readDirs) {
-          readDir = context.unsafeGetDir(SKFS.DirName::create(readDirName));
+          readDir = context.unsafeGetDir(readDirName);
           read = readDir.getArray(context, localKey).map(x ->
             SKFS.IntFile::fromFile(x)
           );
@@ -198,18 +204,18 @@ fun evalSub(
     )
   };
 
-  subDirs
+  subDirs.map(x -> SKFS.DirName::create(x))
 }
 
 fun evalLFun(
   context: mutable SKFS.Context,
   thisDirName: String,
-  readDirs: List<String>,
+  readDirs: List<SKFS.DirName>,
   key: SKFS.BaseName,
 ): SKFS.File {
   reads = List[];
   for (dirName in readDirs) {
-    dir = context.unsafeGetDir(SKFS.DirName::create(dirName));
+    dir = context.unsafeGetDir(dirName);
     value = key match {
     | SKFS.IID(x) -> SKFS.IntFile(x)
     | _ -> error()
@@ -245,7 +251,7 @@ fun evalFun(
   context: mutable SKFS.Context,
   writer: mutable SKFS.Writer,
   thisDirName: String,
-  readDirs: List<String>,
+  readDirs: List<SKFS.DirName>,
   currentKey: SKFS.BaseName,
   currentValues: Array<SKFS.File>,
 ): void {
@@ -253,7 +259,7 @@ fun evalFun(
 
   reads = List[currentValues];
   for (dirName in readDirs.concat(subDirs)) {
-    dir = context.unsafeGetDir(SKFS.DirName::create(dirName));
+    dir = context.unsafeGetDir(dirName);
     value = currentValues[0];
     read = dir
       .getArray(context, SKFS.IID(SKFS.IntFile::fromFile(value).value))
@@ -426,13 +432,13 @@ fun genReadDirs(
   rand: RNbr -> Int,
   config: Config,
   dirs: GenDirs,
-): List<String> {
+): List<SKFS.DirName> {
   readDirs = List[];
   funBodySize = 1 + rand(config.funBodySize);
   for (_ in Range(1, funBodySize)) {
     !readDirs = List.Cons(genGet(rand, dirs), readDirs);
   };
-  readDirs
+  readDirs.map(x -> SKFS.DirName::create(x))
 }
 
 fun genMDir(

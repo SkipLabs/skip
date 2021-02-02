@@ -4,8 +4,8 @@ class KeySet(value: Set<BaseName>) extends File
 
 fun baseNameFromFile(file: File): BaseName {
   file match {
-  | SID(_) -> SID::fromFile(file)
-  | IID(_) -> IID::fromFile(file)
+  | SID _ -> SID::fromFile(file)
+  | IID _ -> IID::fromFile(file)
   | _ -> invariant_violation("Was expecting a baseName")
   }
 }
@@ -125,7 +125,10 @@ fun testIndex(): mutable SKFS.Context {
     for (i in Range(0, 32)) {
       for (j in Range(i, 32)) {
         queryData.push(
-          (SKFS.SID("s" + i + "_" + j), SKFS.StringFile(`[${i}, ${j}]`)),
+          (
+            SKFS.SID::create("s" + i + "_" + j),
+            SKFS.StringFile(`[${i}, ${j}]`),
+          ),
         );
       }
     };

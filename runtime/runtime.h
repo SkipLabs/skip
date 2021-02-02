@@ -49,11 +49,11 @@ typedef struct {
 /* Types used for the hashtable. */
 /*****************************************************************************/
 
-#define TOMB ((void*)-1)
+#define TOMB ((uint64_t)-1)
 
 typedef struct {
   void* key;
-  void* value;
+  uint64_t value;
 } sk_cell_t;
 
 typedef struct {
@@ -65,7 +65,7 @@ typedef struct {
 
 void sk_htbl_init(sk_htbl_t* table, size_t bitcapacity);
 void sk_htbl_free(sk_htbl_t* table);
-void sk_htbl_add(sk_htbl_t* table, void* key, void* value);
+void sk_htbl_add(sk_htbl_t* table, void* key, uint64_t value);
 sk_cell_t* sk_htbl_find(sk_htbl_t* table, void* key);
 int sk_htbl_mem(sk_htbl_t* table, void* key);
 void sk_htbl_remove(sk_htbl_t* table, void* key);
@@ -155,7 +155,7 @@ void SKIP_free(char* obj);
 int memcmp(const void * ptr1, const void * ptr2, size_t num);
 void* sk_alloc(size_t size);
 void sk_gen_htbl_init(void*(*alloc)(size_t), sk_htbl_t* table, size_t bitcapacity);
-void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), sk_htbl_t* table, void* key, void* value);
+void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), sk_htbl_t* table, void* key, uint64_t value);
 void* sk_malloc(size_t size);
 void sk_check_memory();
 void sk_incr_ref_count(void*);

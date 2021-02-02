@@ -41,7 +41,7 @@ void sk_htbl_resize(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), s
   size_t i;
 
   for(i = 0; i < 1 << table->bitcapacity; i++) {
-    if(table->data[i].key != 0 && table->data[i].value != 0) {
+    if(table->data[i].key != 0 && table->data[i].value != TOMB) {
       sk_htbl_add(&new_table, table->data[i].key, table->data[i].value);
     }
   }
@@ -50,12 +50,14 @@ void sk_htbl_resize(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), s
   *table = new_table;
 }
 
-void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), sk_htbl_t* table, void* key, void* value) {
+void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), sk_htbl_t* table, void* key, uint64_t value) {
   size_t capacity = 1 << table->bitcapacity;
 
   if(table->size >= capacity/2) {
     sk_htbl_resize(alloc, sk_free_size, table);
   }
+
+  capacity = 1 << table->bitcapacity;
 
   uintptr_t ikey = (uintptr_t)key;
   ikey = ikey & (capacity-1);
@@ -73,7 +75,7 @@ void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), 
   table->data[ikey].value = value;
 }
 
-void sk_htbl_add(sk_htbl_t* table, void* key, void* value) {
+void sk_htbl_add(sk_htbl_t* table, void* key, uint64_t value) {
   sk_gen_htbl_add(sk_malloc, sk_free_size, table, key, value);
 }
 
@@ -126,7 +128,7 @@ int sk_test_table() {
 
   size_t i = 0;
   for(i = 1; i < 1000000; i++) {
-    sk_htbl_add(table, (void*)i, (void*)i);
+    sk_htbl_add(table, (void*)i, i);
   }
 
   for(i = 1; i < 10000; i++) {
