@@ -63,6 +63,15 @@ mutable class Writer{
 }
 
 /*****************************************************************************/
+/* Typed version of the Compacter. */
+/*****************************************************************************/
+
+class ECompacter<T>{
+  init: (mutable Iterator<T> ~> T),
+  update: (?T, Array<T>, Array<T>) ~> T,
+}
+
+/*****************************************************************************/
 /* The preferred way of accessing the file-system. */
 /*****************************************************************************/
 
@@ -194,6 +203,7 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
+    compacterOpt: ?ECompacter<T2> = None(),
   ): EHandle<T2> {
     EagerDir::apply(
       context,
@@ -202,6 +212,17 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
       (context, writer, key, files) ~> {
         if (files.size() == 0) return void;
         f(context, writer, key, files.map(x -> this.conv(x)));
+      },
+      compacterOpt match {
+      | None() -> None()
+      | Some(compacter) ->
+        Some(
+          Compacter{
+            init => files ~> compacter.init(files.map(conv)),
+            update => (state, old, new) ~>
+              compacter.update(state.map(conv), old.map(conv), new.map(conv)),
+          },
+        )
       },
     );
     EHandle(conv, dirName)
@@ -278,10 +299,9 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
+    compact: ?(ECompacter<T2>) = None(),
   ): EHandle<T2> {
-    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
-      f(context, writer, key, files);
-    })
+    this.genericMap(conv, context, dirName, f, compact)
   }
 
   fun pre(context: mutable Context): ?EHandle<T> {
@@ -314,12 +334,23 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context.getEagerDir(this.dirName).size(context)
   }
 
-  fun addAggregate(
+  fun addAggregate<U: File>[T: U](
+    conv: File ~> U,
     context: mutable Context,
     name: String,
-    aggr: Aggregate,
+    compacter: ECompacter<U>,
   ): void {
-    context.getEagerDir(this.dirName).addAggregate(context, name, aggr)
+    context
+      .getEagerDir(this.dirName)
+      .addAggregate(
+        context,
+        name,
+        Compacter{
+          init => files ~> compacter.init(files.map(conv)),
+          update => (state, old, new) ~>
+            compacter.update(state.map(conv), old.map(conv), new.map(conv)),
+        },
+      )
   }
 
   fun getAggregate(context: mutable Context, name: String): File {

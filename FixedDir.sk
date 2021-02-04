@@ -76,6 +76,21 @@ class FixedDir<T, Compressed>{
     }
   }
 
+  fun getPosSourceKey(source: Path, key: BaseName, i: Int, j: Int): Int {
+    if (i > j) {
+      return i;
+    };
+    pivot = (i + j) / 2;
+    c1 = key.compare(this.data[pivot].key);
+    c = if (c1 is EQ _) source.compare(this.data[pivot].value.i0) else c1;
+    c match {
+    | LT()
+    | EQ() ->
+      this.getPosSourceKey(source, key, i, pivot - 1)
+    | GT() -> this.getPosSourceKey(source, key, pivot + 1, j)
+    }
+  }
+
   fun getArray(key: BaseName): Array<(Path, T)> {
     pos = this.getPos(key, 0, this.data.size() - 1);
     result = mutable Vector[];
@@ -98,6 +113,22 @@ class FixedDir<T, Compressed>{
       yield elt.value;
       !pos = pos + 1;
     };
+  }
+
+  fun getIterSourceKey(source: Path, key: BaseName): mutable Iterator<T> {
+    pos = this.getPosSourceKey(source, key, 0, this.data.size() - 1);
+    while (
+      pos < this.data.size() &&
+      this.data[pos].value.i0 == source &&
+      this.data[pos].key == key
+    ) {
+      yield this.data[pos].value.i1;
+      !pos = pos + 1;
+    };
+  }
+
+  fun getArraySourceKey(source: Path, key: BaseName): Array<T> {
+    this.getIterSourceKey(source, key).collect(Array)
   }
 }
 

@@ -325,14 +325,15 @@ fun printRow(row: SKSQL.Row): void {
 fun showSelect(context: mutable SKFS.Context, select: Select): void {
   outputDir = getSelectOutputDir(context);
   dirName = outputDir.get(context, SKFS.SID::create(select.id));
-  dir = context.getDir(dirName);
-  files = dir.files();
-  for (file in files) {
-    rows = dir.getArrayRaw(file);
-    for (row in rows) {
-      printRow(SKSQL.Row::fromFile(row));
+  dir = context.getEagerDir(dirName);
+  dir.onFiles(files ~> {
+    for (kv in files) {
+      (_, rows) = kv;
+      for (row in rows) {
+        printRow(SKSQL.Row::fromFile(row));
+      }
     }
-  }
+  })
 }
 
 class EvalExnEnv(

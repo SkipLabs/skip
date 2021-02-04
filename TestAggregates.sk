@@ -1,5 +1,102 @@
 module SKFSTest;
 
+fun sumCompacter(): SKFS.ECompacter<SKFS.IntFile> {
+  SKFS.ECompacter{
+    init => values ~> {
+      acc = 0;
+      for (value in values) {
+        !acc = acc + value.value;
+      };
+      SKFS.IntFile(acc)
+    },
+    update => (stateOpt, old, new) ~> {
+      acc = stateOpt match {
+      | None() -> 0
+      | Some(state) -> SKFS.IntFile::fromFile(state).value
+      };
+      for (value in old) {
+        !acc = acc - value.value;
+      };
+      for (value in new) {
+        !acc = acc + value.value;
+      };
+      SKFS.IntFile(acc)
+    },
+  }
+}
+
+base class Insert<T: Orderable> uses Orderable {
+  children =
+  | Add(T)
+  | Rem(T)
+
+  fun compare(right: Insert<T>): Order {
+    (this, right) match {
+    | (Add(x), Add(y)) -> x.compare(y)
+    | (Add _, _) -> LT()
+    | (_, Add _) -> GT()
+    | (Rem(x), Rem(y)) -> x.compare(y)
+    }
+  }
+
+  fun fromAdd(): T
+  | Add(x) -> x
+  | _ -> invariant_violation("Unexpected Rem")
+}
+class MaxVal<T: Orderable>(values: Array<T>, inserts: List<Insert<T>>) {
+  fun max(): (this, ?T) {
+    this.inserts match {
+    | List.Nil() ->
+      if (this.values.size() > 0) (this, Some(this.values[0])) else {
+        (this, None())
+      }
+    | inserts ->
+      newValues = Vector<Insert<T>>::mcreateFromItems(
+        this.values.map(x -> Add(x)),
+      );
+      newValues.extend(inserts);
+      result = mutable Vector[];
+      i = 0;
+      while (i < newValues.size()) {
+        if (i + 1 < newValues.size() && newValues[i + 1] is Rem _) {
+          !i = i + 2;
+        };
+        newValues[i] match {
+        | Rem _ -> invariant_violation("Unexpected remove")
+        | Add(x) -> result.push(x)
+        }
+      };
+      !this.values = newValues.map(x -> x.fromAdd()).toArray();
+      this.max()
+    }
+  }
+}
+/*
+fun updateMax(action: SKFS.ECompactAction<SKFS.IntFile>): SKFS.File {
+  action match {
+  | SKFS.ECInit(values) ->
+    acc = 0;
+    for (value in values) {
+      !acc = acc + value.value;
+    };
+    SKFS.IntFile(acc)
+  | SKFS.ECUpdate(stateOpt, last, new) ->
+    debug((stateOpt, last, new));
+    acc = stateOpt match {
+    | None() -> 0
+    | Some(state) -> SKFS.IntFile::fromFile(state).value
+    };
+    for (value in last) {
+      !acc = acc - value.value;
+    };
+    for (value in new) {
+      !acc = acc + value.value;
+    };
+    SKFS.IntFile(acc)
+  }
+}
+*/
+
 fun testAggregates(): mutable SKFS.Context {
   context = SKFS.run(context ~> {
     dirSInput1 = context.mkdir(
@@ -8,48 +105,61 @@ fun testAggregates(): mutable SKFS.Context {
       Array[
         (SKFS.IID(0), SKFS.StringFile("23")),
         (SKFS.IID(1), SKFS.StringFile("35")),
+        (SKFS.IID(21), SKFS.StringFile("5")),
       ],
     );
 
-    dirInput = dirSInput1.map(
+    dirInput = dirSInput1.contextWriterKeyMap(
       SKFS.IntFile::fromFile,
       context,
       SKFS.DirName::create("/input/"),
-      x ~> SKFS.IntFile(x.value.toInt()),
+      (_context, writer, key, value) ~> {
+        writer.write(
+          SKFS.IID(key.hash() % 10),
+          SKFS.IntFile(value.value.toInt()),
+        )
+      },
+    );
+
+    dirMod2 = dirSInput1.contextWriterKeyValues(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/mod10/"),
+      (_context, writer, key, values) ~> {
+        writer.writeArray(
+          SKFS.IID(key.hash() % 10),
+          values.map(x -> SKFS.IntFile(x.value.toInt())),
+        )
+      },
+      Some(sumCompacter()),
+    );
+
+    _dirMod3 = dirMod2.contextWriterKeyValues(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/mode10_copy/"),
+      (_context, writer, key, values) ~> {
+        writer.writeArray(key, values)
+      },
+      None(),
     );
 
     dirInput.addAggregate(
-      context,
-      "sum",
-      SKFS.Aggregate(SKFS.IntFile(0), (stateFile, update) ~> {
-        state = SKFS.IntFile::fromFile(stateFile).value;
-        update match {
-        | SKFS.Insert(_, files) ->
-          for (file in files) {
-            !state = state + SKFS.IntFile::fromFile(file).value
-          }
-        | SKFS.Update(_, files1, files2) ->
-          for (file in files1) {
-            !state = state - SKFS.IntFile::fromFile(file).value
-          };
-          for (file in files2) {
-            !state = state - SKFS.IntFile::fromFile(file).value
-          }
-        | SKFS.Remove(_, files) ->
-          for (file in files) {
-            !state = state - SKFS.IntFile::fromFile(file).value
-          }
-        };
-        SKFS.IntFile(state)
-      }),
-    );
-
-    _dirSum = dirInput.contextMap(
       SKFS.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/sum/"),
-      (context, _) ~>
-        SKFS.IntFile::fromFile(dirInput.getAggregate(context, "sum"))
+      "sum",
+      sumCompacter(),
+    );
+
+    _dirTotalSum = dirInput.contextWriterKeyValues(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/totalSum/"),
+      (context, writer, key, _) ~>
+        writer.write(
+          key,
+          SKFS.IntFile::fromFile(dirInput.getAggregate(context, "sum")),
+        )
       ,
     );
   });
