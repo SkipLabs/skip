@@ -72,6 +72,7 @@ void sk_new_page(size_t size) {
 }
 
 char* SKIP_Obstack_alloc(size_t size) {
+  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
   if (head + size > end) {
     sk_new_page(size);
   }
@@ -81,8 +82,13 @@ char* SKIP_Obstack_alloc(size_t size) {
 }
 
 void* SKIP_Obstack_calloc(size_t size) {
-  unsigned char* result = (unsigned char*)SKIP_Obstack_alloc(size);
-  SkipInt i;
+  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
+  if (head + size > end) {
+    sk_new_page(size);
+  }
+  char* result = head;
+  head += size;
+  int i;
   for(i = 0; i < size; i++) {
     result[i] = 0;
   }
@@ -102,18 +108,25 @@ char* SKIP_Obstack_shallowClone(size_t size, char* obj) {
 
 
 char* SKIP_new_Obstack() {
-  char* saved = head;
-  return saved;
+  head = NULL;
+  page = NULL;
+  end = NULL;
+  return NULL;
 }
 
 void SKIP_destroy_Obstack(char* saved) {
-  while(saved < page || saved >= end) {
+  while(saved < page || saved > end) {
     char* tofree = page;
     size_t tosk_free_size = *(size_t*)(page + sizeof(char*));
     page = *(char**)page;
+    sk_free_size(tofree, tosk_free_size);
+    if(page == NULL) {
+      head = NULL;
+      end = NULL;
+      return;
+    }
     size_t size = *(size_t*)(page + sizeof(char*));
     end = page + size;
-    sk_free_size(tofree, tosk_free_size);
   }
   head = saved;
 }
@@ -205,5 +218,6 @@ int binarySearch(sk_cell_t* arr, size_t l, size_t r, void* x) {
 
 
 int is_in_obstack(void* ptr, sk_cell_t* pages, size_t size) {
-  return binarySearch(pages, 0, size-1, ptr);
+  int result = binarySearch(pages, 0, size-1, ptr);
+  return result;
 }

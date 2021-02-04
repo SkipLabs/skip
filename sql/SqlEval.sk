@@ -370,6 +370,7 @@ fun evalExn(gcontext: mutable SKFS.Context, chars: Array<Char>): void {
     };
     lex = env.lex;
     pos = env.pos;
+    if (isEOF(lex, pos)) return None();
     evaluator = Evaluator::fromSaved(context, env.evaluator);
     (!pos, stmt) = parseStmt(lex, pos);
     stmt match {
@@ -377,13 +378,12 @@ fun evalExn(gcontext: mutable SKFS.Context, chars: Array<Char>): void {
     | _ -> evaluator.stmt(stmt)
     };
     stmt match {
-    | select @ Select _ ->
-      showSelect(context, select);
-      !context = SKFS.Context::fromSaved(icontext)
+    | select @ Select _ -> showSelect(context, select)
+    //      !context = SKFS.Context::fromSaved(icontext)
     | _ -> void
     };
     context.setGlobal("EvalExnEnv", EvalExnEnv(lex, pos, evaluator.save()));
-    if (isEOF(lex, pos)) None() else Some(context.clone())
+    Some(context.clone())
   })
 }
 

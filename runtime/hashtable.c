@@ -1,8 +1,8 @@
 #include "runtime.h"
 
-void sk_gen_htbl_init(void*(*alloc)(size_t), sk_htbl_t* table, size_t bitcapacity) {
+void sk_htbl_init(sk_htbl_t* table, size_t bitcapacity) {
   size_t capacity = 1 << bitcapacity;
-  sk_cell_t* data = alloc(sizeof(sk_cell_t) * capacity);
+  sk_cell_t* data = sk_malloc(sizeof(sk_cell_t) * capacity);
   size_t i;
 
  // Sets the unused keys to zero.
@@ -16,27 +16,22 @@ void sk_gen_htbl_init(void*(*alloc)(size_t), sk_htbl_t* table, size_t bitcapacit
   table->data = data;
 }
 
-void sk_htbl_init(sk_htbl_t* table, size_t bitcapacity) {
-  sk_gen_htbl_init(sk_malloc, table, bitcapacity);
-}
-
 void sk_htbl_free(sk_htbl_t* table) {
   size_t capacity = 1 << table->bitcapacity;
   sk_free_size(table->data, sizeof(sk_cell_t) * capacity);
 }
 
-void print_int(uint64_t);
-
-void sk_htbl_resize(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), sk_htbl_t* table) {
+void sk_htbl_resize(sk_htbl_t* table) {
   size_t table_size = 1 << table->bitcapacity;
   size_t bitcapacity = table->bitcapacity;
+
 
   if(table->rsize > table_size/2) {
     bitcapacity++;
   }
 
   sk_htbl_t new_table;
-  sk_gen_htbl_init(alloc, &new_table, bitcapacity);
+  sk_htbl_init(&new_table, bitcapacity);
 
   size_t i;
 
@@ -50,11 +45,11 @@ void sk_htbl_resize(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), s
   *table = new_table;
 }
 
-void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), sk_htbl_t* table, void* key, uint64_t value) {
+void sk_htbl_add(sk_htbl_t* table, void* key, uint64_t value) {
   size_t capacity = 1 << table->bitcapacity;
 
   if(table->size >= capacity/2) {
-    sk_htbl_resize(alloc, sk_free_size, table);
+    sk_htbl_resize(table);
   }
 
   capacity = 1 << table->bitcapacity;
@@ -73,10 +68,6 @@ void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), 
   table->rsize++;
   table->data[ikey].key = key;
   table->data[ikey].value = value;
-}
-
-void sk_htbl_add(sk_htbl_t* table, void* key, uint64_t value) {
-  sk_gen_htbl_add(sk_malloc, sk_free_size, table, key, value);
 }
 
 sk_cell_t* sk_htbl_find(sk_htbl_t* table, void* key) {

@@ -23,3 +23,7 @@ extern char __heap_base;
 int sk_is_static(void* ptr) {
   return (char*)ptr < end_of_static;
 }
+
+int sk_is_const(void* ptr) {
+  return 0;
+}

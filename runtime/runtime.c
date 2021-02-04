@@ -55,7 +55,18 @@ extern void skip_main(void);
 
 void** context;
 
+extern __thread char* page;
+extern __thread char* head;
+extern __thread char* end;
+size_t const_page_size;
+void* const_pages;
+
 void SKIP_context_init(char* obj) {
+  const_page_size = nbr_pages();
+  const_pages = get_pages(const_page_size);
+  head = NULL;
+  page = NULL;
+  end = NULL;
   *context = obj;
 }
 
@@ -63,10 +74,9 @@ char* SKIP_context_get() {
   return *context;
 }
 
-extern size_t total_palloc_size;
-
-void SKIP_context_sync(char* obj) {
+void* SKIP_context_sync(char* obj) {
   char* new_obj = SKIP_intern_shared(obj);
   SKIP_free(*context);
   *context = new_obj;
+  return new_obj;
 }

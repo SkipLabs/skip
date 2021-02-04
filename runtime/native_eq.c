@@ -51,7 +51,7 @@ SkipInt SKIP_native_eq_class(stack_t* st, char* obj1, char* obj2) {
       void* ptr2 = *(((void**)obj2)+(mask_slot * bitsize)+i);
 
       if(ty1->m_refMask[mask_slot] & (1 << i) && ptr1 != ptr2) {
-        SKIP_stack_push(st, ptr1, ptr2);
+        sk_stack_push(st, ptr1, ptr2);
       }
       else {
         if(ptr1 != ptr2) {
@@ -107,7 +107,7 @@ SkipInt SKIP_native_eq_array(stack_t* st, char* obj1, char* obj2) {
         void* ptr2 = *((void**)ohead2);
 
         if(ty1->m_refMask[mask_slot] & (1 << i) && ptr1 != ptr2) {
-          SKIP_stack_push(st, ptr1, ptr2);
+          sk_stack_push(st, ptr1, ptr2);
         }
         else {
           if(ptr1 != ptr2) {
@@ -172,22 +172,22 @@ SkipInt SKIP_native_eq_helper(stack_t* st, char* obj1, char* obj2) {
 SkipInt SKIP_isEq(char* obj1, char* obj2) {
   stack_t st_holder;
   stack_t* st = &st_holder;
-  SKIP_stack_init(st, 1024);
+  sk_stack_init(st, 1024);
   SkipInt cmp = SKIP_native_eq_helper(st, obj1, obj2);
   if(cmp != 0) {
-    SKIP_stack_free(st);
+    sk_stack_free(st);
     return !!cmp;
   }
   while(st->head > 0) {
-    value_t delayed = SKIP_stack_pop(st);
+    value_t delayed = sk_stack_pop(st);
     void* obj1 = delayed.value;
     void* obj2 = delayed.slot;
     SkipInt cmp = SKIP_native_eq_helper(st, obj1, obj2);
     if(cmp != 0) {
-      SKIP_stack_free(st);
+      sk_stack_free(st);
       return !!cmp;
     }
   }
-  SKIP_stack_free(st);
+  sk_stack_free(st);
   return 0;
 }

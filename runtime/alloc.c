@@ -21,7 +21,7 @@
 __thread char* break_ptr = NULL;
 
 int sk_is_static(void* ptr) {
-  return (char*)ptr < break_ptr;
+  return (char*)ptr <= break_ptr;
 }
 
 /*****************************************************************************/
@@ -227,7 +227,6 @@ void* sk_get_ftable(size_t size) {
 extern void** context;
 
 void SKIP_memory_init() {
-  break_ptr = sbrk(0);
   char* init_heap;
   size_t size = sk_alloc_page(PERSISTENT_PAGE_SIZE, &init_heap);
   char* heap = init_heap;

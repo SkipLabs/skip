@@ -524,7 +524,7 @@ private native fun destroyObstack(Obstack): void;
 
 @debug
 @cpp_extern("SKIP_context_sync")
-private native fun gContextSync(Context): void;
+private native fun gContextSync(Context): Context;
 
 @debug
 @cpp_extern("SKIP_context_init")
@@ -534,18 +534,22 @@ private native fun gContextInit(Context): void;
 @cpp_extern("SKIP_context_get")
 native fun gContextGet(): Context;
 
+@debug
+@cpp_extern("sk_verify_shared")
+native fun .verify(Context): void;
+
+@cpp_noinline
 fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
-  !f = intern(f);
   gContextInit(origContext);
-  context = origContext;
   loop {
     pos = newObstack();
+    context = gContextGet();
+    verify(context);
     newContextOpt = f(context);
     newContextOpt match {
     | None() -> return void
     | Some(newContext) ->
-      gContextSync(newContext);
-      !context = gContextGet();
+      _ = gContextSync(newContext);
       destroyObstack(pos)
     }
   }

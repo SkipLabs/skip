@@ -544,11 +544,12 @@ fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
 /* Test. */
 /*****************************************************************************/
 
+@cpp_noinline
 fun updateContext(context: mutable SKFS.Context): mutable SKFS.Context {
-  SKFS.gContextSync(context.clone());
+  newContext = SKFS.gContextSync(context.clone());
   dirty = context.dirty;
   dirtyReaders = context.dirtyReaders;
-  !context = SKFS.Context::fromSaved(SKFS.gContextGet());
+  !context = SKFS.Context::fromSaved(newContext);
   context with {dirty, dirtyReaders}
 }
 
@@ -571,7 +572,7 @@ fun testStress(): mutable SKFS.Context {
     });
     if (context.debugMode) print_string("Initialization finished");
     newProg = updateProgram(context, origProg);
-    !context = updateContext(context);
+    //    !context = updateContext(context);
     context.update();
     !context = updateContext(context);
     if (context.debugMode) print_string("Running program from scratch");

@@ -173,8 +173,18 @@ class IID() extends BaseName {
 }
 class SID(value: String) extends BaseName {
   static fun create(value: String): this {
-    hashTag = hash(SID(value, 0));
-    SID(value, hashTag)
+    SID(value, 0)
+  }
+
+  fun hash(): Int {
+    this.value.hash()
+  }
+
+  fun compare(y: FileName): Order {
+    y match {
+    | SID(v2, _) -> this.value.compare(v2)
+    | _ -> compare(this, y)
+    }
   }
 
   fun toString(): String {

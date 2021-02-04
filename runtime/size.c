@@ -26,7 +26,7 @@ size_t SKIP_size_class(stack_t* st, char* obj) {
       for(i = 0; i < bitsize && i < size; i++) {
         if(ty->m_refMask[mask_slot] & (1 << i)) {
           void** ptr = ((void**)obj)+(mask_slot * bitsize)+i;
-          SKIP_stack_push(st, ptr, (void*)1);
+          sk_stack_push(st, ptr, (void*)1);
         }
       };
       if(size < bitsize) {
@@ -62,7 +62,7 @@ size_t SKIP_size_array(stack_t* st, char* obj) {
         for(i = 0; i < bitsize && size > 0; i++) {
           if(ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
-            SKIP_stack_push(st, ptr, (void*)1);
+            sk_stack_push(st, ptr, (void*)1);
           }
           ohead += sizeof(void*);
           size -= sizeof(void*);
@@ -118,12 +118,12 @@ size_t SKIP_size(void* obj) {
   size_t page_size = nbr_pages();
   sk_cell_t* pages = get_pages(page_size);
 
-  SKIP_stack_init(st, 1024);
+  sk_stack_init(st, 1024);
   size_t result = 0;
-  SKIP_stack_push(st, &obj, (void*)1);
+  sk_stack_push(st, &obj, (void*)1);
 
   while(st->head > 0) {
-    value_t delayed = SKIP_stack_pop(st);
+    value_t delayed = sk_stack_pop(st);
     void* toCopy = *delayed.value;
     int in_obstack = is_in_obstack(toCopy, pages, page_size);
 
@@ -135,7 +135,7 @@ size_t SKIP_size(void* obj) {
   }
 
   sk_free_size(pages, sizeof(sk_cell_t*) * page_size);
-  SKIP_stack_free(st);
+  sk_stack_free(st);
 
   return result;
 }

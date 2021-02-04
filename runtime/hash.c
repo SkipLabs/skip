@@ -183,7 +183,7 @@ uint64_t sk_hash_class(stack_t* st, char* obj) {
     for(i = 0; i < bitsize && i < size; i++) {
       void** ptr = ((void**)obj)+(mask_slot * bitsize)+i;
       if(((ty->m_refsHintMask & 1) != 0) && ty->m_refMask[mask_slot] & (1 << i)) {
-        SKIP_stack_push(st, ptr, 0);
+        sk_stack_push(st, ptr, 0);
       }
       else {
         crc = sk_crc64_combine(crc, *ptr);
@@ -222,7 +222,7 @@ uint64_t sk_hash_array(stack_t* st, char* obj) {
         void** ptr = (void**)ohead;
         void** slot = (void**)rhead;
         if(((ty->m_refsHintMask & 1) != 0) && ty->m_refMask[mask_slot] & (1 << i)) {
-          SKIP_stack_push(st, ptr, slot);
+          sk_stack_push(st, ptr, slot);
         }
         else {
           crc = sk_crc64_combine(crc, *slot);
@@ -280,13 +280,13 @@ uint64_t SKIP_hash(void* obj) {
   sk_htbl_t* ht = &ht_holder;
   uint64_t crc = CRC_INIT;
 
-  SKIP_stack_init(st, 1024);
-  sk_htbl_init(ht, 10);
+  sk_stack_init(st, 1024);
+  sk_htbl_init(ht, 5);
 
-  SKIP_stack_push(st, &obj, 0);
+  sk_stack_push(st, &obj, 0);
 
   while(st->head > 0) {
-    value_t delayed = SKIP_stack_pop(st);
+    value_t delayed = sk_stack_pop(st);
     void* toHash = *delayed.value;
 
     sk_cell_t* cell = sk_htbl_find(ht, toHash);
@@ -302,7 +302,7 @@ uint64_t SKIP_hash(void* obj) {
 
   }
 
-  SKIP_stack_free(st);
+  sk_stack_free(st);
   sk_htbl_free(ht);
 
   return crc;

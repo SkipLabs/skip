@@ -73,7 +73,7 @@ uintptr_t sk_decr_ref_count(void* obj) {
   return result;
 }
 
-char* SKIP_intern_class(stack_t* st, char* obj) {
+static char* SKIP_intern_class(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
@@ -91,7 +91,9 @@ char* SKIP_intern_class(stack_t* st, char* obj) {
         if(ty->m_refMask[mask_slot] & (1 << i)) {
           void** ptr = ((void**)obj)+(mask_slot * bitsize)+i;
           void** slot = result+(mask_slot * bitsize)+i;
-          SKIP_stack_push(st, ptr, slot);
+          if(*ptr != NULL) {
+            sk_stack_push(st, ptr, slot);
+          }
         }
       };
       if(size < bitsize) {
@@ -105,7 +107,7 @@ char* SKIP_intern_class(stack_t* st, char* obj) {
   return (char*)result;
 }
 
-char* SKIP_intern_array(stack_t* st, char* obj) {
+static char* SKIP_intern_array(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
@@ -129,7 +131,9 @@ char* SKIP_intern_array(stack_t* st, char* obj) {
           if(ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
             void** slot = (void**)rhead;
-            SKIP_stack_push(st, ptr, slot);
+            if(*ptr != NULL) {
+              sk_stack_push(st, ptr, slot);
+            }
           }
           ohead += sizeof(void*);
           rhead += sizeof(void*);
@@ -143,7 +147,7 @@ char* SKIP_intern_array(stack_t* st, char* obj) {
   return (char*)result;
 }
 
-char* SKIP_intern_string(char* obj) {
+static char* SKIP_intern_string(char* obj) {
   size_t len = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
   char* result = shallow_intern(obj, len, 2 * sizeof(uint32_t));
   return result;
@@ -153,19 +157,9 @@ uint32_t SKIP_is_string(char* obj) {
   return *(((uint32_t*)obj)-1) & 0x80000000;
 }
 
-char* SKIP_intern_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj) {
-
-  if(obj == NULL) {
-    return NULL;
-  }
+static char* SKIP_intern_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj) {
 
   char* result;
-
-  // Check if we are dealing with a string
-  if(SKIP_is_string(obj)) {
-    result = SKIP_intern_string(obj);
-    return result;
-  }
 
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
@@ -184,53 +178,90 @@ char* SKIP_intern_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj
   return (char*)result;
 }
 
-
 void* SKIP_intern_shared(void* obj) {
+  if(obj == NULL) {
+    return NULL;
+  }
+
   stack_t st_holder;
   stack_t* st = &st_holder;
+  stack3_t st3_holder;
+  stack3_t* st3 = &st3_holder;
   size_t page_size = nbr_pages();
   sk_cell_t* pages = get_pages(page_size);
-  sk_htbl_t ht_holder;
-  sk_htbl_t* ht = &ht_holder;
 
-  SKIP_stack_init(st, 1024);
-  sk_htbl_init(ht, 10);
+  sk_stack_init(st, PAGE_SIZE);
+  sk_stack3_init(st3, PAGE_SIZE);
 
-  void* result;
-  SKIP_stack_push(st, &obj, &result);
+  void* result = obj;
+  sk_stack_push(st, &obj, &result);
 
   while(st->head > 0) {
-    value_t delayed = SKIP_stack_pop(st);
+    value_t delayed = sk_stack_pop(st);
     void* toCopy = *delayed.value;
     int in_obstack = is_in_obstack(toCopy, pages, page_size);
 
     if(!in_obstack) {
 
-      if(!sk_is_static(toCopy)) {
+      int is_const = sk_is_const(toCopy);
+
+      if(!sk_is_static(toCopy) && !is_const) {
         sk_incr_ref_count(toCopy);
       }
 
       continue;
     }
 
-    sk_cell_t* cell = sk_htbl_find(ht, toCopy);
     void* interned_ptr;
 
-    if(cell == NULL) {
+    if(SKIP_is_string(toCopy)) {
+      sk_string_t* str = (sk_string_t*)((char*)toCopy-sizeof(uint32_t)*2);
+      if(str->size != -1 && str->size < sizeof(void*)) {
+        void* interned_ptr = SKIP_intern_string(toCopy);
+        *delayed.slot = interned_ptr;
+        continue;
+      }
+
+      if(str->size == (uint32_t)-1) {
+        void* interned_ptr = *(void**)toCopy;
+        *delayed.slot = interned_ptr;
+        sk_incr_ref_count(interned_ptr);
+        continue;
+      }
+      void* interned_ptr = SKIP_intern_string(toCopy);
+      sk_stack3_push(st3, (void**)toCopy, *(void**)toCopy, (void*)(uintptr_t)(str->size));
+      str->size = (uint32_t)-1;
+      *(void**)toCopy = interned_ptr;
+      *delayed.slot = interned_ptr;
+      continue;
+    }
+
+    if(((uintptr_t)*((void**)toCopy-1) & 1) == 0) {
       interned_ptr = SKIP_intern_obj(st, pages, page_size, toCopy);
-      sk_htbl_add(ht, toCopy, (uint64_t)interned_ptr);
+      sk_stack3_push(st3, ((void**)toCopy-1), *((void**)toCopy-1), NULL);
+      *((void**)toCopy-1) = (void*)((uintptr_t)interned_ptr | 1);
     }
     else {
-      interned_ptr = (void*)(cell->value);
+      interned_ptr = (void*)((uintptr_t)*((void**)toCopy-1) & ~1);
       sk_incr_ref_count(interned_ptr);
     }
 
     *delayed.slot = interned_ptr;
   }
 
-  sk_free_size(pages, sizeof(sk_cell_t*) * page_size);
-  SKIP_stack_free(st);
-  sk_htbl_free(ht);
+  while(st3->head > 0) {
+    value3_t cell = sk_stack3_pop(st3);
+    void** toClean = cell.value1;
+    *toClean = cell.value2;
+    if(cell.value3 != NULL) {
+      sk_string_t* str = (sk_string_t*)((char*)cell.value1-sizeof(uint32_t)*2);
+      str->size = (uint32_t)(uintptr_t)cell.value3;
+    }
+  }
+
+  sk_free_size(pages, sizeof(sk_cell_t) * page_size);
+  sk_stack_free(st);
+  sk_stack3_free(st3);
 
   return result;
 }

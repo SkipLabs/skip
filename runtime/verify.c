@@ -1,15 +1,40 @@
 #include "runtime.h"
 
 /*****************************************************************************/
-/* Freeing primitive. */
+/* Verifying a property on an object */
 /*****************************************************************************/
+void sk_show_ref_count(void* obj) {
+  uintptr_t* count = obj;
+  if(SKIP_is_string(obj)) {
+    #ifdef SKIP64
+    count -= 2;
+    #endif
+    #ifdef SKIP32
+    count -= 3;
+    #endif
+  }
+  else {
+    SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
-void free_intern(char* obj, size_t memsize, size_t leftsize) {
-  memsize += leftsize;
-  sk_sk_free_size(obj-leftsize-sizeof(uintptr_t), memsize+sizeof(uintptr_t));
+    switch(ty->m_kind) {
+    case 0:
+      count -= 2;
+      break;
+    case 1:
+      count -= 3;
+      break;
+    default:
+      SKIP_internalExit();
+    }
+  }
+/*
+  if(*count > 1000) {
+    printf("FOUND SUSPICIOUS COUNT %ld %p\n", *count, obj);
+  }
+*/
 }
 
-void SKIP_free_class(stack_t* st, char* obj) {
+void sk_verify_class(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
@@ -24,8 +49,10 @@ void SKIP_free_class(stack_t* st, char* obj) {
     while(size > 0) {
       for(i = 0; i < bitsize && i < size; i++) {
         if(ty->m_refMask[mask_slot] & (1 << i)) {
-          void* ptr = *(((void**)obj)+(mask_slot * bitsize)+i);
-          sk_stack_push(st, ptr, ptr);
+          void** ptr = ((void**)obj)+(mask_slot * bitsize)+i;
+          if(*ptr != NULL) {
+            sk_stack_push(st, ptr, (void*)1);
+          }
         }
       };
       if(size < bitsize) {
@@ -35,13 +62,9 @@ void SKIP_free_class(stack_t* st, char* obj) {
       mask_slot++;
     }
   }
-
-  free_intern(obj, memsize, leftsize);
-
-  return;
 }
 
-void SKIP_free_array(stack_t* st, char* obj) {
+void sk_verify_array(stack_t* st, char* obj) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
@@ -61,8 +84,10 @@ void SKIP_free_array(stack_t* st, char* obj) {
         int i;
         for(i = 0; i < bitsize && size > 0; i++) {
           if(ty->m_refMask[mask_slot] & (1 << i)) {
-            void* ptr = *((void**)ohead);
-            sk_stack_push(st, ptr, ptr);
+            void** ptr = (void**)ohead;
+            if(*ptr != NULL) {
+              sk_stack_push(st, ptr, (void*)1);
+            }
           }
           ohead += sizeof(void*);
           size -= sizeof(void*);
@@ -71,23 +96,18 @@ void SKIP_free_array(stack_t* st, char* obj) {
       }
     }
   }
-
-  free_intern(obj, memsize, leftsize);
-
-  return;
 }
 
-void SKIP_free_obj(stack_t* st, char* obj) {
+void sk_verify_string(char* obj) {
+  size_t len = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
+}
 
-  if(obj == NULL) {
-    return;
-  }
+void sk_verify_obj(stack_t* st, char* obj) {
+  char* result;
 
   // Check if we are dealing with a string
   if(SKIP_is_string(obj)) {
-    size_t memsize = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
-    size_t leftsize = 2 * sizeof(uint32_t);
-    free_intern(obj, memsize, leftsize);
+    sk_verify_string(obj);
     return;
   }
 
@@ -95,43 +115,40 @@ void SKIP_free_obj(stack_t* st, char* obj) {
 
   switch(ty->m_kind) {
   case 0:
-    SKIP_free_class(st, obj);
+    sk_verify_class(st, obj);
     break;
   case 1:
-    SKIP_free_array(st, obj);
+    sk_verify_array(st, obj);
     break;
   default:
     // NOT SUPPORTED
     SKIP_internalExit();
   }
-
-  return;
 }
 
-void SKIP_free(char* obj) {
+void sk_verify_shared(void* obj) {
+  return;
+  if(obj == NULL) {
+    return;
+  }
+
   stack_t st_holder;
   stack_t* st = &st_holder;
 
   sk_stack_init(st, 1024);
-  sk_stack_push(st, (void**)obj, NULL);
 
+  void* result = obj;
+  sk_stack_push(st, &obj, &result);
 
+//  printf("----------------------- %p\n", obj);
   while(st->head > 0) {
     value_t delayed = sk_stack_pop(st);
-    void* toFree = delayed.value;
-
-    if(sk_is_static(toFree)) {
-      continue;
+    void* toCopy = *delayed.value;
+    int is_const = sk_is_const(toCopy);
+    if(!sk_is_static(toCopy) && !is_const) {
+      sk_show_ref_count(toCopy);
     }
-
-    if(sk_is_const(toFree)) {
-      continue;
-    }
-
-   uintptr_t count = sk_decr_ref_count(toFree);
-    if(count == 0) {
-      SKIP_free_obj(st, toFree);
-    }
+    sk_verify_obj(st, toCopy);
   }
 
   sk_stack_free(st);

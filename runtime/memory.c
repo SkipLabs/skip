@@ -24,7 +24,7 @@ void free_size(void* ptr, size_t size) {
 
 void sk_memory_check_init() {
   #ifdef MEMORY_CHECK
-  sk_gen_htbl_init(malloc, sk_malloc_table, 10);
+  sk_htbl_init(sk_malloc_table, 20);
   #endif
 }
 
@@ -117,7 +117,14 @@ void* sk_malloc(size_t size) {
   #ifdef MEMORY_CHECK
   static size_t alloc_count = 0;
   if(sk_init_over) {
-    sk_gen_htbl_add(malloc, free_size, sk_malloc_table, result, (void*)alloc_count);
+    size_t capacity = 1 << sk_malloc_table->bitcapacity;
+
+    if(sk_malloc_table->size >= capacity/2) {
+      fprintf(stderr, "MEMORY CHECK TABLE SIZE TO SMALL\n");
+      exit(88);
+    }
+
+    sk_htbl_add(sk_malloc_table, result, (uint64_t)alloc_count);
     alloc_count++;
   }
   #endif

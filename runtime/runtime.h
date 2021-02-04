@@ -89,10 +89,31 @@ typedef struct {
   value_t* values;
 } stack_t;
 
-void SKIP_stack_init(stack_t* st, size_t capacity);
-void SKIP_stack_free(stack_t* st);
-void SKIP_stack_push(stack_t* st, void** value, void** slot);
-value_t SKIP_stack_pop(stack_t* st);
+void sk_stack_init(stack_t* st, size_t capacity);
+void sk_stack_free(stack_t* st);
+void sk_stack_push(stack_t* st, void** value, void** slot);
+value_t sk_stack_pop(stack_t* st);
+
+/*****************************************************************************/
+/* Stack3 types. */
+/*****************************************************************************/
+
+typedef struct {
+  void* value1;
+  void* value2;
+  void* value3;
+} value3_t;
+
+typedef struct {
+  size_t head;
+  size_t capacity;
+  value3_t* values;
+} stack3_t;
+
+void sk_stack3_init(stack3_t* st, size_t capacity);
+void sk_stack3_free(stack3_t* st);
+void sk_stack3_push(stack3_t* st, void* value1, void* value2, void* value3);
+value3_t sk_stack3_pop(stack3_t* st);
 
 /*****************************************************************************/
 /* The type information exposed by the Skip compiler for each object. */
@@ -161,5 +182,6 @@ void sk_check_memory();
 void sk_incr_ref_count(void*);
 uintptr_t sk_decr_ref_count(void*);
 int sk_is_static(void*);
+int sk_is_const(void*);
 
 #endif

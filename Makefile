@@ -22,7 +22,8 @@ CFILES=\
 	runtime/stack.c \
 	runtime/string.c \
 	runtime/size.c \
-	runtime/native_eq.c
+	runtime/native_eq.c \
+	runtime/verify.c
 
 CFILES32=$(CFILES) runtime/runtime32_specific.c
 CFILES64=$(CFILES) runtime/runtime64_specific.cpp runtime/alloc.c

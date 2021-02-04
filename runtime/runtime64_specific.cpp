@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <pthread.h>
+#include <unistd.h>
 
 namespace skip {
 struct SkipException : std::exception {
@@ -76,12 +77,27 @@ void sk_memory_init();
 void sk_memory_check_init();
 void sk_memory_check_init_over();
 void sk_new_page(size_t size);
+void SKIP_memory_init();
+void* get_pages(size_t);
+size_t nbr_pages();
+int is_in_obstack(void*, void*, size_t);
+
+extern __thread void* break_ptr;
+
+extern size_t const_page_size;
+extern void* const_pages;
+
+int sk_is_const(void* obj) {
+  return is_in_obstack(obj, const_pages, const_page_size);
+}
 
 int main(int pargc, char** pargv) {
   pthread_mutex_init(&glock, NULL);
+  break_ptr = sbrk(0);
   sk_memory_check_init();
   argc = pargc;
   argv = pargv;
+  SKIP_memory_init();
   SKIP_initializeSkip();
   sk_memory_check_init_over();
   skip_main();
