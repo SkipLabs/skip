@@ -28,34 +28,23 @@ class KeyRow(key: SKFS.BaseName, values: Array<Row>) extends SKFS.File
 
 class RowKey(
   values: Array<SValue>,
-  //  kinds: Array<(Int, IKind)>,
+  kinds: Array<(Int, IKind)>,
 ) extends SKFS.BaseName {
-  static fun create(value: Array<SValue>, _kinds: Array<(Int, IKind)>): this {
-    // TODO reenable kinds
-    acc = 0;
-    for (elt in value) {
-      !acc = Hashable.combine(elt.hash(), acc);
-    };
-    hashTag = acc;
+  static fun create(values: Array<SValue>, kinds: Array<(Int, IKind)>): this {
+    h = unsafe_hash_native(values);
+    !h = SKFS.hashCombine(h, unsafe_hash_native(kinds));
+    static(values, kinds, h)
+  }
 
-    static(value, hashTag)
+  fun hash(): Int {
+    this.hashTag
   }
 
   fun toString(): String {
     inspect(this).toString();
   }
-  /*
-    fun hash(): Int {
-      if (this.values.size() == 0) return 0;
-      acc = this.values[0].hash();
-      for (i in Range(1, this.values.size())) {
-        !acc = Hashable.combine(acc, this.values[i]);
-      };
-      acc
-    }
 
-
-  fun compare(_file: SKFS.FileName): Order {
+  fun compare(file: SKFS.FileName): Order {
     file match {
     | y @ RowKey _ ->
       for (i in Range(0, this.kinds.size())) {
@@ -71,10 +60,94 @@ class RowKey(
         if (cmp != EQ()) return cmp;
       };
       EQ()
-    | _ -> LT()
+    | _ -> invariant_violation("Can only compare a RowKey with itself")
     }
   }
-  */
 }
 
 class Row(values: Array<SValue>) extends SKFS.File
+
+/*****************************************************************************/
+/* SValue compression/decompression. */
+/*****************************************************************************/
+
+const INT_SIZE: Int = 8;
+
+fun size(value: SValue): Int {
+  idx = 1;
+  value match {
+  | SVNull() -> idx
+  | SVInt(n) if (n >= 0 && n < 32) -> idx
+  | SVInt(_) -> idx + INT_SIZE
+  | SVBool(_) -> invariant_violation("Cannot handle Boolean")
+  | SVString(str) if (stringUnsafeSize(str) < 32) -> idx + stringUnsafeSize(str)
+  | SVString(str) -> idx + INT_SIZE + stringUnsafeSize(str)
+  }
+}
+
+fun compress(values: Array<SValue>): Buffer {
+  bufferSize = 0;
+  for (value in values) {
+    !bufferSize = bufferSize + size(value);
+  };
+  buffer = Buffer::create(bufferSize);
+  idx = 0;
+  for (value in values) {
+    value match {
+    | SVNull() ->
+      buffer![idx] = 0;
+      !idx = idx + 1
+    | SVInt(n) if (n >= 0 && n < 32) ->
+      buffer![idx] = n.shl(3).or(1);
+      !idx = idx + 1
+    | SVInt(n) ->
+      buffer![idx] = 2;
+      !idx = idx + 1;
+      buffer.writeInt(idx, n);
+      !idx = idx + INT_SIZE
+    | SVBool(_) -> invariant_violation("Cannot compress a boolean")
+    | SVString(str) if (stringUnsafeSize(str) < 32) ->
+      size = stringUnsafeSize(str);
+      buffer![idx] = size.shl(3).or(3);
+      !idx = idx + 1;
+      buffer.writeString(idx, str);
+      !idx = idx + size
+    | SVString(str) ->
+      buffer![idx] = 4;
+      !idx = idx + 1;
+      size = stringUnsafeSize(str);
+      buffer.writeInt(idx, size);
+      !idx = idx + INT_SIZE;
+      buffer.writeString(idx, str);
+      !idx = idx + size
+    }
+  };
+  unsafe_chill_trust_me(buffer)
+}
+
+fun decompress(buffer: Buffer): Array<SValue> {
+  idx = 0;
+  result = mutable Vector<SValue>[];
+  while (idx < buffer.size()) {
+    n = buffer.getInt(idx);
+    !idx = idx + 1;
+    n.and(7) match {
+    | 0 -> result.push(SVNull())
+    | 1 -> result.push(SVInt(n.shr(3)))
+    | 2 ->
+      result.push(SVInt(buffer.readInt(idx)));
+      !idx = idx + INT_SIZE
+    | 3 ->
+      size = n.shr(3);
+      result.push(SVString(buffer.readString(idx, size)));
+      !idx = idx + size
+    | 4 ->
+      size = buffer.readInt(idx);
+      !idx = idx + INT_SIZE;
+      result.push(SVString(buffer.readString(idx, size)));
+      !idx = idx + size
+    | _ -> invariant_violation("Invalid code")
+    }
+  };
+  result.toArray();
+}

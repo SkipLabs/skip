@@ -28,7 +28,7 @@ value class FixedRow<T>(
     (this.key, this.value.i0);
   }
 
-  fun compare(row: FixedRow<T>): Order {
+  fun compare<U>[T: U](row: FixedRow<U>): Order {
     this.toKeyPath().compare(row.toKeyPath())
   }
 
@@ -42,13 +42,33 @@ value class FixedRow<T>(
   }
 }
 
-class FixedData<T>{data: Array<FixedRow<T>> = Array[]} {
+base class FixedData<T> {
+  fun size(): Int;
+  fun get(idx: Int): FixedRow<T>;
+  fun getPos(key: BaseName, i: Int, j: Int): Int;
+  fun getArray(key: BaseName): Array<(Path, T)>;
+  fun getIter(key: BaseName): mutable Iterator<(Path, T)>;
+}
+
+class FixedDir<T, Compressed>{
+  data: Array<Compressed> = Array[],
+  decompress: (Int, Compressed) ~> FixedRow<T>,
+} extends FixedData<T> {
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun get(idx: Int): FixedRow<T> {
+    this.decompress(idx, this.data[idx])
+  }
+
   fun getPos(key: BaseName, i: Int, j: Int): Int {
     if (i > j) {
       return i;
     };
     pivot = (i + j) / 2;
-    key.compare(this.data[pivot].key) match {
+    elt = this.decompress(pivot, this.data[pivot]);
+    key.compare(elt.key) match {
     | LT()
     | EQ() ->
       this.getPos(key, i, pivot - 1)
@@ -59,8 +79,11 @@ class FixedData<T>{data: Array<FixedRow<T>> = Array[]} {
   fun getArray(key: BaseName): Array<(Path, T)> {
     pos = this.getPos(key, 0, this.data.size() - 1);
     result = mutable Vector[];
-    while (pos < this.data.size() && this.data[pos].key == key) {
-      result.push(this.data[pos].value);
+    loop {
+      if (pos >= this.data.size()) break void;
+      elt = this.decompress(pos, this.data[pos]);
+      if (elt.key != key) break void;
+      result.push(elt.value);
       !pos = pos + 1;
     };
     result.toArray();
@@ -68,8 +91,11 @@ class FixedData<T>{data: Array<FixedRow<T>> = Array[]} {
 
   fun getIter(key: BaseName): mutable Iterator<(Path, T)> {
     pos = this.getPos(key, 0, this.data.size() - 1);
-    while (pos < this.data.size() && this.data[pos].key == key) {
-      yield this.data[pos].value;
+    loop {
+      if (pos >= this.data.size()) break void;
+      elt = this.decompress(pos, this.data[pos]);
+      if (elt.key != key) break void;
+      yield elt.value;
       !pos = pos + 1;
     };
   }

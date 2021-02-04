@@ -63,7 +63,9 @@ class EagerDir{
   input: Bool,
   fixedData: FixedData<Array<File>>,
   totalSize: Int,
-  fixedOld: FixedData<BaseName> = FixedData{},
+  fixedOld: FixedData<BaseName> = FixedDir<BaseName, FixedRow<BaseName>>{
+    decompress => (_, x) ~> x,
+  },
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
   old: SortedMap<BaseName, Array<BaseName>> = SortedMap[],
   newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
@@ -88,13 +90,13 @@ class EagerDir{
   ): void {
     current = 0;
     addFixed = () -> {
-      key = parent.fixedData.data[current].key;
+      key = parent.fixedData[current].key;
       valueAcc = mutable Vector<(Path, Array<File>)>[];
       while (
-        current < parent.fixedData.data.size() &&
-        parent.fixedData.data[current].key == key
+        current < parent.fixedData.size() &&
+        parent.fixedData[current].key == key
       ) {
-        valueAcc.push(parent.fixedData.data[current].value);
+        valueAcc.push(parent.fixedData[current].value);
         !current = current + 1;
       };
       fixedFiles = valueAcc.map(x -> x.i1).flatten().toArray();
@@ -102,14 +104,14 @@ class EagerDir{
     };
     for (key => _ in parent.data) {
       while (
-        current < parent.fixedData.data.size() &&
-        parent.fixedData.data[current].key < key
+        current < parent.fixedData.size() &&
+        parent.fixedData[current].key < key
       ) {
         addFixed();
       };
       while (
-        current < parent.fixedData.data.size() &&
-        parent.fixedData.data[current].key == key
+        current < parent.fixedData.size() &&
+        parent.fixedData[current].key == key
       ) {
         !current = current + 1;
       };
@@ -123,7 +125,7 @@ class EagerDir{
         ),
       );
     };
-    while (current < parent.fixedData.data.size()) {
+    while (current < parent.fixedData.size()) {
       addFixed();
     };
   }
@@ -260,7 +262,7 @@ class EagerDir{
     static::updateReaders(context, parentName, childName, mapped);
     dataVec.sort();
     oldVec.sort();
-    fixedData = FixedData{data => dataVec.toArray()};
+    fixedData = FixedDir{data => dataVec.toArray(), decompress => (_, x) ~> x};
     time = context.timeStamp();
     totalSize = fixedData.data.size();
     dir = EagerDir{
@@ -270,7 +272,7 @@ class EagerDir{
       parent => Some(parentName),
       fixedData,
       totalSize,
-      fixedOld => FixedData{data => oldVec.toArray()},
+      fixedOld => FixedDir{data => oldVec.toArray(), decompress => (_, x) ~> x},
       mapFun => Some(f),
       newDirs => newDirs.get(),
       childDirs => SortedMap[],
@@ -484,7 +486,7 @@ class EagerDir{
   }
 
   fun unsafeIterKeys(f: (BaseName, Int) -> void): void {
-    fixedData = this.fixedData.data;
+    fixedData = this.fixedData;
     current = 0;
     this.data.eachWithTime((newKey, time) -> {
       while (current < fixedData.size() && fixedData[current].key < newKey) {
@@ -502,7 +504,7 @@ class EagerDir{
   }
 
   fun files(): Set<BaseName> {
-    fixedData = this.fixedData.data;
+    fixedData = this.fixedData;
     current = 0;
     keys = mutable Set[];
     for (newKey => newValues in this.data) {

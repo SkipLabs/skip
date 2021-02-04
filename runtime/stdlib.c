@@ -1,5 +1,7 @@
 #include "runtime.h"
 
+#ifdef SKIP32
+
 void* memset(void* ptr, int value, size_t num) {
   size_t i;
   unsigned char* p = (unsigned char*)ptr;
@@ -27,6 +29,8 @@ void* memcpy(void* dest, const void* src, size_t size) {
   }
   return result;
 }
+
+#endif
 
 void print_int(uint64_t x) {
   char str[256];

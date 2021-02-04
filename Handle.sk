@@ -297,7 +297,10 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   fun next(context: mutable Context): EHandle<T> {
     dirName = this.dirName.next();
     if (!context.hasNext.contains(this.dirName)) {
-      fixedData = FixedData{data => Array[]};
+      fixedData = FixedDir<Array<File>, FixedRow<Array<File>>>{
+        data => Array[],
+        decompress => (_, x) ~> x,
+      };
       time = context.timeStamp();
       totalSize = fixedData.data.size();
       dir = EagerDir{time, input => true, dirName, fixedData, totalSize};

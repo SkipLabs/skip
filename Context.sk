@@ -283,8 +283,11 @@ mutable class Context{
           time,
           input => false,
           dirName => preDirName,
-          fixedData => FixedData{data => Array[]},
           totalSize => 0,
+          fixedData => FixedDir<Array<File>, FixedRow<Array<File>>>{
+            data => Array[],
+            decompress => (_, x) ~> x,
+          },
         };
         dir.unsafeIterKeys((key, _time) -> {
           values = dir.getArrayRaw(key);
@@ -377,38 +380,55 @@ mutable class Context{
     dirName: DirName,
     content: Array<(BaseName, T)> = Array[],
   ): EHandle<T> {
-    dir = this.mkdirMulti(
+    this.mkdirMulti(
       dirName,
       content.map(kv -> {
         (key, value) = kv;
         (key, Array[value])
       }),
     );
-    this.!newDirs = this.newDirs.add(dir.getDirName());
-    this.setDir(dir.getDirName(), dir);
-    EHandle(conv, dir.getDirName())
+    EHandle(conv, dirName)
   }
 
-  mutable fun mkdirMulti<T: File>(
+  mutable fun mkdirMulti(
     dirName: DirName,
-    content: Array<(BaseName, Array<T>)> = Array[],
-  ): Dir {
+    content: Array<(BaseName, Array<File>)> = Array[],
+  ): void {
     if (this.dirs.state.containsKey(dirName)) {
       throw DirAlreadyExists(dirName);
     };
-    vector = mutable Vector[];
+    vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
     for (kv in content) {
       (key, values) = kv;
       path = Path::create(dirName, key);
-      vector.push(FixedRow(key, (path, values.map(x -> (x : File)))));
+      vector.push(FixedRow(key, (path, values)));
     };
     vector.sort();
-    fixedData = FixedData{data => vector.toArray()};
+    fixedData = FixedDir{data => vector.toArray(), decompress => (_, x) ~> x};
+
     time = this.timeStamp();
     totalSize = fixedData.data.size();
     dir = EagerDir{time, input => true, dirName, fixedData, totalSize};
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
-    dir
+    this.!newDirs = this.newDirs.add(dirName);
+  }
+
+  mutable fun mkdirCompressed<T: File, Row: frozen>(
+    conv: File ~> T,
+    dirName: DirName,
+    content: Array<Row>,
+    decompress: (Int, Row) ~> FixedRow<Array<File>>,
+  ): EHandle<T> {
+    if (this.dirs.state.containsKey(dirName)) {
+      throw DirAlreadyExists(dirName);
+    };
+    fixedData = FixedDir{data => content, decompress};
+
+    time = this.timeStamp();
+    dir = EagerDir{time, input => true, dirName, fixedData};
+    this.!dirs = this.dirs.set(dir.time, dirName, dir);
+    this.!newDirs = this.newDirs.add(dirName);
+    EHandle(conv, dirName)
   }
 
   mutable fun setDir(dirName: DirName, dir: Dir): void {
@@ -574,7 +594,7 @@ private native fun gContextSync(Context): Context;
 
 @debug
 @cpp_extern("SKIP_context_init")
-private native fun gContextInit(Context): void;
+private native fun gContextInit(Context): Context;
 
 @debug
 @cpp_extern("SKIP_context_get")
@@ -586,16 +606,15 @@ native fun .verify(Context): void;
 
 @cpp_noinline
 fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
-  gContextInit(origContext);
+  context = gContextInit(origContext);
   loop {
     pos = newObstack();
-    context = gContextGet();
     verify(context);
     newContextOpt = f(context);
     newContextOpt match {
     | None() -> return void
     | Some(newContext) ->
-      _ = gContextSync(newContext);
+      !context = gContextSync(newContext);
       destroyObstack(pos)
     }
   }

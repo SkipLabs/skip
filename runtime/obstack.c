@@ -143,7 +143,6 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
   page = saved->page;
   end = saved->end;
   sk_free_size(saved, sizeof(sk_saved_obstack_t));
-  return;
 }
 
 void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {

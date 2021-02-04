@@ -13,6 +13,7 @@
 
 #define PERSISTENT_PAGE_SIZE (16 * 1024 * 1024)
 #define MAX_STRING_SIZE 1024
+#define SK_FTABLE_SIZE 64
 
 /*****************************************************************************/
 /* Detects pointers that come from the binary. */
@@ -224,6 +225,11 @@ void* sk_get_ftable(size_t size) {
   return ptr;
 }
 
+/*****************************************************************************/
+/* Memory initialization. */
+/*****************************************************************************/
+
+
 extern void** context;
 
 void SKIP_memory_init() {
@@ -234,10 +240,10 @@ void SKIP_memory_init() {
 
   sk_ftable = (void**)heap;
   int i;
-  for(i = 0; i < 64; i++) {
+  for(i = 0; i < SK_FTABLE_SIZE; i++) {
     sk_ftable[i] = NULL;
   }
-  heap += (sizeof(void*) * 64);
+  heap += (sizeof(void*) * SK_FTABLE_SIZE);
 
   context = (void**)heap;
   heap += sizeof(void**);
@@ -325,7 +331,7 @@ void SKIP_load_context() {
 
     if(i == 0) {
       sk_ftable = (void**)page_addr;
-      page_addr += (sizeof(void*) * 64);
+      page_addr += (sizeof(void*) * SK_FTABLE_SIZE);
 
       context = (void**)page_addr;
       page_addr += sizeof(void**);
