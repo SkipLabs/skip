@@ -3,8 +3,7 @@ module SKFSTest;
 const tableStr: String = "CREATE TABLE t1(a INTEGER, b INTEGER);";
 
 fun evalStmt(evaluator: mutable SKSQL.Evaluator, str: String): void {
-  chars = str.chars().toArray();
-  lex = SKSQL.Lexer(0, chars);
+  lex = SKSQL.Lexer(0, SKSQL.Buffer(str));
   (_, stmtAst) = SKSQL.parseStmt(lex, 0);
   evaluator.stmt(stmtAst)
 }

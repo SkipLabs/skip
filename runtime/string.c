@@ -174,6 +174,26 @@ SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2) {
 }
 
 /*****************************************************************************/
+/* Unsafe char access */
+/*****************************************************************************/
+
+uint32_t SKIP_String_unsafe_get(unsigned char* str, SkipInt n) {
+  return (uint32_t)str[n];
+}
+
+SkipInt SKIP_String_unsafe_size(unsigned char* str) {
+  return SKIP_String_byteSize((char*)str);
+}
+
+void* SKIP_String_unsafe_slice(unsigned char* str, SkipInt n1, SkipInt n2) {
+  size_t size = n2 - n1;
+  char* result = sk_string_alloc(size);
+  memcpy(result, str + n1, size);
+  sk_string_set_hash(result);
+  return result;
+}
+
+/*****************************************************************************/
 /* Multibyte utf8 string used for testing purposes. */
 /*****************************************************************************/
 

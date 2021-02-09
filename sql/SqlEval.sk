@@ -142,8 +142,7 @@ mutable class Evaluator{
   }
 
   mutable fun stmtStr(idRoot: Int, str: String): void {
-    chars = str.chars().toArray();
-    lex = SKSQL.Lexer(idRoot, chars);
+    lex = SKSQL.Lexer(idRoot, Buffer(str));
     (_, stmtAst) = SKSQL.parseStmt(lex, 0);
     this.stmt(stmtAst)
   }
@@ -243,10 +242,10 @@ fun read(): String {
   )
 }
 
-fun getLine(chars: Array<Char>, pos: Int): Int {
+fun getLine(buffer: Buffer, pos: Int): Int {
   line = 1;
   for (i in Range(0, pos)) {
-    if (chars[i] == '\n') {
+    if (buffer[i] == '\n') {
       !line = line + 1;
     }
   };
@@ -255,16 +254,16 @@ fun getLine(chars: Array<Char>, pos: Int): Int {
 
 fun printErrorAndExit(
   fileName: String,
-  chars: Array<Char>,
+  buffer: Buffer,
   pos: Int,
   msg: String,
 ): void {
   leftSpaces = 0;
   cursor = 0;
   line = 0;
-  !pos = min(chars.size() - 1, pos);
+  !pos = min(buffer.size() - 1, pos);
   while (pos - cursor > 0) {
-    if (chars[pos - cursor] == '\n') {
+    if (buffer[pos - cursor] == '\n') {
       !line = line + 1;
       if (line == 1) {
         !leftSpaces = cursor;
@@ -277,19 +276,19 @@ fun printErrorAndExit(
     !leftSpaces = pos;
   };
   right = 0;
-  while (pos + right < chars.size() && chars[pos + right] != '\n') {
+  while (pos + right < buffer.size() && buffer[pos + right] != '\n') {
     !right = right + 1
   };
   txtBegin = max(0, pos - cursor);
-  txtEnd = min(chars.size(), pos + right);
-  print_error(String::fromChars(chars.slice(txtBegin, txtEnd)));
+  txtEnd = min(buffer.size(), pos + right);
+  print_error(buffer.slice(txtBegin, txtEnd));
   spaceBuffer = mutable Vector[];
   for (_ in Range(0, leftSpaces - 1)) spaceBuffer.push(' ');
   margin = String::fromChars(spaceBuffer.toArray());
   print_error(margin + "^");
   print_error(margin + "|");
   print_error(margin + " ----- ERROR");
-  errLine = getLine(chars, pos);
+  errLine = getLine(buffer, pos);
   charPos = `characters ${leftSpaces}-${leftSpaces}`;
   print_error(`File "${fileName}", line ${errLine}, ${charPos}:`);
   print_error(msg);
@@ -358,9 +357,9 @@ fun compactInserts(
   pos
 }
 
-fun evalExn(gcontext: mutable SKFS.Context, chars: Array<Char>): void {
+fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
   gevaluator = Evaluator::create(gcontext);
-  origEnv = EvalExnEnv(Lexer(0, chars), 0, gevaluator.save());
+  origEnv = EvalExnEnv(Lexer(0, buffer), 0, gevaluator.save());
   gcontext.setGlobal("EvalExnEnv", origEnv);
   SKFS.runWithGc(gcontext.clone(), icontext ~> {
     context = SKFS.Context::fromSaved(icontext);
@@ -387,7 +386,7 @@ fun evalExn(gcontext: mutable SKFS.Context, chars: Array<Char>): void {
   })
 }
 
-fun extractSql(chars: Array<Char>): void {
+fun extractSql(chars: Buffer): void {
   lex = Lexer(0, chars);
   pos = 0;
   while (!isEOF(lex, pos)) {
@@ -395,15 +394,15 @@ fun extractSql(chars: Array<Char>): void {
     test match {
     | TestStmt{posBegin, posEnd}
     | TestQuery{posBegin, posEnd} ->
-      print_string(String::fromChars(chars.slice(posBegin, posEnd)));
+      print_string(chars.slice(posBegin, posEnd));
       print_string(";\n")
     | _ -> void
     }
   };
 }
 
-fun parseSql(chars: Array<Char>): void {
-  lex = Lexer(0, chars);
+fun parseSql(buffer: Buffer): void {
+  lex = Lexer(0, buffer);
   pos = 0;
   while (!isEOF(lex, pos)) {
     loc = SKFS.newObstack();
@@ -413,26 +412,25 @@ fun parseSql(chars: Array<Char>): void {
 }
 
 fun eval(args: Array<String>): mutable SKFS.Context {
-  txt = read();
+  buffer = Buffer(read());
   SKFS.run(context ~> {
     //    context.!debugMode = true;
     context.!failOnExn = true;
     exnMode = args.contains("--backtrace");
     if (args.contains("--extract-sql")) {
-      extractSql(txt.chars().toArray());
+      extractSql(buffer);
       return void;
     };
     fileName = if (args.size() == 0) "" else args[args.size() - 1];
     //    print_string("ExceptionMode: " + exnMode);
     //    print_string("FileName: " + fileName);
-    chars = txt.chars().toArray();
-    if (exnMode) evalExn(context, chars) else {
+    if (exnMode) evalExn(context, buffer) else {
       context.vtry(
-        () -> evalExn(context, chars),
+        () -> evalExn(context, buffer),
         e ->
           e match {
           | Error(pos, msg) ->
-            printErrorAndExit(fileName, chars, pos, msg);
+            printErrorAndExit(fileName, buffer, pos, msg);
             invariant_violation("Unreachable")
           | exn -> throw (exn)
           }

@@ -1,6 +1,29 @@
 module SKSQL;
 
-class Lexer(idRoot: Int, content: Array<Char>) {
+@cpp_extern("SKIP_String_unsafe_get")
+native fun stringUnsafeGet(str: String, idx: Int): Char;
+
+@cpp_extern("SKIP_String_unsafe_size")
+native fun stringUnsafeSize(str: String): Int;
+
+@cpp_extern("SKIP_String_unsafe_slice")
+native fun stringUnsafeSlice(str: String, Int, Int): String;
+
+value class Buffer(content: String) {
+  fun get(idx: Int): Char {
+    stringUnsafeGet(this.content, idx)
+  }
+
+  fun size(): Int {
+    stringUnsafeSize(this.content)
+  }
+
+  fun slice(n1: Int, n2: Int): String {
+    stringUnsafeSlice(this.content, n1, n2)
+  }
+}
+
+class Lexer(idRoot: Int, content: Buffer) {
   fun next(pos: Int): (Int, Token) {
     tok = this.token(pos);
     (tok.posEnd, tok)
@@ -127,7 +150,7 @@ class Lexer(idRoot: Int, content: Array<Char>) {
   }
 
   fun wordAt(tok: Token): String {
-    String::fromChars(this.content.slice(tok.posBegin, tok.posEnd))
+    this.content.slice(tok.posBegin, tok.posEnd)
   }
 
   fun nextInt(pos: Int): (Int, Int) {

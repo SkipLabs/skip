@@ -212,8 +212,7 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
 }
 
 fun isSQL(str: String): Bool {
-  chars = str.chars().toArray();
-  lex = SKSQL.Lexer(0, chars);
+  lex = SKSQL.Lexer(0, SKSQL.Buffer(str));
   if (SKSQL.isEOF(lex, 0)) return false;
   lex.word(0).uppercase() match {
   | "CREATE" | "INSERT" | "UPDATE" | "DROP" | "DELETE" | "REPLACE" | "SELECT" ->
@@ -223,8 +222,7 @@ fun isSQL(str: String): Bool {
 }
 
 fun parseSQLStmt(idRoot: Int, cmd: String): ?SKSQL.Stmt {
-  chars = cmd.chars().toArray();
-  lex = SKSQL.Lexer(idRoot, chars);
+  lex = SKSQL.Lexer(idRoot, SKSQL.Buffer(cmd));
   (_, stmtAst) = SKSQL.parseStmt(lex, 0);
   Some(stmtAst)
 }
