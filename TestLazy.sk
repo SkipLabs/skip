@@ -18,7 +18,6 @@ fun testLazy(): mutable SKFS.Context {
       context,
       SKFS.DirName::create("/lazy1/"),
       (context, _self, x) ~> {
-        debug("CALLED LAZY1 " + x);
         Array[
           SKFS.IntFile(
             x match {
@@ -38,6 +37,33 @@ fun testLazy(): mutable SKFS.Context {
         Array[SKFS.IntFile(dir1.getArray(context, key)[0].value)]
       },
     );
+
+    adir1 = SKFS.LHandle::create(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/alazy1/"),
+      (context, _self, x) ~> {
+        Array[
+          SKFS.IntFile(
+            x match {
+            | SKFS.IID(v) ->
+              dirInput.getArray(context, SKFS.IID(0))[0].value + v
+            | _ -> error()
+            },
+          ),
+        ]
+      },
+    );
+    _adir2 = SKFS.LHandle::create(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/alazy2/"),
+      (context, _self, key) ~> {
+        arr = adir1.getArrayAsync(context, key);
+        if (arr.size() == 0) arr else Array[SKFS.IntFile(arr[0].value)]
+      },
+    );
+
     _dir3 = dirInput2.contextWriterKeyMap(
       SKFS.IntFile::fromFile,
       context,
@@ -50,7 +76,26 @@ fun testLazy(): mutable SKFS.Context {
 
   input = SKFS.DirName::create("/input/");
   dir2 = SKFS.DirName::create("/lazy2/");
+  adir2 = SKFS.DirName::create("/alazy2/");
   dir3 = SKFS.DirName::create("/eager/");
+
+  expectEq("Async Lazy basic", Array<SKFS.File>[], () ->
+    getLazyData(context, adir2, SKFS.IID(0), true)
+  );
+
+  context.update(() -> true);
+
+  expectEq("Async Lazy basic with interruption", Array<SKFS.File>[], () ->
+    getLazyData(context, adir2, SKFS.IID(0), true)
+  );
+
+  context.update();
+
+  expectEq(
+    "Async Lazy basic without interruption",
+    Array<SKFS.File>[SKFS.IntFile(23)],
+    () -> getLazyData(context, adir2, SKFS.IID(0), true),
+  );
 
   expectEq("Lazy basic", Array<SKFS.File>[SKFS.IntFile(23)], () ->
     getData(context, dir2, SKFS.IID(0))

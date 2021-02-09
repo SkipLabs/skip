@@ -137,11 +137,17 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, EHandle<T>, BaseName) ~> Array<T>,
-  ): EHandle<T> {
+  ): LHandle<T> {
     dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
       f(context, EHandle(conv, dirName), key);
     });
-    EHandle(conv, dir.getDirName())
+    LHandle(conv, dir.getDirName())
+  }
+
+  fun getArrayAsync(context: mutable Context, key: BaseName): Array<T> {
+    dir = context.unsafeGetLazyDir(this.getDirName());
+    results = dir.getArrayAsync(context, key).map(this.getConv());
+    results
   }
 }
 

@@ -8,6 +8,7 @@ base class LazyResult {
   | LDefined(Array<File>)
   | LError(ErrorFile)
   | LAbsent()
+  | LDelayed()
 }
 
 class LazyDir{
@@ -147,13 +148,21 @@ class LazyDir{
     context.setDir(this.dirName, this);
   }
 
-  fun getArray(context: mutable Context, key: BaseName): Array<File> {
-    path = Path::create(this.dirName, key);
-    context.addDep(path);
+  fun unsafeGetArray(
+    context: mutable Context,
+    key: BaseName,
+    isAsync: Bool = false,
+  ): Array<File> {
     lazyResult = this.data.maybeGet(key) match {
     | None()
     | Some(LAbsent()) ->
-      this.lazyFun(context, key)
+      if (isAsync) {
+        context.pushAsync(Path::create(this.dirName, key));
+        LDelayed()
+      } else {
+        this.lazyFun(context, key)
+      }
+    | Some(LDelayed()) if (!isAsync) -> this.lazyFun(context, key)
     | Some(x) -> x
     };
     lazyResult match {
@@ -161,5 +170,17 @@ class LazyDir{
     | LError(err) -> Array[err]
     | _ -> Array[]
     }
+  }
+
+  fun getArray(context: mutable Context, key: BaseName): Array<File> {
+    path = Path::create(this.dirName, key);
+    context.addDep(path);
+    this.unsafeGetArray(context, key, false)
+  }
+
+  fun getArrayAsync(context: mutable Context, key: BaseName): Array<File> {
+    path = Path::create(this.dirName, key);
+    context.addDep(path);
+    this.unsafeGetArray(context, key, true)
   }
 }

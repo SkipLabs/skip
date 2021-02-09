@@ -237,11 +237,11 @@ fun evalLFun(
   | _ -> error()
   };
   if (keyValue > 10) {
-    thisDir = context.unsafeGetDir(SKFS.DirName::create(thisDirName));
+    thisDir = context.unsafeGetLazyDir(SKFS.DirName::create(thisDirName));
     !result =
       result +
       SKFS.IntFile::fromFile(
-        thisDir.getArray(context, SKFS.IID(keyValue / 2))[0],
+        thisDir.getArrayAsync(context, SKFS.IID(keyValue / 2))[0],
       ).value;
   };
   SKFS.IntFile(result)
@@ -345,7 +345,8 @@ fun compareContext(
         | SKFS.LazyDir{data} ->
           data.maybeGet(key) match {
           | None()
-          | Some(SKFS.LAbsent()) ->
+          | Some(SKFS.LAbsent())
+          | Some(SKFS.LDelayed()) ->
             print_string("EMPTY DATA")
           | Some(SKFS.LDefined(files)) ->
             intFiles = files.map(file -> SKFS.IntFile::fromFile(file));

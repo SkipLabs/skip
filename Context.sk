@@ -120,12 +120,34 @@ mutable class Context{
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
+  mutable asyncList: List<Path> = List[],
+  mutable asyncQueue: List<Path> = List[],
   dirty: mutable Map<DirName, mutable Set<BaseName>> = mutable Map[],
   dirtyReaders: mutable Map<
     DirName,
     mutable Map<DirName, mutable Set<BaseName>>,
   > = mutable Map[],
 } {
+  mutable fun pushAsync(path: Path): void {
+    this.!asyncList = List.Cons(path, this.asyncList);
+  }
+
+  mutable fun popAsync(): ?Path {
+    this.asyncQueue match {
+    | List.Nil() ->
+      this.asyncList match {
+      | List.Nil() -> None()
+      | l ->
+        this.!asyncQueue = l.reversed();
+        this.!asyncList = List[];
+        this.popAsync()
+      }
+    | List.Cons(x, rl) ->
+      this.!asyncQueue = rl;
+      Some(x)
+    }
+  }
+
   readonly fun vtry<T>(f: () -> T, onError: .Exception -> T): T {
     if (this.failOnExn) f() else vtry(f, onError)
   }
@@ -306,7 +328,7 @@ mutable class Context{
     }
   }
 
-  mutable fun update(): void {
+  mutable fun update(interrupt: () -> Bool = () -> false): void {
     if (this.debugMode) {
       print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
@@ -314,27 +336,40 @@ mutable class Context{
     this.updateNewDeps();
 
     this.!tick = this.tick + 1;
+
     loop {
-      toUpdate = this.toUpdate.minimum();
-      toUpdate match {
-      | None() ->
-        this.dirty.clear();
-        this.dirtyReaders.clear();
-        this.updatePre(this.toReset);
-        this.!toReset = SortedSet[];
-        return void
-      | Some((time, Arrow(parentName, childName))) ->
-        this.!toReset = this.toReset.set(childName);
-        this.!toUpdate = this.toUpdate.remove(time);
-        this.unsafeGetDir(childName) match {
-        | DeletedDir _ -> void
-        | child @ LazyDir _ -> child.update(this)
-        | child @ EagerDir _ ->
-          this.!toReset = this.toReset.set(parentName);
-          EagerDir::update(this, parentName, child)
-        }
+      while (!interrupt()) {
+        path = this.popAsync() match {
+        | None() -> break void
+        | Some(x) -> x
+        };
+        dir = this.unsafeGetLazyDir(path.dirName);
+        _ = dir.unsafeGetArray(this, path.baseName);
+        updateDirtyReaders(this, path);
       };
-    };
+
+      loop {
+        toUpdate = this.toUpdate.minimum();
+        toUpdate match {
+        | None() ->
+          this.dirty.clear();
+          this.dirtyReaders.clear();
+          this.updatePre(this.toReset);
+          this.!toReset = SortedSet[];
+          return void
+        | Some((time, Arrow(parentName, childName))) ->
+          this.!toReset = this.toReset.set(childName);
+          this.!toUpdate = this.toUpdate.remove(time);
+          this.unsafeGetDir(childName) match {
+          | DeletedDir _ -> void
+          | child @ LazyDir _ -> child.update(this)
+          | child @ EagerDir _ ->
+            this.!toReset = this.toReset.set(parentName);
+            EagerDir::update(this, parentName, child)
+          }
+        }
+      }
+    }
   }
 
   mutable fun timeStamp(): Int {

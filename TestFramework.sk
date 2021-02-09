@@ -71,4 +71,40 @@ fun expectEq<T: frozen>(msg: String, x: T, f: () -> T): void {
   });
 }
 
+fun write(
+  context: mutable SKFS.Context,
+  dirInput: SKFS.DirName,
+  key: SKFS.BaseName,
+  values: Array<SKFS.File>,
+): void {
+  context.unsafeGetEagerDir(dirInput).writeArray(context, key, values);
+}
+
+fun getData(
+  context: mutable SKFS.Context,
+  dirName: SKFS.DirName,
+  key: SKFS.BaseName,
+): Array<SKFS.File> {
+  context.unsafeGetDir(dirName) match {
+  | SKFS.DeletedDir _ ->
+    invariant_violation("Trying to write to an empty directory")
+  | edir @ SKFS.EagerDir _ -> edir.getArrayRaw(key)
+  | ldir @ SKFS.LazyDir _ -> ldir.unsafeGetArray(context, key)
+  }
+}
+
+fun getLazyData(
+  context: mutable SKFS.Context,
+  dirName: SKFS.DirName,
+  key: SKFS.BaseName,
+  isAsync: Bool = false,
+): Array<SKFS.File> {
+  context.unsafeGetDir(dirName) match {
+  | SKFS.DeletedDir _ ->
+    invariant_violation("Trying to write to an empty directory")
+  | SKFS.EagerDir _ -> invariant_violation("Was expecting a Lazy dir")
+  | ldir @ SKFS.LazyDir _ -> ldir.unsafeGetArray(context, key, isAsync)
+  }
+}
+
 module end;

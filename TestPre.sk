@@ -1,27 +1,5 @@
 module SKFSTest;
 
-fun write(
-  context: mutable SKFS.Context,
-  dirInput: SKFS.DirName,
-  key: SKFS.BaseName,
-  values: Array<SKFS.File>,
-): void {
-  context.unsafeGetEagerDir(dirInput).writeArray(context, key, values);
-}
-
-fun getData(
-  context: mutable SKFS.Context,
-  dirName: SKFS.DirName,
-  key: SKFS.BaseName,
-): Array<SKFS.File> {
-  context.unsafeGetDir(dirName) match {
-  | SKFS.DeletedDir _ ->
-    invariant_violation("Trying to write to an empty directory")
-  | edir @ SKFS.EagerDir _ -> edir.getArrayRaw(key)
-  | ldir @ SKFS.LazyDir _ -> ldir.getArray(context, key)
-  }
-}
-
 fun testPre(): mutable SKFS.Context {
   context = SKFS.run(context ~> {
     dirSInput1 = context.mkdir(
