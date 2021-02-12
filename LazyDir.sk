@@ -50,7 +50,7 @@ class LazyDir{
   static fun create(
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, DirName, BaseName) ~> Array<File>,
+    f: (mutable Context, DirName, BaseName) ~> ?Array<File>,
   ): Dir {
     time = context.timeStamp();
     updateReaders = (
@@ -74,7 +74,10 @@ class LazyDir{
       context.!reads = mutable Vector[];
       result = context.vtry<LazyResult>(
         () -> {
-          LDefined(f(context, dirName, key))
+          f(context, dirName, key) match {
+          | None() -> LAbsent()
+          | Some(x) -> LDefined(x)
+          }
         },
         e ->
           LError(

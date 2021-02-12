@@ -38,29 +38,31 @@ fun testLazy(): mutable SKFS.Context {
       },
     );
 
-    adir1 = SKFS.LHandle::create(
+    adir1 = SKFS.LHandle::createAsync(
       SKFS.IntFile::fromFile,
       context,
       SKFS.DirName::create("/alazy1/"),
       (context, _self, x) ~> {
-        Array[
-          SKFS.IntFile(
-            x match {
-            | SKFS.IID(v) ->
-              dirInput.getArray(context, SKFS.IID(0))[0].value + v
-            | _ -> error()
-            },
-          ),
-        ]
+        Some(
+          Array[
+            SKFS.IntFile(
+              x match {
+              | SKFS.IID(v) ->
+                dirInput.getArray(context, SKFS.IID(0))[0].value + v
+              | _ -> error()
+              },
+            ),
+          ],
+        )
       },
     );
-    _adir2 = SKFS.LHandle::create(
+    _adir2 = SKFS.LHandle::createAsync(
       SKFS.IntFile::fromFile,
       context,
       SKFS.DirName::create("/alazy2/"),
       (context, _self, key) ~> {
         arr = adir1.getArrayAsync(context, key);
-        if (arr.size() == 0) arr else Array[SKFS.IntFile(arr[0].value)]
+        if (arr.size() == 0) None() else Some(Array[SKFS.IntFile(arr[0].value)])
       },
     );
 

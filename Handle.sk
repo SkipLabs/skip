@@ -139,6 +139,18 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     f: (mutable Context, EHandle<T>, BaseName) ~> Array<T>,
   ): LHandle<T> {
     dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
+      Some(f(context, EHandle(conv, dirName), key));
+    });
+    LHandle(conv, dir.getDirName())
+  }
+
+  static fun createAsync<T: File>(
+    conv: File ~> T,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, EHandle<T>, BaseName) ~> ?Array<T>,
+  ): LHandle<T> {
+    dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
       f(context, EHandle(conv, dirName), key);
     });
     LHandle(conv, dir.getDirName())

@@ -121,7 +121,6 @@ mutable class Context{
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
   mutable asyncList: List<Path> = List[],
-  mutable asyncQueue: List<Path> = List[],
   dirty: mutable Map<DirName, mutable Set<BaseName>> = mutable Map[],
   dirtyReaders: mutable Map<
     DirName,
@@ -133,17 +132,10 @@ mutable class Context{
   }
 
   mutable fun popAsync(): ?Path {
-    this.asyncQueue match {
-    | List.Nil() ->
-      this.asyncList match {
-      | List.Nil() -> None()
-      | l ->
-        this.!asyncQueue = l.reversed();
-        this.!asyncList = List[];
-        this.popAsync()
-      }
+    this.asyncList match {
+    | List.Nil() -> None()
     | List.Cons(x, rl) ->
-      this.!asyncQueue = rl;
+      this.!asyncList = rl;
       Some(x)
     }
   }
