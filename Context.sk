@@ -299,10 +299,7 @@ mutable class Context{
           );
         });
         this.setDir(preDir.dirName, preDir);
-        updateDirtyReaders(
-          this,
-          Path::create(preDirName.tag(), DirTag::create()),
-        );
+        updateDirtyReaders(this, Path::create(preDirName.tag(), DIR_TAG));
         this.setDir(preDirName, preDir)
       | Some(preDir) ->
         for (kv in dir.data.getChangesAfter(this.tick - 1)) {
@@ -434,7 +431,7 @@ mutable class Context{
   }
 
   mutable fun getDir(dirName: DirName): Dir {
-    this.addDep(Path::create(dirName.tag(), DirTag::create()));
+    this.addDep(Path::create(dirName.tag(), DIR_TAG));
     this.dirs.get(dirName);
   }
 
@@ -510,7 +507,7 @@ mutable class Context{
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.addDep(Path::create(dirName.tag(), DirTag::create()));
+    this.addDep(Path::create(dirName.tag(), DIR_TAG));
     this.dirs.maybeGet(dirName);
   }
 
