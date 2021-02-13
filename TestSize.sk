@@ -1,0 +1,58 @@
+module SKFSTest;
+
+fun testSize(): mutable SKFS.Context {
+  context = SKFS.run(context ~> {
+    dirSInput = context.mkdir(
+      SKFS.StringFile::fromFile,
+      SKFS.DirName::create("/sinput/"),
+      Array[
+        (SKFS.IID(0), SKFS.StringFile("23")),
+        (SKFS.IID(1), SKFS.StringFile("35")),
+      ],
+    );
+
+    _dir = dirSInput.contextMap(
+      SKFS.IntFile::fromFile,
+      context,
+      SKFS.DirName::create("/input/"),
+      (context, _) ~> SKFS.IntFile(dirSInput.size(context)),
+    );
+  });
+
+  /***************************************************************************/
+  // STARTING TESTS
+
+  dirSInput = SKFS.DirName::create("/sinput/");
+  dir = SKFS.DirName::create("/input/");
+
+  expectEq("Test size init", Array<SKFS.File>[SKFS.IntFile(2)], () ->
+    getData(context, dir, SKFS.IID(0))
+  );
+
+  write(context, dirSInput, SKFS.IID(3), Array[SKFS.StringFile("3")]);
+  context.update();
+
+  expectEq("Test size after new file", Array<SKFS.File>[SKFS.IntFile(3)], () ->
+    getData(context, dir, SKFS.IID(0))
+  );
+
+  write(context, dirSInput, SKFS.IID(3), Array[SKFS.StringFile("4")]);
+  context.update();
+
+  expectEq(
+    "Test size after file modif",
+    Array<SKFS.File>[SKFS.IntFile(3)],
+    () -> getData(context, dir, SKFS.IID(0)),
+  );
+
+  write(context, dirSInput, SKFS.IID(3), Array[]);
+  context.update();
+
+  expectEq(
+    "Test size after file removal",
+    Array<SKFS.File>[SKFS.IntFile(2)],
+    () -> getData(context, dir, SKFS.IID(0)),
+  );
+
+  context
+}
