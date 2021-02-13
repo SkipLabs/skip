@@ -320,7 +320,18 @@ mutable class Context{
     }
   }
 
-  mutable fun update(interrupt: () -> Bool = () -> false): void {
+  mutable fun update(): void {
+    hasBackgroundWork = this.updateWithStatus(0);
+    if (hasBackgroundWork) {
+      invariant_violation(
+        "update should not be called when there is background work" +
+          "use updateWithStatus instead",
+      );
+    };
+    void
+  }
+
+  mutable fun updateWithStatus(backgroundRounds: Int): Bool {
     if (this.debugMode) {
       print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
@@ -329,36 +340,34 @@ mutable class Context{
 
     this.!tick = this.tick + 1;
 
-    loop {
-      while (!interrupt()) {
-        path = this.popAsync() match {
-        | None() -> break void
-        | Some(x) -> x
-        };
-        dir = this.unsafeGetLazyDir(path.dirName);
-        _ = dir.unsafeGetArray(this, path.baseName);
-        updateDirtyReaders(this, path);
+    for (_ in Range(0, backgroundRounds)) {
+      path = this.popAsync() match {
+      | None() -> break void
+      | Some(x) -> x
       };
+      dir = this.unsafeGetLazyDir(path.dirName);
+      _ = dir.unsafeGetArray(this, path.baseName);
+      updateDirtyReaders(this, path);
+    };
 
-      loop {
-        toUpdate = this.toUpdate.minimum();
-        toUpdate match {
-        | None() ->
-          this.dirty.clear();
-          this.dirtyReaders.clear();
-          this.updatePre(this.toReset);
-          this.!toReset = SortedSet[];
-          return void
-        | Some((time, Arrow(parentName, childName))) ->
-          this.!toReset = this.toReset.set(childName);
-          this.!toUpdate = this.toUpdate.remove(time);
-          this.unsafeGetDir(childName) match {
-          | DeletedDir _ -> void
-          | child @ LazyDir _ -> child.update(this)
-          | child @ EagerDir _ ->
-            this.!toReset = this.toReset.set(parentName);
-            EagerDir::update(this, parentName, child)
-          }
+    loop {
+      toUpdate = this.toUpdate.minimum();
+      toUpdate match {
+      | None() ->
+        this.dirty.clear();
+        this.dirtyReaders.clear();
+        this.updatePre(this.toReset);
+        this.!toReset = SortedSet[];
+        return !this.asyncList.isEmpty()
+      | Some((time, Arrow(parentName, childName))) ->
+        this.!toReset = this.toReset.set(childName);
+        this.!toUpdate = this.toUpdate.remove(time);
+        this.unsafeGetDir(childName) match {
+        | DeletedDir _ -> void
+        | child @ LazyDir _ -> child.update(this)
+        | child @ EagerDir _ ->
+          this.!toReset = this.toReset.set(parentName);
+          EagerDir::update(this, parentName, child)
         }
       }
     }
