@@ -86,16 +86,11 @@ class Path(dirName: DirName, baseName: BaseName) extends FileName {
   }
 }
 
-class DirName(dirName: String, dTag: Int) extends FileName {
-  const HASH: Int = 213112;
-  const HASH_TAG: Int = 213113;
-
+class DirName(dirName: String) extends FileName {
   static fun create(dirName: String): DirName {
     static::validateDirName(dirName);
     dirNameHash = hash(dirName);
-    hashTag = hashCombine(static::HASH, dirNameHash);
-    dTag = hashCombine(static::HASH_TAG, dirNameHash);
-    static(dirName, dTag, hashTag)
+    static(dirName, dirNameHash)
   }
 
   fun pre(): this {
@@ -107,7 +102,15 @@ class DirName(dirName: String, dTag: Int) extends FileName {
   }
 
   fun tag(): this {
-    static(this.dirName + "tag/", this.dTag, this.dTag);
+    dirName = this.dirName + "tag/";
+    dirNameHash = hash(dirName);
+    static(dirName, dirNameHash)
+  }
+
+  fun size(): this {
+    dirName = this.dirName + "size/";
+    dirNameHash = hash(dirName);
+    static(dirName, dirNameHash)
   }
 
   static private fun validateDirName(dirName: String): void {
@@ -139,16 +142,29 @@ class DirName(dirName: String, dTag: Int) extends FileName {
 
 base class BaseName extends FileName
 
-const DIR_TAG: DirTag = DirTag::createSingletonUseConstantInstead();
+const DIR_TAG: DirTag = DirTag::createSingleton();
 
 class DirTag() extends BaseName {
-  static fun createSingletonUseConstantInstead(): this {
+  static fun createSingleton(): this {
     hashTag = hash(DirTag(0));
     DirTag(hashTag)
   }
 
   fun toString(): String {
     "DirTag()"
+  }
+}
+
+const SIZE_TAG: SizeTag = SizeTag::createSingleton();
+
+class SizeTag() extends BaseName {
+  static fun createSingleton(): this {
+    hashTag = hash(SizeTag(0));
+    SizeTag(hashTag)
+  }
+
+  fun toString(): String {
+    "SizeTag()"
   }
 }
 

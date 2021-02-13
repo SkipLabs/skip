@@ -49,6 +49,7 @@ class EagerDir{
   dirName: DirName,
   input: Bool,
   fixedData: FixedData<Array<File>>,
+  totalSize: Int,
   fixedOld: FixedData<BaseName> = FixedData{},
   data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
   old: SortedMap<BaseName, Array<BaseName>> = SortedMap[],
@@ -234,7 +235,7 @@ class EagerDir{
     | _ -> void
     };
     acc = mutable Vector[];
-    parent = context.getEagerDir(parentName);
+    parent = context.unsafeGetEagerDir(parentName);
     context.!newDirs = context.newDirs.add(childName);
     static::mapData(context, parent, f, acc);
     mapped = acc.chill();
@@ -247,12 +248,14 @@ class EagerDir{
     oldVec.sort();
     fixedData = FixedData{data => dataVec.toArray()};
     time = context.timeStamp();
+    totalSize = fixedData.data.size();
     dir = EagerDir{
       time,
       dirName => childName,
       input => false,
       parent => Some(parentName),
       fixedData,
+      totalSize,
       fixedOld => FixedData{data => oldVec.toArray()},
       mapFun => Some(f),
       newDirs => newDirs.get(),
@@ -412,7 +415,16 @@ class EagerDir{
     k: BaseName,
     rvalues: Array<File>,
   ): this {
-    if (native_eq(rvalues, this.getArrayRaw(k)) == 0) return this;
+    oldValues = this.getArrayRaw(k);
+    if (native_eq(rvalues, oldValues) == 0) return this;
+
+    totalSize = if (oldValues.size() == 0 && rvalues.size() > 0) {
+      this.totalSize + 1
+    } else if (oldValues.size() > 0 && rvalues.size() == 0) {
+      this.totalSize - 1
+    } else {
+      this.totalSize
+    };
 
     map = this.data.maybeGet(k) match {
     | None() -> SortedMap[]
@@ -426,7 +438,13 @@ class EagerDir{
     context.dirty[this.dirName].insert(k);
 
     path = Path::create(this.dirName, k);
-    !this = this with {data};
+
+    if (this.totalSize != totalSize) {
+      sizePath = Path::create(this.dirName.size(), SIZE_TAG);
+      updateDirtyReaders(context, sizePath);
+    };
+
+    !this = this with {data, totalSize};
 
     updateDirtyReaders(context, path);
 
@@ -565,6 +583,11 @@ class EagerDir{
     !this = this.writeEntry(context, source, key, values);
     context.!toReset = context.toReset.set(this.dirName);
     context.setDir(this.dirName, this);
+  }
+
+  fun size(context: mutable Context): Int {
+    context.addDep(Path::create(this.dirName.size(), SIZE_TAG));
+    this.totalSize
   }
 
   fun write(context: mutable Context, baseName: BaseName, value: File): void {

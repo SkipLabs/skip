@@ -416,26 +416,13 @@ fun eval(args: Array<String>): mutable SKFS.Context {
   SKFS.run(context ~> {
     //    context.!debugMode = true;
     context.!failOnExn = true;
-    exnMode = args.contains("--backtrace");
     if (args.contains("--extract-sql")) {
       extractSql(buffer);
       return void;
     };
-    fileName = if (args.size() == 0) "" else args[args.size() - 1];
+    _fileName = if (args.size() == 0) "" else args[args.size() - 1];
     //    print_string("ExceptionMode: " + exnMode);
     //    print_string("FileName: " + fileName);
-    if (exnMode) evalExn(context, buffer) else {
-      context.vtry(
-        () -> evalExn(context, buffer),
-        e ->
-          e match {
-          | Error(pos, msg) ->
-            printErrorAndExit(fileName, buffer, pos, msg);
-            invariant_violation("Unreachable")
-          | exn -> throw (exn)
-          }
-        ,
-      )
-    }
+    evalExn(context, buffer)
   });
 }

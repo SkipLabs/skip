@@ -6,7 +6,6 @@ module SKFS;
 base class LazyResult {
   children =
   | LDefined(Array<File>)
-  | LError(ErrorFile)
   | LAbsent()
   | LDelayed()
 }
@@ -72,23 +71,11 @@ class LazyDir{
     lazyFun = (context: mutable Context, key: BaseName) ~> {
       readsCopy = context.reads;
       context.!reads = mutable Vector[];
-      result = context.vtry<LazyResult>(
-        () -> {
-          f(context, dirName, key) match {
-          | None() -> LAbsent()
-          | Some(x) -> LDefined(x)
-          }
-        },
-        e ->
-          LError(
-            ErrorFile(
-              List[
-                ErrorTrace(dirName.toString(), key.toString(), e.getMessage()),
-              ],
-            ),
-          )
-        ,
-      );
+      result = f(context, dirName, key) match {
+      | None() -> LAbsent()
+      | Some(x) -> LDefined(x)
+      };
+
       dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = result;
       updateReaders(dirName, context, key);
@@ -109,7 +96,6 @@ class LazyDir{
   fun getArrayRaw(key: BaseName): Array<File> {
     this.data.maybeGet(key) match {
     | Some(LDefined(arr)) -> arr
-    | Some(LError(err)) -> Array[err]
     | _ -> Array[]
     }
   }
@@ -170,7 +156,6 @@ class LazyDir{
     };
     lazyResult match {
     | LDefined(arr) -> arr
-    | LError(err) -> Array[err]
     | _ -> Array[]
     }
   }

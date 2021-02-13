@@ -140,10 +140,6 @@ mutable class Context{
     }
   }
 
-  readonly fun vtry<T>(f: () -> T, onError: .Exception -> T): T {
-    if (this.failOnExn) f() else vtry(f, onError)
-  }
-
   readonly fun clone(): this {
     static{
       pwd => this.pwd,
@@ -288,6 +284,7 @@ mutable class Context{
           input => false,
           dirName => preDirName,
           fixedData => FixedData{data => Array[]},
+          totalSize => 0,
         };
         dir.unsafeIterKeys((key, _time) -> {
           values = dir.getArrayRaw(key);
@@ -408,7 +405,8 @@ mutable class Context{
     vector.sort();
     fixedData = FixedData{data => vector.toArray()};
     time = this.timeStamp();
-    dir = EagerDir{time, input => true, dirName, fixedData};
+    totalSize = fixedData.data.size();
+    dir = EagerDir{time, input => true, dirName, fixedData, totalSize};
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
     dir
   }
@@ -442,60 +440,68 @@ mutable class Context{
   mutable fun unsafeGetLazyDir(dirName: DirName): LazyDir {
     this.unsafeGetDir(dirName) match {
     | d @ LazyDir _ -> d
-    | _ -> invariant_violation("Was expecting LazyDir")
+    | _ -> invariant_violation("unsafeGetLazyDir: Was expecting LazyDir")
     }
   }
 
   mutable fun unsafeGetEagerDir(dirName: DirName): EagerDir {
     this.unsafeGetDir(dirName) match {
     | d @ EagerDir _ -> d
-    | _ -> invariant_violation("Was expecting EagerDir")
+    | _ -> invariant_violation("unsafeGetEagerDir: Was expecting EagerDir")
     }
   }
 
   mutable fun unsafeMaybeGetLazyDir(dirName: DirName): ?LazyDir {
     this.unsafeMaybeGetDir(dirName) match {
-    | None() -> None()
+    | None()
+    | Some(DeletedDir _) ->
+      None()
     | Some(d @ LazyDir _) -> Some(d)
-    | _ -> invariant_violation("Was expecting LazyDir")
+    | _ -> invariant_violation("unsafeMaybeGetLazyDir: Was expecting LazyDir")
     }
   }
 
   mutable fun unsafeMaybeGetEagerDir(dirName: DirName): ?EagerDir {
     this.unsafeMaybeGetDir(dirName) match {
-    | None() -> None()
+    | None()
+    | Some(DeletedDir _) ->
+      None()
     | Some(d @ EagerDir _) -> Some(d)
-    | _ -> invariant_violation("Was expecting EagerDir")
+    | _ -> invariant_violation("unsafeMaybeGetEagerDir: Was expecting EagerDir")
     }
   }
 
   mutable fun getLazyDir(dirName: DirName): LazyDir {
     this.getDir(dirName) match {
     | d @ LazyDir _ -> d
-    | _ -> invariant_violation("Was expecting LazyDir")
+    | _ -> invariant_violation("getLazyDir: Was expecting LazyDir")
     }
   }
 
   mutable fun getEagerDir(dirName: DirName): EagerDir {
     this.getDir(dirName) match {
     | d @ EagerDir _ -> d
-    | _ -> invariant_violation("Was expecting EagerDir")
+    | _ -> invariant_violation("getEagerDir: Was expecting EagerDir")
     }
   }
 
   mutable fun maybeGetLazyDir(dirName: DirName): ?LazyDir {
     this.maybeGetDir(dirName) match {
-    | None() -> None()
+    | None()
+    | Some(DeletedDir _) ->
+      None()
     | Some(d @ LazyDir _) -> Some(d)
-    | _ -> invariant_violation("Was expecting LazyDir")
+    | _ -> invariant_violation("maybeGetLazyDir: Was expecting LazyDir")
     }
   }
 
   mutable fun maybeGetEagerDir(dirName: DirName): ?EagerDir {
     this.maybeGetDir(dirName) match {
-    | None() -> None()
+    | None()
+    | Some(DeletedDir _) ->
+      None()
     | Some(d @ EagerDir _) -> Some(d)
-    | _ -> invariant_violation("Was expecting EagerDir")
+    | _ -> invariant_violation("maybeGetEagerDir: Was expecting EagerDir")
     }
   }
 
