@@ -41,6 +41,19 @@ class ProductRow(
 ) extends File
 
 /*****************************************************************************/
+/* The action passed to aggregate functions. */
+/*****************************************************************************/
+
+base class FileAction {
+  children =
+  | Insert(BaseName, File)
+  | Update(BaseName, File)
+  | Remove(BaseName)
+}
+
+value class Aggregate(state: File, next: (File, FileAction) ~> File)
+
+/*****************************************************************************/
 /* An Eager Directory. */
 /*****************************************************************************/
 
@@ -58,6 +71,7 @@ class EagerDir{
 
   parent: ?DirName = None(),
   childDirs: SortedMap<Int, DirName> = SortedMap[],
+  aggregates: List<Aggregate> = List[],
 } extends Dir {
   fun isInput(): Bool {
     this.input
@@ -600,5 +614,28 @@ class EagerDir{
 
   fun isDeleted(): Bool {
     false
+  }
+
+  fun addAggregate(context: mutable Context, aggr: Aggregate): void {
+    if (!this.data.isEmpty()) {
+      invariant_violation(
+        "Cannot add an aggregate after the directory changed",
+      );
+    };
+
+    fixedData = this.fixedData;
+    state = aggr.state;
+    current = 0;
+    while (current < fixedData.size()) {
+      row = fixedData[current];
+      for (value in row.value.i1) {
+        !state = aggr.next(state, Insert(row.key, value));
+      };
+      !current = current + 1;
+    };
+
+    !aggr.state = state;
+    !this.aggregates = List.Cons(aggr, this.aggregates);
+    context.setDir(this.dirName, this)
   }
 }
