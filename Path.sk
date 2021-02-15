@@ -113,6 +113,12 @@ class DirName(dirName: String) extends FileName {
     static(dirName, dirNameHash)
   }
 
+  fun aggr(): this {
+    dirName = this.dirName + "aggr/";
+    dirNameHash = hash(dirName);
+    static(dirName, dirNameHash)
+  }
+
   static private fun validateDirName(dirName: String): void {
     validator = mutable SKFSImpl.NameValidator(dirName, dirName.chars(), 0);
     validator.go()
@@ -201,7 +207,7 @@ class SID(value: String) extends BaseName {
   fun compare(y: FileName): Order {
     y match {
     | SID(v2, _) -> this.value.compare(v2)
-    | _ -> compare(this, y)
+    | _ -> invariant_violation("Heterogeneous keys detected")
     }
   }
 

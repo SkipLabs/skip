@@ -46,9 +46,9 @@ class ProductRow(
 
 base class FileAction {
   children =
-  | Insert(BaseName, File)
-  | Update(BaseName, File)
-  | Remove(BaseName)
+  | Insert(BaseName, Array<File>)
+  | Update(BaseName, Array<File>, Array<File>)
+  | Remove(BaseName, Array<File>)
 }
 
 value class Aggregate(state: File, next: (File, FileAction) ~> File)
@@ -71,7 +71,7 @@ class EagerDir{
 
   parent: ?DirName = None(),
   childDirs: SortedMap<Int, DirName> = SortedMap[],
-  aggregates: List<Aggregate> = List[],
+  aggregates: SortedMap<String, Aggregate> = SortedMap[],
 } extends Dir {
   fun isInput(): Bool {
     this.input
@@ -440,6 +440,8 @@ class EagerDir{
       this.totalSize
     };
 
+    !this = this.updateAggregates(context, k, oldValues, rvalues);
+
     map = this.data.maybeGet(k) match {
     | None() -> SortedMap[]
     | Some(x) -> x
@@ -616,26 +618,64 @@ class EagerDir{
     false
   }
 
-  fun addAggregate(context: mutable Context, aggr: Aggregate): void {
+  fun updateAggregates(
+    context: mutable Context,
+    key: BaseName,
+    oldValues: Array<File>,
+    newValues: Array<File>,
+  ): this {
+    operation = if (oldValues.size() > 0 && newValues.size() == 0) {
+      Remove(key, oldValues)
+    } else if (oldValues.size() == 0 && newValues.size() > 0) {
+      Insert(key, newValues)
+    } else { // We know they are not equal because the update function checked
+      Update(key, oldValues, newValues)
+    };
+
+    !this.aggregates = this.aggregates.map((name, aggr) -> {
+      newState = aggr.next(aggr.state, operation);
+      if (native_eq(aggr.state, newState) != 0) {
+        aggrPath = Path::create(this.dirName.aggr(), SID::create(name));
+        updateDirtyReaders(context, aggrPath);
+      };
+      !aggr.state = newState;
+      aggr
+    });
+
+    this
+  }
+
+  fun addAggregate(
+    context: mutable Context,
+    name: String,
+    aggr: Aggregate,
+  ): void {
     if (!this.data.isEmpty()) {
       invariant_violation(
         "Cannot add an aggregate after the directory changed",
       );
     };
 
-    fixedData = this.fixedData;
+    if (this.aggregates.containsKey(name)) {
+      invariant_violation(`The aggregate ${name} already exists`);
+    };
+
+    fixedData = this.fixedData.data;
     state = aggr.state;
     current = 0;
     while (current < fixedData.size()) {
       row = fixedData[current];
-      for (value in row.value.i1) {
-        !state = aggr.next(state, Insert(row.key, value));
-      };
+      !state = aggr.next(state, Insert(row.key, row.value.i1));
       !current = current + 1;
     };
 
     !aggr.state = state;
-    !this.aggregates = List.Cons(aggr, this.aggregates);
+    !this.aggregates[name] = aggr;
     context.setDir(this.dirName, this)
+  }
+
+  fun getAggregate(context: mutable Context, name: String): File {
+    context.addDep(Path::create(this.dirName.aggr(), SID::create(name)));
+    this.aggregates[name].state
   }
 }

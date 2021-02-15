@@ -310,6 +310,18 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   fun size(context: mutable Context): Int {
     context.getEagerDir(this.dirName).size(context)
   }
+
+  fun addAggregate(
+    context: mutable Context,
+    name: String,
+    aggr: Aggregate,
+  ): void {
+    context.getEagerDir(this.dirName).addAggregate(context, name, aggr)
+  }
+
+  fun getAggregate(context: mutable Context, name: String): File {
+    context.getEagerDir(this.dirName).getAggregate(context, name)
+  }
 }
 
 module end;
