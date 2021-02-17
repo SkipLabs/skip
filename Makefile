@@ -4,13 +4,14 @@ SKC=~/skip/build/bin/skip_to_llvm
 BCLINK=llvm-link-10
 MEMSIZE32=134217728
 
-OLEVEL=-O3
+OLEVEL=-O0
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
 
 SKIP_FILES=$(wildcard *.sk) $(wildcard */*.sk)
 CFILES=\
+	runtime/copy.c \
 	runtime/free.c \
 	runtime/hash.c \
 	runtime/hashtable.c \

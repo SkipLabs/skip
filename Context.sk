@@ -562,6 +562,13 @@ private native fun newObstack(): Obstack;
 private native fun destroyObstack(Obstack): void;
 
 @debug
+@cpp_extern("SKIP_destroy_Obstack_with_value")
+private native fun destroyObstackWithValue<T: frozen>(
+  Obstack,
+  Array<T>,
+): Array<T>;
+
+@debug
 @cpp_extern("SKIP_context_sync")
 private native fun gContextSync(Context): Context;
 
@@ -592,6 +599,13 @@ fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
       destroyObstack(pos)
     }
   }
+}
+
+fun withRegion<T: frozen>(f: () ~> T): T {
+  saved = newObstack();
+  result = Array[f()];
+  copied = destroyObstackWithValue(saved, result);
+  copied[0]
 }
 
 module end;

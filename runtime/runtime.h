@@ -183,5 +183,6 @@ void sk_incr_ref_count(void*);
 uintptr_t sk_decr_ref_count(void*);
 int sk_is_static(void*);
 int sk_is_const(void*);
+void* SKIP_copy_with_pages(void* obj, size_t page_size, sk_cell_t* pages);
 
 #endif

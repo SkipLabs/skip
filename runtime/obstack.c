@@ -106,30 +106,63 @@ char* SKIP_Obstack_shallowClone(size_t size, char* obj) {
 /* Obstack creation/destruction. */
 /*****************************************************************************/
 
+typedef struct {
+  char* head;
+  char* page;
+  char* end;
+} sk_saved_obstack_t;
 
-char* SKIP_new_Obstack() {
+sk_saved_obstack_t* SKIP_new_Obstack() {
+  sk_saved_obstack_t* saved = sk_malloc(sizeof(sk_saved_obstack_t));
+  saved->head = head;
+  saved->page = page;
+  saved->end = end;
   head = NULL;
   page = NULL;
   end = NULL;
-  return NULL;
+  return saved;
 }
 
-void SKIP_destroy_Obstack(char* saved) {
-  while(saved < page || saved > end) {
+void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
+  while(saved->head < page || saved->head > end) {
     char* tofree = page;
     size_t tosk_free_size = *(size_t*)(page + sizeof(char*));
     page = *(char**)page;
     sk_free_size(tofree, tosk_free_size);
     if(page == NULL) {
-      head = NULL;
-      end = NULL;
+      head = saved->head;
+      page = saved->page;
+      end = saved->end;
+      sk_free_size(saved, sizeof(sk_saved_obstack_t));
       return;
     }
     size_t size = *(size_t*)(page + sizeof(char*));
     end = page + size;
   }
-  head = saved;
+  head = saved->head;
+  page = saved->page;
+  end = saved->end;
+  sk_free_size(saved, sizeof(sk_saved_obstack_t));
+  return;
 }
+
+void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
+  size_t page_size = nbr_pages();
+  sk_cell_t* pages = get_pages(page_size);
+  char* head_copy = head;
+  char* page_copy = page;
+  char* end_copy = end;
+  head = saved->head;
+  page = saved->page;
+  end = saved->end;
+  void* result = SKIP_copy_with_pages(toCopy, page_size, pages);
+  head = head_copy;
+  page = page_copy;
+  end = end_copy;
+  SKIP_destroy_Obstack(saved);
+  return result;
+}
+
 
 /*****************************************************************************/
 /* Collection primitive (disabled). */
