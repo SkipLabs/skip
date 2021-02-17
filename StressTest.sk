@@ -161,7 +161,7 @@ fun evalSub(
 
   sum = sumAcc;
 
-  subDirs = List[];
+  subDirs = List<String>[];
 
   for (dirName in readDirs.sorted().unique()) {
     genericDir = context.unsafeGetDir(dirName);
@@ -267,14 +267,17 @@ fun evalFun(
     !reads = List.Cons(read, reads);
   };
 
-  result = List[];
-  for (ilist in reads) {
-    !result = merge(
-      result,
-      List::createFromItems(ilist).map(x -> SKFS.IntFile::fromFile(x)),
-    );
-  };
-  out = Array::createFromItems(result);
+  frozenReads = reads;
+  out = SKFS.withRegion(() ~> {
+    result = List<SKFS.IntFile>[];
+    for (ilist in frozenReads) {
+      !result = merge(
+        result,
+        List::createFromItems(ilist).map(x -> SKFS.IntFile::fromFile(x)),
+      );
+    };
+    Array::createFromItems(result);
+  });
 
   allValues = mutable Map[];
   for (file in out) {
