@@ -425,7 +425,8 @@ mutable class Context{
     fixedData = FixedDir{data => content, decompress};
 
     time = this.timeStamp();
-    dir = EagerDir{time, input => true, dirName, fixedData};
+    totalSize = fixedData.data.size();
+    dir = EagerDir{time, input => true, dirName, fixedData, totalSize};
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
     EHandle(conv, dirName)

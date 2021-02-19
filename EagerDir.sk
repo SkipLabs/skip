@@ -648,32 +648,11 @@ class EagerDir{
   }
 
   fun addAggregate(
-    context: mutable Context,
-    name: String,
-    aggr: Aggregate,
+    _context: mutable Context,
+    _name: String,
+    _aggr: Aggregate,
   ): void {
-    if (!this.data.isEmpty()) {
-      invariant_violation(
-        "Cannot add an aggregate after the directory changed",
-      );
-    };
-
-    if (this.aggregates.containsKey(name)) {
-      invariant_violation(`The aggregate ${name} already exists`);
-    };
-
-    fixedData = this.fixedData.data;
-    state = aggr.state;
-    current = 0;
-    while (current < fixedData.size()) {
-      row = fixedData[current];
-      !state = aggr.next(state, Insert(row.key, row.value.i1));
-      !current = current + 1;
-    };
-
-    !aggr.state = state;
-    !this.aggregates[name] = aggr;
-    context.setDir(this.dirName, this)
+    invariant_violation("TODO reintroduce aggregate");
   }
 
   fun getAggregate(context: mutable Context, name: String): File {
