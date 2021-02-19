@@ -219,7 +219,6 @@ void* SKIP_String_unsafe_slice(unsigned char* str, SkipInt n1, SkipInt n2) {
   return result;
 }
 
-<<<<<<< HEAD
 void* SKIP_String_unsafe_create(SkipInt size) {
   char* result = SKIP_Obstack_alloc(size + 2 * sizeof(uint32_t));
   *(uint32_t*)result = (uint32_t)size;
@@ -229,8 +228,6 @@ void* SKIP_String_unsafe_create(SkipInt size) {
   return result;
 }
 
-=======
->>>>>>> First implementation of Compacter
 /*****************************************************************************/
 /* Multibyte utf8 string used for testing purposes. */
 /*****************************************************************************/

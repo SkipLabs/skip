@@ -48,6 +48,7 @@ base class FixedData<T> {
   fun getPos(key: BaseName, i: Int, j: Int): Int;
   fun getArray(key: BaseName): Array<(Path, T)>;
   fun getIter(key: BaseName): mutable Iterator<(Path, T)>;
+  fun getArraySourceKey(source: Path, key: BaseName): Array<T>;
 }
 
 class FixedDir<T, Compressed>{
@@ -81,8 +82,9 @@ class FixedDir<T, Compressed>{
       return i;
     };
     pivot = (i + j) / 2;
-    c1 = key.compare(this.data[pivot].key);
-    c = if (c1 is EQ _) source.compare(this.data[pivot].value.i0) else c1;
+    entry = this.decompress(pivot, this.data[pivot]);
+    c1 = key.compare(entry.key);
+    c = if (c1 is EQ _) source.compare(entry.value.i0) else c1;
     c match {
     | LT()
     | EQ() ->
@@ -117,12 +119,12 @@ class FixedDir<T, Compressed>{
 
   fun getIterSourceKey(source: Path, key: BaseName): mutable Iterator<T> {
     pos = this.getPosSourceKey(source, key, 0, this.data.size() - 1);
-    while (
-      pos < this.data.size() &&
-      this.data[pos].value.i0 == source &&
-      this.data[pos].key == key
-    ) {
-      yield this.data[pos].value.i1;
+    loop {
+      if (pos >= this.data.size()) break void;
+      entry = this.decompress(pos, this.data[pos]);
+      if (entry.value.i0 != source) break void;
+      if (entry.key != key) break void;
+      yield entry.value.i1;
       !pos = pos + 1;
     };
   }

@@ -61,8 +61,8 @@ class Compact{
   ): this {
     acc = mutable Vector[];
     current = mutable IntRef(0);
-    while (current.value < fixedData.data.size()) {
-      key = fixedData.data[current.value].key;
+    while (current.value < fixedData.size()) {
+      key = fixedData[current.value].key;
       iterator = static::makeCompactKeyIterator(fixedData, key, current);
       acc.push((key, compacter.init(iterator)));
     };
@@ -76,10 +76,10 @@ class Compact{
     current: mutable IntRef,
   ): mutable Iterator<File> {
     while (
-      current.value < fixedData.data.size() &&
-      fixedData.data[current.value].key == key
+      current.value < fixedData.size() &&
+      fixedData[current.value].key == key
     ) {
-      for (file in fixedData.data[current.value].value.i1) {
+      for (file in fixedData[current.value].value.i1) {
         yield file;
       };
       current.incr()
@@ -340,7 +340,7 @@ class EagerDir{
     oldVec.sort();
     fixedData = FixedDir{data => dataVec.toArray(), decompress => (_, x) ~> x};
     time = context.timeStamp();
-    totalSize = fixedData.data.size();
+    totalSize = fixedData.size();
     compact = compacterOpt match {
     | None() -> None()
     | Some(compacter) -> Some(Compact::create(fixedData, compacter))
@@ -609,12 +609,12 @@ class EagerDir{
   }
 
   private fun getFixedFiles(current: mutable IntRef): mutable Iterator<File> {
-    key = this.fixedData.data[current.value].key;
+    key = this.fixedData[current.value].key;
     while (
-      current.value < this.fixedData.data.size() &&
-      this.fixedData.data[current.value].key == key
+      current.value < this.fixedData.size() &&
+      this.fixedData[current.value].key == key
     ) {
-      for (elt in this.fixedData.data[current.value].value.i1) {
+      for (elt in this.fixedData[current.value].value.i1) {
         yield elt;
       };
       current.incr();
@@ -625,26 +625,24 @@ class EagerDir{
     current = mutable IntRef(0);
     for (key => _ in this.data) {
       while (
-        current.value < this.fixedData.data.size() &&
-        this.fixedData.data[current.value].key < key
+        current.value < this.fixedData.size() &&
+        this.fixedData[current.value].key < key
       ) {
-        fixedKey = this.fixedData.data[current.value].key;
+        fixedKey = this.fixedData[current.value].key;
         fixedFiles = this.getFixedFiles(current);
-        current.incr();
         yield (fixedKey, fixedFiles);
       };
       while (
-        current.value < this.fixedData.data.size() &&
-        this.fixedData.data[current.value].key == key
+        current.value < this.fixedData.size() &&
+        this.fixedData[current.value].key == key
       ) {
         current.incr();
       };
       yield (key, this.getArrayRaw(key).iterator());
     };
-    while (current.value < this.fixedData.data.size()) {
-      fixedKey = this.fixedData.data[current.value].key;
+    while (current.value < this.fixedData.size()) {
+      fixedKey = this.fixedData[current.value].key;
       fixedFiles = this.getFixedFiles(current);
-      current.incr();
       yield (fixedKey, fixedFiles);
     };
   }
@@ -656,7 +654,7 @@ class EagerDir{
   }
 
   fun keys(): Set<BaseName> {
-    fixedData = this.fixedData.data;
+    fixedData = this.fixedData;
     current = 0;
     keys = mutable Set[];
     for (newKey => newValues in this.data) {
