@@ -250,6 +250,9 @@ int binarySearch(sk_cell_t* arr, size_t l, size_t r, void* x) {
 
 
 int is_in_obstack(void* ptr, sk_cell_t* pages, size_t size) {
+  if(size == 0) {
+    return 0;
+  }
   int result = binarySearch(pages, 0, size-1, ptr);
   return result;
 }
