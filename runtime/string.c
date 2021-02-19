@@ -40,6 +40,11 @@ char* sk_string_create(const char* buffer, uint32_t size) {
   return result;
 }
 
+char* SKIP_String__fromUtf8(char* class, char* array) {
+  SkipInt size = SKIP_getArraySize(array);
+  return sk_string_create(array, size);
+}
+
 uint32_t SKIP_String_getByte(unsigned char* bytes, SkipInt idx) {
   return (uint32_t)bytes[idx];
 }
