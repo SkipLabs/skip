@@ -70,7 +70,7 @@ class LazyDir{
     };
     lazyFun = (context: mutable Context, key: BaseName) ~> {
       readsCopy = context.reads;
-      context.!reads = mutable Vector[];
+      context.!reads = List[];
       result = f(context, dirName, key) match {
       | None() -> LAbsent()
       | Some(x) -> LDefined(x)
@@ -100,9 +100,12 @@ class LazyDir{
     }
   }
 
-  fun update(context: mutable Context): void {
+  fun update(
+    context: mutable Context,
+    dirtyReadersOpt: ?readonly Map<DirName, readonly Set<BaseName>>,
+  ): void {
     thisDirtyReaders = SortedSet[];
-    firstDirtyReaders = context.dirtyReaders.maybeGet(this.dirName) match {
+    firstDirtyReaders = dirtyReadersOpt match {
     | None() -> mutable Map[]
     | Some(m) -> m
     };

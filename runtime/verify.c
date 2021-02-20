@@ -144,8 +144,7 @@ void sk_verify_shared(void* obj) {
   while(st->head > 0) {
     value_t delayed = sk_stack_pop(st);
     void* toCopy = *delayed.value;
-    int is_const = sk_is_const(toCopy);
-    if(!sk_is_static(toCopy) && !is_const) {
+    if(!sk_is_static(toCopy)) {
       sk_show_ref_count(toCopy);
     }
     sk_verify_obj(st, toCopy);

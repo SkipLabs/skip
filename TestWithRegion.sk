@@ -4,8 +4,9 @@
 module SKFSTest;
 
 fun testWithRegion(): mutable SKFS.Context {
+  context = mutable SKFS.Context{};
   l = List[1, 2, 3];
-  l2 = SKFS.withRegion(() ~> {
+  l2 = SKFS.withRegion(context, _context ~> {
     l.map(x -> x + 1);
   });
   acc = 0;
@@ -13,5 +14,5 @@ fun testWithRegion(): mutable SKFS.Context {
     !acc = acc + elt;
   };
   expectEq("Test withRegion", acc, () -> 9);
-  mutable SKFS.Context{}
+  context
 }

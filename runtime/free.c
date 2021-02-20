@@ -124,10 +124,6 @@ void SKIP_free(char* obj) {
       continue;
     }
 
-    if(sk_is_const(toFree)) {
-      continue;
-    }
-
    uintptr_t count = sk_decr_ref_count(toFree);
     if(count == 0) {
       SKIP_free_obj(st, toFree);

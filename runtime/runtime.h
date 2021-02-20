@@ -9,7 +9,8 @@
 #define SKIP_RUNTIME 1
 
 #define NULL ((void*)0)
-#define PAGE_SIZE (1024 * 1024)
+
+#define PAGE_SIZE (512 * 1024)
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -72,7 +73,7 @@ void sk_htbl_remove(sk_htbl_t* table, void* key);
 SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2);
 size_t nbr_pages();
 sk_cell_t* get_pages(size_t size);
-int is_in_obstack(void* ptr, sk_cell_t* pages, size_t size);
+int is_in_obstack(char* ptr, sk_cell_t* pages, size_t size);
 
 /*****************************************************************************/
 /* Stack types. */

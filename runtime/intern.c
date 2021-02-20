@@ -203,9 +203,7 @@ void* SKIP_intern_shared(void* obj) {
 
     if(!in_obstack) {
 
-      int is_const = sk_is_const(toCopy);
-
-      if(!sk_is_static(toCopy) && !is_const) {
+      if(!sk_is_static(toCopy)) {
         sk_incr_ref_count(toCopy);
       }
 
@@ -267,5 +265,5 @@ void* SKIP_intern_shared(void* obj) {
 }
 
 void* SKIP_intern(void* obj) {
-  return obj;
+  return SKIP_intern_shared(obj);
 }

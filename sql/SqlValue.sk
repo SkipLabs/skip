@@ -26,11 +26,8 @@ base class SValue uses Hashable, Orderable, Show {
 
 class KeyRow(key: SKFS.BaseName, values: Array<Row>) extends SKFS.File
 
-class RowKey(
-  values: Array<SValue>,
-  kinds: Array<(Int, IKind)>,
-) extends SKFS.BaseName {
-  static fun create(values: Array<SValue>, kinds: Array<(Int, IKind)>): this {
+class RowKey(values: Buffer, kinds: Array<(Int, IKind)>) extends SKFS.BaseName {
+  static fun create(values: Buffer, kinds: Array<(Int, IKind)>): this {
     h = unsafe_hash_native(values);
     !h = SKFS.hashCombine(h, unsafe_hash_native(kinds));
     static(values, kinds, h)
@@ -65,7 +62,7 @@ class RowKey(
   }
 }
 
-class Row(values: Array<SValue>) extends SKFS.File
+class Row(values: Buffer) extends SKFS.File
 
 /*****************************************************************************/
 /* SValue compression/decompression. */

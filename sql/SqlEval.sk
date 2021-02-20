@@ -198,7 +198,7 @@ mutable class Evaluator{
     table = getTable(this.context, pos, baseName);
     dir = getDir(table);
     key = this.newKey(name);
-    row = Row(decompress(computeInsert(pos, paramsOpt, rawValues, table)));
+    row = Row(computeInsert(pos, paramsOpt, rawValues, table));
     this.context.getEagerDir(dir.dirName).write(this.context, key, row);
   }
 
@@ -213,7 +213,7 @@ mutable class Evaluator{
       dirName,
       init,
       (idx, values) ~> {
-        row: SKFS.File = Row(decompress(values));
+        row: SKFS.File = Row(values);
         key = SKFS.IID(idx);
         path = SKFS.Path::create(dirName, key);
         SKFS.FixedRow(key, (path, Array[row]))
@@ -309,7 +309,7 @@ fun printErrorAndExit(
 }
 
 fun printRow(row: SKSQL.Row): void {
-  values = row.values;
+  values = decompress(row.values);
   size = values.size();
   if (size == 1) {
     print_string(values[0]);
@@ -355,7 +355,8 @@ fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
     };
     lex = env.lex;
     pos = env.pos;
-    readStmt: ?Stmt = None();
+    readMode = false;
+    hadInserts = false;
     if (isEOF(lex, pos)) return None();
     evaluator = Evaluator::fromSaved(context, env.evaluator);
     mtables: mutable Map<
@@ -368,6 +369,7 @@ fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
     };
     for (_ in Range(0, INSERT_BUCKET_SIZE)) {
       if (isEOF(lex, pos)) break void;
+      posBefore = pos;
       (!pos, stmt) = parseStmt(lex, pos);
       stmt match {
       | table @ Table _ ->
@@ -382,12 +384,14 @@ fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
         row = computeInsert(pos, paramsOpt, rawValues, dirDescr);
         inserts.push(row)
       | _ ->
-        !readStmt = Some(stmt);
+        !readMode = true;
+        !pos = posBefore;
         break void
       }
     };
 
     for (tableName => data in mtables) {
+      !hadInserts = true;
       (dirDescr, mrows) = data;
       rows = unsafe_chill_trust_me(mrows);
       env.inserts.maybeGet(tableName) match {
@@ -398,7 +402,7 @@ fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
       }
     };
 
-    if (isEOF(lex, pos) || readStmt is Some _) {
+    if (isEOF(lex, pos) || readMode) {
       for (tableName => data in env.inserts) {
         (dirDescr, rowsList) = data;
         rows = rowsList.flatten().collect(Array);
@@ -408,15 +412,15 @@ fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
       !env.inserts = SortedMap[];
     };
 
-    readStmt match {
-    | None() -> void
-    | Some(stmt) ->
+    if (!isEOF(lex, pos) && !hadInserts && readMode) {
+      (!pos, stmt) = parseStmt(lex, pos);
+
       evaluator.stmt(stmt);
 
       stmt match {
       | select @ Select _ -> showSelect(context, select)
       | _ -> void
-      }
+      };
     };
     //    !context = SKFS.Context::fromSaved(icontext);
     context.setGlobal(

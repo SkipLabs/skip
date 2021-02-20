@@ -5,7 +5,7 @@ module SKSQL;
 
 class ExprEvaluator{
   pos: Int,
-  env: Map<String, ?SValue>,
+  env: Map<Int, ?SValue>,
   //  cols: Map<String, Int>,
   //  dir: SKFS.EHandle<Row>,
 } {
@@ -56,10 +56,10 @@ class ExprEvaluator{
       str.getIter().next() match {
       | None() -> invariant_violation("Found empty literal")
       | Some(c) if (Chars.isDigit(c)) -> SVInt(str.toInt())
-      | _ if (!this.env.containsKey(str)) ->
+      | _ if (!this.env.containsKey(str.hash())) ->
         error(this.pos, "Unbound name: " + str)
       | _ ->
-        this.env[str] match {
+        this.env[str.hash()] match {
         | None() -> error(this.pos, "Ambiguous name: " + str)
         | Some(v) -> v
         }
@@ -167,10 +167,9 @@ class ExprEvaluator{
       if (values.size() > 1) {
         error(select.pos, "Sub-select returns more than one column");
       };
-      values[0]
+      decompress(values)[0]
     }
   }
-
   /*
     fun sum(context: mutable SKFS.Context, args: Array<Expr>): (Int, Int) {
       if (args.size() != 1) {
@@ -211,7 +210,6 @@ class ExprEvaluator{
       (acc, elts.size())
     }
   */
-
   /*
     fun countAll(context: mutable SKFS.Context): Int {
       zero = SKFS.IID(0);
@@ -234,13 +232,14 @@ class ExprEvaluator{
       acc
     }
   */
-
-  fun getCol(row: Row, colNumber: Int): SValue {
-    values = row.values;
-    if (colNumber < 0) error(this.pos, "Expected positive column number");
-    if (colNumber >= values.size()) {
-      error(this.pos, "column number out of bound")
-    };
-    values[colNumber]
-  }
+  /*
+    fun getCol(row: Row, colNumber: Int): SValue {
+      values = row.values;
+      if (colNumber < 0) error(this.pos, "Expected positive column number");
+      if (colNumber >= values.size()) {
+        error(this.pos, "column number out of bound")
+      };
+      decompress(values)[colNumber]
+    }
+  */
 }

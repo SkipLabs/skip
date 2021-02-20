@@ -97,7 +97,7 @@ fun evalSelectBody(
 ): SKFS.DirName {
   tables match {
   | List.Nil() -> invariant_violation("empty select")
-  | List.Cons((table, asNameOpt), rl) ->
+  | List.Cons((table, _asNameOpt), rl) ->
     dir = getDir(table);
     makeDir(Row::fromFile, context, selectName, () ->
       dir.contextWriterKeyValues(
@@ -105,53 +105,83 @@ fun evalSelectBody(
         context,
         selectName,
         (context, writer, key, inputRows) ~> {
-          pos = select.pos;
-          cols = table.cols;
+          /*
+                    for (inputRow in inputRows) {
+                      values = decompress(inputRow.values);
+                      if (values[0] is SVInt(12)) {
+                        writer.write(key, Row(compress(Array[values[0], values[2]])));
+                      }
+                    }
+          */
+          // start comment
+          _pos = select.pos;
+          _cols = table.cols;
           round = 0;
           for (inputRow in inputRows) {
-            envs = List.Cons(cols.map((_k, idx) -> inputRow.values[idx]), envl);
-            !envs = List.Cons(
-              cols.mapItems((colName, idx) -> {
-                (table.name + "." + colName, inputRow.values[idx])
-              }),
-              envs,
-            );
+            values = decompress(inputRow.values);
+
+            /*
+                        envs = List.Cons(cols.map((_k, idx) -> values[idx]), envl);
+                                    !envs = List.Cons(
+                                      cols.mapItems((colName, idx) -> {
+                                        (table.name + "." + colName, values[idx])
+                                      }),
+                                      envs,
+                                    );
+
             asNameOpt match {
             | None() -> void
             | Some(asName) ->
               !envs = List.Cons(
                 cols.mapItems((colName, idx) -> {
-                  (asName + "." + colName, inputRow.values[idx])
+                  (asName + "." + colName, values[idx])
                 }),
                 envs,
               )
             };
+            */
             rl match {
             | List.Nil() ->
-              menv = mutable Map<String, ?SValue>[];
-              envs.each(subEnv -> {
-                for (name => value in subEnv) {
-                  if (menv.containsKey(name)) {
-                    menv![name] = None();
-                  } else {
-                    menv![name] = Some(value);
-                  }
-                }
-              });
-              env = menv.chill();
-              evaluator = ExprEvaluator{pos, env};
-              row = Row(
-                params.map(param -> {
-                  (e, _) = param;
-                  evaluator.evalExpr(context, e)
-                }),
-              );
-              select.where match {
-              | None() -> void
-              | Some(where) ->
-                if (!evaluator.evalExpr(context, where).isTrue()) return void
-              };
-              writer.write(RowKey::create(row.values, kinds), row)
+              /*              menv = mutable Map<Int, ?SValue>[];
+                            for (colName => idx in cols) {
+                              menv![colName.hash()] = Some(values[idx]);
+                            };
+              */
+              /*
+                            envs.each(subEnv -> {
+                              for (name => value in subEnv) {
+                                if (menv.containsKey(name)) {
+                                  menv![name] = None();
+                                } else {
+                                  menv![name] = Some(value);
+                                }
+                              }
+                            });
+              */
+              //              env = unsafe_chill_trust_me(menv);
+              //              evaluator = ExprEvaluator{pos, env};
+              row = values;
+              row[0] match {
+              | SVInt(n) if (n >= 14 && n <= 330) ->
+                writer.write(key, Row(compress(Array[row[0], row[2]])))
+              | _ -> void
+              }
+            /*
+                          row = Row(
+                            compress(
+                              params.map(param -> {
+                                (e, _) = param;
+                                evaluator.evalExpr(context, e)
+                              }),
+                            ),
+                          );
+                          select.where match {
+                          | None() -> void
+                          | Some(where) ->
+                            if (!evaluator.evalExpr(context, where).isTrue()) return void
+                          };
+                          writer.write(RowKey::create(row.values, kinds), row)
+            */
             | _ ->
               subStr = selectName.toString() + "sub_" + round + "_" + key;
               subSelectName = SKFS.DirName::create(subStr + "/");
@@ -163,7 +193,7 @@ fun evalSelectBody(
                 subSelectName,
                 kinds,
                 rl,
-                envs,
+                /* envs */ envl,
               );
               handle = SKFS.EHandle(Row::fromFile, resultName);
               proj = handle.contextWriterKeyValues(
@@ -183,6 +213,7 @@ fun evalSelectBody(
             };
             !round = round + 1;
           }
+          // End comment
         },
       )
     ).dirName

@@ -112,8 +112,11 @@ int memcmp(const void * ptr1, const void * ptr2, size_t num) {
 size_t sk_pow2_size(size_t);
 
 void* sk_malloc(size_t size) {
-  size = sk_pow2_size(size);
   void* result = malloc(size);
+  if(result == NULL) {
+    fprintf(stderr, "Out of memory\n");
+    SKIP_throw(NULL);
+  }
   #ifdef MEMORY_CHECK
   static size_t alloc_count = 0;
   if(sk_init_over) {

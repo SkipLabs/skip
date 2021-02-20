@@ -45,13 +45,12 @@ value class FixedRow<T>(
 base class FixedData<T> {
   fun size(): Int;
   fun get(idx: Int): FixedRow<T>;
-  fun getPos(key: BaseName, i: Int, j: Int): Int;
   fun getArray(key: BaseName): Array<(Path, T)>;
   fun getIter(key: BaseName): mutable Iterator<(Path, T)>;
   fun getArraySourceKey(source: Path, key: BaseName): Array<T>;
 }
 
-class FixedDir<T, Compressed>{
+class CompressedDir<T, Compressed>{
   data: Array<Compressed> = Array[],
   decompress: (Int, Compressed) ~> FixedRow<T>,
 } extends FixedData<T> {
@@ -63,12 +62,71 @@ class FixedDir<T, Compressed>{
     this.decompress(idx, this.data[idx])
   }
 
+  fun getArray(key: BaseName): Array<(Path, T)> {
+    pos = key match {
+    | IID(x) -> x
+    | _ -> invariant_violation("Expected a primary key")
+    };
+    result = mutable Vector[];
+    loop {
+      if (pos >= this.data.size()) break void;
+      elt = this.decompress(pos, this.data[pos]);
+      if (elt.key != key) break void;
+      result.push(elt.value);
+      !pos = pos + 1;
+    };
+    result.toArray();
+  }
+
+  fun getIter(key: BaseName): mutable Iterator<(Path, T)> {
+    pos = key match {
+    | IID(x) -> x
+    | _ -> invariant_violation("Expected a primary key")
+    };
+    loop {
+      if (pos >= this.data.size()) break void;
+      elt = this.decompress(pos, this.data[pos]);
+      if (elt.key != key) break void;
+      yield elt.value;
+      !pos = pos + 1;
+    };
+  }
+
+  fun getIterSourceKey(source: Path, key: BaseName): mutable Iterator<T> {
+    pos = key match {
+    | IID(x) -> x
+    | _ -> invariant_violation("Expected a primary key")
+    };
+    loop {
+      if (pos >= this.data.size()) break void;
+      entry = this.decompress(pos, this.data[pos]);
+      if (entry.value.i0 != source) break void;
+      if (entry.key != key) break void;
+      yield entry.value.i1;
+      !pos = pos + 1;
+    };
+  }
+
+  fun getArraySourceKey(source: Path, key: BaseName): Array<T> {
+    this.getIterSourceKey(source, key).collect(Array)
+  }
+}
+
+class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun get(idx: Int): FixedRow<T> {
+    this.data.unsafe_get(idx)
+  }
+
   fun getPos(key: BaseName, i: Int, j: Int): Int {
     if (i > j) {
       return i;
     };
     pivot = (i + j) / 2;
-    elt = this.decompress(pivot, this.data[pivot]);
+    elt = this.data[pivot];
     key.compare(elt.key) match {
     | LT()
     | EQ() ->
@@ -82,7 +140,7 @@ class FixedDir<T, Compressed>{
       return i;
     };
     pivot = (i + j) / 2;
-    entry = this.decompress(pivot, this.data[pivot]);
+    entry = this.data[pivot];
     c1 = key.compare(entry.key);
     c = if (c1 is EQ _) source.compare(entry.value.i0) else c1;
     c match {
@@ -98,7 +156,7 @@ class FixedDir<T, Compressed>{
     result = mutable Vector[];
     loop {
       if (pos >= this.data.size()) break void;
-      elt = this.decompress(pos, this.data[pos]);
+      elt = this.data[pos];
       if (elt.key != key) break void;
       result.push(elt.value);
       !pos = pos + 1;
@@ -110,7 +168,7 @@ class FixedDir<T, Compressed>{
     pos = this.getPos(key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
-      elt = this.decompress(pos, this.data[pos]);
+      elt = this.data[pos];
       if (elt.key != key) break void;
       yield elt.value;
       !pos = pos + 1;
@@ -121,7 +179,7 @@ class FixedDir<T, Compressed>{
     pos = this.getPosSourceKey(source, key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
-      entry = this.decompress(pos, this.data[pos]);
+      entry = this.data[pos];
       if (entry.value.i0 != source) break void;
       if (entry.key != key) break void;
       yield entry.value.i1;

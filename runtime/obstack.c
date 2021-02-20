@@ -57,12 +57,22 @@ __thread char* end = NULL;
 /* Obstack allocation. */
 /*****************************************************************************/
 
+int total_pages = 0;
+
 void sk_new_page(size_t size) {
+  total_pages++;
+//  printf("ALLOC %d\n", total_pages);
   size_t block_size = PAGE_SIZE;
   if(size + sizeof(char*) + sizeof(size_t) > block_size) {
     block_size = size + sizeof(char*) + sizeof(size_t);
   }
   head = (char*)sk_malloc(block_size);
+  if(head == NULL) {
+    #ifdef SKIP64
+    fprintf(stderr, "Out of memory\n");
+    #endif
+    SKIP_throw(NULL);
+  }
   end = head + block_size;
   *(char**)head = page;
   page = head;
@@ -73,7 +83,7 @@ void sk_new_page(size_t size) {
 
 char* SKIP_Obstack_alloc(size_t size) {
   size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
-  if (head + size > end) {
+  if (head + size >= end) {
     sk_new_page(size);
   }
   char* result = head;
@@ -83,7 +93,7 @@ char* SKIP_Obstack_alloc(size_t size) {
 
 void* SKIP_Obstack_calloc(size_t size) {
   size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
-  if (head + size > end) {
+  if (head + size >= end) {
     sk_new_page(size);
   }
   char* result = head;
@@ -113,7 +123,8 @@ typedef struct {
 } sk_saved_obstack_t;
 
 sk_saved_obstack_t* SKIP_new_Obstack() {
-  sk_saved_obstack_t* saved = sk_malloc(sizeof(sk_saved_obstack_t));
+  sk_saved_obstack_t* saved =
+    (sk_saved_obstack_t*)SKIP_Obstack_alloc(sizeof(sk_saved_obstack_t));
   saved->head = head;
   saved->page = page;
   saved->end = end;
@@ -124,25 +135,37 @@ sk_saved_obstack_t* SKIP_new_Obstack() {
 }
 
 void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
-  while(saved->head < page || saved->head > end) {
+  char* saved_page;
+  char* saved_head;
+  char* saved_end;
+  if(saved == NULL) {
+    saved_page = NULL;
+    saved_head = NULL;
+    saved_end = NULL;
+  }
+  else {
+    saved_page = saved->page;
+    saved_head = saved->head;
+    saved_end = saved->end;
+  }
+  while(saved_head < page || saved_head > end) {
     char* tofree = page;
     size_t tosk_free_size = *(size_t*)(page + sizeof(char*));
     page = *(char**)page;
+    total_pages--;
     sk_free_size(tofree, tosk_free_size);
     if(page == NULL) {
-      head = saved->head;
-      page = saved->page;
-      end = saved->end;
-      sk_free_size(saved, sizeof(sk_saved_obstack_t));
+      head = saved_head;
+      page = saved_page;
+      end = saved_end;
       return;
     }
     size_t size = *(size_t*)(page + sizeof(char*));
     end = page + size;
   }
-  head = saved->head;
-  page = saved->page;
-  end = saved->end;
-  sk_free_size(saved, sizeof(sk_saved_obstack_t));
+  head = saved_head;
+  page = saved_page;
+  end = saved_end;
 }
 
 void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
@@ -155,6 +178,9 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   page = saved->page;
   end = saved->end;
   void* result = SKIP_copy_with_pages(toCopy, page_size, pages);
+  saved->head = head;
+  saved->page = page;
+  saved->end = end;
   head = head_copy;
   page = page_copy;
   end = end_copy;
@@ -162,6 +188,11 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   return result;
 }
 
+uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
+  return
+    (head < saved->page && head >= saved->end) ||
+    (head >= (saved->head + PAGE_SIZE / 2));
+}
 
 /*****************************************************************************/
 /* Collection primitive (disabled). */
@@ -229,30 +260,30 @@ sk_cell_t* get_pages(size_t size) {
   return result;
 }
 
-int binarySearch(sk_cell_t* arr, size_t l, size_t r, void* x) {
-  if (r >= l) {
-    size_t mid = (l + r) / 2;
-
-    if (arr[mid].key <= x && x < (void*)(arr[mid].value)) {
-      return 1;
-    }
-
-    if (x < arr[mid].key)  {
-      if(mid == 0) return 0;
-      return binarySearch(arr, l, mid - 1, x);
-    }
-
-    return binarySearch(arr, mid + 1, r, x);
+int binarySearch(sk_cell_t* arr, int l, int r, char* x) {
+  if(l > r) {
+    return ((char*)arr[l].key <= x && x < (char*)(arr[l].value));
   }
 
-  return 0;
+  int mid = (l + r) / 2;
+
+  if (x < (char*)arr[mid].key)  {
+    return binarySearch(arr, l, mid - 1, x);
+  }
+  else if(x >= (char*)(arr[mid].value)) {
+    return binarySearch(arr, mid + 1, r, x);
+  }
+  else {
+    return 1;
+  }
 }
 
 
-int is_in_obstack(void* ptr, sk_cell_t* pages, size_t size) {
+int is_in_obstack(char* ptr, sk_cell_t* pages, size_t size) {
   if(size == 0) {
     return 0;
   }
+  if(pages == NULL) return 0;
   int result = binarySearch(pages, 0, size-1, ptr);
   return result;
 }

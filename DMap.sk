@@ -15,6 +15,12 @@ value class TimeTag(max: Int, current: Int) {
   }
 }
 
+mutable class IterHolder<Key, Value>(iter: mutable Iterator<(Key, Value)>) {
+  mutable fun items(): mutable Iterator<(Key, Value)> {
+    this.iter
+  }
+}
+
 base class DMap<Key: FileName, Value> {
   children =
   | Nil()
@@ -43,6 +49,33 @@ base class DMap<Key: FileName, Value> {
         yield x;
       }
     }
+  }
+
+  private fun itemsAfterKeyHelper(
+    lastSkipped: Key,
+  ): mutable Iterator<(Key, Value)> {
+    this match {
+    | Nil() -> void
+    | Node{key, value, left, right} ->
+      if (key > lastSkipped) {
+        for (x in left.itemsAfterKeyHelper(lastSkipped)) {
+          yield x;
+        };
+        yield (key, value);
+      };
+      for (x in right.itemsAfterKeyHelper(lastSkipped)) {
+        yield x;
+      }
+    }
+  }
+
+  fun itemsAfterKey(lastSkippedOpt: ?Key): mutable IterHolder<Key, Value> {
+    mutable IterHolder(
+      lastSkippedOpt match {
+      | None() -> this.items()
+      | Some(lastSkipped) -> this.itemsAfterKeyHelper(lastSkipped)
+      },
+    )
   }
 
   fun minKey(cond: ((Key, Value)) -> Bool): ?Key {

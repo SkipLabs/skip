@@ -31,13 +31,22 @@ fun testProduct(): mutable SKFS.Context {
 
     expectEq(
       "Product test1",
-      context.unsafeGetDir(product.dirName).keys(),
+      context
+        .unsafeGetDir(product.dirName)
+        .keys()
+        .map(x -> {
+          x match {
+          | SKFS.PID(v, _) -> v
+          | _ -> invariant_violation("Expected PID")
+          }
+        })
+        .collect(Set),
       () ->
         Set[
-          SKFS.PID::create(Array[SKFS.IID(0), SKFS.IID(0)]),
-          SKFS.PID::create(Array[SKFS.IID(0), SKFS.IID(2)]),
-          SKFS.PID::create(Array[SKFS.IID(1), SKFS.IID(0)]),
-          SKFS.PID::create(Array[SKFS.IID(1), SKFS.IID(2)]),
+          Array[SKFS.IID(0), SKFS.IID(0)],
+          Array[SKFS.IID(0), SKFS.IID(2)],
+          Array[SKFS.IID(1), SKFS.IID(0)],
+          Array[SKFS.IID(1), SKFS.IID(2)],
         ]
       ,
     );

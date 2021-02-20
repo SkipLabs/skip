@@ -9,7 +9,7 @@ extern size_t total_palloc_size;
 static char* shallow_copy(char* obj, size_t memsize, size_t leftsize) {
   memsize += leftsize;
   size_t alloc_size = memsize;
-  char* mem = sk_alloc(alloc_size);
+  char* mem = SKIP_Obstack_alloc(alloc_size);
   memcpy(mem, obj - leftsize, memsize);
   mem = mem + leftsize;
   return mem;
@@ -95,7 +95,7 @@ static char* SKIP_copy_string(char* obj) {
   return result;
 }
 
-static char* SKIP_copy_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj) {
+static char* SKIP_copy_obj(stack_t* st, char* obj) {
 
   char* result;
 
@@ -126,8 +126,8 @@ void* SKIP_copy_with_pages(void* obj, size_t page_size, sk_cell_t* pages) {
   stack3_t st3_holder;
   stack3_t* st3 = &st3_holder;
 
-  sk_stack_init(st, PAGE_SIZE);
-  sk_stack3_init(st3, PAGE_SIZE);
+  sk_stack_init(st, 1024);
+  sk_stack3_init(st3, 1024);
 
   void* result = obj;
   sk_stack_push(st, &obj, &result);
@@ -139,9 +139,6 @@ void* SKIP_copy_with_pages(void* obj, size_t page_size, sk_cell_t* pages) {
     int in_obstack = is_in_obstack(toCopy, pages, page_size);
 
     if(!in_obstack) {
-
-      int is_const = sk_is_const(toCopy);
-
       continue;
     }
 
@@ -169,7 +166,7 @@ void* SKIP_copy_with_pages(void* obj, size_t page_size, sk_cell_t* pages) {
     }
 
     if(((uintptr_t)*((void**)toCopy-1) & 1) == 0) {
-      copied_ptr = SKIP_copy_obj(st, pages, page_size, toCopy);
+      copied_ptr = SKIP_copy_obj(st, toCopy);
       sk_stack3_push(st3, ((void**)toCopy-1), *((void**)toCopy-1), NULL);
       *((void**)toCopy-1) = (void*)((uintptr_t)copied_ptr | 1);
     }
