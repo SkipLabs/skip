@@ -83,16 +83,21 @@ void sk_new_page(size_t size) {
 
 char* SKIP_Obstack_alloc(size_t size) {
   size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
+  size += 8;
+
   if (head + size >= end) {
     sk_new_page(size);
   }
   char* result = head;
   head += size;
+
+  result += 8;
   return result;
 }
 
 void* SKIP_Obstack_calloc(size_t size) {
   size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
+  size += 8;
   if (head + size >= end) {
     sk_new_page(size);
   }
@@ -102,6 +107,7 @@ void* SKIP_Obstack_calloc(size_t size) {
   for(i = 0; i < size; i++) {
     result[i] = 0;
   }
+  result += 8;
   return result;
 }
 
@@ -188,10 +194,21 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   return result;
 }
 
+static int sk_gc_enabled = 1;
+
+void SKIP_disable_GC() {
+  sk_gc_enabled = 0;
+}
+
+void SKIP_enable_GC() {
+  sk_gc_enabled = 1;
+}
+
 uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
   return
-    (head < saved->page && head >= saved->end) ||
-    (head >= (saved->head + PAGE_SIZE / 2));
+    sk_gc_enabled &&
+    ((head < saved->page && head >= saved->end) ||
+    (head >= (saved->head + PAGE_SIZE / 2)));
 }
 
 /*****************************************************************************/

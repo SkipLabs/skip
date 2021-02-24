@@ -21,23 +21,15 @@ fun computeInsert(
   paramsOpt: ?Array<String>,
   rawValues: InsertValues,
   table: DirDescr,
-): Buffer {
+): Row {
   values = rawValues match {
-  | IQuery _ -> todo()
-  | IValues(vals) ->
-    vals.map(x ->
-      x match {
-      | VNull() -> SVNull()
-      | VInt(n) -> SVInt(n)
-      | VLShift(n1, n2) -> SVInt(n1.shl(n2))
-      | VFloat(_, _) -> todo()
-      | VString(str) -> SVString(str)
-      }
-    )
+  | IQuery _ ->
+    invariant_violation("TODO: IQuery values in INSERT (SqlEval.sk)")
+  | IValues(vals) -> vals
   };
   schemaSize = table.schema.size();
   valueSize = values.size();
-  row = paramsOpt match {
+  svalues = paramsOpt match {
   | None() ->
     if (valueSize != schemaSize) {
       error(pos, "Value size mismatch with table schema");
@@ -53,7 +45,7 @@ fun computeInsert(
     };
     size = schemaSize;
     cols = table.cols;
-    result = Array<SValue>::mfill(params.size(), SVInt(0));
+    result = Array<Value>::mfill(params.size(), VNull());
     for (i in Range(0, size)) {
       colName = params[i];
       if (!cols.containsKey(colName)) {
@@ -61,38 +53,69 @@ fun computeInsert(
       };
       result![cols[colName]] = values[i];
     };
-    result.chill()
+    unsafe_chill_trust_me(result)
   };
-  compress(row)
+  Row::fromCValues(
+    svalues.mapWithIndex((idx, val) -> {
+      if (val is VNull _) return (None() : ?CValue);
+      table.schema[idx].ty match {
+      | INTEGER() ->
+        val match {
+        | VInt(n) -> Some(CInt(n))
+        | _ -> error(pos, "Type mismatch")
+        }
+      | FLOAT() -> invariant_violation("TODO: insert FLOAT")
+      | TEXT() ->
+        val match {
+        | VString(str) -> Some(CString(str))
+        | _ -> error(pos, "Type mismatch")
+        }
+      }
+    }),
+  )
 }
 
 fun computeKinds(
-  pos: Int,
-  size: Int,
-  ekinds: Array<(Expr, IKind)>,
-): Array<(Int, IKind)> {
-  processed = Array::mfill(size, false);
+  params: Array<CGExpr>,
+  ekinds: Array<(Int, IKind)>,
+): Array<(Int, IKind, Type)> {
+  size = params.size();
+  paramTypes = params.map(x -> x.getType());
+  colSet = mutable Set[];
+  ikinds = ekinds.map(eik -> {
+    (colNumber, kind) = eik;
+    !colNumber = colNumber - 1;
+    if (colNumber < 0 || colNumber >= size) {
+      errorEval("ORDER BY out of bounds");
+    };
+    if (colSet.contains(colNumber)) {
+      errorEval("invalid ORDER by");
+    };
+    colSet.add(colNumber);
+    (colNumber, kind)
+  });
+  computeOrder(paramTypes, ikinds)
+}
+
+fun computeOrder(
+  paramTypes: Array<Type>,
+  ikinds: Array<(Int, IKind)>,
+): Array<(Int, IKind, Type)> {
+  size = paramTypes.size();
+  defaultKinds = Array<?(Int, SKSQL.IKind, SKSQL.Type)>::mfillBy(size, i ->
+    Some((i, (INONE() : IKind), paramTypes[i]))
+  );
   kinds = mutable Vector[];
-  for (eik in ekinds) {
-    (e, ik) = eik;
-    e match {
-    | Literal(colNumberStr) ->
-      for (digit in colNumberStr) {
-        if (!Chars.isDigit(digit)) {
-          error(pos, "Invalid column number in ORDER BY");
-        }
-      };
-      colNumber = colNumberStr.toInt() - 1;
-      if (colNumber >= size) {
-        error(pos, "ORDER BY out of bounds");
-      };
-      kinds.push((colNumber, ik))
-    | _ -> error(pos, "Invalid ORDER BY")
-    }
+  for (ik in ikinds) {
+    (colNumber, kind) = ik;
+    defaultKinds![colNumber] = None();
+    kinds.push((colNumber, kind, paramTypes[colNumber]))
   };
-  for (i in Range(0, size)) {
-    if (processed[i]) continue;
-    kinds.push((i, INONE()));
+  for (defaultKind in defaultKinds) {
+    defaultKind match {
+    | None() -> void
+    | Some(k) -> kinds.push(k)
+    }
   };
   kinds.toArray()
 }
@@ -104,30 +127,21 @@ class EvaluatorSaved{
 
 mutable class Evaluator{
   mutable idRoot: Int,
-  context: mutable SKFS.Context,
   mutable tableCounters: SortedMap<String, Int>,
 } {
   readonly fun clone(): Evaluator {
-    static{
-      idRoot => this.idRoot,
-      context => this.context.clone(),
-      tableCounters => this.tableCounters,
-    }
+    static{idRoot => this.idRoot, tableCounters => this.tableCounters}
   }
 
   static fun create(context: mutable SKFS.Context): mutable this {
     _ = getSelectOutputDir(context);
     _ = getSelectInputDir(context);
     _ = getTableDir(context);
-    mutable Evaluator{idRoot => 0, context, tableCounters => SortedMap[]}
+    mutable Evaluator{idRoot => 0, tableCounters => SortedMap[]}
   }
 
-  static fun fromSaved(
-    context: mutable SKFS.Context,
-    saved: EvaluatorSaved,
-  ): mutable this {
+  static fun fromSaved(saved: EvaluatorSaved): mutable this {
     mutable Evaluator{
-      context,
       idRoot => saved.idRoot,
       tableCounters => saved.tableCounters,
     }
@@ -143,90 +157,97 @@ mutable class Evaluator{
     SKFS.IID(result)
   }
 
-  mutable fun stmtStr(idRoot: Int, str: String): void {
+  mutable fun stmtStr(
+    context: mutable SKFS.Context,
+    idRoot: Int,
+    str: String,
+  ): void {
     lex = SKSQL.Lexer(idRoot, Buffer(str));
     (_, stmtAst) = SKSQL.parseStmt(lex, 0);
-    this.stmt(stmtAst)
+    this.stmt(context, stmtAst)
   }
 
   mutable fun write(
+    context: mutable SKFS.Context,
     dirName: SKFS.DirName,
     key: SKFS.BaseName,
     value: SKFS.File,
   ): void {
-    this.context.getEagerDir(dirName).write(this.context, key, value);
+    context.getEagerDir(dirName).write(context, key, value);
   }
 
   mutable fun writeArray(
+    context: mutable SKFS.Context,
     dirName: SKFS.DirName,
     key: SKFS.BaseName,
     values: Array<SKFS.File>,
   ): void {
-    this.context.getEagerDir(dirName).writeArray(this.context, key, values);
+    context.getEagerDir(dirName).writeArray(context, key, values);
   }
 
-  mutable fun stmt(stmt: Stmt): void {
+  mutable fun stmt(context: mutable SKFS.Context, stmt: Stmt): void {
     stmt match {
     | Table{name, schema} ->
       dirDescr = computeTableDescr(name, schema);
-      this.createTable(name, dirDescr)
+      this.createTable(context, name, dirDescr)
     | Insert{pos, name, paramsOpt, values} ->
-      this.insert(pos, name, paramsOpt, values)
-    | select @ Select{} ->
-      input = getSelectInputDir(this.context);
-      this.write(input.dirName, SKFS.SID::create(select.id), select)
-    | _ -> todo()
+      this.insert(context, pos, name, paramsOpt, values)
+    | selectAst @ Select{} ->
+      compiler = SKSQL.Compiler::create(selectAst.pos);
+      select = compiler.compileSelect(context, selectAst);
+      input = getSelectInputDir(context);
+      this.write(context, input.dirName, SKFS.SID::create(select.id), select);
+      context.update()
+    | index @ Index _ ->
+      input = getIndexInputDir(context);
+      this.write(context, input.dirName, SKFS.SID::create(index.name), index);
+      _ = getIndexOutputDir(context);
+      context.update()
+    | _ -> invariant_violation("TODO rest of stmt in SqlEval.sk")
     /*
       | View{name: String, query: Query}
       | Drop{kind: TableKind, name: String}
       | Delete{colName: ?String, name: String, where: ?Expr}
-      | Index{name: String, fields: (String, Array<(String, IKind)>)}
       | Update{name: String, sets: Array<(String, Expr)>, where: ?Expr}
       | Replace{name: String, values: InsertValues}
     */
     };
-    this.context.update()
   }
 
   mutable fun insert(
+    context: mutable SKFS.Context,
     pos: Int,
     name: String,
     paramsOpt: ?Array<String>,
     rawValues: InsertValues,
   ): void {
     baseName = SKFS.SID::create(name);
-    table = getTable(this.context, pos, baseName);
+    table = getTable(context, pos, baseName);
     dir = getDir(table);
     key = this.newKey(name);
-    row = Row(computeInsert(pos, paramsOpt, rawValues, table));
-    this.context.getEagerDir(dir.dirName).write(this.context, key, row);
+    row = computeInsert(pos, paramsOpt, rawValues, table);
+    context.getEagerDir(dir.dirName).write(context, key, row);
   }
 
   mutable fun createTable(
+    context: mutable SKFS.Context,
     name: String,
     dirDescr: DirDescr,
-    init: Array<Buffer> = Array[],
+    init: Array<Row> = Array[],
   ): void {
     dirName = dirDescr.dirName;
-    _ = this.context.mkdirCompressed(
-      Row::fromFile,
-      dirName,
-      init,
-      (idx, values) ~> {
-        row: SKFS.File = Row(values);
-        key = SKFS.IID(idx);
-        path = SKFS.Path::create(dirName, key);
-        SKFS.FixedRow(key, (path, Array[row]))
-      },
-    );
-    tables = getTableDir(this.context);
-    this.context.getEagerDir(tables.dirName).write(
-      this.context,
-      SKFS.SID::create(name),
-      dirDescr,
-    );
+    _ = context.mkdirCompressed(Row::fromFile, dirName, init, (idx, row) ~> {
+      file: SKFS.File = row;
+      key = SKFS.IID(idx);
+      path = SKFS.Path::create(dirName, key);
+      SKFS.FixedRow(key, (SKFS.Source::create(path), Array[file]))
+    });
+    tables = getTableDir(context);
+    context
+      .getEagerDir(tables.dirName)
+      .write(context, SKFS.SID::create(name), dirDescr);
     this.!tableCounters[name] = 0;
-    if (this.context.debugMode) {
+    if (context.debugMode) {
       print_string("CREATED: " + name);
     };
   }
@@ -242,17 +263,24 @@ fun throwEndOfFile(): void {
 @cpp_extern("SKIP_String_concatN")
 native fun concatArray(Array<String>): String;
 
-fun read(): String {
-  buffer = mutable Vector[];
-  vtry(
-    () ->
-      loop {
-        line = read_line();
-        buffer.push(line);
-        buffer.push("\n");
-      },
-    _endOfFile -> concatArray(buffer.toArray()),
-  )
+@cpp_extern("SKIP_read_file")
+native fun read_file(String): String;
+
+fun read(fileNameOpt: ?String): String {
+  fileNameOpt match {
+  | None() ->
+    buffer = mutable Vector[];
+    vtry(
+      () ->
+        loop {
+          line = read_line();
+          buffer.push(line);
+          buffer.push("\n");
+        },
+      _endOfFile -> concatArray(buffer.toArray()),
+    )
+  | Some(fileName) -> read_file(fileName)
+  }
 }
 
 fun getLine(buffer: Buffer, pos: Int): Int {
@@ -265,12 +293,7 @@ fun getLine(buffer: Buffer, pos: Int): Int {
   line
 }
 
-fun printErrorAndExit(
-  fileName: String,
-  buffer: Buffer,
-  pos: Int,
-  msg: String,
-): void {
+fun printErrorAndExit(buffer: Buffer, pos: Int, msg: String): void {
   leftSpaces = 0;
   cursor = 0;
   line = 0;
@@ -303,65 +326,84 @@ fun printErrorAndExit(
   print_error(margin + " ----- ERROR");
   errLine = getLine(buffer, pos);
   charPos = `characters ${leftSpaces}-${leftSpaces}`;
-  print_error(`File "${fileName}", line ${errLine}, ${charPos}:`);
+  print_error(`File "", line ${errLine}, ${charPos}:`);
   print_error(msg);
   exit(2)
 }
 
-fun printRow(row: SKSQL.Row): void {
-  values = decompress(row.values);
-  size = values.size();
+fun printRow(row: SKSQL.Row, types: Array<Type>): void {
+  size = row.size();
+  if (row is RowKind _) {
+    invariant_violation("Cannot print a RowKind");
+  };
   if (size == 1) {
-    print_string(values[0]);
+    row.getValue(types[0], 0) match {
+    | None() -> print_string("")
+    | Some(v) -> print_string(v.toString())
+    };
     return void;
   };
   for (i in Range(0, size - 1)) {
-    print_raw(values[i].toString());
+    row.getValue(types[i], i) match {
+    | None() -> void
+    | Some(v) -> print_raw(v.toString())
+    };
     print_raw("|");
   };
-  print_string(values[size - 1]);
+  row.getValue(types[size - 1], size - 1) match {
+  | None() -> print_string("")
+  | Some(v) -> print_string(v.toString())
+  }
 }
 
 fun showSelect(context: mutable SKFS.Context, select: Select): void {
   outputDir = getSelectOutputDir(context);
-  dirName = outputDir.get(context, SKFS.SID::create(select.id));
-  dir = context.getEagerDir(dirName);
-  dir.onFiles(files ~> {
-    for (kv in files) {
-      (_, rows) = kv;
-      for (row in rows) {
-        printRow(SKSQL.Row::fromFile(row));
+  outputDir.get(context, SKFS.SID::create(select.id)) match {
+  | SelectDir(dirName, types) ->
+    dir = context.getEagerDir(dirName);
+    dir.onFiles(files ~> {
+      for (kv in files) {
+        (_, rows) = kv;
+        for (row in rows) {
+          row match {
+          | RowNone() -> void
+          | RowRepeat(r, n) ->
+            for (_ in Range(0, n)) {
+              printRow(r, types)
+            }
+          | r -> printRow(Row::fromFile(r), types)
+          }
+        }
       }
-    }
-  })
+    })
+  | SelectArray(row, types) -> printRow(row, types)
+  | SelectError(err) -> print_string(err.msg)
+  }
 }
 
 class EvalExnEnv(
   lex: Lexer,
   pos: Int,
   evaluator: EvaluatorSaved,
-  inserts: SortedMap<String, (DirDescr, List<Vector<Buffer>>)>,
+  inserts: SortedMap<String, (DirDescr, List<Vector<Row>>)>,
 ) extends SKFS.File
 
-fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
-  gevaluator = Evaluator::create(gcontext);
-  origEnv = EvalExnEnv(Lexer(0, buffer), 0, gevaluator.save(), SortedMap[]);
-  gcontext.setGlobal("EvalExnEnv", origEnv);
-  SKFS.runWithGc(gcontext.clone(), icontext ~> {
-    context = SKFS.Context::fromSaved(icontext);
-    env = context.getGlobal("EvalExnEnv").fromSome() match {
-    | x @ EvalExnEnv _ -> x
-    | _ -> invariant_violation("Wrong environement type")
-    };
-    lex = env.lex;
-    pos = env.pos;
-    readMode = false;
-    hadInserts = false;
-    if (isEOF(lex, pos)) return None();
-    evaluator = Evaluator::fromSaved(context, env.evaluator);
+fun evalWithContext(context: mutable SKFS.Context, packInserts: Bool): Bool {
+  env = context.getGlobal("EvalExnEnv").fromSome() match {
+  | x @ EvalExnEnv _ -> x
+  | _ -> invariant_violation("Wrong environement type")
+  };
+  lex = env.lex;
+  pos = env.pos;
+
+  if (isEOF(lex, pos)) return false;
+  evaluator = Evaluator::fromSaved(env.evaluator);
+
+  if (packInserts) {
+    readStmt: ?Stmt = None();
     mtables: mutable Map<
       String,
-      (DirDescr, mutable Vector<Buffer>),
+      (DirDescr, mutable Vector<Row>),
     > = mutable Map[];
     for (tableName => data in env.inserts) {
       (dirDescr, _) = data;
@@ -369,7 +411,6 @@ fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
     };
     for (_ in Range(0, INSERT_BUCKET_SIZE)) {
       if (isEOF(lex, pos)) break void;
-      posBefore = pos;
       (!pos, stmt) = parseStmt(lex, pos);
       stmt match {
       | table @ Table _ ->
@@ -384,14 +425,12 @@ fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
         row = computeInsert(pos, paramsOpt, rawValues, dirDescr);
         inserts.push(row)
       | _ ->
-        !readMode = true;
-        !pos = posBefore;
+        !readStmt = Some(stmt);
         break void
       }
     };
 
     for (tableName => data in mtables) {
-      !hadInserts = true;
       (dirDescr, mrows) = data;
       rows = unsafe_chill_trust_me(mrows);
       env.inserts.maybeGet(tableName) match {
@@ -402,32 +441,83 @@ fun evalExn(gcontext: mutable SKFS.Context, buffer: Buffer): void {
       }
     };
 
-    if (isEOF(lex, pos) || readMode) {
+    if (isEOF(lex, pos) || readStmt is Some _) {
       for (tableName => data in env.inserts) {
         (dirDescr, rowsList) = data;
         rows = rowsList.flatten().collect(Array);
-        evaluator.createTable(tableName, dirDescr, rows);
+        evaluator.createTable(context, tableName, dirDescr, rows);
         evaluator.!tableCounters[tableName] = rows.size();
       };
       !env.inserts = SortedMap[];
     };
 
-    if (!isEOF(lex, pos) && !hadInserts && readMode) {
-      (!pos, stmt) = parseStmt(lex, pos);
+    if (readStmt is Some _) {
+      stmt = readStmt.fromSome();
 
-      evaluator.stmt(stmt);
+      evaluator.stmt(context, stmt);
 
       stmt match {
-      | select @ Select _ -> showSelect(context, select)
+      | select @ Select _ ->
+        context.!deps = SKFS.Deps[];
+        showSelect(context, select)
       | _ -> void
       };
     };
-    //    !context = SKFS.Context::fromSaved(icontext);
-    context.setGlobal(
-      "EvalExnEnv",
-      EvalExnEnv(lex, pos, evaluator.save(), env.inserts),
-    );
-    Some(context.clone())
+  } else {
+    if (isEOF(lex, pos)) return false;
+    (!pos, stmt) = parseStmt(lex, pos);
+
+    evaluator.stmt(context, stmt);
+
+    stmt match {
+    | select @ Select _ ->
+      context.!deps = SKFS.Deps[];
+      showSelect(context, select)
+    | _ -> void
+    };
+  };
+  context.setGlobal(
+    "EvalExnEnv",
+    EvalExnEnv(lex, pos, evaluator.save(), env.inserts),
+  );
+  packInserts
+}
+
+fun setupContext(context: mutable SKFS.Context, buffer: Buffer): void {
+  (evaluator, inserts) = context.getGlobal("EvalExnEnv") match {
+  | None() -> (Evaluator::create(context).save(), SortedMap[])
+  | Some(env @ EvalExnEnv _) -> (env.evaluator, env.inserts)
+  | Some _ -> invariant_violation("EvalExnEnv has the wrong type")
+  };
+  context.!failOnExn = true;
+  origEnv = EvalExnEnv(Lexer(0, buffer), 0, evaluator, inserts);
+  context.setGlobal("EvalExnEnv", origEnv);
+}
+
+fun evalExn(buffer: Buffer, packInserts: Bool): mutable SKFS.Context {
+  gcontext = mutable SKFS.Context{unsafeReuse => true};
+  setupContext(gcontext, buffer);
+  SKFS.disableGC();
+  SKFS.runWithGcReturnContext(gcontext.clone(), icontext ~> {
+    context = SKFS.Context::fromSaved(icontext);
+    shouldContinue = false;
+    /*    vtry(
+          () -> {
+    */
+    !shouldContinue = evalWithContext(context, packInserts);
+    /*      },
+          err -> {
+            err match {
+            | Error(pos, str) -> printErrorAndExit(buffer, pos, str)
+            | exn -> throw exn
+            }
+          },
+        );
+    */
+    if (shouldContinue) Some(context.clone()) else {
+      context.update();
+      None()
+    }
   })
 }
 
@@ -457,17 +547,10 @@ fun parseSql(buffer: Buffer): void {
 }
 
 fun eval(args: Array<String>): mutable SKFS.Context {
-  buffer = Buffer(read());
-  SKFS.run(context ~> {
-    //    context.!debugMode = true;
-    context.!failOnExn = true;
-    if (args.contains("--extract-sql")) {
-      extractSql(buffer);
-      return void;
-    };
-    _fileName = if (args.size() == 0) "" else args[args.size() - 1];
-    //    print_string("ExceptionMode: " + exnMode);
-    //    print_string("FileName: " + fileName);
-    evalExn(context, buffer)
-  });
+  buffer = Buffer(read(if (args.size() > 1) Some(args[1]) else None()));
+  //    context.!debugMode = true;
+  _fileName = if (args.size() == 0) "" else args[args.size() - 1];
+  //    print_string("ExceptionMode: " + exnMode);
+  //    print_string("FileName: " + fileName);
+  evalExn(buffer, true)
 }

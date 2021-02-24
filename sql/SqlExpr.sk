@@ -3,243 +3,394 @@
 /*****************************************************************************/
 module SKSQL;
 
-class ExprEvaluator{
-  pos: Int,
-  env: Map<Int, ?SValue>,
-  //  cols: Map<String, Int>,
-  //  dir: SKFS.EHandle<Row>,
-} {
-  fun binop(
+fun btoi(b: Bool): Int {
+  if (b) 1 else 0
+}
+
+fun errorEval<T>(msg: String): T {
+  throw Error(0, msg);
+}
+
+base class ComparisonKind {
+  children =
+  | Lt()
+  | Gt()
+  | Gte()
+  | Lte()
+  | Eq()
+  | Diff()
+}
+
+class ExprEvaluator(
+  entries: Array<Row>,
+  tables: Array<DirDescr>,
+  up: ?ExprEvaluator,
+) extends SKFS.FileName {
+  static fun create(
+    entries: Array<Row>,
+    tablesHash: Int,
+    tables: Array<DirDescr>,
+    up: ?ExprEvaluator,
+  ): this {
+    result = static(entries, tables, up, 0);
+    h1 = entries.hash();
+    h2 = tablesHash;
+    h3 = up match {
+    | None() -> 0
+    | Some(x) -> x.hashTag
+    };
+    result with {hashTag => SKFS.hashCombine(h1, SKFS.hashCombine(h2, h3))}
+  }
+
+  fun toString(): String {
+    inspect(this).toString()
+  }
+
+  private fun evalCFExpr(
     context: mutable SKFS.Context,
-    op: String,
-    e1: SKSQL.Expr,
-    e2: SKSQL.Expr,
-  ): SValue {
-    op match {
-    | "<" -> SVBool(this.evalExpr(context, e1) < this.evalExpr(context, e2))
-    | "<=" -> SVBool(this.evalExpr(context, e1) <= this.evalExpr(context, e2))
-    | ">" -> SVBool(this.evalExpr(context, e1) > this.evalExpr(context, e2))
-    | ">=" -> SVBool(this.evalExpr(context, e1) >= this.evalExpr(context, e2))
-    | "=" -> SVBool(this.evalExpr(context, e1) == this.evalExpr(context, e2))
-    | "AND" ->
-      SVBool(
-        this.evalExpr(context, e1).isTrue() &&
-          this.evalExpr(context, e2).isTrue(),
+    expr: SKSQL.CExpr<Float>,
+  ): ?Float {
+    expr match {
+    | CFICast(e) -> this.evalCIExpr(context, e).flatMap(n -> Some(n.toFloat()))
+    | CDiv(e1, e2) ->
+      this.evalCFExpr(context, e1).flatMap(n1 ->
+        this.evalCFExpr(context, e2).flatMap(n2 -> Some(n1 / n2))
       )
-    | "OR" ->
-      SVBool(
-        this.evalExpr(context, e1).isTrue() ||
-          this.evalExpr(context, e2).isTrue(),
-      )
-    | "+" -> SVInt(this.int(context, e1) + this.int(context, e2))
-    | "-" -> SVInt(this.int(context, e1) - this.int(context, e2))
-    | "*" -> SVInt(this.int(context, e1) * this.int(context, e2))
-    | "/" -> SVInt(this.int(context, e1) / this.int(context, e2))
+
+    | CEQuery(select) ->
+      this.evalQuery(context, select) match {
+      | None() -> None()
+      | Some(CFloat(f)) -> Some(f)
+      | e ->
+        debug(e);
+        invariant_violation("Unexpected value in iexpr")
+      }
     | _ ->
-      debug(op);
-      todo()
+      debug(expr);
+      invariant_violation("TODO: rest of evalCFExpr")
     }
   }
 
-  fun int(context: mutable SKFS.Context, e: SKSQL.Expr): Int {
-    this.evalExpr(context, e) match {
-    | SVInt(n) -> n
-    | _ -> error(this.pos, "Was expecting a numeric value")
+  private fun evalCSExpr(
+    _context: mutable SKFS.Context,
+    expr: SKSQL.CExpr<String>,
+  ): ?String {
+    expr match {
+    | CSLiteral(str) -> Some(str)
+    | CSGetFrom(tableNbr, n) -> this.entries[tableNbr].getString(n)
+    | _ ->
+      debug(expr);
+      invariant_violation("TODO: rest of evalCSExpr")
     }
   }
 
-  fun evalExpr(context: mutable SKFS.Context, e: SKSQL.Expr): SValue {
-    e match {
-    | Binop(".", Literal(str1), Literal(str2)) ->
-      this.evalExpr(context, Literal(str1 + "." + str2))
-    | Literal(str) ->
-      str.getIter().next() match {
-      | None() -> invariant_violation("Found empty literal")
-      | Some(c) if (Chars.isDigit(c)) -> SVInt(str.toInt())
-      | _ if (!this.env.containsKey(str.hash())) ->
-        error(this.pos, "Unbound name: " + str)
-      | _ ->
-        this.env[str.hash()] match {
-        | None() -> error(this.pos, "Ambiguous name: " + str)
-        | Some(v) -> v
-        }
+  fun evalCIExpr(context: mutable SKFS.Context, expr: SKSQL.CExpr<Int>): ?Int {
+    expr match {
+    | CISize(tableNbr) ->
+      Some(context.getEagerDir(this.tables[tableNbr].dirName).size(context))
+    | CIGetParam(_) -> invariant_violation("TODO CIGetParam")
+    | CIGetFrom(tableNbr, n) -> this.entries[tableNbr].getInt(n)
+    | CILiteral(n) -> Some(n)
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCIExpr(context, x)
       }
-    | Not(sub) ->
-      this.evalExpr(context, sub) match {
-      | SVBool(false) -> SVBool(true)
-      | SVBool(true) -> SVBool(false)
-      | x -> error(this.pos, "Invalid operation NOT on: " + x)
+
+    | CNot(e) ->
+      this.evalCIExpr(context, e) match {
+      | None() -> Some(1)
+      | Some(n) -> if (n == 0) Some(1) else Some(0)
       }
-    | Case(None(), cases, elseCaseOpt) ->
-      for (case in cases) {
-        (cond, action) = case;
-        if (this.evalExpr(context, cond).isTrue()) {
-          return this.evalExpr(context, action);
-        }
+    | CLte(e1, e2) -> this.bopCompare(context, Lte(), e1, e2)
+    | CLt(e1, e2) -> this.bopCompare(context, Lt(), e1, e2)
+    | CGte(e1, e2) -> this.bopCompare(context, Gte(), e1, e2)
+    | CGt(e1, e2) -> this.bopCompare(context, Gt(), e1, e2)
+    | CEq(e1, e2) -> this.bopCompare(context, Eq(), e1, e2)
+    | CDiff(e1, e2) -> this.bopCompare(context, Diff(), e1, e2)
+
+    | CAdd(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          Some(n1 + n2)
+        })
+      )
+    | CSub(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          Some(n1 - n2)
+        })
+      )
+    | CMul(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          Some(n1 * n2)
+        })
+      )
+    | CDiv(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          Some(n1 / n2)
+        })
+      )
+
+    | CIf(conde, e1, e2) ->
+      cond = this.evalCIExpr(context, conde) match {
+      | None() -> false
+      | Some(n) -> n != 0
       };
-      elseCaseOpt match {
-      | None() -> SVNull()
-      | Some(elseCase) -> this.evalExpr(context, elseCase)
+      if (cond) {
+        this.evalCIExpr(context, e1)
+      } else {
+        this.evalCIExpr(context, e2)
       }
-    | Case(Some(cond), cases, elseCaseOpt) ->
-      search = this.evalExpr(context, cond);
-      for (case in cases) {
-        (pat, action) = case;
-        if (search == this.evalExpr(context, pat)) {
-          return this.evalExpr(context, action);
-        }
-      };
-      elseCaseOpt match {
-      | None() -> SVNull()
-      | Some(elseCase) -> this.evalExpr(context, elseCase)
-      }
-    | Binop(op, e1, e2) -> this.binop(context, op, e1, e2)
-    | EQuery(q) -> this.evalQuery(context, q)
-    /*    | Call(Literal(funName), None()) ->
-          funName.uppercase() match {
-          | "COUNT" -> SVInt(this.countAll(context))
-          | _ ->
-            debug(funName);
-            error(this.pos, "Invalid function: " + funName)
-          }
-    */
-    | Call(Literal(funName), Some(args)) ->
-      funName.uppercase() match {
-      | "AVG" -> todo()
-      /*        (sum, size) = this.sum(context, args);
-              if (sum == 0) SVInt(0) else SVInt(sum / size)
-      */
-      | "SUM" -> todo()
-      /*
-              (sum, _) = this.sum(context, args);
-              SVInt(sum)
-      */
-      | "ABS" ->
-        if (args.size() != 1) {
-          error(this.pos, "Invalid number of arguments passed to ABS");
-        };
-        this.evalExpr(context, args[0]) match {
-        | SVInt(n) if (n < 0) -> SVInt(n)
+
+    | COr(e1, e2) ->
+      this.evalCIExpr(context, e1) match {
+      | None()
+      | Some(0) ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> Some(btoi(n2 != 0))) match {
+        | None() -> Some(0)
         | x -> x
         }
-      | _ ->
-        debug(funName);
-        error(this.pos, "Invalid function: " + funName)
+      | x -> x
       }
-    | Exists(q) -> SVBool(this.evalQuery(context, q) != SVNull())
-    | _ ->
-      debug("missing expr");
-      debug(e);
-      todo()
-    /*
-        | All(Expr)
-        | Distinct(Expr)
-        | In(Expr, Array<Expr>)
-        | Between(Expr)
-        | EQuery(Query)
-        | Exists(Query)
-        | UMinus(Expr)
-        | UPlus(Expr)
-        | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
-        | Call(Expr, ?Array<Expr>)
-    */
+
+    | CAnd(e1, e2) ->
+      this.evalCIExpr(context, e1) match {
+      | None() -> Some(0)
+      | x @ Some(0) -> x
+      | Some _ ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> Some(btoi(n2 != 0)))
+      }
+
+    | CIAbs(n) ->
+      this.evalCIExpr(context, n).flatMap(x -> Some(if (x < 0) -x else x))
+
+    | CExists(select) ->
+      evalSelect(context, select, Some(this)) match {
+      | SelectDir(dirName, _) ->
+        dir = context.getEagerDir(dirName);
+        size = dir.size(context);
+        Some(if (size > 0) 1 else 0)
+      | SelectArray _ -> Some(1)
+      | SelectError(exn) -> throw exn
+      }
+
+    | CCoalesce(el) ->
+      for (e in el) {
+        this.evalCIExpr(context, e) match {
+        | None() -> continue
+        | v @ Some(_) -> return v
+        }
+      };
+      None()
+
+    | CIIsNull(e) ->
+      this.evalCIExpr(context, e) match {
+      | None() -> Some(1)
+      | Some _ -> Some(0)
+      }
+
+    | CFIsNull(e) ->
+      this.evalCFExpr(context, e) match {
+      | None() -> Some(1)
+      | Some _ -> Some(0)
+      }
+
+    | CSIsNull(e) ->
+      this.evalCSExpr(context, e) match {
+      | None() -> Some(1)
+      | Some _ -> Some(0)
+      }
+
+    | CEQuery(select) ->
+      this.evalQuery(context, select) match {
+      | None() -> None()
+      | Some(CInt(n)) -> Some(n)
+      | e ->
+        debug(e);
+        invariant_violation("Unexpected value in iexpr")
+      }
+
+    | CBetween(e1, e2, e3) ->
+      this.bopCompare(context, Lte(), e2, e1).flatMap(n1 ->
+        this.bopCompare(context, Lte(), e1, e3).flatMap(n2 ->
+          Some(btoi(n1 != 0 && n2 != 0))
+        )
+      )
+
+    | CNotBetween(e1, e2, e3) ->
+      this.bopCompare(context, Lte(), e2, e1).flatMap(n1 ->
+        this.bopCompare(context, Lte(), e1, e3).flatMap(n2 ->
+          Some(btoi(n1 == 0 || n2 == 0))
+        )
+      )
+
+    | CIn(v, set) ->
+      for (elt in set) {
+        this.bopCompare(context, Eq(), v, elt) match {
+        | None()
+        | Some(0) ->
+          void
+        | x -> break x
+        }
+      } else {
+        Some(0)
+      }
     }
   }
 
-  fun evalQuery(context: mutable SKFS.Context, query: Query): SValue {
-    select = query match {
-    | select @ Select _ -> select
-    };
-    selectName = evalSelect(context, select);
-    dirName = SKFS.DirName::create("/" + select.id + "/files/");
-    handle = SKFS.EHandle(Row::fromFile, selectName);
-    files = makeDir(Row::fromFile, context, dirName, () ->
-      handle.contextWriterMap(
-        Row::fromFile,
-        context,
-        dirName,
-        (_, writer, x) ~> writer.write(SKFS.IID(0), x),
-      )
-    );
-    fileArray = files.getArray(context, SKFS.IID(0));
-    if (fileArray.size() == 0) SVNull() else {
-      values = fileArray[0].values;
-      if (values.size() > 1) {
-        error(select.pos, "Sub-select returns more than one column");
+  private fun evalQuery(
+    context: mutable SKFS.Context,
+    select: CSelect,
+  ): ?CValue {
+    evalSelect(context, select, Some(this)) match {
+    | SelectDir(dirName, types) ->
+      dir = context.getEagerDir(dirName);
+      size = dir.size(context);
+      if (size == 0) {
+        errorEval("SELECT used as value returns no value");
       };
-      decompress(values)[0]
+      if (size > 1) {
+        errorEval("SELECT used as value returns multiple values");
+      };
+      key = dir.keys().min().fromSome();
+      files = dir.getArray(context, key);
+      if (files.size() == 0) {
+        errorEval("SELECT used as value returns no value");
+      };
+      if (files.size() > 1) {
+        errorEval("SELECT used as value returns multiple values");
+      };
+      Row::fromFile(files[0]) match {
+      | RowNone() -> errorEval("SELECT used as value returns no value")
+      | RowRepeat(_, n) ->
+        invariant(n > 1);
+        errorEval("SELECT used as value returns multiple values")
+      | err @ RowError _ -> throw err
+      | row @ RowNullableValues _
+      | row @ RowValues _ ->
+        if (row.size() != 1) {
+          errorEval("SELECT used as value returns multiple columns");
+        };
+        row.getValue(types[0], 0)
+      | row @ RowKind _ ->
+        debug(row);
+        invariant_violation("RowKind should have been resolved")
+      }
+    | SelectArray(values, types) ->
+      if (values.size() == 0) {
+        errorEval("SELECT used as value returns no value");
+      };
+      if (values.size() > 1) {
+        errorEval("SELECT used as value returns multiple values");
+      };
+      values.getValue(types[0], 0)
+    | SelectError(exn) -> throw exn
     }
   }
-  /*
-    fun sum(context: mutable SKFS.Context, args: Array<Expr>): (Int, Int) {
-      if (args.size() != 1) {
-        error(this.pos, "Invalid number of arguments passed to 'avg'");
-      };
-      colName = args[0] match {
-      | Literal(x) ->
-        if (!this.env.containsKey(x)) {
-          error(this.pos, "Column not found: " + x);
-        };
-        x
-      | _ -> error(this.pos, "'AVG' expects a column name")
-      };
-      avgName = makeAvgName(this.dir.dirName, colName);
-      zero = SKFS.IID(0);
-      reducer = makeDir(Row::fromFile, context, avgName, () -> {
-        this.dir.contextWriterMap(
-          Row::fromFile,
-          context,
-          avgName,
-          (_context, writer, row) ~> {
-            this.env[colName] match {
-            | None() -> void
-            | Some(value) -> writer.write(zero, Row(Array[value]))
-            }
-          },
+
+  fun evalCGExpr(context: mutable SKFS.Context, e: SKSQL.CGExpr): ?CValue {
+    result = e match {
+    | CGNull() -> None()
+    | CIExpr(ie) -> this.evalCIExpr(context, ie).map(x -> CInt(x))
+    | CFExpr(fe) -> this.evalCFExpr(context, fe).map(x -> CFloat(x))
+    | CSExpr(se) -> this.evalCSExpr(context, se).map(x -> CString(x))
+    };
+    result
+  }
+
+  fun bopCompare(
+    context: mutable SKFS.Context,
+    bop: ComparisonKind,
+    ge1: CGExpr,
+    ge2: CGExpr,
+  ): ?Int {
+    ge1 match {
+    | CGNull() -> None()
+    | CIExpr(ie1) ->
+      ge2 match {
+      | CGNull() -> None()
+      | CIExpr(ie2) ->
+        this.evalCIExpr(context, ie1).flatMap(n1 ->
+          this.evalCIExpr(context, ie2).flatMap(n2 -> {
+            Some(
+              btoi(
+                bop match {
+                | Lt() -> n1 < n2
+                | Lte() -> n1 <= n2
+                | Gte() -> n1 >= n2
+                | Gt() -> n1 > n2
+                | Eq() -> n1 == n2
+                | Diff() -> n1 != n2
+                },
+              ),
+            )
+          })
         )
-      });
-      elts = reducer.getArray(context, zero);
-      if (elts.size() == 0) return (0, 0);
-      acc = 0;
-      for (elt in elts) {
-        elt.values[0] match {
-        | SVInt(n) -> !acc = acc + n
-        | _ -> void
-        }
-      };
-      (acc, elts.size())
-    }
-  */
-  /*
-    fun countAll(context: mutable SKFS.Context): Int {
-      zero = SKFS.IID(0);
-      countName = makeCountName(this.dir.dirName);
-      reducer = makeDir(Row::fromFile, context, countName, () -> {
-        this.dir.contextWriterMap(
-          Row::fromFile,
-          context,
-          countName,
-          (_context, writer, _row) ~> {
-            writer.write(zero, Row(Array[]));
-          },
+      | CFExpr(fe2) ->
+        this.evalCIExpr(context, ie1).flatMap(n1 ->
+          this.evalCFExpr(context, fe2).flatMap(f2 -> {
+            f1 = n1.toFloat();
+            Some(
+              btoi(
+                bop match {
+                | Lt() -> f1 < f2
+                | Lte() -> f1 <= f2
+                | Gte() -> f1 >= f2
+                | Gt() -> f1 > f2
+                | Eq() -> f1 == f2
+                | Diff() -> f1 != f2
+                },
+              ),
+            )
+          })
         )
-      });
-      elts = reducer.getArray(context, zero);
-      acc = 0;
-      for (_elt in elts) {
-        !acc = acc + 1;
-      };
-      acc
+      | CSExpr _ -> invariant_violation("TODO: string comparison (I)")
+      }
+    | CFExpr(fe1) ->
+      ge2 match {
+      | CGNull() -> None()
+      | CIExpr(ie2) ->
+        this.evalCFExpr(context, fe1).flatMap(f1 ->
+          this.evalCIExpr(context, ie2).flatMap(n2 -> {
+            f2 = n2.toFloat();
+            Some(
+              btoi(
+                bop match {
+                | Lt() -> f1 < f2
+                | Lte() -> f1 <= f2
+                | Gte() -> f1 >= f2
+                | Gt() -> f1 > f2
+                | Eq() -> f1 == f2
+                | Diff() -> f1 != f2
+                },
+              ),
+            )
+          })
+        )
+      | CFExpr(fe2) ->
+        this.evalCFExpr(context, fe1).flatMap(f1 ->
+          this.evalCFExpr(context, fe2).flatMap(f2 -> {
+            Some(
+              btoi(
+                bop match {
+                | Lt() -> f1 < f2
+                | Lte() -> f1 <= f2
+                | Gte() -> f1 >= f2
+                | Gt() -> f1 > f2
+                | Eq() -> f1 == f2
+                | Diff() -> f1 != f2
+                },
+              ),
+            )
+          })
+        )
+      | CSExpr _ -> invariant_violation("TODO: string comparison (F)")
+      }
+    | CSExpr _ -> invariant_violation("TODO: string comparison")
     }
-  */
-  /*
-    fun getCol(row: Row, colNumber: Int): SValue {
-      values = row.values;
-      if (colNumber < 0) error(this.pos, "Expected positive column number");
-      if (colNumber >= values.size()) {
-        error(this.pos, "column number out of bound")
-      };
-      decompress(values)[colNumber]
-    }
-  */
+  }
 }

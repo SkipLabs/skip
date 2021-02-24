@@ -1,36 +1,81 @@
 module SKSQL;
 
-base class SValue uses Hashable, Orderable, Show {
-  children =
-  | SVNull()
-  | SVInt(Int)
-  | SVBool(Bool)
-  | SVString(String)
+@cpp_extern("SKIP_unsafe_int_to_string")
+native fun unsafeIntToString(Int): String;
 
-  fun toString(): String
-  | SVNull() -> "null"
-  | SVInt(n) -> n.toString()
-  | SVBool(b) -> if (b) "true" else "false"
-  | SVString(s) -> "\"" + s + "\""
+@cpp_extern("SKIP_unsafe_string_to_int")
+native fun unsafeStringToInt(String): Int;
 
-  fun isTrue(): Bool {
-    this match {
-    | SVInt(1)
-    | SVBool(true)
-    | SVString("TRUE") ->
-      true
-    | _ -> false
+@cpp_extern("SKIP_unsafe_float_to_int")
+native fun unsafeFloatToInt(Float): Int;
+
+@cpp_extern("SKIP_unsafe_int_to_float")
+native fun unsafeIntToFloat(Int): Float;
+
+@cpp_extern("SKIP_unsafe_get_svalue")
+native fun unsafeGetFast(Array<SValue>, Int): SValue;
+
+value class SValue(value: Int) {
+  static fun null(): this {
+    static(0)
+  }
+
+  fun toInt(): Int {
+    this.value
+  }
+
+  static fun fromInt(n: Int): this {
+    static(n)
+  }
+
+  fun toFloat(): Float {
+    unsafeIntToFloat(this.value)
+  }
+
+  static fun toCValue(valOpt: ?SValue, ty: Type): ?CValue {
+    valOpt match {
+    | None() -> None()
+    | Some(val) ->
+      Some(
+        ty match {
+        | FLOAT() -> CFloat(val.toFloat())
+        | INTEGER() -> CInt(val.toInt())
+        | TEXT() -> invariant_violation("TODO: toCValue string SqlValue")
+        },
+      )
     }
   }
 }
 
 class KeyRow(key: SKFS.BaseName, values: Array<Row>) extends SKFS.File
 
-class RowKey(values: Buffer, kinds: Array<(Int, IKind)>) extends SKFS.BaseName {
-  static fun create(values: Buffer, kinds: Array<(Int, IKind)>): this {
-    h = unsafe_hash_native(values);
-    !h = SKFS.hashCombine(h, unsafe_hash_native(kinds));
-    static(values, kinds, h)
+fun compareRows(kinds: Array<(Int, IKind, Type)>, x: Row, y: Row): Order {
+  for (i in Range(0, kinds.size())) {
+    (idx, direction, ty) = kinds[i];
+    value1 = x.getValue(ty, idx);
+    value2 = y.getValue(ty, idx);
+    (value1, value2) match {
+    | (None(), None()) -> continue
+    | (None(), _) -> return LT()
+    | (_, None()) -> return GT()
+    | (Some(v1), Some(v2)) ->
+      cmp = direction match {
+      | INONE()
+      | IASC() ->
+        v1.compare(ty, v2)
+      | IDESC() -> v1.compare(ty, v2)
+      };
+      if (cmp != EQ()) return cmp
+    }
+  };
+  EQ()
+}
+
+class RowKey(row: Row, kinds: Array<(Int, IKind, Type)>) extends SKFS.BaseName {
+  static fun create(row: Row, kinds: Array<(Int, IKind, Type)>): this {
+    result = static(row, kinds, 0);
+    !result = result with {hashTag => hash(result)};
+    result
   }
 
   fun hash(): Int {
@@ -43,108 +88,243 @@ class RowKey(values: Buffer, kinds: Array<(Int, IKind)>) extends SKFS.BaseName {
 
   fun compare(file: SKFS.FileName): Order {
     file match {
-    | y @ RowKey _ ->
-      for (i in Range(0, this.kinds.size())) {
-        (idx, direction) = this.kinds[i];
-        value1 = this.values[idx];
-        value2 = y.values[idx];
-        cmp = direction match {
-        | INONE()
-        | IASC() ->
-          value1.compare(value2)
-        | IDESC() -> value2.compare(value1)
-        };
-        if (cmp != EQ()) return cmp;
-      };
-      EQ()
+    | y @ RowKey _ -> compareRows(this.kinds, this.row, y.row)
     | _ -> invariant_violation("Can only compare a RowKey with itself")
     }
   }
 }
 
-class Row(values: Buffer) extends SKFS.File
+base class Row protected () extends SKFS.File uses Hashable {
+  static fun create(values: Array<SValue>): Row {
+    RowValues(values)
+  }
 
-/*****************************************************************************/
-/* SValue compression/decompression. */
-/*****************************************************************************/
+  static fun fromCValues(cValues: Array<?CValue>): Row {
+    hasNullOrStr = cValues.any(x -> x is None _ || x is Some(CString _));
+    if (hasNullOrStr) {
+      masks = Array::mfill(1 + cValues.size() / 63, 0);
+      strings = cValues
+        .filter(x -> x is Some(CString _))
+        .map(x ->
+          x match {
+          | Some(CString(str)) -> str
+          | _ -> invariant_violation("Expected a string")
+          }
+        );
+      stringIdx = 0;
+      data = cValues.mapWithIndex((i, cValue) -> {
+        cValue match {
+        | None() ->
+          masks![i / 63] = masks[i / 63].or(1.shl(i % 63));
+          SValue(0)
+        | Some(CInt(n)) -> SValue(n)
+        | Some(CFloat(f)) -> SValue(unsafeFloatToInt(f))
+        | Some(CString _) ->
+          result = stringIdx;
+          !stringIdx = stringIdx + 1;
+          SValue(result)
+        }
+      });
+      RowNullableValues(data, strings, unsafe_chill_trust_me(masks))
+    } else {
+      data = cValues.map(cValue -> {
+        cValue match {
+        | None() -> invariant_violation("Should not be null")
+        | Some(CInt(n)) -> SValue(n)
+        | Some(CFloat(f)) -> SValue(unsafeFloatToInt(f))
+        | Some(CString _) -> invariant_violation("Should not be a string")
+        }
+      });
+      RowValues(data)
+    }
+  }
 
-const INT_SIZE: Int = 8;
+  static fun fromFile(file: SKFS.File): Row {
+    file match {
+    | x @ RowValues _ -> x
+    | x @ RowNullableValues _ -> x
+    | x @ RowKind _ -> x
+    | x @ RowRepeat _ -> x
+    | x @ RowNone() -> x
+    | x @ RowError _ -> x
+    | _ -> invariant_violation("Invalid row")
+    }
+  }
 
-fun size(value: SValue): Int {
-  idx = 1;
-  value match {
-  | SVNull() -> idx
-  | SVInt(n) if (n >= 0 && n < 32) -> idx
-  | SVInt(_) -> idx + INT_SIZE
-  | SVBool(_) -> invariant_violation("Cannot handle Boolean")
-  | SVString(str) if (stringUnsafeSize(str) < 32) -> idx + stringUnsafeSize(str)
-  | SVString(str) -> idx + INT_SIZE + stringUnsafeSize(str)
+  fun size(): Int;
+  fun getInt(Int): ?Int;
+  fun getString(Int): ?String;
+  fun getValue(ty: Type, n: Int): ?CValue;
+  fun iter(f: (Int, ?SValue) -> void): void;
+}
+
+class RowNullableValues(
+  data: Array<SValue>,
+  strings: Array<String>,
+  null: Array<Int>,
+) extends Row {
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun isNull(n: Int): Bool {
+    idx = n / 63;
+    mask = 1.shl(n % 63);
+    this.null[idx].and(mask) != 0
+  }
+
+  fun getInt(n: Int): ?Int {
+    if (this.isNull(n)) {
+      None()
+    } else {
+      Some(this.data[n].toInt())
+    }
+  }
+
+  fun getString(n: Int): ?String {
+    if (this.isNull(n)) None() else Some(this.strings[this.data[n].value])
+  }
+
+  fun getValue(ty: Type, n: Int): ?CValue {
+    if (this.isNull(n)) {
+      None()
+    } else {
+      Some(
+        ty match {
+        | TEXT() -> CString(this.strings[this.data[n].value])
+        | INTEGER() -> CInt(this.data[n].toInt())
+        | FLOAT() -> CFloat(this.data[n].toFloat())
+        },
+      )
+    }
+  }
+
+  fun hash(): Int {
+    SKFS.hashCombine(hash(this.data), hash(this.null))
+  }
+
+  fun iter(f: (Int, ?SValue) -> void): void {
+    for (i in Range(0, this.size())) {
+      if (this.isNull(i)) {
+        f(i, None())
+      } else {
+        f(i, Some(this.data[i]))
+      }
+    }
   }
 }
 
-fun compress(values: Array<SValue>): Buffer {
-  bufferSize = 0;
-  for (value in values) {
-    !bufferSize = bufferSize + size(value);
-  };
-  buffer = Buffer::create(bufferSize);
-  idx = 0;
-  for (value in values) {
-    value match {
-    | SVNull() ->
-      buffer![idx] = 0;
-      !idx = idx + 1
-    | SVInt(n) if (n >= 0 && n < 32) ->
-      buffer![idx] = n.shl(3).or(1);
-      !idx = idx + 1
-    | SVInt(n) ->
-      buffer![idx] = 2;
-      !idx = idx + 1;
-      buffer.writeInt(idx, n);
-      !idx = idx + INT_SIZE
-    | SVBool(_) -> invariant_violation("Cannot compress a boolean")
-    | SVString(str) if (stringUnsafeSize(str) < 32) ->
-      size = stringUnsafeSize(str);
-      buffer![idx] = size.shl(3).or(3);
-      !idx = idx + 1;
-      buffer.writeString(idx, str);
-      !idx = idx + size
-    | SVString(str) ->
-      buffer![idx] = 4;
-      !idx = idx + 1;
-      size = stringUnsafeSize(str);
-      buffer.writeInt(idx, size);
-      !idx = idx + INT_SIZE;
-      buffer.writeString(idx, str);
-      !idx = idx + size
-    }
-  };
-  unsafe_chill_trust_me(buffer)
+class RowKind(order: Int, kind: QueryKind, row: Row) extends Row {
+  fun size(): Int {
+    this.row.size()
+  }
+  fun getInt(n: Int): ?Int {
+    this.row.getInt(n)
+  }
+  fun getString(n: Int): ?String {
+    this.row.getString(n)
+  }
+  fun getValue(ty: Type, n: Int): ?CValue {
+    this.row.getValue(ty, n)
+  }
+  fun iter(_f: (Int, ?SValue) -> void): void {
+    debug(this);
+    invariant_violation("Trying to iterate on a RowKind");
+  }
+
+  fun hash(): Int {
+    SKFS.hashCombine(hash(this.kind), this.row.hash())
+  }
 }
 
-fun decompress(buffer: Buffer): Array<SValue> {
-  idx = 0;
-  result = mutable Vector<SValue>[];
-  while (idx < buffer.size()) {
-    n = buffer.getInt(idx);
-    !idx = idx + 1;
-    n.and(7) match {
-    | 0 -> result.push(SVNull())
-    | 1 -> result.push(SVInt(n.shr(3)))
-    | 2 ->
-      result.push(SVInt(buffer.readInt(idx)));
-      !idx = idx + INT_SIZE
-    | 3 ->
-      size = n.shr(3);
-      result.push(SVString(buffer.readString(idx, size)));
-      !idx = idx + size
-    | 4 ->
-      size = buffer.readInt(idx);
-      !idx = idx + INT_SIZE;
-      result.push(SVString(buffer.readString(idx, size)));
-      !idx = idx + size
-    | _ -> invariant_violation("Invalid code")
+class RowValues(data: Array<SValue>) extends Row {
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun getInt(n: Int): ?Int {
+    Some(this.data[n].toInt())
+  }
+
+  fun getValue(ty: Type, n: Int): ?CValue {
+    ty match {
+    | INTEGER() -> Some(CInt(this.data[n].toInt()))
+    | FLOAT() -> Some(CFloat(this.data[n].toFloat()))
+    | _ -> invariant_violation("Internal error: found string in RowValues")
     }
-  };
-  result.toArray();
+  }
+
+  fun getString(Int): ?String {
+    invariant_violation("Internal error: called getString on RowValues")
+  }
+
+  fun hash(): Int {
+    hash(this.data)
+  }
+
+  fun iter(f: (Int, ?SValue) -> void): void {
+    for (i in Range(0, this.size())) {
+      f(i, Some(this.data[i]))
+    }
+  }
+}
+
+class RowError(msg: String) extends Row, Exception {
+  fun size(): Int {
+    throw this;
+  }
+  fun getInt(Int): ?Int {
+    throw this;
+  }
+  fun getString(Int): ?String {
+    throw this;
+  }
+  fun getValue(Type, Int): ?CValue {
+    throw this
+  }
+  fun iter(_f: (Int, ?SValue) -> void): void {
+    throw this
+  }
+}
+
+class RowRepeat(row: Row, int: Int) extends Row {
+  fun size(): Int {
+    this.row.size()
+  }
+  fun getInt(n: Int): ?Int {
+    this.row.getInt(n)
+  }
+  fun getString(n: Int): ?String {
+    this.row.getString(n)
+  }
+  fun getValue(ty: Type, n: Int): ?CValue {
+    this.row.getValue(ty, n)
+  }
+  fun iter(f: (Int, ?SValue) -> void): void {
+    this.row.iter(f)
+  }
+  fun hash(): Int {
+    this.row.hash()
+  }
+}
+
+class RowNone() extends Row {
+  fun size(): Int {
+    0
+  }
+  fun getInt(Int): ?Int {
+    None()
+  }
+  fun getString(Int): ?String {
+    None()
+  }
+  fun getValue(Type, Int): ?CValue {
+    None()
+  }
+  fun iter((Int, ?SValue) -> void): void {
+    void
+  }
+  fun hash(): Int {
+    0
+  }
 }

@@ -57,9 +57,7 @@ value class ArrowKey(
 fun run(f: (mutable Context) -> void): mutable Context {
   context = mutable Context{};
   f(context);
-  context.updateNewDeps();
   context.initPre();
-  context.updateFixedDeps();
   context
 }
 
@@ -74,13 +72,111 @@ fun run(f: (mutable Context) -> void): mutable Context {
 
 fun updateDirtyReaders(context: mutable Context, path: Path): void {
   for (reader in context.getDeps(path)) {
-    child = context.unsafeGetDir(reader.childName);
+    child = context.unsafeMaybeGetDir(reader.childName) match {
+    | None() -> continue
+    | Some(x) -> x
+    };
+    parent = context.unsafeMaybeGetDir(reader.parentName) match {
+    | None() -> continue
+    | Some(x) -> x
+    };
     context.!dirtyReaders = List.Cons(reader, context.dirtyReaders);
     context.!toUpdate = context.toUpdate.set(
-      child.getTime(),
+      (child.getTime(), parent.getTime()),
       Arrow(reader.parentName, reader.childName),
     );
   };
+}
+
+/*****************************************************************************/
+/* Dependencies tracking. */
+/*****************************************************************************/
+
+value class Deps(
+  data: HashMap<Path, SortedSet<ArrowKey>> = HashMap[],
+  idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
+) {
+  static fun createFromItems(items: Array<(Path, ArrowKey)>): this {
+    deps = Deps();
+    for (item in items) {
+      (path, arrowKey) = item;
+      !deps[path] = arrowKey;
+    };
+    deps
+  }
+
+  fun maybeGet(path: Path): ?SortedSet<ArrowKey> {
+    this.data.maybeGet(path)
+  }
+
+  fun set(path: Path, arrowKey: ArrowKey): this {
+    set = this.data.maybeGet(path) match {
+    | None() -> SortedSet[]
+    | Some(x) -> x
+    };
+    !set = set.set(arrowKey);
+    !this.data[path] = set;
+    !this = this.iset(arrowKey.childName, path);
+
+    this
+  }
+
+  fun iset(dirName: DirName, arrow: Path): this {
+    iset = this.idata.maybeGet(dirName) match {
+    | None() -> SortedSet[]
+    | Some(x) -> x
+    };
+    !iset = iset.set(arrow);
+    !this.idata[dirName] = iset;
+    this
+  }
+
+  fun iremove(dirName: DirName, arrow: Path): this {
+    iset = this.idata.maybeGet(dirName) match {
+    | None() -> SortedSet[]
+    | Some(x) -> x
+    };
+    !iset = iset.remove(arrow);
+    if (iset.isEmpty()) {
+      !this.idata = this.idata.remove(dirName);
+    } else {
+      !this.idata[dirName] = iset;
+    };
+    this
+  }
+
+  fun remove(path: Path, arrowKey: ArrowKey): this {
+    set = this.data.maybeGet(path) match {
+    | None() -> SortedSet[]
+    | Some(x) -> x
+    };
+    !set = set.remove(arrowKey);
+    if (set.isEmpty()) {
+      !this.data = this.data.remove(path)
+    } else {
+      !this.data[path] = set
+    };
+    !this = this.iremove(arrowKey.childName, path);
+    this
+  }
+
+  fun removeDir(dirName: DirName): this {
+    paths = this.idata.maybeGet(dirName) match {
+    | None() -> return this
+    | Some(x) -> x
+    };
+    for (path in paths) {
+      this.data.maybeGet(path) match {
+      | None() -> continue
+      | Some(vset) ->
+        !this.data[path] = vset.filter(x ->
+          !(x.parentName == dirName || x.childName == dirName)
+        )
+      }
+    };
+    !this.idata = this.idata.remove(dirName);
+    this
+  }
 }
 
 /*****************************************************************************/
@@ -90,23 +186,28 @@ fun updateDirtyReaders(context: mutable Context, path: Path): void {
 mutable class Context{
   mutable pwd: String = "/",
   mutable dirs: Dirs = Dirs{},
-  mutable reads: List<Path> = List[],
+  mutable reads: SortedSet<Path> = SortedSet[],
   mutable time: Int = 1,
   mutable tick: Int = 1,
-  mutable toUpdate: SortedMap<Int, Arrow> = SortedMap[],
-  mutable deps: List<Array<(Path, ArrowKey)>> = List[],
-  mutable fixedDeps: Map<Path, Set<ArrowKey>> = Map[],
-  mutable newDeps: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
+  mutable lazyCapacity: Int = 10,
+  mutable toUpdate: SortedMap<(Int, Int), Arrow> = SortedMap[],
+  mutable deps: Deps = Deps[],
   mutable debugMode: Bool = debugMode,
   mutable failOnExn: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
-  mutable hasNext: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
   mutable asyncList: List<Path> = List[],
   mutable dirty: List<Path> = List[],
   mutable dirtyReaders: List<ArrowKey> = List[],
+  mutable unsafeReuse: Bool = false,
+  mutable arrowStack: List<ArrowKey> = List[],
+  mutable lazyGets: SortedSet<Path> = SortedSet[],
+  mutable lazyGetsQueueIn: List<Array<Path>> = List[],
+  mutable lazyGetsQueueOut: List<Array<Path>> = List[],
+  mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
+  mutable reallyRemoveDir: Bool = true,
 } {
   mutable fun pushAsync(path: Path): void {
     this.!asyncList = List.Cons(path, this.asyncList);
@@ -130,18 +231,22 @@ mutable class Context{
       tick => this.tick,
       toUpdate => this.toUpdate,
       deps => this.deps,
-      fixedDeps => this.fixedDeps,
-      newDeps => this.newDeps,
       debugMode => this.debugMode,
       failOnExn => this.failOnExn,
       hasPre => this.hasPre,
-      hasNext => this.hasNext,
       newDirs => this.newDirs,
       toReset => this.toReset,
       globals => this.globals,
       asyncList => this.asyncList,
       dirty => this.dirty,
       dirtyReaders => this.dirtyReaders,
+      unsafeReuse => this.unsafeReuse,
+      arrowStack => this.arrowStack,
+      lazyGets => this.lazyGets,
+      lazyGetsQueueIn => this.lazyGetsQueueIn,
+      lazyGetsQueueOut => this.lazyGetsQueueOut,
+      lazyGetsRefCount => this.lazyGetsRefCount,
+      reallyRemoveDir => this.reallyRemoveDir,
     }
   }
 
@@ -154,18 +259,22 @@ mutable class Context{
       tick => ctx.tick,
       toUpdate => ctx.toUpdate,
       deps => ctx.deps,
-      fixedDeps => ctx.fixedDeps,
-      newDeps => ctx.newDeps,
       debugMode => ctx.debugMode,
       failOnExn => ctx.failOnExn,
       hasPre => ctx.hasPre,
-      hasNext => ctx.hasNext,
       newDirs => ctx.newDirs,
       toReset => ctx.toReset,
       globals => ctx.globals,
       asyncList => ctx.asyncList,
       dirty => ctx.dirty,
       dirtyReaders => ctx.dirtyReaders,
+      unsafeReuse => ctx.unsafeReuse,
+      arrowStack => ctx.arrowStack,
+      lazyGets => ctx.lazyGets,
+      lazyGetsQueueIn => ctx.lazyGetsQueueIn,
+      lazyGetsQueueOut => ctx.lazyGetsQueueOut,
+      lazyGetsRefCount => ctx.lazyGetsRefCount,
+      reallyRemoveDir => ctx.reallyRemoveDir,
     }
   }
 
@@ -177,38 +286,52 @@ mutable class Context{
     this.!tick = ctx.tick;
     this.!toUpdate = ctx.toUpdate;
     this.!deps = ctx.deps;
-    this.!fixedDeps = ctx.fixedDeps;
-    this.!newDeps = ctx.newDeps;
     this.!debugMode = ctx.debugMode;
     this.!failOnExn = ctx.failOnExn;
     this.!hasPre = ctx.hasPre;
-    this.!hasNext = ctx.hasNext;
     this.!newDirs = ctx.newDirs;
     this.!toReset = ctx.toReset;
     this.!globals = ctx.globals;
     this.!asyncList = ctx.asyncList;
     this.!dirty = ctx.dirty;
     this.!dirtyReaders = ctx.dirtyReaders;
+    this.!unsafeReuse = ctx.unsafeReuse;
+    this.!arrowStack = ctx.arrowStack;
+    this.!lazyGets = ctx.lazyGets;
+    this.!lazyGetsQueueIn = ctx.lazyGetsQueueIn;
+    this.!lazyGetsQueueOut = ctx.lazyGetsQueueOut;
+    this.!lazyGetsRefCount = ctx.lazyGetsRefCount;
+    this.!reallyRemoveDir = ctx.reallyRemoveDir;
   }
 
-  mutable fun getReads(): List<Path> {
+  mutable fun getReads(): SortedSet<Path> {
     this.reads
   }
 
-  readonly fun getDeps(path: Path): Set<ArrowKey> {
-    set = if (!this.fixedDeps.containsKey(path)) {
-      Set[]
-    } else {
-      this.fixedDeps[path]
-    };
-    this.newDeps.maybeGet(path) match {
-    | None() -> set
-    | Some(newDeps) ->
-      mset = Set::mcreateFromItems(set);
-      for (dep in newDeps) {
-        mset.insert(dep);
-      };
-      mset.chill()
+  mutable fun enter(arrow: ArrowKey): void {
+    this.!arrowStack = List.Cons(arrow, this.arrowStack);
+  }
+
+  mutable fun leave(arrow: ArrowKey): void {
+    this.arrowStack match {
+    | List.Nil() -> invariant_violation("Cannot leave empty context")
+    | List.Cons(arr, rl) ->
+      invariant(arr == arrow);
+      this.!arrowStack = rl
+    }
+  }
+
+  readonly fun currentArrow(): ?ArrowKey {
+    this.arrowStack match {
+    | List.Nil() -> None()
+    | List.Cons(x, _) -> Some(x)
+    }
+  }
+
+  readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
+    this.deps.maybeGet(path) match {
+    | None() -> SortedSet[]
+    | Some(deps) -> deps
     }
   }
 
@@ -227,45 +350,14 @@ mutable class Context{
     values
   }
 
-  mutable fun updateFixedDeps(): void {
-    fixedDeps = mutable Map[];
-    invariant(this.fixedDeps.isEmpty());
-    for (depVector in this.deps) {
-      for (read in depVector) {
-        (path, arrowKey) = read;
-        sourceDir = arrowKey.parentName;
-        targetDir = arrowKey.childName;
-        baseName = arrowKey.key;
-        if (!fixedDeps.containsKey(path)) {
-          fixedDeps![path] = mutable Set[];
-        };
-        fixedDeps[path].add(ArrowKey(sourceDir, targetDir, baseName));
-      }
+  mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
+    readSet = mutable Set[];
+    for (read in reads) {
+      readSet.insert(read);
     };
-    this.!deps = List[];
-    this.!fixedDeps = fixedDeps.chill().map((_, v) -> v.chill());
-  }
-
-  mutable fun updateNewDeps(): void {
-    for (depVector in this.deps) {
-      for (read in depVector) {
-        (path, arrowKey) = read;
-        sourceDir = arrowKey.parentName;
-        targetDir = arrowKey.childName;
-        baseName = arrowKey.key;
-        reader = ArrowKey(sourceDir, targetDir, baseName);
-        if (this.fixedDeps.containsKey(path)) {
-          if (this.fixedDeps[path].contains(reader)) {
-            continue;
-          };
-        };
-        if (!this.newDeps.containsKey(path)) {
-          this.!newDeps[path] = SortedSet[];
-        };
-        this.!newDeps[path] = this.newDeps[path].add(reader);
-      }
+    for (path in readSet) {
+      this.!deps = this.deps.set(path, reader);
     };
-    this.!deps = List[];
   }
 
   mutable fun initPre(): void {
@@ -291,9 +383,10 @@ mutable class Context{
           dirName => preDirName,
           totalSize => 0,
           fixedData => FixedDir{},
+          creator => this.currentArrow(),
         };
         dir.unsafeIterKeys((key, _time) -> {
-          values = dir.getArrayRaw(key);
+          values = dir.getArrayRaw(key).collect(Array);
           !preDir = preDir.writeEntry(
             this,
             Path::create(preDir.dirName, key),
@@ -307,7 +400,7 @@ mutable class Context{
       | Some(preDir) ->
         for (kv in dir.data.getChangesAfter(this.tick - 1)) {
           (key, _) = kv;
-          values = dir.getArrayRaw(key);
+          values = dir.getArrayRaw(key).collect(Array);
           !preDir = preDir.writeEntry(
             this,
             Path::create(preDir.dirName, key),
@@ -318,6 +411,74 @@ mutable class Context{
         this.setDir(preDir.dirName, preDir)
       }
     }
+  }
+
+  mutable fun updateLazyGets(): void {
+    for (path in this.lazyGets) {
+      refCount = this.lazyGetsRefCount.maybeGet(path) match {
+      | None() -> 0
+      | Some(x) -> x
+      };
+      this.!lazyGetsRefCount[path] = refCount + 1;
+    };
+    this.!lazyGetsQueueIn = List.Cons(
+      this.lazyGets.toArray(),
+      this.lazyGetsQueueIn,
+    );
+    this.!lazyGets = SortedSet[];
+    if (this.tick <= this.lazyCapacity) return void;
+    queue = this.lazyGetsQueueOut match {
+    | List.Nil() ->
+      invariant(this.lazyGetsQueueIn is List.Cons _);
+      this.!lazyGetsQueueOut = this.lazyGetsQueueIn.reversed();
+      this.!lazyGetsQueueIn = List[];
+      this.lazyGetsQueueOut
+    | l -> l
+    };
+    queue match {
+    | List.Nil() -> invariant_violation("LazyGets reached empty queue")
+    | List.Cons(lazyGets, rl) ->
+      this.!lazyGetsQueueOut = rl;
+      toRemove = mutable Map[];
+      for (path in lazyGets) {
+        refCount = this.lazyGetsRefCount.maybeGet(path) match {
+        | None() -> invariant_violation("Not found")
+        | Some(x) -> x
+        };
+        !refCount = refCount - 1;
+        if (refCount == 0) {
+          this.!lazyGetsRefCount = this.lazyGetsRefCount.remove(path);
+          if (!toRemove.containsKey(path.dirName)) {
+            toRemove![path.dirName] = mutable Set[];
+          };
+          toRemove[path.dirName].insert(path.baseName);
+        } else {
+          this.!lazyGetsRefCount[path] = refCount;
+        }
+      };
+      for (dirName => keys in toRemove) {
+        dir = this.unsafeGetLazyDir(dirName);
+        data = dir.data;
+        for (key in keys) {
+          data.maybeGet(key) match {
+          | Some(LDefined(_, newDirs, reads)) ->
+            for (newDir in newDirs) {
+              this.removeDir(newDir);
+            };
+            for (read in reads) {
+              this.!deps = this.deps.remove(
+                read,
+                ArrowKey(dirName, dirName, key),
+              )
+            }
+          | _ -> void
+          };
+          !data = data.remove(key);
+        };
+        !dir.data = data;
+        this.setDir(dirName, dir)
+      }
+    };
   }
 
   mutable fun update(): void {
@@ -336,9 +497,9 @@ mutable class Context{
       print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
 
-    this.updateNewDeps();
-
     this.!tick = this.tick + 1;
+
+    this.updateLazyGets();
 
     while (backgroundRounds > 0) {
       roundsCopy = backgroundRounds;
@@ -401,13 +562,27 @@ mutable class Context{
       | Some((time, Arrow(parentName, childName))) ->
         this.!toReset = this.toReset.set(childName);
         this.!toUpdate = this.toUpdate.remove(time);
-        this.unsafeGetDir(childName) match {
-        | DeletedDir _ -> void
-        | child @ LazyDir _ ->
+        this.unsafeMaybeGetDir(childName) match {
+        | None()
+        | Some(DeletedDir _) ->
+          void
+        | Some(child @ LazyDir _) ->
           child.update(this, dirtyReaders.maybeGet(child.dirName))
-        | child @ EagerDir _ ->
+        | Some(child @ EagerDir _) ->
           this.!toReset = this.toReset.set(parentName);
-          EagerDir::update(this, dirty, dirtyReaders, parentName, child)
+          (mapFun, rangeOpt) = child.parents.maybeGet(parentName) match {
+          | None() -> invariant_violation("Could not find parent")
+          | Some(f) -> f
+          };
+          EagerDir::update(
+            this,
+            dirty,
+            dirtyReaders,
+            parentName,
+            mapFun,
+            rangeOpt,
+            child,
+          )
         }
       }
     }
@@ -440,18 +615,37 @@ mutable class Context{
     if (this.dirs.state.containsKey(dirName)) {
       throw DirAlreadyExists(dirName);
     };
+    !content = content.sortedBy(x ~> x.i0);
     vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
+    valueAcc = mutable Vector[];
+    last: ?BaseName = None();
     for (kv in content) {
       (key, values) = kv;
-      path = Path::create(dirName, key);
-      vector.push(FixedRow(key, (path, values)));
+      last match {
+      | None() ->
+        valueAcc.extend(values);
+        !last = Some(key)
+      | Some(oldKey) if (oldKey == key) -> valueAcc.extend(values)
+      | Some(oldKey) ->
+        path = Source::create(Path::create(dirName, oldKey));
+        vector.push(FixedRow(oldKey, (path, valueAcc.toArray())));
+        !last = Some(key);
+        valueAcc.clear();
+        valueAcc.extend(values)
+      };
     };
-    vector.sort();
+    last match {
+    | None() -> void
+    | Some(key) ->
+      path = Source::create(Path::create(dirName, key));
+      vector.push(FixedRow(key, (path, valueAcc.toArray())))
+    };
     fixedData = FixedDir{data => vector.toArray()};
 
     time = this.timeStamp();
     totalSize = fixedData.data.size();
-    dir = EagerDir{time, input => true, dirName, fixedData, totalSize};
+    creator = this.currentArrow();
+    dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
   }
@@ -469,7 +663,8 @@ mutable class Context{
 
     time = this.timeStamp();
     totalSize = fixedData.data.size();
-    dir = EagerDir{time, input => true, dirName, fixedData, totalSize};
+    creator = this.currentArrow();
+    dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};
     this.!dirs = this.dirs.set(dir.time, dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
     EHandle(conv, dirName)
@@ -573,7 +768,24 @@ mutable class Context{
     if (this.debugMode) {
       print_string("REMOVED: " + dirName);
     };
-    this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()});
+    this.unsafeMaybeGetEagerDir(dirName) match {
+    | None() -> return void
+    | Some(dir) ->
+      for (parentName => _ in dir.parents) {
+        this.unsafeMaybeGetEagerDir(parentName) match {
+        | None() -> continue
+        | Some(parent) ->
+          !parent.childDirs = parent.childDirs.remove(dirName);
+          this.setDir(parent.dirName, parent)
+        }
+      }
+    };
+    this.!deps = this.deps.removeDir(dirName);
+    if (this.reallyRemoveDir) {
+      this.!dirs.state = this.dirs.state.remove(dirName)
+    } else {
+      this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()})
+    };
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
@@ -586,7 +798,7 @@ mutable class Context{
   }
 
   mutable fun addDep(path: Path): void {
-    this.!reads = List.Cons(path, this.reads);
+    this.!reads = this.reads.set(path);
   }
 
   mutable fun setGlobal(name: String, file: File): void {
@@ -649,20 +861,34 @@ native fun .verify(Context): void;
 @cpp_extern("SKIP_should_GC")
 native fun shouldGC(Obstack): UInt32;
 
+@debug
+@cpp_extern("SKIP_disable_GC")
+native fun disableGC(): void;
+
+@debug
+@cpp_extern("SKIP_enable_GC")
+native fun enableGC(): void;
+
 @cpp_noinline
-fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
+fun runWithGcReturnContext(
+  origContext: Context,
+  f: Context ~> ?Context,
+): mutable Context {
   context = gContextInit(origContext);
   loop {
     pos = newObstack();
-    verify(context);
     newContextOpt = f(context);
     newContextOpt match {
-    | None() -> return void
+    | None() -> return Context::fromSaved(context)
     | Some(newContext) ->
       !context = gContextSync(newContext);
       destroyObstack(pos)
     }
   }
+}
+
+fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
+  _ = runWithGcReturnContext(origContext, f);
 }
 
 fun withRegion<T>(

@@ -2,39 +2,139 @@ module SKFS;
 
 class KeySet(value: Set<BaseName>) extends File
 
-fun baseNameFromFile(file: File): BaseName {
-  file match {
-  | SID _ -> SID::fromFile(file)
-  | IID _ -> IID::fromFile(file)
-  | _ -> invariant_violation("Was expecting a baseName")
+class BigInt(data: Array<UInt32>) extends BaseName {
+  fun toString(): String {
+    inspect(this).toString()
+  }
+
+  static fun create(ints: Array<Int>): this {
+    mdata = Array::mfill(ints.size() * 2, UInt32::truncate(0));
+    for (j in Range(0, ints.size())) {
+      i = ints.size() - j - 1;
+      n = ints[i];
+      signed = n < 0;
+      lBits = n.and(1.shl(32) - 1);
+      hBits = n.shr(32);
+      mdata![2 * i] = UInt32::truncate(
+        if (signed) 1.shl(31) + hBits else hBits,
+      );
+      mdata![2 * i + 1] = UInt32::truncate(lBits);
+    };
+    first = 0;
+    while (first < mdata.size() && mdata[first] == 0) !first = first + 1;
+    data = mdata.slice(first, mdata.size());
+
+    BigInt(data, hash(data))
+  }
+
+  fun toInt(): Int {
+    if (this.data.size() > 2) {
+      invariant_violation("BigInt too big to be represented as an integer")
+    };
+    this.data[0].toInt().shl(32) + this.data[1].toInt()
+  }
+
+  fun shr(n: Int): this {
+    mdata = Array::mfill(this.data.size(), UInt32::truncate(0));
+    for (j in Range(0, this.data.size())) {
+      i = this.data.size() - j - 1;
+
+      up = if (i - 1 - n / 32 < 0) 0 else {
+        this.data[i - 1 - n / 32].and(1.shl(n % 32) - 1)
+      };
+
+      if (i - n / 32 < 0) break void;
+
+      mdata![i] = UInt32::truncate(
+        this.data[i - n / 32].shr(n % 32).or(up.shl(32 - n % 32)),
+      );
+    };
+
+    first = 0;
+    while (first < mdata.size() && mdata[first] == 0) !first = first + 1;
+
+    data = mdata.slice(first, mdata.size());
+
+    BigInt(data, hash(data))
+  }
+
+  fun shl(n: Int): this {
+    size = this.data.size();
+    mdataSize = size + 1 + n / 32;
+    mdata = Array::mfillBy(mdataSize, i ~>
+      if (i - 1 - n / 32 < 0) UInt32::truncate(0) else this.data[i - 1 - n / 32]
+    );
+
+    for (i in Range(0, mdataSize)) {
+      current = if (i + n / 32 >= mdataSize) 0 else {
+        mdata[i + n / 32].shl(n % 32)
+      };
+      down = if (i + 1 + n / 32 >= mdataSize) 0 else {
+        mdata[i + 1 + n / 32].shr(32 - n % 32)
+      };
+      mdata![i] = UInt32::truncate(current.or(down));
+    };
+
+    BigInt(mdata.chill(), hash(mdata))
+  }
+
+  fun isZero(): Bool {
+    for (elt in this.data) {
+      if (elt != 0) return false;
+    };
+    true
+  }
+
+  fun incr(): this {
+    mdata = Array::mfillBy(this.data.size() + 1, i ~>
+      if (i - 1 < 0) UInt32::truncate(0) else this.data[i - 1]
+    );
+
+    for (j in Range(0, mdata.size())) {
+      i = mdata.size() - 1 - j;
+      if (mdata[i] == 0) {
+        mdata![i] = UInt32::truncate(1);
+        break void;
+      };
+      n = UInt32::truncate(mdata[i] + 1);
+      mdata![i] = n;
+      if (n != 0) break void;
+    };
+
+    first = 0;
+    while (first < mdata.size() && mdata[first] == 0) !first = first + 1;
+
+    data = mdata.slice(first, mdata.size());
+
+    BigInt(data, hash(data))
   }
 }
 
 class RangeIndex{bitSize: Int, intSize: Int, data: Array<EHandle<BaseName>>} {
-  static fun create{
+  static fun create<T: File>{
     context: mutable Context,
+    name: String,
     bitSize: Int,
     intSize: Int,
-    input: EHandle<IntFile>,
+    input: EHandle<T>,
+    proj: T ~> BigInt,
   }: RangeIndex {
     dirs = mutable Vector[];
     for (round in Range(0, intSize / bitSize)) {
-      subName = DirName::create(
-        input.dirName.toString() + "rindex" + round + "/",
-      );
+      subName = DirName::create(name + "rindex" + round + "/");
       dirs.push(
         input.contextWriterKeyMap(
-          baseNameFromFile,
+          BigInt::fromFile,
           context,
           subName,
           (_context, writer, key, file) ~> {
-            value = file.value;
+            value = proj(file);
             if (round == 0) {
-              writer.write(IID(value), key);
+              writer.write(value, key);
             } else {
               !value = value.shr(round * bitSize);
-              if (value != 0) {
-                writer.write(IID(value), key);
+              if (!value.isZero()) {
+                writer.write(value, key);
               }
             }
           },
@@ -48,43 +148,46 @@ class RangeIndex{bitSize: Int, intSize: Int, data: Array<EHandle<BaseName>>} {
     context: mutable Context,
     acc: mutable Set<BaseName>,
     level: Int,
-    start: Int,
-    end: Int,
+    start: SKFS.BigInt,
+    end: SKFS.BigInt,
   ): void {
     if (start > end) return void;
-    shStart = start.shr(this.bitSize) + 1;
+    shStart = start.shr(this.bitSize).incr();
     shEnd = end.shr(this.bitSize);
     nextStart = shStart.shl(this.bitSize);
     nextEnd = shEnd.shl(this.bitSize);
     if (nextStart >= end) {
-      for (i in Range(start, end)) {
-        for (elt in this.data[level].getArray(context, IID(i))) {
+      i = start;
+      while (i < end) {
+        for (elt in this.data[level].getArray(context, i)) {
           acc.insert(elt);
         };
+        !i = i.incr();
       };
       return void;
     };
     while (start < nextStart) {
-      for (elt in this.data[level].getArray(context, IID(start))) {
+      for (elt in this.data[level].getArray(context, start)) {
         acc.insert(elt);
       };
-      !start = start + 1;
+      !start = start.incr();
     };
-    if (shStart != 0 && shStart != -1 && shStart < shEnd) {
+    if (!shStart.isZero() && shStart < shEnd) {
       this.lquery(context, acc, level + 1, shStart, shEnd);
     };
     while (nextEnd < end) {
-      for (elt in this.data[level].getArray(context, IID(nextEnd))) {
+      for (elt in this.data[level].getArray(context, nextEnd)) {
         acc.insert(elt);
       };
-      !nextEnd = nextEnd + 1;
+      !nextEnd = nextEnd.incr();
     }
   }
 
-  fun query(context: mutable Context, start: Int, end: Int): Set<BaseName> {
-    if (start < 0 || end < 0) {
-      error("Negative number not supported in RangeQueries");
-    };
+  fun query(
+    context: mutable Context,
+    start: BigInt,
+    end: BigInt,
+  ): Set<BaseName> {
     acc = mutable Set[];
     this.lquery(context, acc, 0, start, end);
     acc.chill()
@@ -140,9 +243,11 @@ fun testIndex(): mutable SKFS.Context {
     );
     rindex = SKFS.RangeIndex::create{
       context,
+      name => "/results/",
       intSize => 16,
       bitSize => 5,
       input,
+      proj => x ~> SKFS.BigInt::create(Array[x.value]),
     };
     _queryResults = queries.contextMap(
       SKFS.KeySet::fromFile,
@@ -150,7 +255,13 @@ fun testIndex(): mutable SKFS.Context {
       SKFS.DirName::create("/qresults/"),
       (context, queryStr) ~> {
         (start, end) = parseRange(queryStr.value);
-        SKFS.KeySet(rindex.query(context, start, end + 1));
+        SKFS.KeySet(
+          rindex.query(
+            context,
+            SKFS.BigInt::create(Array[start]),
+            SKFS.BigInt::create(Array[end + 1]),
+          ),
+        );
       },
     );
     /*

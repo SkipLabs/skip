@@ -10,6 +10,11 @@
 #include <map>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 
 namespace skip {
 struct SkipException : std::exception {
@@ -129,6 +134,35 @@ void SKIP_glock() {
 
 void SKIP_gunlock() {
   pthread_mutex_unlock(&glock);
+}
+
+char* sk_string_alloc(size_t);
+void sk_string_set_hash(char*);
+
+char* SKIP_read_file(char* filename_obj) {
+ struct stat s;
+ size_t filename_size = SKIP_String_byteSize(filename_obj);
+ char* filename = (char*)malloc(filename_size+1);
+ memcpy(filename, filename_obj, filename_size);
+ filename[filename_size] = (char)0;
+
+ int fd = open(filename, O_RDONLY);
+ int status = fstat(fd, &s);
+ size_t size = s.st_size;
+
+ char* f = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+ if(f == (void*)MAP_FAILED) {
+   perror("ERROR (MMap FAILED)");
+   fprintf(stderr, "Could not open file: %s\n", filename);
+   exit(45);
+ }
+ char* result = sk_string_alloc(size);
+ memcpy(result, f, size);
+ sk_string_set_hash(result);
+ free(filename);
+ munmap(f, size);
+ close(fd);
+ return result;
 }
 
 }

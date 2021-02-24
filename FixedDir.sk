@@ -20,23 +20,33 @@
 /*****************************************************************************/
 module SKFS;
 
-value class FixedRow<T>(
-  key: BaseName,
-  value: (Path, T),
-) uses Hashable, Orderable {
-  fun toKeyPath(): (BaseName, Path) {
-    (this.key, this.value.i0);
-  }
-
-  fun compare<U>[T: U](row: FixedRow<U>): Order {
-    this.toKeyPath().compare(row.toKeyPath())
+value class Source private (value: Int) uses Orderable, Hashable {
+  static fun create(value: Path): this {
+    static(value.hashTag)
   }
 
   fun hash(): Int {
-    this.toKeyPath().hash()
+    this.value
+  }
+}
+
+value class FixedRow<T>(
+  key: BaseName,
+  value: (Source, T),
+) uses Hashable, Orderable {
+  fun toKeyInt(): (BaseName, Int) {
+    (this.key, this.value.i0.value.hash());
   }
 
-  fun changeSource(source: Path): this {
+  fun compare<U>[T: U](row: FixedRow<U>): Order {
+    this.toKeyInt().compare(row.toKeyInt())
+  }
+
+  fun hash(): Int {
+    this.toKeyInt().hash()
+  }
+
+  fun changeSource(source: Source): this {
     !this.value.i0 = source;
     this
   }
@@ -45,9 +55,10 @@ value class FixedRow<T>(
 base class FixedData<T> {
   fun size(): Int;
   fun get(idx: Int): FixedRow<T>;
-  fun getArray(key: BaseName): Array<(Path, T)>;
-  fun getIter(key: BaseName): mutable Iterator<(Path, T)>;
-  fun getArraySourceKey(source: Path, key: BaseName): Array<T>;
+  fun getPos(key: BaseName): Int;
+  fun getArray(key: BaseName): Array<(Source, T)>;
+  fun getIter(key: BaseName): mutable Iterator<(Source, T)>;
+  fun getArraySourceKey(source: Source, key: BaseName): Array<T>;
 }
 
 class CompressedDir<T, Compressed>{
@@ -62,7 +73,14 @@ class CompressedDir<T, Compressed>{
     this.decompress(idx, this.data[idx])
   }
 
-  fun getArray(key: BaseName): Array<(Path, T)> {
+  fun getPos(key: BaseName): Int {
+    key match {
+    | IID(x) -> x
+    | _ -> invariant_violation("Expected a primary key")
+    }
+  }
+
+  fun getArray(key: BaseName): Array<(Source, T)> {
     pos = key match {
     | IID(x) -> x
     | _ -> invariant_violation("Expected a primary key")
@@ -78,7 +96,7 @@ class CompressedDir<T, Compressed>{
     result.toArray();
   }
 
-  fun getIter(key: BaseName): mutable Iterator<(Path, T)> {
+  fun getIter(key: BaseName): mutable Iterator<(Source, T)> {
     pos = key match {
     | IID(x) -> x
     | _ -> invariant_violation("Expected a primary key")
@@ -92,7 +110,7 @@ class CompressedDir<T, Compressed>{
     };
   }
 
-  fun getIterSourceKey(source: Path, key: BaseName): mutable Iterator<T> {
+  fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T> {
     pos = key match {
     | IID(x) -> x
     | _ -> invariant_violation("Expected a primary key")
@@ -107,7 +125,7 @@ class CompressedDir<T, Compressed>{
     };
   }
 
-  fun getArraySourceKey(source: Path, key: BaseName): Array<T> {
+  fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
     this.getIterSourceKey(source, key).collect(Array)
   }
 }
@@ -121,7 +139,11 @@ class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
     this.data.unsafe_get(idx)
   }
 
-  fun getPos(key: BaseName, i: Int, j: Int): Int {
+  fun getPos(key: BaseName): Int {
+    this.getPosij(key, 0, this.size() - 1)
+  }
+
+  fun getPosij(key: BaseName, i: Int, j: Int): Int {
     if (i > j) {
       return i;
     };
@@ -130,12 +152,12 @@ class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
     key.compare(elt.key) match {
     | LT()
     | EQ() ->
-      this.getPos(key, i, pivot - 1)
-    | GT() -> this.getPos(key, pivot + 1, j)
+      this.getPosij(key, i, pivot - 1)
+    | GT() -> this.getPosij(key, pivot + 1, j)
     }
   }
 
-  fun getPosSourceKey(source: Path, key: BaseName, i: Int, j: Int): Int {
+  fun getPosSourceKey(source: Source, key: BaseName, i: Int, j: Int): Int {
     if (i > j) {
       return i;
     };
@@ -151,8 +173,8 @@ class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
     }
   }
 
-  fun getArray(key: BaseName): Array<(Path, T)> {
-    pos = this.getPos(key, 0, this.data.size() - 1);
+  fun getArray(key: BaseName): Array<(Source, T)> {
+    pos = this.getPosij(key, 0, this.data.size() - 1);
     result = mutable Vector[];
     loop {
       if (pos >= this.data.size()) break void;
@@ -164,8 +186,8 @@ class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
     result.toArray();
   }
 
-  fun getIter(key: BaseName): mutable Iterator<(Path, T)> {
-    pos = this.getPos(key, 0, this.data.size() - 1);
+  fun getIter(key: BaseName): mutable Iterator<(Source, T)> {
+    pos = this.getPosij(key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
       elt = this.data[pos];
@@ -175,7 +197,7 @@ class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
     };
   }
 
-  fun getIterSourceKey(source: Path, key: BaseName): mutable Iterator<T> {
+  fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T> {
     pos = this.getPosSourceKey(source, key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
@@ -187,16 +209,80 @@ class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
     };
   }
 
-  fun getArraySourceKey(source: Path, key: BaseName): Array<T> {
+  fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
     this.getIterSourceKey(source, key).collect(Array)
   }
 }
 
+class FixedSingle<K: Orderable, +V>(data: Array<(K, V)> = Array[]) {
+  static fun empty(): this {
+    FixedSingle()
+  }
+
+  fun items(): mutable Iterator<(K, V)> {
+    this.data.iterator()
+  }
+
+  static fun create(data: mutable Vector<(K, V)>): this {
+    data.sortBy(x ~> x.i0);
+
+    lastOpt: ?K = None();
+    for (kv in data) {
+      (k, _) = kv;
+      lastOpt match {
+      | None() -> !lastOpt = Some(k)
+      | Some(last) ->
+        if (last == k) {
+          invariant_violation("Duplicate value in single")
+        } else {
+          !lastOpt = Some(k)
+        }
+      }
+    };
+
+    FixedSingle(data.toArray())
+  }
+
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun get(idx: Int): (K, V) {
+    this.data[idx]
+  }
+
+  private fun getPos(key: K): Int {
+    this.getPosij(key, 0, this.size() - 1)
+  }
+
+  private fun getPosij(key: K, i: Int, j: Int): Int {
+    if (i > j) {
+      return i;
+    };
+    pivot = (i + j) / 2;
+    elt = this.data[pivot];
+    key.compare(elt.i0) match {
+    | LT()
+    | EQ() ->
+      this.getPosij(key, i, pivot - 1)
+    | GT() -> this.getPosij(key, pivot + 1, j)
+    }
+  }
+
+  fun maybeGet(key: K): ?V {
+    pos = this.getPosij(key, 0, this.data.size() - 1);
+    if (pos < 0 || pos >= this.data.size()) return None();
+    elt = this.data[pos];
+    if (elt.i0 != key) return None();
+    Some(elt.i1);
+  }
+}
+
 mutable class FixedDataIterator<T> private {
-  iter: mutable Iterator<(Path, T)>,
-  mutable currentOpt: ?(Path, T) = None(),
+  iter: mutable Iterator<(Source, T)>,
+  mutable currentOpt: ?(Source, T) = None(),
 } {
-  static fun create(iter: mutable Iterator<(Path, T)>): mutable this {
+  static fun create(iter: mutable Iterator<(Source, T)>): mutable this {
     mutable static{currentOpt => iter.next(), iter => iter}
   }
 
@@ -204,7 +290,7 @@ mutable class FixedDataIterator<T> private {
     this.currentOpt is None _
   }
 
-  readonly fun current(): (Path, T) {
+  readonly fun current(): (Source, T) {
     this.currentOpt match {
     | None() -> invariant_violation("Cannot access current")
     | Some(x) -> x

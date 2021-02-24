@@ -31,3 +31,8 @@ extern char __heap_base;
 int sk_is_static(void* ptr) {
   return (char*)ptr < end_of_static;
 }
+
+char* SKIP_read_file(char* filename_obj) {
+  SKIP_throw((void*)0);
+  return (void*)0;
+}

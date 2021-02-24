@@ -212,7 +212,10 @@ uint64_t sk_hash_array(stack_t* st, char* obj) {
   char* ohead = obj;
   char* end = obj + memsize;
 
-  while(ohead < end) {
+  if ((ty->m_refsHintMask & 1) == 0) {
+    crc = sk_crc64(crc, obj, len * ty->m_userByteSize);
+  }
+  else while(ohead < end) {
     size_t size = ty->m_userByteSize;
     size_t slot = 0;
     size_t mask_slot = 0;
@@ -221,7 +224,7 @@ uint64_t sk_hash_array(stack_t* st, char* obj) {
       for(i = 0; i < bitsize && size > 0; i++) {
         void** ptr = (void**)ohead;
         void** slot = (void**)rhead;
-        if(((ty->m_refsHintMask & 1) != 0) && ty->m_refMask[mask_slot] & (1 << i)) {
+        if (ty->m_refMask[mask_slot] & (1 << i)) {
           sk_stack_push(st, ptr, slot);
         }
         else {

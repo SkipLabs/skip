@@ -21,6 +21,12 @@ mutable class IterHolder<Key, Value>(iter: mutable Iterator<(Key, Value)>) {
   }
 }
 
+base class Boundary<T> {
+  children =
+  | Inclusive(T)
+  | Exclusive(T)
+}
+
 base class DMap<Key: FileName, Value> {
   children =
   | Nil()
@@ -52,24 +58,31 @@ base class DMap<Key: FileName, Value> {
   }
 
   private fun itemsAfterKeyHelper(
-    lastSkipped: Key,
+    boundary: Boundary<Key>,
   ): mutable Iterator<(Key, Value)> {
     this match {
     | Nil() -> void
     | Node{key, value, left, right} ->
-      if (key > lastSkipped) {
-        for (x in left.itemsAfterKeyHelper(lastSkipped)) {
+      if (
+        boundary match {
+        | Inclusive(lastSkipped) -> key >= lastSkipped
+        | Exclusive(lastSkipped) -> key > lastSkipped
+        }
+      ) {
+        for (x in left.itemsAfterKeyHelper(boundary)) {
           yield x;
         };
         yield (key, value);
       };
-      for (x in right.itemsAfterKeyHelper(lastSkipped)) {
+      for (x in right.itemsAfterKeyHelper(boundary)) {
         yield x;
       }
     }
   }
 
-  fun itemsAfterKey(lastSkippedOpt: ?Key): mutable IterHolder<Key, Value> {
+  fun itemsAfterKey(
+    lastSkippedOpt: ?Boundary<Key>,
+  ): mutable IterHolder<Key, Value> {
     mutable IterHolder(
       lastSkippedOpt match {
       | None() -> this.items()
@@ -177,6 +190,39 @@ base class DMap<Key: FileName, Value> {
     | EQ() -> Some(value)
     | GT() -> right.maybeGet(k)
     }
+
+  fun remove(k: Key): DMap<Key, Value>
+  | Nil() -> this
+  | Node{time, key, value, left, right} ->
+    k.compare(key) match {
+    | LT() -> static::node(time, key, value, left.remove(k), right)
+    | EQ() -> DMap::merge(left, right)
+    | GT() -> static::node(time, key, value, left, right.remove(k))
+    }
+
+  fun removeMinBinding(): ((TimeTag, Key, Value), DMap<Key, Value>) {
+    this match {
+    | Nil() -> invariant_violation("Remove min binding on empty DMap")
+    | Node{time, left => Nil(), key, value, right} ->
+      ((time, key, value), right)
+    | Node{time, left, key, value, right} ->
+      (binding, !left) = left.removeMinBinding();
+      (binding, static::balance(time, key, value, left, right))
+    }
+  }
+
+  static fun merge(
+    t1: DMap<Key, Value>,
+    t2: DMap<Key, Value>,
+  ): DMap<Key, Value> {
+    (t1, t2) match {
+    | (Nil(), t) -> t
+    | (t, Nil()) -> t
+    | (_, _) ->
+      ((t, k, v), !t2) = t2.removeMinBinding();
+      static::balance(t, k, v, t1, t2)
+    }
+  }
 
   protected static fun balance(
     t: TimeTag,

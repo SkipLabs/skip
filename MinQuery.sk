@@ -18,7 +18,8 @@ fun minDir<T: frozen>(
     context,
     dirEHandle.dirName,
     diffMinDirName,
-    (context, writer, key, newValues) ~> {
+    (context, writer, key, newValuesIter) ~> {
+      newValues = newValuesIter.collect(Array);
       preDiffOpt = EHandle(dirEHandle.conv, dirEHandle.dirName).pre(context);
       oldValues = preDiffOpt match {
       | None() -> Array[]

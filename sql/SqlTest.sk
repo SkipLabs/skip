@@ -2,28 +2,32 @@ module SKFSTest;
 
 const tableStr: String = "CREATE TABLE t1(a INTEGER, b INTEGER);";
 
-fun evalStmt(evaluator: mutable SKSQL.Evaluator, str: String): void {
+fun evalStmt(
+  context: mutable SKFS.Context,
+  evaluator: mutable SKSQL.Evaluator,
+  str: String,
+): void {
   lex = SKSQL.Lexer(0, SKSQL.Buffer(str));
   (_, stmtAst) = SKSQL.parseStmt(lex, 0);
-  evaluator.stmt(stmtAst)
+  evaluator.stmt(context, stmtAst)
 }
 
 fun testSql(): mutable SKFS.Context {
   SKFS.run(context ~> {
     context.!debugMode = false;
     evaluator = SKSQL.Evaluator::create(context);
-    _table = evalStmt(evaluator, tableStr);
+    _table = evalStmt(context, evaluator, tableStr);
     expectFail("INSERT in non-existent table", () -> {
-      evalStmt(evaluator, "INSERT INTO tdumb(e,c) VALUES(103,102)");
+      evalStmt(context, evaluator, "INSERT INTO tdumb(e,c) VALUES(103,102)");
     });
     expectFail("INSERT params/values size mismatch", () -> {
-      evalStmt(evaluator, "INSERT INTO t1(e) VALUES(103,102)");
+      evalStmt(context, evaluator, "INSERT INTO t1(e) VALUES(103,102)");
     });
     expectFail("INSERT schema/values size mismatch", () -> {
-      evalStmt(evaluator, "INSERT INTO t1(e) VALUES(103)");
+      evalStmt(context, evaluator, "INSERT INTO t1(e) VALUES(103)");
     });
     expectPass("INSERT success", () -> {
-      evalStmt(evaluator, "INSERT INTO t1(b,a) VALUES(103,102)");
+      evalStmt(context, evaluator, "INSERT INTO t1(b,a) VALUES(103,102)");
     })
   });
 }

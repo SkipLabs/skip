@@ -13,7 +13,8 @@ fun sumDir<T: frozen>(
     context,
     dir.dirName,
     diffCountDirName,
-    (context, writer, key, newValues) ~> {
+    (context, writer, key, newValuesIter) ~> {
+      newValues = newValuesIter.collect(Array);
       preDiffOpt = EHandle(dir.conv, dir.dirName).pre(context);
       oldValues = preDiffOpt match {
       | None() -> Array[]

@@ -1,0 +1,139 @@
+/*****************************************************************************/
+/* The compiled abstract syntax tree. */
+/*****************************************************************************/
+module SKSQL;
+
+base class AggrKind {
+  children =
+  | Sum()
+  | Count()
+}
+
+base class CValue {
+  children =
+  | CInt(Int)
+  | CFloat(Float)
+  | CString(String)
+
+  fun compare(_ty: Type, v2: CValue): Order {
+    (this, v2) match {
+    | (CInt(n1), CInt(n2)) -> n1.compare(n2)
+    | (CFloat(n1), CFloat(n2)) -> n1.compare(n2)
+    | (CString(n1), CString(n2)) -> n1.compare(n2)
+    | _ -> invariant_violation("Typing internal error")
+    }
+  }
+
+  fun toString(): String {
+    this match {
+    | CInt(n) -> n.toString()
+    | CFloat(f) -> f.toString()
+    | CString(str) -> str
+    }
+  }
+}
+
+class CSelect{
+  id: String,
+  kind: SelectKind,
+  params: Array<CGExpr>,
+  aggr: ?Array<(AggrKind, CGExpr)>,
+  kinds: Array<(Int, SKSQL.IKind, SKSQL.Type)>,
+  from: Array<DirDescr>,
+  fromHash: Int,
+  join: ?CJoin,
+  where: ?CExpr<Int>,
+  in_: ?Array<CGExpr>,
+  groupBy: ?Array<Int>,
+  having: ?CGExpr,
+  orderBy: ?Array<(Int, IKind)>,
+  rest: ?(QueryKind, CSelect),
+  needUp: Bool,
+} extends SKFS.File
+
+class CJoin{
+  kind: JoinKind,
+  names: Array<TableName>,
+  on: ?Array<(CGExpr, ?String)>,
+}
+
+base class CGExpr {
+  children =
+  | CGNull()
+  | CIExpr(CExpr<Int>)
+  | CSExpr(CExpr<String>)
+  | CFExpr(CExpr<Float>)
+
+  fun up(): CGExpr {
+    this match {
+    | CGNull() -> CGNull()
+    | CIExpr(ce) -> CIExpr(CUp(ce))
+    | CSExpr(ce) -> CSExpr(CUp(ce))
+    | CFExpr(ce) -> CFExpr(CUp(ce))
+    }
+  }
+
+  fun getType(): Type {
+    this match {
+    | CGNull _
+    | CIExpr _ ->
+      INTEGER()
+    | CFExpr _ -> FLOAT()
+    | CSExpr _ -> TEXT()
+    }
+  }
+}
+
+base class CExpr<Value>
+
+class CISize(Int) extends CExpr<Int>
+
+class CIGetParam(Int) extends CExpr<Int>
+class CSGetParam(Int) extends CExpr<String>
+class CFGetParam(Int) extends CExpr<Float>
+
+class CFICast(CExpr<Int>) extends CExpr<Float>
+
+class CIGetFrom(Int, Int) extends CExpr<Int>
+class CSGetFrom(Int, Int) extends CExpr<String>
+class CFGetFrom(Int, Int) extends CExpr<Float>
+
+class CILiteral(Int) extends CExpr<Int>
+class CFLiteral(Float) extends CExpr<Float>
+class CSLiteral(String) extends CExpr<String>
+class CNot<Int>(CExpr<Int>) extends CExpr<Int>
+//class CAll(CExpr) extends CExpr<?>
+//class CDistinct(CExpr) extends CExpr<?>
+//class CIn(CExpr, Array<CExpr>) extends CExpr<?>
+//class CBetween(CExpr) extends CExpr<?>
+class CLte(CGExpr, CGExpr) extends CExpr<Int>
+class CLt(CGExpr, CGExpr) extends CExpr<Int>
+class CGte(CGExpr, CGExpr) extends CExpr<Int>
+class CGt(CGExpr, CGExpr) extends CExpr<Int>
+class CEq(CGExpr, CGExpr) extends CExpr<Int>
+class CDiff(CGExpr, CGExpr) extends CExpr<Int>
+class CBetween(CGExpr, CGExpr, CGExpr) extends CExpr<Int>
+class CNotBetween(CGExpr, CGExpr, CGExpr) extends CExpr<Int>
+
+class CAdd<T>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CSub<T>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CMul<T>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CDiv<T>(CExpr<T>, CExpr<T>) extends CExpr<T>
+
+class CIf<T>(CExpr<Int>, CExpr<T>, CExpr<T>) extends CExpr<T>
+class CIn(CGExpr, Array<CGExpr>) extends CExpr<Int>
+
+class CExists<T>(CSelect) extends CExpr<T>
+class CEQuery<T>(CSelect) extends CExpr<T>
+
+class CIAbs(CExpr<Int>) extends CExpr<Int>
+class COr(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+class CAnd(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+
+class CUp<T>(CExpr<T>) extends CExpr<T>
+class CCoalesce<T>(Array<CExpr<T>>) extends CExpr<T>
+class CIIsNull(CExpr<Int>) extends CExpr<Int>
+class CFIsNull(CExpr<Float>) extends CExpr<Int>
+class CSIsNull(CExpr<String>) extends CExpr<Int>
+//class CCase(condOpt: ?CExpr, whenCases: Array<(CExpr, CExpr)>, elseCase: ?CExpr) extends CExpr<?>
+//class CCall(CExpr, ?Array<CExpr>) extends CExpr<?>

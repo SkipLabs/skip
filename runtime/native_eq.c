@@ -127,8 +127,7 @@ SkipInt SKIP_native_eq_array(stack_t* st, char* obj1, char* obj2) {
 }
 
 SkipInt SKIP_native_eq_helper(stack_t* st, char* obj1, char* obj2) {
-
-  if(obj1 == NULL && obj2 == NULL) {
+  if(obj1 == obj2) {
     return 0;
   }
 

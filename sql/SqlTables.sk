@@ -7,6 +7,8 @@ module SKSQL;
 const tableInfo: SKFS.DirName = SKFS.DirName::create("/tablesInfo/");
 const selectInput: SKFS.DirName = SKFS.DirName::create("/selectInput/");
 const selectOutput: SKFS.DirName = SKFS.DirName::create("/selectOutput/");
+const indexInput: SKFS.DirName = SKFS.DirName::create("/indexInput/");
+const indexOutput: SKFS.DirName = SKFS.DirName::create("/indexOutput/");
 
 extension class TypeDescr extends SKFS.File
 
@@ -51,27 +53,62 @@ fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
   )
 }
 
-extension class Select extends SKFS.File
+/*****************************************************************************/
+/* Select Dirs. */
+/*****************************************************************************/
 
-fun getSelectInputDir(context: mutable SKFS.Context): SKFS.EHandle<Select> {
-  makeDir(Select::fromFile, context, selectInput, () ->
-    context.mkdir(Select::fromFile, selectInput, Array[])
+fun getSelectInputDir(context: mutable SKFS.Context): SKFS.EHandle<CSelect> {
+  makeDir(CSelect::fromFile, context, selectInput, () ->
+    context.mkdir(CSelect::fromFile, selectInput, Array[])
   )
 }
 
 fun getSelectOutputDir(
   context: mutable SKFS.Context,
-): SKFS.EHandle<SKFS.DirName> {
+): SKFS.EHandle<SelectValue> {
   input = getSelectInputDir(context);
-  makeDir(SKFS.DirName::fromFile, context, selectOutput, () -> {
+  makeDir(SelectValue::fromFile, context, selectOutput, () -> {
     input.contextMap(
-      SKFS.DirName::fromFile,
+      SelectValue::fromFile,
       context,
       selectOutput,
-      (context, request) ~> evalSelect(context, request),
+      (context, request) ~> evalSelect(context, request, None()),
     )
   })
 }
+
+/*****************************************************************************/
+/* Indexes. */
+/*****************************************************************************/
+
+extension class Index extends SKFS.File
+
+class IndexDescr{
+  name: String,
+  fields: Array<(Int, IKind, Type)>,
+} extends SKFS.File
+
+fun getIndexInputDir(context: mutable SKFS.Context): SKFS.EHandle<Index> {
+  makeDir(Index::fromFile, context, indexInput, () ->
+    context.mkdir(Index::fromFile, indexInput, Array[])
+  )
+}
+
+fun getIndexOutputDir(context: mutable SKFS.Context): SKFS.EHandle<IndexDescr> {
+  input = getIndexInputDir(context);
+  makeDir(IndexDescr::fromFile, context, indexOutput, () -> {
+    input.contextMap(
+      IndexDescr::fromFile,
+      context,
+      indexOutput,
+      (context, index) ~> createIndex(context, index.pos, index.fields),
+    )
+  })
+}
+
+/*****************************************************************************/
+/* Tables. */
+/*****************************************************************************/
 
 fun getTable(
   context: mutable SKFS.Context,

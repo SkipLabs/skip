@@ -109,7 +109,6 @@ fun writeCmd(env: mutable CmdEnv, pathStr: String, cmd: String): void {
       dir.writeArray(env.context, path.baseName, Array[StringFile(cmd)]);
     }
   };
-  env.context.update();
 }
 
 fun eval(env: mutable CmdEnv, cmd: String): void {
@@ -240,42 +239,16 @@ untracked fun toplevel(topContext: mutable Context): void {
         print_error("You cannot run an SQL query when not in SQL MODE");
         return None();
       };
-      evaluator = context.getGlobal("SQLEvaluator") match {
-      | Some(x @ SKSQL.EvaluatorSaved _) ->
-        SKSQL.Evaluator::fromSaved(context, x)
-      | Some(_) -> invariant_violation("Unexpected type for SKSQL.Evaluator")
-      | None() ->
-        evaluator = SKSQL.Evaluator::create(context);
-        context.setGlobal("Evaluator", evaluator.save());
-        evaluator
-      };
-
-      vtry(
-        () -> {
-          sqlOpt = parseSQLStmt(evaluator.idRoot, cmd);
-          sqlOpt match {
-          | None() -> void
-          | Some(sql) ->
-            evaluator.stmt(sql);
-            evaluator.!idRoot = evaluator.idRoot + 1;
-            sql match {
-            | select @ SKSQL.Select _ -> SKSQL.showSelect(context, select)
-            | _ -> void
-            }
-          }
-        },
-        exn ->
-          exn match {
-          | SKSQL.Error(_, msg) -> print_error(msg)
-          | _ -> print_error("Unknown error")
-          }
-        ,
-      );
-      context.setGlobal("SQLEvaluator", evaluator.save());
+      SKSQL.setupContext(context, SKSQL.Buffer(cmd));
+      shouldContinue = SKSQL.evalWithContext(context, false);
+      if (shouldContinue) {
+        print_error("Unsupported SQL statement in toplevel");
+      }
     } else {
       eval(env, cmd);
     };
     context.!pwd = env.pwd;
+    context.update();
     Some(context.clone())
   })
 }

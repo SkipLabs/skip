@@ -1,0 +1,39 @@
+/*****************************************************************************/
+/* Module handling Sql indexes. */
+/*****************************************************************************/
+
+module SKSQL;
+
+fun createIndex(
+  context: mutable SKFS.Context,
+  pos: Int,
+  fields: (String, Array<(String, IKind)>),
+): IndexDescr {
+  (tableName, colNames) = fields;
+  if (colNames.size() < 1) {
+    error(pos, "Invalid index: missing column names")
+  };
+  indexName = "/indexes/" + tableName + "/";
+  table = getTable(context, pos, SKFS.SID::create(tableName));
+  dir = getDir(table);
+  for (colName in colNames) {
+    if (!table.cols.containsKey(colName.i0)) {
+      error(pos, "Unknown column: " + colName.i0);
+    };
+  };
+  cols = colNames.map(x -> (table.cols[x.i0], x.i1));
+  types = table.schema.map(x -> x.ty);
+  kinds = computeOrder(types, cols);
+  handle = SKFS.EHandle(Row::fromFile, dir.dirName);
+  _ = handle.contextWriterKeyValues(
+    Row::fromFile,
+    context,
+    SKFS.DirName::create(indexName),
+    (_ctx, writer, _key, rows) ~> {
+      for (row in rows) {
+        writer.write(RowKey::create(row, kinds), row)
+      };
+    },
+  );
+  IndexDescr{name => indexName, fields => kinds}
+}

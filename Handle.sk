@@ -21,7 +21,7 @@
  * all of type IntFile. The type Handle<IntFile> is there to the rescue! Every
  * operation will be type-checked (statically) against the type IntFile.
  *
- * So if I try to write a SringFile instead of an IntFile I get a static error.
+ * So if I try to write a StringFile instead of an IntFile I get a static error.
  * The other important part is that all the higher order operations are also
  * typed. So applying a map to a Handle also produces a handle.
  *
@@ -33,6 +33,48 @@
 /*****************************************************************************/
 
 module SKFS;
+
+/*****************************************************************************/
+/* Iterator capable of answering if it produces at least one element. */
+/*****************************************************************************/
+
+mutable base class IteratorWithIsEmpty<+T> extends Iterator<T> {
+  static fun create(iter: mutable Iterator<T>): mutable IteratorWithIsEmpty<T> {
+    iter.next() match {
+    | None() -> mutable EmptyIterator()
+    | Some(v) -> mutable NonEmptyIterator(Some(v), iter)
+    }
+  }
+
+  readonly fun isEmpty(): Bool;
+}
+
+mutable class EmptyIterator<T>() extends IteratorWithIsEmpty<T> {
+  mutable fun next(): ?T {
+    None()
+  }
+
+  readonly fun isEmpty(): Bool {
+    true
+  }
+}
+
+mutable class NonEmptyIterator<T>(
+  mutable first: ?T,
+  iter: mutable Iterator<T>,
+) extends IteratorWithIsEmpty<T> {
+  mutable fun next(): ?T {
+    this.first match {
+    | None() -> this.iter.next()
+    | x @ Some _ ->
+      this.!first = None();
+      x
+    }
+  }
+  readonly fun isEmpty(): Bool {
+    false
+  }
+}
 
 /*****************************************************************************/
 /* The class handed over to the closures mapping over a directory. */
@@ -63,12 +105,13 @@ mutable class Writer{
 }
 
 /*****************************************************************************/
-/* Typed version of the Compacter. */
+/* Typed version of the Compactor. */
 /*****************************************************************************/
 
-class ECompacter<T>{
+class ECompactor<T>{
+  canReset: Bool,
   init: (mutable Iterator<T> ~> T),
-  update: (?T, Array<T>, Array<T>) ~> T,
+  update: (T, Array<T>, Array<T>) ~> ?T,
 }
 
 /*****************************************************************************/
@@ -86,8 +129,12 @@ base class Handle<+T: frozen> {
 
   fun getArray(context: mutable Context, key: BaseName): Array<T> {
     dir = context.unsafeGetDir(this.getDirName());
-    results = dir.getArray(context, key).map(this.getConv());
-    results
+    dir.getArray(context, key).map(this.getConv())
+  }
+
+  fun getIter(context: mutable Context, key: BaseName): mutable Iterator<T> {
+    dir = context.unsafeGetDir(this.getDirName());
+    dir.getIter(context, key).map(this.getConv())
   }
 
   fun get(context: mutable Context, key: BaseName): T {
@@ -127,10 +174,10 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     conv: File ~> T,
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, EHandle<T>, BaseName) ~> Array<T>,
+    f: (mutable Context, LHandle<T>, BaseName) ~> Array<T>,
   ): LHandle<T> {
     dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
-      Some(f(context, EHandle(conv, dirName), key));
+      Some(f(context, LHandle(conv, dirName), key));
     });
     LHandle(conv, dir.getDirName())
   }
@@ -139,10 +186,10 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     conv: File ~> T,
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, EHandle<T>, BaseName) ~> ?Array<T>,
+    f: (mutable Context, LHandle<T>, BaseName) ~> ?Array<T>,
   ): LHandle<T> {
     dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
-      f(context, EHandle(conv, dirName), key);
+      f(context, LHandle(conv, dirName), key);
     });
     LHandle(conv, dir.getDirName())
   }
@@ -159,68 +206,114 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
 /*****************************************************************************/
 
 class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
-  /*
-    fun union<U>[T: U](
-      context: mutable Context,
-      dirName: DirName,
-      dirs: Array<EHandle<U>>,
-    ): EHandle<T> {
-      thisDir = context.unsafeGetEagerDir(this.dirName);
-      thisDir.apply(
-        context,
-        dirName,
-        (_context, writer, key, files) ~> {
-          if (files.size() == 0) return void;
-          writer.writeArray(key, files);
-        },
-        dirs.map(x -> context.getEagerDir(x.dirName)),
-      );
-      EHandle(this.conv, dirName)
-    }
-  */
-
-  fun product<T2: File, T3: File>(
-    conv: File ~> T3,
-    context: mutable Context,
-    dirName: DirName,
-    dir2: EHandle<T2>,
-    f: (mutable Context, BaseName, Array<T>, BaseName, Array<T2>) ~> Array<T3>,
-  ): EHandle<T3> {
-    thisDir = context.unsafeGetEagerDir(this.dirName);
-    thisDir.product(
-      context,
-      dirName,
-      context.getEagerDir(dir2.dirName),
-      (context, key1, files1, key2, files2) ~> {
-        f(context, key1, files1.map(this.conv), key2, files2.map(dir2.conv))
-      },
-    );
-    EHandle(conv, dirName)
-  }
-
   private fun genericMap<T2: File>(
     conv: File ~> T2,
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
-    compacterOpt: ?ECompacter<T2> = None(),
+    compactorOpt: ?ECompactor<T2> = None(),
   ): EHandle<T2> {
     EagerDir::apply(
       context,
       this.dirName,
       dirName,
-      (context, writer, key, files) ~> {
+      (context, writer, key, fileIter) ~> {
+        files = fileIter.collect(Array);
         if (files.size() == 0) return void;
         f(context, writer, key, files.map(x -> this.conv(x)));
       },
-      compacterOpt match {
+      compactorOpt match {
       | None() -> None()
-      | Some(compacter) ->
+      | Some(compactor) ->
         Some(
-          Compacter{
-            init => files ~> compacter.init(files.map(conv)),
+          ICompactor{
+            canReset => compactor.canReset,
+            init => files ~> compactor.init(files.map(conv)),
             update => (state, old, new) ~>
-              compacter.update(state.map(conv), old.map(conv), new.map(conv)),
+              compactor.update(conv(state), old.map(conv), new.map(conv)),
+          },
+        )
+      },
+    );
+    EHandle(conv, dirName)
+  }
+
+  fun contextWriterKeyIter<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, BaseName, mutable Iterator<T>) ~> void,
+    compactorOpt: ?ECompactor<T2> = None(),
+  ): EHandle<T2> {
+    EagerDir::apply(
+      context,
+      this.dirName,
+      dirName,
+      (context, writer, key, fileIter) ~> {
+        iter = IteratorWithIsEmpty::create(fileIter);
+        if (iter.isEmpty()) return void;
+        f(context, writer, key, iter.map(this.conv));
+      },
+      compactorOpt match {
+      | None() -> None()
+      | Some(compactor) ->
+        Some(
+          ICompactor{
+            canReset => compactor.canReset,
+            init => files ~> compactor.init(files.map(conv)),
+            update => (state, old, new) ~>
+              compactor.update(conv(state), old.map(conv), new.map(conv)),
+          },
+        )
+      },
+    );
+    EHandle(conv, dirName)
+  }
+
+  fun multiContextWriterKeyIter<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    parents: FixedSingle<
+      DirName,
+      (
+        (
+          mutable Context,
+          mutable Writer,
+          BaseName,
+          mutable Iterator<T>,
+        ) ~> void,
+        ?Array<KeyRange>,
+      ),
+    >,
+    dirName: DirName,
+    compactorOpt: ?ECompactor<T2> = None(),
+  ): EHandle<T2> {
+    dynParents = mutable Vector[];
+    parentSet = mutable Set[];
+    for (parentName => parentData in parents) {
+      (mapFun, rangeOpt) = parentData;
+      dynamicMapFun = (context, writer, key, fileIter) ~> {
+        iter = IteratorWithIsEmpty::create(fileIter);
+        if (iter.isEmpty()) return void;
+        mapFun(context, writer, key, iter.map(this.conv));
+      };
+      parentSet.add(parentName);
+      dynParents.push((parentName, (dynamicMapFun, rangeOpt)))
+    };
+    fixedParents = FixedSingle::create(dynParents);
+    EagerDir::applyMany(
+      context,
+      fixedParents,
+      dirName,
+      compactorOpt match {
+      | None() -> None()
+      | Some(compactor) ->
+        Some(
+          ICompactor{
+            canReset => compactor.canReset,
+            init => files ~> compactor.init(files.map(conv)),
+            update => (state, old, new) ~>
+              compactor.update(conv(state), old.map(conv), new.map(conv)),
           },
         )
       },
@@ -299,9 +392,9 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
-    compact: ?(ECompacter<T2>) = None(),
+    compactorOpt: ?(ECompactor<T2>) = None(),
   ): EHandle<T2> {
-    this.genericMap(conv, context, dirName, f, compact)
+    this.genericMap(conv, context, dirName, f, compactorOpt)
   }
 
   fun pre(context: mutable Context): ?EHandle<T> {
@@ -314,44 +407,8 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     }
   }
 
-  fun next(context: mutable Context): EHandle<T> {
-    dirName = this.dirName.next();
-    if (!context.hasNext.contains(this.dirName)) {
-      fixedData = FixedDir{};
-      time = context.timeStamp();
-      totalSize = fixedData.data.size();
-      dir = EagerDir{time, input => true, dirName, fixedData, totalSize};
-      context.setDir(dirName, dir);
-      return EHandle(this.conv, dirName)
-    };
-    EHandle(this.conv, dirName)
-  }
-
   fun size(context: mutable Context): Int {
     context.getEagerDir(this.dirName).size(context)
-  }
-
-  fun addAggregate<U: File>[T: U](
-    conv: File ~> U,
-    context: mutable Context,
-    name: String,
-    compacter: ECompacter<U>,
-  ): void {
-    context
-      .getEagerDir(this.dirName)
-      .addAggregate(
-        context,
-        name,
-        Compacter{
-          init => files ~> compacter.init(files.map(conv)),
-          update => (state, old, new) ~>
-            compacter.update(state.map(conv), old.map(conv), new.map(conv)),
-        },
-      )
-  }
-
-  fun getAggregate(context: mutable Context, name: String): File {
-    context.getEagerDir(this.dirName).getAggregate(context, name)
   }
 }
 

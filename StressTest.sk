@@ -13,15 +13,17 @@ base class RNbr {
 
 class Config{
   nbrInputs: RNbr = RRange(1, 5),
+  nbrDiffRounds: Int = 2,
+  nbrParents: RNbr = RRange(1, 5),
   inputSize: RNbr = RRange(1, 5),
   missingKey: RNbr = RProb(40),
   valueWidth: RNbr = RRange(1, 5),
   valueRange: RNbr = RRange(0, 5),
   nbrDirs: RNbr = RRange(1, 5),
   funBodySize: RNbr = RRange(1, 5),
-  mergeSize: RNbr = RRange(1, 4),
+  mergeSize: RNbr = RRange(1, 5),
   probKeyChange: RNbr = RProb(50),
-  probLazyDir: RNbr = RProb(50),
+  probLazyDir: RNbr = RProb(30),
   probKeyChangeRemoved: RNbr = RProb(10),
   nbrRounds: Int = 4000,
 }
@@ -31,15 +33,15 @@ class Config{
   nbrInputs: RNbr = RRange(1, 2),
   inputSize: RNbr = RRange(1, 2),
   missingKey: RNbr = RProb(30),
-  valueWidth: RNbr = RRange(1, 2),
-  valueRange: RNbr = RRange(0, 2),
+  valueWidth: RNbr = RRange(1, 3),
+  valueRange: RNbr = RRange(0, 10),
   nbrDirs: RNbr = RRange(1, 2),
   funBodySize: RNbr = RRange(1, 2),
   mergeSize: RNbr = RRange(1, 2),
   probKeyChange: RNbr = RProb(50),
   probLazyDir: RNbr = RProb(0),
   probKeyChangeRemoved: RNbr = RProb(0),
-  nbrRounds: Int = 100,
+  nbrRounds: Int = 1000,
 }
 */
 
@@ -49,12 +51,12 @@ class Program(
   inputs: List<Input>,
   diffs: Map<String, Map<Int, List<SKFS.IntFile>>>,
   mDirs: List<DirValue>,
-)
+) extends SKFS.File
 
 class Input{name: String, data: Map<Int, List<SKFS.IntFile>>}
 base class DirValue{name: String} {
   children =
-  | MDir{input: String, readDirs: List<SKFS.DirName>}
+  | MDir{inputs: Array<String>, readDirs: List<SKFS.DirName>}
   | LDir{readDirs: List<SKFS.DirName>}
 }
 
@@ -123,16 +125,35 @@ fun evalDirs(context: mutable SKFS.Context, dirs: List<DirValue>): void {
 
 fun evalMDir(context: mutable SKFS.Context, dir: MDir): void {
   name = dir.name;
-  input = dir.input;
+  parents = mutable Vector[];
   readDirs = dir.readDirs;
-  SKFS.EagerDir::apply(
+  for (input in dir.inputs) {
+    parents.push(
+      (
+        SKFS.DirName::create(input),
+        (
+          (context, writer, key, valueIter) ~> {
+            values = valueIter.collect(Array);
+            if (values.size() == 0) return void;
+            evalFun(
+              input,
+              context,
+              writer,
+              name.toString(),
+              readDirs,
+              key,
+              values,
+            )
+          },
+          None(),
+        ),
+      ),
+    )
+  };
+  SKFS.EagerDir::applyMany(
     context,
-    SKFS.DirName::create(input),
+    SKFS.FixedSingle::create(parents),
     SKFS.DirName::create(name),
-    (context, writer, key, values) ~> {
-      if (values.size() == 0) return void;
-      evalFun(context, writer, name.toString(), readDirs, key, values)
-    },
   )
 }
 
@@ -147,16 +168,19 @@ fun evalLDir(context: mutable SKFS.Context, dir: LDir): void {
 }
 
 fun evalSub(
+  input: String,
   context: mutable SKFS.Context,
   thisDirName: String,
   readDirs: List<SKFS.DirName>,
   currentKey: SKFS.BaseName,
-  currentValues: Array<SKFS.File>,
+  currentFiles: Array<SKFS.File>,
 ): List<SKFS.DirName> {
   sumAcc = 0;
 
+  currentValues = currentFiles.map(x -> SKFS.IntFile::fromFile(x).value);
+
   for (elt in currentValues) {
-    !sumAcc = sumAcc + SKFS.IntFile::fromFile(elt).value;
+    !sumAcc = sumAcc + elt;
   };
 
   sum = sumAcc;
@@ -177,6 +201,7 @@ fun evalSub(
       currentKey +
       "_" +
       sum +
+      hash(input) +
       thisDirName;
     subDirName = SKFS.DirName::create(subDirNameStr);
     !subDirs = List.Cons(subDirNameStr, subDirs);
@@ -184,8 +209,9 @@ fun evalSub(
       context,
       dir.dirName,
       subDirName,
-      (context, writer, localKey, values) ~> {
-        if (values.size() == 0) return void;
+      (context, writer, localKey, valueIter) ~> {
+        iterator = SKFS.IteratorWithIsEmpty::create(valueIter);
+        if (iterator.isEmpty()) return void;
         localSum = sum;
         for (readDirName in readDirs) {
           readDir = context.unsafeGetDir(readDirName);
@@ -196,10 +222,27 @@ fun evalSub(
             !localSum = localSum + value.value
           };
         };
-        for (value in values) {
+        for (value in iterator) {
           !localSum = localSum + SKFS.IntFile::fromFile(value).value;
         };
         writer.write(localKey, SKFS.IntFile(localSum))
+      },
+      None(),
+      if (
+        (true || sum % 2 == 0) &&
+        currentValues.size() >= 2 &&
+        currentValues[0] <= currentValues[1]
+      ) {
+        Some(
+          Array[
+            SKFS.KeyRange(
+              SKFS.IID(currentValues[0]),
+              SKFS.IID(currentValues[1]),
+            ),
+          ],
+        )
+      } else {
+        None()
       },
     )
   };
@@ -241,13 +284,14 @@ fun evalLFun(
     !result =
       result +
       SKFS.IntFile::fromFile(
-        thisDir.getArrayAsync(context, SKFS.IID(keyValue / 2))[0],
+        thisDir.getArray(context, SKFS.IID(keyValue / 2))[0],
       ).value;
   };
   SKFS.IntFile(result)
 }
 
 fun evalFun(
+  input: String,
   context: mutable SKFS.Context,
   writer: mutable SKFS.Writer,
   thisDirName: String,
@@ -255,7 +299,14 @@ fun evalFun(
   currentKey: SKFS.BaseName,
   currentValues: Array<SKFS.File>,
 ): void {
-  subDirs = evalSub(context, thisDirName, readDirs, currentKey, currentValues);
+  subDirs = evalSub(
+    input,
+    context,
+    thisDirName,
+    readDirs,
+    currentKey,
+    currentValues,
+  );
 
   reads = List[currentValues];
   for (dirName in readDirs.concat(subDirs)) {
@@ -338,7 +389,7 @@ fun compareContext(
           for (fixed in fixedData.getArray(key)) {
             (k, files) = fixed;
             intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
-            print_string(`FIXED  ${k} => ${intFiles}`)
+            print_string(`FIXED  ${k.value} => ${intFiles}`)
           }
         | _ -> void
         };
@@ -349,7 +400,7 @@ fun compareContext(
           | Some(SKFS.LAbsent())
           | Some(SKFS.LDelayed()) ->
             print_string("EMPTY DATA")
-          | Some(SKFS.LDefined(files)) ->
+          | Some(SKFS.LDefined(files, _, _)) ->
             intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
             print_string(`       ${intFiles}`)
           }
@@ -359,7 +410,7 @@ fun compareContext(
           | Some(sources) ->
             for (k => files in sources) {
               intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
-              print_string(`       ${k} => ${intFiles}`)
+              print_string(`       ${k.value} => ${intFiles}`)
             }
           }
         | _ -> void
@@ -371,7 +422,7 @@ fun compareContext(
           for (fixed in fixedData.getArray(key)) {
             (k, files) = fixed;
             intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
-            print_string(`FIXED  ${k} => ${intFiles}`)
+            print_string(`FIXED  ${k.value} => ${intFiles}`)
           }
         | _ -> void
         };
@@ -449,12 +500,15 @@ fun genMDir(
   nbr: Int,
 ): MDir {
   name = "/dir" + nbr + "/";
-  inputNbr = rand(RRange(0, mdirs.size()));
-  input = mdirs[inputNbr];
+  inputs = mutable Set[];
+  for (_ in Range(0, rand(config.nbrParents))) {
+    inputNbr = rand(RRange(0, mdirs.size()));
+    inputs.insert(mdirs[inputNbr]);
+  };
   readDirs = genReadDirs(rand, config, dirs);
   dirs.push(name);
   mdirs.push(name);
-  MDir{name, input, readDirs}
+  MDir{name, inputs => inputs.toArray(), readDirs}
 }
 
 fun genLDir(rand: RNbr -> Int, config: Config, dirs: GenDirs, nbr: Int): LDir {
@@ -519,7 +573,14 @@ fun genProgram(config: Config, round: Int): Program {
 /* Function that applies the diff. */
 /*****************************************************************************/
 
-fun updateProgram(context: mutable SKFS.Context, prog: Program): Program {
+fun updateProgram(
+  context: mutable SKFS.Context,
+  prog: Program,
+  i: Int,
+): Program {
+  !prog.diffs = prog.diffs.map((_, diff) ->
+    diff.map((_, arr) -> arr.map(x -> x + i))
+  );
   !prog.inputs = prog.inputs.map(input -> {
     dirName = SKFS.DirName::create(input.name);
     diff = prog.diffs[input.name];
@@ -567,22 +628,40 @@ fun testStress(): mutable SKFS.Context {
       eval(context, origProg);
     });
     if (context.debugMode) print_string("Initialization finished");
-    newProg = updateProgram(context, origProg);
+    prog = updateProgram(context, origProg, 0);
     !context = updateContext(context);
     context.update();
     !context = updateContext(context);
+    context.setGlobal("PROG", prog);
+    for (i in Range(1, config.nbrDiffRounds)) {
+      !prog = SKFS.withRegion(context, (_, context) ~> {
+        //        print_string(inspect(context).toString().length());
+        // print_string("Round: " + i);
+        lprog = context.getGlobal("PROG") match {
+        | Some(x @ Program _) -> x
+        | _ -> invariant_violation("Was expecting a program")
+        };
+        !lprog = updateProgram(context, lprog, i);
+        context.update();
+        context.setGlobal("PROG", lprog);
+        lprog
+      })
+    };
     if (context.debugMode) print_string("Running program from scratch");
+    newProg = prog;
     context2 = SKFS.run(context ~> {
       eval(context, newProg);
     });
     if (context.debugMode) {
       print_string("Compare contexts (Phase 1: updated/scratch)")
     };
-    _ = compareContext(context, context2);
+    hasError = compareContext(context, context2);
+    if (hasError) invariant_violation("Stress test failed");
     if (context.debugMode) {
       print_string("Compare contexts (Phase 2: scratch/updated)")
     };
-    _ = compareContext(context2, context);
+    hasError2 = compareContext(context2, context);
+    if (hasError2) invariant_violation("Stress test failed");
     SKFS.destroyObstack(pos);
     checkMemory();
     !round = round + 1;

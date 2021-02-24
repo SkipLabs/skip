@@ -4,7 +4,7 @@
 /* String implementation */
 /*****************************************************************************/
 
-static void sk_string_set_hash(char* obj) {
+void sk_string_set_hash(char* obj) {
   sk_string_t* str = (sk_string_t*)(obj-sizeof(uint32_t)*2);
   SkipInt acc = 0;
   uint32_t i;
@@ -25,7 +25,7 @@ uint32_t SKIP_String_byteSize(char* obj) {
 }
 
 // Allocates a string (with no data nor hash).
-static char* sk_string_alloc(uint32_t size) {
+char* sk_string_alloc(uint32_t size) {
   uint32_t* iresult = (uint32_t*)SKIP_Obstack_alloc(size + 2 * sizeof(uint32_t));
   *iresult = (uint32_t)size;
   iresult++;
@@ -231,6 +231,115 @@ void* SKIP_String_unsafe_create(SkipInt size) {
   result += sizeof(uint32_t);
   sk_string_set_hash(result);
   return result;
+}
+
+char* SKIP_unsafe_int_to_string(SkipInt n) {
+  return (char*)n;
+}
+
+SkipInt SKIP_unsafe_string_to_int(char* n) {
+  return (SkipInt)n;
+}
+
+SkipInt SKIP_unsafe_float_to_int(double f) {
+  SkipInt* x = (SkipInt*)&f;
+  return *x;
+}
+
+double SKIP_unsafe_int_to_float(SkipInt f) {
+  double* x = (double*)&f;
+  return *x;
+}
+
+int ipow(int x, int y) {
+  if(y == 0) {
+    return 1;
+  }
+  int tmp = ipow(x, y/2);
+  if(y % 2 == 0) {
+    return tmp * tmp;
+  }
+  else {
+    return tmp * tmp * x;
+  }
+}
+
+#define precision 2
+
+char* SKIP_Float_toString(double origf) {
+  float f = (float)origf;
+  float ff;
+	ff = f;
+	char str[64];
+	int a,b,c,k,l=0,m,i=0,j;
+
+	// check for negetive float
+	if(f<0.0)
+	{
+
+		str[i++]='-';
+		f*=-1;
+	}
+
+	a=f;	// extracting whole number
+	f-=a;	// extracting decimal part
+	k = precision;
+
+	// number of digits in whole number
+	while(k>-1) {
+		l = ipow(10,k);
+		m = a/l;
+		if(m>0)
+		{
+			break;
+		}
+	k--;
+	}
+
+	// number of digits in whole number are k+1
+
+	/*
+	extracting most significant digit i.e. right most digit , and concatenating to string
+	obtained as quotient by dividing number by 10^k where k = (number of digit -1)
+	*/
+
+	for(l=k+1;l>0;l--)
+	{
+		b = ipow(10,l-1);
+		c = a/b;
+		str[i++]=c+48;
+		a%=b;
+	}
+	str[i++] = '.';
+
+	/* extracting decimal digits till precision */
+
+	for(l=0;l<precision;l++)
+	{
+		f*=10.0;
+		b = f;
+		str[i++]=b+48;
+		f-=b;
+	}
+
+  if(str[i-1] == '0' && str[i-2] == '0') {
+    i = i - 3;
+    char* result = sk_string_alloc(i);
+    memcpy(result, str, i);
+    sk_string_set_hash(result);
+    return result;
+  }
+
+
+  char* result = sk_string_alloc(i);
+  memcpy(result, str, i);
+  sk_string_set_hash(result);
+  return result;
+
+}
+
+SkipInt SKIP_unsafe_get_svalue(SkipInt* buffer, SkipInt n) {
+  return buffer[n];
 }
 
 /*****************************************************************************/

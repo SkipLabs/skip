@@ -4,6 +4,13 @@
 module SKFS;
 
 class DeletedDir{time: Int, dirName: DirName} extends Dir {
+  fun incrRefCount(_context: mutable Context): void {
+    void
+  }
+  fun decrRefCount(_context: mutable Context): void {
+    void
+  }
+
   static fun addDirtyReader(mutable Context, DirName, DirName, BaseName): void {
     void
   }
@@ -27,6 +34,10 @@ class DeletedDir{time: Int, dirName: DirName} extends Dir {
     Array[]
   }
 
+  fun getIter(mutable Context, BaseName): mutable Iterator<File> {
+    mutable EmptyIterator()
+  }
+
   fun writeEntry(mutable Context, Path, BaseName, Array<File>): this {
     this
   }
@@ -44,13 +55,6 @@ class DeletedDir{time: Int, dirName: DirName} extends Dir {
     Array[]
   }
 
-  fun updateReaders(
-    mutable Context,
-    DirName,
-    readonly Vector<RowMapped<Array<File>>>,
-  ): void {
-    void
-  }
   fun updateNewDirs(
     mutable Context,
     BaseName,

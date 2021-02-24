@@ -28,7 +28,7 @@ base class Stmt {
   | View{name: String, query: Query}
   | Drop{kind: TableKind, name: String}
   | Delete{colName: ?String, name: String, where: ?Expr}
-  | Index{name: String, fields: (String, Array<(String, IKind)>)}
+  | Index{pos: Int, name: String, fields: (String, Array<(String, IKind)>)}
   | Insert{
     pos: Int,
     name: String,
@@ -81,7 +81,7 @@ class Select{
   groupBy: ?Array<(Expr, ?String)>,
   having: ?Expr,
   orderBy: ?Array<(Expr, IKind)>,
-  rest: Array<(QueryKind, Select)>,
+  rest: ?(QueryKind, Select),
 } extends Query, Stmt
 
 class Join{
@@ -109,8 +109,15 @@ base class SelectKind {
 base class QueryKind {
   children =
   | QExcept()
-  | QUnion(Bool)
-  | QIntersect()
+  | QUnion(QUnionKind)
+  | QIntersect(Bool)
+}
+
+base class QUnionKind {
+  children =
+  | USingle()
+  | UAll()
+  | UIntersect()
 }
 
 base class Value {
@@ -146,5 +153,4 @@ base class Type {
   | FLOAT()
   | INTEGER()
   | TEXT()
-  | VARCHAR(Int)
 }

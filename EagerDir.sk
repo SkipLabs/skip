@@ -4,70 +4,50 @@
 module SKFS;
 
 /*****************************************************************************/
+/* Constants. */
+/*****************************************************************************/
+
+const PURGE_LIMIT: Int = 30;
+
+/*****************************************************************************/
 /* The signature of a function used by apply. */
 /*****************************************************************************/
 
-type MapFun = (mutable Context, mutable Writer, BaseName, Array<File>) ~> void;
-
-/*****************************************************************************/
-/* The result of a map. */
-/*****************************************************************************/
-
-value class RowMapped<T>(
-  key: BaseName,
-  reads: List<Path>,
-  values: Array<FixedRow<T>>,
-  newDirs: SortedSet<DirName>,
-)
-
-/*****************************************************************************/
-/* The result of a map, after the sorting and grouping. */
-/*****************************************************************************/
-
-value class GroupedRows<T>(
-  rows: Array<FixedRow<T>>,
-  old: Array<FixedRow<BaseName>>,
-  newDirs: SortedMap<BaseName, SortedSet<DirName>>,
-)
-
-/*****************************************************************************/
-/* Intermediate representation needed to compute the product. */
-/*****************************************************************************/
-
-class ProductRow(
-  key1: BaseName,
-  key2: BaseName,
-  values: Array<File>,
-) extends File
+type MapFun = (
+  mutable Context,
+  mutable Writer,
+  BaseName,
+  mutable Iterator<File>,
+) ~> void;
 
 /*****************************************************************************/
 /* The action passed to aggregate functions. */
 /*****************************************************************************/
 
-value class Aggregate(state: File, compacter: Compacter)
+value class Aggregate(state: File, compactor: ICompactor)
 
 /*****************************************************************************/
 /* Compaction types and helpers. */
 /*****************************************************************************/
 
-class Compact{
-  compacter: Compacter,
+class Compactor{
+  compactor: ICompactor,
   fixed: Array<(BaseName, File)>,
   modified: SortedMap<BaseName, File>,
 } {
   static fun create(
     fixedData: FixedData<Array<File>>,
-    compacter: Compacter,
+    compactor: ICompactor,
   ): this {
     acc = mutable Vector[];
     current = mutable IntRef(0);
     while (current.value < fixedData.size()) {
       key = fixedData[current.value].key;
       iterator = static::makeCompactKeyIterator(fixedData, key, current);
-      acc.push((key, compacter.init(iterator)));
+      acc.push((key, compactor.init(iterator)));
     };
     fixed = acc.toArray();
-    static{compacter, fixed, modified => SortedMap[]}
+    static{compactor, fixed, modified => SortedMap[]}
   }
 
   static fun makeCompactKeyIterator(
@@ -113,14 +93,42 @@ class Compact{
   }
 }
 
-class Compacter{
+class ICompactor{
+  canReset: Bool,
   init: (mutable Iterator<File> ~> File),
-  update: (?File, Array<File>, Array<File>) ~> File,
+  update: (File, Array<File>, Array<File>) ~> ?File,
 }
 
 mutable class IntRef(mutable value: Int) {
   mutable fun incr(): void {
     this.!value = this.value + 1
+  }
+}
+
+/*****************************************************************************/
+/* Ranges. */
+/*****************************************************************************/
+
+value class KeyRange(start: BaseName, end: BaseName) uses Orderable, Show {
+  fun toString(): String {
+    `[${this.start}, ${this.end}]`
+  }
+}
+
+/*****************************************************************************/
+/* Keys and newDirs produced during a mapping. */
+/*****************************************************************************/
+
+value class MInfo(
+  keys: Array<BaseName>,
+  newDirs: Array<DirName>,
+  reads: Array<Path>,
+) {
+  static fun empty(): this {
+    MInfo(Array[], Array[], Array[])
+  }
+  fun isEmpty(): Bool {
+    this.keys.size() == 0 && this.newDirs.size() == 0 && this.reads.size() == 0
   }
 }
 
@@ -134,17 +142,99 @@ class EagerDir{
   input: Bool,
   fixedData: FixedData<Array<File>>,
   totalSize: Int,
-  fixedOld: FixedData<BaseName> = FixedDir{},
-  data: DMap<BaseName, SortedMap<Path, Array<File>>> = Nil(),
-  old: SortedMap<BaseName, Array<BaseName>> = SortedMap[],
-  newDirs: SortedMap<BaseName, SortedSet<DirName>> = SortedMap[],
-  mapFun: ?MapFun = None(),
-
-  parent: ?DirName = None(),
-  childDirs: SortedMap<Int, DirName> = SortedMap[],
-  aggregates: SortedMap<String, Aggregate> = SortedMap[],
-  compact: ?Compact = None(),
+  creator: ?ArrowKey,
+  fixedOld: FixedSingle<Source, MInfo> = FixedSingle::empty(),
+  data: DMap<BaseName, SortedMap<Source, Array<File>>> = Nil(),
+  old: SortedMap<Source, MInfo> = SortedMap[],
+  parents: FixedSingle<
+    DirName,
+    (MapFun, ?Array<KeyRange>),
+  > = FixedSingle::empty(),
+  childDirs: SortedSet<DirName> = SortedSet[],
+  slices: RangeMapList<BaseName, DirName> = RangeMapList[],
+  compactor: ?Compactor = None(),
+  purgeCount: Int = 0,
 } extends Dir {
+  fun purgeOld(): FixedSingle<Source, MInfo> {
+    current = 0;
+    acc = mutable Vector[];
+    for (source => minfo in this.old) {
+      while (
+        current < this.fixedOld.size() &&
+        this.fixedOld[current].i0 < source
+      ) {
+        acc.push(this.fixedOld[current]);
+        !current = current + 1;
+      };
+      while (
+        current < this.fixedOld.size() &&
+        this.fixedOld[current].i0 == source
+      ) {
+        !current = current + 1;
+      };
+      if (!minfo.isEmpty()) {
+        acc.push((source, minfo));
+      }
+    };
+    while (current < this.fixedOld.size()) {
+      acc.push(this.fixedOld[current]);
+      !current = current + 1;
+    };
+    FixedSingle(acc.toArray());
+  }
+
+  fun purgeData(): SKFS.FixedData<Array<SKFS.File>> {
+    current = 0;
+    acc = mutable Vector[];
+    for (key => map in this.data) {
+      while (
+        current < this.fixedData.size() &&
+        this.fixedData[current].key < key
+      ) {
+        acc.push(this.fixedData[current]);
+        !current = current + 1;
+      };
+      for (source => values in map) {
+        while (
+          current < this.fixedData.size() &&
+          this.fixedData[current].key == key &&
+          this.fixedData[current].value.i0 < source
+        ) {
+          acc.push(this.fixedData[current]);
+          !current = current + 1;
+        };
+        if (values.size() > 0) {
+          acc.push(FixedRow(key, (source, values)));
+        };
+        while (
+          current < this.fixedData.size() &&
+          this.fixedData[current].key == key &&
+          this.fixedData[current].value.i0 == source
+        ) {
+          !current = current + 1;
+        };
+      };
+      while (
+        current < this.fixedData.size() &&
+        this.fixedData[current].key == key
+      ) {
+        acc.push(this.fixedData[current]);
+        !current = current + 1;
+      };
+    };
+    while (current < this.fixedData.size()) {
+      acc.push(this.fixedData[current]);
+      !current = current + 1;
+    };
+    FixedDir{data => acc.toArray()};
+  }
+
+  fun purge(): this {
+    fixedOld = this.purgeOld();
+    fixedData = this.purgeData();
+    this with {old => SortedMap[], data => DMap::empty(), fixedData, fixedOld};
+  }
+
   fun isInput(): Bool {
     this.input
   }
@@ -154,23 +244,31 @@ class EagerDir{
 
   private static fun fixedMapData(
     context: mutable Context,
+    oldVec: mutable Vector<(Source, MInfo)>,
     parent: EagerDir,
+    childName: DirName,
     f: MapFun,
-    acc: mutable Vector<RowMapped<Array<File>>>,
+    acc: mutable Vector<FixedRow<Array<File>>>,
     current: mutable IntRef,
   ): void {
     key = parent.fixedData[current.value].key;
     // fast path
     if (
-      parent.compact is None() &&
+      parent.compactor is None() &&
       current.value + 1 < parent.fixedData.size() &&
       parent.fixedData[current.value + 1].key != key
     ) {
-      fixedFiles = parent.fixedData[current.value].value.i1;
-      static::mapRow(context, parent.dirName, key, fixedFiles, f) match {
-      | None() -> void
-      | Some(x) -> acc.push(x)
-      };
+      fixedFiles = parent.fixedData[current.value].value.i1.iterator();
+      static::mapRow(
+        context,
+        acc,
+        oldVec,
+        parent.dirName,
+        childName,
+        key,
+        fixedFiles,
+        f,
+      );
       current.incr();
       return void;
     };
@@ -185,87 +283,156 @@ class EagerDir{
       };
       current.incr();
     };
-    fixedFiles = parent.compact match {
-    | None() -> valueAcc.toArray()
-    | Some(compact) -> compact.getArray(key)
+    fixedFiles = parent.compactor match {
+    | None() -> valueAcc.iterator()
+    | Some(compact) -> compact.getArray(key).iterator()
     };
-    static::mapRow(context, parent.dirName, key, fixedFiles, f) match {
-    | None() -> void
-    | Some(x) -> acc.push(x)
-    }
+    static::mapRow(
+      context,
+      acc,
+      oldVec,
+      parent.dirName,
+      childName,
+      key,
+      fixedFiles,
+      f,
+    );
   }
 
   private static fun subMapData(
     obstack: Obstack,
     context: mutable Context,
     parent: EagerDir,
+    childName: DirName,
     f: MapFun,
     currentStart: Int,
-    last: ?BaseName,
-  ): (readonly Vector<RowMapped<Array<File>>>, ?BaseName, Int) {
+    currentEnd: Int,
+    start: ?Boundary<BaseName>,
+    end: ?BaseName,
+  ): (
+    readonly Vector<FixedRow<Array<File>>>,
+    readonly Vector<(Source, MInfo)>,
+    ?BaseName,
+    Int,
+  ) {
     acc = mutable Vector[];
+    oldVec = mutable Vector[];
     current = mutable IntRef(currentStart);
     size = 0;
 
-    for (key => _ in parent.data.itemsAfterKey(last)) {
+    for (key => _ in parent.data.itemsAfterKey(start)) {
+      end match {
+      | Some(endKey) if (key > endKey) -> break void
+      | _ -> void
+      };
       while (
-        current.value < parent.fixedData.size() &&
+        current.value <= currentEnd &&
         parent.fixedData[current.value].key < key
       ) {
         fixedKey = parent.fixedData[current.value].key;
-        static::fixedMapData(context, parent, f, acc, current);
+        static::fixedMapData(
+          context,
+          oldVec,
+          parent,
+          childName,
+          f,
+          acc,
+          current,
+        );
         !size = size + 1;
         if (shouldGC(obstack) != 0) {
-          return (acc, Some(fixedKey), current.value);
+          return (acc, oldVec, Some(fixedKey), current.value);
         }
       };
       while (
-        current.value < parent.fixedData.size() &&
+        current.value <= currentEnd &&
         parent.fixedData[current.value].key == key
       ) {
         current.incr();
       };
+
       static::mapRow(
         context,
+        acc,
+        oldVec,
         parent.dirName,
+        childName,
         key,
-        parent.getArrayRaw(key),
+        parent.getIterRaw(key),
         f,
-      ) match {
-      | None() -> void
-      | Some(x) -> acc.push(x)
-      };
+      );
       !size = size + 1;
       if (shouldGC(obstack) != 0) {
-        return (acc, Some(key), current.value);
+        return (acc, oldVec, Some(key), current.value);
       }
     };
-    while (current.value < parent.fixedData.size()) {
+
+    while (current.value <= currentEnd) {
       fixedKey = parent.fixedData[current.value].key;
-      static::fixedMapData(context, parent, f, acc, current);
+      static::fixedMapData(context, oldVec, parent, childName, f, acc, current);
       !size = size + 1;
       if (shouldGC(obstack) != 0) {
-        return (acc, Some(fixedKey), current.value);
+        return (acc, oldVec, Some(fixedKey), current.value);
       }
     };
-    (acc, None(), current.value)
+    (acc, oldVec, None(), current.value)
   }
 
   private static fun mapData(
     context: mutable Context,
+    oldVec: mutable Vector<(Source, MInfo)>,
     parent: EagerDir,
+    childName: DirName,
     f: MapFun,
-    origAcc: mutable Vector<readonly Vector<RowMapped<Array<File>>>>,
+    acc: mutable Vector<FixedRow<Array<File>>>,
+    rangeOpt: ?KeyRange,
   ): void {
-    last: ?BaseName = None();
-    current = 0;
+    last: ?Boundary<BaseName> = rangeOpt match {
+    | None() -> None()
+    | Some(range) -> Some(Inclusive(range.start))
+    };
+    current = rangeOpt match {
+    | None() -> 0
+    | Some(range) ->
+      pos = parent.fixedData.getPos(range.start);
+      if (pos < 0) 0 else pos
+    };
+    end = rangeOpt.map(r -> r.end);
+    currentEnd = end match {
+    | None() -> parent.fixedData.size() - 1
+    | Some(key) ->
+      pos = parent.fixedData.getPos(key);
+      if (pos < parent.fixedData.size() && parent.fixedData[pos].key != key) {
+        !pos = pos - 1;
+      };
+      min(parent.fixedData.size() - 1, pos)
+    };
+
     loop {
       lcurrent = current;
       llast = last;
-      (acc, !last, !current) = withRegion(context, (obstack, context) ~> {
-        static::subMapData(obstack, context, parent, f, lcurrent, llast);
-      });
-      origAcc.push(acc);
+
+      (localAcc, localOldVec, lastSkipped, !current) = withRegion(
+        context,
+        (obstack, context) ~> {
+          static::subMapData(
+            obstack,
+            context,
+            parent,
+            childName,
+            f,
+            lcurrent,
+            currentEnd,
+            llast,
+            end,
+          );
+        },
+      );
+
+      acc.extend(localAcc);
+      oldVec.extend(localOldVec);
+
+      !last = lastSkipped.map(x -> Exclusive(x));
       if (last is None _) {
         break void;
       }
@@ -274,106 +441,76 @@ class EagerDir{
 
   private static fun mapRow(
     context: mutable Context,
+    acc: mutable Vector<FixedRow<Array<File>>>,
+    oldVec: mutable Vector<(Source, MInfo)>,
     parentName: DirName,
+    childName: DirName,
     key: BaseName,
-    values: Array<File>,
+    values: mutable Iterator<File>,
     f: MapFun,
-  ): ?RowMapped<Array<File>> {
+  ): void {
+    arrow = ArrowKey(parentName, childName, key);
+    context.enter(arrow);
+
     if (context.debugMode) {
       print_string(`MAP_ROW: ${parentName} ${key} ${inspect(values)}`);
     };
+
     newDirsCopy = context.newDirs;
     readsCopy = context.reads;
+
     context.!newDirs = SortedSet[];
-    context.!reads = List[];
+    context.!reads = SortedSet[];
 
     writer = mutable Writer{};
     f(context, writer, key, values);
 
     kvArray = writer.getWrites();
     newDirs = context.newDirs;
-    if (newDirs.isEmpty() && kvArray.isEmpty()) {
-      return None();
-    };
     reads = context.getReads();
     context.!newDirs = newDirsCopy;
     context.!reads = readsCopy;
-    rows = kvArray.map(kv2 -> {
-      (k2, v2) = kv2;
-      path = Path::create(parentName, key);
-      FixedRow(k2, (path, v2))
-    });
-    Some(RowMapped(key, reads, rows, newDirs))
+
+    context.updateNewDeps(ArrowKey(parentName, childName, key), reads);
+
+    path = Path::create(parentName, key);
+    source = Source::create(path);
+
+    for (kv in kvArray) {
+      (k, v) = kv;
+      acc.push(FixedRow(k, (source, v)))
+    };
+
+    if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
+      oldVec.push(
+        (
+          source,
+          MInfo(kvArray.map(kv -> kv.i0), newDirs.toArray(), reads.toArray()),
+        ),
+      );
+    };
+
+    context.leave(arrow);
   }
 
-  private static fun regroupMap(
-    parentName: DirName,
-    mapped: Vector<readonly Vector<RowMapped<Array<File>>>>,
-    rowVec: mutable Vector<FixedRow<Array<File>>>,
-    oldVec: mutable Vector<FixedRow<SKFS.BaseName>>,
-    newDirsRef: mutable Ref<SortedMap<BaseName, SortedSet<DirName>>>,
-  ): void {
-    for (rowMappedV in mapped) {
-      for (rowMapped in rowMappedV) {
-        key = rowMapped.key;
-        rows = rowMapped.values;
-        for (row in rows) {
-          oldVec.push(FixedRow(key, (Path::create(parentName, key), row.key)));
-          rowVec.push(row);
-        };
-        if (!rowMapped.newDirs.isEmpty()) {
-          newDirs = newDirsRef.get();
-          !newDirs = newDirs.set(key, rowMapped.newDirs);
-          newDirsRef.set(newDirs);
-        }
-      }
-    }
-  }
-
-  fun product(
-    context: mutable Context,
-    productDirName: DirName,
-    dir2: EagerDir,
-    f: (mutable Context, BaseName, Array<File>, BaseName, Array<File>) ~> Array<
-      File,
-    >,
-  ): void {
-    static::apply(
-      context,
-      this.dirName,
-      productDirName,
-      (context, writer, key1, values1) ~> {
-        if (values1.size() == 0) return void;
-        hash1 = key1.hash();
-        hash2 = (23, key1).hash();
-        name = hash1.toString() + hash2;
-        subProductDirName = productDirName.sub(name);
-        static::apply(
-          context,
-          dir2.dirName,
-          subProductDirName,
-          (context, writer, key2, values2) ~> {
-            if (values2.size() == 0) return void;
-            values = f(context, key1, values1, key2, values2);
-            writer.write(IID(0), ProductRow(key1, key2, values));
-          },
-        );
-        subDir = context.getDir(subProductDirName);
-        values = subDir.getArray(context, IID(0));
-        if (values.size() == 0) {
-          return void;
-        };
-        for (file in values) {
-          row = ProductRow::fromFile(file);
-          key = PID::create(Array[row.key1, row.key2]);
-          writer.writeArray(key, row.values);
-        }
-      },
-    );
-  }
-
-  static fun isReusable(child: EagerDir, f: MapFun): Bool {
-    child.parent is Some _ && inspect(child.mapFun.fromSome()) == inspect(f)
+  static fun isReusable(
+    context: readonly Context,
+    child: EagerDir,
+    parents: FixedSingle<DirName, (MapFun, ?Array<KeyRange>)>,
+  ): Bool {
+    if (context.unsafeReuse) return true;
+    same = (native_eq(parents, child.parents) == 0);
+    if (same && child.creator != context.currentArrow()) {
+      invariant_violation(
+        "Duplicate subdirectory: " +
+          child.dirName.toString() +
+          "\nFirst created: " +
+          inspect(child.creator).toString() +
+          "\nThen: " +
+          inspect(context.currentArrow()).toString(),
+      );
+    };
+    same
   }
 
   static fun reuseDir(context: mutable Context, childName: DirName): void {
@@ -388,114 +525,171 @@ class EagerDir{
     parentName: DirName,
     childName: DirName,
     f: MapFun,
-    compacterOpt: ?Compacter = None(),
+    compactorOpt: ?ICompactor = None(),
+    rangeOpt: ?Array<KeyRange> = None(),
+  ): void {
+    parents = FixedSingle::create(mutable Vector[(parentName, (f, rangeOpt))]);
+    static::applyMany(context, parents, childName, compactorOpt);
+  }
+
+  static fun applyMany(
+    context: mutable Context,
+    parents: FixedSingle<DirName, (MapFun, ?Array<KeyRange>)>,
+    childName: DirName,
+    compactorOpt: ?ICompactor = None(),
   ): void {
     if (context.newDirs.contains(childName)) {
       error(`Error: directory ${childName.toString()} already exists`);
     };
     context.unsafeMaybeGetEagerDir(childName) match {
-    | Some(child) if (static::isReusable(child, f)) ->
+    | Some(child) if (static::isReusable(context, child, parents)) ->
       static::reuseDir(context, childName);
       return void
     | _ -> void
     };
-    acc = mutable Vector[];
-    parent = context.unsafeGetEagerDir(parentName);
+
     context.!newDirs = context.newDirs.add(childName);
-    static::mapData(context, parent, f, acc);
-    mapped = acc.chill();
-    dataVec = mutable Vector[];
+
+    acc = mutable Vector<FixedRow<Array<File>>>[];
     oldVec = mutable Vector[];
-    newDirs = mutable Ref(SortedMap[]);
-    static::regroupMap(parent.dirName, mapped, dataVec, oldVec, newDirs);
-    static::updateReaders(context, parentName, childName, mapped);
-    dataVec.sort();
-    oldVec.sort();
-    fixedData = FixedDir{data => dataVec.toArray()};
+
+    for (parentName => parentData in parents) {
+      (f, rangeOpt) = parentData;
+      parent = context.unsafeGetEagerDir(parentName);
+      rangeOpt match {
+      | None() ->
+        static::mapData(context, oldVec, parent, childName, f, acc, None())
+      | Some(ranges) ->
+        for (range in ranges) {
+          static::mapData(
+            context,
+            oldVec,
+            parent,
+            childName,
+            f,
+            acc,
+            Some(range),
+          );
+        }
+      }
+    };
+
+    acc.sort();
+    fixedData = FixedDir{data => acc.toArray()};
     time = context.timeStamp();
     totalSize = fixedData.size();
-    compact = compacterOpt match {
-    | None() -> None()
-    | Some(compacter) -> Some(Compact::create(fixedData, compacter))
+    (!fixedData, compactor) = compactorOpt match {
+    | None() -> (fixedData, None())
+    | Some(icompactor) ->
+      (
+        if (icompactor.canReset) fixedData else FixedDir{},
+        Some(Compactor::create(fixedData, icompactor)),
+      )
     };
+
     dir = EagerDir{
       time,
       dirName => childName,
       input => false,
-      parent => Some(parentName),
+      parents,
       fixedData,
       totalSize,
-      fixedOld => FixedDir{data => oldVec.toArray()},
-      mapFun => Some(f),
-      newDirs => newDirs.get(),
-      childDirs => SortedMap[],
-      compact,
+      creator => context.currentArrow(),
+      fixedOld => FixedSingle::create(oldVec),
+      childDirs => SortedSet[],
+      compactor,
     };
     updateDirtyReaders(context, Path::create(childName.tag(), DIR_TAG));
     context.setDir(childName, dir);
-    static::addChildToParent(context, time, parentName, childName);
+    for (parentName => parentData in parents) {
+      (_, rangeOpt) = parentData;
+      static::addChildToParent(context, parentName, childName, rangeOpt);
+    };
     if (context.debugMode) {
+      parentNames = parents.items().map(x -> (x.i0, x.i1.i1)).collect(Array);
       print_string(
-        `CREATED:  ${childName} (time: ${time}, parent: ${parentName})`,
+        `CREATED:  ${childName} (time: ${time}, parents: ${parentNames})`,
       );
     };
   }
 
   private static fun addChildToParent(
     context: mutable Context,
-    time: Int,
     parentName: DirName,
     childName: DirName,
+    rangeOpt: ?Array<KeyRange>,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
-    !parent.childDirs = parent.childDirs.add(time, childName);
+    rangeOpt match {
+    | None() -> !parent.childDirs = parent.childDirs.set(childName)
+    | Some(ranges) ->
+      for (range in ranges) {
+        !parent.purgeCount = parent.purgeCount + 1;
+        !parent.slices = parent.slices.add(range.start, range.end, childName)
+      }
+    };
+    if (parent.purgeCount >= PURGE_LIMIT) {
+      !parent = parent with {
+        slices => parent.purgeSlices(context),
+        purgeCount => 0,
+      };
+    };
     context.setDir(parent.dirName, parent);
   }
 
   fun getArrayRaw(key: BaseName): Array<File> {
-    this.compact match {
-    | None() ->
-      fixedIter = this.fixedData.getIter(key);
-      this.data.maybeGet(key) match {
-      | None() ->
-        acc = mutable Vector[];
-        for (rows in fixedIter) {
-          for (row in rows.i1) {
-            acc.push(row);
-          }
-        };
-        acc.toArray()
-      | Some(modified) ->
-        fixed = FixedDataIterator::create(this.fixedData.getIter(key));
-        result = mutable Vector<File>[];
+    this.getIterRaw(key).collect(Array)
+  }
 
-        for (path => values in modified) {
-          while (!fixed.isEnd() && fixed.current().i0 < path) {
-            for (file in fixed.current().i1) {
-              result.push(file);
-            };
-            fixed.next();
-          };
-          while (!fixed.isEnd() && fixed.current().i0 == path) {
-            fixed.next();
-          };
-          for (file in values) {
-            result.push(file);
-          }
-        };
-        while (!fixed.isEnd()) {
+  private fun getDataIter(key: BaseName): mutable Iterator<File> {
+    fixedIter = this.fixedData.getIter(key);
+    this.data.maybeGet(key) match {
+    | None() ->
+      for (rows in fixedIter) {
+        for (row in rows.i1) {
+          yield row;
+        }
+      }
+    | Some(modified) ->
+      fixed = FixedDataIterator::create(this.fixedData.getIter(key));
+
+      for (source => values in modified) {
+        while (!fixed.isEnd() && fixed.current().i0.value < source.value) {
           for (file in fixed.current().i1) {
-            result.push(file);
+            yield file;
           };
           fixed.next();
         };
-        result.toArray()
+        while (!fixed.isEnd() && fixed.current().i0.value == source.value) {
+          fixed.next();
+        };
+        for (file in values) {
+          yield file;
+        }
+      };
+      while (!fixed.isEnd()) {
+        for (file in fixed.current().i1) {
+          yield file;
+        };
+        fixed.next();
       }
-    | Some(compact) -> compact.getArray(key)
     }
   }
 
-  private fun getArraySourceKey(source: Path, key: BaseName): Array<File> {
+  private fun getIterRaw(key: BaseName): mutable Iterator<File> {
+    this.compactor match {
+    | None() ->
+      for (elt in this.getDataIter(key)) {
+        yield elt
+      }
+    | Some(compact) ->
+      for (elt in compact.getArray(key)) {
+        yield elt
+      }
+    }
+  }
+
+  private fun getArraySourceKey(source: Source, key: BaseName): Array<File> {
     this.data.maybeGet(key) match {
     | None() -> this.fixedData.getArraySourceKey(source, key).flatten()
     | Some(modified) ->
@@ -514,6 +708,8 @@ class EagerDir{
       readonly Map<DirName, readonly Set<BaseName>>,
     >,
     parentName: DirName,
+    mapFun: MapFun,
+    rangeOpt: ?Array<KeyRange>,
     child: EagerDir,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
@@ -522,30 +718,41 @@ class EagerDir{
     dirty = mutable Set[];
     if (contextDirtyReaders.containsKey(parent.dirName)) {
       if (contextDirtyReaders[parent.dirName].containsKey(childName)) {
-        for (elt in contextDirtyReaders[parent.dirName][childName]) {
-          dirty.insert(elt)
+        for (key in contextDirtyReaders[parent.dirName][childName]) {
+          rangeOpt match {
+          | Some(
+            ranges,
+          ) if (!ranges.any(range -> range.start <= key && key <= range.end)) ->
+            void
+          | _ -> dirty.insert(key)
+          }
         }
       };
     };
     if (contextDirty.containsKey(parent.dirName)) {
       for (key in contextDirty[parent.dirName]) {
-        dirty.insert(key);
+        rangeOpt match {
+        | Some(
+          ranges,
+        ) if (!ranges.any(range -> range.start <= key && key <= range.end)) ->
+          void
+        | _ -> dirty.insert(key)
+        }
       };
     };
 
-    mapFun = child.mapFun match {
-    | None() -> invariant_violation("Cannot update an input Directory")
-    | Some(f) -> f
-    };
-
     for (key in dirty) {
-      values = parent.getArrayRaw(key);
-      oldKeys = Set::mcreateFromItems(static::getOld(child, key));
+      context.enter(ArrowKey(parentName, childName, key));
+      values = parent.getIterRaw(key);
+      path = Path::create(parentName, key);
+      source = Source::create(path);
+      oldInfo = static::getOld(child, source);
+      oldKeys = Set::mcreateFromItems(oldInfo.keys);
       writer = mutable Writer{};
       newDirsCopy = context.newDirs;
       readsCopy = context.reads;
       context.!newDirs = SortedSet[];
-      context.!reads = List[];
+      context.!reads = SortedSet[];
 
       mapFun(context, writer, key, values);
 
@@ -554,20 +761,21 @@ class EagerDir{
       context.!newDirs = newDirsCopy;
       context.!reads = readsCopy;
 
-      !child = child.updateNewDirs(context, key, newDirs);
+      !child = child.updateNewDirs(context, source, newDirs);
       mapped = writer.getWrites();
 
       for (read in reads) {
-        readSet = context.newDeps.maybeGet(read) match {
-        | None() -> SortedSet[]
-        | Some(x) -> x
-        };
-        !readSet = readSet.set(ArrowKey(parentName, child.dirName, key));
-        context.!newDeps[read] = readSet;
+        arrowKey = ArrowKey(parentName, child.dirName, key);
+        context.!deps = context.deps.set(read, arrowKey);
+      };
+
+      for (oldRead in oldInfo.reads) {
+        if (reads.contains(oldRead)) continue;
+        arrowKey = ArrowKey(parentName, child.dirName, key);
+        context.!deps = context.deps.remove(oldRead, arrowKey);
       };
 
       keys = mutable Vector[];
-      source = Path::create(parentName, key);
 
       for (kv in mapped) {
         (k, rvalues) = kv;
@@ -576,35 +784,49 @@ class EagerDir{
         if (oldKeys.contains(k)) {
           oldKeys.remove(k);
         };
-        !child = child.writeEntry(context, source, k, rvalues);
+        !child = child.writeEntry(context, path, k, rvalues);
       };
 
       // Let's remove the keys that no longer exist.
       for (k in oldKeys) {
-        !child = child.writeEntry(context, source, k, Array[]);
+        !child = child.writeEntry(context, path, k, Array[]);
       };
 
       // We need to remember what keys we produced for the next
       // time around.
-      !child.old[key] = keys.toArray();
+      !child.old[source] = MInfo(
+        keys.toArray(),
+        newDirs.toArray(),
+        reads.toArray(),
+      );
+
+      context.leave(ArrowKey(parentName, childName, key));
     };
     context.setDir(child.dirName, child);
   }
 
   fun getArray(context: mutable Context, key: BaseName): Array<File> {
+    this.getIter(context, key).collect(Array)
+  }
+
+  fun getIter(context: mutable Context, key: BaseName): mutable Iterator<File> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
-    values = this.getArrayRaw(key);
-    if (values.size() != 0) return values;
-    values
+    this.getIterRaw(key)
   }
 
   fun writeEntry(
     context: mutable Context,
-    source: Path,
+    sourcePath: Path,
     k: BaseName,
     rvalues: Array<File>,
   ): this {
+    if (Math.ipow(2, this.data.getHeight() + 1) >= this.fixedData.size()) {
+      !this = this.purge();
+    };
+
+    source = Source::create(sourcePath);
+
     oldValues = this.getArraySourceKey(source, k);
     if (native_eq(rvalues, oldValues) == 0) return this;
 
@@ -616,20 +838,27 @@ class EagerDir{
       this.totalSize
     };
 
-    !this = this.updateAggregates(context, oldValues, rvalues);
-
     map = this.data.maybeGet(k) match {
     | None() -> SortedMap[]
     | Some(x) -> x
     };
+
     !map = map.set(source, rvalues);
     data = this.data.set(TimeTag::create(context.tick), k, map);
 
-    compact = this.compact match {
+    compactor = this.compactor match {
     | None() -> None()
     | Some(cdata) ->
-      state = cdata.get(k);
-      !cdata.modified[k] = cdata.compacter.update(state, oldValues, rvalues);
+      cdata.get(k) match {
+      | None() -> !cdata.modified[k] = cdata.compactor.init(this.getDataIter(k))
+      | Some(state) ->
+        cdata.compactor.update(state, oldValues, rvalues) match {
+        | None() ->
+          invariant(cdata.compactor.canReset);
+          !cdata.modified[k] = cdata.compactor.init(this.getDataIter(k))
+        | Some(new) -> !cdata.modified[k] = new
+        }
+      };
       Some(cdata)
     };
 
@@ -642,27 +871,82 @@ class EagerDir{
       updateDirtyReaders(context, sizePath);
     };
 
-    !this = this with {data, totalSize, compact};
+    !this = this with {data, totalSize, compactor};
 
     updateDirtyReaders(context, path);
 
+    parentTime = this.time;
+    childDirs = SortedSet[];
+
     for (childName in this.childDirs) {
-      context.unsafeGetDir(childName) match {
-      | child @ EagerDir _ ->
+      context.unsafeMaybeGetEagerDir(childName) match {
+      | None() -> continue
+      | Some(childDir) ->
+        !childDirs = childDirs.set(childName);
         context.!toUpdate = context.toUpdate.set(
-          child.time,
+          (childDir.time, parentTime),
           Arrow(this.dirName, childName),
         )
-      | DeletedDir _ -> void
-      | LazyDir _ -> invariant_violation("Unexpected child type")
       }
     };
-    if (context.debugMode) {
-      name = "" + this.dirName + k;
-      print_string(`WRITTEN:  ${name} => ${inspect(rvalues)} (${source})`);
+
+    purgeCount = this.purgeCount;
+    slices = this.slices;
+
+    for (childNameTime in this.slices.get(k)) {
+      !purgeCount = purgeCount + 1;
+      childName = childNameTime;
+      context.unsafeMaybeGetEagerDir(childName) match {
+      | None() -> continue
+      | Some(childDir) ->
+        context.!toUpdate = context.toUpdate.set(
+          (childDir.time, parentTime),
+          Arrow(this.dirName, childName),
+        )
+      }
     };
 
-    this
+    if (context.debugMode) {
+      name = "" + this.dirName + k;
+      print_string(
+        `WRITTEN:  ${name} => ${inspect(rvalues)} (${source.value})`,
+      );
+    };
+
+    if (purgeCount >= PURGE_LIMIT) {
+      !slices = this.purgeSlices(context);
+      !purgeCount = 0;
+    };
+
+    this with {childDirs, slices, purgeCount}
+  }
+
+  fun purgeSlices(
+    context: mutable Context,
+  ): RangeMapList<SKFS.BaseName, SKFS.DirName> {
+    slices = RangeMapList[];
+    childDirs = SortedSet[];
+    for (slice in this.slices) {
+      for (childDir in slice.i1) {
+        !childDirs = childDirs.set(childDir);
+      }
+    };
+    for (child in childDirs) {
+      context.unsafeMaybeGetEagerDir(child) match {
+      | None() -> continue
+      | Some(childDir) ->
+        for (parent in childDir.parents.items()) {
+          parent.i1.i1 match {
+          | None() -> continue
+          | Some(ranges) ->
+            for (range in ranges) {
+              !slices = slices.add(range.start, range.end, childDir.dirName)
+            }
+          }
+        }
+      }
+    };
+    slices
   }
 
   fun unsafeIterKeys(f: (BaseName, Int) -> void): void {
@@ -689,14 +973,26 @@ class EagerDir{
       current.value < this.fixedData.size() &&
       this.fixedData[current.value].key == key
     ) {
-      for (elt in this.fixedData[current.value].value.i1) {
-        yield elt;
+      if (this.compactor is None()) {
+        for (elt in this.fixedData[current.value].value.i1) {
+          yield elt;
+        };
       };
       current.incr();
     };
+
+    this.compactor match {
+    | None() -> void
+    | Some(compact) ->
+      for (elt in compact.getArray(key)) {
+        yield elt
+      }
+    }
   }
 
-  private fun getIter(): mutable Iterator<(BaseName, mutable Iterator<File>)> {
+  fun unsafeGetFileIter(): mutable Iterator<
+    (BaseName, mutable Iterator<File>),
+  > {
     current = mutable IntRef(0);
     for (key => _ in this.data) {
       while (
@@ -713,7 +1009,7 @@ class EagerDir{
       ) {
         current.incr();
       };
-      yield (key, this.getArrayRaw(key).iterator());
+      yield (key, this.getIterRaw(key));
     };
     while (current.value < this.fixedData.size()) {
       fixedKey = this.fixedData[current.value].key;
@@ -725,7 +1021,7 @@ class EagerDir{
   fun onFiles(
     process: mutable Iterator<(BaseName, mutable Iterator<File>)> ~> void,
   ): void {
-    process(this.getIter())
+    process(this.unsafeGetFileIter())
   }
 
   fun keys(): Set<BaseName> {
@@ -758,61 +1054,35 @@ class EagerDir{
     this.dirName
   }
 
-  static fun getOld(child: EagerDir, key: BaseName): Array<BaseName> {
+  static fun getOld(child: EagerDir, key: Source): MInfo {
     if (child.old.containsKey(key)) {
       child.old[key]
     } else {
-      child.fixedOld.getArray(key).map(x -> x.i1)
-    }
-  }
-
-  private static fun updateReaders(
-    context: mutable Context,
-    parentName: DirName,
-    childName: DirName,
-    mapped: readonly Vector<readonly Vector<RowMapped<Array<File>>>>,
-  ): void {
-    readDirs = mutable Map[];
-    deps = mutable Vector[];
-    for (rowV in mapped) {
-      for (row in rowV) {
-        for (read in row.reads) {
-          if (!readDirs.containsKey(read.dirName)) {
-            readDirs![read.dirName] = mutable Vector[];
-          };
-          readDirs[read.dirName].push((read.baseName, row.key));
-        }
+      child.fixedOld.maybeGet(key) match {
+      | None() -> MInfo::empty()
+      | Some(v) -> v
       }
-    };
-    for (readDirName => reads in readDirs) {
-      reads.sort();
-      uniqReads = reads.unique();
-      for (row in uniqReads) {
-        readerKey = row.i0;
-        readKey = row.i1;
-        readerPath = Path::create(readDirName, readerKey);
-        deps.push((readerPath, ArrowKey(parentName, childName, readKey)));
-      };
-    };
-    context.!deps = List.Cons(deps.toArray(), context.deps);
+    }
   }
 
   fun updateNewDirs(
     context: mutable Context,
-    key: BaseName,
+    source: Source,
     newDirs: SortedSet<DirName>,
   ): this {
     removed = mutable Vector[];
-    this.newDirs.maybeGet(key) match {
-    | None() -> if (newDirs.isEmpty()) return this
-    | Some(lastRoundDirs) ->
-      for (dirName in lastRoundDirs) {
-        if (newDirs.contains(dirName)) continue;
-        context.removeDir(dirName);
-        removed.push(dirName);
-      }
+    minfo = static::getOld(this, source);
+    if (minfo.newDirs.isEmpty()) return this;
+
+    lastRoundDirs = minfo.newDirs;
+    for (dirName in lastRoundDirs) {
+      if (newDirs.contains(dirName)) continue;
+      context.removeDir(dirName);
+      removed.push(dirName)
     };
-    !this.newDirs = this.newDirs.set(key, newDirs);
+    !minfo.newDirs = newDirs.toArray();
+    !this.old[source] = minfo;
+
     for (dirName in removed) {
       updateDirtyReaders(context, Path::create(dirName.tag(), DIR_TAG));
     };
@@ -845,44 +1115,5 @@ class EagerDir{
 
   fun isDeleted(): Bool {
     false
-  }
-
-  fun updateAggregates(
-    context: mutable Context,
-    oldValues: Array<File>,
-    newValues: Array<File>,
-  ): this {
-    !this.aggregates = this.aggregates.map((name, aggr) -> {
-      state = aggr.state;
-      newState = aggr.compacter.update(Some(state), oldValues, newValues);
-      if (native_eq(aggr.state, newState) != 0) {
-        aggrPath = Path::create(this.dirName.aggr(), SID::create(name));
-        updateDirtyReaders(context, aggrPath);
-      };
-      !aggr.state = newState;
-      aggr
-    });
-
-    this
-  }
-
-  fun addAggregate(
-    context: mutable Context,
-    name: String,
-    compacter: Compacter,
-  ): void {
-    if (this.aggregates.containsKey(name)) {
-      invariant_violation(`The aggregate ${name} already exists`);
-    };
-
-    state = compacter.init(this.getIter().map(x -> x.i1.iterator()).flatten());
-
-    !this.aggregates[name] = Aggregate(state, compacter);
-    context.setDir(this.dirName, this)
-  }
-
-  fun getAggregate(context: mutable Context, name: String): File {
-    context.addDep(Path::create(this.dirName.aggr(), SID::create(name)));
-    this.aggregates[name].state
   }
 }
