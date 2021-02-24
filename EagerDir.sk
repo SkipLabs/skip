@@ -196,6 +196,7 @@ class EagerDir{
   }
 
   private static fun subMapData(
+    obstack: Obstack,
     context: mutable Context,
     parent: EagerDir,
     f: MapFun,
@@ -214,7 +215,7 @@ class EagerDir{
         fixedKey = parent.fixedData[current.value].key;
         static::fixedMapData(context, parent, f, acc, current);
         !size = size + 1;
-        if (shouldGC() != 0) {
+        if (shouldGC(obstack) != 0) {
           return (acc, Some(fixedKey), current.value);
         }
       };
@@ -235,7 +236,7 @@ class EagerDir{
       | Some(x) -> acc.push(x)
       };
       !size = size + 1;
-      if (shouldGC() != 0) {
+      if (shouldGC(obstack) != 0) {
         return (acc, Some(key), current.value);
       }
     };
@@ -243,7 +244,7 @@ class EagerDir{
       fixedKey = parent.fixedData[current.value].key;
       static::fixedMapData(context, parent, f, acc, current);
       !size = size + 1;
-      if (shouldGC() != 0) {
+      if (shouldGC(obstack) != 0) {
         return (acc, Some(fixedKey), current.value);
       }
     };
@@ -261,8 +262,8 @@ class EagerDir{
     loop {
       lcurrent = current;
       llast = last;
-      (acc, !last, !current) = withRegion(context, context ~> {
-        static::subMapData(context, parent, f, lcurrent, llast);
+      (acc, !last, !current) = withRegion(context, (obstack, context) ~> {
+        static::subMapData(obstack, context, parent, f, lcurrent, llast);
       });
       origAcc.push(acc);
       if (last is None _) {

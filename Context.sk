@@ -342,7 +342,7 @@ mutable class Context{
 
     while (backgroundRounds > 0) {
       roundsCopy = backgroundRounds;
-      !backgroundRounds = withRegion(this, context ~> {
+      !backgroundRounds = withRegion(this, (obstack, context) ~> {
         rounds = roundsCopy;
         while (rounds > 0) {
           path = context.popAsync() match {
@@ -355,7 +355,7 @@ mutable class Context{
           _ = dir.unsafeGetArray(context, path.baseName);
           updateDirtyReaders(context, path);
           !rounds = rounds - 1;
-          if (shouldGC() != 0) {
+          if (shouldGC(obstack) != 0) {
             break void;
           }
         };
@@ -647,7 +647,7 @@ native fun .verify(Context): void;
 
 @debug
 @cpp_extern("SKIP_should_GC")
-native fun shouldGC(): UInt32;
+native fun shouldGC(Obstack): UInt32;
 
 @cpp_noinline
 fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
@@ -665,9 +665,12 @@ fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
   }
 }
 
-fun withRegion<T>(context: mutable Context, f: mutable Context ~> T): T {
+fun withRegion<T>(
+  context: mutable Context,
+  f: (Obstack, mutable Context) ~> T,
+): T {
   saved = newObstack();
-  fresult = f(context);
+  fresult = f(saved, context);
   copied = destroyObstackWithValue(saved, List[(context.clone(), fresult)]);
   (icontext, copiedResult) = copied.getHead();
   context.replaceFromSaved(icontext);
