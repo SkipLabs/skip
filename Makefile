@@ -43,7 +43,8 @@ SKFUNS=\
 	skip_main \
 	sk_string_create \
 	SKIP_initializeSkip \
-	SKIP_skfs_init
+	SKIP_skfs_init \
+	SKIP_skfs_end_of_init
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))
 

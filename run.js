@@ -206,6 +206,7 @@ WebAssembly.instantiate(typedArray, {
   instance = result.instance;
   result.instance.exports.SKIP_skfs_init();
   result.instance.exports.SKIP_initializeSkip();
+  result.instance.exports.SKIP_skfs_end_of_init();
   result.instance.exports.skip_main();
 }).catch(e => {
   // error caught

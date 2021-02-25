@@ -18,6 +18,14 @@ void SKIP_skfs_init() {
   end_of_static = (char*)bump_pointer;
 }
 
+void SKIP_destroy_Obstack(void*);
+
+void SKIP_skfs_end_of_init() {
+  if((char*)bump_pointer != (char*)0) {
+    SKIP_destroy_Obstack((char*)0);
+  }
+}
+
 extern char __heap_base;
 
 int sk_is_static(void* ptr) {

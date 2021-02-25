@@ -60,9 +60,6 @@ extern __thread char* head;
 extern __thread char* end;
 
 void* SKIP_context_init(char* obj) {
-  head = NULL;
-  page = NULL;
-  end = NULL;
   *context = SKIP_intern_shared(obj);
   return obj;
 }
