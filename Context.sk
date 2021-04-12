@@ -461,10 +461,7 @@ mutable class Context{
         data = dir.data;
         for (key in keys) {
           data.maybeGet(key) match {
-          | Some(LDefined(_, newDirs, reads)) ->
-            for (newDir in newDirs) {
-              this.removeDir(newDir);
-            };
+          | Some(LDefined(_, reads)) ->
             for (read in reads) {
               this.!deps = this.deps.remove(
                 read,

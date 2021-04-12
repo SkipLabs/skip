@@ -5,7 +5,7 @@ module SKFS;
 
 base class LazyResult {
   children =
-  | LDefined(Array<File>, Array<DirName>, Array<Path>)
+  | LDefined(Array<File>, Array<Path>)
   | LAbsent()
   | LDelayed()
 }
@@ -54,16 +54,13 @@ class LazyDir{
     time = context.timeStamp();
     lazyFun = (context: mutable Context, key: BaseName) ~> {
       readsCopy = context.reads;
-      newDirsCopy = context.newDirs;
       context.!reads = SortedSet[];
-      context.!newDirs = SortedSet[];
 
       resultOpt = f(context, dirName, key);
 
       result = resultOpt match {
       | None() -> LAbsent()
-      | Some(x) ->
-        LDefined(x, context.newDirs.toArray(), context.reads.toArray())
+      | Some(x) -> LDefined(x, context.reads.toArray())
       };
 
       for (read in context.reads) {
@@ -81,7 +78,6 @@ class LazyDir{
         print_string(`WRITTEN LAZY:  ${name} => ${inspect(result)}`);
       };
       context.!reads = readsCopy;
-      context.!newDirs = newDirsCopy;
       result
     };
     newDir = LazyDir{time, dirName, lazyFun};
@@ -92,7 +88,7 @@ class LazyDir{
 
   fun getArrayRaw(key: BaseName): Array<File> {
     this.data.maybeGet(key) match {
-    | Some(LDefined(arr, _, _)) -> arr
+    | Some(LDefined(arr, _)) -> arr
     | _ -> Array[]
     }
   }
@@ -158,10 +154,7 @@ class LazyDir{
     | Some(x) -> x
     };
     lazyResult match {
-    | LDefined(arr, newDirs, reads) ->
-      for (newDir in newDirs) {
-        context.!newDirs = context.newDirs.set(newDir);
-      };
+    | LDefined(arr, reads) ->
       for (read in reads) {
         context.!reads = context.reads.set(read);
       };
