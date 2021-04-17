@@ -33,6 +33,7 @@ value class Source private (value: Int) uses Orderable, Hashable {
 value class FixedRow<T>(
   key: BaseName,
   value: (Source, T),
+  tag: TimeTag,
 ) uses Hashable, Orderable {
   fun toKeyInt(): (BaseName, Int) {
     (this.key, this.value.i0.value.hash());
@@ -59,9 +60,11 @@ base class FixedData<T> {
   fun getArray(key: BaseName): Array<(Source, T)>;
   fun getIter(key: BaseName): mutable Iterator<(Source, T)>;
   fun getArraySourceKey(source: Source, key: BaseName): Array<T>;
+  fun getChangesAfter(time: Int): Set<BaseName>;
 }
 
 class CompressedDir<T, Compressed>{
+  time: Int,
   data: Array<Compressed> = Array[],
   decompress: (Int, Compressed) ~> FixedRow<T>,
 } extends FixedData<T> {
@@ -128,9 +131,40 @@ class CompressedDir<T, Compressed>{
   fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
     this.getIterSourceKey(source, key).collect(Array)
   }
+
+  fun getChangesAfter(time: Int): Set<BaseName> {
+    if (time > this.time) return Set[];
+    acc = mutable Set[];
+    for (idx => value in this.data) {
+      acc.insert(this.decompress(idx, value).key);
+    };
+    acc.chill()
+  }
 }
 
-class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
+class FixedDir<T> private {
+  data: Array<FixedRow<T>> = Array[],
+} extends FixedData<T> {
+  static fun create(data: Array<FixedRow<T>>): this {
+    result = data.clone();
+    _ = static::computeTags(result, 0, result.size() - 1);
+    FixedDir{data => result.chill()}
+  }
+
+  static fun fromDMap(dmap: DMap<BaseName, SortedMap<Source, T>>): this {
+    acc = mutable Vector[];
+    dmap.itemsWithTime().each(item -> {
+      (key, valueMap, time) = item;
+      for (source => value in valueMap) {
+        acc.push(FixedRow(key, (source, value), time))
+      }
+    });
+    data = acc.toArray();
+    result = data.clone();
+    _ = static::computeTags(result, 0, result.size() - 1);
+    FixedDir{data => result.chill()}
+  }
+
   fun size(): Int {
     this.data.size()
   }
@@ -211,6 +245,74 @@ class FixedDir<T>{data: Array<FixedRow<T>> = Array[]} extends FixedData<T> {
 
   fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
     this.getIterSourceKey(source, key).collect(Array)
+  }
+
+  static fun computeTags(
+    array: mutable Array<FixedRow<T>>,
+    i: Int,
+    j: Int,
+  ): TimeTag {
+    if (i > j) {
+      if (i < 0 || i >= array.size()) {
+        return TimeTag::create(0)
+      } else {
+        loop {
+          elt = array[i];
+          key = elt.key;
+          maxVal = elt.tag.max;
+          loop {
+            !i = i + 1;
+            if (i >= array.size() || array[i].key != key) {
+              return TimeTag(maxVal, maxVal)
+            };
+            !maxVal = max(maxVal, array[i].tag.max);
+          }
+        }
+      }
+    };
+    pivot = (i + j) / 2;
+    elt = array[pivot];
+    tag = elt.tag;
+    left = static::computeTags(array, i, pivot - 1);
+    right = static::computeTags(array, pivot + 1, j);
+    !tag.max = max(tag.max, max(left.max, right.max));
+    array![pivot] = elt with {tag};
+    tag
+  }
+
+  fun getChangesAcc(
+    after: Int,
+    acc: mutable Vector<BaseName>,
+    i: Int,
+    j: Int,
+  ): void {
+    if (i < 0 || i >= this.data.size()) {
+      return void
+    };
+    if (i > j) {
+      time = this.data[i].tag;
+      if (time.max < after) return void;
+      if (time.current >= after) {
+        acc.push(this.data[i].key);
+      };
+      return void;
+    };
+    pivot = (i + j) / 2;
+    elt = this.data[pivot];
+    time = elt.tag;
+    if (time.max < after) return void;
+    if (time.current >= after) {
+      acc.push(elt.key);
+    };
+    this.getChangesAcc(after, acc, i, pivot - 1);
+    this.getChangesAcc(after, acc, pivot + 1, j);
+  }
+
+  fun getChangesAfter(time: Int): Set<BaseName> {
+    acc = mutable Vector[];
+    this.getChangesAcc(time, acc, 0, this.data.size() - 1);
+    acc.sort();
+    acc.unique().collect(Set)
   }
 }
 

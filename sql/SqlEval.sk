@@ -236,11 +236,12 @@ mutable class Evaluator{
     init: Array<Row> = Array[],
   ): void {
     dirName = dirDescr.dirName;
+    tag = SKFS.TimeTag::create(context.timeStamp());
     _ = context.mkdirCompressed(Row::fromFile, dirName, init, (idx, row) ~> {
       file: SKFS.File = row;
       key = SKFS.IID(idx);
       path = SKFS.Path::create(dirName, key);
-      SKFS.FixedRow(key, (SKFS.Source::create(path), Array[file]))
+      SKFS.FixedRow(key, (SKFS.Source::create(path), Array[file]), tag)
     });
     tables = getTableDir(context);
     context

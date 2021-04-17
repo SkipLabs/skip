@@ -95,6 +95,20 @@ base class DMap<Key: FileName, Value> {
     this.items().filter(cond).next().map(x -> x.i0)
   }
 
+  fun itemsWithTime(): mutable Iterator<(Key, Value, TimeTag)> {
+    this match {
+    | Nil() -> void
+    | Node{time, key, value, left, right} ->
+      for (x in left.itemsWithTime()) {
+        yield x;
+      };
+      yield (key, value, time);
+      for (x in right.itemsWithTime()) {
+        yield x;
+      }
+    }
+  }
+
   fun eachWithTime(f: (Key, Int) -> void): void
   | Nil() -> void
   | Node{key, time, left, right} ->
@@ -114,18 +128,18 @@ base class DMap<Key: FileName, Value> {
     Nil()
   }
 
-  fun getChangesAcc(after: Int, acc: mutable Vector<(Key, Value)>): void
+  fun getChangesAcc(after: Int, acc: mutable Set<Key>): void
   | Nil() -> void
-  | Node{time, key, value, left, right} ->
+  | Node{time, key, left, right} ->
     if (time.max < after) return void;
     if (time.current >= after) {
-      acc.push((key, value));
+      acc.insert(key);
     };
     left.getChangesAcc(after, acc);
     right.getChangesAcc(after, acc)
 
-  fun getChangesAfter(time: Int): Vector<(Key, Value)> {
-    acc = mutable Vector[];
+  fun getChangesAfter(time: Int): Set<Key> {
+    acc = mutable Set[];
     this.getChangesAcc(time, acc);
     unsafe_chill_trust_me(acc)
   }
@@ -302,7 +316,7 @@ fun testDMap(): void {
   !x = x.set(SKFS.TimeTag::create(1), SKFS.IID(3), 3);
   !x = x.set(SKFS.TimeTag::create(2), SKFS.IID(1), 23);
   expectEq("Changes after", Array[1, 2, 3], () ->
-    x.getChangesAfter(1).toArray().map(x -> x.i0.hashTag)
+    x.getChangesAfter(1).toArray().map(x -> x.hashTag)
   );
   void
 }

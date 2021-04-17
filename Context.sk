@@ -382,7 +382,7 @@ mutable class Context{
           input => false,
           dirName => preDirName,
           totalSize => 0,
-          fixedData => FixedDir{},
+          fixedData => FixedDir::create(Array[]),
           creator => this.currentArrow(),
         };
         dir.unsafeIterKeys((key, _time) -> {
@@ -398,8 +398,7 @@ mutable class Context{
         updateDirtyReaders(this, Path::create(preDirName.tag(), DIR_TAG));
         this.setDir(preDirName, preDir)
       | Some(preDir) ->
-        for (kv in dir.data.getChangesAfter(this.tick - 1)) {
-          (key, _) = kv;
+        for (key in dir.getChangesAfter(this.tick - 1)) {
           values = dir.getArrayRaw(key).collect(Array);
           !preDir = preDir.writeEntry(
             this,
@@ -616,6 +615,8 @@ mutable class Context{
     vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
     valueAcc = mutable Vector[];
     last: ?BaseName = None();
+    time = this.timeStamp();
+
     for (kv in content) {
       (key, values) = kv;
       last match {
@@ -625,7 +626,9 @@ mutable class Context{
       | Some(oldKey) if (oldKey == key) -> valueAcc.extend(values)
       | Some(oldKey) ->
         path = Source::create(Path::create(dirName, oldKey));
-        vector.push(FixedRow(oldKey, (path, valueAcc.toArray())));
+        vector.push(
+          FixedRow(oldKey, (path, valueAcc.toArray()), TimeTag::create(time)),
+        );
         !last = Some(key);
         valueAcc.clear();
         valueAcc.extend(values)
@@ -635,11 +638,12 @@ mutable class Context{
     | None() -> void
     | Some(key) ->
       path = Source::create(Path::create(dirName, key));
-      vector.push(FixedRow(key, (path, valueAcc.toArray())))
+      vector.push(
+        FixedRow(key, (path, valueAcc.toArray()), TimeTag::create(time)),
+      )
     };
-    fixedData = FixedDir{data => vector.toArray()};
+    fixedData = FixedDir::create(vector.toArray());
 
-    time = this.timeStamp();
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
     dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};
@@ -656,9 +660,9 @@ mutable class Context{
     if (this.dirs.state.containsKey(dirName)) {
       throw DirAlreadyExists(dirName);
     };
-    fixedData = CompressedDir{data => content, decompress};
-
     time = this.timeStamp();
+    fixedData = CompressedDir{time, data => content, decompress};
+
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
     dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};

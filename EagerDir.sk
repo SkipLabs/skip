@@ -186,7 +186,8 @@ class EagerDir{
   fun purgeData(): SKFS.FixedData<Array<SKFS.File>> {
     current = 0;
     acc = mutable Vector[];
-    for (key => map in this.data) {
+
+    this.data.eachWithTime((key, time) -> {
       while (
         current < this.fixedData.size() &&
         this.fixedData[current].key < key
@@ -194,6 +195,7 @@ class EagerDir{
         acc.push(this.fixedData[current]);
         !current = current + 1;
       };
+      map = this.data.maybeGet(key).fromSome();
       for (source => values in map) {
         while (
           current < this.fixedData.size() &&
@@ -204,7 +206,7 @@ class EagerDir{
           !current = current + 1;
         };
         if (values.size() > 0) {
-          acc.push(FixedRow(key, (source, values)));
+          acc.push(FixedRow(key, (source, values), TimeTag::create(time)));
         };
         while (
           current < this.fixedData.size() &&
@@ -221,12 +223,12 @@ class EagerDir{
         acc.push(this.fixedData[current]);
         !current = current + 1;
       };
-    };
+    });
     while (current < this.fixedData.size()) {
       acc.push(this.fixedData[current]);
       !current = current + 1;
     };
-    FixedDir{data => acc.toArray()};
+    FixedDir::create(acc.toArray());
   }
 
   fun purge(): this {
@@ -238,8 +240,13 @@ class EagerDir{
   fun isInput(): Bool {
     this.input
   }
+
   fun getTime(): Int {
     this.time
+  }
+
+  fun getChangesAfter(time: Int): Set<BaseName> {
+    this.data.getChangesAfter(time).union(this.fixedData.getChangesAfter(time))
   }
 
   private static fun fixedMapData(
@@ -475,10 +482,11 @@ class EagerDir{
 
     path = Path::create(parentName, key);
     source = Source::create(path);
+    time = context.timeStamp();
 
     for (kv in kvArray) {
       (k, v) = kv;
-      acc.push(FixedRow(k, (source, v)))
+      acc.push(FixedRow(k, (source, v), TimeTag::create(time)))
     };
 
     if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
@@ -575,14 +583,14 @@ class EagerDir{
     };
 
     acc.sort();
-    fixedData = FixedDir{data => acc.toArray()};
+    fixedData = FixedDir::create(acc.toArray());
     time = context.timeStamp();
     totalSize = fixedData.size();
     (!fixedData, compactor) = compactorOpt match {
     | None() -> (fixedData, None())
     | Some(icompactor) ->
       (
-        if (icompactor.canReset) fixedData else FixedDir{},
+        if (icompactor.canReset) fixedData else FixedDir::create(Array[]),
         Some(Compactor::create(fixedData, icompactor)),
       )
     };
