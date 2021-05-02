@@ -50,6 +50,7 @@ class LazyDir{
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, DirName, BaseName) ~> ?Array<File>,
+    collect: Bool = true,
   ): Dir {
     time = context.timeStamp();
     lazyFun = (context: mutable Context, key: BaseName) ~> {
@@ -70,7 +71,9 @@ class LazyDir{
 
       dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = result;
-      context.!lazyGets = context.lazyGets.set(Path::create(dirName, key));
+      if (collect) {
+        context.!lazyGets = context.lazyGets.set(Path::create(dirName, key));
+      };
 
       context.setDir(dirName, dir);
       if (context.debugMode) {
