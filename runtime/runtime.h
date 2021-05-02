@@ -195,5 +195,17 @@ void* memset(void *, int, unsigned long);
 size_t sk_page_size(char* page);
 int sk_is_large_page(char* page);
 void sk_obstack_attach_page(char* lpage);
+void SKIP_context_set(char* obj);
+char* SKIP_context_get();
+void SKIP_context_set_unsafe(char* obj);
+char* SKIP_context_get_unsafe();
+void sk_commit();
+void sk_staging();
+void SKIP_syncContext(uint64_t, char* context, char* obj);
+SkipInt SKIP_isEq(char* obj1, char* obj2);
+void sk_global_lock();
+void sk_global_unlock();
+char* sk_new_const(char* cst);
+void sk_persist_consts();
 
 #endif

@@ -73,7 +73,7 @@ void sk_obstack_attach_page(char* lpage) {
 char* sk_large_page(size_t size) {
   size_t block_size = size + sizeof(char*) + sizeof(size_t);
   block_size += 64;
-  char* lpage = (char*)sk_palloc(block_size);
+  char* lpage = (char*)sk_malloc(block_size);
   if(lpage == NULL) {
     #ifdef SKIP64
     fprintf(stderr, "Out of memory\n");
@@ -91,7 +91,7 @@ char* sk_large_page(size_t size) {
 
 void sk_new_page() {
   size_t block_size = PAGE_SIZE;
-  head = (char*)sk_palloc(block_size);
+  head = (char*)sk_malloc(block_size);
   if(head == NULL) {
     #ifdef SKIP64
     fprintf(stderr, "Out of memory\n");
@@ -233,7 +233,7 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
     char* tofree = page;
     size_t tosk_free_size = sk_page_size(page);
     page = *(char**)page;
-    sk_pfree_size(tofree, tosk_free_size);
+    sk_free_size(tofree, tosk_free_size);
     if(page == NULL) {
       head = NULL;
       page = NULL;
@@ -263,7 +263,7 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
     if((uint64_t)pages[i].key != pages[i].value) {
       char* fpage = (char*)(pages[i].key);
       size_t fnbr_pages = *(size_t*)(fpage + sizeof(char*));
-      sk_pfree_size(fpage, fnbr_pages);
+      sk_free_size(fpage, fnbr_pages);
     }
   }
 
@@ -304,15 +304,15 @@ static void heapify(sk_cell_t* arr, int n, int i) {
   int largest = i;
   int l = 2 * i + 1;
   int r = 2 * i + 2;
-  
+
   if (l < n && arr[l].key > arr[largest].key) {
     largest = l;
   }
-  
+
   if (r < n && arr[r].key > arr[largest].key) {
     largest = r;
   }
- 
+
   if (largest != i) {
     sk_cell_t tmp = arr[i];
     arr[i] = arr[largest];
@@ -320,12 +320,12 @@ static void heapify(sk_cell_t* arr, int n, int i) {
     heapify(arr, n, largest);
   }
 }
- 
+
 static void heap_sort(sk_cell_t* arr, int n) {
   for (int i = n / 2 - 1; i >= 0; i--) {
     heapify(arr, n, i);
   }
- 
+
   for (int i = n - 1; i > 0; i--) {
     sk_cell_t tmp = arr[0];
     arr[0] = arr[i];

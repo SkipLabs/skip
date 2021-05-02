@@ -606,11 +606,6 @@ fun updateProgram(
 /* Test. */
 /*****************************************************************************/
 
-@cpp_noinline
-fun updateContext(context: mutable SKFS.Context): mutable SKFS.Context {
-  SKFS.Context::fromSaved(SKFS.gContextSync(context.clone()));
-}
-
 @cpp_extern("SKIP_check_memory")
 native fun .checkMemory(): void;
 
@@ -630,14 +625,10 @@ fun testStress(): mutable SKFS.Context {
     });
     if (context.debugMode) print_string("Initialization finished");
     prog = updateProgram(context, origProg, 0);
-    !context = updateContext(context);
     context.update();
-    !context = updateContext(context);
     context.setGlobal("PROG", prog);
     for (i in Range(1, config.nbrDiffRounds)) {
       !prog = SKFS.withRegion(context, (_, context) ~> {
-        //        print_string(inspect(context).toString().length());
-        // print_string("Round: " + i);
         lprog = context.getGlobal("PROG") match {
         | Some(x @ Program _) -> x
         | _ -> invariant_violation("Was expecting a program")

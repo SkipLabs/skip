@@ -274,5 +274,5 @@ void* SKIP_intern_shared(void* obj) {
 }
 
 void* SKIP_intern(void* obj) {
-  return SKIP_intern_shared(obj);
+  return sk_new_const(obj);
 }

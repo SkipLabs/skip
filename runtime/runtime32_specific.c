@@ -37,7 +37,52 @@ int sk_is_static(void* ptr) {
   return (char*)ptr < end_of_static;
 }
 
+void sk_staging() {
+}
+
+void sk_commit() {
+}
+
 char* SKIP_read_file(char* filename_obj) {
   SKIP_throw((void*)0);
   return (void*)0;
+}
+
+void** context;
+
+char* SKIP_context_get() {
+  return *context;
+}
+
+void SKIP_context_set(char* obj) {
+  *context = obj;
+}
+
+char* SKIP_context_get_unsafe() {
+  return *context;
+}
+
+void SKIP_context_set_unsafe(char* obj) {
+  *context = obj;
+}
+
+SkipInt SKIP_genSym(SkipInt n) {
+  static SkipInt x = 1;
+  x++;
+  return x;
+}
+
+char* sk_new_const(char* cst) {
+  return SKIP_intern_shared(cst);
+}
+
+void SKIP_throw_EndOfFile();
+
+int SKIP_getchar() {
+  SKIP_throw_EndOfFile();
+  return 0;
+}
+
+int SKIP_isatty() {
+  return 0;
 }

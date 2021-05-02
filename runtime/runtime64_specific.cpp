@@ -55,6 +55,18 @@ uint32_t SKIP_read_line_get(uint32_t i) {
   return lineBuffer[i];
 }
 
+uint32_t SKIP_getchar(uint64_t) {
+  int c = std::getchar();
+  if(c == EOF) {
+    SKIP_throw_EndOfFile();
+  }
+  return (uint32_t)c;
+}
+
+uint32_t SKIP_isatty() {
+  return (uint32_t)isatty(fileno(stdin));
+}
+
 thread_local void* exn;
 
 void* SKIP_getExn() {
@@ -77,30 +89,15 @@ char* SKIP_getArgN(uint32_t n) {
   return sk_string_create(argv[n], strlen(argv[n]));
 }
 
-pthread_mutex_t glock;
-void sk_memory_check_init();
-void sk_memory_check_init_over();
-void sk_new_page(size_t size);
-void SKIP_memory_init();
-void SKIP_destroy_Obstack(char*);
-void* get_pages(size_t);
-size_t nbr_pages();
-int is_in_obstack(void*, void*, size_t);
-extern __thread char* head;
-extern __thread void* break_ptr;
+void SKIP_memory_init(int pargc, char** pargv);
+void sk_persist_consts();
 
 int main(int pargc, char** pargv) {
-  pthread_mutex_init(&glock, NULL);
-  break_ptr = sbrk(0);
-  sk_memory_check_init();
   argc = pargc;
   argv = pargv;
-  SKIP_memory_init();
+  SKIP_memory_init(pargc, pargv);
   SKIP_initializeSkip();
-  if(head != NULL) {
-    SKIP_destroy_Obstack(NULL);
-  }
-  sk_memory_check_init_over();
+  sk_persist_consts();
   skip_main();
 }
 
@@ -125,14 +122,6 @@ void print_string(char* str) {
 void SKIP_print_error(char* str) {
   print(stderr, str);
   fprintf(stderr, "\n");
-}
-
-void SKIP_glock() {
-  pthread_mutex_lock(&glock);
-}
-
-void SKIP_gunlock() {
-  pthread_mutex_unlock(&glock);
 }
 
 char* sk_string_alloc(size_t);

@@ -3,7 +3,7 @@ const fs = require('fs');
 var source = fs.readFileSync('./build/out32.wasm');
 
 var instance = null;
-var args = ['all'];
+var args = ['--all'];
 
 function encodeUTF8(s) {
   var data = new Uint8Array(instance.exports.memory.buffer);

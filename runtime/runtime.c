@@ -1,5 +1,9 @@
 #include "runtime.h"
 
+#ifdef SKIP64
+#include <unistd.h>
+#endif
+
 /*****************************************************************************/
 /* Primitives that are not used in embedded mode. */
 /*****************************************************************************/
@@ -7,8 +11,10 @@
 void SKIP_Regex_initialize() {
 }
 
-void SKIP_internalExit() {
-  todo();
+void SKIP_internalExit(uint64_t code) {
+  #ifdef SKIP64
+  _exit(code);
+  #endif
 }
 
 void SKIP_print_last_exception_stack_trace_and_exit() {
@@ -33,46 +39,28 @@ void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
 }
 
 /*****************************************************************************/
-/* Primite used for testing purposes. */
-/*****************************************************************************/
-#define MAGIC_NUMBER 232131
-
-void* SKIP_make_C_object() {
-  uint32_t* obj = (uint32_t*)sk_malloc(sizeof(uint32_t));
-  *obj = MAGIC_NUMBER;
-  return (void*)obj;
-}
-
-uint32_t SKIP_is_C_object(uint32_t* obj) {
-  return (*obj == MAGIC_NUMBER);
-}
-
-extern void skip_main(void);
-
-/*****************************************************************************/
 /* Global context synchronization. */
 /*****************************************************************************/
 
-void** context;
-
-extern __thread char* page;
-extern __thread char* head;
-extern __thread char* end;
-
 void* SKIP_context_init(char* obj) {
-  *context = SKIP_intern_shared(obj);
-  return obj;
+  void* context = SKIP_context_get();
+  if(context == NULL) {
+    sk_global_lock();
+    context = SKIP_intern_shared(obj);
+    SKIP_context_set_unsafe(context);
+    sk_global_unlock();
+  }
+  return context;
 }
 
-char* SKIP_context_get() {
-  return *context;
-}
-
-extern size_t total_palloc_size;
-
-void* SKIP_context_sync(char* obj) {
+void* SKIP_context_sync(uint64_t txTime, char* old_context, char* obj) {
+  sk_staging();
+  char* context = SKIP_context_get_unsafe();
+  SKIP_syncContext(txTime, context, obj);
   char* new_obj = SKIP_intern_shared(obj);
-  SKIP_free(*context);
-  *context = new_obj;
+  SKIP_context_set_unsafe(new_obj);
+  SKIP_free(old_context);
+  SKIP_free(context);
+  sk_commit();
   return new_obj;
 }

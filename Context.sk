@@ -12,6 +12,13 @@
 module SKFS;
 
 /*****************************************************************************/
+/* Unique number generator. */
+/*****************************************************************************/
+
+@cpp_extern("SKIP_genSym")
+native fun genSym(Int): Int;
+
+/*****************************************************************************/
 /* Constants */
 /*****************************************************************************/
 
@@ -190,7 +197,7 @@ mutable class Context{
   mutable pwd: String = "/",
   mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
-  mutable time: Int = 1,
+  mutable time: Int = 0,
   mutable tick: Int = 1,
   mutable lazyCapacity: Int = 10,
   mutable toUpdate: SortedMap<(Int, Int), Arrow> = SortedMap[],
@@ -493,6 +500,7 @@ mutable class Context{
     };
 
     this.!tick = this.tick + 1;
+    _ = this.timeStamp();
 
     this.updateLazyGets();
 
@@ -584,7 +592,7 @@ mutable class Context{
   }
 
   mutable fun timeStamp(): Int {
-    this.!time = this.time + 1;
+    this.!time = genSym(this.time + 1);
     this.time
   }
 
@@ -646,7 +654,7 @@ mutable class Context{
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
     dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};
-    this.!dirs = this.dirs.set(dir.time, dirName, dir);
+    this.setDir(dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
   }
 
@@ -665,26 +673,13 @@ mutable class Context{
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
     dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};
-    this.!dirs = this.dirs.set(dir.time, dirName, dir);
+    this.setDir(dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
     EHandle(conv, dirName)
   }
 
   mutable fun setDir(dirName: DirName, dir: Dir): void {
-    /*
-    dirNamePwdStr = this.pwd.join("/");
-    dirNameStr = dirName.toString();
-    dirNameArr = dirNameStr.split("/");
-    if (dirNameArr.size() < 2) {
-      error(`Invalid directory name: ${dirNameStr}`);
-    };
-    lastDirName = dirNameArr[dirNameArr.size() - 2];
-    if (dirNamePwdStr + lastDirName + "/" != dirNameStr) {
-      error(`Cannot create directory ${dirNameStr} from path ${dirNamePwdStr}`);
-    };
-    */
-    // TODO: re-enable this when the dirNames are represented as lists
-    this.!dirs = this.dirs.set(dir.getTime(), dirName, dir);
+    this.!dirs = this.dirs.set(this.timeStamp(), dirName, dir);
   }
 
   mutable fun getDir(dirName: DirName): Dir {
@@ -826,6 +821,35 @@ class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   }
 }
 
+@cpp_export("SKIP_syncContext")
+fun syncContext(txTime: Int, newRoot: Context, ctx: mutable Context): void {
+  if (txTime == newRoot.time) return void;
+
+  context = Context::fromSaved(newRoot);
+
+  changedDirNames = ctx.dirs.state.getChangesAfter(txTime);
+  for (dirName in changedDirNames) {
+    ctx.unsafeMaybeGetDir(dirName) match {
+    | Some(dir @ EagerDir{input => true}) ->
+      changedKeys = dir.getChangesAfter(txTime);
+      context.unsafeMaybeGetDir(dirName) match {
+      | None() -> context.mkdirMulti(dirName, Array[])
+      | Some(EagerDir{input => true}) -> void
+      | Some(_) -> invariant_violation("Error: incompactible dir types")
+      };
+      for (key in changedKeys) {
+        values = dir.getArrayRaw(key);
+        inputDir = context.unsafeMaybeGetEagerDir(dirName).fromSome();
+        inputDir.writeArray(context, key, values);
+      }
+    | _ -> void
+    }
+  };
+
+  context.update();
+  ctx.replaceFromSaved(context.clone());
+}
+
 @cpp_extern
 private native base class Obstack
 
@@ -843,7 +867,7 @@ private native fun destroyObstackWithValue<T>(Obstack, List<T>): List<T>;
 
 @debug
 @cpp_extern("SKIP_context_sync")
-private native fun gContextSync(Context): Context;
+private native fun gContextSync(Int, Context, Context): Context;
 
 @debug
 @cpp_extern("SKIP_context_init")
@@ -869,25 +893,38 @@ native fun disableGC(): void;
 @cpp_extern("SKIP_enable_GC")
 native fun enableGC(): void;
 
+base class ContextOp {
+  children =
+  | CContinue(Context)
+  | CStop(Context)
+  | CAbort()
+}
+
 @cpp_noinline
 fun runWithGcReturnContext(
   origContext: Context,
-  f: Context ~> ?Context,
+  f: Context ~> ContextOp,
 ): mutable Context {
   context = gContextInit(origContext);
+  startTime = context.time;
   loop {
     pos = newObstack();
     newContextOpt = f(context);
     newContextOpt match {
-    | None() -> return Context::fromSaved(context)
-    | Some(newContext) ->
-      !context = gContextSync(newContext);
+    | CAbort() -> return Context::fromSaved(context)
+    | CContinue(newContext) ->
+      !context = gContextSync(startTime, context, newContext);
+      !startTime = context.time;
       destroyObstack(pos)
+    | CStop(newContext) ->
+      !context = gContextSync(startTime, context, newContext);
+      !startTime = context.time;
+      return Context::fromSaved(context)
     }
   }
 }
 
-fun runWithGc(origContext: Context, f: Context ~> ?Context): void {
+fun runWithGc(origContext: Context, f: Context ~> ContextOp): void {
   _ = runWithGcReturnContext(origContext, f);
 }
 

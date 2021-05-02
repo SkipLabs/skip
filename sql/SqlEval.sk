@@ -4,6 +4,7 @@
 module SKSQL;
 
 const INSERT_BUCKET_SIZE: Int = 100000;
+const PACK_INSERTS: Bool = true;
 
 fun computeTableDescr(name: String, schema: Array<TypeDescr>): DirDescr {
   dirNameStr = "/" + name + "/";
@@ -154,7 +155,7 @@ mutable class Evaluator{
   mutable fun newKey(dirName: String): SKFS.BaseName {
     result = this.tableCounters[dirName];
     this.!tableCounters[dirName] = result + 1;
-    SKFS.IID(result)
+    SKFS.IID(SKFS.genSym(result))
   }
 
   mutable fun stmtStr(
@@ -196,13 +197,11 @@ mutable class Evaluator{
       compiler = SKSQL.Compiler::create(selectAst.pos);
       select = compiler.compileSelect(context, selectAst);
       input = getSelectInputDir(context);
-      this.write(context, input.dirName, SKFS.SID::create(select.id), select);
-      context.update()
+      this.write(context, input.dirName, SKFS.SID::create(select.id), select)
     | index @ Index _ ->
       input = getIndexInputDir(context);
       this.write(context, input.dirName, SKFS.SID::create(index.name), index);
-      _ = getIndexOutputDir(context);
-      context.update()
+      _ = getIndexOutputDir(context)
     | _ -> invariant_violation("TODO rest of stmt in SqlEval.sk")
     /*
       | View{name: String, query: Query}
@@ -212,6 +211,7 @@ mutable class Evaluator{
       | Replace{name: String, values: InsertValues}
     */
     };
+    context.update();
   }
 
   mutable fun insert(
@@ -264,24 +264,25 @@ fun throwEndOfFile(): void {
 @cpp_extern("SKIP_String_concatN")
 native fun concatArray(Array<String>): String;
 
-@cpp_extern("SKIP_read_file")
-native fun read_file(String): String;
+@cpp_extern("SKIP_getchar")
+native fun getChar(Int): Char;
 
-fun read(fileNameOpt: ?String): String {
-  fileNameOpt match {
-  | None() ->
-    buffer = mutable Vector[];
-    vtry(
-      () ->
-        loop {
-          line = read_line();
-          buffer.push(line);
-          buffer.push("\n");
-        },
-      _endOfFile -> concatArray(buffer.toArray()),
-    )
-  | Some(fileName) -> read_file(fileName)
-  }
+@cpp_extern("SKIP_isatty")
+native fun isATTY(): UInt32;
+
+fun read(): String {
+  i = 0;
+  chars = mutable Vector[];
+  vtry(
+    () ->
+      loop {
+        c = getChar(i);
+        chars.push(c);
+        !i = i + 1;
+        if (c == ';') return String::fromChars(chars.toArray());
+      },
+    _endOfFile -> String::fromChars(chars.toArray()),
+  )
 }
 
 fun getLine(buffer: Buffer, pos: Int): Int {
@@ -484,6 +485,16 @@ fun evalWithContext(context: mutable SKFS.Context, packInserts: Bool): Bool {
   packInserts
 }
 
+/*
+fun setupContext(context: mutable SKFS.Context, buffer: Buffer): void {
+  evaluator = Evaluator::create(context).save();
+  inserts = SortedMap[];
+  context.!failOnExn = true;
+  origEnv = EvalExnEnv(ID, Lexer(0, buffer), 0, evaluator, inserts);
+  context.setGlobal("EvalExnEnv", origEnv);
+}
+*/
+
 fun setupContext(context: mutable SKFS.Context, buffer: Buffer): void {
   (evaluator, inserts) = context.getGlobal("EvalExnEnv") match {
   | None() -> (Evaluator::create(context).save(), SortedMap[])
@@ -493,33 +504,6 @@ fun setupContext(context: mutable SKFS.Context, buffer: Buffer): void {
   context.!failOnExn = true;
   origEnv = EvalExnEnv(Lexer(0, buffer), 0, evaluator, inserts);
   context.setGlobal("EvalExnEnv", origEnv);
-}
-
-fun evalExn(buffer: Buffer, packInserts: Bool): mutable SKFS.Context {
-  gcontext = mutable SKFS.Context{unsafeReuse => true};
-  setupContext(gcontext, buffer);
-  SKFS.disableGC();
-  SKFS.runWithGcReturnContext(gcontext.clone(), icontext ~> {
-    context = SKFS.Context::fromSaved(icontext);
-    shouldContinue = false;
-    /*    vtry(
-          () -> {
-    */
-    !shouldContinue = evalWithContext(context, packInserts);
-    /*      },
-          err -> {
-            err match {
-            | Error(pos, str) -> printErrorAndExit(buffer, pos, str)
-            | exn -> throw exn
-            }
-          },
-        );
-    */
-    if (shouldContinue) Some(context.clone()) else {
-      context.update();
-      None()
-    }
-  })
 }
 
 fun extractSql(chars: Buffer): void {
@@ -547,11 +531,38 @@ fun parseSql(buffer: Buffer): void {
   };
 }
 
-fun eval(args: Array<String>): mutable SKFS.Context {
-  buffer = Buffer(read(if (args.size() > 1) Some(args[1]) else None()));
-  //    context.!debugMode = true;
-  _fileName = if (args.size() == 0) "" else args[args.size() - 1];
-  //    print_string("ExceptionMode: " + exnMode);
-  //    print_string("FileName: " + fileName);
-  evalExn(buffer, true)
+fun makeSqlContext(): mutable SKFS.Context {
+  gcontext = mutable SKFS.Context{unsafeReuse => true};
+  SKFS.disableGC();
+  gcontext
+}
+
+fun eval(gcontext: mutable SKFS.Context): void {
+  SKFS.runWithGc(gcontext.clone(), icontext ~> {
+    context = SKFS.Context::fromSaved(icontext);
+    if (isATTY() != 0) {
+      print_raw("sqlive> ");
+    };
+    buffer = Buffer(read());
+    setupContext(context, buffer);
+    shouldContinue = false;
+    vtry(
+      () -> {
+        !shouldContinue = evalWithContext(context, PACK_INSERTS);
+      },
+      err -> {
+        err match {
+        | Error(pos, str) -> printErrorAndExit(buffer, pos, str)
+        | exn ->
+          print_error(exn.getMessage());
+          exit(44)
+        }
+      },
+    );
+
+    if (shouldContinue) SKFS.CContinue(context.clone()) else {
+      context.update();
+      SKFS.CStop(context.clone())
+    }
+  })
 }

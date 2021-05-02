@@ -233,12 +233,8 @@ untracked fun toplevel(topContext: mutable Context): void {
     prompt = env.pwd + "$ ";
     print_raw(prompt);
     cmd = vtry(() -> read_line(), _exn -> "");
-    if (cmd == "") return None();
+    if (cmd == "") return CAbort();
     if (isSQL(cmd)) {
-      if (!SKFS.isSqlMode) {
-        print_error("You cannot run an SQL query when not in SQL MODE");
-        return None();
-      };
       SKSQL.setupContext(context, SKSQL.Buffer(cmd));
       shouldContinue = SKSQL.evalWithContext(context, false);
       if (shouldContinue) {
@@ -249,6 +245,6 @@ untracked fun toplevel(topContext: mutable Context): void {
     };
     context.!pwd = env.pwd;
     context.update();
-    Some(context.clone())
+    CContinue(context.clone())
   })
 }

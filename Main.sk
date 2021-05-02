@@ -1,23 +1,43 @@
-module SKFS;
+module alias AP = ArgumentParser;
 
-const args: Array<String> = arguments();
-const isSqlMode: Bool = args.size() > 1 && args[0] == "sql";
+const argsSchema: Array<AP.Param> = Array[
+  AP.BoolParam{name => "all", help => "run all the tests", negatable => false},
+  AP.BoolParam{name => "debug", help => "", negatable => false},
+  AP.StringParam{name => "test", help => "The name of the test to run"},
+  AP.StringParam{name => "init", help => "Initializes a new data file"},
+  AP.StringParam{name => "data", help => "Loads an existing data file"},
+];
 
-module end;
+const parsedArgs: AP.ParseResult = AP.parse(argsSchema, arguments()) match {
+| Success(value) -> value
+| Failure(error) ->
+  print_error(error.getMessage());
+  exit(2)
+};
+
+const argMap: Map<String, AP.Value> = parsedArgs.argumentValues;
 
 untracked fun main(): void {
-  _ = SKFS.gContextInit(SKFS.Context{});
-  if (SKFS.args.size() == 0) {
-    print_error("Command parameters missing");
+  if (parsedArgs.unknown.size() != 0) {
+    unknownOptions = parsedArgs.unknown.filter(x ->
+      x != "" && x.getIter().next() == Some('-')
+    );
+    for (option in unknownOptions) {
+      if (option != "--help") print_error("Unknown option: " + option);
+    };
+    if (unknownOptions.size() != 0) {
+      print_error(AP.help(argsSchema));
+      exit(2);
+    }
+  };
+  argFiles = parsedArgs.unknown.toArray();
+  if (argFiles.size() > 0) {
+    for (file in argFiles) {
+      print_error("Error: don't know what to do with " + file);
+    };
     exit(2);
   };
-  SKFS.args[0] match {
-  | "sql" ->
-    context = SKSQL.eval(SKFS.args);
-    if (SKFS.args.size() > 1 && SKFS.args.contains("--toplevel")) {
-      SKFS.toplevel(context)
-    }
-  | "all" ->
+  if (argMap.maybeGet("all") is Some(AP.BoolValue _)) {
     testFuns = SKFSTest.getAllTests();
     for (testName => testFun in testFuns) {
       print_string(
@@ -29,26 +49,38 @@ untracked fun main(): void {
       );
       _ = testFun();
       print_string("");
+      return void;
     }
-  | "toplevel" | "test" ->
-    if (SKFS.args.size() <= 1) {
-      print_error("Error: missing test name");
-      exit(3);
-    };
+  } else if (argMap.maybeGet("test") is Some(AP.StringValue _)) {
     testFuns = SKFSTest.getAllTests();
-    testName = SKFS.args[1];
-    if (!testFuns.containsKey(testName)) {
-      print_error("Error: unknown test " + testName + "\n");
-      for (key => _ in testFuns) {
-        print_error("  " + key + "\n");
+    testName = argMap["test"] match {
+    | AP.StringValue{value => testName} ->
+      if (!testFuns.containsKey(testName)) {
+        print_error("Error: unknown test " + testName + "\n");
+        for (key => _ in testFuns) {
+          print_error("  " + key + "\n");
+        };
+        exit(4);
       };
-      exit(4);
+      testName
+    | _ ->
+      print_error("Invalid test name type");
+      exit(2)
     };
     context = testFuns[testName]();
-    _ = SKFS.gContextSync(context.clone());
-    if (SKFS.args[0] == "toplevel") {
+    if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
       SKFS.toplevel(context)
     }
-  | cmd -> print_error("Error: unknown command " + cmd + "\n")
+  } else if (argMap.maybeGet("init") is Some(AP.StringValue _)) {
+    SKFS.runWithGc(SKSQL.makeSqlContext().clone(), (ctx) ~> SKFS.CStop(ctx));
+    return void;
+  } else if (argMap.maybeGet("data") is Some(AP.StringValue _)) {
+    // this was handled in the C++ side
+    void
+  };
+  if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
+    SKFS.toplevel(mutable SKFS.Context{});
+  } else {
+    SKSQL.eval(SKSQL.makeSqlContext())
   }
 }

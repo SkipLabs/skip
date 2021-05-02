@@ -4,7 +4,7 @@ SKC=~/skip/build/bin/skip_to_llvm
 BCLINK=llvm-link-10
 MEMSIZE32=1073741824
 
-OLEVEL=-O3
+OLEVEL=-O0 -g
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
@@ -24,10 +24,15 @@ CFILES=\
 	runtime/string.c \
 	runtime/native_eq.c 
 
+NATIVE_FILES=\
+	runtime/palloc.c\
+	runtime/consts.c
+
 CFILES32=$(CFILES) runtime/runtime32_specific.c
-CFILES64=$(CFILES) runtime/runtime64_specific.cpp runtime/alloc.c
+CFILES64=$(CFILES) runtime/runtime64_specific.cpp $(NATIVE_FILES)
 BCFILES32=$(addprefix build/,$(CFILES32:.c=.bc))
 OFILES=$(addprefix build/,$(CFILES:.c=.o))
+ONATIVE_FILES=build/magic.h $(addprefix build/,$(NATIVE_FILES:.c=.o))
 
 SKFUNS=\
 	getCompositeName \
@@ -46,11 +51,15 @@ SKFUNS=\
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
-default: build/out32.wasm build/a.out
+default: build/out32.wasm build/sqlive
 
-test: build/out32.wasm build/a.out
+build/magic.h:
+	echo -n "#define MAGIC " > build/magic.h
+	date | cksum | awk '{print $$1}' >> build/magic.h
+
+test: build/out32.wasm build/sqlive
 	node run.js
-	build/a.out all
+	build/sqlive all
 
 build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	cat preamble32.ll build/out32.ll > build/preamble_and_out32.ll
@@ -69,16 +78,16 @@ build/%.bc: %.c
 	mkdir -p build/runtime
 	$(CC) $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
 
-build/a.out: build/out64.ll build/libskip_runtime64.a
+build/sqlive: build/out64.ll build/libskip_runtime64.a
 	cat preamble64.ll build/out64.ll > build/preamble_and_out64.ll
-	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -o build/a.out
+	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -lpthread -o build/sqlive
 
 build/out64.ll: $(SKIP_FILES)
 	mkdir -p build/
 	$(SKC) --embedded64 . --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
 
-build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o build/runtime/alloc.o
-	ar rcs build/libskip_runtime64.a $(OFILES) build/runtime/runtime64_specific.o build/runtime/alloc.o
+build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o $(ONATIVE_FILES)
+	ar rcs build/libskip_runtime64.a $(OFILES) build/runtime/runtime64_specific.o $(ONATIVE_FILES)
 
 build/runtime/runtime64_specific.o: runtime/runtime64_specific.cpp
 	$(CPP) $(OLEVEL) -c runtime/runtime64_specific.cpp -o build/runtime/runtime64_specific.o

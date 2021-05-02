@@ -15,6 +15,8 @@ void free(void*);
 /*****************************************************************************/
 /* Free table. */
 /*****************************************************************************/
+
+#ifdef SKIP32
 void** sk_ftable;
 
 size_t sk_bit_size(size_t size) {
@@ -41,6 +43,7 @@ void* sk_get_ftable(size_t size) {
   sk_ftable[slot] = *(void**)sk_ftable[slot];
   return ptr;
 }
+#endif
 
 /*****************************************************************************/
 /* Common primitives . */
