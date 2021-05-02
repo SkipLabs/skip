@@ -130,11 +130,11 @@ class LazyDir{
             print_string("LAZY REUSING KEY: " + key);
           };
           continue;
-        }
-      | None() -> void
+        };
+        !this.data[key] = newData;
+        if (!(oldData is LAbsent _)) updateDirtyReaders(context, path)
+      | None() -> !this.data[key] = newData
       };
-      !this.data[key] = newData;
-      updateDirtyReaders(context, path);
     };
     context.setDir(this.dirName, this);
   }
