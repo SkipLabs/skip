@@ -84,9 +84,17 @@ class LazyDir{
       result
     };
     newDir = LazyDir{time, dirName, lazyFun};
-    updateDirtyReaders(context, Path::create(dirName.tag(), DIR_TAG));
-    context.setDir(dirName, newDir);
-    newDir
+    context.maybeGetLazyDir(dirName) match {
+    | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
+      if (context.debugMode) {
+        print_string(`REUSING: ${dirName.toString()}`);
+      };
+      ldir
+    | _ ->
+      updateDirtyReaders(context, Path::create(dirName.tag(), DIR_TAG));
+      context.setDir(dirName, newDir);
+      newDir
+    }
   }
 
   fun getArrayRaw(key: BaseName): Array<File> {
