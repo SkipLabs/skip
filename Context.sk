@@ -23,6 +23,60 @@ const dummyDirty: Map<DirName, Set<BaseName>> = Map[];
 const dummyDirtyReaders: Map<DirName, Map<DirName, Set<BaseName>>> = Map[];
 
 /*****************************************************************************/
+/* ReadSet */
+/*****************************************************************************/
+
+class Read(path: Path, calls: ReadSet) uses Orderable, Hashable {
+  fun compare(y: Read): Order {
+    this.path.compare(y.path)
+  }
+
+  fun hash(): Int {
+    this.path.hash()
+  }
+}
+
+class ReadSet(reads: SortedSet<Read>) {
+  static fun createFromItems(reads: Array<Read>): this {
+    static(SortedSet::createFromItems(reads))
+  }
+
+  fun isEmpty(): Bool {
+    this.reads.isEmpty()
+  }
+
+  fun set(path: Path): this {
+    !this.reads = this.reads.set(Read(path, ReadSet[]));
+    this
+  }
+
+  fun addCall(path: Path, rset: ReadSet): this {
+    !this.reads = this.reads.set(Read(path, rset));
+    this
+  }
+
+  fun valueAcc(acc: mutable Set<Path>): void {
+    for (elt in this.reads) {
+      acc.insert(elt.path);
+      for (sub in elt.calls.reads.values()) {
+        acc.insert(sub.path);
+        sub.calls.valueAcc(acc)
+      }
+    }
+  }
+
+  fun toSet(): readonly Set<Path> {
+    acc = mutable Set[];
+    this.valueAcc(acc);
+    acc
+  }
+
+  fun values(): mutable Iterator<Path> {
+    this.toSet().values()
+  }
+}
+
+/*****************************************************************************/
 /* The types used to manage dependencies. */
 /*****************************************************************************/
 
@@ -186,7 +240,7 @@ value class Deps(
 mutable class Context{
   mutable pwd: String = "/",
   mutable dirs: Dirs = Dirs{},
-  mutable reads: SortedSet<Path> = SortedSet[],
+  mutable reads: ReadSet = ReadSet[],
   mutable time: Int = 1,
   mutable tick: Int = 1,
   mutable lazyCapacity: Int = 10,
@@ -307,7 +361,7 @@ mutable class Context{
     this.!reallyRemoveDir = ctx.reallyRemoveDir;
   }
 
-  mutable fun getReads(): SortedSet<Path> {
+  mutable fun getReads(): ReadSet {
     this.reads
   }
 
@@ -353,7 +407,7 @@ mutable class Context{
     values
   }
 
-  mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
+  mutable fun updateNewDeps(reader: ArrowKey, reads: ReadSet): void {
     readSet = mutable Set[];
     for (read in reads) {
       readSet.insert(read);
