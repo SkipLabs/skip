@@ -165,7 +165,11 @@ class LazyDir{
     | Some(x) -> x
     };
     lazyResult match {
-    | LDefined(arr, _) -> arr
+    | LDefined(arr, reads) ->
+      for (read in reads) {
+        context.!reads = context.reads.set(read);
+      };
+      arr
     | _ -> Array[]
     }
   }
