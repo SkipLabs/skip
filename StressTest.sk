@@ -13,7 +13,7 @@ base class RNbr {
 
 class Config{
   nbrInputs: RNbr = RRange(1, 5),
-  nbrDiffRounds: Int = 1000,
+  nbrDiffRounds: Int = 2,
   nbrParents: RNbr = RRange(1, 5),
   inputSize: RNbr = RRange(1, 5),
   missingKey: RNbr = RProb(40),
@@ -635,7 +635,7 @@ fun testStress(): mutable SKFS.Context {
     context.setGlobal("PROG", prog);
     for (i in Range(1, config.nbrDiffRounds)) {
       !prog = SKFS.withRegion(context, (_, context) ~> {
-        print_string(inspect(context.deps).toString().length());
+        //        print_string(inspect(context).toString().length());
         // print_string("Round: " + i);
         lprog = context.getGlobal("PROG") match {
         | Some(x @ Program _) -> x

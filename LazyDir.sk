@@ -5,7 +5,7 @@ module SKFS;
 
 base class LazyResult {
   children =
-  | LDefined(Array<File>, ReadSet)
+  | LDefined(Array<File>, Array<Path>)
   | LAbsent()
   | LDelayed()
 }
@@ -15,7 +15,6 @@ class LazyDir{
   dirName: DirName,
   data: SortedMap<BaseName, LazyResult> = SortedMap[],
   lazyFun: ((mutable Context, BaseName) ~> LazyResult),
-  collect: Bool,
 } extends Dir {
   fun isInput(): Bool {
     false
@@ -56,13 +55,13 @@ class LazyDir{
     time = context.timeStamp();
     lazyFun = (context: mutable Context, key: BaseName) ~> {
       readsCopy = context.reads;
-      context.!reads = ReadSet[];
+      context.!reads = SortedSet[];
 
       resultOpt = f(context, dirName, key);
 
       result = resultOpt match {
       | None() -> LAbsent()
-      | Some(x) -> LDefined(x, context.reads)
+      | Some(x) -> LDefined(x, context.reads.toArray())
       };
 
       for (read in context.reads) {
@@ -84,7 +83,7 @@ class LazyDir{
       context.!reads = readsCopy;
       result
     };
-    newDir = LazyDir{time, dirName, lazyFun, collect};
+    newDir = LazyDir{time, dirName, lazyFun};
     context.maybeGetLazyDir(dirName) match {
     | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
       if (context.debugMode) {
@@ -167,9 +166,8 @@ class LazyDir{
     };
     lazyResult match {
     | LDefined(arr, reads) ->
-      if (this.collect) {
-        path = Path::create(this.dirName, key);
-        context.!reads = context.reads.addCall(path, reads);
+      for (read in reads) {
+        context.!reads = context.reads.set(read);
       };
       arr
     | _ -> Array[]

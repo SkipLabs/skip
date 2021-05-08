@@ -122,13 +122,13 @@ value class KeyRange(start: BaseName, end: BaseName) uses Orderable, Show {
 value class MInfo(
   keys: Array<BaseName>,
   newDirs: Array<DirName>,
-  reads: ReadSet,
+  reads: Array<Path>,
 ) {
   static fun empty(): this {
-    MInfo(Array[], Array[], ReadSet[])
+    MInfo(Array[], Array[], Array[])
   }
   fun isEmpty(): Bool {
-    this.keys.size() == 0 && this.newDirs.size() == 0 && this.reads.isEmpty()
+    this.keys.size() == 0 && this.newDirs.size() == 0 && this.reads.size() == 0
   }
 }
 
@@ -467,7 +467,7 @@ class EagerDir{
     readsCopy = context.reads;
 
     context.!newDirs = SortedSet[];
-    context.!reads = ReadSet[];
+    context.!reads = SortedSet[];
 
     writer = mutable Writer{};
     f(context, writer, key, values);
@@ -491,7 +491,10 @@ class EagerDir{
 
     if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
       oldVec.push(
-        (source, MInfo(kvArray.map(kv -> kv.i0), newDirs.toArray(), reads)),
+        (
+          source,
+          MInfo(kvArray.map(kv -> kv.i0), newDirs.toArray(), reads.toArray()),
+        ),
       );
     };
 
@@ -757,7 +760,7 @@ class EagerDir{
       newDirsCopy = context.newDirs;
       readsCopy = context.reads;
       context.!newDirs = SortedSet[];
-      context.!reads = ReadSet[];
+      context.!reads = SortedSet[];
 
       mapFun(context, writer, key, values);
 
@@ -774,10 +777,8 @@ class EagerDir{
         context.!deps = context.deps.set(read, arrowKey);
       };
 
-      readSet = reads.toSet();
-
       for (oldRead in oldInfo.reads) {
-        if (readSet.contains(oldRead)) continue;
+        if (reads.contains(oldRead)) continue;
         arrowKey = ArrowKey(parentName, child.dirName, key);
         context.!deps = context.deps.remove(oldRead, arrowKey);
       };
@@ -801,7 +802,11 @@ class EagerDir{
 
       // We need to remember what keys we produced for the next
       // time around.
-      !child.old[source] = MInfo(keys.toArray(), newDirs.toArray(), reads);
+      !child.old[source] = MInfo(
+        keys.toArray(),
+        newDirs.toArray(),
+        reads.toArray(),
+      );
 
       context.leave(ArrowKey(parentName, childName, key));
     };
