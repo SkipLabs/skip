@@ -15,6 +15,7 @@ class LazyDir{
   dirName: DirName,
   data: SortedMap<BaseName, LazyResult> = SortedMap[],
   lazyFun: ((mutable Context, BaseName) ~> LazyResult),
+  collect: Bool,
 } extends Dir {
   fun isInput(): Bool {
     false
@@ -83,7 +84,7 @@ class LazyDir{
       context.!reads = readsCopy;
       result
     };
-    newDir = LazyDir{time, dirName, lazyFun};
+    newDir = LazyDir{time, dirName, lazyFun, collect};
     context.maybeGetLazyDir(dirName) match {
     | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
       if (context.debugMode) {
@@ -166,8 +167,10 @@ class LazyDir{
     };
     lazyResult match {
     | LDefined(arr, reads) ->
-      for (read in reads) {
-        context.!reads = context.reads.set(read);
+      if (this.collect) {
+        for (read in reads) {
+          context.!reads = context.reads.set(read);
+        };
       };
       arr
     | _ -> Array[]
