@@ -2,13 +2,28 @@
 
 #ifdef SKIP32
 
-void* memset(void* ptr, int value, size_t num) {
-  size_t i;
-  unsigned char* p = (unsigned char*)ptr;
-  for(i = 0; i < num; i++) {
-    p[i] = (unsigned char)value;
+void* memset(void* ptr, int value, size_t size) {
+  void* result = ptr;
+
+  if(value != 0) {
+    // memset only implemented for zero
+    SKIP_throw(NULL);
   }
-  return ptr;
+
+  const char* end = (char*)ptr + size;
+  const char* lend = (char*)ptr + (size / sizeof(long) * sizeof(long));
+
+  while(ptr < (void*)lend) {
+    *(long*)ptr = 0;
+    ptr += sizeof(long);
+  }
+
+  while(ptr < (void*)end) {
+    *(char*)ptr = 0;
+    ptr++;
+  }
+
+  return result;
 }
 
 void* memcpy(void* dest, const void* src, size_t size) {

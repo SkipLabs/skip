@@ -13,6 +13,36 @@ void free(void*);
 #endif
 
 /*****************************************************************************/
+/* Free table. */
+/*****************************************************************************/
+void** sk_ftable;
+
+size_t sk_bit_size(size_t size) {
+  return (size_t)(sizeof(size_t) * 8 - __builtin_clzl(size - 1));
+}
+
+size_t sk_pow2_size(size_t size) {
+  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*)-1);
+  return (1 << sk_bit_size(size));
+}
+
+void sk_add_ftable(void* ptr, size_t size) {
+  int slot = sk_bit_size(size);
+  *(void**)ptr = sk_ftable[slot];
+  sk_ftable[slot] = ptr;
+}
+
+void* sk_get_ftable(size_t size) {
+  int slot = sk_bit_size(size);
+  void** ptr = sk_ftable[slot];
+  if(ptr == NULL) {
+    return ptr;
+  }
+  sk_ftable[slot] = *(void**)sk_ftable[slot];
+  return ptr;
+}
+
+/*****************************************************************************/
 /* Common primitives . */
 /*****************************************************************************/
 
@@ -43,30 +73,30 @@ extern unsigned char __heap_base;
 
 unsigned char* bump_pointer = &__heap_base;
 
-void* SKIP_get_free(size_t);
-void SKIP_add_free(void*, size_t);
-
 void* sk_malloc(size_t size) {
-  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*)-1);
-  void* res = SKIP_get_free(size);
+  size += 8;
+  size = (size + 7) & ~7;
+  void* res = sk_get_ftable(size);
   if(res != NULL) {
     return res;
   }
-  void* result = bump_pointer;
-  bump_pointer += size;
+  char* result = (char*)bump_pointer;
+  int slot = sk_bit_size(size);
+  bump_pointer += (1 << slot);
   return result;
 }
 
 void sk_free_size(void* ptr, size_t size) {
-  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*)-1);
-  SKIP_add_free(ptr, size);
+  size += 8;
+  size = (size + 7) & ~7;
+  sk_add_ftable(ptr, size);
 }
 
-void* sk_alloc(size_t size) {
+void* sk_palloc(size_t size) {
   return sk_malloc(size);
 }
 
-void sk_sk_free_size(void* ptr, size_t size) {
+void sk_pfree_size(void* ptr, size_t size) {
   sk_free_size(ptr, size);
 }
 
@@ -77,10 +107,10 @@ void SKIP_load_context() {
 }
 
 int memcmp(const void * ptr1, const void * ptr2, size_t num) {
-  unsigned char* str1 = (unsigned char*)ptr1;
-  unsigned char* str2 = (unsigned char*)ptr2;
-  unsigned char* end1 = str1 + num;
-  unsigned char* end2 = str2 + num;
+  char* str1 = (char*)ptr1;
+  char* str2 = (char*)ptr2;
+  char* end1 = str1 + num;
+  char* end2 = str2 + num;
 
   while(1) {
     if(str1 == end1 && str2 == end2) {
@@ -92,8 +122,8 @@ int memcmp(const void * ptr1, const void * ptr2, size_t num) {
     if(str2 == end2) {
       return 1;
     }
-    unsigned char c1 = *str1;
-    unsigned char c2 = *str2;
+    char c1 = *str1;
+    char c2 = *str2;
     SkipInt diff = c1 - c2;
     if(diff != 0) return diff;
     str1++;
@@ -109,7 +139,13 @@ int memcmp(const void * ptr1, const void * ptr2, size_t num) {
 /*****************************************************************************/
 
 #ifdef SKIP64
-size_t sk_pow2_size(size_t);
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
 
 void* sk_malloc(size_t size) {
   void* result = malloc(size);

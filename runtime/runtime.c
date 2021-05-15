@@ -74,6 +74,5 @@ void* SKIP_context_sync(char* obj) {
   char* new_obj = SKIP_intern_shared(obj);
   SKIP_free(*context);
   *context = new_obj;
-//  printf("%ld\n", total_palloc_size);
   return new_obj;
 }

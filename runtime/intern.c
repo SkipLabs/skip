@@ -4,13 +4,16 @@
 /* Interning primitives. */
 /*****************************************************************************/
 
-extern size_t total_palloc_size;
+static char* shallow_intern(
+  char* obj,
+  size_t memsize,
+  size_t leftsize,
+  char* large_page) {
 
-static char* shallow_intern(char* obj, size_t memsize, size_t leftsize) {
   memsize += leftsize;
   size_t alloc_size = memsize + sizeof(uintptr_t);
-  char* mem = sk_alloc(alloc_size);
-  *(uintptr_t*)mem = 0;
+  char* mem= sk_palloc(alloc_size);
+  *(uintptr_t*)mem = 1;
   mem += sizeof(uintptr_t);
   memcpy(mem, obj - leftsize, memsize);
   mem = mem + leftsize;
@@ -68,17 +71,16 @@ uintptr_t sk_decr_ref_count(void* obj) {
       SKIP_internalExit();
     }
   }
-  uintptr_t result = *count;
   *count = *count - 1;
-  return result;
+  return *count;
 }
 
-static char* SKIP_intern_class(stack_t* st, char* obj) {
+static char* SKIP_intern_class(stack_t* st, char* obj, char* large_page) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
-  void** result = (void**)shallow_intern(obj, memsize, leftsize);
+  void** result = (void**)shallow_intern(obj, memsize, leftsize, large_page);
 
   if((ty->m_refsHintMask & 1) != 0) {
     size_t size = ty->m_userByteSize / sizeof(void*);
@@ -107,13 +109,13 @@ static char* SKIP_intern_class(stack_t* st, char* obj) {
   return (char*)result;
 }
 
-static char* SKIP_intern_array(stack_t* st, char* obj) {
+static char* SKIP_intern_array(stack_t* st, char* obj, char* large_page) {
   SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
-  void** result = (void**)shallow_intern(obj, memsize, leftsize);
+  void** result = (void**)shallow_intern(obj, memsize, leftsize, large_page);
   size_t bitsize = sizeof(void*) * 8;
 
   if((ty->m_refsHintMask & 1) != 0) {
@@ -147,9 +149,9 @@ static char* SKIP_intern_array(stack_t* st, char* obj) {
   return (char*)result;
 }
 
-static char* SKIP_intern_string(char* obj) {
+static char* SKIP_intern_string(char* obj, char* large_page) {
   size_t len = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
-  char* result = shallow_intern(obj, len, 2 * sizeof(uint32_t));
+  char* result = shallow_intern(obj, len, 2 * sizeof(uint32_t), large_page);
   return result;
 }
 
@@ -157,7 +159,7 @@ uint32_t SKIP_is_string(char* obj) {
   return *(((uint32_t*)obj)-1) & 0x80000000;
 }
 
-static char* SKIP_intern_obj(stack_t* st, sk_cell_t* pages, size_t page_size, char* obj) {
+static char* SKIP_intern_obj(stack_t* st, char* obj, char* large_page) {
 
   char* result;
 
@@ -165,10 +167,10 @@ static char* SKIP_intern_obj(stack_t* st, sk_cell_t* pages, size_t page_size, ch
 
   switch(ty->m_kind) {
   case 0:
-    result = SKIP_intern_class(st, obj);
+    result = SKIP_intern_class(st, obj, large_page);
     break;
   case 1:
-    result = SKIP_intern_array(st, obj);
+    result = SKIP_intern_array(st, obj, large_page);
     break;
   default:
     // NOT SUPPORTED
@@ -187,11 +189,11 @@ void* SKIP_intern_shared(void* obj) {
   stack_t* st = &st_holder;
   stack3_t st3_holder;
   stack3_t* st3 = &st3_holder;
-  size_t page_size = nbr_pages();
-  sk_cell_t* pages = get_pages(page_size);
+  size_t nbr_pages = sk_get_nbr_pages(NULL);
+  sk_cell_t* pages = sk_get_pages(nbr_pages);
 
-  sk_stack_init(st, PAGE_SIZE);
-  sk_stack3_init(st3, PAGE_SIZE);
+  sk_stack_init(st, STACK_INIT_CAPACITY);
+  sk_stack3_init(st3, STACK_INIT_CAPACITY);
 
   void* result = obj;
   sk_stack_push(st, &obj, &result);
@@ -199,9 +201,9 @@ void* SKIP_intern_shared(void* obj) {
   while(st->head > 0) {
     value_t delayed = sk_stack_pop(st);
     void* toCopy = *delayed.value;
-    int in_obstack = is_in_obstack(toCopy, pages, page_size);
+    size_t obstack_idx = sk_get_obstack_idx(toCopy, pages, nbr_pages);
 
-    if(!in_obstack) {
+    if(obstack_idx >= nbr_pages) {
 
       if(!sk_is_static(toCopy)) {
         sk_incr_ref_count(toCopy);
@@ -210,12 +212,19 @@ void* SKIP_intern_shared(void* obj) {
       continue;
     }
 
+    char* large_page = NULL;
+
+    if(sk_is_large_page(pages[obstack_idx].key)) {
+      large_page = pages[obstack_idx].key;
+      pages[obstack_idx].value = (uint64_t)pages[obstack_idx].key;
+    }
+
     void* interned_ptr;
 
     if(SKIP_is_string(toCopy)) {
       sk_string_t* str = (sk_string_t*)((char*)toCopy-sizeof(uint32_t)*2);
       if(str->size != -1 && str->size < sizeof(void*)) {
-        void* interned_ptr = SKIP_intern_string(toCopy);
+        void* interned_ptr = SKIP_intern_string(toCopy, large_page);
         *delayed.slot = interned_ptr;
         continue;
       }
@@ -226,7 +235,7 @@ void* SKIP_intern_shared(void* obj) {
         sk_incr_ref_count(interned_ptr);
         continue;
       }
-      void* interned_ptr = SKIP_intern_string(toCopy);
+      void* interned_ptr = SKIP_intern_string(toCopy, large_page);
       sk_stack3_push(st3, (void**)toCopy, *(void**)toCopy, (void*)(uintptr_t)(str->size));
       str->size = (uint32_t)-1;
       *(void**)toCopy = interned_ptr;
@@ -235,7 +244,7 @@ void* SKIP_intern_shared(void* obj) {
     }
 
     if(((uintptr_t)*((void**)toCopy-1) & 1) == 0) {
-      interned_ptr = SKIP_intern_obj(st, pages, page_size, toCopy);
+      interned_ptr = SKIP_intern_obj(st, toCopy, large_page);
       sk_stack3_push(st3, ((void**)toCopy-1), *((void**)toCopy-1), NULL);
       *((void**)toCopy-1) = (void*)((uintptr_t)interned_ptr | 1);
     }
@@ -257,7 +266,7 @@ void* SKIP_intern_shared(void* obj) {
     }
   }
 
-  sk_free_size(pages, sizeof(sk_cell_t) * page_size);
+  sk_free_size(pages, sizeof(sk_cell_t) * nbr_pages);
   sk_stack_free(st);
   sk_stack3_free(st3);
 

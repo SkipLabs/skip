@@ -171,7 +171,7 @@ SkipInt SKIP_native_eq_helper(stack_t* st, char* obj1, char* obj2) {
 SkipInt SKIP_isEq(char* obj1, char* obj2) {
   stack_t st_holder;
   stack_t* st = &st_holder;
-  sk_stack_init(st, 1024);
+  sk_stack_init(st, STACK_INIT_CAPACITY);
   SkipInt cmp = SKIP_native_eq_helper(st, obj1, obj2);
   if(cmp != 0) {
     sk_stack_free(st);

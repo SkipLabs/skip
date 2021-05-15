@@ -4,6 +4,7 @@
  * additional dependency makes it more challenging.
  */
 /*****************************************************************************/
+#define SK_FTABLE_SIZE 64
 
 #ifndef SKIP_RUNTIME
 #define SKIP_RUNTIME 1
@@ -11,6 +12,7 @@
 #define NULL ((void*)0)
 
 #define PAGE_SIZE (512 * 1024)
+#define STACK_INIT_CAPACITY (1024)
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -71,9 +73,9 @@ sk_cell_t* sk_htbl_find(sk_htbl_t* table, void* key);
 int sk_htbl_mem(sk_htbl_t* table, void* key);
 void sk_htbl_remove(sk_htbl_t* table, void* key);
 SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2);
-size_t nbr_pages();
-sk_cell_t* get_pages(size_t size);
-int is_in_obstack(char* ptr, sk_cell_t* pages, size_t size);
+size_t sk_get_nbr_pages();
+sk_cell_t* sk_get_pages(size_t size);
+size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t size);
 
 /*****************************************************************************/
 /* Stack types. */
@@ -161,7 +163,7 @@ void SKIP_add_free_slot(char*, uint32_t);
 char* SKIP_Obstack_alloc(size_t size);
 void free(void*);
 void sk_free_size(void*, size_t);
-void sk_sk_free_size(void*, size_t);
+void sk_pfree_size(void*, size_t);
 void* memcpy(void* dest, const void* src, size_t size);
 void throw_Invalid_utf8();
 uint32_t SKIP_String_byteSize(char* str);
@@ -175,7 +177,7 @@ void SKIP_internalExit();
 uint32_t SKIP_is_string(char* obj);
 void SKIP_free(char* obj);
 int memcmp(const void * ptr1, const void * ptr2, size_t num);
-void* sk_alloc(size_t size);
+void* sk_palloc(size_t size);
 void sk_gen_htbl_init(void*(*alloc)(size_t), sk_htbl_t* table, size_t bitcapacity);
 void sk_gen_htbl_add(void*(*alloc)(size_t), void(*sk_free_size)(void*, size_t), sk_htbl_t* table, void* key, uint64_t value);
 void* sk_malloc(size_t size);
@@ -184,6 +186,14 @@ void sk_incr_ref_count(void*);
 uintptr_t sk_decr_ref_count(void*);
 int sk_is_static(void*);
 int sk_is_const(void*);
-void* SKIP_copy_with_pages(void* obj, size_t page_size, sk_cell_t* pages);
+void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages);
+void print_int(SkipInt);
+size_t sk_pow2_size(size_t);
+void* sk_get_ftable(size_t size);
+void sk_add_ftable(void* ptr, size_t size);
+void* memset(void *, int, unsigned long);
+size_t sk_page_size(char* page);
+int sk_is_large_page(char* page);
+void sk_obstack_attach_page(char* lpage);
 
 #endif

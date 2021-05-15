@@ -87,7 +87,6 @@ void* get_pages(size_t);
 size_t nbr_pages();
 int is_in_obstack(void*, void*, size_t);
 extern __thread char* head;
-
 extern __thread void* break_ptr;
 
 int main(int pargc, char** pargv) {

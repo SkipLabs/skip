@@ -6,7 +6,8 @@
 
 void free_intern(char* obj, size_t memsize, size_t leftsize) {
   memsize += leftsize;
-  sk_sk_free_size(obj-leftsize-sizeof(uintptr_t), memsize+sizeof(uintptr_t));
+  void* addr = obj - leftsize - sizeof(uintptr_t);
+  sk_pfree_size(addr, memsize+sizeof(uintptr_t));
 }
 
 void SKIP_free_class(stack_t* st, char* obj) {
@@ -112,7 +113,7 @@ void SKIP_free(char* obj) {
   stack_t st_holder;
   stack_t* st = &st_holder;
 
-  sk_stack_init(st, 1024);
+  sk_stack_init(st, STACK_INIT_CAPACITY);
   sk_stack_push(st, (void**)obj, NULL);
 
 

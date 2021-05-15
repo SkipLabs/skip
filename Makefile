@@ -2,7 +2,7 @@ CC=clang-10
 CPP=clang++-10
 SKC=~/skip/build/bin/skip_to_llvm
 BCLINK=llvm-link-10
-MEMSIZE32=134217728
+MEMSIZE32=1073741824
 
 OLEVEL=-O3
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
@@ -22,9 +22,7 @@ CFILES=\
 	runtime/stdlib.c \
 	runtime/stack.c \
 	runtime/string.c \
-	runtime/size.c \
-	runtime/native_eq.c \
-	runtime/verify.c
+	runtime/native_eq.c 
 
 CFILES32=$(CFILES) runtime/runtime32_specific.c
 CFILES64=$(CFILES) runtime/runtime64_specific.cpp runtime/alloc.c

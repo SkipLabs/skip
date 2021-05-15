@@ -1,8 +1,10 @@
+#include "runtime.h"
+
 void __cxa_throw(void*, void*, void*);
 
 void* exn = (void*)0;
 
-void SKIP_throw(char* exc) {
+void SKIP_throw(void* exc) {
   exn = exc;
   __cxa_throw(0, 0, 0);
 }
@@ -13,9 +15,12 @@ void* SKIP_getExn() {
 
 char* end_of_static;
 extern unsigned char* bump_pointer;
+void* sk_ftable_holder[SK_FTABLE_SIZE];
+extern void** sk_ftable;
 
 void SKIP_skfs_init() {
   end_of_static = (char*)bump_pointer;
+  sk_ftable = sk_ftable_holder;
 }
 
 void SKIP_destroy_Obstack(void*);

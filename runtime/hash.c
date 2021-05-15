@@ -283,7 +283,7 @@ uint64_t SKIP_hash(void* obj) {
   sk_htbl_t* ht = &ht_holder;
   uint64_t crc = CRC_INIT;
 
-  sk_stack_init(st, 1024);
+  sk_stack_init(st, STACK_INIT_CAPACITY);
   sk_htbl_init(ht, 5);
 
   sk_stack_push(st, &obj, 0);

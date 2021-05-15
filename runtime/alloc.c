@@ -13,7 +13,6 @@
 
 #define PERSISTENT_PAGE_SIZE (16 * 1024 * 1024)
 #define MAX_STRING_SIZE 1024
-#define SK_FTABLE_SIZE 64
 
 /*****************************************************************************/
 /* Detects pointers that come from the binary. */
@@ -47,7 +46,7 @@ static size_t sk_ppage_nbr = 0;
 static char** sk_phead = NULL;
 static char** sk_pend = NULL;
 
-static size_t sk_get_nbr_pages() {
+static size_t sk_get_nbr_persistent_pages() {
   char filename[MAX_STRING_SIZE];
   strcpy(filename, skfs_dir);
   strcat(filename, "/info");
@@ -159,7 +158,7 @@ void sk_load_page_info(size_t page_nbr, void** addr, size_t* size) {
   close(fd);
 }
 
-size_t sk_alloc_page(size_t size, char** heap) {
+size_t sk_palloc_page(size_t size, char** heap) {
   void* result;
   mkdir_SKFS();
   size = sk_round_page_size(size);
@@ -187,42 +186,11 @@ size_t sk_alloc_page(size_t size, char** heap) {
 }
 
 void sk_new_ppage(size_t size) {
-  size_t real_size = sk_alloc_page(size, sk_phead);
+  size_t real_size = sk_palloc_page(size, sk_phead);
   sk_save_page_info(sk_ppage_nbr, *sk_phead, real_size);
   sk_ppage_nbr++;
   sk_update_nbr_pages(sk_ppage_nbr);
   *sk_pend = *sk_phead + real_size;
-}
-
-/*****************************************************************************/
-/* Free table. */
-/*****************************************************************************/
-
-void** sk_ftable;
-
-size_t sk_bit_size(size_t size) {
-  return (size_t)(sizeof(size_t) * 8 - __builtin_clzl(size - 1));
-}
-
-size_t sk_pow2_size(size_t size) {
-  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*)-1);
-  return (1 << sk_bit_size(size));
-}
-
-void sk_add_ftable(void* ptr, size_t size) {
-  int slot = sk_bit_size(size);
-  *(void**)ptr = sk_ftable[slot];
-  sk_ftable[slot] = ptr;
-}
-
-void* sk_get_ftable(size_t size) {
-  int slot = sk_bit_size(size);
-  void** ptr = sk_ftable[slot];
-  if(ptr == NULL) {
-    return ptr;
-  }
-  sk_ftable[slot] = *(void**)sk_ftable[slot];
-  return ptr;
 }
 
 /*****************************************************************************/
@@ -231,10 +199,11 @@ void* sk_get_ftable(size_t size) {
 
 
 extern void** context;
+extern void** sk_ftable;
 
 void SKIP_memory_init() {
   char* init_heap;
-  size_t size = sk_alloc_page(PERSISTENT_PAGE_SIZE, &init_heap);
+  size_t size = sk_palloc_page(PERSISTENT_PAGE_SIZE, &init_heap);
   char* heap = init_heap;
   char* heap_end = heap + size;
 
@@ -279,7 +248,7 @@ static size_t sk_round_size(size_t size) {
 
 size_t total_palloc_size = 0;
 
-void* sk_alloc(size_t size) {
+void* sk_palloc(size_t size) {
   size = sk_pow2_size(size);
   total_palloc_size += size;
   sk_cell_t* ptr = sk_get_ftable(size);
@@ -294,14 +263,14 @@ void* sk_alloc(size_t size) {
   return result;
 }
 
-void sk_sk_free_size(void* chunk, size_t size) {
+void sk_pfree_size(void* chunk, size_t size) {
   size = sk_pow2_size(size);
   total_palloc_size -= size;
   sk_add_ftable(chunk, size);
 }
 
 void SKIP_load_context() {
-  sk_ppage_nbr = sk_get_nbr_pages();
+  sk_ppage_nbr = sk_get_nbr_persistent_pages();
   int i;
 
   for(i = 0; i < sk_ppage_nbr; i++) {

@@ -57,16 +57,41 @@ __thread char* end = NULL;
 /* Obstack allocation. */
 /*****************************************************************************/
 
-int total_pages = 0;
+size_t sk_page_size(char* page) {
+  return *(size_t*)(page + sizeof(char*));
+}
 
-void sk_new_page(size_t size) {
-  total_pages++;
-//  printf("ALLOC %d\n", total_pages);
-  size_t block_size = PAGE_SIZE;
-  if(size + sizeof(char*) + sizeof(size_t) > block_size) {
-    block_size = size + sizeof(char*) + sizeof(size_t);
+int sk_is_large_page(char* page) {
+  return sk_page_size(page) > PAGE_SIZE;
+}
+
+void sk_obstack_attach_page(char* lpage) {
+  *(char**)lpage = *(char**)page;
+  *(char**)page = lpage;
+}
+
+char* sk_large_page(size_t size) {
+  size_t block_size = size + sizeof(char*) + sizeof(size_t);
+  block_size += 64;
+  char* lpage = (char*)sk_palloc(block_size);
+  if(lpage == NULL) {
+    #ifdef SKIP64
+    fprintf(stderr, "Out of memory\n");
+    #endif
+    SKIP_throw(NULL);
   }
-  head = (char*)sk_malloc(block_size);
+  sk_obstack_attach_page(lpage);
+  lpage += sizeof(char*);
+  *(size_t*)lpage = block_size;
+  lpage += sizeof(size_t);
+  // This space is needed in case the page gets interned.
+  lpage += 64;
+  return lpage;
+}
+
+void sk_new_page() {
+  size_t block_size = PAGE_SIZE;
+  head = (char*)sk_palloc(block_size);
   if(head == NULL) {
     #ifdef SKIP64
     fprintf(stderr, "Out of memory\n");
@@ -82,13 +107,22 @@ void sk_new_page(size_t size) {
 }
 
 char* SKIP_Obstack_alloc(size_t size) {
-  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
+  char* result;
   size += 8;
+  size = (size + 7) & ~7;
 
   if (head + size >= end) {
-    sk_new_page(size);
+    if(size + sizeof(char*) + sizeof(size_t) > PAGE_SIZE) {
+      result = sk_large_page(size);
+      result += 8;
+      return result;
+    }
+    else {
+      sk_new_page();
+    }
   }
-  char* result = head;
+
+  result = head;
   head += size;
 
   result += 8;
@@ -96,25 +130,66 @@ char* SKIP_Obstack_alloc(size_t size) {
 }
 
 void* SKIP_Obstack_calloc(size_t size) {
-  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
-  size += 8;
-  if (head + size >= end) {
-    sk_new_page(size);
-  }
-  char* result = head;
-  head += size;
-  int i;
-  for(i = 0; i < size; i++) {
-    result[i] = 0;
-  }
-  result += 8;
+  char* result = SKIP_Obstack_alloc(size);
+  memset(result, 0, size);
   return result;
 }
+
+/*****************************************************************************/
+/* Horrible hack for 32bits mode.
+ *
+ * As it turns out, memcpy is super slow in some implementations of wasm.
+ * They have a proposal to fix that (by adding a special opcode), but it's
+ * going to take some time before that opcode is available everywhere.
+ *
+ * So for now, we have to live in a world where wasm memcpy are slow.
+ * Because shallowClone is used so often (everytime we write "with" or !x.y =),
+ * we take a serious performance hit everytime.
+ *
+ * Of course, we could change the compiler to emit the store instructions.
+ * That woule work, but it makes the code much larger.
+ *
+ * So what we are doing here is introducing a special hack to speed up the
+ * cloning of the objects that we clone the most (the nodes that come from
+ * maps).
+ *
+ * The trick consists in loading/storing a structure with 11 long integers.
+ * The compiler produces a much more efficient version of the copy than memcpy.
+ *
+ * It's not nice ... but it will do for now!
+ */
+/*****************************************************************************/
+
+#ifdef SKIP32
+typedef struct {
+  long l0;
+  long l1;
+  long l2;
+  long l3;
+  long l4;
+  long l5;
+  long l6;
+  long l7;
+  long l8;
+  long l9;
+  long l10;
+} long11_t;
+#endif
+
 
 char* SKIP_Obstack_shallowClone(size_t size, char* obj) {
   size = size + sizeof(void*);
   char* mem = SKIP_Obstack_alloc(size);
+#ifdef SKIP32
+  if(size == 44) {
+    *(long11_t*)mem = *(long11_t*)(obj-sizeof(void*));
+  }
+  else {
+#endif
   memcpy(mem, obj-sizeof(void*), size);
+#ifdef SKIP32
+  }
+#endif
   return mem+sizeof(void*);
 }
 
@@ -134,9 +209,9 @@ sk_saved_obstack_t* SKIP_new_Obstack() {
   saved->head = head;
   saved->page = page;
   saved->end = end;
-  head = NULL;
-  page = NULL;
-  end = NULL;
+
+  sk_new_page();
+
   return saved;
 }
 
@@ -156,14 +231,13 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
   }
   while(saved_head < page || saved_head > end) {
     char* tofree = page;
-    size_t tosk_free_size = *(size_t*)(page + sizeof(char*));
+    size_t tosk_free_size = sk_page_size(page);
     page = *(char**)page;
-    total_pages--;
-    sk_free_size(tofree, tosk_free_size);
+    sk_pfree_size(tofree, tosk_free_size);
     if(page == NULL) {
-      head = saved_head;
-      page = saved_page;
-      end = saved_end;
+      head = NULL;
+      page = NULL;
+      end = NULL;
       return;
     }
     size_t size = *(size_t*)(page + sizeof(char*));
@@ -175,22 +249,26 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
 }
 
 void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
-  size_t page_size = nbr_pages();
-  sk_cell_t* pages = get_pages(page_size);
-  char* head_copy = head;
-  char* page_copy = page;
-  char* end_copy = end;
-  head = saved->head;
+  size_t nbr_pages = sk_get_nbr_pages(saved->page);
+  sk_cell_t* pages = sk_get_pages(nbr_pages);
+
   page = saved->page;
+  head = saved->head;
   end = saved->end;
-  void* result = SKIP_copy_with_pages(toCopy, page_size, pages);
-  saved->head = head;
-  saved->page = page;
-  saved->end = end;
-  head = head_copy;
-  page = page_copy;
-  end = end_copy;
-  SKIP_destroy_Obstack(saved);
+
+  void* result = SKIP_copy_with_pages(toCopy, nbr_pages, pages);
+
+  int i;
+  for(i = 0; i < nbr_pages; i++) {
+    if((uint64_t)pages[i].key != pages[i].value) {
+      char* fpage = (char*)(pages[i].key);
+      size_t fnbr_pages = *(size_t*)(fpage + sizeof(char*));
+      sk_pfree_size(fpage, fnbr_pages);
+    }
+  }
+
+  sk_free_size(pages, sizeof(sk_cell_t) * nbr_pages);
+
   return result;
 }
 
@@ -219,67 +297,78 @@ void SKIP_Obstack_auto_collect() {
 }
 
 /*****************************************************************************/
+/* Sort used to sort the pages. */
+/*****************************************************************************/
+
+static void heapify(sk_cell_t* arr, int n, int i) {
+  int largest = i;
+  int l = 2 * i + 1;
+  int r = 2 * i + 2;
+  
+  if (l < n && arr[l].key > arr[largest].key) {
+    largest = l;
+  }
+  
+  if (r < n && arr[r].key > arr[largest].key) {
+    largest = r;
+  }
+ 
+  if (largest != i) {
+    sk_cell_t tmp = arr[i];
+    arr[i] = arr[largest];
+    arr[largest] = tmp;
+    heapify(arr, n, largest);
+  }
+}
+ 
+static void heap_sort(sk_cell_t* arr, int n) {
+  for (int i = n / 2 - 1; i >= 0; i--) {
+    heapify(arr, n, i);
+  }
+ 
+  for (int i = n - 1; i > 0; i--) {
+    sk_cell_t tmp = arr[0];
+    arr[0] = arr[i];
+    arr[i] = tmp;
+    heapify(arr, i, 0);
+  }
+}
+
+/*****************************************************************************/
 /* Search. */
 /*****************************************************************************/
 
-size_t nbr_pages() {
+size_t sk_get_nbr_pages(void *saved_page) {
   size_t nbr_page = 0;
   void* cursor = page;
-  while(cursor != NULL) {
+  while(cursor != NULL && cursor != saved_page) {
     cursor = *(char**)cursor;
     nbr_page++;
   }
   return nbr_page;
 }
 
-void quicksort(sk_cell_t* arr,int first,int last){
-  int i, j, pivot;
-  sk_cell_t temp;
-
-  if(first < last){
-    pivot = first;
-    i = first;
-    j = last;
-
-    while(i < j){
-      while(arr[i].key <= arr[pivot].key && i<last) {
-        i++;
-      }
-      while(arr[j].key > arr[pivot].key) {
-        j--;
-      }
-      if(i < j){
-        temp = arr[i];
-        arr[i] = arr[j];
-        arr[j] = temp;
-      }
-    }
-
-    temp = arr[pivot];
-    arr[pivot] = arr[j];
-    arr[j] = temp;
-    quicksort(arr, first, j-1);
-    quicksort(arr, j+1, last);
-  }
-}
-
-sk_cell_t* get_pages(size_t size) {
+sk_cell_t* sk_get_pages(size_t size) {
   sk_cell_t* result = (sk_cell_t*)sk_malloc(sizeof(sk_cell_t) * size);
   int i = 0;
   void* cursor = page;
-  while(cursor != NULL) {
+  for(i = 0; i < size; i++) {
     result[i].key = cursor;
     result[i].value = (uint64_t)(cursor + *(size_t*)(cursor + sizeof(char*)));
     cursor = *(char**)cursor;
-    i++;
   }
-  quicksort(result, 0, size-1);
+  heap_sort(result, size);
   return result;
 }
 
-int binarySearch(sk_cell_t* arr, int l, int r, char* x) {
-  if(l > r) {
-    return ((char*)arr[l].key <= x && x < (char*)(arr[l].value));
+size_t binarySearch(sk_cell_t* arr, int l, int r, char* x) {
+  if(l >= r) {
+    if(((char*)arr[l].key <= x && x < (char*)(arr[l].value))) {
+      return l;
+    }
+    else {
+      return -1;
+    }
   }
 
   int mid = (l + r) / 2;
@@ -291,16 +380,15 @@ int binarySearch(sk_cell_t* arr, int l, int r, char* x) {
     return binarySearch(arr, mid + 1, r, x);
   }
   else {
-    return 1;
+    return mid;
   }
 }
 
 
-int is_in_obstack(char* ptr, sk_cell_t* pages, size_t size) {
-  if(size == 0) {
-    return 0;
+size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t size) {
+  if(size == 0 || pages == NULL) {
+    return -1;
   }
-  if(pages == NULL) return 0;
   int result = binarySearch(pages, 0, size-1, ptr);
   return result;
 }
