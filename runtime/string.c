@@ -263,79 +263,10 @@ int ipow(int x, int y) {
     return tmp * tmp * x;
   }
 }
-
-#define precision 2
+extern char* SKIP_floatToString(double origf);
 
 char* SKIP_Float_toString(double origf) {
-  float f = (float)origf;
-  float ff;
-	ff = f;
-	char str[64];
-	int a,b,c,k,l=0,m,i=0,j;
-
-	// check for negetive float
-	if(f<0.0)
-	{
-
-		str[i++]='-';
-		f*=-1;
-	}
-
-	a=f;	// extracting whole number
-	f-=a;	// extracting decimal part
-	k = precision;
-
-	// number of digits in whole number
-	while(k>-1) {
-		l = ipow(10,k);
-		m = a/l;
-		if(m>0)
-		{
-			break;
-		}
-	k--;
-	}
-
-	// number of digits in whole number are k+1
-
-	/*
-	extracting most significant digit i.e. right most digit , and concatenating to string
-	obtained as quotient by dividing number by 10^k where k = (number of digit -1)
-	*/
-
-	for(l=k+1;l>0;l--)
-	{
-		b = ipow(10,l-1);
-		c = a/b;
-		str[i++]=c+48;
-		a%=b;
-	}
-	str[i++] = '.';
-
-	/* extracting decimal digits till precision */
-
-	for(l=0;l<precision;l++)
-	{
-		f*=10.0;
-		b = f;
-		str[i++]=b+48;
-		f-=b;
-	}
-
-  if(str[i-1] == '0' && str[i-2] == '0') {
-    i = i - 3;
-    char* result = sk_string_alloc(i);
-    memcpy(result, str, i);
-    sk_string_set_hash(result);
-    return result;
-  }
-
-
-  char* result = sk_string_alloc(i);
-  memcpy(result, str, i);
-  sk_string_set_hash(result);
-  return result;
-
+  return SKIP_floatToString(origf);
 }
 
 SkipInt SKIP_unsafe_get_svalue(SkipInt* buffer, SkipInt n) {

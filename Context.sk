@@ -700,21 +700,21 @@ mutable class Context{
     this.dirs.get(dirName);
   }
 
-  mutable fun unsafeGetLazyDir(dirName: DirName): LazyDir {
+  readonly fun unsafeGetLazyDir(dirName: DirName): LazyDir {
     this.unsafeGetDir(dirName) match {
     | d @ LazyDir _ -> d
     | _ -> invariant_violation("unsafeGetLazyDir: Was expecting LazyDir")
     }
   }
 
-  mutable fun unsafeGetEagerDir(dirName: DirName): EagerDir {
+  readonly fun unsafeGetEagerDir(dirName: DirName): EagerDir {
     this.unsafeGetDir(dirName) match {
     | d @ EagerDir _ -> d
     | _ -> invariant_violation("unsafeGetEagerDir: Was expecting EagerDir")
     }
   }
 
-  mutable fun unsafeMaybeGetLazyDir(dirName: DirName): ?LazyDir {
+  readonly fun unsafeMaybeGetLazyDir(dirName: DirName): ?LazyDir {
     this.unsafeMaybeGetDir(dirName) match {
     | None()
     | Some(DeletedDir _) ->
@@ -724,7 +724,7 @@ mutable class Context{
     }
   }
 
-  mutable fun unsafeMaybeGetEagerDir(dirName: DirName): ?EagerDir {
+  readonly fun unsafeMaybeGetEagerDir(dirName: DirName): ?EagerDir {
     this.unsafeMaybeGetDir(dirName) match {
     | None()
     | Some(DeletedDir _) ->

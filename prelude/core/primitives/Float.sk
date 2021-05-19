@@ -105,3 +105,154 @@ native value class Float uses Number {
     }
   }
 }
+
+@cpp_export("SKIP_floatToString")
+fun floatToString(value: Float): String {
+  if (value.isNaN()) {
+    return "nan";
+  };
+  str = "";
+  if (value < 0.0) {
+    !str = "-";
+    !value = -value;
+  };
+  if (value == Float::inf) {
+    return `${str}inf`;
+  };
+  (integralPart, optDecimalPart, optExponent) = splitFloat(value);
+  !str = `${str}${integralPart}`;
+  optDecimalPart.each(decimalPart ->
+    !str = `${str}${decimalsPart(decimalPart)}`
+  );
+  optExponent.each(exponent -> !str = `${str}e${exponent}`);
+  str;
+}
+
+fun splitFloat(value: Float): (UInt32, ?UInt32, ?Int16) {
+  exponent = normalizeFloat(value);
+  integralPart = value.toInt();
+  remainder = value - integralPart.toFloat();
+  !remainder = remainder * 1e9;
+  decimalPart = remainder;
+  // rounding
+  !remainder = remainder - decimalPart;
+  zInt16 = Int16::truncate(0);
+  oInt16 = Int16::truncate(1);
+  if (remainder >= 0.5) {
+    !decimalPart = decimalPart + 1.0;
+    if (decimalPart >= 1e9) {
+      !decimalPart = 0.0;
+      !integralPart = integralPart + 1;
+      if (exponent != zInt16 && integralPart >= 10) {
+        !exponent = Int16::truncate(exponent + oInt16);
+        !integralPart = 1;
+      }
+    }
+  };
+  iDecimalPart = decimalPart.toInt();
+  (
+    UInt32::truncate(integralPart),
+    if (iDecimalPart > 0) Some(UInt32::truncate(iDecimalPart)) else None(),
+    if (exponent != zInt16) Some(exponent) else None(),
+  )
+}
+
+fun normalizeFloat(value: Float): Int16 {
+  positiveExpThreshold = 1e7;
+  negativeExpThreshold = 1e-5;
+  exponent = 0;
+  if (value >= positiveExpThreshold) {
+    if (value >= 1e256) {
+      !value = value / 1e256;
+      !exponent = exponent + 256;
+    };
+    if (value >= 1e128) {
+      !value = value / 1e128;
+      !exponent = exponent + 128;
+    };
+    if (value >= 1e64) {
+      !value = value / 1e64;
+      !exponent = exponent + 64;
+    };
+    if (value >= 1e32) {
+      !value = value / 1e32;
+      !exponent = exponent + 32;
+    };
+    if (value >= 1e16) {
+      !value = value / 1e16;
+      !exponent = exponent + 16;
+    };
+    if (value >= 1e8) {
+      !value = value / 1e8;
+      !exponent = exponent + 8;
+    };
+    if (value >= 1e4) {
+      !value = value / 1e4;
+      !exponent = exponent + 4;
+    };
+    if (value >= 1e2) {
+      !value = value / 1e2;
+      !exponent = exponent + 2;
+    };
+    if (value >= 1e1) {
+      !value = value / 1e1;
+      !exponent = exponent + 1;
+    }
+  };
+  if (value > 0.0 && value <= negativeExpThreshold) {
+    if (value < 1e-255) {
+      !value = value * 1e256;
+      !exponent = exponent - 256;
+    };
+    if (value < 1e-127) {
+      !value = value * 1e128;
+      !exponent = exponent - 128;
+    };
+    if (value < 1e-63) {
+      !value = value * 1e64;
+      !exponent = exponent - 64;
+    };
+    if (value < 1e-31) {
+      !value = value * 1e32;
+      !exponent = exponent - 32;
+    };
+    if (value < 1e-15) {
+      !value = value * 1e16;
+      !exponent = exponent - 16;
+    };
+    if (value < 1e-7) {
+      !value = value * 1e8;
+      !exponent = exponent - 8;
+    };
+    if (value < 1e-3) {
+      !value = value * 1e4;
+      !exponent = exponent - 4;
+    };
+    if (value < 1e-1) {
+      !value = value * 1e2;
+      !exponent = exponent - 2;
+    };
+    if (value < 1e0) {
+      !value = value * 1e1;
+      !exponent = exponent - 1;
+    }
+  };
+  Int16::truncate(exponent);
+}
+
+fun decimalsPart(value: UInt32): String {
+  iValue = value.toInt();
+  width = 9;
+  // remove trailing zeros
+  while (iValue % 10 == 0 && width > 0) {
+    !iValue = iValue / 10;
+    !width = width - 1;
+  };
+  str = "";
+  while (width > 0) {
+    !str = `${iValue % 10}${str}`;
+    !iValue = iValue / 10;
+    !width = width - 1;
+  };
+  `.${str}`
+}

@@ -140,12 +140,12 @@ base class Handle<+T: frozen> {
   fun get(context: mutable Context, key: BaseName): T {
     values = this.getArray(context, key);
     if (values.size() >= 2) {
-      msg = "Duplicate keys: " + key;
+      msg = `Error: Duplicate keys '${key}' in '${this.getDirName()}'`;
       print_error(msg);
       invariant_violation(msg);
     };
     if (values.size() == 0) {
-      msg = "No value error for key: " + key;
+      msg = `Error: No value for keys '${key}' in '${this.getDirName()}'`;
       print_error(msg);
       invariant_violation(msg);
     };
@@ -175,10 +175,16 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, LHandle<T>, BaseName) ~> Array<T>,
+    collect: Bool = true,
   ): LHandle<T> {
-    dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
-      Some(f(context, LHandle(conv, dirName), key));
-    });
+    dir = LazyDir::create(
+      context,
+      dirName,
+      (context, dirName, key) ~> {
+        Some(f(context, LHandle(conv, dirName), key));
+      },
+      collect,
+    );
     LHandle(conv, dir.getDirName())
   }
 
@@ -187,10 +193,16 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, LHandle<T>, BaseName) ~> ?Array<T>,
+    collect: Bool = true,
   ): LHandle<T> {
-    dir = LazyDir::create(context, dirName, (context, dirName, key) ~> {
-      f(context, LHandle(conv, dirName), key);
-    });
+    dir = LazyDir::create(
+      context,
+      dirName,
+      (context, dirName, key) ~> {
+        f(context, LHandle(conv, dirName), key);
+      },
+      collect,
+    );
     LHandle(conv, dir.getDirName())
   }
 
