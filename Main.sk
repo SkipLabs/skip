@@ -70,7 +70,9 @@ untracked fun main(): void {
     context = testFuns[testName]();
     if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
       SKFS.toplevel(context)
-    }
+    } else {
+      return void
+    };
   } else if (argMap.maybeGet("init") is Some(AP.StringValue _)) {
     SKFS.runWithGc(SKSQL.makeSqlContext().clone(), (ctx) ~> SKFS.CStop(ctx));
     return void;
