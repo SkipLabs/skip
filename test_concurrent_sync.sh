@@ -26,7 +26,7 @@ done
 wait
 
 echo "SELECT * FROM t1;" | build/sqlive --data /tmp/test_data  > /tmp/test_result
-sum=`cat /tmp/test_result | egrep '^[0-9]+$' | awk -p '{x += $1} END {print x}'`
+sum=`cat /tmp/test_result | egrep '^[0-9]+$' | awk '{x += $1} END {print x}'`
 
 if [[ sum -eq 51515050 ]]
 then

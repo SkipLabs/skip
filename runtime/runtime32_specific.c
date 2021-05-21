@@ -50,6 +50,12 @@ char* SKIP_read_file(char* filename_obj) {
 
 void** context;
 
+void sk_global_lock() {
+}
+
+void sk_global_unlock() {
+}
+
 char* SKIP_context_get() {
   return *context;
 }
