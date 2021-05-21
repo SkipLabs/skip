@@ -25,8 +25,8 @@ static char* shallow_copy(
   return mem;
 }
 
-static char* SKIP_copy_class(stack_t* st, char* obj, char* large_page) {
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+static char* SKIP_copy_class(sk_stack_t* st, char* obj, char* large_page) {
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
@@ -59,8 +59,8 @@ static char* SKIP_copy_class(stack_t* st, char* obj, char* large_page) {
   return (char*)result;
 }
 
-static char* SKIP_copy_array(stack_t* st, char* obj, char* large_page) {
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+static char* SKIP_copy_array(sk_stack_t* st, char* obj, char* large_page) {
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
@@ -105,11 +105,11 @@ static char* SKIP_copy_string(char* obj, char* large_page) {
   return result;
 }
 
-static char* SKIP_copy_obj(stack_t* st, char* obj, char* large_page) {
+static char* SKIP_copy_obj(sk_stack_t* st, char* obj, char* large_page) {
 
   char* result;
 
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   switch(ty->m_kind) {
   case 0:
@@ -131,10 +131,10 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
     return NULL;
   }
 
-  stack_t st_holder;
-  stack_t* st = &st_holder;
-  stack3_t st3_holder;
-  stack3_t* st3 = &st3_holder;
+  sk_stack_t st_holder;
+  sk_stack_t* st = &st_holder;
+  sk_stack3_t st3_holder;
+  sk_stack3_t* st3 = &st3_holder;
 
   sk_stack_init(st, STACK_INIT_CAPACITY);
   sk_stack3_init(st3, STACK_INIT_CAPACITY);
@@ -143,7 +143,7 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
   sk_stack_push(st, &obj, &result);
 
   while(st->head > 0) {
-    value_t delayed = sk_stack_pop(st);
+    sk_value_t delayed = sk_stack_pop(st);
     void* toCopy = *delayed.value;
 
     int obstack_idx = sk_get_obstack_idx(toCopy, pages, nbr_pages);
@@ -195,7 +195,7 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
   }
 
   while(st3->head > 0) {
-    value3_t cell = sk_stack3_pop(st3);
+    sk_value3_t cell = sk_stack3_pop(st3);
     void** toClean = cell.value1;
     *toClean = cell.value2;
     if(cell.value3 != NULL) {

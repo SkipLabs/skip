@@ -1,5 +1,45 @@
 #include "runtime.h"
 
+#ifdef SKIP64
+
+#include <stdio.h>
+#include <string.h>
+#include <malloc.h>
+#include <stdlib.h>
+
+void* SKIP_exec(char* cmd) {
+  size_t size = SKIP_String_byteSize(cmd);
+  char* cstr = malloc(size+1);
+  memcpy(cstr, cmd, size);
+  cstr[size] = 0;
+
+  FILE* fstream = popen(cstr, "w");
+
+  if(fstream == NULL) {
+    perror("Could not execute command");
+    exit(4);
+  }
+
+  free(cstr);
+
+  return fstream;
+}
+
+uint32_t SKIP_write_to_proc(FILE* f, char* str) {
+  size_t size = SKIP_String_byteSize(str);
+  size_t n = fwrite(str, 1, size, f);
+  if(n != size) {
+    return 1;
+  };
+  return 0;
+}
+
+uint32_t SKIP_wait_for_proc(FILE* f) {
+  return pclose(f);
+}
+
+#endif
+
 #ifdef SKIP32
 
 void* memset(void* ptr, int value, size_t size) {
@@ -47,7 +87,7 @@ void* memcpy(void* dest, const void* src, size_t size) {
 
 #endif
 
-void print_int(uint64_t x) {
+void sk_print_int(uint64_t x) {
   char str[256];
   SkipInt i = 255;
   if(x == 0) {

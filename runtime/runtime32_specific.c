@@ -60,15 +60,15 @@ char* SKIP_context_get() {
   return *context;
 }
 
-void SKIP_context_set(char* obj) {
+void sk_context_set(char* obj) {
   *context = obj;
 }
 
-char* SKIP_context_get_unsafe() {
+char* sk_context_get_unsafe() {
   return *context;
 }
 
-void SKIP_context_set_unsafe(char* obj) {
+void sk_context_set_unsafe(char* obj) {
   *context = obj;
 }
 

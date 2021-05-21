@@ -113,7 +113,7 @@ typedef struct {
 ginfo_t **ginfo_root = NULL;
 ginfo_t **ginfo = NULL;
 
-char* SKIP_context_get_unsafe() {
+char* sk_context_get_unsafe() {
   char* context = (*ginfo)->context;
 
   if(context != NULL) {
@@ -125,18 +125,18 @@ char* SKIP_context_get_unsafe() {
 
 char* SKIP_context_get() {
   sk_global_lock();
-  char* context = SKIP_context_get_unsafe();
+  char* context = sk_context_get_unsafe();
   sk_global_unlock();
   return context;
 }
 
-void SKIP_context_set(char* obj) {
+void sk_context_set(char* obj) {
   sk_global_lock();
   (*ginfo)->context = obj;
   sk_global_unlock();
 }
 
-void SKIP_context_set_unsafe(char* obj) {
+void sk_context_set_unsafe(char* obj) {
   (*ginfo)->context = obj;
 }
 

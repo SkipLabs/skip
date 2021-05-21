@@ -166,8 +166,8 @@ SkipInt SKIP_hash_combine(SkipInt crc1, SkipInt crc2) {
 /* Hashing of SKIP objects. */
 /*****************************************************************************/
 
-uint64_t sk_hash_class(stack_t* st, char* obj) {
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
@@ -199,9 +199,9 @@ uint64_t sk_hash_class(stack_t* st, char* obj) {
   return crc;
 }
 
-uint64_t sk_hash_array(stack_t* st, char* obj) {
+uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
   uint64_t crc = CRC_INIT;
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
@@ -248,7 +248,7 @@ uint64_t sk_hash_string(char* obj) {
   return sk_crc64(crc, obj, memsize);
 }
 
-uint64_t sk_hash_obj(stack_t* st, char* obj) {
+uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
 
   if(obj == NULL) {
     return 0;
@@ -259,7 +259,7 @@ uint64_t sk_hash_obj(stack_t* st, char* obj) {
     return sk_hash_string(obj);
   }
 
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   switch(ty->m_kind) {
   case 0:
@@ -275,8 +275,8 @@ uint64_t sk_hash_obj(stack_t* st, char* obj) {
 }
 
 uint64_t SKIP_hash(void* obj) {
-  stack_t st_holder;
-  stack_t* st = &st_holder;
+  sk_stack_t st_holder;
+  sk_stack_t* st = &st_holder;
   sk_htbl_t ht_holder;
   sk_htbl_t* ht = &ht_holder;
   uint64_t crc = CRC_INIT;
@@ -287,7 +287,7 @@ uint64_t SKIP_hash(void* obj) {
   sk_stack_push(st, &obj, 0);
 
   while(st->head > 0) {
-    value_t delayed = sk_stack_pop(st);
+    sk_value_t delayed = sk_stack_pop(st);
     void* toHash = *delayed.value;
 
     sk_cell_t* cell = sk_htbl_find(ht, toHash);

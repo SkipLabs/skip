@@ -37,7 +37,7 @@ char* sk_new_const(char* cst) {
     }
     sk_global_lock();
     char* icst = SKIP_intern_shared(cst);
-    SKIP_free((*pconsts)[pconsts_count]);
+    sk_free_root((*pconsts)[pconsts_count]);
     (*pconsts)[pconsts_count] = icst;
     sk_global_unlock();
     pconsts_count++;

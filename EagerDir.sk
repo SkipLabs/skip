@@ -133,6 +133,12 @@ value class MInfo(
 }
 
 /*****************************************************************************/
+/* The class used for subscriptions. */
+/*****************************************************************************/
+
+value class Sub(cmd: String, status: Int, time: Int)
+
+/*****************************************************************************/
 /* An Eager Directory. */
 /*****************************************************************************/
 
@@ -154,7 +160,63 @@ class EagerDir{
   slices: RangeMapList<BaseName, DirName> = RangeMapList[],
   compactor: ?Compactor = None(),
   purgeCount: Int = 0,
+  subs: SortedMap<Int, Sub> = SortedMap[],
 } extends Dir {
+  private fun notifyCmd(
+    id: Int,
+    changes: Set<BaseName>,
+    cmd: String,
+    time: Int,
+  ): this {
+    proc = exec(cmd);
+    for (key in changes) {
+      key match {
+      | rkey @ SKSQL.RowKey _ -> rkey.print(str -> writeToProc(proc, str))
+      | _ ->
+        for (value in this.getArrayRaw(key)) {
+          value match {
+          | SKFS.StringFile(str) ->
+            writeToProc(proc, "" + key + "\t" + str + "\n")
+          | x ->
+            writeToProc(proc, "" + key + "\t" + inspect(x).toString() + "\n")
+          }
+        }
+      };
+    };
+    status = waitForProc(proc);
+    !this.subs[id] = Sub(cmd, status, time);
+    this
+  }
+
+  private fun notifyAll(time: Int): this {
+    changes = this.getChangesAfter(time);
+    for (id => sub in this.subs) {
+      if (sub.status == 0) {
+        !this = this.notifyCmd(id, changes, sub.cmd, time);
+      }
+    };
+    this
+  }
+
+  fun subscribe(context: mutable Context, cmd: String, init: Bool): Int {
+    id = genSym(0);
+    !this.subs[id] = Sub(cmd, 0, 0);
+    if (init) {
+      changes = this.getChangesAfter(0);
+      !this = this.notifyCmd(id, changes, cmd, 0);
+    };
+    context.setDir(this.dirName, this);
+    context.!sessions[id] = this.dirName;
+    id
+  }
+
+  fun reconnect(context: mutable Context, id: Int): void {
+    sub = this.subs[id];
+    changes = this.getChangesAfter(sub.time);
+    !this = this.notifyCmd(id, changes, sub.cmd, context.time);
+    context.setDir(this.dirName, this);
+  }
+
   fun purgeOld(): FixedSingle<Source, MInfo> {
     current = 0;
     acc = mutable Vector[];
@@ -720,6 +782,7 @@ class EagerDir{
     rangeOpt: ?Array<KeyRange>,
     child: EagerDir,
   ): void {
+    startTime = context.time;
     parent = context.unsafeGetEagerDir(parentName);
     childName = child.dirName;
 
@@ -810,6 +873,9 @@ class EagerDir{
 
       context.leave(ArrowKey(parentName, childName, key));
     };
+
+    !child = child.notifyAll(startTime);
+
     context.setDir(child.dirName, child);
   }
 

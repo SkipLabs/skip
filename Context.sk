@@ -218,6 +218,7 @@ mutable class Context{
   mutable lazyGetsQueueOut: List<Array<Path>> = List[],
   mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable reallyRemoveDir: Bool = true,
+  mutable sessions: SortedMap<Int, DirName> = SortedMap[],
 } {
   mutable fun pushAsync(path: Path): void {
     this.!asyncList = List.Cons(path, this.asyncList);
@@ -258,6 +259,7 @@ mutable class Context{
       lazyGetsQueueOut => this.lazyGetsQueueOut,
       lazyGetsRefCount => this.lazyGetsRefCount,
       reallyRemoveDir => this.reallyRemoveDir,
+      sessions => this.sessions,
     }
   }
 
@@ -287,6 +289,7 @@ mutable class Context{
       lazyGetsQueueOut => ctx.lazyGetsQueueOut,
       lazyGetsRefCount => ctx.lazyGetsRefCount,
       reallyRemoveDir => ctx.reallyRemoveDir,
+      sessions => ctx.sessions,
     }
   }
 
@@ -315,6 +318,7 @@ mutable class Context{
     this.!lazyGetsQueueOut = ctx.lazyGetsQueueOut;
     this.!lazyGetsRefCount = ctx.lazyGetsRefCount;
     this.!reallyRemoveDir = ctx.reallyRemoveDir;
+    this.!sessions = ctx.sessions;
   }
 
   mutable fun getReads(): SortedSet<Path> {
@@ -876,6 +880,10 @@ private native fun gContextInit(Context): Context;
 @debug
 @cpp_extern("SKIP_context_get")
 native fun gContextGet(): Context;
+
+@debug
+@cpp_extern("SKIP_has_context")
+native fun gHasContext(): UInt32;
 
 @debug
 @cpp_extern("sk_verify_shared")

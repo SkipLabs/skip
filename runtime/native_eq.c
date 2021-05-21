@@ -26,11 +26,11 @@
  */
 /*****************************************************************************/
 
-SkipInt SKIP_native_eq_class(stack_t* st, char* obj1, char* obj2) {
+SkipInt SKIP_native_eq_class(sk_stack_t* st, char* obj1, char* obj2) {
   if(obj1 == obj2) return 0;
 
-  SkipGcType* ty1 = *(*(((SkipGcType***)obj1)-1)+1);
-  SkipGcType* ty2 = *(*(((SkipGcType***)obj2)-1)+1);
+  SKIP_gc_type_t* ty1 = *(*(((SKIP_gc_type_t***)obj1)-1)+1);
+  SKIP_gc_type_t* ty2 = *(*(((SKIP_gc_type_t***)obj2)-1)+1);
 
   if(ty1 != ty2) {
     return 1;
@@ -69,9 +69,9 @@ SkipInt SKIP_native_eq_class(stack_t* st, char* obj1, char* obj2) {
   return 0;
 }
 
-SkipInt SKIP_native_eq_array(stack_t* st, char* obj1, char* obj2) {
-  SkipGcType* ty1 = *(*(((SkipGcType***)obj1)-1)+1);
-  SkipGcType* ty2 = *(*(((SkipGcType***)obj2)-1)+1);
+SkipInt SKIP_native_eq_array(sk_stack_t* st, char* obj1, char* obj2) {
+  SKIP_gc_type_t* ty1 = *(*(((SKIP_gc_type_t***)obj1)-1)+1);
+  SKIP_gc_type_t* ty2 = *(*(((SKIP_gc_type_t***)obj2)-1)+1);
 
   if(ty1 != ty2) {
     return 1;
@@ -126,7 +126,7 @@ SkipInt SKIP_native_eq_array(stack_t* st, char* obj1, char* obj2) {
   return 0;
 }
 
-SkipInt SKIP_native_eq_helper(stack_t* st, char* obj1, char* obj2) {
+SkipInt SKIP_native_eq_helper(sk_stack_t* st, char* obj1, char* obj2) {
   if(obj1 == obj2) {
     return 0;
   }
@@ -146,8 +146,8 @@ SkipInt SKIP_native_eq_helper(stack_t* st, char* obj1, char* obj2) {
     return 1;
   }
 
-  SkipGcType* ty1 = *(*(((SkipGcType***)obj1)-1)+1);
-  SkipGcType* ty2 = *(*(((SkipGcType***)obj2)-1)+1);
+  SKIP_gc_type_t* ty1 = *(*(((SKIP_gc_type_t***)obj1)-1)+1);
+  SKIP_gc_type_t* ty2 = *(*(((SKIP_gc_type_t***)obj2)-1)+1);
 
   if(ty1 != ty2) {
     return 1;
@@ -169,8 +169,8 @@ SkipInt SKIP_native_eq_helper(stack_t* st, char* obj1, char* obj2) {
 }
 
 SkipInt SKIP_isEq(char* obj1, char* obj2) {
-  stack_t st_holder;
-  stack_t* st = &st_holder;
+  sk_stack_t st_holder;
+  sk_stack_t* st = &st_holder;
   sk_stack_init(st, STACK_INIT_CAPACITY);
   SkipInt cmp = SKIP_native_eq_helper(st, obj1, obj2);
   if(cmp != 0) {
@@ -178,7 +178,7 @@ SkipInt SKIP_isEq(char* obj1, char* obj2) {
     return !!cmp;
   }
   while(st->head > 0) {
-    value_t delayed = sk_stack_pop(st);
+    sk_value_t delayed = sk_stack_pop(st);
     void* obj1 = delayed.value;
     void* obj2 = delayed.slot;
     SkipInt cmp = SKIP_native_eq_helper(st, obj1, obj2);

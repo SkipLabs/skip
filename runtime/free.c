@@ -10,8 +10,8 @@ void free_intern(char* obj, size_t memsize, size_t leftsize) {
   sk_pfree_size(addr, memsize+sizeof(uintptr_t));
 }
 
-void SKIP_free_class(stack_t* st, char* obj) {
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+void sk_free_class(sk_stack_t* st, char* obj) {
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
@@ -42,8 +42,8 @@ void SKIP_free_class(stack_t* st, char* obj) {
   return;
 }
 
-void SKIP_free_array(stack_t* st, char* obj) {
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+void sk_free_array(sk_stack_t* st, char* obj) {
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
@@ -78,7 +78,7 @@ void SKIP_free_array(stack_t* st, char* obj) {
   return;
 }
 
-void SKIP_free_obj(stack_t* st, char* obj) {
+void sk_free_obj(sk_stack_t* st, char* obj) {
 
   if(obj == NULL) {
     return;
@@ -92,14 +92,14 @@ void SKIP_free_obj(stack_t* st, char* obj) {
     return;
   }
 
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   switch(ty->m_kind) {
   case 0:
-    SKIP_free_class(st, obj);
+    sk_free_class(st, obj);
     break;
   case 1:
-    SKIP_free_array(st, obj);
+    sk_free_array(st, obj);
     break;
   default:
     // NOT SUPPORTED
@@ -109,16 +109,16 @@ void SKIP_free_obj(stack_t* st, char* obj) {
   return;
 }
 
-void SKIP_free(char* obj) {
-  stack_t st_holder;
-  stack_t* st = &st_holder;
+void sk_free_root(char* obj) {
+  sk_stack_t st_holder;
+  sk_stack_t* st = &st_holder;
 
   sk_stack_init(st, STACK_INIT_CAPACITY);
   sk_stack_push(st, (void**)obj, NULL);
 
 
   while(st->head > 0) {
-    value_t delayed = sk_stack_pop(st);
+    sk_value_t delayed = sk_stack_pop(st);
     void* toFree = delayed.value;
 
     if(sk_is_static(toFree)) {
@@ -127,7 +127,7 @@ void SKIP_free(char* obj) {
 
    uintptr_t count = sk_decr_ref_count(toFree);
     if(count == 0) {
-      SKIP_free_obj(st, toFree);
+      sk_free_obj(st, toFree);
     }
   }
 

@@ -3,9 +3,20 @@ module alias AP = ArgumentParser;
 const argsSchema: Array<AP.Param> = Array[
   AP.BoolParam{name => "all", help => "run all the tests", negatable => false},
   AP.BoolParam{name => "debug", help => "", negatable => false},
+  AP.BoolParam{name => "sessions", help => "", negatable => false},
   AP.StringParam{name => "test", help => "The name of the test to run"},
   AP.StringParam{name => "init", help => "Initializes a new data file"},
   AP.StringParam{name => "data", help => "Loads an existing data file"},
+  AP.StringParam{
+    name => "connect",
+    help => "Same as --subscribe, but sends the initial state first",
+  },
+  AP.StringParam{
+    name => "subscribe",
+    help => "Subscribes to a directory change",
+  },
+  AP.IntParam{name => "reconnect", help => "reconnects to a session id"},
+  AP.StringParam{name => "cmd", help => "Name of the command to run on change"},
 ];
 
 const parsedArgs: AP.ParseResult = AP.parse(argsSchema, arguments()) match {
@@ -16,6 +27,17 @@ const parsedArgs: AP.ParseResult = AP.parse(argsSchema, arguments()) match {
 };
 
 const argMap: Map<String, AP.Value> = parsedArgs.argumentValues;
+
+native base class Proc
+
+@cpp_extern("SKIP_exec")
+native fun exec(String): Proc;
+
+@cpp_extern("SKIP_write_to_proc")
+native fun writeToProc(Proc, String): void;
+
+@cpp_extern("SKIP_wait_for_proc")
+native fun waitForProc(Proc): Int;
 
 untracked fun main(): void {
   if (parsedArgs.unknown.size() != 0) {
@@ -37,6 +59,97 @@ untracked fun main(): void {
     };
     exit(2);
   };
+
+  argMap.maybeGet("sessions" + "") match {
+  | Some(AP.BoolValue _) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data" + "") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    startContext = SKFS.gContextGet();
+    context = SKFS.Context::fromSaved(startContext);
+    startTime = context.time;
+    for (id => dirName in context.sessions) {
+      sub = context.unsafeGetEagerDir(dirName).subs[id];
+      print_string(
+        id.toString() +
+          "\t" +
+          dirName.toString() +
+          "\t" +
+          if (sub.status == 0) "CONNECTED" else "DISCONNECTED",
+      );
+    };
+    _context = SKFS.gContextSync(startTime, startContext, context.clone());
+    return void
+  | _ -> void
+  };
+
+  argMap.maybeGet("reconnect" + "") match {
+  | Some(AP.IntValue{value => sessionID}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data" + "") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    startContext = SKFS.gContextGet();
+    context = SKFS.Context::fromSaved(startContext);
+    startTime = context.time;
+    dirName = context.sessions.maybeGet(sessionID) match {
+    | None() ->
+      print_error("Error: session not found");
+      exit(2)
+    | Some(x) -> x
+    };
+    edir = context.unsafeGetEagerDir(dirName);
+    edir.reconnect(context, sessionID);
+    _context = SKFS.gContextSync(startTime, startContext, context.clone());
+    return void
+  | _ -> void
+  };
+
+  subscribe = argMap.maybeGet("connect" + "") match {
+  | Some(AP.StringValue{value => dirName}) -> Some((dirName, true))
+  | _ ->
+    argMap.maybeGet("subscribe" + "") match {
+    | Some(AP.StringValue{value => dirName}) -> Some((dirName, false))
+    | _ -> None()
+    }
+  };
+
+  subscribe match {
+  | None() -> void
+  | Some((dirNameStr, init)) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data" + "") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    startContext = SKFS.gContextGet();
+    context = SKFS.Context::fromSaved(startContext);
+    startTime = context.time;
+    dirName = SKFS.DirName::create(dirNameStr);
+    edir = context.unsafeMaybeGetDir(dirName) match {
+    | Some(SKFS.LazyDir _) ->
+      print_error("Error: cannot connect to a lazy directory");
+      exit(2)
+    | Some(edir @ SKFS.EagerDir _) -> edir
+    | _ ->
+      print_error("Error: directory not found");
+      exit(3)
+    };
+    cmd = argMap.maybeGet("cmd" + "") match {
+    | Some(AP.StringValue{value => x}) -> x
+    | _ ->
+      print_error("Error: missing --cmd");
+      exit(4)
+    };
+    sessionID = edir.subscribe(context, cmd, init);
+    print_string(sessionID.toString());
+    _context = SKFS.gContextSync(startTime, startContext, context.clone());
+    return void
+  };
+
   if (argMap.maybeGet("all") is Some(AP.BoolValue _)) {
     testFuns = SKFSTest.getAllTests();
     for (testName => testFun in testFuns) {

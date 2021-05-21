@@ -31,7 +31,7 @@ void sk_incr_ref_count(void* obj) {
     #endif
   }
   else {
-    SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+    SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
     switch(ty->m_kind) {
     case 0:
@@ -58,7 +58,7 @@ uintptr_t sk_decr_ref_count(void* obj) {
     #endif
   }
   else {
-    SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+    SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
     switch(ty->m_kind) {
     case 0:
@@ -75,8 +75,8 @@ uintptr_t sk_decr_ref_count(void* obj) {
   return *count;
 }
 
-static char* SKIP_intern_class(stack_t* st, char* obj, char* large_page) {
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+static char* SKIP_intern_class(sk_stack_t* st, char* obj, char* large_page) {
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
@@ -109,8 +109,8 @@ static char* SKIP_intern_class(stack_t* st, char* obj, char* large_page) {
   return (char*)result;
 }
 
-static char* SKIP_intern_array(stack_t* st, char* obj, char* large_page) {
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+static char* SKIP_intern_array(sk_stack_t* st, char* obj, char* large_page) {
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t len = *(uint32_t*)(obj-sizeof(char*)-sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
@@ -159,11 +159,11 @@ uint32_t SKIP_is_string(char* obj) {
   return *(((uint32_t*)obj)-1) & 0x80000000;
 }
 
-static char* SKIP_intern_obj(stack_t* st, char* obj, char* large_page) {
+static char* SKIP_intern_obj(sk_stack_t* st, char* obj, char* large_page) {
 
   char* result;
 
-  SkipGcType* ty = *(*(((SkipGcType***)obj)-1)+1);
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   switch(ty->m_kind) {
   case 0:
@@ -185,10 +185,10 @@ void* SKIP_intern_shared(void* obj) {
     return NULL;
   }
 
-  stack_t st_holder;
-  stack_t* st = &st_holder;
-  stack3_t st3_holder;
-  stack3_t* st3 = &st3_holder;
+  sk_stack_t st_holder;
+  sk_stack_t* st = &st_holder;
+  sk_stack3_t st3_holder;
+  sk_stack3_t* st3 = &st3_holder;
   size_t nbr_pages = sk_get_nbr_pages(NULL);
   sk_cell_t* pages = sk_get_pages(nbr_pages);
 
@@ -199,7 +199,7 @@ void* SKIP_intern_shared(void* obj) {
   sk_stack_push(st, &obj, &result);
 
   while(st->head > 0) {
-    value_t delayed = sk_stack_pop(st);
+    sk_value_t delayed = sk_stack_pop(st);
     void* toCopy = *delayed.value;
     size_t obstack_idx = sk_get_obstack_idx(toCopy, pages, nbr_pages);
 
@@ -257,7 +257,7 @@ void* SKIP_intern_shared(void* obj) {
   }
 
   while(st3->head > 0) {
-    value3_t cell = sk_stack3_pop(st3);
+    sk_value3_t cell = sk_stack3_pop(st3);
     void** toClean = cell.value1;
     *toClean = cell.value2;
     if(cell.value3 != NULL) {

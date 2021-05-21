@@ -92,6 +92,25 @@ class RowKey(row: Row, kinds: Array<(Int, IKind, Type)>) extends SKFS.BaseName {
     | _ -> invariant_violation("Can only compare a RowKey with itself")
     }
   }
+
+  fun print(o: String -> void): void {
+    o(this.hashTag.toString());
+    o("\t");
+    size = this.row.size();
+    if (size == 0) return void;
+    for (idx in Range(0, size - 1)) {
+      this.row.getValue(this.kinds[idx].i2, idx) match {
+      | None() -> o("NULL")
+      | Some(v) -> o(v.toString())
+      };
+      o(", ");
+    };
+    this.row.getValue(this.kinds[size - 1].i2, size - 1) match {
+    | None() -> o("NULL")
+    | Some(v) -> o(v.toString())
+    };
+    o("\n")
+  }
 }
 
 base class Row protected () extends SKFS.File uses Hashable {
