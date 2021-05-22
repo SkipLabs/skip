@@ -131,19 +131,8 @@ class LazyDir{
     });
     for (path in dirtyReaders) {
       key = path.baseName;
-      newData = this.lazyFun(context, key);
-      this.data.maybeGet(key) match {
-      | Some(oldData) ->
-        if (native_eq(oldData, newData) == 0) {
-          if (context.debugMode) {
-            print_string("LAZY REUSING KEY: " + key);
-          };
-          continue;
-        };
-        !this.data[key] = newData;
-        if (!(oldData is LAbsent _)) updateDirtyReaders(context, path)
-      | None() -> !this.data[key] = newData
-      };
+      !this.data = this.data.remove(key);
+      updateDirtyReaders(context, path)
     };
     context.setDir(this.dirName, this);
   }
