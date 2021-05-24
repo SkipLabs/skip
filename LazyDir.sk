@@ -6,6 +6,7 @@ module SKFS;
 base class LazyResult {
   children =
   | LDefined(Array<File>, Array<Path>)
+  | LRemoved(Array<Path>)
   | LAbsent()
   | LDelayed()
 }
@@ -72,9 +73,6 @@ class LazyDir{
 
       dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = result;
-      if (collect) {
-        context.!lazyGets = context.lazyGets.set(Path::create(dirName, key));
-      };
 
       context.setDir(dirName, dir);
       if (context.debugMode) {
@@ -109,7 +107,7 @@ class LazyDir{
     context: mutable Context,
     dirtyReadersOpt: ?readonly Map<DirName, readonly Set<BaseName>>,
   ): void {
-    thisDirtyReaders = SortedSet[];
+    dirtyReaders = mutable Set[];
     firstDirtyReaders = dirtyReadersOpt match {
     | None() -> mutable Map[]
     | Some(m) -> m
@@ -117,23 +115,28 @@ class LazyDir{
 
     for (dirtyReaderDirName => dirtyReaderBaseNames in firstDirtyReaders) {
       for (dirtyReaderBaseName in dirtyReaderBaseNames) {
-        !thisDirtyReaders = thisDirtyReaders.add(
+        dirtyReaders.insert(
           Path::create(dirtyReaderDirName, dirtyReaderBaseName),
         );
       }
     };
-    dirtyReaders = fixPoint(thisDirtyReaders, key -> {
-      context
-        .getDeps(key)
-        .filter(x -> x.childName == this.dirName)
-        .map(x -> Path::create(x.childName, x.key))
-        .collect(Set);
-    });
+
     for (path in dirtyReaders) {
       key = path.baseName;
+      oldValue = this.data.maybeGet(key);
       !this.data = this.data.remove(key);
-      updateDirtyReaders(context, path)
+      updateDirtyReaders(context, path);
+      oldValue match {
+      | Some(LDefined(_, reads))
+      | Some(LRemoved(reads)) ->
+        for (read in reads) {
+          arrow = ArrowKey(this.dirName, this.dirName, key);
+          context.!deps = context.deps.remove(read, arrow)
+        }
+      | _ -> void
+      }
     };
+
     context.setDir(this.dirName, this);
   }
 
@@ -142,9 +145,16 @@ class LazyDir{
     key: BaseName,
     isAsync: Bool = false,
   ): Array<File> {
+    if (this.collect) {
+      context.!lazyGets = context.lazyGets.set(Path::create(this.dirName, key));
+    };
     lazyResult = this.data.maybeGet(key) match {
-    | None()
-    | Some(LAbsent()) ->
+    | x @ None()
+    | x @ Some(LRemoved _)
+    | x @ Some(LAbsent()) ->
+      if (x is Some(LRemoved _)) {
+        print_string("LRemoved: " + Path::create(this.dirName, key).toString())
+      };
       if (isAsync) {
         context.pushAsync(Path::create(this.dirName, key));
         LDelayed()
@@ -155,13 +165,7 @@ class LazyDir{
     | Some(x) -> x
     };
     lazyResult match {
-    | LDefined(arr, reads) ->
-      if (this.collect) {
-        for (read in reads) {
-          context.!reads = context.reads.set(read);
-        };
-      };
-      arr
+    | LDefined(arr, _reads) -> arr
     | _ -> Array[]
     }
   }

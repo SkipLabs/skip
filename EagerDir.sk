@@ -836,7 +836,6 @@ class EagerDir{
     source = Source::create(sourcePath);
 
     oldValues = this.getArraySourceKey(source, k);
-    if (native_eq(rvalues, oldValues) == 0) return this;
 
     totalSize = if (oldValues.size() == 0 && rvalues.size() > 0) {
       this.totalSize + 1
@@ -853,6 +852,10 @@ class EagerDir{
 
     !map = map.set(source, rvalues);
     data = this.data.set(TimeTag::create(context.tick), k, map);
+
+    if (native_eq(rvalues, oldValues) == 0) {
+      return this with {data};
+    };
 
     compactor = this.compactor match {
     | None() -> None()
@@ -916,9 +919,7 @@ class EagerDir{
 
     if (context.debugMode) {
       name = "" + this.dirName + k;
-      print_string(
-        `WRITTEN:  ${name}`,
-      );
+      print_string(`WRITTEN:  ${name}`);
     };
 
     if (purgeCount >= PURGE_LIMIT) {
