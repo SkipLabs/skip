@@ -60,10 +60,10 @@ untracked fun main(): void {
     exit(2);
   };
 
-  argMap.maybeGet("sessions" + "") match {
+  argMap.maybeGet("sessions") match {
   | Some(AP.BoolValue _) ->
     if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data" + "") is Some(AP.MissingValue{}));
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
       exit(2);
     };
@@ -85,10 +85,10 @@ untracked fun main(): void {
   | _ -> void
   };
 
-  argMap.maybeGet("reconnect" + "") match {
+  argMap.maybeGet("reconnect") match {
   | Some(AP.IntValue{value => sessionID}) ->
     if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data" + "") is Some(AP.MissingValue{}));
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
       exit(2);
     };
@@ -108,10 +108,10 @@ untracked fun main(): void {
   | _ -> void
   };
 
-  subscribe = argMap.maybeGet("connect" + "") match {
+  subscribe = argMap.maybeGet("connect") match {
   | Some(AP.StringValue{value => dirName}) -> Some((dirName, true))
   | _ ->
-    argMap.maybeGet("subscribe" + "") match {
+    argMap.maybeGet("subscribe") match {
     | Some(AP.StringValue{value => dirName}) -> Some((dirName, false))
     | _ -> None()
     }
@@ -121,7 +121,7 @@ untracked fun main(): void {
   | None() -> void
   | Some((dirNameStr, init)) ->
     if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data" + "") is Some(AP.MissingValue{}));
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
       exit(2);
     };
@@ -138,7 +138,7 @@ untracked fun main(): void {
       print_error("Error: directory not found");
       exit(3)
     };
-    cmd = argMap.maybeGet("cmd" + "") match {
+    cmd = argMap.maybeGet("cmd") match {
     | Some(AP.StringValue{value => x}) -> x
     | _ ->
       print_error("Error: missing --cmd");
