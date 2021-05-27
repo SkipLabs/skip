@@ -459,6 +459,7 @@ void sk_pfree_size(void* chunk, size_t size) {
     free(chunk);
     return;
   }
+  sk_check_has_lock();
   size = sk_pow2_size(size);
   total_palloc_size -= size;
   sk_add_ftable(chunk, size);
