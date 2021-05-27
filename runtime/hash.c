@@ -216,7 +216,7 @@ uint64_t sk_hash_array(stack_t* st, char* obj) {
     crc = sk_crc64(crc, obj, len * ty->m_userByteSize);
   }
   else while(ohead < end) {
-    size_t size = ty->m_userByteSize;
+    size_t size = ty->m_userByteSize * len;
     size_t slot = 0;
     size_t mask_slot = 0;
     while(size > 0) {
@@ -245,9 +245,7 @@ uint64_t sk_hash_array(stack_t* st, char* obj) {
 uint64_t sk_hash_string(char* obj) {
   uint64_t crc = CRC_INIT;
   size_t memsize = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
-  size_t leftsize = 2 * sizeof(uint32_t);
-  memsize += leftsize;
-  return sk_crc64(crc, obj-leftsize, memsize);
+  return sk_crc64(crc, obj, memsize);
 }
 
 uint64_t sk_hash_obj(stack_t* st, char* obj) {
