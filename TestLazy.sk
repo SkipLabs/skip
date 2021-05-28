@@ -103,7 +103,7 @@ fun testLazy(): mutable SKFS.Context {
     getData(context, dir2, SKFS.IID(0))
   );
   write(context, input, SKFS.IID(0), Array[SKFS.IntFile(22)]);
-  context.update();
+  _status = context.updateWithStatus(10);
 
   expectEq("Lazy after update", Array<SKFS.File>[SKFS.IntFile(22)], () ->
     getData(context, dir2, SKFS.IID(0))

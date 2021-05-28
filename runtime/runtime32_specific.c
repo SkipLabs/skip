@@ -92,3 +92,16 @@ int SKIP_getchar() {
 int SKIP_isatty() {
   return 0;
 }
+
+void* SKIP_exec(char* cmd) {
+  // Not implemented
+  return NULL;
+}
+
+void SKIP_write_to_proc(void* proc, char* str) {
+  // Not implemented.
+}
+
+void SKIP_wait_for_proc(void* proc) {
+  // Not implemented
+}

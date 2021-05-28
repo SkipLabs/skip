@@ -854,6 +854,25 @@ fun syncContext(txTime: Int, newRoot: Context, ctx: mutable Context): void {
   ctx.replaceFromSaved(context.clone());
 }
 
+/*****************************************************************************/
+/* External process handling. Basically a thin layer on top of popen/pclose. */
+/*****************************************************************************/
+
+native base class Proc
+
+@cpp_extern("SKIP_exec")
+native fun exec(String): Proc;
+
+@cpp_extern("SKIP_write_to_proc")
+native fun writeToProc(Proc, String): void;
+
+@cpp_extern("SKIP_wait_for_proc")
+native fun waitForProc(Proc): Int;
+
+/*****************************************************************************/
+/* Runtime primitives. */
+/*****************************************************************************/
+
 @cpp_extern
 private native base class Obstack
 

@@ -205,9 +205,11 @@ mutable class Evaluator{
       this.write(context, input.dirName, SKFS.SID::create(index.name), index);
       _ = getIndexOutputDir(context);
       context.update()
+    | View{name => viewName, query => select @ Select _} ->
+      this.stmt(context, select with {id => viewName});
+      context.update()
     | _ -> invariant_violation("TODO rest of stmt in SqlEval.sk")
     /*
-      | View{name: String, query: Query}
       | Drop{kind: TableKind, name: String}
       | Delete{colName: ?String, name: String, where: ?Expr}
       | Update{name: String, sets: Array<(String, Expr)>, where: ?Expr}

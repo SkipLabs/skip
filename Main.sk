@@ -28,16 +28,14 @@ const parsedArgs: AP.ParseResult = AP.parse(argsSchema, arguments()) match {
 
 const argMap: Map<String, AP.Value> = parsedArgs.argumentValues;
 
-native base class Proc
-
-@cpp_extern("SKIP_exec")
-native fun exec(String): Proc;
-
-@cpp_extern("SKIP_write_to_proc")
-native fun writeToProc(Proc, String): void;
-
-@cpp_extern("SKIP_wait_for_proc")
-native fun waitForProc(Proc): Int;
+fun fixUpDirName(dirNameStr: String): SKFS.DirName {
+  chars = dirNameStr.chars();
+  SKFS.DirName::create(
+    (if (chars[0] != '/') "/" else "") +
+      dirNameStr +
+      (if (chars[chars.size() - 1] != '/') "/" else ""),
+  )
+}
 
 untracked fun main(): void {
   if (parsedArgs.unknown.size() != 0) {
@@ -109,17 +107,19 @@ untracked fun main(): void {
   };
 
   subscribe = argMap.maybeGet("connect") match {
-  | Some(AP.StringValue{value => dirName}) -> Some((dirName, true))
+  | Some(AP.StringValue{value => dirName}) ->
+    Some((fixUpDirName(dirName), true))
   | _ ->
     argMap.maybeGet("subscribe") match {
-    | Some(AP.StringValue{value => dirName}) -> Some((dirName, false))
+    | Some(AP.StringValue{value => dirName}) ->
+      Some((fixUpDirName(dirName), false))
     | _ -> None()
     }
   };
 
   subscribe match {
   | None() -> void
-  | Some((dirNameStr, init)) ->
+  | Some((dirName, init)) ->
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
@@ -128,7 +128,6 @@ untracked fun main(): void {
     startContext = SKFS.gContextGet();
     context = SKFS.Context::fromSaved(startContext);
     startTime = context.time;
-    dirName = SKFS.DirName::create(dirNameStr);
     edir = context.unsafeMaybeGetDir(dirName) match {
     | Some(SKFS.LazyDir _) ->
       print_error("Error: cannot connect to a lazy directory");
