@@ -48,7 +48,7 @@ char* SKIP_read_file(char* filename_obj) {
   return (void*)0;
 }
 
-void** context;
+void* context;
 
 void sk_global_lock() {
 }
@@ -56,20 +56,23 @@ void sk_global_lock() {
 void sk_global_unlock() {
 }
 
+char* sk_context_get_unsafe() {
+  if(context != NULL) {
+    sk_incr_ref_count(context);
+  }
+  return context;
+}
+
 char* SKIP_context_get() {
-  return *context;
+  return sk_context_get_unsafe();
 }
 
 void sk_context_set(char* obj) {
-  *context = obj;
-}
-
-char* sk_context_get_unsafe() {
-  return *context;
+  context = obj;
 }
 
 void sk_context_set_unsafe(char* obj) {
-  *context = obj;
+  context = obj;
 }
 
 SkipInt SKIP_genSym(SkipInt n) {
