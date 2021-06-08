@@ -290,7 +290,7 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
   size_t t = ((crc >> 56) ^ ty->m_kind) & 0xFF;
   crc = crc64table[t] ^ (crc << 8);
 
-  return 0;
+  return crc;
 }
 
 uint64_t SKIP_hash(void* obj) {
