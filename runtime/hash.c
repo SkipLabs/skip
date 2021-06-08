@@ -141,21 +141,34 @@ const uint64_t crc64table[256] = {
 /* Hashing primitive. */
 /*****************************************************************************/
 
-uint64_t sk_crc64(uint64_t crc, const void *p, size_t len) {
-	size_t i, t;
-
+static uint64_t sk_crc64(uint64_t crc, const void *p, size_t len) {
 	const unsigned char *_p = p;
+	const unsigned char *end = p + len;
 
-	for (i = 0; i < len; i++) {
-		t = ((crc >> 56) ^ (*_p++)) & 0xFF;
+	while(_p < end) {
+		unsigned int t = ((unsigned int)(crc >> 56) ^ (*_p++)) & 0xFF;
 		crc = crc64table[t] ^ (crc << 8);
 	}
 
 	return crc;
 }
 
-uint64_t sk_crc64_combine(uint64_t crc1, void* crc2) {
-  return sk_crc64(crc1, &crc2, sizeof(void*));
+static uint64_t sk_crc64_combine(uint64_t crc, void* p) {
+#ifdef SKIP32
+	const unsigned char *_p = (unsigned char*)&p;
+  unsigned int t = ((unsigned int)(crc >> 56) ^ (*_p++)) & 0xFF;
+  crc = crc64table[t] ^ (crc << 8);
+  t = ((unsigned int)(crc >> 56) ^ (*_p++)) & 0xFF;
+  crc = crc64table[t] ^ (crc << 8);
+  t = ((unsigned int)(crc >> 56) ^ (*_p++)) & 0xFF;
+  crc = crc64table[t] ^ (crc << 8);
+  t = ((unsigned int)(crc >> 56) ^ (*_p++)) & 0xFF;
+  crc = crc64table[t] ^ (crc << 8);
+  return crc;
+#endif
+#ifdef SKIP64
+  return sk_crc64(crc, &p, sizeof(void*));
+#endif
 }
 
 SkipInt SKIP_hash_combine(SkipInt crc1, SkipInt crc2) {
@@ -166,7 +179,7 @@ SkipInt SKIP_hash_combine(SkipInt crc1, SkipInt crc2) {
 /* Hashing of SKIP objects. */
 /*****************************************************************************/
 
-uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
+static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
   size_t memsize = ty->m_userByteSize;
@@ -199,7 +212,7 @@ uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
   return crc;
 }
 
-uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
+static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
   uint64_t crc = CRC_INIT;
   SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
@@ -242,13 +255,13 @@ uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
 }
 
 
-uint64_t sk_hash_string(char* obj) {
+static uint64_t sk_hash_string(char* obj) {
   uint64_t crc = CRC_INIT;
   size_t memsize = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
   return sk_crc64(crc, obj, memsize);
 }
 
-uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
+static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
 
   if(obj == NULL) {
     return 0;
@@ -260,16 +273,22 @@ uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
   }
 
   SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
+  uint64_t crc;
 
   switch(ty->m_kind) {
   case 0:
-    return sk_hash_class(st, obj);
+    crc = sk_hash_class(st, obj);
+    break;
   case 1:
-    return sk_hash_array(st, obj);
+    crc = sk_hash_array(st, obj);
+    break;
   default:
     // NOT SUPPORTED
     SKIP_internalExit();
   }
+
+  size_t t = ((crc >> 56) ^ ty->m_kind) & 0xFF;
+  crc = crc64table[t] ^ (crc << 8);
 
   return 0;
 }
@@ -277,34 +296,20 @@ uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
 uint64_t SKIP_hash(void* obj) {
   sk_stack_t st_holder;
   sk_stack_t* st = &st_holder;
-  sk_htbl_t ht_holder;
-  sk_htbl_t* ht = &ht_holder;
   uint64_t crc = CRC_INIT;
 
   sk_stack_init(st, STACK_INIT_CAPACITY);
-  sk_htbl_init(ht, 5);
-
   sk_stack_push(st, &obj, 0);
 
   while(st->head > 0) {
     sk_value_t delayed = sk_stack_pop(st);
     void* toHash = *delayed.value;
 
-    sk_cell_t* cell = sk_htbl_find(ht, toHash);
-
-    if(cell == NULL) {
-      uint64_t new_crc = sk_hash_obj(st, toHash);
-      sk_htbl_add(ht, toHash, new_crc);
-      crc = sk_crc64(crc, &new_crc, sizeof(uint64_t));
-    }
-    else {
-      crc = sk_crc64(crc, &cell->value, sizeof(uint64_t));
-    }
-
+    uint64_t new_crc = sk_hash_obj(st, toHash);
+    crc = sk_crc64(crc, &new_crc, sizeof(uint64_t));
   }
 
   sk_stack_free(st);
-  sk_htbl_free(ht);
 
   return crc;
 }
