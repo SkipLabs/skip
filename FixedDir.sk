@@ -33,7 +33,7 @@ value class Source private (value: Int) uses Orderable, Hashable {
 value class FixedRow<T>(
   key: BaseName,
   value: (Source, T),
-  tag: TimeTag,
+  tag: TickRange,
 ) uses Hashable, Orderable {
   fun toKeyInt(): (BaseName, Int) {
     (this.key, this.value.i0.value.hash());
@@ -60,11 +60,12 @@ base class FixedData<T> {
   fun getArray(key: BaseName): Array<(Source, T)>;
   fun getIter(key: BaseName): mutable Iterator<(Source, T)>;
   fun getArraySourceKey(source: Source, key: BaseName): Array<T>;
-  fun getChangesAfter(time: Int): Set<BaseName>;
+  fun getChangesAfter(tick: Tick): Set<BaseName>;
 }
 
 class CompressedDir<T, Compressed>{
-  time: Int,
+  time: Time,
+  tick: Tick,
   data: Array<Compressed> = Array[],
   decompress: (Int, Compressed) ~> FixedRow<T>,
 } extends FixedData<T> {
@@ -132,8 +133,8 @@ class CompressedDir<T, Compressed>{
     this.getIterSourceKey(source, key).collect(Array)
   }
 
-  fun getChangesAfter(time: Int): Set<BaseName> {
-    if (time > this.time) return Set[];
+  fun getChangesAfter(tick: Tick): Set<BaseName> {
+    if (tick > this.tick) return Set[];
     acc = mutable Set[];
     for (idx => value in this.data) {
       acc.insert(this.decompress(idx, value).key);
@@ -145,18 +146,21 @@ class CompressedDir<T, Compressed>{
 class FixedDir<T> private {
   data: Array<FixedRow<T>> = Array[],
 } extends FixedData<T> {
-  static fun create(data: Array<FixedRow<T>>): this {
-    result = data.clone();
+  static fun create(
+    data: mutable Vector<FixedRow<T>> = mutable Vector[],
+  ): this {
+    data.sort();
+    result = data.toArray().clone();
     _ = static::computeTags(result, 0, result.size() - 1);
     FixedDir{data => result.chill()}
   }
 
   static fun fromDMap(dmap: DMap<BaseName, SortedMap<Source, T>>): this {
     acc = mutable Vector[];
-    dmap.itemsWithTime().each(item -> {
-      (key, valueMap, time) = item;
+    dmap.itemsWithTick().each(item -> {
+      (key, valueMap, tick) = item;
       for (source => value in valueMap) {
-        acc.push(FixedRow(key, (source, value), time))
+        acc.push(FixedRow(key, (source, value), tick))
       }
     });
     data = acc.toArray();
@@ -251,10 +255,10 @@ class FixedDir<T> private {
     array: mutable Array<FixedRow<T>>,
     i: Int,
     j: Int,
-  ): TimeTag {
+  ): TickRange {
     if (i > j) {
       if (i < 0 || i >= array.size()) {
-        return TimeTag::create(0)
+        return TickRange::create(Tick(0))
       } else {
         loop {
           elt = array[i];
@@ -263,7 +267,7 @@ class FixedDir<T> private {
           loop {
             !i = i + 1;
             if (i >= array.size() || array[i].key != key) {
-              return TimeTag(maxVal, maxVal)
+              return TickRange(maxVal, maxVal)
             };
             !maxVal = max(maxVal, array[i].tag.max);
           }
@@ -281,7 +285,7 @@ class FixedDir<T> private {
   }
 
   fun getChangesAcc(
-    after: Int,
+    after: Tick,
     acc: mutable Vector<BaseName>,
     i: Int,
     j: Int,
@@ -289,28 +293,28 @@ class FixedDir<T> private {
     if (i < 0 || i >= this.data.size()) {
       return void
     };
-    if (i > j) {
-      time = this.data[i].tag;
-      if (time.max < after) return void;
-      if (time.current >= after) {
+    if (i >= j) {
+      tick = this.data[i].tag;
+      if (tick.max < after) return void;
+      if (tick.current >= after) {
         acc.push(this.data[i].key);
       };
       return void;
     };
     pivot = (i + j) / 2;
     elt = this.data[pivot];
-    time = elt.tag;
-    if (time.max < after) return void;
-    if (time.current >= after) {
+    tick = elt.tag;
+    if (tick.max < after) return void;
+    if (tick.current >= after) {
       acc.push(elt.key);
     };
     this.getChangesAcc(after, acc, i, pivot - 1);
     this.getChangesAcc(after, acc, pivot + 1, j);
   }
 
-  fun getChangesAfter(time: Int): Set<BaseName> {
+  fun getChangesAfter(tick: Tick): Set<BaseName> {
     acc = mutable Vector[];
-    this.getChangesAcc(time, acc, 0, this.data.size() - 1);
+    this.getChangesAcc(tick, acc, 0, this.data.size() - 1);
     acc.sort();
     acc.unique().collect(Set)
   }

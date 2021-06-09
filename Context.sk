@@ -190,6 +190,42 @@ value class Deps(
 }
 
 /*****************************************************************************/
+/* Value classes for tick and time. We use them to make sure we never treat
+ * them as integer. */
+/*****************************************************************************/
+
+value class Tick(value: Int) uses Orderable, Show {
+  fun next(): this {
+    !this.value = this.value + 1;
+    this
+  }
+
+  fun prev(): this {
+    !this.value = this.value - 1;
+    this
+  }
+
+  fun toString(): String {
+    this.value.toString()
+  }
+}
+
+value class Time(value: Int) uses Orderable, Show {
+  fun next(): this {
+    !this.value = genSym(this.value + 1);
+    this
+  }
+  fun toString(): String {
+    this.value.toString()
+  }
+
+  fun negate(): this {
+    !this.value = -this.value;
+    this
+  }
+}
+
+/*****************************************************************************/
 /* The context */
 /*****************************************************************************/
 
@@ -197,10 +233,10 @@ mutable class Context{
   mutable pwd: String = "/",
   mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
-  mutable time: Int = 0,
-  mutable tick: Int = 1,
+  mutable time: Time = Time(0),
+  mutable tick: Tick = Tick(1),
   mutable lazyCapacity: Int = 10,
-  mutable toUpdate: SortedMap<(Int, Int), Arrow> = SortedMap[],
+  mutable toUpdate: SortedMap<(Time, Time), Arrow> = SortedMap[],
   mutable deps: Deps = Deps[],
   mutable debugMode: Bool = debugMode,
   mutable failOnExn: Bool = true,
@@ -399,7 +435,7 @@ mutable class Context{
           input => false,
           dirName => preDirName,
           totalSize => 0,
-          fixedData => FixedDir::create(Array[]),
+          fixedData => FixedDir::create(),
           creator => this.currentArrow(),
         };
         dir.unsafeIterKeys((key, _time) -> {
@@ -415,7 +451,7 @@ mutable class Context{
         updateDirtyReaders(this, Path::create(preDirName.tag(), DIR_TAG));
         this.setDir(preDirName, preDir)
       | Some(preDir) ->
-        for (key in dir.getChangesAfter(this.tick - 1)) {
+        for (key in dir.getChangesAfter(this.tick.prev())) {
           values = dir.getArrayRaw(key).collect(Array);
           !preDir = preDir.writeEntry(
             this,
@@ -442,7 +478,7 @@ mutable class Context{
       this.lazyGetsQueueIn,
     );
     this.!lazyGets = SortedSet[];
-    if (this.tick <= this.lazyCapacity) return void;
+    if (this.tick <= Tick(this.lazyCapacity)) return void;
     queue = this.lazyGetsQueueOut match {
     | List.Nil() ->
       invariant(this.lazyGetsQueueIn is List.Cons _);
@@ -503,7 +539,7 @@ mutable class Context{
       print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
 
-    this.!tick = this.tick + 1;
+    this.!tick = this.tick.next();
     _ = this.timeStamp();
 
     this.updateLazyGets();
@@ -595,8 +631,8 @@ mutable class Context{
     }
   }
 
-  mutable fun timeStamp(): Int {
-    this.!time = genSym(this.time + 1);
+  mutable fun timeStamp(): Time {
+    this.!time = this.time.next();
     this.time
   }
 
@@ -627,6 +663,7 @@ mutable class Context{
     valueAcc = mutable Vector[];
     last: ?BaseName = None();
     time = this.timeStamp();
+    tick = this.tick;
 
     for (kv in content) {
       (key, values) = kv;
@@ -638,7 +675,7 @@ mutable class Context{
       | Some(oldKey) ->
         path = Source::create(Path::create(dirName, oldKey));
         vector.push(
-          FixedRow(oldKey, (path, valueAcc.toArray()), TimeTag::create(time)),
+          FixedRow(oldKey, (path, valueAcc.toArray()), TickRange::create(tick)),
         );
         !last = Some(key);
         valueAcc.clear();
@@ -650,10 +687,10 @@ mutable class Context{
     | Some(key) ->
       path = Source::create(Path::create(dirName, key));
       vector.push(
-        FixedRow(key, (path, valueAcc.toArray()), TimeTag::create(time)),
+        FixedRow(key, (path, valueAcc.toArray()), TickRange::create(tick)),
       )
     };
-    fixedData = FixedDir::create(vector.toArray());
+    fixedData = FixedDir::create(vector);
 
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
@@ -672,7 +709,8 @@ mutable class Context{
       throw DirAlreadyExists(dirName);
     };
     time = this.timeStamp();
-    fixedData = CompressedDir{time, data => content, decompress};
+    tick = this.tick;
+    fixedData = CompressedDir{time, tick, data => content, decompress};
 
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
@@ -683,7 +721,7 @@ mutable class Context{
   }
 
   mutable fun setDir(dirName: DirName, dir: Dir): void {
-    this.!dirs = this.dirs.set(this.timeStamp(), dirName, dir);
+    this.!dirs = this.dirs.set(this.tick, dirName, dir);
   }
 
   mutable fun getDir(dirName: DirName): Dir {
@@ -810,8 +848,8 @@ mutable class Context{
 }
 
 class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
-  fun set<T: File>(time: Int, key: DirName, value: Dir): this {
-    !this.state = this.state.set(TimeTag::create(time), key, value);
+  fun set<T: File>(tick: Tick, key: DirName, value: Dir): this {
+    !this.state = this.state.set(TickRange::create(tick), key, value);
     this
   }
   fun maybeGet(key: DirName): ?Dir {
@@ -826,16 +864,16 @@ class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
 }
 
 @cpp_export("SKIP_syncContext")
-fun syncContext(txTime: Int, newRoot: Context, ctx: mutable Context): void {
-  if (txTime == newRoot.time) return void;
+fun syncContext(txTick: Tick, newRoot: Context, ctx: mutable Context): void {
+  if (txTick == newRoot.tick) return void;
 
   context = Context::fromSaved(newRoot);
 
-  changedDirNames = ctx.dirs.state.getChangesAfter(txTime);
+  changedDirNames = ctx.dirs.state.getChangesAfter(txTick);
   for (dirName in changedDirNames) {
     ctx.unsafeMaybeGetDir(dirName) match {
     | Some(dir @ EagerDir{input => true}) ->
-      changedKeys = dir.getChangesAfter(txTime);
+      changedKeys = dir.getChangesAfter(txTick);
       context.unsafeMaybeGetDir(dirName) match {
       | None() -> context.mkdirMulti(dirName, Array[])
       | Some(EagerDir{input => true}) -> void
@@ -890,7 +928,7 @@ private native fun destroyObstackWithValue<T>(Obstack, List<T>): List<T>;
 
 @debug
 @cpp_extern("SKIP_context_sync")
-private native fun gContextSync(Int, Context, Context): Context;
+private native fun gContextSync(Tick, Context, Context): Context;
 
 @debug
 @cpp_extern("SKIP_context_init")
@@ -933,19 +971,19 @@ fun runWithGcReturnContext(
   f: Context ~> ContextOp,
 ): mutable Context {
   context = gContextInit(origContext);
-  startTime = context.time;
+  startTick = context.tick;
   loop {
     pos = newObstack();
     newContextOpt = f(context);
     newContextOpt match {
     | CAbort() -> return Context::fromSaved(context)
     | CContinue(newContext) ->
-      !context = gContextSync(startTime, context, newContext);
-      !startTime = context.time;
+      !context = gContextSync(startTick, context, newContext);
+      !startTick = context.tick;
       destroyObstack(pos)
     | CStop(newContext) ->
-      !context = gContextSync(startTime, context, newContext);
-      !startTime = context.time;
+      !context = gContextSync(startTick, context, newContext);
+      !startTick = context.tick;
       return Context::fromSaved(context)
     }
   }

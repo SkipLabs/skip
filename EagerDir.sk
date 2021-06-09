@@ -136,14 +136,14 @@ value class MInfo(
 /* The class used for subscriptions. */
 /*****************************************************************************/
 
-value class Sub(cmd: String, status: Int, time: Int)
+value class Sub(cmd: String, status: Int, tick: Tick)
 
 /*****************************************************************************/
 /* An Eager Directory. */
 /*****************************************************************************/
 
 class EagerDir{
-  time: Int,
+  time: Time,
   dirName: DirName,
   input: Bool,
   fixedData: FixedData<Array<File>>,
@@ -166,7 +166,7 @@ class EagerDir{
     id: Int,
     changes: Set<BaseName>,
     cmd: String,
-    time: Int,
+    tick: Tick,
   ): this {
     proc = exec(cmd);
     for (key in changes) {
@@ -184,15 +184,15 @@ class EagerDir{
       };
     };
     status = waitForProc(proc);
-    !this.subs[id] = Sub(cmd, status, time);
+    !this.subs[id] = Sub(cmd, status, tick);
     this
   }
 
-  private fun notifyAll(time: Int): this {
-    changes = this.getChangesAfter(time);
+  private fun notifyAll(tick: Tick): this {
+    changes = this.getChangesAfter(tick);
     for (id => sub in this.subs) {
       if (sub.status == 0) {
-        !this = this.notifyCmd(id, changes, sub.cmd, time);
+        !this = this.notifyCmd(id, changes, sub.cmd, tick);
       }
     };
     this
@@ -200,10 +200,10 @@ class EagerDir{
 
   fun subscribe(context: mutable Context, cmd: String, init: Bool): Int {
     id = genSym(0);
-    !this.subs[id] = Sub(cmd, 0, 0);
+    !this.subs[id] = Sub(cmd, 0, Tick(0));
     if (init) {
-      changes = this.getChangesAfter(0);
-      !this = this.notifyCmd(id, changes, cmd, 0);
+      changes = this.getChangesAfter(Tick(0));
+      !this = this.notifyCmd(id, changes, cmd, Tick(0));
     };
     context.setDir(this.dirName, this);
     context.!sessions[id] = this.dirName;
@@ -212,8 +212,8 @@ class EagerDir{
 
   fun reconnect(context: mutable Context, id: Int): void {
     sub = this.subs[id];
-    changes = this.getChangesAfter(sub.time);
-    !this = this.notifyCmd(id, changes, sub.cmd, context.time);
+    changes = this.getChangesAfter(sub.tick);
+    !this = this.notifyCmd(id, changes, sub.cmd, context.tick);
     context.setDir(this.dirName, this);
   }
 
@@ -249,7 +249,7 @@ class EagerDir{
     current = 0;
     acc = mutable Vector[];
 
-    this.data.eachWithTime((key, time) -> {
+    this.data.eachWithTick((key, time) -> {
       while (
         current < this.fixedData.size() &&
         this.fixedData[current].key < key
@@ -267,9 +267,7 @@ class EagerDir{
           acc.push(this.fixedData[current]);
           !current = current + 1;
         };
-        if (values.size() > 0) {
-          acc.push(FixedRow(key, (source, values), TimeTag::create(time)));
-        };
+        acc.push(FixedRow(key, (source, values), TickRange::create(time)));
         while (
           current < this.fixedData.size() &&
           this.fixedData[current].key == key &&
@@ -290,7 +288,7 @@ class EagerDir{
       acc.push(this.fixedData[current]);
       !current = current + 1;
     };
-    FixedDir::create(acc.toArray());
+    FixedDir::create(acc);
   }
 
   fun purge(): this {
@@ -303,12 +301,14 @@ class EagerDir{
     this.input
   }
 
-  fun getTime(): Int {
+  fun getTime(): Time {
     this.time
   }
 
-  fun getChangesAfter(time: Int): Set<BaseName> {
-    this.data.getChangesAfter(time).union(this.fixedData.getChangesAfter(time))
+  fun getChangesAfter(tick: Tick): Set<BaseName> {
+    new = this.data.getChangesAfter(tick);
+    old = this.fixedData.getChangesAfter(tick);
+    new.union(old)
   }
 
   private static fun fixedMapData(
@@ -544,11 +544,10 @@ class EagerDir{
 
     path = Path::create(parentName, key);
     source = Source::create(path);
-    time = context.timeStamp();
 
     for (kv in kvArray) {
       (k, v) = kv;
-      acc.push(FixedRow(k, (source, v), TimeTag::create(time)))
+      acc.push(FixedRow(k, (source, v), TickRange::create(context.tick)))
     };
 
     if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
@@ -644,15 +643,14 @@ class EagerDir{
       }
     };
 
-    acc.sort();
-    fixedData = FixedDir::create(acc.toArray());
+    fixedData = FixedDir::create(acc);
     time = context.timeStamp();
     totalSize = fixedData.size();
     (!fixedData, compactor) = compactorOpt match {
     | None() -> (fixedData, None())
     | Some(icompactor) ->
       (
-        if (icompactor.canReset) fixedData else FixedDir::create(Array[]),
+        if (icompactor.canReset) fixedData else FixedDir::create(),
         Some(Compactor::create(fixedData, icompactor)),
       )
     };
@@ -782,7 +780,7 @@ class EagerDir{
     rangeOpt: ?Array<KeyRange>,
     child: EagerDir,
   ): void {
-    startTime = context.time;
+    startTick = context.tick;
     parent = context.unsafeGetEagerDir(parentName);
     childName = child.dirName;
 
@@ -874,7 +872,7 @@ class EagerDir{
       context.leave(ArrowKey(parentName, childName, key));
     };
 
-    !child = child.notifyAll(startTime);
+    !child = child.notifyAll(startTick);
 
     context.setDir(child.dirName, child);
   }
@@ -917,7 +915,7 @@ class EagerDir{
     };
 
     !map = map.set(source, rvalues);
-    tag = TimeTag::create(context.timeStamp());
+    tag = TickRange::create(context.tick);
     data = this.data.set(tag, k, map);
 
     if (native_eq(rvalues, oldValues) == 0) {
@@ -1025,20 +1023,20 @@ class EagerDir{
     slices
   }
 
-  fun unsafeIterKeys(f: (BaseName, Int) -> void): void {
+  fun unsafeIterKeys(f: (BaseName, Tick) -> void): void {
     fixedData = this.fixedData;
     current = 0;
-    this.data.eachWithTime((newKey, time) -> {
+    this.data.eachWithTick((newKey, tick) -> {
       while (current < fixedData.size() && fixedData[current].key < newKey) {
         row = fixedData[current];
-        f(row.key, 0);
+        f(row.key, Tick(0));
         !current = current + 1;
       };
-      f(newKey, time);
+      f(newKey, tick);
     });
     while (current < fixedData.size()) {
       row = fixedData[current];
-      f(row.key, 0);
+      f(row.key, Tick(0));
       !current = current + 1;
     };
   }

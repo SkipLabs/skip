@@ -1,0 +1,74 @@
+/*****************************************************************************/
+/* Stress testing changes after. */
+/*****************************************************************************/
+
+module SKFSTest;
+
+fun testChangesAfter(): mutable SKFS.Context {
+  dirName = SKFS.DirName::create("/sinput/");
+  context = SKFS.run(context ~> {
+    _ = context.mkdir(
+      SKFS.StringFile::fromFile,
+      dirName,
+      Array[
+        (SKFS.IID(0), SKFS.StringFile("0")),
+        (SKFS.IID(1), SKFS.StringFile("0")),
+      ],
+    );
+  });
+  tick = context.tick;
+  context.update();
+  expectEq(
+    "Test getChangesAfter 0:",
+    Array<SKFS.BaseName>[SKFS.IID(0), SKFS.IID(1)],
+    () -> {
+      context
+        .unsafeGetEagerDir(dirName)
+        .getChangesAfter(tick)
+        .collect(Array)
+        .sorted()
+    },
+  );
+  !tick = context.tick;
+  write(context, dirName, SKFS.IID(1), Array[]);
+  write(context, dirName, SKFS.IID(2), Array[SKFS.StringFile("22")]);
+  context.update();
+  expectEq(
+    "Test getChangesAfter 1:",
+    Array<SKFS.BaseName>[SKFS.IID(1), SKFS.IID(2)],
+    () -> {
+      context
+        .unsafeGetEagerDir(dirName)
+        .getChangesAfter(tick)
+        .collect(Array)
+        .sorted()
+    },
+  );
+
+  for (i in Range(0, 1000)) {
+    write(context, dirName, SKFS.IID(i), Array[SKFS.StringFile("23")]);
+  };
+  context.update();
+
+  rand = Random::mcreate(23);
+  for (i in Range(0, 100)) {
+    !tick = context.tick;
+    changes = mutable Set<SKFS.BaseName>[];
+    for (_ in Range(0, rand.random(0, 100))) {
+      key = SKFS.IID(rand.random(0, 1000));
+      changes.insert(key);
+      write(context, dirName, key, Array[SKFS.StringFile("44")]);
+    };
+    context.update();
+    expectEq(
+      "Test getChangesAfter " + (2 + i) + ":",
+      changes.collect(Array).sorted(),
+      () -> {
+        dir = context.unsafeGetEagerDir(dirName);
+        if (rand.random(0, 10) > 5) !dir = dir.purge();
+        dir.getChangesAfter(tick).collect(Array).sorted()
+      },
+    );
+  };
+  context
+}

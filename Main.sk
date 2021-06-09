@@ -67,7 +67,7 @@ untracked fun main(): void {
     };
     startContext = SKFS.gContextGet();
     context = SKFS.Context::fromSaved(startContext);
-    startTime = context.time;
+    startTick = context.tick;
     for (id => dirName in context.sessions) {
       sub = context.unsafeGetEagerDir(dirName).subs[id];
       print_string(
@@ -78,7 +78,7 @@ untracked fun main(): void {
           if (sub.status == 0) "CONNECTED" else "DISCONNECTED",
       );
     };
-    _context = SKFS.gContextSync(startTime, startContext, context.clone());
+    _context = SKFS.gContextSync(startTick, startContext, context.clone());
     return void
   | _ -> void
   };
@@ -92,7 +92,7 @@ untracked fun main(): void {
     };
     startContext = SKFS.gContextGet();
     context = SKFS.Context::fromSaved(startContext);
-    startTime = context.time;
+    startTick = context.tick;
     dirName = context.sessions.maybeGet(sessionID) match {
     | None() ->
       print_error("Error: session not found");
@@ -101,7 +101,7 @@ untracked fun main(): void {
     };
     edir = context.unsafeGetEagerDir(dirName);
     edir.reconnect(context, sessionID);
-    _context = SKFS.gContextSync(startTime, startContext, context.clone());
+    _context = SKFS.gContextSync(startTick, startContext, context.clone());
     return void
   | _ -> void
   };
@@ -127,7 +127,7 @@ untracked fun main(): void {
     };
     startContext = SKFS.gContextGet();
     context = SKFS.Context::fromSaved(startContext);
-    startTime = context.time;
+    startTick = context.tick;
     edir = context.unsafeMaybeGetDir(dirName) match {
     | Some(SKFS.LazyDir _) ->
       print_error("Error: cannot connect to a lazy directory");
@@ -145,7 +145,7 @@ untracked fun main(): void {
     };
     sessionID = edir.subscribe(context, cmd, init);
     print_string(sessionID.toString());
-    _context = SKFS.gContextSync(startTime, startContext, context.clone());
+    _context = SKFS.gContextSync(startTick, startContext, context.clone());
     return void
   };
 
