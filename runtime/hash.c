@@ -287,8 +287,7 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
     SKIP_internalExit();
   }
 
-  size_t t = ((crc >> 56) ^ ty->m_kind) & 0xFF;
-  crc = crc64table[t] ^ (crc << 8);
+  crc = sk_crc64_combine(crc, ty);
 
   return crc;
 }
