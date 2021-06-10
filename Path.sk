@@ -73,11 +73,7 @@ class Path(dirName: DirName, baseName: BaseName) extends FileName {
   static fun fromString(path: String): this {
     (dirNameStr, baseNameStr) = splitPath(path);
     dirName = DirName::create(dirNameStr);
-    baseName = baseNameStr.getIter().next() match {
-    | None() -> invariant_violation("Expected a path")
-    | Some(c) if (c == '-' || Chars.isDigit(c)) -> IID(baseNameStr.toInt())
-    | _ -> SID::create(baseNameStr)
-    };
+    baseName = SID::create(baseNameStr);
     Path::create(dirName, baseName)
   }
 

@@ -879,11 +879,13 @@ fun syncContext(txTick: Tick, newRoot: Context, ctx: mutable Context): void {
       | Some(EagerDir{input => true}) -> void
       | Some(_) -> invariant_violation("Error: incompactible dir types")
       };
+      entries = mutable Vector[];
       for (key in changedKeys) {
         values = dir.getArrayRaw(key);
-        inputDir = context.unsafeMaybeGetEagerDir(dirName).fromSome();
-        inputDir.writeArray(context, key, values);
-      }
+        entries.push((key, values));
+      };
+      inputDir = context.unsafeMaybeGetEagerDir(dirName).fromSome();
+      inputDir.writeArrayMany(context, entries.iterator())
     | _ -> void
     }
   };

@@ -15,6 +15,10 @@ const argsSchema: Array<AP.Param> = Array[
     name => "subscribe",
     help => "Subscribes to a directory change",
   },
+  AP.StringParam{
+    name => "write",
+    help => "Writes the data coming from stdin into a directory",
+  },
   AP.IntParam{name => "reconnect", help => "reconnects to a session id"},
   AP.StringParam{name => "cmd", help => "Name of the command to run on change"},
 ];
@@ -102,6 +106,18 @@ untracked fun main(): void {
     edir = context.unsafeGetEagerDir(dirName);
     edir.reconnect(context, sessionID);
     _context = SKFS.gContextSync(startTick, startContext, context.clone());
+    return void
+  | _ -> void
+  };
+
+  argMap.maybeGet("write") match {
+  | Some(AP.StringValue{value => dirNameStr}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    SKFS.writeFromStdin(dirNameStr);
     return void
   | _ -> void
   };

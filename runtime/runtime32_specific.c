@@ -111,3 +111,7 @@ void SKIP_write_to_proc(void* proc, char* str) {
 void SKIP_wait_for_proc(void* proc) {
   // Not implemented
 }
+
+void sk_check_has_lock() {
+  // always true in wasm mode.
+}

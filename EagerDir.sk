@@ -169,16 +169,34 @@ class EagerDir{
     tick: Tick,
   ): this {
     proc = exec(cmd);
+    writeToProc(proc, "\n");
+    writeToProc(proc, "\n");
     for (key in changes) {
       key match {
-      | rkey @ SKSQL.RowKey _ -> rkey.print(str -> writeToProc(proc, str))
+      | rkey @ SKSQL.RowKey _ ->
+        rkey.print(str -> writeToProc(proc, escape(str)))
       | _ ->
-        for (value in this.getArrayRaw(key)) {
-          value match {
-          | SKFS.StringFile(str) ->
-            writeToProc(proc, "" + key + "\t" + str + "\n")
-          | x ->
-            writeToProc(proc, "" + key + "\t" + inspect(x).toString() + "\n")
+        values = this.getArrayRaw(key);
+        if (values.size() == 0) {
+          writeToProc(proc, "" + escape(key.toString()) + "\n")
+        } else {
+          for (value in values) {
+            value match {
+            | SKFS.StringFile(str) ->
+              writeToProc(
+                proc,
+                "" + escape(key.toString()) + "\t" + escape(str) + "\n",
+              )
+            | x ->
+              writeToProc(
+                proc,
+                "" +
+                  escape(key.toString()) +
+                  "\t" +
+                  escape(inspect(x).toString()) +
+                  "\n",
+              )
+            }
           }
         }
       };
@@ -1172,6 +1190,19 @@ class EagerDir{
   ): void {
     source = Path::create(this.dirName, key);
     !this = this.writeEntry(context, source, key, values);
+    context.!toReset = context.toReset.set(this.dirName);
+    context.setDir(this.dirName, this);
+  }
+
+  fun writeArrayMany(
+    context: mutable Context,
+    bindings: mutable Iterator<(BaseName, Array<File>)>,
+  ): void {
+    for (kv in bindings) {
+      (key, values) = kv;
+      source = Path::create(this.dirName, key);
+      !this = this.writeEntry(context, source, key, values);
+    };
     context.!toReset = context.toReset.set(this.dirName);
     context.setDir(this.dirName, this);
   }

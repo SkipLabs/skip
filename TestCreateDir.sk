@@ -1,0 +1,29 @@
+/*****************************************************************************/
+/* Test that creates a directory. */
+/*****************************************************************************/
+
+module SKFSTest;
+
+fun testCreateDir(): mutable SKFS.Context {
+  SKFS.runWithGcReturnContext(SKFS.Context{}, icontext ~> {
+    context = SKFS.Context::fromSaved(icontext);
+    dirName = SKFS.DirName::create("/tmp/");
+    mappedDirName = SKFS.DirName::create("/tmp/mapped/");
+    dir = context.mkdir(SKFS.StringFile::fromFile, dirName, Array[]);
+    _ = dir.contextWriterKeyValues(
+      SKFS.StringFile::fromFile,
+      context,
+      mappedDirName,
+      (_context, writer, key, files) ~> {
+        writer.writeArray(
+          key,
+          files.map(file -> {
+            !file.value = file.value + "Mapped";
+            file
+          }),
+        )
+      },
+    );
+    SKFS.CStop(context.clone())
+  })
+}
