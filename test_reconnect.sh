@@ -19,6 +19,6 @@ for i in {1..10}; do echo "insert into t1 values($i);" | build/sqlive --data /tm
 
 nc -l -p 2345 > /tmp/server_out&
 
-build/sqlive --reconnect 624 --data /tmp/data
+build/sqlive --reconnect 210 --data /tmp/data
 
 build/sqlive --sessions --data /tmp/data

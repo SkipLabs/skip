@@ -1,5 +1,29 @@
 module SKFS;
 
+const DumbEPointer: ExternalPointer = ExternalPointer(0, _ ~> void);
+
+@cpp_export("sk_get_external_pointer")
+fun getExternalPointer(): ExternalPointer {
+  DumbEPointer
+}
+
+class ExternalPointer(value: Int, destructor: Int ~> void) extends File
+
+@cpp_export("sk_get_external_pointer_value")
+fun getValue(p: ExternalPointer): Int {
+  p.value
+}
+
+@cpp_export("sk_get_external_pointer_destructor")
+fun getDestructor(p: ExternalPointer): Int ~> void {
+  p.destructor
+}
+
+@cpp_export("sk_call_external_pointer_descructor")
+fun callDestructor(destructor: Int ~> void, value: Int): void {
+  destructor(value)
+}
+
 extension base class .Inspect {
   fun simplePrint(o: String -> void): void
   | .InspectSpecial(v) -> o("'" + v + "'")

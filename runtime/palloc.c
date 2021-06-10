@@ -24,6 +24,8 @@
 
 void*** pconsts = NULL;
 
+void* program_break = NULL;
+
 /*****************************************************************************/
 /* Gensym. */
 /*****************************************************************************/
@@ -220,7 +222,7 @@ void sk_commit() {
 /* Creates a new file mapping. */
 /*****************************************************************************/
 
-void sk_create_mapping(char* fileName) {
+void sk_create_mapping(char* fileName, char* static_limit) {
   if(access(fileName, F_OK) == 0) {
     fprintf(stderr, "ERROR: File %s already exists!\n", fileName);
     exit(21);
@@ -285,7 +287,7 @@ void sk_create_mapping(char* fileName) {
     exit(31);
   }
 
-  (*ginfo)->break_ptr = sbrk(0);
+  (*ginfo)->break_ptr = static_limit;
 
   // The head must be aligned!
   head = (char*)(((uintptr_t)head + (uintptr_t)(15)) & ~((uintptr_t)(15)));
@@ -397,10 +399,10 @@ void* sk_get_ftable(size_t size) {
 /* No file initialization (the memory is not backed by a file). */
 /*****************************************************************************/
 
-static void sk_init_no_file() {
+static void sk_init_no_file(char* static_limit) {
   ginfo = malloc(sizeof(ginfo_t*));
   *ginfo = malloc(sizeof(ginfo_t));
-  (*ginfo)->break_ptr = sbrk(0);
+  (*ginfo)->break_ptr = static_limit;
   (*ginfo)->fileName = NULL;
   gmutex = NULL;
   gid = malloc(sizeof(uint64_t));
@@ -409,20 +411,29 @@ static void sk_init_no_file() {
   *pconsts = NULL;
 }
 
+int sk_is_nofile_mode() {
+  return ((*ginfo)->fileName == NULL);
+}
+
 /*****************************************************************************/
 /* Memory initialization. */
 /*****************************************************************************/
 
+extern SKIP_gc_type_t* epointer_ty;
+
 void SKIP_memory_init(int argc, char** argv) {
+  char* obj = sk_get_external_pointer();
+  epointer_ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
+
   int is_create = 0;
   char* fileName = parse_args(argc, argv, &is_create);
 
   if(fileName == NULL) {
-    sk_init_no_file();
+    sk_init_no_file(program_break);
     return;
   }
   if(is_create) {
-    sk_create_mapping(fileName);
+    sk_create_mapping(fileName, program_break);
     return;
   }
   sk_load_mapping(fileName);

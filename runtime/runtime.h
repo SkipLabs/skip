@@ -203,5 +203,10 @@ void sk_staging();
 char* sk_string_create(const char* buffer, uint32_t size);
 void throw_Invalid_utf8();
 void todo();
+char* sk_get_external_pointer();
+char* sk_get_external_pointer_destructor(char* obj);
+SkipInt sk_get_external_pointer_value(char* obj);
+void sk_call_external_pointer_descructor(char*, SkipInt);
+int sk_is_nofile_mode();
 
 #endif

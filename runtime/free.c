@@ -1,5 +1,25 @@
 #include "runtime.h"
 
+#ifdef SKIP64
+#include <unistd.h>
+#endif
+
+extern SKIP_gc_type_t* epointer_ty;
+
+/*****************************************************************************/
+/* Primitive used to test that external pointers are freed properly. */
+/*****************************************************************************/
+
+static SkipInt test_counter = 0;
+
+void SKIP_test_free_external_pointer(SkipInt n) {
+  test_counter++;
+}
+
+SkipInt SKIP_get_free_test_counter() {
+  return test_counter;
+}
+
 /*****************************************************************************/
 /* Freeing primitive. */
 /*****************************************************************************/
@@ -16,7 +36,18 @@ void sk_free_class(sk_stack_t* st, char* obj) {
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
 
-  if((ty->m_refsHintMask & 1) != 0) {
+  if(ty == epointer_ty) {
+    #ifdef SKIP64
+    if(!sk_is_nofile_mode()) {
+      fprintf(stderr, "You cannot use external pointers in persistent mode.\n");
+      _exit(23);
+    }
+    #endif
+    char* destructor = sk_get_external_pointer_destructor(obj);
+    SkipInt value = sk_get_external_pointer_value(obj);
+    sk_call_external_pointer_descructor(destructor, value);
+  }
+  else if((ty->m_refsHintMask & 1) != 0) {
     size_t size = ty->m_userByteSize / sizeof(void*);
     size_t bitsize = sizeof(void*) * 8;
     size_t slot = 0;
@@ -115,7 +146,6 @@ void sk_free_root(char* obj) {
 
   sk_stack_init(st, STACK_INIT_CAPACITY);
   sk_stack_push(st, (void**)obj, NULL);
-
 
   while(st->head > 0) {
     sk_value_t delayed = sk_stack_pop(st);

@@ -91,6 +91,12 @@ char* SKIP_getArgN(uint32_t n) {
 
 void SKIP_memory_init(int pargc, char** pargv);
 void sk_persist_consts();
+extern void* program_break;
+
+void __attribute__ ((constructor)) premain()
+{
+  program_break = sbrk(0);
+}
 
 int main(int pargc, char** pargv) {
   argc = pargc;

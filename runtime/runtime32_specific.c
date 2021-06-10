@@ -17,10 +17,13 @@ char* end_of_static;
 extern unsigned char* bump_pointer;
 void* sk_ftable_holder[SK_FTABLE_SIZE];
 extern void** sk_ftable;
+extern SKIP_gc_type_t* epointer_ty;
 
 void SKIP_skfs_init() {
   end_of_static = (char*)bump_pointer;
   sk_ftable = sk_ftable_holder;
+  char* obj = sk_get_external_pointer();
+  epointer_ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 }
 
 void SKIP_destroy_Obstack(void*);
