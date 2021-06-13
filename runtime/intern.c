@@ -88,7 +88,7 @@ static char* SKIP_intern_class(sk_stack_t* st, char* obj, char* large_page) {
   size_t leftsize = ty->m_uninternedMetadataByteSize;
   void** result = (void**)shallow_intern(obj, memsize, leftsize, large_page);
 
-  if(ty != epointer_ty && (ty->m_refsHintMask & 1) != 0) {
+  if(epointer_ty != NULL && ty != epointer_ty && (ty->m_refsHintMask & 1) != 0) {
     size_t size = ty->m_userByteSize / sizeof(void*);
     size_t bitsize = sizeof(void*) * 8;
     size_t slot = 0;

@@ -422,21 +422,21 @@ int sk_is_nofile_mode() {
 extern SKIP_gc_type_t* epointer_ty;
 
 void SKIP_memory_init(int argc, char** argv) {
-  char* obj = sk_get_external_pointer();
-  epointer_ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
-
   int is_create = 0;
   char* fileName = parse_args(argc, argv, &is_create);
 
   if(fileName == NULL) {
     sk_init_no_file(program_break);
-    return;
   }
-  if(is_create) {
+  else if(is_create) {
     sk_create_mapping(fileName, program_break);
-    return;
   }
-  sk_load_mapping(fileName);
+  else {
+    sk_load_mapping(fileName);
+  }
+
+  char* obj = sk_get_external_pointer();
+  epointer_ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 }
 
 /*****************************************************************************/
