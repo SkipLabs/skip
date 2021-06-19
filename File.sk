@@ -1,13 +1,25 @@
 module SKFS;
 
-const DumbEPointer: ExternalPointer = ExternalPointer(0, _ ~> void);
+@cpp_extern("SKIP_create_external_pointer")
+native fun createExternalPointer(ExternalPointer): ExternalPointer;
+
+class ExternalPointer private (
+  value: Int,
+  destructor: Int ~> void,
+) extends File {
+  static fun create(value: Int, destructor: Int ~> void): this {
+    createExternalPointer(static(value, destructor));
+  }
+
+  static fun getExternalPointer(): ExternalPointer {
+    ExternalPointer(0, _ ~> void)
+  }
+}
 
 @cpp_export("sk_get_external_pointer")
 fun getExternalPointer(): ExternalPointer {
-  DumbEPointer
+  ExternalPointer::getExternalPointer()
 }
-
-class ExternalPointer(value: Int, destructor: Int ~> void) extends File
 
 @cpp_export("sk_get_external_pointer_value")
 fun getValue(p: ExternalPointer): Int {

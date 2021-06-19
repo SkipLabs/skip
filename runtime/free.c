@@ -5,6 +5,7 @@
 #endif
 
 extern SKIP_gc_type_t* epointer_ty;
+extern sk_list_t* sk_external_pointers;
 
 /*****************************************************************************/
 /* Primitive used to test that external pointers are freed properly. */
@@ -146,6 +147,44 @@ void sk_free_root(char* obj) {
 
   sk_stack_init(st, STACK_INIT_CAPACITY);
   sk_stack_push(st, (void**)obj, NULL);
+
+  while(st->head > 0) {
+    sk_value_t delayed = sk_stack_pop(st);
+    void* toFree = delayed.value;
+
+    if(sk_is_static(toFree)) {
+      continue;
+    }
+
+   uintptr_t count = sk_decr_ref_count(toFree);
+    if(count == 0) {
+      sk_free_obj(st, toFree);
+    }
+  }
+
+  sk_stack_free(st);
+}
+
+void sk_free_external_pointers() {
+  sk_check_has_lock();
+
+  sk_stack_t st_holder;
+  sk_stack_t* st = &st_holder;
+
+  sk_stack_init(st, STACK_INIT_CAPACITY);
+  sk_list_t* cursor = sk_external_pointers;
+
+  while(cursor != NULL) {
+    sk_list_t* l = cursor;
+    uintptr_t count = sk_decr_ref_count(l->head);
+    if(count == 0) {
+      sk_free_obj(st, l->head);
+    }
+    cursor = l->tail;
+    sk_free_size(l, sizeof(sk_list_t));
+  }
+
+  sk_external_pointers = NULL;
 
   while(st->head > 0) {
     sk_value_t delayed = sk_stack_pop(st);

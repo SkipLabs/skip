@@ -15,44 +15,18 @@ fun testExternalPointer(): mutable SKFS.Context {
       context.setGlobal("Count", SKFS.IntFile(0));
     };
     round = SKFS.IntFile::fromFile(context.getGlobal("Count").fromSome()).value;
-    epointer = SKFS.ExternalPointer(round, testFreeEP);
-    !round = round + 1;
+    epointer = SKFS.ExternalPointer::create(round, testFreeEP);
     testCounter = getFreeTestCounter();
-
-    // This deserves an explanation.
-    // So what's going on is that I am not able to retrieve the correct program
-    // break. Normally a call to sbrk(0) would do the trick. But because the
-    // main is compiled by C++ (because we rely on C++ exceptions ...), it's
-    // actually complicated to get C++ to call something before constants
-    // are initialized. There might be way, I am just not aware of it.
-    //
-    // Because of this, malloc has enough time to call sbrk and get a few pages
-    // before my call to sbrk(0).
-    // As a result, the first few mallocs end up with an address that is before
-    // what we consider the program break. In other words, those pointers look
-    // like constants to the runtime (and are therefore never collected).
-    //
-    // I need to spend time to fix this at some point. But it involves reading
-    // about C++. Which I enjoy as much as pins and needles soup.
-    //
-    // So for now, we just live with the fact that the runtime leaks the first
-    // few objects that it allocates.
-    //
-    // What the code does here is that we reset the round to 0, until the free
-    // function is actually called, that is, when the runtime is no more
-    // leaking.
-
-    if (testCounter == 0) {
-      !round = 0;
-    } else {
-      expectEq("Call to free nbr " + round, round, () -> testCounter);
-    };
+    expectEq("Call to free nbr " + round, round, () ->
+      if (round == 0) 0 else testCounter + 1
+    );
+    !round = round + 1;
     context.setGlobal("Count", SKFS.IntFile(round));
     context.setGlobal("Pointer", epointer);
     context.update();
     if (round == 10) SKFS.CStop(context.clone()) else {
       SKFS.CContinue(context.clone())
-    }
+    };
   });
   mutable SKFS.Context{}
 }

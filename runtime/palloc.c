@@ -47,7 +47,7 @@ pthread_mutex_t* gmutex = (void*)1234;
 static int sk_is_locked = 0;
 
 void sk_check_has_lock() {
-  if(!sk_is_locked) {
+  if((gmutex != NULL) && !sk_is_locked) {
     fprintf(stderr, "INTERNAL ERROR: unsafe operation\n");
     SKIP_throw(NULL);
   }
@@ -364,6 +364,12 @@ void sk_load_mapping(char* fileName) {
 
 int sk_is_static(void* ptr) {
   return (char*)ptr <= (*ginfo)->break_ptr;
+}
+
+void sk_lower_static(void* ptr) {
+  if((char*)ptr < (*ginfo)->break_ptr) {
+    (*ginfo)->break_ptr = ptr - 1;
+  }
 }
 
 /*****************************************************************************/

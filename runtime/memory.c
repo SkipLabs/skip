@@ -152,6 +152,8 @@ int memcmp(const void * ptr1, const void * ptr2, size_t num) {
 
 void* sk_malloc(size_t size) {
   void* result = malloc(size);
+  sk_lower_static(result);
+
   if(result == NULL) {
     fprintf(stderr, "Out of memory\n");
     SKIP_throw(NULL);

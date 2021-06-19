@@ -69,6 +69,7 @@ void* SKIP_context_sync(uint64_t txTime, char* old_context, char* obj) {
   sk_context_set_unsafe(new_obj);
   sk_free_root(old_context);
   sk_free_root(context);
+  sk_free_external_pointers();
   sk_commit();
   return new_obj;
 }

@@ -282,3 +282,20 @@ void* SKIP_intern_shared(void* obj) {
 void* SKIP_intern(void* obj) {
   return sk_new_const(obj);
 }
+
+sk_list_t* sk_external_pointers = NULL;
+
+void* SKIP_create_external_pointer(void* obj) {
+  sk_global_lock();
+
+  void* result = SKIP_intern_shared(obj);
+
+  sk_list_t* l = (sk_list_t*)sk_malloc(sizeof(sk_list_t));
+  l->head = result;
+  l->tail = sk_external_pointers;
+  sk_external_pointers = l;
+
+  sk_global_unlock();
+
+  return result;
+}

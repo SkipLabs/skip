@@ -4,7 +4,7 @@ SKC=~/skip/build/bin/skip_to_llvm
 BCLINK=llvm-link-10
 MEMSIZE32=1073741824
 
-OLEVEL=-O3
+OLEVEL=-O0
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
@@ -22,7 +22,7 @@ CFILES=\
 	runtime/stdlib.c \
 	runtime/stack.c \
 	runtime/string.c \
-	runtime/native_eq.c 
+	runtime/native_eq.c
 
 NATIVE_FILES=\
 	runtime/palloc.c\

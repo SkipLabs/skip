@@ -149,6 +149,15 @@ typedef struct {
 } sk_string_t;
 
 /*****************************************************************************/
+/* SKIP linked list. */
+/*****************************************************************************/
+
+typedef struct {
+  void* head;
+  void* tail;
+} sk_list_t;
+
+/*****************************************************************************/
 /* Function signatures. */
 /*****************************************************************************/
 
@@ -208,5 +217,9 @@ char* sk_get_external_pointer_destructor(char* obj);
 SkipInt sk_get_external_pointer_value(char* obj);
 void sk_call_external_pointer_descructor(char*, SkipInt);
 int sk_is_nofile_mode();
+void sk_lower_static(void*);
+void sk_check_has_lock();
+void sk_free_obj(sk_stack_t* st, char* obj);
+void sk_free_external_pointers();
 
 #endif
