@@ -77,7 +77,11 @@ fun run(f: (mutable Context) -> void): mutable Context {
  */
 /*****************************************************************************/
 
-fun updateDirtyReaders(context: mutable Context, path: Path): void {
+fun updateDirtyReaders(
+  context: mutable Context,
+  path: Path,
+  addToDirtyList: Bool = true,
+): void {
   for (reader in context.getDeps(path)) {
     child = context.unsafeMaybeGetDir(reader.childName) match {
     | None() -> continue
@@ -87,7 +91,9 @@ fun updateDirtyReaders(context: mutable Context, path: Path): void {
     | None() -> continue
     | Some(x) -> x
     };
-    context.!dirtyReaders = List.Cons(reader, context.dirtyReaders);
+    if (addToDirtyList) {
+      context.!dirtyReaders = List.Cons(reader, context.dirtyReaders);
+    };
     time = if (reader.parentName == reader.childName) {
       (-child.getTime(), -child.getTime())
     } else {
@@ -557,7 +563,7 @@ mutable class Context{
           };
           dir = context.unsafeGetLazyDir(path.dirName);
           _ = dir.unsafeGetArray(context, path.baseName);
-          updateDirtyReaders(context, path);
+          updateDirtyReaders(context, path, false);
           !rounds = rounds - 1;
           if (shouldGC(obstack) != 0) {
             break void;
