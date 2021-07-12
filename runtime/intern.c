@@ -53,7 +53,7 @@ void sk_incr_ref_count(void* obj) {
   *count = *count + 1;
 }
 
-uintptr_t sk_decr_ref_count(void* obj) {
+static uintptr_t* sk_get_ref_count_addr(void* obj) {
   uintptr_t* count = obj;
   if(SKIP_is_string(obj)) {
     #ifdef SKIP64
@@ -77,7 +77,17 @@ uintptr_t sk_decr_ref_count(void* obj) {
       SKIP_internalExit();
     }
   }
+  return count;
+}
+
+uintptr_t sk_decr_ref_count(void* obj) {
+  uintptr_t* count = sk_get_ref_count_addr(obj);
   *count = *count - 1;
+  return *count;
+}
+
+uintptr_t sk_get_ref_count(void* obj) {
+  uintptr_t* count = sk_get_ref_count_addr(obj);
   return *count;
 }
 

@@ -606,23 +606,22 @@ fun updateProgram(
 /* Test. */
 /*****************************************************************************/
 
-@cpp_extern("SKIP_check_memory")
-native fun .checkMemory(): void;
-
 fun testStress(): mutable SKFS.Context {
   config = Config{};
-  _ = SKFS.gContextInit(SKFS.Context{});
   print_string("Stress Test Begin");
-  round = 0;
-  for (_ in Range(0, config.nbrRounds)) {
-    pos = SKFS.newObstack();
+  origContext = SKFS.Context{};
+  SKFS.runWithGcReturnContext(origContext, icontext ~> {
+    context = SKFS.Context::fromSaved(icontext);
+    round = context.getGlobal("ROUND") match {
+    | None() -> 0
+    | Some(x) -> SKFS.IntFile::fromFile(x).value
+    };
+    !context = SKFS.Context::fromSaved(origContext);
     if (SKFS.debugMode) {
       print_string("Round: " + round);
     };
     origProg = genProgram(config, round);
-    context = SKFS.run(context ~> {
-      eval(context, origProg);
-    });
+    eval(context, origProg);
     if (context.debugMode) print_string("Initialization finished");
     prog = updateProgram(context, origProg, 0);
     context.update();
@@ -654,10 +653,14 @@ fun testStress(): mutable SKFS.Context {
     };
     hasError2 = compareContext(context2, context);
     if (hasError2) invariant_violation("Stress test failed");
-    SKFS.destroyObstack(pos);
-    checkMemory();
+    print_string("ROUND: " + round);
     !round = round + 1;
-  };
-  print_string("Stress Test end");
-  SKFS.Context::fromSaved(SKFS.gContextGet())
+    context.setGlobal("ROUND", SKFS.IntFile(round));
+    if (round < config.nbrRounds) {
+      SKFS.CContinue(context.clone())
+    } else {
+      print_string("Stress Test end");
+      SKFS.CStop(context.clone())
+    }
+  })
 }

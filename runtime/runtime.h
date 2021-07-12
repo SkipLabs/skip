@@ -221,5 +221,7 @@ void sk_lower_static(void*);
 void sk_check_has_lock();
 void sk_free_obj(sk_stack_t* st, char* obj);
 void sk_free_external_pointers();
+uintptr_t sk_get_ref_count(void* obj);
+void SKIP_throwInvalidSynchronization();
 
 #endif

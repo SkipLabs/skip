@@ -946,9 +946,29 @@ private native fun gContextInit(Context): Context;
 @cpp_extern("SKIP_context_get")
 native fun gContextGet(): Context;
 
+class InvalidSync() extends Exception {
+  fun toString(): String {
+    "Internal error: invalid synchronization, getContext called too many times"
+  }
+}
+
+@debug
+@cpp_export("SKIP_throwInvalidSynchronization")
+fun throwInvalidSynchronization(): void {
+  throw InvalidSync()
+}
+
 @debug
 @cpp_extern("SKIP_has_context")
 native fun gHasContext(): UInt32;
+
+@debug
+@cpp_extern("SKIP_context_ref_count")
+native fun gContextRefCount(): Int;
+
+@debug
+@cpp_extern("SKIP_context_free")
+native fun gContextFree(): void;
 
 @debug
 @cpp_extern("sk_verify_shared")

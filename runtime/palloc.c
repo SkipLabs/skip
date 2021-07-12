@@ -115,20 +115,47 @@ typedef struct {
 ginfo_t **ginfo_root = NULL;
 ginfo_t **ginfo = NULL;
 
+/*****************************************************************************/
+/* Global context access primitives. */
+/*****************************************************************************/
+
+void SKIP_context_free() {
+  char* context = (*ginfo)->context;
+  if(context != NULL) {
+    sk_free_root(context);
+  }
+  (*ginfo)->context = NULL;
+}
+
 char* sk_context_get_unsafe() {
   char* context = (*ginfo)->context;
 
   if(context != NULL) {
     sk_incr_ref_count(context);
+    if((*ginfo)->fileName == NULL && sk_get_ref_count(context) > 2) {
+      SKIP_throwInvalidSynchronization();
+    }
   }
 
   return context;
+}
+
+SkipInt SKIP_context_ref_count() {
+  char* context = (*ginfo)->context;
+
+  if(context == NULL) {
+    return (SkipInt)0;
+  }
+  else {
+    return sk_get_ref_count(context);
+  }
 }
 
 char* SKIP_context_get() {
   sk_global_lock();
   char* context = sk_context_get_unsafe();
   sk_global_unlock();
+
   return context;
 }
 
