@@ -53,14 +53,14 @@ fun testChangesAfter(): mutable SKFS.Context {
   rand = Random::mcreate(23);
   for (i in Range(0, 100)) {
     !tick = context.tick;
-    changes = mutable Set<SKFS.BaseName>[];
+    changes = SortedSet<SKFS.BaseName>[];
     for (_ in Range(0, rand.random(0, 100))) {
       dir = context.unsafeGetEagerDir(dirName);
       key = SKFS.IID(rand.random(0, 1000));
       current = dir.getArrayRaw(key);
       value = Array[SKFS.StringFile(rand.random(44, 48).toString())];
       if (native_eq(current, value) != 0) {
-        changes.insert(key);
+        !changes = changes.set(key);
       };
       write(context, dirName, key, value);
     };

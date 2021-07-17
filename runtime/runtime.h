@@ -180,12 +180,20 @@ uint32_t SKIP_is_string(char* obj);
 void SKIP_print_char(uint32_t);
 uint32_t SKIP_read_line_fill();
 uint32_t SKIP_read_line_get(uint32_t);
-void SKIP_syncContext(uint64_t, char* context, char* obj);
+char* SKIP_resolve_context(
+  uint64_t,
+  char* context,
+  char* obj,
+  char* synchronizer,
+  char* lockedF
+);
+void SKIP_call_after_unlock(char*, char*);
+
 void SKIP_throw(void*);
 
 void sk_add_ftable(void* ptr, size_t size);
-void sk_commit();
-char* sk_context_get_unsafe();
+void sk_commit(char*, uint32_t);
+char* SKIP_context_get_unsafe();
 void sk_context_set(char* obj);
 void sk_context_set_unsafe(char* obj);
 uintptr_t sk_decr_ref_count(void*);
@@ -223,5 +231,6 @@ void sk_free_obj(sk_stack_t* st, char* obj);
 void sk_free_external_pointers();
 uintptr_t sk_get_ref_count(void* obj);
 void SKIP_throwInvalidSynchronization();
+void SKIP_call_finalize(char*, char*);
 
 #endif

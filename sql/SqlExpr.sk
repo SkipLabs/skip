@@ -3,6 +3,23 @@
 /*****************************************************************************/
 module SKSQL;
 
+base class AValue<+T> {
+  children =
+  | AUndef()
+  | ANull()
+  | ADef(T)
+
+  fun flatMap<T2>(f: T -> AValue<T2>): AValue<T2>
+  | AUndef() -> AUndef()
+  | ANull() -> ANull()
+  | ADef(x) -> f(x)
+
+  fun map<T2>(f: T -> T2): AValue<T2>
+  | AUndef() -> AUndef()
+  | ANull() -> ANull()
+  | ADef(x) -> ADef(f(x))
+}
+
 fun btoi(b: Bool): Int {
   if (b) 1 else 0
 }
@@ -22,26 +39,11 @@ base class ComparisonKind {
 }
 
 class ExprEvaluator(
+  params: ?Row,
   entries: Array<Row>,
-  tables: Array<DirDescr>,
+  tables: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
   up: ?ExprEvaluator,
 ) extends SKFS.FileName {
-  static fun create(
-    entries: Array<Row>,
-    tablesHash: Int,
-    tables: Array<DirDescr>,
-    up: ?ExprEvaluator,
-  ): this {
-    result = static(entries, tables, up, 0);
-    h1 = entries.hash();
-    h2 = tablesHash;
-    h3 = up match {
-    | None() -> 0
-    | Some(x) -> x.hashTag
-    };
-    result with {hashTag => SKFS.hashCombine(h1, SKFS.hashCombine(h2, h3))}
-  }
-
   fun toString(): String {
     inspect(this).toString()
   }
@@ -49,48 +51,221 @@ class ExprEvaluator(
   private fun evalCFExpr(
     context: mutable SKFS.Context,
     expr: SKSQL.CExpr<Float>,
-  ): ?Float {
+  ): AValue<Float> {
     expr match {
-    | CFICast(e) -> this.evalCIExpr(context, e).flatMap(n -> Some(n.toFloat()))
+    | CNull() -> ANull()
+
+    | CFGetParam(n) ->
+      this.params match {
+      | None() -> AUndef()
+      | Some(params) ->
+        params.getFloat(n) match {
+        | None() -> ANull()
+        | Some(v) -> ADef(v)
+        }
+      }
+
+    | CFGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getFloat(n) match {
+        | None() -> ANull()
+        | Some(x) -> ADef(x)
+        }
+      }
+
+    | CFLiteral(f) -> ADef(f)
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCFExpr(context, x)
+      }
+
+    | CAdd(e1, e2) ->
+      this.evalCFExpr(context, e1).flatMap(n1 ->
+        this.evalCFExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 + n2)
+        })
+      )
+    | CSub(e1, e2) ->
+      this.evalCFExpr(context, e1).flatMap(n1 ->
+        this.evalCFExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 - n2)
+        })
+      )
+    | CMul(e1, e2) ->
+      this.evalCFExpr(context, e1).flatMap(n1 ->
+        this.evalCFExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 * n2)
+        })
+      )
+
+    | CMod(_e1, _e2) -> invariant_violation("Modulo on floats")
+
     | CDiv(e1, e2) ->
       this.evalCFExpr(context, e1).flatMap(n1 ->
-        this.evalCFExpr(context, e2).flatMap(n2 -> Some(n1 / n2))
+        this.evalCFExpr(context, e2).flatMap(n2 -> {
+          if (n2 == 0.0) ANull() else ADef(n1 / n2)
+        })
       )
+
+    | CIf(conde, e1, e2) ->
+      cond = this.evalCIExpr(context, conde) match {
+      | AUndef() -> return AUndef()
+      | ANull() -> false
+      | ADef(n) -> n != 0
+      };
+      if (cond) {
+        this.evalCFExpr(context, e1)
+      } else {
+        this.evalCFExpr(context, e2)
+      }
+
+    | CFAbs(f) ->
+      this.evalCFExpr(context, f).flatMap(x -> ADef(if (x < 0.0) -x else x))
+
+    | CCoalesce(el) ->
+      for (e in el) {
+        this.evalCFExpr(context, e) match {
+        | AUndef() -> return AUndef()
+        | ANull() -> continue
+        | v @ ADef(_) -> return v
+        }
+      };
+      ANull()
 
     | CEQuery(select) ->
       this.evalQuery(context, select) match {
-      | None() -> None()
-      | Some(CFloat(f)) -> Some(f)
-      | e ->
-        debug(e);
-        invariant_violation("Unexpected value in iexpr")
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CFloat(f)) -> ADef(f)
+      | _ -> errorEval("Expected a float")
       }
-    | _ ->
-      debug(expr);
-      invariant_violation("TODO: rest of evalCFExpr")
+
+    | CNullIf(e1, e2) ->
+      this.evalCFExpr(context, e1) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(x) ->
+        this.evalCFExpr(context, e2) match {
+        | AUndef() -> AUndef()
+        | ANull() -> ADef(x)
+        | ADef(y) -> if (x == y) ANull() else ADef(x)
+        }
+      }
+
+    | CFICast(f) -> this.evalCIExpr(context, f).map(x -> x.toFloat())
+    | CFSCast(s) -> this.evalCSExpr(context, s).map(x -> x.toFloat())
     }
   }
 
   private fun evalCSExpr(
-    _context: mutable SKFS.Context,
+    context: mutable SKFS.Context,
     expr: SKSQL.CExpr<String>,
-  ): ?String {
+  ): AValue<String> {
     expr match {
-    | CSLiteral(str) -> Some(str)
-    | CSGetFrom(tableNbr, n) -> this.entries[tableNbr].getString(n)
+    | CSLiteral(str) -> ADef(str)
+    | CSGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getString(n) match {
+        | None() -> ANull()
+        | Some(x) -> ADef(x)
+        }
+      }
+    | CSConcat(e1, e2) ->
+      this.evalCSExpr(context, e1).flatMap(n1 ->
+        this.evalCSExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 + n2)
+        })
+      )
+
+    | CStrftime(sformat, stime, smodifiers) ->
+      this.evalCSExpr(context, sformat).flatMap(format ->
+        this.evalCSExpr(context, stime).flatMap(time -> {
+          modifiers = smodifiers.map(x -> this.evalCSExpr(context, x));
+          for (m in modifiers) {
+            m match {
+            | AUndef() -> return AUndef()
+            | _ -> void
+            }
+          };
+          for (m in modifiers) {
+            m match {
+            | ANull() -> return ANull()
+            | _ -> void
+            }
+          };
+          ADef(
+            strftime(
+              context,
+              format,
+              time,
+              modifiers.map(m ->
+                m match {
+                | ADef(v) -> v
+                | _ -> invariant_violation("Should have been checked")
+                }
+              ),
+            ),
+          )
+        })
+      )
+
+    | CEQuery(select) ->
+      this.evalQuery(context, select) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CString(f)) -> ADef(f)
+      | _ -> errorEval("Expected a string")
+      }
+
     | _ ->
       debug(expr);
       invariant_violation("TODO: rest of evalCSExpr")
     }
   }
 
-  fun evalCIExpr(context: mutable SKFS.Context, expr: SKSQL.CExpr<Int>): ?Int {
+  fun evalWhere(
+    context: mutable SKFS.Context,
+    expr: ?SKSQL.CExpr<Int>,
+  ): AValue<Int> {
     expr match {
+    | None() -> ADef(1)
+    | Some(e) -> this.evalCIExpr(context, e)
+    }
+  }
+
+  fun evalCIExpr(
+    context: mutable SKFS.Context,
+    expr: SKSQL.CExpr<Int>,
+  ): AValue<Int> {
+    expr match {
+    | CNull() -> ANull()
     | CISize(tableNbr) ->
-      Some(context.getEagerDir(this.tables[tableNbr].dirName).size(context))
-    | CIGetParam(_) -> invariant_violation("TODO CIGetParam")
-    | CIGetFrom(tableNbr, n) -> this.entries[tableNbr].getInt(n)
-    | CILiteral(n) -> Some(n)
+      ADef(context.getEagerDir(this.tables[tableNbr].i0.dirName).size(context))
+    | CIGetParam(n) ->
+      this.params match {
+      | None() -> AUndef()
+      | Some(params) ->
+        params.getInt(n) match {
+        | None() -> ANull()
+        | Some(v) -> ADef(v)
+        }
+      }
+    | CIGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getInt(n) match {
+        | None() -> ANull()
+        | Some(x) -> ADef(x)
+        }
+      }
+    | CILiteral(n) -> ADef(n)
 
     | CUp(x) ->
       this.up match {
@@ -100,45 +275,159 @@ class ExprEvaluator(
 
     | CNot(e) ->
       this.evalCIExpr(context, e) match {
-      | None() -> Some(1)
-      | Some(n) -> if (n == 0) Some(1) else Some(0)
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(n) -> ADef(if (n == 0) 1 else 0)
       }
-    | CLte(e1, e2) -> this.bopCompare(context, Lte(), e1, e2)
-    | CLt(e1, e2) -> this.bopCompare(context, Lt(), e1, e2)
-    | CGte(e1, e2) -> this.bopCompare(context, Gte(), e1, e2)
-    | CGt(e1, e2) -> this.bopCompare(context, Gt(), e1, e2)
-    | CEq(e1, e2) -> this.bopCompare(context, Eq(), e1, e2)
-    | CDiff(e1, e2) -> this.bopCompare(context, Diff(), e1, e2)
+
+    | CILte(e1, e2) ->
+      this.biopCompare(
+        Lte(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CILt(e1, e2) ->
+      this.biopCompare(
+        Lt(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CIGte(e1, e2) ->
+      this.biopCompare(
+        Gte(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CIGt(e1, e2) ->
+      this.biopCompare(
+        Gt(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CIEq(e1, e2) ->
+      this.biopCompare(
+        Eq(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CIDiff(e1, e2) ->
+      this.biopCompare(
+        Diff(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+
+    | CFLte(e1, e2) ->
+      this.bfopCompare(
+        Lte(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFLt(e1, e2) ->
+      this.bfopCompare(
+        Lt(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFGte(e1, e2) ->
+      this.bfopCompare(
+        Gte(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFGt(e1, e2) ->
+      this.bfopCompare(
+        Gt(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFEq(e1, e2) ->
+      this.bfopCompare(
+        Eq(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFDiff(e1, e2) ->
+      this.bfopCompare(
+        Diff(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+
+    | CSLte(e1, e2) ->
+      this.bsopCompare(
+        Lte(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSLt(e1, e2) ->
+      this.bsopCompare(
+        Lt(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSGte(e1, e2) ->
+      this.bsopCompare(
+        Gte(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSGt(e1, e2) ->
+      this.bsopCompare(
+        Gt(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSEq(e1, e2) ->
+      this.bsopCompare(
+        Eq(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSDiff(e1, e2) ->
+      this.bsopCompare(
+        Diff(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
 
     | CAdd(e1, e2) ->
       this.evalCIExpr(context, e1).flatMap(n1 ->
         this.evalCIExpr(context, e2).flatMap(n2 -> {
-          Some(n1 + n2)
+          ADef(n1 + n2)
         })
       )
     | CSub(e1, e2) ->
       this.evalCIExpr(context, e1).flatMap(n1 ->
         this.evalCIExpr(context, e2).flatMap(n2 -> {
-          Some(n1 - n2)
+          ADef(n1 - n2)
         })
       )
     | CMul(e1, e2) ->
       this.evalCIExpr(context, e1).flatMap(n1 ->
         this.evalCIExpr(context, e2).flatMap(n2 -> {
-          Some(n1 * n2)
+          ADef(n1 * n2)
         })
       )
     | CDiv(e1, e2) ->
       this.evalCIExpr(context, e1).flatMap(n1 ->
         this.evalCIExpr(context, e2).flatMap(n2 -> {
-          Some(n1 / n2)
+          if (n2 == 0) ANull() else ADef(n1 / n2)
+        })
+      )
+
+    | CMod(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 % n2)
         })
       )
 
     | CIf(conde, e1, e2) ->
       cond = this.evalCIExpr(context, conde) match {
-      | None() -> false
-      | Some(n) -> n != 0
+      | AUndef() -> return AUndef()
+      | ANull() -> false
+      | ADef(n) -> n != 0
       };
       if (cond) {
         this.evalCIExpr(context, e1)
@@ -148,153 +437,309 @@ class ExprEvaluator(
 
     | COr(e1, e2) ->
       this.evalCIExpr(context, e1) match {
-      | None()
-      | Some(0) ->
-        this.evalCIExpr(context, e2).flatMap(n2 -> Some(btoi(n2 != 0))) match {
-        | None() -> Some(0)
+      | ANull()
+      | ADef(0) ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0))) match {
+        | AUndef() -> AUndef()
         | x -> x
+        }
+      | AUndef() ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0))) match {
+        | ADef(0) -> AUndef()
+        | x @ ADef _ -> x
+        | _ -> AUndef()
         }
       | x -> x
       }
 
     | CAnd(e1, e2) ->
       this.evalCIExpr(context, e1) match {
-      | None() -> Some(0)
-      | x @ Some(0) -> x
-      | Some _ ->
-        this.evalCIExpr(context, e2).flatMap(n2 -> Some(btoi(n2 != 0)))
+      | ANull() -> ADef(0)
+      | x @ ADef(0) -> x
+      | AUndef() ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0))) match {
+        | ANull()
+        | ADef(0) ->
+          ADef(0)
+        | _ -> AUndef()
+        }
+      | ADef _ ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0)))
       }
 
     | CIAbs(n) ->
-      this.evalCIExpr(context, n).flatMap(x -> Some(if (x < 0) -x else x))
+      this.evalCIExpr(context, n).flatMap(x -> ADef(if (x < 0) -x else x))
 
     | CExists(select) ->
-      evalSelect(context, select, Some(this)) match {
-      | SelectDir(dirName, _) ->
-        dir = context.getEagerDir(dirName);
-        size = dir.size(context);
-        Some(if (size > 0) 1 else 0)
-      | SelectArray _ -> Some(1)
-      | SelectError(exn) -> throw exn
-      }
+      sdir = evalSelect(context, select, Some(this));
+      dir = context.unsafeGetEagerDir(sdir.dirName);
+      if (dir.time.value > 0) {
+        !dir.time = SKFS.Time(-dir.time.value);
+        context.setDir(dir.dirName, dir);
+      };
+      size = dir.size(context);
+      ADef(if (size > 0) 1 else 0)
 
     | CCoalesce(el) ->
       for (e in el) {
         this.evalCIExpr(context, e) match {
-        | None() -> continue
-        | v @ Some(_) -> return v
+        | AUndef() -> return AUndef()
+        | ANull() -> continue
+        | v @ ADef(_) -> return v
         }
       };
-      None()
+      ANull()
 
     | CIIsNull(e) ->
       this.evalCIExpr(context, e) match {
-      | None() -> Some(1)
-      | Some _ -> Some(0)
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
       }
 
     | CFIsNull(e) ->
       this.evalCFExpr(context, e) match {
-      | None() -> Some(1)
-      | Some _ -> Some(0)
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
       }
 
     | CSIsNull(e) ->
       this.evalCSExpr(context, e) match {
-      | None() -> Some(1)
-      | Some _ -> Some(0)
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
       }
 
     | CEQuery(select) ->
       this.evalQuery(context, select) match {
-      | None() -> None()
-      | Some(CInt(n)) -> Some(n)
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CInt(n)) -> ADef(n)
       | e ->
         debug(e);
         invariant_violation("Unexpected value in iexpr")
       }
 
-    | CBetween(e1, e2, e3) ->
-      this.bopCompare(context, Lte(), e2, e1).flatMap(n1 ->
-        this.bopCompare(context, Lte(), e1, e3).flatMap(n2 ->
-          Some(btoi(n1 != 0 && n2 != 0))
-        )
+    | CIBetween(e1, e2, e3) ->
+      (
+        this.biopCompare(
+          Lte(),
+          this.evalCIExpr(context, e2),
+          this.evalCIExpr(context, e1),
+        ),
+        this.biopCompare(
+          Lte(),
+          this.evalCIExpr(context, e1),
+          this.evalCIExpr(context, e3),
+        ),
+      ) match {
+      | (ADef(0), _)
+      | (_, ADef(0)) ->
+        ADef(0)
+      | (AUndef _, _)
+      | (_, AUndef _) ->
+        AUndef()
+      | (ANull(), _)
+      | (_, ANull()) ->
+        ANull()
+      | _ -> ADef(1)
+      }
+
+    | CINotBetween(e1, e2, e3) ->
+      (
+        this.biopCompare(
+          Lte(),
+          this.evalCIExpr(context, e2),
+          this.evalCIExpr(context, e1),
+        ),
+        this.biopCompare(
+          Lte(),
+          this.evalCIExpr(context, e1),
+          this.evalCIExpr(context, e3),
+        ),
+      ) match {
+      | (ADef(0), _)
+      | (_, ADef(0)) ->
+        ADef(1)
+      | (AUndef _, _)
+      | (_, AUndef _) ->
+        AUndef()
+      | (ANull(), _)
+      | (_, ANull()) ->
+        ANull()
+      | _ -> ADef(0)
+      }
+
+    | CFBetween(e1, e2, e3) ->
+      this.bfopCompare(
+        Lte(),
+        this.evalCFExpr(context, e2),
+        this.evalCFExpr(context, e1),
+      ).flatMap(n1 ->
+        this.bfopCompare(
+          Lte(),
+          this.evalCFExpr(context, e1),
+          this.evalCFExpr(context, e3),
+        ).flatMap(n2 -> ADef(btoi(n1 != 0 && n2 != 0)))
       )
 
-    | CNotBetween(e1, e2, e3) ->
-      this.bopCompare(context, Lte(), e2, e1).flatMap(n1 ->
-        this.bopCompare(context, Lte(), e1, e3).flatMap(n2 ->
-          Some(btoi(n1 == 0 || n2 == 0))
-        )
+    | CFNotBetween(e1, e2, e3) ->
+      this.bfopCompare(
+        Lte(),
+        this.evalCFExpr(context, e2),
+        this.evalCFExpr(context, e1),
+      ).flatMap(n1 ->
+        this.bfopCompare(
+          Lte(),
+          this.evalCFExpr(context, e1),
+          this.evalCFExpr(context, e3),
+        ).flatMap(n2 -> ADef(btoi(n1 == 0 || n2 == 0)))
       )
 
-    | CIn(v, set) ->
-      for (elt in set) {
-        this.bopCompare(context, Eq(), v, elt) match {
-        | None()
-        | Some(0) ->
-          void
+    | CSBetween(e1, e2, e3) ->
+      this.bsopCompare(
+        Lte(),
+        this.evalCSExpr(context, e2),
+        this.evalCSExpr(context, e1),
+      ).flatMap(n1 ->
+        this.bsopCompare(
+          Lte(),
+          this.evalCSExpr(context, e1),
+          this.evalCSExpr(context, e3),
+        ).flatMap(n2 -> ADef(btoi(n1 != 0 && n2 != 0)))
+      )
+
+    | CSNotBetween(e1, e2, e3) ->
+      this.bsopCompare(
+        Lte(),
+        this.evalCSExpr(context, e2),
+        this.evalCSExpr(context, e1),
+      ).flatMap(n1 ->
+        this.bsopCompare(
+          Lte(),
+          this.evalCSExpr(context, e1),
+          this.evalCSExpr(context, e3),
+        ).flatMap(n2 -> ADef(btoi(n1 == 0 || n2 == 0)))
+      )
+
+    | CIIn(vExpr, set) ->
+      v = this.evalCIExpr(context, vExpr);
+      hasNull = v is ANull();
+
+      for (eltExpr in set) {
+        elt = this.evalCIExpr(context, eltExpr);
+        this.biopCompare(Eq(), v, elt) match {
+        | AUndef() -> return AUndef()
+        | ANull() -> !hasNull = true
+        | ADef(0) -> void
         | x -> break x
         }
       } else {
-        Some(0)
+        if (hasNull) {
+          ANull()
+        } else {
+          ADef(0)
+        }
       }
+
+    | CFIn(vExpr, set) ->
+      v = this.evalCFExpr(context, vExpr);
+      hasNull = v is ANull();
+
+      for (eltExpr in set) {
+        elt = this.evalCFExpr(context, eltExpr);
+        this.bfopCompare(Eq(), v, elt) match {
+        | AUndef() -> return AUndef()
+        | ANull() -> !hasNull = true
+        | ADef(0) -> void
+        | x -> break x
+        }
+      } else {
+        if (hasNull) {
+          ANull()
+        } else {
+          ADef(0)
+        }
+      }
+
+    | CSIn(vExpr, set) ->
+      v = this.evalCSExpr(context, vExpr);
+      hasNull = v is ANull();
+
+      for (elt in set) {
+        this.bsopCompare(Eq(), v, this.evalCSExpr(context, elt)) match {
+        | AUndef() -> return AUndef()
+        | ANull() -> !hasNull = true
+        | ADef(0) -> void
+        | x -> break x
+        }
+      } else {
+        if (hasNull) {
+          ANull()
+        } else {
+          ADef(0)
+        }
+      }
+
+    | CNullIf(e1, e2) ->
+      this.evalCIExpr(context, e1) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(x) ->
+        this.evalCIExpr(context, e2) match {
+        | AUndef() -> AUndef()
+        | ANull() -> ADef(x)
+        | ADef(y) -> if (x == y) ANull() else ADef(x)
+        }
+      }
+    | CIFCast(f) -> this.evalCFExpr(context, f).map(x -> x.toInt())
+    | CISCast(s) -> this.evalCSExpr(context, s).map(x -> x.toInt())
     }
   }
 
   private fun evalQuery(
     context: mutable SKFS.Context,
     select: CSelect,
-  ): ?CValue {
-    evalSelect(context, select, Some(this)) match {
-    | SelectDir(dirName, types) ->
-      dir = context.getEagerDir(dirName);
-      size = dir.size(context);
-      if (size == 0) {
-        errorEval("SELECT used as value returns no value");
-      };
-      if (size > 1) {
-        errorEval("SELECT used as value returns multiple values");
-      };
-      key = dir.keys().min().fromSome();
-      files = dir.getArray(context, key);
-      if (files.size() == 0) {
-        errorEval("SELECT used as value returns no value");
-      };
-      if (files.size() > 1) {
-        errorEval("SELECT used as value returns multiple values");
-      };
-      Row::fromFile(files[0]) match {
-      | RowNone() -> errorEval("SELECT used as value returns no value")
-      | RowRepeat(_, n) ->
-        invariant(n > 1);
-        errorEval("SELECT used as value returns multiple values")
-      | err @ RowError _ -> throw err
-      | row @ RowNullableValues _
-      | row @ RowValues _ ->
-        if (row.size() != 1) {
-          errorEval("SELECT used as value returns multiple columns");
-        };
-        row.getValue(types[0], 0)
-      | row @ RowKind _ ->
-        debug(row);
-        invariant_violation("RowKind should have been resolved")
-      }
-    | SelectArray(values, types) ->
-      if (values.size() == 0) {
-        errorEval("SELECT used as value returns no value");
-      };
-      if (values.size() > 1) {
-        errorEval("SELECT used as value returns multiple values");
-      };
-      values.getValue(types[0], 0)
-    | SelectError(exn) -> throw exn
+  ): AValue<CValue> {
+    sdir = evalSelect(context, select, Some(this));
+    dirName = sdir.dirName;
+    dir = context.unsafeGetEagerDir(dirName);
+    if (dir.time.value > 0) {
+      !dir.time = SKFS.Time(-dir.time.value);
+      context.setDir(dir.dirName, dir);
+    };
+    size = dir.size(context);
+    if (size == 0) {
+      errorEval("SELECT used as value returns no value");
+    };
+    if (size > 1) {
+      errorEval("SELECT used as value returns multiple values");
+    };
+    key = dir.keys().min().fromSome();
+    files = dir.getArray(context, key);
+    if (files.size() == 0) {
+      errorEval("SELECT used as value returns no value");
+    };
+    if (files.size() > 1) {
+      errorEval("SELECT used as value returns multiple values");
+    };
+    row = RowValues::fromFile(files[0]);
+    if (row.size() != 1) {
+      errorEval("SELECT used as value returns multiple columns");
+    };
+    row.getValue(0) match {
+    | None() -> ANull()
+    | Some(x) -> ADef(x)
     }
   }
 
-  fun evalCGExpr(context: mutable SKFS.Context, e: SKSQL.CGExpr): ?CValue {
+  fun evalCGExpr(
+    context: mutable SKFS.Context,
+    e: SKSQL.CGExpr,
+  ): AValue<CValue> {
     result = e match {
-    | CGNull() -> None()
+    | CGNull() -> ANull()
     | CIExpr(ie) -> this.evalCIExpr(context, ie).map(x -> CInt(x))
     | CFExpr(fe) -> this.evalCFExpr(context, fe).map(x -> CFloat(x))
     | CSExpr(se) -> this.evalCSExpr(context, se).map(x -> CString(x))
@@ -302,95 +747,72 @@ class ExprEvaluator(
     result
   }
 
-  fun bopCompare(
-    context: mutable SKFS.Context,
+  fun biopCompare(
     bop: ComparisonKind,
-    ge1: CGExpr,
-    ge2: CGExpr,
-  ): ?Int {
-    ge1 match {
-    | CGNull() -> None()
-    | CIExpr(ie1) ->
-      ge2 match {
-      | CGNull() -> None()
-      | CIExpr(ie2) ->
-        this.evalCIExpr(context, ie1).flatMap(n1 ->
-          this.evalCIExpr(context, ie2).flatMap(n2 -> {
-            Some(
-              btoi(
-                bop match {
-                | Lt() -> n1 < n2
-                | Lte() -> n1 <= n2
-                | Gte() -> n1 >= n2
-                | Gt() -> n1 > n2
-                | Eq() -> n1 == n2
-                | Diff() -> n1 != n2
-                },
-              ),
-            )
-          })
+    ie1: AValue<Int>,
+    ie2: AValue<Int>,
+  ): AValue<Int> {
+    ie1.flatMap(n1 ->
+      ie2.flatMap(n2 -> {
+        ADef(
+          btoi(
+            bop match {
+            | Lt() -> n1 < n2
+            | Lte() -> n1 <= n2
+            | Gte() -> n1 >= n2
+            | Gt() -> n1 > n2
+            | Eq() -> n1 == n2
+            | Diff() -> n1 != n2
+            },
+          ),
         )
-      | CFExpr(fe2) ->
-        this.evalCIExpr(context, ie1).flatMap(n1 ->
-          this.evalCFExpr(context, fe2).flatMap(f2 -> {
-            f1 = n1.toFloat();
-            Some(
-              btoi(
-                bop match {
-                | Lt() -> f1 < f2
-                | Lte() -> f1 <= f2
-                | Gte() -> f1 >= f2
-                | Gt() -> f1 > f2
-                | Eq() -> f1 == f2
-                | Diff() -> f1 != f2
-                },
-              ),
-            )
-          })
+      })
+    )
+  }
+
+  fun bfopCompare(
+    bop: ComparisonKind,
+    fe1: AValue<Float>,
+    fe2: AValue<Float>,
+  ): AValue<Int> {
+    fe1.flatMap(f1 ->
+      fe2.flatMap(f2 -> {
+        ADef(
+          btoi(
+            bop match {
+            | Lt() -> f1 < f2
+            | Lte() -> f1 <= f2
+            | Gte() -> f1 >= f2
+            | Gt() -> f1 > f2
+            | Eq() -> f1 == f2
+            | Diff() -> f1 != f2
+            },
+          ),
         )
-      | CSExpr _ -> invariant_violation("TODO: string comparison (I)")
-      }
-    | CFExpr(fe1) ->
-      ge2 match {
-      | CGNull() -> None()
-      | CIExpr(ie2) ->
-        this.evalCFExpr(context, fe1).flatMap(f1 ->
-          this.evalCIExpr(context, ie2).flatMap(n2 -> {
-            f2 = n2.toFloat();
-            Some(
-              btoi(
-                bop match {
-                | Lt() -> f1 < f2
-                | Lte() -> f1 <= f2
-                | Gte() -> f1 >= f2
-                | Gt() -> f1 > f2
-                | Eq() -> f1 == f2
-                | Diff() -> f1 != f2
-                },
-              ),
-            )
-          })
+      })
+    )
+  }
+
+  fun bsopCompare(
+    bop: ComparisonKind,
+    se1: AValue<String>,
+    se2: AValue<String>,
+  ): AValue<Int> {
+    se1.flatMap(s1 ->
+      se2.flatMap(s2 -> {
+        ADef(
+          btoi(
+            bop match {
+            | Lt() -> s1 < s2
+            | Lte() -> s1 <= s2
+            | Gte() -> s1 >= s2
+            | Gt() -> s1 > s2
+            | Eq() -> s1 == s2
+            | Diff() -> s1 != s2
+            },
+          ),
         )
-      | CFExpr(fe2) ->
-        this.evalCFExpr(context, fe1).flatMap(f1 ->
-          this.evalCFExpr(context, fe2).flatMap(f2 -> {
-            Some(
-              btoi(
-                bop match {
-                | Lt() -> f1 < f2
-                | Lte() -> f1 <= f2
-                | Gte() -> f1 >= f2
-                | Gt() -> f1 > f2
-                | Eq() -> f1 == f2
-                | Diff() -> f1 != f2
-                },
-              ),
-            )
-          })
-        )
-      | CSExpr _ -> invariant_violation("TODO: string comparison (F)")
-      }
-    | CSExpr _ -> invariant_violation("TODO: string comparison")
-    }
+      })
+    )
   }
 }

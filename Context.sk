@@ -37,10 +37,7 @@ const dummyDirtyReaders: Map<DirName, Map<DirName, Set<BaseName>>> = Map[];
 // Typically, a map is a tranformation that associates a value from a parent
 // to a child. The association between the two is called an Arrow.
 
-value class Arrow(
-  parentName: DirName,
-  childName: DirName,
-) uses Hashable, Orderable
+value class Arrow(parentName: DirName, childName: DirName) uses Orderable
 
 // An ArrowKey, is an Arrow plus a key (the key is from the parent).
 // This type is used to describe the root of a dependency on an EagerMap.
@@ -55,7 +52,7 @@ value class ArrowKey(
   parentName: DirName,
   childName: DirName,
   key: BaseName,
-) uses Hashable, Orderable
+) uses Orderable
 
 /*****************************************************************************/
 /* The function used to start the system. */
@@ -109,7 +106,7 @@ fun updateDirtyReaders(
 /*****************************************************************************/
 
 value class Deps(
-  data: HashMap<Path, SortedSet<ArrowKey>> = HashMap[],
+  data: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
   idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
 ) {
   static fun createFromItems(items: Array<(Path, ArrowKey)>): this {
@@ -215,6 +212,8 @@ value class Tick(value: Int) uses Orderable, Show {
     this.value.toString()
   }
 }
+
+class TickFile(value: Tick) extends File
 
 value class Time(value: Int) uses Orderable, Show {
   fun next(): this {
@@ -410,9 +409,9 @@ mutable class Context{
   }
 
   mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
-    readSet = mutable Set[];
+    readSet = SortedSet[];
     for (read in reads) {
-      readSet.insert(read);
+      !readSet = readSet.set(read);
     };
     for (path in readSet) {
       this.!deps = this.deps.set(path, reader);
@@ -454,7 +453,7 @@ mutable class Context{
           );
         });
         this.setDir(preDir.dirName, preDir);
-        updateDirtyReaders(this, Path::create(preDirName.tag(), DIR_TAG));
+        updateDirtyReaders(this, Path::create(preDirName.tag(), DirTag()));
         this.setDir(preDirName, preDir)
       | Some(preDir) ->
         for (key in dir.getChangesAfter(this.tick.prev())) {
@@ -507,9 +506,9 @@ mutable class Context{
         if (refCount == 0) {
           this.!lazyGetsRefCount = this.lazyGetsRefCount.remove(path);
           if (!toRemove.containsKey(path.dirName)) {
-            toRemove![path.dirName] = mutable Set[];
+            toRemove![path.dirName] = SortedSet[];
           };
-          toRemove[path.dirName].insert(path.baseName);
+          toRemove![path.dirName] = toRemove[path.dirName].set(path.baseName);
         } else {
           this.!lazyGetsRefCount[path] = refCount;
         }
@@ -529,8 +528,8 @@ mutable class Context{
     };
   }
 
-  mutable fun update(): void {
-    hasBackgroundWork = this.updateWithStatus(0);
+  mutable fun update(notify: Bool = true): void {
+    hasBackgroundWork = this.updateWithStatus(0, notify);
     if (hasBackgroundWork) {
       invariant_violation(
         "update should not be called when there is background work" +
@@ -540,7 +539,7 @@ mutable class Context{
     void
   }
 
-  mutable fun updateWithStatus(backgroundRounds: Int): Bool {
+  mutable fun updateWithStatus(backgroundRounds: Int, notify: Bool): Bool {
     if (this.debugMode) {
       print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
@@ -573,19 +572,19 @@ mutable class Context{
       })
     };
 
-    dirty = mutable Map<DirName, mutable Set<BaseName>>[];
+    dirty = mutable Map<DirName, SortedSet<BaseName>>[];
     dirtyReaders = mutable Map<
       DirName,
-      mutable Map<DirName, mutable Set<BaseName>>,
+      mutable Map<DirName, SortedSet<BaseName>>,
     >[];
 
     loop {
       for (path in this.dirty) {
         dirty.maybeGet(path.dirName) match {
         | None() ->
-          set = mutable Set[path.baseName];
+          set = SortedSet[path.baseName];
           dirty![path.dirName] = set
-        | Some(set) -> set.insert(path.baseName)
+        | Some(set) -> dirty![path.dirName] = set.set(path.baseName)
         };
       };
       this.!dirty = List[];
@@ -595,9 +594,11 @@ mutable class Context{
         };
 
         if (!dirtyReaders[reader.parentName].containsKey(reader.childName)) {
-          dirtyReaders[reader.parentName]![reader.childName] = mutable Set[];
+          dirtyReaders[reader.parentName]![reader.childName] = SortedSet[];
         };
-        dirtyReaders[reader.parentName][reader.childName].insert(reader.key);
+        dirtyReaders[reader.parentName]![reader.childName] = dirtyReaders[
+          reader.parentName,
+        ][reader.childName].set(reader.key);
       };
       this.!dirtyReaders = List[];
       toUpdate = this.toUpdate.minimum();
@@ -631,6 +632,7 @@ mutable class Context{
             mapFun,
             rangeOpt,
             child,
+            notify,
           )
         }
       }
@@ -709,7 +711,7 @@ mutable class Context{
     conv: File ~> T,
     dirName: DirName,
     content: Array<Row>,
-    decompress: (Int, Row) ~> FixedRow<Array<File>>,
+    decompress: Row ~> FixedRow<Array<File>>,
   ): EHandle<T> {
     if (this.dirs.state.containsKey(dirName)) {
       throw DirAlreadyExists(dirName);
@@ -731,7 +733,7 @@ mutable class Context{
   }
 
   mutable fun getDir(dirName: DirName): Dir {
-    this.addDep(Path::create(dirName.tag(), DIR_TAG));
+    this.addDep(Path::create(dirName.tag(), DirTag()));
     this.dirs.get(dirName);
   }
 
@@ -807,7 +809,7 @@ mutable class Context{
     }
   }
 
-  mutable fun removeDir(dirName: DirName): void {
+  mutable fun removeDir(dirName: DirName, reallyRemove: Bool = false): void {
     if (this.debugMode) {
       print_string("REMOVED: " + dirName);
     };
@@ -824,7 +826,7 @@ mutable class Context{
       }
     };
     this.!deps = this.deps.removeDir(dirName);
-    if (this.reallyRemoveDir) {
+    if (this.reallyRemoveDir || reallyRemove) {
       this.!dirs.state = this.dirs.state.remove(dirName)
     } else {
       this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()})
@@ -832,7 +834,7 @@ mutable class Context{
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.addDep(Path::create(dirName.tag(), DIR_TAG));
+    this.addDep(Path::create(dirName.tag(), DirTag()));
     this.dirs.maybeGet(dirName);
   }
 
@@ -846,6 +848,10 @@ mutable class Context{
 
   mutable fun setGlobal(name: String, file: File): void {
     this.!globals = this.globals.set(name, file);
+  }
+
+  mutable fun removeGlobal(name: String): void {
+    this.!globals = this.globals.remove(name);
   }
 
   readonly fun getGlobal(name: String): ?File {
@@ -869,51 +875,100 @@ class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   }
 }
 
-@cpp_export("SKIP_syncContext")
-fun syncContext(txTick: Tick, newRoot: Context, ctx: mutable Context): void {
-  if (txTick == newRoot.tick) return void;
-
-  context = Context::fromSaved(newRoot);
-
-  changedDirNames = ctx.dirs.state.getChangesAfter(txTick);
+fun import(
+  targetCtx: mutable Context,
+  tick: Tick,
+  sourceCtx: readonly Context,
+): void {
+  changedDirNames = sourceCtx.dirs.state.getChangesAfter(tick);
   for (dirName in changedDirNames) {
-    ctx.unsafeMaybeGetDir(dirName) match {
-    | Some(dir @ EagerDir{input => true}) ->
-      changedKeys = dir.getChangesAfter(txTick);
-      context.unsafeMaybeGetDir(dirName) match {
-      | None() -> context.mkdirMulti(dirName, Array[])
-      | Some(EagerDir{input => true}) -> void
-      | Some(_) -> invariant_violation("Error: incompactible dir types")
-      };
-      entries = mutable Vector[];
-      for (key in changedKeys) {
-        values = dir.getArrayRaw(key);
-        entries.push((key, values));
-      };
-      inputDir = context.unsafeMaybeGetEagerDir(dirName).fromSome();
-      inputDir.writeArrayMany(context, entries.iterator())
+    sourceCtx.unsafeMaybeGetDir(dirName) match {
+    | Some(dir @ EagerDir{input => true, creator => None()}) ->
+      changedKeys = dir.getChangesAfter(tick);
+      targetCtx.unsafeMaybeGetDir(dirName) match {
+      | None() -> void
+      | Some(EagerDir{input => true}) ->
+        entries = mutable Vector[];
+        for (key in changedKeys) {
+          for (srcValue in dir.unsafeGetDataIter(key)) {
+            (source, values) = srcValue;
+            entries.push((key, (source.value, values)));
+          }
+        };
+        targetCtx.unsafeMaybeGetEagerDir(dir.dirName) match {
+        | None() ->
+          if (dir.creator is None()) {
+            targetCtx.setDir(dir.dirName, dir);
+          }
+        | Some(inputDir) ->
+          inputDir.writeArraySourceMany(targetCtx, entries.iterator())
+        }
+
+      | Some(_) -> invariant_violation("Error import: incompatible dir types")
+      }
+
     | _ -> void
     }
   };
+}
 
-  context.update();
-  ctx.replaceFromSaved(context.clone());
+class Synchronizer(
+  importFromRoot: ((mutable Context, Tick, readonly Context) ~> void),
+  exportToRoot: ((mutable Context, Tick, readonly Context) ~> void),
+  afterUnlock: (mutable Context ~> void),
+)
+
+@cpp_export("SKIP_resolve_context")
+fun resolveContext(
+  tick: Tick,
+  root: Context,
+  delta: mutable Context,
+  synchronizer: ?Synchronizer,
+  lockF: ?((mutable Context, mutable Context) ~> void),
+): readonly Context {
+  synchronizer match {
+  | None() if (tick == root.tick) -> delta
+  | None() -> invariant_violation("Concurrent access without synchronizer")
+  | Some(sync) ->
+    sync.importFromRoot(delta, tick, root);
+
+    newRoot = Context::fromSaved(root);
+    newRoot.!globals = delta.globals;
+
+    sync.exportToRoot(newRoot, tick, delta);
+    lockF match {
+    | None() -> void
+    | Some(f) -> f(newRoot, delta)
+    };
+    newRoot
+  }
+}
+
+@cpp_export("SKIP_call_after_unlock")
+fun callAfterUnlock(
+  synchronizer: ?Synchronizer,
+  context: mutable Context,
+): void {
+  synchronizer match {
+  | None() -> void
+  | Some(sync) -> sync.afterUnlock(context)
+  }
 }
 
 /*****************************************************************************/
 /* External process handling. Basically a thin layer on top of popen/pclose. */
 /*****************************************************************************/
 
-native base class Proc
+native base class UnixDescr
 
 @cpp_extern("SKIP_exec")
-native fun exec(String): Proc;
+native fun exec(String): UnixDescr;
 
 @cpp_extern("SKIP_write_to_proc")
-native fun writeToProc(Proc, String): void;
+native fun writeToProc(UnixDescr, String): void;
 
 @cpp_extern("SKIP_wait_for_proc")
-native fun waitForProc(Proc): Int;
+native fun waitForProc(UnixDescr): Int;
 
 /*****************************************************************************/
 /* Runtime primitives. */
@@ -936,15 +991,49 @@ private native fun destroyObstackWithValue<T>(Obstack, List<T>): List<T>;
 
 @debug
 @cpp_extern("SKIP_context_sync")
-private native fun gContextSync(Tick, Context, Context): Context;
+private native fun gContextSync(
+  Tick,
+  Context,
+  Context,
+  ?Synchronizer,
+  UInt32,
+  ?((mutable Context, mutable Context) ~> void),
+): Context;
+
+@debug
+@cpp_extern("SKIP_context_sync_no_lock")
+private native fun gContextSyncNoLock(
+  Tick,
+  Context,
+  Context,
+  ?Synchronizer,
+  UInt32,
+  ?((mutable Context, mutable Context) ~> void),
+): Context;
+
+@debug
+@cpp_extern("SKIP_global_unlock")
+private native fun gGlobalUnlock(): void;
+
+@debug
+@cpp_extern("SKIP_global_lock")
+private native fun gGlobalLock(): void;
+
+@debug
+@cpp_extern("SKIP_global_has_lock")
+private native fun gGlobalHasLock(): UInt32;
 
 @debug
 @cpp_extern("SKIP_context_init")
-private native fun gContextInit(Context): Context;
+private native fun gContextInit(Context): void;
 
 @debug
 @cpp_extern("SKIP_context_get")
 native fun gContextGet(): Context;
+
+@debug
+@cpp_extern("SKIP_context_get_unsafe")
+native fun gContextGetNoLock(): Context;
 
 class InvalidSync() extends Exception {
   fun toString(): String {
@@ -963,12 +1052,12 @@ fun throwInvalidSynchronization(): void {
 native fun gHasContext(): UInt32;
 
 @debug
-@cpp_extern("SKIP_context_ref_count")
-native fun gContextRefCount(): Int;
+@cpp_extern("SKIP_unsafe_free")
+native fun gUnsafeFree(Context): void;
 
 @debug
-@cpp_extern("SKIP_context_free")
-native fun gContextFree(): void;
+@cpp_extern("SKIP_context_ref_count")
+native fun gContextRefCount(): Int;
 
 @debug
 @cpp_extern("sk_verify_shared")
@@ -988,37 +1077,148 @@ native fun enableGC(): void;
 
 base class ContextOp {
   children =
-  | CContinue(Context)
-  | CStop(Context)
-  | CAbort()
+  | CContinue(?((mutable Context, mutable Context) ~> void))
+  | CStop(?((mutable Context, mutable Context) ~> void))
+}
+
+@cpp_noinline
+fun runWithGcIntern(
+  initCtx: Context,
+  f: Context ~> (Context, ContextOp),
+  synchronizer: ?Synchronizer,
+  isync: Bool = false,
+): Context {
+  sync = UInt32::truncate(if (isync) 1 else 0);
+  if (gHasContext() == 0) {
+    gContextInit(initCtx);
+  };
+  context = synchronizer match {
+  | None() ->
+    gGlobalLock();
+    gContextGetNoLock()
+  | Some _ -> gContextGet()
+  };
+  globals = initCtx.globals;
+  loop {
+    startTick = context.tick;
+    pos = newObstack();
+    (newContext, newContextOp) = f(context with {globals});
+    newContextOp match {
+    | CContinue(underLockF) ->
+      synchronizer match {
+      | None() ->
+        !context = gContextSyncNoLock(
+          startTick,
+          context,
+          newContext,
+          synchronizer,
+          sync,
+          underLockF,
+        );
+        gGlobalUnlock();
+        destroyObstack(pos)
+      | Some _ ->
+        !context = gContextSync(
+          startTick,
+          context,
+          newContext,
+          synchronizer,
+          sync,
+          underLockF,
+        );
+        destroyObstack(pos)
+      }
+    | CStop(underLockF) ->
+      synchronizer match {
+      | None() ->
+        !context = gContextSyncNoLock(
+          startTick,
+          context,
+          newContext,
+          synchronizer,
+          sync,
+          underLockF,
+        );
+        gGlobalUnlock();
+        gUnsafeFree(context);
+        return context
+      | Some _ ->
+        !context = gContextSync(
+          startTick,
+          context,
+          newContext,
+          synchronizer,
+          sync,
+          underLockF,
+        );
+        gUnsafeFree(context);
+        return context
+      }
+    };
+    !globals = context.globals;
+  }
+}
+
+@cpp_noinline
+fun runLocked(
+  initCtx: Context,
+  f: mutable Context ~> void,
+  sync: Bool = false,
+): void {
+  if (gHasContext() == 0) {
+    gContextInit(initCtx);
+  };
+  gGlobalLock();
+  root = gContextGetNoLock();
+  context = Context::fromSaved(root);
+  f(context);
+  newRoot = gContextSyncNoLock(
+    root.tick,
+    root,
+    context.clone(),
+    None(),
+    if (sync) UInt32::truncate(1) else UInt32::truncate(0),
+    None(),
+  );
+  gGlobalUnlock();
+  gUnsafeFree(newRoot);
+}
+
+@cpp_noinline
+fun runWithGc(
+  initCtx: Context,
+  f: mutable Context ~> ContextOp,
+  synchronizer: ?Synchronizer = None(),
+  sync: Bool = false,
+): void {
+  _ = runWithGcIntern(
+    initCtx,
+    icontext ~> {
+      context = Context::fromSaved(icontext);
+      cop = f(context);
+      (context.clone(), cop);
+    },
+    synchronizer,
+    sync,
+  )
 }
 
 @cpp_noinline
 fun runWithGcReturnContext(
-  origContext: Context,
-  f: Context ~> ContextOp,
+  initCtx: Context,
+  f: mutable Context ~> ContextOp,
+  synchronizer: ?Synchronizer = None(),
 ): mutable Context {
-  context = gContextInit(origContext);
-  startTick = context.tick;
-  loop {
-    pos = newObstack();
-    newContextOpt = f(context);
-    newContextOpt match {
-    | CAbort() -> return Context::fromSaved(context)
-    | CContinue(newContext) ->
-      !context = gContextSync(startTick, context, newContext);
-      !startTick = context.tick;
-      destroyObstack(pos)
-    | CStop(newContext) ->
-      !context = gContextSync(startTick, context, newContext);
-      !startTick = context.tick;
-      return Context::fromSaved(context)
-    }
-  }
-}
-
-fun runWithGc(origContext: Context, f: Context ~> ContextOp): void {
-  _ = runWithGcReturnContext(origContext, f);
+  result = runWithGcIntern(
+    initCtx,
+    icontext ~> {
+      context = Context::fromSaved(icontext);
+      cop = f(context);
+      (context.clone(), cop);
+    },
+    synchronizer,
+  );
+  Context::fromSaved(result)
 }
 
 fun withRegion<T>(

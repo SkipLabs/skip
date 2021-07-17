@@ -1,5 +1,9 @@
 #include "runtime.h"
 
+#ifdef SKIP64
+#include <stdlib.h>
+#endif
+
 /*****************************************************************************/
 /* String implementation */
 /*****************************************************************************/
@@ -273,6 +277,24 @@ SkipInt SKIP_unsafe_get_svalue(SkipInt* buffer, SkipInt n) {
   return buffer[n];
 }
 
+double SKIP_String__toFloat_raw(char* str) {
+  #ifdef SKIP32
+  SKIP_throw(NULL); // TODO
+  return 0.0;
+  #endif
+  #ifdef SKIP64
+  size_t size = SKIP_String_byteSize((char*)str);
+  if(size >= 255) {
+    SKIP_throw(NULL); // TODO
+  }
+  char cstr[256];
+  memcpy(cstr, str, size);
+  cstr[size] = 0;
+
+  return atof(cstr);
+  #endif
+}
+
 /*****************************************************************************/
 /* Multibyte utf8 string used for testing purposes. */
 /*****************************************************************************/
@@ -295,4 +317,9 @@ char* SKIP_invalid_utf8_test_string() {
     string_utf8_buffer[i] = (unsigned char)test_utf8_data[i];
   }
   return sk_string_create((char*)string_utf8_buffer, 2);
+}
+
+char* SKIP_largest_string() {
+  static unsigned char buffer[] = { 255, 255, 255, 255, 255, 255, 255, 255 };
+  return sk_string_create((char*)buffer, 8);
 }

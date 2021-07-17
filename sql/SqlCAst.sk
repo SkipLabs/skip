@@ -3,24 +3,44 @@
 /*****************************************************************************/
 module SKSQL;
 
-base class AggrKind {
+base class AggrKind uses Orderable {
   children =
-  | Sum()
-  | Count()
+  | Noop()
+  | Sum(SelectKind)
+  | Count(SelectKind)
 }
 
-base class CValue {
+base class CValue uses Orderable, Show {
   children =
-  | CInt(Int)
-  | CFloat(Float)
-  | CString(String)
+  | CInt(value: Int)
+  | CFloat(value: Float)
+  | CString(value: String)
 
-  fun compare(_ty: Type, v2: CValue): Order {
-    (this, v2) match {
-    | (CInt(n1), CInt(n2)) -> n1.compare(n2)
-    | (CFloat(n1), CFloat(n2)) -> n1.compare(n2)
-    | (CString(n1), CString(n2)) -> n1.compare(n2)
-    | _ -> invariant_violation("Typing internal error")
+  fun getInt(): ?Int
+  | CInt(n) -> Some(n)
+  | _ -> None()
+
+  fun +(y: CValue): CValue {
+    (this, y) match {
+    | (CInt(n1), CInt(n2)) -> CInt(n1 + n2)
+    | (CFloat(f1), CFloat(f2)) -> CFloat(f1 + f2)
+    | _ -> invariant_violation("Invalid type")
+    }
+  }
+
+  fun -(y: CValue): CValue {
+    (this, y) match {
+    | (CInt(n1), CInt(n2)) -> CInt(n1 - n2)
+    | (CFloat(f1), CFloat(f2)) -> CFloat(f1 - f2)
+    | _ -> invariant_violation("Invalid type")
+    }
+  }
+
+  fun *(y: Int): CValue {
+    this match {
+    | CInt(n) -> CInt(n * y)
+    | CFloat(f) -> CFloat(f * y.toFloat())
+    | _ -> invariant_violation("Invalid type")
     }
   }
 
@@ -31,6 +51,39 @@ base class CValue {
     | CString(str) -> str
     }
   }
+
+  fun max(): CValue
+  | CInt(_) -> CInt(Int::max)
+  | CFloat(_) -> CFloat(Float::inf)
+  | CString(_) -> CString(largestString())
+
+  fun min(): CValue
+  | CInt(_) -> CInt(Int::min)
+  | CFloat(_) -> CFloat(-Float::inf)
+  | CString(_) -> CString("")
+}
+
+base class CGroupByElt uses Orderable {
+  children =
+  | CGBExpr(CGExpr, Type)
+  | CGBCol(Int, Type)
+}
+
+base class SubSelectTask uses Orderable {
+  children =
+  | SubSelect(CSelect)
+  | SubMerge{
+    leftDirName: SKFS.DirName,
+    leftColNbr: Int,
+    leftIsUnique: Bool,
+    leftRanges: ?Array<SKFS.KeyRange>,
+    rightDirName: SKFS.DirName,
+    rightColNbr: Int,
+    rightIsUnique: Bool,
+    rightRanges: ?Array<SKFS.KeyRange>,
+    childName: SKFS.DirName,
+    kinds: Array<(Int, IKind, Type)>,
+  }
 }
 
 class CSelect{
@@ -39,17 +92,18 @@ class CSelect{
   params: Array<CGExpr>,
   aggr: ?Array<(AggrKind, CGExpr)>,
   kinds: Array<(Int, SKSQL.IKind, SKSQL.Type)>,
-  from: Array<DirDescr>,
-  fromHash: Int,
-  join: ?CJoin,
+  from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
   where: ?CExpr<Int>,
   in_: ?Array<CGExpr>,
-  groupBy: ?Array<Int>,
-  having: ?CGExpr,
+  groupBy: ?Array<CGroupByElt>,
+  having: ?CExpr<Int>,
   orderBy: ?Array<(Int, IKind)>,
+  limit: ?CExpr<Int>,
   rest: ?(QueryKind, CSelect),
   needUp: Bool,
-} extends SKFS.File
+  needGetParam: Bool,
+  other: Array<SubSelectTask>,
+} extends SKFS.File uses Orderable
 
 class CJoin{
   kind: JoinKind,
@@ -57,7 +111,7 @@ class CJoin{
   on: ?Array<(CGExpr, ?String)>,
 }
 
-base class CGExpr {
+base class CGExpr uses Orderable {
   children =
   | CGNull()
   | CIExpr(CExpr<Int>)
@@ -84,8 +138,11 @@ base class CGExpr {
   }
 }
 
-base class CExpr<Value>
+@cpp_extern("SKIP_largest_string")
+native fun largestString(): String;
 
+base class CExpr<Value: frozen> uses Orderable
+class CNull<T: frozen>() extends CExpr<T>
 class CISize(Int) extends CExpr<Int>
 
 class CIGetParam(Int) extends CExpr<Int>
@@ -93,6 +150,11 @@ class CSGetParam(Int) extends CExpr<String>
 class CFGetParam(Int) extends CExpr<Float>
 
 class CFICast(CExpr<Int>) extends CExpr<Float>
+class CIFCast(CExpr<Float>) extends CExpr<Int>
+class CISCast(CExpr<String>) extends CExpr<Int>
+class CSICast(CExpr<Int>) extends CExpr<String>
+class CSFCast(CExpr<Float>) extends CExpr<String>
+class CFSCast(CExpr<String>) extends CExpr<Float>
 
 class CIGetFrom(Int, Int) extends CExpr<Int>
 class CSGetFrom(Int, Int) extends CExpr<String>
@@ -101,39 +163,71 @@ class CFGetFrom(Int, Int) extends CExpr<Float>
 class CILiteral(Int) extends CExpr<Int>
 class CFLiteral(Float) extends CExpr<Float>
 class CSLiteral(String) extends CExpr<String>
-class CNot<Int>(CExpr<Int>) extends CExpr<Int>
-//class CAll(CExpr) extends CExpr<?>
-//class CDistinct(CExpr) extends CExpr<?>
-//class CIn(CExpr, Array<CExpr>) extends CExpr<?>
-//class CBetween(CExpr) extends CExpr<?>
-class CLte(CGExpr, CGExpr) extends CExpr<Int>
-class CLt(CGExpr, CGExpr) extends CExpr<Int>
-class CGte(CGExpr, CGExpr) extends CExpr<Int>
-class CGt(CGExpr, CGExpr) extends CExpr<Int>
-class CEq(CGExpr, CGExpr) extends CExpr<Int>
-class CDiff(CGExpr, CGExpr) extends CExpr<Int>
-class CBetween(CGExpr, CGExpr, CGExpr) extends CExpr<Int>
-class CNotBetween(CGExpr, CGExpr, CGExpr) extends CExpr<Int>
+class CNot(CExpr<Int>) extends CExpr<Int>
 
-class CAdd<T>(CExpr<T>, CExpr<T>) extends CExpr<T>
-class CSub<T>(CExpr<T>, CExpr<T>) extends CExpr<T>
-class CMul<T>(CExpr<T>, CExpr<T>) extends CExpr<T>
-class CDiv<T>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CILte(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+class CILt(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+class CIGte(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+class CIGt(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+class CIEq(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+class CIDiff(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+class CIBetween(CExpr<Int>, CExpr<Int>, CExpr<Int>) extends CExpr<Int>
+class CINotBetween(CExpr<Int>, CExpr<Int>, CExpr<Int>) extends CExpr<Int>
 
-class CIf<T>(CExpr<Int>, CExpr<T>, CExpr<T>) extends CExpr<T>
-class CIn(CGExpr, Array<CGExpr>) extends CExpr<Int>
+class CFLte(CExpr<Float>, CExpr<Float>) extends CExpr<Int>
+class CFLt(CExpr<Float>, CExpr<Float>) extends CExpr<Int>
+class CFGte(CExpr<Float>, CExpr<Float>) extends CExpr<Int>
+class CFGt(CExpr<Float>, CExpr<Float>) extends CExpr<Int>
+class CFEq(CExpr<Float>, CExpr<Float>) extends CExpr<Int>
+class CFDiff(CExpr<Float>, CExpr<Float>) extends CExpr<Int>
+class CFBetween(CExpr<Float>, CExpr<Float>, CExpr<Float>) extends CExpr<Int>
+class CFNotBetween(CExpr<Float>, CExpr<Float>, CExpr<Float>) extends CExpr<Int>
 
-class CExists<T>(CSelect) extends CExpr<T>
-class CEQuery<T>(CSelect) extends CExpr<T>
+class CSLte(CExpr<String>, CExpr<String>) extends CExpr<Int>
+class CSLt(CExpr<String>, CExpr<String>) extends CExpr<Int>
+class CSGte(CExpr<String>, CExpr<String>) extends CExpr<Int>
+class CSGt(CExpr<String>, CExpr<String>) extends CExpr<Int>
+class CSEq(CExpr<String>, CExpr<String>) extends CExpr<Int>
+class CSDiff(CExpr<String>, CExpr<String>) extends CExpr<Int>
+class CSBetween(CExpr<String>, CExpr<String>, CExpr<String>) extends CExpr<Int>
+class CSNotBetween(
+  CExpr<String>,
+  CExpr<String>,
+  CExpr<String>,
+) extends CExpr<Int>
+
+class CAdd<T: frozen>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CSub<T: frozen>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CMul<T: frozen>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CDiv<T: frozen>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CMod<T: frozen>(CExpr<T>, CExpr<T>) extends CExpr<T>
+
+class CIf<T: frozen>(CExpr<Int>, CExpr<T>, CExpr<T>) extends CExpr<T>
+
+class CIIn(CExpr<Int>, Array<CExpr<Int>>) extends CExpr<Int>
+class CFIn(CExpr<Float>, Array<CExpr<Float>>) extends CExpr<Int>
+class CSIn(CExpr<String>, Array<CExpr<String>>) extends CExpr<Int>
+
+class CExists(CSelect) extends CExpr<Int>
+class CEQuery<T: frozen>(CSelect) extends CExpr<T>
 
 class CIAbs(CExpr<Int>) extends CExpr<Int>
+class CFAbs(CExpr<Float>) extends CExpr<Float>
 class COr(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
 class CAnd(CExpr<Int>, CExpr<Int>) extends CExpr<Int>
 
-class CUp<T>(CExpr<T>) extends CExpr<T>
-class CCoalesce<T>(Array<CExpr<T>>) extends CExpr<T>
+class CUp<T: frozen>(CExpr<T>) extends CExpr<T>
+class CCoalesce<T: frozen>(Array<CExpr<T>>) extends CExpr<T>
 class CIIsNull(CExpr<Int>) extends CExpr<Int>
 class CFIsNull(CExpr<Float>) extends CExpr<Int>
 class CSIsNull(CExpr<String>) extends CExpr<Int>
+class CSConcat(CExpr<String>, CExpr<String>) extends CExpr<String>
+
+class CNullIf<T: frozen>(CExpr<T>, CExpr<T>) extends CExpr<T>
+class CStrftime(
+  CExpr<String>,
+  CExpr<String>,
+  Array<CExpr<String>>,
+) extends CExpr<String>
 //class CCase(condOpt: ?CExpr, whenCases: Array<(CExpr, CExpr)>, elseCase: ?CExpr) extends CExpr<?>
 //class CCall(CExpr, ?Array<CExpr>) extends CExpr<?>

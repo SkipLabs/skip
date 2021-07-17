@@ -4,18 +4,23 @@ const tableStr: String = "CREATE TABLE t1(a INTEGER, b INTEGER);";
 
 fun evalStmt(
   context: mutable SKFS.Context,
-  evaluator: mutable SKSQL.Evaluator,
+  evaluator: SKSQL.Evaluator,
   str: String,
 ): void {
   lex = SKSQL.Lexer(0, SKSQL.Buffer(str));
   (_, stmtAst) = SKSQL.parseStmt(lex, 0);
-  evaluator.stmt(context, stmtAst)
+  _ = evaluator.stmt(context, stmtAst, false)
 }
 
 fun testSql(): mutable SKFS.Context {
   SKFS.run(context ~> {
     context.!debugMode = false;
-    evaluator = SKSQL.Evaluator::create(context);
+    options = SKSQL.Options{
+      backtrace => false,
+      allowCross => false,
+      sync => false,
+    };
+    evaluator = SKSQL.Evaluator{options};
     _table = evalStmt(context, evaluator, tableStr);
     expectFail("INSERT in non-existent table", () -> {
       evalStmt(context, evaluator, "INSERT INTO tdumb(e,c) VALUES(103,102)");

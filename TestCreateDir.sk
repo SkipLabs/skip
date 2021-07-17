@@ -5,8 +5,7 @@
 module SKFSTest;
 
 fun testCreateDir(): mutable SKFS.Context {
-  SKFS.runWithGcReturnContext(SKFS.Context{}, icontext ~> {
-    context = SKFS.Context::fromSaved(icontext);
+  SKFS.runWithGcReturnContext(SKFS.Context{}, context ~> {
     dirName = SKFS.DirName::create("/tmp/");
     mappedDirName = SKFS.DirName::create("/tmp/mapped/");
     dir = context.mkdir(SKFS.StringFile::fromFile, dirName, Array[]);
@@ -24,6 +23,6 @@ fun testCreateDir(): mutable SKFS.Context {
         )
       },
     );
-    SKFS.CStop(context.clone())
+    SKFS.CStop(None())
   })
 }

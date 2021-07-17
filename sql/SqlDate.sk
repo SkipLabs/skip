@@ -1,0 +1,608 @@
+module SKSQL;
+/*****************************************************************************/
+/* Unix API. */
+/*****************************************************************************/
+
+@cpp_extern("SKIP_time")
+native fun getUnixTime(): Int;
+
+@cpp_extern("SKIP_localtime")
+native fun localTime(Int, mutable TM): void;
+
+@cpp_extern("SKIP_gmtime")
+native fun gmTime(Int, mutable TM): void;
+
+@cpp_extern("SKIP_mktime_local")
+native fun mkLocalTime(readonly TM): Int;
+
+@cpp_extern("SKIP_mktime_utc")
+native fun mkUtcTime(readonly TM): Int;
+
+base class TimeZone {
+  children =
+  | TZUtc()
+  | TZLocal()
+}
+
+fun time(tz: TimeZone, stamp: Int): TM {
+  TM::fromTM(mtime(tz, stamp))
+}
+
+fun mtime(tz: TimeZone, stamp: Int): mutable TM {
+  tm = TM::mcreate();
+  tz match {
+  | TZUtc() -> gmTime(stamp, tm)
+  | TZLocal() -> localTime(stamp, tm)
+  };
+  tm
+}
+
+fun mktime(tz: TimeZone, tm: mutable TM): Int {
+  tz match {
+  | TZUtc() -> mkUtcTime(tm)
+  | TZLocal() -> mkLocalTime(tm)
+  }
+}
+
+/*****************************************************************************/
+/*
+
+Group 1
+YYYY-MM-DD
+YYYY-MM-DD HH:MM
+YYYY-MM-DD HH:MM:SS
+YYYY-MM-DD HH:MM:SS.SSS
+YYYY-MM-DDTHH:MM
+YYYY-MM-DDTHH:MM:SS
+YYYY-MM-DDTHH:MM:SS.SSS
+
+Group 2
+HH:MM
+HH:MM:SS
+HH:MM:SS.SSS
+
+now
+DDDDDDDDDD
+*/
+/*****************************************************************************/
+
+const codeZero: Int = '0'.code();
+
+fun toInt(input: readonly Vector<Char>): Int {
+  result = 0;
+  power = 1;
+  size = input.size();
+  for (i in Range(0, size)) {
+    !result = result + (input[size - 1 - i].code() - codeZero) * power;
+    !power = power * 10;
+  };
+  result
+}
+
+fun toInt1(x: Char): Int {
+  toInt(Vector[x])
+}
+
+fun toInt2(x: Char, y: Char): Int {
+  toInt(Vector[x, y])
+}
+
+fun toInt3(x: Char, y: Char, z: Char): Int {
+  toInt(Vector[x, y, z])
+}
+
+fun toInt4(x: Char, y: Char, z: Char, u: Char): Int {
+  toInt(Vector[x, y, z, u])
+}
+
+base class Date {
+  children =
+  | DNow()
+  | DNbr(Int)
+  | DTime{
+    hours: Int,
+    minutes: Int,
+    seconds: ?Int = None(),
+    mseconds: ?Int = None(),
+  }
+  | DDate{year: Int, month: Int, day: Int, time: ?DTime = None()}
+
+  fun toTM(context: mutable SKFS.Context, tz: TimeZone): mutable TM {
+    this match {
+    | DNow() ->
+      now = getNow(context);
+      mtime(tz, now)
+    | DNbr(stamp) -> mtime(tz, stamp)
+    | DTime{hours, minutes, seconds} ->
+      tm = TM::mcreate();
+      tm.!tm_hour = Int32::truncate(hours);
+      tm.!tm_min = Int32::truncate(minutes);
+      tm.!tm_sec = Int32::truncate(
+        seconds match {
+        | None() -> 0
+        | Some(x) -> x
+        },
+      );
+      tm
+
+    | DDate{year, month, day, time => None()} ->
+      tm = TM::mcreate();
+      tm.!tm_year = Int32::truncate(year - 1900);
+      tm.!tm_mon = Int32::truncate(month - 1);
+      tm.!tm_mday = Int32::truncate(day);
+      tm
+
+    | DDate{year, month, day, time => Some(DTime{hours, minutes, seconds})} ->
+      tm = TM::mcreate();
+
+      tm.!tm_year = Int32::truncate(year - 1900);
+      tm.!tm_mon = Int32::truncate(month - 1);
+      tm.!tm_mday = Int32::truncate(day);
+      tm.!tm_hour = Int32::truncate(hours);
+      tm.!tm_min = Int32::truncate(minutes);
+      tm.!tm_sec = Int32::truncate(
+        seconds match {
+        | None() -> 0
+        | Some(x) -> x
+        },
+      );
+      tm
+    }
+  }
+}
+
+fun parseFullDate(str: String): ?Date {
+  iter = str.getIter();
+  x1 = iter.next() match {
+  | None() -> return None()
+  | Some('n') -> return if (str == "now") Some(DNow()) else None()
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  x2 = iter.next() match {
+  | None() -> return Some(DNbr(toInt1(x1)))
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  x3 = iter.next() match {
+  | None() -> return Some(DNbr(toInt2(x1, x2)))
+  | Some(':') -> return parseTime(iter, Vector[x1, x2])
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  x4 = iter.next() match {
+  | None() -> return Some(DNbr(toInt3(x1, x2, x3)))
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  x5 = iter.next() match {
+  | None() -> return Some(DNbr(toInt4(x1, x2, x3, x4)))
+  | Some('-') -> return parseDate(iter, Vector[x1, x2, x3, x4])
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  digits = mutable Vector[x1, x2, x3, x4, x5];
+  for (x in iter) {
+    if (x < '0' || x > '9') return None();
+    digits.push(x);
+  };
+  Some(DNbr(toInt(digits)))
+}
+
+/*
+YYYY-MM-DD
+YYYY-MM-DD HH:MM
+YYYY-MM-DD HH:MM:SS
+YYYY-MM-DD HH:MM:SS.SSS
+YYYY-MM-DDTHH:MM
+YYYY-MM-DDTHH:MM:SS
+YYYY-MM-DDTHH:MM:SS.SSS
+*/
+
+fun parseDate(
+  iter: mutable Iterator<Char>,
+  yearV: readonly Vector<Char>,
+): ?Date {
+  year = toInt(yearV);
+  month1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  month2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  iter.next() match {
+  | Some('-') -> void
+  | _ -> return None()
+  };
+  month = toInt(Vector[month1, month2]);
+  if (month > 12) return None();
+  day1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  day2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  day = toInt(Vector[day1, day2]);
+  if (day > 31) return None();
+  iter.next() match {
+  | None() -> return Some(DDate{year, month, day})
+  | Some(' ')
+  | Some('T') ->
+    void
+  | _ -> return None()
+  };
+  hour1 = iter.next() match {
+  | Some(' ') -> return Some(DDate{year, month, day})
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  hour2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  iter.next() match {
+  | Some(':') -> void
+  | _ -> return None()
+  };
+  time = parseTime(iter, Vector[hour1, hour2]);
+  Some(DDate{year, month, day, time})
+}
+
+/*
+HH:MM
+HH:MM:SS
+HH:MM:SS.SSS
+*/
+
+fun parseTime(
+  iter: mutable Iterator<Char>,
+  hoursV: readonly Vector<Char>,
+): ?DTime {
+  hours = toInt(hoursV);
+  if (hours > 23) return None();
+  minute1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  minute2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  minutes = toInt(Vector[minute1, minute2]);
+  if (minutes >= 60) return None();
+  iter.next() match {
+  | None() -> return Some(DTime{hours, minutes})
+  | Some(':') -> void
+  | _ -> return None()
+  };
+  second1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  second2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  seconds = toInt(Vector[second1, second2]);
+  if (seconds >= 60) return None();
+  iter.next() match {
+  | None() -> return Some(DTime{hours, minutes, seconds => Some(seconds)})
+  | Some('.') -> void
+  | _ -> return None()
+  };
+  msecond1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  msecond2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  msecond3 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  mseconds = toInt(Vector[msecond1, msecond2, msecond3]);
+  Some(
+    DTime{hours, minutes, seconds => Some(seconds), mseconds => Some(mseconds)},
+  )
+}
+
+/*****************************************************************************/
+/*
+ *  NNN days
+ *  NNN hours
+ *  NNN minutes
+ *  NNN.NNNN seconds
+ *  NNN months
+ *  NNN years
+ *  start of month
+ *  start of year
+ *  start of day
+ *  weekday N
+ *  unixepoch
+ *  localtime
+ *  utc
+ */
+/*****************************************************************************/
+
+base class PlusMinus {
+  children =
+  | PMPlus()
+  | PMMinus()
+}
+
+@cpp_export
+mutable class TM private (
+  mutable tm_sec: Int32,
+  mutable tm_min: Int32,
+  mutable tm_hour: Int32,
+  mutable tm_mday: Int32,
+  mutable tm_mon: Int32,
+  mutable tm_year: Int32,
+  mutable tm_wday: Int32,
+  mutable tm_yday: Int32,
+  mutable tm_isdst: Int32,
+) {
+  fun clone(): TM {
+    static(
+      this.tm_sec,
+      this.tm_min,
+      this.tm_hour,
+      this.tm_mday,
+      this.tm_mon,
+      this.tm_year,
+      this.tm_wday,
+      this.tm_yday,
+      this.tm_isdst,
+    )
+  }
+
+  readonly fun mclone(): mutable TM {
+    mutable static(
+      this.tm_sec,
+      this.tm_min,
+      this.tm_hour,
+      this.tm_mday,
+      this.tm_mon,
+      this.tm_year,
+      this.tm_wday,
+      this.tm_yday,
+      this.tm_isdst,
+    )
+  }
+
+  static fun mcreate(): mutable TM {
+    mutable static(
+      Int32::truncate(0),
+      Int32::truncate(0),
+      Int32::truncate(0),
+      Int32::truncate(1),
+      Int32::truncate(0),
+      Int32::truncate(100),
+      Int32::truncate(0),
+      Int32::truncate(0),
+      Int32::truncate(-1),
+    )
+  }
+  static fun fromTM(tm: readonly TM): TM {
+    static(
+      tm.tm_sec,
+      tm.tm_min,
+      tm.tm_hour,
+      tm.tm_mday,
+      tm.tm_mon,
+      tm.tm_year,
+      tm.tm_wday,
+      tm.tm_yday,
+      tm.tm_isdst,
+    )
+  }
+}
+
+class TMNamed private {
+  tm_sec: Int32,
+  tm_min: Int32,
+  tm_hour: Int32,
+  tm_mday: Int32,
+  tm_mon: Int32,
+  tm_year: Int32,
+  tm_wday: Int32,
+  tm_yday: Int32,
+  tm_isdst: Int32,
+} {
+  static fun create(tm: readonly TM): this {
+    static{
+      tm_sec => tm.tm_sec,
+      tm_min => tm.tm_min,
+      tm_hour => tm.tm_hour,
+      tm_mday => tm.tm_mday,
+      tm_mon => tm.tm_mon,
+      tm_year => tm.tm_year,
+      tm_wday => tm.tm_wday,
+      tm_yday => tm.tm_yday,
+      tm_isdst => tm.tm_isdst,
+    }
+  }
+}
+
+const minSecs: Int = 60;
+const hourSecs: Int = 3600;
+const daySecs: Int = hourSecs * 24;
+
+mutable class DateTime(tz: TimeZone, tm: mutable TM) {
+  mutable fun apply(modifier: String): void {
+    pos = 0;
+    lex = Lexer(pos, Buffer(modifier));
+    this.applyModifier(lex, pos)
+  }
+
+  private mutable fun applyModifier(lex: Lexer, pos: Int): void {
+    if (lex.isEq(pos, "+")) {
+      !pos = lex.expect(pos, "+");
+      this.applyNNN(lex, pos, PMPlus())
+    } else if (lex.isEq(pos, "-")) {
+      !pos = lex.expect(pos, "-");
+      this.applyNNN(lex, pos, PMMinus())
+    } else if (lex.isEq(pos, "start")) {
+      this.applyStart(lex, pos);
+    } else if (lex.isEq(pos, "weekday")) {
+      !pos = lex.expect(pos, "weekday");
+      (!pos, n) = lex.nextInt32(pos);
+      if (n < 0 || n > 6) {
+        errorEval("Invalid weekday");
+      };
+      _ = mktime(this.tz, this.tm);
+      this.tm.!tm_isdst = Int32::truncate(-1);
+      this.tm.!tm_mday = Int32::truncate(
+        this.tm.tm_mday +
+          if (n >= this.tm.tm_wday) n - this.tm.tm_wday else {
+            7 + n - this.tm.tm_wday
+          },
+      );
+    } else {
+      errorEval("Invalid date modifier")
+    }
+  }
+
+  /*
+   *  start of month
+   *  start of year
+   *  start of day
+   */
+
+  private mutable fun applyStart(lex: Lexer, pos: Int): void {
+    !pos = lex.expect(pos, "of");
+    this.tm.!tm_hour = Int32::truncate(0);
+    this.tm.!tm_min = Int32::truncate(0);
+    this.tm.!tm_sec = Int32::truncate(0);
+    lex.word(pos) match {
+    | "month" -> this.tm.!tm_mday = Int32::truncate(1)
+    | "year" ->
+      this.tm.!tm_mon = Int32::truncate(0);
+      this.tm.!tm_mday = Int32::truncate(1)
+    | "day" -> void
+    | x -> errorEval("Invalid modifier: " + x)
+    }
+  }
+
+  private mutable fun applyNNN(
+    lex: Lexer,
+    pos: Int,
+    plusMinus: PlusMinus,
+  ): void {
+    (!pos, nbr) = lex.nextInt32(pos);
+    if (lex.isEq(pos, ".")) {
+      todo()
+    } else {
+      (!pos, word) = lex.nextWord(pos);
+      word match {
+      | "days" | "day" ->
+        this.tm.!tm_mday = static::op(plusMinus, this.tm.tm_mday, nbr)
+      | "hours" | "hour" ->
+        this.tm.!tm_hour = static::op(plusMinus, this.tm.tm_hour, nbr)
+      | "minutes" | "minute" ->
+        this.tm.!tm_min = static::op(plusMinus, this.tm.tm_min, nbr)
+      | "months" | "month" ->
+        this.tm.!tm_mon = static::op(plusMinus, this.tm.tm_mon, nbr)
+      | "years" | "year" ->
+        this.tm.!tm_year = static::op(plusMinus, this.tm.tm_year, nbr)
+      | _ -> errorEval("Unexepected token: " + word)
+      }
+    }
+  }
+
+  static private fun op(plusMinus: PlusMinus, x: Int32, y: Int32): Int32 {
+    plusMinus match {
+    | PMPlus() -> Int32::truncate(x + y)
+    | PMMinus() -> Int32::truncate(x - y)
+    }
+  }
+}
+
+/*****************************************************************************/
+/* Get now. */
+/*****************************************************************************/
+
+fun forbidNow(context: mutable SKFS.Context): void {
+  context.setGlobal("NowForbidden", SKFS.BoolFile(true));
+}
+
+fun getNow(context: mutable SKFS.Context): Int {
+  context.getGlobal("NowForbidden") match {
+  | Some(SKFS.BoolFile(true)) ->
+    errorEval("Cannot access 'now' in this context")
+  | _ -> void
+  };
+
+  context.getGlobal("Now") match {
+  | None() ->
+    now = getUnixTime();
+    context.setGlobal("Now", SKFS.IntFile(now));
+    now
+  | Some(file) -> SKFS.IntFile::fromFile(file).value
+  }
+}
+
+/*****************************************************************************/
+/* strftime. */
+/*****************************************************************************/
+
+@cpp_extern("SKIP_unix_strftime")
+native fun unixStrftime(String, readonly TM): String;
+
+fun check_format(format: String): void {
+  iter = format.getIter();
+  loop {
+    c = iter.next();
+    if (c is None()) return void;
+    if (c is Some('%')) {
+      iter.next() match {
+      | Some('f') -> errorEval("fractional seconds not supported")
+      | Some('J') -> errorEval("Julian day not supported")
+      | _ -> void
+      }
+    }
+  }
+}
+
+fun strftime(
+  context: mutable SKFS.Context,
+  format: String,
+  timeValue: String,
+  origModifiers: Array<String>,
+): String {
+  check_format(format);
+  modifiers = mutable Vector[];
+  timeZoneOpt: ?TimeZone = None();
+  for (modifier in origModifiers) {
+    (modifier, timeZoneOpt) match {
+    | ("utc", None()) -> !timeZoneOpt = Some(TZUtc())
+    | ("utc", Some(TZUtc())) -> void
+    | ("utc", Some(TZLocal())) -> errorEval("contradicting time zones")
+    | ("localtime", None()) -> !timeZoneOpt = Some(TZLocal())
+    | ("localtime", Some(TZLocal())) -> void
+    | ("localtime", Some(TZUtc())) -> errorEval("contradicting time zones")
+    | (x, _) -> modifiers.push(x)
+    }
+  };
+  tz = timeZoneOpt match {
+  | None() -> TZUtc()
+  | Some(x) -> x
+  };
+  dateTime = parseFullDate(timeValue) match {
+  | None() -> errorEval("Invalid date")
+  | Some(x) -> x
+  };
+  tm = dateTime.toTM(context, tz);
+  dt = mutable DateTime(tz, tm);
+  for (modifier in modifiers) {
+    dt.apply(modifier);
+  };
+  _ = mktime(tz, tm);
+  unixStrftime(format, tm);
+}

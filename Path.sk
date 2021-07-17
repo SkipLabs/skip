@@ -12,15 +12,7 @@ module SKFS;
 
 //const root: DirName = DirName::create("/");
 
-base class FileName(hashTag: Int) extends File uses Hashable, Orderable, Show {
-  overridable fun hash(): Int {
-    this.hashTag
-  }
-
-  overridable fun compare(y: FileName): Order {
-    this.hashTag.compare(y.hashTag);
-  }
-}
+base class FileName extends File uses Show
 
 // Decomposes the string into the tuple: (directory name, base name).
 fun splitPath(path: String): (String, String) {
@@ -59,15 +51,12 @@ fun splitPath(path: String): (String, String) {
 @cpp_extern("SKIP_hash_combine")
 native fun hashCombine(Int, Int): Int;
 
-class Path(dirName: DirName, baseName: BaseName) extends FileName {
-  const HASH: Int = 3123214;
-
+class Path(
+  dirName: DirName,
+  baseName: BaseName,
+) extends FileName uses Orderable {
   static fun create(dirName: DirName, baseName: BaseName): this {
-    hashTag = hashCombine(
-      static::HASH,
-      hashCombine(dirName.hash(), baseName.hash()),
-    );
-    static(dirName, baseName, hashTag)
+    static(dirName, baseName)
   }
 
   static fun fromString(path: String): this {
@@ -82,11 +71,31 @@ class Path(dirName: DirName, baseName: BaseName) extends FileName {
   }
 }
 
-class DirName(dirName: String) extends FileName {
+class DirName(
+  dirName: String,
+  hashTag1: Int,
+  hashTag2: Int,
+) extends BaseName uses Hashable {
   static fun create(dirName: String): DirName {
     static::validateDirName(dirName);
-    dirNameHash = hash(dirName);
-    static(dirName, dirNameHash)
+    dirNameHash1 = hash(dirName);
+    dirNameHash2 = hash((1, dirName));
+    static(dirName, dirNameHash1, dirNameHash2)
+  }
+
+  fun compare(base: BaseName): Order {
+    base match {
+    | dir @ DirName _ ->
+      this.hashTag1.compare(dir.hashTag1) match {
+      | EQ() -> this.hashTag2.compare(dir.hashTag2)
+      | x -> x
+      }
+    | _ -> invariant_violation("Expected a DirName")
+    }
+  }
+
+  fun hash(): Int {
+    this.hashTag1
   }
 
   fun pre(): this {
@@ -99,20 +108,30 @@ class DirName(dirName: String) extends FileName {
 
   fun tag(): this {
     dirName = this.dirName + "tag/";
-    dirNameHash = hash(dirName);
-    static(dirName, dirNameHash)
+    dirNameHash1 = hash(dirName);
+    dirNameHash2 = hash((1, dirName));
+    static(dirName, dirNameHash1, dirNameHash2)
   }
 
   fun size(): this {
     dirName = this.dirName + "size/";
-    dirNameHash = hash(dirName);
-    static(dirName, dirNameHash)
+    dirNameHash1 = hash(dirName);
+    dirNameHash2 = hash((1, dirName));
+    static(dirName, dirNameHash1, dirNameHash2)
+  }
+
+  fun files(): this {
+    dirName = this.dirName + "files/";
+    dirNameHash1 = hash(dirName);
+    dirNameHash2 = hash((1, dirName));
+    static(dirName, dirNameHash1, dirNameHash2)
   }
 
   fun aggr(): this {
     dirName = this.dirName + "aggr/";
-    dirNameHash = hash(dirName);
-    static(dirName, dirNameHash)
+    dirNameHash1 = hash(dirName);
+    dirNameHash2 = hash((1, dirName));
+    static(dirName, dirNameHash1, dirNameHash2)
   }
 
   static private fun validateDirName(dirName: String): void {
@@ -142,35 +161,37 @@ class DirName(dirName: String) extends FileName {
   }
 }
 
-base class BaseName extends FileName
-
-const DIR_TAG: DirTag = DirTag::createSingleton();
+base class BaseName extends FileName uses Orderable {
+  overridable fun toStringRemove(): String {
+    "" + escape(this.toString()) + "\t\n"
+  }
+}
 
 class DirTag() extends BaseName {
-  static fun createSingleton(): this {
-    hashTag = hash(DirTag(0));
-    DirTag(hashTag)
-  }
-
   fun toString(): String {
     "DirTag()"
   }
 }
 
-const SIZE_TAG: SizeTag = SizeTag::createSingleton();
-
 class SizeTag() extends BaseName {
-  static fun createSingleton(): this {
-    hashTag = hash(SizeTag(0));
-    SizeTag(hashTag)
-  }
-
   fun toString(): String {
     "SizeTag()"
   }
 }
 
-class IID() extends BaseName {
+class FilesTag() extends BaseName {
+  fun toString(): String {
+    "FilesTag()"
+  }
+}
+
+class IsEmptyTag() extends BaseName {
+  fun toString(): String {
+    "IsEmptyTag()"
+  }
+}
+
+class IID(value: Int) extends BaseName {
   static fun create(key: String): IID {
     chars = Vector::mcreateFromItems(key.chars());
     chars.reverse();
@@ -188,46 +209,23 @@ class IID() extends BaseName {
   }
 
   fun toString(): String {
-    this.hashTag.toString()
+    this.value.toString()
   }
 }
 class SID(value: String) extends BaseName {
   static fun create(value: String): this {
-    hash = hash(value);
-    SID(value, hash)
-  }
-
-  fun hash(): Int {
-    this.hashTag
+    SID(value)
   }
 
   fun compare(y: FileName): Order {
     y match {
-    | SID(v2, _) -> this.value.compare(v2)
+    | SID(v2) -> this.value.compare(v2)
     | _ -> invariant_violation("Heterogeneous keys detected")
     }
   }
 
   fun toString(): String {
     this.value
-  }
-}
-
-class PID(value: Array<BaseName>) extends BaseName {
-  static fun create(value: Array<BaseName>): this {
-    hashTag = hash(PID(value, 0));
-    PID(value, hashTag)
-  }
-
-  fun toString(): String {
-    inspect(this).toString()
-  }
-
-  fun compare(y: FileName): Order {
-    y match {
-    | PID(v, _) -> this.value.compare(v)
-    | _ -> compare(this, y)
-    }
   }
 }
 

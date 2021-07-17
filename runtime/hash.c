@@ -196,7 +196,9 @@ static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
     for(i = 0; i < bitsize && i < size; i++) {
       void** ptr = ((void**)obj)+(mask_slot * bitsize)+i;
       if(((ty->m_refsHintMask & 1) != 0) && ty->m_refMask[mask_slot] & (1 << i)) {
-        sk_stack_push(st, ptr, 0);
+        if(*ptr != NULL && *ptr != (void*)1) {
+          sk_stack_push(st, ptr, 0);
+        }
       }
       else {
         crc = sk_crc64_combine(crc, *ptr);
@@ -238,7 +240,9 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
         void** ptr = (void**)ohead;
         void** slot = (void**)rhead;
         if (ty->m_refMask[mask_slot] & (1 << i)) {
-          sk_stack_push(st, ptr, slot);
+          if(*slot != NULL && *slot != (void*)1) {
+            sk_stack_push(st, ptr, slot);
+          }
         }
         else {
           crc = sk_crc64_combine(crc, *slot);

@@ -304,7 +304,7 @@ mutable native class .Array<+T>
     | 0 -> ""
     | 1 -> this.unsafe_get(0).toString()
     | size ->
-      concatStringArray(
+      concatStringSequence(
         if (separator.isEmpty()) {
           // TODO: It would be nice to specalize this for Array<String>
           this.map(x -> x.toString())
@@ -803,15 +803,15 @@ private mutable class ReversedValuesIterator<V>
   }
 }
 
-fun concatStringArray(v: readonly Array<String>): String {
+fun concatStringSequence(seq: readonly Sequence<String>): String {
   // Count characters.
   numChars = 0;
-  for (i in Range(0, v.size())) !numChars = numChars + v[i].length();
+  for (v in seq) !numChars = numChars + v.length();
   buf = Array::mfill(numChars, '\0');
 
   // Fill the buffer.
   out = 0;
-  v.each(s ->
+  seq.each(s ->
     s.each(c -> {
       buf.set(out, c);
       !out = out + 1

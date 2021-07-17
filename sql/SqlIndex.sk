@@ -6,34 +6,472 @@ module SKSQL;
 
 fun createIndex(
   context: mutable SKFS.Context,
+  userIndexNameOpt: ?String,
+  dirName: SKFS.DirName,
+  kinds: Array<(Int, IKind, Type)>,
+  unique: Bool = false,
+): IndexDescr {
+  idxKinds = kinds.mapWithIndex((idx, field) -> {
+    (idx, IASC(), field.i2)
+  });
+  indexName = "/indexes" + dirName.toString() + hash(kinds) + "/";
+  index = (SKFS.EHandle(RowValues::fromFile, dirName)).contextWriterKeyValues(
+    RowValues::fromFile,
+    context,
+    SKFS.DirName::create(indexName),
+    (_ctx, writer, _key, rows) ~> {
+      if (rows.size() == 0) return void;
+      row = rows[0];
+      values = mutable Vector[];
+      for (kind in kinds) {
+        values.push(row.getValue(kind.i0));
+      };
+      rvalues = RowValues::create(values.toArray());
+      writer.writeArray(RowKey::create(rvalues, idxKinds), rows);
+    },
+  );
+  if (unique) {
+    _ = index.contextWriterKeyValues(
+      SKFS.StringFile::fromFile,
+      context,
+      SKFS.DirName::create(indexName + "unique/"),
+      (_, _, _key, values) ~> {
+        if (values.size() == 0) return void;
+        repeat = 0;
+        for (r in values) {
+          !repeat = repeat + r.repeat;
+        };
+        if (repeat > 1) error(0, "UNIQUE constraint failed")
+      },
+    )
+  };
+
+  userIndexName = userIndexNameOpt match {
+  | None() -> indexName
+  | Some(x) -> x
+  };
+
+  indexDescr = IndexDescr{
+    name => userIndexName,
+    dirName => index.dirName,
+    tableName => dirName,
+    fields => kinds,
+  };
+
+  tables = getTableDir(context);
+  context
+    .getEagerDir(tables.dirName)
+    .write(context, SKFS.SID::create(userIndexName), index.dirName);
+  indexDescr
+}
+
+fun createUserIndex(
+  options: Options,
+  context: mutable SKFS.Context,
+  userIndexName: String,
   pos: Int,
   fields: (String, Array<(String, IKind)>),
 ): IndexDescr {
   (tableName, colNames) = fields;
+  !colNames = colNames.map(x -> (x.i0, IASC()));
+  colSet = mutable Set[];
+  for (colName in colNames) {
+    if (colSet.contains(colName.i0)) {
+      error(pos, "Duplicate column name: " + colName.i0);
+    };
+    colSet.add(colName.i0);
+  };
   if (colNames.size() < 1) {
     error(pos, "Invalid index: missing column names")
   };
-  indexName = "/indexes/" + tableName + "/";
-  table = getTable(context, pos, SKFS.SID::create(tableName));
-  dir = getDir(table);
-  for (colName in colNames) {
-    if (!table.cols.containsKey(colName.i0)) {
-      error(pos, "Unknown column: " + colName.i0);
-    };
+
+  table = getTable(options, context, pos, SKFS.SID::create(tableName));
+  additionalCols = mutable Vector[];
+  for (ty in table.schema) {
+    if (colSet.contains(ty.name)) continue;
+    additionalCols.push((ty.name, IASC()));
   };
+  !colNames = colNames.concat(additionalCols.toArray());
+
   cols = colNames.map(x -> (table.cols[x.i0], x.i1));
   types = table.schema.map(x -> x.ty);
   kinds = computeOrder(types, cols);
-  handle = SKFS.EHandle(Row::fromFile, dir.dirName);
-  _ = handle.contextWriterKeyValues(
-    Row::fromFile,
-    context,
-    SKFS.DirName::create(indexName),
-    (_ctx, writer, _key, rows) ~> {
-      for (row in rows) {
-        writer.write(RowKey::create(row, kinds), row)
+
+  createIndex(context, Some(userIndexName), table.dirName, kinds)
+}
+
+/*****************************************************************************/
+/* Algebra used to compile index lookups. */
+/*****************************************************************************/
+
+class SortedA<+T: Orderable> private (value: Array<T>) {
+  static fun createFromItems(array: Array<T>): this {
+    static(array.sorted())
+  }
+
+  fun merge<U: Orderable>[T: U](
+    t2A: SortedA<U>,
+    leftF: U ~> ?U,
+    rightF: U ~> ?U,
+    equalF: (U, U) ~> ?U,
+  ): SortedA<U> {
+    nthis: SortedA<U> = this;
+    t1 = nthis.value;
+    t2 = t2A.value;
+    result = mutable Vector[];
+    i = 0;
+    j = 0;
+    while (i < t1.size() || j < t2.size()) {
+      if (i >= t1.size()) {
+        rightF(t2[j]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !j = j + 1;
+        continue;
       };
-    },
-  );
-  IndexDescr{name => indexName, fields => kinds}
+      if (j >= t2.size()) {
+        leftF(t1[i]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !i = i + 1;
+        continue;
+      };
+      if (t1[i] < t2[j]) {
+        leftF(t1[i]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !i = i + 1;
+      } else if (t1[i] > t2[j]) {
+        rightF(t2[j]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !j = j + 1;
+      } else {
+        equalF(t1[i], t2[j]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !i = i + 1;
+        !j = j + 1;
+      }
+    };
+    SortedA(result.toArray())
+  }
+}
+
+base class ColOp uses Orderable {
+  children =
+  | COEq()
+  | COLt()
+  | COLte()
+  | COGt()
+  | COGte()
+
+  static fun create(op: String): ColOp {
+    op match {
+    | "=" -> COEq()
+    | "<" -> COLt()
+    | "<=" -> COLte()
+    | ">" -> COGt()
+    | ">=" -> COGte()
+    | _ -> invariant_violation("Unknown operation: " + op)
+    }
+  }
+}
+
+class Col(
+  colNbr: Int,
+  values: Array<(ColOp, CValue)>,
+  unique: Bool,
+) uses Orderable {
+  fun compare(y: Col): Order {
+    this.colNbr.compare(y.colNbr)
+  }
+}
+
+class Solution(
+  eqs: Array<CValue>,
+  other: ?(ColOp, CValue),
+  unique: Bool,
+) uses Orderable {
+  fun min(): Array<CValue> {
+    (op, last) = this.other match {
+    | None() -> return this.eqs
+    | Some((COEq(), _)) -> return this.eqs
+    | Some((op, x)) -> (op, x)
+    };
+    this.eqs.concat(
+      Array[
+        op match {
+        | COEq() -> invariant_violation("Already filtered out")
+        | COLt()
+        | COLte() ->
+          last.min()
+        | COGt()
+        | COGte() ->
+          last
+        },
+      ],
+    )
+  }
+
+  fun max(): Array<CValue> {
+    (op, last) = this.other match {
+    | None() -> return this.eqs
+    | Some((COEq(), _)) -> return this.eqs
+    | Some((op, x)) -> (op, x)
+    };
+    this.eqs.concat(
+      Array[
+        op match {
+        | COEq() -> invariant_violation("Already filtered out")
+        | COLt()
+        | COLte() ->
+          last
+        | COGt()
+        | COGte() ->
+          last.max()
+        },
+      ],
+    )
+  }
+}
+
+class LookUp{
+  index: IndexDescr,
+  tableNbr: Int,
+  cols: SortedA<Col>,
+} uses Orderable {
+  fun compare(y: LookUp): Order {
+    this.index.compare(y.index)
+  }
+
+  fun or(y: LookUp): ?LookUp {
+    if (this.index != y.index) return None();
+    if (this.cols.value.size() > 1 || y.cols.value.size() > 1) return None();
+    invariant(this.tableNbr == y.tableNbr);
+    index = this.index;
+    tableNbr = this.tableNbr;
+
+    cols = this.cols.merge(
+      y.cols,
+      _ ~> None(),
+      _ ~> None(),
+      (x, y) ~> Some(Col(x.colNbr, x.values.concat(y.values), x.unique)),
+    );
+
+    Some(LookUp{index, tableNbr, cols})
+  }
+
+  fun and(y: LookUp): ?LookUp {
+    if (this.index != y.index) return None();
+    invariant(this.tableNbr == y.tableNbr);
+
+    index = this.index;
+    tableNbr = this.tableNbr;
+
+    cols = this.cols.merge(
+      y.cols,
+      x ~> Some(x),
+      x ~> Some(x),
+      (x, y) ~> {
+        allEq1 = for (opVal in x.values) {
+          if (opVal.i0 is COEq()) continue;
+          break false;
+        } else {
+          true
+        };
+        allEq2 = for (opVal in y.values) {
+          if (opVal.i0 is COEq()) continue;
+          break false;
+        } else {
+          true
+        };
+        Some(
+          if (allEq1 && allEq2) {
+            if (x.values.size() <= y.values.size()) x else y
+          } else if (allEq1) x else {
+            y
+          },
+        )
+      },
+    );
+
+    lookUp = LookUp{index, tableNbr, cols};
+    Some(lookUp)
+  }
+
+  static fun solutions(
+    acc: mutable Vector<Solution>,
+    n: Int,
+    solutionHead: Array<CValue>,
+    cols: Array<Col>,
+    unique: Bool,
+  ): void {
+    if (cols.size() == 0 || acc.size() > 128) {
+      acc.push(Solution(solutionHead, None(), unique));
+      return void;
+    };
+    col = cols[0];
+    if (col.colNbr != n) {
+      acc.push(Solution(solutionHead, None(), unique));
+      return void;
+    };
+    !cols = cols.slice(1, cols.size());
+    if (col.values.size() > 1 || col.values[0].i0 is COEq()) {
+      for (opVal in col.values) {
+        if (!(opVal.i0 is COEq())) {
+          acc.push(Solution(solutionHead, None(), unique));
+          return void;
+        }
+      };
+      for (opVal in col.values) {
+        (_, value) = opVal;
+        static::solutions(
+          acc,
+          n + 1,
+          solutionHead.concat(Array[value]),
+          cols,
+          unique || col.unique,
+        )
+      }
+    } else if (col.values.size() == 1) {
+      (op, value) = col.values[0];
+      acc.push(Solution(solutionHead, Some((op, value)), unique));
+    } else {
+      acc.push(Solution(solutionHead, None(), unique))
+    }
+  }
+
+  fun normalize(): ?Ranges {
+    acc = mutable Vector[];
+    static::solutions(acc, 0, Array[], this.cols.value, false);
+    set = SortedSet[];
+    nonEq = 0;
+    for (range in acc) {
+      if (range.other is Some _) !nonEq = nonEq + 1;
+    };
+    for (range in acc) {
+      !set = set.set(range);
+    };
+    if (nonEq != 1 || set.size() != 1) {
+      !set = set.map(x -> {
+        !x.other = None();
+        x
+      })
+    };
+    !set = set.filter(x -> x.eqs.size() > 0 || x.other is Some _);
+    if (set.size() == 0) return None();
+    Some(Ranges::create(this.index, this.tableNbr, set.collect(Array)))
+  }
+}
+
+class Ranges private (
+  index: IndexDescr,
+  tableNbr: Int,
+  ranges: Array<Solution>,
+  unique: Bool,
+  size: Int,
+  op: ColOp,
+) {
+  static fun create(
+    index: IndexDescr,
+    tableNbr: Int,
+    ranges: Array<Solution>,
+  ): this {
+    Ranges(
+      index,
+      tableNbr,
+      ranges,
+      static::isUnique(ranges),
+      static::getSize(ranges),
+      static::getOp(ranges),
+    )
+  }
+
+  static fun isUnique(ranges: Array<Solution>): Bool {
+    for (solution in ranges) {
+      if (!solution.unique) return false;
+    };
+    true
+  }
+
+  static fun getSize(ranges: Array<Solution>): Int {
+    size = 0;
+    for (solution in ranges) {
+      !size = max(
+        solution.eqs.size() + (if (solution.other is Some _) 1 else 0),
+        size,
+      );
+    };
+    size
+  }
+
+  static fun getOp(ranges: Array<Solution>): ColOp {
+    colOp = COEq();
+    for (solution in ranges) {
+      solution.other match {
+      | Some((COEq(), _)) -> void
+      | Some((op, _)) -> return op
+      | None() -> void
+      }
+    };
+    colOp
+  }
+
+  fun select(other: Ranges): Ranges {
+    (this.unique, other.unique) match {
+    | (true, false) -> this
+    | (false, true) -> other
+    | _ ->
+      if (this.size > other.size) return this;
+      if (this.size < other.size) return other;
+      (this.op, other.op) match {
+      | (COEq(), _) -> this
+      | (_, COEq()) -> other
+      | _ -> this
+      }
+    }
+  }
+
+  fun minMax(): Array<(Array<CValue>, Array<CValue>)> {
+    this.ranges.map(x -> (x.min(), x.max()))
+  }
+}
+
+class LookUps private (array: SortedA<LookUp>) {
+  static fun createFromItems(array: Array<LookUp>): this {
+    static(SortedA::createFromItems(array))
+  }
+
+  fun and(y: LookUps): LookUps {
+    LookUps(
+      this.array.merge(y.array, x ~> Some(x), x ~> Some(x), (x, y) ~> x.and(y)),
+    )
+  }
+
+  fun or(y: LookUps): LookUps {
+    LookUps(
+      this.array.merge(y.array, _ ~> None(), _ ~> None(), (x, y) ~> x.or(y)),
+    )
+  }
+
+  fun select(): ?(IndexDescr, Int, Array<(Array<CValue>, Array<CValue>)>) {
+    cand: ?Ranges = None();
+    for (lookUp in this.array.value) {
+      !cand = (cand, lookUp.normalize()) match {
+      | (None(), x) -> x
+      | (Some(x), Some(y)) -> Some(x.select(y))
+      | (Some(x), None()) -> Some(x)
+      }
+    };
+    cand match {
+    | None() -> None()
+    | Some(x) -> Some((x.index, x.tableNbr, x.minMax()))
+    }
+  }
 }

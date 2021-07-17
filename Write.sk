@@ -20,6 +20,9 @@ fun escape(str: String): String {
     } else if (c == '\n') {
       output.push('\\');
       output.push('n');
+    } else if (c == '"') {
+      output.push('\\');
+      output.push('"');
     } else {
       output.push(c);
     }
@@ -44,6 +47,9 @@ fun unescape(input: readonly Vector<Char>): String {
       | 'n' ->
         output.push('\n');
         !i = i + 1
+      | '"' ->
+        output.push('"');
+        !i = i + 1
       | '\\' ->
         output.push('\\');
         !i = i + 1
@@ -56,49 +62,46 @@ fun unescape(input: readonly Vector<Char>): String {
   String::fromChars(output.toArray())
 }
 
-fun getWriteKey(readAt: Int -> Char): ?(String, Bool) {
-  i = 0;
+fun getWriteKey(readAt: () -> Char): (?String, Bool) {
   chars = mutable Vector[];
-  vtry<?(String, Bool)>(
+  vtry<(?String, Bool)>(
     () -> {
       loop {
-        c = readAt(i);
+        c = readAt();
         if (c == '\\') {
           chars.push(c);
-          !i = i + 1;
           continue
         };
         if (c == '\n') {
-          return (Some((unescape(chars), false)))
+          return (None(), false);
         };
         if (c == '\t') {
-          return (Some((unescape(chars), true)))
+          return (Some(unescape(chars)), false)
         };
         chars.push(c);
-        !i = i + 1;
       }
     },
-    _ -> return None(),
+    _ -> return (None(), true),
   )
 }
 
-fun getWriteValue(readAt: Int -> Char): ?String {
-  i = 0;
+fun getWriteValue(readAt: () -> Char): ?String {
   chars = mutable Vector[];
   vtry<?String>(
     () -> {
+      first = readAt();
+      if (first != '"') return None();
+
       loop {
-        c = readAt(i);
+        c = readAt();
         if (c == '\\') {
           chars.push(c);
-          !i = i + 1;
           continue
         };
         if (c == '\n') {
-          return Some(unescape(chars))
+          return Some(unescape(chars.slice(0, chars.size() - 1)))
         };
         chars.push(c);
-        !i = i + 1;
       }
     },
     _ -> return None(),
@@ -106,17 +109,17 @@ fun getWriteValue(readAt: Int -> Char): ?String {
 }
 
 fun getWriteKeyValueIter(
-  readAt: Int -> Char,
-): mutable Iterator<(String, ?String)> {
+  readAt: () -> Char,
+): mutable Iterator<?(String, ?String)> {
   loop {
-    getWriteKey(readAt) match {
-    | Some((key, hasValue)) ->
-      if (hasValue) {
-        yield (key, getWriteValue(readAt));
-      } else {
-        yield (key, None())
-      }
-    | None() -> break void
+    (key, isFinished) = getWriteKey(readAt);
+    key match {
+    | Some(k) -> yield (Some((k, getWriteValue(readAt))))
+    | None() if (!isFinished) -> yield None()
+    | None() -> void
+    };
+    if (isFinished) {
+      break void;
     }
   }
 }
@@ -127,59 +130,72 @@ base class KVStreamOp {
   | KVAcc(keyName: String, valueName: ?String)
 }
 
-fun getWriteStreamOpIter(readAt: Int -> Char): mutable Iterator<KVStreamOp> {
+fun getWriteStreamOpIter(readAt: () -> Char): mutable Iterator<?KVStreamOp> {
   lastKeyOpt: ?String = None();
 
-  for (current in getWriteKeyValueIter(readAt)) {
-    if (current.i0 == "") {
-      yield KVSep();
-    } else {
-      lastKeyOpt match {
-      | None() -> yield KVAcc(current.i0, current.i1)
-      | Some(lastKey) ->
-        if (current.i0 != lastKey) {
-          yield KVSep()
-        };
-        yield KVAcc(current.i0, current.i1)
-      }
-    };
-    !lastKeyOpt = Some(current.i0);
+  for (currentOpt in getWriteKeyValueIter(readAt)) {
+    currentOpt match {
+    | None() ->
+      !lastKeyOpt = None();
+      yield None()
+    | Some(current) ->
+      if (current.i0 == "") {
+        yield Some(KVSep());
+      } else {
+        lastKeyOpt match {
+        | None() -> yield Some(KVAcc(current.i0, current.i1))
+        | Some(lastKey) ->
+          if (current.i0 != lastKey) {
+            yield Some(KVSep())
+          };
+          yield Some(KVAcc(current.i0, current.i1))
+        }
+      };
+      !lastKeyOpt = Some(current.i0)
+    }
   };
 
-  yield KVSep()
+  yield Some(KVSep())
 }
 
 fun getWriteKeyValuesIter(
-  readAt: Int -> Char,
+  readAt: () -> Char,
 ): mutable Iterator<(BaseName, Array<File>)> {
-  key = "";
+  keyOpt: ?String = Some("");
   values = mutable Vector[];
-  for (op in getWriteStreamOpIter(readAt)) {
-    op match {
-    | KVSep() ->
-      if (key != "") {
-        yield (SID::create(key), values.toArray());
-      };
-      values.clear()
-    | KVAcc(k, value) ->
-      !key = k;
-      value match {
-      | None() -> values.clear()
-      | Some(v) -> values.push(SKFS.StringFile(v))
+  for (opOpt in getWriteStreamOpIter(readAt)) {
+    opOpt match {
+    | None() ->
+      values.clear();
+      !keyOpt = None()
+    | Some(op) ->
+      op match {
+      | KVSep() ->
+        keyOpt match {
+        | None() -> void
+        | Some(key) -> yield (SID::create(key), values.toArray())
+        };
+        values.clear()
+      | KVAcc(k, value) ->
+        !keyOpt = Some(k);
+        value match {
+        | None() -> values.clear()
+        | Some(v) -> values.push(SKFS.StringFile(v))
+        }
       }
     }
   }
 }
 
-fun writeFromStdin(dirNameStr: String): void {
+fun writeFromStdin(context: mutable Context, dirNameStr: String): void {
   dirName = SKFS.DirName::create(dirNameStr);
-  startContext = SKFS.gContextGet();
-  context = SKFS.Context::fromSaved(startContext);
-  startTick = context.tick;
   dir = context.unsafeGetEagerDir(dirName);
-  dir.writeArrayMany(context, getWriteKeyValuesIter(getChar));
-  context.update();
-  _context = SKFS.gContextSync(startTick, startContext, context.clone());
+  i = 0;
+  next = () -> {
+    !i = i + 1;
+    getChar(i);
+  };
+  dir.writeArrayMany(context, getWriteKeyValuesIter(next));
 }
 
 module end;
@@ -233,6 +249,8 @@ fun testWriteChunk(): mutable SKFS.Context {
       entries.push((SKFS.SID::create(keyStr), values.toArray()));
     };
 
+    entries.sortBy(x ~> x.i0);
+
     buffer = mutable Vector[];
     o = str -> buffer.push(str);
 
@@ -240,9 +258,9 @@ fun testWriteChunk(): mutable SKFS.Context {
       (key, values) = kv;
       for (value in values) {
         o(SKFS.escape(key.toString()));
-        o("\t");
+        o("\t\"");
         o(SKFS.escape(value.value.toString()));
-        o("\n");
+        o("\"\n");
       };
     };
 
@@ -258,7 +276,7 @@ fun testWriteChunk(): mutable SKFS.Context {
 
     chunks = "".join(chunksBuffer);
     chunksIter = chunks.getIter();
-    next = _ -> {
+    next = () -> {
       chunksIter.next() match {
       | None() -> throw EndOfFile()
       | Some(c) -> c
@@ -267,24 +285,28 @@ fun testWriteChunk(): mutable SKFS.Context {
 
     buffer.clear();
 
-    parsedEntries = mutable Map[];
+    parsedEntries = SortedMap[];
     for (kv in SKFS.getWriteKeyValuesIter(next).collect(Array)) {
       (key, values) = kv;
-      parsedEntries![key] = values;
+      !parsedEntries[key] = values;
     };
 
     for (key => values in parsedEntries) {
       for (value in values) {
         o(SKFS.escape(key.toString()));
-        o("\t");
+        o("\t\"");
         o(SKFS.escape(SKFS.StringFile::fromFile(value).value.toString()));
-        o("\n");
+        o("\"\n");
       };
     };
 
     parsedChunk = "\n\n" + "".join(buffer);
 
     !eq = eq && (chunk == parsedChunk);
+
+    if (chunk != parsedChunk) {
+      break void;
+    }
   };
 
   expectEq("Write escaping test ", eq, () -> true);

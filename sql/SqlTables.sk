@@ -5,34 +5,31 @@
 module SKSQL;
 
 const tableInfo: SKFS.DirName = SKFS.DirName::create("/tablesInfo/");
-const selectInput: SKFS.DirName = SKFS.DirName::create("/selectInput/");
-const selectOutput: SKFS.DirName = SKFS.DirName::create("/selectOutput/");
+const views: SKFS.DirName = SKFS.DirName::create("/views/");
+const windows: SKFS.DirName = SKFS.DirName::create("/windows/");
+const subsInput: SKFS.DirName = SKFS.DirName::create("/subsInput/");
+const subsOutput: SKFS.DirName = SKFS.DirName::create("/subsOutput/");
 const indexInput: SKFS.DirName = SKFS.DirName::create("/indexInput/");
 const indexOutput: SKFS.DirName = SKFS.DirName::create("/indexOutput/");
+const indexByCol: SKFS.DirName = SKFS.DirName::create("/indexByCol/");
 
 extension class TypeDescr extends SKFS.File
 
 class DirDescr{
   name: String,
   schema: Array<TypeDescr>,
-  cols: Map<String, Int>,
+  cols: SortedMap<String, Int>,
   dirName: SKFS.DirName,
-} extends SKFS.File
+  alias: ?String,
+  windowSize: ?Int,
+} extends SKFS.File uses Orderable
 
 fun makeSelectName(id: String): SKFS.DirName {
   SKFS.DirName::create("/" + id + "/");
 }
 
-fun makeAvgName(dir: SKFS.DirName, colName: String): SKFS.DirName {
-  SKFS.DirName::create(dir.toString() + "avg/" + colName + "/")
-}
-
-fun makeCountName(dir: SKFS.DirName): SKFS.DirName {
-  SKFS.DirName::create(dir.toString() + "count/")
-}
-
 fun getDir(dirDescr: DirDescr): SKFS.EHandle<Row> {
-  SKFS.EHandle(Row::fromFile, dirDescr.dirName)
+  SKFS.EHandle(RowValues::fromFile, dirDescr.dirName)
 }
 
 fun makeDir<T: frozen>(
@@ -54,27 +51,76 @@ fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
 }
 
 /*****************************************************************************/
-/* Select Dirs. */
+/* Views. */
 /*****************************************************************************/
 
-fun getSelectInputDir(context: mutable SKFS.Context): SKFS.EHandle<CSelect> {
-  makeDir(CSelect::fromFile, context, selectInput, () ->
-    context.mkdir(CSelect::fromFile, selectInput, Array[])
+fun getViewsDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
+  makeDir(DirDescr::fromFile, context, views, () ->
+    context.mkdir(DirDescr::fromFile, views, Array[])
   )
 }
 
-fun getSelectOutputDir(
+/*****************************************************************************/
+/* Window Counts. */
+/*****************************************************************************/
+
+fun getWindowsDir(context: mutable SKFS.Context): SKFS.EHandle<Queue> {
+  makeDir(Queue::fromFile, context, windows, () ->
+    context.mkdir(Queue::fromFile, windows, Array[])
+  )
+}
+
+/*****************************************************************************/
+/* Subscriptions. */
+/*****************************************************************************/
+
+class SubRequestFile(
+  viewName: String,
+  viewDirName: SKFS.DirName,
+  init: Bool,
+  cmd: ?SKFS.CmdKind,
+  sessionID: Int,
+) extends SKFS.File
+
+fun getSubsDirs(
+  options: Options,
   context: mutable SKFS.Context,
-): SKFS.EHandle<SelectValue> {
-  input = getSelectInputDir(context);
-  makeDir(SelectValue::fromFile, context, selectOutput, () -> {
-    input.contextMap(
-      SelectValue::fromFile,
-      context,
-      selectOutput,
-      (context, request) ~> evalSelect(context, request, None()),
-    )
-  })
+): (SKFS.EHandle<SubRequestFile>, SKFS.EHandle<SKFS.IntFile>) {
+  if (context.unsafeMaybeGetEagerDir(subsInput) is Some _) {
+    input = SKFS.EHandle(SubRequestFile::fromFile, subsInput);
+    output = SKFS.EHandle(SKFS.IntFile::fromFile, subsOutput);
+    return (input, output)
+  };
+  input = context.mkdir(SubRequestFile::fromFile, subsInput, Array[]);
+  output = input.contextWriterKeyValues(
+    SKFS.IntFile::fromFile,
+    context,
+    subsOutput,
+    (context, writer, key, values) ~> {
+      request = SubRequestFile::fromFile(values[0]);
+      viewName = request.viewName;
+      cmd = request.cmd;
+      init = request.init;
+      sessionID = request.sessionID;
+      views = SKSQL.getViewsDir(context);
+      viewsDir = context.unsafeGetEagerDir(views.dirName);
+      selectFiles = viewsDir.getArrayRaw(SKFS.SID(viewName.toString()));
+      invariant(selectFiles.size() <= 1);
+      if (selectFiles.size() == 0) {
+        print_error(`Error: view ${viewName.toString()} doesn't exists`);
+        exit(3)
+      };
+      selectFile = SKSQL.SelectFile::fromFile(selectFiles[0]);
+      selectAst = selectFile.value;
+      compiler = SKSQL.Compiler::create(options, selectAst.pos);
+      select = compiler.compileSelect(context, selectAst);
+      selectDir = SKSQL.evalSelect(context, select, None());
+      edir = context.unsafeGetEagerDir(selectDir.dirName);
+      edir.subscribe(context, sessionID, cmd, init);
+      writer.write(key, SKFS.IntFile(sessionID))
+    },
+  );
+  (input, output)
 }
 
 /*****************************************************************************/
@@ -85,8 +131,14 @@ extension class Index extends SKFS.File
 
 class IndexDescr{
   name: String,
+  dirName: SKFS.DirName,
+  tableName: SKFS.DirName,
   fields: Array<(Int, IKind, Type)>,
-} extends SKFS.File
+} extends SKFS.File uses Orderable {
+  fun compare(y: IndexDescr): Order {
+    this.name.compare(y.name)
+  }
+}
 
 fun getIndexInputDir(context: mutable SKFS.Context): SKFS.EHandle<Index> {
   makeDir(Index::fromFile, context, indexInput, () ->
@@ -94,29 +146,120 @@ fun getIndexInputDir(context: mutable SKFS.Context): SKFS.EHandle<Index> {
   )
 }
 
-fun getIndexOutputDir(context: mutable SKFS.Context): SKFS.EHandle<IndexDescr> {
+fun getIndexOutputDir(
+  options: Options,
+  context: mutable SKFS.Context,
+): SKFS.EHandle<IndexDescr> {
   input = getIndexInputDir(context);
   makeDir(IndexDescr::fromFile, context, indexOutput, () -> {
     input.contextMap(
       IndexDescr::fromFile,
       context,
       indexOutput,
-      (context, index) ~> createIndex(context, index.pos, index.fields),
+      (context, index) ~> {
+        createUserIndex(options, context, index.name, index.pos, index.fields)
+      },
     )
   })
 }
 
+fun makeIndexEntry(tableName: SKFS.DirName, colNbr: Int): SKFS.SID {
+  SKFS.SID::create(tableName.toString() + ":" + colNbr);
+}
+
+fun getIndexByColNbr(
+  options: Options,
+  context: mutable SKFS.Context,
+): SKFS.EHandle<IndexDescr> {
+  indexes = getIndexOutputDir(options, context);
+  makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
+    indexes.contextWriterMap(
+      IndexDescr::fromFile,
+      context,
+      indexByCol,
+      (_context, writer, indexDescr) ~> {
+        for (field in indexDescr.fields) {
+          fieldNbr = field.i0;
+          indexEntry = makeIndexEntry(indexDescr.tableName, fieldNbr);
+          writer.write(indexEntry, indexDescr)
+        }
+      },
+    )
+  })
+}
 /*****************************************************************************/
 /* Tables. */
 /*****************************************************************************/
 
 fun getTable(
+  options: Options,
   context: mutable SKFS.Context,
   pos: Int,
   name: SKFS.BaseName,
 ): DirDescr {
   getTableDir(context).maybeGet(context, name) match {
-  | None() -> error(pos, "Table '" + name + "' does not exist")
-  | Some(x) -> x
+  | None() ->
+    hviews = getViewsDir(context);
+    viewsDir = context.unsafeGetEagerDir(hviews.dirName);
+    viewArray = viewsDir.getArrayRaw(name);
+    if (viewArray.size() == 0) {
+      error(pos, "Table '" + name + "' does not exist")
+    } else {
+      compiler = SKSQL.Compiler::create(options, pos);
+      select = SelectFile::fromFile(viewArray[0]).value;
+      cselect = compiler.compileSelect(context, select);
+      dirDescr = SKSQL.Compiler::getDirDescr(select, cselect);
+      _ = evalSelect(context, cselect, None());
+      dirDescr
+    }
+  | Some(dirDescr) ->
+    context.getGlobal("TableMap") match {
+    | None() -> dirDescr
+    | Some(tableMapFile) ->
+      tableMap = TableMap::fromFile(tableMapFile);
+      oldDescr = tableMap.map.maybeGet(name) match {
+      | None() -> dirDescr
+      | Some((version, descr)) if (version == tableMap.version) -> return descr
+      | Some((_, x)) -> x
+      };
+      oldDirName = oldDescr.dirName;
+      oldDir = context.unsafeGetEagerDir(oldDirName);
+      nextName = SKFS.DirName::create(
+        "/next/" + dirDescr.name + "/" + tableMap.version.value + "/",
+      );
+      sinkName = SKFS.DirName::create(
+        "/sink/" + dirDescr.name + "/" + tableMap.version.value + "/",
+      );
+      dir = SKFS.EagerDir{
+        time => context.timeStamp(),
+        dirName => nextName,
+        input => true,
+        fixedData => oldDir.fixedData,
+        data => oldDir.data,
+        totalSize => oldDir.totalSize,
+        creator => context.currentArrow(),
+      };
+      context.setDir(dir.dirName, dir);
+      _ = SKFS.EHandle(Row::fromFile, oldDirName).contextWriterKeyIter(
+        Row::fromFile,
+        context,
+        sinkName,
+        (context, _writer, key, _valueIter) ~> {
+          entries = mutable Vector[];
+          for (srcValue in (context.unsafeGetEagerDir(
+            oldDirName,
+          )).unsafeGetDataIter(key)) {
+            (source, values) = srcValue;
+            entries.push((key, (source.value, values)));
+          };
+          inputDir = context.unsafeGetEagerDir(nextName);
+          inputDir.writeArraySourceMany(context, entries.iterator());
+        },
+      );
+      result = dirDescr with {dirName => nextName};
+      !tableMap.map[name] = (tableMap.version, result);
+      context.setGlobal("TableMap", tableMap);
+      result
+    }
   }
 }

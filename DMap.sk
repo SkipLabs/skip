@@ -27,7 +27,7 @@ base class Boundary<T> {
   | Exclusive(T)
 }
 
-base class DMap<Key: FileName, Value> {
+base class DMap<Key: BaseName, Value> {
   children =
   | Nil()
   | Node{
@@ -91,10 +91,6 @@ base class DMap<Key: FileName, Value> {
     )
   }
 
-  fun minKey(cond: ((Key, Value)) -> Bool): ?Key {
-    this.items().filter(cond).next().map(x -> x.i0)
-  }
-
   fun itemsWithTick(): mutable Iterator<(Key, Value, TickRange)> {
     this match {
     | Nil() -> void
@@ -124,24 +120,24 @@ base class DMap<Key: FileName, Value> {
   | Nil() -> 0
   | Node{height} -> height
 
-  static fun empty<Key: FileName, Value>(): DMap<Key, Value> {
+  static fun empty<Key: BaseName, Value>(): DMap<Key, Value> {
     Nil()
   }
 
-  fun getChangesAcc(after: Tick, acc: mutable Set<Key>): void
+  fun getChangesAcc(after: Tick, ref: mutable Ref<SortedSet<Key>>): void
   | Nil() -> void
   | Node{tick, key, left, right} ->
     if (tick.max < after) return void;
     if (tick.current >= after) {
-      acc.insert(key);
+      ref.set(ref.get().set(key));
     };
-    left.getChangesAcc(after, acc);
-    right.getChangesAcc(after, acc)
+    left.getChangesAcc(after, ref);
+    right.getChangesAcc(after, ref)
 
-  fun getChangesAfter(tick: Tick): Set<Key> {
-    acc = mutable Set[];
-    this.getChangesAcc(tick, acc);
-    unsafe_chill_trust_me(acc)
+  fun getChangesAfter(tick: Tick): SortedSet<Key> {
+    ref = mutable Ref(SortedSet[]);
+    this.getChangesAcc(tick, ref);
+    ref.get()
   }
 
   fun getChangesRangeAcc(
@@ -316,7 +312,7 @@ fun testDMap(): void {
   !x = x.set(SKFS.TickRange::create(SKFS.Tick(1)), SKFS.IID(3), 3);
   !x = x.set(SKFS.TickRange::create(SKFS.Tick(2)), SKFS.IID(1), 23);
   expectEq("Changes after", Array[1, 2, 3], () ->
-    x.getChangesAfter(SKFS.Tick(1)).toArray().map(x -> x.hashTag)
+    x.getChangesAfter(SKFS.Tick(1)).toArray().map(x -> x.value)
   );
   void
 }

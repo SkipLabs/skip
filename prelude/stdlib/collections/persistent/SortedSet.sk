@@ -38,6 +38,10 @@ class .SortedSet<+T: Orderable>(
     this
   }
 
+  fun min(): ?T {
+    this.inner.minimum().map(x -> x.i0)
+  }
+
   static fun createFromIterator<C: mutable Iterator<T>>(items: C): this {
     static(SortedMap::createFromIterator(items.map(i -> (i, void))))
   }

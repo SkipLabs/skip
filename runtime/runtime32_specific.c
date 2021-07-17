@@ -43,7 +43,8 @@ int sk_is_static(void* ptr) {
 void sk_staging() {
 }
 
-void sk_commit() {
+void sk_commit(char* new_root, uint32_t sync) {
+  sk_context_set_unsafe(new_root);
 }
 
 char* SKIP_read_file(char* filename_obj) {
@@ -59,7 +60,11 @@ void sk_global_lock() {
 void sk_global_unlock() {
 }
 
-char* sk_context_get_unsafe() {
+uint32_t SKIP_has_context() {
+  return (uint32_t)(context != NULL);
+}
+
+char* SKIP_context_get_unsafe() {
   if(context != NULL) {
     sk_incr_ref_count(context);
   }
@@ -67,7 +72,7 @@ char* sk_context_get_unsafe() {
 }
 
 char* SKIP_context_get() {
-  return sk_context_get_unsafe();
+  return SKIP_context_get_unsafe();
 }
 
 void sk_context_set(char* obj) {
@@ -114,4 +119,44 @@ void SKIP_wait_for_proc(void* proc) {
 
 void sk_check_has_lock() {
   // always true in wasm mode.
+}
+
+void SKIP_print_persistent_size() {
+  // Not implemented
+}
+
+int SKIP_unix_open(char* name) {
+  return 1;
+}
+
+void SKIP_unix_close(int fd) {
+  // Not implemented
+}
+
+void SKIP_write_to_file() {
+  // Not implemented
+}
+
+void SKIP_mktime_utc() {
+  // Not implemented
+}
+
+void SKIP_mktime_local() {
+  // Not implemented
+}
+
+void SKIP_unix_strftime() {
+  // Not implemented
+}
+
+void SKIP_gmtime() {
+  // Not implemented
+}
+
+void SKIP_localtime() {
+  // Not implemented
+}
+
+void SKIP_time() {
+  // Not implemented
 }

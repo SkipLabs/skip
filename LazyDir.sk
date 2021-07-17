@@ -30,14 +30,14 @@ class LazyDir{
     context.setDir(this.dirName, this);
   }
 
-  fun keys(): Set<BaseName> {
-    keys = mutable Set[];
+  fun keys(): SortedSet<BaseName> {
+    keys = SortedSet[];
     for (newKey => value in this.data) {
       if (value is LDefined _) {
-        keys.insert(newKey);
+        !keys = keys.set(newKey);
       };
     };
-    keys.chill()
+    keys
   }
 
   fun getDirName(): DirName {
@@ -90,7 +90,7 @@ class LazyDir{
       };
       ldir
     | _ ->
-      updateDirtyReaders(context, Path::create(dirName.tag(), DIR_TAG));
+      updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
       context.setDir(dirName, newDir);
       newDir
     }
@@ -105,9 +105,9 @@ class LazyDir{
 
   fun update(
     context: mutable Context,
-    dirtyReadersOpt: ?readonly Map<DirName, readonly Set<BaseName>>,
+    dirtyReadersOpt: ?readonly Map<DirName, SortedSet<BaseName>>,
   ): void {
-    dirtyReaders = mutable Set[];
+    dirtyReaders = SortedSet[];
     firstDirtyReaders = dirtyReadersOpt match {
     | None() -> mutable Map[]
     | Some(m) -> m
@@ -115,7 +115,7 @@ class LazyDir{
 
     for (dirtyReaderDirName => dirtyReaderBaseNames in firstDirtyReaders) {
       for (dirtyReaderBaseName in dirtyReaderBaseNames) {
-        dirtyReaders.insert(
+        !dirtyReaders = dirtyReaders.set(
           Path::create(dirtyReaderDirName, dirtyReaderBaseName),
         );
       }

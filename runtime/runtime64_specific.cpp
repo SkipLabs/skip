@@ -159,4 +159,72 @@ char* SKIP_read_file(char* filename_obj) {
  return result;
 }
 
+int64_t SKIP_unix_open(char* filename_obj) {
+ struct stat s;
+ size_t filename_size = SKIP_String_byteSize(filename_obj);
+ char* filename = (char*)malloc(filename_size+1);
+ memcpy(filename, filename_obj, filename_size);
+ filename[filename_size] = (char)0;
+
+ int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0777);
+
+ if(fd == -1) {
+   perror("ERROR file open failed");
+   fprintf(stderr, "Could not open file: %s\n", filename);
+   exit(45);
+ }
+
+ free(filename);
+
+ return (int64_t)fd;
+}
+
+int64_t SKIP_unix_close(int64_t fd) {
+ int status = close((int)fd);
+ return (int64_t)status;
+}
+
+void SKIP_write_to_file(int64_t fd, char* str) {
+ size_t size = SKIP_String_byteSize(str);
+ while(size > 0) {
+   size_t written = write(fd, str, size);
+   size -= written;
+ }
+}
+
+int64_t SKIP_time() {
+  return (int64_t)time(NULL);
+}
+
+void SKIP_localtime(int64_t timep, char* resultp) {
+  localtime_r(&timep, (struct tm*)resultp);
+}
+
+void SKIP_gmtime(int64_t timep, char* resultp) {
+  gmtime_r(&timep, (struct tm*)resultp);
+}
+
+int64_t SKIP_mktime_local(char* timedate) {
+  return (int64_t)mktime((struct tm*)timedate);
+}
+
+int64_t SKIP_mktime_utc(char* timedate) {
+  return (int64_t)mktime((struct tm*)timedate) - timezone;
+}
+
+char* SKIP_unix_strftime(char* formatp, char* timep) {
+  struct tm* tm = (struct tm*)timep;
+  char buffer[1024];
+  char cformat[1024];
+  uint32_t byteSize = SKIP_String_byteSize(formatp);
+  if(byteSize >= 1024) {
+    fprintf(stderr, "format string too large");
+    exit(23);
+  }
+  cformat[byteSize] = 0;
+  memcpy(cformat, formatp, byteSize);
+  size_t size = strftime(buffer, 1024, cformat, tm);
+  return sk_string_create(buffer, size);
+}
+
 }

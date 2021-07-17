@@ -226,25 +226,23 @@ fun parseSQLStmt(idRoot: Int, cmd: String): ?SKSQL.Stmt {
   Some(stmtAst)
 }
 
-untracked fun toplevel(topContext: mutable Context): void {
-  runWithGc(topContext.clone(), savedContext ~> {
-    context = Context::fromSaved(savedContext);
+untracked fun toplevel(topContext: Context): void {
+  runWithGc(topContext, context ~> {
     env = mutable CmdEnv{context, pwd => context.pwd};
     prompt = env.pwd + "$ ";
     print_raw(prompt);
     cmd = vtry(() -> read_line(), _exn -> "");
-    if (cmd == "") return CAbort();
+    if (cmd == "") return CStop(None());
     if (isSQL(cmd)) {
-      SKSQL.setupContext(context, SKSQL.Buffer(cmd));
-      shouldContinue = SKSQL.evalWithContext(context, false);
-      if (shouldContinue) {
-        print_error("Unsupported SQL statement in toplevel");
-      }
-    } else {
-      eval(env, cmd);
+      invariant_violation("TODO reenable toplevel");
+      /*
+            while (SKSQL.evalWithContext(context) is Some _) {
+              eval(env, cmd);
+            }
+      */
     };
     context.!pwd = env.pwd;
     context.update();
-    CContinue(context.clone())
+    CContinue(None())
   })
 }

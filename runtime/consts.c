@@ -1,7 +1,7 @@
 /*****************************************************************************/
 /* File dealing with constants initialization.
  *
- * During the initialization phase, an array keeping track of all constants 
+ * During the initialization phase, an array keeping track of all constants
  * is allocated with malloc. Until we know how many constants they are.
  * We then transfer the array into a persistent array.
  *
@@ -35,6 +35,12 @@ char* sk_new_const(char* cst) {
       pconsts_count++;
       return pcst;
     }
+    #ifdef SKIP64
+    if(!sk_is_nofile_mode()) {
+      fprintf(stderr, "Cannot have a changing constant int persitent mode\n");
+      SKIP_throw(NULL);
+    }
+    #endif
     sk_global_lock();
     char* icst = SKIP_intern_shared(cst);
     sk_free_root((*pconsts)[pconsts_count]);
@@ -78,7 +84,7 @@ char* sk_new_const(char* cst) {
 void sk_persist_consts() {
   if((*pconsts) != NULL) return;
   sk_global_lock();
-  *pconsts = (void**)sk_palloc(mconsts_count * sizeof(void*));  
+  *pconsts = (void**)sk_palloc(mconsts_count * sizeof(void*));
   memcpy(*pconsts, mconsts, mconsts_count * sizeof(void*));
   sk_free_size(mconsts, mconsts_size * sizeof(void*));
   sk_global_unlock();

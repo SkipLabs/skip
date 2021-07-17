@@ -24,10 +24,10 @@ base class Test {
 
 base class Stmt {
   children =
-  | Table{name: String, schema: Array<TypeDescr>}
+  | Table{name: String, schema: Array<TypeDescr>, windowSize: ?Int}
   | View{name: String, query: Query}
   | Drop{kind: TableKind, name: String}
-  | Delete{colName: ?String, name: String, where: ?Expr}
+  | Delete{pos: Int, colName: ?String, name: String, where: ?Expr}
   | Index{pos: Int, name: String, fields: (String, Array<(String, IKind)>)}
   | Insert{
     pos: Int,
@@ -54,7 +54,7 @@ base class InsertValues {
   | IQuery(Query)
 }
 
-base class IKind {
+base class IKind uses Orderable {
   children =
   | INONE()
   | IASC()
@@ -81,6 +81,7 @@ class Select{
   groupBy: ?Array<(Expr, ?String)>,
   having: ?Expr,
   orderBy: ?Array<(Expr, IKind)>,
+  limit: ?Expr,
   rest: ?(QueryKind, Select),
 } extends Query, Stmt
 
@@ -99,21 +100,21 @@ base class JoinKind {
   | JNone()
 }
 
-base class SelectKind {
+base class SelectKind uses Orderable {
   children =
   | SAll()
   | SDistinct()
   | SNone()
 }
 
-base class QueryKind {
+base class QueryKind uses Orderable {
   children =
   | QExcept()
   | QUnion(QUnionKind)
   | QIntersect(Bool)
 }
 
-base class QUnionKind {
+base class QUnionKind uses Orderable {
   children =
   | USingle()
   | UAll()
@@ -125,13 +126,13 @@ base class Value {
   | VNull()
   | VInt(Int)
   | VLShift(Int, Int)
-  | VFloat(Int, Int)
+  | VFloat(Float)
   | VString(String)
 }
 
 base class Expr {
   children =
-  | Literal(String)
+  | Literal(String, Bool)
   | Not(Expr)
   | All(Expr)
   | Distinct(Expr)
@@ -143,14 +144,84 @@ base class Expr {
   | UMinus(Expr)
   | UPlus(Expr)
   | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
-  | Call(Expr, ?Array<Expr>)
+  | Call(String, ?Array<Expr>)
+  | Cast(Expr, Type)
 }
 
-class TypeDescr{name: String, ty: Type, primary: Bool, unique: Bool}
+class TypeDescr{
+  name: String,
+  ty: Type,
+  primary: Bool,
+  unique: Bool,
+} uses Orderable
 
-base class Type {
+base class Type uses Orderable {
   children =
   | FLOAT()
   | INTEGER()
   | TEXT()
+}
+
+/*****************************************************************************/
+/* Looks for an aggregate function. */
+/*****************************************************************************/
+
+fun hasAggr(expr: Expr): Bool {
+  expr match {
+  | Literal _ -> false
+  | Not(e)
+  | All(e)
+  | Between(e)
+  | UMinus(e)
+  | UPlus(e)
+  | Distinct(e) ->
+    hasAggr(e)
+  | In(e, arr) ->
+    hasAggr(e) ||
+      for (x in arr) {
+        if (hasAggr(x)) break true;
+      } else {
+        false
+      }
+  | Binop(_, e1, e2) -> hasAggr(e1) || hasAggr(e2)
+  | EQuery(_)
+  | Exists(_) ->
+    false
+  | Case(condOpt, whenCases, elseCase) ->
+    condOpt match {
+    | Some(e) if (hasAggr(e)) -> return true
+    | _ -> void
+    };
+    for (kv in whenCases) {
+      (e1, e2) = kv;
+      if (hasAggr(e1) || hasAggr(e2)) return true;
+    };
+    elseCase match {
+    | Some(e) if (hasAggr(e)) -> true
+    | _ -> false
+    }
+  | Call("sum", _)
+  | Call("avg", _)
+  | Call("count", _) ->
+    true
+  | Call(_, None()) -> false
+  | Call(_, Some(arr)) ->
+    for (e in arr) {
+      if (hasAggr(e)) return true
+    };
+    false
+  | Cast(e, _) -> hasAggr(e)
+  }
+}
+
+fun selectIsAggr(select: Select): Bool {
+  select.groupBy is Some _ ||
+    select.params match {
+    | None() -> false
+    | Some(params) ->
+      for (e in params) {
+        if (hasAggr(e.i0)) return true;
+      };
+      false
+    }
 }

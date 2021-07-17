@@ -1,0 +1,1 @@
+select strftime('%s', 'now');

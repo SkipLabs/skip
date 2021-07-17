@@ -79,14 +79,14 @@ class Lexer(idRoot: Int, content: Buffer) {
   }
 
   fun skipSpaces(pos: Int): Int {
-    // skip whitespaces
+    // skip whitespaces and comments
     loop {
       if (pos >= this.content.size()) {
         return pos;
       };
       currentChar = this.content[pos];
       currentChar match {
-      | ' ' | '\n' | '\r' ->
+      | ' ' | '\n' | '\r' | '\t' ->
         !pos = pos + 1;
         continue
       | '#' ->
@@ -105,7 +105,7 @@ class Lexer(idRoot: Int, content: Buffer) {
     !posBegin = this.skipSpaces(posBegin);
     pos = posBegin;
     if (pos >= this.content.size()) {
-      error(this.content.size() - 1, "Unexpected end of file");
+      throw EndOfFile()
     };
     !posBegin = pos;
     currentChar = this.content[pos];
@@ -205,7 +205,38 @@ class Lexer(idRoot: Int, content: Buffer) {
   fun nextInt(pos: Int): (Int, Int) {
     (!pos, str) = this.nextWord(pos);
     vtry(
-      () -> (pos, str.toInt()),
+      () -> {
+        iter = str.getIter();
+        chars = mutable Vector[];
+        for (c in iter) {
+          if (c == '0') continue;
+          chars.push(c);
+          break void;
+        };
+        for (c in iter) {
+          chars.push(c);
+        };
+        newStr = String::fromChars(chars.toArray());
+        (
+          pos,
+          if (chars.size() == 0 && str != "") 0 else {
+            newStr.toInt()
+          },
+        )
+      },
+      _ -> error(pos, "Expected integer, found: " + str),
+    )
+  }
+
+  fun nextInt32(pos: Int): (Int, Int32) {
+    (!pos, i) = this.nextInt(pos);
+    (pos, Int32::truncate(i))
+  }
+
+  fun nextIntSize(pos: Int): (Int, Int, Int) {
+    (!pos, str) = this.nextWord(pos);
+    vtry(
+      () -> (pos, str.toInt(), str.length()),
       _ -> error(pos, "Expected integer, found: " + str),
     )
   }

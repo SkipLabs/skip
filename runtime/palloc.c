@@ -44,7 +44,7 @@ pthread_mutexattr_t* gmutex_attr;
 pthread_mutex_t* gmutex = (void*)1234;
 
 // This is only used for debugging purposes
-static int sk_is_locked = 0;
+int sk_is_locked = 0;
 
 void sk_check_has_lock() {
   if((gmutex != NULL) && !sk_is_locked) {
@@ -110,6 +110,7 @@ typedef struct {
   char* end;
   char* fileName;
   char* break_ptr;
+  size_t total_palloc_size;
 } ginfo_t;
 
 ginfo_t **ginfo_root = NULL;
@@ -119,15 +120,7 @@ ginfo_t **ginfo = NULL;
 /* Global context access primitives. */
 /*****************************************************************************/
 
-void SKIP_context_free() {
-  char* context = (*ginfo)->context;
-  if(context != NULL) {
-    sk_free_root(context);
-  }
-  (*ginfo)->context = NULL;
-}
-
-char* sk_context_get_unsafe() {
+char* SKIP_context_get_unsafe() {
   char* context = (*ginfo)->context;
 
   if(context != NULL) {
@@ -139,6 +132,15 @@ char* sk_context_get_unsafe() {
 
   return context;
 }
+
+uint32_t SKIP_has_context() {
+  sk_global_lock();
+  char* context = (*ginfo)->context;
+  uint32_t result = context != NULL;
+  sk_global_unlock();
+  return result;
+}
+
 
 SkipInt SKIP_context_ref_count() {
   char* context = (*ginfo)->context;
@@ -153,7 +155,7 @@ SkipInt SKIP_context_ref_count() {
 
 char* SKIP_context_get() {
   sk_global_lock();
-  char* context = sk_context_get_unsafe();
+  char* context = SKIP_context_get_unsafe();
   sk_global_unlock();
 
   return context;
@@ -166,7 +168,8 @@ void sk_context_set(char* obj) {
 }
 
 void sk_context_set_unsafe(char* obj) {
-  (*ginfo)->context = obj;
+  void* vobj = (void*)obj;
+  __atomic_store(&(*ginfo)->context, &vobj, __ATOMIC_RELAXED);
 }
 
 /*****************************************************************************/
@@ -206,43 +209,20 @@ static char* parse_args(int argc, char** argv, int* is_init) {
 /* Staging/commit. */
 /*****************************************************************************/
 
-void sk_staging() {
+void sk_commit(char* new_root, uint32_t sync) {
   if((*ginfo)->fileName == NULL) {
+    sk_context_set_unsafe(new_root);
     return;
   }
 
-  sk_global_lock();
-
-  ginfo_root = ginfo;
-
-  ginfo_t* array = (*ginfo)->ginfo_array;
-  ginfo_t* ginfo_data = *ginfo;
-  ginfo = malloc(sizeof(ginfo_t*));
-  *ginfo = ginfo_data;
-
-  if(*ginfo == array) {
-    array[1] = array[0];
-    *ginfo = &array[1];
+  __sync_synchronize();
+  if(sync) {
+    msync(BOTTOM_ADDR, PERSISTENT_SIZE, MS_SYNC);
   }
-  else {
-    array[0] = array[1];
-    *ginfo = &array[0];
+  sk_context_set_unsafe(new_root);
+  if(sync) {
+    msync(BOTTOM_ADDR, PERSISTENT_SIZE, MS_SYNC);
   }
-}
-
-void sk_commit() {
-  if((*ginfo)->fileName == NULL) {
-    return;
-  }
-
-  ginfo_t* array = (*ginfo)->ginfo_array;
-  ginfo_t* ginfo_data = *ginfo;
-  free(ginfo);
-  ginfo = ginfo_root;
-  __atomic_thread_fence(__ATOMIC_RELEASE);
-  __atomic_store(ginfo, &ginfo_data, __ATOMIC_RELEASE);
-
-  sk_global_unlock();
 }
 
 /*****************************************************************************/
@@ -315,6 +295,7 @@ void sk_create_mapping(char* fileName, char* static_limit) {
   }
 
   (*ginfo)->break_ptr = static_limit;
+  (*ginfo)->total_palloc_size = 0;
 
   // The head must be aligned!
   head = (char*)(((uintptr_t)head + (uintptr_t)(15)) & ~((uintptr_t)(15)));
@@ -436,6 +417,7 @@ static void sk_init_no_file(char* static_limit) {
   ginfo = malloc(sizeof(ginfo_t*));
   *ginfo = malloc(sizeof(ginfo_t));
   (*ginfo)->break_ptr = static_limit;
+  (*ginfo)->total_palloc_size = 0;
   (*ginfo)->fileName = NULL;
   gmutex = NULL;
   gid = malloc(sizeof(uint64_t));
@@ -476,7 +458,9 @@ void SKIP_memory_init(int argc, char** argv) {
 /* Persistent alloc/free primitives. */
 /*****************************************************************************/
 
-size_t total_palloc_size = 0;
+void SKIP_print_persistent_size() {
+  printf("%ld\n", (*ginfo)->total_palloc_size);
+}
 
 void* sk_palloc(size_t size) {
   if((*ginfo)->fileName == NULL) {
@@ -484,7 +468,7 @@ void* sk_palloc(size_t size) {
   }
   sk_check_has_lock();
   size = sk_pow2_size(size);
-  total_palloc_size += size;
+  (*ginfo)->total_palloc_size += size;
   sk_cell_t* ptr = sk_get_ftable(size);
   if(ptr != NULL) {
     return ptr;
@@ -505,6 +489,6 @@ void sk_pfree_size(void* chunk, size_t size) {
   }
   sk_check_has_lock();
   size = sk_pow2_size(size);
-  total_palloc_size -= size;
+  (*ginfo)->total_palloc_size -= size;
   sk_add_ftable(chunk, size);
 }

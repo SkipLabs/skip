@@ -98,9 +98,7 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, Stmt) {
   | _ ->
     error(tok.posBegin, "Unexpected SQL statement starting with '" + str + "'")
   };
-  if (lex.isEq(pos, ";")) {
-    !pos = lex.expect(pos, ";");
-  };
+  !pos = lex.expect(pos, ";");
   (pos, result)
 }
 
@@ -152,6 +150,7 @@ fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
     Some(name)
   };
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   where = if (lex.isEqUpper(pos, "WHERE")) {
     !pos = lex.expectUpper(pos, "WHERE");
     (!pos, cond) = parseExpr(lex, pos);
@@ -159,7 +158,7 @@ fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
   } else {
     None()
   };
-  (pos, Delete{colName, name, where})
+  (pos, Delete{pos, colName, name, where})
 }
 
 fun parseDrop(lex: Lexer, pos: Int): (Int, Drop) {
@@ -174,6 +173,7 @@ fun parseDrop(lex: Lexer, pos: Int): (Int, Drop) {
     TTable()
   };
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   (pos, Drop{kind, name})
 }
 
@@ -236,6 +236,13 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
   } else {
     None()
   };
+  limit = if (lex.isEqUpper(pos, "LIMIT")) {
+    !pos = lex.expectUpper(pos, "LIMIT");
+    (!pos, limit) = parseExpr(lex, pos);
+    Some(limit)
+  } else {
+    None()
+  };
   query = Select{
     id => "",
     pos => posBegin,
@@ -248,6 +255,7 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
     groupBy,
     having,
     orderBy,
+    limit,
     rest => None(),
   };
 
@@ -324,6 +332,7 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
     FQuery(query);
   } else {
     (!pos, sfrom) = lex.nextWord(pos);
+    !sfrom = sfrom.lowercase();
     FName(sfrom)
   };
   posMark = pos;
@@ -339,6 +348,7 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
   asStr = wordUpper match {
   | "AS" ->
     (!pos, !word) = lex.nextWord(pos);
+    !word = word.lowercase();
     Some(word)
   | _ if (isKeyword(word)) ->
     !pos = posMark;
@@ -497,7 +507,7 @@ fun parseElseCase(lex: Lexer, pos: Int): (Int, ?Expr) {
 }
 
 fun parseExpr(lex: Lexer, pos: Int): (Int, Expr) {
-  parseExprWithPrio(9, lex, pos)
+  parseExprWithPrio(100, lex, pos)
 }
 
 fun isEOF(lex: Lexer, pos: Int): Bool {
@@ -527,29 +537,37 @@ fun parseOperator(lex: Lexer, pos: Int): ?(Int, String) {
   ) {
     return Some((tok2.posEnd, "NOT BETWEEN"));
   };
-  Some((pos, lex.wordAt(tok1).uppercase()))
+  if (
+    lex.wordAt(tok1).uppercase() == "NOT" &&
+    lex.wordAt(tok2).uppercase() == "IN"
+  ) {
+    return Some((tok2.posEnd, "NOT IN"));
+  };
+  token = lex.wordAt(tok1);
+  op = token.uppercase();
+  Some((pos, op))
 }
 
 fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
   (!pos, tok) = lex.next(pos);
   left = if (lex.isEqAt(tok, "(")) {
-    (!pos, e) = parseExprWithPrio(9, lex, pos);
+    (!pos, e) = parseExprWithPrio(100, lex, pos);
     !pos = lex.expect(pos, ")");
     e
   } else if (lex.isEqAt(tok, "'")) {
     (!pos, str) = parseString(lex, tok.posBegin);
-    Literal(str)
+    Literal(str, true)
   } else if (lex.isEqUpperAt(tok, "x") && lex.isEq(pos, "'")) {
     (!pos, str) = parseString(lex, pos);
-    Literal("x" + str)
+    Literal("x" + str, false)
   } else if (lex.isEqUpperAt(tok, "NOT")) {
-    (!pos, e) = parseExprWithPrio(5, lex, pos);
+    (!pos, e) = parseExprWithPrio(opPriority["NOT"], lex, pos);
     Not(e)
   } else if (lex.isEqUpperAt(tok, "ALL")) {
-    (!pos, e) = parseExprWithPrio(7, lex, pos);
+    (!pos, e) = parseExprWithPrio(opPriority["ALL"], lex, pos);
     All(e)
   } else if (lex.isEqUpperAt(tok, "DISTINCT")) {
-    (!pos, e) = parseExprWithPrio(7, lex, pos);
+    (!pos, e) = parseExprWithPrio(opPriority["DISTINCT"], lex, pos);
     Distinct(e)
   } else if (lex.isEqUpperAt(tok, "SELECT")) {
     (!pos, select) = parseSelect(lex, pos);
@@ -578,7 +596,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     UPlus(e)
   } else {
     if (lex.wordAt(tok) == ">") invariant_violation("WTF?");
-    Literal(lex.wordAt(tok));
+    Literal(lex.wordAt(tok), false);
   };
 
   loop {
@@ -593,10 +611,21 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
       if (lex.isEq(pos, "*")) {
         !pos = lex.expect(pos, "*");
         !pos = lex.expect(pos, ")");
-        !left = Call(left, None());
+        !left = makeCall(pos, left, None());
+      } else if (
+        left match {
+        | Literal(x, _) -> x.uppercase() == "CAST"
+        | _ -> false
+        }
+      ) {
+        (!pos, e) = parseExpr(lex, pos);
+        !pos = lex.expectUpper(pos, "AS");
+        (!pos, ty) = parseTypeName(lex, pos);
+        !pos = lex.expect(pos, ")");
+        !left = Cast(e, ty);
       } else {
         (!pos, params) = parseExprList(lex, pos);
-        !left = Call(left, Some(params));
+        !left = makeCall(pos, left, Some(params));
       }
     } else {
       opOpt = parseOperator(lex, pos);
@@ -604,12 +633,19 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
       | None() -> return posLeft
       | Some((newPos, op)) ->
         !pos = newPos;
+        if (!opPriority.containsKey(op) || opPriority[op] > priority) {
+          return posLeft;
+        };
         op
       };
       if (op == "IN") {
         !pos = lex.expect(pos, "(");
         (!pos, el) = parseExprList(lex, pos);
         !left = In(left, el);
+      } else if (op == "NOT IN") {
+        !pos = lex.expect(pos, "(");
+        (!pos, el) = parseExprList(lex, pos);
+        !left = Not(In(left, el));
       } else {
         opPriority.maybeGet(op) match {
         | None() -> return posLeft
@@ -628,6 +664,13 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
         }
       }
     }
+  }
+}
+
+fun makeCall(pos: Int, left: Expr, params: ?Array<Expr>): Expr {
+  left match {
+  | Literal(x, _) -> Call(x.lowercase(), params)
+  | _ -> error(pos, "Unexpected function call")
   }
 }
 
@@ -651,7 +694,7 @@ fun parseExprList(lex: Lexer, pos: Int): (Int, Array<Expr>) {
 fun parseCreate(lex: Lexer, pos: Int): (Int, Stmt) {
   if (lex.isEqUpper(pos, "TABLE")) {
     !pos = lex.expectUpper(pos, "TABLE");
-    return parseCreateTable(lex, pos);
+    return parseCreateTable(lex, pos, None());
   };
   if (lex.isEqUpper(pos, "UNIQUE")) {
     !pos = lex.expectUpper(pos, "UNIQUE");
@@ -666,11 +709,17 @@ fun parseCreate(lex: Lexer, pos: Int): (Int, Stmt) {
     !pos = lex.expectUpper(pos, "VIEW");
     return parseView(lex, pos);
   };
+  if (lex.isEqUpper(pos, "WINDOW")) {
+    !pos = lex.expectUpper(pos, "WINDOW");
+    (!pos, wsize) = lex.nextInt(pos);
+    return parseCreateTable(lex, pos, Some(wsize));
+  };
   error(pos, "Unexpected token");
 }
 
 fun parseView(lex: Lexer, pos: Int): (Int, View) {
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   if (lex.isEqUpper(pos, "AS")) {
     !pos = lex.expectUpper(pos, "AS");
   };
@@ -682,6 +731,7 @@ fun parseView(lex: Lexer, pos: Int): (Int, View) {
 fun parseCreateIndex(lex: Lexer, pos: Int): (Int, Index) {
   origPos = pos;
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   !pos = lex.expectUpper(pos, "ON");
   (!pos, fields) = parseIndexOn(lex, pos);
   (pos, Index{pos => origPos, name, fields})
@@ -765,6 +815,55 @@ fun parseValues(lex: Lexer, pos: Int): (Int, InsertValues) {
   (pos, IValues(values.toArray()))
 }
 
+fun parseCValues(lex: Lexer, pos: Int): Array<?CValue> {
+  acc = mutable Vector[];
+  loop {
+    if (isEOF(lex, pos)) return acc.toArray();
+    (!pos, value) = parseCValue(lex, pos);
+    acc.push(value);
+    if (isEOF(lex, pos)) return acc.toArray();
+    !pos = lex.expect(pos, ",");
+  };
+}
+
+fun parseCValue(lex: Lexer, pos: Int): (Int, ?CValue) {
+  (_, tok) = lex.next(pos);
+  if (lex.isEqUpperAt(tok, "N")) {
+    return (tok.posEnd, None());
+  };
+  if (lex.isEqAt(tok, "-")) {
+    !pos = lex.expect(pos, "-");
+    (!pos, n) = lex.nextInt(pos);
+    return (pos, Some(CInt(-n)));
+  };
+  if (Chars.isDigit(lex.content[tok.posBegin])) {
+    (!pos, n) = lex.nextInt(pos);
+    if (lex.isEq(pos, ".")) {
+      !pos = lex.expect(pos, ".");
+      (!pos, _n2) = lex.nextInt(pos);
+      invariant_violation("TODO: parse float CValue")
+    };
+    return (pos, Some(CInt(n)));
+  };
+  if (lex.content[tok.posBegin] == '\'') {
+    (!pos, str) = parseString(lex, tok.posBegin);
+    return (pos, Some(CString(str)))
+  };
+  error(pos, "Invalid value")
+}
+
+fun parseCSVValue(str: String): Value {
+  if (str == "") return SKSQL.VNull();
+  str.toIntOption() match {
+  | None() ->
+    str.toFloatOption() match {
+    | None() -> VString(str)
+    | Some(f) -> VFloat(f)
+    }
+  | Some(x) -> VInt(x)
+  }
+}
+
 fun parseString(lex: Lexer, pos: Int): (Int, String) {
   posBegin = pos;
   !pos = pos + 1;
@@ -793,11 +892,11 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
     return (pos, VInt(-n));
   };
   if (Chars.isDigit(lex.content[tok.posBegin])) {
-    (!pos, n) = lex.nextInt(pos);
+    (!pos, n, size) = lex.nextIntSize(pos);
     if (lex.isEq(pos, ".")) {
       !pos = lex.expect(pos, ".");
       (!pos, n2) = lex.nextInt(pos);
-      return (pos, VFloat(n, n2));
+      return (pos, VFloat(n.toFloat() + n2.toFloat() / (10 * size).toFloat()));
     };
     if (lex.isEq(pos, "<")) {
       !pos = lex.expect(pos, "<");
@@ -818,10 +917,11 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
   error(pos, "Invalid value")
 }
 
-fun parseCreateTable(lex: Lexer, pos: Int): (Int, Table) {
+fun parseCreateTable(lex: Lexer, pos: Int, windowSize: ?Int): (Int, Table) {
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   (!pos, schema) = parseTableSchema(lex, pos);
-  (pos, Table{name, schema})
+  (pos, Table{name, schema, windowSize})
 }
 
 fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
@@ -840,25 +940,29 @@ fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
   (pos, schema.toArray())
 }
 
-fun parseType(lex: Lexer, pos: Int): (Int, Type, Bool, Bool) {
-  ty = if (lex.isEqUpper(pos, "FLOAT")) {
+fun parseTypeName(lex: Lexer, pos: Int): (Int, Type) {
+  if (lex.isEqUpper(pos, "FLOAT")) {
     !pos = lex.expectUpper(pos, "FLOAT");
-    FLOAT()
+    (pos, FLOAT())
   } else if (lex.isEqUpper(pos, "INTEGER")) {
     !pos = lex.expectUpper(pos, "INTEGER");
-    INTEGER()
+    (pos, INTEGER())
   } else if (lex.isEqUpper(pos, "TEXT")) {
     !pos = lex.expectUpper(pos, "TEXT");
-    TEXT()
+    (pos, TEXT())
   } else if (lex.isEqUpper(pos, "VARCHAR")) {
     !pos = lex.expectUpper(pos, "VARCHAR");
     !pos = lex.expect(pos, "(");
     (!pos, _) = lex.nextInt(pos);
     !pos = lex.expect(pos, ")");
-    TEXT()
+    (pos, TEXT())
   } else {
     error(pos, "Unknown type");
-  };
+  }
+}
+
+fun parseType(lex: Lexer, pos: Int): (Int, Type, Bool, Bool) {
+  (!pos, ty) = parseTypeName(lex, pos);
   isPrimaryKey = if (lex.isEqUpper(pos, "PRIMARY")) {
     !pos = lex.expectUpper(pos, "PRIMARY");
     !pos = lex.expectUpper(pos, "KEY");

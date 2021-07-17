@@ -7,10 +7,9 @@ native fun testFreeEP(Int): void;
 native fun getFreeTestCounter(): Int;
 
 fun testExternalPointer(): mutable SKFS.Context {
-  gcontext = mutable SKFS.Context{};
+  gcontext = SKFS.Context{};
 
-  SKFS.runWithGc(gcontext.clone(), icontext ~> {
-    context = SKFS.Context::fromSaved(icontext);
+  SKFS.runWithGc(gcontext, context ~> {
     if (context.getGlobal("Count") is None()) {
       context.setGlobal("Count", SKFS.IntFile(0));
     };
@@ -25,9 +24,9 @@ fun testExternalPointer(): mutable SKFS.Context {
     context.setGlobal("Pointer", epointer);
     context.update();
     if (round == 10) {
-      SKFS.CStop(context.clone())
+      SKFS.CStop(None())
     } else {
-      SKFS.CContinue(context.clone())
+      SKFS.CContinue(None())
     };
   });
   mutable SKFS.Context{}

@@ -16,46 +16,139 @@ class SubTask(
   key: SKFS.BaseName,
   inputRow: Row,
   entries: List<Row>,
-  remainingTables: List<SKSQL.DirDescr>,
-) extends SKFS.BaseName {
-  static fun create(
-    name: String,
-    key: SKFS.BaseName,
-    inputRow: Row,
-    entries: List<Row>,
-    remainingTables: List<SKSQL.DirDescr>,
-    remainingTablesHash: Int,
-  ): this {
-    h = hash((name, key, inputRow, entries, remainingTablesHash));
-    static(name, key, inputRow, entries, remainingTables, h)
-  }
+  remainingTables: List<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>,
+)
 
+class KVFile(value: (SKFS.BaseName, Array<SKFS.File>)) extends SKFS.File
+
+class ProjKey(
+  value: ?CValue,
+  leftShard: Int,
+  rightShard: Int,
+) extends SKFS.BaseName {
   fun toString(): String {
-    inspect(this).toString()
+    this.value.toString()
   }
 }
 
-class KVFile(value: (SKFS.BaseName, Array<SKFS.File>)) extends SKFS.File
+class LeftFile(RowValues) extends SKFS.File
+class LeftShardedFile{
+  leftShardID: Int,
+  rightShard: Int,
+  value: RowValues,
+} extends SKFS.File
+
+class RightFile(RowValues) extends SKFS.File
+class RightShardedFile{
+  leftShard: Int,
+  rightShardID: Int,
+  value: RowValues,
+} extends SKFS.File
+
+/*****************************************************************************/
+/* Helper */
+/*****************************************************************************/
+
+fun firstRow(rows: mutable Iterator<Row>): ?Row {
+  for (row in rows) {
+    break Some(row);
+  } else {
+    None()
+  }
+}
+
+fun firstRowAsArray(rows: mutable Iterator<Row>): Array<Row> {
+  firstRow(rows) match {
+  | None() -> Array[]
+  | Some(x) -> Array[x]
+  }
+}
+
+fun initRepeatRow(rows: mutable Iterator<Row>): Array<Row> {
+  firstRow(rows) match {
+  | None() -> Array[]
+  | Some(RowValues(values, n)) ->
+    for (row in rows) {
+      row match {
+      | RowValues(_, r) -> !n = n + r
+      | _ -> invariant_violation("Unexpected Row kind")
+      }
+    };
+    Array[RowValues::create(values, n)]
+  | _ -> invariant_violation("Unexpected Row kind")
+  }
+}
+
+fun updateRepeatRow(
+  state: Array<Row>,
+  remove: Array<Row>,
+  adds: Array<Row>,
+): ?Array<Row> {
+  invariant(state.size() == 1);
+  (values, n) = state[0] match {
+  | RowValues(values, n) -> (values, n)
+  | _ -> invariant_violation("Unexpected state in updateRepeatRow")
+  };
+  for (row in remove) {
+    row match {
+    | RowValues(_, r) -> !n = n - r
+    | _ -> invariant_violation("Unexpected state in updateRepeatRow")
+    }
+  };
+  for (row in adds) {
+    row match {
+    | RowValues(_, r) -> !n = n + r
+    | _ -> invariant_violation("Unexpected state in updateRepeatRow")
+    }
+  };
+  if (n == 0) Some(Array[]) else Some(Array[RowValues::create(values, n)])
+}
+
+// produces the closest power of 2 larger than n
+fun pow2(n: Int): Int {
+  invariant(n >= 0);
+  if (n <= 1) 2 else 2 * pow2(n / 2)
+}
+
+fun genericProj(
+  _context: mutable SKFS.Context,
+  writer: mutable SKFS.Writer,
+  key: SKFS.BaseName,
+  valueIter: mutable Iterator<SKFS.File>,
+): void {
+  writer.writeArray(key, valueIter.collect(Array))
+}
+
+/*****************************************************************************/
+/* We need to be able to write more than one row per key. */
+/*****************************************************************************/
+
+mutable class MultiWriter{
+  mutable writes: SortedMap<
+    SKFS.BaseName,
+    mutable Vector<SKFS.File>,
+  > = SortedMap[],
+} {
+  mutable fun write(key: SKFS.BaseName, value: SKFS.File): void {
+    if (!this.writes.containsKey(key)) {
+      this.!writes[key] = mutable Vector[];
+    };
+    this.writes[key].push(value);
+  }
+
+  mutable fun writeArray(key: SKFS.BaseName, values: Array<SKFS.File>): void {
+    if (!this.writes.containsKey(key)) {
+      this.!writes[key] = mutable Vector[];
+    };
+    this.writes[key].extend(values);
+  }
+}
 
 /*****************************************************************************/
 /* The value returned by the evaluator. */
 /*****************************************************************************/
 
-base class SelectValue extends SKFS.File {
-  children =
-  | SelectDir(SKFS.DirName, Array<Type>)
-  | SelectArray(Row, Array<Type>)
-  | SelectError(RowError)
-
-  static fun fromFile(file: SKFS.File): SelectValue {
-    file match {
-    | x @ SelectDir _ -> x
-    | x @ SelectArray _ -> x
-    | x @ SelectError _ -> x
-    | _ -> invariant_violation("Unexpected file type for SelectValue")
-    }
-  }
-}
+class SelectDir(dirName: SKFS.DirName, types: Array<Type>) extends SKFS.File
 
 /*****************************************************************************/
 /* The main entry point. */
@@ -65,24 +158,40 @@ fun evalSelect(
   context: mutable SKFS.Context,
   select: CSelect,
   up: ?ExprEvaluator,
-): SelectValue {
-  makeSelectEvaluator(select, up).evalSelect(context)
+): SelectDir {
+  makeSelectEvaluator(context, select, up).evalSelect(context)
 }
 
-fun makeSelectEvaluator(select: CSelect, up: ?ExprEvaluator): SelectEvaluator {
-  selectName = makeSelectName(
+fun makeSelectEvaluator(
+  context: mutable SKFS.Context,
+  select: CSelect,
+  up: ?ExprEvaluator,
+): SelectEvaluator {
+  selectName1 = makeSelectName(
     select.id +
       up match {
-      | Some(ev) if (select.needUp) -> "_" + ev.hashTag
-      | _ -> ""
+      | Some(ev) if (select.needUp) -> "_" + hash(ev)
+      | _ ->
+        context.getGlobal("TableMap") match {
+        | None() -> ""
+        | Some(file) -> TableMap::fromFile(file).version.value.toString()
+        }
       },
   );
+  selectName1Empty = SKFS.DirName::create(selectName1.toString() + "empty/");
+  selectName2 = if (select.aggr is Some _) {
+    SKFS.DirName::create(selectName1.toString() + "aggrEnv/")
+  } else {
+    selectName1
+  };
   types = select.params.map(x -> x.getType());
   SelectEvaluator{
     select,
     up,
     params => select.params,
-    selectName,
+    selectName1,
+    selectName1Empty,
+    selectName2,
     kinds => select.kinds,
     types,
   }
@@ -96,70 +205,366 @@ class SelectEvaluator{
   select: CSelect,
   up: ?ExprEvaluator,
   params: Array<CGExpr>,
-  selectName: SKFS.DirName,
+  selectName1: SKFS.DirName,
+  selectName1Empty: SKFS.DirName,
+  selectName2: SKFS.DirName,
   kinds: Array<(Int, SKSQL.IKind, Type)>,
   types: Array<Type>,
 } {
-  fun evalSelect(context: mutable SKFS.Context): SelectValue {
-    this.select.aggr match {
+  fun evalSelect(context: mutable SKFS.Context): SelectDir {
+    this.select.limit match {
+    | None() -> this.evalSelectNoLimit(context)
+    | Some(limitExpr) ->
+      limitMappedName = this.selectName1;
+      limitName = SKFS.DirName::create(this.selectName1.toString() + "limit/");
+      !this.selectName1 = SKFS.DirName::create(
+        this.selectName1.toString() + "nolimit/",
+      );
+      !this.selectName2 = SKFS.DirName::create(
+        this.selectName2.toString() + "nolimit/",
+      );
+      emptyEval = ExprEvaluator(None(), Array[], this.select.from, this.up);
+      limit = emptyEval.evalCIExpr(context, limitExpr) match {
+      | ANull() -> 0
+      | ADef(x) -> x
+      | AUndef() -> invariant_violation("Unexpected Undef")
+      };
+      limitDir = context.unsafeMaybeGetEagerDir(limitName) match {
+      | None() ->
+        h = context.mkdir(Row::fromFile, limitName, Array[]);
+        context.unsafeGetEagerDir(h.dirName)
+      | Some(dir) ->
+        context.!newDirs = context.newDirs.set(limitName);
+        dir
+      };
+      selectDir = this.evalSelectNoLimit(context);
+      iter = (context.unsafeGetEagerDir(selectDir.dirName)).getIterator(
+        context,
+      );
+      arr = mutable Vector[];
+      i = 0;
+      while (i < limit) {
+        iter.next() match {
+        | None() ->
+          arr.push(((SKFS.IID(i) : SKFS.BaseName), Array[]));
+          !i = i + 1
+        | Some((_, fileIter)) ->
+          values = fileIter.map(RowValues::fromFile).collect(Array);
+          if (values.size() == 0) continue;
+          value = values[0];
+          repeat = 0;
+          for (v in values) {
+            !repeat = repeat + v.repeat;
+          };
+          if (repeat == 0) continue;
+          !value = value.setRepeat(repeat);
+          arr.push(((SKFS.IID(i) : SKFS.BaseName), Array[value]));
+          !i = i + 1
+        }
+      };
+      j = 0;
+      arr2 = mutable Vector[];
+      source = SKFS.Path::create(limitName, SKFS.IID(0));
+      for (elt in arr) {
+        (key, values) = elt;
+        if (values.size() == 0) {
+          arr2.push((key, (source, Array[])))
+        } else {
+          value = values[0];
+          repeat = if (j + value.repeat >= limit) limit - j else value.repeat;
+          if (repeat > 0) {
+            !value = value.setRepeat(repeat);
+            arr2.push((key, (source, Array[(value : SKFS.File)])));
+            !j = j + repeat;
+          } else {
+            arr2.push((key, (source, Array[])));
+          }
+        }
+      };
+      limitDir.writeArraySourceMany(context, arr2.iterator());
+      kinds = this.kinds;
+      _limitDirMapped = SKFS.EHandle(
+        RowValues::fromFile,
+        limitDir.dirName,
+      ).contextWriterKeyValues(
+        RowValues::fromFile,
+        context,
+        limitMappedName,
+        (_context, writer, _key, values) ~> {
+          if (values.size() == 0) return void;
+          writer.writeArray(RowKey(values[0], kinds), values);
+        },
+      );
+      SelectDir(limitMappedName, selectDir.types)
+    }
+  }
+
+  fun evalSubTask(context: mutable SKFS.Context, subTask: SubSelectTask): void {
+    subTask match {
+    | SubSelect(cselect) -> _ = evalSelect(context, cselect, None())
+    | SubMerge{
+      leftDirName,
+      leftColNbr,
+      leftIsUnique,
+      leftRanges,
+      rightDirName,
+      rightColNbr,
+      rightIsUnique,
+      rightRanges,
+      childName,
+      kinds,
+    } ->
+      leftHandle = SKFS.EHandle(Row::fromFile, leftDirName);
+      rightHandle = SKFS.EHandle(Row::fromFile, rightDirName);
+
+      projName = SKFS.DirName::create(childName.toString() + "proj/");
+
+      leftSize = context.unsafeGetEagerDir(leftHandle.dirName).totalSize;
+      rightSize = context.unsafeGetEagerDir(rightHandle.dirName).totalSize;
+      leftShard = if (leftIsUnique || rightSize == 0 || rightSize >= leftSize) {
+        1
+      } else {
+        leftSize / rightSize
+      };
+      rightShard = if (
+        rightIsUnique ||
+        leftSize == 0 ||
+        leftSize >= rightSize
+      ) 1 else {
+        rightSize / leftSize;
+      };
+
+      projLeftFun = (_context, writer, _, valueIter) ~> {
+        row = normalizeValueIter(
+          valueIter.next() match {
+          | None() -> return void
+          | Some(x) -> RowValues::fromFile(x)
+          },
+          valueIter,
+        );
+        key = row.getValue(leftColNbr);
+        leftShardID = SKFS.genSym(leftShard) % leftShard;
+        shardedFile = LeftShardedFile{leftShardID, rightShard, value => row};
+        for (i in Range(0, rightShard)) {
+          projKey = ProjKey(key, leftShardID, i);
+          writer.write(projKey, LeftFile(shardedFile.value))
+        }
+      };
+
+      projRightFun = (_context, writer, _, valueIter) ~> {
+        row = normalizeValueIter(
+          valueIter.next() match {
+          | None() -> return void
+          | Some(x) -> RowValues::fromFile(x)
+          },
+          valueIter,
+        );
+        key = row.getValue(rightColNbr);
+        rightShardID = SKFS.genSym(rightShard) % rightShard;
+        shardedFile = RightShardedFile{leftShard, rightShardID, value => row};
+        for (i in Range(0, leftShard)) {
+          projKey = ProjKey(key, i, rightShardID);
+          writer.write(projKey, RightFile(shardedFile.value))
+        }
+      };
+
+      SKFS.EagerDir::applyMany(
+        context,
+        SKFS.FixedSingle::create(
+          mutable Vector[
+            (leftHandle.dirName, (projLeftFun, leftRanges)),
+            (rightHandle.dirName, (projRightFun, rightRanges)),
+          ],
+        ),
+        projName,
+      );
+      SKFS.EagerDir::applyMany(
+        context,
+        SKFS.FixedSingle::create(
+          mutable Vector[(projName, (makeJoinReducer(kinds), None()))],
+        ),
+        childName,
+      )
+    };
+  }
+
+  fun evalSelectNoLimit(context: mutable SKFS.Context): SelectDir {
+    for (subTask in this.select.other) {
+      this.evalSubTask(context, subTask);
+    };
+    dirName = this.select.aggr match {
+    | None() if (this.select.from.size() == 0) ->
+      this.evalEmptyFrom(context);
+      this.selectName1
     | None() ->
       resultDir = this.evalSelectTableList(
         context,
         List::createFromItems(this.select.from),
         List[],
       );
-      SelectDir(resultDir.dirName, this.types)
+      resultDir.dirName
     | Some(_) ->
       if (this.select.rest is Some _) {
         invariant_violation("Unexpected select type for aggregate function")
       };
-      SelectArray(this.evalAggr(context), this.types)
-    }
+      this.evalAggr(context)
+    };
+    SelectDir(dirName, this.types)
   }
 
-  fun evalAggr(context: mutable SKFS.Context): Row {
+  fun evalAggr(context: mutable SKFS.Context): SKFS.DirName {
     aggrs = this.select.aggr.fromSome();
-    !this.params = aggrs.map(x -> x.i1);
-    resultDir = this.evalSelectTableList(
-      context,
-      List::createFromItems(this.select.from),
-      List[],
-    );
-    aggrResult = resultDir.getArray(context, SKFS.IID(0));
-    entry = if (aggrResult.size() == 0) {
-      Row::create(
-        aggrs.map(x ->
-          x.i0 match {
-          | Sum() -> SValue::fromInt(0)
-          | Count() -> SValue::fromInt(0)
-          }
-        ),
-      )
+
+    if (this.select.from.size() == 0) {
+      if (context.unsafeMaybeGetEagerDir(this.selectName1) is None()) {
+        emptyEval = ExprEvaluator(None(), Array[], this.select.from, this.up);
+        entry = this.evalRow(context, emptyEval, aggrs.map(y -> y.i1), 1);
+        evaluator = ExprEvaluator(
+          None(),
+          Array[entry],
+          this.select.from,
+          this.up,
+        );
+        row = this.evalRow(context, evaluator, this.select.params, 1);
+        _dir = context.mkdir(
+          Row::fromFile,
+          this.selectName1,
+          Array[(SKFS.IID(0), row)],
+        );
+      } else {
+        context.!newDirs = context.newDirs.set(this.selectName1);
+      };
+      this.selectName1
     } else {
-      aggrResult[0]
-    };
-    evaluator = ExprEvaluator(Array[entry], this.select.from, this.up, 0);
-    row = this.evalRow(context, evaluator, this.select.params);
-    row
+      resultDir = (this with {
+        params => aggrs.map(x -> x.i1),
+      }).evalSelectTableList(
+        context,
+        List::createFromItems(this.select.from),
+        List[],
+      );
+
+      // Empty case
+      if (context.unsafeMaybeGetEagerDir(this.selectName1Empty) is None()) {
+        emptyEntry = RowValues::create(
+          aggrs.map(x ->
+            x.i0 match {
+            | Noop() -> None()
+            | Sum(_) -> None()
+            | Count(_) -> Some(CInt(0))
+            }
+          ),
+        );
+        emptyEvaluator = ExprEvaluator(
+          None(),
+          Array[emptyEntry],
+          this.select.from,
+          this.up,
+        );
+        emptyRow = this.evalRow(context, emptyEvaluator, this.select.params, 1);
+        _ = context.mkdir(
+          Row::fromFile,
+          this.selectName1Empty,
+          Array[(SKFS.IID(0), emptyRow)],
+        );
+      } else {
+        context.!newDirs = context.newDirs.set(this.selectName1Empty);
+      };
+
+      // Case with actual data
+      _ = resultDir.contextWriterKeyIter(
+        Row::fromFile,
+        context,
+        this.selectName1,
+        (context, writer, key, aggrResult) ~> {
+          entry = firstRow(aggrResult).fromSome();
+          evaluator = ExprEvaluator(
+            None(),
+            Array[entry],
+            this.select.from,
+            this.up,
+          );
+          this.select.having match {
+          | None() ->
+            row = this.evalRow(context, evaluator, this.select.params, 1);
+            writer.write(key, row)
+          | Some(cond) ->
+            evaluator.evalCIExpr(context, cond) match {
+            | ADef(0)
+            | ANull() ->
+              void
+            | AUndef() ->
+              invariant_violation("Having should never be undefined")
+            | ADef(_) ->
+              row = this.evalRow(context, evaluator, this.select.params, 1);
+              writer.write(key, row)
+            }
+          }
+        },
+      );
+      if (
+        resultDir.isEmpty(context) &&
+        aggrs.any(x -> !(x.i0 is Noop())) &&
+        this.select.groupBy is None _
+      ) this.selectName1Empty else {
+        this.selectName1
+      }
+    }
   }
 
   fun evalRow(
     context: mutable SKFS.Context,
     evaluator: ExprEvaluator,
     params: Array<CGExpr>,
-  ): Row {
-    Row::fromCValues(params.map(param -> evaluator.evalCGExpr(context, param)))
+    repeat: Int,
+  ): RowValues {
+    RowValues::create(
+      params.map(param ->
+        evaluator.evalCGExpr(context, param) match {
+        | AUndef() -> invariant_violation("Unexpected undefined value")
+        | ANull() -> None()
+        | ADef(x) -> Some(x)
+        }
+      ),
+      repeat,
+    )
+  }
+
+  fun evalEmptyFrom(context: mutable SKFS.Context): void {
+    dirName = this.selectName2;
+    if (context.unsafeMaybeGetEagerDir(dirName) is None()) {
+      evaluator = ExprEvaluator(None(), Array[], this.select.from, this.up);
+
+      whereVal = evaluator.evalWhere(context, this.select.where);
+      row = whereVal match {
+      | ANull()
+      | ADef(0) ->
+        this.evalRow(context, evaluator, Array[CGNull()], 1)
+      | AUndef()
+      | ADef(_) ->
+        this.evalRow(context, evaluator, this.select.params, 1)
+      };
+      _dir = context.mkdir(Row::fromFile, dirName, Array[(SKFS.IID(0), row)]);
+    } else {
+      context.!newDirs = context.newDirs.set(dirName);
+    }
   }
 
   fun evalSelectTableList(
     context: mutable SKFS.Context,
-    tables: List<DirDescr>,
+    tables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
     entries: List<Row>,
   ): SKFS.EHandle<Row> {
     tables match {
     | List.Nil() -> invariant_violation("empty select")
     | List.Cons(table, remainingTables) ->
-      this.evalSelectTable(context, getDir(table), remainingTables, entries)
+      this.evalSelectTable(
+        context,
+        getDir(table.i0),
+        table.i1,
+        remainingTables,
+        entries,
+      )
     }
   }
 
@@ -191,8 +596,10 @@ class SelectEvaluator{
   }
 
   fun makeParents(
+    context: mutable SKFS.Context,
     dirName: SKFS.DirName,
-    remainingTables: List<DirDescr>,
+    rangeOpt: ?Array<SKFS.KeyRange>,
+    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
     entries: List<Row>,
   ): SKFS.FixedSingle<SKFS.DirName, (MapFunRow, ?Array<SKFS.KeyRange>)> {
     queryKind = this.select.rest match {
@@ -202,7 +609,7 @@ class SelectEvaluator{
     | Some(_) ->
       Some((0, this.makeQueryKind(QUnion(USingle()), this.select.rest)))
     };
-    mapFunRow = (ctx, wrt, key, rows) ~>
+    mapFunRow = (ctx, wrt, key, rows) ~> {
       this.evalSelectTableRows(
         queryKind,
         remainingTables,
@@ -212,14 +619,15 @@ class SelectEvaluator{
         key,
         rows,
       );
-    mparents = mutable Vector[(dirName, (mapFunRow, None()))];
+    };
+    mparents = mutable Vector[(dirName, (mapFunRow, rangeOpt))];
     order = 1;
     rest = this.select.rest;
 
     while (rest is Some _) {
       currentOrder = order;
       (qKind, query) = rest.fromSome();
-      ev = makeSelectEvaluator(query, this.up);
+      ev = makeSelectEvaluator(context, query, this.up);
       rtables = List::createFromItems(query.from);
       (rtable, rremainingTables) = rtables match {
       | List.Nil() -> invariant_violation("TODO: empty union")
@@ -237,8 +645,8 @@ class SelectEvaluator{
           rows,
         )
       };
-      dirDescr = getDir(rtable);
-      mparents.push((dirDescr.dirName, (rmapFun, None())));
+      dirDescr = getDir(rtable.i0);
+      mparents.push((dirDescr.dirName, (rmapFun, rtable.i1)));
       !rest = query.rest;
       !order = order + 1
     };
@@ -248,75 +656,180 @@ class SelectEvaluator{
   fun evalSelectTable(
     context: mutable SKFS.Context,
     dir: SKFS.EHandle<Row>,
-    remainingTables: List<DirDescr>,
+    rangeOpt: ?Array<SKFS.KeyRange>,
+    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
     entries: List<Row>,
   ): SKFS.EHandle<Row> {
+    parents = this.makeParents(
+      context,
+      dir.dirName,
+      rangeOpt,
+      remainingTables,
+      entries,
+    );
     dir.multiContextWriterKeyIter(
       Row::fromFile,
       context,
-      this.makeParents(dir.dirName, remainingTables, entries),
-      this.selectName,
-      this.evalSelectTableCompactor(),
+      parents,
+      this.selectName2,
+      this.evalSelectTableReducer(),
     )
   }
 
   fun evalSelectTableRows(
     qkind: ?(Int, QueryKind),
-    remainingTables: List<DirDescr>,
+    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
     entries: List<Row>,
     context: mutable SKFS.Context,
     writer: mutable SKFS.Writer,
     key: SKFS.BaseName,
     inputRows: mutable Iterator<Row>,
   ): void {
-    remainingTablesHash = hash(remainingTables);
-    lazySub: ?SKFS.LHandle<KVFile> = None();
+    mwriter = mutable MultiWriter{};
 
-    for (inputRow in inputRows) {
-      remainingTables match {
-      | List.Nil() ->
-        this.evalSelectRow(context, qkind, entries, key, inputRow, writer)
+    key match {
+    | RowKey _ ->
+      inputRow = inputRows.next() match {
+      | None() -> return void
+      | Some(x @ RowValues _) -> x
+      | Some(x) ->
+        debug(x);
+        invariant_violation("Unexpected row type")
+      };
 
-      | _ ->
-        if (lazySub is None()) {
-          !lazySub = Some(this.createLazySub(context));
+      repeat = inputRow.repeat;
+
+      for (ir in inputRows) {
+        ir match {
+        | RowValues(_, r) -> !repeat = repeat + r
+        | _ ->
+          debug(ir);
+          invariant_violation("Unexpected Row type")
+        }
+      };
+
+      if (repeat != inputRow.repeat) {
+        !inputRow = inputRow.setRepeat(repeat);
+      };
+
+      this.evalSelectTableRow(
+        qkind,
+        remainingTables,
+        entries,
+        context,
+        mwriter,
+        key,
+        inputRow,
+        repeat,
+      )
+    | _ ->
+      for (inputRow in inputRows) {
+        repeat = inputRow match {
+        | RowValues(_, x) -> x
+        | _ -> invariant_violation("Expected RowValues")
         };
-        this.evalSelectCross(
-          context,
+        this.evalSelectTableRow(
+          qkind,
           remainingTables,
-          remainingTablesHash,
           entries,
+          context,
+          mwriter,
           key,
           inputRow,
-          writer,
-          lazySub.fromSome(),
+          repeat,
         )
       }
+    };
+
+    for (rkey => rvaluesIter in mwriter.writes) {
+      rvalues = rvaluesIter.toArray();
+      writer.writeArray(rkey, rvalues);
     }
   }
 
-  fun evalSelectTableCompactor(): ?SKFS.ECompactor<Row> {
-    compactor = this.select.aggr match {
-    | None() -> None()
+  fun evalSelectTableRow(
+    qkind: ?(Int, QueryKind),
+    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    entries: List<Row>,
+    context: mutable SKFS.Context,
+    mwriter: mutable MultiWriter,
+    key: SKFS.BaseName,
+    inputRow: Row,
+    repeat: Int,
+  ): void {
+    evaluator = ExprEvaluator(
+      None(),
+      entries match {
+      | List.Nil() -> Array[inputRow]
+      | l -> List.Cons(inputRow, l).reversed().collect(Array)
+      },
+      this.select.from,
+      this.up,
+    );
+
+    whereVal = evaluator.evalWhere(context, this.select.where);
+    whereVal match {
+    | ANull()
+    | ADef(0) ->
+      return void
+    | AUndef()
+    | ADef(_) ->
+      void
+    };
+
+    remainingTables match {
+    | List.Nil() ->
+      this.evalSelectRow(context, qkind, key, evaluator, mwriter, repeat)
+
+    | _ ->
+      this.evalSelectCross(
+        context,
+        remainingTables,
+        entries,
+        key,
+        inputRow,
+        mwriter,
+        repeat,
+      )
+    }
+  }
+
+  fun evalSelectTableReducer(): ?SKFS.EReducer<Row> {
+    reducer = this.select.aggr match {
+    | None() ->
+      if (this.select.kind is SDistinct() || this.select.groupBy is Some _) {
+        Some(
+          SKFS.EReducer{
+            canReset => false,
+            init => firstRowAsArray,
+            update => (_, _, rows) ~> Some(firstRowAsArray(rows.iterator())),
+          },
+        )
+      } else {
+        Some(
+          SKFS.EReducer{
+            canReset => false,
+            init => initRepeatRow,
+            update => updateRepeatRow,
+          },
+        )
+      }
     | Some(aggrs) ->
       aggrKinds = aggrs.map(x -> x.i0);
       Some(
-        SKFS.ECompactor{
+        SKFS.EReducer{
           canReset => false,
-          init => rows ~> compactorInit(aggrKinds, rows),
+          init => rows ~> reducerInit(aggrKinds, rows),
           update => (state, old, new) ~>
-            Some(compactorUpdate(aggrKinds, state, old, new)),
+            Some(reducerUpdate(aggrKinds, state, old, new)),
         },
       )
     };
     this.select.rest match {
-    | None() -> compactor
+    | None() -> reducer
     | Some(_) ->
-      if (compactor is Some _) {
-        invariant_violation("TODO: compactor mix aggr and union");
-      };
       Some(
-        SKFS.ECompactor{
+        SKFS.EReducer{
           canReset => true,
           init => initUnion,
           update => (_, _, _) ~> None(),
@@ -328,183 +841,182 @@ class SelectEvaluator{
   fun evalSelectRow(
     context: mutable SKFS.Context,
     qkind: ?(Int, QueryKind),
-    entries: List<Row>,
-    _key: SKFS.BaseName,
-    inputRow: Row,
-    writer: mutable SKFS.Writer,
+    _inputKey: SKFS.BaseName,
+    evaluator: SKSQL.ExprEvaluator,
+    writer: mutable MultiWriter,
+    repeat: Int,
   ): void {
-    evaluator = ExprEvaluator::create(
-      entries match {
-      | List.Nil() -> Array[inputRow]
-      | l -> List.Cons(inputRow, l).reversed().collect(Array)
-      },
-      this.select.fromHash,
-      this.select.from,
-      this.up,
-    );
-    this.select.where match {
-    | None() -> void
-    | Some(where) ->
-      evaluator.evalCIExpr(context, where) match {
-      | None()
-      | Some(0) ->
-        return void
-      | Some(_) -> void
-      }
-    };
-    row = this.evalRow(context, evaluator, this.params);
+    row = this.evalRow(context, evaluator, this.params, repeat);
     if (this.select.aggr is Some _) {
-      writer.write(SKFS.IID(0), row)
+      !evaluator = evaluator with {entries => Array[row]};
+      key = this.select.groupBy match {
+      | None() -> SKFS.IID(0)
+      | Some(groupBy) -> makeGroupByKey(context, evaluator, row, groupBy)
+      };
+      writer.write(key, row);
     } else {
+      invariant(this.select.groupBy is None());
+      key = RowKey::create(row, this.kinds);
       qkind match {
-      | None() -> writer.write(RowKey::create(row, this.kinds), row)
-      | Some((order, k)) ->
-        writer.write(RowKey::create(row, this.kinds), RowKind(order, k, row))
+      | None() -> writer.write(key, row)
+      | Some((order, k)) -> writer.write(key, RowKind(order, k, row))
       }
     };
   }
 
-  fun createLazySub(context: mutable SKFS.Context): SKFS.LHandle<KVFile> {
-    subSelectLazy = SKFS.DirName::create(this.selectName.toString() + "lazy/");
-    SKFS.LHandle::create(
-      KVFile::fromFile,
+  fun createSub(
+    context: mutable SKFS.Context,
+    subTask: SubTask,
+  ): mutable Iterator<KVFile> {
+    subStr = subTask.name + "sub_" + hash(subTask.key).toString();
+    subSelectName = SKFS.DirName::create(subStr + "/");
+    nthis = this;
+    !nthis.selectName2 = subSelectName;
+    result = nthis.evalSelectTableList(
       context,
-      subSelectLazy,
-      (context, _, baseName) ~> {
-        subTask = baseName match {
-        | x @ SubTask _ -> x
-        | _ -> invariant_violation("Expected a subtask")
-        };
-        subStr = subTask.name + "sub_" + subTask.key;
-        subSelectName = SKFS.DirName::create(subStr + "/");
-        nthis = this;
-        !nthis.selectName = subSelectName;
-        result = nthis.evalSelectTableList(
-          context,
-          subTask.remainingTables,
-          List.Cons(subTask.inputRow, subTask.entries),
-        );
-        context
-          .unsafeGetEagerDir(result.dirName)
-          .unsafeGetFileIter()
-          .map(x -> KVFile((x.i0, x.i1.collect(Array))))
-          .collect(Array)
-      },
+      subTask.remainingTables,
+      List.Cons(subTask.inputRow, subTask.entries),
     );
+    context.unsafeGetEagerDir(result.dirName).unsafeGetFileIter().map(x ->
+      KVFile((x.i0, x.i1.collect(Array)))
+    )
   }
 
   fun evalSelectCross(
     context: mutable SKFS.Context,
-    remainingTables: List<DirDescr>,
-    remainingTablesHash: Int,
+    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
     entries: List<Row>,
     key: SKFS.BaseName,
-    inputRow: Row,
-    writer: mutable SKFS.Writer,
-    lazySub: SKFS.LHandle<KVFile>,
+    inputRow: SKSQL.Row,
+    writer: mutable MultiWriter,
+    repeat: Int,
   ): void {
-    subTask = SubTask::create(
-      this.selectName.toString(),
+    subTask = SubTask(
+      this.selectName2.toString(),
       key,
       inputRow,
       entries,
       remainingTables,
-      remainingTablesHash,
     );
-    result = lazySub.getArray(context, subTask);
+    result = this.createSub(context, subTask);
     for (kv in result) {
-      writer.writeArray(kv.value.i0, kv.value.i1)
+      writer.writeArray(
+        kv.value.i0,
+        kv.value.i1.map(x -> {
+          x match {
+          | RowValues(values, r) -> RowValues::create(values, r * repeat)
+          | _ -> invariant_violation("Unexpected Row type")
+          }
+        }),
+      )
     }
   }
 }
 
 /*****************************************************************************/
-/* Compactor used by aggregate functions. */
+/* Reducer used by aggregate functions. */
 /*****************************************************************************/
 
-fun compactorInit(
+fun updateState(
+  op: (CValue, CValue) ~> CValue,
+  state: mutable Array<?SKSQL.CValue>,
+  rows: mutable Iterator<Row>,
+  aggrKinds: Array<AggrKind>,
+): void {
+  lastRow: ?Row = None();
+  for (row in rows) {
+    for (i => vOpt in row) {
+      kind = aggrKinds[i];
+      repeat = row match {
+      | RowValues(_, x) -> x
+      | _ -> invariant_violation("Expected a RowValue")
+      };
+      (kind, lastRow, vOpt) match {
+      | (
+        Sum(SDistinct()),
+        Some(lrow),
+        Some(_),
+      ) if (lrow.getInt(i) == vOpt.flatMap(x -> x.getInt())) ->
+        void
+      | (Sum _, _, None()) -> void
+      | (Sum _, _, Some(v @ CInt(_))) ->
+        state[i] match {
+        | None() -> state![i] = Some(op(CInt(0), v * repeat))
+        | Some(acc) -> state![i] = Some(op(acc, v * repeat))
+        }
+
+      | (Sum _, _, Some(v @ CFloat(_))) ->
+        state[i] match {
+        | None() -> state![i] = Some(op(CFloat(0.0), v * repeat))
+        | Some(acc) -> state![i] = Some(op(acc, v * repeat))
+        }
+
+      | (
+        Count(SDistinct()),
+        Some(lrow),
+        Some(_),
+      ) if (lrow.getInt(i) == vOpt.flatMap(x -> x.getInt())) ->
+        void
+      | (Count(_), _, None()) -> void
+      | (Count(_), _, Some(_)) ->
+        state[i] match {
+        | None() -> state![i] = Some(op(CInt(0), CInt(repeat)))
+        | Some(acc) -> state![i] = Some(op(acc, CInt(repeat)))
+        }
+
+      | (Noop(), _, x) -> state![i] = x
+
+      | (_, _, Some(SKSQL.CString _)) ->
+        invariant_violation("Invalid aggregate")
+      }
+    };
+    !lastRow = Some(row);
+  };
+}
+
+fun reducerInit(
   aggrKinds: Array<AggrKind>,
   rows: mutable Iterator<Row>,
-): Row {
-  state = Array::mcreateFromItems(
+): Array<Row> {
+  state = Array<?CValue>::mcreateFromItems(
     aggrKinds.map(kind -> {
       kind match {
-      | Sum()
-      | Count() ->
-        SValue::fromInt(0)
+      | Noop()
+      | Sum(_)
+      | Count(_) ->
+        None()
       }
     }),
   );
-  for (row in rows) {
-    row.iter((i, vOpt) -> {
-      v = vOpt match {
-      | None() -> 0
-      | Some(x) -> x.toInt()
-      };
-      kind = aggrKinds[i];
-      kind match {
-      | Sum() -> state![i] = SValue::fromInt(state[i].toInt() + v)
-      | Count() ->
-        state![i] = SValue::fromInt(
-          state[i].toInt() + (if (vOpt is None()) 0 else 1),
-        )
-      }
-    })
-  };
-  Row::create(unsafe_chill_trust_me(state))
+  updateState((x, y) ~> x + y, state, rows, aggrKinds);
+  Array[RowValues::create(unsafe_chill_trust_me(state).map(x -> x))]
 }
 
-fun compactorUpdate(
+fun reducerUpdate(
   aggrKinds: Array<AggrKind>,
-  stateRow: Row,
+  stateRow: Array<Row>,
   oldRows: Array<Row>,
   newRows: Array<Row>,
-): Row {
-  stateRowValues = stateRow match {
-  | RowValues(data) -> data
+): Array<Row> {
+  stateRowValues: Array<?CValue> = stateRow[0] match {
+  | RowValues(data, 1) -> data
   | _ -> invariant_violation("Was expecting RowValues")
   };
+
   state = Array::mcreateFromItems(stateRowValues);
-  for (row in oldRows) {
-    row.iter((i, vOpt) -> {
-      v = vOpt match {
-      | None() -> 0
-      | Some(x) -> x.toInt()
-      };
-      kind = aggrKinds[i];
-      kind match {
-      | Sum() -> state![i] = SValue::fromInt(state[i].toInt() - v)
-      | Count() ->
-        state![i] = SValue::fromInt(
-          state[i].toInt() + (if (vOpt is None()) 0 else -1),
-        )
-      }
-    })
-  };
-  for (row in newRows) {
-    row.iter((i, vOpt) -> {
-      v = vOpt match {
-      | None() -> 0
-      | Some(x) -> x.toInt()
-      };
-      kind = aggrKinds[i];
-      kind match {
-      | Sum() -> state![i] = SValue::fromInt(state[i].toInt() + v)
-      | Count() ->
-        state![i] = SValue::fromInt(
-          state[i].toInt() + (if (vOpt is None()) 0 else 1),
-        )
-      }
-    })
-  };
-  Row::create(unsafe_chill_trust_me(state))
+
+  updateState((x, y) ~> x - y, state, oldRows.iterator(), aggrKinds);
+  updateState((x, y) ~> x + y, state, newRows.iterator(), aggrKinds);
+
+  values = unsafe_chill_trust_me(state).map(x -> x);
+  Array[RowValues::create(values)]
 }
 
 /*****************************************************************************/
-/* Compactor for intersections/unions/except. */
+/* Reducer for intersections/unions/except. */
 /*****************************************************************************/
 
-fun initUnion(rowIter: mutable Iterator<Row>): Row {
+fun initUnion(rowIter: mutable Iterator<Row>): Array<Row> {
   unsortedRows = rowIter.collect(Array);
 
   indexes = unsortedRows
@@ -523,7 +1035,7 @@ fun initUnion(rowIter: mutable Iterator<Row>): Row {
     }
   );
 
-  if (rows.size() == 0) return RowNone();
+  if (rows.size() == 0) return Array[];
   count = 0;
   countIntersect = 0;
   intersectOrder = -1;
@@ -556,11 +1068,93 @@ fun initUnion(rowIter: mutable Iterator<Row>): Row {
   };
 
   if (count == 0) {
-    return RowNone();
+    return Array[];
   };
   if (count == 1) {
-    return rows[0].row;
+    return Array[rows[0].row];
   };
 
-  RowRepeat(rows[0].row, count)
+  result = mutable Vector[];
+  for (_ in Range(0, count)) {
+    result.push(rows[0].row);
+  };
+  result.toArray()
+}
+
+/*****************************************************************************/
+/* Builds the key used by a group by. */
+/*****************************************************************************/
+
+fun makeGroupByKey(
+  context: mutable SKFS.Context,
+  evaluator: ExprEvaluator,
+  row: Row,
+  groupBy: Array<CGroupByElt>,
+): RowKey {
+  rowKey = mutable Vector[];
+  kinds = mutable Vector[];
+  for (idx => elt in groupBy) {
+    elt match {
+    | CGBCol(n, ty) ->
+      value = row.getValue(n);
+      rowKey.push(value);
+      kinds.push((idx, IASC(), ty))
+    | CGBExpr(e, ty) ->
+      value = evaluator.evalCGExpr(context, e) match {
+      | ANull() -> None()
+      | ADef(x) -> Some(x)
+      | _ -> invariant_violation("Should have successfully interpreted")
+      };
+      rowKey.push(value);
+      kinds.push((idx, IASC(), ty))
+    }
+  };
+  result = RowKey(RowValues::create(rowKey.toArray()), kinds.toArray());
+  result
+}
+
+/*****************************************************************************/
+/* Reducer used by joins. */
+/*****************************************************************************/
+
+fun makeJoinReducer(
+  kinds: Array<(Int, IKind, Type)>,
+): (
+  mutable SKFS.Context,
+  mutable SKFS.Writer,
+  SKFS.BaseName,
+  mutable Iterator<SKFS.File>,
+) ~> void {
+  (_, writer, _, files) ~> {
+    leftRows = mutable Vector[];
+    rightRows = mutable Vector[];
+    for (file in files) {
+      file match {
+      | LeftFile(leftFile) -> leftRows.push(RowValues::fromFile(leftFile))
+      | RightFile(rightFile) -> rightRows.push(RowValues::fromFile(rightFile))
+      | _ ->
+        debug(file);
+        invariant_violation("Unexpected file type in joinReducer")
+      }
+    };
+    for (left in leftRows) {
+      for (right in rightRows) {
+        values = left.values.concat(right.values).collect(Array);
+        row = RowValues::create(values, left.repeat * right.repeat);
+        writer.write(RowKey(row, kinds), row);
+      }
+    }
+  }
+}
+
+fun normalizeValueIter(
+  value: RowValues,
+  valueIter: mutable Iterator<SKFS.File>,
+): RowValues {
+  repeat = value.repeat;
+  for (v in valueIter) {
+    !repeat = repeat + RowValues::fromFile(v).repeat;
+  };
+  !value = value.setRepeat(repeat);
+  value
 }

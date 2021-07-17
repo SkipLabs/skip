@@ -81,18 +81,18 @@ mutable class NonEmptyIterator<T>(
 /*****************************************************************************/
 
 mutable class Writer{
-  private writes: mutable Map<BaseName, Array<File>> = mutable Map[],
+  private mutable writes: SortedMap<BaseName, Array<File>> = SortedMap[],
 } {
   mutable fun writeArray(key: BaseName, values: Array<File>): void {
-    this.writes![key] = values;
+    this.!writes[key] = values;
   }
 
   mutable fun write(key: BaseName, value: File): void {
-    this.writes![key] = Array[value];
+    this.!writes[key] = Array[value];
   }
 
   mutable fun remove(key: BaseName): void {
-    this.writes![key] = Array[];
+    this.!writes[key] = Array[];
   }
 
   readonly fun getWrites(): Array<(BaseName, Array<File>)> {
@@ -105,13 +105,13 @@ mutable class Writer{
 }
 
 /*****************************************************************************/
-/* Typed version of the Compactor. */
+/* Typed version of the Reducer. */
 /*****************************************************************************/
 
-class ECompactor<T>{
+class EReducer<T>{
   canReset: Bool,
-  init: (mutable Iterator<T> ~> T),
-  update: (T, Array<T>, Array<T>) ~> ?T,
+  init: (mutable Iterator<T> ~> Array<T>),
+  update: (Array<T>, Array<T>, Array<T>) ~> ?Array<T>,
 }
 
 /*****************************************************************************/
@@ -223,7 +223,7 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
-    compactorOpt: ?ECompactor<T2> = None(),
+    reducerOpt: ?EReducer<T2> = None(),
   ): EHandle<T2> {
     EagerDir::apply(
       context,
@@ -234,15 +234,14 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
         if (files.size() == 0) return void;
         f(context, writer, key, files.map(x -> this.conv(x)));
       },
-      compactorOpt match {
+      reducerOpt match {
       | None() -> None()
-      | Some(compactor) ->
+      | Some(reducer) ->
         Some(
-          ICompactor{
-            canReset => compactor.canReset,
-            init => files ~> compactor.init(files.map(conv)),
+          IReducer{
+            init => files ~> reducer.init(files.map(conv)),
             update => (state, old, new) ~>
-              compactor.update(conv(state), old.map(conv), new.map(conv)),
+              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
           },
         )
       },
@@ -255,7 +254,7 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, mutable Iterator<T>) ~> void,
-    compactorOpt: ?ECompactor<T2> = None(),
+    reducerOpt: ?EReducer<T2> = None(),
   ): EHandle<T2> {
     EagerDir::apply(
       context,
@@ -266,15 +265,14 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
         if (iter.isEmpty()) return void;
         f(context, writer, key, iter.map(this.conv));
       },
-      compactorOpt match {
+      reducerOpt match {
       | None() -> None()
-      | Some(compactor) ->
+      | Some(reducer) ->
         Some(
-          ICompactor{
-            canReset => compactor.canReset,
-            init => files ~> compactor.init(files.map(conv)),
+          IReducer{
+            init => files ~> reducer.init(files.map(conv)),
             update => (state, old, new) ~>
-              compactor.update(conv(state), old.map(conv), new.map(conv)),
+              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
           },
         )
       },
@@ -298,7 +296,7 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
       ),
     >,
     dirName: DirName,
-    compactorOpt: ?ECompactor<T2> = None(),
+    reducerOpt: ?EReducer<T2> = None(),
   ): EHandle<T2> {
     dynParents = mutable Vector[];
     parentSet = mutable Set[];
@@ -317,15 +315,14 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
       context,
       fixedParents,
       dirName,
-      compactorOpt match {
+      reducerOpt match {
       | None() -> None()
-      | Some(compactor) ->
+      | Some(reducer) ->
         Some(
-          ICompactor{
-            canReset => compactor.canReset,
-            init => files ~> compactor.init(files.map(conv)),
+          IReducer{
+            init => files ~> reducer.init(files.map(conv)),
             update => (state, old, new) ~>
-              compactor.update(conv(state), old.map(conv), new.map(conv)),
+              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
           },
         )
       },
@@ -404,9 +401,9 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
-    compactorOpt: ?(ECompactor<T2>) = None(),
+    reducerOpt: ?(EReducer<T2>) = None(),
   ): EHandle<T2> {
-    this.genericMap(conv, context, dirName, f, compactorOpt)
+    this.genericMap(conv, context, dirName, f, reducerOpt)
   }
 
   fun pre(context: mutable Context): ?EHandle<T> {
@@ -421,6 +418,10 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
 
   fun size(context: mutable Context): Int {
     context.getEagerDir(this.dirName).size(context)
+  }
+
+  fun isEmpty(context: mutable Context): Bool {
+    context.getEagerDir(this.dirName).isEmpty(context)
   }
 }
 

@@ -1,0 +1,1 @@
+CREATE VIEW V0 AS select * from t1 ORDER BY 1 LIMIT 2 ;

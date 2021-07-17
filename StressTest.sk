@@ -328,10 +328,10 @@ fun evalFun(
   };
   out = Array::createFromItems(result);
 
-  allValues = mutable Map[];
+  allValues = SortedMap[];
   for (file in out) {
     key = SKFS.IID(SKFS.IntFile::fromFile(file).value);
-    if (!allValues.containsKey(key)) allValues![key] = mutable Vector[];
+    if (!allValues.containsKey(key)) !allValues[key] = mutable Vector[];
     allValues[key].push(
       SKFS.IntFile(
         currentKey match {
@@ -610,13 +610,12 @@ fun testStress(): mutable SKFS.Context {
   config = Config{};
   print_string("Stress Test Begin");
   origContext = SKFS.Context{};
-  SKFS.runWithGcReturnContext(origContext, icontext ~> {
-    context = SKFS.Context::fromSaved(icontext);
+  SKFS.runWithGcReturnContext(origContext, context ~> {
     round = context.getGlobal("ROUND") match {
     | None() -> 0
     | Some(x) -> SKFS.IntFile::fromFile(x).value
     };
-    !context = SKFS.Context::fromSaved(origContext);
+    context.replaceFromSaved(origContext);
     if (SKFS.debugMode) {
       print_string("Round: " + round);
     };
@@ -653,14 +652,13 @@ fun testStress(): mutable SKFS.Context {
     };
     hasError2 = compareContext(context2, context);
     if (hasError2) invariant_violation("Stress test failed");
-    print_string("ROUND: " + round);
     !round = round + 1;
     context.setGlobal("ROUND", SKFS.IntFile(round));
     if (round < config.nbrRounds) {
-      SKFS.CContinue(context.clone())
+      SKFS.CContinue(None())
     } else {
       print_string("Stress Test end");
-      SKFS.CStop(context.clone())
+      SKFS.CStop(None())
     }
   })
 }

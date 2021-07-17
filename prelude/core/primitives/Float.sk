@@ -121,9 +121,10 @@ fun floatToString(value: Float): String {
   };
   (integralPart, optDecimalPart, optExponent) = splitFloat(value);
   !str = `${str}${integralPart}`;
-  optDecimalPart.each(decimalPart ->
-    !str = `${str}${decimalsPart(decimalPart)}`
-  );
+  optDecimalPart match {
+  | None() -> !str = `${str}.0`
+  | Some(decimalPart) -> !str = `${str}${decimalsPart(decimalPart)}`
+  };
   optExponent.each(exponent -> !str = `${str}e${exponent}`);
   str;
 }

@@ -4,29 +4,169 @@
 
 module SKSQL;
 
+/*****************************************************************************/
+/* Helper functions/types for merge joins. */
+/*****************************************************************************/
+
+class JTable{
+  dirName: SKFS.DirName,
+  ranges: ?Array<SKFS.KeyRange>,
+  schema: Array<SKSQL.TypeDescr>,
+  alias: ?String,
+  windowSize: ?Int,
+} {
+  static fun fromDirDescr(
+    dirDescr: DirDescr,
+    ranges: ?Array<SKFS.KeyRange>,
+  ): this {
+    JTable{
+      dirName => dirDescr.dirName,
+      ranges,
+      schema => dirDescr.schema,
+      alias => dirDescr.alias,
+      windowSize => dirDescr.windowSize,
+    }
+  }
+}
+
+value class TableProj(tableNbr: Int, col: (Int, IKind, Type), isUnique: Bool)
+value class EqJoin(left: TableProj, right: TableProj)
+
+fun isUnique(tyDescr: TypeDescr): Bool {
+  tyDescr.primary || tyDescr.unique
+}
+
+const crossJoinMsg: String = `
+This will be interpreted as a cross-join, which is almost
+certainly not what you want (and will probably never terminate).
+If you are absolutely sure that's what you want to do, you can pass
+the option '--allow-cross-join' to make this error go away.`;
+
+const multipleTablesNoUniqueMsg: String = `
+SELECT involves multiple tables but none of them defines a unique column.
+`;
+
+const multipleTablesNoClauseMsg: String = `
+SELECT involves multiple tables but no appropriate join clause was found.
+`;
+
+fun errorNoMergeClause(pos: Int, t1: DirDescr, t2: DirDescr): void {
+  col = for (ty in t1.schema) {
+    if (isUnique(ty)) break t1.name + "." + ty.name;
+  } else {
+    for (ty in t2.schema) {
+      if (isUnique(ty)) break t2.name + "." + ty.name;
+    } else {
+      msg =
+        multipleTablesNoUniqueMsg +
+        "You should add a primary key (or a unique column) to either " +
+        t1.name +
+        " or to " +
+        t2.name +
+        ".\n" +
+        crossJoinMsg;
+      error(pos, msg)
+    }
+  };
+
+  clause = "someTable.someCol=" + col;
+
+  error(
+    pos,
+    multipleTablesNoClauseMsg +
+      "Was expecting to find a clause of the form:\n" +
+      clause +
+      "\n\n" +
+      "If you believe you have a clause of that form, " +
+      "make sure it is not embedded in another expression\n\n" +
+      "For example, this is correct:\n" +
+      "SELECT * FROM " +
+      clause +
+      " AND ... AND ...\n\n" +
+      "While this is incorrect:\n" +
+      "SELECT * FROM (" +
+      clause +
+      " OR ...) AND ...\n\n" +
+      crossJoinMsg,
+  )
+}
+
+/*****************************************************************************/
+/* Finds table */
+/*****************************************************************************/
+
 mutable class Compiler{
+  options: Options,
   pos: Int,
   mutable subst: mutable Map<String, CGExpr> = mutable Map[],
+  mutable paramsNbr: mutable Map<String, Int> = mutable Map[],
   mutable ambiguous: mutable Set<String> = mutable Set[],
-  mutable iaggr: mutable Vector<(AggrKind, CExpr<Int>)> = mutable Vector[],
-  mutable faggr: mutable Vector<(AggrKind, CExpr<Float>)> = mutable Vector[],
-  mutable saggr: mutable Vector<(AggrKind, CExpr<String>)> = mutable Vector[],
+  mutable isAggr: Bool = false,
+  mutable aggrVars: mutable Vector<(AggrKind, CGExpr)> = mutable Vector[],
   mutable needUp: Bool = false,
+  mutable needGetParam: Bool = false,
+  mutable other: mutable Vector<SubSelectTask> = mutable Vector[],
 } {
-  static fun create(pos: Int): mutable this {
-    mutable static{pos}
+  static fun create(options: Options, pos: Int): mutable this {
+    mutable static{options, pos}
+  }
+
+  mutable fun compileDistinctWithGroupBy(select: Select): Select {
+    // Tranforms:
+    // 'select distinct ... from ... group by ...'
+    // ==> 'select distinct * from (select ... from ... group by ...)'
+
+    Select{
+      pos => select.pos,
+      id => select.id,
+      kind => SDistinct(),
+      params => None(),
+      from => Some(
+        Array[
+          TableName(
+            FQuery(
+              select with {
+                id => select.id + "-distinct",
+                kind => SNone(),
+                orderBy => None(),
+                limit => None(),
+              },
+            ),
+            None(),
+            false,
+          ),
+        ],
+      ),
+      where => None(),
+      groupBy => None(),
+      having => None(),
+      in_ => None(),
+      join => None(),
+      orderBy => select.orderBy,
+      limit => select.limit,
+      rest => None(),
+    }
   }
 
   mutable fun compileSelect(
     context: mutable SKFS.Context,
     select: Select,
   ): CSelect {
+    if (select.groupBy is Some _ && select.kind is SDistinct _) {
+      !select = this.compileDistinctWithGroupBy(select);
+    };
+    !select = this.expandJoins(context, select.join, select);
+
     substCopy = this.subst;
+    paramsNbrCopy = this.paramsNbr;
     ambiguousCopy = this.ambiguous;
-    iaggrCopy = this.iaggr;
-    faggrCopy = this.faggr;
-    saggrCopy = this.saggr;
+    aggrVarsCopy = this.aggrVars;
     needUpCopy = this.needUp;
+    isAggrCopy = this.isAggr;
+    otherCopy = this.other;
+
+    isAggr = selectIsAggr(select);
+    this.!isAggr = isAggr;
 
     newSubst = mutable Map[];
     for (key => value in this.subst) {
@@ -43,48 +183,54 @@ mutable class Compiler{
     };
 
     this.!subst = newSubst;
+    this.!paramsNbr = mutable Map[];
     this.!ambiguous = newAmbiguous;
-    this.!iaggr = mutable Vector[];
-    this.!faggr = mutable Vector[];
-    this.!saggr = mutable Vector[];
+    this.!aggrVars = mutable Vector[];
     this.!needUp = false;
+    this.!other = mutable Vector[];
 
-    from = this.compileFrom(context, select.from);
-    params = this.compileParams(context, from, select.params);
-    join = this.compileJoin(context, select.join);
+    origFrom = this.compileFrom(context, select.from);
+    from = this.compileJoin(context, origFrom, select);
+    sparams = select.params match {
+    | None() ->
+      params = mutable Vector[];
+      for (tableNbr => dirDescr in from) {
+        tableName = dirDescr.i0.alias match {
+        | None() -> dirDescr.i0.name
+        | Some(x) -> x
+        };
+        for (slot => tyDescr in dirDescr.i0.schema) {
+          varName = tableName + "." + tyDescr.name;
+          this.subst![varName] = tyDescr.ty match {
+          | INTEGER() -> CIExpr(CIGetFrom(tableNbr, slot))
+          | FLOAT() -> CFExpr(CFGetFrom(tableNbr, slot))
+          | TEXT() -> CSExpr(CSGetFrom(tableNbr, slot))
+          };
+          params.push((Literal(varName, false), None()))
+        }
+      };
+      params.toArray()
+    | Some(params) -> params
+    };
+    params = this.compileParams(context, sparams);
     where = this.compileWhere(context, select.where);
     in_ = this.compileIn(context, select.in_);
-    groupBy = this.compileGroupBy(context, select.groupBy);
+    groupBy = this.compileGroupBy(context, select.groupBy, params);
     having = this.compileHaving(context, select.having);
+
     orderBy = this.compileOrderBy(context, select.orderBy);
+    limit = this.compileLimit(context, select.limit);
     rest = this.compileRest(context, select.rest);
     aggr: ?Array<(AggrKind, CGExpr)> = None();
-    if (
-      this.iaggr.size() != 0 ||
-      this.faggr.size() != 0 ||
-      this.saggr.size() != 0
-    ) {
-      aggrVars = mutable Vector<(AggrKind, CGExpr)>[];
-      for (kv in this.iaggr) {
-        (k, elt) = kv;
-        aggrVars.push((k, CIExpr(elt)));
-      };
-      for (kv in this.faggr) {
-        (k, elt) = kv;
-        aggrVars.push((k, CFExpr(elt)));
-      };
-      for (kv in this.saggr) {
-        (k, elt) = kv;
-        aggrVars.push((k, CSExpr(elt)));
-      };
-      !aggr = Some(aggrVars.toArray());
+    if (this.aggrVars.size() != 0) {
+      !aggr = Some(this.aggrVars.toArray());
     };
 
     kinds = orderBy match {
     | None() ->
       i = 0;
-      params.map(e -> {
-        result = (i, IASC(), e.getType());
+      params.map(param -> {
+        result = (i, IASC(), param.getType());
         !i = i + 1;
         result
       })
@@ -98,61 +244,51 @@ mutable class Compiler{
       aggr,
       from,
       kinds,
-      fromHash => hash(from),
-      join,
       where,
       in_,
       groupBy,
       having,
       orderBy,
+      limit,
       rest,
       needUp => this.needUp,
+      needGetParam => this.needGetParam,
+      other => this.other.toArray(),
     };
 
     this.!subst = substCopy;
+    this.!paramsNbr = paramsNbrCopy;
     this.!ambiguous = ambiguousCopy;
-    this.!iaggr = iaggrCopy;
-    this.!faggr = faggrCopy;
-    this.!saggr = saggrCopy;
+    this.!aggrVars = aggrVarsCopy;
     this.!needUp = needUpCopy;
+    this.!isAggr = isAggrCopy;
+    this.!other = otherCopy;
 
     cselect
   }
 
   mutable fun compileParams(
     context: mutable SKFS.Context,
-    tables: Array<DirDescr>,
-    paramsOpt: ?Array<(Expr, ?String)>,
+    params: Array<(Expr, ?String)>,
   ): Array<CGExpr> {
-    params = paramsOpt match {
-    | None() ->
-      params = mutable Vector[];
-      for (table in tables) {
-        for (tyDescr in table.schema) {
-          params.push((Literal(table.name + "." + tyDescr.name), None()))
-        }
-      };
-      params.toArray()
-    | Some(params) -> params
-    };
     cparams = params.map(param -> {
       (expr, asName) = param;
       (this.compileExpr(context, expr), asName)
     });
-    i = 0;
-    for (cparam in cparams) {
+    for (i => cparam in cparams) {
       (typedExpr, asNameOpt) = cparam;
       asNameOpt match {
-      | None() -> continue
-      | Some(asName) ->
+      | Some(asName) if (!this.subst.containsKey(asName)) ->
+        this.!needGetParam = true;
+        this.paramsNbr![asName] = i;
         this.subst![asName] = typedExpr match {
         | CGNull _ -> CGNull()
         | CIExpr _ -> CIExpr(CIGetParam(i))
         | CSExpr _ -> CSExpr(CSGetParam(i))
         | CFExpr _ -> CFExpr(CFGetParam(i))
         }
+      | _ -> continue
       };
-      !i = i + 1;
     };
     cparams.map(x -> x.i0)
   }
@@ -160,22 +296,26 @@ mutable class Compiler{
   mutable fun compileFrom(
     context: mutable SKFS.Context,
     from: ?Array<TableName>,
-  ): Array<DirDescr> {
+  ): Array<SKSQL.DirDescr> {
     from match {
-    | None() -> error(this.pos, "Expected FROM")
+    | None() -> Array[]
     | Some(fromTables) ->
       tableNbr = 0;
 
       tables = fromTables.map(fromTable -> {
-        tableName = this.computeFromName(context, fromTable.name);
-        tableSID = SKFS.SID::create(tableName);
-        table = getTable(context, this.pos, tableSID);
+        table = this.getFromDirDescr(context, fromTable.name);
+        tableAlias = fromTable.asName match {
+        | Some(x) -> x
+        | None() -> table.name
+        };
+        !table.alias = Some(tableAlias);
         table
       });
 
       for (i => fromName in fromTables) {
         table = tables[i];
         tableName = table.name;
+
         for (colName => colNbr in table.cols) {
           this.addGetFrom(tableNbr, table.schema, colName, colNbr);
         };
@@ -191,6 +331,27 @@ mutable class Compiler{
             this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
           }
         };
+
+        !tableNbr = tableNbr + 1;
+      };
+
+      !tableNbr = 0;
+
+      for (i => fromName in fromTables) {
+        table = tables[i];
+        tableName = table.name;
+
+        fromName.asName match {
+        | None() -> void
+        | Some(_) ->
+          for (colName => colNbr in table.cols) {
+            dotName = tableName + "." + colName;
+            if (!this.subst.containsKey(dotName)) {
+              this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
+            }
+          }
+        };
+
         !tableNbr = tableNbr + 1;
       };
 
@@ -215,23 +376,131 @@ mutable class Compiler{
     }
   }
 
-  mutable fun computeFromName(
-    _context: mutable SKFS.Context,
+  mutable fun getFromDirDescr(
+    context: mutable SKFS.Context,
     name: FromName,
-  ): String {
+  ): DirDescr {
     name match {
-    | FName(tableName) -> tableName
-    | FQuery(_query) -> invariant_violation("TODO FQuery")
+    | FName(tableName) ->
+      tableSID = SKFS.SID::create(tableName);
+      getTable(this.options, context, this.pos, tableSID)
+
+    | FQuery(select @ Select _) ->
+      cselect = this.compileSelect(context, select);
+      this.other.push(SubSelect(cselect));
+      static::getDirDescr(select, cselect)
     }
   }
 
-  mutable fun compileJoin(
+  static fun getDirDescr(select: Select, cselect: CSelect): DirDescr {
+    cols = SortedMap[];
+    invCols = mutable Map[];
+    select.params match {
+    | None() ->
+      slot = 0;
+      for (dirDescr in cselect.from) {
+        for (tyDescr in dirDescr.i0.schema) {
+          if (!cols.containsKey(tyDescr.name)) {
+            !cols[tyDescr.name] = slot;
+            invCols![slot] = tyDescr.name;
+          };
+          !slot = slot + 1;
+        }
+      }
+
+    | Some(params) ->
+      for (idx => param in params) {
+        param match {
+        | (_, Some(colName)) ->
+          if (cols.containsKey(colName)) continue;
+          !cols[colName] = idx;
+          invCols![idx] = colName
+        | (Literal(colName, _), _) ->
+          if (cols.containsKey(colName)) continue;
+          iter = colName.getIter();
+          first = iter.next().fromSome();
+          if (!Chars.isDigit(first)) {
+            !cols[colName] = idx;
+            invCols![idx] = colName;
+          }
+        | (Binop(".", _, Literal(colName, _)), _) ->
+          if (cols.containsKey(colName)) continue;
+          !cols[colName] = idx;
+          invCols![idx] = colName
+        | _ -> void
+        }
+      }
+    };
+    schema = cselect.params.mapWithIndex((idx, param) -> {
+      ty = TypeDescr{
+        name => invCols.maybeGet(idx) match {
+        | None() ->
+          col = "col<" + idx + ">";
+          !cols[col] = idx;
+          col
+        | Some(x) -> x
+        },
+        ty => param.getType(),
+        unique => false,
+        primary => false,
+      };
+      ty
+    });
+    DirDescr{
+      name => cselect.id,
+      schema,
+      cols,
+      dirName => SKFS.DirName::create("/" + cselect.id + "/"),
+      alias => Some(cselect.id),
+      windowSize => None(),
+    }
+  }
+
+  mutable fun expandJoins(
     _context: mutable SKFS.Context,
     joinOpt: ?Join,
-  ): ?CJoin {
+    select: Select,
+  ): Select {
     joinOpt match {
-    | None() -> None()
-    | Some _ -> invariant_violation("TODO compileJoin")
+    | None() -> select
+    | Some(join) ->
+      join.kind match {
+      | JCross() ->
+        !select.from = select.from match {
+        | None() -> Some(join.names)
+        | Some(names) -> Some(names.concat(join.names))
+        };
+        !select.join = None();
+        select
+      | JInner()
+      | JNone() ->
+        !select.from = select.from match {
+        | None() -> Some(join.names)
+        | Some(names) -> Some(names.concat(join.names))
+        };
+        !select.join = None();
+        join.on match {
+        | None() -> select
+        | Some(clauses) ->
+          whereInit = select.where match {
+          | None() -> Literal("1", false)
+          | Some(whereInit) -> whereInit
+          };
+
+          where = whereInit;
+          for (clause in clauses) {
+            (e, a) = clause;
+            if (a is Some _) {
+              error(this.pos, "Unsupported join");
+            };
+            !where = Binop("AND", e, where);
+          };
+          !select.where = Some(where);
+          select
+        }
+      | JLeft(_) -> error(this.pos, "TODO left join")
+      | JOuter() -> error(this.pos, "Error: OUTER JOIN not supported")
+      }
     }
   }
 
@@ -239,16 +508,17 @@ mutable class Compiler{
     context: mutable SKFS.Context,
     whereOpt: ?Expr,
   ): ?CExpr<Int> {
-    whereOpt match {
-    | None() -> None()
-    | Some(expr) ->
-      this.compileExpr(context, expr) match {
-      | CIExpr(e) -> Some(e)
-      | te ->
-        debug((expr, te));
-        error(this.pos, "Invalid type for where clause")
+    this.noAggr(() -> {
+      whereOpt match {
+      | None() -> None()
+      | Some(expr) ->
+        this.compileExpr(context, expr) match {
+        | CGNull() -> Some(CNull())
+        | CIExpr(x) -> Some(x)
+        | _ -> error(this.pos, "Invalid type for where clause")
+        }
       }
-    }
+    })
   }
 
   mutable fun compileIn(
@@ -264,7 +534,8 @@ mutable class Compiler{
   mutable fun compileGroupBy(
     context: mutable SKFS.Context,
     groupByOpt: ?Array<(Expr, ?String)>,
-  ): ?Array<Int> {
+    params: Array<CGExpr>,
+  ): ?Array<CGroupByElt> {
     groupByOpt match {
     | None() -> None()
     | Some(groupBy) ->
@@ -272,8 +543,14 @@ mutable class Compiler{
         groupBy.map(kv -> {
           (group, _) = kv;
           this.compileExpr(context, group) match {
-          | CIExpr(CILiteral(n)) -> n
-          | _ -> error(this.pos, "GROUP BY expects integers")
+          | CIExpr(CILiteral(nIndexedAt1)) ->
+            n = nIndexedAt1 - 1;
+            if (n < 0 || n >= params.size()) {
+              error(this.pos, "GROUP BY out of bounds");
+            };
+            e = params[n];
+            CGBExpr(e, e.getType())
+          | e -> CGBExpr(e, e.getType())
           }
         }),
       )
@@ -281,13 +558,16 @@ mutable class Compiler{
   }
 
   mutable fun compileHaving(
-    _context: mutable SKFS.Context,
+    context: mutable SKFS.Context,
     havingOpt: ?Expr,
-  ): ?CGExpr {
-    havingOpt match {
-    | None() -> None()
-    | Some _ -> invariant_violation("TODO: compileHaving")
-    }
+  ): ?CExpr<Int> {
+    havingOpt.map(e ->
+      this.compileExpr(context, e) match {
+      | CGNull() -> CILiteral(0)
+      | CIExpr(x) -> x
+      | _ -> error(this.pos, "Invalid type for HAVING clause")
+      }
+    )
   }
 
   mutable fun compileRest(
@@ -316,13 +596,33 @@ mutable class Compiler{
     }
   }
 
+  mutable fun compileLimit(
+    context: mutable SKFS.Context,
+    limit: ?Expr,
+  ): ?CExpr<Int> {
+    limit match {
+    | None() -> None()
+    | Some(e) ->
+      this.compileExpr(context, e) match {
+      | CIExpr(i) -> Some(i)
+      | _ -> error(this.pos, "Invalid limit")
+      }
+    }
+  }
+
   mutable fun compileExpr(context: mutable SKFS.Context, expr: Expr): CGExpr {
     expr match {
-    | Literal("NULL") -> CGNull()
-    | Literal(str) ->
+    | Literal("NULL", _) -> CGNull()
+    | Literal(str, isString) ->
+      if (isString) return CSExpr(CSLiteral(str));
       str.getIter().next() match {
       | None() -> invariant_violation("Empty literal")
-      | Some(c) if (Chars.isDigit(c)) -> CIExpr(CILiteral(str.toInt()))
+      | Some(c) if (Chars.isDigit(c)) ->
+        if (str.contains(".")) {
+          CFExpr(CFLiteral(str.toFloat()))
+        } else {
+          CIExpr(CILiteral(str.toInt()))
+        }
       | _ ->
         if (this.ambiguous.contains(str)) {
           error(this.pos, "Ambiguous name: " + str);
@@ -337,13 +637,23 @@ mutable class Compiler{
             this.!needUp = true
           | _ -> void
           };
-          e
+          if (this.isAggr) {
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Noop(), e));
+            e.getType() match {
+            | INTEGER() -> CIExpr(CIGetFrom(0, slot))
+            | FLOAT() -> CFExpr(CFGetFrom(0, slot))
+            | TEXT() -> CSExpr(CSGetFrom(0, slot))
+            }
+          } else {
+            e
+          }
         }
       }
-    | Binop(".", Literal(ge1), Literal(ge2)) ->
-      this.compileExpr(context, Literal(ge1 + "." + ge2))
+    | Binop(".", Literal(ge1, _), Literal(ge2, _)) ->
+      this.compileExpr(context, Literal(ge1 + "." + ge2, false))
 
-    | Binop("IS", e, Literal("NULL")) ->
+    | Binop("IS", e, Literal("NULL", _)) ->
       CIExpr(
         this.compileExpr(context, e) match {
         | CGNull() -> CILiteral(1)
@@ -353,7 +663,7 @@ mutable class Compiler{
         },
       )
 
-    | Binop("IS", e, Not(Literal("NULL"))) ->
+    | Binop("IS", e, Not(Literal("NULL", _))) ->
       CIExpr(
         CNot(
           this.compileExpr(context, e) match {
@@ -365,68 +675,72 @@ mutable class Compiler{
         ),
       )
 
-    | Binop(bop, ge1, ge2) ->
+    | Binop("BETWEEN", e1, Binop("AND", e2, e3)) ->
       (
-        this.compileExpr(context, ge1),
-        this.compileExpr(context, ge2),
-        bop,
+        this.compileExpr(context, e1),
+        this.compileExpr(context, e2),
+        this.compileExpr(context, e3),
       ) match {
-      | (CGNull(), _, _)
-      | (_, CGNull(), _) ->
-        CGNull()
+      | (CGNull(), _, _) -> CGNull()
+      | (_, CGNull(), CGNull()) -> CGNull()
 
-      | (cge1, cge2, "<") -> CIExpr(CLt(cge1, cge2))
-      | (cge1, cge2, "<=") -> CIExpr(CLte(cge1, cge2))
-      | (cge1, cge2, ">=") -> CIExpr(CGte(cge1, cge2))
-      | (cge1, cge2, ">") -> CIExpr(CGt(cge1, cge2))
-      | (cge1, cge2, "=") -> CIExpr(CEq(cge1, cge2))
-      | (cge1, cge2, "<>") -> CIExpr(CDiff(cge1, cge2))
+      | (CIExpr(i1), CIExpr(i2), CIExpr(i3)) -> CIExpr(CIBetween(i1, i2, i3))
+      | (CIExpr(i1), CGNull(), CIExpr(i3)) -> CIExpr(CIBetween(i1, CNull(), i3))
+      | (CIExpr(i1), CIExpr(i2), CGNull()) -> CIExpr(CIBetween(i1, i2, CNull()))
 
-      | (CIExpr(e1), CIExpr(e2), "+") -> CIExpr(CAdd(e1, e2))
-      | (CIExpr(e1), CIExpr(e2), "-") -> CIExpr(CSub(e1, e2))
-      | (CIExpr(e1), CIExpr(e2), "*") -> CIExpr(CMul(e1, e2))
-      | (CIExpr(e1), CIExpr(e2), "/") -> CFExpr(CDiv(CFICast(e1), CFICast(e2)))
+      | (CFExpr(f1), CFExpr(f2), CFExpr(f3)) -> CIExpr(CFBetween(f1, f2, f3))
+      | (CFExpr(f1), CGNull(), CFExpr(f3)) -> CIExpr(CFBetween(f1, CNull(), f3))
+      | (CFExpr(f1), CFExpr(f2), CGNull()) -> CIExpr(CFBetween(f1, f2, CNull()))
 
-      | (CFExpr(e1), CFExpr(e2), "+") -> CFExpr(CAdd(e1, e2))
-      | (CFExpr(e1), CFExpr(e2), "-") -> CFExpr(CSub(e1, e2))
-      | (CFExpr(e1), CFExpr(e2), "*") -> CFExpr(CMul(e1, e2))
-      | (CFExpr(e1), CFExpr(e2), "/") -> CFExpr(CDiv(e1, e2))
+      | (CSExpr(s1), CSExpr(s2), CSExpr(s3)) -> CIExpr(CSBetween(s1, s2, s3))
+      | (CSExpr(s1), CGNull(), CSExpr(s3)) -> CIExpr(CSBetween(s1, CNull(), s3))
+      | (CSExpr(s1), CSExpr(s2), CGNull()) -> CIExpr(CSBetween(s1, s2, CNull()))
 
-      | (CIExpr(e1), CIExpr(e2), "OR") -> CIExpr(COr(e1, e2))
-      | (CIExpr(e1), CIExpr(e2), "AND") -> CIExpr(CAnd(e1, e2))
-
-      | (cge1, _, "BETWEEN") ->
-        ge2 match {
-        | Binop("AND", e2, e3) ->
-          CIExpr(
-            CBetween(
-              cge1,
-              this.compileExpr(context, e2),
-              this.compileExpr(context, e3),
-            ),
-          )
-        | _ -> invariant_violation("Invalid not between")
-        }
-
-      | (cge1, _, "NOT BETWEEN") ->
-        ge2 match {
-        | Binop("AND", e2, e3) ->
-          CIExpr(
-            CNotBetween(
-              cge1,
-              this.compileExpr(context, e2),
-              this.compileExpr(context, e3),
-            ),
-          )
-        | _ -> invariant_violation("Invalid not between")
-        }
-
-      | (e1, e2, op) ->
-        debug((e1, e2, op));
-        error(this.pos, "Type mismatch")
+      | _ -> error(this.pos, "Type error: BETWEEN")
       }
+
+    | Binop("BETWEEN", _, _) -> invariant_violation("Invalid between")
+
+    | Binop("NOT BETWEEN", e1, Binop("AND", e2, e3)) ->
+      (
+        this.compileExpr(context, e1),
+        this.compileExpr(context, e2),
+        this.compileExpr(context, e3),
+      ) match {
+      | (CGNull(), _, _) -> CGNull()
+      | (_, CGNull(), CGNull()) -> CGNull()
+
+      | (CIExpr(i1), CIExpr(i2), CIExpr(i3)) -> CIExpr(CINotBetween(i1, i2, i3))
+      | (CIExpr(i1), CGNull(), CIExpr(i3)) ->
+        CIExpr(CINotBetween(i1, CNull(), i3))
+      | (CIExpr(i1), CIExpr(i2), CGNull()) ->
+        CIExpr(CINotBetween(i1, i2, CNull()))
+
+      | (CFExpr(f1), CFExpr(f2), CFExpr(f3)) -> CIExpr(CFNotBetween(f1, f2, f3))
+      | (CFExpr(f1), CGNull(), CFExpr(f3)) ->
+        CIExpr(CFNotBetween(f1, CNull(), f3))
+      | (CFExpr(f1), CFExpr(f2), CGNull()) ->
+        CIExpr(CFNotBetween(f1, f2, CNull()))
+
+      | (CSExpr(s1), CSExpr(s2), CSExpr(s3)) -> CIExpr(CSNotBetween(s1, s2, s3))
+      | (CSExpr(s1), CGNull(), CSExpr(s3)) ->
+        CIExpr(CSNotBetween(s1, CNull(), s3))
+      | (CSExpr(s1), CSExpr(s2), CGNull()) ->
+        CIExpr(CSNotBetween(s1, s2, CNull()))
+
+      | _ -> error(this.pos, "Type error: NOT BETWEEN")
+      }
+
+    | Binop("NOT BETWEEN", _, _) -> invariant_violation("Invalid between")
+
+    | Binop(bop, ge1, ge2) ->
+      cge1 = this.compileExpr(context, ge1);
+      cge2 = this.compileExpr(context, ge2);
+      this.compileBinop(cge1, cge2, bop)
+
     | Not(e) ->
       this.compileExpr(context, e) match {
+      | CGNull() -> CGNull()
       | CIExpr(b) -> CIExpr(CNot(b))
       | _ ->
         debug(e);
@@ -466,9 +780,9 @@ mutable class Compiler{
       }
     | Exists(select @ Select _) ->
       CIExpr(CExists(this.compileSelect(context, select)))
-    | SKSQL.Call(SKSQL.Literal("coalesce"), None()) ->
-      error(this.pos, "Missing arguments for coalesce")
-    | SKSQL.Call(SKSQL.Literal("coalesce"), Some(values)) ->
+    | SKSQL.Call("coalesce", None()) ->
+      error(this.pos, "Missing arguments for COALESCE")
+    | SKSQL.Call("coalesce", Some(values)) ->
       tvalues = values.map(x -> this.compileExpr(context, x));
       ty = for (val in tvalues) {
         val match {
@@ -487,6 +801,7 @@ mutable class Compiler{
           CCoalesce(
             tvalues.map(tvalue ->
               tvalue match {
+              | CGNull() -> CNull()
               | CIExpr(e) -> e
               | _ -> error(this.pos, "Inconsistent types in coalesce")
               }
@@ -498,6 +813,7 @@ mutable class Compiler{
           CCoalesce(
             tvalues.map(tvalue ->
               tvalue match {
+              | CGNull() -> CNull()
               | CFExpr(e) -> e
               | _ -> error(this.pos, "Inconsistent types in coalesce")
               }
@@ -509,6 +825,7 @@ mutable class Compiler{
           CCoalesce(
             tvalues.map(tvalue ->
               tvalue match {
+              | CGNull() -> CNull()
               | CSExpr(e) -> e
               | _ -> error(this.pos, "Inconsistent types in coalesce")
               }
@@ -516,75 +833,262 @@ mutable class Compiler{
           ),
         )
       }
-    | SKSQL.Call(SKSQL.Literal("sum"), Some(values)) ->
-      if (values.size() != 1) {
-        error(this.pos, "Invalid number of arguments for sum")
-      };
-      this.compileExpr(context, values[0]) match {
-      | CIExpr(e) ->
-        slot = this.iaggr.size();
-        this.iaggr.push((Sum(), e));
-        CIExpr(CIGetFrom(0, slot))
-      | CFExpr(e) ->
-        slot = this.faggr.size();
-        this.faggr.push((Sum(), e));
-        CFExpr(CFGetFrom(0, slot))
-      | CSExpr _ -> error(this.pos, "Cannot call sum on a string")
-      | CGNull _ -> invariant_violation("TODO sum on NULL")
-      }
-    | SKSQL.Call(SKSQL.Literal("count"), arg) ->
-      value = arg match {
-      | None() -> Literal("1")
-      | Some(values) ->
+    | SKSQL.Call("sum", Some(values)) ->
+      this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for sum")
         };
-        values[0]
-      };
-      this.compileExpr(context, value) match {
-      | CIExpr(e) ->
-        slot = this.iaggr.size();
-        this.iaggr.push((Count(), e));
-        CIExpr(CIGetFrom(0, slot))
-      | CFExpr(e) ->
-        slot = this.faggr.size();
-        this.faggr.push((Count(), e));
-        CFExpr(CFGetFrom(0, slot))
-      | CSExpr _ -> error(this.pos, "Cannot call count on a string")
-      | CGNull _ -> invariant_violation("TODO count on NULL")
-      }
-    | SKSQL.Call(SKSQL.Literal("avg"), Some(values)) ->
-      if (values.size() != 1) {
-        error(this.pos, "Invalid number of arguments for avg")
-      };
-      this.compileExpr(context, values[0]) match {
-      | CIExpr(e) ->
-        sumSlot = this.iaggr.size();
-        this.iaggr.push((Sum(), e));
-        countSlot = this.iaggr.size();
-        this.iaggr.push((Count(), e));
-        CFExpr(
-          CDiv(
-            CFICast(CIGetFrom(0, sumSlot)),
-            CFICast(CIGetFrom(0, countSlot)),
-          ),
-        )
-      | CFExpr(_) -> invariant_violation("TODO avg on floats in SqlCompile")
-      | CSExpr _ -> error(this.pos, "Cannot call avg on a string")
-      | CGNull _ -> invariant_violation("TODO avg on NULL")
-      }
-    | SKSQL.Call(SKSQL.Literal("abs"), Some(values)) ->
+        (skind, value) = values[0] match {
+        | Distinct(e) -> (SDistinct(), e)
+        | All(e) -> (SAll(), e)
+        | e -> (SNone(), e)
+        };
+        this.compileExpr(context, value) match {
+        | e @ CIExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Sum(skind), e));
+          CIExpr(CIGetFrom(0, slot))
+        | e @ CFExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Sum(skind), e));
+          CFExpr(CFGetFrom(0, slot))
+        | CSExpr _ -> error(this.pos, "Cannot call sum on a string")
+        | CGNull _ -> CGNull()
+        }
+      })
+    | SKSQL.Call("count", arg) ->
+      this.noAggr(() -> {
+        value = arg match {
+        | None() -> Literal("1", false)
+        | Some(values) ->
+          if (values.size() != 1) {
+            error(this.pos, "Invalid number of arguments for sum")
+          };
+          values[0]
+        };
+        (skind, !value) = value match {
+        | Distinct(e) -> (SDistinct(), e)
+        | All(e) -> (SAll(), e)
+        | e -> (SNone(), e)
+        };
+        this.compileExpr(context, value) match {
+        | e @ CIExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Count(skind), e));
+          CIExpr(CIGetFrom(0, slot))
+        | e @ CFExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Count(skind), e));
+          CFExpr(CFGetFrom(0, slot))
+        | CSExpr _ -> error(this.pos, "Cannot call count on a string")
+        | CGNull _ -> CGNull()
+        }
+      })
+    | SKSQL.Call("avg", Some(values)) ->
+      this.noAggr(() -> {
+        if (values.size() != 1) {
+          error(this.pos, "Invalid number of arguments for avg")
+        };
+        (skind, value) = values[0] match {
+        | Distinct(e) -> (SDistinct(), e)
+        | All(e) -> (SAll(), e)
+        | e -> (SNone(), e)
+        };
+        this.compileExpr(context, value) match {
+        | e @ CIExpr(_) ->
+          sumSlot = this.aggrVars.size();
+          this.aggrVars.push((Sum(skind), e));
+          countSlot = this.aggrVars.size();
+          this.aggrVars.push((Count(skind), e));
+          CFExpr(
+            CDiv(
+              CFICast(CIGetFrom(0, sumSlot)),
+              CFICast(CIGetFrom(0, countSlot)),
+            ),
+          )
+        | e @ CFExpr(_) ->
+          sumSlot = this.aggrVars.size();
+          this.aggrVars.push((Sum(skind), e));
+          countSlot = this.aggrVars.size();
+          this.aggrVars.push((Count(skind), e));
+          CFExpr(CDiv(CFGetFrom(0, sumSlot), CFICast(CIGetFrom(0, countSlot))))
+        | CSExpr _ -> error(this.pos, "Cannot call avg on a string")
+        | CGNull _ -> CGNull()
+        }
+      })
+    | SKSQL.Call("abs", Some(values)) ->
       if (values.size() != 1) {
         error(this.pos, "Invalid number of arguments for abs")
       };
       this.compileExpr(context, values[0]) match {
       | CIExpr(n) -> CIExpr(CIAbs(n))
-      | _ -> error(this.pos, "Invalid arguments for abs, expected an integer")
+      | CFExpr(f) -> CFExpr(CFAbs(f))
+      | _ ->
+        error(
+          this.pos,
+          "Invalid arguments for abs, expected an integer or a float",
+        )
       }
+
     | In(e, arr) ->
+      this.compileExpr(context, e) match {
+      | CGNull() -> CGNull()
+      | CIExpr(i) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CIExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CIIn(i, set))
+
+      | CFExpr(f) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CFExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CFIn(f, set))
+
+      | CSExpr(s) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CSExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CSIn(s, set))
+      }
+
+    | UMinus(e) ->
       val = this.compileExpr(context, e);
-      set = arr.map(x -> this.compileExpr(context, x));
-      CIExpr(CIn(val, set))
+      val match {
+      | CGNull() -> CGNull()
+      | CIExpr(i) -> CIExpr(CSub(CILiteral(0), i))
+      | CFExpr(f) -> CFExpr(CSub(CFLiteral(0.0), f))
+      | CSExpr _ -> error(this.pos, "cannot apply - on a string")
+      }
+
+    | UPlus(e) ->
+      val = this.compileExpr(context, e);
+      val match {
+      | CSExpr _ -> error(this.pos, "cannot apply + on a string")
+      | x -> x
+      }
+
+    | Call("date", Some(args)) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.compileExpr(
+        context,
+        Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+      )
+
+    | Call("time", Some(args)) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.compileExpr(
+        context,
+        Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+      )
+
+    | Call("datetime", Some(args)) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.compileExpr(
+        context,
+        Call(
+          "strftime",
+          Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+        ),
+      )
+
+    | Call("julianday", _) -> error(this.pos, "julianday not supported")
+
+    | Call("strftime", Some(args)) ->
+      if (args.size() < 2) {
+        error(this.pos, "Missing arguments strftime");
+      };
+
+      isStatic = for (arg in args) {
+        arg match {
+        | Literal(_, true) -> void
+        | _ -> break false
+        }
+      } else {
+        true
+      };
+
+      if (isStatic) {
+        sargs = args.map(x ->
+          x match {
+          | Literal(v, true) -> v
+          | _ -> error(this.pos, "only static dates are supported")
+          }
+        );
+
+        CSExpr(
+          CSLiteral(
+            strftime(context, sargs[0], sargs[1], sargs.slice(2, sargs.size())),
+          ),
+        )
+      } else {
+        sargs = args.map(arg ->
+          this.compileExpr(context, arg) match {
+          | CSExpr(x) -> x
+          | _ -> error(this.pos, "Expected a string")
+          }
+        );
+        CSExpr(CStrftime(sargs[0], sargs[1], sargs.slice(2, sargs.size())))
+      }
+
+    | SKSQL.Call("nullif", Some(args)) ->
+      if (args.size() != 2) {
+        error(this.pos, "NULLIF expects 2 arguments");
+      };
+      (
+        this.compileExpr(context, args[0]),
+        this.compileExpr(context, args[1]),
+      ) match {
+      | (CGNull(), CGNull()) -> CGNull()
+      | (CIExpr(e1), CIExpr(e2)) -> CIExpr(CNullIf(e1, e2))
+      | (CFExpr(e1), CFExpr(e2)) -> CFExpr(CNullIf(e1, e2))
+      | (CSExpr(e1), CSExpr(e2)) -> CSExpr(CNullIf(e1, e2))
+      | (x, _) -> x
+      }
+
+    | SKSQL.Case(condOpt, cases, defaultOpt) ->
+      acc = defaultOpt match {
+      | None() -> CGNull()
+      | Some(d) -> this.compileExpr(context, d)
+      };
+      for (case in cases.reversed()) {
+        (pat, action) = case;
+        cond = condOpt match {
+        | None() -> this.compileExpr(context, pat)
+        | Some(v) -> this.compileExpr(context, Binop("=", v, pat))
+        };
+        !acc = this.makeIf(cond, this.compileExpr(context, action), acc);
+      };
+      acc
+
+    | Cast(e1, ty) ->
+      (this.compileExpr(context, e1), ty) match {
+      | (CGNull(), _) -> CGNull()
+      | (CIExpr(i), FLOAT()) -> CFExpr(CFICast(i))
+      | (CFExpr(f), INTEGER()) -> CIExpr(CIFCast(f))
+      | (CSExpr(s), INTEGER()) -> CIExpr(CISCast(s))
+      | (CIExpr(i), TEXT()) -> CSExpr(CSICast(i))
+      | (CFExpr(f), TEXT()) -> CSExpr(CSFCast(f))
+      | (CSExpr(s), FLOAT()) -> CFExpr(CFSCast(s))
+      | (ci @ CIExpr _, INTEGER()) -> ci
+      | (cf @ CFExpr _, FLOAT()) -> cf
+      | (cs @ CSExpr _, TEXT()) -> cs
+      }
 
     | e ->
       debug(e);
@@ -592,16 +1096,491 @@ mutable class Compiler{
     }
   }
 
+  mutable fun noAggr<T>(f: () -> T): T {
+    this.!isAggr = false;
+    result = f();
+    this.!isAggr = true;
+    result
+  }
+
+  mutable fun compileBinop(cge1: CGExpr, cge2: CGExpr, op: String): CGExpr {
+    (cge1, cge2, op) match {
+    | (CGNull(), CGNull(), _) -> CGNull()
+
+    | (CIExpr(e1), CIExpr(e2), "OR") -> CIExpr(COr(e1, e2))
+    | (CGNull(), CIExpr(e2), "OR") -> CIExpr(COr(CNull(), e2))
+    | (CIExpr(e1), CGNull(), "OR") -> CIExpr(COr(e1, CNull()))
+
+    | (CGNull(), _, _)
+    | (_, CGNull(), _) ->
+      CGNull()
+
+    | (CIExpr(e1), CIExpr(e2), "<") -> CIExpr(CILt(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), "<=") -> CIExpr(CILte(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), ">=") -> CIExpr(CIGte(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), ">") -> CIExpr(CIGt(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), "=") -> CIExpr(CIEq(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), "<>") -> CIExpr(CIDiff(e1, e2))
+
+    | (CFExpr(e1), CFExpr(e2), "<") -> CIExpr(CFLt(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), "<=") -> CIExpr(CFLte(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), ">=") -> CIExpr(CFGte(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), ">") -> CIExpr(CFGt(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), "=") -> CIExpr(CFEq(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), "<>") -> CIExpr(CFDiff(e1, e2))
+
+    | (CSExpr(e1), CSExpr(e2), "<") -> CIExpr(CSLt(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), "<=") -> CIExpr(CSLte(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), ">=") -> CIExpr(CSGte(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), ">") -> CIExpr(CSGt(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), "=") -> CIExpr(CSEq(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), "<>") -> CIExpr(CSDiff(e1, e2))
+
+    | (CIExpr(e1), CIExpr(e2), "+") -> CIExpr(CAdd(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), "-") -> CIExpr(CSub(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), "*") -> CIExpr(CMul(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), "/") -> CIExpr(CDiv(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), "%") -> CIExpr(CMod(e1, e2))
+
+    | (CFExpr(e1), CFExpr(e2), "+") -> CFExpr(CAdd(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), "-") -> CFExpr(CSub(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), "*") -> CFExpr(CMul(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), "/") -> CFExpr(CDiv(e1, e2))
+
+    | (CIExpr(e1), CIExpr(e2), "AND") -> CIExpr(CAnd(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), "||") -> CSExpr(CSConcat(e1, e2))
+
+    | _ -> error(this.pos, "Incompatible types: " + op)
+    }
+  }
+
   mutable fun makeIf(cond: CGExpr, branch1: CGExpr, branch2: CGExpr): CGExpr {
     cond match {
+    | CGNull() -> branch2
     | CIExpr(icond) ->
       (branch1, branch2) match {
       | (CIExpr(e1), CIExpr(e2)) -> CIExpr(CIf(icond, e1, e2))
       | (CFExpr(e1), CFExpr(e2)) -> CFExpr(CIf(icond, e1, e2))
       | (CSExpr(e1), CSExpr(e2)) -> CSExpr(CIf(icond, e1, e2))
-      | _ -> error(this.pos, "Branch have different types")
+      | (CGNull(), CGNull()) -> CGNull()
+      | (CGNull(), CIExpr(e2)) -> CIExpr(CIf(icond, CNull(), e2))
+      | (CGNull(), CFExpr(e2)) -> CFExpr(CIf(icond, CNull(), e2))
+      | (CGNull(), CSExpr(e2)) -> CSExpr(CIf(icond, CNull(), e2))
+      | (CIExpr(e1), CGNull()) -> CIExpr(CIf(icond, e1, CNull()))
+      | (CFExpr(e1), CGNull()) -> CFExpr(CIf(icond, e1, CNull()))
+      | (CSExpr(e1), CGNull()) -> CSExpr(CIf(icond, e1, CNull()))
+      | _ ->
+        debug((branch1, branch2));
+        error(this.pos, "Branch have different types")
       }
-    | _ -> error(this.pos, "Unexpected when condition type")
+    | CFExpr(_) ->
+      error(
+        this.pos,
+        "Unexpected if condition type, expected INTEGER, not FLOAT",
+      )
+    | CSExpr(_) ->
+      error(
+        this.pos,
+        "Unexpected if condition type, expected INTEGER, not TEXT",
+      )
+    }
+  }
+
+  readonly fun findJoin(
+    tables: readonly Vector<?JTable>,
+    cond: Expr,
+  ): (Expr, ?EqJoin) {
+    cond match {
+    | Binop("AND", e1, e2) ->
+      (!e1, join1) = this.findJoin(tables, e1);
+      join1 match {
+      | None() ->
+        (!e2, join2) = this.findJoin(tables, e2);
+        join2 match {
+        | None() -> (cond, None())
+        | Some(_) ->
+          (if (e2 is Literal("1", false)) e1 else Binop("AND", e1, e2), join2)
+        }
+      | Some(_) ->
+        (if (e1 is Literal("1", false)) e2 else Binop("AND", e1, e2), join1)
+      }
+    | Binop("=", Binop(".", Literal(tname1, _), Literal(cname1, _)), e2) ->
+      this.findJoin(
+        tables,
+        Binop("=", Literal(tname1 + "." + cname1, false), e2),
+      )
+
+    | Binop("=", e1, Binop(".", Literal(tname2, _), Literal(cname2, _))) ->
+      this.findJoin(
+        tables,
+        Binop("=", e1, Literal(tname2 + "." + cname2, false)),
+      )
+
+    | Binop(
+      "=",
+      e1 @ Literal(name1, _),
+      e2 @ Literal(name2, _),
+    ) if (this.subst.containsKey(name1) && this.subst.containsKey(name2)) ->
+      (this.subst[name1], this.subst[name2]) match {
+      | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
+      | (CFExpr(CFGetFrom(tableNbr1, col1)), CFExpr(CFGetFrom(tableNbr2, col2)))
+      | (
+        CSExpr(CSGetFrom(tableNbr1, col1)),
+        CSExpr(CSGetFrom(tableNbr2, col2)),
+      ) if (
+        tables[tableNbr1] is Some _ &&
+        tables[tableNbr2] is Some _ &&
+        tableNbr1 != tableNbr2
+      ) ->
+        table1 = tables[tableNbr1].fromSome();
+        table2 = tables[tableNbr2].fromSome();
+        col1IsUnique = isUnique(table1.schema[col1]);
+        col2IsUnique = isUnique(table2.schema[col2]);
+        if (col1IsUnique && !col2IsUnique) {
+          this.findJoin(tables, Binop("=", e2, e1))
+        } else {
+          col1Name = (col1, IASC(), table1.schema[col1].ty);
+          proj1 = TableProj(tableNbr1, col1Name, col1IsUnique);
+          col2Name = (col2, IASC(), table2.schema[col2].ty);
+          proj2 = TableProj(tableNbr2, col2Name, col2IsUnique);
+          (Literal("1", false), Some(EqJoin(proj1, proj2)))
+        }
+      | _ -> (cond, None())
+      }
+    | _ -> (cond, None())
+    }
+  }
+
+  mutable fun compileJoin(
+    context: mutable SKFS.Context,
+    origFrom: Array<DirDescr>,
+    select: Select,
+  ): Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)> {
+    select.where match {
+    | None() ->
+      if (origFrom.size() > 1 && !this.options.allowCross) {
+        errorNoMergeClause(this.pos, origFrom[0], origFrom[1]);
+      };
+      origFrom.map(x -> (x, None()))
+    | Some(cond) ->
+      from = this.compileIndexes(context, origFrom, cond);
+      !from = this.compileMerge(from, cond);
+
+      tablesLeft = from.filter(x ->
+        x.i1 match {
+        | None() -> true
+        | Some(_) -> false
+        }
+      );
+      if (tablesLeft.size() >= 2 && !this.options.allowCross) {
+        errorNoMergeClause(
+          this.pos,
+          from.filter(x -> x.i0.dirName == tablesLeft[0].i0.dirName)[0].i0,
+          from.filter(x -> x.i0.dirName == tablesLeft[1].i0.dirName)[0].i0,
+        );
+      };
+      from
+    }
+  }
+
+  mutable fun compileMerge(
+    from: Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>,
+    cond: Expr,
+  ): Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)> {
+    tables = mutable Vector<?JTable>[];
+    newFrom = mutable Vector[];
+    moveMap = mutable Map[];
+
+    for (tableRange in from) {
+      tables.push(Some(JTable::fromDirDescr(tableRange.i0, tableRange.i1)))
+    };
+
+    loop {
+      (!cond, joinOpt) = this.findJoin(tables, cond);
+      join = joinOpt match {
+      | None() ->
+        for (tableNbr => tableOpt in tables) {
+          tableOpt match {
+          | None() -> void
+          | Some(table) ->
+            moveMap![tableNbr] = newFrom.size();
+            dirDescr = DirDescr{
+              name => table.dirName.toString(),
+              dirName => table.dirName,
+              schema => table.schema.map(x ->
+                if (x.primary) x with {unique => true} else x
+              ),
+              alias => table.alias,
+              cols => SortedMap[],
+              windowSize => table.windowSize,
+            };
+            newFrom.push((dirDescr, table.ranges))
+          }
+        };
+
+        for (name => cexpr in this.subst.clone()) {
+          cexpr match {
+          | SKSQL.CIExpr(
+            SKSQL.CIGetFrom(tableNbr, colNbr),
+          ) if (moveMap.containsKey(tableNbr)) ->
+            this.subst![name] = SKSQL.CIExpr(
+              SKSQL.CIGetFrom(moveMap[tableNbr], colNbr),
+            )
+          | SKSQL.CFExpr(
+            SKSQL.CFGetFrom(tableNbr, colNbr),
+          ) if (moveMap.containsKey(tableNbr)) ->
+            this.subst![name] = SKSQL.CFExpr(
+              SKSQL.CFGetFrom(moveMap[tableNbr], colNbr),
+            )
+          | SKSQL.CSExpr(
+            SKSQL.CSGetFrom(tableNbr, colNbr),
+          ) if (moveMap.containsKey(tableNbr)) ->
+            this.subst![name] = SKSQL.CSExpr(
+              SKSQL.CSGetFrom(moveMap[tableNbr], colNbr),
+            )
+          | _ -> void
+          }
+        };
+
+        return newFrom.toArray()
+      | Some(x) -> x
+      };
+      leftTable = tables[join.left.tableNbr].fromSome();
+      rightTable = tables[join.right.tableNbr].fromSome();
+      childName = SKFS.DirName::create(
+        "/merge/left" +
+          leftTable.dirName +
+          join.left.col.i0 +
+          "-" +
+          hash(leftTable.ranges) +
+          "/right" +
+          rightTable.dirName +
+          join.right.col.i0 +
+          "-" +
+          hash(rightTable.ranges) +
+          "/",
+      );
+      leftKinds = tables[join.left.tableNbr]
+        .fromSome()
+        .schema.mapWithIndex((idx, tyDescr) -> (idx, IASC(), tyDescr.ty));
+      rightKinds = tables[join.right.tableNbr]
+        .fromSome()
+        .schema.mapWithIndex((idx, tyDescr) -> (idx, IASC(), tyDescr.ty));
+      this.other.push(
+        SubMerge{
+          leftDirName => leftTable.dirName,
+          leftColNbr => join.left.col.i0,
+          leftIsUnique => join.left.isUnique,
+          leftRanges => leftTable.ranges,
+          rightDirName => rightTable.dirName,
+          rightColNbr => join.right.col.i0,
+          rightIsUnique => join.right.isUnique,
+          rightRanges => rightTable.ranges,
+          childName,
+          kinds => leftKinds.concat(rightKinds),
+        },
+      );
+
+      for (name => cexpr in this.subst.clone()) {
+        cexpr match {
+        | SKSQL.CIExpr(
+          SKSQL.CIGetFrom(tableNbr, colNbr),
+        ) if (tableNbr == join.right.tableNbr) ->
+          leftSize = tables[join.left.tableNbr].fromSome().schema.size();
+          this.subst![name] = SKSQL.CIExpr(
+            SKSQL.CIGetFrom(join.left.tableNbr, leftSize + colNbr),
+          )
+        | SKSQL.CFExpr(
+          SKSQL.CFGetFrom(tableNbr, colNbr),
+        ) if (tableNbr == join.right.tableNbr) ->
+          leftSize = tables[join.left.tableNbr].fromSome().schema.size();
+          this.subst![name] = SKSQL.CFExpr(
+            SKSQL.CFGetFrom(join.left.tableNbr, leftSize + colNbr),
+          )
+        | SKSQL.CSExpr(
+          SKSQL.CSGetFrom(tableNbr, colNbr),
+        ) if (tableNbr == join.right.tableNbr) ->
+          leftSize = tables[join.left.tableNbr].fromSome().schema.size();
+          this.subst![name] = SKSQL.CSExpr(
+            SKSQL.CSGetFrom(join.left.tableNbr, leftSize + colNbr),
+          )
+        | _ -> void
+        }
+      };
+      newSchema = tables[join.left.tableNbr]
+        .fromSome()
+        .schema.concat(tables[join.right.tableNbr].fromSome().schema);
+      tables![join.right.tableNbr] = None();
+      tables![join.left.tableNbr] = Some(
+        JTable{
+          dirName => childName,
+          ranges => None(),
+          schema => newSchema,
+          alias => None(),
+          windowSize => None(),
+        },
+      );
+    }
+  }
+
+  mutable fun compileIndexes(
+    context: mutable SKFS.Context,
+    from: Array<DirDescr>,
+    cond: Expr,
+  ): Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)> {
+    tables = mutable Vector[];
+    for (dirDescr in from) {
+      tables.push(JTable::fromDirDescr(dirDescr, None()));
+    };
+    killed = mutable Set[];
+    rangeMap = mutable Map[];
+
+    loop {
+      this.findLookUps(context, killed, tables, cond).select() match {
+      | None() ->
+        result = from.mapWithIndex((idx, table) -> {
+          rangeMap.maybeGet(idx) match {
+          | None() -> (table, None())
+          | Some((indexDirName, ranges)) ->
+            (table with {dirName => indexDirName}, Some(ranges))
+          }
+        });
+        return result
+      | Some((index, tableNbr, ranges)) ->
+        killed.add(index.tableName);
+        rowRanges = ranges.map(range -> {
+          (minKeyValues, maxKeyValues) = range;
+          kinds = index.fields.mapWithIndex((idx, field) -> {
+            (idx, IASC(), field.i2)
+          });
+          maxValues = kinds.mapWithIndex((idx, kind) -> {
+            if (idx < maxKeyValues.size()) {
+              Some(maxKeyValues[idx])
+            } else {
+              Some(
+                kind.i2 match {
+                | INTEGER() -> CInt(Int::max)
+                | FLOAT() -> CFloat(Float::inf)
+                | TEXT() -> CString(largestString())
+                },
+              )
+            }
+          });
+          minKey = RowKey(
+            RowValues::create(minKeyValues.map(x -> Some(x))),
+            kinds,
+          );
+          maxKey = RowKey(RowValues::create(maxValues), kinds);
+          SKFS.KeyRange(minKey, maxKey)
+        });
+        rangeMap![tableNbr] = (index.dirName, rowRanges)
+      }
+    }
+  }
+
+  readonly fun isVar(name: String): Bool {
+    this.subst.containsKey(name)
+  }
+
+  mutable fun findLookUps(
+    context: mutable SKFS.Context,
+    killed: readonly Set<SKFS.DirName>,
+    tables: readonly Vector<JTable>,
+    cond: Expr,
+  ): LookUps {
+    cond match {
+    | Binop(op, Binop(".", Literal(tname1, _), Literal(cname1, _)), e2) ->
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(op, Literal(tname1 + "." + cname1, false), e2),
+      )
+
+    | Binop(op, e1, Binop(".", Literal(tname2, _), Literal(cname2, _))) ->
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(op, e1, Literal(tname2 + "." + cname2, false)),
+      )
+
+    | Binop("AND", e1, e2) ->
+      this.findLookUps(context, killed, tables, e1).and(
+        this.findLookUps(context, killed, tables, e2),
+      )
+    | Binop("OR", e1, e2) ->
+      this.findLookUps(context, killed, tables, e1).or(
+        this.findLookUps(context, killed, tables, e2),
+      )
+
+    | Binop(
+      _,
+      Literal(name1, _),
+      Literal(name2, _),
+    ) if (this.isVar(name1) && this.isVar(name2)) ->
+      LookUps[]
+
+    | In(e, values) ->
+      if (values.size() == 0) {
+        error(this.pos, "Invalid IN")
+      };
+      acc = Binop("=", e, values[0]);
+      for (i in Range(1, values.size())) {
+        !acc = Binop("OR", acc, Binop("=", e, values[i]))
+      };
+      this.findLookUps(context, killed, tables, acc)
+
+    | Binop(
+      op,
+      e1 @ Literal _,
+      e2 @ Literal(name2, _),
+    ) if (this.isVar(name2)) ->
+      !op = op match {
+      | "=" -> op
+      | "<" -> ">"
+      | "<=" -> ">="
+      | ">" -> "<"
+      | ">=" -> "<="
+      | _ -> return LookUps[]
+      };
+      this.findLookUps(context, killed, tables, Binop(op, e2, e1))
+
+    | Binop(op, Literal(name1, _), e @ Literal _) if (this.isVar(name1)) ->
+      (tableNbr, colNbr) = this.subst[name1] match {
+      | (CIExpr(CIGetFrom(x, y))) -> (x, y)
+      | (CFExpr(CFGetFrom(x, y))) -> (x, y)
+      | (CSExpr(CSGetFrom(x, y))) -> (x, y)
+      | _ -> return LookUps[]
+      };
+      table = tables[tableNbr];
+      indexEntry = makeIndexEntry(table.dirName, colNbr);
+      indexTable = getIndexByColNbr(this.options, context);
+      indexes = indexTable.getArray(context, indexEntry);
+      !indexes = indexes.filter(index -> !killed.contains(index.tableName));
+      ce = this.compileExpr(context, e);
+      if (ce.getType() != table.schema[colNbr].ty) {
+        error(this.pos, "Incompatible types");
+      };
+      value = ce match {
+      | CIExpr(CILiteral(v)) -> CInt(v)
+      | CFExpr(CFLiteral(f)) -> CFloat(f)
+      | CSExpr(CSLiteral(s)) -> CString(s)
+      | _ -> return LookUps[]
+      };
+      lookUps = indexes.map(index -> {
+        (lookUpColNbr, unique) = for (slot => field in index.fields) {
+          if (field.i0 == colNbr) break (slot, isUnique(table.schema[colNbr]))
+        } else {
+          invariant_violation("Could not find column: " + colNbr)
+        };
+        cols = SortedA[
+          Col(lookUpColNbr, Array[(ColOp::create(op), value)], unique),
+        ];
+        LookUp{index, tableNbr, cols}
+      });
+      LookUps::createFromItems(lookUps)
+    | _ -> LookUps[]
     }
   }
 }

@@ -20,33 +20,13 @@
 /*****************************************************************************/
 module SKFS;
 
-value class Source private (value: Int) uses Orderable, Hashable {
+value class Source private (value: Path) uses Orderable {
   static fun create(value: Path): this {
-    static(value.hashTag)
-  }
-
-  fun hash(): Int {
-    this.value
+    static(value)
   }
 }
 
-value class FixedRow<T>(
-  key: BaseName,
-  value: (Source, T),
-  tag: TickRange,
-) uses Hashable, Orderable {
-  fun toKeyInt(): (BaseName, Int) {
-    (this.key, this.value.i0.value.hash());
-  }
-
-  fun compare<U>[T: U](row: FixedRow<U>): Order {
-    this.toKeyInt().compare(row.toKeyInt())
-  }
-
-  fun hash(): Int {
-    this.toKeyInt().hash()
-  }
-
+value class FixedRow<T>(key: BaseName, value: (Source, T), tag: TickRange) {
   fun changeSource(source: Source): this {
     !this.value.i0 = source;
     this
@@ -60,39 +40,47 @@ base class FixedData<T> {
   fun getArray(key: BaseName): Array<(Source, T)>;
   fun getIter(key: BaseName): mutable Iterator<(Source, T)>;
   fun getArraySourceKey(source: Source, key: BaseName): Array<T>;
-  fun getChangesAfter(tick: Tick): Set<BaseName>;
+  fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
 }
 
 class CompressedDir<T, Compressed>{
   time: Time,
   tick: Tick,
   data: Array<Compressed> = Array[],
-  decompress: (Int, Compressed) ~> FixedRow<T>,
+  decompress: Compressed ~> FixedRow<T>,
 } extends FixedData<T> {
   fun size(): Int {
     this.data.size()
   }
 
   fun get(idx: Int): FixedRow<T> {
-    this.decompress(idx, this.data[idx])
+    this.decompress(this.data[idx])
   }
 
   fun getPos(key: BaseName): Int {
-    key match {
-    | IID(x) -> x
-    | _ -> invariant_violation("Expected a primary key")
+    this.getPosij(key, 0, this.size() - 1)
+  }
+
+  fun getPosij(key: BaseName, i: Int, j: Int): Int {
+    if (i > j) {
+      return i;
+    };
+    pivot = (i + j) / 2;
+    elt = this.decompress(this.data[pivot]);
+    key.compare(elt.key) match {
+    | LT()
+    | EQ() ->
+      this.getPosij(key, i, pivot - 1)
+    | GT() -> this.getPosij(key, pivot + 1, j)
     }
   }
 
   fun getArray(key: BaseName): Array<(Source, T)> {
-    pos = key match {
-    | IID(x) -> x
-    | _ -> invariant_violation("Expected a primary key")
-    };
+    pos = this.getPos(key);
     result = mutable Vector[];
     loop {
       if (pos >= this.data.size()) break void;
-      elt = this.decompress(pos, this.data[pos]);
+      elt = this.decompress(this.data[pos]);
       if (elt.key != key) break void;
       result.push(elt.value);
       !pos = pos + 1;
@@ -101,13 +89,10 @@ class CompressedDir<T, Compressed>{
   }
 
   fun getIter(key: BaseName): mutable Iterator<(Source, T)> {
-    pos = key match {
-    | IID(x) -> x
-    | _ -> invariant_violation("Expected a primary key")
-    };
+    pos = this.getPos(key);
     loop {
       if (pos >= this.data.size()) break void;
-      elt = this.decompress(pos, this.data[pos]);
+      elt = this.decompress(this.data[pos]);
       if (elt.key != key) break void;
       yield elt.value;
       !pos = pos + 1;
@@ -115,13 +100,10 @@ class CompressedDir<T, Compressed>{
   }
 
   fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T> {
-    pos = key match {
-    | IID(x) -> x
-    | _ -> invariant_violation("Expected a primary key")
-    };
+    pos = this.getPos(key);
     loop {
       if (pos >= this.data.size()) break void;
-      entry = this.decompress(pos, this.data[pos]);
+      entry = this.decompress(this.data[pos]);
       if (entry.value.i0 != source) break void;
       if (entry.key != key) break void;
       yield entry.value.i1;
@@ -133,13 +115,13 @@ class CompressedDir<T, Compressed>{
     this.getIterSourceKey(source, key).collect(Array)
   }
 
-  fun getChangesAfter(tick: Tick): Set<BaseName> {
-    if (tick > this.tick) return Set[];
-    acc = mutable Set[];
-    for (idx => value in this.data) {
-      acc.insert(this.decompress(idx, value).key);
+  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+    if (tick > this.tick) return SortedSet[];
+    acc = SortedSet[];
+    for (value in this.data) {
+      !acc = acc.set(this.decompress(value).key);
     };
-    acc.chill()
+    acc
   }
 }
 
@@ -149,9 +131,10 @@ class FixedDir<T> private {
   static fun create(
     data: mutable Vector<FixedRow<T>> = mutable Vector[],
   ): this {
-    data.sort();
+    data.sortBy(row ~> (row.key, row.value.i0));
     result = data.toArray().clone();
-    _ = static::computeTags(result, 0, result.size() - 1);
+    cache = Array::mfill(result.size(), false);
+    _ = static::computeTags(cache, result, 0, result.size() - 1);
     FixedDir{data => result.chill()}
   }
 
@@ -165,7 +148,8 @@ class FixedDir<T> private {
     });
     data = acc.toArray();
     result = data.clone();
-    _ = static::computeTags(result, 0, result.size() - 1);
+    cache = Array::mfill(result.size(), false);
+    _ = static::computeTags(cache, result, 0, result.size() - 1);
     FixedDir{data => result.chill()}
   }
 
@@ -252,6 +236,7 @@ class FixedDir<T> private {
   }
 
   static fun computeTags(
+    cache: mutable Array<Bool>,
     array: mutable Array<FixedRow<T>>,
     i: Int,
     j: Int,
@@ -270,6 +255,9 @@ class FixedDir<T> private {
               return TickRange(maxVal, maxVal)
             };
             !maxVal = max(maxVal, array[i].tag.max);
+            if (cache[i]) {
+              return TickRange(maxVal, maxVal)
+            };
           }
         }
       }
@@ -277,10 +265,11 @@ class FixedDir<T> private {
     pivot = (i + j) / 2;
     elt = array[pivot];
     tag = elt.tag;
-    left = static::computeTags(array, i, pivot - 1);
-    right = static::computeTags(array, pivot + 1, j);
+    right = static::computeTags(cache, array, pivot + 1, j);
+    left = static::computeTags(cache, array, i, pivot - 1);
     !tag.max = max(tag.max, max(left.max, right.max));
     array![pivot] = elt with {tag};
+    cache![pivot] = true;
     tag
   }
 
@@ -312,11 +301,14 @@ class FixedDir<T> private {
     this.getChangesAcc(after, acc, pivot + 1, j);
   }
 
-  fun getChangesAfter(tick: Tick): Set<BaseName> {
+  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
     acc = mutable Vector[];
     this.getChangesAcc(tick, acc, 0, this.data.size() - 1);
-    acc.sort();
-    acc.unique().collect(Set)
+    result = SortedSet[];
+    for (elt in acc) {
+      !result = result.set(elt);
+    };
+    result
   }
 }
 
@@ -339,6 +331,7 @@ class FixedSingle<K: Orderable, +V>(data: Array<(K, V)> = Array[]) {
       | None() -> !lastOpt = Some(k)
       | Some(last) ->
         if (last == k) {
+          debug((last, k));
           invariant_violation("Duplicate value in single")
         } else {
           !lastOpt = Some(k)
