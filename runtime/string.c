@@ -2,6 +2,7 @@
 
 #ifdef SKIP64
 #include <stdlib.h>
+#include <string.h>
 #endif
 
 /*****************************************************************************/
@@ -292,6 +293,32 @@ double SKIP_String__toFloat_raw(char* str) {
   cstr[size] = 0;
 
   return atof(cstr);
+  #endif
+}
+
+char* SKIP_float_to_string(double f) {
+  #ifdef SKIP64
+  char s[256];
+  sprintf(s, "%.17g", f);
+  int size = strlen(s);
+  int i;
+  int needs_trailing_dot = 1;
+  for(i = 0; i < size; i++) {
+    if((s[i] >= '0') && (s[i] <= '9') || (s[i] == '-')) {
+      continue;
+    }
+    needs_trailing_dot = 0;
+  }
+  if(needs_trailing_dot) {
+    s[size] = '.';
+    s[size+1] = '0';
+    size += 2;
+  }
+  return sk_string_create(s, size);
+  #endif
+  #ifdef SKIP32
+  // Not implemented
+  return sk_string_create("", 0);
   #endif
 }
 

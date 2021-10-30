@@ -14,7 +14,7 @@
 #include "runtime.h"
 #include "../build/magic.h"
 
-#define PERSISTENT_SIZE (1024L * 1024L * 1024L * 128L)
+#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
 #define BOTTOM_ADDR ((void*)0x0000001000000000)
 #define FTABLE_SIZE 64
 
@@ -27,13 +27,31 @@ void*** pconsts = NULL;
 void* program_break = NULL;
 
 /*****************************************************************************/
+/* Database capacity. */
+/*****************************************************************************/
+
+size_t *capacity = NULL;
+
+/*****************************************************************************/
 /* Gensym. */
 /*****************************************************************************/
 
 uint64_t* gid;
 
-uint64_t SKIP_genSym(uint64_t unused) {
-  return __atomic_fetch_add(gid, 1, __ATOMIC_RELAXED);
+uint64_t SKIP_genSym(uint64_t largerThan) {
+  uint64_t n = 1;
+  uint64_t gid_value = __atomic_load_n(gid, __ATOMIC_RELAXED);
+
+  if(largerThan > 1024L * 1024L * 1024L) {
+    fprintf(stderr, "ID too large: %lld\n", largerThan);
+    exit(2);
+  }
+
+  if(largerThan > gid_value) {
+    n += largerThan - gid_value;
+  };
+
+  return __atomic_fetch_add(gid, n, __ATOMIC_RELAXED);
 }
 
 /*****************************************************************************/
@@ -205,6 +223,39 @@ static char* parse_args(int argc, char** argv, int* is_init) {
   }
 }
 
+size_t parse_capacity(int argc, char** argv) {
+  int i;
+  int idx = -1;
+
+  for(i = 1; i < argc; i++) {
+    if(strcmp(argv[i], "--capacity") == 0) {
+      if(i + 1 < argc) {
+        if(argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
+          int j = 0;
+
+          while(argv[i+1][j] != 0) {
+            if(argv[i+1][j] >= '0' && argv[i+1][j] <= '9') {
+              j++;
+              continue;
+            };
+            fprintf(stderr, "--capacity expects an integer\n");
+            exit(2);
+          }
+          return atol(argv[i+1]);
+        }
+        else if(argv[i+1][0] == '-') {
+          return DEFAULT_CAPACITY;
+        }
+        else {
+          fprintf(stderr, "--capacity expects an integer\n");
+          exit(2);
+        }
+      }
+    }
+  }
+  return DEFAULT_CAPACITY;
+}
+
 /*****************************************************************************/
 /* Staging/commit. */
 /*****************************************************************************/
@@ -217,11 +268,11 @@ void sk_commit(char* new_root, uint32_t sync) {
 
   __sync_synchronize();
   if(sync) {
-    msync(BOTTOM_ADDR, PERSISTENT_SIZE, MS_SYNC);
+    msync(BOTTOM_ADDR, *capacity, MS_SYNC);
   }
   sk_context_set_unsafe(new_root);
   if(sync) {
-    msync(BOTTOM_ADDR, PERSISTENT_SIZE, MS_SYNC);
+    msync(BOTTOM_ADDR, *capacity, MS_SYNC);
   }
 }
 
@@ -229,17 +280,17 @@ void sk_commit(char* new_root, uint32_t sync) {
 /* Creates a new file mapping. */
 /*****************************************************************************/
 
-void sk_create_mapping(char* fileName, char* static_limit) {
+void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   if(access(fileName, F_OK) == 0) {
     fprintf(stderr, "ERROR: File %s already exists!\n", fileName);
     exit(21);
   }
   int fd = open(fileName, O_RDWR | O_CREAT, 0600);
-  lseek(fd, PERSISTENT_SIZE, SEEK_SET);
+  lseek(fd, icapacity, SEEK_SET);
   write(fd, "", 1);
   int prot = PROT_READ | PROT_WRITE;
-  char* begin = mmap(BOTTOM_ADDR, PERSISTENT_SIZE, prot, MAP_SHARED | MAP_FIXED, fd, 0);
-  char* end = begin + PERSISTENT_SIZE;
+  char* begin = mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
+  char* end = begin + icapacity;
 
   if(begin == (void*)-1) {
     perror("ERROR (MMAP FAILED)");
@@ -270,6 +321,9 @@ void sk_create_mapping(char* fileName, char* static_limit) {
 
   gid = (uint64_t*)head;
   head += sizeof(uint64_t);
+
+  capacity = (size_t*)head;
+  head += sizeof(size_t);
 
   pconsts = (void***)head;
   head += sizeof(void**);
@@ -305,6 +359,10 @@ void sk_create_mapping(char* fileName, char* static_limit) {
   (*ginfo)->end = end;
   (*ginfo)->fileName = persistent_fileName;
   *gid = 1;
+  if(icapacity != DEFAULT_CAPACITY) {
+    printf("CAPACITY SET TO: %ld\n", icapacity);
+  }
+  *capacity = icapacity;
   *pconsts = NULL;
 
   sk_global_lock_init();
@@ -362,6 +420,8 @@ void sk_load_mapping(char* fileName) {
   head += sizeof(ginfo_t*);
   gid = (uint64_t*)head;
   head += sizeof(uint64_t);
+  capacity = (size_t*)head;
+  head += sizeof(size_t);
   pconsts = (void***)head;
   head += sizeof(void**);
 }
@@ -376,7 +436,7 @@ int sk_is_static(void* ptr) {
 
 void sk_lower_static(void* ptr) {
   if((char*)ptr < (*ginfo)->break_ptr) {
-    (*ginfo)->break_ptr = ptr - 1;
+    (*ginfo)->break_ptr = ptr;
   }
 }
 
@@ -444,7 +504,9 @@ void SKIP_memory_init(int argc, char** argv) {
     sk_init_no_file(program_break);
   }
   else if(is_create) {
-    sk_create_mapping(fileName, program_break);
+    size_t capacity = DEFAULT_CAPACITY;
+    capacity = parse_capacity(argc, argv);
+    sk_create_mapping(fileName, program_break, capacity);
   }
   else {
     sk_load_mapping(fileName);
@@ -474,7 +536,7 @@ void* sk_palloc(size_t size) {
     return ptr;
   }
   if((*ginfo)->head + size >= (*ginfo)->end) {
-    fprintf(stderr, "Error: out of persistent memory.");
+    fprintf(stderr, "Error: out of persistent memory.\n");
     exit(45);
   }
   void* result = (*ginfo)->head;

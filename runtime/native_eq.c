@@ -190,3 +190,7 @@ SkipInt SKIP_isEq(char* obj1, char* obj2) {
   sk_stack_free(st);
   return 0;
 }
+
+uint32_t SKIP_unsafe_compare_sets(char* obj1, char* obj2) {
+  return (obj1 == obj2);
+}

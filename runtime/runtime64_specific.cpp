@@ -56,11 +56,57 @@ uint32_t SKIP_read_line_get(uint32_t i) {
 }
 
 uint32_t SKIP_getchar(uint64_t) {
-  int c = std::getchar();
-  if(c == EOF) {
+  int c1 = (uint32_t)std::getchar();
+
+  if(c1 == EOF) {
     SKIP_throw_EndOfFile();
   }
-  return (uint32_t)c;
+
+  if ((c1 & 0x80) == 0) {
+    return c1;
+  }
+
+  int c2 = (uint32_t)std::getchar();
+
+  if(c2 == EOF) {
+    fprintf(stderr, "Invalid utf8");
+    exit(23);
+  }
+
+  if ((c1 & 0x20) == 0) {
+    return (c1 - 192) * 64 + (c2 - 128);
+  }
+
+  int c3 = (uint32_t)std::getchar();
+
+  if(c3 == EOF) {
+    fprintf(stderr, "Invalid utf8");
+    exit(23);
+  }
+
+  if((c1 & 0x10) == 0) {
+    return (c1 - 224) * 4096 +
+      (c2 - 128) * 64 +
+      (c3 - 128);
+  }
+
+  int c4 = (uint32_t)std::getchar();
+
+  if(c4 == EOF) {
+    fprintf(stderr, "Invalid utf8");
+    exit(23);
+  }
+
+  if((c1 & 0x8) == 0) {
+    return (c1 - 240) * 262144 +
+      (c2 - 128) * 4096 +
+      (c3 - 128) * 64 +
+      (c4 - 128);
+  }
+
+  fprintf(stderr, "Invalid utf8");
+  exit(23);
+  return 0;
 }
 
 uint32_t SKIP_isatty() {
@@ -120,6 +166,10 @@ void SKIP_print_raw(char* str) {
   print(stdout, str);
 }
 
+void SKIP_flush_stdout() {
+  fflush(stdout);
+}
+
 void print_string(char* str) {
   print(stdout, str);
   printf("\n");
@@ -160,7 +210,6 @@ char* SKIP_read_file(char* filename_obj) {
 }
 
 int64_t SKIP_unix_open(char* filename_obj) {
- struct stat s;
  size_t filename_size = SKIP_String_byteSize(filename_obj);
  char* filename = (char*)malloc(filename_size+1);
  memcpy(filename, filename_obj, filename_size);
@@ -173,8 +222,6 @@ int64_t SKIP_unix_open(char* filename_obj) {
    fprintf(stderr, "Could not open file: %s\n", filename);
    exit(45);
  }
-
- free(filename);
 
  return (int64_t)fd;
 }
@@ -190,6 +237,46 @@ void SKIP_write_to_file(int64_t fd, char* str) {
    size_t written = write(fd, str, size);
    size -= written;
  }
+}
+
+void SKIP_check_if_file_exists(char* filename_obj) {
+}
+
+int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
+  size_t filename_size = SKIP_String_byteSize(filename_obj);
+  char* filename = (char*)malloc(filename_size+1);
+  memcpy(filename, filename_obj, filename_size);
+  filename[filename_size] = (char)0;
+
+  int fd = open(filename, O_CREAT | O_WRONLY, 0644);
+
+  if(fd == -1) {
+    free(filename);
+    return -1;
+  }
+
+  char buf_data[256];
+  char* buf = buf_data;
+  sprintf(buf, "%ld\n", tick);
+  size_t size = strlen(buf);
+
+  while(size > 0) {
+    size_t written = write(fd, buf, size);
+    if(written == -1) {
+      free(filename);
+      return -1;
+    }
+    buf += written;
+    size -= written;
+  }
+
+  if(close(fd) == -1) {
+    free(filename);
+    return -1;
+  }
+
+  free(filename);
+  return 0;
 }
 
 int64_t SKIP_time() {

@@ -190,7 +190,6 @@ native class .String uses Hashable, Show, Orderable {
         error ||
         !hasMantissaDigit ||
         !(hasDot || hasExponent) ||
-        (hasDot && !hasFractionalDigit) ||
         (hasExponent && !hasExponentDigit)
       ) {
         None()
@@ -493,13 +492,13 @@ private fun toIntOptionHelper(s: String): (Int, Int) {
   | None() -> (0, 0)
   | Some('-') ->
     i.next() match {
-    | Some(ch) if (ch >= '1' && ch <= '9') ->
+    | Some(ch) if (ch >= '0' && ch <= '9') ->
       v = ch.code() - 48;
       n = toIntHelperRest(i, v);
       (n + 1, -n)
     | _ -> (0, 0)
     }
-  | Some(ch) if (ch >= '1' && ch <= '9') ->
+  | Some(ch) if (ch >= '0' && ch <= '9') ->
     v = ch.code() - 48;
     n = toIntHelperRest(i, v);
     (if (n >= 0) 1 else 0, n)

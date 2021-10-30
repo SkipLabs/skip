@@ -32,6 +32,7 @@ const opPriority: Map<String, Int> = Map[
   ("IN", 6),
   ("NOT IN", 6),
   ("LIKE", 6),
+  ("NOT LIKE", 6),
   ("SOME", 6),
   ("IS", 6),
 
@@ -90,6 +91,7 @@ const keywords: Set<String> = Set[
   "RIGHT",
   "BY",
   "HAVING",
+  "VIRTUAL",
   "ROLLBACK",
   "CASCADE",
   "HOLDLOCK",
@@ -281,8 +283,11 @@ fun isLetter(c: Char): Bool {
   Chars.isUpperCaseLetter(c) || Chars.isLowerCaseLetter(c) || c == '_'
 }
 
-fun isLetterOrDigit(c: Char): Bool {
-  isLetter(c) || Chars.isDigit(c)
-}
-
 value class Token(posBegin: Int, posEnd: Int)
+
+base class TokenKind {
+  children =
+  | TKInt()
+  | TKFloat()
+  | TKWord()
+}

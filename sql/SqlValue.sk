@@ -96,9 +96,9 @@ class RowKey(
     inspect(this).toString();
   }
 
-  fun toStringRemove(): String {
+  fun toStringRemove(csv: Bool): String {
     this.row match {
-    | r @ RowValues(_, _) -> "0\t" + r.toStringSingle() + "\n"
+    | r @ RowValues(_, _) -> "0\t" + r.toStringSingle(csv) + "\n"
     }
   }
 }
@@ -125,10 +125,15 @@ base class Row extends SKFS.File {
       cvalue match {
       | None() -> o("NULL")
       | Some(CInt(n)) -> o(n.toString())
-      | Some(CFloat _) -> invariant_violation("TODO CFloat")
+      | Some(CFloat(f)) -> o(f.toString())
       | Some(CString(s)) ->
         o("'");
-        o(s);
+        chars = mutable Vector[];
+        for (c in s) {
+          if (c == '\'') chars.push(c);
+          chars.push(c);
+        };
+        o(String::fromChars(chars.toArray()));
         o("'")
       };
       if (i != this.size() - 1) {
@@ -159,36 +164,36 @@ class RowValues private (
     this.values.size()
   }
 
-  fun toStringSingle(): String {
+  fun toStringSingle(csv: Bool): String {
     result = mutable Vector[];
     values = this.values;
     size = values.size();
     if (size == 1) {
       values[0] match {
       | None() -> return ""
-      | Some(v) -> return v.toString()
+      | Some(v) -> return v.toStringOrCsv(csv)
       }
     };
     for (i in Range(0, size - 1)) {
       values[i] match {
       | None() -> void
-      | Some(v) -> result.push(v.toString())
+      | Some(v) -> result.push(v.toStringOrCsv(csv))
       };
-      result.push("|");
+      result.push(if (csv) "," else "|");
     };
     values[size - 1] match {
     | None() -> void
-    | Some(v) -> result.push(v.toString())
+    | Some(v) -> result.push(v.toStringOrCsv(csv))
     };
     Array.concatStringSequence(result)
   }
 
-  fun toKVString(_key: SKFS.BaseName): String {
+  fun toKVString(csv: Bool, _key: SKFS.BaseName): String {
     repeat = 0;
     for (_ in Range(0, this.repeat)) {
       !repeat = repeat + this.repeat
     };
-    this.repeat.toString() + "\t" + this.toStringSingle() + "\n"
+    this.repeat.toString() + "\t" + this.toStringSingle(csv) + "\n"
   }
 
   fun getInt(n: Int): ?Int {

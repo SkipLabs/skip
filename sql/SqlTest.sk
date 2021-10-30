@@ -9,7 +9,7 @@ fun evalStmt(
 ): void {
   lex = SKSQL.Lexer(0, SKSQL.Buffer(str));
   (_, stmtAst) = SKSQL.parseStmt(lex, 0);
-  _ = evaluator.stmt(context, stmtAst, false)
+  _ = evaluator.stmt(context, stmtAst.fromSome(), false)
 }
 
 fun testSql(): mutable SKFS.Context {
@@ -17,8 +17,10 @@ fun testSql(): mutable SKFS.Context {
     context.!debugMode = false;
     options = SKSQL.Options{
       backtrace => false,
-      allowCross => false,
+      alwaysAllowJoins => false,
       sync => false,
+      showUsedIndexes => false,
+      csv => false,
     };
     evaluator = SKSQL.Evaluator{options};
     _table = evalStmt(context, evaluator, tableStr);

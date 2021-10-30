@@ -9,7 +9,7 @@ fun createIndex(
   userIndexNameOpt: ?String,
   dirName: SKFS.DirName,
   kinds: Array<(Int, IKind, Type)>,
-  unique: Bool = false,
+  unique: Bool,
 ): IndexDescr {
   idxKinds = kinds.mapWithIndex((idx, field) -> {
     (idx, IASC(), field.i2)
@@ -56,12 +56,9 @@ fun createIndex(
     dirName => index.dirName,
     tableName => dirName,
     fields => kinds,
+    unique,
   };
 
-  tables = getTableDir(context);
-  context
-    .getEagerDir(tables.dirName)
-    .write(context, SKFS.SID::create(userIndexName), index.dirName);
   indexDescr
 }
 
@@ -71,6 +68,7 @@ fun createUserIndex(
   userIndexName: String,
   pos: Int,
   fields: (String, Array<(String, IKind)>),
+  unique: Bool,
 ): IndexDescr {
   (tableName, colNames) = fields;
   !colNames = colNames.map(x -> (x.i0, IASC()));
@@ -93,11 +91,16 @@ fun createUserIndex(
   };
   !colNames = colNames.concat(additionalCols.toArray());
 
-  cols = colNames.map(x -> (table.cols[x.i0], x.i1));
+  cols = colNames.map(x -> {
+    if (!table.cols.containsKey(x.i0)) {
+      error(pos, "Column not found: " + x.i0);
+    };
+    (table.cols[x.i0], x.i1)
+  });
   types = table.schema.map(x -> x.ty);
   kinds = computeOrder(types, cols);
 
-  createIndex(context, Some(userIndexName), table.dirName, kinds)
+  createIndex(context, Some(userIndexName), table.dirName, kinds, unique)
 }
 
 /*****************************************************************************/
@@ -165,76 +168,103 @@ class SortedA<+T: Orderable> private (value: Array<T>) {
 
 base class ColOp uses Orderable {
   children =
-  | COEq()
-  | COLt()
-  | COLte()
-  | COGt()
-  | COGte()
+  | COEq(CValue)
+  | COLt(CValue)
+  | COLte(CValue)
+  | COGt(CValue)
+  | COGte(CValue)
+  | COLike(String)
+  | CORange(CValue, CValue)
 
-  static fun create(op: String): ColOp {
+  static fun create(op: String, value: CValue): ColOp {
     op match {
-    | "=" -> COEq()
-    | "<" -> COLt()
-    | "<=" -> COLte()
-    | ">" -> COGt()
-    | ">=" -> COGte()
+    | "=" -> COEq(value)
+    | "<" -> COLt(value)
+    | "<=" -> COLte(value)
+    | ">" -> COGt(value)
+    | ">=" -> COGte(value)
+    | "LIKE" ->
+      COLike(
+        value match {
+        | CString(x) -> x
+        | _ -> invariant_violation("Unexpected LIKE type")
+        },
+      )
     | _ -> invariant_violation("Unknown operation: " + op)
     }
   }
 }
 
-class Col(
-  colNbr: Int,
-  values: Array<(ColOp, CValue)>,
-  unique: Bool,
-) uses Orderable {
+class Col(colNbr: Int, values: Array<ColOp>, unique: Bool) uses Orderable {
   fun compare(y: Col): Order {
     this.colNbr.compare(y.colNbr)
   }
 }
 
-class Solution(
-  eqs: Array<CValue>,
-  other: ?(ColOp, CValue),
-  unique: Bool,
-) uses Orderable {
+class Solution(eqs: Array<CValue>, other: ?ColOp, unique: Bool) uses Orderable {
   fun min(): Array<CValue> {
-    (op, last) = this.other match {
+    op = this.other match {
     | None() -> return this.eqs
-    | Some((COEq(), _)) -> return this.eqs
-    | Some((op, x)) -> (op, x)
+    | Some(COEq _) -> return this.eqs
+    | Some(op) -> op
     };
     this.eqs.concat(
       Array[
         op match {
-        | COEq() -> invariant_violation("Already filtered out")
-        | COLt()
-        | COLte() ->
+        | COEq _ -> invariant_violation("Already filtered out")
+        | CORange(x, _) -> x
+        | COLt(last)
+        | COLte(last) ->
           last.min()
-        | COGt()
-        | COGte() ->
+        | COGt(last)
+        | COGte(last) ->
           last
+        | COLike(last) ->
+          CString(
+            {
+              sub = mutable Vector[];
+              for (c in last) {
+                if (c == '_') break void;
+                if (c == '%') break void;
+                sub.push(c);
+              };
+              String::fromChars(sub.toArray())
+            },
+          )
         },
       ],
     )
   }
 
   fun max(): Array<CValue> {
-    (op, last) = this.other match {
+    op = this.other match {
     | None() -> return this.eqs
-    | Some((COEq(), _)) -> return this.eqs
-    | Some((op, x)) -> (op, x)
+    | Some(COEq _) -> return this.eqs
+    | Some(op) -> op
     };
     this.eqs.concat(
       Array[
         op match {
-        | COEq() -> invariant_violation("Already filtered out")
-        | COLt()
-        | COLte() ->
+        | COEq _ -> invariant_violation("Already filtered out")
+        | CORange(_, x) -> x
+        | COLt(last)
+        | COLte(last) ->
           last
-        | COGt()
-        | COGte() ->
+        | COGt(last)
+        | COGte(last) ->
           last.max()
+        | COLike(last) ->
+          CString(
+            {
+              sub = mutable Vector[];
+              for (c in last) {
+                if (c == '_') break void;
+                if (c == '%') break void;
+                sub.push(c);
+              };
+              String::fromChars(sub.toArray()) + largestString()
+            },
+          )
         },
       ],
     )
@@ -280,13 +310,13 @@ class LookUp{
       x ~> Some(x),
       (x, y) ~> {
         allEq1 = for (opVal in x.values) {
-          if (opVal.i0 is COEq()) continue;
+          if (opVal is COEq _) continue;
           break false;
         } else {
           true
         };
         allEq2 = for (opVal in y.values) {
-          if (opVal.i0 is COEq()) continue;
+          if (opVal is COEq _) continue;
           break false;
         } else {
           true
@@ -294,8 +324,20 @@ class LookUp{
         Some(
           if (allEq1 && allEq2) {
             if (x.values.size() <= y.values.size()) x else y
-          } else if (allEq1) x else {
-            y
+          } else {
+            if (x.values.size() == 1 && y.values.size() == 1) {
+              (x.values[0], y.values[0]) match {
+              | (COGte(low), COLte(high))
+              | (COLte(high), COGte(low)) ->
+                Col(x.colNbr, Array[CORange(low, high)], x.unique)
+              | _ if (allEq1) -> x
+              | _ -> y
+              }
+            } else if (allEq1) {
+              x
+            } else {
+              y
+            }
           },
         )
       },
@@ -322,15 +364,18 @@ class LookUp{
       return void;
     };
     !cols = cols.slice(1, cols.size());
-    if (col.values.size() > 1 || col.values[0].i0 is COEq()) {
+    if (col.values.size() > 1 || col.values[0] is COEq _) {
       for (opVal in col.values) {
-        if (!(opVal.i0 is COEq())) {
+        if (!(opVal is COEq _)) {
           acc.push(Solution(solutionHead, None(), unique));
           return void;
         }
       };
       for (opVal in col.values) {
-        (_, value) = opVal;
+        value = opVal match {
+        | COEq(x) -> x
+        | _ -> invariant_violation("Unexpected operation kind")
+        };
         static::solutions(
           acc,
           n + 1,
@@ -340,8 +385,7 @@ class LookUp{
         )
       }
     } else if (col.values.size() == 1) {
-      (op, value) = col.values[0];
-      acc.push(Solution(solutionHead, Some((op, value)), unique));
+      acc.push(Solution(solutionHead, Some(col.values[0]), unique));
     } else {
       acc.push(Solution(solutionHead, None(), unique))
     }
@@ -376,7 +420,7 @@ class Ranges private (
   ranges: Array<Solution>,
   unique: Bool,
   size: Int,
-  op: ColOp,
+  isEq: Bool,
 ) {
   static fun create(
     index: IndexDescr,
@@ -389,7 +433,7 @@ class Ranges private (
       ranges,
       static::isUnique(ranges),
       static::getSize(ranges),
-      static::getOp(ranges),
+      static::isEqOp(ranges),
     )
   }
 
@@ -411,16 +455,14 @@ class Ranges private (
     size
   }
 
-  static fun getOp(ranges: Array<Solution>): ColOp {
-    colOp = COEq();
+  static fun isEqOp(ranges: Array<Solution>): Bool {
     for (solution in ranges) {
       solution.other match {
-      | Some((COEq(), _)) -> void
-      | Some((op, _)) -> return op
-      | None() -> void
+      | Some(COEq _) -> void
+      | _ -> return false
       }
     };
-    colOp
+    true
   }
 
   fun select(other: Ranges): Ranges {
@@ -430,9 +472,9 @@ class Ranges private (
     | _ ->
       if (this.size > other.size) return this;
       if (this.size < other.size) return other;
-      (this.op, other.op) match {
-      | (COEq(), _) -> this
-      | (_, COEq()) -> other
+      (this.isEq, other.isEq) match {
+      | (true, _) -> this
+      | (_, true) -> other
       | _ -> this
       }
     }

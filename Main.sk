@@ -4,8 +4,13 @@ const argsSchema: Array<AP.Param> = Array[
   AP.BoolParam{name => "all", help => "run all the tests", negatable => false},
   AP.BoolParam{name => "replay", help => "replay a diff", negatable => false},
   AP.BoolParam{
-    name => "allow-cross-joins",
-    help => "allows cross joins (they are banned by default)",
+    name => "always-allow-joins",
+    help => "allows cross joins and joins outside of virtual views",
+    negatable => false,
+  },
+  AP.BoolParam{
+    name => "show-used-indexes",
+    help => "prints on stdout the indexes used by a query",
     negatable => false,
   },
   AP.BoolParam{name => "backtrace", help => "internal use", negatable => false},
@@ -22,17 +27,21 @@ const argsSchema: Array<AP.Param> = Array[
   },
   AP.BoolParam{name => "debug", help => "", negatable => false},
   AP.BoolParam{name => "sessions", help => "", negatable => false},
+  AP.BoolParam{
+    name => "csv",
+    help => "Changes the output format to CSV",
+    negatable => false,
+  },
   AP.StringParam{name => "test", help => "The name of the test to run"},
   AP.StringParam{name => "init", help => "Initializes a new data file"},
+  AP.StringParam{name => "capacity", help => "Initializes at a given capacity"},
   AP.StringParam{name => "data", help => "Loads an existing data file"},
   AP.StringParam{
     name => "connect",
     help => "Same as --subscribe, but sends the initial state first",
   },
-  AP.StringParam{
-    name => "subscribe",
-    help => "Subscribes to a directory change",
-  },
+  AP.IntParam{name => "disconnect", help => "Disconnects a session"},
+  AP.IntParam{name => "subscribe", help => "Subscribes to a directory change"},
   AP.StringParam{
     name => "write",
     help => "Writes the data coming from stdin into a directory",
@@ -48,10 +57,34 @@ const argsSchema: Array<AP.Param> = Array[
   },
   AP.StringParam{name => "cmd", help => "Name of the command to run on change"},
   AP.StringParam{
-    name => "file",
-    help => "Name of the file to write to on change",
+    name => "stream",
+    help => "Name of the file receiving the stream of changes",
+  },
+  AP.StringParam{
+    name => "notify",
+    help => "Name of the file updated with time of the last change",
   },
   AP.StringParam{name => "load-csv", help => "load csv values into table"},
+  AP.BoolParam{
+    name => "dump-tables",
+    help => "Dumps the table in SQL format",
+    negatable => false,
+  },
+  AP.BoolParam{
+    name => "dump-inserts",
+    help => "Dumps the inserts in SQL format",
+    negatable => false,
+  },
+  AP.BoolParam{
+    name => "dump-views",
+    help => "Dumps the views in SQL format",
+    negatable => false,
+  },
+  AP.BoolParam{
+    name => "dump",
+    help => "Dumps tables/inserts/views in SQL format",
+    negatable => false,
+  },
 ];
 
 fun getParsedArgs(): AP.ParseResult {
@@ -100,8 +133,14 @@ untracked fun main(): void {
 
   options = SKSQL.Options{
     backtrace => argMap.maybeGet("backtrace") is Some(AP.BoolValue _),
-    allowCross => argMap.maybeGet("allow-cross-joins") is Some(AP.BoolValue _),
+    alwaysAllowJoins => argMap.maybeGet("always-allow-joins") is Some(
+      AP.BoolValue _,
+    ),
     sync => argMap.maybeGet("sync") is Some(AP.BoolValue _),
+    showUsedIndexes => argMap.maybeGet("show-used-indexes") is Some(
+      AP.BoolValue _,
+    ),
+    csv => argMap.maybeGet("csv") is Some(AP.BoolValue _),
   };
 
   argMap.maybeGet("sessions") match {
@@ -149,17 +188,85 @@ untracked fun main(): void {
   | _ -> void
   };
 
+  argMap.maybeGet("dump-tables") match {
+  | Some(AP.BoolValue{value => true}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    SKSQL.runSql(options, context ~> {
+      SKSQL.dumpTables(context);
+      exit(0);
+      SKFS.CStop(None())
+    });
+    return void
+  | _ -> void
+  };
+
+  argMap.maybeGet("dump-inserts") match {
+  | Some(AP.BoolValue{value => true}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    SKSQL.runSql(options, context ~> {
+      SKSQL.dumpInserts(context);
+      SKFS.CStop(None())
+    });
+    return void
+  | _ -> void
+  };
+
+  argMap.maybeGet("dump-views") match {
+  | Some(AP.BoolValue{value => true}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    SKSQL.runSql(options, context ~> {
+      SKSQL.dumpViews(context);
+      SKFS.CStop(None())
+    });
+    return void
+  | _ -> void
+  };
+
+  argMap.maybeGet("dump") match {
+  | Some(AP.BoolValue{value => true}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    SKSQL.runSql(options, context ~> {
+      SKSQL.dumpTables(context);
+      SKSQL.dumpInserts(context);
+      SKSQL.dumpViews(context);
+      SKFS.CStop(None())
+    });
+    return void
+  | _ -> void
+  };
+
   argMap.maybeGet("load-csv") match {
   | Some(AP.StringValue{value => tableNameUpper}) ->
     tableName = tableNameUpper.lowercase();
     SKSQL.runSql(options, context ~> {
+      line = context.getGlobal("Line") match {
+      | None() -> mutable Ref(1)
+      | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
+      };
       vtry<SKFS.ContextOp>(
         () -> {
-          SKFS.CContinue(SKCSV.insert(context, options, tableName))
+          contextOp = SKCSV.insert(context, line, options, tableName);
+          context.setGlobal("Line", SKFS.IntFile(line.get()));
+          contextOp
         },
         exn -> {
-          if (exn is EndOfFile _) return SKFS.CStop(None());
-          print_error(exn.getMessage());
+          print_error("Error, line " + line.get() + ": " + exn.getMessage());
           exit(23);
         },
       );
@@ -213,6 +320,9 @@ untracked fun main(): void {
       exit(2);
     };
     SKSQL.runSql(options, context ~> {
+      if (options.csv) {
+        context.setGlobal("CSV", SKFS.BoolFile(true));
+      };
       dirName = context.sessions.maybeGet(sessionID) match {
       | None() ->
         print_error("Error: session not found");
@@ -230,6 +340,29 @@ untracked fun main(): void {
     });
     return void
   | _ -> void
+  };
+
+  argMap.maybeGet("disconnect") match {
+  | Some(AP.IntValue{value => sessionID}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      exit(2);
+    };
+    SKSQL.runLockedSql(options, context ~> {
+      dirName = context.sessions.maybeGet(sessionID) match {
+      | None() ->
+        print_error("Error: session not found");
+        exit(2)
+      | Some(x) -> x
+      };
+      context.unsafeGetEagerDir(dirName).disconnect(context, sessionID);
+    });
+    return void
+  | Some(AP.MissingValue{}) -> void
+  | _ ->
+    print_error("Error: --disconnect expects a session ID");
+    exit(2)
   };
 
   argMap.maybeGet("write") match {
@@ -262,29 +395,39 @@ untracked fun main(): void {
 
   subscribe match {
   | None() -> void
-  | Some((viewName, viewDirName, init)) ->
+  | Some((userViewName, viewDirName, init)) ->
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
       exit(2);
     };
     SKSQL.runLockedSql(options, context ~> {
+      viewName = userViewName.lowercase();
       SKSQL.forbidNow(context);
-      cmd = (argMap.maybeGet("cmd"), argMap.maybeGet("file")) match {
-      | (Some(AP.StringValue _), Some(AP.StringValue _)) ->
-        print_error("Cannot have both --cmd and --file");
+      cmd = (
+        argMap.maybeGet("cmd"),
+        argMap.maybeGet("stream"),
+        argMap.maybeGet("notify"),
+      ) match {
+      | (Some(AP.StringValue _), Some(AP.StringValue _), _) ->
+        print_error("Cannot have both --cmd and --stream");
         exit(4)
-      | (Some(AP.StringValue{value => x}), _) -> Some(SKFS.NCmd(x))
-      | (_, Some(AP.StringValue{value => x})) -> Some(SKFS.NFile(x))
+      | (_, Some(AP.StringValue _), Some(AP.StringValue _)) ->
+        print_error("Cannot have both --stream and --notify");
+        exit(4)
+      | (Some(AP.StringValue _), _, Some(AP.StringValue _)) ->
+        print_error("Cannot have both --cmd and --notify");
+        exit(4)
+      | (Some(AP.StringValue{value => x}), _, _) ->
+        Some(SKFS.NCmd(options.csv, x))
+      | (_, Some(AP.StringValue{value => x}), _) ->
+        Some(SKFS.NStream(options.csv, x))
+      | (_, _, Some(AP.StringValue{value => x})) -> Some(SKFS.NNotify(x))
       | _ -> None()
       };
       (input, output) = SKSQL.getSubsDirs(options, context);
       viewKey = SKFS.SID(viewName);
       inputDir = context.unsafeGetEagerDir(input.dirName);
-      if (inputDir.getArrayRaw(viewKey).size() != 0) {
-        print_error(`View ${viewName} already exists`);
-        exit(4)
-      };
       sessionID = SKFS.genSym(0);
       request = SKSQL.SubRequestFile(
         viewName,
@@ -402,6 +545,9 @@ untracked fun main(): void {
   } else if (argMap.maybeGet("init") is Some(AP.StringValue _)) {
     _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
     return void;
+  } else if (argMap.maybeGet("capacity") is Some(AP.StringValue _)) {
+    print_error("cannot use capacity without init");
+    exit(2)
   } else if (argMap.maybeGet("data") is Some(AP.StringValue _)) {
     // this was handled in the C++ side
     void

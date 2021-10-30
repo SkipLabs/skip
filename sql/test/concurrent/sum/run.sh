@@ -8,9 +8,9 @@ $SQLIVE --init /tmp/test.db
 
 cat create.sql | $SQLIVE --data /tmp/test.db
 
-for i in {1..4}
+for i in {1..10}
 do
-    cat inserts.sql | $SQLIVE --data /tmp/test.db  &
+    cat inserts.sql | $SQLIVE --data /tmp/test.db &
 done
 wait
 

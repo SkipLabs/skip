@@ -31,10 +31,6 @@ native fun stringUnsafeSlice(str: String, Int, Int): String;
 native fun stringUnsafeCreate(Int): String;
 
 mutable class Buffer(content: String) {
-  static fun create(size: Int): mutable this {
-    mutable Buffer(stringUnsafeCreate(size))
-  }
-
   readonly fun get(idx: Int): Char {
     stringUnsafeGet(this.content, idx)
   }
@@ -101,6 +97,13 @@ class Lexer(idRoot: Int, content: Buffer) {
   }
 
   fun token(posBegin: Int, size: Int = this.content.size()): Token {
+    this.tokenAndKind(posBegin, size).i0
+  }
+
+  fun tokenAndKind(
+    posBegin: Int,
+    size: Int = this.content.size(),
+  ): (Token, TokenKind) {
     !size = min(size, this.content.size());
     !posBegin = this.skipSpaces(posBegin);
     pos = posBegin;
@@ -110,20 +113,37 @@ class Lexer(idRoot: Int, content: Buffer) {
     !posBegin = pos;
     currentChar = this.content[pos];
     !pos = pos + 1;
-    currentChar match {
-    | _ if (pos >= this.content.size()) -> void
+    tokenKind = currentChar match {
+    | _ if (pos >= this.content.size()) -> TKWord()
     | _ if (Chars.isDigit(currentChar)) ->
-      while (pos < size && Chars.isDigit(this.content[pos])) {
+      lastWasE = false;
+      allDigits = true;
+      while (
+        pos < size &&
+        (isLetter(this.content[pos]) ||
+          Chars.isDigit(this.content[pos]) ||
+          this.content[pos] == '.' ||
+          this.content[pos] == '-' && lastWasE)
+      ) {
+        !lastWasE = this.content[pos] == 'e' || this.content[pos] == 'E';
+        if (!Chars.isDigit(this.content[pos])) {
+          !allDigits = false;
+        };
         !pos = pos + 1
-      }
+      };
+      if (allDigits) TKInt() else TKFloat()
     | _ if (isLetter(currentChar)) ->
-      while (pos < size && isLetterOrDigit(this.content[pos])) {
-        !pos = pos + 1
-      }
-    | _ -> void
+      while (
+        pos < size &&
+        (isLetter(this.content[pos]) || Chars.isDigit(this.content[pos]))
+      ) {
+        !pos = pos + 1;
+      };
+      TKWord()
+    | _ -> TKWord()
     };
     posEnd = pos;
-    Token(posBegin, posEnd)
+    (Token(posBegin, posEnd), tokenKind)
   }
 
   fun isEqAtF(token: Token, str: String, f: Char ~> Char): Bool {
@@ -202,29 +222,24 @@ class Lexer(idRoot: Int, content: Buffer) {
     this.content.slice(tok.posBegin, tok.posEnd)
   }
 
-  fun nextInt(pos: Int): (Int, Int) {
+  private fun nextIntStr(pos: Int): (Int, readonly Vector<Char>) {
     (!pos, str) = this.nextWord(pos);
+    (pos, str.chars())
+  }
+
+  fun nextInt(pos: Int): (Int, Int) {
     vtry(
       () -> {
-        iter = str.getIter();
-        chars = mutable Vector[];
-        for (c in iter) {
-          if (c == '0') continue;
-          chars.push(c);
-          break void;
-        };
-        for (c in iter) {
-          chars.push(c);
-        };
+        (!pos, chars) = this.nextIntStr(pos);
         newStr = String::fromChars(chars.toArray());
         (
           pos,
-          if (chars.size() == 0 && str != "") 0 else {
+          if (chars.size() == 0) 0 else {
             newStr.toInt()
           },
         )
       },
-      _ -> error(pos, "Expected integer, found: " + str),
+      _ -> error(pos, "Expected integer"),
     )
   }
 

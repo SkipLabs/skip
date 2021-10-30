@@ -1,0 +1,11 @@
+insert into t1 values(1, 2);
+insert into t1 values(10, 21);
+insert into t1 values(10, 21);
+insert into t1 values(12, 23);
+insert into t1 values(14, 25);
+insert into t1 values(16, 27);
+insert into t1 values(18, 29);
+insert into t1 values(110, 211);
+insert into t1 values(110, 212);
+insert into t1 values(112, 213);
+insert into t1 values(114, 215);

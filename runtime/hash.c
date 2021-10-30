@@ -266,9 +266,8 @@ static uint64_t sk_hash_string(char* obj) {
 }
 
 static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
-
-  if(obj == NULL) {
-    return 0;
+  if(obj < (char*)64) {
+    return (uint64_t)obj;
   }
 
   // Check if we are dealing with a string

@@ -136,12 +136,12 @@ class ExprEvaluator(
       };
       ANull()
 
-    | CEQuery(select) ->
+    | CFQuery(select) ->
       this.evalQuery(context, select) match {
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(CFloat(f)) -> ADef(f)
-      | _ -> errorEval("Expected a float")
+      | _ -> invariant_violation("Types have already been checked")
       }
 
     | CNullIf(e1, e2) ->
@@ -215,17 +215,75 @@ class ExprEvaluator(
         })
       )
 
-    | CEQuery(select) ->
+    | CSQuery(select) ->
       this.evalQuery(context, select) match {
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(CString(f)) -> ADef(f)
-      | _ -> errorEval("Expected a string")
+      | _ -> invariant_violation("Types have already been checked")
       }
 
-    | _ ->
-      debug(expr);
-      invariant_violation("TODO: rest of evalCSExpr")
+    | CIf(conde, e1, e2) ->
+      cond = this.evalCIExpr(context, conde) match {
+      | AUndef() -> return AUndef()
+      | ANull() -> false
+      | ADef(n) -> n != 0
+      };
+      if (cond) {
+        this.evalCSExpr(context, e1)
+      } else {
+        this.evalCSExpr(context, e2)
+      }
+
+    | SKSQL.CAdd _
+    | SKSQL.CSub _
+    | SKSQL.CDiv _
+    | SKSQL.CMod _
+    | SKSQL.CMul _ ->
+      invariant_violation("INTERNAL ERROR: invalid operator on strings")
+
+    | CCoalesce(el) ->
+      for (e in el) {
+        this.evalCSExpr(context, e) match {
+        | AUndef() -> return AUndef()
+        | ANull() -> continue
+        | v @ ADef(_) -> return v
+        }
+      };
+      ANull()
+
+    | CNull() -> ANull()
+
+    | CNullIf(e1, e2) ->
+      this.evalCSExpr(context, e1) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(x) ->
+        this.evalCSExpr(context, e2) match {
+        | AUndef() -> AUndef()
+        | ANull() -> ADef(x)
+        | ADef(y) -> if (x == y) ANull() else ADef(x)
+        }
+      }
+
+    | SKSQL.CSFCast(e) -> this.evalCFExpr(context, e).map(f -> f.toString())
+    | SKSQL.CSICast(e) -> this.evalCIExpr(context, e).map(f -> f.toString())
+
+    | CSGetParam(n) ->
+      this.params match {
+      | None() -> AUndef()
+      | Some(params) ->
+        params.getString(n) match {
+        | None() -> ANull()
+        | Some(v) -> ADef(v)
+        }
+      }
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCSExpr(context, x)
+      }
     }
   }
 
@@ -279,6 +337,8 @@ class ExprEvaluator(
       | ANull() -> ANull()
       | ADef(n) -> ADef(if (n == 0) 1 else 0)
       }
+
+    | COn(_, e) -> this.evalCIExpr(context, e)
 
     | CILte(e1, e2) ->
       this.biopCompare(
@@ -511,14 +571,12 @@ class ExprEvaluator(
       | ADef _ -> ADef(0)
       }
 
-    | CEQuery(select) ->
+    | CIQuery(select) ->
       this.evalQuery(context, select) match {
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(CInt(n)) -> ADef(n)
-      | e ->
-        debug(e);
-        invariant_violation("Unexpected value in iexpr")
+      | _ -> invariant_violation("Types have already been checked")
       }
 
     | CIBetween(e1, e2, e3) ->
@@ -623,6 +681,34 @@ class ExprEvaluator(
         ).flatMap(n2 -> ADef(btoi(n1 == 0 || n2 == 0)))
       )
 
+    | CSLike(e1, pattern) ->
+      this.evalCSExpr(context, e1).flatMap(text -> {
+        ADef(btoi(matching(text, pattern)))
+      })
+
+    | CIIn(vExpr, set) if (set.size() == 1 && set[0] is CIQuery _) ->
+      query = set[0] match {
+      | CIQuery(q) -> q
+      | _ -> invariant_violation("Already checked in pattern")
+      };
+      v = this.evalCIExpr(context, vExpr) match {
+      | ANull() -> return ANull()
+      | ADef(x) -> x
+      | AUndef() -> return AUndef()
+      };
+      sdir = evalSelect(context, query, Some(this));
+      dirName = sdir.dirName;
+      dir = context.unsafeGetEagerDir(dirName);
+      if (dir.time.value > 0) {
+        !dir.time = SKFS.Time(-dir.time.value);
+        context.setDir(dir.dirName, dir);
+      };
+      invariant(query.orderBy is None());
+      invariant(query.params.size() == 1);
+      row = RowValues::create(Array[Some(CInt(v))], 1);
+      kinds = Array[(0, IASC(), TEXT())];
+      ADef(btoi(dir.getArray(context, RowKey(row, kinds)).size() != 0))
+
     | CIIn(vExpr, set) ->
       v = this.evalCIExpr(context, vExpr);
       hasNull = v is ANull();
@@ -643,6 +729,29 @@ class ExprEvaluator(
         }
       }
 
+    | CFIn(vExpr, set) if (set.size() == 1 && set[0] is CFQuery _) ->
+      query = set[0] match {
+      | CFQuery(q) -> q
+      | _ -> invariant_violation("Already checked in pattern")
+      };
+      v = this.evalCFExpr(context, vExpr) match {
+      | ANull() -> return ANull()
+      | ADef(x) -> x
+      | AUndef() -> return AUndef()
+      };
+      sdir = evalSelect(context, query, Some(this));
+      dirName = sdir.dirName;
+      dir = context.unsafeGetEagerDir(dirName);
+      if (dir.time.value > 0) {
+        !dir.time = SKFS.Time(-dir.time.value);
+        context.setDir(dir.dirName, dir);
+      };
+      invariant(query.orderBy is None());
+      invariant(query.params.size() == 1);
+      row = RowValues::create(Array[Some(CFloat(v))], 1);
+      kinds = Array[(0, IASC(), TEXT())];
+      ADef(btoi(dir.getArray(context, RowKey(row, kinds)).size() != 0))
+
     | CFIn(vExpr, set) ->
       v = this.evalCFExpr(context, vExpr);
       hasNull = v is ANull();
@@ -662,6 +771,29 @@ class ExprEvaluator(
           ADef(0)
         }
       }
+
+    | CSIn(vExpr, set) if (set.size() == 1 && set[0] is CSQuery _) ->
+      query = set[0] match {
+      | CSQuery(q) -> q
+      | _ -> invariant_violation("Already checked in pattern")
+      };
+      v = this.evalCSExpr(context, vExpr) match {
+      | ANull() -> return ANull()
+      | ADef(x) -> x
+      | AUndef() -> return AUndef()
+      };
+      sdir = evalSelect(context, query, Some(this));
+      dirName = sdir.dirName;
+      dir = context.unsafeGetEagerDir(dirName);
+      if (dir.time.value > 0) {
+        !dir.time = SKFS.Time(-dir.time.value);
+        context.setDir(dir.dirName, dir);
+      };
+      invariant(query.orderBy is None());
+      invariant(query.params.size() == 1);
+      row = RowValues::create(Array[Some(CString(v))], 1);
+      kinds = Array[(0, IASC(), TEXT())];
+      ADef(btoi(dir.getArray(context, RowKey(row, kinds)).size() != 0))
 
     | CSIn(vExpr, set) ->
       v = this.evalCSExpr(context, vExpr);
@@ -709,22 +841,25 @@ class ExprEvaluator(
       !dir.time = SKFS.Time(-dir.time.value);
       context.setDir(dir.dirName, dir);
     };
-    size = dir.size(context);
-    if (size == 0) {
-      errorEval("SELECT used as value returns no value");
+    keys = dir.keys();
+    if (keys.size() == 0) {
+      return ANull();
     };
-    if (size > 1) {
-      errorEval("SELECT used as value returns multiple values");
-    };
-    key = dir.keys().min().fromSome();
+    key = keys.min().fromSome();
     files = dir.getArray(context, key);
     if (files.size() == 0) {
-      errorEval("SELECT used as value returns no value");
-    };
-    if (files.size() > 1) {
-      errorEval("SELECT used as value returns multiple values");
+      return ANull();
     };
     row = RowValues::fromFile(files[0]);
+    repeat = row.repeat;
+    if (files.size() > 1) {
+      for (i in Range(1, files.size())) {
+        !repeat = repeat + RowValues::fromFile(files[i]).repeat;
+      }
+    };
+    if (repeat != row.repeat) {
+      !row = row.setRepeat(repeat);
+    };
     if (row.size() != 1) {
       errorEval("SELECT used as value returns multiple columns");
     };
@@ -815,4 +950,47 @@ class ExprEvaluator(
       })
     )
   }
+}
+
+/*****************************************************************************/
+/* LIKE matching. */
+/*****************************************************************************/
+
+fun isSub(sub: Array<Char>, text: Vector<Char>, i: Int): Bool {
+  for (j in Range(0, sub.size())) {
+    if (i >= text.size()) return false;
+    c = sub[j];
+    if (c == '_') {
+      !i = i + 1;
+      continue
+    };
+    if (c == text[i]) {
+      !i = i + 1;
+      continue
+    };
+    return false;
+  };
+  true
+}
+
+fun matching(text: String, pat: Pattern): Bool {
+  chars = text.chars();
+  subs = pat.subs;
+  if (!pat.firstIsPercent) {
+    if (subs.size() == 0) return chars.isEmpty();
+    if (!isSub(subs[0], chars, 0)) return false;
+  };
+  if (!pat.lastIsPercent) {
+    if (subs.size() == 0) return chars.isEmpty();
+    sub = subs[subs.size() - 1];
+    if (!isSub(sub, chars, chars.size() - sub.size())) return false;
+  };
+  idx = 0;
+  for (i in Range(0, chars.size())) {
+    if (idx == subs.size()) break void;
+    if (isSub(subs[idx], chars, i)) {
+      !idx = idx + 1;
+    }
+  };
+  idx == subs.size()
 }

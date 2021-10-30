@@ -3,11 +3,23 @@
 /*****************************************************************************/
 module SKSQL;
 
+@cpp_extern("SKIP_float_to_string")
+native fun floatToString(Float): String;
+
+value class Pattern{
+  hasUnderscore: Bool,
+  firstIsPercent: Bool,
+  lastIsPercent: Bool,
+  subs: Array<Array<Char>>,
+} uses Orderable
+
 base class AggrKind uses Orderable {
   children =
   | Noop()
   | Sum(SelectKind)
   | Count(SelectKind)
+  | Min()
+  | Max()
 }
 
 base class CValue uses Orderable, Show {
@@ -47,7 +59,23 @@ base class CValue uses Orderable, Show {
   fun toString(): String {
     this match {
     | CInt(n) -> n.toString()
-    | CFloat(f) -> f.toString()
+    | CFloat(f) -> floatToString(f)
+    | CString(str) -> str
+    }
+  }
+
+  fun toStringOrCsv(csv: Bool): String {
+    this match {
+    | CInt(n) -> n.toString()
+    | CFloat(f) -> floatToString(f)
+    | CString(str) if (csv) ->
+      result = mutable Vector['"'];
+      for (c in str) {
+        if (c == '"') result.push(c);
+        result.push(c);
+      };
+      result.push('"');
+      String::fromChars(result.toArray())
     | CString(str) -> str
     }
   }
@@ -83,6 +111,7 @@ base class SubSelectTask uses Orderable {
     rightRanges: ?Array<SKFS.KeyRange>,
     childName: SKFS.DirName,
     kinds: Array<(Int, IKind, Type)>,
+    joinKind: JoinKind,
   }
 }
 
@@ -90,11 +119,11 @@ class CSelect{
   id: String,
   kind: SelectKind,
   params: Array<CGExpr>,
+  sets: Array<(Int, CGExpr)>,
   aggr: ?Array<(AggrKind, CGExpr)>,
   kinds: Array<(Int, SKSQL.IKind, SKSQL.Type)>,
   from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
   where: ?CExpr<Int>,
-  in_: ?Array<CGExpr>,
   groupBy: ?Array<CGroupByElt>,
   having: ?CExpr<Int>,
   orderBy: ?Array<(Int, IKind)>,
@@ -195,6 +224,7 @@ class CSNotBetween(
   CExpr<String>,
   CExpr<String>,
 ) extends CExpr<Int>
+class CSLike(CExpr<String>, Pattern) extends CExpr<Int>
 
 class CAdd<T: frozen>(CExpr<T>, CExpr<T>) extends CExpr<T>
 class CSub<T: frozen>(CExpr<T>, CExpr<T>) extends CExpr<T>
@@ -209,7 +239,9 @@ class CFIn(CExpr<Float>, Array<CExpr<Float>>) extends CExpr<Int>
 class CSIn(CExpr<String>, Array<CExpr<String>>) extends CExpr<Int>
 
 class CExists(CSelect) extends CExpr<Int>
-class CEQuery<T: frozen>(CSelect) extends CExpr<T>
+class CIQuery(CSelect) extends CExpr<Int>
+class CFQuery(CSelect) extends CExpr<Float>
+class CSQuery(CSelect) extends CExpr<String>
 
 class CIAbs(CExpr<Int>) extends CExpr<Int>
 class CFAbs(CExpr<Float>) extends CExpr<Float>
@@ -229,5 +261,5 @@ class CStrftime(
   CExpr<String>,
   Array<CExpr<String>>,
 ) extends CExpr<String>
-//class CCase(condOpt: ?CExpr, whenCases: Array<(CExpr, CExpr)>, elseCase: ?CExpr) extends CExpr<?>
-//class CCall(CExpr, ?Array<CExpr>) extends CExpr<?>
+
+class COn(JoinKind, CExpr<Int>) extends CExpr<Int>

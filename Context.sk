@@ -260,6 +260,7 @@ mutable class Context{
   mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable reallyRemoveDir: Bool = true,
   mutable sessions: SortedMap<Int, DirName> = SortedMap[],
+  mutable removeSubDirs: Bool = true,
 } {
   mutable fun pushAsync(path: Path): void {
     this.!asyncList = List.Cons(path, this.asyncList);
@@ -301,6 +302,7 @@ mutable class Context{
       lazyGetsRefCount => this.lazyGetsRefCount,
       reallyRemoveDir => this.reallyRemoveDir,
       sessions => this.sessions,
+      removeSubDirs => this.removeSubDirs,
     }
   }
 
@@ -331,6 +333,7 @@ mutable class Context{
       lazyGetsRefCount => ctx.lazyGetsRefCount,
       reallyRemoveDir => ctx.reallyRemoveDir,
       sessions => ctx.sessions,
+      removeSubDirs => ctx.removeSubDirs,
     }
   }
 
@@ -360,6 +363,7 @@ mutable class Context{
     this.!lazyGetsRefCount = ctx.lazyGetsRefCount;
     this.!reallyRemoveDir = ctx.reallyRemoveDir;
     this.!sessions = ctx.sessions;
+    this.!removeSubDirs = ctx.removeSubDirs;
   }
 
   mutable fun getReads(): SortedSet<Path> {
@@ -938,7 +942,20 @@ fun resolveContext(
     sync.exportToRoot(newRoot, tick, delta);
     lockF match {
     | None() -> void
-    | Some(f) -> f(newRoot, delta)
+    | Some(f) ->
+      vtry(
+        () -> {
+          f(newRoot, delta)
+        },
+        (err -> {
+          line = delta.getGlobal("Line") match {
+          | None() -> -1
+          | Some(x) -> SKFS.IntFile::fromFile(x).value
+          };
+          print_error("Error, line " + line + ": " + err.getMessage());
+          exit(2);
+        }),
+      )
     };
     newRoot
   }

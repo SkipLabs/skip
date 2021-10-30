@@ -24,19 +24,29 @@ base class Test {
 
 base class Stmt {
   children =
-  | Table{name: String, schema: Array<TypeDescr>, windowSize: ?Int}
-  | View{name: String, query: Query}
-  | Drop{kind: TableKind, name: String}
+  | Table{pos: Int, name: String, schema: Array<TypeDescr>, windowSize: ?Int}
+  | View{pos: Int, virtual: Bool, name: String, query: Query, text: String}
+  | Drop{pos: Int, kind: TableKind, name: String}
   | Delete{pos: Int, colName: ?String, name: String, where: ?Expr}
-  | Index{pos: Int, name: String, fields: (String, Array<(String, IKind)>)}
+  | Index{
+    pos: Int,
+    name: String,
+    fields: (String, Array<(String, IKind)>),
+    unique: Bool,
+  }
   | Insert{
     pos: Int,
     name: String,
     paramsOpt: ?Array<String>,
     values: InsertValues,
   }
-  | Update{name: String, sets: Array<(String, Expr)>, where: ?Expr}
-  | Replace{name: String, values: InsertValues}
+  | Update{
+    pos: Int,
+    name: String,
+    sets: Array<(String, Pos, Expr)>,
+    where: ?Expr,
+  }
+  | Replace{pos: Int, name: String, values: InsertValues}
 }
 
 class TableName(name: FromName, asName: ?String, indexed: Bool = true)
@@ -50,7 +60,7 @@ base class TableKind {
 
 base class InsertValues {
   children =
-  | IValues(Array<Value>)
+  | IValues(Array<Array<Value>>)
   | IQuery(Query)
 }
 
@@ -77,23 +87,20 @@ class Select{
   from: ?Array<TableName>,
   join: ?Join,
   where: ?Expr,
-  in_: ?Array<Expr>,
   groupBy: ?Array<(Expr, ?String)>,
   having: ?Expr,
   orderBy: ?Array<(Expr, IKind)>,
   limit: ?Expr,
   rest: ?(QueryKind, Select),
+  shouldExpand: Bool = false,
 } extends Query, Stmt
 
-class Join{
-  kind: JoinKind,
-  names: Array<TableName>,
-  on: ?Array<(Expr, ?String)>,
-}
+class Join{kind: JoinKind, names: Array<TableName>, on: ?(Expr, Array<Expr>)}
 
-base class JoinKind {
+base class JoinKind uses Orderable {
   children =
   | JLeft(Bool)
+  | JRight(Bool)
   | JCross()
   | JOuter()
   | JInner()
@@ -128,6 +135,7 @@ base class Value {
   | VLShift(Int, Int)
   | VFloat(Float)
   | VString(String)
+  | VId(String)
 }
 
 base class Expr {
@@ -138,6 +146,7 @@ base class Expr {
   | Distinct(Expr)
   | In(Expr, Array<Expr>)
   | Between(Expr)
+  | On(JoinKind, Expr)
   | Binop(String, Expr, Expr)
   | EQuery(Query)
   | Exists(Query)
@@ -153,6 +162,7 @@ class TypeDescr{
   ty: Type,
   primary: Bool,
   unique: Bool,
+  notNull: Bool,
 } uses Orderable
 
 base class Type uses Orderable {
@@ -184,6 +194,7 @@ fun hasAggr(expr: Expr): Bool {
         false
       }
   | Binop(_, e1, e2) -> hasAggr(e1) || hasAggr(e2)
+  | On(_, e) -> hasAggr(e)
   | EQuery(_)
   | Exists(_) ->
     false
@@ -200,6 +211,8 @@ fun hasAggr(expr: Expr): Bool {
     | Some(e) if (hasAggr(e)) -> true
     | _ -> false
     }
+  | Call("min", _)
+  | Call("max", _)
   | Call("sum", _)
   | Call("avg", _)
   | Call("count", _) ->
@@ -223,5 +236,14 @@ fun selectIsAggr(select: Select): Bool {
         if (hasAggr(e.i0)) return true;
       };
       false
+    }
+}
+
+fun selectOrRestIsAggrOrEmptyFrom(select: Select): Bool {
+  selectIsAggr(select) ||
+    select.from is None() ||
+    select.rest match {
+    | Some((_, q)) -> selectOrRestIsAggrOrEmptyFrom(q)
+    | None() -> false
     }
 }

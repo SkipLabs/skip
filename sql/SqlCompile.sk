@@ -9,6 +9,7 @@ module SKSQL;
 /*****************************************************************************/
 
 class JTable{
+  name: String,
   dirName: SKFS.DirName,
   ranges: ?Array<SKFS.KeyRange>,
   schema: Array<SKSQL.TypeDescr>,
@@ -20,6 +21,7 @@ class JTable{
     ranges: ?Array<SKFS.KeyRange>,
   ): this {
     JTable{
+      name => dirDescr.name,
       dirName => dirDescr.dirName,
       ranges,
       schema => dirDescr.schema,
@@ -38,9 +40,9 @@ fun isUnique(tyDescr: TypeDescr): Bool {
 
 const crossJoinMsg: String = `
 This will be interpreted as a cross-join, which is almost
-certainly not what you want (and will probably never terminate).
+certainly not what you want.
 If you are absolutely sure that's what you want to do, you can pass
-the option '--allow-cross-join' to make this error go away.`;
+the option '--always-allow-joins' to make this error go away.`;
 
 const multipleTablesNoUniqueMsg: String = `
 SELECT involves multiple tables but none of them defines a unique column.
@@ -50,43 +52,14 @@ const multipleTablesNoClauseMsg: String = `
 SELECT involves multiple tables but no appropriate join clause was found.
 `;
 
-fun errorNoMergeClause(pos: Int, t1: DirDescr, t2: DirDescr): void {
-  col = for (ty in t1.schema) {
-    if (isUnique(ty)) break t1.name + "." + ty.name;
-  } else {
-    for (ty in t2.schema) {
-      if (isUnique(ty)) break t2.name + "." + ty.name;
-    } else {
-      msg =
-        multipleTablesNoUniqueMsg +
-        "You should add a primary key (or a unique column) to either " +
-        t1.name +
-        " or to " +
-        t2.name +
-        ".\n" +
-        crossJoinMsg;
-      error(pos, msg)
-    }
-  };
-
-  clause = "someTable.someCol=" + col;
-
-  error(
+fun errorNoMergeClause(pos: Int): void {
+  errorNbr(
+    1,
     pos,
     multipleTablesNoClauseMsg +
       "Was expecting to find a clause of the form:\n" +
-      clause +
-      "\n\n" +
-      "If you believe you have a clause of that form, " +
-      "make sure it is not embedded in another expression\n\n" +
-      "For example, this is correct:\n" +
-      "SELECT * FROM " +
-      clause +
-      " AND ... AND ...\n\n" +
-      "While this is incorrect:\n" +
-      "SELECT * FROM (" +
-      clause +
-      " OR ...) AND ...\n\n" +
+      "... AND colName1 = colName2 AND ...\n" +
+      "\n" +
       crossJoinMsg,
   )
 }
@@ -111,25 +84,27 @@ mutable class Compiler{
     mutable static{options, pos}
   }
 
-  mutable fun compileDistinctWithGroupBy(select: Select): Select {
+  mutable fun expandGroupBy(select: Select): Select {
     // Tranforms:
-    // 'select distinct ... from ... group by ...'
-    // ==> 'select distinct * from (select ... from ... group by ...)'
+    // 'select ... from ... group by ...'
+    // ==> 'select * from (select ... from ... group by ...)'
 
     Select{
       pos => select.pos,
       id => select.id,
-      kind => SDistinct(),
+      kind => select.kind,
       params => None(),
       from => Some(
         Array[
           TableName(
             FQuery(
               select with {
-                id => select.id + "-distinct",
+                id => select.id + "-groupBy",
                 kind => SNone(),
                 orderBy => None(),
                 limit => None(),
+                rest => None(),
+                shouldExpand => false,
               },
             ),
             None(),
@@ -140,21 +115,32 @@ mutable class Compiler{
       where => None(),
       groupBy => None(),
       having => None(),
-      in_ => None(),
       join => None(),
       orderBy => select.orderBy,
       limit => select.limit,
-      rest => None(),
+      shouldExpand => false,
+      rest => select.rest.map(x -> (x.i0, x.i1 with {shouldExpand => true})),
     }
   }
 
   mutable fun compileSelect(
     context: mutable SKFS.Context,
     select: Select,
+    toplevel: Bool,
+    sets: Array<(String, Pos, Expr)> = Array[],
   ): CSelect {
-    if (select.groupBy is Some _ && select.kind is SDistinct _) {
-      !select = this.compileDistinctWithGroupBy(select);
+    if (
+      select.kind is SDistinct _ ||
+      select.shouldExpand ||
+      toplevel &&
+        (select.orderBy is Some _ || select.limit is Some _) &&
+        (select.groupBy is Some _) ||
+      (select.rest is Some _ || toplevel) &&
+        selectOrRestIsAggrOrEmptyFrom(select)
+    ) {
+      !select = this.expandGroupBy(select);
     };
+
     !select = this.expandJoins(context, select.join, select);
 
     substCopy = this.subst;
@@ -190,23 +176,18 @@ mutable class Compiler{
     this.!other = mutable Vector[];
 
     origFrom = this.compileFrom(context, select.from);
-    from = this.compileJoin(context, origFrom, select);
+    (cond, from) = this.compileJoin(context, origFrom, select);
+    !select.where = cond;
     sparams = select.params match {
     | None() ->
       params = mutable Vector[];
-      for (tableNbr => dirDescr in from) {
-        tableName = dirDescr.i0.alias match {
-        | None() -> dirDescr.i0.name
+      for (dirDescr in origFrom) {
+        tableName = dirDescr.alias match {
+        | None() -> dirDescr.name
         | Some(x) -> x
         };
-        for (slot => tyDescr in dirDescr.i0.schema) {
-          varName = tableName + "." + tyDescr.name;
-          this.subst![varName] = tyDescr.ty match {
-          | INTEGER() -> CIExpr(CIGetFrom(tableNbr, slot))
-          | FLOAT() -> CFExpr(CFGetFrom(tableNbr, slot))
-          | TEXT() -> CSExpr(CSGetFrom(tableNbr, slot))
-          };
-          params.push((Literal(varName, false), None()))
+        for (varName in dirDescr.colNames) {
+          params.push((Literal(tableName + "." + varName, false), None()))
         }
       };
       params.toArray()
@@ -214,13 +195,12 @@ mutable class Compiler{
     };
     params = this.compileParams(context, sparams);
     where = this.compileWhere(context, select.where);
-    in_ = this.compileIn(context, select.in_);
     groupBy = this.compileGroupBy(context, select.groupBy, params);
     having = this.compileHaving(context, select.having);
 
-    orderBy = this.compileOrderBy(context, select.orderBy);
+    orderBy = this.compileOrderBy(select.params, from, select.orderBy);
     limit = this.compileLimit(context, select.limit);
-    rest = this.compileRest(context, select.rest);
+    rest = this.compileRest(context, params, select.rest);
     aggr: ?Array<(AggrKind, CGExpr)> = None();
     if (this.aggrVars.size() != 0) {
       !aggr = Some(this.aggrVars.toArray());
@@ -238,14 +218,18 @@ mutable class Compiler{
     };
 
     cselect = CSelect{
-      id => select.id,
+      id => select.id +
+        context.getGlobal("TableMap") match {
+        | None() -> ""
+        | Some(file) -> "_V" + TableMap::fromFile(file).version.value.toString()
+        },
       kind => select.kind,
       params,
+      sets => this.compileSets(context, sets),
       aggr,
       from,
       kinds,
       where,
-      in_,
       groupBy,
       having,
       orderBy,
@@ -265,6 +249,38 @@ mutable class Compiler{
     this.!other = otherCopy;
 
     cselect
+  }
+
+  mutable fun compileSets(
+    context: mutable SKFS.Context,
+    params: Array<(String, Pos, Expr)>,
+  ): Array<(Int, CGExpr)> {
+    this.noAggr(() -> {
+      params.map(set -> {
+        (colName, pos, e) = set;
+        this.compileExpr(context, Literal(colName, false)) match {
+        | (CIExpr(CIGetFrom(0, n))) ->
+          this.compileExpr(context, e) match {
+          | CGNull() -> (n, CGNull())
+          | v @ CIExpr(_) -> (n, v)
+          | _ -> errorNbr(2, pos.value, "Incompatible types for set")
+          }
+        | (CFExpr(CFGetFrom(0, n))) ->
+          this.compileExpr(context, e) match {
+          | CGNull() -> (n, CGNull())
+          | v @ CFExpr(_) -> (n, v)
+          | _ -> errorNbr(2, pos.value, "Incompatible types for set")
+          }
+        | (CSExpr(CSGetFrom(0, n))) ->
+          this.compileExpr(context, e) match {
+          | CGNull() -> (n, CGNull())
+          | v @ CSExpr(_) -> (n, v)
+          | _ -> errorNbr(2, pos.value, "Incompatible types for set")
+          }
+        | _ -> errorNbr(3, pos.value, "Invalid set")
+        };
+      })
+    })
   }
 
   mutable fun compileParams(
@@ -386,23 +402,32 @@ mutable class Compiler{
       getTable(this.options, context, this.pos, tableSID)
 
     | FQuery(select @ Select _) ->
-      cselect = this.compileSelect(context, select);
-      this.other.push(SubSelect(cselect));
-      static::getDirDescr(select, cselect)
+      cselect = this.compileSelect(context, select, false);
+      selectDir = evalSelect(context, cselect, None());
+      static::getDirDescr(
+        select.params,
+        cselect.from,
+        cselect.params,
+        selectDir.dirName.toString(),
+        selectDir.dirName,
+      )
     }
   }
 
-  static fun getDirDescr(select: Select, cselect: CSelect): DirDescr {
+  static fun getCols(
+    paramsOpt: ?Array<(Expr, ?String)>,
+    from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+  ): (SortedMap<String, Int>, readonly Map<Int, String>) {
     cols = SortedMap[];
     invCols = mutable Map[];
-    select.params match {
+    paramsOpt match {
     | None() ->
       slot = 0;
-      for (dirDescr in cselect.from) {
-        for (tyDescr in dirDescr.i0.schema) {
-          if (!cols.containsKey(tyDescr.name)) {
-            !cols[tyDescr.name] = slot;
-            invCols![slot] = tyDescr.name;
+      for (dirDescr in from) {
+        for (tyName in dirDescr.i0.colNames) {
+          if (!cols.containsKey(tyName)) {
+            !cols[tyName] = slot;
+            invCols![slot] = tyName;
           };
           !slot = slot + 1;
         }
@@ -431,7 +456,18 @@ mutable class Compiler{
         }
       }
     };
-    schema = cselect.params.mapWithIndex((idx, param) -> {
+    (cols, invCols)
+  }
+
+  static fun getDirDescr(
+    paramsOpt: ?Array<(Expr, ?String)>,
+    from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    cparams: Array<CGExpr>,
+    selectId: String,
+    dirName: SKFS.DirName,
+  ): DirDescr {
+    (cols, invCols) = static::getCols(paramsOpt, from);
+    schema = cparams.mapWithIndex((idx, param) -> {
       ty = TypeDescr{
         name => invCols.maybeGet(idx) match {
         | None() ->
@@ -443,16 +479,19 @@ mutable class Compiler{
         ty => param.getType(),
         unique => false,
         primary => false,
+        notNull => false,
       };
       ty
     });
     DirDescr{
-      name => cselect.id,
+      name => selectId,
+      colNames => schema.map(ty -> ty.name),
       schema,
       cols,
-      dirName => SKFS.DirName::create("/" + cselect.id + "/"),
-      alias => Some(cselect.id),
+      dirName,
+      alias => Some(selectId),
       windowSize => None(),
+      isInput => false,
     }
   }
 
@@ -472,34 +511,26 @@ mutable class Compiler{
         };
         !select.join = None();
         select
-      | JInner()
-      | JNone() ->
+      | _ ->
         !select.from = select.from match {
         | None() -> Some(join.names)
         | Some(names) -> Some(names.concat(join.names))
         };
         !select.join = None();
         join.on match {
-        | None() -> select
-        | Some(clauses) ->
-          whereInit = select.where match {
-          | None() -> Literal("1", false)
-          | Some(whereInit) -> whereInit
-          };
+        | None() -> errorNbr(4, this.pos, "Expected ON after JOIN")
+        | Some((onClause, clauses)) ->
+          clauseIter = clauses.iterator();
 
-          where = whereInit;
-          for (clause in clauses) {
-            (e, a) = clause;
-            if (a is Some _) {
-              error(this.pos, "Unsupported join");
-            };
-            !where = Binop("AND", e, where);
+          for (clause in clauseIter) {
+            !onClause = Binop("AND", onClause, clause);
           };
-          !select.where = Some(where);
+          !select.where = select.where match {
+          | None() -> Some(On(join.kind, onClause))
+          | Some(where) -> Some(Binop("AND", On(join.kind, onClause), where))
+          };
           select
         }
-      | JLeft(_) -> error(this.pos, "TODO left join")
-      | JOuter() -> error(this.pos, "Error: OUTER JOIN not supported")
       }
     }
   }
@@ -515,20 +546,11 @@ mutable class Compiler{
         this.compileExpr(context, expr) match {
         | CGNull() -> Some(CNull())
         | CIExpr(x) -> Some(x)
-        | _ -> error(this.pos, "Invalid type for where clause")
+        | CFExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a FLOAT")
+        | CSExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a STRING")
         }
       }
     })
-  }
-
-  mutable fun compileIn(
-    _context: mutable SKFS.Context,
-    inOpt: ?Array<Expr>,
-  ): ?Array<CGExpr> {
-    inOpt match {
-    | None() -> None()
-    | Some _ -> invariant_violation("TODO: compileIn")
-    }
   }
 
   mutable fun compileGroupBy(
@@ -546,7 +568,7 @@ mutable class Compiler{
           | CIExpr(CILiteral(nIndexedAt1)) ->
             n = nIndexedAt1 - 1;
             if (n < 0 || n >= params.size()) {
-              error(this.pos, "GROUP BY out of bounds");
+              errorNbr(6, this.pos, "GROUP BY out of bounds");
             };
             e = params[n];
             CGBExpr(e, e.getType())
@@ -565,31 +587,63 @@ mutable class Compiler{
       this.compileExpr(context, e) match {
       | CGNull() -> CILiteral(0)
       | CIExpr(x) -> x
-      | _ -> error(this.pos, "Invalid type for HAVING clause")
+      | _ -> errorNbr(7, this.pos, "Invalid type for HAVING clause")
       }
     )
   }
 
   mutable fun compileRest(
     context: mutable SKFS.Context,
+    cparams: Array<CGExpr>,
     rest: ?(QueryKind, Select),
   ): ?(QueryKind, CSelect) {
-    rest.map(x -> (x.i0, this.compileSelect(context, x.i1)))
+    crest = rest.map(x -> (x.i0, this.compileSelect(context, x.i1, false)));
+    crest match {
+    | None() -> void
+    | Some((_, query)) ->
+      qparams = query.params;
+      if (cparams.size() != qparams.size()) {
+        errorNbr(8, this.pos, "Incompatible select width for union");
+      };
+      for (i in Range(0, qparams.size())) {
+        if (qparams[i].getType() != cparams[i].getType()) {
+          errorNbr(9, this.pos, "Incompatible types for union");
+        }
+      }
+    };
+    crest
   }
 
   mutable fun compileOrderBy(
-    context: mutable SKFS.Context,
+    params: ?Array<(SKSQL.Expr, ?String)>,
+    from: Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>,
     orderByOpt: ?Array<(Expr, IKind)>,
   ): ?Array<(Int, IKind)> {
     orderByOpt match {
     | None() -> None()
     | Some(orderBy) ->
+      (cols, _) = static::getCols(params, from);
       Some(
         orderBy.map(kv -> {
           (order, kind) = kv;
-          this.compileExpr(context, order) match {
-          | CIExpr(CILiteral(n)) -> (n, kind)
-          | _ -> error(this.pos, "ORDER BY expects integer literal")
+          order match {
+          | Literal(n, false) ->
+            first = n.getIter().next().fromSome();
+            if (Chars.isDigit(first)) {
+              for (c in n) {
+                if (Chars.isDigit(c)) continue;
+                errorNbr(11, this.pos, "invalid ORDER BY")
+              };
+              (n.toInt(), kind)
+            } else {
+              if (cols.containsKey(n)) {
+                (cols[n] + 1, kind)
+              } else {
+                errorNbr(10, this.pos, "invalid ORDER BY, unbound name " + n)
+              }
+            }
+
+          | _ -> errorNbr(11, this.pos, "invalid ORDER BY")
           }
         }),
       )
@@ -603,22 +657,31 @@ mutable class Compiler{
     limit match {
     | None() -> None()
     | Some(e) ->
+      if (this.options.virtual) {
+        errorNbr(12, this.pos, "Cannot use LIMIT in a virtual view")
+      };
       this.compileExpr(context, e) match {
       | CIExpr(i) -> Some(i)
-      | _ -> error(this.pos, "Invalid limit")
+      | _ -> errorNbr(13, this.pos, "Invalid limit")
       }
     }
   }
 
   mutable fun compileExpr(context: mutable SKFS.Context, expr: Expr): CGExpr {
     expr match {
-    | Literal("NULL", _) -> CGNull()
+    | Literal("null", _) -> CGNull()
     | Literal(str, isString) ->
       if (isString) return CSExpr(CSLiteral(str));
       str.getIter().next() match {
       | None() -> invariant_violation("Empty literal")
-      | Some(c) if (Chars.isDigit(c)) ->
-        if (str.contains(".")) {
+      | Some(c) if (Chars.isDigit(c) || c == '.') ->
+        if (
+          str.contains(".") ||
+          str.contains("e") ||
+          str.contains("E") ||
+          str.contains("p") ||
+          str.contains("P")
+        ) {
           CFExpr(CFLiteral(str.toFloat()))
         } else {
           CIExpr(CILiteral(str.toInt()))
@@ -653,7 +716,7 @@ mutable class Compiler{
     | Binop(".", Literal(ge1, _), Literal(ge2, _)) ->
       this.compileExpr(context, Literal(ge1 + "." + ge2, false))
 
-    | Binop("IS", e, Literal("NULL", _)) ->
+    | Binop("IS", e, Literal("null", _)) ->
       CIExpr(
         this.compileExpr(context, e) match {
         | CGNull() -> CILiteral(1)
@@ -663,7 +726,7 @@ mutable class Compiler{
         },
       )
 
-    | Binop("IS", e, Not(Literal("NULL", _))) ->
+    | Binop("IS", e, Not(Literal("null", _))) ->
       CIExpr(
         CNot(
           this.compileExpr(context, e) match {
@@ -733,6 +796,20 @@ mutable class Compiler{
 
     | Binop("NOT BETWEEN", _, _) -> invariant_violation("Invalid between")
 
+    | Binop("NOT LIKE", ge1, ge2) ->
+      this.compileExpr(context, Not(Binop("LIKE", ge1, ge2)))
+
+    | Binop("LIKE", ge1, ge2) ->
+      pattern = ge2 match {
+      | Literal(str, true) -> str
+      | _ -> error(this.pos, "Invalid LIKE, expected a pattern")
+      };
+
+      this.compileExpr(context, ge1) match {
+      | CSExpr(e1) -> CIExpr(CSLike(e1, parsePattern(pattern.chars())))
+      | _ -> error(this.pos, "Invalid LIKE, expected a string")
+      }
+
     | Binop(bop, ge1, ge2) ->
       cge1 = this.compileExpr(context, ge1);
       cge2 = this.compileExpr(context, ge2);
@@ -769,20 +846,37 @@ mutable class Compiler{
       };
       result
     | EQuery(select @ Select _) ->
-      cselect = this.compileSelect(context, select);
+      cselect = this.compileSelect(context, select, false);
       if (cselect.params.size() != 1) {
         error(this.pos, "Invalid type for inner SELECT");
       };
       cselect.params[0].getType() match {
-      | INTEGER() -> CIExpr(CEQuery(cselect))
-      | FLOAT() -> CFExpr(CEQuery(cselect))
-      | TEXT() -> CSExpr(CEQuery(cselect))
+      | INTEGER() -> CIExpr(CIQuery(cselect))
+      | FLOAT() -> CFExpr(CFQuery(cselect))
+      | TEXT() -> CSExpr(CSQuery(cselect))
       }
     | Exists(select @ Select _) ->
-      CIExpr(CExists(this.compileSelect(context, select)))
+      CIExpr(CExists(this.compileSelect(context, select, false)))
     | SKSQL.Call("coalesce", None()) ->
       error(this.pos, "Missing arguments for COALESCE")
-    | SKSQL.Call("coalesce", Some(values)) ->
+    | Call("id", None()) -> error(this.pos, "id expects one argument")
+    | Call("id", Some(args)) ->
+      if (args.size() != 1) {
+        error(this.pos, "id expects one argument")
+      };
+      args[0] match {
+      | Literal(varName, true) ->
+        globals = context.getGlobal(GLOBALS) match {
+        | None() -> error(this.pos, "Unknown id " + varName)
+        | Some(file) -> Globals::fromFile(file)
+        };
+        if (!globals.containsKey(varName)) {
+          error(this.pos, "Unknown id " + varName)
+        };
+        CIExpr(CILiteral(globals[varName]))
+      | _ -> error(this.pos, "id expects a string literal")
+      }
+    | Call("coalesce", Some(values)) ->
       tvalues = values.map(x -> this.compileExpr(context, x));
       ty = for (val in tvalues) {
         val match {
@@ -833,6 +927,7 @@ mutable class Compiler{
           ),
         )
       }
+
     | SKSQL.Call("sum", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
@@ -856,6 +951,53 @@ mutable class Compiler{
         | CGNull _ -> CGNull()
         }
       })
+
+    | SKSQL.Call("min", Some(values)) ->
+      this.noAggr(() -> {
+        if (values.size() != 1) {
+          error(this.pos, "Invalid number of arguments for min")
+        };
+        value = values[0];
+        this.compileExpr(context, value) match {
+        | e @ CIExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Min(), e));
+          CIExpr(CIGetFrom(0, slot))
+        | e @ CFExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Min(), e));
+          CFExpr(CFGetFrom(0, slot))
+        | e @ CSExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Min(), e));
+          CSExpr(CSGetFrom(0, slot))
+        | CGNull _ -> CGNull()
+        }
+      })
+
+    | SKSQL.Call("max", Some(values)) ->
+      this.noAggr(() -> {
+        if (values.size() != 1) {
+          error(this.pos, "Invalid number of arguments for max")
+        };
+        value = values[0];
+        this.compileExpr(context, value) match {
+        | e @ CIExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Max(), e));
+          CIExpr(CIGetFrom(0, slot))
+        | e @ CFExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Max(), e));
+          CFExpr(CFGetFrom(0, slot))
+        | e @ CSExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Max(), e));
+          CSExpr(CSGetFrom(0, slot))
+        | CGNull _ -> CGNull()
+        }
+      })
+
     | SKSQL.Call("count", arg) ->
       this.noAggr(() -> {
         value = arg match {
@@ -884,6 +1026,7 @@ mutable class Compiler{
         | CGNull _ -> CGNull()
         }
       })
+
     | SKSQL.Call("avg", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
@@ -916,6 +1059,7 @@ mutable class Compiler{
         | CGNull _ -> CGNull()
         }
       })
+
     | SKSQL.Call("abs", Some(values)) ->
       if (values.size() != 1) {
         error(this.pos, "Invalid number of arguments for abs")
@@ -1031,11 +1175,7 @@ mutable class Compiler{
           }
         );
 
-        CSExpr(
-          CSLiteral(
-            strftime(context, sargs[0], sargs[1], sargs.slice(2, sargs.size())),
-          ),
-        )
+        CSExpr(CSLiteral(callStrftime(this.pos, context, sargs)))
       } else {
         sargs = args.map(arg ->
           this.compileExpr(context, arg) match {
@@ -1090,9 +1230,17 @@ mutable class Compiler{
       | (cs @ CSExpr _, TEXT()) -> cs
       }
 
-    | e ->
-      debug(e);
-      invariant_violation("TODO: compileExpr")
+    | On(k, e) ->
+      this.compileExpr(context, e) match {
+      | CGNull _ -> CIExpr(CNull())
+      | CIExpr(ie) -> CIExpr(COn(k, ie))
+      | _ -> error(this.pos, "Unexpected type for ON")
+      }
+
+    | All _ -> error(this.pos, "Unexpected ALL")
+    | Distinct _ -> error(this.pos, "Unexpected Distinct")
+    | Between _ -> error(this.pos, "Unexpected BETWEEN")
+    | Call(fname, _) -> error(this.pos, "Unknown function: " + fname)
     }
   }
 
@@ -1189,20 +1337,44 @@ mutable class Compiler{
   readonly fun findJoin(
     tables: readonly Vector<?JTable>,
     cond: Expr,
-  ): (Expr, ?EqJoin) {
+  ): (Expr, JoinKind, ?EqJoin) {
     cond match {
+    | On(jk, e) ->
+      (!e, _, eqJoin) = this.findJoin(tables, e);
+      jk match {
+      | JLeft(_)
+      | JRight(_)
+      | JOuter() ->
+        if (eqJoin is None()) {
+          error(this.pos, "Invalid ON expression for JOIN");
+        }
+      | JCross()
+      | JInner()
+      | JNone() ->
+        void
+      };
+      (e, jk, eqJoin)
+
     | Binop("AND", e1, e2) ->
-      (!e1, join1) = this.findJoin(tables, e1);
+      (!e1, jk1, join1) = this.findJoin(tables, e1);
       join1 match {
       | None() ->
-        (!e2, join2) = this.findJoin(tables, e2);
+        (!e2, jk2, join2) = this.findJoin(tables, e2);
         join2 match {
-        | None() -> (cond, None())
+        | None() -> (cond, JNone(), None())
         | Some(_) ->
-          (if (e2 is Literal("1", false)) e1 else Binop("AND", e1, e2), join2)
+          (
+            if (e2 is Literal("1", false)) e1 else Binop("AND", e1, e2),
+            jk2,
+            join2,
+          )
         }
       | Some(_) ->
-        (if (e1 is Literal("1", false)) e2 else Binop("AND", e1, e2), join1)
+        (
+          if (e1 is Literal("1", false)) e2 else Binop("AND", e1, e2),
+          jk1,
+          join1,
+        )
       }
     | Binop("=", Binop(".", Literal(tname1, _), Literal(cname1, _)), e2) ->
       this.findJoin(
@@ -1218,8 +1390,8 @@ mutable class Compiler{
 
     | Binop(
       "=",
-      e1 @ Literal(name1, _),
-      e2 @ Literal(name2, _),
+      Literal(name1, _),
+      Literal(name2, _),
     ) if (this.subst.containsKey(name1) && this.subst.containsKey(name2)) ->
       (this.subst[name1], this.subst[name2]) match {
       | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
@@ -1232,22 +1404,26 @@ mutable class Compiler{
         tables[tableNbr2] is Some _ &&
         tableNbr1 != tableNbr2
       ) ->
+        if (tableNbr1 > tableNbr2) {
+          (!tableNbr1, !col1, !tableNbr2, !col2) = (
+            tableNbr2,
+            col2,
+            tableNbr1,
+            col1,
+          );
+        };
         table1 = tables[tableNbr1].fromSome();
         table2 = tables[tableNbr2].fromSome();
         col1IsUnique = isUnique(table1.schema[col1]);
         col2IsUnique = isUnique(table2.schema[col2]);
-        if (col1IsUnique && !col2IsUnique) {
-          this.findJoin(tables, Binop("=", e2, e1))
-        } else {
-          col1Name = (col1, IASC(), table1.schema[col1].ty);
-          proj1 = TableProj(tableNbr1, col1Name, col1IsUnique);
-          col2Name = (col2, IASC(), table2.schema[col2].ty);
-          proj2 = TableProj(tableNbr2, col2Name, col2IsUnique);
-          (Literal("1", false), Some(EqJoin(proj1, proj2)))
-        }
-      | _ -> (cond, None())
+        col1Name = (col1, IASC(), table1.schema[col1].ty);
+        proj1 = TableProj(tableNbr1, col1Name, col1IsUnique);
+        col2Name = (col2, IASC(), table2.schema[col2].ty);
+        proj2 = TableProj(tableNbr2, col2Name, col2IsUnique);
+        (Literal("1", false), JInner(), Some(EqJoin(proj1, proj2)))
+      | _ -> (cond, JNone(), None())
       }
-    | _ -> (cond, None())
+    | _ -> (cond, JNone(), None())
     }
   }
 
@@ -1255,16 +1431,24 @@ mutable class Compiler{
     context: mutable SKFS.Context,
     origFrom: Array<DirDescr>,
     select: Select,
-  ): Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)> {
+  ): (?Expr, Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>) {
     select.where match {
     | None() ->
-      if (origFrom.size() > 1 && !this.options.allowCross) {
-        errorNoMergeClause(this.pos, origFrom[0], origFrom[1]);
+      if (origFrom.size() > 1) {
+        if (this.options.virtual) {
+          error(
+            this.pos,
+            "Cross joins not supported in virtual views (regardless of option --always-allow-joins)",
+          );
+        };
+        if (!this.options.alwaysAllowJoins) {
+          errorNoMergeClause(this.pos);
+        }
       };
-      origFrom.map(x -> (x, None()))
+      (None(), origFrom.map(x -> (x, None())))
     | Some(cond) ->
       from = this.compileIndexes(context, origFrom, cond);
-      !from = this.compileMerge(from, cond);
+      (!cond, !from) = this.compileMerge(from, cond);
 
       tablesLeft = from.filter(x ->
         x.i1 match {
@@ -1272,21 +1456,17 @@ mutable class Compiler{
         | Some(_) -> false
         }
       );
-      if (tablesLeft.size() >= 2 && !this.options.allowCross) {
-        errorNoMergeClause(
-          this.pos,
-          from.filter(x -> x.i0.dirName == tablesLeft[0].i0.dirName)[0].i0,
-          from.filter(x -> x.i0.dirName == tablesLeft[1].i0.dirName)[0].i0,
-        );
+      if (tablesLeft.size() >= 2 && !this.options.alwaysAllowJoins) {
+        errorNoMergeClause(this.pos);
       };
-      from
+      (Some(cond), from)
     }
   }
 
   mutable fun compileMerge(
     from: Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>,
     cond: Expr,
-  ): Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)> {
+  ): (Expr, Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>) {
     tables = mutable Vector<?JTable>[];
     newFrom = mutable Vector[];
     moveMap = mutable Map[];
@@ -1296,7 +1476,7 @@ mutable class Compiler{
     };
 
     loop {
-      (!cond, joinOpt) = this.findJoin(tables, cond);
+      (!cond, joinKind, joinOpt) = this.findJoin(tables, cond);
       join = joinOpt match {
       | None() ->
         for (tableNbr => tableOpt in tables) {
@@ -1306,6 +1486,7 @@ mutable class Compiler{
             moveMap![tableNbr] = newFrom.size();
             dirDescr = DirDescr{
               name => table.dirName.toString(),
+              colNames => from.map(x -> x.i0.colNames).flatten(),
               dirName => table.dirName,
               schema => table.schema.map(x ->
                 if (x.primary) x with {unique => true} else x
@@ -1313,6 +1494,7 @@ mutable class Compiler{
               alias => table.alias,
               cols => SortedMap[],
               windowSize => table.windowSize,
+              isInput => false,
             };
             newFrom.push((dirDescr, table.ranges))
           }
@@ -1342,11 +1524,47 @@ mutable class Compiler{
           }
         };
 
-        return newFrom.toArray()
+        return (cond, newFrom.toArray())
       | Some(x) -> x
       };
       leftTable = tables[join.left.tableNbr].fromSome();
       rightTable = tables[join.right.tableNbr].fromSome();
+      viewName = leftTable.name + "_" + rightTable.name;
+      if (!this.options.virtual && !this.options.alwaysAllowJoins) {
+        leftSchema = tables[join.left.tableNbr].fromSome().schema;
+        col1 = leftSchema[join.left.col.i0].name;
+        rightSchema = tables[join.right.tableNbr].fromSome().schema;
+        col2 = rightSchema[join.right.col.i0].name;
+        msg =
+          "Joins outside of virtual views are considered bad practice in sqlive.\n" +
+          "You should first create a virtual view joining " +
+          leftTable.name +
+          " and " +
+          rightTable.name +
+          " with a query of the form:\n\n" +
+          "create virtual view " +
+          viewName +
+          " as select * from " +
+          leftTable.name +
+          ", " +
+          rightTable.name +
+          " where " +
+          col1 +
+          " = " +
+          col2 +
+          ";\n\n" +
+          "And then use " +
+          viewName +
+          " directly.\n" +
+          "PS: You can ignore this error message with " +
+          "--always-allow-join (not recommended).\n" +
+          if (tables.size() == 2) {
+            "PS2: don't forget you can add indexes to virtual views."
+          } else {
+            ""
+          };
+        error(this.pos, msg)
+      };
       childName = SKFS.DirName::create(
         "/merge/left" +
           leftTable.dirName +
@@ -1378,6 +1596,7 @@ mutable class Compiler{
           rightRanges => rightTable.ranges,
           childName,
           kinds => leftKinds.concat(rightKinds),
+          joinKind,
         },
       );
 
@@ -1413,6 +1632,7 @@ mutable class Compiler{
       tables![join.right.tableNbr] = None();
       tables![join.left.tableNbr] = Some(
         JTable{
+          name => viewName,
           dirName => childName,
           ranges => None(),
           schema => newSchema,
@@ -1447,6 +1667,18 @@ mutable class Compiler{
         });
         return result
       | Some((index, tableNbr, ranges)) ->
+        for (range in ranges) {
+          (low, high) = range;
+          if (low > high) {
+            error(
+              this.pos,
+              "contradictory inequalities, result will always be empty",
+            );
+          };
+        };
+        if (this.options.showUsedIndexes) {
+          print_string("USING INDEX: " + index.name);
+        };
         killed.add(index.tableName);
         rowRanges = ranges.map(range -> {
           (minKeyValues, maxKeyValues) = range;
@@ -1489,6 +1721,138 @@ mutable class Compiler{
     cond: Expr,
   ): LookUps {
     cond match {
+    | Binop(
+      op,
+      Call("strftime", Some(args)),
+      e2,
+    ) if (args.all(x -> x is Literal(_, true))) ->
+      sargs = args.map(x ->
+        x match {
+        | Literal(str, _) -> str
+        | _ -> invariant_violation("Unexpected type")
+        }
+      );
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(op, Literal(callStrftime(this.pos, context, sargs), true), e2),
+      )
+
+    | Binop(
+      op,
+      e1,
+      Call("strftime", Some(args)),
+    ) if (args.all(x -> x is Literal(_, true))) ->
+      sargs = args.map(x ->
+        x match {
+        | Literal(str, _) -> str
+        | _ -> invariant_violation("Unexpected type")
+        }
+      );
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(op, e1, Literal(callStrftime(this.pos, context, sargs), true)),
+      )
+
+    | Binop(op, Call("date", Some(args)), e2) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+          e2,
+        ),
+      )
+
+    | Binop(op, Call("time", Some(args)), e2) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+          e2,
+        ),
+      )
+
+    | Binop(op, Call("datetime", Some(args)), e2) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          Call(
+            "strftime",
+            Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+          ),
+          e2,
+        ),
+      )
+
+    | Binop(op, e1, Call("date", Some(args))) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          e1,
+          Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+        ),
+      )
+
+    | Binop(op, e1, Call("time", Some(args))) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          e1,
+          Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+        ),
+      )
+
+    | Binop(op, e1, Call("datetime", Some(args))) ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          e1,
+          Call(
+            "strftime",
+            Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+          ),
+        ),
+      )
+
     | Binop(op, Binop(".", Literal(tname1, _), Literal(cname1, _)), e2) ->
       this.findLookUps(
         context,
@@ -1547,6 +1911,10 @@ mutable class Compiler{
       this.findLookUps(context, killed, tables, Binop(op, e2, e1))
 
     | Binop(op, Literal(name1, _), e @ Literal _) if (this.isVar(name1)) ->
+      op match {
+      | "=" | "<" | "<=" | ">" | ">=" -> void
+      | _ -> return LookUps[]
+      };
       (tableNbr, colNbr) = this.subst[name1] match {
       | (CIExpr(CIGetFrom(x, y))) -> (x, y)
       | (CFExpr(CFGetFrom(x, y))) -> (x, y)
@@ -1575,7 +1943,7 @@ mutable class Compiler{
           invariant_violation("Could not find column: " + colNbr)
         };
         cols = SortedA[
-          Col(lookUpColNbr, Array[(ColOp::create(op), value)], unique),
+          Col(lookUpColNbr, Array[(ColOp::create(op, value))], unique),
         ];
         LookUp{index, tableNbr, cols}
       });
@@ -1583,4 +1951,34 @@ mutable class Compiler{
     | _ -> LookUps[]
     }
   }
+}
+
+/*****************************************************************************/
+/* LIKE patterns parsing. */
+/*****************************************************************************/
+
+fun parsePattern(str: Vector<Char>): Pattern {
+  text = mutable Vector[];
+  subs = mutable Vector[];
+  hasUnderscore = false;
+  for (c in str) {
+    if (c == '%') {
+      if (text.size() != 0) {
+        subs.push(text.toArray());
+        text.clear();
+      };
+      continue;
+    };
+    if (c == '_') {
+      !hasUnderscore = true;
+    };
+    text.push(c);
+  };
+  if (text.size() != 0) {
+    subs.push(text.toArray());
+    text.clear();
+  };
+  firstIsPercent = str.size() > 0 && str[0] == '%';
+  lastIsPercent = str.size() > 0 && str[str.size() - 1] == '%';
+  Pattern{hasUnderscore, firstIsPercent, lastIsPercent, subs => subs.toArray()}
 }

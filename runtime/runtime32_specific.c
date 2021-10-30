@@ -160,3 +160,12 @@ void SKIP_localtime() {
 void SKIP_time() {
   // Not implemented
 }
+
+void SKIP_flush_stdout() {
+  // Not implemented
+}
+
+uint64_t SKIP_notify(char* filename_obj, uint64_t tick) {
+  // Not implemented
+  return 0;
+}

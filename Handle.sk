@@ -423,6 +423,15 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   fun isEmpty(context: mutable Context): Bool {
     context.getEagerDir(this.dirName).isEmpty(context)
   }
+
+  fun writeArray<U: File>[T: U](
+    context: mutable Context,
+    key: BaseName,
+    values: Array<U>,
+  ): void {
+    dir = context.unsafeGetEagerDir(this.dirName);
+    dir.writeArray(context, key, values);
+  }
 }
 
 module end;

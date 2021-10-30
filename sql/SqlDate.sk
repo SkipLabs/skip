@@ -497,7 +497,7 @@ mutable class DateTime(tz: TimeZone, tm: mutable TM) {
   ): void {
     (!pos, nbr) = lex.nextInt32(pos);
     if (lex.isEq(pos, ".")) {
-      todo()
+      error(pos, ". in dates not implemented");
     } else {
       (!pos, word) = lex.nextWord(pos);
       word match {
@@ -568,6 +568,15 @@ fun check_format(format: String): void {
       }
     }
   }
+}
+
+fun callStrftime(
+  pos: Int,
+  context: mutable SKFS.Context,
+  sargs: Array<String>,
+): String {
+  if (sargs.size() < 2) error(pos, "missing arguments for strftime");
+  strftime(context, sargs[0], sargs[1], sargs.slice(2, sargs.size()))
 }
 
 fun strftime(

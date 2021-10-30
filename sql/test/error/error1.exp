@@ -1,0 +1,17 @@
+
+
+select * from t1, t2;
+       ^
+       |
+        ----- ERROR
+Error: line 4, characters 8-8:
+
+SELECT involves multiple tables but no appropriate join clause was found.
+Was expecting to find a clause of the form:
+... AND colName1 = colName2 AND ...
+
+
+This will be interpreted as a cross-join, which is almost
+certainly not what you want.
+If you are absolutely sure that's what you want to do, you can pass
+the option '--always-allow-joins' to make this error go away.

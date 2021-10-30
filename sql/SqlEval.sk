@@ -32,47 +32,94 @@ fun computeTableDescr(
     colVec.push((schema[i].name, i));
   };
   cols = SortedMap::createFromItems(colVec);
-  DirDescr{name, schema, cols, dirName, alias => None(), windowSize}
+  colNames = schema.map(ty -> ty.name);
+  DirDescr{
+    name,
+    colNames,
+    schema,
+    cols,
+    dirName,
+    alias => None(),
+    windowSize,
+    isInput => true,
+  }
 }
 
 fun computeInsert(
+  context: mutable SKFS.Context,
+  inTransaction: Bool,
   pos: Int,
   paramsOpt: ?Array<String>,
-  values: Array<?CValue>,
+  valuesArray: Array<Array<Value>>,
   table: DirDescr,
-): RowValues {
-  schemaSize = table.schema.size();
-  valueSize = values.size();
-  cvalues = paramsOpt match {
-  | None() ->
-    if (valueSize != schemaSize) {
-      error(pos, "Value size mismatch with table schema");
-    };
-    values
-  | Some(params) ->
-    paramSize = params.size();
-    if (paramSize != valueSize) {
-      error(pos, "Value size mismatch");
-    };
-    if (paramSize != schemaSize) {
-      error(pos, "Value size mismatch with table schema");
-    };
-    size = schemaSize;
-    cols = table.cols;
-    result = Array<?CValue>::mfill(params.size(), None());
-    for (i in Range(0, size)) {
-      colName = params[i];
-      if (!cols.containsKey(colName)) {
-        error(pos, "Column not found: " + colName);
+): Array<RowValues> {
+  valuesArray.map(vals -> {
+    values = vals.mapWithIndex((idx, val) -> {
+      valueToCValue(context, inTransaction, pos, table.schema, idx, val)
+    });
+    schema = table.schema;
+    schemaSize = schema.size();
+    valueSize = values.size();
+    cvalues = paramsOpt match {
+    | None() ->
+      if (valueSize != schemaSize) {
+        error(pos, "Value size mismatch with table schema");
       };
-      result![cols[colName]] = values[i];
+      values
+    | Some(params) ->
+      paramSize = params.size();
+      if (
+        values.size() == paramSize &&
+        paramSize == schemaSize - 1 &&
+        schema.any(ty -> ty.primary)
+      ) {
+        (primaryColName, primaryIndex) = for (i => ty in schema) {
+          if (ty.primary) break (ty.name, i)
+        } else {
+          invariant_violation("Internal error")
+        };
+        newParams = mutable Vector[];
+        newValues = mutable Vector[];
+        for (i in Range(0, primaryIndex)) {
+          newParams.push(params[i]);
+          newValues.push(values[i]);
+        };
+        newParams.push(primaryColName);
+        newValues.push(Some(CInt(SKFS.genSym(0))));
+        for (i in Range(primaryIndex, params.size())) {
+          newParams.push(params[i]);
+          newValues.push(values[i]);
+        };
+        !params = newParams.toArray();
+        !values = newValues.toArray();
+        !paramSize = params.size();
+        !valueSize = values.size();
+      };
+      if (paramSize != valueSize) {
+        error(pos, "Value size mismatch");
+      };
+      if (paramSize != schemaSize) {
+        error(pos, "Value size mismatch with table schema");
+      };
+      size = schemaSize;
+      cols = table.cols;
+      result = Array<?CValue>::mfill(params.size(), None());
+      for (i in Range(0, size)) {
+        colName = params[i];
+        if (!cols.containsKey(colName)) {
+          error(pos, "Column not found: " + colName);
+        };
+        result![cols[colName]] = values[i];
+      };
+      unsafe_chill_trust_me(result)
     };
-    unsafe_chill_trust_me(result)
-  };
-  RowValues::create(cvalues)
+    RowValues::create(cvalues)
+  })
 }
 
 fun valueToCValue(
+  context: mutable SKFS.Context,
+  inTransaction: Bool,
   pos: Int,
   schema: Array<TypeDescr>,
   idx: Int,
@@ -81,23 +128,73 @@ fun valueToCValue(
   if (idx >= schema.size()) {
     error(pos, "Too many columns defined");
   };
-  if (val is VNull _) return (None() : ?CValue);
+  if (val is VNull _) {
+    if (schema[idx].notNull) {
+      error(pos, "cannot insert NULL in column declared as NOT NULL")
+    } else {
+      return (None() : ?CValue)
+    }
+  };
   schema[idx].ty match {
   | INTEGER() ->
     val match {
-    | VInt(n) -> Some(CInt(n))
+    | VId(varName) ->
+      if (!inTransaction) {
+        error(pos, "id can only be used in a transaction");
+      };
+      globals = context.getGlobal(GLOBALS) match {
+      | None() -> Globals()
+      | Some(file) -> Globals::fromFile(file)
+      };
+      if (globals.containsKey(varName)) {
+        error(pos, "Name already bound " + varName)
+      };
+      id = SKFS.genSym(0);
+      !globals = globals.set(varName, id);
+      context.setGlobal(GLOBALS, globals);
+      Some(CInt(id))
+    | VInt(n) ->
+      if (schema[idx].primary) {
+        _ = SKFS.genSym(n);
+      };
+      Some(CInt(n))
     | VLShift(n1, n2) -> Some(CInt(n1.shl(n2)))
-    | _ -> error(pos, "Type mismatch")
+    | v ->
+      error(
+        pos,
+        "Type mismatch on column " +
+          (idx + 1) +
+          " expected type INTEGER (found " +
+          inspect(v).toString() +
+          ")",
+      )
     }
   | FLOAT() ->
     val match {
     | VFloat(f) -> Some(CFloat(f))
-    | _ -> error(pos, "Type mismatch")
+    | VInt(i) -> Some(CFloat(i.toFloat()))
+    | v ->
+      error(
+        pos,
+        "Type mismatch on column " +
+          (idx + 1) +
+          " expected type FLOAT (found " +
+          inspect(v).toString() +
+          ")",
+      )
     }
   | TEXT() ->
     val match {
     | VString(str) -> Some(CString(str))
-    | _ -> error(pos, "Type mismatch")
+    | v ->
+      error(
+        pos,
+        "Type mismatch on column " +
+          (idx + 1) +
+          " expected type STRING (found " +
+          inspect(v).toString() +
+          ")",
+      )
     }
   }
 }
@@ -147,7 +244,12 @@ fun computeOrder(
   kinds.toArray()
 }
 
-class SelectFile(value: Select) extends SKFS.File
+class SelectFile(
+  tick: Int,
+  virtual: Bool,
+  text: String,
+  value: Select,
+) extends SKFS.File
 
 class Evaluator{options: Options} {
   fun write(
@@ -174,7 +276,10 @@ class Evaluator{options: Options} {
     inTransaction: Bool,
   ): ?((mutable SKFS.Context, mutable SKFS.Context) ~> void) {
     stmt match {
-    | Table{name, schema, windowSize} ->
+    | Table{pos, name, schema, windowSize} ->
+      if (inTransaction) {
+        error(pos, "Cannot create a table in a transaction");
+      };
       Some((context, _) ~> {
         dirDescr = computeTableDescr(name, schema, windowSize);
         windowSize match {
@@ -183,16 +288,19 @@ class Evaluator{options: Options} {
           exit(23)
         | _ -> void
         };
-        this.createTable(context, name, dirDescr)
+        this.createTable(context, pos, name, dirDescr)
       })
     | Insert{pos, name, paramsOpt, values} ->
       baseName = SKFS.SID::create(name);
+      if (getTableDir(context).maybeGet(context, baseName) is None()) {
+        error(pos, "Table not found: " + name);
+      };
       values match {
       | IQuery(selectAst @ Select _) ->
+        !selectAst.id = selectAst.id + "_" + SKFS.genSym(0);
         compiler = SKSQL.Compiler::create(this.options, selectAst.pos);
-        select = compiler.compileSelect(context, selectAst);
+        select = compiler.compileSelect(context, selectAst, true);
         selectDir = evalSelect(context, select, None());
-        handle = SKFS.EHandle(Row::fromFile, selectDir.dirName);
         updateTableMap(context);
         table = getTable(this.options, context, pos, baseName);
         dir = getDir(table);
@@ -211,37 +319,33 @@ class Evaluator{options: Options} {
           | _ -> error(pos, "Incompatible select type")
           }
         };
-        id = SKFS.genSym(0);
-        _ = handle.contextWriterKeyValues(
-          Row::fromFile,
+        _ = SKFS.EagerDir::apply(
           context,
+          selectDir.dirName,
           sinkDirName,
-          (context, _writer, key, _) ~> {
-            for (srcValue in (context.unsafeGetEagerDir(
-              selectDir.dirName,
-            )).unsafeGetDataIter(key)) {
-              (source, valuesR) = srcValue;
-              path = source.value;
-              !path.baseName = SKFS.IID(hash((id, path.baseName)));
-              newDir = context
-                .unsafeGetEagerDir(dir.dirName)
-                .writeEntry(context, path, key, valuesR);
-              context.setDir(newDir.dirName, newDir);
-            };
+          (context, _writer, key, valueIter) ~> {
+            entries = Vector[
+              (
+                key,
+                (
+                  SKFS.Path::create(selectDir.dirName, key),
+                  valueIter.collect(Array),
+                ),
+              ),
+            ];
+            inputDir = context.unsafeGetEagerDir(dir.dirName);
+            inputDir.writeArraySourceMany(context, entries.iterator());
           },
         );
         None()
 
       | IValues(vals) ->
         table = getTable(this.options, context, pos, baseName);
-        cvalues = vals.mapWithIndex((idx, val) ->
-          valueToCValue(pos, table.schema, idx, val)
-        );
-        this.insert(context, pos, inTransaction, table, paramsOpt, cvalues)
+        this.insert(context, pos, inTransaction, table, paramsOpt, vals)
       }
     | selectAst @ Select{} ->
       compiler = SKSQL.Compiler::create(this.options, selectAst.pos);
-      select = compiler.compileSelect(context, selectAst);
+      select = compiler.compileSelect(context, selectAst, true);
       selectDir = evalSelect(context, select, None());
       stdout = context.getGlobal("Stdout") match {
       | Some(StdoutFile(l)) -> l
@@ -253,20 +357,101 @@ class Evaluator{options: Options} {
       None()
 
     | index @ Index _ ->
-      options = this.options;
       Some((context, _) ~> {
-        input = getIndexInputDir(context);
-        this.write(context, input.dirName, SKFS.SID::create(index.name), index);
-        _ = getIndexOutputDir(options, context)
+        this.makeIndex(context, index)
       })
-    | View{name => viewName, query => selectAst @ Select _} ->
-      !selectAst.id = viewName;
+    | View{
+      pos,
+      name => viewName,
+      query => origSelectAst @ Select _,
+      virtual,
+      text,
+    } ->
+      if (inTransaction) {
+        error(pos, "Cannot create a view in a transaction");
+      };
+      selectAst = origSelectAst with {id => viewName};
       views = getViewsDir(context);
       viewsDir = context.unsafeGetEagerDir(views.dirName);
-      viewsDir.write(context, SKFS.SID(viewName), SelectFile(selectAst));
-      None()
-    | Drop{kind => TView(), name => _} -> todo()
-    | Drop{kind => TIndex(), name => _} -> todo()
+      key = SKFS.SID(viewName);
+      if (viewsDir.getArrayRaw(key).size() != 0) {
+        error(pos, "VIEW " + viewName + " already exists");
+      };
+      viewsDir.write(
+        context,
+        key,
+        SelectFile(context.tick.value, virtual, text, selectAst),
+      );
+      if (virtual) {
+        if (inTransaction) {
+          error(pos, "Cannot create a virtual view in a transaction");
+        };
+        startTick = context.tick;
+        // This phase just populates the data.
+        compiler1 = SKSQL.Compiler::create(
+          this.options with {virtual => true},
+          selectAst.pos,
+        );
+        cselect1 = compiler1.compileSelect(context, selectAst, true);
+        _ = SKSQL.evalSelect(context, cselect1, None());
+        Some((context, delta) ~> {
+          sameDeps = unsafeCompareSets(context.deps.data, delta.deps.data);
+          // If the deps haven't changed, that means we can reuse
+          // the pre-computed data.
+          if (sameDeps != 0) {
+            changedDirNames = delta.dirs.state.getChangesAfter(startTick);
+            for (changedDirName in changedDirNames) {
+              if (!context.dirs.state.containsKey(changedDirName)) {
+                context.setGlobal(
+                  "PRE_COMPUTED_" + changedDirName,
+                  delta.unsafeGetDir(changedDirName),
+                );
+              }
+            }
+          };
+          compiler = SKSQL.Compiler::create(
+            this.options with {virtual => true},
+            selectAst.pos,
+          );
+          cselect = compiler.compileSelect(context, selectAst, true);
+          dirName = SKFS.DirName::create("/" + selectAst.id + "/");
+          dirDescr = SKSQL.Compiler::getDirDescr(
+            selectAst.params,
+            cselect.from,
+            cselect.params,
+            cselect.id,
+            dirName,
+          );
+          _selectDir = SKSQL.evalSelect(context, cselect, None());
+          tableDir = getTableDir(context);
+          fileName = SKFS.SID::create(viewName);
+          tableDir.writeArray(context, fileName, Array[dirDescr]);
+        })
+      } else {
+        None()
+      }
+    | Drop{pos, kind => TView(), name => viewName} ->
+      if (inTransaction) {
+        error(pos, "Cannot drop a view in a transaction");
+      };
+      Some((context, _) ~> {
+        views = getViewsDir(context);
+        viewsDir = context.unsafeGetEagerDir(views.dirName);
+        key = SKFS.SID(viewName);
+        files = viewsDir.getArrayRaw(key);
+        if (files.size() == 0) {
+          error(pos, "VIEW " + viewName + " does not exist");
+        };
+        selectFile = SelectFile::fromFile(files[0]);
+        if (selectFile.virtual) {
+          error(pos, "Cannot drop a virtual view");
+        } else {
+          viewsDir.writeArray(context, key, Array[]);
+        }
+      })
+
+    | Drop{pos, kind => TIndex(), name => _} ->
+      error(pos, "Drop index not supported")
     | Drop{kind => TTable(), name} ->
       Some((context, _) ~> {
         dirNameStr = "/" + name + "/";
@@ -278,50 +463,148 @@ class Evaluator{options: Options} {
         )
       })
     | Delete{pos, colName => None(), name, where} ->
+      _ = this.delete(context, pos, name, where, Array[]);
+      None()
+    | Delete{pos, colName => Some _} ->
+      error(pos, "DELETE colName not supported")
+
+    | Update{pos, name, sets, where} ->
       baseName = SKFS.SID::create(name);
+      if (getTableDir(context).maybeGet(context, baseName) is None()) {
+        error(pos, "Table not found: " + name);
+      };
+      deleteDir = this.delete(context, pos, name, where, sets);
+      updateTableMap(context);
       table = getTable(this.options, context, pos, baseName);
-      inputHandle = getDir(table);
-      if (table.windowSize is Some _) {
-        print_error("Error: cannot delete from a window");
-        exit(23);
-      };
-      from = Some(Array[TableName(FName(name), None(), false)]);
-      selectAst = Select{
-        id => "SELECT_" + SKFS.genSym(pos),
-        pos => pos,
-        params => None(),
-        from,
-        where,
-        groupBy => None(),
-        having => None(),
-        in_ => None(),
-        join => None(),
-        kind => SAll(),
-        limit => None(),
-        orderBy => None(),
-        rest => None(),
-      };
-      compiler = SKSQL.Compiler::create(this.options, selectAst.pos);
-      select = compiler.compileSelect(context, selectAst);
-      selectHandle = evalSelect(context, select, None());
-      inputDir = context.unsafeGetEagerDir(inputHandle.dirName);
-      selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
-      newDir = context.unsafeGetEagerDir(inputDir.dirName);
-      selectDir.unsafeIterKeys((key, _) -> {
-        for (sourceValues in inputDir.getDataIter(context, key)) {
-          (source, _values) = sourceValues;
-          !newDir = newDir.writeEntry(context, source.value, key, Array[]);
-        }
-      });
-      context.setDir(newDir.dirName, newDir);
+      dir = getDir(table);
+      sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
+      sinkDirName = SKFS.DirName::create(sinkName);
+      _ = SKFS.EagerDir::apply(
+        context,
+        deleteDir,
+        sinkDirName,
+        (context, _writer, key, valueIter) ~> {
+          entries = Vector[
+            (
+              key,
+              (SKFS.Path::create(deleteDir, key), valueIter.collect(Array)),
+            ),
+          ];
+          inputDir = context.unsafeGetEagerDir(dir.dirName);
+          inputDir.writeArraySourceMany(context, entries.iterator());
+        },
+      );
       None()
 
-    | _ -> invariant_violation("TODO rest of stmt in SqlEval.sk")
-    /*
-          | Update{name: String, sets: Array<(String, Expr)>, where: ?Expr}
-          | Replace{name: String, values: InsertValues}
-        */
+    | Replace{pos} -> error(pos, "REPLACE colName not supported")
     };
+  }
+
+  fun makeIndex(context: mutable SKFS.Context, index: Index): void {
+    input = getIndexInputDir(context);
+    key = SKFS.SID::create(index.name);
+    size = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key).size();
+    if (size != 0) {
+      error(index.pos, "INDEX " + index.name + " already exists");
+    };
+    this.write(context, input.dirName, key, index);
+    _ = getIndexOutputDir(this.options, context)
+  }
+
+  fun delete(
+    context: mutable SKFS.Context,
+    pos: Int,
+    name: String,
+    where: ?Expr,
+    sets: Array<(String, Pos, Expr)>,
+  ): SKFS.DirName {
+    sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
+    sinkDirName = SKFS.DirName::create(sinkName);
+    from = Some(Array[TableName(FName(name), None(), false)]);
+    selectAst = Select{
+      id => "SELECT_" + SKFS.genSym(pos),
+      pos => pos,
+      params => None(),
+      from,
+      where,
+      groupBy => None(),
+      having => None(),
+      join => None(),
+      kind => SAll(),
+      limit => None(),
+      orderBy => None(),
+      rest => None(),
+    };
+    compiler = SKSQL.Compiler::create(this.options, selectAst.pos);
+    select = compiler.compileSelect(context, selectAst, true, sets);
+    selectHandle = evalSelect(context, select, None());
+    selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
+    updateTableMap(context);
+    baseName = SKFS.SID::create(name);
+    table = getTable(this.options, context, pos, baseName);
+    inputDir = getDir(table);
+    if (table.windowSize is Some _) {
+      print_error("Error: cannot delete from a window");
+      exit(23);
+    };
+    SKFS.EagerDir::apply(
+      context,
+      selectDir.dirName,
+      sinkDirName,
+      (context, writer, key, rowIter) ~> {
+        entries = mutable Vector[];
+        dir = context.unsafeGetEagerDir(inputDir.dirName);
+        for ((source, _) in dir.getDataIter(context, key)) {
+          entries.push((key, (source.value, Array<SKFS.File>[])));
+        };
+        dir.writeArraySourceMany(context, entries.iterator());
+        if (select.sets.isEmpty()) return void;
+
+        row = rowIter.next() match {
+        | None() -> return void
+        | Some(x @ RowValues _) -> x
+        | Some(_) -> invariant_violation("Unexpected row type")
+        };
+
+        repeat = row.repeat;
+
+        for (ir in rowIter) {
+          ir match {
+          | RowValues(_, r) -> !repeat = repeat + r
+          | _ -> invariant_violation("Unexpected Row type")
+          }
+        };
+
+        if (repeat != row.repeat) {
+          !row = row.setRepeat(repeat);
+        };
+
+        evaluator = ExprEvaluator(None(), Array[row], Array[], None());
+
+        values = Array::mcreateFromItems(row.values);
+
+        for (set in select.sets) {
+          (idx, e) = set;
+          values![idx] = evaluator.evalCGExpr(context, e) match {
+          | ADef(x) -> Some(x)
+          | ANull() -> None()
+          | AUndef _ -> invariant_violation("Undefined set value")
+          };
+        };
+        !row = RowValues::create(values.chill(), row.repeat);
+        kinds = key match {
+        | RowKey(_, kinds) -> kinds
+        | _ -> invariant_violation("Unexpected row kind")
+        };
+
+        writer.write(RowKey(row, kinds), row);
+      },
+    );
+    sinkDir = context.unsafeGetEagerDir(sinkDirName);
+    !sinkDir.time.value = Int::max - sinkDir.time.value;
+    context.setDir(sinkDir.dirName, sinkDir);
+    updateTableMap(context);
+    sinkDirName
   }
 
   fun insert(
@@ -330,19 +613,21 @@ class Evaluator{options: Options} {
     inTransaction: Bool,
     table: DirDescr,
     paramsOpt: ?Array<String>,
-    values: Array<?CValue>,
+    values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context) ~> void) {
-    row = computeInsert(pos, paramsOpt, values, table);
+    rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
 
     table.windowSize match {
     | None() ->
-      dir = getDir(table);
-      newDir = context.getEagerDir(dir.dirName);
-      kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
-      key = RowKey(row, kinds);
-      source = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(pos)));
-      !newDir = newDir.writeEntry(context, source, key, Array[row]);
-      context.setDir(newDir.dirName, newDir);
+      for (row in rows) {
+        dir = getDir(table);
+        newDir = context.getEagerDir(dir.dirName);
+        kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
+        key = RowKey(row, kinds);
+        source = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(pos)));
+        !newDir = newDir.writeEntry(context, source, key, Array[row]);
+        context.setDir(newDir.dirName, newDir);
+      };
       None()
     | Some(ws) ->
       if (inTransaction) {
@@ -350,33 +635,36 @@ class Evaluator{options: Options} {
         exit(23);
       };
       Some((context, _) ~> {
-        dir = getDir(table);
-        newDir = context.getEagerDir(dir.dirName);
-        wdir = getWindowsDir(context);
-        queues = (
-          context.unsafeGetEagerDir(wdir.dirName).getArrayRaw(table.dirName)
-        );
-        queue = if (queues.size() == 0) {
-          Queue::create(ws)
-        } else {
-          Queue::fromFile(queues[0])
-        };
-        (!queue, keyID) = queue.next();
-        key = SKFS.IID(keyID);
-        source = SKFS.Path(dir.dirName, key);
-        !newDir = newDir.writeEntry(context, source, key, Array[row]);
-        (context.unsafeGetEagerDir(wdir.dirName)).writeArray(
-          context,
-          table.dirName,
-          Array[queue],
-        );
-        context.setDir(newDir.dirName, newDir);
+        for (row in rows) {
+          dir = getDir(table);
+          newDir = context.getEagerDir(dir.dirName);
+          wdir = getWindowsDir(context);
+          queues = (
+            context.unsafeGetEagerDir(wdir.dirName).getArrayRaw(table.dirName)
+          );
+          queue = if (queues.size() == 0) {
+            Queue::create(ws)
+          } else {
+            Queue::fromFile(queues[0])
+          };
+          (!queue, keyID) = queue.next();
+          key = SKFS.IID(keyID);
+          source = SKFS.Path(dir.dirName, key);
+          !newDir = newDir.writeEntry(context, source, key, Array[row]);
+          (context.unsafeGetEagerDir(wdir.dirName)).writeArray(
+            context,
+            table.dirName,
+            Array[queue],
+          );
+          context.setDir(newDir.dirName, newDir);
+        }
       })
     }
   }
 
   fun createTable(
     context: mutable SKFS.Context,
+    pos: Int,
     name: String,
     dirDescr: DirDescr,
     init: Array<RowValues> = Array[],
@@ -390,21 +678,36 @@ class Evaluator{options: Options} {
       path = SKFS.Path::create(dirName, key);
       SKFS.FixedRow(key, (SKFS.Source::create(path), Array[file]), tag)
     });
-    tables = getTableDir(context);
-    for (i => tyDescr in dirDescr.schema) {
+
+    getTableDir(context).writeArray(
+      context,
+      SKFS.SID::create(name),
+      Array[dirDescr],
+    );
+
+    hasPrimary = false;
+    for (tyDescr in dirDescr.schema) {
+      if (tyDescr.primary) {
+        if (hasPrimary) {
+          error(pos, "multiple primary keys detected");
+        };
+        if (!(tyDescr.ty is INTEGER())) {
+          error(pos, "primary keys are expected to be integers");
+        };
+        !hasPrimary = true;
+      };
       if (tyDescr.unique || tyDescr.primary) {
-        _ = createIndex(
+        this.makeIndex(
           context,
-          None(),
-          dirName,
-          Array[(i, IASC(), tyDescr.ty)],
-          true,
+          Index{
+            pos => pos,
+            name => name + "_" + tyDescr.name,
+            fields => (name, Array[(tyDescr.name, IASC())]),
+            unique => true,
+          },
         );
       }
     };
-    context
-      .getEagerDir(tables.dirName)
-      .write(context, SKFS.SID::create(name), dirDescr);
     if (context.debugMode) {
       print_string("CREATED: " + name);
     };
@@ -417,14 +720,35 @@ native fun concatArray(Array<String>): String;
 @cpp_extern("SKIP_isatty")
 native fun isATTY(): UInt32;
 
+@cpp_extern("SKIP_unsafe_compare_sets")
+native fun unsafeCompareSets(
+  SortedMap<SKFS.Path, SortedSet<SKFS.ArrowKey>>,
+  SortedMap<SKFS.Path, SortedSet<SKFS.ArrowKey>>,
+): Int32;
+
 fun read(line: Int): (Int, String) {
+  lineStart = line;
   i = 0;
   chars = mutable Vector[];
+  hasData = false;
   vtry(
     () ->
       loop {
         c = getChar(i);
+        isWhiteSpace = c == ' ' || c == '\n' || c == '\t' || c == '\r';
+        !hasData = !isWhiteSpace;
+
         !i = i + 1;
+
+        if (c == '\'') {
+          chars.push(c);
+          loop {
+            c2 = getChar(i);
+            chars.push(c2);
+            if (c2 == '\'') break void;
+          };
+          continue;
+        };
 
         if (c == '-') {
           c2 = getChar(i);
@@ -462,7 +786,13 @@ fun read(line: Int): (Int, String) {
         if (c == '\n') !line = line + 1;
         if (c == ';') return (line, String::fromChars(chars.toArray()));
       },
-    _endOfFile -> (line, String::fromChars(chars.toArray())),
+    _endOfFile -> {
+      if (hasData) {
+        print_error("Error, line " + lineStart + ": unfinished statement");
+        exit(23);
+      };
+      (line, "")
+    },
   )
 }
 
@@ -519,11 +849,11 @@ fun printErrorAndExit(
   exit(2)
 }
 
-fun printRow(row: SKSQL.Row): void {
+fun printRow(csv: Bool, row: SKSQL.Row): void {
   row match {
   | rvalues @ RowValues(_, r) ->
     for (_ in Range(0, r)) {
-      print_string(rvalues.toStringSingle())
+      print_string(rvalues.toStringSingle(csv))
     }
   | RowKind _ -> invariant_violation("Cannot print a RowKind")
   }
@@ -563,9 +893,12 @@ fun extractSql(chars: Buffer): void {
 }
 
 fun makeSqlContext(): mutable SKFS.Context {
-  gcontext = mutable SKFS.Context{unsafeReuse => true, failOnExn => true};
-  gcontext.setGlobal("Line", SKFS.IntFile(1));
-  //  SKFS.disableGC();
+  gcontext = mutable SKFS.Context{
+    unsafeReuse => true,
+    failOnExn => true,
+    removeSubDirs => false,
+  };
+  gcontext.setGlobal("Line", SKFS.IntFile(0));
   gcontext
 }
 
@@ -576,7 +909,14 @@ fun doOnError(options: Options, f: () -> void, error: Exception -> void): void {
 class StmtFile(stmt: Stmt) extends SKFS.File
 class TickFile(tick: SKFS.Tick) extends SKFS.File
 
-class Options{allowCross: Bool, backtrace: Bool, sync: Bool}
+class Options{
+  alwaysAllowJoins: Bool,
+  backtrace: Bool,
+  sync: Bool,
+  virtual: Bool = false,
+  showUsedIndexes: Bool,
+  csv: Bool,
+}
 
 fun eval(options: Options): void {
   runSql(options, context ~> {
@@ -586,6 +926,10 @@ fun eval(options: Options): void {
     lineFile = SKFS.IntFile::fromFile(context.getGlobal("Line").fromSome());
     context.!globals = SortedMap[];
     context.setGlobal("Line", lineFile);
+    context.removeGlobal("TableMap");
+    if (options.csv) {
+      context.setGlobal("CSV", SKFS.BoolFile(true));
+    };
 
     gline = lineFile.value;
 
@@ -635,10 +979,18 @@ fun eval(options: Options): void {
           if (lex.isEqUpper(pos, "COMMIT")) {
             !pos = lex.expectUpper(pos, "COMMIT");
             !pos = lex.expect(pos, ";");
+            context.getGlobal("GLOBALS") match {
+            | None() -> void
+            | Some(_) -> context.removeGlobal(GLOBALS)
+            };
             break void;
           };
 
-          (!pos, stmt) = parseStmt(lex, pos);
+          (!pos, stmtOpt) = parseStmt(lex, pos);
+          stmt = stmtOpt match {
+          | None() -> break void
+          | Some(x) -> x
+          };
           markIfRead(context, stmt);
 
           lastStmtOpt = context.getGlobal("LastStmtOpt").map(file ->
@@ -696,7 +1048,16 @@ fun runSql(options: Options, f: mutable SKFS.Context ~> SKFS.ContextOp): void {
 }
 
 fun runLockedSql(options: Options, f: mutable SKFS.Context ~> void): void {
-  SKFS.runLocked(SKSQL.makeSqlContext().clone(), f, options.sync)
+  doOnError(
+    options,
+    () -> {
+      SKFS.runLocked(SKSQL.makeSqlContext().clone(), f, options.sync)
+    },
+    err -> {
+      print_error(err.getMessage());
+      exit(45);
+    },
+  )
 }
 
 fun importFromRoot(
@@ -725,6 +1086,7 @@ fun importFromRoot(
       | Some(x) -> SKFS.IntFile::fromFile(x).value
       };
       print_error("Error, line " + line + ": " + err.getMessage());
+      exit(2);
     }),
   )
 }
@@ -821,6 +1183,7 @@ fun exportToRoot(
       };
       root.replaceFromSaved(rootCopy);
       print_error("Error, line " + line + ": " + err.getMessage());
+      exit(2);
     }),
   )
 }
@@ -842,7 +1205,11 @@ fun updateTableMap(context: mutable SKFS.Context): void {
 class StdoutFile(value: List<SelectDir>) extends SKFS.File
 class StdoutDiff(dirName: SKFS.DirName, time: SKFS.Tick) extends SKFS.File
 
-fun showSelect(context: mutable SKFS.Context, sdir: SelectDir): void {
+fun showSelect(
+  context: mutable SKFS.Context,
+  csv: Bool,
+  sdir: SelectDir,
+): void {
   dirName = sdir.dirName;
   dir = context.unsafeGetEagerDir(dirName);
   dir.onFiles(files ~> {
@@ -850,18 +1217,19 @@ fun showSelect(context: mutable SKFS.Context, sdir: SelectDir): void {
       (_key, rows) = kv;
       rowArray = rows.collect(Array);
       for (row in rowArray) {
-        printRow(RowValues::fromFile(row));
+        printRow(csv, RowValues::fromFile(row));
       }
     }
   })
 }
 
 fun printContext(context: mutable SKFS.Context): void {
+  csv = context.getGlobal("CSV") is Some _;
   context.globals.maybeGet("Stdout") match {
   | None() -> void
   | Some(StdoutFile(stdout)) ->
     for (selectDir in stdout.toArray().reversed()) {
-      showSelect(context, selectDir)
+      showSelect(context, csv, selectDir)
     }
   | Some(StdoutDiff(dirName, time)) ->
     edir = context.unsafeGetEagerDir(dirName);
@@ -869,10 +1237,10 @@ fun printContext(context: mutable SKFS.Context): void {
     for (key in edir.getChangesAfter(time)) {
       values = edir.getArrayRaw(key);
       if (values.size() == 0) {
-        print_raw(key.toStringRemove())
+        print_raw(key.toStringRemove(csv))
       } else {
         for (value in values) {
-          print_raw(value.toKVString(key))
+          print_raw(value.toKVString(csv, key))
         }
       };
     }

@@ -17,11 +17,13 @@ extension class TypeDescr extends SKFS.File
 
 class DirDescr{
   name: String,
+  colNames: Array<String>,
   schema: Array<TypeDescr>,
   cols: SortedMap<String, Int>,
   dirName: SKFS.DirName,
   alias: ?String,
   windowSize: ?Int,
+  isInput: Bool,
 } extends SKFS.File uses Orderable
 
 fun makeSelectName(id: String): SKFS.DirName {
@@ -54,9 +56,9 @@ fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
 /* Views. */
 /*****************************************************************************/
 
-fun getViewsDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
-  makeDir(DirDescr::fromFile, context, views, () ->
-    context.mkdir(DirDescr::fromFile, views, Array[])
+fun getViewsDir(context: mutable SKFS.Context): SKFS.EHandle<SelectFile> {
+  makeDir(SelectFile::fromFile, context, views, () ->
+    context.mkdir(SelectFile::fromFile, views, Array[])
   )
 }
 
@@ -111,9 +113,16 @@ fun getSubsDirs(
         exit(3)
       };
       selectFile = SKSQL.SelectFile::fromFile(selectFiles[0]);
+      if (!selectFile.virtual) {
+        print_error("Error: can only connect to virtual views");
+        exit(23);
+      };
       selectAst = selectFile.value;
-      compiler = SKSQL.Compiler::create(options, selectAst.pos);
-      select = compiler.compileSelect(context, selectAst);
+      compiler = SKSQL.Compiler::create(
+        options with {virtual => true},
+        selectAst.pos,
+      );
+      select = compiler.compileSelect(context, selectAst, true);
       selectDir = SKSQL.evalSelect(context, select, None());
       edir = context.unsafeGetEagerDir(selectDir.dirName);
       edir.subscribe(context, sessionID, cmd, init);
@@ -134,6 +143,7 @@ class IndexDescr{
   dirName: SKFS.DirName,
   tableName: SKFS.DirName,
   fields: Array<(Int, IKind, Type)>,
+  unique: Bool,
 } extends SKFS.File uses Orderable {
   fun compare(y: IndexDescr): Order {
     this.name.compare(y.name)
@@ -157,7 +167,14 @@ fun getIndexOutputDir(
       context,
       indexOutput,
       (context, index) ~> {
-        createUserIndex(options, context, index.name, index.pos, index.fields)
+        createUserIndex(
+          options,
+          context,
+          index.name,
+          index.pos,
+          index.fields,
+          index.unique,
+        )
       },
     )
   })
@@ -197,7 +214,8 @@ fun getTable(
   pos: Int,
   name: SKFS.BaseName,
 ): DirDescr {
-  getTableDir(context).maybeGet(context, name) match {
+  tableDir = getTableDir(context);
+  tableDir.maybeGet(context, name) match {
   | None() ->
     hviews = getViewsDir(context);
     viewsDir = context.unsafeGetEagerDir(hviews.dirName);
@@ -205,11 +223,21 @@ fun getTable(
     if (viewArray.size() == 0) {
       error(pos, "Table '" + name + "' does not exist")
     } else {
+      view = viewArray[0];
+      selectFile = SelectFile::fromFile(view);
+      dirName = SKFS.DirName::create("/" + selectFile.value.id + "/");
       compiler = SKSQL.Compiler::create(options, pos);
-      select = SelectFile::fromFile(viewArray[0]).value;
-      cselect = compiler.compileSelect(context, select);
-      dirDescr = SKSQL.Compiler::getDirDescr(select, cselect);
-      _ = evalSelect(context, cselect, None());
+      cselect = compiler.compileSelect(context, selectFile.value, true);
+      dirDescr = SKSQL.Compiler::getDirDescr(
+        selectFile.value.params,
+        cselect.from,
+        cselect.params,
+        cselect.id,
+        dirName,
+      );
+      if (!selectFile.virtual) {
+        _ = evalSelect(context, cselect, None());
+      };
       dirDescr
     }
   | Some(dirDescr) ->
@@ -240,9 +268,9 @@ fun getTable(
         creator => context.currentArrow(),
       };
       context.setDir(dir.dirName, dir);
-      _ = SKFS.EHandle(Row::fromFile, oldDirName).contextWriterKeyIter(
-        Row::fromFile,
+      _ = SKFS.EagerDir::apply(
         context,
+        oldDirName,
         sinkName,
         (context, _writer, key, _valueIter) ~> {
           entries = mutable Vector[];
@@ -255,11 +283,151 @@ fun getTable(
           inputDir = context.unsafeGetEagerDir(nextName);
           inputDir.writeArraySourceMany(context, entries.iterator());
         },
+        None(),
+        None(),
+        true,
       );
       result = dirDescr with {dirName => nextName};
       !tableMap.map[name] = (tableMap.version, result);
       context.setGlobal("TableMap", tableMap);
       result
     }
+  }
+}
+
+/*****************************************************************************/
+/* DUMP. */
+/*****************************************************************************/
+
+@cpp_extern("SKIP_flush_stdout")
+native fun flushStdout(): void;
+
+fun dumpTables(origContext: readonly SKFS.Context): void {
+  context = SKFS.Context::fromSaved(origContext.clone());
+  handle = getTableDir(context);
+  sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
+  _ = handle.map(handle.conv, context, sinkName, dirDescr ~> {
+    if (!dirDescr.isInput) return dirDescr;
+    o = print_raw;
+    o("CREATE ");
+    o(
+      dirDescr.windowSize match {
+      | None() -> "TABLE "
+      | Some(size) -> "WINDOW " + size + " "
+      },
+    );
+    o(dirDescr.name);
+    o(" (\n");
+    for (colName in dirDescr.colNames) {
+      colIndex = dirDescr.cols[colName];
+      o("  ");
+      o(colName);
+      o(" ");
+      ty = dirDescr.schema[colIndex];
+      o(
+        ty.ty match {
+        | INTEGER() -> "INTEGER"
+        | FLOAT() -> "FLOAT"
+        | TEXT() -> "TEXT"
+        },
+      );
+      if (ty.unique) {
+        o(" UNIQUE");
+      };
+      if (ty.primary) {
+        o(" PRIMARY KEY");
+      };
+      if (ty.notNull) {
+        o(" NOT NULL");
+      };
+      if (colIndex < dirDescr.schema.size() - 1) {
+        o(",");
+      };
+      o("\n");
+    };
+    o(");\n");
+    flushStdout();
+    dirDescr
+  });
+}
+
+fun dumpInserts(origContext: readonly SKFS.Context): void {
+  context = SKFS.Context::fromSaved(origContext.clone());
+  handle = getTableDir(context);
+  sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
+  _ = handle.contextMap(handle.conv, context, sinkName, (context, dirDescr) ~> {
+    if (!dirDescr.isInput) return dirDescr;
+    o = print_raw;
+    fileIter = context.unsafeGetEagerDir(dirDescr.dirName).unsafeGetFileIter();
+    count = 1;
+    o("BEGIN TRANSACTION;\n");
+    for (kv in fileIter) {
+      if (count % 1024 == 0) {
+        o("COMMIT;\n");
+        o("BEGIN TRANSACTION;\n");
+      };
+      (_, files) = kv;
+      for (file in files) {
+        row = RowValues::fromFile(file);
+        for (_ in Range(0, row.repeat)) {
+          o("INSERT INTO " + dirDescr.name + " VALUES ");
+          o(row.toString());
+          o(";\n");
+          !count = count + 1;
+        };
+      };
+    };
+    o("COMMIT;\n");
+    flushStdout();
+    dirDescr
+  });
+}
+
+fun dumpViews(origContext: readonly SKFS.Context): void {
+  context = SKFS.Context::fromSaved(origContext.clone());
+  handle = getViewsDir(context);
+  sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
+  sortedName = SKFS.DirName::create("/sorted_" + SKFS.genSym(0) + "/");
+  sorted = handle.contextWriterKeyValues(
+    handle.conv,
+    context,
+    sortedName,
+    (_context, writer, _key, values) ~> {
+      for (selectFile in values) {
+        writer.write(SKFS.IID(selectFile.tick), selectFile)
+      }
+    },
+  );
+  _ = sorted.contextWriterKeyIter(
+    sorted.conv,
+    context,
+    sinkName,
+    (_context, _writer, _key, views) ~> {
+      o = print_raw;
+      for (view in views) {
+        o(view.text);
+        o(";\n");
+      };
+      flushStdout();
+    },
+  );
+}
+
+/*****************************************************************************/
+/* File used for globals. */
+/*****************************************************************************/
+
+const GLOBALS: String = "GLOBALS";
+
+class Globals(map: SortedMap<String, Int> = SortedMap[]) extends SKFS.File {
+  fun set(var: String, val: Int): this {
+    !this.map[var] = val;
+    this
+  }
+  fun containsKey(var: String): Bool {
+    this.map.containsKey(var)
+  }
+  fun get(var: String): Int {
+    this.map[var]
   }
 }

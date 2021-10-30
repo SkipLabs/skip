@@ -1,0 +1,15 @@
+
+
+select * from t1, t2 where a = b;
+       ^
+       |
+        ----- ERROR
+Error: line 4, characters 8-8:
+Joins outside of virtual views are considered bad practice in sqlive.
+You should first create a virtual view joining t1 and t2 with a query of the form:
+
+create virtual view t1_t2 as select * from t1, t2 where a = b;
+
+And then use t1_t2 directly.
+PS: You can ignore this error message with --always-allow-join (not recommended).
+PS2: don't forget you can add indexes to virtual views.

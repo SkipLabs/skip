@@ -63,17 +63,20 @@ fun trim(chars: Array<Char>): Array<Char> {
   chars.slice(i, j)
 }
 
-fun lex(next: () -> Char): mutable Iterator<String> {
+fun lex(next: () -> Char): mutable Iterator<(Bool, String)> {
   stringAcc: ?mutable Vector<Char> = None();
+  isString: Bool = false;
   for (tok in lexRaw(next)) {
     (tok, stringAcc) match {
     | (Chars(chars), Some(acc)) if (chars.size() > 0 && chars[0] == '"') ->
+      !isString = true;
       !chars = trim(chars);
       acc.extend(chars.slice(0, chars.size() - 1))
     | (
       Chars(chars),
       None(),
     ) if (chars.size() > 0 && chars[chars.size() - 1] == '"') ->
+      !isString = true;
       !chars = trim(chars);
       !chars = chars.slice(1, chars.size() - 1);
       !stringAcc = Some(Vector::mcreateFromItems(chars))
@@ -82,10 +85,11 @@ fun lex(next: () -> Char): mutable Iterator<String> {
       | None() -> void
       | Some(acc) ->
         !stringAcc = None();
-        yield String::fromChars(acc.toArray())
+        yield (isString, String::fromChars(acc.toArray()))
       };
+      !isString = false;
       tok match {
-      | Chars(chars) -> yield String::fromChars(trim(chars))
+      | Chars(chars) -> yield (false, String::fromChars(trim(chars)))
       | NewLine() -> break void
       | Comma() -> void
       }
@@ -95,15 +99,16 @@ fun lex(next: () -> Char): mutable Iterator<String> {
   | None() -> void
   | Some(acc) ->
     !stringAcc = None();
-    yield String::fromChars(acc.toArray())
+    yield (isString, String::fromChars(acc.toArray()))
   }
 }
 
 fun insert(
   context: mutable SKFS.Context,
+  line: mutable Ref<Int>,
   options: SKSQL.Options,
   tableName: String,
-): ?((mutable SKFS.Context, mutable SKFS.Context) ~> void) {
+): SKFS.ContextOp {
   baseName = SKFS.SID::create(tableName);
 
   eval = SKSQL.Evaluator{options};
@@ -111,25 +116,37 @@ fun insert(
   inTransaction = false;
   paramsOpt = None();
   table = SKSQL.getTable(options, context, pos, baseName);
-  values = mutable Vector[];
-  for (_ in Range(0, 1000)) {
-    for (value in lex(() -> getChar(0))) {
-      values.push(value);
-    };
-    cvalues = values.mapWithIndex((idx, val) -> {
-      cval = SKSQL.parseCSVValue(val);
-      SKSQL.valueToCValue(pos, table.schema, idx, cval)
-    });
-    f = eval.insert(
-      context,
-      pos,
-      inTransaction,
-      table,
-      paramsOpt,
-      cvalues.toArray(),
-    );
-    if (f is Some _) return f;
-    values.clear();
-  };
-  None()
+  array = mutable Vector[];
+  eof = false;
+  vtry(
+    () -> {
+      for (_ in Range(0, 100)) {
+        values = mutable Vector[];
+        for (value in lex(() -> getChar(0))) {
+          values.push(value);
+        };
+        cvalues = values.map(SKSQL.parseCSVValue);
+        array.push(cvalues.toArray());
+        line.set(line.get() + 1);
+      }
+    },
+    exn -> {
+      if (exn is EndOfFile _) {
+        !eof = true;
+        return void;
+      };
+      print_error("Error, line " + line.get() + ": " + exn.getMessage());
+      exit(23);
+    },
+  );
+  f = eval.insert(
+    context,
+    pos,
+    inTransaction,
+    table,
+    paramsOpt,
+    array.toArray(),
+  );
+  if (f is Some _ || !eof) return SKFS.CContinue(f);
+  SKFS.CStop(f)
 }

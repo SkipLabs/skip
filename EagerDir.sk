@@ -165,8 +165,9 @@ value class MInfo(
 
 base class CmdKind {
   children =
-  | NCmd(String)
-  | NFile(String)
+  | NCmd(Bool, String)
+  | NStream(Bool, String)
+  | NNotify(String)
 }
 
 value class Sub(cmd: ?CmdKind, status: Int, tick: Tick)
@@ -179,6 +180,9 @@ native fun unixClose(UnixDescr): Int;
 
 @cpp_extern("SKIP_write_to_file")
 native fun writeToFile(UnixDescr, String): void;
+
+@cpp_extern("SKIP_notify")
+native fun unixNotify(String, Int): Int;
 
 /*****************************************************************************/
 /* An Eager Directory. */
@@ -223,29 +227,34 @@ class EagerDir{
     cmdKind: CmdKind,
     tick: Tick,
   ): this {
-    (fd, write) = cmdKind match {
-    | NCmd(cmd) ->
+    (fd, csv, write) = cmdKind match {
+    | NCmd(csv, cmd) ->
       fd = exec(cmd);
-      (fd, x -> writeToProc(fd, x))
-    | NFile(file) ->
+      (fd, csv, x -> writeToProc(fd, x))
+    | NStream(csv, file) ->
       fd = unixOpen(file);
-      (fd, x -> writeToFile(fd, x))
+      (fd, csv, x -> writeToFile(fd, x))
+    | NNotify(file) ->
+      status = unixNotify(file, tick.value);
+      !this.subs[id] = Sub(Some(cmdKind), status, tick);
+      return this
     };
     write("\n");
     write("\n");
     for (key in changes) {
       values = this.getArrayRaw(key);
       if (values.size() == 0) {
-        write(key.toStringRemove())
+        write(key.toStringRemove(csv))
       } else {
         for (value in values) {
-          write(value.toKVString(key))
+          write(value.toKVString(csv, key))
         }
       };
     };
     status = cmdKind match {
     | NCmd _ -> waitForProc(fd)
-    | NFile _ -> unixClose(fd)
+    | NStream _ -> unixClose(fd)
+    | NNotify _ -> 0
     };
     !this.subs[id] = Sub(Some(cmdKind), status, tick);
     this
@@ -253,6 +262,7 @@ class EagerDir{
 
   private fun notifyAll(tick: Tick): this {
     changes = this.getChangesAfter(tick);
+    if (changes.isEmpty()) return this;
     for (id => sub in this.subs) {
       if (sub.status == 0) {
         sub.cmd match {
@@ -262,6 +272,11 @@ class EagerDir{
       }
     };
     this
+  }
+
+  fun disconnect(context: mutable SKFS.Context, sessionId: Int): void {
+    !this.subs[sessionId].status = -1;
+    context.setDir(this.dirName, this)
   }
 
   fun subscribe(
@@ -676,9 +691,10 @@ class EagerDir{
     f: MapFun,
     reducerOpt: ?IReducer = None(),
     rangeOpt: ?Array<KeyRange> = None(),
+    unsafeSkipInit: Bool = false,
   ): void {
     parents = FixedSingle::create(mutable Vector[(parentName, (f, rangeOpt))]);
-    static::applyMany(context, parents, childName, reducerOpt);
+    static::applyMany(context, parents, childName, reducerOpt, unsafeSkipInit);
   }
 
   static fun applyMany(
@@ -686,6 +702,7 @@ class EagerDir{
     parents: FixedSingle<DirName, (MapFun, ?Array<KeyRange>)>,
     childName: DirName,
     reducerOpt: ?IReducer = None(),
+    unsafeSkipInit: Bool = false,
   ): void {
     context.unsafeMaybeGetEagerDir(childName) match {
     | Some(child) if (static::isReusable(context, child, parents)) ->
@@ -698,63 +715,74 @@ class EagerDir{
       error(`Error: directory ${childName.toString()} already exists`);
     };
 
-    context.!newDirs = context.newDirs.add(childName);
+    globalName = "PRE_COMPUTED_" + childName;
 
-    acc = mutable Vector<FixedRow<Array<File>>>[];
-    oldVec = mutable Vector[];
+    dir = context.getGlobal(globalName) match {
+    | Some(x @ EagerDir _) ->
+      invariant(x.creator == context.currentArrow());
+      context.removeGlobal(globalName);
+      x
+    | _ ->
+      context.!newDirs = context.newDirs.add(childName);
 
-    for (parentName => parentData in parents) {
-      (f, rangeOpt) = parentData;
-      parent = context.unsafeGetEagerDir(parentName);
-      rangeOpt match {
-      | None() ->
-        static::mapData(context, oldVec, parent, childName, f, acc, None())
-      | Some(ranges) ->
-        for (range in ranges) {
-          static::mapData(
-            context,
-            oldVec,
-            parent,
-            childName,
-            f,
-            acc,
-            Some(range),
-          );
+      acc = mutable Vector<FixedRow<Array<File>>>[];
+      oldVec = mutable Vector[];
+
+      if (!unsafeSkipInit) {
+        for (parentName => parentData in parents) {
+          (f, rangeOpt) = parentData;
+          parent = context.unsafeGetEagerDir(parentName);
+          rangeOpt match {
+          | None() ->
+            static::mapData(context, oldVec, parent, childName, f, acc, None())
+          | Some(ranges) ->
+            for (range in ranges) {
+              static::mapData(
+                context,
+                oldVec,
+                parent,
+                childName,
+                f,
+                acc,
+                Some(range),
+              );
+            }
+          }
         }
+      };
+
+      fixedData = FixedDir::create(acc);
+      time = context.timeStamp();
+      totalSize = fixedData.size();
+      reducer = reducerOpt.map(ireducer ->
+        Reducer::create(fixedData, ireducer)
+      );
+
+      if (context.debugMode) {
+        parentNames = parents.items().map(x -> (x.i0, x.i1.i1)).collect(Array);
+        print_string(
+          `CREATED:  ${childName} (time: ${time}, parents: ${parentNames})`,
+        );
+      };
+
+      EagerDir{
+        time,
+        dirName => childName,
+        input => false,
+        parents,
+        fixedData,
+        totalSize,
+        creator => context.currentArrow(),
+        fixedOld => FixedSingle::create(oldVec),
+        childDirs => SortedSet[],
+        reducer,
       }
-    };
-
-    fixedData = FixedDir::create(acc);
-    time = context.timeStamp();
-    totalSize = fixedData.size();
-    (!fixedData, reducer) = reducerOpt match {
-    | None() -> (fixedData, None())
-    | Some(ireducer) -> (fixedData, Some(Reducer::create(fixedData, ireducer)))
-    };
-
-    dir = EagerDir{
-      time,
-      dirName => childName,
-      input => false,
-      parents,
-      fixedData,
-      totalSize,
-      creator => context.currentArrow(),
-      fixedOld => FixedSingle::create(oldVec),
-      childDirs => SortedSet[],
-      reducer,
     };
     updateDirtyReaders(context, Path::create(childName.tag(), DirTag()));
     context.setDir(childName, dir);
     for (parentName => parentData in parents) {
       (_, rangeOpt) = parentData;
       static::addChildToParent(context, parentName, childName, rangeOpt);
-    };
-    if (context.debugMode) {
-      parentNames = parents.items().map(x -> (x.i0, x.i1.i1)).collect(Array);
-      print_string(
-        `CREATED:  ${childName} (time: ${time}, parents: ${parentNames})`,
-      );
     };
   }
 
@@ -784,6 +812,10 @@ class EagerDir{
 
   fun getArrayRaw(key: BaseName): Array<File> {
     this.getIterRaw(key).collect(Array);
+  }
+
+  fun unsafeGetDataValues(key: BaseName): Array<(Source, Array<File>)> {
+    this.unsafeGetDataIter(key).collect(Array)
   }
 
   fun unsafeGetDataIter(
@@ -1276,7 +1308,7 @@ class EagerDir{
   ): this {
     removed = mutable Vector[];
     minfo = static::getOld(this, source);
-    if (minfo.newDirs.isEmpty()) return this;
+    if (minfo.newDirs.isEmpty() || !context.removeSubDirs) return this;
 
     lastRoundDirs = minfo.newDirs;
     for (dirName in lastRoundDirs) {
