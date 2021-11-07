@@ -3,17 +3,50 @@ module SKFS;
 @cpp_extern("SKIP_create_external_pointer")
 native fun createExternalPointer(ExternalPointer): ExternalPointer;
 
+base class BExternalPointer {
+  fun toString(): String;
+  fun getMagicNumber(): Int;
+}
+
+class DumbPointer(n: Int) extends BExternalPointer {
+  fun toString(): String {
+    "dumb:" + this.n
+  }
+  fun getMagicNumber(): Int {
+    0
+  }
+}
+
 class ExternalPointer private (
+  magic: Int,
   value: Int,
   destructor: Int ~> void,
-) extends File {
+) extends File, BExternalPointer {
   static fun create(value: Int, destructor: Int ~> void): this {
-    createExternalPointer(static(value, destructor));
+    createExternalPointer(static(234566 + value % 2, value, destructor));
   }
 
   static fun getExternalPointer(): ExternalPointer {
-    ExternalPointer(0, _ ~> void)
+    ExternalPointer(0, 0, _ ~> void)
   }
+
+  fun toString(): String {
+    "external:" + this.value
+  }
+
+  fun getMagicNumber(): Int {
+    this.magic
+  }
+}
+
+@cpp_export("sk_get_magic_number")
+fun getExternalPointerMagicNumber(ep: BExternalPointer): Int {
+  ep.getMagicNumber()
+}
+
+@cpp_export("sk_debug_external_pointer")
+fun debugExternalPointer(ep: BExternalPointer): void {
+  debug(ep.toString())
 }
 
 @cpp_export("sk_get_external_pointer")

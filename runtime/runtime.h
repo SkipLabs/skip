@@ -223,6 +223,7 @@ void todo();
 char* sk_get_external_pointer();
 char* sk_get_external_pointer_destructor(char* obj);
 SkipInt sk_get_external_pointer_value(char* obj);
+SkipInt sk_get_magic_number(char* obj);
 void sk_call_external_pointer_descructor(char*, SkipInt);
 int sk_is_nofile_mode();
 void sk_lower_static(void*);
