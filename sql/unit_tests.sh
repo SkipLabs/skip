@@ -128,3 +128,9 @@ if cat test/test_id.sql | sqlive | tr '\n' S | grep -q "123S122S"; then
 else
     echo -e "TEST ID:\tFAILED"
 fi
+
+if cat test/lower_upper.sql | sqlive | grep -q "FOO|bar"; then
+    echo -e "TEST LOWER/UPPER:\tOK"
+else
+    echo -e "TEST LOWER/UPPER:\tFAILED"
+fi

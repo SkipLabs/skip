@@ -274,13 +274,13 @@ class Evaluator{options: Options} {
     context: mutable SKFS.Context,
     stmt: Stmt,
     inTransaction: Bool,
-  ): ?((mutable SKFS.Context, mutable SKFS.Context) ~> void) {
+  ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     stmt match {
     | Table{pos, name, schema, windowSize} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
       };
-      Some((context, _) ~> {
+      Some((context, _, _) ~> {
         dirDescr = computeTableDescr(name, schema, windowSize);
         windowSize match {
         | Some(x) if (x <= 0) ->
@@ -357,7 +357,7 @@ class Evaluator{options: Options} {
       None()
 
     | index @ Index _ ->
-      Some((context, _) ~> {
+      Some((context, _, _) ~> {
         this.makeIndex(context, index)
       })
     | View{
@@ -394,7 +394,7 @@ class Evaluator{options: Options} {
         );
         cselect1 = compiler1.compileSelect(context, selectAst, true);
         _ = SKSQL.evalSelect(context, cselect1, None());
-        Some((context, delta) ~> {
+        Some((context, delta, _) ~> {
           sameDeps = unsafeCompareSets(context.deps.data, delta.deps.data);
           // If the deps haven't changed, that means we can reuse
           // the pre-computed data.
@@ -434,7 +434,7 @@ class Evaluator{options: Options} {
       if (inTransaction) {
         error(pos, "Cannot drop a view in a transaction");
       };
-      Some((context, _) ~> {
+      Some((context, _, _) ~> {
         views = getViewsDir(context);
         viewsDir = context.unsafeGetEagerDir(views.dirName);
         key = SKFS.SID(viewName);
@@ -453,7 +453,7 @@ class Evaluator{options: Options} {
     | Drop{pos, kind => TIndex(), name => _} ->
       error(pos, "Drop index not supported")
     | Drop{kind => TTable(), name} ->
-      Some((context, _) ~> {
+      Some((context, _, _) ~> {
         dirNameStr = "/" + name + "/";
         dirName = SKFS.DirName::create(dirNameStr);
         context.removeDir(dirName);
@@ -614,7 +614,7 @@ class Evaluator{options: Options} {
     table: DirDescr,
     paramsOpt: ?Array<String>,
     values: Array<Array<Value>>,
-  ): ?((mutable SKFS.Context, mutable SKFS.Context) ~> void) {
+  ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
 
     table.windowSize match {
@@ -634,31 +634,40 @@ class Evaluator{options: Options} {
         print_error("Error: cannot insert into a window within a transaction");
         exit(23);
       };
-      Some((context, _) ~> {
-        for (row in rows) {
-          dir = getDir(table);
-          newDir = context.getEagerDir(dir.dirName);
-          wdir = getWindowsDir(context);
-          queues = (
-            context.unsafeGetEagerDir(wdir.dirName).getArrayRaw(table.dirName)
-          );
-          queue = if (queues.size() == 0) {
-            Queue::create(ws)
-          } else {
-            Queue::fromFile(queues[0])
-          };
-          (!queue, keyID) = queue.next();
-          key = SKFS.IID(keyID);
-          source = SKFS.Path(dir.dirName, key);
-          !newDir = newDir.writeEntry(context, source, key, Array[row]);
-          (context.unsafeGetEagerDir(wdir.dirName)).writeArray(
-            context,
-            table.dirName,
-            Array[queue],
-          );
-          context.setDir(newDir.dirName, newDir);
-        }
+      Some((context, _, _) ~> {
+        this.insertWindow(context, ws, rows, table)
       })
+    }
+  }
+
+  fun insertWindow(
+    context: mutable SKFS.Context,
+    ws: Int,
+    rows: Array<RowValues>,
+    table: DirDescr,
+  ): void {
+    for (row in rows) {
+      dir = getDir(table);
+      newDir = context.getEagerDir(dir.dirName);
+      wdir = getWindowsDir(context);
+      queues = (
+        context.unsafeGetEagerDir(wdir.dirName).getArrayRaw(table.dirName)
+      );
+      queue = if (queues.size() == 0) {
+        Queue::create(ws)
+      } else {
+        Queue::fromFile(queues[0])
+      };
+      (!queue, keyID) = queue.next();
+      key = SKFS.IID(keyID);
+      source = SKFS.Path(dir.dirName, key);
+      !newDir = newDir.writeEntry(context, source, key, Array[row]);
+      (context.unsafeGetEagerDir(wdir.dirName)).writeArray(
+        context,
+        table.dirName,
+        Array[queue],
+      );
+      context.setDir(newDir.dirName, newDir);
     }
   }
 
@@ -864,7 +873,7 @@ fun evalWithContext(
   context: mutable SKFS.Context,
   stmt: Stmt,
   inTransaction: Bool,
-): ?((mutable SKFS.Context, mutable SKFS.Context) ~> void) {
+): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
   evaluator = Evaluator{options};
   evaluator.stmt(context, stmt, inTransaction);
 }
@@ -942,6 +951,7 @@ fun eval(options: Options): void {
     underLockF: ?((
       mutable SKFS.Context,
       mutable SKFS.Context,
+      SKFS.Context,
     ) ~> void) = None();
 
     doOnError(

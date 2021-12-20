@@ -167,6 +167,10 @@ class ExprEvaluator(
   ): AValue<String> {
     expr match {
     | CSLiteral(str) -> ADef(str)
+    | CSLower(e) ->
+      this.evalCSExpr(context, e).flatMap(str -> ADef(str.lowercase()))
+    | CSUpper(e) ->
+      this.evalCSExpr(context, e).flatMap(str -> ADef(str.uppercase()))
     | CSGetFrom(tableNbr, n) ->
       if (tableNbr >= this.entries.size()) {
         AUndef()

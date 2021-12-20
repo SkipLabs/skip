@@ -876,6 +876,26 @@ mutable class Compiler{
         CIExpr(CILiteral(globals[varName]))
       | _ -> error(this.pos, "id expects a string literal")
       }
+    | Call("upper", None()) -> error(this.pos, "upper expects one argument")
+    | Call("lower", None()) -> error(this.pos, "lower expects one argument")
+    | Call("upper", Some(values)) ->
+      if (values.size() != 1) {
+        error(this.pos, "upper expects one argument")
+      };
+      this.compileExpr(context, values[0]) match {
+      | CGNull _ -> CGNull()
+      | CSExpr(e) -> CSExpr(CSUpper(e))
+      | _ -> error(this.pos, "upper expects a string")
+      }
+    | Call("lower", Some(values)) ->
+      if (values.size() != 1) {
+        error(this.pos, "lower expects one argument")
+      };
+      this.compileExpr(context, values[0]) match {
+      | CGNull _ -> CGNull()
+      | CSExpr(e) -> CSExpr(CSLower(e))
+      | _ -> error(this.pos, "lower expects a string")
+      }
     | Call("coalesce", Some(values)) ->
       tvalues = values.map(x -> this.compileExpr(context, x));
       ty = for (val in tvalues) {

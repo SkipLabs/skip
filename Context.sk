@@ -928,7 +928,7 @@ fun resolveContext(
   root: Context,
   delta: mutable Context,
   synchronizer: ?Synchronizer,
-  lockF: ?((mutable Context, mutable Context) ~> void),
+  lockF: ?((mutable Context, mutable Context, Context) ~> void),
 ): readonly Context {
   synchronizer match {
   | None() if (tick == root.tick) -> delta
@@ -945,7 +945,7 @@ fun resolveContext(
     | Some(f) ->
       vtry(
         () -> {
-          f(newRoot, delta)
+          f(newRoot, delta, root)
         },
         (err -> {
           line = delta.getGlobal("Line") match {
@@ -1014,7 +1014,7 @@ private native fun gContextSync(
   Context,
   ?Synchronizer,
   UInt32,
-  ?((mutable Context, mutable Context) ~> void),
+  ?((mutable Context, mutable Context, Context) ~> void),
 ): Context;
 
 @debug
@@ -1025,7 +1025,7 @@ private native fun gContextSyncNoLock(
   Context,
   ?Synchronizer,
   UInt32,
-  ?((mutable Context, mutable Context) ~> void),
+  ?((mutable Context, mutable Context, Context) ~> void),
 ): Context;
 
 @debug
@@ -1094,8 +1094,8 @@ native fun enableGC(): void;
 
 base class ContextOp {
   children =
-  | CContinue(?((mutable Context, mutable Context) ~> void))
-  | CStop(?((mutable Context, mutable Context) ~> void))
+  | CContinue(?((mutable Context, mutable Context, Context) ~> void))
+  | CStop(?((mutable Context, mutable Context, Context) ~> void))
 }
 
 @cpp_noinline
