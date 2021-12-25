@@ -6,7 +6,6 @@ module SKSQL;
 
 const tableInfo: SKFS.DirName = SKFS.DirName::create("/tablesInfo/");
 const views: SKFS.DirName = SKFS.DirName::create("/views/");
-const windows: SKFS.DirName = SKFS.DirName::create("/windows/");
 const subsInput: SKFS.DirName = SKFS.DirName::create("/subsInput/");
 const subsOutput: SKFS.DirName = SKFS.DirName::create("/subsOutput/");
 const indexInput: SKFS.DirName = SKFS.DirName::create("/indexInput/");
@@ -48,7 +47,7 @@ fun makeDir<T: frozen>(
 
 fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
   makeDir(DirDescr::fromFile, context, tableInfo, () ->
-    context.mkdir(DirDescr::fromFile, tableInfo, Array[])
+    context.mkdir(DirDescr::fromFile, tableInfo, false, Array[])
   )
 }
 
@@ -58,17 +57,7 @@ fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
 
 fun getViewsDir(context: mutable SKFS.Context): SKFS.EHandle<SelectFile> {
   makeDir(SelectFile::fromFile, context, views, () ->
-    context.mkdir(SelectFile::fromFile, views, Array[])
-  )
-}
-
-/*****************************************************************************/
-/* Window Counts. */
-/*****************************************************************************/
-
-fun getWindowsDir(context: mutable SKFS.Context): SKFS.EHandle<Queue> {
-  makeDir(Queue::fromFile, context, windows, () ->
-    context.mkdir(Queue::fromFile, windows, Array[])
+    context.mkdir(SelectFile::fromFile, views, false, Array[])
   )
 }
 
@@ -93,7 +82,7 @@ fun getSubsDirs(
     output = SKFS.EHandle(SKFS.IntFile::fromFile, subsOutput);
     return (input, output)
   };
-  input = context.mkdir(SubRequestFile::fromFile, subsInput, Array[]);
+  input = context.mkdir(SubRequestFile::fromFile, subsInput, false, Array[]);
   output = input.contextWriterKeyValues(
     SKFS.IntFile::fromFile,
     context,
@@ -110,12 +99,12 @@ fun getSubsDirs(
       invariant(selectFiles.size() <= 1);
       if (selectFiles.size() == 0) {
         print_error(`Error: view ${viewName.toString()} doesn't exists`);
-        exit(3)
+        skipExit(3)
       };
       selectFile = SKSQL.SelectFile::fromFile(selectFiles[0]);
       if (!selectFile.virtual) {
         print_error("Error: can only connect to virtual views");
-        exit(23);
+        skipExit(23);
       };
       selectAst = selectFile.value;
       compiler = SKSQL.Compiler::create(
@@ -152,7 +141,7 @@ class IndexDescr{
 
 fun getIndexInputDir(context: mutable SKFS.Context): SKFS.EHandle<Index> {
   makeDir(Index::fromFile, context, indexInput, () ->
-    context.mkdir(Index::fromFile, indexInput, Array[])
+    context.mkdir(Index::fromFile, indexInput, false, Array[])
   )
 }
 
@@ -266,6 +255,7 @@ fun getTable(
         data => oldDir.data,
         totalSize => oldDir.totalSize,
         creator => context.currentArrow(),
+        reallyRemove => false,
       };
       context.setDir(dir.dirName, dir);
       _ = SKFS.EagerDir::apply(
@@ -313,6 +303,7 @@ fun dumpTables(origContext: readonly SKFS.Context): void {
     o(
       dirDescr.windowSize match {
       | None() -> "TABLE "
+      | Some(0) -> "STREAM " + " "
       | Some(size) -> "WINDOW " + size + " "
       },
     );

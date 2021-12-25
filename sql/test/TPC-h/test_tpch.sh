@@ -20,15 +20,15 @@ fi
 # NATION_COUNT VIEW
 ###############################################################################
 
-echo "create virtual view nation_count as select c_nationkey, count(*) from customer group by c_nationkey;" | sqlive --data /tmp/test.db
-sqlive --data /tmp/test.db --connect nation_count --stream /tmp/nation_count > /dev/null
+echo "create virtual view nation_count as select c_nationkey, count(*) from customer group by c_nationkey;" | skdb --data /tmp/test.db
+skdb --data /tmp/test.db --connect nation_count --updates /tmp/nation_count > /dev/null
 
 ###############################################################################
 # JOIN VIEW
 ###############################################################################
 
 START=$SECONDS
-cat view1.sql | sqlive --data /tmp/test.db 
+cat view1.sql | skdb --data /tmp/test.db 
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 120 ));
 then
@@ -42,7 +42,7 @@ fi
 ###############################################################################
 
 START=$SECONDS
-echo "create index view1_o_orderdate on view1(o_orderdate);" | sqlive --data /tmp/test.db
+echo "create index view1_o_orderdate on view1(o_orderdate);" | skdb --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 10 ));
 then
@@ -58,7 +58,7 @@ fi
 rm -f /tmp/query1
 
 START=$SECONDS
-cat query1.sql | sqlive --data /tmp/test.db
+cat query1.sql | skdb --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 3 ));
 then
@@ -67,7 +67,7 @@ else
     echo -e "BUILD query1 VIRTUAL VIEW:\tOK ($TOTAL)"
 fi
 
-sqlive --data /tmp/test.db --connect query1 --stream /tmp/query1 > /dev/null
+skdb --data /tmp/test.db --connect query1 --updates /tmp/query1 > /dev/null
 
 ###############################################################################
 # Query 2
@@ -76,7 +76,7 @@ sqlive --data /tmp/test.db --connect query1 --stream /tmp/query1 > /dev/null
 rm -f /tmp/query2
 
 START=$SECONDS
-cat query2.sql | sqlive --data /tmp/test.db
+cat query2.sql | skdb --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 20 ));
 then
@@ -85,7 +85,7 @@ else
     echo -e "BUILD query2 VIRTUAL VIEW:\tOK ($TOTAL)"
 fi
 
-sqlive --data /tmp/test.db --connect query2 --stream /tmp/query2 > /dev/null
+skdb --data /tmp/test.db --connect query2 --updates /tmp/query2 > /dev/null
 
 ###############################################################################
 # Query 3
@@ -94,7 +94,7 @@ sqlive --data /tmp/test.db --connect query2 --stream /tmp/query2 > /dev/null
 rm -f /tmp/query3
 
 START=$SECONDS
-cat query3.sql | sqlive --data /tmp/test.db
+cat query3.sql | skdb --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 30 ));
 then
@@ -103,25 +103,25 @@ else
     echo -e "BUILD query3 VIRTUAL VIEW:\tOK ($TOTAL)"
 fi
 
-sqlive --data /tmp/test.db --connect query3 --stream /tmp/query3 > /dev/null
+skdb --data /tmp/test.db --connect query3 --updates /tmp/query3 > /dev/null
 
 ###############################################################################
 # DUMP AND CHECK SIZE
 ###############################################################################
 
-rm -f /tmp/test2.db
-sqlive --init /tmp/test2.db
-sqlive --data /tmp/test.db --dump | sqlive --data /tmp/test2.db
-sqlive --compact --data /tmp/test2.db
+# rm -f /tmp/test2.db
+# skdb --init /tmp/test2.db
+# skdb --data /tmp/test.db --dump | skdb --data /tmp/test2.db
+# skdb --compact --data /tmp/test2.db
 
-mv /tmp/test2.db /tmp/test.db
+# mv /tmp/test2.db /tmp/test.db
 
 ###############################################################################
 # MASS DELETE
 ###############################################################################
 
 START=$SECONDS
-echo "delete from customer where c_custkey <= 10000;" | sqlive --data /tmp/test.db
+echo "delete from customer where c_custkey <= 10000;" | skdb --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 50 ));
 then
@@ -135,7 +135,7 @@ fi
 ###############################################################################
 
 START=$SECONDS
-echo "delete from lineitem where l_orderkey < 10;" | sqlive --data /tmp/test.db
+echo "delete from lineitem where l_orderkey < 10;" | skdb --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 5 ));
 then

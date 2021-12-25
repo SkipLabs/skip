@@ -210,6 +210,26 @@ base class DMap<Key: BaseName, Value> {
     | GT() -> static::node(tick, key, value, left, right.remove(k))
     }
 
+  fun filterChanged(f: (Key, Value) -> Bool): (DMap<Key, Value>, Bool)
+  | Nil() -> (this, false)
+  | Node{tick, key, value, left, right} ->
+    (newLeft, leftChanged) = left.filterChanged(f);
+    keep = f(key, value);
+    (newRight, rightChanged) = right.filterChanged(f);
+    if (keep) {
+      if (leftChanged || rightChanged) {
+        (static::node(tick, key, value, newLeft, newRight), true)
+      } else {
+        (this, false)
+      }
+    } else {
+      (DMap::merge(left, right), true)
+    }
+
+  fun filter(f: (Key, Value) -> Bool): DMap<Key, Value> {
+    this.filterChanged(f).i0
+  }
+
   fun removeMinBinding(): ((TickRange, Key, Value), DMap<Key, Value>) {
     this match {
     | Nil() -> invariant_violation("Remove min binding on empty DMap")
@@ -218,6 +238,14 @@ base class DMap<Key: BaseName, Value> {
     | Node{tick, left, key, value, right} ->
       (binding, !left) = left.removeMinBinding();
       (binding, static::balance(tick, key, value, left, right))
+    }
+  }
+
+  fun maxBinding(): ?(Key, Value) {
+    this match {
+    | Nil() -> None()
+    | Node{key, value, right => Nil()} -> Some((key, value))
+    | Node{right} -> right.maxBinding()
     }
   }
 

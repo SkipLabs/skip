@@ -57,8 +57,8 @@ const argsSchema: Array<AP.Param> = Array[
   },
   AP.StringParam{name => "cmd", help => "Name of the command to run on change"},
   AP.StringParam{
-    name => "stream",
-    help => "Name of the file receiving the stream of changes",
+    name => "updates",
+    help => "Name of the file where the updates will be written",
   },
   AP.StringParam{
     name => "notify",
@@ -85,6 +85,11 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Dumps tables/inserts/views in SQL format",
     negatable => false,
   },
+  AP.BoolParam{
+    name => "force-window-update",
+    help => "Makes sure every window change triggers notifications",
+    negatable => false,
+  },
 ];
 
 fun getParsedArgs(): AP.ParseResult {
@@ -92,7 +97,7 @@ fun getParsedArgs(): AP.ParseResult {
   | Success(value) -> value
   | Failure(error) ->
     print_error(error.getMessage());
-    exit(2)
+    skipExit(2)
   }
 }
 
@@ -120,7 +125,7 @@ untracked fun main(): void {
     };
     if (unknownOptions.size() != 0) {
       print_error(AP.help(argsSchema));
-      exit(2);
+      skipExit(2);
     }
   };
   argFiles = parsedArgs.unknown.toArray();
@@ -128,7 +133,7 @@ untracked fun main(): void {
     for (file in argFiles) {
       print_error("Error: don't know what to do with " + file);
     };
-    exit(2);
+    skipExit(2);
   };
 
   options = SKSQL.Options{
@@ -141,6 +146,9 @@ untracked fun main(): void {
       AP.BoolValue _,
     ),
     csv => argMap.maybeGet("csv") is Some(AP.BoolValue _),
+    forceWindowUpdate => argMap.maybeGet("force-window-update") is Some(
+      AP.BoolValue _,
+    ),
   };
 
   argMap.maybeGet("sessions") match {
@@ -148,7 +156,7 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
       for (id => dirName in context.sessions) {
@@ -172,7 +180,7 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runLockedSql(options, context ~> {
       for (_dirName => dir in context.dirs.state) {
@@ -193,11 +201,11 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
       SKSQL.dumpTables(context);
-      exit(0);
+      skipExit(0);
       SKFS.CStop(None())
     });
     return void
@@ -209,7 +217,7 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
       SKSQL.dumpInserts(context);
@@ -224,7 +232,7 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
       SKSQL.dumpViews(context);
@@ -239,7 +247,7 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
       SKSQL.dumpTables(context);
@@ -254,20 +262,28 @@ untracked fun main(): void {
   argMap.maybeGet("load-csv") match {
   | Some(AP.StringValue{value => tableNameUpper}) ->
     tableName = tableNameUpper.lowercase();
+    name = SKFS.SID::create(tableName);
     SKSQL.runSql(options, context ~> {
+      table = context.getGlobal("CSV_TABLE") match {
+      | None() ->
+        tableDescr = SKSQL.getTable(options, context, 0, name);
+        context.setGlobal("CSV_TABLE", tableDescr);
+        tableDescr
+      | Some(x) -> SKSQL.DirDescr::fromFile(x)
+      };
       line = context.getGlobal("Line") match {
       | None() -> mutable Ref(1)
       | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
       };
       vtry<SKFS.ContextOp>(
         () -> {
-          contextOp = SKCSV.insert(context, line, options, tableName);
+          contextOp = SKCSV.insert(context, line, options, table);
           context.setGlobal("Line", SKFS.IntFile(line.get()));
           contextOp
         },
         exn -> {
           print_error("Error, line " + line.get() + ": " + exn.getMessage());
-          exit(23);
+          skipExit(23);
         },
       );
     });
@@ -280,7 +296,7 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, _context ~> {
       printPersistentSize();
@@ -295,13 +311,13 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
       dirName = context.sessions.maybeGet(sessionID) match {
       | None() ->
         print_error("Error: session not found");
-        exit(2)
+        skipExit(2)
       | Some(x) -> x
       };
       edir = context.unsafeGetEagerDir(dirName);
@@ -317,7 +333,7 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
       if (options.csv) {
@@ -326,14 +342,14 @@ untracked fun main(): void {
       dirName = context.sessions.maybeGet(sessionID) match {
       | None() ->
         print_error("Error: session not found");
-        exit(2)
+        skipExit(2)
       | Some(x) -> x
       };
       time = argMap.maybeGet("since") match {
       | Some(AP.IntValue{value}) -> value
       | _ ->
         print_error("Error: --since option missing");
-        exit(2)
+        skipExit(2)
       };
       context.setGlobal("Stdout", SKSQL.StdoutDiff(dirName, SKFS.Tick(time)));
       SKFS.CStop(None())
@@ -347,13 +363,13 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runLockedSql(options, context ~> {
       dirName = context.sessions.maybeGet(sessionID) match {
       | None() ->
         print_error("Error: session not found");
-        exit(2)
+        skipExit(2)
       | Some(x) -> x
       };
       context.unsafeGetEagerDir(dirName).disconnect(context, sessionID);
@@ -362,7 +378,7 @@ untracked fun main(): void {
   | Some(AP.MissingValue{}) -> void
   | _ ->
     print_error("Error: --disconnect expects a session ID");
-    exit(2)
+    skipExit(2)
   };
 
   argMap.maybeGet("write") match {
@@ -370,7 +386,7 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
       SKFS.writeFromStdin(context, dirNameStr);
@@ -399,29 +415,29 @@ untracked fun main(): void {
     if (SKFS.gHasContext() == 0) {
       invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
       print_error("Error: option --data is missing");
-      exit(2);
+      skipExit(2);
     };
     SKSQL.runLockedSql(options, context ~> {
       viewName = userViewName.lowercase();
       SKSQL.forbidNow(context);
       cmd = (
         argMap.maybeGet("cmd"),
-        argMap.maybeGet("stream"),
+        argMap.maybeGet("updates"),
         argMap.maybeGet("notify"),
       ) match {
       | (Some(AP.StringValue _), Some(AP.StringValue _), _) ->
-        print_error("Cannot have both --cmd and --stream");
-        exit(4)
+        print_error("Cannot have both --cmd and --updates");
+        skipExit(4)
       | (_, Some(AP.StringValue _), Some(AP.StringValue _)) ->
-        print_error("Cannot have both --stream and --notify");
-        exit(4)
+        print_error("Cannot have both --updates and --notify");
+        skipExit(4)
       | (Some(AP.StringValue _), _, Some(AP.StringValue _)) ->
         print_error("Cannot have both --cmd and --notify");
-        exit(4)
+        skipExit(4)
       | (Some(AP.StringValue{value => x}), _, _) ->
         Some(SKFS.NCmd(options.csv, x))
       | (_, Some(AP.StringValue{value => x}), _) ->
-        Some(SKFS.NStream(options.csv, x))
+        Some(SKFS.NUpdates(options.csv, x))
       | (_, _, Some(AP.StringValue{value => x})) -> Some(SKFS.NNotify(x))
       | _ -> None()
       };
@@ -466,7 +482,7 @@ untracked fun main(): void {
               print_error(
                 "Error, line " + lineNbr + ": unexpected end of line",
               );
-              exit(23)
+              skipExit(23)
             | Some(x) -> x
             };
             if (c == '\t') break void;
@@ -474,7 +490,7 @@ untracked fun main(): void {
               print_error(
                 "Error, line " + lineNbr + ": expected an integer key",
               );
-              exit(23)
+              skipExit(23)
             };
             chars.push(c);
           };
@@ -529,12 +545,12 @@ untracked fun main(): void {
         for (key => _ in testFuns) {
           print_error("  " + key + "\n");
         };
-        exit(4);
+        skipExit(4);
       };
       testName
     | _ ->
       print_error("Invalid test name type");
-      exit(2)
+      skipExit(2)
     };
     context = testFuns[testName]();
     if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
@@ -547,7 +563,7 @@ untracked fun main(): void {
     return void;
   } else if (argMap.maybeGet("capacity") is Some(AP.StringValue _)) {
     print_error("cannot use capacity without init");
-    exit(2)
+    skipExit(2)
   } else if (argMap.maybeGet("data") is Some(AP.StringValue _)) {
     // this was handled in the C++ side
     void

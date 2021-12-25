@@ -2,7 +2,7 @@
 
 run_test () {
   echo -en "$1:\t"
-  cat $1 | ~/skfs/build/sqlive --always-allow-joins | sort > /tmp/kk1
+  cat $1 | ~/skfs/build/skdb --always-allow-joins | sort > /tmp/kk1
   cat $1 | sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2 > /dev/null
   if [ $? -eq 0 ]; then
@@ -13,7 +13,7 @@ run_test () {
 }
 
 run_one_test () {
-  cat $1 | time ~/skfs/build/sqlive --always-allow-joins | sort > /tmp/kk1
+  cat $1 | time ~/skfs/build/skdb --always-allow-joins | sort > /tmp/kk1
   cat $1 | time sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2
   if [ $? -eq 0 ]; then
@@ -23,7 +23,7 @@ run_one_test () {
 
 echo ""
 echo "*******************************************************************************"
-echo "* SQLIVE TESTS *"
+echo "* SKDB TESTS *"
 echo "*******************************************************************************"
 echo ""
 
@@ -63,7 +63,7 @@ done
 
 echo ""
 echo "*******************************************************************************"
-echo "* SQLIVE CONCURRENCY TESTS *"
+echo "* SKDB CONCURRENCY TESTS *"
 echo "*******************************************************************************"
 echo ""
 
@@ -74,7 +74,7 @@ for i in {1..10}; do (cd ./test/concurrent/sum_transaction/ && ./run.sh); done
 
 echo ""
 echo "*******************************************************************************"
-echo "* SQLIVE LARGE TESTS *"
+echo "* SKDB LARGE TESTS *"
 echo "*******************************************************************************"
 echo ""
 
@@ -84,7 +84,7 @@ run_test 'test/select3_large.sql'
 
 echo ""
 echo "*******************************************************************************"
-echo "* SQLIVE UNIT TESTS *"
+echo "* SKDB UNIT TESTS *"
 echo "*******************************************************************************"
 echo ""
 
@@ -92,11 +92,19 @@ run_test 'test/comments.sql'
 
 echo ""
 echo "*******************************************************************************"
-echo "* SQLIVE DIFF TESTS *"
+echo "* SKDB DIFF TESTS *"
 echo "*******************************************************************************"
 echo ""
 
 ./test_diff.sh
+
+echo ""
+echo "*******************************************************************************"
+echo "* SKDB WINDOW SIZE TESTS *"
+echo "*******************************************************************************"
+echo ""
+
+./test_window_size.sh
 
 echo ""
 echo "*******************************************************************************"

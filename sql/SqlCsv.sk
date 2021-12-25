@@ -107,20 +107,17 @@ fun insert(
   context: mutable SKFS.Context,
   line: mutable Ref<Int>,
   options: SKSQL.Options,
-  tableName: String,
+  table: SKSQL.DirDescr,
 ): SKFS.ContextOp {
-  baseName = SKFS.SID::create(tableName);
-
   eval = SKSQL.Evaluator{options};
   pos = 0;
   inTransaction = false;
   paramsOpt = None();
-  table = SKSQL.getTable(options, context, pos, baseName);
   array = mutable Vector[];
   eof = false;
   vtry(
     () -> {
-      for (_ in Range(0, 100)) {
+      for (_ in Range(0, 1000)) {
         values = mutable Vector[];
         for (value in lex(() -> getChar(0))) {
           values.push(value);
@@ -136,7 +133,7 @@ fun insert(
         return void;
       };
       print_error("Error, line " + line.get() + ": " + exn.getMessage());
-      exit(23);
+      skipExit(23);
     },
   );
   f = eval.insert(
@@ -147,6 +144,6 @@ fun insert(
     paramsOpt,
     array.toArray(),
   );
-  if (f is Some _ || !eof) return SKFS.CContinue(f);
+  if (!eof) return SKFS.CContinue(f);
   SKFS.CStop(f)
 }

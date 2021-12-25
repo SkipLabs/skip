@@ -1,7 +1,7 @@
 #!/bin/bash
 
 run_test () {
-  cat $1 | ~/skfs/build/sqlive --always-allow-joins | sort > /tmp/kk1
+  cat $1 | ~/skfs/build/skdb --always-allow-joins | sort > /tmp/kk1
   cat $1 | sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2 > /dev/null
   if [ $? -eq 0 ]; then
@@ -126,4 +126,4 @@ run_hour_test () {
 #     run_hour_test "+$i month"
 #done
 
-echo "select date('now', '+1 day');" | sqlive 
+echo "select date('now', '+1 day');" | skdb 

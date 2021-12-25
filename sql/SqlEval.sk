@@ -1,22 +1,6 @@
 module SKSQL;
 
 /*****************************************************************************/
-/* Helper class for windows. */
-/*****************************************************************************/
-
-class Queue private (size: Int, idx: Int = 0) extends SKFS.File {
-  static fun create(size: Int): this {
-    invariant(size > 0);
-    static(size)
-  }
-  fun next(): (this, Int) {
-    result = this.idx;
-    !this.idx = (this.idx + 1) % this.size;
-    (this, result)
-  }
-}
-
-/*****************************************************************************/
 /* Functions evaluating SQL. */
 /*****************************************************************************/
 
@@ -138,9 +122,9 @@ fun valueToCValue(
   schema[idx].ty match {
   | INTEGER() ->
     val match {
-    | VId(varName) ->
+    | VId(Some(varName)) ->
       if (!inTransaction) {
-        error(pos, "id can only be used in a transaction");
+        error(pos, "named id can only be used in a transaction");
       };
       globals = context.getGlobal(GLOBALS) match {
       | None() -> Globals()
@@ -153,6 +137,13 @@ fun valueToCValue(
       !globals = globals.set(varName, id);
       context.setGlobal(GLOBALS, globals);
       Some(CInt(id))
+    | VId(None()) -> Some(CInt(SKFS.genSym(0)))
+    | VTime() ->
+      if (inTransaction) {
+        error(pos, "time can not be used in a transaction");
+      };
+      time = getUnixTime();
+      Some(CInt(time))
     | VInt(n) ->
       if (schema[idx].primary) {
         _ = SKFS.genSym(n);
@@ -283,12 +274,17 @@ class Evaluator{options: Options} {
       Some((context, _, _) ~> {
         dirDescr = computeTableDescr(name, schema, windowSize);
         windowSize match {
-        | Some(x) if (x <= 0) ->
+        | Some(x) if (x < 0) ->
           print_error("Invalid WINDOW size");
-          exit(23)
+          skipExit(23)
         | _ -> void
         };
-        this.createTable(context, pos, name, dirDescr)
+        reallyRemove = windowSize match {
+        | Some(0) -> false
+        | Some(_) -> true
+        | None() -> false
+        };
+        this.createTable(context, pos, name, dirDescr, reallyRemove)
       })
     | Insert{pos, name, paramsOpt, values} ->
       baseName = SKFS.SID::create(name);
@@ -545,7 +541,7 @@ class Evaluator{options: Options} {
     inputDir = getDir(table);
     if (table.windowSize is Some _) {
       print_error("Error: cannot delete from a window");
-      exit(23);
+      skipExit(23);
     };
     SKFS.EagerDir::apply(
       context,
@@ -616,27 +612,64 @@ class Evaluator{options: Options} {
     values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
-
     table.windowSize match {
-    | None() ->
-      for (row in rows) {
-        dir = getDir(table);
-        newDir = context.getEagerDir(dir.dirName);
-        kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
-        key = RowKey(row, kinds);
-        source = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(pos)));
-        !newDir = newDir.writeEntry(context, source, key, Array[row]);
-        context.setDir(newDir.dirName, newDir);
-      };
+    | None() if (inTransaction) ->
+      this.insertTable(context, table, rows);
       None()
+    | None() ->
+      Some((context, _, _) ~> {
+        this.insertTable(context, table, rows);
+        context.update(true)
+      })
+
     | Some(ws) ->
       if (inTransaction) {
         print_error("Error: cannot insert into a window within a transaction");
-        exit(23);
+        skipExit(23);
       };
-      Some((context, _, _) ~> {
-        this.insertWindow(context, ws, rows, table)
-      })
+      if (ws == 0) {
+        this.insertStream(context, rows, table);
+        Some((_, _, _) ~> {
+          void
+        })
+      } else {
+        Some((context, _, _) ~> {
+          this.insertWindow(context, ws, rows, table);
+        })
+      }
+    }
+  }
+
+  fun insertTable(
+    context: mutable SKFS.Context,
+    table: DirDescr,
+    rows: Array<RowValues>,
+  ): void {
+    dir = getDir(table);
+    newDir = context.unsafeGetEagerDir(dir.dirName);
+    kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
+    for (row in rows) {
+      key = RowKey(row, kinds);
+      source = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0)));
+      !newDir = newDir.writeEntry(context, source, key, Array[row]);
+    };
+    context.setDir(newDir.dirName, newDir);
+  }
+
+  fun insertStream(
+    context: mutable SKFS.Context,
+    rows: Array<RowValues>,
+    table: DirDescr,
+  ): void {
+    dir = getDir(table);
+    newDir = context.unsafeGetEagerDir(dir.dirName);
+    key = SKFS.IID(SKFS.genSym(0));
+    source = SKFS.Path(dir.dirName, key);
+    for (row in rows) {
+      vcontext = context.mclone();
+      !newDir = newDir.writeEntry(vcontext, source, key, Array[row]);
+      vcontext.setDir(newDir.dirName, newDir);
+      vcontext.update(true);
     }
   }
 
@@ -646,28 +679,50 @@ class Evaluator{options: Options} {
     rows: Array<RowValues>,
     table: DirDescr,
   ): void {
-    for (row in rows) {
-      dir = getDir(table);
-      newDir = context.getEagerDir(dir.dirName);
-      wdir = getWindowsDir(context);
-      queues = (
-        context.unsafeGetEagerDir(wdir.dirName).getArrayRaw(table.dirName)
-      );
-      queue = if (queues.size() == 0) {
-        Queue::create(ws)
-      } else {
-        Queue::fromFile(queues[0])
+    dir = getDir(table);
+    newDir = context.unsafeGetEagerDir(dir.dirName);
+
+    kinds = table.schema.mapWithIndex((idx, tyDescr) ->
+      (idx, IASC(), tyDescr.ty)
+    );
+
+    rowsIter = rows.iterator();
+    row1 = rowsIter.next();
+    row2 = rowsIter.next();
+    i = 0;
+
+    loop {
+      row = row1 match {
+      | None() -> break void
+      | Some(x) -> x
       };
-      (!queue, keyID) = queue.next();
-      key = SKFS.IID(keyID);
+      key = RowKey(row, kinds);
       source = SKFS.Path(dir.dirName, key);
       !newDir = newDir.writeEntry(context, source, key, Array[row]);
-      (context.unsafeGetEagerDir(wdir.dirName)).writeArray(
-        context,
-        table.dirName,
-        Array[queue],
-      );
-      context.setDir(newDir.dirName, newDir);
+      time = row.getInt(0).fromSome();
+
+      for (kv in newDir.unsafeGetFileIter()) {
+        (minKey, minFile) = kv;
+        minValues = minFile.map(x -> RowValues::fromFile(x)).collect(Array);
+        if (minValues.size() == 0) continue;
+        minValue = minValues[0];
+        if (minValue.getInt(0).fromSome() + ws > time) {
+          break void;
+        };
+        minSource = SKFS.Path(dir.dirName, minKey);
+        !newDir = newDir.writeEntry(context, minSource, minKey, Array[]);
+        void
+      };
+
+      !row1 = row2;
+
+      if (row1 is None() || i % 1024 == 0 || this.options.forceWindowUpdate) {
+        context.setDir(dir.dirName, newDir);
+        context.update(true)
+      };
+
+      !i = i + 1;
+      !row2 = rowsIter.next();
     }
   }
 
@@ -676,17 +731,24 @@ class Evaluator{options: Options} {
     pos: Int,
     name: String,
     dirDescr: DirDescr,
+    reallyRemove: Bool,
     init: Array<RowValues> = Array[],
   ): void {
     dirName = dirDescr.dirName;
     kinds = dirDescr.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
     tag = SKFS.TickRange::create(context.tick);
-    _ = context.mkdirCompressed(RowValues::fromFile, dirName, init, row ~> {
-      file: SKFS.File = row;
-      key = RowKey(row, kinds);
-      path = SKFS.Path::create(dirName, key);
-      SKFS.FixedRow(key, (SKFS.Source::create(path), Array[file]), tag)
-    });
+    _ = context.mkdirCompressed(
+      RowValues::fromFile,
+      dirName,
+      init,
+      row ~> {
+        file: SKFS.File = row;
+        key = RowKey(row, kinds);
+        path = SKFS.Path::create(dirName, key);
+        SKFS.FixedRow(key, (SKFS.Source::create(path), Array[file]), tag)
+      },
+      reallyRemove,
+    );
 
     getTableDir(context).writeArray(
       context,
@@ -695,6 +757,15 @@ class Evaluator{options: Options} {
     );
 
     hasPrimary = false;
+    dirDescr.windowSize match {
+    | Some(0) -> void
+    | Some(_) ->
+      if (!(dirDescr.schema[0].ty is INTEGER())) {
+        error(pos, "WINDOW expects a first column of type INTEGER")
+      }
+    | _ -> void
+    };
+
     for (tyDescr in dirDescr.schema) {
       if (tyDescr.primary) {
         if (hasPrimary) {
@@ -798,7 +869,7 @@ fun read(line: Int): (Int, String) {
     _endOfFile -> {
       if (hasData) {
         print_error("Error, line " + lineStart + ": unfinished statement");
-        exit(23);
+        skipExit(23);
       };
       (line, "")
     },
@@ -855,7 +926,7 @@ fun printErrorAndExit(
   charPos = `characters ${leftSpaces}-${leftSpaces}`;
   print_error(`Error: line ${errLine}, ${charPos}:`);
   print_error(msg);
-  exit(2)
+  skipExit(2)
 }
 
 fun printRow(csv: Bool, row: SKSQL.Row): void {
@@ -925,12 +996,13 @@ class Options{
   virtual: Bool = false,
   showUsedIndexes: Bool,
   csv: Bool,
+  forceWindowUpdate: Bool,
 }
 
 fun eval(options: Options): void {
   runSql(options, context ~> {
     if (isATTY() != 0) {
-      print_raw("sqlive> ");
+      print_raw("skdb> ");
     };
     lineFile = SKFS.IntFile::fromFile(context.getGlobal("Line").fromSome());
     context.!globals = SortedMap[];
@@ -1032,7 +1104,7 @@ fun eval(options: Options): void {
           printErrorAndExit(gline, buffer, posError, str)
         | exn ->
           print_error(exn.getMessage());
-          exit(44)
+          skipExit(44)
         }
       },
     );
@@ -1049,11 +1121,19 @@ fun eval(options: Options): void {
 }
 
 fun runSql(options: Options, f: mutable SKFS.Context ~> SKFS.ContextOp): void {
-  SKFS.runWithGc(
-    SKSQL.makeSqlContext().clone(),
-    f,
-    Some(SKFS.Synchronizer(importFromRoot, exportToRoot, printContext)),
-    options.sync,
+  doOnError(
+    options,
+    () ->
+      SKFS.runWithGc(
+        SKSQL.makeSqlContext().clone(),
+        f,
+        Some(SKFS.Synchronizer(importFromRoot, exportToRoot, printContext)),
+        options.sync,
+      ),
+    err -> {
+      print_error(err.getMessage());
+      skipExit(45);
+    },
   )
 }
 
@@ -1065,7 +1145,7 @@ fun runLockedSql(options: Options, f: mutable SKFS.Context ~> void): void {
     },
     err -> {
       print_error(err.getMessage());
-      exit(45);
+      skipExit(45);
     },
   )
 }
@@ -1096,7 +1176,7 @@ fun importFromRoot(
       | Some(x) -> SKFS.IntFile::fromFile(x).value
       };
       print_error("Error, line " + line + ": " + err.getMessage());
-      exit(2);
+      skipExit(2);
     }),
   )
 }
@@ -1149,6 +1229,7 @@ fun importNext(
             fixedData => SKFS.FixedDir::create(mutable Vector[]),
             totalSize => 0,
             creator => None(),
+            reallyRemove => false,
           };
           targetCtx.setDir(targetDir.dirName, targetDir)
         | Some(_) -> void
@@ -1193,7 +1274,7 @@ fun exportToRoot(
       };
       root.replaceFromSaved(rootCopy);
       print_error("Error, line " + line + ": " + err.getMessage());
-      exit(2);
+      skipExit(2);
     }),
   )
 }

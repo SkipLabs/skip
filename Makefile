@@ -51,15 +51,15 @@ SKFUNS=\
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
-default: build/out32.wasm build/sqlive
+default: build/out32.wasm build/skdb
 
 build/magic.h:
 	echo -n "#define MAGIC " > build/magic.h
 	date | cksum | awk '{print $$1}' >> build/magic.h
 
-test: build/out32.wasm build/sqlive
+test: build/out32.wasm build/skdb
 	node run.js
-	build/sqlive all
+	build/skdb all
 
 build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	cat preamble32.ll build/out32.ll > build/preamble_and_out32.ll
@@ -78,9 +78,10 @@ build/%.bc: %.c
 	mkdir -p build/runtime
 	$(CC) $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
 
-build/sqlive: build/out64.ll build/libskip_runtime64.a
+build/skdb: build/out64.ll build/libskip_runtime64.a
 	cat preamble64.ll build/out64.ll > build/preamble_and_out64.ll
-	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -lpthread -o build/sqlive
+	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -o build/skdb -Wl,--whole-archive -static -lrt -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
+	./stripdebug.sh build/skdb
 
 build/out64.ll: $(SKIP_FILES)
 	mkdir -p build/

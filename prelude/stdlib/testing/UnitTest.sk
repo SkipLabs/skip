@@ -100,7 +100,7 @@ untracked fun main(tests: Array<(String, untracked () -> void)>): void {
     print_error_ln(
       "No tests provided: use `--allow-empty` if this is expected.",
     );
-    exit(2)
+    skipExit(2)
   };
   runTests(tests, projectName, expectError, options)
 }
@@ -127,7 +127,7 @@ untracked fun runTests(
     | Success _ -> print(reportSuccess{name, options})
     | Failure(exception) ->
       print(reportFailure{name, exception, options});
-      exit(1)
+      skipExit(1)
     }
   }
 }

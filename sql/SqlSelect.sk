@@ -233,7 +233,7 @@ class SelectEvaluator{
       };
       limitDir = context.unsafeMaybeGetEagerDir(limitName) match {
       | None() ->
-        h = context.mkdir(Row::fromFile, limitName, Array[]);
+        h = context.mkdir(Row::fromFile, limitName, false, Array[]);
         context.unsafeGetEagerDir(h.dirName)
       | Some(dir) ->
         context.!newDirs = context.newDirs.set(limitName);
@@ -432,6 +432,7 @@ class SelectEvaluator{
         _dir = context.mkdir(
           Row::fromFile,
           this.selectName1,
+          false,
           Array[(SKFS.IID(0), row)],
         );
       } else {
@@ -523,6 +524,7 @@ class SelectEvaluator{
           _ = context.mkdir(
             Row::fromFile,
             selectName1Empty,
+            false,
             Array[(SKFS.IID(0), emptyRow)],
           );
         } else {
@@ -595,7 +597,12 @@ class SelectEvaluator{
       | ADef(_) ->
         this.evalRow(context, evaluator, this.select.params, 1)
       };
-      _dir = context.mkdir(Row::fromFile, dirName, Array[(SKFS.IID(0), row)]);
+      _dir = context.mkdir(
+        Row::fromFile,
+        dirName,
+        false,
+        Array[(SKFS.IID(0), row)],
+      );
     } else {
       context.!newDirs = context.newDirs.set(dirName);
     }
@@ -967,9 +974,11 @@ fun updateState(
   state: mutable Array<?SKSQL.CValue>,
   rows: mutable Iterator<Row>,
   aggrKinds: Array<AggrKind>,
-): Bool {
+): (Bool, Bool) {
   lastRow: ?Row = None();
+  size = 0;
   for (row in rows) {
+    !size = size + 2;
     for (i => vOpt in row) {
       kind = aggrKinds[i];
       repeat = row match {
@@ -981,12 +990,12 @@ fun updateState(
       | (Min(), _, Some(_)) ->
         if (state[i] is None() && adding) state![i] = vOpt;
         if (state[i] < vOpt) continue;
-        if (!adding) return true;
+        if (!adding) return (true, false);
         state![i] = vOpt
       | (Max(), _, None()) -> continue
       | (Max(), _, Some(_)) ->
         if (state[i] > vOpt) continue;
-        if (!adding) return true;
+        if (!adding) return (true, false);
         state![i] = vOpt
       | (
         Sum(SDistinct()),
@@ -1028,7 +1037,7 @@ fun updateState(
     };
     !lastRow = Some(row);
   };
-  lastRow is None()
+  (false, lastRow is None())
 }
 
 fun reducerInit(
@@ -1047,10 +1056,16 @@ fun reducerInit(
       }
     }),
   );
-  shouldReset = updateState((x, y) ~> x + y, true, state, rows, aggrKinds);
-  if (shouldReset) Array[] else {
-    Array[RowValues::create(unsafe_chill_trust_me(state).map(x -> x))]
-  }
+  (shouldReset, isEmpty) = updateState(
+    (x, y) ~> x + y,
+    true,
+    state,
+    rows,
+    aggrKinds,
+  );
+  invariant(!shouldReset);
+  if (isEmpty) return Array[];
+  Array[RowValues::create(unsafe_chill_trust_me(state).map(x -> x))]
 }
 
 fun isPotentiallyEmpty(
@@ -1081,7 +1096,7 @@ fun reducerUpdate(
 
   state = Array::mcreateFromItems(stateRowValues);
 
-  shouldReset = updateState(
+  (shouldReset, _) = updateState(
     (x, y) ~> x - y,
     false,
     state,
@@ -1213,7 +1228,7 @@ fun makeJoinReducer(
   SKFS.BaseName,
   mutable Iterator<SKFS.File>,
 ) ~> void {
-  (_, writer, _, files) ~> {
+  (_, writer, _key, files) ~> {
     leftRows = mutable Vector[];
     rightRows = mutable Vector[];
     for (file in files) {
@@ -1231,12 +1246,12 @@ fun makeJoinReducer(
         (joinKind is JLeft _ || joinKind is JOuter _)
       ) {
         right = Array::fill(kinds.size() - left.size(), None<CValue>());
-        values = left.values.concat(right).collect(Array);
+        values = left.values.concat(right);
         row = RowValues::create(values, left.repeat);
         writer.write(RowKey(row, kinds), row);
       };
       for (right in rightRows) {
-        values = left.values.concat(right.values).collect(Array);
+        values = left.values.concat(right.values);
         row = RowValues::create(values, left.repeat * right.repeat);
         writer.write(RowKey(row, kinds), row);
       }
@@ -1247,7 +1262,7 @@ fun makeJoinReducer(
     ) {
       for (right in rightRows) {
         left = Array::fill(kinds.size() - right.size(), None<CValue>());
-        values = left.concat(right.values).collect(Array);
+        values = left.concat(right.values);
         row = RowValues::create(values, right.repeat);
         writer.write(RowKey(row, kinds), row);
       }

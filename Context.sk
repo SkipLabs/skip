@@ -306,6 +306,37 @@ mutable class Context{
     }
   }
 
+  readonly fun mclone(): mutable this {
+    mutable static{
+      pwd => this.pwd,
+      dirs => this.dirs,
+      reads => this.reads,
+      time => this.time,
+      tick => this.tick,
+      lazyCapacity => this.lazyCapacity,
+      toUpdate => this.toUpdate,
+      deps => this.deps,
+      debugMode => this.debugMode,
+      failOnExn => this.failOnExn,
+      hasPre => this.hasPre,
+      newDirs => this.newDirs,
+      toReset => this.toReset,
+      globals => this.globals,
+      asyncList => this.asyncList,
+      dirty => this.dirty,
+      dirtyReaders => this.dirtyReaders,
+      unsafeReuse => this.unsafeReuse,
+      arrowStack => this.arrowStack,
+      lazyGets => this.lazyGets,
+      lazyGetsQueueIn => this.lazyGetsQueueIn,
+      lazyGetsQueueOut => this.lazyGetsQueueOut,
+      lazyGetsRefCount => this.lazyGetsRefCount,
+      reallyRemoveDir => this.reallyRemoveDir,
+      sessions => this.sessions,
+      removeSubDirs => this.removeSubDirs,
+    }
+  }
+
   static fun fromSaved(ctx: Context): mutable this {
     mutable static{
       pwd => ctx.pwd,
@@ -446,6 +477,7 @@ mutable class Context{
           totalSize => 0,
           fixedData => FixedDir::create(),
           creator => this.currentArrow(),
+          reallyRemove => dir.reallyRemove,
         };
         dir.unsafeIterKeys((key, _time) -> {
           values = dir.getArrayRaw(key).collect(Array);
@@ -651,10 +683,12 @@ mutable class Context{
   mutable fun mkdir<T: File>(
     conv: File ~> T,
     dirName: DirName,
+    reallyRemove: Bool,
     content: Array<(BaseName, T)> = Array[],
   ): EHandle<T> {
     this.mkdirMulti(
       dirName,
+      reallyRemove,
       content.map(kv -> {
         (key, value) = kv;
         (key, Array[value])
@@ -665,6 +699,7 @@ mutable class Context{
 
   mutable fun mkdirMulti(
     dirName: DirName,
+    reallyRemove: Bool,
     content: Array<(BaseName, Array<File>)> = Array[],
   ): void {
     if (this.dirs.state.containsKey(dirName)) {
@@ -706,7 +741,15 @@ mutable class Context{
 
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
-    dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};
+    dir = EagerDir{
+      time,
+      input => true,
+      dirName,
+      fixedData,
+      totalSize,
+      creator,
+      reallyRemove,
+    };
     this.setDir(dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
   }
@@ -716,6 +759,7 @@ mutable class Context{
     dirName: DirName,
     content: Array<Row>,
     decompress: Row ~> FixedRow<Array<File>>,
+    reallyRemove: Bool,
   ): EHandle<T> {
     if (this.dirs.state.containsKey(dirName)) {
       throw DirAlreadyExists(dirName);
@@ -726,7 +770,15 @@ mutable class Context{
 
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
-    dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};
+    dir = EagerDir{
+      time,
+      input => true,
+      dirName,
+      fixedData,
+      totalSize,
+      creator,
+      reallyRemove,
+    };
     this.setDir(dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
     EHandle(conv, dirName)
@@ -953,7 +1005,7 @@ fun resolveContext(
           | Some(x) -> SKFS.IntFile::fromFile(x).value
           };
           print_error("Error, line " + line + ": " + err.getMessage());
-          exit(2);
+          skipExit(2);
         }),
       )
     };

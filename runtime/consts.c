@@ -37,7 +37,7 @@ char* sk_new_const(char* cst) {
     }
     #ifdef SKIP64
     if(!sk_is_nofile_mode()) {
-      fprintf(stderr, "Cannot have a changing constant int persitent mode\n");
+      fprintf(stderr, "Cannot have a changing constant in persitent mode\n");
       SKIP_throw(NULL);
     }
     #endif

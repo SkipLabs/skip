@@ -36,10 +36,12 @@ class Reducer{
   modified: SortedMap<BaseName, Array<File>>,
 } {
   static fun create(
+    reallyRemove: Bool,
     fixedData: FixedData<Array<File>>,
     reducer: IReducer,
   ): this {
     acc = mutable Vector[];
+    modified = SortedMap[];
     current = mutable IntRef(0);
     while (current.value < fixedData.size()) {
       key = fixedData[current.value].key;
@@ -48,10 +50,14 @@ class Reducer{
         key,
         current,
       ).iterator();
-      acc.push((key, reducer.init(iterator)));
+      if (reallyRemove) {
+        !modified = modified.set(key, reducer.init(iterator))
+      } else {
+        acc.push((key, reducer.init(iterator)))
+      };
     };
     fixed = acc.toArray();
-    static{reducer, fixed, modified => SortedMap[]}
+    static{reducer, fixed, modified}
   }
 
   fun unsafeIter(): mutable Iterator<(BaseName, mutable Iterator<File>)> {
@@ -103,21 +109,25 @@ class Reducer{
 
   fun getArray(key: BaseName): Array<File> {
     this.modified.maybeGet(key) match {
-    | None() -> this.getFixed(key, 0, this.fixed.size() - 1)
+    | None() -> this.getFixedij(key, 0, this.fixed.size() - 1)
     | Some(values) -> values
     }
   }
 
-  private fun getFixed(key: BaseName, i: Int, j: Int): Array<File> {
+  private fun getFixedij(key: BaseName, i: Int, j: Int): Array<File> {
     if (i > j) {
       return Array[];
     };
     pivot = (i + j) / 2;
     key.compare(this.fixed[pivot].i0) match {
-    | LT() -> this.getFixed(key, i, pivot - 1)
+    | LT() -> this.getFixedij(key, i, pivot - 1)
     | EQ() -> this.fixed[pivot].i1
-    | GT() -> this.getFixed(key, pivot + 1, j)
+    | GT() -> this.getFixedij(key, pivot + 1, j)
     }
+  }
+
+  fun getFixed(key: BaseName): Array<File> {
+    this.getFixedij(key, 0, this.fixed.size() - 1)
   }
 }
 
@@ -166,7 +176,7 @@ value class MInfo(
 base class CmdKind {
   children =
   | NCmd(Bool, String)
-  | NStream(Bool, String)
+  | NUpdates(Bool, String)
   | NNotify(String)
 }
 
@@ -195,6 +205,7 @@ class EagerDir{
   fixedData: FixedData<Array<File>>,
   totalSize: Int,
   creator: ?ArrowKey,
+  reallyRemove: Bool,
   fixedOld: FixedSingle<Source, MInfo> = FixedSingle::empty(),
   data: DMap<BaseName, SortedMap<Source, Array<File>>> = Nil(),
   old: SortedMap<Source, MInfo> = SortedMap[],
@@ -231,7 +242,7 @@ class EagerDir{
     | NCmd(csv, cmd) ->
       fd = exec(cmd);
       (fd, csv, x -> writeToProc(fd, x))
-    | NStream(csv, file) ->
+    | NUpdates(csv, file) ->
       fd = unixOpen(file);
       (fd, csv, x -> writeToFile(fd, x))
     | NNotify(file) ->
@@ -239,8 +250,10 @@ class EagerDir{
       !this.subs[id] = Sub(Some(cmdKind), status, tick);
       return this
     };
-    write("\n");
-    write("\n");
+    if (!changes.isEmpty()) {
+      write("\n");
+      write("\n");
+    };
     for (key in changes) {
       values = this.getArrayRaw(key);
       if (values.size() == 0) {
@@ -253,7 +266,7 @@ class EagerDir{
     };
     status = cmdKind match {
     | NCmd _ -> waitForProc(fd)
-    | NStream _ -> unixClose(fd)
+    | NUpdates _ -> unixClose(fd)
     | NNotify _ -> 0
     };
     !this.subs[id] = Sub(Some(cmdKind), status, tick);
@@ -728,10 +741,15 @@ class EagerDir{
       acc = mutable Vector<FixedRow<Array<File>>>[];
       oldVec = mutable Vector[];
 
+      reallyRemove = false;
+
       if (!unsafeSkipInit) {
         for (parentName => parentData in parents) {
           (f, rangeOpt) = parentData;
           parent = context.unsafeGetEagerDir(parentName);
+          if (parent.reallyRemove) {
+            !reallyRemove = true;
+          };
           rangeOpt match {
           | None() ->
             static::mapData(context, oldVec, parent, childName, f, acc, None())
@@ -753,9 +771,9 @@ class EagerDir{
 
       fixedData = FixedDir::create(acc);
       time = context.timeStamp();
-      totalSize = fixedData.size();
+      totalSize = acc.size();
       reducer = reducerOpt.map(ireducer ->
-        Reducer::create(fixedData, ireducer)
+        Reducer::create(reallyRemove, fixedData, ireducer)
       );
 
       if (context.debugMode) {
@@ -765,17 +783,39 @@ class EagerDir{
         );
       };
 
+      (!fixedData, data) = if (reallyRemove) {
+        data = DMap::empty();
+        for (fixedRow in acc) {
+          // This is due to a compiler bug, if you remove it, the optimizer
+          // believes that the next match Some is never taken.
+          if (fixedRow.value.i1.size() < 0) {
+            !data = data.set(fixedRow.tag, fixedRow.key, SortedMap[]);
+          };
+          map = data.maybeGet(fixedRow.key) match {
+          | None() -> SortedMap[]
+          | Some(x) -> x
+          };
+          !map = map.set(fixedRow.value.i0, fixedRow.value.i1);
+          !data = data.set(fixedRow.tag, fixedRow.key, map);
+        };
+        (FixedDir::create(mutable Vector[]), data)
+      } else {
+        (fixedData, DMap::empty())
+      };
+
       EagerDir{
         time,
         dirName => childName,
         input => false,
         parents,
         fixedData,
+        data,
         totalSize,
         creator => context.currentArrow(),
         fixedOld => FixedSingle::create(oldVec),
         childDirs => SortedSet[],
         reducer,
+        reallyRemove,
       }
     };
     updateDirtyReaders(context, Path::create(childName.tag(), DirTag()));
@@ -969,11 +1009,16 @@ class EagerDir{
 
       // We need to remember what keys we produced for the next
       // time around.
-      !child.old[source] = MInfo(
-        keys.toArray(),
-        newDirs.toArray(),
-        reads.toArray(),
-      );
+      minfo = MInfo(keys.toArray(), newDirs.toArray(), reads.toArray());
+      if (
+        !minfo.keys.isEmpty() ||
+        !minfo.newDirs.isEmpty() ||
+        !minfo.reads.isEmpty()
+      ) {
+        !child.old[source] = minfo
+      } else if (child.old.containsKey(source)) {
+        !child.old = child.old.remove(source);
+      };
 
       context.leave(ArrowKey(parentName, childName, key));
     };
@@ -1009,6 +1054,7 @@ class EagerDir{
     };
 
     if (
+      !this.reallyRemove &&
       this.data.getHeight() > 10 &&
       Math.ipow(2, this.data.getHeight()) >= this.fixedData.size()
     ) {
@@ -1028,9 +1074,20 @@ class EagerDir{
     | Some(x) -> x
     };
 
-    !map = map.set(source, rvalues);
-    tag = TickRange::create(context.tick);
-    !this.data = this.data.set(tag, k, map);
+    if (this.reallyRemove && rvalues.isEmpty()) {
+      invariant(this.fixedData.size() == 0);
+      !map = map.remove(source);
+    } else {
+      !map = map.set(source, rvalues);
+    };
+
+    if (this.reallyRemove && map.isEmpty()) {
+      invariant(this.fixedData.size() == 0);
+      !this.data = this.data.remove(k);
+    } else {
+      tag = TickRange::create(context.tick);
+      !this.data = this.data.set(tag, k, map);
+    };
 
     reducer = this.reducer match {
     | None() -> None()
@@ -1046,7 +1103,13 @@ class EagerDir{
           !cdata.modified[k] = cdata.reducer.init(
             this.unsafeGetDataIter(k).map(x -> x.i1.iterator()).flatten(),
           )
-        | Some(new) -> !cdata.modified[k] = new
+        | Some(new) ->
+          if (this.reallyRemove && new.size() == 0) {
+            invariant(cdata.fixed.isEmpty());
+            !cdata.modified = cdata.modified.remove(k);
+          } else {
+            !cdata.modified[k] = new
+          }
         }
       };
       Some(cdata)

@@ -17,6 +17,6 @@ echo "* NATIVE TESTS *"
 echo "*******************************************************************************"
 echo ""
 
-build/sqlive --all
+build/skdb --all
 
 (cd sql/ && ./test_sql.sh)

@@ -1,25 +1,23 @@
 #!/bin/bash
 
 DB=/tmp/test.db
-SQLIVE="../build/sqlive --always-allow-joins --data $DB"
+SKDB="../build/skdb --always-allow-joins --data $DB"
 
 run_diff () {
-
 
     rm -f /tmp/kk1 /tmp/kk2 /tmp/kk3 $DB
 
     nviews=`cat $2 | grep VIEW | sed 's/CREATE VIRTUAL VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1`
 
-    ../build/sqlive --init $DB
-    cat $1 $2 | $SQLIVE
+    ../build/skdb --init $DB
+    cat $1 $2 | $SKDB
 
     for i in $(seq 0 $((nviews))); do
         rm -f /tmp/V$i
-        $SQLIVE --connect "V$i" --stream "/tmp/V$i" > /dev/null &
+        $SKDB --connect "V$i" --updates "/tmp/V$i" > /dev/null &
     done
 
-
-    cat $3 $4 $5 | $SQLIVE
+    cat $3 $4 $5 | $SKDB
 
     rm -f /tmp/selects.sql
 
@@ -30,15 +28,14 @@ run_diff () {
     rm -f /tmp/replays
 
     for i in $(seq 0 $((nviews))); do
-        cat "/tmp/V$i" | sqlive --replay >> /tmp/replays
+        cat "/tmp/V$i" | skdb --replay >> /tmp/replays
     done;
 
-    cat /tmp/selects.sql | $SQLIVE | sort -n > /tmp/kk1
+    cat /tmp/selects.sql | $SKDB | sort -n > /tmp/kk1
 
     cat $2 | sed 's/CREATE VIRTUAL VIEW V[0-9]* AS //' > /tmp/selects2.sql
 
-    cat $1 $3 $4 $5 /tmp/selects2.sql > /tmp/foo
-    cat $1 $3 $4 $5 /tmp/selects2.sql | sqlite3 | sort -n > /tmp/kk2
+    cat $1 $3 $4 $5 /tmp/selects2.sql | sed 's/WINDOW [0-9]*/TABLE/g' | sqlite3 | sort -n > /tmp/kk2
 
     diff /tmp/kk1 /tmp/kk2
     diff /tmp/kk1 /tmp/kk2 > /dev/null
@@ -46,6 +43,11 @@ run_diff () {
         echo -e "$2 (part-1):\tOK"
     else
         echo -e "$2 (part-1):\tFAILED"
+    fi
+
+    if grep -q WINDOW $1;
+    then
+        return;
     fi
 
     cat /tmp/replays | sort -n > /tmp/kk3
@@ -71,3 +73,4 @@ run_diff 'test/select5.1-create.sql' 'test/select5.1-views.sql' 'test/select5.1-
 run_diff 'test/groupby_create.sql' 'test/groupby_views.sql' 'test/groupby_inserts.sql'
 run_diff 'test/groupby_create.sql' 'test/groupby_views.sql' 'test/groupby_inserts.sql' 'test/groupby_delete.sql'
 run_diff 'test/slt_good_0_create.sql' 'test/slt_good_0_views.sql' 'test/slt_good_0_inserts.sql'
+run_diff 'test/select2_create_window.sql' 'test/select2_views.sql' 'test/select2_inserts_window.sql'

@@ -76,7 +76,7 @@ fun main(benchmarks: Array<(String, (Bencher) -> BenchmarkStats)>): void {
     print_error_ln(
       "No benchmarks provided: use `--allow-empty` if this is expected.",
     );
-    exit(2);
+    skipExit(2);
   };
   b = Bencher(options);
   results = benchmarks
@@ -285,7 +285,7 @@ private fun parseArgs(): (Options, ?String) {
   | Success(results) ->
     if (results.getBool("help")) {
       print_string(AP.help(schema));
-      exit(0)
+      skipExit(0)
     };
     allowEmpty = results.getBool("allow-empty");
     minIterations = results.getInt("min-iterations");
@@ -317,7 +317,7 @@ private fun parseArgs(): (Options, ?String) {
 private fun error(reason: String): _ {
   print_error_ln(reason.trim());
   print_error(AP.help(schema));
-  exit(1)
+  skipExit(1)
 }
 
 private fun writeResultFile(
