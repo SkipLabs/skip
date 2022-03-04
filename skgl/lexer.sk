@@ -1,0 +1,96 @@
+/*****************************************************************************/
+/* Lexer used by SKGL (Skip Graphical Server) */
+/*****************************************************************************/
+
+module SKGL;
+
+fun isLetter(c: Char): Bool {
+  Chars.isUpperCaseLetter(c) || Chars.isLowerCaseLetter(c) || c == '_'
+}
+
+fun isLetterOrDigit(c: Char): Bool {
+  isLetter(c) || Chars.isDigit(c)
+}
+
+value class Token(begin: Int, end: Int) {
+  fun isEmpty(): Bool {
+    this.begin >= this.end
+  }
+
+  fun toPos(fileName: String): Pos {
+    Pos(fileName, this.begin, this.end)
+  }
+}
+
+class Lexer(fileName: String, content: Array<Char>) {
+  private fun nextRaw(posBegin: Int): (Int, Token) {
+    pos = posBegin;
+    size = this.content.size();
+    if (pos >= size) {
+      return (pos, Token(posBegin, pos));
+    };
+    currentChar = this.content[pos];
+    !pos = pos + 1;
+    if (currentChar == ' ') {
+      while (pos < size && this.content[pos] == ' ') {
+        !pos = pos + 1
+      }
+    } else if (currentChar == '\n') {
+      void
+    } else if (Chars.isDigit(currentChar)) {
+      while (pos < size && Chars.isDigit(this.content[pos])) {
+        !pos = pos + 1
+      }
+    } else if (isLetter(currentChar)) {
+      while (pos < size && isLetterOrDigit(this.content[pos])) {
+        !pos = pos + 1
+      }
+    };
+    posEnd = pos;
+    (posEnd, Token(posBegin, posEnd))
+  }
+
+  fun next(pos: Int): (Int, Token) {
+    loop {
+      (!pos, tok) = this.nextRaw(pos);
+      if (this.isEq(tok.begin, "\n")) continue;
+      if (this.isEq(tok.begin, " ")) continue;
+      if (this.isEq(tok.begin, "/*")) {
+        while (!this.isEq(tok.begin, "*/")) {
+          (!pos, !tok) = this.nextRaw(pos);
+          if (tok.begin >= tok.end) return (pos, tok);
+        };
+        !pos = pos + 1;
+        continue
+      };
+      if (this.isEq(tok.begin, "//")) {
+        while (!this.isEq(tok.begin, "\n")) {
+          (!pos, !tok) = this.nextRaw(pos);
+          if (tok.begin >= tok.end) return (pos, tok);
+        };
+        continue
+      };
+      return (pos, tok);
+    }
+  }
+
+  fun isEq(pos: Int, str: String): Bool {
+    for (c in str) {
+      if (pos >= this.content.size()) return false;
+      if (this.content[pos] != c) return false;
+      !pos = pos + 1;
+    };
+    true
+  }
+
+  fun nextStr(pos: Int): (Int, String) {
+    (!pos, tok) = this.next(pos);
+    (pos, this.tokenStr(tok))
+  }
+
+  fun tokenStr(tok: Token): (String) {
+    String::fromChars(this.content.slice(tok.begin, tok.end))
+  }
+}
+
+module end;

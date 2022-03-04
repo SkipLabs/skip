@@ -1,0 +1,137 @@
+/**
+ * Copyright (c) SkipLabs, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/******************************************************************************
+/* Parsing errors */
+/*****************************************************************************/
+
+module SKGL;
+
+base class ParseError extends Exception {
+  fun resolve(context: mutable SKFS.Context): String {
+    this.getMessages().map(x -> x.resolve(context)).join("\n")
+  }
+  fun getMessages(): Array<ErrMsg>;
+}
+
+class ErrMsg(fileName: String, posBegin: Int, posEnd: Int, msg: String) {
+  fun resolve(_context: mutable SKFS.Context): String {
+    fname = this.fileName;
+    msg = this.msg;
+    `File "${fname}", characters ${this.posBegin}-${this.posEnd}:\n${msg}\n`
+  }
+}
+
+class DuplicateSymbolInFile(
+  fileName: String,
+  symbolName: String,
+  pos1: Int,
+  pos2: Int,
+) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[
+      ErrMsg(
+        this.fileName,
+        this.pos2,
+        this.pos2,
+        `Duplicate symbol found in file: ${this.fileName}`,
+      ),
+      ErrMsg(
+        this.fileName,
+        this.pos1,
+        this.pos1,
+        `Previous definition was found here: ${this.fileName}`,
+      ),
+    ]
+  }
+}
+
+class ExpectedClassOrFun(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[ErrMsg(this.fileName, this.pos, this.pos, "Expected class/fun")]
+  }
+}
+
+class DuplicateFields(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[ErrMsg(this.fileName, this.pos, this.pos, "Duplicate fields")]
+  }
+}
+
+class DuplicateParams(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[ErrMsg(this.fileName, this.pos, this.pos, "Duplicate parameters")]
+  }
+}
+
+class InvalidName(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[ErrMsg(this.fileName, this.pos, this.pos, "Invalid name")]
+  }
+}
+
+class UnfinishedClassDef(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[
+      ErrMsg(this.fileName, this.pos, this.pos, "Unfinished class definition"),
+    ]
+  }
+}
+
+class UnfinishedFunDef(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[
+      ErrMsg(this.fileName, this.pos, this.pos, "Unfinished fun definition"),
+    ]
+  }
+}
+
+class Expected(
+  fileName: String,
+  pos: Int,
+  expected: String,
+) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[
+      ErrMsg(this.fileName, this.pos, this.pos, "Expected " + this.expected),
+    ]
+  }
+}
+
+class InvalidFieldName(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[ErrMsg(this.fileName, this.pos, this.pos, "Invalid field name")]
+  }
+}
+
+class InvalidParameterName(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[ErrMsg(this.fileName, this.pos, this.pos, "Invalid parameter name")]
+  }
+}
+
+class ExpectedChar(fileName: String, pos: Int, char: Char) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[
+      ErrMsg(this.fileName, this.pos, this.pos, "Expected char: " + this.char),
+    ]
+  }
+}
+
+class ExpectedName(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[ErrMsg(this.fileName, this.pos, this.pos, "Expected a name")]
+  }
+}
+
+class InvalidExpression(fileName: String, pos: Int) extends ParseError {
+  fun getMessages(): Array<ErrMsg> {
+    Array[ErrMsg(this.fileName, this.pos, this.pos, "Invalid expression")]
+  }
+}
+
+module end;

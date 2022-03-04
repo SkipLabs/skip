@@ -1,0 +1,50 @@
+/**
+ * Copyright (c) SkipLabs, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@cpp_extern("SKIP_read_file")
+native fun readFile(String): String;
+
+untracked fun main(): void {
+  gcontext = SKFS.Context{failOnExn => true};
+  fileNameStr = arguments()[0];
+  fileContent = readFile(fileNameStr);
+  SKFS.runWithGc(gcontext, context ~> {
+    srcDirName = SKFS.DirName::create("/src/");
+    srcDir = context.mkdir(SKFS.StringFile::fromFile, srcDirName, false);
+    fileName = SKFS.SID(fileNameStr);
+    srcDir.writeArray(context, fileName, Array[SKFS.StringFile(fileContent)]);
+    context.update();
+
+    programDir = srcDir.contextWriterKeyValues(
+      SKGL.ProgramFile::fromFile,
+      context,
+      SKGL.programDirName,
+      SKGL.populateProgram,
+    );
+
+    defs = programDir.contextWriterKeyValues(
+      SKGL.DefFile::fromFile,
+      context,
+      SKGL.defsDirName,
+      SKGL.populateDefs,
+    );
+
+    err = SKGL.causalityCheck(context, defs, Array["foo"]);
+    err match {
+    | None() -> void
+    | Some(x) ->
+      debug(("Causality error", x));
+      return SKFS.CStop(None())
+    };
+
+    tdefs = SKGL.createTAst(context, SKGL.primitivesExample, defs);
+    evaluator = SKGL.Evaluator{prims => SKGL.primitivesExample, tdefs};
+    debug(evaluator.eval(context, "main", Array[]));
+
+    SKFS.CStop(None())
+  });
+}

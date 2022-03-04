@@ -18,12 +18,16 @@ base class .Rope<+T> {
     result
   }
 
-  fun add<T2>[T: T2](v: T2): Rope<T2> {
+  fun +<T2>[T: T2](v: T2): Rope<T2> {
     Cons(v, this)
   }
 
   fun union<T2>[T: T2](other: Rope<T2>): Rope<T2> {
     Union(this, other)
+  }
+
+  fun append<T2>[T: T2](other: Rope<T2>): Rope<T2> {
+    this.union(other)
   }
 
   fun valueAcc<T2>[T: T2](

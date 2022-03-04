@@ -1,0 +1,70 @@
+module SKGL;
+
+const tint: Type = Type(PosId("Int", -1), TNamed("Int"));
+const tbool: Type = Type(PosId("Bool", -1), TNamed("Bool"));
+
+fun isInt(value: Value, f: Int -> Value): Value {
+  value match {
+  | err @ VError _ -> err
+  | VInt(n) -> f(n)
+  | _ -> VError("Expected an Int")
+  }
+}
+
+fun isBool(value: Value, f: Bool -> Value): Value {
+  value match {
+  | err @ VError _ -> err
+  | VBool(n) -> f(n)
+  | _ -> VError("Expected an Int")
+  }
+}
+
+const primitivesExample_: SortedMap<
+  String,
+  (Type_, Array<Value> ~> Value),
+> = SortedMap[
+  "iplus" => (
+    TArrow(Array[tint, tint], tint),
+    args ~> isInt(args[0], x1 -> isInt(args[1], x2 -> VInt(x1 + x2))),
+  ),
+  "iminus" => (
+    TArrow(Array[tint, tint], tint),
+    args ~> isInt(args[0], x1 -> isInt(args[1], x2 -> VInt(x1 - x2))),
+  ),
+  "imult" => (
+    TArrow(Array[tint, tint], tint),
+    args ~> isInt(args[0], x1 -> isInt(args[1], x2 -> VInt(x1 * x2))),
+  ),
+  "idiv" => (
+    TArrow(Array[tint, tint], tint),
+    args ~>
+      isInt(args[0], x1 ->
+        isInt(args[1], x2 ->
+          if (x2 == 0) VError("Division by zero") else VInt(x1 / x2)
+        )
+      ),
+  ),
+  "ilt" => (
+    TArrow(Array[tint, tint], tbool),
+    args ~> isInt(args[0], x1 -> isInt(args[1], x2 -> VBool(x1 < x2))),
+  ),
+  "ilte" => (
+    TArrow(Array[tint, tint], tbool),
+    args ~> isInt(args[0], x1 -> isInt(args[1], x2 -> VBool(x1 <= x2))),
+  ),
+  "igt" => (
+    TArrow(Array[tint, tint], tbool),
+    args ~> isInt(args[0], x1 -> isInt(args[1], x2 -> VBool(x1 > x2))),
+  ),
+  "igte" => (
+    TArrow(Array[tint, tint], tbool),
+    args ~> isInt(args[0], x1 -> isInt(args[1], x2 -> VBool(x1 >= x2))),
+  ),
+];
+
+const primitivesExample: SortedMap<
+  String,
+  (Type, Array<Value> ~> Value),
+> = primitivesExample_.map((name, def) ->
+  (Type(PosId(name, -1), def.i0), def.i1)
+);

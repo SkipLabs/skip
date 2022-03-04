@@ -1,0 +1,315 @@
+module SKGL;
+
+value class Pos(fileName: String, begin: Int, end: Int)
+value class PosId(symbolName: String, id: Int) uses Orderable
+
+value class Program(defs: Array<Def>)
+
+base class Def{name: Name} {
+  children =
+  | Class{
+    fields: SortedMap<String, (Name, Type)>,
+    fieldIndex: SortedMap<String, Int>,
+  }
+  | Fun{params: SortedMap<String, Name>, body: Seq}
+}
+
+class Seq(eqs: Array<Eq>, ret: Expr)
+
+class Type(posId: PosId, ty: Type_)
+base class Type_ {
+  children =
+  | TSourceError(TypeError)
+  | TError(TypeError)
+  | TNamed(String)
+  | TVar(Int)
+  | TTuple(Array<Type>)
+  | TArray(Type)
+  | TArrow(Array<Type>, Type)
+}
+
+value class Name(posId: PosId, value: String)
+
+class Eq(lhs: Expr, rhs: Expr)
+
+class Expr(posId: PosId, e: Expr_)
+base class Expr_ {
+  children =
+  | EInt(Int)
+  | EVar(Name)
+  | ETuple(Array<Expr>)
+  | EObject(Name, Array<(Name, Expr)>)
+  | EArray(Array<Expr>)
+  | ECall(Expr, Array<Expr>)
+  | EIf(Expr, Seq, Seq)
+  | EDot(?Type, Expr, Name)
+  | EGetArray(Expr, Expr)
+}
+
+/*****************************************************************************/
+/* Logic populating program files. */
+/*****************************************************************************/
+
+class ProgramFile(value: Result<Program, Exception>) extends SKFS.File
+const programDirName: SKFS.DirName = SKFS.DirName::create("/programs/");
+
+fun populateProgram(
+  _context: mutable SKFS.Context,
+  writer: mutable SKFS.Writer,
+  key: SKFS.BaseName,
+  sources: Array<SKFS.StringFile>,
+): void {
+  file = ProgramFile(
+    vtry<Result<Program, Exception>>(
+      () -> {
+        fileName = key match {
+        | SKFS.SID(x) -> x
+        | _ -> invariant_violation("Expected filename")
+        };
+        lexer = SKGL.Lexer(fileName, sources[0].value.chars().toArray());
+        parser = SKGL.Parser(0, lexer);
+        (_, program) = parser.parseProgram();
+        Success(program)
+      },
+      exn -> Failure(exn),
+    ),
+  );
+  writer.write(key, file);
+}
+
+class DefFile(value: Def) extends SKFS.File
+const defsDirName: SKFS.DirName = SKFS.DirName::create("/defs/");
+
+fun populateDefs(
+  _context: mutable SKFS.Context,
+  writer: mutable SKFS.Writer,
+  _key: SKFS.BaseName,
+  programs: Array<ProgramFile>,
+): void {
+  programs[0].value match {
+  | Failure(e) -> debug(e.getMessage())
+  | Success(program) ->
+    for (def in program.defs) {
+      writer.write(SKFS.SID(def.name.value), DefFile(def));
+    }
+  }
+}
+
+/*****************************************************************************/
+/* Causality analysis (checks that there are no cycles). */
+/*****************************************************************************/
+
+base class CAResult {
+  children =
+  | CAError(Name, List<String>)
+  | CADeps(SortedSet<String>)
+}
+
+class Causality{
+  defs: SKFS.EHandle<DefFile>,
+  deps: SortedMap<String, SortedSet<String>> = SortedMap[],
+} {
+  fun funDef(
+    context: mutable SKFS.Context,
+    visiting: SortedSet<String>,
+    visitl: List<String>,
+    f: Fun,
+  ): (this, CAResult) {
+    if (visiting.contains(f.name.value)) {
+      return (this, CAError(f.name, visitl));
+    };
+    if (this.deps.containsKey(f.name.value)) {
+      return (this, CADeps(this.deps[f.name.value]));
+    };
+    !visiting = visiting.add(f.name.value);
+    !visitl = List.Cons(f.name.value, visitl);
+    locals = SortedSet[];
+    deps = SortedSet[];
+    for (eq in f.body.eqs) {
+      !locals = this.addLocals(locals, eq.lhs);
+      (!this, eqDepsOpt) = this.expr(context, visiting, visitl, locals, eq.rhs);
+      eqDeps = eqDepsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      !deps = eqDeps.union(deps);
+    };
+    (!this, retDepsOpt) = this.expr(
+      context,
+      visiting,
+      visitl,
+      locals,
+      f.body.ret,
+    );
+    retDeps = retDepsOpt match {
+    | err @ CAError _ -> return (this, err)
+    | CADeps(x) -> x
+    };
+    !deps = retDeps.union(deps);
+    !this.deps[f.name.value] = deps;
+    (this, CADeps(deps))
+  }
+
+  fun addLocals(locals: SortedSet<String>, e: Expr): SortedSet<String> {
+    e.e match {
+    | EVar(Name(_, n)) ->
+      n.getIter().next() match {
+      | None() -> invariant_violation("Unexpected empty string")
+      | Some('_') -> locals
+      | Some _ ->
+        !locals = locals.set(n);
+        locals
+      }
+    | ETuple(arr) -> arr.reduce(this.addLocals, locals)
+    | _ -> locals
+    }
+  }
+
+  fun expr(
+    context: mutable SKFS.Context,
+    visiting: SortedSet<String>,
+    visitl: List<String>,
+    locals: SortedSet<String>,
+    e: Expr,
+  ): (this, CAResult) {
+    e.e match {
+    | EInt(_) -> (this, CADeps(SortedSet[]))
+    | EVar(Name(_, n)) if (locals.contains(n)) -> (this, CADeps(SortedSet[]))
+    | EVar(n) ->
+      arr = this.defs.getArray(context, SKFS.SID(n.value));
+      if (arr.size() == 0) return (this, CADeps(SortedSet[]));
+      arr[0].value match {
+      | f @ Fun _ -> this.funDef(context, visiting, visitl, f)
+      | _ -> (this, CADeps(SortedSet[]))
+      }
+    | EDot(_, x, _) -> this.expr(context, visiting, visitl, locals, x)
+    | EArray(arr)
+    | ETuple(arr) ->
+      this.exprArray(context, visiting, visitl, locals, arr)
+    | ECall(f, arr) ->
+      (!this, fDepsOpt) = this.expr(context, visiting, visitl, locals, f);
+      fdeps = fDepsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      (!this, arrDepsOpt) = this.exprArray(
+        context,
+        visiting,
+        visitl,
+        locals,
+        arr,
+      );
+      arrDeps = arrDepsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      deps = fdeps.union(arrDeps);
+      (this, CADeps(deps))
+    | EGetArray(obj, idx) ->
+      (!this, objDepsOpt) = this.expr(context, visiting, visitl, locals, obj);
+      objDeps = objDepsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      (!this, idxDepsOpt) = this.expr(context, visiting, visitl, locals, idx);
+      idxDeps = idxDepsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      deps = objDeps.union(idxDeps);
+      (this, CADeps(deps))
+    | EObject(_, fields) ->
+      this.exprArray(context, visiting, visitl, locals, fields.map(x -> x.i1))
+    | EIf(cond, Seq(branch1, ret1), Seq(branch2, ret2)) ->
+      (!this, depsOpt) = this.expr(context, visiting, visitl, locals, cond);
+      deps = depsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      localsCopy = locals;
+      for (eq in branch1) {
+        (!this, eqDepsOpt) = this.expr(
+          context,
+          visiting,
+          visitl,
+          locals,
+          eq.rhs,
+        );
+        eqDeps = eqDepsOpt match {
+        | err @ CAError _ -> return (this, err)
+        | CADeps(x) -> x
+        };
+        !deps = eqDeps.union(deps);
+      };
+      (!this, ret1DepsOpt) = this.expr(context, visiting, visitl, locals, ret1);
+      !locals = localsCopy;
+      ret1Deps = ret1DepsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      !deps = ret1Deps.union(deps);
+      for (eq in branch2) {
+        (!this, eqDepsOpt) = this.expr(
+          context,
+          visiting,
+          visitl,
+          locals,
+          eq.rhs,
+        );
+        eqDeps = eqDepsOpt match {
+        | err @ CAError _ -> return (this, err)
+        | CADeps(x) -> x
+        };
+        !deps = eqDeps.union(deps);
+      };
+      (!this, ret2DepsOpt) = this.expr(context, visiting, visitl, locals, ret2);
+      ret2Deps = ret2DepsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      !deps = ret2Deps.union(deps);
+      (this, CADeps(deps))
+    }
+  }
+
+  fun exprArray(
+    context: mutable SKFS.Context,
+    visiting: SortedSet<String>,
+    visitl: List<String>,
+    locals: SortedSet<String>,
+    arr: Array<Expr>,
+  ): (this, CAResult) {
+    deps = SortedSet[];
+    for (se in arr) {
+      (!this, seDepsOpt) = this.expr(context, visiting, visitl, locals, se);
+      seDeps = seDepsOpt match {
+      | err @ CAError _ -> return (this, err)
+      | CADeps(x) -> x
+      };
+      !deps = seDeps.union(deps);
+    };
+    (this, CADeps(deps))
+  }
+}
+
+fun causalityCheck(
+  context: mutable SKFS.Context,
+  defs: SKFS.EHandle<DefFile>,
+  funNames: Array<String>,
+): ?(Name, List<String>) {
+  checker = Causality{defs};
+  for (funName in funNames) {
+    arr = defs.getArray(context, SKFS.SID(funName));
+    if (arr.size() == 0) continue;
+    arr[0].value match {
+    | f @ Fun _ ->
+      (!checker, result) = checker.funDef(context, SortedSet[], List[], f);
+      result match {
+      | CAError(err, path) -> return Some((err, path))
+      | CADeps _ -> void
+      }
+    | _ -> continue
+    }
+  };
+  None()
+}

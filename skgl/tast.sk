@@ -1,0 +1,39 @@
+module SKGL;
+
+base class TDef {
+  children =
+  | TFun{
+    name: Name,
+    tparams: SortedSet<Int>,
+    params: Array<Param>,
+    eqs: Array<TEq>,
+    ret: TExpr,
+  }
+  | TClass{name: Name, fields: Array<(Name, Type)>}
+}
+
+value class Param(id: Int, name: Name, ty: Type)
+
+class TEq(lhs: TPat, rhs: TExpr)
+
+base class TPat {
+  children =
+  | PTuple(Array<TPat>)
+  | PVar(Int, String)
+}
+
+class TExpr(posId: PosId, ty: Type, e: TExpr_)
+base class TExpr_ {
+  children =
+  | TEBool(Bool)
+  | TEInt(Int)
+  | TEVar(Int, Name)
+  | TEGlobal(Name)
+  | TETuple(Array<TExpr>)
+  | TEObject(Name, Array<(Name, TExpr)>)
+  | TEArray(Array<TExpr>)
+  | TECall(TExpr, Array<TExpr>)
+  | TEIf(TExpr, Array<TEq>, TExpr, Array<TEq>, TExpr)
+  | TEDot(TExpr, Int, Name)
+  | TEGetArray(TExpr, TExpr)
+}

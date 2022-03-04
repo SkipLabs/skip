@@ -1,0 +1,783 @@
+module SKGL;
+
+/*****************************************************************************/
+/* Substitution primitives. */
+/*****************************************************************************/
+
+fun substType(
+  boundVars: SortedSet<Int>,
+  tsubst: SortedMap<Int, Type>,
+  ty: Type,
+): Type {
+  ty.ty match {
+  | TError _
+  | TSourceError _
+  | TNamed _ ->
+    ty
+  | TVar(n) if (tsubst.containsKey(n)) ->
+    if (boundVars.contains(n)) {
+      !ty.ty = TError(RecursiveTypeError());
+      return ty;
+    };
+    !boundVars = boundVars.add(n);
+    substType(boundVars, tsubst, tsubst.get(n))
+  | TVar _ -> ty
+  | TTuple(arr) ->
+    sarr = mutable Vector[];
+    for (sty in arr) {
+      sarr.push(substType(boundVars, tsubst, sty));
+    };
+    Type(ty.posId, TTuple(sarr.toArray()))
+  | TArray(sty) -> Type(ty.posId, TArray(substType(boundVars, tsubst, sty)))
+  | TArrow(params, rty) ->
+    sparams = mutable Vector[];
+    for (param in params) {
+      sparams.push(substType(boundVars, tsubst, param));
+    };
+    Type(ty.posId, TArrow(sparams.toArray(), substType(boundVars, tsubst, rty)))
+  }
+}
+
+/*****************************************************************************/
+/* Changes a type from TError to TFixedError. */
+/*****************************************************************************/
+
+fun substTError(
+  boundVars: SortedSet<Int>,
+  tsubst: SortedMap<Int, Type>,
+  ty: Type,
+): (SortedMap<Int, Type>, Type) {
+  (!tsubst, !ty.ty) = substTError_(boundVars, tsubst, ty.ty);
+  (tsubst, ty)
+}
+
+fun substTError_(
+  boundVars: SortedSet<Int>,
+  tsubst: SortedMap<Int, Type>,
+  ty: Type_,
+): (SortedMap<Int, Type>, Type_) {
+  ty match {
+  | TSourceError(err)
+  | TError(err) ->
+    (tsubst, TError(err))
+  | TNamed _ -> (tsubst, ty)
+  | TVar(n) if (tsubst.containsKey(n)) ->
+    if (boundVars.contains(n)) {
+      return (tsubst, TError(RecursiveTypeError()));
+    };
+    !boundVars = boundVars.add(n);
+    sty = tsubst.get(n);
+    (!tsubst, !sty) = substTError(boundVars, tsubst, sty);
+    !tsubst = tsubst.set(n, sty);
+    (tsubst, ty)
+  | TVar _ -> (tsubst, ty)
+  | TTuple(arr) ->
+    sarr = mutable Vector[];
+    for (sty in arr) {
+      (!tsubst, !sty) = substTError(boundVars, tsubst, sty);
+      sarr.push(sty);
+    };
+    (tsubst, TTuple(sarr.toArray()))
+  | TArray(sty) ->
+    (!tsubst, !sty) = substTError(boundVars, tsubst, sty);
+    (tsubst, TArray(sty))
+  | TArrow(params, rty) ->
+    sparams = mutable Vector[];
+    for (param in params) {
+      (!tsubst, !param) = substTError(boundVars, tsubst, param);
+      sparams.push(param);
+    };
+    (!tsubst, !rty) = substTError(boundVars, tsubst, rty);
+    (tsubst, TArrow(sparams.toArray(), rty))
+  }
+}
+
+/*****************************************************************************/
+/* Errors. */
+/*****************************************************************************/
+
+fun errorType(posId: PosId, reason: String, ty1: Type, ty2: Type): Type {
+  Type(posId, TSourceError(UnifyError(posId, reason, ty1, ty2)))
+}
+
+fun errorUndefinedVar(n: Name): Type {
+  Type(n.posId, TSourceError(UndefinedVarError(n)))
+}
+
+fun errorMultipleDefinitions(n: Name): Type {
+  Type(n.posId, TSourceError(MultipleDefinitionsError(n)));
+}
+
+fun errorUnexpectedClassName(n: Name): Type {
+  Type(n.posId, TSourceError(UnexpectedClassNameError(n)))
+}
+
+fun errorUnknownField(n: Name): Type {
+  Type(n.posId, TSourceError(UnknownFieldError(n)))
+}
+
+fun errorMissingField(n: Name): Type {
+  Type(n.posId, TSourceError(MissingFieldError(n)))
+}
+
+fun errorUnboundName(n: Name): Type {
+  Type(n.posId, TSourceError(UnboundNameError(n)))
+}
+
+fun errorDuplicateField(n: Name): Type {
+  Type(n.posId, TSourceError(DuplicateFieldError(n)))
+}
+
+fun errorInvalidDot(posId: PosId): Type {
+  Type(posId, TSourceError(InvalidDotError(posId)))
+}
+
+fun errorOutOfBounds(posId: PosId): Type {
+  Type(posId, TSourceError(OutOfBoundsError(posId)))
+}
+
+fun errorSizeMismatch(
+  kind: MismatchKind,
+  pos1: PosId,
+  size1: Int,
+  pos2: PosId,
+  size2: Int,
+): Type {
+  Type(pos1, TSourceError(SizeMismatchError(kind, pos1, size1, pos2, size2)))
+}
+
+const typesDirName: SKFS.DirName = SKFS.DirName::create("/types/");
+
+class TypeFile(value: (Type, TDef)) extends SKFS.File
+
+fun createTAst(
+  context: mutable SKFS.Context,
+  prims: SortedMap<String, (Type, Array<Value> ~> Value)>,
+  defs: SKFS.EHandle<DefFile>,
+): SKFS.LHandle<TypeFile> {
+  SKFS.LHandle::create(
+    TypeFile::fromFile,
+    context,
+    typesDirName,
+    (ctx, self, typeName) ~> {
+      typer = Typer{prims, defs, types => self};
+      typer.computeTAst(ctx, typeName) match {
+      | None() -> Array[]
+      | Some(def) -> Array[TypeFile(def)]
+      }
+    },
+    false,
+  )
+}
+
+class Typer{
+  topSym: Int = 0,
+  tsubst: SortedMap<Int, Type> = SortedMap[],
+  subst: SortedMap<String, (Int, Type)> = SortedMap[],
+  varNbr: Int = 0,
+  vars: SortedMap<String, Int> = SortedMap[],
+  prims: SortedMap<String, (Type, Array<Value> ~> Value)>,
+  defs: SKFS.EHandle<DefFile>,
+  types: SKFS.LHandle<TypeFile>,
+} {
+  fun getClass(context: mutable SKFS.Context, name: Name): ?Class {
+    arr = this.defs.getArray(context, SKFS.SID(name.value));
+    if (arr.size() == 0) {
+      return None();
+    };
+    arr[0].value match {
+    | result @ Class _ -> Some(result)
+    | _ ->
+      invariant_violation("Classes and Funs should be in different name spaces")
+    }
+  }
+
+  fun computeTAst(
+    context: mutable SKFS.Context,
+    key: SKFS.BaseName,
+  ): ?(Type, TDef) {
+    arr = this.defs.getArray(context, key);
+    if (arr.size() == 0) return None();
+    Some(
+      arr[0].value match {
+      | f @ Fun _ ->
+        (ftype, tfun) = this.typeFunDef(context, f);
+        (Type(f.name.posId, ftype), tfun)
+      | c @ Class _ ->
+        (
+          Type(c.name.posId, TNamed(c.name.value)),
+          TClass{
+            name => c.name,
+            fields => c.fields.items().map(x -> x.i1).collect(Array),
+          },
+        )
+      },
+    )
+  }
+
+  fun getType(context: mutable SKFS.Context, name: Name): TypeFile {
+    this.types.get(context, SKFS.SID(name.value))
+  }
+
+  fun typeFunDef(context: mutable SKFS.Context, f: Fun): (Type_, TFun) {
+    tfun = this.funDef(context, f);
+    tsubst = SortedMap[];
+    for (tparam in tfun.tparams) {
+      if (this.topSym <= tparam) {
+        !this.topSym = tparam + 1;
+      }
+    };
+    for (tparam in tfun.tparams) {
+      (!this, n) = this.genSym();
+      !tsubst = tsubst.set(tparam, Type(f.name.posId, TVar(n)));
+    };
+    fType = Type(f.name.posId, TArrow(tfun.params.map(x -> x.ty), tfun.ret.ty));
+    (substType(SortedSet[], tsubst, fType).ty, tfun)
+  }
+
+  fun funDef(context: mutable SKFS.Context, f: Fun): TFun {
+    invariant(this.vars.isEmpty());
+    params = mutable Vector[];
+    paramTypes = mutable Vector[];
+    for (param in f.params) {
+      varNbr = this.varNbr;
+      !this.varNbr = this.varNbr + 1;
+      !this.vars[param.value] = varNbr;
+      (!this, n) = this.genSym();
+      paramType = Type(param.posId, TVar(n));
+      !this.subst = this.subst.set(param.value, (varNbr, paramType));
+      paramTypes.push(paramType);
+      params.push(Param(varNbr, param, paramType));
+    };
+    (!this, eqs, ret) = this.eqs(context, f.body);
+    result = this.generalizeTFun(
+      TFun{
+        name => f.name,
+        tparams => SortedSet[],
+        params => params.toArray(),
+        eqs,
+        ret,
+      },
+    );
+    result
+  }
+
+  fun eqs(context: mutable SKFS.Context, seq: Seq): (this, Array<TEq>, TExpr) {
+    teqs = mutable Vector[];
+    for (eq in seq.eqs) {
+      (!this, rhs) = this.expr(context, eq.rhs);
+      (!this, pat) = this.bindPattern(eq.lhs, rhs.ty);
+      teqs.push(TEq(pat, rhs));
+    };
+    (!this, tret) = this.expr(context, seq.ret);
+    (this, teqs.toArray(), tret)
+  }
+
+  fun bindPattern(pat: Expr, rhs: Type): (this, TPat) {
+    (pat.e, rhs.ty) match {
+    | (ETuple(patArr), TTuple(tyArr)) ->
+      result = mutable Vector[];
+      i = 0;
+      while (i < patArr.size()) {
+        spat = patArr[i];
+        tyOpt = if (i >= tyArr.size()) errorOutOfBounds(pat.posId) else {
+          tyArr[i]
+        };
+        (!this, p) = this.bindPattern(spat, tyOpt);
+        result.push(p)
+      };
+      (this, PTuple(result.toArray()))
+    | (EVar(n), _) ->
+      varNbr = this.varNbr;
+      !this.varNbr = this.varNbr + 1;
+      !this.subst = this.subst.set(n.value, (varNbr, rhs));
+      (this, PVar(varNbr, n.value))
+    | _ -> invariant_violation("Unexpected pattern")
+    }
+  }
+
+  fun generalizeTFun(f: TFun): TFun {
+    boundVars = SortedSet[];
+    freeVars = SortedSet[];
+    gparams = mutable Vector[];
+    for (param in f.params) {
+      (!freeVars, !param.ty) = this.generalizeType(
+        boundVars,
+        freeVars,
+        param.ty,
+      );
+      gparams.push(param);
+    };
+    (!freeVars, geqs, gret) = this.generalizeEqs(
+      boundVars,
+      freeVars,
+      f.eqs,
+      f.ret,
+    );
+    TFun{
+      name => f.name,
+      tparams => freeVars,
+      params => gparams.toArray(),
+      eqs => geqs,
+      ret => gret,
+    }
+  }
+
+  fun generalizeEqs(
+    boundVars: SortedSet<Int>,
+    freeVars: SortedSet<Int>,
+    eqs: Array<TEq>,
+    ret: TExpr,
+  ): (SortedSet<Int>, Array<TEq>, TExpr) {
+    geqs = mutable Vector[];
+    for (eq in eqs) {
+      (!freeVars, !eq.rhs) = this.generalizeExpr(boundVars, freeVars, eq.rhs);
+      geqs.push(eq);
+    };
+    (!freeVars, gret) = this.generalizeExpr(boundVars, freeVars, ret);
+    (freeVars, geqs.toArray(), gret);
+  }
+
+  fun generalizeExpr(
+    boundVars: SortedSet<Int>,
+    freeVars: SortedSet<Int>,
+    e: TExpr,
+  ): (SortedSet<Int>, TExpr) {
+    (!freeVars, e_) = this.generalizeExpr_(boundVars, freeVars, e.e);
+    (!freeVars, ty) = this.generalizeType(boundVars, freeVars, e.ty);
+    (freeVars, TExpr(e.posId, ty, e_))
+  }
+
+  fun generalizeExpr_(
+    boundVars: SortedSet<Int>,
+    freeVars: SortedSet<Int>,
+    e: TExpr_,
+  ): (SortedSet<Int>, TExpr_) {
+    e match {
+    | TEBool _
+    | TEInt _
+    | TEVar _
+    | TEGlobal _ ->
+      (freeVars, e)
+    | TETuple(arr) ->
+      garr = mutable Vector[];
+      for (te in arr) {
+        (!freeVars, gte) = this.generalizeExpr(boundVars, freeVars, te);
+        garr.push(gte);
+      };
+      (freeVars, TETuple(garr.toArray()))
+    | TEObject(name, fields) ->
+      gfields = mutable Vector[];
+      for (field in fields) {
+        (!freeVars, fieldExpr) = this.generalizeExpr(
+          boundVars,
+          freeVars,
+          field.i1,
+        );
+        gfields.push((field.i0, fieldExpr));
+      };
+      (freeVars, TEObject(name, gfields.toArray()))
+    | TEArray(arr) ->
+      garr = mutable Vector[];
+      for (te in arr) {
+        (!freeVars, gte) = this.generalizeExpr(boundVars, freeVars, te);
+        garr.push(gte);
+      };
+      (freeVars, TEArray(garr.toArray()))
+    | TECall(f, arr) ->
+      (!freeVars, gf) = this.generalizeExpr(boundVars, freeVars, f);
+      garr = mutable Vector[];
+      for (te in arr) {
+        (!freeVars, gte) = this.generalizeExpr(boundVars, freeVars, te);
+        garr.push(gte);
+      };
+      (freeVars, TECall(gf, garr.toArray()))
+    | TEGetArray(obj, idx) ->
+      (!freeVars, gobj) = this.generalizeExpr(boundVars, freeVars, obj);
+      (!freeVars, gidx) = this.generalizeExpr(boundVars, freeVars, idx);
+      (freeVars, TEGetArray(gobj, gidx))
+    | TEIf(cond, eqs1, ret1, eqs2, ret2) ->
+      (!freeVars, !cond) = this.generalizeExpr(boundVars, freeVars, cond);
+      (!freeVars, !eqs1, !ret1) = this.generalizeEqs(
+        boundVars,
+        freeVars,
+        eqs1,
+        ret1,
+      );
+      (!freeVars, !eqs2, !ret2) = this.generalizeEqs(
+        boundVars,
+        freeVars,
+        eqs2,
+        ret2,
+      );
+      (freeVars, TEIf(cond, eqs1, ret1, eqs2, ret2))
+    | TEDot(te, idx, fieldName) ->
+      (!freeVars, !te) = this.generalizeExpr(boundVars, freeVars, te);
+      (freeVars, TEDot(te, idx, fieldName))
+    }
+  }
+
+  fun generalizeType(
+    boundVars: SortedSet<Int>,
+    freeVars: SortedSet<Int>,
+    ty: Type,
+  ): (SortedSet<Int>, Type) {
+    ty.ty match {
+    | TSourceError(e) -> (freeVars, Type(ty.posId, TError(e)))
+    | TError _
+    | TNamed _ ->
+      (freeVars, ty)
+    | TVar(n) if (this.tsubst.containsKey(n)) ->
+      if (boundVars.contains(n)) {
+        !ty.ty = TError(RecursiveTypeError());
+        return (freeVars, ty);
+      };
+      !boundVars = boundVars.add(n);
+      this.generalizeType(boundVars, freeVars, this.tsubst.get(n))
+    | TVar(n) -> (freeVars.set(n), ty)
+    | TTuple(arr) ->
+      garr = mutable Vector[];
+      for (sty in arr) {
+        (!freeVars, gsty) = this.generalizeType(boundVars, freeVars, sty);
+        garr.push(gsty);
+      };
+      (freeVars, Type(ty.posId, TTuple(garr.toArray())))
+    | TArray(sty) ->
+      (!freeVars, gsty) = this.generalizeType(boundVars, freeVars, sty);
+      (freeVars, Type(ty.posId, TArray(gsty)))
+    | TArrow(params, rty) ->
+      gparams = mutable Vector[];
+      for (param in params) {
+        (!freeVars, gparam) = this.generalizeType(boundVars, freeVars, param);
+        gparams.push(gparam);
+      };
+      (!freeVars, grty) = this.generalizeType(boundVars, freeVars, rty);
+      (freeVars, Type(ty.posId, TArrow(gparams.toArray(), grty)))
+    }
+  }
+
+  fun bind(n: Int, ty: Type): this {
+    !this.tsubst = this.tsubst.set(n, ty);
+    this
+  }
+
+  fun genSym(): (this, Int) {
+    result = this.topSym;
+    !this.topSym = this.topSym + 1;
+    (this, result);
+  }
+
+  fun unify(posId: PosId, reason: String, ty1: Type, ty2: Type): (this, Type) {
+    (!this, result) = (ty1.ty, ty2.ty) match {
+    | (TVar(n1), TVar(n2)) if (n1 == n2) -> (this, ty1)
+    | (TVar(n), _) if (!this.tsubst.containsKey(n)) ->
+      !this = this.bind(n, ty2);
+      (this, ty1)
+    | (_, TVar(n)) if (!this.tsubst.containsKey(n)) ->
+      !this = this.bind(n, ty1);
+      (this, Type(ty1.posId, ty2.ty))
+    | (TVar(n1), TVar(n2)) ->
+      (!this, n) = this.genSym();
+      tvar = Type(ty1.posId, TVar(n));
+      sty1 = this.tsubst.get(n1);
+      sty2 = this.tsubst.get(n2);
+      !this = this.bind(n1, tvar);
+      !this = this.bind(n2, tvar);
+      (!this, ty) = this.unify(posId, reason, sty1, sty2);
+      !this = this.bind(n, ty);
+      (this, tvar)
+    | (TSourceError(_), _) -> (this, ty1)
+    | (_, TSourceError(_)) -> (this, ty2)
+    | (TError(_), _) -> (this, ty2)
+    | (_, TError(_)) -> (this, ty1)
+    | (TNamed(name1), TNamed(name2)) if (name1 == name2) -> (this, ty1)
+    | (TNamed _, _)
+    | (_, TNamed _) ->
+      (this, errorType(posId, reason, ty1, ty2))
+    | (TTuple(arr1), TTuple(arr2)) if (arr1.size() != arr2.size()) ->
+      (
+        this,
+        errorSizeMismatch(
+          MKTuple(),
+          ty1.posId,
+          arr1.size(),
+          ty2.posId,
+          arr2.size(),
+        ),
+      )
+    | (TTuple(arr1), TTuple(arr2)) ->
+      result = mutable Vector[];
+      for (i => sty1 in arr1) {
+        (!this, ty) = this.unify(posId, reason, sty1, arr2[i]);
+        result.push(ty);
+      };
+      (this, Type(ty1.posId, TTuple(result.toArray())))
+    | (TArray(sty1), TArray(sty2)) ->
+      (!this, ty) = this.unify(posId, reason, sty1, sty2);
+      (this, Type(ty1.posId, TArray(ty)))
+    | (TArrow(args1, rty1), TArrow(args2, rty2)) ->
+      args = mutable Vector[];
+      for (i => arg1 in args1) {
+        (!this, arg) = this.unify(posId, reason, arg1, args2[i]);
+        args.push(arg);
+      };
+      (!this, rty) = this.unify(posId, reason, rty1, rty2);
+      (this, Type(ty1.posId, TArrow(args.toArray(), rty)))
+    | _ -> (this, errorType(posId, reason, ty1, ty2))
+    };
+    (this, result)
+  }
+
+  fun expr(context: mutable SKFS.Context, e: Expr): (this, TExpr) {
+    (!this, type_, e_) = this.expr_(context, e.posId, e.e);
+    (!this.tsubst, !type_) = substTError(SortedSet[], this.tsubst, type_);
+    (this, TExpr(e.posId, type_, e_))
+  }
+
+  fun expr_(
+    context: mutable SKFS.Context,
+    posId: PosId,
+    e_: Expr_,
+  ): (this, Type, TExpr_) {
+    e_ match {
+    | EInt(n) -> (this, Type(posId, TNamed("Int")), TEInt(n))
+    | EVar(Name(_, "true")) -> (this, Type(posId, TNamed("Bool")), TEBool(true))
+    | EVar(Name(_, "false")) ->
+      (this, Type(posId, TNamed("Bool")), TEBool(false))
+    | EVar(n) ->
+      if (!this.subst.containsKey(n.value)) {
+        arr = this.types.getArray(context, SKFS.SID(n.value));
+        if (arr.size() == 0) {
+          if (this.prims.containsKey(n.value)) {
+            return (this, this.prims[n.value].i0, TEGlobal(n));
+          };
+          return (this, errorUnboundName(n), TEGlobal(n));
+        };
+        if (arr.size() > 1) {
+          return (this, errorMultipleDefinitions(n), TEGlobal(n));
+        };
+
+        (!this, fty) = this.instantiate(mutable Map[], arr[0].value.i0);
+        return (this, fty, TEGlobal(n));
+      };
+      (varNbr, ty) = this.subst.get(n.value);
+      (this, ty, TEVar(varNbr, n))
+    | ETuple(arr) ->
+      tarr = mutable Vector[];
+      earr = mutable Vector[];
+      for (se in arr) {
+        (!this, ste) = this.expr(context, se);
+        tarr.push(ste.ty);
+        earr.push(ste);
+      };
+      (this, Type(posId, TTuple(tarr.toArray())), TETuple(earr.toArray()))
+    | EArray(arr) ->
+      (!this, n) = this.genSym();
+      ty = Type(posId, TVar(n));
+      earr = mutable Vector[];
+      for (se in arr) {
+        (!this, ste) = this.expr(context, se);
+        (!this, !ty) = this.unify(
+          ste.posId,
+          "Unexpected array element",
+          ty,
+          ste.ty,
+        );
+        earr.push(ste);
+      };
+      (this, Type(posId, TArray(ty)), TEArray(earr.toArray()))
+    | ECall(f, args) ->
+      (!this, n) = this.genSym();
+      retType = Type(posId, TVar(n));
+      (!this, tf) = this.expr(context, f);
+      targs = mutable Vector[];
+      targTypes = mutable Vector[];
+      for (arg in args) {
+        (!this, targ) = this.expr(context, arg);
+        targs.push(targ);
+        targTypes.push(targ.ty);
+      };
+      expectedType = Type(f.posId, TArrow(targTypes.toArray(), retType));
+      (!this, _fty) = this.unify(
+        posId,
+        "Unexpected argument type",
+        tf.ty,
+        expectedType,
+      );
+      (this, retType, TECall(tf, targs.toArray()))
+    | EDot(tyOpt, e, fieldName) ->
+      (!this, te) = this.expr(context, e);
+      tyOpt match {
+      | None() -> void
+      | Some(ty) -> (!this, _) = this.unify(posId, "Unexpected type", ty, te.ty)
+      };
+      substType(SortedSet[], this.tsubst, te.ty).ty match {
+      | TNamed(className) ->
+        name = Name(te.posId, className);
+        arr = this.defs.getArray(context, SKFS.SID(className));
+        if (arr.size() == 0) {
+          return (this, errorUnboundName(name), TEDot(te, -1, fieldName));
+        };
+        if (arr.size() > 1) {
+          return (
+            this,
+            errorMultipleDefinitions(name),
+            TEDot(te, -1, fieldName),
+          );
+        };
+        arr[0].value match {
+        | c @ Class _ ->
+          if (!c.fields.containsKey(fieldName.value)) {
+            return (
+              this,
+              errorUnknownField(fieldName),
+              TEDot(te, -1, fieldName),
+            );
+          };
+          (
+            this,
+            c.fields[fieldName.value].i1,
+            TEDot(te, c.fieldIndex[fieldName.value], fieldName),
+          )
+        | _ -> invariant_violation("Expected a class name")
+        }
+      | _ -> (this, errorInvalidDot(posId), TEDot(te, -1, fieldName))
+      }
+    | EObject(className, fields) ->
+      (objectType, classDefFields) = this.getClass(context, className) match {
+      | None() -> (errorUnboundName(className), SortedMap[])
+      | Some(classDef) ->
+        (Type(posId, TNamed(className.value)), classDef.fields)
+      };
+      tfields = mutable Vector[];
+      fieldTypes = mutable Vector[];
+      for (field in fields) {
+        (!this, tfield) = this.expr(context, field.i1);
+        tfields.push((field.i0, tfield));
+        fieldTypes.push((field.i0, 1, tfield.ty));
+      };
+      for (fieldDef in classDefFields) {
+        fieldTypes.push((fieldDef.i0, 0, fieldDef.i1));
+      };
+      fieldTypes.sortBy(x ~> (x.i0.value, x.i1));
+      i = 0;
+      fieldNbr = 0;
+      while (i < fieldTypes.size()) {
+        if (fieldNbr >= tfields.size()) {
+          !objectType = errorMissingField(fieldTypes[i].i0);
+          break void;
+        };
+        if (fieldTypes[i].i1 == 1) {
+          tfield = tfields[fieldNbr];
+          !tfield.i1.ty = errorUnknownField(fieldTypes[i].i0);
+          tfields![fieldNbr] = tfield;
+          !i = i + 1;
+          !fieldNbr = fieldNbr + 1;
+          continue;
+        };
+        if (i + 1 >= fieldTypes.size() || fieldTypes[i + 1].i1 == 0) {
+          tfield = tfields[fieldNbr];
+          !tfield.i1.ty = errorMissingField(fieldTypes[i].i0);
+          tfields![fieldNbr] = tfield;
+          !i = i + 1;
+          !fieldNbr = fieldNbr + 1;
+          continue;
+        };
+        if (
+          i + 2 < fieldTypes.size() &&
+          fieldTypes[i + 2].i0.value == fieldTypes[i].i0.value
+        ) {
+          tfield = tfields[fieldNbr];
+          !tfield.i1.ty = errorDuplicateField(fieldTypes[i].i0);
+          tfields![fieldNbr] = tfield;
+          !i = i + 2;
+          !fieldNbr = fieldNbr + 1;
+          continue;
+        };
+        (!this, _fieldType) = this.unify(
+          fieldTypes[i + 1].i0.posId,
+          "Unexpected field type",
+          fieldTypes[i].i2,
+          fieldTypes[i + 1].i2,
+        );
+        !fieldNbr = fieldNbr + 1;
+        !i = i + 2;
+      };
+      (this, objectType, TEObject(className, tfields.toArray()))
+    | EIf(cond, Seq(eqs1, ret1), Seq(eqs2, ret2)) ->
+      (!this, tcond) = this.expr(context, cond);
+      (!this, !tcond.ty) = this.unify(
+        cond.posId,
+        "Expected a boolean for if condition",
+        tcond.ty,
+        Type(cond.posId, TNamed("Bool")),
+      );
+      (!this, teqs1, tret1) = this.eqs(context, Seq(eqs1, ret1));
+      (!this, teqs2, tret2) = this.eqs(context, Seq(eqs2, ret2));
+      (!this, ty) = this.unify(
+        posId,
+        "Incompatible if branches",
+        tret1.ty,
+        tret2.ty,
+      );
+      (this, ty, TEIf(tcond, teqs1, tret1, teqs2, tret2))
+    | EGetArray(obj, idx) ->
+      (!this, n) = this.genSym();
+      tvar = Type(obj.posId, TVar(n));
+      tarr = Type(obj.posId, TArray(tvar));
+      (!this, tobj) = this.expr(context, obj);
+      (!this, !tobj.ty) = this.unify(
+        obj.posId,
+        "Expected an array",
+        tobj.ty,
+        tarr,
+      );
+      (!this, tidx) = this.expr(context, idx);
+      tint = Type(idx.posId, TNamed("Int"));
+      (!this, !tidx.ty) = this.unify(
+        idx.posId,
+        "Expected an integer",
+        tidx.ty,
+        tint,
+      );
+      (this, tvar, TEGetArray(tobj, tidx))
+    }
+  }
+
+  /*****************************************************************************/
+  /* Instantiation. */
+  /*****************************************************************************/
+
+  fun instantiate(map: mutable Map<Int, Type>, ty: Type): (this, Type) {
+    ty.ty match {
+    | TError _
+    | TSourceError _
+    | TNamed _ ->
+      (this, ty)
+    | TVar(n) if (!map.containsKey(n)) ->
+      (!this, n2) = this.genSym();
+      nty = Type(ty.posId, TVar(n2));
+      map![n] = nty;
+      (this, nty)
+    | TVar(n) -> (this, map[n])
+    | TTuple(arr) ->
+      sarr = mutable Vector[];
+      for (sty in arr) {
+        (!this, !sty) = this.instantiate(map, sty);
+        sarr.push(sty);
+      };
+      (this, Type(ty.posId, TTuple(sarr.toArray())))
+    | TArray(sty) ->
+      (!this, !sty) = this.instantiate(map, sty);
+      (this, Type(ty.posId, TArray(sty)))
+    | TArrow(params, rty) ->
+      sparams = mutable Vector[];
+      for (param in params) {
+        (!this, !param) = this.instantiate(map, param);
+        sparams.push(param);
+      };
+      (!this, !rty) = this.instantiate(map, rty);
+      (this, Type(ty.posId, TArrow(sparams.toArray(), rty)))
+    }
+  }
+}
