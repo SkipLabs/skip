@@ -95,11 +95,6 @@ char* sk_new_const(char* cst) {
 
 void SKIP_throw_EndOfFile();
 
-int SKIP_getchar() {
-  SKIP_throw_EndOfFile();
-  return 0;
-}
-
 int SKIP_isatty() {
   return 0;
 }
@@ -125,16 +120,8 @@ void SKIP_print_persistent_size() {
   // Not implemented
 }
 
-int SKIP_unix_open(char* name) {
-  return 1;
-}
-
-void SKIP_unix_close(int fd) {
-  // Not implemented
-}
-
-void SKIP_write_to_file() {
-  // Not implemented
+int SKIP_unix_close(int fd) {
+  return 0;
 }
 
 void SKIP_mktime_utc() {

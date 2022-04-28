@@ -115,6 +115,7 @@ fun fixUpDirName(dirNameStr: String): SKFS.DirName {
 native fun printPersistentSize(): void;
 
 untracked fun main(): void {
+  saved = SKFS.newObstack();
   parsedArgs = getParsedArgs();
   argMap = parsedArgs.argumentValues;
   if (parsedArgs.unknown.size() != 0) {
@@ -572,5 +573,6 @@ untracked fun main(): void {
     SKFS.toplevel(SKFS.Context{});
   } else {
     SKSQL.eval(options, user)
-  }
+  };
+  SKFS.destroyObstack(saved);
 }

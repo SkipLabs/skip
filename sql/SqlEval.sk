@@ -954,7 +954,7 @@ fun read(line: Int): (Int, String) {
   vtry(
     () ->
       loop {
-        c = getChar(i);
+        c = getChar();
         isWhiteSpace = c == ' ' || c == '\n' || c == '\t' || c == '\r';
         !hasData = !isWhiteSpace;
 
@@ -963,7 +963,7 @@ fun read(line: Int): (Int, String) {
         if (c == '\'') {
           chars.push(c);
           loop {
-            c2 = getChar(i);
+            c2 = getChar();
             chars.push(c2);
             if (c2 == '\'') break void;
           };
@@ -971,10 +971,10 @@ fun read(line: Int): (Int, String) {
         };
 
         if (c == '-') {
-          c2 = getChar(i);
+          c2 = getChar();
           !i = i + 1;
           if (c2 == '-') {
-            while (getChar(i) != '\n') {
+            while (getChar() != '\n') {
               !i = i + 1;
             };
             continue
@@ -983,13 +983,13 @@ fun read(line: Int): (Int, String) {
             chars.push(c2);
           }
         } else if (c == '/') {
-          c2 = getChar(i);
+          c2 = getChar();
           !i = i + 1;
           if (c2 == '*') {
-            last = getChar(i);
+            last = getChar();
             !i = i + 1;
             loop {
-              c3 = getChar(i);
+              c3 = getChar();
               !i = i + 1;
               if (last == '*' && c3 == '/') break void;
               !last = c3;

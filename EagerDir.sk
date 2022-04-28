@@ -182,22 +182,22 @@ base class CmdKind {
 value class Sub(
   lock: Mutex,
   cmd: ?CmdKind,
-  status: Int,
+  status: Int32,
   tick: Tick,
   filter: SKFS.Context ~> (BaseName ~> Bool) = _ ~> (_ ~> true),
 )
 
 @cpp_extern("SKIP_unix_open")
-native fun unixOpen(String): UnixDescr;
+native fun unixOpen(String): Int32;
 
 @cpp_extern("SKIP_unix_close")
-native fun unixClose(UnixDescr): Int;
+native fun unixClose(Int32): Int32;
 
 @cpp_extern("SKIP_write_to_file")
-native fun writeToFile(UnixDescr, String): void;
+native fun writeToFile(Int32, String): void;
 
 @cpp_extern("SKIP_notify")
-native fun unixNotify(String, Int): Int;
+native fun unixNotify(String, Int32): Int32;
 
 /*****************************************************************************/
 /* An Eager Directory. */
@@ -251,7 +251,7 @@ class EagerDir{
       fd = unixOpen(file);
       (fd, csv, x -> writeToFile(fd, x))
     | NNotify(file) ->
-      status = unixNotify(file, tick.value);
+      status = unixNotify(file, Int32::truncate(tick.value));
       !this.subs[id] = Sub(lock, Some(cmdKind), status, tick);
       return this
     };
@@ -274,7 +274,7 @@ class EagerDir{
     };
     status = cmdKind match {
     | NUpdates _ -> unixClose(fd)
-    | NNotify _ -> 0
+    | NNotify _ -> Int32::truncate(0)
     };
     !this.subs[id] = Sub(lock, Some(cmdKind), status, tick);
     this
@@ -299,7 +299,7 @@ class EagerDir{
   }
 
   fun disconnect(context: mutable SKFS.Context, sessionId: Int): void {
-    !this.subs[sessionId].status = -1;
+    !this.subs[sessionId].status = Int32::truncate(-1);
     context.setDir(this.dirName, this)
   }
 
@@ -311,7 +311,7 @@ class EagerDir{
     filter: Context ~> (BaseName ~> Bool),
   ): void {
     if (this.subs.containsKey(sessionId)) return void;
-    sub = Sub(mutexCreate(), cmdOpt, 0, Tick(0), filter);
+    sub = Sub(mutexCreate(), cmdOpt, Int32::truncate(0), Tick(0), filter);
     !this.subs[sessionId] = sub;
     if (init) {
       changes = this.getChangesAfter(Tick(0));
