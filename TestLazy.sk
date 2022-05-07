@@ -87,13 +87,13 @@ fun testLazy(): mutable SKFS.Context {
     getLazyData(context, adir2, SKFS.IID(0), true)
   );
 
-  _ = context.updateWithStatus(0, false);
+  _ = context.updateWithStatus(0);
 
   expectEq("Async Lazy basic with interruption", Array<SKFS.File>[], () ->
     getLazyData(context, adir2, SKFS.IID(0), true)
   );
 
-  _ = context.updateWithStatus(30, false);
+  _ = context.updateWithStatus(30);
 
   expectEq(
     "Async Lazy basic without interruption",
@@ -105,7 +105,7 @@ fun testLazy(): mutable SKFS.Context {
     getData(context, dir2, SKFS.IID(0))
   );
   write(context, input, SKFS.IID(0), Array[SKFS.IntFile(22)]);
-  _status = context.updateWithStatus(10, false);
+  _status = context.updateWithStatus(10);
 
   expectEq("Lazy after update", Array<SKFS.File>[SKFS.IntFile(22)], () ->
     getData(context, dir2, SKFS.IID(0))

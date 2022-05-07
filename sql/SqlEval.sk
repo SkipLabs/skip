@@ -619,7 +619,7 @@ class Evaluator{options: Options} {
     | None() ->
       Some((context, _, _) ~> {
         this.insertTable(context, table, rows);
-        context.update(true)
+        context.update();
       })
 
     | Some(ws) ->
@@ -666,10 +666,12 @@ class Evaluator{options: Options} {
     key = SKFS.IID(SKFS.genSym(0));
     source = SKFS.Path(dir.dirName, key);
     for (row in rows) {
+      start = context.tick;
       vcontext = context.mclone();
       !newDir = newDir.writeEntry(vcontext, source, key, Array[row]);
       vcontext.setDir(newDir.dirName, newDir);
-      vcontext.update(true);
+      vcontext.update();
+      vcontext.notifyAll(start);
     }
   }
 
@@ -716,9 +718,9 @@ class Evaluator{options: Options} {
 
       !row1 = row2;
 
-      if (row1 is None() || i % 1024 == 0 || this.options.forceWindowUpdate) {
+      if (row1 is None()) {
         context.setDir(dir.dirName, newDir);
-        context.update(true)
+        context.update();
       };
 
       !i = i + 1;
@@ -996,7 +998,6 @@ class Options{
   virtual: Bool = false,
   showUsedIndexes: Bool,
   csv: Bool,
-  forceWindowUpdate: Bool,
 }
 
 fun eval(options: Options): void {
@@ -1033,6 +1034,7 @@ fun eval(options: Options): void {
         isTransaction = false;
 
         loop {
+          !underLockF = None();
           (!line, !lineStr) = read(gline);
           !buffer = Buffer(lineStr);
           !lex = Lexer(0, buffer);
@@ -1167,7 +1169,7 @@ fun importFromRoot(
       };
       if (shouldImport) {
         SKFS.import(delta, tick, root);
-        delta.update(/* notify */ false);
+        delta.update();
       }
     },
     (err -> {

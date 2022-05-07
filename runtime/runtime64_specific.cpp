@@ -56,7 +56,7 @@ uint32_t SKIP_read_line_get(uint32_t i) {
 }
 
 uint32_t SKIP_getchar(uint64_t) {
-  int c1 = (uint32_t)std::getchar();
+  int c1 = (uint32_t)getc(stdin);
 
   if(c1 == EOF) {
     SKIP_throw_EndOfFile();
@@ -66,7 +66,7 @@ uint32_t SKIP_getchar(uint64_t) {
     return c1;
   }
 
-  int c2 = (uint32_t)std::getchar();
+  int c2 = (uint32_t)getc(stdin);
 
   if(c2 == EOF) {
     fprintf(stderr, "Invalid utf8");
@@ -77,7 +77,7 @@ uint32_t SKIP_getchar(uint64_t) {
     return (c1 - 192) * 64 + (c2 - 128);
   }
 
-  int c3 = (uint32_t)std::getchar();
+  int c3 = (uint32_t)getc(stdin);
 
   if(c3 == EOF) {
     fprintf(stderr, "Invalid utf8");
@@ -90,7 +90,7 @@ uint32_t SKIP_getchar(uint64_t) {
       (c3 - 128);
   }
 
-  int c4 = (uint32_t)std::getchar();
+  int c4 = (uint32_t)getc(stdin);
 
   if(c4 == EOF) {
     fprintf(stderr, "Invalid utf8");
@@ -209,13 +209,21 @@ char* SKIP_read_file(char* filename_obj) {
  return result;
 }
 
+std::map<std::string, int> files;
+
 int64_t SKIP_unix_open(char* filename_obj) {
  size_t filename_size = SKIP_String_byteSize(filename_obj);
  char* filename = (char*)malloc(filename_size+1);
  memcpy(filename, filename_obj, filename_size);
  filename[filename_size] = (char)0;
+ std::string s(filename);
+
+ if(files.count(s) != 0) {
+   return files[s];
+ }
 
  int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0777);
+ files[s] = fd;
 
  if(fd == -1) {
    perror("ERROR file open failed");
@@ -227,8 +235,9 @@ int64_t SKIP_unix_open(char* filename_obj) {
 }
 
 int64_t SKIP_unix_close(int64_t fd) {
- int status = close((int)fd);
- return (int64_t)status;
+//  int status = close((int)fd);
+//  return (int64_t)status;
+  return 0;
 }
 
 void SKIP_write_to_file(int64_t fd, char* str) {

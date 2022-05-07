@@ -175,12 +175,11 @@ value class MInfo(
 
 base class CmdKind {
   children =
-  | NCmd(Bool, String)
   | NUpdates(Bool, String)
   | NNotify(String)
 }
 
-value class Sub(cmd: ?CmdKind, status: Int, tick: Tick)
+value class Sub(lock: Mutex, cmd: ?CmdKind, status: Int, tick: Tick)
 
 @cpp_extern("SKIP_unix_open")
 native fun unixOpen(String): UnixDescr;
@@ -233,24 +232,22 @@ class EagerDir{
   }
 
   private fun notifyCmd(
+    lock: Mutex,
     id: Int,
     changes: SortedSet<BaseName>,
     cmdKind: CmdKind,
     tick: Tick,
   ): this {
     (fd, csv, write) = cmdKind match {
-    | NCmd(csv, cmd) ->
-      fd = exec(cmd);
-      (fd, csv, x -> writeToProc(fd, x))
     | NUpdates(csv, file) ->
       fd = unixOpen(file);
       (fd, csv, x -> writeToFile(fd, x))
     | NNotify(file) ->
       status = unixNotify(file, tick.value);
-      !this.subs[id] = Sub(Some(cmdKind), status, tick);
+      !this.subs[id] = Sub(lock, Some(cmdKind), status, tick);
       return this
     };
-    if (!changes.isEmpty()) {
+    if (!changes.isEmpty() && !this.reallyRemove) {
       write("\n");
       write("\n");
     };
@@ -265,23 +262,25 @@ class EagerDir{
       };
     };
     status = cmdKind match {
-    | NCmd _ -> waitForProc(fd)
     | NUpdates _ -> unixClose(fd)
     | NNotify _ -> 0
     };
-    !this.subs[id] = Sub(Some(cmdKind), status, tick);
+    !this.subs[id] = Sub(lock, Some(cmdKind), status, tick);
     this
   }
 
-  private fun notifyAll(tick: Tick): this {
+  fun notifyAll(tick: Tick): this {
     changes = this.getChangesAfter(tick);
     if (changes.isEmpty()) return this;
     for (id => sub in this.subs) {
+      lock = unfreezeLock(sub.lock);
       if (sub.status == 0) {
+        mutexLock(lock);
         sub.cmd match {
         | None() -> void
-        | Some(cmd) -> !this = this.notifyCmd(id, changes, cmd, tick)
-        }
+        | Some(cmd) -> !this = this.notifyCmd(sub.lock, id, changes, cmd, tick)
+        };
+        mutexUnlock(lock);
       }
     };
     this
@@ -299,12 +298,14 @@ class EagerDir{
     init: Bool,
   ): void {
     if (this.subs.containsKey(sessionId)) return void;
-    !this.subs[sessionId] = Sub(cmdOpt, 0, Tick(0));
+    sub = Sub(mutexCreate(), cmdOpt, 0, Tick(0));
+    !this.subs[sessionId] = sub;
     if (init) {
       changes = this.getChangesAfter(Tick(0));
       cmdOpt match {
       | None() -> void
-      | Some(cmd) -> !this = this.notifyCmd(sessionId, changes, cmd, Tick(0))
+      | Some(cmd) ->
+        !this = this.notifyCmd(sub.lock, sessionId, changes, cmd, Tick(0))
       }
     };
     context.setDir(this.dirName, this);
@@ -316,7 +317,8 @@ class EagerDir{
     changes = this.getChangesAfter(sub.tick);
     sub.cmd match {
     | None() -> void
-    | Some(cmd) -> !this = this.notifyCmd(id, changes, cmd, context.tick)
+    | Some(cmd) ->
+      !this = this.notifyCmd(sub.lock, id, changes, cmd, context.tick)
     };
     context.setDir(this.dirName, this);
   }
@@ -924,9 +926,7 @@ class EagerDir{
     mapFun: MapFun,
     rangeOpt: ?Array<KeyRange>,
     child: EagerDir,
-    notify: Bool,
   ): void {
-    startTick = context.tick;
     parent = context.unsafeGetEagerDir(parentName);
     childName = child.dirName;
 
@@ -1021,10 +1021,6 @@ class EagerDir{
       };
 
       context.leave(ArrowKey(parentName, childName, key));
-    };
-
-    if (notify) {
-      !child = child.notifyAll(startTick);
     };
 
     context.setDir(child.dirName, child);

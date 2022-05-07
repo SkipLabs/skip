@@ -41,7 +41,10 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Same as --subscribe, but sends the initial state first",
   },
   AP.IntParam{name => "disconnect", help => "Disconnects a session"},
-  AP.IntParam{name => "subscribe", help => "Subscribes to a directory change"},
+  AP.StringParam{
+    name => "subscribe",
+    help => "Subscribes to a directory change",
+  },
   AP.StringParam{
     name => "write",
     help => "Writes the data coming from stdin into a directory",
@@ -55,7 +58,6 @@ const argsSchema: Array<AP.Param> = Array[
     name => "since",
     help => "specifies the starting time of the diff",
   },
-  AP.StringParam{name => "cmd", help => "Name of the command to run on change"},
   AP.StringParam{
     name => "updates",
     help => "Name of the file where the updates will be written",
@@ -83,11 +85,6 @@ const argsSchema: Array<AP.Param> = Array[
   AP.BoolParam{
     name => "dump",
     help => "Dumps tables/inserts/views in SQL format",
-    negatable => false,
-  },
-  AP.BoolParam{
-    name => "force-window-update",
-    help => "Makes sure every window change triggers notifications",
     negatable => false,
   },
 ];
@@ -146,9 +143,6 @@ untracked fun main(): void {
       AP.BoolValue _,
     ),
     csv => argMap.maybeGet("csv") is Some(AP.BoolValue _),
-    forceWindowUpdate => argMap.maybeGet("force-window-update") is Some(
-      AP.BoolValue _,
-    ),
   };
 
   argMap.maybeGet("sessions") match {
@@ -420,25 +414,13 @@ untracked fun main(): void {
     SKSQL.runLockedSql(options, context ~> {
       viewName = userViewName.lowercase();
       SKSQL.forbidNow(context);
-      cmd = (
-        argMap.maybeGet("cmd"),
-        argMap.maybeGet("updates"),
-        argMap.maybeGet("notify"),
-      ) match {
-      | (Some(AP.StringValue _), Some(AP.StringValue _), _) ->
-        print_error("Cannot have both --cmd and --updates");
-        skipExit(4)
-      | (_, Some(AP.StringValue _), Some(AP.StringValue _)) ->
+      cmd = (argMap.maybeGet("updates"), argMap.maybeGet("notify")) match {
+      | (Some(AP.StringValue _), Some(AP.StringValue _)) ->
         print_error("Cannot have both --updates and --notify");
         skipExit(4)
-      | (Some(AP.StringValue _), _, Some(AP.StringValue _)) ->
-        print_error("Cannot have both --cmd and --notify");
-        skipExit(4)
-      | (Some(AP.StringValue{value => x}), _, _) ->
-        Some(SKFS.NCmd(options.csv, x))
-      | (_, Some(AP.StringValue{value => x}), _) ->
+      | (Some(AP.StringValue{value => x}), _) ->
         Some(SKFS.NUpdates(options.csv, x))
-      | (_, _, Some(AP.StringValue{value => x})) -> Some(SKFS.NNotify(x))
+      | (_, Some(AP.StringValue{value => x})) -> Some(SKFS.NNotify(x))
       | _ -> None()
       };
       (input, output) = SKSQL.getSubsDirs(options, context);

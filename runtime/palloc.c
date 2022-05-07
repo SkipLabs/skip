@@ -116,6 +116,80 @@ void sk_global_unlock() {
 }
 
 /*****************************************************************************/
+/* Mutexes/Condition variables. */
+/*****************************************************************************/
+
+void SKIP_mutex_init(pthread_mutex_t* lock) {
+  if(sizeof(pthread_mutex_t) > 40) {
+    fprintf(stderr, "Internal error: mutex object not large enough for this arch");
+  }
+  pthread_mutex_init(lock, gmutex_attr);
+}
+
+void SKIP_mutex_lock(pthread_mutex_t* lock) {
+  int code = pthread_mutex_lock(lock);
+
+  if(code == 0) {
+    return;
+  }
+
+  if(code == EOWNERDEAD) {
+    pthread_mutex_consistent(lock);
+    return;
+  }
+
+  fprintf(stderr, "Internal error: locking failed\n");
+  exit(44);
+}
+
+void SKIP_mutex_unlock(pthread_mutex_t* lock) {
+  int code = pthread_mutex_unlock(lock);
+
+  if(code == 0) {
+    return;
+  }
+
+  fprintf(stderr, "Internal error: unlocking failed\n");
+  exit(44);
+}
+
+void SKIP_cond_init(pthread_cond_t* cond) {
+  if(sizeof(pthread_mutex_t) > 48) {
+    fprintf(stderr, "Internal error: mutex object not large enough for this arch");
+  }
+  pthread_condattr_t cond_attr_value;
+  pthread_condattr_t* cond_attr = &cond_attr_value;
+  pthread_condattr_init(cond_attr);
+  pthread_condattr_setpshared(cond_attr, PTHREAD_PROCESS_SHARED);
+  pthread_cond_init(cond, cond_attr);
+}
+
+void* SKIP_freeze_lock(void* x) {
+  return x;
+}
+
+void* SKIP_unfreeze_lock(void* x) {
+  return x;
+}
+
+void* SKIP_freeze_cond(void* x) {
+  return x;
+}
+
+void* SKIP_unfreeze_cond(void* x) {
+  return x;
+}
+
+void SKIP_cond_wait(pthread_cond_t* x, pthread_mutex_t* y) {
+  printf("Wait\n");
+  pthread_cond_wait(x, y);
+}
+
+void SKIP_cond_broadcast(void* c) {
+  pthread_cond_broadcast(c);
+}
+
+/*****************************************************************************/
 /* The global information structure. */
 /*****************************************************************************/
 
@@ -307,7 +381,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   *(void**)head = begin;
   head += sizeof(void*);
 
-  gmutex_attr = (pthread_mutexattr_t*) head;
+  gmutex_attr = (pthread_mutexattr_t*)head;
   head += sizeof(pthread_mutexattr_t);
 
   gmutex = (pthread_mutex_t*)head;

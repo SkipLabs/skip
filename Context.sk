@@ -564,8 +564,8 @@ mutable class Context{
     };
   }
 
-  mutable fun update(notify: Bool = true): void {
-    hasBackgroundWork = this.updateWithStatus(0, notify);
+  mutable fun update(): void {
+    hasBackgroundWork = this.updateWithStatus(0);
     if (hasBackgroundWork) {
       invariant_violation(
         "update should not be called when there is background work" +
@@ -575,12 +575,11 @@ mutable class Context{
     void
   }
 
-  mutable fun updateWithStatus(backgroundRounds: Int, notify: Bool): Bool {
+  mutable fun updateWithStatus(backgroundRounds: Int): Bool {
     if (this.debugMode) {
       print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
 
-    this.!tick = this.tick.next();
     _ = this.timeStamp();
 
     this.updateLazyGets();
@@ -644,6 +643,7 @@ mutable class Context{
         invariant(this.dirtyReaders.isEmpty());
         this.updatePre(this.toReset);
         this.!toReset = SortedSet[];
+        this.!tick = this.tick.next();
         return !this.asyncList.isEmpty()
       | Some((time, Arrow(parentName, childName))) ->
         this.!toReset = this.toReset.set(childName);
@@ -668,9 +668,23 @@ mutable class Context{
             mapFun,
             rangeOpt,
             child,
-            notify,
           )
         }
+      }
+    }
+  }
+
+  readonly fun notifyAll(start: Tick): void {
+    changedDirNames = this.getGlobal("CHANGED_DIRS") match {
+    | None() -> this.dirs.state.getChangesAfter(start)
+    | Some(x @ ChangedDirs _) -> x.value
+    | _ -> invariant_violation("Wrong type for CHANGED_DIRS")
+    };
+    if (this.tick == start) return void;
+    for (dirName in changedDirNames) {
+      this.unsafeMaybeGetDir(dirName) match {
+      | Some(dir @ EagerDir _) -> _ = dir.notifyAll(start)
+      | _ -> void
       }
     }
   }
@@ -974,6 +988,8 @@ class Synchronizer(
   afterUnlock: (mutable Context ~> void),
 )
 
+class ChangedDirs(value: SortedSet<DirName>) extends File
+
 @cpp_export("SKIP_resolve_context")
 fun resolveContext(
   tick: Tick,
@@ -986,6 +1002,7 @@ fun resolveContext(
   | None() if (tick == root.tick) -> delta
   | None() -> invariant_violation("Concurrent access without synchronizer")
   | Some(sync) ->
+    changedDirs = delta.dirs.state.getChangesAfter(tick);
     sync.importFromRoot(delta, tick, root);
 
     newRoot = Context::fromSaved(root);
@@ -997,7 +1014,11 @@ fun resolveContext(
     | Some(f) ->
       vtry(
         () -> {
-          f(newRoot, delta, root)
+          newRootTick = newRoot.tick;
+          f(newRoot, delta, root);
+          !changedDirs = changedDirs.union(
+            newRoot.dirs.state.getChangesAfter(newRootTick),
+          );
         },
         (err -> {
           line = delta.getGlobal("Line") match {
@@ -1009,6 +1030,7 @@ fun resolveContext(
         }),
       )
     };
+    newRoot.setGlobal("CHANGED_DIRS", ChangedDirs(changedDirs));
     newRoot
   }
 }
@@ -1023,6 +1045,58 @@ fun callAfterUnlock(
   | Some(sync) -> sync.afterUnlock(context)
   }
 }
+
+/*****************************************************************************/
+/* Locks/Conditions. */
+/*****************************************************************************/
+
+mutable class Mutex(Int, Int, Int, Int, Int)
+mutable class Condition(Int, Int, Int, Int, Int, Int)
+
+@cpp_extern("SKIP_mutex_init")
+native fun mutexInit(mutable Mutex): void;
+
+fun mutexCreate(): Mutex {
+  lock = mutable Mutex(0, 0, 0, 0, 0);
+  mutexInit(lock);
+  freezeLock(lock)
+}
+
+@cpp_extern("SKIP_mutex_lock")
+native fun mutexLock(mutable Mutex): void;
+
+@cpp_extern("SKIP_mutex_unlock")
+native fun mutexUnlock(mutable Mutex): void;
+
+@cpp_extern("SKIP_cond_init")
+native fun condInit(mutable Condition): void;
+
+fun condCreate(): Condition {
+  cond = mutable Condition(0, 0, 0, 0, 0, 0);
+  condInit(cond);
+  freezeCond(cond)
+}
+
+@cpp_extern("SKIP_cond_wait")
+native fun condWait(mutable Condition, mutable Mutex): Int32;
+
+@cpp_extern("SKIP_cond_broadcast")
+native fun condBroadcast(mutable Condition): Int32;
+
+@cpp_extern("pthread_cond_signal")
+native fun condSignal(mutable Condition): Int32;
+
+@cpp_extern("SKIP_freeze_lock")
+native fun freezeLock(lock: mutable Mutex): Mutex;
+
+@cpp_extern("SKIP_unfreeze_lock")
+native fun unfreezeLock(lock: Mutex): mutable Mutex;
+
+@cpp_extern("SKIP_freeze_cond")
+native fun freezeCond(cond: mutable Condition): Condition;
+
+@cpp_extern("SKIP_unfreeze_cond")
+native fun unfreezeCond(cond: Condition): mutable Condition;
 
 /*****************************************************************************/
 /* External process handling. Basically a thin layer on top of popen/pclose. */
@@ -1171,6 +1245,7 @@ fun runWithGcIntern(
   loop {
     startTick = context.tick;
     pos = newObstack();
+    start = context.tick;
     (newContext, newContextOp) = f(context with {globals});
     newContextOp match {
     | CContinue(underLockF) ->
@@ -1185,6 +1260,7 @@ fun runWithGcIntern(
           underLockF,
         );
         gGlobalUnlock();
+        context.notifyAll(start);
         destroyObstack(pos)
       | Some _ ->
         !context = gContextSync(
@@ -1195,6 +1271,7 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
+        context.notifyAll(start);
         destroyObstack(pos)
       }
     | CStop(underLockF) ->
@@ -1209,6 +1286,7 @@ fun runWithGcIntern(
           underLockF,
         );
         gGlobalUnlock();
+        context.notifyAll(start);
         gUnsafeFree(context);
         return context
       | Some _ ->
@@ -1220,6 +1298,7 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
+        context.notifyAll(start);
         gUnsafeFree(context);
         return context
       }
@@ -1239,6 +1318,7 @@ fun runLocked(
   };
   gGlobalLock();
   root = gContextGetNoLock();
+  start = root.tick;
   context = Context::fromSaved(root);
   f(context);
   newRoot = gContextSyncNoLock(
@@ -1250,6 +1330,7 @@ fun runLocked(
     None(),
   );
   gGlobalUnlock();
+  newRoot.notifyAll(start);
   gUnsafeFree(newRoot);
 }
 
