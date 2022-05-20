@@ -136,6 +136,10 @@ fun errorOutOfBounds(posId: PosId): Type {
   Type(posId, TSourceError(OutOfBoundsError(posId)))
 }
 
+fun errorCausality(posId: PosId, msg: CAError): Type {
+  Type(posId, TSourceError(CyclicDefinition(msg)))
+}
+
 fun errorSizeMismatch(
   kind: MismatchKind,
   pos1: PosId,
@@ -154,13 +158,14 @@ fun createTAst(
   context: mutable SKFS.Context,
   prims: SortedMap<String, (Type, Array<Value> ~> Value)>,
   defs: SKFS.EHandle<DefFile>,
+  deps: SKFS.LHandle<CAFile>,
 ): SKFS.LHandle<TypeFile> {
   SKFS.LHandle::create(
     TypeFile::fromFile,
     context,
     typesDirName,
     (ctx, self, typeName) ~> {
-      typer = Typer{prims, defs, types => self};
+      typer = Typer{prims, defs, deps, types => self};
       typer.computeTAst(ctx, typeName) match {
       | None() -> Array[]
       | Some(def) -> Array[TypeFile(def)]
@@ -178,6 +183,7 @@ class Typer{
   vars: SortedMap<String, Int> = SortedMap[],
   prims: SortedMap<String, (Type, Array<Value> ~> Value)>,
   defs: SKFS.EHandle<DefFile>,
+  deps: SKFS.LHandle<CAFile>,
   types: SKFS.LHandle<TypeFile>,
 } {
   fun getClass(context: mutable SKFS.Context, name: Name): ?Class {
@@ -546,6 +552,18 @@ class Typer{
       (this, Type(posId, TNamed("Bool")), TEBool(false))
     | EVar(n) ->
       if (!this.subst.containsKey(n.value)) {
+        depsArr = this.deps.getArray(context, SKFS.SID(n.value));
+        if (depsArr.size() == 0) {
+          return (this, errorUnboundName(n), TEGlobal(n));
+        };
+        if (depsArr.size() != 1) {
+          invariant_violation("Unexpected causality result");
+        };
+        depsArr[0].value match {
+        | err @ CAError _ ->
+          return (this, errorCausality(posId, err), TEGlobal(n))
+        | _ -> void
+        };
         arr = this.types.getArray(context, SKFS.SID(n.value));
         if (arr.size() == 0) {
           if (this.prims.containsKey(n.value)) {

@@ -3,10 +3,17 @@
 /*****************************************************************************/
 module SKFS;
 
+class CyclicExn(BaseName) extends Exception, File {
+  fun toString(): String {
+    inspect(this).toString()
+  }
+}
+
 base class LazyResult {
   children =
   | LDefined(Array<File>, Array<Path>)
   | LRemoved(Array<Path>)
+  | LCycle()
   | LAbsent()
   | LDelayed()
 }
@@ -56,6 +63,10 @@ class LazyDir{
   ): Dir {
     time = context.timeStamp();
     lazyFun = (context: mutable Context, key: BaseName) ~> {
+      dir = context.unsafeGetLazyDir(dirName);
+      !dir.data[key] = LCycle();
+      context.setDir(dirName, dir);
+
       readsCopy = context.reads;
       context.!reads = SortedSet[];
 
@@ -71,10 +82,10 @@ class LazyDir{
         context.!deps = context.deps.set(read, arrowKey);
       };
 
-      dir = context.unsafeGetLazyDir(dirName);
+      !dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = result;
-
       context.setDir(dirName, dir);
+
       if (context.debugMode) {
         name = "" + dir.dirName + key;
         print_string(`WRITTEN LAZY:  ${name}`);
@@ -144,11 +155,13 @@ class LazyDir{
     context: mutable Context,
     key: BaseName,
     isAsync: Bool = false,
+    throwOnCycle: Bool = true,
   ): Array<File> {
     if (this.collect) {
       context.!lazyGets = context.lazyGets.set(Path::create(this.dirName, key));
     };
     lazyResult = this.data.maybeGet(key) match {
+    | Some(LCycle()) if (throwOnCycle) -> throw CyclicExn(key)
     | x @ None()
     | x @ Some(LRemoved _)
     | x @ Some(LAbsent()) ->
@@ -173,7 +186,18 @@ class LazyDir{
   fun getArray(context: mutable Context, key: BaseName): Array<File> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
-    this.unsafeGetArray(context, key, false)
+    this.unsafeGetArray(context, key, false, true)
+  }
+
+  fun getArrayWithOptions(
+    context: mutable Context,
+    key: BaseName,
+    isAsync: Bool = false,
+    throwOnCycle: Bool = true,
+  ): Array<File> {
+    path = Path::create(this.dirName, key);
+    context.addDep(path);
+    this.unsafeGetArray(context, key, isAsync, throwOnCycle)
   }
 
   fun getIter(context: mutable Context, key: BaseName): mutable Iterator<File> {

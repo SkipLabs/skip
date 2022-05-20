@@ -211,6 +211,19 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     results = dir.getArrayAsync(context, key).map(this.getConv());
     results
   }
+
+  fun getArrayWithOptions(
+    context: mutable Context,
+    key: BaseName,
+    isAsync: Bool,
+    throwOnCycle: Bool,
+  ): Array<T> {
+    dir = context.unsafeGetLazyDir(this.getDirName());
+    results = dir
+      .getArrayWithOptions(context, key, isAsync, throwOnCycle)
+      .map(this.getConv());
+    results
+  }
 }
 
 /*****************************************************************************/

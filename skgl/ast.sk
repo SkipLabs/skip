@@ -99,30 +99,37 @@ fun populateDefs(
 /* Causality analysis (checks that there are no cycles). */
 /*****************************************************************************/
 
+class CAFile(value: CAResult) extends SKFS.File
+
 base class CAResult {
   children =
-  | CAError(Name, List<String>)
+  | CAError(Name, List<Name>)
   | CADeps(SortedSet<String>)
 }
+
+const causalityDirName: SKFS.DirName = SKFS.DirName::create("/causality/");
+const causalityDepsDirName: SKFS.DirName = SKFS.DirName::create(
+  "/causalityDeps/",
+);
 
 class Causality{
   defs: SKFS.EHandle<DefFile>,
   deps: SortedMap<String, SortedSet<String>> = SortedMap[],
+  transitive: Bool,
 } {
   fun funDef(
     context: mutable SKFS.Context,
     visiting: SortedSet<String>,
-    visitl: List<String>,
+    visitl: List<Name>,
     f: Fun,
   ): (this, CAResult) {
     if (visiting.contains(f.name.value)) {
+      !visitl = List.Cons(f.name, visitl);
       return (this, CAError(f.name, visitl));
     };
     if (this.deps.containsKey(f.name.value)) {
       return (this, CADeps(this.deps[f.name.value]));
     };
-    !visiting = visiting.add(f.name.value);
-    !visitl = List.Cons(f.name.value, visitl);
     locals = SortedSet[];
     deps = SortedSet[];
     for (eq in f.body.eqs) {
@@ -168,7 +175,7 @@ class Causality{
   fun expr(
     context: mutable SKFS.Context,
     visiting: SortedSet<String>,
-    visitl: List<String>,
+    visitl: List<Name>,
     locals: SortedSet<String>,
     e: Expr,
   ): (this, CAResult) {
@@ -179,7 +186,16 @@ class Causality{
       arr = this.defs.getArray(context, SKFS.SID(n.value));
       if (arr.size() == 0) return (this, CADeps(SortedSet[]));
       arr[0].value match {
-      | f @ Fun _ -> this.funDef(context, visiting, visitl, f)
+      | f @ Fun _ ->
+        name = f.name;
+        !name.posId = e.posId;
+        !visiting = visiting.add(name.value);
+        !visitl = List.Cons(name, visitl);
+        if (this.transitive) {
+          this.funDef(context, visiting, visitl, f)
+        } else {
+          (this, CADeps(SortedSet[f.name.value]))
+        }
       | _ -> (this, CADeps(SortedSet[]))
       }
     | EDot(_, x, _) -> this.expr(context, visiting, visitl, locals, x)
@@ -275,7 +291,7 @@ class Causality{
   fun exprArray(
     context: mutable SKFS.Context,
     visiting: SortedSet<String>,
-    visitl: List<String>,
+    visitl: List<Name>,
     locals: SortedSet<String>,
     arr: Array<Expr>,
   ): (this, CAResult) {
@@ -295,21 +311,66 @@ class Causality{
 fun causalityCheck(
   context: mutable SKFS.Context,
   defs: SKFS.EHandle<DefFile>,
-  funNames: Array<String>,
-): ?(Name, List<String>) {
-  checker = Causality{defs};
-  for (funName in funNames) {
-    arr = defs.getArray(context, SKFS.SID(funName));
-    if (arr.size() == 0) continue;
-    arr[0].value match {
-    | f @ Fun _ ->
-      (!checker, result) = checker.funDef(context, SortedSet[], List[], f);
-      result match {
-      | CAError(err, path) -> return Some((err, path))
-      | CADeps _ -> void
+): SKFS.LHandle<CAFile> {
+  depsDir = defs.contextWriterKeyIter(
+    CAFile::fromFile,
+    context,
+    causalityDepsDirName,
+    (context, writer, key, iter) ~> {
+      checker = Causality{defs, transitive => false};
+      arr = iter.collect(Array);
+      if (arr.size() == 0) return void;
+      arr[0].value match {
+      | f @ Fun _ ->
+        (!checker, result) = checker.funDef(context, SortedSet[], List[], f);
+        writer.write(key, CAFile(result))
+      | _ -> void
       }
-    | _ -> continue
-    }
-  };
-  None()
+    },
+  );
+  SKFS.LHandle::create(
+    CAFile::fromFile,
+    context,
+    causalityDirName,
+    (context, self, key) ~> {
+      key match {
+      | SKFS.SID(funName) ->
+        depsDir.maybeGet(context, SKFS.SID(funName)) match {
+        | None() -> Array[CAFile(CADeps(SortedSet[]))]
+        | Some(file @ CAFile(CAError _)) -> Array[file]
+        | Some(CAFile(CADeps(startingDeps))) ->
+          deps = startingDeps;
+          for (dep in startingDeps) {
+            for (file in self.getArrayWithOptions(
+              context,
+              SKFS.SID(dep),
+              false,
+              false,
+            )) {
+              file match {
+              | CAFile(CADeps(newDeps)) -> !deps = deps.union(newDeps)
+              | CAFile(CAError _) -> return Array[file]
+              }
+            }
+          };
+          result = Array[CAFile(CADeps(deps))];
+          if (deps.contains(funName)) {
+            arr = defs.getArray(context, key);
+            if (arr.size() == 0) return result;
+            f = arr[0].value match {
+            | f @ Fun _ -> f
+            | _ -> return result
+            };
+            checker = Causality{defs, transitive => true};
+            (_, err) = checker.funDef(context, SortedSet[], List[], f);
+            invariant(err is CAError _);
+            Array[CAFile(err)]
+          } else {
+            Array[CAFile(CADeps(deps))]
+          }
+        }
+      | _ -> invariant_violation("Unexpected key type")
+      }
+    },
+  )
 }

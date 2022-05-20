@@ -33,15 +33,8 @@ untracked fun main(): void {
       SKGL.populateDefs,
     );
 
-    err = SKGL.causalityCheck(context, defs, Array["foo"]);
-    err match {
-    | None() -> void
-    | Some(x) ->
-      debug(("Causality error", x));
-      return SKFS.CStop(None())
-    };
-
-    tdefs = SKGL.createTAst(context, SKGL.primitivesExample, defs);
+    deps = SKGL.causalityCheck(context, defs);
+    tdefs = SKGL.createTAst(context, SKGL.primitivesExample, defs, deps);
     evaluator = SKGL.Evaluator{prims => SKGL.primitivesExample, tdefs};
     debug(evaluator.eval(context, "main", Array[]));
 
