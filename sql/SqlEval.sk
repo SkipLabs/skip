@@ -1209,14 +1209,16 @@ fun importNext(
   targetCtx: mutable SKFS.Context,
   tick: SKFS.Tick,
   sourceCtx: readonly SKFS.Context,
-): void {
+): Bool {
   changedDirNames = sourceCtx.dirs.state.getChangesAfter(tick);
   updates = mutable Map[];
+  hasMultipleVersions = false;
   for (dirName in changedDirNames) {
     sourceCtx.unsafeMaybeGetDir(dirName) match {
     | Some(SKFS.DeletedDir{}) -> targetCtx.removeDir(dirName)
     | Some(dir @ SKFS.EagerDir{input => true}) ->
       (targetDirName, version) = makeInputDirName(dirName);
+      !hasMultipleVersions = hasMultipleVersions || version != 0;
       updates.maybeGet(targetDirName) match {
       | Some((_, iversion, _)) if (iversion > version) -> void
       | _ ->
@@ -1256,18 +1258,20 @@ fun importNext(
       inputDir.writeArraySourceMany(targetCtx, entries.iterator())
     }
   };
+  hasMultipleVersions
 }
 
 fun exportToRoot(
   root: mutable SKFS.Context,
   tick: SKFS.Tick,
   delta: readonly SKFS.Context,
-): void {
+): Bool {
   rootCopy = root.clone();
   vtry(
     () -> {
-      importNext(root, tick, delta);
+      hasVersioning = importNext(root, tick, delta);
       root.update();
+      hasVersioning
     },
     (err -> {
       line = delta.getGlobal("Line") match {

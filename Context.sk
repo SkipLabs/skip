@@ -984,7 +984,7 @@ fun import(
 
 class Synchronizer(
   importFromRoot: ((mutable Context, Tick, readonly Context) ~> void),
-  exportToRoot: ((mutable Context, Tick, readonly Context) ~> void),
+  exportToRoot: ((mutable Context, Tick, readonly Context) ~> Bool),
   afterUnlock: (mutable Context ~> void),
 )
 
@@ -1008,7 +1008,8 @@ fun resolveContext(
     newRoot = Context::fromSaved(root);
     newRoot.!globals = delta.globals;
 
-    sync.exportToRoot(newRoot, tick, delta);
+    hasVersioning = sync.exportToRoot(newRoot, tick, delta);
+
     lockF match {
     | None() -> void
     | Some(f) ->
@@ -1030,7 +1031,9 @@ fun resolveContext(
         }),
       )
     };
-    newRoot.setGlobal("CHANGED_DIRS", ChangedDirs(changedDirs));
+    if (!hasVersioning) {
+      newRoot.setGlobal("CHANGED_DIRS", ChangedDirs(changedDirs));
+    };
     newRoot
   }
 }
