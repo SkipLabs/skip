@@ -296,6 +296,10 @@ uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
 void SKIP_Obstack_auto_collect() {
 }
 
+void* SKIP_Obstack_collect1(void* note, void* obj) {
+  return obj;
+}
+
 /*****************************************************************************/
 /* Sort used to sort the pages. */
 /*****************************************************************************/

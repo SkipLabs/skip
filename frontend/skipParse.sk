@@ -1,0 +1,72 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/*****************************************************************************/
+/* Utility functions to perform the parsing. */
+/*****************************************************************************/
+module alias Error = SkipError;
+
+module FileCache;
+
+const fileDirName: SKFS.DirName = SKFS.DirName::create("/fileCache/");
+const fileDir: SKFS.EHandle<SKFS.StringFile> = SKFS.EHandle(
+  SKFS.StringFile::fromFile,
+  fileDirName,
+);
+
+fun addFile(context: mutable SKFS.Context, filename: String): void {
+  fileDir.writeArray(
+    context,
+    SKFS.SID(filename),
+    Array[SKFS.StringFile(FileSystem.readTextFile(filename))],
+  )
+}
+
+module end;
+
+module SkipParse;
+
+const astDirName: SKFS.DirName = SKFS.DirName::create("/astCache/");
+const astDir: SKFS.EHandle<DefsFile> = SKFS.EHandle(
+  DefsFile::fromFile,
+  astDirName,
+);
+
+class DefsFile(value: List<SkipAst.Definition>) extends SKFS.File
+
+fun getAst(fileName: String): List<SkipAst.Definition> {
+  astDir.get(Reactive.getContext(), SKFS.SID(fileName)).value
+}
+
+fun parseFile(fileName: String, source: String): DefsFile {
+  fileResult = SkipParser.parseSource(source, true);
+  ast = parseToAst(fileName, fileResult);
+  DefsFile(ast)
+}
+
+fun parseToAst(
+  filename: String,
+  parseResults: Parser.ParseResults,
+): List<SkipAst.Definition> {
+  parseResults.throwOnError(filename);
+  List::createFromItems(
+    ConvertTree.Converter{filename}.convertTree(parseResults.tree),
+  );
+}
+
+// Used by docgen
+fun parse(filename: String, contents: String): List<SkipAst.Definition> {
+  parseToAst(filename, SkipParser.parseSource(contents, false));
+}
+
+fun parse_files(
+  fileList: Sequence<String>,
+): Sequence<List<SkipAst.Definition>> {
+  fileList.map(getAst)
+}
+
+module end;

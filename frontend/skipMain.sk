@@ -1,0 +1,110 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module SkipMain;
+/*****************************************************************************/
+/* All the phases of the front-end. */
+/*****************************************************************************/
+
+fun type_program(
+  context: mutable SKFS.Context,
+  embeddedMode: Bool,
+  files: List<String>,
+): SkipTypedAst.Program {
+  fileDir = context.mkdir(
+    SKFS.StringFile::fromFile,
+    FileCache.fileDirName,
+    false,
+    Array[],
+  );
+
+  for (x in files) FileCache.addFile(context, x);
+
+  parsed_program = fileDir.mapKV(
+    SkipParse.DefsFile::fromFile,
+    context,
+    SkipParse.astDirName,
+    (key, source) ~> {
+      fileName = key match {
+      | SKFS.SID(x) -> x
+      | _ -> invariant_violation("Unexpected key type")
+      };
+      SkipParse.parseFile(fileName, source.value)
+    },
+  );
+
+  (expanded_program, defsDir, childDir) = SkipExpand.program(
+    context,
+    parsed_program,
+  );
+  inhDir = SkipInherit.populateClassesDir(context);
+  SkipNaming.populateClasses(context, defsDir, inhDir, childDir);
+  SkipNaming.populateFuns(context, defsDir);
+
+  Reactive.setContext(context);
+
+  typed_program = runCompilerPhase("frontend/type_program", () ->
+    SkipTyping.program(embeddedMode, expanded_program)
+  );
+
+  typed_program
+}
+
+/*****************************************************************************/
+/* Main entry point */
+/*****************************************************************************/
+
+fun compile(
+  context: mutable SKFS.Context,
+  files: List<String>,
+  embeddedMode: Bool = false,
+): SkipTypedAst.Program {
+  SkipError.doAndReportErrors(() ->
+    compileWithErrors(context, files, embeddedMode)
+  )
+}
+
+fun compileWithErrors(
+  context: mutable SKFS.Context,
+  files: List<String>,
+  emeddedMode: Bool = false,
+): Result<SkipTypedAst.Program, Vector<SkipError.Error>> {
+  vtry(
+    () ->
+      (Success(type_program(context, emeddedMode, files)) : Result<
+        SkipTypedAst.Program,
+        Vector<SkipError.Error>,
+      >),
+    exn ->
+      exn match {
+      // TODO: We shouldn't need the unique() here. Fix this with T21967329.
+      | SkipError.SkipErrorException{errors} ->
+        (Failure(errors.unique()) : Result<
+          SkipTypedAst.Program,
+          Vector<SkipError.Error>,
+        >)
+      | _ -> throw exn
+      }
+    ,
+  )
+}
+
+fun .main(): void {
+  files = List::createFromItems(
+    arguments().filter(x -> x != "--data" && x != "/tmp/foo.data"),
+  );
+  debug(files);
+  SKFS.runWithGc(SKFS.Context{}, context ~> {
+    Reactive.setContext(context);
+    result = compileWithErrors(context, files);
+    result match {
+    | Failure(e) -> debug(e)
+    | _ -> void
+    };
+    SKFS.CStop(None())
+  })
+}

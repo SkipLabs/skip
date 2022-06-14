@@ -183,7 +183,7 @@ void SKIP_print_error(char* str) {
 char* sk_string_alloc(size_t);
 void sk_string_set_hash(char*);
 
-char* SKIP_read_file(char* filename_obj) {
+char* SKIP_open_file(char* filename_obj) {
  struct stat s;
  size_t filename_size = SKIP_String_byteSize(filename_obj);
  char* filename = (char*)malloc(filename_size+1);
@@ -321,6 +321,24 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
   memcpy(cformat, formatp, byteSize);
   size_t size = strftime(buffer, 1024, cformat, tm);
   return sk_string_create(buffer, size);
+}
+
+thread_local void* gctx = NULL;
+
+void SKIP_set_context(void* ctx) {
+  gctx = ctx;
+}
+
+int32_t SKIP_is_set_context() {
+  return gctx != NULL;
+}
+
+void* SKIP_get_context() {
+  if(gctx == NULL) {
+    fprintf(stderr, "get_context has not been initialized\n");
+    exit(2);
+  }
+  return gctx;
 }
 
 }
