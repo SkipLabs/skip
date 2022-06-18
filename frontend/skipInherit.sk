@@ -699,7 +699,7 @@ fun inherit_algebraic(
   ) if (is_subtype(self.name, obj_name)) ->
     (pos, _) = obj_name;
     check_child_kind(pos, self);
-    body2 = () ~> {
+    body2 = (_context) ~> {
       body = action;
       body1 = {
         arg_pats match {
@@ -724,7 +724,7 @@ fun inherit_algebraic(
     methods.set(met1.name, met1)
   | (_, A.Pat_var(this_name)) ->
     (pos, _) = this_name;
-    body1 = () ~> {
+    body1 = (_context) ~> {
       this_aliases1 = List.Cons(this_name, this_aliases);
       body = action;
       this_bindings(pos, this_aliases1, body)
@@ -1300,7 +1300,7 @@ fun replace_expr_body_inst(cd: A.Class_def, x: A.Expr_body): A.Expr_body {
   | A.BFrom(_)
   | A.BNative(_) ->
     x
-  | A.BExpr(e) -> A.BExpr(() ~> replace_inst_expr(cd, e()))
+  | A.BExpr(e) -> A.BExpr((context) ~> replace_inst_expr(cd, e(context)))
   | A.BAlgebraic(mbl) -> A.BAlgebraic(replace_inst_match_branches(cd, mbl))
   }
 }
@@ -2092,7 +2092,7 @@ fun method_body__(subst: SMap<A.Type_>, x: A.Expr_body): A.Expr_body {
   x match {
   | A.BNone() -> A.BNone()
   | A.BNative(p) -> A.BNative(p)
-  | A.BExpr(e) -> A.BExpr(() ~> expr(subst, e()))
+  | A.BExpr(e) -> A.BExpr((context) ~> expr(subst, e(context)))
   | A.BAlgebraic(mbl) -> A.BAlgebraic(mbl.map(mb -> match_branch(subst, mb)))
   | x1 @ A.BFrom(_) -> x1
   }

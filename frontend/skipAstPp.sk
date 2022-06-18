@@ -50,9 +50,14 @@ fun explicity(o: mutable BufferedPrinter.Out, x: SkipAst.Explicity): void {
 }
 
 fun inherited(
+  context: mutable SKFS.Context,
   o: mutable BufferedPrinter.Out,
   kind: SkipAst.InheritedKind,
-  pval: ((mutable BufferedPrinter.Out, SkipAst.Expr_body) -> void),
+  pval: ((
+    mutable SKFS.Context,
+    mutable BufferedPrinter.Out,
+    SkipAst.Expr_body,
+  ) -> void),
 ): void {
   exp = kind.explicit;
   n = kind.from_;
@@ -63,7 +68,7 @@ fun inherited(
   o.out(" from ");
   name(o, n);
   o.out(" ");
-  pval(o, value)
+  pval(context, o, value)
 }
 
 fun annotations(o: mutable BufferedPrinter.Out, ans: SSet): void {
@@ -87,37 +92,47 @@ fun type_def<T>(
 }
 
 fun files(
+  context: mutable SKFS.Context,
   o: mutable BufferedPrinter.Out,
   defl: List<List<SkipAst.Definition>>,
 ): void {
-  for (ds in defl) file(o, ds)
+  for (ds in defl) file(context, o, ds)
 }
 
-fun program(o: mutable BufferedPrinter.Out, prog: SkipAst.Program): void {
+fun program(
+  context: mutable SKFS.Context,
+  o: mutable BufferedPrinter.Out,
+  prog: SkipAst.Program,
+): void {
   class_defs = prog.class_defs;
   fun_defs = prog.fun_defs;
   const_defs = prog.const_defs;
   type_defs = prog.type_defs;
-  for (x in class_defs) class_def(o, x);
-  for (x in fun_defs) fun_def(o, x);
-  for (x in const_defs) const_def(o, x);
+  for (x in class_defs) class_def(context, o, x);
+  for (x in fun_defs) fun_def(context, o, x);
+  for (x in const_defs) const_def(context, o, x);
   for (x in type_defs) type_alias_def(o, x)
 }
 
 fun file(
+  context: mutable SKFS.Context,
   o: mutable BufferedPrinter.Out,
   fil_defs: List<SkipAst.Definition>,
 ): void {
-  for (d in fil_defs) definition(o, d)
+  for (d in fil_defs) definition(context, o, d)
 }
 
-fun definition(o: mutable BufferedPrinter.Out, x: SkipAst.Definition): void {
+fun definition(
+  context: mutable SKFS.Context,
+  o: mutable BufferedPrinter.Out,
+  x: SkipAst.Definition,
+): void {
   x match {
   | SkipAst.DMalias(a) -> module_alias(o, a)
-  | SkipAst.DClass(c) -> class_def(o, c)
+  | SkipAst.DClass(c) -> class_def(context, o, c)
   | SkipAst.DModule(_, n) -> module_(o, n)
-  | SkipAst.DFun(f) -> fun_def(o, f)
-  | SkipAst.DConst(cst) -> const_def(o, cst)
+  | SkipAst.DFun(f) -> fun_def(context, o, f)
+  | SkipAst.DConst(cst) -> const_def(context, o, cst)
   | SkipAst.DType(tdef) -> type_alias_def(o, tdef)
   | SkipAst.DModuleEnd _ ->
     o.out("module end;");
@@ -132,34 +147,43 @@ fun module_(o: mutable BufferedPrinter.Out, mname: SkipAst.Name): void {
   o.newline()
 }
 
-fun const_def(o: mutable BufferedPrinter.Out, cst: SkipAst.Const_def): void {
+fun const_def(
+  context: mutable SKFS.Context,
+  o: mutable BufferedPrinter.Out,
+  cst: SkipAst.Const_def,
+): void {
   o.out("const ");
   name(o, cst.name);
   o.out(": ");
   type(o, cst.type);
   o.out(" = ");
-  const_value(o, cst.value);
+  const_value(context, o, cst.value);
   o.out(";");
   o.newline()
 }
 
 fun const_value(
+  context: mutable SKFS.Context,
   o: mutable BufferedPrinter.Out,
   body: SkipAst.Inherited_body,
 ): void {
   (_, value) = body;
   value match {
-  | SkipAst.Inherited(inh) -> inherited(o, inh, const_value_)
-  | SkipAst.Body(value1) -> const_value_(o, value1)
+  | SkipAst.Inherited(inh) -> inherited(context, o, inh, const_value_)
+  | SkipAst.Body(value1) -> const_value_(context, o, value1)
   }
 }
 
-fun const_value_(o: mutable BufferedPrinter.Out, x: SkipAst.Expr_body): void {
+fun const_value_(
+  context: mutable SKFS.Context,
+  o: mutable BufferedPrinter.Out,
+  x: SkipAst.Expr_body,
+): void {
   x match {
   | SkipAst.BNative _
   | SkipAst.BNone() ->
     void
-  | SkipAst.BExpr(v) -> expr(o, v())
+  | SkipAst.BExpr(v) -> expr(o, v(context))
   | SkipAst.BFrom(tn) ->
     o.out(" from ");
     type_name(o, tn)
@@ -197,7 +221,11 @@ fun cla_type_def(
   type_def(o, cla_tyd, tyd)
 }
 
-fun class_def(o: mutable BufferedPrinter.Out, cd: SkipAst.Class_def): void {
+fun class_def(
+  context: mutable SKFS.Context,
+  o: mutable BufferedPrinter.Out,
+  cd: SkipAst.Class_def,
+): void {
   annotations(o, cd.annotations);
   if (cd.value.isSome()) {
     o.out("value ")
@@ -230,15 +258,19 @@ fun class_def(o: mutable BufferedPrinter.Out, cd: SkipAst.Class_def): void {
       o.newline()
     };
     for (x in cd.types) cla_type_def(o, x);
-    for (cst in cd.consts) const_def(o, cst);
-    for (m in cd.methods) method_(o, m)
+    for (cst in cd.consts) const_def(context, o, cst);
+    for (m in cd.methods) method_(context, o, m)
   });
   o.out("}");
   o.newline();
   o.newline()
 }
 
-fun fun_def(o: mutable BufferedPrinter.Out, fd: SkipAst.Fun_def): void {
+fun fun_def(
+  context: mutable SKFS.Context,
+  o: mutable BufferedPrinter.Out,
+  fd: SkipAst.Fun_def,
+): void {
   annotations(o, fd.annotations);
   o.out("fun ");
   name(o, fd.name);
@@ -252,7 +284,7 @@ fun fun_def(o: mutable BufferedPrinter.Out, fd: SkipAst.Fun_def): void {
   | Some(body) ->
     o.out("{");
     o.newline();
-    o.margin(() -> expr(o, body()));
+    o.margin(() -> expr(o, body(context)));
     o.newline();
     o.out("}");
     o.newline();
@@ -441,24 +473,30 @@ fun return_type(o: mutable BufferedPrinter.Out, ty: SkipAst.Type_): void {
 }
 
 fun method_body(
+  context: mutable SKFS.Context,
   o: mutable BufferedPrinter.Out,
   mb: SkipAst.Inherited_body,
 ): void {
   (_, mb1) = mb;
-  method_body_(o, mb1)
+  method_body_(context, o, mb1)
 }
 
 fun method_body_(
+  context: mutable SKFS.Context,
   o: mutable BufferedPrinter.Out,
   x: SkipAst.Inherited_body_,
 ): void {
   x match {
-  | SkipAst.Inherited(inh) -> inherited(o, inh, method_body__)
-  | SkipAst.Body(mb) -> method_body__(o, mb)
+  | SkipAst.Inherited(inh) -> inherited(context, o, inh, method_body__)
+  | SkipAst.Body(mb) -> method_body__(context, o, mb)
   }
 }
 
-fun method_body__(o: mutable BufferedPrinter.Out, x: SkipAst.Expr_body): void {
+fun method_body__(
+  context: mutable SKFS.Context,
+  o: mutable BufferedPrinter.Out,
+  x: SkipAst.Expr_body,
+): void {
   x match {
   | SkipAst.BNative _
   | SkipAst.BNone() ->
@@ -467,7 +505,7 @@ fun method_body__(o: mutable BufferedPrinter.Out, x: SkipAst.Expr_body): void {
   | SkipAst.BExpr(e) ->
     o.out("{");
     o.newline();
-    o.margin(() -> expr(o, e()));
+    o.margin(() -> expr(o, e(context)));
     o.newline();
     o.out("}");
     o.newline();
@@ -548,7 +586,11 @@ fun child(o: mutable BufferedPrinter.Out, chi: SkipAst.Child): void {
   chi.chi_params.each(cp -> class_params_(o, cp))
 }
 
-fun method_(o: mutable BufferedPrinter.Out, m: SkipAst.Method_def): void {
+fun method_(
+  context: mutable SKFS.Context,
+  o: mutable BufferedPrinter.Out,
+  m: SkipAst.Method_def,
+): void {
   annotations(o, m.annotations);
   m.mutable_ match {
   | None() -> void
@@ -571,7 +613,7 @@ fun method_(o: mutable BufferedPrinter.Out, m: SkipAst.Method_def): void {
   tparams(o, m.tparams);
   params(o, m.params);
   return_type(o, m.return_);
-  method_body(o, m.body)
+  method_body(context, o, m.body)
 }
 
 fun whenparams(

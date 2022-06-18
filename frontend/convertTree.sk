@@ -1750,13 +1750,15 @@ class Converter{filename: String} {
     }
   }
 
-  fun convertFunctionBody(tree: ParseTree): ?() ~> SkipAst.Expr {
+  fun convertFunctionBody(
+    tree: ParseTree,
+  ): ?(mutable SKFS.Context) ~> SkipAst.Expr {
     tree match {
     | ParseTree.TokenTree _ ->
       None() // token == semi-colon
-    | ParseTree.BlockTree _ -> Some(() ~> this.convertExpression(tree))
+    | ParseTree.BlockTree _ -> Some((_) ~> this.convertExpression(tree))
     | ParseTree.LazyTree{builder} ->
-      Some(() ~> this.convertExpression(builder()))
+      Some((_) ~> this.convertExpression(builder()))
     | _ ->
       invariant_violation(
         "Unexpected function body: " + this.treeToString(tree),
@@ -2100,7 +2102,7 @@ class Converter{filename: String} {
     | _ ->
       (
         this.convertPos(tree),
-        SkipAst.Body(SkipAst.BExpr(() ~> this.convertInitializer(tree))),
+        SkipAst.Body(SkipAst.BExpr((_) ~> this.convertInitializer(tree))),
       )
     }
   }
@@ -2139,9 +2141,9 @@ class Converter{filename: String} {
         | ParseTree.PatternBranchListTree _ ->
           SkipAst.BAlgebraic(this.convertPatternBranchList(tree))
         | ParseTree.BlockTree _ ->
-          SkipAst.BExpr(() ~> this.convertExpression(tree))
+          SkipAst.BExpr((_) ~> this.convertExpression(tree))
         | ParseTree.LazyTree{builder} ->
-          SkipAst.BExpr(() ~> this.convertExpression(builder()))
+          SkipAst.BExpr((_) ~> this.convertExpression(builder()))
         | _ ->
           invariant_violation(
             "Unexpected method body: " + this.treeToString(tree),

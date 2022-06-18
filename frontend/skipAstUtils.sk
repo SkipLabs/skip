@@ -47,7 +47,7 @@ fun targs_of_tparams(tparams: Array<Ast.Type_parameter>): Array<Ast.Type_> {
 /*****************************************************************************/
 
 fun type<Tenv: frozen, Tacc>(
-  f: (Tenv, Tacc, Ast.Type_) ~> (Tacc, Ast.Type_),
+  f: (Tenv, Tacc, Ast.Type_) -> (Tacc, Ast.Type_),
   env: Tenv,
   acc: Tacc,
   pos_ty: Ast.Type_,
@@ -60,7 +60,7 @@ fun type<Tenv: frozen, Tacc>(
 }
 
 fun type__<Tenv: frozen, Tacc>(
-  f: (Tenv, Tacc, Ast.Type_) ~> (Tacc, Ast.Type_),
+  f: (Tenv, Tacc, Ast.Type_) -> (Tacc, Ast.Type_),
   env: Tenv,
   acc: Tacc,
   pos_ty: Ast.Type__,
@@ -79,16 +79,16 @@ fun type__<Tenv: frozen, Tacc>(
   | x @ Ast.Tthis() -> (acc, x)
 
   | Ast.Tapply(n, tyl) ->
-    (acc2, tyl2) = tyl.mapAcc((acc_p, ty_p) ~> type(f, env, acc_p, ty_p), acc);
+    (acc2, tyl2) = tyl.mapAcc((acc_p, ty_p) -> type(f, env, acc_p, ty_p), acc);
     (acc2, Ast.Tapply(n, tyl2))
 
   | Ast.Ttuple(tyl) ->
-    (acc2, tyl2) = tyl.mapAcc((acc_p, ty_p) ~> type(f, env, acc_p, ty_p), acc);
+    (acc2, tyl2) = tyl.mapAcc((acc_p, ty_p) -> type(f, env, acc_p, ty_p), acc);
     (acc2, Ast.Ttuple(tyl2))
 
   | Ast.Tfun(fkind, ty1, ty2) ->
     (acc2, ty12) = ty1.map_foldl(
-      (acc_p, ty_p) ~> type(f, env, acc_p, ty_p),
+      (acc_p, ty_p) -> type(f, env, acc_p, ty_p),
       acc,
     );
     (acc3, ty22) = type(f, env, acc2, ty2);

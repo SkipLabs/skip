@@ -942,6 +942,7 @@ fun check_locals_pattern(bound: Bound, pat: N.Pattern): Bound {
 }
 
 fun class_parameters(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   cd: A.Class_def,
@@ -951,7 +952,7 @@ fun class_parameters(
   | A.NativeConstruct(fr) -> N.NativeConstruct(fr)
   | A.HasParams(acp) ->
     check_default_last(acp.params);
-    cp = class_params(acc, env, cd, acp);
+    cp = class_params(context, acc, env, cd, acp);
     !cp.params = check_locals_fun_parameters(empty_bound, cp.params).i1;
     N.HasParams(cp)
   }
@@ -1007,11 +1008,14 @@ fun close_local_scope_fun_parameters(
 /* Core naming */
 /*****************************************************************************/
 
-fun check_type_alias(ta: A.Type_alias_def): void {
+fun check_type_alias(
+  context: mutable SKFS.Context,
+  ta: A.Type_alias_def,
+): void {
   env = make_env();
   acc = mutable ClassAcc{};
   env1 = ta.tparams.foldl(type_alias_parameter, env);
-  _ = type(acc, env1, ta.body)
+  _ = type(context, acc, env1, ta.body)
 }
 
 fun maybeGetConst(
@@ -1020,7 +1024,7 @@ fun maybeGetConst(
 ): ?N.Const_def {
   GlobalEnv.getConst(context, constName) match {
   | None() -> None()
-  | Some(astConst) -> Some(const_def(make_env(), astConst))
+  | Some(astConst) -> Some(const_def(context, make_env(), astConst))
   }
 }
 
@@ -1031,17 +1035,23 @@ fun getConst(context: mutable SKFS.Context, constName: A.Name): N.Const_def {
   }
 }
 
-fun const_def(env: Env, cst: A.Const_def): N.Const_def {
-  const_def_with_acc(mutable ClassAcc{}, env, cst)
+fun const_def(
+  context: mutable SKFS.Context,
+  env: Env,
+  cst: A.Const_def,
+): N.Const_def {
+  const_def_with_acc(context, mutable ClassAcc{}, env, cst)
 }
 
 fun const_def_with_acc(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   cst: A.Const_def,
 ): N.Const_def {
   !env.in_deferred = cst.deferred_.isSome();
   (from_, source, (localsErrors, value)) = const_val(
+    context,
     acc,
     env with {in_class_const_expr => true},
     cst.value,
@@ -1059,7 +1069,7 @@ fun const_def_with_acc(
     | None() -> env.sk_this.map(((c: A.Class_def) -> c.name))
     }
   };
-  type = type(acc, env with {in_consts_type_annot => true}, cst.type);
+  type = type(context, acc, env with {in_consts_type_annot => true}, cst.type);
   N.Const_def{
     value,
     annotations => cst.annotations,
@@ -1075,6 +1085,7 @@ fun const_def_with_acc(
 }
 
 fun const_val(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   v: A.Inherited_body,
@@ -1083,12 +1094,18 @@ fun const_val(
   value match {
   | A.Inherited(inh) ->
     check_explicity(inh.explicit);
-    (Some(inh.from_), Some(inh.source), const_val_(acc, env, pos, inh.value))
-  | A.Body(value1) -> (None(), None(), const_val_(acc, env, pos, value1))
+    (
+      Some(inh.from_),
+      Some(inh.source),
+      const_val_(context, acc, env, pos, inh.value),
+    )
+  | A.Body(value1) ->
+    (None(), None(), const_val_(context, acc, env, pos, value1))
   }
 }
 
 fun const_val_(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   _pos: FileRange,
@@ -1098,7 +1115,7 @@ fun const_val_(
   | A.BNone() -> (List[], N.Abstract())
   | A.BNative _ -> (List[], N.Native())
   | A.BExpr(orig) ->
-    e = expr(mutable Acc{classAcc => acc}, env, orig());
+    e = expr(context, mutable Acc{classAcc => acc}, env, orig(context));
     (free, _, !e) = check_locals(empty_bound, e);
     (free.errors, N.Implemented(e))
   | A.BFrom(A.Tclass(cname)) -> invalid_from(cname)
@@ -1109,36 +1126,46 @@ fun const_val_(
 }
 
 fun cla_type_def(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   td: A.Type_def<A.Cla_tyd>,
 ): N.Type_def {
-  type_param_with_acc = (env, tparam) -> type_parameter(acc, env, tparam);
+  type_param_with_acc = (env, tparam) ->
+    type_parameter(context, acc, env, tparam);
   (env1, tparams) = td.tparams.mapAcc(type_param_with_acc, env);
   N.Type_def{
     annotations => td.annotations,
     visibility => visibility(td.visibility),
     name => td.name,
     tparams => tparams,
-    body => cla_tyd(acc, env1, td.body),
+    body => cla_tyd(context, acc, env1, td.body),
     source => td.source.fromSome(),
   }
 }
 
-fun cla_tyd(acc: mutable ClassAcc, env: Env, x: A.Cla_tyd): N.Cla_tyd {
+fun cla_tyd(
+  context: mutable SKFS.Context,
+  acc: mutable ClassAcc,
+  env: Env,
+  x: A.Cla_tyd,
+): N.Cla_tyd {
   x match {
   | A.TydDefined(ty) ->
-    ty1 = type_tyd(acc, env, (p -> Tyd_value(p)), ty);
+    ty1 = type_tyd(context, acc, env, (p -> Tyd_value(p)), ty);
     N.TydDefined(ty1)
   | A.TydAbstract(tyd_type, def) ->
     N.TydAbstract(
-      tyd_type.map(ty -> type_tyd(acc, env, p -> Tyd_constraint(p), ty)),
-      def.map(ty -> type_tyd(acc, env, p -> Tyd_constraint(p), ty)),
+      tyd_type.map(ty ->
+        type_tyd(context, acc, env, p -> Tyd_constraint(p), ty)
+      ),
+      def.map(ty -> type_tyd(context, acc, env, p -> Tyd_constraint(p), ty)),
     )
   }
 }
 
 fun type_tyd(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   case: ((FileRange) -> Tabstract_case),
@@ -1146,10 +1173,13 @@ fun type_tyd(
 ): N.Type_ {
   (pos, _) = ty;
   env1 = env with {in_tabstract => case(pos)};
-  type(acc, env1, ty)
+  type(context, acc, env1, ty)
 }
 
-fun type_alias(tyd: A.Type_alias_def): N.Type_alias_def {
+fun type_alias(
+  context: mutable SKFS.Context,
+  tyd: A.Type_alias_def,
+): N.Type_alias_def {
   env = make_env();
   acc = mutable ClassAcc{};
   name = tyd.name;
@@ -1159,7 +1189,7 @@ fun type_alias(tyd: A.Type_alias_def): N.Type_alias_def {
     (i, n)
   });
   env1 = env with {tparams => tyd.tparams.reduce(tparam_add, env.tparams)};
-  body = type(acc, env1, tyd.body);
+  body = type(context, acc, env1, tyd.body);
   N.Type_alias_def{annotations, name, tparams, body}
 }
 
@@ -1276,16 +1306,17 @@ fun class_def(
   inst_type = inst1.map(inst -> make_inst_type(name.i0, inst));
   !env = env with {inst => inst1, inst_type, sk_this => this1};
   cd.tparams.each(enforce_no_this_in_tparam);
-  type_param_with_acc = (env, tparam) -> type_parameter(acc, env, tparam);
+  type_param_with_acc = (env, tparam) ->
+    type_parameter(context, acc, env, tparam);
   (!env, tparams) = cd.tparams.mapAcc(type_param_with_acc, env);
-  extends_ = make_extends(acc, env, cd.extends_);
-  use = make_extends(acc, env, cd.use);
-  consts = cd.consts.map((_, cd) -> const_def_with_acc(acc, env, cd));
-  params = class_parameters(acc, env, cd);
+  extends_ = make_extends(context, acc, env, cd.extends_);
+  use = make_extends(context, acc, env, cd.use);
+  consts = cd.consts.map((_, cd) -> const_def_with_acc(context, acc, env, cd));
+  params = class_parameters(context, acc, env, cd);
   methods = cd.methods.map((_, met) ->
-    method_def(context_name, acc, env, tparams, met)
+    method_def(context, context_name, acc, env, tparams, met)
   );
-  types = cd.types.map((_, td) -> cla_type_def(acc, env, td));
+  types = cd.types.map((_, td) -> cla_type_def(context, acc, env, td));
   fields = make_fields(consts, params, methods, types);
   cd.extension match {
   | None() -> void
@@ -1336,6 +1367,7 @@ fun class_def(
  * Note that the keys for type arguments are purely syntactic
  */
 fun make_extends(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   extend_list: Array<A.Parent>,
@@ -1344,7 +1376,7 @@ fun make_extends(
   for (par in extend_list) {
     (n, tyl) = par.parent;
     parentName = type_name(env, n);
-    parentTargs = tylist(acc, env, tyl);
+    parentTargs = tylist(context, acc, env, tyl);
     sk_this = env.sk_this.fromSome().name;
     has_tconst = parentTargs.any(ty ->
       ty.i1 match {
@@ -1357,7 +1389,7 @@ fun make_extends(
       | _ -> false
       }
     );
-    wcarr = par.conditions.map(wc -> when_clause(acc, env, wc));
+    wcarr = par.conditions.map(wc -> when_clause(context, acc, env, wc));
 
     wckey = N.WhenclauseKey(wcarr);
     effective_source = if (has_tconst) sk_this else par.source;
@@ -1437,6 +1469,7 @@ fun maxDepthCD(n1: N.Name, n2: N.Name): SelectedName {
 }
 
 fun class_params(
+  context: mutable SKFS.Context,
   classAcc: mutable ClassAcc,
   env: Env,
   cd: A.Class_def,
@@ -1454,7 +1487,7 @@ fun class_params(
     visibility => visibility(t__.visibility),
     params => {
       acc = mutable Acc{classAcc};
-      params.map(par -> parameter_(acc, Some(cd), env, par))
+      params.map(par -> parameter_(context, acc, Some(cd), env, par))
     },
   }
 }
@@ -1682,14 +1715,15 @@ fun makeMethodMacros(env: Env, macro_: ?FileRange): UMap<MacroDefinition> {
 }
 
 fun method_def(
-  context: String,
+  context: mutable SKFS.Context,
+  context_name: String,
   classAcc: mutable ClassAcc,
   env: Env,
   cla_tparams: Array<N.Type_parameter>,
   met: A.Method_def,
 ): N.Method_def {
   (_position, method_name) = met.name;
-  tparam_context = context + "<method:tparam>" + method_name + ":";
+  tparam_context = context_name + "<method:tparam>" + method_name + ":";
   !env.in_deferred = met.deferred_.isSome();
   tunder_count = sk_create_counter();
   (tparams, params) = met.params.map_foldl(
@@ -1704,7 +1738,7 @@ fun method_def(
       ),
     met.tparams,
   );
-  return_context = context + "<method:return>" + method_name + ":";
+  return_context = context_name + "<method:return>" + method_name + ":";
   (tparams1, return_) = tunder_type(
     return_context,
     classAcc,
@@ -1713,9 +1747,12 @@ fun method_def(
     tparams,
     met.return_,
   );
-  type_param_with_acc = (env, tparam) -> type_parameter(classAcc, env, tparam);
+  type_param_with_acc = (env, tparam) ->
+    type_parameter(context, classAcc, env, tparam);
   (env1, tparams2) = tparams1.mapAcc(type_param_with_acc, env);
-  whenparams = met.whenparams.map(tp -> when_clause(classAcc, env1, tp));
+  whenparams = met.whenparams.map(tp ->
+    when_clause(context, classAcc, env1, tp)
+  );
   cd = env1.sk_this.fromSome();
   env2 = env1 with {
     in_async => met.async_,
@@ -1723,11 +1760,12 @@ fun method_def(
     macros => makeMethodMacros(env, met.macro_),
   };
   acc = mutable Acc{classAcc};
-  params1 = params.map(par -> parameter(acc, env2, par));
+  params1 = params.map(par -> parameter(context, acc, env2, par));
   locals_fr = met.name.i0;
   bound = empty_bound.bind((locals_fr, "this")).bind((locals_fr, "static"));
   (!bound, params2) = check_locals_fun_parameters(bound, params1);
   (algebraic, from_, source, localsErrors, body) = method_body(
+    context,
     acc,
     env2,
     bound,
@@ -1746,7 +1784,7 @@ fun method_def(
     | Some(n) -> n
     }
   };
-  return_1 = type(classAcc, env2, return_);
+  return_1 = type(context, classAcc, env2, return_);
   (tparams3, whenparams1) = infer_met_tparams_frozen(
     met.frozen_,
     met.async_,
@@ -1821,15 +1859,17 @@ fun method_def(
 }
 
 fun when_clause(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   wc: A.When_type_clause,
 ): N.Whenclause {
   !env.is_constraint_position = true;
-  (type(acc, env, wc.i0), tylist(acc, env, wc.i1))
+  (type(context, acc, env, wc.i0), tylist(context, acc, env, wc.i1))
 }
 
 fun method_body(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   bound: Bound,
@@ -1837,6 +1877,7 @@ fun method_body(
   met: A.Method_def,
 ): (Bool, ?A.Name, ?A.Name, List<SkipError.Trace>, N.Expr_body) {
   (algebraic, from_, source, (localsErrors, body)) = method_body_(
+    context,
     acc,
     env,
     bound,
@@ -1862,6 +1903,7 @@ fun method_body(
 }
 
 fun method_body_(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   bound: Bound,
@@ -1876,7 +1918,7 @@ fun method_body_(
       false,
       None(),
       None(),
-      method_body__(false, isStatic, acc, env, bound, params, mb1),
+      method_body__(context, false, isStatic, acc, env, bound, params, mb1),
     )
   | A.Inherited(im) ->
     check_explicity(im.explicit);
@@ -1884,7 +1926,16 @@ fun method_body_(
       im.algebraic,
       if (im.algebraic) None() else Some(im.from_),
       Some(im.source),
-      method_body__(im.algebraic, isStatic, acc, env, bound, params, im.value),
+      method_body__(
+        context,
+        im.algebraic,
+        isStatic,
+        acc,
+        env,
+        bound,
+        params,
+        im.value,
+      ),
     )
   }
 }
@@ -1898,6 +1949,7 @@ fun macroOnNonExpressionBody(env: Env): List<SkipError.Trace> {
 }
 
 fun method_body__(
+  context: mutable SKFS.Context,
   algebraic: Bool,
   isStatic: Bool,
   acc: mutable Acc,
@@ -1921,7 +1973,7 @@ fun method_body__(
     ) {
       (List[], N.Abstract())
     } else {
-      e = expr(acc, env, orig());
+      e = expr(context, acc, env, orig(context));
       (free, _, !e) = check_locals(bound, e);
       // Check for unused positional arguments, but silence the warning for
       //   algebraic branches, since the parameter list cannot be different across
@@ -1985,11 +2037,14 @@ fun populateFuns(
     FunFile::fromFile,
     context,
     funsDirName,
-    (_context, writer, _key, values) ~> {
+    (context, writer, _key, values) ~> {
       if (values.size() > 1) return void;
       values[0].value match {
       | GlobalEnv.EFun(f) ->
-        writer.write(SKFS.SID(f.name.i1), FunFile(fun_def(make_env(), f)))
+        writer.write(
+          SKFS.SID(f.name.i1),
+          FunFile(fun_def(context, make_env(), f)),
+        )
       | _ -> void
       }
     },
@@ -2009,7 +2064,7 @@ fun getFun(context: mutable SKFS.Context, funName: A.Name): N.Fun_def {
   }
 }
 
-fun fun_def(env: Env, fd: A.Fun_def): N.Fun_def {
+fun fun_def(context: mutable SKFS.Context, env: Env, fd: A.Fun_def): N.Fun_def {
   classAcc = mutable ClassAcc{};
   acc = mutable Acc{classAcc};
 
@@ -2037,7 +2092,8 @@ fun fun_def(env: Env, fd: A.Fun_def): N.Fun_def {
     tparams,
     fd.return_,
   );
-  type_param_with_acc = (env, tparam) -> type_parameter(classAcc, env, tparam);
+  type_param_with_acc = (env, tparam) ->
+    type_parameter(context, classAcc, env, tparam);
   (env1, tparams2) = tparams1.mapAcc(type_param_with_acc, env);
   env2 = env1 with {in_async => fd.async_};
   check_predefined(fd.name);
@@ -2045,8 +2101,8 @@ fun fun_def(env: Env, fd: A.Fun_def): N.Fun_def {
     SkipError.error(fd.name.i0, "Expected a function body")
   };
   check_default_last(params);
-  params1 = params.map(p -> parameter(acc, env2, p));
-  return_1 = type(classAcc, env2, return_);
+  params1 = params.map(p -> parameter(context, acc, env2, p));
+  return_1 = type(context, classAcc, env2, return_);
   tparams3 = infer_fun_tparams_frozen(
     fd.async_,
     fd.memoized_,
@@ -2057,12 +2113,13 @@ fun fun_def(env: Env, fd: A.Fun_def): N.Fun_def {
   (bound, params2) = check_locals_fun_parameters(empty_bound, params1);
 
   (localsErrors, body) = body(
+    context,
     acc,
     env2,
     bound,
     params2,
     fd.native_,
-    fd.body.map(x -> x()),
+    fd.body.map(x -> x(context)),
   );
   checkNoReturnBody(body);
 
@@ -2113,6 +2170,7 @@ fun check_default_last_array(params: Array<A.Parameter>): void {
 }
 
 fun body(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   bound: Bound,
@@ -2124,7 +2182,7 @@ fun body(
   | (None(), None()) -> (List[], N.Abstract())
   | (Some _, None()) -> (List[], N.Native())
   | (None(), Some(orig)) ->
-    e = expr(acc, env, orig);
+    e = expr(context, acc, env, orig);
     (free, _, !e) = check_locals(bound, e);
     !free = close_local_scope_fun_parameters(free, params);
     (free.errors, N.Implemented(e))
@@ -2176,6 +2234,7 @@ fun enforce_no_this(ty_: A.Type_): void {
 }
 
 fun type_parameter(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   tp: A.Type_parameter,
@@ -2183,7 +2242,8 @@ fun type_parameter(
   (var, ident, name, ty) = tp;
   tya = ty match {
   | None() -> Array[]
-  | Some(tyl) -> tylist(acc, env with {is_constraint_position => true}, tyl)
+  | Some(tyl) ->
+    tylist(context, acc, env with {is_constraint_position => true}, tyl)
   };
   !env.tparams = tparam_add(env.tparams, tp);
   (env, (var, ident, name, tya))
@@ -2203,11 +2263,17 @@ fun type_alias_parameter(env: Env, tp: A.Type_parameter): Env {
   env with {tparams}
 }
 
-fun parameter(acc: mutable Acc, env: Env, par: A.Parameter): N.Parameter {
-  parameter_(acc, None(), env, par)
+fun parameter(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  par: A.Parameter,
+): N.Parameter {
+  parameter_(context, acc, None(), env, par)
 }
 
 fun parameter_(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   cdo: ?A.Class_def,
   env: Env,
@@ -2223,13 +2289,13 @@ fun parameter_(
   };
   !env.in_deferred = env.in_deferred || deferred_.isSome();
   type = cdo match {
-  | None() -> fun_param_type(acc.classAcc, env, par.type)
-  | Some _ -> type(acc.classAcc, env, par.type)
+  | None() -> fun_param_type(context, acc.classAcc, env, par.type)
+  | Some _ -> type(context, acc.classAcc, env, par.type)
   };
   (localsErrors, value) = par.value match {
   | None() -> (List[], None())
   | Some(ex) ->
-    nex = expr(acc, env, ex);
+    nex = expr(context, acc, env, ex);
     (free, _, !nex) = check_locals(empty_bound, nex);
     (free.errors, Some(nex))
   };
@@ -2355,6 +2421,7 @@ Return value is one of:
   N.Tapply (n, targs)
 */
 fun bind_named_type{
+  context: mutable SKFS.Context,
   fr: FileRange,
   acc: mutable ClassAcc,
   env: Env,
@@ -2366,6 +2433,7 @@ fun bind_named_type{
   tn match {
   | A.Tmacro(n) ->
     bind_named_type{
+      context,
       fr,
       acc,
       env,
@@ -2376,13 +2444,14 @@ fun bind_named_type{
     }
   | A.Tclass(n) ->
     s = n.i1;
+    isType = GlobalEnv.getType(context, n.i1).isSome();
     find_tparam(env, s) match {
     | Some _ if (in_expr) ->
       SkipError.error(fr, "Generics cannot be used as expressions")
     | Some((_, id, _, _)) -> N.Tparam(None(), A.Vnone(), id, n)
-    | None() if (GlobalEnv.getType(n.i1).isSome()) ->
+    | None() if (isType) ->
       /* resolve type alias refs */
-      tyd = GlobalEnv.getType(n.i1).fromSome();
+      tyd = GlobalEnv.getType(context, n.i1).fromSome();
       tparams = tyd.tparams.map(AU.tparam_name);
       arity = tparams.size();
       given = targs.size();
@@ -2390,11 +2459,11 @@ fun bind_named_type{
         arity_mismatch(n.i0, n.i1, arity, given)
       };
       subst = AU.make_name_subst(fr, tparams, targs);
-      body = type(acc, env, AU.type_subst(subst, tyd.body));
+      body = type(context, acc, env, AU.type_subst(subst, tyd.body));
       ty_str = SkipTypes.to_string(
         env.sk_this.map(cd -> cd.name),
         SortedMap[],
-        (fr, N.Tapply(N.Mchilled(), n, tylist(acc, env, targs))),
+        (fr, N.Tapply(N.Mchilled(), n, tylist(context, acc, env, targs))),
       );
       N.Tnamed(N.NAlias((fr, ty_str)), body)
     | _ ->
@@ -2417,7 +2486,7 @@ fun bind_named_type{
       if (arity != given && (given != 0 || (!in_expr))) {
         arity_mismatch(n.i0, n.i1, arity, given)
       };
-      N.Tapply(N.Mchilled(), n, tylist(acc, env1, targs))
+      N.Tapply(N.Mchilled(), n, tylist(context, acc, env1, targs))
     }
   | A.Tmodule_class(_, (_, x), (_, y)) ->
     SkipError.error(fr, "Internal error: unexpanded module name " + x + "." + y)
@@ -2447,14 +2516,20 @@ fun make_tparam(
 }
 
 fun tylist(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   tyl: Array<A.Type_>,
 ): Array<N.Type_> {
-  tyl.map(ty -> type(acc, env, ty))
+  tyl.map(ty -> type(context, acc, env, ty))
 }
 
-fun type(acc: mutable ClassAcc, env: Env, ty: A.Type_): N.Type_ {
+fun type(
+  context: mutable SKFS.Context,
+  acc: mutable ClassAcc,
+  env: Env,
+  ty: A.Type_,
+): N.Type_ {
   (fr, ty_) = ty;
   ty_ match {
   | A.Tany() ->
@@ -2480,9 +2555,10 @@ fun type(acc: mutable ClassAcc, env: Env, ty: A.Type_): N.Type_ {
   | A.Tinst() -> (fr, get_inst_type(fr, env))
   | A.Tthis() ->
     acc.!seen_this_type = true;
-    (fr, reduce_type(fr, acc, env, (fr, "this"), Array[]))
+    (fr, reduce_type(context, fr, acc, env, (fr, "this"), Array[]))
   | A.Tapply(tn, targs) ->
     named_type = bind_named_type{
+      context,
       fr,
       acc,
       env,
@@ -2492,18 +2568,19 @@ fun type(acc: mutable ClassAcc, env: Env, ty: A.Type_): N.Type_ {
       in_expr => false,
     };
     (fr, named_type)
-  | A.Ttuple(tyl) -> (fr, N.tuple_type(fr, tylist(acc, env, tyl)))
+  | A.Ttuple(tyl) -> (fr, N.tuple_type(fr, tylist(context, acc, env, tyl)))
   | A.Tfun(tmodifiers, tparams, tbody) ->
-    (fr, fun_type(acc, env, tmodifiers, tparams, tbody))
+    (fr, fun_type(context, acc, env, tmodifiers, tparams, tbody))
   | A.Tabstract(A.Tclass(sk_this @ (_, "this")), tnl) ->
-    (fr, reduce_type(fr, acc, env, sk_this, tnl))
+    (fr, reduce_type(context, fr, acc, env, sk_this, tnl))
   | A.Tabstract(cn, tnl) ->
-    (fr, reduce_type(fr, acc, env, type_name(env, cn), tnl))
+    (fr, reduce_type(context, fr, acc, env, type_name(env, cn), tnl))
   | A.Tmutable(inner) ->
-    add_mutability_mode(N.Mmutable(fr), type(acc, env, inner))
+    add_mutability_mode(N.Mmutable(fr), type(context, acc, env, inner))
   | A.Treadonly(inner) ->
-    add_mutability_mode(N.Mreadonly(fr), type(acc, env, inner))
-  | A.Tawaitable(inner) -> (fr, N.Tawaitable(A.Vnone(), type(acc, env, inner)))
+    add_mutability_mode(N.Mreadonly(fr), type(context, acc, env, inner))
+  | A.Tawaitable(inner) ->
+    (fr, N.Tawaitable(A.Vnone(), type(context, acc, env, inner)))
   }
 }
 
@@ -2560,6 +2637,7 @@ fun arity_mismatch(pos: FileRange, name: String, arity: Int, given: Int): void {
 }
 
 fun fun_type(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   tmodifiers: A.Lam_modifier,
@@ -2568,8 +2646,8 @@ fun fun_type(
 ): N.Type__ {
   fpurity = if (tmodifiers.is_mutable) N.Fmutable() else N.Fpure();
   ftracked = if (tmodifiers.is_untracked) N.Funtracked() else N.Ftracked();
-  tparams1 = fun_tparams(acc, env, tparams);
-  tbody1 = type(acc, env, tbody);
+  tparams1 = fun_tparams(context, acc, env, tparams);
+  tbody1 = type(context, acc, env, tbody);
   N.Tfun(
     A.Vnone(),
     (Array[fpurity], Array[ftracked]),
@@ -2580,26 +2658,35 @@ fun fun_type(
 }
 
 fun fun_tparams(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   x: Parameters<A.Type_>,
 ): Parameters<N.Type_> {
   x match {
-  | Positional(tyl) -> Positional(tyl.map(ty -> fun_param_type(acc, env, ty)))
-  | Named(tym) -> Named(tym.map((_, ty) -> fun_param_type(acc, env, ty)))
+  | Positional(tyl) ->
+    Positional(tyl.map(ty -> fun_param_type(context, acc, env, ty)))
+  | Named(tym) ->
+    Named(tym.map((_, ty) -> fun_param_type(context, acc, env, ty)))
   }
 }
 
-fun fun_param_type(acc: mutable ClassAcc, env: Env, ty: A.Type_): N.Type_ {
+fun fun_param_type(
+  context: mutable SKFS.Context,
+  acc: mutable ClassAcc,
+  env: Env,
+  ty: A.Type_,
+): N.Type_ {
   (fr, ty_) = ty;
   ty_ match {
   | A.Tfun(tmodifiers, tparams, tbody) ->
-    (fr, fun_type(acc, env, tmodifiers, tparams, tbody))
-  | _ -> type(acc, env, ty)
+    (fr, fun_type(context, acc, env, tmodifiers, tparams, tbody))
+  | _ -> type(context, acc, env, ty)
   }
 }
 
 fun reduce_type(
+  context: mutable SKFS.Context,
   pos: FileRange,
   acc: mutable ClassAcc,
   env: Env,
@@ -2614,7 +2701,7 @@ fun reduce_type(
     ty_inner = (pos, N.Tapply(N.Mchilled(), name, targs));
     N.Tnamed(N.NThis(name), ty_inner)
   } else {
-    new_ty = reduce_type_(pos, acc, env, cn, tnl);
+    new_ty = reduce_type_(context, pos, acc, env, cn, tnl);
     N.unfold_tnamed((pos, new_ty)) match {
     | _ if (isTydValueOrConstraint(env.in_tabstract)) -> void
     | (frany, N.Tanything()) if (!env.in_deferred) ->
@@ -2639,6 +2726,7 @@ fun reduce_type(
  * see 'get_typedef_type' for more
  */
 fun reduce_type_(
+  context: mutable SKFS.Context,
   tpos: FileRange,
   acc: mutable ClassAcc,
   env: Env,
@@ -2653,7 +2741,15 @@ fun reduce_type_(
     | _ -> (false, cn)
     }
   };
-  tyo = reduce_type_array(from_self_abstract, tpos, acc, env, cn1, tnl);
+  tyo = reduce_type_array(
+    context,
+    from_self_abstract,
+    tpos,
+    acc,
+    env,
+    cn1,
+    tnl,
+  );
   (n_info, ty) = tyo match {
   | Resolved_tabstract(ty) -> (N.NTydAbstract(cn1, tnl), ty)
   | Resolved_tnamed(_, ty) -> (N.NTydResolved(cn1, tnl), ty)
@@ -2662,6 +2758,7 @@ fun reduce_type_(
 }
 
 fun reduce_type_array(
+  context: mutable SKFS.Context,
   from_self_abstract: Bool,
   _tpos: FileRange,
   acc: mutable ClassAcc,
@@ -2677,9 +2774,23 @@ fun reduce_type_array(
     (curResolving, nextResolving) match {
     | (None(), _) -> invariant_violation("assert false")
     | (Some(resolving), None()) ->
-      break get_typedef_type(from_self_abstract, acc, env, curName, resolving)
+      break get_typedef_type(
+        context,
+        from_self_abstract,
+        acc,
+        env,
+        curName,
+        resolving,
+      )
     | (Some(resolving), Some _) ->
-      ty = get_typedef_type(from_self_abstract, acc, env, curName, resolving);
+      ty = get_typedef_type(
+        context,
+        from_self_abstract,
+        acc,
+        env,
+        curName,
+        resolving,
+      );
 
       !from_self_abstract = from_self_abstract && ty is Resolved_tabstract _;
       !curName = get_name(resolving.i0, ty);
@@ -2714,6 +2825,7 @@ fun get_name_(pos: FileRange, x: N.Type_): A.Name {
  * abstract/constrained type constant
  */
 fun get_typedef_type(
+  context: mutable SKFS.Context,
   from_self_abstract: Bool,
   acc: mutable ClassAcc,
   env: Env,
@@ -2753,7 +2865,7 @@ fun get_typedef_type(
         " is not yet defined and cannot be used other than with `this` inside it's defining class",
     )
   | (A.TydAbstract(tyd_type, _), _, true) ->
-    cstr = tyd_type.map((t -> type(acc, env1, t)));
+    cstr = tyd_type.map((t -> type(context, acc, env1, t)));
     ty = {
       cstr match {
       | None() -> (pos, N.Tanything())
@@ -2762,7 +2874,7 @@ fun get_typedef_type(
     };
     Resolved_tabstract(ty)
   | (A.TydDefined(ty), _, _) ->
-    ty1 = type(acc, env1 with {const_type_this => Some(cd)}, ty);
+    ty1 = type(context, acc, env1 with {const_type_this => Some(cd)}, ty);
     Resolved_tnamed(List[cn, tn], ty1)
   }
 }
@@ -3049,6 +3161,7 @@ fun build_whenparams_for_frozen_cla_tparams(
 
 // TODO support irrefutable patterns
 fun desugar_bind(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   lv: A.Lvalue,
@@ -3059,15 +3172,18 @@ fun desugar_bind(
   rvalue1 = {
     rvalue match {
     | (pos1, A.Annotated(rv, (fpos, A.Tfun(tmodifiers, tparams, tbody)))) ->
-      rv1 = expr(acc, env, rv);
+      rv1 = expr(context, acc, env, rv);
       (
         pos1,
         N.Annotated(
           rv1,
-          (fpos, fun_type(acc.classAcc, env, tmodifiers, tparams, tbody)),
+          (
+            fpos,
+            fun_type(context, acc.classAcc, env, tmodifiers, tparams, tbody),
+          ),
         ),
       )
-    | _ -> expr(acc, env, rvalue)
+    | _ -> expr(context, acc, env, rvalue)
     }
   };
   lvalue_ match {
@@ -3083,7 +3199,7 @@ fun desugar_bind(
       lv_pos = lv.i0;
       tmp = sk_new_var_name(acc.classAcc.next_id, lv_pos);
       var = (lv_pos, A.Var(tmp));
-      !action = (lv_pos, desugar_bind(acc, env, lv, var, action));
+      !action = (lv_pos, desugar_bind(context, acc, env, lv, var, action));
       (lv_pos, N.Pat_var(tmp))
     });
     N.Match(
@@ -3100,12 +3216,20 @@ fun desugar_bind(
   */
   | A.Lvalue_array_set(arr, args) ->
     method_name = (pos, "set");
-    set_method = (pos, N.Dot(expr(acc, env, arr), method_name));
-    args1 = appendPositionalArg(call_args(acc, env, args), rvalue1);
+    set_method = (pos, N.Dot(expr(context, acc, env, arr), method_name));
+    args1 = appendPositionalArg(call_args(context, acc, env, args), rvalue1);
     rvalue2 = (pos, N.Call(None(), set_method, Array[], args1));
     N.Seq(rvalue2, scope_of_bind)
   | A.Lvalue_assign(assign) ->
-    desugar_lvalue_assign(acc, env, pos, assign, rvalue1, scope_of_bind)
+    desugar_lvalue_assign(
+      context,
+      acc,
+      env,
+      pos,
+      assign,
+      rvalue1,
+      scope_of_bind,
+    )
   }
 }
 
@@ -3120,6 +3244,7 @@ fun appendPositionalArg<T>(
 }
 
 fun desugar_lvalue_assign(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -3127,8 +3252,15 @@ fun desugar_lvalue_assign(
   rvalue: N.Expr,
   scope_of_bind: N.Expr,
 ): N.Expr_ {
-  (bindings, assign1) = remove_side_effects_lvalue(acc, env, pos, assign);
+  (bindings, assign1) = remove_side_effects_lvalue(
+    context,
+    acc,
+    env,
+    pos,
+    assign,
+  );
   lvalue = desugar_lvalue_assign_no_side_effects(
+    context,
     acc,
     pos,
     env,
@@ -3172,6 +3304,7 @@ fun desugar_lvalue_assign(
   a = a with {b => a.b.set(i, a.b.get(i).set(j, rv) }
 */
 fun desugar_lvalue_assign_no_side_effects(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   pos: FileRange,
   env: Env,
@@ -3186,14 +3319,15 @@ fun desugar_lvalue_assign_no_side_effects(
   | A.Lvalue_assign_field(obj, field) ->
     /* $obj.field = rvalue; scope_of_bind */
     N.Seq(
-      (pos, N.AssignField(expr(acc, env, obj), field, rvalue)),
+      (pos, N.AssignField(expr(context, acc, env, obj), field, rvalue)),
       scope_of_bind,
     )
   | A.Lvalue_assign_with(value, field) ->
-    obj = rhs_lvalue_assign_obj(acc, env, pos, value);
+    obj = rhs_lvalue_assign_obj(context, acc, env, pos, value);
     /* obj.set(index) */
     rvalue1 = make_with(pos, obj, field, rvalue);
     desugar_lvalue_assign_no_side_effects(
+      context,
       acc,
       pos,
       env,
@@ -3202,13 +3336,14 @@ fun desugar_lvalue_assign_no_side_effects(
       scope_of_bind,
     )
   | A.Lvalue_assign_array_set(value, args) ->
-    obj = rhs_lvalue_assign_obj(acc, env, pos, value);
+    obj = rhs_lvalue_assign_obj(context, acc, env, pos, value);
     /* obj.set(args, rvalue) */
     method_name = (pos, "set");
     set_method = (pos, N.Dot(obj, method_name));
-    args1 = appendPositionalArg(call_args(acc, env, args), rvalue);
+    args1 = appendPositionalArg(call_args(context, acc, env, args), rvalue);
     rvalue1 = (pos, N.Call(None(), set_method, Array[], args1));
     desugar_lvalue_assign_no_side_effects(
+      context,
       acc,
       pos,
       env,
@@ -3220,6 +3355,7 @@ fun desugar_lvalue_assign_no_side_effects(
 }
 
 fun rhs_lvalue_assign_obj(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -3228,20 +3364,21 @@ fun rhs_lvalue_assign_obj(
   assign match {
   | A.Lvalue_assign_local(name) -> (name.i0, N.Var(name))
   | A.Lvalue_assign_field(obj, field) ->
-    (obj.i0, N.Dot(expr(acc, env, obj), field))
+    (obj.i0, N.Dot(expr(context, acc, env, obj), field))
   | A.Lvalue_assign_with(value, field) ->
-    obj = rhs_lvalue_assign_obj(acc, env, pos, value);
+    obj = rhs_lvalue_assign_obj(context, acc, env, pos, value);
     (obj.i0, N.Dot(obj, field))
   | A.Lvalue_assign_array_set(value, args) ->
     /* obj.get(args) */
-    obj = rhs_lvalue_assign_obj(acc, env, pos, value);
+    obj = rhs_lvalue_assign_obj(context, acc, env, pos, value);
     get = (obj.i0, N.Dot(obj, (pos, "get")));
-    args1 = call_args(acc, env, args);
+    args1 = call_args(context, acc, env, args);
     (pos, N.Call(None(), get, Array[], args1))
   }
 }
 
 fun remove_side_effects_lvalue(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -3253,16 +3390,25 @@ fun remove_side_effects_lvalue(
     pos1 = obj.i0;
     tmp = sk_new_var_name(acc.classAcc.next_id, pos1);
     var = (pos1, A.Var(tmp));
-    obj1 = expr(acc, env, obj);
+    obj1 = expr(context, acc, env, obj);
     (Array[(tmp, obj1)], A.Lvalue_assign_field(var, field))
   | A.Lvalue_assign_with(value, name) ->
-    remove_side_effects_lvalue(acc, env, pos, value) match {
+    remove_side_effects_lvalue(context, acc, env, pos, value) match {
     | (bindings, value1) -> (bindings, A.Lvalue_assign_with(value1, name))
     }
   | A.Lvalue_assign_array_set(value, args) ->
-    (bindings, value1) = remove_side_effects_lvalue(acc, env, pos, value);
+    (bindings, value1) = remove_side_effects_lvalue(
+      context,
+      acc,
+      env,
+      pos,
+      value,
+    );
     name_args: Array<(A.Name, N.Expr)> = args.toArray().map(arg ->
-      (sk_new_var_name(acc.classAcc.next_id, pos), expr(acc, env, arg.i1))
+      (
+        sk_new_var_name(acc.classAcc.next_id, pos),
+        expr(context, acc, env, arg.i1),
+      )
     );
     (
       bindings.concat(name_args),
@@ -3339,7 +3485,12 @@ private base class ExprState {
   | SeqState(FileRange, N.Expr)
 }
 
-fun expr(acc: mutable Acc, env: Env, ex: A.Expr): N.Expr {
+fun expr(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  ex: A.Expr,
+): N.Expr {
   initial: ExprState = AExpr(ex);
   stack = mutable Vector[initial];
   res: ?N.Expr = None();
@@ -3351,12 +3502,14 @@ fun expr(acc: mutable Acc, env: Env, ex: A.Expr): N.Expr {
         stack.push(BindState(pos, lv, rv));
         stack.push(AExpr(cont))
       | (pos, A.Seq(lf, rt)) ->
-        stack.push(SeqState(pos, expr(acc, env, lf)));
+        stack.push(SeqState(pos, expr(context, acc, env, lf)));
         stack.push(AExpr(rt))
-      | (pos, e) -> !res = Some((pos, expr_(acc, env, pos, e)))
+      | (pos, e) -> !res = Some((pos, expr_(context, acc, env, pos, e)))
       }
     | BindState(pos, lv, rv) ->
-      !res = Some((pos, desugar_bind(acc, env, lv, rv, res.fromSome())))
+      !res = Some(
+        (pos, desugar_bind(context, acc, env, lv, rv, res.fromSome())),
+      )
     | SeqState(pos, e1) -> !res = Some((pos, N.Seq(e1, res.fromSome())))
     }
   };
@@ -3393,6 +3546,7 @@ fun expandMacroStaticDot(env: Env, object: N.Expr, n: A.Name): N.Expr_ {
 }
 
 fun expandForEachMacro(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   binding: A.ForEachBinding,
@@ -3400,9 +3554,9 @@ fun expandForEachMacro(
   abody: A.Expr,
   awoBreak: A.Expr,
 ): N.Expr_ {
-  collection = expr(acc, env, acollection);
-  body = expr(acc, env, abody);
-  woBreak = expr(acc, env, awoBreak);
+  collection = expr(context, acc, env, acollection);
+  body = expr(context, acc, env, abody);
+  woBreak = expr(context, acc, env, awoBreak);
 
   binFr = binding.fr;
   noargs = Positional(Array[]);
@@ -3481,6 +3635,7 @@ fun maybeReportDuplicateMacro(
 }
 
 fun expandForEachFieldMacro(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   _pos: FileRange,
@@ -3515,7 +3670,7 @@ fun expandForEachFieldMacro(
       )
     | None() -> void
     };
-    expr(acc, env with {macros}, body)
+    expr(context, acc, env with {macros}, body)
   };
   env.sk_this
     .fromSome()
@@ -3543,15 +3698,25 @@ fun expandForEachFieldMacro(
     )
 }
 
-fun expr_(acc: mutable Acc, env: Env, pos: FileRange, x: A.Expr_): N.Expr_ {
+fun expr_(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  pos: FileRange,
+  x: A.Expr_,
+): N.Expr_ {
   x match {
   | A.Literal(l) -> N.Literal(l)
   | A.Var(n) -> N.Var(n)
   | A.MacroVar(n) -> expandExpressionMacro(env, n)
   | A.Seq _ -> invariant_violation("assert false")
   | A.If(e1, e2, e3) ->
-    N.If(expr(acc, env, e1), expr(acc, env, e2), expr(acc, env, e3))
-  | A.Cstr(n, tyl) -> classname(pos, acc, env, n, tyl)
+    N.If(
+      expr(context, acc, env, e1),
+      expr(context, acc, env, e2),
+      expr(context, acc, env, e3),
+    )
+  | A.Cstr(n, tyl) -> classname(context, pos, acc, env, n, tyl)
   | A.Call((p, A.Cstr(n, tyl1)), tyl2, args) ->
     tyl = if (tyl1.isEmpty()) {
       tyl2
@@ -3559,22 +3724,22 @@ fun expr_(acc: mutable Acc, env: Env, pos: FileRange, x: A.Expr_): N.Expr_ {
       assert(tyl2.isEmpty());
       tyl1
     };
-    bind_object(acc, p, env, n, tyl, args)
+    bind_object(context, acc, p, env, n, tyl, args)
   | A.Call(e, tyl, ep) ->
     N.Call(
       None(),
-      expr(acc, env, e),
-      tylist(acc.classAcc, env, tyl),
-      call_args(acc, env, ep),
+      expr(context, acc, env, e),
+      tylist(context, acc.classAcc, env, tyl),
+      call_args(context, acc, env, ep),
     )
   | A.Mutable(
     (_, A.CallArray((_, A.Cstr((_, "Array"), tyl)), _, Positional(el))),
   )
   | A.CallArray((_, A.Cstr((_, "Array"), tyl)), _, Positional(el)) ->
-    tyl1 = tylist(acc.classAcc, env, tyl);
+    tyl1 = tylist(context, acc.classAcc, env, tyl);
     el1 = el.map(ex -> {
       (_, e) = ex;
-      expr(acc, env, e)
+      expr(context, acc, env, e)
     });
     x match {
     | A.Mutable((mp, _)) -> N.Array(Some(mp), tyl1, el1)
@@ -3583,10 +3748,10 @@ fun expr_(acc: mutable Acc, env: Env, pos: FileRange, x: A.Expr_): N.Expr_ {
   | A.Mutable((_, A.CallArray((p, A.Cstr(n, ctargs)), tyl, Positional(args))))
   | A.CallArray((p, A.Cstr(n, ctargs)), tyl, Positional(args)) ->
     assert(tyl.isEmpty());
-    cn = (p, classname(p, acc, env, n, ctargs));
+    cn = (p, classname(context, p, acc, env, n, ctargs));
     args1 = args.map(ex -> {
       (_, e) = ex;
-      expr(acc, env, e)
+      expr(context, acc, env, e)
     });
     is_mutable = x match {
     | A.Mutable((mp, _)) -> Some(mp)
@@ -3597,12 +3762,12 @@ fun expr_(acc: mutable Acc, env: Env, pos: FileRange, x: A.Expr_): N.Expr_ {
   | A.CallArray((p, A.Cstr(n, ctargs)), tyl, Named(args)) ->
     // TODO is this reachable? collection-literal-expression allows [ ] only
     assert(tyl.isEmpty());
-    cn = (p, classname(p, acc, env, n, ctargs));
+    cn = (p, classname(context, p, acc, env, n, ctargs));
     kvalues = args
       .items()
       .map(kordered -> {
         (key, oe) = kordered;
-        ordered = ordered_expr(acc, env, oe);
+        ordered = ordered_expr(context, acc, env, oe);
         (i, value) = ordered;
         (i, key, value)
       })
@@ -3624,13 +3789,13 @@ fun expr_(acc: mutable Acc, env: Env, pos: FileRange, x: A.Expr_): N.Expr_ {
     if (!tyl.isEmpty()) {
       SkipError.error(pos, "Unexpected explicit type arguments")
     };
-    N.ArrayGet(expr(acc, env, e), call_args(acc, env, args))
+    N.ArrayGet(expr(context, acc, env, e), call_args(context, acc, env, args))
   | A.Mutable((_, A.CallMap((p, A.Cstr((_, "Array"), tyl)), _, args)))
   | A.CallMap((p, A.Cstr((_, "Array"), tyl)), _, args) ->
-    tyl1 = tylist(acc.classAcc, env, tyl);
+    tyl1 = tylist(context, acc.classAcc, env, tyl);
     args1 = args.map(ex -> {
       (e1, e2) = ex;
-      pair = Array[expr(acc, env, e1), expr(acc, env, e2)];
+      pair = Array[expr(context, acc, env, e1), expr(context, acc, env, e2)];
       (p, N.tuple_expr(p, pair))
     });
     mut = x match {
@@ -3641,10 +3806,10 @@ fun expr_(acc: mutable Acc, env: Env, pos: FileRange, x: A.Expr_): N.Expr_ {
   | A.Mutable((_, A.CallMap((p, A.Cstr(n, ctargs)), tyl, args)))
   | A.CallMap((p, A.Cstr(n, ctargs)), tyl, args) ->
     assert(tyl.isEmpty());
-    cn = (p, classname(p, acc, env, n, ctargs));
+    cn = (p, classname(context, p, acc, env, n, ctargs));
     args1 = args.map(ex -> {
       (e1, e2) = ex;
-      pair = Array[expr(acc, env, e1), expr(acc, env, e2)];
+      pair = Array[expr(context, acc, env, e1), expr(context, acc, env, e2)];
       (p, N.tuple_expr(p, pair))
     });
     is_mutable = x match {
@@ -3654,51 +3819,69 @@ fun expr_(acc: mutable Acc, env: Env, pos: FileRange, x: A.Expr_): N.Expr_ {
     call_from_items(pos, cn, is_mutable, args1)
   | A.CallMap(e, _, _) -> SkipError.error(e.i0, "Expected a classname")
   | A.Annotated(e, ty) ->
-    N.Annotated(expr(acc, env, e), type(acc.classAcc, env, ty))
+    N.Annotated(
+      expr(context, acc, env, e),
+      type(context, acc.classAcc, env, ty),
+    )
   | A.Bind _ -> invariant_violation("assert false")
-  | A.Dot(e, n) -> N.Dot(expr(acc, env, e), n)
-  | A.StaticDot(e, n) -> N.StaticDot(expr(acc, env, e), n)
-  | A.MacroDot(e, n) -> expandMacroDot(env, expr(acc, env, e), n)
-  | A.MacroStaticDot(e, n) -> expandMacroStaticDot(env, expr(acc, env, e), n)
-  | A.Pipe(e1, e2) -> N.Pipe(expr(acc, env, e1), expr(acc, env, e2))
+  | A.Dot(e, n) -> N.Dot(expr(context, acc, env, e), n)
+  | A.StaticDot(e, n) -> N.StaticDot(expr(context, acc, env, e), n)
+  | A.MacroDot(e, n) -> expandMacroDot(env, expr(context, acc, env, e), n)
+  | A.MacroStaticDot(e, n) ->
+    expandMacroStaticDot(env, expr(context, acc, env, e), n)
+  | A.Pipe(e1, e2) ->
+    N.Pipe(expr(context, acc, env, e1), expr(context, acc, env, e2))
   | A.Binop(bop, e1, e2) ->
-    N.Binop(binop(bop), expr(acc, env, e1), expr(acc, env, e2))
-  | A.Unop(uop, e) -> N.Unop(unop(uop), expr(acc, env, e))
-  | A.Is(e1, pat) -> N.Is(expr(acc, env, e1), pattern(acc, env, pat))
-  | A.As(e1, pat) -> N.As(expr(acc, env, e1), pattern(acc, env, pat))
+    N.Binop(
+      binop(bop),
+      expr(context, acc, env, e1),
+      expr(context, acc, env, e2),
+    )
+  | A.Unop(uop, e) -> N.Unop(unop(uop), expr(context, acc, env, e))
+  | A.Is(e1, pat) ->
+    N.Is(expr(context, acc, env, e1), pattern(context, acc, env, pat))
+  | A.As(e1, pat) ->
+    N.As(expr(context, acc, env, e1), pattern(context, acc, env, pat))
   | A.Match(e, mbl) ->
-    N.Match(expr(acc, env, e), mbl.map(mb -> match_branch(acc, env, mb)))
-  | A.Lambda(mods, nparams, e) -> lambda(acc, env, pos, mods, nparams, e)
-  | A.Tuple(el) -> N.tuple_expr(pos, el.map(ex -> expr(acc, env, ex)))
-  | A.TemplateLiteral(ep) -> N.TemplateLiteral(call_args(acc, env, ep))
+    N.Match(
+      expr(context, acc, env, e),
+      mbl.map(mb -> match_branch(context, acc, env, mb)),
+    )
+  | A.Lambda(mods, nparams, e) ->
+    lambda(context, acc, env, pos, mods, nparams, e)
+  | A.Tuple(el) -> N.tuple_expr(pos, el.map(ex -> expr(context, acc, env, ex)))
+  | A.TemplateLiteral(ep) -> N.TemplateLiteral(call_args(context, acc, env, ep))
   | A.Try(e, mbl) ->
-    N.Try(expr(acc, env, e), mbl.map(mb -> match_branch(acc, env, mb)))
-  | A.Await(e) -> sk_await(acc, env, pos, e)
+    N.Try(
+      expr(context, acc, env, e),
+      mbl.map(mb -> match_branch(context, acc, env, mb)),
+    )
+  | A.Await(e) -> sk_await(context, acc, env, pos, e)
   | A.Return(e) ->
     acc.setReturns(pos);
-    N.Return(expr(acc, env, e))
+    N.Return(expr(context, acc, env, e))
   | A.Yield(e) ->
     acc.setYields(pos);
-    N.Yield(expr(acc, env, e))
+    N.Yield(expr(context, acc, env, e))
   | A.YieldBreak() ->
     acc.setYields(pos);
     N.YieldBreak()
-  | A.Async(e) -> sk_async(acc, env, pos, e)
-  | A.Throw(e) -> N.Throw(expr(acc, env, e))
+  | A.Async(e) -> sk_async(context, acc, env, pos, e)
+  | A.Throw(e) -> N.Throw(expr(context, acc, env, e))
   | A.With(e, updates) ->
     N.With(
-      expr(acc, env, e),
-      updates.map((_, oe) -> ordered_expr(acc, env, oe)),
+      expr(context, acc, env, e),
+      updates.map((_, oe) -> ordered_expr(context, acc, env, oe)),
     )
-  | A.Mutable(e) -> make_mutable_expr(pos, expr(acc, env, e))
+  | A.Mutable(e) -> make_mutable_expr(pos, expr(context, acc, env, e))
 
   | A.Continue() -> N.Continue()
-  | A.Break(eb) -> N.Break(expr(acc, env, eb))
+  | A.Break(eb) -> N.Break(expr(context, acc, env, eb))
   | A.DoWhile(body, cond, woBreak) ->
     N.DoWhile(
-      expr(acc, env, body),
-      expr(acc, env, cond),
-      expr(acc, env, woBreak),
+      expr(context, acc, env, body),
+      expr(context, acc, env, cond),
+      expr(context, acc, env, woBreak),
     )
   | A.While((pos2, A.Literal(A.BoolLiteral(true))), _, _) ->
     SkipError.error(
@@ -3711,13 +3894,17 @@ fun expr_(acc: mutable Acc, env: Env, pos: FileRange, x: A.Expr_): N.Expr_ {
         },
       ),
     )
-  | A.Loop(body) -> N.Loop(expr(acc, env, body))
+  | A.Loop(body) -> N.Loop(expr(context, acc, env, body))
   | A.While(cond, body, woBreak) ->
-    N.While(expr(acc, env, cond), expr(acc, env, body), expr(acc, env, woBreak))
+    N.While(
+      expr(context, acc, env, cond),
+      expr(context, acc, env, body),
+      expr(context, acc, env, woBreak),
+    )
   | A.ForEach(binding, acollection, abody, awoBreak) ->
-    expandForEachMacro(acc, env, binding, acollection, abody, awoBreak)
+    expandForEachMacro(context, acc, env, binding, acollection, abody, awoBreak)
   | A.ForEachFieldMacro(field, fieldName, body) ->
-    expandForEachFieldMacro(acc, env, pos, field, fieldName, body)
+    expandForEachFieldMacro(context, acc, env, pos, field, fieldName, body)
   }
 }
 
@@ -3730,17 +3917,23 @@ fun make_mutable_expr(fr: FileRange, e: N.Expr): N.Expr_ {
   }
 }
 
-fun call_args(acc: mutable Acc, env: Env, params: A.Call_args): N.Call_args {
-  params.map(oe -> ordered_expr(acc, env, oe))
+fun call_args(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  params: A.Call_args,
+): N.Call_args {
+  params.map(oe -> ordered_expr(context, acc, env, oe))
 }
 
 fun ordered_expr(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   ex: A.Ordered_expr,
 ): N.Ordered_expr {
   (i, e) = ex;
-  (i, expr(acc, env, e))
+  (i, expr(context, acc, env, e))
 }
 
 fun lambda_modifiers(mods: A.Lam_modifier): N.Tfun_modifiers {
@@ -3756,6 +3949,7 @@ private fun appendYieldBreak(e: N.Expr): N.Expr {
 }
 
 fun lambda(
+  context: mutable SKFS.Context,
   containingAcc: mutable Acc,
   env: Env,
   _pos: FileRange,
@@ -3765,21 +3959,33 @@ fun lambda(
 ): N.Expr_ {
   acc = mutable Acc{classAcc => containingAcc.classAcc};
   mods1 = lambda_modifiers(mods);
-  nparams1 = lambda_parameters(acc, env, nparams);
+  nparams1 = lambda_parameters(context, acc, env, nparams);
   env1 = env with {in_async => None()};
-  e1 = expr(acc, env1, e);
+  e1 = expr(context, acc, env1, e);
   e2 = if (acc.yields.isSome()) appendYieldBreak(e1) else e1;
   N.Lambda(mods1, nparams1, SortedMap[], e2, acc.yields);
 }
 
-fun sk_async(acc: mutable Acc, env: Env, pos: FileRange, e: A.Expr): N.Expr_ {
+fun sk_async(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  pos: FileRange,
+  e: A.Expr,
+): N.Expr_ {
   env1 = env with {in_async => Some(pos)};
-  N.Async(SortedMap[], expr(acc, env1, e))
+  N.Async(SortedMap[], expr(context, acc, env1, e))
 }
 
-fun sk_await(acc: mutable Acc, env: Env, pos: FileRange, e: A.Expr): N.Expr_ {
+fun sk_await(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  pos: FileRange,
+  e: A.Expr,
+): N.Expr_ {
   if (env.in_async.isSome()) {
-    N.Await(expr(acc, env, e))
+    N.Await(expr(context, acc, env, e))
   } else {
     SkipError.error(pos, "Cannot await outside an async context")
   }
@@ -3812,6 +4018,7 @@ fun ordered_named_arg_to_pair(p: (Int, N.Name, N.Expr)): N.Expr {
 /* Static expressions. */
 /*****************************************************************************/
 fun bind_object(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   pos: FileRange,
   env: Env,
@@ -3819,10 +4026,10 @@ fun bind_object(
   targs: Array<A.Type_>,
   args: A.Call_args,
 ): N.Expr_ {
-  classname(pos, acc, env, n, targs) match {
+  classname(context, pos, acc, env, n, targs) match {
   | N.Classname(n1, targs1) ->
     check_object(n1);
-    N.Object(None(), n1, targs1, call_args(acc, env, args))
+    N.Object(None(), n1, targs1, call_args(context, acc, env, args))
   | _ -> invariant_violation("assert false")
   }
 }
@@ -3839,6 +4046,7 @@ fun check_object(object_name: N.Name): void {
 
 // Standalone class identifiers become Class<_> objects
 fun classname(
+  context: mutable SKFS.Context,
   fr: FileRange,
   acc: mutable Acc,
   env: Env,
@@ -3847,6 +4055,7 @@ fun classname(
 ): N.Expr_ {
   tn = A.Tclass(name);
   named_type = bind_named_type{
+    context,
     fr,
     acc => acc.classAcc,
     env,
@@ -3873,61 +4082,78 @@ fun classname(
 }
 
 fun match_branch(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   mb: A.Match_branch,
 ): N.Match_branch {
   (pats, maybe_guard, e) = mb;
   (
-    patterns(acc, env, pats),
-    maybe_guard.map(ex -> expr(acc, env, ex)),
-    expr(acc, env, e),
+    patterns(context, acc, env, pats),
+    maybe_guard.map(ex -> expr(context, acc, env, ex)),
+    expr(context, acc, env, e),
   )
 }
 
 fun lambda_parameters(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   params: Parameters<A.Lam_parameter>,
 ): Parameters<N.Lam_parameter> {
-  params.map(lp -> lambda_parameter(acc, env, lp))
+  params.map(lp -> lambda_parameter(context, acc, env, lp))
 }
 
 fun lambda_parameter(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   lp: A.Lam_parameter,
 ): N.Lam_parameter {
   (n, ty) = lp;
-  (n, ty.map(ty -> type(acc.classAcc, env, ty)))
+  (n, ty.map(ty -> type(context, acc.classAcc, env, ty)))
 }
 
 fun patterns(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   pats: List<A.Pattern>,
 ): List<N.Pattern> {
-  pats.map(pat -> pattern(acc, env, pat))
+  pats.map(pat -> pattern(context, acc, env, pat))
 }
 
-fun pattern(acc: mutable Acc, env: Env, pat: A.Pattern): N.Pattern {
+fun pattern(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  pat: A.Pattern,
+): N.Pattern {
   check_pattern(pat);
-  translate_pattern(acc, env, pat)
+  translate_pattern(context, acc, env, pat)
 }
 
-fun translate_pattern(acc: mutable Acc, env: Env, x: A.Pattern): N.Pattern {
+fun translate_pattern(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  x: A.Pattern,
+): N.Pattern {
   x match {
-  | (pos, A.Pat_const(ex)) -> (pos, N.Pat_const(expr(acc, env, ex)))
+  | (pos, A.Pat_const(ex)) -> (pos, N.Pat_const(expr(context, acc, env, ex)))
   | (pos, A.Pat_var(n)) -> (pos, N.Pat_var(n))
   | (pos, A.Pat_literal(l)) -> (pos, N.Pat_literal(l))
   | (pos, A.Pat_type(tid, nparams, complete)) ->
-    tid1 = pattern_type_identifier(acc.classAcc, env, pos, tid);
-    params = nparams.map(parms -> pattern_parameters(acc, env, parms));
+    tid1 = pattern_type_identifier(context, acc.classAcc, env, pos, tid);
+    params = nparams.map(parms -> pattern_parameters(context, acc, env, parms));
     (pos, N.Pat_type(tid1, params, complete))
   | (pos, A.Pat_tuple(pats)) ->
-    npats = pats.map(translate_pat -> pattern(acc, env, translate_pat));
+    npats = pats.map(translate_pat ->
+      pattern(context, acc, env, translate_pat)
+    );
     (pos, N.tuple_pattern(pos, npats))
-  | (pos, A.Pat_as(p, n)) -> (pos, N.Pat_as(translate_pattern(acc, env, p), n))
+  | (pos, A.Pat_as(p, n)) ->
+    (pos, N.Pat_as(translate_pattern(context, acc, env, p), n))
   }
 }
 
@@ -3946,6 +4172,7 @@ fun cla_tyd_object_name(pos: FileRange, tpos: FileRange, x: N.Type__): N.Name {
 }
 
 fun pattern_classname(
+  context: mutable SKFS.Context,
   fr: FileRange,
   acc: mutable ClassAcc,
   env: Env,
@@ -3953,6 +4180,7 @@ fun pattern_classname(
   targs: Array<A.Type_>,
 ): (N.Name, Array<N.Type_>) {
   named_type = bind_named_type{
+    context,
     fr,
     acc,
     env,
@@ -3979,13 +4207,15 @@ fun pattern_classname(
 }
 
 fun pattern_type_identifier(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   pos: FileRange,
   tid: A.TypeIdentifier,
 ): N.Type_identifier {
   tid match {
-  | A.Tid_object(n) -> N.Tid_object(pattern_object_name(acc, env, pos, n))
+  | A.Tid_object(n) ->
+    N.Tid_object(pattern_object_name(context, acc, env, pos, n))
   | A.Tid_static(n1, n2) ->
     (class_name, class_def) = {
       (n1.i1, env.sk_this) match {
@@ -4001,20 +4231,21 @@ fun pattern_type_identifier(
     };
     tyd = class_def.types[n2];
     (tpos, _) = tyd.name;
-    ty = reduce_type(pos, acc, env, class_name, Array[n2]);
+    ty = reduce_type(context, pos, acc, env, class_name, Array[n2]);
     obj_name = cla_tyd_object_name(pos, tpos, ty);
-    n = pattern_object_name(acc, env, pos, A.Tclass(obj_name));
+    n = pattern_object_name(context, acc, env, pos, A.Tclass(obj_name));
     N.Tid_static((n1, n2), n)
   }
 }
 
 fun pattern_object_name(
+  context: mutable SKFS.Context,
   acc: mutable ClassAcc,
   env: Env,
   pos: FileRange,
   n: A.Type_name,
 ): N.Name {
-  (n1, _) = pattern_classname(pos, acc, env, n, Array[]);
+  (n1, _) = pattern_classname(context, pos, acc, env, n, Array[]);
   /* TODO: Targs could be non-empty. Should allow specifying targs when matching on classes. */
   cd = SkipInherit.getClass(n1);
   cd match {
@@ -4026,11 +4257,12 @@ fun pattern_object_name(
 }
 
 fun pattern_parameters(
+  context: mutable SKFS.Context,
   acc: mutable Acc,
   env: Env,
   nparams: Parameters<A.Pattern>,
 ): Parameters<N.Pattern> {
-  nparams.map(pat -> translate_pattern(acc, env, pat))
+  nparams.map(pat -> translate_pattern(context, acc, env, pat))
 }
 
 fun unop(op: A.Unoperator): N.PosUnop {

@@ -255,9 +255,9 @@ fun program(
   prog: SkipAst.Program,
 ): SkipTypedAst.Program {
   for (ta in prog.type_defs) {
-    SkipNaming.check_type_alias(ta)
+    SkipNaming.check_type_alias(context, ta)
   };
-  tya_defs = prog.type_defs.map((_, ta) -> SkipNaming.type_alias(ta));
+  tya_defs = prog.type_defs.map((_, ta) -> SkipNaming.type_alias(context, ta));
   defs = programToDefinitions(prog.class_defs, prog.const_defs, prog.fun_defs);
   defsOrErrors = defs.map(def -> {
     SkipError.doWithError(() -> {
