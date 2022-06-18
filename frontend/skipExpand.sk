@@ -113,25 +113,36 @@ fun populateCache(
   );
 }
 
-fun fillChildrenSet(classDefs: UMap<A.Class_def>): void {
-  checkCycles(classDefs);
-}
-
 private fun isConcreteClass(defs: UMap<A.Class_def>, c: String): Bool {
   defs.getOrCrash(c).kind is A.KClass()
 }
 
-private fun checkCycles(classDefs: UMap<A.Class_def>): void {
-  for (classDef in classDefs) {
-    checkCycle(SSet[], classDefs, classDef)
-  }
+fun checkCycles(
+  context: mutable SKFS.Context,
+  defs: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
+): void {
+  _ = defs.contextWriterKeyIter(
+    SKFS.StringFile::fromFile,
+    context,
+    SKFS.DirName::create("/checkCycle/"),
+    (context, _writer, _key, defFiles) ~> {
+      for (defFile in defFiles) {
+        defFile.value match {
+        | GlobalEnv.EClass(classDef) ->
+          checkCycle(context, SSet[], defs, classDef)
+        | _ -> void
+        }
+      }
+    },
+  )
 }
 
 // Basic check for explicit cycle in a hierarchy. Does not consider
 // implicit cycles due to subtyping
 private fun checkCycle(
+  context: mutable SKFS.Context,
   visited: SSet,
-  classDefs: UMap<A.Class_def>,
+  classDefs: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
   classDef: A.Class_def,
 ): void {
   (classNamePos, className) = classDef.name;
@@ -145,14 +156,15 @@ private fun checkCycle(
     | A.Tclass(x) -> x
     | _ -> invariant_violation("The name should have been expanded")
     };
-    if (!classDefs.containsRawKey(parentName)) {
+    parentClass = GlobalEnv.getClass(context, parentName) match {
+    | None() ->
       SkipError.error(
         parentPos,
         "Unbound class name for parent '" + parentName + "'",
       )
+    | Some(x) -> x
     };
-    parentClass = classDefs.getOrCrash(parentName);
-    checkCycle(visited, classDefs, parentClass)
+    checkCycle(context, visited, classDefs, parentClass)
   }
 }
 
@@ -1010,7 +1022,7 @@ fun program(
   defs = GlobalEnv.populateDefinitions(context, expandedDefs);
   program = module_map_fold(context, module_defs);
   childDir = ChildMap.populateCache(context, expandedDefs);
-  ChildMap.fillChildrenSet(program.class_defs);
+  ChildMap.checkCycles(context, defs);
   (program, defs, childDir)
 }
 
