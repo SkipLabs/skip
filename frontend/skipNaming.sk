@@ -1014,15 +1014,18 @@ fun check_type_alias(ta: A.Type_alias_def): void {
   _ = type(acc, env1, ta.body)
 }
 
-fun maybeGetConst(constName: String): ?N.Const_def {
-  GlobalEnv.getConst(constName) match {
+fun maybeGetConst(
+  context: mutable SKFS.Context,
+  constName: String,
+): ?N.Const_def {
+  GlobalEnv.getConst(context, constName) match {
   | None() -> None()
   | Some(astConst) -> Some(const_def(make_env(), astConst))
   }
 }
 
-fun getConst(constName: A.Name): N.Const_def {
-  maybeGetConst(constName.i1) match {
+fun getConst(context: mutable SKFS.Context, constName: A.Name): N.Const_def {
+  maybeGetConst(context, constName.i1) match {
   | None() -> SkipError.error(constName.i0, "Unbound constant")
   | Some(x) -> x
   }
@@ -1194,14 +1197,17 @@ fun populateClasses(
   )
 }
 
-fun maybeGetClass(className: String): ?N.Class_def {
-  arr = classesDir.getArray(Reactive.getContext(), SKFS.SID(className));
+fun maybeGetClass(
+  context: mutable SKFS.Context,
+  className: String,
+): ?N.Class_def {
+  arr = classesDir.getArray(context, SKFS.SID(className));
   if (arr.size() == 0) return None();
   Some(ClassFile::fromFile(arr[0]).value);
 }
 
-fun getClass(className: A.Name): N.Class_def {
-  maybeGetClass(className.i1) match {
+fun getClass(context: mutable SKFS.Context, className: A.Name): N.Class_def {
+  maybeGetClass(context, className.i1) match {
   | None() -> SkipError.error(className.i0, `Unbound class: '${className.i1}'`)
   | Some(x) -> x
   }
@@ -1990,14 +1996,14 @@ fun populateFuns(
   )
 }
 
-fun maybeGetFun(funName: String): ?N.Fun_def {
-  arr = funsDir.getArray(Reactive.getContext(), SKFS.SID(funName));
+fun maybeGetFun(context: mutable SKFS.Context, funName: String): ?N.Fun_def {
+  arr = funsDir.getArray(context, SKFS.SID(funName));
   if (arr.size() == 0) return None();
   Some(FunFile::fromFile(arr[0]).value);
 }
 
-fun getFun(funName: A.Name): N.Fun_def {
-  maybeGetFun(funName.i1) match {
+fun getFun(context: mutable SKFS.Context, funName: A.Name): N.Fun_def {
+  maybeGetFun(context, funName.i1) match {
   | None() -> SkipError.error(funName.i0, `Unbound fun: '${funName.i1}'`)
   | Some(x) -> x
   }

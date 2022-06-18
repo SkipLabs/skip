@@ -1084,6 +1084,7 @@ fun verify_readonly_type_(
  */
 /*****************************************************************************/
 fun promote(
+  context: mutable SKFS.Context,
   env: Env,
   variance: N.Variance,
   subst: IMap<N.Type_>,
@@ -1094,7 +1095,7 @@ fun promote(
   | (fr, N.Tfrozen _) -> (fr, N.Tfrozen(variance))
   | (fr, N.TnonNullable _) -> (fr, N.TnonNullable(variance))
   | (pos, N.Tnamed(names, ty)) ->
-    ty1 = promote(env, variance, subst, ty);
+    ty1 = promote(context, env, variance, subst, ty);
     (pos, N.Tnamed(names, ty1))
   | ty @ (_, N.Tvar(tv)) ->
     subst.maybeGet(tv) match {
@@ -1104,35 +1105,35 @@ fun promote(
     | Some(x1) ->
       tvars = env.tvars.set(tv);
       !env = env with {tvars};
-      promote(env, variance, subst, x1)
+      promote(context, env, variance, subst, x1)
     }
   | (pos, N.Tapply(mode, cname, targs)) ->
-    cd = SkipNaming.getClass(cname);
-    targs1 = promote_targs(env, variance, mode, subst, cd, targs);
+    cd = SkipNaming.getClass(context, cname);
+    targs1 = promote_targs(context, env, variance, mode, subst, cd, targs);
     (pos, N.Tpromoted(variance, mode, env.promoted, SortedMap[], cname, targs1))
   | (pos, N.Tpromoted(_, mode, seen, tparams, cname, targs)) ->
-    cd = SkipNaming.getClass(cname);
-    targs1 = promote_targs(env, variance, mode, subst, cd, targs);
+    cd = SkipNaming.getClass(context, cname);
+    targs1 = promote_targs(context, env, variance, mode, subst, cd, targs);
     (pos, N.Tpromoted(variance, mode, seen, tparams, cname, targs1))
   | (pos, N.Tfun(_, ml, tyl, params, rty)) ->
     ml1 = promote_tfun_modifiers(ml);
-    params1 = params.map(p -> contra_promote(env, variance, subst, p));
-    rty1 = promote(env, variance, subst, rty);
+    params1 = params.map(p -> contra_promote(context, env, variance, subst, p));
+    rty1 = promote(context, env, variance, subst, rty);
     (pos, N.Tfun(variance, ml1, tyl, params1, rty1))
   | (pos, N.Tparam(frozen_, _, id, name)) ->
     (pos, N.Tparam(frozen_, variance, id, name))
   | (pos, N.Tlambda(_, id, ml, ty)) ->
     ml1 = promote_tfun_modifiers(ml);
-    ty1 = promote(env, variance, subst, ty);
+    ty1 = promote(context, env, variance, subst, ty);
     (pos, N.Tlambda(variance, id, ml1, ty1))
   | (pos, N.Tawaitable(_, ty)) ->
-    ty1 = promote(env, variance, subst, ty);
+    ty1 = promote(context, env, variance, subst, ty);
     (pos, N.Tawaitable(variance, ty1))
   | (pos, N.Tdefault(ty)) ->
-    ty1 = promote(env, variance, subst, ty);
+    ty1 = promote(context, env, variance, subst, ty);
     (pos, N.Tdefault(ty1))
   | (pos, N.Tset(_, mode, tparams, l)) ->
-    l1 = l.map(p -> promote_inter_elt(env, variance, mode, subst, p));
+    l1 = l.map(p -> promote_inter_elt(context, env, variance, mode, subst, p));
     (pos, N.Tset(variance, mode, tparams, l1))
   }
 }
@@ -1143,19 +1144,21 @@ fun has_looped_promotion(env: Env, nm: N.Name): Bool {
 }
 
 fun promote_inter_elt(
+  context: mutable SKFS.Context,
   env: Env,
   variance: N.Variance,
   mode: N.Modality,
   subst: IMap<N.Type_>,
   elt: N.InterElt,
 ): N.InterElt {
-  cd = SkipNaming.getClass(elt.name);
-  targs = promote_targs(env, variance, mode, subst, cd, elt.targs);
+  cd = SkipNaming.getClass(context, elt.name);
+  targs = promote_targs(context, env, variance, mode, subst, cd, elt.targs);
   // dont promote the conditions, done lazily on filtering
   elt with {targs}
 }
 
 fun contra_promote(
+  context: mutable SKFS.Context,
   env: Env,
   variance: N.Variance,
   subst: IMap<N.Type_>,
@@ -1168,7 +1171,7 @@ fun contra_promote(
     | A.Vnone() -> A.Vnone()
     }
   };
-  promote(env, variance1, subst, ty)
+  promote(context, env, variance1, subst, ty)
 }
 
 fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
@@ -1207,6 +1210,7 @@ fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
 }
 
 fun promote_tapply(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   var: N.Variance,
@@ -1217,11 +1221,12 @@ fun promote_tapply(
   class_name: N.Name,
   targs: Array<N.Type_>,
 ): N.Type_ {
-  cd = SkipNaming.getClass(class_name);
+  cd = SkipNaming.getClass(context, class_name);
   if (has_looped_promotion(env, class_name)) {
     (pos, N.Tpromoted(var, mode, env.promoted, tparams, class_name, targs))
   } else {
     force_promote_tapply(
+      context,
       next_id,
       env,
       var,
@@ -1236,6 +1241,7 @@ fun promote_tapply(
 }
 
 fun force_promote_tapply(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   var: N.Variance,
@@ -1246,11 +1252,22 @@ fun force_promote_tapply(
   cd: N.Class_def,
   targs: Array<N.Type_>,
 ): N.Type_ {
-  inter = make_promoted(next_id, env, var, mode, subst, pos, cd, targs);
+  inter = make_promoted(
+    context,
+    next_id,
+    env,
+    var,
+    mode,
+    subst,
+    pos,
+    cd,
+    targs,
+  );
   (pos, N.Tset(var, mode, tparams, inter))
 }
 
 fun promote_targs(
+  context: mutable SKFS.Context,
   env: Env,
   variance: N.Variance,
   mode: N.Modality,
@@ -1264,11 +1281,12 @@ fun promote_targs(
   };
   variance_l = cd.tparams.map(p -> p.i0);
   variance_l.zipWith(tyl, (var, ty) ->
-    promote_targ(env, variance, subst, var, ty)
+    promote_targ(context, env, variance, subst, var, ty)
   )
 }
 
 fun promote_targ(
+  context: mutable SKFS.Context,
   env: Env,
   variance: A.Variance,
   subst: IMap<N.Type_>,
@@ -1276,9 +1294,9 @@ fun promote_targ(
   ty: N.Type_,
 ): N.Type_ {
   tparam_variance match {
-  | A.Vminus() -> contra_promote(env, variance, subst, ty)
-  | A.Vnone() -> promote(env, A.Vnone(), subst, ty)
-  | A.Vplus() -> promote(env, variance, subst, ty)
+  | A.Vminus() -> contra_promote(context, env, variance, subst, ty)
+  | A.Vnone() -> promote(context, env, A.Vnone(), subst, ty)
+  | A.Vplus() -> promote(context, env, variance, subst, ty)
   }
 }
 
@@ -1287,6 +1305,7 @@ fun compare_set_elt(l: N.InterElt, r: N.InterElt): Order {
 }
 
 fun make_promoted(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   variance: N.Variance,
@@ -1321,9 +1340,9 @@ fun make_promoted(
         (lhs, rhs)
       })
     );
-    elt = make_promoted_elt(name, targa, conditions);
+    elt = make_promoted_elt(context, name, targa, conditions);
     /* We should pass around a real position here. Worth it? */
-    promote_inter_elt(parent_tenv, variance, mode, subst, elt)
+    promote_inter_elt(context, parent_tenv, variance, mode, subst, elt)
   });
   elt = N.InterElt{
     depth => cd.depth,
@@ -1342,7 +1361,7 @@ fun make_promoted(
     result;
   } else {
     acc = Acc{subst, constraints => SkipTypingUtils.Constraints::empty};
-    (after_acc, uniqued) = uniq_join(next_id, env, acc, result);
+    (after_acc, uniqued) = uniq_join(context, next_id, env, acc, result);
     if (!after_acc.constraints.isEmpty()) {
       SkipError.error(pos, "ICE Constraints added during promotion")
     };
@@ -1351,11 +1370,12 @@ fun make_promoted(
 }
 
 fun make_promoted_elt(
+  context: mutable SKFS.Context,
   name: N.Name,
   targs: Array<N.Type_>,
   wcs: Array<Array<N.Whenclause>>,
 ): N.InterElt {
-  cd = SkipNaming.getClass(name);
+  cd = SkipNaming.getClass(context, name);
   conditions = if (wcs.isEmpty()) N.ECNoConditions() else N.ECConditions(wcs);
   N.InterElt{depth => cd.depth, kind => cd.kind, name, targs, conditions}
 }
@@ -1381,6 +1401,7 @@ fun make_promoted_elt(
  *   the property cannot hold, you throw
  */
 fun join(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -1395,20 +1416,23 @@ fun join(
    * on the PHP backend
    */
   (N.unfold_tnamed(ty1), ty1, N.unfold_tnamed(ty2), ty2) match {
-  | ((_, N.Tdefault(ty11)), _, _, _) -> join(next_id, env, acc, ty11, ty2)
-  | (_, _, (_, N.Tdefault(ty21)), _) -> join(next_id, env, acc, ty1, ty21)
+  | ((_, N.Tdefault(ty11)), _, _, _) ->
+    join(context, next_id, env, acc, ty11, ty2)
+  | (_, _, (_, N.Tdefault(ty21)), _) ->
+    join(context, next_id, env, acc, ty1, ty21)
   | (tvar @ (_, N.Tvar(_)), _, _, (_, N.Tnamed _)) ->
-    join_into_new_tvar(next_id, env, acc, tvar, ty2)
+    join_into_new_tvar(context, next_id, env, acc, tvar, ty2)
   | (_, (_, N.Tnamed _), tvar @ (_, N.Tvar(_)), _) ->
-    join_into_new_tvar(next_id, env, acc, tvar, ty1)
+    join_into_new_tvar(context, next_id, env, acc, tvar, ty1)
   | (_, (_, N.Tnamed _), _, (_, N.Tanything())) -> (acc, ty1)
   | (_, (_, N.Tanything()), _, (_, N.Tnamed _)) -> (acc, ty2)
   | (non_named_ty1, _, non_named_ty2, _) ->
-    join_(next_id, env, acc, non_named_ty1, non_named_ty2)
+    join_(context, next_id, env, acc, non_named_ty1, non_named_ty2)
   }
 }
 
 fun join_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -1421,10 +1445,10 @@ fun join_(
 
   /* Tvar */
   | ((pos, N.Tvar(var1)), (_, N.Tvar(var2))) ->
-    join_tvar(next_id, env, pos, acc, var1, var2)
+    join_tvar(context, next_id, env, pos, acc, var1, var2)
   | (tvar @ (_, N.Tvar(_)), other_ty)
   | (other_ty, tvar @ (_, N.Tvar(_))) ->
-    join_into_new_tvar(next_id, env, acc, tvar, other_ty)
+    join_into_new_tvar(context, next_id, env, acc, tvar, other_ty)
 
   | (
     (pos, N.Tlambda(var1, id, mods1, ty11)),
@@ -1436,12 +1460,12 @@ fun join_(
     | (_, tracking) if (tracking.isEmpty()) -> throw exn
     | mods ->
       variance = join_variance(var1, var2);
-      (!acc, ty) = join(next_id, env, acc, ty11, ty21);
+      (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
       (acc, (pos, N.Tlambda(variance, id, mods, ty)))
     }
   | ((pos, N.Tlambda(var, id, mods, ty11)), ty21)
   | (ty21, (pos, N.Tlambda(var, id, mods, ty11))) ->
-    (!acc, ty) = join(next_id, env, acc, ty11, ty21);
+    (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
     (acc, (pos, N.Tlambda(var, id, mods, ty)))
 
   /* Constraints */
@@ -1477,8 +1501,16 @@ fun join_(
     (pos, N.Tfun(variance1, mods1, _, params1, rty1)),
     (_, N.Tfun(variance2, mods2, _, params2, rty2)),
   ) ->
-    (!acc, params) = join_params(next_id, env, pos, acc, params1, params2);
-    (!acc, rty) = join(next_id, env, acc, rty1, rty2);
+    (!acc, params) = join_params(
+      context,
+      next_id,
+      env,
+      pos,
+      acc,
+      params1,
+      params2,
+    );
+    (!acc, rty) = join(context, next_id, env, acc, rty1, rty2);
     exn = Join(ty1, ty2);
     join_tfun_modifiers(exn, variance1, mods1, variance2, mods2) match {
     | (purity, _) if (purity.isEmpty()) -> throw exn
@@ -1534,7 +1566,7 @@ fun join_(
           frozen1,
           pid1,
         );
-        join_try_list(next_id, exn, env, acc, tp2, freeze_upper, tyl1)
+        join_try_list(context, next_id, exn, env, acc, tp2, freeze_upper, tyl1)
       },
       e ->
         e match {
@@ -1546,7 +1578,16 @@ fun join_(
             frozen2,
             pid2,
           );
-          join_try_list(next_id, exn, env, acc, tp1, freeze_upper, tyl2)
+          join_try_list(
+            context,
+            next_id,
+            exn,
+            env,
+            acc,
+            tp1,
+            freeze_upper,
+            tyl2,
+          )
         | _ -> throw e
         }
       ,
@@ -1559,7 +1600,16 @@ fun join_(
       frozen_,
       pid,
     );
-    join_try_list(next_id, Join(ty1, ty2), env, acc, ty, freeze_upper, tyl)
+    join_try_list(
+      context,
+      next_id,
+      Join(ty1, ty2),
+      env,
+      acc,
+      ty,
+      freeze_upper,
+      tyl,
+    )
   | (ty, (_, N.Tparam(frozen_, A.Vplus(), pid, _))) ->
     tyl = env.tparam_constraints.findUppers(pid);
     freeze_upper = should_freeze_upper(
@@ -1568,11 +1618,20 @@ fun join_(
       frozen_,
       pid,
     );
-    join_try_list(next_id, Join(ty1, ty2), env, acc, ty, freeze_upper, tyl)
+    join_try_list(
+      context,
+      next_id,
+      Join(ty1, ty2),
+      env,
+      acc,
+      ty,
+      freeze_upper,
+      tyl,
+    )
   /* Awaitable */
   | ((fr, N.Tawaitable(v1, inner1)), (_, N.Tawaitable(v2, inner2))) ->
     var = join_variance(v1, v2);
-    (!acc, inner) = join(next_id, env, acc, inner1, inner2);
+    (!acc, inner) = join(context, next_id, env, acc, inner1, inner2);
     (acc, (fr, N.Tawaitable(var, inner)))
   /* Object types */
   | ((_, N.Tset(_, _, _, elts)), _)
@@ -1585,10 +1644,11 @@ fun join_(
     | Some _ -> void
     };
     join(
+      context,
       next_id,
       env,
       acc,
-      promote_tpromoted(next_id, env, acc.subst, assert_tpromoted(tp)),
+      promote_tpromoted(context, next_id, env, acc.subst, assert_tpromoted(tp)),
       ty2,
     )
   | ((_, N.Tset(v1, m1, _, _)), tp @ (_, N.Tpromoted(v2, m2, _, _, _, _))) ->
@@ -1597,11 +1657,12 @@ fun join_(
     | Some _ -> void
     };
     join(
+      context,
       next_id,
       env,
       acc,
       ty1,
-      promote_tpromoted(next_id, env, acc.subst, assert_tpromoted(tp)),
+      promote_tpromoted(context, next_id, env, acc.subst, assert_tpromoted(tp)),
     )
 
   | (
@@ -1613,6 +1674,7 @@ fun join_(
     | Some(m) -> m
     };
     !tyl1 = maybe_update_tpromoted_targs_variance(
+      context,
       env,
       mode,
       mode1,
@@ -1622,6 +1684,7 @@ fun join_(
       tyl1,
     );
     !tyl2 = maybe_update_tpromoted_targs_variance(
+      context,
       env,
       mode,
       mode2,
@@ -1631,11 +1694,11 @@ fun join_(
       tyl2,
     );
     var = join_variance(var1, var2);
-    (!acc, tyl) = join_list_(next_id, env, acc, tyl1, tyl2);
+    (!acc, tyl) = join_list_(context, next_id, env, acc, tyl1, tyl2);
     tparams = join_set_tparams(var1, tparams1, var2, tparams2);
     (acc, (pos, N.Tpromoted(var, mode, SSet[], tparams, n1, tyl)))
   | (t1 @ (_, N.Tpromoted _), t2 @ (_, N.Tpromoted _)) ->
-    join_tpromoted(next_id, env, acc, Join(ty1, ty2), t1, t2)
+    join_tpromoted(context, next_id, env, acc, Join(ty1, ty2), t1, t2)
 
   | (
     (pos, ts1 @ N.Tset(var1, mode1, tparams1, elts1)),
@@ -1646,9 +1709,26 @@ fun join_(
     | None() -> throw exn
     | Some(m) -> m
     };
-    !elts1 = maybe_update_elts_variance(env, mode, mode1, var1, acc, elts1);
-    !elts2 = maybe_update_elts_variance(env, mode, mode2, var2, acc, elts2);
+    !elts1 = maybe_update_elts_variance(
+      context,
+      env,
+      mode,
+      mode1,
+      var1,
+      acc,
+      elts1,
+    );
+    !elts2 = maybe_update_elts_variance(
+      context,
+      env,
+      mode,
+      mode2,
+      var2,
+      acc,
+      elts2,
+    );
     (var, (!acc, elts)) = join_set(
+      context,
       next_id,
       exn,
       env,
@@ -1667,13 +1747,25 @@ fun join_(
       } else if ((all_ktype_1 || all_ktype_2) && env.solving_constraints) {
         elts
       } else {
-        drop_extraneous_ktype(elts)
+        drop_extraneous_ktype(context, elts)
       }
     };
     if (tyl3.isEmpty()) throw exn;
     joined = (pos, N.Tset(var, mode, tparams, tyl3));
-    !acc = verify_mutability_preservation_tset(env, acc, (pos, ts1), joined);
-    !acc = verify_mutability_preservation_tset(env, acc, (pos2, ts2), joined);
+    !acc = verify_mutability_preservation_tset(
+      context,
+      env,
+      acc,
+      (pos, ts1),
+      joined,
+    );
+    !acc = verify_mutability_preservation_tset(
+      context,
+      env,
+      acc,
+      (pos2, ts2),
+      joined,
+    );
     (acc, joined)
 
   | _ -> throw Join(ty1, ty2)
@@ -1681,6 +1773,7 @@ fun join_(
 }
 
 fun join_try_list(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   exn: Exception,
   env: Env,
@@ -1699,7 +1792,10 @@ fun join_try_list(
     | _ -> void
     };
     // skip ktraits if not solving constraints
-    if (!env.solving_constraints && is_tset_all_ktype(acc.subst, ty2)) continue;
+    if (
+      !env.solving_constraints &&
+      is_tset_all_ktype(context, acc.subst, ty2)
+    ) continue;
 
     vtry(
       () -> {
@@ -1709,7 +1805,7 @@ fun join_try_list(
           freeze_upper,
           ty2,
         );
-        !result = Some(join(next_id, env, acc, ty, ty2_fixed))
+        !result = Some(join(context, next_id, env, acc, ty, ty2_fixed))
       },
       exn ->
         exn match {
@@ -1728,10 +1824,14 @@ fun join_try_list(
   throw exn
 }
 
-fun is_tset_all_ktype(subst: IMap<N.Type_>, ty: N.Type_): Bool {
+fun is_tset_all_ktype(
+  context: mutable SKFS.Context,
+  subst: IMap<N.Type_>,
+  ty: N.Type_,
+): Bool {
   unfold_type(subst, ty) match {
   | (_, N.Tpromoted(_, _, _, _, cname, _)) ->
-    cd = SkipNaming.getClass(cname);
+    cd = SkipNaming.getClass(context, cname);
     cd.kind == A.KTrait()
   | (_, N.Tset(_, _, _, elts)) -> all_ktype(elts)
   | _ -> false
@@ -1796,14 +1896,17 @@ fun all_ktype(x: Array<N.InterElt>): Bool {
  * a + b
  * which would cause a Foo + Bar which could explode at runtime
  */
-fun drop_extraneous_ktype(elts: Array<N.InterElt>): Array<N.InterElt> {
+fun drop_extraneous_ktype(
+  context: mutable SKFS.Context,
+  elts: Array<N.InterElt>,
+): Array<N.InterElt> {
   if (elts.isEmpty()) return elts;
   if (elts[0].kind is A.KClass()) return elts;
 
   kbases = elts.values().filter(elt -> elt.kind != A.KTrait());
   kbases_implement = mutable Set[];
   for (elt in kbases) {
-    for (parName in SkipNaming.getClass(elt.name).use.keys()) {
+    for (parName in SkipNaming.getClass(context, elt.name).use.keys()) {
       kbases_implement.insert(parName.i1)
     }
   };
@@ -1817,6 +1920,7 @@ fun drop_extraneous_ktype(elts: Array<N.InterElt>): Array<N.InterElt> {
 }
 
 fun promote_tpromoted(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   subst: IMap<N.Type_>,
@@ -1824,9 +1928,10 @@ fun promote_tpromoted(
 ): N.Type_ {
   (pos, p_) = p;
   !env = env with {promoted => p_.promoted_set};
-  cd = SkipNaming.getClass(p_.name);
+  cd = SkipNaming.getClass(context, p_.name);
   var = if (has_looped_promotion(env, p_.name)) A.Vnone() else p_.variance;
   force_promote_tapply(
+    context,
     next_id,
     env,
     var,
@@ -1844,6 +1949,7 @@ fun promote_tpromoted(
  * can be done quicker
  */
 fun join_tpromoted(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -1873,11 +1979,12 @@ fun join_tpromoted(
       plus_tp.i1.name.i1 != mn.i1,
       "ICE same elt tpromoted is a separate case",
     );
-    mkind = SkipNaming.getClass(mn).kind;
-    pkind = SkipNaming.getClass(plus_tp.i1.name).kind;
-    pty_promoted = promote_tpromoted(next_id, env, acc.subst, plus_tp);
+    mkind = SkipNaming.getClass(context, mn).kind;
+    pkind = SkipNaming.getClass(context, plus_tp.i1.name).kind;
+    pty_promoted = promote_tpromoted(context, next_id, env, acc.subst, plus_tp);
     (_, _, _, ptparams, interl) = assert_tset(pty_promoted);
     (facc, tyl) = join_tpromoted_tyl(
+      context,
       next_id,
       pos,
       env,
@@ -1890,6 +1997,7 @@ fun join_tpromoted(
     tparams = join_set_tparams(A.Vplus(), ptparams, mvar, mtparams);
     new_ty = (pos, N.Tpromoted(A.Vnone(), mode, SSet[], tparams, mn, tyl));
     !facc = verify_mutability_preservation_tpromoted(
+      context,
       env,
       facc,
       plus_tp,
@@ -1907,18 +2015,18 @@ fun join_tpromoted(
   (var1, var2) match {
   | (A.Vminus(), A.Vminus())
   | (A.Vplus(), A.Vplus()) ->
-    ty1 = promote_tpromoted(next_id, env, acc.subst, tp1);
-    ty2 = promote_tpromoted(next_id, env, acc.subst, tp2);
-    join(next_id, env, acc, ty1, ty2)
+    ty1 = promote_tpromoted(context, next_id, env, acc.subst, tp1);
+    ty2 = promote_tpromoted(context, next_id, env, acc.subst, tp2);
+    join(context, next_id, env, acc, ty1, ty2)
   | (A.Vplus(), A.Vnone())
   | (A.Vplus(), A.Vminus()) ->
-    !tp1 = maybe_update_tpromoted_variance(env, mode, acc, tp1);
-    !tp2 = maybe_update_tpromoted_variance(env, mode, acc, tp2);
+    !tp1 = maybe_update_tpromoted_variance(context, env, mode, acc, tp1);
+    !tp2 = maybe_update_tpromoted_variance(context, env, mode, acc, tp2);
     join_plus_with_none_or_minus(pos1, tp1, tp2)
   | (A.Vnone(), A.Vplus())
   | (A.Vminus(), A.Vplus()) ->
-    !tp1 = maybe_update_tpromoted_variance(env, mode, acc, tp1);
-    !tp2 = maybe_update_tpromoted_variance(env, mode, acc, tp2);
+    !tp1 = maybe_update_tpromoted_variance(context, env, mode, acc, tp1);
+    !tp2 = maybe_update_tpromoted_variance(context, env, mode, acc, tp2);
     join_plus_with_none_or_minus(pos2, tp2, tp1)
   | (A.Vnone(), A.Vminus())
   | (A.Vminus(), A.Vnone())
@@ -1929,6 +2037,7 @@ fun join_tpromoted(
 }
 
 fun join_tpromoted_tyl(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -1940,10 +2049,10 @@ fun join_tpromoted_tyl(
 ): (Acc, Array<N.Type_>) {
   for (elt in elts) {
     if (n1.i1 == elt.name.i1) {
-      valid = validConditions(next_id, env, acc, elt);
+      valid = validConditions(context, next_id, env, acc, elt);
       if (!valid) throw exn;
 
-      return join_list(next_id, env, pos, acc, tyl1, elt.targs)
+      return join_list(context, next_id, env, pos, acc, tyl1, elt.targs)
     }
   };
 
@@ -1951,6 +2060,7 @@ fun join_tpromoted_tyl(
 }
 
 fun join_set(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   exn: Exception,
   env: Env,
@@ -1962,23 +2072,30 @@ fun join_set(
 ): (N.Variance, (Acc, Array<N.InterElt>)) {
   (var1, var2) match {
   | (A.Vplus(), A.Vplus()) ->
-    (A.Vplus(), join_set_plus_plus(next_id, env, acc, tyl1, tyl2))
+    (A.Vplus(), join_set_plus_plus(context, next_id, env, acc, tyl1, tyl2))
   | (A.Vminus(), A.Vminus()) ->
-    (A.Vminus(), join_set_minus_minus(next_id, env, acc, tyl1, tyl2))
+    (A.Vminus(), join_set_minus_minus(context, next_id, env, acc, tyl1, tyl2))
   | (A.Vplus(), A.Vminus()) ->
-    (A.Vnone(), join_set_minus_plus(next_id, exn, env, acc, tyl2, tyl1))
+    (
+      A.Vnone(),
+      join_set_minus_plus(context, next_id, exn, env, acc, tyl2, tyl1),
+    )
   | (A.Vminus(), A.Vplus()) ->
-    (A.Vnone(), join_set_minus_plus(next_id, exn, env, acc, tyl1, tyl2))
+    (
+      A.Vnone(),
+      join_set_minus_plus(context, next_id, exn, env, acc, tyl1, tyl2),
+    )
   | (A.Vnone(), A.Vplus())
   | (A.Vplus(), A.Vnone())
   | (A.Vnone(), A.Vminus())
   | (A.Vminus(), A.Vnone())
   | (A.Vnone(), A.Vnone()) ->
-    (A.Vnone(), join_set_inv(next_id, exn, env, acc, tyl1, tyl2))
+    (A.Vnone(), join_set_inv(context, next_id, exn, env, acc, tyl1, tyl2))
   }
 }
 
 fun join_set_plus_plus(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -1999,11 +2116,19 @@ fun join_set_plus_plus(
       compare_set_elt(elt1, elt2) match {
       | EQ() ->
         allValid =
-          validConditions(next_id, env, acc, elt1) &&
-          validConditions(next_id, env, acc, elt2);
+          validConditions(context, next_id, env, acc, elt1) &&
+          validConditions(context, next_id, env, acc, elt2);
         if (allValid) {
           conditions = satisfyConditions(elt1.conditions, elt2.conditions);
-          join_set_elt_opt(next_id, env, acc, elt1, elt2, conditions) match {
+          join_set_elt_opt(
+            context,
+            next_id,
+            env,
+            acc,
+            elt1,
+            elt2,
+            conditions,
+          ) match {
           | None() -> void
           | Some((nacc, set_elt)) ->
             !acc = nacc;
@@ -2028,6 +2153,7 @@ fun join_set_plus_plus(
  * coming from different classes
  */
 fun uniqElt(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2038,17 +2164,17 @@ fun uniqElt(
   (elt1.conditions, elt2.conditions) match {
   | (N.ECConditions(conds1), N.ECConditions(conds2)) if (keepMultiple) ->
     conds = N.ECConditions(conds1.concat(conds2));
-    (!acc, elt) = join_set_elt(next_id, env, acc, elt1, elt2, conds);
+    (!acc, elt) = join_set_elt(context, next_id, env, acc, elt1, elt2, conds);
     (acc, Some(elt))
   | _ ->
-    elt1Valid = validConditions(next_id, env, acc, elt1);
-    elt2Valid = validConditions(next_id, env, acc, elt2);
+    elt1Valid = validConditions(context, next_id, env, acc, elt1);
+    elt2Valid = validConditions(context, next_id, env, acc, elt2);
     // Add elt if either conditions satisified, but take targs only from the
     // valid elts
     (elt1Valid, elt2Valid) match {
     | (true, true) ->
       conds = satisfyConditions(elt1.conditions, elt2.conditions);
-      (!acc, elt) = join_set_elt(next_id, env, acc, elt1, elt2, conds);
+      (!acc, elt) = join_set_elt(context, next_id, env, acc, elt1, elt2, conds);
       (acc, Some(elt))
     | (true, false) ->
       !elt1.conditions = satisfyCondition(elt1.conditions);
@@ -2061,6 +2187,7 @@ fun uniqElt(
   }
 }
 fun uniq_join(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2079,7 +2206,7 @@ fun uniq_join(
       break (acc, result.toArray())
     | (Some(elt1), Some(elt2)) ->
       if (elt1.name.i1 == elt2.name.i1) {
-        (!acc, eltOpt) = uniqElt(next_id, env, acc, elt1, elt2, true);
+        (!acc, eltOpt) = uniqElt(context, next_id, env, acc, elt1, elt2, true);
         eltOpt match {
         | None() ->
           !cur1 = cur2;
@@ -2099,6 +2226,7 @@ fun uniq_join(
 }
 
 fun join_set_minus_minus(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2121,7 +2249,7 @@ fun join_set_minus_minus(
       | Some _ -> Array[elt].values().concat(iter1)
       };
       rem
-        .filter(elt -> validConditions(next_id, env, acc, elt))
+        .filter(elt -> validConditions(context, next_id, env, acc, elt))
         .map(elt -> elt with {conditions => satisfyCondition(elt.conditions)})
         .each(result.push);
       break (acc, result.toArray())
@@ -2129,20 +2257,28 @@ fun join_set_minus_minus(
       compare_set_elt(elt1, elt2) match {
       | EQ() ->
         // add if either conditions satsified
-        (!acc, maybeJoined) = uniqElt(next_id, env, acc, elt1, elt2, false);
+        (!acc, maybeJoined) = uniqElt(
+          context,
+          next_id,
+          env,
+          acc,
+          elt1,
+          elt2,
+          false,
+        );
         maybeJoined.each(result.push);
         !cur1 = iter1.next();
         !cur2 = iter2.next()
       | LT() ->
         // add only if satsified conditions
-        if (validConditions(next_id, env, acc, elt1)) {
+        if (validConditions(context, next_id, env, acc, elt1)) {
           !elt1.conditions = satisfyCondition(elt1.conditions);
           result.push(elt1)
         };
         !cur1 = iter1.next()
       | GT() ->
         // add only if satsified conditions
-        if (validConditions(next_id, env, acc, elt2)) {
+        if (validConditions(context, next_id, env, acc, elt2)) {
           !elt2.conditions = satisfyCondition(elt2.conditions);
           result.push(elt2)
         };
@@ -2153,6 +2289,7 @@ fun join_set_minus_minus(
 }
 
 fun join_set_minus_plus(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   exn: Exception,
   env: Env,
@@ -2176,8 +2313,8 @@ fun join_set_minus_plus(
     | (Some(minus), Some(plus)) ->
       compare_set_elt(minus, plus) match {
       | EQ() ->
-        minusValid = validConditions(next_id, env, acc, minus);
-        plusValid = validConditions(next_id, env, acc, plus);
+        minusValid = validConditions(context, next_id, env, acc, minus);
+        plusValid = validConditions(context, next_id, env, acc, plus);
         // If the minus isn't satisfied, its safe to drop
         // If the minus is satisfied, and the plus isn't,
         //   and the minus isn't conditional, throw
@@ -2186,7 +2323,15 @@ fun join_set_minus_plus(
         | (true, false) if (!minus.isConditional()) -> throw exn
         | (true, true) ->
           conds = satisfyConditions(minus.conditions, plus.conditions);
-          (!acc, joined) = join_set_elt(next_id, env, acc, minus, plus, conds);
+          (!acc, joined) = join_set_elt(
+            context,
+            next_id,
+            env,
+            acc,
+            minus,
+            plus,
+            conds,
+          );
           result.push(joined)
         | _ -> void
         };
@@ -2203,6 +2348,7 @@ fun join_set_minus_plus(
 }
 
 fun join_set_inv(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   exn: Exception,
   env: Env,
@@ -2232,11 +2378,19 @@ fun join_set_inv(
       | EQ() ->
         // Both conditions need to be valid to keep
         allValid =
-          validConditions(next_id, env, acc, elt1) &&
-          validConditions(next_id, env, acc, elt2);
+          validConditions(context, next_id, env, acc, elt1) &&
+          validConditions(context, next_id, env, acc, elt2);
         if (allValid) {
           conds = satisfyConditions(elt1.conditions, elt2.conditions);
-          (!acc, joined) = join_set_elt(next_id, env, acc, elt1, elt2, conds);
+          (!acc, joined) = join_set_elt(
+            context,
+            next_id,
+            env,
+            acc,
+            elt1,
+            elt2,
+            conds,
+          );
           result.push(joined)
         };
         !cur1 = iter1.next();
@@ -2252,6 +2406,7 @@ fun join_set_inv(
 }
 
 fun join_set_elt_opt(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2261,7 +2416,7 @@ fun join_set_elt_opt(
 ): ?(Acc, N.InterElt) {
   vtry<?(SkipTypes.Acc, SkipNamedAst.InterElt)>(
     () -> {
-      Some(join_set_elt(next_id, env, acc, elt1, etl2, conditions))
+      Some(join_set_elt(context, next_id, env, acc, elt1, etl2, conditions))
     },
     exn ->
       exn match {
@@ -2276,6 +2431,7 @@ fun join_set_elt_opt(
 }
 
 fun join_set_elt(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2285,7 +2441,15 @@ fun join_set_elt(
 ): (Acc, N.InterElt) {
   pos = elt1.name.i0;
   assert(compare(elt1.name.i1, elt2.name.i1) is EQ());
-  (!acc, targs) = join_list(next_id, env, pos, acc, elt1.targs, elt2.targs);
+  (!acc, targs) = join_list(
+    context,
+    next_id,
+    env,
+    pos,
+    acc,
+    elt1.targs,
+    elt2.targs,
+  );
   (acc, elt1 with {targs, conditions})
 }
 
@@ -2321,6 +2485,7 @@ fun satisfyCondition(c: N.InterEltConditions): N.InterEltConditions {
  * we need to know alpha=String before checking the conditions
  */
 fun validConditions(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2331,7 +2496,9 @@ fun validConditions(
   | N.ECSatisfied() ->
     true
   | N.ECConditions(conditions) ->
-    conditions.any(inner -> validConditionsList(next_id, env, acc, inner))
+    conditions.any(inner ->
+      validConditionsList(context, next_id, env, acc, inner)
+    )
   }
 }
 
@@ -2340,6 +2507,7 @@ fun validConditions(
 // - they have no unresolved tvars
 // - all constraints are satisfied, i.e. t1 <: t2 & ... & tn
 fun validConditionsList(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2351,7 +2519,7 @@ fun validConditionsList(
     false
   } else {
     conditions.all(cond ->
-      filter_condition(next_id, env, acc, cond) match {
+      filter_condition(context, next_id, env, acc, cond) match {
       | Some(nacc) ->
         !acc = nacc;
         true
@@ -2364,6 +2532,7 @@ fun validConditionsList(
 // TODO during the try catch we might generate strings for error messages
 // This is unnecessary work since we will just catch them
 fun filter_condition(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2371,12 +2540,12 @@ fun filter_condition(
 ): ?Acc {
   !env.solving_constraints = true;
   (lhs, rhss) = condition;
-  !lhs = promote(env, A.Vplus(), acc.subst, lhs);
+  !lhs = promote(context, env, A.Vplus(), acc.subst, lhs);
   vtry<?SkipTypes.Acc>(
     () -> {
       for (rhs in rhss) {
-        !rhs = promote(env, A.Vminus(), acc.subst, rhs);
-        (!acc, _) = join(next_id, env, acc, lhs, rhs);
+        !rhs = promote(context, env, A.Vminus(), acc.subst, rhs);
+        (!acc, _) = join(context, next_id, env, acc, lhs, rhs);
       };
 
       if (acc.constraints.isEmpty()) Some(acc) else None()
@@ -2460,6 +2629,7 @@ fun is_set_eq(s1: SMap<String>, s2: SMap<String>): Bool {
 }
 
 fun join_into_new_tvar(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2469,10 +2639,11 @@ fun join_into_new_tvar(
   tvar_id = next_id();
   !acc.subst = acc.subst.set(tvar_id, other_ty);
   tvar2 = (other_ty.i0, N.Tvar(tvar_id));
-  join(next_id, env, acc, tvar1, tvar2)
+  join(context, next_id, env, acc, tvar1, tvar2)
 }
 
 fun join_tvar(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2523,7 +2694,7 @@ fun join_tvar(
     };
     !acc = fwd_tvar(acc, n1, tvar);
     !acc = fwd_tvar(acc, n2, tvar);
-    (!acc, ty) = join(next_id, env, acc, ty1, ty2);
+    (!acc, ty) = join(context, next_id, env, acc, ty1, ty2);
     /* did the new_tvar already get bound? */
     acc.subst.maybeGet(tvar_id) match {
     | None() -> (acc with {subst => acc.subst.set(tvar_id, ty)}, ty)
@@ -2580,6 +2751,7 @@ fun flatten_tvar(subst: IMap<N.Type_>, id: Int): (Int, ?N.Type_) {
 }
 
 fun join_array(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2593,13 +2765,14 @@ fun join_array(
     throw TypeArityMismatch(pos, arity1, arity2)
   };
   joineda = a1.zipWith(a2, (x1, x2) -> {
-    (!acc, x) = join(next_id, env, acc, x1, x2);
+    (!acc, x) = join(context, next_id, env, acc, x1, x2);
     x
   });
   (acc, joineda)
 }
 
 fun join_list(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2612,10 +2785,11 @@ fun join_list(
   if (arity1 != arity2) {
     throw TypeArityMismatch(pos, arity1, arity2)
   };
-  join_list_(next_id, env, acc, l1, l2)
+  join_list_(context, next_id, env, acc, l1, l2)
 }
 
 fun join_list_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2623,13 +2797,14 @@ fun join_list_(
   l2: Array<N.Type_>,
 ): (Acc, Array<N.Type_>) {
   l = l1.zipWith(l2, (x1, x2) -> {
-    (!acc, x) = join(next_id, env, acc, x1, x2);
+    (!acc, x) = join(context, next_id, env, acc, x1, x2);
     x
   });
   (acc, l)
 }
 
 fun join_funs(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2640,6 +2815,7 @@ fun join_funs(
   (fty_params1, fty_return1) = p1;
   (fty_params2, fty_return2) = p2;
   (!acc, fty_params) = join_params(
+    context,
     next_id,
     env,
     pos,
@@ -2647,11 +2823,19 @@ fun join_funs(
     fty_params1,
     fty_params2,
   );
-  (!acc, fty_return) = join(next_id, env, acc, fty_return1, fty_return2);
+  (!acc, fty_return) = join(
+    context,
+    next_id,
+    env,
+    acc,
+    fty_return1,
+    fty_return2,
+  );
   (acc, fty_params, fty_return)
 }
 
 fun join_params(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2661,7 +2845,7 @@ fun join_params(
 ): (Acc, Parameters<N.Type_>) {
   (fty_params1, fty_params2) match {
   | (Positional(tyl1), Positional(tyl2)) ->
-    (!acc, tyl) = join_array(next_id, env, pos, acc, tyl1, tyl2);
+    (!acc, tyl) = join_array(context, next_id, env, pos, acc, tyl1, tyl2);
     (acc, Positional(tyl))
   | (Named(m1), Named(m2)) ->
     l1 = m1.reduce(
@@ -2674,7 +2858,7 @@ fun join_params(
         List.Cons((x, y), acc),
       (List[] : List<(N.Name, N.Type_)>),
     );
-    (!acc, l) = join_named_params(next_id, env, pos, acc, l1, l2);
+    (!acc, l) = join_named_params(context, next_id, env, pos, acc, l1, l2);
     m = l.foldl(
       ((z, p) -> {
         (x, y) = p;
@@ -2688,6 +2872,7 @@ fun join_params(
 }
 
 fun join_named_params(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2704,8 +2889,8 @@ fun join_named_params(
     if (name1.i1 != name2.i1) {
       invariant_violation("TODO error incompatible fun params")
     };
-    (!acc, ty) = join(next_id, env, acc, ty1, ty2);
-    (!acc, rl) = join_named_params(next_id, env, pos, acc, rl1, rl2);
+    (!acc, ty) = join(context, next_id, env, acc, ty1, ty2);
+    (!acc, rl) = join_named_params(context, next_id, env, pos, acc, rl1, rl2);
     (acc, List.Cons((name1, ty), rl))
   }
 }
@@ -2740,6 +2925,7 @@ fun is_not_nullable(env: Env, ty_: N.Type_): Bool {
 }
 
 private fun verify_mutability_preservation_tpromoted(
+  context: mutable SKFS.Context,
   env: Env,
   acc: Acc,
   child_ty: (FileRange, N.Tpromoted),
@@ -2757,6 +2943,7 @@ private fun verify_mutability_preservation_tpromoted(
     acc
   | (N.Mchilled(), N.Mchilled()) ->
     CheckMutPreservation(env, child_ty, joined_ty, SSet[new_name.i1]).point(
+      context,
       acc,
       child_name,
       child_tyl,
@@ -2766,6 +2953,7 @@ private fun verify_mutability_preservation_tpromoted(
 }
 
 private fun verify_mutability_preservation_tset(
+  context: mutable SKFS.Context,
   env: Env,
   acc: Acc,
   child_ty: (FileRange, N.Tset),
@@ -2782,6 +2970,7 @@ private fun verify_mutability_preservation_tset(
   | (N.Mchilled(), N.Mchilled()) ->
     parents = new_elts.values().map(e -> e.name.i1) |> SSet::createFromIterator;
     CheckMutPreservation(env, child_ty, joined_ty, parents).sets(
+      context,
       acc,
       child_elts,
     )
@@ -2795,26 +2984,36 @@ private class CheckMutPreservation(
   joined_ty: N.Type_,
   parents: SSet,
 ) {
-  fun sets(acc: Acc, child_elts: Array<N.InterElt>): Acc {
+  fun sets(
+    context: mutable SKFS.Context,
+    acc: Acc,
+    child_elts: Array<N.InterElt>,
+  ): Acc {
     mk_map = acc ->
       child_elts.reduce(
-        (fm, elt) -> fm.merge(this.point_(acc, elt.name, elt.targs)),
+        (fm, elt) -> fm.merge(this.point_(context, acc, elt.name, elt.targs)),
         SortedMap[],
       );
     this.check(acc, mk_map)
   }
 
-  fun point(acc: Acc, child_name: N.Name, child_tyl: Array<N.Type_>): Acc {
+  fun point(
+    context: mutable SKFS.Context,
+    acc: Acc,
+    child_name: N.Name,
+    child_tyl: Array<N.Type_>,
+  ): Acc {
     if (this.parents.contains(child_name.i1)) return acc;
-    this.check(acc, acc -> this.point_(acc, child_name, child_tyl))
+    this.check(acc, acc -> this.point_(context, acc, child_name, child_tyl))
   }
 
   fun point_(
+    context: mutable SKFS.Context,
     acc: Acc,
     name: N.Name,
     tyl: Array<N.Type_>,
   ): IMap<TU.MutPreservationConstraint> {
-    cd = SkipNaming.getClass(name);
+    cd = SkipNaming.getClass(context, name);
     tyl
       .values()
       .zip(cd.tparams.values().zip(cd.tparam_parents.values()))
@@ -3058,6 +3257,7 @@ fun maybe_freeze_upper_bound(
 // If promoting from mutable -> readonly, rerun promotion to remove the invariant
 // restriction on mutable types
 fun maybe_update_tpromoted_variance(
+  context: mutable SKFS.Context,
   env: Env,
   joined_mode: N.Modality,
   acc: Acc,
@@ -3067,8 +3267,9 @@ fun maybe_update_tpromoted_variance(
   (tp_.mode, joined_mode, tp_.variance) match {
   | (N.Mmutable _, N.Mreadonly _, A.Vplus())
   | (N.Mmutable _, N.Mreadonly _, A.Vminus()) ->
-    cd = SkipNaming.getClass(tp_.name);
+    cd = SkipNaming.getClass(context, tp_.name);
     fixed_targs = promote_targs(
+      context,
       env,
       tp_.variance,
       joined_mode,
@@ -3084,6 +3285,7 @@ fun maybe_update_tpromoted_variance(
 // If promoting from mutable -> readonly, rerun promotion to remove the invariant
 // restriction on mutable types
 fun maybe_update_tpromoted_targs_variance(
+  context: mutable SKFS.Context,
   env: Env,
   joined_mode: N.Modality,
   orig_mode: N.Modality,
@@ -3095,8 +3297,8 @@ fun maybe_update_tpromoted_targs_variance(
   (orig_mode, joined_mode, var) match {
   | (N.Mmutable _, N.Mreadonly _, A.Vplus())
   | (N.Mmutable _, N.Mreadonly _, A.Vminus()) ->
-    cd = SkipNaming.getClass(n);
-    promote_targs(env, var, joined_mode, acc.subst, cd, targs)
+    cd = SkipNaming.getClass(context, n);
+    promote_targs(context, env, var, joined_mode, acc.subst, cd, targs)
   | _ -> targs
   }
 }
@@ -3104,6 +3306,7 @@ fun maybe_update_tpromoted_targs_variance(
 // If promoting from mutable -> readonly, rerun promotion to remove the invariant
 // restriction on mutable types
 fun maybe_update_elts_variance(
+  context: mutable SKFS.Context,
   env: Env,
   joined_mode: N.Modality,
   orig_mode: N.Modality,
@@ -3114,7 +3317,9 @@ fun maybe_update_elts_variance(
   (orig_mode, joined_mode, var) match {
   | (N.Mmutable _, N.Mreadonly _, A.Vplus())
   | (N.Mmutable _, N.Mreadonly _, A.Vminus()) ->
-    elts.map(p -> promote_inter_elt(env, var, joined_mode, acc.subst, p))
+    elts.map(p ->
+      promote_inter_elt(context, env, var, joined_mode, acc.subst, p)
+    )
   | _ -> elts
   }
 }

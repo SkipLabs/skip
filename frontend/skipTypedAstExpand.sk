@@ -40,34 +40,40 @@ fun prune_tfun_mods<Ta>(x: Array<Ta>): Array<Ta> {
 /*****************************************************************************/
 /* Type expansion. */
 /*****************************************************************************/
-fun type(env: Env, subst: IMap<N.Type_>, ty_: N.Type_): N.Type_ {
+fun type(
+  context: mutable SKFS.Context,
+  env: Env,
+  subst: IMap<N.Type_>,
+  ty_: N.Type_,
+): N.Type_ {
   (pos, ty) = ty_;
-  (pos, type__(env, subst, pos, ty))
+  (pos, type__(context, env, subst, pos, ty))
 }
 
 fun type__(
+  context: mutable SKFS.Context,
   env: Env,
   subst: IMap<N.Type_>,
   pos: FileRange,
   ty_: N.Type__,
 ): N.Type__ {
-  inner = ty -> type(env, subst, ty);
+  inner = ty -> type(context, env, subst, ty);
   ty_ match {
   | N.Tanything() -> ty_
   | N.Tfrozen _
   | N.TnonNullable _ ->
     N.Tanything()
   | N.Tapply(mode, n, tyl) ->
-    check_tapply(env, pos, n, ty_);
+    check_tapply(context, env, pos, n, ty_);
     N.Tapply(mode, n, tyl.map(inner))
   | N.Tpromoted(var, mode, _, tparams, n, tyl) ->
     !tparams = filter_expanded_tparams(tparams);
-    check_tpromoted(env, pos, tparams, n, ty_);
+    check_tpromoted(context, env, pos, tparams, n, ty_);
     tyl1 = tyl.map(inner);
     if (tparams.isEmpty()) {
       N.Tapply(mode, n, tyl1)
     } else {
-      cd = SkipNaming.getClass(n);
+      cd = SkipNaming.getClass(context, n);
       elt = N.InterElt{
         depth => cd.depth,
         kind => cd.kind,
@@ -83,14 +89,14 @@ fun type__(
       variance,
       tfun_mods(mods),
       Array[],
-      type__params(env, subst, params),
+      type__params(context, env, subst, params),
       inner(ty),
     )
   // Mismatched variance tparams are replaced with their upper bound post typing
   // The "upper bound" is usually whatever the type argument the parent has
   // that was found to be unsafe
   | N.Tparam(_, _, id, _) if (id.startsWith(TU.mismatched_prefix)) ->
-    type(env, subst, env.mismatched_variance_bounds[id]).i1
+    type(context, env, subst, env.mismatched_variance_bounds[id]).i1
   // Uknown type arg existentials are replaced with their upper bound post
   // typing. The upper bound must be a concrete/physical type and not a ktrait
   // If no bound is found, we give Tanything
@@ -100,6 +106,7 @@ fun type__(
     };
     uppers = env.tparam_constraints.findUppers(id).filter(x ->
       TU.has_concrete_type_for_matching(
+        context,
         env.tparam_constraints,
         subst,
         x,
@@ -108,7 +115,7 @@ fun type__(
     if (uppers.isEmpty()) {
       N.Tanything()
     } else {
-      type(env, subst, uppers[0]).i1
+      type(context, env, subst, uppers[0]).i1
     }
   | x @ N.Tparam _ -> x
   // Empty Tset is valid if it has a Tparam that it came from
@@ -123,7 +130,7 @@ fun type__(
     elt = inter[0];
     !tparams = filter_expanded_tparams(tparams);
     check_elt(env, pos, tparams, elt, ty_);
-    newElts = type__inter(env, subst, inter);
+    newElts = type__inter(context, env, subst, inter);
     invariant(!newElts.isEmpty(), "ICE empty tset in nonempty case");
     ielt = newElts[0];
     if (tparams.isEmpty()) N.Tapply(mode, ielt.name, ielt.targs) else {
@@ -142,6 +149,7 @@ fun type__(
 }
 
 fun type__inter(
+  context: mutable SKFS.Context,
   env: Env,
   subst: IMap<N.Type_>,
   inter: Array<N.InterElt>,
@@ -156,10 +164,10 @@ fun type__inter(
       if (parents.contains(cname.i1)) {
         None()
       } else {
-        cd = SkipNaming.getClass(cname);
+        cd = SkipNaming.getClass(context, cname);
         add_all(cd.extends_);
         add_all(cd.use);
-        !elt.targs = tyl.map(ty -> type(env, subst, ty));
+        !elt.targs = tyl.map(ty -> type(context, env, subst, ty));
         Some(elt)
       }
     })
@@ -169,13 +177,14 @@ fun type__inter(
 }
 
 fun type__params(
+  context: mutable SKFS.Context,
   env: Env,
   subst: IMap<N.Type_>,
   x: Parameters<N.Type_>,
 ): Parameters<N.Type_> {
   x match {
-  | Positional(l) -> Positional(l.map(ty -> type(env, subst, ty)))
-  | Named(m) -> Named(m.map((_, ty) -> type(env, subst, ty)))
+  | Positional(l) -> Positional(l.map(ty -> type(context, env, subst, ty)))
+  | Named(m) -> Named(m.map((_, ty) -> type(context, env, subst, ty)))
   }
 }
 
@@ -192,11 +201,17 @@ fun filter_expanded_tparams(tparams: SMap<String>): SMap<String> {
   )
 }
 
-fun check_tapply(env: Env, pos: FileRange, n: N.Name, ty: N.Type__): void {
+fun check_tapply(
+  context: mutable SKFS.Context,
+  env: Env,
+  pos: FileRange,
+  n: N.Name,
+  ty: N.Type__,
+): void {
   is_valid =
     check_is_this(env, n) ||
     env.is_constraint ||
-    SkipNaming.getClass(n).kind != A.KTrait();
+    SkipNaming.getClass(context, n).kind != A.KTrait();
   if (!is_valid) {
     print_error_ln(pos.toString());
     BufferedPrinter.pp(SkipNamedAstPp.type__, ty);
@@ -207,6 +222,7 @@ fun check_tapply(env: Env, pos: FileRange, n: N.Name, ty: N.Type__): void {
 }
 
 fun check_tpromoted(
+  context: mutable SKFS.Context,
   env: Env,
   pos: FileRange,
   tparams: SMap<String>,
@@ -217,7 +233,7 @@ fun check_tpromoted(
     check_is_this(env, n) ||
     env.is_constraint ||
     !tparams.isEmpty() ||
-    SkipNaming.getClass(n).kind != A.KTrait();
+    SkipNaming.getClass(context, n).kind != A.KTrait();
   if (!is_valid) {
     print_error_ln(pos.toString());
     BufferedPrinter.pp(SkipNamedAstPp.type__, ty);
@@ -270,6 +286,7 @@ private base class ExprState {
 }
 
 fun expr(
+  context: mutable SKFS.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -283,21 +300,21 @@ fun expr(
     | tx @ TExpr _ ->
       tx.expr match {
       | (ty, (pos, b @ T.Bind _)) ->
-        !ty = type(env, subst, ty);
-        bind = binding(env, subst, b.binding);
-        rval = expr(env, lambdas, subst, b.expr);
+        !ty = type(context, env, subst, ty);
+        bind = binding(context, env, subst, b.binding);
+        rval = expr(context, env, lambdas, subst, b.expr);
         stack.push(BindState{ty, pos, bind, rval});
         stack.push(TExpr{expr => b.cont})
       | (ty, (pos, s @ T.Seq _)) ->
-        !ty = type(env, subst, ty);
-        left = expr(env, lambdas, subst, s.left);
+        !ty = type(context, env, subst, ty);
+        left = expr(context, env, lambdas, subst, s.left);
         stack.push(SeqState{ty, pos, left});
         stack.push(TExpr{expr => s.right})
       | (ty, (pos, c @ T.Call _)) ->
-        !ty = type(env, subst, ty);
+        !ty = type(context, env, subst, ty);
         stack.push(CallState{ty, pos, args => c.args});
         stack.push(TExpr{expr => c.base})
-      | x -> !res = Some(expr_(env, lambdas, subst, x))
+      | x -> !res = Some(expr_(context, env, lambdas, subst, x))
       }
     | b @ BindState _ ->
       cont = res.fromSome();
@@ -307,7 +324,7 @@ fun expr(
       !res = Some((s.ty, (s.pos, T.Seq(s.left, right))))
     | c @ CallState _ ->
       base = res.fromSome();
-      args = expr_parameters(env, lambdas, subst, c.args);
+      args = expr_parameters(context, env, lambdas, subst, c.args);
       !res = Some((c.ty, (c.pos, T.Call(base, args))))
     }
   };
@@ -315,36 +332,38 @@ fun expr(
 }
 
 fun expr_(
+  context: mutable SKFS.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
   e: T.Expr,
 ): T.Expr {
   (orig_ty, (pos, e__)) = e;
-  ty = type(env, subst, orig_ty);
-  inner = ex -> expr(env, lambdas, subst, ex);
+  ty = type(context, env, subst, orig_ty);
+  inner = ex -> expr(context, env, lambdas, subst, ex);
   e__ match {
   | T.DefaultArg() -> (ty, (pos, T.DefaultArg()))
   | T.Literal(l) -> (ty, (pos, T.Literal(l)))
   | T.Const(n) -> (ty, (pos, T.Const(n)))
-  | T.Fun(n, tyl) -> (ty, (pos, T.Fun(n, tyl.map(ty -> type(env, subst, ty)))))
+  | T.Fun(n, tyl) ->
+    (ty, (pos, T.Fun(n, tyl.map(ty -> type(context, env, subst, ty)))))
   | T.Local(n) -> (ty, (pos, T.Local(n)))
   | T.Annotated(e1, ty_) ->
-    (ty, (pos, T.Annotated(inner(e1), type(env, subst, ty_))))
+    (ty, (pos, T.Annotated(inner(e1), type(context, env, subst, ty_))))
   | T.Call _ -> invariant_violation("ICE call covered in expr")
   | T.Barbar(e1, e2) -> (ty, (pos, T.Barbar(inner(e1), inner(e2))))
   | T.Ampamp(e1, e2) -> (ty, (pos, T.Ampamp(inner(e1), inner(e2))))
   | T.Assign(v, rvalue) ->
-    (ty, (pos, T.Assign(local(env, subst, v), inner(rvalue))))
+    (ty, (pos, T.Assign(local(context, env, subst, v), inner(rvalue))))
   | T.Lambda(np, fv, e1, yields) ->
-    np1 = np.map(p -> binding(env, subst, p));
-    fv1 = fv.map((_, p) -> binding(env, subst, p));
+    np1 = np.map(p -> binding(context, env, subst, p));
+    fv1 = fv.map((_, p) -> binding(context, env, subst, p));
     e2 = inner(e1);
     (ty, (pos, T.Lambda(np1, fv1, e2, yields)))
   | T.Await(e1) -> (ty, (pos, T.Await(inner(e1))))
   | T.Return(e1) -> (ty, (pos, T.Return(inner(e1))))
   | T.Async(fv, e1) ->
-    fv1 = fv.map((_, p) -> binding(env, subst, p));
+    fv1 = fv.map((_, p) -> binding(context, env, subst, p));
     (ty, (pos, T.Async(fv1, inner(e1))))
   | T.Throw(e1) -> (ty, (pos, T.Throw(inner(e1))))
   | T.Array(el) -> (ty, (pos, T.Array(el.map(inner))))
@@ -361,7 +380,7 @@ fun expr_(
         pos,
         T.Match(
           inner(e1),
-          mbl.map(mb -> match_branch(env, lambdas, subst, mb)),
+          mbl.map(mb -> match_branch(context, env, lambdas, subst, mb)),
         ),
       ),
     )
@@ -370,7 +389,10 @@ fun expr_(
       ty,
       (
         pos,
-        T.Try(inner(e1), mbl.map(mb -> match_branch(env, lambdas, subst, mb))),
+        T.Try(
+          inner(e1),
+          mbl.map(mb -> match_branch(context, env, lambdas, subst, mb)),
+        ),
       ),
     )
   | T.Bind _ -> invariant_violation("ICE bind covered in expr")
@@ -381,8 +403,8 @@ fun expr_(
         pos,
         T.Object(
           n,
-          targs.map(ty -> type(env, subst, ty)),
-          expr_parameters(env, lambdas, subst, args),
+          targs.map(ty -> type(context, env, subst, ty)),
+          expr_parameters(context, env, lambdas, subst, args),
         ),
       ),
     )
@@ -391,34 +413,42 @@ fun expr_(
   /* Add casts to "dot" nodes to remove `Tset` for the native backend */
   | T.Dot(dot_info) ->
     obj_expr = add_source_cast(
+      context,
       env,
       lambdas,
       subst,
       dot_info.source,
       dot_info.obj_expr,
     );
-    field_targs = dot_info.field_targs.map(ty -> type(env, subst, ty));
+    field_targs = dot_info.field_targs.map(ty -> type(context, env, subst, ty));
     (ty, (pos, T.Dot(dot_info with {obj_expr, field_targs})))
   | T.AssignField(e1, source, n, e2) ->
-    e11 = add_source_cast(env, lambdas, subst, source, e1);
+    e11 = add_source_cast(context, env, lambdas, subst, source, e1);
     (ty, (pos, T.AssignField(inner(e11), source, n, inner(e2))))
   | T.With(e1, updates) ->
     (
       ty,
-      (pos, T.With(inner(e1), with_updates(env, lambdas, subst, ty, updates))),
+      (
+        pos,
+        T.With(
+          inner(e1),
+          with_updates(context, env, lambdas, subst, ty, updates),
+        ),
+      ),
     )
 
   /* Add casts to "static dot" nodes to remove `Tset` for the native backend */
   | T.StaticDot(dot_info) ->
     obj_expr = add_classobj_source_cast(
+      context,
       env,
       dot_info.source,
       inner(dot_info.obj_expr),
     );
-    field_targs = dot_info.field_targs.map(ty -> type(env, subst, ty));
+    field_targs = dot_info.field_targs.map(ty -> type(context, env, subst, ty));
     (ty, (pos, T.StaticDot(dot_info with {obj_expr, field_targs})))
   | T.DynamicConstruction(e1, n, targs, args) ->
-    e2 = add_classobj_source_cast(env, n, inner(e1));
+    e2 = add_classobj_source_cast(context, env, n, inner(e1));
     (
       ty,
       (
@@ -426,13 +456,19 @@ fun expr_(
         T.DynamicConstruction(
           e2,
           n,
-          targs.map(ty -> type(env, subst, ty)),
-          expr_parameters(env, lambdas, subst, args),
+          targs.map(ty -> type(context, env, subst, ty)),
+          expr_parameters(context, env, lambdas, subst, args),
         ),
       ),
     )
   | T.TemplateLiteral(args) ->
-    (ty, (pos, T.TemplateLiteral(expr_parameters(env, lambdas, subst, args))))
+    (
+      ty,
+      (
+        pos,
+        T.TemplateLiteral(expr_parameters(context, env, lambdas, subst, args)),
+      ),
+    )
   | T.Continue() -> (ty, (pos, T.Continue()))
   | T.Break(eb) -> (ty, (pos, T.Break(inner(eb))))
   | T.Loop(eb) -> (ty, (pos, T.Loop(inner(eb))))
@@ -446,16 +482,18 @@ fun expr_(
 }
 
 fun ordered_expr(
+  context: mutable SKFS.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
   ex: T.Ordered_expr,
 ): T.Ordered_expr {
   (i, e) = ex;
-  (i, expr(env, lambdas, subst, e))
+  (i, expr(context, env, lambdas, subst, e))
 }
 
 fun with_updates(
+  context: mutable SKFS.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -465,17 +503,18 @@ fun with_updates(
   m.map((_, p) -> {
     (i, e, source, cast_opt) = p;
     assert(cast_opt.isSome());
-    cast = type(env, subst, cast_opt.fromSome());
+    cast = type(context, env, subst, cast_opt.fromSome());
     (
       i,
-      expr(env, lambdas, subst, e),
+      expr(context, env, lambdas, subst, e),
       source,
-      build_necessary_cast(env, source, obj_ty, cast),
+      build_necessary_cast(context, env, source, obj_ty, cast),
     )
   })
 }
 
 fun expr_option(
+  context: mutable SKFS.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -483,11 +522,12 @@ fun expr_option(
 ): ?T.Expr {
   x match {
   | None() -> None()
-  | Some(x1) -> Some(expr(env, lambdas, subst, x1))
+  | Some(x1) -> Some(expr(context, env, lambdas, subst, x1))
   }
 }
 
 fun expr_parameters(
+  context: mutable SKFS.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -495,12 +535,14 @@ fun expr_parameters(
 ): T.Call_args {
   x match {
   | Positional(el) ->
-    Positional(el.map(oe -> ordered_expr(env, lambdas, subst, oe)))
-  | Named(em) -> Named(em.map((_, oe) -> ordered_expr(env, lambdas, subst, oe)))
+    Positional(el.map(oe -> ordered_expr(context, env, lambdas, subst, oe)))
+  | Named(em) ->
+    Named(em.map((_, oe) -> ordered_expr(context, env, lambdas, subst, oe)))
   }
 }
 
 fun add_source_cast(
+  context: mutable SKFS.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -508,15 +550,16 @@ fun add_source_cast(
   e: T.Expr,
 ): T.Expr {
   (ty, (pos, _)) = e;
-  cast_ty_opt = find_source_ty(env, false, source, ty);
+  cast_ty_opt = find_source_ty(context, env, false, source, ty);
   res_e = cast_ty_opt match {
   | None() -> e
   | Some(new_ty) -> (new_ty, (pos, T.Annotated(e, new_ty)))
   };
-  expr(env, lambdas, subst, res_e)
+  expr(context, env, lambdas, subst, res_e)
 }
 
 fun find_source_ty(
+  context: mutable SKFS.Context,
   env: Env,
   from_with: Bool,
   source: N.Name,
@@ -524,10 +567,10 @@ fun find_source_ty(
 ): ?N.Type_ {
   ty match {
   | (_, N.Tnamed(_, inner_ty)) ->
-    find_source_ty(env, from_with, source, inner_ty)
+    find_source_ty(context, env, from_with, source, inner_ty)
   | (pos, N.Tset(_, mode, _, elts)) ->
     elt = elts.find(elt -> elt.name.i1 == source.i1).fromSome();
-    elt_cd = SkipNaming.getClass(elt.name);
+    elt_cd = SkipNaming.getClass(context, elt.name);
     elt_cd.kind match {
     | A.KTrait() -> None()
     | _ -> Some((pos, N.Tapply(mode, elt.name, elt.targs)))
@@ -537,7 +580,7 @@ fun find_source_ty(
     N.Tpromoted(_, mode, _, tparam_set, n, tyl),
   ) if (!tparam_set.isEmpty()) ->
     invariant(n.i1 == source.i1, "ICE invalid cast");
-    SkipNaming.getClass(n).kind match {
+    SkipNaming.getClass(context, n).kind match {
     | A.KTrait() -> None()
     | _ -> Some((fr, N.Tapply(mode, n, tyl)))
     }
@@ -551,10 +594,15 @@ fun find_source_ty(
   }
 }
 
-fun add_classobj_source_cast(env: Env, source: N.Name, e: T.Expr): T.Expr {
+fun add_classobj_source_cast(
+  context: mutable SKFS.Context,
+  env: Env,
+  source: N.Name,
+  e: T.Expr,
+): T.Expr {
   (classobj_ty, (pos, _)) = e;
   (cpos, cname, inner_ty) = unwrap_classobj_ty(classobj_ty);
-  cast_ty_opt = find_source_ty(env, false, source, inner_ty);
+  cast_ty_opt = find_source_ty(context, env, false, source, inner_ty);
   cast_ty_opt match {
   | None() -> e
   | Some(new_inner_ty) ->
@@ -579,6 +627,7 @@ fun unwrap_classobj_ty(ty: N.Type_): (FileRange, N.Name, N.Type_) {
 }
 
 fun build_necessary_cast(
+  context: mutable SKFS.Context,
   env: Env,
   source: N.Name,
   obj_ty: N.Type_,
@@ -586,9 +635,9 @@ fun build_necessary_cast(
 ): ?N.Type_ {
   /* If the source is just the obj_ty, no cast;
    *   otherwise, use the cast provided */
-  find_source_ty(env, true, source, obj_ty) match {
+  find_source_ty(context, env, true, source, obj_ty) match {
   | None() -> None()
-  | Some _ -> find_source_ty(env, false, source, cast)
+  | Some _ -> find_source_ty(context, env, false, source, cast)
   }
 }
 
@@ -596,6 +645,7 @@ fun build_necessary_cast(
 /* Pattern-matching. */
 /*****************************************************************************/
 fun match_branch(
+  context: mutable SKFS.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -603,58 +653,86 @@ fun match_branch(
 ): T.Match_branch {
   (pats, maybe_guard, e) = p;
   (
-    patterns(env, subst, pats),
-    maybe_guard.map((ex -> expr(env, lambdas, subst, ex))),
-    expr(env, lambdas, subst, e),
+    patterns(context, env, subst, pats),
+    maybe_guard.map((ex -> expr(context, env, lambdas, subst, ex))),
+    expr(context, env, lambdas, subst, e),
   )
 }
 
 fun patterns(
+  context: mutable SKFS.Context,
   env: Env,
   subst: IMap<N.Type_>,
   pats: List<T.Pattern>,
 ): List<T.Pattern> {
-  pats.map(pat -> pattern(env, subst, pat))
+  pats.map(pat -> pattern(context, env, subst, pat))
 }
 
-fun pattern(env: Env, subst: IMap<N.Type_>, pat: T.Pattern): T.Pattern {
+fun pattern(
+  context: mutable SKFS.Context,
+  env: Env,
+  subst: IMap<N.Type_>,
+  pat: T.Pattern,
+): T.Pattern {
   (ty, pat_) = pat;
-  (type(env, subst, ty), pattern_(env, subst, pat_))
+  (type(context, env, subst, ty), pattern_(context, env, subst, pat_))
 }
 
-fun pattern_(env: Env, subst: IMap<N.Type_>, pat_: T.Pattern_): T.Pattern_ {
+fun pattern_(
+  context: mutable SKFS.Context,
+  env: Env,
+  subst: IMap<N.Type_>,
+  pat_: T.Pattern_,
+): T.Pattern_ {
   (pos, pat__) = pat_;
-  (pos, pattern__(env, subst, pat__))
+  (pos, pattern__(context, env, subst, pat__))
 }
 
-fun pattern__(env: Env, subst: IMap<N.Type_>, x: T.Pattern__): T.Pattern__ {
+fun pattern__(
+  context: mutable SKFS.Context,
+  env: Env,
+  subst: IMap<N.Type_>,
+  x: T.Pattern__,
+): T.Pattern__ {
   x match {
-  | T.Pat_var(v) -> T.Pat_var(binding(env, subst, v))
+  | T.Pat_var(v) -> T.Pat_var(binding(context, env, subst, v))
   | l @ T.Pat_literal _ -> l
   | T.Pat_type(tid, castType, params) ->
     new_params = params.map(pars ->
-      pars.map(p -> param_pattern(env, subst, p))
+      pars.map(p -> param_pattern(context, env, subst, p))
     );
-    T.Pat_type(tid, type(env, subst, castType), new_params)
-  | T.Pat_as(p, v) -> T.Pat_as(pattern(env, subst, p), binding(env, subst, v))
+    T.Pat_type(tid, type(context, env, subst, castType), new_params)
+  | T.Pat_as(p, v) ->
+    T.Pat_as(pattern(context, env, subst, p), binding(context, env, subst, v))
   }
 }
 
 fun param_pattern(
+  context: mutable SKFS.Context,
   env: Env,
   subst: IMap<N.Type_>,
   param_pat: T.ParamPattern,
 ): T.ParamPattern {
   (ty, pat) = param_pat;
-  (type(env, subst, ty), pattern(env, subst, pat))
+  (type(context, env, subst, ty), pattern(context, env, subst, pat))
 }
 
-fun local(env: Env, subst: IMap<N.Type_>, local: T.LocalInfo): T.LocalInfo {
+fun local(
+  context: mutable SKFS.Context,
+  env: Env,
+  subst: IMap<N.Type_>,
+  local: T.LocalInfo,
+): T.LocalInfo {
   (ty, n) = local;
-  (type(env, subst, ty), n)
+  (type(context, env, subst, ty), n)
 }
 
-fun binding(env: Env, subst: IMap<N.Type_>, binding: T.Binding): T.Binding {
+fun binding(
+  context: mutable SKFS.Context,
+  env: Env,
+  subst: IMap<N.Type_>,
+  binding: T.Binding,
+): T.Binding {
   (ty, n, byref) = binding;
-  (type(env, subst, ty), n, byref)
+  (type(context, env, subst, ty), n, byref)
 }

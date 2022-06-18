@@ -366,11 +366,8 @@ fun getType(typeName: String): ?A.Type_alias_def {
   )
 }
 
-fun getConst(constName: String): ?A.Const_def {
-  arr = defMapDir.getArray(
-    Reactive.getContext(),
-    SKFS.SID("const:" + constName),
-  );
+fun getConst(context: mutable SKFS.Context, constName: String): ?A.Const_def {
+  arr = defMapDir.getArray(context, SKFS.SID("const:" + constName));
   if (arr.size() == 0) return None();
   if (arr.size() > 1) invariant_violation("TODO multiple consts");
   Some(

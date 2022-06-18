@@ -259,19 +259,34 @@ fun make_tenv(env: Env, acc: Acc): Types.Env {
   }
 }
 
-fun promote(env: Env, acc: Acc, ty: N.Type_): N.Type_ {
+fun promote(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  ty: N.Type_,
+): N.Type_ {
   tenv = make_tenv(env, acc);
-  Types.promote(tenv, Ast.Vplus(), acc.subst, ty)
+  Types.promote(context, tenv, Ast.Vplus(), acc.subst, ty)
 }
 
-fun contra_promote(env: Env, acc: Acc, ty: N.Type_): N.Type_ {
+fun contra_promote(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  ty: N.Type_,
+): N.Type_ {
   tenv = make_tenv(env, acc);
-  Types.promote(tenv, Ast.Vminus(), acc.subst, ty)
+  Types.promote(context, tenv, Ast.Vminus(), acc.subst, ty)
 }
 
-fun inv_promote(env: Env, acc: Acc, ty: N.Type_): N.Type_ {
+fun inv_promote(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  ty: N.Type_,
+): N.Type_ {
   tenv = make_tenv(env, acc);
-  Types.promote(tenv, Ast.Vnone(), acc.subst, ty)
+  Types.promote(context, tenv, Ast.Vnone(), acc.subst, ty)
 }
 
 fun freeze(caller_pos: FileRange, acc: Acc, x: N.Type_): N.Type_ {
@@ -361,6 +376,7 @@ fun make_texn(fr: FileRange, var: N.Variance): N.Type_ {
 }
 
 fun make_tapply(
+  context: mutable SKFS.Context,
   env: Env,
   acc: Acc,
   pos: FileRange,
@@ -368,7 +384,7 @@ fun make_tapply(
   class_name: N.Name,
   targs: Array<N.Type_>,
 ): N.Type_ {
-  promote(env, acc, (pos, N.Tapply(mode, class_name, targs)))
+  promote(context, env, acc, (pos, N.Tapply(mode, class_name, targs)))
 }
 
 fun is_this_ty(env: Env, acc: Acc, ty: N.Type_): Bool {
@@ -389,8 +405,15 @@ fun is_this_ty_(this_cstr: String, acc: Acc, x: N.Type_): Bool {
   }
 }
 
-fun make_tconcrete(env: Env, acc: Acc, pos: FileRange, ty: N.Type_): N.Type_ {
+fun make_tconcrete(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  pos: FileRange,
+  ty: N.Type_,
+): N.Type_ {
   tclass = make_tapply(
+    context,
     env,
     acc,
     pos,
@@ -405,8 +428,22 @@ fun make_tconcrete(env: Env, acc: Acc, pos: FileRange, ty: N.Type_): N.Type_ {
   }
 }
 
-fun make_tobject(env: Env, acc: Acc, pos: FileRange, ty: N.Type_): N.Type_ {
-  tclass = make_tapply(env, acc, pos, N.Mchilled(), (pos, "Class"), Array[ty]);
+fun make_tobject(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  pos: FileRange,
+  ty: N.Type_,
+): N.Type_ {
+  tclass = make_tapply(
+    context,
+    env,
+    acc,
+    pos,
+    N.Mchilled(),
+    (pos, "Class"),
+    Array[ty],
+  );
   if (is_this_ty(env, acc, ty)) {
     (pos, N.Tnamed(N.NStatic(env.this_class.fromSome()), tclass))
   } else {
@@ -414,9 +451,15 @@ fun make_tobject(env: Env, acc: Acc, pos: FileRange, ty: N.Type_): N.Type_ {
   }
 }
 
-fun make_tbase(env: Env, acc: Acc, pos: FileRange, ty: N.Type_): N.Type_ {
+fun make_tbase(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  pos: FileRange,
+  ty: N.Type_,
+): N.Type_ {
   /* is never this */
-  make_tapply(env, acc, pos, N.Mchilled(), (pos, "Base"), Array[ty])
+  make_tapply(context, env, acc, pos, N.Mchilled(), (pos, "Base"), Array[ty])
 }
 
 const invalidCastError: String = "InvalidCast";
@@ -429,11 +472,24 @@ const invalidCastError: String = "InvalidCast";
 /*****************************************************************************/
 
 base class Constraint uses Show {
-  fun solve(next_id: () -> Int, msg: String, env: Env, acc: Acc): Acc;
+  fun solve(
+    context: mutable SKFS.Context,
+    next_id: () -> Int,
+    msg: String,
+    env: Env,
+    acc: Acc,
+  ): Acc;
 
-  fun solve_call(next_id: () -> Int, last_tvar: Int, env: Env, acc: Acc): Acc;
+  fun solve_call(
+    context: mutable SKFS.Context,
+    next_id: () -> Int,
+    last_tvar: Int,
+    env: Env,
+    acc: Acc,
+  ): Acc;
 
   static fun solve_pair(
+    context: mutable SKFS.Context,
     next_id: () -> Int,
     msg: String,
     env: Env,
@@ -442,8 +498,9 @@ base class Constraint uses Show {
     lty_co: N.Type_,
     rty: N.Type_,
   ): Acc {
-    rty_contra = contra_promote(env, acc, rty);
+    rty_contra = contra_promote(context, env, acc, rty);
     (acc1, _) = join_constraints(
+      context,
       next_id,
       env,
       fr,
@@ -465,13 +522,28 @@ class RelationalConstraint(
   lty: N.Type_,
   rtys: Array<N.Type_>,
 ) extends TypingConstraint {
-  fun solve(next_id: () -> Int, msg: String, env: Env, acc: Acc): Acc {
-    lty_co = promote(env, acc, this.lty);
-    expand_type(env, acc, lty_co) match {
+  fun solve(
+    context: mutable SKFS.Context,
+    next_id: () -> Int,
+    msg: String,
+    env: Env,
+    acc: Acc,
+  ): Acc {
+    lty_co = promote(context, env, acc, this.lty);
+    expand_type(context, env, acc, lty_co) match {
     | (_, N.Tanything()) -> acc
     | _ ->
       rtype = (acc, rty) ->
-        Constraint::solve_pair(next_id, msg, env, acc, this.fr, lty_co, rty);
+        Constraint::solve_pair(
+          context,
+          next_id,
+          msg,
+          env,
+          acc,
+          this.fr,
+          lty_co,
+          rty,
+        );
       this.rtys.reduce(rtype, acc)
     }
   }
@@ -525,22 +597,29 @@ class RelationalConstraint(
    */
   /***************************************************************************/
 
-  fun solve_call(next_id: () -> Int, last_tvar: Int, env: Env, acc: Acc): Acc {
+  fun solve_call(
+    context: mutable SKFS.Context,
+    next_id: () -> Int,
+    last_tvar: Int,
+    env: Env,
+    acc: Acc,
+  ): Acc {
     msg = "Constraint not satisfied";
     pos = this.fr;
     lty = this.lty;
     rtys = this.rtys;
-    lty_co = promote(env, acc, lty);
+    lty_co = promote(context, env, acc, lty);
     Types.unfold_type(acc.subst, lty_co) match {
     | (_, N.Tanything()) -> acc
     | _ ->
       rtype = (acc: Acc, rty: N.Type_) -> {
-        if (!this.currentlySolvable(lty_co, rty, env, acc)) return acc;
+        if (!this.currentlySolvable(context, lty_co, rty, env, acc)) return acc;
         // if rty is a tvar of interest, rebind it to the LUB of lty and rty
         acc1 = rty match {
         | (_, N.Tvar(id)) if (id >= last_tvar) ->
-          rty_co = promote(env, acc, rty);
+          rty_co = promote(context, env, acc, rty);
           (acc1, joined) = join_constraints(
+            context,
             next_id,
             env,
             pos,
@@ -550,20 +629,30 @@ class RelationalConstraint(
             rty_co,
           );
           // back-propagate LUB to old tvar id. constraint forwarding should simplify
-          new_rty_co = promote(env, acc1, rty);
+          new_rty_co = promote(context, env, acc1, rty);
           acc2 = static::fix_subst(id, new_rty_co, acc1);
-          (acc3, _) = join(next_id, env, pos, msg, acc2, rty, joined);
+          (acc3, _) = join(context, next_id, env, pos, msg, acc2, rty, joined);
           acc3
         | _ -> acc
         };
         // then solve as usual
-        TypingConstraint::solve_pair(next_id, msg, env, acc1, pos, lty_co, rty);
+        TypingConstraint::solve_pair(
+          context,
+          next_id,
+          msg,
+          env,
+          acc1,
+          pos,
+          lty_co,
+          rty,
+        );
       };
       rtys.foldl(rtype, acc)
     }
   }
 
   private fun currentlySolvable(
+    context: mutable SKFS.Context,
     lty_co: N.Type_,
     rty: N.Type_,
     env: Env,
@@ -573,7 +662,7 @@ class RelationalConstraint(
     // Tsets are already promoted
     | N.Tpromoted(_, _, _, _, n, targs)
     | N.Tapply(_, n, targs) ->
-      cd = SkipNaming.getClass(n);
+      cd = SkipNaming.getClass(context, n);
       conditionalUses = cd.use.filter((_, _, p) -> !p.conditions.isEmpty());
       if (conditionalUses.isEmpty()) {
         true
@@ -582,7 +671,7 @@ class RelationalConstraint(
         subst_tparams = N.make_subst(lty_co.i0, tparams, targs);
         tsubst = t ->
           N.type_subst(Types.freeze, subst_tparams, acc.tparam_constraints, t);
-        presentTraits = this.rtyKTraits(rty, env, acc);
+        presentTraits = this.rtyKTraits(context, rty, env, acc);
         for ((parName, _tya, par) in conditionalUses) {
           if (!presentTraits.contains(parName.i1)) continue;
           allPossibleConditionsHaveUnresolved = par.conditions.all(conds -> {
@@ -597,18 +686,26 @@ class RelationalConstraint(
     | N.Tparam(_, _, id, _) ->
       acc.tparam_constraints
         .findUppers(id)
-        .foldl((b, t) -> b && this.currentlySolvable(t, rty, env, acc), true)
+        .foldl(
+          (b, t) -> b && this.currentlySolvable(context, t, rty, env, acc),
+          true,
+        )
 
-    | N.Tdefault(ty) -> this.currentlySolvable(ty, rty, env, acc)
+    | N.Tdefault(ty) -> this.currentlySolvable(context, ty, rty, env, acc)
     | _ -> true
     }
   }
 
-  private fun rtyKTraits(rty: N.Type_, env: Env, acc: Acc): SSet {
+  private fun rtyKTraits(
+    context: mutable SKFS.Context,
+    rty: N.Type_,
+    env: Env,
+    acc: Acc,
+  ): SSet {
     Types.unfold_type(acc.subst, rty).i1 match {
     | N.Tpromoted(_, _, _, _, n, _)
     | N.Tapply(_, n, _) ->
-      cd = SkipNaming.getClass(n);
+      cd = SkipNaming.getClass(context, n);
       cd.kind match {
       | Ast.KTrait() ->
         s =
@@ -625,9 +722,9 @@ class RelationalConstraint(
     | N.Tparam(_, _, id, _) ->
       acc.tparam_constraints
         .findUppers(id)
-        .foldl((s, t) -> s.union(this.rtyKTraits(t, env, acc)), SSet[])
+        .foldl((s, t) -> s.union(this.rtyKTraits(context, t, env, acc)), SSet[])
 
-    | N.Tdefault(ty) -> this.rtyKTraits(ty, env, acc)
+    | N.Tdefault(ty) -> this.rtyKTraits(context, ty, env, acc)
     | _ -> SSet[]
     }
   }
@@ -660,13 +757,19 @@ class MutPreservationConstraint(
   tparam: N.Type_parameter,
   tvar: (FileRange, N.Tvar),
 ) extends TypingConstraint {
-  fun solve(next_id: () -> Int, msg: String, env: Env, acc: Acc): Acc {
+  fun solve(
+    context: mutable SKFS.Context,
+    next_id: () -> Int,
+    msg: String,
+    env: Env,
+    acc: Acc,
+  ): Acc {
     fr = this.tvar.i0;
     tfrozen = (fr, N.Tfrozen(Ast.Vminus()));
-    tvar_co = promote(env, acc, this.tvar);
+    tvar_co = promote(context, env, acc, this.tvar);
     vtry(
       () -> {
-        (!acc, _) = join_exn(next_id, env, acc, tvar_co, tfrozen);
+        (!acc, _) = join_exn(context, next_id, env, acc, tvar_co, tfrozen);
         acc
       },
       exn -> {
@@ -678,16 +781,22 @@ class MutPreservationConstraint(
             this.targ,
             this.tparam,
           );
-          types_error(next_id, true, env, acc, fr, msg, mut_pres)
+          types_error(context, next_id, true, env, acc, fr, msg, mut_pres)
         | e @ Types.Exception _ ->
-          types_error(next_id, true, env, acc, fr, msg, e)
+          types_error(context, next_id, true, env, acc, fr, msg, e)
         | _ -> throw exn
         }
       },
     )
   }
 
-  fun solve_call(() -> Int, Int, Env, acc: Acc): Acc {
+  fun solve_call(
+    _context: mutable SKFS.Context,
+    () -> Int,
+    Int,
+    Env,
+    acc: Acc,
+  ): Acc {
     acc
   }
 
@@ -713,7 +822,13 @@ class LocalMutableConstraint(
   fr: FileRange,
   ty: N.Type_,
 ) extends Constraint {
-  fun solve(_next_id: () -> Int, _msg: String, _env: Env, acc: Acc): Acc {
+  fun solve(
+    _context: mutable SKFS.Context,
+    _next_id: () -> Int,
+    _msg: String,
+    _env: Env,
+    acc: Acc,
+  ): Acc {
     mode = this.level match {
     | LAsyncBlock _ -> is_mutable(acc, this.ty, true)
     | LPureLambda _ -> is_mutable(acc, this.ty, false)
@@ -725,7 +840,13 @@ class LocalMutableConstraint(
     acc
   }
 
-  fun solve_call(() -> Int, Int, Env, acc: Acc): Acc {
+  fun solve_call(
+    _context: mutable SKFS.Context,
+    () -> Int,
+    Int,
+    Env,
+    acc: Acc,
+  ): Acc {
     acc
   }
 
@@ -848,11 +969,22 @@ value class Constraints(
       this.locals.map(c -> c.toString()).join("\n")
   }
 
-  fun solve(next_id: () -> Int, env: Env, acc: Acc): Acc {
-    this.solve_msg(next_id, "Constraint not satisfied", env, acc)
+  fun solve(
+    context: mutable SKFS.Context,
+    next_id: () -> Int,
+    env: Env,
+    acc: Acc,
+  ): Acc {
+    this.solve_msg(context, next_id, "Constraint not satisfied", env, acc)
   }
 
-  fun solve_msg(next_id: () -> Int, msg: String, env: Env, acc: Acc): Acc {
+  fun solve_msg(
+    context: mutable SKFS.Context,
+    next_id: () -> Int,
+    msg: String,
+    env: Env,
+    acc: Acc,
+  ): Acc {
     original = acc.constraints;
     !acc.constraints = static::empty;
     (relational_upper, other) = this.typing.partition(x ->
@@ -864,18 +996,31 @@ value class Constraints(
       | _ -> invariant_violation("ICE impossible match solve_msg")
       }
     );
-    !acc = relational.foldl((acc, c) -> c.solve(next_id, msg, env, acc), acc);
-    !acc = static::check_constraint_consistency(next_id, env, acc, relational);
-    !acc = other.foldl((acc, c) -> c.solve(next_id, msg, env, acc), acc);
-    for (c in this.locals) _ = c.solve(next_id, msg, env, acc);
+    !acc = relational.foldl(
+      (acc, c) -> c.solve(context, next_id, msg, env, acc),
+      acc,
+    );
+    !acc = static::check_constraint_consistency(
+      context,
+      next_id,
+      env,
+      acc,
+      relational,
+    );
+    !acc = other.foldl(
+      (acc, c) -> c.solve(context, next_id, msg, env, acc),
+      acc,
+    );
+    for (c in this.locals) _ = c.solve(context, next_id, msg, env, acc);
     if (acc.constraints.isEmpty()) {
       acc with {constraints => original}
     } else {
-      acc.constraints.solve(next_id, env, acc)
+      acc.constraints.solve(context, next_id, env, acc)
     }
   }
 
   fun solve_at_call(
+    context: mutable SKFS.Context,
     next_id: () -> Int,
     last_constraint: Int,
     last_tvar: Int,
@@ -887,7 +1032,7 @@ value class Constraints(
     // grab the relational constraints for call contraints as described above
     (!constraints, _) = constraints.takeAndDrop(len - last_constraint);
     constraints.foldl(
-      (acc, c) -> c.solve_call(next_id, last_tvar, env, acc),
+      (acc, c) -> c.solve_call(context, next_id, last_tvar, env, acc),
       acc,
     );
   }
@@ -906,6 +1051,7 @@ value class Constraints(
    * canonical form for constraints
    */
   private static fun check_constraint_consistency(
+    context: mutable SKFS.Context,
     next_id: () -> Int,
     env: Env,
     acc: Acc,
@@ -954,7 +1100,7 @@ value class Constraints(
     check_cs = (acc: Acc, cs: List<RelationalConstraint>) -> {
       phys_rtys = mutable Vector[];
       for (c in cs) {
-        rtys = c.rtys.filter(t -> static::is_leaf_type(env, acc, t));
+        rtys = c.rtys.filter(t -> static::is_leaf_type(context, env, acc, t));
         pos_rtys = rtys.map(t -> (c.fr, t));
         phys_rtys.extend(pos_rtys)
       };
@@ -964,11 +1110,11 @@ value class Constraints(
         join_co = (acc_ty: (Acc, N.Type_), pos_rty: (FileRange, N.Type_)) -> {
           (rty_acc, ty_co) = acc_ty;
           (pos, rty) = pos_rty;
-          rty_co = promote(env, acc, rty);
+          rty_co = promote(context, env, acc, rty);
           msg = "Constraint not satisfied";
-          join(next_id, env, pos, msg, rty_acc, ty_co, rty_co)
+          join(context, next_id, env, pos, msg, rty_acc, ty_co, rty_co)
         };
-        init = (acc, promote(env, acc, rtys_hd));
+        init = (acc, promote(context, env, acc, rtys_hd));
 
         (acc1, _) = rtysIter.reduce(join_co, init);
         acc1
@@ -986,11 +1132,16 @@ value class Constraints(
    * to each other - e.g. leaf classes are leaf types, but base classes and
    * traits are not.
    */
-  private static fun is_leaf_type(env: Env, acc: Acc, ty: N.Type_): Bool {
-    child = t -> static::is_leaf_type(env, acc, t);
+  private static fun is_leaf_type(
+    context: mutable SKFS.Context,
+    env: Env,
+    acc: Acc,
+    ty: N.Type_,
+  ): Bool {
+    child = t -> static::is_leaf_type(context, env, acc, t);
     Types.unfold_type(acc.subst, ty) match {
     | (_, N.Tapply(_, name, targs)) ->
-      SkipNaming.getClass(name).kind match {
+      SkipNaming.getClass(context, name).kind match {
       | Ast.KClass() -> targs.all(child)
       | _ -> false
       }
@@ -1012,6 +1163,7 @@ value class Constraints(
 // Check for solveable constraints on methods. If they are not solveable,
 // the method doesn't need to be implemented by the child in question
 fun solvableWhenparams(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   _fr: FileRange,
   env: Env,
@@ -1028,25 +1180,25 @@ fun solvableWhenparams(
     unresovledInnerTvars = isCDTparam(tps, lhs) || !hasCDTparam(tps, lhs);
     if (unresovledInnerTvars) continue;
     for (rhs in rhss) {
-      traits = ktraits(acc.subst, rhs);
-      if (hasConditionalTrait(acc.subst, traits, lhs)) return None();
+      traits = ktraits(context, acc.subst, rhs);
+      if (hasConditionalTrait(context, acc.subst, traits, lhs)) return None();
     }
   };
   finst = t -> {
-    (!acc, !t) = instantiate(next_id, env, acc, t);
+    (!acc, !t) = instantiate(context, next_id, env, acc, t);
     t
   };
   // Actual check
   vtry<?Bool>(
     () -> {
       for ((lhs, rhss) in whenclauses) {
-        !lhs = promote(env, acc, finst(lhs));
+        !lhs = promote(context, env, acc, finst(lhs));
         for (rhs in rhss) {
-          !rhs = contra_promote(env, acc, finst(rhs));
-          (!acc, _) = join_exn_(next_id, true, env, acc, lhs, rhs)
+          !rhs = contra_promote(context, env, acc, finst(rhs));
+          (!acc, _) = join_exn_(context, next_id, true, env, acc, lhs, rhs)
         }
       };
-      _ = acc.constraints.solve(next_id, env, acc);
+      _ = acc.constraints.solve(context, next_id, env, acc);
       Some(true)
     },
     exn ->
@@ -1074,42 +1226,57 @@ fun hasCDTparam(tps: SSet, ty: N.Type_): Bool {
   N.type_fold((cur, t) -> cur || isCDTparam(tps, t), false, ty)
 }
 
-fun ktraits(subst: IMap<N.Type_>, ty: N.Type_): SSet {
+fun ktraits(
+  context: mutable SKFS.Context,
+  subst: IMap<N.Type_>,
+  ty: N.Type_,
+): SSet {
   Types.unfold_type(subst, ty).i1 match {
   | N.Tdefault(inner)
   | N.Tnamed(_, inner) ->
-    ktraits(subst, inner)
+    ktraits(context, subst, inner)
   | N.Tpromoted(_, _, _, _, n, _)
   | N.Tapply(_, n, _) ->
-    SkipNaming.getClass(n).kind match {
+    SkipNaming.getClass(context, n).kind match {
     | Ast.KTrait() -> SSet[n.i1]
     | _ -> SSet[]
     }
   | N.Tset(_, _, _, elts) ->
     elts
       .values()
-      .filter(elt -> SkipNaming.getClass(elt.name).kind is Ast.KTrait())
+      .filter(elt ->
+        SkipNaming.getClass(context, elt.name).kind is Ast.KTrait()
+      )
       .map(elt -> elt.name.i1) |> SSet::createFromIterator
   | _ -> SSet[]
   }
 }
 
-fun hasConditionalTrait(subst: IMap<N.Type_>, traits: SSet, ty: N.Type_): Bool {
+fun hasConditionalTrait(
+  context: mutable SKFS.Context,
+  subst: IMap<N.Type_>,
+  traits: SSet,
+  ty: N.Type_,
+): Bool {
   Types.unfold_type(subst, ty).i1 match {
   | N.Tdefault(inner)
   | N.Tnamed(_, inner) ->
-    hasConditionalTrait(subst, traits, inner)
+    hasConditionalTrait(context, subst, traits, inner)
   | N.Tpromoted(_, _, _, _, n, _)
   | N.Tapply(_, n, _) ->
-    hasConditionalTraitPoint(traits, n)
+    hasConditionalTraitPoint(context, traits, n)
   | N.Tset(_, _, _, elts) ->
-    elts.any(elt -> hasConditionalTraitPoint(traits, elt.name))
+    elts.any(elt -> hasConditionalTraitPoint(context, traits, elt.name))
   | _ -> false
   }
 }
 
-fun hasConditionalTraitPoint(traits: SSet, n: N.Name): Bool {
-  cd = SkipNaming.getClass(n);
+fun hasConditionalTraitPoint(
+  context: mutable SKFS.Context,
+  traits: SSet,
+  n: N.Name,
+): Bool {
+  cd = SkipNaming.getClass(context, n);
   cd.use.any((n, _, par) -> traits.contains(n.i1) && !par.conditions.isEmpty())
 }
 
@@ -1126,14 +1293,24 @@ fun make_expand_env(env: Env, acc: Acc): Expand.Env {
   }
 }
 
-fun expand_expr(env: Env, acc: Acc, e: TAst.Expr): TAst.Expr {
+fun expand_expr(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  e: TAst.Expr,
+): TAst.Expr {
   exp_env = make_expand_env(env, acc);
-  Expand.expr(exp_env, acc.lambda_bodies, acc.subst, e)
+  Expand.expr(context, exp_env, acc.lambda_bodies, acc.subst, e)
 }
 
-fun expand_type(env: Env, acc: Acc, ty: N.Type_): N.Type_ {
+fun expand_type(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  ty: N.Type_,
+): N.Type_ {
   exp_env = make_expand_env(env, acc);
-  Expand.type(exp_env, acc.subst, ty)
+  Expand.type(context, exp_env, acc.subst, ty)
 }
 
 /*****************************************************************************/
@@ -1525,6 +1702,7 @@ fun suggested_frozen_fix(
 }
 
 fun suggested_join_fix(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   solving_constraints: Bool,
   env: Env,
@@ -1546,8 +1724,9 @@ fun suggested_join_fix(
   | (Some(Ast.Vplus()), Some(Ast.Vnone())) ->
     vtry<List<(FileRange, String)>>(
       () -> {
-        prom_ty2 = promote(env, acc, ty2);
+        prom_ty2 = promote(context, env, acc, ty2);
         (!acc, new_ty) = join_exn_(
+          context,
           next_id,
           solving_constraints,
           env,
@@ -1580,9 +1759,10 @@ fun suggested_join_fix(
   | (Some(Ast.Vminus()), Some(Ast.Vnone())) ->
     vtry<List<(FileRange, String)>>(
       () -> {
-        prom_ty1 = promote(env, acc, ty1);
-        prom_ty2 = promote(env, acc, ty2);
+        prom_ty1 = promote(context, env, acc, ty1);
+        prom_ty2 = promote(context, env, acc, ty2);
         (!acc, new_ty) = join_exn_(
+          context,
           next_id,
           solving_constraints,
           env,
@@ -1622,6 +1802,7 @@ fun suggested_join_fix(
 }
 
 fun types_error<T>(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   solving_constraints: Bool,
   env: Env,
@@ -1713,6 +1894,7 @@ fun types_error<T>(
             (ty2.i0, msg2 + Types.to_string(env.this_class, acc.subst, ty2)),
             // Add any casting/annotation suggestions
             suggested_join_fix(
+              context,
               next_id,
               solving_constraints,
               env,
@@ -1802,6 +1984,7 @@ fun types_error<T>(
 }
 
 fun join_exn_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   solving_constraints: Bool,
   env: Env,
@@ -1811,7 +1994,7 @@ fun join_exn_(
 ): (Acc, N.Type_) {
   tenv = make_tenv(env, acc) with {solving_constraints};
   tacc = Types.Acc{subst => acc.subst, constraints => Constraints::empty};
-  (!tacc, ty) = Types.join(next_id, tenv, tacc, ty1, ty2);
+  (!tacc, ty) = Types.join(context, next_id, tenv, tacc, ty1, ty2);
   // TODO: turn this back on when memory crunch eases
   // constraints = fwd_constraints(acc);
   !acc = acc with {
@@ -1854,6 +2037,7 @@ fun join_exn_(
 // }
 
 fun join_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   solving_constraints: Bool,
   env: Env,
@@ -1865,12 +2049,21 @@ fun join_(
 ): (Acc, N.Type_) {
   vtry(
     () -> {
-      join_exn_(next_id, solving_constraints, env, acc, ty1, ty2)
+      join_exn_(context, next_id, solving_constraints, env, acc, ty1, ty2)
     },
     exn ->
       exn match {
       | e @ Types.Exception _ ->
-        types_error(next_id, solving_constraints, env, acc, pos, msg, e)
+        types_error(
+          context,
+          next_id,
+          solving_constraints,
+          env,
+          acc,
+          pos,
+          msg,
+          e,
+        )
       | _ -> throw exn
       }
     ,
@@ -1878,6 +2071,7 @@ fun join_(
 }
 
 fun join_constraints(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -1886,20 +2080,22 @@ fun join_constraints(
   ty1: N.Type_,
   ty2: N.Type_,
 ): (Acc, N.Type_) {
-  join_(next_id, true, env, pos, msg, acc, ty1, ty2)
+  join_(context, next_id, true, env, pos, msg, acc, ty1, ty2)
 }
 
 fun join_constraints_exn(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
   ty1: N.Type_,
   ty2: N.Type_,
 ): (Acc, N.Type_) {
-  join_exn_(next_id, true, env, acc, ty1, ty2)
+  join_exn_(context, next_id, true, env, acc, ty1, ty2)
 }
 
 fun join(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -1908,17 +2104,18 @@ fun join(
   ty1: N.Type_,
   ty2: N.Type_,
 ): (Acc, N.Type_) {
-  join_(next_id, false, env, pos, msg, acc, ty1, ty2)
+  join_(context, next_id, false, env, pos, msg, acc, ty1, ty2)
 }
 
 fun join_exn(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
   ty1: N.Type_,
   ty2: N.Type_,
 ): (Acc, N.Type_) {
-  join_exn_(next_id, false, env, acc, ty1, ty2)
+  join_exn_(context, next_id, false, env, acc, ty1, ty2)
 }
 
 /*****************************************************************************/
@@ -1968,25 +2165,28 @@ value class TparamConstraints private {
 
   // addition encapsoilate any changes needed for canonicalized constraints
   fun addAdditionalTparamConstraints(
+    context: mutable SKFS.Context,
     env: Env,
     acc: Acc,
     id: String,
     tyl: Array<N.Type_>,
   ): this {
-    this.addUppers(env, acc, id, tyl)
+    this.addUppers(context, env, acc, id, tyl)
   }
 
   fun resetTparamConstraints(
+    context: mutable SKFS.Context,
     env: Env,
     acc: Acc,
     id: String,
     tyl: Array<N.Type_>,
   ): this {
     !this.uppers = this.uppers.remove(id);
-    this.addUppers(env, acc, id, tyl)
+    this.addUppers(context, env, acc, id, tyl)
   }
 
   fun bindTparamConstraints(
+    context: mutable SKFS.Context,
     env: Env,
     acc: Acc,
     tparams: Array<N.Type_parameter>,
@@ -2003,7 +2203,7 @@ value class TparamConstraints private {
           );
           invariant_violation("")
         };
-        tc.addUppers(env, acc, id, tyl)
+        tc.addUppers(context, env, acc, id, tyl)
       },
       this,
     )
@@ -2026,6 +2226,7 @@ value class TparamConstraints private {
    * TODO we dont currently track lowerbounds
    */
   fun addWhenparamConstraints(
+    context: mutable SKFS.Context,
     next_id: () -> Int,
     env: Env,
     acc: Acc,
@@ -2041,6 +2242,7 @@ value class TparamConstraints private {
         );
         // Upper bounds
         !tc = tc.solveForBounds(
+          context,
           next_id,
           env,
           acc,
@@ -2054,6 +2256,7 @@ value class TparamConstraints private {
           tyl,
         );
         !tc = tc.solveForBounds(
+          context,
           next_id,
           env,
           acc,
@@ -2105,6 +2308,7 @@ value class TparamConstraints private {
   }
 
   private fun addConstraint(
+    context: mutable SKFS.Context,
     env: Env,
     acc: Acc,
     tparam_id: String,
@@ -2145,7 +2349,7 @@ value class TparamConstraints private {
           "ICE TODO This constraint adds equality to a type parameter to a type which is not yet supported",
         )
       | Ast.Vminus() ->
-        co_ty = promote(env, acc, ty);
+        co_ty = promote(context, env, acc, ty);
         uppers = static::appendUppers(tparam_id, Array[co_ty], this.uppers);
         this with {uppers}
       }
@@ -2153,6 +2357,7 @@ value class TparamConstraints private {
   }
 
   private fun addForBounds(
+    context: mutable SKFS.Context,
     env: Env,
     acc: Acc,
     tvars_to_tparams: IMap<(FileRange, N.Tparam)>,
@@ -2160,9 +2365,17 @@ value class TparamConstraints private {
     tparam_id: String,
     bound_ty: N.Type_,
   ): this {
-    constraint = ty -> this.addConstraint(env, acc, tparam_id, ty);
+    constraint = ty -> this.addConstraint(context, env, acc, tparam_id, ty);
     next = ty ->
-      this.addForBounds(env, acc, tvars_to_tparams, tvar_subst, tparam_id, ty);
+      this.addForBounds(
+        context,
+        env,
+        acc,
+        tvars_to_tparams,
+        tvar_subst,
+        tparam_id,
+        ty,
+      );
     bound_ty match {
     | (_, N.Tdefault(inner))
     | (_, N.Tnamed(_, inner)) ->
@@ -2180,6 +2393,7 @@ value class TparamConstraints private {
   }
 
   private fun solveForBounds(
+    context: mutable SKFS.Context,
     next_id: () -> Int,
     env: Env,
     acc: Acc,
@@ -2187,13 +2401,14 @@ value class TparamConstraints private {
     subtype: N.Type_,
     supertypes: Array<N.Type_>,
   ): this {
-    cosubtype = promote(env, acc, subtype);
+    cosubtype = promote(context, env, acc, subtype);
     supertypes.reduce(
       (tc, supertype) -> {
-        contrasupertype = contra_promote(env, acc, supertype);
+        contrasupertype = contra_promote(context, env, acc, supertype);
         vtry(
           () -> {
             (tmp_acc, _) = join_constraints_exn(
+              context,
               next_id,
               env,
               acc,
@@ -2206,7 +2421,15 @@ value class TparamConstraints private {
                 tvars_to_tparams.maybeGet(id) match {
                 | None() -> tc
                 | Some((_, tp)) ->
-                  tc.addForBounds(env, acc, tvars_to_tparams, subst, tp.id, ty)
+                  tc.addForBounds(
+                    context,
+                    env,
+                    acc,
+                    tvars_to_tparams,
+                    subst,
+                    tp.id,
+                    ty,
+                  )
                 },
               tc,
             )
@@ -2224,12 +2447,13 @@ value class TparamConstraints private {
   }
 
   private fun addUppers(
+    context: mutable SKFS.Context,
     env: Env,
     acc: Acc,
     id: String,
     tys: this::Bounds,
   ): this {
-    !tys = tys.map(ty -> promote(env, acc, ty));
+    !tys = tys.map(ty -> promote(context, env, acc, ty));
     uppers = static::appendUppers(id, tys, this.uppers);
     this with {uppers}
   }
@@ -2291,12 +2515,14 @@ value class TparamConstraints private {
 }
 
 fun add_additional_tparam_constraints(
+  context: mutable SKFS.Context,
   env: Env,
   acc: Acc,
   id: String,
   tyl: Array<N.Type_>,
 ): Acc {
   tparam_constraints = acc.tparam_constraints.addAdditionalTparamConstraints(
+    context,
     env,
     acc,
     id,
@@ -2306,12 +2532,14 @@ fun add_additional_tparam_constraints(
 }
 
 fun reset_tparam_constraints(
+  context: mutable SKFS.Context,
   env: Env,
   acc: Acc,
   id: String,
   tyl: Array<N.Type_>,
 ): Acc {
   tparam_constraints = acc.tparam_constraints.resetTparamConstraints(
+    context,
     env,
     acc,
     id,
@@ -2321,11 +2549,13 @@ fun reset_tparam_constraints(
 }
 
 fun bind_tparam_constraints(
+  context: mutable SKFS.Context,
   env: Env,
   acc: Acc,
   tparams: Array<N.Type_parameter>,
 ): Acc {
   tparam_constraints = acc.tparam_constraints.bindTparamConstraints(
+    context,
     env,
     acc,
     tparams,
@@ -2334,12 +2564,14 @@ fun bind_tparam_constraints(
 }
 
 fun add_whenparams(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
   whenclauses: Array<N.Whenclause>,
 ): Acc {
   tparam_constraints = acc.tparam_constraints.addWhenparamConstraints(
+    context,
     next_id,
     env,
     acc,
@@ -2492,6 +2724,7 @@ fun make_class_params_type_for_deconstruction(
 /* Adds missing type arguments to the special types "this/inst" */
 /*****************************************************************************/
 fun make_this_type<Ta, Tb>(
+  context: mutable SKFS.Context,
   env: Env,
   acc: Acc,
   mode: N.Modality,
@@ -2503,7 +2736,7 @@ fun make_this_type<Ta, Tb>(
     (_, id, name, _) = p;
     (name.i0, N.Tparam(None(), Ast.Vnone(), id, name))
   });
-  this_ty = make_tapply(env, acc, pos, mode, cla_name, targs);
+  this_ty = make_tapply(context, env, acc, pos, mode, cla_name, targs);
   (pos, N.Tnamed(N.NThis(cla_name), this_ty))
 }
 
@@ -2686,22 +2919,33 @@ fun bind_local_var(env: Env, acc: Acc, ty: N.Type_, name: N.Name): (Env, Acc) {
   }
 }
 
-fun bind_param(ea: (Env, Acc), p: TAst.Parameter): (Env, Acc) {
+fun bind_param(
+  context: mutable SKFS.Context,
+  ea: (Env, Acc),
+  p: TAst.Parameter,
+): (Env, Acc) {
   (env, acc) = ea;
   ty = p.type;
-  ty1 = promote(env, acc, ty);
+  ty1 = promote(context, env, acc, ty);
   (env1, acc1) = bind_local_var(env, acc, ty1, p.name);
   (env1, acc1)
 }
 
-fun bind_params(env: Env, acc: Acc, x: Parameters<TAst.Parameter>): (Env, Acc) {
+fun bind_params(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc,
+  x: Parameters<TAst.Parameter>,
+): (Env, Acc) {
   x match {
-  | Positional(l) -> l.foldl(bind_param, (env, acc))
-  | Named(fds) -> fds.reduce(((ea, _, p) -> bind_param(ea, p)), (env, acc))
+  | Positional(l) -> l.foldl((x, y) -> bind_param(context, x, y), (env, acc))
+  | Named(fds) ->
+    fds.reduce(((ea, _, p) -> bind_param(context, ea, p)), (env, acc))
   }
 }
 
 fun classname_ty(
+  context: mutable SKFS.Context,
   sk_this: Bool,
   env: Env,
   acc: Acc,
@@ -2721,23 +2965,35 @@ fun classname_ty(
           "and their static members cannot be accssed directly",
       )
     };
-    make_tobject(env, acc, pos, ty)
+    make_tobject(context, env, acc, pos, ty)
   | Ast.KBase() ->
     if (sk_this) {
-      make_tobject(env, acc, pos, ty)
+      make_tobject(context, env, acc, pos, ty)
     } else {
-      make_tbase(env, acc, pos, ty)
+      make_tbase(context, env, acc, pos, ty)
     }
-  | Ast.KClass() -> make_tconcrete(env, acc, pos, ty)
+  | Ast.KClass() -> make_tconcrete(context, env, acc, pos, ty)
   }
 }
 
-fun bind_this_type(fkind: N.FieldKind, env: Env, cd: N.Class_def): ?N.Type_ {
+fun bind_this_type(
+  context: mutable SKFS.Context,
+  fkind: N.FieldKind,
+  env: Env,
+  cd: N.Class_def,
+): ?N.Type_ {
   acc = empty_acc;
   fkind match {
   | N.FKStatic _ -> None()
   | N.FKFrozen(frozen_fr) ->
-    this_ty = make_this_type(env, acc, N.Mchilled(), cd.name, cd.tparams);
+    this_ty = make_this_type(
+      context,
+      env,
+      acc,
+      N.Mchilled(),
+      cd.name,
+      cd.tparams,
+    );
     Some(freeze(frozen_fr, acc, this_ty))
   | _ ->
     mode = fkind match {
@@ -2748,26 +3004,42 @@ fun bind_this_type(fkind: N.FieldKind, env: Env, cd: N.Class_def): ?N.Type_ {
     | N.FKReadonly(fr) -> N.Mreadonly(fr)
     | N.FKMutable(fr) -> N.Mmutable(fr)
     };
-    Some(make_this_type(env, acc, mode, cd.name, cd.tparams))
+    Some(make_this_type(context, env, acc, mode, cd.name, cd.tparams))
   }
 }
 
-fun bind_static_type(env: Env, cd: N.Class_def): N.Type_ {
+fun bind_static_type(
+  context: mutable SKFS.Context,
+  env: Env,
+  cd: N.Class_def,
+): N.Type_ {
   (pos, _) = cd.name;
   acc = empty_acc;
-  this_ty = make_this_type(env, acc, N.Mchilled(), cd.name, cd.tparams);
-  classname_ty(true, env, acc, pos, cd, this_ty)
+  this_ty = make_this_type(
+    context,
+    env,
+    acc,
+    N.Mchilled(),
+    cd.name,
+    cd.tparams,
+  );
+  classname_ty(context, true, env, acc, pos, cd, this_ty)
 }
 
-fun bind_this_and_static(fkind: N.FieldKind, env: Env, cd: N.Class_def): Env {
+fun bind_this_and_static(
+  context: mutable SKFS.Context,
+  fkind: N.FieldKind,
+  env: Env,
+  cd: N.Class_def,
+): Env {
   (pos, _) = cd.name;
   fkind match {
   | N.FKStatic _ ->
-    static_ty = bind_static_type(env, cd);
+    static_ty = bind_static_type(context, env, cd);
     (!env, _acc) = bind_local_var(env, empty_acc, static_ty, (pos, "static"));
     env
   | N.FKDynamic _ ->
-    this_ty = bind_this_type(fkind, env, cd).fromSome();
+    this_ty = bind_this_type(context, fkind, env, cd).fromSome();
     (!env, _acc) = bind_local_var(env, empty_acc, this_ty, (pos, "this"));
     env
   }
@@ -2777,16 +3049,18 @@ fun bind_this_and_static(fkind: N.FieldKind, env: Env, cd: N.Class_def): Env {
 /* Object instantiation. */
 /*****************************************************************************/
 fun instantiate(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
   ty: N.Type_,
 ): (Acc, N.Type_) {
   (caller_pos, _) = ty;
-  instantiate_(next_id, caller_pos, env, acc, ty)
+  instantiate_(context, next_id, caller_pos, env, acc, ty)
 }
 
 fun instantiate_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -2794,11 +3068,20 @@ fun instantiate_(
   ty: N.Type_,
 ): (Acc, N.Type_) {
   (pos, ty_) = ty;
-  (acc1, ty_1) = instantiate_type_(next_id, caller_pos, env, acc, pos, ty_);
+  (acc1, ty_1) = instantiate_type_(
+    context,
+    next_id,
+    caller_pos,
+    env,
+    acc,
+    pos,
+    ty_,
+  );
   (acc1, (pos, ty_1))
 }
 
 fun instantiate_type_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -2813,6 +3096,7 @@ fun instantiate_type_(
     (acc, x)
   | N.Tapply(mode, x1, tyl) ->
     (acc1, targs) = instantiate_tapply(
+      context,
       next_id,
       caller_pos,
       env,
@@ -2824,6 +3108,7 @@ fun instantiate_type_(
     (acc1, N.Tapply(mode, x1, targs))
   | N.Tpromoted(seen, mode, var, tparams, x1, tyl) ->
     (acc1, targs) = instantiate_tapply(
+      context,
       next_id,
       caller_pos,
       env,
@@ -2834,26 +3119,27 @@ fun instantiate_type_(
     );
     (acc1, N.Tpromoted(seen, mode, var, tparams, x1, targs))
   | N.Tawaitable(var, ty) ->
-    (acc1, ty1) = instantiate_(next_id, caller_pos, env, acc, ty);
+    (acc1, ty1) = instantiate_(context, next_id, caller_pos, env, acc, ty);
     (acc1, N.Tawaitable(var, ty1))
   | N.Tfun(variance, ml, _, params, rty) ->
     (acc1, params1) = params.map_foldl(
-      (p1, p2) -> instantiate_(next_id, caller_pos, env, p1, p2),
+      (p1, p2) -> instantiate_(context, next_id, caller_pos, env, p1, p2),
       acc,
     );
-    (acc2, rty1) = instantiate_(next_id, caller_pos, env, acc1, rty);
+    (acc2, rty1) = instantiate_(context, next_id, caller_pos, env, acc1, rty);
     (acc2, N.Tfun(variance, ml, Array[], params1, rty1))
   | tparam @ N.Tparam _ -> (acc, tparam)
   | N.Tvar _ -> invariant_violation("ICE instantiate tvar")
   | N.Tlambda _ -> invariant_violation("ICE instantiate tlambda")
   | N.Tdefault(ty) ->
-    (acc1, ty1) = instantiate_(next_id, caller_pos, env, acc, ty);
+    (acc1, ty1) = instantiate_(context, next_id, caller_pos, env, acc, ty);
     (acc1, N.Tdefault(ty1))
   | N.Tnamed(names, ty) ->
-    (acc1, ty1) = instantiate_(next_id, caller_pos, env, acc, ty);
+    (acc1, ty1) = instantiate_(context, next_id, caller_pos, env, acc, ty);
     (acc1, N.Tnamed(names, ty1))
   | N.Tset(var, mode, tparams, inter) ->
     (acc1, inter1) = instantiate_inter(
+      context,
       next_id,
       caller_pos,
       env,
@@ -2866,6 +3152,7 @@ fun instantiate_type_(
 }
 
 fun instantiate_tapply(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -2874,7 +3161,7 @@ fun instantiate_tapply(
   x: N.Name,
   targs: Array<N.Type_>,
 ): (Acc, Array<N.Type_>) {
-  cd = SkipNaming.getClass(x);
+  cd = SkipNaming.getClass(context, x);
   expected_length = cd.tparams.size();
   if (expected_length != targs.size()) {
     SkipError.errorl(
@@ -2890,11 +3177,19 @@ fun instantiate_tapply(
     acc,
     cd.tparams,
   );
-  (!acc, targs1) = instantiate_targs(next_id, env, acc, tparams, targs);
+  (!acc, targs1) = instantiate_targs(
+    context,
+    next_id,
+    env,
+    acc,
+    tparams,
+    targs,
+  );
   (acc, targs1)
 }
 
 fun instantiate_targs(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2904,6 +3199,7 @@ fun instantiate_targs(
   instantiated = tparams.zipWith(targs, (tparam, targ) -> {
     (pos, _) = targ;
     (!acc, ty) = join(
+      context,
       next_id,
       env,
       pos,
@@ -2918,6 +3214,7 @@ fun instantiate_targs(
 }
 
 fun instantiate_inter(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -2928,6 +3225,7 @@ fun instantiate_inter(
   inter.mapAcc(
     ((acc1, elt) -> {
       (acc2, !elt.targs) = instantiate_tapply(
+        context,
         next_id,
         caller_pos,
         env,
@@ -2943,6 +3241,7 @@ fun instantiate_inter(
 }
 
 fun instantiate_option(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -2952,25 +3251,27 @@ fun instantiate_option(
   x match {
   | None() -> (acc, None())
   | Some(ty) ->
-    (acc1, ty1) = instantiate_(next_id, caller_pos, env, acc, ty);
+    (acc1, ty1) = instantiate_(context, next_id, caller_pos, env, acc, ty);
     (acc1, Some(ty1))
   }
 }
 
 fun instantiate_object_type_(
+  context: mutable SKFS.Context,
   caller_pos: FileRange,
   next_id: () -> Int,
   acc: Acc,
   mode: N.Modality,
   name: N.Name,
 ): (Acc, N.Class_def, SMap<(FileRange, N.Type__)>, (N.Type_, Array<N.Type_>)) {
-  cd = SkipNaming.getClass(name);
+  cd = SkipNaming.getClass(context, name);
   (acc1, subst, targs) = mk_tparams(next_id, caller_pos, acc, cd.tparams);
   rty = (caller_pos, N.Tapply(mode, name, targs));
   (acc1, cd, subst, (rty, targs))
 }
 
 fun instantiate_object_type(
+  context: mutable SKFS.Context,
   caller_pos: FileRange,
   next_id: () -> Int,
   acc: Acc,
@@ -2978,6 +3279,7 @@ fun instantiate_object_type(
   name: N.Name,
 ): (Acc, N.Class_def, (FileRange, N.Type__)) {
   (acc1, cd, _subst, (rty, _targs)) = instantiate_object_type_(
+    context,
     caller_pos,
     next_id,
     acc,
@@ -3000,6 +3302,7 @@ class InvalidPattern(
  * child's type
  */
 fun reconstrain_parent(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   orig_pos: FileRange,
@@ -3014,6 +3317,7 @@ fun reconstrain_parent(
   new_bound match {
   | (_, N.Tanything()) ->
     (!acc, _) = join_exn(
+      context,
       next_id,
       env,
       acc,
@@ -3025,7 +3329,7 @@ fun reconstrain_parent(
   //   acc
   | ty ->
     unfolded_ty = Types.unfold_type(acc.subst, ty);
-    prom_ty = promote(env, acc, ty);
+    prom_ty = promote(context, env, acc, ty);
     new_uppers = mutable Vector[];
     folded_acc = acc.tparam_constraints
       .findUppers(tparam_id)
@@ -3041,10 +3345,10 @@ fun reconstrain_parent(
           | _ ->
             /* the promotion of @ty must join with the contrapromotion of the
              * upper bounds for @tparam_id. */
-            bounding_ty = contra_promote(env, acc1, upper_bound_ty);
+            bounding_ty = contra_promote(context, env, acc1, upper_bound_ty);
             vtry(
               () -> {
-                join_exn(next_id, env, acc1, prom_ty, bounding_ty).i0
+                join_exn(context, next_id, env, acc1, prom_ty, bounding_ty).i0
               },
               exn ->
                 exn match {
@@ -3067,7 +3371,13 @@ fun reconstrain_parent(
     // The new upper is a subtype of EVERY current upper bound
     // Thus, we can just replace the upper bound with that type
     new_uppers.push(ty);
-    reset_tparam_constraints(env, folded_acc, tparam_id, new_uppers.toArray())
+    reset_tparam_constraints(
+      context,
+      env,
+      folded_acc,
+      tparam_id,
+      new_uppers.toArray(),
+    )
   }
 }
 
@@ -3085,6 +3395,7 @@ fun createExistentialName(fr: FileRange): N.Name {
 /* For any unknown type arguments, add a new type parameter to the enverionment
  */
 fun create_existentials(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -3105,8 +3416,8 @@ fun create_existentials(
         };
         exist = (pos, N.Tparam(frozen_, Ast.Vnone(), exist_id, exist_name));
         exist_tp = (Ast.Vnone(), exist_id, exist_name, Array[]);
-        acc2 = bind_tparam_constraints(env, acc1, Array[exist_tp]);
-        (acc3, ty2) = join_exn(next_id, env, acc2, ty1, exist);
+        acc2 = bind_tparam_constraints(context, env, acc1, Array[exist_tp]);
+        (acc3, ty2) = join_exn(context, next_id, env, acc2, ty1, exist);
         (acc3, ty2)
       | x -> (acc1, x)
       }
@@ -3126,6 +3437,7 @@ fun create_existentials(
  * (which are tparams)
  */
 fun rebindPatternExistentials(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -3150,6 +3462,7 @@ fun rebindPatternExistentials(
           uppers = acc.tparam_constraints.findUppers(id);
           reboundUppers = uppers.map(upper -> {
             (!acc, upper2) = rebindPatternExistentials(
+              context,
               next_id,
               env,
               acc,
@@ -3170,6 +3483,7 @@ fun rebindPatternExistentials(
     ty,
   );
   !acc.tparam_constraints = acc.tparam_constraints.bindTparamConstraints(
+    context,
     env,
     acc,
     rebound.values().collect(Array),
@@ -3178,6 +3492,7 @@ fun rebindPatternExistentials(
 }
 
 fun reconstrain_child(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -3202,18 +3517,25 @@ fun reconstrain_child(
   // If the tparam does not have upper bounds
   // Refine the generic by adding the constraints as upper bounds
   | Some(id) if (effecitively_empty(id)) ->
-    add_additional_tparam_constraints(env, acc, id, ty_constraints)
+    add_additional_tparam_constraints(context, env, acc, id, ty_constraints)
   // If the tparam DOES have upper bounds
   // They must be MORE specific to satisfy the constraints,
   //   thus leave them as is
   | _ ->
-    prom_ty = promote(env, acc, ty);
+    prom_ty = promote(context, env, acc, ty);
     ty_constraints.foldl(
       (facc, constraint_ty) -> {
-        !constraint_ty = contra_promote(env, facc, constraint_ty);
+        !constraint_ty = contra_promote(context, env, facc, constraint_ty);
         vtry(
           () -> {
-            join_constraints_exn(next_id, env, facc, constraint_ty, prom_ty).i0
+            join_constraints_exn(
+              context,
+              next_id,
+              env,
+              facc,
+              constraint_ty,
+              prom_ty,
+            ).i0
           },
           exn ->
             exn match {
@@ -3254,13 +3576,14 @@ fun build_parents(env: Env, acc: Acc, obj_ty: N.Type_): SSet {
  * Replace it with an existential to prevent unsound behavior
  */
 fun fix_mismatched_variance<Ta>(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   name: (FileRange, String),
   parents: SSet,
   child_subst: SMap<N.Type_>,
   acc: Acc,
 ): Acc {
-  cd = SkipNaming.getClass(name);
+  cd = SkipNaming.getClass(context, name);
   mismatched = cd.tparam_mismatched;
   if (mismatched.isEmpty()) {
     acc
@@ -3340,6 +3663,7 @@ fun instantiate_pattern_object_is_same_type(
 
 /* throws for invalid patterns */
 fun instantiate_pattern_object_no_params_exn(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3350,11 +3674,12 @@ fun instantiate_pattern_object_no_params_exn(
   sameType = instantiate_pattern_object_is_same_type(acc, obj_ty, name);
   sameType match {
   | Some((mode, tyl)) ->
-    cd = SkipNaming.getClass(name);
+    cd = SkipNaming.getClass(context, name);
     subst = N.make_subst(pos, cd.tparams.map(tp -> tp.i1), tyl);
     (env, acc, mode, subst, obj_ty)
   | None() ->
     instantiate_pattern_object_no_params_exn_full(
+      context,
       next_id,
       pos,
       env,
@@ -3366,6 +3691,7 @@ fun instantiate_pattern_object_no_params_exn(
 }
 
 fun instantiate_pattern_object_no_params_exn_full(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3378,17 +3704,18 @@ fun instantiate_pattern_object_no_params_exn_full(
   mode = pat_object_mode(acc, obj_ty);
   (parent_tvars, obj_ty_tvars) = N.replace_tparams(obj_ty, next_id);
   (!acc, _cd, subst, (case_ty, _targs)) = instantiate_object_type_(
+    context,
     pos,
     next_id,
     acc,
     mode,
     name,
   );
-  !case_ty = promote(env, acc, case_ty);
+  !case_ty = promote(context, env, acc, case_ty);
   (!acc, _) = {
     vtry(
       () -> {
-        join_exn(next_id, env, acc, obj_ty_tvars, case_ty)
+        join_exn(context, next_id, env, acc, obj_ty_tvars, case_ty)
       },
       exn ->
         exn match {
@@ -3407,14 +3734,22 @@ fun instantiate_pattern_object_no_params_exn_full(
     )
   };
   parents = build_parents(env, acc, obj_ty);
-  !acc = fix_mismatched_variance(next_id, name, parents, subst, acc);
+  !acc = fix_mismatched_variance(context, next_id, name, parents, subst, acc);
   !acc = parent_tvars.reduce(
-    (acc1, id, tp) -> reconstrain_parent(next_id, env, pos, id, tp, acc1),
+    (acc1, id, tp) ->
+      reconstrain_parent(context, next_id, env, pos, id, tp, acc1),
     acc,
   );
-  (!acc, !case_ty) = create_existentials(next_id, env, acc, mode, case_ty);
+  (!acc, !case_ty) = create_existentials(
+    context,
+    next_id,
+    env,
+    acc,
+    mode,
+    case_ty,
+  );
   !acc = acc.constraints.typing_fold(
-    (acc1, cur) -> reconstrain_child(next_id, env, pos, acc1, cur),
+    (acc1, cur) -> reconstrain_child(context, next_id, env, pos, acc1, cur),
     acc,
   );
   /* could stop early here for exhaustiveness, but would make it messier
@@ -3425,6 +3760,7 @@ fun instantiate_pattern_object_no_params_exn_full(
 
 /* throws for invalid patterns */
 fun instantiate_pattern_object_exn(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3436,9 +3772,10 @@ fun instantiate_pattern_object_exn(
   Acc,
   (?Parameters<NestedPat>, SkipNamedAst.Type_, SkipNamedAst.Type_),
 ) {
-  cd = SkipNaming.getClass(name);
+  cd = SkipNaming.getClass(context, name);
   oldTparams = acc.tparam_constraints;
   (!env, !acc, mode, subst, case_ty) = instantiate_pattern_object_no_params_exn(
+    context,
     next_id,
     pos,
     env,
@@ -3455,6 +3792,7 @@ fun instantiate_pattern_object_exn(
    * (which are tparams)
    */
   (!acc, castType) = rebindPatternExistentials(
+    context,
     next_id,
     env,
     acc,
@@ -3473,6 +3811,7 @@ fun instantiate_pattern_object_exn(
 }
 
 fun instantiate_pattern_object_exn_only(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3480,8 +3819,9 @@ fun instantiate_pattern_object_exn_only(
   obj_ty: N.Type_,
   name: N.Name,
 ): void {
-  cd = SkipNaming.getClass(name);
+  cd = SkipNaming.getClass(context, name);
   (!env, !acc, mode, subst, _) = instantiate_pattern_object_no_params_exn(
+    context,
     next_id,
     pos,
     env,
@@ -3501,6 +3841,7 @@ fun instantiate_pattern_object_exn_only(
 }
 
 fun instantiate_pattern_object(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3514,13 +3855,30 @@ fun instantiate_pattern_object(
 ) {
   vtry(
     () -> {
-      instantiate_pattern_object_exn(next_id, pos, env, acc, obj_ty, name)
+      instantiate_pattern_object_exn(
+        context,
+        next_id,
+        pos,
+        env,
+        acc,
+        obj_ty,
+        name,
+      )
     },
     exn ->
       exn match {
       | InvalidPattern(last_id, solving_constraints, acc1, pos1, msg, e) ->
         new_id = sk_create_counter_from_value(last_id);
-        types_error(new_id, solving_constraints, env, acc1, pos1, msg, e)
+        types_error(
+          context,
+          new_id,
+          solving_constraints,
+          env,
+          acc1,
+          pos1,
+          msg,
+          e,
+        )
       | _ -> throw exn
       }
     ,
@@ -3528,33 +3886,38 @@ fun instantiate_pattern_object(
 }
 
 fun instantiate_object_type_with_targs(
+  context: mutable SKFS.Context,
   pos: FileRange,
   targs: Array<N.Type_>,
   acc: Acc,
   mode: N.Modality,
   name: N.Name,
 ): (Acc, N.Class_def, SMap<N.Type_>, (N.Type_, Array<N.Type_>)) {
-  cd = SkipNaming.getClass(name);
+  cd = SkipNaming.getClass(context, name);
   (acc1, subst) = mk_tparams_with_targs(pos, acc, cd.tparams, targs);
   rty = (pos, N.Tapply(mode, name, targs));
   (acc1, cd, subst, (rty, targs))
 }
 
 fun instantiate_object_impl(
+  context: mutable SKFS.Context,
   caller_pos: FileRange,
   next_id: () -> Int,
-  k_object_type: (FileRange, (() -> Int), Acc, N.Modality, N.Name) -> (
+  k_object_type: (
+    mutable SKFS.Context,
+    FileRange,
+    (() -> Int),
     Acc,
-    N.Class_def,
-    SMap<N.Type_>,
-    (N.Type_, Array<N.Type_>),
-  ),
+    N.Modality,
+    N.Name,
+  ) -> (Acc, N.Class_def, SMap<N.Type_>, (N.Type_, Array<N.Type_>)),
   env: Env,
   acc: Acc,
   mode: N.Modality,
   name: N.Name,
 ): (Acc, (?Parameters<N.Type_>, N.Type_, Array<N.Type_>)) {
   (acc1, cd, subst, (rty, targs)) = k_object_type(
+    context,
     caller_pos,
     next_id,
     acc,
@@ -3568,11 +3931,12 @@ fun instantiate_object_impl(
     acc1.tparam_constraints,
     cd.params,
   );
-  rty1 = promote(env, acc1, rty);
+  rty1 = promote(context, env, acc1, rty);
   (acc1, (params_ty, rty1, targs))
 }
 
 fun instantiate_object(
+  context: mutable SKFS.Context,
   caller_pos: FileRange,
   next_id: () -> Int,
   env: Env,
@@ -3581,6 +3945,7 @@ fun instantiate_object(
   name: N.Name,
 ): (Acc, (?Parameters<N.Type_>, N.Type_, Array<N.Type_>)) {
   instantiate_object_impl(
+    context,
     caller_pos,
     next_id,
     instantiate_object_type_,
@@ -3592,6 +3957,7 @@ fun instantiate_object(
 }
 
 fun instantiate_object_with_targs(
+  context: mutable SKFS.Context,
   caller_pos: FileRange,
   targs: Array<N.Type_>,
   env: Env,
@@ -3601,10 +3967,11 @@ fun instantiate_object_with_targs(
 ): (Acc, ?Parameters<N.Type_>) {
   next_id = () -> invariant_violation("Should not be called");
   (acc1, (params_ty, _cty, _targs)) = instantiate_object_impl(
+    context,
     caller_pos,
     next_id,
-    (pos, _p1, p2, p3, p4) ->
-      instantiate_object_type_with_targs(pos, targs, p2, p3, p4),
+    (context, pos, _p1, p2, p3, p4) ->
+      instantiate_object_type_with_targs(context, pos, targs, p2, p3, p4),
     env,
     acc,
     mode,
@@ -3621,6 +3988,7 @@ fun instantiate_object_with_targs(
  * the children for P<Int> we get {C}
  */
 fun build_match_class_set(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -3642,7 +4010,7 @@ fun build_match_class_set(
   known_valid_members = SSet[];
   handle_tapply = (n, tyl) -> {
     !known_valid_members = known_valid_members.set(n.i1);
-    cd = SkipNaming.getClass(n);
+    cd = SkipNaming.getClass(context, n);
     // if the parent has no type arguments. ALL children must be valid
     if (tyl.isEmpty()) {
       !known_valid_members = known_valid_members.union(cd.concrete_children);
@@ -3651,7 +4019,8 @@ fun build_match_class_set(
   };
 
   sk_children = unfolded_ty match {
-  | (_, N.Tdefault(ty1)) -> build_match_class_set(next_id, env, acc, ty1)
+  | (_, N.Tdefault(ty1)) ->
+    build_match_class_set(context, next_id, env, acc, ty1)
   | (_, N.Tapply(_, n, tyl))
   | (_, N.Tpromoted(_, _, _, _, n, tyl)) ->
     handle_tapply(n, tyl)
@@ -3661,7 +4030,10 @@ fun build_match_class_set(
       if (elt.kind == Ast.KTrait()) return false;
       // Skip an elt if it is the parent of a previous element
       if (parents.contains(elt.name.i1)) return false;
-      for (parentName in SkipNaming.getClass(elt.name).extends_.keys()) {
+      for (parentName in SkipNaming.getClass(
+        context,
+        elt.name,
+      ).extends_.keys()) {
         !parents = parents.set(parentName.i1)
       };
       true
@@ -3674,7 +4046,7 @@ fun build_match_class_set(
     upper_bound_children = acc.tparam_constraints
       .findUppers(i)
       .filter(cur1 -> may_have_children(acc, cur1))
-      .map(x -> build_match_class_set(next_id, env, acc, x));
+      .map(x -> build_match_class_set(context, next_id, env, acc, x));
     combine_children(upper_bound_children)
   | _ ->
     debug_type(acc, unfolded_ty);
@@ -3682,7 +4054,7 @@ fun build_match_class_set(
   };
   sk_children.filter(s ->
     known_valid_members.contains(s) ||
-      valid_child_for_match(next_id, env, acc, ty, s)
+      valid_child_for_match(context, next_id, env, acc, ty, s)
   )
 }
 
@@ -3722,6 +4094,7 @@ fun combine_child_map(x: ?SSet, s: SSet): ?SSet {
 }
 
 fun valid_child_for_match(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -3730,8 +4103,9 @@ fun valid_child_for_match(
 ): Bool {
   vtry(
     () -> {
-      !ty = contra_promote(env, acc, ty);
+      !ty = contra_promote(context, env, acc, ty);
       instantiate_pattern_object_exn_only(
+        context,
         next_id,
         ty.i0,
         env,
@@ -3752,13 +4126,14 @@ fun valid_child_for_match(
 
 // None for no error. Some(b) where b iff the tparam has a trait constraint
 fun has_concrete_type_for_matching_tparam(
+  context: mutable SKFS.Context,
   tc: TparamConstraints,
   subst: IMap<N.Type_>,
   id: String,
 ): ?Bool {
   res: ?Bool = Some(false);
   _ = tc.findUppers(id).any(ty -> {
-    has_concrete_type_for_matching(tc, subst, ty) match {
+    has_concrete_type_for_matching(context, tc, subst, ty) match {
     | None() ->
       !res = None();
       true
@@ -3773,6 +4148,7 @@ fun has_concrete_type_for_matching_tparam(
 }
 
 fun has_concrete_type_for_matching(
+  context: mutable SKFS.Context,
   tc: TparamConstraints,
   subst: IMap<N.Type_>,
   ty: N.Type_,
@@ -3789,7 +4165,7 @@ fun has_concrete_type_for_matching(
     None()
   | N.Tapply(_, n, _)
   | N.Tpromoted(_, _, _, _, n, _) ->
-    SkipNaming.getClass(n).kind match {
+    SkipNaming.getClass(context, n).kind match {
     | Ast.KTrait() -> Some(true)
     | _ -> None()
     }
@@ -3801,9 +4177,10 @@ fun has_concrete_type_for_matching(
     }
 
   | N.Tparam(_, _, id, _) ->
-    has_concrete_type_for_matching_tparam(tc, subst, id)
+    has_concrete_type_for_matching_tparam(context, tc, subst, id)
 
-  | N.Tdefault(inner) -> has_concrete_type_for_matching(tc, subst, inner)
+  | N.Tdefault(inner) ->
+    has_concrete_type_for_matching(context, tc, subst, inner)
 
   | N.Tvar _
   | N.Tnamed _ ->

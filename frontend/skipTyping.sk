@@ -66,6 +66,7 @@ fun make_exhaustive_pattern_env(
 }
 
 fun print_pattern(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -74,13 +75,15 @@ fun print_pattern(
 ): String {
   eenv = make_exhaustive_pattern_env(env, acc);
   Exhaustive.print_pattern(
+    context,
     eenv,
     "",
-    pattern(next_id, env, acc, acc.level, TUtils.InitPat(ety), pat).i1,
+    pattern(context, next_id, env, acc, acc.level, TUtils.InitPat(ety), pat).i1,
   )
 }
 
 fun check_exhaustive_match(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -89,10 +92,11 @@ fun check_exhaustive_match(
   mbl: List<TAst.Match_branch>,
 ): void {
   eenv = make_exhaustive_pattern_env(env, acc);
-  Exhaustive.check_exhaustive_match(next_id, eenv, pos, ty, mbl)
+  Exhaustive.check_exhaustive_match(context, next_id, eenv, pos, ty, mbl)
 }
 
 fun check_exhaustive_match_is(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -101,10 +105,11 @@ fun check_exhaustive_match_is(
   mbl: List<TAst.Match_branch>,
 ): void {
   eenv = make_exhaustive_pattern_env(env, acc);
-  Exhaustive.check_exhaustive_match_is(next_id, eenv, pos, ty, mbl)
+  Exhaustive.check_exhaustive_match_is(context, next_id, eenv, pos, ty, mbl)
 }
 
 fun check_exhaustive_match_as(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -113,10 +118,11 @@ fun check_exhaustive_match_as(
   mbl: List<TAst.Match_branch>,
 ): void {
   eenv = make_exhaustive_pattern_env(env, acc);
-  Exhaustive.check_exhaustive_match_as(next_id, eenv, pos, ty, mbl)
+  Exhaustive.check_exhaustive_match_as(context, next_id, eenv, pos, ty, mbl)
 }
 
 fun check_exhaustive_try(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -124,7 +130,7 @@ fun check_exhaustive_try(
   mbl: List<TAst.Match_branch>,
 ): void {
   eenv = make_exhaustive_pattern_env(env, acc);
-  Exhaustive.check_exhaustive_try(next_id, eenv, pos, mbl)
+  Exhaustive.check_exhaustive_try(context, next_id, eenv, pos, mbl)
 }
 
 /*****************************************************************************/
@@ -164,33 +170,43 @@ fun reportLocalsErrors(errors: List<SkipError.Trace>): void {
 /*****************************************************************************/
 
 fun solve_constraints(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
 ): TUtils.Acc {
-  acc.constraints.solve(next_id, env, acc)
+  acc.constraints.solve(context, next_id, env, acc)
 }
 
 fun solve_constraints_msg(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   msg: String,
   env: TUtils.Env,
   acc: TUtils.Acc,
 ): TUtils.Acc {
-  acc.constraints.solve_msg(next_id, msg, env, acc)
+  acc.constraints.solve_msg(context, next_id, msg, env, acc)
 }
 
 /* solves the constraitns up to the last constraint (judged by length of the
  * constraints)
  */
 fun solve_call_constraints(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   last_constraint: Int,
   last_tvar: Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
 ): TUtils.Acc {
-  acc.constraints.solve_at_call(next_id, last_constraint, last_tvar, env, acc)
+  acc.constraints.solve_at_call(
+    context,
+    next_id,
+    last_constraint,
+    last_tvar,
+    env,
+    acc,
+  )
 }
 
 /*****************************************************************************/
@@ -233,19 +249,25 @@ fun programToDefinitions(
 /*****************************************************************************/
 /* The main entry point */
 /*****************************************************************************/
-fun program(embeddedMode: Bool, prog: SkipAst.Program): SkipTypedAst.Program {
+fun program(
+  context: mutable SKFS.Context,
+  embeddedMode: Bool,
+  prog: SkipAst.Program,
+): SkipTypedAst.Program {
   for (ta in prog.type_defs) {
     SkipNaming.check_type_alias(ta)
   };
   tya_defs = prog.type_defs.map((_, ta) -> SkipNaming.type_alias(ta));
   defs = programToDefinitions(prog.class_defs, prog.const_defs, prog.fun_defs);
-  defsOrErrors = defs.map(def ~> {
+  defsOrErrors = defs.map(def -> {
     SkipError.doWithError(() -> {
       def match {
       | SkipAst.DClass(x) ->
-        SkipTypedAst.DClass(class_def(embeddedMode, x.name))
-      | SkipAst.DConst(x) -> SkipTypedAst.DConst(global_const_def(x.name))
-      | SkipAst.DFun(x) -> SkipTypedAst.DFun(fun_def(embeddedMode, x.name))
+        SkipTypedAst.DClass(class_def(context, embeddedMode, x.name))
+      | SkipAst.DConst(x) ->
+        SkipTypedAst.DConst(global_const_def(context, x.name))
+      | SkipAst.DFun(x) ->
+        SkipTypedAst.DFun(fun_def(context, embeddedMode, x.name))
       | _ -> invariant_violation("ICE: unexpected definition type")
       }
     })
@@ -266,7 +288,7 @@ fun program(embeddedMode: Bool, prog: SkipAst.Program): SkipTypedAst.Program {
     }
   };
 
-  SkipNaming.maybeGetFun("main").each(main -> {
+  SkipNaming.maybeGetFun(context, "main").each(main -> {
     N.unfold_tnamed(main.return_) match {
     | (_, N.Tapply(N.Mchilled(), (_, "Void"), tya)) if (tya.isEmpty()) -> void
     | (_, N.Tawaitable _) ->
@@ -292,13 +314,14 @@ fun program(embeddedMode: Bool, prog: SkipAst.Program): SkipTypedAst.Program {
 }
 
 fun const_def(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   type: N.Type_,
   v: N.Expr,
 ): TAst.Expr {
   next_id = sk_create_counter();
-  (!acc, v1) = expr(next_id, env, acc, v);
+  (!acc, v1) = expr(context, next_id, env, acc, v);
   v_type = TAstUtils.get_type(v1);
   TUtils.is_mutable(acc, type, false) match {
   | N.Efrozen() -> void
@@ -313,8 +336,9 @@ fun const_def(
       ],
     )
   };
-  type1 = TUtils.contra_promote(env, acc, type);
+  type1 = TUtils.contra_promote(context, env, acc, type);
   (!acc, _) = TUtils.join(
+    context,
     next_id,
     env,
     type1.i0,
@@ -323,13 +347,16 @@ fun const_def(
     type1,
     v_type,
   );
-  !acc = solve_lambdas(next_id, env, acc);
-  !acc = solve_constraints(next_id, env, acc);
-  TUtils.expand_expr(env, acc, v1)
+  !acc = solve_lambdas(context, next_id, env, acc);
+  !acc = solve_constraints(context, next_id, env, acc);
+  TUtils.expand_expr(context, env, acc, v1)
 }
 
-fun global_const_def(constName: N.Name): TAst.Const_def {
-  cst = SkipNaming.getConst(constName);
+fun global_const_def(
+  context: mutable SKFS.Context,
+  constName: N.Name,
+): TAst.Const_def {
+  cst = SkipNaming.getConst(context, constName);
   env = makeEnv(false);
   (pos, _) = constName;
   acc = TUtils.empty_acc;
@@ -351,7 +378,7 @@ fun global_const_def(constName: N.Name): TAst.Const_def {
     value match {
     | N.Native() -> None()
     | N.Abstract() -> SkipError.error(name.i0, "No value defined")
-    | N.Implemented(v) -> Some(const_def(env, acc, type, v))
+    | N.Implemented(v) -> Some(const_def(context, env, acc, type, v))
     }
   };
   TAst.Const_def{
@@ -359,7 +386,7 @@ fun global_const_def(constName: N.Name): TAst.Const_def {
     annotations,
     visibility,
     name,
-    type => TUtils.expand_type(env, acc, type),
+    type => TUtils.expand_type(context, env, acc, type),
     value => value1,
     source,
     from_,
@@ -368,11 +395,12 @@ fun global_const_def(constName: N.Name): TAst.Const_def {
 }
 
 fun class_const(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   cst: N.Const_def,
 ): TAst.Const_def {
-  mkcon = () -> class_const_(env, acc, cst);
+  mkcon = () -> class_const_(context, env, acc, cst);
   this_class = env.this_class.fromSome();
   source = cst.source.fromSome();
   if (this_class.i1 != source.i1) {
@@ -383,6 +411,7 @@ fun class_const(
 }
 
 fun class_const_(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   cst: N.Const_def,
@@ -407,7 +436,7 @@ fun class_const_(
         source
       };
       !env = env with {orig_this_class};
-      Some(const_def(env, acc, type, v))
+      Some(const_def(context, env, acc, type, v))
     }
   };
   res = TAst.Const_def{
@@ -415,7 +444,7 @@ fun class_const_(
     annotations,
     visibility,
     name,
-    type => TUtils.expand_type(env, acc, type),
+    type => TUtils.expand_type(context, env, acc, type),
     value => value1,
     source,
     from_,
@@ -433,7 +462,11 @@ fun class_const_(
 // but it is a multi-step process
 // This optimization can lead to unsound behavior if combined with lower bounds
 // on generics. And there are possibly other holes around contravariance
-fun method_is_copydown(name: N.Name, met: N.Method_def): Bool {
+fun method_is_copydown(
+  context: mutable SKFS.Context,
+  name: N.Name,
+  met: N.Method_def,
+): Bool {
   // inherited...
   name != met.source &&
     // ...and not abstract
@@ -447,7 +480,7 @@ fun method_is_copydown(name: N.Name, met: N.Method_def): Bool {
     // ...and not macro
     met.macro_.isNone() &&
     {
-      source = SkipNaming.getClass(met.source);
+      source = SkipNaming.getClass(context, met.source);
       // ...and source is a class, not a trait
       !(source.kind is Ast.KTrait()) &&
         // ...with no deferred fields of any kind
@@ -467,8 +500,12 @@ fun method_is_copydown(name: N.Name, met: N.Method_def): Bool {
     }
 }
 
-fun class_def(embeddedMode: Bool, className: SkipAst.Name): TAst.Class_def {
-  cd = SkipNaming.getClass(className);
+fun class_def(
+  context: mutable SKFS.Context,
+  embeddedMode: Bool,
+  className: SkipAst.Name,
+): TAst.Class_def {
+  cd = SkipNaming.getClass(context, className);
   env = makeEnv(embeddedMode);
   next_id = sk_create_counter();
   depth = cd.depth;
@@ -485,31 +522,36 @@ fun class_def(embeddedMode: Bool, className: SkipAst.Name): TAst.Class_def {
   types = cd.types;
   consts = cd.consts;
   is_self_parameterized = cd.is_self_parameterized;
-  methods = cd.methods.filter((_, m) -> !method_is_copydown(cd.name, m));
+  methods = cd.methods.filter((_, m) ->
+    !method_is_copydown(context, cd.name, m)
+  );
   fields = cd.fields;
   children_ = cd.children_;
   concrete_children = cd.concrete_children;
   annotations = cd.annotations;
   !env = env with {this_class => Some(cd.name)};
   acc = TUtils.empty_acc;
-  !acc = TUtils.bind_tparam_constraints(env, acc, cd.tparams);
-  tmp_env = TUtils.bind_this_and_static(N.FKChilled(), env, cd);
-  extends_1 = make_extend(next_id, tmp_env, acc, "extend", extends_);
-  use1 = make_extend(next_id, tmp_env, acc, "use", use);
+  !acc = TUtils.bind_tparam_constraints(context, env, acc, cd.tparams);
+  tmp_env = TUtils.bind_this_and_static(context, N.FKChilled(), env, cd);
+  extends_1 = make_extend(context, next_id, tmp_env, acc, "extend", extends_);
+  use1 = make_extend(context, next_id, tmp_env, acc, "use", use);
   (params1, consts1, methods1, types1) = SkipError.do4WithError(
-    () -> maybeClassParameters(next_id, env, acc, params),
-    () -> consts.mapWithErrors((_, c) -> class_const(env, acc, c)),
-    () -> methods.mapWithErrors((_, m) -> method_def(next_id, env, acc, m)),
-    () -> types.mapWithErrors((_, t) -> type_def(env, acc, t)),
+    () -> maybeClassParameters(context, next_id, env, acc, params),
+    () -> consts.mapWithErrors((_, c) -> class_const(context, env, acc, c)),
+    () ->
+      methods.mapWithErrors((_, m) ->
+        method_def(context, next_id, env, acc, m)
+      ),
+    () -> types.mapWithErrors((_, t) -> type_def(context, env, acc, t)),
   );
   !acc = cd.extends_.reduce(
     (acc, n, tya, par) ->
-      check_implement(next_id, "extend", env, acc, cd, n, tya, par),
+      check_implement(context, next_id, "extend", env, acc, cd, n, tya, par),
     acc,
   );
   !acc = cd.use.reduce(
     (acc, n, tya, par) ->
-      check_implement(next_id, "use", env, acc, cd, n, tya, par),
+      check_implement(context, next_id, "use", env, acc, cd, n, tya, par),
     acc,
   );
   methods2 = methods1.map((_, met) -> {
@@ -585,9 +627,14 @@ fun con_body(x: ?TAst.Expr): TAst.Expr_body {
   }
 }
 
-fun type_def(env: TUtils.Env, acc: TUtils.Acc, tyd: N.Type_def): TAst.Type_def {
+fun type_def(
+  context: mutable SKFS.Context,
+  env: TUtils.Env,
+  acc: TUtils.Acc,
+  tyd: N.Type_def,
+): TAst.Type_def {
   next_id = sk_create_counter();
-  mktyd = () -> type_def_(next_id, env, acc, tyd);
+  mktyd = () -> type_def_(context, next_id, env, acc, tyd);
   this_class = env.this_class.fromSome();
   source = tyd.source;
   if (this_class.i1 != source.i1) {
@@ -598,12 +645,13 @@ fun type_def(env: TUtils.Env, acc: TUtils.Acc, tyd: N.Type_def): TAst.Type_def {
 }
 
 fun type_def_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   tyd: N.Type_def,
 ): TAst.Type_def {
-  check_tyd_default(next_id, tyd.name.i0, env, acc, tyd.body);
+  check_tyd_default(context, next_id, tyd.name.i0, env, acc, tyd.body);
   visibility = tyd.visibility;
   name = tyd.name;
   tparams = tyd.tparams;
@@ -620,6 +668,7 @@ fun type_def_(
 }
 
 fun check_tyd_default(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -632,11 +681,24 @@ fun check_tyd_default(
   | N.TydAbstract(_, None()) ->
     void
   | N.TydAbstract(Some(tyd_type), Some(tyd_default)) ->
-    (acc1, tyd_type1) = TUtils.instantiate(next_id, env, acc, tyd_type);
-    tyd_type2 = TUtils.contra_promote(env, acc1, tyd_type1);
-    (acc2, tyd_default1) = TUtils.instantiate(next_id, env, acc1, tyd_default);
-    tyd_default2 = TUtils.promote(env, acc2, tyd_default1);
+    (acc1, tyd_type1) = TUtils.instantiate(
+      context,
+      next_id,
+      env,
+      acc,
+      tyd_type,
+    );
+    tyd_type2 = TUtils.contra_promote(context, env, acc1, tyd_type1);
+    (acc2, tyd_default1) = TUtils.instantiate(
+      context,
+      next_id,
+      env,
+      acc1,
+      tyd_default,
+    );
+    tyd_default2 = TUtils.promote(context, env, acc2, tyd_default1);
     (_acc, _ty) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -649,6 +711,7 @@ fun check_tyd_default(
 }
 
 fun make_extend(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -658,6 +721,7 @@ fun make_extend(
   parentsm = UMap[];
   for ((parName, parTargs, parInfo) in parents) {
     !parentsm = make_extend_(
+      context,
       next_id,
       env,
       acc,
@@ -671,11 +735,14 @@ fun make_extend(
     );
   };
   parentsm.map((_, p) ->
-    p with {targs => p.targs.map(ty -> TUtils.expand_type(env, acc, ty))}
+    p with {
+      targs => p.targs.map(ty -> TUtils.expand_type(context, env, acc, ty)),
+    }
   )
 }
 
 fun make_extend_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -692,6 +759,7 @@ fun make_extend_(
   vtry(
     () -> {
       make_extend__(
+        context,
         next_id,
         env,
         acc,
@@ -725,6 +793,7 @@ fun make_extend_(
 }
 
 fun make_extend__(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -736,19 +805,19 @@ fun make_extend__(
   conditions: Array<Array<N.Whenclause>>,
 ): UMap<TAst.Parent> {
   fr = parName.i0;
-  tparams = SkipNaming.getClass(parName).tparams;
-  !acc = TUtils.bind_tparam_constraints(env, acc, tparams);
+  tparams = SkipNaming.getClass(context, parName).tparams;
+  !acc = TUtils.bind_tparam_constraints(context, env, acc, tparams);
   sk_this = env.this_class.fromSome().i1;
   ty = (fr, N.Tapply(N.Mchilled(), parName, tyl));
-  (cstr_acc, ty1) = TUtils.instantiate(next_id, env, acc, ty);
+  (cstr_acc, ty1) = TUtils.instantiate(context, next_id, env, acc, ty);
   !tyl = ty1 match {
   | (_, N.Tapply(_, _, new_tyl)) -> new_tyl
   | _ -> invariant_violation("ICE no tapply for make_extend")
   };
   invariant(!conditions.isEmpty(), "ICE empty conditions");
   for (conds in conditions) {
-    facc = TUtils.add_whenparams(next_id, env, cstr_acc, conds);
-    _ = solve_constraints(next_id, env, facc);
+    facc = TUtils.add_whenparams(context, next_id, env, cstr_acc, conds);
+    _ = solve_constraints(context, next_id, env, facc);
   };
   parents.maybeGet(parName) match {
   | None() ->
@@ -769,10 +838,11 @@ fun make_extend__(
     } else {
       parEffectiveSource
     };
-    !tyl = tyl.map(ty -> TUtils.promote(env, acc, ty));
+    !tyl = tyl.map(ty -> TUtils.promote(context, env, acc, ty));
     prev_extend_type = (fr, N.Tapply(N.Mchilled(), parName, prev.targs));
-    prom_prev_extend_type = TUtils.promote(env, acc, prev_extend_type);
+    prom_prev_extend_type = TUtils.promote(context, env, acc, prev_extend_type);
     (_, targs) = merge_extend(
+      context,
       next_id,
       env,
       acc,
@@ -788,6 +858,7 @@ fun make_extend__(
 }
 
 fun merge_extend(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -798,10 +869,11 @@ fun merge_extend(
   conditions: Array<Array<N.Whenclause>>,
 ): (N.Name, Array<N.Type_>) {
   for (conds in conditions) {
-    facc = TUtils.add_whenparams(next_id, env, acc, conds);
+    facc = TUtils.add_whenparams(context, next_id, env, acc, conds);
     exty = (pos, N.Tapply(N.Mchilled(), curName, curTargs));
-    current = TUtils.promote(env, facc, exty);
+    current = TUtils.promote(context, env, facc, exty);
     (!prev, !curName, !curTargs) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -822,17 +894,25 @@ fun merge_extend(
   }
 }
 
-fun fun_def(embeddedMode: Bool, funName: SkipAst.Name): TAst.Fun_def {
-  fd = SkipNaming.getFun(funName);
+fun fun_def(
+  context: mutable SKFS.Context,
+  embeddedMode: Bool,
+  funName: SkipAst.Name,
+): TAst.Fun_def {
+  fd = SkipNaming.getFun(context, funName);
   if (embeddedMode && fd.name.i1 == "etry") {
     !fd.native_ = Some(fd.name.i0);
     !fd.body = N.Native()
   };
-  result = named_fun_def(embeddedMode, fd);
+  result = named_fun_def(context, embeddedMode, fd);
   result
 }
 
-fun named_fun_def(embeddedMode: Bool, fd: SkipNamedAst.Fun_def): TAst.Fun_def {
+fun named_fun_def(
+  context: mutable SKFS.Context,
+  embeddedMode: Bool,
+  fd: SkipNamedAst.Fun_def,
+): TAst.Fun_def {
   env = makeEnv(embeddedMode);
   next_id = sk_create_counter();
   acc = TUtils.empty_acc;
@@ -847,11 +927,12 @@ fun named_fun_def(embeddedMode: Bool, fd: SkipNamedAst.Fun_def): TAst.Fun_def {
   params = fd.params;
   return_ = fd.return_;
   body = fd.body;
-  !acc = TUtils.bind_tparam_constraints(env, acc, tparams);
-  params1 = fun_parameters(next_id, env, acc, params);
-  (!env, !acc) = TUtils.bind_params(env, acc, params1);
-  params2 = expand_fun_parameter_types(env, acc, params1);
+  !acc = TUtils.bind_tparam_constraints(context, env, acc, tparams);
+  params1 = fun_parameters(context, next_id, env, acc, params);
+  (!env, !acc) = TUtils.bind_params(context, env, acc, params1);
+  params2 = expand_fun_parameter_types(context, env, acc, params1);
   body1 = method_body(
+    context,
     next_id,
     env,
     acc,
@@ -875,7 +956,7 @@ fun named_fun_def(embeddedMode: Bool, fd: SkipNamedAst.Fun_def): TAst.Fun_def {
       name,
       tparams,
       params => params2,
-      return_ => TUtils.expand_type(env, acc, return_),
+      return_ => TUtils.expand_type(context, env, acc, return_),
       body => body1,
       yields => fd.yields,
     },
@@ -925,6 +1006,7 @@ private fun assert_legal_memo_return_type(
 
 // Record the return type and, if applicable, yield type, in env.
 fun setReturnType(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -941,6 +1023,7 @@ fun setReturnType(
   | Some(yieldPos) ->
     var = TUtils.fresh(next_id, (yieldPos, void));
     iterTy = TUtils.make_tapply(
+      context,
       env,
       acc,
       yieldPos,
@@ -948,25 +1031,27 @@ fun setReturnType(
       (yieldPos, "Iterator"),
       Array[var],
     );
-    it_ty = TUtils.inv_promote(env, acc, iterTy);
+    it_ty = TUtils.inv_promote(context, env, acc, iterTy);
     (!acc, expected) = TUtils.join(
+      context,
       next_id,
       env,
       yieldPos,
       "Generators must return 'mutable Iterator<_>'\nThis function is a generator because of 'yield'",
       acc,
-      TUtils.promote(env, acc, ty),
+      TUtils.promote(context, env, acc, ty),
       it_ty,
     );
     env with {
       return_type => TUtils.RType(expected),
-      yield_type => TUtils.YType(TUtils.promote(env, acc, var)),
+      yield_type => TUtils.YType(TUtils.promote(context, env, acc, var)),
     }
   | _ -> env
   }
 }
 
 fun method_body(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -979,7 +1064,7 @@ fun method_body(
   x: N.Expr_body,
   yields: ?FileRange,
 ): TAst.Expr_body {
-  !env = setReturnType(next_id, env, acc, return_ty, yields);
+  !env = setReturnType(context, next_id, env, acc, return_ty, yields);
 
   /* Check for invalid async/memoized functions with mutable types */
   is_untracked = sk_untracked is Some _;
@@ -1035,14 +1120,23 @@ fun method_body(
   /* Handle the method body */
   x match {
   | N.Native() ->
-    check_return_ty(next_id, env, acc, sk_async, return_ty);
+    check_return_ty(context, next_id, env, acc, sk_async, return_ty);
     TAst.Native()
   | N.Abstract() ->
-    check_return_ty(next_id, env, acc, sk_async, return_ty);
+    check_return_ty(context, next_id, env, acc, sk_async, return_ty);
     TAst.Abstract()
   | N.Implemented(body) ->
     TAst.Implemented(
-      method_body_(next_id, env, acc, sk_async, sk_untracked, return_ty, body),
+      method_body_(
+        context,
+        next_id,
+        env,
+        acc,
+        sk_async,
+        sk_untracked,
+        return_ty,
+        body,
+      ),
     )
   }
 }
@@ -1056,6 +1150,7 @@ fun method_body(
 const SOLVABLE_CONDITIONS_EDGE: String = "Note that implementations are not needed if the conditional constraints on the method are impossible to satisfy.\nBut due to conditional trait usage, we were unable to determine if the conditions on this method are possible to satisfy";
 
 fun check_method_defined(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1063,7 +1158,7 @@ fun check_method_defined(
 ): void {
   thiscd = env.this_class match {
   | None() -> return void
-  | Some(n) -> SkipNaming.getClass(n)
+  | Some(n) -> SkipNaming.getClass(context, n)
   };
   // method's can be abstract for base classes or traits
   if (!(thiscd.kind is Ast.KClass())) return void;
@@ -1083,6 +1178,7 @@ fun check_method_defined(
   if (thiscd.name.i1 == met.source.i1) error(List.Nil());
 
   conditionsSolvable = TUtils.solvableWhenparams(
+    context,
     next_id,
     met.name.i0,
     env,
@@ -1100,6 +1196,7 @@ fun check_method_defined(
 }
 
 fun method_body_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1110,12 +1207,19 @@ fun method_body_(
 ): TAst.Expr {
   env1 = env with {sk_async, tracked_context => !sk_untracked.isSome()};
   (pos, _) = body;
-  (acc1, fun_body) = expr(next_id, env1, acc, body);
+  (acc1, fun_body) = expr(context, next_id, env1, acc, body);
   body_ty = TAstUtils.get_type(fun_body);
   body_ty1 = make_return_type(env1, body_ty);
-  (!acc, return_ty1) = TUtils.instantiate(next_id, env1, acc1, return_ty);
-  return_ty2 = TUtils.contra_promote(env1, acc, return_ty1);
+  (!acc, return_ty1) = TUtils.instantiate(
+    context,
+    next_id,
+    env1,
+    acc1,
+    return_ty,
+  );
+  return_ty2 = TUtils.contra_promote(context, env1, acc, return_ty1);
   (!acc, _) = TUtils.join(
+    context,
     next_id,
     env1,
     pos,
@@ -1126,31 +1230,39 @@ fun method_body_(
     body_ty1,
     return_ty2,
   );
-  !acc = solve_lambdas(next_id, env1, acc);
-  !acc = solve_constraints(next_id, env1, acc);
-  fun_body1 = TUtils.expand_expr(env1, acc, fun_body);
+  !acc = solve_lambdas(context, next_id, env1, acc);
+  !acc = solve_constraints(context, next_id, env1, acc);
+  fun_body1 = TUtils.expand_expr(context, env1, acc, fun_body);
   fun_body1
 }
 
 fun check_return_ty(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   _sk_async: ?FileRange,
   return_ty: N.Type_,
 ): void {
-  (!acc, _return_ty) = TUtils.instantiate(next_id, env, acc, return_ty);
-  _ = solve_constraints(next_id, env, acc)
+  (!acc, _return_ty) = TUtils.instantiate(
+    context,
+    next_id,
+    env,
+    acc,
+    return_ty,
+  );
+  _ = solve_constraints(context, next_id, env, acc)
 }
 
 fun method_def(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   met: N.Method_def,
 ): TAst.Method_def {
   mkmet = () -> {
-    res = method_def_(next_id, env, acc, met);
+    res = method_def_(context, next_id, env, acc, met);
     reportLocalsErrors(met.localsErrors);
     res
   };
@@ -1164,6 +1276,7 @@ fun method_def(
 }
 
 fun method_def_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1200,12 +1313,12 @@ fun method_def_(
       },
     ),
   };
-  !acc = TUtils.bind_tparam_constraints(env, acc, met.tparams);
-  !acc = TUtils.add_whenparams(next_id, env, acc, met.whenparams);
-  check_method_defined(next_id, env, acc, met);
-  cd = SkipNaming.getClass(this_name);
+  !acc = TUtils.bind_tparam_constraints(context, env, acc, met.tparams);
+  !acc = TUtils.add_whenparams(context, next_id, env, acc, met.whenparams);
+  check_method_defined(context, next_id, env, acc, met);
+  cd = SkipNaming.getClass(context, this_name);
   (pos, _) = name;
-  !env = TUtils.bind_this_and_static(kind, env, cd);
+  !env = TUtils.bind_this_and_static(context, kind, env, cd);
   env_params = env with {
     return_type => TUtils.RNotAllowed(
       ". Early return is not allowed in default arguments",
@@ -1214,10 +1327,11 @@ fun method_def_(
       ". Yield is not allowed in default arguments",
     ),
   };
-  params1 = fun_parameters(next_id, env_params, acc, params);
-  (!env, !acc) = TUtils.bind_params(env, acc, params1);
-  params2 = expand_fun_parameter_types(env, acc, params1);
+  params1 = fun_parameters(context, next_id, env_params, acc, params);
+  (!env, !acc) = TUtils.bind_params(context, env, acc, params1);
+  params2 = expand_fun_parameter_types(context, env, acc, params1);
   body1 = method_body(
+    context,
     next_id,
     env,
     acc,
@@ -1231,7 +1345,7 @@ fun method_def_(
     met.yields,
   );
   whenparams = met.whenparams;
-  this_type = TUtils.bind_this_type(kind, env, cd);
+  this_type = TUtils.bind_this_type(context, kind, env, cd);
   this_type match {
   | None() -> void
   | Some _ if (untracked_.isSome()) -> void
@@ -1241,13 +1355,18 @@ fun method_def_(
     this_type match {
     | Some(ty) ->
       (
-        TUtils.expand_type(env, acc, ty),
+        TUtils.expand_type(context, env, acc, ty),
         (pos, "this"),
         TAstUtils.default_binding_info,
       )
     | None() ->
       (
-        TUtils.expand_type(env, acc, TUtils.bind_static_type(env, cd)),
+        TUtils.expand_type(
+          context,
+          env,
+          acc,
+          TUtils.bind_static_type(context, env, cd),
+        ),
         (pos, "static"),
         TAstUtils.default_binding_info,
       )
@@ -1268,7 +1387,7 @@ fun method_def_(
     tparams,
     whenparams,
     params => params2,
-    return_ => TUtils.expand_type(env, acc, return_),
+    return_ => TUtils.expand_type(context, env, acc, return_),
     body => body1,
     algebraic,
     implicit_param,
@@ -1354,6 +1473,7 @@ fun assert_frozen_type(
 /* Class parameters */
 /*****************************************************************************/
 fun maybeClassParameters(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1363,11 +1483,12 @@ fun maybeClassParameters(
   | N.NoParams()
   | N.NativeConstruct _ ->
     None()
-  | N.HasParams(cp) -> Some(class_parameters(next_id, env, acc, cp))
+  | N.HasParams(cp) -> Some(class_parameters(context, next_id, env, acc, cp))
   }
 }
 
 fun class_parameters(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1378,8 +1499,8 @@ fun class_parameters(
   params = cp.params;
   visibility = cp.visibility;
   source = cp.source;
-  params1 = class_fields(next_id, env, acc, params);
-  params2 = expand_fun_parameter_types(env, acc, params1);
+  params1 = class_fields(context, next_id, env, acc, params);
+  params2 = expand_fun_parameter_types(context, env, acc, params1);
   TAst.Class_params{pos, final_, params => params2, visibility, source}
 }
 
@@ -1387,21 +1508,23 @@ fun class_parameters(
 /* Function parameters */
 /*****************************************************************************/
 fun class_fields(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   params: Parameters<N.Parameter>,
 ): Parameters<TAst.Parameter> {
-  params.map(x -> class_field(next_id, env, acc, x))
+  params.map(x -> class_field(context, next_id, env, acc, x))
 }
 
 fun class_field(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   par: N.Parameter,
 ): TAst.Parameter {
-  mkpar = () -> class_field_(next_id, env, acc, par);
+  mkpar = () -> class_field_(context, next_id, env, acc, par);
   this_class = env.this_class.fromSome();
   source = par.source.fromSome();
   if (this_class.i1 != source.i1) {
@@ -1412,6 +1535,7 @@ fun class_field(
 }
 
 fun class_field_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1422,19 +1546,21 @@ fun class_field_(
     par.source
   };
   env1 = env with {orig_this_class};
-  fun_param(next_id, env1, acc, par)
+  fun_param(context, next_id, env1, acc, par)
 }
 
 fun fun_parameters(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   params: Parameters<N.Parameter>,
 ): Parameters<TAst.Parameter> {
-  params.map(x -> fun_param(next_id, env, acc, x))
+  params.map(x -> fun_param(context, next_id, env, acc, x))
 }
 
 fun fun_param(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1447,9 +1573,9 @@ fun fun_param(
   index = param.index;
   mutable_ = param.mutable_;
   deferred_ = param.deferred_;
-  (!acc, type1) = TUtils.instantiate(next_id, env, acc, type);
-  !acc = solve_constraints(next_id, env, acc);
-  value = fun_param_value(next_id, env, acc, param, type1);
+  (!acc, type1) = TUtils.instantiate(context, next_id, env, acc, type);
+  !acc = solve_constraints(context, next_id, env, acc);
+  value = fun_param_value(context, next_id, env, acc, param, type1);
   res = TAst.Parameter{
     annotations,
     visibility,
@@ -1466,23 +1592,26 @@ fun fun_param(
 }
 
 fun expand_fun_parameter_type(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   param: TAst.Parameter,
 ): TAst.Parameter {
-  type = TUtils.expand_type(env, acc, param.type);
+  type = TUtils.expand_type(context, env, acc, param.type);
   param with {type}
 }
 
 fun expand_fun_parameter_types(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   x: Parameters<TAst.Parameter>,
 ): Parameters<TAst.Parameter> {
-  x.map(cur -> expand_fun_parameter_type(env, acc, cur))
+  x.map(cur -> expand_fun_parameter_type(context, env, acc, cur))
 }
 
 fun fun_param_value(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1492,10 +1621,11 @@ fun fun_param_value(
   param.value match {
   | None() -> None()
   | Some(e @ (pos, _)) ->
-    (acc1, e1) = expr(next_id, env, acc, e);
+    (acc1, e1) = expr(context, next_id, env, acc, e);
     e_ty = TAstUtils.get_type(e1);
-    type1 = TUtils.contra_promote(env, acc1, type);
+    type1 = TUtils.contra_promote(context, env, acc1, type);
     (!acc, _) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -1504,9 +1634,9 @@ fun fun_param_value(
       type1,
       e_ty,
     );
-    !acc = solve_lambdas(next_id, env, acc);
-    !acc = solve_constraints(next_id, env, acc);
-    e2 = TUtils.expand_expr(env, acc, e1);
+    !acc = solve_lambdas(context, next_id, env, acc);
+    !acc = solve_constraints(context, next_id, env, acc);
+    e2 = TUtils.expand_expr(context, env, acc, e1);
     Some(e2)
   }
 }
@@ -1597,6 +1727,7 @@ fun inner_type_for_class_add_outer_frozen(
 }
 
 fun call_or_constructor_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   pos: FileRange,
@@ -1609,11 +1740,12 @@ fun call_or_constructor_(
   Types.unfold_type(acc.subst, TAstUtils.get_type(f)) match {
   | tfun_ty @ (_, N.Tfun _) ->
     check_no_mutable(mut, f.i1.i0);
-    tfun_call(next_id, pos, env, acc, f, tfun_ty, args_ty, args)
+    tfun_call(context, next_id, pos, env, acc, f, tfun_ty, args_ty, args)
   | (_, N.Tlambda(_, id, _, tfun_ty)) if (acc.lambdas.containsKey(id)) ->
     check_no_mutable(mut, f.i1.i0);
     lam = acc.lambdas[id];
     (!acc, ecall) = tfun_call(
+      context,
       next_id,
       pos,
       env,
@@ -1623,11 +1755,28 @@ fun call_or_constructor_(
       args_ty,
       args,
     );
-    !acc = lambda(next_id, false, env, acc, lam with {lam_type => tfun_ty});
+    !acc = lambda(
+      context,
+      next_id,
+      false,
+      env,
+      acc,
+      lam with {lam_type => tfun_ty},
+    );
     (acc, ecall)
   | (_, N.Tlambda(_, _, _, fty)) ->
     f1 = (fty, f.i1);
-    call_or_constructor_(next_id, env, pos, acc, mut, f1, args_ty, args)
+    call_or_constructor_(
+      context,
+      next_id,
+      env,
+      pos,
+      acc,
+      mut,
+      f1,
+      args_ty,
+      args,
+    )
   | (_, N.Tparam(_, _, param_id, _)) ->
     tfun = acc.tparam_constraints
       .findUppers(param_id)
@@ -1641,14 +1790,16 @@ fun call_or_constructor_(
         (None() : ?N.Type_),
       );
     tfun match {
-    | None() -> constructor_call(next_id, pos, env, acc, mut, f, args, args_ty)
+    | None() ->
+      constructor_call(context, next_id, pos, env, acc, mut, f, args, args_ty)
     | Some(tfun_ty) ->
       check_no_mutable(mut, f.i1.i0);
-      promty = TUtils.promote(env, acc, tfun_ty);
+      promty = TUtils.promote(context, env, acc, tfun_ty);
       !f = (promty, (pos, TAst.Annotated(f, promty)));
-      tfun_call(next_id, pos, env, acc, f, tfun_ty, args_ty, args)
+      tfun_call(context, next_id, pos, env, acc, f, tfun_ty, args_ty, args)
     }
-  | _ -> constructor_call(next_id, pos, env, acc, mut, f, args, args_ty)
+  | _ ->
+    constructor_call(context, next_id, pos, env, acc, mut, f, args, args_ty)
   }
 }
 
@@ -1662,7 +1813,10 @@ fun check_tracking(
     !tracking.isEmpty() &&
     tracking[0] is N.Funtracked()
   ) {
-    SkipError.error(pos, "Cannot call anfunction from a tracked context")
+    SkipError.error(
+      pos,
+      "Cannot call an untracked function from a tracked context",
+    )
   }
 }
 
@@ -1695,6 +1849,7 @@ fun check_args_length<T>(
 }
 
 fun join_args(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1709,6 +1864,7 @@ fun join_args(
     param = param_tyl[i];
     (_, arg, argpos) = args_tyl[i];
     (!acc, _) = TUtils.join(
+      context,
       next_id,
       env,
       argpos,
@@ -1731,6 +1887,7 @@ fun join_args(
 }
 
 fun call(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -1739,10 +1896,11 @@ fun call(
   args: Parameters<(Int, N.Type_, FileRange)>,
   invalid_arg_msg: String,
 ): (TUtils.Acc, Array<(?N.Name, TAst.Ordered_expr)>) {
-  call_(next_id, pos, env, acc, params_ty, args, invalid_arg_msg)
+  call_(context, next_id, pos, env, acc, params_ty, args, invalid_arg_msg)
 }
 
 fun call_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -1753,9 +1911,9 @@ fun call_(
 ): (TUtils.Acc, Array<(?N.Name, TAst.Ordered_expr)>) {
   (params_ty, args) match {
   | (Positional(tyl), Positional(args1)) ->
-    tyl1 = tyl.map(cur1 -> TUtils.contra_promote(env, acc, cur1));
+    tyl1 = tyl.map(cur1 -> TUtils.contra_promote(context, env, acc, cur1));
     check_args_length(pos, tyl1, args1);
-    join_args(next_id, env, acc, tyl1, args1, invalid_arg_msg)
+    join_args(context, next_id, env, acc, tyl1, args1, invalid_arg_msg)
   | (Named(ty_map), Named(args1)) ->
     maxArg = args1.reduce((cur, _, i__) -> max(i__.i0, cur), 0);
     argIdx = maxArg;
@@ -1774,8 +1932,9 @@ fun call_(
           SkipError.errorl(List[(pos, "Invalid arguments"), (namefr, msg)])
         }
       | Some((_, arg, pos1)) ->
-        contraparam = TUtils.contra_promote(env, acc, param);
+        contraparam = TUtils.contra_promote(context, env, acc, param);
         (!acc, _) = TUtils.join(
+          context,
           next_id,
           env,
           pos1,
@@ -1797,6 +1956,7 @@ fun call_(
 }
 
 fun tfun_call(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -1812,6 +1972,7 @@ fun tfun_call(
   | _ -> invariant_violation("ICE no tfun tfun_call")
   };
   (acc1, add_args) = call(
+    context,
     next_id,
     pos,
     env,
@@ -1827,6 +1988,7 @@ fun tfun_call(
 }
 
 fun constructor_call(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -1844,10 +2006,11 @@ fun constructor_call(
   this_ty = maybe_static_ty(env, acc, f_ty);
   tvar = (pos, TUtils.fresh_(next_id));
   tobject = this_ty match {
-  | Some _ -> TUtils.make_tobject(env, acc, pos, tvar)
-  | None() -> TUtils.make_tconcrete(env, acc, pos, tvar)
+  | Some _ -> TUtils.make_tobject(context, env, acc, pos, tvar)
+  | None() -> TUtils.make_tconcrete(context, env, acc, pos, tvar)
   };
   (!acc, _ty) = TUtils.join(
+    context,
     next_id,
     env,
     pos,
@@ -1857,8 +2020,8 @@ fun constructor_call(
     tobject,
   );
   (underlying_class, class_targs) = untapply(pos, acc, tvar);
-  cd = SkipNaming.getClass(underlying_class);
-  check_constructor_call(env, pos, cd);
+  cd = SkipNaming.getClass(context, underlying_class);
+  check_constructor_call(context, env, pos, cd);
   check_deferred_construct(
     env,
     pos,
@@ -1869,6 +2032,7 @@ fun constructor_call(
   );
   check_mutable_constructor_call(pos, mut, cd);
   (!acc, params_ty) = TUtils.instantiate_object_with_targs(
+    context,
     pos,
     class_targs,
     env,
@@ -1878,6 +2042,7 @@ fun constructor_call(
   );
   invalid_arg_msg = constructor_invalid_argument_message(mut, cd);
   (!acc, add_args) = call(
+    context,
     next_id,
     pos,
     env,
@@ -1909,6 +2074,7 @@ fun constructor_call(
 }
 
 fun check_constructor_call(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   pos: FileRange,
   cd: N.Class_def,
@@ -1939,7 +2105,7 @@ fun check_constructor_call(
   source = cp.source;
   visibility = cp.visibility;
   msg = () ~> "Invalid constructor call for class " + cd.name.i1;
-  check_visibility(env, pos, cd.name, source, msg, visibility)
+  check_visibility(context, env, pos, cd.name, source, msg, visibility)
 }
 
 fun untapply(
@@ -2070,6 +2236,7 @@ fun maybe_tobject_kind(acc: TUtils.Acc, ty: N.Type_): ?String {
 /* Let bindings. */
 /*****************************************************************************/
 fun expr_bind(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -2078,16 +2245,17 @@ fun expr_bind(
   e: N.Expr,
 ): (TUtils.Acc, TAst.Expr) {
   (pos, _) = var_name;
-  (acc1, rvalue1) = expr(next_id, env, acc, rvalue);
+  (acc1, rvalue1) = expr(context, next_id, env, acc, rvalue);
   ty = TAstUtils.get_type(rvalue1);
   rvalue2 = (ty, rvalue1.i1);
   (env1, acc2) = TUtils.bind_local_var(env, acc1, ty, var_name);
-  (acc3, e1) = expr(next_id, env1, acc2, e);
+  (acc3, e1) = expr(context, next_id, env1, acc2, e);
   var = (ty, var_name, TAstUtils.default_binding_info);
   (acc3, (e1.i0, (pos, TAst.Bind(var, rvalue2, e1))))
 }
 
 fun expr_annotation(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -2098,9 +2266,10 @@ fun expr_annotation(
   x match {
   | None() -> (acc, ty_inferred)
   | Some(ty_annotated) ->
-    (acc1, cty) = TUtils.instantiate(next_id, env, acc, ty_annotated);
-    cty1 = TUtils.contra_promote(env, acc1, cty);
+    (acc1, cty) = TUtils.instantiate(context, next_id, env, acc, ty_annotated);
+    cty1 = TUtils.contra_promote(context, env, acc1, cty);
     (acc2, _) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2109,8 +2278,8 @@ fun expr_annotation(
       cty1,
       ty_inferred,
     );
-    (acc3, ty) = TUtils.instantiate(next_id, env, acc2, ty_annotated);
-    ty1 = TUtils.promote(env, acc3, ty);
+    (acc3, ty) = TUtils.instantiate(context, next_id, env, acc2, ty_annotated);
+    ty1 = TUtils.promote(context, env, acc3, ty);
     (acc3, ty1)
   }
 }
@@ -2139,6 +2308,7 @@ private base class ExprState {
 }
 
 fun expr(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -2155,7 +2325,7 @@ fun expr(
         if (env.locals.containsKey(var_name.i1)) {
           SkipError.error(var_name.i0, already_bound_msg(var_name))
         } else {
-          (!acc, value) = expr(next_id, env, acc, rvalue);
+          (!acc, value) = expr(context, next_id, env, acc, rvalue);
           ty = TAstUtils.get_type(value);
           (!env, !acc) = TUtils.bind_local_var(env, acc, ty, var_name);
           binding = (ty, var_name, TAstUtils.default_binding_info);
@@ -2163,11 +2333,12 @@ fun expr(
           stack.push(NExpr{expr => e})
         }
       | (_, N.Seq(e1, e2)) ->
-        (!acc, e11) = expr(next_id, env, acc, e1);
+        (!acc, e11) = expr(context, next_id, env, acc, e1);
         e1_pos = TAstUtils.expr_pos(e11);
         ty1 = TAstUtils.get_type(e11);
         ty2 = TUtils.make_tvoid(e1_pos, Ast.Vminus());
         (!acc, _) = TUtils.join(
+          context,
           next_id,
           env,
           e1_pos,
@@ -2215,10 +2386,10 @@ fun expr(
         last_lambda_id = acc.last_lambda_id();
         last_constraint = acc.constraints.typing_size();
         last_tvar = next_id();
-        magic_call(next_id, pos, env, acc, mut, nbase, args) match {
+        magic_call(context, next_id, pos, env, acc, mut, nbase, args) match {
         | Some((acc1, call)) ->
           !acc = acc1;
-          !res = Some((TUtils.promote(env, acc, call.i0), call.i1))
+          !res = Some((TUtils.promote(context, env, acc, call.i0), call.i1))
         | None() ->
           stack.push(
             CallState{
@@ -2234,8 +2405,8 @@ fun expr(
           stack.push(NExpr{expr => nbase})
         }
       | x ->
-        (!acc, e) = expr_(next_id, env, acc, x);
-        !res = Some((TUtils.promote(env, acc, e.i0), e.i1))
+        (!acc, e) = expr_(context, next_id, env, acc, x);
+        !res = Some((TUtils.promote(context, env, acc, e.i0), e.i1))
       }
     | b @ BindState _ ->
       cont = res.fromSome();
@@ -2248,8 +2419,8 @@ fun expr(
       !res = Some((rty, (pos, TAst.Seq(s.left, right))))
     | c @ CallState _ ->
       base = res.fromSome();
-      (!acc, call) = finish_call(next_id, env, acc, base, c);
-      ty = TUtils.promote(env, acc, call.i0);
+      (!acc, call) = finish_call(context, next_id, env, acc, base, c);
+      ty = TUtils.promote(context, env, acc, call.i0);
       !res = Some((ty, call.i1))
     }
   };
@@ -2257,6 +2428,7 @@ fun expr(
 }
 
 fun finish_call(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -2265,13 +2437,14 @@ fun finish_call(
 ): (TUtils.Acc, TAst.Expr) {
   (!acc, !base) = strip_tdefault_from_indirect_call(acc, base);
   t = TAstUtils.get_type(base);
-  !acc = explicit_targs(next_id, c.pos, env, acc, t, c.targs);
-  (!acc, typed_args) = call_args(next_id, env, acc, c.args);
+  !acc = explicit_targs(context, next_id, c.pos, env, acc, t, c.targs);
+  (!acc, typed_args) = call_args(context, next_id, env, acc, c.args);
   args_ty = typed_args.map(i_e -> {
     (i, e) = i_e;
     (i, TAstUtils.get_type(e), TAstUtils.expr_pos(e))
   });
   (!acc, call) = call_or_constructor_(
+    context,
     next_id,
     env,
     c.pos,
@@ -2282,6 +2455,7 @@ fun finish_call(
     typed_args,
   );
   !acc = solve_call_constraints(
+    context,
     next_id,
     c.last_constraint,
     c.last_tvar,
@@ -2289,6 +2463,7 @@ fun finish_call(
     acc,
   );
   !acc = solve_new_lambdas(
+    context,
     next_id,
     c.last_lambda_id,
     env,
@@ -2299,6 +2474,7 @@ fun finish_call(
 }
 
 fun magic_call(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -2314,7 +2490,7 @@ fun magic_call(
     };
     check_no_mutable(mut, base.i0);
     (_, e) = arga[0];
-    (!acc, e1) = expr(next_id, env, acc, e);
+    (!acc, e1) = expr(context, next_id, env, acc, e);
     old_ty = TAstUtils.get_type(e1);
     if (Types.has_unresolved(acc.subst, old_ty)) {
       SkipError.errorl(
@@ -2333,15 +2509,15 @@ fun magic_call(
   | ((_, N.Var((_, "class"))), Positional(arga)) if (arga.size() == 1) ->
     check_no_mutable(mut, base.i0);
     (_, e) = arga[0];
-    (acc1, e1) = expr(next_id, env, acc, e);
+    (acc1, e1) = expr(context, next_id, env, acc, e);
     ty = inner_type_for_class(pos, env, acc1, TAstUtils.get_type(e1));
-    tclass = TUtils.make_tconcrete(env, acc1, pos, ty);
+    tclass = TUtils.make_tconcrete(context, env, acc1, pos, ty);
     e2 = (pos, TAst.GetClass(e1));
     Some((acc1, (tclass, e2)))
   | ((_, N.Var((_, "show"))), Positional(arga)) if (arga.size() == 1) ->
     check_no_mutable(mut, base.i0);
     (_, e) = arga[0];
-    (acc1, e1) = expr(next_id, env, acc, e);
+    (acc1, e1) = expr(context, next_id, env, acc, e);
     ty = Types.fill_vars(acc1.subst, TAstUtils.get_type(e1));
     TUtils.debug_type(acc1, ty);
     print_newline();
@@ -2357,7 +2533,7 @@ fun magic_call(
   ) if (arga.size() == 1) ->
     check_no_mutable(mut, base.i0);
     (_, e) = arga[0];
-    (acc1, e1) = expr(next_id, env, acc, e);
+    (acc1, e1) = expr(context, next_id, env, acc, e);
     ty = TUtils.user_chill(pos, env, acc, e1.i0);
     Some((acc1, (ty, (pos, TAst.Annotated(e1, ty)))))
   | _ -> None()
@@ -2372,12 +2548,14 @@ fun already_bound_msg(var_name: N.Name): String {
 }
 
 fun literal(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   pos: FileRange,
   l: Ast.LiteralValue,
 ): (TUtils.Acc, (N.Type_, (FileRange, Ast.LiteralValue))) {
   ty = TUtils.make_tapply(
+    context,
     env,
     acc,
     pos,
@@ -2389,6 +2567,7 @@ fun literal(
 }
 
 fun expr_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -2397,7 +2576,7 @@ fun expr_(
   (pos, e_) = e;
   e_ match {
   | N.Literal(l) ->
-    (acc1, (ty, (pos1, l1))) = literal(env, acc, pos, l);
+    (acc1, (ty, (pos1, l1))) = literal(context, env, acc, pos, l);
     (acc1, (ty, (pos1, TAst.Literal(l1))))
   | N.Var(n) ->
     pos1 = n.i0;
@@ -2405,49 +2584,58 @@ fun expr_(
     | Some((vty, level)) ->
       (!acc, vty_fixed) = check_local_mutable(env, acc, pos1, level, vty);
       (acc, (vty_fixed, (pos1, TAst.Local(n))))
-    | None() if (SkipNaming.maybeGetFun(n.i1).isSome()) ->
-      fd = SkipNaming.getFun(n);
-      (!acc, subst, targs) = TUtils.mk_tparams(next_id, pos1, acc, fd.tparams);
-      tracking = SkipNaming.make_tfun_tracking(fd.untracked_);
-      params_ty = TUtils.make_params_type(
-        subst,
-        acc.tparam_constraints,
-        fd.params,
-      );
-      rty = TUtils.type_subst(subst, acc, fd.return_);
-      origTy = (
-        pos1,
-        N.Tfun(
-          Ast.Vnone(),
-          (Array[N.Fpure()], tracking),
-          targs,
-          params_ty,
-          rty,
-        ),
-      );
-      level = -1;
-      (!acc, ty) = check_local_mutable(env, acc, pos1, level, origTy);
-      e1 = (pos1, TAst.Fun(n, targs));
-      (acc, (ty, e1))
-    | None() if (SkipNaming.maybeGetConst(n.i1).isSome()) ->
-      ty = SkipNaming.getConst(n).type;
-      (acc, (ty, (pos1, TAst.Const(n))))
     | None() ->
-      /* TODO: reinsert this
-      didYouMeanTypos = SkipDidYouMean.didYouMeanTypos(
-      sk_smap_key_list(env.locals)
-        .concat(sk_umap_key_list(env.consts))
-        .concat(sk_umap_key_list(env.funs)),
-      n.i1,
-      );
-      */
-      SkipError.error(n.i0, "Unbound variable: " + n.i1)
+      if (SkipNaming.maybeGetFun(context, n.i1).isSome()) {
+        fd = SkipNaming.getFun(context, n);
+        (!acc, subst, targs) = TUtils.mk_tparams(
+          next_id,
+          pos1,
+          acc,
+          fd.tparams,
+        );
+        tracking = SkipNaming.make_tfun_tracking(fd.untracked_);
+        params_ty = TUtils.make_params_type(
+          subst,
+          acc.tparam_constraints,
+          fd.params,
+        );
+        rty = TUtils.type_subst(subst, acc, fd.return_);
+        origTy = (
+          pos1,
+          N.Tfun(
+            Ast.Vnone(),
+            (Array[N.Fpure()], tracking),
+            targs,
+            params_ty,
+            rty,
+          ),
+        );
+        level = -1;
+        (!acc, ty) = check_local_mutable(env, acc, pos1, level, origTy);
+        e1 = (pos1, TAst.Fun(n, targs));
+        (acc, (ty, e1))
+      } else if (SkipNaming.maybeGetConst(context, n.i1).isSome()) {
+        ty = SkipNaming.getConst(context, n).type;
+        (acc, (ty, (pos1, TAst.Const(n))))
+      } else {
+        /* TODO: reinsert this
+        didYouMeanTypos = SkipDidYouMean.didYouMeanTypos(
+        sk_smap_key_list(env.locals)
+          .concat(sk_umap_key_list(env.consts))
+          .concat(sk_umap_key_list(env.funs)),
+        n.i1,
+        );
+        */
+
+        SkipError.error(n.i0, "Unbound variable: " + n.i1)
+      }
     }
   | N.If(e1, e2, e3) ->
-    (acc1, e11) = expr(next_id, env, acc, e1);
+    (acc1, e11) = expr(context, next_id, env, acc, e1);
     e1_pos = TAstUtils.expr_pos(e11);
     ty1 = TAstUtils.get_type(e11);
     (acc2, _) = TUtils.join(
+      context,
       next_id,
       env,
       e1_pos,
@@ -2456,11 +2644,12 @@ fun expr_(
       ty1,
       TUtils.make_tbool(e1_pos, Ast.Vminus()),
     );
-    (acc3, e21) = expr(next_id, env, acc2, e2);
-    (acc4, e31) = expr(next_id, env, acc3, e3);
+    (acc3, e21) = expr(context, next_id, env, acc2, e2);
+    (acc4, e31) = expr(context, next_id, env, acc3, e3);
     ty21 = TAstUtils.get_type(e21);
     ty3 = TAstUtils.get_type(e31);
     (acc5, ty) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2474,16 +2663,23 @@ fun expr_(
   | N.Call _ -> invariant_violation("ICE call covered in expr")
   | N.ArrayGet(e1, args) ->
     e1_get = (pos, N.Dot(e1, (pos, "get")));
-    expr(next_id, env, acc, (pos, N.Call(None(), e1_get, Array[], args)))
+    expr(
+      context,
+      next_id,
+      env,
+      acc,
+      (pos, N.Call(None(), e1_get, Array[], args)),
+    )
 
   | N.Object(mut, name, tyl, args) ->
-    cd = SkipNaming.getClass(name);
+    cd = SkipNaming.getClass(context, name);
     check_mutable_constructor_call(pos, mut, cd);
     mode = mut match {
     | None() -> N.Mchilled()
     | Some(mfr) -> N.Mmutable(mfr)
     };
     (acc1, (params_ty, object_ty, targs)) = TUtils.instantiate_object(
+      context,
       pos,
       next_id,
       env,
@@ -2491,7 +2687,7 @@ fun expr_(
       mode,
       name,
     );
-    acc2 = explicit_targs(next_id, pos, env, acc1, object_ty, tyl);
+    acc2 = explicit_targs(context, next_id, pos, env, acc1, object_ty, tyl);
     params_ty1 = {
       params_ty match {
       | None() ->
@@ -2503,13 +2699,14 @@ fun expr_(
       | Some(params_ty_) -> params_ty_
       }
     };
-    (acc3, args1) = call_args(next_id, env, acc2, args);
+    (acc3, args1) = call_args(context, next_id, env, acc2, args);
     args_types = args1.map(i_e -> {
       (i, e1) = i_e;
       (i, TAstUtils.get_type(e1), TAstUtils.expr_pos(e1))
     });
     invalid_arg_msg = constructor_invalid_argument_message(mut, cd);
     (acc4, add_args) = call(
+      context,
       next_id,
       pos,
       env,
@@ -2520,14 +2717,15 @@ fun expr_(
     );
     args2 = TUtils.add_default_arguments(add_args, args1);
     invariant(cd.kind == Ast.KClass(), "Kind was checked in naming");
-    check_constructor_call(env, pos, cd);
+    check_constructor_call(context, env, pos, cd);
     e1 = (pos, TAst.Object(name, targs, args2));
     (acc4, (object_ty, e1))
   | N.Annotated(e1, ty_annotated) ->
-    acc_e2 = expr(next_id, env, acc, e1);
+    acc_e2 = expr(context, next_id, env, acc, e1);
     (acc1, e2) = acc_e2;
     (e_ty, _) = e2;
     (acc2, ty) = expr_annotation(
+      context,
       next_id,
       pos,
       env,
@@ -2539,7 +2737,7 @@ fun expr_(
   | N.Bind _ -> invariant_violation("ICE bind covered in expr")
   | N.Seq _ -> invariant_violation("ICE seq covered in expr")
   | N.Assign(name, rvalue) ->
-    (acc1, rvalue1) = expr(next_id, env, acc, rvalue);
+    (acc1, rvalue1) = expr(context, next_id, env, acc, rvalue);
     lvalue_ty = {
       name match {
       | (pos1, "_") -> (pos1, N.Tanything())
@@ -2552,8 +2750,9 @@ fun expr_(
       }
     };
     rvalue_ty = TAstUtils.get_type(rvalue1);
-    lvalue_ty1 = TUtils.contra_promote(env, acc1, lvalue_ty);
+    lvalue_ty1 = TUtils.contra_promote(context, env, acc1, lvalue_ty);
     (acc2, _) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2566,11 +2765,12 @@ fun expr_(
     e1 = (pos, TAst.Assign((lvalue_ty1, name), rvalue1));
     (acc2, (ty, e1))
   | N.Await(e1 @ (e_pos, _)) ->
-    (acc1, e2) = expr(next_id, env, acc, e1);
+    (acc1, e2) = expr(context, next_id, env, acc, e1);
     e_ty = TAstUtils.get_type(e2);
     tv = TUtils.fresh(next_id, (pos, void));
     obs = (e_pos, N.Tawaitable(Ast.Vplus(), tv));
     (acc2, _) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2585,11 +2785,12 @@ fun expr_(
     | TUtils.RNotAllowed(msg) ->
       SkipError.error(pos, "Invalid context for early return" + msg)
     | TUtils.RType(expected_ty) ->
-      (!acc, typed_ret_expr) = expr(next_id, env, acc, ret_expr);
+      (!acc, typed_ret_expr) = expr(context, next_id, env, acc, ret_expr);
       e_ty = TAstUtils.get_type(typed_ret_expr);
       ret_ty = make_return_type(env, e_ty);
-      !expected_ty = TUtils.contra_promote(env, acc, expected_ty);
+      !expected_ty = TUtils.contra_promote(context, env, acc, expected_ty);
       (!acc, _) = TUtils.join(
+        context,
         next_id,
         env,
         pos,
@@ -2602,10 +2803,11 @@ fun expr_(
     }
   | N.Yield(yield_expr) ->
     expected_ty = env.yield_type.getType(pos);
-    (!acc, typed_yield_expr) = expr(next_id, env, acc, yield_expr);
+    (!acc, typed_yield_expr) = expr(context, next_id, env, acc, yield_expr);
     yield_ty = TAstUtils.get_type(typed_yield_expr);
-    !expected_ty = TUtils.contra_promote(env, acc, expected_ty);
+    !expected_ty = TUtils.contra_promote(context, env, acc, expected_ty);
     (!acc, _) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2622,26 +2824,29 @@ fun expr_(
     (acc, ((pos, N.Tanything()), (pos, TAst.YieldBreak())))
   | N.Classname(name, tyl) ->
     (acc1, cd, oty) = TUtils.instantiate_object_type(
+      context,
       pos,
       next_id,
       acc,
       N.Mchilled(),
       name,
     );
-    acc2 = explicit_targs(next_id, pos, env, acc1, oty, tyl);
-    ty = TUtils.classname_ty(false, env, acc2, pos, cd, oty);
+    acc2 = explicit_targs(context, next_id, pos, env, acc1, oty, tyl);
+    ty = TUtils.classname_ty(context, false, env, acc2, pos, cd, oty);
     (acc2, (ty, (pos, TAst.Classname(name))))
   | N.StaticDot(obj, field) ->
-    (acc1, obj1) = expr(next_id, env, acc, obj);
+    (acc1, obj1) = expr(context, next_id, env, acc, obj);
     obj_ty = TAstUtils.get_type(obj1);
     obj_pos = TAstUtils.expr_pos(obj1);
     tobject = TUtils.make_tobject(
+      context,
       env,
       acc1,
       pos,
       TUtils.fresh(next_id, (pos, void)),
     );
     (_acc, _ty) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2651,6 +2856,7 @@ fun expr_(
       tobject,
     );
     (acc2, dot, source) = expr_dot(
+      context,
       next_id,
       true,
       env,
@@ -2677,11 +2883,11 @@ fun expr_(
     );
     (acc2, e1)
   | N.Dot(obj, field) ->
-    (acc1, obj1) = expr(next_id, env, acc, obj);
-    bind_dot(next_id, env, acc1, pos, obj1, field)
+    (acc1, obj1) = expr(context, next_id, env, acc, obj);
+    bind_dot(context, next_id, env, acc1, pos, obj1, field)
   | N.Pipe(e1, e2) ->
-    (acc1, e11) = expr(next_id, env, acc, e1);
-    (acc2, e21) = expr(next_id, env, acc1, e2);
+    (acc1, e11) = expr(context, next_id, env, acc, e1);
+    (acc2, e21) = expr(context, next_id, env, acc1, e2);
     ty1 = TAstUtils.get_type(e11);
     ty2 = TAstUtils.get_type(e21);
     ret_ty = TUtils.fresh(next_id, (pos, void));
@@ -2696,6 +2902,7 @@ fun expr_(
       ),
     );
     (acc3, _) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2707,10 +2914,11 @@ fun expr_(
     (acc3, (ret_ty, (pos, TAst.Call(e21, Positional(Array[(0, e11)])))))
   | N.Binop((_, op @ N.Barbar()), e1, e2)
   | N.Binop((_, op @ N.Ampamp()), e1, e2) ->
-    (acc1, e11) = expr(next_id, env, acc, e1);
+    (acc1, e11) = expr(context, next_id, env, acc, e1);
     e1_pos = TAstUtils.expr_pos(e11);
     ty1 = TAstUtils.get_type(e11);
     (acc2, _) = TUtils.join(
+      context,
       next_id,
       env,
       e1_pos,
@@ -2719,10 +2927,11 @@ fun expr_(
       ty1,
       TUtils.make_tbool(e1_pos, Ast.Vminus()),
     );
-    (acc3, e21) = expr(next_id, env, acc2, e2);
+    (acc3, e21) = expr(context, next_id, env, acc2, e2);
     e2_pos = TAstUtils.expr_pos(e21);
     ty2 = TAstUtils.get_type(e21);
     (acc4, _) = TUtils.join(
+      context,
       next_id,
       env,
       e2_pos,
@@ -2736,9 +2945,10 @@ fun expr_(
   | N.Binop _ -> invariant_violation("ICE binop covered in expr")
   | N.Throw(e1) ->
     (e_pos, _) = e1;
-    (acc1, e2) = expr(next_id, env, acc, e1);
+    (acc1, e2) = expr(context, next_id, env, acc, e1);
     e_ty = TAstUtils.get_type(e2);
     (acc2, _) = TUtils.join(
+      context,
       next_id,
       env,
       e_pos,
@@ -2757,9 +2967,10 @@ fun expr_(
       yield_type => TUtils.YNotAllowed("Yield not allowed in an async block"),
       frozen_level => TUtils.LAsyncBlock(pos, acc.level),
     };
-    (!acc, typed_block) = expr(next_id, env, acc, async_block);
+    (!acc, typed_block) = expr(context, next_id, env, acc, async_block);
     ty = TAstUtils.get_type(typed_block);
     (!acc, !ty) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2779,20 +2990,21 @@ fun expr_(
         pos,
         N.Call(None(), (upos, N.Dot(e1, name)), Array[], Positional(Array[])),
       );
-      expr(next_id, env, acc, e2)
+      expr(context, next_id, env, acc, e2)
     | N.Uminus() ->
       name = (pos, "negate");
       e2 = (
         pos,
         N.Call(None(), (upos, N.Dot(e1, name)), Array[], Positional(Array[])),
       );
-      expr(next_id, env, acc, e2)
+      expr(context, next_id, env, acc, e2)
     }
   | N.Lambda(ml, params, captured, e1, yields) ->
     lambda_id = next_id();
     variance = Ast.Vplus();
     mods = Types.promote_tfun_modifiers(ml);
     ((explicit_params, acc1), lam_params) = lam_parameters(
+      context,
       next_id,
       env,
       acc,
@@ -2828,17 +3040,25 @@ fun expr_(
     branch1 = (List[pat], None(), ebool(true));
     branch2 = (List[(pat.i0, N.Pat_var((pat.i0, "_")))], None(), ebool(false));
     mbl = List[branch1, branch2];
-    (!acc, lhs) = expr(next_id, env, acc, lhs_expr);
+    (!acc, lhs) = expr(context, next_id, env, acc, lhs_expr);
     e_ty = TAstUtils.get_type(lhs);
     rty = TUtils.make_tbool(pos, SkipAst.Vminus());
-    (!acc, mbl1, !rty) = match_branch_list(next_id, e_ty, rty, env, acc, mbl);
+    (!acc, mbl1, !rty) = match_branch_list(
+      context,
+      next_id,
+      e_ty,
+      rty,
+      env,
+      acc,
+      mbl,
+    );
     lhs_pos = (pos, TAst.Match(lhs, mbl1));
     if (env.check_exhaustive_match) {
-      check_exhaustive_match_is(next_id, env, acc, pos, e_ty, mbl1)
+      check_exhaustive_match_is(context, next_id, env, acc, pos, e_ty, mbl1)
     };
     (acc, (rty, lhs_pos))
   | N.As(lhs_expr, pat) ->
-    (!acc, lhs) = expr(next_id, env, acc, lhs_expr);
+    (!acc, lhs) = expr(context, next_id, env, acc, lhs_expr);
     e_ty = TAstUtils.get_type(lhs);
     rty = TUtils.fresh(next_id, (pos, void));
     identifier = sk_new_var_name(next_id, pat.i0);
@@ -2854,7 +3074,7 @@ fun expr_(
     );
     expectedTyString = (
       pos,
-      e_string(print_pattern(next_id, env, acc, e_ty, pat)),
+      e_string(print_pattern(context, next_id, env, acc, e_ty, pat)),
     );
     obj_call_args = Positional(
       Array[(0, actualTyString), (1, expectedTyString)],
@@ -2872,30 +3092,47 @@ fun expr_(
       throw_expr,
     );
     mbl = List[matches_branch, throw_branch];
-    (!acc, mbl1, !rty) = match_branch_list(next_id, e_ty, rty, env, acc, mbl);
+    (!acc, mbl1, !rty) = match_branch_list(
+      context,
+      next_id,
+      e_ty,
+      rty,
+      env,
+      acc,
+      mbl,
+    );
     lhs_pos = (pos, TAst.Match(lhs, mbl1));
     if (env.check_exhaustive_match) {
-      check_exhaustive_match_as(next_id, env, acc, pos, e_ty, mbl1)
+      check_exhaustive_match_as(context, next_id, env, acc, pos, e_ty, mbl1)
     };
     (acc, (rty, lhs_pos))
   | N.Match(match_expr, mbl) ->
-    (acc1, e1) = expr(next_id, env, acc, match_expr);
+    (acc1, e1) = expr(context, next_id, env, acc, match_expr);
     e_ty = TAstUtils.get_type(e1);
     rty = TUtils.fresh(next_id, (pos, void));
-    (acc2, mbl1, rty1) = match_branch_list(next_id, e_ty, rty, env, acc1, mbl);
+    (acc2, mbl1, rty1) = match_branch_list(
+      context,
+      next_id,
+      e_ty,
+      rty,
+      env,
+      acc1,
+      mbl,
+    );
     e2 = (pos, TAst.Match(e1, mbl1));
     if (env.check_exhaustive_match) {
-      check_exhaustive_match(next_id, env, acc2, pos, e_ty, mbl1)
+      check_exhaustive_match(context, next_id, env, acc2, pos, e_ty, mbl1)
     };
     (acc2, (rty1, e2))
   | N.Try(match_expr, mbl) ->
     if (env.embeddedMode) {
       SkipError.error(pos, "Cannot use try/catch in embedded mode (use etry)");
     };
-    (acc1, e1) = expr(next_id, env, acc, match_expr);
+    (acc1, e1) = expr(context, next_id, env, acc, match_expr);
     e_ty = TAstUtils.get_type(e1);
     pat_ty = TUtils.make_texn(pos, Ast.Vplus());
     (acc2, mbl1, e_ty1) = match_branch_list(
+      context,
       next_id,
       pat_ty,
       e_ty,
@@ -2905,7 +3142,7 @@ fun expr_(
     );
     e2 = (pos, TAst.Try(e1, mbl1));
     if (env.check_exhaustive_match) {
-      check_exhaustive_try(next_id, env, acc2, pos, mbl1)
+      check_exhaustive_try(context, next_id, env, acc2, pos, mbl1)
     };
     (acc2, (e_ty1, e2))
   | N.Concurrent _ -> invariant_violation("TODO concurrent")
@@ -2915,10 +3152,13 @@ fun expr_(
     | Some(mfr) -> N.Mmutable(mfr)
     };
     elt_pos = if (el.isEmpty()) pos else el[0].i0;
-    (acc1, el1) = el.mapAcc((acc, x) -> expr(next_id, env, acc, x), acc);
+    (acc1, el1) = el.mapAcc(
+      (acc, x) -> expr(context, next_id, env, acc, x),
+      acc,
+    );
     elt_ty = ((pos, N.Tanything()) : N.Type_);
     (acc2, elt_ty1) = el1.foldl(
-      ((acc_ty, cur) -> array_element(next_id, env, pos, acc_ty, cur)),
+      ((acc_ty, cur) -> array_element(context, next_id, env, pos, acc_ty, cur)),
       (acc1, elt_ty),
     );
     explicit_ty = tyl.size() match {
@@ -2926,8 +3166,9 @@ fun expr_(
     | 1 -> tyl[0]
     | _ -> SkipError.error(tyl[1].i0, "Unexpected type argument")
     };
-    explicit_ty1 = TUtils.contra_promote(env, acc2, explicit_ty);
+    explicit_ty1 = TUtils.contra_promote(context, env, acc2, explicit_ty);
     (acc3, elt_ty2) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -2938,6 +3179,7 @@ fun expr_(
     );
     array_targs = Array[elt_ty2];
     array_ty = TUtils.make_tapply(
+      context,
       env,
       acc3,
       pos,
@@ -2948,15 +3190,16 @@ fun expr_(
     e1 = (pos, TAst.Array(el1));
     (acc3, (array_ty, e1))
   | N.With(obj, updates) ->
-    (acc1, obj1) = expr(next_id, env, acc, obj);
+    (acc1, obj1) = expr(context, next_id, env, acc, obj);
     obj_ty = TAstUtils.get_type(obj1);
     obj_pos = TAstUtils.expr_pos(obj1);
     (acc2, updates1) = updates.mapAcc(
       (acc2, field_name, i_rvalue) -> {
         (field_pos, _) = field_name;
         (i, rvalue) = i_rvalue;
-        (acc3, rvalue1) = expr(next_id, env, acc2, rvalue);
+        (acc3, rvalue1) = expr(context, next_id, env, acc2, rvalue);
         (acc4, dot, source) = expr_dot(
+          context,
           next_id,
           false,
           env,
@@ -2973,7 +3216,7 @@ fun expr_(
         if (!(elt_kind is N.EProperty())) {
           SkipError.error(field_pos, "Can only bind to class properties")
         };
-        cd = SkipNaming.getClass(source);
+        cd = SkipNaming.getClass(context, source);
         cp = cd.params.fromHasParams("with field deconstruction");
         visibility = cp.visibility;
         msg = () ~>
@@ -2984,6 +3227,7 @@ fun expr_(
         vis_msg = () ~>
           "Changing this property constructs a new object, so it is limited by the constructor visibility. ";
         check_visibility(
+          context,
           env,
           field_pos,
           source,
@@ -2992,9 +3236,10 @@ fun expr_(
           visibility,
           vis_msg,
         );
-        field_type1 = TUtils.contra_promote(env, acc4, field_type);
+        field_type1 = TUtils.contra_promote(context, env, acc4, field_type);
         rvalue_type = TAstUtils.get_type(rvalue1);
         (acc5, _) = TUtils.join(
+          context,
           next_id,
           env,
           field_pos,
@@ -3009,8 +3254,8 @@ fun expr_(
     );
     (acc2, (obj_ty, (pos, TAst.With(obj1, updates1))))
   | N.AssignField(obj, field_name, rvalue) ->
-    (acc1, obj1) = expr(next_id, env, acc, obj);
-    (acc2, rvalue1) = expr(next_id, env, acc1, rvalue);
+    (acc1, obj1) = expr(context, next_id, env, acc, obj);
+    (acc2, rvalue1) = expr(context, next_id, env, acc1, rvalue);
     obj_ty = TAstUtils.get_type(obj1);
     obj_pos = TAstUtils.expr_pos(obj1);
     TUtils.is_mutable(acc2, obj_ty, false) match {
@@ -3028,6 +3273,7 @@ fun expr_(
       )
     };
     (acc3, dot, source) = expr_dot(
+      context,
       next_id,
       false,
       env,
@@ -3061,9 +3307,10 @@ fun expr_(
     }) {
       SkipError.error(pos, "Can only assign to class properties")
     };
-    field_ty = TUtils.contra_promote(env, acc3, field_type);
+    field_ty = TUtils.contra_promote(context, env, acc3, field_type);
     rvalue_type = TAstUtils.get_type(rvalue1);
     (acc4, _) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -3094,9 +3341,10 @@ fun expr_(
           ),
         );
 
-        (acc1, e1) = expr(next_id, env, acc, toStringExpr);
+        (acc1, e1) = expr(context, next_id, env, acc, toStringExpr);
         e1_pos = TAstUtils.expr_pos(e1);
         (acc2, _) = TUtils.join(
+          context,
           next_id,
           env,
           e1_pos,
@@ -3121,9 +3369,10 @@ fun expr_(
     env.break_type match {
     | None() -> SkipError.error(pos, "Unexpected 'break' found outside a loop")
     | Some(break_type) ->
-      (!acc, eb) = expr(next_id, env, acc, neb);
+      (!acc, eb) = expr(context, next_id, env, acc, neb);
       (ty, (ebfr, _)) = eb;
       (!acc, _) = TUtils.join(
+        context,
         next_id,
         env,
         ebfr,
@@ -3135,13 +3384,28 @@ fun expr_(
       (acc, ((pos, N.Tanything()), (pos, TAst.Break(eb))))
     }
   | N.Loop(nbody) ->
-    (!acc, break_type, body) = loop_body(next_id, pos, env, acc, nbody);
+    (!acc, break_type, body) = loop_body(
+      context,
+      next_id,
+      pos,
+      env,
+      acc,
+      nbody,
+    );
     (acc, (break_type, (pos, TAst.Loop(body))))
   | N.DoWhile(nbody, ncondition, nwoBreak) ->
-    (!acc, break_type, body) = loop_body(next_id, pos, env, acc, nbody);
-    (!acc, condition) = expr(next_id, env, acc, ncondition);
+    (!acc, break_type, body) = loop_body(
+      context,
+      next_id,
+      pos,
+      env,
+      acc,
+      nbody,
+    );
+    (!acc, condition) = expr(context, next_id, env, acc, ncondition);
     conditionFr = condition.i1.i0;
     (!acc, _) = TUtils.join(
+      context,
       next_id,
       env,
       conditionFr,
@@ -3150,8 +3414,9 @@ fun expr_(
       TUtils.make_tbool(conditionFr, Ast.Vminus()),
       condition.i0,
     );
-    (!acc, woBreak) = expr(next_id, env, acc, nwoBreak);
+    (!acc, woBreak) = expr(context, next_id, env, acc, nwoBreak);
     (!acc, _) = TUtils.join(
+      context,
       next_id,
       env,
       woBreak.i1.i0,
@@ -3162,9 +3427,10 @@ fun expr_(
     );
     (acc, (break_type, (pos, TAst.DoWhile(body, condition, woBreak))))
   | N.While(ncondition, nbody, nwoBreak) ->
-    (!acc, condition) = expr(next_id, env, acc, ncondition);
+    (!acc, condition) = expr(context, next_id, env, acc, ncondition);
     conditionFr = condition.i1.i0;
     (!acc, _) = TUtils.join(
+      context,
       next_id,
       env,
       conditionFr,
@@ -3173,9 +3439,17 @@ fun expr_(
       TUtils.make_tbool(conditionFr, Ast.Vminus()),
       condition.i0,
     );
-    (!acc, break_type, body) = loop_body(next_id, pos, env, acc, nbody);
-    (!acc, woBreak) = expr(next_id, env, acc, nwoBreak);
+    (!acc, break_type, body) = loop_body(
+      context,
+      next_id,
+      pos,
+      env,
+      acc,
+      nbody,
+    );
+    (!acc, woBreak) = expr(context, next_id, env, acc, nwoBreak);
     (!acc, _) = TUtils.join(
+      context,
       next_id,
       env,
       woBreak.i1.i0,
@@ -3190,6 +3464,7 @@ fun expr_(
 
 // Keep this in sync with bind_dot.
 fun get_field_type(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3198,6 +3473,7 @@ fun get_field_type(
   field: N.Name,
 ): TAst.Type_ {
   (acc2, dot, _) = expr_dot(
+    context,
     next_id,
     false,
     env,
@@ -3215,6 +3491,7 @@ fun get_field_type(
 
 // Keep this in sync with get_field_type above.
 fun bind_dot(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3225,6 +3502,7 @@ fun bind_dot(
   obj_ty = TAstUtils.get_type(obj);
   obj_pos = TAstUtils.expr_pos(obj);
   (acc2, dot, source) = expr_dot(
+    context,
     next_id,
     false,
     env,
@@ -3259,18 +3537,20 @@ fun convert_or_and(op: N.Binop_, e1: TAst.Expr, e2: TAst.Expr): TAst.Expr__ {
 }
 
 fun lam_parameters(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   params: Parameters<N.Lam_parameter>,
 ): ((Bool, TUtils.Acc), Parameters<(N.Name, N.Type_)>) {
   params.map_foldl(
-    (bacc, x) -> lam_parameter(next_id, env, bacc, x),
+    (bacc, x) -> lam_parameter(context, next_id, env, bacc, x),
     (false, acc),
   )
 }
 
 fun lam_parameter(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   bacc: (Bool, TUtils.Acc),
@@ -3282,7 +3562,7 @@ fun lam_parameter(
   tyopt match {
   | None() -> ((false, acc), (n, TUtils.fresh(next_id, n)))
   | Some(ty) ->
-    (!acc, !ty) = TUtils.instantiate(next_id, env, acc, ty);
+    (!acc, !ty) = TUtils.instantiate(context, next_id, env, acc, ty);
     ((true, acc), (n, ty))
   }
 }
@@ -3320,6 +3600,7 @@ fun add_field_targs(
 }
 
 fun explicit_targs(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -3337,7 +3618,7 @@ fun explicit_targs(
       msg = "Invalid arity, expected " + size_str + " type parameters";
       SkipError.error(pos, msg)
     };
-    bind_explicit_targs(next_id, env, acc, explicit_targs, fun_targs)
+    bind_explicit_targs(context, next_id, env, acc, explicit_targs, fun_targs)
   | (_, N.Tset(Ast.Vplus(), _, _, elts)) if (!elts.isEmpty()) ->
     class_targs = elts[0] match {
     | N.InterElt{name => (_, "Concrete"), targs} ->
@@ -3345,11 +3626,11 @@ fun explicit_targs(
       (targs[0].i1 as N.Tset(Ast.Vplus(), _, _, _)).elts[0].targs
     | _ -> elts[0].targs
     };
-    bind_explicit_targs(next_id, env, acc, explicit_targs, class_targs)
+    bind_explicit_targs(context, next_id, env, acc, explicit_targs, class_targs)
 
   | (_, N.Tpromoted(_, _, _, _, _, class_targs))
   | (_, N.Tapply(_, _, class_targs)) ->
-    bind_explicit_targs(next_id, env, acc, explicit_targs, class_targs)
+    bind_explicit_targs(context, next_id, env, acc, explicit_targs, class_targs)
   | _ ->
     print_error(ty1.i0.toString() + "\n");
     TUtils.debug_type(acc, ty1);
@@ -3358,6 +3639,7 @@ fun explicit_targs(
 }
 
 fun bind_explicit_targs(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3369,6 +3651,7 @@ fun bind_explicit_targs(
     (facc, explicit_targ, targ) -> {
       (pos, _) = explicit_targ;
       (!facc, _ty) = TUtils.join(
+        context,
         next_id,
         env,
         pos,
@@ -3387,6 +3670,7 @@ fun bind_explicit_targs(
 /* Function used to solve lambda types introduced during a call. */
 /*****************************************************************************/
 fun solve_new_lambdas(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   last_id: Int,
   env: TUtils.Env,
@@ -3400,7 +3684,7 @@ fun solve_new_lambdas(
     acc1 = {
       vtry(
         () -> {
-          lambda(next_id, true, env, acc, lbd)
+          lambda(context, next_id, true, env, acc, lbd)
         },
         exn ->
           exn match {
@@ -3410,7 +3694,7 @@ fun solve_new_lambdas(
         ,
       )
     };
-    solve_new_lambdas(next_id, last_id, env, acc1, rl)
+    solve_new_lambdas(context, next_id, last_id, env, acc1, rl)
   }
 }
 
@@ -3537,6 +3821,7 @@ private fun check_if_block_mutable(
 }
 
 fun array_element(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   fr: FileRange,
@@ -3546,6 +3831,7 @@ fun array_element(
   (elt_ty2, _) = next_elt;
   (acc, elt_ty1) = acc_elty;
   (!acc, joined) = TUtils.join(
+    context,
     next_id,
     env,
     fr,
@@ -3558,6 +3844,7 @@ fun array_element(
 }
 
 fun match_branch_list(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   ety: TAst.Type_,
   rty: TAst.Type_,
@@ -3568,8 +3855,24 @@ fun match_branch_list(
   x match {
   | List.Nil() -> (acc, List[], rty)
   | List.Cons(pa, mbl) ->
-    (acc1, mbl1, rty1) = match_branch_list(next_id, ety, rty, env, acc, mbl);
-    (acc2, pa1, rty2) = patterns_action(next_id, ety, rty1, env, acc1, pa);
+    (acc1, mbl1, rty1) = match_branch_list(
+      context,
+      next_id,
+      ety,
+      rty,
+      env,
+      acc,
+      mbl,
+    );
+    (acc2, pa1, rty2) = patterns_action(
+      context,
+      next_id,
+      ety,
+      rty1,
+      env,
+      acc1,
+      pa,
+    );
     (acc2, List.Cons(pa1, mbl1), rty2)
   }
 }
@@ -3587,6 +3890,7 @@ fun get_mut_pat(acc: TUtils.Acc, ety: N.Type_): (N.Modality, N.Type_) {
 }
 
 fun pattern_guard(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3594,10 +3898,11 @@ fun pattern_guard(
 ): (TUtils.Acc, TAst.Expr) {
   (pos, guard) = pguard;
   env1 = env with {frozen_level => TUtils.LIfBlock(pos, acc.level)};
-  (acc1, guard1) = expr(next_id, env1, acc, (pos, guard));
+  (acc1, guard1) = expr(context, next_id, env1, acc, (pos, guard));
   e_pos = TAstUtils.expr_pos(guard1);
   e_ty = TAstUtils.get_type(guard1);
   (acc2, _) = TUtils.join(
+    context,
     next_id,
     env1,
     e_pos,
@@ -3610,6 +3915,7 @@ fun pattern_guard(
 }
 
 fun patterns_action(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   ety: TAst.Type_,
   rty: TAst.Type_,
@@ -3619,16 +3925,17 @@ fun patterns_action(
 ): (TUtils.Acc, TAst.Match_branch, TAst.Type_) {
   (pats, maybe_guard, action) = branch;
   prev_upper_bounds = acc.tparam_constraints;
-  ((!env, !acc), pats1) = patterns(next_id, env, acc, ety, pats);
+  ((!env, !acc), pats1) = patterns(context, next_id, env, acc, ety, pats);
   (!acc, maybe_guard1) = maybe_guard match {
   | None() -> (acc, None())
   | Some(x) ->
-    (acc2, x2) = pattern_guard(next_id, env, acc, x);
+    (acc2, x2) = pattern_guard(context, next_id, env, acc, x);
     (acc2, Some(x2))
   };
-  (!acc, action1) = expr(next_id, env, acc, action);
+  (!acc, action1) = expr(context, next_id, env, acc, action);
   (action_ty, (action_pos, _)) = action1;
   (!acc, rty1) = TUtils.join(
+    context,
     next_id,
     env,
     action_pos,
@@ -3645,6 +3952,7 @@ fun patterns_action(
 }
 
 fun patterns(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3656,13 +3964,14 @@ fun patterns(
   pats.map_foldl(
     ((env_acc, pat) -> {
       (env1, acc1) = env_acc;
-      pattern(next_id, env1, acc1, pat_level, einfo, pat)
+      pattern(context, next_id, env1, acc1, pat_level, einfo, pat)
     }),
     (env, acc),
   )
 }
 
 fun pattern(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3672,6 +3981,7 @@ fun pattern(
 ): ((TUtils.Env, TUtils.Acc), TAst.Pattern) {
   (pos, pat) = pos_pat;
   ((env1, acc1), tpat) = pattern_(
+    context,
     next_id,
     env,
     acc,
@@ -3680,22 +3990,25 @@ fun pattern(
     pos,
     pat,
   );
-  check_no_existential_in_local(acc1, tpat);
+  check_no_existential_in_local(context, acc1, tpat);
   ((env1, acc1), tpat)
 }
 
 // return simple static expr converted to pattern, or error trace
-fun pattern_from_expr(expr: N.Expr): Result<N.Pattern_, SkipError.Trace> {
+fun pattern_from_expr(
+  context: mutable SKFS.Context,
+  expr: N.Expr,
+): Result<N.Pattern_, SkipError.Trace> {
   fail_msg = "Constant must be initialized to a literal or static object expression, or a static reference to another such constant.";
   expr.i1 match {
   | N.Literal(value) -> Success(N.Pat_literal(value))
   | N.Var(name) ->
-    SkipNaming.maybeGetConst(name.i1) match {
-    | Some(def) -> pattern_from_const(def)
+    SkipNaming.maybeGetConst(context, name.i1) match {
+    | Some(def) -> pattern_from_const(context, def)
     | None() -> Failure((expr.i0, fail_msg))
     }
   | N.Object(mut, name, _, args) ->
-    cd = SkipNaming.getClass(name);
+    cd = SkipNaming.getClass(context, name);
     mut match {
     | Some(pos) -> Failure((pos, "Constant is initialized to a mutable value"))
     | None() ->
@@ -3711,7 +4024,7 @@ fun pattern_from_expr(expr: N.Expr): Result<N.Pattern_, SkipError.Trace> {
       ) if (!cp.params.all(p ~> p.visibility.i1 is N.VPublic())) ->
         Failure((expr.i0, "Constant initializer uses non-public field(s)"))
       | _ ->
-        arg_results = args.map(a ~> pattern_from_expr(a.i1));
+        arg_results = args.map(a -> pattern_from_expr(context, a.i1));
         arg_results.find(a ~> a is Failure _) match {
         | Some(fail) -> fail
         | None() ->
@@ -3720,13 +4033,13 @@ fun pattern_from_expr(expr: N.Expr): Result<N.Pattern_, SkipError.Trace> {
         }
       }
     }
-  | N.Annotated(e, _) -> pattern_from_expr(e)
+  | N.Annotated(e, _) -> pattern_from_expr(context, e)
   | N.StaticDot(cls_expr, field) ->
     cls_expr match {
     | (_, N.Classname(cls_name, _)) ->
-      cd = SkipNaming.getClass(cls_name);
+      cd = SkipNaming.getClass(context, cls_name);
       cd.consts.maybeGet(field) match {
-      | Some(def) -> pattern_from_const(def)
+      | Some(def) -> pattern_from_const(context, def)
       | None() ->
         msg = `Could not find static member '${field.i1}' on class '${
           cls_name.i1
@@ -3740,17 +4053,21 @@ fun pattern_from_expr(expr: N.Expr): Result<N.Pattern_, SkipError.Trace> {
 }
 
 // return const's static RHS converted to pattern, or error trace
-fun pattern_from_const(def: N.Const_def): Result<N.Pattern_, SkipError.Trace> {
+fun pattern_from_const(
+  context: mutable SKFS.Context,
+  def: N.Const_def,
+): Result<N.Pattern_, SkipError.Trace> {
   def.value match {
   | N.Abstract() ->
     Failure((def.name.i0, "Abstract constants cannot be used in patterns"))
   | N.Native() ->
     Failure((def.name.i0, "Native constants cannot be used in patterns"))
-  | N.Implemented(expr) -> pattern_from_expr(expr)
+  | N.Implemented(expr) -> pattern_from_expr(context, expr)
   }
 }
 
 fun pattern_(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3759,18 +4076,18 @@ fun pattern_(
   pos: FileRange,
   x: N.Pattern_,
 ): ((TUtils.Env, TUtils.Acc), TAst.Pattern) {
-  check_pattern(pos, env, acc, einfo, x);
+  check_pattern(context, pos, env, acc, einfo, x);
   ety = einfo.ty;
   x match {
   | N.Pat_const(named_expr) ->
-    (!acc, typed_expr) = expr(next_id, env, acc, named_expr);
+    (!acc, typed_expr) = expr(context, next_id, env, acc, named_expr);
     typed_expr match {
     | (_, (_, TAst.Const(name))) ->
       // for constants with simple static initializers, convert initializer
       // to pattern and swap it in. for others, raise error.
-      pattern_from_const(SkipNaming.getConst(name)) match {
+      pattern_from_const(context, SkipNaming.getConst(context, name)) match {
       | Success(pat_) ->
-        pattern_(next_id, env, acc, pat_level, einfo, pos, pat_)
+        pattern_(context, next_id, env, acc, pat_level, einfo, pos, pat_)
       | Failure(trace) ->
         SkipError.errorl(
           List[(pos, "Ineligible constant used in pattern:"), trace],
@@ -3784,6 +4101,7 @@ fun pattern_(
     }
   | N.Pat_var(var_name) ->
     (env1, acc1, var) = bind_pattern_local(
+      context,
       next_id,
       env,
       acc,
@@ -3794,9 +4112,10 @@ fun pattern_(
     (fixed_ty, _, _) = var;
     ((env1, acc1), (fixed_ty, (pos, TAst.Pat_var(var))))
   | N.Pat_literal(l) ->
-    (acc1, (ty, (_, l1))) = literal(env, acc, pos, l);
+    (acc1, (ty, (_, l1))) = literal(context, env, acc, pos, l);
     pat = (pos, TAst.Pat_literal(l1));
     (acc2, _) = TUtils.join(
+      context,
       next_id,
       env,
       pos,
@@ -3809,6 +4128,7 @@ fun pattern_(
   | N.Pat_type(tid, field_pats, _) ->
     obj_name = obj_name_of_tid(tid);
     ((env1, acc1), object_ty, castType, pos1, params) = object_pattern(
+      context,
       next_id,
       pos,
       env,
@@ -3821,9 +4141,18 @@ fun pattern_(
     pat_ = (pos1, TAst.Pat_type(type_identifier(tid), castType, params));
     ((env1, acc1), (object_ty, pat_))
   | N.Pat_as(pat, var_name) ->
-    ((env1, acc1), pat1) = pattern(next_id, env, acc, pat_level, einfo, pat);
+    ((env1, acc1), pat1) = pattern(
+      context,
+      next_id,
+      env,
+      acc,
+      pat_level,
+      einfo,
+      pat,
+    );
     ty = TAstUtils.get_type_of_pattern(pat1);
     (env2, acc2, var) = bind_pattern_local(
+      context,
       next_id,
       env1,
       acc1,
@@ -3852,6 +4181,7 @@ fun obj_name_of_tid(x: N.Type_identifier): N.Name {
 }
 
 fun object_pattern_args(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   obj_name: N.Name,
@@ -3907,7 +4237,7 @@ fun object_pattern_args(
       (env_acc, info_pat) -> {
         (env1, acc1) = env_acc;
         (info, pat) = info_pat;
-        type_pat_arg(next_id, pat_level, env1, acc1, info, obj_ty, pat)
+        type_pat_arg(context, next_id, pat_level, env1, acc1, info, obj_ty, pat)
       },
       (env, acc),
     );
@@ -3916,6 +4246,7 @@ fun object_pattern_args(
 }
 
 fun type_pat_arg(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pat_level: Int,
   env: TUtils.Env,
@@ -3925,9 +4256,18 @@ fun type_pat_arg(
   pat: N.Pattern,
 ): ((TUtils.Env, TUtils.Acc), TAst.ParamPattern) {
   ty = info.ty;
-  prom_param_ty = TUtils.promote(env, acc, ty);
-  field_ty = get_field_type(next_id, env, acc, pat.i0, obj_ty, info.name);
+  prom_param_ty = TUtils.promote(context, env, acc, ty);
+  field_ty = get_field_type(
+    context,
+    next_id,
+    env,
+    acc,
+    pat.i0,
+    obj_ty,
+    info.name,
+  );
   ((!env, !acc), res_pat) = pattern(
+    context,
     next_id,
     env,
     acc,
@@ -3939,6 +4279,7 @@ fun type_pat_arg(
 }
 
 fun object_pattern(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -3959,6 +4300,7 @@ fun object_pattern(
     acc1,
     (params_ty, object_ty, castType),
   ) = TUtils.instantiate_pattern_object(
+    context,
     next_id,
     pos,
     env,
@@ -3967,6 +4309,7 @@ fun object_pattern(
     obj_name,
   );
   ((env2, acc2), field_pats1) = object_pattern_args(
+    context,
     next_id,
     pos,
     obj_name,
@@ -3981,27 +4324,30 @@ fun object_pattern(
 }
 
 fun call_args(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   params: N.Call_args,
 ): (TUtils.Acc, TAst.Call_args) {
-  params.map_foldl((acc, x) -> ordered_expr(next_id, env, acc, x), acc)
+  params.map_foldl((acc, x) -> ordered_expr(context, next_id, env, acc, x), acc)
 }
 
 fun ordered_expr(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
   i_e: N.Ordered_expr,
 ): (TUtils.Acc, TAst.Ordered_expr) {
   (i, e) = i_e;
-  (acc1, e1) = expr(next_id, env, acc, e);
+  (acc1, e1) = expr(context, next_id, env, acc, e);
   (acc1, (i, e1))
 }
 
 // Join types across cross patern binding
 fun bind_pattern_local(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4010,14 +4356,15 @@ fun bind_pattern_local(
   var_name: N.Name,
 ): (TUtils.Env, TUtils.Acc, TAst.Binding) {
   arg_ty = TUtils.fresh(next_id, var_name);
-  (acc1, _) = TUtils.join_exn(next_id, env, acc, param_ty, arg_ty);
+  (acc1, _) = TUtils.join_exn(context, next_id, env, acc, param_ty, arg_ty);
   (_, str_var_name) = var_name;
   (acc2, new_ty) = {
     env.locals.maybeGet(str_var_name) match {
     | Some((prev_ty, _level)) ->
-      prom_prev_ty = TUtils.promote(env, acc1, prev_ty);
-      prom_arg_ty = TUtils.promote(env, acc1, arg_ty);
+      prom_prev_ty = TUtils.promote(context, env, acc1, prev_ty);
+      prom_arg_ty = TUtils.promote(context, env, acc1, arg_ty);
       (acc2, join_ty) = TUtils.join(
+        context,
         next_id,
         env,
         pos,
@@ -4041,6 +4388,7 @@ fun inaccessible_field_in_pattern_message(fieldName: String): String {
 }
 
 fun check_pattern(
+  context: mutable SKFS.Context,
   fr: FileRange,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4054,10 +4402,18 @@ fun check_pattern(
     void
   | (np @ TUtils.NestedPat _, _) ->
     msg = () ~> inaccessible_field_in_pattern_message(np.name.i1);
-    check_visibility(env, fr, np.class_name, np.source, msg, np.visibility)
+    check_visibility(
+      context,
+      env,
+      fr,
+      np.class_name,
+      np.source,
+      msg,
+      np.visibility,
+    )
   };
   x match {
-  | N.Pat_type _ -> check_concrete_pat_type(fr, env, acc, einfo.ty)
+  | N.Pat_type _ -> check_concrete_pat_type(context, fr, env, acc, einfo.ty)
   | _ -> void
   }
 }
@@ -4077,18 +4433,29 @@ fun msg_no_existential_params(cname: String): String {
 
 const msg_no_existential_in_local: String = "Invalid pattern binding. Cannot bind this expression to a local.\nTry replacing with '_'";
 
-fun check_no_existential_in_local(acc: TUtils.Acc, pat: TAst.Pattern): void {
+fun check_no_existential_in_local(
+  context: mutable SKFS.Context,
+  acc: TUtils.Acc,
+  pat: TAst.Pattern,
+): void {
   pat match {
   | (ty, (fr, TAst.Pat_type(tid, _castType, Some _))) ->
     cname = tid match {
     | TAst.Tid_object((_, s)) -> s
     | TAst.Tid_static(((_, root), (_, id)), _) -> root + "::" + id
     };
-    check_existential_binding_ty(fr, acc, msg_no_existential_params(cname), ty)
+    check_existential_binding_ty(
+      context,
+      fr,
+      acc,
+      msg_no_existential_params(cname),
+      ty,
+    )
   | (_, (fr, TAst.Pat_var(binding)))
   | (_, (fr, TAst.Pat_as(_, binding))) ->
     if (!SkipNaming.is_wildcard_name(binding.i1)) {
       check_existential_binding_ty(
+        context,
         fr,
         acc,
         msg_no_existential_in_local,
@@ -4100,18 +4467,20 @@ fun check_no_existential_in_local(acc: TUtils.Acc, pat: TAst.Pattern): void {
 }
 
 fun check_existential_binding_ty(
+  context: mutable SKFS.Context,
   fr: FileRange,
   acc: TUtils.Acc,
   msg: String,
   ty: N.Type_,
 ): void {
   N.type_iter(
-    x -> check_existential_inner(fr, acc, msg, x),
+    x -> check_existential_inner(context, fr, acc, msg, x),
     Types.unfold_type(acc.subst, ty),
   )
 }
 
 fun check_existential_inner(
+  context: mutable SKFS.Context,
   fr: FileRange,
   acc: TUtils.Acc,
   msg: String,
@@ -4119,7 +4488,7 @@ fun check_existential_inner(
 ): void {
   Types.unfold_type(acc.subst, ty) match {
   | (tyfr, N.Tparam(_, _, id, _)) if (id.startsWith(TUtils.unknown_prefix)) ->
-    check_pat_type_tparam(acc, id) match {
+    check_pat_type_tparam(context, acc, id) match {
     | None() -> void
     | Some _ ->
       SkipError.errorl(
@@ -4139,6 +4508,7 @@ fun check_existential_inner(
 }
 
 fun check_concrete_pat_type(
+  context: mutable SKFS.Context,
   fr: FileRange,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4161,7 +4531,7 @@ fun check_concrete_pat_type(
     void
 
   | N.Tparam(_, _, id, name) ->
-    check_pat_type_tparam(acc, id) match {
+    check_pat_type_tparam(context, acc, id) match {
     | None() -> void
     | Some(has_trait) ->
       msg = if (has_trait) {
@@ -4180,15 +4550,20 @@ fun check_concrete_pat_type(
         ],
       )
     }
-  | N.Tdefault(inner) -> check_concrete_pat_type(fr, env, acc, inner)
+  | N.Tdefault(inner) -> check_concrete_pat_type(context, fr, env, acc, inner)
   | N.Tvar _
   | N.Tnamed _ ->
     invariant_violation("bad unfold")
   }
 }
 
-fun check_pat_type_tparam(acc: TUtils.Acc, id: String): ?Bool {
+fun check_pat_type_tparam(
+  context: mutable SKFS.Context,
+  acc: TUtils.Acc,
+  id: String,
+): ?Bool {
   TUtils.has_concrete_type_for_matching_tparam(
+    context,
     acc.tparam_constraints,
     acc.subst,
     id,
@@ -4196,6 +4571,7 @@ fun check_pat_type_tparam(acc: TUtils.Acc, id: String): ?Bool {
 }
 
 fun loop_body(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   fr: FileRange,
   env: TUtils.Env,
@@ -4204,9 +4580,10 @@ fun loop_body(
 ): (TUtils.Acc, N.Type_, TAst.Expr) {
   break_type = (fr, TUtils.fresh_(next_id));
   body_env = env with {break_type => Some(break_type)};
-  (!acc, body) = expr(next_id, body_env, acc, nbody);
+  (!acc, body) = expr(context, next_id, body_env, acc, nbody);
   tvoid = TUtils.make_tvoid(body.i1.i0, Ast.Vminus());
   (!acc, _) = TUtils.join(
+    context,
     next_id,
     body_env,
     fr,
@@ -4227,16 +4604,22 @@ base class DotResult {
   | DotError(List<(FileRange, String)>)
   | DotFound(acc: TUtils.Acc, info: Dot_expr_info, source: N.Name)
 
-  fun wrapClassObject(env: TUtils.Env, fr: FileRange, tobject: N.Name): this
+  fun wrapClassObject(
+    context: mutable SKFS.Context,
+    env: TUtils.Env,
+    fr: FileRange,
+    tobject: N.Name,
+  ): this
   | DotNone()
   | DotError _ ->
     this
   | DotFound _ ->
     wrapped = (fr, N.Tapply(N.Mchilled(), tobject, Array[this.info.obj_ty]));
-    !this.info.obj_ty = TUtils.promote(env, this.acc, wrapped);
+    !this.info.obj_ty = TUtils.promote(context, env, this.acc, wrapped);
     this
 
   fun updateTparam(
+    context: mutable SKFS.Context,
     env: TUtils.Env,
     tparam_id: String,
     tparam_name: String,
@@ -4245,24 +4628,35 @@ base class DotResult {
   | DotError _ ->
     this
   | DotFound _ ->
-    obj_ty = TUtils.promote(env, this.acc, this.info.obj_ty);
+    obj_ty = TUtils.promote(context, env, this.acc, this.info.obj_ty);
     !this.info.obj_ty = TUtils.reset_tparam_bounds_for_tset_tpromoted(
       SortedMap[tparam_id => tparam_name],
       obj_ty,
     );
     this
 
-  fun promote(env: TUtils.Env): this
+  fun promote(context: mutable SKFS.Context, env: TUtils.Env): this
   | DotNone()
   | DotError _ ->
     this
   | DotFound _ ->
-    !this.info.obj_ty = TUtils.promote(env, this.acc, this.info.obj_ty);
-    !this.info.field_type = TUtils.promote(env, this.acc, this.info.field_type);
+    !this.info.obj_ty = TUtils.promote(
+      context,
+      env,
+      this.acc,
+      this.info.obj_ty,
+    );
+    !this.info.field_type = TUtils.promote(
+      context,
+      env,
+      this.acc,
+      this.info.field_type,
+    );
     this
 }
 
 fun expr_dot(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   sk_static: Bool,
   env: TUtils.Env,
@@ -4274,6 +4668,7 @@ fun expr_dot(
   is_pattern: Bool = false,
 ): (TUtils.Acc, Dot_expr_info, TAst.Name) {
   result = ExprDot::start(
+    context,
     next_id,
     sk_static,
     env,
@@ -4289,7 +4684,7 @@ fun expr_dot(
   | DotNone() ->
     (ty_pos, _) = obj_ty;
     ty_str = Types.to_string(env.this_class, acc.subst, obj_ty);
-    field_map = field_map_for_error(env, acc, sk_static, obj_ty);
+    field_map = field_map_for_error(context, env, acc, sk_static, obj_ty);
     didYouMeanTypos = SkipDidYouMean.findTypos(field_map, field_name.i1);
     msg1 = `The field ${field_name.i1} is undefined${SkipDidYouMean.formatTypos(
       didYouMeanTypos,
@@ -4314,6 +4709,7 @@ mutable class ExprDot(
   is_pattern: Bool,
 ) {
   static fun start(
+    context: mutable SKFS.Context,
     next_id: () -> Int,
     sk_static: Bool,
     env: TUtils.Env,
@@ -4334,18 +4730,22 @@ mutable class ExprDot(
       field_name,
       is_pattern,
     );
-    result = exprDot.entry(acc, original_object_ty);
-    result.promote(env)
+    result = exprDot.entry(context, acc, original_object_ty);
+    result.promote(context, env)
   }
 
-  private mutable fun entry(acc: TUtils.Acc, obj_ty: TAst.Type_): DotResult {
+  private mutable fun entry(
+    context: mutable SKFS.Context,
+    acc: TUtils.Acc,
+    obj_ty: TAst.Type_,
+  ): DotResult {
     is_static = this.sk_static;
     Types.unfold_type(acc.subst, obj_ty) match {
     | (_, N.Tapply(_, name, tya))
     | (_, N.Tpromoted(_, _, _, _, name, tya)) if (is_static) ->
       if (TAstUtils.is_class_object(name.i1)) {
         invariant(tya.size() == 1, "ICE malformed class object ExprDot.entry");
-        this.static_find(obj_ty.i0, name, acc, tya[0])
+        this.static_find(context, obj_ty.i0, name, acc, tya[0])
       } else {
         DotNone()
       }
@@ -4359,7 +4759,7 @@ mutable class ExprDot(
           targs.size() == 1,
           "ICE malformed class object ExprDot.entry",
         );
-        result = this.static_find(obj_ty.i0, elt.name, acc, targs[0]);
+        result = this.static_find(context, obj_ty.i0, elt.name, acc, targs[0]);
         if (result is DotFound _) break result
       } else {
         DotNone()
@@ -4368,29 +4768,31 @@ mutable class ExprDot(
       upper_tyl = acc.tparam_constraints.findUppers(tparam_id);
       result: DotResult = DotNone();
       _ = upper_tyl.any(ty -> {
-        !result = this.entry(acc, ty);
+        !result = this.entry(context, acc, ty);
         result is DotFound _
       });
-      result.updateTparam(this.env, tparam_id, tparam_name.i1)
+      result.updateTparam(context, this.env, tparam_id, tparam_name.i1)
     | _ if (is_static) ->
       // should only happen from tparam upperbounds
       // since we join going into StaticDot
       DotNone()
-    | unfolded -> this.find(None(), None(), acc, unfolded)
+    | unfolded -> this.find(context, None(), None(), acc, unfolded)
     }
   }
 
   private mutable fun static_find(
+    context: mutable SKFS.Context,
     fr: FileRange,
     tobject: N.Name,
     acc: TUtils.Acc,
     inner_ty: N.Type_,
   ): DotResult {
-    result = this.find(Some(tobject), None(), acc, inner_ty);
-    result.wrapClassObject(this.env, fr, tobject)
+    result = this.find(context, Some(tobject), None(), acc, inner_ty);
+    result.wrapClassObject(context, this.env, fr, tobject)
   }
 
   private mutable fun find(
+    context: mutable SKFS.Context,
     tobject: ?N.Name,
     tparam: ?N.Type_,
     acc: TUtils.Acc,
@@ -4399,11 +4801,12 @@ mutable class ExprDot(
     Types.unfold_type(acc.subst, obj_ty) match {
     | (_, N.Tapply(mode, n, tyl))
     | (_, N.Tpromoted(_, mode, _, _, n, tyl)) ->
-      this.tapply(tobject, tparam, acc, obj_ty.i0, mode, n, tyl)
+      this.tapply(context, tobject, tparam, acc, obj_ty.i0, mode, n, tyl)
     | (_, N.Tset(_, mode, _, elts)) ->
       result: DotResult = DotNone();
       _ = elts.any(elt -> {
         !result = this.tapply(
+          context,
           tobject,
           tparam,
           acc,
@@ -4431,10 +4834,10 @@ mutable class ExprDot(
           freeze_upper,
           upper_ty,
         );
-        !result = this.find(tobject, tparam, acc, fixed_ty);
+        !result = this.find(context, tobject, tparam, acc, fixed_ty);
         result is DotFound _
       });
-      result.updateTparam(this.env, tparam_id, tparam_name.i1)
+      result.updateTparam(context, this.env, tparam_id, tparam_name.i1)
     | (_, N.Tanything()) ->
       msg = `Could not infer the type of the object. Cannot access the field: ${
         this.field_name.i1
@@ -4456,6 +4859,7 @@ mutable class ExprDot(
   }
 
   private mutable fun tapply(
+    context: mutable SKFS.Context,
     tobject: ?N.Name,
     tparam: ?N.Type_,
     acc: TUtils.Acc,
@@ -4464,7 +4868,7 @@ mutable class ExprDot(
     name: N.Name,
     obj_targs: Array<N.Type_>,
   ): DotResult {
-    cd = SkipNaming.getClass(name);
+    cd = SkipNaming.getClass(context, name);
     if (!cd.fields.containsKey(this.field_name)) return DotNone();
 
     (_, field_str) = this.field_name;
@@ -4474,6 +4878,7 @@ mutable class ExprDot(
       // We don't check here because we may be creating a Dot for a field
       // pattern which isn't used (aka starts with an '_').
       check_field_visibility(
+        context,
         this.env,
         this.dot_fr,
         cd.name,
@@ -4538,12 +4943,13 @@ mutable class ExprDot(
 }
 
 fun field_map_for_error(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   sk_static: Bool,
   obj_ty: N.Type_,
 ): Map<String, String> {
-  m = field_kind_map_for_error(env, acc, sk_static, obj_ty);
+  m = field_kind_map_for_error(context, env, acc, sk_static, obj_ty);
   filter_static = if (sk_static) {
     (_, v) -> v.i1 is N.FKStatic _
   } else {
@@ -4557,6 +4963,7 @@ fun field_map_for_error(
 }
 
 fun field_kind_map_for_error(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   sk_static: Bool,
@@ -4569,7 +4976,7 @@ fun field_kind_map_for_error(
     TAstUtils.is_class_object(name.i1)
   ) ->
     invariant(tya.size() == 1, "ICE class object with wrong arity?");
-    field_kind_map_for_error(env, acc, false, tya[0])
+    field_kind_map_for_error(context, env, acc, false, tya[0])
   | (_, N.Tset(_, _, _, elts)) if (sk_static) ->
     classobj_elts = elts.filter(elt -> TAstUtils.is_class_object(elt.name.i1));
     classobj_elts.foldl(
@@ -4577,28 +4984,27 @@ fun field_kind_map_for_error(
         tya = elt.targs;
         invariant(tya.size() == 1, "ICE class object without targs");
 
-        res = field_kind_map_for_error(env, acc, false, tya[0]);
+        res = field_kind_map_for_error(context, env, acc, false, tya[0]);
         res.mergeWith(s, combine_fields_for_error)
       },
       SortedMap[],
     )
   | (_, N.Tapply(_, name, _))
   | (_, N.Tpromoted(_, _, _, _, name, _)) ->
-    find_fields_for_error(name)
+    find_fields_for_error(context, name)
   | (_, N.Tset(_, _, _, elts)) ->
-    elts.foldl(
-      (s, elt) -> {
-        res = find_fields_for_error(elt.name);
-        res.mergeWith(s, combine_fields_for_error)
-      },
-      SortedMap[],
-    )
+    s = SortedMap[];
+    for (elt in elts) {
+      res = find_fields_for_error(context, elt.name);
+      !s = res.mergeWith(s, combine_fields_for_error)
+    };
+    s
   | (_, N.Tparam(_, _, i, _)) ->
     acc.tparam_constraints
       .findUppers(i)
       .foldl(
         (s, ty) -> {
-          res = field_kind_map_for_error(env, acc, sk_static, ty);
+          res = field_kind_map_for_error(context, env, acc, sk_static, ty);
           res.mergeWith(s, combine_fields_for_error)
         },
         SortedMap[],
@@ -4607,8 +5013,11 @@ fun field_kind_map_for_error(
   }
 }
 
-fun find_fields_for_error(name: N.Name): SMap<(String, N.FieldKind)> {
-  cd = SkipNaming.getClass(name);
+fun find_fields_for_error(
+  context: mutable SKFS.Context,
+  name: N.Name,
+): SMap<(String, N.FieldKind)> {
+  cd = SkipNaming.getClass(context, name);
   fieldsMap = cd.fields.reduce(
     (m, name, fdt) -> m.set(name.i1, (name.i1, fdt.kind)),
     SortedMap[],
@@ -4726,6 +5135,7 @@ fun fix_fdt_tfun_purity_modifiers(mode: N.Modality, type: N.Type_): N.Type_ {
 /* Checking that the field can be accessed (visibility). */
 /*****************************************************************************/
 fun check_field_visibility(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   pos: FileRange,
   class_name: N.Name,
@@ -4734,10 +5144,19 @@ fun check_field_visibility(
 ): void {
   (_, field_str) = field_name;
   msg = () ~> "Cannot access " + field_str;
-  check_visibility(env, pos, class_name, fdt.source, msg, fdt.visibility)
+  check_visibility(
+    context,
+    env,
+    pos,
+    class_name,
+    fdt.source,
+    msg,
+    fdt.visibility,
+  )
 }
 
 fun check_visibility(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   pos: FileRange,
   class_name: N.Name,
@@ -4750,7 +5169,7 @@ fun check_visibility(
   | (vis_pos, N.VPrivate()) ->
     check_private(env, pos, vis_pos, source_name, msg, vis_msg)
   | (vis_pos, N.VProtected()) ->
-    check_protected(env, pos, vis_pos, class_name, msg, vis_msg)
+    check_protected(context, env, pos, vis_pos, class_name, msg, vis_msg)
   | (_, N.VPublic()) -> void
   }
 }
@@ -4773,6 +5192,7 @@ fun check_private(
 }
 
 fun check_protected(
+  context: mutable SKFS.Context,
   env: TUtils.Env,
   pos: FileRange,
   vis_pos: FileRange,
@@ -4782,15 +5202,22 @@ fun check_protected(
 ): void {
   (_, class_str) = class_name;
   env.this_class match {
-  | Some(
-    this_name,
-  ) if ({
-    this_class = SkipNaming.getClass(this_name);
-    this_name1 = this_class.name;
-    class_str == this_name1.i1 ||
-      this_class.extends_.any((n, _, _) -> class_str == n.i1)
-  }) ->
-    void
+  | Some(this_name) ->
+    if ({
+      this_class = SkipNaming.getClass(context, this_name);
+      this_name1 = this_class.name;
+      class_str == this_name1.i1 ||
+        this_class.extends_.any((n, _, _) -> class_str == n.i1)
+    }) {
+      void
+    } else {
+      SkipError.errorl(
+        List[
+          (pos, msg()),
+          (vis_pos, vis_msg() + "It was declared as protected"),
+        ],
+      )
+    }
   | _ ->
     SkipError.errorl(
       List[(pos, msg()), (vis_pos, vis_msg() + "It was declared as protected")],
@@ -4904,6 +5331,7 @@ fun specialize_this_type(
  * lambda is used inside another, the captured lambda should be sovled first
  */
 fun solve_lambdas(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4916,9 +5344,13 @@ fun solve_lambdas(
     acc
   } else {
     acc1 = solve_lambdas(
+      context,
       next_id,
       env,
-      todos.foldl(((acc1, lbd) -> lambda(next_id, false, env, acc1, lbd)), acc),
+      todos.foldl(
+        ((acc1, lbd) -> lambda(context, next_id, false, env, acc1, lbd)),
+        acc,
+      ),
     );
     assert(acc1.lambdas.isEmpty());
     acc1
@@ -4926,6 +5358,7 @@ fun solve_lambdas(
 }
 
 fun lambda(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   can_delay: Bool,
   env: TUtils.Env,
@@ -4937,7 +5370,14 @@ fun lambda(
   lam_explicit_param_ty = lam.lam_explicit_param_ty;
   Types.unfold_type(acc.subst, lam_type) match {
   | (_, N.Tlambda(_, _, _, lam_type1)) ->
-    lambda(next_id, can_delay, env, acc, lam with {lam_type => lam_type1})
+    lambda(
+      context,
+      next_id,
+      can_delay,
+      env,
+      acc,
+      lam with {lam_type => lam_type1},
+    )
   | (fpos, N.Tfun(_, ml, _, args, rty)) ->
     lam_locals = lam.lam_locals;
     lam_captured = lam.lam_captured;
@@ -4955,14 +5395,17 @@ fun lambda(
         frozen_level => lam.lam_frozen_level,
         locals => lam_locals,
       };
-      !env = setReturnType(next_id, env, acc, rty, lam.yields);
-      ordered_args = args.map(t -> (0, TUtils.promote(env, acc, t), t.i0));
+      !env = setReturnType(context, next_id, env, acc, rty, lam.yields);
+      ordered_args = args.map(t ->
+        (0, TUtils.promote(context, env, acc, t), t.i0)
+      );
       params_ty = lam_params.map(p -> p.i1);
       (!env, !acc) = lam_params.foldl(
         (ea, p) -> TUtils.bind_local_var(ea.i0, ea.i1, p.i1, p.i0),
         (env, acc),
       );
       (!acc, _) = call(
+        context,
         next_id,
         lam_pos,
         env,
@@ -4971,7 +5414,7 @@ fun lambda(
         ordered_args,
         invalid_argument_message,
       );
-      (!acc, elam_body) = expr(next_id, env, acc, lam_body);
+      (!acc, elam_body) = expr(context, next_id, env, acc, lam_body);
       e_ty = TAstUtils.get_type(elam_body);
       bindings = add_binding_info(env, lam_captured);
       elam_params = lam_params.map(p ->
@@ -4983,9 +5426,10 @@ fun lambda(
         N.Tfun(Ast.Vnone(), lam.lam_tfun_modifiers, Array[], params_ty, e_ty),
       );
       rf_ty = (fpos, N.Tfun(Ast.Vnone(), ml, Array[], params_ty, rty));
-      ef_ty1 = TUtils.promote(env, acc, ef_ty);
-      rf_ty1 = TUtils.contra_promote(env, acc, rf_ty);
+      ef_ty1 = TUtils.promote(context, env, acc, ef_ty);
+      rf_ty1 = TUtils.contra_promote(context, env, acc, rf_ty);
       (!acc, _) = TUtils.join(
+        context,
         next_id,
         env,
         lam_pos,
@@ -5093,6 +5537,7 @@ fun check_missing_fields(
 }
 
 fun check_implement(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   _extend_str: String,
   env: TUtils.Env,
@@ -5106,16 +5551,22 @@ fun check_implement(
 
   child_name = child_class.name;
   (pos, _) = child_name;
-  parent_class = SkipNaming.getClass(parent_name);
+  parent_class = SkipNaming.getClass(context, parent_name);
   check_missing_fields(env, child_class, parent_class);
   parent_tparam_idents = parent_class.tparams.map(N.tparam_ident);
   parent_subst = N.make_subst(pos, parent_tparam_idents, childs_parent_targs);
   old_tparam_constriants = acc.tparam_constraints;
-  !acc = TUtils.bind_tparam_constraints(env, acc, parent_class.tparams);
+  !acc = TUtils.bind_tparam_constraints(
+    context,
+    env,
+    acc,
+    parent_class.tparams,
+  );
   initial_tparam_constriants = acc.tparam_constraints;
   for (conds in parent_info.conditions) {
-    !acc = TUtils.add_whenparams(next_id, env, acc, conds);
+    !acc = TUtils.add_whenparams(context, next_id, env, acc, conds);
     !acc = check_fields(
+      context,
       next_id,
       pos,
       env,
@@ -5166,6 +5617,7 @@ fun check_field_tparams_add_constraints<Ta, Tb>(
 }
 
 fun check_fields(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -5179,24 +5631,53 @@ fun check_fields(
   child_fields.reduce(
     (acc, name, child_field) -> {
       original_tparam_constraints = acc.tparam_constraints;
-      !acc = TUtils.bind_tparam_constraints(env, acc, child_field.tparams);
+      !acc = TUtils.bind_tparam_constraints(
+        context,
+        env,
+        acc,
+        child_field.tparams,
+      );
       after_child_fdt_tparam_constraints = acc.tparam_constraints;
       child_kind = child_field.kind;
       child_deferred = child_field.deferred_;
       child_ty = child_field.type;
       parent_fields.maybeGetRaw(name.i1) match {
       | None() ->
-        !acc = TUtils.add_whenparams(next_id, env, acc, child_field.whenparams);
-        (!acc, _child_ty1) = TUtils.instantiate(next_id, env, acc, child_ty);
-        !acc = solve_constraints(next_id, env, acc);
+        !acc = TUtils.add_whenparams(
+          context,
+          next_id,
+          env,
+          acc,
+          child_field.whenparams,
+        );
+        (!acc, _child_ty1) = TUtils.instantiate(
+          context,
+          next_id,
+          env,
+          acc,
+          child_ty,
+        );
+        !acc = solve_constraints(context, next_id, env, acc);
         acc with {
           constraints => TUtils.Constraints::empty,
           tparam_constraints => original_tparam_constraints,
         }
       | Some((_, parent_field)) if (parent_field.deferred_.isSome()) ->
-        !acc = TUtils.add_whenparams(next_id, env, acc, child_field.whenparams);
-        (!acc, _child_ty1) = TUtils.instantiate(next_id, env, acc, child_ty);
-        !acc = solve_constraints(next_id, env, acc);
+        !acc = TUtils.add_whenparams(
+          context,
+          next_id,
+          env,
+          acc,
+          child_field.whenparams,
+        );
+        (!acc, _child_ty1) = TUtils.instantiate(
+          context,
+          next_id,
+          env,
+          acc,
+          child_ty,
+        );
+        !acc = solve_constraints(context, next_id, env, acc);
         acc with {
           constraints => TUtils.Constraints::empty,
           tparam_constraints => original_tparam_constraints,
@@ -5228,8 +5709,14 @@ fun check_fields(
           (v, i, n, tyl) = tparam;
           (v, i, n, tyl.map(ty -> f_psubst(acc, ty)))
         });
-        !acc = TUtils.bind_tparam_constraints(env, acc, parent_tparams);
+        !acc = TUtils.bind_tparam_constraints(
+          context,
+          env,
+          acc,
+          parent_tparams,
+        );
         !acc = TUtils.add_whenparams(
+          context,
           next_id,
           env,
           acc,
@@ -5238,8 +5725,15 @@ fun check_fields(
         all_child_whenparams = childs_view_parent_whenparams.concat(
           child_field.whenparams,
         );
-        !acc = TUtils.add_whenparams(next_id, env, acc, all_child_whenparams);
+        !acc = TUtils.add_whenparams(
+          context,
+          next_id,
+          env,
+          acc,
+          all_child_whenparams,
+        );
         sk_this = TUtils.make_this_type(
+          context,
           env,
           acc,
           N.Mchilled(),
@@ -5253,7 +5747,7 @@ fun check_fields(
           parent_ty,
         );
         parent_ty2 = f_psubst(acc, parent_ty1);
-        parent_ty3 = TUtils.contra_promote(env, acc, parent_ty2);
+        parent_ty3 = TUtils.contra_promote(context, env, acc, parent_ty2);
         child_subst = check_field_tparams_make_subst(
           next_id,
           pos,
@@ -5279,7 +5773,7 @@ fun check_fields(
           child_field.tparams,
         );
         child_ty1 = TUtils.type_subst(child_fdtsubst, acc, child_ty);
-        child_ty2 = TUtils.promote(env, acc, child_ty1);
+        child_ty2 = TUtils.promote(context, env, acc, child_ty1);
         child_ty3 = TUtils.type_contra_tparam_subst(
           child_subst,
           acc,
@@ -5295,6 +5789,7 @@ fun check_fields(
           "'";
         msg = "Invalid override" + root_msg;
         (!acc, _) = TUtils.join(
+          context,
           next_id,
           env,
           pos,
@@ -5304,7 +5799,7 @@ fun check_fields(
           parent_ty3,
         );
         child_fdtsubst_expanded = child_fdtsubst.map((_, x) ->
-          TUtils.expand_type(env, acc, x)
+          TUtils.expand_type(context, env, acc, x)
         );
         !acc = add_generic_map(
           parent_class.name,
@@ -5314,6 +5809,7 @@ fun check_fields(
         );
         check_default_args(pos, acc, name, parent_ty3, child_ty3);
         !acc = solve_constraints_msg(
+          context,
           next_id,
           msg + ". Constraint not satisfied",
           env,
@@ -5324,6 +5820,7 @@ fun check_fields(
           tparam_constraints => after_child_fdt_tparam_constraints,
         };
         !acc = check_whenparams(
+          context,
           next_id,
           env,
           acc,
@@ -5427,18 +5924,19 @@ fun check_default_arg(
 /* Returns "Some inst_type" when inst must be treated differently than "this".
  */
 fun make_inst(
+  context: mutable SKFS.Context,
   child_field: N.Field_type,
   child_class: N.Class_def,
 ): ?(N.Name, Array<N.Type_>) {
   inst_name = child_field.source;
-  source_cd = SkipNaming.getClass(inst_name);
+  source_cd = SkipNaming.getClass(context, inst_name);
   source_cd.kind match {
   | Ast.KTrait() -> None()
   | Ast.KBase()
   | Ast.KClass() ->
     Some(
       if (inst_name.i1 == child_class.name.i1) {
-        make_inst_from_class(inst_name)
+        make_inst_from_class(context, inst_name)
       } else {
         make_inst_from_extends(inst_name, child_class.extends_)
       },
@@ -5446,8 +5944,11 @@ fun make_inst(
   }
 }
 
-fun make_inst_from_class(inst_name: N.Name): (N.Name, Array<N.Type_>) {
-  cd = SkipNaming.getClass(inst_name);
+fun make_inst_from_class(
+  context: mutable SKFS.Context,
+  inst_name: N.Name,
+): (N.Name, Array<N.Type_>) {
+  cd = SkipNaming.getClass(context, inst_name);
   targs = cd.tparams.map(tparam -> {
     (_, i, x, tyl) = tparam;
     if (!tyl.isEmpty()) invariant_violation("TODO make_inst_from_class");
@@ -5475,6 +5976,7 @@ fun make_inst_from_extends(
  * method, as if it was being called
  */
 fun check_whenparams(
+  context: mutable SKFS.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -5502,10 +6004,11 @@ fun check_whenparams(
       (_, id, n, _) = tp;
       ((n.i0, N.Tparam(None(), Ast.Vplus(), id, n)), tfrozenl)
     });
-    TUtils.add_whenparams(next_id, env, acc, frozen_child_tparams)
+    TUtils.add_whenparams(context, next_id, env, acc, frozen_child_tparams)
   | _ -> acc
   };
   !acc = TUtils.add_whenparams(
+    context,
     next_id,
     env,
     acc,
@@ -5527,6 +6030,7 @@ fun check_whenparams(
     acc,
   );
   !acc = solve_constraints_msg(
+    context,
     next_id,
     "Invalid conditional type override" +
       root_msg +
