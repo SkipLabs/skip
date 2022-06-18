@@ -863,10 +863,15 @@ fun tuple_not_supported<T>(pos: FileRange, arity: Int): T {
   )
 }
 
-fun mk_tuple<T>(pos: FileRange, arity: Int, k: Name -> T): T {
+fun mk_tuple<T>(
+  context: mutable SKFS.Context,
+  pos: FileRange,
+  arity: Int,
+  k: Name -> T,
+): T {
   pos.invariant(arity >= min_tuple, "ICE invalid tuple: arity < min_tuple");
   name = tuple_name(pos, arity);
-  SkipInherit.maybeGetClass(name.i1) match {
+  SkipInherit.maybeGetClass(context, name.i1) match {
   | None() -> tuple_not_supported(pos, arity)
   | Some _ ->
     pos.invariant(arity <= max_tuple, "ICE invalid tuple: arity > max_tuple");
@@ -874,19 +879,31 @@ fun mk_tuple<T>(pos: FileRange, arity: Int, k: Name -> T): T {
   }
 }
 
-fun tuple_pattern(pos: FileRange, l: .Array<Pattern>): Pattern_ {
-  mk_tuple(pos, l.size(), name ->
+fun tuple_pattern(
+  context: mutable SKFS.Context,
+  pos: FileRange,
+  l: .Array<Pattern>,
+): Pattern_ {
+  mk_tuple(context, pos, l.size(), name ->
     Pat_type(Tid_object(name), Some(Positional(l)), A.Complete())
   )
 }
 
-fun tuple_type(pos: FileRange, l: .Array<Type_>): Type__ {
-  mk_tuple(pos, l.size(), name -> Tapply(Mchilled(), name, l))
+fun tuple_type(
+  context: mutable SKFS.Context,
+  pos: FileRange,
+  l: .Array<Type_>,
+): Type__ {
+  mk_tuple(context, pos, l.size(), name -> Tapply(Mchilled(), name, l))
 }
 
-fun tuple_expr(pos: FileRange, l: .Array<Expr>): Expr_ {
+fun tuple_expr(
+  context: mutable SKFS.Context,
+  pos: FileRange,
+  l: .Array<Expr>,
+): Expr_ {
   args = Positional(l.map(e -> (0, e)));
-  mk_tuple(pos, l.size(), name -> Object(None(), name, .Array[], args))
+  mk_tuple(context, pos, l.size(), name -> Object(None(), name, .Array[], args))
 }
 
 /*****************************************************************************/

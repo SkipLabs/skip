@@ -20,6 +20,7 @@ base class Parameters<+T> uses Hashable[T: Hashable], Equality[T: Equality] {
   fun toArray(): Array<T>;
   fun find(p: T -> Bool): ?T;
   fun eqBy<U>[T: U](other: Parameters<U>, eq: (U, U) -> Bool): Bool;
+  fun values(): mutable Iterator<T>;
 
   fun ==<U: Equality>[T: U](other: Parameters<U>): Bool {
     (this, other) match {
@@ -37,6 +38,10 @@ base class Parameters<+T> uses Hashable[T: Hashable], Equality[T: Equality] {
 class Positional<+T>(args: Array<T>) extends Parameters<T> {
   static fun create(): Positional<T> {
     Positional(Array[])
+  }
+
+  fun values(): mutable Iterator<T> {
+    this.args.values()
   }
 
   fun map<T2>(f: T -> T2): Positional<T2> {
@@ -124,6 +129,10 @@ class Positional<+T>(args: Array<T>) extends Parameters<T> {
 class Named<+T>(args: UMap<T>) extends Parameters<T> {
   fun map<T2>(f: T -> T2): Named<T2> {
     Named(this.args.map((_, v) -> f(v)))
+  }
+
+  fun values(): mutable Iterator<T> {
+    this.args.values()
   }
 
   fun foldl<R>(f: (R, T) -> R, init: R): R {

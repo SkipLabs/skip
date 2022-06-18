@@ -71,7 +71,7 @@ fun getChildren(
   className: String,
 ): SSet {
   childDir
-    .getArray(Reactive.getContext(), SKFS.SID(className))
+    .getArray(context, SKFS.SID(className))
     .map(x -> x.value)
     .foldl(
       (result, child) ->
@@ -167,8 +167,8 @@ const moduleDir: SKFS.EHandle<SKFS.ArrayStringFile> = SKFS.EHandle(
   moduleDirName,
 );
 
-fun containsKey(key: String): Bool {
-  moduleDir.getArray(Reactive.getContext(), SKFS.SID(key)).size() > 0
+fun containsKey(context: mutable SKFS.Context, key: String): Bool {
+  moduleDir.getArray(context, SKFS.SID(key)).size() > 0
 }
 
 fun populateCache(
@@ -339,11 +339,8 @@ fun populateDefinitions(
   );
 }
 
-fun getClass(className: String): ?A.Class_def {
-  arr = defMapDir.getArray(
-    Reactive.getContext(),
-    SKFS.SID("class:" + className),
-  );
+fun getClass(context: mutable SKFS.Context, className: String): ?A.Class_def {
+  arr = defMapDir.getArray(context, SKFS.SID("class:" + className));
   if (arr.size() == 0) return None();
   if (arr.size() > 1) invariant_violation("TODO multiple classes");
   Some(
@@ -487,8 +484,8 @@ fun module_names_find_unsafe(
   }
 }
 
-fun module_names_mem(x: Module_): Bool {
-  ModuleMap.containsKey(name_of_module(x))
+fun module_names_mem(context: mutable SKFS.Context, x: Module_): Bool {
+  ModuleMap.containsKey(context, name_of_module(x))
 }
 
 fun module_map_fold(
@@ -714,7 +711,7 @@ fun check_module(
     void
   } else {
     md_name = expand_module_name(env, mname);
-    if (!module_names_mem(md_name)) {
+    if (!module_names_mem(context, md_name)) {
       SkipError.error(mpos, "Unbound module: " + m_str)
     };
     md = module_names_find_unsafe(context, md_name);

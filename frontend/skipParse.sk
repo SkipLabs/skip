@@ -38,8 +38,11 @@ const astDir: SKFS.EHandle<DefsFile> = SKFS.EHandle(
 
 class DefsFile(value: List<SkipAst.Definition>) extends SKFS.File
 
-fun getAst(fileName: String): List<SkipAst.Definition> {
-  astDir.get(Reactive.getContext(), SKFS.SID(fileName)).value
+fun getAst(
+  context: mutable SKFS.Context,
+  fileName: String,
+): List<SkipAst.Definition> {
+  astDir.get(context, SKFS.SID(fileName)).value
 }
 
 fun parseFile(fileName: String, source: String): DefsFile {
@@ -64,9 +67,10 @@ fun parse(filename: String, contents: String): List<SkipAst.Definition> {
 }
 
 fun parse_files(
+  context: mutable SKFS.Context,
   fileList: Sequence<String>,
 ): Sequence<List<SkipAst.Definition>> {
-  fileList.map(getAst)
+  fileList.map(x -> getAst(context, x))
 }
 
 module end;

@@ -162,10 +162,14 @@ fun vis_string(x: (FileRange, A.Visibility)): String {
  * TODO only support algebraic branches on children clauses
  */
 /*****************************************************************************/
-fun is_subtype(child_name: A.Name, parent_name: A.Name): Bool {
+fun is_subtype(
+  context: mutable SKFS.Context,
+  child_name: A.Name,
+  parent_name: A.Name,
+): Bool {
   if (child_name.i1 == parent_name.i1) return true;
   getCD = n ->
-    GlobalEnv.getClass(n.i1) match {
+    GlobalEnv.getClass(context, n.i1) match {
     | None() -> SkipError.error(n.i0, `Unbound class: '${n.i1}'`)
     | Some(cd) -> cd
     };
@@ -180,25 +184,33 @@ fun is_subtype(child_name: A.Name, parent_name: A.Name): Bool {
             | (A.Tclass(x), _) -> x
             | _ -> invariant_violation("ICE non expanded name in is_subtype")
             };
-            is_subtype(extend_name, parent_name)
+            is_subtype(context, extend_name, parent_name)
           }
       },
       false,
     )
 }
 
-fun tid_matches(self: A.Class_def, tid: A.TypeIdentifier): Bool {
+fun tid_matches(
+  context: mutable SKFS.Context,
+  self: A.Class_def,
+  tid: A.TypeIdentifier,
+): Bool {
   tid match {
-  | A.Tid_object(A.Tclass(obj_name)) -> is_subtype(self.name, obj_name)
+  | A.Tid_object(A.Tclass(obj_name)) -> is_subtype(context, self.name, obj_name)
   | _ -> false
   }
 }
 
-fun pat_matches(self: A.Class_def, pat: A.Pattern): Bool {
+fun pat_matches(
+  context: mutable SKFS.Context,
+  self: A.Class_def,
+  pat: A.Pattern,
+): Bool {
   pat match {
-  | (_, A.Pat_type(tid, _, _)) -> tid_matches(self, tid)
+  | (_, A.Pat_type(tid, _, _)) -> tid_matches(context, self, tid)
   | (_, A.Pat_var(_this_name)) -> true
-  | (_, A.Pat_as(p, _this_name)) -> pat_matches(self, p)
+  | (_, A.Pat_as(p, _this_name)) -> pat_matches(context, self, p)
   | _ -> false
   }
 }
@@ -571,6 +583,7 @@ fun check_child_kind(pos: FileRange, child: A.Class_def): void {
  */
 /*****************************************************************************/
 fun inherit_method(
+  context: mutable SKFS.Context,
   self: A.Class_def,
   parent_name: A.Name,
   met: A.Method_def,
@@ -588,6 +601,7 @@ fun inherit_method(
     ),
   ) if (self.kind == A.KClass()) ->
     inherit_algebraic_pats(
+      context,
       self,
       parent_name,
       explicit,
@@ -604,13 +618,14 @@ fun inherit_method(
 }
 
 fun find_matching_pattern_in_mbl(
+  context: mutable SKFS.Context,
   self: A.Class_def,
   mbl: List<A.Match_branch>,
 ): ?(A.Pattern, ?A.Expr, A.Expr) {
   mbl match {
   | List.Cons((pats, mg, ex), tl) ->
-    pats.find(pat -> pat_matches(self, pat)) match {
-    | None() -> find_matching_pattern_in_mbl(self, tl)
+    pats.find(pat -> pat_matches(context, self, pat)) match {
+    | None() -> find_matching_pattern_in_mbl(context, self, tl)
     | Some(pat) -> Some((pat, mg, ex))
     }
   | List.Nil() -> None()
@@ -618,6 +633,7 @@ fun find_matching_pattern_in_mbl(
 }
 
 fun inherit_algebraic_pats(
+  context: mutable SKFS.Context,
   self: A.Class_def,
   parent_name: A.Name,
   explicit: A.Explicity,
@@ -629,7 +645,7 @@ fun inherit_algebraic_pats(
   this_aliases: List<A.Name>,
   mbl: List<A.Match_branch>,
 ): UMap<A.Method_def> {
-  find_matching_pattern_in_mbl(self, mbl) match {
+  find_matching_pattern_in_mbl(context, self, mbl) match {
   | None() ->
     SkipError.error(
       parent_pos,
@@ -645,6 +661,7 @@ fun inherit_algebraic_pats(
     )
   | Some((pat, None(), ex)) ->
     inherit_algebraic(
+      context,
       self,
       parent_name,
       explicit,
@@ -679,6 +696,7 @@ fun arg_patterns_to_params(
 }
 
 fun inherit_algebraic(
+  context: mutable SKFS.Context,
   self: A.Class_def,
   parent_name: A.Name,
   explicit: A.Explicity,
@@ -691,37 +709,38 @@ fun inherit_algebraic(
   pat: A.Pattern,
   action: A.Expr,
 ): UMap<A.Method_def> {
-  assert(pat_matches(self, pat));
+  assert(pat_matches(context, self, pat));
   pat match {
-  | (
-    _,
-    A.Pat_type(A.Tid_object(A.Tclass(obj_name)), arg_pats, _),
-  ) if (is_subtype(self.name, obj_name)) ->
-    (pos, _) = obj_name;
-    check_child_kind(pos, self);
-    body2 = (_context) ~> {
-      body = action;
-      body1 = {
-        arg_pats match {
-        | None() -> body
-        | Some(arg_pats1) ->
-          params = arg_patterns_to_params(arg_pats1);
-          param_bindings(pos, self.params, params, body)
-        }
+  | (_, A.Pat_type(A.Tid_object(A.Tclass(obj_name)), arg_pats, _)) ->
+    if (is_subtype(context, self.name, obj_name)) {
+      (pos, _) = obj_name;
+      check_child_kind(pos, self);
+      body2 = (_context) ~> {
+        body = action;
+        body1 = {
+          arg_pats match {
+          | None() -> body
+          | Some(arg_pats1) ->
+            params = arg_patterns_to_params(arg_pats1);
+            param_bindings(pos, self.params, params, body)
+          }
+        };
+        this_bindings(pos, this_aliases, body1);
       };
-      this_bindings(pos, this_aliases, body1);
-    };
-    body3 = (action.i0, A.BExpr(body2));
-    inherited_method = A.InheritedKind{
-      explicit,
-      source,
-      from_ => parent_name,
-      value => body3.i1,
-      algebraic => true,
-    };
-    body4 = (body3.i0, A.Inherited(inherited_method));
-    met1 = (met : A.Method_def) with {body => body4};
-    methods.set(met1.name, met1)
+      body3 = (action.i0, A.BExpr(body2));
+      inherited_method = A.InheritedKind{
+        explicit,
+        source,
+        from_ => parent_name,
+        value => body3.i1,
+        algebraic => true,
+      };
+      body4 = (body3.i0, A.Inherited(inherited_method));
+      met1 = (met : A.Method_def) with {body => body4};
+      methods.set(met1.name, met1)
+    } else {
+      invariant_violation("Mismatch with pat_matches")
+    }
   | (_, A.Pat_var(this_name)) ->
     (pos, _) = this_name;
     body1 = (_context) ~> {
@@ -743,6 +762,7 @@ fun inherit_algebraic(
   | (_, A.Pat_as(p, this_name)) ->
     this_aliases1 = List.Cons(this_name, this_aliases);
     inherit_algebraic(
+      context,
       self,
       parent_name,
       explicit,
@@ -884,8 +904,11 @@ const classesDir: SKFS.LHandle<ClassFile> = SKFS.LHandle(
 
 class ClassFile(value: SkipAst.Class_def) extends SKFS.File
 
-fun getClass(className: A.Name): SkipAst.Class_def {
-  maybeGetClass(className.i1) match {
+fun getClass(
+  context: mutable SKFS.Context,
+  className: A.Name,
+): SkipAst.Class_def {
+  maybeGetClass(context, className.i1) match {
   | None() -> SkipError.error(className.i0, `Unbound class: '${className.i1}'`)
   | Some(x) -> x
   }
@@ -899,34 +922,35 @@ fun populateClassesDir(
     context,
     classesDirName,
     (context, _self, key) ~> {
-      Reactive.setContext(context);
       className = key match {
       | SKFS.SID(x) -> x
       | _ -> invariant_violation("Expected an SID")
       };
-      result = GlobalEnv.getClass(className) match {
+      result = GlobalEnv.getClass(context, className) match {
       | None() -> Array[]
-      | Some(cd) -> Array[ClassFile(class_def(cd))]
+      | Some(cd) -> Array[ClassFile(class_def(context, cd))]
       };
-      Reactive.setContext(context);
       result
     },
     false,
   )
 }
 
-fun maybeGetClass(className: String): ?SkipAst.Class_def {
-  arr = classesDir.getArray(Reactive.getContext(), SKFS.SID(className));
+fun maybeGetClass(
+  context: mutable SKFS.Context,
+  className: String,
+): ?SkipAst.Class_def {
+  arr = classesDir.getArray(context, SKFS.SID(className));
   if (arr.size() == 0) return None();
   Some(arr[0].value)
 }
 
-fun class_def(cd: A.Class_def): A.Class_def {
+fun class_def(context: mutable SKFS.Context, cd: A.Class_def): A.Class_def {
   verify_methods_and_consts(cd);
   if (cd.value.isSome()) check_value_class(cd);
 
   !cd.depth = 0;
-  !cd = cd.use.foldl((cd, parent) -> inherit_trait(cd, parent), cd);
+  !cd = cd.use.foldl((cd, parent) -> inherit_trait(context, cd, parent), cd);
   extends_ = cd.extends_.map(x -> x with {source => cd.name});
   /* All traits are flattened and inherited as if they were all written out
    * on that class
@@ -952,7 +976,7 @@ fun class_def(cd: A.Class_def): A.Class_def {
     }
   };
   /* params need to be done before inheriting methods for algebraic bodies */
-  !cd = cd.extends_.foldl((cd, p) -> inherit_class_params(cd, p), cd);
+  !cd = cd.extends_.foldl((cd, p) -> inherit_class_params(context, cd, p), cd);
   params = (cd.kind, cd.params) match {
   | (A.KClass(), A.NoParams()) ->
     msg = `Missing class constructor fields. You can define positional fields with '${
@@ -962,14 +986,18 @@ fun class_def(cd: A.Class_def): A.Class_def {
   | (_, x) -> x
   };
   !cd.params = params;
-  cd.extends_.foldl((cd, p) -> inherit_class(cd, p), cd)
+  cd.extends_.foldl((cd, p) -> inherit_class(context, cd, p), cd)
 }
 
-fun inherit_class_params(cd: A.Class_def, p: A.Parent): A.Class_def {
+fun inherit_class_params(
+  context: mutable SKFS.Context,
+  cd: A.Class_def,
+  p: A.Parent,
+): A.Class_def {
   (parent_name, type_arguments) = p.parent;
   parent_name1 = make_class_name(parent_name);
   (parent_pos, _) = parent_name1;
-  parent_class = getClass(parent_name1);
+  parent_class = getClass(context, parent_name1);
   check_mutable(parent_pos, cd, parent_class);
   check_extends(parent_pos, cd, parent_class, Extends());
   tparams = parent_class.tparams.map(AU.tparam_id);
@@ -978,11 +1006,15 @@ fun inherit_class_params(cd: A.Class_def, p: A.Parent): A.Class_def {
   (cd : A.Class_def) with {params}
 }
 
-fun inherit_class(cd: A.Class_def, p: A.Parent): A.Class_def {
+fun inherit_class(
+  context: mutable SKFS.Context,
+  cd: A.Class_def,
+  p: A.Parent,
+): A.Class_def {
   (parent_name, type_arguments) = p.parent;
   parent_name1 = make_class_name(parent_name);
   (parent_pos, _) = parent_name1;
-  parent_class = getClass(parent_name1);
+  parent_class = getClass(context, parent_name1);
   tparams = parent_class.tparams.map(AU.tparam_id);
   subst = AU.make_subst(parent_pos, tparams, type_arguments);
   parent_extends = parent_class.extends_;
@@ -993,12 +1025,23 @@ fun inherit_class(cd: A.Class_def, p: A.Parent): A.Class_def {
   types = inherit_types(cd.kind, subst, parent_class.types, cd.types);
   extends_ = inherit_extends(subst, cd, parent_extends);
   use = inherit_uses(subst, cd, parent_uses);
-  methods = inherit_methods(cd, subst, Array[], parent_name1, parent_methods);
+  methods = inherit_methods(
+    context,
+    cd,
+    subst,
+    Array[],
+    parent_name1,
+    parent_methods,
+  );
   consts = inherit_consts(subst, cd, parent_name1, parent_consts);
   cd with {depth, extends_, use, consts, types, methods}
 }
 
-fun inherit_trait(cd: A.Class_def, p: A.Parent): A.Class_def {
+fun inherit_trait(
+  context: mutable SKFS.Context,
+  cd: A.Class_def,
+  p: A.Parent,
+): A.Class_def {
   if (p.source.i1 != "" && p.source.i1 != cd.name.i1) {
     invariant_violation(
       `ICE inherited trait ${p.parent.i0} on ${cd.name.i1} from ${p.source.i1}`,
@@ -1007,7 +1050,7 @@ fun inherit_trait(cd: A.Class_def, p: A.Parent): A.Class_def {
   (tc_cident, type_arguments) = p.parent;
   tc_name = make_class_name(tc_cident);
   (tc_pos, _) = tc_name;
-  tc_class = getClass(tc_name);
+  tc_class = getClass(context, tc_name);
   // conditionas are applied to anything inherited from the trait
   // hence these bans
   if (!p.conditions.isEmpty() && !tc_class.consts.isEmpty()) {
@@ -1046,7 +1089,14 @@ fun inherit_trait(cd: A.Class_def, p: A.Parent): A.Class_def {
   parent_consts = tc_class.consts.map((_, con) -> replace_const_inst(cd, con));
   depth = inherit_depth(tc_class.depth, cd.depth);
   types = inherit_types(cd.kind, subst, parent_types, cd.types);
-  methods = inherit_methods(cd, subst, conditions, tc_name, parent_methods);
+  methods = inherit_methods(
+    context,
+    cd,
+    subst,
+    conditions,
+    tc_name,
+    parent_methods,
+  );
   consts = inherit_consts(subst, cd, tc_name, parent_consts);
   cd with {params, types, methods, consts, use, depth}
 }
@@ -1889,6 +1939,7 @@ fun check_inherit_type_body(
 /* Adds inherited methods. */
 /*****************************************************************************/
 fun inherit_methods(
+  context: mutable SKFS.Context,
   self: A.Class_def,
   subst: SMap<A.Type_>,
   conditions: Array<A.When_type_clause>,
@@ -1934,13 +1985,13 @@ fun inherit_methods(
         };
         whenparams = parent_method.whenparams.concat(conditions);
         met1 = parent_method with {body, deferred_, whenparams};
-        inherit_method(self, parent_name, met1, methods)
+        inherit_method(context, self, parent_name, met1, methods)
       | Some(child_method) ->
         add_method_wrap = (exp, methods1) -> {
           deferred_ = child_method.deferred_;
           whenparams = parent_method.whenparams.concat(conditions);
           parent_method1 = parent_method with {deferred_, whenparams};
-          add_method(exp, self, parent_name, parent_method1, methods1)
+          add_method(context, exp, self, parent_name, parent_method1, methods1)
         };
         resolve_conflict(
           "method",
@@ -1965,6 +2016,7 @@ fun verify_methods(cd: A.Class_def, consts: UMap<A.Method_def>): void {
 /* Adds a new inherited method. */
 /*****************************************************************************/
 fun add_method(
+  context: mutable SKFS.Context,
   explicity: A.Explicity,
   self: A.Class_def,
   parent_name: A.Name,
@@ -2002,7 +2054,7 @@ fun add_method(
       return_ => parent_method.return_,
     }
   };
-  inherit_method(self, parent_name, met, methods)
+  inherit_method(context, self, parent_name, met, methods)
 }
 
 fun empty_met(met: A.Method_def): Bool {

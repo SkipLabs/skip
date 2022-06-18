@@ -45,8 +45,6 @@ fun type_program(
   SkipNaming.populateClasses(context, defsDir, inhDir, childDir);
   SkipNaming.populateFuns(context, defsDir);
 
-  Reactive.setContext(context);
-
   typed_program = runCompilerPhase("frontend/type_program", () ->
     SkipTyping.program(context, embeddedMode, expanded_program)
   );
@@ -99,7 +97,6 @@ fun .main(): void {
   );
   debug(files);
   SKFS.runWithGc(SKFS.Context{}, context ~> {
-    Reactive.setContext(context);
     result = compileWithErrors(context, files);
     result match {
     | Failure(e) -> debug(e)

@@ -1327,7 +1327,7 @@ fun class_def(
   is_self_parameterized = acc.seen_this_type;
   children_ = ChildMap.getChildren(context, childDir, name.i1);
   concrete_children = children_.filter(x -> {
-    GlobalEnv.getClass(x) match {
+    GlobalEnv.getClass(context, x) match {
     | Some(childDef) -> childDef.kind == A.KClass()
     | None() -> false
     }
@@ -1358,7 +1358,7 @@ fun class_def(
   /* Checks that all the methods have valid implementations */
   check_class_rules(cd1);
   /* check compatibility of ancestors, post-mutability propagation */
-  !cd1 = SkipCheckVariance.class_def(cd1);
+  !cd1 = SkipCheckVariance.class_def(context, cd1);
   cd1
 }
 
@@ -1417,6 +1417,7 @@ fun make_extends(
         tmap.set(targkey, parent)
       | Some(parent) ->
         (!effective_source, !inherited_source) = maxSources(
+          context,
           effective_source,
           inherited_source,
           parent.effective_source,
@@ -1433,18 +1434,19 @@ fun make_extends(
 }
 
 fun maxSources(
+  context: mutable SKFS.Context,
   es1: N.Name,
   is1: N.Name,
   es2: N.Name,
   is2: N.Name,
 ): (N.Name, N.Name) {
   if (es1.i1 == es2.i1) {
-    maxDepthCD(is1, is2) match {
+    maxDepthCD(context, is1, is2) match {
     | LName(isn) -> (es1, isn)
     | RName(isn) -> (es2, isn)
     }
   } else {
-    maxDepthCD(es1, es2) match {
+    maxDepthCD(context, es1, es2) match {
     | LName(esn) -> (esn, is1)
     | RName(esn) -> (esn, is2)
     }
@@ -1458,9 +1460,13 @@ base class SelectedName(n: N.Name) {
 }
 
 // The source for an extend list is the most senior parent
-fun maxDepthCD(n1: N.Name, n2: N.Name): SelectedName {
-  cd1 = SkipInherit.getClass(n1);
-  cd2 = SkipInherit.getClass(n2);
+fun maxDepthCD(
+  context: mutable SKFS.Context,
+  n1: N.Name,
+  n2: N.Name,
+): SelectedName {
+  cd1 = SkipInherit.getClass(context, n1);
+  cd2 = SkipInherit.getClass(context, n2);
   cd1.depth.compare(cd2.depth) match {
   | GT() -> LName(n1)
   | EQ() -> if (n1.i1 <= n2.i1) LName(n1) else LName(n2)
@@ -2468,7 +2474,7 @@ fun bind_named_type{
       N.Tnamed(N.NAlias((fr, ty_str)), body)
     | _ ->
       /* resolve class refs */
-      cd = SkipInherit.getClass(n);
+      cd = SkipInherit.getClass(context, n);
       if ((!env.is_constraint_position) && cd.kind == A.KTrait()) {
         msg1 = if (pattern) {
           "Traits cannot be used as patterns"
@@ -2568,7 +2574,8 @@ fun type(
       in_expr => false,
     };
     (fr, named_type)
-  | A.Ttuple(tyl) -> (fr, N.tuple_type(fr, tylist(context, acc, env, tyl)))
+  | A.Ttuple(tyl) ->
+    (fr, N.tuple_type(context, fr, tylist(context, acc, env, tyl)))
   | A.Tfun(tmodifiers, tparams, tbody) ->
     (fr, fun_type(context, acc, env, tmodifiers, tparams, tbody))
   | A.Tabstract(A.Tclass(sk_this @ (_, "this")), tnl) ->
@@ -2833,7 +2840,7 @@ fun get_typedef_type(
   name: N.Name,
 ): Resolved_tyd {
   (pos, tyd_str) = name;
-  cd = SkipInherit.getClass(cn);
+  cd = SkipInherit.getClass(context, cn);
   if (!cd.types.containsKey(name)) {
     SkipError.error(pos, "Field " + tyd_str + " could not be found in " + cn.i1)
   };
@@ -3204,7 +3211,9 @@ fun desugar_bind(
     });
     N.Match(
       rvalue1,
-      List[(List[(pos, N.tuple_pattern(pos, pat_vars))], None(), action)],
+      List[
+        (List[(pos, N.tuple_pattern(context, pos, pat_vars))], None(), action),
+      ],
     )
   /*
     name = rv
@@ -3588,11 +3597,11 @@ fun expandForEachMacro(
   | A.FEKeyed(k, v, _) ->
     lk = (k.i0, N.Pat_var(k));
     lv = (v.i0, N.Pat_var(v));
-    (binFr, N.tuple_pattern(binFr, Array[lk, lv]))
+    (binFr, N.tuple_pattern(context, binFr, Array[lk, lv]))
   | A.FEIdent(n, _) -> (n.i0, N.Pat_var(n))
   | A.FETuple(ns, _) ->
     pats = ns.map(n -> (n.i0, N.Pat_var(n)));
-    (binFr, N.tuple_pattern(binFr, pats))
+    (binFr, N.tuple_pattern(context, binFr, pats))
   };
   // On Some keep looping
   somePat = pat_type(binFr, N.FOR_SOME, Some(Positional(Array[fspats])));
@@ -3779,7 +3788,7 @@ fun expr_(
       },
       compare,
     );
-    pairs = kvalues.map(ordered_named_arg_to_pair);
+    pairs = kvalues.map(x -> ordered_named_arg_to_pair(context, x));
     is_mutable = x match {
     | A.Mutable((mp, _)) -> Some(mp)
     | _ -> None()
@@ -3796,7 +3805,7 @@ fun expr_(
     args1 = args.map(ex -> {
       (e1, e2) = ex;
       pair = Array[expr(context, acc, env, e1), expr(context, acc, env, e2)];
-      (p, N.tuple_expr(p, pair))
+      (p, N.tuple_expr(context, p, pair))
     });
     mut = x match {
     | A.Mutable((mp, _)) -> Some(mp)
@@ -3810,7 +3819,7 @@ fun expr_(
     args1 = args.map(ex -> {
       (e1, e2) = ex;
       pair = Array[expr(context, acc, env, e1), expr(context, acc, env, e2)];
-      (p, N.tuple_expr(p, pair))
+      (p, N.tuple_expr(context, p, pair))
     });
     is_mutable = x match {
     | A.Mutable((mp, _)) -> Some(mp)
@@ -3849,7 +3858,8 @@ fun expr_(
     )
   | A.Lambda(mods, nparams, e) ->
     lambda(context, acc, env, pos, mods, nparams, e)
-  | A.Tuple(el) -> N.tuple_expr(pos, el.map(ex -> expr(context, acc, env, ex)))
+  | A.Tuple(el) ->
+    N.tuple_expr(context, pos, el.map(ex -> expr(context, acc, env, ex)))
   | A.TemplateLiteral(ep) -> N.TemplateLiteral(call_args(context, acc, env, ep))
   | A.Try(e, mbl) ->
     N.Try(
@@ -4008,10 +4018,13 @@ fun call_from_items(
   N.Call(None(), from_items, Array[], Positional(Array[(0, vec)]))
 }
 
-fun ordered_named_arg_to_pair(p: (Int, N.Name, N.Expr)): N.Expr {
+fun ordered_named_arg_to_pair(
+  context: mutable SKFS.Context,
+  p: (Int, N.Name, N.Expr),
+): N.Expr {
   (_, (kpos, s), v) = p;
   pair = Array[(kpos, N.Literal(A.StringLiteral(s))), v];
-  (kpos, N.tuple_expr(kpos, pair))
+  (kpos, N.tuple_expr(context, kpos, pair))
 }
 
 /*****************************************************************************/
@@ -4028,15 +4041,15 @@ fun bind_object(
 ): N.Expr_ {
   classname(context, pos, acc, env, n, targs) match {
   | N.Classname(n1, targs1) ->
-    check_object(n1);
+    check_object(context, n1);
     N.Object(None(), n1, targs1, call_args(context, acc, env, args))
   | _ -> invariant_violation("assert false")
   }
 }
 
-fun check_object(object_name: N.Name): void {
+fun check_object(context: mutable SKFS.Context, object_name: N.Name): void {
   (pos, _) = object_name;
-  cd = SkipInherit.getClass(object_name);
+  cd = SkipInherit.getClass(context, object_name);
   cd.kind match {
   | A.KClass() -> void
   | A.KTrait() -> SkipError.error(pos, "Cannot instantiate a trait")
@@ -4151,7 +4164,7 @@ fun translate_pattern(
     npats = pats.map(translate_pat ->
       pattern(context, acc, env, translate_pat)
     );
-    (pos, N.tuple_pattern(pos, npats))
+    (pos, N.tuple_pattern(context, pos, npats))
   | (pos, A.Pat_as(p, n)) ->
     (pos, N.Pat_as(translate_pattern(context, acc, env, p), n))
   }
@@ -4223,7 +4236,7 @@ fun pattern_type_identifier(
         acc.!seen_this_type = true;
         (n1, x)
       | ("this", None()) -> SkipError.error(n1.i0, "Unbound name")
-      | _ -> (n1, SkipInherit.getClass(n1))
+      | _ -> (n1, SkipInherit.getClass(context, n1))
       }
     };
     if (!class_def.types.containsKey(n2)) {
@@ -4247,7 +4260,7 @@ fun pattern_object_name(
 ): N.Name {
   (n1, _) = pattern_classname(context, pos, acc, env, n, Array[]);
   /* TODO: Targs could be non-empty. Should allow specifying targs when matching on classes. */
-  cd = SkipInherit.getClass(n1);
+  cd = SkipInherit.getClass(context, n1);
   cd match {
   | A.Class_def{kind => A.KTrait()} ->
     SkipError.error(pos, "Cannot pattern-match on a type-class")

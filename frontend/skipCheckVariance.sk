@@ -213,37 +213,44 @@ fun type_def(tyd: N.Type_def): void {
   check_no_variance(tyd.tparams)
 }
 
-fun class_def(cd: N.Class_def): N.Class_def {
+fun class_def(context: mutable SKFS.Context, cd: N.Class_def): N.Class_def {
   env = makeEmptyEnv();
   (co_params, contra_params, inv_params) = make_co_contra(cd);
   tparam_constraints = bind_tparams(env.tparam_constraints, cd.tparams);
   !env = env with {co_params, contra_params, inv_params, tparam_constraints};
   ignore_noacc(
     cd.use.reduce(
-      (acc, n, targs, _) -> sk_extends(env, acc, n, targs),
+      (acc, n, targs, _) -> sk_extends(context, env, acc, n, targs),
       no_acc(),
     ),
   );
   acc = cd.extends_.reduce(
-    (acc, n, targs, _) -> sk_extends(env, acc, n, targs),
+    (acc, n, targs, _) -> sk_extends(context, env, acc, n, targs),
     empty_acc(),
   );
   for (cur2 in cd.types) type_def(cur2);
   tparam_mismatched = get_mismatched(acc);
-  class_params(env, cd.params);
-  for (cur1 => cur2 in cd.methods) method_def(env, cur1.i1, cur2);
+  class_params(context, env, cd.params);
+  for (cur1 => cur2 in cd.methods) method_def(context, env, cur1.i1, cur2);
   cd with {tparam_mismatched}
 }
 
-fun method_def(env: Env, _: String, met: N.Method_def): void {
+fun method_def(
+  context: mutable SKFS.Context,
+  env: Env,
+  _: String,
+  met: N.Method_def,
+): void {
   met.kind match {
   | N.FKMutable _ -> void
   | _ ->
     tparam_constraints = bind_tparams(env.tparam_constraints, met.tparams);
     env1 = env with {is_static => met.kind is N.FKStatic _, tparam_constraints};
     check_no_variance(met.tparams);
-    ignore_noacc(parameters(Contravariant(), env1, no_acc_sset(), met.params));
-    ignore_noacc(type(Covariant(), env, no_acc_sset(), met.return_))
+    ignore_noacc(
+      parameters(context, Contravariant(), env1, no_acc_sset(), met.params),
+    );
+    ignore_noacc(type(context, Covariant(), env, no_acc_sset(), met.return_))
   }
 }
 
@@ -251,44 +258,57 @@ fun fun_def(fd: N.Fun_def): void {
   check_no_variance(fd.tparams)
 }
 
-fun class_params(env: Env, opt: N.MaybeClassParams): void {
+fun class_params(
+  context: mutable SKFS.Context,
+  env: Env,
+  opt: N.MaybeClassParams,
+): void {
   opt match {
   | N.NoParams()
   | N.NativeConstruct _ ->
     void
   | N.HasParams(x) ->
-    ignore_noacc(
-      x.params.foldl(
-        ((acc, param) ~> class_param(env, acc, param)),
-        no_acc_sset(),
-      ),
-    )
+    acc = no_acc_sset();
+    for (param in x.params) {
+      !acc = class_param(context, env, acc, param);
+    }
   }
 }
 
-fun class_param(env: Env, acc: Acc<SSet>, cp_param: N.Parameter): Acc<SSet> {
-  parameter(Covariant(), env, acc, cp_param)
+fun class_param(
+  context: mutable SKFS.Context,
+  env: Env,
+  acc: Acc<SSet>,
+  cp_param: N.Parameter,
+): Acc<SSet> {
+  parameter(context, Covariant(), env, acc, cp_param)
 }
 
 fun parameters(
+  context: mutable SKFS.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
   params: Parameters<N.Parameter>,
 ): Acc<SSet> {
-  params.foldl(((acc, param) ~> parameter(variance, env, acc, param)), acc)
+  for (param in params) {
+    !acc = parameter(context, variance, env, acc, param);
+  };
+  acc
 }
 
 fun parameter(
+  context: mutable SKFS.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
   par: N.Parameter,
 ): Acc<SSet> {
-  type(variance, env, acc, par.type)
+  type(context, variance, env, acc, par.type)
 }
 
 fun sk_extends(
+  context: mutable SKFS.Context,
   env: Env,
   acc: Acc<SMap<SSet>>,
   n: N.Name,
@@ -299,6 +319,7 @@ fun sk_extends(
   | NoAcc() -> NoAcc()
   };
   inner_acc1 = type(
+    context,
     Invariant(),
     env,
     inner_acc,
@@ -308,6 +329,7 @@ fun sk_extends(
 }
 
 fun type(
+  context: mutable SKFS.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
@@ -321,7 +343,7 @@ fun type(
     acc
   | N.Tpromoted(_, _, _, _, tn, targs)
   | N.Tapply(_, tn, targs) ->
-    cd = SkipInherit.getClass(tn);
+    cd = SkipInherit.getClass(context, tn);
     tparams = cd.tparams;
     ntargs = targs.size();
     ntparams = tparams.size();
@@ -329,11 +351,14 @@ fun type(
     tparams
       .values()
       .zip(targs.values())
-      .reduce((cur, p) -> type_parameter(variance, env, cur, p.i0, p.i1), acc)
+      .reduce(
+        (cur, p) -> type_parameter(context, variance, env, cur, p.i0, p.i1),
+        acc,
+      )
   | N.Tset(_, _, _, elts) ->
     elts.foldl(
       ((acc1, elt) -> {
-        cd = SkipInherit.getClass(elt.name);
+        cd = SkipInherit.getClass(context, elt.name);
         tparams = cd.tparams;
         ntargs = elt.targs.size();
         ntparams = tparams.size();
@@ -342,16 +367,16 @@ fun type(
           .values()
           .zip(elt.targs.values())
           .reduce(
-            (cur, p) -> type_parameter(variance, env, cur, p.i0, p.i1),
+            (cur, p) -> type_parameter(context, variance, env, cur, p.i0, p.i1),
             acc1,
           )
       }),
       acc,
     )
-  | N.Tawaitable(_, ty1) -> type(variance, env, acc, ty1)
+  | N.Tawaitable(_, ty1) -> type(context, variance, env, acc, ty1)
   | N.Tfun(_, _, _, params, ty1) ->
-    acc1 = fun_params(variance, env, acc, params);
-    type(variance, env, acc1, ty1)
+    acc1 = fun_params(context, variance, env, acc, params);
+    type(context, variance, env, acc1, ty1)
   | N.Tparam(_, _, ident, (_pos, _)) ->
     if (env.is_static) {
       assert(acc is NoAcc());
@@ -361,7 +386,7 @@ fun type(
     }
   | N.Tdefault(ty1)
   | N.Tnamed(_, ty1) ->
-    type(variance, env, acc, ty1)
+    type(context, variance, env, acc, ty1)
   | N.Tvar _
   | N.Tlambda _ ->
     invariant_violation("assert false")
@@ -446,6 +471,7 @@ fun variance_error(
 }
 
 fun fun_params(
+  context: mutable SKFS.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
@@ -453,13 +479,17 @@ fun fun_params(
 ): Acc<SSet> {
   x match {
   | Positional(tyl) ->
-    tyl.foldl(((acc1, ty) -> type(flip(variance), env, acc1, ty)), acc)
+    tyl.foldl(((acc1, ty) -> type(context, flip(variance), env, acc1, ty)), acc)
   | Named(tym) ->
-    tym.reduce(((acc1, _, ty) -> type(flip(variance), env, acc1, ty)), acc)
+    tym.reduce(
+      ((acc1, _, ty) -> type(context, flip(variance), env, acc1, ty)),
+      acc,
+    )
   }
 }
 
 fun type_parameter(
+  context: mutable SKFS.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
@@ -479,7 +509,7 @@ fun type_parameter(
     | _ -> variance
     }
   };
-  type(variance1, env, acc, ty)
+  type(context, variance1, env, acc, ty)
 }
 
 fun check_arity(
