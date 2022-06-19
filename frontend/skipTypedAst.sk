@@ -23,7 +23,13 @@ class Program{
   class_defs: UMap<Class_def>,
   fun_defs: UMap<Fun_def>,
   const_defs: UMap<Const_def>,
-  tya_defs: UMap<Type_alias_def>,
+}
+
+base class Def {
+  children =
+  | DClass(Class_def)
+  | DFun(Fun_def)
+  | DConst(Const_def)
 }
 
 class Const_def{
@@ -50,13 +56,6 @@ class Type_def{
 type Type_alias_def = SkipNamedAst.Type_alias_def;
 
 type Cla_tyd = SkipNamedAst.Cla_tyd;
-
-base class Definition {
-  children =
-  | DClass(Class_def)
-  | DConst(Const_def)
-  | DFun(Fun_def)
-}
 
 class Class_def{
   depth: Int,

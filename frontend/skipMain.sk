@@ -14,7 +14,7 @@ fun type_program(
   context: mutable SKFS.Context,
   embeddedMode: Bool,
   files: List<String>,
-): SkipTypedAst.Program {
+): SKFS.EHandle<SkipTyping.DefFile> {
   fileDir = context.mkdir(
     SKFS.StringFile::fromFile,
     FileCache.fileDirName,
@@ -37,19 +37,12 @@ fun type_program(
     },
   );
 
-  (expanded_program, defsDir, childDir) = SkipExpand.program(
-    context,
-    parsed_program,
-  );
+  (defsDir, childDir) = SkipExpand.program(context, parsed_program);
   inhDir = SkipInherit.populateClassesDir(context);
   SkipNaming.populateClasses(context, defsDir, inhDir, childDir);
   SkipNaming.populateFuns(context, defsDir);
 
-  typed_program = runCompilerPhase("frontend/type_program", () ->
-    SkipTyping.program(context, embeddedMode, expanded_program)
-  );
-
-  typed_program
+  SkipTyping.program(context, embeddedMode, defsDir)
 }
 
 /*****************************************************************************/
@@ -59,36 +52,29 @@ fun type_program(
 fun compile(
   context: mutable SKFS.Context,
   files: List<String>,
-  embeddedMode: Bool = false,
-): SkipTypedAst.Program {
-  SkipError.doAndReportErrors(() ->
-    compileWithErrors(context, files, embeddedMode)
-  )
-}
-
-fun compileWithErrors(
-  context: mutable SKFS.Context,
-  files: List<String>,
   emeddedMode: Bool = false,
-): Result<SkipTypedAst.Program, Vector<SkipError.Error>> {
-  vtry(
-    () ->
-      (Success(type_program(context, emeddedMode, files)) : Result<
-        SkipTypedAst.Program,
-        Vector<SkipError.Error>,
-      >),
-    exn ->
-      exn match {
-      // TODO: We shouldn't need the unique() here. Fix this with T21967329.
-      | SkipError.SkipErrorException{errors} ->
-        (Failure(errors.unique()) : Result<
+): SKFS.EHandle<SkipTyping.DefFile> {
+  type_program(context, emeddedMode, files)
+  /*
+    vtry(
+      () ->
+        (Success() : Result<
           SkipTypedAst.Program,
           Vector<SkipError.Error>,
-        >)
-      | _ -> throw exn
-      }
-    ,
-  )
+        >),
+      exn ->
+        exn match {
+        // TODO: We shouldn't need the unique() here. Fix this with T21967329.
+        | SkipError.SkipErrorException{errors} ->
+          (Failure(errors.unique()) : Result<
+            SkipTypedAst.Program,
+            Vector<SkipError.Error>,
+          >)
+        | _ -> throw exn
+        }
+      ,
+    )
+  */
 }
 
 fun .main(): void {
@@ -97,11 +83,7 @@ fun .main(): void {
   );
   debug(files);
   SKFS.runWithGc(SKFS.Context{}, context ~> {
-    result = compileWithErrors(context, files);
-    result match {
-    | Failure(e) -> debug(e)
-    | _ -> void
-    };
+    _result = compile(context, files);
     SKFS.CStop(None())
   })
 }

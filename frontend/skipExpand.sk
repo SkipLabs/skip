@@ -941,11 +941,7 @@ class DefsFile(value: (?FileRange, SkipExpand.Defs)) extends SKFS.File
 fun program(
   context: mutable SKFS.Context,
   files: SKFS.EHandle<SkipParse.DefsFile>,
-): (
-  SkipAst.Program,
-  SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
-  SKFS.EHandle<SKFS.StringFile>,
-) {
+): (SKFS.EHandle<GlobalEnv.ExpandedDefFile>, SKFS.EHandle<SKFS.StringFile>) {
   moduleDefsPhase1Dir = files.contextWriterKeyIter(
     DefsFile::fromFile,
     context,
@@ -978,29 +974,7 @@ fun program(
       writer.write(SKFS.SID(moduleName), DefsFile(acc))
     },
   );
-  proj = moduleDefsDir.contextWriterKeyValues(
-    ModuleMapFile::fromFile,
-    context,
-    SKFS.DirName::create("/moduleMap/proj/"),
-    (_context, writer, key, files) ~> {
-      if (files.size() == 0) return void;
-      moduleName = key match {
-      | SKFS.SID(x) -> x
-      | _ -> invariant_violation("Unexpected key")
-      };
-      defs = files[0].value;
-      writer.writeArray(
-        SKFS.IID(0),
-        Array[ModuleMapFile(SortedMap[moduleName => defs])],
-      )
-    },
-  );
-  moduleDefsVector = Vector::createFromItems(
-    proj.getArray(context, SKFS.IID(0)).map(x -> x.value),
-  );
-  module_defs = moduleDefsVector.foldl(mergeModuleMap, SortedMap[]);
   ModuleMap.populateCache(context, moduleDefsDir);
-
   expandEnv = makeEnv();
   expandedDefs = moduleDefsDir.contextWriterKeyValues(
     DefsFile::fromFile,
@@ -1020,10 +994,9 @@ fun program(
     },
   );
   defs = GlobalEnv.populateDefinitions(context, expandedDefs);
-  program = module_map_fold(context, module_defs);
   childDir = ChildMap.populateCache(context, expandedDefs);
   ChildMap.checkCycles(context, defs);
-  (program, defs, childDir)
+  (defs, childDir)
 }
 
 /*****************************************************************************/

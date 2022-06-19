@@ -249,68 +249,41 @@ fun programToDefinitions(
 /*****************************************************************************/
 /* The main entry point */
 /*****************************************************************************/
+class DefFile(TAst.Def) extends SKFS.File
+
 fun program(
   context: mutable SKFS.Context,
   embeddedMode: Bool,
-  prog: SkipAst.Program,
-): SkipTypedAst.Program {
-  for (ta in prog.type_defs) {
-    SkipNaming.check_type_alias(context, ta)
-  };
-  tya_defs = prog.type_defs.map((_, ta) -> SkipNaming.type_alias(context, ta));
-  defs = programToDefinitions(prog.class_defs, prog.const_defs, prog.fun_defs);
-  defsOrErrors = defs.map(def -> {
-    SkipError.doWithError(() -> {
-      def match {
-      | SkipAst.DClass(x) ->
-        SkipTypedAst.DClass(class_def(context, embeddedMode, x.name))
-      | SkipAst.DConst(x) ->
-        SkipTypedAst.DConst(global_const_def(context, x.name))
-      | SkipAst.DFun(x) ->
-        SkipTypedAst.DFun(fun_def(context, embeddedMode, x.name))
-      | _ -> invariant_violation("ICE: unexpected definition type")
+  defs: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
+): SKFS.EHandle<DefFile> {
+  defs.contextWriterKeyValues(
+    DefFile::fromFile,
+    context,
+    SKFS.DirName::create("/typing/"),
+    (context, writer, key, values) ~> {
+      // if(values.size() > 1) TODO multiple defs
+      values[0].value match {
+      | GlobalEnv.EClass(x) ->
+        writer.write(
+          key,
+          DefFile(
+            SkipTypedAst.DClass(class_def(context, embeddedMode, x.name)),
+          ),
+        )
+      | GlobalEnv.EConst(x) ->
+        writer.write(
+          key,
+          DefFile(SkipTypedAst.DConst(global_const_def(context, x.name))),
+        )
+      | GlobalEnv.EFun(x) ->
+        writer.write(
+          key,
+          DefFile(SkipTypedAst.DFun(fun_def(context, embeddedMode, x.name))),
+        )
+      | GlobalEnv.EType(ta) -> SkipNaming.check_type_alias(context, ta)
       }
-    })
-  });
-  errors = mutable Vector[];
-  class_defs = UMap[];
-  const_defs = UMap[];
-  fun_defs = UMap[];
-  for (defOrError in defsOrErrors) {
-    defOrError match {
-    | Success(def) ->
-      def match {
-      | SkipTypedAst.DClass(x) -> !class_defs = class_defs.add(x.name, x)
-      | SkipTypedAst.DConst(x) -> !const_defs = const_defs.add(x.name, x)
-      | SkipTypedAst.DFun(x) -> !fun_defs = fun_defs.add(x.name, x)
-      }
-    | Failure(x) -> errors.push(x)
-    }
-  };
-
-  SkipNaming.maybeGetFun(context, "main").each(main -> {
-    N.unfold_tnamed(main.return_) match {
-    | (_, N.Tapply(N.Mchilled(), (_, "Void"), tya)) if (tya.isEmpty()) -> void
-    | (_, N.Tawaitable _) ->
-      SkipError.error(
-        main.return_.i0,
-        "main must return void: 'fun main(): void {'. " +
-          "The normal way to call an asynchronous function is to prepend the call with 'await'. " +
-          "But in order to call the very first asynchronous function, you need to wrap the call with 'awaitSynchronously()'.",
-      )
-    | _ ->
-      SkipError.error(
-        main.return_.i0,
-        "main must return void: 'fun main(): void {'",
-      )
-    }
-  });
-
-  if (errors.size() == 0) {
-    TAst.Program{fun_defs, const_defs, class_defs, tya_defs}
-  } else {
-    throw SkipError.SkipErrorException{errors => errors.chill().flatten()}
-  }
+    },
+  );
 }
 
 fun const_def(
