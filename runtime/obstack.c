@@ -135,62 +135,16 @@ void* SKIP_Obstack_calloc(size_t size) {
   return result;
 }
 
-/*****************************************************************************/
-/* Horrible hack for 32bits mode.
- *
- * As it turns out, memcpy is super slow in some implementations of wasm.
- * They have a proposal to fix that (by adding a special opcode), but it's
- * going to take some time before that opcode is available everywhere.
- *
- * So for now, we have to live in a world where wasm memcpy are slow.
- * Because shallowClone is used so often (everytime we write "with" or !x.y =),
- * we take a serious performance hit everytime.
- *
- * Of course, we could change the compiler to emit the store instructions.
- * That woule work, but it makes the code much larger.
- *
- * So what we are doing here is introducing a special hack to speed up the
- * cloning of the objects that we clone the most (the nodes that come from
- * maps).
- *
- * The trick consists in loading/storing a structure with 11 long integers.
- * The compiler produces a much more efficient version of the copy than memcpy.
- *
- * It's not nice ... but it will do for now!
- */
-/*****************************************************************************/
+char* SKIP_Obstack_shallowClone(size_t _size, char* obj) {
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
 
-#ifdef SKIP32
-typedef struct {
-  long l0;
-  long l1;
-  long l2;
-  long l3;
-  long l4;
-  long l5;
-  long l6;
-  long l7;
-  long l8;
-  long l9;
-  long l10;
-} long11_t;
-#endif
+  size_t memsize = ty->m_userByteSize;
+  size_t leftsize = ty->m_uninternedMetadataByteSize;
+  size_t size = memsize + leftsize;
 
-
-char* SKIP_Obstack_shallowClone(size_t size, char* obj) {
-  size = size + sizeof(void*);
   char* mem = SKIP_Obstack_alloc(size);
-#ifdef SKIP32
-  if(size == 44) {
-    *(long11_t*)mem = *(long11_t*)(obj-sizeof(void*));
-  }
-  else {
-#endif
-  memcpy(mem, obj-sizeof(void*), size);
-#ifdef SKIP32
-  }
-#endif
-  return mem+sizeof(void*);
+  memcpy(mem, obj-leftsize, size);
+  return mem+leftsize;
 }
 
 /*****************************************************************************/

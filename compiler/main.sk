@@ -1,0 +1,17 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+fun main(): void {
+  files = List::createFromItems(
+    arguments().filter(x -> x != "--data" && x != "/tmp/foo.data"),
+  );
+  debug(files);
+  SKFS.runWithGc(SKFS.Context{}, context ~> {
+    _result = compile(context, kConfig.unknown);
+    SKFS.CStop(None())
+  })
+}

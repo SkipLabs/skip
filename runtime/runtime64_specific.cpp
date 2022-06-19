@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <linux/limits.h>
 
 namespace skip {
 struct SkipException : std::exception {
@@ -323,22 +324,24 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
   return sk_string_create(buffer, size);
 }
 
-thread_local void* gctx = NULL;
-
-void SKIP_set_context(void* ctx) {
-  gctx = ctx;
+char* SKIP_getcwd() {
+  char path[PATH_MAX];
+  getcwd(path, PATH_MAX);
+  return sk_string_create(path, strlen(path));
 }
 
-int32_t SKIP_is_set_context() {
-  return gctx != NULL;
+int64_t SKIP_numThreads() {
+  return 1;
 }
 
-void* SKIP_get_context() {
-  if(gctx == NULL) {
-    fprintf(stderr, "get_context has not been initialized\n");
-    exit(2);
+void SKIP_string_to_file(char* str, char* file) {
+  FILE *out = fopen(file, "w");
+  size_t size = SKIP_String_byteSize(str);
+  while(size != 0) {
+    size_t written = fwrite(str, 1, size, out);
+    size -= written;
   }
-  return gctx;
+  fclose(out);
 }
 
 }

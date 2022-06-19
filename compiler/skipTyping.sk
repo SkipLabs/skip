@@ -249,7 +249,7 @@ fun programToDefinitions(
 /*****************************************************************************/
 /* The main entry point */
 /*****************************************************************************/
-class DefFile(TAst.Def) extends SKFS.File
+class DefFile(value: TAst.Def) extends SKFS.File
 
 fun program(
   context: mutable SKFS.Context,
@@ -260,24 +260,24 @@ fun program(
     DefFile::fromFile,
     context,
     SKFS.DirName::create("/typing/"),
-    (context, writer, key, values) ~> {
+    (context, writer, _key, values) ~> {
       // if(values.size() > 1) TODO multiple defs
       values[0].value match {
       | GlobalEnv.EClass(x) ->
         writer.write(
-          key,
+          SKFS.SID(x.name.i1),
           DefFile(
             SkipTypedAst.DClass(class_def(context, embeddedMode, x.name)),
           ),
         )
       | GlobalEnv.EConst(x) ->
         writer.write(
-          key,
+          SKFS.SID(x.name.i1),
           DefFile(SkipTypedAst.DConst(global_const_def(context, x.name))),
         )
       | GlobalEnv.EFun(x) ->
         writer.write(
-          key,
+          SKFS.SID(x.name.i1),
           DefFile(SkipTypedAst.DFun(fun_def(context, embeddedMode, x.name))),
         )
       | GlobalEnv.EType(ta) -> SkipNaming.check_type_alias(context, ta)

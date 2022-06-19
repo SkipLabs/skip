@@ -64,6 +64,32 @@ declare void @__cxa_end_catch()
 ; Delete after update_lkg
 declare void @abort() noreturn
 
+; Awaitable
+
+define void @SKIP_awaitableNotifyWaitersValueIsReady(i8*) {
+  ret void
+}
+
+define void @SKIP_awaitableSyncOrThrow(i8*) {
+  ret void
+}
+
+define void @SKIP_awaitableThrow(i8*, i8*) {
+  ret void
+}
+
+define void @SKIP_invocationOnStateChange(i8*, i64) {
+  ret void
+}
+
+define void @SKIP_memoValueBoxObject(i8*, i8*) {
+  ret void
+}
+
+define void @SKIP_memoizeCall(i8*, i8*) {
+  ret void
+}
+
 ; Obstack code
 
 ; Function Attrs: alwaysinline nounwind uwtable

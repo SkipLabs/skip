@@ -1,6 +1,6 @@
 CC=clang-10
 CPP=clang++-10
-SKC=~/skip/build/bin/skip_to_llvm
+SKC=~/skip/build/bin/skip_to_llvm  --no-inline
 BCLINK=llvm-link-10
 MEMSIZE32=1073741824
 
