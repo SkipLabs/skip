@@ -56,16 +56,60 @@ const EMPTY_ENV: Env = Env{
 
 /************************************************************/
 
+class DefFile(value: O.Def) extends SKFS.File
 
-fun program_phase(prog: TAst.Program): O.Program {
-  const_defs = prog.const_defs.map(const_def);
-  class_defs = prog.class_defs.map(class_def);
-  fun_defs = prog.fun_defs.map(fun_def);
-  O.Program{const_defs, class_defs, fun_defs}
+fun convertOuterToProgram(
+  context: mutable SKFS.Context,
+  defs: SKFS.EHandle<DefFile>,
+): O.Program {
+  defsProj = defs.contextWriterKeyValues(
+    DefFile::fromFile,
+    context,
+    SKFS.DirName::create("/outerAstProgram/"),
+    (_context, writer, _, value) ~> {
+      writer.writeArray(SKFS.IID(0), value)
+    },
+  );
+  defsArray = defsProj.getArray(context, SKFS.IID(0));
+  class_defs = UMap[];
+  fun_defs = UMap[];
+  const_defs = UMap[];
+  for (def in defsArray) {
+    def.value match {
+    | O.DClass(x) -> !class_defs[(x.name.pos, x.name.id)] = x
+    | O.DFun(x) -> !fun_defs[(x.name.pos, x.name.id)] = x
+    | O.DConst(x) -> !const_defs[(x.name.pos, x.name.id)] = x
+    }
+  };
+  O.Program{class_defs, fun_defs, const_defs}
 }
 
-fun program(prog: TAst.Program): O.Program {
-  runCompilerPhase("outer/makeOuter", () -> program_phase(prog));
+fun program_phase(
+  context: mutable SKFS.Context,
+  typedDefs: SKFS.EHandle<SkipTyping.DefFile>,
+): O.Program {
+  outerDefs = typedDefs.map(
+    DefFile::fromFile,
+    context,
+    SKFS.DirName::create("/outerDefs/"),
+    defFile ~> {
+      DefFile(
+        defFile.value match {
+        | SkipTypedAst.DConst(x) -> O.DConst(const_def(x))
+        | SkipTypedAst.DClass(x) -> O.DClass(class_def(x))
+        | SkipTypedAst.DFun(x) -> O.DFun(fun_def(x))
+        },
+      )
+    },
+  );
+  convertOuterToProgram(context, outerDefs)
+}
+
+fun program(
+  context: mutable SKFS.Context,
+  prog: SKFS.EHandle<SkipTyping.DefFile>,
+): O.Program {
+  runCompilerPhase("outer/makeOuter", () -> program_phase(context, prog));
 }
 
 fun tya_def(TAst.Name, tya: TAst.Type_alias_def): O.TypeAliasDef {
@@ -90,7 +134,7 @@ fun tya_tparam(x: (String, NAst.Name)): O.TypeAliasTparam {
 /* Classes. */
 /*****************************************************************************/
 
-fun class_def(TAst.Name, cd: TAst.Class_def): O.ClassDef {
+fun class_def(cd: TAst.Class_def): O.ClassDef {
   O.ClassDef{
     depth => cd.depth,
     native_ => cd.native_,
@@ -137,10 +181,10 @@ fun kind(x: TAst.Class_kind): O.ClassKind {
 /* Class constants. */
 /*****************************************************************************/
 fun class_const_defs(defs: UMap<TAst.Const_def>): UMap<O.ConstDef> {
-  defs.filter((_, c) -> c.deferred_.isNone()).map(const_def)
+  defs.filter((_, c) -> c.deferred_.isNone()).map((_, x) -> const_def(x))
 }
 
-fun const_def(TAst.Name, con: TAst.Const_def): O.ConstDef {
+fun const_def(con: TAst.Const_def): O.ConstDef {
   O.ConstDef{
     annotations => con.annotations,
     native_ => con.native_,
@@ -311,7 +355,7 @@ fun initializer(new_id: () -> Int, expr: TAst.Expr): O.Initializer {
 /*****************************************************************************/
 /* Functions. */
 /*****************************************************************************/
-fun fun_def(TAst.Name, fd: TAst.Fun_def): O.FunDef {
+fun fun_def(fd: TAst.Fun_def): O.FunDef {
   O.FunDef{
     annotations => fd.annotations,
     native_ => fd.native_,

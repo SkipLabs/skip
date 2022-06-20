@@ -53,45 +53,26 @@ fun compile(
   context: mutable SKFS.Context,
   files: List<String>,
   emeddedMode: Bool = false,
-): SkipTypedAst.Program {
-  defsProj = type_program(context, emeddedMode, files).contextWriterKeyValues(
-    SkipTyping.DefFile::fromFile,
-    context,
-    SKFS.DirName::create("/tastProgram/"),
-    (_context, writer, _, value) ~> {
-      writer.writeArray(SKFS.IID(0), value)
-    },
-  );
-  defs = defsProj.getArray(context, SKFS.IID(0));
-  class_defs = UMap[];
-  fun_defs = UMap[];
-  const_defs = UMap[];
-  for (def in defs) {
-    def.value match {
-    | SkipTypedAst.DClass(x) -> !class_defs[x.name] = x
-    | SkipTypedAst.DFun(x) -> !fun_defs[x.name] = x
-    | SkipTypedAst.DConst(x) -> !const_defs[x.name] = x
-    }
-  };
-  SkipTypedAst.Program{class_defs, fun_defs, const_defs}
+): SKFS.EHandle<SkipTyping.DefFile> {
+  type_program(context, emeddedMode, files)
   /*
-    vtry(
-      () ->
-        (Success() : Result<
-          SkipTypedAst.Program,
-          Vector<SkipError.Error>,
-        >),
-      exn ->
-        exn match {
-        // TODO: We shouldn't need the unique() here. Fix this with T21967329.
-        | SkipError.SkipErrorException{errors} ->
-          (Failure(errors.unique()) : Result<
+      vtry(
+        () ->
+          (Success() : Result<
             SkipTypedAst.Program,
             Vector<SkipError.Error>,
-          >)
-        | _ -> throw exn
-        }
-      ,
-    )
-  */
+          >),
+        exn ->
+          exn match {
+          // TODO: We shouldn't need the unique() here. Fix this with T21967329.
+          | SkipError.SkipErrorException{errors} ->
+            (Failure(errors.unique()) : Result<
+              SkipTypedAst.Program,
+              Vector<SkipError.Error>,
+            >)
+          | _ -> throw exn
+          }
+        ,
+      )
+    */
 }

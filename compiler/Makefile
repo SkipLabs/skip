@@ -1,10 +1,10 @@
 CC=clang-10
 CPP=clang++-10
-SKC=~/skip/build/bin/skip_to_llvm  --no-inline
+SKC=~/skip/build/bin/skip_to_llvm
 BCLINK=llvm-link-10
 MEMSIZE32=1073741824
 
-OLEVEL=-O3
+OLEVEL=-O0
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
