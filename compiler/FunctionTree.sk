@@ -82,6 +82,7 @@ fun emitIntAdd{
 }
 
 fun emitNamedCall{
+  context: mutable SKFS.Context,
   fs: mutable O.FunSpecializer,
   name: String,
   args: Array<O.MaybeExists<O.InstrTree>>,
@@ -93,7 +94,7 @@ fun emitNamedCall{
   casts: Array<String> = Array[],
 }: O.MaybeExists<O.InstrTree> {
   fromExists(fs, fs.flattenArgs(args), pos, flatArgs -> {
-    ttype = fs.specializer.getReturnType(typ, fs.callers, pos);
+    ttype = fs.specializer.getReturnType(context, typ, fs.callers, pos);
     call = fs.emitNamedCall{
       typ => ttype,
       name,
@@ -113,6 +114,7 @@ fun emitNamedCall{
 }
 
 fun emitCallFunction{
+  context: mutable SKFS.Context,
   fs: mutable O.FunSpecializer,
   args: Array<O.MaybeExists<O.InstrTree>>,
   name: SFunctionID,
@@ -123,7 +125,7 @@ fun emitCallFunction{
   prettyName: String = "",
 }: O.MaybeExists<O.InstrTree> {
   fromExists(fs, fs.flattenArgs(args), pos, flatArgs -> {
-    ttype = fs.specializer.getReturnType(typ, fs.callers, pos);
+    ttype = fs.specializer.getReturnType(context, typ, fs.callers, pos);
     call = fs.emitCallFunction{
       args => flatArgs,
       name,
@@ -142,6 +144,7 @@ fun emitCallFunction{
 }
 
 fun emitCallMethod{
+  context: mutable SKFS.Context,
   fs: mutable O.FunSpecializer,
   method: String,
   retType: Type,
@@ -151,7 +154,7 @@ fun emitCallMethod{
 }: O.MaybeExists<O.InstrTree> {
   fromExists(fs, fs.flattenArgs(args), pos, flatArgs -> {
     smap = fs.getMethodSMap(targs);
-    ttype = fs.specializer.getReturnType(retType, fs.callers, pos);
+    ttype = fs.specializer.getReturnType(context, retType, fs.callers, pos);
     call = fs.emitCallMethod{method, args => flatArgs, smap, typ => ttype, pos};
     if (retType != tVoid) {
       O.Exists(fs.reassembleCall(retType, call.id, pos, None()))
@@ -162,6 +165,7 @@ fun emitCallMethod{
 }
 
 fun emitInvokeFunction{
+  context: mutable SKFS.Context,
   fs: mutable O.FunSpecializer,
   args: Array<O.MaybeExists<O.InstrTree>>,
   name: SFunctionID,
@@ -176,7 +180,7 @@ fun emitInvokeFunction{
   fromExists(fs, fs.flattenArgs(args), pos, flatArgs -> {
     noCatchHelper = fs.newBlockID();
 
-    ttype = fs.specializer.getReturnType(typ, fs.callers, pos);
+    ttype = fs.specializer.getReturnType(context, typ, fs.callers, pos);
     call = fs.emitInvokeFunction{
       args => flatArgs,
       name,
@@ -289,6 +293,7 @@ fun emitCast{
 }
 
 fun emitObject{
+  context: mutable SKFS.Context,
   fs: mutable O.FunSpecializer,
   args: Array<O.MaybeExists<O.InstrTree>>,
   pos: Pos,
@@ -299,7 +304,7 @@ fun emitObject{
     shape match {
     | O.NamedLeaf _ ->
       // Normal object
-      ttype = fs.specializer.getReturnType(typ, fs.callers, pos);
+      ttype = fs.specializer.getReturnType(context, typ, fs.callers, pos);
       call = fs.emitObject{args => flatArgs, pos, typ => ttype};
       O.Exists(fs.reassembleCall(typ, call.id, pos, None()))
     | O.NamedInner _ ->

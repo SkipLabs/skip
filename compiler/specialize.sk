@@ -431,13 +431,14 @@ mutable class Specializer{
   // use the tparamInherit field to determine the targ values based on
   // information from the class which the method call was compiled against.
   mutable fun computeMethodTargs(
+    context: mutable SKFS.Context,
     call: GCallMethodBase,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
   ): Array<Tclass> {
     pos = call.pos;
 
     obj = call.args[0];
-    objType = this.getTclass3(obj.getType(), tparamEnv);
+    objType = this.getTclass3(context, obj.getType(), tparamEnv);
     objTypeInfo = this.sclasses[objType.sclassID];
     objTypeGClass = objTypeInfo.gclass;
 
@@ -459,6 +460,7 @@ mutable class Specializer{
           // Look up the source method so we can add its tparams
           // to the environment.
           sourceGClass = this.converter.getGClass(
+            context,
             this.processedClasses,
             call.source,
             pos,
@@ -479,7 +481,7 @@ mutable class Specializer{
           env3.extend(
             makeTypeMap(
               sm.tparams,
-              gtargs.map(t -> this.getTclass3(t, tparamEnv)),
+              gtargs.map(t -> this.getTclass3(context, t, tparamEnv)),
               pos,
             ),
           );
@@ -492,12 +494,12 @@ mutable class Specializer{
     | None() -> gtargs
     };
 
-    realGTargs.map(t -> this.getTclass3(t, tparamEnv))
+    realGTargs.map(t -> this.getTclass3(context, t, tparamEnv))
   }
 
   // Find the transitive closure of functions and classes
   // reachable from our original root set so we can compile them all.
-  mutable fun findAllFunctionsAndSClasses(): void {
+  mutable fun findAllFunctionsAndSClasses(context: mutable SKFS.Context): void {
     // Make sure our builtin types exist so we can spontaneously create
     // instances later, e.g. during lowering.
     builtinTypes = Array[
@@ -519,14 +521,17 @@ mutable class Specializer{
 
     for (tt in builtinTypes) {
       (t, lazyGClass) = tt;
-      sc = this.getSClass2(HalfClass(lazyGClass, Array[], DeepFrozen())).sclass;
+      sc = this.getSClass2(
+        context,
+        HalfClass(lazyGClass, Array[], DeepFrozen()),
+      ).sclass;
       if (sc.id != t.sclassID) {
         sc.pos.die(`sclass ID mismatch: ${sc.id} != ${t.sclassID}`)
       }
     };
 
     // Keep specializing functions and types until we hit a fixed point.
-    while (this.specializePendingFuns()) void;
+    while (this.specializePendingFuns(context)) void;
 
     if (false) {
       // Debug support for dumping out the back end's understanding of
@@ -562,7 +567,9 @@ mutable class Specializer{
   }
 
   // Specializes pending functions. Returns true if anything changed.
-  private mutable fun specializePendingFuns(): Bool {
+  private mutable fun specializePendingFuns(
+    context: mutable SKFS.Context,
+  ): Bool {
     changed = false;
 
     while (!this.funStack.isEmpty()) {
@@ -578,15 +585,19 @@ mutable class Specializer{
         // and only if that fails run applyTparams and look up the real type.
         key = (t, literalType);
         if (seenTypes.maybeInsert(key)) {
-          _ = this.getTclass3(t, tparamEnv, this.pos, literalType)
+          _ = this.getTclass3(context, t, tparamEnv, this.pos, literalType)
         }
       };
 
       // Ensure the stub for a generator's "next" method exists,
       // so we can find it when we provide a body for it later.
-      returnType = this.getTclass3(f.funInfo.funType.returnType, tparamEnv);
+      returnType = this.getTclass3(
+        context,
+        f.funInfo.funType.returnType,
+        tparamEnv,
+      );
       if (f.funInfo.isGenerator) {
-        this.requestMethod("next", returnType, Array[])
+        this.requestMethod(context, "next", returnType, Array[])
       };
 
       // Process parameters.
@@ -605,21 +616,26 @@ mutable class Specializer{
           instr match {
           | GCallFunctionBase{name, targs => innerTargs} ->
             _ = this.requestFunction(
+              context,
               name,
-              innerTargs.map(t -> this.getTclass3(t, tparamEnv)),
+              innerTargs.map(t -> this.getTclass3(context, t, tparamEnv)),
             )
           | call @ GCallMethodBase{method} ->
-            objType = this.getTclass3(call.args[0].getType(), tparamEnv);
-            innerTargs = this.computeMethodTargs(call, tparamEnv);
-            this.requestMethod(method, objType, innerTargs)
+            objType = this.getTclass3(
+              context,
+              call.args[0].getType(),
+              tparamEnv,
+            );
+            innerTargs = this.computeMethodTargs(context, call, tparamEnv);
+            this.requestMethod(context, method, objType, innerTargs)
 
           | GTypeSwitch{value} ->
             // TypeSwitch on an Option type will generate an "isSome()"
             // call, so we need to force that method to get compiled.
-            valType = this.getTclass3(value.getType(), tparamEnv);
+            valType = this.getTclass3(context, value.getType(), tparamEnv);
 
             if (this.sclasses[valType.sclassID].optionStyle.isSome()) {
-              this.requestMethod("isSome", valType, Array[])
+              this.requestMethod(context, "isSome", valType, Array[])
             }
 
           | GCustomInstr{request} ->
@@ -835,25 +851,27 @@ mutable class Specializer{
   // contravariance in generic types. Basically if it is ever legal to cast
   // 'sub' to 'super'
   private mutable fun inherit(
+    context: mutable SKFS.Context,
     super: mutable SClassInfo,
     sub: mutable SClassInfo,
   ): void {
     if (super.subtypes.maybeInsert(sub.sclass.id)) {
       sub.supertypes.add(super.sclass.id);
 
-      for (t in super.supertypes) this.inherit(this.sclasses[t], sub);
-      for (t in sub.subtypes) this.inherit(super, this.sclasses[t]);
+      for (t in super.supertypes) this.inherit(context, this.sclasses[t], sub);
+      for (t in sub.subtypes) this.inherit(context, super, this.sclasses[t]);
 
       // Track all methods callable on concrete classes (by casting to some
       // supertype) so we know what to compile for them. We don't need to do
       // this for base classes or value classes.
       if (sub.sclass.kind.isKClass()) {
-        for (m => _ in super.methods) this.noteCalledMethod(sub, m)
+        for (m => _ in super.methods) this.noteCalledMethod(context, sub, m)
       }
     }
   }
 
   mutable fun specializeType2(
+    context: mutable SKFS.Context,
     generic: LazyGClass,
     mutability: Mutability,
     targs: Array<Type>,
@@ -864,18 +882,24 @@ mutable class Specializer{
         .keys()
         .map(sid -> {
           tclassArgs = targs.map(arg -> arg.typeInSuperposition(sid));
-          (sid, this.getTclass2(generic, tclassArgs, mutability));
+          (sid, this.getTclass2(context, generic, tclassArgs, mutability));
         })
         .collect(UnorderedMap);
       Type::make(smap)
     | _ ->
       // easy case - no superpositions at all.
-      this.getTclass2(generic, targs.map(t -> t.asTclass(this.pos)), mutability)
+      this.getTclass2(
+        context,
+        generic,
+        targs.map(t -> t.asTclass(this.pos)),
+        mutability,
+      )
     }
   }
 
   // Converts a non-parametric type to a Tclass.
   mutable fun getTclass2(
+    context: mutable SKFS.Context,
     generic: LazyGClass,
     targs: Array<Tclass>,
     mutability: Mutability,
@@ -892,12 +916,16 @@ mutable class Specializer{
       !mutability = Readonly()
     };
 
-    info = this.getSClass2(HalfClass(generic, targs, mutability, literalType));
+    info = this.getSClass2(
+      context,
+      HalfClass(generic, targs, mutability, literalType),
+    );
 
     Tclass(info.sclass.id, mutability)
   }
 
   mutable fun getTclass3(
+    context: mutable SKFS.Context,
     gt: GType,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     pos: Pos = this.pos,
@@ -907,8 +935,9 @@ mutable class Specializer{
     | tp @ GTparam _ -> typeMapGet(tparamEnv, tp, pos)
     | GTapply(lazyGClass, mutability, gtargs) ->
       this.getTclass2(
+        context,
         lazyGClass,
-        gtargs.map(gt -> this.getTclass3(gt, tparamEnv, pos)),
+        gtargs.map(gt -> this.getTclass3(context, gt, tparamEnv, pos)),
         mutability,
         literalType,
       )
@@ -955,6 +984,7 @@ mutable class Specializer{
   }
 
   mutable fun specializeType(
+    context: mutable SKFS.Context,
     t: GType,
     mapCache: mutable UnorderedMap<(GType, Bool), Type>,
     callers: Array<FunSuperpositionID>,
@@ -963,13 +993,13 @@ mutable class Specializer{
   ): Type {
     mapCache.getOrAdd((t, literalType), () -> {
       if (!t.isParametric()) {
-        this.getTclass3(t, kEmptyTypeMap, this.pos, literalType)
+        this.getTclass3(context, t, kEmptyTypeMap, this.pos, literalType)
       } else {
         // This might need a Tsuperposition, so work out what the Tclass
         // will be for every possible superposition.
         smap = mutable UnorderedMap[];
         callers.eachWithIndex((i, c) -> {
-          tc = this.getTclass3(t, typemaps[i], this.pos, literalType);
+          tc = this.getTclass3(context, t, typemaps[i], this.pos, literalType);
           smap.set(c, tc)
         });
         Type::make(smap.chill())
@@ -986,10 +1016,14 @@ mutable class Specializer{
   // Create a type for Call Instrs that return multiple values. To regularize
   // later stages of the compiler we make their return types always be
   // scalarized out to an instance of this if they have more than one argument.
-  mutable fun getReturnTuple(types: Array<Tclass>): Tclass {
+  mutable fun getReturnTuple(
+    context: mutable SKFS.Context,
+    types: Array<Tclass>,
+  ): Tclass {
     invariant(types.size() > 1, "No need for 0- or 1-return tuples.");
 
     this.getTclass2(
+      context,
       ReturnTupleLazyGClass(types.size()),
       types,
       Mutability::fromFlag(!types.all(t -> t.isDeepFrozen())),
@@ -1006,6 +1040,7 @@ mutable class Specializer{
   // can of what's happening without introducing a lot of complexity
   // related to nested value classes etc.
   mutable fun getReturnType(
+    context: mutable SKFS.Context,
     typ: Type,
     callers: Array<FunSuperpositionID>,
     pos: Pos,
@@ -1023,7 +1058,7 @@ mutable class Specializer{
       smap = mutable UnorderedMap[];
       for (caller in callers) {
         tv = types.map(t -> t.typeInSuperposition(caller));
-        smap.set(caller, this.getReturnTuple(tv))
+        smap.set(caller, this.getReturnTuple(context, tv))
       };
       Type::make(smap.chill())
     }
@@ -1109,7 +1144,10 @@ mutable class Specializer{
   // Apply the rules documented on createMetaClass() to convert
   // Base<T>, Concrete<T> and Class<T> to the corresponding metaclass,
   // or return 'hc' if no such conversion is possible.
-  private mutable fun maybeConvertMetaClass(hc: HalfClass): HalfClass {
+  private mutable fun maybeConvertMetaClass(
+    context: mutable SKFS.Context,
+    hc: HalfClass,
+  ): HalfClass {
     (gid, targ) = hc.generic match {
     | FrontEndLazyGClass("Base") ->
       tArgInfo = this.sclasses[hc.targs[0].sclassID];
@@ -1156,7 +1194,7 @@ mutable class Specializer{
     // use Concrete here.
     this.getOptionStyle2(hc, this.pos) match {
     | Some(x) ->
-      tag = this.getOptionTagType(hc.generic);
+      tag = this.getOptionTagType(context, hc.generic);
       opthc with {
         generic => ConcreteMetaImplLazyGClass(x.fastClass()),
         targs => hc.targs.concat(Array[tag]),
@@ -1168,20 +1206,26 @@ mutable class Specializer{
     }
   }
 
-  private mutable fun getOptionTagType(optionGClass: LazyGClass): Tclass {
+  private mutable fun getOptionTagType(
+    context: mutable SKFS.Context,
+    optionGClass: LazyGClass,
+  ): Tclass {
     lazyGClass = optionGClass match {
     | FrontEndLazyGClass("Option") -> FrontEndLazyGClass("FastOption.OptionTag")
     | FrontEndLazyGClass("Some") -> FrontEndLazyGClass("FastOption.SomeTag")
     | FrontEndLazyGClass("None") -> FrontEndLazyGClass("FastOption.NoneTag")
     | _ -> this.pos.die(`Bad option type ${optionGClass.nameStr()}`)
     };
-    this.getTclass2(lazyGClass, Array[], DeepFrozen())
+    this.getTclass2(context, lazyGClass, Array[], DeepFrozen())
   }
 
-  mutable fun getSClass2(hc: HalfClass): mutable SClassInfo {
+  mutable fun getSClass2(
+    context: mutable SKFS.Context,
+    hc: HalfClass,
+  ): mutable SClassInfo {
     // Canonicalize a Concrete<T>, etc. to the right metaclass.
     origHC = hc;
-    !hc = this.maybeConvertMetaClass(hc);
+    !hc = this.maybeConvertMetaClass(context, hc);
     targs = hc.targs;
 
     // We only care about some of the fields.
@@ -1195,9 +1239,10 @@ mutable class Specializer{
       | Some(style) ->
         // Create the underlying implementation type. See comments
         // in FastOption.sk.
-        tag = this.getOptionTagType(hc.generic);
+        tag = this.getOptionTagType(context, hc.generic);
 
         implInfo = this.getSClass2(
+          context,
           HalfClass(style.fastClass(), Array[targs[0], tag], hc.mutability),
         );
 
@@ -1208,6 +1253,7 @@ mutable class Specializer{
       };
 
       gclass = this.converter.getGClass(
+        context,
         this.processedClasses,
         hc.generic,
         this.pos,
@@ -1294,7 +1340,7 @@ mutable class Specializer{
       info.!unscalarizedFields = gclass.fields.map(f ->
         SField{
           name => f.name,
-          typ => this.getTclass3(f.typ, tparamEnv, f.pos),
+          typ => this.getTclass3(context, f.typ, tparamEnv, f.pos),
           isAssignable => f.isAssignable,
           pos => f.pos,
           index => f.index,
@@ -1303,7 +1349,7 @@ mutable class Specializer{
 
       // populate sclass extends_ after registration, but before inherits pass
       for (gta in gclass.extends_) {
-        super = this.getTclass3(gta, tparamEnv);
+        super = this.getTclass3(context, gta, tparamEnv);
         info.extends_.set(gta.generic, super.sclassID);
       };
 
@@ -1329,8 +1375,8 @@ mutable class Specializer{
 
       // Connect super- and subtypes in the "extends" hierarchy.
       for (ta in gclass.extends_) {
-        super = this.getTclass3(ta, tparamEnv);
-        this.inherit(this.sclasses[super.sclassID], info);
+        super = this.getTclass3(context, ta, tparamEnv);
+        this.inherit(context, this.sclasses[super.sclassID], info);
       };
 
       // Now look for super- and subtypes based on co- and contravariance.
@@ -1405,11 +1451,11 @@ mutable class Specializer{
               })
             ) {
               if (isSubType) {
-                this.inherit(other, info)
+                this.inherit(context, other, info)
               };
 
               if (isSuperType) {
-                this.inherit(info, other)
+                this.inherit(context, info, other)
               }
             }
           }
@@ -1421,6 +1467,7 @@ mutable class Specializer{
       // operation, and we need to know about every type that might exist
       // at runtime.
       _ = this.getSClass2(
+        context,
         origHC with {
           targs => origHC.targs.map(t -> t.mapMutability(_ -> DeepFrozen())),
           mutability => DeepFrozen(),
@@ -1464,6 +1511,7 @@ mutable class Specializer{
   // add entry to info's method map, and optionally request
   // implementation function
   private mutable fun addMethod(
+    context: mutable SKFS.Context,
     info: mutable SClassInfo,
     m: MethodKey,
     requestImpl: Bool,
@@ -1485,6 +1533,7 @@ mutable class Specializer{
         hostInfo = this.sclasses[hostID];
         host = hostInfo.sclass;
         this.requestFunction(
+          context,
           getLazyGFun(hostInfo.lazyGClass),
           m.targs.id,
           host.superposition.id,
@@ -1495,6 +1544,7 @@ mutable class Specializer{
   }
 
   private mutable fun noteCalledMethod(
+    context: mutable SKFS.Context,
     receiver: mutable SClassInfo,
     m: MethodKey,
   ): void {
@@ -1519,12 +1569,12 @@ mutable class Specializer{
       // MyFinalClass<Animal> and calls this method, it will just invoke
       // the devirtualized implementation directly.
       if (receiver.sclass.kind.isFinal()) {
-        this.addMethod(receiver, m, true)
+        this.addMethod(context, receiver, m, true)
       } else {
         for (subID in receiver.subtypes) {
           info = this.sclasses[subID];
           if (!info.methods.containsKey(m)) {
-            this.addMethod(info, m, info.sclass.kind.isFinal())
+            this.addMethod(context, info, m, info.sclass.kind.isFinal())
           }
         }
       }
@@ -1532,18 +1582,20 @@ mutable class Specializer{
   }
 
   mutable fun requestMethod(
+    context: mutable SKFS.Context,
     method: String,
     objType: Tclass,
     targs: Array<Tclass>,
   ): void {
     info = this.sclasses[objType.sclassID];
     sposn = MethodSuperpositionID(targs);
-    this.noteCalledMethod(info, MethodKey(method, sposn))
+    this.noteCalledMethod(context, info, MethodKey(method, sposn))
   }
 
   // Ask that the requested function be compiled to machine code compatible
   // with the given targs.
   mutable fun requestFunction(
+    context: mutable SKFS.Context,
     name: LazyGFun,
     methodTargs: Array<Tclass>,
     classTargs: Array<Tclass> = Array[],
@@ -1558,6 +1610,7 @@ mutable class Specializer{
       converter = this.converter;
 
       function = converter.getGFunction(
+        context,
         this.processedFuns,
         this.processedClasses,
         name,
@@ -1624,6 +1677,7 @@ mutable class Specializer{
   // partition every function. The real algorithm needs to examine the GInstrs
   // and other referenced functions to decide what needs to be partitioned.
   mutable fun partitionFunctions(
+    context: mutable SKFS.Context,
     runtimeFunctionsVec: readonly Vector<FrontEndLazyGFun>,
     env: GlobalEnv,
   ): GlobalEnv {
@@ -1635,6 +1689,7 @@ mutable class Specializer{
     funToInstsMap = mutable UnorderedMap[];
     for (key in this.funsNeeded) {
       gf = converter.getGFunction(
+        context,
         this.processedFuns,
         this.processedClasses,
         key.i0,
@@ -1684,7 +1739,15 @@ mutable class Specializer{
       // Stupidly give every unique set of parameters its own instantiation.
       for (s in insts) {
         sid = sids[s];
-        f = FunSpecializer::run(this, gf, Array[s.i1], sid, sids, msfuns);
+        f = FunSpecializer::run(
+          context,
+          this,
+          gf,
+          Array[s.i1],
+          sid,
+          sids,
+          msfuns,
+        );
         if (!gf.hasImplementation()) {
           // Kill off junk "Unreachable" block.
           !f = f with {blocks => Array[]}
@@ -1790,6 +1853,7 @@ mutable class FunSpecializer{
   }
 
   static fun run(
+    context: mutable SKFS.Context,
     specializer: mutable Specializer,
     gfunction: GFunction,
     callers: Array<FunSuperpositionID>,
@@ -1857,7 +1921,13 @@ mutable class FunSpecializer{
     // Leverage CompoundType to scalarize both parameters and return values.
     params = NamedInner(
       gfunction.params.map(p -> {
-        t = specializer.specializeType(p.typ, mapCache, callers, typemaps);
+        t = specializer.specializeType(
+          context,
+          p.typ,
+          mapCache,
+          callers,
+          typemaps,
+        );
         if (!specializer.canInstantiate(t)) {
           !cannotInstantiateParam = Some((p.prettyName, t))
         };
@@ -1867,6 +1937,7 @@ mutable class FunSpecializer{
     flatParams = params.flattened();
 
     specReturnType = specializer.specializeType(
+      context,
       gfi.funType.returnType,
       mapCache,
       callers,
@@ -1890,6 +1961,7 @@ mutable class FunSpecializer{
         params => flatParams.map(p -> p.i1),
         returnType => returnType.flattened().map(p -> p.i1),
         aggregateReturnType => specializer.getReturnType(
+          context,
           specReturnType,
           callers,
           gfi.pos,
@@ -1973,7 +2045,7 @@ mutable class FunSpecializer{
         fs.values.add(gfunction.params[i].id, Exists(f.i1))
       });
 
-      fs.go()
+      fs.go(context)
     }
   }
 
@@ -1996,12 +2068,13 @@ mutable class FunSpecializer{
   // Given a set of outgoing Targs for a function call, returns the
   // SuperpositionMap for it.
   mutable fun getFunSMap(
+    context: mutable SKFS.Context,
     targs: Array<GType>,
   ): SuperpositionMap<FunSuperpositionID> {
     if (targs.isEmpty()) {
       kNonParametricFunSmap
     } else {
-      stargs = targs.map(t -> this.specializeType(t));
+      stargs = targs.map(t -> this.specializeType(context, t));
       this.getSpecializedFunSMap(stargs);
     }
   }
@@ -2042,8 +2115,13 @@ mutable class FunSpecializer{
     this.specializer.canInstantiate(typ)
   }
 
-  mutable fun specializeType(t: GType, literalType: Bool = false): Type {
+  mutable fun specializeType(
+    context: mutable SKFS.Context,
+    t: GType,
+    literalType: Bool = false,
+  ): Type {
     this.specializer.specializeType(
+      context,
       t,
       this.mapCache,
       this.callers,
@@ -2053,6 +2131,7 @@ mutable class FunSpecializer{
   }
 
   mutable fun specializeType2(
+    context: mutable SKFS.Context,
     lazyGClass: LazyGClass,
     targs: Array<Type>,
     mutability: Mutability,
@@ -2063,6 +2142,7 @@ mutable class FunSpecializer{
     smap = mutable UnorderedMap[];
     for (c in this.callers) {
       tc = this.specializer.getTclass2(
+        context,
         lazyGClass,
         targs.map(t -> t.typeInSuperposition(c)),
         mutability,
@@ -2073,14 +2153,19 @@ mutable class FunSpecializer{
     Type::make(smap.chill())
   }
 
-  mutable fun getOptionStyle(gt: GType): ?OptionStyle {
+  mutable fun getOptionStyle(
+    context: mutable SKFS.Context,
+    gt: GType,
+  ): ?OptionStyle {
     // If we are in a superposition of Option<Foo> and Option<Bar>,
     // make sure that both possibilities yield the exact same style and
     // return it.
     s = this.specializer;
     result = (None() : ?OptionStyle);
     this.typemaps.eachWithIndex((i, tm) -> {
-      optionStyle = s.sclasses[s.getTclass3(gt, tm).sclassID].optionStyle;
+      optionStyle = s.sclasses[
+        s.getTclass3(context, gt, tm).sclassID,
+      ].optionStyle;
       if (i == 0) {
         !result = optionStyle
       } else if (optionStyle != result) {
@@ -2098,6 +2183,7 @@ mutable class FunSpecializer{
   //
   // TODO: Delete forceSomeUndef flag once T25379806 is fixed.
   mutable fun getValue(
+    context: mutable SKFS.Context,
     val: GInstr,
     forceSomeUndef: Bool = false,
   ): MaybeExists<InstrTree> {
@@ -2114,7 +2200,7 @@ mutable class FunSpecializer{
       | GConstantChar{value} -> Exists(InstrLeaf(this.constantChar(value).id))
       | GConstantDefaultArg _
       | GConstantZero _ ->
-        typ = this.specializeType(val.getType());
+        typ = this.specializeType(context, val.getType());
         if (!this.canInstantiate(typ) && !forceSomeUndef) {
           NotExists(
             `Attempt to create zero constant of non-instantiatable type ${typ}`,
@@ -2186,8 +2272,12 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun emitGSuspend(a: GSuspend, pos: Pos): void {
-    this.flattenArgs(Array[this.getValue(a.awaitable)]) match {
+  private mutable fun emitGSuspend(
+    context: mutable SKFS.Context,
+    a: GSuspend,
+    pos: Pos,
+  ): void {
+    this.flattenArgs(Array[this.getValue(context, a.awaitable)]) match {
     | NotExists(why) -> _ = this.unreachable(pos, why)
     | Exists(values) ->
       pos.invariant(values.size() == 1, "Expected one awaitable");
@@ -2248,13 +2338,15 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallFunction(
+    context: mutable SKFS.Context,
     call: GCallFunctionBase,
     typ: Type,
     pos: Pos,
     invokeSuccessors: ?Array<GBlockID>,
   ): void {
-    smap = this.getFunSMap(call.targs);
+    smap = this.getFunSMap(context, call.targs);
     this.emitGCallFunctionWithSmap(
+      context,
       call.id,
       call.args,
       call.name,
@@ -2297,6 +2389,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallFunctionWithSmap(
+    context: mutable SKFS.Context,
     callID: GInstrID,
     callArgs: Array<GInstr>,
     name: LazyGFun,
@@ -2306,7 +2399,9 @@ mutable class FunSpecializer{
     prettyName: String,
     invokeSuccessors: ?Array<GBlockID>,
   ): void {
-    callVal = this.flattenArgs(callArgs.map(v -> this.getValue(v))) match {
+    callVal = this.flattenArgs(
+      callArgs.map(v -> this.getValue(context, v)),
+    ) match {
     | NotExists(why) -> this.unreachable(pos, why)
     | Exists(args) ->
       name.gname().id match {
@@ -2314,13 +2409,19 @@ mutable class FunSpecializer{
         // HACK: We need to intercept this here, because only during
         // specialization do we know the SentinelOptionStyle that tells
         // us how to generate this method.
-        this.emitGCallToIsSome(callID, callArgs, pos, invokeSuccessors);
+        this.emitGCallToIsSome(
+          context,
+          callID,
+          callArgs,
+          pos,
+          invokeSuccessors,
+        );
         return void
       | "Awaitable.boxMemoValue" ->
-        this.emitGCallToBoxMemoValue(callArgs, pos);
+        this.emitGCallToBoxMemoValue(context, callArgs, pos);
         return void
       | "Awaitable.unboxMemoValue" ->
-        this.emitGCallToUnboxMemoValue(callID, callArgs, typ, pos);
+        this.emitGCallToUnboxMemoValue(context, callID, callArgs, typ, pos);
         return void
       | _ -> void
       };
@@ -2329,7 +2430,7 @@ mutable class FunSpecializer{
 
       id = this.iid();
 
-      ttype = this.specializer.getReturnType(typ, this.callers, pos);
+      ttype = this.specializer.getReturnType(context, typ, this.callers, pos);
       returns = this.canInstantiate(typ);
 
       // Since an Invoke already terminates a block, if it doesn't return
@@ -2399,6 +2500,7 @@ mutable class FunSpecializer{
 
   // Call a method on a KValue or KClass.
   private mutable fun emitGCallFinalMethod(
+    context: mutable SKFS.Context,
     callID: GInstrID,
     objType: Type,
     method: String,
@@ -2459,6 +2561,7 @@ mutable class FunSpecializer{
     };
 
     this.emitGCallFunctionWithSmap(
+      context,
       callID,
       args,
       name,
@@ -2472,6 +2575,7 @@ mutable class FunSpecializer{
 
   // Call a method on a KBase.
   private mutable fun emitGCallVirtualMethod(
+    context: mutable SKFS.Context,
     callID: GInstrID,
     method: String,
     targs: Array<Type>,
@@ -2481,14 +2585,16 @@ mutable class FunSpecializer{
     prettyName: String,
     invokeSuccessors: ?Array<GBlockID>,
   ): void {
-    callVal = this.flattenArgs(callArgs.map(v -> this.getValue(v))) match {
+    callVal = this.flattenArgs(
+      callArgs.map(v -> this.getValue(context, v)),
+    ) match {
     | NotExists(why) -> this.unreachable(pos, why)
     | Exists(args) ->
       id = this.iid();
 
       smap = this.getMethodSMap(targs);
 
-      ttype = this.specializer.getReturnType(typ, this.callers, pos);
+      ttype = this.specializer.getReturnType(context, typ, this.callers, pos);
       returns = this.canInstantiate(typ);
 
       // Since an Invoke already terminates a block, if it doesn't return
@@ -2559,12 +2665,13 @@ mutable class FunSpecializer{
   // Implement SentinelOption::isSome by comparing the appropriate
   // field against the chosen sentinel constant.
   private mutable fun emitGCallToIsSome(
+    context: mutable SKFS.Context,
     callID: GInstrID,
     args: Array<GInstr>,
     pos: Pos,
     invokeSuccessors: ?Array<GBlockID>,
   ): void {
-    thisType = this.specializeType(args[0].getType());
+    thisType = this.specializeType(context, args[0].getType());
     sc = this.specializer.exampleSClass(thisType);
     style = this.specializer.sclasses[sc.id].optionStyle match {
     | Some(s @ SentinelOptionStyle _) -> s
@@ -2572,7 +2679,7 @@ mutable class FunSpecializer{
     };
 
     // "Load" the sentinel field from the SentinelOption value class.
-    sentinelField = this.getValue(args[0]).fromExists();
+    sentinelField = this.getValue(context, args[0]).fromExists();
     for (field in dotJoin("valueIfSome.value", style.path).split(".")) {
       !sentinelField = sentinelField.asInner(pos).getField(field, pos)
     };
@@ -2607,10 +2714,11 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallToBoxMemoValue(
+    context: mutable SKFS.Context,
     args: Array<GInstr>,
     pos: Pos,
   ): void {
-    this.flattenArgs(Array[this.getValue(args[1])]) match {
+    this.flattenArgs(Array[this.getValue(context, args[1])]) match {
     | NotExists(why) -> _ = this.unreachable(pos, why)
     | Exists(values) ->
       if (values.isEmpty()) {
@@ -2677,6 +2785,7 @@ mutable class FunSpecializer{
           boxed = this.emitObject{
             args => values,
             typ => this.specializeType(
+              context,
               GTapply(
                 FrontEndLazyGClass("Runtime.LocalVariable"),
                 DeepFrozen(),
@@ -2699,7 +2808,7 @@ mutable class FunSpecializer{
       name = this.specializedFunctionMap[key];
 
       // The address of the MemoValue to which we are storing.
-      addr = this.getValue(args[0]).fromExists().flattened()[0].i1;
+      addr = this.getValue(context, args[0]).fromExists().flattened()[0].i1;
 
       _ = this.emitCallFunction{
         name,
@@ -2720,6 +2829,7 @@ mutable class FunSpecializer{
   // This must match the logic in emitGCallToBoxMemoValue(), since it
   // reverses the boxing operation.
   private mutable fun emitGCallToUnboxMemoValue(
+    context: mutable SKFS.Context,
     callID: GInstrID,
     args: Array<GInstr>,
     typ: Type,
@@ -2746,7 +2856,7 @@ mutable class FunSpecializer{
     };
 
     // The address of the MemoValue from which we are loading.
-    addr = this.getValue(args[0]).fromExists().flattened()[0].i1;
+    addr = this.getValue(context, args[0]).fromExists().flattened()[0].i1;
 
     load = (t: Type) ->
       this.emitLoad{
@@ -2792,6 +2902,7 @@ mutable class FunSpecializer{
         // Need to unbox from a LocalVariable<T>.
         ref = load(
           this.specializeType2(
+            context,
             FrontEndLazyGClass("Runtime.LocalVariable"),
             Array[typ],
             DeepFrozen(),
@@ -2816,11 +2927,12 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallMethod(
+    context: mutable SKFS.Context,
     call: GCallMethodBase,
     typ: Type,
     pos: Pos,
   ): void {
-    objType = this.specializeType(call.args[0].getType());
+    objType = this.specializeType(context, call.args[0].getType());
 
     // TODO: This is too aggressive once we start creating real
     // superpositions, as we may choose to superimpose a bunch of final
@@ -2834,7 +2946,7 @@ mutable class FunSpecializer{
     // Figure out what the targs are. See comments for
     // computeMethodTargs for why we need to do this.
     allTargs = this.typemaps.map(typemap ->
-      this.specializer.computeMethodTargs(call, typemap)
+      this.specializer.computeMethodTargs(context, call, typemap)
     );
 
     targs = allTargs[0];
@@ -2848,6 +2960,7 @@ mutable class FunSpecializer{
 
     if (isFinal) {
       this.emitGCallFinalMethod(
+        context,
         call.id,
         objType,
         call.method,
@@ -2860,6 +2973,7 @@ mutable class FunSpecializer{
       )
     } else {
       this.emitGCallVirtualMethod(
+        context,
         call.id,
         call.method,
         newTargs,
@@ -2872,9 +2986,13 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun emitGFreeze(frz: GFreeze, pos: Pos): void {
+  private mutable fun emitGFreeze(
+    context: mutable SKFS.Context,
+    frz: GFreeze,
+    pos: Pos,
+  ): void {
     // When freezing a value class, we freeze each piece separately.
-    val = this.getValue(frz.obj) match {
+    val = this.getValue(context, frz.obj) match {
     | NotExists(why) -> this.unreachable(pos, why)
     | Exists(obj) ->
       Exists(
@@ -2916,13 +3034,17 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCastOrReinterpret(
+    context: mutable SKFS.Context,
     c: GTypedStmt,
     resultInstrType: Concrete<SimpleUnaryStmt>,
     castValue: GInstr,
     resultType: Type,
     pos: Pos,
   ): void {
-    val = (this.canInstantiate(resultType), this.getValue(castValue)) match {
+    val = (
+      this.canInstantiate(resultType),
+      this.getValue(context, castValue),
+    ) match {
     | (_, NotExists(why)) -> this.unreachable(pos, why)
     | (false, _) ->
       this.unreachable(
@@ -2958,8 +3080,13 @@ mutable class FunSpecializer{
     this.setValue(c, val)
   }
 
-  private mutable fun emitGEArray(ev: GEArray, typ: Type, pos: Pos): void {
-    val = this.flattenArgs(ev.args.map(v -> this.getValue(v))) match {
+  private mutable fun emitGEArray(
+    context: mutable SKFS.Context,
+    ev: GEArray,
+    typ: Type,
+    pos: Pos,
+  ): void {
+    val = this.flattenArgs(ev.args.map(v -> this.getValue(context, v))) match {
     | NotExists(why) -> this.unreachable(pos, why)
     | Exists(args) ->
       Exists(
@@ -3007,8 +3134,13 @@ mutable class FunSpecializer{
     this.setValue(g, val)
   }
 
-  private mutable fun emitGGetField(gf: GGetField, typ: Type, pos: Pos): void {
-    val = (this.canInstantiate(typ), this.getValue(gf.obj)) match {
+  private mutable fun emitGGetField(
+    context: mutable SKFS.Context,
+    gf: GGetField,
+    typ: Type,
+    pos: Pos,
+  ): void {
+    val = (this.canInstantiate(typ), this.getValue(context, gf.obj)) match {
     | (_, NotExists(why)) -> this.unreachable(pos, why)
     | (false, _) ->
       this.unreachable(
@@ -3036,7 +3168,7 @@ mutable class FunSpecializer{
     | (true, Exists(cv @ NamedInner _)) ->
       if (
         gf.field == "value" &&
-        this.getOptionStyle(gf.obj.getType()).isSome()
+        this.getOptionStyle(context, gf.obj.getType()).isSome()
       ) {
         // Redirect Some.value to Some.valueIfSome.value, to adjust for
         // the Option implementation substitutions.
@@ -3053,13 +3185,14 @@ mutable class FunSpecializer{
   // Converts Some(x) or None() to the corresponding code to construct
   // the analogous FlagOption or SentinelOption.
   private mutable fun optionGObjectValue(
+    context: mutable SKFS.Context,
     o: GObject,
     style: OptionStyle,
   ): InstrTree {
     o.args.size() match {
     | 1 ->
       // This must be a "Some"
-      arg = this.getValue(o.args[0], true).fromExists();
+      arg = this.getValue(context, o.args[0], true).fromExists();
 
       // This is the value of the FastOptionTrait::value field, which
       // is an Unsafe.RawStorage which itself has a value field.
@@ -3080,7 +3213,7 @@ mutable class FunSpecializer{
       }
     | 0 ->
       // This must be a "None"
-      typ = this.specializeType(o.getType());
+      typ = this.specializeType(context, o.getType());
       tree = this.scalarize(typ);
 
       style match {
@@ -3116,17 +3249,22 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun emitGObject(o: GObject, typ: Type, pos: Pos): void {
+  private mutable fun emitGObject(
+    context: mutable SKFS.Context,
+    o: GObject,
+    typ: Type,
+    pos: Pos,
+  ): void {
     val = (
       o.forceCanInstantiate || this.canInstantiate(typ),
       this.flattenArgs(
-        o.args.map(z -> this.getValue(z, o.forceCanInstantiate)),
+        o.args.map(z -> this.getValue(context, z, o.forceCanInstantiate)),
       ),
     ) match {
     | (_, NotExists(why)) -> this.unreachable(pos, why)
     | (true, Exists(args)) ->
       Exists(
-        this.getOptionStyle(o.getType()) match {
+        this.getOptionStyle(context, o.getType()) match {
         | None() ->
           sc = this.specializer.exampleSClass(typ);
 
@@ -3148,11 +3286,11 @@ mutable class FunSpecializer{
             };
             InstrInner(
               fields.mapWithIndex((i, f) ->
-                (f.name, this.getValue(o.args[i], true).fromExists())
+                (f.name, this.getValue(context, o.args[i], true).fromExists())
               ),
             )
           }
-        | Some(style) -> this.optionGObjectValue(o, style)
+        | Some(style) -> this.optionGObjectValue(context, o, style)
         },
       )
     | _ ->
@@ -3178,16 +3316,24 @@ mutable class FunSpecializer{
     this.setValue(r, Exists(InstrLeaf(awaitable.id)))
   }
 
-  private mutable fun emitGReturn(r: GReturn, pos: Pos): void {
-    this.flattenArgs(Array[this.getValue(r.value)]) match {
+  private mutable fun emitGReturn(
+    context: mutable SKFS.Context,
+    r: GReturn,
+    pos: Pos,
+  ): void {
+    this.flattenArgs(Array[this.getValue(context, r.value)]) match {
     | NotExists(why) -> _ = this.unreachable(pos, why)
     | Exists(values) ->
       _ = this.emitReturn{values, pos, prettyName => r.prettyName}
     }
   }
 
-  private mutable fun emitGSetField(s: GSetField, pos: Pos): void {
-    (this.getValue(s.obj), this.getValue(s.value)) match {
+  private mutable fun emitGSetField(
+    context: mutable SKFS.Context,
+    s: GSetField,
+    pos: Pos,
+  ): void {
+    (this.getValue(context, s.obj), this.getValue(context, s.value)) match {
     | (NotExists(why), _)
     | (_, NotExists(why)) ->
       _ = this.unreachable(pos, why)
@@ -3230,11 +3376,12 @@ mutable class FunSpecializer{
   //      bbb()
   //    }
   private mutable fun emitOptionGTypeSwitch(
+    context: mutable SKFS.Context,
     ts: GTypeSwitch,
     style: OptionStyle,
     pos: Pos,
   ): void {
-    this.getValue(ts.value) match {
+    this.getValue(context, ts.value) match {
     | NotExists(why) -> _ = this.unreachable(pos, why)
     | Exists(NamedLeaf _) ->
       // There should have been some nesting depth here.
@@ -3271,9 +3418,9 @@ mutable class FunSpecializer{
         method => "isSome",
         source => style.fastClass(),
       };
-      this.emitGCallMethod(callToIsSome, tBool, pos);
+      this.emitGCallMethod(context, callToIsSome, tBool, pos);
 
-      this.getValue(callToIsSome) match {
+      this.getValue(context, callToIsSome) match {
       | NotExists(why) -> _ = this.unreachable(pos, why)
       | Exists(predicate @ InstrLeaf _) ->
         _ = this.emitIf{
@@ -3287,8 +3434,12 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun emitGTypeSwitch(ts: GTypeSwitch, pos: Pos): void {
-    this.getValue(ts.value) match {
+  private mutable fun emitGTypeSwitch(
+    context: mutable SKFS.Context,
+    ts: GTypeSwitch,
+    pos: Pos,
+  ): void {
+    this.getValue(context, ts.value) match {
     | NotExists(why) -> _ = this.unreachable(pos, why)
     | Exists(obj @ NamedLeaf _) ->
       _ = this.emitTypeSwitch{
@@ -3302,7 +3453,7 @@ mutable class FunSpecializer{
       // Type switch on a value class. We can't resolve types at runtime
       // since there is no vtable, so to simplify the definition of
       // TypeSwitch we just resolve this to a Jump right now.
-      typ = this.specializeType(ts.value.getType());
+      typ = this.specializeType(context, ts.value.getType());
       sc = this.specializer.exampleSClass(typ);
 
       succ = Control.findTypeSwitchSuccessor(sc, ts.cases, this);
@@ -3315,11 +3466,18 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun emitGWith(w: GWith, resultType: Type, pos: Pos): void {
+  private mutable fun emitGWith(
+    context: mutable SKFS.Context,
+    w: GWith,
+    resultType: Type,
+    pos: Pos,
+  ): void {
     val = (
       this.canInstantiate(resultType),
-      this.flattenArgs(w.fieldAssignments.map(kv -> this.getValue(kv.i1))),
-      this.getValue(w.obj),
+      this.flattenArgs(
+        w.fieldAssignments.map(kv -> this.getValue(context, kv.i1)),
+      ),
+      this.getValue(context, w.obj),
     ) match {
     | (_, _, NotExists(why))
     | (_, NotExists(why), _) ->
@@ -3338,7 +3496,7 @@ mutable class FunSpecializer{
       // Build up all the scalar field assignments.
       for (kv in w.fieldAssignments) {
         (fieldName, valueInstr) = kv;
-        fieldVal = this.getValue(valueInstr).fromExists();
+        fieldVal = this.getValue(context, valueInstr).fromExists();
         fieldVal.flattened(fieldName).each(a.push)
       };
 
@@ -3358,7 +3516,7 @@ mutable class FunSpecializer{
       // with some fields replaced, but does not generate any code.
       a = mutable UnorderedMap[];
       for (kv in w.fieldAssignments) {
-        a.set(kv.i0, this.getValue(kv.i1).fromExists())
+        a.set(kv.i0, this.getValue(context, kv.i1).fromExists())
       };
       Exists(
         InstrInner(
@@ -3373,10 +3531,14 @@ mutable class FunSpecializer{
     this.setValue(w, val)
   }
 
-  private mutable fun initializeGeneratorInfo(none: GInstr, pos: Pos): void {
+  private mutable fun initializeGeneratorInfo(
+    context: mutable SKFS.Context,
+    none: GInstr,
+    pos: Pos,
+  ): void {
     if (this.coroutineInfo.isNone()) {
       // Record the value to be used for None() for the next() return.
-      this.flattenArgs(Array[this.getValue(none)]) match {
+      this.flattenArgs(Array[this.getValue(context, none)]) match {
       | NotExists(why) ->
         _ = {
           pos.die(`Unexpectedly unable to create a coroutine None(): ${why}`)
@@ -3397,18 +3559,26 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun emitGYield(r: GYield, pos: Pos): void {
-    this.initializeGeneratorInfo(r.none, pos);
+  private mutable fun emitGYield(
+    context: mutable SKFS.Context,
+    r: GYield,
+    pos: Pos,
+  ): void {
+    this.initializeGeneratorInfo(context, r.none, pos);
 
-    this.flattenArgs(Array[this.getValue(r.value)]) match {
+    this.flattenArgs(Array[this.getValue(context, r.value)]) match {
     | NotExists(why) -> _ = this.unreachable(pos, why)
     | Exists(values) ->
       _ = this.emitYield{values, pos, prettyName => r.prettyName}
     }
   }
 
-  private mutable fun emitGYieldBreak(r: GYieldBreak, pos: Pos): void {
-    this.initializeGeneratorInfo(r.none, pos);
+  private mutable fun emitGYieldBreak(
+    context: mutable SKFS.Context,
+    r: GYieldBreak,
+    pos: Pos,
+  ): void {
+    this.initializeGeneratorInfo(context, r.none, pos);
 
     _ = this.emitYieldBreak{pos, prettyName => r.prettyName}
   }
@@ -3436,7 +3606,7 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun go(): Function {
+  private mutable fun go(context: mutable SKFS.Context): Function {
     fpos = this.optinfo.f.pos;
 
     for (block in this.gfunction.blocks) {
@@ -3461,27 +3631,34 @@ mutable class FunSpecializer{
           pos = this.makePos(instr.pos, fpos);
           this.!pos = pos;
 
-          typ = this.specializeType(instr.getType());
+          typ = this.specializeType(context, instr.getType());
 
           instr match {
           | r @ GAsyncReturn _ ->
             _ = this.emitAsyncReturn{pos, prettyName => r.prettyName}
           | call @ GInvokeFunction _ ->
-            _ = this.emitGCallFunction(call, typ, pos, Some(call.successors))
+            _ = this.emitGCallFunction(
+              context,
+              call,
+              typ,
+              pos,
+              Some(call.successors),
+            )
           | call @ GCallFunctionBase _ ->
-            _ = this.emitGCallFunction(call, typ, pos, None())
-          | call @ GCallMethodBase _ -> this.emitGCallMethod(call, typ, pos)
+            _ = this.emitGCallFunction(context, call, typ, pos, None())
+          | call @ GCallMethodBase _ ->
+            this.emitGCallMethod(context, call, typ, pos)
           | c @ GCast _ ->
-            this.emitGCastOrReinterpret(c, Cast, c.value, typ, pos)
+            this.emitGCastOrReinterpret(context, c, Cast, c.value, typ, pos)
           | c @ GCustomInstr _ -> c.emit(c, this)
-          | ev @ GEArray _ -> this.emitGEArray(ev, typ, pos)
-          | frz @ GFreeze _ -> this.emitGFreeze(frz, pos)
+          | ev @ GEArray _ -> this.emitGEArray(context, ev, typ, pos)
+          | frz @ GFreeze _ -> this.emitGFreeze(context, frz, pos)
           | r @ GGetCurrentAwaitable _ ->
             this.emitGGetCurrentAwaitable(r, typ, pos)
           | g @ GGetConst _ -> this.emitGGetConst(g, typ, pos)
-          | gf @ GGetField _ -> this.emitGGetField(gf, typ, pos)
+          | gf @ GGetField _ -> this.emitGGetField(context, gf, typ, pos)
           | GIf{predicate, successors, prettyName} ->
-            this.getValue(predicate) match {
+            this.getValue(context, predicate) match {
             | NotExists(why) -> _ = this.unreachable(pos, why)
             | Exists(predval @ InstrLeaf _) ->
               _ = this.emitIf{
@@ -3494,7 +3671,7 @@ mutable class FunSpecializer{
             | _ -> pos.die("Expected Bool")
             }
           | GIntSwitch{value, cases, successors, prettyName} ->
-            this.getValue(value) match {
+            this.getValue(context, value) match {
             | NotExists(why) -> _ = this.unreachable(pos, why)
             | Exists(switchValue @ InstrLeaf _) ->
               _ = this.emitIntSwitch{
@@ -3526,12 +3703,12 @@ mutable class FunSpecializer{
               ),
             )
           | o @ GObject _ ->
-            typeToCreate = this.specializeType(instr.getType(), true);
-            this.emitGObject(o, typeToCreate, pos)
-          | r @ GReturn _ -> this.emitGReturn(r, pos)
-          | s @ GSetField _ -> this.emitGSetField(s, pos)
+            typeToCreate = this.specializeType(context, instr.getType(), true);
+            this.emitGObject(context, o, typeToCreate, pos)
+          | r @ GReturn _ -> this.emitGReturn(context, r, pos)
+          | s @ GSetField _ -> this.emitGSetField(context, s, pos)
           | GStringSwitch{value, cases, prettyName, successors} ->
-            this.getValue(value) match {
+            this.getValue(context, value) match {
             | NotExists(why) -> _ = this.unreachable(pos, why)
             | Exists(switchValue @ InstrLeaf _) ->
               _ = this.emitStringSwitch{
@@ -3539,7 +3716,7 @@ mutable class FunSpecializer{
                 prettyName,
                 value => switchValue.value,
                 cases => cases.map(case ->
-                  this.getValue(case) match {
+                  this.getValue(context, case) match {
                   | Exists(leaf @ InstrLeaf _) -> leaf.value
                   | _ -> pos.die("Invalid StringSwitch case value.")
                   }
@@ -3548,25 +3725,25 @@ mutable class FunSpecializer{
               }
             | _ -> pos.die("Expected String")
             }
-          | s @ GSuspend _ -> this.emitGSuspend(s, pos)
+          | s @ GSuspend _ -> this.emitGSuspend(context, s, pos)
           | GThrow{prettyName, exception} ->
-            this.getValue(exception) match {
+            this.getValue(context, exception) match {
             | NotExists(why) -> _ = this.unreachable(pos, why)
             | Exists(exc @ InstrLeaf _) ->
               _ = this.emitThrow{pos, prettyName, exception => exc.value}
             | _ -> pos.die("Expected Exception")
             }
           | ts @ GTypeSwitch _ ->
-            this.getOptionStyle(ts.value.getType()) match {
-            | Some(style) -> this.emitOptionGTypeSwitch(ts, style, pos)
-            | None() -> this.emitGTypeSwitch(ts, pos)
+            this.getOptionStyle(context, ts.value.getType()) match {
+            | Some(style) -> this.emitOptionGTypeSwitch(context, ts, style, pos)
+            | None() -> this.emitGTypeSwitch(context, ts, pos)
             }
           | GUnreachable{why} -> _ = this.unreachable(pos, why)
-          | w @ GWith _ -> this.emitGWith(w, typ, pos)
-          | w @ GYield _ -> this.emitGYield(w, pos)
-          | w @ GYieldBreak _ -> this.emitGYieldBreak(w, pos)
+          | w @ GWith _ -> this.emitGWith(context, w, typ, pos)
+          | w @ GYield _ -> this.emitGYield(context, w, pos)
+          | w @ GYieldBreak _ -> this.emitGYieldBreak(context, w, pos)
           | ze @ GZeroExtend{prettyName, value} ->
-            x = this.getValue(value) match {
+            x = this.getValue(context, value) match {
             | NotExists(why) -> this.unreachable(pos, why)
             | Exists(ival @ InstrLeaf _) ->
               Exists(

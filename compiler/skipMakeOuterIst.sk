@@ -58,32 +58,6 @@ const EMPTY_ENV: Env = Env{
 
 class DefFile(value: O.Def) extends SKFS.File
 
-fun convertOuterToProgram(
-  context: mutable SKFS.Context,
-  defs: SKFS.EHandle<DefFile>,
-): O.Program {
-  defsProj = defs.contextWriterKeyValues(
-    DefFile::fromFile,
-    context,
-    SKFS.DirName::create("/outerAstProgram/"),
-    (_context, writer, _, value) ~> {
-      writer.writeArray(SKFS.IID(0), value)
-    },
-  );
-  defsArray = defsProj.getArray(context, SKFS.IID(0));
-  class_defs = UMap[];
-  fun_defs = UMap[];
-  const_defs = UMap[];
-  for (def in defsArray) {
-    def.value match {
-    | O.DClass(x) -> !class_defs[(x.name.pos, x.name.id)] = x
-    | O.DFun(x) -> !fun_defs[(x.name.pos, x.name.id)] = x
-    | O.DConst(x) -> !const_defs[(x.name.pos, x.name.id)] = x
-    }
-  };
-  O.Program{class_defs, fun_defs, const_defs}
-}
-
 fun program_phase(
   context: mutable SKFS.Context,
   typedDefs: SKFS.EHandle<SkipTyping.DefFile>,
@@ -102,7 +76,26 @@ fun program_phase(
       )
     },
   );
-  convertOuterToProgram(context, outerDefs)
+  defsProj = outerDefs.contextWriterKeyValues(
+    DefFile::fromFile,
+    context,
+    SKFS.DirName::create("/outerProgram/proj/"),
+    (_context, writer, _, value) ~> {
+      writer.writeArray(SKFS.IID(0), value)
+    },
+  );
+  defs = defsProj.getArray(context, SKFS.IID(0));
+  class_defs = UMap[];
+  fun_defs = UMap[];
+  const_defs = UMap[];
+  for (def in defs) {
+    def.value match {
+    | O.DClass(x) -> !class_defs[(x.name.pos, x.name.id)] = x
+    | O.DFun(x) -> !fun_defs[(x.name.pos, x.name.id)] = x
+    | O.DConst(x) -> !const_defs[(x.name.pos, x.name.id)] = x
+    }
+  };
+  O.Program(outerDefs, class_defs, fun_defs, const_defs)
 }
 
 fun program(

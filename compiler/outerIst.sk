@@ -43,10 +43,28 @@ base class Visibility uses Equality {
   | VProtected()
 }
 
-class Program{
+class Program(
+  program: SKFS.EHandle<SkipMakeOuterIst.DefFile>,
   class_defs: UMap<ClassDef>,
   fun_defs: UMap<FunDef>,
   const_defs: UMap<ConstDef>,
+) {
+  fun getClass(context: mutable SKFS.Context, className: String): ClassDef {
+    arr = this.program.getArray(context, SKFS.SID(className));
+    invariant(arr.size() == 1);
+    arr[0].value match {
+    | DClass(x) -> x
+    | _ -> invariant_violation("Unexpected type")
+    }
+  }
+  fun getFun(context: mutable SKFS.Context, funName: String): FunDef {
+    arr = this.program.getArray(context, SKFS.SID(funName));
+    invariant(arr.size() == 1);
+    arr[0].value match {
+    | DFun(x) -> x
+    | _ -> invariant_violation("Unexpected type")
+    }
+  }
 }
 
 base class Def {

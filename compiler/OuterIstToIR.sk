@@ -229,6 +229,7 @@ class ParameterInfo{
 // A GFunction which may or may not be compiled to GIR yet.
 base class LazyGFun{} uses Hashable, Orderable, Show {
   fun compile(
+    context: mutable SKFS.Context,
     processedFuns: mutable Map<LazyGFun, GFunction>,
     processedClasses: mutable Map<LazyGClass, GClass>,
     converter: Converter,
@@ -260,6 +261,7 @@ class DoneLazyGFun{function: GFunction} extends LazyGFun {
   }
 
   fun compile(
+    _context: mutable SKFS.Context,
     _processedFuns: mutable Map<LazyGFun, GFunction>,
     _processedClasses: mutable Map<LazyGClass, GClass>,
     _converter: Converter,
@@ -275,15 +277,17 @@ class FrontEndLazyGFun{frontEndName: String} extends LazyGFun {
   }
 
   fun compile(
+    context: mutable SKFS.Context,
     processedFuns: mutable Map<LazyGFun, GFunction>,
     processedClasses: mutable Map<LazyGClass, GClass>,
     converter: Converter,
   ): GFunction {
-    funDef = converter.program.fun_defs.getOrCrash(this.frontEndName);
+    funDef = converter.program.getFun(context, this.frontEndName);
     converter.getGFunction(
+      context,
       processedFuns,
       processedClasses,
-      converter.convertFunDef(funDef),
+      converter.convertFunDef(context, funDef),
     )
   }
 }
@@ -300,6 +304,7 @@ base class FunInfoLazyGFun{
 class NativeLazyGFun{} extends FunInfoLazyGFun {
   // Make a no-implementation function.
   fun compile(
+    _context: mutable SKFS.Context,
     _processedFuns: mutable Map<LazyGFun, GFunction>,
     _processedClasses: mutable Map<LazyGClass, GClass>,
     _converter: Converter,
@@ -325,11 +330,13 @@ base class ConcreteLazyGFun{
   captured: Array<GField> = Array[],
 } extends FunInfoLazyGFun {
   overridable fun compile(
+    context: mutable SKFS.Context,
     processedFuns: mutable Map<LazyGFun, GFunction>,
     processedClasses: mutable Map<LazyGClass, GClass>,
     converter: Converter,
   ): GFunction {
     emitter = OuterIstEmitter::make(
+      context,
       converter,
       this,
       processedFuns,
@@ -338,7 +345,7 @@ base class ConcreteLazyGFun{
 
     emitter.emitPreamble();
 
-    this.emitBody(emitter);
+    this.emitBody(context, emitter);
 
     emitter.terminateExistingBlock();
 
@@ -355,7 +362,10 @@ base class ConcreteLazyGFun{
     }
   }
 
-  protected fun emitBody(emitter: mutable OuterIstEmitter): void;
+  protected fun emitBody(
+    context: mutable SKFS.Context,
+    emitter: mutable OuterIstEmitter,
+  ): void;
 
   overridable fun getParams(Converter): Array<ParameterInfo> {
     this.params
@@ -378,15 +388,23 @@ base class ConcreteLazyGFun{
 }
 
 class InspectLazyGFun extends ConcreteLazyGFun {
-  protected fun emitBody(emitter: mutable OuterIstEmitter): void {
-    emitter.emitBindParameters();
+  protected fun emitBody(
+    context: mutable SKFS.Context,
+    emitter: mutable OuterIstEmitter,
+  ): void {
+    emitter.emitBindParameters(context);
 
     // The "this" object for this inspect method.
     obj = emitter.params[0];
 
     pos = emitter.funInfo.pos;
     clsID = obj.typ.asGTapply(pos).generic;
-    cls = emitter.converter.getGClass(emitter.processedClasses, clsID, pos);
+    cls = emitter.converter.getGClass(
+      context,
+      emitter.processedClasses,
+      clsID,
+      pos,
+    );
     if (!cls.kind.isFinal()) {
       pos.die(`inspect method only valid for concrete classes, not ${obj.typ}`)
     };
@@ -396,9 +414,11 @@ class InspectLazyGFun extends ConcreteLazyGFun {
       // has a mutable parameter.
       if (
         !this.isLegalInspectSignature(
+          context,
           emitter.processedClasses,
           cls,
           emitter.converter.getGFunction(
+            context,
             emitter.processedFuns,
             emitter.processedClasses,
             def.function.fromSome()(clsID),
@@ -621,6 +641,7 @@ class InspectLazyGFun extends ConcreteLazyGFun {
   // if they happen to make a method called "inspect" with the wrong signature
   // we'll just ignore it.
   private fun isLegalInspectSignature(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     cls: GClass,
     f: GFunction,
@@ -634,7 +655,12 @@ class InspectLazyGFun extends ConcreteLazyGFun {
       (funInfo.funType.returnType == gtInspect ||
         (funInfo.funType.returnType match {
         | GTapply(generic, _, _) ->
-          gc = converter.getGClass(processedClasses, generic, funInfo.pos);
+          gc = converter.getGClass(
+            context,
+            processedClasses,
+            generic,
+            funInfo.pos,
+          );
           gc.extends_.contains(gtInspect)
         | _ -> false
         }))
@@ -642,7 +668,10 @@ class InspectLazyGFun extends ConcreteLazyGFun {
 }
 
 class GetClassLazyGFun extends ConcreteLazyGFun {
-  protected fun emitBody(emitter: mutable OuterIstEmitter): void {
+  protected fun emitBody(
+    _context: mutable SKFS.Context,
+    emitter: mutable OuterIstEmitter,
+  ): void {
     pos = emitter.funInfo.pos;
 
     value = emitter.emitInstr(
@@ -658,9 +687,12 @@ class GetClassLazyGFun extends ConcreteLazyGFun {
 base class BodyProvidingLazyGFun{} extends ConcreteLazyGFun {
   fun getBody(converter: Converter): I.Stmt;
 
-  overridable protected fun emitBody(emitter: mutable OuterIstEmitter): void {
-    emitter.emitBindParameters();
-    emitter.emitStmt(this.getBody(emitter.converter));
+  overridable protected fun emitBody(
+    context: mutable SKFS.Context,
+    emitter: mutable OuterIstEmitter,
+  ): void {
+    emitter.emitBindParameters(context);
+    emitter.emitStmt(context, this.getBody(emitter.converter));
   }
 }
 
@@ -679,7 +711,10 @@ base class BodyLazyGFun{body: I.Stmt} extends BodyProvidingLazyGFun {
 class CustomLazyGFun{
   emitBodyHelper: mutable OuterIstEmitter ~> void,
 } extends ConcreteLazyGFun {
-  protected fun emitBody(e: mutable OuterIstEmitter): void {
+  protected fun emitBody(
+    _context: mutable SKFS.Context,
+    e: mutable OuterIstEmitter,
+  ): void {
     this.emitBodyHelper(e)
   }
 }
@@ -687,13 +722,17 @@ class CustomLazyGFun{
 class MemoizeThunkLazyGFun{
   capturedParams: Array<ParameterInfo>,
 } extends BodyLazyGFun {
-  protected fun emitBody(emitter: mutable OuterIstEmitter): void {
+  protected fun emitBody(
+    context: mutable SKFS.Context,
+    emitter: mutable OuterIstEmitter,
+  ): void {
     // Create a separate async function for the body.
     funInfo = this.funInfo;
     pos = funInfo.pos;
 
     thisObj = emitter.params[0];
     fields = emitter.converter.getGClass(
+      context,
       emitter.processedClasses,
       thisObj.getType().asGTapply(pos).generic,
       pos,
@@ -803,7 +842,10 @@ class MemoizeLazyGFun{
     this.bodyProvider.getParams(converter)
   }
 
-  protected fun emitBody(emitter: mutable OuterIstEmitter): void {
+  protected fun emitBody(
+    context: mutable SKFS.Context,
+    emitter: mutable OuterIstEmitter,
+  ): void {
     funInfo = this.funInfo;
     tparams = funInfo.tparams;
     converter = emitter.converter;
@@ -903,6 +945,7 @@ class MemoizeLazyGFun{
     };
 
     thunkClass = converter.finishGClass(
+      context,
       emitter.processedClasses,
       GClass{
         name => thunkClassname,
@@ -945,6 +988,7 @@ class MemoizeLazyGFun{
       Array[underlyingType],
     );
     memoReturnGClass = converter.getGClass(
+      context,
       emitter.processedClasses,
       memoReturnType.generic,
       pos,
@@ -1028,8 +1072,11 @@ class AsyncCoroutineLazyGFun{
     )
   }
 
-  protected fun emitBody(emitter: mutable OuterIstEmitter): void {
-    emitter.emitBindParameters();
+  protected fun emitBody(
+    context: mutable SKFS.Context,
+    emitter: mutable OuterIstEmitter,
+  ): void {
+    emitter.emitBindParameters(context);
 
     pos = this.funInfo.pos;
 
@@ -1038,6 +1085,7 @@ class AsyncCoroutineLazyGFun{
     excInfo = SkipOuterIstUtils.nonconst_binding_info;
 
     emitter.emitTry(
+      context,
       this.bodyProvider.getBody(emitter.converter),
       () -> {
         _ = emitter.emitCallFunction(
@@ -1323,6 +1371,7 @@ value class Converter(program: I.Program) {
   }
 
   fun finishGClass(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     orig: GClass,
     addInspect: Bool = true,
@@ -1372,6 +1421,7 @@ value class Converter(program: I.Program) {
           (gclass.fields[0].typ match {
           | GTapply(subgid, _, _) ->
             this.scalarizesToNoMoreThanOneScalar(
+              context,
               processedClasses,
               subgid,
               gclass.pos,
@@ -1384,13 +1434,14 @@ value class Converter(program: I.Program) {
 
     // Make sure we have created GClasses for all base classes.
     for (ta in gclass.extends_) {
-      _ = this.getGClass(processedClasses, ta.generic, gclass.pos)
+      _ = this.getGClass(context, processedClasses, ta.generic, gclass.pos)
     };
 
     gclass
   }
 
   fun getGFunction(
+    context: mutable SKFS.Context,
     processedFuns: mutable Map<LazyGFun, GFunction>,
     processedClasses: mutable Map<LazyGClass, GClass>,
     lazy: LazyGFun,
@@ -1398,24 +1449,21 @@ value class Converter(program: I.Program) {
     if (processedFuns.containsKey(lazy)) {
       processedFuns[lazy]
     } else {
-      result = lazy.compile(processedFuns, processedClasses, this);
+      result = lazy.compile(context, processedFuns, processedClasses, this);
       processedFuns![lazy] = result;
       result
     }
   }
 
   // Returns the GClassKind, if known.
-  fun getGClassKind(ref: LazyGClass): GClassKind {
+  fun getGClassKind(
+    context: mutable SKFS.Context,
+    ref: LazyGClass,
+  ): GClassKind {
     ref match {
     | LiteralLazyGClass(cls) -> cls.kind
     | FrontEndLazyGClass(nameStr) ->
-      this.program.class_defs.maybeGetNoPos(nameStr) match {
-      | Some(x) -> this.convertClassKind(x)
-      | None() ->
-        invariant_violation(
-          `Could not find type ${nameStr} in the front end classes`,
-        )
-      }
+      this.convertClassKind(this.program.getClass(context, nameStr))
     | BaseMetaLazyGClass _
     | ClassMetaLazyGClass _
     | ConcreteMetaLazyGClass _
@@ -1430,6 +1478,7 @@ value class Converter(program: I.Program) {
   }
 
   fun getGClass(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     gid: LazyGClass,
     pos: Pos,
@@ -1440,7 +1489,7 @@ value class Converter(program: I.Program) {
       // Don't clutter the underlying memoized function with a Pos argument.
       vtry(
         () -> {
-          this.getGClassImpl(processedClasses, gid)
+          this.getGClassImpl(context, processedClasses, gid)
         },
         exn ->
           exn match {
@@ -1452,6 +1501,7 @@ value class Converter(program: I.Program) {
   }
 
   private fun getGClassImpl(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     gid: LazyGClass,
   ): GClass {
@@ -1459,38 +1509,43 @@ value class Converter(program: I.Program) {
     result = gid match {
     | LiteralLazyGClass(cls) -> cls
     | name @ FrontEndLazyGClass _ ->
-      this.program.class_defs.maybeGetRaw(name.id) match {
-      | Some((classPos, classDef)) ->
-        this.convertClassDef(processedClasses, classDef, name, classPos)
-      | None() -> invariant_violation(`Unable to find class '${name.id}'`)
-      }
-    | meta @ BaseMetaLazyGClass _ -> this.createBaseMeta(processedClasses, meta)
+      classDef = this.program.getClass(context, name.id);
+      this.convertClassDef(
+        context,
+        processedClasses,
+        classDef,
+        name,
+        classDef.name.pos,
+      )
+    | meta @ BaseMetaLazyGClass _ ->
+      this.createBaseMeta(context, processedClasses, meta)
     | meta @ BaseMetaImplLazyGClass _ ->
-      this.createBaseMetaImpl(processedClasses, meta)
+      this.createBaseMetaImpl(context, processedClasses, meta)
     | meta @ ClassMetaLazyGClass _ ->
-      this.createClassMeta(processedClasses, meta)
+      this.createClassMeta(context, processedClasses, meta)
     | meta @ ConcreteMetaLazyGClass _ ->
-      this.createConcreteMeta(processedClasses, meta)
+      this.createConcreteMeta(context, processedClasses, meta)
     | meta @ ConcreteMetaImplLazyGClass _ ->
-      this.createConcreteMetaImpl(processedClasses, meta)
+      this.createConcreteMetaImpl(context, processedClasses, meta)
     | c @ ClosureBaseLazyGClass _ ->
-      this.createClosureBaseClass(processedClasses, c)
-    | MetaMetaLazyGClass _ -> this.createMetaMeta(processedClasses)
+      this.createClosureBaseClass(context, processedClasses, c)
+    | MetaMetaLazyGClass _ -> this.createMetaMeta(context, processedClasses)
     | rt @ ReturnTupleLazyGClass(arity) ->
-      this.createReturnTuple(processedClasses, rt.name(), arity)
+      this.createReturnTuple(context, processedClasses, rt.name(), arity)
     };
     processedClasses![gid] = result;
     result
   }
 
   fun getMetaClass(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     lazyGClass: LazyGClass,
     g: ?GClass = None(),
   ): LazyGClass {
     gc = g match {
     | Some(x) -> x
-    | None() -> this.getGClassImpl(processedClasses, lazyGClass)
+    | None() -> this.getGClassImpl(context, processedClasses, lazyGClass)
     };
 
     if (!gc.hasMeta) {
@@ -1510,6 +1565,7 @@ value class Converter(program: I.Program) {
   }
 
   private fun createReturnTuple(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     name: GClassName,
     arity: Int,
@@ -1519,6 +1575,7 @@ value class Converter(program: I.Program) {
     tparams = this.allocTparams("<class>" + name.id, arity);
 
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name,
@@ -1542,9 +1599,11 @@ value class Converter(program: I.Program) {
   // a class that is its own metaclass. You can't do anything interesting
   // with this class but it needs to exist.
   private fun createMetaMeta(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
   ): GClass {
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name => GClassName("<builtin>.MetaMeta"),
@@ -1563,6 +1622,7 @@ value class Converter(program: I.Program) {
   // (We can assume this targ congruence for closure classes.)
   // Note: not transitive - we depend on being called on parents before kids.
   fun flattenClosureClassExtends(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     extends_: Array<GTapply>,
     pos: FileRange,
@@ -1571,7 +1631,12 @@ value class Converter(program: I.Program) {
     addExtend = gta -> flat.maybeSet(gta.generic, gta);
     for (parent in extends_) {
       if (addExtend(parent)) {
-        parentClass = this.getGClass(processedClasses, parent.generic, pos);
+        parentClass = this.getGClass(
+          context,
+          processedClasses,
+          parent.generic,
+          pos,
+        );
         for (grandParent in parentClass.extends_) {
           _ = addExtend(grandParent with {targs => parent.targs})
         }
@@ -1582,6 +1647,7 @@ value class Converter(program: I.Program) {
 
   // Create a class somewhere in a closure class hierarchy.
   fun createClosureClass(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     className: GClassName,
     callMethodType: GFunType,
@@ -1629,6 +1695,7 @@ value class Converter(program: I.Program) {
 
     // Create the actual generic class for this closure.
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name => className,
@@ -1641,6 +1708,7 @@ value class Converter(program: I.Program) {
         fieldsFinal => kind.isFinal(),
         constructorParametersNamed => true,
         extends_ => this.flattenClosureClassExtends(
+          context,
           processedClasses,
           extends_,
           pos,
@@ -1662,6 +1730,7 @@ value class Converter(program: I.Program) {
   // Closures are desugared to objects with a "call()" method. This creates
   // the base class to use for all closures with a particular function type.
   private fun createClosureBaseClass(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     cb: ClosureBaseLazyGClass,
   ): GClass {
@@ -1717,6 +1786,7 @@ value class Converter(program: I.Program) {
     pos = FileRange.builtin;
 
     this.createClosureClass(
+      context,
       processedClasses,
       cb.name(),
       mtype,
@@ -1731,6 +1801,7 @@ value class Converter(program: I.Program) {
       }),
       KBase(),
       this.flattenClosureClassExtends(
+        context,
         processedClasses,
         parent1.concat(parent2),
         pos,
@@ -1827,6 +1898,7 @@ value class Converter(program: I.Program) {
   }
 
   private fun getStaticMethods(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     gc: GClass,
     name: LazyGClass,
@@ -1839,7 +1911,11 @@ value class Converter(program: I.Program) {
       if (gc.extends_.size() != 1) {
         return mutable UnorderedMap[]
       };
-      !gc = this.getGClassImpl(processedClasses, gc.extends_[0].generic);
+      !gc = this.getGClassImpl(
+        context,
+        processedClasses,
+        gc.extends_[0].generic,
+      );
     };
 
     if (gc.tparams.size() != orig.tparams.size()) {
@@ -1848,16 +1924,19 @@ value class Converter(program: I.Program) {
     };
 
     // Get the front end methods.
-    cd = this.program.class_defs.maybeGetNoPos(gc.name.id) match {
-    | Some(x) -> x
-    | None() -> gc.pos.die(`Unable to find class ${gc.name.id} in front end`)
-    };
+    cd = this.program.getClass(context, gc.name.id);
     fem = this.getFrontEndStaticMethods(cd);
 
     methods = UnorderedMap::mcreate(fem.size());
     phys = name.name();
     fem.each(md -> {
-      (mname, mf) = this.convertMethodDef(md, phys, orig.name, gc.tparams);
+      (mname, mf) = this.convertMethodDef(
+        context,
+        md,
+        phys,
+        orig.name,
+        gc.tparams,
+      );
       methods.add(mname, mf)
     });
 
@@ -2060,11 +2139,12 @@ value class Converter(program: I.Program) {
   // end). But it's not enough to only put those only in the ConcreteMeta
   // hierarchy, since some BaseMeta class could provide an implmentation.
   private fun createBaseMeta(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     name: BaseMetaLazyGClass,
   ): GClass {
     cls = name.cls;
-    gc = this.getGClassImpl(processedClasses, cls);
+    gc = this.getGClassImpl(context, processedClasses, cls);
 
     // Note: in keeping with current front-end policy, here we copy methods
     // down from B::.ClassMeta to its "local" sub-metaclasses.
@@ -2072,6 +2152,7 @@ value class Converter(program: I.Program) {
     // that propagates static methods to the full metaclass hierarchy.
 
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name => name.name(),
@@ -2090,19 +2171,26 @@ value class Converter(program: I.Program) {
             }),
           )
         },
-        methods => this.getStaticMethods(processedClasses, gc, name).chill(),
+        methods => this.getStaticMethods(
+          context,
+          processedClasses,
+          gc,
+          name,
+        ).chill(),
       },
     )
   }
 
   private fun createBaseMetaImpl(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     name: BaseMetaImplLazyGClass,
   ): GClass {
     cls = name.cls;
-    gc = this.getGClassImpl(processedClasses, cls);
+    gc = this.getGClassImpl(context, processedClasses, cls);
 
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name => name.name(),
@@ -2115,18 +2203,25 @@ value class Converter(program: I.Program) {
         extends_ => Array[
           GTapply(BaseMetaLazyGClass(cls), DeepFrozen(), gc.tparams),
         ],
-        methods => this.getStaticMethods(processedClasses, gc, name).chill(),
+        methods => this.getStaticMethods(
+          context,
+          processedClasses,
+          gc,
+          name,
+        ).chill(),
       },
     )
   }
 
   private fun createClassMeta(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     name: ClassMetaLazyGClass,
   ): GClass {
-    gc = this.getGClassImpl(processedClasses, name.cls);
+    gc = this.getGClassImpl(context, processedClasses, name.cls);
 
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name => name.name(),
@@ -2139,27 +2234,34 @@ value class Converter(program: I.Program) {
         extends_ => gc.extends_.map(t -> {
           GTapply(ClassMetaLazyGClass(t.generic), DeepFrozen(), t.targs)
         }),
-        methods => this.getStaticMethods(processedClasses, gc, name).chill(),
+        methods => this.getStaticMethods(
+          context,
+          processedClasses,
+          gc,
+          name,
+        ).chill(),
       },
     )
   }
 
   private fun createConcreteMeta(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     name: ConcreteMetaLazyGClass,
   ): GClass {
-    gc = this.getGClassImpl(processedClasses, name.cls);
+    gc = this.getGClassImpl(context, processedClasses, name.cls);
     pos = gc.pos;
 
-    methods = this.getStaticMethods(processedClasses, gc, name);
+    methods = this.getStaticMethods(context, processedClasses, gc, name);
 
     if (gc.isFrontEndClass && gc.fieldsFinal) {
       // Create abstract declarations for the factories.
-      fegc = this.program.class_defs.getOrCrash(gc.name.id);
+      fegc = this.program.getClass(context, gc.name.id);
       for (factoryIndex in Range(0, 2)) {
         factoryIsMutable = (factoryIndex == 0);
         factory = this.createFactory(factoryIsMutable, true, fegc, pos);
         (mname, mf) = this.convertMethodDef(
+          context,
           factory,
           name.name(),
           gc.name,
@@ -2170,6 +2272,7 @@ value class Converter(program: I.Program) {
     };
 
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name => name.name(),
@@ -2194,13 +2297,15 @@ value class Converter(program: I.Program) {
   }
 
   private fun createConcreteMetaImpl(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     name: ConcreteMetaImplLazyGClass,
   ): GClass {
-    gc = this.getGClassImpl(processedClasses, name.cls);
+    gc = this.getGClassImpl(context, processedClasses, name.cls);
     pos = gc.pos;
 
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name => name.name(),
@@ -2215,15 +2320,16 @@ value class Converter(program: I.Program) {
           GTapply(ConcreteMetaLazyGClass(t.generic), DeepFrozen(), t.targs)
         }),
         methods => {
-          m = this.getStaticMethods(processedClasses, gc, name);
+          m = this.getStaticMethods(context, processedClasses, gc, name);
 
           if (gc.isFrontEndClass && gc.fieldsFinal) {
             // Create factories.
-            fegc = this.program.class_defs.getOrCrash(gc.name.id);
+            fegc = this.program.getClass(context, gc.name.id);
             for (factoryIndex in Range(0, 2)) {
               factoryIsMutable = (factoryIndex == 0);
               factory = this.createFactory(factoryIsMutable, false, fegc, pos);
               (mname, mf) = this.convertMethodDef(
+                context,
                 factory,
                 name.name(),
                 gc.name,
@@ -2239,15 +2345,18 @@ value class Converter(program: I.Program) {
     )
   }
 
-  fun asTfun(typ: I.Type): I.Tfun {
+  fun asTfun(context: mutable SKFS.Context, typ: I.Type): I.Tfun {
     typ.ty match {
     | t @ I.Tfun _ -> t
     | _ ->
-      typ.pos.die("Expected function type but got " + this.convertType(typ))
+      typ.pos.die(
+        "Expected function type but got " + this.convertType(context, typ),
+      )
     }
   }
 
   fun makeGFunType{
+    context: mutable SKFS.Context,
     paramTypes: Parameters<I.Type>,
     returnType: I.Type,
     isMutable: Bool,
@@ -2258,17 +2367,17 @@ value class Converter(program: I.Program) {
       paramTypes,
     );
     makeGFunTypeWithFlags{
-      paramTypes => this.convertTypes(flatParams),
+      paramTypes => this.convertTypes(context, flatParams),
       numOptional,
       useOptionalMask,
-      returnType => this.convertType(returnType),
+      returnType => this.convertType(context, returnType),
       isMutable,
       isTracked,
     }
   }
 
   // Convert a GFunType without creating the usual closure wrapper class type.
-  fun convertRawTfun(f: I.Tfun): GFunType {
+  fun convertRawTfun(context: mutable SKFS.Context, f: I.Tfun): GFunType {
     isMutable = f.modifiers.purity match {
     | I.Fpure() -> false
     | I.Fmutable() -> true
@@ -2279,6 +2388,7 @@ value class Converter(program: I.Program) {
     };
 
     this.makeGFunType{
+      context,
       paramTypes => f.params,
       returnType => f.returnType,
       isMutable,
@@ -2287,6 +2397,7 @@ value class Converter(program: I.Program) {
   }
 
   private fun convertTapply(
+    context: mutable SKFS.Context,
     name: String,
     types: Array<I.Type>,
     mutability: Mutability,
@@ -2294,28 +2405,32 @@ value class Converter(program: I.Program) {
     GTapply(
       FrontEndLazyGClass(name),
       mutability,
-      types.map(t -> this.convertType(t)),
+      types.map(t -> this.convertType(context, t)),
     )
   }
 
   // Convert an OuterIst type to an IR type.
-  fun convertType(in_: I.Type, mutability: Mutability = DeepFrozen()): GType {
+  fun convertType(
+    context: mutable SKFS.Context,
+    in_: I.Type,
+    mutability: Mutability = DeepFrozen(),
+  ): GType {
     mustBeFrozen = true;
     ret = in_.ty match {
     | I.Tany() -> gtAny
     | I.Tapply(name, typesList) ->
       invariant(name.id != "void", "ICE void should be Void");
       !mustBeFrozen = false;
-      this.convertTapply(name.id, typesList, mutability)
+      this.convertTapply(context, name.id, typesList, mutability)
     | I.TsetElt(tparamsMap, name, typesList) ->
       !mustBeFrozen = false;
 
-      tapply = this.convertTapply(name.id, typesList, mutability);
+      tapply = this.convertTapply(context, name.id, typesList, mutability);
 
       // This back end does not care about traits, so throw them away.
       isTrait = tapply match {
       | GTapply(FrontEndLazyGClass(id), _, _) ->
-        this.program.class_defs.getOrCrash(id).kind is I.KTrait _
+        this.program.getClass(context, id).kind is I.KTrait _
       | GTapply _
       | GTparam _ ->
         false
@@ -2334,19 +2449,19 @@ value class Converter(program: I.Program) {
         (pid, pname) = tparamsMap.items().next().fromSome();
         GTparam(pid, pname)
       }
-    | f @ I.Tfun _ -> this.getClosureBaseClass(this.convertRawTfun(f))
+    | f @ I.Tfun _ -> this.getClosureBaseClass(this.convertRawTfun(context, f))
     | I.Tparam(v, id, name, typ2) ->
       tylist = typ2 match {
       | None() -> List::create()
       | Some(ty_cstr) -> List[ty_cstr]
       };
       this.convertTypeParameter(I.TypeParameter(v, id, name, tylist))
-    | I.Tmutable(t) -> this.convertType(t, Mutable())
-    | I.Treadonly(t) -> this.convertType(t, Readonly())
+    | I.Tmutable(t) -> this.convertType(context, t, Mutable())
+    | I.Treadonly(t) -> this.convertType(context, t, Readonly())
     | I.Tnamed(_, typ2) ->
       !mustBeFrozen = false;
-      this.convertType(typ2, mutability)
-    | I.Tdefault(ty) -> this.convertType(ty)
+      this.convertType(context, typ2, mutability)
+    | I.Tdefault(ty) -> this.convertType(context, ty)
     };
 
     if (mustBeFrozen && mutability != DeepFrozen()) {
@@ -2356,8 +2471,11 @@ value class Converter(program: I.Program) {
     ret
   }
 
-  fun convertTypes<T: Sequence<I.Type>>(types: T): Array<GType> {
-    types.collect(Array).map(t -> this.convertType(t))
+  fun convertTypes<T: Sequence<I.Type>>(
+    context: mutable SKFS.Context,
+    types: T,
+  ): Array<GType> {
+    types.collect(Array).map(t -> this.convertType(context, t))
   }
 
   fun convertTypeParameter(in_: I.TypeParameter): GTparam {
@@ -2370,9 +2488,12 @@ value class Converter(program: I.Program) {
     tparams.collect(Array).map(this.convertTypeParameter)
   }
 
-  fun convertFields(fields: Array<I.Parameter>): Array<GField> {
+  fun convertFields(
+    context: mutable SKFS.Context,
+    fields: Array<I.Parameter>,
+  ): Array<GField> {
     fields.map(f -> {
-      typ = this.convertType(f.type);
+      typ = this.convertType(context, f.type);
       GField{
         pos => f.name.pos,
         name => f.name.id,
@@ -2384,6 +2505,7 @@ value class Converter(program: I.Program) {
   }
 
   fun convertExtends(
+    context: mutable SKFS.Context,
     in_: I.ClassDef,
     parentMutability: Mutability,
   ): Array<GTapply> {
@@ -2392,7 +2514,7 @@ value class Converter(program: I.Program) {
       GTapply(
         FrontEndLazyGClass(name),
         parentMutability,
-        this.convertTypes(parentInfo.targs),
+        this.convertTypes(context, parentInfo.targs),
       )
     })
   }
@@ -2408,6 +2530,7 @@ value class Converter(program: I.Program) {
   }
 
   private fun convertClassDef(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     in_: I.ClassDef,
     classID: FrontEndLazyGClass,
@@ -2442,7 +2565,7 @@ value class Converter(program: I.Program) {
     | _ -> None()
     };
 
-    extends_ = this.convertExtends(in_, parentMutability);
+    extends_ = this.convertExtends(context, in_, parentMutability);
 
     nonStaticMethods = in_.methods.filter((_, v) ->
       v.kind is SkipNamedAst.FKDynamic _
@@ -2478,7 +2601,7 @@ value class Converter(program: I.Program) {
     (fields, _, _) = flattenParams(fieldParams, paramTypes(fieldParams));
 
     convertedFields = if (classname != "Unsafe.RawStorage") {
-      this.convertFields(fields)
+      this.convertFields(context, fields)
     } else {
       // Give Unsafe.RawStorage a field "value: T" to hold its internal data.
       pos.invariant(fields.isEmpty(), "Unexpected RawStorage fields.");
@@ -2495,7 +2618,7 @@ value class Converter(program: I.Program) {
 
     methods = UnorderedMap::mcreate(nonStaticMethods.size());
     for (v in nonStaticMethods) {
-      (mname, mf) = this.convertMethodDef(v, name, name, tparams);
+      (mname, mf) = this.convertMethodDef(context, v, name, name, tparams);
       methods.add(mname, mf)
     };
 
@@ -2509,6 +2632,7 @@ value class Converter(program: I.Program) {
     };
 
     this.finishGClass(
+      context,
       processedClasses,
       GClass{
         name,
@@ -2595,13 +2719,14 @@ value class Converter(program: I.Program) {
     }
   }
 
-  fun convertFunDef(in_: I.FunDef): LazyGFun {
+  fun convertFunDef(context: mutable SKFS.Context, in_: I.FunDef): LazyGFun {
     (pos, name) = (in_.name.pos, in_.name.id);
 
     tparams = this.convertTypeParameters(in_.tparams);
 
     funParamTypes = paramTypes(in_.params);
     funType = this.makeGFunType{
+      context,
       paramTypes => funParamTypes,
       returnType => in_.return_,
       isMutable => false,
@@ -2662,6 +2787,7 @@ value class Converter(program: I.Program) {
   }
 
   fun convertMethodDef(
+    context: mutable SKFS.Context,
     in_: I.MethodDef,
     physicalClassName: GClassName,
     // Usually the same as physicalClassName, but for static methods
@@ -2703,10 +2829,13 @@ value class Converter(program: I.Program) {
     funName = physicalClassName.id + "::" + name;
 
     funType = makeGFunTypeWithFlags{
-      paramTypes => this.convertTypes(flatParams.map(defaultifyParamType)),
+      paramTypes => this.convertTypes(
+        context,
+        flatParams.map(defaultifyParamType),
+      ),
       numOptional,
       useOptionalMask,
-      returnType => this.convertType(in_.return_),
+      returnType => this.convertType(context, in_.return_),
       isMutable => false,
       isTracked => in_.untracked_.isNone(),
     };
@@ -2773,7 +2902,7 @@ value class Converter(program: I.Program) {
       for (base => tmap in in_.generic_mapping) {
         timap.set(
           FrontEndLazyGClass(base),
-          methodTparams.map(tp -> this.convertType(tmap[tp.id])),
+          methodTparams.map(tp -> this.convertType(context, tmap[tp.id])),
         )
       };
       timap.chill()
@@ -2789,14 +2918,17 @@ value class Converter(program: I.Program) {
     )
   }
 
-  fun convertConstDef(in_: I.ConstDef): ConstLazyGFun {
+  fun convertConstDef(
+    context: mutable SKFS.Context,
+    in_: I.ConstDef,
+  ): ConstLazyGFun {
     // Create a function that unconditionally computes this constant value.
     // See GetConst for what happens next.
     funType = GFunType{
       isMutable => false,
       isTracked => true,
       params => Array[],
-      returnType => this.convertType(in_.type),
+      returnType => this.convertType(context, in_.type),
     };
 
     constName = ConstID(in_.name.id);
@@ -2837,17 +2969,18 @@ value class Converter(program: I.Program) {
   // For a value class with two Int fields this would be false, for a value
   // class containing a value class containing one Int it's true, etc.
   private fun scalarizesToNoMoreThanOneScalar(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     gid: LazyGClass,
     pos: Pos,
   ): Bool {
     loop {
-      this.getGClassKind(gid) match {
+      this.getGClassKind(context, gid) match {
       | KBase()
       | KClass() ->
         return true
       | KValue() ->
-        gclass = this.getGClass(processedClasses, gid, pos);
+        gclass = this.getGClass(context, processedClasses, gid, pos);
         if (gclass.fields.isEmpty()) {
           return true
         } else if (gclass.fields.size() > 1) {
@@ -2867,12 +3000,14 @@ value class Converter(program: I.Program) {
   }
 
   private fun assertNoStaticMethods(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     lazyGClass: LazyGClass,
     gc: GClass,
   ): void {
-    metaID = this.getMetaClass(processedClasses, lazyGClass, Some(gc));
-    for (name => def in this.getGClassImpl(processedClasses, metaID).methods) {
+    metaID = this.getMetaClass(context, processedClasses, lazyGClass, Some(gc));
+    for (name => def in this.getGClassImpl(context, processedClasses, metaID)
+      .methods) {
       if (
         name != kFrozenFactoryName &&
         name != kGetClassMethodName &&
@@ -2891,6 +3026,7 @@ value class Converter(program: I.Program) {
   // particular coroutine state. This produces a new such class
   // for the generator function described by funInfo.
   fun createGeneratorClass(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     funInfo: GFunInfo,
   ): GTapply {
@@ -2910,6 +3046,7 @@ value class Converter(program: I.Program) {
     };
 
     template = this.getGClass(
+      context,
       processedClasses,
       FrontEndLazyGClass("Iterator.Generator"),
       pos,
@@ -2996,7 +3133,9 @@ value class Converter(program: I.Program) {
     };
 
     GTapply(
-      LiteralLazyGClass(this.finishGClass(processedClasses, generatorGClass)),
+      LiteralLazyGClass(
+        this.finishGClass(context, processedClasses, generatorGClass),
+      ),
       Mutable(),
       yieldedTargs.concat(funInfo.tparams),
     )
@@ -3006,6 +3145,7 @@ value class Converter(program: I.Program) {
   // particular coroutine state. This produces a new such class
   // for the generator function described by funInfo.
   fun createAwaitableClass(
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     funInfo: GFunInfo,
   ): GTapply {
@@ -3031,7 +3171,7 @@ value class Converter(program: I.Program) {
     awaitableFunTargs = awaitableTargs.concat(funInfo.tparams);
 
     templateID = FrontEndLazyGClass("Awaitable.AwaitableTemplate");
-    template = this.getGClass(processedClasses, templateID, pos);
+    template = this.getGClass(context, processedClasses, templateID, pos);
 
     // This class takes as tparams all of the tparams in the environment
     // where the async function body appears, since that body might
@@ -3114,7 +3254,7 @@ value class Converter(program: I.Program) {
     };
 
     // We aren't smart enough to handle static methods on special classes yet.
-    this.assertNoStaticMethods(processedClasses, templateID, template);
+    this.assertNoStaticMethods(context, processedClasses, templateID, template);
 
     GTapply(LiteralLazyGClass(awaitableGClass), Mutable(), awaitableFunTargs);
   }
@@ -3169,6 +3309,7 @@ mutable class OuterIstEmitter{
   processedClasses: mutable Map<LazyGClass, GClass>,
 } {
   static fun make(
+    context: mutable SKFS.Context,
     converter: Converter,
     lazy: ConcreteLazyGFun,
     processedFuns: mutable Map<LazyGFun, GFunction>,
@@ -3177,11 +3318,13 @@ mutable class OuterIstEmitter{
     funInfo = lazy.funInfo;
     if (funInfo.isGenerator) {
       !funInfo.funType.returnType = converter.createGeneratorClass(
+        context,
         processedClasses,
         funInfo,
       )
     } else if (funInfo.isAsync) {
       !funInfo.funType.returnType = converter.createAwaitableClass(
+        context,
         processedClasses,
         funInfo,
       )
@@ -3341,7 +3484,7 @@ mutable class OuterIstEmitter{
     }
   }
 
-  mutable fun emitBindParameters(): void {
+  mutable fun emitBindParameters(context: mutable SKFS.Context): void {
     lazy = this.lazy;
 
     // Bind captured variables as locals.
@@ -3456,9 +3599,13 @@ mutable class OuterIstEmitter{
 
           // Conditionally replace this variable with its default value.
           this.startBlock(computeDefaultBlock);
-          this.emitStmt(defaultStmt);
+          this.emitStmt(context, defaultStmt);
           defaultExprPos = defaultExpr.pos;
-          this.setLocal(name, this.emitExpr(defaultExpr), defaultExprPos);
+          this.setLocal(
+            name,
+            this.emitExpr(context, defaultExpr),
+            defaultExprPos,
+          );
           this.maybeEmitJump(afterBlock.id, defaultExprPos);
 
           this.startBlock(afterBlock)
@@ -3505,9 +3652,13 @@ mutable class OuterIstEmitter{
           param = paramInfos[firstOptional + i];
           (defaultStmt, defaultExpr) = param.getInit().asOuter();
 
-          this.emitStmt(defaultStmt);
+          this.emitStmt(context, defaultStmt);
           defaultExprPos = defaultExpr.pos;
-          this.setLocal(param.name, this.emitExpr(defaultExpr), defaultExprPos);
+          this.setLocal(
+            param.name,
+            this.emitExpr(context, defaultExpr),
+            defaultExprPos,
+          );
 
           // "Fall through" to the next case.
           this.maybeEmitJump(blocks[i + 2].id, defaultExprPos)
@@ -3519,6 +3670,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitParams(
+    context: mutable SKFS.Context,
     params: Parameters<I.Expr>,
     expectedTypes: Parameters<I.Type>,
     skipOptionalFlags: Bool = false,
@@ -3527,7 +3679,7 @@ mutable class OuterIstEmitter{
       params,
       expectedTypes,
     );
-    args = flatParams.map(arg -> this.emitExpr(arg));
+    args = flatParams.map(arg -> this.emitExpr(context, arg));
 
     if (numOptional == 0 || skipOptionalFlags) {
       args
@@ -3609,8 +3761,11 @@ mutable class OuterIstEmitter{
     this.!pos = b.pos
   }
 
-  private mutable fun convertType(typ: I.Type): GType {
-    this.converter.convertType(typ)
+  private mutable fun convertType(
+    context: mutable SKFS.Context,
+    typ: I.Type,
+  ): GType {
+    this.converter.convertType(context, typ)
   }
 
   // Emit a call to a global function.
@@ -3653,6 +3808,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitMethodCall(
+    context: mutable SKFS.Context,
     info: I.DotInfo,
     methodArgs: Parameters<I.Expr>,
     staticMethodCall: Bool,
@@ -3665,19 +3821,23 @@ mutable class OuterIstEmitter{
     | I.EProperty() -> pos.die("Cannot handle EProperty yet")
     };
 
-    obj = this.emitExpr(info.obj_expr);
-    frontEndMethodType = this.converter.asTfun(info.field_type);
-    reorderedArgs = this.emitParams(methodArgs, frontEndMethodType.params);
+    obj = this.emitExpr(context, info.obj_expr);
+    frontEndMethodType = this.converter.asTfun(context, info.field_type);
+    reorderedArgs = this.emitParams(
+      context,
+      methodArgs,
+      frontEndMethodType.params,
+    );
 
     args = Array[obj].concat(reorderedArgs);
 
     // Find the type of the method, which does not include "this".
-    mtype = this.converter.convertRawTfun(frontEndMethodType);
+    mtype = this.converter.convertRawTfun(context, frontEndMethodType);
 
     // Prepend a "this" of whatever object type we are invoking it on.
     typ = mtype with {params => Array[obj.getType()].concat(mtype.params)};
 
-    targs = this.converter.convertTypes(info.field_targs);
+    targs = this.converter.convertTypes(context, info.field_targs);
 
     source = (FrontEndLazyGClass(info.source.id) : LazyGClass);
     if (staticMethodCall) {
@@ -3718,11 +3878,12 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitClosureCall(
+    context: mutable SKFS.Context,
     funcExpr: I.Expr,
     params: Parameters<I.Expr>,
     pos: FileRange,
   ): GInstr {
-    closureType = this.convertType(funcExpr.ty);
+    closureType = this.convertType(context, funcExpr.ty);
     closureTypeName = closureType match {
     | GTapply(generic, _, _) -> generic.nameStr()
     | _ -> ""
@@ -3742,7 +3903,7 @@ mutable class OuterIstEmitter{
       field_type => funcExpr.ty,
     };
 
-    this.emitMethodCall(info, params, false, pos)
+    this.emitMethodCall(context, info, params, false, pos)
   }
 
   // Handle an "async" block. The strategy is to create a global async
@@ -3832,8 +3993,13 @@ mutable class OuterIstEmitter{
     )
   }
 
-  mutable fun emitAwait(expr: I.Expr, typ: GType, pos: FileRange): GInstr {
-    awaitable = this.emitExpr(expr);
+  mutable fun emitAwait(
+    context: mutable SKFS.Context,
+    expr: I.Expr,
+    typ: GType,
+    pos: FileRange,
+  ): GInstr {
+    awaitable = this.emitExpr(context, expr);
 
     // See if the awaitable is ready.
     //
@@ -3914,6 +4080,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun emitLambda{
+    context: mutable SKFS.Context,
     processedClasses: mutable Map<LazyGClass, GClass>,
     paramVars: Array<I.Binding>,
     captured: Array<I.Name>,
@@ -3990,6 +4157,7 @@ mutable class OuterIstEmitter{
     );
 
     closureGClass = this.converter.createClosureClass(
+      context,
       processedClasses,
       closureClassName,
       callMethodType,
@@ -4022,12 +4190,13 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitWith(
+    context: mutable SKFS.Context,
     objExpr: I.Expr,
     typ: GType,
     fieldAssignments: UMap<I.WithUpdate>,
   ): GInstr {
     pos = objExpr.pos;
-    obj = this.emitExpr(objExpr);
+    obj = this.emitExpr(context, objExpr);
 
     // Sort assignments by source position so we evaluate them in
     // the user's original order (see T16663788).
@@ -4042,7 +4211,7 @@ mutable class OuterIstEmitter{
     // Compile expressions in order and make a map of their values.
     assignments = assignmentExprs.map(a -> {
       ((_aPos, aField), aExprSourceCast) = a;
-      (aField, this.emitExpr(aExprSourceCast.expr))
+      (aField, this.emitExpr(context, aExprSourceCast.expr))
     });
 
     this.emitInstr(
@@ -4051,6 +4220,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitFactoryCall(
+    context: mutable SKFS.Context,
     runtimeType: I.Expr,
     frontEndType: I.Type,
     name: I.Name,
@@ -4067,7 +4237,7 @@ mutable class OuterIstEmitter{
     } else {
       // See which fields are optional.
       fields = getFields(
-        this.converter.program.class_defs[(name.pos, name.id)],
+        this.converter.program.getClass(context, name.id),
         pos,
       );
       optional = mutable Vector[];
@@ -4111,6 +4281,7 @@ mutable class OuterIstEmitter{
     };
 
     this.emitMethodCall(
+      context,
       I.DotInfo{
         obj_expr => runtimeType,
         field => I.Name(pos, factoryName),
@@ -4126,12 +4297,13 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitExpr(
+    context: mutable SKFS.Context,
     expr__: I.Expr,
     prettyName: String = "",
   ): GInstr {
     (frontEndType, pos, top_expr) = (expr__.ty, expr__.pos, expr__.expr);
 
-    typ = this.convertType(frontEndType);
+    typ = this.convertType(context, frontEndType);
 
     instr = top_expr match {
     | I.DefaultArg() -> this.constantDefaultArg(typ)
@@ -4155,7 +4327,7 @@ mutable class OuterIstEmitter{
       | I.LString(value) -> this.constantString(UTF8String::make(value))
       | I.LVoid() ->
         evoid = I.Object(I.Name(pos, "Void"), Array[], Positional(Array[]));
-        this.emitExpr(I.Expr(frontEndType, pos, evoid), prettyName)
+        this.emitExpr(context, I.Expr(frontEndType, pos, evoid), prettyName)
       }
     | I.Const(I.Name(_, name)) ->
       this.emitInstr(GGetConst{typ, pos, name => ConstID(name)})
@@ -4167,7 +4339,15 @@ mutable class OuterIstEmitter{
         this.emitCast(localValue, typ, pos)
       }
     | I.DynamicConstruction(expr, name, types, params) ->
-      this.emitFactoryCall(expr, frontEndType, name, types, params, pos)
+      this.emitFactoryCall(
+        context,
+        expr,
+        frontEndType,
+        name,
+        types,
+        params,
+        pos,
+      )
     | I.Object(name, types, params) ->
       if (hasDefaultArg(params)) {
         // Missing at least one constructor argument, so call the factory.
@@ -4176,29 +4356,44 @@ mutable class OuterIstEmitter{
           pos,
           I.Classname(name),
         );
-        this.emitFactoryCall(meta, frontEndType, name, types, params, pos)
+        this.emitFactoryCall(
+          context,
+          meta,
+          frontEndType,
+          name,
+          types,
+          params,
+          pos,
+        )
       } else {
         cd = this.converter.program.class_defs.getOrCrash(name.id);
-        args = this.emitParams(params, paramTypes(getFields(cd, pos)), true);
+        args = this.emitParams(
+          context,
+          params,
+          paramTypes(getFields(cd, pos)),
+          true,
+        );
 
         this.emitInstr(GObject{typ, pos, prettyName, args})
       }
-    | I.Call(funcExpr, params) -> this.emitClosureCall(funcExpr, params, pos)
+    | I.Call(funcExpr, params) ->
+      this.emitClosureCall(context, funcExpr, params, pos)
     | I.FunCall(name, tparams, params) ->
-      def = this.converter.program.fun_defs.getOrCrash(name.id);
+      def = this.converter.program.getFun(context, name.id);
 
       this.emitCallFunction(
         FrontEndLazyGFun{frontEndName => name.id},
-        this.emitParams(params, paramTypes(def.params)),
-        this.converter.convertTypes(tparams),
+        this.emitParams(context, params, paramTypes(def.params)),
+        this.converter.convertTypes(context, tparams),
         typ,
         pos,
       )
     | I.MethodCall(info, params) ->
-      this.emitMethodCall(info, params, false, pos)
-    | I.StaticCall(info, params) -> this.emitMethodCall(info, params, true, pos)
+      this.emitMethodCall(context, info, params, false, pos)
+    | I.StaticCall(info, params) ->
+      this.emitMethodCall(context, info, params, true, pos)
     | I.Dot(info) ->
-      obj = this.emitExpr(info.obj_expr);
+      obj = this.emitExpr(context, info.obj_expr);
 
       info.elt_kind match {
       | I.EConst _ -> pos.die("Cannot handle impossible Dot EConst.")
@@ -4235,18 +4430,20 @@ mutable class OuterIstEmitter{
           ),
         };
 
-        this.emitMethodCall(callInfo, Positional::create(), true, pos)
+        this.emitMethodCall(context, callInfo, Positional::create(), true, pos)
       }
     | I.Lambda(params, _, captured, body, yields) ->
       (flatParams, _, _) = flattenParams(params, params.map(b -> b.ty));
       this.emitLambda{
+        context,
         processedClasses => this.processedClasses,
         paramVars => flatParams,
         captured => captured.values().map(p -> p.name).collect(Array),
         body,
         closureClassNameHint => "Closure",
         callMethodType => this.converter.convertRawTfun(
-          this.converter.asTfun(frontEndType),
+          context,
+          this.converter.asTfun(context, frontEndType),
         ),
         yields => yields.isSome(),
         pos,
@@ -4256,18 +4453,18 @@ mutable class OuterIstEmitter{
         GEArray{
           typ,
           pos,
-          args => exprs.collect(Array).map(e -> this.emitExpr(e)),
+          args => exprs.collect(Array).map(e -> this.emitExpr(context, e)),
         },
       )
     | I.Async(stmt, expr) -> this.emitAsync(stmt, expr, typ, pos)
-    | I.Await(expr) -> this.emitAwait(expr, typ, pos)
+    | I.Await(expr) -> this.emitAwait(context, expr, typ, pos)
     | I.Freeze(expr) ->
-      this.emitInstr(GFreeze{typ, pos, obj => this.emitExpr(expr)})
+      this.emitInstr(GFreeze{typ, pos, obj => this.emitExpr(context, expr)})
     | I.GetClass(expr) ->
       // Desugar class(x) -> x..getClass()
       // These methods are machine-generated and never throw so we don't
       // need to worry about "invoke" vs "call".
-      obj = this.emitExpr(expr);
+      obj = this.emitExpr(context, expr);
       this.emitInstr(
         GCallMethod{
           typ,
@@ -4289,10 +4486,10 @@ mutable class OuterIstEmitter{
       // post-specialization this can get optimized into a singleton.
       this.emitInstr(GObject{typ, pos, args => Array[]})
     | I.With(expr, fieldAssignments) ->
-      this.emitWith(expr, typ, fieldAssignments)
+      this.emitWith(context, expr, typ, fieldAssignments)
     | I.Cast(castType, expr) ->
-      _typ = this.convertType(castType);
-      this.emitCast(this.emitExpr(expr), typ, pos)
+      _typ = this.convertType(context, castType);
+      this.emitCast(this.emitExpr(context, expr), typ, pos)
     };
 
     instr
@@ -4306,7 +4503,10 @@ mutable class OuterIstEmitter{
     }
   }
 
-  private mutable fun emitJumpBlock(entries: List<I.LabeledStmt>): void {
+  private mutable fun emitJumpBlock(
+    context: mutable SKFS.Context,
+    entries: List<I.LabeledStmt>,
+  ): void {
     items = mutable Vector[];
     for (lstmt in entries) {
       (label, stmt) = (lstmt.label, lstmt.stmt);
@@ -4321,13 +4521,14 @@ mutable class OuterIstEmitter{
     for (i in Range(0, size)) {
       item = items[i];
       this.labels.remove(item.name);
-      this.emitStmt(item.stmt);
+      this.emitStmt(context, item.stmt);
       this.maybeEmitJump(items[0].block.id, item.pos);
       this.startBlock(items[(i + 1) % size].block)
     }
   }
 
   private mutable fun emitIf(
+    context: mutable SKFS.Context,
     predInstr: GInstr,
     trueBody: I.Stmt,
     falseBody: I.Stmt,
@@ -4349,18 +4550,22 @@ mutable class OuterIstEmitter{
 
     // Emit the "if true" clause.
     this.startBlock(trueBlock);
-    this.emitStmt(trueBody);
+    this.emitStmt(context, trueBody);
     this.maybeEmitJump(joinBlock.id, pos);
 
     // Emit the "if false" clause.
     this.startBlock(falseBlock);
-    this.emitStmt(falseBody);
+    this.emitStmt(context, falseBody);
     this.maybeEmitJump(joinBlock.id, pos);
 
     this.startBlock(joinBlock)
   }
 
-  private mutable fun emitLoopForever(pos: FileRange, body: I.Stmt): void {
+  private mutable fun emitLoopForever(
+    context: mutable SKFS.Context,
+    pos: FileRange,
+    body: I.Stmt,
+  ): void {
     block = this.newBlock(pos, "loop_forever");
     this.maybeEmitJump(block.id, pos);
 
@@ -4369,18 +4574,19 @@ mutable class OuterIstEmitter{
 
     // Emit the body.
     this.startBlock(block);
-    this.emitStmt(body);
+    this.emitStmt(context, body);
     this.maybeEmitJump(block.id, pos);
 
     this.!continueID = oldContinueID;
   }
 
   private mutable fun emitTypeSwitch(
+    context: mutable SKFS.Context,
     switchExpr: I.Expr,
     branchList: List<I.TypeSwitchBranch>,
     defaultBody: ?I.Stmt,
   ): void {
-    switchValue = this.emitExpr(switchExpr);
+    switchValue = this.emitExpr(context, switchExpr);
     pos = switchExpr.pos;
 
     // Create a "default" body if there isn't one already. TODO: What
@@ -4459,7 +4665,7 @@ mutable class OuterIstEmitter{
     // Emit the action blocks.
     for (action in actions) {
       this.startBlock(action.block);
-      this.emitStmt(action.body);
+      this.emitStmt(context, action.body);
       this.maybeEmitJump(joinBlock.id, action.block.pos)
     };
 
@@ -4467,6 +4673,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitIntSwitch(
+    context: mutable SKFS.Context,
     switchValue: GInstr,
     branchList: List<I.SwitchBranch>,
     default: I.Stmt,
@@ -4545,7 +4752,7 @@ mutable class OuterIstEmitter{
     // Emit the action blocks.
     for (action in actions) {
       this.startBlock(action.block);
-      this.emitStmt(action.body);
+      this.emitStmt(context, action.body);
       this.maybeEmitJump(joinBlock.id, action.block.pos)
     };
 
@@ -4553,6 +4760,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitStringSwitch(
+    context: mutable SKFS.Context,
     switchValue: GInstr,
     branchList: List<I.SwitchBranch>,
     default: I.Stmt,
@@ -4628,7 +4836,7 @@ mutable class OuterIstEmitter{
     // Emit the action blocks.
     for (action in actions) {
       this.startBlock(action.block);
-      this.emitStmt(action.body);
+      this.emitStmt(context, action.body);
       this.maybeEmitJump(joinBlock.id, action.block.pos)
     };
 
@@ -4637,6 +4845,7 @@ mutable class OuterIstEmitter{
 
   // We compile a Float switch as an IntSwitch on the raw IEEE FP bits.
   private mutable fun emitFloatSwitch(
+    context: mutable SKFS.Context,
     switchValue: GInstr,
     branchList: List<I.SwitchBranch>,
     default: I.Stmt,
@@ -4687,7 +4896,7 @@ mutable class OuterIstEmitter{
       },
     );
 
-    this.emitIntSwitch(bits, intBranchList, default, pos)
+    this.emitIntSwitch(context, bits, intBranchList, default, pos)
   }
 
   private mutable fun emitThrow(exc: GInstr, pos: FileRange): void {
@@ -4705,6 +4914,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun emitTry(
+    context: mutable SKFS.Context,
     body: I.Stmt,
     emitCatchMatch: () -> void,
     excBinding: I.Binding,
@@ -4715,7 +4925,7 @@ mutable class OuterIstEmitter{
     // declared as not being reassigned, but we can reassign
     // when a throw appears lexically inside a try.
     excVar = excBinding.name.id;
-    excType = this.convertType(excBinding.ty);
+    excType = this.convertType(context, excBinding.ty);
     tmpExcVar = "tmp:exc:" + excVar;
     this.emitBind(
       tmpExcVar,
@@ -4743,7 +4953,7 @@ mutable class OuterIstEmitter{
         exceptionVariable => tmpExcVar,
       },
     );
-    this.emitStmt(body);
+    this.emitStmt(context, body);
     this.!tryInfo = oldTryInfo;
 
     this.maybeEmitJump(afterTry.id, pos);
@@ -4860,6 +5070,7 @@ mutable class OuterIstEmitter{
   // From within a generator, figure out the type of values being
   // "yielded", then wrap it in the given generic and mutability.
   private mutable fun generatorOptionType(
+    context: mutable SKFS.Context,
     generic: String,
     mutability: Mutability,
   ): GType {
@@ -4869,9 +5080,15 @@ mutable class OuterIstEmitter{
     // readonly Option<XX>.
     pos = this.pos;
     ta = this.funInfo.funType.returnType.asGTapply(pos);
-    gc = this.converter.getGClass(this.processedClasses, ta.generic, pos);
+    gc = this.converter.getGClass(
+      context,
+      this.processedClasses,
+      ta.generic,
+      pos,
+    );
     method = gc.methods["next"];
     opt = this.converter.getGFunction(
+      context,
       this.processedFuns,
       this.processedClasses,
       method.function.fromSome("No next method found")(ta.generic),
@@ -4885,73 +5102,83 @@ mutable class OuterIstEmitter{
     GTapply(FrontEndLazyGClass(generic), mutability, targs)
   }
 
-  private mutable fun generatorNone(pos: FileRange): GInstr {
+  private mutable fun generatorNone(
+    context: mutable SKFS.Context,
+    pos: FileRange,
+  ): GInstr {
     this.emitInstr(
       GObject{
-        typ => this.generatorOptionType("None", DeepFrozen()),
+        typ => this.generatorOptionType(context, "None", DeepFrozen()),
         pos,
         args => Array[],
       },
     )
   }
 
-  private mutable fun emitYield(value: GInstr, pos: FileRange): void {
+  private mutable fun emitYield(
+    context: mutable SKFS.Context,
+    value: GInstr,
+    pos: FileRange,
+  ): void {
     // Yield always yields Some(x), to make it easier for later compilation
     // stages to eventually turn this into a Return of that value, to
     // match with the Iterator::next return type.
     some = this.emitInstr(
       GObject{
-        typ => this.generatorOptionType("Some", Readonly()),
+        typ => this.generatorOptionType(context, "Some", Readonly()),
         pos,
         args => Array[value],
       },
     );
-    none = this.generatorNone(pos);
+    none = this.generatorNone(context, pos);
     _ = this.emitInstr(GYield{pos, value => some, none})
   }
 
-  private mutable fun emitYieldBreak(pos: FileRange): void {
+  private mutable fun emitYieldBreak(
+    context: mutable SKFS.Context,
+    pos: FileRange,
+  ): void {
     // Compute the proper None() type here, to make it easier to access later.
-    none = this.generatorNone(pos);
+    none = this.generatorNone(context, pos);
     _ = this.emitInstr(GYieldBreak{pos, none})
   }
 
-  mutable fun emitStmt(stmt: I.Stmt): void {
+  mutable fun emitStmt(context: mutable SKFS.Context, stmt: I.Stmt): void {
     stmt match {
     | I.JumpTo(name) -> this.emitJumpTo(name)
-    | I.JumpBlock(entries, _) -> this.emitJumpBlock(entries)
-    | I.SingleExpr(e) -> _ = this.emitExpr(e)
+    | I.JumpBlock(entries, _) -> this.emitJumpBlock(context, entries)
+    | I.SingleExpr(e) -> _ = this.emitExpr(context, e)
     | I.Bind(var, expr_opt) ->
       (pos, name) = (var.name.pos, var.name.id);
 
-      typ = this.convertType(var.ty);
+      typ = this.convertType(context, var.ty);
       value = expr_opt match {
-      | Some(expr) -> this.emitExpr(expr)
+      | Some(expr) -> this.emitExpr(context, expr)
       | None() -> this.constantZero(typ)
       };
 
       this.emitBind(name, typ, value, var.info, pos)
     | I.Assign(var, expr) ->
-      this.setLocal(var.name.id, this.emitExpr(expr), expr.pos)
+      this.setLocal(var.name.id, this.emitExpr(context, expr), expr.pos)
     | I.AssignField(
       I.LocalVar(varType, varName),
       _,
       I.Name(pos, field),
       expr,
     ) ->
-      obj = this.emitExpr(I.Expr(varType, pos, I.Local(varName)));
-      value = this.emitExpr(expr);
+      obj = this.emitExpr(context, I.Expr(varType, pos, I.Local(varName)));
+      value = this.emitExpr(context, expr);
 
       _ = this.emitInstr(GSetField{pos, obj, field, value})
-    | I.Seq(stmts) -> for (stmt2 in stmts) this.emitStmt(stmt2)
+    | I.Seq(stmts) -> for (stmt2 in stmts) this.emitStmt(context, stmt2)
     | I.If(e, t, f) ->
       pos = e.pos;
-      this.emitIf(this.emitExpr(e), t, f, pos)
-    | I.LoopForever(pos, body) -> this.emitLoopForever(pos, body)
+      this.emitIf(context, this.emitExpr(context, e), t, f, pos)
+    | I.LoopForever(pos, body) -> this.emitLoopForever(context, pos, body)
     | I.Match(expr, _branches) -> expr.pos.die("Match should have been lowered")
     | I.Switch(expr, branches, default) ->
       pos = expr.pos;
-      val = this.emitExpr(expr);
+      val = this.emitExpr(context, expr);
 
       if (branches.isEmpty()) {
         pos.die("Trivial match should have been lowered away earlier.")
@@ -4970,24 +5197,25 @@ mutable class OuterIstEmitter{
       };
 
       val.getType() match {
-      | t if (t == gtInt) -> this.emitIntSwitch(val, branches, defaultBody, pos)
+      | t if (t == gtInt) ->
+        this.emitIntSwitch(context, val, branches, defaultBody, pos)
       | t if (t == gtChar) ->
         // Widen to "Int" and use IntSwitch.
         wide = this.emitInstr(GZeroExtend{typ => gtInt, pos, value => val});
-        this.emitIntSwitch(wide, branches, defaultBody, pos, true)
+        this.emitIntSwitch(context, wide, branches, defaultBody, pos, true)
       | t if (t == gtString) ->
-        this.emitStringSwitch(val, branches, defaultBody, pos)
+        this.emitStringSwitch(context, val, branches, defaultBody, pos)
       | t if (t == gtFloat) ->
-        this.emitFloatSwitch(val, branches, defaultBody, pos)
+        this.emitFloatSwitch(context, val, branches, defaultBody, pos)
       | t if (t == gtBool) ->
         pos.die("Bool match should have been lowered to 'if' already.")
       | t -> pos.die("Switch not handled on type " + t)
       }
     | I.TypeSwitch(expr, branches, default) ->
-      this.emitTypeSwitch(expr, branches, default)
+      this.emitTypeSwitch(context, expr, branches, default)
     | I.Return(expr) ->
       pos = expr.pos;
-      value = this.emitExpr(expr);
+      value = this.emitExpr(context, expr);
       if (expr.ty.pos == kForceReturnHackPos) {
         // Generate a physical return right here.
         _ = this.emitInstr(GReturn{pos, value})
@@ -4996,10 +5224,16 @@ mutable class OuterIstEmitter{
       }
     | I.Try _ -> this.funInfo.die("Try should have been lowered")
     | I.TryCatch(pos, body, excBinding, catchMatch) ->
-      this.emitTry(body, () -> this.emitStmt(catchMatch), excBinding, pos)
-    | I.Throw(e) -> this.emitThrow(this.emitExpr(e), e.pos)
-    | I.Yield(e) -> this.emitYield(this.emitExpr(e), e.pos)
-    | I.YieldBreak(pos) -> this.emitYieldBreak(pos)
+      this.emitTry(
+        context,
+        body,
+        () -> this.emitStmt(context, catchMatch),
+        excBinding,
+        pos,
+      )
+    | I.Throw(e) -> this.emitThrow(this.emitExpr(context, e), e.pos)
+    | I.Yield(e) -> this.emitYield(context, this.emitExpr(context, e), e.pos)
+    | I.YieldBreak(pos) -> this.emitYieldBreak(context, pos)
     }
   }
 }
@@ -5072,7 +5306,7 @@ fun createIR(
   constsVec = mutable Vector[];
 
   for (constDef in converter.program.const_defs) {
-    constsVec.push(converter.convertConstDef(constDef));
+    constsVec.push(converter.convertConstDef(context, constDef));
   };
 
   for (_key => classDef in converter.program.class_defs) {
@@ -5090,6 +5324,7 @@ fun createIR(
 
             constsVec.push(
               converter.convertConstDef(
+                context,
                 constDef with {name => I.Name(constPos, realConstName)},
               ),
             )
@@ -5179,12 +5414,12 @@ fun createIR(
   );
 
   for (gid in forceCompile) {
-    _ = specializer.requestFunction(gid, Array[])
+    _ = specializer.requestFunction(context, gid, Array[])
   };
   reportMemoryStatistics("native/createIR after force compile constant inits");
 
   // Find every relevant type and function in the program.
-  specializer.findAllFunctionsAndSClasses();
+  specializer.findAllFunctionsAndSClasses(context);
   reportMemoryStatistics("native/createIR after findAllFunctionsAndSClasses");
 
   // Latch the sub- and supertypes.
@@ -5212,7 +5447,7 @@ fun createIR(
   reportMemoryStatistics("native/createIR after FieldLayoutChooser");
 
   // Split up functions based on which ones can share machine code.
-  !env = specializer.partitionFunctions(runtimeFunctions, env);
+  !env = specializer.partitionFunctions(context, runtimeFunctions, env);
   reportMemoryStatistics("native/createIR after partitionFunctions");
 
   newFuns = env.sfuns.clone();
