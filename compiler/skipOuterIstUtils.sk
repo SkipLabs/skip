@@ -813,18 +813,6 @@ mutable base class Visitor {
     (new, cds1) = cds.mapAcc((b, _, c) -> this.acc_class_def(b, c), false);
     (new, if (new) cds1 else cds)
   }
-
-  overridable mutable fun program(p: O.Program): (Bool, O.Program) {
-    (
-      this.class_defs(p.class_defs),
-      this.const_defs(p.const_defs),
-      this.fun_defs(p.fun_defs),
-    ) match {
-    | ((false, _), (false, _), (false, _)) -> (false, p)
-    | ((_, class_defs), (_, const_defs), (_, fun_defs)) ->
-      (true, p with {class_defs, const_defs, fun_defs})
-    }
-  }
 }
 
 // pipeline a sequence of visits to function-level definitions
