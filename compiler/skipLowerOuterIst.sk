@@ -49,21 +49,23 @@ mutable class EnsureOuterIstVisitor(new_id: () -> Int) extends OU.Visitor {
 }
 
 fun loweringPasses(
+  context: mutable SKFS.Context,
   new_id: () -> Int,
-  class_defs: UMap<O.ClassDef>,
+  class_defs: O.Program,
 ): Array<mutable OU.Visitor> {
   Array[
     mutable EnsureOuterIstVisitor(new_id),
-    mutable SkipLowerMatches.MatchCompiler(new_id, class_defs),
+    mutable SkipLowerMatches.MatchCompiler(new_id, class_defs, context),
     mutable SkipOptimizeLocals.LocalsOptimizer(new_id),
   ]
 }
 
 fun loweringPipeline(
+  context: mutable SKFS.Context,
   new_id: () -> Int,
-  class_defs: UMap<O.ClassDef>,
+  class_defs: O.Program,
 ): mutable OU.FunctionLevelVisitorPipeline {
-  passes = loweringPasses(new_id, class_defs);
+  passes = loweringPasses(context, new_id, class_defs);
   mutable OU.FunctionLevelVisitorPipeline(passes)
 }
 
@@ -73,31 +75,41 @@ fun loweringPipeline(
 //
 
 fun class_params(
+  context: mutable SKFS.Context,
   class_params: O.ClassParams,
   program: O.Program,
 ): O.ClassParams {
   new_id = sk_create_counter();
-  pipe = loweringPipeline(new_id, program.class_defs);
+  pipe = loweringPipeline(context, new_id, program);
   pipe.class_params(class_params).i1
 }
 
-fun const_def(const_def: O.ConstDef, program: O.Program): O.ConstDef {
+fun const_def(
+  context: mutable SKFS.Context,
+  const_def: O.ConstDef,
+  program: O.Program,
+): O.ConstDef {
   new_id = sk_create_counter();
-  pipe = loweringPipeline(new_id, program.class_defs);
+  pipe = loweringPipeline(context, new_id, program);
   pipe.const_def(const_def).i1
 }
 
-fun fun_def(fun_def: O.FunDef, program: O.Program): O.FunDef {
+fun fun_def(
+  context: mutable SKFS.Context,
+  fun_def: O.FunDef,
+  program: O.Program,
+): O.FunDef {
   new_id = sk_create_counter();
-  pipe = loweringPipeline(new_id, program.class_defs);
+  pipe = loweringPipeline(context, new_id, program);
   pipe.fun_def(fun_def).i1
 }
 
 fun method_def(
+  context: mutable SKFS.Context,
   method_def: O.MethodDef,
   program: OuterIst.Program,
 ): O.MethodDef {
   new_id = sk_create_counter();
-  pipe = loweringPipeline(new_id, program.class_defs);
+  pipe = loweringPipeline(context, new_id, program);
   pipe.method_def(method_def).i1
 }

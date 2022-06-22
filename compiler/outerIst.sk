@@ -204,7 +204,7 @@ base class CallableDef{
     | _ -> true
     }
   }
-  fun lower(program: Program): this;
+  fun lower(context: mutable SKFS.Context, program: Program): this;
 }
 
 class MethodDef{
@@ -218,18 +218,18 @@ class MethodDef{
   implicit_param: Binding,
   generic_mapping: SMap<SMap<Type>>,
 } extends CallableDef {
-  fun lower(program: Program): this {
+  fun lower(context: mutable SKFS.Context, program: Program): this {
     this.body match {
-    | Some(TypedBody _) -> SLO.method_def(this, program)
+    | Some(TypedBody _) -> SLO.method_def(context, this, program)
     | _ -> this.getPos().die(`already lowered`)
     }
   }
 }
 
 class FunDef{} extends CallableDef {
-  fun lower(program: Program): this {
+  fun lower(context: mutable SKFS.Context, program: Program): this {
     this.body match {
-    | Some(TypedBody _) -> SLO.fun_def(this, program)
+    | Some(TypedBody _) -> SLO.fun_def(context, this, program)
     | _ -> this.getPos().die(`already lowered`)
     }
   }

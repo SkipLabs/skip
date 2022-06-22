@@ -340,7 +340,10 @@ base class ConcreteLazyGFun{
     emitter: mutable OuterIstEmitter,
   ): void;
 
-  overridable fun getParams(Converter): Array<ParameterInfo> {
+  overridable fun getParams(
+    _context: mutable SKFS.Context,
+    Converter,
+  ): Array<ParameterInfo> {
     this.params
   }
 
@@ -386,7 +389,7 @@ class InspectLazyGFun extends ConcreteLazyGFun {
           cls,
           emitter.converter.getGFunction(
             context,
-            def.function.fromSome()(clsID),
+            def.function.fromSome()(context, clsID),
           ),
           emitter.converter,
         )
@@ -644,14 +647,14 @@ class GetClassLazyGFun extends ConcreteLazyGFun {
 
 // Lazy functions with either a backing definition or a handbuilt body.
 base class BodyProvidingLazyGFun{} extends ConcreteLazyGFun {
-  fun getBody(converter: Converter): I.Stmt;
+  fun getBody(context: mutable SKFS.Context, converter: Converter): I.Stmt;
 
   overridable protected fun emitBody(
     context: mutable SKFS.Context,
     emitter: mutable OuterIstEmitter,
   ): void {
     emitter.emitBindParameters(context);
-    emitter.emitStmt(context, this.getBody(emitter.converter));
+    emitter.emitStmt(context, this.getBody(context, emitter.converter));
   }
 }
 
@@ -660,7 +663,7 @@ base class BodyLazyGFun{body: I.Stmt} extends BodyProvidingLazyGFun {
   | NormalLazyGFun
   | ConstLazyGFun{constName: ConstID}
 
-  fun getBody(_: Converter): I.Stmt {
+  fun getBody(_context: mutable SKFS.Context, _: Converter): I.Stmt {
     this.body
   }
 }
@@ -796,8 +799,11 @@ class MemoizeThunkLazyGFun{
 class MemoizeLazyGFun{
   bodyProvider: BodyProvidingLazyGFun,
 } extends ConcreteLazyGFun {
-  fun getParams(converter: Converter): Array<ParameterInfo> {
-    this.bodyProvider.getParams(converter)
+  fun getParams(
+    context: mutable SKFS.Context,
+    converter: Converter,
+  ): Array<ParameterInfo> {
+    this.bodyProvider.getParams(context, converter)
   }
 
   protected fun emitBody(
@@ -824,7 +830,7 @@ class MemoizeLazyGFun{
     //    pass in a flag saying whether the default needs to be evaluated,
     //    but don't pass in a value.
     capturedVec = mutable Vector[];
-    this.getParams(converter).eachWithIndex((i, p) -> {
+    this.getParams(context, converter).eachWithIndex((i, p) -> {
       updated = p.info.updated || p.value.isSome();
 
       if (updated || p.info.read) {
@@ -860,7 +866,7 @@ class MemoizeLazyGFun{
     useOptionalMask = this.useOptionalMask;
 
     callMethod = GMethodDef{
-      function => Some(receiver ~> {
+      function => Some((context, receiver) ~> {
         callMethodFunInfo = GFunInfo{
           gfunction => GFunctionName(thunkClassname.id + "::call"),
           pos,
@@ -894,7 +900,7 @@ class MemoizeLazyGFun{
             },
           ],
           capturedParams => captured.map(x -> x.i1),
-          body => bodyProvider.getBody(converter),
+          body => bodyProvider.getBody(context, converter),
           useOptionalMask,
         }
       }),
@@ -1007,8 +1013,11 @@ class AsyncCoroutineLazyGFun{
     extractAwaitableType(this.funInfo.funType.returnType, this.funInfo.pos)
   }
 
-  fun getParams(converter: Converter): Array<ParameterInfo> {
-    this.bodyProvider.getParams(converter)
+  fun getParams(
+    context: mutable SKFS.Context,
+    converter: Converter,
+  ): Array<ParameterInfo> {
+    this.bodyProvider.getParams(context, converter)
   }
 
   // Return the Awaitable object for the current async function.
@@ -1042,7 +1051,7 @@ class AsyncCoroutineLazyGFun{
 
     emitter.emitTry(
       context,
-      this.bodyProvider.getBody(emitter.converter),
+      this.bodyProvider.getBody(context, emitter.converter),
       () -> {
         _ = emitter.emitCallFunction(
           FrontEndLazyGFun{frontEndName => "Awaitable.awaitableThrow"},
@@ -1110,15 +1119,18 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     }
   }
 
-  fun getBody(converter: Converter): I.Stmt {
-    getLoweredDef(converter.program, this.def).getBody().asOuter()
+  fun getBody(context: mutable SKFS.Context, converter: Converter): I.Stmt {
+    getLoweredDef(context, converter.program, this.def).getBody().asOuter()
   }
 
   // get our lowered def, and patch our params array with the fresh info.
   // (For simplicity we just do this every time getParams() is called,
   // on the assumption it's usually called just once)
-  fun getParams(converter: Converter): Array<ParameterInfo> {
-    def = getLoweredDef(converter.program, this.def);
+  fun getParams(
+    context: mutable SKFS.Context,
+    converter: Converter,
+  ): Array<ParameterInfo> {
+    def = getLoweredDef(context, converter.program, this.def);
     defParams = def.getParams();
     this.params.map(p -> {
       if (p.index < 0) {
@@ -1172,10 +1184,11 @@ private fun parseClosureFieldName(field: GField): (String, ClosureCaptureKind) {
 }
 
 private fun memoizedGetLoweredDef(
+  context: mutable SKFS.Context,
   program: I.Program,
   def: I.CallableDef,
 ): I.CallableDef {
-  lowered = def.lower(program);
+  lowered = def.lower(context, program);
   if (shouldDebugSymbol(def.getName())) {
     debug(def.getName() + " unlowered");
     debug(def);
@@ -1186,13 +1199,14 @@ private fun memoizedGetLoweredDef(
 }
 
 private fun getLoweredDef(
+  context: mutable SKFS.Context,
   program: I.Program,
   def: I.CallableDef,
 ): I.CallableDef {
   if (def.isLowered()) {
     def
   } else {
-    memoizedGetLoweredDef(program, def)
+    memoizedGetLoweredDef(context, program, def)
   }
 }
 
@@ -1343,7 +1357,7 @@ value class Converter private (
       // Copy this into a local so we don't capture all of gclass.
       tparams = gclass.tparams;
 
-      Some(receiver ~> {
+      Some((_context, receiver) ~> {
         className = receiver.name();
 
         funInfo = GFunInfo{
@@ -1391,7 +1405,7 @@ value class Converter private (
       // Copy this into a local so we don't capture all of gclass.
       tparams = gclass.tparams;
 
-      Some(receiver ~> {
+      Some((_context, receiver) ~> {
         className = receiver.name();
 
         returnType = GTapply(
@@ -1653,7 +1667,7 @@ value class Converter private (
     methods = UnorderedMap[
       "call" => GMethodDef{
         function => generateBody.map(bodyFunc ~>
-          receiver ~> {
+          (_context, receiver) ~> {
             thisType: GType = GTapply(
               receiver,
               Mutability::fromFlag(callMethodType.isMutable),
@@ -1790,20 +1804,24 @@ value class Converter private (
 
   // Return the fields for a class, if any,
   // with lowered OuterIst in their default initializers
-  private fun getLoweredFields(cd: I.ClassDef): Parameters<I.Parameter> {
+  private fun getLoweredFields(
+    context: mutable SKFS.Context,
+    cd: I.ClassDef,
+  ): Parameters<I.Parameter> {
     cd.params match {
-    | Some(cp) -> SLO.class_params(cp, this.program).params
+    | Some(cp) -> SLO.class_params(context, cp, this.program).params
     | None() -> Positional::create()
     }
   }
 
   private fun createFactory(
+    context: mutable SKFS.Context,
     returnsMutable: Bool,
     isAbstract: Bool,
     frontEndGClass: I.ClassDef,
     pos: FileRange,
   ): I.MethodDef {
-    frontEndFields = this.getLoweredFields(frontEndGClass);
+    frontEndFields = this.getLoweredFields(context, frontEndGClass);
 
     frontEndTparams = frontEndGClass.tparams.map(tp -> {
       I.Type(pos, I.Tparam(tp.var, tp.id, tp.name, None()))
@@ -2208,7 +2226,13 @@ value class Converter private (
       fegc = this.program.getClass(context, gc.name.id);
       for (factoryIndex in Range(0, 2)) {
         factoryIsMutable = (factoryIndex == 0);
-        factory = this.createFactory(factoryIsMutable, true, fegc, pos);
+        factory = this.createFactory(
+          context,
+          factoryIsMutable,
+          true,
+          fegc,
+          pos,
+        );
         (mname, mf) = this.convertMethodDef(
           context,
           factory,
@@ -2273,7 +2297,13 @@ value class Converter private (
             fegc = this.program.getClass(context, gc.name.id);
             for (factoryIndex in Range(0, 2)) {
               factoryIsMutable = (factoryIndex == 0);
-              factory = this.createFactory(factoryIsMutable, false, fegc, pos);
+              factory = this.createFactory(
+                context,
+                factoryIsMutable,
+                false,
+                fegc,
+                pos,
+              );
               (mname, mf) = this.convertMethodDef(
                 context,
                 factory,
@@ -2854,7 +2884,7 @@ value class Converter private (
     (
       name,
       GMethodDef{
-        function => methodFunction.map(lazy ~> _ ~> lazy),
+        function => methodFunction.map(lazy ~> ((_, _) ~> lazy)),
         tparams => methodTparams,
         tparamInherit,
         pos,
@@ -2878,7 +2908,7 @@ value class Converter private (
     constName = ConstID(in_.name.id);
 
     // generate initializer outerIst eagerly for const_defs
-    !in_ = SLO.const_def(in_, this.program);
+    !in_ = SLO.const_def(context, in_, this.program);
 
     in_.value match {
     | Some(init) ->
@@ -3021,7 +3051,7 @@ value class Converter private (
             methodDef
           } else {
             GMethodDef{
-              function => Some(receiver ~> {
+              function => Some((_context, receiver) ~> {
                 generatorType = GTapply(receiver, Mutable(), tparams);
 
                 // Produce a skeleton for the "next" method. The body will
@@ -3144,7 +3174,7 @@ value class Converter private (
           if (name != "next") {
             methodDef
           } else {
-            function = receiver ~> {
+            function = (_context, receiver) ~> {
               // Produce a skeleton for the "next" method. The body will
               // be filled in for real much later, once the ramp up function
               // has been optimized and gets split in two.
@@ -3433,7 +3463,7 @@ mutable class OuterIstEmitter{
       }
     };
 
-    paramInfos = lazy.getParams(this.converter);
+    paramInfos = lazy.getParams(context, this.converter);
 
     // Declare all required arguments and all optional positional arguments.
     // Optional named arguments are handled below.
@@ -5004,7 +5034,7 @@ mutable class OuterIstEmitter{
     method = gc.methods["next"];
     opt = this.converter.getGFunction(
       context,
-      method.function.fromSome("No next method found")(ta.generic),
+      method.function.fromSome("No next method found")(context, ta.generic),
     ).funInfo.funType.returnType;
 
     targs = opt match {

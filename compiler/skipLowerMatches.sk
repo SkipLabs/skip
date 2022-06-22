@@ -308,31 +308,28 @@ fun select_match_column(rows: List<Row>): Int {
  * class. We need to do this in order to get around weird subtyping relationships
  * and multiple inheritance in our generated code. */
 fun concretize_class(
-  class_defs: UMap<O.ClassDef>,
+  context: mutable SKFS.Context,
+  program: O.Program,
   class_tid: O.TypeIdentifier,
 ): List<O.TypeIdentifier> {
   class_tid match {
   | O.TidStatic _ -> List[class_tid]
   | O.TidObject(name) ->
-    class_defs.maybeGetNoPos(name.id) match {
-    | None() ->
-      name.pos.die(`ICE: no definition for class ${name.id} in match lowering`)
-    | Some(class_def) ->
-      class_def.kind match {
-      | O.KTrait() -> List[]
-      | O.KBase() ->
-        /* We can have a base class with no children. So if this is the case
-         * add the base class back in.*/
-        if (class_def.concrete_children.isEmpty()) {
-          List[class_tid]
-        } else {
-          class_def.concrete_children.reduce(
-            (acc, kid) ~> List.Cons(O.TidObject(O.Name(name.pos, kid)), acc),
-            List[],
-          )
-        }
-      | O.KClass() -> List[class_tid]
+    class_def = program.getClass(context, name.id);
+    class_def.kind match {
+    | O.KTrait() -> List[]
+    | O.KBase() ->
+      /* We can have a base class with no children. So if this is the case
+       * add the base class back in.*/
+      if (class_def.concrete_children.isEmpty()) {
+        List[class_tid]
+      } else {
+        class_def.concrete_children.reduce(
+          (acc, kid) ~> List.Cons(O.TidObject(O.Name(name.pos, kid)), acc),
+          List[],
+        )
       }
+    | O.KClass() -> List[class_tid]
     }
   }
 }
@@ -397,7 +394,8 @@ mutable class Acc{
 // Match-lowering visitor
 mutable class MatchCompiler(
   new_id: () -> Int,
-  cds: UMap<O.ClassDef>,
+  program: O.Program,
+  context: mutable SKFS.Context,
   mutable acc: mutable Acc = mutable Acc{},
 ) extends OIU.Visitor {
   readonly fun getVisitorName(): String {
@@ -480,6 +478,7 @@ mutable class MatchCompiler(
   }
 
   readonly fun concretizePatterns(
+    context: mutable SKFS.Context,
     patterns: List<StrippedPattern>,
   ): (List<StrippedPattern>, List<StrippedPattern>) {
     patterns match {
@@ -487,14 +486,14 @@ mutable class MatchCompiler(
     | List.Cons(pat, rest) ->
       // subtle: we want to retain original subclasses, and only fill in using
       // expanded base classes. This retains critical type info from original pats
-      (orig, expanded) = this.concretizePatterns(rest);
+      (orig, expanded) = this.concretizePatterns(context, rest);
       pat.pat match {
       /* params don't matter here */
       | PatType(tid, castType, params) ->
         (ty, pos) = (pat.ty, pat.pos);
         update_pat = new_tid ->
           StrippedPattern(ty, pos, PatType(new_tid, castType, params));
-        concrete_subs = concretize_class(this.cds, tid);
+        concrete_subs = concretize_class(context, this.program, tid);
         concrete_subs.foldl(
           (acc, sub_tid) -> {
             (orig1, expanded1) = acc;
@@ -514,23 +513,30 @@ mutable class MatchCompiler(
   /* Return separate lists of wildcards and constructors from a pattern column,
      with the constructors concretized and deduped. */
   readonly fun getRootConstructors(
+    context: mutable SKFS.Context,
     col: List<StrippedPattern>,
   ): (List<StrippedPattern>, List<StrippedPattern>) {
     (wildcards, ctors) = col.partition(p ~> p.isDefault());
-    (orig, expanded) = this.concretizePatterns(ctors);
+    (orig, expanded) = this.concretizePatterns(context, ctors);
     deduped = this.dedupConstructors(orig, expanded);
     (wildcards, deduped)
   }
 
-  readonly fun isChild(c: O.TypeIdentifier, p: O.TypeIdentifier): Bool {
-    this.cds.maybeGetNoPos(c.name.id) match {
-    | None() -> c.name.pos.die(`no definition for class ${c.name.id}`)
-    | Some(cd) -> cd.extends_.containsRawKey(p.name.id)
-    }
+  readonly fun isChild(
+    context: mutable SKFS.Context,
+    c: O.TypeIdentifier,
+    p: O.TypeIdentifier,
+  ): Bool {
+    cd = this.program.getClass(context, c.name.id);
+    cd.extends_.containsRawKey(p.name.id);
   }
 
-  readonly fun isSubtype(c: O.TypeIdentifier, p: O.TypeIdentifier): Bool {
-    c.name.id == p.name.id || this.isChild(c, p)
+  readonly fun isSubtype(
+    context: mutable SKFS.Context,
+    c: O.TypeIdentifier,
+    p: O.TypeIdentifier,
+  ): Bool {
+    c.name.id == p.name.id || this.isChild(context, c, p)
   }
 
   /* We need to possibly add wildcards to @params since the left
@@ -555,13 +561,14 @@ mutable class MatchCompiler(
 
   /* canonicalize the given parameters to non-optional named form */
   readonly fun namedParams<T>(
+    context: mutable SKFS.Context,
     cls_name: O.Name,
     paramsOpt: ?Parameters<T>,
   ): UMap<T> {
     paramsOpt match {
     | None() -> UMap[]
     | Some(Positional(plist)) ->
-      cd = this.cds.getOrCrash(cls_name.id);
+      cd = this.program.getClass(context, cls_name.id);
       cd.params match {
       | None() -> UMap[]
       | Some(O.ClassParams{params => Named _}) ->
@@ -616,7 +623,11 @@ mutable class MatchCompiler(
    * type constructors, and the incoming is a subtype. In this case we recurse
    * into the constructor arguments, and add those tests to the head of the row.
    */
-  readonly fun specializeRow(con: StrippedPattern, r: Row): ?Row {
+  readonly fun specializeRow(
+    context: mutable SKFS.Context,
+    con: StrippedPattern,
+    r: Row,
+  ): ?Row {
     invariant(!r.patterns.isEmpty(), "specialize_row: empty pattern row");
     restPatsIter = () ~> r.patterns.iterator().drop(1);
     restRow = () ~> r with {patterns => r.patterns.drop(1)};
@@ -640,13 +651,13 @@ mutable class MatchCompiler(
       patterns = wildcards.concat(restPatsIter()).collect(Array);
       Some(r with {patterns})
     | (PatType _, PatLiteral _) -> None()
-    | (
-      PatType(conTid, _, conParams),
-      PatType(patTid, _, patParams),
-    ) if (this.isSubtype(conTid, patTid)) ->
-      patterns = this.normalizeParams(conParams, patParams, restPatsIter());
-      Some(r with {patterns})
-    | (PatType _, PatType _) -> None()
+    | (PatType(conTid, _, conParams), PatType(patTid, _, patParams)) ->
+      if (this.isSubtype(context, conTid, patTid)) {
+        patterns = this.normalizeParams(conParams, patParams, restPatsIter());
+        Some(r with {patterns})
+      } else {
+        None()
+      }
     }
   }
 
@@ -710,10 +721,14 @@ mutable class MatchCompiler(
   }
 
   /* true if concretized classes of expr's type are covered by pats */
-  readonly fun isSaturated(expr: O.Expr, pats: List<StrippedPattern>): Bool {
+  readonly fun isSaturated(
+    context: mutable SKFS.Context,
+    expr: O.Expr,
+    pats: List<StrippedPattern>,
+  ): Bool {
     expr.ty match {
     | O.Type(_, O.Tapply(name, _)) ->
-      concretes = concretize_class(this.cds, O.TidObject(name));
+      concretes = concretize_class(context, this.program, O.TidObject(name));
       (pats.size() >= concretes.size()) &&
         {
           concrete_names = concretes.map(c ->
@@ -742,6 +757,7 @@ mutable class MatchCompiler(
   /* The same thing is done here as in @generate_switch, just outputing
    * typeswitches instead. */
   readonly fun generateTypeSwitch(
+    context: mutable SKFS.Context,
     expr: O.Expr,
     compiledPats: List<(StrippedPattern, O.Stmt)>,
     defaultBranch: ?O.Stmt,
@@ -750,7 +766,7 @@ mutable class MatchCompiler(
       pat.pat match {
       | PatType(tid, _, _) ->
         pos = pat.pos;
-        concretize_class(this.cds, tid).map(c ~> (pos, c))
+        concretize_class(context, this.program, tid).map(c ~> (pos, c))
       | _ ->
         invariant_violation(
           "Internal error: encountered non-type pattern while generating type-switch statement",
@@ -809,7 +825,9 @@ mutable class MatchCompiler(
     /* Specializing a matrix w.r.t a constructor is just specializing each row
      * of the matrix based on that constructor. Note that specialization of a matrix
      * may very well remove some rows from the matrix. */
-    specRows = rows.map(r -> this.specializeRow(ctor, r)).filterNone();
+    specRows = rows
+      .map(r -> this.specializeRow(this.context, ctor, r))
+      .filterNone();
     cmat = MemoKey(exprs, specRows);
     this.acc.memoTable.maybeGet(cmat) match {
     | Some(lab) ->
@@ -866,12 +884,14 @@ mutable class MatchCompiler(
       (!rows, !exprs) = swapCols(rows, exprs, i);
       col0 = get_nth_column_pats(rows, 0);
       // Grab the constructors in the column, remove wildcards, and setify
-      (wildcards, rootCtors) = this.getRootConstructors(col0);
+      (wildcards, rootCtors) = this.getRootConstructors(this.context, col0);
       compiledPats = rootCtors.map(c ->
         this.compileSub(c, exprs, rows, default)
       );
       // if this is a saturated column, we can dispense with WCs
-      if (this.isSaturated(exprs[0].e, rootCtors)) !wildcards = List[];
+      if (this.isSaturated(this.context, exprs[0].e, rootCtors)) {
+        !wildcards = List[]
+      };
       // if there are any wildcards in our left column, default will route to
       // the submatrix reachable from them. Otherwise, drop through to outer
       // default.
@@ -897,7 +917,7 @@ mutable class MatchCompiler(
       testStmt = if (rootCtors.any(rc ~> rc.pat is PatLiteral _)) {
         this.generateSwitch(exprs[0].e, compiledPats, default)
       } else {
-        this.generateTypeSwitch(exprs[0].e, compiledPats, default)
+        this.generateTypeSwitch(this.context, exprs[0].e, compiledPats, default)
       };
       /* Now label this subproblem so that others can jump to us possibly */
       this.addBlock(pos, testStmt)
@@ -973,18 +993,20 @@ mutable class MatchCompiler(
        * needed later on in order to allow us to deal with parameter overrides in the
        * multiple inheritance case. */
       texpr = typedAliasExpr();
-      pmap = this.namedParams(tid.name, paramPats).map((name, param) -> {
-        (pos, id) = name;
-        getField = OIU.make_get_field(
-          param.ty,
-          param.pat.pos,
-          tid.name,
-          texpr,
-          O.Name(pos, id),
-        );
-        paramPat = this.convertPat(getField, binds, inits, param.pat);
-        StrippedParamPattern(param.ty, paramPat)
-      });
+      pmap = this.namedParams(this.context, tid.name, paramPats).map(
+        (name, param) -> {
+          (pos, id) = name;
+          getField = OIU.make_get_field(
+            param.ty,
+            param.pat.pos,
+            tid.name,
+            texpr,
+            O.Name(pos, id),
+          );
+          paramPat = this.convertPat(getField, binds, inits, param.pat);
+          StrippedParamPattern(param.ty, paramPat)
+        },
+      );
       StrippedPattern(p.ty, p.pos, PatType(tid, castType, pmap))
     | O.Pat_as(pat, b) ->
       if (!OIU.is_underscore_binding(b)) {
