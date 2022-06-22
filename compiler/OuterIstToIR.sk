@@ -1223,71 +1223,112 @@ fun makeGFunTypeWithFlags{
   GFunType{isMutable, isTracked, params => paramsWithFlags, returnType}
 }
 
+class LazyGFunKey(value: LazyGFun) extends SKFS.BaseName {
+  fun compare(other: SKFS.BaseName): Order {
+    other match {
+    | LazyGFunKey(x) -> this.value.toString().compare(x.toString())
+    | _ -> invariant_violation("Heterogeneous keys found")
+    }
+  }
+}
+
+class GFunctionFile(value: GFunction) extends SKFS.File
+
+class LazyGClassKey(value: LazyGClass) extends SKFS.BaseName {
+  fun compare(other: SKFS.BaseName): Order {
+    other match {
+    | LazyGClassKey(x) -> this.value.name().id.compare(x.name().id)
+    | _ -> invariant_violation("Heterogeneous keys found")
+    }
+  }
+}
+class GClassFile(value: GClass) extends SKFS.File
+
 // Manages the overall conversion from OuterIst to IR.
 value class Converter private (
   program: I.Program,
-  funs: SKFS.LHandle<GFunction>,
-  classes: SKFS.LHandle<GClass>,
+  funs: SKFS.LHandle<GFunctionFile>,
+  classes: SKFS.LHandle<GClassFile>,
 ) {
   static fun create(
-    _context: mutable SKFS.Context,
-    _name: SKFS.DirName,
-    _program: I.Program,
+    context: mutable SKFS.Context,
+    name: SKFS.DirName,
+    program: I.Program,
   ): this {
-    todo();
-    /*
-        funs = SKFS.LHandle::create(
-          context,
-          SKFS.DirName::create(name.toString() + "funs/"),
-          this.getGFunctionFun,
-        );
-            classes = SKFS.LHandle::Create(
-              context,
-              SKFS.DirName::create(name.toString() + "classes/"),
-              this.getGFunctionClasses,
-            );
-            static(program, funs, classes)
-        */
+    funDirName = SKFS.DirName::create(name.toString() + "funs/");
+    funs = SKFS.LHandle(GFunctionFile::fromFile, funDirName);
+    classDirName = SKFS.DirName::create(name.toString() + "classes/");
+    classes = SKFS.LHandle(GClassFile::fromFile, classDirName);
+    converter = static(program, funs, classes);
+    _ = SKFS.LHandle::create(
+      GFunctionFile::fromFile,
+      context,
+      funDirName,
+      converter.getGFunctionFun,
+    );
+    _ = SKFS.LHandle::create(
+      GClassFile::fromFile,
+      context,
+      classDirName,
+      converter.getGClassImplFun,
+    );
+    converter
   }
 
   fun getGFunction(context: mutable SKFS.Context, lazy: LazyGFun): GFunction {
-    this.funs.get(context, SKFS.SID(lazy.gname().idValue()))
+    this.funs.get(context, LazyGFunKey(lazy)).value
   }
 
   fun getGFunctionFun(
     context: mutable SKFS.Context,
-    lazy: LazyGFun,
-  ): GFunction {
-    lazy.compile(context, this)
+    _self: SKFS.LHandle<GFunctionFile>,
+    key: SKFS.BaseName,
+  ): Array<GFunctionFile> {
+    lazy = key match {
+    | LazyGFunKey(x) -> x
+    | _ -> invariant_violation("Unexpected key type")
+    };
+    Array[GFunctionFile(lazy.compile(context, this))]
   }
 
   private fun getGClassImpl(
     context: mutable SKFS.Context,
     gid: LazyGClass,
   ): GClass {
-    this.classes.get(context, SKFS.SID(gid.name().idValue()))
+    this.classes.get(context, LazyGClassKey(gid)).value
   }
 
   private fun getGClassImplFun(
     context: mutable SKFS.Context,
-    gid: LazyGClass,
-  ): GClass {
-    gid match {
-    | LiteralLazyGClass(cls) -> cls
-    | name @ FrontEndLazyGClass _ ->
-      classDef = this.program.getClass(context, name.id);
-      this.convertClassDef(context, classDef, name, classDef.name.pos)
-    | meta @ BaseMetaLazyGClass _ -> this.createBaseMeta(context, meta)
-    | meta @ BaseMetaImplLazyGClass _ -> this.createBaseMetaImpl(context, meta)
-    | meta @ ClassMetaLazyGClass _ -> this.createClassMeta(context, meta)
-    | meta @ ConcreteMetaLazyGClass _ -> this.createConcreteMeta(context, meta)
-    | meta @ ConcreteMetaImplLazyGClass _ ->
-      this.createConcreteMetaImpl(context, meta)
-    | c @ ClosureBaseLazyGClass _ -> this.createClosureBaseClass(context, c)
-    | MetaMetaLazyGClass _ -> this.createMetaMeta(context)
-    | rt @ ReturnTupleLazyGClass(arity) ->
-      this.createReturnTuple(context, rt.name(), arity)
-    }
+    _self: SKFS.LHandle<GClassFile>,
+    key: SKFS.BaseName,
+  ): Array<GClassFile> {
+    gid = key match {
+    | LazyGClassKey(x) -> x
+    | _ -> invariant_violation("Unexpected key type")
+    };
+    Array[
+      GClassFile(
+        gid match {
+        | LiteralLazyGClass(cls) -> cls
+        | name @ FrontEndLazyGClass _ ->
+          classDef = this.program.getClass(context, name.id);
+          this.convertClassDef(context, classDef, name, classDef.name.pos)
+        | meta @ BaseMetaLazyGClass _ -> this.createBaseMeta(context, meta)
+        | meta @ BaseMetaImplLazyGClass _ ->
+          this.createBaseMetaImpl(context, meta)
+        | meta @ ClassMetaLazyGClass _ -> this.createClassMeta(context, meta)
+        | meta @ ConcreteMetaLazyGClass _ ->
+          this.createConcreteMeta(context, meta)
+        | meta @ ConcreteMetaImplLazyGClass _ ->
+          this.createConcreteMetaImpl(context, meta)
+        | c @ ClosureBaseLazyGClass _ -> this.createClosureBaseClass(context, c)
+        | MetaMetaLazyGClass _ -> this.createMetaMeta(context)
+        | rt @ ReturnTupleLazyGClass(arity) ->
+          this.createReturnTuple(context, rt.name(), arity)
+        },
+      ),
+    ]
   }
 
   // Every class gets a codegen'd method to help with "inspect". Although

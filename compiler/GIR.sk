@@ -41,7 +41,7 @@ base class .GClassKind {
 // A descriptor that can produce a GClass on demand. See Converter::getGClass().
 // TODO: T31411692: Delete Hashable/Equality/hash once the only thing
 // looking these up is the memoizer.
-base class .LazyGClass() uses Hashable, Equality, HasClassName {
+base class .LazyGClass() uses Hashable, Orderable, HasClassName {
   children =
   // The name of a front end class, with an associated OuterIst.Class_def.
   | .FrontEndLazyGClass(id: String)
@@ -227,7 +227,11 @@ class GClass{
   fields: Array<GField> = Array[],
   canInstantiate: Bool = true,
   scalarType: ?ScalarType = None(),
-} extends HasFileRange {
+} extends HasFileRange uses Orderable {
+  fun compare(other: GClass): Order {
+    this.name.compare(other.name)
+  }
+
   fun maybeGetField(name: String): ?GField {
     this.fields.find(field -> field.name == name)
   }
