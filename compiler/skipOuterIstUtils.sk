@@ -869,22 +869,6 @@ mutable class FunctionLevelVisitorPipeline(
   }
 }
 
-// TODO remove when last callers have been ported to Visitor.
-// (There are a couple of non-NBE lowering passes remaining)
-fun map_program(
-  map_class_def: O.ClassDef -> O.ClassDef,
-  map_const_def: O.ConstDef -> O.ConstDef,
-  map_fun_def: O.FunDef -> O.FunDef,
-  prog: O.Program,
-): O.Program {
-  O.Program(
-    prog.program,
-    prog.class_defs.map((_, x) -> map_class_def(x)),
-    prog.fun_defs.map((_, x) -> map_fun_def(x)),
-    prog.const_defs.map((_, x) -> map_const_def(x)),
-  )
-}
-
 // -------------------------------------------------------------------------
 // -------------------------------------------------------------------------
 // -------------------------------------------------------------------------
@@ -1190,18 +1174,6 @@ fun stmt_map_to_fun_map(
     body => func.body.map(b -> b.mapOuter(map_stmt)),
     params => stmt_map_to_parameters_map(map_stmt, func.params),
   }
-}
-
-fun map_program_stmts(
-  map_stmt: ((O.Stmt) -> O.Stmt),
-  prog: O.Program,
-): O.Program {
-  map_program(
-    p -> stmt_map_to_class_map(map_stmt, p),
-    p -> stmt_map_to_const_map(map_stmt, p),
-    p -> stmt_map_to_fun_map(map_stmt, p),
-    prog,
-  )
 }
 
 /*****************************************************************************/

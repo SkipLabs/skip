@@ -68,23 +68,4 @@ fun validateExpression(_program: O.Program, _e: O.Expr): void {
   void
 }
 
-// Reuses the mapping/finding framework for iteration ...
-fun validateProgram(program: O.Program): void {
-  validateMapper = s -> {
-    _ = OU.iterate_stmt(
-      e -> {
-        validateExpression(program, e);
-        OU.Continue()
-      },
-      s -> {
-        validateStatement(program, s);
-        OU.Continue()
-      },
-      s,
-    );
-    s;
-  };
-  _ = OU.map_program_stmts(validateMapper, program);
-}
-
 module end;
