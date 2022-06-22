@@ -459,12 +459,7 @@ mutable class Specializer{
         } else {
           // Look up the source method so we can add its tparams
           // to the environment.
-          sourceGClass = this.converter.getGClass(
-            context,
-            this.processedClasses,
-            call.source,
-            pos,
-          );
+          sourceGClass = this.converter.getGClass(context, call.source, pos);
           sm = sourceGClass.methods.maybeGet(call.method) match {
           | Some(cm) -> cm
           | None() ->
@@ -1252,12 +1247,7 @@ mutable class Specializer{
         return implInfo
       };
 
-      gclass = this.converter.getGClass(
-        context,
-        this.processedClasses,
-        hc.generic,
-        this.pos,
-      );
+      gclass = this.converter.getGClass(context, hc.generic, this.pos);
 
       kind = gclass.kind match {
       | ck @ ClassKind _ -> ck
@@ -1609,12 +1599,7 @@ mutable class Specializer{
     if (this.funsNeeded.maybeInsert(key)) {
       converter = this.converter;
 
-      function = converter.getGFunction(
-        context,
-        this.processedFuns,
-        this.processedClasses,
-        name,
-      );
+      function = converter.getGFunction(context, name);
 
       newTargs = classTargs.concat(methodTargs);
       if (function.funInfo.tparams.size() != newTargs.size()) {
@@ -1688,12 +1673,7 @@ mutable class Specializer{
     // Map each GFunction to all its instantiations.
     funToInstsMap = mutable UnorderedMap[];
     for (key in this.funsNeeded) {
-      gf = converter.getGFunction(
-        context,
-        this.processedFuns,
-        this.processedClasses,
-        key.i0,
-      );
+      gf = converter.getGFunction(context, key.i0);
       funToInstsMap.getOrAdd(gf, () -> mutable Vector[]).push(key)
     };
     reportMemoryStatistics("native/partitionFunctions after instantiation");

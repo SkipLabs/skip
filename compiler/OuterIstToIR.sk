@@ -228,12 +228,7 @@ class ParameterInfo{
 
 // A GFunction which may or may not be compiled to GIR yet.
 base class LazyGFun{} uses Hashable, Orderable, Show {
-  fun compile(
-    context: mutable SKFS.Context,
-    processedFuns: mutable Map<LazyGFun, GFunction>,
-    processedClasses: mutable Map<LazyGClass, GClass>,
-    converter: Converter,
-  ): GFunction;
+  fun compile(context: mutable SKFS.Context, converter: Converter): GFunction;
 
   fun gname(): GFunctionName;
 
@@ -262,8 +257,6 @@ class DoneLazyGFun{function: GFunction} extends LazyGFun {
 
   fun compile(
     _context: mutable SKFS.Context,
-    _processedFuns: mutable Map<LazyGFun, GFunction>,
-    _processedClasses: mutable Map<LazyGClass, GClass>,
     _converter: Converter,
   ): GFunction {
     this.function
@@ -276,19 +269,9 @@ class FrontEndLazyGFun{frontEndName: String} extends LazyGFun {
     GFunctionName(this.frontEndName)
   }
 
-  fun compile(
-    context: mutable SKFS.Context,
-    processedFuns: mutable Map<LazyGFun, GFunction>,
-    processedClasses: mutable Map<LazyGClass, GClass>,
-    converter: Converter,
-  ): GFunction {
+  fun compile(context: mutable SKFS.Context, converter: Converter): GFunction {
     funDef = converter.program.getFun(context, this.frontEndName);
-    converter.getGFunction(
-      context,
-      processedFuns,
-      processedClasses,
-      converter.convertFunDef(context, funDef),
-    )
+    converter.getGFunction(context, converter.convertFunDef(context, funDef))
   }
 }
 
@@ -305,8 +288,6 @@ class NativeLazyGFun{} extends FunInfoLazyGFun {
   // Make a no-implementation function.
   fun compile(
     _context: mutable SKFS.Context,
-    _processedFuns: mutable Map<LazyGFun, GFunction>,
-    _processedClasses: mutable Map<LazyGClass, GClass>,
     _converter: Converter,
   ): GFunction {
     funInfo = this.funInfo;
@@ -331,17 +312,9 @@ base class ConcreteLazyGFun{
 } extends FunInfoLazyGFun {
   overridable fun compile(
     context: mutable SKFS.Context,
-    processedFuns: mutable Map<LazyGFun, GFunction>,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     converter: Converter,
   ): GFunction {
-    emitter = OuterIstEmitter::make(
-      context,
-      converter,
-      this,
-      processedFuns,
-      processedClasses,
-    );
+    emitter = OuterIstEmitter::make(context, converter, this);
 
     emitter.emitPreamble();
 
@@ -399,12 +372,7 @@ class InspectLazyGFun extends ConcreteLazyGFun {
 
     pos = emitter.funInfo.pos;
     clsID = obj.typ.asGTapply(pos).generic;
-    cls = emitter.converter.getGClass(
-      context,
-      emitter.processedClasses,
-      clsID,
-      pos,
-    );
+    cls = emitter.converter.getGClass(context, clsID, pos);
     if (!cls.kind.isFinal()) {
       pos.die(`inspect method only valid for concrete classes, not ${obj.typ}`)
     };
@@ -415,12 +383,9 @@ class InspectLazyGFun extends ConcreteLazyGFun {
       if (
         !this.isLegalInspectSignature(
           context,
-          emitter.processedClasses,
           cls,
           emitter.converter.getGFunction(
             context,
-            emitter.processedFuns,
-            emitter.processedClasses,
             def.function.fromSome()(clsID),
           ),
           emitter.converter,
@@ -642,7 +607,6 @@ class InspectLazyGFun extends ConcreteLazyGFun {
   // we'll just ignore it.
   private fun isLegalInspectSignature(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     cls: GClass,
     f: GFunction,
     converter: Converter,
@@ -655,12 +619,7 @@ class InspectLazyGFun extends ConcreteLazyGFun {
       (funInfo.funType.returnType == gtInspect ||
         (funInfo.funType.returnType match {
         | GTapply(generic, _, _) ->
-          gc = converter.getGClass(
-            context,
-            processedClasses,
-            generic,
-            funInfo.pos,
-          );
+          gc = converter.getGClass(context, generic, funInfo.pos);
           gc.extends_.contains(gtInspect)
         | _ -> false
         }))
@@ -733,7 +692,6 @@ class MemoizeThunkLazyGFun{
     thisObj = emitter.params[0];
     fields = emitter.converter.getGClass(
       context,
-      emitter.processedClasses,
       thisObj.getType().asGTapply(pos).generic,
       pos,
     ).fields;
@@ -946,7 +904,6 @@ class MemoizeLazyGFun{
 
     thunkClass = converter.finishGClass(
       context,
-      emitter.processedClasses,
       GClass{
         name => thunkClassname,
         tparams,
@@ -989,7 +946,6 @@ class MemoizeLazyGFun{
     );
     memoReturnGClass = converter.getGClass(
       context,
-      emitter.processedClasses,
       memoReturnType.generic,
       pos,
     );
@@ -1268,7 +1224,72 @@ fun makeGFunTypeWithFlags{
 }
 
 // Manages the overall conversion from OuterIst to IR.
-value class Converter(program: I.Program) {
+value class Converter private (
+  program: I.Program,
+  funs: SKFS.LHandle<GFunction>,
+  classes: SKFS.LHandle<GClass>,
+) {
+  static fun create(
+    _context: mutable SKFS.Context,
+    _name: SKFS.DirName,
+    _program: I.Program,
+  ): this {
+    todo();
+    /*
+        funs = SKFS.LHandle::create(
+          context,
+          SKFS.DirName::create(name.toString() + "funs/"),
+          this.getGFunctionFun,
+        );
+            classes = SKFS.LHandle::Create(
+              context,
+              SKFS.DirName::create(name.toString() + "classes/"),
+              this.getGFunctionClasses,
+            );
+            static(program, funs, classes)
+        */
+  }
+
+  fun getGFunction(context: mutable SKFS.Context, lazy: LazyGFun): GFunction {
+    this.funs.get(context, SKFS.SID(lazy.gname().idValue()))
+  }
+
+  fun getGFunctionFun(
+    context: mutable SKFS.Context,
+    lazy: LazyGFun,
+  ): GFunction {
+    lazy.compile(context, this)
+  }
+
+  private fun getGClassImpl(
+    context: mutable SKFS.Context,
+    gid: LazyGClass,
+  ): GClass {
+    this.classes.get(context, SKFS.SID(gid.name().idValue()))
+  }
+
+  private fun getGClassImplFun(
+    context: mutable SKFS.Context,
+    gid: LazyGClass,
+  ): GClass {
+    gid match {
+    | LiteralLazyGClass(cls) -> cls
+    | name @ FrontEndLazyGClass _ ->
+      classDef = this.program.getClass(context, name.id);
+      this.convertClassDef(context, classDef, name, classDef.name.pos)
+    | meta @ BaseMetaLazyGClass _ -> this.createBaseMeta(context, meta)
+    | meta @ BaseMetaImplLazyGClass _ -> this.createBaseMetaImpl(context, meta)
+    | meta @ ClassMetaLazyGClass _ -> this.createClassMeta(context, meta)
+    | meta @ ConcreteMetaLazyGClass _ -> this.createConcreteMeta(context, meta)
+    | meta @ ConcreteMetaImplLazyGClass _ ->
+      this.createConcreteMetaImpl(context, meta)
+    | c @ ClosureBaseLazyGClass _ -> this.createClosureBaseClass(context, c)
+    | MetaMetaLazyGClass _ -> this.createMetaMeta(context)
+    | rt @ ReturnTupleLazyGClass(arity) ->
+      this.createReturnTuple(context, rt.name(), arity)
+    }
+  }
+
   // Every class gets a codegen'd method to help with "inspect". Although
   // we create the stubs eagerly for simplicity, like all methods they are
   // only actually compiled on demand.
@@ -1372,7 +1393,6 @@ value class Converter(program: I.Program) {
 
   fun finishGClass(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     orig: GClass,
     addInspect: Bool = true,
   ): GClass {
@@ -1420,12 +1440,7 @@ value class Converter(program: I.Program) {
           !gclass.fields[0].isAssignable &&
           (gclass.fields[0].typ match {
           | GTapply(subgid, _, _) ->
-            this.scalarizesToNoMoreThanOneScalar(
-              context,
-              processedClasses,
-              subgid,
-              gclass.pos,
-            )
+            this.scalarizesToNoMoreThanOneScalar(context, subgid, gclass.pos)
           | _ -> false
           })))
     ) {
@@ -1434,25 +1449,10 @@ value class Converter(program: I.Program) {
 
     // Make sure we have created GClasses for all base classes.
     for (ta in gclass.extends_) {
-      _ = this.getGClass(context, processedClasses, ta.generic, gclass.pos)
+      _ = this.getGClass(context, ta.generic, gclass.pos)
     };
 
     gclass
-  }
-
-  fun getGFunction(
-    context: mutable SKFS.Context,
-    processedFuns: mutable Map<LazyGFun, GFunction>,
-    processedClasses: mutable Map<LazyGClass, GClass>,
-    lazy: LazyGFun,
-  ): GFunction {
-    if (processedFuns.containsKey(lazy)) {
-      processedFuns[lazy]
-    } else {
-      result = lazy.compile(context, processedFuns, processedClasses, this);
-      processedFuns![lazy] = result;
-      result
-    }
   }
 
   // Returns the GClassKind, if known.
@@ -1479,7 +1479,6 @@ value class Converter(program: I.Program) {
 
   fun getGClass(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     gid: LazyGClass,
     pos: Pos,
   ): GClass {
@@ -1489,7 +1488,7 @@ value class Converter(program: I.Program) {
       // Don't clutter the underlying memoized function with a Pos argument.
       vtry(
         () -> {
-          this.getGClassImpl(context, processedClasses, gid)
+          this.getGClassImpl(context, gid)
         },
         exn ->
           exn match {
@@ -1500,52 +1499,14 @@ value class Converter(program: I.Program) {
     }
   }
 
-  private fun getGClassImpl(
-    context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
-    gid: LazyGClass,
-  ): GClass {
-    if (processedClasses.containsKey(gid)) return processedClasses[gid];
-    result = gid match {
-    | LiteralLazyGClass(cls) -> cls
-    | name @ FrontEndLazyGClass _ ->
-      classDef = this.program.getClass(context, name.id);
-      this.convertClassDef(
-        context,
-        processedClasses,
-        classDef,
-        name,
-        classDef.name.pos,
-      )
-    | meta @ BaseMetaLazyGClass _ ->
-      this.createBaseMeta(context, processedClasses, meta)
-    | meta @ BaseMetaImplLazyGClass _ ->
-      this.createBaseMetaImpl(context, processedClasses, meta)
-    | meta @ ClassMetaLazyGClass _ ->
-      this.createClassMeta(context, processedClasses, meta)
-    | meta @ ConcreteMetaLazyGClass _ ->
-      this.createConcreteMeta(context, processedClasses, meta)
-    | meta @ ConcreteMetaImplLazyGClass _ ->
-      this.createConcreteMetaImpl(context, processedClasses, meta)
-    | c @ ClosureBaseLazyGClass _ ->
-      this.createClosureBaseClass(context, processedClasses, c)
-    | MetaMetaLazyGClass _ -> this.createMetaMeta(context, processedClasses)
-    | rt @ ReturnTupleLazyGClass(arity) ->
-      this.createReturnTuple(context, processedClasses, rt.name(), arity)
-    };
-    processedClasses![gid] = result;
-    result
-  }
-
   fun getMetaClass(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     lazyGClass: LazyGClass,
     g: ?GClass = None(),
   ): LazyGClass {
     gc = g match {
     | Some(x) -> x
-    | None() -> this.getGClassImpl(context, processedClasses, lazyGClass)
+    | None() -> this.getGClassImpl(context, lazyGClass)
     };
 
     if (!gc.hasMeta) {
@@ -1566,7 +1527,6 @@ value class Converter(program: I.Program) {
 
   private fun createReturnTuple(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     name: GClassName,
     arity: Int,
   ): GClass {
@@ -1576,7 +1536,6 @@ value class Converter(program: I.Program) {
 
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name,
         tparams,
@@ -1598,13 +1557,9 @@ value class Converter(program: I.Program) {
   // When you do class(class(class(...(x)))) it quickly ends up in
   // a class that is its own metaclass. You can't do anything interesting
   // with this class but it needs to exist.
-  private fun createMetaMeta(
-    context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
-  ): GClass {
+  private fun createMetaMeta(context: mutable SKFS.Context): GClass {
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name => GClassName("<builtin>.MetaMeta"),
         tparams => Array[],
@@ -1623,7 +1578,6 @@ value class Converter(program: I.Program) {
   // Note: not transitive - we depend on being called on parents before kids.
   fun flattenClosureClassExtends(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     extends_: Array<GTapply>,
     pos: FileRange,
   ): Array<GTapply> {
@@ -1631,12 +1585,7 @@ value class Converter(program: I.Program) {
     addExtend = gta -> flat.maybeSet(gta.generic, gta);
     for (parent in extends_) {
       if (addExtend(parent)) {
-        parentClass = this.getGClass(
-          context,
-          processedClasses,
-          parent.generic,
-          pos,
-        );
+        parentClass = this.getGClass(context, parent.generic, pos);
         for (grandParent in parentClass.extends_) {
           _ = addExtend(grandParent with {targs => parent.targs})
         }
@@ -1648,7 +1597,6 @@ value class Converter(program: I.Program) {
   // Create a class somewhere in a closure class hierarchy.
   fun createClosureClass(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     className: GClassName,
     callMethodType: GFunType,
     tparams: Array<GTparam>,
@@ -1696,7 +1644,6 @@ value class Converter(program: I.Program) {
     // Create the actual generic class for this closure.
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name => className,
         tparams,
@@ -1707,12 +1654,7 @@ value class Converter(program: I.Program) {
         isLambda => true,
         fieldsFinal => kind.isFinal(),
         constructorParametersNamed => true,
-        extends_ => this.flattenClosureClassExtends(
-          context,
-          processedClasses,
-          extends_,
-          pos,
-        ),
+        extends_ => this.flattenClosureClassExtends(context, extends_, pos),
         methods,
         fields,
       },
@@ -1731,7 +1673,6 @@ value class Converter(program: I.Program) {
   // the base class to use for all closures with a particular function type.
   private fun createClosureBaseClass(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     cb: ClosureBaseLazyGClass,
   ): GClass {
     // We model the fact that a "pure" ("~>") lambda can be cast to an
@@ -1787,7 +1728,6 @@ value class Converter(program: I.Program) {
 
     this.createClosureClass(
       context,
-      processedClasses,
       cb.name(),
       mtype,
       tparams,
@@ -1800,12 +1740,7 @@ value class Converter(program: I.Program) {
         }
       }),
       KBase(),
-      this.flattenClosureClassExtends(
-        context,
-        processedClasses,
-        parent1.concat(parent2),
-        pos,
-      ),
+      this.flattenClosureClassExtends(context, parent1.concat(parent2), pos),
       false,
       pos,
       None(),
@@ -1899,7 +1834,6 @@ value class Converter(program: I.Program) {
 
   private fun getStaticMethods(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     gc: GClass,
     name: LazyGClass,
   ): mutable UnorderedMap<String, GMethodDef> {
@@ -1911,11 +1845,7 @@ value class Converter(program: I.Program) {
       if (gc.extends_.size() != 1) {
         return mutable UnorderedMap[]
       };
-      !gc = this.getGClassImpl(
-        context,
-        processedClasses,
-        gc.extends_[0].generic,
-      );
+      !gc = this.getGClassImpl(context, gc.extends_[0].generic);
     };
 
     if (gc.tparams.size() != orig.tparams.size()) {
@@ -2140,11 +2070,10 @@ value class Converter(program: I.Program) {
   // hierarchy, since some BaseMeta class could provide an implmentation.
   private fun createBaseMeta(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     name: BaseMetaLazyGClass,
   ): GClass {
     cls = name.cls;
-    gc = this.getGClassImpl(context, processedClasses, cls);
+    gc = this.getGClassImpl(context, cls);
 
     // Note: in keeping with current front-end policy, here we copy methods
     // down from B::.ClassMeta to its "local" sub-metaclasses.
@@ -2153,7 +2082,6 @@ value class Converter(program: I.Program) {
 
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name => name.name(),
         tparams => gc.tparams,
@@ -2171,27 +2099,20 @@ value class Converter(program: I.Program) {
             }),
           )
         },
-        methods => this.getStaticMethods(
-          context,
-          processedClasses,
-          gc,
-          name,
-        ).chill(),
+        methods => this.getStaticMethods(context, gc, name).chill(),
       },
     )
   }
 
   private fun createBaseMetaImpl(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     name: BaseMetaImplLazyGClass,
   ): GClass {
     cls = name.cls;
-    gc = this.getGClassImpl(context, processedClasses, cls);
+    gc = this.getGClassImpl(context, cls);
 
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name => name.name(),
         tparams => gc.tparams,
@@ -2203,26 +2124,19 @@ value class Converter(program: I.Program) {
         extends_ => Array[
           GTapply(BaseMetaLazyGClass(cls), DeepFrozen(), gc.tparams),
         ],
-        methods => this.getStaticMethods(
-          context,
-          processedClasses,
-          gc,
-          name,
-        ).chill(),
+        methods => this.getStaticMethods(context, gc, name).chill(),
       },
     )
   }
 
   private fun createClassMeta(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     name: ClassMetaLazyGClass,
   ): GClass {
-    gc = this.getGClassImpl(context, processedClasses, name.cls);
+    gc = this.getGClassImpl(context, name.cls);
 
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name => name.name(),
         tparams => gc.tparams,
@@ -2234,25 +2148,19 @@ value class Converter(program: I.Program) {
         extends_ => gc.extends_.map(t -> {
           GTapply(ClassMetaLazyGClass(t.generic), DeepFrozen(), t.targs)
         }),
-        methods => this.getStaticMethods(
-          context,
-          processedClasses,
-          gc,
-          name,
-        ).chill(),
+        methods => this.getStaticMethods(context, gc, name).chill(),
       },
     )
   }
 
   private fun createConcreteMeta(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     name: ConcreteMetaLazyGClass,
   ): GClass {
-    gc = this.getGClassImpl(context, processedClasses, name.cls);
+    gc = this.getGClassImpl(context, name.cls);
     pos = gc.pos;
 
-    methods = this.getStaticMethods(context, processedClasses, gc, name);
+    methods = this.getStaticMethods(context, gc, name);
 
     if (gc.isFrontEndClass && gc.fieldsFinal) {
       // Create abstract declarations for the factories.
@@ -2273,7 +2181,6 @@ value class Converter(program: I.Program) {
 
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name => name.name(),
         tparams => gc.tparams,
@@ -2298,15 +2205,13 @@ value class Converter(program: I.Program) {
 
   private fun createConcreteMetaImpl(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     name: ConcreteMetaImplLazyGClass,
   ): GClass {
-    gc = this.getGClassImpl(context, processedClasses, name.cls);
+    gc = this.getGClassImpl(context, name.cls);
     pos = gc.pos;
 
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name => name.name(),
         tparams => gc.tparams,
@@ -2320,7 +2225,7 @@ value class Converter(program: I.Program) {
           GTapply(ConcreteMetaLazyGClass(t.generic), DeepFrozen(), t.targs)
         }),
         methods => {
-          m = this.getStaticMethods(context, processedClasses, gc, name);
+          m = this.getStaticMethods(context, gc, name);
 
           if (gc.isFrontEndClass && gc.fieldsFinal) {
             // Create factories.
@@ -2531,7 +2436,6 @@ value class Converter(program: I.Program) {
 
   private fun convertClassDef(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     in_: I.ClassDef,
     classID: FrontEndLazyGClass,
     pos: FileRange,
@@ -2633,7 +2537,6 @@ value class Converter(program: I.Program) {
 
     this.finishGClass(
       context,
-      processedClasses,
       GClass{
         name,
         tparams,
@@ -2970,7 +2873,6 @@ value class Converter(program: I.Program) {
   // class containing a value class containing one Int it's true, etc.
   private fun scalarizesToNoMoreThanOneScalar(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     gid: LazyGClass,
     pos: Pos,
   ): Bool {
@@ -2980,7 +2882,7 @@ value class Converter(program: I.Program) {
       | KClass() ->
         return true
       | KValue() ->
-        gclass = this.getGClass(context, processedClasses, gid, pos);
+        gclass = this.getGClass(context, gid, pos);
         if (gclass.fields.isEmpty()) {
           return true
         } else if (gclass.fields.size() > 1) {
@@ -3001,13 +2903,11 @@ value class Converter(program: I.Program) {
 
   private fun assertNoStaticMethods(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     lazyGClass: LazyGClass,
     gc: GClass,
   ): void {
-    metaID = this.getMetaClass(context, processedClasses, lazyGClass, Some(gc));
-    for (name => def in this.getGClassImpl(context, processedClasses, metaID)
-      .methods) {
+    metaID = this.getMetaClass(context, lazyGClass, Some(gc));
+    for (name => def in this.getGClassImpl(context, metaID).methods) {
       if (
         name != kFrozenFactoryName &&
         name != kGetClassMethodName &&
@@ -3027,7 +2927,6 @@ value class Converter(program: I.Program) {
   // for the generator function described by funInfo.
   fun createGeneratorClass(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     funInfo: GFunInfo,
   ): GTapply {
     // We start with Iterator.Generator as a basic template
@@ -3047,7 +2946,6 @@ value class Converter(program: I.Program) {
 
     template = this.getGClass(
       context,
-      processedClasses,
       FrontEndLazyGClass("Iterator.Generator"),
       pos,
     );
@@ -3133,9 +3031,7 @@ value class Converter(program: I.Program) {
     };
 
     GTapply(
-      LiteralLazyGClass(
-        this.finishGClass(context, processedClasses, generatorGClass),
-      ),
+      LiteralLazyGClass(this.finishGClass(context, generatorGClass)),
       Mutable(),
       yieldedTargs.concat(funInfo.tparams),
     )
@@ -3146,7 +3042,6 @@ value class Converter(program: I.Program) {
   // for the generator function described by funInfo.
   fun createAwaitableClass(
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     funInfo: GFunInfo,
   ): GTapply {
     // We start with Iterator.Generator as a basic template
@@ -3171,7 +3066,7 @@ value class Converter(program: I.Program) {
     awaitableFunTargs = awaitableTargs.concat(funInfo.tparams);
 
     templateID = FrontEndLazyGClass("Awaitable.AwaitableTemplate");
-    template = this.getGClass(context, processedClasses, templateID, pos);
+    template = this.getGClass(context, templateID, pos);
 
     // This class takes as tparams all of the tparams in the environment
     // where the async function body appears, since that body might
@@ -3254,7 +3149,7 @@ value class Converter(program: I.Program) {
     };
 
     // We aren't smart enough to handle static methods on special classes yet.
-    this.assertNoStaticMethods(context, processedClasses, templateID, template);
+    this.assertNoStaticMethods(context, templateID, template);
 
     GTapply(LiteralLazyGClass(awaitableGClass), Mutable(), awaitableFunTargs);
   }
@@ -3305,39 +3200,26 @@ mutable class OuterIstEmitter{
   mutable params: Array<GFunParam> = Array[],
   mutable blockActive: Bool = false,
   mutable pos: FileRange,
-  processedFuns: mutable Map<LazyGFun, GFunction>,
-  processedClasses: mutable Map<LazyGClass, GClass>,
 } {
   static fun make(
     context: mutable SKFS.Context,
     converter: Converter,
     lazy: ConcreteLazyGFun,
-    processedFuns: mutable Map<LazyGFun, GFunction>,
-    processedClasses: mutable Map<LazyGClass, GClass>,
   ): mutable OuterIstEmitter {
     funInfo = lazy.funInfo;
     if (funInfo.isGenerator) {
       !funInfo.funType.returnType = converter.createGeneratorClass(
         context,
-        processedClasses,
         funInfo,
       )
     } else if (funInfo.isAsync) {
       !funInfo.funType.returnType = converter.createAwaitableClass(
         context,
-        processedClasses,
         funInfo,
       )
     };
 
-    mutable OuterIstEmitter{
-      converter,
-      funInfo,
-      lazy,
-      pos => lazy.funInfo.pos,
-      processedFuns,
-      processedClasses,
-    }
+    mutable OuterIstEmitter{converter, funInfo, lazy, pos => lazy.funInfo.pos}
   }
 
   readonly fun constantBool(value: Bool): GConstantBool {
@@ -4081,7 +3963,6 @@ mutable class OuterIstEmitter{
 
   mutable fun emitLambda{
     context: mutable SKFS.Context,
-    processedClasses: mutable Map<LazyGClass, GClass>,
     paramVars: Array<I.Binding>,
     captured: Array<I.Name>,
     body: I.Stmt,
@@ -4158,7 +4039,6 @@ mutable class OuterIstEmitter{
 
     closureGClass = this.converter.createClosureClass(
       context,
-      processedClasses,
       closureClassName,
       callMethodType,
       this.funInfo.tparams,
@@ -4436,7 +4316,6 @@ mutable class OuterIstEmitter{
       (flatParams, _, _) = flattenParams(params, params.map(b -> b.ty));
       this.emitLambda{
         context,
-        processedClasses => this.processedClasses,
         paramVars => flatParams,
         captured => captured.values().map(p -> p.name).collect(Array),
         body,
@@ -5080,17 +4959,10 @@ mutable class OuterIstEmitter{
     // readonly Option<XX>.
     pos = this.pos;
     ta = this.funInfo.funType.returnType.asGTapply(pos);
-    gc = this.converter.getGClass(
-      context,
-      this.processedClasses,
-      ta.generic,
-      pos,
-    );
+    gc = this.converter.getGClass(context, ta.generic, pos);
     method = gc.methods["next"];
     opt = this.converter.getGFunction(
       context,
-      this.processedFuns,
-      this.processedClasses,
       method.function.fromSome("No next method found")(ta.generic),
     ).funInfo.funType.returnType;
 
@@ -5288,8 +5160,14 @@ private fun sourceToOuterIst(
   context: mutable SKFS.Context,
   fileNames: Array<String>,
 ): Converter {
-  Converter(makeOuterIst(context, fileNames))
+  Converter::create(
+    context,
+    SKFS.DirName::create("/converter/"),
+    makeOuterIst(context, fileNames),
+  )
 }
+
+class ConstFile(value: OuterIstToIR.ConstLazyGFun) extends SKFS.File
 
 fun createIR(
   context: mutable SKFS.Context,
@@ -5302,38 +5180,48 @@ fun createIR(
   forceCompile = mutable Vector<LazyGFun>[];
   disasm = mutable UnorderedSet[];
 
-  // Functions that compute global consts.
-  constsVec = mutable Vector[];
+  constDefs = converter.program.program.contextWriterKeyValues(
+    ConstFile::fromFile,
+    context,
+    SKFS.DirName::create("/constsDefsCreateIR/"),
+    (context, writer, _, files) ~> {
+      invariant(files.size() == 1);
+      result = mutable Vector[];
+      files[0].value match {
+      | OuterIst.DConst(constDef) ->
+        result.push(ConstFile(converter.convertConstDef(context, constDef)))
+      | OuterIst.DClass(classDef) ->
+        if (!(classDef.kind is I.KTrait _)) {
+          if (!classDef.consts.isEmpty()) {
+            // Right now we guarantee we run all const initializers at
+            // startup so create anything with consts now.
+            for (constKey => constDef in classDef.consts) {
+              (constPos, constName) = constKey;
 
-  for (constDef in converter.program.const_defs) {
-    constsVec.push(converter.convertConstDef(context, constDef));
-  };
+              if (constDef.value.isSome()) {
+                // Create a normal, "true global" const whose name is qualified with
+                // the owning class's name.
+                realConstName = classDef.name.id + "::" + constName;
 
-  for (_key => classDef in converter.program.class_defs) {
-    if (!(classDef.kind is I.KTrait _)) {
-      if (!classDef.consts.isEmpty()) {
-        // Right now we guarantee we run all const initializers at
-        // startup so create anything with consts now.
-        for (constKey => constDef in classDef.consts) {
-          (constPos, constName) = constKey;
-
-          if (constDef.value.isSome()) {
-            // Create a normal, "true global" const whose name is qualified with
-            // the owning class's name.
-            realConstName = classDef.name.id + "::" + constName;
-
-            constsVec.push(
-              converter.convertConstDef(
-                context,
-                constDef with {name => I.Name(constPos, realConstName)},
-              ),
-            )
+                result.push(
+                  ConstFile(
+                    converter.convertConstDef(
+                      context,
+                      constDef with {name => I.Name(constPos, realConstName)},
+                    ),
+                  ),
+                );
+              }
+            }
           }
         }
-      }
-    }
-  };
-  consts = constsVec.toArray();
+      | _ -> void
+      };
+      writer.writeArray(SKFS.IID(0), result.toArray())
+    },
+  );
+
+  consts = constDefs.getArray(context, SKFS.IID(0)).map(x -> x.value);
 
   for (c in consts) {
     forceCompile.push(c)
