@@ -247,7 +247,7 @@ mutable private class SClassInfo{
   mutable optionStyle: ?OptionStyle = None(),
 
   // parallel to GClass::extends_
-  extends_: mutable Map<LazyGClass, SClassID> = mutable Map[],
+  mutable extends_: SortedMap<LazyGClass, SClassID> = SortedMap[],
 } {
   readonly fun getUnscalarizedField(name: String, pos: Pos): SField {
     field = (None() : ?SField);
@@ -1330,7 +1330,7 @@ mutable class Specializer{
       // populate sclass extends_ after registration, but before inherits pass
       for (gta in gclass.extends_) {
         super = this.getTclass3(context, gta, tparamEnv);
-        info.extends_.set(gta.generic, super.sclassID);
+        info.!extends_ = info.extends_.set(gta.generic, super.sclassID);
       };
 
       // This class can be instantiated only if all fields can.
