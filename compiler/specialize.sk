@@ -20,7 +20,7 @@ private const kSimpleCaller: Array<FunSuperpositionID> = Array[
 // should be able to construct images of these at compile time.
 private const kEmptyTypeMap: UnorderedMap<GTparam, Tclass> = UnorderedMap[];
 private const kEmptyGTypeMap: UnorderedMap<GTparam, GType> = UnorderedMap[];
-private const kEmptySClassSet: UnorderedSet<SClassID> = UnorderedSet[];
+private const kEmptySClassSet: SortedSet<SClassID> = SortedSet[];
 
 // This is a "halfway specialized" class -- we've specialized the type
 // parameters already, but not the whole type.
@@ -226,9 +226,8 @@ mutable private class SClassInfo{
   gclass: GClass,
   lazyGClass: LazyGClass,
 
-  // TODO: Make sclass mutable and just use mutable fields in it directly?
-  supertypes: mutable UnorderedSet<SClassID>,
-  subtypes: mutable UnorderedSet<SClassID>,
+  mutable supertypes: SortedSet<SClassID>,
+  mutable subtypes: SortedSet<SClassID>,
 
   // If a non-final class, keys are all methods called on something
   // whose compile-time type was this class, but not necessarily methods
@@ -840,8 +839,9 @@ mutable class Specializer{
     super: mutable SClassInfo,
     sub: mutable SClassInfo,
   ): void {
-    if (super.subtypes.maybeInsert(sub.sclass.id)) {
-      sub.supertypes.add(super.sclass.id);
+    if (!super.subtypes.contains(sub.sclass.id)) {
+      super.!subtypes = super.subtypes.set(sub.sclass.id);
+      sub.!supertypes = sub.supertypes.set(super.sclass.id);
 
       for (t in super.supertypes) this.inherit(context, this.sclasses[t], sub);
       for (t in sub.subtypes) this.inherit(context, super, this.sclasses[t]);
@@ -1303,8 +1303,8 @@ mutable class Specializer{
         gclass,
         lazyGClass => hc.generic,
         optionStyle,
-        supertypes => mutable UnorderedSet[sid],
-        subtypes => mutable UnorderedSet[sid],
+        supertypes => SortedSet[sid],
+        subtypes => SortedSet[sid],
       };
 
       // Record this class.
