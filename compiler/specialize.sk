@@ -338,10 +338,7 @@ private base class OptionStyle uses Equality, Show {
 
 mutable class Specializer{
   // For each FrontEndLazyGClass, what are all its SClass instances?
-  gclassMap: mutable UnorderedMap<
-    GClassName,
-    mutable Vector<SClassID>,
-  > = mutable UnorderedMap[],
+  mutable gclassMap: SortedMap<GClassName, List<SClassID>> = SortedMap[],
 
   // Maps (FrontEndLazyGClass, GTargs) to SClassID.
   sclassMap: mutable UnorderedMap<
@@ -824,10 +821,14 @@ mutable class Specializer{
   // TODO: We could literally use an intrusive linked list, would that be bad?
   private mutable fun noteGClassInstance(instance: mutable SClassInfo): void {
     // Note that another instance of this GClass exists.
-    buf = this.gclassMap.getOrAdd(instance.sclass.gclassName, () ->
-      mutable Vector[]
+    l = this.gclassMap.maybeGet(instance.sclass.gclassName) match {
+    | None() -> List[]
+    | Some(l) -> l
+    };
+    this.!gclassMap[instance.sclass.gclassName] = List.Cons(
+      instance.sclass.id,
+      l,
     );
-    buf.push(instance.sclass.id)
   }
 
   // Indicate that 'sub' is a subtype of 'super'. This could mean direct or
