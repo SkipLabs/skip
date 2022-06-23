@@ -65,7 +65,7 @@ value class HalfClass(
 value class HalfSClass(
   generic: LazyGClass,
   targs: Array<Tclass>,
-) uses Hashable, Equality
+) uses Hashable, Orderable
 
 // This indicates the presence or absence of a value; unlike Option,
 // if the value is missing it explains why it is missing.
@@ -340,10 +340,7 @@ mutable class Specializer{
   mutable gclassMap: SortedMap<GClassName, List<SClassID>> = SortedMap[],
 
   // Maps (FrontEndLazyGClass, GTargs) to SClassID.
-  sclassMap: mutable UnorderedMap<
-    HalfSClass,
-    SClassID,
-  > = mutable UnorderedMap[],
+  mutable sclassMap: SortedMap<HalfSClass, SClassID> = SortedMap[],
 
   // Maps SClassID.id to information about that class.
   sclasses: mutable Map<SClassID, mutable SClassInfo> = mutable Map[],
@@ -1232,7 +1229,7 @@ mutable class Specializer{
         );
 
         // Redirect Option<T> etc. to the implementation type.
-        this.sclassMap.set(hsc, implInfo.sclass.id);
+        this.!sclassMap = this.sclassMap.set(hsc, implInfo.sclass.id);
 
         return implInfo
       };
@@ -1309,7 +1306,7 @@ mutable class Specializer{
 
       // Record this class.
       this.sclasses.set(sid, info);
-      this.sclassMap.set(hsc, sid);
+      this.!sclassMap = this.sclassMap.set(hsc, sid);
       this.noteGClassInstance(info);
 
       // Now that the type is registered we can do things that may go
