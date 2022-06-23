@@ -237,7 +237,7 @@ mutable private class SClassInfo{
   // any base class, i.e. the ones that might be invoked at runtime.
   //
   // Values in either case are sclasses on which the methods are defined.
-  methods: mutable UnorderedMap<MethodKey, SClassID> = mutable UnorderedMap[],
+  mutable methods: SortedMap<MethodKey, SClassID> = SortedMap[],
   // Once computed, the fields for this class. These are not "scalarized"
   // like the eventual SClass SFields are, so that e.g. a 3-tuple will still
   // just be one field instead of 3.
@@ -1505,7 +1505,7 @@ mutable class Specializer{
       )
     };
     // add mapping from method name to host sclass id
-    info.methods.set(m, hostID);
+    info.!methods = info.methods.set(m, hostID);
     // optionally request implementation
     if (requestImpl) {
       gmethod.function match {
