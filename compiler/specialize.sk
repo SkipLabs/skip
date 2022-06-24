@@ -350,7 +350,7 @@ mutable class Specializer{
   mutable funsNeeded: SortedSet<GFunKey> = SortedSet[],
 
   // Functions we still need to analyze with a new set of Targs.
-  funStack: mutable Vector<(GFunction, Array<Tclass>)> = mutable Vector[],
+  mutable funStack: List<(GFunction, Array<Tclass>)> = List[],
 
   converter: Converter,
 
@@ -553,7 +553,12 @@ mutable class Specializer{
       !changed = true;
       oldPos = this.pos;
 
-      (f, targs) = this.funStack.pop();
+      (f, targs) = this.funStack match {
+      | List.Nil() -> invariant_violation("Unexpected empty stack")
+      | List.Cons(x, rl) ->
+        this.!funStack = rl;
+        x
+      };
 
       tparamEnv = makeTypeMap(f.funInfo.tparams, targs, f.funInfo.pos);
       seenTypes = mutable UnorderedSet[];
@@ -1596,7 +1601,7 @@ mutable class Specializer{
             `expected ${function.funInfo.tparams}, but got ${newTargs}`,
         )
       };
-      this.funStack.push((function, newTargs));
+      this.!funStack = List.Cons((function, newTargs), this.funStack);
     }
   }
 
