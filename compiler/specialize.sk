@@ -249,6 +249,34 @@ mutable private class SClassInfo{
   // parallel to GClass::extends_
   mutable extends_: SortedMap<LazyGClass, SClassID> = SortedMap[],
 } {
+  readonly fun chill(): this {
+    static{
+      sclass => this.sclass,
+      gclass => this.gclass,
+      lazyGClass => this.lazyGClass,
+      supertypes => this.supertypes,
+      subtypes => this.subtypes,
+      methods => this.methods,
+      unscalarizedFields => this.unscalarizedFields,
+      optionStyle => this.optionStyle,
+      extends_ => this.extends_,
+    }
+  }
+
+  readonly fun mclone(): mutable this {
+    mutable static{
+      sclass => this.sclass,
+      gclass => this.gclass,
+      lazyGClass => this.lazyGClass,
+      supertypes => this.supertypes,
+      subtypes => this.subtypes,
+      methods => this.methods,
+      unscalarizedFields => this.unscalarizedFields,
+      optionStyle => this.optionStyle,
+      extends_ => this.extends_,
+    }
+  }
+
   readonly fun getUnscalarizedField(name: String, pos: Pos): SField {
     field = (None() : ?SField);
     _ = this.unscalarizedFields.any(f ->
@@ -367,6 +395,38 @@ mutable class Specializer{
     consts: Array<ConstLazyGFun>,
   ): mutable Specializer {
     mutable Specializer{converter, consts, pos => FileRange.builtin}
+  }
+
+  readonly fun chill(): this {
+    static{
+      gclassMap => this.gclassMap,
+      sclassMap => this.sclassMap,
+      sclasses => this.sclasses.map((_, x) -> x.chill()),
+      funsNeeded => this.funsNeeded,
+      funStack => this.funStack,
+      converter => this.converter,
+      consts => this.consts,
+      canCreateNewSClasses => this.canCreateNewSClasses,
+      pos => this.pos,
+    }
+  }
+
+  readonly fun mclone(): mutable this {
+    sclasses = SortedMap[];
+    for (x => y in this.sclasses) {
+      !sclasses[x] = y.mclone();
+    };
+    mutable static{
+      gclassMap => this.gclassMap,
+      sclassMap => this.sclassMap,
+      sclasses,
+      funsNeeded => this.funsNeeded,
+      funStack => this.funStack,
+      converter => this.converter,
+      consts => this.consts,
+      canCreateNewSClasses => this.canCreateNewSClasses,
+      pos => this.pos,
+    }
   }
 
   readonly fun getSClass(sid: SClassID): SClass {
