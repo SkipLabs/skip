@@ -278,7 +278,7 @@ fun class_method_defs(cd: TAst.Class_def): UMap<O.MethodDef> {
 }
 
 fun method_def(met: TAst.Method_def, cd: TAst.Class_def): O.MethodDef {
-  O.MethodDef{
+  m = O.MethodDef{
     visibility => visibility(met.visibility),
     overridable_ => met.overridable_,
     memoized_ => met.memoized_,
@@ -301,7 +301,10 @@ fun method_def(met: TAst.Method_def, cd: TAst.Class_def): O.MethodDef {
       tparam_map.map((_, ty) -> type(true, ty))
     ),
     yields => met.yields,
-  }
+    hash => 0,
+  };
+  !m.hash = hash(m);
+  m
 }
 
 fun lazy_method_body(native_body: ?O.Body, x: TAst.Expr_body): ?O.Body {
@@ -349,7 +352,7 @@ fun initializer(new_id: () -> Int, expr: TAst.Expr): O.Initializer {
 /* Functions. */
 /*****************************************************************************/
 fun fun_def(fd: TAst.Fun_def): O.FunDef {
-  O.FunDef{
+  f = O.FunDef{
     annotations => fd.annotations,
     native_ => fd.native_,
     memoized_ => fd.memoized_,
@@ -361,7 +364,10 @@ fun fun_def(fd: TAst.Fun_def): O.FunDef {
     return_ => sig_type_(fd.return_),
     body => lazy_function_body(fd.body),
     yields => fd.yields,
-  }
+    hash => 0,
+  };
+  !f.hash = hash(f);
+  f
 }
 
 fun lazy_function_body(b: TAst.Expr_body): ?O.Body {

@@ -1183,19 +1183,41 @@ private fun parseClosureFieldName(field: GField): (String, ClosureCaptureKind) {
   }
 }
 
+const lowerDirName: SKFS.DirName = SKFS.DirName::create("/lowerDefs/");
+const lowerDir: SKFS.EHandle<CallableDefFile> = SKFS.EHandle(
+  CallableDefFile::fromFile,
+  lowerDirName,
+);
+
+class CallableDefFile(hash: Int, value: I.CallableDef) extends SKFS.BaseName {
+  fun compare(other: SKFS.BaseName): Order {
+    other match {
+    | x @ CallableDefFile _ -> this.hash.compare(x.hash)
+    | _ -> invariant_violation("Heterogeneous keys detected")
+    }
+  }
+}
+
 private fun memoizedGetLoweredDef(
   context: mutable SKFS.Context,
   program: I.Program,
   def: I.CallableDef,
 ): I.CallableDef {
-  lowered = def.lower(context, program);
-  if (shouldDebugSymbol(def.getName())) {
-    debug(def.getName() + " unlowered");
-    debug(def);
-    debug(def.getName() + " lowered");
-    debug(lowered);
-  };
-  lowered
+  defFile = CallableDefFile(def.hash, def);
+  lowerDir.maybeGet(context, defFile) match {
+  | None() ->
+    lowered = def.lower(context, program);
+    if (shouldDebugSymbol(def.getName())) {
+      debug(def.getName() + " unlowered");
+      debug(def);
+      debug(def.getName() + " lowered");
+      debug(lowered);
+    };
+    loweredFile = CallableDefFile(lowered.hash, lowered);
+    lowerDir.writeArray(context, defFile, Array[loweredFile]);
+    lowered
+  | Some(x) -> x.value
+  }
 }
 
 private fun getLoweredDef(
@@ -1861,7 +1883,7 @@ value class Converter private (
       kFrozenFactoryName
     };
 
-    I.MethodDef{
+    mdef = I.MethodDef{
       name => I.Name(pos, factoryName),
       body,
       visibility => (pos, I.VPublic()),
@@ -1888,7 +1910,10 @@ value class Converter private (
       ),
       generic_mapping => SortedMap[],
       yields => None(),
-    }
+      hash => 0,
+    };
+    !mdef.hash = hash(mdef);
+    mdef
   }
 
   private fun getStaticMethods(
@@ -1979,40 +2004,41 @@ value class Converter private (
 
       // Generate a static method that reads a global const.
       getterName = "getConst:" + constName;
-      methods.push(
-        I.MethodDef{
-          name => I.Name(constPos, getterName),
-          body => constDef.value.map(_ ->
-            I.OuterBody(
-              I.Return(
-                I.Expr(
-                  constDef.type,
-                  constPos,
-                  I.Const(I.Name(constPos, realConstName)),
-                ),
+      met = I.MethodDef{
+        name => I.Name(constPos, getterName),
+        body => constDef.value.map(_ ->
+          I.OuterBody(
+            I.Return(
+              I.Expr(
+                constDef.type,
+                constPos,
+                I.Const(I.Name(constPos, realConstName)),
               ),
-            )
-          ),
-          annotations => SSet[],
-          async_ => None(),
-          met_class => cd.name,
-          from_ => constDef.from_.default(cd.name),
-          implicit_param => staticThisBinding(constPos),
-          overridable_ => None(),
-          memoized_ => None(),
-          native_ => None(),
-          params => Positional::create(),
-          return_ => constDef.type,
-          source => constDef.source.default(cd.name),
-          kind => SkipNamedAst.FKStatic(constPos),
-          tparams => Array[],
-          untracked_ => None(),
-          visibility => constDef.visibility,
-          whenparams => Array[],
-          generic_mapping => SortedMap[],
-          yields => None(),
-        },
-      )
+            ),
+          )
+        ),
+        annotations => SSet[],
+        async_ => None(),
+        met_class => cd.name,
+        from_ => constDef.from_.default(cd.name),
+        implicit_param => staticThisBinding(constPos),
+        overridable_ => None(),
+        memoized_ => None(),
+        native_ => None(),
+        params => Positional::create(),
+        return_ => constDef.type,
+        source => constDef.source.default(cd.name),
+        kind => SkipNamedAst.FKStatic(constPos),
+        tparams => Array[],
+        untracked_ => None(),
+        visibility => constDef.visibility,
+        whenparams => Array[],
+        generic_mapping => SortedMap[],
+        yields => None(),
+        hash => 0,
+      };
+      !met.hash = hash(met);
+      methods.push(met);
     };
 
     methods.toArray()
@@ -5293,6 +5319,7 @@ fun createIR(
   );
 
   consts = constDefs.getArray(context, SKFS.IID(0)).map(x -> x.value);
+  _ = context.mkdir(CallableDefFile::fromFile, lowerDirName, false, Array[]);
 
   for (c in consts) {
     forceCompile.push(c)
@@ -5374,6 +5401,7 @@ fun createIR(
 
   // Find every relevant type and function in the program.
   specializer.findAllFunctionsAndSClasses(context);
+  skipExit(0);
   reportMemoryStatistics("native/createIR after findAllFunctionsAndSClasses");
 
   // Latch the sub- and supertypes.
