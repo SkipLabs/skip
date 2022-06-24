@@ -347,7 +347,7 @@ mutable class Specializer{
 
   // Specialized functions we already know we're going to need.
   // Everything in here was pushed on funStack at some point.
-  funsNeeded: mutable UnorderedSet<GFunKey> = mutable UnorderedSet[],
+  mutable funsNeeded: SortedSet<GFunKey> = SortedSet[],
 
   // Functions we still need to analyze with a new set of Targs.
   funStack: mutable Vector<(GFunction, Array<Tclass>)> = mutable Vector[],
@@ -1583,7 +1583,8 @@ mutable class Specializer{
     );
     key = GFunKey(name, superposition);
 
-    if (this.funsNeeded.maybeInsert(key)) {
+    if (!this.funsNeeded.contains(key)) {
+      this.!funsNeeded = this.funsNeeded.set(key);
       converter = this.converter;
 
       function = converter.getGFunction(context, name);
