@@ -1119,8 +1119,20 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     }
   }
 
+  private fun getLoweredDef(
+    context: mutable SKFS.Context,
+    converter: Converter,
+    def: I.CallableDef,
+  ): I.CallableDef {
+    if (def.isLowered()) {
+      def
+    } else {
+      converter.lower.get(context, CallableDefFile(def)).value
+    }
+  }
+
   fun getBody(context: mutable SKFS.Context, converter: Converter): I.Stmt {
-    getLoweredDef(context, converter.program, this.def).getBody().asOuter()
+    this.getLoweredDef(context, converter, this.def).getBody().asOuter()
   }
 
   // get our lowered def, and patch our params array with the fresh info.
@@ -1130,7 +1142,7 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     context: mutable SKFS.Context,
     converter: Converter,
   ): Array<ParameterInfo> {
-    def = getLoweredDef(context, converter.program, this.def);
+    def = this.getLoweredDef(context, converter, this.def);
     defParams = def.getParams();
     this.params.map(p -> {
       if (p.index < 0) {
@@ -1183,52 +1195,12 @@ private fun parseClosureFieldName(field: GField): (String, ClosureCaptureKind) {
   }
 }
 
-const lowerDirName: SKFS.DirName = SKFS.DirName::create("/lowerDefs/");
-const lowerDir: SKFS.EHandle<CallableDefFile> = SKFS.EHandle(
-  CallableDefFile::fromFile,
-  lowerDirName,
-);
-
-class CallableDefFile(hash: Int, value: I.CallableDef) extends SKFS.BaseName {
+class CallableDefFile(value: I.CallableDef) extends SKFS.BaseName {
   fun compare(other: SKFS.BaseName): Order {
     other match {
-    | x @ CallableDefFile _ -> this.hash.compare(x.hash)
+    | CallableDefFile(x) -> this.value.hash.compare(x.hash)
     | _ -> invariant_violation("Heterogeneous keys detected")
     }
-  }
-}
-
-private fun memoizedGetLoweredDef(
-  context: mutable SKFS.Context,
-  program: I.Program,
-  def: I.CallableDef,
-): I.CallableDef {
-  defFile = CallableDefFile(def.hash, def);
-  lowerDir.maybeGet(context, defFile) match {
-  | None() ->
-    lowered = def.lower(context, program);
-    if (shouldDebugSymbol(def.getName())) {
-      debug(def.getName() + " unlowered");
-      debug(def);
-      debug(def.getName() + " lowered");
-      debug(lowered);
-    };
-    loweredFile = CallableDefFile(lowered.hash, lowered);
-    lowerDir.writeArray(context, defFile, Array[loweredFile]);
-    lowered
-  | Some(x) -> x.value
-  }
-}
-
-private fun getLoweredDef(
-  context: mutable SKFS.Context,
-  program: I.Program,
-  def: I.CallableDef,
-): I.CallableDef {
-  if (def.isLowered()) {
-    def
-  } else {
-    memoizedGetLoweredDef(context, program, def)
   }
 }
 
@@ -1285,6 +1257,7 @@ value class Converter private (
   program: I.Program,
   funs: SKFS.LHandle<GFunctionFile>,
   classes: SKFS.LHandle<GClassFile>,
+  lower: SKFS.EHandle<CallableDefFile>,
 ) {
   static fun create(
     context: mutable SKFS.Context,
@@ -1295,7 +1268,9 @@ value class Converter private (
     funs = SKFS.LHandle(GFunctionFile::fromFile, funDirName);
     classDirName = SKFS.DirName::create(name.toString() + "classes/");
     classes = SKFS.LHandle(GClassFile::fromFile, classDirName);
-    converter = static(program, funs, classes);
+    lowerDirName: SKFS.DirName = SKFS.DirName::create("/lowerDefs/");
+    lower = SKFS.EHandle(CallableDefFile::fromFile, lowerDirName);
+    converter = static(program, funs, classes, lower);
     _ = SKFS.LHandle::create(
       GFunctionFile::fromFile,
       context,
@@ -1307,6 +1282,32 @@ value class Converter private (
       context,
       classDirName,
       converter.getGClassImplFun,
+    );
+    _ = SKFS.LHandle::create(
+      CallableDefFile::fromFile,
+      context,
+      lowerDirName,
+      (context, _, key) ~> {
+        def = key match {
+        | CallableDefFile(x) -> x
+        | _ -> invariant_violation("Unexpected key type")
+        };
+        defFile = CallableDefFile(def);
+        lower.maybeGet(context, defFile) match {
+        | None() ->
+          lowered = def.lower(context, program);
+          if (shouldDebugSymbol(def.getName())) {
+            debug(def.getName() + " unlowered");
+            debug(def);
+            debug(def.getName() + " lowered");
+            debug(lowered);
+          };
+          loweredFile = CallableDefFile(lowered);
+          lower.writeArray(context, defFile, Array[loweredFile]);
+          Array[loweredFile]
+        | Some(x) -> Array[x]
+        }
+      },
     );
     converter
   }
@@ -5319,7 +5320,6 @@ fun createIR(
   );
 
   consts = constDefs.getArray(context, SKFS.IID(0)).map(x -> x.value);
-  _ = context.mkdir(CallableDefFile::fromFile, lowerDirName, false, Array[]);
 
   for (c in consts) {
     forceCompile.push(c)
