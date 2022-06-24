@@ -658,7 +658,7 @@ private fun optimizeAll(env: GlobalEnv, opts: Int): GlobalEnv {
         // Some Function also produced extra side effects, which we
         // need to apply here. We need to do this as a separate pass
         // so we end up with any "extraFun" functions as the "keepers".
-        newClasses = (None() : ?mutable Map<SClassID, SClass>);
+        newClasses = (None() : ?SortedMap<SClassID, SClass>);
 
         for (fe in newFuns) {
           fe.extraFun match {
@@ -668,13 +668,12 @@ private fun optimizeAll(env: GlobalEnv, opts: Int): GlobalEnv {
 
           fe.extraClass match {
           | Some(ec) ->
-            (newClasses match {
+            nc = newClasses match {
             | Some(nc) -> nc
-            | None() ->
-              nc = env.sclasses.clone(1);
-              !newClasses = Some(nc);
-              nc
-            }).set(ec.id, ec)
+            | None() -> env.sclasses
+            };
+            !nc = nc.set(ec.id, ec);
+            !newClasses = Some(nc)
           | None() -> void
           }
         };

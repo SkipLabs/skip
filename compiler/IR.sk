@@ -105,7 +105,7 @@ mutable base class ClassLookupEnv {
 
 class GlobalEnv{
   // Specialized classes.
-  sclasses: Map<SClassID, SClass>,
+  sclasses: SortedMap<SClassID, SClass>,
 
   // Specialized functions, keyed by ID.
   sfuns: FunctionIDToFunction = FunctionIDToFunction::mcreate().chill(),
@@ -121,7 +121,7 @@ class GlobalEnv{
   // All non-parametric functions exported by the runtime.
   runtimeFunctions: UnorderedMap<String, SFunctionID> = UnorderedMap[],
 } extends ClassLookupEnv {
-  static fun make(sclasses: Map<SClassID, SClass>): GlobalEnv {
+  static fun make(sclasses: SortedMap<SClassID, SClass>): GlobalEnv {
     GlobalEnv{sclasses}
   }
 

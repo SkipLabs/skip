@@ -343,7 +343,7 @@ mutable class Specializer{
   mutable sclassMap: SortedMap<HalfSClass, SClassID> = SortedMap[],
 
   // Maps SClassID.id to information about that class.
-  sclasses: mutable Map<SClassID, mutable SClassInfo> = mutable Map[],
+  mutable sclasses: SortedMap<SClassID, mutable SClassInfo> = SortedMap[],
 
   // Specialized functions we already know we're going to need.
   // Everything in here was pushed on funStack at some point.
@@ -373,7 +373,7 @@ mutable class Specializer{
     this.sclasses[sid].sclass
   }
 
-  readonly fun createNewSClassesMap(): Map<SClassID, SClass> {
+  readonly fun createNewSClassesMap(): SortedMap<SClassID, SClass> {
     this.sclasses.map((_, info) -> info.sclass)
   }
 
@@ -1305,7 +1305,7 @@ mutable class Specializer{
       };
 
       // Record this class.
-      this.sclasses.set(sid, info);
+      this.!sclasses = this.sclasses.set(sid, info);
       this.!sclassMap = this.sclassMap.set(hsc, sid);
       this.noteGClassInstance(info);
 
