@@ -1257,7 +1257,7 @@ value class Converter private (
   program: I.Program,
   funs: SKFS.LHandle<GFunctionFile>,
   classes: SKFS.LHandle<GClassFile>,
-  lower: SKFS.EHandle<CallableDefFile>,
+  lower: SKFS.LHandle<CallableDefFile>,
 ) {
   static fun create(
     context: mutable SKFS.Context,
@@ -1269,7 +1269,7 @@ value class Converter private (
     classDirName = SKFS.DirName::create(name.toString() + "classes/");
     classes = SKFS.LHandle(GClassFile::fromFile, classDirName);
     lowerDirName: SKFS.DirName = SKFS.DirName::create("/lowerDefs/");
-    lower = SKFS.EHandle(CallableDefFile::fromFile, lowerDirName);
+    lower = SKFS.LHandle(CallableDefFile::fromFile, lowerDirName);
     converter = static(program, funs, classes, lower);
     _ = SKFS.LHandle::create(
       GFunctionFile::fromFile,
@@ -1292,21 +1292,15 @@ value class Converter private (
         | CallableDefFile(x) -> x
         | _ -> invariant_violation("Unexpected key type")
         };
-        defFile = CallableDefFile(def);
-        lower.maybeGet(context, defFile) match {
-        | None() ->
-          lowered = def.lower(context, program);
-          if (shouldDebugSymbol(def.getName())) {
-            debug(def.getName() + " unlowered");
-            debug(def);
-            debug(def.getName() + " lowered");
-            debug(lowered);
-          };
-          loweredFile = CallableDefFile(lowered);
-          lower.writeArray(context, defFile, Array[loweredFile]);
-          Array[loweredFile]
-        | Some(x) -> Array[x]
-        }
+        lowered = def.lower(context, program);
+        if (shouldDebugSymbol(def.getName())) {
+          debug(def.getName() + " unlowered");
+          debug(def);
+          debug(def.getName() + " lowered");
+          debug(lowered);
+        };
+        loweredFile = CallableDefFile(lowered);
+        Array[loweredFile]
       },
     );
     converter
