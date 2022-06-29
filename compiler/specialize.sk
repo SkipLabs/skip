@@ -221,13 +221,13 @@ private const kExistsVoidInstrTree: MaybeExists<InstrTree> = Exists(
   kVoidInstrTree,
 );
 
-mutable private class SClassInfo{
-  mutable sclass: SClass,
+private class SClassInfo{
+  sclass: SClass,
   gclass: GClass,
   lazyGClass: LazyGClass,
 
-  mutable supertypes: SortedSet<SClassID>,
-  mutable subtypes: SortedSet<SClassID>,
+  supertypes: SortedSet<SClassID>,
+  subtypes: SortedSet<SClassID>,
 
   // If a non-final class, keys are all methods called on something
   // whose compile-time type was this class, but not necessarily methods
@@ -237,122 +237,70 @@ mutable private class SClassInfo{
   // any base class, i.e. the ones that might be invoked at runtime.
   //
   // Values in either case are sclasses on which the methods are defined.
-  mutable methods: SortedMap<MethodKey, SClassID> = SortedMap[],
+  methods: SortedMap<MethodKey, SClassID> = SortedMap[],
   // Once computed, the fields for this class. These are not "scalarized"
   // like the eventual SClass SFields are, so that e.g. a 3-tuple will still
   // just be one field instead of 3.
-  mutable unscalarizedFields: Array<SField> = Array[],
+  unscalarizedFields: Array<SField> = Array[],
 
   // If this is an Option-related type, what OptionStyle does it use?
   optionStyle: ?OptionStyle = None(),
 
   // parallel to GClass::extends_
-  mutable extends_: SortedMap<LazyGClass, SClassID> = SortedMap[],
+  extends_: SortedMap<LazyGClass, SClassID> = SortedMap[],
 } {
-  mutable fun setSClass(
-    specializer: mutable Specializer,
-    frozenThis: this,
-    value: SClass,
-  ): this {
-    this.!sclass = value;
-    !frozenThis.sclass = value;
-    specializer.!fsclasses[frozenThis.sclass.id] = frozenThis;
-    frozenThis
+  fun setSClass(specializer: mutable Specializer, value: SClass): this {
+    !this.sclass = value;
+    specializer.!sclasses[this.sclass.id] = this;
+    this
   }
 
-  mutable fun setSuperTypes(
+  fun setSuperTypes(
     specializer: mutable Specializer,
-    frozenThis: this,
     value: SortedSet<SClassID>,
   ): this {
-    this.!supertypes = value;
-    !frozenThis.supertypes = value;
-    specializer.!fsclasses[frozenThis.sclass.id] = frozenThis;
-    frozenThis
+    !this.supertypes = value;
+    specializer.!sclasses[this.sclass.id] = this;
+    this
   }
 
-  mutable fun setSubTypes(
+  fun setSubTypes(
     specializer: mutable Specializer,
-    frozenThis: this,
     value: SortedSet<SClassID>,
   ): this {
-    this.!subtypes = value;
-    !frozenThis.subtypes = value;
-    specializer.!fsclasses[frozenThis.sclass.id] = frozenThis;
-    frozenThis
+    !this.subtypes = value;
+    specializer.!sclasses[this.sclass.id] = this;
+    this
   }
 
-  mutable fun setMethods(
+  fun setMethods(
     specializer: mutable Specializer,
-    frozenThis: this,
     value: SortedMap<MethodKey, SClassID>,
   ): this {
-    this.!methods = value;
-    !frozenThis.methods = value;
-    specializer.!fsclasses[frozenThis.sclass.id] = frozenThis;
-    frozenThis
+    !this.methods = value;
+    specializer.!sclasses[this.sclass.id] = this;
+    this
   }
 
-  mutable fun setUnscalarizedFields(
+  fun setUnscalarizedFields(
     specializer: mutable Specializer,
-    frozenThis: this,
     value: Array<SField>,
   ): this {
-    this.!unscalarizedFields = value;
-    !frozenThis.unscalarizedFields = value;
-    specializer.!fsclasses[frozenThis.sclass.id] = frozenThis;
-    frozenThis
+    !this.unscalarizedFields = value;
+    specializer.!sclasses[this.sclass.id] = this;
+    this
   }
 
-  mutable fun setExtends(
+  fun setExtends(
     specializer: mutable Specializer,
-    frozenThis: this,
     value: SortedMap<LazyGClass, SClassID>,
   ): this {
-    this.!extends_ = value;
-    !frozenThis.extends_ = value;
-    specializer.!fsclasses[frozenThis.sclass.id] = frozenThis;
-    frozenThis
+    !this.extends_ = value;
+    specializer.!sclasses[this.sclass.id] = this;
+    this
   }
 
-  /*
-    mutable fun supertypes: SortedSet<SClassID>,
-    mutable fun subtypes: SortedSet<SClassID>,
-    mutable fun methods: SortedMap<MethodKey, SClassID> = SortedMap[],
-    mutable fun unscalarizedFields: Array<SField> = Array[],
-    mutable fun optionStyle: ?OptionStyle = None(),
-    mutable fun extends_: SortedMap<LazyGClass, SClassID> = SortedMap[],
-  */
-
-  readonly fun chill(): this {
-    static{
-      sclass => this.sclass,
-      gclass => this.gclass,
-      lazyGClass => this.lazyGClass,
-      supertypes => this.supertypes,
-      subtypes => this.subtypes,
-      methods => this.methods,
-      unscalarizedFields => this.unscalarizedFields,
-      optionStyle => this.optionStyle,
-      extends_ => this.extends_,
-    }
-  }
-
-  readonly fun mclone(): mutable this {
-    mutable static{
-      sclass => this.sclass,
-      gclass => this.gclass,
-      lazyGClass => this.lazyGClass,
-      supertypes => this.supertypes,
-      subtypes => this.subtypes,
-      methods => this.methods,
-      unscalarizedFields => this.unscalarizedFields,
-      optionStyle => this.optionStyle,
-      extends_ => this.extends_,
-    }
-  }
-
-  readonly fun getUnscalarizedField(name: String, pos: Pos): SField {
+  fun getUnscalarizedField(name: String, pos: Pos): SField {
     field = (None() : ?SField);
     _ = this.unscalarizedFields.any(f ->
       f.name == name &&
@@ -446,8 +394,7 @@ mutable class Specializer{
   mutable sclassMap: SortedMap<HalfSClass, SClassID> = SortedMap[],
 
   // Maps SClassID.id to information about that class.
-  mutable sclasses: SortedMap<SClassID, mutable SClassInfo> = SortedMap[],
-  mutable fsclasses: SortedMap<SClassID, SClassInfo> = SortedMap[],
+  mutable sclasses: SortedMap<SClassID, SClassInfo> = SortedMap[],
 
   // Specialized functions we already know we're going to need.
   // Everything in here was pushed on funStack at some point.
@@ -477,7 +424,7 @@ mutable class Specializer{
     static{
       gclassMap => this.gclassMap,
       sclassMap => this.sclassMap,
-      sclasses => this.sclasses.map((_, x) -> x.chill()),
+      sclasses => this.sclasses,
       funsNeeded => this.funsNeeded,
       funStack => this.funStack,
       converter => this.converter,
@@ -488,14 +435,10 @@ mutable class Specializer{
   }
 
   readonly fun mclone(): mutable this {
-    sclasses = SortedMap[];
-    for (x => y in this.sclasses) {
-      !sclasses[x] = y.mclone();
-    };
     mutable static{
       gclassMap => this.gclassMap,
       sclassMap => this.sclassMap,
-      sclasses,
+      sclasses => this.sclasses,
       funsNeeded => this.funsNeeded,
       funStack => this.funStack,
       converter => this.converter,
@@ -918,8 +861,7 @@ mutable class Specializer{
     // Reuse this repeatedly.
     buf = mutable Vector[];
 
-    for (sid => info in this.sclasses) {
-      finfo = this.fsclasses[sid];
+    for (info in this.sclasses) {
       buf.clear();
       sclass = info.sclass;
       pos = sclass.pos;
@@ -951,7 +893,6 @@ mutable class Specializer{
 
       _ = info.setSClass(
         this,
-        finfo,
         sclass with {fields => buf.toArray(), arraySlot},
       );
     }
@@ -960,7 +901,7 @@ mutable class Specializer{
   // Add the given SClass to its GClass's list of instances.
   //
   // TODO: We could literally use an intrusive linked list, would that be bad?
-  private mutable fun noteGClassInstance(instance: mutable SClassInfo): void {
+  private mutable fun noteGClassInstance(instance: SClassInfo): void {
     // Note that another instance of this GClass exists.
     l = this.gclassMap.maybeGet(instance.sclass.gclassName) match {
     | None() -> List[]
@@ -978,40 +919,18 @@ mutable class Specializer{
   // 'sub' to 'super'
   private mutable fun inherit(
     context: mutable SKFS.Context,
-    super: mutable SClassInfo,
-    sub: mutable SClassInfo,
-    fsuper: SClassInfo,
-    fsub: SClassInfo,
+    super: SClassInfo,
+    sub: SClassInfo,
   ): (SClassInfo, SClassInfo) {
     if (!super.subtypes.contains(sub.sclass.id)) {
-      !fsuper = super.setSubTypes(
-        this,
-        fsuper,
-        super.subtypes.set(sub.sclass.id),
-      );
-      !fsub = sub.setSuperTypes(
-        this,
-        fsub,
-        sub.supertypes.set(super.sclass.id),
-      );
+      !super = super.setSubTypes(this, super.subtypes.set(sub.sclass.id));
+      !sub = sub.setSuperTypes(this, sub.supertypes.set(super.sclass.id));
 
       for (t in super.supertypes) {
-        (_, !fsub) = this.inherit(
-          context,
-          this.sclasses[t],
-          sub,
-          this.fsclasses[t],
-          fsub,
-        );
+        (_, !sub) = this.inherit(context, this.sclasses[t], sub);
       };
       for (t in sub.subtypes) {
-        (!fsuper, _) = this.inherit(
-          context,
-          super,
-          this.sclasses[t],
-          fsuper,
-          this.fsclasses[t],
-        )
+        (!super, _) = this.inherit(context, super, this.sclasses[t])
       };
 
       // Track all methods callable on concrete classes (by casting to some
@@ -1019,11 +938,11 @@ mutable class Specializer{
       // this for base classes or value classes.
       if (sub.sclass.kind.isKClass()) {
         for (m => _ in super.methods) {
-          !fsub = this.noteCalledMethod(context, sub, fsub, m)
+          !sub = this.noteCalledMethod(context, sub, m)
         }
       }
     };
-    (fsuper, fsub)
+    (super, sub)
   }
 
   mutable fun specializeType2(
@@ -1378,7 +1297,7 @@ mutable class Specializer{
   mutable fun getSClass2(
     context: mutable SKFS.Context,
     hc: HalfClass,
-  ): mutable SClassInfo {
+  ): SClassInfo {
     // Canonicalize a Concrete<T>, etc. to the right metaclass.
     origHC = hc;
     !hc = this.maybeConvertMetaClass(context, hc);
@@ -1469,7 +1388,7 @@ mutable class Specializer{
 
       // Create SClassInfo, starting out as a sub- and supertype of itself
       // (because any type is substitutable for itself).
-      info = mutable SClassInfo{
+      info = SClassInfo{
         sclass => newClass,
         gclass,
         lazyGClass => hc.generic,
@@ -1477,8 +1396,6 @@ mutable class Specializer{
         supertypes => SortedSet[sid],
         subtypes => SortedSet[sid],
       };
-
-      finfo = info.chill();
 
       // Record this class.
       this.!sclasses = this.sclasses.set(sid, info);
@@ -1490,9 +1407,8 @@ mutable class Specializer{
 
       // Create the fields. We will flatten them to scalars later.
       tparamEnv = makeTypeMap(gclass.tparams, targs, this.pos);
-      !finfo = info.setUnscalarizedFields(
+      !info = info.setUnscalarizedFields(
         this,
-        finfo,
         gclass.fields.map(f ->
           SField{
             name => f.name,
@@ -1507,9 +1423,8 @@ mutable class Specializer{
       // populate sclass extends_ after registration, but before inherits pass
       for (gta in gclass.extends_) {
         super = this.getTclass3(context, gta, tparamEnv);
-        !finfo = info.setExtends(
+        !info = info.setExtends(
           this,
-          finfo,
           info.extends_.set(gta.generic, super.sclassID),
         );
       };
@@ -1523,9 +1438,8 @@ mutable class Specializer{
         gclass.name.idValue() == "Unsafe.RawStorage"
       );
 
-      !finfo = info.setSClass(
+      !info = info.setSClass(
         this,
-        finfo,
         info.sclass with {
           canInstantiate,
           fields => if (gclass.isReturnTuple) {
@@ -1541,13 +1455,7 @@ mutable class Specializer{
       // Connect super- and subtypes in the "extends" hierarchy.
       for (ta in gclass.extends_) {
         super = this.getTclass3(context, ta, tparamEnv);
-        (_, !finfo) = this.inherit(
-          context,
-          this.sclasses[super.sclassID],
-          info,
-          this.fsclasses[super.sclassID],
-          finfo,
-        );
+        (_, !info) = this.inherit(context, this.sclasses[super.sclassID], info);
       };
 
       // Now look for super- and subtypes based on co- and contravariance.
@@ -1573,7 +1481,6 @@ mutable class Specializer{
         for (otherID in this.gclassMap[hc.generic.name()]) {
           if (otherID != sid) {
             other = this.sclasses[otherID];
-            fother = this.fsclasses[otherID];
 
             // Is 'newClass' a supertype of 'other'?
             isSuperType = true;
@@ -1623,23 +1530,11 @@ mutable class Specializer{
               })
             ) {
               if (isSubType) {
-                (!fother, !finfo) = this.inherit(
-                  context,
-                  other,
-                  info,
-                  fother,
-                  finfo,
-                )
+                (!other, !info) = this.inherit(context, other, info)
               };
 
               if (isSuperType) {
-                (!finfo, !fother) = this.inherit(
-                  context,
-                  info,
-                  other,
-                  finfo,
-                  fother,
-                )
+                (!info, !other) = this.inherit(context, info, other)
               }
             }
           }
@@ -1696,8 +1591,7 @@ mutable class Specializer{
   // implementation function
   private mutable fun addMethod(
     context: mutable SKFS.Context,
-    info: mutable SClassInfo,
-    finfo: SClassInfo,
+    info: SClassInfo,
     m: MethodKey,
     requestImpl: Bool,
   ): SClassInfo {
@@ -1710,7 +1604,7 @@ mutable class Specializer{
       )
     };
     // add mapping from method name to host sclass id
-    !finfo = info.setMethods(this, finfo, info.methods.set(m, hostID));
+    !info = info.setMethods(this, info.methods.set(m, hostID));
     // optionally request implementation
     if (requestImpl) {
       gmethod.function match {
@@ -1726,13 +1620,12 @@ mutable class Specializer{
       | None() -> void
       }
     };
-    finfo
+    info
   }
 
   private mutable fun noteCalledMethod(
     context: mutable SKFS.Context,
-    receiver: mutable SClassInfo,
-    freceiver: SClassInfo,
+    receiver: SClassInfo,
     m: MethodKey,
   ): SClassInfo {
     if (receiver.sclass.id == tAny.sclassID) {
@@ -1756,24 +1649,17 @@ mutable class Specializer{
       // MyFinalClass<Animal> and calls this method, it will just invoke
       // the devirtualized implementation directly.
       if (receiver.sclass.kind.isFinal()) {
-        !freceiver = this.addMethod(context, receiver, freceiver, m, true)
+        !receiver = this.addMethod(context, receiver, m, true)
       } else {
         for (subID in receiver.subtypes) {
           info = this.sclasses[subID];
-          finfo = this.fsclasses[subID];
           if (!info.methods.containsKey(m)) {
-            !finfo = this.addMethod(
-              context,
-              info,
-              finfo,
-              m,
-              info.sclass.kind.isFinal(),
-            )
+            _ = this.addMethod(context, info, m, info.sclass.kind.isFinal())
           }
         }
       }
     };
-    freceiver
+    receiver
   }
 
   mutable fun requestMethod(
@@ -1783,9 +1669,8 @@ mutable class Specializer{
     targs: Array<Tclass>,
   ): void {
     info = this.sclasses[objType.sclassID];
-    finfo = this.fsclasses[objType.sclassID];
     sposn = MethodSuperpositionID(targs);
-    _ = this.noteCalledMethod(context, info, finfo, MethodKey(method, sposn))
+    _ = this.noteCalledMethod(context, info, MethodKey(method, sposn))
   }
 
   // Ask that the requested function be compiled to machine code compatible
@@ -1945,8 +1830,7 @@ mutable class Specializer{
     reportMemoryStatistics("native/partitionFunctions after sfuns");
 
     // Populate each SClass.methods with the SFunctionIDs for its code.
-    for (sid => info in this.sclasses) {
-      finfo = this.fsclasses[sid];
+    for (info in this.sclasses) {
       if (!info.methods.isEmpty()) {
         newMethods = UnorderedMap::mcreate(info.methods.size());
         for (mkey => hostID in info.methods) {
@@ -1971,7 +1855,7 @@ mutable class Specializer{
         // Record the methods.
         sclass = info.sclass;
         !sclass.methods = newMethods.chill();
-        _ = info.setSClass(this, finfo, sclass);
+        _ = info.setSClass(this, sclass);
       }
     };
     reportMemoryStatistics("native/partitionFunctions after populate methods");

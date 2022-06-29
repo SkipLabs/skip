@@ -5398,11 +5398,9 @@ fun createIR(
   reportMemoryStatistics("native/createIR after findAllFunctionsAndSClasses");
 
   // Latch the sub- and supertypes.
-  for (sid => info in specializer.sclasses) {
-    finfo = specializer.fsclasses[sid];
+  for (info in specializer.sclasses) {
     _ = info.setSClass(
       specializer,
-      finfo,
       info.sclass with {
         subtypes => info.subtypes,
         supertypes => info.supertypes,
@@ -5415,11 +5413,9 @@ fun createIR(
   specializer.scalarizeAllFields();
   reportMemoryStatistics("native/createIR after scalarizeAllFields");
 
-  for (sid => info in specializer.sclasses) {
-    finfo = specializer.fsclasses[sid];
+  for (info in specializer.sclasses) {
     _ = info.setSClass(
       specializer,
-      finfo,
       info.sclass with {canAliasMutableTypes => true},
     );
   };
