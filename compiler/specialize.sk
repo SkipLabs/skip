@@ -629,114 +629,117 @@ mutable class Specializer{
     changed = false;
     while (!this.funStack.isEmpty()) {
       !changed = true;
-      oldPos = this.pos;
-
       (f, targs) = this.funStack match {
       | List.Nil() -> invariant_violation("Unexpected empty stack")
       | List.Cons(x, rl) ->
         this.!funStack = rl;
         x
       };
-
-      tparamEnv = makeTypeMap(f.funInfo.tparams, targs, f.funInfo.pos);
-      seenTypes = mutable UnorderedSet[];
-      noteType = (t, literalType) -> {
-        // For speed look up the parametric version of the type in the cache,
-        // and only if that fails run applyTparams and look up the real type.
-        key = (t, literalType);
-        if (seenTypes.maybeInsert(key)) {
-          _ = this.getTclass3(context, t, tparamEnv, this.pos, literalType)
-        }
-      };
-
-      // Ensure the stub for a generator's "next" method exists,
-      // so we can find it when we provide a body for it later.
-      returnType = this.getTclass3(
-        context,
-        f.funInfo.funType.returnType,
-        tparamEnv,
-      );
-      if (f.funInfo.isGenerator) {
-        this.requestMethod(context, "next", returnType, Array[])
-      };
-
-      // Process parameters.
-      for (instr in f.params) {
-        this.!pos = instr.pos;
-        noteType(instr.getType(), false);
-      };
-
-      // Process the body of the function.
-      for (b in f.blocks) {
-        for (instr in b.instrs) {
-          this.!pos = instr.pos;
-
-          noteType(instr.getType(), false);
-
-          instr match {
-          | GCallFunctionBase{name, targs => innerTargs} ->
-            _ = this.requestFunction(
-              context,
-              name,
-              innerTargs.map(t -> this.getTclass3(context, t, tparamEnv)),
-            )
-          | call @ GCallMethodBase{method} ->
-            objType = this.getTclass3(
-              context,
-              call.args[0].getType(),
-              tparamEnv,
-            );
-            innerTargs = this.computeMethodTargs(context, call, tparamEnv);
-            this.requestMethod(context, method, objType, innerTargs)
-
-          | GTypeSwitch{value} ->
-            // TypeSwitch on an Option type will generate an "isSome()"
-            // call, so we need to force that method to get compiled.
-            valType = this.getTclass3(context, value.getType(), tparamEnv);
-
-            if (this.sclasses[valType.sclassID].optionStyle.isSome()) {
-              this.requestMethod(context, "isSome", valType, Array[])
-            }
-
-          | GCustomInstr{request} ->
-            request match {
-            | Some(lambda) -> lambda(this, targs, tparamEnv)
-            | None _ -> void
-            }
-
-          | obj @ GObject _ -> noteType(obj.getType(), true)
-
-          // These do not cause any additional types or code to be needed.
-          | GAsyncReturn _
-          | GCast _
-          | GEArray _
-          | GFreeze _
-          | GGetConst _
-          | GGetCurrentAwaitable _
-          | GGetField _
-          | GIf _
-          | GIntSwitch _
-          | GJump _
-          | GLandingPad _
-          | GReturn _
-          | GSetField _
-          | GStringSwitch _
-          | GSuspend _
-          | GThrow _
-          | GUnreachable _
-          | GWith _
-          | GYield _
-          | GYieldBreak _
-          | GZeroExtend _ ->
-            void
-          }
-        }
-      };
-
-      this.!pos = oldPos;
+      this.specializePendingFun(context, f, targs);
     };
 
     changed
+  }
+
+  private mutable fun specializePendingFun(
+    context: mutable SKFS.Context,
+    f: GFunction,
+    targs: Array<Tclass>,
+  ): void {
+    oldPos = this.pos;
+
+    tparamEnv = makeTypeMap(f.funInfo.tparams, targs, f.funInfo.pos);
+    seenTypes = mutable UnorderedSet[];
+    noteType = (t, literalType) -> {
+      // For speed look up the parametric version of the type in the cache,
+      // and only if that fails run applyTparams and look up the real type.
+      key = (t, literalType);
+      if (seenTypes.maybeInsert(key)) {
+        _ = this.getTclass3(context, t, tparamEnv, this.pos, literalType)
+      }
+    };
+
+    // Ensure the stub for a generator's "next" method exists,
+    // so we can find it when we provide a body for it later.
+    returnType = this.getTclass3(
+      context,
+      f.funInfo.funType.returnType,
+      tparamEnv,
+    );
+    if (f.funInfo.isGenerator) {
+      this.requestMethod(context, "next", returnType, Array[])
+    };
+
+    // Process parameters.
+    for (instr in f.params) {
+      this.!pos = instr.pos;
+      noteType(instr.getType(), false);
+    };
+
+    // Process the body of the function.
+    for (b in f.blocks) {
+      for (instr in b.instrs) {
+        this.!pos = instr.pos;
+
+        noteType(instr.getType(), false);
+
+        instr match {
+        | GCallFunctionBase{name, targs => innerTargs} ->
+          _ = this.requestFunction(
+            context,
+            name,
+            innerTargs.map(t -> this.getTclass3(context, t, tparamEnv)),
+          )
+        | call @ GCallMethodBase{method} ->
+          objType = this.getTclass3(context, call.args[0].getType(), tparamEnv);
+          innerTargs = this.computeMethodTargs(context, call, tparamEnv);
+          this.requestMethod(context, method, objType, innerTargs)
+
+        | GTypeSwitch{value} ->
+          // TypeSwitch on an Option type will generate an "isSome()"
+          // call, so we need to force that method to get compiled.
+          valType = this.getTclass3(context, value.getType(), tparamEnv);
+
+          if (this.sclasses[valType.sclassID].optionStyle.isSome()) {
+            this.requestMethod(context, "isSome", valType, Array[])
+          }
+
+        | GCustomInstr{request} ->
+          request match {
+          | Some(lambda) -> lambda(this, targs, tparamEnv)
+          | None _ -> void
+          }
+
+        | obj @ GObject _ -> noteType(obj.getType(), true)
+
+        // These do not cause any additional types or code to be needed.
+        | GAsyncReturn _
+        | GCast _
+        | GEArray _
+        | GFreeze _
+        | GGetConst _
+        | GGetCurrentAwaitable _
+        | GGetField _
+        | GIf _
+        | GIntSwitch _
+        | GJump _
+        | GLandingPad _
+        | GReturn _
+        | GSetField _
+        | GStringSwitch _
+        | GSuspend _
+        | GThrow _
+        | GUnreachable _
+        | GWith _
+        | GYield _
+        | GYieldBreak _
+        | GZeroExtend _ ->
+          void
+        }
+      }
+    };
+
+    this.!pos = oldPos;
   }
 
   readonly fun exampleSClass(t: Type): SClass {
