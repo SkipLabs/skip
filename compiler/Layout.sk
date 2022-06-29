@@ -173,21 +173,27 @@ mutable private class FieldLayoutChooser(
     );
 
     // Process all the fixed layout classes first
-    for (info in specializer.sclasses) {
+    for (sid => info in specializer.sclasses) {
+      finfo = specializer.fsclasses[sid];
       sc = info.sclass;
       if (
         annotationsContainParam(sc.annotations, "@cpp_export", sc.pos).isSome()
       ) {
         flc.classAlreadyProcessed.insert(sc.id);
-        info.!sclass = sc with {
-          layout => Some(layoutCppExportClass(specializer, sc.fields)),
-        };
+        _ = info.setSClass(
+          specializer,
+          finfo,
+          sc with {
+            layout => Some(layoutCppExportClass(specializer, sc.fields)),
+          },
+        );
       }
     };
 
     emptyLayout = Some(Array[]);
 
-    for (info in specializer.sclasses) {
+    for (sid => info in specializer.sclasses) {
+      finfo = specializer.fsclasses[sid];
       sc = info.sclass;
       if (!sc.isArray() && !sc.kind.isValueClass()) {
         if (sc.fields.isEmpty()) {
@@ -196,13 +202,21 @@ mutable private class FieldLayoutChooser(
           // classes with no fields but with covariant subtypes. The reason
           // is that with no fields, no field layout constraints get created
           // by the colorer, and those are what trigger assigning to 'layout'.
-          info.!sclass = sc with {layout => emptyLayout};
+          _ = info.setSClass(
+            specializer,
+            finfo,
+            sc with {layout => emptyLayout},
+          );
         } else if (flc.classAlreadyProcessed.maybeInsert(sc.id)) {
           constraints = flc.buildConstraintsForConnectedClasses(sc);
           if (!constraints.isEmpty()) {
             flc.assignFieldOffsets(constraints)
           } else {
-            info.!sclass = sc with {layout => emptyLayout};
+            _ = info.setSClass(
+              specializer,
+              finfo,
+              sc with {layout => emptyLayout},
+            );
           }
         }
       }
@@ -385,11 +399,16 @@ mutable private class FieldLayoutChooser(
       (sid, layoutIndex) = sidAndLayoutIndex;
       layout = classLayouts[layoutIndex].fields;
       info = this.specializer.sclasses[sid];
+      finfo = this.specializer.fsclasses[sid];
       sc = info.sclass;
 
       sc.pos.invariant(sc.fields.size() == layout.size(), "Layout mismatch");
 
-      info.!sclass = sc with {layout => Some(layout.toArray())}
+      _ = info.setSClass(
+        this.specializer,
+        finfo,
+        sc with {layout => Some(layout.toArray())},
+      )
     }
   }
 }
