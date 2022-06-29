@@ -448,6 +448,16 @@ mutable class Specializer{
     }
   }
 
+  mutable fun replace(other: this): void {
+    this.!gclassMap = other.gclassMap;
+    this.!sclassMap = other.sclassMap;
+    this.!sclasses = other.sclasses;
+    this.!funsNeeded = other.funsNeeded;
+    this.!funStack = other.funStack;
+    this.!canCreateNewSClasses = other.canCreateNewSClasses;
+    this.!pos = other.pos;
+  }
+
   readonly fun getSClass(sid: SClassID): SClass {
     this.sclasses[sid].sclass
   }
@@ -635,7 +645,13 @@ mutable class Specializer{
         this.!funStack = rl;
         x
       };
-      this.specializePendingFun(context, f, targs);
+      specializer = this.chill();
+      newSpecializer = SKFS.withRegion(context, (_, context) ~> {
+        mspecializer = specializer.mclone();
+        mspecializer.specializePendingFun(context, f, targs);
+        mspecializer.chill();
+      });
+      this.replace(newSpecializer)
     };
 
     changed
