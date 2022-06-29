@@ -684,7 +684,6 @@ mutable class Specializer{
     context: mutable SKFS.Context,
   ): Bool {
     changed = false;
-
     while (!this.funStack.isEmpty()) {
       !changed = true;
       oldPos = this.pos;
@@ -791,7 +790,7 @@ mutable class Specializer{
         }
       };
 
-      this.!pos = oldPos
+      this.!pos = oldPos;
     };
 
     changed
@@ -981,9 +980,9 @@ mutable class Specializer{
     context: mutable SKFS.Context,
     super: mutable SClassInfo,
     sub: mutable SClassInfo,
-  ): void {
-    fsuper = super.chill();
-    fsub = sub.chill();
+    fsuper: SClassInfo,
+    fsub: SClassInfo,
+  ): (SClassInfo, SClassInfo) {
     if (!super.subtypes.contains(sub.sclass.id)) {
       !fsuper = super.setSubTypes(
         this,
@@ -996,16 +995,35 @@ mutable class Specializer{
         sub.supertypes.set(super.sclass.id),
       );
 
-      for (t in super.supertypes) this.inherit(context, this.sclasses[t], sub);
-      for (t in sub.subtypes) this.inherit(context, super, this.sclasses[t]);
+      for (t in super.supertypes) {
+        (_, !fsub) = this.inherit(
+          context,
+          this.sclasses[t],
+          sub,
+          this.fsclasses[t],
+          fsub,
+        );
+      };
+      for (t in sub.subtypes) {
+        (!fsuper, _) = this.inherit(
+          context,
+          super,
+          this.sclasses[t],
+          fsuper,
+          this.fsclasses[t],
+        )
+      };
 
       // Track all methods callable on concrete classes (by casting to some
       // supertype) so we know what to compile for them. We don't need to do
       // this for base classes or value classes.
       if (sub.sclass.kind.isKClass()) {
-        for (m => _ in super.methods) this.noteCalledMethod(context, sub, m)
+        for (m => _ in super.methods) {
+          !fsub = this.noteCalledMethod(context, sub, fsub, m)
+        }
       }
-    }
+    };
+    (fsuper, fsub)
   }
 
   mutable fun specializeType2(
@@ -1523,7 +1541,13 @@ mutable class Specializer{
       // Connect super- and subtypes in the "extends" hierarchy.
       for (ta in gclass.extends_) {
         super = this.getTclass3(context, ta, tparamEnv);
-        this.inherit(context, this.sclasses[super.sclassID], info);
+        (_, !finfo) = this.inherit(
+          context,
+          this.sclasses[super.sclassID],
+          info,
+          this.fsclasses[super.sclassID],
+          finfo,
+        );
       };
 
       // Now look for super- and subtypes based on co- and contravariance.
@@ -1549,6 +1573,7 @@ mutable class Specializer{
         for (otherID in this.gclassMap[hc.generic.name()]) {
           if (otherID != sid) {
             other = this.sclasses[otherID];
+            fother = this.fsclasses[otherID];
 
             // Is 'newClass' a supertype of 'other'?
             isSuperType = true;
@@ -1598,11 +1623,23 @@ mutable class Specializer{
               })
             ) {
               if (isSubType) {
-                this.inherit(context, other, info)
+                (!fother, !finfo) = this.inherit(
+                  context,
+                  other,
+                  info,
+                  fother,
+                  finfo,
+                )
               };
 
               if (isSuperType) {
-                this.inherit(context, info, other)
+                (!finfo, !fother) = this.inherit(
+                  context,
+                  info,
+                  other,
+                  finfo,
+                  fother,
+                )
               }
             }
           }
@@ -1660,10 +1697,10 @@ mutable class Specializer{
   private mutable fun addMethod(
     context: mutable SKFS.Context,
     info: mutable SClassInfo,
+    finfo: SClassInfo,
     m: MethodKey,
     requestImpl: Bool,
-  ): void {
-    finfo = info.chill();
+  ): SClassInfo {
     receiver = info.sclass;
     (hostID, gmethod) = this.findMethod(info, m.name) match {
     | Some((hostID, gmethod)) -> (hostID, gmethod)
@@ -1688,14 +1725,16 @@ mutable class Specializer{
         )
       | None() -> void
       }
-    }
+    };
+    finfo
   }
 
   private mutable fun noteCalledMethod(
     context: mutable SKFS.Context,
     receiver: mutable SClassInfo,
+    freceiver: SClassInfo,
     m: MethodKey,
-  ): void {
+  ): SClassInfo {
     if (receiver.sclass.id == tAny.sclassID) {
       // NOTE: We don't create methods for tAny, since we will later turn such
       // calls into "unreachable". This is important because tAny is a "bottom"
@@ -1717,16 +1756,24 @@ mutable class Specializer{
       // MyFinalClass<Animal> and calls this method, it will just invoke
       // the devirtualized implementation directly.
       if (receiver.sclass.kind.isFinal()) {
-        this.addMethod(context, receiver, m, true)
+        !freceiver = this.addMethod(context, receiver, freceiver, m, true)
       } else {
         for (subID in receiver.subtypes) {
           info = this.sclasses[subID];
+          finfo = this.fsclasses[subID];
           if (!info.methods.containsKey(m)) {
-            this.addMethod(context, info, m, info.sclass.kind.isFinal())
+            !finfo = this.addMethod(
+              context,
+              info,
+              finfo,
+              m,
+              info.sclass.kind.isFinal(),
+            )
           }
         }
       }
-    }
+    };
+    freceiver
   }
 
   mutable fun requestMethod(
@@ -1736,8 +1783,9 @@ mutable class Specializer{
     targs: Array<Tclass>,
   ): void {
     info = this.sclasses[objType.sclassID];
+    finfo = this.fsclasses[objType.sclassID];
     sposn = MethodSuperpositionID(targs);
-    this.noteCalledMethod(context, info, MethodKey(method, sposn))
+    _ = this.noteCalledMethod(context, info, finfo, MethodKey(method, sposn))
   }
 
   // Ask that the requested function be compiled to machine code compatible
