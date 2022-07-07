@@ -642,7 +642,11 @@ private fun optimizeAll(env: GlobalEnv, opts: Int): GlobalEnv {
       envSnapshot = env;
       newFuns = Array::fillBy(unoptimized.size(), i ->
         allFuns[unoptimized[i]]
-      ).map(f ~> optimizeOne(f, envSnapshot, opts));
+      ).map(f ~>
+        SKFS.withRegion(mutable SKFS.Context{}, (_, _context) ~>
+          optimizeOne(f, envSnapshot, opts)
+        )
+      );
 
       // Record the results.
       foundExtra = false;
