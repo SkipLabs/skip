@@ -191,7 +191,7 @@ mutable class GFunInfo{
   tparams: Array<GTparam>,
   isAsync: Bool = false,
   isGenerator: Bool = false,
-} extends FunInfoCommon, HasFileRange
+} extends FunInfoCommon, HasFileRange uses Hashable
 
 // Globally unique name for each generic function.
 value class .GClassName() uses TypeSafeID<String> {
@@ -279,7 +279,7 @@ class GField{
 mutable class GBlock{
   instrs: mutable Vector<GStmt> = mutable Vector[],
   prettyName: String = "",
-} extends GHasID<GBlockID>, HasFileRange {
+} extends GHasID<GBlockID>, HasFileRange uses Hashable {
   readonly fun chill(): this {
     static{
       id => this.id,
@@ -291,20 +291,25 @@ mutable class GBlock{
 }
 
 // See CoroutineInfo.
-class GUnfinishedNext(rampUp: GFunInfo)
+class GUnfinishedNext(rampUp: GFunInfo) uses Hashable
 
+class GFunctionFile(value: GFunction) extends SKFS.File
 class GFunction{
   funInfo: GFunInfo,
   params: Array<GFunParam>,
   blocks: Array<GBlock>,
   coroutineInfo: ?GUnfinishedNext = None(),
-} uses Show, Hashable, Equality {
+} uses Show, Hashable, Orderable {
   fun toString(): String {
     "<GFunction " + this.funInfo.gfunction.id + ">"
   }
 
   fun ==(other: GFunction): Bool {
     this.funInfo.gfunction == other.funInfo.gfunction
+  }
+
+  fun compare(other: GFunction): Order {
+    this.funInfo.gfunction.id.compare(other.funInfo.gfunction.id)
   }
 
   fun hash(): Int {
@@ -448,7 +453,7 @@ class GFunType{
   // Return type. TODO: Should this become an array, so after we expand
   // value classes they become separate values?
   returnType: GType,
-} {
+} uses Hashable {
   fun applyTparams(tparamEnv: UnorderedMap<GTparam, GType>): GFunType {
     this with {
       params => this.params.map(t -> t.applyTparams(tparamEnv)),
@@ -457,7 +462,7 @@ class GFunType{
   }
 }
 
-base class GInstr uses Show {
+base class GInstr uses Show, Hashable {
   // NOTE: GTypedStmt must be first to resolve GInvokeBase ambiguity.
   fun getType(): GType {
     this match {
@@ -554,7 +559,11 @@ class GCustomInstr{
     tparamEnv: UnorderedMap<GTparam, Tclass>,
   ) ~> void,
   args: Array<GInstr> = Array[],
-} extends GTypedStmt {}
+} extends GTypedStmt {
+  fun hash(): Int {
+    (hash(this.emit), hash(this.request), this.args.hash()).hash()
+  }
+}
 
 // Stmts that are appear only as the last Stmt in a Block. They cannot
 // appear anywhere else, and a Block must always end with one of these.

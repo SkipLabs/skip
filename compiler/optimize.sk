@@ -541,7 +541,11 @@ private fun findUnfinishedDependencyCycleMember(
 
 // Optimizes all functions with the given set of optimizations. Returns
 // the new Env.
-private fun optimizeAll(env: GlobalEnv, opts: Int): GlobalEnv {
+private fun optimizeAll(
+  context: mutable SKFS.Context,
+  env: GlobalEnv,
+  opts: Int,
+): GlobalEnv {
   verbose = kConfig.verbose;
 
   // Extract the functions to optimize.
@@ -642,11 +646,11 @@ private fun optimizeAll(env: GlobalEnv, opts: Int): GlobalEnv {
       envSnapshot = env;
       newFuns = Array::fillBy(unoptimized.size(), i ->
         allFuns[unoptimized[i]]
-      ).map(f ~>
-        SKFS.withRegion(mutable SKFS.Context{}, (_, _context) ~>
-          optimizeOne(f, envSnapshot, opts)
-        )
-      );
+      ).map(f -> {
+        SKFS.withRegion(context, (_, _context) ~> {
+          optimizeOne(f, envSnapshot, opts);
+        })
+      });
 
       // Record the results.
       foundExtra = false;
@@ -683,7 +687,7 @@ private fun optimizeAll(env: GlobalEnv, opts: Int): GlobalEnv {
         };
 
         newClasses match {
-        | Some(nc) -> !env = env with {sclasses => nc.chill()}
+        | Some(nc) -> !env = env with {sclasses => nc}
         | None() -> void
         };
 
@@ -779,12 +783,10 @@ private fun optimizeAll(env: GlobalEnv, opts: Int): GlobalEnv {
 }
 
 // Note that after we lower, we never inline again, as that may be illegal.
-fun compileAll(env: GlobalEnv): GlobalEnv {
-  !env = optimizeAll(env, kConfig.optConfig.all());
-
+fun compileAll(context: mutable SKFS.Context, env: GlobalEnv): GlobalEnv {
+  !env = optimizeAll(context, env, kConfig.optConfig.all());
   !env = LowerConst.lowerAllConsts(env);
-
-  !env = optimizeAll(env, kConfig.optConfig.all());
+  !env = optimizeAll(context, env, kConfig.optConfig.all());
 
   env
 }

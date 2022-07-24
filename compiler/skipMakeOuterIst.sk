@@ -55,47 +55,30 @@ const EMPTY_ENV: Env = Env{
 };
 
 /************************************************************/
-
-class DefFile(value: O.Def) extends SKFS.File
-
 fun program_phase(
   context: mutable SKFS.Context,
   typedDefs: SKFS.EHandle<SkipTyping.DefFile>,
 ): O.Program {
-  outerDefs = typedDefs.map(
-    DefFile::fromFile,
+  outerDefs = typedDefs.contextWriterKeyValues(
+    O.DefFile::fromFile,
     context,
     SKFS.DirName::create("/outerDefs/"),
-    defFile ~> {
-      DefFile(
-        defFile.value match {
-        | SkipTypedAst.DConst(x) -> O.DConst(const_def(x))
-        | SkipTypedAst.DClass(x) -> O.DClass(class_def(x))
-        | SkipTypedAst.DFun(x) -> O.DFun(fun_def(x))
-        },
-      )
+    (_context, writer, _key, defFiles) ~> {
+      defFile = defFiles[0];
+      defFile.value match {
+      | SkipTypedAst.DConst(x) ->
+        cst = const_def(x);
+        writer.write(SKFS.SID(cst.name.id), O.DefFile(O.DConst(cst)))
+      | SkipTypedAst.DClass(x) ->
+        cd = class_def(x);
+        writer.write(SKFS.SID(cd.name.id), O.DefFile(O.DClass(cd)))
+      | SkipTypedAst.DFun(x) ->
+        fd = fun_def(x);
+        writer.write(SKFS.SID(fd.name.id), O.DefFile(O.DFun(fd)))
+      };
     },
   );
-  defsProj = outerDefs.contextWriterKeyValues(
-    DefFile::fromFile,
-    context,
-    SKFS.DirName::create("/outerProgram/proj/"),
-    (_context, writer, _, value) ~> {
-      writer.writeArray(SKFS.IID(0), value)
-    },
-  );
-  defs = defsProj.getArray(context, SKFS.IID(0));
-  class_defs = UMap[];
-  fun_defs = UMap[];
-  const_defs = UMap[];
-  for (def in defs) {
-    def.value match {
-    | O.DClass(x) -> !class_defs[(x.name.pos, x.name.id)] = x
-    | O.DFun(x) -> !fun_defs[(x.name.pos, x.name.id)] = x
-    | O.DConst(x) -> !const_defs[(x.name.pos, x.name.id)] = x
-    }
-  };
-  O.Program(outerDefs, fun_defs, const_defs)
+  O.Program::create(outerDefs)
 }
 
 fun program(
@@ -108,7 +91,7 @@ fun program(
 fun tya_def(TAst.Name, tya: TAst.Type_alias_def): O.TypeAliasDef {
   O.TypeAliasDef{
     annotations => tya.annotations,
-    name => O.name(tya.name),
+    name => O.localName(tya.name),
     tparams => tparams(tya.tparams),
     body => sig_type_(tya.body),
   }
@@ -120,7 +103,7 @@ fun tparams(tparams: Array<(String, NAst.Name)>): Array<O.TypeAliasTparam> {
 
 fun tya_tparam(x: (String, NAst.Name)): O.TypeAliasTparam {
   (i, n) = x;
-  O.TypeAliasTparam(i, O.name(n))
+  O.TypeAliasTparam(i, O.localName(n))
 }
 
 /*****************************************************************************/
@@ -134,7 +117,7 @@ fun class_def(cd: TAst.Class_def): O.ClassDef {
     kind => kind(cd.kind),
     value => cd.value,
     mutable_ => cd.mutable_,
-    name => O.name(cd.name),
+    name => O.className(cd.name),
     tparams => type_parameters(cd.tparams),
     params => cd.params.map(class_parameters),
     extends_ => class_extends(cd.extends_),
@@ -156,7 +139,7 @@ fun class_parameters(cp: TAst.Class_params): O.ClassParams {
   O.ClassParams{
     pos => cp.pos,
     final_ => cp.final_,
-    source => O.name(cp.source),
+    source => O.className(cp.source),
     params => lazy_parameters(params),
     visibility => visibility(cp.visibility),
   }
@@ -174,19 +157,32 @@ fun kind(x: TAst.Class_kind): O.ClassKind {
 /* Class constants. */
 /*****************************************************************************/
 fun class_const_defs(defs: UMap<TAst.Const_def>): UMap<O.ConstDef> {
-  defs.filter((_, c) -> c.deferred_.isNone()).map((_, x) -> const_def(x))
+  defs.filter((_, c) -> c.deferred_.isNone()).map((_, x) -> class_const_def(x))
 }
 
 fun const_def(con: TAst.Const_def): O.ConstDef {
   O.ConstDef{
     annotations => con.annotations,
     native_ => con.native_,
-    name => O.name(con.name),
+    name => O.constName(con.name),
     type => sig_type_(con.type),
     value => lazy_initializer_opt(con.value),
     visibility => visibility(con.visibility),
-    from_ => con.from_.map(O.name),
-    source => con.source.map(O.name),
+    from_ => con.from_.map(O.localName),
+    source => con.source.map(O.className),
+  }
+}
+
+fun class_const_def(con: TAst.Const_def): O.ConstDef {
+  O.ConstDef{
+    annotations => con.annotations,
+    native_ => con.native_,
+    name => O.localName(con.name),
+    type => sig_type_(con.type),
+    value => lazy_initializer_opt(con.value),
+    visibility => visibility(con.visibility),
+    from_ => con.from_.map(O.localName),
+    source => con.source.map(O.className),
   }
 }
 
@@ -196,8 +192,8 @@ fun const_def(con: TAst.Const_def): O.ConstDef {
 fun class_extends(parent_map: UMap<TAst.Parent>): UMap<O.Parent> {
   parent_map.map((_, p) ->
     O.Parent{
-      effective_source => O.name(p.effective_source),
-      inherited_source => O.name(p.inherited_source),
+      effective_source => O.className(p.effective_source),
+      inherited_source => O.className(p.inherited_source),
       targs => p.targs.map(sig_type_),
     }
   )
@@ -227,7 +223,7 @@ fun type_parameter(
   tyl: Array<TAst.Type_>,
 ): O.TypeParameter {
   otyl = List::createFromItems(tyl.map(sig_type_));
-  O.TypeParameter(variance(v), i, O.name(n), otyl)
+  O.TypeParameter(variance(v), i, O.localName(n), otyl)
 }
 
 fun variance(x: TAst.Variance): O.Variance {
@@ -287,10 +283,10 @@ fun method_def(met: TAst.Method_def, cd: TAst.Class_def): O.MethodDef {
     native_ => met.native_,
     kind => met.kind,
     untracked_ => met.untracked_,
-    name => O.name(met.name),
-    from_ => O.name(met.from_),
-    source => O.name(met.source),
-    met_class => O.name(cd.name),
+    name => O.localName(met.name),
+    from_ => O.className(met.from_),
+    source => O.className(met.source),
+    met_class => O.className(cd.name),
     whenparams => when_clause(met.whenparams),
     tparams => type_parameters(met.tparams),
     params => lazy_parameters(met.params),
@@ -301,9 +297,9 @@ fun method_def(met: TAst.Method_def, cd: TAst.Class_def): O.MethodDef {
       tparam_map.map((_, ty) -> type(true, ty))
     ),
     yields => met.yields,
-    hash => 0,
+    xhash => 0,
   };
-  !m.hash = hash(m);
+  !m.xhash = hash(m);
   m
 }
 
@@ -358,15 +354,16 @@ fun fun_def(fd: TAst.Fun_def): O.FunDef {
     memoized_ => fd.memoized_,
     async_ => fd.async_,
     untracked_ => fd.untracked_,
-    name => O.name(fd.name),
+    origName => fd.name.i1,
+    name => O.funName(fd.name),
     tparams => type_parameters(fd.tparams),
     params => lazy_parameters(fd.params),
     return_ => sig_type_(fd.return_),
     body => lazy_function_body(fd.body),
     yields => fd.yields,
-    hash => 0,
+    xhash => 0,
   };
-  !f.hash = hash(f);
+  !f.xhash = hash(f);
   f
 }
 
@@ -442,12 +439,12 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
     } else {
       nl = {
         ninfo match {
-        | NAst.NAlias(n) -> Array[O.name(n)]
+        | NAst.NAlias(n) -> Array[O.localName(n)]
         | NAst.NThis _ -> Array[O.Name(pos, "this")]
         | NAst.NInst _ -> Array[O.Name(pos, "inst")]
         | NAst.NTydResolved(c, nl)
         | NAst.NTydAbstract(c, nl) ->
-          Array[O.name(c)].concat(nl.map(O.name))
+          Array[O.className(c)].concat(nl.map(O.localName))
         | NAst.NStatic _ -> invariant_violation("assert false")
         }
       };
@@ -466,7 +463,7 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
   | NAst.Tapply(mode, x1, tyl) ->
     tapply = O.Type(
       pos,
-      O.Tapply(O.name(x1), tyl.map(t -> type(remove_aliases, t))),
+      O.Tapply(O.className(x1), tyl.map(t -> type(remove_aliases, t))),
     );
     mode match {
     | NAst.Mchilled() -> tapply
@@ -474,7 +471,7 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
     | NAst.Mmutable(mfr) -> O.Type(mfr, O.Tmutable(tapply))
     }
   | NAst.Tparam(_, v, i, n) ->
-    O.Type(pos, O.Tparam(variance(v), i, O.name(n), None()))
+    O.Type(pos, O.Tparam(variance(v), i, O.localName(n), None()))
   | NAst.Tset(_, _, tparams, elts) if (tparams.isEmpty() && elts.isEmpty()) ->
     O.Type(pos, O.Tany())
   | NAst.Tdefault(ty) -> O.Type(pos, O.Tdefault(type(remove_aliases, ty)))
@@ -482,7 +479,7 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
     nelt = elts[0];
     elt = O.TsetElt(
       tparams,
-      O.name(nelt.name),
+      O.className(nelt.name),
       nelt.targs.map(cur1 -> type(remove_aliases, cur1)),
     );
     pelt = O.Type(pos, elt);
@@ -726,9 +723,9 @@ fun expr_(
   e__ match {
   | TAst.DefaultArg() -> (acc, O.Expr(ty, pos, O.DefaultArg()))
   | TAst.Literal(l) -> (acc, O.Expr(ty, pos, O.ELiteral(literal(l))))
-  | TAst.Local(n) -> (acc, O.Expr(ty, pos, O.Local(O.name(n))))
-  | TAst.Const(n) -> (acc, O.Expr(ty, pos, O.Const(O.name(n))))
-  | TAst.Classname(n) -> (acc, O.Expr(ty, pos, O.Classname(O.name(n))))
+  | TAst.Local(n) -> (acc, O.Expr(ty, pos, O.Local(O.localName(n))))
+  | TAst.Const(n) -> (acc, O.Expr(ty, pos, O.Const(O.constName(n))))
+  | TAst.Classname(n) -> (acc, O.Expr(ty, pos, O.Classname(O.className(n))))
   | TAst.DynamicConstruction(e1, n, targs, args) ->
     (acc1, e2) = bind_expr(new_id, env, acc, e1);
     (acc2, args1) = call_args(new_id, env, acc1, args);
@@ -737,12 +734,15 @@ fun expr_(
       O.Expr(
         ty,
         pos,
-        O.DynamicConstruction(e2, O.name(n), targs.map(expr_type_), args1),
+        O.DynamicConstruction(e2, O.className(n), targs.map(expr_type_), args1),
       ),
     )
   | TAst.Object(n, targs, args) ->
     (acc1, args1) = call_args(new_id, env, acc, args);
-    (acc1, O.Expr(ty, pos, O.Object(O.name(n), targs.map(expr_type_), args1)))
+    (
+      acc1,
+      O.Expr(ty, pos, O.Object(O.className(n), targs.map(expr_type_), args1)),
+    )
   | TAst.Barbar(e1, e2) ->
     expr(
       new_id,
@@ -780,7 +780,7 @@ fun expr_(
     (acc2, O.Expr(ty, pos, O.StaticCall(di1, args1)))
   | TAst.Call((_, (_, TAst.Fun(n, tyl))), args) ->
     (acc1, args1) = call_args(new_id, env, acc, args);
-    (acc1, O.Expr(ty, pos, O.FunCall(O.name(n), tyl.map(expr_type_), args1)))
+    (acc1, O.Expr(ty, pos, O.FunCall(O.funName(n), tyl.map(expr_type_), args1)))
   | TAst.Call(e1, args) ->
     unwrap_annotated(e1) match {
     | e2 @ (_, (_, TAst.Lambda _)) ->
@@ -793,7 +793,7 @@ fun expr_(
   | TAst.Fun(n, targs) ->
     targs1 = targs.map(expr_type_);
     f_call = (ty_ret, vars) ->
-      O.Expr(ty_ret, pos, O.FunCall(O.name(n), targs1, vars));
+      O.Expr(ty_ret, pos, O.FunCall(O.funName(n), targs1, vars));
     wrap_fun(new_id, acc, ty, pos, SortedMap[], f_call)
   | TAst.StaticDot(di) if (di.elt_kind is NAst.EMethod()) ->
     wrap_method(new_id, env, acc, true, ty, pos, di)
@@ -811,7 +811,7 @@ fun expr_(
     info = OU.const_binding_info;
     (acc3, var) = make_var_assign(new_id, acc2, e11, pos, info);
     acc4 = List.Cons(
-      O.AssignField(var, O.name(source), O.name(name), e21),
+      O.AssignField(var, O.className(source), O.localName(name), e21),
       acc3,
     );
     (acc4, OU.make_void(pos))
@@ -1084,9 +1084,9 @@ fun dot_info(
     acc1,
     O.DotInfo{
       obj_expr => obj_expr1,
-      field => O.name(field),
+      field => O.localName(field),
       field_targs => field_targs1,
-      source => O.name(source),
+      source => O.className(source),
       elt_kind => elt_kind1,
       field_type,
     },
@@ -1104,7 +1104,7 @@ fun elt_kind(x: TAst.Elt_kind): O.EltKind {
 
 fun local(ty_name: TAst.LocalInfo): O.LocalVar {
   (ty, n) = ty_name;
-  O.LocalVar(expr_type_(ty), O.name(n))
+  O.LocalVar(expr_type_(ty), O.localName(n))
 }
 
 fun binding_info(info: TAst.Binding_info): O.BindingInfo {
@@ -1117,7 +1117,7 @@ fun binding_info(info: TAst.Binding_info): O.BindingInfo {
 
 fun binding(ty_name_info: TAst.Binding): O.Binding {
   (ty, n, info) = ty_name_info;
-  O.Binding(expr_type_(ty), O.name(n), binding_info(info))
+  O.Binding(expr_type_(ty), O.localName(n), binding_info(info))
 }
 
 fun make_var_binding(
@@ -1312,7 +1312,10 @@ fun with_updates(
     ((acc1, x) -> {
       (n, (_, e, source, cast_opt)) = x;
       (acc2, e1) = bind_expr(new_id, env, acc1, e);
-      (acc2, (n, O.WithUpdate(e1, O.name(source), cast_opt.map(expr_type_))))
+      (
+        acc2,
+        (n, O.WithUpdate(e1, O.className(source), cast_opt.map(expr_type_))),
+      )
     }),
     acc,
   );
@@ -1526,8 +1529,61 @@ fun param_pattern(param_pat: TAst.ParamPattern): O.ParamPattern {
 
 fun type_identifier(x: TAst.Type_identifier): O.TypeIdentifier {
   x match {
-  | TAst.Tid_object(n) -> O.TidObject(O.name(n))
+  | TAst.Tid_object(n) -> O.TidObject(O.className(n))
   | TAst.Tid_static(ns, n) ->
-    O.TidStatic(O.name(ns.i0), O.name(ns.i1), O.name(n))
+    O.TidStatic(O.className(ns.i0), O.localName(ns.i1), O.localName(n))
   }
 }
+
+/*****************************************************************************/
+/* Typed Ast compilation phases. */
+/*****************************************************************************/
+
+/*
+
+fun onExpr(void, e: TAst.Expr): TAst.Expr {
+  !e.i1.i1 = e.i1.i1 match {
+  | TAst.StaticDot(info) ->
+    debug(info);
+    TAst.StaticDot(info)
+  | x -> x
+  };
+  e
+}
+
+fun makeVisitor(): mutable TAst.Visitor<void> {
+  state = void;
+  visitor = mutable TAst.Visitor{
+    state,
+    onExpr => Array[onExpr],
+    onType => Array[],
+    onPattern => Array[],
+    onMethod_def => Array[],
+  };
+  visitor
+}
+
+fun compileTypedAstClass_def(
+  visitor: mutable TAst.Visitor<void>,
+  cd: TAst.Class_def,
+): TAst.Class_def {
+  !cd = visitor.visitClass_def(cd);
+  cd
+}
+
+fun compileTypedAstFun_def(
+  visitor: mutable TAst.Visitor<void>,
+  fd: TAst.Fun_def,
+): TAst.Fun_def {
+  !fd = visitor.visitFun_def(fd);
+  fd
+}
+
+fun compileTypedAstConst_def(
+  visitor: mutable TAst.Visitor<void>,
+  cst: TAst.Const_def,
+): TAst.Const_def {
+  !cst = visitor.visitConst_def(cst);
+  cst
+}
+*/

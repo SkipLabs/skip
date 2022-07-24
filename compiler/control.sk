@@ -134,7 +134,36 @@ fun findTypeSwitchSuccessor(
   if (
     cases.any(gclass -> {
       !case = case + 1;
-      sc.supertypes.any(super -> gclass == env.getSClass(super).gclassName)
+      sc.supertypes.any(super -> {
+        gclass == env.untrackedGetSClass(super).gclassName
+      })
+    })
+  ) {
+    // Found a match. Add 1 to skip default (successor 0).
+    case + 1
+  } else {
+    // No match, use default (successor 0).
+    0
+  }
+}
+
+fun trackedFindTypeSwitchSuccessor(
+  sc: SClass,
+  cases: Array<GClassName>,
+  env: mutable ClassLookupEnv,
+): Int {
+  invariant(
+    sc.kind.isFinal(),
+    "Cannot find type switch successor " + "for non-final type",
+  );
+
+  case = -1;
+  if (
+    cases.any(gclass -> {
+      !case = case + 1;
+      sc.supertypes.any(super -> {
+        gclass == env.getSClass(super).gclassName
+      })
     })
   ) {
     // Found a match. Add 1 to skip default (successor 0).

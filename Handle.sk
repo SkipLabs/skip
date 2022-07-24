@@ -462,6 +462,17 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     dir = context.unsafeGetEagerDir(this.dirName);
     dir.writeArray(context, key, values);
   }
+
+  fun unsafeGetArray(context: mutable Context, key: BaseName): Array<T> {
+    dir = context.unsafeGetDir(this.getDirName());
+    dir.getArrayRaw(key).map(this.getConv())
+  }
+
+  fun unsafeGet(context: mutable Context, key: BaseName): T {
+    arr = this.unsafeGetArray(context, key);
+    invariant(arr.size() == 1);
+    arr[0]
+  }
 }
 
 module end;

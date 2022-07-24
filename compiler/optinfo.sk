@@ -375,6 +375,14 @@ mutable base class IDMap<Key: HasIDValue<Int> & Show, Val> final {
   readonly fun clone(): mutable this {
     mutable static{vec => this.vec.clone(), pos => this.pos}
   }
+
+  readonly fun copy(): mutable this {
+    mutable static{
+      vec => this.vec.clone(),
+      pos => this.pos,
+      nextAllocIndex => this.nextAllocIndex,
+    }
+  }
 }
 
 // Workaround for T28022384 where we can't have a conditional method on IDMap.

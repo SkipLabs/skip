@@ -1900,7 +1900,7 @@ fun make_new_local_var(
   ty: O.Type,
   info: O.BindingInfo,
 ): (O.Bind, O.Expr, O.Name) {
-  n = O.name(sk_new_var_name(new_id, ty.pos));
+  n = O.localName(sk_new_var_name(new_id, ty.pos));
   (
     make_bind_statement(O.Binding(ty, n, info), None()),
     make_local_expr(n, ty),
@@ -1913,7 +1913,7 @@ fun make_new_local_init(
   e: O.Expr,
   info: O.BindingInfo,
 ): (O.Bind, O.Expr, O.Name) {
-  n = O.name(sk_new_var_name(new_id, e.pos));
+  n = O.localName(sk_new_var_name(new_id, e.pos));
   ty = e.ty;
   (
     make_bind_statement(O.Binding(ty, n, info), Some(e)),

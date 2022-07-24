@@ -257,7 +257,7 @@ base class Type uses Show, Equality, Hashable {
   //
   // TODO: This should pass a Tclass, not SClass, to func, handling mutability.
   fun forEachConcreteSubtype(
-    env: readonly ClassLookupEnv,
+    env: ClassLookupEnv,
     func: (SClass -> Bool),
   ): Bool {
     seen = mutable UnorderedSet[];
@@ -267,7 +267,7 @@ base class Type uses Show, Equality, Hashable {
         if (!seen.maybeInsert(t)) {
           true
         } else {
-          sub = env.getSClass(t);
+          sub = env.untrackedGetSClass(t);
           !sub.kind.isFinal() || func(sub)
         }
       })
@@ -284,7 +284,7 @@ class Tclass(
   mutability: Mutability,
 ) extends Type uses Orderable {
   fun sclass(env: readonly ClassLookupEnv): SClass {
-    env.getSClass(this.sclassID)
+    env.untrackedGetSClass(this.sclassID)
   }
 
   fun ==(other: Type): Bool {

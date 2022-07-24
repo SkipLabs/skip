@@ -32,7 +32,19 @@ value class Name(pos: FileRange, id: String) uses Hashable, Equality {
 
 // Temp conversions from old (pos, str) code into Name
 // can remove once upstream Names etc. are converted
-fun name(n: (FileRange, String)): Name {
+fun funName(n: (FileRange, String)): Name {
+  Name(n.i0, n.i1)
+}
+
+fun className(n: (FileRange, String)): Name {
+  Name(n.i0, n.i1)
+}
+
+fun constName(n: (FileRange, String)): Name {
+  Name(n.i0, n.i1)
+}
+
+fun localName(n: (FileRange, String)): Name {
   Name(n.i0, n.i1)
 }
 
@@ -43,29 +55,105 @@ base class Visibility uses Equality {
   | VProtected()
 }
 
-class Program(
-  program: SKFS.EHandle<SkipMakeOuterIst.DefFile>,
-  fun_defs: UMap<FunDef>,
-  const_defs: UMap<ConstDef>,
-) {
+class Program private (program: SKFS.EHandle<DefFile>) {
+  static fun create(program: SKFS.EHandle<DefFile>): this {
+    static(program)
+  }
+
   fun getClass(context: mutable SKFS.Context, className: String): ClassDef {
-    arr = this.program.getArray(context, SKFS.SID(className));
+    key = SKFS.SID(className);
+    arr = this.program.getArray(context, key);
     invariant(arr.size() == 1);
     arr[0].value match {
     | DClass(x) -> x
     | _ -> invariant_violation("Unexpected type")
     }
   }
+
   fun getFun(context: mutable SKFS.Context, funName: String): FunDef {
-    arr = this.program.getArray(context, SKFS.SID(funName));
+    key = SKFS.SID(funName);
+    arr = this.program.getArray(context, key);
     invariant(arr.size() == 1);
     arr[0].value match {
     | DFun(x) -> x
     | _ -> invariant_violation("Unexpected type")
     }
   }
+
+  fun getFunsProj(context: mutable SKFS.Context): SKFS.EHandle<FunDefFile> {
+    invariant(context.getGlobal("INIT") is Some _);
+    this.program.contextWriterKeyValues(
+      FunDefFile::fromFile,
+      context,
+      SKFS.DirName::create("/funsDefsProj/"),
+      (_context, writer, _, files) ~> {
+        invariant(files.size() == 1);
+        result = mutable Vector[];
+        files[0].value match {
+        | OuterIst.DFun(funDef) -> result.push(FunDefFile(funDef))
+        | _ -> void
+        };
+        writer.writeArray(SKFS.IID(0), result.toArray());
+      },
+    )
+  }
+
+  fun getConstsProj(context: mutable SKFS.Context): SKFS.EHandle<ConstDefFile> {
+    invariant(context.getGlobal("INIT") is Some _);
+    this.program.contextWriterKeyValues(
+      ConstDefFile::fromFile,
+      context,
+      SKFS.DirName::create("/constsDefsProj/"),
+      (_context, writer, _, files) ~> {
+        invariant(files.size() == 1);
+        result = mutable Vector[];
+        files[0].value match {
+        | OuterIst.DConst(constDef) -> result.push(ConstDefFile(constDef))
+        | OuterIst.DClass(classDef) ->
+          if (!(classDef.kind is KTrait _)) {
+            if (!classDef.consts.isEmpty()) {
+              // Right now we guarantee we run all const initializers at
+              // startup so create anything with consts now.
+              for (constKey => constDef in classDef.consts) {
+                (constPos, constName) = constKey;
+
+                if (constDef.value.isSome()) {
+                  // Create a normal, "true global" const whose name is qualified with
+                  // the owning class's name.
+                  realConstName = classDef.name.id + "::" + constName;
+
+                  result.push(
+                    ConstDefFile(
+                      constDef with {name => Name(constPos, realConstName)},
+                    ),
+                  );
+                }
+              }
+            }
+          }
+        | _ -> void
+        };
+        writer.writeArray(SKFS.IID(0), result.toArray());
+      },
+    )
+  }
+
+  fun getConsts(
+    context: mutable SKFS.Context,
+    constsDir: SKFS.EHandle<ConstDefFile>,
+  ): Array<ConstDef> {
+    constsDir.unsafeGetArray(context, SKFS.IID(0)).map(x -> x.value)
+  }
+
+  fun getFuns(
+    context: mutable SKFS.Context,
+    funsDir: SKFS.EHandle<FunDefFile>,
+  ): Array<FunDef> {
+    funsDir.unsafeGetArray(context, SKFS.IID(0)).map(x -> x.value)
+  }
 }
 
+class DefFile(value: Def) extends SKFS.File
 base class Def {
   children =
   | DClass(ClassDef)
@@ -92,6 +180,8 @@ base class SymbolDef{name: Name} {
   }
 }
 
+class ConstsArrayFile(value: Array<ConstDef>) extends SKFS.File
+class ConstDefFile(value: ConstDef) extends SKFS.File
 class ConstDef{
   annotations: SSet,
   native_: ?FileRange,
@@ -110,6 +200,8 @@ class TypeDef{
   tyd_value: ?Type,
   source: Name,
 }
+
+class ClassDefFile(value: ClassDef) extends SKFS.File
 
 class ClassDef{
   depth: Int,
@@ -172,6 +264,15 @@ base class Body {
   }
 }
 
+class CallableDefFile(value: CallableDef) extends SKFS.BaseName {
+  fun compare(other: SKFS.BaseName): Order {
+    other match {
+    | CallableDefFile(x) -> this.value.xhash.compare(x.xhash)
+    | _ -> invariant_violation("Heterogeneous keys detected")
+    }
+  }
+}
+
 // common super of FunDef and MethodDef
 base class CallableDef{
   annotations: SSet,
@@ -184,7 +285,7 @@ base class CallableDef{
   tparams: Array<TypeParameter>,
   untracked_: ?FileRange,
   yields: ?FileRange,
-  hash: Int,
+  xhash: Int,
 } extends SymbolDef {
   fun getParams(): Parameters<Parameter> {
     this.params
@@ -226,7 +327,9 @@ class MethodDef{
   }
 }
 
-class FunDef{} extends CallableDef {
+class FunsArrayFile(value: Array<FunDef>) extends SKFS.File
+class FunDefFile(value: FunDef) extends SKFS.File
+class FunDef{origName: String} extends CallableDef {
   fun lower(context: mutable SKFS.Context, program: Program): this {
     this.body match {
     | Some(TypedBody _) -> SLO.fun_def(context, this, program)

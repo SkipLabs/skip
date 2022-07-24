@@ -21,7 +21,7 @@ module OuterIstToIR;
 private value class FieldKey(
   sclass: SClassID,
   name: String,
-) uses Hashable, Equality {
+) uses Hashable, Orderable, Equality {
   fun ==(other: FieldKey): Bool {
     this.sclass == other.sclass && this.name == other.name
   }
@@ -160,37 +160,32 @@ mutable private class FieldLayoutChooser(
 
   // True for every class which is part of a connected component of classes
   // that has been or is being graph-colored.
-  classAlreadyProcessed: mutable UnorderedSet<SClassID>,
+  mutable classAlreadyProcessed: SortedSet<SClassID>,
 
   // Every (class, field) pair which has been added to a layout constraint.
-  fieldsDone: mutable UnorderedSet<FieldKey> = mutable UnorderedSet[],
+  mutable fieldsDone: SortedSet<FieldKey> = SortedSet[],
 ) {
   // Update the bitOffset field in all SClass fields to have offsets.
   static fun run(specializer: mutable Specializer): void {
-    flc = mutable FieldLayoutChooser(
-      specializer,
-      UnorderedSet::mcreate(specializer.sclasses.size()),
-    );
+    flc = mutable FieldLayoutChooser(specializer, SortedSet[]);
 
     // Process all the fixed layout classes first
-    for (info in specializer.sclasses) {
+    for (info in specializer.untrackedSClasses()) {
       sc = info.sclass;
       if (
         annotationsContainParam(sc.annotations, "@cpp_export", sc.pos).isSome()
       ) {
-        flc.classAlreadyProcessed.insert(sc.id);
-        _ = info.setSClass(
-          specializer,
-          sc with {
-            layout => Some(layoutCppExportClass(specializer, sc.fields)),
-          },
-        );
+        flc.!classAlreadyProcessed = flc.classAlreadyProcessed.set(sc.id);
+        !info.sclass = sc with {
+          layout => Some(layoutCppExportClass(specializer, sc.fields)),
+        };
+        specializer.untrackedSClassSet(info.sclass.id, info);
       }
     };
 
     emptyLayout = Some(Array[]);
 
-    for (info in specializer.sclasses) {
+    for (info in specializer.untrackedSClasses()) {
       sc = info.sclass;
       if (!sc.isArray() && !sc.kind.isValueClass()) {
         if (sc.fields.isEmpty()) {
@@ -199,13 +194,16 @@ mutable private class FieldLayoutChooser(
           // classes with no fields but with covariant subtypes. The reason
           // is that with no fields, no field layout constraints get created
           // by the colorer, and those are what trigger assigning to 'layout'.
-          _ = info.setSClass(specializer, sc with {layout => emptyLayout});
-        } else if (flc.classAlreadyProcessed.maybeInsert(sc.id)) {
+          !info.sclass = sc with {layout => emptyLayout};
+          specializer.untrackedSClassSet(info.sclass.id, info);
+        } else if (!flc.classAlreadyProcessed.contains(sc.id)) {
+          flc.!classAlreadyProcessed = flc.classAlreadyProcessed.set(sc.id);
           constraints = flc.buildConstraintsForConnectedClasses(sc);
           if (!constraints.isEmpty()) {
             flc.assignFieldOffsets(constraints)
           } else {
-            _ = info.setSClass(specializer, sc with {layout => emptyLayout});
+            !info.sclass = sc with {layout => emptyLayout};
+            specializer.untrackedSClassSet(info.sclass.id, info);
           }
         }
       }
@@ -237,13 +235,15 @@ mutable private class FieldLayoutChooser(
       sid = typesWithField[i];
       !i = i + 1;
 
-      info = this.specializer.sclasses[sid];
+      info = this.specializer.sclassGet(sid);
 
       // Visit all supertypes and constrain those with this field to
       // use the same offset as this type.
       for (superID in info.supertypes) {
-        if (this.fieldsDone.maybeInsert(FieldKey(superID, name))) {
-          superInfo = this.specializer.sclasses[superID];
+        fkey = FieldKey(superID, name);
+        if (!this.fieldsDone.contains(fkey)) {
+          this.!fieldsDone = this.fieldsDone.set(fkey);
+          superInfo = this.specializer.sclassGet(superID);
           if (superInfo.sclass.maybeGetField(name).isSome()) {
             typesWithField.push(superID)
           }
@@ -252,8 +252,10 @@ mutable private class FieldLayoutChooser(
 
       // Same as above, but for all subtypes.
       for (subID in info.subtypes) {
-        subInfo = this.specializer.sclasses[subID];
-        if (this.fieldsDone.maybeInsert(FieldKey(subID, name))) {
+        subInfo = this.specializer.sclassGet(subID);
+        fkey = FieldKey(subID, name);
+        if (!this.fieldsDone.contains(fkey)) {
+          this.!fieldsDone = this.fieldsDone.set(fkey);
           if (!subInfo.sclass.maybeGetField(name).isSome()) {
             subInfo.sclass.die(
               "Expected class " +
@@ -273,7 +275,7 @@ mutable private class FieldLayoutChooser(
 
     // Get this field's primitive type. We don't have legal GlobalEnv
     // yet so we can't use Type::getScalarType().
-    fieldSClass = this.specializer.sclasses[field.typ.sclassID].sclass;
+    fieldSClass = this.specializer.sclassGet(field.typ.sclassID).sclass;
     fieldPrim = fieldSClass.getScalarType();
 
     FieldLayoutConstraint(field.name, fieldPrim, typesWithField.toArray())
@@ -290,10 +292,12 @@ mutable private class FieldLayoutChooser(
 
     while (!connectedClassesStack.isEmpty()) {
       sid = connectedClassesStack.pop();
-      sclass = this.specializer.sclasses[sid].sclass;
+      sclass = this.specializer.sclassGet(sid).sclass;
 
       for (field in sclass.fields) {
-        if (this.fieldsDone.maybeInsert(FieldKey(sid, field.name))) {
+        fkey = FieldKey(sid, field.name);
+        if (!this.fieldsDone.contains(fkey)) {
+          this.!fieldsDone = this.fieldsDone.set(fkey);
           // We have not yet determined layout constraints for this field.
           constraint = this.constrainConnectedClassesWithField(sclass, field);
 
@@ -303,7 +307,10 @@ mutable private class FieldLayoutChooser(
           // fields that need to be part of this graph coloring process.
           // Add those to the connected component now.
           for (csid in constraint.types) {
-            if (this.classAlreadyProcessed.maybeInsert(csid)) {
+            if (!this.classAlreadyProcessed.contains(csid)) {
+              this.!classAlreadyProcessed = this.classAlreadyProcessed.set(
+                csid,
+              );
               connectedClassesStack.push(csid)
             }
           }
@@ -387,15 +394,13 @@ mutable private class FieldLayoutChooser(
     for (sidAndLayoutIndex in classToLayout.items()) {
       (sid, layoutIndex) = sidAndLayoutIndex;
       layout = classLayouts[layoutIndex].fields;
-      info = this.specializer.sclasses[sid];
+      info = this.specializer.sclassGet(sid);
       sc = info.sclass;
 
       sc.pos.invariant(sc.fields.size() == layout.size(), "Layout mismatch");
 
-      _ = info.setSClass(
-        this.specializer,
-        sc with {layout => Some(layout.toArray())},
-      )
+      !info.sclass = sc with {layout => Some(layout.toArray())};
+      this.specializer.untrackedSClassSet(info.sclass.id, info);
     }
   }
 }
@@ -430,7 +435,7 @@ private fun layoutCppExportClass(
     .map(field -> {
       // Get this field's primitive type. We don't have legal GlobalEnv
       // yet so we can't use Type::getScalarType().
-      fieldSClass = s.sclasses[field.typ.sclassID].sclass;
+      fieldSClass = s.untrackedSClassGet(field.typ.sclassID).sclass;
       scalarType = fieldSClass.getScalarType();
 
       // Naturally align the bit offsets

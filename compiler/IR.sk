@@ -97,10 +97,15 @@ mutable class FunctionIDToFunction extends
   mutable fun allocID(): SFunctionID {
     SFunctionID(this.allocIndex())
   }
+
+  readonly fun items(): mutable Iterator<(Int, ?Function)> {
+    this.vec.items()
+  }
 }
 
 mutable base class ClassLookupEnv {
-  readonly fun getSClass(sid: SClassID): SClass;
+  readonly fun untrackedGetSClass(sid: SClassID): SClass;
+  mutable fun getSClass(sid: SClassID): SClass;
 }
 
 class GlobalEnv{
@@ -135,6 +140,10 @@ class GlobalEnv{
   fun getSClass(sid: SClassID): SClass {
     this.sclasses[sid]
   }
+
+  fun untrackedGetSClass(sid: SClassID): SClass {
+    this.sclasses[sid]
+  }
 }
 
 // A UTF8-encoded string that knows its Skip checksum.
@@ -144,7 +153,9 @@ base class UTF8String{
   string: String,
 } uses Hashable, Orderable, Show {
   static fun useShortStrings(): Bool {
-    !targetIsWasm() && !isEmbedded()
+    // Short strings are not supported by the new runtime
+    false
+    //    !targetIsWasm() && !isEmbedded()
   }
 
   static fun make(string: String): UTF8String {
@@ -405,6 +416,7 @@ class SClass{
     this.maybeGetLayoutSlot(name) match {
     | Some(slot) -> slot
     | None() ->
+      debug("Could not find layout slot for field " + this + "." + name);
       pos.die("Could not find layout slot for field " + this + "." + name)
     }
   }
@@ -1528,6 +1540,7 @@ base class CoroutineInfo {
   }
 }
 
+class FunctionFile(value: Function) extends SKFS.File
 class Function{
   params: Array<FunParam>,
 

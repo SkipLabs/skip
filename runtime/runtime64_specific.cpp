@@ -343,5 +343,4 @@ void SKIP_string_to_file(char* str, char* file) {
   }
   fclose(out);
 }
-
 }

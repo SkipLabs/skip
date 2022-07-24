@@ -251,6 +251,9 @@ fun programToDefinitions(
 /*****************************************************************************/
 class DefFile(value: TAst.Def) extends SKFS.File
 
+const dirName: SKFS.DirName = SKFS.DirName::create("/typing/");
+const dir: SKFS.EHandle<DefFile> = SKFS.EHandle(DefFile::fromFile, dirName);
+
 fun program(
   context: mutable SKFS.Context,
   embeddedMode: Bool,
@@ -259,7 +262,7 @@ fun program(
   defs.contextWriterKeyValues(
     DefFile::fromFile,
     context,
-    SKFS.DirName::create("/typing/"),
+    dirName,
     (context, writer, _key, values) ~> {
       // if(values.size() > 1) TODO multiple defs
       values[0].value match {

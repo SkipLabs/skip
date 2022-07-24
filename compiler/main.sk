@@ -5,11 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+class FooBar() extends Exception
+
 fun main(): void {
-  files = List::createFromItems(
-    arguments().filter(x -> x != "--data" && x != "/tmp/foo.data"),
-  );
-  debug(files);
+  if (arguments().any(x -> x == "--init")) {
+    _ = SKFS.gContextInit(SKFS.Context{});
+    return void;
+  };
   SKFS.runWithGc(SKFS.Context{}, context ~> {
     _result = compile(context, kConfig.unknown);
     SKFS.CStop(None())

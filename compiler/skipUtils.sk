@@ -59,57 +59,10 @@ fun reportMemoryStatistics(_phase: String): void {
   void
 }
 
-class Config{
-  debug: Bool = false,
-  debugPhase: ?String = None(),
-  profile: Bool = false,
-  profilePath: ?String = None(),
-}
-
-const utilsConfigSchema: Array<ArgumentParser.Param> = Array[
-  ArgumentParser.BoolParam{
-    name => "profile",
-    help => "Set to enable profiling of compiler phases",
-    negatable => false,
-  },
-  ArgumentParser.StringParam{
-    name => "profile-path",
-    help => "Path to write profile data",
-    validate => ArgumentParser.nonEmpty,
-  },
-  ArgumentParser.BoolParam{
-    name => "debug",
-    help => "Set to enable debugging of compiler phases",
-    negatable => false,
-  },
-  ArgumentParser.StringParam{
-    name => "debug-phase",
-    help => "Name of a compiler phase to debug",
-  },
-];
-
-const config: Config = {
-  ArgumentParser.parse(utilsConfigSchema, arguments()) match {
-  | Success(results) ->
-    debugPhase = results.maybeGetString("debug-phase");
-    profilePath = results.maybeGetString("profile-path");
-    debug = results.getBool("debug");
-    profile = results.getBool("profile");
-    Config{debug, debugPhase, profile, profilePath}
-  | Failure(exn) ->
-    print_error_ln(exn.getMessage().trim());
-    print_error_ln(ArgumentParser.help(utilsConfigSchema));
-    skipExit(1)
-  }
-};
-
 // TODO: Add a distinct command line argument for this instead of overloading --debug.
 // TODO: Will do that once we've merged the various command line argument parsers.
-fun shouldDebugSymbol(symbolName: String): Bool {
-  config.debugPhase match {
-  | Some(debugPhase) -> symbolName.contains(debugPhase)
-  | _ -> false
-  }
+fun shouldDebugSymbol(_symbolName: String): Bool {
+  false
 }
 
 // Returns elapsed time in milli-seconds.

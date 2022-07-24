@@ -27,7 +27,7 @@ base class Boundary<T> {
   | Exclusive(T)
 }
 
-base class DMap<Key: BaseName, Value> {
+base class DMap<Key: Orderable, Value> {
   children =
   | Nil()
   | Node{
@@ -53,6 +53,28 @@ base class DMap<Key: BaseName, Value> {
       yield (key, value);
       for (x in right.items()) {
         yield x;
+      }
+    }
+  }
+
+  fun values(): mutable Iterator<Value> {
+    this.items().map(x -> x.i1)
+  }
+
+  fun map<Value2>(tick: Tick, f: (Key, Value) -> Value2): DMap<Key, Value2> {
+    this match {
+    | Nil() -> Nil()
+    | Node{key, value, left, right, height} ->
+      left2 = left.map(tick, f);
+      value2 = f(key, value);
+      right2 = right.map(tick, f);
+      Node{
+        tick => TickRange(tick, tick),
+        key,
+        value => value2,
+        left => left2,
+        right => right2,
+        height,
       }
     }
   }
@@ -120,7 +142,7 @@ base class DMap<Key: BaseName, Value> {
   | Nil() -> 0
   | Node{height} -> height
 
-  static fun empty<Key: BaseName, Value>(): DMap<Key, Value> {
+  static fun empty<Key: Orderable, Value>(): DMap<Key, Value> {
     Nil()
   }
 
@@ -138,6 +160,24 @@ base class DMap<Key: BaseName, Value> {
     ref = mutable Ref(SortedSet[]);
     this.getChangesAcc(tick, ref);
     ref.get()
+  }
+
+  fun getChangesAfterIter(after: Tick): mutable Iterator<(Key, Value)> {
+    this match {
+    | Nil() -> void
+    | Node{tick, key, value, left, right} ->
+      if (tick.max < after) void else {
+        for (elt in left.getChangesAfterIter(after)) {
+          yield elt
+        };
+        if (tick.current >= after) {
+          yield ((key, value));
+        };
+        for (elt in right.getChangesAfterIter(after)) {
+          yield elt
+        }
+      }
+    }
   }
 
   fun getChangesRangeAcc(
@@ -200,6 +240,10 @@ base class DMap<Key: BaseName, Value> {
     | EQ() -> Some(value)
     | GT() -> right.maybeGet(k)
     }
+
+  fun get(k: Key): Value {
+    this.maybeGet(k).fromSome()
+  }
 
   fun remove(k: Key): DMap<Key, Value>
   | Nil() -> this

@@ -196,8 +196,8 @@ static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
     for(i = 0; i < bitsize && i < size; i++) {
       void** ptr = ((void**)obj)+(mask_slot * bitsize)+i;
       if(((ty->m_refsHintMask & 1) != 0) && ty->m_refMask[mask_slot] & (1 << i)) {
-        if(*ptr != NULL && *ptr != (void*)1) {
-          sk_stack_push(st, ptr, 0);
+        if(*ptr != NULL) {
+          sk_stack_push(st, ptr, ptr);
         }
       }
       else {
@@ -223,35 +223,34 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
   size_t leftsize = ty->m_uninternedMetadataByteSize;
   size_t bitsize = sizeof(void*) * 8;
 
-  char* rhead = (char*)obj;
   char* ohead = obj;
   char* end = obj + memsize;
 
   if ((ty->m_refsHintMask & 1) == 0) {
     crc = sk_crc64(crc, obj, len * ty->m_userByteSize);
   }
-  else while(ohead < end) {
-    size_t size = ty->m_userByteSize * len;
-    size_t slot = 0;
-    size_t mask_slot = 0;
-    while(size > 0) {
-      int i;
-      for(i = 0; i < bitsize && size > 0; i++) {
-        void** ptr = (void**)ohead;
-        void** slot = (void**)rhead;
-        if (ty->m_refMask[mask_slot] & (1 << i)) {
-          if(*slot != NULL && *slot != (void*)1) {
-            sk_stack_push(st, ptr, slot);
+  else {
+    char* ohead = obj;
+    char* end = obj + memsize;
+
+    while(ohead < end) {
+      size_t size = ty->m_userByteSize;
+      size_t slot = 0;
+      size_t mask_slot = 0;
+      while(size > 0) {
+        int i;
+        for(i = 0; i < bitsize && size > 0; i++) {
+          if(ty->m_refMask[mask_slot] & (1 << i)) {
+            void** ptr = (void**)ohead;
+            if(*ptr != NULL) {
+              sk_stack_push(st, ptr, ptr);
+            }
           }
-        }
-        else {
-          crc = sk_crc64_combine(crc, *slot);
-        }
-        ohead += sizeof(void*);
-        rhead += sizeof(void*);
-        size -= sizeof(void*);
-      };
-      mask_slot++;
+          ohead += sizeof(void*);
+          size -= sizeof(void*);
+        };
+        mask_slot++;
+      }
     }
   }
 
@@ -306,8 +305,12 @@ uint64_t SKIP_hash(void* obj) {
   while(st->head > 0) {
     sk_value_t delayed = sk_stack_pop(st);
     void* toHash = *delayed.value;
-
-    uint64_t new_crc = sk_hash_obj(st, toHash);
+    uint64_t new_crc;
+    if(sk_is_static(toHash)) {
+      new_crc = (uint64_t)toHash;
+    } else {
+      new_crc = sk_hash_obj(st, toHash);
+    }
     crc = sk_crc64(crc, &new_crc, sizeof(uint64_t));
   }
 

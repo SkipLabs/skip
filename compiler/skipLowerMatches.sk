@@ -1087,7 +1087,7 @@ mutable class MatchCompiler(
 
   mutable fun try_(t: O.Try): (Bool, O.Stmt) {
     (_, !t) = this.tryChildren(t);
-    exn_name = O.name(sk_new_var_name(this.new_id, t.pos));
+    exn_name = O.localName(sk_new_var_name(this.new_id, t.pos));
     exn_type = OIU.make_exception_type(t.pos);
     expr = O.Expr(exn_type, t.pos, O.Local(exn_name));
     default = O.Throw(expr);

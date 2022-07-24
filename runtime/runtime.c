@@ -45,6 +45,30 @@ void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
 /* Global context synchronization. */
 /*****************************************************************************/
 
+#ifdef SKIP32
+static char* local_ctx = NULL;
+#endif
+
+#ifdef SKIP64
+static __thread char* local_ctx = NULL;
+#endif
+
+void SKIP_unsafe_set_local_context(char* obj) {
+  local_ctx = obj;
+}
+
+void SKIP_unsafe_remove_local_context(char* obj) {
+  local_ctx = NULL;
+}
+
+char* SKIP_unsafe_get_local_context() {
+  if(local_ctx == NULL) {
+    fprintf(stderr, "Error: local context is not set");
+    SKIP_throw(NULL);
+  }
+  return local_ctx;
+}
+
 void SKIP_context_init(char* obj) {
   sk_global_lock();
   char* context = SKIP_intern_shared(obj);

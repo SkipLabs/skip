@@ -55,6 +55,8 @@ class Config private {
     // Just allow them to be ignored here
     AP.StringArrayParam{name => "debug"},
     AP.BoolParam{name => "profile"},
+    AP.StringParam{name => "data"},
+    AP.StringParam{name => "init"},
   ];
 
   static fun make(result: AP.ParseResult): this {
@@ -190,49 +192,12 @@ fun isEmbedded(): Bool {
   isEmbedded32() || isEmbedded64()
 }
 
-fun createSpecializedIR(
+fun createOptimizedFunctions(
   context: mutable SKFS.Context,
-  fileNames: Array<String>,
+  env: GlobalEnv,
 ): GlobalEnv {
-  cfg = kConfig.mainConfig;
-
-  // Are we in "disassemble" mode?
-  disasm = (
-    cfg.disasmAll ||
-    cfg.disasmAnnotated ||
-    !cfg.disasmFiles.isEmpty() ||
-    !cfg.disasmFunctions.isEmpty()
-  );
-
-  // Create a filter for what functions to disassemble.
-  //
-  // Note that for "disasmAll" we do not return true, since we only want
-  // to disassemble code which is actually used, and returning true would
-  // force everything to be compiled just so it could be disassembled.
-  shouldDisasm = (
-    funDef ~>
-      disasm &&
-        (cfg.disasmFunctions.contains(funDef.getName()) ||
-          (cfg.disasmAnnotated &&
-            annotationsContain(funDef.annotations, "@disasm", funDef.getPos())))
-  );
-
-  // Create a filter for what functions to compile.
-  shouldRuntimeExport = (
-    funDef ~>
-      AsmOutput.cppIsExported(
-        funDef.getName(),
-        funDef.annotations,
-        funDef.getPos(),
-      )
-  );
-
-  OuterIstToIR.createIR(context, fileNames, shouldDisasm, shouldRuntimeExport)
-}
-
-fun createOptimizedFunctions(env: GlobalEnv): GlobalEnv {
   runCompilerPhase("native/compile", () -> {
-    !env = Optimize.compileAll(env);
+    !env = Optimize.compileAll(context, env);
 
     // Find all the functions that are still reachable from the root set,
     // post-inlining, dead code elimination, etc.
@@ -270,22 +235,121 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
     skipExit(4); // Exit code used by g++ for no input files
   };
 
-  env = createSpecializedIR(context, fileNames);
-  !env = createOptimizedFunctions(env);
+  cfg = kConfig.mainConfig;
 
-  defs = runCompilerPhase("native/create_asm_graph", () -> {
-    AsmOutput.createAsmDefGraph(env)
-  });
+  // Are we in "disassemble" mode?
+  disasm = (
+    cfg.disasmAll ||
+    cfg.disasmAnnotated ||
+    !cfg.disasmFiles.isEmpty() ||
+    !cfg.disasmFunctions.isEmpty()
+  );
 
-  runCompilerPhase("native/merge_asm_graph", () -> {
-    AsmOutput.mergeIdenticalAsmDefs(defs)
-  });
+  // Create a filter for what functions to disassemble.
+  //
+  // Note that for "disasmAll" we do not return true, since we only want
+  // to disassemble code which is actually used, and returning true would
+  // force everything to be compiled just so it could be disassembled.
+  shouldDisasm = (
+    funDef ~>
+      disasm &&
+        (cfg.disasmFunctions.contains(funDef.origName) ||
+          (cfg.disasmAnnotated &&
+            annotationsContain(funDef.annotations, "@disasm", funDef.getPos())))
+  );
 
-  runCompilerPhase("native/create_asm_symbols", () -> {
-    AsmOutput.assignFinalSymbols(defs)
-  });
+  // Create a filter for what functions to compile.
+  shouldRuntimeExport = (
+    funDef ~>
+      AsmOutput.cppIsExported(
+        funDef.origName,
+        funDef.annotations,
+        funDef.getPos(),
+      )
+  );
 
-  runCompilerPhase("native/write_asm_files", () -> {
-    AsmOutput.writeOutputFiles(defs, fileNames)
-  })
+  if (context.unsafeMaybeGetDir(FileCache.fileDirName) is None()) {
+    _ = context.mkdir(x ~> x, FileCache.fileDirName, false, Array[]);
+  };
+
+  for (x in fileNames) FileCache.addFile(context, x);
+
+  backendDirName = SKFS.DirName::create("/backend/");
+  backendSinkDirName = SKFS.DirName::create("/backendSink/");
+
+  if (context.unsafeMaybeGetEagerDir(backendDirName) is None()) {
+    outerIst = OuterIstToIR.makeOuterIst(context);
+
+    defsProj = outerIst.getFunsProj(context);
+    constsProj = outerIst.getConstsProj(context);
+
+    converter = OuterIstToIR.Converter::create(
+      context,
+      SKFS.DirName::create("/converter/"),
+      outerIst,
+    );
+
+    backendDir = context.mkdir(
+      SKFS.IntFile::fromFile,
+      backendDirName,
+      false,
+      Array[(SKFS.IID(0), SKFS.IntFile(-128))],
+    );
+
+    _ = backendDir.contextWriterKeyValues(
+      SKFS.IntFile::fromFile,
+      context,
+      backendSinkDirName,
+      (context, _writer, _key, _values) ~> {
+        debug("CREATING IR");
+        env = OuterIstToIR.createIR(
+          context,
+          shouldDisasm,
+          shouldRuntimeExport,
+          outerIst,
+          converter,
+          constsProj,
+          defsProj,
+        );
+        debug("OPTIMIZING");
+
+        !env = createOptimizedFunctions(context, env);
+
+        debug("CREATING ASM DEF GRAPH");
+
+        defs = runCompilerPhase("native/create_asm_graph", () -> {
+          AsmOutput.createAsmDefGraph(env)
+        });
+
+        debug("CREATING ASM MERGE GRAPH");
+
+        runCompilerPhase("native/merge_asm_graph", () -> {
+          AsmOutput.mergeIdenticalAsmDefs(defs)
+        });
+
+        debug("CREATING ASM SYMBOLS");
+
+        runCompilerPhase("native/create_asm_symbols", () -> {
+          AsmOutput.assignFinalSymbols(defs)
+        });
+
+        debug("WRITING FILES");
+
+        runCompilerPhase("native/write_asm_files", () -> {
+          AsmOutput.writeOutputFiles(defs, fileNames)
+        });
+
+        debug("DONE");
+      },
+    );
+  } else {
+    context
+      .unsafeGetEagerDir(backendDirName)
+      .writeArray(
+        context,
+        SKFS.IID(0),
+        Array[SKFS.IntFile(context.tick.value)],
+      );
+  };
+  context.update()
 }

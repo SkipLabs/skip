@@ -271,7 +271,9 @@ class FrontEndLazyGFun{frontEndName: String} extends LazyGFun {
 
   fun compile(context: mutable SKFS.Context, converter: Converter): GFunction {
     funDef = converter.program.getFun(context, this.frontEndName);
-    converter.getGFunction(context, converter.convertFunDef(context, funDef))
+    convertedFunDef = converter.convertFunDef(context, funDef);
+    result = converter.getGFunction(context, convertedFunDef);
+    result
   }
 }
 
@@ -1124,11 +1126,12 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     converter: Converter,
     def: I.CallableDef,
   ): I.CallableDef {
-    if (def.isLowered()) {
+    result = if (def.isLowered()) {
       def
     } else {
-      converter.lower.get(context, CallableDefFile(def)).value
-    }
+      converter.lower.get(context, I.CallableDefFile(def)).value
+    };
+    result
   }
 
   fun getBody(context: mutable SKFS.Context, converter: Converter): I.Stmt {
@@ -1195,15 +1198,6 @@ private fun parseClosureFieldName(field: GField): (String, ClosureCaptureKind) {
   }
 }
 
-class CallableDefFile(value: I.CallableDef) extends SKFS.BaseName {
-  fun compare(other: SKFS.BaseName): Order {
-    other match {
-    | CallableDefFile(x) -> this.value.hash.compare(x.hash)
-    | _ -> invariant_violation("Heterogeneous keys detected")
-    }
-  }
-}
-
 fun makeGFunTypeWithFlags{
   paramTypes: Array<GType>,
   numOptional: Int,
@@ -1234,18 +1228,16 @@ fun makeGFunTypeWithFlags{
 class LazyGFunKey(value: LazyGFun) extends SKFS.BaseName {
   fun compare(other: SKFS.BaseName): Order {
     other match {
-    | LazyGFunKey(x) -> this.value.toString().compare(x.toString())
+    | LazyGFunKey(value) -> this.value.toString().compare(value.toString())
     | _ -> invariant_violation("Heterogeneous keys found")
     }
   }
 }
 
-class GFunctionFile(value: GFunction) extends SKFS.File
-
 class LazyGClassKey(value: LazyGClass) extends SKFS.BaseName {
   fun compare(other: SKFS.BaseName): Order {
     other match {
-    | LazyGClassKey(x) -> this.value.name().id.compare(x.name().id)
+    | LazyGClassKey(value) -> this.value.name().id.compare(value.name().id)
     | _ -> invariant_violation("Heterogeneous keys found")
     }
   }
@@ -1253,12 +1245,32 @@ class LazyGClassKey(value: LazyGClass) extends SKFS.BaseName {
 class GClassFile(value: GClass) extends SKFS.File
 
 // Manages the overall conversion from OuterIst to IR.
-value class Converter private (
+class Converter private (
   program: I.Program,
   funs: SKFS.LHandle<GFunctionFile>,
   classes: SKFS.LHandle<GClassFile>,
-  lower: SKFS.LHandle<CallableDefFile>,
+  lower: SKFS.LHandle<I.CallableDefFile>,
 ) {
+  fun resetCache(context: mutable SKFS.Context): void {
+    funsDir = context.unsafeGetLazyDir(this.funs.dirName);
+    !funsDir.data = SortedMap[];
+    context.setDir(funsDir.dirName, funsDir);
+    classesDir = context.unsafeGetLazyDir(this.classes.dirName);
+    !classesDir.data = SortedMap[];
+    context.setDir(classesDir.dirName, classesDir);
+    lowerDir = context.unsafeGetLazyDir(this.lower.dirName);
+    !lowerDir.data = SortedMap[];
+    context.setDir(lowerDir.dirName, lowerDir);
+  }
+
+  fun getConsts(
+    context: mutable SKFS.Context,
+    constsProj: SKFS.EHandle<I.ConstDefFile>,
+  ): Array<ConstLazyGFun> {
+    consts = this.program.getConsts(context, constsProj);
+    consts.map(cst -> this.convertConstDef(context, cst))
+  }
+
   static fun create(
     context: mutable SKFS.Context,
     name: SKFS.DirName,
@@ -1269,27 +1281,29 @@ value class Converter private (
     classDirName = SKFS.DirName::create(name.toString() + "classes/");
     classes = SKFS.LHandle(GClassFile::fromFile, classDirName);
     lowerDirName: SKFS.DirName = SKFS.DirName::create("/lowerDefs/");
-    lower = SKFS.LHandle(CallableDefFile::fromFile, lowerDirName);
+    lower = SKFS.LHandle(I.CallableDefFile::fromFile, lowerDirName);
     converter = static(program, funs, classes, lower);
     _ = SKFS.LHandle::create(
       GFunctionFile::fromFile,
       context,
       funDirName,
       converter.getGFunctionFun,
+      false,
     );
     _ = SKFS.LHandle::create(
       GClassFile::fromFile,
       context,
       classDirName,
       converter.getGClassImplFun,
+      false,
     );
     _ = SKFS.LHandle::create(
-      CallableDefFile::fromFile,
+      I.CallableDefFile::fromFile,
       context,
       lowerDirName,
       (context, _, key) ~> {
         def = key match {
-        | CallableDefFile(x) -> x
+        | I.CallableDefFile(x) -> x
         | _ -> invariant_violation("Unexpected key type")
         };
         lowered = def.lower(context, program);
@@ -1299,7 +1313,7 @@ value class Converter private (
           debug(def.getName() + " lowered");
           debug(lowered);
         };
-        loweredFile = CallableDefFile(lowered);
+        loweredFile = I.CallableDefFile(lowered);
         Array[loweredFile]
       },
     );
@@ -1307,7 +1321,12 @@ value class Converter private (
   }
 
   fun getGFunction(context: mutable SKFS.Context, lazy: LazyGFun): GFunction {
-    this.funs.get(context, LazyGFunKey(lazy)).value
+    key = LazyGFunKey(lazy);
+    //    this.funs.get(context, key).value
+    if (lazy.gname().toString().contains("main")) {
+      debug(("getGFunction", lazy.gname().toString()));
+    };
+    this.getGFunctionFun(context, this.funs, key)[0].value;
   }
 
   fun getGFunctionFun(
@@ -1319,14 +1338,16 @@ value class Converter private (
     | LazyGFunKey(x) -> x
     | _ -> invariant_violation("Unexpected key type")
     };
-    Array[GFunctionFile(lazy.compile(context, this))]
+    file = GFunctionFile(lazy.compile(context, this));
+    Array[file]
   }
 
   private fun getGClassImpl(
     context: mutable SKFS.Context,
     gid: LazyGClass,
   ): GClass {
-    this.classes.get(context, LazyGClassKey(gid)).value
+    key = LazyGClassKey(gid);
+    this.classes.get(context, key).value
   }
 
   private fun getGClassImplFun(
@@ -1338,7 +1359,7 @@ value class Converter private (
     | LazyGClassKey(x) -> x
     | _ -> invariant_violation("Unexpected key type")
     };
-    Array[
+    value = Array[
       GClassFile(
         gid match {
         | LiteralLazyGClass(cls) -> cls
@@ -1359,7 +1380,8 @@ value class Converter private (
           this.createReturnTuple(context, rt.name(), arity)
         },
       ),
-    ]
+    ];
+    value
   }
 
   // Every class gets a codegen'd method to help with "inspect". Although
@@ -1552,22 +1574,11 @@ value class Converter private (
   fun getGClass(
     context: mutable SKFS.Context,
     gid: LazyGClass,
-    pos: Pos,
+    _pos: Pos,
   ): GClass {
     gid match {
     | LiteralLazyGClass(cls) -> cls
-    | _ ->
-      // Don't clutter the underlying memoized function with a Pos argument.
-      vtry(
-        () -> {
-          this.getGClassImpl(context, gid)
-        },
-        exn ->
-          exn match {
-          | e @ Exception _ -> pos.die(e.getMessage())
-          }
-        ,
-      )
+    | _ -> this.getGClassImpl(context, gid)
     }
   }
 
@@ -1905,9 +1916,9 @@ value class Converter private (
       ),
       generic_mapping => SortedMap[],
       yields => None(),
-      hash => 0,
+      xhash => 0,
     };
-    !mdef.hash = hash(mdef);
+    !mdef.xhash = hash(mdef);
     mdef
   }
 
@@ -2030,9 +2041,9 @@ value class Converter private (
         whenparams => Array[],
         generic_mapping => SortedMap[],
         yields => None(),
-        hash => 0,
+        xhash => 0,
       };
-      !met.hash = hash(met);
+      !met.xhash = hash(met);
       methods.push(met);
     };
 
@@ -5234,86 +5245,46 @@ private const kEmptyMethods: UnorderedMap<
   SFunctionID,
 > = UnorderedMap[];
 
-private fun makeOuterIst(
-  context: mutable SKFS.Context,
-  fileNames: Array<String>,
-): OuterIst.Program {
+private fun makeOuterIst(context: mutable SKFS.Context): OuterIst.Program {
   // run the compiler front end from parsing to type checking
-  typedAst = SkipMain.compile(
-    context,
-    List::createFromItems(fileNames),
-    isEmbedded(),
-  );
+  typedAst = SkipMain.type_program(context);
   // OuterIst skeleton is built here, but code is done lazily
   SkipMakeOuterIst.program(context, typedAst)
 }
 
-private fun sourceToOuterIst(
-  context: mutable SKFS.Context,
-  fileNames: Array<String>,
-): Converter {
-  Converter::create(
-    context,
-    SKFS.DirName::create("/converter/"),
-    makeOuterIst(context, fileNames),
-  )
-}
-
 class ConstFile(value: OuterIstToIR.ConstLazyGFun) extends SKFS.File
+class ConstsArrayFile(
+  value: Array<OuterIstToIR.ConstLazyGFun>,
+) extends SKFS.File
+
+const constsArrayDirName: SKFS.DirName = SKFS.DirName::create("/constsArray/");
+const constsArrayDir: SKFS.EHandle<ConstsArrayFile> = SKFS.EHandle(
+  ConstsArrayFile::fromFile,
+  constsArrayDirName,
+);
+
+fun origName(frontEndName: String): String {
+  if (frontEndName.contains("$")) {
+    frontEndName.split("$", 1)[0];
+  } else {
+    frontEndName
+  }
+}
 
 fun createIR(
   context: mutable SKFS.Context,
-  fileNames: Array<String>,
   shouldDisasm: (I.FunDef ~> Bool),
   shouldRuntimeExport: (I.FunDef ~> Bool),
+  outerIst: I.Program,
+  converter: Converter,
+  constsProj: SKFS.EHandle<I.ConstDefFile>,
+  funDefsProj: SKFS.EHandle<I.FunDefFile>,
 ): GlobalEnv {
-  converter = sourceToOuterIst(context, fileNames);
+  consts = converter.getConsts(context, constsProj);
+  funDefs = outerIst.getFuns(context, funDefsProj);
 
   forceCompile = mutable Vector<LazyGFun>[];
   disasm = mutable UnorderedSet[];
-
-  constDefs = converter.program.program.contextWriterKeyValues(
-    ConstFile::fromFile,
-    context,
-    SKFS.DirName::create("/constsDefsCreateIR/"),
-    (context, writer, _, files) ~> {
-      invariant(files.size() == 1);
-      result = mutable Vector[];
-      files[0].value match {
-      | OuterIst.DConst(constDef) ->
-        result.push(ConstFile(converter.convertConstDef(context, constDef)))
-      | OuterIst.DClass(classDef) ->
-        if (!(classDef.kind is I.KTrait _)) {
-          if (!classDef.consts.isEmpty()) {
-            // Right now we guarantee we run all const initializers at
-            // startup so create anything with consts now.
-            for (constKey => constDef in classDef.consts) {
-              (constPos, constName) = constKey;
-
-              if (constDef.value.isSome()) {
-                // Create a normal, "true global" const whose name is qualified with
-                // the owning class's name.
-                realConstName = classDef.name.id + "::" + constName;
-
-                result.push(
-                  ConstFile(
-                    converter.convertConstDef(
-                      context,
-                      constDef with {name => I.Name(constPos, realConstName)},
-                    ),
-                  ),
-                );
-              }
-            }
-          }
-        }
-      | _ -> void
-      };
-      writer.writeArray(SKFS.IID(0), result.toArray())
-    },
-  );
-
-  consts = constDefs.getArray(context, SKFS.IID(0)).map(x -> x.value);
 
   for (c in consts) {
     forceCompile.push(c)
@@ -5321,12 +5292,9 @@ fun createIR(
 
   runtimeFunctions = mutable Vector[];
 
-  // Forcibly compile constant initializers too, in case they have side
-  // effects like throwing an exception on startup. This is arguably a bit
-  // wasteful as it pulls in more code than we strictly need.
-
-  for (defKey => funDef in converter.program.fun_defs) {
-    (pos, name) = defKey;
+  for (funDef in funDefs) {
+    pos = funDef.name.pos;
+    name = funDef.name.id;
     annotations = funDef.annotations;
 
     isParametric = !funDef.tparams.isEmpty();
@@ -5377,6 +5345,7 @@ fun createIR(
     | None() -> void
     }
   };
+
   reportMemoryStatistics("native/createIR after convert functions");
 
   // Export request functions outside of Skip.
@@ -5386,74 +5355,57 @@ fun createIR(
 
   reportMemoryStatistics("native/createIR after specialize");
 
-  specializer = Specializer::make(converter, consts);
+  reportMemoryStatistics("native/createIR after force compile constant inits");
+
+  // Find every relevant type and function in the program.
+  specializer = Specializer::make(context, converter);
 
   for (gid in forceCompile) {
     _ = specializer.requestFunction(context, gid, Array[])
   };
-  reportMemoryStatistics("native/createIR after force compile constant inits");
 
-  // Find every relevant type and function in the program.
   specializer.findAllFunctionsAndSClasses(context);
+
   reportMemoryStatistics("native/createIR after findAllFunctionsAndSClasses");
 
+  debug("LATCH");
+
   // Latch the sub- and supertypes.
-  for (info in specializer.sclasses) {
-    _ = info.setSClass(
-      specializer,
-      info.sclass with {
-        subtypes => info.subtypes,
-        supertypes => info.supertypes,
-      },
-    )
+  for (info in specializer.untrackedSClasses()) {
+    !info.sclass = info.sclass with {
+      subtypes => info.subtypes,
+      supertypes => info.supertypes,
+    };
+    specializer.untrackedSClassSet(info.sclass.id, info);
   };
   reportMemoryStatistics("native/createIR after latch sub/super");
 
+  debug("SCALARIZE");
+
   // Flatten value class fields into scalars.
-  specializer.scalarizeAllFields();
+  specializer.scalarizeAllFields(specializer.sclasses.items().map(x -> x.i1));
   reportMemoryStatistics("native/createIR after scalarizeAllFields");
 
-  for (info in specializer.sclasses) {
-    _ = info.setSClass(
-      specializer,
-      info.sclass with {canAliasMutableTypes => true},
-    );
-  };
-  reportMemoryStatistics("native/createIR after classHasMutableTypeAliases");
+  debug("LAYOUT CHOOSER");
 
-  env = GlobalEnv::make(specializer.createNewSClassesMap());
+  specializer.withRegion(context, (_context, specializer) ~> {
+    // Choose offsets for every field.
+    FieldLayoutChooser::run(specializer);
+    reportMemoryStatistics("native/createIR after FieldLayoutChooser");
+  });
 
-  // Choose offsets for every field.
-  FieldLayoutChooser::run(specializer);
-  reportMemoryStatistics("native/createIR after FieldLayoutChooser");
+  debug("PARTITION");
 
   // Split up functions based on which ones can share machine code.
-  !env = specializer.partitionFunctions(context, runtimeFunctions, env);
-  reportMemoryStatistics("native/createIR after partitionFunctions");
-
-  newFuns = env.sfuns.clone();
-  for (f in env.sfuns) {
-    if (f.hasImplementation()) {
-      newFuns.insert(
-        f with {
-          isDisasm => disasm.contains(f.name),
-          isRuntimeExport => (AsmOutput.cppIsExported(
-            f.name,
-            f.annotations,
-            f.pos,
-          ) || AsmOutput.cppIsImported(f, f.pos)),
-        },
-      )
-    }
-  };
-
-  !env = env with {
-    sfuns => newFuns.chill(),
-    // Latch the final array of these, now that their method code IDs
-    // are set, and partitionFunctions has had a chance to make a few
-    // more tuple types.
-    sclasses => specializer.createNewSClassesMap(),
-  };
+  sclasses = specializer.createNewSClassesMap();
+  env = GlobalEnv::make(sclasses);
+  !env = specializer.partitionFunctions(
+    context,
+    runtimeFunctions,
+    env,
+    consts,
+    disasm,
+  );
 
   reportMemoryStatistics("native/createIR end");
 
