@@ -1824,7 +1824,6 @@ mutable class Specializer{
     key = GFunKey(name, superposition);
 
     converter = this.converter;
-    debug(("Requesting", name.toString()));
     function = converter.getGFunction(context, name);
 
     if (!this.funsNeededContains(key)) {
@@ -1851,10 +1850,8 @@ mutable class Specializer{
   // See comments at the top of coroutine.sk for more info.
   private readonly fun insertCoroutineCompilationOrderDependencies(
     msfuns: mutable FunctionIDToFunction,
-    incremental: Bool,
   ): void {
     for (f in msfuns) {
-      if (incremental && !f.name.contains("$")) continue;
       f.coroutineInfo match {
       | Some(UnfinishedCoroutine _) ->
         f.pos.invariant(
@@ -1905,18 +1902,6 @@ mutable class Specializer{
 
     // First dealing with all the symbols found at initialization time
     for (key in this.funsNeeded) {
-      if (key.i0.gname().toString().contains("$")) continue;
-      gf = this.converter.getGFunction(context, key.i0);
-      funToInstsMap.getOrAdd(gf, () -> mutable Vector[]).push(key);
-    };
-    for (gf => insts in funToInstsMap) {
-      funToInsts.push((gf, insts.toArray()));
-    };
-
-    // Now dealing with the "new" symbols (those with a dollar sign)
-    funToInstsMap.clear();
-    for (key in this.funsNeeded) {
-      if (!key.i0.gname().toString().contains("$")) continue;
       gf = this.converter.getGFunction(context, key.i0);
       funToInstsMap.getOrAdd(gf, () -> mutable Vector[]).push(key);
     };
@@ -1943,14 +1928,6 @@ mutable class Specializer{
     // by name in later stages of the compiler.
     runtimeFunctions = UnorderedMap::mcreate(runtimeFunctionsVec.size());
     for (name in runtimeFunctionsVec) {
-      if (name.gname().toString().contains("$")) continue;
-      sids.maybeGet(GFunKey(name, FunSuperpositionID::empty)) match {
-      | Some(sid) -> runtimeFunctions.set(name.gname().id, sid)
-      | None() -> invariant_violation(`Could not find runtime function ${name}`)
-      }
-    };
-    for (name in runtimeFunctionsVec) {
-      if (!name.gname().toString().contains("$")) continue;
       sids.maybeGet(GFunKey(name, FunSuperpositionID::empty)) match {
       | Some(sid) -> runtimeFunctions.set(name.gname().id, sid)
       | None() -> invariant_violation(`Could not find runtime function ${name}`)
@@ -1964,12 +1941,21 @@ mutable class Specializer{
       for (s in insts) {
         sid = sids[s];
 
-        f = FunSpecializer::run(context, this, gf, Array[s.i1], sid, sids);
-        if (!gf.hasImplementation()) {
-          // Kill off junk "Unreachable" block.
-          !f = f with {blocks => Array[]}
-        };
-
+        f = this.withRegion(context, (context, specializer) ~> {
+          f = FunSpecializer::run(
+            context,
+            specializer,
+            gf,
+            Array[s.i1],
+            sid,
+            sids,
+          );
+          if (!gf.hasImplementation()) {
+            // Kill off junk "Unreachable" block.
+            !f = f with {blocks => Array[]}
+          };
+          f
+        });
         msfuns.insert(f)
       }
     };
@@ -1977,30 +1963,18 @@ mutable class Specializer{
 
     // Populate each SClass.methods with the SFunctionIDs for its code.
     for (info in this.untrackedSClasses()) {
-      if (!info.sclass.id.id.contains("$")) {
-        this.populateSFunctionIDs(info, sids);
-      }
-    };
-
-    for (info in this.untrackedSClasses()) {
-      if (info.sclass.id.id.contains("$")) {
-        this.populateSFunctionIDs(info, sids);
-      }
+      this.withRegion(context, (_, specializer) ~> {
+        specializer.populateSFunctionIDs(info, sids);
+      })
     };
 
     // Figure out which Function handles each const.
     consts = UnorderedMap::mcreate(23);
     for (lazy in lconsts) {
-      if (lazy.gname().toString().contains("$")) continue;
       consts.set(lazy.constName, sids[GFunKey(lazy, FunSuperpositionID::empty)])
     };
 
-    for (lazy in lconsts) {
-      if (!lazy.gname().toString().contains("$")) continue;
-      consts.set(lazy.constName, sids[GFunKey(lazy, FunSuperpositionID::empty)])
-    };
-
-    this.insertCoroutineCompilationOrderDependencies(msfuns, false);
+    this.insertCoroutineCompilationOrderDependencies(msfuns);
 
     for (f in msfuns) {
       if (f.hasImplementation()) {
@@ -2008,7 +1982,7 @@ mutable class Specializer{
           f with {
             isDisasm => disasm.contains(f.name),
             isRuntimeExport => (AsmOutput.cppIsExported(
-              origName(f.name),
+              f.name,
               f.annotations,
               f.pos,
             ) || AsmOutput.cppIsImported(f, f.pos)),

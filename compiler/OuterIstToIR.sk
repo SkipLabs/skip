@@ -1321,12 +1321,7 @@ class Converter private (
   }
 
   fun getGFunction(context: mutable SKFS.Context, lazy: LazyGFun): GFunction {
-    key = LazyGFunKey(lazy);
-    //    this.funs.get(context, key).value
-    if (lazy.gname().toString().contains("main")) {
-      debug(("getGFunction", lazy.gname().toString()));
-    };
-    this.getGFunctionFun(context, this.funs, key)[0].value;
+    this.getGFunctionFun(context, this.funs, LazyGFunKey(lazy))[0].value
   }
 
   fun getGFunctionFun(
@@ -5263,14 +5258,6 @@ const constsArrayDir: SKFS.EHandle<ConstsArrayFile> = SKFS.EHandle(
   constsArrayDirName,
 );
 
-fun origName(frontEndName: String): String {
-  if (frontEndName.contains("$")) {
-    frontEndName.split("$", 1)[0];
-  } else {
-    frontEndName
-  }
-}
-
 fun createIR(
   context: mutable SKFS.Context,
   shouldDisasm: (I.FunDef ~> Bool),
@@ -5369,6 +5356,7 @@ fun createIR(
   reportMemoryStatistics("native/createIR after findAllFunctionsAndSClasses");
 
   debug("LATCH");
+  SKFS.printPersistentSize();
 
   // Latch the sub- and supertypes.
   for (info in specializer.untrackedSClasses()) {
@@ -5381,12 +5369,14 @@ fun createIR(
   reportMemoryStatistics("native/createIR after latch sub/super");
 
   debug("SCALARIZE");
+  SKFS.printPersistentSize();
 
   // Flatten value class fields into scalars.
   specializer.scalarizeAllFields(specializer.sclasses.items().map(x -> x.i1));
   reportMemoryStatistics("native/createIR after scalarizeAllFields");
 
   debug("LAYOUT CHOOSER");
+  SKFS.printPersistentSize();
 
   specializer.withRegion(context, (_context, specializer) ~> {
     // Choose offsets for every field.
@@ -5395,6 +5385,7 @@ fun createIR(
   });
 
   debug("PARTITION");
+  SKFS.printPersistentSize();
 
   // Split up functions based on which ones can share machine code.
   sclasses = specializer.createNewSClassesMap();
