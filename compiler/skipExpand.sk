@@ -88,27 +88,29 @@ fun populateCache(
     SKFS.StringFile::fromFile,
     context,
     childDirName,
-    (_context, writer, _key, defsFiles) ~> {
-      map = mutable Map[];
-      invariant(defsFiles.size() == 1);
-      defs = defsFiles[0].value.i1;
-      for (classDef in defs.class_defs) {
-        (_fileRange, childStr) = classDef.name;
-        for (classExtends in classDef.extends_) {
-          (parentClass, _) = classExtends.parent;
-          parentStr = parentClass match {
-          | A.Tclass((_, x)) -> x
-          | _ -> invariant_violation("The name should have been expanded")
-          };
-          if (!map.containsKey(parentStr)) {
-            map![parentStr] = mutable Vector[];
-          };
-          map[parentStr].push(SKFS.StringFile(childStr));
+    (context, writer, _key, defsFiles) ~> {
+      SkipError.catchErrors(context, () -> {
+        map = mutable Map[];
+        invariant(defsFiles.size() == 1);
+        defs = defsFiles[0].value.i1;
+        for (classDef in defs.class_defs) {
+          (_fileRange, childStr) = classDef.name;
+          for (classExtends in classDef.extends_) {
+            (parentClass, _) = classExtends.parent;
+            parentStr = parentClass match {
+            | A.Tclass((_, x)) -> x
+            | _ -> invariant_violation("The name should have been expanded")
+            };
+            if (!map.containsKey(parentStr)) {
+              map![parentStr] = mutable Vector[];
+            };
+            map[parentStr].push(SKFS.StringFile(childStr));
+          }
+        };
+        for (parentStr => childVec in map) {
+          writer.writeArray(SKFS.SID(parentStr), childVec.toArray());
         }
-      };
-      for (parentStr => childVec in map) {
-        writer.writeArray(SKFS.SID(parentStr), childVec.toArray());
-      }
+      })
     },
   );
 }
@@ -126,13 +128,15 @@ fun checkCycles(
     context,
     SKFS.DirName::create("/checkCycle/"),
     (context, _writer, _key, defFiles) ~> {
-      for (defFile in defFiles) {
-        defFile.value match {
-        | GlobalEnv.EClass(classDef) ->
-          checkCycle(context, SSet[], defs, classDef)
-        | _ -> void
+      SkipError.catchErrors(context, () -> {
+        for (defFile in defFiles) {
+          defFile.value match {
+          | GlobalEnv.EClass(classDef) ->
+            checkCycle(context, SSet[], defs, classDef)
+          | _ -> void
+          }
         }
-      }
+      })
     },
   )
 }
@@ -191,61 +195,65 @@ fun populateCache(
     SKFS.StringFile::fromFile,
     context,
     moduleDirName1,
-    (_context, writer, key, values) ~> {
-      moduleName = key match {
-      | SKFS.SID(x) -> x
-      | _ -> invariant_violation("Unexpected key type")
-      };
-      defMap = mutable Map[];
-      pushDef = (prefix, moduleName, defName) -> {
-        if (defName.startsWith(".")) {
-          !moduleName = "U";
-          !defName = defName.getIter().forward(1).collectString();
+    (context, writer, key, values) ~> {
+      SkipError.catchErrors(context, () -> {
+        moduleName = key match {
+        | SKFS.SID(x) -> x
+        | _ -> invariant_violation("Unexpected key type")
         };
-        !defName = prefix + defName;
-        if (!defMap.containsKey(moduleName)) {
-          defMap![moduleName] = SortedSet[];
+        defMap = mutable Map[];
+        pushDef = (prefix, moduleName, defName) -> {
+          if (defName.startsWith(".")) {
+            !moduleName = "U";
+            !defName = defName.getIter().forward(1).collectString();
+          };
+          !defName = prefix + defName;
+          if (!defMap.containsKey(moduleName)) {
+            defMap![moduleName] = SortedSet[];
+          };
+          defMap![moduleName] = defMap[moduleName].set(defName);
         };
-        defMap![moduleName] = defMap[moduleName].set(defName);
-      };
 
-      (_, defs) = values[0].value;
+        (_, defs) = values[0].value;
 
-      for (cd in defs.class_defs) {
-        (_fileRange, defName) = cd.name;
-        pushDef("class:", moduleName, defName);
-      };
-      for (fd in defs.fun_defs) {
-        (_fileRange, defName) = fd.name;
-        pushDef("fun:", moduleName, defName);
-      };
-      for (cst in defs.const_defs) {
-        (_fileRange, defName) = cst.name;
-        pushDef("const:", moduleName, defName);
-      };
-      for (tyd in defs.type_defs) {
-        (_fileRange, defName) = tyd.name;
-        pushDef("type:", moduleName, defName);
-      };
-      for (defModuleName => defSet in defMap) {
-        writer.writeArray(
-          SKFS.SID(defModuleName),
-          defSet.collect(Array).map(x -> SKFS.StringFile(x)),
-        );
-      }
+        for (cd in defs.class_defs) {
+          (_fileRange, defName) = cd.name;
+          pushDef("class:", moduleName, defName);
+        };
+        for (fd in defs.fun_defs) {
+          (_fileRange, defName) = fd.name;
+          pushDef("fun:", moduleName, defName);
+        };
+        for (cst in defs.const_defs) {
+          (_fileRange, defName) = cst.name;
+          pushDef("const:", moduleName, defName);
+        };
+        for (tyd in defs.type_defs) {
+          (_fileRange, defName) = tyd.name;
+          pushDef("type:", moduleName, defName);
+        };
+        for (defModuleName => defSet in defMap) {
+          writer.writeArray(
+            SKFS.SID(defModuleName),
+            defSet.collect(Array).map(x -> SKFS.StringFile(x)),
+          );
+        }
+      })
     },
   );
   _ = moduleDirName1.contextWriterKeyIter(
     SKFS.ArrayStringFile::fromFile,
     context,
     moduleDirName,
-    (_context, writer, key, iter) ~> {
-      writer.write(
-        key,
-        SKFS.ArrayStringFile(
-          iter.map(x -> x.value).collect(SortedSet).collect(Array),
-        ),
-      );
+    (context, writer, key, iter) ~> {
+      SkipError.catchErrors(context, () -> {
+        writer.write(
+          key,
+          SKFS.ArrayStringFile(
+            iter.map(x -> x.value).collect(SortedSet).collect(Array),
+          ),
+        );
+      })
     },
   )
 }
@@ -281,72 +289,76 @@ fun populateDefinitions(
     ExpandedDefFile::fromFile,
     context,
     defMapDirName1,
-    (_context, writer, _key, defsFiles) ~> {
-      invariant(defsFiles.size() == 1);
-      defs = defsFiles[0].value.i1;
-      for (classDef in defs.class_defs) {
-        expandedDefFile = ExpandedDefFile(EClass(classDef));
-        writer.write(SKFS.SID("class:" + classDef.name.i1), expandedDefFile);
-      };
-      for (typeDef in defs.type_defs) {
-        expandedDefFile = ExpandedDefFile(EType(typeDef));
-        writer.write(SKFS.SID("type:" + typeDef.name.i1), expandedDefFile)
-      };
-      for (constDef in defs.const_defs) {
-        expandedDefFile = ExpandedDefFile(EConst(constDef));
-        writer.write(SKFS.SID("const:" + constDef.name.i1), expandedDefFile)
-      };
-      for (funDef in defs.fun_defs) {
-        expandedDefFile = ExpandedDefFile(EFun(funDef));
-        writer.write(SKFS.SID("fun:" + funDef.name.i1), expandedDefFile)
-      };
+    (context, writer, _key, defsFiles) ~> {
+      SkipError.catchErrors(context, () -> {
+        invariant(defsFiles.size() == 1);
+        defs = defsFiles[0].value.i1;
+        for (classDef in defs.class_defs) {
+          expandedDefFile = ExpandedDefFile(EClass(classDef));
+          writer.write(SKFS.SID("class:" + classDef.name.i1), expandedDefFile);
+        };
+        for (typeDef in defs.type_defs) {
+          expandedDefFile = ExpandedDefFile(EType(typeDef));
+          writer.write(SKFS.SID("type:" + typeDef.name.i1), expandedDefFile)
+        };
+        for (constDef in defs.const_defs) {
+          expandedDefFile = ExpandedDefFile(EConst(constDef));
+          writer.write(SKFS.SID("const:" + constDef.name.i1), expandedDefFile)
+        };
+        for (funDef in defs.fun_defs) {
+          expandedDefFile = ExpandedDefFile(EFun(funDef));
+          writer.write(SKFS.SID("fun:" + funDef.name.i1), expandedDefFile)
+        };
+      })
     },
   );
   phase1.contextWriterKeyValues(
     ExpandedDefFile::fromFile,
     context,
     defMapDirName,
-    (_context, writer, key, defFiles) ~> {
-      name = key match {
-      | SKFS.SID(x) -> x
-      | _ -> invariant_violation("Unexpected key type")
-      };
-      if (name.startsWith("class:") && defFiles.size() > 1) {
-        roots = mutable Vector[];
-        exts = mutable Vector[];
-        for (cd in defFiles) {
-          cd.value match {
-          | EClass(c) ->
-            if (c.extension is None()) {
-              roots.push(c)
-            } else {
-              exts.push(c)
+    (context, writer, key, defFiles) ~> {
+      SkipError.catchErrors(context, () -> {
+        name = key match {
+        | SKFS.SID(x) -> x
+        | _ -> invariant_violation("Unexpected key type")
+        };
+        if (name.startsWith("class:") && defFiles.size() > 1) {
+          roots = mutable Vector[];
+          exts = mutable Vector[];
+          for (cd in defFiles) {
+            cd.value match {
+            | EClass(c) ->
+              if (c.extension is None()) {
+                roots.push(c)
+              } else {
+                exts.push(c)
+              }
+            | _ ->
+              invariant_violation(
+                "All values associated with a key class: should be classes",
+              )
             }
-          | _ ->
-            invariant_violation(
-              "All values associated with a key class: should be classes",
+          };
+
+          if (roots.size() == 0) {
+            writer.writeArray(key, defFiles);
+          } else if (roots.size() > 1) {
+            writer.writeArray(
+              key,
+              roots.map(x -> ExpandedDefFile(EClass(x))).toArray(),
             )
-          }
-        };
+          };
+          root = roots[0];
 
-        if (roots.size() == 0) {
-          writer.writeArray(key, defFiles);
-        } else if (roots.size() > 1) {
-          writer.writeArray(
-            key,
-            roots.map(x -> ExpandedDefFile(EClass(x))).toArray(),
-          )
-        };
-        root = roots[0];
-
-        for (c in exts) {
-          invariant(c.extension is Some _);
-          !root = SkipExpand.merge_class(root, c)
-        };
-        writer.write(key, ExpandedDefFile(EClass(root)))
-      } else {
-        writer.writeArray(key, defFiles)
-      }
+          for (c in exts) {
+            invariant(c.extension is Some _);
+            !root = SkipExpand.merge_class(root, c)
+          };
+          writer.write(key, ExpandedDefFile(EClass(root)))
+        } else {
+          writer.writeArray(key, defFiles)
+        }
+      })
     },
   );
 }
@@ -948,10 +960,12 @@ fun program(
     SKFS.DirName::create("/moduleMap1/"),
     (context, writer, _key, values) ~> {
       for (fileDefs in values) {
-        moduleMap = definitions(context, fileDefs.value);
-        for (moduleName => defs in moduleMap) {
-          writer.write(SKFS.SID(moduleName), DefsFile(defs))
-        }
+        SkipError.catchErrors(context, () -> {
+          moduleMap = definitions(context, fileDefs.value);
+          for (moduleName => defs in moduleMap) {
+            writer.write(SKFS.SID(moduleName), DefsFile(defs))
+          }
+        })
       }
     },
   );
@@ -959,19 +973,21 @@ fun program(
     DefsFile::fromFile,
     context,
     SKFS.DirName::create("/moduleMap2/"),
-    (_context, writer, key, values) ~> {
-      acc = values.next() match {
-      | None() -> return void
-      | Some(defFile) -> defFile.value
-      };
-      for (defs in values) {
-        !acc = mergeDefs(acc, defs.value);
-      };
-      moduleName = key match {
-      | SKFS.SID(x) -> x
-      | _ -> invariant_violation("Unexpected key")
-      };
-      writer.write(SKFS.SID(moduleName), DefsFile(acc))
+    (context, writer, key, values) ~> {
+      SkipError.catchErrors(context, () -> {
+        acc = values.next() match {
+        | None() -> return void
+        | Some(defFile) -> defFile.value
+        };
+        for (defs in values) {
+          !acc = mergeDefs(acc, defs.value);
+        };
+        moduleName = key match {
+        | SKFS.SID(x) -> x
+        | _ -> invariant_violation("Unexpected key")
+        };
+        writer.write(SKFS.SID(moduleName), DefsFile(acc))
+      })
     },
   );
   ModuleMap.populateCache(context, moduleDefsDir);
@@ -981,16 +997,18 @@ fun program(
     context,
     SKFS.DirName::create("/moduleMap3/"),
     (context, writer, key, defsFiles) ~> {
-      moduleName = key match {
-      | SKFS.SID(x) -> x
-      | _ -> invariant_violation("Unexpected key")
-      };
-      invariant(defsFiles.size() == 1);
-      defs = defsFiles[0].value;
-      writer.write(
-        key,
-        DefsFile(module_expand(context, expandEnv, moduleName, defs)),
-      )
+      SkipError.catchErrors(context, () -> {
+        moduleName = key match {
+        | SKFS.SID(x) -> x
+        | _ -> invariant_violation("Unexpected key")
+        };
+        invariant(defsFiles.size() == 1);
+        defs = defsFiles[0].value;
+        writer.write(
+          key,
+          DefsFile(module_expand(context, expandEnv, moduleName, defs)),
+        );
+      })
     },
   );
   defs = GlobalEnv.populateDefinitions(context, expandedDefs);

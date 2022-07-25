@@ -7,6 +7,12 @@
 
 module SkipError;
 
+const errorDirName: SKFS.DirName = SKFS.DirName::create("/errors/");
+const errorDir: SKFS.EHandle<SkipErrorException> = SKFS.EHandle(
+  SkipErrorException::fromFile,
+  errorDirName,
+);
+
 fun fail<T>(): T {
   skipExit(2)
 }
@@ -65,7 +71,7 @@ fun printErrors(errors: Vector<Error>): void {
   print_error(errorsToString(errors));
 }
 
-class SkipErrorException{errors: Vector<Error>} extends Exception {
+class SkipErrorException{errors: Vector<Error>} extends Exception, SKFS.File {
   fun getMessage(): String {
     invariant_violation("Internal Error: should have used printErrors");
   }
@@ -79,6 +85,21 @@ fun throwErrors(errors: Vector<Error>): void {
 
 fun throwFlattenedErrors(errors: Vector<Vector<Error>>): void {
   throwErrors(errors.flatten());
+}
+
+fun catchErrors(context: mutable SKFS.Context, f: () -> void): void {
+  vtry(
+    () -> {
+      f()
+    },
+    exn ->
+      exn match {
+      | err @ SkipError.SkipErrorException _ ->
+        context.unsafeGetEagerDir(errorDirName).write(context, SKFS.IID(0), err)
+      | _ -> throw exn
+      }
+    ,
+  )
 }
 
 fun doWithError<T>(f: () -> T): Result<T, Vector<Error>> {
