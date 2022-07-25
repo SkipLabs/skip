@@ -13,16 +13,19 @@ module SkipMain;
 fun type_program(
   context: mutable SKFS.Context,
 ): SKFS.EHandle<SkipTyping.DefFile> {
-  parsed_program = FileCache.fileDir.mapKV(
+  parsed_program = FileCache.fileDir.contextWriterKeyValues(
     SkipParse.DefsFile::fromFile,
     context,
     SkipParse.astDirName,
-    (key, source) ~> {
-      fileName = key match {
-      | SKFS.SID(x) -> x
-      | _ -> invariant_violation("Unexpected key type")
-      };
-      SkipParse.parseFile(fileName, source.value)
+    (context, writer, key, sources) ~> {
+      source = sources[0];
+      SkipError.catchErrors(context, () -> {
+        fileName = key match {
+        | SKFS.SID(x) -> x
+        | _ -> invariant_violation("Unexpected key type")
+        };
+        writer.write(key, SkipParse.parseFile(fileName, source.value))
+      })
     },
   );
 
@@ -30,6 +33,5 @@ fun type_program(
   inhDir = SkipInherit.populateClassesDir(context);
   SkipNaming.populateClasses(context, defsDir, inhDir, childDir);
   SkipNaming.populateFuns(context, defsDir);
-
   SkipTyping.program(context, true, defsDir)
 }

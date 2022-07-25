@@ -267,23 +267,32 @@ fun program(
       // if(values.size() > 1) TODO multiple defs
       values[0].value match {
       | GlobalEnv.EClass(x) ->
-        writer.write(
-          SKFS.SID(x.name.i1),
-          DefFile(
-            SkipTypedAst.DClass(class_def(context, embeddedMode, x.name)),
-          ),
-        )
+        SkipError.catchErrors(context, () -> {
+          writer.write(
+            SKFS.SID(x.name.i1),
+            DefFile(
+              SkipTypedAst.DClass(class_def(context, embeddedMode, x.name)),
+            ),
+          )
+        })
       | GlobalEnv.EConst(x) ->
-        writer.write(
-          SKFS.SID(x.name.i1),
-          DefFile(SkipTypedAst.DConst(global_const_def(context, x.name))),
-        )
+        SkipError.catchErrors(context, () -> {
+          writer.write(
+            SKFS.SID(x.name.i1),
+            DefFile(SkipTypedAst.DConst(global_const_def(context, x.name))),
+          )
+        })
       | GlobalEnv.EFun(x) ->
-        writer.write(
-          SKFS.SID(x.name.i1),
-          DefFile(SkipTypedAst.DFun(fun_def(context, embeddedMode, x.name))),
-        )
-      | GlobalEnv.EType(ta) -> SkipNaming.check_type_alias(context, ta)
+        SkipError.catchErrors(context, () -> {
+          writer.write(
+            SKFS.SID(x.name.i1),
+            DefFile(SkipTypedAst.DFun(fun_def(context, embeddedMode, x.name))),
+          )
+        })
+      | GlobalEnv.EType(ta) ->
+        SkipError.catchErrors(context, () -> {
+          SkipNaming.check_type_alias(context, ta)
+        })
       }
     },
   );

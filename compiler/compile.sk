@@ -302,6 +302,14 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
       context,
       backendSinkDirName,
       (context, _writer, _key, _values) ~> {
+        errors = SkipError.errorDir.unsafeGetArray(context, SKFS.IID(0));
+        if (errors.size() > 0) {
+          SkipError.printErrors(
+            errors.map(x -> x.errors).flatten().collect(Vector),
+          );
+          skipExit(2)
+        };
+
         debug("CREATING IR");
         SKFS.printPersistentSize();
         env = OuterIstToIR.createIR(
