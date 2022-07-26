@@ -5355,9 +5355,6 @@ fun createIR(
 
   reportMemoryStatistics("native/createIR after findAllFunctionsAndSClasses");
 
-  debug("LATCH");
-  SKFS.printPersistentSize();
-
   // Latch the sub- and supertypes.
   for (info in specializer.untrackedSClasses()) {
     !info.sclass = info.sclass with {
@@ -5368,24 +5365,15 @@ fun createIR(
   };
   reportMemoryStatistics("native/createIR after latch sub/super");
 
-  debug("SCALARIZE");
-  SKFS.printPersistentSize();
-
   // Flatten value class fields into scalars.
   specializer.scalarizeAllFields(specializer.sclasses.items().map(x -> x.i1));
   reportMemoryStatistics("native/createIR after scalarizeAllFields");
-
-  debug("LAYOUT CHOOSER");
-  SKFS.printPersistentSize();
 
   specializer.withRegion(context, (_context, specializer) ~> {
     // Choose offsets for every field.
     FieldLayoutChooser::run(specializer);
     reportMemoryStatistics("native/createIR after FieldLayoutChooser");
   });
-
-  debug("PARTITION");
-  SKFS.printPersistentSize();
 
   // Split up functions based on which ones can share machine code.
   sclasses = specializer.createNewSClassesMap();

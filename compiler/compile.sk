@@ -310,8 +310,6 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
           skipExit(2)
         };
 
-        debug("CREATING IR");
-        SKFS.printPersistentSize();
         env = OuterIstToIR.createIR(
           context,
           shouldDisasm,
@@ -321,41 +319,23 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
           constsProj,
           defsProj,
         );
-        debug("OPTIMIZING");
-        SKFS.printPersistentSize();
 
         !env = createOptimizedFunctions(context, env);
-
-        debug("CREATING ASM DEF GRAPH");
-        SKFS.printPersistentSize();
-
         defs = runCompilerPhase("native/create_asm_graph", () -> {
           AsmOutput.createAsmDefGraph(env)
         });
-
-        debug("CREATING ASM MERGE GRAPH");
-        SKFS.printPersistentSize();
 
         runCompilerPhase("native/merge_asm_graph", () -> {
           AsmOutput.mergeIdenticalAsmDefs(defs)
         });
 
-        debug("CREATING ASM SYMBOLS");
-        SKFS.printPersistentSize();
-
         runCompilerPhase("native/create_asm_symbols", () -> {
           AsmOutput.assignFinalSymbols(defs)
         });
 
-        debug("WRITING FILES");
-        SKFS.printPersistentSize();
-
         runCompilerPhase("native/write_asm_files", () -> {
           AsmOutput.writeOutputFiles(defs, fileNames)
         });
-
-        debug("DONE");
-        SKFS.printPersistentSize();
       },
     );
   } else {
