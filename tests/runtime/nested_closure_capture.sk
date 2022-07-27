@@ -1,0 +1,19 @@
+fun searcher(find: Char): (String ~> Int) {
+  s ~> {
+    i = s.getIter();
+    count = 0;
+    loop {
+      i.next() match {
+      | Some(ch) if (ch == find) -> break count
+      | Some _ -> void
+      | None() -> break -1
+      };
+      !count = count + 1;
+    }
+  }
+}
+
+fun main(): void {
+  f = searcher(' ');
+  print_raw(f("foo bar").toString() + "\n")
+}
