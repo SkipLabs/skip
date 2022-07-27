@@ -1211,18 +1211,20 @@ fun populateClasses(
     context,
     classesDirName,
     (context, writer, _key, values) ~> {
-      if (values.size() > 1) return void;
-      values[0].value match {
-      | GlobalEnv.EClass(def) ->
-        inheritedClassArr = inhDir.getArray(context, SKFS.SID(def.name.i1));
-        if (inheritedClassArr.size() == 0) return void;
-        c = inheritedClassArr[0].value;
-        writer.write(
-          SKFS.SID(c.name.i1),
-          ClassFile(class_def(context, childDir, make_env(), c)),
-        )
-      | _ -> void
-      }
+      SkipError.catchErrors(2, context, () -> {
+        if (values.size() > 1) return void;
+        values[0].value match {
+        | GlobalEnv.EClass(def) ->
+          inheritedClassArr = inhDir.getArray(context, SKFS.SID(def.name.i1));
+          if (inheritedClassArr.size() == 0) return void;
+          c = inheritedClassArr[0].value;
+          writer.write(
+            SKFS.SID(c.name.i1),
+            ClassFile(class_def(context, childDir, make_env(), c)),
+          )
+        | _ -> void
+        }
+      })
     },
   )
 }
@@ -1238,7 +1240,8 @@ fun maybeGetClass(
 
 fun getClass(context: mutable SKFS.Context, className: A.Name): N.Class_def {
   maybeGetClass(context, className.i1) match {
-  | None() -> SkipError.error(className.i0, `Unbound class: '${className.i1}'`)
+  | None() ->
+    SkipError.fatalError(className.i0, `Unbound class: '${className.i1}'`)
   | Some(x) -> x
   }
 }
@@ -2044,15 +2047,17 @@ fun populateFuns(
     context,
     funsDirName,
     (context, writer, _key, values) ~> {
-      if (values.size() > 1) return void;
-      values[0].value match {
-      | GlobalEnv.EFun(f) ->
-        writer.write(
-          SKFS.SID(f.name.i1),
-          FunFile(fun_def(context, make_env(), f)),
-        )
-      | _ -> void
-      }
+      SkipError.catchErrors(2, context, () -> {
+        if (values.size() > 1) return void;
+        values[0].value match {
+        | GlobalEnv.EFun(f) ->
+          writer.write(
+            SKFS.SID(f.name.i1),
+            FunFile(fun_def(context, make_env(), f)),
+          )
+        | _ -> void
+        }
+      })
     },
   )
 }

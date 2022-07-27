@@ -13,6 +13,14 @@ const errorDir: SKFS.EHandle<SkipErrorException> = SKFS.EHandle(
   errorDirName,
 );
 
+class ErrorPhaseFile(dirName: SKFS.DirName, nbr: Int) extends SKFS.File
+
+const errorPhaseDirName: SKFS.DirName = SKFS.DirName::create("/errorPhases/");
+const errorPhaseDir: SKFS.EHandle<ErrorPhaseFile> = SKFS.EHandle(
+  ErrorPhaseFile::fromFile,
+  errorPhaseDirName,
+);
+
 fun fail<T>(): T {
   skipExit(2)
 }
@@ -71,7 +79,9 @@ fun printErrors(errors: Vector<Error>): void {
   print_error(errorsToString(errors));
 }
 
-class SkipErrorException{errors: Vector<Error>} extends Exception, SKFS.File {
+class SkipErrorException{
+  errors: Vector<Error>,
+} extends Exception, SKFS.File uses Hashable {
   fun getMessage(): String {
     invariant_violation("Internal Error: should have used printErrors");
   }
@@ -87,7 +97,29 @@ fun throwFlattenedErrors(errors: Vector<Vector<Error>>): void {
   throwErrors(errors.flatten());
 }
 
-fun catchErrors(context: mutable SKFS.Context, f: () -> void): void {
+fun printErrorsAndExit<T>(errors: Array<SkipErrorException>): T {
+  SkipError.printErrors(errors.map(x -> x.errors).flatten().collect(Vector));
+  skipExit(2)
+}
+
+fun catchErrors(
+  phase: Int,
+  context: mutable SKFS.Context,
+  f: () -> void,
+): void {
+  currentPhaseArray = errorPhaseDir.unsafeGetArray(context, SKFS.IID(0));
+  currentPhase = if (currentPhaseArray.size() == 0) {
+    ErrorPhaseFile(SKFS.DirName::create("/errors/" + phase + "/"), phase)
+  } else {
+    currentPhaseArray[0]
+  };
+  if (phase > currentPhase.nbr) {
+    errors = SkipError.errorDir.unsafeGetArray(context, SKFS.IID(0));
+    if (errors.size() != 0) {
+      printErrorsAndExit(errors);
+    };
+    errorPhaseDir.writeArray(context, SKFS.IID(0), Array[currentPhase]);
+  };
   vtry(
     () -> {
       f()
@@ -95,7 +127,13 @@ fun catchErrors(context: mutable SKFS.Context, f: () -> void): void {
     exn ->
       exn match {
       | err @ SkipError.SkipErrorException _ ->
-        context.unsafeGetEagerDir(errorDirName).write(context, SKFS.IID(0), err)
+        source = SKFS.Path(currentPhase.dirName, SKFS.IID(err.hash()));
+        context.setDir(
+          errorDirName,
+          context
+            .unsafeGetEagerDir(errorDirName)
+            .writeEntry(context, source, SKFS.IID(0), Array[err]),
+        )
       | _ -> throw exn
       }
     ,
@@ -357,6 +395,16 @@ fun getContextOfRange(range: TextRange, fileContents: String): String {
 
 fun error<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {
   errorl(List[(pos, msg)], fix);
+}
+
+fun fatalError<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {
+  printErrorsAndExit(
+    Array[
+      SkipErrorException{
+        errors => Vector[Error{traces => List[(pos, msg)], fix}],
+      },
+    ],
+  );
 }
 
 fun errorl<T>(traces: List<(FileRange, String)>, fix: ?Fix = None()): T {

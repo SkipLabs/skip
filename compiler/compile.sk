@@ -271,6 +271,7 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
   if (context.unsafeMaybeGetDir(FileCache.fileDirName) is None()) {
     _ = context.mkdir(x ~> x, FileCache.fileDirName, false, Array[]);
     _ = context.mkdir(x ~> x, SkipError.errorDirName, false, Array[]);
+    _ = context.mkdir(x ~> x, SkipError.errorPhaseDirName, false, Array[]);
   };
 
   for (x in fileNames) FileCache.addFile(context, x);
@@ -304,10 +305,7 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
       (context, _writer, _key, _values) ~> {
         errors = SkipError.errorDir.unsafeGetArray(context, SKFS.IID(0));
         if (errors.size() > 0) {
-          SkipError.printErrors(
-            errors.map(x -> x.errors).flatten().collect(Vector),
-          );
-          skipExit(2)
+          SkipError.printErrorsAndExit(errors);
         };
 
         env = OuterIstToIR.createIR(

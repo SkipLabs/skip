@@ -267,7 +267,7 @@ fun program(
       // if(values.size() > 1) TODO multiple defs
       values[0].value match {
       | GlobalEnv.EClass(x) ->
-        SkipError.catchErrors(context, () -> {
+        SkipError.catchErrors(3, context, () -> {
           writer.write(
             SKFS.SID(x.name.i1),
             DefFile(
@@ -276,21 +276,21 @@ fun program(
           )
         })
       | GlobalEnv.EConst(x) ->
-        SkipError.catchErrors(context, () -> {
+        SkipError.catchErrors(3, context, () -> {
           writer.write(
             SKFS.SID(x.name.i1),
             DefFile(SkipTypedAst.DConst(global_const_def(context, x.name))),
           )
         })
       | GlobalEnv.EFun(x) ->
-        SkipError.catchErrors(context, () -> {
+        SkipError.catchErrors(3, context, () -> {
           writer.write(
             SKFS.SID(x.name.i1),
             DefFile(SkipTypedAst.DFun(fun_def(context, embeddedMode, x.name))),
           )
         })
       | GlobalEnv.EType(ta) ->
-        SkipError.catchErrors(context, () -> {
+        SkipError.catchErrors(3, context, () -> {
           SkipNaming.check_type_alias(context, ta)
         })
       }

@@ -89,7 +89,7 @@ fun populateCache(
     context,
     childDirName,
     (context, writer, _key, defsFiles) ~> {
-      SkipError.catchErrors(context, () -> {
+      SkipError.catchErrors(1, context, () -> {
         map = mutable Map[];
         invariant(defsFiles.size() == 1);
         defs = defsFiles[0].value.i1;
@@ -128,7 +128,7 @@ fun checkCycles(
     context,
     SKFS.DirName::create("/checkCycle/"),
     (context, _writer, _key, defFiles) ~> {
-      SkipError.catchErrors(context, () -> {
+      SkipError.catchErrors(1, context, () -> {
         for (defFile in defFiles) {
           defFile.value match {
           | GlobalEnv.EClass(classDef) ->
@@ -196,7 +196,7 @@ fun populateCache(
     context,
     moduleDirName1,
     (context, writer, key, values) ~> {
-      SkipError.catchErrors(context, () -> {
+      SkipError.catchErrors(1, context, () -> {
         moduleName = key match {
         | SKFS.SID(x) -> x
         | _ -> invariant_violation("Unexpected key type")
@@ -246,7 +246,7 @@ fun populateCache(
     context,
     moduleDirName,
     (context, writer, key, iter) ~> {
-      SkipError.catchErrors(context, () -> {
+      SkipError.catchErrors(1, context, () -> {
         writer.write(
           key,
           SKFS.ArrayStringFile(
@@ -290,7 +290,7 @@ fun populateDefinitions(
     context,
     defMapDirName1,
     (context, writer, _key, defsFiles) ~> {
-      SkipError.catchErrors(context, () -> {
+      SkipError.catchErrors(1, context, () -> {
         invariant(defsFiles.size() == 1);
         defs = defsFiles[0].value.i1;
         for (classDef in defs.class_defs) {
@@ -317,7 +317,7 @@ fun populateDefinitions(
     context,
     defMapDirName,
     (context, writer, key, defFiles) ~> {
-      SkipError.catchErrors(context, () -> {
+      SkipError.catchErrors(1, context, () -> {
         name = key match {
         | SKFS.SID(x) -> x
         | _ -> invariant_violation("Unexpected key type")
@@ -960,7 +960,7 @@ fun program(
     SKFS.DirName::create("/moduleMap1/"),
     (context, writer, _key, values) ~> {
       for (fileDefs in values) {
-        SkipError.catchErrors(context, () -> {
+        SkipError.catchErrors(1, context, () -> {
           moduleMap = definitions(context, fileDefs.value);
           for (moduleName => defs in moduleMap) {
             writer.write(SKFS.SID(moduleName), DefsFile(defs))
@@ -974,7 +974,7 @@ fun program(
     context,
     SKFS.DirName::create("/moduleMap2/"),
     (context, writer, key, values) ~> {
-      SkipError.catchErrors(context, () -> {
+      SkipError.catchErrors(1, context, () -> {
         acc = values.next() match {
         | None() -> return void
         | Some(defFile) -> defFile.value
@@ -997,7 +997,7 @@ fun program(
     context,
     SKFS.DirName::create("/moduleMap3/"),
     (context, writer, key, defsFiles) ~> {
-      SkipError.catchErrors(context, () -> {
+      SkipError.catchErrors(1, context, () -> {
         moduleName = key match {
         | SKFS.SID(x) -> x
         | _ -> invariant_violation("Unexpected key")
