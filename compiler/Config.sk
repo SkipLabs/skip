@@ -10,7 +10,10 @@ module alias AP = ArgumentParser;
 module Config;
 
 // Global config object.
-const .kConfig: Config = Config::make(arguments());
+const .kConfig: Config = {
+  SKFS.unsafeEnableNewConstMode();
+  Config::make(arguments());
+};
 
 // global config settings, built from arguments() on startup.
 private class Config{
