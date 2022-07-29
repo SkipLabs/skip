@@ -1,0 +1,94 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+// This module contains functions specific to the native back end,
+// for internal use of the compiler and runtime. Everything in here
+// should be "private" so users can't access it.
+
+module Runtime;
+
+// Dummy class indicating an opaque pointer analogous to "void*"
+// A real (untyped) skip object that the GC understands
+native value class GCPointer
+
+// A pointer to random non-GC'd memory
+native value class NonGCPointer {
+  @intrinsic
+  static native fun zero(): NonGCPointer;
+}
+
+// This is produced only internally by the compiler to hold updated local
+// variables. Typically they are optimized away, but when lambdas are
+// involved they may preserved so lambdas can point to them.
+//
+// We make T invariant because we never cast an instance of one of these
+// to a different type, and invariant types compile more quickly.
+private mutable class LocalVariable<T>(mutable value: T)
+
+@cpp_export("SKIP_getExceptionMessage")
+private fun getExceptionMessage(e: Exception): String {
+  e.getMessage()
+}
+
+@cpp_export("SKIP_makeRuntimeError")
+private fun makeRuntimeError(msg: String): RuntimeError {
+  RuntimeError(msg)
+}
+
+@no_inline
+@cpp_export("SKIP_throwRuntimeError")
+private fun throwRuntimeError(msg: String): void {
+  throw RuntimeError(msg);
+}
+
+// Provide a version of throwOutOfBounds() for use by C++ (can't @cpp_export
+// Exception's throwOutOfBounds() because it returns `_`)
+@no_inline
+@cpp_export("SKIP_throwOutOfBounds")
+private fun throwOutOfBounds(): void {
+  .throwOutOfBounds();
+}
+
+@cpp_export("SKIP_createStringVector")
+@no_throw
+private fun createStringVector(size: Int): mutable Array<String> {
+  Array<String>::mfill(size, "")
+}
+
+@cpp_export("SKIP_createIntVector")
+@no_throw
+private fun createIntVector(size: Int): mutable Array<Int> {
+  Array<Int>::mfill(size, 0)
+}
+
+@cpp_export("SKIP_throwInvariantViolation")
+private fun throwInvariantViolation(msg: String): void {
+  invariant_violation(msg);
+}
+
+// NOTE: Even if the runtime does not call this, its existence acts as a call
+// site, informing the compiler that closures with this signature are callable
+// and their "call" methods need to appear in their vtables.
+@cpp_export("SKIP_invokeMemoizeThunk")
+private fun invokeMemoizeThunk(func: () ~> void): void {
+  func()
+}
+
+@cpp_runtime("SKIP_invocationOnStateChange")
+private native fun invocationOnStateChange(
+  obj: GCPointer,
+  changeType: Int,
+): void;
+
+module end;
+
+// May return true if two objects are equal.
+// Definitely returns true if two objects are different.
+// This function cannot be used as a replacement for equality.
+// Cf: runtime/native_eq.c
+@cpp_extern("SKIP_isEq")
+native fun native_eq<T: frozen>(T, T): Int;

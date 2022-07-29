@@ -343,4 +343,12 @@ void SKIP_string_to_file(char* str, char* file) {
   }
   fclose(out);
 }
+
+int64_t SKIP_get_mtime(char *path) {
+    struct stat st;
+    if(stat(path, &st) < 0) {
+      return 0;
+    }
+    return st.st_mtime;
+}
 }

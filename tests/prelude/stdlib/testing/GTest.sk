@@ -1,0 +1,54 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module GTest;
+
+// This harness it used to emulate a C++ test written with google_test.
+//
+// Example of use:
+//     fun main(): void {
+//       GTest.TestCase::new(
+//         "SkipTests",
+//         Map[
+//           "test1" => () ~> {
+//             assertEqual(2, 2);
+//           },
+//           "test2" => () ~> {
+//             assertEqual(1, 2);
+//           },
+//           "test3" => test3,
+//         ]).run();
+//     }
+//
+//     def test3(): void { ... }
+//
+class TestCase private {name: String, tests: UnorderedMap<String, () ~> void>} {
+  static fun new(
+    name: String,
+    tests: UnorderedMap<String, () ~> void>,
+  ): TestCase {
+    TestCase{name, tests}
+  }
+
+  fun usage(): void {
+    print_string("Skip Test Harness");
+    print_string("");
+    print_string("  --gtest_list_tests");
+    print_string("  --gtest_filter=POSTIVE_PATTERNS[-NEGATIVE_PATTERNS]");
+  }
+
+  fun list_tests(): void {
+    print_string(this.name + ".");
+    this.tests.each((name, _) -> {
+      print_string("  " + name);
+    });
+  }
+
+  untracked fun run(): void {
+    void
+  }
+}

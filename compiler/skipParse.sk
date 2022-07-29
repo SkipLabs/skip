@@ -18,12 +18,49 @@ const fileDir: SKFS.EHandle<SKFS.StringFile> = SKFS.EHandle(
   fileDirName,
 );
 
-fun addFile(context: mutable SKFS.Context, filename: String): void {
-  fileDir.writeArray(
+const allFilesDirName: SKFS.DirName = SKFS.DirName::create("/allFilesCache/");
+const allFilesDir: SKFS.EHandle<SKFS.StringFile> = SKFS.EHandle(
+  SKFS.StringFile::fromFile,
+  allFilesDirName,
+);
+
+const fileTimeDirName: SKFS.DirName = SKFS.DirName::create("/fileTimeCache/");
+const fileTimeDir: SKFS.EHandle<SKFS.IntFile> = SKFS.EHandle(
+  SKFS.IntFile::fromFile,
+  fileTimeDirName,
+);
+
+@cpp_extern("SKIP_get_mtime")
+native fun getLastModificationTime(fileName: String): Int;
+
+fun writeFiles(context: mutable SKFS.Context, fileNames: Array<String>): void {
+  oldFiles = allFilesDir
+    .unsafeGetArray(context, SKFS.IID(0))
+    .map(x -> x.value)
+    .collect(SortedSet);
+  for (fileName in fileNames) {
+    if (oldFiles.contains(fileName)) {
+      !oldFiles = oldFiles.remove(fileName);
+    };
+    key = SKFS.SID(fileName);
+    lastModifTime = getLastModificationTime(fileName);
+    timeArr = fileTimeDir.unsafeGetArray(context, key);
+    if (timeArr.size() > 0 && timeArr[0].value == lastModifTime) continue;
+    fileTimeDir.writeArray(context, key, Array[SKFS.IntFile(lastModifTime)]);
+    fileDir.writeArray(
+      context,
+      SKFS.SID(fileName),
+      Array[SKFS.StringFile(FileSystem.readTextFile(fileName))],
+    )
+  };
+  for (fileName in oldFiles) {
+    fileDir.writeArray(context, SKFS.SID(fileName), Array[SKFS.StringFile("")])
+  };
+  allFilesDir.writeArray(
     context,
-    SKFS.SID(filename),
-    Array[SKFS.StringFile(FileSystem.readTextFile(filename))],
-  )
+    SKFS.IID(0),
+    fileNames.map(x -> SKFS.StringFile(x)),
+  );
 }
 
 module end;

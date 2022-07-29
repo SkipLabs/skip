@@ -270,11 +270,13 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
 
   if (context.unsafeMaybeGetDir(FileCache.fileDirName) is None()) {
     _ = context.mkdir(x ~> x, FileCache.fileDirName, false, Array[]);
+    _ = context.mkdir(x ~> x, FileCache.fileTimeDirName, false, Array[]);
+    _ = context.mkdir(x ~> x, FileCache.allFilesDirName, false, Array[]);
     _ = context.mkdir(x ~> x, SkipError.errorDirName, false, Array[]);
     _ = context.mkdir(x ~> x, SkipError.errorPhaseDirName, false, Array[]);
   };
 
-  for (x in fileNames) FileCache.addFile(context, x);
+  FileCache.writeFiles(context, fileNames);
 
   backendDirName = SKFS.DirName::create("/backend/");
   backendSinkDirName = SKFS.DirName::create("/backendSink/");

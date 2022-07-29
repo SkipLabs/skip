@@ -196,6 +196,7 @@ fun populateCache(
     context,
     moduleDirName1,
     (context, writer, key, values) ~> {
+      if (values.size() == 0) return void;
       SkipError.catchErrors(1, context, () -> {
         moduleName = key match {
         | SKFS.SID(x) -> x
@@ -213,7 +214,6 @@ fun populateCache(
           };
           defMap![moduleName] = defMap[moduleName].set(defName);
         };
-
         (_, defs) = values[0].value;
 
         for (cd in defs.class_defs) {
@@ -342,11 +342,27 @@ fun populateDefinitions(
 
           if (roots.size() == 0) {
             writer.writeArray(key, defFiles);
+            SkipError.error(
+              exts[0].name.i0,
+              "Undefined class " + exts[0].name.i1,
+            );
           } else if (roots.size() > 1) {
             writer.writeArray(
               key,
               roots.map(x -> ExpandedDefFile(EClass(x))).toArray(),
-            )
+            );
+            SkipError.errorl(
+              List[
+                (
+                  roots[0].name.i0,
+                  "Multiple definitions for class " + roots[0].name.i1,
+                ),
+                (
+                  roots[1].name.i0,
+                  "Previous definition was here " + roots[1].name.i1,
+                ),
+              ],
+            );
           };
           root = roots[0];
 

@@ -1,0 +1,193 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module String;
+
+@cpp_runtime
+native fun getByte(String, Int): UInt32;
+
+fun igetByte(str: String, n: Int): Int {
+  getByte(str, n).toInt()
+}
+
+@cpp_runtime
+native fun byteSize(String): UInt32;
+
+mutable class StringIterator private (
+  // This object is manipulated by the native methods directly.  It's important
+  // that the fields match the native implementation
+  // (String.cpp:StringIterator).
+  private s: String,
+  private mutable i: Int,
+) extends Iterator<Char> uses Equality {
+  static fun make(s: String): mutable StringIterator {
+    mutable StringIterator(s, 0)
+  }
+
+  readonly fun chill(): this {
+    static(this.s, this.i)
+  }
+
+  static fun makeEnd(s: String): mutable StringIterator {
+    mutable StringIterator(s, Unsafe.string_utf8_size(s))
+  }
+
+  readonly fun clone(): mutable StringIterator {
+    mutable StringIterator(this.s, this.i);
+  }
+
+  mutable fun assign(other: readonly StringIterator): void {
+    invariant(
+      this.s == other.s,
+      "Cannot assign from different string iterator",
+    );
+    this.!i = other.i;
+  }
+
+  private static fun charFromCodeOpt(code: Int): ?Char {
+    if (code == -1) {
+      None()
+    } else {
+      Some(Char::fromCode(code))
+    }
+  }
+
+  readonly fun sizeHint(): ?Int {
+    None()
+  }
+
+  readonly fun current(): ?Char {
+    c = this.currentCode();
+    if (c < 0) return None();
+    Some(Char::fromCode(c))
+  }
+
+  readonly fun currentCode(): Int {
+    str = this.s;
+    size = byteSize(str).toInt();
+    i = this.i;
+
+    if (i >= size || i < 0) {
+      return -1;
+    };
+
+    if ((igetByte(str, i).and(0x80)) == 0) {
+      return (igetByte(str, i));
+    };
+    if ((igetByte(str, i).and(0x20)) == 0) {
+      return (igetByte(str, i) - 192) * 64 + (igetByte(str, i + 1) - 128);
+    };
+    if ((igetByte(str, i).and(0x10)) == 0) {
+      return (igetByte(str, i) - 224) * 4096 +
+        (igetByte(str, i + 1) - 128) * 64 +
+        (igetByte(str, i + 2) - 128);
+    };
+    if ((igetByte(str, i).and(0x8)) == 0) {
+      return (igetByte(str, i) - 240) * 262144 +
+        (igetByte(str, i + 1) - 128) * 4096 +
+        (igetByte(str, i + 2) - 128) * 64 +
+        (igetByte(str, i + 3) - 128);
+    };
+
+    -1
+  }
+
+  readonly fun atEnd(): Bool {
+    this.current().isNone()
+  }
+
+  mutable fun next(): ?Char {
+    c = this.nextCode();
+    if (c < 0) return None();
+    Some(Char::fromCode(c))
+  }
+
+  mutable fun nextCode(): Int {
+    str = this.s;
+    size = byteSize(str).toInt();
+    i = this.i;
+
+    if (i >= size) {
+      return -1;
+    };
+
+    if ((igetByte(str, i).and(0x80)) == 0) {
+      c = this.currentCode();
+      this.!i = i + 1;
+      return c;
+    };
+    if (i + 1 >= size) return -1;
+    if ((igetByte(str, i).and(0x20)) == 0) {
+      c = this.currentCode();
+      this.!i = i + 2;
+      return c;
+    };
+    if (i + 2 >= size) return -1;
+    if ((igetByte(str, i).and(0x10)) == 0) {
+      c = this.currentCode();
+      this.!i = i + 3;
+      return c;
+    };
+    if (i + 3 >= size) return -1;
+    if ((igetByte(str, i).and(0x8)) == 0) {
+      c = this.currentCode();
+      this.!i = i + 4;
+      return c;
+    };
+
+    -1;
+  }
+
+  mutable fun drop(n: Int): mutable this {
+    while (n > 0 && this.nextCode() > 0) {
+      !n = n - 1;
+    };
+    this
+  }
+
+  mutable fun prev(): ?Char {
+    c = this.prevCode();
+    if (c < 0) return None();
+    Some(Char::fromCode(c))
+  }
+
+  mutable fun prevCode(): Int {
+    str = this.s;
+    size = byteSize(str).toInt();
+    i = this.i;
+    if (size == 0) return -1;
+    if (i < 0) return -1;
+
+    !i = i - 1;
+
+    while (
+      (i >= 0) &&
+      ((igetByte(str, i).and(0x80)) != 0) &&
+      ((igetByte(str, i).and(0x40)) == 0)
+    ) !i = i - 1;
+
+    this.!i = i;
+
+    if (i < 0) return -1;
+    this.currentCode();
+  }
+
+  @cpp_runtime
+  native readonly fun substring(end: readonly StringIterator): String;
+
+  readonly fun <(other: readonly StringIterator): Bool {
+    this.i < other.i
+  }
+
+  readonly fun >(other: readonly StringIterator): Bool {
+    this.i > other.i
+  }
+
+  readonly fun ==(other: readonly StringIterator): Bool {
+    this.i == other.i
+  }
+}

@@ -134,7 +134,9 @@ fun catchErrors(
             .unsafeGetEagerDir(errorDirName)
             .writeEntry(context, source, SKFS.IID(0), Array[err]),
         )
-      | _ -> throw exn
+      | _ ->
+        debug(exn);
+        throw exn
       }
     ,
   )
@@ -394,7 +396,14 @@ fun getContextOfRange(range: TextRange, fileContents: String): String {
 }
 
 fun error<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {
-  errorl(List[(pos, msg)], fix);
+  printErrorsAndExit(
+    Array[
+      SkipErrorException{
+        errors => Vector[Error{traces => List[(pos, msg)], fix}],
+      },
+    ],
+  );
+  //  errorl(List[(pos, msg)], fix);
 }
 
 fun fatalError<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {

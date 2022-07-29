@@ -1,0 +1,259 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+native value class Float uses Number {
+  @intrinsic
+  native fun ==(other: Float): Bool;
+  @intrinsic
+  native fun !=(other: Float): Bool;
+  @intrinsic
+  native fun +(other: Float): Float;
+  @intrinsic
+  native fun -(other: Float): Float;
+  @intrinsic
+  native fun *(other: Float): Float;
+  @intrinsic
+  native fun /(other: Float): Float;
+  @intrinsic
+  native fun <(other: Float): Bool;
+  @intrinsic
+  native fun >(other: Float): Bool;
+  @intrinsic
+  native fun <=(other: Float): Bool;
+  @intrinsic
+  native fun >=(other: Float): Bool;
+
+  /*
+   * Float should /not/ be Orderable, because Orderable implies a total
+   * order, and in floating point NaNs are incomparable with everything
+   * (including themselves). But, in practice, this is a too strong a
+   * constraint to prevent doing min/max of two floats or to sort a vector
+   * of floats.
+   */
+  fun compare(other: Float): Order {
+    if (this < other) {
+      LT()
+    } else if (this == other) {
+      EQ()
+    } else {
+      GT()
+    }
+  }
+
+  // The equality and comparison operators for Float follow the IEEE definition
+  // Meaning they do not define an identity relation. Use isEqual for that.
+  fun isEqual(other: Float): Bool {
+    this.toBits() == other.toBits()
+  }
+
+  // This hack does (-0.0 - this) so that 0.0 negates to -0.0.
+  fun negate(): Float {
+    (0.0 * (0.0 - 1.0)) - this
+  }
+
+  const inf: Float = 1.0 / 0.0;
+  const nan: Float = 0.0 / 0.0;
+
+  fun isNaN(): Bool {
+    this != this
+  }
+
+  fun fromInt(x: Int): Float {
+    x.toFloat()
+  }
+
+  fun fromFloat(x: Float): Float {
+    x
+  }
+
+  fun toFloat(): Float {
+    this
+  }
+
+  /** Converts a float to a string.
+   * Special values are formatted as "inf", "-inf", and "nan".
+   * Integer values are formatted as Int::toString(), with a trailing ".0".
+   * All other values are formatted by the "%.17g" printf format.
+   * See http://pubs.opengroup.org/onlinepubs/009695399/functions/fprintf.html
+   */
+  @intrinsic
+  native fun toString(): String;
+  @intrinsic
+  native fun toBits(): Int;
+  @intrinsic
+  native fun toInt(): Int;
+
+  fun inspect(): Inspect {
+    InspectLiteral(this.toString())
+  }
+
+  fun hash(): Int {
+    // Hash using raw FP bits, but make sure that -0.0 and 0.0 have the
+    // same hash since they are ==.
+    //
+    // But be very careful using Floats in hash tables, because NaN does
+    // not compare equal to itself!
+    bits = this.toBits();
+    if (bits == 0) {
+      (-0.0).toBits()
+    } else {
+      bits
+    }
+  }
+}
+
+@cpp_export("SKIP_floatToString")
+fun floatToString(value: Float): String {
+  if (value.isNaN()) {
+    return "nan";
+  };
+  str = "";
+  if (value < 0.0) {
+    !str = "-";
+    !value = -value;
+  };
+  if (value == Float::inf) {
+    return `${str}inf`;
+  };
+  (integralPart, optDecimalPart, optExponent) = splitFloat(value);
+  !str = `${str}${integralPart}`;
+  optDecimalPart match {
+  | None() -> !str = `${str}.0`
+  | Some(decimalPart) -> !str = `${str}${decimalsPart(decimalPart)}`
+  };
+  optExponent.each(exponent -> !str = `${str}e${exponent}`);
+  str;
+}
+
+fun splitFloat(value: Float): (UInt32, ?UInt32, ?Int16) {
+  exponent = normalizeFloat(value);
+  integralPart = value.toInt();
+  remainder = value - integralPart.toFloat();
+  !remainder = remainder * 1e9;
+  decimalPart = remainder;
+  // rounding
+  !remainder = remainder - decimalPart;
+  zInt16 = Int16::truncate(0);
+  oInt16 = Int16::truncate(1);
+  if (remainder >= 0.5) {
+    !decimalPart = decimalPart + 1.0;
+    if (decimalPart >= 1e9) {
+      !decimalPart = 0.0;
+      !integralPart = integralPart + 1;
+      if (exponent != zInt16 && integralPart >= 10) {
+        !exponent = Int16::truncate(exponent + oInt16);
+        !integralPart = 1;
+      }
+    }
+  };
+  iDecimalPart = decimalPart.toInt();
+  (
+    UInt32::truncate(integralPart),
+    if (iDecimalPart > 0) Some(UInt32::truncate(iDecimalPart)) else None(),
+    if (exponent != zInt16) Some(exponent) else None(),
+  )
+}
+
+fun normalizeFloat(value: Float): Int16 {
+  positiveExpThreshold = 1e7;
+  negativeExpThreshold = 1e-5;
+  exponent = 0;
+  if (value >= positiveExpThreshold) {
+    if (value >= 1e256) {
+      !value = value / 1e256;
+      !exponent = exponent + 256;
+    };
+    if (value >= 1e128) {
+      !value = value / 1e128;
+      !exponent = exponent + 128;
+    };
+    if (value >= 1e64) {
+      !value = value / 1e64;
+      !exponent = exponent + 64;
+    };
+    if (value >= 1e32) {
+      !value = value / 1e32;
+      !exponent = exponent + 32;
+    };
+    if (value >= 1e16) {
+      !value = value / 1e16;
+      !exponent = exponent + 16;
+    };
+    if (value >= 1e8) {
+      !value = value / 1e8;
+      !exponent = exponent + 8;
+    };
+    if (value >= 1e4) {
+      !value = value / 1e4;
+      !exponent = exponent + 4;
+    };
+    if (value >= 1e2) {
+      !value = value / 1e2;
+      !exponent = exponent + 2;
+    };
+    if (value >= 1e1) {
+      !value = value / 1e1;
+      !exponent = exponent + 1;
+    }
+  };
+  if (value > 0.0 && value <= negativeExpThreshold) {
+    if (value < 1e-255) {
+      !value = value * 1e256;
+      !exponent = exponent - 256;
+    };
+    if (value < 1e-127) {
+      !value = value * 1e128;
+      !exponent = exponent - 128;
+    };
+    if (value < 1e-63) {
+      !value = value * 1e64;
+      !exponent = exponent - 64;
+    };
+    if (value < 1e-31) {
+      !value = value * 1e32;
+      !exponent = exponent - 32;
+    };
+    if (value < 1e-15) {
+      !value = value * 1e16;
+      !exponent = exponent - 16;
+    };
+    if (value < 1e-7) {
+      !value = value * 1e8;
+      !exponent = exponent - 8;
+    };
+    if (value < 1e-3) {
+      !value = value * 1e4;
+      !exponent = exponent - 4;
+    };
+    if (value < 1e-1) {
+      !value = value * 1e2;
+      !exponent = exponent - 2;
+    };
+    if (value < 1e0) {
+      !value = value * 1e1;
+      !exponent = exponent - 1;
+    }
+  };
+  Int16::truncate(exponent);
+}
+
+fun decimalsPart(value: UInt32): String {
+  iValue = value.toInt();
+  width = 9;
+  // remove trailing zeros
+  while (iValue % 10 == 0 && width > 0) {
+    !iValue = iValue / 10;
+    !width = width - 1;
+  };
+  str = "";
+  while (width > 0) {
+    !str = `${iValue % 10}${str}`;
+    !iValue = iValue / 10;
+    !width = width - 1;
+  };
+  `.${str}`
+}
