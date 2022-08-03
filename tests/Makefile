@@ -1,16 +1,16 @@
 SOURCES := $(shell find ./ -name "*.sk" | sed "s|^\./||" | grep syntax)
-LLVMOBJS = $(addprefix ../build/tests/, $(SOURCES:.sk=.out))
+LLVMOBJS = $(addprefix ../build/tests/, $(SOURCES:.sk=.test))
 
-default: $(LLVMOBJS)
+default: ../build/state.db $(LLVMOBJS)
 
 ../build/state.db:
 	@mkdir -p ../build/tests/
 	../build/skc --embedded64 --no-inline --preamble ../preamble64.ll `find ../prelude/ -name "*.sk"` `ls ~/skfs/*.sk` --init ../build/state.db --check
 
-../build/tests/%.out: ../build/state.db %.sk
+../build/tests/%.test: %.sk
 	@mkdir -p $(dir $@)
-	@- ../build/skc --embedded64 --no-inline --preamble ../preamble64.ll `find ../prelude/ -name "*.sk"` `ls ~/skfs/*.sk` --export-function-as main=skip_main --data $^ 2> $(@:.out=.err) > $(@:.out=.ll) || true
-	@- sed -i 's/File "/File ".\//' $(@:.out=.err)
+	@- ../build/skc --embedded64 --no-inline --preamble ../preamble64.ll `find ../prelude/ -name "*.sk"` `ls ~/skfs/*.sk` --export-function-as main=skip_main --data ../build/state.db $^ 2> $(@:.test=.err) > $(@:.test=.ll) || true
+	@- sed -i 's/File "/File ".\//' $(@:.test=.err)
 	@./run.sh $@
 
 clean:

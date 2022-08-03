@@ -281,8 +281,6 @@ fun compile(
     _ = context.mkdir(x ~> x, FileCache.fileDirName, false, Array[]);
     _ = context.mkdir(x ~> x, FileCache.fileTimeDirName, false, Array[]);
     _ = context.mkdir(x ~> x, FileCache.allFilesDirName, false, Array[]);
-    _ = context.mkdir(x ~> x, SkipError.errorDirName, false, Array[]);
-    _ = context.mkdir(x ~> x, SkipError.errorPhaseDirName, false, Array[]);
   };
 
   FileCache.writeFiles(context, fileNames);
@@ -314,11 +312,6 @@ fun compile(
       context,
       backendSinkDirName,
       (context, _writer, _key, _values) ~> {
-        errors = SkipError.errorDir.unsafeGetArray(context, SKFS.IID(0));
-        if (errors.size() > 0) {
-          SkipError.printErrorsAndExit(errors);
-        };
-
         if (kConfig.mainConfig.check) {
           return void;
         };

@@ -7,20 +7,6 @@
 
 module SkipError;
 
-const errorDirName: SKFS.DirName = SKFS.DirName::create("/errors/");
-const errorDir: SKFS.EHandle<SkipErrorException> = SKFS.EHandle(
-  SkipErrorException::fromFile,
-  errorDirName,
-);
-
-class ErrorPhaseFile(dirName: SKFS.DirName, nbr: Int) extends SKFS.File
-
-const errorPhaseDirName: SKFS.DirName = SKFS.DirName::create("/errorPhases/");
-const errorPhaseDir: SKFS.EHandle<ErrorPhaseFile> = SKFS.EHandle(
-  ErrorPhaseFile::fromFile,
-  errorPhaseDirName,
-);
-
 fun fail<T>(): T {
   skipExit(2)
 }
@@ -103,37 +89,17 @@ fun printErrorsAndExit<T>(errors: Array<SkipErrorException>): T {
 }
 
 fun catchErrors(
-  phase: Int,
-  context: mutable SKFS.Context,
+  _phase: Int,
+  _context: mutable SKFS.Context,
   f: () -> void,
 ): void {
-  currentPhaseArray = errorPhaseDir.unsafeGetArray(context, SKFS.IID(0));
-  currentPhase = if (currentPhaseArray.size() == 0) {
-    ErrorPhaseFile(SKFS.DirName::create("/errors/" + phase + "/"), phase)
-  } else {
-    currentPhaseArray[0]
-  };
-  if (phase > currentPhase.nbr) {
-    errors = SkipError.errorDir.unsafeGetArray(context, SKFS.IID(0));
-    if (errors.size() != 0) {
-      printErrorsAndExit(errors);
-    };
-    errorPhaseDir.writeArray(context, SKFS.IID(0), Array[currentPhase]);
-  };
   vtry(
     () -> {
       f()
     },
     exn ->
       exn match {
-      | err @ SkipError.SkipErrorException _ ->
-        source = SKFS.Path(currentPhase.dirName, SKFS.IID(err.hash()));
-        context.setDir(
-          errorDirName,
-          context
-            .unsafeGetEagerDir(errorDirName)
-            .writeEntry(context, source, SKFS.IID(0), Array[err]),
-        )
+      | err @ SkipError.SkipErrorException _ -> printErrorsAndExit(Array[err])
       | _ ->
         debug(exn);
         throw exn

@@ -1,10 +1,15 @@
 fun main(): void {
   print_raw(
-    try {
-      foo()
-    } catch {
-    | _ -> "Pass\n"
-    },
+    vtry(
+      () -> {
+        foo()
+      },
+      exn ->
+        exn match {
+        | _ -> "Pass\n"
+        }
+      ,
+    ),
   )
 }
 

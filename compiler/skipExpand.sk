@@ -202,6 +202,7 @@ fun populateCache(
         | SKFS.SID(x) -> x
         | _ -> invariant_violation("Unexpected key type")
         };
+        SkipExpand.checkConflicts(values[0].value);
         defMap = mutable Map[];
         pushDef = (prefix, moduleName, defName) -> {
           if (defName.startsWith(".")) {
@@ -542,6 +543,29 @@ fun module_map_fold(
   moduleMap
     .map((x, y) -> module_expand(context, env, x, y).i1)
     .reduce((y, _, x) -> mergePrograms(x.toProgram(), y), emptyProgram)
+}
+
+fun checkConflicts(posDefs: (?FileRange, Defs)): void {
+  prog2 = posDefs.i1.toProgram();
+  acc = A.Program{
+    const_defs => UMap[],
+    type_defs => UMap[],
+    fun_defs => UMap[],
+    class_defs => UMap[],
+  };
+  prog2.type_defs.each((_, type_def) ->
+    !acc = add_tyd_to_acc(type_def.name, type_def, acc)
+  );
+  prog2.class_defs.each((_, class_def) ->
+    !acc = add_cd_to_acc(class_def.name, class_def, acc)
+  );
+  prog2.fun_defs.each((_, fun_def) ->
+    !acc = add_fun_to_acc(fun_def.name, fun_def, acc)
+  );
+  prog2.const_defs.each((_, const_def) -> {
+    !acc = add_con_to_acc(const_def.name, const_def, acc)
+  });
+  void
 }
 
 fun module_expand(
