@@ -1,5 +1,5 @@
-SOURCES := $(shell find ./ -name "*.sk" | grep syntax)
-LLVMOBJS = $(abspath $(addprefix ../build/tests/, $(SOURCES:.sk=.out)))
+SOURCES := $(shell find ./ -name "*.sk" | sed "s|^\./||" | grep syntax)
+LLVMOBJS = $(addprefix ../build/tests/, $(SOURCES:.sk=.out))
 
 default: $(LLVMOBJS)
 
@@ -15,8 +15,5 @@ default: $(LLVMOBJS)
 
 clean:
 	rm -Rf ../build/state.db
-	find . -name "*.ll" | xargs rm -f
-	find . -name "*.out" | xargs rm -f
-	find . -name "*.err" | xargs rm -f
-	find . -name "*.o" | xargs rm -f
+	rm -Rf ../build/tests
 
