@@ -6,8 +6,10 @@ CPP=clang++-10
 OLEVEL=-O0
 RUNTIME=../build/libskip_runtime64.a
 
-EXP="${1%.out}.exp"
-EXP_ERR="${1%.out}.exp_err"
+TEST_EXP="${1%.out}.exp"
+EXP=${TEST_EXP#"../build/tests/"}
+TEST_EXP_ERR="${1%.out}.exp_err"
+EXP_ERR=${TEST_EXP_ERR#"../build/tests/"}
 ERR="${1%.out}.err"
 
 if test -f "$EXP_ERR"; then
