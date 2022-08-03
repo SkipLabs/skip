@@ -12,12 +12,7 @@ void SKIP_Regex_initialize() {
 }
 
 void SKIP_internalExit(uint64_t code) {
-  #ifdef SKIP64
-  _exit(code);
-  #endif
-  #ifdef SKIP32
-  SKIP_throw(NULL);
-  #endif
+  SKIP_exit(code);
 }
 
 void SKIP_print_last_exception_stack_trace_and_exit() {

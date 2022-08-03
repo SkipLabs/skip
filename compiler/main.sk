@@ -8,12 +8,25 @@
 class FooBar() extends Exception
 
 fun main(): void {
-  if (arguments().any(x -> x == "--init")) {
+  isInit = arguments().any(x -> x == "--init");
+  if (isInit) {
     _ = SKFS.gContextInit(SKFS.Context{});
-    return void;
   };
-  SKFS.runWithGc(SKFS.Context{}, context ~> {
-    _result = compile(context, kConfig.unknown);
-    SKFS.CStop(None())
-  })
+  SKFS.runWithGc(
+    SKFS.Context{},
+    context ~> {
+      if (isInit) {
+        SKFS.CStop(
+          Some((context, _, _) ~> {
+            _result = compile(isInit, context, kConfig.unknown);
+          }),
+        )
+      } else {
+        _result = compile(isInit, context, kConfig.unknown);
+        skipExit(0);
+        SKFS.CStop(None())
+      }
+    },
+    Some(SKFS.Synchronizer(SKFS.import, SKFS.export, _ ~> void)),
+  )
 }

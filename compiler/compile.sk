@@ -30,6 +30,7 @@ class Config private {
   // binary sizes.
   useSpecializedNames: Bool,
   version: Bool,
+  check: Bool,
 } {
   // Supported command-line arguments.
   const args: Array<AP.Param> = Array[
@@ -57,6 +58,7 @@ class Config private {
     AP.BoolParam{name => "profile"},
     AP.StringParam{name => "data"},
     AP.StringParam{name => "init"},
+    AP.BoolParam{name => "check"},
   ];
 
   static fun make(result: AP.ParseResult): this {
@@ -77,6 +79,7 @@ class Config private {
     sampleRate = 0;
     useSpecializedNames = false;
     version = false;
+    check = false;
 
     for (arg in result) {
       arg match {
@@ -106,6 +109,7 @@ class Config private {
       | AP.BoolValue{name => "use-specialized-names", value} ->
         !useSpecializedNames = value
       | AP.BoolValue{name => "version", value} -> !version = value
+      | AP.BoolValue{name => "check", value} -> !check = value
       | _ -> void
       }
     };
@@ -170,6 +174,7 @@ class Config private {
       sampleRate,
       useSpecializedNames,
       version,
+      check,
     }
   }
 }
@@ -227,7 +232,11 @@ fun createOptimizedFunctions(
   env
 }
 
-fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
+fun compile(
+  isInit: Bool,
+  context: mutable SKFS.Context,
+  fileNames: Array<String>,
+): void {
   // Convert project:program-unit targets to a list of source files.
 
   if (fileNames.isEmpty()) {
@@ -297,7 +306,7 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
       SKFS.IntFile::fromFile,
       backendDirName,
       false,
-      Array[(SKFS.IID(0), SKFS.IntFile(-128))],
+      if (isInit) Array[] else Array[(SKFS.IID(0), SKFS.IntFile(-128))],
     );
 
     _ = backendDir.contextWriterKeyValues(
@@ -308,6 +317,10 @@ fun compile(context: mutable SKFS.Context, fileNames: Array<String>): void {
         errors = SkipError.errorDir.unsafeGetArray(context, SKFS.IID(0));
         if (errors.size() > 0) {
           SkipError.printErrorsAndExit(errors);
+        };
+
+        if (kConfig.mainConfig.check) {
+          return void;
         };
 
         env = OuterIstToIR.createIR(

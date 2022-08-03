@@ -351,4 +351,8 @@ int64_t SKIP_get_mtime(char *path) {
     }
     return st.st_mtime;
 }
+
+void SKIP_exit(uint64_t code) {
+  exit(code);
+}
 }

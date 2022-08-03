@@ -1,3 +1,5 @@
+target triple = "x86_64-pc-linux-gnu"
+
 declare i8* @SKIP_Obstack_alloc(i64)
 declare i8* @SKIP_Obstack_calloc(i64) #0
 declare i8* @SKIP_Int_toString(i64) #0

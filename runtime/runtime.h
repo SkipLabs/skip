@@ -233,5 +233,6 @@ void sk_free_external_pointers();
 uintptr_t sk_get_ref_count(void* obj);
 void SKIP_throwInvalidSynchronization();
 void SKIP_call_finalize(char*, char*);
+void SKIP_exit(SkipInt);
 
 #endif
