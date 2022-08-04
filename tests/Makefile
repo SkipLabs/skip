@@ -1,4 +1,4 @@
-SOURCES := $(shell find ./ -name "*.sk" | sed "s|^\./||" | grep syntax)
+SOURCES := $(shell find ./ -name "*.sk" | sed "s|^\./||" | grep -v todo)
 LLVMOBJS = $(addprefix ../build/tests/, $(SOURCES:.sk=.test))
 
 default: ../build/state.db $(LLVMOBJS)
