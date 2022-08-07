@@ -13,9 +13,15 @@ fun loopThenThrow(n: Int): void {
 }
 
 fun main(): void {
-  try {
-    loopThenThrow(0)
-  } catch {
-  | OutOfBounds _ -> print_string("done")
-  }
+  vtry(
+    () -> {
+      loopThenThrow(0)
+    },
+    exn ->
+      exn match {
+      | OutOfBounds _ -> print_string("done")
+      | _ -> throw (exn)
+      }
+    ,
+  )
 }

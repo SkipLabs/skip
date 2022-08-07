@@ -88,6 +88,34 @@ fun printErrorsAndExit<T>(errors: Array<SkipErrorException>): T {
   skipExit(2)
 }
 
+class ErrorsFile(value: List<SkipErrorException>) extends SKFS.File
+
+fun keepErrors(
+  _phase: Int,
+  context: mutable SKFS.Context,
+  f: () -> void,
+): void {
+  vtry(
+    () -> {
+      f()
+    },
+    exn ->
+      exn match {
+      | err @ SkipError.SkipErrorException _ ->
+        errors = context.getGlobal("ERRORS") match {
+        | None() -> List[]
+        | Some(x) -> ErrorsFile::fromFile(x).value
+        };
+        !errors = List.Cons(err, errors);
+        context.setGlobal("ERRORS", ErrorsFile(errors))
+      | _ ->
+        debug(exn);
+        throw exn
+      }
+    ,
+  )
+}
+
 fun catchErrors(
   _phase: Int,
   _context: mutable SKFS.Context,

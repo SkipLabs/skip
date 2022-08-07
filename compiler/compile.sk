@@ -316,6 +316,14 @@ fun compile(
           return void;
         };
 
+        context.getGlobal("ERRORS") match {
+        | None() -> void
+        | Some(errors) ->
+          SkipError.printErrorsAndExit(
+            SkipError.ErrorsFile::fromFile(errors).value.reversed().toArray(),
+          )
+        };
+
         env = OuterIstToIR.createIR(
           context,
           shouldDisasm,
