@@ -1001,8 +1001,53 @@ class Options{
   csv: Bool,
 }
 
-fun eval(options: Options): void {
+fun connectUser(context: mutable SKFS.Context, userName: String): void {
+  if (userName.contains("'")) {
+    print_error("Invalid user name");
+    skipExit(2);
+  };
+  query = "select userID from SK_USERS where userName = '" + userName + "';";
+  lexer = SKSQL.Lexer(0, SKSQL.Buffer(query));
+  selectAst = SKSQL.parseSelect(lexer, 0).i1;
+  skOptions = SKSQL.Options{
+    alwaysAllowJoins => false,
+    backtrace => false,
+    sync => false,
+    virtual => false,
+    showUsedIndexes => false,
+    csv => false,
+  };
+  compiler = SKSQL.Compiler::create(skOptions, 0);
+  cselect = compiler.compileSelect(context, selectAst, true);
+  selectDir = SKSQL.evalSelect(context, cselect, None());
+  dirName = selectDir.dirName;
+  dir = context.unsafeGetEagerDir(dirName);
+  dir.onFiles(files -> {
+    for (kv in files) {
+      (_key, rows) = kv;
+      rowArray = rows.collect(Array);
+      for (row in rowArray) {
+        values = RowValues::fromFile(row);
+        values.getInt(0) match {
+        | None() ->
+          print_error("Could not find user: " + userName);
+          skipExit(2)
+        | Some(n) ->
+          context.setGlobal("USER", SKFS.IntFile(n));
+          return void
+        }
+      }
+    }
+  });
+  if (context.getGlobal("USER") is None()) {
+    print_error("Could not find user: " + userName);
+    skipExit(2)
+  }
+}
+
+fun eval(options: Options, userOpt: ?String): void {
   runSql(options, context ~> {
+    userOpt.each(user -> connectUser(context, user));
     if (isATTY() != 0) {
       print_raw("skdb> ");
     };

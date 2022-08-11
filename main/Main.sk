@@ -87,6 +87,10 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Dumps tables/inserts/views in SQL format",
     negatable => false,
   },
+  AP.StringParam{
+    name => "user",
+    help => "name of the user (to compute access rights)",
+  },
 ];
 
 fun getParsedArgs(): AP.ParseResult {
@@ -550,9 +554,13 @@ untracked fun main(): void {
     // this was handled in the C++ side
     void
   };
+  user = argMap.maybeGet("user") match {
+  | Some(AP.StringValue{value => userName}) -> Some(userName)
+  | _ -> None()
+  };
   if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
     SKFS.toplevel(SKFS.Context{});
   } else {
-    SKSQL.eval(options)
+    SKSQL.eval(options, user)
   }
 }
