@@ -3,6 +3,7 @@
 rm -f /tmp/test.db
 
 skdb --init /tmp/test.db
+
 SKDB="skdb --data /tmp/test.db"
 
 cat privacy/init.sql | $SKDB

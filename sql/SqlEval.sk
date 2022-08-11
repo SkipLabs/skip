@@ -1218,6 +1218,7 @@ fun connectUser(context: mutable SKFS.Context, userName: String): void {
 
 fun eval(options: Options, userOpt: ?String): void {
   runSql(options, context ~> {
+    userOpt.each(user -> connectUser(context, user));
     if (isATTY() != 0) {
       print_raw("skdb> ");
     };
