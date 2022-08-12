@@ -492,8 +492,6 @@ class Evaluator{options: Options} {
         },
       );
       None()
-
-    | Replace{pos} -> error(pos, "REPLACE colName not supported")
     };
   }
 
@@ -505,7 +503,7 @@ class Evaluator{options: Options} {
       error(index.pos, "INDEX " + index.name + " already exists");
     };
     this.write(context, input.dirName, key, index);
-    _ = getIndexOutputDir(this.options, context)
+    _ = getIndexOutputDir(this.options, context);
   }
 
   fun delete(
@@ -740,7 +738,7 @@ class Evaluator{options: Options} {
     dirName = dirDescr.dirName;
     kinds = dirDescr.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
     tag = SKFS.TickRange::create(context.tick);
-    _ = context.mkdirCompressed(
+    dir = context.mkdirCompressed(
       RowValues::fromFile,
       dirName,
       init,
@@ -794,6 +792,73 @@ class Evaluator{options: Options} {
     if (context.debugMode) {
       print_string("CREATED: " + name);
     };
+
+    if (name == "skdb_groups") {
+      this.createGroupsReaders(context, dir);
+    };
+  }
+
+  fun createGroupsReaders(
+    context: mutable SKFS.Context,
+    usersDir: SKFS.EHandle<RowValues>,
+  ): void {
+    groupsReadersName = "skdb_groups_readers";
+    groupsReadersDirName = SKFS.DirName::create("/" + groupsReadersName + "/");
+    dirDescr = DirDescr{
+      name => groupsReadersName,
+      colNames => Array["groupid", "readerid"],
+      schema => Array[
+        TypeDescr{
+          name => "groupid",
+          ty => INTEGER(),
+          primary => false,
+          unique => false,
+          notNull => true,
+        },
+        TypeDescr{
+          name => "readerid",
+          ty => INTEGER(),
+          primary => false,
+          unique => false,
+          notNull => true,
+        },
+      ],
+      cols => SortedMap["groupid" => 0, "readerid" => 1],
+      dirName => groupsReadersDirName,
+      alias => None(),
+      windowSize => None(),
+      isInput => false,
+    };
+    kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
+    _ = usersDir.contextWriterKeyValues(
+      RowValues::fromFile,
+      context,
+      groupsReadersDirName,
+      (context, writer, _key, values) ~> {
+        invariant(values.size() == 1);
+        groupName = values[0].getString(1).fromSome().lowercase();
+        groupDirName = SKFS.DirName::create("/" + groupName + "/");
+        groupDirNameProj = SKFS.DirName::create("/" + groupName + "/proj/");
+        dir = SKFS.EHandle(RowValues::fromFile, groupDirName);
+        projDir = dir.contextWriterKeyValues(
+          RowValues::fromFile,
+          context,
+          groupDirNameProj,
+          (_context, writer, _key, values) ~> {
+            writer.writeArray(SKFS.IID(0), values)
+          },
+        );
+        for (row in projDir.getArray(context, SKFS.IID(0))) {
+          newRow = RowValues::create(
+            Array[values[0].getValue(0), row.getValue(0)],
+          );
+          writer.write(RowKey(newRow, kinds), newRow);
+        }
+      },
+    );
+    tableDir = getTableDir(context);
+    fileName = SKFS.SID::create(groupsReadersName);
+    tableDir.writeArray(context, fileName, Array[dirDescr]);
   }
 }
 
@@ -1006,7 +1071,7 @@ fun connectUser(context: mutable SKFS.Context, userName: String): void {
     print_error("Invalid user name");
     skipExit(2);
   };
-  query = "select userID from SK_USERS where userName = '" + userName + "';";
+  query = "select userID from skdb_users where userName = '" + userName + "';";
   lexer = SKSQL.Lexer(0, SKSQL.Buffer(query));
   selectAst = SKSQL.parseSelect(lexer, 0).i1;
   skOptions = SKSQL.Options{
@@ -1039,20 +1104,39 @@ fun connectUser(context: mutable SKFS.Context, userName: String): void {
       }
     }
   });
-  if (context.getGlobal("USER") is None()) {
+  context.getGlobal("USER") match {
+  | None() ->
     print_error("Could not find user: " + userName);
     skipExit(2)
+  | Some(userIDFile) ->
+    userID = SKFS.IntFile::fromFile(userIDFile).value;
+    activeUsersDirName = SKFS.DirName::create("/skdb_active_users/");
+    context.unsafeMaybeGetEagerDir(activeUsersDirName) match {
+    | None() ->
+      print_error("Could not find 'skdb_active_users'");
+      skipExit(2)
+    | Some(activeUsers) ->
+      values = Array[Some(CInt(userID))];
+      kinds = Array[(0, IASC(), INTEGER())];
+      row = RowValues::create(values);
+      rowKey = RowKey(row, kinds);
+      oldRow = activeUsers.getArrayRaw(rowKey);
+      if (oldRow.size() == 0) {
+        activeUsers.writeArray(context, rowKey, Array[row]);
+        context.update()
+      }
+    }
   }
 }
 
 fun eval(options: Options, userOpt: ?String): void {
   runSql(options, context ~> {
-    userOpt.each(user -> connectUser(context, user));
     if (isATTY() != 0) {
       print_raw("skdb> ");
     };
     lineFile = SKFS.IntFile::fromFile(context.getGlobal("Line").fromSome());
     context.!globals = SortedMap[];
+    userOpt.each(user -> connectUser(context, user));
     context.setGlobal("Line", lineFile);
     context.removeGlobal("TableMap");
     if (options.csv) {
@@ -1395,8 +1479,7 @@ fun markIfRead(context: mutable SKFS.Context, stmt: Stmt): void {
   stmt match {
   | Insert{values => IQuery _}
   | Update _
-  | Select _
-  | Replace _ ->
+  | Select _ ->
     context.setGlobal("IsRead", SKFS.BoolFile(true))
   | Table _
   | View _

@@ -103,9 +103,6 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
   | "DELETE" ->
     (!pos, x) = parseDelete(lex, pos);
     (pos, Some(x))
-  | "REPLACE" ->
-    (!pos, x) = parseReplace(lex, pos);
-    (pos, Some(x))
   | "SELECT" ->
     (!pos, x) = parseSelect(lex, pos);
     (pos, Some(x))
@@ -119,13 +116,6 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
   };
   !pos = lex.expect(pos, ";");
   (pos, result)
-}
-
-fun parseReplace(lex: Lexer, pos: Int): (Int, Replace) {
-  !pos = lex.expectUpper(pos, "INTO");
-  (!pos, name) = lex.nextWord(pos);
-  (!pos, values) = parseValues(lex, pos);
-  (pos, Replace{pos, name, values})
 }
 
 fun parseUpdate(lex: Lexer, pos: Int): (Int, Update) {

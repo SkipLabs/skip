@@ -426,7 +426,91 @@ mutable class Compiler{
     name match {
     | FName(tableName) ->
       tableSID = SKFS.SID::create(tableName);
-      getTable(this.options, context, this.pos, tableSID)
+      table = getTable(this.options, context, this.pos, tableSID);
+      context.getGlobal("USER") match {
+      | None() -> void
+      | Some(userIDFile) ->
+        userID = SKFS.IntFile::fromFile(userIDFile).value;
+
+        readersDirName = SKFS.DirName::create(
+          table.dirName.toString() + "readers/",
+        );
+        if (context.unsafeMaybeGetEagerDir(readersDirName) is None()) {
+          print_error(
+            "The table " +
+              tableName +
+              " is not accessible when connected as a user. " +
+              "Does it define the column 'skdb_privacy'?",
+          );
+          skipExit(2);
+        };
+
+        userDirName = SKFS.DirName::create(
+          table.dirName.toString() + "readers/" + userID + "/",
+        );
+
+        minValues = RowValues::create(
+          table.schema
+            .map(_ -> None())
+            .concat(Array[None(), Some(CInt(userID))]),
+        );
+        maxValues = RowValues::create(
+          table.schema
+            .map(entry ->
+              Some(
+                entry.ty match {
+                | INTEGER() -> CInt(Int::max)
+                | FLOAT() -> CFloat(Float::inf)
+                | TEXT() -> CString(largestString())
+                },
+              )
+            )
+            .concat(Array[Some(CInt(Int::max)), Some(CInt(userID))]),
+        );
+
+        userIdIndex = table.schema.size() + 1;
+
+        kinds = Array[
+          (table.schema.size() + 1, IASC(), INTEGER()),
+          (table.schema.size(), IASC(), INTEGER()),
+        ].concat(
+          table.schema.mapWithIndex((idx, entry) -> (idx, IASC(), entry.ty)),
+        );
+
+        minKey = RowKey(minValues, kinds);
+        maxKey = RowKey(maxValues, kinds);
+
+        context.unsafeMaybeGetEagerDir(userDirName) match {
+        | None() ->
+          _ = SKFS.EHandle::multiContextWriterKeyIter(
+            RowValues::fromFile,
+            context,
+            SKFS.FixedSingle[
+              (
+                readersDirName,
+                (
+                  (_context, writer, key, rowIter) ~> {
+                    rows = rowIter.collect(Array);
+                    invariant(
+                      rows[0].getValue(userIdIndex) match {
+                      | Some(CInt(n)) -> n == userID
+                      | _ -> false
+                      },
+                    );
+                    writer.writeArray(key, rows)
+                  },
+                  Some(Array[SKFS.KeyRange(minKey, maxKey)]),
+                ),
+              ),
+            ],
+            userDirName,
+          )
+        | Some _ -> void
+        };
+
+        !table.dirName = userDirName
+      };
+      table
 
     | FQuery(select @ Select _) ->
       cselect = this.compileSelect(context, select, false);

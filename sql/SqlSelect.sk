@@ -212,7 +212,7 @@ class SelectEvaluator{
 } {
   fun evalSelect(context: mutable SKFS.Context): SelectDir {
     for (subTask in this.select.other) {
-      this.evalSubTask(context, subTask);
+      static::evalSubTask(context, subTask);
     };
     this.select.limit match {
     | None() -> this.evalSelectNoLimit(context)
@@ -302,7 +302,10 @@ class SelectEvaluator{
     }
   }
 
-  fun evalSubTask(context: mutable SKFS.Context, subTask: SubSelectTask): void {
+  static fun evalSubTask(
+    context: mutable SKFS.Context,
+    subTask: SubSelectTask,
+  ): void {
     subTask match {
     | SubSelect(cselect) -> _ = evalSelect(context, cselect, None())
     | SubMerge{
@@ -317,6 +320,7 @@ class SelectEvaluator{
       childName,
       kinds,
       joinKind,
+      onlyLeftValues,
     } ->
       leftHandle = SKFS.EHandle(Row::fromFile, leftDirName);
       rightHandle = SKFS.EHandle(Row::fromFile, rightDirName);
@@ -386,7 +390,10 @@ class SelectEvaluator{
         context,
         SKFS.FixedSingle::create(
           mutable Vector[
-            (projName, (makeJoinReducer(joinKind, kinds), None())),
+            (
+              projName,
+              (makeJoinReducer(joinKind, kinds, onlyLeftValues), None()),
+            ),
           ],
         ),
         childName,
@@ -718,7 +725,7 @@ class SelectEvaluator{
     entries: List<Row>,
   ): SKFS.EHandle<Row> {
     parents = this.makeParents(dir.dirName, rangeOpt, remainingTables, entries);
-    dir.multiContextWriterKeyIter(
+    SKFS.EHandle::multiContextWriterKeyIter(
       Row::fromFile,
       context,
       parents,
@@ -1222,6 +1229,7 @@ fun makeGroupByKey(
 fun makeJoinReducer(
   joinKind: JoinKind,
   kinds: Array<(Int, IKind, Type)>,
+  onlyLeftValues: Bool,
 ): (
   mutable SKFS.Context,
   mutable SKFS.Writer,
@@ -1245,19 +1253,24 @@ fun makeJoinReducer(
         rightRows.isEmpty() &&
         (joinKind is JLeft _ || joinKind is JOuter _)
       ) {
-        right = Array::fill(kinds.size() - left.size(), None<CValue>());
-        values = left.values.concat(right);
+        values = if (onlyLeftValues) left.values else {
+          right = Array::fill(kinds.size() - left.size(), None<CValue>());
+          left.values.concat(right);
+        };
         row = RowValues::create(values, left.repeat);
         writer.write(RowKey(row, kinds), row);
       };
       for (right in rightRows) {
-        values = left.values.concat(right.values);
+        values = if (onlyLeftValues) left.values else {
+          left.values.concat(right.values)
+        };
         row = RowValues::create(values, left.repeat * right.repeat);
         writer.write(RowKey(row, kinds), row);
       }
     };
     if (
       (joinKind is JRight _ || joinKind is JOuter _) &&
+      !onlyLeftValues &&
       leftRows.size() == 0
     ) {
       for (right in rightRows) {

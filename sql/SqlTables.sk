@@ -5,6 +5,9 @@
 module SKSQL;
 
 const tableInfo: SKFS.DirName = SKFS.DirName::create("/tablesInfo/");
+const tableInfoReaders: SKFS.DirName = SKFS.DirName::create(
+  "/tablesInfoReaders/",
+);
 const views: SKFS.DirName = SKFS.DirName::create("/views/");
 const subsInput: SKFS.DirName = SKFS.DirName::create("/subsInput/");
 const subsOutput: SKFS.DirName = SKFS.DirName::create("/subsOutput/");
@@ -46,9 +49,78 @@ fun makeDir<T: frozen>(
 }
 
 fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
-  makeDir(DirDescr::fromFile, context, tableInfo, () ->
-    context.mkdir(DirDescr::fromFile, tableInfo, false, Array[])
-  )
+  makeDir(DirDescr::fromFile, context, tableInfo, () -> {
+    tableDir = context.mkdir(DirDescr::fromFile, tableInfo, false, Array[]);
+    _ = tableDir.contextWriterKeyValues(
+      SKFS.IntFile::fromFile,
+      context,
+      tableInfoReaders,
+      (context, _writer, _key, values) ~> {
+        dirDescr = values[0];
+        dirDescr.cols.maybeGet("skdb_privacy") match {
+        | None() -> void
+        | Some(privacyColNbr) ->
+          if (!(dirDescr.schema[privacyColNbr].ty is INTEGER())) {
+            print_error("skdb_privacy should be of type INTEGER()");
+            skipExit(2);
+          };
+          kinds = dirDescr.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
+          makeTableReaders(context, dirDescr, kinds, privacyColNbr)
+        };
+      },
+    );
+    tableDir
+  })
+}
+
+fun makeTableReaders(
+  context: mutable SKFS.Context,
+  dirDescr: DirDescr,
+  leftKinds: Array<(Int, IKind, SKSQL.Type)>,
+  privacyColNbr: Int,
+): void {
+  dirName = dirDescr.dirName;
+  windowSize = dirDescr.windowSize;
+  groupsActiveReadersName = "skdb_groups_active_readers";
+  groupsActiveReadersDirName = SKFS.DirName::create(
+    "/" + groupsActiveReadersName + "/",
+  );
+  if (context.unsafeMaybeGetEagerDir(groupsActiveReadersDirName) is None()) {
+    print_error(
+      "You are trying to create a table with the column 'skdb_privacy', " +
+        "but the table " +
+        groupsActiveReadersName +
+        " is undefined. " +
+        "Did you run 'skdb --privacy-init'?",
+    );
+    skipExit(2)
+  };
+
+  childName = SKFS.DirName::create(dirName.toString() + "readers/");
+
+  kinds = Array[
+    (leftKinds.size() + 1, IASC(), INTEGER()),
+    (leftKinds.size(), IASC(), INTEGER()),
+  ].concat(leftKinds);
+
+  SelectEvaluator::evalSubTask(
+    context,
+    SubMerge{
+      leftDirName => dirName,
+      leftColNbr => privacyColNbr,
+      leftIsUnique => false,
+      leftRanges => None(),
+      rightDirName => groupsActiveReadersDirName,
+      rightColNbr => 0,
+      rightIsUnique => false,
+      rightRanges => None(),
+      childName,
+      kinds => kinds,
+      joinKind => JInner(),
+      windowSize,
+      onlyLeftValues => false,
+    },
+  );
 }
 
 /*****************************************************************************/

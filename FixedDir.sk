@@ -321,6 +321,10 @@ class FixedSingle<K: Orderable, +V>(data: Array<(K, V)> = Array[]) {
     this.data.iterator()
   }
 
+  static fun createFromItems(items: Sequence<(K, V)>): this {
+    static::create(Vector::mcreateFromItems(items));
+  }
+
   static fun create(data: mutable Vector<(K, V)>): this {
     data.sortBy(x ~> x.i0);
 
