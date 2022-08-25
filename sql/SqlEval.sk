@@ -130,13 +130,14 @@ fun valueToCValue(
       | None() -> Globals()
       | Some(file) -> Globals::fromFile(file)
       };
-      if (globals.containsKey(varName)) {
-        error(pos, "Name already bound " + varName)
-      };
-      id = SKFS.genSym(0);
-      !globals = globals.set(varName, id);
-      context.setGlobal(GLOBALS, globals);
-      Some(CInt(id))
+      globals.maybeGet(varName) match {
+      | None() ->
+        id = SKFS.genSym(0);
+        !globals = globals.set(varName, id);
+        context.setGlobal(GLOBALS, globals);
+        Some(CInt(id))
+      | Some(id) -> Some(CInt(id))
+      }
     | VId(None()) -> Some(CInt(SKFS.genSym(0)))
     | VTime() ->
       if (inTransaction) {
