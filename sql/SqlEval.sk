@@ -1066,14 +1066,11 @@ class Options{
   csv: Bool,
 }
 
-fun connectUser(context: mutable SKFS.Context, userName: String): void {
-  if (userName.contains("'")) {
-    print_error("Invalid user name");
-    skipExit(2);
-  };
-  query = "select userID from skdb_users where userName = '" + userName + "';";
+fun evalQuery(context: mutable SKFS.Context, query: String): Array<RowValues> {
   lexer = SKSQL.Lexer(0, SKSQL.Buffer(query));
-  selectAst = SKSQL.parseSelect(lexer, 0).i1;
+  selectAst = SKSQL.parseQuery(lexer, 0).i1 match {
+  | x @ Select _ -> x
+  };
   skOptions = SKSQL.Options{
     alwaysAllowJoins => false,
     backtrace => false,
@@ -1087,46 +1084,45 @@ fun connectUser(context: mutable SKFS.Context, userName: String): void {
   selectDir = SKSQL.evalSelect(context, cselect, None());
   dirName = selectDir.dirName;
   dir = context.unsafeGetEagerDir(dirName);
+  result = mutable Vector[];
   dir.onFiles(files -> {
     for (kv in files) {
       (_key, rows) = kv;
-      rowArray = rows.collect(Array);
-      for (row in rowArray) {
-        values = RowValues::fromFile(row);
-        values.getInt(0) match {
-        | None() ->
-          print_error("Could not find user: " + userName);
-          skipExit(2)
-        | Some(n) ->
-          context.setGlobal("USER", SKFS.IntFile(n));
-          return void
-        }
+      for (row in rows) {
+        result.push(RowValues::fromFile(row))
       }
     }
   });
-  context.getGlobal("USER") match {
-  | None() ->
+  result.toArray()
+}
+
+class UserFile(id: Int, name: String, groups: SortedSet<Int>) extends SKFS.File
+
+fun connectUser(context: mutable SKFS.Context, userName: String): void {
+  if (userName.contains("'")) {
+    print_error("Invalid user name");
+    skipExit(2);
+  };
+  userRows = evalQuery(
+    context,
+    "select userID from skdb_users where userName = '" + userName + "';",
+  );
+  if (userRows.size() == 0) {
     print_error("Could not find user: " + userName);
     skipExit(2)
-  | Some(userIDFile) ->
-    userID = SKFS.IntFile::fromFile(userIDFile).value;
-    activeUsersDirName = SKFS.DirName::create("/skdb_active_users/");
-    context.unsafeMaybeGetEagerDir(activeUsersDirName) match {
-    | None() ->
-      print_error("Could not find 'skdb_active_users'");
-      skipExit(2)
-    | Some(activeUsers) ->
-      values = Array[Some(CInt(userID))];
-      kinds = Array[(0, IASC(), INTEGER())];
-      row = RowValues::create(values);
-      rowKey = RowKey(row, kinds);
-      oldRow = activeUsers.getArrayRaw(rowKey);
-      if (oldRow.size() == 0) {
-        activeUsers.writeArray(context, rowKey, Array[row]);
-        context.update()
-      }
-    }
-  }
+  } else {
+    userID = userRows[0].getInt(0).fromSome();
+    groupsRows = evalQuery(
+      context,
+      "select * from skdb_groups_readers where readerID = " + userID + ";",
+    );
+    groups = SortedSet[];
+    for (groupRow in groupsRows) {
+      !groups = groups.set(groupRow.getInt(0).fromSome());
+    };
+    userFile = UserFile(userID, userName, groups);
+    context.setGlobal("USER", userFile);
+  };
 }
 
 fun eval(options: Options, userOpt: ?String): void {

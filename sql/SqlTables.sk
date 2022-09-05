@@ -5,9 +5,6 @@
 module SKSQL;
 
 const tableInfo: SKFS.DirName = SKFS.DirName::create("/tablesInfo/");
-const tableInfoReaders: SKFS.DirName = SKFS.DirName::create(
-  "/tablesInfoReaders/",
-);
 const views: SKFS.DirName = SKFS.DirName::create("/views/");
 const subsInput: SKFS.DirName = SKFS.DirName::create("/subsInput/");
 const subsOutput: SKFS.DirName = SKFS.DirName::create("/subsOutput/");
@@ -50,77 +47,8 @@ fun makeDir<T: frozen>(
 
 fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
   makeDir(DirDescr::fromFile, context, tableInfo, () -> {
-    tableDir = context.mkdir(DirDescr::fromFile, tableInfo, false, Array[]);
-    _ = tableDir.contextWriterKeyValues(
-      SKFS.IntFile::fromFile,
-      context,
-      tableInfoReaders,
-      (context, _writer, _key, values) ~> {
-        dirDescr = values[0];
-        dirDescr.cols.maybeGet("skdb_privacy") match {
-        | None() -> void
-        | Some(privacyColNbr) ->
-          if (!(dirDescr.schema[privacyColNbr].ty is INTEGER())) {
-            print_error("skdb_privacy should be of type INTEGER()");
-            skipExit(2);
-          };
-          kinds = dirDescr.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
-          makeTableReaders(context, dirDescr, kinds, privacyColNbr)
-        };
-      },
-    );
-    tableDir
+    context.mkdir(DirDescr::fromFile, tableInfo, false, Array[])
   })
-}
-
-fun makeTableReaders(
-  context: mutable SKFS.Context,
-  dirDescr: DirDescr,
-  leftKinds: Array<(Int, IKind, SKSQL.Type)>,
-  privacyColNbr: Int,
-): void {
-  dirName = dirDescr.dirName;
-  windowSize = dirDescr.windowSize;
-  groupsActiveReadersName = "skdb_groups_active_readers";
-  groupsActiveReadersDirName = SKFS.DirName::create(
-    "/" + groupsActiveReadersName + "/",
-  );
-  if (context.unsafeMaybeGetEagerDir(groupsActiveReadersDirName) is None()) {
-    print_error(
-      "You are trying to create a table with the column 'skdb_privacy', " +
-        "but the table " +
-        groupsActiveReadersName +
-        " is undefined. " +
-        "Did you run 'skdb --privacy-init'?",
-    );
-    skipExit(2)
-  };
-
-  childName = SKFS.DirName::create(dirName.toString() + "readers/");
-
-  kinds = Array[
-    (leftKinds.size() + 1, IASC(), INTEGER()),
-    (leftKinds.size(), IASC(), INTEGER()),
-  ].concat(leftKinds);
-
-  SelectEvaluator::evalSubTask(
-    context,
-    SubMerge{
-      leftDirName => dirName,
-      leftColNbr => privacyColNbr,
-      leftIsUnique => false,
-      leftRanges => None(),
-      rightDirName => groupsActiveReadersDirName,
-      rightColNbr => 0,
-      rightIsUnique => false,
-      rightRanges => None(),
-      childName,
-      kinds => kinds,
-      joinKind => JInner(),
-      windowSize,
-      onlyLeftValues => false,
-    },
-  );
 }
 
 /*****************************************************************************/
@@ -165,27 +93,35 @@ fun getSubsDirs(
       cmd = request.cmd;
       init = request.init;
       sessionID = request.sessionID;
-      views = SKSQL.getViewsDir(context);
-      viewsDir = context.unsafeGetEagerDir(views.dirName);
-      selectFiles = viewsDir.getArrayRaw(SKFS.SID(viewName.toString()));
-      invariant(selectFiles.size() <= 1);
-      if (selectFiles.size() == 0) {
-        print_error(`Error: view ${viewName.toString()} doesn't exists`);
-        skipExit(3)
+      tableDir = getTableDir(context);
+      edir = tableDir.maybeGet(context, SKFS.SID(request.viewName)) match {
+      | None() ->
+        views = SKSQL.getViewsDir(context);
+        viewsDir = context.unsafeGetEagerDir(views.dirName);
+        selectFiles = viewsDir.getArrayRaw(SKFS.SID(viewName.toString()));
+        invariant(selectFiles.size() <= 1);
+        if (selectFiles.size() == 0) {
+          print_error(`Error: view ${viewName.toString()} doesn't exists`);
+          skipExit(3)
+        };
+        selectFile = SKSQL.SelectFile::fromFile(selectFiles[0]);
+        if (!selectFile.virtual) {
+          print_error("Error: can only connect to virtual views");
+          skipExit(23);
+        };
+        selectAst = selectFile.value;
+        compiler = SKSQL.Compiler::create(
+          options with {virtual => true},
+          selectAst.pos,
+        );
+        select = compiler.compileSelect(context, selectAst, true);
+        selectDir = SKSQL.evalSelect(context, select, None());
+        edir = context.unsafeGetEagerDir(selectDir.dirName);
+        edir
+      | Some(dirDescr) ->
+        edir = context.unsafeGetEagerDir(dirDescr.dirName);
+        edir
       };
-      selectFile = SKSQL.SelectFile::fromFile(selectFiles[0]);
-      if (!selectFile.virtual) {
-        print_error("Error: can only connect to virtual views");
-        skipExit(23);
-      };
-      selectAst = selectFile.value;
-      compiler = SKSQL.Compiler::create(
-        options with {virtual => true},
-        selectAst.pos,
-      );
-      select = compiler.compileSelect(context, selectAst, true);
-      selectDir = SKSQL.evalSelect(context, select, None());
-      edir = context.unsafeGetEagerDir(selectDir.dirName);
       edir.subscribe(context, sessionID, cmd, init);
       writer.write(key, SKFS.IntFile(sessionID))
     },
