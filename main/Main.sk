@@ -431,12 +431,17 @@ untracked fun main(): void {
       viewKey = SKFS.SID(viewName);
       inputDir = context.unsafeGetEagerDir(input.dirName);
       sessionID = SKFS.genSym(0);
+      user = argMap.maybeGet("user") match {
+      | Some(AP.StringValue{value => userName}) -> Some(userName)
+      | _ -> None()
+      };
       request = SKSQL.SubRequestFile(
         viewName,
         viewDirName,
         init,
         cmd,
         sessionID,
+        user,
       );
       inputDir.write(context, viewKey, request);
       context.update();

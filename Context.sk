@@ -683,7 +683,7 @@ mutable class Context{
     if (this.tick == start) return void;
     for (dirName in changedDirNames) {
       this.unsafeMaybeGetDir(dirName) match {
-      | Some(dir @ EagerDir _) -> _ = dir.notifyAll(start)
+      | Some(dir @ EagerDir _) -> _ = dir.notifyAll(this.clone(), start)
       | _ -> void
       }
     }

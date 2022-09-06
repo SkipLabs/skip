@@ -1098,7 +1098,7 @@ fun evalQuery(context: mutable SKFS.Context, query: String): Array<RowValues> {
 
 class UserFile(id: Int, name: String, groups: SortedSet<Int>) extends SKFS.File
 
-fun connectUser(context: mutable SKFS.Context, userName: String): void {
+fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
   if (userName.contains("'")) {
     print_error("Invalid user name");
     skipExit(2);
@@ -1110,19 +1110,22 @@ fun connectUser(context: mutable SKFS.Context, userName: String): void {
   if (userRows.size() == 0) {
     print_error("Could not find user: " + userName);
     skipExit(2)
-  } else {
-    userID = userRows[0].getInt(0).fromSome();
-    groupsRows = evalQuery(
-      context,
-      "select * from skdb_groups_readers where readerID = " + userID + ";",
-    );
-    groups = SortedSet[];
-    for (groupRow in groupsRows) {
-      !groups = groups.set(groupRow.getInt(0).fromSome());
-    };
-    userFile = UserFile(userID, userName, groups);
-    context.setGlobal("USER", userFile);
   };
+  userID = userRows[0].getInt(0).fromSome();
+  groupsRows = evalQuery(
+    context,
+    "select * from skdb_groups_readers where readerID = " + userID + ";",
+  );
+  groups = SortedSet[];
+  for (groupRow in groupsRows) {
+    !groups = groups.set(groupRow.getInt(0).fromSome());
+  };
+  UserFile(userID, userName, groups);
+}
+
+fun connectUser(context: mutable SKFS.Context, userName: String): void {
+  userFile = makeUserFile(context, userName);
+  context.setGlobal("USER", userFile);
 }
 
 fun eval(options: Options, userOpt: ?String): void {

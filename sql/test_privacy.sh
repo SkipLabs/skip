@@ -9,7 +9,7 @@ cat privacy/init.sql | $SKDB
 GROUPID=`cat init_test_privacy.sql | $SKDB`
 
 (echo "begin transaction;";
- for i in {1..100}; do
+ for i in {1..1000}; do
      echo "insert into skdb_users values($i, 'user$i');"
  done;
  echo "commit;"
@@ -17,7 +17,7 @@ GROUPID=`cat init_test_privacy.sql | $SKDB`
 
 
 (echo "begin transaction;";
- for i in {1..100}; do
+ for i in {1..1000}; do
      echo "insert into skdb_arrows values($i, $i, $GROUPID);"
  done;
  echo "commit;"

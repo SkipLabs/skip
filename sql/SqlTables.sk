@@ -71,6 +71,7 @@ class SubRequestFile(
   init: Bool,
   cmd: ?SKFS.CmdKind,
   sessionID: Int,
+  user: ?String,
 ) extends SKFS.File
 
 fun getSubsDirs(
@@ -94,7 +95,10 @@ fun getSubsDirs(
       init = request.init;
       sessionID = request.sessionID;
       tableDir = getTableDir(context);
-      edir = tableDir.maybeGet(context, SKFS.SID(request.viewName)) match {
+      (edir, dirDescr) = tableDir.maybeGet(
+        context,
+        SKFS.SID(request.viewName),
+      ) match {
       | None() ->
         views = SKSQL.getViewsDir(context);
         viewsDir = context.unsafeGetEagerDir(views.dirName);
@@ -114,15 +118,56 @@ fun getSubsDirs(
           options with {virtual => true},
           selectAst.pos,
         );
-        select = compiler.compileSelect(context, selectAst, true);
-        selectDir = SKSQL.evalSelect(context, select, None());
+        cselect = compiler.compileSelect(context, selectAst, true);
+        selectDir = SKSQL.evalSelect(context, cselect, None());
         edir = context.unsafeGetEagerDir(selectDir.dirName);
-        edir
+        dirDescr = Compiler::getDirDescr(
+          selectAst.params,
+          cselect.from,
+          cselect.params,
+          selectDir.dirName.toString(),
+          selectDir.dirName,
+        );
+        (edir, dirDescr)
       | Some(dirDescr) ->
         edir = context.unsafeGetEagerDir(dirDescr.dirName);
-        edir
+        (edir, dirDescr)
       };
-      edir.subscribe(context, sessionID, cmd, init);
+      filter = request.user match {
+      | None() -> _ ~> _ ~> true
+      | Some(userName) ->
+        privacyColNbr = dirDescr.cols.maybeGet("skdb_privacy") match {
+        | None() ->
+          print_error(
+            "Cannot access table: " +
+              dirDescr.name +
+              ".\n" +
+              "You are connected as user " +
+              userName +
+              " you can only access tables defining the column skdb_privacy.",
+          );
+          skipExit(2)
+        | Some(x) -> x
+        };
+        if (!(dirDescr.schema[privacyColNbr].ty is INTEGER())) {
+          print_error("skdb_privacy must be of type integer");
+          skipExit(2)
+        };
+        context ~> {
+          userFile = SKSQL.makeUserFile(context.mclone(), userName);
+          (file: SKFS.BaseName) ~> {
+            file match {
+            | k @ RowKey _ ->
+              k.row.getInt(privacyColNbr) match {
+              | None() -> true
+              | Some(groupID) -> userFile.groups.contains(groupID)
+              }
+            | _ -> true
+            }
+          }
+        }
+      };
+      edir.subscribe(context, sessionID, cmd, init, filter);
       writer.write(key, SKFS.IntFile(sessionID))
     },
   );
