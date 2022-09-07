@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- Users and active users
+-- Users
 -------------------------------------------------------------------------------
 
 CREATE TABLE skdb_users(userID INTEGER PRIMARY KEY, userName STRING UNIQUE NOT NULL);
@@ -24,10 +24,10 @@ CREATE INDEX skdb_groups_groupName ON skdb_groups(groupName);
 INSERT INTO skdb_groups VALUES (id(), 'skdb_users', 'skdb_users', 'ALL');
 
 -------------------------------------------------------------------------------
--- The graph of objects.
+-- Graph
 -------------------------------------------------------------------------------
 
 CREATE TABLE skdb_objects(objectID INTEGER PRIMARY KEY, tableName STRING, skdb_privacy INTEGER);
 CREATE TABLE skdb_arrows(startID INTEGER PRIMARY KEY, endID INTEGER, skdb_privacy INTEGER);
 CREATE TABLE skdb_roots(rootID INTEGER PRIMARY KEY, skdb_privacy INTEGER);
-CREATE TABLE skdb_pointers(rootID INTEGER PRIMARY KEY, skdb_privacy INTEGER);
+
