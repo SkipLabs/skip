@@ -796,6 +796,103 @@ class Evaluator{options: Options} {
     if (name == "skdb_groups") {
       this.createGroupsReaders(context, dir);
     };
+
+    if (name == "skdb_objects") {
+      objectIndexDirName = SKFS.DirName::create(
+        dir.dirName.toString() + "index/",
+      );
+      this.createPrimaryKeyIndex(context, objectIndexDirName, dir);
+    };
+
+    if (name == "skdb_arrows") {
+      objectIndexDirName = SKFS.DirName::create(
+        dir.dirName.toString() + "index/",
+      );
+      this.createPrimaryKeyIndex(context, objectIndexDirName, dir);
+    };
+
+    if (name == "skdb_roots") {
+      this.expandRoots(context, dir);
+    }
+  }
+
+  fun expandRoots(
+    context: mutable SKFS.Context,
+    rootsDir: SKFS.EHandle<RowValues>,
+  ): void {
+    //objectsDirName = SKFS.DirName::create("/skdb_objects/index/");
+    arrowsDirName = SKFS.DirName::create("/skdb_arrows/index/");
+    //objectsDir = SKFS.EHandle(RowValues::fromFile, objectsDirName);
+    arrowsDir = SKFS.EHandle(RowValues::fromFile, arrowsDirName);
+
+    _ = rootsDir.contextWriterKeyValues(
+      RowValues::fromFile,
+      context,
+      SKFS.DirName::create("/skdb_roots/expanded/"),
+      (context, _writer, _key, values) ~> {
+        for (value in values) {
+          idx = value.getInt(0).fromSome();
+          rootInit = value.getInt(1).fromSome();
+          maxDepth = value.getInt(2).fromSome();
+          maxWidth = value.getInt(3).fromSome();
+
+          objects = mutable Vector[];
+          roots = Array[rootInit];
+          initValues = RowValues::create(
+            Array[(None() : ?CInt), Some(CInt(rootInit))],
+          );
+          kinds = Array[(0, IASC(), INTEGER()), (1, IASC(), INTEGER())];
+          objects.push((RowKey(initValues, kinds), initValues));
+          depth = 0;
+          while (depth < maxDepth) {
+            !roots = roots
+              .map(root -> {
+                arrows = arrowsDir.getArray(context, SKFS.IID(root));
+                if (arrows.size() > maxWidth) {
+                  !arrows = arrows.slice(0, maxWidth);
+                };
+                for (arrow in arrows) {
+                  start = arrow.getInt(0).fromSome();
+                  end = arrow.getInt(1).fromSome();
+                  _privacy = arrow.getInt(2);
+                  rowValues = RowValues::create(
+                    Array[Some(CInt(start)), Some(CInt(end))],
+                  );
+                  objects.push((RowKey(rowValues, kinds), rowValues));
+                };
+                arrows.map(x -> x.getInt(1).fromSome());
+              })
+              .flatten();
+            if (roots.size() == 0) break void;
+            !depth = depth + 1;
+          };
+          _ = context.mkdir(
+            RowValues::fromFile,
+            SKFS.DirName::create("/skdb_roots_" + idx + "/"),
+            false,
+            objects.toArray(),
+          );
+        }
+      },
+    )
+  }
+
+  fun createPrimaryKeyIndex(
+    context: mutable SKFS.Context,
+    objectIndexDirName: SKFS.DirName,
+    objectDir: SKFS.EHandle<RowValues>,
+  ): void {
+    _ = objectDir.contextWriterKeyValues(
+      RowValues::fromFile,
+      context,
+      objectIndexDirName,
+      (_context, writer, _key, values) ~> {
+        for (value in values) {
+          idx = value.getInt(0).fromSome();
+          writer.write(SKFS.IID(idx), value);
+        }
+      },
+    )
   }
 
   fun createGroupsReaders(

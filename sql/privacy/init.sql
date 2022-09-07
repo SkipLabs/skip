@@ -27,7 +27,29 @@ INSERT INTO skdb_groups VALUES (id(), 'skdb_users', 'skdb_users', 'ALL');
 -- Graph
 -------------------------------------------------------------------------------
 
-CREATE TABLE skdb_objects(objectID INTEGER PRIMARY KEY, tableName STRING, skdb_privacy INTEGER);
-CREATE TABLE skdb_arrows(startID INTEGER PRIMARY KEY, endID INTEGER, skdb_privacy INTEGER);
-CREATE TABLE skdb_roots(rootID INTEGER PRIMARY KEY, skdb_privacy INTEGER);
+CREATE TABLE skdb_objects(
+  objectID INTEGER PRIMARY KEY,
+  tableName STRING,
+  tableObjectID INTEGER,
+  skdb_privacy INTEGER
+);
+
+CREATE TABLE skdb_arrows(
+  startID INTEGER,
+  endID INTEGER,
+  skdb_privacy INTEGER
+);
+
+CREATE TABLE skdb_roots(
+  rootID INTEGER PRIMARY KEY,
+  start INTEGER NOT NULL,
+  depth INTEGER NOT NULL,
+  width INTEGER NOT NULL,
+  userID INTEGER
+);
+
+CREATE TABLE skdb_expanded(
+  parentID INTEGER,
+  objectID INTEGER
+);
 
