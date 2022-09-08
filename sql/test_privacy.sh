@@ -35,6 +35,7 @@ GROUPID=`cat init_test_privacy.sql | $SKDB`
  echo "insert into skdb_objects values (id('obj1'), 'test_table', 22, NULL);";
  echo "insert into skdb_objects values (id('obj2'), 'test_table', 23, NULL);";
  echo "insert into skdb_arrows values (id('obj1'), id('obj2'), NULL);";
- echo "insert into skdb_roots values (id(), id('obj1'), 3, 3, NULL);";
+ echo "insert into skdb_roots values (id('root'), id('obj1'), 3, 3, NULL);";
+ echo "select id('root');";
  echo "commit;") | $SKDB
 
