@@ -139,6 +139,12 @@ fun valueToCValue(
       | Some(id) -> Some(CInt(id))
       }
     | VId(None()) -> Some(CInt(SKFS.genSym(0)))
+    | VUid() ->
+      context.getGlobal("USER") match {
+      | None() ->
+        error(pos, "Cannot use a the function uid() if not connected as a user")
+      | Some(user) -> Some(CInt(UserFile::fromFile(user).id))
+      }
     | VTime() ->
       if (inTransaction) {
         error(pos, "time can not be used in a transaction");
@@ -243,7 +249,7 @@ class SelectFile(
   value: Select,
 ) extends SKFS.File
 
-class Evaluator{options: Options} {
+class Evaluator{options: Options, user: ?UserFile} {
   fun write(
     context: mutable SKFS.Context,
     dirName: SKFS.DirName,
@@ -602,6 +608,50 @@ class Evaluator{options: Options} {
     sinkDirName
   }
 
+  fun checkUserRows(pos: Int, table: DirDescr, rows: Array<RowValues>): void {
+    this.user.each(u ->
+      table.cols.maybeGet("skdb_owner") match {
+      | None() ->
+        error(
+          pos,
+          "You cannot write into the table " +
+            table.name +
+            " because you are connected as user " +
+            u.name +
+            ".\n" +
+            "You can only write into tables that define the column skdb_owner",
+        )
+      | Some(colNbr) ->
+        for (row in rows) {
+          row.getValue(colNbr) match {
+          | None() ->
+            error(
+              pos,
+              "The field skdb_owner can only be set to the userID " +
+                "of the connected user (in this case " +
+                u.id +
+                ")",
+            )
+          | Some(CInt(n)) ->
+            if (n != u.id) {
+              error(
+                pos,
+                "skdb_owner is set to the wrong id for user " +
+                  u.name +
+                  " expected " +
+                  u.id +
+                  " (found " +
+                  n +
+                  ")",
+              );
+            }
+          | Some _ -> error(pos, "skdb_owner should be of type INTEGER")
+          };
+        }
+      }
+    );
+  }
+
   fun insert(
     context: mutable SKFS.Context,
     pos: Int,
@@ -611,6 +661,7 @@ class Evaluator{options: Options} {
     values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
+    this.checkUserRows(pos, table, rows);
     table.windowSize match {
     | None() if (inTransaction) ->
       this.insertTable(context, table, rows);
@@ -1111,7 +1162,8 @@ fun evalWithContext(
   stmt: Stmt,
   inTransaction: Bool,
 ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
-  evaluator = Evaluator{options};
+  user = context.getGlobal("USER").map(UserFile::fromFile);
+  evaluator = Evaluator{options, user};
   evaluator.stmt(context, stmt, inTransaction);
 }
 
@@ -1194,7 +1246,17 @@ fun evalQuery(context: mutable SKFS.Context, query: String): Array<RowValues> {
   result.toArray()
 }
 
-class UserFile(id: Int, name: String, groups: SortedSet<Int>) extends SKFS.File
+base class Group {
+  children =
+  | WhiteList(SortedSet<Int>)
+  | BlackList(SortedSet<Int>)
+
+  fun contains(x: Int): Bool
+  | WhiteList(l) -> l.contains(x)
+  | BlackList(l) -> !l.contains(x)
+}
+
+class UserFile(id: Int, name: String, groups: Group) extends SKFS.File
 
 fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
   if (userName.contains("'")) {

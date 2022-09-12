@@ -969,6 +969,12 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
     return (pos, VTime());
   };
 
+  if (lex.isEqUpperAt(tok, "UID")) {
+    !pos = lex.expect(pos, "(");
+    !pos = lex.expect(pos, ")");
+    return (pos, VUid());
+  };
+
   if (lex.content[tok.posBegin] == '\'') {
     (!pos, str) = parseString(lex, tok.posBegin);
     return (pos, VString(str));

@@ -273,9 +273,14 @@ untracked fun main(): void {
       | None() -> mutable Ref(1)
       | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
       };
+      userNameOpt = argMap.maybeGet("user") match {
+      | Some(AP.StringValue{value => userName}) -> Some(userName)
+      | _ -> None()
+      };
+      user = userNameOpt.map(x -> SKSQL.makeUserFile(context, x));
       vtry<SKFS.ContextOp>(
         () -> {
-          contextOp = SKCSV.insert(context, line, options, table);
+          contextOp = SKCSV.insert(context, line, options, table, user);
           context.setGlobal("Line", SKFS.IntFile(line.get()));
           contextOp
         },
