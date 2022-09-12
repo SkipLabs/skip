@@ -122,7 +122,7 @@ fun valueToCValue(
   schema[idx].ty match {
   | INTEGER() ->
     val match {
-    | VId(Some(varName)) ->
+    | VId(isPositive, Some(varName)) ->
       if (!inTransaction) {
         error(pos, "named id can only be used in a transaction");
       };
@@ -133,12 +133,18 @@ fun valueToCValue(
       globals.maybeGet(varName) match {
       | None() ->
         id = SKFS.genSym(0);
+        if (!isPositive) !id = -id;
         !globals = globals.set(varName, id);
         context.setGlobal(GLOBALS, globals);
         Some(CInt(id))
       | Some(id) -> Some(CInt(id))
       }
-    | VId(None()) -> Some(CInt(SKFS.genSym(0)))
+    | VId(isPositive, None()) ->
+      if (isPositive) {
+        Some(CInt(SKFS.genSym(0)))
+      } else {
+        Some(CInt(-SKFS.genSym(0)))
+      }
     | VUid() ->
       context.getGlobal("USER") match {
       | None() ->
@@ -845,110 +851,13 @@ class Evaluator{options: Options, user: ?UserFile} {
     };
 
     if (name == "skdb_groups") {
-      this.createGroupsReaders(context, dir);
+      this.createGroupsReaders(context, pos, dir);
     };
-
-    if (name == "skdb_objects") {
-      objectIndexDirName = SKFS.DirName::create(
-        dir.dirName.toString() + "index/",
-      );
-      this.createPrimaryKeyIndex(context, objectIndexDirName, dir);
-    };
-
-    if (name == "skdb_arrows") {
-      objectIndexDirName = SKFS.DirName::create(
-        dir.dirName.toString() + "index/",
-      );
-      this.createPrimaryKeyIndex(context, objectIndexDirName, dir);
-    };
-
-    if (name == "skdb_roots") {
-      this.expandRoots(context, dir);
-    }
-  }
-
-  fun expandRoots(
-    context: mutable SKFS.Context,
-    rootsDir: SKFS.EHandle<RowValues>,
-  ): void {
-    //objectsDirName = SKFS.DirName::create("/skdb_objects/index/");
-    arrowsDirName = SKFS.DirName::create("/skdb_arrows/index/");
-    //objectsDir = SKFS.EHandle(RowValues::fromFile, objectsDirName);
-    arrowsDir = SKFS.EHandle(RowValues::fromFile, arrowsDirName);
-
-    _ = rootsDir.contextWriterKeyValues(
-      RowValues::fromFile,
-      context,
-      SKFS.DirName::create("/skdb_roots/expanded/"),
-      (context, _writer, _key, values) ~> {
-        for (value in values) {
-          idx = value.getInt(0).fromSome();
-          rootInit = value.getInt(1).fromSome();
-          maxDepth = value.getInt(2).fromSome();
-          maxWidth = value.getInt(3).fromSome();
-
-          objects = mutable Vector[];
-          roots = Array[rootInit];
-          initValues = RowValues::create(
-            Array[(None() : ?CInt), Some(CInt(rootInit))],
-          );
-          kinds = Array[(0, IASC(), INTEGER()), (1, IASC(), INTEGER())];
-          objects.push((RowKey(initValues, kinds), initValues));
-          depth = 0;
-          while (depth < maxDepth) {
-            !roots = roots
-              .map(root -> {
-                arrows = arrowsDir.getArray(context, SKFS.IID(root));
-                if (arrows.size() > maxWidth) {
-                  !arrows = arrows.slice(0, maxWidth);
-                };
-                for (arrow in arrows) {
-                  start = arrow.getInt(0).fromSome();
-                  end = arrow.getInt(1).fromSome();
-                  _privacy = arrow.getInt(2);
-                  rowValues = RowValues::create(
-                    Array[Some(CInt(start)), Some(CInt(end))],
-                  );
-                  objects.push((RowKey(rowValues, kinds), rowValues));
-                };
-                arrows.map(x -> x.getInt(1).fromSome());
-              })
-              .flatten();
-            if (roots.size() == 0) break void;
-            !depth = depth + 1;
-          };
-          debug(("creating", "/skdb_root_" + idx + "/"));
-          _ = context.mkdir(
-            RowValues::fromFile,
-            SKFS.DirName::create("/skdb_root_" + idx + "/"),
-            false,
-            objects.toArray(),
-          );
-        }
-      },
-    )
-  }
-
-  fun createPrimaryKeyIndex(
-    context: mutable SKFS.Context,
-    objectIndexDirName: SKFS.DirName,
-    objectDir: SKFS.EHandle<RowValues>,
-  ): void {
-    _ = objectDir.contextWriterKeyValues(
-      RowValues::fromFile,
-      context,
-      objectIndexDirName,
-      (_context, writer, _key, values) ~> {
-        for (value in values) {
-          idx = value.getInt(0).fromSome();
-          writer.write(SKFS.IID(idx), value);
-        }
-      },
-    )
   }
 
   fun createGroupsReaders(
     context: mutable SKFS.Context,
+    pos: Int,
     usersDir: SKFS.EHandle<RowValues>,
   ): void {
     groupsReadersName = "skdb_groups_readers";
@@ -986,6 +895,20 @@ class Evaluator{options: Options, user: ?UserFile} {
       (context, writer, _key, values) ~> {
         invariant(values.size() == 1);
         groupName = values[0].getString(1).fromSome().lowercase();
+        if (groupName.startsWith("blacklist")) {
+          if (values[0].getInt(0).fromSome() >= 0) {
+            error(pos, "blacklists are expected to have negative identifiers");
+          }
+        } else if (groupName.startsWith("whitelist")) {
+          if (values[0].getInt(0).fromSome() < 0) {
+            error(pos, "whitelistss are expected to have positive identifiers");
+          }
+        } else {
+          error(
+            pos,
+            "Group names should start with 'whitelist' or 'blacklist'",
+          );
+        };
         groupDirName = SKFS.DirName::create("/" + groupName + "/");
         groupDirNameProj = SKFS.DirName::create("/" + groupName + "/proj/");
         dir = SKFS.EHandle(RowValues::fromFile, groupDirName);
@@ -1246,17 +1169,22 @@ fun evalQuery(context: mutable SKFS.Context, query: String): Array<RowValues> {
   result.toArray()
 }
 
-base class Group {
+base class GroupKind {
   children =
-  | WhiteList(SortedSet<Int>)
-  | BlackList(SortedSet<Int>)
-
-  fun contains(x: Int): Bool
-  | WhiteList(l) -> l.contains(x)
-  | BlackList(l) -> !l.contains(x)
+  | WhiteList()
+  | BlackList()
 }
 
-class UserFile(id: Int, name: String, groups: Group) extends SKFS.File
+class Groups(data: SortedSet<Int>) {
+  fun contains(groupID: Int): Bool {
+    if (groupID < 0) {
+      !this.data.contains(groupID)
+    } else {
+      this.data.contains(groupID)
+    }
+  }
+}
+class UserFile(id: Int, name: String, groups: Groups) extends SKFS.File
 
 fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
   if (userName.contains("'")) {
@@ -1280,7 +1208,7 @@ fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
   for (groupRow in groupsRows) {
     !groups = groups.set(groupRow.getInt(0).fromSome());
   };
-  UserFile(userID, userName, groups);
+  UserFile(userID, userName, Groups(groups));
 }
 
 fun connectUser(context: mutable SKFS.Context, userName: String): void {

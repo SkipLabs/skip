@@ -2,21 +2,20 @@
 -- Users
 -------------------------------------------------------------------------------
 
-CREATE TABLE skdb_users(
-  userID INTEGER PRIMARY KEY,
-  userName STRING UNIQUE NOT NULL
+create table skdb_users(
+  userid integer primary key,
+  username string unique not null
 );
 
 -------------------------------------------------------------------------------
 -- Groups
 -------------------------------------------------------------------------------
 
-CREATE TABLE skdb_groups(
-  groupID INTEGER PRIMARY KEY,
-  readers STRING NOT NULL,
-  is_public INTEGER
+create table skdb_groups(
+  groupid integer primary key,
+  readers string not null
 );
 
 -- Passed this point The view skdb_groups_readers is created by the db.
-CREATE INDEX skdb_groups_readers_readerID ON skdb_groups_readers(readerID);
+create index skdb_groups_readers_readerid on skdb_groups_readers(readerid);
 
