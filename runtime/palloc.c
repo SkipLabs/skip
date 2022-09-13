@@ -181,7 +181,6 @@ void* SKIP_unfreeze_cond(void* x) {
 }
 
 void SKIP_cond_wait(pthread_cond_t* x, pthread_mutex_t* y) {
-  printf("Wait\n");
   pthread_cond_wait(x, y);
 }
 

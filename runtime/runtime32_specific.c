@@ -156,3 +156,28 @@ uint64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   // Not implemented
   return 0;
 }
+
+void* SKIP_freeze_lock(void* x) {
+  return x;
+}
+
+void* SKIP_unfreeze_lock(void* x) {
+  return x;
+}
+
+void* SKIP_freeze_cond(void* x) {
+  return x;
+}
+
+void* SKIP_unfreeze_cond(void* x) {
+  return x;
+}
+
+void SKIP_mutex_init(void* lock) {
+}
+
+void SKIP_mutex_lock(void* lock) {
+}
+
+void SKIP_mutex_unlock(void* lock) {
+}
