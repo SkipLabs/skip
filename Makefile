@@ -1,7 +1,9 @@
-CC=clang-10
-CPP=clang++-10
+CC=clang-14
+CPP=clang++-14
 SKC=~/skip/build/bin/skip_to_llvm
-BCLINK=llvm-link-10
+BCLINK=llvm-link-14
+LLC=llc-14
+WASMLD=wasm-ld-14
 MEMSIZE32=1073741824
 
 OLEVEL=-O3
@@ -63,9 +65,9 @@ test: build/out32.wasm build/skdb
 
 build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	cat preamble32.ll build/out32.ll > build/preamble_and_out32.ll
-	llvm-link-10 build/full_runtime32.bc build/preamble_and_out32.ll -o build/all.bc
-	llc-10 -mtriple=wasm32-unknown-unknown $(OLEVEL) -filetype=obj build/all.bc -o build/out32.o
-	wasm-ld-10 --initial-memory=$(MEMSIZE32) $(EXPORTJS) build/out32.o -o build/out32.wasm --no-entry -allow-undefined
+	$(BCLINK) build/full_runtime32.bc build/preamble_and_out32.ll -o build/all.bc
+	$(LLC) -mtriple=wasm32-unknown-unknown $(OLEVEL) -filetype=obj build/all.bc -o build/out32.o
+	$(WASMLD) --initial-memory=$(MEMSIZE32) $(EXPORTJS) build/out32.o -o build/out32.wasm --no-entry -allow-undefined
 
 build/out32.ll: $(SKIP_FILES)
 	mkdir -p build/
