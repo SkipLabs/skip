@@ -8,7 +8,7 @@ var FileReader = require('filereader');
 /* ***************************************************************************/
 
 function makeWebSocket(uri, onmessage, onclose, onerror) {
-  var socket = null; 
+  var socket = null;
   if (typeof window === 'undefined') {
     var W3CWebSocket = require('websocket').w3cwebsocket;
 
@@ -64,13 +64,6 @@ function runServer(uri, cmd, stdin) {
     })
   });
 }
-
-runServer(
-  "ws://127.0.0.1:3048",
-  "skdb --data test.db",
-  "select * from skdb_users where userID < 10;"
-).then(x => console.log(x));
-
 
 /* ***************************************************************************/
 /* A few primitives to encode/decode utf8. */
@@ -163,8 +156,7 @@ async function makeSKDB() {
   var fileDescrNbr = 2;
   var files = new Array();
   var changed_files = new Array();
-  var servers = Array[];
-  var server = null;
+  var servers = [];
 
   const env = {
     memoryBase: 0,
@@ -252,11 +244,32 @@ async function makeSKDB() {
       current_stdin = 0;
       skipMain();
       return stdout.join('');
-    }
+    },
 
-    newServer: function(uri) {
-      servers[] = uri;
-      server = uri;
+    newServer: function(uri, db, user) {
+      servers.push([uri, db, user]);
+      return servers.length - 1;
+    },
+
+    server: function(serverID) {
+      var uri, db, user;
+      if(serverID === undefined) {
+        [uri, db, user] = servers[servers.length - 1];
+      }
+      else  {
+        [uri, db, user] = servers[serverID];
+      }
+      return {
+        runCmd: async function(cmd, stdin) {
+          let result = await runServer(uri, cmd, stdin);
+          return result;
+        },
+        runSql: async function(stdin) {
+          var cmd = "skdb --data " + db + " --user " + user;
+          let result = await runServer(uri, cmd, stdin);
+          return result;
+        },
+      };
     },
   }
 
@@ -272,30 +285,29 @@ async function makeSKDB() {
 }
 
 /*
-makeSKDB().then(skdb => {
+runServer(
+  "ws://127.0.0.1:3048",
+  "skdb --data test.db",
+  "select * from skdb_users where userID < 10;"
+).then(x => console.log(x));
+*/
+
+async function testDB() {
+  skdb = await makeSKDB();
+  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
+  users = await skdb.server().runSql("select * from posts;");
+  console.log(users);
+}
+
+testDB();
+
+/*
   skdb.cmd([], 'create table t1 (a INTEGER, b INTEGER);');
   skdb.cmd([], 'insert into t1 values (23, 45);');
   process.stdout.write(skdb.cmd([], 'select * from t1;'));
   skdb.cmd([], 'create virtual view v1 as select * from t1;');
   process.stdout.write(skdb.cmd(['--connect', 'v1', '--updates', '/tmp/file1'], []));
   skdb.cmd([], 'insert into t1 values (24, 45);');
+*/
 //  console.log(changed_files);
 //  console.log(files[2].join(""));
-})
-*/
-
-
-/*
-async function request(uri, query) {
-  socket = await makeWebSocket(
-  ,
-  function(msg) { console.log(msg); },
-  function(data) { console.log("message: ", data); }
-).then(socket => {
-  socket("cat\ntoto\ntata\ntiti");
-})
-
-}
-
-request("ws://127.0.0.1:3048", "select * from skdb_users;").then(result => console.log(result));
-*/

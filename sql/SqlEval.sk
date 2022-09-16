@@ -1212,8 +1212,10 @@ fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
 }
 
 fun connectUser(context: mutable SKFS.Context, userName: String): void {
-  userFile = makeUserFile(context, userName);
-  context.setGlobal("USER", userFile);
+  if (context.getGlobal("USER") is None()) {
+    userFile = makeUserFile(context, userName);
+    context.setGlobal("USER", userFile);
+  }
 }
 
 fun eval(options: Options, userOpt: ?String): void {
