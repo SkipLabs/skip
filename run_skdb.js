@@ -1,6 +1,76 @@
 const util = require('util');
 const fs = require('fs');
 var source = fs.readFileSync('./build/out32.wasm');
+var FileReader = require('filereader');
+
+/* ***************************************************************************/
+/* Primitives to connect to websockets. */
+/* ***************************************************************************/
+
+function makeWebSocket(uri, onmessage, onclose, onerror) {
+  var socket = null; 
+  if (typeof window === 'undefined') {
+    var W3CWebSocket = require('websocket').w3cwebsocket;
+
+    socket = new W3CWebSocket(uri);
+  }
+  else {
+    socket = new WebSocket(uri);
+  }
+
+  return new Promise((resolve, reject) => {
+
+    socket.onmessage = function(event) {
+      const blb = event.data;
+      const reader = new FileReader();
+      if(typeof window === 'undefined') {
+        var string = new TextDecoder().decode(blb);
+        onmessage(string);
+      }
+      else {
+        reader.addEventListener("load", () => {
+          onmessage(reader.result);
+        }, false);
+        reader.readAsText(blb);
+      }
+    };
+    socket.onclose = onclose;
+    socket.onerror = onerror;
+    socket.onopen = function(event) {
+      resolve(
+        function(msg) {
+          var enc = new TextEncoder();
+          socket.send(enc.encode(msg));
+        },
+      );
+    };
+  });
+}
+
+function runServer(uri, cmd, stdin) {
+  var data = "";
+  return new Promise((resolve, reject) => {
+    makeWebSocket(
+      uri,
+      function(msg) {
+        data += msg;
+      },
+      function(_) { resolve(data); },
+      function(err) { reject(err); }
+    ).then(write => {
+      write(cmd + "\n");
+      write(stdin + "\n");
+      write("END\n");
+    })
+  });
+}
+
+runServer(
+  "ws://127.0.0.1:3048",
+  "skdb --data test.db",
+  "select * from skdb_users where userID < 10;"
+).then(x => console.log(x));
+
 
 /* ***************************************************************************/
 /* A few primitives to encode/decode utf8. */
@@ -39,7 +109,7 @@ function encodeUTF8(instance, s) {
   return instance.exports.sk_string_create(addr, i);
 }
 
-function decodeUTF8(instance, bytes) {
+function decodeUTF8(bytes) {
   var i = 0, s = '';
   while (i < bytes.length) {
     var c = bytes[i++];
@@ -73,7 +143,7 @@ function wasmStringToJS(instance, wasmPointer) {
   var size = instance.exports['SKIP_String_byteSize'](wasmPointer);
   var data = new Uint8Array(instance.exports.memory.buffer);
 
-  return decodeUTF8(instance, data.slice(wasmPointer, wasmPointer + size));
+  return decodeUTF8(data.slice(wasmPointer, wasmPointer + size));
 }
 
 /* ***************************************************************************/
@@ -93,6 +163,8 @@ async function makeSKDB() {
   var fileDescrNbr = 2;
   var files = new Array();
   var changed_files = new Array();
+  var servers = Array[];
+  var server = null;
 
   const env = {
     memoryBase: 0,
@@ -181,6 +253,11 @@ async function makeSKDB() {
       skipMain();
       return stdout.join('');
     }
+
+    newServer: function(uri) {
+      servers[] = uri;
+      server = uri;
+    },
   }
 
   result = await WebAssembly.instantiate(typedArray, {env: env});
@@ -194,6 +271,7 @@ async function makeSKDB() {
   return skdb;
 }
 
+/*
 makeSKDB().then(skdb => {
   skdb.cmd([], 'create table t1 (a INTEGER, b INTEGER);');
   skdb.cmd([], 'insert into t1 values (23, 45);');
@@ -204,3 +282,20 @@ makeSKDB().then(skdb => {
 //  console.log(changed_files);
 //  console.log(files[2].join(""));
 })
+*/
+
+
+/*
+async function request(uri, query) {
+  socket = await makeWebSocket(
+  ,
+  function(msg) { console.log(msg); },
+  function(data) { console.log("message: ", data); }
+).then(socket => {
+  socket("cat\ntoto\ntata\ntiti");
+})
+
+}
+
+request("ws://127.0.0.1:3048", "select * from skdb_users;").then(result => console.log(result));
+*/

@@ -1,6 +1,7 @@
 #!/bin/bash
 
-FILE=/tmp/test.db
+DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+FILE=$DIR/test.db
 SKDB_BIN=~/skfs/build/skdb
 SKDB="$SKDB_BIN --data $FILE"
 
@@ -11,7 +12,7 @@ $SKDB_BIN --init $FILE
 cat ../privacy/init.sql | $SKDB
 
 (echo "begin transaction;"
- for i in {1..10}; do
+ for i in {1..100000}; do
      echo "insert into skdb_users values($i, 'user$i');"
  done
  echo "commit;") | $SKDB
