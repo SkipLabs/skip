@@ -576,7 +576,7 @@ mutable class Compiler{
       | _ -> void
       }
     };
-    DirDescr{
+    DirDescr::create{
       name => selectId,
       colNames => schema.map(ty -> ty.name),
       schema,
@@ -1597,7 +1597,7 @@ mutable class Compiler{
           | None() -> void
           | Some(table) ->
             moveMap![tableNbr] = newFrom.size();
-            dirDescr = DirDescr{
+            dirDescr = DirDescr::create{
               name => table.dirName.toString(),
               colNames => from.map(x -> x.i0.colNames).flatten(),
               dirName => table.dirName,

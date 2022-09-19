@@ -49,6 +49,10 @@ const argsSchema: Array<AP.Param> = Array[
     name => "write",
     help => "Writes the data coming from stdin into a directory",
   },
+  AP.StringParam{
+    name => "write-csv",
+    help => "Writes the data coming from stdin into a directory in csv format",
+  },
   AP.IntParam{name => "reconnect", help => "reconnects to a session id"},
   AP.IntParam{
     name => "diff",
@@ -278,7 +282,10 @@ untracked fun main(): void {
       | Some(AP.StringValue{value => userName}) -> Some(userName)
       | _ -> None()
       };
-      user = userNameOpt.map(x -> SKSQL.makeUserFile(context, x));
+      user = userNameOpt match {
+      | None() -> None()
+      | Some(x) -> Some(SKSQL.connectUser(context, x))
+      };
       vtry<SKFS.ContextOp>(
         () -> {
           contextOp = SKCSV.insert(context, line, options, table, user);
@@ -400,6 +407,39 @@ untracked fun main(): void {
   | _ -> void
   };
 
+  argMap.maybeGet("write-csv") match {
+  | Some(AP.StringValue{value => tableNameUpper}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      skipExit(2);
+    };
+    tableName = tableNameUpper.lowercase();
+    name = SKFS.SID::create(tableName);
+    SKSQL.runSql(options, context ~> {
+      table = context.getGlobal("CSV_TABLE") match {
+      | None() ->
+        tableDescr = SKSQL.getTable(options, context, 0, name);
+        context.setGlobal("CSV_TABLE", tableDescr);
+        tableDescr
+      | Some(x) -> SKSQL.DirDescr::fromFile(x)
+      };
+      line = context.getGlobal("Line") match {
+      | None() -> mutable Ref(1)
+      | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
+      };
+      argMap.maybeGet("user") match {
+      | Some(AP.StringValue _) ->
+        print_error("Cannot user write-csv as a user");
+        skipExit(23)
+      | _ -> void
+      };
+      SKCSV.replayDiff(context, line, read_line, table)
+    });
+    return void
+  | _ -> void
+  };
+
   subscribe = argMap.maybeGet("connect") match {
   | Some(AP.StringValue{value => viewName}) ->
     !viewName = viewName.lowercase();
@@ -460,62 +500,13 @@ untracked fun main(): void {
   };
 
   if (argMap.maybeGet("replay") is Some(AP.BoolValue _)) {
-    map = mutable Map<String, (Int, Int)>[];
-    lineNbr = 1;
-    txNbr = 0;
-    vtry(
-      () -> {
-        loop {
-          line = read_line();
-          if (line == "") {
-            !txNbr = txNbr + 1;
-            continue;
-          };
-          chars = mutable Vector[];
-          iter = line.getIter();
-          loop {
-            c = iter.next() match {
-            | None() ->
-              print_error(
-                "Error, line " + lineNbr + ": unexpected end of line",
-              );
-              skipExit(23)
-            | Some(x) -> x
-            };
-            if (c == '\t') break void;
-            if (c < '0' || c > '9') {
-              print_error(
-                "Error, line " + lineNbr + ": expected an integer key",
-              );
-              skipExit(23)
-            };
-            chars.push(c);
-          };
-          repeat = String::fromChars(chars.toArray()).toInt();
-          value = line.sub(iter, line.length() - chars.size() - 1);
-          if (map.containsKey(value)) {
-            (oldTxNbr, oldRepeat) = map[value];
-            if (oldTxNbr == txNbr) {
-              map![value] = (txNbr, oldRepeat + repeat);
-            } else {
-              map![value] = (txNbr, repeat);
-            }
-          } else {
-            map![value] = (txNbr, repeat);
-          };
-          !lineNbr = lineNbr + 1;
-        }
-      },
-      exn -> {
-        invariant(exn is EndOfFile _);
-        map.each((value, txNbrAndRepeat) -> {
-          (_, repeat) = txNbrAndRepeat;
-          for (_ in Range(0, repeat)) {
-            print_string(value);
-          }
-        })
-      },
-    );
+    state = SKCSV.replayStdin();
+    state.each((value, txNbrAndRepeat) -> {
+      (_, repeat) = txNbrAndRepeat;
+      for (_ in Range(0, repeat)) {
+        print_string(value);
+      }
+    });
     return void
   };
 

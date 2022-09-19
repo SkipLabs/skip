@@ -65,6 +65,20 @@ function runServer(uri, cmd, stdin) {
   });
 }
 
+function runServerForever(uri, cmd, stdin, localCmd) {
+  var data = "";
+
+  makeWebSocket(
+    uri,
+    localCmd,
+    function(_) { console.log("Error connection lost"); },
+    function(err) { console.log("Error connection lost"); }
+  ).then(write => {
+    write(cmd + "\n");
+    write(stdin + "\n");
+  })
+}
+
 /* ***************************************************************************/
 /* A few primitives to encode/decode utf8. */
 /* ***************************************************************************/
@@ -232,18 +246,21 @@ async function makeSKDB() {
     SKIP_gunlock: function(){}
   }
 
-
-  var typedArray = new Uint8Array(source);
-
-  const skdb = {
-
-    cmd: function(new_args, new_stdin) {
+  runLocal = function(new_args, new_stdin) {
       args = new_args;
       stdin = new_stdin;
       stdout = new Array();
       current_stdin = 0;
       skipMain();
       return stdout.join('');
+  }
+
+  var typedArray = new Uint8Array(source);
+
+  const skdb = {
+
+    cmd: function(new_args, new_stdin) {
+      return runLocal(new_args, new_stdin);
     },
 
     newServer: function(uri, db, user) {
@@ -268,6 +285,22 @@ async function makeSKDB() {
           var cmd = "skdb --data " + db + " --user " + user;
           let result = await runServer(uri, cmd, stdin);
           return result;
+        },
+        mirrorTable: function(tableName) {
+          var fifoName = tableName + "_" + user;
+          var cmd =
+              "rm -f " + fifoName + ";" +
+              "mkfifo " + fifoName + ";" +
+              "tail -f " + fifoName + "&" +
+              "skdb --data " + db + " --user " + user + " --csv --connect " + tableName +
+              " --updates " + fifoName + ";" +
+              "wait"
+          ;
+          console.log(cmd);
+          runServerForever(uri, cmd, "", function (msg) {
+            console.log("writeing local: " + msg);
+//            runLocal(["--write-csv", tableName], msg);
+          })
         },
       };
     },
@@ -296,6 +329,9 @@ async function testDB() {
   skdb = await makeSKDB();
   skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
   users = await skdb.server().runSql("select * from posts;");
+  skdb.cmd([], 'create table posts (a INTEGER, b INTEGER, c INTEGER, txt STRING);');
+  skdb.server().mirrorTable("posts");
+  
   console.log(users);
 }
 

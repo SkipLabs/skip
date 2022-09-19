@@ -17,7 +17,7 @@ fun computeTableDescr(
   };
   cols = SortedMap::createFromItems(colVec);
   colNames = schema.map(ty -> ty.name);
-  DirDescr{
+  DirDescr::create{
     name,
     colNames,
     schema,
@@ -862,7 +862,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   ): void {
     groupsReadersName = "skdb_groups_readers";
     groupsReadersDirName = SKFS.DirName::create("/" + groupsReadersName + "/");
-    dirDescr = DirDescr{
+    dirDescr = DirDescr::create{
       name => groupsReadersName,
       colNames => Array["groupid", "readerid"],
       schema => Array[
@@ -1211,22 +1211,24 @@ fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
   UserFile(userID, userName, Groups(groups));
 }
 
-fun connectUser(context: mutable SKFS.Context, userName: String): void {
-  if (context.getGlobal("USER") is None()) {
+fun connectUser(context: mutable SKFS.Context, userName: String): UserFile {
+  context.getGlobal("USER") match {
+  | None() ->
     userFile = makeUserFile(context, userName);
     context.setGlobal("USER", userFile);
+    userFile
+  | Some(x) -> UserFile::fromFile(x)
   }
 }
 
 fun eval(options: Options, userOpt: ?String): void {
   runSql(options, context ~> {
-    userOpt.each(user -> connectUser(context, user));
     if (isATTY() != 0) {
       print_raw("skdb> ");
     };
     lineFile = SKFS.IntFile::fromFile(context.getGlobal("Line").fromSome());
     context.!globals = SortedMap[];
-    userOpt.each(user -> connectUser(context, user));
+    userOpt.each(user -> _ = connectUser(context, user));
     context.setGlobal("Line", lineFile);
     context.removeGlobal("TableMap");
     if (options.csv) {

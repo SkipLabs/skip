@@ -148,3 +148,162 @@ fun insert(
   if (!eof) return SKFS.CContinue(f);
   SKFS.CStop(f)
 }
+
+fun replayDiff(
+  context: mutable SKFS.Context,
+  lineNbr: mutable Ref<Int>,
+  getLine: () -> String,
+  table: SKSQL.DirDescr,
+): SKFS.ContextOp {
+  map = mutable Map<String, Int>[];
+  makeResult = () -> {
+    result = mutable Vector[];
+    for (str => repeat in map) {
+      values = mutable Vector[];
+      iter = str.getIter();
+      next = () -> {
+        val = iter.next();
+        val match {
+        | None() -> '\n'
+        | Some(x) -> x
+        }
+      };
+      for (value in lex(next)) {
+        values.push(value);
+      };
+      cvalues = values.map(SKSQL.parseCSVValue);
+      pos = lineNbr.get();
+      rows = SKSQL.computeInsert(
+        context,
+        false,
+        pos,
+        None(),
+        Array[cvalues.toArray()],
+        table,
+      );
+      result.extend(rows.map(x -> x.setRepeat(repeat)))
+    };
+    result.toArray();
+  };
+
+  vtry<SKFS.ContextOp>(
+    () -> {
+      loop {
+        line = getLine();
+        lineNbr.set(lineNbr.get() + 1);
+        if (line == "") {
+          rows = makeResult();
+          dir = context.unsafeGetEagerDir(table.dirName);
+          f = Some((context, _, _) ~>
+            dir.writeArrayMany(
+              context,
+              rows.iterator().map(row -> {
+                key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
+                file: SKFS.File = row;
+                (key, Array[file])
+              }),
+            )
+          );
+          return SKFS.CContinue(f);
+        };
+        chars = mutable Vector[];
+        iter = line.getIter();
+        loop {
+          c = iter.next() match {
+          | None() ->
+            print_error(
+              "Error, line " + lineNbr.get() + ": unexpected end of line",
+            );
+            skipExit(23)
+          | Some(x) -> x
+          };
+          if (c == '\t') break void;
+          if (c < '0' || c > '9') {
+            print_error(
+              "Error, line " + lineNbr.get() + ": expected an integer key",
+            );
+            skipExit(23)
+          };
+          chars.push(c);
+        };
+        repeat = String::fromChars(chars.toArray()).toInt();
+        value = line.sub(iter, line.length() - chars.size() - 1);
+        if (map.containsKey(value)) {
+          oldRepeat = map[value];
+          map![value] = oldRepeat + repeat;
+        } else {
+          map![value] = repeat;
+        };
+      }
+    },
+    exn -> {
+      if (exn is EndOfFile _) {
+        rows = makeResult();
+        dir = context.unsafeGetEagerDir(table.dirName);
+        f = Some((context, _, _) ~>
+          dir.writeArrayMany(
+            context,
+            rows.iterator().map(row -> {
+              key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
+              file: SKFS.File = row;
+              (key, Array[file])
+            }),
+          )
+        );
+        SKFS.CStop(f)
+      } else {
+        throw exn
+      }
+    },
+  );
+}
+
+fun replayStdin(): Map<String, (Int, Int)> {
+  map = mutable Map<String, (Int, Int)>[];
+  lineNbr = 1;
+  txNbr = 0;
+  vtry(
+    () -> {
+      loop {
+        line = read_line();
+        if (line == "") {
+          !txNbr = txNbr + 1;
+          continue;
+        };
+        chars = mutable Vector[];
+        iter = line.getIter();
+        loop {
+          c = iter.next() match {
+          | None() ->
+            print_error("Error, line " + lineNbr + ": unexpected end of line");
+            skipExit(23)
+          | Some(x) -> x
+          };
+          if (c == '\t') break void;
+          if (c < '0' || c > '9') {
+            print_error("Error, line " + lineNbr + ": expected an integer key");
+            skipExit(23)
+          };
+          chars.push(c);
+        };
+        repeat = String::fromChars(chars.toArray()).toInt();
+        value = line.sub(iter, line.length() - chars.size() - 1);
+        if (map.containsKey(value)) {
+          (oldTxNbr, oldRepeat) = map[value];
+          if (oldTxNbr == txNbr) {
+            map![value] = (txNbr, oldRepeat + repeat);
+          } else {
+            map![value] = (txNbr, repeat);
+          }
+        } else {
+          map![value] = (txNbr, repeat);
+        };
+        !lineNbr = lineNbr + 1;
+      }
+    },
+    exn -> {
+      invariant(exn is EndOfFile _);
+      map.chill()
+    },
+  );
+}

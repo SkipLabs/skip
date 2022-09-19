@@ -18,12 +18,36 @@ class DirDescr{
   name: String,
   colNames: Array<String>,
   schema: Array<TypeDescr>,
+  kinds: Array<(Int, IKind, Type)>,
   cols: SortedMap<String, Int>,
   dirName: SKFS.DirName,
   alias: ?String,
   windowSize: ?Int,
   isInput: Bool,
-} extends SKFS.File uses Orderable
+} extends SKFS.File uses Orderable {
+  static fun create{
+    name: String,
+    colNames: Array<String>,
+    schema: Array<TypeDescr>,
+    cols: SortedMap<String, Int>,
+    dirName: SKFS.DirName,
+    alias: ?String,
+    windowSize: ?Int,
+    isInput: Bool,
+  }: this {
+    static{
+      name,
+      colNames,
+      schema,
+      kinds => schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty)),
+      cols,
+      dirName,
+      alias,
+      windowSize,
+      isInput,
+    }
+  }
+}
 
 fun makeSelectName(id: String): SKFS.DirName {
   SKFS.DirName::create("/" + id + "/");
@@ -154,7 +178,7 @@ fun getSubsDirs(
           skipExit(2)
         };
         context ~> {
-          userFile = SKSQL.makeUserFile(context.mclone(), userName);
+          userFile = SKSQL.connectUser(context.mclone(), userName);
           (file: SKFS.BaseName) ~> {
             file match {
             | k @ RowKey _ ->
