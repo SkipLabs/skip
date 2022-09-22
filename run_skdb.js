@@ -171,6 +171,7 @@ async function makeSKDB() {
   var files = new Array();
   var changed_files = new Array();
   var servers = [];
+  var lineBuffer = [];
 
   const env = {
     memoryBase: 0,
@@ -189,7 +190,8 @@ async function makeSKDB() {
     SKIP_etry: function(f, exn_handler) {
       try {
         return SKIP_call0(f);
-      } catch(_) {
+      } catch(e) {
+        console.log(e);
         return SKIP_call0(exn_handler);
       }
     },
@@ -205,14 +207,33 @@ async function makeSKDB() {
       process.stderr.write(wasmStringToJS(instance, str));
     },
     SKIP_read_line_fill: function() {
-      throw new Error('SKIP_read_line_fill not implemented');
+      lineBuffer = [];
+      endOfLine = 10;
+      if(current_stdin >= stdin.length) {
+        instance.exports.SKIP_throw_EndOfFile();
+      };
+      while(stdin.charCodeAt(current_stdin) !== 10) {
+        if(current_stdin >= stdin.length) {
+          if(lineBuffer.length == 0) {
+            instance.exports.SKIP_throw_EndOfFile();
+          }
+          else {
+            return lineBuffer;
+          }
+        }
+        lineBuffer.push(stdin.charCodeAt(current_stdin));
+        current_stdin++;
+      };
+      current_stdin++;
+      return lineBuffer;
     },
     SKIP_read_line_get:function(i) {
-      throw new Error('SKIP_read_line_get not implemented');
+      return lineBuffer[i];
     },
     SKIP_getchar: function(i) {
+      console.log("JS", current_stdin, 'JS2', stdin.length);
       if(current_stdin >= stdin.length) {
-        SKIP_throw_EndOfFile();
+        instance.exports.SKIP_throw_EndOfFile();
       }
       var result = stdin.charCodeAt(current_stdin);
       current_stdin++;
@@ -293,13 +314,13 @@ async function makeSKDB() {
               "mkfifo " + fifoName + ";" +
               "tail -f " + fifoName + "&" +
               "skdb --data " + db + " --user " + user + " --csv --connect " + tableName +
-              " --updates " + fifoName + ";" +
+              " --updates " + fifoName + " > /dev/null;" +
               "wait"
           ;
           console.log(cmd);
           runServerForever(uri, cmd, "", function (msg) {
+            runLocal(["--backtrace", "--write-csv", tableName], msg);
             console.log("writeing local: " + msg);
-//            runLocal(["--write-csv", tableName], msg);
           })
         },
       };

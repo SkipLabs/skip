@@ -434,7 +434,17 @@ untracked fun main(): void {
         skipExit(23)
       | _ -> void
       };
-      SKCSV.replayDiff(context, line, read_line, table)
+      myReadLine = () -> {
+        buffer = mutable Vector[];
+        loop {
+          debug("Reading char");
+          c = getChar();
+          debug(("Read", c));
+          if (c == '\n') return String::fromChars(buffer.toArray());
+          buffer.push(c);
+        }
+      };
+      SKCSV.replayDiff(context, line, myReadLine, table)
     });
     return void
   | _ -> void

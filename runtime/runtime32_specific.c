@@ -6,6 +6,7 @@ void* exn = (void*)0;
 
 void SKIP_throw(void* exc) {
   exn = exc;
+  sk_print_int((SkipInt)exn);
   __cxa_throw(0, 0, 0);
 }
 
