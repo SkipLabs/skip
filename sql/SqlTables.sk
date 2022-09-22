@@ -369,52 +369,61 @@ fun getTable(
 @cpp_extern("SKIP_flush_stdout")
 native fun flushStdout(): void;
 
+fun printDirDescr(dirDescr: DirDescr): void {
+  o = print_raw;
+  o("CREATE ");
+  o(
+    dirDescr.windowSize match {
+    | None() -> "TABLE "
+    | Some(0) -> "STREAM " + " "
+    | Some(size) -> "WINDOW " + size + " "
+    },
+  );
+  o(dirDescr.name);
+  o(" (\n");
+  for (colName in dirDescr.colNames) {
+    colIndex = dirDescr.cols[colName];
+    o("  ");
+    o(colName);
+    o(" ");
+    ty = dirDescr.schema[colIndex];
+    o(
+      ty.ty match {
+      | INTEGER() -> "INTEGER"
+      | FLOAT() -> "FLOAT"
+      | TEXT() -> "TEXT"
+      },
+    );
+    if (ty.unique) {
+      o(" UNIQUE");
+    };
+    if (ty.primary) {
+      o(" PRIMARY KEY");
+    };
+    if (ty.notNull) {
+      o(" NOT NULL");
+    };
+    if (colIndex < dirDescr.schema.size() - 1) {
+      o(",");
+    };
+    o("\n");
+  };
+  o(");\n");
+  flushStdout();
+}
+
+fun dumpTable(origContext: readonly SKFS.Context, tableName: String): void {
+  context = SKFS.Context::fromSaved(origContext.clone());
+  printDirDescr(getTableDir(context).get(context, SKFS.SID(tableName)));
+}
+
 fun dumpTables(origContext: readonly SKFS.Context): void {
   context = SKFS.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
   _ = handle.map(handle.conv, context, sinkName, dirDescr ~> {
     if (!dirDescr.isInput) return dirDescr;
-    o = print_raw;
-    o("CREATE ");
-    o(
-      dirDescr.windowSize match {
-      | None() -> "TABLE "
-      | Some(0) -> "STREAM " + " "
-      | Some(size) -> "WINDOW " + size + " "
-      },
-    );
-    o(dirDescr.name);
-    o(" (\n");
-    for (colName in dirDescr.colNames) {
-      colIndex = dirDescr.cols[colName];
-      o("  ");
-      o(colName);
-      o(" ");
-      ty = dirDescr.schema[colIndex];
-      o(
-        ty.ty match {
-        | INTEGER() -> "INTEGER"
-        | FLOAT() -> "FLOAT"
-        | TEXT() -> "TEXT"
-        },
-      );
-      if (ty.unique) {
-        o(" UNIQUE");
-      };
-      if (ty.primary) {
-        o(" PRIMARY KEY");
-      };
-      if (ty.notNull) {
-        o(" NOT NULL");
-      };
-      if (colIndex < dirDescr.schema.size() - 1) {
-        o(",");
-      };
-      o("\n");
-    };
-    o(");\n");
-    flushStdout();
+    printDirDescr(dirDescr);
     dirDescr
   });
 }

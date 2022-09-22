@@ -71,6 +71,10 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Name of the file updated with time of the last change",
   },
   AP.StringParam{name => "load-csv", help => "load csv values into table"},
+  AP.StringParam{
+    name => "dump-table",
+    help => "prints a specific table signature",
+  },
   AP.BoolParam{
     name => "dump-tables",
     help => "Dumps the table in SQL format",
@@ -194,6 +198,22 @@ untracked fun main(): void {
         | _ -> void
         }
       };
+    });
+    return void
+  | _ -> void
+  };
+
+  argMap.maybeGet("dump-table") match {
+  | Some(AP.StringValue{value => tableName}) ->
+    if (SKFS.gHasContext() == 0) {
+      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+      print_error("Error: option --data is missing");
+      skipExit(2);
+    };
+    SKSQL.runSql(options, context ~> {
+      SKSQL.dumpTable(context, tableName);
+      skipExit(0);
+      SKFS.CStop(None())
     });
     return void
   | _ -> void
@@ -437,9 +457,7 @@ untracked fun main(): void {
       myReadLine = () -> {
         buffer = mutable Vector[];
         loop {
-          debug("Reading char");
           c = getChar();
-          debug(("Read", c));
           if (c == '\n') return String::fromChars(buffer.toArray());
           buffer.push(c);
         }

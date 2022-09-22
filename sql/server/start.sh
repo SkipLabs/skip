@@ -29,11 +29,11 @@ for i in {1..10}; do
     echo "insert into skdb_groups values(-id(), 'blacklist_group$i');" | $SKDB
 done
 
-echo "create table posts (postID integer, skdb_privacy integer, skdb_owner integer, data string);" | $SKDB
+echo "create table posts (sessionID integer, localID integer, skdb_privacy integer, skdb_owner integer, data string);" | $SKDB
 
 GROUPID=`echo "select groupID from skdb_groups where readers = 'whitelist_group2';" | $SKDB`
 
-echo "insert into posts values (id(), $GROUPID, 6, 'The first post!');" | $SKDB
+echo "insert into posts values (id(), id(), $GROUPID, 6, 'The first post!');" | $SKDB
 
 
 cd ~/websockify && ./run 3048 -- /home/julienv/skfs/sql/server/start_tcp_server.sh

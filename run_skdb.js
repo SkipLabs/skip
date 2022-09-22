@@ -190,8 +190,7 @@ async function makeSKDB() {
     SKIP_etry: function(f, exn_handler) {
       try {
         return SKIP_call0(f);
-      } catch(e) {
-        console.log(e);
+      } catch(_) {
         return SKIP_call0(exn_handler);
       }
     },
@@ -231,7 +230,6 @@ async function makeSKDB() {
       return lineBuffer[i];
     },
     SKIP_getchar: function(i) {
-      console.log("JS", current_stdin, 'JS2', stdin.length);
       if(current_stdin >= stdin.length) {
         instance.exports.SKIP_throw_EndOfFile();
       }
@@ -317,11 +315,19 @@ async function makeSKDB() {
               " --updates " + fifoName + " > /dev/null;" +
               "wait"
           ;
-          console.log(cmd);
-          runServerForever(uri, cmd, "", function (msg) {
-            runLocal(["--backtrace", "--write-csv", tableName], msg);
-            console.log("writeing local: " + msg);
-          })
+          skdb.cmd([], 'create table posts_remote (a INTEGER, b INTEGER, c INTEGER, txt STRING);');
+          return new Promise((resolve, reject) => {
+            runServerForever(uri, cmd, "", function (msg) {
+              runLocal(["--backtrace", "--write-csv", tableName + "_remote"], msg);
+              console.log('resolved');
+              resolve(0);
+            })
+          });
+        },
+        mirrorAllTables: async function() {
+          let cmd = 'skdb --data ' + db + ' --dump-tables';
+          let tables = await runServer(uri, cmd, '');
+          console.log(tables.match(/CREATE TABLE (.*) \(/g));
         },
       };
     },
@@ -350,10 +356,12 @@ async function testDB() {
   skdb = await makeSKDB();
   skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
   users = await skdb.server().runSql("select * from posts;");
-  skdb.cmd([], 'create table posts (a INTEGER, b INTEGER, c INTEGER, txt STRING);');
-  skdb.server().mirrorTable("posts");
+  await skdb.server().mirrorAllTables();
+///  _ = await skdb.server().mirrorTable("posts");
+  console.log('here');
+//  console.log(skdb.cmd([], 'select * from posts_remote;'));
+  console.log('here2');
   
-  console.log(users);
 }
 
 testDB();
