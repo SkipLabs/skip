@@ -75,6 +75,10 @@ const argsSchema: Array<AP.Param> = Array[
     name => "dump-table",
     help => "prints a specific table signature",
   },
+  AP.StringParam{
+    name => "table-suffix",
+    help => "adds a suffix when using dump-table(s)",
+  },
   AP.BoolParam{
     name => "dump-tables",
     help => "Dumps the table in SQL format",
@@ -210,8 +214,12 @@ untracked fun main(): void {
       print_error("Error: option --data is missing");
       skipExit(2);
     };
+    suffix = argMap.maybeGet("table-suffix") match {
+    | Some(AP.StringValue{value => suffix}) -> Some(suffix)
+    | _ -> None()
+    };
     SKSQL.runSql(options, context ~> {
-      SKSQL.dumpTable(context, tableName);
+      SKSQL.dumpTable(context, tableName, suffix);
       skipExit(0);
       SKFS.CStop(None())
     });
@@ -226,8 +234,12 @@ untracked fun main(): void {
       print_error("Error: option --data is missing");
       skipExit(2);
     };
+    suffix = argMap.maybeGet("table-suffix") match {
+    | Some(AP.StringValue{value => suffix}) -> Some(suffix)
+    | _ -> None()
+    };
     SKSQL.runSql(options, context ~> {
-      SKSQL.dumpTables(context);
+      SKSQL.dumpTables(context, suffix);
       skipExit(0);
       SKFS.CStop(None())
     });
@@ -273,7 +285,7 @@ untracked fun main(): void {
       skipExit(2);
     };
     SKSQL.runSql(options, context ~> {
-      SKSQL.dumpTables(context);
+      SKSQL.dumpTables(context, None());
       SKSQL.dumpInserts(context);
       SKSQL.dumpViews(context);
       SKFS.CStop(None())
@@ -448,11 +460,9 @@ untracked fun main(): void {
       | None() -> mutable Ref(1)
       | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
       };
-      argMap.maybeGet("user") match {
-      | Some(AP.StringValue _) ->
-        print_error("Cannot user write-csv as a user");
-        skipExit(23)
-      | _ -> void
+      user = argMap.maybeGet("user") match {
+      | Some(AP.StringValue{value}) -> Some(value)
+      | _ -> None()
       };
       myReadLine = () -> {
         buffer = mutable Vector[];
@@ -462,7 +472,7 @@ untracked fun main(): void {
           buffer.push(c);
         }
       };
-      SKCSV.replayDiff(context, line, myReadLine, table)
+      SKCSV.replayDiff(context, line, myReadLine, table, user)
     });
     return void
   | _ -> void

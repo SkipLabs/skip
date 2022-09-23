@@ -154,8 +154,10 @@ fun replayDiff(
   lineNbr: mutable Ref<Int>,
   getLine: () -> String,
   table: SKSQL.DirDescr,
+  user: ?String,
 ): SKFS.ContextOp {
   map = mutable Map<String, Int>[];
+  userFileOpt = user.map(x -> SKSQL.connectUser(context, x));
   makeResult = () -> {
     result = mutable Vector[];
     for (str => repeat in map) {
@@ -181,6 +183,10 @@ fun replayDiff(
         Array[cvalues.toArray()],
         table,
       );
+      userFileOpt match {
+      | None() -> void
+      | Some(userFile) -> SKSQL.checkUserRows(userFile, pos, table, rows)
+      };
       result.extend(rows.map(x -> x.setRepeat(repeat)))
     };
     result.toArray();

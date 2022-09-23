@@ -369,7 +369,7 @@ fun getTable(
 @cpp_extern("SKIP_flush_stdout")
 native fun flushStdout(): void;
 
-fun printDirDescr(dirDescr: DirDescr): void {
+fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
   o = print_raw;
   o("CREATE ");
   o(
@@ -380,6 +380,10 @@ fun printDirDescr(dirDescr: DirDescr): void {
     },
   );
   o(dirDescr.name);
+  suffix match {
+  | None() -> void
+  | Some(x) -> o(x)
+  };
   o(" (\n");
   for (colName in dirDescr.colNames) {
     colIndex = dirDescr.cols[colName];
@@ -412,18 +416,22 @@ fun printDirDescr(dirDescr: DirDescr): void {
   flushStdout();
 }
 
-fun dumpTable(origContext: readonly SKFS.Context, tableName: String): void {
+fun dumpTable(
+  origContext: readonly SKFS.Context,
+  tableName: String,
+  suffix: ?String,
+): void {
   context = SKFS.Context::fromSaved(origContext.clone());
-  printDirDescr(getTableDir(context).get(context, SKFS.SID(tableName)));
+  printDirDescr(getTableDir(context).get(context, SKFS.SID(tableName)), suffix);
 }
 
-fun dumpTables(origContext: readonly SKFS.Context): void {
+fun dumpTables(origContext: readonly SKFS.Context, suffix: ?String): void {
   context = SKFS.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
   _ = handle.map(handle.conv, context, sinkName, dirDescr ~> {
     if (!dirDescr.isInput) return dirDescr;
-    printDirDescr(dirDescr);
+    printDirDescr(dirDescr, suffix);
     dirDescr
   });
 }
