@@ -264,6 +264,11 @@ async function makeSKDB() {
       let jsStr = wasmStringToJS(instance, str);
       files[fd].push(jsStr);
       changed_files[fd] = fd;
+      console.log('w2f: ', fd, ' content:', jsStr);
+      if(execOnChange[fd] !== undefined) {
+        execOnChange[fd](files[fd].join(''));
+        files[fd] = [];
+      }
     },
     SKIP_glock: function(){},
     SKIP_gunlock: function(){}
@@ -275,20 +280,14 @@ async function makeSKDB() {
     stdout = new Array();
     current_stdin = 0;
     skipMain();
-    for(fd in changed_files) {
-      if(execOnChange[fd] !== undefined) {
-        execOnChange[fd](files[fd].join(''));
-        files[fd] = [];
-      }
-    }
-    changed_files = [];
     return stdout.join('');
   }
 
   var typedArray = new Uint8Array(source);
 
   var connectTable = function(uri, db, user, tableName, suffix) {
-    let fifoName = tableName + "_" + user + "." + sessionID;
+    let randNbr = Math.floor(Math.random() * 10000000000);
+    let fifoName = tableName + "_" + user + "." + randNbr;
     let cmd =
         "rm -f " + fifoName + ";" +
         "mkfifo " + fifoName + ";" +
@@ -300,7 +299,7 @@ async function makeSKDB() {
     return new Promise((resolve, reject) => {
       runServerForever(uri, cmd, "", function (msg) {
         if(msg != "") {
-          console.log('retrive remote', msg);
+          console.log('retrieve remote', msg, '>>END');
           runLocal(["--write-csv", tableName + suffix], msg);
         };
         resolve(0);
@@ -310,22 +309,25 @@ async function makeSKDB() {
 
   const skdb = {
 
-    cmd: function(new_args, new_stdin) {
-      return runLocal(new_args, new_stdin);
+    client: {
+
+      cmd: function(new_args, new_stdin) {
+        return runLocal(new_args, new_stdin);
+      },
+
+      subscribe: function(viewName, f) {
+        execOnChange[fileDescrNbr] = f;
+        let fileName = "/subscriptions/sub" + count;
+        count++;
+        runLocal(['--csv', '--subscribe', viewName, '--updates', fileName], "");
+      },
+
+      sql: function(stdin) {
+        return runLocal([], stdin);
+      },
     },
 
-    subscribe: function(viewName, f) {
-      execOnChange[fileDescrNbr] = f;
-      let fileName = "/subscriptions/sub" + count;
-      count++;
-      runLocal(['--csv', '--subscribe', viewName, '--updates', fileName], "");
-    },
-
-    runSql: function(stdin) {
-      return runLocal([], stdin);
-    },
-
-    newServer: function(uri, db, user) {
+    connect: function(uri, db, user) {
       servers.push([uri, db, user]);
       return servers.length - 1;
     },
@@ -339,11 +341,11 @@ async function makeSKDB() {
         [uri, db, user] = servers[serverID];
       }
       return {
-        runCmd: async function(cmd, stdin) {
+        cmd: async function(cmd, stdin) {
           let result = await runServer(uri, cmd, stdin);
           return result;
         },
-        runSql: async function(stdin) {
+        sql: async function(stdin) {
           var cmd = "skdb --data " + db + " --user " + user;
           let result = await runServer(uri, cmd, stdin);
           return result;
@@ -366,11 +368,12 @@ async function makeSKDB() {
           };
           runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");
 
+          await connectTable(uri, db, user, tableName, remoteSuffix);
+
           runLocal([], "create virtual view " + tableName
                    + " as select * from " + tableName + localSuffix +
                    " union select * from " + tableName + remoteSuffix + ";");
 
-          await connectTable(uri, db, user, tableName, remoteSuffix);
         },
       };
     },
@@ -395,21 +398,21 @@ runServer(
 ).then(x => console.log(x));
 */
 
-console.log(Math.random());
-
 async function testDB() {
   skdb = await makeSKDB();
-  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
-  await skdb.server().mirrorTable('posts');
-//  skdb.runSql('create virtual view posts2 as select * from posts where localID % 2 = 0;');
+  skdb.connect("ws://127.0.0.1:3048", "test.db", "user6");
+  skdb.server().mirrorTable("posts");
+//  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
+//  await skdb.server().mirrorTable('posts');
+//  skdb.sql('create virtual view posts2 as select * from posts where localID % 2 = 0;');
 //  skdb.subscribe('posts2', function(str) {
 //    console.log('Recieved a change: ' + str);
 //  });
-//  skdb.runSql("insert into posts_local values (4,44,74,6,'The second post!');")
-//  console.log(skdb.runSql('select * from posts2;'));
-//  console.log(skdb.runSql('select * from posts;'));
-//  console.log(skdb.runSql('insert into posts_local values(1,38,74,6, NULL);'));
-//  console.log(skdb.runSql('select * from posts;'));
+//  skdb.sql("insert into posts_local values (4,44,74,6,'The second post!');")
+//  console.log(skdb.sql('select * from posts2;'));
+//  console.log(skdb.sql('select * from posts;'));
+//  console.log(skdb.sql('insert into posts_local values(1,38,74,6, NULL);'));
+//  console.log(skdb.sql('select * from posts;'));
 
   var rl = readline.createInterface({
     input: process.stdin,
@@ -418,10 +421,15 @@ async function testDB() {
   });
 
   var recursiveAsyncReadLine = function () {
-    rl.question('skdb (local)> ', function (query) {
+    rl.question('js> ', function (query) {
       if (query == 'quit')
         return rl.close();
-      console.log(skdb.runSql(query));
+      try {
+        console.log(eval(query));
+      }
+      catch(exn) {
+        console.log('Error: ' + exn);
+      }
       recursiveAsyncReadLine();
     });
   };

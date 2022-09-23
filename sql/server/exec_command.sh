@@ -12,6 +12,7 @@ while read LINE; do
     if [ "$LINE" == "END" ]; then
         break;
     fi;
+    echo "$LINE" >> /tmp/bar
     echo "$LINE"
 done | eval "cd $SCRIPT_DIR; ${CMD}" 2>&1
 

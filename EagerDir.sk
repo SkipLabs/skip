@@ -249,7 +249,8 @@ class EagerDir{
     (fd, csv, write) = cmdKind match {
     | NUpdates(csv, file) ->
       fd = unixOpen(file);
-      (fd, csv, x -> writeToFile(fd, x))
+      writer = mutable Debug.BufferedWriter(x -> writeToFile(fd, x), 1024);
+      (fd, csv, writer.write)
     | NNotify(file) ->
       status = unixNotify(file, Int32::truncate(tick.value));
       !this.subs[id] = Sub(lock, Some(cmdKind), status, tick);
