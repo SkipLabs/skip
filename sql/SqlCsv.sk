@@ -246,7 +246,7 @@ fun replayDiff(
       if (exn is EndOfFile _) {
         rows = makeResult();
         dir = context.unsafeGetEagerDir(table.dirName);
-        f = Some((context, _, _) ~>
+        f = Some((context, _, _) ~> {
           dir.writeArrayMany(
             context,
             rows.iterator().map(row -> {
@@ -254,8 +254,8 @@ fun replayDiff(
               file: SKFS.File = row;
               (key, Array[file])
             }),
-          )
-        );
+          );
+        });
         SKFS.CStop(f)
       } else {
         throw exn

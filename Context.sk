@@ -12,6 +12,25 @@
 module SKFS;
 
 /*****************************************************************************/
+/* Sessions. */
+/*****************************************************************************/
+
+base class CmdKind {
+  children =
+  | NUpdates(Bool, String)
+  | NNotify(String)
+  | NTail()
+}
+
+value class Sub(
+  lock: Mutex,
+  cond: Condition,
+  cmd: CmdKind,
+  dirName: DirName,
+  filter: SKFS.Context ~> (BaseName ~> Bool) = _ ~> (_ ~> true),
+)
+
+/*****************************************************************************/
 /* Unique number generator. */
 /*****************************************************************************/
 
@@ -259,9 +278,27 @@ mutable class Context{
   mutable lazyGetsQueueOut: List<Array<Path>> = List[],
   mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable reallyRemoveDir: Bool = true,
-  mutable sessions: SortedMap<Int, DirName> = SortedMap[],
+  mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
 } {
+  mutable fun subscribe(
+    context: mutable Context,
+    dirName: DirName,
+    sessionId: Int,
+    cmd: CmdKind,
+    init: Bool,
+    filter: Context ~> (BaseName ~> Bool),
+  ): void {
+    sub = Sub(mutexCreate(), condCreate(), cmd, dirName, filter);
+    if (init) {
+      tick0 = Tick(0);
+      dir = this.unsafeGetEagerDir(dirName);
+      changes = dir.getChangesAfter(tick0);
+      dir.notify(context, sub, changes, tick0);
+    };
+    context.!sessions[sessionId] = sub;
+  }
+
   mutable fun pushAsync(path: Path): void {
     this.!asyncList = List.Cons(path, this.asyncList);
   }
@@ -681,9 +718,13 @@ mutable class Context{
     | _ -> invariant_violation("Wrong type for CHANGED_DIRS")
     };
     if (this.tick == start) return void;
-    for (dirName in changedDirNames) {
+    for (_ => sub in this.sessions) {
+      dirName = sub.dirName;
+      if (!changedDirNames.contains(dirName)) continue;
       this.unsafeMaybeGetDir(dirName) match {
-      | Some(dir @ EagerDir _) -> _ = dir.notifyAll(this.clone(), start)
+      | Some(dir @ EagerDir _) ->
+        changes = dir.getChangesAfter(start);
+        _ = dir.notify(this.clone(), sub, changes, start)
       | _ -> void
       }
     }
@@ -1065,9 +1106,11 @@ fun mutexCreate(): Mutex {
   freezeLock(lock)
 }
 
+@debug
 @cpp_extern("SKIP_mutex_lock")
 native fun mutexLock(mutable Mutex): void;
 
+@debug
 @cpp_extern("SKIP_mutex_unlock")
 native fun mutexUnlock(mutable Mutex): void;
 
@@ -1080,12 +1123,15 @@ fun condCreate(): Condition {
   freezeCond(cond)
 }
 
+@debug
 @cpp_extern("SKIP_cond_wait")
 native fun condWait(mutable Condition, mutable Mutex): Int32;
 
+@debug
 @cpp_extern("SKIP_cond_broadcast")
 native fun condBroadcast(mutable Condition): Int32;
 
+@debug
 @cpp_extern("pthread_cond_signal")
 native fun condSignal(mutable Condition): Int32;
 

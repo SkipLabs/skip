@@ -173,20 +173,6 @@ value class MInfo(
 /* The class used for subscriptions. */
 /*****************************************************************************/
 
-base class CmdKind {
-  children =
-  | NUpdates(Bool, String)
-  | NNotify(String)
-}
-
-value class Sub(
-  lock: Mutex,
-  cmd: ?CmdKind,
-  status: Int32,
-  tick: Tick,
-  filter: SKFS.Context ~> (BaseName ~> Bool) = _ ~> (_ ~> true),
-)
-
 @cpp_extern("SKIP_unix_open")
 native fun unixOpen(String): Int32;
 
@@ -222,7 +208,6 @@ class EagerDir{
   slices: RangeMapList<BaseName, DirName> = RangeMapList[],
   reducer: ?Reducer = None(),
   purgeCount: Int = 0,
-  subs: SortedMap<Int, Sub> = SortedMap[],
 } extends Dir {
   fun compress<Compressed: frozen>(
     context: mutable Context,
@@ -237,30 +222,46 @@ class EagerDir{
     context.setDir(this.dirName, this);
   }
 
-  private fun notifyCmd(
+  fun notify(
     context: readonly SKFS.Context,
     sub: Sub,
-    lock: Mutex,
-    id: Int,
     changes: SortedSet<BaseName>,
-    cmdKind: CmdKind,
     tick: Tick,
-  ): this {
-    (fd, csv, writer) = cmdKind match {
+  ): void {
+    lock = unfreezeLock(sub.lock);
+    sub.cmd match {
     | NUpdates(csv, file) ->
+      mutexLock(lock);
       fd = unixOpen(file);
-      writer = mutable Debug.BufferedWriter(x -> writeToFile(fd, x), 1024);
-      (fd, csv, writer)
+      o = x -> writeToFile(fd, x);
+      this.writeDiffStdout(context, changes, o, csv, sub.filter);
+      _ = unixClose(fd);
+      mutexUnlock(lock)
     | NNotify(file) ->
-      status = unixNotify(file, Int32::truncate(tick.value));
-      !this.subs[id] = Sub(lock, Some(cmdKind), status, tick);
-      return this
-    };
+      mutexLock(lock);
+      _ = unixNotify(file, Int32::truncate(tick.value));
+      mutexUnlock(lock)
+    | NTail() ->
+      mutexLock(lock);
+      cond = unfreezeCond(sub.cond);
+      _ = condBroadcast(cond);
+      mutexUnlock(lock)
+    }
+  }
+
+  fun writeDiffStdout(
+    context: readonly SKFS.Context,
+    changes: SortedSet<BaseName>,
+    o: String -> void,
+    csv: Bool,
+    filter: ((SKFS.Context) ~> ((SKFS.BaseName) ~> Bool)),
+  ): void {
+    writer = mutable Debug.BufferedWriter(o, 1024);
     if (!changes.isEmpty() && !this.reallyRemove) {
       writer.write("\n");
       writer.write("\n");
     };
-    filterFun = sub.filter(context.clone());
+    filterFun = filter(context.clone());
 
     for (key in changes) {
       if (!filterFun(key)) continue;
@@ -275,84 +276,7 @@ class EagerDir{
     };
 
     writer.flush();
-    status = cmdKind match {
-    | NUpdates _ -> unixClose(fd)
-    | NNotify _ -> Int32::truncate(0)
-    };
-    !this.subs[id] = Sub(lock, Some(cmdKind), status, tick);
-    this
-  }
-
-  fun notifyAll(context: SKFS.Context, tick: Tick): this {
-    changes = this.getChangesAfter(tick);
-    if (changes.isEmpty()) return this;
-    for (id => sub in this.subs) {
-      lock = unfreezeLock(sub.lock);
-      if (sub.status == 0) {
-        mutexLock(lock);
-        sub.cmd match {
-        | None() -> void
-        | Some(cmd) ->
-          !this = this.notifyCmd(context, sub, sub.lock, id, changes, cmd, tick)
-        };
-        mutexUnlock(lock);
-      }
-    };
-    this
-  }
-
-  fun disconnect(context: mutable SKFS.Context, sessionId: Int): void {
-    !this.subs[sessionId].status = Int32::truncate(-1);
-    context.setDir(this.dirName, this)
-  }
-
-  fun subscribe(
-    context: mutable Context,
-    sessionId: Int,
-    cmdOpt: ?CmdKind,
-    init: Bool,
-    filter: Context ~> (BaseName ~> Bool),
-  ): void {
-    if (this.subs.containsKey(sessionId)) return void;
-    sub = Sub(mutexCreate(), cmdOpt, Int32::truncate(0), Tick(0), filter);
-    !this.subs[sessionId] = sub;
-    if (init) {
-      changes = this.getChangesAfter(Tick(0));
-      cmdOpt match {
-      | None() -> void
-      | Some(cmd) ->
-        !this = this.notifyCmd(
-          context,
-          sub,
-          sub.lock,
-          sessionId,
-          changes,
-          cmd,
-          Tick(0),
-        )
-      }
-    };
-    context.setDir(this.dirName, this);
-    context.!sessions[sessionId] = this.dirName;
-  }
-
-  fun reconnect(context: mutable SKFS.Context, id: Int): void {
-    sub = this.subs[id];
-    changes = this.getChangesAfter(sub.tick);
-    sub.cmd match {
-    | None() -> void
-    | Some(cmd) ->
-      !this = this.notifyCmd(
-        context,
-        sub,
-        sub.lock,
-        id,
-        changes,
-        cmd,
-        context.tick,
-      )
-    };
-    context.setDir(this.dirName, this);
+    flushStdout();
   }
 
   fun purgeOld(): FixedSingle<Source, MInfo> {

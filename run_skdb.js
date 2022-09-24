@@ -264,7 +264,7 @@ async function makeSKDB() {
       let jsStr = wasmStringToJS(instance, str);
       files[fd].push(jsStr);
       changed_files[fd] = fd;
-      console.log('w2f: ', fd, ' content:', jsStr);
+//      console.log('w2f: ', fd, ' content:', jsStr);
       if(execOnChange[fd] !== undefined) {
         execOnChange[fd](files[fd].join(''));
         files[fd] = [];
@@ -286,16 +286,14 @@ async function makeSKDB() {
   var typedArray = new Uint8Array(source);
 
   var connectTable = function(uri, db, user, tableName, suffix) {
-    let randNbr = Math.floor(Math.random() * 10000000000);
-    let fifoName = tableName + "_" + user + "." + randNbr;
     let cmd =
-        "rm -f " + fifoName + ";" +
-        "mkfifo " + fifoName + ";" +
-        "tail -f " + fifoName + "&" +
-        "skdb --data " + db + " --user " + user + " --csv --connect " + tableName +
-        " --updates " + fifoName + " > /dev/null;" +
-        "wait"
-    ;
+/*
+        "rm -f /tmp/foo && skdb --data " + db + " --user " + user + " --csv --updates /tmp/foo "  +
+        " --connect " + tableName + " > /dev/null; tail -n +1 -f /tmp/foo" ;
+*/
+        "skdb --data " + db + " --user " + user + " --csv --tail "  +
+        "`skdb --connect " + tableName + " --data " + db + "`";
+
     return new Promise((resolve, reject) => {
       runServerForever(uri, cmd, "", function (msg) {
         if(msg != "") {
@@ -363,7 +361,7 @@ async function makeSKDB() {
 
           var fileName = tableName + "_" + user;
           execOnChange[fileDescrNbr] = function(change) {
-            console.log('sending remote', change);
+//            console.log('sending remote', change);
             runServer(uri, 'skdb --data ' + db + ' --user ' + user + ' --write-csv ' + tableName, change);
           };
           runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");

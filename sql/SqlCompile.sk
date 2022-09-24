@@ -473,19 +473,9 @@ mutable class Compiler{
   ): DirDescr {
     name match {
     | FName(tableName) ->
-      if (
-        tableName.startsWith("skdb_root_") &&
-        tableName.length() > "skdb_root_".length()
-      ) {
-        tableSID = SKFS.SID::create("skdb_expanded");
-        table = getTable(this.options, context, this.pos, tableSID);
-        !table.dirName = SKFS.DirName::create("/" + tableName + "/");
-        table
-      } else {
-        tableSID = SKFS.SID::create(tableName);
-        table = getTable(this.options, context, this.pos, tableSID);
-        table
-      }
+      tableSID = SKFS.SID::create(tableName);
+      table = getTable(this.options, context, this.pos, tableSID);
+      table
 
     | FQuery(select @ Select _) ->
       cselect = this.compileSelect(context, select, false);

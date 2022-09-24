@@ -181,3 +181,12 @@ void SKIP_mutex_lock(void* lock) {
 
 void SKIP_mutex_unlock(void* lock) {
 }
+
+void SKIP_cond_init(void* cond) {
+}
+
+void SKIP_cond_wait(void* x, void* y) {
+}
+
+void SKIP_cond_broadcast(void* c) {
+}

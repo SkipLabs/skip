@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm -f /tmp/foo
+rm -f /tmp/bar
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 

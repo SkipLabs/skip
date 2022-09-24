@@ -111,7 +111,7 @@ void sk_global_unlock() {
     return;
   }
 
-  fprintf(stderr, "Internal error: unlocking failed\n");
+  fprintf(stderr, "Internal error: global unlocking failed, %s\n", strerror(errno));
   exit(44);
 }
 
@@ -123,7 +123,12 @@ void SKIP_mutex_init(pthread_mutex_t* lock) {
   if(sizeof(pthread_mutex_t) > 40) {
     fprintf(stderr, "Internal error: mutex object not large enough for this arch");
   }
-  pthread_mutex_init(lock, gmutex_attr);
+  pthread_mutexattr_t mutex_attr_holder;
+  pthread_mutexattr_t* mutex_attr = &mutex_attr_holder;
+  pthread_mutexattr_init(mutex_attr);
+  pthread_mutexattr_setpshared(mutex_attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutexattr_setrobust(mutex_attr, PTHREAD_MUTEX_ROBUST);
+  pthread_mutex_init(lock, mutex_attr);
 }
 
 void SKIP_mutex_lock(pthread_mutex_t* lock) {
@@ -149,7 +154,7 @@ void SKIP_mutex_unlock(pthread_mutex_t* lock) {
     return;
   }
 
-  fprintf(stderr, "Internal error: unlocking failed\n");
+  fprintf(stderr, "Internal error: unlocking failed, %d\n", code);
   exit(44);
 }
 

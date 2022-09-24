@@ -93,7 +93,7 @@ class SubRequestFile(
   viewName: String,
   viewDirName: SKFS.DirName,
   init: Bool,
-  cmd: ?SKFS.CmdKind,
+  cmd: SKFS.CmdKind,
   sessionID: Int,
   user: ?String,
 ) extends SKFS.File
@@ -191,7 +191,7 @@ fun getSubsDirs(
           }
         }
       };
-      edir.subscribe(context, sessionID, cmd, init, filter);
+      context.subscribe(context, edir.dirName, sessionID, cmd, init, filter);
       writer.write(key, SKFS.IntFile(sessionID))
     },
   );
@@ -365,9 +365,6 @@ fun getTable(
 /*****************************************************************************/
 /* DUMP. */
 /*****************************************************************************/
-
-@cpp_extern("SKIP_flush_stdout")
-native fun flushStdout(): void;
 
 fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
   o = print_raw;
