@@ -66,6 +66,20 @@ function runServer(uri, cmd, stdin) {
   });
 }
 
+async function runServerWriteForever(uri, cmd) {
+  var data = "";
+
+  let write = await makeWebSocket(
+    uri,
+    function(change) { console.log("Error writing: " + change)},
+    function(_) { console.log("Error connection lost"); },
+    function(err) { console.log("Error connection lost"); }
+  );
+
+  write(cmd + "\n");
+  return write;
+}
+
 function runServerForever(uri, cmd, stdin, localCmd) {
   var data = "";
 
@@ -285,25 +299,37 @@ async function makeSKDB() {
 
   var typedArray = new Uint8Array(source);
 
-  var connectTable = function(uri, db, user, tableName, suffix) {
+  var connectReadTable = function(uri, db, user, tableName, suffix) {
     let cmd =
 /*
         "rm -f /tmp/foo && skdb --data " + db + " --user " + user + " --csv --updates /tmp/foo "  +
         " --connect " + tableName + " > /dev/null; tail -n +1 -f /tmp/foo" ;
 */
+
+
         "skdb --data " + db + " --user " + user + " --csv --tail "  +
         "`skdb --connect " + tableName + " --data " + db + "`";
+
 
     return new Promise((resolve, reject) => {
       runServerForever(uri, cmd, "", function (msg) {
         if(msg != "") {
-          console.log('retrieve remote', msg, '>>END');
+//          console.log('retrieve remote', msg, '>>END');
           runLocal(["--write-csv", tableName + suffix], msg);
         };
         resolve(0);
       })
     });
   };
+
+  var connectWriteTable = async function(uri, db, user, tableName) {
+    let cmd =
+        "skdb --data " + db + " --user " + user + " --write-csv "  + tableName;
+
+    let write = await runServerWriteForever(uri, cmd);
+    return write;
+  };
+
 
   const skdb = {
 
@@ -359,14 +385,15 @@ async function makeSKDB() {
           let createLocalTable = await runServer(uri, localCmd, "");
           runLocal([], createLocalTable);
 
+          let write = await connectWriteTable(uri, db, user, tableName);
+
           var fileName = tableName + "_" + user;
           execOnChange[fileDescrNbr] = function(change) {
-//            console.log('sending remote', change);
-            runServer(uri, 'skdb --data ' + db + ' --user ' + user + ' --write-csv ' + tableName, change);
+            write(change);
           };
-          runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");
+          runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");    
 
-          await connectTable(uri, db, user, tableName, remoteSuffix);
+          await connectReadTable(uri, db, user, tableName, remoteSuffix);
 
           runLocal([], "create virtual view " + tableName
                    + " as select * from " + tableName + localSuffix +

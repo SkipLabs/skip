@@ -1,12 +1,10 @@
 #!/bin/bash
 
-rm -f /tmp/bar
-
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 read CMD
 
-echo "$CMD" > /tmp/bar
+echo "$CMD" >> /tmp/bar
 
 while read LINE; do
     if [ "$LINE" == "END" ]; then
