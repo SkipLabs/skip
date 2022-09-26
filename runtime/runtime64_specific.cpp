@@ -323,4 +323,26 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
   return sk_string_create(buffer, size);
 }
 
+int32_t SKIP_stdin_has_data() {
+  fd_set rfds;
+  struct timeval tv;
+  int retval;
+
+  /* Watch stdin (fd 0) to see when it has input. */
+  FD_ZERO(&rfds);
+  FD_SET(0, &rfds);
+  tv.tv_sec = 0;
+  tv.tv_usec = 0;
+
+  retval = select(1, &rfds, NULL, NULL, &tv);
+  /* Don't rely on the value of tv now! */
+
+  if (retval) {
+    return 1;
+  }
+  else {
+    return 0;
+  }
+}
+
 }

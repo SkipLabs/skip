@@ -190,3 +190,7 @@ void SKIP_cond_wait(void* x, void* y) {
 
 void SKIP_cond_broadcast(void* c) {
 }
+
+int32_t SKIP_stdin_has_data() {
+  return 1;
+}

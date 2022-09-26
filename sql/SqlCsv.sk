@@ -7,6 +7,9 @@ base class Token {
   | Chars(Array<Char>)
 }
 
+@cpp_extern("SKIP_stdin_has_data")
+native fun stdinHasData(): Int32;
+
 fun lexRaw(next: () -> Char): mutable Iterator<Token> {
   acc = mutable Vector[];
   lastIsString = false;
@@ -156,62 +159,16 @@ fun replayDiff(
   table: SKSQL.DirDescr,
   user: ?String,
 ): SKFS.ContextOp {
-  map = mutable Map<String, Int>[];
   userFileOpt = user.map(x -> SKSQL.connectUser(context, x));
-  makeResult = () -> {
-    result = mutable Vector[];
-    for (str => repeat in map) {
-      values = mutable Vector[];
-      iter = str.getIter();
-      next = () -> {
-        val = iter.next();
-        val match {
-        | None() -> '\n'
-        | Some(x) -> x
-        }
-      };
-      for (value in lex(next)) {
-        values.push(value);
-      };
-      cvalues = values.map(SKSQL.parseCSVValue);
-      pos = lineNbr.get();
-      rows = SKSQL.computeInsert(
-        context,
-        false,
-        pos,
-        None(),
-        Array[cvalues.toArray()],
-        table,
-      );
-      userFileOpt match {
-      | None() -> void
-      | Some(userFile) -> SKSQL.checkUserRows(userFile, pos, table, rows)
-      };
-      result.extend(rows.map(x -> x.setRepeat(repeat)))
-    };
-    result.toArray();
-  };
+  dir = context.unsafeGetEagerDir(table.dirName);
+  buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
 
   vtry<SKFS.ContextOp>(
     () -> {
       loop {
         line = getLine();
         lineNbr.set(lineNbr.get() + 1);
-        if (line == "") {
-          rows = makeResult();
-          dir = context.unsafeGetEagerDir(table.dirName);
-          f = Some((context, _, _) ~>
-            dir.writeArrayMany(
-              context,
-              rows.iterator().map(row -> {
-                key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
-                file: SKFS.File = row;
-                (key, Array[file])
-              }),
-            )
-          );
-          return SKFS.CContinue(f);
-        };
+        if (line == "") continue;
         chars = mutable Vector[];
         iter = line.getIter();
         loop {
@@ -233,19 +190,55 @@ fun replayDiff(
           chars.push(c);
         };
         repeat = String::fromChars(chars.toArray()).toInt();
-        value = line.sub(iter, line.length() - chars.size() - 1);
-        if (map.containsKey(value)) {
-          oldRepeat = map[value];
-          map![value] = oldRepeat + repeat;
-        } else {
-          map![value] = repeat;
+        str = line.sub(iter, line.length() - chars.size() - 1);
+        values = mutable Vector[];
+        strIter = str.getIter();
+        next = () -> {
+          val = strIter.next();
+          val match {
+          | None() -> '\n'
+          | Some(x) -> x
+          }
         };
+        for (value in lex(next)) {
+          values.push(value);
+        };
+        cvalues = values.map(SKSQL.parseCSVValue);
+        pos = lineNbr.get();
+        newRows = SKSQL.computeInsert(
+          context,
+          false,
+          pos,
+          None(),
+          Array[cvalues.toArray()],
+          table,
+        );
+        userFileOpt match {
+        | None() -> void
+        | Some(userFile) -> SKSQL.checkUserRows(userFile, pos, table, newRows)
+        };
+        buffer.extend(newRows.map(x -> x.setRepeat(repeat)));
+
+        if (stdinHasData() != 0) continue;
+        rows = buffer.toArray();
+        buffer.clear();
+
+        f = Some((context, _, _) ~> {
+          dir.writeArrayMany(
+            context,
+            rows.iterator().map(row -> {
+              key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
+              file: SKFS.File = row;
+              (key, Array[file])
+            }),
+          );
+        });
+        break SKFS.CContinue(f)
       }
     },
     exn -> {
       if (exn is EndOfFile _) {
-        rows = makeResult();
-        dir = context.unsafeGetEagerDir(table.dirName);
+        rows = buffer.toArray();
         f = Some((context, _, _) ~> {
           dir.writeArrayMany(
             context,
