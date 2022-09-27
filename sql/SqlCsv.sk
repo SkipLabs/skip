@@ -162,6 +162,10 @@ fun replayDiff(
   userFileOpt = user.map(x -> SKSQL.connectUser(context, x));
   dir = context.unsafeGetEagerDir(table.dirName);
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
+  if (table.windowSize is Some _) {
+    print_error("Cannot use write-csv on a window or a stream");
+    skipExit(23);
+  };
 
   vtry<SKFS.ContextOp>(
     () -> {
@@ -232,6 +236,7 @@ fun replayDiff(
               (key, Array[file])
             }),
           );
+          context.update();
         });
         break SKFS.CContinue(f)
       }
@@ -248,6 +253,7 @@ fun replayDiff(
               (key, Array[file])
             }),
           );
+          context.update();
         });
         SKFS.CStop(f)
       } else {

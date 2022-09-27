@@ -276,6 +276,7 @@ async function makeSKDB() {
     },
     SKIP_write_to_file: function(fd, str) {
       let jsStr = wasmStringToJS(instance, str);
+      if(jsStr == "") return;
       files[fd].push(jsStr);
       changed_files[fd] = fd;
 //      console.log('w2f: ', fd, ' content:', jsStr);
