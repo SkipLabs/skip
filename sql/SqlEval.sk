@@ -1561,12 +1561,8 @@ fun printContext(context: mutable SKFS.Context): void {
     print_string("Time: " + (context.tick.value + 1));
     for (key in edir.getChangesAfter(time)) {
       values = edir.getArrayRaw(key);
-      if (values.size() == 0) {
-        print_raw(key.toStringRemove(csv))
-      } else {
-        for (value in values) {
-          print_raw(value.toKVString(csv, key))
-        }
+      for (value in values) {
+        print_raw(value.toKVString(csv, key))
       };
     }
   | Some _ -> invariant_violation("Unexpected Stdout type")
