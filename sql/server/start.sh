@@ -31,6 +31,9 @@ echo "insert into skdb_user values(id(), 'stranger');" | $SKDB
 ) | $SKDB
 
 
+(echo "insert into skdb_groups values(id('group'), skiplabs_employees);"
+ echo "select id('group');"
+) $SKDB
 
 
 echo "create table posts (sessionID integer, localID integer, skdb_privacy integer, skdb_owner integer, data string);" | $SKDB
