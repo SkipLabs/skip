@@ -11,23 +11,11 @@ $SKDB_BIN --init $FILE
 
 cat ../privacy/init.sql | $SKDB
 
-(echo "begin transaction;"
- for i in {1..10}; do
-     echo "insert into skdb_users values($i, 'user$i');"
- done
- echo "commit;") | $SKDB
-
-for i in {1..10}; do
-    echo "create table whitelist_group$i (userID integer);" | $SKDB
-    echo "insert into whitelist_group$i select userID from skdb_users where userID % $i = 0;" | $SKDB
-    echo "insert into skdb_groups values(id(), 'whitelist_group$i');" | $SKDB
-done
-
-for i in {1..10}; do
-    echo "create table blacklist_group$i (userID integer);" | $SKDB
-    echo "insert into blacklist_group$i select userID from skdb_users where userID % $i = 0;" | $SKDB
-    echo "insert into skdb_groups values(-id(), 'blacklist_group$i');" | $SKDB
-done
+echo "insert into skdb_users values(id(), 'julienv');"
+echo "insert into skdb_users values(id(), 'daniell');"
+echo "insert into skdb_users values(id(), 'gregs');"
+echo "insert into skdb_users values(id(), 'lucash');"
+echo "insert into skdb_users values(id(), 'laurem');"
 
 echo "create table posts (sessionID integer, localID integer, skdb_privacy integer, skdb_owner integer, data string);" | $SKDB
 
