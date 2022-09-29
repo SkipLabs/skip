@@ -32,6 +32,11 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Changes the output format to CSV",
     negatable => false,
   },
+  AP.BoolParam{
+    name => "json",
+    help => "Changes the output format to JSON",
+    negatable => false,
+  },
   AP.StringParam{name => "test", help => "The name of the test to run"},
   AP.StringParam{name => "init", help => "Initializes a new data file"},
   AP.StringParam{name => "capacity", help => "Initializes at a given capacity"},
@@ -161,7 +166,13 @@ untracked fun main(): void {
         showUsedIndexes => argMap.maybeGet("show-used-indexes") is Some(
           AP.BoolValue _,
         ),
-        csv => argMap.maybeGet("csv") is Some(AP.BoolValue _),
+        format => if (argMap.maybeGet("csv") is Some(AP.BoolValue _)) {
+          SKSQL.OFK_CSV()
+        } else if (argMap.maybeGet("json") is Some(AP.BoolValue _)) {
+          SKSQL.OFK_JSON()
+        } else {
+          SKSQL.OFK_SQL()
+        },
       };
 
       argMap.maybeGet("sessions") match {
@@ -355,9 +366,6 @@ untracked fun main(): void {
           skipExit(2);
         };
         SKSQL.runSql(options, context ~> {
-          if (options.csv) {
-            context.setGlobal("CSV", SKFS.BoolFile(true));
-          };
           sub = context.sessions.maybeGet(sessionID) match {
           | None() ->
             print_error("Error: session not found");
@@ -370,9 +378,17 @@ untracked fun main(): void {
             print_error("Error: --since option missing");
             skipExit(2)
           };
+          format = options.format match {
+          | SKSQL.OFK_CSV() -> SKFS.OCSV()
+          | SKSQL.OFK_JSON() ->
+            print_error("JSON support not implemented for --diff");
+            skipExit(145)
+          | SKSQL.OFK_SQL() -> SKFS.OSQL()
+          };
+
           context.setGlobal(
             "Stdout",
-            SKSQL.StdoutDiff(sub.dirName, SKFS.Tick(time)),
+            SKSQL.StdoutDiff(format, sub.dirName, SKFS.Tick(time)),
           );
           SKFS.CStop(None())
         });
@@ -424,7 +440,6 @@ untracked fun main(): void {
           print_error("Error: option --data is missing");
           skipExit(2);
         };
-        csv = argMap.maybeGet("csv") is Some(AP.BoolValue _);
         tick = 0;
         loop {
           context = SKFS.gContextGet();
@@ -437,7 +452,15 @@ untracked fun main(): void {
           dirName = sub.dirName;
           edir = context.unsafeGetEagerDir(dirName);
           changes = edir.getChangesAfter(SKFS.Tick(tick));
-          edir.writeDiffStdout(context, changes, print_raw, csv, sub.filter);
+          format = options.format match {
+          | SKSQL.OFK_CSV() -> SKFS.OCSV()
+          | SKSQL.OFK_JSON() ->
+            print_error("JSON support not implemented for --diff");
+            skipExit(145)
+          | SKSQL.OFK_SQL() -> SKFS.OSQL()
+          };
+
+          edir.writeDiffStdout(context, changes, print_raw, format, sub.filter);
           !tick = context.tick.value;
           lock = SKFS.unfreezeLock(sub.lock);
           cond = SKFS.unfreezeCond(sub.cond);
@@ -515,12 +538,18 @@ untracked fun main(): void {
         SKSQL.runLockedSql(options, context ~> {
           viewName = userViewName.lowercase();
           SKSQL.forbidNow(context);
+          format = options.format match {
+          | SKSQL.OFK_CSV() -> SKFS.OCSV()
+          | SKSQL.OFK_JSON() ->
+            print_error("JSON support not implemented for --diff");
+            skipExit(145)
+          | SKSQL.OFK_SQL() -> SKFS.OSQL()
+          };
           cmd = (argMap.maybeGet("updates"), argMap.maybeGet("notify")) match {
           | (Some(AP.StringValue _), Some(AP.StringValue _)) ->
             print_error("Cannot have both --updates and --notify");
             skipExit(4)
-          | (Some(AP.StringValue{value => x}), _) ->
-            SKFS.NUpdates(options.csv, x)
+          | (Some(AP.StringValue{value => x}), _) -> SKFS.NUpdates(format, x)
           | (_, Some(AP.StringValue{value => x})) -> SKFS.NNotify(x)
           | _ -> SKFS.NTail()
           };

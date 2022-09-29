@@ -313,9 +313,18 @@ async function makeSKDB() {
 
 
     return new Promise((resolve, reject) => {
+      data = '';
       runServerForever(uri, cmd, "", function (msg) {
         if(msg != "") {
 //          console.log('retrieve remote', msg, '>>END');
+          var index = msg.lastIndexOf("\n");
+          if(index < msg.length) {
+            index++;
+          }
+          let newData = msg.slice(index);
+          msg = data + msg.slice(0, index);
+          data = newData;
+          console.log(msg + 'END');
           runLocal(["--write-csv", tableName + suffix], msg);
         };
         resolve(0);
@@ -367,6 +376,11 @@ async function makeSKDB() {
       }
       return {
         cmd: async function(cmd, stdin) {
+          let result = await runServer(uri, cmd, stdin);
+          return result;
+        },
+        sqlRaw: async function(stdin) {
+          var cmd = "skdb --data " + db + " --user " + user;
           let result = await runServer(uri, cmd, stdin);
           return result;
         },
@@ -426,7 +440,7 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  skdb.connect("ws://127.0.0.1:3048", "test.db", "user6");
+  skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
   skdb.server().mirrorTable("posts");
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');

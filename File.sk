@@ -168,12 +168,29 @@ class BoolFile(value: Bool) extends File uses Orderable, Show {
 }
 
 class StringFile(value: .String) extends File {
-  fun toKVString(_csv: Bool, key: BaseName): String {
+  fun toKVString(_format: OutputFormat, key: BaseName): String {
     "" + escape(key.toString()) + "\t\"" + escape(this.value) + "\"\n"
   }
 }
 
 class ArrayCharFile(value: Array<Char>) extends File
+
+base class OutputFormat {
+  children =
+  | OSQL()
+  | OCSV()
+  | OJSON(fieldNames: Array<String>)
+
+  fun usesComma(): Bool
+  | OSQL() -> false
+  | OCSV() -> true
+  | OJSON(_) -> true
+
+  fun usesDoubleQuotes(): Bool
+  | OSQL() -> false
+  | OCSV() -> true
+  | OJSON(_) -> true
+}
 
 base class File {
   deferred macro overridable static fun fromFile(obj: File): this {
@@ -182,7 +199,7 @@ base class File {
     }
   }
 
-  overridable fun toKVString(_csv: Bool, key: BaseName): String {
+  overridable fun toKVString(_csv: OutputFormat, key: BaseName): String {
     "" +
       escape(key.toString()) +
       "\t\"" +

@@ -307,7 +307,10 @@ fun replayStdin(): Map<String, (Int, Int)> {
       }
     },
     exn -> {
-      invariant(exn is EndOfFile _);
+      if (!(exn is EndOfFile _)) {
+        print_error("Unexpected error: " + exn.getMessage());
+        skipExit(22);
+      };
       map.chill()
     },
   );

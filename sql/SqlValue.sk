@@ -95,12 +95,6 @@ class RowKey(
   fun toString(): String {
     inspect(this).toString();
   }
-
-  fun toStringRemove(csv: Bool): String {
-    this.row match {
-    | r @ RowValues(_, _) -> "0\t" + r.toStringSingle(csv) + "\n"
-    }
-  }
 }
 
 base class Row extends SKFS.File {
@@ -155,7 +149,7 @@ class RowValues private (
   }
 
   fun setRepeat(repeat: Int): this {
-    invariant(repeat >= 1);
+    invariant(repeat >= 0);
     !this.repeat = repeat;
     this
   }
@@ -164,36 +158,50 @@ class RowValues private (
     this.values.size()
   }
 
-  fun toStringSingle(csv: Bool): String {
-    result = mutable Vector[];
+  fun toStringSingle(format: SKFS.OutputFormat): String {
     values = this.values;
     size = values.size();
-    if (size == 1) {
+    if (!(format is SKFS.OJSON _) && size == 1) {
       values[0] match {
       | None() -> return ""
-      | Some(v) -> return v.toStringOrCsv(csv)
+      | Some(v) -> return v.toStringWithFormat(format)
       }
     };
+    result = mutable Vector[];
+    if (format is SKFS.OJSON _) {
+      result.push("{");
+    };
     for (i in Range(0, size - 1)) {
-      values[i] match {
-      | None() -> void
-      | Some(v) -> result.push(v.toStringOrCsv(csv))
+      format match {
+      | SKFS.OJSON(fieldNames) -> result.push("\"" + fieldNames[i] + "\":")
+      | _ -> void
       };
-      result.push(if (csv) "," else "|");
+      values[i] match {
+      | None() -> if (format is SKFS.OJSON _) result.push("null") else void
+      | Some(v) -> result.push(v.toStringWithFormat(format))
+      };
+      result.push(if (format.usesComma()) "," else "|");
+    };
+    format match {
+    | SKFS.OJSON(fieldNames) -> result.push("\"" + fieldNames[size - 1] + "\":")
+    | _ -> void
     };
     values[size - 1] match {
-    | None() -> void
-    | Some(v) -> result.push(v.toStringOrCsv(csv))
+    | None() -> if (format is SKFS.OJSON _) result.push("null") else void
+    | Some(v) -> result.push(v.toStringWithFormat(format))
+    };
+    if (format is SKFS.OJSON _) {
+      result.push("}");
     };
     Array.concatStringSequence(result)
   }
 
-  fun toKVString(csv: Bool, _key: SKFS.BaseName): String {
+  fun toKVString(format: SKFS.OutputFormat, _key: SKFS.BaseName): String {
     repeat = 0;
     for (_ in Range(0, this.repeat)) {
       !repeat = repeat + this.repeat
     };
-    this.repeat.toString() + "\t" + this.toStringSingle(csv) + "\n"
+    this.repeat.toString() + "\t" + this.toStringSingle(format) + "\n"
   }
 
   fun getInt(n: Int): ?Int {

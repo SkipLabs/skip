@@ -404,12 +404,26 @@ class Evaluator{options: Options, user: ?UserFile} {
       select = compiler.compileSelect(context, selectAst, true);
       selectDir = evalSelect(context, select, None());
       stdout = context.getGlobal("Stdout") match {
-      | Some(StdoutFile(l)) -> l
+      | Some(StdoutFile(_, l)) -> l
       | Some(_) -> invariant_violation("Wrong type for global stdout")
       | None() -> List[]
       };
       !stdout = List.Cons(selectDir, stdout);
-      context.setGlobal("Stdout", StdoutFile(stdout));
+      format = this.options.format match {
+      | OFK_CSV() -> SKFS.OCSV()
+      | OFK_JSON() ->
+        dirDescr = Compiler::getDirDescr(
+          selectAst.params,
+          select.from,
+          select.params,
+          selectDir.dirName.toString(),
+          selectDir.dirName,
+        );
+        fieldNames = dirDescr.schema.map(x -> x.name);
+        SKFS.OJSON(fieldNames)
+      | OFK_SQL() -> SKFS.OSQL()
+      };
+      context.setGlobal("Stdout", StdoutFile(format, stdout));
       None()
 
     | index @ Index _ ->
@@ -1075,11 +1089,11 @@ fun printErrorAndExit(
   skipExit(2)
 }
 
-fun printRow(csv: Bool, row: SKSQL.Row): void {
+fun printRow(format: SKFS.OutputFormat, row: SKSQL.Row): void {
   row match {
   | rvalues @ RowValues(_, r) ->
     for (_ in Range(0, r)) {
-      print_string(rvalues.toStringSingle(csv))
+      print_string(rvalues.toStringSingle(format))
     }
   | RowKind _ -> invariant_violation("Cannot print a RowKind")
   }
@@ -1136,14 +1150,21 @@ fun doOnError(options: Options, f: () -> void, error: Exception -> void): void {
 class StmtFile(stmt: Stmt) extends SKFS.File
 class TickFile(tick: SKFS.Tick) extends SKFS.File
 
+base class OutputFormatKind {
+  children =
+  | OFK_CSV()
+  | OFK_JSON()
+  | OFK_SQL()
+}
+
 class Options{
   alwaysAllowJoins: Bool,
   backtrace: Bool,
   sync: Bool,
   virtual: Bool = false,
   showUsedIndexes: Bool,
-  csv: Bool,
-}
+  format: OutputFormatKind = OFK_SQL(),
+} extends SKFS.File
 
 fun evalQuery(context: mutable SKFS.Context, query: String): Array<RowValues> {
   lexer = SKSQL.Lexer(0, SKSQL.Buffer(query));
@@ -1156,7 +1177,6 @@ fun evalQuery(context: mutable SKFS.Context, query: String): Array<RowValues> {
     sync => false,
     virtual => false,
     showUsedIndexes => false,
-    csv => false,
   };
   compiler = SKSQL.Compiler::create(skOptions, 0);
   cselect = compiler.compileSelect(context, selectAst, true);
@@ -1237,9 +1257,6 @@ fun eval(options: Options, userOpt: ?String): void {
     userOpt.each(user -> _ = connectUser(context, user));
     context.setGlobal("Line", lineFile);
     context.removeGlobal("TableMap");
-    if (options.csv) {
-      context.setGlobal("CSV", SKFS.BoolFile(true));
-    };
 
     gline = lineFile.value;
 
@@ -1527,12 +1544,19 @@ fun updateTableMap(context: mutable SKFS.Context): void {
   context.setGlobal("TableMap", tableMap)
 }
 
-class StdoutFile(value: List<SelectDir>) extends SKFS.File
-class StdoutDiff(dirName: SKFS.DirName, time: SKFS.Tick) extends SKFS.File
+class StdoutFile(
+  format: SKFS.OutputFormat,
+  value: List<SelectDir>,
+) extends SKFS.File
+class StdoutDiff(
+  format: SKFS.OutputFormat,
+  dirName: SKFS.DirName,
+  time: SKFS.Tick,
+) extends SKFS.File
 
 fun showSelect(
   context: mutable SKFS.Context,
-  csv: Bool,
+  format: SKFS.OutputFormat,
   sdir: SelectDir,
 ): void {
   dirName = sdir.dirName;
@@ -1542,27 +1566,26 @@ fun showSelect(
       (_key, rows) = kv;
       rowArray = rows.collect(Array);
       for (row in rowArray) {
-        printRow(csv, RowValues::fromFile(row));
+        printRow(format, RowValues::fromFile(row));
       }
     }
   })
 }
 
 fun printContext(context: mutable SKFS.Context): void {
-  csv = context.getGlobal("CSV") is Some _;
   context.globals.maybeGet("Stdout") match {
   | None() -> void
-  | Some(StdoutFile(stdout)) ->
+  | Some(StdoutFile(format, stdout)) ->
     for (selectDir in stdout.toArray().reversed()) {
-      showSelect(context, csv, selectDir)
+      showSelect(context, format, selectDir)
     }
-  | Some(StdoutDiff(dirName, time)) ->
+  | Some(StdoutDiff(format, dirName, time)) ->
     edir = context.unsafeGetEagerDir(dirName);
     print_string("Time: " + (context.tick.value + 1));
     for (key in edir.getChangesAfter(time)) {
       values = edir.getArrayRaw(key);
       for (value in values) {
-        print_raw(value.toKVString(csv, key))
+        print_raw(value.toKVString(format, key))
       };
     }
   | Some _ -> invariant_violation("Unexpected Stdout type")
