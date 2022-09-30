@@ -332,14 +332,10 @@ async function makeSKDB() {
   };
 
   // This should really not work this way, there whould be a specific command for that
-  var connectGroupsReaders = function(uri, db, user) {
+  var connectGroupsReaders = function(uri, db, userID) {
     let cmd =
-        "skdb --data " + db + " --tail "  +
-        "`skdb --connect skdb_groups_readers --data " + db + "` | egrep '|"+user+"$' | sed 's/.$[\\t]//' | sed 's/|.*//'";
-    console.log(cmd);
-    return;
-
-/*
+        "skdb --data "+db+" --tail `skdb --connect skdb_groups_readers --data "+db+"`"+
+      " | grep --line-buffered '|"+userID+"$' | sed -u 's/|.*//'";
     return new Promise((resolve, reject) => {
       data = '';
       runServerForever(uri, function() { resolve(0) }, cmd, "", function (msg) {
@@ -353,11 +349,10 @@ async function makeSKDB() {
           msg = data + msg.slice(0, index);
           data = newData;
 //          console.log(msg + 'END');
-          runLocal(["--write-csv", tableName], msg);
+          console.log('received group change: ' + msg);
         };
       })
     });
-*/
   };
 
   var connectWriteTable = async function(uri, db, user, tableName) {
@@ -409,8 +404,7 @@ async function makeSKDB() {
       let result = await runServer(uri, cmd, "select id(), uid('"+user+"');");
       [sessionID, userID] = result.split("|").map(x => parseInt(x));
       servers.push([uri, db, user, userID, sessionID]);
-      console.log('userID: ' + userID, " sessionID: ", sessionID);
-//      connectGroupsReaders(uri, db, user);
+      connectGroupsReaders(uri, db, userID);
       return servers.length - 1;
     },
 
