@@ -38,11 +38,15 @@ GROUPID=`(
  echo "commit;"
 ) | $SKDB`
 
+JULIENID=`echo "select userID from skdb_users where userName = 'julienv';" | $SKDB`
+STRANGERID=`echo "select userID from skdb_users where userName = 'stranger';" | $SKDB`
+
 echo "SKIPLABS EMPLOYEES: $GROUPID"
-echo "JULIENV ID: " `echo "select userID from skdb_users where userName = 'julienv';" | $SKDB`
+echo "JULIENV ID: $JULIENID"
+echo "STRANGER ID: $STRANGERID"
 
 echo "create table posts (sessionID integer, localID integer, skdb_privacy integer, skdb_owner integer, data string);" | $SKDB
-
+echo "insert into posts values(22, 23, $GROUPID, $JULIENID, 'my first post');" | $SKDB
 
 
 cd ~/websockify && ./run 3048 -- /home/julienv/skfs/sql/server/start_tcp_server.sh

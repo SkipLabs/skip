@@ -8,7 +8,7 @@ var readline = require('readline');
 /* Primitives to connect to websockets. */
 /* ***************************************************************************/
 
-function makeWebSocket(uri, onmessage, onclose, onerror) {
+function makeWebSocket(uri, onopen, onmessage, onclose, onerror) {
   var socket = null;
   if (typeof window === 'undefined') {
     var W3CWebSocket = require('websocket').w3cwebsocket;
@@ -38,6 +38,7 @@ function makeWebSocket(uri, onmessage, onclose, onerror) {
     socket.onclose = onclose;
     socket.onerror = onerror;
     socket.onopen = function(event) {
+      onopen();
       resolve(
         function(msg) {
           var enc = new TextEncoder();
@@ -53,6 +54,7 @@ function runServer(uri, cmd, stdin) {
   return new Promise((resolve, reject) => {
     makeWebSocket(
       uri,
+      function() {},
       function(msg) {
         data += msg;
       },
@@ -71,6 +73,7 @@ async function runServerWriteForever(uri, cmd) {
 
   let write = await makeWebSocket(
     uri,
+    function() {},
     function(change) { console.log("Error writing: " + change)},
     function(_) { console.log("Error connection lost"); },
     function(err) { console.log("Error connection lost"); }
@@ -80,11 +83,12 @@ async function runServerWriteForever(uri, cmd) {
   return write;
 }
 
-function runServerForever(uri, cmd, stdin, localCmd) {
+function runServerForever(uri, onopen, cmd, stdin, localCmd) {
   var data = "";
 
   makeWebSocket(
     uri,
+    onopen,
     localCmd,
     function(_) { console.log("Error connection lost"); },
     function(err) { console.log("Error connection lost"); }
@@ -300,21 +304,17 @@ async function makeSKDB() {
 
   var typedArray = new Uint8Array(source);
 
+  var mirroredTables = new Array();
+
   var connectReadTable = function(uri, db, user, tableName, suffix) {
     let cmd =
-/*
-        "rm -f /tmp/foo && skdb --data " + db + " --user " + user + " --csv --updates /tmp/foo "  +
-        " --connect " + tableName + " > /dev/null; tail -n +1 -f /tmp/foo" ;
-*/
-
-
-        "skdb --data " + db + " --user " + user + " --csv --tail "  +
-        "`skdb --connect " + tableName + " --data " + db + "`";
+        "skdb --data " + db + " --csv --tail "  +
+        "`skdb --connect " + tableName + " --user " + user + " --data " + db + "`";
 
 
     return new Promise((resolve, reject) => {
       data = '';
-      runServerForever(uri, cmd, "", function (msg) {
+      runServerForever(uri, function() { resolve(0) }, cmd, "", function (msg) {
         if(msg != "") {
 //          console.log('retrieve remote', msg, '>>END');
           var index = msg.lastIndexOf("\n");
@@ -324,10 +324,9 @@ async function makeSKDB() {
           let newData = msg.slice(index);
           msg = data + msg.slice(0, index);
           data = newData;
-          console.log(msg + 'END');
+//          console.log(msg + 'END');
           runLocal(["--write-csv", tableName + suffix], msg);
         };
-        resolve(0);
       })
     });
   };
@@ -345,6 +344,10 @@ async function makeSKDB() {
 
     client: {
 
+      getSessionID: function(tableName) {
+        return mirroredTables[tableName];
+      },
+
       cmd: function(new_args, new_stdin) {
         return runLocal(new_args, new_stdin);
       },
@@ -356,25 +359,39 @@ async function makeSKDB() {
         runLocal(['--csv', '--subscribe', viewName, '--updates', fileName], "");
       },
 
-      sql: function(stdin) {
+      sqlRaw: function(stdin) {
         return runLocal([], stdin);
       },
+
+      sql: function(stdin) {
+        return runLocal(['--json'], stdin)
+                 .split("\n")
+                 .filter(x => x != "")
+                 .map(x => JSON.parse(x));
+      },
+
+      getID: function() {
+        return parseInt(runLocal(['--gensym'], ''));
+      }
     },
 
-    connect: function(uri, db, user) {
-      servers.push([uri, db, user]);
+    connect: async function(uri, db, user) {
+      let cmd = "skdb --data " + db + " --gensym";
+      let sessionID = await runServer(uri, cmd, "");
+      servers.push([uri, db, user, sessionID]);
       return servers.length - 1;
     },
 
     server: function(serverID) {
-      var uri, db, user;
+      var uri, db, user, sessionID;
       if(serverID === undefined) {
-        [uri, db, user] = servers[servers.length - 1];
+        serverID = servers.length - 1;
       }
-      else  {
-        [uri, db, user] = servers[serverID];
-      }
+      [uri, db, user, sessionID] = servers[serverID];
       return {
+        sessionID: function() {
+          return sessionID;
+        },
         cmd: async function(cmd, stdin) {
           let result = await runServer(uri, cmd, stdin);
           return result;
@@ -408,7 +425,10 @@ async function makeSKDB() {
           };
           runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");    
 
+
           await connectReadTable(uri, db, user, tableName, remoteSuffix);
+
+          mirroredTables[tableName] = sessionID;
 
           runLocal([], "create virtual view " + tableName
                    + " as select * from " + tableName + localSuffix +
@@ -440,8 +460,8 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
-  skdb.server().mirrorTable("posts");
+  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
+  await skdb.server().mirrorTable("posts");
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');
 //  skdb.sql('create virtual view posts2 as select * from posts where localID % 2 = 0;');

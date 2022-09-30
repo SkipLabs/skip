@@ -1,6 +1,11 @@
 module alias AP = ArgumentParser;
 
 const argsSchema: Array<AP.Param> = Array[
+  AP.BoolParam{
+    name => "gensym",
+    help => "returns an identifier",
+    negatable => false,
+  },
   AP.BoolParam{name => "all", help => "run all the tests", negatable => false},
   AP.BoolParam{name => "replay", help => "replay a diff", negatable => false},
   AP.BoolParam{
@@ -155,6 +160,11 @@ untracked fun main(): void {
           print_error("Error: don't know what to do with " + file);
         };
         skipExit(2);
+      };
+
+      if (argMap.maybeGet("gensym") is Some(AP.BoolValue _)) {
+        print_string("" + SKFS.genSym(0));
+        return void;
       };
 
       options = SKSQL.Options{

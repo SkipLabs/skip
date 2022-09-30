@@ -277,11 +277,11 @@ mutable class Compiler{
           RowValues::fromFile,
           context,
           userDirName,
-          (_context, writer, key, values) ~> {
+          (context, writer, key, values) ~> {
             values[0].getInt(privacyColNbr) match {
             | None() -> writer.writeArray(key, values)
             | Some(n) ->
-              if (userFile.groups.contains(n)) {
+              if (userFile.contains(context, n)) {
                 writer.writeArray(key, values)
               }
             }

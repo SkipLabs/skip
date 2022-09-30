@@ -1210,7 +1210,25 @@ class Groups(data: SortedSet<Int>) {
     }
   }
 }
-class UserFile(id: Int, name: String, groups: Groups) extends SKFS.File
+class UserFile(id: Int, name: String) extends SKFS.File {
+  const fields: Array<(Int, IASC, Type)> = Array[
+    (0, IASC(), INTEGER()),
+    (1, IASC(), INTEGER()),
+  ];
+  const dirName: SKFS.DirName = SKFS.DirName::create("/skdb_groups_readers/");
+
+  fun contains(context: readonly SKFS.Context, groupID: Int): Bool {
+    readers = context.unsafeGetEagerDir(static::dirName);
+    readers
+      .getArrayRaw(
+        RowKey(
+          RowValues::create(Array[Some(CInt(groupID)), Some(CInt(this.id))]),
+          static::fields,
+        ),
+      )
+      .size() != 0
+  }
+}
 
 fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
   if (userName.contains("'")) {
@@ -1226,15 +1244,7 @@ fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
     skipExit(2)
   };
   userID = userRows[0].getInt(0).fromSome();
-  groupsRows = evalQuery(
-    context,
-    "select * from skdb_groups_readers where readerID = " + userID + ";",
-  );
-  groups = SortedSet[];
-  for (groupRow in groupsRows) {
-    !groups = groups.set(groupRow.getInt(0).fromSome());
-  };
-  UserFile(userID, userName, Groups(groups));
+  UserFile(userID, userName);
 }
 
 fun connectUser(context: mutable SKFS.Context, userName: String): UserFile {
