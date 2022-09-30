@@ -451,6 +451,9 @@ untracked fun main(): void {
           };
           dirName = sub.dirName;
           edir = context.unsafeGetEagerDir(dirName);
+          if (sub.reset(context, SKFS.Tick(tick))) {
+            !tick = 0;
+          };
           changes = edir.getChangesAfter(SKFS.Tick(tick));
           format = options.format match {
           | SKSQL.OFK_CSV() -> SKFS.OCSV()
