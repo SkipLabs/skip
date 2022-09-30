@@ -331,6 +331,35 @@ async function makeSKDB() {
     });
   };
 
+  // This should really not work this way, there whould be a specific command for that
+  var connectGroupsReaders = function(uri, db, user) {
+    let cmd =
+        "skdb --data " + db + " --tail "  +
+        "`skdb --connect skdb_groups_readers --data " + db + "` | egrep '|"+user+"$' | sed 's/.$[\\t]//' | sed 's/|.*//'";
+    console.log(cmd);
+    return;
+
+/*
+    return new Promise((resolve, reject) => {
+      data = '';
+      runServerForever(uri, function() { resolve(0) }, cmd, "", function (msg) {
+        if(msg != "") {
+//          console.log('retrieve remote', msg, '>>END');
+          var index = msg.lastIndexOf("\n");
+          if(index < msg.length) {
+            index++;
+          }
+          let newData = msg.slice(index);
+          msg = data + msg.slice(0, index);
+          data = newData;
+//          console.log(msg + 'END');
+          runLocal(["--write-csv", tableName], msg);
+        };
+      })
+    });
+*/
+  };
+
   var connectWriteTable = async function(uri, db, user, tableName) {
     let cmd =
         "skdb --data " + db + " --user " + user + " --write-csv "  + tableName;
@@ -376,19 +405,25 @@ async function makeSKDB() {
     },
 
     connect: async function(uri, db, user) {
-      let cmd = "skdb --data " + db + " --gensym";
-      let sessionID = await runServer(uri, cmd, "");
-      servers.push([uri, db, user, sessionID]);
+      let cmd = "skdb --data " + db;
+      let result = await runServer(uri, cmd, "select id(), uid('"+user+"');");
+      [sessionID, userID] = result.split("|").map(x => parseInt(x));
+      servers.push([uri, db, user, userID, sessionID]);
+      console.log('userID: ' + userID, " sessionID: ", sessionID);
+//      connectGroupsReaders(uri, db, user);
       return servers.length - 1;
     },
 
     server: function(serverID) {
-      var uri, db, user, sessionID;
+      var uri, db, user, userID, sessionID;
       if(serverID === undefined) {
         serverID = servers.length - 1;
       }
-      [uri, db, user, sessionID] = servers[serverID];
+      [uri, db, user, userID, sessionID] = servers[serverID];
       return {
+        userID: function() {
+          return userID;
+        },
         sessionID: function() {
           return sessionID;
         },
@@ -407,7 +442,7 @@ async function makeSKDB() {
           return result;
         },
         mirrorTable: async function(tableName) {
-          let remoteSuffix = '_remote';
+          let remoteSuffix = '_remote_' + serverID;
           let remoteCmd = 'skdb --data ' + db + ' --dump-table ' + tableName + ' --table-suffix ' + remoteSuffix;
           let createRemoteTable = await runServer(uri, remoteCmd, "");
           runLocal([], createRemoteTable);
