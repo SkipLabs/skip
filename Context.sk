@@ -27,7 +27,9 @@ value class Sub(
   cond: Condition,
   cmd: CmdKind,
   dirName: DirName,
+  userID: ?Int,
   reset: (SKFS.Context, SKFS.Tick) ~> Bool,
+  matchesGroup: (BaseName, Int) ~> Bool,
   filter: SKFS.Context ~> (BaseName ~> Bool) = _ ~> (_ ~> true),
 )
 
@@ -288,10 +290,21 @@ mutable class Context{
     sessionId: Int,
     cmd: CmdKind,
     init: Bool,
+    userID: ?Int,
     reset: (SKFS.Context, SKFS.Tick) ~> Bool,
+    matchesGroup: (BaseName, Int) ~> Bool,
     filter: Context ~> (BaseName ~> Bool),
   ): void {
-    sub = Sub(mutexCreate(), condCreate(), cmd, dirName, reset, filter);
+    sub = Sub(
+      mutexCreate(),
+      condCreate(),
+      cmd,
+      dirName,
+      userID,
+      reset,
+      matchesGroup,
+      filter,
+    );
     if (init) {
       tick0 = Tick(0);
       dir = this.unsafeGetEagerDir(dirName);

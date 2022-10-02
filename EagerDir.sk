@@ -249,6 +249,28 @@ class EagerDir{
     }
   }
 
+  fun writeRemoveDiffStdout(
+    changes: SortedSet<BaseName>,
+    o: String -> void,
+    format: OutputFormat,
+  ): void {
+    writer = mutable Debug.BufferedWriter(o, 1024);
+    if (!changes.isEmpty() && !this.reallyRemove) {
+      writer.write("\n");
+      writer.write("\n");
+    };
+
+    for (key in changes) {
+      values = this.getArrayRaw(key);
+      for (value in values) {
+        writer.write(value.toKVStringRemove(format, key))
+      };
+    };
+
+    writer.flush();
+    flushStdout();
+  }
+
   fun writeDiffStdout(
     context: readonly SKFS.Context,
     changes: SortedSet<BaseName>,

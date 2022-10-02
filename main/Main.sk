@@ -451,8 +451,22 @@ untracked fun main(): void {
           };
           dirName = sub.dirName;
           edir = context.unsafeGetEagerDir(dirName);
-          if (sub.reset(context, SKFS.Tick(tick))) {
-            !tick = 0;
+          sub.userID match {
+          | Some(userID) if (sub.reset(context, SKFS.Tick(tick))) ->
+            readers = context.unsafeGetEagerDir(SKSQL.groupsReaders);
+            toRemove = mutable Vector[];
+            for (rowKey in readers.getChangesAfter(SKFS.Tick(tick))) {
+              rowKey match {
+              | SKSQL.RowKey(row, _) ->
+                if (row.getInt(1).fromSome() == userID) {
+                  toRemove.push(row.getInt(0).fromSome());
+                }
+              | _ -> invariant_violation("Unexpected key type")
+              }
+            };
+            debug(("To remove: ", toRemove));
+            !tick = 0
+          | _ -> void
           };
           changes = edir.getChangesAfter(SKFS.Tick(tick));
           format = options.format match {

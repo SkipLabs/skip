@@ -178,8 +178,8 @@ fun getSubsDirs(
           false
         }
       };
-      filter = request.user match {
-      | None() -> _ ~> _ ~> true
+      (userFile, matchesGroup, filter) = request.user match {
+      | None() -> (None(), ((_, _) ~> false), (_ ~> _ ~> true))
       | Some(userName) ->
         userFile = SKSQL.connectUser(context, userName);
         privacyColNbr = dirDescr.cols.maybeGet("skdb_privacy") match {
@@ -199,18 +199,31 @@ fun getSubsDirs(
           print_error("skdb_privacy must be of type integer");
           skipExit(2)
         };
-        context ~> {
-          (file: SKFS.BaseName) ~> {
+        (
+          Some(userFile.id),
+          ((file: SKFS.BaseName, groupID: Int) ~> {
             file match {
             | k @ RowKey _ ->
               k.row.getInt(privacyColNbr) match {
               | None() -> true
-              | Some(groupID) -> userFile.contains(context, groupID)
+              | Some(gid) -> gid == groupID
               }
             | _ -> true
             }
-          }
-        }
+          }),
+          (context ~> {
+            (file: SKFS.BaseName) ~> {
+              file match {
+              | k @ RowKey _ ->
+                k.row.getInt(privacyColNbr) match {
+                | None() -> true
+                | Some(groupID) -> userFile.contains(context, groupID)
+                }
+              | _ -> true
+              }
+            }
+          }),
+        )
       };
       context.subscribe(
         context,
@@ -218,7 +231,9 @@ fun getSubsDirs(
         sessionID,
         cmd,
         init,
+        userFile,
         reset,
+        matchesGroup,
         filter,
       );
       writer.write(key, SKFS.IntFile(sessionID))

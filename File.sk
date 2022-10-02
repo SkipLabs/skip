@@ -171,6 +171,10 @@ class StringFile(value: .String) extends File {
   fun toKVString(_format: OutputFormat, key: BaseName): String {
     "" + escape(key.toString()) + "\t\"" + escape(this.value) + "\"\n"
   }
+
+  fun toKVStringRemove(_format: OutputFormat, key: BaseName): String {
+    "" + escape(key.toString()) + "\t\n"
+  }
 }
 
 class ArrayCharFile(value: Array<Char>) extends File
@@ -205,6 +209,10 @@ base class File {
       "\t\"" +
       escape(inspect(this).toString()) +
       "\"\n"
+  }
+
+  overridable fun toKVStringRemove(_csv: OutputFormat, key: BaseName): String {
+    "" + escape(key.toString()) + "\t\n"
   }
 }
 
