@@ -12,6 +12,16 @@
 module SKFS;
 
 /*****************************************************************************/
+/* This is a magic directory containing all the pairs of "groupID, readerID".
+ * For example, 32/12, means that the user with a userID 12 can see the
+ * groupID 32. When the groupID is positive it is a whitelist, when it's
+ * negative it is a blacklist.
+ */
+/*****************************************************************************/
+
+const groupsReaders: DirName = DirName::create("/skdb_groups_readers/");
+
+/*****************************************************************************/
 /* Sessions. */
 /*****************************************************************************/
 
@@ -29,7 +39,7 @@ value class Sub(
   dirName: DirName,
   userID: ?Int,
   reset: (SKFS.Context, SKFS.Tick) ~> Bool,
-  matchesGroup: (BaseName, Int) ~> Bool,
+  getGroupID: BaseName ~> Int,
   filter: SKFS.Context ~> (BaseName ~> Bool) = _ ~> (_ ~> true),
 )
 
@@ -292,7 +302,7 @@ mutable class Context{
     init: Bool,
     userID: ?Int,
     reset: (SKFS.Context, SKFS.Tick) ~> Bool,
-    matchesGroup: (BaseName, Int) ~> Bool,
+    matchesGroup: BaseName ~> Int,
     filter: Context ~> (BaseName ~> Bool),
   ): void {
     sub = Sub(
@@ -726,6 +736,22 @@ mutable class Context{
     }
   }
 
+  readonly fun changeInPrivacy(start: Tick): readonly Set<Int> {
+    result = mutable Set[];
+    this.unsafeMaybeGetEagerDir(groupsReaders) match {
+    | None() -> result
+    | Some(readers) ->
+      changes = readers.getChangesAfter(start);
+      for (rowKey in changes) {
+        rowKey match {
+        | SKSQL.RowKey(row, _) -> result.insert(row.getInt(1).fromSome())
+        | _ -> void
+        }
+      };
+      result
+    }
+  }
+
   readonly fun notifyAll(start: Tick): void {
     changedDirNames = this.getGlobal("CHANGED_DIRS") match {
     | None() -> this.dirs.state.getChangesAfter(start)
@@ -733,9 +759,14 @@ mutable class Context{
     | _ -> invariant_violation("Wrong type for CHANGED_DIRS")
     };
     if (this.tick == start) return void;
+    usersPrivacyChanges = this.changeInPrivacy(start);
     for (_ => sub in this.sessions) {
       dirName = sub.dirName;
-      if (!changedDirNames.contains(dirName)) continue;
+      privacyChanged = sub.userID match {
+      | None() -> false
+      | Some(userID) -> usersPrivacyChanges.contains(userID)
+      };
+      if (!privacyChanged && !changedDirNames.contains(dirName)) continue;
       this.unsafeMaybeGetDir(dirName) match {
       | Some(dir @ EagerDir _) ->
         changes = dir.getChangesAfter(start);

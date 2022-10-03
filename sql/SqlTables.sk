@@ -11,9 +11,6 @@ const subsOutput: SKFS.DirName = SKFS.DirName::create("/subsOutput/");
 const indexInput: SKFS.DirName = SKFS.DirName::create("/indexInput/");
 const indexOutput: SKFS.DirName = SKFS.DirName::create("/indexOutput/");
 const indexByCol: SKFS.DirName = SKFS.DirName::create("/indexByCol/");
-const groupsReaders: SKFS.DirName = SKFS.DirName::create(
-  "/skdb_groups_readers/",
-);
 
 extension class TypeDescr extends SKFS.File
 
@@ -165,7 +162,7 @@ fun getSubsDirs(
       | Some(userName) ->
         userFile = SKSQL.connectUser(context, userName);
         (context: SKFS.Context, tick: SKFS.Tick) ~> {
-          readers = context.unsafeGetEagerDir(groupsReaders);
+          readers = context.unsafeGetEagerDir(SKFS.groupsReaders);
           for (rowKey in readers.getChangesAfter(tick)) {
             rowKey match {
             | RowKey(row, _) ->
@@ -179,7 +176,7 @@ fun getSubsDirs(
         }
       };
       (userFile, matchesGroup, filter) = request.user match {
-      | None() -> (None(), ((_, _) ~> false), (_ ~> _ ~> true))
+      | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
       | Some(userName) ->
         userFile = SKSQL.connectUser(context, userName);
         privacyColNbr = dirDescr.cols.maybeGet("skdb_privacy") match {
@@ -201,14 +198,14 @@ fun getSubsDirs(
         };
         (
           Some(userFile.id),
-          ((file: SKFS.BaseName, groupID: Int) ~> {
+          ((file: SKFS.BaseName) ~> {
             file match {
             | k @ RowKey _ ->
               k.row.getInt(privacyColNbr) match {
-              | None() -> true
-              | Some(gid) -> gid == groupID
+              | None() -> 0
+              | Some(gid) -> gid
               }
-            | _ -> true
+            | _ -> 0
             }
           }),
           (context ~> {

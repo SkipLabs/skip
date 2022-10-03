@@ -441,6 +441,7 @@ untracked fun main(): void {
           skipExit(2);
         };
         tick = 0;
+        init = true;
         loop {
           context = SKFS.gContextGet();
           sub = context.sessions.maybeGet(sessionID) match {
@@ -451,24 +452,6 @@ untracked fun main(): void {
           };
           dirName = sub.dirName;
           edir = context.unsafeGetEagerDir(dirName);
-          sub.userID match {
-          | Some(userID) if (sub.reset(context, SKFS.Tick(tick))) ->
-            readers = context.unsafeGetEagerDir(SKSQL.groupsReaders);
-            toRemove = mutable Vector[];
-            for (rowKey in readers.getChangesAfter(SKFS.Tick(tick))) {
-              rowKey match {
-              | SKSQL.RowKey(row, _) ->
-                if (row.getInt(1).fromSome() == userID) {
-                  toRemove.push(row.getInt(0).fromSome());
-                }
-              | _ -> invariant_violation("Unexpected key type")
-              }
-            };
-            debug(("To remove: ", toRemove));
-            !tick = 0
-          | _ -> void
-          };
-          changes = edir.getChangesAfter(SKFS.Tick(tick));
           format = options.format match {
           | SKSQL.OFK_CSV() -> SKFS.OCSV()
           | SKSQL.OFK_JSON() ->
@@ -477,17 +460,81 @@ untracked fun main(): void {
           | SKSQL.OFK_SQL() -> SKFS.OSQL()
           };
 
+          sub.userID match {
+          | Some(userID) if (sub.reset(context, SKFS.Tick(tick)) && !init) ->
+            readers = context.unsafeGetEagerDir(SKFS.groupsReaders);
+            toAdd = mutable Set[];
+            toRemove = mutable Set[];
+            for (rowKey in readers.getChangesAfter(SKFS.Tick(tick))) {
+              rowKey match {
+              | SKSQL.RowKey(row, _) ->
+                if (row.getInt(1).fromSome() == userID) {
+                  arr = readers.getArrayRaw(rowKey);
+                  groupID = row.getInt(0).fromSome();
+                  if (groupID > 0) { // Dealing with a whitelist
+                    if (arr.isEmpty()) {
+                      toRemove.insert(groupID);
+                    } else {
+                      toAdd.insert(groupID);
+                    }
+                  } else { // Dealing with a blacklist
+                    if (arr.isEmpty()) {
+                      toAdd.insert(groupID);
+                    } else {
+                      toRemove.insert(groupID);
+                    }
+                  }
+                }
+              | _ -> invariant_violation("Unexpected key type")
+              }
+            };
+            writer = mutable Debug.BufferedWriter(print_raw, 1024);
+            writer.write("\n");
+            writer.write("\n");
+            for (kv in edir.unsafeGetFileIter()) {
+              (key, valueIter) = kv;
+              values = valueIter.collect(Array);
+              if (toAdd.contains(sub.getGroupID(key))) {
+                if (values.size() == 0) {
+                  writer.write(key.toKVStringRemove(format))
+                } else {
+                  for (value in values) {
+                    writer.write(value.toKVString(format, key))
+                  }
+                }
+              } else if (toRemove.contains(sub.getGroupID(key))) {
+                key match {
+                | SKSQL.RowKey(row, _) ->
+                  writer.write(row.setRepeat(0).toKVString(format, key))
+                | _ -> void
+                }
+              }
+            };
+            writer.flush();
+            flushStdout()
+          | _ -> void
+          };
+          changes = edir.getChangesAfter(SKFS.Tick(tick));
           edir.writeDiffStdout(context, changes, print_raw, format, sub.filter);
           !tick = context.tick.value;
+          !init = false;
           lock = SKFS.unfreezeLock(sub.lock);
           cond = SKFS.unfreezeCond(sub.cond);
           SKFS.mutexLock(lock);
-          status = SKFS.condWait(cond, lock);
-          SKFS.mutexUnlock(lock);
-          if (status != Int32::truncate(0)) {
-            print_error("Connection failed");
-            skipExit(22);
+          while ({
+            newContext = SKFS.gContextGet();
+            newContext
+              .unsafeGetEagerDir(dirName)
+              .getChangesAfter(SKFS.Tick(tick))
+              .isEmpty() &&
+              newContext
+                .unsafeGetEagerDir(SKFS.groupsReaders)
+                .getChangesAfter(SKFS.Tick(tick))
+                .isEmpty()
+          }) {
+            _ = SKFS.condWait(cond, lock);
           };
+          SKFS.mutexUnlock(lock);
         }
       | _ -> void
       };

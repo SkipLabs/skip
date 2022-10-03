@@ -324,7 +324,7 @@ async function makeSKDB() {
           let newData = msg.slice(index);
           msg = data + msg.slice(0, index);
           data = newData;
-//          console.log(msg + 'END');
+//          console.log('BEGIN' + msg + 'END');
           runLocal(["--write-csv", tableName + suffix], msg);
         };
       })
@@ -349,7 +349,7 @@ async function makeSKDB() {
           msg = data + msg.slice(0, index);
           data = newData;
 //          console.log(msg + 'END');
-          console.log('received group change: ' + msg);
+//          console.log('received group change: ' + msg);
         };
       })
     });
@@ -489,8 +489,8 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
-  await skdb.server().mirrorTable("posts");
+//  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
+//  await skdb.server().mirrorTable("posts");
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');
 //  skdb.sql('create virtual view posts2 as select * from posts where localID % 2 = 0;');
