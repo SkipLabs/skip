@@ -75,7 +75,7 @@ async function runServerWriteForever(uri, cmd) {
     uri,
     function() {},
     function(change) { console.log("Error writing: " + change)},
-    function(_) { console.log("Error connection lost"); },
+    function(exn) { console.log("Error connection lost: " + cmd); },
     function(err) { console.log("Error connection lost"); }
   );
 
@@ -450,6 +450,7 @@ async function makeSKDB() {
 
           var fileName = tableName + "_" + user;
           execOnChange[fileDescrNbr] = function(change) {
+            console.log('writing change: ' + change);
             write(change);
           };
           runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");    
@@ -489,8 +490,12 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-//  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
+  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
+  await skdb.server().mirrorTable("all_admin_groups");
+  await skdb.server().mirrorTable("all_users");
+  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
 //  await skdb.server().mirrorTable("posts");
+
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');
 //  skdb.sql('create virtual view posts2 as select * from posts where localID % 2 = 0;');
@@ -527,6 +532,7 @@ async function testDB() {
 }
 
 testDB();
+
 
 /*
   skdb.cmd([], 'create table t1 (a INTEGER, b INTEGER);');

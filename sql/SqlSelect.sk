@@ -1140,7 +1140,9 @@ fun initUnion(rowIter: mutable Iterator<Row>): Array<Row> {
   rows = Array::fillBy(unsortedRows.size(), i ->
     unsortedRows[indexes[i].i1] match {
     | r @ RowKind _ -> r
-    | _ -> invariant_violation("Expected a row kind")
+    | r ->
+      debug(r);
+      invariant_violation("Expected a row kind")
     }
   );
 

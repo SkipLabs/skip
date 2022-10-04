@@ -5,6 +5,7 @@ module SKSQL;
 /*****************************************************************************/
 
 fun checkUserRows(
+  context: readonly SKFS.Context,
   user: UserFile,
   pos: Int,
   table: DirDescr,
@@ -33,7 +34,38 @@ fun checkUserRows(
             ")",
         )
       | Some(CInt(n)) ->
-        if (n != user.id) {
+        if (n == user.id) {
+          table.cols.maybeGet("skdb_privacy") match {
+          | None() ->
+            error(
+              pos,
+              "You cannot write into the table " +
+                table.name +
+                " because you are connected as user " +
+                user.name +
+                ".\n" +
+                "You can only write into tables that define the column skdb_privacy",
+            )
+          | Some(privacyColNbr) ->
+            row.getValue(privacyColNbr) match {
+            | None() -> void
+            | Some(CInt(groupID)) ->
+              if (!user.contains(context, groupID)) {
+                error(
+                  pos,
+                  "You cannot write into the table " +
+                    table.name +
+                    " because you are connected as user " +
+                    user.name +
+                    ".\n" +
+                    "Which is not a member of groupID: " +
+                    groupID,
+                )
+              }
+            | Some(_) -> error(pos, "skdb_privacy should be of type INTEGER")
+            }
+          }
+        } else {
           error(
             pos,
             "skdb_owner is set to the wrong id for user " +
@@ -62,13 +94,9 @@ fun computeTableDescr(
   for (i in Range(0, schema.size())) {
     colVec.push((schema[i].name, i));
   };
-  cols = SortedMap::createFromItems(colVec);
-  colNames = schema.map(ty -> ty.name);
   DirDescr::create{
     name,
-    colNames,
     schema,
-    cols,
     dirName,
     alias => None(),
     windowSize,
@@ -686,7 +714,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
     this.user match {
     | None() -> void
-    | Some(user) -> checkUserRows(user, pos, table, rows)
+    | Some(user) -> checkUserRows(context, user, pos, table, rows)
     };
     table.windowSize match {
     | None() if (inTransaction) ->
@@ -884,7 +912,6 @@ class Evaluator{options: Options, user: ?UserFile} {
     groupsReadersDirName = SKFS.DirName::create("/" + groupsReadersName + "/");
     dirDescr = DirDescr::create{
       name => groupsReadersName,
-      colNames => Array["groupid", "readerid"],
       schema => Array[
         TypeDescr{
           name => "groupid",
@@ -901,7 +928,6 @@ class Evaluator{options: Options, user: ?UserFile} {
           notNull => true,
         },
       ],
-      cols => SortedMap["groupid" => 0, "readerid" => 1],
       dirName => groupsReadersDirName,
       alias => None(),
       windowSize => None(),

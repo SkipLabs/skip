@@ -27,14 +27,17 @@ class DirDescr{
 } extends SKFS.File uses Orderable {
   static fun create{
     name: String,
-    colNames: Array<String>,
     schema: Array<TypeDescr>,
-    cols: SortedMap<String, Int>,
     dirName: SKFS.DirName,
     alias: ?String,
     windowSize: ?Int,
     isInput: Bool,
   }: this {
+    colNames = schema.map(x -> x.name);
+    cols = SortedMap[];
+    for (i => ty in schema) {
+      !cols[ty.name] = i;
+    };
     static{
       name,
       colNames,

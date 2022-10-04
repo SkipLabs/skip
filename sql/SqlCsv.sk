@@ -160,12 +160,40 @@ fun replayDiff(
   user: ?String,
 ): SKFS.ContextOp {
   userFileOpt = user.map(x -> SKSQL.connectUser(context, x));
-  dir = context.unsafeGetEagerDir(table.dirName);
+  origDir = context.unsafeGetEagerDir(table.dirName);
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
   if (table.windowSize is Some _) {
     print_error("Cannot use write-csv on a window or a stream");
     skipExit(23);
   };
+
+  makeFun = rows ->
+    Some((context, _, _) ~> {
+      entries = mutable Vector[];
+      dir = origDir;
+      for (row in rows) {
+        if (row.repeat != 0) continue;
+        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+        for ((source, _) in dir.getDataIter(context, key)) {
+          entries.push((key, (source.value, Array<SKFS.File>[])));
+        };
+      };
+      if (!entries.isEmpty()) {
+        dir.writeArraySourceMany(context, entries.iterator());
+      };
+      !dir = context.unsafeGetEagerDir(table.dirName);
+      dir.writeArrayMany(
+        context,
+        rows
+          .iterator()
+          .filter(row -> row.repeat != 0)
+          .map(row -> {
+            (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
+            ((k : SKFS.BaseName), (v : Array<SKFS.File>))
+          }),
+      );
+      context.update();
+    });
 
   vtry<SKFS.ContextOp>(
     () -> {
@@ -219,7 +247,8 @@ fun replayDiff(
         );
         userFileOpt match {
         | None() -> void
-        | Some(userFile) -> SKSQL.checkUserRows(userFile, pos, table, newRows)
+        | Some(userFile) ->
+          SKSQL.checkUserRows(context, userFile, pos, table, newRows)
         };
         buffer.extend(newRows.map(x -> x.setRepeat(repeat)));
 
@@ -227,35 +256,13 @@ fun replayDiff(
         rows = buffer.toArray();
         buffer.clear();
 
-        f = Some((context, _, _) ~> {
-          dir.writeArrayMany(
-            context,
-            rows.iterator().map(row -> {
-              key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
-              file: SKFS.File = row;
-              (key, Array[file])
-            }),
-          );
-          context.update();
-        });
-        break SKFS.CContinue(f)
+        break SKFS.CContinue(makeFun(rows))
       }
     },
     exn -> {
       if (exn is EndOfFile _) {
         rows = buffer.toArray();
-        f = Some((context, _, _) ~> {
-          dir.writeArrayMany(
-            context,
-            rows.iterator().map(row -> {
-              key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
-              file: SKFS.File = row;
-              (key, Array[file])
-            }),
-          );
-          context.update();
-        });
-        SKFS.CStop(f)
+        SKFS.CStop(makeFun(rows))
       } else {
         throw exn
       }

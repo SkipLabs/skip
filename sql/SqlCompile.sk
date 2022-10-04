@@ -568,9 +568,7 @@ mutable class Compiler{
     };
     DirDescr::create{
       name => selectId,
-      colNames => schema.map(ty -> ty.name),
       schema,
-      cols,
       dirName,
       alias => Some(selectId),
       windowSize,
@@ -1608,13 +1606,11 @@ mutable class Compiler{
             moveMap![tableNbr] = newFrom.size();
             dirDescr = DirDescr::create{
               name => table.dirName.toString(),
-              colNames => from.map(x -> x.i0.colNames).flatten(),
               dirName => table.dirName,
               schema => table.schema.map(x ->
                 if (x.primary) x with {unique => true} else x
               ),
               alias => table.alias,
-              cols => SortedMap[],
               windowSize => table.windowSize,
               isInput => false,
             };
