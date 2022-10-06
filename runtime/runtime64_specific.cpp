@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <pthread.h>
 
 namespace skip {
 struct SkipException : std::exception {
@@ -343,6 +344,18 @@ int32_t SKIP_stdin_has_data() {
   else {
     return 0;
   }
+}
+
+void* wait_for_EOF(void*) {
+  char buf[256];
+  while(read(0, buf, 256) > 0);
+  exit(0);
+  return NULL;
+}
+
+void SKIP_unix_die_on_EOF() {
+  pthread_t thread_id;
+  pthread_create(&thread_id, NULL, &wait_for_EOF, NULL);
 }
 
 }

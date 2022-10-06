@@ -4,13 +4,13 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 read CMD
 
-echo "$CMD" >> /tmp/bar
+echo "$CMD" > "/tmp/session.$$"
 
 while read LINE; do
     if [ "$LINE" == "END" ]; then
         break;
     fi;
-    echo "$LINE" >> /tmp/bar
+    echo "$LINE" >> "/tmp/session.$$"
     echo "$LINE"
 done | eval "cd $SCRIPT_DIR; ${CMD}" 2>&1
 

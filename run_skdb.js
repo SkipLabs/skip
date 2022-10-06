@@ -450,7 +450,7 @@ async function makeSKDB() {
 
           var fileName = tableName + "_" + user;
           execOnChange[fileDescrNbr] = function(change) {
-            console.log('writing change: ' + change);
+//            console.log('writing change: ' + change);
             write(change);
           };
           runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");    
@@ -490,11 +490,11 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
+  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "daniell");
   await skdb.server().mirrorTable("all_admin_groups");
   await skdb.server().mirrorTable("all_users");
   await skdb.server().mirrorTable("whitelist_skiplabs_employees");
-//  await skdb.server().mirrorTable("posts");
+  await skdb.server().mirrorTable("posts");
 
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');

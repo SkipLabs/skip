@@ -131,6 +131,9 @@ fun fixUpDirName(dirNameStr: String): SKFS.DirName {
 @cpp_extern("SKIP_print_persistent_size")
 native fun printPersistentSize(): void;
 
+@cpp_extern("SKIP_unix_die_on_EOF")
+native fun dieOnEOF(): void;
+
 untracked fun main(): void {
   saved = SKFS.newObstack();
   vtry(
@@ -442,6 +445,7 @@ untracked fun main(): void {
         };
         tick = 0;
         init = true;
+        dieOnEOF();
         loop {
           context = SKFS.gContextGet();
           sub = context.sessions.maybeGet(sessionID) match {
