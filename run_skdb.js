@@ -490,7 +490,7 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "daniell");
+  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
   await skdb.server().mirrorTable("all_admin_groups");
   await skdb.server().mirrorTable("all_users");
   await skdb.server().mirrorTable("whitelist_skiplabs_employees");

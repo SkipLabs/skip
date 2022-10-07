@@ -194,3 +194,6 @@ void SKIP_cond_broadcast(void* c) {
 int SKIP_stdin_has_data() {
   return 1;
 }
+
+void SKIP_unix_die_on_EOF() {
+}

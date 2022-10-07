@@ -60,4 +60,4 @@ echo "create table posts (sessionID integer, localID integer, skdb_privacy integ
 echo "insert into posts values(22, 23, $GROUPID, $JULIENID, 'my first post');" | $SKDB
 
 
-cd ~/websockify && ./run 3048 --wrap-mode=respawn -v  -- /home/julienv/skfs/sql/server/start_tcp_server.sh
+cd ~/websockify && ./run 3048 -v  -- /home/julienv/skfs/sql/server/start_tcp_server.sh
