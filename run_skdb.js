@@ -399,7 +399,7 @@ async function makeSKDB() {
       }
     },
 
-    connect: async function(uri, db, user) {
+    connect: async function(uri, db, user, token) {
       let cmd = "skdb --data " + db;
       let result = await runServer(uri, cmd, "select id(), uid('"+user+"');");
       [sessionID, userID] = result.split("|").map(x => parseInt(x));
@@ -490,11 +490,13 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv");
+  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv", "auth0|123456");
   await skdb.server().mirrorTable("all_admin_groups");
   await skdb.server().mirrorTable("all_users");
-  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
-  await skdb.server().mirrorTable("posts");
+  await skdb.server().mirrorTable("whitelist_skiplabs_employees_data");
+  await skdb.server().mirrorTable("posts_data");
+  await skdb.client.sql("create virtual view posts_latest as select ID, data, present, max(timestamp) from posts_data group by id;");
+  await skdb.client.sql("create virtual view posts as select ID, data from posts_latest where present <> 0;");
 
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');
