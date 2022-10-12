@@ -13,4 +13,4 @@ cat ../privacy/init.sql | $SKDB
 
 cat initdb.sql | $SKDB
 
-#cd ~/websockify && ./run 3048 -v  -- /home/julienv/skfs/sql/server/start_tcp_server.sh
+# cd ~/websockify && ./run 3048 -v  -- /home/julienv/skfs/sql/server/start_tcp_server.sh
