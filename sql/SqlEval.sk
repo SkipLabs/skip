@@ -355,11 +355,15 @@ class Evaluator{options: Options, user: ?UserFile} {
     inTransaction: Bool,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     stmt match {
-    | Table{pos, name, schema, windowSize} ->
+    | Table{pos, name => origName, schema, isUser, windowSize} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
       };
-      Some((context, _, _) ~> {
+      Some((context, delta, oldRoot) ~> {
+        name = origName;
+        if (isUser) {
+          !name = name + "_modifs";
+        };
         dirDescr = computeTableDescr(name, schema, windowSize);
         windowSize match {
         | Some(x) if (x < 0) ->
@@ -372,7 +376,87 @@ class Evaluator{options: Options, user: ?UserFile} {
         | Some(_) -> true
         | None() -> false
         };
-        this.createTable(context, pos, name, dirDescr, reallyRemove)
+        if (isUser) {
+          dirDescr.cols.maybeGet("skdb_privacy") match {
+          | None() ->
+            print_error(
+              "The column skdb_privacy is not defined for user table",
+            );
+            skipExit(44)
+          | Some(colNbr) ->
+            if (!(schema[colNbr].ty is INTEGER _)) {
+              print_error("skdb_privacy expects type INTEGER");
+              skipExit(45)
+            }
+          };
+          dirDescr.cols.maybeGet("skdb_owner") match {
+          | None() ->
+            print_error("The column skdb_owner is not defined for user table");
+            skipExit(44)
+          | Some(colNbr) ->
+            if (!(schema[colNbr].ty is INTEGER _)) {
+              print_error("skdb_owner expects type INTEGER");
+              skipExit(45)
+            }
+          };
+          dirDescr.cols.maybeGet("skdb_timestamp") match {
+          | None() ->
+            print_error(
+              "The column skdb_timestamp is not defined for user table",
+            );
+            skipExit(44)
+          | Some(colNbr) ->
+            if (!(schema[colNbr].ty is INTEGER _)) {
+              print_error("skdb_timestamp expects type INTEGER");
+              skipExit(45)
+            }
+          };
+          dirDescr.cols.maybeGet("skdb_present") match {
+          | None() ->
+            print_error(
+              "The column skdb_present is not defined for user table",
+            );
+            skipExit(44)
+          | Some(colNbr) ->
+            if (!(schema[colNbr].ty is INTEGER _)) {
+              print_error("skdb_present expects type INTEGER");
+              skipExit(45)
+            }
+          };
+        };
+        this.createTable(context, pos, name, dirDescr, reallyRemove);
+        if (isUser) {
+          selectParams = schema
+            .map(ty ->
+              if (ty.name == "skdb_timestamp") "max(skdb_timestamp)" else {
+                ty.name
+              }
+            )
+            .join(", ");
+          groupBy = schema
+            .filter(ty -> ty.name != "skdb_timestamp")
+            .map(ty -> ty.name)
+            .join(", ");
+          text =
+            "select " +
+            selectParams +
+            " from " +
+            name +
+            " group by " +
+            groupBy +
+            " having skdb_present = 1;";
+          (_, queryOpt) = parseStmt(Lexer(0, Buffer(text)), 0);
+          query = queryOpt.fromSome() match {
+          | select @ Select _ -> select
+          | _ -> invariant_violation("Unexpected query type")
+          };
+          view = View{pos, virtual => true, name => origName, query, text};
+
+          this.stmt(context, view, inTransaction) match {
+          | None() -> void
+          | Some(f) -> f(context, delta, oldRoot)
+          }
+        }
       })
     | Insert{pos, name, paramsOpt, values} ->
       baseName = SKFS.SID::create(name);
