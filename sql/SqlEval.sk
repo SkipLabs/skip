@@ -428,29 +428,37 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (isUser) {
           selectParams = schema
             .map(ty ->
-              if (ty.name == "skdb_timestamp") "max(skdb_timestamp)" else {
+              if (ty.name == "skdb_timestamp") {
+                "max(skdb_timestamp) as skdb_timestamp"
+              } else {
                 ty.name
               }
             )
             .join(", ");
           groupBy = schema
             .filter(ty -> ty.name != "skdb_timestamp")
+            .filter(ty -> ty.name != "skdb_present")
             .map(ty -> ty.name)
             .join(", ");
-          text =
+          textQuery =
             "select " +
             selectParams +
             " from " +
             name +
             " group by " +
-            groupBy +
-            " having skdb_present = 1;";
-          (_, queryOpt) = parseStmt(Lexer(0, Buffer(text)), 0);
+            groupBy;
+          (_, queryOpt) = parseStmt(Lexer(0, Buffer(textQuery + ";")), 0);
           query = queryOpt.fromSome() match {
           | select @ Select _ -> select
           | _ -> invariant_violation("Unexpected query type")
           };
-          view = View{pos, virtual => true, name => origName, query, text};
+          view = View{
+            pos,
+            virtual => true,
+            name => origName,
+            query,
+            text => "create virtual view " + origName + " " + textQuery,
+          };
 
           this.stmt(context, view, inTransaction) match {
           | None() -> void

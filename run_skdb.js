@@ -395,6 +395,23 @@ async function makeSKDB() {
                  .map(x => JSON.parse(x));
       },
 
+      insert: function(tableName, values) {
+        values = values.map(x => { 
+          if(typeof x == 'string') {
+            if(x == undefined) {
+              return "NULL";
+            }
+            return "'" + x + "'";
+          };
+          return x;
+        });
+        let stdin = "insert into " + tableName + " values (" + values.join(", ") + ");";
+        return runLocal(['--json'], stdin)
+                 .split("\n")
+                 .filter(x => x != "")
+                 .map(x => JSON.parse(x));        
+      },
+
       getID: function() {
         return parseInt(runLocal(['--gensym'], ''));
       }
@@ -422,19 +439,34 @@ async function makeSKDB() {
         sessionID: function() {
           return sessionID;
         },
-        cmd: async function(cmd, stdin) {
-          let result = await runServer(uri, cmd, stdin);
+        cmd: async function(passwd, args, stdin) {
+          if(passwd != "admin1234") {
+            console.log("Error: wrong admin password");
+            return;
+          }
+          cmdline = "skdb --data " + db + " " + args.join(" ");
+          let result = await runServer(uri, cmdline, stdin);
           return result;
         },
-        sqlRaw: async function(stdin) {
+        sqlRaw: async function(passwd, stdin) {
+          if(passwd != "admin1234") {
+            console.log("Error: wrong admin password");
+            return;
+          }
           var cmd = "skdb --data " + db + " --user " + user;
           let result = await runServer(uri, cmd, stdin);
           return result;
         },
-        sql: async function(stdin) {
-          var cmd = "skdb --data " + db + " --user " + user;
+        sql: async function(passwd, stdin) {
+          if(passwd != "admin1234") {
+            console.log("Error: wrong admin password");
+            return;
+          }
+          var cmd = "skdb --json --data " + db;
           let result = await runServer(uri, cmd, stdin);
-          return result;
+          return result.split("\n")
+                 .filter(x => x != "")
+                 .map(x => JSON.parse(x));
         },
         mirrorTable: async function(tableName) {
           let remoteSuffix = '_remote_' + serverID;
@@ -447,7 +479,7 @@ async function makeSKDB() {
           let createLocalTable = await runServer(uri, localCmd, "");
           runLocal([], createLocalTable);
 
-          let write = await connectWriteTable(uri, db, user, tableName);
+          let write = await connectWriteTable(uri, db, user, tableName + "_modifs");
 
           var fileName = tableName + "_" + user;
           execOnChange[fileDescrNbr] = function(change) {
@@ -462,9 +494,24 @@ async function makeSKDB() {
           mirroredTables[tableName] = sessionID;
 
           runLocal([], "create virtual view " + tableName
-                   + " as select * from " + tableName + localSuffix +
-                   " union select * from " + tableName + remoteSuffix + ";");
+                   + " as select * from " + tableName + localSuffix + " where skdb_present = 1 " +
+                   " union select * from " + tableName + remoteSuffix + " where skdb_present = 1;");
 
+        },
+        mirrorView: async function(tableName, suffix) {
+          let remoteCmd = 'skdb --data ' + db + ' --dump-table ' + tableName;
+          if(suffix == undefined) {
+            suffix = '';
+          }
+          else {
+            remoteCmd = remoteCmd + ' --table-suffix ' + suffix;
+          }
+          let createRemoteTable = await runServer(uri, remoteCmd, "");
+          runLocal([], createRemoteTable);
+
+          await connectReadTable(uri, db, user, tableName, suffix);
+
+          mirroredTables[tableName] = sessionID;
         },
       };
     },
@@ -489,16 +536,15 @@ runServer(
 ).then(x => console.log(x));
 */
 
+
 async function testDB() {
   skdb = await makeSKDB();
   sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv", "auth0|123456");
-  await skdb.server().mirrorTable("all_users");
-  await skdb.server().mirrorTable("all_groups");
-  await skdb.server().mirrorTable("users_country");
-  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
+//  await skdb.server().mirrorView("all_users");
+//  await skdb.server().mirrorView("all_groups");
+//  await skdb.server().mirrorTable("user_profiles");
+//  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
   await skdb.server().mirrorTable("posts");
-  await skdb.client.sql("create virtual view posts_latest as select ID, data, present, max(timestamp) from posts group by id;");
-  await skdb.client.sql("create virtual view posts_data as select ID, data from posts_latest where present <> 0;");
 
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');

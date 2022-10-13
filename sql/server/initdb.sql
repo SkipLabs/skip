@@ -12,17 +12,45 @@ insert into skdb_users values(id(), 'laurem');
 -- Creating a table of country codes associated with users.
 -------------------------------------------------------------------------------
 
-create table users_country(id INTEGER, countryCode STRING, skdb_privacy INTEGER, skdb_owner INTEGER, present INTEGER, timestamp INTEGER);
-create virtual view users_country_latest as
-  select id, countryCode, skdb_privacy, present, max(timestamp) from users_country group by id;
-create virtual view users_country_present as
-  select id, countryCode, skdb_privacy from users_country_latest where present <> 0;
+create user table user_profiles(
+  id INTEGER,
+  full_name STRING,
+  country_code STRING,
+  skdb_privacy INTEGER,
+  skdb_owner INTEGER,
+  skdb_present INTEGER,
+  skdb_timestamp INTEGER
+);
 
-insert into users_country select userID, 'US', NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER) from skdb_users where userName = 'julienv';
-insert into users_country select userID, 'FR', NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER) from skdb_users where userName = 'daniell';
-insert into users_country select userID, 'UK', NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER) from skdb_users where userName = 'gregs';
-insert into users_country select userID, 'FR', NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER) from skdb_users where userName = 'lucash';
-insert into users_country select userID, 'FR', NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER) from skdb_users where userName = 'laurem';
+insert into user_profiles_modifs
+  select userID, 'Julien Verlaguet', 'US',
+         NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER)
+  from skdb_users
+  where username = 'julienv';
+
+insert into user_profiles_modifs
+  select userID, 'Daniel Lopes', 'FR',
+         NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER)
+  from skdb_users
+  where username = 'daniell';
+
+insert into user_profiles_modifs
+  select userID, 'Greg Sexton', 'UK',
+         NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER)
+  from skdb_users
+  where username = 'gregs';
+
+insert into user_profiles_modifs
+  select userID, 'Lucas Hosseini', 'FR',
+         NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER)
+  from skdb_users
+  where username = 'lucash';
+
+insert into user_profiles_modifs
+  select userID, 'Laure Martin', 'FR',
+         NULL, userID, 1, CAST(strftime('%s', 'now') AS INTEGER)
+  from skdb_users
+  where username = 'laurem';
 
 -------------------------------------------------------------------------------
 -- Creating a visible table of users/groups.
@@ -30,79 +58,109 @@ insert into users_country select userID, 'FR', NULL, userID, 1, CAST(strftime('%
 -- with the column skdb_visibility set to NULL so that everybody can see it.
 -------------------------------------------------------------------------------
 
-create virtual view all_users as select userID, userName, null as skdb_privacy from skdb_users;
-create virtual view all_groups as select groupID, readers, null as skdb_privacy from skdb_groups;
+create virtual view all_users as
+  select userID, username, null as skdb_privacy from skdb_users;
+
+create virtual view all_groups as
+  select groupID, readers, null as skdb_privacy from skdb_groups;
 
 -------------------------------------------------------------------------------
--- Creating our first whitelist.
+-- Creating whitelists, one is for skiplabs employees, the other for
+-- skiplabs employees based in France.
 -------------------------------------------------------------------------------
 
-create table whitelist_skiplabs_employees_modifs (userID INTEGER, skdb_privacy INTEGER, skdb_owner INTEGER, present INTEGER, timestamp INTEGER);
-create virtual view whitelist_skiplabs_employees as select userID, present, max(timestamp) from whitelist_skiplabs_employees_modifs group by userID having present = 1;
-create virtual view whitelist_skiplabs_employees_country as select userID, countryCode from whitelist_skiplabs_employees, users_country where userID = id;
-create virtual view whitelist_skiplabs_employees_FR as select userID from whitelist_skiplabs_employees_country where countryCode = 'FR';
+create user table whitelist_skiplabs_employees (
+  userID INTEGER,
+  skdb_privacy INTEGER,
+  skdb_owner INTEGER,
+  skdb_present INTEGER,
+  skdb_timestamp INTEGER
+);
 
+create virtual view whitelist_skiplabs_employees_country as
+  select userID, country_code
+  from whitelist_skiplabs_employees, user_profiles
+  where userID = id;
+
+create virtual view whitelist_skiplabs_employees_FR as
+  select userID
+  from whitelist_skiplabs_employees_country
+  where country_code = 'FR';
 
 insert into whitelist_skiplabs_employees_modifs
   select userID,
          NULL,
-         (select userID from skdb_users where userName = 'julienv'),
+         (select userID from skdb_users where username = 'julienv'),
          1,
          CAST(strftime('%s', 'now') AS INTEGER)
-  from all_users where userName = 'julienv';
+  from all_users where username = 'julienv';
 
 insert into whitelist_skiplabs_employees_modifs
   select userID,
          NULL,
-         (select userID from skdb_users where userName = 'julienv'),
+         (select userID from skdb_users where username = 'julienv'),
          1,
          CAST(strftime('%s', 'now') AS INTEGER)
-  from all_users where userName = 'daniell';
+  from all_users where username = 'daniell';
 
 insert into whitelist_skiplabs_employees_modifs
   select userID,
          NULL,
-         (select userID from skdb_users where userName = 'julienv'),
+         (select userID from skdb_users where username = 'julienv'),
          1,
          CAST(strftime('%s', 'now') AS INTEGER)         
-  from all_users where userName = 'gregs';
+  from all_users where username = 'gregs';
 
 insert into whitelist_skiplabs_employees_modifs
   select userID,
          NULL,
-         (select userID from skdb_users where userName = 'julienv'),
+         (select userID from skdb_users where username = 'julienv'),
          1,
          CAST(strftime('%s', 'now') AS INTEGER)         
-  from all_users where userName = 'lucash';
+  from all_users where username = 'lucash';
 
 insert into whitelist_skiplabs_employees_modifs
   select userID,
          NULL,
-         (select userID from skdb_users where userName = 'julienv'),
+         (select userID from skdb_users where username = 'julienv'),
          1,
          CAST(strftime('%s', 'now') AS INTEGER)         
-  from all_users where userName = 'laurem';
-
+  from all_users where username = 'laurem';
 
 insert into skdb_groups values(id(), 'whitelist_skiplabs_employees');
 insert into skdb_groups values(id(), 'whitelist_skiplabs_employees_FR');
 
-create table posts (ID integer, skdb_privacy integer, skdb_owner integer, timestamp INTEGER, present INTEGER, data string);
-insert into posts select 
+-------------------------------------------------------------------------------
+-- Posts
+-------------------------------------------------------------------------------
+
+create user table posts (
+  ID integer,
+  data string,
+  skdb_privacy integer,
+  skdb_owner integer,
+  skdb_timestamp INTEGER,
+  skdb_present INTEGER
+);
+
+create virtual view posts_count as
+  select count(*) as count, null as skdb_privacy from posts;
+
+insert into posts_modifs select 
   23,
+  'my first post',
   (select groupID from skdb_groups where readers = 'whitelist_skiplabs_employees'),
-  (select userID from skdb_users where userName = 'julienv'),
+  (select userID from skdb_users where username = 'julienv'),
   cast(strftime('%s', 'now') as INTEGER) * 1000,
-  1,
-  'my first post'
+  1
 ;
 
-insert into posts select 
-  23,
+insert into posts_modifs select 
+  24,
+  'my first post for employees based in France',
   (select groupID from skdb_groups where readers = 'whitelist_skiplabs_employees_FR'),
-  (select userID from skdb_users where userName = 'lucash'),
+  (select userID from skdb_users where username = 'lucash'),
   cast(strftime('%s', 'now') as INTEGER) * 1000,
-  1,
-  'my first post for employees based in France'
+  1
 ;
 
