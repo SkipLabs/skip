@@ -722,14 +722,9 @@ fun parseExprList(lex: Lexer, pos: Int): (Int, Array<Expr>) {
 }
 
 fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
-  if (lex.isEqUpper(pos, "USER")) {
-    !pos = lex.expectUpper(pos, "USER");
-    !pos = lex.expectUpper(pos, "TABLE");
-    return parseCreateTable(lex, pos, true, None());
-  };
   if (lex.isEqUpper(pos, "TABLE")) {
     !pos = lex.expectUpper(pos, "TABLE");
-    return parseCreateTable(lex, pos, false, None());
+    return parseCreateTable(lex, pos, None());
   };
   if (lex.isEqUpper(pos, "UNIQUE")) {
     !pos = lex.expectUpper(pos, "UNIQUE");
@@ -752,11 +747,11 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
   if (lex.isEqUpper(pos, "WINDOW")) {
     !pos = lex.expectUpper(pos, "WINDOW");
     (!pos, wsize) = lex.nextInt(pos);
-    return parseCreateTable(lex, pos, false, Some(wsize));
+    return parseCreateTable(lex, pos, Some(wsize));
   };
   if (lex.isEqUpper(pos, "STREAM")) {
     !pos = lex.expectUpper(pos, "STREAM");
-    return parseCreateTable(lex, pos, false, Some(0));
+    return parseCreateTable(lex, pos, Some(0));
   };
   error(pos, "Unexpected token");
 }
@@ -1022,16 +1017,11 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
   error(pos, "Invalid value")
 }
 
-fun parseCreateTable(
-  lex: Lexer,
-  pos: Int,
-  isUser: Bool,
-  windowSize: ?Int,
-): (Int, Table) {
+fun parseCreateTable(lex: Lexer, pos: Int, windowSize: ?Int): (Int, Table) {
   (!pos, name) = lex.nextWord(pos);
   !name = name.lowercase();
   (!pos, schema) = parseTableSchema(lex, pos);
-  (pos, Table{pos, name, schema, isUser, windowSize})
+  (pos, Table{pos, name, schema, windowSize})
 }
 
 fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {

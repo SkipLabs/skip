@@ -5,7 +5,6 @@ module SKSQL;
 /*****************************************************************************/
 
 fun checkUserRows(
-  context: readonly SKFS.Context,
   user: UserFile,
   pos: Int,
   table: DirDescr,
@@ -34,38 +33,7 @@ fun checkUserRows(
             ")",
         )
       | Some(CInt(n)) ->
-        if (n == user.id) {
-          table.cols.maybeGet("skdb_privacy") match {
-          | None() ->
-            error(
-              pos,
-              "You cannot write into the table " +
-                table.name +
-                " because you are connected as user " +
-                user.name +
-                ".\n" +
-                "You can only write into tables that define the column skdb_privacy",
-            )
-          | Some(privacyColNbr) ->
-            row.getValue(privacyColNbr) match {
-            | None() -> void
-            | Some(CInt(groupID)) ->
-              if (!user.contains(context, groupID)) {
-                error(
-                  pos,
-                  "You cannot write into the table " +
-                    table.name +
-                    " because you are connected as user " +
-                    user.name +
-                    ".\n" +
-                    "Which is not a member of groupID: " +
-                    groupID,
-                )
-              }
-            | Some(_) -> error(pos, "skdb_privacy should be of type INTEGER")
-            }
-          }
-        } else {
+        if (n != user.id) {
           error(
             pos,
             "skdb_owner is set to the wrong id for user " +
@@ -355,15 +323,11 @@ class Evaluator{options: Options, user: ?UserFile} {
     inTransaction: Bool,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     stmt match {
-    | Table{pos, name => origName, schema, isUser, windowSize} ->
+    | Table{pos, name, schema, windowSize} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
       };
-      Some((context, delta, oldRoot) ~> {
-        name = origName;
-        if (isUser) {
-          !name = name + "_modifs";
-        };
+      Some((context, _, _) ~> {
         dirDescr = computeTableDescr(name, schema, windowSize);
         windowSize match {
         | Some(x) if (x < 0) ->
@@ -376,95 +340,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         | Some(_) -> true
         | None() -> false
         };
-        if (isUser) {
-          dirDescr.cols.maybeGet("skdb_privacy") match {
-          | None() ->
-            print_error(
-              "The column skdb_privacy is not defined for user table",
-            );
-            skipExit(44)
-          | Some(colNbr) ->
-            if (!(schema[colNbr].ty is INTEGER _)) {
-              print_error("skdb_privacy expects type INTEGER");
-              skipExit(45)
-            }
-          };
-          dirDescr.cols.maybeGet("skdb_owner") match {
-          | None() ->
-            print_error("The column skdb_owner is not defined for user table");
-            skipExit(44)
-          | Some(colNbr) ->
-            if (!(schema[colNbr].ty is INTEGER _)) {
-              print_error("skdb_owner expects type INTEGER");
-              skipExit(45)
-            }
-          };
-          dirDescr.cols.maybeGet("skdb_timestamp") match {
-          | None() ->
-            print_error(
-              "The column skdb_timestamp is not defined for user table",
-            );
-            skipExit(44)
-          | Some(colNbr) ->
-            if (!(schema[colNbr].ty is INTEGER _)) {
-              print_error("skdb_timestamp expects type INTEGER");
-              skipExit(45)
-            }
-          };
-          dirDescr.cols.maybeGet("skdb_present") match {
-          | None() ->
-            print_error(
-              "The column skdb_present is not defined for user table",
-            );
-            skipExit(44)
-          | Some(colNbr) ->
-            if (!(schema[colNbr].ty is INTEGER _)) {
-              print_error("skdb_present expects type INTEGER");
-              skipExit(45)
-            }
-          };
-        };
         this.createTable(context, pos, name, dirDescr, reallyRemove);
-        if (isUser) {
-          selectParams = schema
-            .map(ty ->
-              if (ty.name == "skdb_timestamp") {
-                "max(skdb_timestamp) as skdb_timestamp"
-              } else {
-                ty.name
-              }
-            )
-            .join(", ");
-          groupBy = schema
-            .filter(ty -> ty.name != "skdb_timestamp")
-            .filter(ty -> ty.name != "skdb_present")
-            .map(ty -> ty.name)
-            .join(", ");
-          textQuery =
-            "select " +
-            selectParams +
-            " from " +
-            name +
-            " group by " +
-            groupBy;
-          (_, queryOpt) = parseStmt(Lexer(0, Buffer(textQuery + ";")), 0);
-          query = queryOpt.fromSome() match {
-          | select @ Select _ -> select
-          | _ -> invariant_violation("Unexpected query type")
-          };
-          view = View{
-            pos,
-            virtual => true,
-            name => origName,
-            query,
-            text => "create virtual view " + origName + " " + textQuery,
-          };
-
-          this.stmt(context, view, inTransaction) match {
-          | None() -> void
-          | Some(f) -> f(context, delta, oldRoot)
-          }
-        }
       })
     | Insert{pos, name, paramsOpt, values} ->
       baseName = SKFS.SID::create(name);
@@ -806,7 +682,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
     this.user match {
     | None() -> void
-    | Some(user) -> checkUserRows(context, user, pos, table, rows)
+    | Some(user) -> checkUserRows(user, pos, table, rows)
     };
     table.windowSize match {
     | None() if (inTransaction) ->
