@@ -244,54 +244,6 @@ mutable class Compiler{
       }
     };
 
-    context.getGlobal("USER") match {
-    | None() -> void
-    | Some(file) ->
-      userFile = UserFile::fromFile(file);
-      !from = from.map(dirDescrAndRange -> {
-        (dirDescr, range) = dirDescrAndRange;
-        privacyColNbr = dirDescr.cols.maybeGet("skdb_privacy") match {
-        | None() ->
-          print_error(
-            "Cannot access table: " +
-              dirDescr.name +
-              ".\n" +
-              "You are connected as user " +
-              userFile.name +
-              " you can only access tables defining the column skdb_privacy.",
-          );
-          skipExit(2)
-        | Some(x) -> x
-        };
-        if (!(dirDescr.schema[privacyColNbr].ty is INTEGER())) {
-          print_error("skdb_privacy must be of type integer");
-          skipExit(2)
-        };
-        userDirName = SKFS.DirName::create(
-          dirDescr.dirName.toString() + "user" + userFile.id + "/",
-        );
-        _ = SKFS.EHandle(
-          RowValues::fromFile,
-          dirDescr.dirName,
-        ).contextWriterKeyValues(
-          RowValues::fromFile,
-          context,
-          userDirName,
-          (context, writer, key, values) ~> {
-            values[0].getInt(privacyColNbr) match {
-            | None() -> writer.writeArray(key, values)
-            | Some(n) ->
-              if (userFile.contains(context, n)) {
-                writer.writeArray(key, values)
-              }
-            }
-          },
-        );
-        !dirDescr.dirName = userDirName;
-        (dirDescr, range);
-      })
-    };
-
     cselect = CSelect{
       id => select.id +
         context.getGlobal("TableMap") match {

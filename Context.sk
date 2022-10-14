@@ -19,7 +19,7 @@ module SKFS;
  */
 /*****************************************************************************/
 
-const groupsReaders: DirName = DirName::create("/skdb_groups_readers/");
+const accessReaders: DirName = DirName::create("/skdb_access_readers/");
 
 /*****************************************************************************/
 /* Sessions. */
@@ -40,7 +40,7 @@ value class Sub(
   userID: ?Int,
   reset: (SKFS.Context, SKFS.Tick) ~> Bool,
   getGroupID: BaseName ~> Int,
-  filter: SKFS.Context ~> (BaseName ~> Bool) = _ ~> (_ ~> true),
+  filter: SKFS.Context ~> (BaseName -> Bool) = _ ~> (_ -> true),
 )
 
 /*****************************************************************************/
@@ -303,7 +303,7 @@ mutable class Context{
     userID: ?Int,
     reset: (SKFS.Context, SKFS.Tick) ~> Bool,
     matchesGroup: BaseName ~> Int,
-    filter: Context ~> (BaseName ~> Bool),
+    filter: Context ~> (BaseName -> Bool),
   ): void {
     sub = Sub(
       mutexCreate(),
@@ -738,7 +738,7 @@ mutable class Context{
 
   readonly fun changeInPrivacy(start: Tick): readonly Set<Int> {
     result = mutable Set[];
-    this.unsafeMaybeGetEagerDir(groupsReaders) match {
+    this.unsafeMaybeGetEagerDir(accessReaders) match {
     | None() -> result
     | Some(readers) ->
       changes = readers.getChangesAfter(start);

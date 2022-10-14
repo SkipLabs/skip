@@ -466,7 +466,9 @@ untracked fun main(): void {
 
           sub.userID match {
           | Some(userID) if (sub.reset(context, SKFS.Tick(tick)) && !init) ->
-            readers = context.unsafeGetEagerDir(SKFS.groupsReaders);
+            readers = context.unsafeGetEagerDir(
+              SKFS.DirName::create("/skdb_access_readers/"),
+            );
             toAdd = mutable Set[];
             toRemove = mutable Set[];
             for (rowKey in readers.getChangesAfter(SKFS.Tick(tick))) {
@@ -532,7 +534,7 @@ untracked fun main(): void {
               .getChangesAfter(SKFS.Tick(tick))
               .isEmpty() &&
               newContext
-                .unsafeGetEagerDir(SKFS.groupsReaders)
+                .unsafeGetEagerDir(SKFS.accessReaders)
                 .getChangesAfter(SKFS.Tick(tick))
                 .isEmpty()
           }) {

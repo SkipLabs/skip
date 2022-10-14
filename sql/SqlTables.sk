@@ -165,7 +165,7 @@ fun getSubsDirs(
       | Some(userName) ->
         userFile = SKSQL.connectUser(context, userName);
         (context: SKFS.Context, tick: SKFS.Tick) ~> {
-          readers = context.unsafeGetEagerDir(SKFS.groupsReaders);
+          readers = context.unsafeGetEagerDir(SKFS.accessReaders);
           for (rowKey in readers.getChangesAfter(tick)) {
             rowKey match {
             | RowKey(row, _) ->
@@ -182,7 +182,7 @@ fun getSubsDirs(
       | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
       | Some(userName) ->
         userFile = SKSQL.connectUser(context, userName);
-        privacyColNbr = dirDescr.cols.maybeGet("skdb_privacy") match {
+        accessColNbr = dirDescr.cols.maybeGet("skdb_access") match {
         | None() ->
           print_error(
             "Cannot access table: " +
@@ -190,13 +190,13 @@ fun getSubsDirs(
               ".\n" +
               "You are connected as user " +
               userName +
-              " you can only access tables defining the column skdb_privacy.",
+              " you can only access tables defining the column skdb_access.",
           );
           skipExit(2)
         | Some(x) -> x
         };
-        if (!(dirDescr.schema[privacyColNbr].ty is INTEGER())) {
-          print_error("skdb_privacy must be of type integer");
+        if (!(dirDescr.schema[accessColNbr].ty is INTEGER())) {
+          print_error("skdb_access must be of type integer");
           skipExit(2)
         };
         (
@@ -204,7 +204,7 @@ fun getSubsDirs(
           ((file: SKFS.BaseName) ~> {
             file match {
             | k @ RowKey _ ->
-              k.row.getInt(privacyColNbr) match {
+              k.row.getInt(accessColNbr) match {
               | None() -> 0
               | Some(gid) -> gid
               }
@@ -212,12 +212,13 @@ fun getSubsDirs(
             }
           }),
           (context ~> {
-            (file: SKFS.BaseName) ~> {
+            access = mutable AccessSolver(userFile.id);
+            (file: SKFS.BaseName) -> {
               file match {
               | k @ RowKey _ ->
-                k.row.getInt(privacyColNbr) match {
+                k.row.getInt(accessColNbr) match {
                 | None() -> true
-                | Some(groupID) -> userFile.contains(context, groupID)
+                | Some(accessID) -> access.canRead(context, accessID)
                 }
               | _ -> true
               }

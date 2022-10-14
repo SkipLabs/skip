@@ -8,40 +8,36 @@ insert into skdb_users values(id(), 'gregs');
 insert into skdb_users values(id(), 'lucash');
 insert into skdb_users values(id(), 'laurem');
 
--------------------------------------------------------------------------------
--- Creating a table of country codes associated with users.
--------------------------------------------------------------------------------
-
-create table user_profiles(
-  id INTEGER,
+create table profiles(
+  skdb_owner INTEGER,
   full_name STRING,
   country_code STRING,
-  skdb_privacy INTEGER,
-  skdb_owner INTEGER
+  skdb_access INTEGER
 );
 
-insert into user_profiles
-  select userID, 'Julien Verlaguet', 'US', NULL, userID
+insert into profiles
+  select userID, 'Julien Verlaguet', 'US', -1
   from skdb_users
-  where username = 'julienv';
+  where username = 'julienv'
+;
 
-insert into user_profiles
-  select userID, 'Daniel Lopes', 'FR', NULL, userID
-  from skdb_users
-  where username = 'daniell';
+insert into profiles
+   select userID, 'Daniel Lopes', 'FR', -1
+   from skdb_users
+   where username = 'daniell';
 
-insert into user_profiles
-  select userID, 'Greg Sexton', 'UK', NULL, userID
+insert into profiles
+  select userID, 'Greg Sexton', 'UK', -1
   from skdb_users
   where username = 'gregs';
 
-insert into user_profiles
-  select userID, 'Lucas Hosseini', 'FR', NULL, userID
+insert into profiles
+  select userID, 'Lucas Hosseini', 'FR', -1
   from skdb_users
   where username = 'lucash';
 
-insert into user_profiles
-  select userID, 'Laure Martin', 'FR',NULL, userID
+insert into profiles
+  select userID, 'Laure Martin', 'FR', -1
   from skdb_users
   where username = 'laurem';
 
@@ -52,14 +48,14 @@ insert into user_profiles
 -------------------------------------------------------------------------------
 
 create virtual view all_users as
-  select userID, username, null as skdb_privacy from skdb_users;
+  select userID, username, -1 as skdb_access from skdb_users;
 
 create virtual view all_groups as
-  select groupID, readers, null as skdb_privacy from skdb_groups;
+  select groupID, members, -1 as skdb_access from skdb_groups;
+
 
 -------------------------------------------------------------------------------
--- Creating whitelists, one is for skiplabs employees, the other for
--- skiplabs employees based in France.
+-- Creating a table of country codes associated with users.
 -------------------------------------------------------------------------------
 
 create table whitelist_skiplabs_employees_admin (
@@ -75,13 +71,13 @@ insert into skdb_groups values(id(), 'whitelist_skiplabs_employees_admin');
 
 create table whitelist_skiplabs_employees (
   userID INTEGER,
-  skdb_privacy INTEGER
+  skdb_access INTEGER
 );
 
 create virtual view whitelist_skiplabs_employees_country as
   select userID, country_code
-  from whitelist_skiplabs_employees, user_profiles
-  where userID = id;
+  from whitelist_skiplabs_employees, profiles
+  where userID = skdb_owner;
 
 create virtual view whitelist_skiplabs_employees_FR as
   select userID
@@ -94,7 +90,7 @@ insert into whitelist_skiplabs_employees
     (
       select groupID
       from skdb_groups
-      where readers = 'whitelist_skiplabs_employees_admin'
+      where members = 'whitelist_skiplabs_employees_admin'
     )
   from skdb_users
   where username = 'julienv' OR
@@ -107,6 +103,24 @@ insert into whitelist_skiplabs_employees
 insert into skdb_groups values(id(), 'whitelist_skiplabs_employees');
 insert into skdb_groups values(id(), 'whitelist_skiplabs_employees_FR');
 
+insert into skdb_access select
+  id(),
+  groupID,
+  groupID,
+  'skiplabs_employees'
+  from skdb_groups
+  where members = 'whitelist_skiplabs_employees'
+;
+
+insert into skdb_access select
+  id(),
+  groupID,
+  groupID,
+  'skiplabs_employees_FR'
+  from skdb_groups
+  where members = 'whitelist_skiplabs_employees_FR'
+;
+
 -------------------------------------------------------------------------------
 -- Posts
 -------------------------------------------------------------------------------
@@ -114,44 +128,21 @@ insert into skdb_groups values(id(), 'whitelist_skiplabs_employees_FR');
 create table posts (
   ID integer,
   data string,
-  skdb_privacy integer,
+  skdb_access integer not null,
   skdb_owner integer
 );
 
 insert into posts select 
    23,
    'my first post',
-   (select groupID from skdb_groups where readers = 'whitelist_skiplabs_employees'),
+   (select accessID from skdb_access where name = 'skiplabs_employees'),
    (select userID from skdb_users where username = 'julienv')
 ;
 
 insert into posts select 
    24,
    'my first post for employees based in France',
-   (select groupID from skdb_groups where readers = 'whitelist_skiplabs_employees_FR'),
+   (select accessID from skdb_access where name = 'skiplabs_employees_FR'),
    (select userID from skdb_users where username = 'lucash')
 ;
-
-create virtual view readers_fid
-  select cast(groupID as STRING) || '-' || cast(readerID as STRING) as fid
-  from skdb_groups_readers
-;
-
-create virtual view posts_with_fid
-  select
-    cast(skdb_privacy as STRING) || '-' || cast(skdb_owner as STRING) as fid,
-    data
-  from posts
-;
-
-create virtual view visible_posts
-  select p.fid, p.data
-  from posts_with_fid as p, readers_fid as r
-  where p.fid = r.fid
-;
-
-select * from visible_posts;
-
-create virtual view posts_count as
-  select count(*) as count, null as skdb_privacy from posts;
 
