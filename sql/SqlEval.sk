@@ -1195,15 +1195,6 @@ base class GroupKind {
   | BlackList()
 }
 
-class Groups(data: SortedSet<Int>) {
-  fun contains(groupID: Int): Bool {
-    if (groupID < 0) {
-      !this.data.contains(groupID)
-    } else {
-      this.data.contains(groupID)
-    }
-  }
-}
 class UserFile(id: Int, name: String) extends SKFS.File {
   const fields: Array<(Int, IASC, Type)> = Array[
     (0, IASC(), INTEGER()),
@@ -1213,14 +1204,15 @@ class UserFile(id: Int, name: String) extends SKFS.File {
 
   fun contains(context: readonly SKFS.Context, groupID: Int): Bool {
     readers = context.unsafeGetEagerDir(static::dirName);
-    readers
+    size = readers
       .getArrayRaw(
         RowKey(
           RowValues::create(Array[Some(CInt(groupID)), Some(CInt(this.id))]),
           static::fields,
         ),
       )
-      .size() != 0
+      .size();
+    if (groupID > 0) size != 0 else size == 0
   }
 }
 
