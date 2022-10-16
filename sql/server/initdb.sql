@@ -12,32 +12,33 @@ create table profiles(
   skdb_owner INTEGER,
   full_name STRING,
   country_code STRING,
-  skdb_access INTEGER
+  skdb_access INTEGER,
+  employer STRING
 );
 
 insert into profiles
-  select userID, 'Julien Verlaguet', 'US', -1
+  select userID, 'Julien Verlaguet', 'US', -1, 'skiplabs'
   from skdb_users
   where username = 'julienv'
 ;
 
 insert into profiles
-   select userID, 'Daniel Lopes', 'FR', -1
+   select userID, 'Daniel Lopes', 'FR', -1, 'skiplabs'
    from skdb_users
    where username = 'daniell';
 
 insert into profiles
-  select userID, 'Greg Sexton', 'UK', -1
+  select userID, 'Greg Sexton', 'UK', -1, 'skiplabs'
   from skdb_users
   where username = 'gregs';
 
 insert into profiles
-  select userID, 'Lucas Hosseini', 'FR', -1
+  select userID, 'Lucas Hosseini', 'FR', -1, 'skiplabs'
   from skdb_users
   where username = 'lucash';
 
 insert into profiles
-  select userID, 'Laure Martin', 'FR', -1
+  select userID, 'Laure Martin', 'FR', -1, 'skiplabs'
   from skdb_users
   where username = 'laurem';
 
@@ -58,47 +59,16 @@ create virtual view all_groups as
 -- Creating a table of country codes associated with users.
 -------------------------------------------------------------------------------
 
-create table whitelist_skiplabs_employees_admin (
-  userID INTEGER
-);
-
-insert into whitelist_skiplabs_employees_admin
-  select userID from skdb_users
-  where username = 'julienv'
+create virtual view whitelist_skiplabs_employees as
+  select skdb_owner as userID from profiles where employer = 'skiplabs'
 ;
-
-insert into skdb_groups values(id(), 'whitelist_skiplabs_employees_admin');
-
-create table whitelist_skiplabs_employees (
-  userID INTEGER,
-  skdb_access INTEGER
-);
-
-create virtual view whitelist_skiplabs_employees_country as
-  select userID, country_code
-  from whitelist_skiplabs_employees, profiles
-  where userID = skdb_owner;
 
 create virtual view whitelist_skiplabs_employees_FR as
-  select userID
-  from whitelist_skiplabs_employees_country
-  where country_code = 'FR';
-
-insert into whitelist_skiplabs_employees
-  select
-    userID,
-    (
-      select groupID
-      from skdb_groups
-      where members = 'whitelist_skiplabs_employees_admin'
-    )
-  from skdb_users
-  where username = 'julienv' OR
-        username = 'lucash' OR
-        username = 'daniell' OR
-        username = 'gregs' OR
-        username = 'laurem'
+  select skdb_owner as userID
+  from profiles
+  where employer = 'skiplabs' AND country_code = 'FR'
 ;
+
 
 insert into skdb_groups values(id(), 'whitelist_skiplabs_employees');
 insert into skdb_groups values(id(), 'whitelist_skiplabs_employees_FR');

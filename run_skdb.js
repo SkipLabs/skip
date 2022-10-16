@@ -453,7 +453,7 @@ async function makeSKDB() {
             console.log("Error: wrong admin password");
             return;
           }
-          var cmd = "skdb --data " + db + " --user " + user;
+          var cmd = "skdb --data " + db;
           let result = await runServer(uri, cmd, stdin);
           return result;
         },
@@ -539,12 +539,12 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "daniell", "auth0|123456");
+//  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv", "auth0|123456");
 //  await skdb.server().mirrorView("all_users");
 //  await skdb.server().mirrorView("all_groups");
 //  await skdb.server().mirrorTable("user_profiles");
 //  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
-  await skdb.server().mirrorTable("posts");
+//  await skdb.server().mirrorTable("posts");
 
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');

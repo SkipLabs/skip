@@ -94,6 +94,10 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Dumps the inserts in SQL format",
     negatable => false,
   },
+  AP.StringParam{
+    name => "dump-view",
+    help => "prints a specific view signature",
+  },
   AP.BoolParam{
     name => "dump-views",
     help => "Dumps the views in SQL format",
@@ -229,7 +233,7 @@ untracked fun main(): void {
         | _ -> None()
         };
         SKSQL.runSql(options, context ~> {
-          SKSQL.dumpTable(context, tableName, suffix);
+          SKSQL.dumpTable(context, tableName.lowercase(), suffix);
           skipExit(0);
           SKFS.CStop(None())
         });
@@ -266,6 +270,22 @@ untracked fun main(): void {
         };
         SKSQL.runSql(options, context ~> {
           SKSQL.dumpInserts(context);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("dump-view") match {
+      | Some(AP.StringValue{value => viewName}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, context ~> {
+          SKSQL.dumpView(context, viewName.lowercase());
+          skipExit(0);
           SKFS.CStop(None())
         });
         return void

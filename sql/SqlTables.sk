@@ -510,6 +510,21 @@ fun dumpInserts(origContext: readonly SKFS.Context): void {
   });
 }
 
+fun dumpView(origContext: readonly SKFS.Context, viewName: String): void {
+  context = SKFS.Context::fromSaved(origContext.clone());
+  hviews = getViewsDir(context);
+  viewsDir = context.unsafeGetEagerDir(hviews.dirName);
+  arr = viewsDir.getArrayRaw(SKFS.SID(viewName));
+  if (arr.size() == 0) {
+    print_error("View " + viewName + " not found");
+    skipExit(104);
+  };
+  invariant(arr.size() == 1);
+  print_raw(SelectFile::fromFile(arr[0]).text);
+  print_raw(";\n");
+  flushStdout();
+}
+
 fun dumpViews(origContext: readonly SKFS.Context): void {
   context = SKFS.Context::fromSaved(origContext.clone());
   handle = getViewsDir(context);
