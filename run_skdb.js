@@ -479,7 +479,7 @@ async function makeSKDB() {
           let createLocalTable = await runServer(uri, localCmd, "");
           runLocal([], createLocalTable);
 
-          let write = await connectWriteTable(uri, db, user, tableName + "_modifs");
+          let write = await connectWriteTable(uri, db, user, tableName);
 
           var fileName = tableName + "_" + user;
           execOnChange[fileDescrNbr] = function(change) {
@@ -494,8 +494,8 @@ async function makeSKDB() {
           mirroredTables[tableName] = sessionID;
 
           runLocal([], "create virtual view " + tableName
-                   + " as select * from " + tableName + localSuffix + " where skdb_present = 1 " +
-                   " union select * from " + tableName + remoteSuffix + " where skdb_present = 1;");
+                   + " as select * from " + tableName + localSuffix +
+                   " union select * from " + tableName + remoteSuffix + ";");
 
         },
         mirrorView: async function(tableName, suffix) {
@@ -539,7 +539,7 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv", "auth0|123456");
+  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "daniell", "auth0|123456");
 //  await skdb.server().mirrorView("all_users");
 //  await skdb.server().mirrorView("all_groups");
 //  await skdb.server().mirrorTable("user_profiles");
