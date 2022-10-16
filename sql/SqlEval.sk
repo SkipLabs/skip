@@ -1308,29 +1308,43 @@ mutable class AccessSolver(
   }
 }
 
-class UserFile(id: Int, name: String) extends SKFS.File
-
-fun makeUserFile(context: mutable SKFS.Context, userName: String): UserFile {
-  if (userName.contains("'")) {
-    print_error("Invalid user name");
-    skipExit(2);
-  };
-  userRows = evalQuery(
-    context,
-    "select userID from skdb_users where userName = '" + userName + "';",
-  );
-  if (userRows.size() == 0) {
-    print_error("Could not find user: " + userName);
-    skipExit(2)
-  };
-  userID = userRows[0].getInt(0).fromSome();
-  UserFile(userID, userName);
+class UserFile(id: Int, name: String) extends SKFS.File {
+  static fun create(
+    context: mutable SKFS.Context,
+    userName: String,
+    password: String,
+  ): UserFile {
+    if (userName.contains("'")) {
+      print_error("Invalid user name");
+      skipExit(2);
+    };
+    userRows = evalQuery(
+      context,
+      "select userID, password from skdb_users where userName = '" +
+        userName +
+        "';",
+    );
+    if (userRows.size() == 0) {
+      print_error("Could not find user: " + userName);
+      skipExit(2)
+    };
+    if (userRows[0].getString(1).fromSome() != password) {
+      print_error("Invalid password for user: " + userName);
+      skipExit(2)
+    };
+    userID = userRows[0].getInt(0).fromSome();
+    UserFile(userID, userName);
+  }
 }
 
-fun connectUser(context: mutable SKFS.Context, userName: String): UserFile {
+fun connectUser(
+  context: mutable SKFS.Context,
+  userName: String,
+  password: String,
+): UserFile {
   context.getGlobal("USER") match {
   | None() ->
-    userFile = makeUserFile(context, userName);
+    userFile = UserFile::create(context, userName, password);
     context.setGlobal("USER", userFile);
     userFile
   | Some(x) -> UserFile::fromFile(x)

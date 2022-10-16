@@ -892,16 +892,9 @@ mutable class Compiler{
       CIExpr(CExists(this.compileSelect(context, select, false)))
     | SKSQL.Call("coalesce", None()) ->
       error(this.pos, "Missing arguments for COALESCE")
-    | Call("uid", Some(args)) ->
+    | Call("uid", _) ->
       context.getGlobal("USER") match {
       | None() ->
-        if (args.size() != 0) {
-          args[0] match {
-          | Literal(userName, true) ->
-            return CIExpr(CILiteral(makeUserFile(context, userName).id))
-          | _ -> error(this.pos, "uid expects a string literal")
-          }
-        };
         error(
           this.pos,
           "Cannot use a the function uid() if not connected as a user",

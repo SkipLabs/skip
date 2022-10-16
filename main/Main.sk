@@ -108,10 +108,8 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Dumps tables/inserts/views in SQL format",
     negatable => false,
   },
-  AP.StringParam{
-    name => "user",
-    help => "name of the user (to compute access rights)",
-  },
+  AP.StringParam{name => "user", help => "name of the user"},
+  AP.StringParam{name => "password", help => "password of the user"},
 ];
 
 fun getParsedArgs(): AP.ParseResult {
@@ -346,7 +344,14 @@ untracked fun main(): void {
           };
           user = userNameOpt match {
           | None() -> None()
-          | Some(x) -> Some(SKSQL.connectUser(context, x))
+          | Some(userName) ->
+            argMap.maybeGet("password") match {
+            | Some(AP.StringValue{value => password}) ->
+              Some(SKSQL.connectUser(context, userName, password))
+            | _ ->
+              print_error("Password missing for user " + userName);
+              skipExit(57)
+            }
           };
           vtry<SKFS.ContextOp>(
             () -> {
@@ -587,7 +592,14 @@ untracked fun main(): void {
           | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
           };
           user = argMap.maybeGet("user") match {
-          | Some(AP.StringValue{value}) -> Some(value)
+          | Some(AP.StringValue{value => userName}) ->
+            argMap.maybeGet("password") match {
+            | Some(AP.StringValue{value => password}) ->
+              Some((userName, password))
+            | _ ->
+              print_error("Password missing for user " + userName);
+              skipExit(57)
+            }
           | _ -> None()
           };
           myReadLine = () -> {
@@ -648,7 +660,14 @@ untracked fun main(): void {
           inputDir = context.unsafeGetEagerDir(input.dirName);
           sessionID = SKFS.genSym(0);
           user = argMap.maybeGet("user") match {
-          | Some(AP.StringValue{value => userName}) -> Some(userName)
+          | Some(AP.StringValue{value => userName}) ->
+            argMap.maybeGet("password") match {
+            | Some(AP.StringValue{value => password}) ->
+              Some((userName, password))
+            | _ ->
+              print_error("Password missing for user " + userName);
+              skipExit(57)
+            }
           | _ -> None()
           };
           request = SKSQL.SubRequestFile(
