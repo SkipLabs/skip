@@ -1337,20 +1337,6 @@ class UserFile(id: Int, name: String) extends SKFS.File {
   }
 }
 
-fun connectUser(
-  context: mutable SKFS.Context,
-  userName: String,
-  password: String,
-): UserFile {
-  context.getGlobal("USER") match {
-  | None() ->
-    userFile = UserFile::create(context, userName, password);
-    context.setGlobal("USER", userFile);
-    userFile
-  | Some(x) -> UserFile::fromFile(x)
-  }
-}
-
 fun eval(options: Options, userOpt: ?String): void {
   runSql(options, context ~> {
     if (isATTY() != 0) {

@@ -54,7 +54,6 @@ create virtual view all_users as
 create virtual view all_groups as
   select groupID, members, -1 as skdb_access from skdb_groups;
 
-
 -------------------------------------------------------------------------------
 -- Creating a table of country codes associated with users.
 -------------------------------------------------------------------------------
@@ -91,6 +90,54 @@ insert into skdb_access select
 ;
 
 -------------------------------------------------------------------------------
+-- Friends
+-------------------------------------------------------------------------------
+
+create table friends (skdb_owner INTEGER, friend INTEGER, skdb_access INTEGER);
+
+create table whitelist_julienv (userID integer);
+insert into whitelist_julienv
+  select userID from skdb_users where userName = 'julienv'
+;
+insert into skdb_groups values (id(), 'whitelist_julienv');
+
+create virtual view whitelist_julienv_friends as
+  select friend
+  from friends
+  where skdb_owner = (select userID from skdb_users where userName = 'julienv')
+  union
+    select userID from skdb_users where userName = 'julienv'
+;
+insert into skdb_groups values (id(), 'whitelist_julienv_friends');
+
+insert into skdb_access select
+  id(),
+  (select groupID
+   from skdb_groups
+   where members = 'whitelist_julienv_friends'
+  ),
+  (select groupID
+   from skdb_groups
+   where members = 'whitelist_julienv'
+  ),
+  'julienv_friends'
+;
+
+-------------------------------------------------------------------------------
+-- All access
+-------------------------------------------------------------------------------
+
+create virtual view all_access as
+  select accessID,
+         readers.members as readers,
+         writers.members as writers,
+         -1 as skdb_access
+  from skdb_access, skdb_groups as readers, skdb_groups as writers
+  where skdb_access.readersID = readers.groupID AND
+        skdb_access.writersID = writers.groupID
+;
+
+-------------------------------------------------------------------------------
 -- Posts
 -------------------------------------------------------------------------------
 
@@ -103,7 +150,7 @@ create table posts (
 
 insert into posts select 
    23,
-   'my first post',
+   'my first post for skiplabs employees',
    (select accessID from skdb_access where name = 'skiplabs_employees'),
    (select userID from skdb_users where username = 'julienv')
 ;
@@ -112,6 +159,12 @@ insert into posts select
    24,
    'my first post for employees based in France',
    (select accessID from skdb_access where name = 'skiplabs_employees_FR'),
-   (select userID from skdb_users where username = 'lucash')
+   (select userID from skdb_users where username = 'julienv')
 ;
 
+insert into posts select 
+   25,
+   'my first post for my friends',
+   (select accessID from skdb_access where name = 'julienv_friends'),
+   (select userID from skdb_users where username = 'julienv')
+;
