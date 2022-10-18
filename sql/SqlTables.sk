@@ -163,7 +163,7 @@ fun getSubsDirs(
       reset = request.user match {
       | None() -> (_, _) ~> false
       | Some((userName, password)) ->
-        userFile = SKSQL.connectUser(context, userName, password);
+        userFile = SKSQL.UserFile::create(context, userName, password);
         (context: SKFS.Context, tick: SKFS.Tick) ~> {
           readers = context.unsafeGetEagerDir(SKFS.accessReaders);
           for (rowKey in readers.getChangesAfter(tick)) {
@@ -181,7 +181,7 @@ fun getSubsDirs(
       (userFile, matchesGroup, filter) = request.user match {
       | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
       | Some((userName, password)) ->
-        userFile = SKSQL.connectUser(context, userName, password);
+        userFile = SKSQL.UserFile::create(context, userName, password);
         accessColNbr = dirDescr.cols.maybeGet("skdb_access") match {
         | None() ->
           print_error(

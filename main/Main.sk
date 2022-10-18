@@ -347,7 +347,7 @@ untracked fun main(): void {
           | Some(userName) ->
             argMap.maybeGet("password") match {
             | Some(AP.StringValue{value => password}) ->
-              Some(SKSQL.connectUser(context, userName, password))
+              Some(SKSQL.UserFile::create(context, userName, password))
             | _ ->
               print_error("Password missing for user " + userName);
               skipExit(57)

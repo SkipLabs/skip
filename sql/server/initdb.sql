@@ -101,12 +101,32 @@ insert into whitelist_julienv
 ;
 insert into skdb_groups values (id(), 'whitelist_julienv');
 
+insert into skdb_access select
+  id(),
+  (select groupID
+   from skdb_groups
+   where members = 'whitelist_julienv'
+  ),
+  (select groupID
+   from skdb_groups
+   where members = 'whitelist_julienv'
+  ),
+  'julienv'
+;
+
 create virtual view whitelist_julienv_friends as
-  select friend
-  from friends
-  where skdb_owner = (select userID from skdb_users where userName = 'julienv')
+    select
+      friend,
+      (select accessID from skdb_access where name = 'julienv') as skdb_access
+    from friends
+    where
+      skdb_owner = (select userID from skdb_users where userName = 'julienv')
   union
-    select userID from skdb_users where userName = 'julienv'
+    select
+      userID,
+      (select accessID from skdb_access where name = 'julienv') as skdb_access
+    from skdb_users
+    where userName = 'julienv'
 ;
 insert into skdb_groups values (id(), 'whitelist_julienv_friends');
 

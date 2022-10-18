@@ -312,8 +312,6 @@ async function makeSKDB() {
         "`skdb --connect " + tableName + " --user " + user +
         " --password " + password + " --data " + db + "`"
         ;
-    console.log(cmd);
-
 
     return new Promise((resolve, reject) => {
       data = '';
@@ -543,12 +541,13 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "daniell", "passdaniell");
+//  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "daniell", "passdaniell");
 //  await skdb.server().mirrorView("all_users");
 //  await skdb.server().mirrorView("all_groups");
 //  await skdb.server().mirrorTable("user_profiles");
 //  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
-  await skdb.server().mirrorTable("posts");
+//  await skdb.server().mirrorTable("posts");
+//  await skdb.server().mirrorTable("all_access");
 
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');

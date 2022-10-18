@@ -159,7 +159,7 @@ fun replayDiff(
   table: SKSQL.DirDescr,
   user: ?(String, String),
 ): SKFS.ContextOp {
-  userFileOpt = user.map(x -> SKSQL.connectUser(context, x.i0, x.i1));
+  userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x.i0, x.i1));
   origDir = context.unsafeGetEagerDir(table.dirName);
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
   if (table.windowSize is Some _) {
