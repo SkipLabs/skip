@@ -1,35 +1,53 @@
 #!/bin/bash
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SKDB=skdb
 
-read CMD
+cd $SCRIPT_DIR
 
-while read LINE; do
+read LINE
+RRD="$LINE"
+
+CMD=`echo "$LINE" | $SKDB --csv-field 0`
+
+(while read LINE; do
     if [ "$LINE" == "END" ]; then
         break;
     fi;
     echo "$LINE"
-done | eval "cd $SCRIPT_DIR; ${CMD}" 2>&1
+done) |
+(
+case "$CMD" in
 
-# while read LINE; do
-#     if [ "$LINE" = "\r" ]; then
-#         break;
-#     fi;
-#     echo "$LINE" | egrep -q "^Sec-WebSocket-Key"
-#     if [ "$?" -eq "0" ]; then
-#         str=`echo -n $LINE | sed 's/\r//g' | sed 's/Sec-WebSocket-Key: //'`
-#         str+="258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-#         hash=`echo -n "$str" | openssl dgst -binary -sha1 | openssl base64 -A`
-#     fi
-# done 
+  "SQL")
+    DB=`echo "$LINE" | $SKDB --csv-field 1`
+    $SKDB --data "$DB"
+    ;;
 
-# echo -e "HTTP/1.1 101 Switching Protocols\r"
-# echo -e "Upgrade: websocket\r"
-# echo -e "Connection: Upgrade\r"
-# echo -e "Sec-WebSocket-Accept: $hash\r"
-# echo -e "\r"
-# echo -e "\r"
+  "DUMP_TABLE")
+    DB=`echo "$LINE" | $SKDB --csv-field 1`
+    TABLE_NAME=`echo "$LINE" | $SKDB --csv-field 2`
+    TABLE_SUFFIX=`echo "$LINE" | $SKDB --csv-field 3`
+    $SKDB --data "$DB" --dump-table "$TABLE_NAME" --table-suffix "$TABLE_SUFFIX"
+    ;;
 
-# while read LINE; do
-#     echo "$LINE";
-# done
+  "WRITE")
+    DB=`echo "$LINE" | $SKDB --csv-field 1`
+    USER=`echo "$LINE" | $SKDB --csv-field 2`
+    PASSWORD=`echo "$LINE" | $SKDB --csv-field 3`
+    TABLE_NAME=`echo "$LINE" | $SKDB --csv-field 4`
+    $SKDB --data "$DB" --user "$USER" --password "$PASSWORD" --write-csv "$TABLE_NAME"
+    ;;
+
+  "TAIL")
+    DB=`echo "$LINE" | $SKDB --csv-field 1`
+    USER=`echo "$LINE" | $SKDB --csv-field 2`
+    PASSWORD=`echo "$LINE" | $SKDB --csv-field 3`
+    TABLE_NAME=`echo "$LINE" | $SKDB --csv-field 4`
+    $SKDB --data "$DB" --csv --tail `$SKDB --connect "$TABLE_NAME" --user "$USER" --password "$PASSWORD" --data "$DB"`
+    ;;
+  *)
+    eval "${RRD}" 2>&1
+    ;;
+esac 2>&1
+)

@@ -307,12 +307,8 @@ async function makeSKDB() {
   var mirroredTables = new Array();
 
   var connectReadTable = function(uri, db, user, password, tableName, suffix) {
-    let cmd =
-        "skdb --data " + db + " --csv --tail "  +
-        "`skdb --connect " + tableName + " --user " + user +
-        " --password " + password + " --data " + db + "`"
-        ;
-
+    let cmd =["TAIL", db, user, password, tableName].join(",");
+    console.log(cmd);
     return new Promise((resolve, reject) => {
       data = '';
       runServerForever(uri, function() { resolve(0) }, cmd, "", function (msg) {
@@ -327,30 +323,6 @@ async function makeSKDB() {
           data = newData;
 //          console.log('BEGIN' + msg + 'END');
           runLocal(["--write-csv", tableName + suffix], msg);
-        };
-      })
-    });
-  };
-
-  // This should really not work this way, there whould be a specific command for that
-  var connectGroupsReaders = function(uri, db, userID) {
-    let cmd =
-        "skdb --data "+db+" --tail `skdb --connect skdb_groups_readers --data "+db+"`"+
-      " | grep --line-buffered '|"+userID+"$' | sed -u 's/|.*//'";
-    return new Promise((resolve, reject) => {
-      data = '';
-      runServerForever(uri, function() { resolve(0) }, cmd, "", function (msg) {
-        if(msg != "") {
-//          console.log('retrieve remote', msg, '>>END');
-          var index = msg.lastIndexOf("\n");
-          if(index < msg.length) {
-            index++;
-          }
-          let newData = msg.slice(index);
-          msg = data + msg.slice(0, index);
-          data = newData;
-//          console.log(msg + 'END');
-//          console.log('received group change: ' + msg);
         };
       })
     });
@@ -424,7 +396,6 @@ async function makeSKDB() {
       let result = await runServer(uri, cmd, "select id(), uid('"+user+"');");
       [sessionID, userID] = result.split("|").map(x => parseInt(x));
       servers.push([uri, db, user, password, userID, sessionID]);
-      connectGroupsReaders(uri, db, userID);
       return servers.length - 1;
     },
 
@@ -511,7 +482,7 @@ async function makeSKDB() {
           let createRemoteTable = await runServer(uri, remoteCmd, "");
           runLocal([], createRemoteTable);
 
-          await connectReadTable(uri, db, user, tableName, suffix);
+          await connectReadTable(uri, db, user, password, tableName, suffix);
 
           mirroredTables[tableName] = sessionID;
         },
@@ -541,13 +512,13 @@ runServer(
 
 async function testDB() {
   skdb = await makeSKDB();
-//  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "daniell", "passdaniell");
-//  await skdb.server().mirrorView("all_users");
+  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "daniell", "passdaniell");
+  await skdb.server().mirrorView("all_users");
 //  await skdb.server().mirrorView("all_groups");
 //  await skdb.server().mirrorTable("user_profiles");
 //  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
-//  await skdb.server().mirrorTable("posts");
-//  await skdb.server().mirrorTable("all_access");
+  await skdb.server().mirrorTable("posts");
+  await skdb.server().mirrorTable("all_access");
 
 //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
 //  await skdb.server().mirrorTable('posts');

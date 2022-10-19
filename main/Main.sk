@@ -110,6 +110,11 @@ const argsSchema: Array<AP.Param> = Array[
   },
   AP.StringParam{name => "user", help => "name of the user"},
   AP.StringParam{name => "password", help => "password of the user"},
+  AP.IntParam{name => "csv-field", help => "outputs a specific csv field"},
+  AP.BoolParam{
+    name => "csv-all-fields",
+    help => "outputs a specific csv field",
+  },
 ];
 
 fun getParsedArgs(): AP.ParseResult {
@@ -319,6 +324,21 @@ untracked fun main(): void {
           SKFS.CStop(None())
         });
         return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("csv-field") match {
+      | Some(AP.IntValue{value => fieldNbr}) ->
+        line = mutable Ref(1);
+        loop {
+          (eof, rows) = SKCSV.parseCsv(line, x ~> x);
+          for (row in rows) {
+            if (fieldNbr < 0 || fieldNbr >= row.size()) continue;
+            str = row[fieldNbr].i1;
+            print_string(str);
+          };
+          if (eof) return void;
+        }
       | _ -> void
       };
 

@@ -106,17 +106,10 @@ fun lex(next: () -> Char): mutable Iterator<(Bool, String)> {
   }
 }
 
-fun insert(
-  context: mutable SKFS.Context,
+fun parseCsv<T>(
   line: mutable Ref<Int>,
-  options: SKSQL.Options,
-  table: SKSQL.DirDescr,
-  user: ?SKSQL.UserFile,
-): SKFS.ContextOp {
-  eval = SKSQL.Evaluator{options, user};
-  pos = 0;
-  inTransaction = false;
-  paramsOpt = None();
+  f: ((Bool, String)) ~> T,
+): (Bool, Array<Array<T>>) {
   array = mutable Vector[];
   eof = false;
   vtry(
@@ -126,7 +119,7 @@ fun insert(
         for (value in lex(() -> getChar())) {
           values.push(value);
         };
-        cvalues = values.map(SKSQL.parseCSVValue);
+        cvalues = values.map(f);
         array.push(cvalues.toArray());
         line.set(line.get() + 1);
       }
@@ -140,14 +133,22 @@ fun insert(
       skipExit(23);
     },
   );
-  f = eval.insert(
-    context,
-    pos,
-    inTransaction,
-    table,
-    paramsOpt,
-    array.toArray(),
-  );
+  (eof, array.toArray())
+}
+
+fun insert(
+  context: mutable SKFS.Context,
+  line: mutable Ref<Int>,
+  options: SKSQL.Options,
+  table: SKSQL.DirDescr,
+  user: ?SKSQL.UserFile,
+): SKFS.ContextOp {
+  eval = SKSQL.Evaluator{options, user};
+  pos = 0;
+  inTransaction = false;
+  paramsOpt = None();
+  (eof, array) = parseCsv(line, SKSQL.parseCSVValue);
+  f = eval.insert(context, pos, inTransaction, table, paramsOpt, array);
   if (!eof) return SKFS.CContinue(f);
   SKFS.CStop(f)
 }
