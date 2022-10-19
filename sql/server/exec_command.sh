@@ -46,8 +46,10 @@ case "$CMD" in
     TABLE_NAME=`echo "$LINE" | $SKDB --csv-field 4`
     $SKDB --data "$DB" --csv --tail `$SKDB --connect "$TABLE_NAME" --user "$USER" --password "$PASSWORD" --data "$DB"`
     ;;
+
   *)
-    eval "${RRD}" 2>&1
+    eval "${RRD}"
     ;;
+
 esac 2>&1
 )

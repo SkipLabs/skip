@@ -1476,4 +1476,10 @@ fun withRegion<T>(
   copiedResult
 }
 
+fun withRegionVoid<T>(f: () ~> void): void {
+  saved = newObstack();
+  f();
+  destroyObstack(saved);
+}
+
 module end;

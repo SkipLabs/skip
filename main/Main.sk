@@ -492,6 +492,7 @@ untracked fun main(): void {
         init = true;
         dieOnEOF();
         loop {
+          localObstack = SKFS.newObstack();
           context = SKFS.gContextGet();
           sub = context.sessions.maybeGet(sessionID) match {
           | None() ->
@@ -586,6 +587,7 @@ untracked fun main(): void {
             _ = SKFS.condWait(cond, lock);
           };
           SKFS.mutexUnlock(lock);
+          SKFS.destroyObstack(localObstack);
         }
       | _ -> void
       };

@@ -169,6 +169,7 @@ void SKIP_print_raw(char* str) {
 
 void SKIP_flush_stdout() {
   fflush(stdout);
+  fflush(stderr);
 }
 
 void print_string(char* str) {
