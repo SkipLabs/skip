@@ -11,7 +11,7 @@
 
 #define NULL ((void*)0)
 
-#define PAGE_SIZE (512 * 1024)
+#define PAGE_SIZE (1024 * 1024 * 8)
 #define STACK_INIT_CAPACITY (1024)
 
 typedef unsigned char uint8_t;
@@ -25,6 +25,7 @@ typedef uint64_t SkipInt;
 typedef unsigned int uintptr_t;
 typedef int intptr_t;
 #define WORDSIZE 4
+#define WASM_HEAP_SIZE 1073741824
 #endif
 
 #ifdef SKIP64
@@ -207,7 +208,7 @@ int sk_is_const(void*);
 int sk_is_large_page(char* page);
 int sk_is_static(void*);
 void* sk_malloc(size_t size);
-void* sk_malloc(size_t);
+void* sk_malloc_end(size_t);
 char* sk_new_const(char* cst);
 void sk_obstack_attach_page(char* lpage);
 size_t sk_page_size(char* page);

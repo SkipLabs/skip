@@ -855,36 +855,6 @@ mutable class Context{
     this.!newDirs = this.newDirs.add(dirName);
   }
 
-  mutable fun mkdirCompressed<T: File, Row: frozen>(
-    conv: File ~> T,
-    dirName: DirName,
-    content: Array<Row>,
-    decompress: Row ~> FixedRow<Array<File>>,
-    reallyRemove: Bool,
-  ): EHandle<T> {
-    if (this.dirs.state.containsKey(dirName)) {
-      throw DirAlreadyExists(dirName);
-    };
-    time = this.timeStamp();
-    tick = this.tick;
-    fixedData = CompressedDir{time, tick, data => content, decompress};
-
-    totalSize = fixedData.data.size();
-    creator = this.currentArrow();
-    dir = EagerDir{
-      time,
-      input => true,
-      dirName,
-      fixedData,
-      totalSize,
-      creator,
-      reallyRemove,
-    };
-    this.setDir(dirName, dir);
-    this.!newDirs = this.newDirs.add(dirName);
-    EHandle(conv, dirName)
-  }
-
   mutable fun setDir(dirName: DirName, dir: Dir): void {
     this.!dirs = this.dirs.set(this.tick, dirName, dir);
   }
@@ -1049,7 +1019,7 @@ fun import(
         for (key in changedKeys) {
           for (srcValue in dir.unsafeGetDataIter(key)) {
             (source, values) = srcValue;
-            entries.push((key, (source.value, values)));
+            entries.push((key, (source.path(), values)));
           }
         };
         targetCtx.unsafeMaybeGetEagerDir(dir.dirName) match {

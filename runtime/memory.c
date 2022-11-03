@@ -75,23 +75,35 @@ void sk_memory_check_init_over() {
 extern unsigned char __heap_base;
 
 unsigned char* bump_pointer = &__heap_base;
+unsigned char* heap_end = &__heap_base + WASM_HEAP_SIZE;
+unsigned long total_size = 0;
 
 void* sk_malloc(size_t size) {
-  size += 8;
-  size = (size + 7) & ~7;
+  size = sk_pow2_size(size);
+  total_size += size;
   void* res = sk_get_ftable(size);
   if(res != NULL) {
     return res;
   }
   char* result = (char*)bump_pointer;
-  int slot = sk_bit_size(size);
-  bump_pointer += (1 << slot);
+  bump_pointer += size;
   return result;
 }
 
+void* sk_malloc_end(size_t size) {
+  size = sk_pow2_size(size);
+  total_size += size;
+  void* res = sk_get_ftable(size);
+  if(res != NULL) {
+    return res;
+  }
+  heap_end -= size;
+  return heap_end;
+}
+
 void sk_free_size(void* ptr, size_t size) {
-  size += 8;
-  size = (size + 7) & ~7;
+  size = sk_pow2_size(size);
+  total_size -= size;
   sk_add_ftable(ptr, size);
 }
 

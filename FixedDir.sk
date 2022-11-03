@@ -20,9 +20,13 @@
 /*****************************************************************************/
 module SKFS;
 
-value class Source(value: Path) uses Orderable {
+value class Source(dirName: DirName, baseName: BaseName) uses Orderable {
   static fun create(value: Path): this {
-    static(value)
+    static(value.dirName, value.baseName)
+  }
+
+  fun path(): Path {
+    Path(this.dirName, this.baseName)
   }
 }
 
@@ -43,93 +47,11 @@ base class FixedData<T> {
   fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
 }
 
-class CompressedDir<T, Compressed>{
-  time: Time,
-  tick: Tick,
-  data: Array<Compressed> = Array[],
-  decompress: Compressed ~> FixedRow<T>,
-} extends FixedData<T> {
-  fun size(): Int {
-    this.data.size()
-  }
-
-  fun get(idx: Int): FixedRow<T> {
-    this.decompress(this.data[idx])
-  }
-
-  fun getPos(key: BaseName): Int {
-    this.getPosij(key, 0, this.size() - 1)
-  }
-
-  fun getPosij(key: BaseName, i: Int, j: Int): Int {
-    if (i > j) {
-      return i;
-    };
-    pivot = (i + j) / 2;
-    elt = this.decompress(this.data[pivot]);
-    key.compare(elt.key) match {
-    | LT()
-    | EQ() ->
-      this.getPosij(key, i, pivot - 1)
-    | GT() -> this.getPosij(key, pivot + 1, j)
-    }
-  }
-
-  fun getArray(key: BaseName): Array<(Source, T)> {
-    pos = this.getPos(key);
-    result = mutable Vector[];
-    loop {
-      if (pos >= this.data.size()) break void;
-      elt = this.decompress(this.data[pos]);
-      if (elt.key != key) break void;
-      result.push(elt.value);
-      !pos = pos + 1;
-    };
-    result.toArray();
-  }
-
-  fun getIter(key: BaseName): mutable Iterator<(Source, T)> {
-    pos = this.getPos(key);
-    loop {
-      if (pos >= this.data.size()) break void;
-      elt = this.decompress(this.data[pos]);
-      if (elt.key != key) break void;
-      yield elt.value;
-      !pos = pos + 1;
-    };
-  }
-
-  fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T> {
-    pos = this.getPos(key);
-    loop {
-      if (pos >= this.data.size()) break void;
-      entry = this.decompress(this.data[pos]);
-      if (entry.value.i0 != source) break void;
-      if (entry.key != key) break void;
-      yield entry.value.i1;
-      !pos = pos + 1;
-    };
-  }
-
-  fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
-    this.getIterSourceKey(source, key).collect(Array)
-  }
-
-  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
-    if (tick > this.tick) return SortedSet[];
-    acc = SortedSet[];
-    for (value in this.data) {
-      !acc = acc.set(this.decompress(value).key);
-    };
-    acc
-  }
-}
-
-class FixedDir<T> private {
-  data: Array<FixedRow<T>> = Array[],
-} extends FixedData<T> {
+class FixedDir private {
+  data: Array<FixedRow<Array<File>>> = Array[],
+} extends FixedData<Array<File>> {
   static fun create(
-    data: mutable Vector<FixedRow<T>> = mutable Vector[],
+    data: mutable Vector<FixedRow<Array<File>>> = mutable Vector[],
   ): this {
     data.sortBy(row ~> (row.key, row.value.i0));
     result = data.toArray().clone();
@@ -138,26 +60,11 @@ class FixedDir<T> private {
     FixedDir{data => result.chill()}
   }
 
-  static fun fromDMap(dmap: DMap<BaseName, SortedMap<Source, T>>): this {
-    acc = mutable Vector[];
-    dmap.itemsWithTick().each(item -> {
-      (key, valueMap, tick) = item;
-      for (source => value in valueMap) {
-        acc.push(FixedRow(key, (source, value), tick))
-      }
-    });
-    data = acc.toArray();
-    result = data.clone();
-    cache = Array::mfill(result.size(), false);
-    _ = static::computeTags(cache, result, 0, result.size() - 1);
-    FixedDir{data => result.chill()}
-  }
-
   fun size(): Int {
     this.data.size()
   }
 
-  fun get(idx: Int): FixedRow<T> {
+  fun get(idx: Int): FixedRow<Array<File>> {
     this.data.unsafe_get(idx)
   }
 
@@ -195,7 +102,7 @@ class FixedDir<T> private {
     }
   }
 
-  fun getArray(key: BaseName): Array<(Source, T)> {
+  fun getArray(key: BaseName): Array<(Source, Array<File>)> {
     pos = this.getPosij(key, 0, this.data.size() - 1);
     result = mutable Vector[];
     loop {
@@ -208,7 +115,7 @@ class FixedDir<T> private {
     result.toArray();
   }
 
-  fun getIter(key: BaseName): mutable Iterator<(Source, T)> {
+  fun getIter(key: BaseName): mutable Iterator<(Source, Array<File>)> {
     pos = this.getPosij(key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
@@ -219,7 +126,10 @@ class FixedDir<T> private {
     };
   }
 
-  fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T> {
+  fun getIterSourceKey(
+    source: Source,
+    key: BaseName,
+  ): mutable Iterator<Array<File>> {
     pos = this.getPosSourceKey(source, key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
@@ -231,13 +141,13 @@ class FixedDir<T> private {
     };
   }
 
-  fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
+  fun getArraySourceKey(source: Source, key: BaseName): Array<Array<File>> {
     this.getIterSourceKey(source, key).collect(Array)
   }
 
   static fun computeTags(
     cache: mutable Array<Bool>,
-    array: mutable Array<FixedRow<T>>,
+    array: mutable Array<FixedRow<Array<File>>>,
     i: Int,
     j: Int,
   ): TickRange {

@@ -156,16 +156,65 @@ value class KeyRange(start: BaseName, end: BaseName) uses Orderable, Show {
 /* Keys and newDirs produced during a mapping. */
 /*****************************************************************************/
 
-value class MInfo(
-  keys: Array<BaseName>,
-  newDirs: Array<DirName>,
-  reads: Array<Path>,
-) {
-  static fun empty(): this {
-    MInfo(Array[], Array[], Array[])
+base class MInfo {
+  children =
+  | MInfoEmpty()
+  | MInfoSingle(BaseName)
+  | MInfoFull(Array<BaseName>, Array<DirName>, Array<Path>)
+
+  fun getKeys(): Array<BaseName> {
+    this match {
+    | MInfoEmpty() -> Array[]
+    | MInfoSingle(x) -> Array[x]
+    | MInfoFull(keys, _, _) -> keys
+    }
   }
+
+  fun getNewDirs(): Array<DirName> {
+    this match {
+    | MInfoEmpty() -> Array[]
+    | MInfoSingle(_) -> Array[]
+    | MInfoFull(_, dirs, _) -> dirs
+    }
+  }
+  fun getReads(): Array<Path> {
+    this match {
+    | MInfoEmpty() -> Array[]
+    | MInfoSingle(_) -> Array[]
+    | MInfoFull(_, _, reads) -> reads
+    }
+  }
+
+  static fun create(
+    keys: Array<BaseName>,
+    newDirs: Array<DirName>,
+    reads: Array<Path>,
+  ): MInfo {
+    if (keys.isEmpty() && newDirs.isEmpty() && reads.isEmpty()) {
+      return MInfoEmpty()
+    };
+    if (keys.size() == 1) return MInfoSingle(keys[0]);
+    MInfoFull(keys, newDirs, reads)
+  }
+
+  static fun empty(): MInfo {
+    MInfoEmpty()
+  }
+
   fun isEmpty(): Bool {
-    this.keys.size() == 0 && this.newDirs.size() == 0 && this.reads.size() == 0
+    this is MInfoEmpty()
+  }
+
+  fun setNewDirs(newDirs: Array<DirName>): MInfo {
+    this match {
+    | MInfoEmpty() ->
+      if (newDirs.isEmpty()) return this;
+      MInfoFull(Array[], newDirs, Array[])
+    | MInfoSingle(key) ->
+      if (newDirs.isEmpty()) return this;
+      MInfoFull(Array[key], newDirs, Array[])
+    | MInfoFull(keys, _, reads) -> static::create(keys, newDirs, reads)
+    }
   }
 }
 
@@ -209,19 +258,6 @@ class EagerDir{
   reducer: ?Reducer = None(),
   purgeCount: Int = 0,
 } extends Dir {
-  fun compress<Compressed: frozen>(
-    context: mutable Context,
-    compress: FixedRow<Array<File>> ~> Compressed,
-    decompress: Compressed ~> FixedRow<Array<File>>,
-  ): void {
-    data = this.flattenData().map(compress).toArray();
-    time = context.timeStamp();
-    tick = context.tick;
-    !this.fixedData = CompressedDir{time, tick, data, decompress};
-    !this.data = Nil();
-    context.setDir(this.dirName, this);
-  }
-
   fun notify(
     context: readonly SKFS.Context,
     sub: Sub,
@@ -620,7 +656,11 @@ class EagerDir{
       oldVec.push(
         (
           source,
-          MInfo(kvArray.map(kv -> kv.i0), newDirs.toArray(), reads.toArray()),
+          MInfo::create(
+            kvArray.map(kv -> kv.i0),
+            newDirs.toArray(),
+            reads.toArray(),
+          ),
         ),
       );
     };
@@ -918,7 +958,7 @@ class EagerDir{
       path = Path::create(parentName, key);
       source = Source::create(path);
       oldInfo = static::getOld(child, source);
-      oldKeys = SortedSet::createFromItems(oldInfo.keys);
+      oldKeys = SortedSet::createFromItems(oldInfo.getKeys());
       writer = mutable Writer{};
       newDirsCopy = context.newDirs;
       readsCopy = context.reads;
@@ -940,7 +980,7 @@ class EagerDir{
         context.!deps = context.deps.set(read, arrowKey);
       };
 
-      for (oldRead in oldInfo.reads) {
+      for (oldRead in oldInfo.getReads()) {
         if (reads.contains(oldRead)) continue;
         arrowKey = ArrowKey(parentName, child.dirName, key);
         context.!deps = context.deps.remove(oldRead, arrowKey);
@@ -965,11 +1005,11 @@ class EagerDir{
 
       // We need to remember what keys we produced for the next
       // time around.
-      minfo = MInfo(keys.toArray(), newDirs.toArray(), reads.toArray());
+      minfo = MInfo::create(keys.toArray(), newDirs.toArray(), reads.toArray());
       if (
-        !minfo.keys.isEmpty() ||
-        !minfo.newDirs.isEmpty() ||
-        !minfo.reads.isEmpty()
+        !minfo.getKeys().isEmpty() ||
+        !minfo.getNewDirs().isEmpty() ||
+        !minfo.getReads().isEmpty()
       ) {
         !child.old[source] = minfo
       } else if (child.old.containsKey(source)) {
@@ -1323,15 +1363,15 @@ class EagerDir{
   ): this {
     removed = mutable Vector[];
     minfo = static::getOld(this, source);
-    if (minfo.newDirs.isEmpty() || !context.removeSubDirs) return this;
+    if (minfo.getNewDirs().isEmpty() || !context.removeSubDirs) return this;
 
-    lastRoundDirs = minfo.newDirs;
+    lastRoundDirs = minfo.getNewDirs();
     for (dirName in lastRoundDirs) {
       if (newDirs.contains(dirName)) continue;
       context.removeDir(dirName);
       removed.push(dirName)
     };
-    !minfo.newDirs = newDirs.toArray();
+    !minfo = minfo.setNewDirs(newDirs.toArray());
     !this.old[source] = minfo;
 
     for (dirName in removed) {

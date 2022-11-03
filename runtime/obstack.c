@@ -91,7 +91,12 @@ char* sk_large_page(size_t size) {
 
 void sk_new_page() {
   size_t block_size = PAGE_SIZE;
+#ifdef SKIP32
+  head = (char*)sk_malloc_end(block_size);
+#endif
+#ifdef SKIP64
   head = (char*)sk_malloc(block_size);
+#endif
   if(head == NULL) {
     #ifdef SKIP64
     fprintf(stderr, "Out of memory\n");

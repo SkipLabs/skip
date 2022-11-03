@@ -1,12 +1,12 @@
-CC=clang-14
-CPP=clang++-14
+CC=clang-12
+CPP=clang++-12
 SKC=~/skip/build/bin/skip_to_llvm
-BCLINK=llvm-link-14
-LLC=llc-14
-WASMLD=wasm-ld-14
+BCLINK=llvm-link-12
+LLC=llc-12
+WASMLD=wasm-ld-12
 MEMSIZE32=1073741824
 
-OLEVEL=-O3
+OLEVEL=-O2
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
@@ -50,6 +50,7 @@ SKFUNS=\
 	SKIP_initializeSkip \
 	SKIP_skfs_init \
 	SKIP_skfs_end_of_init \
+	SKIP_get_persistent_size \
 	SKIP_throw_EndOfFile
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))

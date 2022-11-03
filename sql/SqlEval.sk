@@ -630,7 +630,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         entries = mutable Vector[];
         dir = context.unsafeGetEagerDir(inputDir.dirName);
         for ((source, _) in dir.getDataIter(context, key)) {
-          entries.push((key, (source.value, Array<SKFS.File>[])));
+          entries.push((key, (source.path(), Array<SKFS.File>[])));
         };
         dir.writeArraySourceMany(context, entries.iterator());
         if (select.sets.isEmpty()) return void;
@@ -817,23 +817,9 @@ class Evaluator{options: Options, user: ?UserFile} {
     name: String,
     dirDescr: DirDescr,
     reallyRemove: Bool,
-    init: Array<RowValues> = Array[],
   ): void {
     dirName = dirDescr.dirName;
-    kinds = dirDescr.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
-    tag = SKFS.TickRange::create(context.tick);
-    dir = context.mkdirCompressed(
-      RowValues::fromFile,
-      dirName,
-      init,
-      row ~> {
-        file: SKFS.File = row;
-        key = RowKey(row, kinds);
-        path = SKFS.Path::create(dirName, key);
-        SKFS.FixedRow(key, (SKFS.Source::create(path), Array[file]), tag)
-      },
-      reallyRemove,
-    );
+    dir = context.mkdir(RowValues::fromFile, dirName, reallyRemove);
 
     getTableDir(context).writeArray(
       context,
@@ -1574,7 +1560,7 @@ fun importNext(
         for (key in changedKeys) {
           for (srcValue in dir.unsafeGetDataIter(key)) {
             (source, values) = srcValue;
-            entries.push((key, (source.value, values)));
+            entries.push((key, (source.path(), values)));
           }
         };
         updates![targetDirName] = (dir, version, entries)
