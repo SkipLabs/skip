@@ -326,7 +326,7 @@ static void heapify(sk_cell_t* arr, int n, int i) {
   }
 }
 
-static void heap_sort(sk_cell_t* arr, int n) {
+void sk_heap_sort(sk_cell_t* arr, int n) {
   for (int i = n / 2 - 1; i >= 0; i--) {
     heapify(arr, n, i);
   }
@@ -362,7 +362,7 @@ sk_cell_t* sk_get_pages(size_t size) {
     result[i].value = (uint64_t)(cursor + *(size_t*)(cursor + sizeof(char*)));
     cursor = *(char**)cursor;
   }
-  heap_sort(result, size);
+  sk_heap_sort(result, size);
   return result;
 }
 

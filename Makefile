@@ -51,6 +51,7 @@ SKFUNS=\
 	SKIP_skfs_init \
 	SKIP_skfs_end_of_init \
 	SKIP_get_persistent_size \
+	sk_pop_dirty_page \
 	SKIP_throw_EndOfFile
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))

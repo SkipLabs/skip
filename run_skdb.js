@@ -8,6 +8,8 @@ var readline = require('readline');
 /* Primitives to connect to websockets. */
 /* ***************************************************************************/
 
+var popDirtyPage = null;
+
 function makeWebSocket(uri, onopen, onmessage, onclose, onerror) {
   var socket = null;
   if (typeof window === 'undefined') {
@@ -219,7 +221,7 @@ async function makeSKDB() {
       throw new Error('ErrNo ' + err);
     },
     SKIP_print_char: function(c) {
-      throw new Error('SKIP_print_char not implemented');
+      process.stdout.write(String.fromCharCode(c));
     },
     printf: function(ptr) {
     },
@@ -369,7 +371,7 @@ async function makeSKDB() {
       },
 
       insert: function(tableName, values) {
-        values = values.map(x => { 
+        values = values.map(x => {
           if(typeof x == 'string') {
             if(x == undefined) {
               return "NULL";
@@ -382,7 +384,7 @@ async function makeSKDB() {
         return runLocal(['--json'], stdin)
                  .split("\n")
                  .filter(x => x != "")
-                 .map(x => JSON.parse(x));        
+                 .map(x => JSON.parse(x));
       },
 
       getID: function() {
@@ -459,7 +461,7 @@ async function makeSKDB() {
 //            console.log('writing change: ' + change);
             write(change);
           };
-          runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");    
+          runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");
 
 
           await connectReadTable(uri, db, user, password, tableName, remoteSuffix);
@@ -496,6 +498,7 @@ async function makeSKDB() {
   result.instance.exports.SKIP_skfs_init();
   result.instance.exports.SKIP_initializeSkip();
   result.instance.exports.SKIP_skfs_end_of_init();
+  popDirtyPage = result.instance.exports.sk_pop_dirty_page;
   skipMain = result.instance.exports.skip_main;
 
   return skdb;
@@ -516,6 +519,12 @@ async function testDB() {
   skdb.client.sql(data);
   for(var i = 0; i < 20000; i++) {
     skdb.client.insert('tracks', [i, 'track' + i, 0, 0, i, 'album' + i]);
+    var n = 0;
+//    console.log('written');
+    while(n != -1) {
+      n = popDirtyPage();
+//      console.log(n);
+    }
   }
   return;
 //  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv", "passjulienv");

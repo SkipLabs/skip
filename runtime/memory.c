@@ -43,6 +43,7 @@ void* sk_get_ftable(size_t size) {
   sk_ftable[slot] = *(void**)sk_ftable[slot];
   return ptr;
 }
+
 #endif
 
 /*****************************************************************************/

@@ -18,6 +18,7 @@ typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef long long uint64_t;
 typedef unsigned int uint32_t;
+typedef int int32_t;
 typedef unsigned long size_t;
 typedef uint64_t SkipInt;
 
@@ -26,6 +27,10 @@ typedef unsigned int uintptr_t;
 typedef int intptr_t;
 #define WORDSIZE 4
 #define WASM_HEAP_SIZE 1073741824
+
+#define PERSISTENT_PAGE_BIT_SIZE 20
+#define PERSISTENT_PAGE_SIZE (1 << PERSISTENT_PAGE_BIT_SIZE)
+#define PERSISTENT_TABLE_SIZE (WASM_HEAP_SIZE / PERSISTENT_PAGE_SIZE)
 #endif
 
 #ifdef SKIP64
@@ -234,5 +239,6 @@ void sk_free_external_pointers();
 uintptr_t sk_get_ref_count(void* obj);
 void SKIP_throwInvalidSynchronization();
 void SKIP_call_finalize(char*, char*);
+void sk_heap_sort(sk_cell_t* arr, int n);
 
 #endif
