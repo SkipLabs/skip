@@ -413,7 +413,8 @@ untracked fun main(): void {
           print_error("Error: option --data is missing");
           skipExit(2);
         };
-        SKSQL.runSql(options, context ~> {
+        SKSQL.runSql(options, origContext ~> {
+          context = origContext.mclone();
           sub = context.sessions.maybeGet(sessionID) match {
           | None() ->
             print_error("Error: session not found");
@@ -429,12 +430,25 @@ untracked fun main(): void {
           format = options.format match {
           | SKSQL.OFK_CSV() -> SKFS.OCSV()
           | SKSQL.OFK_JSON() ->
-            print_error("JSON support not implemented for --diff");
-            skipExit(145)
+            tables = SKSQL.getTableDir(context);
+            dirNameStr = sub.dirName.toString();
+            iter = dirNameStr.getIter();
+            _ = iter.next();
+            tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
+            arr = tables.getArray(context, SKFS.SID(tableName));
+            if (arr.size() == 0) {
+              print_error(
+                "There is no sql table associated with dir: " + dirNameStr,
+              );
+              skipExit(44);
+            };
+            dirDescr = arr[0];
+            fieldNames = dirDescr.schema.map(x -> x.name);
+            SKFS.OJSON(fieldNames)
           | SKSQL.OFK_SQL() -> SKFS.OSQL()
           };
 
-          context.setGlobal(
+          origContext.setGlobal(
             "Stdout",
             SKSQL.StdoutDiff(format, sub.dirName, SKFS.Tick(time)),
           );
@@ -505,7 +519,7 @@ untracked fun main(): void {
           format = options.format match {
           | SKSQL.OFK_CSV() -> SKFS.OCSV()
           | SKSQL.OFK_JSON() ->
-            print_error("JSON support not implemented for --diff");
+            print_error("JSON support not implemented for --tail");
             skipExit(145)
           | SKSQL.OFK_SQL() -> SKFS.OSQL()
           };
@@ -665,7 +679,9 @@ untracked fun main(): void {
           format = options.format match {
           | SKSQL.OFK_CSV() -> SKFS.OCSV()
           | SKSQL.OFK_JSON() ->
-            print_error("JSON support not implemented for --diff");
+            print_error(
+              "JSON support not implemented for --subscribe/--connect",
+            );
             skipExit(145)
           | SKSQL.OFK_SQL() -> SKFS.OSQL()
           };
