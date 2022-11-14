@@ -519,8 +519,22 @@ untracked fun main(): void {
           format = options.format match {
           | SKSQL.OFK_CSV() -> SKFS.OCSV()
           | SKSQL.OFK_JSON() ->
-            print_error("JSON support not implemented for --tail");
-            skipExit(145)
+            mcontext = context.mclone();
+            tables = SKSQL.getTableDir(mcontext);
+            dirNameStr = sub.dirName.toString();
+            iter = dirNameStr.getIter();
+            _ = iter.next();
+            tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
+            arr = tables.getArray(mcontext, SKFS.SID(tableName));
+            if (arr.size() == 0) {
+              print_error(
+                "There is no sql table associated with dir: " + dirNameStr,
+              );
+              skipExit(44);
+            };
+            dirDescr = arr[0];
+            fieldNames = dirDescr.schema.map(x -> x.name);
+            SKFS.OJSON(fieldNames)
           | SKSQL.OFK_SQL() -> SKFS.OSQL()
           };
 
@@ -679,10 +693,22 @@ untracked fun main(): void {
           format = options.format match {
           | SKSQL.OFK_CSV() -> SKFS.OCSV()
           | SKSQL.OFK_JSON() ->
-            print_error(
-              "JSON support not implemented for --subscribe/--connect",
-            );
-            skipExit(145)
+            mcontext = context.mclone();
+            tables = SKSQL.getTableDir(mcontext);
+            dirNameStr = viewDirName.toString();
+            iter = dirNameStr.getIter();
+            _ = iter.next();
+            tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
+            arr = tables.getArray(mcontext, SKFS.SID(tableName));
+            if (arr.size() == 0) {
+              print_error(
+                "There is no sql table associated with dir: " + dirNameStr,
+              );
+              skipExit(44);
+            };
+            dirDescr = arr[0];
+            fieldNames = dirDescr.schema.map(x -> x.name);
+            SKFS.OJSON(fieldNames)
           | SKSQL.OFK_SQL() -> SKFS.OSQL()
           };
           cmd = (argMap.maybeGet("updates"), argMap.maybeGet("notify")) match {
