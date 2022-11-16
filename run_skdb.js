@@ -4,11 +4,94 @@ var source = fs.readFileSync('./build/out32.wasm');
 var FileReader = require('filereader');
 var readline = require('readline');
 
+const IndexedDB = require('fake-indexeddb');
+const indexedDB = IndexedDB.indexedDB;
+
+
+/* ***************************************************************************/
+/* Primitives to connect to indexedDB. */
+/* ***************************************************************************/
+
+function makeSKDBStore(dbName, storeName, version, memory, memorySize) {
+  var memory32 = new Uint32Array(memory);
+  let pageBitSize = 20;
+  let pageSize = 1 << pageBitSize;
+  // Let's round up the memorySize to be pageSize aligned
+  memorySize = (memorySize + (pageSize - 1)) & ~(pageSize - 1);
+
+  return new Promise((resolve, reject) => {                                                          
+    var open = indexedDB.open(dbName, 1);
+    
+    open.onupgradeneeded = function() {
+      var db = open.result;
+      var store = db.createObjectStore(storeName, { keyPath: "pageid" });
+    };
+
+    open.onsuccess = function() {
+      var db = open.result;
+      var tx = db.transaction(storeName, "readonly");
+      var store = tx.objectStore(storeName);
+
+      var versionGet = store.get(-1);
+
+      versionGet.onsuccess = function(versionRequest) {
+        if (versionRequest.target.result == undefined || 
+            versionRequest.target.result.content != version) {
+          
+          var txInit = db.transaction(storeName, "readwrite");
+          var storeInit = txInit.objectStore(storeName);
+          dbVersion = versionRequest.target.result;
+          // First, let's empty the store.
+          storeInit.getAllKeys().onsuccess = event => {
+            var pageidx;
+            for (pageidx = 0; pageidx < event.target.result.length; pageidx++) {
+              storeInit.delete(event.target.result[pageidx])
+            }
+          }
+          // Now let's remember the version
+          storeInit.put({pageid: -1, content: version});
+          var i;
+          var cursor = 0;
+          for (i = 0; i < memorySize / pageSize; i++) {
+            console.log(i);
+            storeInit.put({ pageid: i, content: memory.slice(cursor, pageSize) });
+            cursor = cursor + pageSize;
+          }
+        }
+        else {
+          store.getAll().onsuccess = event => {
+            var pageidx;
+            for (pageidx = 0; pageidx < event.target.result.length; pageidx++) {
+              page = event.target.result[pageidx];
+              pageid = page.pageid;
+              page = new Uint32Array(page.content.buffer);
+              start = pageid * (pageSize / 4);
+              for (var i = 0; i < page.length; i++) {
+                memory32[start + i] = page[i];
+              }
+            }
+          }
+        }
+      }
+
+      tx.oncomplete = function() {
+        resolve(db);
+      };
+
+      tx.onerror = function(err) {
+        reject(err);
+      };
+    }
+
+    open.onerror = function(err) {
+      reject(err);
+    }
+  });
+}
+
 /* ***************************************************************************/
 /* Primitives to connect to websockets. */
 /* ***************************************************************************/
-
-var popDirtyPage = null;
 
 function makeWebSocket(uri, onopen, onmessage, onclose, onerror) {
   var socket = null;
@@ -178,7 +261,10 @@ function wasmStringToJS(instance, wasmPointer) {
 /* The function that creates the database. */
 /* ***************************************************************************/
 
-async function makeSKDB() {
+async function makeSKDB(version) {
+  if(!version) {
+    version = 1;
+  }
 
   var count = 0;
   var instance = null;
@@ -295,6 +381,9 @@ async function makeSKDB() {
     SKIP_gunlock: function(){}
   }
 
+  var popDirtyPage = null;
+  var db;
+
   runLocal = function(new_args, new_stdin) {
     args = new_args;
     stdin = new_stdin;
@@ -338,7 +427,6 @@ async function makeSKDB() {
     let write = await runServerWriteForever(uri, cmd);
     return write;
   };
-
 
   const skdb = {
 
@@ -492,14 +580,17 @@ async function makeSKDB() {
     },
   }
 
-  result = await WebAssembly.instantiate(typedArray, {env: env});
+  var result = await WebAssembly.instantiate(typedArray, {env: env});
   SKIP_call0 = result.instance.exports['SKIP_call0'];
   instance = result.instance;
   result.instance.exports.SKIP_skfs_init();
   result.instance.exports.SKIP_initializeSkip();
   result.instance.exports.SKIP_skfs_end_of_init();
   popDirtyPage = result.instance.exports.sk_pop_dirty_page;
+  getPersistentSize = result.instance.exports.SKIP_get_persistent_size;
   skipMain = result.instance.exports.skip_main;
+  console.log('toto: ' + result.instance.exports.SKIP_get_persistent_size());
+  db = await makeSKDBStore("SKDBIndexedDB", "SKDBStore", version, env.memory.buffer, getPersistentSize());
 
   return skdb;
 }
@@ -514,18 +605,18 @@ runServer(
 
 
 async function testDB() {
-  skdb = await makeSKDB();
-  const data = fs.readFileSync('/tmp/test.sql', 'utf8');
-  skdb.client.sql(data);
-  for(var i = 0; i < 20000; i++) {
-    skdb.client.insert('tracks', [i, 'track' + i, 0, 0, i, 'album' + i]);
-    var n = 0;
+  skdb = await makeSKDB(32);
+//  const data = fs.readFileSync('/tmp/test.sql', 'utf8');
+//  skdb.client.sql(data);
+//  for(var i = 0; i < 20000; i++) {
+//    skdb.client.insert('tracks', [i, 'track' + i, 0, 0, i, 'album' + i]);
+//    var n = 0;
 //    console.log('written');
-    while(n != -1) {
-      n = popDirtyPage();
+//    while(n != -1) {
+//      n = popDirtyPage();
 //      console.log(n);
-    }
-  }
+//    }
+//  }
   return;
 //  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv", "passjulienv");
 //  await skdb.server().mirrorView("all_users");

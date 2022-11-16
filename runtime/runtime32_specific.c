@@ -120,11 +120,8 @@ void SKIP_print_persistent_size() {
   // Not implemented
 }
 
-extern unsigned long total_size;
-
-int SKIP_get_persistent_size() {
-  sk_print_int(total_size);
-  return (int)bump_pointer;
+uint32_t SKIP_get_persistent_size() {
+  return (uint32_t)bump_pointer;
 }
 
 int SKIP_unix_close(int fd) {
