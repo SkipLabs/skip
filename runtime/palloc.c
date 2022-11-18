@@ -12,7 +12,6 @@
 #include <pthread.h>
 #include <errno.h>
 #include "runtime.h"
-#include "../build/magic.h"
 
 #define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
 #define BOTTOM_ADDR ((void*)0x0000001000000000)
@@ -379,7 +378,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
 
   char* head = begin;
 
-  *(uint64_t*)head = MAGIC;
+  *(uint64_t*)head = SKIP_get_version();
   head += sizeof(uint64_t);
 
   *(void**)head = begin;
@@ -463,7 +462,7 @@ void sk_load_mapping(char* fileName) {
   lseek(fd, 0L, SEEK_SET);
   int magic_size = read(fd, &magic, sizeof(uint64_t));
 
-  if(magic_size != sizeof(uint64_t) || magic != MAGIC) {
+  if(magic_size != sizeof(uint64_t) || magic != SKIP_get_version()) {
     fprintf(stderr, "Error: wrong file format\n");
     exit(23);
   }

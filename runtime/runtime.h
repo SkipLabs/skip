@@ -240,5 +240,6 @@ uintptr_t sk_get_ref_count(void* obj);
 void SKIP_throwInvalidSynchronization();
 void SKIP_call_finalize(char*, char*);
 void sk_heap_sort(sk_cell_t* arr, int n);
+int SKIP_get_version();
 
 #endif

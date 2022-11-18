@@ -1,27 +1,18 @@
-const util = require('util');
-const fs = require('fs');
-var source = fs.readFileSync('./build/out32.wasm');
-var FileReader = require('filereader');
-var readline = require('readline');
-
-const IndexedDB = require('fake-indexeddb');
-const indexedDB = IndexedDB.indexedDB;
-
-let pageBitSize = 16;
+let pageBitSize = 20;
 let pageSize = 1 << pageBitSize;
 
 /* ***************************************************************************/
 /* Primitives to connect to indexedDB. */
 /* ***************************************************************************/
 
-function makeSKDBStore(dbName, storeName, version, memory, memorySize) {
+function makeSKDBStore(dbName, storeName, version, memory, memorySize, init) {
   var memory32 = new Uint32Array(memory);
   // Let's round up the memorySize to be pageSize aligned
   memorySize = (memorySize + (pageSize - 1)) & ~(pageSize - 1);
 
-  return new Promise((resolve, reject) => {                                                          
+  return new Promise((resolve, reject) => {
     var open = indexedDB.open(dbName, 1);
-    
+
     open.onupgradeneeded = function() {
       var db = open.result;
       var store = db.createObjectStore(storeName, { keyPath: "pageid" });
@@ -32,48 +23,40 @@ function makeSKDBStore(dbName, storeName, version, memory, memorySize) {
       var tx = db.transaction(storeName, "readwrite");
       var store = tx.objectStore(storeName);
 
-      var versionGet = store.get(-1);
+      if (init) {
 
-      versionGet.onsuccess = function(versionRequest) {
-        if (versionRequest.target.result == undefined || 
-            versionRequest.target.result.content != version) {
-          
-          var txInit = tx;//b.transaction(storeName, "readwrite");
-          var storeInit = store; // txInit.objectStore(storeName);
-          dbVersion = versionRequest.target.result;
-          // First, let's empty the store.
-          storeInit.getAllKeys().onsuccess = event => {
-            var pageidx;
-            for (pageidx = 0; pageidx < event.target.result.length; pageidx++) {
-              storeInit.delete(event.target.result[pageidx])
-            }
-          }
-          // Now let's remember the version
-          storeInit.put({pageid: -1, content: version});
-          var i;
-          var cursor = 0;
-          for (i = 0; i < memorySize / pageSize; i++) {
-            content = memory.slice(cursor, cursor + pageSize);
-            storeInit.put({ pageid: i, content: content });
-            cursor = cursor + pageSize;
+        // First, let's empty the store.
+        store.getAllKeys().onsuccess = event => {
+          var pageidx;
+          for (pageidx = 0; pageidx < event.target.result.length; pageidx++) {
+            store.delete(event.target.result[pageidx])
           }
         }
-        else {
-          store.getAll().onsuccess = event => {
-            var pageidx;
-            for (pageidx = 0; pageidx < event.target.result.length; pageidx++) {
-              page = event.target.result[pageidx];
-              pageid = page.pageid;
-              if(pageid < 0) continue;
-              page = new Uint32Array(page.content);
-              start = pageid * (pageSize / 4);
-              for (var i = 0; i < page.length; i++) {
-                memory32[start + i] = page[i];
-              }
+
+        var i;
+        var cursor = 0;
+        for (i = 0; i < memorySize / pageSize; i++) {
+          content = memory.slice(cursor, cursor + pageSize);
+          store.put({ pageid: i, content: content });
+          cursor = cursor + pageSize;
+        }
+      }
+      else {
+        store.getAll().onsuccess = event => {
+          var pageidx;
+          for (pageidx = 0; pageidx < event.target.result.length; pageidx++) {
+            page = event.target.result[pageidx];
+            pageid = page.pageid;
+            if (pageid < 0) continue;
+            page = new Uint32Array(page.content);
+            start = pageid * (pageSize / 4);
+            for (var i = 0; i < page.length; i++) {
+              memory32[start + i] = page[i];
             }
           }
         }
       }
+
 
       tx.oncomplete = function() {
         resolve(db);
@@ -110,7 +93,7 @@ function makeWebSocket(uri, onopen, onmessage, onclose, onerror) {
     socket.onmessage = function(event) {
       const blb = event.data;
       const reader = new FileReader();
-      if(typeof window === 'undefined') {
+      if (typeof window === 'undefined') {
         var string = new TextDecoder().decode(blb);
         onmessage(string);
       }
@@ -140,7 +123,7 @@ function runServer(uri, cmd, stdin) {
   return new Promise((resolve, reject) => {
     makeWebSocket(
       uri,
-      function() {},
+      function() { },
       function(msg) {
         data += msg;
       },
@@ -159,8 +142,8 @@ async function runServerWriteForever(uri, cmd) {
 
   let write = await makeWebSocket(
     uri,
-    function() {},
-    function(change) { console.log("Error writing: " + change)},
+    function() { },
+    function(change) { console.log("Error writing: " + change) },
     function(exn) { console.log("Error connection lost: " + cmd); },
     function(err) { console.log("Error connection lost"); }
   );
@@ -201,18 +184,18 @@ function encodeUTF8(instance, s) {
       data[addr + i++] = c >> 6 | 192;
     } else {
       if (c > 0xd7ff && c < 0xdc00) {
-	if (++ci >= s.length)
-	  throw new Error('UTF-8 encode: incomplete surrogate pair');
-	var c2 = s.charCodeAt(ci);
-	if (c2 < 0xdc00 || c2 > 0xdfff)
-	  throw new Error(
+        if (++ci >= s.length)
+          throw new Error('UTF-8 encode: incomplete surrogate pair');
+        var c2 = s.charCodeAt(ci);
+        if (c2 < 0xdc00 || c2 > 0xdfff)
+          throw new Error(
             'UTF-8 encode: second surrogate character 0x' +
-              c2.toString(16) +
-              ' at index ' +
-              ci + ' out of range');
-	c = 0x10000 + ((c & 0x03ff) << 10) + (c2 & 0x03ff);
-	data[addr + i++] = c >> 18 | 240;
-	data[addr + i++] = c >> 12 & 63 | 128;
+            c2.toString(16) +
+            ' at index ' +
+            ci + ' out of range');
+        c = 0x10000 + ((c & 0x03ff) << 10) + (c2 & 0x03ff);
+        data[addr + i++] = c >> 18 | 240;
+        data[addr + i++] = c >> 12 & 63 | 128;
       } else data[addr + i++] = c >> 12 | 224;
       data[addr + i++] = c >> 6 & 63 | 128;
     }
@@ -227,17 +210,17 @@ function decodeUTF8(bytes) {
     var c = bytes[i++];
     if (c > 127) {
       if (c > 191 && c < 224) {
-	if (i >= bytes.length)
-	  throw new Error('UTF-8 decode: incomplete 2-byte sequence');
-	c = (c & 31) << 6 | bytes[i++] & 63;
+        if (i >= bytes.length)
+          throw new Error('UTF-8 decode: incomplete 2-byte sequence');
+        c = (c & 31) << 6 | bytes[i++] & 63;
       } else if (c > 223 && c < 240) {
-	if (i + 1 >= bytes.length)
-	  throw new Error('UTF-8 decode: incomplete 3-byte sequence');
-	c = (c & 15) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63;
+        if (i + 1 >= bytes.length)
+          throw new Error('UTF-8 decode: incomplete 3-byte sequence');
+        c = (c & 15) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63;
       } else if (c > 239 && c < 248) {
-	if (i + 2 >= bytes.length)
-	  throw new Error('UTF-8 decode: incomplete 4-byte sequence');
-	c = (c & 7) << 18 | (bytes[i++] & 63) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63;
+        if (i + 2 >= bytes.length)
+          throw new Error('UTF-8 decode: incomplete 4-byte sequence');
+        c = (c & 7) << 18 | (bytes[i++] & 63) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63;
       } else throw new Error('UTF-8 decode: unknown multibyte start 0x' + c.toString(16) + ' at index ' + (i - 1));
     }
     if (c <= 0xffff) s += String.fromCharCode(c);
@@ -262,7 +245,7 @@ function wasmStringToJS(instance, wasmPointer) {
 /* The function that creates the database. */
 /* ***************************************************************************/
 
-async function makeSKDB() {
+async function makeSKDB(reboot) {
   var count = 0;
   var instance = null;
   var args = [];
@@ -284,8 +267,8 @@ async function makeSKDB() {
   const env = {
     memoryBase: 0,
     tableBase: 0,
-    memory: new WebAssembly.Memory({initial: 256}),
-    table: new WebAssembly.Table({initial: 0, element: 'anyfunc'}),
+    memory: new WebAssembly.Memory({ initial: 256 }),
+    table: new WebAssembly.Table({ initial: 0, element: 'anyfunc' }),
     abort: function(err) {
       throw new Error('abort ' + err);
     },
@@ -298,7 +281,7 @@ async function makeSKDB() {
     SKIP_etry: function(f, exn_handler) {
       try {
         return SKIP_call0(f);
-      } catch(_) {
+      } catch (_) {
         return SKIP_call0(exn_handler);
       }
     },
@@ -316,12 +299,12 @@ async function makeSKDB() {
     SKIP_read_line_fill: function() {
       lineBuffer = [];
       endOfLine = 10;
-      if(current_stdin >= stdin.length) {
+      if (current_stdin >= stdin.length) {
         instance.exports.SKIP_throw_EndOfFile();
       };
-      while(stdin.charCodeAt(current_stdin) !== 10) {
-        if(current_stdin >= stdin.length) {
-          if(lineBuffer.length == 0) {
+      while (stdin.charCodeAt(current_stdin) !== 10) {
+        if (current_stdin >= stdin.length) {
+          if (lineBuffer.length == 0) {
             instance.exports.SKIP_throw_EndOfFile();
           }
           else {
@@ -334,11 +317,11 @@ async function makeSKDB() {
       current_stdin++;
       return lineBuffer;
     },
-    SKIP_read_line_get:function(i) {
+    SKIP_read_line_get: function(i) {
       return lineBuffer[i];
     },
     SKIP_getchar: function(i) {
-      if(current_stdin >= stdin.length) {
+      if (current_stdin >= stdin.length) {
         instance.exports.SKIP_throw_EndOfFile();
       }
       var result = stdin.charCodeAt(current_stdin);
@@ -356,7 +339,7 @@ async function makeSKDB() {
     },
     SKIP_unix_open: function(wasmFilename) {
       var filename = wasmStringToJS(instance, wasmFilename);
-      if(fileDescrs[filename] !== undefined) {
+      if (fileDescrs[filename] !== undefined) {
         return fileDescrs[filename];
       }
       var fd = fileDescrNbr;
@@ -367,21 +350,45 @@ async function makeSKDB() {
     },
     SKIP_write_to_file: function(fd, str) {
       let jsStr = wasmStringToJS(instance, str);
-      if(jsStr == "") return;
+      if (jsStr == "") return;
       files[fd].push(jsStr);
       changed_files[fd] = fd;
-//      console.log('w2f: ', fd, ' content:', jsStr);
-      if(execOnChange[fd] !== undefined) {
+      //      console.log('w2f: ', fd, ' content:', jsStr);
+      if (execOnChange[fd] !== undefined) {
         execOnChange[fd](files[fd].join(''));
         files[fd] = [];
       }
     },
-    SKIP_glock: function(){},
-    SKIP_gunlock: function(){}
+    SKIP_glock: function() { },
+    SKIP_gunlock: function() { }
   }
 
   var popDirtyPage = null;
   var db;
+  var dirtyPagesHash = [];
+  var dirtyPages = [];
+  var working = 0;
+
+  storePages = function() {
+    if (working == 0 && dirtyPages.length != 0) {
+      working++;
+      var pages = dirtyPages;
+      dirtyPages = [];
+      dirtyPagesHash = [];
+      var tx = db.transaction(storeName, "readwrite");
+      var store = tx.objectStore(storeName);
+      for (var j = 0; j < pages.length; j++) {
+        var page = pages[j];
+        var memory = instance.exports.memory.buffer;
+        store.put({ pageid: page, content: memory.slice(page * pageSize, page * pageSize + pageSize) });
+      }
+      tx.onerror = err => console.log('Error sync db: ' + err);
+      tx.oncomplete = () => {
+        working--;
+        storePages();
+      };
+    }
+  }
 
   runLocal = function(new_args, new_stdin) {
     args = new_args;
@@ -389,53 +396,52 @@ async function makeSKDB() {
     stdout = new Array();
     current_stdin = 0;
     skipMain();
-    var tx = db.transaction(storeName, "readwrite");
-    var store = tx.objectStore(storeName);
-    var dirtyPages = [];
-    while(true) {
+
+    while (true) {
       var dirtyPage = popDirtyPage();
-      if(dirtyPage == -1) break;
-      dirtyPages.push(dirtyPage);
-    }
-    var memory = instance.exports.memory.buffer;
-    var pageid;
-    for(pageid = 0; pageid < initPages; pageid++) {
-      var content = memory.slice(pageid * pageSize, pageid * pageSize + pageSize);
-      store.put({ pageid: pageid, content: content });
-    }
-    for(var j = 0; j < dirtyPages.length; j++) {
-      var dirtyPage = dirtyPages[j];
-      if(dirtyPage < initPages) {
-        dirtyPage = popDirtyPage();
-        continue;
+      if (dirtyPage == -1) break;
+      if (dirtyPage >= initPages) {
+        if (dirtyPagesHash[dirtyPage] != dirtyPage) {
+          dirtyPagesHash[dirtyPage] = dirtyPage;
+          dirtyPages.push(dirtyPage);
+        }
       }
-      store.put({ pageid: dirtyPage, content: memory.slice(dirtyPage * pageSize, dirtyPage * pageSize + pageSize) });
-      dirtyPage = popDirtyPage();
     }
-    tx.onerror = err => console.log('Error sync db: ' + err);
+
+    for (dirtyPage = 0; dirtyPage < initPages; dirtyPage++) {
+      if (dirtyPagesHash[dirtyPage] != dirtyPage) {
+        dirtyPagesHash[dirtyPage] = dirtyPage;
+        dirtyPages.push(dirtyPage);
+      }
+    }
+
+    storePages();
     return stdout.join('');
   }
 
+  var mod = await fetch("out32.wasm");
+  var source = await mod.arrayBuffer();
+  var typedArray = new Uint8Array(source);
   var typedArray = new Uint8Array(source);
 
   var mirroredTables = new Array();
 
   var connectReadTable = function(uri, db, user, password, tableName, suffix) {
-    let cmd =["TAIL", db, user, password, tableName].join(",");
-//    console.log(cmd);
+    let cmd = ["TAIL", db, user, password, tableName].join(",");
+    //    console.log(cmd);
     return new Promise((resolve, reject) => {
       data = '';
-      runServerForever(uri, function() { resolve(0) }, cmd, "", function (msg) {
-        if(msg != "") {
-//          console.log('retrieve remote', msg, '>>END');
+      runServerForever(uri, function() { resolve(0) }, cmd, "", function(msg) {
+        if (msg != "") {
+          //          console.log('retrieve remote', msg, '>>END');
           var index = msg.lastIndexOf("\n");
-          if(index < msg.length) {
+          if (index < msg.length) {
             index++;
           }
           let newData = msg.slice(index);
           msg = data + msg.slice(0, index);
           data = newData;
-//          console.log('BEGIN' + msg + 'END');
+          //          console.log('BEGIN' + msg + 'END');
           runLocal(["--write-csv", tableName + suffix], msg);
         };
       })
@@ -444,8 +450,8 @@ async function makeSKDB() {
 
   var connectWriteTable = async function(uri, db, user, password, tableName) {
     let cmd =
-        "skdb --data " + db + " --user " + user + " --password " + password
-          + " --write-csv "  + tableName;
+      "skdb --data " + db + " --user " + user + " --password " + password
+      + " --write-csv " + tableName;
 
     let write = await runServerWriteForever(uri, cmd);
     return write;
@@ -476,15 +482,15 @@ async function makeSKDB() {
 
       sql: function(stdin) {
         return runLocal(['--json'], stdin)
-                 .split("\n")
-                 .filter(x => x != "")
-                 .map(x => JSON.parse(x));
+          .split("\n")
+          .filter(x => x != "")
+          .map(x => JSON.parse(x));
       },
 
       insert: function(tableName, values) {
         values = values.map(x => {
-          if(typeof x == 'string') {
-            if(x == undefined) {
+          if (typeof x == 'string') {
+            if (x == undefined) {
               return "NULL";
             }
             return "'" + x + "'";
@@ -493,9 +499,9 @@ async function makeSKDB() {
         });
         let stdin = "insert into " + tableName + " values (" + values.join(", ") + ");";
         return runLocal(['--json'], stdin)
-                 .split("\n")
-                 .filter(x => x != "")
-                 .map(x => JSON.parse(x));
+          .split("\n")
+          .filter(x => x != "")
+          .map(x => JSON.parse(x));
       },
 
       getID: function() {
@@ -506,7 +512,7 @@ async function makeSKDB() {
     connect: async function(uri, db, user, password, token) {
       let cmd = "skdb --data " + db;
       password = '"' + password + '"';
-      let result = await runServer(uri, cmd, "select id(), uid('"+user+"');");
+      let result = await runServer(uri, cmd, "select id(), uid('" + user + "');");
       [sessionID, userID] = result.split("|").map(x => parseInt(x));
       servers.push([uri, db, user, password, userID, sessionID]);
       return servers.length - 1;
@@ -514,7 +520,7 @@ async function makeSKDB() {
 
     server: function(serverID) {
       var uri, db, user, password, userID, sessionID;
-      if(serverID === undefined) {
+      if (serverID === undefined) {
         serverID = servers.length - 1;
       }
       [uri, db, user, password, userID, sessionID] = servers[serverID];
@@ -526,7 +532,7 @@ async function makeSKDB() {
           return sessionID;
         },
         cmd: async function(passwd, args, stdin) {
-          if(passwd != "admin1234") {
+          if (passwd != "admin1234") {
             console.log("Error: wrong admin password");
             return;
           }
@@ -535,7 +541,7 @@ async function makeSKDB() {
           return result;
         },
         sqlRaw: async function(passwd, stdin) {
-          if(passwd != "admin1234") {
+          if (passwd != "admin1234") {
             console.log("Error: wrong admin password");
             return;
           }
@@ -544,15 +550,15 @@ async function makeSKDB() {
           return result;
         },
         sql: async function(passwd, stdin) {
-          if(passwd != "admin1234") {
+          if (passwd != "admin1234") {
             console.log("Error: wrong admin password");
             return;
           }
           var cmd = "skdb --json --data " + db;
           let result = await runServer(uri, cmd, stdin);
           return result.split("\n")
-                 .filter(x => x != "")
-                 .map(x => JSON.parse(x));
+            .filter(x => x != "")
+            .map(x => JSON.parse(x));
         },
         mirrorTable: async function(tableName) {
           let remoteSuffix = '_remote_' + serverID;
@@ -569,7 +575,7 @@ async function makeSKDB() {
 
           var fileName = tableName + "_" + user;
           execOnChange[fileDescrNbr] = function(change) {
-//            console.log('writing change: ' + change);
+            //            console.log('writing change: ' + change);
             write(change);
           };
           runLocal(['--csv', '--connect', tableName + localSuffix, '--updates', fileName], "");
@@ -580,13 +586,13 @@ async function makeSKDB() {
           mirroredTables[tableName] = sessionID;
 
           runLocal([], "create virtual view " + tableName
-                   + " as select * from " + tableName + localSuffix +
-                   " union select * from " + tableName + remoteSuffix + ";");
+            + " as select * from " + tableName + localSuffix +
+            " union select * from " + tableName + remoteSuffix + ";");
 
         },
         mirrorView: async function(tableName, suffix) {
           let remoteCmd = 'skdb --data ' + db + ' --dump-table ' + tableName;
-          if(suffix == undefined) {
+          if (suffix == undefined) {
             suffix = '';
           }
           else {
@@ -603,7 +609,7 @@ async function makeSKDB() {
     },
   }
 
-  var result = await WebAssembly.instantiate(typedArray, {env: env});
+  var result = await WebAssembly.instantiate(typedArray, { env: env });
   SKIP_call0 = result.instance.exports['SKIP_call0'];
   instance = result.instance;
   result.instance.exports.SKIP_skfs_init();
@@ -614,83 +620,28 @@ async function makeSKDB() {
   skipMain = result.instance.exports.skip_main;
   initPages = result.instance.exports.SKIP_get_persistent_size() / pageSize + 1;
   version = result.instance.exports.SKIP_get_version();
-  db = await makeSKDBStore("SKDBIndexedDB", storeName, version, instance.exports.memory.buffer, getPersistentSize());
+  db = await makeSKDBStore("SKDBIndexedDB", storeName, version, instance.exports.memory.buffer, getPersistentSize(), reboot);
 
   return skdb;
 }
 
-/*
-runServer(
-  "ws://127.0.0.1:3048",
-  "skdb --data test.db",
-  "select * from skdb_users where userID < 10;"
-).then(x => console.log(x));
-*/
-
+async function initDB() {
+  skdb = await makeSKDB(true);
+  skdb.client.sql('create table tracks (track_id INTEGER primary key, track_name STRING, duration_ms INTEGER, track_number INTEGER, album_id INTEGER, album_name STRING);');
+}
 
 async function testDB() {
   skdb = await makeSKDB();
-  const data = fs.readFileSync('/tmp/test.sql', 'utf8');
-  skdb.client.sql(data);
-  for(var i = 0; i < 100; i++) {
+  console.log(skdb.client.sql('select count(*) from tracks;')[0]);
+
+  var then = performance.now();
+
+  for (var i = 30000; i < 40000; i++) {
     skdb.client.insert('tracks', [i, 'track' + i, 0, 0, i, 'album' + i]);
   };
-  skdb2 = await makeSKDB();
-  console.log(skdb2.client.sql('select count(*) from tracks;'));
-  return;
-//  sessionID = await skdb.connect("ws://127.0.0.1:3048", "test.db", "julienv", "passjulienv");
-//  await skdb.server().mirrorView("all_users");
-//  await skdb.server().mirrorView("all_groups");
-//  await skdb.server().mirrorTable("user_profiles");
-//  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
-//  await skdb.server().mirrorTable("posts");
-//  await skdb.server().mirrorTable("all_access");
-
-//  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
-//  await skdb.server().mirrorTable('posts');
-//  skdb.sql('create virtual view posts2 as select * from posts where localID % 2 = 0;');
-//  skdb.subscribe('posts2', function(str) {
-//    console.log('Recieved a change: ' + str);
-//  });
-//  skdb.sql("insert into posts_local values (4,44,74,6,'The second post!');")
-//  console.log(skdb.sql('select * from posts2;'));
-//  console.log(skdb.sql('select * from posts;'));
-//  console.log(skdb.sql('insert into posts_local values(1,38,74,6, NULL);'));
-//  console.log(skdb.sql('select * from posts;'));
-
-  var rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-
-  });
-
-  var recursiveAsyncReadLine = function () {
-    rl.question('js> ', function (query) {
-      if (query == 'quit')
-        return rl.close();
-      try {
-        console.log(eval(query));
-      }
-      catch(exn) {
-        console.log('Error: ' + exn);
-      }
-      recursiveAsyncReadLine();
-    });
-  };
-
-  recursiveAsyncReadLine();
+  console.log(performance.now() - then);
+  console.log(skdb.client.sql('select count(*) from tracks;')[0]);
 }
 
+// initDB();
 testDB();
-
-
-/*
-  skdb.cmd([], 'create table t1 (a INTEGER, b INTEGER);');
-  skdb.cmd([], 'insert into t1 values (23, 45);');
-  process.stdout.write(skdb.cmd([], 'select * from t1;'));
-  skdb.cmd([], 'create virtual view v1 as select * from t1;');
-  process.stdout.write(skdb.cmd(['--connect', 'v1', '--updates', '/tmp/file1'], []));
-  skdb.cmd([], 'insert into t1 values (24, 45);');
-*/
-//  console.log(changed_files);
-//  console.log(files[2].join(""));

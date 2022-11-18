@@ -32,9 +32,9 @@ NATIVE_FILES=\
 
 CFILES32=$(CFILES) runtime/runtime32_specific.c
 CFILES64=$(CFILES) runtime/runtime64_specific.cpp $(NATIVE_FILES)
-BCFILES32=$(addprefix build/,$(CFILES32:.c=.bc))
+BCFILES32=build/magic.bc $(addprefix build/,$(CFILES32:.c=.bc))
 OFILES=$(addprefix build/,$(CFILES:.c=.o))
-ONATIVE_FILES=build/magic.h $(addprefix build/,$(NATIVE_FILES:.c=.o))
+ONATIVE_FILES= build/magic.o $(addprefix build/,$(NATIVE_FILES:.c=.o))
 
 SKFUNS=\
 	getCompositeName \
@@ -52,15 +52,24 @@ SKFUNS=\
 	SKIP_skfs_end_of_init \
 	SKIP_get_persistent_size \
 	sk_pop_dirty_page \
+	SKIP_get_version \
 	SKIP_throw_EndOfFile
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
 default: build/out32.wasm build/skdb
 
-build/magic.h:
-	echo -n "#define MAGIC " > build/magic.h
-	date | cksum | awk '{print $$1}' >> build/magic.h
+build/magic.c:
+	date | cksum | awk '{print "unsigned long version = " $$1 ";"}' > build/magic.c
+	echo "int SKIP_get_version() { return (int)version; }" >> build/magic.c
+
+build/magic.bc: build/magic.c
+	mkdir -p build/runtime
+	$(CC) $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
+
+build/magic.o: build/magic.c
+	mkdir -p build/runtime
+	$(CC) $(CC64FLAGS) -o $@ -c $<
 
 test: build/out32.wasm build/skdb
 	node run.js
