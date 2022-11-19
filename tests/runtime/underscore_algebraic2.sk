@@ -1,10 +1,15 @@
 fun main(): void {
   print_raw(
-    try {
-      Moo().expectBaz()
-    } catch {
-    | _ -> "Pass\n"
-    },
+    vtry(
+      () -> {
+        Moo().expectBaz()
+      },
+      exn ->
+        exn match {
+        | _ -> "Pass\n"
+        }
+      ,
+    ),
   )
 }
 

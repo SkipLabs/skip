@@ -12,10 +12,15 @@ class Bar() extends Foo {
 
 fun main(): void {
   print_raw(
-    try {
-      Bar().hello()
-    } catch {
-    | _ -> "Pass\n"
-    },
+    vtry(
+      () -> {
+        Bar().hello()
+      },
+      exn ->
+        exn match {
+        | _ -> "Pass\n"
+        }
+      ,
+    ),
   )
 }

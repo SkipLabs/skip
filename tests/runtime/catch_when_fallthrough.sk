@@ -15,19 +15,31 @@ fun t(_e: Exception): Bool {
 }
 
 fun throws(): String {
-  try {
-    throw E();
-  } catch {
-  | e if (t(e)) -> throw Ex()
-  }
+  vtry(
+    () -> {
+      throw E();
+    },
+    exn ->
+      exn match {
+      | e if (t(e)) -> throw Ex()
+      | e -> throw e
+      }
+    ,
+  )
 }
 
 fun main(): void {
   print_raw(
-    try {
-      throws()
-    } catch {
-    | E() -> "Pass\n"
-    },
+    vtry(
+      () -> {
+        throws()
+      },
+      exn ->
+        exn match {
+        | E() -> "Pass\n"
+        | _ -> "Fail"
+        }
+      ,
+    ),
   )
 }

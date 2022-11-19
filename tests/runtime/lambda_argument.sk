@@ -4,11 +4,16 @@ fun loopy(end: Int, f: Int -> void): void {
 
 fun main(): void {
   loopy(100, _ -> void);
-  try {
-    void
-  } catch {
-  | _ -> void
-  };
+  vtry(
+    () -> {
+      void
+    },
+    exn ->
+      exn match {
+      | _ -> void
+      }
+    ,
+  );
   if (true) void else void;
   print_string("Pass")
 }

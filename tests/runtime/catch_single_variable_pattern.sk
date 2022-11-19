@@ -12,15 +12,20 @@ class AnotherException(message: String) extends Exception {
 
 fun main(): void {
   print_raw(
-    try {
-      if (true) {
-        throw (OneException("true\n"))
-      } else {
-        throw (AnotherException("false"))
-      }
-    } catch {
-    | OneException(message) -> message
-    | e -> e.getMessage()
-    },
+    vtry(
+      () -> {
+        if (true) {
+          throw (OneException("true\n"))
+        } else {
+          throw (AnotherException("false"))
+        }
+      },
+      exn ->
+        exn match {
+        | OneException(message) -> message
+        | e -> e.getMessage()
+        }
+      ,
+    ),
   )
 }
