@@ -3,11 +3,17 @@ const ZERO: Int = 0;
 fun main(): void {
   x = 0;
   _x = x as ZERO;
-  try {
-    y = 1;
-    _y = y as ZERO;
-    print_string("Fail")
-  } catch {
-  | InvalidCast _ -> print_string("Pass")
-  }
+  vtry(
+    () -> {
+      y = 1;
+      _y = y as ZERO;
+      print_string("Fail")
+    },
+    exn ->
+      exn match {
+      | InvalidCast _ -> print_string("Pass")
+      | _ -> void
+      }
+    ,
+  )
 }

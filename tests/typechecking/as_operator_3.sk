@@ -6,10 +6,16 @@ class T() extends Q, R
 
 fun main(): void {
   x: P = S();
-  try {
-    _y = x as T _;
-    print_string("Fail")
-  } catch {
-  | InvalidCast _ -> print_string("Pass")
-  }
+  vtry(
+    () -> {
+      _y = x as T _;
+      print_string("Fail")
+    },
+    exn ->
+      exn match {
+      | InvalidCast _ -> print_string("Pass")
+      | _ -> void
+      }
+    ,
+  )
 }

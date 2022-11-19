@@ -10,11 +10,16 @@ fun main(): void {
   msg = "Pass ";
 
   Range(0, 3).each(i -> {
-    try {
-      throwValue(i % 2)
-    } catch {
-    | MyException(n) -> !msg = msg + n
-    }
+    vtry(
+      () -> {
+        throwValue(i % 2)
+      },
+      exn ->
+        exn match {
+        | MyException(n) -> !msg = msg + n
+        }
+      ,
+    )
   });
 
   print_raw(msg + "\n")

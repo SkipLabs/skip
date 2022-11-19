@@ -11,10 +11,16 @@ fun my_throw(): String {
 
 fun main(): void {
   print_raw(
-    try {
-      my_throw()
-    } catch {
-    | MyException() -> "Pass\n"
-    },
+    vtry(
+      () -> {
+        my_throw()
+      },
+      exn ->
+        exn match {
+        | MyException() -> "Pass\n"
+        | _ -> "Fail\n"
+        }
+      ,
+    ),
   )
 }

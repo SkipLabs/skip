@@ -13,29 +13,53 @@ class StringExn(msg: String) extends Exception {
 
 fun main(): void {
   print_raw(
-    (try {
-      positional(throw StringExn("P"), 1 / 0);
-      "Fail"
-    } catch {
-    | StringExn(s) -> s
-    }) +
-      (try {
-        named{a => throw StringExn("a"), b => 1 / 0};
+    (vtry(
+      () -> {
+        positional(throw StringExn("P"), 1 / 0);
         "Fail"
-      } catch {
-      | StringExn(s) -> s
-      }) +
-      (try {
-        named{b => throw StringExn("s"), a => 1 / 0};
-        "Fail"
-      } catch {
-      | StringExn(s) -> s
-      }) +
-      (try {
-        named{b => throw StringExn("s\n"), a => throw StringExn("not me")};
-        "Fail"
-      } catch {
-      | StringExn(s) -> s
-      }),
+      },
+      exn ->
+        exn match {
+        | StringExn(s) -> s
+        | _ -> "Fail"
+        }
+      ,
+    )) +
+      (vtry(
+        () -> {
+          named{a => throw StringExn("a"), b => 1 / 0};
+          "Fail"
+        },
+        exn ->
+          exn match {
+          | StringExn(s) -> s
+          | _ -> "Fail"
+          }
+        ,
+      )) +
+      (vtry(
+        () -> {
+          named{b => throw StringExn("s"), a => 1 / 0};
+          "Fail"
+        },
+        exn ->
+          exn match {
+          | StringExn(s) -> s
+          | _ -> "Fail"
+          }
+        ,
+      )) +
+      (vtry(
+        () -> {
+          named{b => throw StringExn("s\n"), a => throw StringExn("not me")};
+          "Fail"
+        },
+        exn ->
+          exn match {
+          | StringExn(s) -> s
+          | _ -> "Fail"
+          }
+        ,
+      )),
   )
 }
