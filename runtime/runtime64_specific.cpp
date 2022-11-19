@@ -156,11 +156,7 @@ int main(int pargc, char** pargv) {
 
 static void print(FILE* descr, char* str) {
   size_t size = SKIP_String_byteSize((char*)str);
-  char* buffer = (char*)malloc(size+1);
-  memcpy(buffer, str, size);
-  buffer[size] = 0;
-  fprintf(descr, "%s", buffer);
-  free(buffer);
+  fwrite(str, size, 1, descr);
 }
 
 void SKIP_print_raw(char* str) {
