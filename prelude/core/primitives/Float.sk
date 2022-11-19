@@ -122,27 +122,36 @@ fun floatToString(value: Float): String {
   (integralPart, optDecimalPart, optExponent) = splitFloat(value);
   !str = `${str}${integralPart}`;
   optDecimalPart match {
-  | None() -> !str = `${str}.0`
+  | None() ->
+    if (optExponent == None()) {
+      !str = `${str}.0`
+    }
   | Some(decimalPart) -> !str = `${str}${decimalsPart(decimalPart)}`
   };
-  optExponent.each(exponent -> !str = `${str}e${exponent}`);
+  optExponent.each(exponent ->
+    if (exponent < 0) {
+      !str = `${str}e${exponent}`
+    } else {
+      !str = `${str}e+${exponent}`
+    }
+  );
   str;
 }
 
 fun splitFloat(value: Float): (UInt32, ?UInt32, ?Int16) {
-  exponent = normalizeFloat(value);
-  integralPart = value.toInt();
-  remainder = value - integralPart.toFloat();
+  (norm_value, exponent) = normalizeFloat(value);
+  integralPart = norm_value.toInt();
+  remainder = norm_value - integralPart.toFloat();
   !remainder = remainder * 1e9;
-  decimalPart = remainder;
+  decimalPart = remainder.toInt();
   // rounding
-  !remainder = remainder - decimalPart;
+  !remainder = remainder - decimalPart.toFloat();
   zInt16 = Int16::truncate(0);
   oInt16 = Int16::truncate(1);
   if (remainder >= 0.5) {
-    !decimalPart = decimalPart + 1.0;
-    if (decimalPart >= 1e9) {
-      !decimalPart = 0.0;
+    !decimalPart = decimalPart + 1;
+    if (decimalPart.toFloat() >= 1e9) {
+      !decimalPart = 0;
       !integralPart = integralPart + 1;
       if (exponent != zInt16 && integralPart >= 10) {
         !exponent = Int16::truncate(exponent + oInt16);
@@ -150,15 +159,14 @@ fun splitFloat(value: Float): (UInt32, ?UInt32, ?Int16) {
       }
     }
   };
-  iDecimalPart = decimalPart.toInt();
   (
     UInt32::truncate(integralPart),
-    if (iDecimalPart > 0) Some(UInt32::truncate(iDecimalPart)) else None(),
+    if (decimalPart > 0) Some(UInt32::truncate(decimalPart)) else None(),
     if (exponent != zInt16) Some(exponent) else None(),
   )
 }
 
-fun normalizeFloat(value: Float): Int16 {
+fun normalizeFloat(value: Float): (Float, Int16) {
   positiveExpThreshold = 1e7;
   negativeExpThreshold = 1e-5;
   exponent = 0;
@@ -238,7 +246,7 @@ fun normalizeFloat(value: Float): Int16 {
       !exponent = exponent - 1;
     }
   };
-  Int16::truncate(exponent);
+  (value, Int16::truncate(exponent))
 }
 
 fun decimalsPart(value: UInt32): String {
