@@ -1,6 +1,6 @@
 CC=clang-10
 CPP=clang++-10
-SKC=~/skip/build/bin/skip_to_llvm
+SKC=../build/skc
 BCLINK=llvm-link-10
 MEMSIZE32=1073741824
 
@@ -9,7 +9,7 @@ CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
 
-SKIP_FILES=$(wildcard *.sk) $(wildcard ../*.sk) $(wildcard */*.sk)
+SKIP_FILES=$(wildcard *.sk) $(wildcard ../*.sk) $(wildcard */*.sk) $(shell find ../prelude -name '*.sk')
 
 default: ../build/skc
 
@@ -29,7 +29,7 @@ default: ../build/skc
 
 ../build/skc_out64.ll: $(SKIP_FILES)
 	mkdir -p ../build/
-	$(SKC) --embedded64 . --export-function-as main=skip_main $(SKFLAGS) --output ../build/skc_out64.ll
+	$(SKC) --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output ../build/skc_out64.ll
 
 clean:
 	rm -Rf ../build/skc*
