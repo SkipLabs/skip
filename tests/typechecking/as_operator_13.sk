@@ -5,11 +5,17 @@ const FOO: Foo = Foo(0);
 fun main(): void {
   x = Foo(0);
   _x = x as FOO;
-  try {
-    y = Foo(1);
-    _y = y as FOO;
-    print_string("Fail")
-  } catch {
-  | InvalidCast _ -> print_string("Pass")
-  }
+  vtry(
+    () -> {
+      y = Foo(1);
+      _y = y as FOO;
+      print_string("Fail")
+    },
+    exn ->
+      exn match {
+      | InvalidCast _ -> print_string("Pass")
+      | _ -> print_string("Fail")
+      }
+    ,
+  )
 }
