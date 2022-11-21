@@ -16,12 +16,17 @@ fun foo(x: Int = throw_A(), y: Int = throw_B()): void {
 
 fun main(): void {
   print_raw(
-    try {
-      foo();
-      "FAIL"
-    } catch {
-    | A _ -> "Pass\n"
-    | B _ -> "FAIL"
-    },
+    vtry(
+      () -> {
+        foo();
+        "FAIL"
+      },
+      exn ->
+        exn match {
+        | A _ -> "Pass\n"
+        | _ -> "FAIL"
+        }
+      ,
+    ),
   )
 }

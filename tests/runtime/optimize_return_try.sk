@@ -1,9 +1,14 @@
 fun main(): void {
   print_raw(
-    try {
-      "Pass\n"
-    } catch {
-    | Exception _ -> "Fail"
-    },
+    vtry(
+      () -> {
+        "Pass\n"
+      },
+      exn ->
+        exn match {
+        | _ -> "Fail"
+        }
+      ,
+    ),
   )
 }
