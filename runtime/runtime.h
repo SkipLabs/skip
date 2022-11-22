@@ -9,29 +9,21 @@
 #ifndef SKIP_RUNTIME
 #define SKIP_RUNTIME 1
 
-#define NULL ((void*)0)
+#include <stddef.h>
+#include <stdint.h>
 
 #define PAGE_SIZE (512 * 1024)
 #define STACK_INIT_CAPACITY (1024)
 
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef long long uint64_t;
-typedef unsigned int uint32_t;
-typedef unsigned long size_t;
 typedef uint64_t SkipInt;
 
 #ifdef SKIP32
-typedef unsigned int uintptr_t;
-typedef int intptr_t;
 #define WORDSIZE 4
 #endif
 
 #ifdef SKIP64
 #include <stdio.h>
 #define WORDSIZE 8
-typedef unsigned long uintptr_t;
-typedef long intptr_t;
 #endif
 
 /*****************************************************************************/
