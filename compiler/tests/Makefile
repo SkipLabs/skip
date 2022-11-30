@@ -1,6 +1,6 @@
 SOURCES := $(shell find ./ -name "*.sk" | sed "s|^\./||" | grep -v native | grep -v todo)
 PRELUDE_SOURCES := $(shell find ../../prelude -name '*.sk')
-SKFS_SOURCES := $(wildcard ../../*.sk)
+SKFS_SOURCES := $(wildcard ../../skfs/src/*.sk)
 LLVMOBJS = $(addprefix ../../build/tests/, $(SOURCES:.sk=.test))
 
 default: ../../build/state.db $(LLVMOBJS)

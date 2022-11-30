@@ -9,7 +9,7 @@ CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
 
-SKIP_FILES=$(shell find src -name '*.sk') $(wildcard ../*.sk) $(shell find ../prelude -name '*.sk')
+SKIP_FILES=$(shell find src -name '*.sk') $(shell find ../skfs/src -name '*.sk') $(shell find ../prelude -name '*.sk')
 
 default: ../build/skc
 
