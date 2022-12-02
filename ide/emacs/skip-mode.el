@@ -15,8 +15,6 @@
 ;;;
 ;;; Adding braces will correct this.
 
-
-
 (require 'derived)
 (require 'cc-mode)
 
@@ -26,8 +24,6 @@
 ;;;  (apply 'message e)
   )
 
-
-
 (defvar skip-keywords
   '("alias" "as" "async" "await" "catch" "children" "class" "concurrent"
     "const" "else" "extends" "false" "from" "fun" "if" "uses" "trait" "match"
@@ -35,30 +31,22 @@
     "static" "this" "throw" "true" "try" "type" "void" "watch" "with"
     "overridable" "memoized" "frozen" "deferred" "return"))
 
-
 (defvar skip-tab-width 2 "Width of a tab for SKIP mode")
 
-
 (defvar skip-font-lock-defaults
-  `((
-     ;; stuff between double quotes
-     ("//.*" . font-lock-comment-face)
+  `((("//.*" . font-lock-comment-face)
      ("\a\\.\\*\\?" . font-lock-string-face)
      ("\"\\.\\*\\?" . font-lock-string-face)
      ( ,(regexp-opt skip-keywords 'symbols) . font-lock-keyword-face)
-     ("\\<[A-Z]+[a-zA-Z_0-9]*" . font-lock-type-face)
-     )))
+     ("\\<[A-Z]+[a-zA-Z_0-9]*" . font-lock-type-face))))
 
-
-(defun is-block-open (tok) (or (string= tok "(") (string= tok "[")))
-(defun is-block-close (tok) (or (string= tok ")") (string= tok "]")))
-
+(defun skip-is-block-open (tok) (or (string= tok "(") (string= tok "[")))
+(defun skip-is-block-close (tok) (or (string= tok ")") (string= tok "]")))
 
 (defconst skip-2char-ops
   '("[" "]" "=>" "->" ">=" "<=" "==" "!=" "||" "::" "//" "&&" ";;"
     ;; We treat "/*" as a token so it's never misinterpreted as either "/" or "*"
     "/*"))
-
 
 (defconst skip-continuation-before-tokens
   '("+" "-" "*" "/" "=" "->" "=>" "("))
@@ -66,8 +54,7 @@
 (defconst skip-continuation-after-tokens
   '("+" "-" "*" "/" "="))
 
-
-(defun char-is-word (ch)
+(defun skip-char-skip-is-word (ch)
   ;; it seems like there should be a better way to do this
   (and (integerp ch)
        (or
@@ -77,36 +64,31 @@
         (and (>= ch ?a) (<= ch ?z))
         (and (>= ch ?0) (<= ch ?9)))))
 
+(defun skip-is-word (w) (string-match "^[[:word:]]+$" w))
 
-(defun is-word (w) (string-match "^[[:word:]]+$" w))
-
-
-(defun forward-syntactic-whitespace ()
+(defun skip-forward-syntactic-whitespace ()
   (c-skip-ws-forward)
   ;; If we're at a comment skip it and try again
   (cond
    ((looking-at-p "//")
     (end-of-line)
-    (forward-syntactic-whitespace))
+    (skip-forward-syntactic-whitespace))
    ((looking-at-p "/\\*")
     (search-forward "*/")
-    (forward-syntactic-whitespace))))
+    (skip-forward-syntactic-whitespace))))
 
-
-(defun forward-token ()
-    (forward-syntactic-whitespace)
+(defun skip-forward-token ()
+  (skip-forward-syntactic-whitespace)
   (if (eobp)
       nil
     (let ((ch (char-after))
           (start (point)))
-
       (forward-char)
       (cond
        ;; identifier or number
-       ((char-is-word ch)
-        (while (and (not (eobp)) (char-is-word (char-after)))
+       ((skip-char-skip-is-word ch)
+        (while (and (not (eobp)) (skip-char-skip-is-word (char-after)))
           (forward-char)))
-
        ;; string
        ((eq ch ?\")
         (forward-char)
@@ -114,38 +96,32 @@
                     (or (not (eq (char-after) ?\"))
                         (eq (char-before) ?\\)))
           (forward-char)))
-
        ;; two-char identifiers
        ((and (not (eobp)) (member (string ch (char-after)) skip-2char-ops))
         (forward-char))
-
        ;; everything else is just 1 char
        )
-
       (buffer-substring start (point)))))
 
-
-(defun forward-token-same-line ()
+(defun skip-forward-token-same-line ()
   (let ((line-end (line-end-position))
         (start (point))
-        (tok (forward-token)))
+        (tok (skip-forward-token)))
     (if (<= (point) line-end)
         tok
       (goto-char start)
       nil)))
 
-
-(defun backward-token-same-line ()
+(defun skip-skip-backward-token-same-line ()
   (let ((line-start (line-beginning-position))
         (start (point))
-        (tok (backward-token)))
+        (tok (skip-backward-token)))
     (if (>= (point) line-start)
         tok
       (goto-char start)
       nil)))
 
-
-(defun line-comment-start-location ()
+(defun skip-line-comment-start-location ()
   ;; TBD: This doesn't handle '//' in a string properly
   (save-excursion
     (beginning-of-line)
@@ -153,17 +129,15 @@
         (- (point) 2)
       (line-end-position))))
 
-
-(defun bsws-eol-comment-helper ()
-  (let ((comment (line-comment-start-location)))
+(defun skip-bsws-eol-comment-helper ()
+  (let ((comment (skip-line-comment-start-location)))
     (if (> (point) comment)
         (progn
           (goto-char comment)
           t)
       nil)))
 
-
-(defun bsws-block-comment-helper ()
+(defun skip-bsws-block-comment-helper ()
   (if (and (eq (char-before) ?/)
            (progn
              (backward-char)
@@ -173,106 +147,88 @@
         (search-backward "/*")
         t)))
 
-
-(defun backward-syntactic-whitespace ()
+(defun skip-backward-syntactic-whitespace ()
   ;; If we're in the comment then move to the beginning of the comment
   (c-skip-ws-backward)
-
   (if (cond
        ;; See if we're in an EOL comment
-       ((bsws-eol-comment-helper) t)
-
+       ((skip-bsws-eol-comment-helper) t)
        ;; See if we're at the end of a block comment
-       ((bsws-block-comment-helper) t))
-      (backward-syntactic-whitespace)))
+       ((skip-bsws-block-comment-helper) t))
+      (skip-backward-syntactic-whitespace)))
 
-
-
-
-(defun backward-token ()
-  (backward-syntactic-whitespace)
-
+(defun skip-backward-token ()
+  (skip-backward-syntactic-whitespace)
   ;; Because emacs' looking-back is non-greedy we need to hack this up ourselves.
   (if (bobp)
       nil
     (let ((ch (char-before))
           (end (point)))
-
       (backward-char)
       (cond
        ;; identifier or number
-       ((char-is-word ch)
-        (while (and (not (bobp)) (char-is-word (char-before)))
+       ((skip-char-skip-is-word ch)
+        (while (and (not (bobp)) (skip-char-skip-is-word (char-before)))
           (backward-char)))
-
        ;; string
        ((eq ch ?\")
         (backward-char)
         (while (and (not (bobp)) (or (not (eq (char-after) ?\")) (eq (char-before) ?\\)))
           (backward-char)))
-
        ;; two-char identifiers
        ((and (not (bobp)) (member (string (char-before) ch) skip-2char-ops))
         (backward-char))
-
        ;; everything else is just 1 char
        )
-
       (buffer-substring (point) end))))
 
-
-(defun in-block-comment ()
+(defun skip-in-block-comment ()
   (let ((open (save-excursion
                 (condition-case nil
                     (progn (search-backward "/*") (point))
                   (search-failed -1))))
         (close (save-excursion
-                (condition-case nil
-                    (progn (search-backward "*/") (point))
-                  (search-failed -1)))))
+                 (condition-case nil
+                     (progn (search-backward "*/") (point))
+                   (search-failed -1)))))
     (> open close)))
 
-
-(defun forward-token-if (tok)
+(defun skip-forward-token-if (tok)
   (let ((start (point)))
-    (if (string= (forward-token) tok)
+    (if (string= (skip-forward-token) tok)
         t
       (goto-char start)
       nil)))
 
+(defun skip-forward-token-peek ()
+  (save-excursion (skip-forward-token)))
 
-(defun forward-token-peek ()
-  (save-excursion (forward-token)))
-
-
-(defun parse-children-child ()
+(defun skip-parse-children-child ()
   ;; | Foo
   ;; | Foo(...)
   ;; | Foo{...}
-  (if (forward-token-if "|")
-      (if (is-word (forward-token))
-          (let ((next (forward-token-peek)))
+  (if (skip-forward-token-if "|")
+      (if (skip-is-word (skip-forward-token))
+          (let ((next (skip-forward-token-peek)))
             (if (or (string= next "(") (string= next "{"))
                 (forward-list))
             t))))
 
-
-(defun in-children-block (parent-point)
+(defun skip-in-children-block (parent-point)
   (save-excursion
     (let ((start (point)))
       (goto-char parent-point)
-      (forward-token)
-      (if (string= (forward-token) "children")
-          (if (string= (forward-token) "=")
+      (skip-forward-token)
+      (if (string= (skip-forward-token) "children")
+          (if (string= (skip-forward-token) "=")
               (if (< (point) start)
                   (progn
                     (while (and
                             (< (point) start)
-                            (parse-children-child)))
+                            (skip-parse-children-child)))
                     (< start (point)))))))))
 
-
-(defun in-function-match (parent-point)
+(defun skip-in-function-match (parent-point)
   ;; Scan backward to see if we're in a function definition.  We're basically
   ;; going backward at the same scope until we see ';' or 'fun'.
   (save-excursion
@@ -285,21 +241,17 @@
          ((or (< (point) parent-point)
               (eq (char-before) ?\;))
           (setq done 0))
-
          ((or (eq (char-before) ?\))
               (eq (char-before) ?\}))
           (backward-sexp))
-
-         ((string= (backward-token) "fun")
+         ((string= (skip-backward-token) "fun")
           (setq done 1))))
-
       (if (eq done 1)
           (progn
             (back-to-indentation)
             (point))))))
 
-
-(defun in-match (parent-point)
+(defun skip-in-match (parent-point)
   ;; Scan backward to see if we're in a match.  It's harder than just looking
   ;; for "|" because it has to be in the same scope level.
   (let ((start (point))
@@ -310,8 +262,8 @@
       ;; we might be in a match - scan backward until we find a match token
       (while (and (not found)
                   (> (point) parent-point))
-        (let ((tok (backward-token)))
-          (if (is-block-close tok)
+        (let ((tok (skip-backward-token)))
+          (if (skip-is-block-close tok)
               (progn
                 (forward-char)
                 (backward-sexp))
@@ -323,49 +275,42 @@
           nil)
       t)))
 
-
-(defun backward-token-or-sexp ()
-  (let ((tok (backward-token)))
-    (if (is-block-close tok)
+(defun skip-backward-token-or-sexp ()
+  (let ((tok (skip-backward-token)))
+    (if (skip-is-block-close tok)
         (progn
           (forward-char)
           (backward-sexp)))
     tok))
 
-
-(defun backward-token-same-line-or-sexp ()
-  (let ((tok (backward-token-same-line)))
-    (if (is-block-close tok)
+(defun skip-skip-backward-token-same-line-or-sexp ()
+  (let ((tok (skip-skip-backward-token-same-line)))
+    (if (skip-is-block-close tok)
         (progn
           (forward-char)
           (backward-sexp)))
     tok))
-
 
 ;;; Like back-to-indentation but skips sexps
 (defun skip-beginning-of-statement ()
-  (while (backward-token-same-line-or-sexp))
-  (back-to-indentation)
-  )
-
+  (while (skip-skip-backward-token-same-line-or-sexp))
+  (back-to-indentation))
 
 (defun skip-expression-is-closure ()
-  (let ((tok (backward-token-or-sexp)))
+  (let ((tok (skip-backward-token-or-sexp)))
     (if tok
         (cond
          ((string= tok "->") t)
          ((member tok '("{" "(" "[" ";" ",")) nil)
          (t (skip-expression-is-closure))))))
 
-
 (defun skip-indent-line ()
   "Indent current line of skip code"
   (interactive)
-
   ;;; TODO: There are a lot of constants here which should be variables...
   (if (not (or
             (eq (line-beginning-position) (point-min))
-            (in-block-comment)))
+            (skip-in-block-comment)))
       (let ((indent nil))
         (save-excursion
           (let ((start-point (point))
@@ -384,16 +329,14 @@
                 (parent-at-end nil)
                 (parent-is-match-case nil)
                 (cur-tok nil))
-
             (if parent-point
                 (save-excursion
                   (goto-char parent-point)
-                  (setq parent-tok (forward-token-peek))
+                  (setq parent-tok (skip-forward-token-peek))
                   (setq parent-line-ending-position (line-end-position))
                   (setq parent-at-end (eq (+ parent-point 1) parent-line-ending-position))
-
                   (setq parent-indent-point
-                        (if (and (is-block-open parent-tok)
+                        (if (and (skip-is-block-open parent-tok)
                                  (not parent-at-end))
                             (line-beginning-position)
                           (progn
@@ -408,19 +351,19 @@
                           (eq (char-after) ?\|)))))
 
             (skip-debug "parent: pt:%s tok:%s line:%s-%s ind-pt:%s ind:%s"
-                      parent-point parent-tok parent-line-beginning-position
-                      parent-line-ending-position parent-indent-point parent-indent)
+                        parent-point parent-tok parent-line-beginning-position
+                        parent-line-ending-position parent-indent-point parent-indent)
 
             ;; Go to the beginning of the current line - if we're at the top of the
             ;; buffer then just indent 0.
             (beginning-of-line)
 
-            (setq cur-tok (save-excursion (forward-token-same-line)))
+            (setq cur-tok (save-excursion (skip-forward-token-same-line)))
 
             ;; If the line starts with a close paren then we should line up
             ;; with the matching open paren.
             (unless indent
-              (if (is-block-close cur-tok)
+              (if (skip-is-block-close cur-tok)
                   (if (eq (+ parent-point 1) parent-line-ending-position)
                       (progn
                         (setq indent parent-indent)
@@ -448,7 +391,7 @@
             ;; See if we're in one of the weird 'children =' sections.
             (unless indent
               (if (and (string= parent-tok "{")
-                       (in-children-block parent-point))
+                       (skip-in-children-block parent-point))
                   (progn
                     ;; children =
                     ;;   | Foo
@@ -460,7 +403,7 @@
             (unless indent
               (if (string= cur-tok "|")
                   (progn
-                    (let ((fn-point (in-function-match parent-point)))
+                    (let ((fn-point (skip-in-function-match parent-point)))
                       (if fn-point
                           (progn
                             ;; fun foo():String
@@ -482,7 +425,7 @@
 
             ;; Line continuation
             (unless indent
-              (let ((tok (backward-token)))
+              (let ((tok (skip-backward-token)))
                 (if (or
                      (member tok skip-continuation-before-tokens)
                      (member cur-tok skip-continuation-after-tokens))
@@ -493,11 +436,11 @@
                       ;; then we want to indent the parent
                       (save-excursion
                         (skip-beginning-of-statement)
-                        (if (string= (save-excursion (forward-token)) "|")
+                        (if (string= (save-excursion (skip-forward-token)) "|")
                             (progn
                               ;; | foo ->
                               ;;     bar
-                              (forward-syntactic-whitespace)
+                              (skip-forward-syntactic-whitespace)
                               (setq parent-indent (- (point) (line-beginning-position)))
                               (setq parent-is-match-case t)
                               (skip-debug "rule 50*: %s" parent-indent))))
@@ -505,7 +448,7 @@
 
                       (cond
                        ;; If we're in a paren and it's the EOL
-                       ((and (is-block-open parent-tok) parent-at-end)
+                       ((and (skip-is-block-open parent-tok) parent-at-end)
                         (if (save-excursion (goto-char start-point) (skip-expression-is-closure))
                             (progn
                               ;;; foo(
@@ -519,7 +462,7 @@
                           (skip-debug "rule 50bb: %s" indent)))
 
                        ;; We're in a paren but not EOL
-                       ((is-block-open parent-tok)
+                       ((skip-is-block-open parent-tok)
                         (if (string= tok "->")
                             ;;; foo((x) ->
                             ;;;       bar)
@@ -559,7 +502,7 @@
 
             ;; If the enclosing block is parenthesized...
             (unless indent
-              (if (is-block-open parent-tok)
+              (if (skip-is-block-open parent-tok)
                   (progn
                     ;; If the enclosing block's '(' is EOL then indent
                     (if (eq (+ parent-point 1) parent-line-ending-position)
@@ -579,15 +522,14 @@
                         (setq indent (+ parent-indent 4))
                         (skip-debug "rule 90a: %s" indent))
                     (progn
-                        ;; Foo -> {
-                        ;;   bar()
-                        (setq indent (+ parent-indent 2))
-                        (skip-debug "rule 90c: %s" indent)))
+                      ;; Foo -> {
+                      ;;   bar()
+                      (setq indent (+ parent-indent 2))
+                      (skip-debug "rule 90c: %s" indent)))
                 (progn
                   ;; No parent - top level construct
                   (setq indent 0)
-                  (skip-debug "rule 90c: %s" indent))))
-            ))
+                  (skip-debug "rule 90c: %s" indent))))))
         (if (eq (line-beginning-position) (line-end-position))
             ;; blank line
             (indent-line-to indent)
@@ -596,9 +538,7 @@
         ;; If the point is between the beginning of the line and the
         ;; indent then move up to the indent
         (if (< (- (point) (line-beginning-position)) indent)
-            (goto-char (+ (line-beginning-position) indent)))
-        )))
-
+            (goto-char (+ (line-beginning-position) indent))))))
 
 (defvar skip-mode-syntax-table
   (let ((table (make-syntax-table)))
@@ -607,36 +547,28 @@
     (modify-syntax-entry ?` "\"" table)
     table))
 
-
 (define-derived-mode skip-mode prog-mode "Skip"
   "SKIP mode is a major mode for editing Skip files"
-
-  ;; for comments
   (setq comment-end ""
         comment-start "//"
         font-lock-defaults skip-font-lock-defaults
         tab-width skip-tab-width
-        indent-line-function 'skip-indent-line
-        )
+        indent-line-function 'skip-indent-line)
   (set-syntax-table skip-mode-syntax-table)
   (c-initialize-cc-mode t)
-  (c-init-language-vars-for 'c++-mode)
-  )
+  (c-init-language-vars-for 'c++-mode))
 
-
-(defun default-skip-mode-hook ()
+(defun skip-default-skip-mode-hook ()
   (c-set-offset 'block-close '-)
   (c-set-offset 'arglist-intro '+)
   (setq show-trailing-whitespace t)
-  (add-to-list 'write-file-functions 'delete-trailing-whitespace)
-  )
-(add-hook 'skip-mode-hook 'default-skip-mode-hook)
+  (add-to-list 'write-file-functions 'delete-trailing-whitespace))
 
+(add-hook 'skip-mode-hook 'skip-default-skip-mode-hook)
 
 (setq auto-mode-alist
-  (append
-   '(("\\.sk$" . skip-mode))
-   auto-mode-alist))
-
+      (append
+       '(("\\.sk$" . skip-mode))
+       auto-mode-alist))
 
 (provide 'skip-mode)
