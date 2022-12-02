@@ -25,10 +25,10 @@
   )
 
 (defvar skip-keywords
-  '("alias" "as" "async" "await" "catch" "children" "class" "concurrent"
-    "const" "else" "extends" "false" "from" "fun" "if" "uses" "trait" "match"
+  '("alias" "as" "async" "await" "base" "catch" "children" "class" "concurrent"
+    "const" "else" "extends" "false" "from" "for" "fun" "if" "in" "uses" "trait" "match"
     "module" "mutable" "native" "private" "protected" "public" "readonly"
-    "static" "this" "throw" "true" "try" "type" "void" "watch" "with"
+    "static" "this" "throw" "true" "try" "void" "watch" "with" "while"
     "overridable" "memoized" "frozen" "deferred" "return"))
 
 (defvar skip-tab-width 2 "Width of a tab for SKIP mode")
