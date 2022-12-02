@@ -1,6 +1,6 @@
 FROM ubuntu:20.04
 RUN apt-get update
-RUN apt-get install -y git make clang
+RUN apt-get install -y git make clang lld-10
 COPY . /skfs_build
 WORKDIR /skfs_build
 RUN mkdir build
