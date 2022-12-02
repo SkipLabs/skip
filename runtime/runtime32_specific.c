@@ -170,6 +170,6 @@ uint64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   return 0;
 }
 
-void SKIP_exit(int64_t code) {
+void SKIP_exit(uint64_t code) {
   SKIP_throw(NULL);
 }

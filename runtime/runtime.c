@@ -58,7 +58,9 @@ void SKIP_unsafe_remove_local_context(char* obj) {
 
 char* SKIP_unsafe_get_local_context() {
   if(local_ctx == NULL) {
+#ifdef SKIP64
     fprintf(stderr, "Error: local context is not set");
+#endif
     SKIP_throw(NULL);
   }
   return local_ctx;
