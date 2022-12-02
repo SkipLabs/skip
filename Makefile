@@ -1,6 +1,6 @@
 CC=clang-10
 CPP=clang++-10
-SKC=~/skip/build/bin/skip_to_llvm
+SKC=build/skc
 BCLINK=llvm-link-10
 MEMSIZE32=1073741824
 
@@ -9,7 +9,7 @@ CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
 
-SKIP_FILES=$(wildcard *.sk) $(wildcard */*.sk)
+SKIP_FILES=$(shell find prelude -name '*.sk') $(shell find skfs -name '*.sk') $(wildcard main/*.sk) $(wildcard sql/*.sk)
 CFILES=\
 	runtime/copy.c \
 	runtime/free.c \
@@ -69,7 +69,7 @@ build/out32.wasm: build/out32.ll build/full_runtime32.bc
 
 build/out32.ll: $(SKIP_FILES)
 	mkdir -p build/
-	$(SKC) --embedded32 . --export-function-as main=skip_main $(SKFLAGS) --output build/out32.ll
+	$(SKC) --embedded32 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out32.ll
 
 build/full_runtime32.bc: $(BCFILES32)
 	$(BCLINK) $(BCFILES32) -o build/full_runtime32.bc
@@ -85,7 +85,7 @@ build/skdb: build/out64.ll build/libskip_runtime64.a
 
 build/out64.ll: $(SKIP_FILES)
 	mkdir -p build/
-	$(SKC) --embedded64 . --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
+	$(SKC) --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
 
 build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o $(ONATIVE_FILES)
 	ar rcs build/libskip_runtime64.a $(OFILES) build/runtime/runtime64_specific.o $(ONATIVE_FILES)
