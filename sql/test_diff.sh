@@ -1,7 +1,8 @@
 #!/bin/bash
 
 DB=/tmp/test.db
-SKDB="../build/skdb --always-allow-joins --data $DB"
+SKDB_CMD=/skfs_build/build/skdb
+SKDB="$SKDB_CMD --always-allow-joins --data $DB"
 
 run_diff () {
 
@@ -9,7 +10,7 @@ run_diff () {
 
     nviews=`cat $2 | grep VIEW | sed 's/CREATE VIRTUAL VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1`
 
-    ../build/skdb --init $DB
+    $SKDB_CMD --init $DB
     cat $1 $2 | $SKDB
 
     for i in $(seq 0 $((nviews))); do
@@ -28,7 +29,7 @@ run_diff () {
     rm -f /tmp/replays
 
     for i in $(seq 0 $((nviews))); do
-        cat "/tmp/V$i" | skdb --replay >> /tmp/replays
+        cat "/tmp/V$i" | $SKDB_CMD --replay >> /tmp/replays
     done;
 
     cat /tmp/selects.sql | $SKDB | sort -n > /tmp/kk1
