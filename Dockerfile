@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 ubuntu:20.04
+FROM ubuntu:20.04
 RUN apt-get update
 RUN apt-get install -y git make clang lld-10 sqlite3 gcc gawk
 COPY . /skfs_build

@@ -119,8 +119,8 @@ void sk_global_unlock() {
 /*****************************************************************************/
 
 void SKIP_mutex_init(pthread_mutex_t* lock) {
-  if(sizeof(pthread_mutex_t) > 40) {
-    fprintf(stderr, "Internal error: mutex object not large enough for this arch");
+  if(sizeof(pthread_mutex_t) > 48) {
+    fprintf(stderr, "Internal error: mutex object too large for this arch\n");
   }
   pthread_mutexattr_t mutex_attr_holder;
   pthread_mutexattr_t* mutex_attr = &mutex_attr_holder;
@@ -159,7 +159,7 @@ void SKIP_mutex_unlock(pthread_mutex_t* lock) {
 
 void SKIP_cond_init(pthread_cond_t* cond) {
   if(sizeof(pthread_mutex_t) > 48) {
-    fprintf(stderr, "Internal error: mutex object not large enough for this arch");
+    fprintf(stderr, "Internal error: mutex object too large for this arch\n");
   }
   pthread_condattr_t cond_attr_value;
   pthread_condattr_t* cond_attr = &cond_attr_value;
