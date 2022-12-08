@@ -163,6 +163,10 @@ void SKIP_print_raw(char* str) {
   print(stdout, str);
 }
 
+void SKIP_print_error_raw(char* str) {
+  print(stderr, str);
+}
+
 void SKIP_flush_stdout() {
   fflush(stdout);
 }
