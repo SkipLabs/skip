@@ -305,12 +305,7 @@ uint64_t SKIP_hash(void* obj) {
   while(st->head > 0) {
     sk_value_t delayed = sk_stack_pop(st);
     void* toHash = *delayed.value;
-    uint64_t new_crc;
-    if(sk_is_static(toHash)) {
-      new_crc = (uint64_t)toHash;
-    } else {
-      new_crc = sk_hash_obj(st, toHash);
-    }
+    uint64_t new_crc = sk_hash_obj(st, toHash);
     crc = sk_crc64(crc, &new_crc, sizeof(uint64_t));
   }
 
