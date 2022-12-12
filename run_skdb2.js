@@ -1,4 +1,14 @@
-let pageBitSize = 20;
+const util = require('util');
+const fs = require('fs');
+var source = fs.readFileSync('./build/out32.wasm');
+var FileReader = require('filereader');
+var readline = require('readline');
+
+const IndexedDB = require('fake-indexeddb');
+const indexedDB = IndexedDB.indexedDB;
+
+let pageBitSize = 16;
+// let pageBitSize = 20;
 let pageSize = 1 << pageBitSize;
 
 /* ***************************************************************************/
@@ -253,6 +263,8 @@ async function makeSKDB(reboot) {
   var current_stdin = 0;
   var stdin = '';
   var stdout = new Array();
+  var trackedRoot = null;
+  var externalFuns = [];
   var skipMain = null;
   var fileDescrs = new Array();
   var fileDescrNbr = 2;
@@ -292,6 +304,10 @@ async function makeSKDB(reboot) {
       process.stdout.write(String.fromCharCode(c));
     },
     printf: function(ptr) {
+    },
+    SKIP_call_external_fun: function(funId, str) {
+      console.log("Called: " + wasmStringToJS(instance, str));
+      return externalFuns[funId](JSON.parse(wasmStringToJS(instance, str)));
     },
     SKIP_print_error: function(str) {
       process.stderr.write(wasmStringToJS(instance, str));
@@ -388,7 +404,13 @@ async function makeSKDB(reboot) {
         storePages();
       };
     }
-  }
+  };
+
+  runTrackedRoot = function(funId, arg) {
+    stdout = new Array();
+    trackedRoot(funId, encodeUTF8(instance, arg));
+    return stdout.join('');
+  };
 
   runLocal = function(new_args, new_stdin) {
     args = new_args;
@@ -417,11 +439,10 @@ async function makeSKDB(reboot) {
 
     storePages();
     return stdout.join('');
-  }
+  };
 
-  var mod = await fetch("out32.wasm");
-  var source = await mod.arrayBuffer();
-  var typedArray = new Uint8Array(source);
+//  var mod = await fetch("out32.wasm");
+//  var source = await mod.arrayBuffer();
   var typedArray = new Uint8Array(source);
 
   var mirroredTables = new Array();
@@ -467,6 +488,15 @@ async function makeSKDB(reboot) {
 
       cmd: function(new_args, new_stdin) {
         return runLocal(new_args, new_stdin);
+      },
+
+      registerFun: function(f) {
+        let funId = externalFuns.length;
+        externalFuns.push(f);
+      },
+
+      trackedRoot: function(f, args) {
+        return runTrackedRoot(f, args);
       },
 
       subscribe: function(viewName, f) {
@@ -618,6 +648,7 @@ async function makeSKDB(reboot) {
   popDirtyPage = result.instance.exports.sk_pop_dirty_page;
   getPersistentSize = result.instance.exports.SKIP_get_persistent_size;
   skipMain = result.instance.exports.skip_main;
+  trackedRoot = result.instance.exports.SKIP_tracked_root;
   initPages = result.instance.exports.SKIP_get_persistent_size() / pageSize + 1;
   version = result.instance.exports.SKIP_get_version();
   db = await makeSKDBStore("SKDBIndexedDB", storeName, version, instance.exports.memory.buffer, getPersistentSize(), reboot);
@@ -627,7 +658,9 @@ async function makeSKDB(reboot) {
 
 async function initDB() {
   skdb = await makeSKDB(true);
-  skdb.client.sql('create table tracks (track_id INTEGER primary key, track_name STRING, duration_ms INTEGER, track_number INTEGER, album_id INTEGER, album_name STRING);');
+//  skdb.client.sql('create table tracks (track_id INTEGER primary key, track_name STRING, duration_ms INTEGER, track_number INTEGER, album_id INTEGER, album_name STRING);');
+  var fid = skdb.client.registerFun(x => console.log('called'+ x));
+  console.log(skdb.client.trackedRoot(fid, "22"));
 }
 
 async function testDB() {
@@ -643,5 +676,5 @@ async function testDB() {
   console.log(skdb.client.sql('select count(*) from tracks;')[0]);
 }
 
-// initDB();
-testDB();
+ initDB();
+//testDB();

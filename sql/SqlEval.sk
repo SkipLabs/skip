@@ -1681,3 +1681,28 @@ fun markIfRead(context: mutable SKFS.Context, stmt: Stmt): void {
     void
   }
 }
+
+/*****************************************************************************/
+/* Primitives storing external functions to be computed in a lazy directory. */
+/*****************************************************************************/
+
+@cpp_extern("SKIP_call_external_fun")
+native fun callExternalFun(Int32, String): void;
+
+@cpp_export("SKIP_tracked_root")
+fun trackedRoot(funId: Int32, funParam: String): void {
+  saved = SKFS.newObstack();
+  vtry(
+    () -> {
+      SKFS.runWithGc(SKFS.Context{}, _context ~> {
+        callExternalFun(funId, funParam);
+        SKFS.CStop(None())
+      });
+    },
+    exn -> {
+      SKFS.destroyObstack(saved);
+      throw (exn);
+    },
+  );
+  SKFS.destroyObstack(saved);
+}
