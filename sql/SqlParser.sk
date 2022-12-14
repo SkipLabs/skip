@@ -139,7 +139,7 @@ fun parseSets(lex: Lexer, pos: Int): (Int, Array<(String, Pos, Expr)>) {
   posEq = pos;
   !pos = lex.expect(pos, "=");
   (!pos, firstValue) = parseExpr(lex, pos);
-  result = mutable Vector[(firstName, Pos(posEq), firstValue)];
+  result = mutable Vector[(firstName.lowercase(), Pos(posEq), firstValue)];
   loop {
     if (!lex.isEq(pos, ",")) {
       break void;
@@ -824,7 +824,7 @@ fun parseParamsOpt(lex: Lexer, pos: Int): (Int, ?Array<String>) {
     names = mutable Vector[];
     loop {
       (!pos, name) = lex.nextWord(pos);
-      names.push(name);
+      names.push(name.lowercase());
       if (lex.isEq(pos, ")")) {
         !pos = lex.expect(pos, ")");
         break void;
