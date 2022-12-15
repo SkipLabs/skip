@@ -6,7 +6,7 @@ LLC=llc-12
 WASMLD=wasm-ld-12
 MEMSIZE32=1073741824
 
-OLEVEL=-O0
+OLEVEL=-O3
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
 CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
@@ -46,7 +46,11 @@ SKFUNS=\
 	SKIP_call0 \
 	SKIP_Obstack_alloc \
 	skip_main \
-	SKIP_tracked_root \
+	SKIP_init_jsroots \
+	SKIP_add_root \
+	SKIP_remove_root \
+	SKIP_tracked_call \
+	SKIP_tracked_query \
 	sk_string_create \
 	SKIP_initializeSkip \
 	SKIP_skfs_init \

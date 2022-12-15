@@ -71,7 +71,13 @@ base class CValue uses Orderable, Show {
     | CString(str) if (format.usesDoubleQuotes()) ->
       result = mutable Vector['"'];
       for (c in str) {
-        if (c == '"') result.push(c);
+        if (c == '"') {
+          format match {
+          | SKFS.OJSON _ -> result.push('\\')
+          | SKFS.OSQL _ -> void
+          | SKFS.OCSV _ -> result.push(c)
+          }
+        };
         result.push(c);
       };
       result.push('"');

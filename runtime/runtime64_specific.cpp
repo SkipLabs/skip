@@ -359,4 +359,9 @@ void SKIP_unix_die_on_EOF() {
   pthread_create(&thread_id, NULL, &wait_for_EOF, NULL);
 }
 
+char* SKIP_call_external_fun(int32_t, char*) {
+  fprintf(stderr, "SKIP_call_external_fun not implemented in native mode");
+  exit(2);
+}
+
 }

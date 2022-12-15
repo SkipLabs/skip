@@ -1148,7 +1148,7 @@ fun makeSqlContext(): mutable SKFS.Context {
   gcontext = mutable SKFS.Context{
     unsafeReuse => true,
     failOnExn => true,
-    removeSubDirs => false,
+    removeSubDirs => true,
   };
   gcontext.setGlobal("Line", SKFS.IntFile(0));
   gcontext
@@ -1323,7 +1323,6 @@ fun eval(options: Options, userOpt: ?String): void {
       print_raw("skdb> ");
     };
     lineFile = SKFS.IntFile::fromFile(context.getGlobal("Line").fromSome());
-    context.!globals = SortedMap[];
     userOpt.each(_ -> {
       print_error("Cannot execute queries as user, use --connect instead");
       skipExit(88);
@@ -1686,18 +1685,91 @@ fun markIfRead(context: mutable SKFS.Context, stmt: Stmt): void {
 /* Primitives storing external functions to be computed in a lazy directory. */
 /*****************************************************************************/
 
-@cpp_extern("SKIP_call_external_fun")
-native fun callExternalFun(Int32, String): void;
+@cpp_extern("SKIP_has_local_context")
+native fun hasLocalContext(): Int32;
 
-@cpp_export("SKIP_tracked_root")
-fun trackedRoot(funId: Int32, funParam: String): void {
+@cpp_extern("SKIP_set_local_context")
+native fun setLocalContext(mutable SKFS.Context): void;
+
+@cpp_extern("SKIP_remove_local_context")
+native fun removeLocalContext(): void;
+
+@cpp_extern("SKIP_get_local_context")
+native fun getLocalContext(): mutable SKFS.Context;
+
+@cpp_extern("SKIP_call_external_fun")
+native fun callExternalFun(Int32, String): String;
+
+class AlreadyDefiningRoot() extends Exception {
+  fun getMessage(): String {
+    "Cannot define a root while already defining a root"
+  }
+}
+
+class JSCall(funId: Int32, funArg: String) extends SKFS.File
+const jsRootsInputDirName: SKFS.DirName = SKFS.DirName::create(
+  "/jsRootsInput/",
+);
+const jsRootsValuesDirName: SKFS.DirName = SKFS.DirName::create("/jsroots/");
+
+@cpp_export("SKIP_init_jsroots")
+fun initJSRoots(): void {
   saved = SKFS.newObstack();
   vtry(
     () -> {
-      SKFS.runWithGc(SKFS.Context{}, _context ~> {
-        callExternalFun(funId, funParam);
-        SKFS.CStop(None())
-      });
+      SKFS.runWithGc(SKFS.Context{}, context ~> {
+        context.!globals = SortedMap[];
+        dirDescr = DirDescr::create{
+          name => "jsroots",
+          schema => Array[
+            TypeDescr{
+              name => "name",
+              ty => TEXT(),
+              primary => false,
+              unique => false,
+              notNull => true,
+            },
+            TypeDescr{
+              name => "value",
+              ty => TEXT(),
+              primary => false,
+              unique => false,
+              notNull => true,
+            },
+          ],
+          dirName => jsRootsValuesDirName,
+          alias => None(),
+          windowSize => None(),
+          isInput => false,
+        };
+        tableDir = getTableDir(context);
+        fileName = SKFS.SID::create("jsroots");
+        tableDir.writeArray(context, fileName, Array[dirDescr]);
+        kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
+        _ = context
+          .mkdir(JSCall::fromFile, jsRootsInputDirName, false, Array[])
+          .contextWriterKeyValues(
+            SKFS.StringFile::fromFile,
+            context,
+            jsRootsValuesDirName,
+            (context, writer, baseName, values) ~> {
+              setLocalContext(context);
+              name = baseName match {
+              | SKFS.SID(x) -> x
+              | _ -> invariant_violation("Unexpected key type")
+              };
+              invariant(values.size() == 1);
+              value = values[0];
+              result = callExternalFun(value.funId, value.funArg);
+              row = RowValues::create(
+                Array[Some(CString(name)), Some(CString(result))],
+              );
+              writer.write(RowKey(row, kinds), row);
+              removeLocalContext()
+            },
+          );
+        SKFS.CStop(None());
+      })
     },
     exn -> {
       SKFS.destroyObstack(saved);
@@ -1705,4 +1777,205 @@ fun trackedRoot(funId: Int32, funParam: String): void {
     },
   );
   SKFS.destroyObstack(saved);
+}
+
+@cpp_export("SKIP_add_root")
+fun addRoot(rootName: String, funId: Int32, funArg: String): void {
+  if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
+  saved = SKFS.newObstack();
+  vtry(
+    () -> {
+      SKFS.runWithGc(SKFS.Context{}, context ~> {
+        context.!globals = SortedMap[];
+        (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
+          context,
+          SKFS.SID(rootName),
+          Array[JSCall(funId, funArg)],
+        );
+        context.update();
+        SKFS.CStop(None())
+      })
+    },
+    exn -> {
+      removeLocalContext();
+      SKFS.destroyObstack(saved);
+      throw (exn);
+    },
+  );
+  removeLocalContext();
+  SKFS.destroyObstack(saved);
+}
+
+@cpp_export("SKIP_remove_root")
+fun removeRoot(rootName: String): void {
+  if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
+  saved = SKFS.newObstack();
+  vtry(
+    () -> {
+      SKFS.runWithGc(SKFS.Context{}, context ~> {
+        context.!globals = SortedMap[];
+        if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
+          return SKFS.CStop(None());
+        };
+        (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
+          context,
+          SKFS.SID(rootName),
+          Array[],
+        );
+        context.update();
+        SKFS.CStop(None());
+      })
+    },
+    exn -> {
+      SKFS.destroyObstack(saved);
+      throw (exn);
+    },
+  );
+  SKFS.destroyObstack(saved);
+}
+
+const trackedJSCallsDirName: SKFS.DirName = SKFS.DirName::create(
+  "/jsTrackedCalls/",
+);
+
+class InvalidTrackedCall() extends Exception {
+  fun getMessage(): String {
+    "Tracked calls can only be made while defining a root."
+  }
+}
+
+fun initTrackedJSCalls(context: mutable SKFS.Context): void {
+  _ = SKFS.LHandle::create(
+    SKFS.StringFile::fromFile,
+    context,
+    trackedJSCallsDirName,
+    (context, _self, key) ~> {
+      setLocalContext(context);
+      (funIdStr, funArg) = key match {
+      | SKFS.SID(v) -> v.splitFirst("#")
+      | _ -> invariant_violation("Invalid key type")
+      };
+      funId = Int32::truncate(funIdStr.toInt());
+      result = callExternalFun(funId, funArg);
+      removeLocalContext();
+      Array[SKFS.StringFile(result)]
+    },
+  );
+}
+
+@cpp_export("SKIP_tracked_call")
+fun trackedCall(funId: Int32, funArg: String): String {
+  if (hasLocalContext() == 0) throw InvalidTrackedCall();
+  context = getLocalContext();
+  ldir = context.unsafeMaybeGetLazyDir(trackedJSCallsDirName) match {
+  | None() ->
+    initTrackedJSCalls(context);
+    context.unsafeGetLazyDir(trackedJSCallsDirName)
+  | Some(l) -> l
+  };
+  arr = ldir.getArray(context, SKFS.SID("" + funId + "#" + funArg));
+  invariant(arr.size() == 1);
+  SKFS.StringFile::fromFile(arr[0]).value
+}
+
+const trackedJSQueriesDirName: SKFS.DirName = SKFS.DirName::create(
+  "/jsTrackedQueries/",
+);
+
+class InvalidTrackedQuery() extends Exception {
+  fun getMessage(): String {
+    "Tracked queries can only be made while defining a root."
+  }
+}
+
+fun initTrackedJSQueries(context: mutable SKFS.Context): void {
+  _ = SKFS.LHandle::create(
+    SKFS.StringFile::fromFile,
+    context,
+    trackedJSQueriesDirName,
+    (context, _self, key) ~> {
+      SKFS.withRegion(context, (_, context) ~> {
+        query = key match {
+        | SKFS.SID(q) -> q
+        | _ -> invariant_violation("Invalid key type")
+        };
+        lexer = SKSQL.Lexer(0, SKSQL.Buffer(query));
+        selectAst = SKSQL.parseQuery(lexer, 0).i1 match {
+        | x @ Select _ -> x
+        };
+        skOptions = SKSQL.Options{
+          alwaysAllowJoins => false,
+          backtrace => false,
+          sync => false,
+          virtual => false,
+          showUsedIndexes => false,
+        };
+        compiler = SKSQL.Compiler::create(skOptions, 0);
+        tableMapCopy = context.getGlobal("TableMap");
+        context.removeGlobal("TableMap");
+        select = compiler.compileSelect(context, selectAst, true);
+        tableMapCopy match {
+        | None() -> void
+        | Some(x) -> context.setGlobal("TableMap", x)
+        };
+        selectDir = SKSQL.evalSelect(context, select, None());
+        selectDirName = selectDir.dirName;
+        selectProjDirName = SKFS.DirName::create(
+          selectDirName.toString() + "proj/",
+        );
+
+        dirDescr = Compiler::getDirDescr(
+          selectAst.params,
+          select.from,
+          select.params,
+          selectDirName.toString(),
+          selectDirName,
+        );
+        fieldNames = dirDescr.schema.map(x -> x.name);
+        format = SKFS.OJSON(fieldNames);
+
+        selectProj = SKFS.EHandle(
+          RowValues::fromFile,
+          selectDirName,
+        ).contextWriterKeyValues(
+          RowValues::fromFile,
+          context,
+          selectProjDirName,
+          (_context, writer, _key, values) ~> {
+            writer.writeArray(SKFS.IID(0), values)
+          },
+        );
+        proj = selectProj.getArray(context, SKFS.IID(0));
+        result = proj
+          .map(row -> {
+            row match {
+            | rvalues @ RowValues(_, r) ->
+              vec = mutable Vector[];
+              for (_ in Range(0, r)) {
+                vec.push(rvalues.toStringSingle(format))
+              };
+              vec.toArray()
+            }
+          })
+          .flatten()
+          .join("\n");
+        Array[SKFS.StringFile(result)]
+      })
+    },
+  );
+}
+
+@cpp_export("SKIP_tracked_query")
+fun trackedQuery(query: String): String {
+  if (hasLocalContext() == 0) throw InvalidTrackedQuery();
+  context = getLocalContext();
+  ldir = context.unsafeMaybeGetLazyDir(trackedJSQueriesDirName) match {
+  | None() ->
+    initTrackedJSQueries(context);
+    context.unsafeGetLazyDir(trackedJSQueriesDirName)
+  | Some(l) -> l
+  };
+  arr = ldir.getArray(context, SKFS.SID(query));
+  invariant(arr.size() == 1);
+  SKFS.StringFile::fromFile(arr[0]).value
 }

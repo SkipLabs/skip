@@ -986,6 +986,9 @@ mutable class Context{
   }
 }
 
+@cpp_extern("SKIP_print_backtrace")
+native fun printBacktrace(): void;
+
 class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   fun set<T: File>(tick: Tick, key: DirName, value: Dir): this {
     !this.state = this.state.set(TickRange::create(tick), key, value);
@@ -996,7 +999,9 @@ class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   }
   fun get(key: DirName): Dir {
     this.maybeGet(key) match {
-    | None() -> invariant_violation("Directory not found: " + key)
+    | None() ->
+      printBacktrace();
+      invariant_violation("Directory not found: " + key)
     | Some(x) -> x
     }
   }
