@@ -99,7 +99,19 @@ fun computeInsert(
 ): Array<RowValues> {
   valuesArray.map(vals -> {
     values = vals.mapWithIndex((idx, val) -> {
-      valueToCValue(context, inTransaction, pos, table.schema, idx, val)
+      schemaIdx = paramsOpt match {
+      | None() -> idx
+      | Some(params) ->
+        colName = params.maybeGet(idx) match {
+        | None() -> error(pos, "Value size mismatch with specified columns")
+        | Some(param) -> param
+        };
+        table.cols.maybeGet(colName) match {
+        | None() -> error(pos, "Column not found: " + colName)
+        | Some(colIdx) -> colIdx
+        }
+      };
+      valueToCValue(context, inTransaction, pos, table.schema, schemaIdx, val)
     });
     schema = table.schema;
     schemaSize = schema.size();
