@@ -38,6 +38,14 @@ extension base class BaseName {
 
     | (SKSQL.RowKey(row1, kinds), SKSQL.RowKey(row2, _)) ->
       SKSQL.compareRows(kinds, row1, row2)
+
+    | (
+      SKSQL.TrackedQuery(q1, start1, end1),
+      SKSQL.TrackedQuery(q2, start2, end2),
+    ) ->
+      (q1, start1, end1).compare((q2, start2, end2))
+    | (SKSQL.TrackedQuery _, _) -> LT()
+    | (_, SKSQL.TrackedQuery _) -> GT()
     }
   }
 }
@@ -156,6 +164,10 @@ class RowValues private (
     invariant(repeat >= 0);
     !this.repeat = repeat;
     this
+  }
+
+  fun getRepeat(): Int {
+    this.repeat
   }
 
   fun size(): Int {

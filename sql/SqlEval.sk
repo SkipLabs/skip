@@ -1878,6 +1878,10 @@ fun trackedCall(funId: Int32, funArg: String): String {
   SKFS.StringFile::fromFile(arr[0]).value
 }
 
+/*****************************************************************************/
+/* Support for tracked queries. */
+/*****************************************************************************/
+
 const trackedJSQueriesDirName: SKFS.DirName = SKFS.DirName::create(
   "/jsTrackedQueries/",
 );
@@ -1885,6 +1889,12 @@ const trackedJSQueriesDirName: SKFS.DirName = SKFS.DirName::create(
 class InvalidTrackedQuery() extends Exception {
   fun getMessage(): String {
     "Tracked queries can only be made while defining a root."
+  }
+}
+
+class TrackedQuery(query: String, start: Int, end: ?Int) extends SKFS.BaseName {
+  fun toString(): String {
+    inspect(this).toString()
   }
 }
 
@@ -1896,10 +1906,10 @@ fun initTrackedJSQueries(context: mutable SKFS.Context): void {
     (context, _self, key) ~> {
       SKFS.withRegion(context, (_, context) ~> {
         query = key match {
-        | SKFS.SID(q) -> q
+        | q @ TrackedQuery _ -> q
         | _ -> invariant_violation("Invalid key type")
         };
-        lexer = SKSQL.Lexer(0, SKSQL.Buffer(query));
+        lexer = SKSQL.Lexer(0, SKSQL.Buffer(query.query));
         selectAst = SKSQL.parseQuery(lexer, 0).i1 match {
         | x @ Select _ -> x
         };
@@ -1945,28 +1955,31 @@ fun initTrackedJSQueries(context: mutable SKFS.Context): void {
             writer.writeArray(SKFS.IID(0), values)
           },
         );
-        proj = selectProj.getArray(context, SKFS.IID(0));
-        result = proj
-          .map(row -> {
-            row match {
-            | rvalues @ RowValues(_, r) ->
-              vec = mutable Vector[];
-              for (_ in Range(0, r)) {
-                vec.push(rvalues.toStringSingle(format))
-              };
-              vec.toArray()
-            }
-          })
-          .flatten()
-          .join("\n");
-        Array[SKFS.StringFile(result)]
+        proj = selectProj.getIter(context, SKFS.IID(0));
+        acc = mutable Vector[];
+        i = 0;
+        for (rvalues in proj) {
+          if (i < query.start) {
+            !i = i + 1;
+            continue
+          };
+          query.end match {
+          | Some(end) -> if (i >= end) break void
+          | _ -> void
+          };
+          for (_ in Range(0, rvalues.getRepeat())) {
+            acc.push(rvalues.toStringSingle(format))
+          };
+          !i = i + 1;
+        };
+        Array[SKFS.StringFile(acc.join("\n"))]
       })
     },
   );
 }
 
 @cpp_export("SKIP_tracked_query")
-fun trackedQuery(query: String): String {
+fun trackedQuery(query: String, start: Int32, end: Int32): String {
   if (hasLocalContext() == 0) throw InvalidTrackedQuery();
   context = getLocalContext();
   ldir = context.unsafeMaybeGetLazyDir(trackedJSQueriesDirName) match {
@@ -1975,7 +1988,14 @@ fun trackedQuery(query: String): String {
     context.unsafeGetLazyDir(trackedJSQueriesDirName)
   | Some(l) -> l
   };
-  arr = ldir.getArray(context, SKFS.SID(query));
+  arr = ldir.getArray(
+    context,
+    TrackedQuery(
+      query,
+      start.toInt(),
+      if (end == -1) None() else Some(end.toInt()),
+    ),
+  );
   invariant(arr.size() == 1);
   SKFS.StringFile::fromFile(arr[0]).value
 }

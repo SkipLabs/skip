@@ -1,14 +1,4 @@
-const util = require('util');
-const fs = require('fs');
-var source = fs.readFileSync('./build/out32.wasm');
-var FileReader = require('filereader');
-var readline = require('readline');
-
-const IndexedDB = require('fake-indexeddb');
-const indexedDB = IndexedDB.indexedDB;
-
-let pageBitSize = 16;
-// let pageBitSize = 20;
+let pageBitSize = 20;
 let pageSize = 1 << pageBitSize;
 
 /* ***************************************************************************/
@@ -501,8 +491,8 @@ async function makeSKDB(reboot) {
     runLocal(['--json', '--subscribe', 'jsroots', '--updates', fileName], "");
   }
 
-//  var mod = await fetch("out32.wasm");
-//  var source = await mod.arrayBuffer();
+  var mod = await fetch("out32.wasm");
+  var source = await mod.arrayBuffer();
   var typedArray = new Uint8Array(source);
 
   var mirroredTables = new Array();
@@ -561,8 +551,10 @@ async function makeSKDB(reboot) {
         return JSON.parse(wasmStringToJS(instance, result));
       },
 
-      trackedQuery: function(arg) {
-        let result = trackedQuery(encodeUTF8(instance, arg));
+      trackedQuery: function(arg, start, end) {
+        if(start === undefined) start = 0;
+        if(end === undefined) end = -1;
+        let result = trackedQuery(encodeUTF8(instance, arg), start, end);
         return wasmStringToJS(instance, result).split('\n')
           .filter(x => x != "")
           .map(x => JSON.parse(x));
@@ -761,11 +753,15 @@ async function initDB() {
 
   var sumLessThan = skdb.client.registerFun(i => {
     let result = skdb.client.trackedQuery(`select sum(a) as count from t1 where a < ${i};`);
-    if(result.length == 0) {
-      return 0;
-    };
     return result[0].count;
   });
+
+  var first10 = skdb.client.registerFun(_ => {
+    return skdb.client.trackedQuery(`select * from t1;`);
+  });
+
+  skdb.client.addRoot("first10", first10, null);
+  console.log(skdb.client.getRoot("first10"));
 
   var buildRoot = skdb.client.registerFun(i => {
     return {rootNbr: i, rootCount: skdb.client.trackedCall(sumLessThan, i) };
