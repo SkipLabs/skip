@@ -121,6 +121,7 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
 fun parseUpdate(lex: Lexer, pos: Int): (Int, Update) {
   posBegin = pos;
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   !pos = lex.expectUpper(pos, "SET");
   (!pos, sets) = parseSets(lex, pos);
   where = if (lex.isEqUpper(pos, "WHERE")) {
@@ -165,6 +166,7 @@ fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
     Some(name)
   };
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   where = if (lex.isEqUpper(pos, "WHERE")) {
     !pos = lex.expectUpper(pos, "WHERE");
     (!pos, cond) = parseExpr(lex, pos);
@@ -187,6 +189,7 @@ fun parseDrop(lex: Lexer, pos: Int): (Int, Drop) {
     TTable()
   };
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   (pos, Drop{pos, kind, name})
 }
 
@@ -336,6 +339,7 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
     FQuery(query);
   } else {
     (!pos, sfrom) = lex.nextWord(pos);
+    !sfrom = sfrom.lowercase();
     FName(sfrom)
   };
   posMark = pos;
@@ -351,6 +355,7 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
   asStr = wordUpper match {
   | "AS" ->
     (!pos, !word) = lex.nextWord(pos);
+    !word = word.lowercase();
     Some(word)
   | _ if (isKeyword(word)) ->
     !pos = posMark;
@@ -753,6 +758,7 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
 
 fun parseView(lex: Lexer, posBegin: Int, pos: Int, virtual: Bool): (Int, View) {
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   if (lex.isEqUpper(pos, "AS")) {
     !pos = lex.expectUpper(pos, "AS");
   };
@@ -765,6 +771,7 @@ fun parseView(lex: Lexer, posBegin: Int, pos: Int, virtual: Bool): (Int, View) {
 fun parseCreateIndex(lex: Lexer, pos: Int): (Int, Index) {
   origPos = pos;
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   !pos = lex.expectUpper(pos, "ON");
   (!pos, fields) = parseIndexOn(lex, pos);
   (pos, Index{pos => origPos, name, fields, unique => false})
@@ -775,6 +782,7 @@ fun parseIndexOn(
   pos: Int,
 ): (Int, (String, Array<(String, IKind)>)) {
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   !pos = lex.expect(pos, "(");
   colDescs = mutable Vector[];
   loop {
@@ -803,6 +811,7 @@ fun parseInsert(lex: Lexer, pos: Int): (Int, Stmt) {
   !pos = lex.expectUpper(pos, "INTO");
   posName = lex.token(pos).posBegin;
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   (!pos, paramsOpt) = parseParamsOpt(lex, pos);
   (!pos, values) = parseValues(lex, pos);
   (pos, Insert{pos => posName, name, paramsOpt, values})
@@ -1003,6 +1012,7 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
 
 fun parseCreateTable(lex: Lexer, pos: Int, windowSize: ?Int): (Int, Table) {
   (!pos, name) = lex.nextWord(pos);
+  !name = name.lowercase();
   (!pos, schema) = parseTableSchema(lex, pos);
   (pos, Table{pos, name, schema, windowSize})
 }
