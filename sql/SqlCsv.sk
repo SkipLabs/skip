@@ -7,6 +7,9 @@ base class Token {
   | Chars(Array<Char>)
 }
 
+@cpp_extern("SKIP_stdin_has_data")
+native fun stdinHasData(): Int32;
+
 fun lexRaw(next: () -> Char): mutable Iterator<Token> {
   acc = mutable Vector[];
   lastIsString = false;
@@ -103,26 +106,20 @@ fun lex(next: () -> Char): mutable Iterator<(Bool, String)> {
   }
 }
 
-fun insert(
-  context: mutable SKFS.Context,
+fun parseCsv<T>(
   line: mutable Ref<Int>,
-  options: SKSQL.Options,
-  table: SKSQL.DirDescr,
-): SKFS.ContextOp {
-  eval = SKSQL.Evaluator{options};
-  pos = 0;
-  inTransaction = false;
-  paramsOpt = None();
+  f: ((Bool, String)) ~> T,
+): (Bool, Array<Array<T>>) {
   array = mutable Vector[];
   eof = false;
   vtry(
     () -> {
       for (_ in Range(0, 1000)) {
         values = mutable Vector[];
-        for (value in lex(() -> getChar(0))) {
+        for (value in lex(() -> getChar())) {
           values.push(value);
         };
-        cvalues = values.map(SKSQL.parseCSVValue);
+        cvalues = values.map(f);
         array.push(cvalues.toArray());
         line.set(line.get() + 1);
       }
@@ -136,14 +133,194 @@ fun insert(
       skipExit(23);
     },
   );
-  f = eval.insert(
-    context,
-    pos,
-    inTransaction,
-    table,
-    paramsOpt,
-    array.toArray(),
-  );
+  (eof, array.toArray())
+}
+
+fun insert(
+  context: mutable SKFS.Context,
+  line: mutable Ref<Int>,
+  options: SKSQL.Options,
+  table: SKSQL.DirDescr,
+  user: ?SKSQL.UserFile,
+): SKFS.ContextOp {
+  eval = SKSQL.Evaluator{options, user};
+  pos = 0;
+  inTransaction = false;
+  paramsOpt = None();
+  (eof, array) = parseCsv(line, SKSQL.parseCSVValue);
+  f = eval.insert(context, pos, inTransaction, table, paramsOpt, array);
   if (!eof) return SKFS.CContinue(f);
   SKFS.CStop(f)
+}
+
+fun replayDiff(
+  context: mutable SKFS.Context,
+  lineNbr: mutable Ref<Int>,
+  getLine: () -> String,
+  table: SKSQL.DirDescr,
+  user: ?(String, String),
+): SKFS.ContextOp {
+  userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x.i0, x.i1));
+  origDir = context.unsafeGetEagerDir(table.dirName);
+  buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
+  if (table.windowSize is Some _) {
+    print_error("Cannot use write-csv on a window or a stream");
+    skipExit(23);
+  };
+
+  makeFun = rows ->
+    Some((context, _, _) ~> {
+      entries = mutable Vector[];
+      dir = origDir;
+      for (row in rows) {
+        if (row.repeat != 0) continue;
+        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+        for ((source, _) in dir.getDataIter(context, key)) {
+          entries.push((key, (source.path(), Array<SKFS.File>[])));
+        };
+      };
+      if (!entries.isEmpty()) {
+        dir.writeArraySourceMany(context, entries.iterator());
+      };
+      !dir = context.unsafeGetEagerDir(table.dirName);
+      dir.writeArrayMany(
+        context,
+        rows
+          .iterator()
+          .filter(row -> row.repeat != 0)
+          .map(row -> {
+            (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
+            ((k : SKFS.BaseName), (v : Array<SKFS.File>))
+          }),
+      );
+      context.update();
+    });
+
+  vtry<SKFS.ContextOp>(
+    () -> {
+      loop {
+        line = getLine();
+        lineNbr.set(lineNbr.get() + 1);
+        if (line == "") continue;
+        chars = mutable Vector[];
+        iter = line.getIter();
+        loop {
+          c = iter.next() match {
+          | None() ->
+            print_error(
+              "Error, line " + lineNbr.get() + ": unexpected end of line",
+            );
+            skipExit(23)
+          | Some(x) -> x
+          };
+          if (c == '\t') break void;
+          if (c < '0' || c > '9') {
+            print_error(
+              "Error, line " + lineNbr.get() + ": expected an integer key",
+            );
+            skipExit(23)
+          };
+          chars.push(c);
+        };
+        repeat = String::fromChars(chars.toArray()).toInt();
+        str = line.sub(iter, line.length() - chars.size() - 1);
+        values = mutable Vector[];
+        strIter = str.getIter();
+        next = () -> {
+          val = strIter.next();
+          val match {
+          | None() -> '\n'
+          | Some(x) -> x
+          }
+        };
+        for (value in lex(next)) {
+          values.push(value);
+        };
+        cvalues = values.map(SKSQL.parseCSVValue);
+        pos = lineNbr.get();
+        newRows = SKSQL.computeInsert(
+          context,
+          false,
+          pos,
+          None(),
+          Array[cvalues.toArray()],
+          table,
+        );
+        userFileOpt match {
+        | None() -> void
+        | Some(userFile) ->
+          SKSQL.checkUserRows(context, userFile, pos, table, newRows)
+        };
+        buffer.extend(newRows.map(x -> x.setRepeat(repeat)));
+
+        if (stdinHasData() != 0) continue;
+        rows = buffer.toArray();
+        buffer.clear();
+
+        break SKFS.CContinue(makeFun(rows))
+      }
+    },
+    exn -> {
+      if (exn is EndOfFile _) {
+        rows = buffer.toArray();
+        SKFS.CStop(makeFun(rows))
+      } else {
+        flushStdout();
+        SKFS.CContinue(None())
+      }
+    },
+  );
+}
+
+fun replayStdin(): Map<String, (Int, Int)> {
+  map = mutable Map<String, (Int, Int)>[];
+  lineNbr = 1;
+  txNbr = 0;
+  vtry(
+    () -> {
+      loop {
+        line = read_line();
+        if (line == "") {
+          !txNbr = txNbr + 1;
+          continue;
+        };
+        chars = mutable Vector[];
+        iter = line.getIter();
+        loop {
+          c = iter.next() match {
+          | None() ->
+            print_error("Error, line " + lineNbr + ": unexpected end of line");
+            skipExit(23)
+          | Some(x) -> x
+          };
+          if (c == '\t') break void;
+          if (c < '0' || c > '9') {
+            print_error("Error, line " + lineNbr + ": expected an integer key");
+            skipExit(23)
+          };
+          chars.push(c);
+        };
+        repeat = String::fromChars(chars.toArray()).toInt();
+        value = line.sub(iter, line.length() - chars.size() - 1);
+        if (map.containsKey(value)) {
+          (oldTxNbr, oldRepeat) = map[value];
+          if (oldTxNbr == txNbr) {
+            map![value] = (txNbr, oldRepeat + repeat);
+          } else {
+            map![value] = (txNbr, repeat);
+          }
+        } else {
+          map![value] = (txNbr, repeat);
+        };
+        !lineNbr = lineNbr + 1;
+      }
+    },
+    exn -> {
+      if (!(exn is EndOfFile _)) {
+        print_error("Unexpected error: " + exn.getMessage());
+        skipExit(22);
+      };
+      map.chill()
+    },
+  );
 }

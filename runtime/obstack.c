@@ -91,7 +91,12 @@ char* sk_large_page(size_t size) {
 
 void sk_new_page() {
   size_t block_size = PAGE_SIZE;
+#ifdef SKIP32
+  head = (char*)sk_malloc_end(block_size);
+#endif
+#ifdef SKIP64
   head = (char*)sk_malloc(block_size);
+#endif
   if(head == NULL) {
     #ifdef SKIP64
     fprintf(stderr, "Out of memory\n");
@@ -279,7 +284,7 @@ static void heapify(sk_cell_t* arr, int n, int i) {
   }
 }
 
-static void heap_sort(sk_cell_t* arr, int n) {
+void sk_heap_sort(sk_cell_t* arr, int n) {
   for (int i = n / 2 - 1; i >= 0; i--) {
     heapify(arr, n, i);
   }
@@ -315,7 +320,7 @@ sk_cell_t* sk_get_pages(size_t size) {
     result[i].value = (uint64_t)(cursor + *(size_t*)(cursor + sizeof(char*)));
     cursor = *(char**)cursor;
   }
-  heap_sort(result, size);
+  sk_heap_sort(result, size);
   return result;
 }
 

@@ -12,6 +12,38 @@
 module SKFS;
 
 /*****************************************************************************/
+/* This is a magic directory containing all the pairs of "groupID, readerID".
+ * For example, 32/12, means that the user with a userID 12 can see the
+ * groupID 32. When the groupID is positive it is a whitelist, when it's
+ * negative it is a blacklist.
+ */
+/*****************************************************************************/
+
+const accessReaders: DirName = DirName::create("/skdb_access_readers/");
+
+/*****************************************************************************/
+/* Sessions. */
+/*****************************************************************************/
+
+base class CmdKind {
+  children =
+  | NUpdates(OutputFormat, String)
+  | NNotify(String)
+  | NTail()
+}
+
+value class Sub(
+  lock: Mutex,
+  cond: Condition,
+  cmd: CmdKind,
+  dirName: DirName,
+  userID: ?Int,
+  reset: (SKFS.Context, SKFS.Tick) ~> Bool,
+  getGroupID: BaseName ~> Int,
+  filter: SKFS.Context ~> (BaseName -> Bool) = _ ~> (_ -> true),
+)
+
+/*****************************************************************************/
 /* Unique number generator. */
 /*****************************************************************************/
 
@@ -259,9 +291,39 @@ mutable class Context{
   mutable lazyGetsQueueOut: List<Array<Path>> = List[],
   mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable reallyRemoveDir: Bool = true,
-  mutable sessions: SortedMap<Int, DirName> = SortedMap[],
+  mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
 } {
+  mutable fun subscribe(
+    context: mutable Context,
+    dirName: DirName,
+    sessionId: Int,
+    cmd: CmdKind,
+    init: Bool,
+    userID: ?Int,
+    reset: (SKFS.Context, SKFS.Tick) ~> Bool,
+    matchesGroup: BaseName ~> Int,
+    filter: Context ~> (BaseName -> Bool),
+  ): void {
+    sub = Sub(
+      mutexCreate(),
+      condCreate(),
+      cmd,
+      dirName,
+      userID,
+      reset,
+      matchesGroup,
+      filter,
+    );
+    if (init) {
+      tick0 = Tick(0);
+      dir = this.unsafeGetEagerDir(dirName);
+      changes = dir.getChangesAfter(tick0);
+      dir.notify(context, sub, changes, tick0);
+    };
+    context.!sessions[sessionId] = sub;
+  }
+
   mutable fun pushAsync(path: Path): void {
     this.!asyncList = List.Cons(path, this.asyncList);
   }
@@ -674,6 +736,22 @@ mutable class Context{
     }
   }
 
+  readonly fun changeInPrivacy(start: Tick): readonly Set<Int> {
+    result = mutable Set[];
+    this.unsafeMaybeGetEagerDir(accessReaders) match {
+    | None() -> result
+    | Some(readers) ->
+      changes = readers.getChangesAfter(start);
+      for (rowKey in changes) {
+        rowKey match {
+        | SKSQL.RowKey(row, _) -> result.insert(row.getInt(1).fromSome())
+        | _ -> void
+        }
+      };
+      result
+    }
+  }
+
   readonly fun notifyAll(start: Tick): void {
     changedDirNames = this.getGlobal("CHANGED_DIRS") match {
     | None() -> this.dirs.state.getChangesAfter(start)
@@ -681,9 +759,18 @@ mutable class Context{
     | _ -> invariant_violation("Wrong type for CHANGED_DIRS")
     };
     if (this.tick == start) return void;
-    for (dirName in changedDirNames) {
+    usersPrivacyChanges = this.changeInPrivacy(start);
+    for (_ => sub in this.sessions) {
+      dirName = sub.dirName;
+      privacyChanged = sub.userID match {
+      | None() -> false
+      | Some(userID) -> usersPrivacyChanges.contains(userID)
+      };
+      if (!privacyChanged && !changedDirNames.contains(dirName)) continue;
       this.unsafeMaybeGetDir(dirName) match {
-      | Some(dir @ EagerDir _) -> _ = dir.notifyAll(start)
+      | Some(dir @ EagerDir _) ->
+        changes = dir.getChangesAfter(start);
+        _ = dir.notify(this.clone(), sub, changes, start)
       | _ -> void
       }
     }
@@ -766,36 +853,6 @@ mutable class Context{
     };
     this.setDir(dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
-  }
-
-  mutable fun mkdirCompressed<T: File, Row: frozen>(
-    conv: File ~> T,
-    dirName: DirName,
-    content: Array<Row>,
-    decompress: Row ~> FixedRow<Array<File>>,
-    reallyRemove: Bool,
-  ): EHandle<T> {
-    if (this.dirs.state.containsKey(dirName)) {
-      throw DirAlreadyExists(dirName);
-    };
-    time = this.timeStamp();
-    tick = this.tick;
-    fixedData = CompressedDir{time, tick, data => content, decompress};
-
-    totalSize = fixedData.data.size();
-    creator = this.currentArrow();
-    dir = EagerDir{
-      time,
-      input => true,
-      dirName,
-      fixedData,
-      totalSize,
-      creator,
-      reallyRemove,
-    };
-    this.setDir(dirName, dir);
-    this.!newDirs = this.newDirs.add(dirName);
-    EHandle(conv, dirName)
   }
 
   mutable fun setDir(dirName: DirName, dir: Dir): void {
@@ -929,6 +986,9 @@ mutable class Context{
   }
 }
 
+// @cpp_extern("SKIP_print_backtrace")
+// native fun printBacktrace(): void;
+
 class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   fun set<T: File>(tick: Tick, key: DirName, value: Dir): this {
     !this.state = this.state.set(TickRange::create(tick), key, value);
@@ -939,7 +999,9 @@ class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   }
   fun get(key: DirName): Dir {
     this.maybeGet(key) match {
-    | None() -> invariant_violation("Directory not found: " + key)
+    | None() ->
+      // printBacktrace();
+      invariant_violation("Directory not found: " + key)
     | Some(x) -> x
     }
   }
@@ -971,7 +1033,7 @@ fun import(
         for (key in changedKeys) {
           for (srcValue in dir.unsafeGetDataIter(key)) {
             (source, values) = srcValue;
-            entries.push((key, (source.value, values)));
+            entries.push((key, (source.path(), values)));
           }
         };
         targetCtx.unsafeMaybeGetEagerDir(dir.dirName) match {
@@ -1088,9 +1150,11 @@ fun mutexCreate(): Mutex {
   freezeLock(lock)
 }
 
+@debug
 @cpp_extern("SKIP_mutex_lock")
 native fun mutexLock(mutable Mutex): void;
 
+@debug
 @cpp_extern("SKIP_mutex_unlock")
 native fun mutexUnlock(mutable Mutex): void;
 
@@ -1103,12 +1167,15 @@ fun condCreate(): Condition {
   freezeCond(cond)
 }
 
+@debug
 @cpp_extern("SKIP_cond_wait")
 native fun condWait(mutable Condition, mutable Mutex): Int32;
 
+@debug
 @cpp_extern("SKIP_cond_broadcast")
 native fun condBroadcast(mutable Condition): Int32;
 
+@debug
 @cpp_extern("pthread_cond_signal")
 native fun condSignal(mutable Condition): Int32;
 
@@ -1128,16 +1195,14 @@ native fun unfreezeCond(cond: Condition): mutable Condition;
 /* External process handling. Basically a thin layer on top of popen/pclose. */
 /*****************************************************************************/
 
-native base class UnixDescr
-
 @cpp_extern("SKIP_exec")
-native fun exec(String): UnixDescr;
+native fun exec(String): Int32;
 
 @cpp_extern("SKIP_write_to_proc")
-native fun writeToProc(UnixDescr, String): void;
+native fun writeToProc(Int32, String): void;
 
 @cpp_extern("SKIP_wait_for_proc")
-native fun waitForProc(UnixDescr): Int;
+native fun waitForProc(Int32): Int32;
 
 /*****************************************************************************/
 /* Runtime primitives. */
@@ -1410,6 +1475,12 @@ fun withRegion<T>(
   (icontext, copiedResult) = copied.getHead();
   context.replaceFromSaved(icontext);
   copiedResult
+}
+
+fun withRegionVoid<T>(f: () ~> void): void {
+  saved = newObstack();
+  f();
+  destroyObstack(saved);
 }
 
 module end;

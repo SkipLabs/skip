@@ -62,12 +62,12 @@ fun unescape(input: readonly Vector<Char>): String {
   String::fromChars(output.toArray())
 }
 
-fun getWriteKey(readAt: () -> Char): (?String, Bool) {
+fun getWriteKey(getChar: () -> Char): (?String, Bool) {
   chars = mutable Vector[];
   vtry<(?String, Bool)>(
     () -> {
       loop {
-        c = readAt();
+        c = getChar();
         if (c == '\\') {
           chars.push(c);
           continue
@@ -85,15 +85,15 @@ fun getWriteKey(readAt: () -> Char): (?String, Bool) {
   )
 }
 
-fun getWriteValue(readAt: () -> Char): ?String {
+fun getWriteValue(getChar: () -> Char): ?String {
   chars = mutable Vector[];
   vtry<?String>(
     () -> {
-      first = readAt();
+      first = getChar();
       if (first != '"') return None();
 
       loop {
-        c = readAt();
+        c = getChar();
         if (c == '\\') {
           chars.push(c);
           continue
@@ -109,12 +109,12 @@ fun getWriteValue(readAt: () -> Char): ?String {
 }
 
 fun getWriteKeyValueIter(
-  readAt: () -> Char,
+  getChar: () -> Char,
 ): mutable Iterator<?(String, ?String)> {
   loop {
-    (key, isFinished) = getWriteKey(readAt);
+    (key, isFinished) = getWriteKey(getChar);
     key match {
-    | Some(k) -> yield (Some((k, getWriteValue(readAt))))
+    | Some(k) -> yield (Some((k, getWriteValue(getChar))))
     | None() if (!isFinished) -> yield None()
     | None() -> void
     };
@@ -130,10 +130,10 @@ base class KVStreamOp {
   | KVAcc(keyName: String, valueName: ?String)
 }
 
-fun getWriteStreamOpIter(readAt: () -> Char): mutable Iterator<?KVStreamOp> {
+fun getWriteStreamOpIter(getChar: () -> Char): mutable Iterator<?KVStreamOp> {
   lastKeyOpt: ?String = None();
 
-  for (currentOpt in getWriteKeyValueIter(readAt)) {
+  for (currentOpt in getWriteKeyValueIter(getChar)) {
     currentOpt match {
     | None() ->
       !lastKeyOpt = None();
@@ -159,11 +159,11 @@ fun getWriteStreamOpIter(readAt: () -> Char): mutable Iterator<?KVStreamOp> {
 }
 
 fun getWriteKeyValuesIter(
-  readAt: () -> Char,
-): mutable Iterator<(BaseName, Array<File>)> {
+  getChar: () -> Char,
+): mutable Iterator<(String, Array<String>)> {
   keyOpt: ?String = Some("");
   values = mutable Vector[];
-  for (opOpt in getWriteStreamOpIter(readAt)) {
+  for (opOpt in getWriteStreamOpIter(getChar)) {
     opOpt match {
     | None() ->
       values.clear();
@@ -173,14 +173,14 @@ fun getWriteKeyValuesIter(
       | KVSep() ->
         keyOpt match {
         | None() -> void
-        | Some(key) -> yield (SID::create(key), values.toArray())
+        | Some(key) -> yield (key, values.toArray())
         };
         values.clear()
       | KVAcc(k, value) ->
         !keyOpt = Some(k);
         value match {
         | None() -> values.clear()
-        | Some(v) -> values.push(SKFS.StringFile(v))
+        | Some(v) -> values.push(v)
         }
       }
     }
@@ -190,12 +190,15 @@ fun getWriteKeyValuesIter(
 fun writeFromStdin(context: mutable Context, dirNameStr: String): void {
   dirName = SKFS.DirName::create(dirNameStr);
   dir = context.unsafeGetEagerDir(dirName);
-  i = 0;
-  next = () -> {
-    !i = i + 1;
-    getChar(i);
-  };
-  dir.writeArrayMany(context, getWriteKeyValuesIter(next));
+  dir.writeArrayMany(
+    context,
+    getWriteKeyValuesIter(getChar).map(kv ->
+      (
+        (SKFS.SID(kv.i0) : SKFS.BaseName),
+        kv.i1.map(x ~> (SKFS.StringFile(x) : SKFS.File)),
+      )
+    ),
+  );
 }
 
 module end;

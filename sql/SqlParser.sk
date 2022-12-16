@@ -103,9 +103,6 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
   | "DELETE" ->
     (!pos, x) = parseDelete(lex, pos);
     (pos, Some(x))
-  | "REPLACE" ->
-    (!pos, x) = parseReplace(lex, pos);
-    (pos, Some(x))
   | "SELECT" ->
     (!pos, x) = parseSelect(lex, pos);
     (pos, Some(x))
@@ -119,13 +116,6 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
   };
   !pos = lex.expect(pos, ";");
   (pos, result)
-}
-
-fun parseReplace(lex: Lexer, pos: Int): (Int, Replace) {
-  !pos = lex.expectUpper(pos, "INTO");
-  (!pos, name) = lex.nextWord(pos);
-  (!pos, values) = parseValues(lex, pos);
-  (pos, Replace{pos, name, values})
 }
 
 fun parseUpdate(lex: Lexer, pos: Int): (Int, Update) {
@@ -963,14 +953,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
     !pos = lex.expect(pos, "(");
     (!pos, !tok) = lex.next(pos);
     if (lex.content[tok.posBegin] == ')') {
-      return (pos, VId(None()));
+      return (pos, VId(true, None()));
     };
     if (lex.content[tok.posBegin] != '\'') {
       error(pos, "id expects a string literal");
     };
     (!pos, str) = parseString(lex, tok.posBegin);
     !pos = lex.expect(pos, ")");
-    return (pos, VId(Some(str)));
+    return (pos, VId(true, Some(str)));
   };
 
   if (lex.isEqUpperAt(tok, "TIME")) {
@@ -993,7 +983,21 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
       | TKFloat() -> return (pos, VFloat(-lex.wordAt(tok).toFloat()))
       | TKWord() -> invariant_violation("Internal error")
       };
-    }
+    };
+
+    if (lex.isEqUpperAt(tok, "ID")) {
+      !pos = lex.expect(pos, "(");
+      (!pos, !tok) = lex.next(pos);
+      if (lex.content[tok.posBegin] == ')') {
+        return (pos, VId(false, None()));
+      };
+      if (lex.content[tok.posBegin] != '\'') {
+        error(pos, "id expects a string literal");
+      };
+      (!pos, str) = parseString(lex, tok.posBegin);
+      !pos = lex.expect(pos, ")");
+      return (pos, VId(false, Some(str)));
+    };
   };
 
   if (Chars.isDigit(lex.content[tok.posBegin])) {
