@@ -32,10 +32,16 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Changes the output format to CSV",
     negatable => false,
   },
+  AP.BoolParam{
+    name => "json",
+    help => "Changes the output format to JSON",
+    negatable => false,
+  },
   AP.StringParam{name => "test", help => "The name of the test to run"},
   AP.StringParam{name => "init", help => "Initializes a new data file"},
   AP.StringParam{name => "capacity", help => "Initializes at a given capacity"},
   AP.StringParam{name => "data", help => "Loads an existing data file"},
+  AP.IntParam{name => "tail", help => "tails the changes on a directory"},
   AP.StringParam{
     name => "connect",
     help => "Same as --subscribe, but sends the initial state first",
@@ -49,7 +55,10 @@ const argsSchema: Array<AP.Param> = Array[
     name => "write",
     help => "Writes the data coming from stdin into a directory",
   },
-  AP.IntParam{name => "reconnect", help => "reconnects to a session id"},
+  AP.StringParam{
+    name => "write-csv",
+    help => "Writes the data coming from stdin into a directory in csv format",
+  },
   AP.IntParam{
     name => "diff",
     help => "sends the diff from session (must be used with --since)",
@@ -67,6 +76,14 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Name of the file updated with time of the last change",
   },
   AP.StringParam{name => "load-csv", help => "load csv values into table"},
+  AP.StringParam{
+    name => "dump-table",
+    help => "prints a specific table signature",
+  },
+  AP.StringParam{
+    name => "table-suffix",
+    help => "adds a suffix when using dump-table(s)",
+  },
   AP.BoolParam{
     name => "dump-tables",
     help => "Dumps the table in SQL format",
@@ -77,6 +94,10 @@ const argsSchema: Array<AP.Param> = Array[
     help => "Dumps the inserts in SQL format",
     negatable => false,
   },
+  AP.StringParam{
+    name => "dump-view",
+    help => "prints a specific view signature",
+  },
   AP.BoolParam{
     name => "dump-views",
     help => "Dumps the views in SQL format",
@@ -86,6 +107,13 @@ const argsSchema: Array<AP.Param> = Array[
     name => "dump",
     help => "Dumps tables/inserts/views in SQL format",
     negatable => false,
+  },
+  AP.StringParam{name => "user", help => "name of the user"},
+  AP.StringParam{name => "password", help => "password of the user"},
+  AP.IntParam{name => "csv-field", help => "outputs a specific csv field"},
+  AP.BoolParam{
+    name => "csv-all-fields",
+    help => "outputs a specific csv field",
   },
 ];
 
@@ -107,449 +135,691 @@ fun fixUpDirName(dirNameStr: String): SKFS.DirName {
   )
 }
 
+@cpp_extern("SKIP_unix_die_on_EOF")
+native fun dieOnEOF(): void;
+
 untracked fun main(): void {
-  parsedArgs = getParsedArgs();
-  argMap = parsedArgs.argumentValues;
-  if (parsedArgs.unknown.size() != 0) {
-    unknownOptions = parsedArgs.unknown.filter(x ->
-      x != "" && x.getIter().next() == Some('-')
-    );
-    for (option in unknownOptions) {
-      if (option != "--help") print_error("Unknown option: " + option);
-    };
-    if (unknownOptions.size() != 0) {
-      print_error(AP.help(argsSchema));
-      skipExit(2);
-    }
-  };
-  argFiles = parsedArgs.unknown.toArray();
-  if (argFiles.size() > 0) {
-    for (file in argFiles) {
-      print_error("Error: don't know what to do with " + file);
-    };
-    skipExit(2);
-  };
-
-  options = SKSQL.Options{
-    backtrace => argMap.maybeGet("backtrace") is Some(AP.BoolValue _),
-    alwaysAllowJoins => argMap.maybeGet("always-allow-joins") is Some(
-      AP.BoolValue _,
-    ),
-    sync => argMap.maybeGet("sync") is Some(AP.BoolValue _),
-    showUsedIndexes => argMap.maybeGet("show-used-indexes") is Some(
-      AP.BoolValue _,
-    ),
-    csv => argMap.maybeGet("csv") is Some(AP.BoolValue _),
-  };
-
-  argMap.maybeGet("sessions") match {
-  | Some(AP.BoolValue _) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, context ~> {
-      for (id => dirName in context.sessions) {
-        sub = context.unsafeGetEagerDir(dirName).subs[id];
-        print_string(
-          id.toString() +
-            "\t" +
-            dirName.toString() +
-            "\t" +
-            if (sub.status == 0) "CONNECTED" else "DISCONNECTED",
+  saved = SKFS.newObstack();
+  vtry(
+    () -> {
+      parsedArgs = getParsedArgs();
+      argMap = parsedArgs.argumentValues;
+      if (parsedArgs.unknown.size() != 0) {
+        unknownOptions = parsedArgs.unknown.filter(x ->
+          x != "" && x.getIter().next() == Some('-')
         );
-      };
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("compact") match {
-  | Some(AP.BoolValue{value => true}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runLockedSql(options, context ~> {
-      for (_dirName => dir in context.dirs.state) {
-        dir match {
-        | edir @ SKFS.EagerDir _ ->
-          !edir = edir.purge();
-          context.setDir(edir.dirName, edir)
-        | _ -> void
+        for (option in unknownOptions) {
+          if (option != "--help") print_error("Unknown option: " + option);
+        };
+        if (unknownOptions.size() != 0) {
+          print_error(AP.help(argsSchema));
+          skipExit(2);
         }
       };
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("dump-tables") match {
-  | Some(AP.BoolValue{value => true}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, context ~> {
-      SKSQL.dumpTables(context);
-      skipExit(0);
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("dump-inserts") match {
-  | Some(AP.BoolValue{value => true}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, context ~> {
-      SKSQL.dumpInserts(context);
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("dump-views") match {
-  | Some(AP.BoolValue{value => true}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, context ~> {
-      SKSQL.dumpViews(context);
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("dump") match {
-  | Some(AP.BoolValue{value => true}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, context ~> {
-      SKSQL.dumpTables(context);
-      SKSQL.dumpInserts(context);
-      SKSQL.dumpViews(context);
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("load-csv") match {
-  | Some(AP.StringValue{value => tableNameUpper}) ->
-    tableName = tableNameUpper.lowercase();
-    name = SKFS.SID::create(tableName);
-    SKSQL.runSql(options, context ~> {
-      table = context.getGlobal("CSV_TABLE") match {
-      | None() ->
-        tableDescr = SKSQL.getTable(options, context, 0, name);
-        context.setGlobal("CSV_TABLE", tableDescr);
-        tableDescr
-      | Some(x) -> SKSQL.DirDescr::fromFile(x)
+      argFiles = parsedArgs.unknown.toArray();
+      if (argFiles.size() > 0) {
+        for (file in argFiles) {
+          print_error("Error: don't know what to do with " + file);
+        };
+        skipExit(2);
       };
-      line = context.getGlobal("Line") match {
-      | None() -> mutable Ref(1)
-      | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
-      };
-      vtry<SKFS.ContextOp>(
-        () -> {
-          contextOp = SKCSV.insert(context, line, options, table);
-          context.setGlobal("Line", SKFS.IntFile(line.get()));
-          contextOp
+
+      options = SKSQL.Options{
+        backtrace => argMap.maybeGet("backtrace") is Some(AP.BoolValue _),
+        alwaysAllowJoins => argMap.maybeGet("always-allow-joins") is Some(
+          AP.BoolValue _,
+        ),
+        sync => argMap.maybeGet("sync") is Some(AP.BoolValue _),
+        showUsedIndexes => argMap.maybeGet("show-used-indexes") is Some(
+          AP.BoolValue _,
+        ),
+        format => if (argMap.maybeGet("csv") is Some(AP.BoolValue _)) {
+          SKSQL.OFK_CSV()
+        } else if (argMap.maybeGet("json") is Some(AP.BoolValue _)) {
+          SKSQL.OFK_JSON()
+        } else {
+          SKSQL.OFK_SQL()
         },
-        exn -> {
-          print_error("Error, line " + line.get() + ": " + exn.getMessage());
-          skipExit(23);
-        },
-      );
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("size") match {
-  | Some(AP.BoolValue{value => true}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, _context ~> {
-      SKFS.printPersistentSize();
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("reconnect") match {
-  | Some(AP.IntValue{value => sessionID}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, context ~> {
-      dirName = context.sessions.maybeGet(sessionID) match {
-      | None() ->
-        print_error("Error: session not found");
-        skipExit(2)
-      | Some(x) -> x
       };
-      edir = context.unsafeGetEagerDir(dirName);
-      edir.reconnect(context, sessionID);
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
 
-  argMap.maybeGet("diff") match {
-  | Some(AP.IntValue{value => sessionID}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, context ~> {
-      if (options.csv) {
-        context.setGlobal("CSV", SKFS.BoolFile(true));
-      };
-      dirName = context.sessions.maybeGet(sessionID) match {
-      | None() ->
-        print_error("Error: session not found");
-        skipExit(2)
-      | Some(x) -> x
-      };
-      time = argMap.maybeGet("since") match {
-      | Some(AP.IntValue{value}) -> value
-      | _ ->
-        print_error("Error: --since option missing");
-        skipExit(2)
-      };
-      context.setGlobal("Stdout", SKSQL.StdoutDiff(dirName, SKFS.Tick(time)));
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
-
-  argMap.maybeGet("disconnect") match {
-  | Some(AP.IntValue{value => sessionID}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runLockedSql(options, context ~> {
-      dirName = context.sessions.maybeGet(sessionID) match {
-      | None() ->
-        print_error("Error: session not found");
-        skipExit(2)
-      | Some(x) -> x
-      };
-      context.unsafeGetEagerDir(dirName).disconnect(context, sessionID);
-    });
-    return void
-  | Some(AP.MissingValue{}) -> void
-  | _ ->
-    print_error("Error: --disconnect expects a session ID");
-    skipExit(2)
-  };
-
-  argMap.maybeGet("write") match {
-  | Some(AP.StringValue{value => dirNameStr}) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runSql(options, context ~> {
-      SKFS.writeFromStdin(context, dirNameStr);
-      SKFS.CStop(None())
-    });
-    return void
-  | _ -> void
-  };
-
-  subscribe = argMap.maybeGet("connect") match {
-  | Some(AP.StringValue{value => viewName}) ->
-    !viewName = viewName.lowercase();
-    Some((viewName, fixUpDirName(viewName), true))
-  | _ ->
-    argMap.maybeGet("subscribe") match {
-    | Some(AP.StringValue{value => viewName}) ->
-      !viewName = viewName.lowercase();
-      Some((viewName, fixUpDirName(viewName), false))
-    | _ -> None()
-    }
-  };
-
-  subscribe match {
-  | None() -> void
-  | Some((userViewName, viewDirName, init)) ->
-    if (SKFS.gHasContext() == 0) {
-      invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
-      print_error("Error: option --data is missing");
-      skipExit(2);
-    };
-    SKSQL.runLockedSql(options, context ~> {
-      viewName = userViewName.lowercase();
-      SKSQL.forbidNow(context);
-      cmd = (argMap.maybeGet("updates"), argMap.maybeGet("notify")) match {
-      | (Some(AP.StringValue _), Some(AP.StringValue _)) ->
-        print_error("Cannot have both --updates and --notify");
-        skipExit(4)
-      | (Some(AP.StringValue{value => x}), _) ->
-        Some(SKFS.NUpdates(options.csv, x))
-      | (_, Some(AP.StringValue{value => x})) -> Some(SKFS.NNotify(x))
-      | _ -> None()
-      };
-      (input, output) = SKSQL.getSubsDirs(options, context);
-      viewKey = SKFS.SID(viewName);
-      inputDir = context.unsafeGetEagerDir(input.dirName);
-      sessionID = SKFS.genSym(0);
-      request = SKSQL.SubRequestFile(
-        viewName,
-        viewDirName,
-        init,
-        cmd,
-        sessionID,
-      );
-      inputDir.write(context, viewKey, request);
-      context.update();
-      outputDir = context.unsafeGetEagerDir(output.dirName);
-      file = outputDir.getArrayRaw(viewKey)[0];
-      invariant(sessionID == SKFS.IntFile::fromFile(file).value);
-      print_string(sessionID.toString());
-    });
-    return void
-  };
-
-  if (argMap.maybeGet("replay") is Some(AP.BoolValue _)) {
-    map = mutable Map<String, (Int, Int)>[];
-    lineNbr = 1;
-    txNbr = 0;
-    vtry(
-      () -> {
-        loop {
-          line = read_line();
-          if (line == "") {
-            !txNbr = txNbr + 1;
-            continue;
+      argMap.maybeGet("sessions") match {
+      | Some(AP.BoolValue _) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, context ~> {
+          for (id => sub in context.sessions) {
+            dirName = sub.dirName;
+            print_string(id.toString() + "\t" + dirName.toString());
           };
-          chars = mutable Vector[];
-          iter = line.getIter();
-          loop {
-            c = iter.next() match {
-            | None() ->
-              print_error(
-                "Error, line " + lineNbr + ": unexpected end of line",
-              );
-              skipExit(23)
-            | Some(x) -> x
-            };
-            if (c == '\t') break void;
-            if (c < '0' || c > '9') {
-              print_error(
-                "Error, line " + lineNbr + ": expected an integer key",
-              );
-              skipExit(23)
-            };
-            chars.push(c);
-          };
-          repeat = String::fromChars(chars.toArray()).toInt();
-          value = line.sub(iter, line.length() - chars.size() - 1);
-          if (map.containsKey(value)) {
-            (oldTxNbr, oldRepeat) = map[value];
-            if (oldTxNbr == txNbr) {
-              map![value] = (txNbr, oldRepeat + repeat);
-            } else {
-              map![value] = (txNbr, repeat);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("compact") match {
+      | Some(AP.BoolValue{value => true}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runLockedSql(options, context ~> {
+          for (_dirName => dir in context.dirs.state) {
+            dir match {
+            | edir @ SKFS.EagerDir _ ->
+              !edir = edir.purge();
+              context.setDir(edir.dirName, edir)
+            | _ -> void
             }
-          } else {
-            map![value] = (txNbr, repeat);
           };
-          !lineNbr = lineNbr + 1;
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("dump-table") match {
+      | Some(AP.StringValue{value => tableName}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        suffix = argMap.maybeGet("table-suffix") match {
+        | Some(AP.StringValue{value => suffix}) -> Some(suffix)
+        | _ -> None()
+        };
+        SKSQL.runSql(options, context ~> {
+          SKSQL.dumpTable(context, tableName.lowercase(), suffix);
+          skipExit(0);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("dump-tables") match {
+      | Some(AP.BoolValue{value => true}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        suffix = argMap.maybeGet("table-suffix") match {
+        | Some(AP.StringValue{value => suffix}) -> Some(suffix)
+        | _ -> None()
+        };
+        SKSQL.runSql(options, context ~> {
+          SKSQL.dumpTables(context, suffix);
+          skipExit(0);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("dump-inserts") match {
+      | Some(AP.BoolValue{value => true}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, context ~> {
+          SKSQL.dumpInserts(context);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("dump-view") match {
+      | Some(AP.StringValue{value => viewName}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, context ~> {
+          SKSQL.dumpView(context, viewName.lowercase());
+          skipExit(0);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("dump-views") match {
+      | Some(AP.BoolValue{value => true}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, context ~> {
+          SKSQL.dumpViews(context);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("dump") match {
+      | Some(AP.BoolValue{value => true}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, context ~> {
+          SKSQL.dumpTables(context, None());
+          SKSQL.dumpInserts(context);
+          SKSQL.dumpViews(context);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("csv-field") match {
+      | Some(AP.IntValue{value => fieldNbr}) ->
+        line = mutable Ref(1);
+        loop {
+          (eof, rows) = SKCSV.parseCsv(line, x ~> x);
+          for (row in rows) {
+            if (fieldNbr < 0 || fieldNbr >= row.size()) continue;
+            str = row[fieldNbr].i1;
+            print_string(str);
+          };
+          if (eof) return void;
         }
-      },
-      exn -> {
-        invariant(exn is EndOfFile _);
-        map.each((value, txNbrAndRepeat) -> {
+      | _ -> void
+      };
+
+      argMap.maybeGet("load-csv") match {
+      | Some(AP.StringValue{value => tableNameUpper}) ->
+        tableName = tableNameUpper.lowercase();
+        name = SKFS.SID::create(tableName);
+        SKSQL.runSql(options, context ~> {
+          table = context.getGlobal("CSV_TABLE") match {
+          | None() ->
+            tableDescr = SKSQL.getTable(options, context, 0, name);
+            context.setGlobal("CSV_TABLE", tableDescr);
+            tableDescr
+          | Some(x) -> SKSQL.DirDescr::fromFile(x)
+          };
+          line = context.getGlobal("Line") match {
+          | None() -> mutable Ref(1)
+          | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
+          };
+          userNameOpt = argMap.maybeGet("user") match {
+          | Some(AP.StringValue{value => userName}) -> Some(userName)
+          | _ -> None()
+          };
+          user = userNameOpt match {
+          | None() -> None()
+          | Some(userName) ->
+            argMap.maybeGet("password") match {
+            | Some(AP.StringValue{value => password}) ->
+              Some(SKSQL.UserFile::create(context, userName, password))
+            | _ ->
+              print_error("Password missing for user " + userName);
+              skipExit(57)
+            }
+          };
+          vtry<SKFS.ContextOp>(
+            () -> {
+              contextOp = SKCSV.insert(context, line, options, table, user);
+              context.setGlobal("Line", SKFS.IntFile(line.get()));
+              contextOp
+            },
+            exn -> {
+              print_error(
+                "Error, line " + line.get() + ": " + exn.getMessage(),
+              );
+              skipExit(23);
+            },
+          );
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("size") match {
+      | Some(AP.BoolValue{value => true}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, _context ~> {
+          SKFS.printPersistentSize();
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("diff") match {
+      | Some(AP.IntValue{value => sessionID}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, origContext ~> {
+          context = origContext.mclone();
+          sub = context.sessions.maybeGet(sessionID) match {
+          | None() ->
+            print_error("Error: session not found");
+            skipExit(2)
+          | Some(x) -> x
+          };
+          time = argMap.maybeGet("since") match {
+          | Some(AP.IntValue{value}) -> value
+          | _ ->
+            print_error("Error: --since option missing");
+            skipExit(2)
+          };
+          format = options.format match {
+          | SKSQL.OFK_CSV() -> SKFS.OCSV()
+          | SKSQL.OFK_JSON() ->
+            tables = SKSQL.getTableDir(context);
+            dirNameStr = sub.dirName.toString();
+            iter = dirNameStr.getIter();
+            _ = iter.next();
+            tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
+            arr = tables.getArray(context, SKFS.SID(tableName));
+            if (arr.size() == 0) {
+              print_error(
+                "There is no sql table associated with dir: " + dirNameStr,
+              );
+              skipExit(44);
+            };
+            dirDescr = arr[0];
+            fieldNames = dirDescr.schema.map(x -> x.name);
+            SKFS.OJSON(fieldNames)
+          | SKSQL.OFK_SQL() -> SKFS.OSQL()
+          };
+
+          origContext.setGlobal(
+            "Stdout",
+            SKSQL.StdoutDiff(format, sub.dirName, SKFS.Tick(time)),
+          );
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("disconnect") match {
+      | Some(AP.IntValue{value => sessionID}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runLockedSql(options, context ~> {
+          context.sessions.maybeGet(sessionID) match {
+          | None() ->
+            print_error("Error: session not found");
+            skipExit(2)
+          | Some(_) -> context.!sessions = context.sessions.remove(sessionID)
+          };
+        });
+        return void
+      | Some(AP.MissingValue{}) -> void
+      | _ ->
+        print_error("Error: --disconnect expects a session ID");
+        skipExit(2)
+      };
+
+      argMap.maybeGet("write") match {
+      | Some(AP.StringValue{value => dirNameStr}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runSql(options, context ~> {
+          SKFS.writeFromStdin(context, dirNameStr);
+          SKFS.CStop(None())
+        });
+        return void
+      | _ -> void
+      };
+
+      argMap.maybeGet("tail") match {
+      | Some(AP.IntValue{value => sessionID}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        tick = 0;
+        init = true;
+        dieOnEOF();
+        loop {
+          localObstack = SKFS.newObstack();
+          context = SKFS.gContextGet();
+          sub = context.sessions.maybeGet(sessionID) match {
+          | None() ->
+            print_error("Error: session not found");
+            skipExit(2)
+          | Some(x) -> x
+          };
+          dirName = sub.dirName;
+          edir = context.unsafeGetEagerDir(dirName);
+          format = options.format match {
+          | SKSQL.OFK_CSV() -> SKFS.OCSV()
+          | SKSQL.OFK_JSON() ->
+            mcontext = context.mclone();
+            tables = SKSQL.getTableDir(mcontext);
+            dirNameStr = sub.dirName.toString();
+            iter = dirNameStr.getIter();
+            _ = iter.next();
+            tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
+            arr = tables.getArray(mcontext, SKFS.SID(tableName));
+            if (arr.size() == 0) {
+              print_error(
+                "There is no sql table associated with dir: " + dirNameStr,
+              );
+              skipExit(44);
+            };
+            dirDescr = arr[0];
+            fieldNames = dirDescr.schema.map(x -> x.name);
+            SKFS.OJSON(fieldNames)
+          | SKSQL.OFK_SQL() -> SKFS.OSQL()
+          };
+
+          sub.userID match {
+          | Some(userID) if (sub.reset(context, SKFS.Tick(tick)) && !init) ->
+            readers = context.unsafeGetEagerDir(
+              SKFS.DirName::create("/skdb_access_readers/"),
+            );
+            toAdd = mutable Set[];
+            toRemove = mutable Set[];
+            for (rowKey in readers.getChangesAfter(SKFS.Tick(tick))) {
+              rowKey match {
+              | SKSQL.RowKey(row, _) ->
+                if (row.getInt(1).fromSome() == userID) {
+                  arr = readers.getArrayRaw(rowKey);
+                  groupID = row.getInt(0).fromSome();
+                  if (groupID > 0) { // Dealing with a whitelist
+                    if (arr.isEmpty()) {
+                      toRemove.insert(groupID);
+                    } else {
+                      toAdd.insert(groupID);
+                    }
+                  } else { // Dealing with a blacklist
+                    if (arr.isEmpty()) {
+                      toAdd.insert(groupID);
+                    } else {
+                      toRemove.insert(groupID);
+                    }
+                  }
+                }
+              | _ -> invariant_violation("Unexpected key type")
+              }
+            };
+            writer = mutable Debug.BufferedWriter(print_raw, 1024);
+            writer.write("\n");
+            writer.write("\n");
+            for (kv in edir.unsafeGetFileIter()) {
+              (key, valueIter) = kv;
+              values = valueIter.collect(Array);
+              if (toAdd.contains(sub.getGroupID(key))) {
+                if (values.size() == 0) {
+                  writer.write(key.toKVStringRemove(format))
+                } else {
+                  for (value in values) {
+                    writer.write(value.toKVString(format, key))
+                  }
+                }
+              } else if (toRemove.contains(sub.getGroupID(key))) {
+                key match {
+                | SKSQL.RowKey(row, _) ->
+                  writer.write(row.setRepeat(0).toKVString(format, key))
+                | _ -> void
+                }
+              }
+            };
+            writer.flush();
+            flushStdout()
+          | _ -> void
+          };
+          changes = edir.getChangesAfter(SKFS.Tick(tick));
+          edir.writeDiffStdout(context, changes, print_raw, format, sub.filter);
+          !tick = context.tick.value;
+          !init = false;
+          lock = SKFS.unfreezeLock(sub.lock);
+          cond = SKFS.unfreezeCond(sub.cond);
+          SKFS.mutexLock(lock);
+          while ({
+            newContext = SKFS.gContextGet();
+            newContext
+              .unsafeGetEagerDir(dirName)
+              .getChangesAfter(SKFS.Tick(tick))
+              .isEmpty() &&
+              newContext
+                .unsafeGetEagerDir(SKFS.accessReaders)
+                .getChangesAfter(SKFS.Tick(tick))
+                .isEmpty()
+          }) {
+            _ = SKFS.condWait(cond, lock);
+          };
+          SKFS.mutexUnlock(lock);
+          SKFS.destroyObstack(localObstack);
+        }
+      | _ -> void
+      };
+
+      argMap.maybeGet("write-csv") match {
+      | Some(AP.StringValue{value => tableNameUpper}) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        tableName = tableNameUpper.lowercase();
+        name = SKFS.SID::create(tableName);
+        SKSQL.runSql(options, context ~> {
+          table = context.getGlobal("CSV_TABLE") match {
+          | None() ->
+            tableDescr = SKSQL.getTable(options, context, 0, name);
+            context.setGlobal("CSV_TABLE", tableDescr);
+            tableDescr
+          | Some(x) -> SKSQL.DirDescr::fromFile(x)
+          };
+          line = context.getGlobal("Line") match {
+          | None() -> mutable Ref(1)
+          | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
+          };
+          user = argMap.maybeGet("user") match {
+          | Some(AP.StringValue{value => userName}) ->
+            argMap.maybeGet("password") match {
+            | Some(AP.StringValue{value => password}) ->
+              Some((userName, password))
+            | _ ->
+              print_error("Password missing for user " + userName);
+              skipExit(57)
+            }
+          | _ -> None()
+          };
+          myReadLine = () -> {
+            buffer = mutable Vector[];
+            loop {
+              c = getChar();
+              if (c == '\n') return String::fromChars(buffer.toArray());
+              buffer.push(c);
+            }
+          };
+          SKCSV.replayDiff(context, line, myReadLine, table, user)
+        });
+        return void
+      | _ -> void
+      };
+
+      subscribe = argMap.maybeGet("connect") match {
+      | Some(AP.StringValue{value => viewName}) ->
+        !viewName = viewName.lowercase();
+        Some((viewName, fixUpDirName(viewName), true))
+      | _ ->
+        argMap.maybeGet("subscribe") match {
+        | Some(AP.StringValue{value => viewName}) ->
+          !viewName = viewName.lowercase();
+          Some((viewName, fixUpDirName(viewName), false))
+        | _ -> None()
+        }
+      };
+
+      subscribe match {
+      | None() -> void
+      | Some((userViewName, viewDirName, init)) ->
+        if (SKFS.gHasContext() == 0) {
+          invariant(argMap.maybeGet("data") is Some(AP.MissingValue{}));
+          print_error("Error: option --data is missing");
+          skipExit(2);
+        };
+        SKSQL.runLockedSql(options, context ~> {
+          viewName = userViewName.lowercase();
+          SKSQL.forbidNow(context);
+          format = options.format match {
+          | SKSQL.OFK_CSV() -> SKFS.OCSV()
+          | SKSQL.OFK_JSON() ->
+            mcontext = context.mclone();
+            tables = SKSQL.getTableDir(mcontext);
+            dirNameStr = viewDirName.toString();
+            iter = dirNameStr.getIter();
+            _ = iter.next();
+            tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
+            arr = tables.getArray(mcontext, SKFS.SID(tableName));
+            if (arr.size() == 0) {
+              print_error(
+                "There is no sql table associated with dir: " + dirNameStr,
+              );
+              skipExit(44);
+            };
+            dirDescr = arr[0];
+            fieldNames = dirDescr.schema.map(x -> x.name);
+            SKFS.OJSON(fieldNames)
+          | SKSQL.OFK_SQL() -> SKFS.OSQL()
+          };
+          cmd = (argMap.maybeGet("updates"), argMap.maybeGet("notify")) match {
+          | (Some(AP.StringValue _), Some(AP.StringValue _)) ->
+            print_error("Cannot have both --updates and --notify");
+            skipExit(4)
+          | (Some(AP.StringValue{value => x}), _) -> SKFS.NUpdates(format, x)
+          | (_, Some(AP.StringValue{value => x})) -> SKFS.NNotify(x)
+          | _ -> SKFS.NTail()
+          };
+          (input, output) = SKSQL.getSubsDirs(options, context);
+          viewKey = SKFS.SID(viewName);
+          inputDir = context.unsafeGetEagerDir(input.dirName);
+          sessionID = SKFS.genSym(0);
+          user = argMap.maybeGet("user") match {
+          | Some(AP.StringValue{value => userName}) ->
+            argMap.maybeGet("password") match {
+            | Some(AP.StringValue{value => password}) ->
+              Some((userName, password))
+            | _ ->
+              print_error("Password missing for user " + userName);
+              skipExit(57)
+            }
+          | _ -> None()
+          };
+          request = SKSQL.SubRequestFile(
+            viewName,
+            viewDirName,
+            init,
+            cmd,
+            sessionID,
+            user,
+          );
+          inputDir.write(context, viewKey, request);
+          context.update();
+          outputDir = context.unsafeGetEagerDir(output.dirName);
+          file = outputDir.getArrayRaw(viewKey)[0];
+          invariant(sessionID == SKFS.IntFile::fromFile(file).value);
+          print_string(sessionID.toString());
+        });
+        return void
+      };
+
+      if (argMap.maybeGet("replay") is Some(AP.BoolValue _)) {
+        state = SKCSV.replayStdin();
+        state.each((value, txNbrAndRepeat) -> {
           (_, repeat) = txNbrAndRepeat;
           for (_ in Range(0, repeat)) {
             print_string(value);
           }
-        })
-      },
-    );
-    return void
-  };
-
-  if (argMap.maybeGet("all") is Some(AP.BoolValue _)) {
-    testFuns = SKFSTest.getAllTests();
-    for (testName => testFun in testFuns) {
-      print_string(
-        "/*****************************************************************************/",
-      );
-      print_string("/* " + testName + " */");
-      print_string(
-        "/*****************************************************************************/",
-      );
-      _ = testFun();
-      print_string("");
-    };
-    return void;
-  } else if (argMap.maybeGet("test") is Some(AP.StringValue _)) {
-    testFuns = SKFSTest.getAllTests();
-    testName = argMap["test"] match {
-    | AP.StringValue{value => testName} ->
-      if (!testFuns.containsKey(testName)) {
-        print_error("Error: unknown test " + testName + "\n");
-        for (key => _ in testFuns) {
-          print_error("  " + key + "\n");
-        };
-        skipExit(4);
+        });
+        return void
       };
-      testName
-    | _ ->
-      print_error("Invalid test name type");
-      skipExit(2)
-    };
-    context = testFuns[testName]();
-    if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
-      SKFS.toplevel(context.clone())
-    } else {
-      return void
-    }
-  } else if (argMap.maybeGet("init") is Some(AP.StringValue _)) {
-    _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
-    return void;
-  } else if (argMap.maybeGet("capacity") is Some(AP.StringValue _)) {
-    print_error("cannot use capacity without init");
-    skipExit(2)
-  } else if (argMap.maybeGet("data") is Some(AP.StringValue _)) {
-    // this was handled in the C++ side
-    void
-  };
-  if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
-    SKFS.toplevel(SKFS.Context{});
-  } else {
-    SKSQL.eval(options)
-  }
+
+      if (argMap.maybeGet("all") is Some(AP.BoolValue _)) {
+        testFuns = SKFSTest.getAllTests();
+        for (testName => testFun in testFuns) {
+          print_string(
+            "/*****************************************************************************/",
+          );
+          print_string("/* " + testName + " */");
+          print_string(
+            "/*****************************************************************************/",
+          );
+          _ = testFun();
+          print_string("");
+        };
+        return void;
+      } else if (argMap.maybeGet("test") is Some(AP.StringValue _)) {
+        testFuns = SKFSTest.getAllTests();
+        testName = argMap["test"] match {
+        | AP.StringValue{value => testName} ->
+          if (!testFuns.containsKey(testName)) {
+            print_error("Error: unknown test " + testName + "\n");
+            for (key => _ in testFuns) {
+              print_error("  " + key + "\n");
+            };
+            skipExit(4);
+          };
+          testName
+        | _ ->
+          print_error("Invalid test name type");
+          skipExit(2)
+        };
+        context = testFuns[testName]();
+        if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
+          SKFS.toplevel(context.clone())
+        } else {
+          return void
+        }
+      } else if (argMap.maybeGet("init") is Some(AP.StringValue _)) {
+        _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
+        return void;
+      } else if (argMap.maybeGet("capacity") is Some(AP.StringValue _)) {
+        print_error("cannot use capacity without init");
+        skipExit(2)
+      } else if (argMap.maybeGet("data") is Some(AP.StringValue _)) {
+        // this was handled in the C++ side
+        void
+      };
+      user = argMap.maybeGet("user") match {
+      | Some(AP.StringValue{value => userName}) -> Some(userName)
+      | _ -> None()
+      };
+      if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
+        SKFS.toplevel(SKFS.Context{});
+      } else {
+        SKSQL.eval(options, user)
+      }
+    },
+    exn -> {
+      SKFS.destroyObstack(saved);
+      throw (exn);
+    },
+  );
+  SKFS.destroyObstack(saved);
 }

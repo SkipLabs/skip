@@ -12,13 +12,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define PAGE_SIZE (512 * 1024)
+#define PAGE_SIZE (1024 * 1024 * 8)
 #define STACK_INIT_CAPACITY (1024)
 
 typedef uint64_t SkipInt;
 
 #ifdef SKIP32
 #define WORDSIZE 4
+#define WASM_HEAP_SIZE 1073741824
+
+#define PERSISTENT_PAGE_BIT_SIZE 20
+#define PERSISTENT_PAGE_SIZE (1 << PERSISTENT_PAGE_BIT_SIZE)
+#define PERSISTENT_TABLE_SIZE (WASM_HEAP_SIZE / PERSISTENT_PAGE_SIZE)
 #endif
 
 #ifdef SKIP64
@@ -199,7 +204,7 @@ int sk_is_const(void*);
 int sk_is_large_page(char* page);
 int sk_is_static(void*);
 void* sk_malloc(size_t size);
-void* sk_malloc(size_t);
+void* sk_malloc_end(size_t);
 char* sk_new_const(char* cst);
 void sk_obstack_attach_page(char* lpage);
 size_t sk_page_size(char* page);
@@ -226,5 +231,7 @@ uintptr_t sk_get_ref_count(void* obj);
 void SKIP_throwInvalidSynchronization();
 void SKIP_call_finalize(char*, char*);
 void SKIP_exit(SkipInt);
+void sk_heap_sort(sk_cell_t* arr, int n);
+int SKIP_get_version();
 
 #endif

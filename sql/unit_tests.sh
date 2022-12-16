@@ -73,7 +73,7 @@ else
     echo -e "TEST NOT LIKE:\tFAILED"
 fi
 
-if cat test/aggr_union.sql | skdb | awk -P '{x+=$1}; END {print x}' | grep -q '11'
+if cat test/aggr_union.sql | skdb | awk '{x+=$1}; END {print x}' | grep -q '11'
 then
     echo -e "TEST AGGR UNION:\tOK"
 else

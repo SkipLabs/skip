@@ -426,7 +426,8 @@ mutable class Compiler{
     name match {
     | FName(tableName) ->
       tableSID = SKFS.SID::create(tableName);
-      getTable(this.options, context, this.pos, tableSID)
+      table = getTable(this.options, context, this.pos, tableSID);
+      table
 
     | FQuery(select @ Select _) ->
       cselect = this.compileSelect(context, select, false);
@@ -517,11 +518,9 @@ mutable class Compiler{
       | _ -> void
       }
     };
-    DirDescr{
+    DirDescr::create{
       name => selectId,
-      colNames => schema.map(ty -> ty.name),
       schema,
-      cols,
       dirName,
       alias => Some(selectId),
       windowSize,
@@ -893,8 +892,20 @@ mutable class Compiler{
       CIExpr(CExists(this.compileSelect(context, select, false)))
     | SKSQL.Call("coalesce", None()) ->
       error(this.pos, "Missing arguments for COALESCE")
+    | Call("uid", _) ->
+      context.getGlobal("USER") match {
+      | None() ->
+        error(
+          this.pos,
+          "Cannot use a the function uid() if not connected as a user",
+        )
+      | Some(user) -> CIExpr(CILiteral(UserFile::fromFile(user).id))
+      }
     | Call("id", None()) -> error(this.pos, "id expects one argument")
     | Call("id", Some(args)) ->
+      if (args.size() == 0) {
+        return CIExpr(CILiteral(SKFS.genSym(0)))
+      };
       if (args.size() != 1) {
         error(this.pos, "id expects one argument")
       };
@@ -1538,15 +1549,13 @@ mutable class Compiler{
           | None() -> void
           | Some(table) ->
             moveMap![tableNbr] = newFrom.size();
-            dirDescr = DirDescr{
+            dirDescr = DirDescr::create{
               name => table.dirName.toString(),
-              colNames => from.map(x -> x.i0.colNames).flatten(),
               dirName => table.dirName,
               schema => table.schema.map(x ->
                 if (x.primary) x with {unique => true} else x
               ),
               alias => table.alias,
-              cols => SortedMap[],
               windowSize => table.windowSize,
               isInput => false,
             };

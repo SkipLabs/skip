@@ -64,14 +64,20 @@ base class CValue uses Orderable, Show {
     }
   }
 
-  fun toStringOrCsv(csv: Bool): String {
+  fun toStringWithFormat(format: SKFS.OutputFormat): String {
     this match {
     | CInt(n) -> n.toString()
     | CFloat(f) -> floatToString(f)
-    | CString(str) if (csv) ->
+    | CString(str) if (format.usesDoubleQuotes()) ->
       result = mutable Vector['"'];
       for (c in str) {
-        if (c == '"') result.push(c);
+        if (c == '"') {
+          format match {
+          | SKFS.OJSON _ -> result.push('\\')
+          | SKFS.OSQL _ -> void
+          | SKFS.OCSV _ -> result.push(c)
+          }
+        };
         result.push(c);
       };
       result.push('"');
@@ -113,6 +119,7 @@ base class SubSelectTask uses Orderable {
     kinds: Array<(Int, IKind, Type)>,
     joinKind: JoinKind,
     windowSize: ?Int,
+    onlyLeftValues: Bool = false,
   }
 }
 
