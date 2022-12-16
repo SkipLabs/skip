@@ -47,6 +47,7 @@ run_test 'test/select3.sql';
 # run_test 'test/select4.2.sql';
 run_test 'test/select5.1.sql';
 # run_test 'test/select5.2.sql';
+run_test 'test/insert-reorder.sql';
 
 for i in test/random/expr/*.sql; do
     run_test $i;
