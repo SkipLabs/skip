@@ -91,11 +91,13 @@ fun createUserIndex(
   };
   !colNames = colNames.concat(additionalCols.toArray());
 
+  colsLower = table.cols.mapItems((col, idx) -> (col.lowercase(), idx));
   cols = colNames.map(x -> {
-    if (!table.cols.containsKey(x.i0)) {
+    colNameLower = x.i0.lowercase();
+    if (!colsLower.containsKey(colNameLower)) {
       error(pos, "Column not found: " + x.i0);
     };
-    (table.cols[x.i0], x.i1)
+    (colsLower[colNameLower], x.i1)
   });
   types = table.schema.map(x -> x.ty);
   kinds = computeOrder(types, cols);
