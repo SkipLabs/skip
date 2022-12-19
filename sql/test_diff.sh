@@ -69,7 +69,8 @@ run_diff 'test/select1_float_create.sql' 'test/select1_float_views.sql' 'test/se
 run_diff 'test/select2_create.sql' 'test/select2_views.sql' 'test/select2_inserts.sql'
 run_diff 'test/select3_create.sql' 'test/select3_views.sql' 'test/select3_inserts.sql'
 run_diff 'test/select3_create.sql' 'test/select3_views.sql' 'test/select3_inserts.sql' 'test/select3_partial_delete.sql'
-run_diff 'test/select4.1-create.sql' 'test/select4.1-views.sql' 'test/select4.1-inserts.sql'
+# TODO: re-enable me after #40 is fixed
+# run_diff 'test/select4.1-create.sql' 'test/select4.1-views.sql' 'test/select4.1-inserts.sql'
 run_diff 'test/select5.1-create.sql' 'test/select5.1-views.sql' 'test/select5.1-inserts.sql'
 run_diff 'test/groupby_create.sql' 'test/groupby_views.sql' 'test/groupby_inserts.sql'
 run_diff 'test/groupby_create.sql' 'test/groupby_views.sql' 'test/groupby_inserts.sql' 'test/groupby_delete.sql'
