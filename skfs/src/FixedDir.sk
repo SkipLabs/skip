@@ -1,0 +1,316 @@
+/*****************************************************************************/
+/* Definition of the "fixed" part of a directory.
+ *
+ * Every Eager Directory defines a "fixed" part. Meaning, the values defined
+ * at initialization time. After the initialization, the directory is defined
+ * as the difference between the initialization data (that never changes) and
+ * the changes made to the directory since its inception.
+ *
+ * So for example:
+ * dir = mkdir(..., Array[(1, 1), (2, 2), (3, 3)]);
+ * fixedData => FixedRow((1, (src, 1)), (2, (src, 2)), (3, (src, 3)))
+ *
+ * Then later someone removes the key 2.
+ * data => DMap[2 => SortedMap(src, Array[])]
+ *
+ * And the value associated with the key "2" is defined as the difference
+ * between fixedData and data. So in this case, because the source is the same
+ * the key 2 is associated with an empty array.
+ */
+/*****************************************************************************/
+module SKFS;
+
+value class Source(dirName: DirName, baseName: BaseName) uses Orderable {
+  static fun create(value: Path): this {
+    static(value.dirName, value.baseName)
+  }
+
+  fun path(): Path {
+    Path(this.dirName, this.baseName)
+  }
+}
+
+value class FixedRow<T>(key: BaseName, value: (Source, T), tag: TickRange) {
+  fun changeSource(source: Source): this {
+    !this.value.i0 = source;
+    this
+  }
+}
+
+base class FixedData<T> {
+  fun size(): Int;
+  fun get(idx: Int): FixedRow<T>;
+  fun getPos(key: BaseName): Int;
+  fun getArray(key: BaseName): Array<(Source, T)>;
+  fun getIter(key: BaseName): mutable Iterator<(Source, T)>;
+  fun getArraySourceKey(source: Source, key: BaseName): Array<T>;
+  fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
+}
+
+class FixedDir private {
+  data: Array<FixedRow<Array<File>>> = Array[],
+} extends FixedData<Array<File>> {
+  static fun create(
+    data: mutable Vector<FixedRow<Array<File>>> = mutable Vector[],
+  ): this {
+    data.sortBy(row ~> (row.key, row.value.i0));
+    result = data.toArray().clone();
+    cache = Array::mfill(result.size(), false);
+    _ = static::computeTags(cache, result, 0, result.size() - 1);
+    FixedDir{data => result.chill()}
+  }
+
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun get(idx: Int): FixedRow<Array<File>> {
+    this.data.unsafe_get(idx)
+  }
+
+  fun getPos(key: BaseName): Int {
+    this.getPosij(key, 0, this.size() - 1)
+  }
+
+  fun getPosij(key: BaseName, i: Int, j: Int): Int {
+    if (i > j) {
+      return i;
+    };
+    pivot = (i + j) / 2;
+    elt = this.data[pivot];
+    key.compare(elt.key) match {
+    | LT()
+    | EQ() ->
+      this.getPosij(key, i, pivot - 1)
+    | GT() -> this.getPosij(key, pivot + 1, j)
+    }
+  }
+
+  fun getPosSourceKey(source: Source, key: BaseName, i: Int, j: Int): Int {
+    if (i > j) {
+      return i;
+    };
+    pivot = (i + j) / 2;
+    entry = this.data[pivot];
+    c1 = key.compare(entry.key);
+    c = if (c1 is EQ _) source.compare(entry.value.i0) else c1;
+    c match {
+    | LT()
+    | EQ() ->
+      this.getPosSourceKey(source, key, i, pivot - 1)
+    | GT() -> this.getPosSourceKey(source, key, pivot + 1, j)
+    }
+  }
+
+  fun getArray(key: BaseName): Array<(Source, Array<File>)> {
+    pos = this.getPosij(key, 0, this.data.size() - 1);
+    result = mutable Vector[];
+    loop {
+      if (pos >= this.data.size()) break void;
+      elt = this.data[pos];
+      if (elt.key != key) break void;
+      result.push(elt.value);
+      !pos = pos + 1;
+    };
+    result.toArray();
+  }
+
+  fun getIter(key: BaseName): mutable Iterator<(Source, Array<File>)> {
+    pos = this.getPosij(key, 0, this.data.size() - 1);
+    loop {
+      if (pos >= this.data.size()) break void;
+      elt = this.data[pos];
+      if (elt.key != key) break void;
+      yield elt.value;
+      !pos = pos + 1;
+    };
+  }
+
+  fun getIterSourceKey(
+    source: Source,
+    key: BaseName,
+  ): mutable Iterator<Array<File>> {
+    pos = this.getPosSourceKey(source, key, 0, this.data.size() - 1);
+    loop {
+      if (pos >= this.data.size()) break void;
+      entry = this.data[pos];
+      if (entry.value.i0 != source) break void;
+      if (entry.key != key) break void;
+      yield entry.value.i1;
+      !pos = pos + 1;
+    };
+  }
+
+  fun getArraySourceKey(source: Source, key: BaseName): Array<Array<File>> {
+    this.getIterSourceKey(source, key).collect(Array)
+  }
+
+  static fun computeTags(
+    cache: mutable Array<Bool>,
+    array: mutable Array<FixedRow<Array<File>>>,
+    i: Int,
+    j: Int,
+  ): TickRange {
+    if (i > j) {
+      if (i < 0 || i >= array.size()) {
+        return TickRange::create(Tick(0))
+      } else {
+        loop {
+          elt = array[i];
+          key = elt.key;
+          maxVal = elt.tag.max;
+          loop {
+            !i = i + 1;
+            if (i >= array.size() || array[i].key != key) {
+              return TickRange(maxVal, maxVal)
+            };
+            !maxVal = max(maxVal, array[i].tag.max);
+            if (cache[i]) {
+              return TickRange(maxVal, maxVal)
+            };
+          }
+        }
+      }
+    };
+    pivot = (i + j) / 2;
+    elt = array[pivot];
+    tag = elt.tag;
+    right = static::computeTags(cache, array, pivot + 1, j);
+    left = static::computeTags(cache, array, i, pivot - 1);
+    !tag.max = max(tag.max, max(left.max, right.max));
+    array![pivot] = elt with {tag};
+    cache![pivot] = true;
+    tag
+  }
+
+  fun getChangesAcc(
+    after: Tick,
+    acc: mutable Vector<BaseName>,
+    i: Int,
+    j: Int,
+  ): void {
+    if (i < 0 || i >= this.data.size()) {
+      return void
+    };
+    if (i >= j) {
+      tick = this.data[i].tag;
+      if (tick.max < after) return void;
+      if (tick.current >= after) {
+        acc.push(this.data[i].key);
+      };
+      return void;
+    };
+    pivot = (i + j) / 2;
+    elt = this.data[pivot];
+    tick = elt.tag;
+    if (tick.max < after) return void;
+    if (tick.current >= after) {
+      acc.push(elt.key);
+    };
+    this.getChangesAcc(after, acc, i, pivot - 1);
+    this.getChangesAcc(after, acc, pivot + 1, j);
+  }
+
+  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+    acc = mutable Vector[];
+    this.getChangesAcc(tick, acc, 0, this.data.size() - 1);
+    result = SortedSet[];
+    for (elt in acc) {
+      !result = result.set(elt);
+    };
+    result
+  }
+}
+
+class FixedSingle<K: Orderable, +V>(data: Array<(K, V)> = Array[]) {
+  static fun empty(): this {
+    FixedSingle()
+  }
+
+  fun items(): mutable Iterator<(K, V)> {
+    this.data.iterator()
+  }
+
+  static fun createFromItems(items: Sequence<(K, V)>): this {
+    static::create(Vector::mcreateFromItems(items));
+  }
+
+  static fun create(data: mutable Vector<(K, V)>): this {
+    data.sortBy(x ~> x.i0);
+
+    lastOpt: ?K = None();
+    for (kv in data) {
+      (k, _) = kv;
+      lastOpt match {
+      | None() -> !lastOpt = Some(k)
+      | Some(last) ->
+        if (last == k) {
+          debug((last, k));
+          invariant_violation("Duplicate value in single")
+        } else {
+          !lastOpt = Some(k)
+        }
+      }
+    };
+
+    FixedSingle(data.toArray())
+  }
+
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun get(idx: Int): (K, V) {
+    this.data[idx]
+  }
+
+  private fun getPos(key: K): Int {
+    this.getPosij(key, 0, this.size() - 1)
+  }
+
+  private fun getPosij(key: K, i: Int, j: Int): Int {
+    if (i > j) {
+      return i;
+    };
+    pivot = (i + j) / 2;
+    elt = this.data[pivot];
+    key.compare(elt.i0) match {
+    | LT()
+    | EQ() ->
+      this.getPosij(key, i, pivot - 1)
+    | GT() -> this.getPosij(key, pivot + 1, j)
+    }
+  }
+
+  fun maybeGet(key: K): ?V {
+    pos = this.getPosij(key, 0, this.data.size() - 1);
+    if (pos < 0 || pos >= this.data.size()) return None();
+    elt = this.data[pos];
+    if (elt.i0 != key) return None();
+    Some(elt.i1);
+  }
+}
+
+mutable class FixedDataIterator<T> private {
+  iter: mutable Iterator<(Source, T)>,
+  mutable currentOpt: ?(Source, T) = None(),
+} {
+  static fun create(iter: mutable Iterator<(Source, T)>): mutable this {
+    mutable static{currentOpt => iter.next(), iter => iter}
+  }
+
+  readonly fun isEnd(): Bool {
+    this.currentOpt is None _
+  }
+
+  readonly fun current(): (Source, T) {
+    this.currentOpt match {
+    | None() -> invariant_violation("Cannot access current")
+    | Some(x) -> x
+    }
+  }
+
+  mutable fun next(): void {
+    this.!currentOpt = this.iter.next();
+  }
+}

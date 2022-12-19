@@ -1,0 +1,234 @@
+module SKFS;
+
+fun sumDir<T: frozen>(
+  context: mutable Context,
+  dir: EHandle<T>,
+  proj: Array<T> ~> Int,
+  diffName: String,
+  name: String,
+): EHandle<IntFile> {
+  diffCountDirName = DirName::create(dir.dirName.toString() + diffName + "/");
+  countDirName = DirName::create(dir.dirName.toString() + name + "/");
+  SKFS.EagerDir::apply(
+    context,
+    dir.dirName,
+    diffCountDirName,
+    (context, writer, key, newValuesIter) ~> {
+      newValues = newValuesIter.collect(Array);
+      preDiffOpt = EHandle(dir.conv, dir.dirName).pre(context);
+      oldValues = preDiffOpt match {
+      | None() -> Array[]
+      | Some(preDir) -> preDir.getArray(context, key)
+      };
+      oldCount = if (oldValues.size() == 0) 0 else proj(oldValues);
+      newCount = if (newValues.size() == 0) 0 else {
+        proj(newValues.map(dir.conv))
+      };
+      cmp = newCount - oldCount;
+      if (cmp != 0) {
+        writer.write(IID(0), IntFile(cmp))
+      }
+    },
+  );
+  countDir = EHandle(IntFile::fromFile, countDirName);
+  SKFS.EagerDir::apply(
+    context,
+    diffCountDirName,
+    countDirName,
+    (context, writer, _, diffs) ~> {
+      oldSums = countDir.pre(context) match {
+      | None() -> Array[]
+      | Some(preDir) -> preDir.getArray(context, IID(0))
+      };
+      acc = if (oldSums.size() == 0) 0 else oldSums[0].value;
+      for (diff in diffs) {
+        !acc = acc + IntFile::fromFile(diff).value;
+      };
+      writer.write(IID(0), IntFile(acc))
+    },
+  );
+  countDir
+}
+
+module end;
+
+module SKFSTest;
+
+fun testCount(): mutable SKFS.Context {
+  context = SKFS.run(context ~> {
+    inputFiles = SortedMap[
+      SKFS.IID(0) => SKFS.StringFile("23"),
+      SKFS.IID(1) => SKFS.StringFile("35"),
+    ];
+
+    sinput = SKFS.DirName::create("/sinput/");
+    dirSInput = context.mkdir(
+      SKFS.StringFile::fromFile,
+      sinput,
+      false,
+      inputFiles.items().collect(Array),
+    );
+
+    _countDir = SKFS.sumDir(context, dirSInput, _ ~> 1, "diffCount", "count");
+
+    inputSumFiles = SortedMap[
+      SKFS.IID(0) => SKFS.StringFile("0"),
+      SKFS.IID(1) => SKFS.StringFile("1"),
+    ];
+
+    sumInput = SKFS.DirName::create("/sumInput/");
+    dirSumInput = context.mkdir(
+      SKFS.StringFile::fromFile,
+      sumInput,
+      false,
+      inputSumFiles.items().collect(Array),
+    );
+    _sumDir = SKFS.sumDir(
+      context,
+      dirSumInput,
+      x ~> x[0].value.toInt(),
+      "diffSum",
+      "sum",
+    );
+  });
+
+  testNbr = 0;
+  incrTestNbr = () -> {
+    !testNbr = testNbr + 1;
+    testNbr
+  };
+
+  dirSInput = SKFS.DirName::create("/sinput/");
+
+  countDir = SKFS.EHandle(
+    SKFS.IntFile::fromFile,
+    SKFS.DirName::create("/sinput/count/"),
+  );
+
+  /*************************** TESTS FOR COUNT ***************************/
+  size = 10;
+
+  for (i in Range(0, size)) {
+    files = Array[SKFS.StringFile(i.toString())];
+    write(context, dirSInput, SKFS.IID(i), files);
+    context.update();
+    expectEq(
+      `TestCount: ${incrTestNbr()}`,
+      Array<SKFS.File>[SKFS.IntFile(if (i < 2) 2 else i + 1)],
+      () -> {
+        getData(context, countDir.dirName, SKFS.IID(0));
+      },
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(context, dirSInput, SKFS.IID(size - j - 1), Array[]);
+    context.update();
+    expectEq(
+      `TestCount: ${incrTestNbr()}`,
+      Array<SKFS.File>[SKFS.IntFile(size - j - 1)],
+      () -> {
+        getData(context, countDir.dirName, SKFS.IID(0))
+      },
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(
+      context,
+      dirSInput,
+      SKFS.IID(size - j - 1),
+      Array[SKFS.StringFile("x")],
+    );
+    context.update();
+    expectEq(
+      `TestCount: ${incrTestNbr()}`,
+      Array<SKFS.File>[SKFS.IntFile(size / 2 + j + 1)],
+      () -> {
+        getData(context, countDir.dirName, SKFS.IID(0))
+      },
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(context, dirSInput, SKFS.IID(size - j - 1), Array[]);
+    context.update();
+    expectEq(
+      `TestCount: ${incrTestNbr()}`,
+      Array<SKFS.File>[SKFS.IntFile(size - j - 1)],
+      () -> {
+        getData(context, countDir.dirName, SKFS.IID(0))
+      },
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(context, dirSInput, SKFS.IID(size - j - 1), Array[]);
+    context.update();
+    expectEq(
+      `TestCount: ${incrTestNbr()}`,
+      Array<SKFS.File>[SKFS.IntFile(size / 2)],
+      () -> {
+        getData(context, countDir.dirName, SKFS.IID(0))
+      },
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(
+      context,
+      dirSInput,
+      SKFS.IID(size - j - 1),
+      Array[SKFS.StringFile("x")],
+    );
+    context.update();
+    expectEq(
+      `TestCount: ${incrTestNbr()}`,
+      Array<SKFS.File>[SKFS.IntFile(size / 2 + j + 1)],
+      () -> {
+        getData(context, countDir.dirName, SKFS.IID(0))
+      },
+    );
+  };
+
+  /*************************** TESTS FOR SUM ***************************/
+
+  dirSumInput = SKFS.DirName::create("/sumInput/");
+
+  sumDir = SKFS.EHandle(
+    SKFS.IntFile::fromFile,
+    SKFS.DirName::create("/sumInput/sum/"),
+  );
+
+  for (i in Range(0, size)) {
+    files = Array[SKFS.StringFile(i.toString())];
+    write(context, dirSumInput, SKFS.IID(i), files);
+    context.update();
+    expectEq(
+      `TestCount: ${incrTestNbr()}`,
+      Array<SKFS.File>[SKFS.IntFile(if (i == 0) 1 else i * (i + 1) / 2)],
+      () -> {
+        getData(context, sumDir.dirName, SKFS.IID(0));
+      },
+    );
+  };
+
+  sum = size * (size - 1) / 2;
+
+  for (i in Range(0, size / 2)) {
+    write(context, dirSumInput, SKFS.IID(size - i - 1), Array[]);
+    !sum = sum - (size - i - 1);
+    context.update();
+    expectEq(
+      `TestCount: ${incrTestNbr()}`,
+      Array<SKFS.File>[SKFS.IntFile(sum)],
+      () -> {
+        getData(context, sumDir.dirName, SKFS.IID(0));
+      },
+    );
+  };
+
+  context
+}
+
+module end;

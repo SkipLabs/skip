@@ -1,0 +1,26 @@
+class MyException(n: Int) extends Exception
+
+@debug
+memoized fun throwValue(n: Int): void {
+  print_string("throwValue " + n);
+  throw MyException(n)
+}
+
+fun main(): void {
+  msg = "Pass ";
+
+  Range(0, 3).each(i -> {
+    vtry(
+      () -> {
+        throwValue(i % 2)
+      },
+      exn ->
+        exn match {
+        | MyException(n) -> !msg = msg + n
+        }
+      ,
+    )
+  });
+
+  print_raw(msg + "\n")
+}

@@ -1,0 +1,232 @@
+module SKFS;
+
+@cpp_extern("SKIP_create_external_pointer")
+native fun createExternalPointer(ExternalPointer): ExternalPointer;
+
+base class BExternalPointer {
+  fun toString(): String;
+  fun getMagicNumber(): Int;
+}
+
+class DumbPointer(n: Int) extends BExternalPointer {
+  fun toString(): String {
+    "dumb:" + this.n
+  }
+  fun getMagicNumber(): Int {
+    0
+  }
+}
+
+class ExternalPointer private (
+  magic: Int,
+  value: Int,
+  destructor: Int ~> void,
+) extends File, BExternalPointer {
+  static fun create(value: Int, destructor: Int ~> void): this {
+    createExternalPointer(static(234566 + value % 2, value, destructor));
+  }
+
+  static fun getExternalPointer(): ExternalPointer {
+    ExternalPointer(0, 0, _ ~> void)
+  }
+
+  fun toString(): String {
+    "external:" + this.value
+  }
+
+  fun getMagicNumber(): Int {
+    this.magic
+  }
+}
+
+@cpp_export("sk_get_magic_number")
+fun getExternalPointerMagicNumber(ep: BExternalPointer): Int {
+  ep.getMagicNumber()
+}
+
+@cpp_export("sk_debug_external_pointer")
+fun debugExternalPointer(ep: BExternalPointer): void {
+  debug(ep.toString())
+}
+
+@cpp_export("sk_get_external_pointer")
+fun getExternalPointer(): ExternalPointer {
+  ExternalPointer::getExternalPointer()
+}
+
+@cpp_export("sk_get_external_pointer_value")
+fun getValue(p: ExternalPointer): Int {
+  p.value
+}
+
+@cpp_export("sk_get_external_pointer_destructor")
+fun getDestructor(p: ExternalPointer): Int ~> void {
+  p.destructor
+}
+
+@cpp_export("sk_call_external_pointer_descructor")
+fun callDestructor(destructor: Int ~> void, value: Int): void {
+  destructor(value)
+}
+
+extension base class .Inspect {
+  fun simplePrint(o: String -> void): void
+  | .InspectSpecial(v) -> o("'" + v + "'")
+  | .InspectString(v) -> o("\"" + v + "\"")
+  | .InspectLiteral(v) -> o(v)
+  | .InspectVector(name, values) ->
+    o(name + "[");
+    if (values.size() == 0) {
+      o("]");
+      return void;
+    };
+    for (i in Range(0, values.size() - 1)) {
+      elt = values[i];
+      elt.simplePrint(o);
+      o(",");
+    };
+    values[values.size() - 1].simplePrint(o);
+    o("]")
+  | .InspectMap(name, values) ->
+    o(name + "[");
+    if (values.size() == 0) {
+      o("]");
+      return void;
+    };
+    for (i in Range(0, values.size() - 1)) {
+      (elt, value) = values[i];
+      elt.simplePrint(o);
+      o("=>");
+      value.simplePrint(o);
+      o(",");
+    };
+    (elt, value) = values[values.size() - 1];
+    elt.simplePrint(o);
+    o("=>");
+    value.simplePrint(o);
+    o(",");
+    o("]")
+  | .InspectCall(name, values) ->
+    o(name + "(");
+    if (values.size() == 0) {
+      o(")");
+      return void;
+    };
+    for (i in Range(0, values.size() - 1)) {
+      elt = values[i];
+      elt.simplePrint(o);
+      o(",");
+    };
+    values[values.size() - 1].simplePrint(o);
+    o(")")
+  | .InspectObject(name, values) ->
+    o(name + "{");
+    if (values.size() == 0) {
+      o("}");
+      return void;
+    };
+    for (i in Range(0, values.size() - 1)) {
+      (key, value) = values[i];
+      o(key);
+      o("=>");
+      value.simplePrint(o);
+      o(",");
+    };
+    (key, value) = values[values.size() - 1];
+    o(key);
+    o("=>");
+    value.simplePrint(o);
+    o(",");
+    o("}")
+
+  fun toString(): String {
+    buffer = mutable Vector[];
+    o = (x) -> buffer.push(x);
+    this.simplePrint(o);
+    "".join(buffer);
+  }
+}
+
+class VoidFile() extends File
+
+class IntFile(value: Int) extends File uses Orderable, Show {
+  fun +<T: Integral>(x: T): IntFile {
+    !this.value = this.value + x;
+    this
+  }
+  fun -<T: Integral>(x: T): IntFile {
+    !this.value = this.value + x;
+    this
+  }
+  fun toString(): String {
+    this.value.toString()
+  }
+}
+
+class BoolFile(value: Bool) extends File uses Orderable, Show {
+  fun toString(): String {
+    this.value.toString()
+  }
+}
+
+class StringFile(value: .String) extends File {
+  fun toKVString(_format: OutputFormat, key: BaseName): String {
+    "" + escape(key.toString()) + "\t\"" + escape(this.value) + "\"\n"
+  }
+
+  fun toKVStringRemove(_format: OutputFormat): String {
+    "" + escape(this.value) + "\t\n"
+  }
+}
+
+class ArrayCharFile(value: Array<Char>) extends File
+class ArrayStringFile(value: Array<String>) extends File
+
+base class OutputFormat {
+  children =
+  | OSQL()
+  | OCSV()
+  | OJSON(fieldNames: Array<String>)
+
+  fun usesComma(): Bool
+  | OSQL() -> false
+  | OCSV() -> true
+  | OJSON(_) -> true
+
+  fun usesDoubleQuotes(): Bool
+  | OSQL() -> false
+  | OCSV() -> true
+  | OJSON(_) -> true
+}
+
+base class File {
+  deferred macro overridable static fun fromFile(obj: File): this {
+    obj match {
+    | x @ #ThisClass _ -> x
+    }
+  }
+
+  overridable fun toKVString(_csv: OutputFormat, key: BaseName): String {
+    "" +
+      escape(key.toString()) +
+      "\t\"" +
+      escape(inspect(this).toString()) +
+      "\"\n"
+  }
+}
+
+trait CGroup {
+  fun zero(): inst;
+  fun +(inst): inst;
+  fun -(inst): inst;
+}
+
+base class CGroupFile extends File uses CGroup
+
+extension class .Int uses CGroup {
+  fun zero(): .Int {
+    0
+  }
+}
+
+module end;

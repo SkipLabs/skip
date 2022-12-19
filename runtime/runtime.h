@@ -9,29 +9,26 @@
 #ifndef SKIP_RUNTIME
 #define SKIP_RUNTIME 1
 
-#define NULL ((void*)0)
+#include <stddef.h>
+#include <stdint.h>
 
-#define PAGE_SIZE (512 * 1024)
+#define PAGE_SIZE (1024 * 1024 * 8)
 #define STACK_INIT_CAPACITY (1024)
 
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef long long uint64_t;
-typedef unsigned int uint32_t;
-typedef unsigned long size_t;
 typedef uint64_t SkipInt;
 
 #ifdef SKIP32
-typedef unsigned int uintptr_t;
-typedef int intptr_t;
 #define WORDSIZE 4
+#define WASM_HEAP_SIZE 1073741824
+
+#define PERSISTENT_PAGE_BIT_SIZE 20
+#define PERSISTENT_PAGE_SIZE (1 << PERSISTENT_PAGE_BIT_SIZE)
+#define PERSISTENT_TABLE_SIZE (WASM_HEAP_SIZE / PERSISTENT_PAGE_SIZE)
 #endif
 
 #ifdef SKIP64
 #include <stdio.h>
 #define WORDSIZE 8
-typedef unsigned long uintptr_t;
-typedef long intptr_t;
 #endif
 
 /*****************************************************************************/
@@ -207,7 +204,7 @@ int sk_is_const(void*);
 int sk_is_large_page(char* page);
 int sk_is_static(void*);
 void* sk_malloc(size_t size);
-void* sk_malloc(size_t);
+void* sk_malloc_end(size_t);
 char* sk_new_const(char* cst);
 void sk_obstack_attach_page(char* lpage);
 size_t sk_page_size(char* page);
@@ -233,5 +230,8 @@ void sk_free_external_pointers();
 uintptr_t sk_get_ref_count(void* obj);
 void SKIP_throwInvalidSynchronization();
 void SKIP_call_finalize(char*, char*);
+void SKIP_exit(SkipInt);
+void sk_heap_sort(sk_cell_t* arr, int n);
+int SKIP_get_version();
 
 #endif

@@ -8,11 +8,14 @@
 // Module for manipulating the Files and Directories.
 
 // TODO: What module should this go in?
-@cpp_runtime
+@cpp_extern("SKIP_getcwd")
 @may_alloc
 native fun getcwd(): String;
 
 module FileSystem;
+
+@cpp_extern("SKIP_open_file")
+native fun open_file(fileName: String): String;
 
 // This is really broken - you can't read a file into a String without an
 // encoding!
@@ -95,7 +98,7 @@ fun readFilesRecursive(
 private native fun .open_file(String): String;
 
 @debug
-@cpp_runtime
+@cpp_extern("SKIP_string_to_file")
 private native fun .string_to_file(s: String, file: String): void;
 
 @cpp_runtime

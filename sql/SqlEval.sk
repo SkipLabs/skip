@@ -4,6 +4,70 @@ module SKSQL;
 /* Functions evaluating SQL. */
 /*****************************************************************************/
 
+fun checkUserRows(
+  context: readonly SKFS.Context,
+  user: UserFile,
+  pos: Int,
+  table: DirDescr,
+  rows: Array<RowValues>,
+): void {
+  table.cols.maybeGet("skdb_owner") match {
+  | None() ->
+    error(
+      pos,
+      "You cannot write into the table " +
+        table.name +
+        " because you are connected as user " +
+        user.name +
+        ".\n" +
+        "You can only write into tables that define the column skdb_owner",
+    )
+  | Some(colNbr) ->
+    table.cols.maybeGet("skdb_access") match {
+    | None() -> void
+    | Some(accessColNbr) ->
+      access = mutable AccessSolver(user.id);
+      for (row in rows) {
+        row.getValue(colNbr) match {
+        | None() ->
+          error(
+            pos,
+            "The field skdb_owner can only be set to the userID " +
+              "of the connected user (in this case " +
+              user.id +
+              ")",
+          )
+        | Some(CInt(n)) ->
+          if (n == user.id) {
+            row.getInt(accessColNbr) match {
+            | None() -> void
+            | Some(accessID) ->
+              if (!access.canWrite(context, accessID)) {
+                error(
+                  pos,
+                  "cannot write in col with skdb_access set to " + accessID,
+                )
+              }
+            }
+          } else {
+            error(
+              pos,
+              "skdb_owner is set to the wrong id for user " +
+                user.name +
+                " expected " +
+                user.id +
+                " (found " +
+                n +
+                ")",
+            );
+          }
+        | Some _ -> error(pos, "skdb_owner should be of type INTEGER")
+        };
+      }
+    }
+  }
+}
+
 fun computeTableDescr(
   name: String,
   schema: Array<TypeDescr>,
@@ -15,13 +79,9 @@ fun computeTableDescr(
   for (i in Range(0, schema.size())) {
     colVec.push((schema[i].name, i));
   };
-  cols = SortedMap::createFromItems(colVec);
-  colNames = schema.map(ty -> ty.name);
-  DirDescr{
+  DirDescr::create{
     name,
-    colNames,
     schema,
-    cols,
     dirName,
     alias => None(),
     windowSize,
@@ -122,7 +182,7 @@ fun valueToCValue(
   schema[idx].ty match {
   | INTEGER() ->
     val match {
-    | VId(Some(varName)) ->
+    | VId(isPositive, Some(varName)) ->
       if (!inTransaction) {
         error(pos, "named id can only be used in a transaction");
       };
@@ -130,14 +190,21 @@ fun valueToCValue(
       | None() -> Globals()
       | Some(file) -> Globals::fromFile(file)
       };
-      if (globals.containsKey(varName)) {
-        error(pos, "Name already bound " + varName)
-      };
-      id = SKFS.genSym(0);
-      !globals = globals.set(varName, id);
-      context.setGlobal(GLOBALS, globals);
-      Some(CInt(id))
-    | VId(None()) -> Some(CInt(SKFS.genSym(0)))
+      globals.maybeGet(varName) match {
+      | None() ->
+        id = SKFS.genSym(0);
+        if (!isPositive) !id = -id;
+        !globals = globals.set(varName, id);
+        context.setGlobal(GLOBALS, globals);
+        Some(CInt(id))
+      | Some(id) -> Some(CInt(id))
+      }
+    | VId(isPositive, None()) ->
+      if (isPositive) {
+        Some(CInt(SKFS.genSym(0)))
+      } else {
+        Some(CInt(-SKFS.genSym(0)))
+      }
     | VTime() ->
       if (inTransaction) {
         error(pos, "time can not be used in a transaction");
@@ -242,7 +309,7 @@ class SelectFile(
   value: Select,
 ) extends SKFS.File
 
-class Evaluator{options: Options} {
+class Evaluator{options: Options, user: ?UserFile} {
   fun write(
     context: mutable SKFS.Context,
     dirName: SKFS.DirName,
@@ -284,7 +351,7 @@ class Evaluator{options: Options} {
         | Some(_) -> true
         | None() -> false
         };
-        this.createTable(context, pos, name, dirDescr, reallyRemove)
+        this.createTable(context, pos, name, dirDescr, reallyRemove);
       })
     | Insert{pos, name, paramsOpt, values} ->
       baseName = SKFS.SID::create(name);
@@ -344,12 +411,26 @@ class Evaluator{options: Options} {
       select = compiler.compileSelect(context, selectAst, true);
       selectDir = evalSelect(context, select, None());
       stdout = context.getGlobal("Stdout") match {
-      | Some(StdoutFile(l)) -> l
+      | Some(StdoutFile(_, l)) -> l
       | Some(_) -> invariant_violation("Wrong type for global stdout")
       | None() -> List[]
       };
       !stdout = List.Cons(selectDir, stdout);
-      context.setGlobal("Stdout", StdoutFile(stdout));
+      format = this.options.format match {
+      | OFK_CSV() -> SKFS.OCSV()
+      | OFK_JSON() ->
+        dirDescr = Compiler::getDirDescr(
+          selectAst.params,
+          select.from,
+          select.params,
+          selectDir.dirName.toString(),
+          selectDir.dirName,
+        );
+        fieldNames = dirDescr.schema.map(x -> x.name);
+        SKFS.OJSON(fieldNames)
+      | OFK_SQL() -> SKFS.OSQL()
+      };
+      context.setGlobal("Stdout", StdoutFile(format, stdout));
       None()
 
     | index @ Index _ ->
@@ -491,8 +572,6 @@ class Evaluator{options: Options} {
         },
       );
       None()
-
-    | Replace{pos} -> error(pos, "REPLACE colName not supported")
     };
   }
 
@@ -504,7 +583,7 @@ class Evaluator{options: Options} {
       error(index.pos, "INDEX " + index.name + " already exists");
     };
     this.write(context, input.dirName, key, index);
-    _ = getIndexOutputDir(this.options, context)
+    _ = getIndexOutputDir(this.options, context);
   }
 
   fun delete(
@@ -551,7 +630,7 @@ class Evaluator{options: Options} {
         entries = mutable Vector[];
         dir = context.unsafeGetEagerDir(inputDir.dirName);
         for ((source, _) in dir.getDataIter(context, key)) {
-          entries.push((key, (source.value, Array<SKFS.File>[])));
+          entries.push((key, (source.path(), Array<SKFS.File>[])));
         };
         dir.writeArraySourceMany(context, entries.iterator());
         if (select.sets.isEmpty()) return void;
@@ -612,6 +691,10 @@ class Evaluator{options: Options} {
     values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
+    this.user match {
+    | None() -> void
+    | Some(user) -> checkUserRows(context, user, pos, table, rows)
+    };
     table.windowSize match {
     | None() if (inTransaction) ->
       this.insertTable(context, table, rows);
@@ -734,23 +817,9 @@ class Evaluator{options: Options} {
     name: String,
     dirDescr: DirDescr,
     reallyRemove: Bool,
-    init: Array<RowValues> = Array[],
   ): void {
     dirName = dirDescr.dirName;
-    kinds = dirDescr.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
-    tag = SKFS.TickRange::create(context.tick);
-    _ = context.mkdirCompressed(
-      RowValues::fromFile,
-      dirName,
-      init,
-      row ~> {
-        file: SKFS.File = row;
-        key = RowKey(row, kinds);
-        path = SKFS.Path::create(dirName, key);
-        SKFS.FixedRow(key, (SKFS.Source::create(path), Array[file]), tag)
-      },
-      reallyRemove,
-    );
+    dir = context.mkdir(RowValues::fromFile, dirName, reallyRemove);
 
     getTableDir(context).writeArray(
       context,
@@ -793,6 +862,106 @@ class Evaluator{options: Options} {
     if (context.debugMode) {
       print_string("CREATED: " + name);
     };
+
+    if (name == "skdb_groups") {
+      this.createGroupsMembers(context, pos, dir);
+    };
+
+    if (name == "skdb_access") {
+      this.createAccessMap(context, dir);
+    };
+  }
+
+  fun createAccessMap(
+    context: mutable SKFS.Context,
+    usersDir: SKFS.EHandle<RowValues>,
+  ): void {
+    _ = usersDir.contextWriterKeyValues(
+      RowValues::fromFile,
+      context,
+      SKFS.DirName::create("/skdb_access/map/"),
+      (_, writer, _, rows) ~> {
+        for (row in rows) {
+          writer.write(SKFS.IID(row.getInt(0).fromSome()), row);
+        }
+      },
+    )
+  }
+
+  fun createGroupsMembers(
+    context: mutable SKFS.Context,
+    pos: Int,
+    usersDir: SKFS.EHandle<RowValues>,
+  ): void {
+    groupsMembersName = "skdb_groups_members";
+    groupsMembersDirName = SKFS.DirName::create("/" + groupsMembersName + "/");
+    dirDescr = DirDescr::create{
+      name => groupsMembersName,
+      schema => Array[
+        TypeDescr{
+          name => "groupid",
+          ty => INTEGER(),
+          primary => false,
+          unique => false,
+          notNull => true,
+        },
+        TypeDescr{
+          name => "memberid",
+          ty => INTEGER(),
+          primary => false,
+          unique => false,
+          notNull => true,
+        },
+      ],
+      dirName => groupsMembersDirName,
+      alias => None(),
+      windowSize => None(),
+      isInput => false,
+    };
+    kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
+    _ = usersDir.contextWriterKeyValues(
+      RowValues::fromFile,
+      context,
+      groupsMembersDirName,
+      (context, writer, _key, values) ~> {
+        invariant(values.size() == 1);
+        groupName = values[0].getString(1).fromSome().lowercase();
+        if (groupName.startsWith("blacklist")) {
+          if (values[0].getInt(0).fromSome() >= 0) {
+            error(pos, "blacklists are expected to have negative identifiers");
+          }
+        } else if (groupName.startsWith("whitelist")) {
+          if (values[0].getInt(0).fromSome() < 0) {
+            error(pos, "whitelistss are expected to have positive identifiers");
+          }
+        } else {
+          error(
+            pos,
+            "Group names should start with 'whitelist' or 'blacklist'",
+          );
+        };
+        groupDirName = SKFS.DirName::create("/" + groupName + "/");
+        groupDirNameProj = SKFS.DirName::create("/" + groupName + "/proj/");
+        dir = SKFS.EHandle(RowValues::fromFile, groupDirName);
+        projDir = dir.contextWriterKeyValues(
+          RowValues::fromFile,
+          context,
+          groupDirNameProj,
+          (_context, writer, _key, values) ~> {
+            writer.writeArray(SKFS.IID(0), values)
+          },
+        );
+        for (row in projDir.getArray(context, SKFS.IID(0))) {
+          newRow = RowValues::create(
+            Array[values[0].getValue(0), row.getValue(0)],
+          );
+          writer.write(RowKey(newRow, kinds), newRow);
+        }
+      },
+    );
+    tableDir = getTableDir(context);
+    fileName = SKFS.SID::create(groupsMembersName);
+    tableDir.writeArray(context, fileName, Array[dirDescr]);
   }
 }
 
@@ -816,7 +985,7 @@ fun read(line: Int): (Int, String) {
   vtry(
     () ->
       loop {
-        c = getChar(i);
+        c = getChar();
         isWhiteSpace = c == ' ' || c == '\n' || c == '\t' || c == '\r';
         !hasData = !isWhiteSpace;
 
@@ -825,7 +994,7 @@ fun read(line: Int): (Int, String) {
         if (c == '\'') {
           chars.push(c);
           loop {
-            c2 = getChar(i);
+            c2 = getChar();
             chars.push(c2);
             if (c2 == '\'') break void;
           };
@@ -833,10 +1002,10 @@ fun read(line: Int): (Int, String) {
         };
 
         if (c == '-') {
-          c2 = getChar(i);
+          c2 = getChar();
           !i = i + 1;
           if (c2 == '-') {
-            while (getChar(i) != '\n') {
+            while (getChar() != '\n') {
               !i = i + 1;
             };
             continue
@@ -845,13 +1014,13 @@ fun read(line: Int): (Int, String) {
             chars.push(c2);
           }
         } else if (c == '/') {
-          c2 = getChar(i);
+          c2 = getChar();
           !i = i + 1;
           if (c2 == '*') {
-            last = getChar(i);
+            last = getChar();
             !i = i + 1;
             loop {
-              c3 = getChar(i);
+              c3 = getChar();
               !i = i + 1;
               if (last == '*' && c3 == '/') break void;
               !last = c3;
@@ -931,11 +1100,11 @@ fun printErrorAndExit(
   skipExit(2)
 }
 
-fun printRow(csv: Bool, row: SKSQL.Row): void {
+fun printRow(format: SKFS.OutputFormat, row: SKSQL.Row): void {
   row match {
   | rvalues @ RowValues(_, r) ->
     for (_ in Range(0, r)) {
-      print_string(rvalues.toStringSingle(csv))
+      print_string(rvalues.toStringSingle(format))
     }
   | RowKind _ -> invariant_violation("Cannot print a RowKind")
   }
@@ -947,7 +1116,8 @@ fun evalWithContext(
   stmt: Stmt,
   inTransaction: Bool,
 ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
-  evaluator = Evaluator{options};
+  user = context.getGlobal("USER").map(UserFile::fromFile);
+  evaluator = Evaluator{options, user};
   evaluator.stmt(context, stmt, inTransaction);
 }
 
@@ -978,7 +1148,7 @@ fun makeSqlContext(): mutable SKFS.Context {
   gcontext = mutable SKFS.Context{
     unsafeReuse => true,
     failOnExn => true,
-    removeSubDirs => false,
+    removeSubDirs => true,
   };
   gcontext.setGlobal("Line", SKFS.IntFile(0));
   gcontext
@@ -991,27 +1161,174 @@ fun doOnError(options: Options, f: () -> void, error: Exception -> void): void {
 class StmtFile(stmt: Stmt) extends SKFS.File
 class TickFile(tick: SKFS.Tick) extends SKFS.File
 
+base class OutputFormatKind {
+  children =
+  | OFK_CSV()
+  | OFK_JSON()
+  | OFK_SQL()
+}
+
 class Options{
   alwaysAllowJoins: Bool,
   backtrace: Bool,
   sync: Bool,
   virtual: Bool = false,
   showUsedIndexes: Bool,
-  csv: Bool,
+  format: OutputFormatKind = OFK_SQL(),
+} extends SKFS.File
+
+fun evalQuery(context: mutable SKFS.Context, query: String): Array<RowValues> {
+  lexer = SKSQL.Lexer(0, SKSQL.Buffer(query));
+  selectAst = SKSQL.parseQuery(lexer, 0).i1 match {
+  | x @ Select _ -> x
+  };
+  skOptions = SKSQL.Options{
+    alwaysAllowJoins => false,
+    backtrace => false,
+    sync => false,
+    virtual => false,
+    showUsedIndexes => false,
+  };
+  compiler = SKSQL.Compiler::create(skOptions, 0);
+  cselect = compiler.compileSelect(context, selectAst, true);
+  selectDir = SKSQL.evalSelect(context, cselect, None());
+  dirName = selectDir.dirName;
+  dir = context.unsafeGetEagerDir(dirName);
+  result = mutable Vector[];
+  dir.onFiles(files -> {
+    for (kv in files) {
+      (_key, rows) = kv;
+      for (row in rows) {
+        result.push(RowValues::fromFile(row))
+      }
+    }
+  });
+  result.toArray()
 }
 
-fun eval(options: Options): void {
+mutable class AccessSolver(
+  userID: Int,
+  canAccessCache: mutable Map<Int, Bool> = mutable Map[],
+  accessTableCache: mutable Map<Int, (Int, Int)> = mutable Map[],
+) {
+  const accessMap: SKFS.DirName = SKFS.DirName::create("/skdb_access/map/");
+
+  const groupMembers: SKFS.DirName = SKFS.DirName::create(
+    "/skdb_groups_members/",
+  );
+
+  const memberFields: Array<(Int, IASC, Type)> = Array[
+    (0, IASC(), INTEGER()),
+    (1, IASC(), INTEGER()),
+  ];
+
+  private mutable fun addAccessTableCache(
+    context: readonly SKFS.Context,
+    accessID: Int,
+  ): void {
+    values = context
+      .unsafeGetEagerDir(static::accessMap)
+      .getArrayRaw(SKFS.IID(accessID))
+      .map(RowValues::fromFile);
+    if (values.size() == 0) {
+      print_error("accessID " + accessID + " not found");
+      skipExit(89);
+    };
+    invariant(values.size() == 1);
+    this.accessTableCache![accessID] = (
+      values[0].getInt(1).fromSome(),
+      values[0].getInt(2).fromSome(),
+    )
+  }
+
+  mutable fun getReaders(context: readonly SKFS.Context, accessID: Int): Int {
+    if (!this.accessTableCache.containsKey(accessID)) {
+      this.addAccessTableCache(context, accessID);
+    };
+    this.accessTableCache[accessID].i0
+  }
+
+  mutable fun getWriters(context: readonly SKFS.Context, accessID: Int): Int {
+    if (!this.accessTableCache.containsKey(accessID)) {
+      this.addAccessTableCache(context, accessID);
+    };
+    this.accessTableCache[accessID].i1
+  }
+
+  private mutable fun canAccess(
+    context: readonly SKFS.Context,
+    groupID: Int,
+  ): Bool {
+    this.canAccessCache.maybeGet(groupID) match {
+    | None() -> void
+    | Some(x) -> return x
+    };
+    readers = context.unsafeGetEagerDir(static::groupMembers);
+    size = readers
+      .getArrayRaw(
+        RowKey(
+          RowValues::create(
+            Array[Some(CInt(groupID)), Some(CInt(this.userID))],
+          ),
+          static::memberFields,
+        ),
+      )
+      .size();
+    result = if (groupID > 0) size != 0 else size == 0;
+    this.canAccessCache![groupID] = result;
+    result
+  }
+
+  mutable fun canRead(context: readonly SKFS.Context, accessID: Int): Bool {
+    this.canAccess(context, this.getReaders(context, accessID));
+  }
+
+  mutable fun canWrite(context: readonly SKFS.Context, accessID: Int): Bool {
+    this.canAccess(context, this.getWriters(context, accessID));
+  }
+}
+
+class UserFile(id: Int, name: String) extends SKFS.File {
+  static fun create(
+    context: mutable SKFS.Context,
+    userName: String,
+    password: String,
+  ): UserFile {
+    if (userName.contains("'")) {
+      print_error("Invalid user name");
+      skipExit(2);
+    };
+    userRows = evalQuery(
+      context,
+      "select userID, password from skdb_users where userName = '" +
+        userName +
+        "';",
+    );
+    if (userRows.size() == 0) {
+      print_error("Could not find user: " + userName);
+      skipExit(2)
+    };
+    if (userRows[0].getString(1).fromSome() != password) {
+      print_error("Invalid password for user: " + userName);
+      skipExit(2)
+    };
+    userID = userRows[0].getInt(0).fromSome();
+    UserFile(userID, userName);
+  }
+}
+
+fun eval(options: Options, userOpt: ?String): void {
   runSql(options, context ~> {
     if (isATTY() != 0) {
       print_raw("skdb> ");
     };
     lineFile = SKFS.IntFile::fromFile(context.getGlobal("Line").fromSome());
-    context.!globals = SortedMap[];
+    userOpt.each(_ -> {
+      print_error("Cannot execute queries as user, use --connect instead");
+      skipExit(88);
+    });
     context.setGlobal("Line", lineFile);
     context.removeGlobal("TableMap");
-    if (options.csv) {
-      context.setGlobal("CSV", SKFS.BoolFile(true));
-    };
 
     gline = lineFile.value;
 
@@ -1242,7 +1559,7 @@ fun importNext(
         for (key in changedKeys) {
           for (srcValue in dir.unsafeGetDataIter(key)) {
             (source, values) = srcValue;
-            entries.push((key, (source.value, values)));
+            entries.push((key, (source.path(), values)));
           }
         };
         updates![targetDirName] = (dir, version, entries)
@@ -1299,12 +1616,19 @@ fun updateTableMap(context: mutable SKFS.Context): void {
   context.setGlobal("TableMap", tableMap)
 }
 
-class StdoutFile(value: List<SelectDir>) extends SKFS.File
-class StdoutDiff(dirName: SKFS.DirName, time: SKFS.Tick) extends SKFS.File
+class StdoutFile(
+  format: SKFS.OutputFormat,
+  value: List<SelectDir>,
+) extends SKFS.File
+class StdoutDiff(
+  format: SKFS.OutputFormat,
+  dirName: SKFS.DirName,
+  time: SKFS.Tick,
+) extends SKFS.File
 
 fun showSelect(
   context: mutable SKFS.Context,
-  csv: Bool,
+  format: SKFS.OutputFormat,
   sdir: SelectDir,
 ): void {
   dirName = sdir.dirName;
@@ -1314,43 +1638,38 @@ fun showSelect(
       (_key, rows) = kv;
       rowArray = rows.collect(Array);
       for (row in rowArray) {
-        printRow(csv, RowValues::fromFile(row));
+        printRow(format, RowValues::fromFile(row));
       }
     }
   })
 }
 
 fun printContext(context: mutable SKFS.Context): void {
-  csv = context.getGlobal("CSV") is Some _;
   context.globals.maybeGet("Stdout") match {
   | None() -> void
-  | Some(StdoutFile(stdout)) ->
+  | Some(StdoutFile(format, stdout)) ->
     for (selectDir in stdout.toArray().reversed()) {
-      showSelect(context, csv, selectDir)
+      showSelect(context, format, selectDir)
     }
-  | Some(StdoutDiff(dirName, time)) ->
+  | Some(StdoutDiff(format, dirName, time)) ->
     edir = context.unsafeGetEagerDir(dirName);
     print_string("Time: " + (context.tick.value + 1));
     for (key in edir.getChangesAfter(time)) {
       values = edir.getArrayRaw(key);
-      if (values.size() == 0) {
-        print_raw(key.toStringRemove(csv))
-      } else {
-        for (value in values) {
-          print_raw(value.toKVString(csv, key))
-        }
+      for (value in values) {
+        print_raw(value.toKVString(format, key))
       };
     }
   | Some _ -> invariant_violation("Unexpected Stdout type")
-  }
+  };
+  flushStdout();
 }
 
 fun markIfRead(context: mutable SKFS.Context, stmt: Stmt): void {
   stmt match {
   | Insert{values => IQuery _}
   | Update _
-  | Select _
-  | Replace _ ->
+  | Select _ ->
     context.setGlobal("IsRead", SKFS.BoolFile(true))
   | Table _
   | View _
@@ -1360,4 +1679,323 @@ fun markIfRead(context: mutable SKFS.Context, stmt: Stmt): void {
   | Insert _ ->
     void
   }
+}
+
+/*****************************************************************************/
+/* Primitives storing external functions to be computed in a lazy directory. */
+/*****************************************************************************/
+
+@cpp_extern("SKIP_has_local_context")
+native fun hasLocalContext(): Int32;
+
+@cpp_extern("SKIP_set_local_context")
+native fun setLocalContext(mutable SKFS.Context): void;
+
+@cpp_extern("SKIP_remove_local_context")
+native fun removeLocalContext(): void;
+
+@cpp_extern("SKIP_get_local_context")
+native fun getLocalContext(): mutable SKFS.Context;
+
+@cpp_extern("SKIP_call_external_fun")
+native fun callExternalFun(Int32, String): String;
+
+class AlreadyDefiningRoot() extends Exception {
+  fun getMessage(): String {
+    "Cannot define a root while already defining a root"
+  }
+}
+
+class JSCall(funId: Int32, funArg: String) extends SKFS.File
+const jsRootsInputDirName: SKFS.DirName = SKFS.DirName::create(
+  "/jsRootsInput/",
+);
+const jsRootsValuesDirName: SKFS.DirName = SKFS.DirName::create("/jsroots/");
+
+@cpp_export("SKIP_init_jsroots")
+fun initJSRoots(): void {
+  saved = SKFS.newObstack();
+  vtry(
+    () -> {
+      SKFS.runWithGc(SKFS.Context{}, context ~> {
+        context.!globals = SortedMap[];
+        dirDescr = DirDescr::create{
+          name => "jsroots",
+          schema => Array[
+            TypeDescr{
+              name => "name",
+              ty => TEXT(),
+              primary => false,
+              unique => false,
+              notNull => true,
+            },
+            TypeDescr{
+              name => "value",
+              ty => TEXT(),
+              primary => false,
+              unique => false,
+              notNull => true,
+            },
+          ],
+          dirName => jsRootsValuesDirName,
+          alias => None(),
+          windowSize => None(),
+          isInput => false,
+        };
+        tableDir = getTableDir(context);
+        fileName = SKFS.SID::create("jsroots");
+        tableDir.writeArray(context, fileName, Array[dirDescr]);
+        kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
+        _ = context
+          .mkdir(JSCall::fromFile, jsRootsInputDirName, false, Array[])
+          .contextWriterKeyValues(
+            SKFS.StringFile::fromFile,
+            context,
+            jsRootsValuesDirName,
+            (context, writer, baseName, values) ~> {
+              setLocalContext(context);
+              name = baseName match {
+              | SKFS.SID(x) -> x
+              | _ -> invariant_violation("Unexpected key type")
+              };
+              invariant(values.size() == 1);
+              value = values[0];
+              result = callExternalFun(value.funId, value.funArg);
+              row = RowValues::create(
+                Array[Some(CString(name)), Some(CString(result))],
+              );
+              writer.write(RowKey(row, kinds), row);
+              removeLocalContext()
+            },
+          );
+        SKFS.CStop(None());
+      })
+    },
+    exn -> {
+      SKFS.destroyObstack(saved);
+      throw (exn);
+    },
+  );
+  SKFS.destroyObstack(saved);
+}
+
+@cpp_export("SKIP_add_root")
+fun addRoot(rootName: String, funId: Int32, funArg: String): void {
+  if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
+  saved = SKFS.newObstack();
+  vtry(
+    () -> {
+      SKFS.runWithGc(SKFS.Context{}, context ~> {
+        context.!globals = SortedMap[];
+        (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
+          context,
+          SKFS.SID(rootName),
+          Array[JSCall(funId, funArg)],
+        );
+        context.update();
+        SKFS.CStop(None())
+      })
+    },
+    exn -> {
+      removeLocalContext();
+      SKFS.destroyObstack(saved);
+      throw (exn);
+    },
+  );
+  removeLocalContext();
+  SKFS.destroyObstack(saved);
+}
+
+@cpp_export("SKIP_remove_root")
+fun removeRoot(rootName: String): void {
+  if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
+  saved = SKFS.newObstack();
+  vtry(
+    () -> {
+      SKFS.runWithGc(SKFS.Context{}, context ~> {
+        context.!globals = SortedMap[];
+        if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
+          return SKFS.CStop(None());
+        };
+        (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
+          context,
+          SKFS.SID(rootName),
+          Array[],
+        );
+        context.update();
+        SKFS.CStop(None());
+      })
+    },
+    exn -> {
+      SKFS.destroyObstack(saved);
+      throw (exn);
+    },
+  );
+  SKFS.destroyObstack(saved);
+}
+
+const trackedJSCallsDirName: SKFS.DirName = SKFS.DirName::create(
+  "/jsTrackedCalls/",
+);
+
+class InvalidTrackedCall() extends Exception {
+  fun getMessage(): String {
+    "Tracked calls can only be made while defining a root."
+  }
+}
+
+fun initTrackedJSCalls(context: mutable SKFS.Context): void {
+  _ = SKFS.LHandle::create(
+    SKFS.StringFile::fromFile,
+    context,
+    trackedJSCallsDirName,
+    (context, _self, key) ~> {
+      setLocalContext(context);
+      (funIdStr, funArg) = key match {
+      | SKFS.SID(v) -> v.splitFirst("#")
+      | _ -> invariant_violation("Invalid key type")
+      };
+      funId = Int32::truncate(funIdStr.toInt());
+      result = callExternalFun(funId, funArg);
+      removeLocalContext();
+      Array[SKFS.StringFile(result)]
+    },
+  );
+}
+
+@cpp_export("SKIP_tracked_call")
+fun trackedCall(funId: Int32, funArg: String): String {
+  if (hasLocalContext() == 0) throw InvalidTrackedCall();
+  context = getLocalContext();
+  ldir = context.unsafeMaybeGetLazyDir(trackedJSCallsDirName) match {
+  | None() ->
+    initTrackedJSCalls(context);
+    context.unsafeGetLazyDir(trackedJSCallsDirName)
+  | Some(l) -> l
+  };
+  arr = ldir.getArray(context, SKFS.SID("" + funId + "#" + funArg));
+  invariant(arr.size() == 1);
+  SKFS.StringFile::fromFile(arr[0]).value
+}
+
+/*****************************************************************************/
+/* Support for tracked queries. */
+/*****************************************************************************/
+
+const trackedJSQueriesDirName: SKFS.DirName = SKFS.DirName::create(
+  "/jsTrackedQueries/",
+);
+
+class InvalidTrackedQuery() extends Exception {
+  fun getMessage(): String {
+    "Tracked queries can only be made while defining a root."
+  }
+}
+
+class TrackedQuery(query: String, start: Int, end: ?Int) extends SKFS.BaseName {
+  fun toString(): String {
+    inspect(this).toString()
+  }
+}
+
+fun initTrackedJSQueries(context: mutable SKFS.Context): void {
+  _ = SKFS.LHandle::create(
+    SKFS.StringFile::fromFile,
+    context,
+    trackedJSQueriesDirName,
+    (context, _self, key) ~> {
+      SKFS.withRegion(context, (_, context) ~> {
+        query = key match {
+        | q @ TrackedQuery _ -> q
+        | _ -> invariant_violation("Invalid key type")
+        };
+        lexer = SKSQL.Lexer(0, SKSQL.Buffer(query.query));
+        selectAst = SKSQL.parseQuery(lexer, 0).i1 match {
+        | x @ Select _ -> x
+        };
+        skOptions = SKSQL.Options{
+          alwaysAllowJoins => false,
+          backtrace => false,
+          sync => false,
+          virtual => false,
+          showUsedIndexes => false,
+        };
+        compiler = SKSQL.Compiler::create(skOptions, 0);
+        tableMapCopy = context.getGlobal("TableMap");
+        context.removeGlobal("TableMap");
+        select = compiler.compileSelect(context, selectAst, true);
+        tableMapCopy match {
+        | None() -> void
+        | Some(x) -> context.setGlobal("TableMap", x)
+        };
+        selectDir = SKSQL.evalSelect(context, select, None());
+        selectDirName = selectDir.dirName;
+        selectProjDirName = SKFS.DirName::create(
+          selectDirName.toString() + "proj/",
+        );
+
+        dirDescr = Compiler::getDirDescr(
+          selectAst.params,
+          select.from,
+          select.params,
+          selectDirName.toString(),
+          selectDirName,
+        );
+        fieldNames = dirDescr.schema.map(x -> x.name);
+        format = SKFS.OJSON(fieldNames);
+
+        selectProj = SKFS.EHandle(
+          RowValues::fromFile,
+          selectDirName,
+        ).contextWriterKeyValues(
+          RowValues::fromFile,
+          context,
+          selectProjDirName,
+          (_context, writer, _key, values) ~> {
+            writer.writeArray(SKFS.IID(0), values)
+          },
+        );
+        proj = selectProj.getIter(context, SKFS.IID(0));
+        acc = mutable Vector[];
+        i = 0;
+        for (rvalues in proj) {
+          if (i < query.start) {
+            !i = i + 1;
+            continue
+          };
+          query.end match {
+          | Some(end) -> if (i >= end) break void
+          | _ -> void
+          };
+          for (_ in Range(0, rvalues.getRepeat())) {
+            acc.push(rvalues.toStringSingle(format))
+          };
+          !i = i + 1;
+        };
+        Array[SKFS.StringFile(acc.join("\n"))]
+      })
+    },
+  );
+}
+
+@cpp_export("SKIP_tracked_query")
+fun trackedQuery(query: String, start: Int32, end: Int32): String {
+  if (hasLocalContext() == 0) throw InvalidTrackedQuery();
+  context = getLocalContext();
+  ldir = context.unsafeMaybeGetLazyDir(trackedJSQueriesDirName) match {
+  | None() ->
+    initTrackedJSQueries(context);
+    context.unsafeGetLazyDir(trackedJSQueriesDirName)
+  | Some(l) -> l
+  };
+  arr = ldir.getArray(
+    context,
+    TrackedQuery(
+      query,
+      start.toInt(),
+      if (end == -1) None() else Some(end.toInt()),
+    ),
+  );
+  invariant(arr.size() == 1);
+  SKFS.StringFile::fromFile(arr[0]).value
 }

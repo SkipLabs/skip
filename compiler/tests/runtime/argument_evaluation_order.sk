@@ -1,0 +1,65 @@
+fun positional(Int, Int): void {
+  void
+}
+fun named{a: Int, b: Int}: void {
+  void
+}
+
+class StringExn(msg: String) extends Exception {
+  fun getMessage(): String {
+    this.msg
+  }
+}
+
+fun main(): void {
+  print_raw(
+    (vtry(
+      () -> {
+        positional(throw StringExn("P"), 1 / 0);
+        "Fail"
+      },
+      exn ->
+        exn match {
+        | StringExn(s) -> s
+        | _ -> "Fail"
+        }
+      ,
+    )) +
+      (vtry(
+        () -> {
+          named{a => throw StringExn("a"), b => 1 / 0};
+          "Fail"
+        },
+        exn ->
+          exn match {
+          | StringExn(s) -> s
+          | _ -> "Fail"
+          }
+        ,
+      )) +
+      (vtry(
+        () -> {
+          named{b => throw StringExn("s"), a => 1 / 0};
+          "Fail"
+        },
+        exn ->
+          exn match {
+          | StringExn(s) -> s
+          | _ -> "Fail"
+          }
+        ,
+      )) +
+      (vtry(
+        () -> {
+          named{b => throw StringExn("s\n"), a => throw StringExn("not me")};
+          "Fail"
+        },
+        exn ->
+          exn match {
+          | StringExn(s) -> s
+          | _ -> "Fail"
+          }
+        ,
+      )),
+  )
+}

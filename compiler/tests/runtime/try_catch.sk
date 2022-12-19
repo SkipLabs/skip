@@ -1,0 +1,26 @@
+class MyException() extends Exception {
+  fun getMessage(): String {
+    ""
+  }
+}
+
+@no_inline
+fun throwExc(): String {
+  throw MyException()
+}
+
+fun main(): void {
+  print_raw(
+    vtry(
+      () -> {
+        throwExc()
+      },
+      exn ->
+        exn match {
+        | MyException() -> "Pass\n"
+        | _ -> "Fail"
+        }
+      ,
+    ),
+  )
+}

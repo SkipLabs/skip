@@ -1,0 +1,482 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/*****************************************************************************/
+/* Helpers for the typed abstract syntax tree. */
+/*****************************************************************************/
+
+module alias T = SkipTypedAst;
+module alias N = SkipNamedAst;
+
+/*****************************************************************************/
+/* Returns the type of an expression. */
+/*****************************************************************************/
+module SkipTypedAstUtils;
+
+fun get_type(p: T.Expr): T.Type_ {
+  (ty, _e) = p;
+  ty
+}
+
+fun get_type_of_pattern(p: T.Pattern): T.Type_ {
+  (ty, _pat) = p;
+  ty
+}
+
+fun type_of__(ty: T.Type_): T.Type__ {
+  ty.i1
+}
+
+fun expr_of__(ex: T.Expr): T.Expr__ {
+  ex.i1.i1
+}
+
+/*****************************************************************************/
+/* Returns the position of an expression */
+/*****************************************************************************/
+
+fun expr_pos(p: T.Expr): FileRange {
+  (_type, (pos, _expr)) = p;
+  pos
+}
+
+fun get_pos_of_type(ty: T.Type_): FileRange {
+  ty.i0
+}
+
+fun pattern_pos(p: T.Pattern): FileRange {
+  (_type, (pos, _pat)) = p;
+  pos
+}
+
+fun patterns_of_mbl(mbl: List<T.Match_branch>): List<T.Pattern> {
+  mbl
+    .map((p) -> {
+      (pat, _, _) = p;
+      pat
+    })
+    .flatten()
+}
+
+fun pattern_of__(param: T.Pattern): T.Pattern__ {
+  (_, (_, p)) = param;
+  p
+}
+
+fun pattern_is_exhaustive(pat: T.Pattern): Bool {
+  pattern_of__(pat) match {
+  | T.Pat_var _ -> true
+  | T.Pat_literal _ -> false
+  /* TODO: should do a type test here */
+  | T.Pat_type _ -> false
+  | T.Pat_as(pat1, _) -> pattern_is_exhaustive(pat1)
+  }
+}
+
+fun match_branch_is_if(mb: T.Match_branch): Bool {
+  mb match {
+  | (_, Some(_), _) -> true
+  | _ -> false
+  }
+}
+
+fun params_pattern_is_exhaustive(param_pats: ?Parameters<T.Pattern>): Bool {
+  param_pats.isNone() || param_pats.fromSome().all(pattern_is_exhaustive)
+}
+
+fun is_class_object(str: String): Bool {
+  ((str == "Base") || (str == "Class")) || (str == "Concrete")
+}
+
+fun is_class_object_name(n: T.Name): Bool {
+  is_class_object(n.i1)
+}
+
+const default_binding_info: T.Binding_info = T.Binding_info{
+  captured => false,
+  updated => false,
+  read => false,
+};
+
+fun binding_needs_ref(p: T.Binding_info): Bool {
+  p.captured && p.updated
+}
+/*****************************************************************************/
+/* Visitor */
+/*****************************************************************************/
+
+
+module end;
+module SkipTypedAst;
+
+fun visitOption<V>(f: V -> V, v: ?V): ?V {
+  v.map(f)
+}
+
+fun visitList<V>(f: V -> V, v: List<V>): List<V> {
+  v.map(f)
+}
+
+fun visitArray<V>(f: V -> V, v: .Array<V>): .Array<V> {
+  v.map(f)
+}
+
+fun visitUMap<V>(f: V -> V, v: UMap<V>): UMap<V> {
+  v.map((_, x) -> f(x))
+}
+
+fun visitSMap<V>(f: V -> V, v: SMap<V>): SMap<V> {
+  v.map((_, x) -> f(x))
+}
+
+mutable class Visitor<State>{
+  state: State,
+  onExpr: .Array<(State, Expr) -> Expr>,
+  onType: .Array<(State, Type_) -> Type_>,
+  onPattern: .Array<(State, Pattern) -> Pattern>,
+  onMethod_def: .Array<(State, Method_def) -> Method_def>,
+} {
+  mutable fun visitParameters<V>(f: V -> V, v: Parameters<V>): Parameters<V> {
+    v.map(x -> f(x))
+  }
+
+  mutable fun visitConst_def(obj: Const_def): Const_def {
+    !obj = obj with {
+      type => this.visitType_(obj.type),
+      value => visitOption(this.visitExpr, obj.value),
+    };
+    obj
+  }
+
+  mutable fun visitClass_def(obj: Class_def): Class_def {
+    !obj = obj with {
+      tparams => visitArray(this.visitType_parameter, obj.tparams),
+      params => visitOption(this.visitClass_params, obj.params),
+      extends_ => visitUMap(this.visitParent, obj.extends_),
+      use => visitUMap(this.visitParent, obj.use),
+      methods => visitUMap(this.visitMethod_def, obj.methods),
+      fields => visitUMap(this.visitField_type, obj.fields),
+      consts => visitUMap(this.visitConst_def, obj.consts),
+    };
+    obj
+  }
+
+  mutable fun visitField_type(
+    obj: SkipNamedAst.Field_type,
+  ): SkipNamedAst.Field_type {
+    !obj = obj with {
+      tparams => visitArray(this.visitType_parameter, obj.tparams),
+      type => this.visitType_(obj.type),
+      whenparams => visitArray(this.visitWhenclause, obj.whenparams),
+    };
+    obj
+  }
+
+  mutable fun visitClass_params(obj: Class_params): Class_params {
+    !obj = obj with {
+      params => this.visitParameters(this.visitParameter, obj.params),
+    };
+    obj
+  }
+
+  mutable fun visitParent(obj: Parent): Parent {
+    !obj = obj with {targs => visitArray(this.visitType_, obj.targs)};
+    obj
+  }
+
+  mutable fun visitMethod_def(obj: Method_def): Method_def {
+    !obj = obj with {
+      whenparams => visitArray(this.visitWhenclause, obj.whenparams),
+      implicit_param => this.visitBinding(obj.implicit_param),
+      generic_mapping => obj.generic_mapping.map((_, x) ->
+        x.map((_, y) -> this.visitType_(y))
+      ),
+      body => this.visitExpr_body(obj.body),
+      params => this.visitParameters(this.visitParameter, obj.params),
+      return_ => this.visitType_(obj.return_),
+      tparams => visitArray(this.visitType_parameter, obj.tparams),
+    };
+    for (f in this.onMethod_def) {
+      !obj = f(this.state, obj);
+    };
+    obj
+  }
+
+  mutable fun visitWhenclause(obj: Whenclause): Whenclause {
+    (this.visitType_(obj.i0), visitArray(this.visitType_, obj.i1))
+  }
+
+  mutable fun visitExpr_body(obj: Expr_body): Expr_body {
+    obj match {
+    | Abstract() -> Abstract()
+    | Native() -> Native()
+    | Implemented(e) -> Implemented(this.visitExpr(e))
+    }
+  }
+
+  mutable fun visitFun_def(obj: Fun_def): Fun_def {
+    !obj = obj with {
+      body => this.visitExpr_body(obj.body),
+      params => this.visitParameters(this.visitParameter, obj.params),
+      return_ => this.visitType_(obj.return_),
+      tparams => visitArray(this.visitType_parameter, obj.tparams),
+    };
+    obj
+  }
+
+  mutable fun visitType_parameter(obj: Type_parameter): Type_parameter {
+    (obj.i0, obj.i1, obj.i2, visitArray(this.visitType_, obj.i3))
+  }
+
+  mutable fun visitParameter(obj: Parameter): Parameter {
+    !obj = obj with {
+      type => this.visitType_(obj.type),
+      value => visitOption(this.visitExpr, obj.value),
+    };
+    obj
+  }
+
+  mutable fun visitNamed_type(obj: Named_type): Named_type {
+    (obj.i0, visitArray(this.visitType_, obj.i1))
+  }
+
+  mutable fun visitType_(obj: Type_): Type_ {
+    !obj = (obj.i0, this.visitType__(obj.i1));
+    for (f in this.onType) {
+      !obj = f(this.state, obj);
+    };
+    obj
+  }
+
+  mutable fun visitType__(obj: Type__): Type__ {
+    obj match {
+    | N.Tfrozen _
+    | N.TnonNullable _
+    | N.Tanything()
+    | N.Tparam _ ->
+      obj
+    | N.Tapply(x0, x1, x2) -> N.Tapply(x0, x1, visitArray(this.visitType_, x2))
+    | N.Tfun(x0, x1, x2, x3, x4) ->
+      N.Tfun(
+        x0,
+        x1,
+        visitArray(this.visitType_, x2),
+        this.visitParameters(this.visitType_, x3),
+        this.visitType_(x4),
+      )
+    | N.Tlambda(x0, x1, x2, x3) -> N.Tlambda(x0, x1, x2, this.visitType_(x3))
+    | N.Tdefault(x) -> N.Tdefault(this.visitType_(x))
+    | N.Tnamed(x0, x1) -> N.Tnamed(x0, this.visitType_(x1))
+
+    | N.Tset(x0, x1, x2, x3) ->
+      N.Tset(x0, x1, x2, visitArray(this.visitInterElt, x3))
+
+    | N.Tawaitable(var, ty) -> N.Tawaitable(var, this.visitType_(ty))
+
+    | N.Tpromoted _ -> invariant_violation("Should have been compiled")
+    | N.Tvar _ -> invariant_violation("Should have been compiled")
+    }
+  }
+
+  mutable fun visitInterElt(obj: N.InterElt): N.InterElt {
+    !obj = obj with {
+      targs => visitArray(this.visitType_, obj.targs),
+      conditions => this.visitInterEltConditions(obj.conditions),
+    };
+    obj
+  }
+
+  mutable fun visitInterEltConditions(
+    obj: N.InterEltConditions,
+  ): N.InterEltConditions {
+    !obj = obj match {
+    | N.ECSatisfied()
+    | N.ECNoConditions() ->
+      obj
+    | N.ECConditions(x) ->
+      N.ECConditions(x.map(y -> y.map(this.visitWhenclause)))
+    };
+    obj
+  }
+
+  mutable fun visitExpr(obj: Expr): Expr {
+    !obj = (this.visitType_(obj.i0), this.visitExpr_(obj.i1));
+    for (f in this.onExpr) {
+      !obj = f(this.state, obj);
+    };
+    obj
+  }
+
+  mutable fun visitExpr_(obj: Expr_): Expr_ {
+    (obj.i0, this.visitExpr__(obj.i1));
+  }
+
+  mutable fun visitExpr__(obj: Expr__): Expr__ {
+    obj match {
+    | DefaultArg()
+    | Literal _
+    | Local _
+    | Continue()
+    | Const _ ->
+      obj
+    | Fun(x0, x1) -> Fun(x0, visitArray(this.visitType_, x1))
+    | Object(x0, types, args) ->
+      Object(x0, visitArray(this.visitType_, types), this.visitCall_args(args))
+    | DynamicConstruction(e, name, types, args) ->
+      DynamicConstruction(
+        this.visitExpr(e),
+        name,
+        visitArray(this.visitType_, types),
+        this.visitCall_args(args),
+      )
+    | Seq(left, right) -> Seq(this.visitExpr(left), this.visitExpr(right))
+    | If(cond, t, f) ->
+      If(this.visitExpr(cond), this.visitExpr(t), this.visitExpr(f))
+    | Call(base, args) -> Call(this.visitExpr(base), this.visitCall_args(args))
+    | Annotated(expr, type_) ->
+      Annotated(this.visitExpr(expr), this.visitType_(type_))
+    | Barbar(left, right) -> Barbar(this.visitExpr(left), this.visitExpr(right))
+    | Ampamp(left, right) -> Ampamp(this.visitExpr(left), this.visitExpr(right))
+    | Bind(binding, expr, cont) ->
+      Bind(
+        this.visitBinding(binding),
+        this.visitExpr(expr),
+        this.visitExpr(cont),
+      )
+    | Assign(info, expr) ->
+      Assign(this.visitLocalInfo(info), this.visitExpr(expr))
+    | StaticDot(info) -> StaticDot(this.visitDot_info(info))
+    | Dot(info) -> Dot(this.visitDot_info(info))
+    | Match(expr, branches) ->
+      Match(this.visitExpr(expr), visitList(this.visitMatch_branch, branches))
+    | Lambda(params, captured, body, yields) ->
+      Lambda(
+        this.visitParameters(this.visitBinding, params),
+        visitSMap(this.visitBinding, captured),
+        this.visitExpr(body),
+        yields,
+      )
+    | Try(expr, branches) ->
+      Try(this.visitExpr(expr), visitList(this.visitMatch_branch, branches))
+    | Return(expr) -> Return(this.visitExpr(expr))
+    | Throw(expr) -> Throw(this.visitExpr(expr))
+    | Array(args) -> Array(visitArray(this.visitExpr, args))
+    | GetClass(expr) -> GetClass(this.visitExpr(expr))
+    | Classname(name) -> Classname(name)
+    | With(expr, updated) ->
+      With(this.visitExpr(expr), this.visitWith_updates(updated))
+    | AssignField(base, source, field, expr) ->
+      AssignField(this.visitExpr(base), source, field, this.visitExpr(expr))
+    | TemplateLiteral(args) -> TemplateLiteral(this.visitCall_args(args))
+    | Break(e) -> Break(this.visitExpr(e))
+    | Loop(body) -> Loop(this.visitExpr(body))
+    | DoWhile(body, condition, withoutBreak) ->
+      DoWhile(
+        this.visitExpr(body),
+        this.visitExpr(condition),
+        this.visitExpr(withoutBreak),
+      )
+    | While(condition, body, withoutBreak) ->
+      While(
+        this.visitExpr(condition),
+        this.visitExpr(body),
+        this.visitExpr(withoutBreak),
+      )
+
+    | LazyLambda _ -> invariant_violation("Should have been expanded")
+    | Async(c, e) -> Async(c, this.visitExpr(e))
+    | Concurrent _ -> invariant_violation("Not supported")
+    | Freeze _ -> invariant_violation("Not supported")
+    | Await(e) -> Await(this.visitExpr(e))
+    | Yield(e) -> Yield(this.visitExpr(e))
+    | YieldBreak() -> YieldBreak()
+    }
+  }
+
+  mutable fun visitOrdered_expr(obj: Ordered_expr): Ordered_expr {
+    (obj.i0, this.visitExpr(obj.i1))
+  }
+
+  mutable fun visitCall_args(obj: Call_args): Call_args {
+    this.visitParameters(this.visitOrdered_expr, obj)
+  }
+
+  mutable fun visitWith_updates(obj: With_updates): With_updates {
+    visitUMap(this.visitWith_update, obj)
+  }
+
+  mutable fun visitWith_update(obj: With_update): With_update {
+    (
+      obj.i0,
+      this.visitExpr(obj.i1),
+      obj.i2,
+      visitOption(this.visitType_, obj.i3),
+    )
+  }
+
+  mutable fun visitDot_info(obj: Dot_info): Dot_info {
+    !obj = obj with {
+      obj_expr => this.visitExpr(obj.obj_expr),
+      field_targs => visitArray(this.visitType_, obj.field_targs),
+    };
+    obj
+  }
+
+  mutable fun visitBinding(obj: Binding): Binding {
+    (this.visitType_(obj.i0), obj.i1, obj.i2)
+  }
+
+  mutable fun visitLocalInfo(obj: LocalInfo): LocalInfo {
+    (this.visitType_(obj.i0), obj.i1)
+  }
+
+  mutable fun visitMatch_branch(obj: Match_branch): Match_branch {
+    (
+      visitList(this.visitPattern, obj.i0),
+      visitOption(this.visitExpr, obj.i1),
+      this.visitExpr(obj.i2),
+    )
+  }
+
+  mutable fun visitPattern(obj: Pattern): Pattern {
+    !obj = (this.visitType_(obj.i0), this.visitPattern_(obj.i1));
+    for (f in this.onPattern) {
+      !obj = f(this.state, obj);
+    };
+    obj
+  }
+
+  mutable fun visitPattern_(obj: Pattern_): Pattern_ {
+    (obj.i0, this.visitPattern__(obj.i1))
+  }
+
+  mutable fun visitParamPattern(obj: ParamPattern): ParamPattern {
+    (this.visitType_(obj.i0), this.visitPattern(obj.i1));
+  }
+
+  mutable fun visitPattern__(obj: Pattern__): Pattern__ {
+    obj match {
+    | Pat_var(b) -> Pat_var(this.visitBinding(b))
+    | Pat_literal _ -> obj
+    | Pat_type(matchClass, castType, params) ->
+      Pat_type(
+        this.visitType_identifier(matchClass),
+        this.visitType_(castType),
+        params.map(x -> x.map(this.visitParamPattern)),
+      )
+    | Pat_as(p, b) -> Pat_as(this.visitPattern(p), this.visitBinding(b))
+    }
+  }
+
+  mutable fun visitType_identifier(obj: Type_identifier): Type_identifier {
+    obj
+    /*
+        | Tid_object(Name)
+      | Tid_static((Name, Name), Name)
+    */
+  }
+}

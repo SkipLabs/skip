@@ -1,0 +1,19 @@
+fun alwaysThrow<T>(): T {
+  throw KeyNotFound()
+}
+
+fun main(): void {
+  print_raw(
+    vtry(
+      () -> {
+        _ = alwaysThrow();
+        "Fail\n"
+      },
+      exn ->
+        exn match {
+        | KeyNotFound() -> "Pass\n"
+        }
+      ,
+    ),
+  )
+}

@@ -1,0 +1,478 @@
+/*****************************************************************************/
+/* Module exposing a typed interface to the file system.
+ *
+ * The code implementing the file system is not statically typed. A first
+ * version attempted to do that, but it became clear very quickly that it
+ * would require to bend the type-system in ways that were counter-productive.
+ *
+ * Moreover, remote-directories, because of their nature break the static
+ * type-checking.
+ *
+ * Hence the idea of an implementation where every file in the system has the
+ * same type "File" and every key the type "BaseName".
+ *
+ * However, type-checking is nice! So how do we get the best of both worlds?
+ * By exposing a typed API!
+ *
+ * This is what the Handle module is for. The idea is to add a layer of type-
+ * checking and expose that to the user.
+ *
+ * Concretely, let's say we want to manipulate a directory where the files are
+ * all of type IntFile. The type Handle<IntFile> is there to the rescue! Every
+ * operation will be type-checked (statically) against the type IntFile.
+ *
+ * So if I try to write a StringFile instead of an IntFile I get a static error.
+ * The other important part is that all the higher order operations are also
+ * typed. So applying a map to a Handle also produces a handle.
+ *
+ * What's nice about that is that it becomes relatively straightforward to
+ * write a program that is fully type-checked. The dynamic nature of the file-
+ * system becomes an implementation detail. All you need to do is to stick with
+ * Handles. Never try to manipulate "Dir" directly and you will be safe!
+ */
+/*****************************************************************************/
+
+module SKFS;
+
+/*****************************************************************************/
+/* Iterator capable of answering if it produces at least one element. */
+/*****************************************************************************/
+
+mutable base class IteratorWithIsEmpty<+T> extends Iterator<T> {
+  static fun create(iter: mutable Iterator<T>): mutable IteratorWithIsEmpty<T> {
+    iter.next() match {
+    | None() -> mutable EmptyIterator()
+    | Some(v) -> mutable NonEmptyIterator(Some(v), iter)
+    }
+  }
+
+  readonly fun isEmpty(): Bool;
+}
+
+mutable class EmptyIterator<T>() extends IteratorWithIsEmpty<T> {
+  mutable fun next(): ?T {
+    None()
+  }
+
+  readonly fun isEmpty(): Bool {
+    true
+  }
+}
+
+mutable class NonEmptyIterator<T>(
+  mutable first: ?T,
+  iter: mutable Iterator<T>,
+) extends IteratorWithIsEmpty<T> {
+  mutable fun next(): ?T {
+    this.first match {
+    | None() -> this.iter.next()
+    | x @ Some _ ->
+      this.!first = None();
+      x
+    }
+  }
+  readonly fun isEmpty(): Bool {
+    false
+  }
+}
+
+/*****************************************************************************/
+/* The class handed over to the closures mapping over a directory. */
+/*****************************************************************************/
+
+mutable class Writer{
+  private mutable writes: SortedMap<BaseName, Array<File>> = SortedMap[],
+} {
+  mutable fun writeArray(key: BaseName, values: Array<File>): void {
+    this.!writes[key] = values;
+  }
+
+  mutable fun write(key: BaseName, value: File): void {
+    this.!writes[key] = Array[value];
+  }
+
+  mutable fun remove(key: BaseName): void {
+    this.!writes[key] = Array[];
+  }
+
+  readonly fun getWrites(): Array<(BaseName, Array<File>)> {
+    result = mutable Vector[];
+    for (key => values in this.writes) {
+      result.push((key, values));
+    };
+    result.toArray()
+  }
+}
+
+/*****************************************************************************/
+/* Typed version of the Reducer. */
+/*****************************************************************************/
+
+class EReducer<T>{
+  canReset: Bool,
+  init: (mutable Iterator<T> ~> Array<T>),
+  update: (Array<T>, Array<T>, Array<T>) ~> ?Array<T>,
+}
+
+/*****************************************************************************/
+/* The preferred way of accessing the file-system. */
+/*****************************************************************************/
+
+base class Handle<+T: frozen> {
+  macro fun getDirName(): DirName {
+    this.dirName
+  }
+
+  macro overridable fun getConv(): SKFS.File ~> T {
+    this.conv
+  }
+
+  fun getArray(context: mutable Context, key: BaseName): Array<T> {
+    dir = context.unsafeGetDir(this.getDirName());
+    dir.getArray(context, key).map(this.getConv())
+  }
+
+  fun getIter(context: mutable Context, key: BaseName): mutable Iterator<T> {
+    dir = context.unsafeGetDir(this.getDirName());
+    dir.getIter(context, key).map(this.getConv())
+  }
+
+  fun get(context: mutable Context, key: BaseName): T {
+    values = this.getArray(context, key);
+    if (values.size() >= 2) {
+      msg = `Error: Duplicate keys '${key}' in '${this.getDirName()}'`;
+      print_error(msg);
+      invariant_violation(msg);
+    };
+    if (values.size() == 0) {
+      msg = `Error: No value for keys '${key}' in '${this.getDirName()}'`;
+      print_error(msg);
+      invariant_violation(msg);
+    };
+    values[0]
+  }
+
+  fun containsKey(context: mutable Context, key: BaseName): Bool {
+    this.getArray(context, key).size() > 0
+  }
+
+  fun maybeGet(context: mutable Context, key: BaseName): ?T {
+    values = this.getArray(context, key);
+    if (values.size() == 0) return None();
+    Some(values[0])
+  }
+}
+
+/*****************************************************************************/
+/* A lazy handle is updated "lazily", in other words, an entry is computed
+ * only when someone tries to access it.
+ */
+/*****************************************************************************/
+
+class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
+  static fun create<T: File>(
+    conv: File ~> T,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, LHandle<T>, BaseName) ~> Array<T>,
+    collect: Bool = true,
+  ): LHandle<T> {
+    dir = LazyDir::create(
+      context,
+      dirName,
+      (context, dirName, key) ~> {
+        Some(f(context, LHandle(conv, dirName), key));
+      },
+      collect,
+    );
+    LHandle(conv, dir.getDirName())
+  }
+
+  static fun createAsync<T: File>(
+    conv: File ~> T,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, LHandle<T>, BaseName) ~> ?Array<T>,
+    collect: Bool = true,
+  ): LHandle<T> {
+    dir = LazyDir::create(
+      context,
+      dirName,
+      (context, dirName, key) ~> {
+        f(context, LHandle(conv, dirName), key);
+      },
+      collect,
+    );
+    LHandle(conv, dir.getDirName())
+  }
+
+  fun getArrayAsync(context: mutable Context, key: BaseName): Array<T> {
+    dir = context.unsafeGetLazyDir(this.getDirName());
+    results = dir.getArrayAsync(context, key).map(this.getConv());
+    results
+  }
+
+  fun getArrayWithOptions(
+    context: mutable Context,
+    key: BaseName,
+    isAsync: Bool,
+    throwOnCycle: Bool,
+  ): Array<T> {
+    dir = context.unsafeGetLazyDir(this.getDirName());
+    results = dir
+      .getArrayWithOptions(context, key, isAsync, throwOnCycle)
+      .map(this.getConv());
+    results
+  }
+}
+
+/*****************************************************************************/
+/* Eager handles. */
+/*****************************************************************************/
+
+class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
+  private fun genericMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
+    reducerOpt: ?EReducer<T2> = None(),
+  ): EHandle<T2> {
+    EagerDir::apply(
+      context,
+      this.dirName,
+      dirName,
+      (context, writer, key, fileIter) ~> {
+        files = fileIter.collect(Array);
+        if (files.size() == 0) return void;
+        f(context, writer, key, files.map(x -> this.conv(x)));
+      },
+      reducerOpt match {
+      | None() -> None()
+      | Some(reducer) ->
+        Some(
+          IReducer{
+            init => files ~> reducer.init(files.map(conv)),
+            update => (state, old, new) ~>
+              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
+          },
+        )
+      },
+    );
+    EHandle(conv, dirName)
+  }
+
+  fun contextWriterKeyIter<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, BaseName, mutable Iterator<T>) ~> void,
+    reducerOpt: ?EReducer<T2> = None(),
+  ): EHandle<T2> {
+    EagerDir::apply(
+      context,
+      this.dirName,
+      dirName,
+      (context, writer, key, fileIter) ~> {
+        iter = IteratorWithIsEmpty::create(fileIter);
+        if (iter.isEmpty()) return void;
+        f(context, writer, key, iter.map(this.conv));
+      },
+      reducerOpt match {
+      | None() -> None()
+      | Some(reducer) ->
+        Some(
+          IReducer{
+            init => files ~> reducer.init(files.map(conv)),
+            update => (state, old, new) ~>
+              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
+          },
+        )
+      },
+    );
+    EHandle(conv, dirName)
+  }
+
+  static fun multiContextWriterKeyIter<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    parents: FixedSingle<
+      DirName,
+      (
+        (
+          mutable Context,
+          mutable Writer,
+          BaseName,
+          mutable Iterator<T2>,
+        ) ~> void,
+        ?Array<KeyRange>,
+      ),
+    >,
+    dirName: DirName,
+    reducerOpt: ?EReducer<T2> = None(),
+  ): EHandle<T2> {
+    dynParents = mutable Vector[];
+    parentSet = mutable Set[];
+    for (parentName => parentData in parents) {
+      (mapFun, rangeOpt) = parentData;
+      dynamicMapFun = (context, writer, key, fileIter) ~> {
+        iter = IteratorWithIsEmpty::create(fileIter);
+        if (iter.isEmpty()) return void;
+        mapFun(context, writer, key, iter.map(conv));
+      };
+      parentSet.add(parentName);
+      dynParents.push((parentName, (dynamicMapFun, rangeOpt)))
+    };
+    fixedParents = FixedSingle::create(dynParents);
+    EagerDir::applyMany(
+      context,
+      fixedParents,
+      dirName,
+      reducerOpt match {
+      | None() -> None()
+      | Some(reducer) ->
+        Some(
+          IReducer{
+            init => files ~> reducer.init(files.map(conv)),
+            update => (state, old, new) ~>
+              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
+          },
+        )
+      },
+    );
+    EHandle(conv, dirName)
+  }
+
+  fun map<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (T) ~> T2,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (_, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        msg = "Duplicate keys: " + key;
+        print_error(msg);
+        invariant_violation(msg);
+      };
+      result = f(files[0]);
+      writer.write(key, result);
+    })
+  }
+
+  fun mapKV<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (BaseName, T) ~> T2,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (_, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        msg = "Duplicate keys: " + key;
+        print_error(msg);
+        invariant_violation(msg);
+      };
+      result = f(key, files[0]);
+      writer.write(key, result);
+    })
+  }
+
+  fun contextMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, T) ~> T2,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        msg = "Duplicate keys: " + key;
+        print_error(msg);
+        invariant_violation(msg);
+      };
+      result = f(context, files[0]);
+      writer.write(key, result);
+    })
+  }
+
+  fun contextWriterMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, T) ~> void,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        msg = "Duplicate keys: " + key;
+        print_error(msg);
+        invariant_violation(msg);
+      };
+      f(context, writer, files[0]);
+    })
+  }
+
+  fun contextWriterKeyMap<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, BaseName, T) ~> void,
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
+      if (files.size() >= 2) {
+        msg = "Duplicate keys: " + key;
+        print_error(msg);
+        invariant_violation(msg);
+      };
+      f(context, writer, key, files[0]);
+    })
+  }
+
+  fun contextWriterKeyValues<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, BaseName, Array<T>) ~> void,
+    reducerOpt: ?(EReducer<T2>) = None(),
+  ): EHandle<T2> {
+    this.genericMap(conv, context, dirName, f, reducerOpt)
+  }
+
+  fun pre(context: mutable Context): ?EHandle<T> {
+    if (!context.hasPre.contains(this.dirName)) {
+      context.!hasPre = context.hasPre.add(this.dirName);
+    };
+    context.maybeGetDir(this.dirName.pre()) match {
+    | None() -> None()
+    | Some(dir) -> Some(EHandle(this.conv, dir.getDirName()))
+    }
+  }
+
+  fun size(context: mutable Context): Int {
+    context.getEagerDir(this.dirName).size(context)
+  }
+
+  fun isEmpty(context: mutable Context): Bool {
+    context.getEagerDir(this.dirName).isEmpty(context)
+  }
+
+  fun writeArray<U: File>[T: U](
+    context: mutable Context,
+    key: BaseName,
+    values: Array<U>,
+  ): void {
+    dir = context.unsafeGetEagerDir(this.dirName);
+    dir.writeArray(context, key, values);
+  }
+
+  fun unsafeGetArray(context: mutable Context, key: BaseName): Array<T> {
+    dir = context.unsafeGetDir(this.getDirName());
+    dir.getArrayRaw(key).map(this.getConv())
+  }
+
+  fun unsafeGet(context: mutable Context, key: BaseName): T {
+    arr = this.unsafeGetArray(context, key);
+    invariant(arr.size() == 1);
+    arr[0]
+  }
+}
+
+module end;

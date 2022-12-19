@@ -1,0 +1,31 @@
+class OneException(message: String) extends Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+class AnotherException(message: String) extends Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+fun main(): void {
+  print_raw(
+    vtry(
+      () -> {
+        if (true) {
+          throw (OneException("true\n"))
+        } else {
+          throw (AnotherException("false"))
+        }
+      },
+      exn ->
+        exn match {
+        | OneException(message) -> message
+        | e -> e.getMessage()
+        }
+      ,
+    ),
+  )
+}

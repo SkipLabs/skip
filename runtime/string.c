@@ -45,6 +45,10 @@ char* sk_string_create(const char* buffer, uint32_t size) {
   return result;
 }
 
+char* SKIP_getBuildVersion() {
+  return sk_string_create("1", 1);
+}
+
 char* SKIP_String__fromUtf8(char* class, char* array) {
   SkipInt size = SKIP_getArraySize(array);
   return sk_string_create(array, size);
@@ -320,6 +324,10 @@ char* SKIP_float_to_string(double f) {
   // Not implemented
   return sk_string_create("", 0);
   #endif
+}
+
+char SKIP_Unsafe_string_utf8_get(char* str, SkipInt n) {
+  return str[n];
 }
 
 /*****************************************************************************/

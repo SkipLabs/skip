@@ -15,6 +15,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <linux/limits.h>
+#include <pthread.h>
 
 namespace skip {
 struct SkipException : std::exception {
@@ -155,19 +157,20 @@ int main(int pargc, char** pargv) {
 
 static void print(FILE* descr, char* str) {
   size_t size = SKIP_String_byteSize((char*)str);
-  char* buffer = (char*)malloc(size+1);
-  memcpy(buffer, str, size);
-  buffer[size] = 0;
-  fprintf(descr, "%s", buffer);
-  free(buffer);
+  fwrite(str, size, 1, descr);
 }
 
 void SKIP_print_raw(char* str) {
   print(stdout, str);
 }
 
+void SKIP_print_error_raw(char* str) {
+  print(stderr, str);
+}
+
 void SKIP_flush_stdout() {
   fflush(stdout);
+  fflush(stderr);
 }
 
 void print_string(char* str) {
@@ -183,7 +186,7 @@ void SKIP_print_error(char* str) {
 char* sk_string_alloc(size_t);
 void sk_string_set_hash(char*);
 
-char* SKIP_read_file(char* filename_obj) {
+char* SKIP_open_file(char* filename_obj) {
  struct stat s;
  size_t filename_size = SKIP_String_byteSize(filename_obj);
  char* filename = (char*)malloc(filename_size+1);
@@ -321,6 +324,77 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
   memcpy(cformat, formatp, byteSize);
   size_t size = strftime(buffer, 1024, cformat, tm);
   return sk_string_create(buffer, size);
+}
+
+char* SKIP_getcwd() {
+  char path[PATH_MAX];
+  getcwd(path, PATH_MAX);
+  return sk_string_create(path, strlen(path));
+}
+
+int64_t SKIP_numThreads() {
+  return 1;
+}
+
+void SKIP_string_to_file(char* str, char* file) {
+  FILE *out = fopen(file, "w");
+  size_t size = SKIP_String_byteSize(str);
+  while(size != 0) {
+    size_t written = fwrite(str, 1, size, out);
+    size -= written;
+  }
+  fclose(out);
+}
+
+int64_t SKIP_get_mtime(char *path) {
+    struct stat st;
+    if(stat(path, &st) < 0) {
+      return 0;
+    }
+    return st.st_mtime;
+}
+
+void SKIP_exit(uint64_t code) {
+  exit(code);
+}
+
+int32_t SKIP_stdin_has_data() {
+  fd_set rfds;
+  struct timeval tv;
+  int retval;
+
+  /* Watch stdin (fd 0) to see when it has input. */
+  FD_ZERO(&rfds);
+  FD_SET(0, &rfds);
+  tv.tv_sec = 0;
+  tv.tv_usec = 0;
+
+  retval = select(1, &rfds, NULL, NULL, &tv);
+  /* Don't rely on the value of tv now! */
+
+  if (retval) {
+    return 1;
+  }
+  else {
+    return 0;
+  }
+}
+
+void* wait_for_EOF(void*) {
+  char buf[256];
+  while(read(0, buf, 256) > 0);
+  exit(0);
+  return NULL;
+}
+
+void SKIP_unix_die_on_EOF() {
+  pthread_t thread_id;
+  pthread_create(&thread_id, NULL, &wait_for_EOF, NULL);
+}
+
+char* SKIP_call_external_fun(int32_t, char*) {
+  fprintf(stderr, "SKIP_call_external_fun not implemented in native mode");
+  exit(2);
 }
 
 }

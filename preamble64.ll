@@ -1,3 +1,5 @@
+target triple = "x86_64-pc-linux-gnu"
+
 declare i8* @SKIP_Obstack_alloc(i64)
 declare i8* @SKIP_Obstack_calloc(i64) #0
 declare i8* @SKIP_Int_toString(i64) #0
@@ -17,6 +19,7 @@ declare i64 @SKIP_Unsafe_string_utf8_size(i8*)
 declare void @SKIP_print_error(i8*)
 declare void @SKIP_Obstack_vectorUnsafeSet(i8**, i8*)
 declare void @SKIP_print_raw(i8*)
+declare void @SKIP_print_error_raw(i8*)
 declare void @SKIP_Obstack_collect(i8*, i8**, i64)
 declare i8* @SKIP_Obstack_shallowClone(i64, i8*)
 declare i64 @SKIP_String_StringIterator__rawCurrent(i8*)
@@ -63,6 +66,32 @@ declare void @__cxa_end_catch()
 
 ; Delete after update_lkg
 declare void @abort() noreturn
+
+; Awaitable
+
+define void @SKIP_awaitableNotifyWaitersValueIsReady(i8*) {
+  ret void
+}
+
+define void @SKIP_awaitableSyncOrThrow(i8*) {
+  ret void
+}
+
+define void @SKIP_awaitableThrow(i8*, i8*) {
+  ret void
+}
+
+define void @SKIP_invocationOnStateChange(i8*, i64) {
+  ret void
+}
+
+define void @SKIP_memoValueBoxObject(i8*, i8*) {
+  ret void
+}
+
+define void @SKIP_memoizeCall(i8*, i8*) {
+  ret void
+}
 
 ; Obstack code
 

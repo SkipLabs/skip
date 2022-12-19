@@ -6,6 +6,51 @@
 
 SKIP_gc_type_t* epointer_ty = NULL;
 
+#ifdef SKIP32
+char sk_dirty_pages[PERSISTENT_TABLE_SIZE];
+extern unsigned char* bump_pointer;
+extern void** sk_ftable;
+
+
+int32_t sk_dirty_pages_stack[PERSISTENT_TABLE_SIZE];
+int32_t sk_dirty_pages_stack_idx = 0;
+
+void sk_persistent_write(char* addr, size_t size) {
+  while(1) {
+    int32_t page_id = ((uint32_t)addr) >> PERSISTENT_PAGE_BIT_SIZE;
+    if(sk_dirty_pages[page_id] == 0) {
+      sk_dirty_pages[page_id] = 1;
+      sk_dirty_pages_stack[sk_dirty_pages_stack_idx] = page_id;
+      sk_dirty_pages_stack_idx++;
+    }
+    if(size > PERSISTENT_PAGE_SIZE) {
+      addr += PERSISTENT_PAGE_SIZE;
+      size -= PERSISTENT_PAGE_SIZE;
+    }
+    else {
+      addr += size;
+      size = 0;
+      if((((uint32_t)addr) >> PERSISTENT_PAGE_BIT_SIZE) == page_id) {
+        return;
+      }
+    }
+  }
+}
+
+int32_t sk_pop_dirty_page() {
+  if(sk_dirty_pages_stack_idx > 0) {
+    int32_t result = sk_dirty_pages_stack[sk_dirty_pages_stack_idx-1];
+    sk_dirty_pages[result] = 0;
+    sk_dirty_pages_stack_idx--;
+    return result;
+  }
+//  sk_print_int((uint32_t)bump_pointer);
+  return -1;
+}
+
+#endif
+
+
 /*****************************************************************************/
 /* Interning primitives. */
 /*****************************************************************************/
@@ -23,10 +68,16 @@ static char* shallow_intern(
   mem += sizeof(uintptr_t);
   memcpy(mem, obj - leftsize, memsize);
   mem = mem + leftsize;
+  #ifdef SKIP32
+  sk_persistent_write(mem, memsize);
+  #endif
   return mem;
 }
 
 void sk_incr_ref_count(void* obj) {
+  #ifdef SKIP32
+  sk_persistent_write(obj, 0);
+  #endif
   uintptr_t* count = obj;
   if(SKIP_is_string(obj)) {
     #ifdef SKIP64
@@ -81,6 +132,9 @@ static uintptr_t* sk_get_ref_count_addr(void* obj) {
 }
 
 uintptr_t sk_decr_ref_count(void* obj) {
+  #ifdef SKIP32
+  sk_persistent_write(obj, 0);
+  #endif
   uintptr_t* count = sk_get_ref_count_addr(obj);
   *count = *count - 1;
   return *count;

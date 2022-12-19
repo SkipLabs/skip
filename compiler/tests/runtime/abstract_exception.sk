@@ -1,0 +1,26 @@
+base class MyMyBaseException extends Exception {
+  fun getMessage(): String {
+    ""
+  }
+}
+class MyException() extends MyMyBaseException
+
+fun my_throw(): String {
+  throw MyException()
+}
+
+fun main(): void {
+  print_raw(
+    vtry(
+      () -> {
+        my_throw()
+      },
+      exn ->
+        exn match {
+        | MyException() -> "Pass\n"
+        | _ -> "Fail\n"
+        }
+      ,
+    ),
+  )
+}
