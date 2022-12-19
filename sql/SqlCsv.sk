@@ -279,10 +279,12 @@ fun replayStdin(): Map<String, (Int, Int)> {
   vtry(
     () -> {
       loop {
-        line = read_line();
-        if (line == "") {
+        line = read_line() match {
+        | None() -> break map.chill()
+        | Some("") ->
           !txNbr = txNbr + 1;
-          continue;
+          continue
+        | Some(l) -> l
         };
         chars = mutable Vector[];
         iter = line.getIter();

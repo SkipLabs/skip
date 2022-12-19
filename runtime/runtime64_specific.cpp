@@ -45,10 +45,10 @@ void SKIP_throw(void* exc) {
 
 thread_local std::string lineBuffer;
 
-uint32_t SKIP_read_line_fill(void) {
+int32_t SKIP_read_line_fill(void) {
   std::getline(std::cin, lineBuffer);
   if (std::cin.fail()) {
-    SKIP_throw_EndOfFile();
+      return -1;
   }
   return lineBuffer.size();
 }

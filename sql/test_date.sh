@@ -35,7 +35,7 @@ run_test () {
 ###############################################################################
 # testing weekdays #
 ###############################################################################
- 
+
 # for i in {0..6}; do
 #     for y in {1990..2020}; do
 #         for m in {1..12}; do
@@ -126,4 +126,4 @@ run_hour_test () {
 #     run_hour_test "+$i month"
 #done
 
-echo "select date('now', '+1 day');" | skdb 
+echo "select date('now', '+1 day');" | skdb
