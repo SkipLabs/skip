@@ -2,7 +2,7 @@
 
 run_test () {
   echo -en "$1:\t"
-  cat $1 | ~/skfs/build/skdb --always-allow-joins | sort > /tmp/kk1
+  cat $1 | /skfs_build/build/skdb --always-allow-joins | sort > /tmp/kk1
   cat $1 | sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2 > /dev/null
   if [ $? -eq 0 ]; then
@@ -13,7 +13,7 @@ run_test () {
 }
 
 run_one_test () {
-  cat $1 | time ~/skfs/build/skdb --always-allow-joins | sort > /tmp/kk1
+  cat $1 | time /skfs_build/build/skdb --always-allow-joins | sort > /tmp/kk1
   cat $1 | time sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2
   if [ $? -eq 0 ]; then
@@ -40,7 +40,10 @@ fi
 run_test 'test/select1.sql';
 run_test 'test/select2.sql';
 run_test 'test/select3.sql';
-run_test 'test/select4.1.sql';
+
+# TODO: disabled see issue #40
+# run_test 'test/select4.1.sql';
+
 # run_test 'test/select4.2.sql';
 run_test 'test/select5.1.sql';
 # run_test 'test/select5.2.sql';
@@ -128,4 +131,5 @@ echo "* TPC-H *"
 echo "*******************************************************************************"
 echo ""
 
-(cd ./test/TPC-h/ && ./test_tpch.sh)
+# TODO: disabled as TPC-H.db isn't checked-in currently, see issue #41
+# (cd ./test/TPC-h/ && ./test_tpch.sh)
