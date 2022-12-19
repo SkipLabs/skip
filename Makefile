@@ -77,8 +77,7 @@ build/magic.o: build/magic.c
 	$(CC) $(CC64FLAGS) -o $@ -c $<
 
 test: build/out32.wasm build/skdb
-	node run.js
-	build/skdb all
+	./run_all_tests.sh
 
 build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	cat preamble32.ll build/out32.ll > build/preamble_and_out32.ll
