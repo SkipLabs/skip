@@ -20,9 +20,8 @@ fun testSql(): mutable SKFS.Context {
       alwaysAllowJoins => false,
       sync => false,
       showUsedIndexes => false,
-      csv => false,
     };
-    evaluator = SKSQL.Evaluator{options};
+    evaluator = SKSQL.Evaluator{options, user => None()};
     _table = evalStmt(context, evaluator, tableStr);
     expectFail("INSERT in non-existent table", () -> {
       evalStmt(context, evaluator, "INSERT INTO tdumb(e,c) VALUES(103,102)");

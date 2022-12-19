@@ -1,0 +1,23 @@
+class MyExn<T: Orderable>(T) extends Exception {
+  fun getMessage(): String {
+    "useful message"
+  }
+}
+
+fun foo(b: Bool): Order {
+  vtry(
+    () -> {
+      if (b) throw MyExn(5) else throw MyExn("hi")
+    },
+    exn ->
+      exn match {
+      | MyExn(x) -> x.compare(x)
+      | _ -> LT()
+      }
+    ,
+  )
+}
+
+fun main(): void {
+  print_raw(if (foo(true) == EQ()) "Pass\n" else "Fail")
+}

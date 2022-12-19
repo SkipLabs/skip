@@ -1,0 +1,113 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/*****************************************************************************/
+/* Utility functions to perform the parsing. */
+/*****************************************************************************/
+module alias Error = SkipError;
+
+module FileCache;
+
+const fileDirName: SKFS.DirName = SKFS.DirName::create("/fileCache/");
+const fileDir: SKFS.EHandle<SKFS.StringFile> = SKFS.EHandle(
+  SKFS.StringFile::fromFile,
+  fileDirName,
+);
+
+const allFilesDirName: SKFS.DirName = SKFS.DirName::create("/allFilesCache/");
+const allFilesDir: SKFS.EHandle<SKFS.StringFile> = SKFS.EHandle(
+  SKFS.StringFile::fromFile,
+  allFilesDirName,
+);
+
+const fileTimeDirName: SKFS.DirName = SKFS.DirName::create("/fileTimeCache/");
+const fileTimeDir: SKFS.EHandle<SKFS.IntFile> = SKFS.EHandle(
+  SKFS.IntFile::fromFile,
+  fileTimeDirName,
+);
+
+@cpp_extern("SKIP_get_mtime")
+native fun getLastModificationTime(fileName: String): Int;
+
+fun writeFiles(context: mutable SKFS.Context, fileNames: Array<String>): void {
+  oldFiles = allFilesDir
+    .unsafeGetArray(context, SKFS.IID(0))
+    .map(x -> x.value)
+    .collect(SortedSet);
+  for (fileName in fileNames) {
+    if (oldFiles.contains(fileName)) {
+      !oldFiles = oldFiles.remove(fileName);
+    };
+    key = SKFS.SID(fileName);
+    lastModifTime = getLastModificationTime(fileName);
+    timeArr = fileTimeDir.unsafeGetArray(context, key);
+    if (timeArr.size() > 0 && timeArr[0].value == lastModifTime) continue;
+    fileTimeDir.writeArray(context, key, Array[SKFS.IntFile(lastModifTime)]);
+    fileDir.writeArray(
+      context,
+      SKFS.SID(fileName),
+      Array[SKFS.StringFile(FileSystem.readTextFile(fileName))],
+    )
+  };
+  for (fileName in oldFiles) {
+    fileDir.writeArray(context, SKFS.SID(fileName), Array[SKFS.StringFile("")])
+  };
+  allFilesDir.writeArray(
+    context,
+    SKFS.IID(0),
+    fileNames.map(x -> SKFS.StringFile(x)),
+  );
+}
+
+module end;
+
+module SkipParse;
+
+const astDirName: SKFS.DirName = SKFS.DirName::create("/astCache/");
+const astDir: SKFS.EHandle<DefsFile> = SKFS.EHandle(
+  DefsFile::fromFile,
+  astDirName,
+);
+
+class DefsFile(value: List<SkipAst.Definition>) extends SKFS.File
+
+fun getAst(
+  context: mutable SKFS.Context,
+  fileName: String,
+): List<SkipAst.Definition> {
+  astDir.get(context, SKFS.SID(fileName)).value
+}
+
+fun parseFile(fileName: String, source: String): DefsFile {
+  fileResult = SkipParser.parseSource(source, true);
+  ast = parseToAst(fileName, fileResult);
+  DefsFile(ast)
+}
+
+fun parseToAst(
+  filename: String,
+  parseResults: Parser.ParseResults,
+): List<SkipAst.Definition> {
+  parseResults.throwOnError(filename);
+  List::createFromItems(
+    ConvertTree.Converter{filename}.convertTree(parseResults.tree),
+  );
+}
+
+// Used by docgen
+fun parse(filename: String, contents: String): List<SkipAst.Definition> {
+  parseToAst(filename, SkipParser.parseSource(contents, false));
+}
+
+fun parse_files(
+  context: mutable SKFS.Context,
+  fileList: Sequence<String>,
+): Sequence<List<SkipAst.Definition>> {
+  fileList.map(x -> getAst(context, x))
+}
+
+module end;

@@ -5,6 +5,41 @@
 #endif
 
 /*****************************************************************************/
+/* Saving/restoring context to thread locals.
+ *
+ * These primitives are very dangerous to use unless you really know what you
+ * are doing. The GC does not keep track of the local context, so saving a
+ * local context without a good understanding of how the memory model works
+ * will probably lead to memory corruption.
+ *
+ * You have been warned ...
+ */
+/*****************************************************************************/
+
+#ifdef SKIP32
+char* lcontext = NULL;
+#endif
+#ifdef SKIP64
+__thread char* lcontext = NULL;
+#endif
+
+int32_t SKIP_has_local_context() {
+  return (int32_t)(lcontext != NULL);
+}
+
+void SKIP_set_local_context(char* context) {
+  lcontext = context;
+}
+
+void SKIP_remove_local_context() {
+  lcontext = NULL;
+}
+
+char* SKIP_get_local_context() {
+  return lcontext;
+}
+
+/*****************************************************************************/
 /* Primitives that are not used in embedded mode. */
 /*****************************************************************************/
 
@@ -12,12 +47,7 @@ void SKIP_Regex_initialize() {
 }
 
 void SKIP_internalExit(uint64_t code) {
-  #ifdef SKIP64
-  _exit(code);
-  #endif
-  #ifdef SKIP32
-  SKIP_throw(NULL);
-  #endif
+  SKIP_exit(code);
 }
 
 void SKIP_print_last_exception_stack_trace_and_exit() {
@@ -44,6 +74,32 @@ void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
 /*****************************************************************************/
 /* Global context synchronization. */
 /*****************************************************************************/
+
+#ifdef SKIP32
+static char* local_ctx = NULL;
+#endif
+
+#ifdef SKIP64
+static __thread char* local_ctx = NULL;
+#endif
+
+void SKIP_unsafe_set_local_context(char* obj) {
+  local_ctx = obj;
+}
+
+void SKIP_unsafe_remove_local_context(char* obj) {
+  local_ctx = NULL;
+}
+
+char* SKIP_unsafe_get_local_context() {
+  if(local_ctx == NULL) {
+#ifdef SKIP64
+    fprintf(stderr, "Error: local context is not set");
+#endif
+    SKIP_throw(NULL);
+  }
+  return local_ctx;
+}
 
 void SKIP_context_init(char* obj) {
   sk_global_lock();

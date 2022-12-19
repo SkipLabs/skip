@@ -18,12 +18,39 @@ class DirDescr{
   name: String,
   colNames: Array<String>,
   schema: Array<TypeDescr>,
+  kinds: Array<(Int, IKind, Type)>,
   cols: SortedMap<String, Int>,
   dirName: SKFS.DirName,
   alias: ?String,
   windowSize: ?Int,
   isInput: Bool,
-} extends SKFS.File uses Orderable
+} extends SKFS.File uses Orderable {
+  static fun create{
+    name: String,
+    schema: Array<TypeDescr>,
+    dirName: SKFS.DirName,
+    alias: ?String,
+    windowSize: ?Int,
+    isInput: Bool,
+  }: this {
+    colNames = schema.map(x -> x.name);
+    cols = SortedMap[];
+    for (i => ty in schema) {
+      !cols[ty.name] = i;
+    };
+    static{
+      name,
+      colNames,
+      schema,
+      kinds => schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty)),
+      cols,
+      dirName,
+      alias,
+      windowSize,
+      isInput,
+    }
+  }
+}
 
 fun makeSelectName(id: String): SKFS.DirName {
   SKFS.DirName::create("/" + id + "/");
@@ -46,9 +73,9 @@ fun makeDir<T: frozen>(
 }
 
 fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
-  makeDir(DirDescr::fromFile, context, tableInfo, () ->
+  makeDir(DirDescr::fromFile, context, tableInfo, () -> {
     context.mkdir(DirDescr::fromFile, tableInfo, false, Array[])
-  )
+  })
 }
 
 /*****************************************************************************/
@@ -69,8 +96,9 @@ class SubRequestFile(
   viewName: String,
   viewDirName: SKFS.DirName,
   init: Bool,
-  cmd: ?SKFS.CmdKind,
+  cmd: SKFS.CmdKind,
   sessionID: Int,
+  user: ?(String, String),
 ) extends SKFS.File
 
 fun getSubsDirs(
@@ -93,28 +121,122 @@ fun getSubsDirs(
       cmd = request.cmd;
       init = request.init;
       sessionID = request.sessionID;
-      views = SKSQL.getViewsDir(context);
-      viewsDir = context.unsafeGetEagerDir(views.dirName);
-      selectFiles = viewsDir.getArrayRaw(SKFS.SID(viewName.toString()));
-      invariant(selectFiles.size() <= 1);
-      if (selectFiles.size() == 0) {
-        print_error(`Error: view ${viewName.toString()} doesn't exists`);
-        skipExit(3)
+      tableDir = getTableDir(context);
+      (edir, dirDescr) = tableDir.maybeGet(
+        context,
+        SKFS.SID(request.viewName),
+      ) match {
+      | None() ->
+        views = SKSQL.getViewsDir(context);
+        viewsDir = context.unsafeGetEagerDir(views.dirName);
+        selectFiles = viewsDir.getArrayRaw(SKFS.SID(viewName.toString()));
+        invariant(selectFiles.size() <= 1);
+        if (selectFiles.size() == 0) {
+          print_error(`Error: view ${viewName.toString()} doesn't exists`);
+          skipExit(3)
+        };
+        selectFile = SKSQL.SelectFile::fromFile(selectFiles[0]);
+        if (!selectFile.virtual) {
+          print_error("Error: can only connect to virtual views");
+          skipExit(23);
+        };
+        selectAst = selectFile.value;
+        compiler = SKSQL.Compiler::create(
+          options with {virtual => true},
+          selectAst.pos,
+        );
+        cselect = compiler.compileSelect(context, selectAst, true);
+        selectDir = SKSQL.evalSelect(context, cselect, None());
+        edir = context.unsafeGetEagerDir(selectDir.dirName);
+        dirDescr = Compiler::getDirDescr(
+          selectAst.params,
+          cselect.from,
+          cselect.params,
+          selectDir.dirName.toString(),
+          selectDir.dirName,
+        );
+        (edir, dirDescr)
+      | Some(dirDescr) ->
+        edir = context.unsafeGetEagerDir(dirDescr.dirName);
+        (edir, dirDescr)
       };
-      selectFile = SKSQL.SelectFile::fromFile(selectFiles[0]);
-      if (!selectFile.virtual) {
-        print_error("Error: can only connect to virtual views");
-        skipExit(23);
+      reset = request.user match {
+      | None() -> (_, _) ~> false
+      | Some((userName, password)) ->
+        userFile = SKSQL.UserFile::create(context, userName, password);
+        (context: SKFS.Context, tick: SKFS.Tick) ~> {
+          readers = context.unsafeGetEagerDir(SKFS.accessReaders);
+          for (rowKey in readers.getChangesAfter(tick)) {
+            rowKey match {
+            | RowKey(row, _) ->
+              if (row.getInt(1).fromSome() == userFile.id) {
+                return true
+              }
+            | _ -> invariant_violation("Unexpected key type")
+            }
+          };
+          false
+        }
       };
-      selectAst = selectFile.value;
-      compiler = SKSQL.Compiler::create(
-        options with {virtual => true},
-        selectAst.pos,
+      (userFile, matchesGroup, filter) = request.user match {
+      | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
+      | Some((userName, password)) ->
+        userFile = SKSQL.UserFile::create(context, userName, password);
+        accessColNbr = dirDescr.cols.maybeGet("skdb_access") match {
+        | None() ->
+          print_error(
+            "Cannot access table: " +
+              dirDescr.name +
+              ".\n" +
+              "You are connected as user " +
+              userName +
+              " you can only access tables defining the column skdb_access.",
+          );
+          skipExit(2)
+        | Some(x) -> x
+        };
+        if (!(dirDescr.schema[accessColNbr].ty is INTEGER())) {
+          print_error("skdb_access must be of type integer");
+          skipExit(2)
+        };
+        (
+          Some(userFile.id),
+          ((file: SKFS.BaseName) ~> {
+            file match {
+            | k @ RowKey _ ->
+              k.row.getInt(accessColNbr) match {
+              | None() -> 0
+              | Some(gid) -> gid
+              }
+            | _ -> 0
+            }
+          }),
+          (context ~> {
+            access = mutable AccessSolver(userFile.id);
+            (file: SKFS.BaseName) -> {
+              file match {
+              | k @ RowKey _ ->
+                k.row.getInt(accessColNbr) match {
+                | None() -> true
+                | Some(accessID) -> access.canRead(context, accessID)
+                }
+              | _ -> true
+              }
+            }
+          }),
+        )
+      };
+      context.subscribe(
+        context,
+        edir.dirName,
+        sessionID,
+        cmd,
+        init,
+        userFile,
+        reset,
+        matchesGroup,
+        filter,
       );
-      select = compiler.compileSelect(context, selectAst, true);
-      selectDir = SKSQL.evalSelect(context, select, None());
-      edir = context.unsafeGetEagerDir(selectDir.dirName);
-      edir.subscribe(context, sessionID, cmd, init);
       writer.write(key, SKFS.IntFile(sessionID))
     },
   );
@@ -268,7 +390,7 @@ fun getTable(
             oldDirName,
           )).unsafeGetDataIter(key)) {
             (source, values) = srcValue;
-            entries.push((key, (source.value, values)));
+            entries.push((key, (source.path(), values)));
           };
           inputDir = context.unsafeGetEagerDir(nextName);
           inputDir.writeArraySourceMany(context, entries.iterator());
@@ -289,55 +411,69 @@ fun getTable(
 /* DUMP. */
 /*****************************************************************************/
 
-@cpp_extern("SKIP_flush_stdout")
-native fun flushStdout(): void;
+fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
+  o = print_raw;
+  o("CREATE ");
+  o(
+    dirDescr.windowSize match {
+    | None() -> "TABLE "
+    | Some(0) -> "STREAM " + " "
+    | Some(size) -> "WINDOW " + size + " "
+    },
+  );
+  o(dirDescr.name);
+  suffix match {
+  | None() -> void
+  | Some(x) -> o(x)
+  };
+  o(" (\n");
+  for (colName in dirDescr.colNames) {
+    colIndex = dirDescr.cols[colName];
+    o("  ");
+    o(colName);
+    o(" ");
+    ty = dirDescr.schema[colIndex];
+    o(
+      ty.ty match {
+      | INTEGER() -> "INTEGER"
+      | FLOAT() -> "FLOAT"
+      | TEXT() -> "TEXT"
+      },
+    );
+    if (ty.unique) {
+      o(" UNIQUE");
+    };
+    if (ty.primary) {
+      o(" PRIMARY KEY");
+    };
+    if (ty.notNull) {
+      o(" NOT NULL");
+    };
+    if (colIndex < dirDescr.schema.size() - 1) {
+      o(",");
+    };
+    o("\n");
+  };
+  o(");\n");
+  flushStdout();
+}
 
-fun dumpTables(origContext: readonly SKFS.Context): void {
+fun dumpTable(
+  origContext: readonly SKFS.Context,
+  tableName: String,
+  suffix: ?String,
+): void {
+  context = SKFS.Context::fromSaved(origContext.clone());
+  printDirDescr(getTableDir(context).get(context, SKFS.SID(tableName)), suffix);
+}
+
+fun dumpTables(origContext: readonly SKFS.Context, suffix: ?String): void {
   context = SKFS.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
   _ = handle.map(handle.conv, context, sinkName, dirDescr ~> {
     if (!dirDescr.isInput) return dirDescr;
-    o = print_raw;
-    o("CREATE ");
-    o(
-      dirDescr.windowSize match {
-      | None() -> "TABLE "
-      | Some(0) -> "STREAM " + " "
-      | Some(size) -> "WINDOW " + size + " "
-      },
-    );
-    o(dirDescr.name);
-    o(" (\n");
-    for (colName in dirDescr.colNames) {
-      colIndex = dirDescr.cols[colName];
-      o("  ");
-      o(colName);
-      o(" ");
-      ty = dirDescr.schema[colIndex];
-      o(
-        ty.ty match {
-        | INTEGER() -> "INTEGER"
-        | FLOAT() -> "FLOAT"
-        | TEXT() -> "TEXT"
-        },
-      );
-      if (ty.unique) {
-        o(" UNIQUE");
-      };
-      if (ty.primary) {
-        o(" PRIMARY KEY");
-      };
-      if (ty.notNull) {
-        o(" NOT NULL");
-      };
-      if (colIndex < dirDescr.schema.size() - 1) {
-        o(",");
-      };
-      o("\n");
-    };
-    o(");\n");
-    flushStdout();
+    printDirDescr(dirDescr, suffix);
     dirDescr
   });
 }
@@ -372,6 +508,21 @@ fun dumpInserts(origContext: readonly SKFS.Context): void {
     flushStdout();
     dirDescr
   });
+}
+
+fun dumpView(origContext: readonly SKFS.Context, viewName: String): void {
+  context = SKFS.Context::fromSaved(origContext.clone());
+  hviews = getViewsDir(context);
+  viewsDir = context.unsafeGetEagerDir(hviews.dirName);
+  arr = viewsDir.getArrayRaw(SKFS.SID(viewName));
+  if (arr.size() == 0) {
+    print_error("View " + viewName + " not found");
+    skipExit(104);
+  };
+  invariant(arr.size() == 1);
+  print_raw(SelectFile::fromFile(arr[0]).text);
+  print_raw(";\n");
+  flushStdout();
 }
 
 fun dumpViews(origContext: readonly SKFS.Context): void {
@@ -420,5 +571,8 @@ class Globals(map: SortedMap<String, Int> = SortedMap[]) extends SKFS.File {
   }
   fun get(var: String): Int {
     this.map[var]
+  }
+  fun maybeGet(var: String): ?Int {
+    this.map.maybeGet(var)
   }
 }

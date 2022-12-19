@@ -1,0 +1,15 @@
+module SKFSTest;
+
+fun testDMap(): void {
+  x = SKFS.DMap::empty();
+  !x = x.set(SKFS.TickRange::create(SKFS.Tick(1)), SKFS.IID(1), 1);
+  !x = x.set(SKFS.TickRange::create(SKFS.Tick(1)), SKFS.IID(2), 2);
+  !x = x.set(SKFS.TickRange::create(SKFS.Tick(1)), SKFS.IID(3), 3);
+  !x = x.set(SKFS.TickRange::create(SKFS.Tick(2)), SKFS.IID(1), 23);
+  expectEq("Changes after", Array[1, 2, 3], () ->
+    x.getChangesAfter(SKFS.Tick(1)).toArray().map(x -> x.value)
+  );
+  void
+}
+
+module end;

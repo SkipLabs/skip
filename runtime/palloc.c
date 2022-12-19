@@ -12,7 +12,6 @@
 #include <pthread.h>
 #include <errno.h>
 #include "runtime.h"
-#include "../build/magic.h"
 
 #define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
 #define BOTTOM_ADDR ((void*)0x0000001000000000)
@@ -111,7 +110,7 @@ void sk_global_unlock() {
     return;
   }
 
-  fprintf(stderr, "Internal error: unlocking failed\n");
+  fprintf(stderr, "Internal error: global unlocking failed, %s\n", strerror(errno));
   exit(44);
 }
 
@@ -123,7 +122,12 @@ void SKIP_mutex_init(pthread_mutex_t* lock) {
   if(sizeof(pthread_mutex_t) > 40) {
     fprintf(stderr, "Internal error: mutex object not large enough for this arch");
   }
-  pthread_mutex_init(lock, gmutex_attr);
+  pthread_mutexattr_t mutex_attr_holder;
+  pthread_mutexattr_t* mutex_attr = &mutex_attr_holder;
+  pthread_mutexattr_init(mutex_attr);
+  pthread_mutexattr_setpshared(mutex_attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutexattr_setrobust(mutex_attr, PTHREAD_MUTEX_ROBUST);
+  pthread_mutex_init(lock, mutex_attr);
 }
 
 void SKIP_mutex_lock(pthread_mutex_t* lock) {
@@ -149,7 +153,7 @@ void SKIP_mutex_unlock(pthread_mutex_t* lock) {
     return;
   }
 
-  fprintf(stderr, "Internal error: unlocking failed\n");
+  fprintf(stderr, "Internal error: unlocking failed, %d\n", code);
   exit(44);
 }
 
@@ -181,7 +185,6 @@ void* SKIP_unfreeze_cond(void* x) {
 }
 
 void SKIP_cond_wait(pthread_cond_t* x, pthread_mutex_t* y) {
-  printf("Wait\n");
   pthread_cond_wait(x, y);
 }
 
@@ -375,7 +378,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
 
   char* head = begin;
 
-  *(uint64_t*)head = MAGIC;
+  *(uint64_t*)head = SKIP_get_version();
   head += sizeof(uint64_t);
 
   *(void**)head = begin;
@@ -459,7 +462,7 @@ void sk_load_mapping(char* fileName) {
   lseek(fd, 0L, SEEK_SET);
   int magic_size = read(fd, &magic, sizeof(uint64_t));
 
-  if(magic_size != sizeof(uint64_t) || magic != MAGIC) {
+  if(magic_size != sizeof(uint64_t) || magic != SKIP_get_version()) {
     fprintf(stderr, "Error: wrong file format\n");
     exit(23);
   }

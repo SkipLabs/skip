@@ -1,0 +1,666 @@
+/*****************************************************************************/
+/* Module generating tests for the filesystem. */
+/*****************************************************************************/
+
+module SKFSTest;
+
+base class RNbr {
+  children =
+  | RFixed(Int)
+  | RRange(Int, Int)
+  | RProb(Int)
+}
+
+class Config{
+  nbrInputs: RNbr = RRange(1, 5),
+  nbrDiffRounds: Int = 2,
+  nbrParents: RNbr = RRange(1, 5),
+  inputSize: RNbr = RRange(1, 5),
+  missingKey: RNbr = RProb(40),
+  valueWidth: RNbr = RRange(1, 5),
+  valueRange: RNbr = RRange(0, 5),
+  nbrDirs: RNbr = RRange(1, 5),
+  funBodySize: RNbr = RRange(1, 5),
+  mergeSize: RNbr = RRange(1, 5),
+  probKeyChange: RNbr = RProb(50),
+  probLazyDir: RNbr = RProb(30),
+  probKeyChangeRemoved: RNbr = RProb(10),
+  nbrRounds: Int = 400,
+}
+
+/*
+class Config{
+  nbrInputs: RNbr = RRange(1, 2),
+  inputSize: RNbr = RRange(1, 2),
+  missingKey: RNbr = RProb(30),
+  valueWidth: RNbr = RRange(1, 3),
+  valueRange: RNbr = RRange(0, 10),
+  nbrDirs: RNbr = RRange(1, 2),
+  funBodySize: RNbr = RRange(1, 2),
+  mergeSize: RNbr = RRange(1, 2),
+  probKeyChange: RNbr = RProb(50),
+  probLazyDir: RNbr = RProb(0),
+  probKeyChangeRemoved: RNbr = RProb(0),
+  nbrRounds: Int = 1000,
+}
+*/
+
+const VALUE_SIZE: Int = 10;
+
+class Program(
+  inputs: List<Input>,
+  diffs: Map<String, Map<Int, List<SKFS.IntFile>>>,
+  mDirs: List<DirValue>,
+) extends SKFS.File
+
+class Input{name: String, data: Map<Int, List<SKFS.IntFile>>}
+base class DirValue{name: String} {
+  children =
+  | MDir{inputs: Array<String>, readDirs: List<SKFS.DirName>}
+  | LDir{readDirs: List<SKFS.DirName>}
+}
+
+/*****************************************************************************/
+/* Interpreter using SKFS. */
+/*****************************************************************************/
+
+fun merge(l1: List<SKFS.IntFile>, l2: List<SKFS.IntFile>): List<SKFS.IntFile> {
+  (l1, l2) match {
+  | (List.Nil(), l)
+  | (l, List.Nil()) ->
+    l
+  | (List.Cons(x1, rl1), List.Cons(x2, rl2)) ->
+    List.Cons(SKFS.IntFile((x1.value + x2.value) % VALUE_SIZE), merge(rl1, rl2))
+  }
+}
+
+fun eval(
+  context: mutable SKFS.Context,
+  prog: Program,
+  debug: Bool = false,
+): void {
+  makeEnv(context, prog.inputs);
+  evalDirs(context, prog.mDirs);
+  if (!debug) return void;
+  for (kv in context.dirs.state.items()) {
+    (dirName, dir) = kv;
+    print_string("Dir: " + dirName);
+    for (key in dir.keys()) {
+      print_string(
+        "  " +
+          key +
+          " => " +
+          dir.getArrayRaw(key).map(x ->
+            SKFS.IntFile::fromFile(x).value.toString()
+          ),
+      );
+    }
+  }
+}
+
+fun makeEnv(context: mutable SKFS.Context, inputs: List<Input>): void {
+  for (input in inputs) {
+    data = mutable Vector[];
+    for (key => values in input.data) {
+      for (value in values) {
+        data.push((SKFS.IID(key), value));
+      }
+    };
+    _ = context.mkdir(
+      SKFS.IntFile::fromFile,
+      SKFS.DirName::create(input.name),
+      false,
+      data.toArray(),
+    );
+  }
+}
+
+fun evalDirs(context: mutable SKFS.Context, dirs: List<DirValue>): void {
+  for (dir in dirs) {
+    dir match {
+    | mDir @ MDir _ -> evalMDir(context, mDir)
+    | lDir @ LDir _ -> evalLDir(context, lDir)
+    }
+  }
+}
+
+fun evalMDir(context: mutable SKFS.Context, dir: MDir): void {
+  name = dir.name;
+  parents = mutable Vector[];
+  readDirs = dir.readDirs;
+  for (input in dir.inputs) {
+    parents.push(
+      (
+        SKFS.DirName::create(input),
+        (
+          (context, writer, key, valueIter) ~> {
+            values = valueIter.collect(Array);
+            if (values.size() == 0) return void;
+            evalFun(
+              input,
+              context,
+              writer,
+              name.toString(),
+              readDirs,
+              key,
+              values,
+            )
+          },
+          None(),
+        ),
+      ),
+    )
+  };
+  SKFS.EagerDir::applyMany(
+    context,
+    SKFS.FixedSingle::create(parents),
+    SKFS.DirName::create(name),
+  )
+}
+
+fun evalLDir(context: mutable SKFS.Context, dir: LDir): void {
+  _ = SKFS.LazyDir::create(
+    context,
+    SKFS.DirName::create(dir.name),
+    (context, _self, key) ~> {
+      Some(Array[evalLFun(context, dir.name, dir.readDirs, key)])
+    },
+  )
+}
+
+fun evalSub(
+  input: String,
+  context: mutable SKFS.Context,
+  thisDirName: String,
+  readDirs: List<SKFS.DirName>,
+  currentKey: SKFS.BaseName,
+  currentFiles: Array<SKFS.File>,
+): List<SKFS.DirName> {
+  sumAcc = 0;
+
+  currentValues = currentFiles.map(x -> SKFS.IntFile::fromFile(x).value);
+
+  for (elt in currentValues) {
+    !sumAcc = sumAcc + elt;
+  };
+
+  sum = sumAcc;
+
+  subDirs = List<String>[];
+
+  for (dirName in readDirs.sorted().unique()) {
+    genericDir = context.unsafeGetDir(dirName);
+    dir = genericDir match {
+    | SKFS.LazyDir _
+    | SKFS.DeletedDir _ ->
+      continue
+    | x @ SKFS.EagerDir _ -> x
+    };
+    subDirNameStr =
+      dirName.toString() +
+      "sub" +
+      currentKey +
+      "_" +
+      sum +
+      hash(input) +
+      thisDirName;
+    subDirName = SKFS.DirName::create(subDirNameStr);
+    !subDirs = List.Cons(subDirNameStr, subDirs);
+    SKFS.EagerDir::apply(
+      context,
+      dir.dirName,
+      subDirName,
+      (context, writer, localKey, valueIter) ~> {
+        iterator = SKFS.IteratorWithIsEmpty::create(valueIter);
+        if (iterator.isEmpty()) return void;
+        localSum = sum;
+        for (readDirName in readDirs) {
+          readDir = context.unsafeGetDir(readDirName);
+          read = readDir.getArray(context, localKey).map(x ->
+            SKFS.IntFile::fromFile(x)
+          );
+          for (value in read) {
+            !localSum = localSum + value.value
+          };
+        };
+        for (value in iterator) {
+          !localSum = localSum + SKFS.IntFile::fromFile(value).value;
+        };
+        writer.write(localKey, SKFS.IntFile(localSum))
+      },
+      None(),
+      if (
+        (true || sum % 2 == 0) &&
+        currentValues.size() >= 2 &&
+        currentValues[0] <= currentValues[1]
+      ) {
+        Some(
+          Array[
+            SKFS.KeyRange(
+              SKFS.IID(currentValues[0]),
+              SKFS.IID(currentValues[1]),
+            ),
+          ],
+        )
+      } else {
+        None()
+      },
+    )
+  };
+
+  subDirs.map(x -> SKFS.DirName::create(x))
+}
+
+fun evalLFun(
+  context: mutable SKFS.Context,
+  thisDirName: String,
+  readDirs: List<SKFS.DirName>,
+  key: SKFS.BaseName,
+): SKFS.File {
+  reads = List[];
+  for (dirName in readDirs) {
+    dir = context.unsafeGetDir(dirName);
+    value = key match {
+    | SKFS.IID(x) -> SKFS.IntFile(x)
+    | _ -> error()
+    };
+    read = dir
+      .getArray(context, SKFS.IID(SKFS.IntFile::fromFile(value).value))
+      .map(x -> SKFS.IntFile::fromFile(x));
+    !reads = List.Cons(read, reads);
+  };
+
+  result = 0;
+  for (ilist in reads) {
+    for (x in ilist) {
+      !result = result + SKFS.IntFile::fromFile(x).value;
+    }
+  };
+  keyValue = key match {
+  | SKFS.IID(x) -> x
+  | _ -> error()
+  };
+  if (keyValue > 10) {
+    thisDir = context.unsafeGetLazyDir(SKFS.DirName::create(thisDirName));
+    !result =
+      result +
+      SKFS.IntFile::fromFile(
+        thisDir.getArray(context, SKFS.IID(keyValue / 2))[0],
+      ).value;
+  };
+  SKFS.IntFile(result)
+}
+
+fun evalFun(
+  input: String,
+  context: mutable SKFS.Context,
+  writer: mutable SKFS.Writer,
+  thisDirName: String,
+  readDirs: List<SKFS.DirName>,
+  currentKey: SKFS.BaseName,
+  currentValues: Array<SKFS.File>,
+): void {
+  subDirs = evalSub(
+    input,
+    context,
+    thisDirName,
+    readDirs,
+    currentKey,
+    currentValues,
+  );
+
+  reads = List[currentValues];
+  for (dirName in readDirs.concat(subDirs)) {
+    dir = context.unsafeGetDir(dirName);
+    value = currentValues[0];
+    read = dir
+      .getArray(context, SKFS.IID(SKFS.IntFile::fromFile(value).value))
+      .map(x -> SKFS.IntFile::fromFile(x));
+    !reads = List.Cons(read, reads);
+  };
+
+  frozenReads = reads;
+  result = List<SKFS.IntFile>[];
+  for (ilist in frozenReads) {
+    !result = merge(
+      result,
+      List::createFromItems(ilist).map(x -> SKFS.IntFile::fromFile(x)),
+    );
+  };
+  out = Array::createFromItems(result);
+
+  allValues = SortedMap[];
+  for (file in out) {
+    key = SKFS.IID(SKFS.IntFile::fromFile(file).value);
+    if (!allValues.containsKey(key)) !allValues[key] = mutable Vector[];
+    allValues[key].push(
+      SKFS.IntFile(
+        currentKey match {
+        | SKFS.IID(x) -> x
+        | _ -> error()
+        },
+      ),
+    );
+  };
+
+  for (key => values in allValues) {
+    writer.writeArray(key, values.toArray())
+  };
+}
+
+/*****************************************************************************/
+/* Compare outputs. */
+/*****************************************************************************/
+
+fun compareContext(
+  context1: readonly SKFS.Context,
+  context2: readonly SKFS.Context,
+): Bool {
+  hasError = false;
+  for (kv in context1.dirs.state.items()) {
+    (dirName, dir) = kv;
+    dirFiles = dir.keys();
+    if (dirFiles.isEmpty()) continue;
+
+    if (context2.unsafeMaybeGetDir(dirName) is None _) {
+      if (dirName.toString().contains("LAZY")) continue;
+      if (dir is SKFS.DeletedDir _) {
+        print_error(`missing directory ${dirName}`);
+        error();
+      };
+      continue;
+    };
+    dir2 = context2.unsafeGetDir(dirName);
+    isLazy = dir2.getDirName().toString().contains("LAZY");
+    for (key in dirFiles) {
+      values1 = dir.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
+      values2 = dir2.getArrayRaw(key).map(x -> SKFS.IntFile::fromFile(x));
+      if (dir2 is SKFS.LazyDir _) {
+        if (values1 == Array[] || values2 == Array[]) continue;
+      };
+      if (values1 != values2) {
+        if (isLazy && (values1.isEmpty() || values2.isEmpty())) {
+          continue
+        };
+        !hasError = true;
+        print_string(`Error: values differ for ${dirName}${key}`);
+        print_string(`       ${values1}`);
+        dir match {
+        | SKFS.EagerDir{fixedData} ->
+          for (fixed in fixedData.getArray(key)) {
+            (k, files) = fixed;
+            intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
+            print_string(`FIXED  ${k.path()} => ${intFiles}`)
+          }
+        | _ -> void
+        };
+        dir match {
+        | SKFS.LazyDir{data} ->
+          data.maybeGet(key) match {
+          | None()
+          | Some(SKFS.LAbsent())
+          | Some(SKFS.LRemoved _)
+          | Some(SKFS.LCycle _)
+          | Some(SKFS.LDelayed()) ->
+            print_string("EMPTY DATA")
+          | Some(SKFS.LDefined(files, _)) ->
+            intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
+            print_string(`       ${intFiles}`)
+          }
+        | SKFS.EagerDir{data} ->
+          data.maybeGet(key) match {
+          | None() -> print_string("EMPTY DATA")
+          | Some(sources) ->
+            for (k => files in sources) {
+              intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
+              print_string(`       ${k.path()} => ${intFiles}`)
+            }
+          }
+        | _ -> void
+        };
+        print_string("");
+        print_string(`       ${values2}`);
+        dir2 match {
+        | SKFS.EagerDir{fixedData} ->
+          for (fixed in fixedData.getArray(key)) {
+            (k, files) = fixed;
+            intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
+            print_string(`FIXED  ${k.path()} => ${intFiles}`)
+          }
+        | _ -> void
+        };
+        print_string("");
+      }
+    };
+  };
+  hasError
+}
+
+/*****************************************************************************/
+/* Program generator. */
+/*****************************************************************************/
+
+type GenDirs = mutable Vector<String>;
+
+fun genValues(rand: RNbr -> Int, config: Config): List<SKFS.IntFile> {
+  values = List[];
+  for (_ in Range(0, rand(config.valueWidth))) {
+    file = SKFS.IntFile(rand(config.valueRange));
+    !values = List.Cons(file, values)
+  };
+  values
+}
+
+fun genInputData(
+  rand: RNbr -> Int,
+  config: Config,
+): Map<Int, List<SKFS.IntFile>> {
+  data = mutable Map[];
+  for (i in Range(0, rand(config.inputSize))) {
+    if (rand(config.missingKey) == 1) continue;
+    data![i] = genValues(rand, config);
+  };
+  data.chill()
+}
+
+fun genInputs(rand: RNbr -> Int, config: Config): (List<Input>, GenDirs) {
+  result = List<Input>[];
+  dirs = mutable Vector[];
+  for (i in Range(0, rand(config.nbrInputs))) {
+    name = "/input" + i + "/";
+    data = genInputData(rand, config);
+    dir = Input{name, data};
+    !result = List.Cons(dir, result);
+    dirs.push(name);
+  };
+  (result, dirs)
+}
+
+fun genGet(rand: RNbr -> Int, dirs: GenDirs): String {
+  dirNbr = rand(RRange(0, dirs.size()));
+  dirName = dirs[dirNbr];
+  dirName
+}
+
+fun genReadDirs(
+  rand: RNbr -> Int,
+  config: Config,
+  dirs: GenDirs,
+): List<SKFS.DirName> {
+  readDirs = List[];
+  funBodySize = 1 + rand(config.funBodySize);
+  for (_ in Range(1, funBodySize)) {
+    !readDirs = List.Cons(genGet(rand, dirs), readDirs);
+  };
+  readDirs.map(x -> SKFS.DirName::create(x))
+}
+
+fun genMDir(
+  rand: RNbr -> Int,
+  config: Config,
+  dirs: GenDirs,
+  mdirs: GenDirs,
+  nbr: Int,
+): MDir {
+  name = "/dir" + nbr + "/";
+  inputs = mutable Set[];
+  for (_ in Range(0, rand(config.nbrParents))) {
+    inputNbr = rand(RRange(0, mdirs.size()));
+    inputs.insert(mdirs[inputNbr]);
+  };
+  readDirs = genReadDirs(rand, config, dirs);
+  dirs.push(name);
+  mdirs.push(name);
+  MDir{name, inputs => inputs.toArray(), readDirs}
+}
+
+fun genLDir(rand: RNbr -> Int, config: Config, dirs: GenDirs, nbr: Int): LDir {
+  name = "/dir" + nbr + "LAZY/";
+  readDirs = genReadDirs(rand, config, dirs);
+  dirs.push(name);
+  ldir = LDir{name, readDirs};
+  ldir
+}
+
+fun genDirs(rand: RNbr -> Int, config: Config, dirs: GenDirs): List<DirValue> {
+  mdirs = Vector::mcreateFromItems(dirs);
+  result = List[];
+  size = dirs.size() + rand(config.nbrDirs);
+  for (i in Range(dirs.size(), size)) {
+    dir = if (i == size - 1 || rand(config.probLazyDir) == 0) {
+      genMDir(rand, config, dirs, mdirs, i)
+    } else {
+      genLDir(rand, config, dirs, i)
+    };
+    !result = List.Cons(dir, result);
+  };
+  result.reversed()
+}
+
+fun genDiffs(
+  rand: RNbr -> Int,
+  config: Config,
+  inputs: List<Input>,
+): Map<String, Map<Int, List<SKFS.IntFile>>> {
+  diffs = mutable Map[];
+  for (input in inputs) {
+    data = mutable Map[];
+    for (key => _ in input.data) {
+      if (rand(config.probKeyChange) == 1) {
+        newValues = if (rand(config.probKeyChangeRemoved) == 1) List[] else {
+          genValues(rand, config)
+        };
+        data![key] = newValues;
+      }
+    };
+    diffs![input.name] = data.chill();
+  };
+  diffs.chill()
+}
+
+fun genProgram(config: Config, round: Int): Program {
+  random = Random::mcreate(1 + round);
+  rand = (rnbr: RNbr) ->
+    rnbr match {
+    | RFixed(fixed) -> fixed
+    | RRange(rmin, rmax) -> random.random(rmin, rmax)
+    | RProb(prob) -> if (random.random(0, 100) < prob) 1 else 0
+    };
+  (inputs, inputDirs) = genInputs(rand, config);
+  dirs = genDirs(rand, config, inputDirs);
+  diffs = genDiffs(rand, config, inputs);
+  Program(inputs, diffs, dirs)
+}
+
+/*****************************************************************************/
+/* Function that applies the diff. */
+/*****************************************************************************/
+
+fun updateProgram(
+  context: mutable SKFS.Context,
+  prog: Program,
+  i: Int,
+): Program {
+  !prog.diffs = prog.diffs.map((_, diff) ->
+    diff.map((_, arr) -> arr.map(x -> x + i))
+  );
+  !prog.inputs = prog.inputs.map(input -> {
+    dirName = SKFS.DirName::create(input.name);
+    diff = prog.diffs[input.name];
+    data = mutable Map[];
+    for (key => values in input.data) {
+      if (diff.containsKey(key)) {
+        newValues = diff[key];
+        dir = context.unsafeGetEagerDir(dirName);
+        valuesArr = Array::createFromItems(newValues);
+        dir.writeArray(context, SKFS.IID(key), valuesArr);
+        data![key] = diff[key];
+      } else {
+        data![key] = values;
+      }
+    };
+    input with {data => data.chill()}
+  });
+  prog
+}
+
+/*****************************************************************************/
+/* Test. */
+/*****************************************************************************/
+
+fun testStress(): mutable SKFS.Context {
+  config = Config{};
+  print_string("Stress Test Begin");
+  origContext = SKFS.Context{};
+  SKFS.runWithGcReturnContext(origContext, context ~> {
+    round = context.getGlobal("ROUND") match {
+    | None() -> 0
+    | Some(x) -> SKFS.IntFile::fromFile(x).value
+    };
+    context.replaceFromSaved(origContext);
+    if (SKFS.debugMode) {
+      print_string("Round: " + round);
+    };
+    origProg = genProgram(config, round);
+    eval(context, origProg);
+    if (context.debugMode) print_string("Initialization finished");
+    prog = updateProgram(context, origProg, 0);
+    context.update();
+    context.setGlobal("PROG", prog);
+    for (i in Range(1, config.nbrDiffRounds)) {
+      !prog = SKFS.withRegion(context, (_, context) ~> {
+        lprog = context.getGlobal("PROG") match {
+        | Some(x @ Program _) -> x
+        | _ -> invariant_violation("Was expecting a program")
+        };
+        !lprog = updateProgram(context, lprog, i);
+        context.update();
+        context.setGlobal("PROG", lprog);
+        lprog
+      })
+    };
+    if (context.debugMode) print_string("Running program from scratch");
+    newProg = prog;
+    context2 = SKFS.run(context ~> {
+      eval(context, newProg);
+    });
+    if (context.debugMode) {
+      print_string("Compare contexts (Phase 1: updated/scratch)")
+    };
+    hasError = compareContext(context, context2);
+    if (hasError) invariant_violation("Stress test failed");
+    if (context.debugMode) {
+      print_string("Compare contexts (Phase 2: scratch/updated)")
+    };
+    hasError2 = compareContext(context2, context);
+    if (hasError2) invariant_violation("Stress test failed");
+    !round = round + 1;
+    context.setGlobal("ROUND", SKFS.IntFile(round));
+    if (round < config.nbrRounds) {
+      SKFS.CContinue(None())
+    } else {
+      print_string("Stress Test end");
+      SKFS.CStop(None())
+    }
+  })
+}

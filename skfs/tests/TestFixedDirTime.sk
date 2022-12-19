@@ -1,0 +1,48 @@
+/*****************************************************************************/
+/* Testing that the time in FixedDirs works. */
+/*****************************************************************************/
+module SKFSTest;
+
+fun testFixedDirTime(): mutable SKFS.Context {
+  rand = Random::mcreate(23);
+  dmap = SKFS.DMap::empty();
+  size = 100;
+  valueSize = 100;
+  dirName = SKFS.DirName::create("/foo/");
+  for (_ in Range(0, size)) {
+    map = SortedMap[];
+    for (i in Range(0, valueSize)) {
+      baseName = SKFS.IID(i);
+      path = SKFS.Path::create(dirName, baseName);
+      source = SKFS.Source::create(path);
+      !map[source] = Array[
+        (SKFS.IntFile(rand.random(0, valueSize)) : SKFS.File),
+      ];
+    };
+    !dmap = dmap.set(
+      SKFS.TickRange::create(SKFS.Tick(rand.random(0, size))),
+      (SKFS.IID(rand.random(0, size)) : SKFS.BaseName),
+      map,
+    );
+  };
+  acc = mutable Vector[];
+  dmap.itemsWithTick().each(item -> {
+    (key, valueMap, tick) = item;
+    for (source => value in valueMap) {
+      acc.push(SKFS.FixedRow(key, (source, value), tick))
+    }
+  });
+  farr = SKFS.FixedDir::create(acc);
+  for (i in Range(0, 1000)) {
+    set1 = dmap.getChangesAfter(SKFS.Tick(i));
+    set2 = farr.getChangesAfter(SKFS.Tick(i));
+    if (!set1.difference(set2).isEmpty() || !set2.difference(set1).isEmpty()) {
+      debug(i);
+      debug(dmap.getChangesAfter(SKFS.Tick(i)));
+      debug(farr.getChangesAfter(SKFS.Tick(i)));
+      invariant_violation("Should be the same")
+    }
+  };
+  print_string("TEST passed\n");
+  mutable SKFS.Context{}
+}

@@ -1,0 +1,37 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module SkipMain;
+/*****************************************************************************/
+/* All the phases of the front-end. */
+/*****************************************************************************/
+
+fun type_program(
+  context: mutable SKFS.Context,
+): SKFS.EHandle<SkipTyping.DefFile> {
+  parsed_program = FileCache.fileDir.contextWriterKeyValues(
+    SkipParse.DefsFile::fromFile,
+    context,
+    SkipParse.astDirName,
+    (context, writer, key, sources) ~> {
+      source = sources[0];
+      SkipError.catchErrors(0, context, () -> {
+        fileName = key match {
+        | SKFS.SID(x) -> x
+        | _ -> invariant_violation("Unexpected key type")
+        };
+        writer.write(key, SkipParse.parseFile(fileName, source.value))
+      })
+    },
+  );
+
+  (defsDir, childDir) = SkipExpand.program(context, parsed_program);
+  inhDir = SkipInherit.populateClassesDir(context);
+  SkipNaming.populateClasses(context, defsDir, inhDir, childDir);
+  SkipNaming.populateFuns(context, defsDir);
+  SkipTyping.program(context, true, defsDir)
+}

@@ -27,6 +27,16 @@ void** mconsts = NULL;
 size_t mconsts_count = 0;
 size_t mconsts_size = 0;
 
+int unsafe_new_const_mode = 0;
+
+void SKIP_unsafe_enable_new_const_mode() {
+  unsafe_new_const_mode = 1;
+}
+
+void SKIP_unsafe_disable_new_const_mode() {
+  unsafe_new_const_mode = 0;
+}
+
 char* sk_new_const(char* cst) {
 
   if((*pconsts) != NULL) {
@@ -37,6 +47,9 @@ char* sk_new_const(char* cst) {
     }
     #ifdef SKIP64
     if(!sk_is_nofile_mode()) {
+      if(unsafe_new_const_mode) {
+        return cst;
+      }
       fprintf(stderr, "Cannot have a changing constant in persitent mode\n");
       SKIP_throw(NULL);
     }

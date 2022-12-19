@@ -1,0 +1,32 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+class FooBar() extends Exception
+
+fun main(): void {
+  isInit = arguments().any(x -> x == "--init");
+  if (isInit) {
+    _ = SKFS.gContextInit(SKFS.Context{});
+  };
+  SKFS.runWithGc(
+    SKFS.Context{},
+    context ~> {
+      if (isInit) {
+        SKFS.CStop(
+          Some((context, _, _) ~> {
+            _result = compile(isInit, context, kConfig.unknown);
+          }),
+        )
+      } else {
+        _result = compile(isInit, context, kConfig.unknown);
+        skipExit(0);
+        SKFS.CStop(None())
+      }
+    },
+    Some(SKFS.Synchronizer(SKFS.import, SKFS.export, _ ~> void)),
+  )
+}

@@ -1,0 +1,32 @@
+class A() extends Exception
+class B() extends Exception
+
+fun throw_A(): Int {
+  throw A()
+}
+fun throw_B(): Int {
+  throw B()
+}
+
+fun foo(x: Int = throw_A(), y: Int = throw_B()): void {
+  _ = x;
+  _ = y;
+  void
+}
+
+fun main(): void {
+  print_raw(
+    vtry(
+      () -> {
+        foo();
+        "FAIL"
+      },
+      exn ->
+        exn match {
+        | A _ -> "Pass\n"
+        | _ -> "FAIL"
+        }
+      ,
+    ),
+  )
+}

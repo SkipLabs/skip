@@ -95,11 +95,6 @@ char* sk_new_const(char* cst) {
 
 void SKIP_throw_EndOfFile();
 
-int SKIP_getchar() {
-  SKIP_throw_EndOfFile();
-  return 0;
-}
-
 int SKIP_isatty() {
   return 0;
 }
@@ -125,16 +120,12 @@ void SKIP_print_persistent_size() {
   // Not implemented
 }
 
-int SKIP_unix_open(char* name) {
-  return 1;
+uint32_t SKIP_get_persistent_size() {
+  return (uint32_t)bump_pointer;
 }
 
-void SKIP_unix_close(int fd) {
-  // Not implemented
-}
-
-void SKIP_write_to_file() {
-  // Not implemented
+int SKIP_unix_close(int fd) {
+  return 0;
 }
 
 void SKIP_mktime_utc() {
@@ -168,4 +159,49 @@ void SKIP_flush_stdout() {
 uint64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   // Not implemented
   return 0;
+}
+
+void SKIP_exit(uint64_t code) {
+  SKIP_throw(NULL);
+}
+
+void* SKIP_freeze_lock(void* x) {
+  return x;
+}
+
+void* SKIP_unfreeze_lock(void* x) {
+  return x;
+}
+
+void* SKIP_freeze_cond(void* x) {
+  return x;
+}
+
+void* SKIP_unfreeze_cond(void* x) {
+  return x;
+}
+
+void SKIP_mutex_init(void* lock) {
+}
+
+void SKIP_mutex_lock(void* lock) {
+}
+
+void SKIP_mutex_unlock(void* lock) {
+}
+
+void SKIP_cond_init(void* cond) {
+}
+
+void SKIP_cond_wait(void* x, void* y) {
+}
+
+void SKIP_cond_broadcast(void* c) {
+}
+
+int SKIP_stdin_has_data() {
+  return 1;
+}
+
+void SKIP_unix_die_on_EOF() {
 }
