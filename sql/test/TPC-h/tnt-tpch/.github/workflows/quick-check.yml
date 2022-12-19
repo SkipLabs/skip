@@ -1,0 +1,83 @@
+name: quick_check
+
+on:
+  push:
+  repository_dispatch:
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: RelWithDebInfo
+  MEM_SIZE: 1073741824
+  SCALE_FACTOR: 0.2
+  TARANTOOL_SRC: tarantool-src
+  BRANCH: master
+
+jobs:
+  build_check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: checkout tpch
+        uses: actions/checkout@v2
+        with:
+          clean: true
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: checkout tarantool sources
+        uses: actions/checkout@v2
+        with:
+          repository: tarantool/tarantool
+          ref: ${{ env.BRANCH }}
+          path:  ${{ env.TARANTOOL_SRC }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install tarantool build prerequisites
+        run: |
+          sudo apt-get install -y patch ccache luarocks libmsgpuck-dev libluajit-5.1-dev
+
+        # by some odd reason we can't use
+        #   working-directory: $GITHUB_WORKSPACE/tarantool/build
+        # syntax - directory is not yet existing before actions 
+        # run. So use workaround with cd
+      - name: Configure CMake for Tarantool sources
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/$TARANTOOL_SRC/
+          cmake -S . -B build \
+                -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build Tarantool
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/$TARANTOOL_SRC/
+          cmake --build build
+      - name: Clean bench data
+        shell: bash
+        run: |
+          make clean-tnt
+      
+      - name: Run micro bench (SF=0.2)
+        shell: bash
+        run: |
+          make create_TNT_db \
+                TARANTOOL=$TARANTOOL_SRC/build/src/tarantool \
+                SCALE_FACTOR=$SCALE_FACTOR \
+                MEM_SIZE=$MEM_SIZE
+          make TARANTOOL=$TARANTOOL_SRC/build/src/tarantool \
+                MEM_SIZE=$MEM_SIZE bench-tnt
+
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: perf_tpch
+          retention-days: 7
+          path: |
+            *_result.txt
+            *_t_version.txt
+            bench-*.csv

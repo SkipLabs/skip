@@ -1,6 +1,11 @@
 #!/bin/bash
 
-TPCHDB='/home/julienv/tnt-tpch/TPC-H.db'
+(cd tnt-tpch
+ make tpch-dbgen/dbgen
+ (cd tpch-dbgen/ && ./dbgen -f -s 1)
+ ./create_db.sh customer lineitem nation orders partsupp part region supplier)
+
+TPCHDB='./tnt-tpch/TPC-H.db'
 
 rm -f /tmp/test.db
 
