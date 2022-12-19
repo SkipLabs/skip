@@ -121,7 +121,12 @@ void todo() {
 
 
 char* SKIP_read_line() {
-  uint32_t size = SKIP_read_line_fill();
+  int32_t size = SKIP_read_line_fill();
+
+  if (size < 0) {
+      return NULL;
+  }
+
   uint32_t i;
   char* result = SKIP_Obstack_alloc(size);
 

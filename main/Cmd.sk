@@ -231,7 +231,10 @@ untracked fun toplevel(topContext: Context): void {
     env = mutable CmdEnv{context, pwd => context.pwd};
     prompt = env.pwd + "$ ";
     print_raw(prompt);
-    cmd = vtry(() -> read_line(), _exn -> "");
+    cmd = read_line() match {
+    | None() -> ""
+    | Some(l) -> l
+    };
     if (cmd == "") return CStop(None());
     if (isSQL(cmd)) {
       invariant_violation("TODO reenable toplevel");
