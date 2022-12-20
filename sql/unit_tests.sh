@@ -142,3 +142,15 @@ if cat test/test_insert_id.sql | $SKDB | grep -q "|22"; then
 else
     echo -e "TEST INSERT ID:\tFAILED"
 fi
+
+if cat test/test_string_escaping_json.sql | $SKDB --json | grep -q '{"a":"\\"Hello world\\""}'; then
+    echo -e "TEST STRING ESCAPING JSON:\tOK"
+else
+    echo -e "TEST STRING ESCAPING JSON:\tFAILED"
+fi
+
+if cat test/test_null_encoding_json.sql | $SKDB --json | grep -q '{"a":1,"b":null,"c":2}'; then
+    echo -e "TEST NULL ENCODING JSON:\tOK"
+else
+    echo -e "TEST NULL ENCODING JSON:\tFAILED"
+fi
