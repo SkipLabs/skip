@@ -143,6 +143,7 @@ else
     echo -e "TEST INSERT ID:\tFAILED"
 fi
 
+
 if cat test/test_string_escaping_json.sql | $SKDB --json | grep -q '{"a":"\\"Hello world\\""}'; then
     echo -e "TEST STRING ESCAPING JSON:\tOK"
 else
@@ -153,4 +154,16 @@ if cat test/test_null_encoding_json.sql | $SKDB --json | grep -q '{"a":1,"b":nul
     echo -e "TEST NULL ENCODING JSON:\tOK"
 else
     echo -e "TEST NULL ENCODING JSON:\tFAILED"
+fi
+
+if cat test/test_real.sql | $SKDB | grep -q "1"; then
+    echo -e "TEST REAL:\tOK"
+else
+    echo -e "TEST REAL:\tFAILED"
+fi
+
+if cat test/test_missing_semi.sql | $SKDB | grep -q "22"; then
+    echo -e "TEST MISSING SEMI:\tOK"
+else
+    echo -e "TEST MISSING SEMI:\tFAILED"
 fi
