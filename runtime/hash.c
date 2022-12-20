@@ -246,6 +246,9 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
               sk_stack_push(st, ptr, ptr);
             }
           }
+          else {
+            crc = sk_crc64(crc, ohead, sizeof(void*));
+          }
           ohead += sizeof(void*);
           size -= sizeof(void*);
         };
