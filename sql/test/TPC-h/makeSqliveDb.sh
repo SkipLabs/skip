@@ -7,9 +7,11 @@
 
 TPCHDB='./tnt-tpch/TPC-H.db'
 
+SKDB=/skfs_build/build/skdb
+
 rm -f /tmp/test.db
 
-skdb --init /tmp/test.db
+$SKDB --init /tmp/test.db
 
 echo "
 CREATE TABLE CUSTOMER (
@@ -22,7 +24,7 @@ CREATE TABLE CUSTOMER (
   c_mktsegment TEXT,
   c_comment    TEXT
 );
-" | skdb --data /tmp/test.db
+" | $SKDB --data /tmp/test.db
 
 echo "
 CREATE TABLE LINEITEM (
@@ -43,7 +45,7 @@ CREATE TABLE LINEITEM (
   l_shipmode      TEXT,
   l_comment       TEXT
 );
-" | skdb --data /tmp/test.db
+" | $SKDB --data /tmp/test.db
 
 echo "
 CREATE TABLE NATION (
@@ -52,7 +54,7 @@ CREATE TABLE NATION (
   n_regionkey INTEGER,
   n_comment   TEXT
 );
-" | skdb --data /tmp/test.db
+" | $SKDB --data /tmp/test.db
 
 echo "
 CREATE TABLE ORDERS (
@@ -66,7 +68,7 @@ CREATE TABLE ORDERS (
   o_shippriority  INTEGER,
   o_comment       TEXT
 );
-" | skdb --data /tmp/test.db
+" | $SKDB --data /tmp/test.db
 
 echo "
 CREATE TABLE PART (
@@ -80,7 +82,7 @@ CREATE TABLE PART (
   p_retailprice FLOAT,
   p_comment     TEXT
 );
-" | skdb --data /tmp/test.db
+" | $SKDB --data /tmp/test.db
 
 echo "
 CREATE TABLE PARTSUPP (
@@ -90,7 +92,7 @@ CREATE TABLE PARTSUPP (
   ps_supplycost FLOAT,
   ps_comment    TEXT
 );
-" | skdb --data /tmp/test.db
+" | $SKDB --data /tmp/test.db
 
 echo "
 CREATE TABLE REGION (
@@ -98,7 +100,7 @@ CREATE TABLE REGION (
   r_name      TEXT,
   r_comment   TEXT
 );
-" | skdb --data /tmp/test.db
+" | $SKDB --data /tmp/test.db
 
 echo "
 CREATE TABLE SUPPLIER (
@@ -110,15 +112,15 @@ CREATE TABLE SUPPLIER (
   s_acctbal   FLOAT,
   s_comment   TEXT
 );
-" | skdb --data /tmp/test.db
+" | $SKDB --data /tmp/test.db
 
-echo "select * from customer;" | sqlite3 $TPCHDB -csv | skdb --load-csv CUSTOMER --data /tmp/test.db 
-echo "select * from lineitem;" | sqlite3 $TPCHDB -csv | head -n 500000 | skdb --load-csv LINEITEM --data /tmp/test.db
-echo "select * from nation;" | sqlite3 $TPCHDB -csv | skdb --load-csv NATION --data /tmp/test.db 
-echo "select * from orders;" | sqlite3 $TPCHDB -csv | skdb --load-csv ORDERS --data /tmp/test.db 
-echo "select * from part;" | sqlite3 $TPCHDB -csv | skdb --load-csv PART --data /tmp/test.db
-echo "select * from partsupp;" | sqlite3 $TPCHDB -csv | skdb --load-csv PARTSUPP --data /tmp/test.db
-echo "select * from region;" | sqlite3 $TPCHDB -csv | skdb --load-csv REGION --data /tmp/test.db
-echo "select * from supplier;" | sqlite3 $TPCHDB -csv | skdb --load-csv SUPPLIER --data /tmp/test.db
+echo "select * from customer;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv CUSTOMER --data /tmp/test.db
+echo "select * from lineitem;" | sqlite3 $TPCHDB -csv | head -n 500000 | $SKDB --load-csv LINEITEM --data /tmp/test.db
+echo "select * from nation;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv NATION --data /tmp/test.db
+echo "select * from orders;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv ORDERS --data /tmp/test.db
+echo "select * from part;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv PART --data /tmp/test.db
+echo "select * from partsupp;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv PARTSUPP --data /tmp/test.db
+echo "select * from region;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv REGION --data /tmp/test.db
+echo "select * from supplier;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv SUPPLIER --data /tmp/test.db
 
-skdb --data /tmp/test.db --compact
+$SKDB --data /tmp/test.db --compact
