@@ -114,7 +114,9 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
   | _ ->
     error(tok.posBegin, "Unexpected SQL statement starting with '" + str + "'")
   };
-  !pos = lex.expect(pos, ";");
+  if (!isEOF(lex, pos)) {
+    !pos = lex.expect(pos, ";");
+  };
   (pos, result)
 }
 
@@ -1070,6 +1072,9 @@ fun parseTypeName(lex: Lexer, pos: Int): (Int, Type) {
     (pos, FLOAT())
   } else if (lex.isEqUpper(pos, "DOUBLE")) {
     !pos = lex.expectUpper(pos, "DOUBLE");
+    (pos, FLOAT())
+  } else if (lex.isEqUpper(pos, "REAL")) {
+    !pos = lex.expectUpper(pos, "REAL");
     (pos, FLOAT())
   } else if (lex.isEqUpper(pos, "INTEGER")) {
     !pos = lex.expectUpper(pos, "INTEGER");

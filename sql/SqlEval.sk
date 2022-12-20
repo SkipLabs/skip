@@ -990,17 +990,12 @@ native fun unsafeCompareSets(
 ): Int32;
 
 fun read(line: Int): (Int, String) {
-  lineStart = line;
   i = 0;
   chars = mutable Vector[];
-  hasData = false;
   vtry(
     () ->
       loop {
         c = getChar();
-        isWhiteSpace = c == ' ' || c == '\n' || c == '\t' || c == '\r';
-        !hasData = !isWhiteSpace;
-
         !i = i + 1;
 
         if (c == '\'') {
@@ -1050,11 +1045,7 @@ fun read(line: Int): (Int, String) {
         if (c == ';') return (line, String::fromChars(chars.toArray()));
       },
     _endOfFile -> {
-      if (hasData) {
-        print_error("Error, line " + lineStart + ": unfinished statement");
-        skipExit(23);
-      };
-      (line, "")
+      (line, String::fromChars(chars.toArray()));
     },
   )
 }
