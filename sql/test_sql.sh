@@ -133,5 +133,4 @@ echo "* TPC-H *"
 echo "*******************************************************************************"
 echo ""
 
-# TODO: disabled as TPC-H.db isn't checked-in currently, see issue #41
-# (cd ./test/TPC-h/ && ./test_tpch.sh)
+(cd ./test/TPC-h/ && ./test_tpch.sh)
