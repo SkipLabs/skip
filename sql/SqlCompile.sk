@@ -321,10 +321,10 @@ mutable class Compiler{
     for (i => cparam in cparams) {
       (typedExpr, asNameOpt) = cparam;
       asNameOpt match {
-      | Some(asName) if (!this.subst.containsKey(asName)) ->
+      | Some(asName) if (!this.subst.containsKey(asName.lowercase())) ->
         this.!needGetParam = true;
         this.paramsNbr![asName] = i;
-        this.subst![asName] = typedExpr match {
+        this.subst![asName.lowercase()] = typedExpr match {
         | CGNull _ -> CGNull()
         | CIExpr _ -> CIExpr(CIGetParam(i))
         | CSExpr _ -> CSExpr(CSGetParam(i))
@@ -389,6 +389,7 @@ mutable class Compiler{
         | Some(_) ->
           for (colName => colNbr in table.cols) {
             dotName = tableName + "." + colName;
+            !dotName = dotName.lowercase();
             if (!this.subst.containsKey(dotName)) {
               this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
             }
@@ -408,6 +409,7 @@ mutable class Compiler{
     colName: String,
     colNbr: Int,
   ): void {
+    !colName = colName.lowercase();
     if (this.subst.containsKey(colName)) {
       this.ambiguous.insert(colName);
     } else {
@@ -723,7 +725,7 @@ mutable class Compiler{
         if (this.ambiguous.contains(str)) {
           error(this.pos, "Ambiguous name: " + str);
         };
-        this.subst.maybeGet(str) match {
+        this.subst.maybeGet(str.lowercase()) match {
         | None() -> error(this.pos, "Unbound name: " + str)
         | Some(e) ->
           e match {
@@ -1457,8 +1459,11 @@ mutable class Compiler{
       "=",
       Literal(name1, _),
       Literal(name2, _),
-    ) if (this.subst.containsKey(name1) && this.subst.containsKey(name2)) ->
-      (this.subst[name1], this.subst[name2]) match {
+    ) if (
+      this.subst.containsKey(name1.lowercase()) &&
+      this.subst.containsKey(name2.lowercase())
+    ) ->
+      (this.subst[name1.lowercase()], this.subst[name2.lowercase()]) match {
       | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
       | (CFExpr(CFGetFrom(tableNbr1, col1)), CFExpr(CFGetFrom(tableNbr2, col2)))
       | (
@@ -1779,8 +1784,9 @@ mutable class Compiler{
     }
   }
 
+  // TODO: use this everywhere!
   readonly fun isVar(name: String): Bool {
-    this.subst.containsKey(name)
+    this.subst.containsKey(name.lowercase())
   }
 
   mutable fun findLookUps(
@@ -1984,7 +1990,7 @@ mutable class Compiler{
       | "=" | "<" | "<=" | ">" | ">=" -> void
       | _ -> return LookUps[]
       };
-      (tableNbr, colNbr) = this.subst[name1] match {
+      (tableNbr, colNbr) = this.subst[name1.lowercase()] match {
       | (CIExpr(CIGetFrom(x, y))) -> (x, y)
       | (CFExpr(CFGetFrom(x, y))) -> (x, y)
       | (CSExpr(CSGetFrom(x, y))) -> (x, y)
