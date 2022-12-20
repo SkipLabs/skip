@@ -97,6 +97,7 @@ fun computeInsert(
   valuesArray: Array<Array<Value>>,
   table: DirDescr,
 ): Array<RowValues> {
+  colsLower = table.cols.mapItems((col, idx) -> (col.lowercase(), idx));
   valuesArray.map(vals -> {
     values = vals.mapWithIndex((idx, val) -> {
       schemaIdx = paramsOpt match {
@@ -106,7 +107,7 @@ fun computeInsert(
         | None() -> error(pos, "Value size mismatch with specified columns")
         | Some(param) -> param
         };
-        table.cols.maybeGet(colName) match {
+        colsLower.maybeGet(colName.lowercase()) match {
         | None() -> error(pos, "Column not found: " + colName)
         | Some(colIdx) -> colIdx
         }
@@ -158,14 +159,13 @@ fun computeInsert(
         error(pos, "Value size mismatch with table schema");
       };
       size = schemaSize;
-      cols = table.cols;
       result = Array<?CValue>::mfill(params.size(), None());
       for (i in Range(0, size)) {
-        colName = params[i];
-        if (!cols.containsKey(colName)) {
+        colName = params[i].lowercase();
+        if (!colsLower.containsKey(colName)) {
           error(pos, "Column not found: " + colName);
         };
-        result![cols[colName]] = values[i];
+        result![colsLower[colName]] = values[i];
       };
       unsafe_chill_trust_me(result)
     };
