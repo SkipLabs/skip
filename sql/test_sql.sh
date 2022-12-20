@@ -41,9 +41,7 @@ run_test 'test/select1.sql';
 run_test 'test/select2.sql';
 run_test 'test/select3.sql';
 
-# TODO: disabled see issue #40
-# run_test 'test/select4.1.sql';
-
+run_test 'test/select4.1.sql';
 # run_test 'test/select4.2.sql';
 run_test 'test/select5.1.sql';
 # run_test 'test/select5.2.sql';
