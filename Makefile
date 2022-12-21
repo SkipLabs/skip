@@ -102,8 +102,7 @@ build/%.bc: %.c
 
 build/skdb: build/out64.ll build/libskip_runtime64.a
 	cat preamble64.ll build/out64.ll > build/preamble_and_out64.ll
-	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -o build/skdb -Wl,--whole-archive -static -lrt -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
-	./stripdebug.sh build/skdb
+	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -o build/skdb -lrt -lpthread
 
 build/out64.ll: $(SKIP_FILES) build/skip64.state
 	mkdir -p build/
