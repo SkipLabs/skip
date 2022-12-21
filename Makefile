@@ -85,9 +85,13 @@ build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	$(LLC) -mtriple=wasm32-unknown-unknown $(OLEVEL) -filetype=obj build/all.bc -o build/out32.o
 	$(WASMLD) --initial-memory=$(MEMSIZE32) $(EXPORTJS) build/out32.o -o build/out32.wasm --no-entry -allow-undefined
 
-build/out32.ll: $(SKIP_FILES)
+build/out32.ll: $(SKIP_FILES) build/skip32.state
 	mkdir -p build/
-	$(SKC) --embedded32 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out32.ll
+	$(SKC) --data build/skip32.state --embedded32 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out32.ll
+
+build/skip32.state:
+	mkdir -p build/
+	$(SKC) --init build/skip32.state --embedded32 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out32.ll
 
 build/full_runtime32.bc: $(BCFILES32)
 	$(BCLINK) $(BCFILES32) -o build/full_runtime32.bc
@@ -101,9 +105,13 @@ build/skdb: build/out64.ll build/libskip_runtime64.a
 	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -o build/skdb -Wl,--whole-archive -static -lrt -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
 	./stripdebug.sh build/skdb
 
-build/out64.ll: $(SKIP_FILES)
+build/out64.ll: $(SKIP_FILES) build/skip64.state
 	mkdir -p build/
-	$(SKC) --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
+	$(SKC) --data build/skip64.state --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
+
+build/skip64.state:
+	mkdir -p build/
+	$(SKC) --init build/skip64.state --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
 
 build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o $(ONATIVE_FILES)
 	ar rcs build/libskip_runtime64.a $(OFILES) build/runtime/runtime64_specific.o $(ONATIVE_FILES)
