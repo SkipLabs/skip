@@ -29,14 +29,14 @@ function makeSKDBStore(dbName, storeName, version, memory, memorySize, init) {
         store.getAllKeys().onsuccess = event => {
           var pageidx;
           for (pageidx = 0; pageidx < event.target.result.length; pageidx++) {
-            store.delete(event.target.result[pageidx])
+            store.delete(event.target.result[pageidx]);
           }
-        }
+        };
 
         var i;
         var cursor = 0;
         for (i = 0; i < memorySize / pageSize; i++) {
-          content = memory.slice(cursor, cursor + pageSize);
+          const content = memory.slice(cursor, cursor + pageSize);
           store.put({ pageid: i, content: content });
           cursor = cursor + pageSize;
         }
@@ -45,16 +45,16 @@ function makeSKDBStore(dbName, storeName, version, memory, memorySize, init) {
         store.getAll().onsuccess = event => {
           var pageidx;
           for (pageidx = 0; pageidx < event.target.result.length; pageidx++) {
-            page = event.target.result[pageidx];
-            pageid = page.pageid;
+            let page = event.target.result[pageidx];
+            const pageid = page.pageid;
             if (pageid < 0) continue;
             page = new Uint32Array(page.content);
-            start = pageid * (pageSize / 4);
+            const start = pageid * (pageSize / 4);
             for (var i = 0; i < page.length; i++) {
               memory32[start + i] = page[i];
             }
           }
-        }
+        };
       }
 
 
@@ -65,11 +65,11 @@ function makeSKDBStore(dbName, storeName, version, memory, memorySize, init) {
       tx.onerror = function(err) {
         reject(err);
       };
-    }
+    };
 
     open.onerror = function(err) {
       reject(err);
-    }
+    };
   });
 }
 
@@ -133,7 +133,7 @@ function runServer(uri, cmd, stdin) {
       write(cmd + "\n");
       write(stdin + "\n");
       write("END\n");
-    })
+    });
   });
 }
 
@@ -143,7 +143,7 @@ async function runServerWriteForever(uri, cmd) {
   let write = await makeWebSocket(
     uri,
     function() { },
-    function(change) { console.log("Error writing: " + change) },
+    function(change) { console.log("Error writing: " + change); },
     function(exn) { console.log("Error connection lost: " + cmd); },
     function(err) { console.log("Error connection lost"); }
   );
@@ -164,7 +164,7 @@ function runServerForever(uri, onopen, cmd, stdin, localCmd) {
   ).then(write => {
     write(cmd + "\n");
     write(stdin + "\n");
-  })
+  });
 }
 
 /* ***************************************************************************/
@@ -226,8 +226,8 @@ function decodeUTF8(bytes) {
     if (c <= 0xffff) s += String.fromCharCode(c);
     else if (c <= 0x10ffff) {
       c -= 0x10000;
-      s += String.fromCharCode(c >> 10 | 0xd800)
-      s += String.fromCharCode(c & 0x3FF | 0xdc00)
+      s += String.fromCharCode(c >> 10 | 0xd800);
+      s += String.fromCharCode(c & 0x3FF | 0xdc00);
     } else throw new Error('UTF-8 decode: code point 0x' + c.toString(16) + ' exceeds UTF-16 reach');
   }
   return s;
@@ -282,6 +282,8 @@ async function makeSKDB(reboot) {
   var storeName = "SKDBStore";
   var initPages = 0;
   var roots = null;
+  var getPersistentSize = null;
+  var version = null;
 
   const env = {
     memoryBase: 0,
@@ -328,7 +330,7 @@ async function makeSKDB(reboot) {
     },
     SKIP_read_line_fill: function() {
       lineBuffer = [];
-      endOfLine = 10;
+      const endOfLine = 10;
       if (current_stdin >= stdin.length) {
         instance.exports.SKIP_throw_EndOfFile();
       };
@@ -391,7 +393,7 @@ async function makeSKDB(reboot) {
     },
     SKIP_glock: function() { },
     SKIP_gunlock: function() { }
-  }
+  };
 
   var popDirtyPage = null;
   var db;
@@ -399,7 +401,7 @@ async function makeSKDB(reboot) {
   var dirtyPages = [];
   var working = 0;
 
-  storePages = function() {
+  const storePages = function() {
     if (working == 0 && dirtyPages.length != 0) {
       working++;
       var pages = dirtyPages;
@@ -420,7 +422,7 @@ async function makeSKDB(reboot) {
     }
   };
 
-  runAddRoot = function(rootName, funId, arg) {
+  const runAddRoot = function(rootName, funId, arg) {
     args = [];
     stdin = "";
     stdout = new Array();
@@ -431,9 +433,9 @@ async function makeSKDB(reboot) {
       encodeUTF8(instance, stringify(arg))
     );
     return stdout.join('');
-  }
+  };
 
-  runLocal = function(new_args, new_stdin) {
+  const runLocal = function(new_args, new_stdin) {
     args = new_args;
     stdin = new_stdin;
     stdout = new Array();
@@ -462,7 +464,7 @@ async function makeSKDB(reboot) {
     return stdout.join('');
   };
 
-  runSubscribeRoots = function() {
+  const runSubscribeRoots = function() {
     roots = new Map();
     execOnChange[fileDescrNbr] = text => {
       let changed = new Map();
@@ -485,11 +487,11 @@ async function makeSKDB(reboot) {
           f(name);
         }
       }
-    }
+    };
     count++;
     let fileName = "/subscriptions/jsroots";
     runLocal(['--json', '--subscribe', 'jsroots', '--updates', fileName], "");
-  }
+  };
 
   var mod = await fetch("out32.wasm");
   var source = await mod.arrayBuffer();
@@ -501,8 +503,8 @@ async function makeSKDB(reboot) {
     let cmd = ["TAIL", db, user, password, tableName].join(",");
     //    console.log(cmd);
     return new Promise((resolve, reject) => {
-      data = '';
-      runServerForever(uri, function() { resolve(0) }, cmd, "", function(msg) {
+      let data = '';
+      runServerForever(uri, function() { resolve(0); }, cmd, "", function(msg) {
         if (msg != "") {
           //          console.log('retrieve remote', msg, '>>END');
           var index = msg.lastIndexOf("\n");
@@ -515,7 +517,7 @@ async function makeSKDB(reboot) {
           //          console.log('BEGIN' + msg + 'END');
           runLocal(["--write-csv", tableName + suffix], msg);
         };
-      })
+      });
     });
   };
 
@@ -625,7 +627,7 @@ async function makeSKDB(reboot) {
       let cmd = "skdb --data " + db;
       password = '"' + password + '"';
       let result = await runServer(uri, cmd, "select id(), uid('" + user + "');");
-      [sessionID, userID] = result.split("|").map(x => parseInt(x));
+      const [sessionID, userID] = result.split("|").map(x => parseInt(x));
       servers.push([uri, db, user, password, userID, sessionID]);
       return servers.length - 1;
     },
@@ -646,25 +648,25 @@ async function makeSKDB(reboot) {
         cmd: async function(passwd, args, stdin) {
           if (passwd != "admin1234") {
             console.log("Error: wrong admin password");
-            return;
+            return "";
           }
-          cmdline = "skdb --data " + db + " " + args.join(" ");
+          const cmdline = "skdb --data " + db + " " + args.join(" ");
           let result = await runServer(uri, cmdline, stdin);
           return result;
         },
         sqlRaw: async function(passwd, stdin) {
           if (passwd != "admin1234") {
             console.log("Error: wrong admin password");
-            return;
+            return "";
           }
-          var cmd = "skdb --data " + db;
+          const cmd = "skdb --data " + db;
           let result = await runServer(uri, cmd, stdin);
           return result;
         },
         sql: async function(passwd, stdin) {
           if (passwd != "admin1234") {
             console.log("Error: wrong admin password");
-            return;
+            return [];
           }
           var cmd = "skdb --json --data " + db;
           let result = await runServer(uri, cmd, stdin);
@@ -719,7 +721,7 @@ async function makeSKDB(reboot) {
         },
       };
     },
-  }
+  };
 
   var result = await WebAssembly.instantiate(typedArray, { env: env });
   SKIP_call0 = result.instance.exports['SKIP_call0'];
@@ -743,7 +745,7 @@ async function makeSKDB(reboot) {
 }
 
 async function initDB() {
-  skdb = await makeSKDB(true);
+  const skdb = await makeSKDB(true);
   skdb.client.sql('create table t1 (a INTEGER);');
   let sizeCount = 20;
 
@@ -791,7 +793,7 @@ async function initDB() {
 }
 
 async function testDB() {
-  skdb = await makeSKDB();
+  const skdb = await makeSKDB();
   console.log(skdb.client.sql('select count(*) from tracks;')[0]);
 
   var then = performance.now();
