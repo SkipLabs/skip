@@ -736,19 +736,21 @@ mutable class Context{
     }
   }
 
-  readonly fun changeInPrivacy(start: Tick): readonly Set<Int> {
+  readonly fun changeInPrivacy(_start: Tick): readonly Set<Int> {
     result = mutable Set[];
     this.unsafeMaybeGetEagerDir(accessReaders) match {
     | None() -> result
-    | Some(readers) ->
-      changes = readers.getChangesAfter(start);
-      for (rowKey in changes) {
-        rowKey match {
-        | SKSQL.RowKey(row, _) -> result.insert(row.getInt(1).fromSome())
-        | _ -> void
-        }
-      };
-      result
+    | Some(_readers) -> invariant_violation("TODO: change in privacy layer")
+    /*
+          changes = readers.getChangesAfter(start);
+          for (rowKey in changes) {
+            rowKey match {
+            | SKSQL.RowKey(row, _) -> result.insert(row.getInt(1).fromSome())
+            | _ -> void
+            }
+          };
+          result
+    */
     }
   }
 
