@@ -28,11 +28,13 @@ dependencies {
 
     // This dependency is used by the application.
     implementation("com.google.guava:guava:31.1-jre")
+
+    implementation("io.undertow:undertow-core:2.3.2.Final")
 }
 
 application {
     // Define the main class for the application.
-    mainClass.set("skgw.AppKt")
+    mainClass.set("io.skiplabs.skgw.AppKt")
 }
 
 tasks.named<Test>("test") {
