@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <dirent.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -352,6 +353,56 @@ int64_t SKIP_get_mtime(char *path) {
       return 0;
     }
     return st.st_mtime;
+}
+
+bool SKIP_is_directory(char *path) {
+    struct stat st;
+    if(stat(path, &st) < 0) {
+      return 0;
+    }
+    return st.st_mode & S_IFDIR;
+}
+
+int64_t SKIP_system(char* cmd_obj) {
+  size_t cmd_size = SKIP_String_byteSize(cmd_obj);
+  char *cmd = (char *)malloc(cmd_size+1);
+  memcpy(cmd, cmd_obj, cmd_size);
+  cmd[cmd_size] = (char)0;
+  int64_t res = system(cmd);
+  free(cmd);
+  return res;
+}
+
+int64_t SKIP_opendir(char *path_obj) {
+  size_t path_size = SKIP_String_byteSize(path_obj);
+  char *path = (char *)malloc(path_size+1);
+  memcpy(path, path_obj, path_size);
+  path[path_size] = (char)0;
+
+  DIR *res = opendir(path);
+  if (res == NULL) {
+    perror("Error opening dir");
+  }
+
+  free(path);
+  return (int64_t)res;
+}
+
+char* SKIP_readdir(int64_t dir_handle) {
+  struct dirent *dp = readdir((DIR*)dir_handle);
+  if (dp == NULL) {
+    return sk_string_create("", 0);
+  }
+  size_t len = strlen(dp->d_name);
+  return sk_string_create(dp->d_name, len);
+}
+
+void SKIP_closedir(int64_t dir_handle) {
+  int rv = closedir((DIR*)dir_handle);
+
+  if (rv != 0) {
+    perror("closedir");
+  }
 }
 
 void SKIP_exit(uint64_t code) {
