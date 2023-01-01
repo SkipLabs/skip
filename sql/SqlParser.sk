@@ -585,6 +585,10 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     (!pos, e) = parseExprWithPrio(100, lex, pos);
     !pos = lex.expect(pos, ")");
     e
+  } else if (lex.isEqUpperAt(tok, "TRUE")) {
+    Literal("1", false)
+  } else if (lex.isEqUpperAt(tok, "FALSE")) {
+    Literal("0", false)
   } else if (lex.isEqAt(tok, "'")) {
     (!pos, str) = parseString(lex, tok.posBegin);
     Literal(str, true)
@@ -627,8 +631,9 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     UPlus(e)
   } else {
     if (lex.wordAt(tok) == ">") invariant_violation("Internal error");
-    if (lex.wordAt(tok).lowercase() == "null") Literal("null", false)
-    else Literal(lex.wordAt(tok), false);
+    if (lex.wordAt(tok).lowercase() == "null") Literal("null", false) else {
+      Literal(lex.wordAt(tok), false)
+    };
   };
 
   loop {
@@ -950,6 +955,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
     return (tok.posEnd, VNull());
   };
 
+  if (lex.isEqUpperAt(tok, "TRUE")) {
+    return (tok.posEnd, VInt(1));
+  };
+
+  if (lex.isEqUpperAt(tok, "FALSE")) {
+    return (tok.posEnd, VInt(0));
+  };
+
   if (lex.isEqUpperAt(tok, "ID")) {
     !pos = lex.expect(pos, "(");
     (!pos, !tok) = lex.next(pos);
@@ -1078,6 +1091,9 @@ fun parseTypeName(lex: Lexer, pos: Int): (Int, Type) {
     (pos, FLOAT())
   } else if (lex.isEqUpper(pos, "INTEGER")) {
     !pos = lex.expectUpper(pos, "INTEGER");
+    (pos, INTEGER())
+  } else if (lex.isEqUpper(pos, "BOOLEAN")) {
+    !pos = lex.expectUpper(pos, "BOOLEAN");
     (pos, INTEGER())
   } else if (lex.isEqUpper(pos, "TEXT")) {
     !pos = lex.expectUpper(pos, "TEXT");
