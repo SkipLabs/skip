@@ -380,6 +380,7 @@ class SKDB {
   private lineBuffer: Array<number> = [];
   private storeName: string;
   private nbrInitPages: number = -1;
+  private rootsAreInitialized = false;
   private roots: Map<string, number> = new Map();
   private pageSize: number = -1;
   // @ts-expect-error
@@ -784,7 +785,8 @@ class SKDB {
     callable: SKDBCallable<T1, T2>,
     arg: T1
   ): void {
-    if (this.roots === null) {
+    if (!this.rootsAreInitialized) {
+      this.rootsAreInitialized = true;
       this.exports.SKIP_init_jsroots();
       this.runSubscribeRoots();
     }
