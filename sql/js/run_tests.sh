@@ -11,9 +11,9 @@ run_compare_test () {
   diff $tmpfile1 $tmpfile2 > /dev/null
   if [ $? -eq 0 ]; then
       rm $tmpfile1 $tmpfile2
-      echo "OK"
+      echo -e "OK"
   else
-      echo "FAILED"
+      echo -e "FAILED"
   fi
 }
 
@@ -34,4 +34,21 @@ then
     echo -e "TEST JS BOOLEAN:\tOK"
 else
     echo -e "TEST JS BOOLEAN:\tFAILED"
+fi
+
+if
+    (cd ../../ && (
+        cat build/skdb_node.js;
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
+        echo "  skdb.sqlRaw('create table if not exists t1 (a BOOLEAN, b boolean);');"
+        echo "  console.log(skdb.sqlRaw('select 1;'));"
+        echo "}"
+        echo "test()"
+    ) | node)| grep -q '1'
+then
+    echo -e "TEST JS CREATE TABLE IF NOT EXISTS:\tOK"
+else
+    echo -e "TEST JS CREATE TABLE IF NOT EXISTS:\tFAILED"
 fi

@@ -346,7 +346,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     inTransaction: Bool,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     stmt match {
-    | Table{pos, name, schema, windowSize} ->
+    | Table{pos, name, schema, ifNotExists, windowSize} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
       };
@@ -363,7 +363,14 @@ class Evaluator{options: Options, user: ?UserFile} {
         | Some(_) -> true
         | None() -> false
         };
-        this.createTable(context, pos, name, dirDescr, reallyRemove);
+        this.createTable(
+          context,
+          pos,
+          name,
+          dirDescr,
+          ifNotExists,
+          reallyRemove,
+        );
       })
     | Insert{pos, name, paramsOpt, values} ->
       baseName = SKFS.SID::create(name);
@@ -828,9 +835,14 @@ class Evaluator{options: Options, user: ?UserFile} {
     pos: Int,
     name: String,
     dirDescr: DirDescr,
+    ifNotExists: Bool,
     reallyRemove: Bool,
   ): void {
     dirName = dirDescr.dirName;
+    if (context.unsafeMaybeGetEagerDir(dirName) is Some _ && ifNotExists) {
+      return void;
+    };
+
     dir = context.mkdir(RowValues::fromFile, dirName, reallyRemove);
 
     getTableDir(context).writeArray(
