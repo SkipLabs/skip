@@ -124,11 +124,11 @@ function makeSKDBStore(
 function makeWebSocket(
   uri: string,
   onopen: () => void,
-  onmessage: (msg: string | ArrayBuffer) => void,
+  onmessage: (msg: string | ArrayBuffer | null) => void,
   onclose: (Event) => void,
   onerror: (Event) => void
 ): Promise<(msg: string) => void> {
-  let socket = null;
+  let socket;
   if (typeof window === "undefined") {
     // @ts-expect-error
     let W3CWebSocket = require("websocket").w3cwebsocket;
@@ -380,14 +380,16 @@ class SKDB {
   private lineBuffer: Array<number> = [];
   private storeName: string;
   private nbrInitPages: number = -1;
-  private roots: Map<string, number> = null;
-  private pageSize: number;
+  private roots: Map<string, number> = new Map();
+  private pageSize: number = -1;
+  // @ts-expect-error
   private db: IDBDatabase;
   private dirtyPagesMap: Array<number> = [];
   private dirtyPages: Array<number> = [];
   private working: number = 0;
   private mirroredTables: Map<string, number> = new Map();
-  private exports: WasmExports = null;
+  // @ts-expect-error
+  private exports: WasmExports;
 
   private constructor(storeName: string) {
     this.storeName = storeName;
