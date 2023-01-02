@@ -52,3 +52,34 @@ then
 else
     echo -e "TEST JS CREATE TABLE IF NOT EXISTS:\tFAILED"
 fi
+
+if
+    (cd ../../ && (
+        cat build/skdb_node.js;
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY);');"
+        echo "}"
+        echo "test()"
+    ) | node)
+then
+    echo -e "TEST STRING PRIMARY KEY:\tOK"
+else
+    echo -e "TEST STRING PRIMARY KEY:\tFAILED"
+fi
+
+if
+    (cd ../../ && (
+        cat build/skdb_node.js;
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');"
+        echo "  skdb.sqlRaw('insert into t1 (b) values (22);');";
+        echo "}"
+        echo "test()"
+    ) | node)2>&1| grep -q 'Cannot generate a string primary key'
+then
+    echo -e "TEST STRING PRIMARY KEY2:\tOK"
+else
+    echo -e "TEST STRING PRIMARY KEY2:\tFAILED"
+fi

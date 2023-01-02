@@ -131,6 +131,9 @@ fun computeInsert(
         schema.any(ty -> ty.primary)
       ) {
         (primaryColName, primaryIndex) = for (i => ty in schema) {
+          if (ty.ty is TEXT()) {
+            error(pos, "Cannot generate a string primary key");
+          };
           if (ty.primary) break (ty.name, i)
         } else {
           invariant_violation("Internal error")
@@ -866,8 +869,8 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (hasPrimary) {
           error(pos, "multiple primary keys detected");
         };
-        if (!(tyDescr.ty is INTEGER())) {
-          error(pos, "primary keys are expected to be integers");
+        if (!(tyDescr.ty is INTEGER()) && !(tyDescr.ty is TEXT())) {
+          error(pos, "primary keys are expected to be integers or strings");
         };
         !hasPrimary = true;
       };
