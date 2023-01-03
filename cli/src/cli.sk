@@ -1,0 +1,147 @@
+module Cli;
+
+base class Arg(
+  name: String,
+  _short: ?String = None(),
+  _long: ?String = None(),
+  _about: ?String = None(),
+  // NOTE: The following parameters cannot be placed in subclasses, since `name` is required.
+  // StringArgs only
+  _default: ?Value = None(),
+  _required: Bool = false,
+  // BoolArgs only
+  _negatable: Bool = false,
+) {
+  // Builder interface methods.
+  fun short(flag: String): this {
+    this with {_short => Some(flag)}
+  }
+
+  fun long(flag: String): this {
+    this with {_long => Some(flag)}
+  }
+
+  fun about(msg: String): this {
+    this with {_about => Some(msg)}
+  }
+
+  // Internal methods.
+  fun _defaultValue(): Value;
+  fun _takesValue(): Bool;
+  fun _isPositional(): Bool;
+}
+
+class StringArg extends Arg {
+  fun default(value: String): this {
+    this with {_default => Some(StringValue(value))}
+  }
+
+  fun required(value: Bool = true): this {
+    this with {_required => value}
+  }
+
+  fun _defaultValue(): Value {
+    this._default match {
+    | Some(v) -> v
+    | None() -> MissingValue()
+    }
+  }
+
+  fun _takesValue(): Bool {
+    true
+  }
+
+  fun _isPositional(): Bool {
+    !this._short.isSome() && !this._long.isSome()
+  }
+}
+
+class BoolArg extends Arg {
+  fun negatable(value: Bool = true): this {
+    this with {_negatable => value}
+  }
+
+  fun _defaultValue(): BoolValue {
+    BoolValue(false)
+  }
+
+  fun _takesValue(): Bool {
+    false
+  }
+
+  fun _isPositional(): Bool {
+    false
+  }
+}
+
+class Command(
+  name: String = "",
+  _args: Array<Arg> = Array[],
+  _extra: Bool = false,
+  _extraName: ?String = None(),
+  _subcommands: Array<Command> = Array[],
+  _about: ?String = None(),
+  _short: ?String = None(),
+) {
+  fun arg(arg: Arg): this {
+    this with {_args => this._args.concat(Array[arg])}
+  }
+
+  fun extra(name: String = ""): this {
+    this with {
+      _extra => true,
+      _extraName => if (name != "") Some(name) else None(),
+    }
+  }
+
+  fun subcommand(cmd: Command): this {
+    this with {_subcommands => this._subcommands.concat(Array[cmd])}
+  }
+
+  fun about(msg: String): this {
+    this with {_about => Some(msg)}
+  }
+
+  fun short(n: String): this {
+    this with {_short => Some(n)}
+  }
+
+  fun help(): this {
+    this.arg(
+      Cli.BoolArg("help")
+        .short("h")
+        .long("help")
+        .about("Print help information"),
+    )
+  }
+
+  fun parseArgs(): ParseResults {
+    res = parseArgs(this);
+    res.error.each(err -> {
+      print_error(`error: ${err.getMessage()}\n`);
+      res.subcommand match {
+      | Some(subcmd) ->
+        this._subcommands.find(c -> c.name == subcmd) match {
+        | Some(cmd) -> print_error(usage(cmd, false, this.name + " "))
+        | None() -> invariant_violation("error")
+        }
+      | None() -> print_error(usage(this, false))
+      };
+      skipExit(1)
+    });
+
+    // TODO: Handle absence of help option.
+    if (res.values.containsKey("help") && res.getBool("help")) {
+      res.subcommand match {
+      | Some(subcmd) ->
+        this._subcommands.find(c -> c.name == subcmd) match {
+        | Some(cmd) -> print_string(usage(cmd, true, this.name + " "))
+        | None() -> invariant_violation("error")
+        }
+      | None() -> print_string(usage(this, true))
+      };
+      skipExit(0)
+    };
+    res
+  }
+}
