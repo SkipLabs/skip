@@ -117,3 +117,39 @@ then
 else
     echo -e "TEST PARSE FLOAT:\tFAILED"
 fi
+
+if
+    (cd ../../ && (
+        cat build/skdb_node.js;
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
+        echo "  skdb.sqlRaw('create virtual view v1 as select * from t1;');"
+        echo "  skdb.sqlRaw('create virtual view if not exists v1 as select * from t1;');"
+        echo "  console.log(skdb.sqlRaw('select 1;'));"
+        echo "}"
+        echo "test()"
+    ) | node)| grep -q '1'
+then
+    echo -e "TEST JS VIRTUAL VIEW IF NOT EXISTS:\tOK"
+else
+    echo -e "TEST JS VIRTUAL VIEW IF NOT EXISTS:\tFAILED"
+fi
+
+if
+    (cd ../../ && (
+        cat build/skdb_node.js;
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
+        echo "  skdb.sqlRaw('create view v1 as select * from t1;');"
+        echo "  skdb.sqlRaw('create view if not exists v1 as select * from t1;');"
+        echo "  console.log(skdb.sqlRaw('select 1;'));"
+        echo "}"
+        echo "test()"
+    ) | node)| grep -q '1'
+then
+    echo -e "TEST JS VIEW IF NOT EXISTS:\tOK"
+else
+    echo -e "TEST JS VIEW IF NOT EXISTS:\tFAILED"
+fi

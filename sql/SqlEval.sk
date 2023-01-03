@@ -462,6 +462,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     | View{
       pos,
       name => viewName,
+      ifNotExists,
       query => origSelectAst @ Select _,
       virtual,
       text,
@@ -474,6 +475,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       viewsDir = context.unsafeGetEagerDir(views.dirName);
       key = SKFS.SID(viewName);
       if (viewsDir.getArrayRaw(key).size() != 0) {
+        if (ifNotExists) return None();
         error(pos, "VIEW " + viewName + " already exists");
       };
       viewsDir.write(
