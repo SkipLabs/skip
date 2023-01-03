@@ -1,0 +1,78 @@
+module TermColor;
+
+base class Attribute {
+  children =
+  | Bold()
+  | Dark()
+  | Underline()
+  | Blink()
+  | Reverse()
+  | Concealed()
+
+  fun code(): Int
+  | Bold() -> 1
+  | Dark() -> 2
+  | Underline() -> 4
+  | Blink() -> 5
+  | Reverse() -> 7
+  | Concealed() -> 8
+}
+
+base class Color {
+  children =
+  | Grey()
+  | Red()
+  | Green()
+  | Yellow()
+  | Blue()
+  | Magenta()
+  | Cyan()
+  | White()
+  | Default()
+
+  fun code(): Int
+  | Grey() -> 30
+  | Red() -> 31
+  | Green() -> 32
+  | Yellow() -> 33
+  | Blue() -> 34
+  | Magenta() -> 35
+  | Cyan() -> 36
+  | White() -> 37
+  | Default() -> invariant_violation("Cannot call code() on Default color.")
+
+  fun bgCode(): Int
+  | Grey() -> 40
+  | Red() -> 41
+  | Green() -> 42
+  | Yellow() -> 43
+  | Blue() -> 44
+  | Magenta() -> 45
+  | Cyan() -> 46
+  | White() -> 47
+  | Default() -> invariant_violation("Cannot call bgCode() on Default color.")
+}
+
+private fun fmt(text: String, code: Int): String {
+  `\x1b[${code}m${text}\x1b[0m`
+}
+
+fun colored(
+  text: String,
+  color: Color = Default(),
+  background: Color = Default(),
+  attrs: Sequence<Attribute> = Array[],
+): String {
+  result = text;
+  color match {
+  | Default() -> void
+  | c -> !result = fmt(result, c.code())
+  };
+  background match {
+  | Default() -> void
+  | c -> !result = fmt(result, c.code())
+  };
+  attrs.each(attr -> !result = fmt(result, attr.code()));
+
+  result
+}
