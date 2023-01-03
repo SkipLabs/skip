@@ -1,0 +1,119 @@
+module TOML;
+
+private fun parseDecInt(tok: .String): ?.Int {
+  it = tok.getIter();
+  sign = it.current() match {
+  | Some('-') ->
+    _ = it.next();
+    -1
+  | Some('+') ->
+    _ = it.next();
+    1
+  | _ -> 1
+  };
+
+  res = eatInteger(it) match {
+  | Some((0, 0)) -> return None()
+  | Some((0, 1)) -> 0
+  | Some((v, 0)) -> sign * v
+  | _ -> return None()
+  };
+
+  if (!it.atEnd()) {
+    return None()
+  };
+
+  Some(res)
+}
+
+private fun parsePrefixedInt(
+  tok: .String,
+  base: .Int,
+  isDigit: (Char) ~> .Bool,
+): ?.Int {
+  it = tok.getIter();
+
+  _ = it.next();
+  _ = it.next();
+
+  res = 0;
+  prevIsDigit = false;
+  it.current() match {
+  | Some(c) if (isDigit(c)) -> void
+  | _ -> return None()
+  };
+
+  loop {
+    if (it.atEnd()) {
+      break void
+    };
+    it.current() match {
+    | Some(c) ->
+      if (isDigit(c)) {
+        !res = base * res + Chars.hexDigitToInt(c);
+        !prevIsDigit = true;
+      } else if (c == '_') {
+        if (!prevIsDigit) {
+          return None()
+        };
+        !prevIsDigit = false
+      } else {
+        return None()
+      }
+    | None() -> return None()
+    };
+    _ = it.next()
+  };
+
+  if (!prevIsDigit) {
+    return None()
+  };
+
+  Some(res)
+}
+
+private fun parseHexInt(tok: .String): ?.Int {
+  parsePrefixedInt(tok, 16, Chars.isHexDigit)
+}
+
+private fun parseOctInt(tok: .String): ?.Int {
+  parsePrefixedInt(tok, 8, Chars.isOctalDigit)
+}
+
+private fun parseBinInt(tok: .String): ?.Int {
+  parsePrefixedInt(tok, 2, c ~> (c == '0') || (c == '1'))
+}
+
+private fun eatInteger(iter: mutable String.StringIterator): ?(.Int, .Int) {
+  leadingZeros = 0;
+  res = 0;
+  prevIsDigit = false;
+  loop {
+    if (iter.atEnd()) {
+      break void
+    };
+    c = iter.current().fromSome();
+    if (Chars.isDigit(c)) {
+      !res = 10 * res + Chars.hexDigitToInt(c);
+      if (res == 0 && c == '0') {
+        !leadingZeros = leadingZeros + 1
+      };
+      !prevIsDigit = true
+    } else if (c == '_') {
+      if (!prevIsDigit) {
+        return None()
+      };
+      !prevIsDigit = false;
+    } else {
+      break void
+    };
+
+    _ = iter.next();
+  };
+
+  if (!prevIsDigit) {
+    return None()
+  };
+
+  Some((res, leadingZeros))
+}

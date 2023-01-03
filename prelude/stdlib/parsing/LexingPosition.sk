@@ -125,6 +125,15 @@ mutable class LexingPosition private {
     };
   }
 
+  // Consume `num` characters and return the resulting string.
+  mutable fun take(num: Int): String {
+    start = this.iter.clone();
+    for (_ in Range(0, num)) {
+      _ = this.iter.next();
+    };
+    start.substring(this.iter)
+  }
+
   readonly fun getPosition(): Position {
     this.position;
   }

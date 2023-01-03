@@ -1,0 +1,198 @@
+// The source of truth is: https://toml.io/en/v1.0.0
+
+module TOML;
+
+base class Value uses Show, Equality {
+  children =
+  | String(value: .String)
+  | Int(value: .Int)
+  | Float(value: .Float)
+  | Bool(value: .Bool)
+  | Array(value: .Array<TOML.Value>)
+
+  fun expectString(): .String
+  | String(v) -> v
+  | _ -> throw TOMLValueExpectedError("String")
+
+  fun expectInt(): .Int
+  | Int(v) -> v
+  | _ -> throw TOMLValueExpectedError("Int")
+
+  fun expectFloat(): .Float
+  | Float(v) -> v
+  | _ -> throw TOMLValueExpectedError("Float")
+
+  fun expectBool(): .Bool
+  | Bool(v) -> v
+  | _ -> throw TOMLValueExpectedError("Bool")
+
+  fun expectLocalDate(): LocalDate
+  | x @ LocalDate _ -> x
+  | _ -> throw TOMLValueExpectedError("LocalDate")
+
+  fun expectLocalTime(): LocalTime
+  | x @ LocalTime _ -> x
+  | _ -> throw TOMLValueExpectedError("LocalTime")
+
+  fun expectDateTime(): DateTime
+  | x @ DateTime _ -> x
+  | _ -> throw TOMLValueExpectedError("DateTime")
+
+  fun expectArray(): .Array<TOML.Value>
+  | Array(v) -> v
+  | _ -> throw TOMLValueExpectedError("Array")
+
+  fun expectTable(): TOML.Table
+  | x @ Table(_) -> x
+  | _ -> throw TOMLValueExpectedError("Table")
+
+  fun toString(): .String
+  | String(v) -> v
+  | Int(v) -> v.toString()
+  | Float(v) -> v.toString()
+  | Bool(v) -> v.toString()
+  | Array(v) -> v.toString()
+  | Table(v) -> v.toString()
+}
+
+class Table(map: .Map<.String, TOML.Value>) extends Value {
+  fun rawMap(): .Map<.String, TOML.Value> {
+    this.map
+  }
+
+  fun maybeGet(key: .String): ?TOML.Value {
+    this.map.maybeGet(key)
+  }
+
+  fun maybeGetString(key: .String): ?.String {
+    this.maybeGet(key).map(v -> v.expectString())
+  }
+
+  fun maybeGetInt(key: .String): ?.Int {
+    this.maybeGet(key).map(v -> v.expectInt())
+  }
+
+  fun maybeGetFloat(key: .String): ?.Float {
+    this.maybeGet(key).map(v -> v.expectFloat())
+  }
+
+  fun maybeGetBool(key: .String): ?.Bool {
+    this.maybeGet(key).map(v -> v.expectBool())
+  }
+
+  fun maybeGetDate(key: .String): ?LocalDate {
+    this.maybeGet(key).map(v -> v.expectLocalDate())
+  }
+
+  fun maybeGetLocalTime(key: .String): ?LocalTime {
+    this.maybeGet(key).map(v -> v.expectLocalTime())
+  }
+
+  fun maybeGetDateTime(key: .String): ?DateTime {
+    this.maybeGet(key).map(v -> v.expectDateTime())
+  }
+
+  fun maybeGetArray(key: .String): ?.Array<TOML.Value> {
+    this.maybeGet(key).map(v -> v.expectArray())
+  }
+
+  fun maybeGetTable(key: .String): ?TOML.Table {
+    this.maybeGet(key).map(v -> v.expectTable())
+  }
+
+  fun get(key: .String): TOML.Value {
+    this.maybeGet(key) match {
+    | Some(v) -> v
+    | None() -> throw KeyNotFoundError(key)
+    }
+  }
+
+  fun getString(key: .String): .String {
+    this.get(key).expectString()
+  }
+
+  fun getInt(key: .String): .Int {
+    this.get(key).expectInt()
+  }
+
+  fun getFloat(key: .String): .Float {
+    this.get(key).expectFloat()
+  }
+
+  fun getBool(key: .String): .Bool {
+    this.get(key).expectBool()
+  }
+
+  fun getLocalDate(key: .String): LocalDate {
+    this.get(key).expectLocalDate()
+  }
+
+  fun getLocalTime(key: .String): LocalTime {
+    this.get(key).expectLocalTime()
+  }
+
+  fun getDateTime(key: .String): DateTime {
+    this.get(key).expectDateTime()
+  }
+
+  fun getArray(key: .String): .Array<TOML.Value> {
+    this.get(key).expectArray()
+  }
+
+  fun getTable(key: .String): TOML.Table {
+    this.get(key).expectTable()
+  }
+}
+
+class LocalDate(year: .Int, month: .Int, day: .Int) extends Value {
+  fun toString(): .String {
+    this.year.toString().padLeft(4, '0') +
+      "-" +
+      this.month.toString().padLeft(2, '0') +
+      "-" +
+      this.day.toString().padLeft(2, '0')
+  }
+}
+
+class LocalTime(
+  hour: .Int,
+  minute: .Int,
+  second: .Int,
+  frac: ?.Int,
+) extends Value {
+  fun toString(): .String {
+    this.hour.toString().padLeft(2, '0') +
+      ":" +
+      this.minute.toString().padLeft(2, '0') +
+      ":" +
+      this.second.toString().padLeft(2, '0') +
+      this.frac.map(x -> `.${x}`).default("")
+  }
+}
+
+class DateTime(
+  year: .Int,
+  month: .Int,
+  day: .Int,
+  hour: .Int,
+  minute: .Int,
+  second: .Int,
+  frac: ?.Int,
+  offset: ?.String,
+) extends Value {
+  fun toString(): .String {
+    this.year.toString().padLeft(4, '0') +
+      "-" +
+      this.month.toString().padLeft(2, '0') +
+      "-" +
+      this.day.toString().padLeft(2, '0') +
+      "T" +
+      this.hour.toString().padLeft(2, '0') +
+      ":" +
+      this.minute.toString().padLeft(2, '0') +
+      ":" +
+      this.second.toString().padLeft(2, '0') +
+      this.frac.map(x -> `.${x}`).default("") +
+      this.offset.default("")
+  }
+}

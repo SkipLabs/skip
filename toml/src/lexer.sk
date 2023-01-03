@@ -1,0 +1,575 @@
+module TOML;
+
+private base class Token uses Show {
+  children =
+  | TStart()
+  | TEOF()
+  | TEOL()
+  | TDot()
+  | TEqual()
+  | TComma()
+  | TLeftBracket()
+  | TRightBracket()
+  | TLeftDoubleBracket()
+  | TRightDoubleBracket()
+  | TLeftCurlyBrace()
+  | TRightCurlyBrace()
+  | TString(.String)
+  | TRawString(.String)
+  | TMultilineString(.String)
+  | TValue(TOML.Value)
+  | TComment()
+
+  fun toString(): .String
+  | TStart _ -> "[START]"
+  | TEOF _ -> "[EOF]"
+  | TEOL _ -> "[EOL]"
+  | TDot _ -> "[DOT]"
+  | TEqual _ -> "[EQUAL]"
+  | TComma _ -> "[COMMA]"
+  | TLeftBracket _ -> "[LEFT BRACKET]"
+  | TRightBracket _ -> "[RIGHT BRACKET]"
+  | TLeftDoubleBracket _ -> "[LEFT DOUBLE BRACKET]"
+  | TRightDoubleBracket _ -> "[RIGHT DOUBLE BRACKET]"
+  | TLeftCurlyBrace _ -> "[LEFT CURLY BRACE]"
+  | TRightCurlyBrace _ -> "[RIGHT CURLY BRACE]"
+  | TString _ -> `[STRING]`
+  | TRawString _ -> `[RAW STRING]`
+  | TMultilineString _ -> `[MULTILINE STRING]`
+  | TValue _ -> `[VALUE]`
+  | TComment _ -> `[COMMENT]`
+}
+
+private mutable class Lexer private {
+  iter: mutable Lexer.LexingPosition,
+  mutable curToken: Token = TStart(),
+  mutable curTokenPosition: Position = Position(0),
+} {
+  static fun create(source: .String): mutable Lexer {
+    mutable Lexer{iter => .Lexer.LexingPosition::create(source)};
+  }
+
+  readonly fun peek(): Token {
+    this.curToken
+  }
+
+  readonly fun position(): Position {
+    this.curTokenPosition
+  }
+
+  mutable fun eatWhitespace(): void {
+    loop {
+      this.iter.peek() match {
+      | ' ' | '\t' -> this.iter.advance()
+      | _ -> break void
+      }
+    }
+  }
+
+  mutable fun advance(expectValue: .Bool = false): void {
+    this.eatWhitespace();
+    this.!curTokenPosition = this.iter.position;
+
+    if (this.iter.atEnd()) {
+      this.!curToken = TEOF();
+      return void
+    };
+
+    this.!curToken = this.iter.peek() match {
+    | '[' ->
+      if (!expectValue && this.peekString("[[")) {
+        this.iter.advance();
+        this.iter.advance();
+        TLeftDoubleBracket()
+      } else {
+        this.iter.advance();
+        TLeftBracket()
+      }
+    | ']' ->
+      if (!expectValue && this.peekString("]]")) {
+        this.iter.advance();
+        this.iter.advance();
+        TRightDoubleBracket()
+      } else {
+        this.iter.advance();
+        TRightBracket()
+      }
+    | '{' ->
+      this.iter.advance();
+      TLeftCurlyBrace()
+    | '}' ->
+      this.iter.advance();
+      TRightCurlyBrace()
+    | '=' ->
+      this.iter.advance();
+      TEqual()
+    | '.' ->
+      this.iter.advance();
+      TDot()
+    | ',' ->
+      this.iter.advance();
+      TComma()
+    | '\n' ->
+      this.iter.advance();
+      TEOL()
+    | '\r' if (this.peekString("\r\n")) ->
+      this.iter.advance();
+      TEOL()
+    | '#' ->
+      this.eatComment();
+      TComment()
+    | '\'' ->
+      if (this.peekString("'''")) {
+        TOML.TMultilineString(this.eatLiteralMultilineString())
+      } else {
+        TOML.TString(this.eatLiteralString())
+      }
+    | '"' ->
+      if (this.peekString("\"\"\"")) {
+        TOML.TMultilineString(this.eatMultilineString())
+      } else {
+        TOML.TString(this.eatString())
+      }
+    | _ if (!expectValue) -> TRawString(this.eatBareKey())
+    | _ -> TValue(this.eatValue())
+    };
+  }
+
+  mutable fun eatValue(): TOML.Value {
+    start = this.iter.clone();
+    dashCount = 0;
+    hasColon = false;
+    hasExp = false;
+    hasDot = false;
+
+    loop {
+      if (this.iter.atEnd()) {
+        break void
+      };
+
+      this.iter.peek() match {
+      | '-' -> !dashCount = dashCount + 1
+      | ':' -> !hasColon = true
+      | '.' -> !hasDot = true
+      | 'e' | 'E' -> !hasExp = true
+      | ',' | '}' | ']' | '\r' | '\n' | '#' -> break void
+      | _ -> void
+      };
+
+      this.iter.advance()
+    };
+
+    token = start.getText(this.iter).trimRight();
+
+    if (token == "true") {
+      TOML.Bool(true)
+    } else if (token == "false") {
+      TOML.Bool(false)
+    } else if (token == "inf") {
+      TOML.Float(.Float::inf)
+    } else if (token == "+inf") {
+      TOML.Float(.Float::inf)
+    } else if (token == "-inf") {
+      TOML.Float(-1.0 * .Float::inf)
+    } else if (token == "nan") {
+      TOML.Float(.Float::nan)
+    } else if (token == "+nan") {
+      TOML.Float(.Float::nan)
+    } else if (token == "-nan") {
+      TOML.Float(-1.0 * .Float::nan)
+    } else if (token.startsWith("0x")) {
+      parseHexInt(token) match {
+      | Some(v) -> TOML.Int(v)
+      | None() -> throw InvalidTOMLError(start.position, "Invalid integer.")
+      }
+    } else if (token.startsWith("0o")) {
+      parseOctInt(token) match {
+      | Some(v) -> TOML.Int(v)
+      | None() -> throw InvalidTOMLError(start.position, "Invalid integer.")
+      }
+    } else if (token.startsWith("0b")) {
+      parseBinInt(token) match {
+      | Some(v) -> TOML.Int(v)
+      | None() -> throw InvalidTOMLError(start.position, "Invalid integer.")
+      }
+    } else if (dashCount >= 2 && hasColon) {
+      parseDateTime(token) match {
+      | Some(v) -> v
+      | None() -> throw InvalidTOMLError(start.position, "Invalid datetime.")
+      }
+    } else if (dashCount >= 2 && !hasExp) {
+      parseDate(token) match {
+      | Some(v) -> v
+      | None() -> throw InvalidTOMLError(start.position, "Invalid date.")
+      }
+    } else if (hasColon) {
+      parseTime(token) match {
+      | Some(v) -> v
+      | None() -> throw InvalidTOMLError(start.position, "Invalid time.")
+      }
+    } else if (hasDot || hasExp) {
+      parseFloat(token) match {
+      | Some(v) -> TOML.Float(v)
+      | None() -> throw InvalidTOMLError(start.position, "Invalid float.")
+      }
+    } else {
+      parseDecInt(token) match {
+      | Some(v) -> TOML.Int(v)
+      | None() -> throw InvalidTOMLError(start.position, "Invalid integer.")
+      }
+    }
+  }
+
+  readonly fun isControlChar(c: Char): .Bool {
+    c != '\t' && (Chars.isControlCharacter(c) || c == '\x7f')
+  }
+
+  mutable fun eatLiteralMultilineString(): .String {
+    // Skip initial '''.
+    this.iter.advance();
+    this.iter.advance();
+    this.iter.advance();
+
+    this.iter.peek() match {
+    | '\n' -> this.iter.advance()
+    | '\r' if (this.peekString("\r\n")) -> this.iter.advance()
+    | _ -> void
+    };
+
+    chars = mutable Vector[];
+    quotesCount = 0;
+
+    loop {
+      this.iter.peek() match {
+      | '\'' ->
+        if (this.peekString("'''")) {
+          if (quotesCount == 3) {
+            throw InvalidTOMLError(
+              this.iter.position,
+              `Cannot put ''' inside multiline literal string.`,
+            )
+          };
+          if (!this.iter.peekCharOffset('\'', 3)) {
+            break void
+          }
+        };
+        !quotesCount = quotesCount + 1;
+        chars.push('\'');
+        this.iter.advance()
+      | '\r' if (this.peekString("\r\n")) ->
+        chars.push('\n');
+        !quotesCount = 0;
+        this.iter.advance()
+      | c ->
+        !quotesCount = 0;
+        if (c != '\t' && c != '\n' && this.isControlChar(c)) {
+          throw InvalidTOMLError(this.iter.position, "Invalid character.")
+        };
+        chars.push(c);
+        this.iter.advance()
+      }
+    };
+
+    // Skip final '''.
+    this.iter.advance();
+    this.iter.advance();
+    this.iter.advance();
+
+    .String::fromChars(chars.collect(.Array))
+  }
+
+  mutable fun eatMultilineString(): .String {
+    // Skip initial """.
+    this.iter.advance();
+    this.iter.advance();
+    this.iter.advance();
+
+    this.iter.peek() match {
+    | '\n' -> this.iter.advance()
+    | '\r' if (this.peekString("\r\n")) -> this.iter.advance()
+    | _ -> void
+    };
+
+    chars = mutable Vector[];
+    quotesCount = 0;
+    loop {
+      this.iter.peek() match {
+      | '"' ->
+        if (this.peekString("\"\"\"")) {
+          if (quotesCount == 3) {
+            throw InvalidTOMLError(
+              this.iter.position,
+              "Cannot put \"\"\" inside multiline string.",
+            )
+          };
+          if (!this.iter.peekCharOffset('"', 3)) {
+            break void
+          }
+        };
+        !quotesCount = quotesCount + 1;
+        chars.push('"');
+        this.iter.advance()
+      | '\\' ->
+        !quotesCount = 0;
+        nextChar = this.iter.peekOffset(1);
+        if (
+          nextChar == ' ' ||
+          nextChar == '\t' ||
+          nextChar == '\n' ||
+          nextChar == '\r'
+        ) {
+          this.iter.advance();
+          hasNewline = false;
+          loop {
+            if (this.iter.atEnd()) {
+              break void
+            };
+            this.iter.peek() match {
+            | ' ' | '\t' -> this.iter.advance()
+            | '\n' ->
+              this.iter.advance();
+              !hasNewline = true
+            | '\r' if (this.peekString("\r\n")) ->
+              this.iter.advance();
+              !hasNewline = true
+            | _ -> break void
+            }
+          };
+          if (!hasNewline) {
+            throw InvalidTOMLError(this.iter.position, "Bad multiline escape")
+          }
+        } else {
+          chars.push(this.eatEscapedChar());
+        }
+      | '\r' if (this.peekString("\r\n")) ->
+        chars.push('\n');
+        !quotesCount = 0;
+        this.iter.advance()
+      | c ->
+        !quotesCount = 0;
+        if (c != '\t' && c != '\n' && c != '\r' && this.isControlChar(c)) {
+          throw InvalidTOMLError(this.iter.position, "Invalid character.")
+        };
+        chars.push(c);
+        this.iter.advance()
+      }
+    };
+
+    // Skip final """.
+    this.iter.advance();
+    this.iter.advance();
+    this.iter.advance();
+
+    .String::fromChars(chars.collect(.Array))
+  }
+
+  mutable fun eatLiteralString(): .String {
+    // Skip initial '\''.
+    this.iter.advance();
+
+    start = this.iter.clone();
+
+    loop {
+      this.iter.peek() match {
+      | '\'' -> break void
+      | c if (!this.isControlChar(c)) -> this.iter.advance()
+      | _ ->
+        throw InvalidTOMLError(
+          this.iter.position,
+          "Invalid character in literal string.",
+        )
+      }
+    };
+
+    res = start.getText(this.iter);
+
+    // Skip final '\''.
+    this.iter.advance();
+
+    res
+  }
+
+  private readonly fun isBareKeyChar(c: Char): .Bool {
+    Chars.isLowerCaseLetter(c) ||
+      Chars.isUpperCaseLetter(c) ||
+      Chars.isDigit(c) ||
+      c == '_' ||
+      c == '-'
+  }
+
+  private mutable fun eatBareKey(): .String {
+    start = this.iter.clone();
+    loop {
+      if (this.iter.atEnd()) {
+        break void
+      };
+      c = this.iter.peek();
+      if (!this.isBareKeyChar(c)) {
+        break void
+      };
+
+      this.iter.advance()
+    };
+
+    this.iter.peek() match {
+    | ' ' | '\t' | '.' | '=' | ']' | '#' -> void
+    | _ ->
+      throw InvalidTOMLError(this.iter.position, "Invalid character in key.")
+    };
+
+    res = start.getText(this.iter);
+    if (res.length() == 0) {
+      throw InvalidTOMLError(start.position, "Invalid empty key segment.")
+    };
+    res
+  }
+
+  mutable fun eatString(): .String {
+    chars = mutable Vector[];
+
+    // Skip initial '"'.
+    this.iter.advance();
+
+    loop {
+      this.iter.peek() match {
+      | '"' -> break void
+      | '\\' -> chars.push(this.eatEscapedChar())
+      | c if (!this.isControlChar(c)) ->
+        chars.push(c);
+        this.iter.advance()
+      | c ->
+        throw InvalidTOMLError(
+          this.iter.position,
+          `Unexpected character in string '${charToString(c)}'.`,
+        )
+      }
+    };
+
+    // Skip final '"'.
+    this.iter.advance();
+
+    // TODO: Probably inefficient.
+    .String::fromChars(.Array::createFromItems(chars))
+  }
+
+  private mutable fun eatUnicodeCode(width: .Int): .Int {
+    res = 0;
+    pos = this.iter.position;
+    for (_ in Range(0, width)) {
+      this.iter.peek() match {
+      | c if (Chars.isHexDigit(c)) -> !res = 16 * res + Chars.hexDigitToInt(c)
+      | _ -> throw InvalidTOMLError(pos, `Invalid unicode escape sequence.`)
+      };
+      this.iter.advance();
+    };
+
+    res
+  }
+
+  private mutable fun eatEscapedChar(): Char {
+    // Skip initial '\'.
+    this.iter.advance();
+
+    pos = this.iter.position;
+    shortcuts = Map[
+      'b' => '\b',
+      't' => '\t',
+      'n' => '\n',
+      'f' => '\f',
+      'r' => '\r',
+      'e' => '\e',
+      '"' => '"',
+      '\\' => '\\',
+    ];
+    this.iter.peek() match {
+    | c if (shortcuts.containsKey(c)) ->
+      this.iter.advance();
+      shortcuts[c]
+    | 'u' ->
+      this.iter.advance();
+      code = this.eatUnicodeCode(4);
+      if (Chars.isSurrogate(code)) {
+        throw InvalidTOMLError(pos, `Invalid unicode escape sequence.`)
+      };
+      Char::fromCode(code)
+    | 'U' ->
+      this.iter.advance();
+      code = this.eatUnicodeCode(8);
+      if (Chars.isSurrogate(code)) {
+        throw InvalidTOMLError(pos, `Invalid unicode escape sequence.`)
+      };
+      Char::fromCode(code)
+    | _ -> throw InvalidTOMLError(pos, `Invalid escape sequence.`)
+    }
+  }
+
+  private mutable fun eatComment(): void {
+    // Skip initial '#'
+    this.iter.advance();
+
+    loop {
+      if (this.iter.atEnd()) {
+        break void
+      };
+      this.iter.peek() match {
+      | '\n' ->
+        break void // NOTE: Fall through does not work here?
+      | '\r' if (this.peekString("\r\n")) -> break void
+      | c if (!this.isControlChar(c)) -> this.iter.advance()
+      | c ->
+        throw InvalidTOMLError(
+          this.iter.position,
+          `Invalid character in comment '${charToString(c)}'.`,
+        )
+      }
+    }
+  }
+
+  readonly fun peekString(str: .String): .Bool {
+    index = 0;
+    for (c in str) {
+      if (!this.iter.peekCharOffset(c, index)) {
+        return false
+      };
+      !index = index + 1
+    };
+
+    true
+  }
+}
+
+private fun requiresEscape(ch: Char): .Bool {
+  !Chars.isPrintableAscii(ch) || (ch == '"') || (ch == '\\');
+}
+
+private fun charToString(ch: Char): .String {
+  if (!requiresEscape(ch)) {
+    ch.toString()
+  } else {
+    addCode = (chars, code) -> {
+      chars.push('\\');
+      chars.push('u');
+      Chars.intToHexDigits(code, 4).each(chars.push);
+    };
+    ch match {
+    | '\\' -> "\\\\"
+    | '"' -> "\\\""
+    | '\b' -> "\\b"
+    | '\f' -> "\\f"
+    | '\n' -> "\\n"
+    | '\r' -> "\\r"
+    | '\e' -> "\\e"
+    | '\t' -> "\\t"
+    | _ if (Chars.isBasicMultiLingualPlane(ch)) ->
+      chars = mutable Vector<Char>[];
+      addCode(chars, ch.code());
+      .String::fromChars(chars.toArray())
+    | _ ->
+      chars = mutable Vector<Char>[];
+      (high, low) = Chars.toUTF16SurrogatePair(ch);
+      addCode(chars, high);
+      addCode(chars, low);
+      .String::fromChars(chars.toArray())
+    };
+  }
+}

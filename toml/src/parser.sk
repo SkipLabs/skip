@@ -1,0 +1,352 @@
+module TOML;
+
+fun decode(source: .String): TOML.Table {
+  lexer = Lexer::create(source);
+
+  result = mutable RTable();
+  curTableKey = .Array[];
+  curTable = result;
+
+  // Get first token.
+  lexer.advance();
+
+  loop {
+    lexer.peek() match {
+    | TEOF _
+    | TEOL _
+    | TComment _ ->
+      void
+    | TRawString _
+    | TString _ ->
+      (key, value) = decodeAssignment(lexer);
+      tableKey = key.slice(0, -1);
+      valueKey = key.last();
+
+      table = curTable.createOrGetTable(tableKey, /* isTableHeader = */ false);
+      if (table.explicit && tableKey.size() > 0) {
+        throw InvalidTOMLError(
+          lexer.position(),
+          `Invalid use of dotted keys to append to explicitly defined table ${curTableKey
+            .concat(key)
+            .join(".")}.`,
+        )
+      };
+      if (table.map.containsKey(valueKey)) {
+        throw InvalidTOMLError(
+          lexer.position(),
+          `Invalid redefinition of value ${curTableKey.concat(key).join(".")}.`,
+        );
+      };
+      table.map.set(valueKey, mutable RValue(value))
+    | TLeftBracket _ ->
+      lexer.advance();
+      curTable.!explicit = true;
+      !curTableKey = decodeKey(lexer);
+      parent = result.createOrGetTable(
+        curTableKey.slice(0, -1),
+        /* isTableHeader = */ true,
+      );
+      !curTable = if (parent.map.containsKey(curTableKey.last())) {
+        parent.map[curTableKey.last()] match {
+        | table @ RTable _ ->
+          if (
+            table.explicit ||
+            table.map.values().any(x ->
+              x match {
+              | RTable _ -> false
+              | _ -> true
+              }
+            )
+          ) {
+            throw InvalidTOMLError(
+              lexer.curTokenPosition,
+              `Redefining ${curTableKey.join(".")}`,
+            )
+          };
+
+          table
+        | _ ->
+          throw InvalidTOMLError(
+            lexer.curTokenPosition,
+            `Redefining ${curTableKey.join(".")}`,
+          )
+        }
+      } else {
+        table = mutable RTable();
+        parent.map.set(curTableKey.last(), table);
+        table
+      };
+
+      lexer.peek() match {
+      | TRightBracket _ -> lexer.advance()
+      | t ->
+        throw InvalidTOMLError(
+          lexer.position(),
+          `Unexpected token ${t}, expected ']'.`,
+        )
+      }
+    | TLeftDoubleBracket _ ->
+      lexer.advance();
+      !curTableKey = decodeKey(lexer);
+      !curTable = result.createOrGetArray(curTableKey);
+
+      lexer.peek() match {
+      | TRightDoubleBracket _ -> lexer.advance()
+      | t ->
+        throw InvalidTOMLError(
+          lexer.position(),
+          `Unexpected token ${t}, expected ']]'.`,
+        )
+      }
+    | t -> throw InvalidTOMLError(lexer.position(), `Unexpected token ${t}.`)
+    };
+
+    lexer.peek() match {
+    | TComment _ -> lexer.advance()
+    | _ -> void
+    };
+
+    lexer.peek() match {
+    | TEOL _ -> lexer.advance()
+    | TEOF _ -> break void
+    | t ->
+      throw InvalidTOMLError(
+        lexer.position(),
+        `Unexpected token ${t}, expected newline or EOF.`,
+      )
+    }
+  };
+
+  result.toTOML() match {
+  | x @ Table _ -> x
+  | _ -> invariant_violation("Invalid root element for TOML.")
+  }
+}
+
+private fun decodeKey(lexer: mutable Lexer): .Array<.String> {
+  segments = mutable Vector<.String>[];
+  loop {
+    lexer.peek() match {
+    | TString(key) ->
+      // TODO: Validate segment
+      segments.push(key);
+      lexer.advance()
+    | TRawString(key) ->
+      // TODO: Validate segment
+      segments.push(key);
+      lexer.advance()
+    | t ->
+      throw InvalidTOMLError(
+        lexer.position(),
+        `Unexpected token ${t}, expected key segment.`,
+      )
+    };
+    lexer.peek() match {
+    | TDot _ -> lexer.advance()
+    | _ -> break void
+    }
+  };
+
+  .Array::createFromItems(segments)
+}
+
+private fun decodeValue(
+  lexer: mutable Lexer,
+  nested: .Bool = false,
+): TOML.Value {
+  lexer.peek() match {
+  | TLeftBracket() -> decodeArray(lexer, nested)
+  | TLeftCurlyBrace() -> decodeInlineTable(lexer)
+  | TString(v)
+  | TMultilineString(v) ->
+    lexer.advance(/* expectValue = */ nested);
+    TOML.String(v)
+  | TValue(v) ->
+    lexer.advance(/* expectValue = */ nested);
+    v
+  | t ->
+    throw InvalidTOMLError(lexer.iter.position, `Invalid token for value ${t}.`)
+  }
+}
+
+private fun decodeArray(lexer: mutable Lexer, nested: .Bool): TOML.Array {
+  // Skip initial '['.
+  lexer.advance(/* expectValue = */ true);
+
+  eatCommentsAndNewlines = () -> {
+    loop {
+      lexer.peek() match {
+      | TComment _
+      | TEOL _ ->
+        lexer.advance(/* expectValue = */ true)
+      | _ -> break void
+      }
+    }
+  };
+  values = mutable Vector[];
+  loop {
+    eatCommentsAndNewlines();
+    lexer.peek() match {
+    | TRightBracket _ -> break void
+    | _ -> void
+    };
+    values.push(decodeValue(lexer, /* nested = */ true));
+    eatCommentsAndNewlines();
+    lexer.peek() match {
+    | TComma _ -> lexer.advance(/* expectValue = */ true)
+    | TRightBracket _ -> void
+    | t ->
+      throw InvalidTOMLError(
+        lexer.iter.position,
+        `Unexpected token ${t}, expected comma or right bracket.`,
+      )
+    };
+  };
+
+  // Skip final ']'.
+  lexer.advance(/* expectValue = */ nested);
+
+  TOML.Array(values.collect(.Array))
+}
+
+private fun decodeInlineTable(lexer: mutable Lexer): TOML.Table {
+  // Skip initial '{'.
+  lexer.advance();
+
+  lexer.peek() match {
+  | TRightCurlyBrace() ->
+    lexer.advance();
+    return TOML.Table(Map[])
+  | _ -> void
+  };
+
+  table = mutable RTable();
+  loop {
+    pos = lexer.iter.clone();
+    (key, value) = decodeAssignment(lexer);
+    parent = table.createOrGetTable(
+      key.slice(0, -1),
+      /* isTableHeader = */ false,
+    );
+    if (parent.map.containsKey(key.last())) {
+      throw InvalidTOMLError(
+        pos.position,
+        `Duplicate key ${key.join(".")} in inline table.`,
+      )
+    };
+    parent.map.set(key.last(), mutable RValue(value));
+    lexer.peek() match {
+    | TRightCurlyBrace _ -> break void
+    | TComma _ ->
+      lexer.advance();
+      void
+    | t ->
+      throw InvalidTOMLError(
+        lexer.position(),
+        `Unexpected token ${t}, expected comma.`,
+      )
+    }
+  };
+
+  // Skip final '}'.
+  lexer.advance();
+
+  table.toTOML() match {
+  | x @ TOML.Table _ -> x
+  | _ -> invariant_violation("")
+  }
+}
+
+private fun decodeAssignment(
+  lexer: mutable Lexer,
+): (.Array<.String>, TOML.Value) {
+  key = decodeKey(lexer);
+  lexer.peek() match {
+  | TEqual _ -> lexer.advance(/* expectValue = */ true)
+  | t ->
+    throw InvalidTOMLError(
+      lexer.position(),
+      `Unexpected token ${t}, expected '='.`,
+    )
+  };
+  value = decodeValue(lexer);
+
+  (key, value)
+}
+
+private mutable base class Result {
+  children =
+  | RTable(
+    map: mutable .Map<.String, mutable Result> = mutable .Map[],
+    mutable explicit: .Bool = false,
+  )
+  | RArray(mutable .Vector<mutable RTable> = mutable .Vector[])
+  | RValue(TOML.Value)
+
+  readonly fun toTOML(): TOML.Value
+  | RTable(map, _) -> TOML.Table(map.map((_, v) -> v.toTOML()))
+  | RArray(arr) -> TOML.Array(arr.collect(.Array).map(x -> x.toTOML()))
+  | RValue(v) -> v
+
+  mutable fun createOrGetTable(
+    key: .Array<.String>,
+    isTableHeader: .Bool,
+  ): mutable RTable {
+    result = this;
+    for (k in key) {
+      next = result match {
+      | RTable(values, true) ->
+        if (!values.containsKey(k)) {
+          if (isTableHeader) {
+            values.set(k, mutable RTable())
+          } else {
+            throw InvalidTOMLError(
+              Position(0),
+              `Redefining (a prefix of) ${key.join(".")}.`,
+            )
+          }
+        };
+        values[k]
+      | RTable(values, false) ->
+        if (!values.containsKey(k)) {
+          values.set(k, mutable RTable());
+        };
+        values[k]
+      | _ ->
+        throw InvalidTOMLError(
+          Position(0),
+          `Redefining (a prefix of) ${key.join(".")} as table`,
+        )
+      };
+      !result = next match {
+      | RArray(values) -> values.last()
+      | x @ RTable _ -> x
+      | _ -> invariant_violation("")
+      }
+    };
+    result match {
+    | x @ RTable _ -> x
+    | _ -> invariant_violation("")
+    }
+  }
+
+  mutable fun createOrGetArray(key: .Array<.String>): mutable RTable {
+    parent = this.createOrGetTable(
+      key.slice(0, -1),
+      /* isTableHeader = */ false,
+    );
+    if (!parent.map.containsKey(key.last())) {
+      parent.map.set(key.last(), mutable RArray())
+    };
+    res = mutable RTable();
+    parent.map[key.last()] match {
+    | RArray(values) -> values.push(res)
+    | _ ->
+      throw InvalidTOMLError(
+        Position(0),
+        `Redefining ${key.join(".")} as an array.`,
+      )
+    };
+    res
+  }
+}
