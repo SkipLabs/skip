@@ -1,0 +1,152 @@
+module Skargo;
+
+private fun hostTarget(): String {
+  // TODO: invoke llvm-config --host-target
+  "x86_64-pc-linux-gnu"
+}
+
+fun execInit(_args: Cli.ParseResults, _env: Env): void {
+  invariant_violation("TODO");
+  void
+}
+
+fun execUpdate(_args: Cli.ParseResults, _env: Env): void {
+  invariant_violation("TODO");
+  void
+}
+
+fun execTest(args: Cli.ParseResults, env: Env): void {
+  verbose = args.getBool("verbose");
+  targetDir = Path.join(env.rootDir, "target");
+  target = hostTarget();
+  build(
+    env.manifest,
+    "test",
+    env.manifest.testHarness,
+    targetDir,
+    target,
+    env,
+    verbose,
+  );
+  filter = args.maybeGetString("filter").default("");
+  run(Path.join(targetDir, "test") + " " + filter, verbose)
+}
+
+fun execBuild(args: Cli.ParseResults, env: Env): void {
+  (target, targetDir) = args.maybeGetString("target") match {
+  | Some(t) -> (t, Path.join(env.rootDir, "target", t))
+  | None() -> (hostTarget(), Path.join(env.rootDir, "target"))
+  };
+  args.maybeGetString("target-dir").each(d -> !targetDir = d);
+
+  for (bin in env.manifest.bin) {
+    build(
+      env.manifest,
+      bin.name,
+      bin.main,
+      targetDir,
+      target,
+      env,
+      args.getBool("verbose"),
+    );
+  }
+}
+
+fun execClean(_args: Cli.ParseResults, env: Env): void {
+  targetDir = Path.join(env.rootDir, "target");
+  run(`rm -rf ${targetDir}`, /* verbose = */ false)
+}
+
+fun execCheck(_args: Cli.ParseResults, _env: Env): void {
+  invariant_violation("TODO")
+}
+
+fun execHelp(_args: Cli.ParseResults, _env: Env): void {
+  invariant_violation("TODO: Spawn manpage.")
+}
+
+fun main(): void {
+  args = Cli.Command("skargo")
+    .about("Skip's package manager")
+    .arg(
+      Cli.BoolArg("version")
+        .short("V")
+        .long("version")
+        .about("Print version info and exit"),
+    )
+    .arg(
+      Cli.BoolArg("verbose")
+        .short("v")
+        .long("verbose")
+        .about("Use verbose output")
+        .global(),
+    )
+    .help()
+    .subcommand(
+      Cli.Command("build")
+        .short("b")
+        .about("Compile a local package")
+        .arg(Cli.StringArg("target").about("Build for the target triple"))
+        .arg(
+          Cli.StringArg("target-dir").about(
+            "Directory for all generated artifacts",
+          ),
+        ),
+    )
+    .subcommand(
+      Cli.Command("check")
+        .short("c")
+        .about(
+          "Analyze the current package and report errors, but don't build object files",
+        ),
+    )
+    .subcommand(
+      Cli.Command("test")
+        .short("t")
+        .about("Run the tests")
+        .arg(
+          Cli.StringArg("filter").about(
+            "If specified, only run tests with names matching the filter",
+          ),
+        ),
+    )
+    .subcommand(Cli.Command("clean").about("Remove the target directory"))
+    .subcommand(
+      Cli.Command("init")
+        .about("Create a new skargo package")
+        .arg(Cli.StringArg("path").default(".")),
+    )
+    .subcommand(
+      Cli.Command("update").about("Update dependencies listed in Skargo.lock"),
+    )
+    .subcommand(
+      Cli.Command("help").about("Displays help for a skargo subcommand"),
+    )
+    .parseArgs();
+
+  if (args.getBool("version")) {
+    print_string("skargo " + Skargo.kVersion);
+    skipExit(0);
+  } else if (args.maybeGetSubcommand().isNone()) {
+    print_string(Cli.usage(args.cmd, true));
+    skipExit(0)
+  } else {
+    subcmd_handler = args.maybeGetSubcommand().map(subcmd ->
+      subcmd match {
+      | "init" -> Skargo.execInit
+      | "update" -> Skargo.execUpdate
+      | "check" -> Skargo.execCheck
+      | "build" -> Skargo.execBuild
+      | "test" -> Skargo.execTest
+      | "clean" -> Skargo.execClean
+      | "help" -> Skargo.execHelp
+      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+      }
+    );
+
+    env = Env::create();
+    subcmd_handler.each(f -> f(args, env))
+  };
+
+  void
+}

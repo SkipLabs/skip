@@ -1,0 +1,49 @@
+module Skargo;
+
+private fun fetchLatestManifest(constraint: VersionConstraint): Manifest {
+  constraint match {
+  | PathConstraint(path, _) -> Manifest::read(Path.join(path, kManifestFile))
+  | RangeConstraint _ ->
+    invariant_violation("TODO") // Fetch highest available version within range.
+  }
+}
+
+// TODO: Backtrack on conflict, and try previous versions.
+private fun solveDependencies(
+  manifest: Manifest,
+  solved: mutable Map<String, Manifest>,
+): Bool {
+  for ((name, constraint) in manifest.dependencies.items()) {
+    if (solved.containsKey(name)) {
+      constraint match {
+      | PathConstraint _ ->
+        depManifest = fetchLatestManifest(constraint);
+        if (depManifest.version != solved[name].version) return false
+      // TODO: If version was specified along path, ensure the expected dep version matches the manifest.
+      | RangeConstraint _ -> invariant_violation("TODO")
+      // if (!constraint.matches(solved[name].version)) return false
+      };
+      continue
+    } else {
+      depManifest = fetchLatestManifest(constraint);
+      solved.set(name, depManifest);
+      if (!solveDependencies(depManifest, solved)) {
+        return false
+      }
+    };
+  };
+  true
+}
+
+class UnsatisfiableDependency() extends Exception {}
+
+fun getDependencies(
+  manifest: Manifest,
+): Result<readonly Map<String, Manifest>, Exception> {
+  result = mutable Map[manifest.name => manifest];
+  if (solveDependencies(manifest, result)) {
+    Success(result)
+  } else {
+    Failure(UnsatisfiableDependency())
+  }
+}
