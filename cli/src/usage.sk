@@ -1,0 +1,119 @@
+module Cli;
+
+const kTabSize: Int = 4;
+
+private fun usageSection(
+  name: String,
+  lines: Sequence<Sequence<?String>>,
+): String {
+  colSizes = lines
+    .map(l -> l.map(c -> c.map(str -> str.length()).default(0)))
+    .foldl(
+      (acc, l) -> acc.zipWith(l, (u, v) -> max(u, v)),
+      Array::fill(lines.first().size(), 0),
+    )
+    .map(x -> if (x > 0) kTabSize * (1 + (x / kTabSize)) else 0);
+
+  `${name}:\n` +
+    lines
+      .map(l ->
+        "".padLeft(kTabSize, ' ') +
+          l
+            .mapWithIndex((index, c) ->
+              c.default("").padRight(colSizes[index], ' ')
+            )
+            .join("")
+      )
+      .join("\n")
+}
+
+private fun usageUsage(
+  cmd: Command,
+  prefix: String,
+  positionalArgs: Sequence<Cli.Arg>,
+  options: Sequence<Cli.Arg>,
+): ?String {
+  res = "Usage:\n" + "".padLeft(kTabSize, ' ') + prefix + cmd.name;
+  if (options.size() > 0) {
+    !res = res + " [OPTIONS]"
+  };
+  if (cmd._subcommands.size() > 0) {
+    !res = res + " [SUBCOMMAND]"
+  } else {
+    // Cannot have both positional args and subcommands.
+    for (arg in positionalArgs) {
+      argString = if (arg._required) {
+        `<${arg.name}>`
+      } else {
+        `[${arg.name}]`
+      };
+      !res = res + " " + argString
+    };
+  };
+  if (cmd._extra) {
+    name = cmd._extraName.default("args");
+    !res = res + ` [-- <${name}>...]`
+  };
+
+  Some(res)
+}
+
+private fun usagePositionalArgs(positionalArgs: Sequence<Cli.Arg>): String {
+  usageSection(
+    "ARGS",
+    positionalArgs.map(arg ->
+      Array[
+        Some(`<${arg.name}>`),
+        arg._default.map(v -> `[default: ${v}]`),
+        arg._about,
+      ]
+    ),
+  )
+}
+
+private fun usageOptions(options: Sequence<Cli.Arg>): String {
+  usageSection(
+    "OPTIONS",
+    options.map(arg -> {
+      optFlags = (arg._short, arg._long) match {
+      | (Some(short), Some(long)) -> `-${short}, --${long}`
+      | (Some(short), None()) -> `-${short}`
+      | (None(), Some(long)) -> `    --${long}`
+      | _ -> invariant_violation("error")
+      };
+      Array[Some(optFlags), arg._about]
+    }),
+  )
+}
+
+private fun usageCommands(subcommands: Sequence<Command>): String {
+  usageSection(
+    "COMMANDS",
+    subcommands.map(subcmd -> {
+      name = subcmd.name;
+      subcmd._short.each(n -> !name = name + ", " + n);
+      Array[Some(name), subcmd._about]
+    }),
+  )
+}
+
+fun usage(cmd: Command, header: Bool = true, prefix: String = ""): String {
+  positionalArgs = cmd._args.filter(arg -> arg._isPositional());
+  options = cmd._args.filter(arg -> !arg._isPositional());
+
+  Array[
+    if (header) cmd._about else None(),
+    usageUsage(cmd, prefix, positionalArgs, options),
+    if (positionalArgs.size() > 0) {
+      Some(usagePositionalArgs(positionalArgs))
+    } else {
+      None()
+    },
+    if (options.size() > 0) Some(usageOptions(options)) else None(),
+    if (cmd._subcommands.size() > 0) {
+      Some(usageCommands(cmd._subcommands))
+    } else {
+      None()
+    },
+  ].filterNone().join("\n\n")
+}

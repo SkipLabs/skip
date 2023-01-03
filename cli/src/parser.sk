@@ -1,0 +1,190 @@
+module Cli;
+
+base class ArgumentError extends Exception uses Equality {
+  children =
+  | InvalidArgumentError(arg: String)
+  | MissingArgumentError(arg: String)
+  | MissingValueError(arg: String)
+  | DuplicateValueError(arg: String)
+
+  fun getMessage(): String
+  | InvalidArgumentError(arg) -> `Invalid argument ${arg}.`
+  | MissingArgumentError(arg) -> `Missing required argument ${arg}.`
+  | MissingValueError(arg) -> `No value provided for argument ${arg}.`
+  | DuplicateValueError(arg) -> `Multiple values provided for argument ${arg}.`
+}
+
+base class Value uses Show, Equality {
+  children =
+  | BoolValue(Bool)
+  | StringValue(String)
+  | MissingValue()
+
+  fun toString(): String
+  | MissingValue() -> "(no value)"
+  | BoolValue(v) -> `boolean value: ${v}`
+  | StringValue(v) -> `string value: ${v}`
+}
+
+class ParseResults{
+  cmd: Command,
+  values: Map<String, Value> = Map[],
+  extra: Array<String> = Array[],
+  subcommand: ?String = None(),
+  error: ?ArgumentError = None(),
+} {
+  fun getBool(name: String): Bool {
+    this.values[name] match {
+    | BoolValue(v) -> v
+    | _ -> invariant_violation(`Argument ${name} is not boolean.`)
+    }
+  }
+
+  fun maybeGetString(name: String): ?String {
+    this.values.maybeGet(name) match {
+    | Some(StringValue(v)) -> Some(v)
+    | Some(MissingValue()) -> None()
+    | Some(_) -> invariant_violation(`Argument ${name} is not a string`)
+    | None() -> invariant_violation(`Argument ${name} is undefined.`)
+    }
+  }
+
+  fun getString(name: String): String {
+    this.maybeGetString(name) match {
+    | Some(s) -> s
+    | None() -> invariant_violation(`Argument ${name} is missing.`)
+    }
+  }
+
+  fun maybeGetSubcommand(): ?String {
+    this.subcommand
+  }
+
+  fun getCommand(): Command {
+    this.cmd
+  }
+}
+
+fun parseArgs(cmd: Command): ParseResults {
+  parseArgsFrom(cmd, arguments())
+}
+
+fun parseArgsFrom(cmd: Command, argv: Sequence<String>): ParseResults {
+  parse(cmd, argv.values())
+}
+
+fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
+  subcommands = mutable Map[];
+  for (subcmd in cmd._subcommands) {
+    subcommands.set(subcmd.name, subcmd);
+    subcmd._short.each(n -> subcommands.set(n, subcmd))
+  };
+  pos_args = mutable Vector[];
+  // TODO: options is a bad name. Maybe flag_args?
+  options = mutable Map[];
+  for (arg in cmd._args) {
+    if (options.containsKey(arg.name)) {
+      invariant_violation(`Duplicate argument ${arg.name}`)
+    };
+    if (arg._isPositional()) {
+      pos_args.push(arg);
+    } else {
+      // TODO: Allow short-only flags?
+      // Use arg name as long flag for convenience.
+      // TODO: Make it possible to have a short flag only.
+      long_flag = arg._long.default(arg.name);
+      options.add(`--${long_flag}`, arg);
+      if (arg._negatable) {
+        options.add(`--no-${long_flag}`, arg);
+      };
+      arg._short.each(flag -> {
+        options.add(`-${flag}`, arg)
+      });
+    }
+  };
+
+  isFirst = true;
+  posArgId = 0;
+  values = mutable Map<String, Value>[];
+  extra = mutable Vector[];
+  hasExtra = false;
+  error: ?ArgumentError = None();
+
+  for (arg in cmd._args) {
+    values.set(arg.name, arg._defaultValue());
+  };
+
+  loop {
+    iterator.next() match {
+    | None() -> break void
+    | Some(str) if (hasExtra) -> extra.push(str)
+    | Some(str) if (isFirst && subcommands.containsKey(str)) ->
+      res = parse(subcommands.get(str), iterator);
+      values.extend(res.values);
+      return res with {
+        subcommand => Some(res.cmd.name),
+        values => values.chill(),
+      }
+    | Some("--") ->
+      if (!cmd._extra) {
+        !error = Some(InvalidArgumentError("--"));
+        break void
+      };
+      !hasExtra = true
+    | Some(str) ->
+      (argName, argValue) = if (str.contains("=")) {
+        (k, v) = str.splitFirst("=");
+        (k, Some(v))
+      } else {
+        (str, None())
+      };
+      options.maybeGet(argName) match {
+      | Some(arg) ->
+        if (arg._takesValue()) {
+          value = argValue match {
+          | Some(v) -> v
+          | None() ->
+            iterator.next() match {
+            | Some(v) -> v
+            | None() ->
+              !error = Some(MissingValueError(arg.name));
+              break void
+            }
+          };
+          if (values[arg.name] is MissingValue _) {
+            values.set(arg.name, StringValue(value))
+          } else {
+            !error = Some(DuplicateValueError(arg.name));
+            break void
+          }
+        } else {
+          values.set(arg.name, BoolValue(!str.startsWith("--no-")))
+        }
+      | None() if (!str.startsWith("-") && posArgId < pos_args.size()) ->
+        values.set(pos_args[posArgId].name, StringValue(str));
+        !posArgId = posArgId + 1
+      | None() ->
+        !error = Some(InvalidArgumentError(str));
+        break void
+      }
+    };
+    !isFirst = false
+  };
+
+  if (error.isNone()) {
+    for (arg in cmd._args) {
+      // Check required arguments
+      if (arg._required && values[arg.name] == MissingValue()) {
+        !error = Some(MissingArgumentError(arg.name));
+        break void
+      }
+    }
+  };
+
+  ParseResults{
+    cmd => cmd,
+    values => values.chill(),
+    extra => Array::createFromItems(extra.chill()),
+    error => error,
+  }
+}
