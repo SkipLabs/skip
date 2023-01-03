@@ -252,7 +252,16 @@ void SKIP_write_to_file(int64_t fd, char* str) {
  }
 }
 
-void SKIP_check_if_file_exists(char* filename_obj) {
+bool SKIP_check_if_file_exists(char* filename_obj) {
+  size_t filename_size = SKIP_String_byteSize(filename_obj);
+  char *filename = (char *)malloc(filename_size+1);
+  memcpy(filename, filename_obj, filename_size);
+  filename[filename_size] = (char)0;
+
+  bool res = (access(filename, F_OK) == 0);
+
+  free(filename);
+  return res;
 }
 
 int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
