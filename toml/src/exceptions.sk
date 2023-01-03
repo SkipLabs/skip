@@ -1,0 +1,33 @@
+module TOML;
+
+base class TOMLError() extends Exception uses Show, Equality
+
+class InvalidTOMLError(position: Position, message: .String) extends TOMLError {
+  fun getMessage(): .String {
+    `${this.position}: Invalid TOML. ${this.message}`
+  }
+
+  fun toString(): .String {
+    `InvalidTOMLError: ${this.getMessage()}`
+  }
+}
+
+class TOMLValueExpectedError(expected: .String) extends TOMLError {
+  fun getMessage(): .String {
+    `expect${this.expected} called on a non-${this.expected} type.`
+  }
+
+  fun toString(): .String {
+    `TOMLValueExpectedError: ${this.getMessage()}`
+  }
+}
+
+class KeyNotFoundError(key: .String) extends TOMLError {
+  fun getMessage(): .String {
+    `Key ${this.key} not found.`
+  }
+
+  fun toString(): .String {
+    `KeyNotFoundError: ${this.getMessage()}`
+  }
+}

@@ -1,0 +1,116 @@
+module alias T = SKTest;
+
+module Tests;
+
+private fun toJSON(value: TOML.Value): JSON.Value {
+  value match {
+  | TOML.String(v) ->
+    JSON.Object(Map["type" => JSON.String("string"), "value" => JSON.String(v)])
+  | TOML.Int(v) ->
+    JSON.Object(
+      Map[
+        "type" => JSON.String("integer"),
+        "value" => JSON.String(v.toString()),
+      ],
+    )
+  | TOML.Float(v) ->
+    JSON.Object(
+      Map["type" => JSON.String("float"), "value" => JSON.String(v.toString())],
+    )
+  | TOML.Bool(v) ->
+    JSON.Object(
+      Map["type" => JSON.String("bool"), "value" => JSON.String(v.toString())],
+    )
+  | x @ TOML.DateTime _ ->
+    JSON.Object(
+      Map[
+        "type" => JSON.String(
+          if (x.offset.isSome()) {
+            "datetime"
+          } else {
+            "datetime-local"
+          },
+        ),
+        "value" => JSON.String(x.toString()),
+      ],
+    )
+  | x @ TOML.LocalDate _ ->
+    JSON.Object(
+      Map[
+        "type" => JSON.String("date-local"),
+        "value" => JSON.String(x.toString()),
+      ],
+    )
+  | x @ TOML.LocalTime _ ->
+    JSON.Object(
+      Map[
+        "type" => JSON.String("time-local"),
+        "value" => JSON.String(x.toString()),
+      ],
+    )
+  | TOML.Array(v) -> JSON.Array(v.map(x -> toJSON(x)).collect(Vector))
+  | TOML.Table(v) -> JSON.Object(v.map((_, x) -> toJSON(x)))
+  }
+}
+
+private fun normalizeJSON(json: JSON.Value): JSON.Value {
+  json match {
+  | x @ JSON.String(_) -> x
+  | JSON.Array(arr) -> JSON.Array(arr.map(normalizeJSON))
+  | JSON.Object(map) ->
+    JSON.Object(
+      Map::createFromItems(map.items().collect(Array).sortedBy(x ~> x.i0)).map(
+        (_, v) -> normalizeJSON(v),
+      ),
+    )
+  | _ -> invariant_violation("Unexpected JSON.")
+  }
+}
+
+fun runValidTest(tomlFile: String, jsonFile: String): void {
+  // TODO: Compare the actual JSON rather than the string representation.
+  actual = normalizeJSON(
+    toJSON(TOML.decode(FileSystem.readTextFile(tomlFile))),
+  ).toString();
+  expected = normalizeJSON(
+    JSON.decode(FileSystem.readTextFile(jsonFile)),
+  ).toString();
+  T.expectEq(expected, actual)
+}
+
+fun runInvalidTest(tomlFile: String): void {
+  vtry(
+    () -> {
+      actual = toJSON(
+        TOML.decode(FileSystem.readTextFile(tomlFile)),
+      ).toString();
+      throw T.ExpectationError("Expected error", "", actual)
+    },
+    _ -> void,
+  )
+}
+
+fun main(): void {
+  SKTest.test_harness(runTest -> {
+    validTests = FileSystem.readFilesRecursive("./tests/valid", fn ->
+      fn.endsWith(".toml")
+    );
+
+    for (testFile in validTests) {
+      fileWithoutExt = testFile.stripSuffix(".toml");
+      testName = fileWithoutExt.stripPrefix("tests/");
+      jsonFile = fileWithoutExt + ".json";
+
+      runTest(testName, () -> runValidTest(testFile, jsonFile))
+    };
+
+    invalidTests = FileSystem.readFilesRecursive("./tests/invalid", fn ->
+      fn.endsWith(".toml")
+    );
+
+    for (testFile in invalidTests) {
+      testName = testFile.stripPrefix("tests/").stripSuffix(".toml");
+      runTest(testName, () -> runInvalidTest(testFile))
+    }
+  })
+}

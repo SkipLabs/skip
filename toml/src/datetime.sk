@@ -1,0 +1,202 @@
+module TOML;
+
+private fun eatDate(iter: mutable String.StringIterator): ?(.Int, .Int, .Int) {
+  year = eatWhile(iter, Chars.isDigit) match {
+  | x if (x.length() == 4) -> x.toInt()
+  | _ -> return None()
+  };
+  if (year > 9999) {
+    return None()
+  };
+  if (!eatChar(iter, '-')) {
+    return None()
+  };
+  month = eatWhile(iter, Chars.isDigit) match {
+  | x if (x.length() == 2) -> x.toInt()
+  | _ -> return None()
+  };
+  if (month == 0 || month > 12) {
+    return None()
+  };
+  if (!eatChar(iter, '-')) {
+    return None()
+  };
+  day = eatWhile(iter, Chars.isDigit) match {
+  | x if (x.length() == 2) -> x.toInt()
+  | _ -> return None()
+  };
+  dayMax = month match {
+  | 2 if ((year % 400 == 0) || (year % 100 != 0 && year % 4 == 0)) -> 29
+  | 2 -> 28
+  | 4
+  | 6
+  | 9
+  | 11 ->
+    30
+  | _ -> 31
+  };
+  if (day == 0 || day > dayMax) {
+    return None()
+  };
+
+  Some((year, month, day))
+}
+
+private fun eatTime(
+  iter: mutable String.StringIterator,
+): ?(.Int, .Int, .Int, ?.Int) {
+  hour = eatWhile(iter, Chars.isDigit) match {
+  | x if (x.length() == 2) -> x.toInt()
+  | _ -> return None()
+  };
+  if (hour > 23) {
+    return None()
+  };
+  if (!eatChar(iter, ':')) {
+    return None()
+  };
+  minute = eatWhile(iter, Chars.isDigit) match {
+  | x if (x.length() == 2) -> x.toInt()
+  | _ -> return None()
+  };
+  if (minute > 59) {
+    return None()
+  };
+  if (!eatChar(iter, ':')) {
+    return None()
+  };
+  second = eatWhile(iter, Chars.isDigit) match {
+  | x if (x.length() == 2) -> x.toInt()
+  | _ -> return None()
+  };
+  if (second > 60) { // TODO: Validate leap seconds.
+    return None()
+  };
+  frac = if (eatChar(iter, '.')) {
+    Some(eatWhile(iter, Chars.isDigit).toInt())
+  } else {
+    None()
+  };
+
+  Some((hour, minute, second, frac))
+}
+
+private fun eatOffset(iter: mutable String.StringIterator): ?.String {
+  eatHourMinute: () -> ?.String = () -> {
+    hour = eatWhile(iter, Chars.isDigit) match {
+    | x if (x.length() == 2) -> x.toInt()
+    | _ -> return None()
+    };
+    if (hour > 23) {
+      return None()
+    };
+    if (!eatChar(iter, ':')) {
+      return None()
+    };
+    minute = eatWhile(iter, Chars.isDigit) match {
+    | x if (x.length() == 2) -> x.toInt()
+    | _ -> return None()
+    };
+    if (minute > 59) {
+      return None()
+    };
+    Some(
+      hour.toString().padLeft(2, '0') + ":" + minute.toString().padLeft(2, '0'),
+    )
+  };
+  iter.current() match {
+  | Some('z')
+  | Some('Z') ->
+    _ = iter.next();
+    Some("Z")
+  | Some(c) if (c == '+' || c == '-') ->
+    _ = iter.next();
+    eatHourMinute() match {
+    | Some(v) -> Some(`${c}${v}`)
+    | None() -> None()
+    }
+  | _ -> None()
+  }
+}
+
+private fun parseDateTime(tok: .String): ?DateTime {
+  iter = tok.getIter();
+  (year, month, day) = eatDate(iter) match {
+  | Some(v) -> v
+  | None() -> return None()
+  };
+  if (!eatChar(iter, 'T') && !eatChar(iter, 't') && !eatChar(iter, ' ')) {
+    return None()
+  };
+  (hour, minute, second, frac) = eatTime(iter) match {
+  | Some(v) -> v
+  | None() -> return None()
+  };
+
+  offset = if (!iter.atEnd()) {
+    eatOffset(iter) match {
+    | Some(v) -> Some(v)
+    | None() -> return None()
+    }
+  } else {
+    None()
+  };
+
+  if (!iter.atEnd()) {
+    return None()
+  };
+
+  Some(DateTime(year, month, day, hour, minute, second, frac, offset))
+}
+
+private fun parseDate(tok: .String): ?LocalDate {
+  iter = tok.getIter();
+  (year, month, day) = eatDate(iter) match {
+  | Some(v) -> v
+  | None() -> return None()
+  };
+
+  if (!iter.atEnd()) {
+    return None();
+  };
+
+  Some(LocalDate(year, month, day))
+}
+
+private fun parseTime(tok: .String): ?LocalTime {
+  iter = tok.getIter();
+  (hour, minute, second, frac) = eatTime(iter) match {
+  | Some(v) -> v
+  | None() -> return None()
+  };
+
+  if (!iter.atEnd()) {
+    return None()
+  };
+
+  Some(LocalTime(hour, minute, second, frac))
+}
+
+private fun eatWhile(
+  iter: mutable String.StringIterator,
+  pred: (Char) ~> .Bool,
+): .String {
+  start = iter.clone();
+  loop {
+    iter.current() match {
+    | Some(c) if (pred(c)) -> _ = iter.next()
+    | _ -> break void
+    }
+  };
+
+  start.slice(iter)
+}
+
+private fun eatChar(iter: mutable String.StringIterator, c: Char): .Bool {
+  iter.current() match {
+  | Some(v) if (v == c) ->
+    _ = iter.next();
+    true
+  | _ -> false
+  }
+}

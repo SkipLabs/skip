@@ -1,0 +1,82 @@
+module TOML;
+
+private fun parseFloat(tok: .String): ?.Float {
+  iter = tok.getIter();
+
+  sign = iter.current().fromSome() match {
+  | '-' ->
+    _ = iter.next();
+    -1.0
+  | '+' ->
+    _ = iter.next();
+    1.0
+  | _ -> 1.0
+  };
+
+  result = eatInteger(iter) match {
+  | Some((0, 0)) -> return None()
+  | Some((0, 1)) -> 0.0
+  | Some((x, 0)) -> x.toFloat()
+  | _ -> return None()
+  };
+
+  e = 0;
+  iter.current().fromSome() match {
+  | '.' ->
+    _ = iter.next();
+    eatInteger(iter) match {
+    | Some((0, 0)) -> return None()
+    | Some((decimalPart, leadingZeros)) ->
+      for (_ in Range(0, leadingZeros)) {
+        !result = 10.0 * result;
+        !e = e - 1
+      };
+      i = decimalPart;
+      while (i != 0) {
+        !result = 10.0 * result;
+        !e = e - 1;
+        !i = i / 10
+      };
+      !result = result + decimalPart.toFloat()
+    | _ -> return None()
+    }
+  | _ -> void
+  };
+
+  iter.current() match {
+  | Some('e')
+  | Some('E') ->
+    _ = iter.next();
+    expSign = iter.current().fromSome() match {
+    | '-' ->
+      _ = iter.next();
+      -1
+    | '+' ->
+      _ = iter.next();
+      1
+    | _ -> 1
+    };
+    eatInteger(iter) match {
+    | Some((0, 0)) -> return None()
+    | Some((exp, _)) -> !e = e + expSign * exp
+    | _ -> return None()
+    }
+  | _ -> void
+  };
+
+  if (!iter.atEnd()) {
+    return None()
+  };
+
+  while (e > 0) {
+    !result = 10.0 * result;
+    !e = e - 1
+  };
+
+  while (e < 0) {
+    !result = 0.1 * result;
+    !e = e + 1
+  };
+
+  Some(sign * result)
+}
