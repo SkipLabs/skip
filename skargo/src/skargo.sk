@@ -1,0 +1,205 @@
+module Skargo;
+
+const kVersion: String = "0.1.0";
+const kManifestFile: String = "Skargo.toml";
+
+class Env{skipPath: String, rootDir: String, manifest: Manifest} {
+  static fun create(): Env {
+    skipPath = Path.parentname(Path.dirname(getMainExecutable(getArg0())));
+    rootDir = findRootDir();
+    Env{
+      skipPath,
+      rootDir,
+      manifest => Manifest::read(Path.join(rootDir, kManifestFile)),
+    }
+  }
+}
+
+// Return the path to the main executable, given the value of argv[0] from
+// program startup.
+// Inspired from `llvm/lib/Support/Unix/Path.inc`.
+private fun getMainExecutable(argv0: String): String {
+  // First approach: absolute path.
+  if (argv0.startsWith("/")) {
+    path = argv0;
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    }
+  };
+
+  // Second approach: relative path.
+  if (argv0.contains("/")) {
+    path = Path.join(getcwd(), argv0);
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    }
+  };
+
+  // Third approach: $PATH
+  for (p in getenv("PATH").split(":")) {
+    path = Path.join(p, argv0);
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    }
+  };
+
+  invariant_violation("Cannot determine main executable.")
+}
+
+private fun findRootDir(): String {
+  path = getcwd();
+
+  loop {
+    if (FileSystem.exists(Path.join(path, kManifestFile))) {
+      return path
+    };
+    if (Path.isRoot(path)) {
+      invariant_violation(
+        `Could not find \`${kManifestFile}\` in \`${getcwd()} or any parent directory.\``,
+      )
+    };
+
+    !path = Path.parentname(path)
+  }
+}
+
+private fun skcFlags(target: String): String {
+  if (target.startsWith("wasm32")) {
+    "--embedded32"
+  } else if (target.startsWith("x86_64")) {
+    "--embedded64"
+  } else {
+    invariant_violation(`Unsupported target ${target}.`)
+  }
+}
+
+// TODO: This is dirty, the compiler should select the correct preamble.
+private fun skcPreamble(target: String, env: Env): String {
+  if (target.startsWith("wasm32")) {
+    Path.join(env.skipPath, "lib", "skip_preamble32.ll");
+  } else if (target.startsWith("x86_64")) {
+    Path.join(env.skipPath, "lib", "skip_preamble64.ll");
+  } else {
+    invariant_violation(`Unsupported target ${target}.`)
+  }
+}
+
+// TODO: This is dirty, the compiler should select the correct runtime.
+private fun skcRuntime(target: String, env: Env): String {
+  if (target.startsWith("wasm32")) {
+    Path.join(env.skipPath, "lib", "libskip_runtime32.bc")
+  } else if (target.startsWith("x86_64")) {
+    Path.join(env.skipPath, "lib", "libskip_runtime64.a")
+  } else {
+    invariant_violation(`Unsupported target ${target}.`)
+  }
+}
+
+private fun run(cmd: String, verbose: Bool): void {
+  if (verbose) {
+    // TODO: colors
+    print_error(`>> ${cmd}`)
+  };
+  rv = system(cmd);
+  if (rv != 0) {
+    invariant_violation("error")
+  };
+}
+
+private fun compile(
+  files: readonly Sequence<String>,
+  binName: String,
+  main: String,
+  targetDir: String,
+  target: String,
+  env: Env,
+  verbose: Bool,
+): void {
+  _ = system(`mkdir -p ${targetDir}`);
+
+  skc = Path.join(env.skipPath, "bin", "skc");
+  llFile = Path.join(targetDir, binName + ".ll");
+  run(
+    `${skc} ${skcFlags(target)} --preamble ${skcPreamble(
+      target,
+      env,
+    )} ${files.join(
+      " ",
+    )} --export-function-as ${main}=skip_main --output ${llFile}`,
+    verbose,
+  );
+
+  if (target.startsWith("wasm32")) {
+    bcFile = Path.join(targetDir, binName + ".bc");
+    run(`llvm-link ${llFile} ${skcRuntime(target, env)} -o ${bcFile}`, verbose);
+    oFile = Path.join(targetDir, binName + ".o");
+    run(
+      `llc -mtriple=wasm32-unknown-unknown -O2 -filetype=obj ${bcFile} -o ${oFile}`,
+      verbose,
+    );
+    output = Path.join(targetDir, binName + ".wasm");
+    // TODO: This is skdb-specific and should be handled in a generic way,
+    // probably by having `skc` invoke wasm-ld directly and feeding it all
+    // `@cpp_exported`-annotated functions (`@cpp_exported` should also be
+    // renamed `@exported`).
+    exportJs = Array[
+      "getCompositeName",
+      "getCompositeSize",
+      "getCompositeAt",
+      "SKIP_String_byteSize",
+      "getLeafValue",
+      "objectKind",
+      "SKIP_call0",
+      "SKIP_Obstack_alloc",
+      "skip_main",
+      "SKIP_init_jsroots",
+      "SKIP_add_root",
+      "SKIP_remove_root",
+      "SKIP_tracked_call",
+      "SKIP_tracked_query",
+      "sk_string_create",
+      "SKIP_initializeSkip",
+      "SKIP_skfs_init",
+      "SKIP_skfs_end_of_init",
+      "SKIP_get_persistent_size",
+      "sk_pop_dirty_page",
+      "SKIP_get_version",
+      "SKIP_throw_EndOfFile",
+    ].map(x -> `-export=${x}`).join(" ");
+    run(
+      `wasm-ld --initial-memory=1073741824 ${exportJs} ${oFile} -o ${output} --no-entry -allow-undefined`,
+      verbose,
+    );
+  } else {
+    output = Path.join(targetDir, binName);
+    run(
+      `clang++ -O3 -mllvm -inline-threshold=0 ${llFile} -o ${output} ${skcRuntime(
+        target,
+        env,
+      )} -lrt -lpthread`,
+      verbose,
+    );
+  }
+}
+
+private fun build(
+  manifest: Manifest,
+  name: String,
+  main: String,
+  targetDir: String,
+  target: String,
+  env: Env,
+  verbose: Bool,
+): void {
+  files = manifest.srcs.concat(manifest.tests);
+  deps = getDependencies(manifest) match {
+  | Success(v) -> v
+  | Failure(_) -> invariant_violation("Unsatisfiable dep")
+  };
+
+  for (dep in deps) {
+    !files = files.concat(dep.srcs)
+  };
+  compile(files, name, main, targetDir, target, env, verbose);
+  void
+}

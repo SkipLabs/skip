@@ -1,0 +1,10 @@
+module SKargo;
+
+base class SkargoError extends Exception {
+  children =
+  | SkargoManifestError(path: String, message: String)
+
+  fun getMessage(): String
+  | SkargoManifestError(path, message) ->
+    `Failed to parse manifest at \`${path}\`: ${message}.`
+}

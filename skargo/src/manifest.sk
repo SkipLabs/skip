@@ -1,0 +1,117 @@
+module Skargo;
+
+class Version(major: Int, minor: Int, patch: Int) uses Equality {
+  static fun fromString(str: String): Version {
+    components = str.split(".");
+    if (components.size() != 3) {
+      invariant_violation("Invalid version string " + str)
+    };
+    Version(components[0].toInt(), components[1].toInt(), components[2].toInt())
+  }
+
+  fun toString(): String {
+    `${this.major}.${this.minor}.${this.patch}`
+  }
+}
+
+base class VersionConstraint {
+  children =
+  | RangeConstraint(low: Version, high: Version)
+  | PathConstraint(path: String, version: ?Version)
+
+  static fun fromTOML(toml: TOML.Value): VersionConstraint {
+    toml match {
+    | TOML.String(v) -> static::fromString(v)
+    | t @ TOML.Table _ ->
+      t.maybeGetString("path") match {
+      | Some(path) ->
+        PathConstraint(
+          path,
+          t.maybeGetString("version").map(Version::fromString),
+        )
+      | _ -> invariant_violation("TODO")
+      }
+    | _ -> invariant_violation("Invalid dependency specification.")
+    };
+  }
+
+  static fun fromString(str: String): VersionConstraint {
+    // TODO: Operators like (~, >, etc.).
+    if (Chars.isDigit(str.chars()[0])) {
+      version = Version::fromString(str);
+      return RangeConstraint(version, version with {patch => version.patch + 1})
+    };
+    invariant_violation("Unsupported version constraint (TODO): " + str)
+  }
+}
+
+class ManifestBinary(name: String, main: String) {
+  static fun fromTOML(toml: TOML.Table): ManifestBinary {
+    name = toml.getString("name");
+    main = toml.getString("main");
+
+    ManifestBinary(name, main)
+  }
+}
+
+class Manifest{
+  name: String,
+  path: String,
+  version: Version,
+  srcs: Array<String>,
+  tests: Array<String>,
+  testHarness: String,
+  dependencies: Map<String, VersionConstraint>,
+  bin: Array<ManifestBinary>,
+} {
+  static fun read(path: String): Manifest {
+    basePath = Path.dirname(path);
+    toml = TOML.decode(FileSystem.readTextFile(path));
+    package = toml.getTable("package");
+    name = package.getString("name");
+    version = Version::fromString(package.getString("version"));
+
+    srcs = package.maybeGetArray("srcs") match {
+    | Some(arr) -> arr.map(x -> x.expectString())
+    | _ ->
+      FileSystem.readFilesRecursive(Path.join(basePath, "src"), f ->
+        f.endsWith(".sk")
+      ).toArray()
+    };
+
+    testHarness = package.maybeGetString("test-harness").default("SKTest.main");
+
+    tests = package.maybeGetArray("tests") match {
+    | Some(arr) -> arr.map(x -> x.expectString())
+    | _ ->
+      testsPath = Path.join(basePath, "tests");
+      if (FileSystem.exists(testsPath)) {
+        FileSystem.readFilesRecursive(testsPath, f ->
+          f.endsWith(".sk")
+        ).toArray()
+      } else {
+        Array[]
+      }
+    };
+
+    dependencies = toml.getTable("dependencies").map.map((_, v) ->
+      VersionConstraint::fromTOML(v)
+    );
+
+    bin = toml.maybeGetArray("bin") match {
+    | Some(arr) -> arr.map(t -> ManifestBinary::fromTOML(t.expectTable()))
+    | None() -> Array[]
+    };
+
+    Manifest{
+      name,
+      path => basePath,
+      version,
+      srcs,
+      tests,
+      testHarness,
+      dependencies,
+      bin,
+    }
+  }
+}
