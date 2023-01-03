@@ -1065,7 +1065,7 @@ async function testDB(): Promise<void> {
 async function promptDB() {
   let skdb = await SKDB.create(true);
   let sessionID = await skdb.connect(
-    "ws://127.0.0.1:3048",
+    "ws://127.0.0.1:9999/skgw",
     "test.db",
     "julienv",
     "passjulienv"
