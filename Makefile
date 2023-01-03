@@ -62,7 +62,7 @@ SKFUNS=\
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
-default: build/out32.wasm build/skdb
+default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js
 
 build/magic.c:
 	date | cksum | awk '{print "unsigned long version = " $$1 ";"}' > build/magic.c
@@ -117,6 +117,16 @@ build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o $(ONATIV
 
 build/runtime/runtime64_specific.o: runtime/runtime64_specific.cpp
 	$(CPP) $(OLEVEL) -c runtime/runtime64_specific.cpp -o build/runtime/runtime64_specific.o
+
+# JS version of SKDB
+
+build/skdb_node.js: sql/js/src/node_header.js build/skdb.js
+	mkdir -p build
+	cat sql/js/src/node_header.js build/skdb.js > $@
+
+build/skdb.js: sql/js/src/skdb.ts
+	mkdir -p build
+	cd sql/js && tsc --build tsconfig.json --pretty false
 
 build/%.o: %.c
 	mkdir -p build/runtime
