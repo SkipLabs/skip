@@ -83,3 +83,21 @@ then
 else
     echo -e "TEST STRING PRIMARY KEY2:\tFAILED"
 fi
+
+if
+    (cd ../../ && (
+        cat build/skdb_node.js;
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  skdb.sql('create table widgets (id text unique, name text);');"
+        echo "  skdb.sql('INSERT INTO widgets (id, name) VALUES (\'a\', \'gear\');');"
+        echo "  skdb.sql('UPDATE widgets SET id = \'c\', name = \'gear2\';');"
+        echo "  console.log(skdb.sqlRaw('select * from widgets;'));"
+        echo "}"
+        echo "test()"
+     ) | node) | grep -q 'c|gear2'
+then
+    echo -e "TEST MULTIPLE FIELD UPDATES:\tOK"
+else
+    echo -e "TEST MULTIPLE FIELD UPDATES:\tFAILED"
+fi
