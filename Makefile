@@ -128,6 +128,10 @@ build/skdb.js: sql/js/src/skdb.ts
 	mkdir -p build
 	cd sql/js && tsc --build tsconfig.json --pretty false
 
+build/index.html: sql/js/index.html build/skdb.js
+	mkdir -p build
+	cp sql/js/index.html $@
+
 build/%.o: %.c
 	mkdir -p build/runtime
 	$(CC) $(CC64FLAGS) -o $@ -c $<
