@@ -101,3 +101,19 @@ then
 else
     echo -e "TEST MULTIPLE FIELD UPDATES:\tFAILED"
 fi
+
+if
+    (cd ../../ && (
+        cat build/skdb_node.js;
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  skdb.sql(\"create table widgets (id text unique , price real not null);\");" 
+        echo "  skdb.sql(\"INSERT INTO widgets (id, price) values ('a', 10.0);\");"
+        echo "}"
+        echo "test()"
+     ) | node) 
+then
+    echo -e "TEST PARSE FLOAT:\tOK"
+else
+    echo -e "TEST PARSE FLOAT:\tFAILED"
+fi

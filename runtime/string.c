@@ -282,12 +282,53 @@ SkipInt SKIP_unsafe_get_svalue(SkipInt* buffer, SkipInt n) {
   return buffer[n];
 }
 
+#ifdef SKIP32
+#define isdigit(c) (c >= '0' && c <= '9')
+
+double atof(const char *s)
+{
+  double a = 0.0;
+  int e = 0;
+  int c;
+  while ((c = *s++) != '\0' && isdigit(c)) {
+    a = a*10.0 + (c - '0');
+  }
+  if (c == '.') {
+    while ((c = *s++) != '\0' && isdigit(c)) {
+      a = a*10.0 + (c - '0');
+      e = e-1;
+    }
+  }
+  if (c == 'e' || c == 'E') {
+    int sign = 1;
+    int i = 0;
+    c = *s++;
+    if (c == '+')
+      c = *s++;
+    else if (c == '-') {
+      c = *s++;
+      sign = -1;
+    }
+    while (isdigit(c)) {
+      i = i*10 + (c - '0');
+      c = *s++;
+    }
+    e += i*sign;
+  }
+  while (e > 0) {
+    a *= 10.0;
+    e--;
+  }
+  while (e < 0) {
+    a *= 0.1;
+    e++;
+  }
+  return a;
+}
+
+#endif
+
 double SKIP_String__toFloat_raw(char* str) {
-  #ifdef SKIP32
-  SKIP_throw(NULL); // TODO
-  return 0.0;
-  #endif
-  #ifdef SKIP64
   size_t size = SKIP_String_byteSize((char*)str);
   if(size >= 255) {
     SKIP_throw(NULL); // TODO
@@ -297,7 +338,6 @@ double SKIP_String__toFloat_raw(char* str) {
   cstr[size] = 0;
 
   return atof(cstr);
-  #endif
 }
 
 char* SKIP_float_to_string(double f) {
