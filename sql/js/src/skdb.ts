@@ -1107,5 +1107,5 @@ async function promptDB() {
 
   recursiveAsyncReadLine();
 }
-initDB();
-promptDB();
+//initDB();
+//promptDB();
