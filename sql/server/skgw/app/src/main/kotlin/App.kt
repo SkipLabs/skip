@@ -1,17 +1,15 @@
 package io.skiplabs.skgw
 
 import io.undertow.Undertow
-import io.undertow.server.HttpHandler
-import io.undertow.server.HttpServerExchange
-import io.undertow.util.Headers
+import io.undertow.server.handlers.resource.FileResourceManager
 import io.undertow.Handlers
 import io.undertow.websockets.WebSocketConnectionCallback
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.AbstractReceiveListener
 import io.undertow.websockets.core.BufferedTextMessage
-import io.undertow.websockets.core.WebSocketFrameType
 import io.undertow.websockets.core.WebSockets
+import java.io.File
 
 fun createHttpServer(): Undertow {
     var server = Undertow.builder()
@@ -29,14 +27,7 @@ fun createHttpServer(): Undertow {
                         channel.resumeReceives()
                     }
                 }))
-            .addPrefixPath("/",
-                object : HttpHandler {
-                    override fun handleRequest(exchange: HttpServerExchange) {
-                        exchange.responseSender.send(
-                            "<html><head><title>Test</title></head><body></body></html>")
-                    }
-                }
-            ))
+            .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs_build/build/")))))
         .build()
     return server
 }
