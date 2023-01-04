@@ -109,13 +109,14 @@ if
         echo "  skdb = await SKDB.create(true);"
         echo "  skdb.sql(\"create table widgets (id text unique , price real not null);\");" 
         echo "  skdb.sql(\"INSERT INTO widgets (id, price) values ('a', 10.0);\");"
+        echo "  console.log(skdb.sqlRaw('select * from widgets'))"
         echo "}"
         echo "test()"
-     ) | node) 
+     ) | node) | grep -q 'a|10.0'
 then
-    echo -e "TEST PARSE FLOAT:\tOK"
+    echo -e "TEST PARSE/PRINT FLOAT:\tOK"
 else
-    echo -e "TEST PARSE FLOAT:\tFAILED"
+    echo -e "TEST PARSE/PRINT FLOAT:\tFAILED"
 fi
 
 if
