@@ -3,9 +3,6 @@
 /*****************************************************************************/
 module SKSQL;
 
-@cpp_extern("SKIP_float_to_string")
-native fun floatToString(Float): String;
-
 value class Pattern{
   hasUnderscore: Bool,
   firstIsPercent: Bool,
@@ -59,7 +56,7 @@ base class CValue uses Orderable, Show {
   fun toString(): String {
     this match {
     | CInt(n) -> n.toString()
-    | CFloat(f) -> floatToString(f)
+    | CFloat(f) -> inspect(f).toString()
     | CString(str) -> str
     }
   }
