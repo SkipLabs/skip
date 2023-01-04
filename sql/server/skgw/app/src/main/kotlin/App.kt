@@ -34,5 +34,19 @@ fun createHttpServer(): Undertow {
 
 fun main() {
     var server = createHttpServer()
+
+    val skdb = Skdb("/tmp/test.db")
+
+    println(skdb.sql("SELECT * FROM posts"))
+    println(skdb.dumpTable("posts", "_remote"))
+
+    skdb.writeCsv(user="gregs", password="passgregs", table="posts", "1\t26,\"here!\",141,68")
+    println(skdb.sql("SELECT * FROM posts"))
+
+    val proc = skdb.tail(user="gregs", password="passgregs", table="posts", {
+        println("would ship: ${it}")
+    })
+
     server.start()
+    proc.destroy()
 }
