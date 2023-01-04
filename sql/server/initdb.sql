@@ -168,21 +168,21 @@ create table posts (
   skdb_owner integer
 );
 
-insert into posts select 
+insert into posts select
    23,
    'my first post for skiplabs employees',
    (select accessID from skdb_access where name = 'skiplabs_employees'),
    (select userID from skdb_users where username = 'julienv')
 ;
 
-insert into posts select 
+insert into posts select
    24,
    'my first post for employees based in France',
    (select accessID from skdb_access where name = 'skiplabs_employees_FR'),
    (select userID from skdb_users where username = 'julienv')
 ;
 
-insert into posts select 
+insert into posts select
    25,
    'my first post for my friends',
    (select accessID from skdb_access where name = 'julienv_friends'),

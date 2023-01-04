@@ -1,16 +1,16 @@
 #!/bin/bash
 
-DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-FILE=$DIR/test.db
-SKDB_BIN=~/skfs/build/skdb
-SKDB="$SKDB_BIN --data $FILE"
+DB=/tmp/test.db
+SKDB_BIN=/skfs_build/build/skdb
+SKDB="$SKDB_BIN --data $DB"
 
-rm -f $FILE
+rm -f $DB
 
-$SKDB_BIN --init $FILE
+$SKDB_BIN --init $DB
 
 cat ../privacy/init.sql | $SKDB
 
 cat initdb.sql | $SKDB
 
-cd ~/websockify && ./run 3048 -v  -- /home/julienv/skfs/sql/server/start_tcp_server.sh
+source "/root/.sdkman/bin/sdkman-init.sh"
+cd skgw && gradle --console plain run
