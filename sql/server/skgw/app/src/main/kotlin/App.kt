@@ -9,7 +9,9 @@ import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.AbstractReceiveListener
 import io.undertow.websockets.core.BufferedTextMessage
 import io.undertow.websockets.core.WebSockets
+import io.undertow.websockets.core.BufferedBinaryMessage
 import java.io.File
+import java.nio.charset.StandardCharsets
 
 fun createHttpServer(): Undertow {
     var server = Undertow.builder()
@@ -20,8 +22,19 @@ fun createHttpServer(): Undertow {
                     override fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel) {
                         channel.receiveSetter.set(
                             object : AbstractReceiveListener() {
+                                override fun onFullBinaryMessage(channel: WebSocketChannel, message: BufferedBinaryMessage) {
+                                    // TODO: we're converting to utf8-encoded bytes in the JS so that we can immediately undo this
+                                    val pooled = message.data
+                                    try {
+                                        val byteBufs = pooled.resource
+                                        val byteBuf = WebSockets.mergeBuffers(*byteBufs)
+                                        println("decode: ${StandardCharsets.UTF_8.decode(byteBuf).toString()}")
+                                    } finally {
+                                        pooled.discard()
+                                    }
+                                }
                                 override fun onFullTextMessage(channel: WebSocketChannel, message: BufferedTextMessage) {
-                                    WebSockets.sendText(message.data, channel, null)
+                                    // TODO: ?
                                 }
                             })
                         channel.resumeReceives()
@@ -34,19 +47,5 @@ fun createHttpServer(): Undertow {
 
 fun main() {
     var server = createHttpServer()
-
-    val skdb = Skdb("/tmp/test.db")
-
-    println(skdb.sql("SELECT * FROM posts"))
-    println(skdb.dumpTable("posts", "_remote"))
-
-    skdb.writeCsv(user="gregs", password="passgregs", table="posts", "1\t26,\"here!\",141,68")
-    println(skdb.sql("SELECT * FROM posts"))
-
-    val proc = skdb.tail(user="gregs", password="passgregs", table="posts", {
-        println("would ship: ${it}")
-    })
-
     server.start()
-    proc.destroy()
 }
