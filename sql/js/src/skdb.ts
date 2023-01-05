@@ -121,13 +121,52 @@ function makeSKDBStore(
 /* Primitives to connect to websockets. */
 /* ***************************************************************************/
 
+// protocol schema
+
+type ProtoQuery = {
+  request: "query";
+  query: string;
+  format?: "json";
+}
+
+type ProtoTail = {
+  request: "tail";
+  table: string;
+  user: string;
+  password: string;
+}
+
+type ProtoDumpTable = {
+  request: "dumpTable";
+  table: string;
+  suffix: string;
+}
+
+type ProtoWrite = {
+  request: "write";
+  table: string;
+  user: string;
+  password: string;
+}
+
+// control plane
+type ProtoRequest = ProtoQuery | ProtoTail | ProtoDumpTable | ProtoWrite;
+
+// data plane
+type ProtoData = {
+  request: "pipe";
+  data: string;
+}
+
+type ProtoMessage = ProtoRequest | ProtoData;
+
 function makeWebSocket(
   uri: string,
   onopen: () => void,
-  onmessage: (msg: string | ArrayBuffer | null) => void,
+  onmessage: (msg: string ) => void,
   onclose: (e: Event) => void,
   onerror: (e: Event) => void
-): Promise<(data: object) => void> {
+): Promise<(data: ProtoMessage) => void> {
   let socket: WebSocket;
   if (typeof window === "undefined") {
     // @ts-expect-error
@@ -149,7 +188,8 @@ function makeWebSocket(
         reader.addEventListener(
           "load",
           () => {
-            onmessage(reader.result);
+            // we know it will be a string because we called readAsText
+            onmessage((reader.result ?? "") as string);
           },
           false
         );
@@ -167,8 +207,7 @@ function makeWebSocket(
   });
 }
 
-// TODO: define the shape of the protocol
-async function makeRequest(uri: string, request: object): Promise<string> {
+async function makeRequest(uri: string, request: ProtoRequest): Promise<string> {
   let data = "";
   return new Promise((resolve, reject) => {
     makeWebSocket(
@@ -189,16 +228,21 @@ async function makeRequest(uri: string, request: object): Promise<string> {
   });
 }
 
-async function makeStream(
+// socket that delivers
+async function makeOutputStream(
   uri: string,
-  request: object,
+  request: ProtoRequest,
   onopen: () => void,
-  onmessage: (msg) => void
+  onmessage: (msg: ProtoData) => void
 ): Promise<void> {
   return makeWebSocket(
     uri,
     onopen,
-    onmessage,
+    function (msg) {
+      // TODO: probably should have some schema check, but I hope we
+      // don't keep json around long enough to warrant writing it.
+      onmessage(JSON.parse(msg));
+    },
     function (_) {
       console.log("Error connection lost");
     },
@@ -210,10 +254,11 @@ async function makeStream(
   });
 }
 
-async function runServerWriteForever(
+// socket that can be written to
+async function makeInputStream(
   uri: string,
-  request: object
-): Promise<(data: object) => void> {
+  request: ProtoRequest
+): Promise<(data: ProtoData) => void> {
   let write = await makeWebSocket(
     uri,
     function () {},
@@ -685,7 +730,7 @@ class SKDB {
     let objThis = this;
     return new Promise((resolve, _reject) => {
       let strData = "";
-      makeStream(
+      makeOutputStream(
         uri,
         {
           request: "tail",
@@ -696,7 +741,8 @@ class SKDB {
         function () {
           resolve(0);
         },
-        function (msg) {
+        function (data: ProtoData) {
+          let msg = data.data;
           if (msg != "") {
             //          console.log('retrieve remote', msg, '>>END');
             let index = msg.lastIndexOf("\n");
@@ -720,7 +766,8 @@ class SKDB {
     password: string,
     tableName: string
   ): Promise<(txt: string) => void> {
-    let write = await runServerWriteForever(uri, {
+    let write = await makeInputStream(uri, {
+      request: "write",
       user: user,
       password: password,
       table: tableName,
