@@ -125,10 +125,10 @@ function makeWebSocket(
   uri: string,
   onopen: () => void,
   onmessage: (msg: string | ArrayBuffer | null) => void,
-  onclose: (Event) => void,
-  onerror: (Event) => void
-): Promise<(msg: string) => void> {
-  let socket;
+  onclose: (e: Event) => void,
+  onerror: (e: Event) => void
+): Promise<(data: object) => void> {
+  let socket: WebSocket;
   if (typeof window === "undefined") {
     // @ts-expect-error
     let W3CWebSocket = require("websocket").w3cwebsocket;
@@ -138,7 +138,7 @@ function makeWebSocket(
     socket = new WebSocket(uri);
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _reject) => {
     socket.onmessage = function (event) {
       const blb = event.data;
       const reader = new FileReader();
@@ -158,17 +158,17 @@ function makeWebSocket(
     };
     socket.onclose = onclose;
     socket.onerror = onerror;
-    socket.onopen = function (event) {
+    socket.onopen = function (_event) {
       onopen();
-      resolve(function (msg) {
-        let enc = new TextEncoder();
-        socket.send(enc.encode(msg));
+      resolve(function (data: object) {
+        socket.send(JSON.stringify(data));
       });
     };
   });
 }
 
-function runServer(uri: string, cmd: string, stdin: string): Promise<string> {
+// TODO: define the shape of the protocol
+async function makeRequest(uri: string, request: object): Promise<string> {
   let data = "";
   return new Promise((resolve, reject) => {
     makeWebSocket(
@@ -183,21 +183,37 @@ function runServer(uri: string, cmd: string, stdin: string): Promise<string> {
       function (err) {
         reject(err);
       }
-    ).then((writeParam) => {
-      let write = writeParam as (msg: string) => void;
-      write(cmd + "\n");
-      write(stdin + "\n");
-      write("END\n");
+    ).then((write) => {
+      write(request);
     });
+  });
+}
+
+async function makeStream(
+  uri: string,
+  request: object,
+  onopen: () => void,
+  onmessage: (msg) => void
+): Promise<void> {
+  return makeWebSocket(
+    uri,
+    onopen,
+    onmessage,
+    function (_) {
+      console.log("Error connection lost");
+    },
+    function (_err) {
+      console.log("Error connection lost");
+    }
+  ).then((write) => {
+    write(request);
   });
 }
 
 async function runServerWriteForever(
   uri: string,
-  cmd: string
-): Promise<(msg: string) => void> {
-  let data = "";
-
+  request: object
+): Promise<(data: object) => void> {
   let write = await makeWebSocket(
     uri,
     function () {},
@@ -205,40 +221,15 @@ async function runServerWriteForever(
       console.log("Error writing: " + change);
     },
     function (exn) {
-      console.log("Error connection lost: " + cmd);
+      console.log("Error connection lost: " + request);
     },
     function (err) {
       console.log("Error connection lost");
     }
   );
 
-  write(cmd + "\n");
+  write(request);
   return write;
-}
-
-function runServerForever(
-  uri: string,
-  onopen: () => void,
-  cmd: string,
-  stdin: string,
-  onClose: (Event) => void
-): Promise<void> {
-  let data = "";
-
-  return makeWebSocket(
-    uri,
-    onopen,
-    onClose,
-    function (_) {
-      console.log("Error connection lost");
-    },
-    function (err) {
-      console.log("Error connection lost");
-    }
-  ).then((write) => {
-    write(cmd + "\n");
-    write(stdin + "\n");
-  });
 }
 
 /* ***************************************************************************/
@@ -450,9 +441,11 @@ class SKDB {
     user: string,
     password: string
   ): Promise<number> {
-    let cmd = "skdb --data " + db;
     password = '"' + password + '"';
-    let result = await runServer(uri, cmd, "select id(), uid('" + user + "');");
+    let result = await makeRequest(uri, {
+      request: "query",
+      query: "select id(), uid('" + user + "');",
+    });
     const [sessionID, userID] = result.split("|").map((x) => parseInt(x));
     let serverID = this.servers.length;
     let server = new SKDBServer(
@@ -690,17 +683,19 @@ class SKDB {
     suffix: string
   ): Promise<number> {
     let objThis = this;
-    let cmd = ["TAIL", db, user, password, tableName].join(",");
-    //    console.log(cmd);
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
       let strData = "";
-      runServerForever(
+      makeStream(
         uri,
+        {
+          request: "tail",
+          user: user,
+          password: password,
+          table: tableName,
+        },
         function () {
           resolve(0);
         },
-        cmd,
-        "",
         function (msg) {
           if (msg != "") {
             //          console.log('retrieve remote', msg, '>>END');
@@ -721,23 +716,19 @@ class SKDB {
 
   async connectWriteTable(
     uri: string,
-    db: string,
     user: string,
     password: string,
     tableName: string
   ): Promise<(txt: string) => void> {
-    let cmd =
-      "skdb --data " +
-      db +
-      " --user " +
-      user +
-      " --password " +
-      password +
-      " --write-csv " +
-      tableName;
-
-    let write = await runServerWriteForever(uri, cmd);
-    return write;
+    let write = await runServerWriteForever(uri, {
+      user: user,
+      password: password,
+      table: tableName,
+    });
+    return (data) => write({
+      request: "pipe",
+      data: data,
+    });
   }
 
   getSessionID(tableName: string): number {
@@ -872,23 +863,15 @@ class SKDBServer {
     this.sessionID = sessionID;
   }
 
-  async cmd(passwd: string, args: string[], stdin: string): Promise<string> {
-    if (passwd != "admin1234") {
-      console.log("Error: wrong admin password");
-      return "";
-    }
-    const cmdline = "skdb --data " + this.db + " " + args.join(" ");
-    let result = await runServer(this.uri, cmdline, stdin);
-    return result;
-  }
-
   async sqlRaw(passwd: string, stdin: string): Promise<string> {
     if (passwd != "admin1234") {
       console.log("Error: wrong admin password");
       return "";
     }
-    const cmd = "skdb --data " + this.db;
-    let result = await runServer(this.uri, cmd, stdin);
+    let result = await makeRequest(this.uri, {
+      request: "query",
+      query: stdin,
+    });
     return result;
   }
 
@@ -897,8 +880,11 @@ class SKDBServer {
       console.log("Error: wrong admin password");
       return [];
     }
-    let cmd = "skdb --json --data " + this.db;
-    let result = await runServer(this.uri, cmd, stdin);
+    let result = await makeRequest(this.uri, {
+      request: "query",
+      query: stdin,
+      format: "json",
+    });
     return result
       .split("\n")
       .filter((x) => x != "")
@@ -907,30 +893,23 @@ class SKDBServer {
 
   async mirrorTable(tableName: string): Promise<void> {
     let remoteSuffix = "_remote_" + this.serverID;
-    let remoteCmd =
-      "skdb --data " +
-      this.db +
-      " --dump-table " +
-      tableName +
-      " --table-suffix " +
-      remoteSuffix;
-    let createRemoteTable = await runServer(this.uri, remoteCmd, "");
+    let createRemoteTable = await makeRequest(this.uri, {
+      request: "dumpTable",
+      table: tableName,
+      suffix: remoteSuffix,
+    });
     this.client.runLocal([], createRemoteTable);
 
     let localSuffix = "_local";
-    let localCmd =
-      "skdb --data " +
-      this.db +
-      " --dump-table " +
-      tableName +
-      " --table-suffix " +
-      localSuffix;
-    let createLocalTable = await runServer(this.uri, localCmd, "");
+    let createLocalTable = await makeRequest(this.uri, {
+      request: "dumpTable",
+      table: tableName,
+      suffix: localSuffix,
+    });
     this.client.runLocal([], createLocalTable);
 
     let write = await this.client.connectWriteTable(
       this.uri,
-      this.db,
       this.user,
       this.password,
       tableName
@@ -971,13 +950,12 @@ class SKDBServer {
   }
 
   async mirrorView(tableName: string, suffix?: string): Promise<void> {
-    let remoteCmd = "skdb --data " + this.db + " --dump-table " + tableName;
-    if (suffix == undefined) {
-      suffix = "";
-    } else {
-      remoteCmd = remoteCmd + " --table-suffix " + suffix;
-    }
-    let createRemoteTable = await runServer(this.uri, remoteCmd, "");
+    suffix ??= ""
+    let createRemoteTable = await makeRequest(this.uri, {
+      request: "dumpTable",
+      table: tableName,
+      suffix: suffix,
+    });
     this.client.runLocal([], createRemoteTable);
 
     await this.client.connectReadTable(
