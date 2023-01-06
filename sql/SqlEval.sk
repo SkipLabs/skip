@@ -1461,32 +1461,36 @@ fun eval(options: Options, userOpt: ?String): void {
 }
 
 fun runSql(options: Options, f: mutable SKFS.Context ~> SKFS.ContextOp): void {
-  doOnError(
-    options,
-    () ->
-      SKFS.runWithGc(
-        SKSQL.makeSqlContext().clone(),
-        f,
-        Some(SKFS.Synchronizer(importFromRoot, exportToRoot, printContext)),
-        options.sync,
-      ),
-    err -> {
-      print_error(err.getMessage());
-      skipExit(45);
-    },
+  SKFS.runWithGc(
+    SKSQL.makeSqlContext().clone(),
+    context ~>
+      if (options.backtrace) f(context) else {
+        vtry<SKFS.ContextOp>(
+          () -> f(context),
+          err -> {
+            print_error(err.getMessage());
+            SKFS.CStop(None())
+          },
+        )
+      },
+    Some(SKFS.Synchronizer(importFromRoot, exportToRoot, printContext)),
+    options.sync,
   )
 }
 
 fun runLockedSql(options: Options, f: mutable SKFS.Context ~> void): void {
-  doOnError(
-    options,
-    () -> {
-      SKFS.runLocked(SKSQL.makeSqlContext().clone(), f, options.sync)
-    },
-    err -> {
-      print_error(err.getMessage());
-      skipExit(45);
-    },
+  SKFS.runLocked(
+    SKSQL.makeSqlContext().clone(),
+    context ~>
+      if (options.backtrace) f(context) else {
+        vtry(
+          () -> f(context),
+          err -> {
+            print_error(err.getMessage())
+          },
+        )
+      },
+    options.sync,
   )
 }
 

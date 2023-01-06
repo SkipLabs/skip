@@ -1064,6 +1064,23 @@ class Synchronizer(
 
 class ChangedDirs(value: SortedSet<DirName>) extends File
 
+fun withErrorHandler(delta: readonly Context, f: () -> void): Bool {
+  vtry(
+    () -> {
+      f();
+      false
+    },
+    exn -> {
+      line = delta.getGlobal("Line") match {
+      | None() -> -1
+      | Some(x) -> SKFS.IntFile::fromFile(x).value
+      };
+      print_error("Error, line " + line + ": " + exn.getMessage());
+      true
+    },
+  );
+}
+
 @cpp_export("SKIP_resolve_context")
 fun resolveContext(
   tick: Tick,
@@ -1077,33 +1094,32 @@ fun resolveContext(
   | None() -> invariant_violation("Concurrent access without synchronizer")
   | Some(sync) ->
     changedDirs = delta.dirs.state.getChangesAfter(tick);
-    sync.importFromRoot(delta, tick, root);
+    hasError = withErrorHandler(delta, () -> {
+      sync.importFromRoot(delta, tick, root);
+    });
+    if (hasError) return root;
 
     newRoot = Context::fromSaved(root);
     newRoot.!globals = delta.globals;
+    hasVersioning = false;
 
-    hasVersioning = sync.exportToRoot(newRoot, tick, delta);
+    !hasError = withErrorHandler(delta, () -> {
+      !hasVersioning = sync.exportToRoot(newRoot, tick, delta);
+    });
+
+    if (hasError) return root;
 
     lockF match {
     | None() -> void
     | Some(f) ->
-      vtry(
-        () -> {
-          newRootTick = newRoot.tick;
-          f(newRoot, delta, root);
-          !changedDirs = changedDirs.union(
-            newRoot.dirs.state.getChangesAfter(newRootTick),
-          );
-        },
-        (err -> {
-          line = delta.getGlobal("Line") match {
-          | None() -> -1
-          | Some(x) -> SKFS.IntFile::fromFile(x).value
-          };
-          print_error("Error, line " + line + ": " + err.getMessage());
-          skipExit(2);
-        }),
-      )
+      !hasError = withErrorHandler(delta, () -> {
+        newRootTick = newRoot.tick;
+        f(newRoot, delta, root);
+        !changedDirs = changedDirs.union(
+          newRoot.dirs.state.getChangesAfter(newRootTick),
+        );
+      });
+      if (hasError) return root
     };
     if (!hasVersioning) {
       newRoot.setGlobal("CHANGED_DIRS", ChangedDirs(changedDirs));
