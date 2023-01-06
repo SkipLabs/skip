@@ -2,7 +2,13 @@ package io.skiplabs.skgw
 
 import java.io.BufferedReader
 import java.io.BufferedWriter
+import java.io.OutputStream
 import kotlin.run
+
+enum class OutputFormat(val flag: String) {
+    JSON("--json"),
+    CSV("--csv"),
+}
 
 // super dumb, mostly synchronous, process facade
 class Skdb(val dbPath: String) {
@@ -37,8 +43,8 @@ class Skdb(val dbPath: String) {
         blockingRun(ProcessBuilder(SKDB_PROC, "--init", dbPath))
     }
 
-    fun sql(stmts: String): String {
-        return blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath), stmts)
+    fun sql(stmts: String, format: OutputFormat): String {
+        return blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath, format.flag), stmts)
     }
 
     fun dumpTable(table: String, suffix: String): String {
@@ -48,14 +54,19 @@ class Skdb(val dbPath: String) {
             "--table-suffix", suffix))
     }
 
-    fun writeCsv(user: String, password: String, table: String, csvInput: String) {
-        blockingRun(
-            ProcessBuilder(
+    fun writeCsv(user: String, password: String, table: String): OutputStream {
+        val pb = ProcessBuilder(
                 SKDB_PROC, "--data", dbPath,
                 "--user", user,
                 "--password", password,
-                "--write-csv", table),
-            csvInput)
+                "--write-csv", table)
+
+        pb.redirectError(ProcessBuilder.Redirect.INHERIT)
+
+        val proc = pb.start()
+
+        // TODO: interface sucks, no way to control and prevent leaking the proc
+        return proc.outputStream
     }
 
     fun tail(user: String, password: String, table: String, callback: (String) -> Unit): Process {
@@ -80,7 +91,7 @@ class Skdb(val dbPath: String) {
         val t = Thread({
             output.forEachLine { callback(it) }
         })
-        t.run()
+        t.start()
 
         return proc
         // TODO: return this so we can kill the proc. but we should
