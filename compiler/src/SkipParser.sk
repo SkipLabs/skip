@@ -4511,7 +4511,8 @@ mutable class SkipParser{
     | TokenKind.BREAK()
     | TokenKind.CONTINUE()
     | TokenKind.YIELD()
-    | TokenKind.FOREACH_FIELD() ->
+    | TokenKind.FOREACH_FIELD()
+    | TokenKind.FOREACH_FUNCTION() ->
       true
     // async, untracked, mutable, static and class can start a declaration, so must disambiguate after functions
     // which have pattern branch lists as bodies
@@ -4552,6 +4553,7 @@ mutable class SkipParser{
   mutable fun parseStatementExpression(): ParseTree {
     this.peek() match {
     | TokenKind.FOREACH_FIELD() -> this.parseForEachFieldMacro()
+    | TokenKind.FOREACH_FUNCTION() -> this.parseForEachFunctionMacro()
     | _ -> this.parseWithExpression()
     }
   }
@@ -4693,6 +4695,52 @@ mutable class SkipParser{
     body = this.parseBindingExpression();
 
     ParseTree.ForEachFieldMacroTree{
+      range => this.createRange(start),
+      keyword,
+      params,
+      body,
+    }
+  }
+
+  // for-each-function-macro:
+  //    #forEachFunction  (  annotation  ,  macro-non-type-identifier)  binding-expression
+  //    #forEachFunction  (  annotation  ,  macro-non-type-identifier  ,  macro-non-type-identifier)  binding-expression
+  mutable fun parseForEachFunctionMacro(): ParseTree {
+    start = this.mark();
+    keyword = this.eatTree(TokenKind.FOREACH_FUNCTION());
+
+    elements = mutable Vector[];
+    separators = mutable Vector[];
+
+    startDelimiter = this.eatTree(TokenKind.OPEN_PAREN());
+
+    elements.push(this.parseAnnotation());
+
+    separators.push(this.eatTree(TokenKind.COMMA()));
+    elements.push(this.eatTree(TokenKind.MACRO_NONTYPE_IDENTIFIER()));
+
+    if (this.peekKind(TokenKind.COMMA())) {
+      separators.push(this.eatTree(TokenKind.COMMA()));
+      elements.push(this.eatTree(TokenKind.MACRO_NONTYPE_IDENTIFIER()));
+    };
+
+    endDelimiter = this.eatTree(TokenKind.CLOSE_PAREN(), Some(startDelimiter));
+
+    arguments = ParseTree.ParseTreeList{
+      range => this.createRange(start),
+      startDelimiter => startDelimiter,
+      elements => elements.collect(Array),
+      separatorKind => Some(TokenKind.COMMA()),
+      separators => separators.collect(Array),
+      endDelimiter => endDelimiter,
+    };
+    params = ParseTree.PositionalArgumentsTree{
+      range => arguments.range,
+      arguments,
+    };
+    body = this.parseBindingExpression();
+
+    ParseTree.ForEachFunctionMacroTree{
       range => this.createRange(start),
       keyword,
       params,
@@ -4869,7 +4917,8 @@ mutable class SkipParser{
     | ParseTree.ReturnExpressionTree _
     | ParseTree.YieldExpressionTree _
     | ParseTree.YieldBreakExpressionTree _
-    | ParseTree.ForEachFieldMacroTree _ ->
+    | ParseTree.ForEachFieldMacroTree _
+    | ParseTree.ForEachFunctionMacroTree _ ->
       void
 
     | ParseTree.CallArrayExpressionTree{func, bang} ->
