@@ -1358,8 +1358,16 @@ fun runWithGcIntern(
   loop {
     startTick = context.tick;
     pos = newObstack();
-    start = context.tick;
-    (newContext, newContextOp) = f(context with {globals});
+    (newContext, newContextOp) = vtry<?(SKFS.Context, SKFS.ContextOp)>(
+      () -> Some(f(context with {globals})),
+      exn -> {
+        print_error(exn.getMessage());
+        None()
+      },
+    ) match {
+    | Some(x) -> x
+    | None() -> return context
+    };
     newContextOp match {
     | CContinue(underLockF) ->
       synchronizer match {
@@ -1373,7 +1381,7 @@ fun runWithGcIntern(
           underLockF,
         );
         gGlobalUnlock();
-        context.notifyAll(start);
+        context.notifyAll(startTick);
         destroyObstack(pos)
       | Some _ ->
         !context = gContextSync(
@@ -1384,7 +1392,7 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
-        context.notifyAll(start);
+        context.notifyAll(startTick);
         destroyObstack(pos)
       }
     | CStop(underLockF) ->
@@ -1399,7 +1407,7 @@ fun runWithGcIntern(
           underLockF,
         );
         gGlobalUnlock();
-        context.notifyAll(start);
+        context.notifyAll(startTick);
         gUnsafeFree(context);
         return context
       | Some _ ->
@@ -1411,7 +1419,7 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
-        context.notifyAll(start);
+        context.notifyAll(startTick);
         gUnsafeFree(context);
         return context
       }
