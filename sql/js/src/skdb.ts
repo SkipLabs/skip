@@ -179,11 +179,13 @@ function makeWebSocket(
 
   return new Promise((resolve, _reject) => {
     socket.onmessage = function (event) {
-      const blb = event.data;
+      const data = event.data;
       const reader = new FileReader();
       if (typeof window === "undefined") {
-        let string = new TextDecoder().decode(blb);
+        let string = new TextDecoder().decode(data);
         onmessage(string);
+      } else if(typeof data === "string") {
+        onmessage(data)
       } else {
         reader.addEventListener(
           "load",
@@ -193,7 +195,7 @@ function makeWebSocket(
           },
           false
         );
-        reader.readAsText(blb);
+        reader.readAsText(data);
       }
     };
     socket.onclose = onclose;
@@ -217,7 +219,7 @@ async function makeRequest(uri: string, request: ProtoRequest): Promise<string> 
         data += msg;
       },
       function (_) {
-        resolve(data);
+        resolve((JSON.parse(data) as ProtoData).data);
       },
       function (err) {
         reject(err);
@@ -486,7 +488,6 @@ class SKDB {
     user: string,
     password: string
   ): Promise<number> {
-    password = '"' + password + '"';
     let result = await makeRequest(uri, {
       request: "query",
       query: "select id(), uid('" + user + "');",
@@ -729,7 +730,6 @@ class SKDB {
   ): Promise<number> {
     let objThis = this;
     return new Promise((resolve, _reject) => {
-      let strData = "";
       makeOutputStream(
         uri,
         {
@@ -744,16 +744,7 @@ class SKDB {
         function (data: ProtoData) {
           let msg = data.data;
           if (msg != "") {
-            //          console.log('retrieve remote', msg, '>>END');
-            let index = msg.lastIndexOf("\n");
-            if (index < msg.length) {
-              index++;
-            }
-            let newData = msg.slice(index);
-            msg = strData + msg.slice(0, index);
-            strData = newData;
-            //          console.log('BEGIN' + msg + 'END');
-            objThis.runLocal(["--write-csv", tableName + suffix], msg);
+            objThis.runLocal(["--write-csv", tableName + suffix], msg + '\n');
           }
         }
       );
