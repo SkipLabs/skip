@@ -2038,10 +2038,40 @@ const funsDir: SKFS.EHandle<FunFile> = SKFS.EHandle(
 );
 class FunFile(value: N.Fun_def) extends SKFS.File
 
+const funsByAnnotationDirName: SKFS.DirName = SKFS.DirName::create(
+  "/namingFunsByAnnotation/",
+);
+const funsByAnnotationDir: SKFS.EHandle<NameFile> = SKFS.EHandle(
+  NameFile::fromFile,
+  funsByAnnotationDirName,
+);
+class NameFile(value: N.Name) extends SKFS.File
+
 fun populateFuns(
   context: mutable SKFS.Context,
   defDir: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
 ): void {
+  // Gathering all functions with their annotations so that they are available
+  // for `#forEachFunction` macro expansion.
+  _ = defDir.contextWriterKeyValues(
+    NameFile::fromFile,
+    context,
+    funsByAnnotationDirName,
+    (context, writer, _key, values) ~> {
+      SkipError.catchErrors(2, context, () -> {
+        if (values.size() > 1) return void;
+
+        values[0].value match {
+        | GlobalEnv.EFun(f) ->
+          for (annotation in f.annotations) {
+            writer.write(SKFS.SID(annotation), NameFile(f.name))
+          }
+        | _ -> void
+        }
+      })
+    },
+  );
+
   _ = defDir.contextWriterKeyValues(
     FunFile::fromFile,
     context,
@@ -3713,6 +3743,61 @@ fun expandForEachFieldMacro(
     )
 }
 
+fun expandForEachFunctionMacro(
+  context: mutable SKFS.Context,
+  acc: mutable Acc,
+  env: Env,
+  _pos: FileRange,
+  annotation: N.Name,
+  function: N.Name,
+  functionName: ?N.Name,
+  body: A.Expr,
+): N.Expr_ {
+  id = function.i1;
+
+  // Always report errors, even when the class contains no function.
+  maybeReportDuplicateMacro(env.macros, function);
+  functionName match {
+  | Some(fn) ->
+    maybeReportDuplicateMacro(env.macros, fn);
+    if (fn.i1 == id) {
+      reportDuplicateMacro(fn.i0, fn.i1, function.i0)
+    }
+  | None() -> void
+  };
+
+  convertFunction = fun_name -> {
+    macros = env.macros;
+    !macros = env.macros.add(
+      function,
+      IdentifierMacro{pos => function.i0, name => id, value => fun_name},
+    );
+    functionName match {
+    | Some(fn) ->
+      !macros = macros.add(
+        fn,
+        ExpressionMacro::createStringLiteralMacro(fn.i0, fn.i1, fun_name.i1),
+      )
+    | None() -> void
+    };
+    expr(context, acc, env with {macros}, body)
+  };
+
+  List::createFromItems(
+    funsByAnnotationDir
+      .getArray(context, SKFS.SID(annotation.i1))
+      .map(f -> f.value)
+      .sorted(),
+  ) match {
+  | List.Nil() -> N.Literal(SkipAst.VoidLiteral())
+  | List.Cons(hd, tl) ->
+    tl.foldl(
+      (result, m) -> (m.i0, N.Seq(convertFunction(m), result)),
+      convertFunction(hd),
+    ).i1
+  }
+}
+
 fun expr_(
   context: mutable SKFS.Context,
   acc: mutable Acc,
@@ -3921,6 +4006,17 @@ fun expr_(
     expandForEachMacro(context, acc, env, binding, acollection, abody, awoBreak)
   | A.ForEachFieldMacro(field, fieldName, body) ->
     expandForEachFieldMacro(context, acc, env, pos, field, fieldName, body)
+  | A.ForEachFunctionMacro(annotation, function, functionName, body) ->
+    expandForEachFunctionMacro(
+      context,
+      acc,
+      env,
+      pos,
+      annotation,
+      function,
+      functionName,
+      body,
+    )
   }
 }
 

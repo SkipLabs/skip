@@ -850,6 +850,17 @@ fun expr(o: mutable BufferedPrinter.Out, e: SkipAst.Expr): void {
     };
     o.out(") ");
     expr(o, body)
+  | SkipAst.ForEachFunctionMacro(annotation, function, functionName, body) ->
+    o.out("#forEachFunction (");
+    name(o, annotation);
+    o.out(", ");
+    name(o, function);
+    if (functionName.isSome()) {
+      o.out(", ");
+      name(o, functionName.fromSome());
+    };
+    o.out(") ");
+    expr(o, body)
   }
 }
 

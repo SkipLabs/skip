@@ -1787,6 +1787,9 @@ fun malias_expr_(
   | A.ForEachFieldMacro(field, fieldName, body) ->
     report_macro_usage(env, pos);
     A.ForEachFieldMacro(field, fieldName, k(body))
+  | A.ForEachFunctionMacro(annotation, function, functionName, body) ->
+    report_macro_usage(env, pos);
+    A.ForEachFunctionMacro(annotation, function, functionName, k(body))
   }
 }
 
@@ -2263,6 +2266,8 @@ fun ext_class_tparams_expr_(
     A.ForEach(binding, k(collection), k(body), k(withoutBreak))
   | A.ForEachFieldMacro(field, fieldName, body) ->
     A.ForEachFieldMacro(field, fieldName, k(body))
+  | A.ForEachFunctionMacro(annotation, function, functionName, body) ->
+    A.ForEachFunctionMacro(annotation, function, functionName, k(body))
   }
 }
 
@@ -3366,6 +3371,13 @@ fun expr_(
     )
   | A.ForEachFieldMacro(field, fieldName, body) ->
     A.ForEachFieldMacro(field, fieldName, expr(context, env, body))
+  | A.ForEachFunctionMacro(annotation, function, functionName, body) ->
+    A.ForEachFunctionMacro(
+      annotation,
+      function,
+      functionName,
+      expr(context, env, body),
+    )
   }
 }
 

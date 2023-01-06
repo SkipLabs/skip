@@ -699,6 +699,8 @@ class Converter{filename: String} {
       )
     | ParseTree.ForEachFieldMacroTree{range, params, body} ->
       this.convertForEachFieldMacro(this.convertRange(range), params, body)
+    | ParseTree.ForEachFunctionMacroTree{range, params, body} ->
+      this.convertForEachFunctionMacro(this.convertRange(range), params, body)
     | _ ->
       invariant_violation("Unexpected expression: " + this.treeToString(tree))
     }
@@ -797,6 +799,24 @@ class Converter{filename: String} {
         None()
       } else {
         Some(this.convertName(args[1]))
+      },
+      this.convertExpression(body),
+    );
+  }
+
+  fun convertForEachFunctionMacro(
+    _range: FileRange,
+    params: ParseTree,
+    body: ParseTree,
+  ): SkipAst.Expr_ {
+    args = (params as ParseTree.PositionalArgumentsTree _).arguments.getList();
+    SkipAst.ForEachFunctionMacro(
+      this.createName(args[0], this.convertAnnotation(args[0]).fromSome()),
+      this.convertName(args[1]),
+      if (args.size() == 3) {
+        Some(this.convertName(args[2]))
+      } else {
+        None()
       },
       this.convertExpression(body),
     );
@@ -1987,40 +2007,39 @@ class Converter{filename: String} {
     )
   }
 
+  fun convertAnnotation(tree: ParseTree): ?String {
+    tree match {
+    | ParseTree.AnnotationTree{name, arguments} ->
+      invariant(
+        name.matchTreeKind(TokenKind.NONTYPE_IDENTIFIER()),
+        "Unexpected annotation name",
+      );
+      nameString = "@" + name.getToken().value;
+      argString = arguments match {
+      | ParseTree.EmptyTree _ -> ""
+      | ParseTree.PositionalArgumentsTree{arguments => args} ->
+        argList = args.getList();
+        invariant(
+          argList.size() == 1,
+          "Expected single argument to annotation",
+        );
+        arg = argList.first();
+        invariant(
+          arg.matchTreeKind(TokenKind.STRING_LITERAL()),
+          "Expected string literal argument to annotation",
+        );
+        token = arg.getToken();
+        "(\"" + token.stringLiteralValue() + "\")"
+      | _ -> invariant_violation("Unexpected annotation arguments tree")
+      };
+      Some(nameString + argString)
+    | _ -> None()
+    }
+  }
+
   fun convertAnnotations(modifiers: ParseTree): SSet {
     SSet::createFromItems(
-      modifiers
-        .getList()
-        .map(tree ->
-          tree match {
-          | ParseTree.AnnotationTree{name, arguments} ->
-            invariant(
-              name.matchTreeKind(TokenKind.NONTYPE_IDENTIFIER()),
-              "Unexpected annotation name",
-            );
-            nameString = "@" + name.getToken().value;
-            argString = arguments match {
-            | ParseTree.EmptyTree _ -> ""
-            | ParseTree.PositionalArgumentsTree{arguments => args} ->
-              argList = args.getList();
-              invariant(
-                argList.size() == 1,
-                "Expected single argument to annotation",
-              );
-              arg = argList.first();
-              invariant(
-                arg.matchTreeKind(TokenKind.STRING_LITERAL()),
-                "Expected string literal argument to annotation",
-              );
-              token = arg.getToken();
-              "(\"" + token.stringLiteralValue() + "\")"
-            | _ -> invariant_violation("Unexpected annotation arguments tree")
-            };
-            Some(nameString + argString)
-          | _ -> None()
-          }
-        )
-        .filterNone(),
+      modifiers.getList().map(this.convertAnnotation).filterNone(),
     )
   }
 
