@@ -490,9 +490,9 @@ class SKDB {
   ): Promise<number> {
     let result = await makeRequest(uri, {
       request: "query",
-      query: "select id(), uid('" + user + "');",
+      query: "select id();",
     });
-    const [sessionID, userID] = result.split("|").map((x) => parseInt(x));
+    const [sessionID] = result.split("|").map((x) => parseInt(x));
     let serverID = this.servers.length;
     let server = new SKDBServer(
       this,
@@ -501,7 +501,7 @@ class SKDB {
       db,
       user,
       password,
-      userID,
+      999,                      // TODO: user id needs to be discovered by query
       sessionID
     );
     this.servers.push(server);
