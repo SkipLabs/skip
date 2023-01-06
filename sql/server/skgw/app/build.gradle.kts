@@ -30,6 +30,9 @@ dependencies {
     implementation("com.google.guava:guava:31.1-jre")
 
     implementation("io.undertow:undertow-core:2.3.2.Final")
+
+    // json
+    implementation("com.beust:klaxon:5.5")
 }
 
 application {
