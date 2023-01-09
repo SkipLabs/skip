@@ -10,6 +10,9 @@ plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
     id("org.jetbrains.kotlin.jvm") version "1.7.10"
 
+    // for lint and formatting
+    id("com.diffplug.spotless") version "6.12.1"
+
     // Apply the application plugin to add support for building a CLI application in Java.
     application
 }
@@ -43,4 +46,8 @@ application {
 tasks.named<Test>("test") {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
+}
+
+spotless {
+    kotlin { ktfmt("0.42").kotlinlangStyle() }
 }

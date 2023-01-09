@@ -1,9 +1,7 @@
 package io.skiplabs.skgw
 
 import java.io.BufferedReader
-import java.io.BufferedWriter
 import java.io.OutputStream
-import kotlin.run
 
 enum class OutputFormat(val flag: String) {
     JSON("--json"),
@@ -48,18 +46,32 @@ class Skdb(val dbPath: String) {
     }
 
     fun dumpTable(table: String, suffix: String): String {
-        return blockingRun(ProcessBuilder(
-            SKDB_PROC, "--data", dbPath,
-            "--dump-table", table,
-            "--table-suffix", suffix))
+        return blockingRun(
+            ProcessBuilder(
+                SKDB_PROC,
+                "--data",
+                dbPath,
+                "--dump-table",
+                table,
+                "--table-suffix",
+                suffix
+            )
+        )
     }
 
     fun writeCsv(user: String, password: String, table: String): OutputStream {
-        val pb = ProcessBuilder(
-                SKDB_PROC, "--data", dbPath,
-                "--user", user,
-                "--password", password,
-                "--write-csv", table)
+        val pb =
+            ProcessBuilder(
+                SKDB_PROC,
+                "--data",
+                dbPath,
+                "--user",
+                user,
+                "--password",
+                password,
+                "--write-csv",
+                table
+            )
 
         pb.redirectError(ProcessBuilder.Redirect.INHERIT)
 
@@ -71,16 +83,21 @@ class Skdb(val dbPath: String) {
 
     fun tail(user: String, password: String, table: String, callback: (String) -> Unit): Process {
         // TODO: check for existing
-        val connection = blockingRun(ProcessBuilder(
-            SKDB_PROC, "--data", dbPath,
-            "--connect", table,
-            "--user", user,
-            "--password", password
-        ))
-        val pb = ProcessBuilder(
-            SKDB_PROC, "--data", dbPath,
-            "--csv",
-            "--tail", connection.trim())
+        val connection =
+            blockingRun(
+                ProcessBuilder(
+                    SKDB_PROC,
+                    "--data",
+                    dbPath,
+                    "--connect",
+                    table,
+                    "--user",
+                    user,
+                    "--password",
+                    password
+                )
+            )
+        val pb = ProcessBuilder(SKDB_PROC, "--data", dbPath, "--csv", "--tail", connection.trim())
 
         // TODO: for hacky debug
         pb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -88,9 +105,7 @@ class Skdb(val dbPath: String) {
 
         val output = proc.inputStream.bufferedReader()
 
-        val t = Thread({
-            output.forEachLine { callback(it) }
-        })
+        val t = Thread({ output.forEachLine { callback(it) } })
         t.start()
 
         return proc
