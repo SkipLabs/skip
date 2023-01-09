@@ -1,6 +1,9 @@
+module alias T = SKTest;
+
 module SKFSTest;
 
-fun testPre(): mutable SKFS.Context {
+@test
+fun testPre(): void {
   context = SKFS.run(context ~> {
     dirSInput1 = context.mkdir(
       SKFS.StringFile::fromFile,
@@ -59,31 +62,35 @@ fun testPre(): mutable SKFS.Context {
   context.update();
   write(context, dirSInput1, SKFS.IID(4), Array[SKFS.StringFile("4")]);
   context.update();
-  expectEq("Test pre 1", Array<SKFS.File>[SKFS.IntFile(3)], () ->
+  T.expectEq(
+    Array<SKFS.File>[SKFS.IntFile(3)],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
       SKFS.IID(3),
-    )
+    ),
+    "Test pre 1",
   );
   write(context, dirSInput1, SKFS.IID(3), Array[]);
   context.update();
-  expectEq("Test pre 2", Array<SKFS.File>[SKFS.IntFile(4)], () ->
+  T.expectEq(
+    Array<SKFS.File>[SKFS.IntFile(4)],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
       SKFS.IID(4),
-    )
+    ),
+    "Test pre 2",
   );
   write(context, dirSInput1, SKFS.IID(4), Array[]);
   context.update();
-  expectEq("Test pre 3", Array<SKFS.File>[], () ->
+  T.expectEq(
+    Array<SKFS.File>[],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
       SKFS.IID(3),
-    )
-  );
-
-  context
+    ),
+    "Test pre 3",
+  )
 }

@@ -2,6 +2,8 @@
 /* Module generating tests for the filesystem. */
 /*****************************************************************************/
 
+module alias T = SKTest;
+
 module SKFSTest;
 
 base class RNbr {
@@ -262,7 +264,7 @@ fun evalLFun(
     dir = context.unsafeGetDir(dirName);
     value = key match {
     | SKFS.IID(x) -> SKFS.IntFile(x)
-    | _ -> error()
+    | _ -> T.fail()
     };
     read = dir
       .getArray(context, SKFS.IID(SKFS.IntFile::fromFile(value).value))
@@ -278,7 +280,7 @@ fun evalLFun(
   };
   keyValue = key match {
   | SKFS.IID(x) -> x
-  | _ -> error()
+  | _ -> T.fail()
   };
   if (keyValue > 10) {
     thisDir = context.unsafeGetLazyDir(SKFS.DirName::create(thisDirName));
@@ -337,7 +339,7 @@ fun evalFun(
       SKFS.IntFile(
         currentKey match {
         | SKFS.IID(x) -> x
-        | _ -> error()
+        | _ -> T.fail()
         },
       ),
     );
@@ -366,7 +368,7 @@ fun compareContext(
       if (dirName.toString().contains("LAZY")) continue;
       if (dir is SKFS.DeletedDir _) {
         print_error(`missing directory ${dirName}`);
-        error();
+        T.fail();
       };
       continue;
     };
@@ -608,11 +610,12 @@ fun updateProgram(
 /* Test. */
 /*****************************************************************************/
 
-fun testStress(): mutable SKFS.Context {
+@test
+fun testStress(): void {
   config = Config{};
   print_string("Stress Test Begin");
   origContext = SKFS.Context{};
-  SKFS.runWithGcReturnContext(origContext, context ~> {
+  _ = SKFS.runWithGcReturnContext(origContext, context ~> {
     round = context.getGlobal("ROUND") match {
     | None() -> 0
     | Some(x) -> SKFS.IntFile::fromFile(x).value

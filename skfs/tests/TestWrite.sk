@@ -1,3 +1,5 @@
+module alias T = SKTest;
+
 module SKFSTest;
 
 fun insertSpecialChars(rand: mutable Random, prob: Int, input: String): String {
@@ -21,7 +23,8 @@ fun insertSpecialChars(rand: mutable Random, prob: Int, input: String): String {
 
 // Tests that we can interrupt a chunk anywhere, restart with the same chunk and
 // the result is the same.
-fun testWriteChunk(): mutable SKFS.Context {
+@test
+fun testWriteChunk(): void {
   nbrEntries = 5;
   maxWidth = 4;
   maxValue = 100;
@@ -107,9 +110,7 @@ fun testWriteChunk(): mutable SKFS.Context {
     }
   };
 
-  expectEq("Write escaping test ", eq, () -> true);
-
-  mutable SKFS.Context{}
+  T.expectTrue(eq, "Write escaping test ")
 }
 
 module end;

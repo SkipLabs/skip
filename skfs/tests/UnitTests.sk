@@ -1,3 +1,5 @@
+module alias T = SKTest;
+
 module SKFSTest;
 
 class IBox(value: Int) extends SKFS.File
@@ -46,14 +48,16 @@ fun compareResults(
   readV = context.getValue(SKFS.Path::fromString(path));
   vtry(
     () -> {
-      expectEq(kind + " test for path " + path, readV, () ->
-        values.map(x -> IBox(x))
+      T.expectEq(
+        readV,
+        values.map(x -> IBox(x)),
+        kind + " test for path " + path,
       );
     },
     _ -> {
-      print_error("Compare result failed\n");
       debug(readV);
-      debug(values)
+      debug(values);
+      T.fail("Compare result failed\n")
     },
   )
 }
@@ -184,8 +188,9 @@ fun testDirs(): void {
 }
 */
 
-fun testSubDirUnit(): mutable SKFS.Context {
-  SKFS.run(context ~> {
+@test
+fun testSubDirUnit(): void {
+  _ = SKFS.run(context ~> {
     dir1 = context.mkdir(
       SKFS.StringFile::fromFile,
       SKFS.DirName::create("/dir1/"),
@@ -206,7 +211,7 @@ fun testSubDirUnit(): mutable SKFS.Context {
         x
       },
     );
-  });
+  })
 }
 
 module end;

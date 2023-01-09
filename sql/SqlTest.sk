@@ -1,3 +1,5 @@
+module alias T = SKTest;
+
 module SKFSTest;
 
 const tableStr: String = "CREATE TABLE t1(a INTEGER, b INTEGER);";
@@ -23,18 +25,30 @@ fun testSql(): mutable SKFS.Context {
     };
     evaluator = SKSQL.Evaluator{options, user => None()};
     _table = evalStmt(context, evaluator, tableStr);
-    expectFail("INSERT in non-existent table", () -> {
-      evalStmt(context, evaluator, "INSERT INTO tdumb(e,c) VALUES(103,102)");
-    });
-    expectFail("INSERT params/values size mismatch", () -> {
-      evalStmt(context, evaluator, "INSERT INTO t1(e) VALUES(103,102)");
-    });
-    expectFail("INSERT schema/values size mismatch", () -> {
-      evalStmt(context, evaluator, "INSERT INTO t1(e) VALUES(103)");
-    });
-    expectPass("INSERT success", () -> {
-      evalStmt(context, evaluator, "INSERT INTO t1(b,a) VALUES(103,102)");
-    })
+    T.expectThrow(
+      () -> {
+        evalStmt(context, evaluator, "INSERT INTO tdumb(e,c) VALUES(103,102)");
+      },
+      "INSERT in non-existent table",
+    );
+    T.expectThrow(
+      () -> {
+        evalStmt(context, evaluator, "INSERT INTO t1(e) VALUES(103,102)");
+      },
+      "INSERT params/values size mismatch",
+    );
+    T.expectThrow(
+      () -> {
+        evalStmt(context, evaluator, "INSERT INTO t1(e) VALUES(103)");
+      },
+      "INSERT schema/values size mismatch",
+    );
+    T.expectThrow(
+      () -> {
+        evalStmt(context, evaluator, "INSERT INTO t1(b,a) VALUES(103,102)");
+      },
+      "INSERT success",
+    )
   });
 }
 

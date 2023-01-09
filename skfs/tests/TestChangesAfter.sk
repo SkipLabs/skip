@@ -2,9 +2,12 @@
 /* Stress testing changes after. */
 /*****************************************************************************/
 
+module alias T = SKTest;
+
 module SKFSTest;
 
-fun testChangesAfter(): mutable SKFS.Context {
+@test
+fun testChangesAfter(): void {
   dirName = SKFS.DirName::create("/sinput/");
   context = SKFS.run(context ~> {
     _ = context.mkdir(
@@ -19,31 +22,27 @@ fun testChangesAfter(): mutable SKFS.Context {
   });
   tick = context.tick;
   context.update();
-  expectEq(
-    "Test getChangesAfter 0:",
+  T.expectEq(
     Array<SKFS.BaseName>[SKFS.IID(0), SKFS.IID(1)],
-    () -> {
-      context
-        .unsafeGetEagerDir(dirName)
-        .getChangesAfter(tick)
-        .collect(Array)
-        .sorted()
-    },
+    context
+      .unsafeGetEagerDir(dirName)
+      .getChangesAfter(tick)
+      .collect(Array)
+      .sorted(),
+    "Test getChangesAfter 0",
   );
   !tick = context.tick;
   write(context, dirName, SKFS.IID(1), Array[]);
   write(context, dirName, SKFS.IID(2), Array[SKFS.StringFile("22")]);
   context.update();
-  expectEq(
-    "Test getChangesAfter 1:",
+  T.expectEq(
     Array<SKFS.BaseName>[SKFS.IID(1), SKFS.IID(2)],
-    () -> {
-      context
-        .unsafeGetEagerDir(dirName)
-        .getChangesAfter(tick)
-        .collect(Array)
-        .sorted()
-    },
+    context
+      .unsafeGetEagerDir(dirName)
+      .getChangesAfter(tick)
+      .collect(Array)
+      .sorted(),
+    "Test getChangesAfter 1",
   );
 
   for (i in Range(0, 1000)) {
@@ -66,15 +65,13 @@ fun testChangesAfter(): mutable SKFS.Context {
       write(context, dirName, key, value);
     };
     context.update();
-    expectEq(
-      "Test getChangesAfter " + (2 + i) + ":",
+
+    dir = context.unsafeGetEagerDir(dirName);
+    if (rand.random(0, 10) > 5) !dir = dir.purge();
+    T.expectEq(
       changes.collect(Array).sorted(),
-      () -> {
-        dir = context.unsafeGetEagerDir(dirName);
-        if (rand.random(0, 10) > 5) !dir = dir.purge();
-        dir.getChangesAfter(tick).collect(Array).sorted()
-      },
+      dir.getChangesAfter(tick).collect(Array).sorted(),
+      "Test getChangesAfter " + (2 + i),
     );
-  };
-  context
+  }
 }

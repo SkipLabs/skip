@@ -444,10 +444,6 @@ module end;
 
 module SKFSTest;
 
-fun error<T>(): T {
-  invariant_violation("ERROR");
-}
-
 class JsonFile(JSON.Value) extends SKFS.File
 
 class User{
@@ -613,12 +609,13 @@ fun testOld(): mutable SKFS.Context {
 class Page{id: Int, text: String} extends SKFS.File
 class QueryResult(Array<Int>) extends SKFS.File
 
-fun testSearch(): mutable SKFS.Context {
+@test
+fun testSearch(): void {
   pagesData = Array[
     Page{id => 1, text => "hello world"},
     Page{id => 2, text => "hello"},
   ].map(x -> (SKFS.IID(x.id), x));
-  SKFS.run(context ~> {
+  _ = SKFS.run(context ~> {
     pages = context.mkdir(
       Page::fromFile,
       SKFS.DirName::create("/pages/"),
@@ -666,5 +663,5 @@ fun testSearch(): mutable SKFS.Context {
         QueryResult(results.toArray())
       },
     );
-  });
+  })
 }
