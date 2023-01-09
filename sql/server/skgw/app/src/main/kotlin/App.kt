@@ -1,50 +1,52 @@
 package io.skiplabs.skgw
 
-import io.undertow.Undertow
-import io.undertow.server.handlers.resource.FileResourceManager
-import io.undertow.Handlers
-import io.undertow.websockets.WebSocketConnectionCallback
-import io.undertow.websockets.spi.WebSocketHttpExchange
-import io.undertow.websockets.core.WebSocketChannel
-import io.undertow.websockets.core.AbstractReceiveListener
-import io.undertow.websockets.core.BufferedTextMessage
-import io.undertow.websockets.core.WebSockets
-import io.undertow.websockets.core.BufferedBinaryMessage
-import io.undertow.websockets.core.WebSocketMessages
-import io.skiplabs.skgw.handleRequest
-import java.io.File
-import java.io.OutputStream
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.ConcurrentHashMap
-import com.beust.klaxon.Parser
-import com.beust.klaxon.JsonObject
+import com.beust.klaxon.Klaxon
 import com.beust.klaxon.TypeAdapter
 import com.beust.klaxon.TypeFor
-import com.beust.klaxon.Klaxon
-import kotlin.reflect.KClass
+import io.undertow.Handlers
+import io.undertow.Undertow
+import io.undertow.server.handlers.resource.FileResourceManager
+import io.undertow.websockets.WebSocketConnectionCallback
+import io.undertow.websockets.core.AbstractReceiveListener
+import io.undertow.websockets.core.BufferedTextMessage
+import io.undertow.websockets.core.WebSocketChannel
+import io.undertow.websockets.core.WebSockets
+import io.undertow.websockets.spi.WebSocketHttpExchange
+import java.io.File
+import java.io.OutputStream
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.bufferedWriter
+import kotlin.reflect.KClass
 
 // TODO:
 val SINGLE_DB = "/tmp/test.db"
 
-class ProtoTypeAdapter: TypeAdapter<ProtoMessage> {
-    override fun classFor(type: Any): KClass<out ProtoMessage> = when(type as String) {
-        "query" -> ProtoQuery::class
-        "tail" -> ProtoTail::class
-        "dumpTable" -> ProtoDumpTable::class
-        "write" -> ProtoWrite::class
-        "pipe" -> ProtoData::class
-        else -> throw IllegalArgumentException("Unknown request type: $type")
-    }
+class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
+    override fun classFor(type: Any): KClass<out ProtoMessage> =
+        when (type as String) {
+            "query" -> ProtoQuery::class
+            "tail" -> ProtoTail::class
+            "dumpTable" -> ProtoDumpTable::class
+            "write" -> ProtoWrite::class
+            "pipe" -> ProtoData::class
+            else -> throw IllegalArgumentException("Unknown request type: $type")
+        }
 }
 
 // TODO: the protocol has no way of communicating errors
 @TypeFor(field = "request", adapter = ProtoTypeAdapter::class)
 sealed class ProtoMessage(val request: String)
+
 data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMessage("query")
-data class ProtoTail(val table: String, val user: String, val password: String) : ProtoMessage("tail")
+
+data class ProtoTail(val table: String, val user: String, val password: String) :
+    ProtoMessage("tail")
+
 data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
-data class ProtoWrite(val table: String, val user: String, val password: String) : ProtoMessage("write")
+
+data class ProtoWrite(val table: String, val user: String, val password: String) :
+    ProtoMessage("write")
+
 data class ProtoData(val data: String) : ProtoMessage("pipe")
 
 fun parse(data: String): ProtoMessage {
@@ -64,11 +66,12 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
 
     when (req) {
         is ProtoQuery -> {
-            val format = when(req.format) {
-                "csv" -> OutputFormat.CSV
-                "json" -> OutputFormat.JSON
-                else -> OutputFormat.CSV
-            }
+            val format =
+                when (req.format) {
+                    "csv" -> OutputFormat.CSV
+                    "json" -> OutputFormat.JSON
+                    else -> OutputFormat.CSV
+                }
             val result = Skdb(SINGLE_DB).sql(req.query, format)
             val payload = serialise(ProtoData(result))
             WebSockets.sendTextBlocking(payload, channel)
@@ -82,10 +85,16 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
         }
         is ProtoTail -> {
             // TODO: no way to shut this down, just leaking resources here.
-            Skdb(SINGLE_DB).tail(req.user, req.password, req.table, {
-                val payload = serialise(ProtoData(it))
-                WebSockets.sendTextBlocking(payload, channel)
-            })
+            Skdb(SINGLE_DB)
+                .tail(
+                    req.user,
+                    req.password,
+                    req.table,
+                    {
+                        val payload = serialise(ProtoData(it))
+                        WebSockets.sendTextBlocking(payload, channel)
+                    }
+                )
         }
         is ProtoWrite -> {
             val skdbStdin = Skdb(SINGLE_DB).writeCsv(req.user, req.password, req.table)
@@ -110,41 +119,62 @@ fun createHttpServer(): Undertow {
     // TODO: weak refs or gc
     val connections = ConcurrentHashMap<WebSocketChannel, ChannelState>()
 
-    var server = Undertow.builder()
-        .addHttpListener(8080, "0.0.0.0")
-        .setHandler(Handlers.path()
-            .addPrefixPath("/skgw", Handlers.websocket(
-                object : WebSocketConnectionCallback {
-                    override fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel) {
-                        // TODO: should harvest the user/auth, and
-                        // database here. these are
-                        // connection-specific properties
-                        connections.put(channel, ChannelState(procStdin = null))
+    var server =
+        Undertow.builder()
+            .addHttpListener(8080, "0.0.0.0")
+            .setHandler(
+                Handlers.path()
+                    .addPrefixPath(
+                        "/skgw",
+                        Handlers.websocket(
+                            object : WebSocketConnectionCallback {
+                                override fun onConnect(
+                                    exchange: WebSocketHttpExchange,
+                                    channel: WebSocketChannel
+                                ) {
+                                    // TODO: should harvest the user/auth, and
+                                    // database here. these are
+                                    // connection-specific properties
+                                    connections.put(channel, ChannelState(procStdin = null))
 
-                        channel.receiveSetter.set(
-                            object : AbstractReceiveListener() {
-                                override fun onFullTextMessage(channel: WebSocketChannel, message: BufferedTextMessage) {
-                                    try {
-                                        var state = connections.get(channel)
+                                    channel.receiveSetter.set(
+                                        object : AbstractReceiveListener() {
+                                            override fun onFullTextMessage(
+                                                channel: WebSocketChannel,
+                                                message: BufferedTextMessage
+                                            ) {
+                                                try {
+                                                    var state = connections.get(channel)
 
-                                        // shouldn't happen
-                                        if (state == null) {
-                                            state = ChannelState(procStdin = null)
-                                            connections.put(channel, state)
+                                                    // shouldn't happen
+                                                    if (state == null) {
+                                                        state = ChannelState(procStdin = null)
+                                                        connections.put(channel, state)
+                                                    }
+
+                                                    handleRequest(message.data, channel, state)
+                                                } catch (ex: Exception) {
+                                                    // 1011 is internal error
+                                                    WebSockets.sendCloseBlocking(
+                                                        1011,
+                                                        ex.message,
+                                                        channel
+                                                    )
+                                                }
+                                            }
                                         }
-
-                                        handleRequest(message.data, channel, state)
-                                    } catch (ex: Exception) {
-                                        // 1011 is internal error
-                                        WebSockets.sendCloseBlocking(1011, ex.message, channel)
-                                    }
+                                    )
+                                    channel.resumeReceives()
                                 }
-                            })
-                        channel.resumeReceives()
-                    }
-                }))
-            .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs_build/build/")))))
-        .build()
+                            }
+                        )
+                    )
+                    .addPrefixPath(
+                        "/",
+                        Handlers.resource(FileResourceManager(File("/skfs_build/build/")))
+                    )
+            )
+            .build()
     return server
 }
 
