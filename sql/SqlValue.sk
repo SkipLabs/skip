@@ -46,6 +46,10 @@ extension base class BaseName {
       (q1, start1, end1).compare((q2, start2, end2))
     | (SKSQL.TrackedQuery _, _) -> LT()
     | (_, SKSQL.TrackedQuery _) -> GT()
+
+    | (SKSQL.CValueFile(x1), SKSQL.CValueFile(x2)) -> x1.compare(x2)
+    | (SKSQL.CValueFile _, _) -> LT()
+    | (_, SKSQL.CValueFile _) -> GT()
     }
   }
 }

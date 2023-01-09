@@ -4,6 +4,8 @@
 
 module SKSQL;
 
+class CValueFile(value: ?CValue) extends SKFS.BaseName
+
 fun createIndex(
   context: mutable SKFS.Context,
   userIndexNameOpt: ?String,
@@ -31,19 +33,40 @@ fun createIndex(
     },
   );
   if (unique) {
-    _ = index.contextWriterKeyValues(
-      SKFS.StringFile::fromFile,
-      context,
-      SKFS.DirName::create(indexName + "unique/"),
-      (_, _, _key, values) ~> {
-        if (values.size() == 0) return void;
-        repeat = 0;
-        for (r in values) {
-          !repeat = repeat + r.repeat;
-        };
-        if (repeat > 1) error(0, "UNIQUE constraint failed")
-      },
-    )
+    _ = index
+      .contextWriterKeyValues(
+        RowValues::fromFile,
+        context,
+        SKFS.DirName::create(indexName + "unique/proj/"),
+        (_, writer, _key, values) ~> {
+          result = SortedMap<CValueFile, mutable Vector<RowValues>>[];
+          for (v in values) {
+            k = CValueFile(v.values[0]);
+            if (!result.containsKey(k)) {
+              !result[k] = mutable Vector[];
+            };
+            result[k].push(v);
+          };
+          for (k => v in result) {
+            writer.writeArray(k, v.toArray());
+          }
+        },
+      )
+      .contextWriterKeyValues(
+        SKFS.StringFile::fromFile,
+        context,
+        SKFS.DirName::create(indexName + "unique/sink/"),
+        (_, _, _key, values) ~> {
+          if (values.size() == 0) return void;
+          repeat = 0;
+          for (r in values) {
+            !repeat = repeat + r.repeat;
+          };
+          if (repeat > 1) {
+            throw error(0, "UNIQUE constraint failed")
+          }
+        },
+      )
   };
 
   userIndexName = userIndexNameOpt match {
