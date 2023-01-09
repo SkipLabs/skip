@@ -1,6 +1,9 @@
+module alias T = SKTest;
+
 module SKFSTest;
 
-fun testLazy(): mutable SKFS.Context {
+@test
+fun testLazy(): void {
   context = SKFS.run(context ~> {
     dirInput = context.mkdir(
       SKFS.IntFile::fromFile,
@@ -25,7 +28,7 @@ fun testLazy(): mutable SKFS.Context {
             x match {
             | SKFS.IID(v) ->
               dirInput.getArray(context, SKFS.IID(0))[0].value + v
-            | _ -> error()
+            | _ -> T.fail()
             },
           ),
         ]
@@ -51,7 +54,7 @@ fun testLazy(): mutable SKFS.Context {
               x match {
               | SKFS.IID(v) ->
                 dirInput.getArray(context, SKFS.IID(0))[0].value + v
-              | _ -> error()
+              | _ -> T.fail()
               },
             ),
           ],
@@ -83,37 +86,45 @@ fun testLazy(): mutable SKFS.Context {
   adir2 = SKFS.DirName::create("/alazy2/");
   dir3 = SKFS.DirName::create("/eager/");
 
-  expectEq("Async Lazy basic", Array<SKFS.File>[], () ->
-    getLazyData(context, adir2, SKFS.IID(0), true)
+  T.expectEq(
+    Array<SKFS.File>[],
+    getLazyData(context, adir2, SKFS.IID(0), true),
+    "Async Lazy basic",
   );
 
   _ = context.updateWithStatus(0);
 
-  expectEq("Async Lazy basic with interruption", Array<SKFS.File>[], () ->
-    getLazyData(context, adir2, SKFS.IID(0), true)
+  T.expectEq(
+    Array<SKFS.File>[],
+    getLazyData(context, adir2, SKFS.IID(0), true),
+    "Async Lazy basic with interruption",
   );
 
   _ = context.updateWithStatus(30);
 
-  expectEq(
-    "Async Lazy basic without interruption",
+  T.expectEq(
     Array<SKFS.File>[SKFS.IntFile(23)],
-    () -> getLazyData(context, adir2, SKFS.IID(0), true),
+    getLazyData(context, adir2, SKFS.IID(0), true),
+    "Async Lazy basic without interruption",
   );
 
-  expectEq("Lazy basic", Array<SKFS.File>[SKFS.IntFile(23)], () ->
-    getData(context, dir2, SKFS.IID(0))
+  T.expectEq(
+    Array<SKFS.File>[SKFS.IntFile(23)],
+    getData(context, dir2, SKFS.IID(0)),
+    "Lazy basic",
   );
   write(context, input, SKFS.IID(0), Array[SKFS.IntFile(22)]);
   _status = context.updateWithStatus(10);
 
-  expectEq("Lazy after update", Array<SKFS.File>[SKFS.IntFile(22)], () ->
-    getData(context, dir2, SKFS.IID(0))
+  T.expectEq(
+    Array<SKFS.File>[SKFS.IntFile(22)],
+    getData(context, dir2, SKFS.IID(0)),
+    "Lazy after update",
   );
 
-  expectEq("Eeager after update", Array<SKFS.File>[SKFS.IntFile(22)], () ->
-    getData(context, dir3, SKFS.IID(0))
-  );
-
-  context
+  T.expectEq(
+    Array<SKFS.File>[SKFS.IntFile(22)],
+    getData(context, dir3, SKFS.IID(0)),
+    "Eeager after update",
+  )
 }

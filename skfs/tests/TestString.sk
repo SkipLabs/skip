@@ -1,3 +1,5 @@
+module alias T = SKTest;
+
 module SKFSTest;
 
 const str: String = "123";
@@ -8,20 +10,22 @@ native fun getUtf8(): String;
 @cpp_extern("SKIP_invalid_utf8_test_string")
 native fun getInvalidUtf8(): String;
 
-fun testString(): mutable SKFS.Context {
+@test
+fun testString(): void {
   utf8 = getUtf8();
   iter = str.getIter();
   sub = str.sub(iter, 3);
   sub2 = str.substring(iter);
-  expectEq("Compare strings", str, () -> sub);
-  expectEq("Compare hashes", str.hash(), () -> sub.hash());
-  expectEq("Compare strings sub", str, () -> sub2);
-  expectEq("Compare hashes sub", str.hash(), () -> sub2.hash());
-  expectEq("Compare sub", "3", () -> str.substring(iter.forward(2)));
-  expectEq("Utf8 length", utf8.length(), () -> 24);
-  expectEq("Utf8 byteSize", String.byteSize(utf8), () -> UInt32::truncate(66));
-  expectEq("Utf8 from/to chars", utf8, () ->
-    String::fromChars(utf8.chars().toArray())
-  );
-  mutable SKFS.Context{}
+  T.expectEq(str, sub, "Compare strings");
+  T.expectEq(str.hash(), sub.hash(), "Compare hashes");
+  T.expectEq(str, sub2, "Compare strings sub");
+  T.expectEq(str.hash(), sub2.hash(), "Compare hashes sub");
+  T.expectEq("3", str.substring(iter.forward(2)), "Compare sub");
+  T.expectEq(utf8.length(), 24, "Utf8 length");
+  T.expectEq(String.byteSize(utf8), UInt32::truncate(66), "Utf8 byteSize");
+  T.expectEq(
+    utf8,
+    String::fromChars(utf8.chars().toArray()),
+    "Utf8 from/to chars",
+  )
 }

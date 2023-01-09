@@ -44,19 +44,23 @@ native fun isCObject(CObject): UInt32;
 
 class CObjectContainer(i0: CObject, i1: Array<CObject>)
 
-fun testRuntime(): mutable SKFS.Context {
+@test
+fun testRuntime(): void {
   chars = Array['a', 'b', 'c'];
-  expectEq("String::replace", "xbc", () ->
-    String::fromChars(chars).replace("a", "x")
+  SKTest.expectEq(
+    "xbc",
+    String::fromChars(chars).replace("a", "x"),
+    "String::replace",
   );
   str = "abc";
   str2 = "123";
-  expectEq("String GT", (GT() : Order), () -> str.compare(str2));
-  expectEq("String LT", (EQ() : Order), () -> str.compare("abc"));
-  expectEq("String LT", (LT() : Order), () -> str2.compare(str));
-  expectEq("String.concat2", "abc123", () -> str + str2);
-  expectEq("String.byteSize", 3, () -> String.byteSize(str).toInt());
-  expectEq("throw", 22, () -> {
+  SKTest.expectEq((GT() : Order), str.compare(str2), "String GT");
+  SKTest.expectEq((EQ() : Order), str.compare("abc"), "String LT");
+  SKTest.expectEq((LT() : Order), str2.compare(str), "String LT");
+  SKTest.expectEq("abc123", str + str2, "String.concat2");
+  SKTest.expectEq(3, String.byteSize(str).toInt(), "String.byteSize");
+  SKTest.expectEq(
+    22,
     vtry(
       () -> makeExn(),
       exn -> {
@@ -65,66 +69,89 @@ fun testRuntime(): mutable SKFS.Context {
         | e -> throw e
         }
       },
-    )
-  });
+    ),
+    "throw",
+  );
   arr = Array[Array[1], Array[2], Array[3]];
-  expectEq("getArraySize", 3, () -> getArraySize(arr));
-  expectEq("hash", 2147580002, () -> str.hash());
-  expectEq("String.getByte", 'b'.code(), () -> String.getByte(str, 1).toInt());
-  expectEq("substring", "c", () -> {
-    iter = str.getIter();
-    str.substring(iter.drop(2));
-  });
-  expectEq("ArrayEach", 6, () -> {
-    result = 0;
-    Array[1, 2, 3].each(x -> !result = result + x);
-    result
-  });
-  expectEq("Native Eq 1", 0, () -> {
-    native_eq(Array[1, 2, 3], Array[1, 2, 3]);
-  });
-  expectEq("Native Eq 2", 1, () -> {
-    native_eq(Array[1, 2, 3], Array[1, 2, 4]);
-  });
-  expectEq("Native Eq 3", 1, () -> {
-    native_eq(Array[1, 2, 4], Array[1, 2, 3]);
-  });
-  expectEq("Native Eq 3", 1, () -> {
-    native_eq(Array[1, 2], Array[1, 2, 3]);
-  });
-  expectEq("Native Eq 4", 0, () -> {
-    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(2, 2))])
-  });
-  expectEq("Native Eq 5", 1, () -> {
-    native_eq(Array[X(0, 1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(2, 2))]);
-  });
-  expectEq("Native Eq 6", 1, () -> {
-    native_eq(Array[X(1, -1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(2, 2))]);
-  });
-  expectEq("Native Eq 7", 1, () -> {
-    native_eq(Array[X(1, 1), T(-23, X(2, 2))], Array[X(1, 1), T(23, X(2, 2))]);
-  });
-  expectEq("Native Eq 8", 1, () -> {
-    native_eq(Array[X(1, 1), T(23, X(-2, 2))], Array[X(1, 1), T(23, X(2, 2))]);
-  });
-  expectEq("Native Eq 9", 1, () -> {
-    native_eq(Array[X(1, 1), T(23, X(2, -2))], Array[X(1, 1), T(23, X(2, 2))]);
-  });
-  expectEq("Native Eq 10", 1, () -> {
-    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(2, 1), T(23, X(2, 2))]);
-  });
-  expectEq("Native Eq 11", 1, () -> {
-    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 2), T(23, X(2, 2))]);
-  });
-  expectEq("Native Eq 12", 1, () -> {
-    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 1), T(24, X(2, 2))]);
-  });
-  expectEq("Native Eq 13", 1, () -> {
-    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(3, 2))]);
-  });
-  expectEq("Native Eq 14", 1, () -> {
-    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(2, 3))]);
-  });
+  SKTest.expectEq(3, getArraySize(arr), "getArraySize");
+  SKTest.expectEq(2147580002, str.hash(), "hash");
+  SKTest.expectEq('b'.code(), String.getByte(str, 1).toInt(), "String.getByte");
+  SKTest.expectEq(
+    "c",
+    {
+      iter = str.getIter();
+      str.substring(iter.drop(2))
+    },
+    "substring",
+  );
+  SKTest.expectEq(
+    6,
+    {
+      result = 0;
+      Array[1, 2, 3].each(x -> !result = result + x);
+      result
+    },
+    "ArrayEach",
+  );
+  SKTest.expectEq(0, native_eq(Array[1, 2, 3], Array[1, 2, 3]), "Native Eq 1");
+  SKTest.expectEq(1, native_eq(Array[1, 2, 3], Array[1, 2, 4]), "Native Eq 2");
+  SKTest.expectEq(1, native_eq(Array[1, 2, 4], Array[1, 2, 3]), "Native Eq 3");
+  SKTest.expectEq(1, native_eq(Array[1, 2], Array[1, 2, 3]), "Native Eq 3");
+  SKTest.expectEq(
+    0,
+    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(2, 2))]),
+    "Native Eq 4",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(0, 1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(2, 2))]),
+    "Native Eq 5",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, -1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(2, 2))]),
+    "Native Eq 6",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, 1), T(-23, X(2, 2))], Array[X(1, 1), T(23, X(2, 2))]),
+    "Native Eq 7",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, 1), T(23, X(-2, 2))], Array[X(1, 1), T(23, X(2, 2))]),
+    "Native Eq 8",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, 1), T(23, X(2, -2))], Array[X(1, 1), T(23, X(2, 2))]),
+    "Native Eq 9",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(2, 1), T(23, X(2, 2))]),
+    "Native Eq 10",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 2), T(23, X(2, 2))]),
+    "Native Eq 11",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 1), T(24, X(2, 2))]),
+    "Native Eq 12",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(3, 2))]),
+    "Native Eq 13",
+  );
+  SKTest.expectEq(
+    1,
+    native_eq(Array[X(1, 1), T(23, X(2, 2))], Array[X(1, 1), T(23, X(2, 3))]),
+    "Native Eq 14",
+  )
   /*
     cobj = CObjectContainer(makeCObject(), Array[makeCObject(), makeCObject()]);
     icobj = intern(cobj);
@@ -138,5 +165,4 @@ fun testRuntime(): mutable SKFS.Context {
       isCObject(icobj.i1[1])
     );
   */
-  mutable SKFS.Context{}
 }

@@ -1,24 +1,20 @@
+module alias T = SKTest;
+
 module SKFSTest;
 
-fun testDirNameFail(str: String): void {
-  expectFail(`Test DirName: '${str}'`, () -> _ = SKFS.DirName::create(str));
-}
-
-fun testDirNamePass(str: String): void {
-  expectPass(`Test DirName: '${str}'`, () -> _ = SKFS.DirName::create(str));
-}
-
+@test
 fun testDirName(): void {
-  testDirNameFail(" ");
-  testDirNameFail("??$");
-  testDirNameFail(".");
-  testDirNameFail("//");
-  testDirNameFail("\n");
-  testDirNamePass("/");
-  testDirNameFail("/missingTrailingSlash");
-  testDirNamePass("/1223/");
-  testDirNamePass("/dir/");
-  testDirNamePass("/dir1/dir2/");
+  T.expectThrow(() -> _ = SKFS.DirName::create(" "));
+  T.expectThrow(() -> _ = SKFS.DirName::create("??$"));
+  T.expectThrow(() -> _ = SKFS.DirName::create("."));
+  T.expectThrow(() -> _ = SKFS.DirName::create("//"));
+  T.expectThrow(() -> _ = SKFS.DirName::create("\n"));
+  T.expectThrow(() -> _ = SKFS.DirName::create("/missingTrailingSlash"));
+
+  _ = SKFS.DirName::create("/");
+  _ = SKFS.DirName::create("/1223/");
+  _ = SKFS.DirName::create("/dir/");
+  _ = SKFS.DirName::create("/dir1/dir2/");
 }
 
 module end;

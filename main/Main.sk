@@ -760,43 +760,7 @@ untracked fun main(): void {
         return void
       };
 
-      if (argMap.maybeGet("all") is Some(AP.BoolValue _)) {
-        testFuns = SKFSTest.getAllTests();
-        for (testName => testFun in testFuns) {
-          print_string(
-            "/*****************************************************************************/",
-          );
-          print_string("/* " + testName + " */");
-          print_string(
-            "/*****************************************************************************/",
-          );
-          _ = testFun();
-          print_string("");
-        };
-        return void;
-      } else if (argMap.maybeGet("test") is Some(AP.StringValue _)) {
-        testFuns = SKFSTest.getAllTests();
-        testName = argMap["test"] match {
-        | AP.StringValue{value => testName} ->
-          if (!testFuns.containsKey(testName)) {
-            print_error("Error: unknown test " + testName + "\n");
-            for (key => _ in testFuns) {
-              print_error("  " + key + "\n");
-            };
-            skipExit(4);
-          };
-          testName
-        | _ ->
-          print_error("Invalid test name type");
-          skipExit(2)
-        };
-        context = testFuns[testName]();
-        if (argMap.maybeGet("debug") is Some(AP.BoolValue _)) {
-          SKFS.toplevel(context.clone())
-        } else {
-          return void
-        }
-      } else if (argMap.maybeGet("init") is Some(AP.StringValue _)) {
+      if (argMap.maybeGet("init") is Some(AP.StringValue _)) {
         _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
         return void;
       } else if (argMap.maybeGet("capacity") is Some(AP.StringValue _)) {

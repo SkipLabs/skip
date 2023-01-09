@@ -1,6 +1,9 @@
+module alias T = SKTest;
+
 module SKFSTest;
 
-fun testSubDir(): mutable SKFS.Context {
+@test
+fun testSubDir(): void {
   dataStr1 = Array[
     (SKFS.IID(1), SKFS.StringFile("1")),
     (SKFS.IID(2), SKFS.StringFile("2")),
@@ -58,47 +61,52 @@ fun testSubDir(): mutable SKFS.Context {
       },
     );
   });
-  SKFSTest.expectPass("Testing subdir exists", () -> {
-    invariant(context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) is Some _)
-  });
-  SKFSTest.expectPass("Testing lazy subdir exists", () -> {
-    invariant(context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) is Some _)
-  });
+  T.expectTrue(
+    context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) is Some _,
+    "Testing subdir exists",
+  );
+  T.expectTrue(
+    context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) is Some _,
+    "Testing lazy subdir exists",
+  );
   inputDir = context.unsafeGetEagerDir(SKFS.DirName::create("/dirStr1/"));
   inputSingle = context.unsafeGetEagerDir(SKFS.DirName::create("/dirSingle/"));
   inputDir.writeArray(context, SKFS.IID(1), Array[SKFS.StringFile("23")]);
   context.update();
-  SKFSTest.expectPass("Testing subdir has been removed", () -> {
-    context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) match {
-    | None() if (context.reallyRemoveDir) -> void
-    | None() -> invariant_violation("Expected an empty directory, not None")
-    | Some(dir) -> invariant(dir is SKFS.DeletedDir _)
-    }
-  });
-  SKFSTest.expectPass("Testing lazy subdir has been removed", () -> {
-    context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) match {
-    | None() if (context.reallyRemoveDir) -> void
-    | None() -> invariant_violation("Expected an empty directory, not None")
-    | Some(dir) -> invariant(dir is SKFS.DeletedDir _)
-    }
-  });
-  SKFSTest.expectPass("Testing new subdir exists", () -> {
-    invariant(context.maybeGetDir(SKFS.DirName::create("/dir2/23/")) is Some _)
-  });
-  SKFSTest.expectPass("Testing new lazy subdir exists", () -> {
-    invariant(context.maybeGetDir(SKFS.DirName::create("/dir3/23/")) is Some _)
-  });
+  context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) match {
+  | None() if (context.reallyRemoveDir) -> void
+  | None() -> T.fail("Expected an empty directory, not None")
+  | Some(dir) ->
+    T.expectTrue(dir is SKFS.DeletedDir _, "Testing subdir has been removed")
+  };
+  context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) match {
+  | None() if (context.reallyRemoveDir) -> void
+  | None() -> T.fail("Expected an empty directory, not None")
+  | Some(dir) ->
+    T.expectTrue(
+      dir is SKFS.DeletedDir _,
+      "Testing lazy subdir has been removed",
+    )
+  };
+  T.expectTrue(
+    context.maybeGetDir(SKFS.DirName::create("/dir2/23/")) is Some _,
+    "Testing new subdir exists",
+  );
+  T.expectTrue(
+    context.maybeGetDir(SKFS.DirName::create("/dir3/23/")) is Some _,
+    "Testing new lazy subdir exists",
+  );
   inputDir.writeArray(context, SKFS.IID(255), Array[SKFS.StringFile("255")]);
   context.update();
   inputDir.writeArray(context, SKFS.IID(255), Array[SKFS.StringFile("255")]);
   context.update();
   inputSingle.writeArray(context, SKFS.IID(0), Array[SKFS.StringFile("1")]);
   inputDir.writeArray(context, SKFS.IID(255), Array[SKFS.StringFile("255")]);
-  context.update();
-  context
+  context.update()
 }
 
-fun testSubSubDirUnit(): mutable SKFS.Context {
+@test
+fun testSubSubDirUnit(): void {
   context = SKFS.run(context ~> {
     dir1 = context.mkdir(
       SKFS.IntFile::fromFile,
@@ -130,6 +138,5 @@ fun testSubSubDirUnit(): mutable SKFS.Context {
   });
   dir2 = context.unsafeGetEagerDir(SKFS.DirName::create("/dir2/"));
   dir2.writeArray(context, SKFS.IID(0), Array[SKFS.IntFile(1)]);
-  context.update();
-  context
+  context.update()
 }
