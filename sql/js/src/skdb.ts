@@ -1080,13 +1080,13 @@ async function testDB(): Promise<void> {
 
 async function promptDB() {
   let skdb = await SKDB.create(true);
-  let sessionID = await skdb.connect(
-    "ws://127.0.0.1:9999/skgw",
-    "test.db",
-    "julienv",
-    "passjulienv"
-  );
-  await skdb.server().mirrorView("all_users");
+//  let sessionID = await skdb.connect(
+//    "ws://127.0.0.1:9999/skgw",
+//    "test.db",
+//    "julienv",
+//    "passjulienv"
+//  );
+//  await skdb.server().mirrorView("all_users");
   //  await skdb.server().mirrorView("all_groups");
   //  await skdb.server().mirrorTable("user_profiles");
   //  await skdb.server().mirrorTable("whitelist_skiplabs_employees");
