@@ -49,6 +49,7 @@ base class Stmt {
   }
   | Insert{
     pos: Int,
+    onConflict: ?OnConflict,
     name: String,
     paramsOpt: ?Array<String>,
     values: InsertValues,
@@ -59,6 +60,12 @@ base class Stmt {
     sets: Array<(String, Pos, Expr)>,
     where: ?Expr,
   }
+}
+
+base class OnConflict {
+  children =
+  | Ignore()
+  | Replace()
 }
 
 class TableName(name: FromName, asName: ?String, indexed: Bool = true)

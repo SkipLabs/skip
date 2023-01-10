@@ -113,6 +113,17 @@ class RowKey(
   }
 }
 
+fun escapeString(o: String -> void, s: String): void {
+  o("'");
+  chars = mutable Vector[];
+  for (c in s) {
+    if (c == '\'') chars.push(c);
+    chars.push(c);
+  };
+  o(String::fromChars(chars.toArray()));
+  o("'")
+}
+
 base class Row extends SKFS.File {
   fun size(): Int;
   fun getInt(n: Int): ?Int;
@@ -136,15 +147,7 @@ base class Row extends SKFS.File {
       | None() -> o("NULL")
       | Some(CInt(n)) -> o(n.toString())
       | Some(CFloat(f)) -> o(f.toString())
-      | Some(CString(s)) ->
-        o("'");
-        chars = mutable Vector[];
-        for (c in s) {
-          if (c == '\'') chars.push(c);
-          chars.push(c);
-        };
-        o(String::fromChars(chars.toArray()));
-        o("'")
+      | Some(CString(s)) -> escapeString(o, s)
       };
       if (i != this.size() - 1) {
         o(",")

@@ -167,3 +167,9 @@ if cat test/test_missing_semi.sql | $SKDB | grep -q "22"; then
 else
     echo -e "TEST MISSING SEMI:\tFAILED"
 fi
+
+if cat test/test_ignore_replace.sql | $SKDB | tr '\n' 'S' | grep -q "22|23S24|26S"; then
+    echo -e "TEST IGNORE/REPLACE:\tOK"
+else
+    echo -e "TEST IGNORE/REPLACE:\tFAILED"
+fi

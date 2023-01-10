@@ -375,13 +375,16 @@ class Evaluator{options: Options, user: ?UserFile} {
           reallyRemove,
         );
       })
-    | Insert{pos, name, paramsOpt, values} ->
+    | Insert{pos, onConflict, name, paramsOpt, values} ->
       baseName = SKFS.SID::create(name);
       if (getTableDir(context).maybeGet(context, baseName) is None()) {
         error(pos, "Table not found: " + name);
       };
       values match {
       | IQuery(selectAst @ Select _) ->
+        if (onConflict is Some _) {
+          error(pos, "Can only use OR IGNORE/REPLACE with values");
+        };
         !selectAst.id = selectAst.id + "_" + SKFS.genSym(0);
         compiler = SKSQL.Compiler::create(this.options, selectAst.pos);
         select = compiler.compileSelect(context, selectAst, true);
@@ -426,7 +429,15 @@ class Evaluator{options: Options, user: ?UserFile} {
 
       | IValues(vals) ->
         table = getTable(this.options, context, pos, baseName);
-        this.insert(context, pos, inTransaction, table, paramsOpt, vals)
+        this.insert(
+          context,
+          pos,
+          onConflict,
+          inTransaction,
+          table,
+          paramsOpt,
+          vals,
+        )
       }
     | selectAst @ Select{} ->
       compiler = SKSQL.Compiler::create(this.options, selectAst.pos);
@@ -709,24 +720,69 @@ class Evaluator{options: Options, user: ?UserFile} {
   fun insert(
     context: mutable SKFS.Context,
     pos: Int,
+    onConflict: ?OnConflict,
     inTransaction: Bool,
     table: DirDescr,
     paramsOpt: ?Array<String>,
     values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
+    if (onConflict is Some(Replace())) {
+      if (values.size() > 1) {
+        error(pos, "Can only use OR IGNORE/REPLACE with one value");
+      };
+      where: Expr = Literal("1", false);
+      valArr = values[0];
+      for (i in Range(0, table.schema.size())) {
+        tyDescr = table.schema[i];
+        if (tyDescr.unique || tyDescr.primary) {
+          clause = Binop(
+            "=",
+            Literal(tyDescr.name.lowercase(), false),
+            valArr[i] match {
+            | VNull() -> Literal("null", false)
+            | VInt(n) -> Literal(n.toString(), false)
+            | VString(s) -> Literal(s, true)
+            | _ -> error(pos, "Unsupported type for OR IGNORE/REPLACE")
+            },
+          );
+          !where = Binop("AND", clause, where);
+        }
+      };
+      _ = this.delete(context, pos, table.name, Some(where), Array[]);
+    };
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
     this.user match {
     | None() -> void
     | Some(user) -> checkUserRows(context, user, pos, table, rows)
     };
     table.windowSize match {
+    | Some _ if (onConflict is Some _) ->
+      error(pos, "OR IGNORE/REPLACE not supported on streams/windows")
+    | None() if (inTransaction && onConflict is Some(Ignore())) ->
+      error(pos, "OR IGNORE not supported in transactions")
     | None() if (inTransaction) ->
       this.insertTable(context, table, rows);
       None()
     | None() ->
       Some((context, _, _) ~> {
-        this.insertTable(context, table, rows);
-        context.update();
+        if (onConflict is Some(Ignore())) {
+          copy = context.clone();
+          vtry(
+            () -> {
+              this.insertTable(context, table, rows);
+              context.update();
+            },
+            exn ->
+              exn match {
+              | Conflict _ -> context.replaceFromSaved(copy)
+              | _ -> throw exn
+              }
+            ,
+          );
+        } else {
+          this.insertTable(context, table, rows);
+          context.update();
+        }
       })
 
     | Some(ws) ->
