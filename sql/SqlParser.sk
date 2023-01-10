@@ -857,13 +857,26 @@ fun parseIndexOn(
 }
 
 fun parseInsert(lex: Lexer, pos: Int): (Int, Stmt) {
+  onConflict: ?OnConflict = None();
+  if (lex.isEqUpper(pos, "OR")) {
+    !pos = lex.expectUpper(pos, "OR");
+    !onConflict = Some(
+      if (lex.isEqUpper(pos, "IGNORE")) {
+        !pos = lex.expectUpper(pos, "IGNORE");
+        Ignore()
+      } else {
+        !pos = lex.expectUpper(pos, "REPLACE");
+        Replace()
+      },
+    );
+  };
   !pos = lex.expectUpper(pos, "INTO");
   posName = lex.token(pos).posBegin;
   (!pos, name) = lex.nextWord(pos);
   !name = name.lowercase();
   (!pos, paramsOpt) = parseParamsOpt(lex, pos);
   (!pos, values) = parseValues(lex, pos);
-  (pos, Insert{pos => posName, name, paramsOpt, values})
+  (pos, Insert{pos => posName, onConflict, name, paramsOpt, values})
 }
 
 fun parseParamsOpt(lex: Lexer, pos: Int): (Int, ?Array<String>) {

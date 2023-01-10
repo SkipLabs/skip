@@ -106,7 +106,7 @@ build/skdb: build/out64.ll build/libskip_runtime64.a
 
 build/out64.ll: $(SKIP_FILES) build/skip64.state
 	mkdir -p build/
-	$(SKC) --data build/skip64.state --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
+	$(SKC) --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
 
 build/skip64.state:
 	mkdir -p build/
