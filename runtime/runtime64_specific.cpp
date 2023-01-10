@@ -133,9 +133,22 @@ uint32_t SKIP_getArgc() {
   return argc-1;
 }
 
+char* SKIP_getArg0() {
+  return sk_string_create(argv[0], strlen(argv[0]));
+}
+
 char* SKIP_getArgN(uint32_t n) {
   n = n + 1;
   return sk_string_create(argv[n], strlen(argv[n]));
+}
+
+char* SKIP_getenv(char* name) {
+  char *value = getenv(name);
+  if (value == 0) {
+    return sk_string_create("", 0);
+  }
+
+  return sk_string_create(value, strlen(value));
 }
 
 void SKIP_memory_init(int pargc, char** pargv);
@@ -419,6 +432,22 @@ void SKIP_closedir(int64_t dir_handle) {
   if (rv != 0) {
     perror("closedir");
   }
+}
+
+char* SKIP_realpath(char* path_obj) {
+  size_t path_size = SKIP_String_byteSize(path_obj);
+  char *path = (char *)malloc(path_size+1);
+  memcpy(path, path_obj, path_size);
+  path[path_size] = (char)0;
+
+  char res[PATH_MAX];
+  char* rv = realpath(path, res);
+  if (rv == NULL) {
+    perror("realpath");
+  }
+
+  free(path);
+  return sk_string_create(res, strlen(res));
 }
 
 void SKIP_exit(uint64_t code) {
