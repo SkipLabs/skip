@@ -179,3 +179,9 @@ if cat test/test_underscore_alias.sql | $SKDB | grep -q "22"; then
 else
     echo -e "TEST UNDERSCORE ALIAS:\tFAILED"
 fi
+
+if cat test/create_index_if_not_exists.sql | $SKDB | grep -q "22"; then
+    echo -e "CREATE INDEX IF NOT EXISTS:\tOK"
+else
+    echo -e "CREATE INDEX IF NOT EXISTS:\tFAILED"
+fi

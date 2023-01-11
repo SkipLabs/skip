@@ -615,6 +615,9 @@ class Evaluator{options: Options, user: ?UserFile} {
     key = SKFS.SID::create(index.name);
     size = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key).size();
     if (size != 0) {
+      if (index.ifNotExists) {
+        return void;
+      };
       error(index.pos, "INDEX " + index.name + " already exists");
     };
     this.write(context, input.dirName, key, index);
@@ -937,6 +940,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           context,
           Index{
             pos => pos,
+            ifNotExists => false,
             name => name + "_" + tyDescr.name,
             fields => (name, Array[(tyDescr.name, IASC())]),
             unique => true,
