@@ -320,7 +320,10 @@ fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?String)>) {
       params.push((param, asParamOpt));
       break void;
     };
-    if (isLetter(lex.content[pos]) && !lex.isKeyword(pos)) {
+    if (
+      (lex.content[pos] == '_' || isLetter(lex.content[pos])) &&
+      !lex.isKeyword(pos)
+    ) {
       (!pos, asParam) = lex.nextWord(pos);
       !asParamOpt = Some(asParam);
     };

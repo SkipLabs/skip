@@ -132,10 +132,12 @@ class Lexer(idRoot: Int, content: Buffer) {
         !pos = pos + 1
       };
       if (allDigits) TKInt() else TKFloat()
-    | _ if (isLetter(currentChar)) ->
+    | _ if (currentChar == '_' || isLetter(currentChar)) ->
       while (
         pos < size &&
-        (isLetter(this.content[pos]) || Chars.isDigit(this.content[pos]))
+        (this.content[pos] == '_' ||
+          isLetter(this.content[pos]) ||
+          Chars.isDigit(this.content[pos]))
       ) {
         !pos = pos + 1;
       };
