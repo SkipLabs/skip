@@ -62,7 +62,7 @@ SKFUNS=\
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
-default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js
+default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html
 
 build/magic.c:
 	date | cksum | awk '{print "unsigned long version = " $$1 ";"}' > build/magic.c
