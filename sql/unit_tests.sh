@@ -173,3 +173,9 @@ if cat test/test_ignore_replace.sql | $SKDB | tr '\n' 'S' | grep -q "22|23S24|26
 else
     echo -e "TEST IGNORE/REPLACE:\tFAILED"
 fi
+
+if cat test/test_underscore_alias.sql | $SKDB | grep -q "22"; then
+    echo -e "TEST IGNORE/REPLACE:\tOK"
+else
+    echo -e "TEST IGNORE/REPLACE:\tFAILED"
+fi
