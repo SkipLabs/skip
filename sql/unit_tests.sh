@@ -175,7 +175,7 @@ else
 fi
 
 if cat test/test_underscore_alias.sql | $SKDB | grep -q "22"; then
-    echo -e "TEST IGNORE/REPLACE:\tOK"
+    echo -e "TEST UNDERSCORE ALIAS:\tOK"
 else
-    echo -e "TEST IGNORE/REPLACE:\tFAILED"
+    echo -e "TEST UNDERSCORE ALIAS:\tFAILED"
 fi
