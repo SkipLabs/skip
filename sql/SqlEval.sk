@@ -319,6 +319,7 @@ fun computeOrder(
 
 class SelectFile(
   tick: Int,
+  name: String,
   virtual: Bool,
   text: String,
   value: Select,
@@ -492,7 +493,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       viewsDir.write(
         context,
         key,
-        SelectFile(context.tick.value, virtual, text, selectAst),
+        SelectFile(context.tick.value, viewName, virtual, text, selectAst),
       );
       if (virtual) {
         if (inTransaction) {
@@ -944,6 +945,7 @@ class Evaluator{options: Options, user: ?UserFile} {
             name => name + "_" + tyDescr.name,
             fields => (name, Array[(tyDescr.name, IASC())]),
             unique => true,
+            text => None(),
           },
         );
       }
