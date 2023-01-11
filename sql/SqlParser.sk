@@ -747,11 +747,25 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
   if (lex.isEqUpper(pos, "UNIQUE")) {
     !pos = lex.expectUpper(pos, "UNIQUE");
     !pos = lex.expectUpper(pos, "INDEX");
-    return parseCreateIndex(lex, pos);
+    ifNotExists = false;
+    if (lex.isEqUpper(pos, "IF")) {
+      !pos = lex.expectUpper(pos, "IF");
+      !pos = lex.expectUpper(pos, "NOT");
+      !pos = lex.expectUpper(pos, "EXISTS");
+      !ifNotExists = true;
+    };
+    return parseCreateIndex(lex, pos, ifNotExists);
   };
   if (lex.isEqUpper(pos, "INDEX")) {
     !pos = lex.expectUpper(pos, "INDEX");
-    return parseCreateIndex(lex, pos);
+    ifNotExists = false;
+    if (lex.isEqUpper(pos, "IF")) {
+      !pos = lex.expectUpper(pos, "IF");
+      !pos = lex.expectUpper(pos, "NOT");
+      !pos = lex.expectUpper(pos, "EXISTS");
+      !ifNotExists = true;
+    };
+    return parseCreateIndex(lex, pos, ifNotExists);
   };
   if (lex.isEqUpper(pos, "VIRTUAL")) {
     !pos = lex.expectUpper(pos, "VIRTUAL");
@@ -820,13 +834,13 @@ fun parseView(
   (pos, View{pos, ifNotExists, virtual, name, query, text})
 }
 
-fun parseCreateIndex(lex: Lexer, pos: Int): (Int, Index) {
+fun parseCreateIndex(lex: Lexer, pos: Int, ifNotExists: Bool): (Int, Index) {
   origPos = pos;
   (!pos, name) = lex.nextWord(pos);
   !name = name.lowercase();
   !pos = lex.expectUpper(pos, "ON");
   (!pos, fields) = parseIndexOn(lex, pos);
-  (pos, Index{pos => origPos, name, fields, unique => false})
+  (pos, Index{pos => origPos, ifNotExists, name, fields, unique => false})
 }
 
 fun parseIndexOn(
