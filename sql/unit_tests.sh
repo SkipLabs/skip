@@ -185,3 +185,18 @@ if cat test/create_index_if_not_exists.sql | $SKDB | grep -q "22"; then
 else
     echo -e "CREATE INDEX IF NOT EXISTS:\tFAILED"
 fi
+
+tmpfile=$(mktemp /tmp/testfile.XXXXXX)
+tmpfile_dump=$(mktemp /tmp/testfile.XXXXXX)
+rm -f $tmpfile $tmpfile_dump
+$SKDB --init $tmpfile
+cat test/test_dump_index.sql | $SKDB --data $tmpfile
+$SKDB --data $tmpfile --dump > $tmpfile_dump
+
+diff $tmpfile_dump test/test_dump_index.exp  > /dev/null
+if [ $? -eq 0 ]; then
+    rm $tmpfile $tmpfile_dump
+    echo -e "TEST DUMP INDEXES:\tOK"
+else
+    echo -e "TEST DUMP INDEXES:\tFAILED"
+fi

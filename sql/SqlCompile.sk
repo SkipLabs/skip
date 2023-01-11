@@ -1753,7 +1753,7 @@ mutable class Compiler{
         if (this.options.showUsedIndexes) {
           print_string("USING INDEX: " + index.name);
         };
-        killed.add(index.tableName);
+        killed.add(index.tableDirName);
         rowRanges = ranges.map(range -> {
           (minKeyValues, maxKeyValues) = range;
           kinds = index.fields.mapWithIndex((idx, field) -> {
@@ -2000,7 +2000,7 @@ mutable class Compiler{
       indexEntry = makeIndexEntry(table.dirName, colNbr);
       indexTable = getIndexByColNbr(this.options, context);
       indexes = indexTable.getArray(context, indexEntry);
-      !indexes = indexes.filter(index -> !killed.contains(index.tableName));
+      !indexes = indexes.filter(index -> !killed.contains(index.tableDirName));
       ce = this.compileExpr(context, e);
       if (ce.getType() != table.schema[colNbr].ty) {
         error(this.pos, "Incompatible types");

@@ -9,9 +9,11 @@ class CValueFile(value: ?CValue) extends SKFS.BaseName
 fun createIndex(
   context: mutable SKFS.Context,
   userIndexNameOpt: ?String,
+  tableName: String,
   dirName: SKFS.DirName,
   kinds: Array<(Int, IKind, Type)>,
   unique: Bool,
+  text: ?String,
 ): IndexDescr {
   idxKinds = kinds.mapWithIndex((idx, field) -> {
     (idx, IASC(), field.i2)
@@ -77,9 +79,11 @@ fun createIndex(
   indexDescr = IndexDescr{
     name => userIndexName,
     dirName => index.dirName,
-    tableName => dirName,
+    tableName => tableName,
+    tableDirName => dirName,
     fields => kinds,
     unique,
+    text,
   };
 
   indexDescr
@@ -92,6 +96,7 @@ fun createUserIndex(
   pos: Int,
   fields: (String, Array<(String, IKind)>),
   unique: Bool,
+  text: ?String,
 ): IndexDescr {
   (tableName, colNames) = fields;
   !colNames = colNames.map(x -> (x.i0, IASC()));
@@ -125,7 +130,15 @@ fun createUserIndex(
   types = table.schema.map(x -> x.ty);
   kinds = computeOrder(types, cols);
 
-  createIndex(context, Some(userIndexName), table.dirName, kinds, unique)
+  createIndex(
+    context,
+    Some(userIndexName),
+    table.name,
+    table.dirName,
+    kinds,
+    unique,
+    text,
+  )
 }
 
 /*****************************************************************************/

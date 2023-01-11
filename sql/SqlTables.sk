@@ -252,9 +252,11 @@ extension class Index extends SKFS.File
 class IndexDescr{
   name: String,
   dirName: SKFS.DirName,
-  tableName: SKFS.DirName,
+  tableName: String,
+  tableDirName: SKFS.DirName,
   fields: Array<(Int, IKind, Type)>,
   unique: Bool,
+  text: ?String,
 } extends SKFS.File uses Orderable {
   fun compare(y: IndexDescr): Order {
     this.name.compare(y.name)
@@ -285,6 +287,7 @@ fun getIndexOutputDir(
           index.pos,
           index.fields,
           index.unique,
+          index.text,
         )
       },
     )
@@ -308,13 +311,31 @@ fun getIndexByColNbr(
       (_context, writer, indexDescr) ~> {
         for (field in indexDescr.fields) {
           fieldNbr = field.i0;
-          indexEntry = makeIndexEntry(indexDescr.tableName, fieldNbr);
+          indexEntry = makeIndexEntry(indexDescr.tableDirName, fieldNbr);
           writer.write(indexEntry, indexDescr)
         }
       },
     )
   })
 }
+
+fun getIndexByName(
+  options: Options,
+  context: mutable SKFS.Context,
+): SKFS.EHandle<IndexDescr> {
+  indexes = getIndexOutputDir(options, context);
+  makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
+    indexes.contextWriterMap(
+      IndexDescr::fromFile,
+      context,
+      indexByCol,
+      (_context, writer, indexDescr) ~> {
+        writer.write(SKFS.SID(indexDescr.tableName), indexDescr)
+      },
+    )
+  })
+}
+
 /*****************************************************************************/
 /* Tables. */
 /*****************************************************************************/
@@ -467,13 +488,26 @@ fun dumpTable(
   printDirDescr(getTableDir(context).get(context, SKFS.SID(tableName)), suffix);
 }
 
-fun dumpTables(origContext: readonly SKFS.Context, suffix: ?String): void {
+fun dumpTables(
+  options: Options,
+  origContext: readonly SKFS.Context,
+  suffix: ?String,
+): void {
   context = SKFS.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
-  _ = handle.map(handle.conv, context, sinkName, dirDescr ~> {
+  _ = handle.contextMap(handle.conv, context, sinkName, (context, dirDescr) ~> {
     if (!dirDescr.isInput) return dirDescr;
     printDirDescr(dirDescr, suffix);
+    for (indexDescr in getIndexByName(options, context).getArray(
+      context,
+      SKFS.SID(dirDescr.dirName.toString()),
+    )) {
+      indexDescr.text match {
+      | None() -> void
+      | Some(text) -> print_string(text + ";")
+      }
+    };
     dirDescr
   });
 }
@@ -525,7 +559,7 @@ fun dumpView(origContext: readonly SKFS.Context, viewName: String): void {
   flushStdout();
 }
 
-fun dumpViews(origContext: readonly SKFS.Context): void {
+fun dumpViews(options: Options, origContext: readonly SKFS.Context): void {
   context = SKFS.Context::fromSaved(origContext.clone());
   handle = getViewsDir(context);
   sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
@@ -544,11 +578,20 @@ fun dumpViews(origContext: readonly SKFS.Context): void {
     sorted.conv,
     context,
     sinkName,
-    (_context, _writer, _key, views) ~> {
+    (context, _writer, _key, views) ~> {
       o = print_raw;
       for (view in views) {
         o(view.text);
         o(";\n");
+        for (indexDescr in getIndexByName(options, context).getArray(
+          context,
+          SKFS.SID(view.name),
+        )) {
+          indexDescr.text match {
+          | None() -> void
+          | Some(text) -> o(text + ";\n")
+          }
+        };
       };
       flushStdout();
     },

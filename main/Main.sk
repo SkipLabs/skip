@@ -253,7 +253,7 @@ untracked fun main(): void {
         | _ -> None()
         };
         SKSQL.runSql(options, context ~> {
-          SKSQL.dumpTables(context, suffix);
+          SKSQL.dumpTables(options, context, suffix);
           skipExit(0);
           SKFS.CStop(None())
         });
@@ -300,7 +300,7 @@ untracked fun main(): void {
           skipExit(2);
         };
         SKSQL.runSql(options, context ~> {
-          SKSQL.dumpViews(context);
+          SKSQL.dumpViews(options, context);
           SKFS.CStop(None())
         });
         return void
@@ -315,9 +315,9 @@ untracked fun main(): void {
           skipExit(2);
         };
         SKSQL.runSql(options, context ~> {
-          SKSQL.dumpTables(context, None());
+          SKSQL.dumpTables(options, context, None());
           SKSQL.dumpInserts(context);
-          SKSQL.dumpViews(context);
+          SKSQL.dumpViews(options, context);
           SKFS.CStop(None())
         });
         return void
