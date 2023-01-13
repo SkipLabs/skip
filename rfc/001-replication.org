@@ -1,0 +1,369 @@
+#+TITLE: Replication semantics
+
+This document describes the SKDB data replication model. It covers how
+the server decides whether to accept data modification. Which users
+data should be replicated to. And how all users end up reaching a
+consistent state despite concurrent modification.
+
+* Server responsibility
+
+The server is to SKDB as GitHub is to Git. It is the central source of
+truth for the database. Clients may interact directly with the server.
+But more commonly they will mirror some of the tables and views and
+work with them locally. When clients want to share local updates they
+push them to the server.
+
+This mechanism differs from GitHub in that:
+
+- the push from the client is likely automatic and happening
+  continuously.
+- the server pushes changes to any connected clients without the need
+  to pull. This mechanism is low latency for collaborative real-time
+  use cases.
+- the server applies privacy rules before pushing data to determine
+  who can read the rows and should receive updates. It only delivers
+  updates to clients that can read the row.
+- the server applies fine-grained access controls to decide whether to
+  accept updates.
+
+
+This document answers the following questions.
+
+1. How is data access defined?
+
+   - How do you control who can see a row? When querying, mirroring,
+     or tailing.
+
+   - How do you control who can insert, update, and delete rows?
+
+2. How does the database prevent or deal with conflicts caused by
+   concurrent modification?
+
+3. How do you control whether data updates are acceptable according to
+   business logic? This is more general than applying database
+   integrity constraints.
+
+* Access control
+
+** ACL per table
+
+There are four access control lists (ACLs) per-table. Each list
+defines the users with that permission. This allows controlling
+whether a user can SELECT, INSERT, UPDATE, or DELETE from a table.
+Each list is defined using a set expression.
+
+For example, if a user is in the DELETE set for table X, then they are
+eligible to /attempt/ to delete a row. They still need to have
+row-level permission, see below.
+
+You cannot UPDATE or DELETE if you do not have SELECT rights - you
+cannot read the row in order to update or delete it.
+
+Having table-level permissions allows for defining which tables are user-facing.
+
+** ACL per row
+
+To facilitate users controlling their privacy and what they share with
+whom, the database allows each row to specify its individual access
+control.
+
+A user must first have table-level permission and then row-level
+permission for a query to be successful.
+
+# TODO: how do we ensure the business logic can read the rows? rely on
+# well-behaved clients setting permissions? or should we have
+# super-user groups that can always read, write, etc? these would be
+# table-level ACLs
+
+This is achieved by defining a special column in the table schema,
+~skdb_access~. If this column is not defined then only table-level
+ACLs are applied.
+
+The value of this column encodes for the row which users may ~read~,
+~modify~, or ~delete~ the row.
+
+Let's see how this works per SQL statement.
+
+*** SELECT
+
+If the user is in the row's ~read~ set then they may select this row.
+Otherwise this row is not visible to the user. It will not be
+mirrored, nor tailed, and they may not modify it.
+
+This is the privacy mechanism the database provides. Using this a user
+may control who can see their data at a fine-grain.
+
+*** DELETE
+
+If a user is in both the ~read~ and ~delete~ set, then they are
+eligible to delete this row. The ~modify~ set is not considered.
+
+Having a delete permission separate from the modify permission is
+useful to model e.g. group posts. A user may post, allowing only
+themselves (or no one, or everyone) to edit the post. But there might
+be a set of admins that are allowed to remove the post from the group.
+
+*** UPDATE
+
+Updates are controlled by the ~modify~ set. The permission applies to
+the whole row - any column may be updated. This is important to
+consider when modelling data.
+
+(If you want to limit which columns in the row can be modified then
+these can be split out to a different table with their own ACL and
+then joined.)
+
+If you have update rights then you may change the ACL on the row as
+part of the update.
+# TODO: should we allow this? or control this?
+
+For a user trying to update, these are the cases.
+
+| Old row ~read~ set | Old row ~modify~ set | Outcome                                      |
+|--------------------+----------------------+----------------------------------------------|
+| OUT                | IN/OUT               | FAIL. You cannot see the row to update it.   |
+| IN                 | OUT                  | FAIL. You are not allowed to modify the row. |
+| IN                 | IN                   | SUCCESS.                                     |
+
+*** INSERT
+
+No row-level permissions are checked on inserts, only table-level.
+
+When inserting a row the user must specify the ~skdb_access~ value if
+the column is defined on the table.
+
+The database allows the user to set any value. They do not have to be
+a member of the ~read~, ~modify~, or ~delete~ sets. The insert is
+accepted but depending on the value, the user may not then be able to
+remove, modify, or even read their write.
+
+Not being able to read your write is useful if you were modelling e.g.
+a mailbox.
+
+** Database schema changes
+
+To CREATE or ALTER you must be an admin user of the database.
+
+** When running locally
+
+When a table is mirrored locally the user only receives data that they
+are eligible to read. It is therefore not strictly necessary to
+enforce access control on reads. These checks may be disabled for
+performance.
+
+Access control should be enforced on mutation to prevent a local write
+from being accepted that will later be rejected by the server.
+
+* Resolving conflict
+
+With each user working with a local copy of a table, the database is
+distributed and decentralised. This means that it cannot sequence
+updates and prevent conflict synchronously. Nor do we want it to do
+this.
+
+For a great experience, we want the user to work with their local
+tables and not have to round trip to the server synchronously. Writes
+are accepted locally, replicated asynchronously, and the user should
+not need to worry about them being rejected at some point in the
+future due to conflict. Once accepted locally, writes can be
+considered accepted globally; writes are not 'optimistic'.
+
+The server may reject writes if they violate ACLs, but well behaved
+clients should not do this.
+
+To motivate the problem we're trying to solve, imagine a user that
+inserts a row with column ~a~ set to 1, and concurrently another user
+deletes rows where ~a = 1~. What should the end state be? And how do
+we ensure that both users end up seeing the same state?
+
+Similarly, what if two users each insert a row and the union violates
+uniqueness constraints?
+
+We could have the server sequence operations and define the end state.
+If we choose a simple policy, such as last writer wins, this will
+often result in surprising behaviour for one of the users. e.g. you
+might suddenly have your insert disappear from under you. The user
+doing the delete may not have intended to clobber new inserts.
+
+Alternatively we might allow applications to specify resolution logic,
+but this will lead to a lot of complexity in the database and defining
+automated resolution is often /very/ hard (think automating merge
+conflicts on diffs!).
+
+Instead we guarantee that concurrent mutations cannot conflict. The
+resulting state of concurrent updates is also not determined by data
+races. To do this we ensure that the order the server receives updates
+does not matter. i.e. that update operations are commutative.
+
+We then defer to the application on how to resolve any conflicts. This
+process is explained below.
+
+** Inserting rows
+
+Inserts are naturally commutative and cannot conflict. We just need to
+ensure that they cannot violate uniqueness constraints.
+
+We define a second special column: ~skdb_author~.
+
+~skdb_author~ has the following semantics:
+- SELECTs are not affected by the column.
+- DELETEs are not affected by the column.
+- INSERT and UPDATE: you may only write your own user id as the value.
+  The database will not accept any other value.
+
+~skdb_author~ is an orthogonal concept to ~skdb_access~. ~skdb_access~
+provides access control. ~skdb_author~ avoids conflict and has no role
+in access control. The columns may both be defined for a table or
+depending on application needs you may use only one or neither.
+
+By defining the ~skdb_author~ column on the table, it is impossible
+for two users to create duplicate rows. (A single user can but this
+should be prevented locally.)
+
+It is now impossible for inserts to conflict and violate uniqueness
+constraints so long as ~skdb_author~ is included in all uniqueness
+constraints. This implies that SKDB must support composite primary
+keys to enable ~skdb_author~ to be included.
+
+** Mutating existing data
+
+For the database to behave as users expect it should not be possible
+to accidentally modify rows that were not modified locally. i.e. *you
+should not be able to modify updates that you have not seen*.
+
+This principle honours the original intent and scope of the
+modification.
+
+*** Deletes
+
+Deletes are naturally commutative but replaying them naively on the
+server can lead to deleting data that you hadn't yet seen locally.
+
+Usually DELETE statements are specified with a WHERE clause to filter
+what is deleted.
+
+To avoid clobbering data you haven't seen, we replicate deletes using
+row-based replication. i.e. we specify the exact data of the row to be
+deleted. The server applies this idempotently (if the row isn't there
+it's happy) to honour the original SQL DELETE semantics and to allow
+concurrent deletes not to conflict.
+
+Row-based replication (RBR) has another advantage over statement-based
+replication: it handles non-determinism. e.g. ~DELETE FROM x where
+RAND() > 0.5;~ can be replicated without issue.
+
+The disadvantage is that RBR can be expensive for deletes that affect
+many rows. These deletes are usually rare in OLTP applications, which
+is what SKDB targets. So this is a reasonable tradeoff.
+
+**** The ABA problem
+
+This scheme greatly reduces the chances of deleting data you haven't
+seen but there are still situations where this can happen.
+
+For example imagine user A and user B delete the same row concurrently
+and then user B learns something and inserts it back. The final state
+should be that we want to keep the row otherwise we've wrongly lost
+data. If user A's delete arrives after B's delete and insert, then we
+will clobber it.
+
+We can solve this problem by using a logical clock. On each
+transaction that the database commits it bumps its internal clock.
+When we send updates down to clients we inform them of the current
+clock value. When a client replicates updates it tells us the value of
+the clock at the time of update. Using this we can ensure that we only
+apply the update to rows that they have seen: where the clock is <= to
+their clock value.
+
+*** Updates
+
+Updates are not naturally commutative. e.g. if two users update the
+same row (each would have to change ~skdb_author~), what should the
+result be?
+
+We resolve this issue by replicating updates as a delete and then an
+insert. Using the above method of applying the delete and the insert
+we ensure that conflicts cannot arise.
+
+In the example of two users concurrently modifying the same row, we
+end up with two rows with different ~skdb_author~ values for the
+application to resolve.
+
+What happens if a user updates the value for the ~skdb_access~ column,
+i.e. changes the ACL for the row? Because updates are sent as a delete
+and then insert, the new ACL is applied on effectively a new row. This
+ensures that this will work even if concurrent changes are happening
+against the old ACL. You'll even get data retraction on privacy
+changes, which is generally a nasty cache invalidation problem that
+many applications get wrong.
+
+** How does an application work with this in practice to resolve conflict?
+
+Whenever ~skdb_author~ is defined on a table, the application must be
+aware that it can get multiple rows for a query where it might expect
+only one.
+
+It can use GROUP BY queries to collapse these and present a view to
+the user. Or it can perform any arbitrary reconciliation logic
+(including asking the user to resolve) and then delete the rows and
+insert a resolved row.
+
+Of course resolution can happen concurrently by multiple users. In
+this case you may have to perform the process recursively.
+
+For situations where you don't care about conflict, or don't want to
+deal with the complexity, or perhaps already have a mechanism to
+prevent conflict - such as a distributed lock - you just don't define
+an ~skdb_author~ column on the table. The database will apply the
+updates in the order it receives them, i.e. last writer wins.
+
+** Geo-distributed servers
+
+One really nice property of having a robust conflict resolution scheme
+is that we can support multiple servers accepting writes.
+
+This enables supporting a larger write scale within the same data
+center. Or probably more useful: it enables having geo-distributed
+servers.
+
+Users can connect to a server that is physically closer and benefit
+from reduced latency. Replicating writes to other users in the same
+region would then be much faster.
+
+Each of the servers would need to replicate with each other. We would
+also need to generalise the logical clock to a vector clock.
+
+* Controlling data with business logic
+
+Under the above replication model users are given a lot of freedom to
+control and manipulate their data.
+
+The common pattern of putting an application layer in front of the
+data layer allows for validating requests with business logic. This
+can be very useful when encoding business rules.
+
+Let's use an example to make this concrete. Imagine you're building a
+chat app. You allow users to read and insert messages in to a table.
+This is how they send messages to each other. Once a message is sent
+we don't want users to be able to delete it, so we do not provide
+delete access. But how would we achieve the business rule that users
+are able to retract a message within the first hour of sending it?
+
+When you put business logic in an application layer in front of a
+database, you're forcing a remote synchronous database interaction.
+SKDB does not need to provide any features to enable this pattern, you
+can already model it.
+
+One way is to have the user write in to an 'event' table that they
+wish to retract a message. This records the request and would be made
+very private.
+
+The remote application layer would receive this request as an update
+to the event table that they are mirroring. It reacts to the update
+applying business logic and validating the request. If valid, the
+application modifies the message table, which would automatically
+propagate the retraction to the relevant users.
+
+This example illustrates how communication between processes can
+happen through state. It models simple request response but could be
+used to model any interaction pattern you can imagine.
