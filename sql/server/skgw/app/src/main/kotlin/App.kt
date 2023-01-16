@@ -5,6 +5,7 @@ import com.beust.klaxon.TypeAdapter
 import com.beust.klaxon.TypeFor
 import io.undertow.Handlers
 import io.undertow.Undertow
+import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.server.handlers.resource.FileResourceManager
 import io.undertow.websockets.WebSocketConnectionCallback
 import io.undertow.websockets.core.AbstractReceiveListener
@@ -12,14 +13,13 @@ import io.undertow.websockets.core.BufferedTextMessage
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
+import io.undertow.util.AttachmentKey
+import io.undertow.util.PathTemplateMatch
 import java.io.File
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.bufferedWriter
 import kotlin.reflect.KClass
-
-// TODO:
-val SINGLE_DB = "/tmp/test.db"
 
 class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
     override fun classFor(type: Any): KClass<out ProtoMessage> =
@@ -72,20 +72,20 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
                     "json" -> OutputFormat.JSON
                     else -> OutputFormat.CSV
                 }
-            val result = Skdb(SINGLE_DB).sql(req.query, format)
+            val result = Skdb(state.dbPath).sql(req.query, format)
             val payload = serialise(ProtoData(result))
             WebSockets.sendTextBlocking(payload, channel)
             channel.close()
         }
         is ProtoDumpTable -> {
-            val result = Skdb(SINGLE_DB).dumpTable(req.table, req.suffix)
+            val result = Skdb(state.dbPath).dumpTable(req.table, req.suffix)
             val payload = serialise(ProtoData(result))
             WebSockets.sendTextBlocking(payload, channel)
             channel.close()
         }
         is ProtoTail -> {
             // TODO: no way to shut this down, just leaking resources here.
-            Skdb(SINGLE_DB)
+            Skdb(state.dbPath)
                 .tail(
                     req.user,
                     req.password,
@@ -97,7 +97,7 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
                 )
         }
         is ProtoWrite -> {
-            val skdbStdin = Skdb(SINGLE_DB).writeCsv(req.user, req.password, req.table)
+            val skdbStdin = Skdb(state.dbPath).writeCsv(req.user, req.password, req.table)
             state.procStdin = skdbStdin
         }
         is ProtoData -> {
@@ -113,68 +113,79 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
     }
 }
 
-data class ChannelState(var procStdin: OutputStream?)
+data class ChannelState(var procStdin: OutputStream?, val dbPath: String)
+
+fun resolveDbPath(db: String?): String? {
+    if (db == null) {
+        return null;
+    }
+
+    // TODO: path should be under /var but this is useful for debug builds
+    val path = "/tmp/${db}.db"
+    return if (File(path).exists()) path else null
+}
 
 fun createHttpServer(): Undertow {
     // TODO: weak refs or gc
     val connections = ConcurrentHashMap<WebSocketChannel, ChannelState>()
 
-    var server =
-        Undertow.builder()
-            .addHttpListener(8080, "0.0.0.0")
-            .setHandler(
-                Handlers.path()
-                    .addPrefixPath(
-                        "/skgw",
-                        Handlers.websocket(
-                            object : WebSocketConnectionCallback {
-                                override fun onConnect(
-                                    exchange: WebSocketHttpExchange,
-                                    channel: WebSocketChannel
-                                ) {
-                                    // TODO: should harvest the user/auth, and
-                                    // database here. these are
-                                    // connection-specific properties
-                                    connections.put(channel, ChannelState(procStdin = null))
+    val rootHandler =
+        Handlers.path()
+            .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs_build/build/"))))
 
-                                    channel.receiveSetter.set(
-                                        object : AbstractReceiveListener() {
-                                            override fun onFullTextMessage(
-                                                channel: WebSocketChannel,
-                                                message: BufferedTextMessage
-                                            ) {
-                                                try {
-                                                    var state = connections.get(channel)
+    var pathHandler =
+        PathTemplateHandler(rootHandler)
+            .add(
+                "/dbs/{database}/connection",
+                Handlers.websocket(
+                    object : WebSocketConnectionCallback {
+                        override fun onConnect(
+                            exchange: WebSocketHttpExchange,
+                            channel: WebSocketChannel
+                        ) {
+                            val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+                            val db = pathParams["database"]
+                            val dbPath = resolveDbPath(db)
 
-                                                    // shouldn't happen
-                                                    if (state == null) {
-                                                        state = ChannelState(procStdin = null)
-                                                        connections.put(channel, state)
-                                                    }
-
-                                                    handleRequest(message.data, channel, state)
-                                                } catch (ex: Exception) {
-                                                    // 1011 is internal error
-                                                    WebSockets.sendCloseBlocking(
-                                                        1011,
-                                                        ex.message,
-                                                        channel
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    )
-                                    channel.resumeReceives()
-                                }
+                            if (dbPath == null) {
+                                // 1011 is internal error
+                                WebSockets.sendCloseBlocking(1011, "resource not found", channel)
+                                return
                             }
-                        )
-                    )
-                    .addPrefixPath(
-                        "/",
-                        Handlers.resource(FileResourceManager(File("/skfs_build/build/")))
-                    )
+
+                            // TODO: should harvest the user/auth, and
+                            // database here. these are
+                            // connection-specific properties
+                            connections.put(channel, ChannelState(procStdin = null, dbPath))
+
+                            channel.receiveSetter.set(
+                                object : AbstractReceiveListener() {
+                                    override fun onFullTextMessage(
+                                        channel: WebSocketChannel,
+                                        message: BufferedTextMessage
+                                    ) {
+                                        try {
+                                            var state = connections.get(channel)
+
+                                            if (state == null) {
+                                                throw RuntimeException("state not found for connection")
+                                            }
+
+                                            handleRequest(message.data, channel, state)
+                                        } catch (ex: Exception) {
+                                            // 1011 is internal error
+                                            WebSockets.sendCloseBlocking(1011, ex.message, channel)
+                                        }
+                                    }
+                                }
+                            )
+                            channel.resumeReceives()
+                        }
+                    }
+                )
             )
-            .build()
+
+    var server = Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
     return server
 }
 
