@@ -485,12 +485,12 @@ export class SKDB {
   }
 
   async connect(
-    uri: string,
     db: string,
     user: string,
-    password: string
+    password: string,
+    endpoint: string = "wss://api.skiplabs.io",
   ): Promise<number> {
-    let result = await makeRequest(uri, {
+    let result = await makeRequest(SKDBServer.getDbSocketUri(endpoint, db), {
       request: "query",
       query: "select id();",
     });
@@ -499,11 +499,10 @@ export class SKDB {
     let server = new SKDBServer(
       this,
       serverID,
-      uri,
+      endpoint,
       db,
       user,
       password,
-      999,                      // TODO: user id needs to be discovered by query
       sessionID
     );
     this.servers.push(server);
@@ -880,27 +879,28 @@ class SKDBServer {
   private db: string;
   private user: string;
   private password: string;
-  private userID: number;
   private sessionID: number;
 
   constructor(
     client: SKDB,
     serverID: number,
-    uri: string,
+    endpoint: string,
     db: string,
     user: string,
     password: string,
-    userID: number,
     sessionID: number
   ) {
     this.client = client;
     this.serverID = serverID;
-    this.uri = uri;
+    this.uri = SKDBServer.getDbSocketUri(endpoint, db);
     this.db = db;
     this.user = user;
     this.password = password;
-    this.userID = userID;
     this.sessionID = sessionID;
+  }
+
+  static getDbSocketUri(endpoint: string, db: string) {
+    return `${endpoint}/dbs/${db}/connection`;
   }
 
   async sqlRaw(passwd: string, stdin: string): Promise<string> {
