@@ -26,16 +26,6 @@ interface WasmExports {
   memory: Memory;
 }
 
-let output = function (str) {
-  // @ts-expect-error
-  process.stdout.write(str);
-};
-
-let error = function (str) {
-  // @ts-expect-error
-  process.stderr.write(str + "\n");
-};
-
 /* ***************************************************************************/
 /* Primitives to connect to indexedDB. */
 /* ***************************************************************************/
@@ -540,10 +530,6 @@ class SKDB {
       __setErrNo: function (err) {
         throw new Error("ErrNo " + err);
       },
-      SKIP_print_char: function (c) {
-        output(String.fromCharCode(c));
-      },
-      printf: function (ptr) {},
       SKIP_call_external_fun: function (funId, str) {
         return encodeUTF8(
           data.exports,
@@ -555,7 +541,7 @@ class SKDB {
         );
       },
       SKIP_print_error: function (str) {
-        error(wasmStringToJS(data.exports, str));
+        console.error(wasmStringToJS(data.exports, str));
       },
       SKIP_read_line_fill: function () {
         data.lineBuffer = [];
