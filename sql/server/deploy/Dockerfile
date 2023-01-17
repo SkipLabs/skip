@@ -26,4 +26,4 @@ RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
 RUN make
 
 WORKDIR /skfs_build/sql/server
-CMD ./start.sh
+CMD ./deploy/start.sh
