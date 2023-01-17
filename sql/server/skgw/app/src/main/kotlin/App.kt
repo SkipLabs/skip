@@ -120,8 +120,7 @@ fun resolveDbPath(db: String?): String? {
         return null;
     }
 
-    // TODO: path should be under /var but this is useful for debug builds
-    val path = "/tmp/${db}.db"
+    val path = "/var/db/${db}.db"
     return if (File(path).exists()) path else null
 }
 
