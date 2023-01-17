@@ -7,14 +7,13 @@ import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.server.handlers.resource.FileResourceManager
+import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.WebSocketConnectionCallback
 import io.undertow.websockets.core.AbstractReceiveListener
 import io.undertow.websockets.core.BufferedTextMessage
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
-import io.undertow.util.AttachmentKey
-import io.undertow.util.PathTemplateMatch
 import java.io.File
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -117,7 +116,7 @@ data class ChannelState(var procStdin: OutputStream?, val dbPath: String)
 
 fun resolveDbPath(db: String?): String? {
     if (db == null) {
-        return null;
+        return null
     }
 
     val path = "/var/db/${db}.db"
@@ -142,7 +141,10 @@ fun createHttpServer(): Undertow {
                             exchange: WebSocketHttpExchange,
                             channel: WebSocketChannel
                         ) {
-                            val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+                            val pathParams =
+                                exchange
+                                    .getAttachment(PathTemplateMatch.ATTACHMENT_KEY)
+                                    .getParameters()
                             val db = pathParams["database"]
                             val dbPath = resolveDbPath(db)
 
@@ -167,7 +169,9 @@ fun createHttpServer(): Undertow {
                                             var state = connections.get(channel)
 
                                             if (state == null) {
-                                                throw RuntimeException("state not found for connection")
+                                                throw RuntimeException(
+                                                    "state not found for connection"
+                                                )
                                             }
 
                                             handleRequest(message.data, channel, state)
