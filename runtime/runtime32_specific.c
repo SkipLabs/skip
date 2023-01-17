@@ -48,7 +48,7 @@ void sk_commit(char* new_root, uint32_t sync) {
 }
 
 char* SKIP_read_file(char* filename_obj) {
-  SKIP_throw((void*)0);
+  SKIP_throw_cruntime(31);
   return (void*)0;
 }
 
@@ -162,7 +162,7 @@ uint64_t SKIP_notify(char* filename_obj, uint64_t tick) {
 }
 
 void SKIP_exit(uint64_t code) {
-  SKIP_throw(NULL);
+  SKIP_throw_cruntime((int32_t)code);
 }
 
 void* SKIP_freeze_lock(void* x) {

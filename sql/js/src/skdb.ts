@@ -33,7 +33,7 @@ let output = function (str) {
 
 let error = function (str) {
   // @ts-expect-error
-  process.stderr.write(str);
+  process.stderr.write(str + "\n");
 };
 
 /* ***************************************************************************/

@@ -88,3 +88,19 @@ fun vtry<T>(f: () -> T, onError: Exception -> T): T {
   );
   result.fromSome()
 }
+
+/*****************************************************************************/
+/* The definitions for the C runtime errors (thrown from C code). */
+/*****************************************************************************/
+
+// We use Int32 to be JS friendly
+class CRuntimeError(code: Int32) extends Exception {
+  fun getMessage(): String {
+    inspect(this).toString()
+  }
+}
+
+@cpp_export("SKIP_throw_cruntime")
+fun throwCRuntime(code: Int32): void {
+  throw CRuntimeError(code);
+}

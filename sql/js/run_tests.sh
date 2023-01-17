@@ -154,3 +154,22 @@ then
 else
     echo -e "TEST JS VIEW IF NOT EXISTS:\tFAILED"
 fi
+
+if
+    (cd ../../ && (
+        cat build/skdb_node.js;
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  for(let i = 0; i < 10000; i++) {"
+        echo "    skdb.sqlRaw('select * from t1;');"
+        echo "    console.log('');"
+        echo "  }"
+        echo "}"
+        echo "test()"
+    ) | node 2>&1)| grep 'does not exist' | awk '{count += 1;} END { print count;}' | grep -q 10000
+then
+    echo -e "TEST ERROR MEMORY:\tOK"
+else
+    echo -e "TEST ERROR MEMORY:\tFAILED"
+fi
+

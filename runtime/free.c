@@ -52,7 +52,7 @@ void sk_free_class(sk_stack_t* st, char* obj) {
       fprintf(stderr, "Invalid external pointer found\n");
       _exit(24);
       #endif
-      SKIP_throw(NULL);
+      SKIP_throw_cruntime(23);
     }
     sk_call_external_pointer_descructor(destructor, value);
   }

@@ -96,7 +96,7 @@ char* SKIP_unsafe_get_local_context() {
 #ifdef SKIP64
     fprintf(stderr, "Error: local context is not set");
 #endif
-    SKIP_throw(NULL);
+    SKIP_throw_cruntime(30);
   }
   return local_ctx;
 }
@@ -153,14 +153,14 @@ void* SKIP_context_sync_no_lock(
     #ifdef SKIP64
     fprintf(stderr, "Internal error: you forgot to initialize the context");
     #endif
-    SKIP_throw(NULL);
+    SKIP_throw_cruntime(28);
   }
   if(root == delta || old_root == delta) {
     // INVALID use of sync, the root should be different
     #ifdef SKIP64
     fprintf(stderr, "Internal error: tried to sync with the same context");
     #endif
-    SKIP_throw(NULL);
+    SKIP_throw_cruntime(29);
   }
   char* rtmp = SKIP_resolve_context(txTime, root, delta, synchronizer, lockF);
   char* new_root = SKIP_intern_shared(rtmp);
