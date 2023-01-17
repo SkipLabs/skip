@@ -488,8 +488,17 @@ export class SKDB {
     db: string,
     user: string,
     password: string,
-    endpoint: string = "wss://api.skiplabs.io",
+    endpoint?: string,
   ): Promise<number> {
+    if (!endpoint) {
+      if (!window) {
+        throw new Error("No endpoint passed to connect and no window object to infer from.");
+      }
+      const loc = window.location;
+      const scheme = loc.protocol === "https:" ? "wss://" : "ws://"
+      endpoint = `${scheme}${loc.host}`
+    }
+
     let result = await makeRequest(SKDBServer.getDbSocketUri(endpoint, db), {
       request: "query",
       query: "select id();",
