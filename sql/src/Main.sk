@@ -135,6 +135,11 @@ untracked fun main(): void {
             .long("follow")
             .short("f")
             .about("Output appended data as the database grows"),
+        )
+        .arg(
+          Cli.StringArg("since")
+            .long("since")
+            .about("Starting time of the tail"),
         ),
     )
     // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
@@ -450,7 +455,10 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
   followMode = args.getBool("follow");
-  tick = 0;
+  tick = args.maybeGetString("since") match {
+  | Some(since) -> since.toInt()
+  | _ -> 0
+  };
   init = true;
   dieOnEOF();
   loop {
