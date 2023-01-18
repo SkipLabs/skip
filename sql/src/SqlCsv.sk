@@ -204,25 +204,33 @@ fun replayDiff(
         if (line == "") continue;
         chars = mutable Vector[];
         iter = line.getIter();
+        checkpoint = false;
         loop {
           c = iter.next() match {
+          | None() if (checkpoint) -> break void
           | None() ->
             print_error(
               "Error, line " + lineNbr.get() + ": unexpected end of line",
             );
             skipExit(23)
+          | Some(':') ->
+            !checkpoint = true;
+            continue
           | Some(x) -> x
           };
           if (c == '\t') break void;
           if (c < '0' || c > '9') {
             print_error(
-              "Error, line " + lineNbr.get() + ": expected an integer key",
+              "Error, line " + lineNbr.get() + ": expected an integer",
             );
             skipExit(23)
           };
           chars.push(c);
         };
-        repeat = String::fromChars(chars.toArray()).toInt();
+        prefix = String::fromChars(chars.toArray()).toInt();
+        if (checkpoint) {
+          continue;
+        };
         str = line.sub(iter, line.length() - chars.size() - 1);
         values = mutable Vector[];
         strIter = str.getIter();
@@ -251,7 +259,7 @@ fun replayDiff(
         | Some(userFile) ->
           SKSQL.checkUserRows(context, userFile, pos, table, newRows)
         };
-        buffer.extend(newRows.map(x -> x.setRepeat(repeat)));
+        buffer.extend(newRows.map(x -> x.setRepeat(prefix)));
 
         if (stdinHasData() != 0) continue;
         rows = buffer.toArray();
@@ -288,11 +296,15 @@ fun replayStdin(): Map<String, (Int, Int)> {
         };
         chars = mutable Vector[];
         iter = line.getIter();
+        checkpoint = false;
         loop {
           c = iter.next() match {
           | None() ->
             print_error("Error, line " + lineNbr + ": unexpected end of line");
             skipExit(23)
+          | Some(':') ->
+            !checkpoint = true;
+            break void
           | Some(x) -> x
           };
           if (c == '\t') break void;
@@ -302,6 +314,7 @@ fun replayStdin(): Map<String, (Int, Int)> {
           };
           chars.push(c);
         };
+        if (checkpoint) continue;
         repeat = String::fromChars(chars.toArray()).toInt();
         value = line.sub(iter, line.length() - chars.size() - 1);
         if (map.containsKey(value)) {
