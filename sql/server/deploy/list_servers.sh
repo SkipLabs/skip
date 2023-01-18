@@ -12,7 +12,7 @@ fi
 
 ROLE=$1
 
-# assumes you have the aws cli installed and configured
+which aws || echo "Could not find aws cli." && exit -1
 
 aws ec2 describe-instances \
     --filters "Name=tag:role,Values=$ROLE" \
