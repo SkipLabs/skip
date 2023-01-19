@@ -81,7 +81,13 @@ class Skdb(val dbPath: String) {
         return proc.outputStream
     }
 
-    fun tail(user: String, password: String, table: String, callback: (String) -> Unit): Process {
+    fun tail(
+        user: String,
+        password: String,
+        table: String,
+        since: Int,
+        callback: (String) -> Unit
+    ): Process {
         // TODO: check for existing
         val connection =
             blockingRun(
@@ -98,7 +104,17 @@ class Skdb(val dbPath: String) {
                     password
                 )
             )
-        val pb = ProcessBuilder(SKDB_PROC, "tail", "--data", dbPath, "--format=csv", connection.trim())
+        val pb =
+            ProcessBuilder(
+                SKDB_PROC,
+                "tail",
+                "--data",
+                dbPath,
+                "--format=csv",
+                connection.trim(),
+                "--since",
+                (if (since < 0) 0 else since).toString()
+            )
 
         // TODO: for hacky debug
         pb.redirectError(ProcessBuilder.Redirect.INHERIT)

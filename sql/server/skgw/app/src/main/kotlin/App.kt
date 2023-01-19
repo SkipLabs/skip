@@ -38,8 +38,12 @@ sealed class ProtoMessage(val request: String)
 
 data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMessage("query")
 
-data class ProtoTail(val table: String, val user: String, val password: String) :
-    ProtoMessage("tail")
+data class ProtoTail(
+    val table: String,
+    val user: String,
+    val password: String,
+    val since: Int = 0,
+) : ProtoMessage("tail")
 
 data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
 
@@ -89,6 +93,7 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
                     req.user,
                     req.password,
                     req.table,
+                    req.since,
                     {
                         val payload = serialise(ProtoData(it))
                         WebSockets.sendTextBlocking(payload, channel)
