@@ -1,0 +1,54 @@
+module SKTest;
+
+mutable base class TestReporter {
+  mutable fun report(name: String, error: ?Exception): void;
+  overridable mutable fun finish(): void {
+    void
+  }
+}
+
+mutable class BasicTestReporter(
+  color: Bool,
+  private mutable successes: Int = 0,
+  private mutable failures: Int = 0,
+) extends TestReporter {
+  mutable fun report(name: String, error: ?Exception): void {
+    result = error match {
+    | Some(exn) ->
+      this.!failures = this.failures + 1;
+      this.failure() + ` ${name}\n${exn.getMessage()}`
+    | None() ->
+      this.!successes = this.successes + 1;
+      this.success() + ` ${name}`
+    };
+    print_string(result)
+  }
+
+  mutable fun finish(): void {
+    print_string(
+      `Failures: ${this.failures}, successes: ${this.successes} (total: ${this
+        .successes + this.failures})`,
+    )
+  }
+
+  private readonly fun failure(): String {
+    if (this.color) {
+      TermColor.colored(
+        "[FAILURE]",
+        TermColor.Red(),
+        TermColor.Default(),
+        Array[TermColor.Bold()],
+      );
+    } else {
+      "[FAILURE]"
+    }
+  }
+
+  private readonly fun success(): String {
+    if (this.color) {
+      TermColor.colored("[OK]", TermColor.Green());
+    } else {
+      "[OK]"
+    }
+  }
+}

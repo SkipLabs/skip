@@ -1,0 +1,42 @@
+module SKTest;
+
+fun test_harness(runTests: ((String, () -> void) -> void) -> void): void {
+  args = Cli.Command()
+    .about("Run tests")
+    .arg(
+      Cli.StringArg("filter").positional().about(
+        "If specified, only run tests containing this string in their names",
+      ),
+    )
+    .help()
+    .parseArgs();
+
+  // TODO: Look into mutability
+  reporter = mutable BasicTestReporter(true);
+  filter = args.maybeGetString("filter").default("");
+  runTests((testName, test) -> {
+    if (!testName.contains(filter)) {
+      return void
+    };
+    vtry(
+      () -> {
+        _ = test();
+        // TODO: reportSuccess/reportFailure.
+        reporter.report(testName, None())
+      },
+      exn -> reporter.report(testName, Some(exn)),
+    )
+  });
+
+  reporter.finish()
+}
+
+fun main(): void {
+  test_harness(runTest -> {
+    _ = runTest; // Trick to avoid compiler error when no @test function is defined.
+    #forEachFunction(@test, #function, #functionName) {
+      runTest(#functionName, #function)
+    };
+    void
+  })
+}
