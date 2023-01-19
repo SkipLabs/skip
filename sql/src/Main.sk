@@ -115,6 +115,13 @@ untracked fun main(): void {
         ),
     )
     .subcommand(
+      Cli.Command("watermark")
+        .about("Get the watermark for table TABLE")
+        .arg(
+          Cli.StringArg("table").positional().required().about("Table name"),
+        ),
+    )
+    .subcommand(
       Cli.Command("write-csv")
         .about("Write data from stdin into a directory in CSV format")
         .arg(Cli.StringArg("table").positional().required().about("Table name"))
@@ -197,6 +204,7 @@ untracked fun main(): void {
       | "disconnect" -> execDisconnect
       | "write" -> execWrite
       | "tail" -> execTail
+      | "watermark" -> execWatermark
       | "write-csv" -> execWriteCsv
       | "subscribe" -> execSubscribe
       | "replay" -> execReplay
@@ -575,6 +583,25 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       break void
     }
   }
+}
+
+fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
+  ensureContext(args);
+  tableName = args.getString("table").lowercase();
+  SKSQL.runSql(options, context ~> {
+    watermarkDir = context.maybeGetDir(SKCSV.watermarks) match {
+    | None() -> context.mkdir(SKFS.TickFile::fromFile, SKCSV.watermarks, false)
+    | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
+    };
+    arr = watermarkDir.unsafeGetArray(context, SKFS.SID::create(tableName));
+    if (arr.size() > 0) {
+      print_string(arr[0].value.value);
+    } else {
+      print_error("Error: watermark for table " + tableName + " not found.");
+      skipExit(1);
+    };
+    SKFS.CStop(None())
+  });
 }
 
 fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
