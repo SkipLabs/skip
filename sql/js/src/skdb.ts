@@ -155,6 +155,7 @@ type ProtoTail = {
   table: string;
   user: string;
   password: string;
+  since: number;
 }
 
 type ProtoDumpTable = {
@@ -747,6 +748,7 @@ export class SKDB {
           user: user,
           password: password,
           table: tableName,
+          since: 0,
         },
         function () {
           resolve(0);
