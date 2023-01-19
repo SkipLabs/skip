@@ -1,0 +1,57 @@
+module SKTest;
+
+// TODO: Get rid of this.
+extension base class .Inspect uses Equality {}
+
+class ExpectationError(
+  msg: String,
+  expected: String,
+  actual: String,
+) extends Exception {
+  fun getMessage(): String {
+    "ExpectationError: " +
+      this.msg +
+      "\n expected: " +
+      this.expected +
+      "\n actual: " +
+      this.actual
+  }
+}
+
+fun expectEq<T: frozen>(
+  actual: T,
+  expected: T,
+  msg: String = "expected equality",
+): void {
+  if (inspect(actual) != inspect(expected)) {
+    throw ExpectationError(
+      msg,
+      inspect(expected).toString(),
+      inspect(actual).toString(),
+    )
+  }
+}
+
+fun expectTrue(b: Bool, msg: String = "expected true"): void {
+  if (!b) {
+    throw ExpectationError(msg, "true", "false")
+  }
+}
+
+fun expectFalse(b: Bool, msg: String = "expected false"): void {
+  if (b) {
+    throw ExpectationError(msg, "false", "true")
+  }
+}
+
+fun fail<T>(msg: String = "failure"): T {
+  throw ExpectationError(msg, "", "")
+}
+
+fun expectThrow(f: () -> void, msg: String = "expected throw"): void {
+  success = false;
+  vtry(f, _ -> !success = true);
+  if (!success) {
+    fail(msg)
+  }
+}
