@@ -346,7 +346,12 @@ int64_t SKIP_numThreads() {
   return 1;
 }
 
-void SKIP_string_to_file(char* str, char* file) {
+void SKIP_string_to_file(char* str, char* file_obj) {
+  size_t file_size = SKIP_String_byteSize(file_obj);
+  char* file = (char *)malloc(file_size+1);
+  memcpy(file, file_obj, file_size);
+  file[file_size] = (char)0;
+
   FILE *out = fopen(file, "w");
   size_t size = SKIP_String_byteSize(str);
   while(size != 0) {
@@ -354,6 +359,8 @@ void SKIP_string_to_file(char* str, char* file) {
     size -= written;
   }
   fclose(out);
+
+  free(file);
 }
 
 int64_t SKIP_get_mtime(char *path) {
