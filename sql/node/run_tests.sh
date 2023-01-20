@@ -1,13 +1,14 @@
 #!/bin/bash
 
 skdb=../../build/skdb
+cp ../../build/out32.wasm .
 
 run_compare_test () {
   echo -en "$1:\t"
   tmpfile1=$(mktemp /tmp/testfile.XXXXXX)
   tmpfile2=$(mktemp /tmp/testfile.XXXXXX)
   cat ../test/$1.sql | $skdb --always-allow-joins > $tmpfile1
-  (cd ../../ && cat build/skdb_node.js sql/js/tests/$1.jsx | node) | egrep -v '^[ ]*$' > $tmpfile2
+  ((cat ../../build/skdb_node.js; echo ""; cat tests/$1.jsx) | node) | egrep -v '^[ ]*$' > $tmpfile2
   diff $tmpfile1 $tmpfile2 > /dev/null
   if [ $? -eq 0 ]; then
       rm $tmpfile1 $tmpfile2
@@ -20,16 +21,16 @@ run_compare_test () {
 run_compare_test select1
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
-        echo "  skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create(true);"
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
         echo "  skdb.sqlRaw('insert into t1 values(TRUE, false);');"
         echo "  console.log(skdb.sqlRaw('select true, false, a, b from t1;'));"
         echo "}"
         echo "test()"
-    ) | node) | grep -q '1|0|1|0'
+    )| node) | grep -q '1|0|1|0'
 then
     echo -e "TEST JS BOOLEAN:\tOK"
 else
@@ -37,8 +38,9 @@ else
 fi
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
         echo "  skdb = await SKDB.create(true);"
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
@@ -54,8 +56,9 @@ else
 fi
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
         echo "  skdb = await SKDB.create(true);"
         echo "  skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY);');"
@@ -69,8 +72,9 @@ else
 fi
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
         echo "  skdb = await SKDB.create(true);"
         echo "  skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');"
@@ -85,8 +89,9 @@ else
 fi
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
         echo "  skdb = await SKDB.create(true);"
         echo "  skdb.sql('create table widgets (id text unique, name text);');"
@@ -103,8 +108,9 @@ else
 fi
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
         echo "  skdb = await SKDB.create(true);"
         echo "  skdb.sql(\"create table widgets (id text unique , price real not null);\");" 
@@ -120,8 +126,9 @@ else
 fi
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
         echo "  skdb = await SKDB.create(true);"
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
@@ -138,8 +145,9 @@ else
 fi
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
         echo "  skdb = await SKDB.create(true);"
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
@@ -156,8 +164,9 @@ else
 fi
 
 if
-    (cd ../../ && (
-        cat build/skdb_node.js;
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
         echo "async function test() {"
         echo "  skdb = await SKDB.create(true);"
         echo "  for(let i = 0; i < 10000; i++) {"
