@@ -51,7 +51,7 @@ char* sk_new_const(char* cst) {
         return cst;
       }
       fprintf(stderr, "Cannot have a changing constant in persitent mode\n");
-      SKIP_throw_cruntime(22);
+      SKIP_throw_cruntime(ERROR_CHANGING_CONST);
     }
     #endif
     sk_global_lock();

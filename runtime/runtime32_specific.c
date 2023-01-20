@@ -48,7 +48,7 @@ void sk_commit(char* new_root, uint32_t sync) {
 }
 
 char* SKIP_read_file(char* filename_obj) {
-  SKIP_throw_cruntime(31);
+  SKIP_throw_cruntime(ERROR_NOT_IMPLEMENTED);
   return (void*)0;
 }
 

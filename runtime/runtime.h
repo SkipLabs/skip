@@ -32,6 +32,21 @@ typedef uint64_t SkipInt;
 #endif
 
 /*****************************************************************************/
+/* The error code thrown by the runtime. */
+/*****************************************************************************/
+
+#define ERROR_TODO 1
+#define ERROR_CHANGING_CONST 22
+#define ERROR_INVALID_EXTERNAL_POINTER 23
+#define ERROR_OUT_OF_MEMORY 24
+#define ERROR_INTERNAL_LOCK 25
+#define ERROR_LOCAL_CONTEXT_NULL 26
+#define ERROR_CONTEXT_NOT_INITIALIZED 27
+#define ERROR_SYNC_SAME_CONTEXT 28
+#define ERROR_NOT_IMPLEMENTED 29
+#define ERROR_FLOAT_TOO_LARGE 30
+
+/*****************************************************************************/
 /* Types used for the Obstack pages info. */
 /*****************************************************************************/
 
