@@ -331,7 +331,7 @@ double atof(const char *s)
 double SKIP_String__toFloat_raw(char* str) {
   size_t size = SKIP_String_byteSize((char*)str);
   if(size >= 255) {
-    SKIP_throw_cruntime(43); // TODO
+    SKIP_throw_cruntime(ERROR_FLOAT_TOO_LARGE);
   }
   char cstr[256];
   memcpy(cstr, str, size);

@@ -169,7 +169,7 @@ void* sk_malloc(size_t size) {
 
   if(result == NULL) {
     fprintf(stderr, "Out of memory\n");
-    SKIP_throw_cruntime(24);
+    SKIP_throw_cruntime(ERROR_OUT_OF_MEMORY);
   }
   #ifdef MEMORY_CHECK
   static size_t alloc_count = 0;

@@ -66,7 +66,7 @@ int sk_is_locked = 0;
 void sk_check_has_lock() {
   if((gmutex != NULL) && !sk_is_locked) {
     fprintf(stderr, "INTERNAL ERROR: unsafe operation\n");
-    SKIP_throw_cruntime(27);
+    SKIP_throw_cruntime(ERROR_INTERNAL_LOCK);
   }
 }
 

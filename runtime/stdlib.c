@@ -47,7 +47,7 @@ void* memset(void* ptr, int value, size_t size) {
 
   if(value != 0) {
     // memset only implemented for zero
-    SKIP_throw_cruntime(40);
+    SKIP_throw_cruntime(ERROR_NOT_IMPLEMENTED);
   }
 
   const char* end = (char*)ptr + size;
@@ -116,7 +116,7 @@ void sk_print_int(uint64_t x) {
 }
 
 void todo() {
-  SKIP_throw_cruntime(1);
+  SKIP_throw_cruntime(ERROR_TODO);
 }
 
 

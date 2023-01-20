@@ -78,7 +78,7 @@ char* sk_large_page(size_t size) {
     #ifdef SKIP64
     fprintf(stderr, "Out of memory\n");
     #endif
-    SKIP_throw_cruntime(25);
+    SKIP_throw_cruntime(ERROR_OUT_OF_MEMORY);
   }
   sk_obstack_attach_page(lpage);
   lpage += sizeof(char*);
@@ -101,7 +101,7 @@ void sk_new_page() {
     #ifdef SKIP64
     fprintf(stderr, "Out of memory\n");
     #endif
-    SKIP_throw_cruntime(26);
+    SKIP_throw_cruntime(ERROR_OUT_OF_MEMORY);
   }
   end = head + block_size;
   *(char**)head = page;
