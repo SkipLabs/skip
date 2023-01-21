@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SKDB=/skfs_build/build/skdb
+SKDB=./target/skdb
 
 if cat test/test_unique.sql | $SKDB 2>&1 | grep -q UNIQUE
 then

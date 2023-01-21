@@ -2,7 +2,7 @@
 
 rm -f /tmp/test.db
 
-SKDB=../../../../build/skdb
+SKDB=../../../target/skdb
 
 $SKDB --init /tmp/test.db
 

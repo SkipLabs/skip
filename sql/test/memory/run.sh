@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SKDB=/skfs_build/build/skdb
+SKDB=../../target/skdb
 
 rm -f /tmp/test.db
 

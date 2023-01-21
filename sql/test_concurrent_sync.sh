@@ -1,12 +1,14 @@
 #!/bin/bash
 
+SKDB=./target/skdb
+
 # Test that launches a bunch of unix process that insert numbers in a table
 # concurrently. We check at the end that the sum of the numbers is correct.
 
 rm -f /tmp/test_data
-../build/skdb --init /tmp/test_data
+$SKDB --init /tmp/test_data
 
-echo 'create table t1(a INTEGER);' | ../build/skdb --data /tmp/test_data
+echo 'create table t1(a INTEGER);' | $SKDB --data /tmp/test_data
 
 for i in {0..100}
 do
@@ -18,14 +20,14 @@ do
     done
 #    UNCOMMENT THIS IF YOU WANT A CORE DUMP
 #    ulimit -c unlimited
-    cat $command | ../build/skdb --data /tmp/test_data &
+    cat $command | $SKDB --data /tmp/test_data &
 #    if [[ $? -eq 139 ]]; then
-#       gdb -q ../build/skdb core -x /tmp/backtrace
+#       gdb -q $SKDB core -x /tmp/backtrace
 #    fi
 done
 wait
 
-echo "SELECT * FROM t1;" | ../build/skdb --data /tmp/test_data  > /tmp/test_result
+echo "SELECT * FROM t1;" | $SKDB --data /tmp/test_data  > /tmp/test_result
 sum=`cat /tmp/test_result | egrep '^[0-9]+$' | awk '{x += $1} END {print x}'`
 
 if [[ sum -eq 51515050 ]]
