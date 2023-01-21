@@ -1,35 +1,82 @@
-CC=clang-10
-CPP=clang++-10
-SKC=../build/skc
-BCLINK=llvm-link-10
-MEMSIZE32=1073741824
+CXXFLAGS ?= -O3 -mllvm -inline-threshold=0 # -enable-new-pm=false
+STAGE    ?= 1
 
-OLEVEL=-O3
-CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
-CC64FLAGS=$(OLEVEL) -DSKIP64
-SKFLAGS=
+prefix   ?= /usr/local
+exec_prefix ?= $(prefix)
+bindir   ?= $(exec_prefix)/bin
+libdir   ?= $(exec_prefix)/lib
 
-SKIP_FILES=$(shell find src -name '*.sk') $(shell find ../skfs/src -name '*.sk') $(shell find ../prelude -name '*.sk')
 
-default: ../build/skc
+.PHONY: default
+default: stage$(STAGE)
 
-../build/skc_out32.wasm: ../build/skc_out32.ll ../build/full_runtime32.bc
-	cat ../preamble32.ll ../build/skc_out32.ll > ../build/preamble_and_skc_out32.ll
-	llvm-link-10 ../build/full_runtime32.bc ../build/preamble_and_skc_out32.ll -o ../build/all.bc
-	llc-10 -mtriple=wasm32-unknown-unknown $(OLEVEL) -filetype=obj ../build/all.bc -o ../build/skc_out32.o
-	wasm-ld-10 --initial-memory=$(MEMSIZE32) $(EXPORTJS) ../build/skc_out32.o -o ../build/skc_out32.wasm --no-entry -allow-undefined
+RUNTIME_SRCS = $(wildcard runtime/*.c)
 
-../build/skc_out32.ll: $(SKIP_FILES)
-	mkdir -p ../build/
-	$(SKC) --embedded32 . --export-function-as main=skip_main $(SKFLAGS) --output ../build/skc_out32.ll
+runtime/libskip_runtime64.a: $(RUNTIME_SRCS) runtime/runtime64_specific.cpp
+	$(MAKE) -C runtime $(@F)
 
-../build/skc: ../build/skc_out64.ll ../build/libskip_runtime64.a
-	cat ../preamble64.ll ../build/skc_out64.ll > ../build/preamble_and_skc_out64.ll
-	$(CPP) $(OLEVEL) ../build/preamble_and_skc_out64.ll ../build/libskip_runtime64.a -o ../build/skc -Wl,--whole-archive -static -lrt -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
+runtime/libskip_runtime32.bc: $(RUNTIME_SRCS) runtime/runtime32_specific.c
+	$(MAKE) -C runtime $(@F)
 
-../build/skc_out64.ll: $(SKIP_FILES)
-	mkdir -p ../build/
-	$(SKC) --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output ../build/skc_out64.ll
+bootstrap/%.ll: bootstrap/%.ll.gz
+	gunzip -c $< > $@
 
+bootstrap/skargo: bootstrap/skargo_out64.ll runtime/libskip_runtime64.a
+	clang++ $(CXXFLAGS) -o $@ $^  -lrt -lpthread
+
+stage%:
+	mkdir -p $@
+	$(MAKE) $@/bin/skc $@/bin/skargo $@/lib/libskip_runtime64.a $@/lib/libskip_runtime32.bc $@/lib/skip_preamble64.ll $@/lib/skip_preamble32.ll
+
+stage%/bin/skargo: bootstrap/skargo
+	mkdir -p $(@D)
+	cp $< $@
+
+stage%/lib/libskip_runtime64.a: runtime/libskip_runtime64.a
+	mkdir -p $(@D)
+	cp $< $@
+
+stage%/lib/libskip_runtime32.bc: runtime/libskip_runtime32.bc
+	mkdir -p $(@D)
+	cp $< $@
+
+stage%/lib/skip_preamble64.ll: preamble/preamble64.ll
+	mkdir -p $(@D)
+	cp $< $@
+
+stage%/lib/skip_preamble32.ll: preamble/preamble32.ll
+	mkdir -p $(@D)
+	cp $< $@
+
+stage0/bin/skc: bootstrap/skc_out64.ll runtime/libskip_runtime64.a
+	mkdir -p $(@D)
+	clang++ $(CXXFLAGS) -o $@ $^ -lrt -lpthread
+
+stage1/bin/skc: stage0
+	PATH=stage0/bin/:$(PATH) skargo build --target-dir stage1/bin
+
+stage2/bin/skc: stage1
+	PATH=stage1/bin/:$(PATH) skargo build --target-dir stage2/bin
+
+stage3/bin/skc: stage2
+	PATH=stage2/bin/:$(PATH) skargo build --target-dir stage3/bin
+# 	TODO: Ensure stage2 == stage3.
+
+.PHONY: install
+install: stage$(STAGE)
+	install -d $(libdir)
+	install -m 644 stage$(STAGE)/lib/libskip_runtime64.a $(libdir)
+	install -m 644 stage$(STAGE)/lib/libskip_runtime32.bc $(libdir)
+	install -m 644 preamble/preamble64.ll $(libdir)/skip_preamble64.ll
+	install -m 644 preamble/preamble32.ll $(libdir)/skip_preamble32.ll
+	install -d $(bindir)
+	install -m 755 stage$(STAGE)/bin/skc stage$(STAGE)/bin/skargo $(bindir)
+
+.PHONY: clean
 clean:
-	rm -Rf ../build/skc*
+	$(MAKE) -C runtime clean
+	rm -Rf stage* bootstrap/*.ll bootstrap/skargo
+
+.PHONY: test
+test: stage$(STAGE)
+	PATH=../stage$(STAGE)/bin:$(PATH) $(MAKE) -C tests 

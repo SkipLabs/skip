@@ -1,40 +1,15 @@
-CC=clang-10
-CPP=clang++-10
+CC=clang
+CPP=clang++
 SKC=build/skc
-BCLINK=llvm-link-10
-LLC=llc-10
+BCLINK=llvm-link
+LLC=llc
 WASMLD=wasm-ld-10
 MEMSIZE32=1073741824
 
 OLEVEL=-O2
-CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
-CC64FLAGS=$(OLEVEL) -DSKIP64
 SKFLAGS=
 
-SKIP_FILES=$(shell find prelude -name '*.sk') $(shell find skfs -name '*.sk') $(wildcard main/*.sk) $(wildcard sql/*.sk)
-CFILES=\
-	runtime/copy.c \
-	runtime/free.c \
-	runtime/hash.c \
-	runtime/hashtable.c \
-	runtime/intern.c \
-	runtime/memory.c \
-	runtime/obstack.c \
-	runtime/runtime.c \
-	runtime/stdlib.c \
-	runtime/stack.c \
-	runtime/string.c \
-	runtime/native_eq.c
-
-NATIVE_FILES=\
-	runtime/palloc.c\
-	runtime/consts.c
-
-CFILES32=$(CFILES) runtime/runtime32_specific.c
-CFILES64=$(CFILES) runtime/runtime64_specific.cpp $(NATIVE_FILES)
-BCFILES32=build/magic.bc $(addprefix build/,$(CFILES32:.c=.bc))
-OFILES=$(addprefix build/,$(CFILES:.c=.o))
-ONATIVE_FILES= build/magic.o $(addprefix build/,$(NATIVE_FILES:.c=.o))
+SKIP_FILES=$(shell find prelude -name '*.sk') $(shell find skfs -name '*.sk') $(wildcard main/*.sk) $(wildcard sql/*.sk) $(wildcard sktest/src/*.sk) $(wildcard termcolor/src/*.sk) $(wildcard cli/src/*.sk)
 
 SKFUNS=\
 	getCompositeName \
@@ -62,55 +37,40 @@ SKFUNS=\
 
 EXPORTJS=$(addprefix -export=,$(SKFUNS))
 
-default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html
+default: compiler build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html
 
-build/magic.c:
-	date | cksum | awk '{print "unsigned long version = " $$1 ";"}' > build/magic.c
-	echo "int SKIP_get_version() { return (int)version; }" >> build/magic.c
-
-build/magic.bc: build/magic.c
-	mkdir -p build/runtime
-	$(CC) $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
-
-build/magic.o: build/magic.c
-	mkdir -p build/runtime
-	$(CC) $(CC64FLAGS) -o $@ -c $<
+.PHONY: compiler
+compiler:
+	$(MAKE) -C compiler STAGE=0
+	mkdir -p build
+	cp compiler/stage0/bin/skc build/
+	cp compiler/stage0/lib/libskip_runtime64.a build/
+	cp compiler/stage0/lib/libskip_runtime32.bc build/
+	cp compiler/stage0/lib/skip_preamble64.ll build/
+	cp compiler/stage0/lib/skip_preamble32.ll build/
 
 test: build/out32.wasm build/skdb
 	./run_all_tests.sh
 
-build/out32.wasm: build/out32.ll build/full_runtime32.bc
-	cat preamble32.ll build/out32.ll > build/preamble_and_out32.ll
-	$(BCLINK) build/full_runtime32.bc build/preamble_and_out32.ll -o build/all.bc
+build/out32.wasm: build/out32.ll compiler
+	cat build/skip_preamble32.ll build/out32.ll > build/preamble_and_out32.ll
+	$(BCLINK) build/libskip_runtime32.bc build/preamble_and_out32.ll -o build/all.bc
 	$(LLC) -mtriple=wasm32-unknown-unknown $(OLEVEL) -filetype=obj build/all.bc -o build/out32.o
 	$(WASMLD) --initial-memory=$(MEMSIZE32) $(EXPORTJS) build/out32.o -o build/out32.wasm --no-entry -allow-undefined
 	mkdir -p sql/js/dist
 	cp build/out32.wasm sql/js/dist
 
-build/out32.ll: $(SKIP_FILES)
+build/out32.ll: $(SKIP_FILES) compiler
 	mkdir -p build/
 	$(SKC) --embedded32 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out32.ll
 
-build/full_runtime32.bc: $(BCFILES32)
-	$(BCLINK) $(BCFILES32) -o build/full_runtime32.bc
-
-build/%.bc: %.c
-	mkdir -p build/runtime
-	$(CC) $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
-
-build/skdb: build/out64.ll build/libskip_runtime64.a
-	cat preamble64.ll build/out64.ll > build/preamble_and_out64.ll
+build/skdb: build/out64.ll compiler
+	cat build/skip_preamble64.ll build/out64.ll > build/preamble_and_out64.ll
 	$(CPP) $(OLEVEL) build/preamble_and_out64.ll build/libskip_runtime64.a -o build/skdb -lrt -lpthread
 
-build/out64.ll: $(SKIP_FILES)
+build/out64.ll: $(SKIP_FILES) compiler
 	mkdir -p build/
 	$(SKC) --embedded64 $(SKIP_FILES) --export-function-as main=skip_main $(SKFLAGS) --output build/out64.ll
-
-build/libskip_runtime64.a: $(OFILES) build/runtime/runtime64_specific.o $(ONATIVE_FILES)
-	ar rcs build/libskip_runtime64.a $(OFILES) build/runtime/runtime64_specific.o $(ONATIVE_FILES)
-
-build/runtime/runtime64_specific.o: runtime/runtime64_specific.cpp
-	$(CPP) $(OLEVEL) -c runtime/runtime64_specific.cpp -o build/runtime/runtime64_specific.o
 
 # JS version of SKDB
 
@@ -127,10 +87,6 @@ build/skdb.js: sql/js/src/skdb.ts
 build/index.html: sql/js/index.html build/skdb.js
 	mkdir -p build
 	cp sql/js/index.html $@
-
-build/%.o: %.c
-	mkdir -p build/runtime
-	$(CC) $(CC64FLAGS) -o $@ -c $<
 
 clean:
 	rm -Rf build
