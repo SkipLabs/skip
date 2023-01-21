@@ -1,8 +1,10 @@
 #!/bin/bash
 
+SKDB=./target/skdb
+
 run_test () {
   echo -en "$1:\t"
-  cat $1 | /skfs_build/build/skdb --always-allow-joins | sort > /tmp/kk1
+  cat $1 | $SKDB --always-allow-joins | sort > /tmp/kk1
   cat $1 | sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2 > /dev/null
   if [ $? -eq 0 ]; then
@@ -13,7 +15,7 @@ run_test () {
 }
 
 run_one_test () {
-  cat $1 | time /skfs_build/build/skdb --always-allow-joins | sort > /tmp/kk1
+  cat $1 | time $SKDB --always-allow-joins | sort > /tmp/kk1
   cat $1 | time sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2
   if [ $? -eq 0 ]; then
@@ -106,6 +108,7 @@ echo "**************************************************************************
 echo "* SKDB WINDOW SIZE TESTS *"
 echo "*******************************************************************************"
 echo ""
+
 
 ./test_window_size.sh
 

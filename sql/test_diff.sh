@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DB=/tmp/test.db
-SKDB_CMD=/skfs_build/build/skdb
+SKDB_CMD=./target/skdb
 SKDB="$SKDB_CMD --always-allow-joins --data $DB"
 
 run_diff () {

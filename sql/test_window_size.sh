@@ -1,10 +1,10 @@
 #!/bin/bash
 
 DB=/tmp/test.db
-SKDB="../build/skdb --always-allow-joins --data $DB"
+SKDB="./target/skdb --always-allow-joins --data $DB"
 
 rm -f /tmp/test.db
-../build/skdb --init /tmp/test.db
+./target/skdb --init /tmp/test.db
 
 cat 'test/select2_create_window.sql' | $SKDB
 
