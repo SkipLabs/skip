@@ -448,6 +448,9 @@ char* SKIP_realpath(char* path_obj) {
   char* rv = realpath(path, res);
   if (rv == NULL) {
     perror("realpath");
+    free(path);
+    // TODO: Ideally, this function would return a ?String instead.
+    return sk_string_create(res, 0);
   }
 
   free(path);

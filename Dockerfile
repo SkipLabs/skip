@@ -1,11 +1,17 @@
-FROM ubuntu:20.04
+FROM ubuntu:20.04 as base
 RUN apt-get update
-RUN apt-get install -y git make clang lld-10 sqlite3 gcc gawk
-RUN sh -c 'DEBIAN_FRONTEND=noninteractive apt-get install -q -y npm'
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get install -q -y npm git make lld sqlite3 gcc gawk clang llvm
+RUN update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-10 100
 RUN npm install -g typescript
-COPY . /skfs_build
-WORKDIR /skfs_build
-RUN mkdir build
-RUN gunzip -c prebuild/preamble_and_skc_out64.ll.gz > build/preamble_and_skc_out64.ll
-RUN make build/libskip_runtime64.a
-RUN clang++ -O3 build/preamble_and_skc_out64.ll build/libskip_runtime64.a -o build/skc -lrt -lpthread
+
+ENV CC=clang
+ENV CXX=clang++
+
+FROM base as bootstrap
+COPY . /skfs
+
+WORKDIR /skfs/compiler
+RUN make install STAGE=0
+
+WORKDIR /skfs
