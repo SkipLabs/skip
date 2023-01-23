@@ -114,13 +114,13 @@ CREATE TABLE SUPPLIER (
 );
 " | $SKDB --data /tmp/test.db
 
-echo "select * from customer;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv CUSTOMER --data /tmp/test.db
-echo "select * from lineitem;" | sqlite3 $TPCHDB -csv | head -n 500000 | $SKDB --load-csv LINEITEM --data /tmp/test.db
-echo "select * from nation;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv NATION --data /tmp/test.db
-echo "select * from orders;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv ORDERS --data /tmp/test.db
-echo "select * from part;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv PART --data /tmp/test.db
-echo "select * from partsupp;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv PARTSUPP --data /tmp/test.db
-echo "select * from region;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv REGION --data /tmp/test.db
-echo "select * from supplier;" | sqlite3 $TPCHDB -csv | $SKDB --load-csv SUPPLIER --data /tmp/test.db
+echo "select * from customer;" | sqlite3 $TPCHDB -csv | $SKDB load-csv CUSTOMER --data /tmp/test.db
+echo "select * from lineitem;" | sqlite3 $TPCHDB -csv | head -n 500000 | $SKDB load-csv LINEITEM --data /tmp/test.db
+echo "select * from nation;" | sqlite3 $TPCHDB -csv | $SKDB load-csv NATION --data /tmp/test.db
+echo "select * from orders;" | sqlite3 $TPCHDB -csv | $SKDB load-csv ORDERS --data /tmp/test.db
+echo "select * from part;" | sqlite3 $TPCHDB -csv | $SKDB load-csv PART --data /tmp/test.db
+echo "select * from partsupp;" | sqlite3 $TPCHDB -csv | $SKDB load-csv PARTSUPP --data /tmp/test.db
+echo "select * from region;" | sqlite3 $TPCHDB -csv | $SKDB load-csv REGION --data /tmp/test.db
+echo "select * from supplier;" | sqlite3 $TPCHDB -csv | $SKDB load-csv SUPPLIER --data /tmp/test.db
 
-$SKDB --data /tmp/test.db --compact
+$SKDB compact --data /tmp/test.db

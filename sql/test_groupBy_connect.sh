@@ -10,7 +10,7 @@ echo "create table t2 (a INTEGER, b INTEGER); create view v1 as select a%4, sum(
 
 for i in {1..1}; do
     rm -f "/tmp/foo$i"
-    $SKDB --connect v1 --data $DB --file "/tmp/foo$i"
+    $SKDB subscribe v1 --connect --data $DB --file "/tmp/foo$i"
 done
 
 for j in {1..10}; do

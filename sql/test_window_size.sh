@@ -42,12 +42,12 @@ size2=0
 
 for i in {32..60}; do
     echo "INSERT INTO t1 VALUES($i,248,10,249,245);" | $SKDB
-    size1=`$SKDB --size`
+    size1=`$SKDB size`
 done
 
 for i in {61..100}; do
     echo "INSERT INTO t1 VALUES($i,248,10,249,245);" | $SKDB
-    size2=`$SKDB --size`
+    size2=`$SKDB size`
 done
 
 if [ "$size1" -eq "$size2" ]; then

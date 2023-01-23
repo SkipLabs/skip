@@ -725,7 +725,7 @@ export class SKDB {
     this.subscriptionCount++;
     let fileName = "/subscriptions/jsroots";
     this.runLocal(
-      ["--json", "--subscribe", "jsroots", "--updates", fileName],
+      ["subscribe", "jsroots", "--format=json", "--updates", fileName],
       ""
     );
   }
@@ -754,7 +754,7 @@ export class SKDB {
         function (data: ProtoData) {
           let msg = data.data;
           if (msg != "") {
-            objThis.runLocal(["--write-csv", tableName + suffix], msg + '\n');
+            objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
           }
         }
       );
@@ -845,7 +845,7 @@ export class SKDB {
     let fileName = "/subscriptions/sub" + this.subscriptionCount;
     this.subscriptionCount++;
     this.runLocal(
-      ["--csv", "--subscribe", viewName, "--updates", fileName],
+      ["subscribe", viewName, "--format=csv", "--updates", fileName],
       ""
     );
   }
@@ -855,7 +855,7 @@ export class SKDB {
   }
 
   sql(stdin: string): Array<any> {
-    return this.runLocal(["--json"], stdin)
+    return this.runLocal(["--format=json"], stdin)
       .split("\n")
       .filter((x) => x != "")
       .map((x) => JSON.parse(x));
@@ -969,7 +969,7 @@ class SKDBServer {
       write(change);
     });
     this.client.runLocal(
-      ["--csv", "--connect", tableName + localSuffix, "--updates", fileName],
+      ["subscribe", tableName + localSuffix, "--connect", "--format=csv", "--updates", fileName],
       ""
     );
 
