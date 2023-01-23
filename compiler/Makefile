@@ -10,19 +10,19 @@ libdir   ?= $(exec_prefix)/lib
 .PHONY: default
 default: stage$(STAGE)
 
-RUNTIME_SRCS = $(wildcard runtime/*.c)
-
-runtime/libskip_runtime64.a: $(RUNTIME_SRCS) runtime/runtime64_specific.cpp
+.PHONY: runtime/libskip_runtime64.a
+runtime/libskip_runtime64.a:
 	$(MAKE) -C runtime $(@F)
 
-runtime/libskip_runtime32.bc: $(RUNTIME_SRCS) runtime/runtime32_specific.c
+.PHONY: runtime/libskip_runtime32.bc
+runtime/libskip_runtime32.bc:
 	$(MAKE) -C runtime $(@F)
 
 bootstrap/%.ll: bootstrap/%.ll.gz
 	gunzip -c $< > $@
 
 bootstrap/skargo: bootstrap/skargo_out64.ll runtime/libskip_runtime64.a
-	clang++ $(CXXFLAGS) -o $@ $^  -lrt -lpthread
+	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lrt -lpthread
 
 stage%:
 	mkdir -p $@
@@ -50,7 +50,7 @@ stage%/lib/skip_preamble32.ll: preamble/preamble32.ll
 
 stage0/bin/skc: bootstrap/skc_out64.ll runtime/libskip_runtime64.a
 	mkdir -p $(@D)
-	clang++ $(CXXFLAGS) -o $@ $^ -lrt -lpthread
+	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lrt -lpthread
 
 stage1/bin/skc: stage0
 	PATH=stage0/bin/:$(PATH) skargo build --target-dir stage1/bin
