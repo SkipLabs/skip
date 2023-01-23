@@ -1,0 +1,134 @@
+module alias T = SKTest;
+
+module SkcTests;
+
+private fun compile(
+  files: readonly Sequence<String>,
+  output: String,
+): System.CompletedProcess {
+  System.subprocess(
+    Array[
+      "skc",
+      "--no-inline",
+      "--preamble",
+      "preamble/preamble64.ll",
+      "--export-function-as",
+      "main=skip_main",
+      "--data",
+      "tests/state.db",
+      "-o",
+      output,
+    ].concat(files.collect(Array)),
+  );
+}
+
+private fun run(argv: Sequence<String>): void {
+  p = System.subprocess(argv.collect(Array));
+  if (p.exitcode != 0) {
+    print_error(p.stderr);
+    skipExit(1)
+  };
+}
+
+private fun genValidTest(
+  basename: String,
+  stdlibSrcs: Array<String>,
+): () -> void {
+  () -> {
+    p = compile(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".ll");
+    if (p.exitcode != 0) {
+      print_error(p.stderr);
+      invariant_violation("skc") // TODO: Throw error
+    };
+    // TODO: Use System.subprocess
+    run(
+      Array[
+        "clang++",
+        "-no-pie",
+        "-O0",
+        basename + ".ll",
+        "runtime/libskip_runtime64.a",
+        "-o",
+        basename + ".bin",
+        "-lrt",
+        "-lpthread",
+      ],
+    );
+
+    !p = System.subprocess(Array[basename + ".bin"]);
+
+    if (p.exitcode != 0) {
+      T.fail("Unexpected error: " + p.stderr)
+    };
+
+    actual = p.stdout;
+    expected = FileSystem.readTextFile(basename + ".exp");
+
+    T.expectEq(actual, expected)
+  };
+}
+
+private fun genInvalidTest(
+  basename: String,
+  stdlibSrcs: Array<String>,
+): () -> void {
+  () -> {
+    p = compile(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".ll");
+
+    if (p.exitcode == 0) {
+      T.fail("Expected compile error")
+    };
+
+    // NOTE: The `.trim()` is needed because error messages seem to currently
+    // have an extra newline.
+    actual = p.stderr.trim();
+    expected = FileSystem.readTextFile(basename + ".exp_err").trim();
+
+    T.expectEq(actual, expected)
+  }
+}
+
+fun main(): void {
+  tests = mutable Map[];
+
+  stdlibSrcs = FileSystem.readFilesRecursive("../prelude/src")
+    .concat(FileSystem.readFilesRecursive("../skfs/src"))
+    .collect(Array);
+
+  run(Array["rm", "-f", "tests/state.db"]);
+
+  run(
+    Array[
+      "skc",
+      "--init",
+      "tests/state.db",
+      "--check",
+    ].concat(stdlibSrcs),
+  );
+
+  validTests = FileSystem.readFilesRecursive("./tests", fn ->
+    fn.endsWith(".exp") && !fn.contains("invalid/")
+  );
+
+  for (testFile in validTests) {
+    basename = testFile.stripSuffix(".exp");
+    (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
+    tests
+      .getOrAdd(testSuite, () -> mutable Map[])
+      .set(testName, genValidTest(basename, stdlibSrcs));
+  };
+
+  invalidTests = FileSystem.readFilesRecursive("./tests", fn ->
+    fn.endsWith(".exp") && fn.contains("invalid/")
+  );
+
+  for (testFile in invalidTests) {
+    basename = testFile.stripSuffix(".exp");
+    (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
+    tests
+      .getOrAdd(testSuite, () -> mutable Map[])
+      .set(testName, genInvalidTest(basename, stdlibSrcs))
+  };
+
+  SKTest.test_harness(tests)
+}
