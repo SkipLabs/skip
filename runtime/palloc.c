@@ -11,6 +11,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
+#include <inttypes.h>
 #include "runtime.h"
 
 #define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
@@ -42,7 +43,7 @@ uint64_t SKIP_genSym(uint64_t largerThan) {
   uint64_t gid_value = __atomic_load_n(gid, __ATOMIC_RELAXED);
 
   if(largerThan > 1024L * 1024L * 1024L) {
-    fprintf(stderr, "ID too large: %lld\n", largerThan);
+    fprintf(stderr, "ID too large: %" PRIu64 "\n", largerThan);
     exit(2);
   }
 
