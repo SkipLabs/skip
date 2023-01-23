@@ -211,6 +211,10 @@ char* SKIP_open_file(char* filename_obj) {
  int status = fstat(fd, &s);
  size_t size = s.st_size;
 
+ if (size == 0) {
+   return sk_string_create(NULL, 0);
+ }
+
  char* f = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
  if(f == (void*)MAP_FAILED) {
    perror("ERROR (MMap FAILED)");
