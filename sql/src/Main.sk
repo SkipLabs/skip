@@ -129,6 +129,12 @@ untracked fun main(): void {
             .positional()
             .required()
             .about("Session id"),
+        )
+        .arg(
+          Cli.BoolArg("follow")
+            .long("follow")
+            .short("f")
+            .about("Output appended data as the database grows"),
         ),
     )
     // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
@@ -443,6 +449,7 @@ fun execWrite(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
+  followMode = args.getBool("follow");
   tick = 0;
   init = true;
   dieOnEOF();
@@ -542,10 +549,11 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     SKFS.mutexLock(lock);
     while ({
       newContext = SKFS.gContextGet();
-      newContext
-        .unsafeGetEagerDir(dirName)
-        .getChangesAfter(SKFS.Tick(tick))
-        .isEmpty() &&
+      followMode &&
+        newContext
+          .unsafeGetEagerDir(dirName)
+          .getChangesAfter(SKFS.Tick(tick))
+          .isEmpty() &&
         newContext
           .unsafeGetEagerDir(SKFS.accessReaders)
           .getChangesAfter(SKFS.Tick(tick))
@@ -555,6 +563,9 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     SKFS.mutexUnlock(lock);
     SKFS.destroyObstack(localObstack);
+    if (!followMode) {
+      break void
+    }
   }
 }
 
