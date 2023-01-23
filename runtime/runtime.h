@@ -85,7 +85,7 @@ sk_cell_t* sk_htbl_find(sk_htbl_t* table, void* key);
 int sk_htbl_mem(sk_htbl_t* table, void* key);
 void sk_htbl_remove(sk_htbl_t* table, void* key);
 SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2);
-size_t sk_get_nbr_pages();
+size_t sk_get_nbr_pages(void *saved_page);
 sk_cell_t* sk_get_pages(size_t size);
 size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t size);
 
@@ -185,7 +185,7 @@ SkipInt SKIP_getArraySize(char*);
 char* SKIP_get_free_slot(uint32_t);
 void* SKIP_intern(void* obj);
 void* SKIP_intern_shared(void* obj);
-void SKIP_internalExit();
+void SKIP_internalExit(uint64_t code);
 void SKIP_invalid_utf8();
 SkipInt SKIP_isEq(char* obj1, char* obj2);
 uint32_t SKIP_is_string(char* obj);
