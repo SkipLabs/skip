@@ -84,6 +84,7 @@ build/out32.wasm: build/out32.ll build/full_runtime32.bc
 	$(BCLINK) build/full_runtime32.bc build/preamble_and_out32.ll -o build/all.bc
 	$(LLC) -mtriple=wasm32-unknown-unknown $(OLEVEL) -filetype=obj build/all.bc -o build/out32.o
 	$(WASMLD) --initial-memory=$(MEMSIZE32) $(EXPORTJS) build/out32.o -o build/out32.wasm --no-entry -allow-undefined
+	mkdir -p sql/js/dist
 	cp build/out32.wasm sql/js/dist
 
 build/out32.ll: $(SKIP_FILES)
