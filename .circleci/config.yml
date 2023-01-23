@@ -28,7 +28,11 @@ jobs:
           name: Run compiler tests
           no_output_timeout: 30m
           command: |
-            cd compiler && make test STAGE=1
+            mkdir -p ~/test-results/skc
+            cd compiler && make STAGE=1
+            PATH=./stage1/bin:$PATH skargo test --format=xml -o ~/test-results/skc/skc.xml
+      - store_test_results:
+          path: ~/test-results/skc/
 
   skfs:
     docker:
