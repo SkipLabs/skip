@@ -12,7 +12,7 @@ rm -f /tmp/nn
 
 echo "create virtual view v1 as select * from t1;" | $SKDB --data /tmp/test.db
 
-$SKDB --connect v1 --notify /tmp/nn --data /tmp/test.db > /dev/null
+$SKDB subscribe v1 --connect --notify /tmp/nn --data /tmp/test.db > /dev/null
 
 n1=`cat /tmp/nn`
 

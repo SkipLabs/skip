@@ -23,7 +23,7 @@ fi
 ###############################################################################
 
 echo "create virtual view nation_count as select c_nationkey, count(*) from customer group by c_nationkey;" | $SKDB --data /tmp/test.db
-$SKDB --data /tmp/test.db --connect nation_count --updates /tmp/nation_count > /dev/null
+$SKDB subscribe nation_count --connect --data /tmp/test.db --updates /tmp/nation_count > /dev/null
 
 ###############################################################################
 # JOIN VIEW
@@ -69,7 +69,7 @@ else
     echo -e "BUILD query1 VIRTUAL VIEW:\tOK ($TOTAL)"
 fi
 
-$SKDB --data /tmp/test.db --connect query1 --updates /tmp/query1 > /dev/null
+$SKDB subscribe query1 --connect --data /tmp/test.db --updates /tmp/query1 > /dev/null
 
 ###############################################################################
 # Query 2
@@ -87,7 +87,7 @@ else
     echo -e "BUILD query2 VIRTUAL VIEW:\tOK ($TOTAL)"
 fi
 
-$SKDB --data /tmp/test.db --connect query2 --updates /tmp/query2 > /dev/null
+$SKDB subscribe query2 --connect --data /tmp/test.db --updates /tmp/query2 > /dev/null
 
 ###############################################################################
 # Query 3
@@ -105,7 +105,7 @@ else
     echo -e "BUILD query3 VIRTUAL VIEW:\tOK ($TOTAL)"
 fi
 
-$SKDB --data /tmp/test.db --connect query3 --updates /tmp/query3 > /dev/null
+$SKDB subscribe query3 --connect --data /tmp/test.db --updates /tmp/query3 > /dev/null
 
 ###############################################################################
 # DUMP AND CHECK SIZE
@@ -113,8 +113,8 @@ $SKDB --data /tmp/test.db --connect query3 --updates /tmp/query3 > /dev/null
 
 # rm -f /tmp/test2.db
 # $SKDB --init /tmp/test2.db
-# $SKDB --data /tmp/test.db --dump | $SKDB --data /tmp/test2.db
-# $SKDB --compact --data /tmp/test2.db
+# $SKDB dump --data /tmp/test.db | $SKDB --data /tmp/test2.db
+# $SKDB compact --data /tmp/test2.db
 
 # mv /tmp/test2.db /tmp/test.db
 

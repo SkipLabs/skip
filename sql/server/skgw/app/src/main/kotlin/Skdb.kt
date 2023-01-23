@@ -4,8 +4,8 @@ import java.io.BufferedReader
 import java.io.OutputStream
 
 enum class OutputFormat(val flag: String) {
-    JSON("--json"),
-    CSV("--csv"),
+    JSON("--format=json"),
+    CSV("--format=csv"),
 }
 
 // super dumb, mostly synchronous, process facade
@@ -49,10 +49,10 @@ class Skdb(val dbPath: String) {
         return blockingRun(
             ProcessBuilder(
                 SKDB_PROC,
+                "dump-table",
+                table,
                 "--data",
                 dbPath,
-                "--dump-table",
-                table,
                 "--table-suffix",
                 suffix
             )
@@ -63,14 +63,14 @@ class Skdb(val dbPath: String) {
         val pb =
             ProcessBuilder(
                 SKDB_PROC,
+                "write-csv",
+                table,
                 "--data",
                 dbPath,
                 "--user",
                 user,
                 "--password",
-                password,
-                "--write-csv",
-                table
+                password
             )
 
         pb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -87,17 +87,18 @@ class Skdb(val dbPath: String) {
             blockingRun(
                 ProcessBuilder(
                     SKDB_PROC,
+                    "subscribe",
+                    table,
+                    "--connect",
                     "--data",
                     dbPath,
-                    "--connect",
-                    table,
                     "--user",
                     user,
                     "--password",
                     password
                 )
             )
-        val pb = ProcessBuilder(SKDB_PROC, "--data", dbPath, "--csv", "--tail", connection.trim())
+        val pb = ProcessBuilder(SKDB_PROC, "tail", "--data", dbPath, "--format=csv", connection.trim())
 
         // TODO: for hacky debug
         pb.redirectError(ProcessBuilder.Redirect.INHERIT)
