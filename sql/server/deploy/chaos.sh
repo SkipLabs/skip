@@ -46,8 +46,8 @@ function kill_random_skdb_pid {
     pid=$(pgrep -f "skdb.*$1" | shuf -n 1)
     if [[ ! -z $pid ]]
     then
-        echo kill_random_skdb_pid: $pid
-        kill -TERM $pid
+        echo kill_random_skdb_pid: $1, $2, $pid
+        kill $2 $pid
         echo $?
     fi
 }
@@ -64,7 +64,12 @@ function restart_server {
 targets[0]="restart_server 0"
 targets[1]="restart_server 1"
 targets[2]="restart_server 5"
-targets[3]="kill_random_skdb_pid tail"
+targets[3]="kill_random_skdb_pid tail -TERM"
+targets[4]="kill_random_skdb_pid tail -KILL"
+targets[5]="kill_random_skdb_pid tail -ABRT"
+# simulates a hung process
+targets[6]="kill_random_skdb_pid tail -STOP"
+
 # targets[2]="kill_random_skdb_pid write-csv"
 
 # TODO: more signals than just term
