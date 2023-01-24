@@ -86,7 +86,8 @@ class Skdb(val dbPath: String) {
         password: String,
         table: String,
         since: Int,
-        callback: (String) -> Unit
+        callback: (String) -> Unit,
+        closed: () -> Unit,
     ): Process {
         // TODO: check for existing
         val connection =
@@ -122,7 +123,12 @@ class Skdb(val dbPath: String) {
 
         val output = proc.inputStream.bufferedReader()
 
-        val t = Thread({ output.forEachLine { callback(it) } })
+        val t = Thread({
+            output.forEachLine {
+                callback(it)
+            }
+            closed()
+        })
         t.start()
 
         return proc

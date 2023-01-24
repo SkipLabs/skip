@@ -97,7 +97,10 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
                     {
                         val payload = serialise(ProtoData(it))
                         WebSockets.sendTextBlocking(payload, channel)
-                    }
+                    },
+                    {
+                        WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                    },
                 )
         }
         is ProtoWrite -> {

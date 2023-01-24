@@ -47,7 +47,7 @@ function kill_random_skdb_pid {
     if [[ ! -z $pid ]]
     then
         echo kill_random_skdb_pid: $pid
-        kill -TERM pid
+        kill -TERM $pid
         echo $?
     fi
 }
@@ -64,8 +64,8 @@ function restart_server {
 targets[0]="restart_server 0"
 targets[1]="restart_server 1"
 targets[2]="restart_server 5"
-# targets[1]="kill_random_skdb_pid tail"
-# targets[2]="random_skdb_pid write-csv"
+targets[3]="kill_random_skdb_pid tail"
+# targets[2]="kill_random_skdb_pid write-csv"
 
 # TODO: more signals than just term
 # TODO: target a proxy
