@@ -575,7 +575,10 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
           .getChangesAfter(SKFS.Tick(tick))
           .isEmpty()
     }) {
-      _ = SKFS.condWait(cond, lock);
+      timeoutSecs = 10;
+      _ = SKFS.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
+      print_raw(":" + tick.toString() + "\n");
+      flushStdout();
     };
     SKFS.mutexUnlock(lock);
     SKFS.destroyObstack(localObstack);
