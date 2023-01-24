@@ -129,9 +129,6 @@ fun resolveDbPath(db: String?): String? {
 }
 
 fun createHttpServer(): Undertow {
-    // TODO: weak refs or gc
-    val connections = ConcurrentHashMap<WebSocketChannel, ChannelState>()
-
     val rootHandler =
         Handlers.path()
             .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
@@ -162,7 +159,8 @@ fun createHttpServer(): Undertow {
                             // TODO: should harvest the user/auth, and
                             // database here. these are
                             // connection-specific properties
-                            connections.put(channel, ChannelState(procStdin = null, dbPath))
+
+                            val state = ChannelState(procStdin = null, dbPath)
 
                             channel.receiveSetter.set(
                                 object : AbstractReceiveListener() {
@@ -171,14 +169,6 @@ fun createHttpServer(): Undertow {
                                         message: BufferedTextMessage
                                     ) {
                                         try {
-                                            var state = connections.get(channel)
-
-                                            if (state == null) {
-                                                throw RuntimeException(
-                                                    "state not found for connection"
-                                                )
-                                            }
-
                                             handleRequest(message.data, channel, state)
                                         } catch (ex: Exception) {
                                             // 1011 is internal error
