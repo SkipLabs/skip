@@ -594,12 +594,8 @@ fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
     | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
     };
     arr = watermarkDir.unsafeGetArray(context, SKFS.SID::create(tableName));
-    if (arr.size() > 0) {
-      print_string(arr[0].value.value);
-    } else {
-      print_error("Error: watermark for table " + tableName + " not found.");
-      skipExit(1);
-    };
+    watermark = if (arr.size() > 0) arr[0].value.value else 0;
+    print_string(watermark);
     SKFS.CStop(None())
   });
 }
