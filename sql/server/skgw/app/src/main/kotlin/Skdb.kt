@@ -1,7 +1,6 @@
 package io.skiplabs.skgw
 
 import java.io.BufferedReader
-import java.io.OutputStream
 
 enum class OutputFormat(val flag: String) {
     JSON("--format=json"),
@@ -59,7 +58,7 @@ class Skdb(val dbPath: String) {
         )
     }
 
-    fun writeCsv(user: String, password: String, table: String): OutputStream {
+    fun writeCsv(user: String, password: String, table: String): Process {
         val pb =
             ProcessBuilder(
                 SKDB_PROC,
@@ -77,8 +76,7 @@ class Skdb(val dbPath: String) {
 
         val proc = pb.start()
 
-        // TODO: interface sucks, no way to control and prevent leaking the proc
-        return proc.outputStream
+        return proc
     }
 
     fun tail(
@@ -123,16 +121,13 @@ class Skdb(val dbPath: String) {
 
         val output = proc.inputStream.bufferedReader()
 
-        val t = Thread({
-            output.forEachLine {
-                callback(it)
-            }
-            closed()
-        })
+        val t =
+            Thread({
+                output.forEachLine { callback(it) }
+                closed()
+            })
         t.start()
 
         return proc
-        // TODO: return this so we can kill the proc. but we should
-        // also be cleaning up the connection that was created.
     }
 }
