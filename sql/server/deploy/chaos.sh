@@ -13,6 +13,8 @@ cd $SCRIPT_DIR/../skgw
 ################################################################################
 
 SERVER_PID_FILE=/tmp/server.pid
+PAUSED_PROCS_FILE=/tmp/chaos_paused_pids
+rm -f $PAUSED_PROCS_FILE
 
 function start_server {
     gradle --console plain run >/tmp/server.log 2>&1 &
@@ -30,6 +32,9 @@ then
 fi
 
 handle_term() {
+    # resume any paused processes so they can go down with the ship.
+    # CONT should be idempotent
+    cat $PAUSED_PROCS_FILE|xargs kill -CONT
     kill $(cat $SERVER_PID_FILE)
     exit 0
 }
@@ -43,21 +48,28 @@ trap 'handle_term' SIGTERM SIGINT
 function kill_random_skdb_pid {
     # TODO: figure out how to only target processes that were recursively
     # spawned by the server_pid
-    pid=$(pgrep -f "skdb.*$1" | shuf -n 1)
+    proc_type=$1
+    signal=$2
+    pid=$(pgrep -f "skdb.*$proc_type" | shuf -n 1)
     if [[ ! -z $pid ]]
     then
-        echo kill_random_skdb_pid: $1, $2, $pid
-        kill $2 $pid
+        if [[ $signal == "-STOP" ]]
+        then
+            echo $pid >> $PAUSED_PROCS_FILE
+        fi
+        echo kill_random_skdb_pid: $proc_type, $signal, $pid
+        kill $signal $pid
         echo $?
     fi
 }
 
 function restart_server {
+    wait_to_restart=$1
     pid=$(cat $SERVER_PID_FILE)
     echo restart_server: $pid
     kill -TERM $pid
     wait $pid
-    sleep $1
+    sleep $wait_to_restart
     start_server
 }
 
@@ -71,10 +83,6 @@ targets[5]="kill_random_skdb_pid tail -ABRT"
 targets[6]="kill_random_skdb_pid tail -STOP"
 
 # targets[2]="kill_random_skdb_pid write-csv"
-
-# TODO: more signals than just term
-# TODO: target a proxy
-# TODO: mess with the network
 
 while true
 do
