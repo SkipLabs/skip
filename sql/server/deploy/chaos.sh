@@ -34,7 +34,7 @@ fi
 handle_term() {
     # resume any paused processes so they can go down with the ship.
     # CONT should be idempotent
-    cat $PAUSED_PROCS_FILE|xargs kill -CONT
+    cat $PAUSED_PROCS_FILE|xargs kill -CONT >/dev/null 2>&1
     kill $(cat $SERVER_PID_FILE)
     exit 0
 }
@@ -57,17 +57,16 @@ function kill_random_skdb_pid {
         then
             echo $pid >> $PAUSED_PROCS_FILE
         fi
-        echo kill_random_skdb_pid: $proc_type, $signal, $pid
         kill $signal $pid
-        echo $?
+        echo kill_random_skdb_pid: $proc_type, $signal, $pid, $?
     fi
 }
 
 function restart_server {
     wait_to_restart=$1
     pid=$(cat $SERVER_PID_FILE)
-    echo restart_server: $pid
     kill -TERM $pid
+    echo restart_server: $pid, $?
     wait $pid
     sleep $wait_to_restart
     start_server
@@ -81,6 +80,8 @@ targets[4]="kill_random_skdb_pid tail -KILL"
 targets[5]="kill_random_skdb_pid tail -ABRT"
 # simulates a hung process
 targets[6]="kill_random_skdb_pid tail -STOP"
+# that can recover
+targets[7]="kill_random_skdb_pid tail -CONT"
 
 # targets[2]="kill_random_skdb_pid write-csv"
 
