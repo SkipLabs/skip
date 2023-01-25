@@ -1,0 +1,43 @@
+module alias T = SKTest;
+
+module CliTests;
+
+@test
+fun duplicateArgument(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.BoolArg("bar").long("bar1"))
+    .arg(Cli.BoolArg("bar").long("bar2"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
+}
+
+@test
+fun duplicateArgumentLongFlag(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.BoolArg("bar1").long("bar"))
+    .arg(Cli.BoolArg("bar2").long("bar"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
+}
+
+@test
+fun duplicateArgumentShortFlag(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.BoolArg("bar1").short("bar"))
+    .arg(Cli.BoolArg("bar2").short("bar"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
+}
+
+@test
+fun duplicateSubcommand(): void {
+  cmd = Cli.Command("foo")
+    .subcommand(Cli.Command("bar"))
+    .subcommand(Cli.Command("bar"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
+}
+
+@test
+fun duplicateSubcommandShort(): void {
+  cmd = Cli.Command("foo")
+    .subcommand(Cli.Command("bar1").short("b"))
+    .subcommand(Cli.Command("bar2").short("b"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]))
+}

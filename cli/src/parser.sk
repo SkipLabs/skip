@@ -76,18 +76,27 @@ fun parseArgsFrom(cmd: Command, argv: Sequence<String>): ParseResults {
 fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
   subcommands = mutable Map[];
   for (subcmd in cmd._subcommands) {
+    if (subcommands.containsKey(subcmd.name)) {
+      invariant_violation(`Duplicate subcommand ${subcmd.name}`)
+    };
     subcommands.set(subcmd.name, subcmd);
-    subcmd._short.each(n -> subcommands.set(n, subcmd))
+    subcmd._short.each(n -> {
+      if (subcommands.containsKey(n)) {
+        invariant_violation(`Duplicate subcommand short alias ${n}`)
+      };
+      subcommands.set(n, subcmd)
+    })
   };
-  pos_args = mutable Vector[];
+  argsNames = mutable Set[];
+  posArgs = mutable Vector[];
   // TODO: options is a bad name. Maybe flag_args?
   options = mutable Map[];
   for (arg in cmd._args) {
-    if (options.containsKey(arg.name)) {
+    if (argsNames.contains(arg.name)) {
       invariant_violation(`Duplicate argument ${arg.name}`)
     };
-    if (arg._isPositional()) {
-      pos_args.push(arg);
+    if (arg._positional) {
+      posArgs.push(arg);
     } else {
       // TODO: Allow short-only flags?
       // Use arg name as long flag for convenience.
@@ -100,10 +109,10 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
       arg._short.each(flag -> {
         options.add(`-${flag}`, arg)
       });
-    }
+    };
+    argsNames.add(arg.name);
   };
 
-  isFirst = true;
   posArgId = 0;
   values = mutable Map<String, Value>[];
   extra = mutable Vector[];
@@ -118,7 +127,7 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
     iterator.next() match {
     | None() -> break void
     | Some(str) if (hasExtra) -> extra.push(str)
-    | Some(str) if (isFirst && subcommands.containsKey(str)) ->
+    | Some(str) if (subcommands.containsKey(str)) ->
       res = parse(subcommands.get(str), iterator);
       values.extend(res.values);
       return res with {
@@ -160,15 +169,14 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
         } else {
           values.set(arg.name, BoolValue(!str.startsWith("--no-")))
         }
-      | None() if (!str.startsWith("-") && posArgId < pos_args.size()) ->
-        values.set(pos_args[posArgId].name, StringValue(str));
+      | None() if (!str.startsWith("-") && posArgId < posArgs.size()) ->
+        values.set(posArgs[posArgId].name, StringValue(str));
         !posArgId = posArgId + 1
       | None() ->
         !error = Some(InvalidArgumentError(str));
         break void
       }
-    };
-    !isFirst = false
+    }
   };
 
   if (error.isNone()) {
@@ -183,6 +191,7 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
 
   ParseResults{
     cmd => cmd,
+
     values => values.chill(),
     extra => Array::createFromItems(extra.chill()),
     error => error,
