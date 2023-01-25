@@ -41,3 +41,109 @@ fun duplicateSubcommandShort(): void {
     .subcommand(Cli.Command("bar2").short("b"));
   T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]))
 }
+
+@test
+fun positionalArgs(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.StringArg("bar").positional())
+    .arg(Cli.StringArg("baz").positional())
+    .arg(Cli.BoolArg("foobar1"))
+    .arg(Cli.BoolArg("foobar2"))
+    .arg(Cli.BoolArg("foobar3"));
+  args = Cli.parseArgsFrom(
+    cmd,
+    Array["--foobar1", "xxx", "--foobar2", "yyy", "--foobar3"],
+  );
+
+  T.expectEq(args.getString("bar"), "xxx");
+  T.expectEq(args.getString("baz"), "yyy");
+}
+
+@test
+fun stringArgsDefault(): void {
+  cmd = Cli.Command("foo").arg(Cli.StringArg("bar")).arg(Cli.StringArg("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "foo1", "--baz=foo2"]);
+
+  T.expectEq(args.getString("bar"), "foo1");
+  T.expectEq(args.getString("baz"), "foo2");
+}
+
+@test
+fun stringArgsLong(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.StringArg("bar").long("foobar"))
+    .arg(Cli.StringArg("baz").long("foobaz"));
+  args = Cli.parseArgsFrom(cmd, Array["--foobar", "foo1", "--foobaz=foo2"]);
+
+  T.expectEq(args.getString("bar"), "foo1");
+  T.expectEq(args.getString("baz"), "foo2");
+  T.expectThrow(() -> _ = args.maybeGetString("foobar"));
+  T.expectThrow(() -> _ = args.maybeGetString("foobaz"));
+}
+
+@test
+fun stringArgsShort(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.StringArg("bar").short("r"))
+    .arg(Cli.StringArg("baz").short("z"));
+  args = Cli.parseArgsFrom(cmd, Array["-r", "foo1", "-z", "foo2"]);
+
+  T.expectEq(args.getString("bar"), "foo1");
+  T.expectEq(args.getString("baz"), "foo2");
+  T.expectThrow(() -> _ = args.maybeGetString("r"));
+  T.expectThrow(() -> _ = args.maybeGetString("z"));
+}
+
+@test
+fun stringArgsShortLong(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.StringArg("bar").long("foobar").short("r"))
+    .arg(Cli.StringArg("baz").long("foobaz").short("z"));
+  args = Cli.parseArgsFrom(cmd, Array["--foobar", "foo1", "-z", "foo2"]);
+
+  T.expectEq(args.getString("bar"), "foo1");
+  T.expectEq(args.getString("baz"), "foo2");
+}
+
+@test
+fun boolArgsDefault(): void {
+  cmd = Cli.Command("foo").arg(Cli.BoolArg("bar")).arg(Cli.BoolArg("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar"]);
+
+  T.expectTrue(args.getBool("bar"));
+  T.expectFalse(args.getBool("baz"));
+}
+
+@test
+fun boolArgsNegatable(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.BoolArg("bar").negatable().default(true))
+    .arg(Cli.BoolArg("baz").negatable().default(true));
+  args = Cli.parseArgsFrom(cmd, Array["--no-bar"]);
+
+  T.expectFalse(args.getBool("bar"));
+  T.expectTrue(args.getBool("baz"));
+}
+
+@test
+fun subcommand(): void {
+  cmd = Cli.Command("foo")
+    .subcommand(Cli.Command("bar"))
+    .subcommand(Cli.Command("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["baz"]);
+  T.expectEq(args.subcommand.fromSome(), "baz")
+}
+
+@test
+fun subcommandOptions(): void {
+  cmd = Cli.Command("foo")
+    .subcommand(Cli.Command("bar").arg(Cli.StringArg("foobar1")))
+    .subcommand(Cli.Command("baz").arg(Cli.StringArg("foobar2")));
+  args1 = Cli.parseArgsFrom(cmd, Array["bar", "--foobar1=xxx"]);
+  T.expectEq(args1.subcommand.fromSome(), "bar");
+  T.expectEq(args1.getString("foobar1"), "xxx");
+  args2 = Cli.parseArgsFrom(cmd, Array["baz", "--foobar2=yyy"]);
+  T.expectEq(args2.subcommand.fromSome(), "baz");
+  T.expectEq(args2.getString("foobar2"), "yyy")
+}
+

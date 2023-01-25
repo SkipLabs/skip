@@ -95,22 +95,30 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
     if (argsNames.contains(arg.name)) {
       invariant_violation(`Duplicate argument ${arg.name}`)
     };
+    argsNames.add(arg.name);
+
     if (arg._positional) {
       posArgs.push(arg);
     } else {
-      // TODO: Allow short-only flags?
-      // Use arg name as long flag for convenience.
-      // TODO: Make it possible to have a short flag only.
-      long_flag = arg._long.default(arg.name);
-      options.add(`--${long_flag}`, arg);
-      if (arg._negatable) {
-        options.add(`--no-${long_flag}`, arg);
+      if (arg._short.isSome()) {
+        options.add(`-${arg._short.fromSome()}`, arg);
+        if (arg._long.isNone()) {
+          if (arg._negatable) {
+            invariant_violation(
+              `Argument ${arg.name} cannot be negatable without a long name`,
+            )
+          };
+          continue
+        }
       };
-      arg._short.each(flag -> {
-        options.add(`-${flag}`, arg)
-      });
-    };
-    argsNames.add(arg.name);
+
+      // Use arg name as default long flag for convenience.
+      longFlag = arg._long.default(arg.name);
+      options.add(`--${longFlag}`, arg);
+      if (arg._negatable) {
+        options.add(`--no-${longFlag}`, arg);
+      };
+    }
   };
 
   posArgId = 0;
