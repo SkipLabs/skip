@@ -57,12 +57,16 @@ class StringArg extends Arg {
 }
 
 class BoolArg extends Arg {
+  fun default(value: Bool): this {
+    this with {_default => Some(BoolValue(value))}
+  }
+
   fun negatable(value: Bool = true): this {
     this with {_negatable => value}
   }
 
-  fun _defaultValue(): BoolValue {
-    BoolValue(false)
+  fun _defaultValue(): Value {
+    this._default.default(BoolValue(false))
   }
 
   fun _takesValue(): Bool {
