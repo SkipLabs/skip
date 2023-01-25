@@ -724,14 +724,32 @@ export class SKDB {
     };
 
     return new Promise((resolve, _reject) => {
-      let socket = new WebSocket(uri);
+      const socket = new WebSocket(uri);
+      const failureThresholdMs = 60000;
+      let failureTimeout: number|undefined = undefined;
+
+      const reconnect = (_event: Event) => {
+        socket.onmessage = null;
+        socket.onclose = null;
+        socket.onerror = null;
+        socket.close();
+        clearTimeout(failureTimeout);
+
+        const backoffMs = 500 + Math.random() * 1000;
+        setTimeout(() => {
+          objThis.connectReadTable(uri, user, password, tableName, suffix, watermark);
+        }, backoffMs)
+      };
 
       socket.onmessage = function (event) {
+        clearTimeout(failureTimeout);
+
         const deliver = (data: ProtoData) => {
           let msg = data.data;
           if (msg != "") {
             objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
           }
+          failureTimeout = setTimeout(reconnect, failureThresholdMs);
         };
 
         const data = event.data;
@@ -753,23 +771,12 @@ export class SKDB {
         }
       };
 
-      const handleFinalState = (_event: Event) => {
-        socket.onmessage = null;
-        socket.onclose = null;
-        socket.onerror = null;
-        socket.close();
-
-        const backoff_ms = 500 + Math.random() * 1000;
-        setTimeout(() => {
-          objThis.connectReadTable(uri, user, password, tableName, suffix, watermark);
-        }, backoff_ms)
-      };
-
-      socket.onclose = handleFinalState;
-      socket.onerror = handleFinalState;
+      socket.onclose = reconnect;
+      socket.onerror = reconnect;
 
       socket.onopen = function (_event) {
         socket.send(JSON.stringify(request));
+        failureTimeout = setTimeout(reconnect, failureThresholdMs);
         resolve(0);
       };
     });
