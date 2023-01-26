@@ -1,4 +1,7 @@
-module alias AP = ArgumentParser;
+@cpp_extern("SKIP_unix_die_on_EOF")
+native fun dieOnEOF(): void;
+
+module SKDB;
 
 const argsSchema: Array<AP.Param> = Array[
   AP.BoolParam{name => "all", help => "run all the tests", negatable => false},
@@ -134,9 +137,6 @@ fun fixUpDirName(dirNameStr: String): SKFS.DirName {
       (if (chars[chars.size() - 1] != '/') "/" else ""),
   )
 }
-
-@cpp_extern("SKIP_unix_die_on_EOF")
-native fun dieOnEOF(): void;
 
 untracked fun main(): void {
   saved = SKFS.newObstack();
