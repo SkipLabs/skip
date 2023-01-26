@@ -172,7 +172,7 @@ fun replayDiff(
   };
 
   makeFun = (rows, checkpoint) -> {
-    Some((context, _, _) ~> {
+    Some((context, delta, _) ~> {
       entries = mutable Vector[];
       dir = origDir;
       for (row in rows) {
@@ -198,6 +198,8 @@ fun replayDiff(
           }),
       );
 
+      checkpointTick = SKFS.Tick(checkpoint);
+      delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
       watermarkDir = context.maybeGetDir(watermarks) match {
       | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks, false)
       | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
@@ -205,7 +207,7 @@ fun replayDiff(
       watermarkKey = SKFS.SID::create(table.name);
       mark = watermarkDir
         .unsafeGetArray(context, watermarkKey)
-        .reduce(max, SKFS.TickFile(SKFS.Tick(checkpoint)));
+        .reduce(max, SKFS.TickFile(checkpointTick));
       watermarkDir.writeArray(context, watermarkKey, Array[mark]);
 
       context.update()
