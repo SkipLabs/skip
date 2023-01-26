@@ -5,6 +5,7 @@ base class Arg(
   _short: ?String = None(),
   _long: ?String = None(),
   _about: ?String = None(),
+  _global: Bool = false,
   // NOTE: The following parameters cannot be placed in subclasses, since `name` is required.
   // StringArgs only
   _default: ?Value = None(),
@@ -28,6 +29,10 @@ base class Arg(
 
   fun about(msg: String): this {
     this with {_about => Some(msg)}
+  }
+
+  fun global(): this {
+    this with {_global => true}
   }
 
   // Internal methods.
@@ -111,37 +116,39 @@ class Command(
       Cli.BoolArg("help")
         .short("h")
         .long("help")
-        .about("Print help information"),
+        .about("Print help information")
+        .global(),
     )
   }
 
   fun parseArgs(): ParseResults {
     res = parseArgs(this);
+
+    if (res.values.containsKey("help") && res.getBool("help")) {
+      res.subcommand match {
+      | Some(subcmd) ->
+        this._subcommands.find(c -> c.name == subcmd) match {
+        | Some(cmd) -> print_string(usage(cmd, true, Some(this)))
+        | None() -> invariant_violation(`Unknown subcommand ${subcmd}`)
+        }
+      | None() -> print_string(usage(this, true))
+      };
+      skipExit(0)
+    };
+
     res.error.each(err -> {
       print_error(`error: ${err.getMessage()}\n`);
       res.subcommand match {
       | Some(subcmd) ->
         this._subcommands.find(c -> c.name == subcmd) match {
-        | Some(cmd) -> print_error(usage(cmd, false, this.name + " "))
-        | None() -> invariant_violation("error")
+        | Some(cmd) -> print_error(usage(cmd, false, Some(this)))
+        | None() -> invariant_violation(`Unknown subcommand ${subcmd}`)
         }
       | None() -> print_error(usage(this, false))
       };
       skipExit(1)
     });
 
-    // TODO: Handle absence of help option.
-    if (res.values.containsKey("help") && res.getBool("help")) {
-      res.subcommand match {
-      | Some(subcmd) ->
-        this._subcommands.find(c -> c.name == subcmd) match {
-        | Some(cmd) -> print_string(usage(cmd, true, this.name + " "))
-        | None() -> invariant_violation("error")
-        }
-      | None() -> print_string(usage(this, true))
-      };
-      skipExit(0)
-    };
     res
   }
 }

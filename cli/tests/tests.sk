@@ -147,3 +147,24 @@ fun subcommandOptions(): void {
   T.expectEq(args2.getString("foobar2"), "yyy")
 }
 
+@test
+fun subcommandGlobalOptions(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.StringArg("global-string").global())
+    .arg(Cli.BoolArg("global-bool").global())
+    .subcommand(Cli.Command("bar"));
+  args1 = Cli.parseArgsFrom(
+    cmd,
+    Array["bar", "--global-string=xxx", "--global-bool"],
+  );
+  T.expectEq(args1.subcommand.fromSome(), "bar");
+  T.expectEq(args1.getString("global-string"), "xxx");
+  T.expectTrue(args1.getBool("global-bool"));
+  args2 = Cli.parseArgsFrom(
+    cmd,
+    Array["--global-string=xxx", "--global-bool", "bar"],
+  );
+  T.expectEq(args2.subcommand.fromSome(), "bar");
+  T.expectEq(args2.getString("global-string"), "xxx");
+  T.expectTrue(args2.getBool("global-bool"))
+}
