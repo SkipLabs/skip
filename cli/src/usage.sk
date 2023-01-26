@@ -79,7 +79,7 @@ private fun usageOptions(options: Sequence<Cli.Arg>): String {
       | (Some(short), Some(long)) -> `-${short}, --${long}`
       | (Some(short), None()) -> `-${short}`
       | (None(), Some(long)) -> `    --${long}`
-      | _ -> invariant_violation("error")
+      | _ -> `    --${arg.name}`
       };
       Array[Some(optFlags), arg._about]
     }),
@@ -97,9 +97,18 @@ private fun usageCommands(subcommands: Sequence<Command>): String {
   )
 }
 
-fun usage(cmd: Command, header: Bool = true, prefix: String = ""): String {
+fun usage(
+  cmd: Command,
+  header: Bool = true,
+  parent: ?Command = None(),
+): String {
   positionalArgs = cmd._args.filter(arg -> arg._positional);
-  options = cmd._args.filter(arg -> !arg._positional);
+  options = cmd._args
+    .filter(arg -> !arg._positional)
+    .concat(
+      parent.map(p -> p._args.filter(arg -> arg._global)).default(Array[]),
+    );
+  prefix = parent.map(x -> x.name + " ").default("");
 
   Array[
     if (header) cmd._about else None(),

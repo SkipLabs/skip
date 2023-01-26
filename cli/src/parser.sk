@@ -73,7 +73,12 @@ fun parseArgsFrom(cmd: Command, argv: Sequence<String>): ParseResults {
   parse(cmd, argv.values())
 }
 
-fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
+private fun parse(
+  cmd: Command,
+  iterator: mutable Iterator<String>,
+  values: mutable Map<String, Value> = mutable Map<String, Value>[],
+  globals: Array<Arg> = Array[],
+): ParseResults {
   subcommands = mutable Map[];
   for (subcmd in cmd._subcommands) {
     if (subcommands.containsKey(subcmd.name)) {
@@ -91,7 +96,7 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
   posArgs = mutable Vector[];
   // TODO: options is a bad name. Maybe flag_args?
   options = mutable Map[];
-  for (arg in cmd._args) {
+  for (arg in cmd._args.concat(globals)) {
     if (argsNames.contains(arg.name)) {
       invariant_violation(`Duplicate argument ${arg.name}`)
     };
@@ -122,26 +127,32 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
   };
 
   posArgId = 0;
-  values = mutable Map<String, Value>[];
   extra = mutable Vector[];
   hasExtra = false;
   error: ?ArgumentError = None();
-
-  for (arg in cmd._args) {
-    values.set(arg.name, arg._defaultValue());
-  };
+  subcommand: ?String = None();
 
   loop {
     iterator.next() match {
     | None() -> break void
     | Some(str) if (hasExtra) -> extra.push(str)
     | Some(str) if (subcommands.containsKey(str)) ->
-      res = parse(subcommands.get(str), iterator);
-      values.extend(res.values);
-      return res with {
-        subcommand => Some(res.cmd.name),
-        values => values.chill(),
-      }
+      subcmd = subcommands.get(str);
+      !subcommand = Some(subcmd.name);
+
+      // TODO: This does not support nested subcommands (which probably
+      // shouldn't exist).
+      globalArgs = cmd._args.filter(a -> a._global);
+      res = parse(subcmd, iterator, values, globalArgs);
+      if (res.error.isSome()) {
+        !error = res.error;
+        break void
+      };
+
+      // TODO: This is dirty.
+      !extra = Vector::mcreateFromItems(res.extra);
+
+      break void
     | Some("--") ->
       if (!cmd._extra) {
         !error = Some(InvalidArgumentError("--"));
@@ -156,26 +167,29 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
         (str, None())
       };
       options.maybeGet(argName) match {
-      | Some(arg) ->
-        if (arg._takesValue()) {
-          value = argValue match {
+      | Some(arg) if (arg._takesValue()) ->
+        value = argValue match {
+        | Some(v) -> v
+        | None() ->
+          iterator.next() match {
           | Some(v) -> v
           | None() ->
-            iterator.next() match {
-            | Some(v) -> v
-            | None() ->
-              !error = Some(MissingValueError(arg.name));
-              break void
-            }
-          };
-          if (values[arg.name] is MissingValue _) {
-            values.set(arg.name, StringValue(value))
-          } else {
-            !error = Some(DuplicateValueError(arg.name));
+            !error = Some(MissingValueError(arg.name));
             break void
           }
+        };
+        if (!values.containsKey(arg.name)) {
+          values.set(arg.name, StringValue(value))
         } else {
+          !error = Some(DuplicateValueError(arg.name));
+          break void
+        }
+      | Some(arg) ->
+        if (!values.containsKey(arg.name)) {
           values.set(arg.name, BoolValue(!str.startsWith("--no-")))
+        } else {
+          !error = Some(DuplicateValueError(arg.name));
+          break void
         }
       | None() if (!str.startsWith("-") && posArgId < posArgs.size()) ->
         values.set(posArgs[posArgId].name, StringValue(str));
@@ -189,17 +203,20 @@ fun parse(cmd: Command, iterator: mutable Iterator<String>): ParseResults {
 
   if (error.isNone()) {
     for (arg in cmd._args) {
-      // Check required arguments
-      if (arg._required && values[arg.name] == MissingValue()) {
-        !error = Some(MissingArgumentError(arg.name));
-        break void
+      if (!values.containsKey(arg.name)) {
+        if (arg._required) {
+          !error = Some(MissingArgumentError(arg.name));
+          break void
+        } else {
+          values.set(arg.name, arg._defaultValue())
+        }
       }
     }
   };
 
   ParseResults{
     cmd => cmd,
-
+    subcommand,
     values => values.chill(),
     extra => Array::createFromItems(extra.chill()),
     error => error,
