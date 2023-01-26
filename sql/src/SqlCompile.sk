@@ -107,7 +107,7 @@ mutable class Compiler{
       pos => select.pos,
       id => select.id,
       kind => select.kind,
-      params => None(),
+      params => SelectParams(true, Array[]),
       from => Some(
         Array[
           TableName(
@@ -192,9 +192,9 @@ mutable class Compiler{
     origFrom = this.compileFrom(context, select.from);
     (cond, from) = this.compileJoin(context, origFrom, select);
     !select.where = cond;
-    sparams = select.params match {
-    | None() ->
-      params = mutable Vector[];
+    sparams = if (select.params.isStar) {
+      extraParams = select.params.params;
+      params = mutable Vector<(Expr, ?String)>[];
       for (dirDescr in origFrom) {
         tableName = dirDescr.alias match {
         | None() -> dirDescr.name
@@ -204,8 +204,12 @@ mutable class Compiler{
           params.push((Literal(tableName + "." + varName, false), None()))
         }
       };
+      for (extraParam in extraParams) {
+        params.push(extraParam);
+      };
       params.toArray()
-    | Some(params) -> params
+    } else {
+      select.params.params
     };
     params = this.compileParams(context, sparams);
     where = this.compileWhere(context, select.where);
@@ -445,14 +449,14 @@ mutable class Compiler{
   }
 
   static fun getCols(
-    paramsOpt: ?Array<(Expr, ?String)>,
+    params: SelectParams,
     from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
   ): (SortedMap<String, Int>, readonly Map<Int, String>) {
     cols = SortedMap[];
     invCols = mutable Map[];
-    paramsOpt match {
-    | None() ->
-      slot = 0;
+    slot = 0;
+
+    if (params.isStar) {
       for (dirDescr in from) {
         for (tyName in dirDescr.i0.colNames) {
           if (!cols.containsKey(tyName)) {
@@ -462,41 +466,42 @@ mutable class Compiler{
           !slot = slot + 1;
         }
       }
+    };
 
-    | Some(params) ->
-      for (idx => param in params) {
-        param match {
-        | (_, Some(colName)) ->
-          if (cols.containsKey(colName)) continue;
+    for (paramIdx => param in params.params) {
+      idx = slot + paramIdx;
+      param match {
+      | (_, Some(colName)) ->
+        if (cols.containsKey(colName)) continue;
+        !cols[colName] = idx;
+        invCols![idx] = colName
+      | (Literal(colName, _), _) ->
+        if (cols.containsKey(colName)) continue;
+        iter = colName.getIter();
+        first = iter.next().fromSome();
+        if (!Chars.isDigit(first)) {
           !cols[colName] = idx;
-          invCols![idx] = colName
-        | (Literal(colName, _), _) ->
-          if (cols.containsKey(colName)) continue;
-          iter = colName.getIter();
-          first = iter.next().fromSome();
-          if (!Chars.isDigit(first)) {
-            !cols[colName] = idx;
-            invCols![idx] = colName;
-          }
-        | (Binop(".", _, Literal(colName, _)), _) ->
-          if (cols.containsKey(colName)) continue;
-          !cols[colName] = idx;
-          invCols![idx] = colName
-        | _ -> void
+          invCols![idx] = colName;
         }
+      | (Binop(".", _, Literal(colName, _)), _) ->
+        if (cols.containsKey(colName)) continue;
+        !cols[colName] = idx;
+        invCols![idx] = colName
+      | _ -> void
       }
     };
+
     (cols, invCols)
   }
 
   static fun getDirDescr(
-    paramsOpt: ?Array<(Expr, ?String)>,
+    params: SelectParams,
     from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
     cparams: Array<CGExpr>,
     selectId: String,
     dirName: SKFS.DirName,
   ): DirDescr {
-    (cols, invCols) = static::getCols(paramsOpt, from);
+    (cols, invCols) = static::getCols(params, from);
     schema = cparams.mapWithIndex((idx, param) -> {
       ty = TypeDescr{
         name => invCols.maybeGet(idx) match {
@@ -650,7 +655,7 @@ mutable class Compiler{
   }
 
   mutable fun compileOrderBy(
-    params: ?Array<(SKSQL.Expr, ?String)>,
+    params: SelectParams,
     from: Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>,
     orderByOpt: ?Array<(Expr, IKind)>,
   ): ?Array<(Int, IKind)> {
