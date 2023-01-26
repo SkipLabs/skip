@@ -100,11 +100,13 @@ base class FromName {
 
 base class Query
 
+class SelectParams(isStar: Bool, params: Array<(Expr, ?String)>)
+
 class Select{
   id: String,
   pos: Int,
   kind: SelectKind,
-  params: ?Array<(Expr, ?String)>,
+  params: SelectParams,
   from: ?Array<TableName>,
   join: ?Join,
   where: ?Expr,
@@ -251,10 +253,8 @@ fun hasAggr(expr: Expr): Bool {
 
 fun selectIsAggr(select: Select): Bool {
   select.groupBy is Some _ ||
-    select.params match {
-    | None() -> false
-    | Some(params) ->
-      for (e in params) {
+    {
+      for (e in select.params.params) {
         if (hasAggr(e.i0)) return true;
       };
       false

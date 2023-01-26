@@ -206,3 +206,9 @@ if [ $? -eq 0 ]; then
 else
     echo -e "TEST DUMP INDEXES:\tFAILED"
 fi
+
+if cat test/test_select_star_plus.sql | $SKDB | grep -q "22|23|45"; then
+    echo -e "TEST STAR COMMA:\tOK"
+else
+    echo -e "TEST STAR COMMA:\tFAILED"
+fi
