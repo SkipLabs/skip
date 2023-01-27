@@ -241,29 +241,6 @@ async function makeRequest(uri: string, request: ProtoRequest): Promise<string> 
   });
 }
 
-// socket that can be written to
-async function makeInputStream(
-  uri: string,
-  request: ProtoRequest
-): Promise<(data: ProtoData) => void> {
-  let write = await makeWebSocket(
-    uri,
-    function () {},
-    function (change) {
-      console.log("Error writing: " + change);
-    },
-    function (exn) {
-      console.log("Error connection lost: " + request);
-    },
-    function (err) {
-      console.log("Error connection lost");
-    }
-  );
-
-  write(request);
-  return write;
-}
-
 /* ***************************************************************************/
 /* A few primitives to encode/decode utf8. */
 /* ***************************************************************************/
@@ -712,7 +689,7 @@ export class SKDB {
     tableName: string,
     suffix: string,
     watermark: (table: string) => number,
-  ): Promise<number> {
+  ): Promise<void> {
     let objThis = this;
 
     const request: ProtoTail = {
@@ -777,7 +754,7 @@ export class SKDB {
       socket.onopen = function (_event) {
         socket.send(JSON.stringify(request));
         failureTimeout = setTimeout(reconnect, failureThresholdMs);
-        resolve(0);
+        resolve();
       };
     });
   }
@@ -786,17 +763,85 @@ export class SKDB {
     uri: string,
     user: string,
     password: string,
-    tableName: string
+    tableName: string,
+    suffix: string,
   ): Promise<(txt: string) => void> {
-    let write = await makeInputStream(uri, {
-      request: "write",
-      user: user,
-      password: password,
-      table: tableName,
-    });
-    return (data) => write({
-      request: "pipe",
-      data: data,
+    let objThis = this;
+
+    const request: ProtoWrite = {
+       request: "write",
+       user: user,
+       password: password,
+       table: tableName,
+    };
+
+    return new Promise((resolve, _reject) => {
+      const socket = new WebSocket(uri);
+      const failureThresholdMs = 60000;
+      let failureTimeout: number|undefined = undefined;
+
+      const reconnect = (_event: Event) => {
+        socket.onmessage = null;
+        socket.onclose = null;
+        socket.onerror = null;
+        socket.close();
+        clearTimeout(failureTimeout);
+
+        const backoffMs = 500 + Math.random() * 1000;
+        setTimeout(() => {
+          objThis.connectWriteTable(uri, user, password, tableName, suffix);
+        }, backoffMs)
+      };
+
+      socket.onmessage = function (event) {
+        clearTimeout(failureTimeout);
+
+        const deliver = (data: ProtoData) => {
+          let msg = data.data;
+          if (msg != "") {
+            // we only expect acks back in the form of checkpoints.
+            // let's store these as a watermark against the table.
+            console.log("write-csv", tableName + suffix, msg + '\n');
+            objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
+          }
+          failureTimeout = setTimeout(reconnect, failureThresholdMs);
+        };
+
+        const data = event.data;
+
+        if(typeof data === "string") {
+          deliver(JSON.parse(data))
+        } else {
+          const reader = new FileReader();
+          reader.addEventListener(
+            "load",
+            () => {
+              let msg = JSON.parse((reader.result || "") as string);
+              // we know it will be a string because we called readAsText
+              deliver(msg);
+            },
+            false
+          );
+          reader.readAsText(data);
+        }
+      };
+
+      socket.onclose = reconnect;
+      socket.onerror = reconnect;
+
+      const write = (data: string) => {
+        console.log("sending", data);
+        socket.send(JSON.stringify({
+          request: "pipe",
+          data: data,
+        }));
+      };
+
+      socket.onopen = function (_event) {
+        socket.send(JSON.stringify(request));
+        failureTimeout = setTimeout(reconnect, failureThresholdMs);
+        resolve(write);
+      };
     });
   }
 
@@ -982,7 +1027,8 @@ class SKDBServer {
       this.uri,
       this.user,
       this.password,
-      tableName
+      tableName,
+      localSuffix
     );
 
     let fileName = tableName + "_" + this.user;
