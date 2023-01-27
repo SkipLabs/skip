@@ -198,23 +198,25 @@ fun replayDiff(
           }),
       );
 
-      checkpointTick = SKFS.Tick(checkpoint);
-      delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
-      watermarkDir = context.maybeGetDir(watermarks) match {
-      | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks, false)
-      | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
-      };
-      watermarkKey = SKFS.SID::create(table.name);
-      mark = watermarkDir
+      if (checkpoint is Some _) {
+        checkpointTick = SKFS.Tick(checkpoint.fromSome());
+        delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
+        watermarkDir = context.maybeGetDir(watermarks) match {
+        | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks, false)
+        | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
+        };
+        watermarkKey = SKFS.SID::create(table.name);
+        mark = watermarkDir
         .unsafeGetArray(context, watermarkKey)
         .reduce(max, SKFS.TickFile(checkpointTick));
-      watermarkDir.writeArray(context, watermarkKey, Array[mark]);
+        watermarkDir.writeArray(context, watermarkKey, Array[mark]);
+      };
 
       context.update()
     })
   };
 
-  checkpoint = 0;
+  checkpoint: ?Int = None();
 
   vtry<SKFS.ContextOp>(
     () -> {
@@ -235,7 +237,7 @@ fun replayDiff(
           | Some(':') ->
             break (
               None(),
-              line.sub(iter, line.length() - chars.size() - 1).toInt(),
+              Some(line.sub(iter, line.length() - chars.size() - 1).toInt()),
             )
           | Some(x) -> x
           };
