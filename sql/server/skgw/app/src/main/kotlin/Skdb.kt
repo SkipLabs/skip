@@ -11,7 +11,7 @@ enum class OutputFormat(val flag: String) {
 // super dumb, mostly synchronous, process facade
 class Skdb(val dbPath: String) {
 
-    val SKDB_PROC = "/skfs_build/build/skdb"
+    val SKDB_PROC = "/skfs/build/skdb"
 
     private fun blockingRun(pb: ProcessBuilder, input: String? = null): String {
         // TODO: hack for quick debug - should go somewhere useful

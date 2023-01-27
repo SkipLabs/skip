@@ -129,7 +129,7 @@ fun createHttpServer(): Undertow {
 
     val rootHandler =
         Handlers.path()
-            .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs_build/build/"))))
+            .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
 
     var pathHandler =
         PathTemplateHandler(rootHandler)
