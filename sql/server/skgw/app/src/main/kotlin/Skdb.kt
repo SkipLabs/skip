@@ -49,7 +49,13 @@ class Skdb(val dbPath: String) {
         ProcessBuilder(SKDB_PROC, "dump-table", table, "--data", dbPath, "--table-suffix", suffix))
   }
 
-  fun writeCsv(user: String, password: String, table: String): Process {
+  fun writeCsv(
+      user: String,
+      password: String,
+      table: String,
+      callback: (String) -> Unit,
+      closed: () -> Unit,
+  ): Process {
     val pb =
         ProcessBuilder(
             SKDB_PROC, "write-csv", table, "--data", dbPath, "--user", user, "--password", password)
@@ -57,6 +63,15 @@ class Skdb(val dbPath: String) {
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
 
     val proc = pb.start()
+
+    val output = proc.inputStream.bufferedReader()
+
+    val t =
+        Thread({
+          output.forEachLine { callback(it) }
+          closed()
+        })
+    t.start()
 
     return proc
   }
