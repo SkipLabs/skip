@@ -807,7 +807,6 @@ export class SKDB {
             console.log("write-csv", tableName + suffix, msg + '\n');
             objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
           }
-          failureTimeout = setTimeout(reconnect, failureThresholdMs);
         };
 
         const data = event.data;
@@ -838,11 +837,12 @@ export class SKDB {
           request: "pipe",
           data: data,
         }));
+        // we expect an ack within a reasonable amount of time
+        failureTimeout = setTimeout(reconnect, failureThresholdMs);
       };
 
       socket.onopen = function (_event) {
         socket.send(JSON.stringify(request));
-        failureTimeout = setTimeout(reconnect, failureThresholdMs);
 
         let fileName = tableName + "_" + user + objThis.fileDescrNbr;
         objThis.attach(change => {
