@@ -19,12 +19,16 @@ class DirDescr{
   colNames: Array<String>,
   schema: Array<TypeDescr>,
   kinds: Array<(Int, IKind, Type)>,
-  cols: SortedMap<String, Int>,
+  cols: Map<String, Int>,
   dirName: SKFS.DirName,
   alias: ?String,
   windowSize: ?Int,
   isInput: Bool,
 } extends SKFS.File uses Orderable {
+  fun compare(y: DirDescr): Order {
+    this.name.compare(y.name)
+  }
+
   static fun create{
     name: String,
     schema: Array<TypeDescr>,
@@ -33,17 +37,17 @@ class DirDescr{
     windowSize: ?Int,
     isInput: Bool,
   }: this {
-    colNames = schema.map(x -> x.name);
-    cols = SortedMap[];
+    colNames = schema.map(x -> x.name.lowercase());
+    cols = mutable Map[];
     for (i => ty in schema) {
-      !cols[ty.name] = i;
+      cols![ty.name] = i;
     };
     static{
       name,
       colNames,
       schema,
       kinds => schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty)),
-      cols,
+      cols => cols.chill(),
       dirName,
       alias,
       windowSize,
