@@ -111,6 +111,7 @@ class Skdb(val dbPath: String) {
                 dbPath,
                 "--format=csv",
                 connection.trim(),
+                "--follow",
                 "--since",
                 (if (since < 0) 0 else since).toString()
             )
