@@ -5,10 +5,10 @@ default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/inde
 test: sql/js/dist/out32.wasm build/skdb
 	./run_all_tests.sh
 
-sql/target/skdb: sql/src/*
+sql/target/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build
 
-sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/*
+sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
 	cd sql && skargo build --target wasm32-unknown-unknown
 
 build/skdb: sql/target/skdb
@@ -42,3 +42,11 @@ build/index.html: sql/js/index.html build/skdb.js
 .PHONY: clean
 clean:
 	rm -Rf build
+
+.PHONY: run-server
+run-server: build/skdb build/out32.wasm build/skdb.js build/index.html
+	./sql/server/deploy/start.sh
+
+.PHONY: run-chaos
+run-chaos: build/skdb build/out32.wasm build/skdb.js build/index.html
+	./sql/server/deploy/chaos.sh
