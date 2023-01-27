@@ -5,10 +5,10 @@ default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/inde
 test: sql/js/dist/out32.wasm build/skdb
 	./run_all_tests.sh
 
-sql/target/skdb:
+sql/target/skdb: sql/src/*
 	cd sql && skargo build
 
-sql/target/wasm32-unknown-unknown/skdb.wasm:
+sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/*
 	cd sql && skargo build --target wasm32-unknown-unknown
 
 build/skdb: sql/target/skdb
