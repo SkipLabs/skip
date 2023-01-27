@@ -1,5 +1,8 @@
 module SKCSV;
 
+// checkpoint watermarks are recorded in to the file system
+const watermarks: SKFS.DirName = SKFS.DirName::create("/watermarks/");
+
 base class Token {
   children =
   | NewLine()
@@ -168,7 +171,7 @@ fun replayDiff(
     skipExit(23);
   };
 
-  makeFun = rows ->
+  makeFun = (rows, checkpoint) -> {
     Some((context, _, _) ~> {
       entries = mutable Vector[];
       dir = origDir;
@@ -183,6 +186,7 @@ fun replayDiff(
         dir.writeArraySourceMany(context, entries.iterator());
       };
       !dir = context.unsafeGetEagerDir(table.dirName);
+
       dir.writeArrayMany(
         context,
         rows
@@ -193,8 +197,22 @@ fun replayDiff(
             ((k : SKFS.BaseName), (v : Array<SKFS.File>))
           }),
       );
-      context.update();
-    });
+
+      watermarkDir = context.maybeGetDir(watermarks) match {
+      | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks, false)
+      | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
+      };
+      watermarkKey = SKFS.SID::create(table.name);
+      mark = watermarkDir
+        .unsafeGetArray(context, watermarkKey)
+        .reduce(max, SKFS.TickFile(SKFS.Tick(checkpoint)));
+      watermarkDir.writeArray(context, watermarkKey, Array[mark]);
+
+      context.update()
+    })
+  };
+
+  checkpoint = 0;
 
   vtry<SKFS.ContextOp>(
     () -> {
@@ -202,68 +220,78 @@ fun replayDiff(
         line = getLine();
         lineNbr.set(lineNbr.get() + 1);
         if (line == "") continue;
+
         chars = mutable Vector[];
         iter = line.getIter();
-        loop {
+        (repeat, !checkpoint) = loop {
           c = iter.next() match {
           | None() ->
             print_error(
               "Error, line " + lineNbr.get() + ": unexpected end of line",
             );
             skipExit(23)
+          | Some(':') ->
+            break (
+              None(),
+              line.sub(iter, line.length() - chars.size() - 1).toInt(),
+            )
           | Some(x) -> x
           };
-          if (c == '\t') break void;
+          if (c == '\t') {
+            break (Some(String::fromChars(chars.toArray()).toInt()), checkpoint)
+          };
           if (c < '0' || c > '9') {
             print_error(
-              "Error, line " + lineNbr.get() + ": expected an integer key",
+              "Error, line " + lineNbr.get() + ": expected an integer",
             );
             skipExit(23)
           };
           chars.push(c);
         };
-        repeat = String::fromChars(chars.toArray()).toInt();
-        str = line.sub(iter, line.length() - chars.size() - 1);
-        values = mutable Vector[];
-        strIter = str.getIter();
-        next = () -> {
-          val = strIter.next();
-          val match {
-          | None() -> '\n'
-          | Some(x) -> x
-          }
+
+        if (repeat is Some _) {
+          str = line.sub(iter, line.length() - chars.size() - 1);
+          values = mutable Vector[];
+          strIter = str.getIter();
+          next = () -> {
+            val = strIter.next();
+            val match {
+            | None() -> '\n'
+            | Some(x) -> x
+            }
+          };
+          for (value in lex(next)) {
+            values.push(value);
+          };
+          cvalues = values.map(SKSQL.parseCSVValue);
+          pos = lineNbr.get();
+          newRows = SKSQL.computeInsert(
+            context,
+            false,
+            pos,
+            None(),
+            Array[cvalues.toArray()],
+            table,
+          );
+          userFileOpt match {
+          | None() -> void
+          | Some(userFile) ->
+            SKSQL.checkUserRows(context, userFile, pos, table, newRows)
+          };
+          buffer.extend(newRows.map(x -> x.setRepeat(repeat.fromSome())));
         };
-        for (value in lex(next)) {
-          values.push(value);
-        };
-        cvalues = values.map(SKSQL.parseCSVValue);
-        pos = lineNbr.get();
-        newRows = SKSQL.computeInsert(
-          context,
-          false,
-          pos,
-          None(),
-          Array[cvalues.toArray()],
-          table,
-        );
-        userFileOpt match {
-        | None() -> void
-        | Some(userFile) ->
-          SKSQL.checkUserRows(context, userFile, pos, table, newRows)
-        };
-        buffer.extend(newRows.map(x -> x.setRepeat(repeat)));
 
         if (stdinHasData() != 0) continue;
         rows = buffer.toArray();
         buffer.clear();
 
-        break SKFS.CContinue(makeFun(rows))
+        break SKFS.CContinue(makeFun(rows, checkpoint))
       }
     },
     exn -> {
       if (exn is EndOfFile _) {
         rows = buffer.toArray();
-        SKFS.CStop(makeFun(rows))
+        SKFS.CStop(makeFun(rows, checkpoint))
       } else {
         flushStdout();
         SKFS.CContinue(None())
@@ -288,11 +316,15 @@ fun replayStdin(): Map<String, (Int, Int)> {
         };
         chars = mutable Vector[];
         iter = line.getIter();
+        checkpoint = false;
         loop {
           c = iter.next() match {
           | None() ->
             print_error("Error, line " + lineNbr + ": unexpected end of line");
             skipExit(23)
+          | Some(':') ->
+            !checkpoint = true;
+            break void
           | Some(x) -> x
           };
           if (c == '\t') break void;
@@ -302,6 +334,7 @@ fun replayStdin(): Map<String, (Int, Int)> {
           };
           chars.push(c);
         };
+        if (checkpoint) continue;
         repeat = String::fromChars(chars.toArray()).toInt();
         value = line.sub(iter, line.length() - chars.size() - 1);
         if (map.containsKey(value)) {

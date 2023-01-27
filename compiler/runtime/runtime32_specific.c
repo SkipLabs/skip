@@ -196,6 +196,9 @@ void SKIP_cond_init(void* cond) {
 void SKIP_cond_wait(void* x, void* y) {
 }
 
+void SKIP_cond_timedwait(void* x, void* y, uint32_t secs) {
+}
+
 void SKIP_cond_broadcast(void* c) {
 }
 
