@@ -115,6 +115,13 @@ untracked fun main(): void {
         ),
     )
     .subcommand(
+      Cli.Command("watermark")
+        .about("Get the watermark for table TABLE")
+        .arg(
+          Cli.StringArg("table").positional().required().about("Table name"),
+        ),
+    )
+    .subcommand(
       Cli.Command("write-csv")
         .about("Write data from stdin into a directory in CSV format")
         .arg(Cli.StringArg("table").positional().required().about("Table name"))
@@ -135,6 +142,11 @@ untracked fun main(): void {
             .long("follow")
             .short("f")
             .about("Output appended data as the database grows"),
+        )
+        .arg(
+          Cli.StringArg("since")
+            .long("since")
+            .about("Starting time of the tail"),
         ),
     )
     // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
@@ -192,6 +204,7 @@ untracked fun main(): void {
       | "disconnect" -> execDisconnect
       | "write" -> execWrite
       | "tail" -> execTail
+      | "watermark" -> execWatermark
       | "write-csv" -> execWriteCsv
       | "subscribe" -> execSubscribe
       | "replay" -> execReplay
@@ -450,7 +463,10 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
   followMode = args.getBool("follow");
-  tick = 0;
+  tick = args.maybeGetString("since") match {
+  | Some(since) -> since.toInt()
+  | _ -> 0
+  };
   init = true;
   dieOnEOF();
   loop {
@@ -559,7 +575,10 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
           .getChangesAfter(SKFS.Tick(tick))
           .isEmpty()
     }) {
-      _ = SKFS.condWait(cond, lock);
+      print_raw(":" + tick.toString() + "\n");
+      flushStdout();
+      timeoutSecs = 10;
+      _ = SKFS.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
     };
     SKFS.mutexUnlock(lock);
     SKFS.destroyObstack(localObstack);
@@ -567,6 +586,21 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       break void
     }
   }
+}
+
+fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
+  ensureContext(args);
+  tableName = args.getString("table").lowercase();
+  SKSQL.runSql(options, context ~> {
+    watermarkDir = context.maybeGetDir(SKCSV.watermarks) match {
+    | None() -> context.mkdir(SKFS.TickFile::fromFile, SKCSV.watermarks, false)
+    | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
+    };
+    arr = watermarkDir.unsafeGetArray(context, SKFS.SID::create(tableName));
+    watermark = if (arr.size() > 0) arr[0].value.value else 0;
+    print_string(watermark);
+    SKFS.CStop(None())
+  });
 }
 
 fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {

@@ -155,6 +155,7 @@ type ProtoTail = {
   table: string;
   user: string;
   password: string;
+  since: number;
 }
 
 type ProtoDumpTable = {
@@ -237,32 +238,6 @@ async function makeRequest(uri: string, request: ProtoRequest): Promise<string> 
     ).then((write) => {
       write(request);
     });
-  });
-}
-
-// socket that delivers
-async function makeOutputStream(
-  uri: string,
-  request: ProtoRequest,
-  onopen: () => void,
-  onmessage: (msg: ProtoData) => void
-): Promise<void> {
-  return makeWebSocket(
-    uri,
-    onopen,
-    function (msg) {
-      // TODO: probably should have some schema check, but I hope we
-      // don't keep json around long enough to warrant writing it.
-      onmessage(JSON.parse(msg));
-    },
-    function (_) {
-      console.log("Error connection lost");
-    },
-    function (_err) {
-      console.log("Error connection lost");
-    }
-  ).then((write) => {
-    write(request);
   });
 }
 
@@ -732,32 +707,78 @@ export class SKDB {
 
   connectReadTable(
     uri: string,
-    db: string,
     user: string,
     password: string,
     tableName: string,
-    suffix: string
+    suffix: string,
+    watermark: (table: string) => number,
   ): Promise<number> {
     let objThis = this;
+
+    const request: ProtoTail = {
+      request: "tail",
+      user: user,
+      password: password,
+      table: tableName,
+      since: watermark(tableName + suffix),
+    };
+
     return new Promise((resolve, _reject) => {
-      makeOutputStream(
-        uri,
-        {
-          request: "tail",
-          user: user,
-          password: password,
-          table: tableName,
-        },
-        function () {
-          resolve(0);
-        },
-        function (data: ProtoData) {
+      const socket = new WebSocket(uri);
+      const failureThresholdMs = 60000;
+      let failureTimeout: number|undefined = undefined;
+
+      const reconnect = (_event: Event) => {
+        socket.onmessage = null;
+        socket.onclose = null;
+        socket.onerror = null;
+        socket.close();
+        clearTimeout(failureTimeout);
+
+        const backoffMs = 500 + Math.random() * 1000;
+        setTimeout(() => {
+          objThis.connectReadTable(uri, user, password, tableName, suffix, watermark);
+        }, backoffMs)
+      };
+
+      socket.onmessage = function (event) {
+        clearTimeout(failureTimeout);
+
+        const deliver = (data: ProtoData) => {
           let msg = data.data;
           if (msg != "") {
             objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
           }
+          failureTimeout = setTimeout(reconnect, failureThresholdMs);
+        };
+
+        const data = event.data;
+
+        if(typeof data === "string") {
+          deliver(JSON.parse(data))
+        } else {
+          const reader = new FileReader();
+          reader.addEventListener(
+            "load",
+            () => {
+              let msg = JSON.parse((reader.result || "") as string);
+              // we know it will be a string because we called readAsText
+              deliver(msg);
+            },
+            false
+          );
+          reader.readAsText(data);
         }
-      );
+      };
+
+      socket.onclose = reconnect;
+      socket.onerror = reconnect;
+
+      socket.onopen = function (_event) {
+        socket.send(JSON.stringify(request));
+        failureTimeout = setTimeout(reconnect, failureThresholdMs);
+        resolve(0);
+      };
     });
   }
 
@@ -975,11 +996,11 @@ class SKDBServer {
 
     await this.client.connectReadTable(
       this.uri,
-      this.db,
       this.user,
       this.password,
       tableName,
-      remoteSuffix
+      remoteSuffix,
+      (table) => parseInt(this.client.runLocal(["watermark", table], "")),
     );
 
     this.client.setMirroredTable(tableName, this.sessionID);
@@ -1009,11 +1030,11 @@ class SKDBServer {
 
     await this.client.connectReadTable(
       this.uri,
-      this.db,
       this.user,
       this.password,
       tableName,
-      suffix
+      suffix,
+      (table) => parseInt(this.client.runLocal(["watermark", table], "")),
     );
 
     this.client.setMirroredTable(tableName, this.sessionID);

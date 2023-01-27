@@ -1,7 +1,6 @@
 package io.skiplabs.skgw
 
 import java.io.BufferedReader
-import java.io.OutputStream
 
 enum class OutputFormat(val flag: String) {
     JSON("--format=json"),
@@ -59,7 +58,7 @@ class Skdb(val dbPath: String) {
         )
     }
 
-    fun writeCsv(user: String, password: String, table: String): OutputStream {
+    fun writeCsv(user: String, password: String, table: String): Process {
         val pb =
             ProcessBuilder(
                 SKDB_PROC,
@@ -77,11 +76,17 @@ class Skdb(val dbPath: String) {
 
         val proc = pb.start()
 
-        // TODO: interface sucks, no way to control and prevent leaking the proc
-        return proc.outputStream
+        return proc
     }
 
-    fun tail(user: String, password: String, table: String, callback: (String) -> Unit): Process {
+    fun tail(
+        user: String,
+        password: String,
+        table: String,
+        since: Int,
+        callback: (String) -> Unit,
+        closed: () -> Unit,
+    ): Process {
         // TODO: check for existing
         val connection =
             blockingRun(
@@ -98,7 +103,18 @@ class Skdb(val dbPath: String) {
                     password
                 )
             )
-        val pb = ProcessBuilder(SKDB_PROC, "tail", "--data", dbPath, "--format=csv", connection.trim())
+        val pb =
+            ProcessBuilder(
+                SKDB_PROC,
+                "tail",
+                "--data",
+                dbPath,
+                "--format=csv",
+                connection.trim(),
+                "--follow",
+                "--since",
+                (if (since < 0) 0 else since).toString()
+            )
 
         // TODO: for hacky debug
         pb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -106,11 +122,13 @@ class Skdb(val dbPath: String) {
 
         val output = proc.inputStream.bufferedReader()
 
-        val t = Thread({ output.forEachLine { callback(it) } })
+        val t =
+            Thread({
+                output.forEachLine { callback(it) }
+                closed()
+            })
         t.start()
 
         return proc
-        // TODO: return this so we can kill the proc. but we should
-        // also be cleaning up the connection that was created.
     }
 }

@@ -15,10 +15,10 @@ import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.File
-import java.io.OutputStream
-import java.util.concurrent.ConcurrentHashMap
+import java.nio.channels.Channel
 import kotlin.io.bufferedWriter
 import kotlin.reflect.KClass
+import org.xnio.ChannelListener
 
 class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
     override fun classFor(type: Any): KClass<out ProtoMessage> =
@@ -38,8 +38,12 @@ sealed class ProtoMessage(val request: String)
 
 data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMessage("query")
 
-data class ProtoTail(val table: String, val user: String, val password: String) :
-    ProtoMessage("tail")
+data class ProtoTail(
+    val table: String,
+    val user: String,
+    val password: String,
+    val since: Int = 0,
+) : ProtoMessage("tail")
 
 data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
 
@@ -74,33 +78,42 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
             val result = Skdb(state.dbPath).sql(req.query, format)
             val payload = serialise(ProtoData(result))
             WebSockets.sendTextBlocking(payload, channel)
+            channel.sendClose()
             channel.close()
         }
         is ProtoDumpTable -> {
             val result = Skdb(state.dbPath).dumpTable(req.table, req.suffix)
             val payload = serialise(ProtoData(result))
             WebSockets.sendTextBlocking(payload, channel)
+            channel.sendClose()
             channel.close()
         }
         is ProtoTail -> {
-            // TODO: no way to shut this down, just leaking resources here.
-            Skdb(state.dbPath)
-                .tail(
-                    req.user,
-                    req.password,
-                    req.table,
-                    {
-                        val payload = serialise(ProtoData(it))
-                        WebSockets.sendTextBlocking(payload, channel)
-                    }
-                )
+            val proc =
+                Skdb(state.dbPath)
+                    .tail(
+                        req.user,
+                        req.password,
+                        req.table,
+                        req.since,
+                        {
+                            val payload = serialise(ProtoData(it))
+                            WebSockets.sendTextBlocking(payload, channel)
+                        },
+                        {
+                            if (channel.isOpen()) {
+                                WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                            }
+                        },
+                    )
+            state.proc = proc
         }
         is ProtoWrite -> {
-            val skdbStdin = Skdb(state.dbPath).writeCsv(req.user, req.password, req.table)
-            state.procStdin = skdbStdin
+            val proc = Skdb(state.dbPath).writeCsv(req.user, req.password, req.table)
+            state.proc = proc
         }
         is ProtoData -> {
-            val stdin = state.procStdin
+            val stdin = state.proc?.outputStream
             if (stdin == null) {
                 throw RuntimeException("data received on a connection without a process setup")
             }
@@ -112,7 +125,7 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
     }
 }
 
-data class ChannelState(var procStdin: OutputStream?, val dbPath: String)
+data class ChannelState(var proc: Process?, val dbPath: String)
 
 fun resolveDbPath(db: String?): String? {
     if (db == null) {
@@ -124,9 +137,6 @@ fun resolveDbPath(db: String?): String? {
 }
 
 fun createHttpServer(): Undertow {
-    // TODO: weak refs or gc
-    val connections = ConcurrentHashMap<WebSocketChannel, ChannelState>()
-
     val rootHandler =
         Handlers.path()
             .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
@@ -157,7 +167,8 @@ fun createHttpServer(): Undertow {
                             // TODO: should harvest the user/auth, and
                             // database here. these are
                             // connection-specific properties
-                            connections.put(channel, ChannelState(procStdin = null, dbPath))
+
+                            val state = ChannelState(proc = null, dbPath)
 
                             channel.receiveSetter.set(
                                 object : AbstractReceiveListener() {
@@ -166,14 +177,6 @@ fun createHttpServer(): Undertow {
                                         message: BufferedTextMessage
                                     ) {
                                         try {
-                                            var state = connections.get(channel)
-
-                                            if (state == null) {
-                                                throw RuntimeException(
-                                                    "state not found for connection"
-                                                )
-                                            }
-
                                             handleRequest(message.data, channel, state)
                                         } catch (ex: Exception) {
                                             // 1011 is internal error
@@ -182,6 +185,17 @@ fun createHttpServer(): Undertow {
                                     }
                                 }
                             )
+
+                            channel.closeSetter.set(
+                                object : ChannelListener<Channel> {
+                                    override fun handleEvent(channel: Channel): Unit {
+                                        state.proc?.outputStream?.close()
+                                        // TODO: wait and ensure the process ends, forcibly close on
+                                        // timeout
+                                    }
+                                }
+                            )
+
                             channel.resumeReceives()
                         }
                     }
