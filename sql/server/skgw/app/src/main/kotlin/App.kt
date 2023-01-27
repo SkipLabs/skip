@@ -97,8 +97,10 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
                   req.table,
                   req.since,
                   {
-                    val payload = serialise(ProtoData(it))
-                    WebSockets.sendTextBlocking(payload, channel)
+                    if (channel.isOpen()) {
+                        val payload = serialise(ProtoData(it))
+                        WebSockets.sendTextBlocking(payload, channel)
+                    }
                   },
                   {
                     if (channel.isOpen()) {
@@ -109,7 +111,23 @@ fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelStat
       state.proc = proc
     }
     is ProtoWrite -> {
-      val proc = Skdb(state.dbPath).writeCsv(req.user, req.password, req.table)
+      val proc =
+          Skdb(state.dbPath)
+              .writeCsv(
+                  req.user,
+                  req.password,
+                  req.table,
+                  {
+                    if (channel.isOpen()) {
+                        val payload = serialise(ProtoData(it))
+                        WebSockets.sendTextBlocking(payload, channel)
+                    }
+                  },
+                  {
+                    if (channel.isOpen()) {
+                      WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                    }
+                  })
       state.proc = proc
     }
     is ProtoData -> {
