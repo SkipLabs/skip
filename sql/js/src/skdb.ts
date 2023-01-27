@@ -682,13 +682,16 @@ export class SKDB {
     );
   }
 
+  watermark(table: string): number {
+    return parseInt(this.runLocal(["watermark", table], ""));
+  }
+
   connectReadTable(
     uri: string,
     user: string,
     password: string,
     tableName: string,
     suffix: string,
-    watermark: (table: string) => number,
   ): Promise<void> {
     let objThis = this;
 
@@ -697,7 +700,7 @@ export class SKDB {
       user: user,
       password: password,
       table: tableName,
-      since: watermark(tableName + suffix),
+      since: objThis.watermark(tableName + suffix),
     };
 
     return new Promise((resolve, _reject) => {
@@ -714,7 +717,7 @@ export class SKDB {
 
         const backoffMs = 500 + Math.random() * 1000;
         setTimeout(() => {
-          objThis.connectReadTable(uri, user, password, tableName, suffix, watermark);
+          objThis.connectReadTable(uri, user, password, tableName, suffix);
         }, backoffMs)
       };
 
@@ -765,7 +768,7 @@ export class SKDB {
     password: string,
     tableName: string,
     suffix: string,
-  ): Promise<(txt: string) => void> {
+  ): Promise<void> {
     let objThis = this;
 
     const request: ProtoWrite = {
@@ -840,7 +843,20 @@ export class SKDB {
       socket.onopen = function (_event) {
         socket.send(JSON.stringify(request));
         failureTimeout = setTimeout(reconnect, failureThresholdMs);
-        resolve(write);
+
+        let fileName = tableName + "_" + user + objThis.fileDescrNbr;
+        objThis.attach(change => {
+          write(change);
+        });
+        objThis.runLocal(
+          [
+            "subscribe", tableName + suffix, "--connect", "--format=csv", "--updates",
+            "--since", objThis.watermark(tableName + suffix).toString(),
+            fileName
+          ],
+          ""
+        );
+        resolve();
       };
     });
   }
@@ -1023,21 +1039,12 @@ class SKDBServer {
     });
     this.client.runLocal([], createLocalTable);
 
-    let write = await this.client.connectWriteTable(
+    await this.client.connectWriteTable(
       this.uri,
       this.user,
       this.password,
       tableName,
       localSuffix
-    );
-
-    let fileName = tableName + "_" + this.user;
-    this.client.attach(change => {
-      write(change);
-    });
-    this.client.runLocal(
-      ["subscribe", tableName + localSuffix, "--connect", "--format=csv", "--updates", fileName],
-      ""
     );
 
     await this.client.connectReadTable(
@@ -1046,7 +1053,6 @@ class SKDBServer {
       this.password,
       tableName,
       remoteSuffix,
-      (table) => parseInt(this.client.runLocal(["watermark", table], "")),
     );
 
     this.client.setMirroredTable(tableName, this.sessionID);
@@ -1080,7 +1086,6 @@ class SKDBServer {
       this.password,
       tableName,
       suffix,
-      (table) => parseInt(this.client.runLocal(["watermark", table], "")),
     );
 
     this.client.setMirroredTable(tableName, this.sessionID);
