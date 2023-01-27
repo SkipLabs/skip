@@ -922,7 +922,7 @@ fun parseParamsOpt(lex: Lexer, pos: Int): (Int, ?Array<String>) {
     names = mutable Vector[];
     loop {
       (!pos, name) = lex.nextWord(pos);
-      names.push(name);
+      names.push(name.lowercase());
       if (lex.isEq(pos, ")")) {
         !pos = lex.expect(pos, ")");
         break void;
@@ -1163,8 +1163,8 @@ fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
       }
     } else {
       (!pos, name) = lex.nextWord(pos);
-      (!pos, ty, primary, unique, notNull) = parseType(lex, pos);
-      schema.push(TypeDescr{name, ty, primary, unique, notNull});
+      (!pos, ty, primary, unique, default, notNull) = parseType(lex, pos);
+      schema.push(TypeDescr{name, ty, primary, unique, default, notNull});
     };
     if (lex.isEq(pos, ")")) {
       !pos = lex.expect(pos, ")");
@@ -1209,7 +1209,7 @@ fun parseTypeName(lex: Lexer, pos: Int): (Int, Type) {
   }
 }
 
-fun parseType(lex: Lexer, pos: Int): (Int, Type, Bool, Bool, Bool) {
+fun parseType(lex: Lexer, pos: Int): (Int, Type, Bool, Bool, ?Value, Bool) {
   (!pos, ty) = parseTypeName(lex, pos);
   isPrimaryKey = if (lex.isEqUpper(pos, "PRIMARY")) {
     !pos = lex.expectUpper(pos, "PRIMARY");
@@ -1224,6 +1224,13 @@ fun parseType(lex: Lexer, pos: Int): (Int, Type, Bool, Bool, Bool) {
   } else {
     false
   };
+  default = if (lex.isEqUpper(pos, "DEFAULT")) {
+    !pos = lex.expectUpper(pos, "DEFAULT");
+    (!pos, e) = parseValue(lex, pos);
+    Some(e)
+  } else {
+    None()
+  };
   isNotNull = if (lex.isEqUpper(pos, "NOT")) {
     !pos = lex.expectUpper(pos, "NOT");
     !pos = lex.expectUpper(pos, "NULL");
@@ -1231,5 +1238,8 @@ fun parseType(lex: Lexer, pos: Int): (Int, Type, Bool, Bool, Bool) {
   } else {
     false
   };
-  (pos, ty, isPrimaryKey, isUnique, isNotNull)
+  if (!isNotNull && !isPrimaryKey && !isUnique && default is None()) {
+    !default = Some(VNull())
+  };
+  (pos, ty, isPrimaryKey, isUnique, default, isNotNull)
 }

@@ -97,7 +97,6 @@ fun computeInsert(
   valuesArray: Array<Array<Value>>,
   table: DirDescr,
 ): Array<RowValues> {
-  colsLower = table.cols.mapItems((col, idx) -> (col.lowercase(), idx));
   valuesArray.map(vals -> {
     values = vals.mapWithIndex((idx, val) -> {
       schemaIdx = paramsOpt match {
@@ -107,7 +106,7 @@ fun computeInsert(
         | None() -> error(pos, "Value size mismatch with specified columns")
         | Some(param) -> param
         };
-        colsLower.maybeGet(colName.lowercase()) match {
+        table.cols.maybeGet(colName.lowercase()) match {
         | None() -> error(pos, "Column not found: " + colName)
         | Some(colIdx) -> colIdx
         }
@@ -124,52 +123,46 @@ fun computeInsert(
       };
       values
     | Some(params) ->
-      paramSize = params.size();
-      if (
-        values.size() == paramSize &&
-        paramSize == schemaSize - 1 &&
-        schema.any(ty -> ty.primary)
-      ) {
-        (primaryColName, primaryIndex) = for (i => ty in schema) {
-          if (ty.ty is TEXT()) {
-            error(pos, "Cannot generate a string primary key");
-          };
-          if (ty.primary) break (ty.name, i)
-        } else {
-          invariant_violation("Internal error")
-        };
-        newParams = mutable Vector[];
-        newValues = mutable Vector[];
-        for (i in Range(0, primaryIndex)) {
-          newParams.push(params[i]);
-          newValues.push(values[i]);
-        };
-        newParams.push(primaryColName);
-        newValues.push(Some(CInt(SKFS.genSym(0))));
-        for (i in Range(primaryIndex, params.size())) {
-          newParams.push(params[i]);
-          newValues.push(values[i]);
-        };
-        !params = newParams.toArray();
-        !values = newValues.toArray();
-        !paramSize = params.size();
-        !valueSize = values.size();
+      missingCols = mutable Map[];
+      for (col in schema) {
+        missingCols![col.name] = col;
       };
-      if (paramSize != valueSize) {
-        error(pos, "Value size mismatch");
-      };
-      if (paramSize != schemaSize) {
-        error(pos, "Value size mismatch with table schema");
-      };
-      size = schemaSize;
-      result = Array<?CValue>::mfill(params.size(), None());
-      for (i in Range(0, size)) {
-        colName = params[i].lowercase();
-        if (!colsLower.containsKey(colName)) {
-          error(pos, "Column not found: " + colName);
+      for (userDefinedCol in params) {
+        if (!missingCols.containsKey(userDefinedCol)) {
+          error(pos, "Column not found: " + userDefinedCol);
         };
-        result![colsLower[colName]] = values[i];
+        missingCols.remove(userDefinedCol);
       };
+
+      result = Array<?CValue>::mfill(schema.size(), None());
+
+      for (i => colName in params) {
+        result![table.cols[colName]] = values[i];
+      };
+
+      for (tyDescr in missingCols) {
+        value = tyDescr.default match {
+        | None() ->
+          if (tyDescr.primary) {
+            if (tyDescr.ty is TEXT()) {
+              error(pos, "Cannot generate a string primary key");
+            };
+            Some(CInt(SKFS.genSym(0)))
+          } else {
+            error(pos, "Missing value for column: " + tyDescr.name);
+          }
+        | Some(v) ->
+          v match {
+          | VNull() -> None()
+          | VInt(n) -> Some(CInt(n))
+          | VFloat(f) -> Some(CFloat(f))
+          | VString(x) -> Some(CString(x))
+          | _ -> error(pos, "Invalid expression for default value")
+          }
+        };
+        result![table.cols[tyDescr.name]] = value;
+      };
+
       unsafe_chill_trust_me(result)
     };
     RowValues::create(cvalues)
@@ -994,6 +987,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           ty => INTEGER(),
           primary => false,
           unique => false,
+          default => None(),
           notNull => true,
         },
         TypeDescr{
@@ -1001,6 +995,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           ty => INTEGER(),
           primary => false,
           unique => false,
+          default => None(),
           notNull => true,
         },
       ],
@@ -1793,6 +1788,7 @@ fun initJSRoots(): void {
               ty => TEXT(),
               primary => false,
               unique => false,
+              default => None(),
               notNull => true,
             },
             TypeDescr{
@@ -1800,6 +1796,7 @@ fun initJSRoots(): void {
               ty => TEXT(),
               primary => false,
               unique => false,
+              default => None(),
               notNull => true,
             },
           ],
