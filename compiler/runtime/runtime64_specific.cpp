@@ -211,8 +211,11 @@ char* SKIP_open_file(char* filename_obj) {
  int status = fstat(fd, &s);
  size_t size = s.st_size;
 
+ char *result = nullptr;
  if (size == 0) {
-   return sk_string_create(NULL, 0);
+   result = sk_string_alloc(0);
+   sk_string_set_hash(result);
+   return result;
  }
 
  char* f = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
@@ -221,7 +224,7 @@ char* SKIP_open_file(char* filename_obj) {
    fprintf(stderr, "Could not open file: %s\n", filename);
    exit(45);
  }
- char* result = sk_string_alloc(size);
+ result = sk_string_alloc(size);
  memcpy(result, f, size);
  sk_string_set_hash(result);
  free(filename);
