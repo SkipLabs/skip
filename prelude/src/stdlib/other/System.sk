@@ -286,3 +286,28 @@ native fun flushStdout(): void;
 @cpp_extern("SKIP_system")
 @may_alloc
 native fun system(cmd: String): Int;
+
+module System;
+
+class CompletedProcess{
+  args: Array<String>,
+  exitcode: Int,
+  stdout: String,
+  stderr: String,
+}
+
+@cpp_runtime
+@may_alloc
+native fun subprocess(args: Array<String>): CompletedProcess;
+
+@cpp_export("sk_completed_process_create")
+fun createCompletedProcess(
+  args: Array<String>,
+  exitcode: Int,
+  stdout: String,
+  stderr: String,
+): CompletedProcess {
+  CompletedProcess{args, exitcode, stdout, stderr}
+}
+
+module end;
