@@ -2,10 +2,14 @@
 
 #ifdef SKIP64
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 void* SKIP_exec(char* cmd) {
   size_t size = SKIP_String_byteSize(cmd);
@@ -137,3 +141,111 @@ char* SKIP_read_line() {
   result = sk_string_create(result, size);
   return result;
 }
+
+#ifdef SKIP64
+
+char* sk_completed_process_create(char* args, SkipInt exitcode, char* stdout, char* stderr);
+
+char* dump_output(int fd) {
+  size_t size = 4096;
+  char *buf = malloc(size);
+  size_t len = 0;
+  for (;;) {
+    if (len == size) {
+      size *= 2;
+      buf = realloc(buf, size);
+    }
+    ssize_t count = read(fd, buf + len, size - len);
+    if (count == -1) {
+      if (errno == EINTR) {
+        continue;
+      } else {
+        perror("read");
+        exit(1);
+      }
+    } else if (count == 0) {
+      break;
+    }
+
+    len += count;
+  }
+
+  char *res = sk_string_create(buf, len);
+  free(buf);
+
+  return res;
+}
+
+char* SKIP_System_subprocess(char *args_obj) {
+  size_t num_args = *(uint32_t*)(args_obj-sizeof(char*)-sizeof(uint32_t));
+  char **args = malloc(sizeof(char *) * (num_args + 1));
+  for (int i = 0; i < num_args; ++i) {
+    char *arg_obj = *((char **)args_obj + i);
+    size_t sz = SKIP_String_byteSize(arg_obj);
+    args[i] = malloc(sizeof(char) * (sz + 1));
+    memcpy(args[i], arg_obj, sz);
+    args[i][sz] = 0;
+  }
+  args[num_args] = 0;
+
+  int stdout_fd[2];
+  if (pipe(stdout_fd) == -1) {
+    perror("pipe");
+    exit(1);
+  }
+
+  int stderr_fd[2];
+  if (pipe(stderr_fd) == -1) {
+    perror("pipe");
+    exit(1);
+  }
+
+  pid_t pid = fork();
+
+  if (pid == -1) {
+    perror("fork");
+    exit(1);
+  }
+
+  if (pid == 0) {
+    while ((dup2(stdout_fd[1], STDOUT_FILENO) == -1) && (errno == EINTR));
+    close(stdout_fd[0]);
+    close(stdout_fd[1]);
+
+    while ((dup2(stderr_fd[1], STDERR_FILENO) == -1) && (errno == EINTR));
+    close(stderr_fd[0]);
+    close(stderr_fd[1]);
+
+    // TODO: Optional envp with execvpe.
+    execvp(args[0], args);
+    perror("execvp");
+    exit(1);
+  }
+  close(stdout_fd[1]);
+  close(stderr_fd[1]);
+
+  char* out = dump_output(stdout_fd[0]);
+  close(stdout_fd[0]);
+  char* err = dump_output(stderr_fd[0]);
+  close(stderr_fd[0]);
+
+  int status;
+  if (waitpid(pid, &status, 0) == -1) {
+    perror("waitpid");
+    exit(1);
+  }
+
+  int32_t exitcode = 0;
+  if (WIFEXITED(status)) {
+    exitcode = WEXITSTATUS(status);
+  }
+
+  for (int i = 0; i < num_args; ++i) {
+    free(args[i]);
+  }
+  free(args);
+
+  return sk_completed_process_create(args_obj, exitcode, out, err);
+}
+
+#endif // SKIP64

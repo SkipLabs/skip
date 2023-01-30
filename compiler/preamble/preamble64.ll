@@ -41,6 +41,7 @@ declare i32 @SKIP_String_byteSize(i8*)
 declare i8* @SKIP_Float_toString(double)
 declare double @SKIP_String__toFloat_raw(i8*)
 declare void @SKIP_FileSystem_appendTextFile(i8*, i8*)
+declare i8* @SKIP_System_subprocess(i8*)
 
 ; LLVM
 
