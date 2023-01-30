@@ -28,8 +28,11 @@ jobs:
           command: |
             if ! git diff --quiet HEAD master -- skfs/
             then
-              cd skfs && skargo test
+              mkdir -p ~/test-results/skfs
+              cd skfs && skargo test --format=xml -o ~/test-results/skfs/skfs.xml
             fi
+      - store_test_results:
+          path: ~/test-results/skfs/
       - run:
           name: Run skdb tests
           command: |

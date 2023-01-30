@@ -1,20 +1,41 @@
 module SKTest;
 
-fun test_harness(runTests: ((String, () -> void) -> void) -> void): void {
-  args = Cli.Command()
+fun test_harness(
+  runTests: ((String, String, () -> void) -> void) -> void,
+): void {
+  args = Cli.Command("tests")
     .about("Run tests")
     .arg(
-      Cli.StringArg("filter").positional().about(
-        "If specified, only run tests containing this string in their names",
-      ),
+      Cli.StringArg("filter")
+        .positional()
+        .about(
+          "If specified, only run tests containing this string in their names",
+        ),
+    )
+    .arg(Cli.StringArg("format").about("Output format (xml, default)"))
+    .arg(
+      Cli.StringArg("output")
+        .short("o")
+        .long("output")
+        .about("Output file (defaults to stdout)"),
+    )
+    .arg(
+      Cli.BoolArg("verbose")
+        .long("verbose")
+        .short("v")
+        .about("User verbose output"),
     )
     .help()
     .parseArgs();
 
   // TODO: Look into mutability
-  reporter = mutable BasicTestReporter(true);
+  reporter = args.maybeGetString("format") match {
+  | Some("xml") -> mutable XmlTestReporter{ output => args.maybeGetString("output")}
+  | None() -> mutable BasicTestReporter{ output => args.maybeGetString("output"), color => true}
+  | Some(fmt) -> invariant_violation(`Unknown test format "${fmt}"`)
+  };
   filter = args.maybeGetString("filter").default("");
-  runTests((testName, test) -> {
+  runTests((testSuite, testName, test) -> {
     if (!testName.contains(filter)) {
       return void
     };
@@ -22,9 +43,9 @@ fun test_harness(runTests: ((String, () -> void) -> void) -> void): void {
       () -> {
         _ = test();
         // TODO: reportSuccess/reportFailure.
-        reporter.report(testName, None())
+        reporter.report(testSuite, testName, None())
       },
-      exn -> reporter.report(testName, Some(exn)),
+      exn -> reporter.report(testSuite, testName, Some(exn)),
     )
   });
 
@@ -35,7 +56,9 @@ fun main(): void {
   test_harness(runTest -> {
     _ = runTest; // Trick to avoid compiler error when no @test function is defined.
     #forEachFunction(@test, #function, #functionName) {
-      runTest(#functionName, #function)
+      // TODO: Properly handle tests outside of module/suite?
+      (testSuite, testName) = #functionName.splitFirst(".");
+      runTest(testSuite, testName, #function)
     };
     void
   })
