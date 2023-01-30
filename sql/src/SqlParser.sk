@@ -124,6 +124,15 @@ fun parseUpdate(lex: Lexer, pos: Int): (Int, Update) {
   posBegin = pos;
   (!pos, name) = lex.nextWord(pos);
   !name = name.lowercase();
+  parseUpdateWithName(lex, posBegin, pos, name);
+}
+
+fun parseUpdateWithName(
+  lex: Lexer,
+  posBegin: Int,
+  pos: Int,
+  name: String,
+): (Int, Update) {
   !pos = lex.expectUpper(pos, "SET");
   (!pos, sets) = parseSets(lex, pos);
   where = if (lex.isEqUpper(pos, "WHERE")) {
@@ -900,10 +909,10 @@ fun parseInsert(lex: Lexer, pos: Int): (Int, Stmt) {
     !onConflict = Some(
       if (lex.isEqUpper(pos, "IGNORE")) {
         !pos = lex.expectUpper(pos, "IGNORE");
-        Ignore()
+        OCIgnore()
       } else {
         !pos = lex.expectUpper(pos, "REPLACE");
-        Replace()
+        OCReplace()
       },
     );
   };
@@ -913,6 +922,24 @@ fun parseInsert(lex: Lexer, pos: Int): (Int, Stmt) {
   !name = name.lowercase();
   (!pos, paramsOpt) = parseParamsOpt(lex, pos);
   (!pos, values) = parseValues(lex, pos);
+  if (lex.isEqUpper(pos, "ON")) {
+    !pos = lex.expectUpper(pos, "ON");
+    !pos = lex.expectUpper(pos, "CONFLICT");
+    !pos = lex.expect(pos, "(");
+    (!pos, _) = lex.nextWord(pos);
+    !pos = lex.expect(pos, ")");
+    !pos = lex.expectUpper(pos, "DO");
+    if (onConflict is Some _) {
+      error(pos, "Already have an ON CONFLICT rule");
+    };
+    if (!lex.isEqUpper(pos, "UPDATE")) {
+      error(pos, "Only UPDATE supported after ON CONFLICT");
+    };
+    !pos = lex.expectUpper(pos, "UPDATE");
+    posBegin = pos;
+    (!pos, update) = parseUpdateWithName(lex, posBegin, pos, name);
+    !onConflict = Some(OCUpdate(update));
+  };
   (pos, Insert{pos => posName, onConflict, name, paramsOpt, values})
 }
 

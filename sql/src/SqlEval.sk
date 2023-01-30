@@ -724,7 +724,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     paramsOpt: ?Array<String>,
     values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
-    if (onConflict is Some(Replace())) {
+    if (onConflict is Some(OCReplace())) {
       if (values.size() > 1) {
         error(pos, "Can only use OR IGNORE/REPLACE with one value");
       };
@@ -756,14 +756,40 @@ class Evaluator{options: Options, user: ?UserFile} {
     table.windowSize match {
     | Some _ if (onConflict is Some _) ->
       error(pos, "OR IGNORE/REPLACE not supported on streams/windows")
-    | None() if (inTransaction && onConflict is Some(Ignore())) ->
+    | None() if (inTransaction && onConflict is Some(OCIgnore())) ->
       error(pos, "OR IGNORE not supported in transactions")
     | None() if (inTransaction) ->
       this.insertTable(context, table, rows);
       None()
+    | None() if (onConflict is Some(OCUpdate(_))) ->
+      onConflict match {
+      | Some(OCUpdate(update)) ->
+        copy = context.clone();
+        hasConflict = vtry(
+          () -> {
+            this.insertTable(context, table, rows);
+            context.update();
+            false
+          },
+          exn ->
+            exn match {
+            | Conflict _ ->
+              context.replaceFromSaved(copy);
+              true
+            | _ -> throw exn
+            }
+          ,
+        );
+        if (hasConflict) {
+          this.stmt(context, update, false)
+        } else {
+          None()
+        }
+      | _ -> None()
+      }
     | None() ->
       Some((context, _, _) ~> {
-        if (onConflict is Some(Ignore())) {
+        if (onConflict is Some(OCIgnore())) {
           copy = context.clone();
           vtry(
             () -> {

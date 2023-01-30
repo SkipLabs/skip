@@ -224,3 +224,9 @@ if cat test/test_count_string.sql | $SKDB | grep -q "0"; then
 else
     echo -e "TEST COUNT STRING:\tFAILED"
 fi
+
+if cat test/test_insert_or_update.sql | $SKDB | grep -q "1|3"; then
+    echo -e "TEST INSERT OR UPDATE:\tOK"
+else
+    echo -e "TEST INSERT OR UPDATE:\tFAILED"
+fi
