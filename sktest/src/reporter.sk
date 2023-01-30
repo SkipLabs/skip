@@ -1,31 +1,37 @@
 module SKTest;
 
-mutable base class TestReporter {
-  mutable fun report(name: String, error: ?Exception): void;
+mutable base class TestReporter{output: ?String} {
+  mutable fun report(suite: String, name: String, error: ?Exception): void;
+  mutable fun writeLine(str: String): void {
+    this.output match {
+    | Some(file) -> FileSystem.appendTextFile(file, str + "\n")
+    | None() -> print_string(str)
+    }
+  }
   overridable mutable fun finish(): void {
     void
   }
 }
 
-mutable class BasicTestReporter(
+mutable class BasicTestReporter{
   color: Bool,
   private mutable successes: Int = 0,
   private mutable failures: Int = 0,
-) extends TestReporter {
-  mutable fun report(name: String, error: ?Exception): void {
+} extends TestReporter {
+  mutable fun report(suite: String, name: String, error: ?Exception): void {
     result = error match {
     | Some(exn) ->
       this.!failures = this.failures + 1;
-      this.failure() + ` ${name}\n${exn.getMessage()}`
+      this.failure() + ` ${suite} ${name}\n${exn.getMessage()}`
     | None() ->
       this.!successes = this.successes + 1;
-      this.success() + ` ${name}`
+      this.success() + ` ${suite} ${name}`
     };
-    print_string(result)
+    this.writeLine(result)
   }
 
   mutable fun finish(): void {
-    print_string(
+    this.writeLine(
       `Failures: ${this.failures}, successes: ${this.successes} (total: ${this
         .successes + this.failures})`,
     )
@@ -50,5 +56,52 @@ mutable class BasicTestReporter(
     } else {
       "[OK]"
     }
+  }
+}
+
+mutable class XmlTestReporter{
+  results: mutable Map<String, mutable Map<String, ?Exception>> = mutable Map[],
+} extends TestReporter {
+  mutable fun report(suite: String, name: String, error: ?Exception): void {
+    if (!this.results.containsKey(suite)) {
+      this.results.set(suite, mutable Map[])
+    };
+    if (this.results[suite].containsKey(name)) {
+      invariant_violation("Duplicate test: " + name)
+    };
+    this.results[suite].set(name, error)
+  }
+
+  mutable fun finish(): void {
+    this.writeLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    totalTests = this.results.values()
+      .map(x -> x.size())
+      .foldl((acc, x) -> acc + x, 0);
+    totalFailures = this.results.values()
+      .map(ts -> ts.values().filterNone().collect(Array).size())
+      .foldl((acc, x) -> acc + x, 0);
+    this.writeLine(
+      `<testsuites tests="${totalTests}" failures="${totalFailures}" errors="0" time="0" timestamp="0" name="AllTests">`,
+    );
+    for ((testSuiteName, results) in this.results.items()) {
+      numTests = results.size();
+      numFailures = results.values().filterNone().collect(Array).size();
+      this.writeLine(
+        `  <testsuite name="${testSuiteName}" tests="${numTests}" failures="${numFailures}" errors="0" time="0">`,
+      );
+      for ((testName, error) in results.items()) {
+        this.writeLine(
+          `    <testcase name="${testName}" file="TODO.sk" line="0" status="run" time="0" classname="">`,
+        );
+        error.each(exn -> {
+          this.writeLine(
+            `      <failure message="${exn.getMessage()}" type="">TODO: test output</failure>`,
+          )
+        });
+        this.writeLine("    </testcase>")
+      };
+      this.writeLine("  </testsuite>");
+    };
+    this.writeLine("</testsuites>")
   }
 }

@@ -97,11 +97,14 @@ fun main(): void {
     );
 
     for (testFile in validTests) {
-      fileWithoutExt = testFile.stripSuffix(".toml");
-      testName = fileWithoutExt.stripPrefix("tests/");
-      jsonFile = fileWithoutExt + ".json";
+      jsonFile = testFile.replace(".toml", ".json");
 
-      runTest(testName, () -> runValidTest(testFile, jsonFile))
+      (testSuite, testName) = testFile
+        .stripPrefix("tests/valid/")
+        .stripSuffix(".toml")
+        .splitFirst("/");
+
+      runTest(testSuite, testName, () -> runValidTest(testFile, jsonFile))
     };
 
     invalidTests = FileSystem.readFilesRecursive("./tests/invalid", fn ->
@@ -109,8 +112,14 @@ fun main(): void {
     );
 
     for (testFile in invalidTests) {
-      testName = testFile.stripPrefix("tests/").stripSuffix(".toml");
-      runTest(testName, () -> runInvalidTest(testFile))
+      (testSuite, testName) = testFile
+        .stripPrefix("tests/invalid/")
+        .stripSuffix(".toml")
+        .splitFirst("/");
+
+      runTest(testSuite, testName + " (invalid)", () ->
+        runInvalidTest(testFile)
+      )
     }
   })
 }
