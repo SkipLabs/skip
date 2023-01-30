@@ -1094,8 +1094,11 @@ mutable class Compiler{
         | e @ CFExpr(_) ->
           slot = this.aggrVars.size();
           this.aggrVars.push((Count(skind), e));
-          CFExpr(CFGetFrom(0, slot))
-        | CSExpr _ -> error(this.pos, "Cannot call count on a string")
+          CIExpr(CIGetFrom(0, slot))
+        | e @ CSExpr(_) ->
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Count(skind), e));
+          CIExpr(CIGetFrom(0, slot))
         | CGNull _ -> CGNull()
         }
       })

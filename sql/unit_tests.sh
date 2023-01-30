@@ -218,3 +218,9 @@ if cat test/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -q "9|test1|tes
 else
     echo -e "TEST DEFAULT VALUES:\tFAILED"
 fi
+
+if cat test/test_count_string.sql | $SKDB | grep -q "0"; then
+    echo -e "TEST COUNT STRING:\tOK"
+else
+    echo -e "TEST COUNT STRING:\tFAILED"
+fi
