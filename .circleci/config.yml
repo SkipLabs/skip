@@ -1,42 +1,98 @@
 version: 2.1
+
+commands:
+  install_git:
+    description: "Install basic tools to conditionally cancel a job"
+    steps:
+      - run:
+          name: Install git and curl
+          command: |
+            DEBIAN_FRONTEND=noninteractive apt-get -qq update
+            DEBIAN_FRONTEND=noninteractive apt-get -qq -y install git curl
+
+  setup:
+    description: "Setup skip toolchain"
+    steps:
+      - run:
+          name: Install dependencies
+          command: |
+            apt-get update -q
+            DEBIAN_FRONTEND=noninteractive apt-get install -q -y npm make lld sqlite3 gcc gawk clang llvm
+      - run:
+          name: Build compiler
+          command: |
+            cd compiler && make install STAGE=0
+
 jobs:
-  build:
+  compiler:
     docker:
       - image: ubuntu:20.04
     resource_class: xlarge
     steps:
       - checkout
+      - install_git
       - run:
-          name: Install dependencies
+          name: Skip job if irrelevant
           command: |
-            apt-get update
-            DEBIAN_FRONTEND=noninteractive apt-get install -q -y npm git make lld sqlite3 gcc gawk clang llvm
-      - run:
-          name: Build compiler
-          command: |
-            cd compiler && make install STAGE=0
+            if git diff --quiet HEAD master -- compiler/
+            then
+              circleci-agent step halt
+            fi
+      - setup
       - run:
           name: Run compiler tests
           no_output_timeout: 30m
           command: |
-            if ! git diff --quiet HEAD master -- compiler/
+            cd compiler && make test STAGE=1
+
+  skfs:
+    docker:
+      - image: ubuntu:20.04
+    steps:
+      - checkout
+      - install_git
+      - run:
+          name: Skip job if irrelevant
+          command: |
+            if git diff --quiet HEAD master -- skfs/
             then
-              cd compiler && make test STAGE=1
+              circleci-agent step halt
             fi
+      - setup
       - run:
           name: Run skfs tests
           command: |
-            if ! git diff --quiet HEAD master -- skfs/
-            then
-              mkdir -p ~/test-results/skfs
-              cd skfs && skargo test --format=xml -o ~/test-results/skfs/skfs.xml
-            fi
+            mkdir -p ~/test-results/skfs
+            cd skfs && skargo test --format=xml -o ~/test-results/skfs/skfs.xml
       - store_test_results:
           path: ~/test-results/skfs/
+
+  skdb:
+    docker:
+      - image: ubuntu:20.04
+    steps:
+      - checkout
+      - install_git
+      - run:
+          name: Skip job if irrelevant
+          command: |
+            if git diff --quiet HEAD master -- sql/
+            then
+              circleci-agent step halt
+            fi
+      - setup
       - run:
           name: Run skdb tests
           command: |
-            if ! git diff --quiet HEAD master -- sql/
-            then
-              cd sql && skargo build && make test
-            fi
+            cd sql && skargo build && make test
+
+workflows:
+  compiler:
+    jobs:
+      - compiler
+  skfs:
+    jobs:
+      - skfs
+  skdb:
+    jobs:
+      - skdb
