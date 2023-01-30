@@ -19,18 +19,21 @@ jobs:
           name: Run compiler tests
           no_output_timeout: 30m
           command: |
-            if ! git diff-index --quiet master -- compiler/
+            if ! git diff --quiet HEAD master -- compiler/
             then
               cd compiler && make test STAGE=1
             fi
       - run:
           name: Run skfs tests
           command: |
-            if ! git diff-index --quiet master -- skfs/
+            if ! git diff --quiet HEAD master -- skfs/
             then
               cd skfs && skargo test
             fi
       - run:
           name: Run skdb tests
           command: |
-            cd sql && skargo build && make test
+            if ! git diff --quiet HEAD master -- sql/
+            then
+              cd sql && skargo build && make test
+            fi
