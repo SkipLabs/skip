@@ -768,6 +768,7 @@ export class SKDB {
     password: string,
     tableName: string,
     suffix: string,
+    session: string | undefined = undefined,
   ): Promise<void> {
     let objThis = this;
 
@@ -779,6 +780,7 @@ export class SKDB {
     };
 
     return new Promise((resolve, _reject) => {
+      let sessionId = session;
       const socket = new WebSocket(uri);
       const failureThresholdMs = 60000;
       let failureTimeout: number|undefined = undefined;
@@ -792,7 +794,7 @@ export class SKDB {
 
         const backoffMs = 500 + Math.random() * 1000;
         setTimeout(() => {
-          objThis.connectWriteTable(uri, user, password, tableName, suffix);
+          objThis.connectWriteTable(uri, user, password, tableName, suffix, sessionId);
         }, backoffMs)
       };
 
@@ -804,7 +806,6 @@ export class SKDB {
           if (msg != "") {
             // we only expect acks back in the form of checkpoints.
             // let's store these as a watermark against the table.
-            console.log("write-csv", tableName + suffix, msg + '\n');
             objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
           }
         };
@@ -832,7 +833,6 @@ export class SKDB {
       socket.onerror = reconnect;
 
       const write = (data: string) => {
-        console.log("sending", data);
         socket.send(JSON.stringify({
           request: "pipe",
           data: data,
@@ -844,18 +844,28 @@ export class SKDB {
       socket.onopen = function (_event) {
         socket.send(JSON.stringify(request));
 
-        let fileName = tableName + "_" + user + objThis.fileDescrNbr;
-        objThis.attach(change => {
-          write(change);
-        });
-        objThis.runLocal(
-          [
-            "subscribe", tableName + suffix, "--connect", "--format=csv", "--updates",
-            "--since", objThis.watermark(tableName + suffix).toString(),
-            fileName
-          ],
-          ""
-        );
+        if (!session) {
+          let fileName = tableName + "_" + user;
+          objThis.attach(change => {
+            write(change);
+          });
+          sessionId = objThis.runLocal(
+            [
+              "subscribe", tableName + suffix, "--connect", "--format=csv", "--updates", fileName
+            ],
+            ""
+          ).trim();
+        } else {
+          const diff = objThis.runLocal(
+            [
+              "diff", "--format=csv",
+              "--since", objThis.watermark(tableName + suffix).toString(),
+              session,
+            ], "");
+
+          write(diff);
+        }
+
         resolve();
       };
     });
