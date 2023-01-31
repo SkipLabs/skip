@@ -97,6 +97,7 @@ fun computeInsert(
   valuesArray: Array<Array<Value>>,
   table: DirDescr,
 ): Array<RowValues> {
+  colsLower = table.cols.mapItems((col, idx) -> (col.lowercase(), idx));
   valuesArray.map(vals -> {
     values = vals.mapWithIndex((idx, val) -> {
       schemaIdx = paramsOpt match {
@@ -106,7 +107,7 @@ fun computeInsert(
         | None() -> error(pos, "Value size mismatch with specified columns")
         | Some(param) -> param
         };
-        table.cols.maybeGet(colName.lowercase()) match {
+        colsLower.maybeGet(colName.lowercase()) match {
         | None() -> error(pos, "Column not found: " + colName)
         | Some(colIdx) -> colIdx
         }
@@ -125,19 +126,19 @@ fun computeInsert(
     | Some(params) ->
       missingCols = mutable Map[];
       for (col in schema) {
-        missingCols![col.name] = col;
+        missingCols![col.name.lowercase()] = col;
       };
       for (userDefinedCol in params) {
-        if (!missingCols.containsKey(userDefinedCol)) {
+        if (!missingCols.containsKey(userDefinedCol.lowercase())) {
           error(pos, "Column not found: " + userDefinedCol);
         };
-        missingCols.remove(userDefinedCol);
+        missingCols.remove(userDefinedCol.lowercase());
       };
 
       result = Array<?CValue>::mfill(schema.size(), None());
 
       for (i => colName in params) {
-        result![table.cols[colName]] = values[i];
+        result![colsLower[colName.lowercase()]] = values[i];
       };
 
       for (tyDescr in missingCols) {
