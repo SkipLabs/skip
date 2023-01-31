@@ -1,10 +1,6 @@
 .PHONY: default
 default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html
 
-.PHONY: test
-test: sql/js/dist/out32.wasm build/skdb
-	./run_all_tests.sh
-
 sql/target/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build
 
@@ -25,10 +21,12 @@ sql/js/dist/out32.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 
 # JS version of SKDB
 
-build/skdb_node.js: sql/node/src/node_header.js build/skdb.js
+build/skdb_node.js: sql/node/src/node_header.js build/skdb.js build/out32.wasm
 	mkdir -p build
-	cat sql/node/src/node_header.js build/skdb.js | sed 's/^export //g' \
-        | sed 's/let wasmModule =.*//g' | sed 's/let wasmBuffer =.*/let wasmBuffer = fs.readFileSync("out32.wasm");/g'> $@
+	cat sql/node/src/node_header.js build/skdb.js \
+        | sed 's/^export //g' \
+        | sed 's/let wasmModule =.*//g' \
+        | sed 's/let wasmBuffer =.*/let wasmBuffer = fs.readFileSync("out32.wasm");/g'> $@
 
 build/skdb.js: sql/js/src/skdb.ts
 	mkdir -p build
@@ -39,9 +37,14 @@ build/index.html: sql/js/index.html build/skdb.js
 	mkdir -p build
 	cp sql/js/index.html $@
 
+
 .PHONY: clean
 clean:
 	rm -Rf build
+
+.PHONY: test
+test: build/skdb_node.js build/skdb
+	./run_all_tests.sh
 
 .PHONY: run-server
 run-server: build/skdb build/out32.wasm build/skdb.js build/index.html
