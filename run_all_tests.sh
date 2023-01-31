@@ -7,9 +7,7 @@ echo "* WASM TESTS *"
 echo "*******************************************************************************"
 echo ""
 
-# node run.js
-echo "TODO: re-enable me"
-# TODO: disabled as, under docker, these result in a LinkError.
+(cd sql/node && ./run_tests.sh)
 
 echo "*******************************************************************************"
 echo "* NATIVE TESTS *"
