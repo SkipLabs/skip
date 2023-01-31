@@ -466,7 +466,7 @@ export class SKDB {
     endpoint?: string,
   ): Promise<number> {
     if (!endpoint) {
-      if (!window) {
+      if (typeof window === 'undefined') {
         throw new Error("No endpoint passed to connect and no window object to infer from.");
       }
       const loc = window.location;
