@@ -164,7 +164,6 @@ fun replayDiff(
   user: ?(String, String),
 ): SKFS.ContextOp {
   userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x.i0, x.i1));
-  origDir = context.unsafeGetEagerDir(table.dirName);
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
   if (table.windowSize is Some _) {
     print_error("Cannot use write-csv on a window or a stream");
@@ -173,25 +172,12 @@ fun replayDiff(
 
   makeFun = (rows, checkpoint) -> {
     Some((context, delta, _) ~> {
-      entries = mutable Vector[];
-      dir = origDir;
-      for (row in rows) {
-        if (row.repeat != 0) continue;
-        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((source, _) in dir.getDataIter(context, key)) {
-          entries.push((key, (source.path(), Array<SKFS.File>[])));
-        };
-      };
-      if (!entries.isEmpty()) {
-        dir.writeArraySourceMany(context, entries.iterator());
-      };
-      !dir = context.unsafeGetEagerDir(table.dirName);
+      dir = context.unsafeGetEagerDir(table.dirName);
 
       dir.writeArrayMany(
         context,
         rows
           .iterator()
-          .filter(row -> row.repeat != 0)
           .map(row -> {
             (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
             ((k : SKFS.BaseName), (v : Array<SKFS.File>))
