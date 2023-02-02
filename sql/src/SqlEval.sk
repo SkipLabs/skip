@@ -1682,11 +1682,14 @@ class StdoutFile(
   format: SKFS.OutputFormat,
   value: List<SelectDir>,
 ) extends SKFS.File
+
 class StdoutDiff(
   format: SKFS.OutputFormat,
   dirName: SKFS.DirName,
   time: SKFS.Tick,
 ) extends SKFS.File
+
+class StdoutCheckpointAck(time: SKFS.Tick) extends SKFS.File
 
 fun showSelect(
   context: mutable SKFS.Context,
@@ -1715,14 +1718,21 @@ fun printContext(context: mutable SKFS.Context): void {
     }
   | Some(StdoutDiff(format, dirName, time)) ->
     edir = context.unsafeGetEagerDir(dirName);
-    print_string("Time: " + (context.tick.value + 1));
     for (key in edir.getChangesAfter(time)) {
       values = edir.getArrayRaw(key);
       for (value in values) {
         print_raw(value.toKVString(format, key))
       };
-    }
+    };
+    // output the checkpoint of where we got to with output
+    print_string(":" + context.tick.value)
   | Some _ -> invariant_violation("Unexpected Stdout type")
+  };
+  context.globals.maybeGet("Ack") match {
+  | None() -> void
+  | Some(StdoutCheckpointAck(tick)) ->
+    print_raw(":" + tick.value.toString() + "\n")
+  | Some _ -> invariant_violation("Unexpected Ack type")
   };
   flushStdout();
 }
