@@ -1,0 +1,213 @@
+#!/bin/bash
+
+SKDB_BIN=/skfs/build/skdb
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+SERVER_DB=/tmp/server.db
+LOCAL_DB=/tmp/local.db
+UPDATES=/tmp/updates
+WRITE_OUTPUT=/tmp/write-out
+
+setup_server() {
+    db=$SERVER_DB
+    rm -f "$db" "$WRITE_OUTPUT"
+
+    SKDB="$SKDB_BIN --data $db"
+    $SKDB_BIN --init "$db"
+
+    $SKDB < "$SCRIPT_DIR/privacy/init.sql"
+
+    (echo "BEGIN TRANSACTION;";
+     echo "INSERT INTO skdb_users VALUES(id('user'), 'test_user', 'pass');"
+     echo "COMMIT;"
+    ) | $SKDB
+
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    echo "CREATE TABLE test_without_pk (id INTEGER, note STRING);" | $SKDB
+}
+
+setup_local() {
+    table=$1
+    db=$LOCAL_DB
+    rm -f "$db" "$UPDATES"
+
+    SKDB="$SKDB_BIN --data $db"
+    $SKDB_BIN --init "$db"
+
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    echo "CREATE TABLE test_without_pk (id INTEGER, note STRING);" | $SKDB
+
+    $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES "$table" > /dev/null
+}
+
+replicate_to_server() {
+    table=$1
+    $SKDB_BIN write-csv --data $SERVER_DB "$table" < $UPDATES > $WRITE_OUTPUT
+}
+
+debug() {
+    echo --------------------------------------
+    echo "$1"
+
+    echo current updates state:
+    cat $UPDATES
+
+    echo last write-csv response:
+    cat $WRITE_OUTPUT
+
+    echo local state:
+    $SKDB_BIN --data $LOCAL_DB <<< "select * from test_with_pk;"
+    $SKDB_BIN --data $LOCAL_DB <<< "select * from test_without_pk;"
+
+    echo server state:
+    $SKDB_BIN --data $SERVER_DB <<< "select * from test_with_pk;"
+    $SKDB_BIN --data $SERVER_DB <<< "select * from test_without_pk;"
+    echo --------------------------------------
+}
+
+assert_line_count() {
+    file=$1
+    pattern=$2
+    expected_cnt=$3
+    cnt=$(grep -Ec "$pattern" "$file")
+    if [[ $cnt -eq "$expected_cnt" ]]
+    then
+        echo "PASS: looking for $pattern. Wanted $expected_cnt and got $cnt."
+    else
+        echo "FAIL: looking for $pattern. Wanted $expected_cnt but got $cnt:"
+        echo "This was the input:"
+        cat "$file"
+        exit 1
+    fi
+}
+
+
+test_basic_replication_unique_rows() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz');"
+
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 1
+    rm -f "$output"
+}
+
+test_basic_replication_unique_rows_replayed() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz');"
+
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 1
+    rm -f "$output"
+
+    # simulate a reconnect - resend everything
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 1
+    rm -f "$output"
+}
+
+test_basic_replication_dup_rows() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    output=$(mktemp)
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+}
+
+test_basic_replication_dup_rows_in_txn() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    (
+        echo "BEGIN TRANSACTION;";
+        echo "INSERT INTO test_without_pk VALUES(1,'bar');";
+        echo "INSERT INTO test_without_pk VALUES(1,'bar');";
+        echo "COMMIT;";
+    ) | $SKDB_BIN --data $LOCAL_DB
+
+    output=$(mktemp)
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    assert_line_count "$output" bar 2
+    rm -f "$output"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    assert_line_count "$output" bar 2
+    rm -f "$output"
+}
+
+test_basic_replication_dup_rows_replayed() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+
+    # simulate a reconnect - resend everything
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+}
+
+# tests:
+test_basic_replication_unique_rows
+test_basic_replication_unique_rows_replayed
+
+test_basic_replication_dup_rows
+test_basic_replication_dup_rows_in_txn
+test_basic_replication_dup_rows_replayed
