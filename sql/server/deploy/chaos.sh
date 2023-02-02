@@ -66,28 +66,39 @@ function restart_server {
     wait_to_restart=$1
     pid=$(cat $SERVER_PID_FILE)
     kill -TERM $pid
-    echo restart_server: $pid, $?
+    echo restart_server: $pid, $?, $wait_to_restart
     wait $pid
     sleep $wait_to_restart
     start_server
 }
 
-targets[0]="restart_server 0"
-targets[1]="restart_server 1"
-targets[2]="restart_server 5"
-targets[3]="kill_random_skdb_pid tail -TERM"
-targets[4]="kill_random_skdb_pid tail -KILL"
-targets[5]="kill_random_skdb_pid tail -ABRT"
-# simulates a hung process
-targets[6]="kill_random_skdb_pid tail -STOP"
-# that can recover
-targets[7]="kill_random_skdb_pid tail -CONT"
+delay_secs=10
+if [[ ! -z $1 ]]
+then
+    delay_secs=$1
+fi
+echo "Will do something chaotic every $delay_secs seconds"
 
-# targets[2]="kill_random_skdb_pid write-csv"
+targets=(
+    "restart_server 0"
+    "restart_server 1"
+    "restart_server 5"
+
+    "kill_random_skdb_pid tail -TERM"
+    "kill_random_skdb_pid tail -KILL"
+    "kill_random_skdb_pid tail -ABRT"
+
+    # simulates a hung process
+    "kill_random_skdb_pid tail -STOP"
+    # that can recover
+    "kill_random_skdb_pid tail -CONT"
+
+    "kill_random_skdb_pid write-csv -TERM"
+)
 
 while true
 do
-    sleep 10
+    sleep $delay_secs
     rand=$(( $RANDOM % ${#targets[@]} ))
     cmd=${targets[$rand]}
     eval $cmd
