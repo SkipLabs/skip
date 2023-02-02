@@ -45,7 +45,14 @@ replicate_to_server() {
     $SKDB_BIN write-csv --data $SERVER_DB "$table" < $UPDATES > $WRITE_OUTPUT
 }
 
+run_test() {
+    echo -n "$1.............."
+    eval "$1"
+    echo "PASS"
+}
+
 debug() {
+    echo
     echo --------------------------------------
     echo "$1"
 
@@ -70,15 +77,22 @@ assert_line_count() {
     pattern=$2
     expected_cnt=$3
     cnt=$(grep -Ec "$pattern" "$file")
-    if [[ $cnt -eq "$expected_cnt" ]]
+    if [[ ! $cnt -eq "$expected_cnt" ]]
     then
-        echo "PASS: looking for $pattern. Wanted $expected_cnt and got $cnt."
-    else
         echo "FAIL: looking for $pattern. Wanted $expected_cnt but got $cnt:"
         echo "This was the input:"
         cat "$file"
         exit 1
     fi
+}
+
+assert_server_rows_has() {
+    expected=$1
+    pattern=$2
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" "$pattern" "$expected"
+    rm -f "$output"
 }
 
 
@@ -155,7 +169,7 @@ test_basic_replication_dup_rows_in_txn() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar');"
     (
         echo "BEGIN TRANSACTION;";
         echo "INSERT INTO test_without_pk VALUES(1,'bar');";
@@ -165,16 +179,14 @@ test_basic_replication_dup_rows_in_txn() {
 
     output=$(mktemp)
     $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
-    assert_line_count "$output" foo 1
-    assert_line_count "$output" bar 2
+    assert_line_count "$output" bar 3
     rm -f "$output"
 
     replicate_to_server test_without_pk
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
-    assert_line_count "$output" foo 1
-    assert_line_count "$output" bar 2
+    assert_line_count "$output" bar 3
     rm -f "$output"
 }
 
@@ -204,10 +216,86 @@ test_basic_replication_dup_rows_replayed() {
     rm -f "$output"
 }
 
-# tests:
-test_basic_replication_unique_rows
-test_basic_replication_unique_rows_replayed
+test_basic_replication_dup_rows_server_state_different() {
+    setup_server
+    setup_local test_without_pk
 
-test_basic_replication_dup_rows
-test_basic_replication_dup_rows_in_txn
-test_basic_replication_dup_rows_replayed
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    output=$(mktemp)
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    rm -f "$output"
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    rm -f "$output"
+
+    replicate_to_server test_without_pk
+
+    # last-writer-wins assignment semantic
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    rm -f "$output"
+}
+
+test_basic_replication_with_deletes() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_server test_without_pk
+    assert_server_rows_has 1 foo
+
+    $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+    replicate_to_server test_without_pk
+    assert_server_rows_has 0 foo
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+    replicate_to_server test_without_pk
+    assert_server_rows_has 0 foo
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+    replicate_to_server test_without_pk
+    assert_server_rows_has 0 foo
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_server test_without_pk
+    assert_server_rows_has 1 foo
+}
+
+test_basic_replication_with_deletes_server_state_different() {
+    setup_server
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+    replicate_to_server test_without_pk
+    assert_server_rows_has 0 foo
+}
+
+# tests:
+run_test test_basic_replication_unique_rows
+run_test test_basic_replication_unique_rows_replayed
+
+run_test test_basic_replication_dup_rows
+run_test test_basic_replication_dup_rows_in_txn
+run_test test_basic_replication_dup_rows_replayed
+
+run_test test_basic_replication_dup_rows_server_state_different
+
+run_test test_basic_replication_with_deletes
+run_test test_basic_replication_with_deletes_server_state_different
