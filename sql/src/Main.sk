@@ -13,228 +13,262 @@ fun fixUpDirName(dirNameStr: String): SKFS.DirName {
 }
 
 untracked fun main(): void {
-  args = Cli.Command("skdb")
-    .about("The SQL database that tells you when your query results changed")
-    .arg(Cli.StringArg("init").about("Initialize new SKFS runtime data"))
-    .arg(Cli.StringArg("data").about("Use existing SKFS runtime data").global())
-    .arg(Cli.BoolArg("backtrace").about("Internal use").global())
-    .arg(Cli.BoolArg("sync").about("Sync to disk").global())
-    .arg(
-      Cli.StringArg("format")
-        .default("sql")
-        .about("Output format (sql, csv, or json)")
-        .global(),
-    )
-    .arg(
-      Cli.BoolArg("always-allow-joins")
-        .about("Allow cross joins and joins outside of virtual views")
-        .global(),
-    )
-    .arg(
-      Cli.BoolArg("show-used-indexes")
-        .about("Print indexes used by a query to stdout")
-        .global(),
-    )
-    .arg(
-      Cli.StringArg("capacity").about(
-        "Initialize SKFS runtime with given capacity",
-      ),
-    )
-    .subcommand(Cli.Command("sessions").about("TODO"))
-    .subcommand(Cli.Command("compact").about("Compact the db"))
-    .subcommand(
-      Cli.Command("dump-table")
-        .about("Print a specific table signature")
-        .arg(Cli.StringArg("table").positional().required().about("Table name"))
-        .arg(Cli.StringArg("table-suffix").about("Optional suffix")),
-    )
-    .subcommand(
-      Cli.Command("dump-tables")
-        .about("Dumps the tables in SQL format")
-        .arg(Cli.StringArg("table-suffix").about("Optional suffix")),
-    )
-    .subcommand(
-      Cli.Command("dump-inserts").about("Dump the inserts in SQL format"),
-    )
-    .subcommand(
-      Cli.Command("dump-view")
-        .about("Print a specific view in SQL format")
-        .arg(Cli.StringArg("view").positional().required().about("View name")),
-    )
-    .subcommand(Cli.Command("dump-views").about("Dump the views in SQL format"))
-    .subcommand(
-      Cli.Command("dump").about("Dumps tables/inserts/views in SQL format"),
-    )
-    .subcommand(
-      Cli.Command("csv-field")
-        .about("Output a specific CSV field")
-        .arg(
-          Cli.StringArg("field").positional().required().about("Field number"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("load-csv")
-        .about("Load CSV values into table")
-        .arg(Cli.StringArg("table").positional().required().about("Table name"))
-        // TODO: Why are `--user`/`--password` only offered for CSV variants?
-        .arg(Cli.StringArg("user").about("Name of the user"))
-        .arg(Cli.StringArg("password").about("Password of the user")),
-    )
-    .subcommand(Cli.Command("size").about("Output the size of the db"))
-    .subcommand(
-      Cli.Command("diff")
-        .about("Send the diff from session")
-        .arg(
-          Cli.StringArg("session-id")
-            .positional()
-            .required()
-            .about("Session id"),
-        )
-        .arg(
-          Cli.StringArg("since").required().about("Starting time of the diff"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("disconnect")
-        .about("Disconnect a session")
-        .arg(
-          Cli.StringArg("session-id")
-            .positional()
-            .required()
-            .about("Session id"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("write")
-        .about("Write data from stdin into a directory")
-        .arg(
-          Cli.StringArg("directory")
-            .positional()
-            .required()
-            .about("Directory name"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("watermark")
-        .about("Get the watermark for table TABLE")
-        .arg(
-          Cli.StringArg("table").positional().required().about("Table name"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("write-csv")
-        .about("Write data from stdin into a directory in CSV format")
-        .arg(Cli.StringArg("table").positional().required().about("Table name"))
-        .arg(Cli.StringArg("user").about("Name of the user"))
-        .arg(Cli.StringArg("password").about("Password of the user")),
-    )
-    .subcommand(
-      Cli.Command("tail")
-        .about("Tail changes on a directory")
-        .arg(
-          Cli.StringArg("session-id")
-            .positional()
-            .required()
-            .about("Session id"),
-        )
-        .arg(
-          Cli.BoolArg("follow")
-            .long("follow")
-            .short("f")
-            .about("Output appended data as the database grows"),
-        )
-        .arg(
-          Cli.StringArg("since")
-            .long("since")
-            .about("Starting time of the tail"),
-        ),
-    )
-    // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
-    .subcommand(
-      Cli.Command("subscribe")
-        .about("Subscribe to a directory change")
-        .arg(Cli.StringArg("view").positional().required().about("View name"))
-        .arg(Cli.BoolArg("connect").about("Send the initial state first"))
-        .arg(
-          Cli.StringArg("updates").about(
-            "Name of the file where the updates will be written",
-          ),
-        )
-        .arg(
-          Cli.StringArg("notify").about(
-            "Name of the file updates with time of the last change",
-          ),
-        )
-        .arg(Cli.StringArg("user").about("Name of the user"))
-        .arg(Cli.StringArg("password").about("Password of the user")),
-    )
-    .subcommand(Cli.Command("replay").about("Replay a diff"))
-    .subcommand(Cli.Command("debug").about("TODO"))
-    .help()
-    .parseArgs();
-
-  options = SKSQL.Options{
-    backtrace => args.getBool("backtrace"),
-    alwaysAllowJoins => args.getBool("always-allow-joins"),
-    sync => args.getBool("sync"),
-    showUsedIndexes => args.getBool("show-used-indexes"),
-    format => args.getString("format") match {
-    | "csv" -> SKSQL.OFK_CSV()
-    | "json" -> SKSQL.OFK_JSON()
-    | "sql" -> SKSQL.OFK_SQL()
-    | f -> invariant_violation(`Unsupported format: ${f}`)
-    },
-  };
-
-  subcmd_handler = args.subcommand
-    .map(subcmd ->
-      subcmd match {
-      | "sessions" -> execSessions
-      | "compact" -> execCompact
-      | "dump-table" -> execDumpTable
-      | "dump-tables" -> execDumpTables
-      | "dump-inserts" -> execDumpInserts
-      | "dump-view" -> execDumpView
-      | "dump-views" -> execDumpViews
-      | "dump" -> execDump
-      | "load-csv" -> execLoadCsv
-      | "csv-field" -> execCsvField
-      | "size" -> execSize
-      | "diff" -> execDiff
-      | "disconnect" -> execDisconnect
-      | "write" -> execWrite
-      | "tail" -> execTail
-      | "watermark" -> execWatermark
-      | "write-csv" -> execWriteCsv
-      | "subscribe" -> execSubscribe
-      | "replay" -> execReplay
-      | "debug" -> execDebug
-      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
-      }
-    )
-    .default((args, options) -> {
-      // NOTE: This should be a subcommand, but the `--init` flag is currently
-      // hardcoded in the runtime. It should be revisited once the runtime has
-      // a proper two-step init API for persistence.
-      if (args.maybeGetString("init") is Some _) {
-        _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
-        return void
-      } else if (args.maybeGetString("capacity") is Some _) {
-        print_error("cannot use capacity without init");
-        skipExit(2)
-      };
-      // TODO: If `--user` is actually needed, reinstate it. It was clashing with
-      // other options and was removed for convenience.
-      // user = argMap.maybeGet("user") match {
-      //   | Some(AP.StringValue{value => userName}) -> Some(userName)
-      //   | _ -> None()
-      //   };
-      SKSQL.eval(options, /* user = */ None())
-    });
-
   saved = SKFS.newObstack();
   vtry(
     () -> {
+      args = Cli.Command("skdb")
+        .about(
+          "The SQL database that tells you when your query results changed",
+        )
+        .arg(Cli.StringArg("init").about("Initialize new SKFS runtime data"))
+        .arg(
+          Cli.StringArg("data")
+            .about("Use existing SKFS runtime data")
+            .global(),
+        )
+        .arg(Cli.BoolArg("backtrace").about("Internal use").global())
+        .arg(Cli.BoolArg("sync").about("Sync to disk").global())
+        .arg(
+          Cli.StringArg("format")
+            .default("sql")
+            .about("Output format (sql, csv, or json)")
+            .global(),
+        )
+        .arg(
+          Cli.BoolArg("always-allow-joins")
+            .about("Allow cross joins and joins outside of virtual views")
+            .global(),
+        )
+        .arg(
+          Cli.BoolArg("show-used-indexes")
+            .about("Print indexes used by a query to stdout")
+            .global(),
+        )
+        .arg(
+          Cli.StringArg("capacity").about(
+            "Initialize SKFS runtime with given capacity",
+          ),
+        )
+        .subcommand(Cli.Command("sessions").about("TODO"))
+        .subcommand(Cli.Command("compact").about("Compact the db"))
+        .subcommand(
+          Cli.Command("dump-table")
+            .about("Print a specific table signature")
+            .arg(
+              Cli.StringArg("table")
+                .positional()
+                .required()
+                .about("Table name"),
+            )
+            .arg(Cli.StringArg("table-suffix").about("Optional suffix")),
+        )
+        .subcommand(
+          Cli.Command("dump-tables")
+            .about("Dumps the tables in SQL format")
+            .arg(Cli.StringArg("table-suffix").about("Optional suffix")),
+        )
+        .subcommand(
+          Cli.Command("dump-inserts").about("Dump the inserts in SQL format"),
+        )
+        .subcommand(
+          Cli.Command("dump-view")
+            .about("Print a specific view in SQL format")
+            .arg(
+              Cli.StringArg("view").positional().required().about("View name"),
+            ),
+        )
+        .subcommand(
+          Cli.Command("dump-views").about("Dump the views in SQL format"),
+        )
+        .subcommand(
+          Cli.Command("dump").about("Dumps tables/inserts/views in SQL format"),
+        )
+        .subcommand(
+          Cli.Command("csv-field")
+            .about("Output a specific CSV field")
+            .arg(
+              Cli.StringArg("field")
+                .positional()
+                .required()
+                .about("Field number"),
+            ),
+        )
+        .subcommand(
+          Cli.Command("load-csv")
+            .about("Load CSV values into table")
+            .arg(
+              Cli.StringArg("table")
+                .positional()
+                .required()
+                .about("Table name"),
+            )
+            // TODO: Why are `--user`/`--password` only offered for CSV variants?
+            .arg(Cli.StringArg("user").about("Name of the user"))
+            .arg(Cli.StringArg("password").about("Password of the user")),
+        )
+        .subcommand(Cli.Command("size").about("Output the size of the db"))
+        .subcommand(
+          Cli.Command("diff")
+            .about("Send the diff from session")
+            .arg(
+              Cli.StringArg("session-id")
+                .positional()
+                .required()
+                .about("Session id"),
+            )
+            .arg(
+              Cli.StringArg("since")
+                .required()
+                .about("Starting time of the diff"),
+            ),
+        )
+        .subcommand(
+          Cli.Command("disconnect")
+            .about("Disconnect a session")
+            .arg(
+              Cli.StringArg("session-id")
+                .positional()
+                .required()
+                .about("Session id"),
+            ),
+        )
+        .subcommand(
+          Cli.Command("write")
+            .about("Write data from stdin into a directory")
+            .arg(
+              Cli.StringArg("directory")
+                .positional()
+                .required()
+                .about("Directory name"),
+            ),
+        )
+        .subcommand(
+          Cli.Command("watermark")
+            .about("Get the watermark for table TABLE")
+            .arg(
+              Cli.StringArg("table")
+                .positional()
+                .required()
+                .about("Table name"),
+            ),
+        )
+        .subcommand(
+          Cli.Command("write-csv")
+            .about("Write data from stdin into a directory in CSV format")
+            .arg(
+              Cli.StringArg("table")
+                .positional()
+                .required()
+                .about("Table name"),
+            )
+            .arg(Cli.StringArg("user").about("Name of the user"))
+            .arg(Cli.StringArg("password").about("Password of the user")),
+        )
+        .subcommand(
+          Cli.Command("tail")
+            .about("Tail changes on a directory")
+            .arg(
+              Cli.StringArg("session-id")
+                .positional()
+                .required()
+                .about("Session id"),
+            )
+            .arg(
+              Cli.BoolArg("follow")
+                .long("follow")
+                .short("f")
+                .about("Output appended data as the database grows"),
+            )
+            .arg(
+              Cli.StringArg("since")
+                .long("since")
+                .about("Starting time of the tail"),
+            ),
+        )
+        // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
+        .subcommand(
+          Cli.Command("subscribe")
+            .about("Subscribe to a directory change")
+            .arg(
+              Cli.StringArg("view").positional().required().about("View name"),
+            )
+            .arg(Cli.BoolArg("connect").about("Send the initial state first"))
+            .arg(
+              Cli.StringArg("updates").about(
+                "Name of the file where the updates will be written",
+              ),
+            )
+            .arg(
+              Cli.StringArg("notify").about(
+                "Name of the file updates with time of the last change",
+              ),
+            )
+            .arg(Cli.StringArg("user").about("Name of the user"))
+            .arg(Cli.StringArg("password").about("Password of the user")),
+        )
+        .subcommand(Cli.Command("replay").about("Replay a diff"))
+        .subcommand(Cli.Command("debug").about("TODO"))
+        .help()
+        .parseArgs();
+
+      options = SKSQL.Options{
+        backtrace => args.getBool("backtrace"),
+        alwaysAllowJoins => args.getBool("always-allow-joins"),
+        sync => args.getBool("sync"),
+        showUsedIndexes => args.getBool("show-used-indexes"),
+        format => args.getString("format") match {
+        | "csv" -> SKSQL.OFK_CSV()
+        | "json" -> SKSQL.OFK_JSON()
+        | "sql" -> SKSQL.OFK_SQL()
+        | f -> invariant_violation(`Unsupported format: ${f}`)
+        },
+      };
+
+      subcmd_handler = args.subcommand
+        .map(subcmd ->
+          subcmd match {
+          | "sessions" -> execSessions
+          | "compact" -> execCompact
+          | "dump-table" -> execDumpTable
+          | "dump-tables" -> execDumpTables
+          | "dump-inserts" -> execDumpInserts
+          | "dump-view" -> execDumpView
+          | "dump-views" -> execDumpViews
+          | "dump" -> execDump
+          | "load-csv" -> execLoadCsv
+          | "csv-field" -> execCsvField
+          | "size" -> execSize
+          | "diff" -> execDiff
+          | "disconnect" -> execDisconnect
+          | "write" -> execWrite
+          | "tail" -> execTail
+          | "watermark" -> execWatermark
+          | "write-csv" -> execWriteCsv
+          | "subscribe" -> execSubscribe
+          | "replay" -> execReplay
+          | "debug" -> execDebug
+          | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+          }
+        )
+        .default((args, options) -> {
+          // NOTE: This should be a subcommand, but the `--init` flag is currently
+          // hardcoded in the runtime. It should be revisited once the runtime has
+          // a proper two-step init API for persistence.
+          if (args.maybeGetString("init") is Some _) {
+            _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
+            return void
+          } else if (args.maybeGetString("capacity") is Some _) {
+            print_error("cannot use capacity without init");
+            skipExit(2)
+          };
+          // TODO: If `--user` is actually needed, reinstate it. It was clashing with
+          // other options and was removed for convenience.
+          // user = argMap.maybeGet("user") match {
+          //   | Some(AP.StringValue{value => userName}) -> Some(userName)
+          //   | _ -> None()
+          //   };
+          SKSQL.eval(options, /* user = */ None())
+        });
       subcmd_handler(args, options)
     },
     exn -> {
