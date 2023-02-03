@@ -24,7 +24,6 @@ sql/js/dist/out32.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 build/skdb_node.js: sql/node/src/node_header.js build/skdb.js build/out32.wasm
 	mkdir -p build
 	cat sql/node/src/node_header.js build/skdb.js \
-        | sed 's/^export //g' \
         | sed 's/let wasmModule =.*//g' \
         | sed 's/let wasmBuffer =.*/let wasmBuffer = fs.readFileSync("out32.wasm");/g'> $@
 	echo >> $@
