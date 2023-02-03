@@ -82,18 +82,23 @@ echo "Will do something chaotic every $delay_secs seconds"
 targets=(
     "restart_server 0"
     "restart_server 1"
-    "restart_server 5"
+    "restart_server 60"
+    "restart_server 120"
 
     "kill_random_skdb_pid tail -TERM"
     "kill_random_skdb_pid tail -KILL"
     "kill_random_skdb_pid tail -ABRT"
 
+    "kill_random_skdb_pid write-csv -TERM"
+    "kill_random_skdb_pid write-csv -KILL"
+    "kill_random_skdb_pid write-csv -ABRT"
+
     # simulates a hung process
     "kill_random_skdb_pid tail -STOP"
+    "kill_random_skdb_pid write-csv -STOP"
     # that can recover
     "kill_random_skdb_pid tail -CONT"
-
-    "kill_random_skdb_pid write-csv -TERM"
+    "kill_random_skdb_pid write-csv -CONT"
 )
 
 while true
