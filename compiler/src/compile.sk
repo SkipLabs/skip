@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-module alias AP = ArgumentParser;
-
 module Main;
 
 class Config private {
@@ -18,7 +16,7 @@ class Config private {
   disasmFunctions: UnorderedSet<String>,
   outputFiles: Array<String>,
   preambleFiles: Array<String>,
-  profilePath: String,
+  // profilePath: String,
   wasm: Bool,
   embedded32: Bool,
   embedded64: Bool,
@@ -32,87 +30,31 @@ class Config private {
   version: Bool,
   check: Bool,
 } {
-  // Supported command-line arguments.
-  const args: Array<AP.Param> = Array[
-    AP.BoolParam{name => "disasm-all"},
-    AP.BoolParam{name => "disasm-annotated"},
-    AP.StringArrayParam{name => "disasm-file"},
-    AP.StringArrayParam{name => "disasm-function"},
-    AP.StringArrayParam{name => "export-function"},
-    AP.StringArrayParam{name => "export-function-as"},
-    AP.StringArrayParam{name => "export-module"},
-    AP.StringArrayParam{name => "output"},
-    AP.StringArrayParam{name => "profile-path"},
-    AP.StringArrayParam{name => "preamble"},
-    AP.BoolParam{name => "wasm"},
-    AP.BoolParam{name => "embedded32"},
-    AP.BoolParam{name => "embedded64"},
-    AP.BoolParam{name => "asan"},
-    AP.BoolParam{name => "autogc"},
-    AP.IntParam{name => "sample-rate"},
-    AP.BoolParam{name => "use-specialized-names"},
-    AP.BoolParam{name => "version"},
-    // These are handled in skipUtils.sk
-    // Just allow them to be ignored here
-    AP.StringArrayParam{name => "debug"},
-    AP.BoolParam{name => "profile"},
-    AP.StringParam{name => "data"},
-    AP.StringParam{name => "init"},
-    AP.BoolParam{name => "check"},
-  ];
-
-  static fun make(result: AP.ParseResult): this {
-    exportedFunctions = UnorderedSet::mcreate(0);
-    exportedAsFunctions = UnorderedSet::mcreate(0);
-    disasmAll = false;
-    disasmAnnotated = false;
-    disasmFiles = UnorderedSet::mcreate(0);
-    disasmFunctions = UnorderedSet::mcreate(0);
-    outputFiles = mutable Vector[];
-    preambleFiles = mutable Vector[];
-    profilePath = "";
-    wasm = false;
-    embedded32 = false;
-    embedded64 = false;
-    asan = false;
-    autogc = true;
-    sampleRate = 0;
-    useSpecializedNames = false;
-    version = false;
-    check = false;
-
-    for (arg in result) {
-      arg match {
-      | AP.BoolValue{name => "disasm-all", value} -> !disasmAll = value
-      | AP.BoolValue{name => "disasm-annotated", value} ->
-        !disasmAnnotated = value
-      | AP.StringArrayValue{name => "disasm-file", value} ->
-        value.each(disasmFiles.insert)
-      | AP.StringArrayValue{name => "disasm-function", value} ->
-        value.each(disasmFunctions.insert)
-      | AP.StringArrayValue{name => "export-function", value} ->
-        value.each(exportedFunctions.insert)
-      | AP.StringArrayValue{name => "export-function-as", value} ->
-        value.each(exportedAsFunctions.insert)
-      | AP.StringArrayValue{name => "preamble", value} ->
-        value.each(preambleFiles.push)
-      | AP.StringArrayValue{name => "output", value} ->
-        for (v in value) if (!outputFiles.contains(v)) outputFiles.push(v)
-      | AP.StringArrayValue{name => "profile-path", value} ->
-        !profilePath = value[0]
-      | AP.BoolValue{name => "wasm", value} -> !wasm = value
-      | AP.BoolValue{name => "embedded32", value} -> !embedded32 = value
-      | AP.BoolValue{name => "embedded64", value} -> !embedded64 = value
-      | AP.BoolValue{name => "asan", value} -> !asan = value
-      | AP.BoolValue{name => "autogc", value} -> !autogc = value
-      | AP.IntValue{name => "sample-rate", value} -> !sampleRate = value
-      | AP.BoolValue{name => "use-specialized-names", value} ->
-        !useSpecializedNames = value
-      | AP.BoolValue{name => "version", value} -> !version = value
-      | AP.BoolValue{name => "check", value} -> !check = value
-      | _ -> void
-      }
-    };
+  static fun make(result: Cli.ParseResults): this {
+    disasmAll = result.getBool("disasm-all");
+    disasmAnnotated = result.getBool("disasm-annotated");
+    disasmFiles = UnorderedSet::createFromItems(result.getArray("disasm-file"));
+    disasmFunctions = UnorderedSet::createFromItems(
+      result.getArray("disasm-function"),
+    );
+    exportedFunctions = UnorderedSet::createFromItems(
+      result.getArray("export-function"),
+    );
+    exportedAsFunctions = UnorderedSet::createFromItems(
+      result.getArray("export-function-as"),
+    );
+    preambleFiles = result.getArray("preamble");
+    outputFiles = result.getArray("output");
+    // profilePath = result.getString("profile-path");
+    wasm = result.getBool("wasm");
+    embedded32 = result.getBool("embedded32");
+    embedded64 = result.getBool("embedded64");
+    asan = result.getBool("asan");
+    autogc = result.getBool("autogc");
+    sampleRate = result.getString("sample-rate").toInt();
+    useSpecializedNames = result.getBool("use-specialized-names");
+    version = result.getBool("version");
+    check = result.getBool("check");
 
     if (version) {
       print_string(getBuildVersion());
@@ -153,19 +95,15 @@ class Config private {
     };
 
     static{
-      exportedFunctions => exportedFunctions.chill(),
+      exportedFunctions,
       exportedAsFunctions => exportAs.chill(),
       disasmAll,
       disasmAnnotated,
-      disasmFiles => disasmFiles.chill(),
-      disasmFunctions => disasmFunctions.chill(),
-      outputFiles => if (outputFiles.isEmpty()) {
-        Array["-"]
-      } else {
-        outputFiles.toArray()
-      },
-      preambleFiles => preambleFiles.toArray(),
-      profilePath,
+      disasmFiles,
+      disasmFunctions,
+      outputFiles,
+      preambleFiles,
+      // profilePath,
       wasm,
       embedded32,
       embedded64,

@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-module alias AP = ArgumentParser;
-
 module Optimize;
 
 // Optimizer config. Individual passes can be enabled or disabled
@@ -43,20 +41,6 @@ mutable class Config private {
   // is never run again for that function.
   const kOptPrerequisites: Int = Config::kOptReady.or(Config::kOptIntrinsics);
 
-  // Supported command-line arguments.
-  const args: Array<AP.Param> = Array[
-    AP.BoolParam{name => "localopts"},
-    AP.BoolParam{name => "dce"},
-    AP.BoolParam{name => "peephole"},
-    AP.BoolParam{name => "control"},
-    AP.BoolParam{name => "regpromote"},
-    AP.BoolParam{name => "inline"},
-    AP.BoolParam{name => "ipa"},
-    AP.BoolParam{name => "verify"},
-    AP.BoolParam{name => "goto"},
-    AP.BoolParam{name => "noopt", negatable => false},
-  ];
-
   readonly fun chill(): this {
     static{
       dce => this.dce,
@@ -85,41 +69,45 @@ mutable class Config private {
     }
   }
 
-  static fun make(results: AP.ParseResult): this {
+  static fun make(results: Cli.ParseResults): this {
     config = static::default();
 
-    // Walk through args processing any we know about.
-    for (arg in results) {
-      arg match {
-      | AP.BoolValue{name, value} ->
-        mask = if (value) -1 else 0;
+    mask = if (results.getBool("localopts")) -1 else 0;
+    config.!dce = static::kOptDCE.and(mask);
+    config.!peephole = static::kOptPeephole.and(mask);
+    config.!control = static::kOptControl.and(mask);
+    config.!regpromote = static::kOptRegPromote.and(mask);
 
-        name match {
-        | "localopts" ->
-          config.!dce = static::kOptDCE.and(mask);
-          config.!peephole = static::kOptPeephole.and(mask);
-          config.!control = static::kOptControl.and(mask);
-          config.!regpromote = static::kOptRegPromote.and(mask)
-        | "dce" -> config.!dce = static::kOptDCE.and(mask)
-        | "peephole" -> config.!peephole = static::kOptPeephole.and(mask)
-        | "control" -> config.!control = static::kOptControl.and(mask)
-        | "regpromote" -> config.!regpromote = static::kOptRegPromote.and(mask)
-        | "inline" -> config.!inline = static::kOptInline.and(mask)
-        | "ipa" -> config.!ipa = static::kOptIPA.and(mask)
-        | "verify" -> config.!verify = value
-        | "goto" -> config.!goto = value
-        | "noopt" ->
-          config.!dce = 0;
-          config.!peephole = 0;
-          config.!control = 0;
-          config.!regpromote = 0;
-          config.!inline = 0;
-          config.!ipa = 0;
-          config.!goto = false
-        | _ -> void
-        }
-      | _ -> void
-      }
+    !mask = if (results.getBool("dce")) -1 else 0;
+    config.!dce = static::kOptDCE.and(mask);
+
+    !mask = if (results.getBool("peephole")) -1 else 0;
+    config.!peephole = static::kOptPeephole.and(mask);
+
+    !mask = if (results.getBool("control")) -1 else 0;
+    config.!control = static::kOptControl.and(mask);
+
+    !mask = if (results.getBool("regpromote")) -1 else 0;
+    config.!regpromote = static::kOptRegPromote.and(mask);
+
+    !mask = if (results.getBool("inline")) -1 else 0;
+    config.!inline = static::kOptInline.and(mask);
+
+    !mask = if (results.getBool("ipa")) -1 else 0;
+    config.!ipa = static::kOptIPA.and(mask);
+
+    config.!verify = results.getBool("verify");
+
+    config.!goto = results.getBool("goto");
+
+    if (results.getBool("noopt")) {
+      config.!dce = 0;
+      config.!peephole = 0;
+      config.!control = 0;
+      config.!regpromote = 0;
+      config.!inline = 0;
+      config.!ipa = 0;
+      config.!goto = false
     };
 
     config.chill()
