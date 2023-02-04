@@ -18,12 +18,14 @@ base class Value uses Show, Equality {
   children =
   | BoolValue(Bool)
   | StringValue(String)
+  | ArrayValue(Array<String>)
   | MissingValue()
 
   fun toString(): String
   | MissingValue() -> "(no value)"
-  | BoolValue(v) -> `boolean value: ${v}`
-  | StringValue(v) -> `string value: ${v}`
+  | BoolValue(v) -> v.toString()
+  | StringValue(v) -> `"${v}"`
+  | ArrayValue(v) -> "[" + v.map(x -> `"${x}"`).join(", ") + "]"
 }
 
 class ParseResults{
@@ -36,7 +38,7 @@ class ParseResults{
   fun getBool(name: String): Bool {
     this.values[name] match {
     | BoolValue(v) -> v
-    | _ -> invariant_violation(`Argument ${name} is not boolean.`)
+    | _ -> invariant_violation(`Argument ${name} is not boolean`)
     }
   }
 
@@ -45,14 +47,30 @@ class ParseResults{
     | Some(StringValue(v)) -> Some(v)
     | Some(MissingValue()) -> None()
     | Some(_) -> invariant_violation(`Argument ${name} is not a string`)
-    | None() -> invariant_violation(`Argument ${name} is undefined.`)
+    | None() -> invariant_violation(`Argument ${name} is undefined`)
     }
   }
 
   fun getString(name: String): String {
     this.maybeGetString(name) match {
     | Some(s) -> s
-    | None() -> invariant_violation(`Argument ${name} is missing.`)
+    | None() -> invariant_violation(`Argument ${name} is missing`)
+    }
+  }
+
+  fun maybeGetArray(name: String): ?Array<String> {
+    this.values.maybeGet(name) match {
+    | Some(ArrayValue(v)) -> Some(v)
+    | Some(MissingValue()) -> None()
+    | Some(_) -> invariant_violation(`Argument ${name} is not an array`)
+    | None() -> invariant_violation(`Argument ${name} is undefined`)
+    }
+  }
+
+  fun getArray(name: String): Array<String> {
+    this.maybeGetArray(name) match {
+    | Some(a) -> a
+    | None() -> invariant_violation(`Argument ${name} is missing`)
     }
   }
 
@@ -93,7 +111,7 @@ private fun parse(
     })
   };
   argsNames = mutable Set[];
-  posArgs = mutable Vector[];
+  posArgs = mutable Vector<Arg>[];
   // TODO: options is a bad name. Maybe flag_args?
   options = mutable Map[];
   for (arg in cmd._args.concat(globals)) {
@@ -103,6 +121,16 @@ private fun parse(
     argsNames.add(arg.name);
 
     if (arg._positional) {
+      if (posArgs.size() > 0) {
+        prevArg = posArgs[posArgs.size() - 1];
+        if (prevArg is ArrayArg _) {
+          invariant_violation(
+            `Positional argument ${
+              arg.name
+            } cannot appear after array positional argument ${prevArg.name}`,
+          )
+        }
+      };
       posArgs.push(arg);
     } else {
       if (arg._short.isSome()) {
@@ -178,11 +206,23 @@ private fun parse(
             break void
           }
         };
-        if (!values.containsKey(arg.name)) {
-          values.set(arg.name, StringValue(value))
-        } else {
-          !error = Some(DuplicateValueError(arg.name));
-          break void
+        arg match {
+        | ArrayArg _ ->
+          values.maybeGet(arg.name) match {
+          | Some(ArrayValue(arr)) ->
+            values.set(arg.name, ArrayValue(arr.concat(Array[value])))
+          | None() -> values.set(arg.name, ArrayValue(Array[value]))
+          | Some(v) ->
+            invariant_violation(`Unexpected value type ${v} for ArrayArg`)
+          }
+        | StringArg _ ->
+          if (!values.containsKey(arg.name)) {
+            values.set(arg.name, StringValue(value))
+          } else {
+            !error = Some(DuplicateValueError(arg.name));
+            break void
+          }
+        | _ -> invariant_violation(`Unexpected argument type ${inspect(arg)}`)
         }
       | Some(arg) ->
         if (!values.containsKey(arg.name)) {
@@ -192,8 +232,18 @@ private fun parse(
           break void
         }
       | None() if (!str.startsWith("-") && posArgId < posArgs.size()) ->
-        values.set(posArgs[posArgId].name, StringValue(str));
-        !posArgId = posArgId + 1
+        if (posArgs[posArgId] is ArrayArg _) {
+          name = posArgs[posArgId].name;
+          values.maybeGet(name) match {
+          | Some(ArrayValue(arr)) ->
+            values.set(name, ArrayValue(arr.concat(Array[str])))
+          | None() -> values.set(name, ArrayValue(Array[str]))
+          | v -> invariant_violation(`Unexpected value type ${v} for ArrayArg`)
+          }
+        } else {
+          values.set(posArgs[posArgId].name, StringValue(str));
+          !posArgId = posArgId + 1
+        }
       | None() ->
         !error = Some(InvalidArgumentError(str));
         break void

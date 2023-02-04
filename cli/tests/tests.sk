@@ -3,6 +3,22 @@ module alias T = SKTest;
 module CliTests;
 
 @test
+fun unexpectedExtraArguments(): void {
+  cmd = Cli.Command("foo").arg(Cli.ArrayArg("bar"));
+  args = Cli.parseArgsFrom(cmd, Array["--", "foo2", "--bar", "--foo2"]);
+
+  T.expectTrue(args.error is Some(Cli.InvalidArgumentError _));
+}
+
+@test
+fun extraArguments(): void {
+  cmd = Cli.Command("foo").arg(Cli.ArrayArg("bar")).extra();
+  args = Cli.parseArgsFrom(cmd, Array["--", "foo2", "--bar", "--foo2"]);
+
+  T.expectEq(args.extra, Array["foo2", "--bar", "--foo2"]);
+}
+
+@test
 fun duplicateArgument(): void {
   cmd = Cli.Command("foo")
     .arg(Cli.BoolArg("bar").long("bar1"))
@@ -167,4 +183,59 @@ fun subcommandGlobalOptions(): void {
   T.expectEq(args2.subcommand.fromSome(), "bar");
   T.expectEq(args2.getString("global-string"), "xxx");
   T.expectTrue(args2.getBool("global-bool"))
+}
+
+@test
+fun arrayArgs(): void {
+  cmd = Cli.Command("foo").arg(Cli.ArrayArg("bar"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "foo1", "--bar=foo2"]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun arrayArgsDefault(): void {
+  cmd = Cli.Command("foo").arg(
+    Cli.ArrayArg("bar").default(Array["foo1", "foo2"]),
+  );
+  args = Cli.parseArgsFrom(cmd, Array[]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun arrayArgsPositional(): void {
+  cmd = Cli.Command("foo").arg(Cli.ArrayArg("bar").positional());
+  args = Cli.parseArgsFrom(cmd, Array["foo1", "foo2"]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun arrayArgsPositionalIntertwined(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.ArrayArg("bar").positional())
+    .arg(Cli.StringArg("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["foo1", "--baz", "foo", "foo2"]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun arrayArgsPositionalAfterArray(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.ArrayArg("bar").positional())
+    .arg(Cli.StringArg("baz").positional());
+
+  T.expectThrow(() -> {
+    _ = Cli.parseArgsFrom(cmd, Array[]);
+  });
+}
+
+@test
+fun arrayArgsPositionalWithExtra(): void {
+  cmd = Cli.Command("foo").arg(Cli.ArrayArg("bar").positional());
+  args = Cli.parseArgsFrom(cmd, Array["foo1", "foo2", "--", "baz"]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
 }
