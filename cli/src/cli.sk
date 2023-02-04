@@ -50,10 +50,7 @@ class StringArg extends Arg {
   }
 
   fun _defaultValue(): Value {
-    this._default match {
-    | Some(v) -> v
-    | None() -> MissingValue()
-    }
+    this._default.default(MissingValue())
   }
 
   fun _takesValue(): Bool {
@@ -76,6 +73,20 @@ class BoolArg extends Arg {
 
   fun _takesValue(): Bool {
     false
+  }
+}
+
+class ArrayArg extends Arg {
+  fun default(value: Array<String>): this {
+    this with {_default => Some(ArrayValue(value))}
+  }
+
+  fun _defaultValue(): Value {
+    this._default.default(MissingValue())
+  }
+
+  fun _takesValue(): Bool {
+    true
   }
 }
 
