@@ -91,35 +91,38 @@ fun runInvalidTest(tomlFile: String): void {
 }
 
 fun main(): void {
-  SKTest.test_harness(runTest -> {
-    validTests = FileSystem.readFilesRecursive("./tests/valid", fn ->
-      fn.endsWith(".toml")
-    );
+  tests = mutable Map[];
 
-    for (testFile in validTests) {
-      jsonFile = testFile.replace(".toml", ".json");
+  validTests = FileSystem.readFilesRecursive("./tests/valid", fn ->
+    fn.endsWith(".toml")
+  );
 
-      (testSuite, testName) = testFile
-        .stripPrefix("tests/valid/")
-        .stripSuffix(".toml")
-        .splitFirst("/");
+  for (testFile in validTests) {
+    jsonFile = testFile.replace(".toml", ".json");
 
-      runTest(testSuite, testName, () -> runValidTest(testFile, jsonFile))
-    };
+    (testSuite, testName) = testFile
+      .stripPrefix("tests/valid/")
+      .stripSuffix(".toml")
+      .splitFirst("/");
 
-    invalidTests = FileSystem.readFilesRecursive("./tests/invalid", fn ->
-      fn.endsWith(".toml")
-    );
+    tests
+      .getOrAdd(testSuite, () -> mutable Map[])
+      .set(testName, () -> runValidTest(testFile, jsonFile));
+  };
+  invalidTests = FileSystem.readFilesRecursive("./tests/invalid", fn ->
+    fn.endsWith(".toml")
+  );
 
-    for (testFile in invalidTests) {
-      (testSuite, testName) = testFile
-        .stripPrefix("tests/invalid/")
-        .stripSuffix(".toml")
-        .splitFirst("/");
+  for (testFile in invalidTests) {
+    (testSuite, testName) = testFile
+      .stripPrefix("tests/invalid/")
+      .stripSuffix(".toml")
+      .splitFirst("/");
 
-      runTest(testSuite, testName + " (invalid)", () ->
-        runInvalidTest(testFile)
-      )
-    }
-  })
+    tests
+      .getOrAdd(testSuite, () -> mutable Map[])
+      .set(testName + " (invalid)", () -> runInvalidTest(testFile));
+  };
+
+  SKTest.test_harness(tests)
 }

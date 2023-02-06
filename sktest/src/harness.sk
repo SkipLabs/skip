@@ -1,7 +1,7 @@
 module SKTest;
 
 fun test_harness(
-  runTests: ((String, String, () -> void) -> void) -> void,
+  tests: readonly Map<String, readonly Map<String, () -> void>>
 ): void {
   args = Cli.Command("tests")
     .about("Run tests")
@@ -28,38 +28,40 @@ fun test_harness(
     .help()
     .parseArgs();
 
-  // TODO: Look into mutability
   reporter = args.maybeGetString("format") match {
   | Some("xml") -> mutable XmlTestReporter{ output => args.maybeGetString("output")}
   | None() -> mutable BasicTestReporter{ output => args.maybeGetString("output"), color => true}
   | Some(fmt) -> invariant_violation(`Unknown test format "${fmt}"`)
   };
   filter = args.maybeGetString("filter").default("");
-  runTests((testSuite, testName, test) -> {
-    if (!testName.contains(filter)) {
-      return void
-    };
-    vtry(
-      () -> {
-        _ = test();
-        // TODO: reportSuccess/reportFailure.
-        reporter.report(testSuite, testName, None())
-      },
-      exn -> reporter.report(testSuite, testName, Some(exn)),
-    )
-  });
+  for (testSuite in tests.keys()) {
+    for ((testName, testFun) in tests[testSuite].items()) {
+      if (!(testSuite + "." + testName).contains(filter)) {
+        continue
+      };
+      vtry(
+        () -> {
+          _ = testFun();
+          // TODO: reportSuccess/reportFailure.
+          reporter.report(testSuite, testName, None())
+        },
+        exn -> reporter.report(testSuite, testName, Some(exn)),
+      )
+    }
+  };
 
   reporter.finish()
 }
 
 fun main(): void {
-  test_harness(runTest -> {
-    _ = runTest; // Trick to avoid compiler error when no @test function is defined.
-    #forEachFunction(@test, #function, #functionName) {
-      // TODO: Properly handle tests outside of module/suite?
-      (testSuite, testName) = #functionName.splitFirst(".");
-      runTest(testSuite, testName, #function)
+  tests = mutable Map[];
+  #forEachFunction(@test, #function, #functionName) {
+    // TODO: Properly handle tests outside of module/suite?
+    (testSuite, testName) = #functionName.splitFirst(".");
+    if (!tests.containsKey(testSuite)) {
+      tests.set(testSuite, mutable Map[])
     };
-    void
-  })
+    tests[testSuite].set(testName, #function)
+  };
+  test_harness(tests.chill())
 }
