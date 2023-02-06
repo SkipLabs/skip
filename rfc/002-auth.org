@@ -1,0 +1,182 @@
+#+TITLE: Authentication and Authorization
+
+* Overview
+
+We use HTTPS or WSS (both built on TLS) for all communication with the
+server. The API does not support plain-text: there is no HTTP/WS
+support.
+
+TLS authenticates (via Certificate Authority) the server to the
+client. It also provides connection integrity and confidentiality.
+This allows the client to trust the server and for both the server and
+client to be confident that communication is not being read,
+intercepted, or tampered with.
+
+For the server to trust the client it must be able to authenticate it.
+This document outlines how we address this gap.
+
+Once authenticated the server must authorize requests. Authorization
+is the responsibility of the privacy and ACL logic, described in
+[[file:001-replication.org]].
+
+* How to authenticate the client?
+
+** Authenticating a web socket
+
+We take advantage of the stateful nature of a web socket and
+authenticate the connection after establishment. Once the connection
+is authenticated all messages on it are considered authenticated. We
+rely on TLS for connection integrity.
+
+The server will close an open connection after 10 minutes. This forces
+the client to re-establish a connection and therefore re-authenticate.
+We can do this cheaply as we have efficient re-sync mechanisms. This
+simple mechanism provides session timeouts and has the nice side
+benefits of
+
+- protecting against resource attacks, where clients open many long
+  lived connections.
+- making end-to-end resilience mechanisms part of the normal operation,
+  ensuring that they are regularly used and tested.
+
+Authentication is achieved by sending an ~authenticate~ message. This
+carries data about the user and is signed using a pre-shared key.
+
+*** Protocol
+
+Clients are always responsible for opening a connection.
+
+The first message they must send is an ~authenticate~ message. There
+is no acknowledgement of authentication by the server. Clients can
+immediately begin sending messages as per the existing protocol.
+
+The server expects an ~authenticate~ message from the client on
+opening a web socket. It must close the socket with an error (1002) if
+it receives any other message before ~authenticate~ or if the
+authentication fails.
+
+In the syntax of typescript, an ~authenticate~ message is defined as:
+
+#+BEGIN_SRC typescript-ts
+  type ProtoAuth = {
+    request: "auth";
+    accessKey: string;
+    date: string;
+    signature: string;
+  }
+#+END_SRC
+
+~request~ defines that this is an authenticate message.
+
+~accessKey~ is the user's public access key. This identifies the user
+and is provided to the user alongside a private key for accessing the
+API.
+
+~date~ is an ISO8601 datetime string of the client's current time.
+
+~signature~ is a base64-encoded HMAC-SHA256. It is the result of the
+following function.
+
+#+BEGIN_EXAMPLE
+signature = Base-64(
+  HMAC-SHA-256(
+    UTF8-Encoded(private-key),
+    UTF8-Encoded(
+      JSON-Serialized(
+        {
+          request: "auth",
+          accessKey: access-key,
+          date: iso8601-now,
+        }
+      )
+    )
+  )
+)
+#+END_EXAMPLE
+
+The server must deserialise the ~authenticate~ message, strip the
+signature, compute the signature using the shared private key, and
+lastly check that they match.
+
+The server must reject any authentication request with a date that is
+not within 10 minutes of it's notion of wall time.
+
+Upon successful authentication the server begins processing requests.
+On any other outcome it closes the websocket with error code 1002,
+protocol error.
+
+*** Key generation, storage, and communication
+
+Authenticated clients, with permissions to do so, may request new
+users be added to the database.
+
+We generate two pieces of information for a user. The access key that
+identifies the user and a private key that they use for signing - this
+is never transferred as part of API usage.
+
+The access key is a random 20 character string (ensuring that it
+doesn't collide with a pre-existing key). There is no pattern in the
+generation of access keys. The characters are [A-Za-z0-9]. This allows
+for significant entropy.
+
+The private key is a randomly generated SHA-256 key.
+
+The access key and private key pair are communicated back to the
+requester over a TLS-secured channel. This is how we achieve key
+distribution.
+
+The (access key, private key) pair are also stored in the database so
+that
+
+- the server can refer to them when processing ~authenticate~
+  messages.
+- the database can refer to the access key (user id) when ensuring
+  privacy and checking ACLs.
+
+*** Other authentication mechanisms considered and their tradeoffs
+
+Two other approaches were considered. They are worth capturing to
+highlight the tradeoffs chosen.
+
+**** Client signs every message it sends
+
+This approach is simple and extends to HTTP as it is stateless. It
+doesn't need extra messages in the protocol, and the connection can
+remain established.
+
+The downside is the cost. Measurements indicate that this has
+non-negligible effects on latency - adding as much as single digit
+milliseconds to every message. If messages are small, throughput can
+drop by 30x.
+
+**** Client fetches a token using HTTP
+
+The idea is the client grabs a token using authenticated HTTP and then
+supplies this alongside the websocket request.
+
+This approach is commonly recommended. It could make sense if we had
+a pre-existing auth mechanism for HTTP.
+
+Ideally we would authenticate the websocket during the HTTP upgrade
+handshake. Rather than allowing an expensive connection to be
+established and only then authenticating it.
+
+Using a token gets us close to this but requires an extra set of
+round-trips to the server to get the token. Unfortunately the browser
+WebSocket API does not allow us to control the headers sent. So we
+would have to pass the token in either the request params (which
+proxies could then log) or in the Cookie (which isn't appropriate).
+
+We would also need to store tokens server side, which adds complexity,
+or use a JWT-like approach, which is also more complex than our
+proposed approach.
+
+In all, despite being popular, this approach doesn't buy us anything
+but would introduce extra round-trips and complexity.
+
+** Authenticating an HTTP request
+
+HTTP is stateless so we must authenticate each request.
+
+Today we do not expose any of the API over HTTP so we do not yet
+define how requests are authenticated.
