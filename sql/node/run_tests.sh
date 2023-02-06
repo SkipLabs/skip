@@ -1,7 +1,7 @@
 #!/bin/bash
 
 skdb=../../build/skdb
-cp ../../build/out32.wasm .
+cp ../js/skdb.wasm .
 node=./node_modules/node/bin/node
 
 npm install

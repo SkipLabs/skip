@@ -111,13 +111,13 @@ function makeSKDBStore(
                 { result: Array<{pageid: number, content: ArrayBuffer}>}
               ).result;
           for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
-            let page = pages[pageIdx];
+            let page = pages[pageIdx]!;
             const pageid = page.pageid;
             if (pageid < 0) continue;
             let pageBuffer = new Uint32Array(page.content);
             const start = pageid * (pageSize / 4);
             for (let i = 0; i < pageBuffer.length; i++) {
-              memory32[start + i] = pageBuffer[i];
+              memory32[start + i] = pageBuffer[i]!;
             }
           }
         };
@@ -247,24 +247,24 @@ function decodeUTF8(bytes: Uint8Array): string {
   let i = 0,
     s = "";
   while (i < bytes.length) {
-    let c = bytes[i++];
+    let c = bytes[i++]!;
     if (c > 127) {
       if (c > 191 && c < 224) {
         if (i >= bytes.length)
           throw new Error("UTF-8 decode: incomplete 2-byte sequence");
-        c = ((c & 31) << 6) | (bytes[i++] & 63);
+        c = ((c & 31) << 6) | (bytes[i++]! & 63);
       } else if (c > 223 && c < 240) {
         if (i + 1 >= bytes.length)
           throw new Error("UTF-8 decode: incomplete 3-byte sequence");
-        c = ((c & 15) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63);
+        c = ((c & 15) << 12) | ((bytes[i++]! & 63) << 6) | (bytes[i++]! & 63);
       } else if (c > 239 && c < 248) {
         if (i + 2 >= bytes.length)
           throw new Error("UTF-8 decode: incomplete 4-byte sequence");
         c =
           ((c & 7) << 18) |
-          ((bytes[i++] & 63) << 12) |
-          ((bytes[i++] & 63) << 6) |
-          (bytes[i++] & 63);
+          ((bytes[i++]! & 63) << 12) |
+          ((bytes[i++]! & 63) << 6) |
+          (bytes[i++]! & 63);
       } else
         throw new Error(
           "UTF-8 decode: unknown multibyte start 0x" +
@@ -361,7 +361,8 @@ export class SKDB {
     let client = new SKDB(storeName);
     let pageBitSize = 20;
     client.pageSize = 1 << pageBitSize;
-    let wasmModule = await fetch(new URL("out32.wasm", import.meta.url));
+    // NOTE the `new URL` is required for bundlers like Vite to find the wasm file
+    let wasmModule = await fetch(new URL("../skdb.wasm", import.meta.url));
     let wasmBuffer = await wasmModule.arrayBuffer();
     let typedArray = new Uint8Array(wasmBuffer);
     let env = client.makeWasmImports();
@@ -436,7 +437,7 @@ export class SKDB {
       endpoint,
       db,
       creds,
-      sessionID
+      sessionID!
     );
     this.servers.push(server);
     return serverID;
@@ -446,7 +447,7 @@ export class SKDB {
     if (serverID === undefined) {
       serverID = this.servers.length - 1;
     }
-    return this.servers[serverID];
+    return this.servers[serverID]!;
   }
 
   private makeWasmImports(): {} {
@@ -478,7 +479,7 @@ export class SKDB {
         return encodeUTF8(
           data.exports,
           stringify(
-            data.externalFuns[funId](
+            data.externalFuns[funId]!(
               JSON.parse(wasmStringToJS(data.exports, str))
             )
           )
@@ -525,7 +526,7 @@ export class SKDB {
         return data.args.length;
       },
       SKIP_getArgN: function (n) {
-        return encodeUTF8(data.exports, data.args[n]);
+        return encodeUTF8(data.exports, data.args[n]!);
       },
       SKIP_unix_open: function (wasmFilename) {
         let filename = wasmStringToJS(data.exports, wasmFilename);
@@ -541,10 +542,10 @@ export class SKDB {
       SKIP_write_to_file: function (fd, str) {
         let jsStr = wasmStringToJS(data.exports, str);
         if (jsStr == "") return;
-        data.files[fd].push(jsStr);
+        data.files[fd]!.push(jsStr);
         data.changed_files[fd] = fd;
         if (data.execOnChange[fd] !== undefined) {
-          data.execOnChange[fd](data.files[fd].join(""));
+          data.execOnChange[fd]!(data.files[fd]!.join(""));
           data.files[fd] = [];
         }
       },
@@ -566,7 +567,7 @@ export class SKDB {
       let tx = db.transaction(this.storeName, "readwrite");
       let store = tx.objectStore(this.storeName);
       for (let j = 0; j < pages.length; j++) {
-        let page = pages[j];
+        let page = pages[j]!;
         let memory = this.exports.memory.buffer;
         let start = page * this.pageSize;
         let end = page * this.pageSize + this.pageSize;
