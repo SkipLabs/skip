@@ -1,23 +1,9 @@
 version: 2.1
 
 commands:
-  install_git:
-    description: "Install basic tools to conditionally cancel a job"
-    steps:
-      - run:
-          name: Install git and curl
-          command: |
-            DEBIAN_FRONTEND=noninteractive apt-get -qq update
-            DEBIAN_FRONTEND=noninteractive apt-get -qq -y install git curl
-
   setup:
     description: "Setup skip toolchain"
     steps:
-      - run:
-          name: Install dependencies
-          command: |
-            apt-get update -q
-            DEBIAN_FRONTEND=noninteractive apt-get install -q -y npm make lld sqlite3 gcc gawk clang llvm
       - run:
           name: Build compiler
           command: |
@@ -26,11 +12,10 @@ commands:
 jobs:
   compiler:
     docker:
-      - image: ubuntu:20.04
+      - image: beauby/skiplabs:circleci-0.0.1
     resource_class: xlarge
     steps:
       - checkout
-      - install_git
       - run:
           name: Skip job if irrelevant
           command: |
@@ -47,10 +32,9 @@ jobs:
 
   skfs:
     docker:
-      - image: ubuntu:20.04
+      - image: beauby/skiplabs:circleci-0.0.1
     steps:
       - checkout
-      - install_git
       - run:
           name: Skip job if irrelevant
           command: |
@@ -69,10 +53,9 @@ jobs:
 
   skdb:
     docker:
-      - image: ubuntu:20.04
+      - image: beauby/skiplabs:circleci-0.0.1
     steps:
       - checkout
-      - install_git
       - run:
           name: Skip job if irrelevant
           command: |
