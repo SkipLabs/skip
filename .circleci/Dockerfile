@@ -1,4 +1,4 @@
-FROM cimg/base:2020.04
+FROM cimg/base:current-20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN sudo apt-get update
