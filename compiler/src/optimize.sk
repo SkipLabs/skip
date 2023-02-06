@@ -11,10 +11,6 @@ module Optimize;
 // from the command line. Here config values are bitmasks rather
 // than bools for ease of manipulation during optimizer passes.
 // Singleton instance of this class is held in kConfig.optConfig.
-//
-// TODO publish flag names via some method Config can call when
-// assembling response to --help
-//
 mutable class Config private {
   mutable dce: Int,
   mutable peephole: Int,
@@ -24,6 +20,8 @@ mutable class Config private {
   mutable ipa: Int,
   mutable verify: Bool,
   // Can we use computed gotos (indirectbr)?
+  // The "goto" labels that get embedded in the megavtable can't point
+  // to blocks across .ll files
   mutable goto: Bool,
 } {
   const kOptReady: Int = 0x01;
@@ -54,63 +52,26 @@ mutable class Config private {
     }
   }
 
-  static fun default(): mutable this {
-    mutable Config{
-      dce => static::kOptDCE,
-      peephole => static::kOptPeephole,
-      control => static::kOptControl,
-      regpromote => static::kOptRegPromote,
-      inline => static::kOptInline,
-      ipa => static::kOptIPA,
-      // The "goto" labels that get embedded in the megavtable can't point
-      // to blocks across .ll files
-      goto => false,
-      verify => true,
+  static fun make(
+    dce: Bool,
+    peephole: Bool,
+    control: Bool,
+    regpromote: Bool,
+    inline: Bool,
+    ipa: Bool,
+    goto: Bool,
+    verify: Bool,
+  ): this {
+    Config{
+      dce => if (dce) static::kOptDCE else 0,
+      peephole => if (peephole) static::kOptPeephole else 0,
+      control => if (control) static::kOptControl else 0,
+      regpromote => if (regpromote) static::kOptRegPromote else 0,
+      inline => if (inline) static::kOptInline else 0,
+      ipa => if (ipa) static::kOptIPA else 0,
+      goto => goto,
+      verify => verify,
     }
-  }
-
-  static fun make(results: Cli.ParseResults): this {
-    config = static::default();
-
-    mask = if (results.getBool("localopts")) -1 else 0;
-    config.!dce = static::kOptDCE.and(mask);
-    config.!peephole = static::kOptPeephole.and(mask);
-    config.!control = static::kOptControl.and(mask);
-    config.!regpromote = static::kOptRegPromote.and(mask);
-
-    !mask = if (results.getBool("dce")) -1 else 0;
-    config.!dce = static::kOptDCE.and(mask);
-
-    !mask = if (results.getBool("peephole")) -1 else 0;
-    config.!peephole = static::kOptPeephole.and(mask);
-
-    !mask = if (results.getBool("control")) -1 else 0;
-    config.!control = static::kOptControl.and(mask);
-
-    !mask = if (results.getBool("regpromote")) -1 else 0;
-    config.!regpromote = static::kOptRegPromote.and(mask);
-
-    !mask = if (results.getBool("inline")) -1 else 0;
-    config.!inline = static::kOptInline.and(mask);
-
-    !mask = if (results.getBool("ipa")) -1 else 0;
-    config.!ipa = static::kOptIPA.and(mask);
-
-    config.!verify = results.getBool("verify");
-
-    config.!goto = results.getBool("goto");
-
-    if (results.getBool("noopt")) {
-      config.!dce = 0;
-      config.!peephole = 0;
-      config.!control = 0;
-      config.!regpromote = 0;
-      config.!inline = 0;
-      config.!ipa = 0;
-      config.!goto = false
-    };
-
-    config.chill()
   }
 
   fun local(): Int {

@@ -47,7 +47,7 @@ private class Config{
       .arg(Cli.BoolArg("release"))
       .arg(Cli.BoolArg("verbose").short("v").long("verbose"))
       // Optimization config flags
-      .arg(Cli.BoolArg("localopts"))
+      // .arg(Cli.BoolArg("localopts").default(true).negatable())
       .arg(Cli.BoolArg("dce").default(true).negatable())
       .arg(Cli.BoolArg("peephole").default(true).negatable())
       .arg(Cli.BoolArg("control").default(true).negatable())
@@ -55,8 +55,8 @@ private class Config{
       .arg(Cli.BoolArg("inline").default(true).negatable())
       .arg(Cli.BoolArg("ipa").default(true).negatable())
       .arg(Cli.BoolArg("verify").default(true).negatable())
-      .arg(Cli.BoolArg("goto"))
-      .arg(Cli.BoolArg("noopt"))
+      .arg(Cli.BoolArg("goto").negatable())
+      // .arg(Cli.BoolArg("noopt"))
       // These are handled in skipUtils.sk
       // Just allow them to be ignored here
       .arg(Cli.ArrayArg("debug"))
@@ -75,8 +75,16 @@ private class Config{
     | _ -> void
     };
 
-    // modules configure themselves
-    optConfig = Optimize.Config::make(results);
+    optConfig = Optimize.Config::make(
+      results.getBool("dce"),
+      results.getBool("peephole"),
+      results.getBool("control"),
+      results.getBool("regpromote"),
+      results.getBool("inline"),
+      results.getBool("ipa"),
+      results.getBool("goto"),
+      results.getBool("verify"),
+    );
     mainConfig = Main.Config::make(results);
 
     release = results.getBool("release");
