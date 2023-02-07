@@ -213,7 +213,42 @@ mutable class Compiler{
     } else {
       select.params.params
     };
-    params = this.compileParams(context, sparams);
+    origFromMap = mutable Map[];
+    for (table in origFrom) {
+      if (!origFromMap.containsKey(table.name)) {
+        origFromMap![table.name] = table;
+      };
+      table.alias match {
+      | Some(alias) if (!origFromMap.containsKey(alias)) ->
+        origFromMap![alias] = table
+      | _ -> void
+      }
+    };
+    expandedSParams = mutable Vector[];
+    for (sparam in sparams) {
+      sparam match {
+      | (
+        Binop(
+          ".",
+          litTableName @ Literal(tableNameStr, false),
+          Literal("*", false),
+        ),
+        asName,
+      ) ->
+        tableName = Name::create(tableNameStr);
+        if (!origFromMap.containsKey(tableName)) {
+          error(this.pos, "Table not found: " + tableNameStr);
+        };
+        tableDescr = origFromMap[tableName];
+        for (colName in tableDescr.colNames) {
+          expandedSParams.push(
+            (Binop(".", litTableName, Literal(colName.lower, false)), asName),
+          )
+        }
+      | _ -> expandedSParams.push(sparam)
+      }
+    };
+    params = this.compileParams(context, expandedSParams.toArray());
     where = this.compileWhere(context, select.where);
     groupBy = this.compileGroupBy(context, select.groupBy, params);
     having = this.compileHaving(context, select.having);
