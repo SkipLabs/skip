@@ -123,15 +123,14 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
 fun parseUpdate(lex: Lexer, pos: Int): (Int, Update) {
   posBegin = pos;
   (!pos, name) = lex.nextWord(pos);
-  !name = name.lowercase();
-  parseUpdateWithName(lex, posBegin, pos, name);
+  parseUpdateWithName(lex, posBegin, pos, Name::create(name));
 }
 
 fun parseUpdateWithName(
   lex: Lexer,
   posBegin: Int,
   pos: Int,
-  name: String,
+  name: Name,
 ): (Int, Update) {
   !pos = lex.expectUpper(pos, "SET");
   (!pos, sets) = parseSets(lex, pos);
@@ -145,8 +144,9 @@ fun parseUpdateWithName(
   (pos, Update{pos => posBegin, name, sets, where})
 }
 
-fun parseSets(lex: Lexer, pos: Int): (Int, Array<(String, Pos, Expr)>) {
-  (!pos, firstName) = lex.nextWord(pos);
+fun parseSets(lex: Lexer, pos: Int): (Int, Array<(Name, Pos, Expr)>) {
+  (!pos, firstNameStr) = lex.nextWord(pos);
+  firstName = Name::create(firstNameStr);
   !pos = lex.skipSpaces(pos);
   posEq = pos;
   !pos = lex.expect(pos, "=");
@@ -157,7 +157,8 @@ fun parseSets(lex: Lexer, pos: Int): (Int, Array<(String, Pos, Expr)>) {
       break void;
     };
     !pos = lex.expect(pos, ",");
-    (!pos, name) = lex.nextWord(pos);
+    (!pos, word) = lex.nextWord(pos);
+    name = Name::create(word);
     !pos = lex.skipSpaces(pos);
     !posEq = pos;
     !pos = lex.expect(pos, "=");
@@ -175,10 +176,9 @@ fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
   } else {
     (!pos, name) = lex.nextWord(pos);
     !pos = lex.expectUpper(pos, "FROM");
-    Some(name)
+    Some(Name::create(name))
   };
   (!pos, name) = lex.nextWord(pos);
-  !name = name.lowercase();
   where = if (lex.isEqUpper(pos, "WHERE")) {
     !pos = lex.expectUpper(pos, "WHERE");
     (!pos, cond) = parseExpr(lex, pos);
@@ -186,7 +186,7 @@ fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
   } else {
     None()
   };
-  (pos, Delete{pos => posBegin, colName, name, where})
+  (pos, Delete{pos => posBegin, colName, name => Name::create(name), where})
 }
 
 fun parseDrop(lex: Lexer, pos: Int): (Int, Drop) {
@@ -201,8 +201,7 @@ fun parseDrop(lex: Lexer, pos: Int): (Int, Drop) {
     TTable()
   };
   (!pos, name) = lex.nextWord(pos);
-  !name = name.lowercase();
-  (pos, Drop{pos, kind, name})
+  (pos, Drop{pos, kind, name => Name::create(name)})
 }
 
 fun parseQuery(lex: Lexer, pos: Int): (Int, Query) {
@@ -278,7 +277,7 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
     None()
   };
   query = Select{
-    id => "",
+    id => Name::create(""),
     pos => posBegin,
     kind,
     params => selectParams,
@@ -320,11 +319,15 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
   !query = query with {
     rest => if (restVector.size() > 0) Some(restVector[0]) else None(),
   };
-  !query = query with {id => "SELECT_" + hash(query with {id => "", pos => 0})};
+  !query = query with {
+    id => Name::create(
+      "SELECT_" + hash(query with {id => Name::create(""), pos => 0}),
+    ),
+  };
   (pos, query)
 }
 
-fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?String)>) {
+fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?Name)>) {
   (_, tok) = lex.next(pos);
   if (lex.isEqAt(tok, "*")) {
     return (tok.posEnd, None());
@@ -332,11 +335,11 @@ fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?String)>) {
   params = mutable Vector[];
   loop {
     (!pos, param) = parseExpr(lex, pos);
-    asParamOpt: ?String = None();
+    asParamOpt: ?Name = None();
     if (lex.isEqUpper(pos, "AS")) {
       !pos = lex.expectUpper(pos, "AS");
       (!pos, asParam) = lex.nextWord(pos);
-      !asParamOpt = Some(asParam);
+      !asParamOpt = Some(Name::create(asParam));
     };
     !pos = lex.skipSpaces(pos);
     if (isEOF(lex, pos)) {
@@ -348,7 +351,7 @@ fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?String)>) {
       !lex.isKeyword(pos)
     ) {
       (!pos, asParam) = lex.nextWord(pos);
-      !asParamOpt = Some(asParam);
+      !asParamOpt = Some(Name::create(asParam));
     };
     params.push((param, asParamOpt));
     if (lex.isEq(pos, ",")) {
@@ -368,8 +371,7 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
     FQuery(query);
   } else {
     (!pos, sfrom) = lex.nextWord(pos);
-    !sfrom = sfrom.lowercase();
-    FName(sfrom)
+    FName(Name::create(sfrom))
   };
   posMark = pos;
   if (isEOF(lex, pos)) {
@@ -384,8 +386,7 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
   asStr = wordUpper match {
   | "AS" ->
     (!pos, !word) = lex.nextWord(pos);
-    !word = word.lowercase();
-    Some(word)
+    Some(Name::create(word))
   | _ if (isKeyword(word)) ->
     !pos = posMark;
     None()
@@ -403,7 +404,7 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
       !pos = posMark;
       None()
     } else {
-      Some(word)
+      Some(Name::create(word))
     }
   };
   indexed = if (lex.isEqUpper(pos, "NOT")) {
@@ -847,14 +848,16 @@ fun parseView(
   virtual: Bool,
 ): (Int, View) {
   (!pos, name) = lex.nextWord(pos);
-  !name = name.lowercase();
   if (lex.isEqUpper(pos, "AS")) {
     !pos = lex.expectUpper(pos, "AS");
   };
   !pos = lex.expectUpper(pos, "SELECT");
   (!pos, query) = parseSelect(lex, pos);
   text = lex.content.slice(posBegin, pos);
-  (pos, View{pos, ifNotExists, virtual, name, query, text})
+  (
+    pos,
+    View{pos, ifNotExists, virtual, name => Name::create(name), query, text},
+  )
 }
 
 fun parseCreateIndex(
@@ -865,23 +868,30 @@ fun parseCreateIndex(
 ): (Int, Index) {
   origPos = pos;
   (!pos, name) = lex.nextWord(pos);
-  !name = name.lowercase();
   !pos = lex.expectUpper(pos, "ON");
   (!pos, fields) = parseIndexOn(lex, pos);
   text = Some(lex.content.slice(posBegin, pos));
-  (pos, Index{pos => origPos, ifNotExists, name, fields, unique => false, text})
+  (
+    pos,
+    Index{
+      pos => origPos,
+      ifNotExists,
+      name => Name::create(name),
+      fields,
+      unique => false,
+      text,
+    },
+  )
 }
 
-fun parseIndexOn(
-  lex: Lexer,
-  pos: Int,
-): (Int, (String, Array<(String, IKind)>)) {
-  (!pos, name) = lex.nextWord(pos);
-  !name = name.lowercase();
+fun parseIndexOn(lex: Lexer, pos: Int): (Int, (Name, Array<(Name, IKind)>)) {
+  (!pos, word) = lex.nextWord(pos);
+  name = Name::create(word);
   !pos = lex.expect(pos, "(");
   colDescs = mutable Vector[];
   loop {
-    (!pos, colName) = lex.nextWord(pos);
+    (!pos, colNameStr) = lex.nextWord(pos);
+    colName = Name::create(colNameStr);
     kind = if (lex.isEqUpper(pos, "DESC")) {
       !pos = lex.expectUpper(pos, "DESC");
       IDESC()
@@ -918,8 +928,8 @@ fun parseInsert(lex: Lexer, pos: Int): (Int, Stmt) {
   };
   !pos = lex.expectUpper(pos, "INTO");
   posName = lex.token(pos).posBegin;
-  (!pos, name) = lex.nextWord(pos);
-  !name = name.lowercase();
+  (!pos, word) = lex.nextWord(pos);
+  name = Name::create(word);
   (!pos, paramsOpt) = parseParamsOpt(lex, pos);
   (!pos, values) = parseValues(lex, pos);
   if (lex.isEqUpper(pos, "ON")) {
@@ -943,12 +953,13 @@ fun parseInsert(lex: Lexer, pos: Int): (Int, Stmt) {
   (pos, Insert{pos => posName, onConflict, name, paramsOpt, values})
 }
 
-fun parseParamsOpt(lex: Lexer, pos: Int): (Int, ?Array<String>) {
+fun parseParamsOpt(lex: Lexer, pos: Int): (Int, ?Array<Name>) {
   if (lex.isEq(pos, "(")) {
     !pos = lex.expect(pos, "(");
     names = mutable Vector[];
     loop {
-      (!pos, name) = lex.nextWord(pos);
+      (!pos, word) = lex.nextWord(pos);
+      name = Name::create(word);
       names.push(name);
       if (lex.isEq(pos, ")")) {
         !pos = lex.expect(pos, ")");
@@ -1151,9 +1162,8 @@ fun parseCreateTable(
   windowSize: ?Int,
 ): (Int, Table) {
   (!pos, name) = lex.nextWord(pos);
-  !name = name.lowercase();
   (!pos, schema) = parseTableSchema(lex, pos);
-  (pos, Table{pos, name, schema, ifNotExists, windowSize})
+  (pos, Table{pos, name => Name::create(name), schema, ifNotExists, windowSize})
 }
 
 fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
@@ -1190,9 +1200,17 @@ fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
       }
     } else {
       (!pos, name) = lex.nextWord(pos);
-      !name = name.lowercase();
       (!pos, ty, primary, unique, default, notNull) = parseType(lex, pos);
-      schema.push(TypeDescr{name, ty, primary, unique, default, notNull});
+      schema.push(
+        TypeDescr{
+          name => Name::create(name),
+          ty,
+          primary,
+          unique,
+          default,
+          notNull,
+        },
+      );
     };
     if (lex.isEq(pos, ")")) {
       !pos = lex.expect(pos, ")");

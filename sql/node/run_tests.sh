@@ -184,3 +184,21 @@ then
 else
     echo -e "TEST ERROR MEMORY:\tFAILED"
 fi
+
+if
+    ((
+        cat ../../build/skdb_node.js;
+        echo "";
+        echo "async function test() {"
+        echo "  skdb = await SKDB.create(true);"
+        echo "  skdb.sql('create table t1 (aBc INTEGER)')"
+        echo "  skdb.insert('t1', [11]);"
+        echo "  console.log(skdb.sql('select * from t1')[0].aBc);"
+        echo "}"
+        echo "test()"
+    ) | $node 2>&1) | grep -q "11"
+then
+    echo -e "TEST COLUMN CASING:\tOK"
+else
+    echo -e "TEST COLUMN CASING :\tFAILED"
+fi

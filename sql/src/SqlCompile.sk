@@ -23,11 +23,11 @@ fun minWindowSize(x: ?Int, y: ?Int): ?Int {
 /*****************************************************************************/
 
 class JTable{
-  name: String,
+  name: Name,
   dirName: SKFS.DirName,
   ranges: ?Array<SKFS.KeyRange>,
   schema: Array<SKSQL.TypeDescr>,
-  alias: ?String,
+  alias: ?Name,
   windowSize: ?Int,
 } {
   static fun fromDirDescr(
@@ -85,9 +85,9 @@ fun errorNoMergeClause(pos: Int): void {
 mutable class Compiler{
   options: Options,
   pos: Int,
-  mutable subst: mutable Map<String, CGExpr> = mutable Map[],
-  mutable paramsNbr: mutable Map<String, Int> = mutable Map[],
-  mutable ambiguous: mutable Set<String> = mutable Set[],
+  mutable subst: mutable Map<Name, CGExpr> = mutable Map[],
+  mutable paramsNbr: mutable Map<Name, Int> = mutable Map[],
+  mutable ambiguous: mutable Set<Name> = mutable Set[],
   mutable isAggr: Bool = false,
   mutable aggrVars: mutable Vector<(AggrKind, CGExpr)> = mutable Vector[],
   mutable needUp: Bool = false,
@@ -113,7 +113,7 @@ mutable class Compiler{
           TableName(
             FQuery(
               select with {
-                id => select.id + "-groupBy",
+                id => Name::create(select.id.lower + "-groupBy"),
                 kind => SNone(),
                 orderBy => None(),
                 limit => None(),
@@ -141,7 +141,7 @@ mutable class Compiler{
     context: mutable SKFS.Context,
     select: Select,
     toplevel: Bool,
-    sets: Array<(String, Pos, Expr)> = Array[],
+    sets: Array<(Name, Pos, Expr)> = Array[],
   ): CSelect {
     if (
       select.kind is SDistinct _ ||
@@ -170,14 +170,14 @@ mutable class Compiler{
 
     newSubst = mutable Map[];
     for (key => value in this.subst) {
-      if (key.contains(".")) {
+      if (key.lower.contains(".")) {
         newSubst![key] = value.up();
       }
     };
 
     newAmbiguous = mutable Set[];
     for (key in this.ambiguous) {
-      if (key.contains(".")) {
+      if (key.lower.contains(".")) {
         newAmbiguous.add(key);
       }
     };
@@ -194,14 +194,16 @@ mutable class Compiler{
     !select.where = cond;
     sparams = if (select.params.isStar) {
       extraParams = select.params.params;
-      params = mutable Vector<(Expr, ?String)>[];
+      params = mutable Vector<(Expr, ?Name)>[];
       for (dirDescr in origFrom) {
         tableName = dirDescr.alias match {
         | None() -> dirDescr.name
         | Some(x) -> x
         };
         for (varName in dirDescr.colNames) {
-          params.push((Literal(tableName + "." + varName, false), None()))
+          params.push(
+            (Literal(tableName.lower + "." + varName.lower, false), None()),
+          )
         }
       };
       for (extraParam in extraParams) {
@@ -249,11 +251,14 @@ mutable class Compiler{
     };
 
     cselect = CSelect{
-      id => select.id +
-        context.getGlobal("TableMap") match {
-        | None() -> ""
-        | Some(file) -> "_V" + TableMap::fromFile(file).version.value.toString()
-        },
+      id => Name::create(
+        select.id.lower +
+          context.getGlobal("TableMap") match {
+          | None() -> ""
+          | Some(file) ->
+            "_V" + TableMap::fromFile(file).version.value.toString()
+          },
+      ),
       kind => select.kind,
       params,
       sets => this.compileSets(context, sets),
@@ -284,12 +289,12 @@ mutable class Compiler{
 
   mutable fun compileSets(
     context: mutable SKFS.Context,
-    params: Array<(String, Pos, Expr)>,
+    params: Array<(Name, Pos, Expr)>,
   ): Array<(Int, CGExpr)> {
     this.noAggr(() -> {
       params.map(set -> {
         (colName, pos, e) = set;
-        this.compileExpr(context, Literal(colName, false)) match {
+        this.compileExpr(context, Literal(colName.lower, false)) match {
         | (CIExpr(CIGetFrom(0, n))) ->
           this.compileExpr(context, e) match {
           | CGNull() -> (n, CGNull())
@@ -316,7 +321,7 @@ mutable class Compiler{
 
   mutable fun compileParams(
     context: mutable SKFS.Context,
-    params: Array<(Expr, ?String)>,
+    params: Array<(Expr, ?Name)>,
   ): Array<CGExpr> {
     cparams = params.map(param -> {
       (expr, asName) = param;
@@ -325,10 +330,10 @@ mutable class Compiler{
     for (i => cparam in cparams) {
       (typedExpr, asNameOpt) = cparam;
       asNameOpt match {
-      | Some(asName) if (!this.subst.containsKey(asName.lowercase())) ->
+      | Some(asName) if (!this.subst.containsKey(asName)) ->
         this.!needGetParam = true;
         this.paramsNbr![asName] = i;
-        this.subst![asName.lowercase()] = typedExpr match {
+        this.subst![asName] = typedExpr match {
         | CGNull _ -> CGNull()
         | CIExpr _ -> CIExpr(CIGetParam(i))
         | CSExpr _ -> CSExpr(CSGetParam(i))
@@ -369,12 +374,12 @@ mutable class Compiler{
         fromName.asName match {
         | None() ->
           for (colName => colNbr in table.cols) {
-            dotName = tableName + "." + colName;
+            dotName = Name::create(tableName.origName + "." + colName.origName);
             this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
           }
         | Some(asName) ->
           for (colName => colNbr in table.cols) {
-            dotName = asName + "." + colName;
+            dotName = Name::create(asName.origName + "." + colName.origName);
             this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
           }
         };
@@ -392,8 +397,7 @@ mutable class Compiler{
         | None() -> void
         | Some(_) ->
           for (colName => colNbr in table.cols) {
-            dotName = tableName + "." + colName;
-            !dotName = dotName.lowercase();
+            dotName = Name::create(tableName.origName + "." + colName.origName);
             if (!this.subst.containsKey(dotName)) {
               this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
             }
@@ -410,10 +414,9 @@ mutable class Compiler{
   mutable fun addGetFrom(
     tableNbr: Int,
     schema: Array<TypeDescr>,
-    colName: String,
+    colName: Name,
     colNbr: Int,
   ): void {
-    !colName = colName.lowercase();
     if (this.subst.containsKey(colName)) {
       this.ambiguous.insert(colName);
     } else {
@@ -431,7 +434,7 @@ mutable class Compiler{
   ): DirDescr {
     name match {
     | FName(tableName) ->
-      tableSID = SKFS.SID::create(tableName);
+      tableSID = SKFS.SID::create(tableName.lower);
       table = getTable(this.options, context, this.pos, tableSID);
       table
 
@@ -442,7 +445,7 @@ mutable class Compiler{
         select.params,
         cselect.from,
         cselect.params,
-        selectDir.dirName.toString(),
+        Name::create(selectDir.dirName.toString()),
         selectDir.dirName,
       )
     }
@@ -451,7 +454,7 @@ mutable class Compiler{
   static fun getCols(
     params: SelectParams,
     from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
-  ): (SortedMap<String, Int>, readonly Map<Int, String>) {
+  ): (SortedMap<Name, Int>, readonly Map<Int, Name>) {
     cols = SortedMap[];
     invCols = mutable Map[];
     slot = 0;
@@ -475,15 +478,17 @@ mutable class Compiler{
         if (cols.containsKey(colName)) continue;
         !cols[colName] = idx;
         invCols![idx] = colName
-      | (Literal(colName, _), _) ->
+      | (Literal(colNameStr, _), _) ->
+        colName = Name::create(colNameStr);
         if (cols.containsKey(colName)) continue;
-        iter = colName.getIter();
+        iter = colNameStr.getIter();
         first = iter.next().fromSome();
         if (!Chars.isDigit(first)) {
           !cols[colName] = idx;
           invCols![idx] = colName;
         }
-      | (Binop(".", _, Literal(colName, _)), _) ->
+      | (Binop(".", _, Literal(colNameStr, _)), _) ->
+        colName = Name::create(colNameStr);
         if (cols.containsKey(colName)) continue;
         !cols[colName] = idx;
         invCols![idx] = colName
@@ -498,7 +503,7 @@ mutable class Compiler{
     params: SelectParams,
     from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
     cparams: Array<CGExpr>,
-    selectId: String,
+    selectId: Name,
     dirName: SKFS.DirName,
   ): DirDescr {
     (cols, invCols) = static::getCols(params, from);
@@ -506,7 +511,7 @@ mutable class Compiler{
       ty = TypeDescr{
         name => invCols.maybeGet(idx) match {
         | None() ->
-          col = "col<" + idx + ">";
+          col = Name::create("col<" + idx + ">");
           !cols[col] = idx;
           col
         | Some(x) -> x
@@ -596,7 +601,7 @@ mutable class Compiler{
 
   mutable fun compileGroupBy(
     context: mutable SKFS.Context,
-    groupByOpt: ?Array<(Expr, ?String)>,
+    groupByOpt: ?Array<(Expr, ?Name)>,
     params: Array<CGExpr>,
   ): ?Array<CGroupByElt> {
     groupByOpt match {
@@ -677,8 +682,9 @@ mutable class Compiler{
               };
               (n.toInt(), kind)
             } else {
-              if (cols.containsKey(n)) {
-                (cols[n] + 1, kind)
+              colName = Name::create(n);
+              if (cols.containsKey(colName)) {
+                (cols[colName] + 1, kind)
               } else {
                 errorNbr(10, this.pos, "invalid ORDER BY, unbound name " + n)
               }
@@ -728,10 +734,10 @@ mutable class Compiler{
           CIExpr(CILiteral(str.toInt()))
         }
       | _ ->
-        if (this.ambiguous.contains(str)) {
+        if (this.ambiguous.contains(Name::create(str))) {
           error(this.pos, "Ambiguous name: " + str);
         };
-        this.subst.maybeGet(str.lowercase()) match {
+        this.subst.maybeGet(Name::create(str)) match {
         | None() -> error(this.pos, "Unbound name: " + str)
         | Some(e) ->
           e match {
@@ -1469,10 +1475,10 @@ mutable class Compiler{
       Literal(name1, _),
       Literal(name2, _),
     ) if (
-      this.subst.containsKey(name1.lowercase()) &&
-      this.subst.containsKey(name2.lowercase())
+      this.subst.containsKey(Name::create(name1)) &&
+      this.subst.containsKey(Name::create(name2))
     ) ->
-      (this.subst[name1.lowercase()], this.subst[name2.lowercase()]) match {
+      (this.subst[Name::create(name1)], this.subst[Name::create(name2)]) match {
       | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
       | (CFExpr(CFGetFrom(tableNbr1, col1)), CFExpr(CFGetFrom(tableNbr2, col2)))
       | (
@@ -1564,7 +1570,7 @@ mutable class Compiler{
           | Some(table) ->
             moveMap![tableNbr] = newFrom.size();
             dirDescr = DirDescr::create{
-              name => table.dirName.toString(),
+              name => Name::create(table.dirName.toString()),
               dirName => table.dirName,
               schema => table.schema.map(x ->
                 if (x.primary) x with {unique => true} else x
@@ -1606,7 +1612,9 @@ mutable class Compiler{
       };
       leftTable = tables[join.left.tableNbr].fromSome();
       rightTable = tables[join.right.tableNbr].fromSome();
-      viewName = leftTable.name + "_" + rightTable.name;
+      viewName = Name::create(
+        leftTable.name.origName + "_" + rightTable.name.origName,
+      );
       if (!this.options.virtual && !this.options.alwaysAllowJoins) {
         leftSchema = tables[join.left.tableNbr].fromSome().schema;
         col1 = leftSchema[join.left.col.i0].name;
@@ -1615,16 +1623,16 @@ mutable class Compiler{
         msg =
           "Joins outside of virtual views are considered bad practice in skdb.\n" +
           "You should first create a virtual view joining " +
-          leftTable.name +
+          leftTable.name.origName +
           " and " +
-          rightTable.name +
+          rightTable.name.origName +
           " with a query of the form:\n\n" +
           "create virtual view " +
           viewName +
           " as select * from " +
-          leftTable.name +
+          leftTable.name.origName +
           ", " +
-          rightTable.name +
+          rightTable.name.origName +
           " where " +
           col1 +
           " = " +
@@ -1795,7 +1803,7 @@ mutable class Compiler{
 
   // TODO: use this everywhere!
   readonly fun isVar(name: String): Bool {
-    this.subst.containsKey(name.lowercase())
+    this.subst.containsKey(Name::create(name))
   }
 
   mutable fun findLookUps(
@@ -1999,7 +2007,7 @@ mutable class Compiler{
       | "=" | "<" | "<=" | ">" | ">=" -> void
       | _ -> return LookUps[]
       };
-      (tableNbr, colNbr) = this.subst[name1.lowercase()] match {
+      (tableNbr, colNbr) = this.subst[Name::create(name1)] match {
       | (CIExpr(CIGetFrom(x, y))) -> (x, y)
       | (CFExpr(CFGetFrom(x, y))) -> (x, y)
       | (CSExpr(CSGetFrom(x, y))) -> (x, y)

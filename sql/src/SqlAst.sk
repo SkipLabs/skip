@@ -1,5 +1,26 @@
 module SKSQL;
 
+value class Name private (
+  lower: String,
+  origName: String,
+) uses Orderable, Hashable, Show {
+  static fun create(value: String): this {
+    static(value.lowercase(), value)
+  }
+
+  fun compare(y: Name): Order {
+    this.lower.compare(y.lower)
+  }
+
+  fun hash(): Int {
+    this.lower.hash()
+  }
+
+  fun toString(): String {
+    this.origName
+  }
+}
+
 base class Test {
   children =
   | HashThreshold(Int)
@@ -26,7 +47,7 @@ base class Stmt {
   children =
   | Table{
     pos: Int,
-    name: String,
+    name: Name,
     schema: Array<TypeDescr>,
     ifNotExists: Bool,
     windowSize: ?Int,
@@ -34,34 +55,29 @@ base class Stmt {
   | View{
     pos: Int,
     virtual: Bool,
-    name: String,
+    name: Name,
     ifNotExists: Bool,
     query: Query,
     text: String,
   }
-  | Drop{pos: Int, kind: TableKind, name: String}
-  | Delete{pos: Int, colName: ?String, name: String, where: ?Expr}
+  | Drop{pos: Int, kind: TableKind, name: Name}
+  | Delete{pos: Int, colName: ?Name, name: Name, where: ?Expr}
   | Index{
     pos: Int,
     ifNotExists: Bool,
-    name: String,
-    fields: (String, Array<(String, IKind)>),
+    name: Name,
+    fields: (Name, Array<(Name, IKind)>),
     unique: Bool,
     text: ?String,
   }
   | Insert{
     pos: Int,
     onConflict: ?OnConflict,
-    name: String,
-    paramsOpt: ?Array<String>,
+    name: Name,
+    paramsOpt: ?Array<Name>,
     values: InsertValues,
   }
-  | Update{
-    pos: Int,
-    name: String,
-    sets: Array<(String, Pos, Expr)>,
-    where: ?Expr,
-  }
+  | Update{pos: Int, name: Name, sets: Array<(Name, Pos, Expr)>, where: ?Expr}
 }
 
 base class OnConflict {
@@ -71,7 +87,7 @@ base class OnConflict {
   | OCUpdate(Update)
 }
 
-class TableName(name: FromName, asName: ?String, indexed: Bool = true)
+class TableName(name: FromName, asName: ?Name, indexed: Bool = true)
 
 base class TableKind {
   children =
@@ -95,23 +111,23 @@ base class IKind uses Orderable {
 
 base class FromName {
   children =
-  | FName(String)
+  | FName(Name)
   | FQuery(Query)
 }
 
 base class Query
 
-class SelectParams(isStar: Bool, params: Array<(Expr, ?String)>)
+class SelectParams(isStar: Bool, params: Array<(Expr, ?Name)>)
 
 class Select{
-  id: String,
+  id: Name,
   pos: Int,
   kind: SelectKind,
   params: SelectParams,
   from: ?Array<TableName>,
   join: ?Join,
   where: ?Expr,
-  groupBy: ?Array<(Expr, ?String)>,
+  groupBy: ?Array<(Expr, ?Name)>,
   having: ?Expr,
   orderBy: ?Array<(Expr, IKind)>,
   limit: ?Expr,
@@ -183,7 +199,7 @@ base class Expr {
 }
 
 class TypeDescr{
-  name: String,
+  name: Name,
   ty: Type,
   primary: Bool,
   unique: Bool,
