@@ -8,6 +8,7 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <poll.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -146,43 +147,21 @@ char* SKIP_read_line() {
 
 char* sk_completed_process_create(char* args, SkipInt exitcode, char* stdout, char* stderr);
 
-char* dump_output(int fd) {
-  size_t size = 4096;
-  char *buf = malloc(size);
-  size_t len = 0;
-  for (;;) {
-    if (len == size) {
-      size *= 2;
-      buf = realloc(buf, size);
-    }
-    ssize_t count = read(fd, buf + len, size - len);
-    if (count == -1) {
-      if (errno == EINTR) {
-        continue;
-      } else {
-        perror("read");
-        exit(1);
-      }
-    } else if (count == 0) {
-      break;
-    }
-
-    len += count;
-  }
-
-  char *res = sk_string_create(buf, len);
-  free(buf);
-
-  return res;
-}
-
 char* SKIP_System_subprocess(char *args_obj) {
   size_t num_args = *(uint32_t*)(args_obj-sizeof(char*)-sizeof(uint32_t));
   char **args = malloc(sizeof(char *) * (num_args + 1));
+  if (args == NULL) {
+    perror("malloc");
+    exit(1);
+  }
   for (int i = 0; i < num_args; ++i) {
     char *arg_obj = *((char **)args_obj + i);
     size_t sz = SKIP_String_byteSize(arg_obj);
     args[i] = malloc(sizeof(char) * (sz + 1));
+    if (args[i] == NULL) {
+      perror("malloc");
+      exit(1);
+    }
     memcpy(args[i], arg_obj, sz);
     args[i][sz] = 0;
   }
@@ -208,26 +187,112 @@ char* SKIP_System_subprocess(char *args_obj) {
   }
 
   if (pid == 0) {
-    while ((dup2(stdout_fd[1], STDOUT_FILENO) == -1) && (errno == EINTR));
-    close(stdout_fd[0]);
-    close(stdout_fd[1]);
-
-    while ((dup2(stderr_fd[1], STDERR_FILENO) == -1) && (errno == EINTR));
-    close(stderr_fd[0]);
-    close(stderr_fd[1]);
+    while (dup2(stdout_fd[1], STDOUT_FILENO) == -1) {
+      if (errno == EINTR) continue;
+      perror("dup2");
+      exit(1);
+    }
+    while (dup2(stderr_fd[1], STDERR_FILENO) == -1) {
+      if (errno == EINTR) continue;
+      perror("dup2");
+      exit(1);
+    }
+    for (int i = 0; i < 2; ++i) {
+      if (close(stdout_fd[i]) == -1) {
+        perror("close");
+        exit(1);
+      }
+      if (close(stderr_fd[i]) == -1) {
+        perror("close");
+        exit(1);
+      }
+    }
 
     // TODO: Optional envp with execvpe.
     execvp(args[0], args);
     perror("execvp");
     exit(1);
   }
-  close(stdout_fd[1]);
-  close(stderr_fd[1]);
+  if (close(stdout_fd[1]) == -1) {
+    perror("close");
+    exit(1);
+  }
+  if (close(stderr_fd[1]) == -1) {
+    perror("close");
+    exit(1);
+  }
 
-  char* out = dump_output(stdout_fd[0]);
-  close(stdout_fd[0]);
-  char* err = dump_output(stderr_fd[0]);
-  close(stderr_fd[0]);
+  for (int i = 0; i < num_args; ++i) {
+    free(args[i]);
+  }
+  free(args);
+
+  const int nfds = 2;
+  char *out[nfds];
+  size_t len[nfds];
+  size_t size[nfds];
+  for (size_t i = 0; i < nfds; ++i) {
+    len[i] = 0;
+    size[i] = 4096;
+    out[i] = malloc(size[i]);
+    if (out[i] == NULL) {
+      perror("malloc");
+      exit(1);
+    }
+  }
+
+  int open_fds = nfds;
+  struct pollfd pfds[] = {
+    {stdout_fd[0], POLLIN, 0},
+    {stderr_fd[0], POLLIN, 0},
+  };
+  while (open_fds > 0) {
+    if (poll(pfds, nfds, -1) == -1) {
+      if (errno == EINTR) {
+        continue;
+      } else {
+        perror("poll");
+        exit(1);
+      }
+    }
+
+    for (nfds_t i = 0; i < nfds; ++i) {
+      if (pfds[i].revents == 0) continue;
+
+      if (pfds[i].revents & POLLIN) {
+        if (size[i] == len[i]) {
+          size[i] *= 2;
+          out[i] = realloc(out[i], size[i]);
+          if (out[i] == NULL) {
+            perror("realloc");
+            exit(1);
+          }
+        }
+        ssize_t count = read(pfds[i].fd, out[i] + len[i], size[i] - len[i]);
+        if (count == -1) {
+          if (errno == EINTR) {
+            continue;
+          } else {
+            perror("read");
+            exit(1);
+          }
+        }
+        len[i] += count;
+      } else { // POLLERR | POLLHUP
+        if (close(pfds[i].fd) == -1) {
+          perror("close");
+          exit(1);
+        }
+        pfds[i].fd = -1;
+        --open_fds;
+      }
+    }
+  }
+
+  char *stdout = sk_string_create(out[0], len[0]);
+  free(out[0]);
+  char *stderr = sk_string_create(out[1], len[1]);
+  free(out[1]);
 
   int status;
   if (waitpid(pid, &status, 0) == -1) {
@@ -240,12 +305,7 @@ char* SKIP_System_subprocess(char *args_obj) {
     exitcode = WEXITSTATUS(status);
   }
 
-  for (int i = 0; i < num_args; ++i) {
-    free(args[i]);
-  }
-  free(args);
-
-  return sk_completed_process_create(args_obj, exitcode, out, err);
+  return sk_completed_process_create(args_obj, exitcode, stdout, stderr);
 }
 
 #endif // SKIP64
