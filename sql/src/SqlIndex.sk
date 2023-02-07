@@ -8,8 +8,8 @@ class CValueFile(value: ?CValue) extends SKFS.BaseName
 
 fun createIndex(
   context: mutable SKFS.Context,
-  userIndexNameOpt: ?String,
-  tableName: String,
+  userIndexNameOpt: ?Name,
+  tableName: Name,
   dirName: SKFS.DirName,
   kinds: Array<(Int, IKind, Type)>,
   unique: Bool,
@@ -18,11 +18,11 @@ fun createIndex(
   idxKinds = kinds.mapWithIndex((idx, field) -> {
     (idx, IASC(), field.i2)
   });
-  indexName = "/indexes" + dirName.toString() + hash(kinds) + "/";
+  indexName = Name::create("/indexes" + dirName.toString() + hash(kinds) + "/");
   index = (SKFS.EHandle(RowValues::fromFile, dirName)).contextWriterKeyValues(
     RowValues::fromFile,
     context,
-    SKFS.DirName::create(indexName),
+    SKFS.DirName::create(indexName.lower),
     (_ctx, writer, _key, rows) ~> {
       if (rows.size() == 0) return void;
       row = rows[0];
@@ -39,7 +39,7 @@ fun createIndex(
       .contextWriterKeyValues(
         RowValues::fromFile,
         context,
-        SKFS.DirName::create(indexName + "unique/proj/"),
+        SKFS.DirName::create(indexName.lower + "unique/proj/"),
         (_, writer, _key, values) ~> {
           result = SortedMap<CValueFile, mutable Vector<RowValues>>[];
           for (v in values) {
@@ -57,7 +57,7 @@ fun createIndex(
       .contextWriterKeyValues(
         SKFS.StringFile::fromFile,
         context,
-        SKFS.DirName::create(indexName + "unique/sink/"),
+        SKFS.DirName::create(indexName.lower + "unique/sink/"),
         (_, _, _key, values) ~> {
           if (values.size() == 0) return void;
           repeat = 0;
@@ -92,9 +92,9 @@ fun createIndex(
 fun createUserIndex(
   options: Options,
   context: mutable SKFS.Context,
-  userIndexName: String,
+  userIndexName: Name,
   pos: Int,
-  fields: (String, Array<(String, IKind)>),
+  fields: (Name, Array<(Name, IKind)>),
   unique: Bool,
   text: ?String,
 ): IndexDescr {
@@ -111,7 +111,7 @@ fun createUserIndex(
     error(pos, "Invalid index: missing column names")
   };
 
-  table = getTable(options, context, pos, SKFS.SID::create(tableName));
+  table = getTable(options, context, pos, SKFS.SID::create(tableName.lower));
   additionalCols = mutable Vector[];
   for (ty in table.schema) {
     if (colSet.contains(ty.name)) continue;
@@ -119,13 +119,12 @@ fun createUserIndex(
   };
   !colNames = colNames.concat(additionalCols.toArray());
 
-  colsLower = table.cols.mapItems((col, idx) -> (col.lowercase(), idx));
   cols = colNames.map(x -> {
-    colNameLower = x.i0.lowercase();
-    if (!colsLower.containsKey(colNameLower)) {
+    colName = x.i0;
+    if (!table.cols.containsKey(colName)) {
       error(pos, "Column not found: " + x.i0);
     };
-    (colsLower[colNameLower], x.i1)
+    (table.cols[colName], x.i1)
   });
   types = table.schema.map(x -> x.ty);
   kinds = computeOrder(types, cols);

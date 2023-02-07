@@ -178,7 +178,7 @@ fun evalSelect(
 
 fun makeSelectEvaluator(select: CSelect, up: ?ExprEvaluator): SelectEvaluator {
   selectName1 = makeSelectName(
-    select.id + if (select.needUp) "_" + hash(up) else "",
+    select.id.lower + if (select.needUp) "_" + hash(up) else "",
   );
   selectName2 = if (select.aggr is Some _) {
     SKFS.DirName::create(selectName1.toString() + "aggrEnv/")

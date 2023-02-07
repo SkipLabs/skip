@@ -205,10 +205,10 @@ fun replayDiff(
         | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks, false)
         | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
         };
-        watermarkKey = SKFS.SID::create(table.name);
+        watermarkKey = SKFS.SID::create(table.name.lower);
         mark = watermarkDir
-        .unsafeGetArray(context, watermarkKey)
-        .reduce(max, SKFS.TickFile(checkpointTick));
+          .unsafeGetArray(context, watermarkKey)
+          .reduce(max, SKFS.TickFile(checkpointTick));
         watermarkDir.writeArray(context, watermarkKey, Array[mark]);
       };
 

@@ -4,6 +4,9 @@ module SKSQL;
 /* Functions evaluating SQL. */
 /*****************************************************************************/
 
+const skdbOwner: Name = Name::create("skdb_owner");
+const skdbAccess: Name = Name::create("skdb_access");
+
 fun checkUserRows(
   context: readonly SKFS.Context,
   user: UserFile,
@@ -11,7 +14,7 @@ fun checkUserRows(
   table: DirDescr,
   rows: Array<RowValues>,
 ): void {
-  table.cols.maybeGet("skdb_owner") match {
+  table.cols.maybeGet(skdbOwner) match {
   | None() ->
     error(
       pos,
@@ -23,7 +26,7 @@ fun checkUserRows(
         "You can only write into tables that define the column skdb_owner",
     )
   | Some(colNbr) ->
-    table.cols.maybeGet("skdb_access") match {
+    table.cols.maybeGet(skdbAccess) match {
     | None() -> void
     | Some(accessColNbr) ->
       access = mutable AccessSolver(user.id);
@@ -69,7 +72,7 @@ fun checkUserRows(
 }
 
 fun computeTableDescr(
-  name: String,
+  name: Name,
   schema: Array<TypeDescr>,
   windowSize: ?Int,
 ): DirDescr {
@@ -93,11 +96,10 @@ fun computeInsert(
   context: mutable SKFS.Context,
   inTransaction: Bool,
   pos: Int,
-  paramsOpt: ?Array<String>,
+  paramsOpt: ?Array<Name>,
   valuesArray: Array<Array<Value>>,
   table: DirDescr,
 ): Array<RowValues> {
-  colsLower = table.cols.mapItems((col, idx) -> (col.lowercase(), idx));
   valuesArray.map(vals -> {
     values = vals.mapWithIndex((idx, val) -> {
       schemaIdx = paramsOpt match {
@@ -107,7 +109,7 @@ fun computeInsert(
         | None() -> error(pos, "Value size mismatch with specified columns")
         | Some(param) -> param
         };
-        table.cols.maybeGet(colName.lowercase()) match {
+        table.cols.maybeGet(colName) match {
         | None() -> error(pos, "Column not found: " + colName)
         | Some(colIdx) -> colIdx
         }
@@ -126,19 +128,19 @@ fun computeInsert(
     | Some(params) ->
       missingCols = mutable Map[];
       for (col in schema) {
-        missingCols![col.name.lowercase()] = col;
+        missingCols![col.name] = col;
       };
       for (userDefinedCol in params) {
-        if (!missingCols.containsKey(userDefinedCol.lowercase())) {
+        if (!missingCols.containsKey(userDefinedCol)) {
           error(pos, "Column not found: " + userDefinedCol);
         };
-        missingCols.remove(userDefinedCol.lowercase());
+        missingCols.remove(userDefinedCol);
       };
 
       result = Array<?CValue>::mfill(schema.size(), None());
 
       for (i => colName in params) {
-        result![colsLower[colName.lowercase()]] = values[i];
+        result![table.cols[colName]] = values[i];
       };
 
       for (tyDescr in missingCols) {
@@ -313,7 +315,7 @@ fun computeOrder(
 
 class SelectFile(
   tick: Int,
-  name: String,
+  name: Name,
   virtual: Bool,
   text: String,
   value: Select,
@@ -371,7 +373,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         );
       })
     | Insert{pos, onConflict, name, paramsOpt, values} ->
-      baseName = SKFS.SID::create(name);
+      baseName = SKFS.SID::create(name.lower);
       if (getTableDir(context).maybeGet(context, baseName) is None()) {
         error(pos, "Table not found: " + name);
       };
@@ -380,7 +382,9 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (onConflict is Some _) {
           error(pos, "Can only use OR IGNORE/REPLACE with values");
         };
-        !selectAst.id = selectAst.id + "_" + SKFS.genSym(0);
+        !selectAst.id = Name::create(
+          selectAst.id.origName + "_" + SKFS.genSym(0),
+        );
         compiler = SKSQL.Compiler::create(this.options, selectAst.pos);
         select = compiler.compileSelect(context, selectAst, true);
         selectDir = evalSelect(context, select, None());
@@ -451,10 +455,10 @@ class Evaluator{options: Options, user: ?UserFile} {
           selectAst.params,
           select.from,
           select.params,
-          selectDir.dirName.toString(),
+          Name::create(selectDir.dirName.toString()),
           selectDir.dirName,
         );
-        fieldNames = dirDescr.schema.map(x -> x.name);
+        fieldNames = dirDescr.schema.map(x -> x.name.origName);
         SKFS.OJSON(fieldNames)
       | OFK_SQL() -> SKFS.OSQL()
       };
@@ -479,7 +483,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       selectAst = origSelectAst with {id => viewName};
       views = getViewsDir(context);
       viewsDir = context.unsafeGetEagerDir(views.dirName);
-      key = SKFS.SID(viewName);
+      key = SKFS.SID(viewName.lower);
       if (viewsDir.getArrayRaw(key).size() != 0) {
         if (ifNotExists) return None();
         error(pos, "VIEW " + viewName + " already exists");
@@ -531,7 +535,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           );
           _selectDir = SKSQL.evalSelect(context, cselect, None());
           tableDir = getTableDir(context);
-          fileName = SKFS.SID::create(viewName);
+          fileName = SKFS.SID::create(viewName.lower);
           tableDir.writeArray(context, fileName, Array[dirDescr]);
         })
       } else {
@@ -544,7 +548,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       Some((context, _, _) ~> {
         views = getViewsDir(context);
         viewsDir = context.unsafeGetEagerDir(views.dirName);
-        key = SKFS.SID(viewName);
+        key = SKFS.SID(viewName.lower);
         files = viewsDir.getArrayRaw(key);
         if (files.size() == 0) {
           error(pos, "VIEW " + viewName + " does not exist");
@@ -576,9 +580,9 @@ class Evaluator{options: Options, user: ?UserFile} {
       error(pos, "DELETE colName not supported")
 
     | Update{pos, name, sets, where} ->
-      baseName = SKFS.SID::create(name);
+      baseName = SKFS.SID::create(name.lower);
       if (getTableDir(context).maybeGet(context, baseName) is None()) {
-        error(pos, "Table not found: " + name);
+        error(pos, "Table not found: " + name.origName);
       };
       deleteDir = this.delete(context, pos, name, where, sets);
       updateTableMap(context);
@@ -607,13 +611,13 @@ class Evaluator{options: Options, user: ?UserFile} {
 
   fun makeIndex(context: mutable SKFS.Context, index: Index): void {
     input = getIndexInputDir(context);
-    key = SKFS.SID::create(index.name);
+    key = SKFS.SID::create(index.name.lower);
     size = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key).size();
     if (size != 0) {
       if (index.ifNotExists) {
         return void;
       };
-      error(index.pos, "INDEX " + index.name + " already exists");
+      error(index.pos, "INDEX " + index.name.origName + " already exists");
     };
     this.write(context, input.dirName, key, index);
     _ = getIndexOutputDir(this.options, context);
@@ -622,15 +626,15 @@ class Evaluator{options: Options, user: ?UserFile} {
   fun delete(
     context: mutable SKFS.Context,
     pos: Int,
-    name: String,
+    name: Name,
     where: ?Expr,
-    sets: Array<(String, Pos, Expr)>,
+    sets: Array<(Name, Pos, Expr)>,
   ): SKFS.DirName {
     sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
     sinkDirName = SKFS.DirName::create(sinkName);
     from = Some(Array[TableName(FName(name), None(), false)]);
     selectAst = Select{
-      id => "SELECT_" + SKFS.genSym(pos),
+      id => Name::create("SELECT_" + SKFS.genSym(pos)),
       pos => pos,
       params => SelectParams(true, Array[]),
       from,
@@ -648,7 +652,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     selectHandle = evalSelect(context, select, None());
     selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
     updateTableMap(context);
-    baseName = SKFS.SID::create(name);
+    baseName = SKFS.SID::create(name.lower);
     table = getTable(this.options, context, pos, baseName);
     inputDir = getDir(table);
     if (table.windowSize is Some _) {
@@ -721,7 +725,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     onConflict: ?OnConflict,
     inTransaction: Bool,
     table: DirDescr,
-    paramsOpt: ?Array<String>,
+    paramsOpt: ?Array<Name>,
     values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     if (onConflict is Some(OCReplace())) {
@@ -735,7 +739,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (tyDescr.unique || tyDescr.primary) {
           clause = Binop(
             "=",
-            Literal(tyDescr.name.lowercase(), false),
+            Literal(tyDescr.name.lower, false),
             valArr[i] match {
             | VNull() -> Literal("null", false)
             | VInt(n) -> Literal(n.toString(), false)
@@ -918,7 +922,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   fun createTable(
     context: mutable SKFS.Context,
     pos: Int,
-    name: String,
+    name: Name,
     dirDescr: DirDescr,
     ifNotExists: Bool,
     reallyRemove: Bool,
@@ -932,7 +936,7 @@ class Evaluator{options: Options, user: ?UserFile} {
 
     getTableDir(context).writeArray(
       context,
-      SKFS.SID::create(name),
+      SKFS.SID::create(name.lower),
       Array[dirDescr],
     );
 
@@ -962,7 +966,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           Index{
             pos => pos,
             ifNotExists => false,
-            name => name + "_" + tyDescr.name,
+            name => Name::create(name.origName + "_" + tyDescr.name.origName),
             fields => (name, Array[(tyDescr.name, IASC())]),
             unique => true,
             text => None(),
@@ -971,14 +975,14 @@ class Evaluator{options: Options, user: ?UserFile} {
       }
     };
     if (context.debugMode) {
-      print_string("CREATED: " + name);
+      print_string("CREATED: " + name.origName);
     };
 
-    if (name == "skdb_groups") {
+    if (name.lower == "skdb_groups") {
       this.createGroupsMembers(context, pos, dir);
     };
 
-    if (name == "skdb_access") {
+    if (name.lower == "skdb_access") {
       this.createAccessMap(context, dir);
     };
   }
@@ -1004,13 +1008,13 @@ class Evaluator{options: Options, user: ?UserFile} {
     pos: Int,
     usersDir: SKFS.EHandle<RowValues>,
   ): void {
-    groupsMembersName = "skdb_groups_members";
+    groupsMembersName = Name::create("skdb_groups_members");
     groupsMembersDirName = SKFS.DirName::create("/" + groupsMembersName + "/");
     dirDescr = DirDescr::create{
       name => groupsMembersName,
       schema => Array[
         TypeDescr{
-          name => "groupid",
+          name => Name::create("groupID"),
           ty => INTEGER(),
           primary => false,
           unique => false,
@@ -1018,7 +1022,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           notNull => true,
         },
         TypeDescr{
-          name => "memberid",
+          name => Name::create("memberID"),
           ty => INTEGER(),
           primary => false,
           unique => false,
@@ -1073,7 +1077,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       },
     );
     tableDir = getTableDir(context);
-    fileName = SKFS.SID::create(groupsMembersName);
+    fileName = SKFS.SID::create(groupsMembersName.lower);
     tableDir.writeArray(context, fileName, Array[dirDescr]);
   }
 }
@@ -1809,6 +1813,7 @@ const jsRootsInputDirName: SKFS.DirName = SKFS.DirName::create(
   "/jsRootsInput/",
 );
 const jsRootsValuesDirName: SKFS.DirName = SKFS.DirName::create("/jsroots/");
+const jsRootsName: Name = Name::create("jsroots");
 
 @cpp_export("SKIP_init_jsroots")
 fun initJSRoots(): void {
@@ -1818,10 +1823,10 @@ fun initJSRoots(): void {
       SKFS.runWithGc(SKFS.Context{}, context ~> {
         context.!globals = SortedMap[];
         dirDescr = DirDescr::create{
-          name => "jsroots",
+          name => jsRootsName,
           schema => Array[
             TypeDescr{
-              name => "name",
+              name => Name::create("name"),
               ty => TEXT(),
               primary => false,
               unique => false,
@@ -1829,7 +1834,7 @@ fun initJSRoots(): void {
               notNull => true,
             },
             TypeDescr{
-              name => "value",
+              name => Name::create("value"),
               ty => TEXT(),
               primary => false,
               unique => false,
@@ -2038,10 +2043,10 @@ fun initTrackedJSQueries(context: mutable SKFS.Context): void {
           selectAst.params,
           select.from,
           select.params,
-          selectDirName.toString(),
+          Name::create(selectDirName.toString()),
           selectDirName,
         );
-        fieldNames = dirDescr.schema.map(x -> x.name);
+        fieldNames = dirDescr.schema.map(x -> x.name.origName);
         format = SKFS.OJSON(fieldNames);
 
         selectProj = SKFS.EHandle(

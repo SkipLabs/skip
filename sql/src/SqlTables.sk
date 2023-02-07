@@ -15,13 +15,13 @@ const indexByCol: SKFS.DirName = SKFS.DirName::create("/indexByCol/");
 extension class TypeDescr extends SKFS.File
 
 class DirDescr{
-  name: String,
-  colNames: Array<String>,
+  name: Name,
+  colNames: Array<Name>,
   schema: Array<TypeDescr>,
   kinds: Array<(Int, IKind, Type)>,
-  cols: Map<String, Int>,
+  cols: Map<Name, Int>,
   dirName: SKFS.DirName,
-  alias: ?String,
+  alias: ?Name,
   windowSize: ?Int,
   isInput: Bool,
 } extends SKFS.File uses Orderable {
@@ -30,17 +30,17 @@ class DirDescr{
   }
 
   static fun create{
-    name: String,
+    name: Name,
     schema: Array<TypeDescr>,
     dirName: SKFS.DirName,
-    alias: ?String,
+    alias: ?Name,
     windowSize: ?Int,
     isInput: Bool,
   }: this {
     cols = mutable Map[];
     colNames = schema.map(x -> x.name);
     for (i => ty in schema) {
-      cols![ty.name.lowercase()] = i;
+      cols![ty.name] = i;
     };
     static{
       name,
@@ -156,7 +156,7 @@ fun getSubsDirs(
           selectAst.params,
           cselect.from,
           cselect.params,
-          selectDir.dirName.toString(),
+          Name::create(selectDir.dirName.toString()),
           selectDir.dirName,
         );
         (edir, dirDescr)
@@ -186,7 +186,7 @@ fun getSubsDirs(
       | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
       | Some((userName, password)) ->
         userFile = SKSQL.UserFile::create(context, userName, password);
-        accessColNbr = dirDescr.cols.maybeGet("skdb_access") match {
+        accessColNbr = dirDescr.cols.maybeGet(skdbAccess) match {
         | None() ->
           print_error(
             "Cannot access table: " +
@@ -254,9 +254,9 @@ fun getSubsDirs(
 extension class Index extends SKFS.File
 
 class IndexDescr{
-  name: String,
+  name: Name,
   dirName: SKFS.DirName,
-  tableName: String,
+  tableName: Name,
   tableDirName: SKFS.DirName,
   fields: Array<(Int, IKind, Type)>,
   unique: Bool,
@@ -334,7 +334,7 @@ fun getIndexByName(
       context,
       indexByCol,
       (_context, writer, indexDescr) ~> {
-        writer.write(SKFS.SID(indexDescr.tableName), indexDescr)
+        writer.write(SKFS.SID(indexDescr.tableName.lower), indexDescr)
       },
     )
   })
@@ -446,7 +446,7 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
     | Some(size) -> "WINDOW " + size + " "
     },
   );
-  o(dirDescr.name);
+  o(dirDescr.name.origName);
   suffix match {
   | None() -> void
   | Some(x) -> o(x)
@@ -455,7 +455,7 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
   for (colName in dirDescr.colNames) {
     colIndex = dirDescr.cols[colName];
     o("  ");
-    o(colName);
+    o(colName.lower);
     o(" ");
     ty = dirDescr.schema[colIndex];
     o(
@@ -589,7 +589,7 @@ fun dumpViews(options: Options, origContext: readonly SKFS.Context): void {
         o(";\n");
         for (indexDescr in getIndexByName(options, context).getArray(
           context,
-          SKFS.SID(view.name),
+          SKFS.SID(view.name.lower),
         )) {
           indexDescr.text match {
           | None() -> void
