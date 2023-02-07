@@ -171,16 +171,35 @@ fun replayDiff(
   };
 
   makeFun = (rows, checkpoint) -> {
+    origDir = context.unsafeGetEagerDir(table.dirName);
     Some((context, delta, _) ~> {
-      dir = context.unsafeGetEagerDir(table.dirName);
+      entries = mutable Vector[];
+      dir = origDir;
+      for (row in rows) {
+        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+        for ((source, _) in dir.getDataIter(context, key)) {
+          entries.push((key, (source.path(), Array<SKFS.File>[])));
+        };
+      };
+      if (!entries.isEmpty()) {
+        dir.writeArraySourceMany(context, entries.iterator());
+      };
 
-      dir.writeArrayMany(
+      !dir = context.unsafeGetEagerDir(table.dirName);
+      dir.writeArraySourceMany(
         context,
         rows
           .iterator()
+          .filter(row -> row.repeat != 0)
           .map(row -> {
             (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
-            ((k : SKFS.BaseName), (v : Array<SKFS.File>))
+            (
+              (k : SKFS.BaseName),
+              (
+                SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0))),
+                (v : Array<SKFS.File>),
+              ),
+            )
           }),
       );
 
@@ -209,7 +228,14 @@ fun replayDiff(
       loop {
         line = getLine();
         lineNbr.set(lineNbr.get() + 1);
-        if (line == "") continue;
+        if (line == "") {
+          rows = buffer.toArray();
+          buffer.clear();
+          // check to see if this is the initial begin txn markers
+          if (rows.isEmpty() && checkpoint is None _) continue;
+          // otherwise wrap up the previous txn
+          break SKFS.CContinue(makeFun(rows, checkpoint))
+        };
 
         chars = mutable Vector[];
         iter = line.getIter();
