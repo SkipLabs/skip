@@ -841,10 +841,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
     for (row in rows) {
       key = RowKey(row, kinds);
-      source = SKFS.Path(dir.dirName, key);
-      files = newDir.getArray(context, key);
-      repeat = files.foldl((acc, x) -> acc + RowValues::fromFile(x).repeat, 0);
-      !row = row.setRepeat(row.getRepeat() + repeat);
+      source = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0)));
       !newDir = newDir.writeEntry(context, source, key, Array[row]);
     };
     context.setDir(newDir.dirName, newDir);

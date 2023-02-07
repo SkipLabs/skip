@@ -287,6 +287,75 @@ test_basic_replication_with_deletes_server_state_different() {
     assert_server_rows_has 0 foo
 }
 
+test_replication_with_a_row_that_has_a_higher_than_two_repeat_count() {
+    # quite a specific test. this is to ensure that write-csv can find
+    # rows that have a repeat count other than 1 or 0.
+
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    # ensure that the row is written to the server with a repeat of 2
+    $SKDB_BIN write-csv --data $SERVER_DB "$table" > $WRITE_OUTPUT <<EOF
+
+
+2	0,"foo"
+EOF
+
+    output=$(mktemp)
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    rm -f "$output"
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    rm -f "$output"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    rm -f "$output"
+}
+
+test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dups() {
+    # this time with multiple inserts
+
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    # ensure that the row is written to the server with a repeat of 2
+    $SKDB_BIN write-csv --data $SERVER_DB "$table" > $WRITE_OUTPUT <<EOF
+
+
+2	0,"foo"
+EOF
+
+    output=$(mktemp)
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 3
+    rm -f "$output"
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    rm -f "$output"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 3
+    rm -f "$output"
+}
+
 # tests:
 run_test test_basic_replication_unique_rows
 run_test test_basic_replication_unique_rows_replayed
@@ -299,3 +368,6 @@ run_test test_basic_replication_dup_rows_server_state_different
 
 run_test test_basic_replication_with_deletes
 run_test test_basic_replication_with_deletes_server_state_different
+
+run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count
+run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dups
