@@ -575,7 +575,9 @@ fun parseOperator(lex: Lexer, pos: Int): ?(Int, String) {
   (_, tok2) = lex.next(pos);
 
   if (
-    (isSymbol(lex.content[tok1.posBegin]) &&
+    (!(lex.content[tok1.posBegin] == '.' &&
+      lex.content[tok2.posBegin] == '*') &&
+      isSymbol(lex.content[tok1.posBegin]) &&
       isSymbol(lex.content[tok2.posBegin])) &&
     tok2.posBegin == tok1.posEnd &&
     lex.content[tok2.posBegin] != '\'' &&
