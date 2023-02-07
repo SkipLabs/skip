@@ -1,7 +1,7 @@
 module SKTest;
 
 fun test_harness(
-  tests: readonly Map<String, readonly Map<String, () -> void>>
+  tests: readonly Map<String, readonly Map<String, () -> void>>,
 ): void {
   args = Cli.Command("tests")
     .about("Run tests")
@@ -29,11 +29,17 @@ fun test_harness(
     .parseArgs();
 
   reporter = args.maybeGetString("format") match {
-  | Some("xml") -> mutable XmlTestReporter{ output => args.maybeGetString("output")}
-  | None() -> mutable BasicTestReporter{ output => args.maybeGetString("output"), color => true}
+  | Some("xml") ->
+    mutable XmlTestReporter{output => args.maybeGetString("output")}
+  | None() ->
+    mutable BasicTestReporter{
+      output => args.maybeGetString("output"),
+      color => true,
+    }
   | Some(fmt) -> invariant_violation(`Unknown test format "${fmt}"`)
   };
   filter = args.maybeGetString("filter").default("");
+  success = true;
   for (testSuite in tests.keys()) {
     for ((testName, testFun) in tests[testSuite].items()) {
       if (!(testSuite + "." + testName).contains(filter)) {
@@ -45,12 +51,18 @@ fun test_harness(
           // TODO: reportSuccess/reportFailure.
           reporter.report(testSuite, testName, None())
         },
-        exn -> reporter.report(testSuite, testName, Some(exn)),
+        exn -> {
+          reporter.report(testSuite, testName, Some(exn));
+          !success = false
+        },
       )
     }
   };
+  reporter.finish();
 
-  reporter.finish()
+  if (!success) {
+    skipExit(1)
+  }
 }
 
 fun main(): void {
@@ -63,5 +75,5 @@ fun main(): void {
     };
     tests[testSuite].set(testName, #function)
   };
-  test_harness(tests.chill())
+  test_harness(tests)
 }
