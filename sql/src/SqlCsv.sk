@@ -164,7 +164,6 @@ fun replayDiff(
   user: ?(String, String),
 ): SKFS.ContextOp {
   userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x.i0, x.i1));
-  origDir = context.unsafeGetEagerDir(table.dirName);
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
   if (table.windowSize is Some _) {
     print_error("Cannot use write-csv on a window or a stream");
@@ -172,11 +171,11 @@ fun replayDiff(
   };
 
   makeFun = (rows, checkpoint) -> {
+    origDir = context.unsafeGetEagerDir(table.dirName);
     Some((context, delta, _) ~> {
       entries = mutable Vector[];
       dir = origDir;
       for (row in rows) {
-        if (row.repeat != 0) continue;
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
         for ((source, _) in dir.getDataIter(context, key)) {
           entries.push((key, (source.path(), Array<SKFS.File>[])));
@@ -185,16 +184,22 @@ fun replayDiff(
       if (!entries.isEmpty()) {
         dir.writeArraySourceMany(context, entries.iterator());
       };
-      !dir = context.unsafeGetEagerDir(table.dirName);
 
-      dir.writeArrayMany(
+      !dir = context.unsafeGetEagerDir(table.dirName);
+      dir.writeArraySourceMany(
         context,
         rows
           .iterator()
           .filter(row -> row.repeat != 0)
           .map(row -> {
             (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
-            ((k : SKFS.BaseName), (v : Array<SKFS.File>))
+            (
+              (k : SKFS.BaseName),
+              (
+                SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0))),
+                (v : Array<SKFS.File>),
+              ),
+            )
           }),
       );
 
@@ -223,7 +228,14 @@ fun replayDiff(
       loop {
         line = getLine();
         lineNbr.set(lineNbr.get() + 1);
-        if (line == "") continue;
+        if (line == "") {
+          rows = buffer.toArray();
+          buffer.clear();
+          // check to see if this is the initial begin txn markers
+          if (rows.isEmpty() && checkpoint is None _) continue;
+          // otherwise wrap up the previous txn
+          break SKFS.CContinue(makeFun(rows, checkpoint))
+        };
 
         chars = mutable Vector[];
         iter = line.getIter();
