@@ -2,11 +2,11 @@
 -- Creating the users
 -------------------------------------------------------------------------------
 
-insert into skdb_users values(id(), 'julienv', 'passjulienv');
-insert into skdb_users values(id(), 'daniell', 'passdaniell');
-insert into skdb_users values(id(), 'gregs', 'passgregs');
-insert into skdb_users values(id(), 'lucash', 'passlucash');
-insert into skdb_users values(id(), 'laurem', 'passlaurem');
+insert into skdb_users values(id(), 'julienv');
+insert into skdb_users values(id(), 'daniell');
+insert into skdb_users values(id(), 'gregs');
+insert into skdb_users values(id(), 'lucash');
+insert into skdb_users values(id(), 'laurem');
 
 create table profiles(
   skdb_owner INTEGER,

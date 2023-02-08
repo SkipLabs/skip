@@ -1400,7 +1400,6 @@ class UserFile(id: Int, name: String) extends SKFS.File {
   static fun create(
     context: mutable SKFS.Context,
     userName: String,
-    password: String,
   ): UserFile {
     if (userName.contains("'")) {
       print_error("Invalid user name");
@@ -1408,16 +1407,12 @@ class UserFile(id: Int, name: String) extends SKFS.File {
     };
     userRows = evalQuery(
       context,
-      "select userID, password from skdb_users where userName = '" +
+      "select userID from skdb_users where userName = '" +
         userName +
         "';",
     );
     if (userRows.size() == 0) {
       print_error("Could not find user: " + userName);
-      skipExit(2)
-    };
-    if (userRows[0].getString(1).fromSome() != password) {
-      print_error("Invalid password for user: " + userName);
       skipExit(2)
     };
     userID = userRows[0].getInt(0).fromSome();

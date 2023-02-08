@@ -72,8 +72,7 @@ async function promptDB() {
   let sessionID = await skdb.connect(
    "ws://host.docker.internal:9999/skgw",
    "test.db",
-   "julienv",
-   "passjulienv"
+   "julienv"
  );
  await skdb.server().mirrorView("all_users");
   //  await skdb.server().mirrorView("all_groups");
