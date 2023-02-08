@@ -180,6 +180,11 @@ type ProtoData = {
 
 type ProtoMessage = ProtoRequest | ProtoData;
 
+interface Creds {
+  accessKey: string,
+  privateKey: CryptoKey,
+}
+
 function makeWebSocket(
   uri: string,
   onopen: () => void,
@@ -439,7 +444,8 @@ export class SKDB {
 
   async connect(
     db: string,
-    user: string,
+    accessKey: string,
+    privateKey: CryptoKey,
     endpoint?: string,
   ): Promise<number> {
     if (!endpoint) {
@@ -462,7 +468,10 @@ export class SKDB {
       serverID,
       endpoint,
       db,
-      user,
+      {
+        accessKey: accessKey,
+        privateKey: privateKey,
+      },
       sessionID
     );
     this.servers.push(server);
@@ -689,7 +698,7 @@ export class SKDB {
 
   async connectReadTable(
     uri: string,
-    user: string,
+    creds: Creds,
     tableName: string,
     suffix: string,
   ): Promise<void> {
@@ -697,7 +706,7 @@ export class SKDB {
 
     const request: ProtoTail = {
       request: "tail",
-      user: user,
+      user: creds.accessKey,
       table: tableName,
       since: objThis.watermark(tableName + suffix),
     };
@@ -716,7 +725,7 @@ export class SKDB {
 
         const backoffMs = 500 + Math.random() * 1000;
         setTimeout(() => {
-          objThis.connectReadTable(uri, user, tableName, suffix);
+          objThis.connectReadTable(uri, creds, tableName, suffix);
         }, backoffMs)
       };
 
@@ -763,7 +772,7 @@ export class SKDB {
 
   async connectWriteTable(
     uri: string,
-    user: string,
+    creds: Creds,
     tableName: string,
     suffix: string,
     session: string | undefined = undefined,
@@ -772,7 +781,7 @@ export class SKDB {
 
     const request: ProtoWrite = {
        request: "write",
-       user: user,
+       user: creds.accessKey,
        table: tableName,
     };
 
@@ -791,7 +800,7 @@ export class SKDB {
 
         const backoffMs = 500 + Math.random() * 1000;
         setTimeout(() => {
-          objThis.connectWriteTable(uri, user, tableName, suffix, sessionId);
+          objThis.connectWriteTable(uri, creds, tableName, suffix, sessionId);
         }, backoffMs)
       };
 
@@ -842,7 +851,7 @@ export class SKDB {
         socket.send(JSON.stringify(request));
 
         if (!session) {
-          let fileName = tableName + "_" + user;
+          let fileName = tableName + "_" + creds.accessKey;
           objThis.attach(change => {
             write(change);
           });
@@ -969,8 +978,7 @@ class SKDBServer {
   private client: SKDB;
   private serverID: number;
   private uri: string;
-  private db: string;
-  private user: string;
+  private creds: Creds;
   private sessionID: number;
 
   constructor(
@@ -978,14 +986,13 @@ class SKDBServer {
     serverID: number,
     endpoint: string,
     db: string,
-    user: string,
+    creds: Creds,
     sessionID: number
   ) {
     this.client = client;
     this.serverID = serverID;
     this.uri = SKDBServer.getDbSocketUri(endpoint, db);
-    this.db = db;
-    this.user = user;
+    this.creds = creds;
     this.sessionID = sessionID;
   }
 
@@ -1032,14 +1039,14 @@ class SKDBServer {
 
     await this.client.connectWriteTable(
       this.uri,
-      this.user,
+      this.creds,
       tableName,
       localSuffix
     );
 
     await this.client.connectReadTable(
       this.uri,
-      this.user,
+      this.creds,
       tableName,
       remoteSuffix,
     );
@@ -1071,7 +1078,7 @@ class SKDBServer {
 
     await this.client.connectReadTable(
       this.uri,
-      this.user,
+      this.creds,
       tableName,
       suffix,
     );
