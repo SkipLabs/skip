@@ -51,14 +51,11 @@ class Skdb(val dbPath: String) {
 
   fun writeCsv(
       user: String,
-      password: String,
       table: String,
       callback: (String) -> Unit,
       closed: () -> Unit,
   ): Process {
-    val pb =
-        ProcessBuilder(
-            SKDB_PROC, "write-csv", table, "--data", dbPath, "--user", user, "--password", password)
+    val pb = ProcessBuilder(SKDB_PROC, "write-csv", table, "--data", dbPath, "--user", user)
 
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
 
@@ -78,7 +75,6 @@ class Skdb(val dbPath: String) {
 
   fun tail(
       user: String,
-      password: String,
       table: String,
       since: Int,
       callback: (String) -> Unit,
@@ -88,16 +84,7 @@ class Skdb(val dbPath: String) {
     val connection =
         blockingRun(
             ProcessBuilder(
-                SKDB_PROC,
-                "subscribe",
-                table,
-                "--connect",
-                "--data",
-                dbPath,
-                "--user",
-                user,
-                "--password",
-                password))
+                SKDB_PROC, "subscribe", table, "--connect", "--data", dbPath, "--user", user))
     val pb =
         ProcessBuilder(
             SKDB_PROC,

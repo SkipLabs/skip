@@ -2,7 +2,7 @@ let SKDB = require('../../../build/skdb_node.js');
 
 const setup = async function(user) {
     const skdb = await SKDB.create(true);
-    await skdb.connect("soak", user, "pass", "ws://localhost:8080");
+    await skdb.connect("soak", user, "ws://localhost:8080");
     await skdb.server().mirrorTable("log");
     return skdb;
 };

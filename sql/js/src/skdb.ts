@@ -154,7 +154,6 @@ type ProtoTail = {
   request: "tail";
   table: string;
   user: string;
-  password: string;
   since: number;
 }
 
@@ -168,7 +167,6 @@ type ProtoWrite = {
   request: "write";
   table: string;
   user: string;
-  password: string;
 }
 
 // control plane
@@ -442,7 +440,6 @@ export class SKDB {
   async connect(
     db: string,
     user: string,
-    password: string,
     endpoint?: string,
   ): Promise<number> {
     if (!endpoint) {
@@ -466,7 +463,6 @@ export class SKDB {
       endpoint,
       db,
       user,
-      password,
       sessionID
     );
     this.servers.push(server);
@@ -691,10 +687,9 @@ export class SKDB {
     return parseInt(this.runLocal(["watermark", table], ""));
   }
 
-  connectReadTable(
+  async connectReadTable(
     uri: string,
     user: string,
-    password: string,
     tableName: string,
     suffix: string,
   ): Promise<void> {
@@ -703,7 +698,6 @@ export class SKDB {
     const request: ProtoTail = {
       request: "tail",
       user: user,
-      password: password,
       table: tableName,
       since: objThis.watermark(tableName + suffix),
     };
@@ -722,7 +716,7 @@ export class SKDB {
 
         const backoffMs = 500 + Math.random() * 1000;
         setTimeout(() => {
-          objThis.connectReadTable(uri, user, password, tableName, suffix);
+          objThis.connectReadTable(uri, user, tableName, suffix);
         }, backoffMs)
       };
 
@@ -770,7 +764,6 @@ export class SKDB {
   async connectWriteTable(
     uri: string,
     user: string,
-    password: string,
     tableName: string,
     suffix: string,
     session: string | undefined = undefined,
@@ -780,7 +773,6 @@ export class SKDB {
     const request: ProtoWrite = {
        request: "write",
        user: user,
-       password: password,
        table: tableName,
     };
 
@@ -799,7 +791,7 @@ export class SKDB {
 
         const backoffMs = 500 + Math.random() * 1000;
         setTimeout(() => {
-          objThis.connectWriteTable(uri, user, password, tableName, suffix, sessionId);
+          objThis.connectWriteTable(uri, user, tableName, suffix, sessionId);
         }, backoffMs)
       };
 
@@ -979,7 +971,6 @@ class SKDBServer {
   private uri: string;
   private db: string;
   private user: string;
-  private password: string;
   private sessionID: number;
 
   constructor(
@@ -988,7 +979,6 @@ class SKDBServer {
     endpoint: string,
     db: string,
     user: string,
-    password: string,
     sessionID: number
   ) {
     this.client = client;
@@ -996,7 +986,6 @@ class SKDBServer {
     this.uri = SKDBServer.getDbSocketUri(endpoint, db);
     this.db = db;
     this.user = user;
-    this.password = password;
     this.sessionID = sessionID;
   }
 
@@ -1004,11 +993,7 @@ class SKDBServer {
     return `${endpoint}/dbs/${db}/connection`;
   }
 
-  async sqlRaw(passwd: string, stdin: string): Promise<string> {
-    if (passwd != "admin1234") {
-      console.log("Error: wrong admin password");
-      return "";
-    }
+  async sqlRaw(stdin: string): Promise<string> {
     let result = await makeRequest(this.uri, {
       request: "query",
       query: stdin,
@@ -1016,11 +1001,7 @@ class SKDBServer {
     return result;
   }
 
-  async sql(passwd: string, stdin: string): Promise<any[]> {
-    if (passwd != "admin1234") {
-      console.log("Error: wrong admin password");
-      return [];
-    }
+  async sql(stdin: string): Promise<any[]> {
     let result = await makeRequest(this.uri, {
       request: "query",
       query: stdin,
@@ -1052,7 +1033,6 @@ class SKDBServer {
     await this.client.connectWriteTable(
       this.uri,
       this.user,
-      this.password,
       tableName,
       localSuffix
     );
@@ -1060,7 +1040,6 @@ class SKDBServer {
     await this.client.connectReadTable(
       this.uri,
       this.user,
-      this.password,
       tableName,
       remoteSuffix,
     );
@@ -1093,7 +1072,6 @@ class SKDBServer {
     await this.client.connectReadTable(
       this.uri,
       this.user,
-      this.password,
       tableName,
       suffix,
     );

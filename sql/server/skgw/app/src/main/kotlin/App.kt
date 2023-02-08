@@ -40,13 +40,12 @@ data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMess
 data class ProtoTail(
     val table: String,
     val user: String,
-    val password: String,
     val since: Int = 0,
 ) : ProtoMessage("tail")
 
 data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
 
-data class ProtoWrite(val table: String, val user: String, val password: String) :
+data class ProtoWrite(val table: String, val user: String) :
     ProtoMessage("write")
 
 data class ProtoData(val data: String) : ProtoMessage("pipe")
@@ -137,7 +136,6 @@ class AuthenticatedConn(val dbPath: String, val authenticatedAt: Long) : Conn {
             Skdb(dbPath)
                 .tail(
                     request.user,
-                    request.password,
                     request.table,
                     request.since,
                     {
@@ -160,7 +158,6 @@ class AuthenticatedConn(val dbPath: String, val authenticatedAt: Long) : Conn {
             Skdb(dbPath)
                 .writeCsv(
                     request.user,
-                    request.password,
                     request.table,
                     {
                       if (channel.isOpen()) {

@@ -102,9 +102,8 @@ untracked fun main(): void {
                 .required()
                 .about("Table name"),
             )
-            // TODO: Why are `--user`/`--password` only offered for CSV variants?
-            .arg(Cli.StringArg("user").about("Name of the user"))
-            .arg(Cli.StringArg("password").about("Password of the user")),
+            // TODO: Why is `--user` only offered for CSV variants?
+            .arg(Cli.StringArg("user").about("Name of the user")),
         )
         .subcommand(Cli.Command("size").about("Output the size of the db"))
         .subcommand(
@@ -161,8 +160,7 @@ untracked fun main(): void {
                 .required()
                 .about("Table name"),
             )
-            .arg(Cli.StringArg("user").about("Name of the user"))
-            .arg(Cli.StringArg("password").about("Password of the user")),
+            .arg(Cli.StringArg("user").about("Name of the user")),
         )
         .subcommand(
           Cli.Command("tail")
@@ -203,8 +201,7 @@ untracked fun main(): void {
                 "Name of the file updates with time of the last change",
               ),
             )
-            .arg(Cli.StringArg("user").about("Name of the user"))
-            .arg(Cli.StringArg("password").about("Password of the user")),
+            .arg(Cli.StringArg("user").about("Name of the user")),
         )
         .subcommand(Cli.Command("replay").about("Replay a diff"))
         .subcommand(Cli.Command("debug").about("TODO"))
@@ -387,14 +384,7 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     user = args.maybeGetString("user") match {
     | None() -> None()
-    | Some(userName) ->
-      args.maybeGetString("password") match {
-      | Some(password) ->
-        Some(SKSQL.UserFile::create(context, userName, password))
-      | _ ->
-        print_error("Password missing for user " + userName);
-        skipExit(57)
-      }
+    | Some(userName) -> Some(SKSQL.UserFile::create(context, userName))
     };
     vtry<SKFS.ContextOp>(
       () -> {
@@ -653,16 +643,7 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
     | None() -> mutable Ref(1)
     | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
     };
-    user = args.maybeGetString("user") match {
-    | Some(userName) ->
-      args.maybeGetString("password") match {
-      | Some(password) -> Some((userName, password))
-      | _ ->
-        print_error("Password missing for user " + userName);
-        skipExit(57)
-      }
-    | _ -> None()
-    };
+    user = args.maybeGetString("user");
     myReadLine = () -> {
       buffer = mutable Vector[];
       loop {
@@ -717,16 +698,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     viewKey = SKFS.SID(viewName);
     inputDir = context.unsafeGetEagerDir(input.dirName);
     sessionID = SKFS.genSym(0);
-    user = args.maybeGetString("user") match {
-    | Some(userName) ->
-      args.maybeGetString("password") match {
-      | Some(password) -> Some((userName, password))
-      | _ ->
-        print_error("Password missing for user " + userName);
-        skipExit(57)
-      }
-    | _ -> None()
-    };
+    user = args.maybeGetString("user");
     request = SKSQL.SubRequestFile(
       viewName,
       viewDirName,
