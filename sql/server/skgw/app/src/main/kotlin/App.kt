@@ -43,13 +43,12 @@ data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMess
 
 data class ProtoTail(
     val table: String,
-    val user: String,
     val since: Int = 0,
 ) : ProtoMessage("tail")
 
 data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
 
-data class ProtoWrite(val table: String, val user: String) : ProtoMessage("write")
+data class ProtoWrite(val table: String) : ProtoMessage("write")
 
 data class ProtoData(val data: String) : ProtoMessage("pipe")
 
@@ -110,7 +109,8 @@ class EstablishedConn(val dbPath: String, val proc: Process, val authenticatedAt
   }
 }
 
-class AuthenticatedConn(val dbPath: String, val authenticatedAt: Long) : Conn {
+class AuthenticatedConn(val dbPath: String, val accessKey: String, val authenticatedAt: Long) :
+    Conn {
   override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
     when (request) {
       is ProtoQuery -> {
@@ -139,7 +139,7 @@ class AuthenticatedConn(val dbPath: String, val authenticatedAt: Long) : Conn {
         val proc =
             Skdb(dbPath)
                 .tail(
-                    request.user,
+                    accessKey,
                     request.table,
                     request.since,
                     {
@@ -161,7 +161,7 @@ class AuthenticatedConn(val dbPath: String, val authenticatedAt: Long) : Conn {
         val proc =
             Skdb(dbPath)
                 .writeCsv(
-                    request.user,
+                    accessKey,
                     request.table,
                     {
                       if (channel.isOpen()) {
@@ -213,7 +213,7 @@ class UnauthenticatedConn(val dbPath: String) : Conn {
       is ProtoWrite -> return unexpectedMsg(channel)
       is ProtoData -> return unexpectedMsg(channel)
       is ProtoAuth -> {
-        return AuthenticatedConn(dbPath, System.currentTimeMillis())
+        return AuthenticatedConn(dbPath, request.accessKey, System.currentTimeMillis())
       }
     }
   }

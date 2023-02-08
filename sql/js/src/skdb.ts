@@ -160,7 +160,6 @@ type ProtoQuery = {
 type ProtoTail = {
   request: "tail";
   table: string;
-  user: string;
   since: number;
 }
 
@@ -173,7 +172,6 @@ type ProtoDumpTable = {
 type ProtoWrite = {
   request: "write";
   table: string;
-  user: string;
 }
 
 // control plane
@@ -705,7 +703,6 @@ export class SKDB {
 
     const request: ProtoTail = {
       request: "tail",
-      user: creds.accessKey,
       table: tableName,
       since: objThis.watermark(tableName + suffix),
     };
@@ -781,7 +778,6 @@ export class SKDB {
 
     const request: ProtoWrite = {
        request: "write",
-       user: creds.accessKey,
        table: tableName,
     };
 
