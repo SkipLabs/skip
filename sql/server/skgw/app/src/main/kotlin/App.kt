@@ -23,6 +23,7 @@ import org.xnio.ChannelListener
 class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
   override fun classFor(type: Any): KClass<out ProtoMessage> =
       when (type as String) {
+        "auth" -> ProtoAuth::class
         "query" -> ProtoQuery::class
         "tail" -> ProtoTail::class
         "dumpTable" -> ProtoDumpTable::class
@@ -35,6 +36,9 @@ class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
 @TypeFor(field = "request", adapter = ProtoTypeAdapter::class)
 sealed class ProtoMessage(val request: String)
 
+data class ProtoAuth(val accessKey: String, val date: String, val signature: String) :
+    ProtoMessage("auth")
+
 data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMessage("query")
 
 data class ProtoTail(
@@ -45,8 +49,7 @@ data class ProtoTail(
 
 data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
 
-data class ProtoWrite(val table: String, val user: String) :
-    ProtoMessage("write")
+data class ProtoWrite(val table: String, val user: String) : ProtoMessage("write")
 
 data class ProtoData(val data: String) : ProtoMessage("pipe")
 
@@ -82,6 +85,7 @@ class EstablishedConn(val dbPath: String, val proc: Process, val authenticatedAt
 
   override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
     when (request) {
+      is ProtoAuth -> return unexpectedMsg(channel)
       is ProtoQuery -> return unexpectedMsg(channel)
       is ProtoDumpTable -> return unexpectedMsg(channel)
       is ProtoTail -> return unexpectedMsg(channel)
@@ -173,6 +177,11 @@ class AuthenticatedConn(val dbPath: String, val authenticatedAt: Long) : Conn {
                     })
         return EstablishedConn(dbPath, proc, authenticatedAt)
       }
+      is ProtoAuth -> {
+        WebSockets.sendCloseBlocking(1002, "unexpected re-auth on established connection", channel)
+        channel.close()
+        return ErroredConn()
+      }
       is ProtoData -> {
         WebSockets.sendCloseBlocking(1002, "unexpected request on established connection", channel)
         channel.close()
@@ -203,6 +212,9 @@ class UnauthenticatedConn(val dbPath: String) : Conn {
       is ProtoTail -> return unexpectedMsg(channel)
       is ProtoWrite -> return unexpectedMsg(channel)
       is ProtoData -> return unexpectedMsg(channel)
+      is ProtoAuth -> {
+        return AuthenticatedConn(dbPath, System.currentTimeMillis())
+      }
     }
   }
 

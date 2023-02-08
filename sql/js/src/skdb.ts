@@ -144,6 +144,13 @@ function makeSKDBStore(
 
 // protocol schema
 
+type ProtoAuth = {
+  request: "auth";
+  accessKey: string;
+  date: string;
+  signature: string;
+}
+
 type ProtoQuery = {
   request: "query";
   query: string;
@@ -178,70 +185,9 @@ type ProtoData = {
   data: string;
 }
 
-type ProtoMessage = ProtoRequest | ProtoData;
-
 interface Creds {
   accessKey: string,
   privateKey: CryptoKey,
-}
-
-function makeWebSocket(
-  uri: string,
-  onopen: () => void,
-  onmessage: (msg: string ) => void,
-  onclose: (e: Event) => void,
-  onerror: (e: Event) => void
-): Promise<(data: ProtoMessage) => void> {
-  let socket = new WebSocket(uri);
-
-  return new Promise((resolve, _reject) => {
-    socket.onmessage = function (event) {
-      const data = event.data;
-      const reader = new FileReader();
-      if(typeof data === "string") {
-        onmessage(data)
-      } else {
-        reader.addEventListener(
-          "load",
-          () => {
-            // we know it will be a string because we called readAsText
-            onmessage((reader.result || "") as string);
-          },
-          false
-        );
-        reader.readAsText(data);
-      }
-    };
-    socket.onclose = onclose;
-    socket.onerror = onerror;
-    socket.onopen = function (_event) {
-      onopen();
-      resolve(function (data: object) {
-        socket.send(JSON.stringify(data));
-      });
-    };
-  });
-}
-
-async function makeRequest(uri: string, request: ProtoRequest): Promise<string> {
-  let data = "";
-  return new Promise((resolve, reject) => {
-    makeWebSocket(
-      uri,
-      function () {},
-      function (msg) {
-        data += msg;
-      },
-      function (_) {
-        resolve((JSON.parse(data) as ProtoData).data);
-      },
-      function (err) {
-        reject(err);
-      }
-    ).then((write) => {
-      write(request);
-    });
-  });
 }
 
 /* ***************************************************************************/
@@ -457,7 +403,12 @@ export class SKDB {
       endpoint = `${scheme}${loc.host}`
     }
 
-    let result = await makeRequest(SKDBServer.getDbSocketUri(endpoint, db), {
+    const creds = {
+      accessKey: accessKey,
+      privateKey: privateKey,
+    };
+
+    let result = await this.makeRequest(SKDBServer.getDbSocketUri(endpoint, db), creds, {
       request: "query",
       query: "select id();",
     });
@@ -468,10 +419,7 @@ export class SKDB {
       serverID,
       endpoint,
       db,
-      {
-        accessKey: accessKey,
-        privateKey: privateKey,
-      },
+      creds,
       sessionID
     );
     this.servers.push(server);
@@ -696,6 +644,57 @@ export class SKDB {
     return parseInt(this.runLocal(["watermark", table], ""));
   }
 
+  createAuthMsg(creds: Creds): ProtoAuth {
+    return {
+      request: "auth",
+      accessKey: creds.accessKey,
+      date: "todo",
+      signature: "todo",
+    };
+  }
+
+  async makeRequest(uri: string, creds: Creds, request: ProtoRequest): Promise<string> {
+    let objThis = this;
+    let data = "";
+    let socket = new WebSocket(uri);
+    const onmessage = function (msg: string) {
+      data += msg;
+    };
+
+    return new Promise((resolve, reject) => {
+      socket.onmessage = function (event) {
+        const data = event.data;
+        const reader = new FileReader();
+        if(typeof data === "string") {
+          onmessage(data)
+        } else {
+          reader.addEventListener(
+            "load",
+            () => {
+              // we know it will be a string because we called readAsText
+              onmessage((reader.result || "") as string);
+            },
+            false
+          );
+          reader.readAsText(data);
+        }
+      };
+      socket.onclose = () => {
+        if (data === "") {
+          reject(new Error(`Empty response to request: ${request}`));
+          return;
+        }
+        const recvData = JSON.parse(data) as ProtoData;
+        resolve(recvData.data);
+      };
+      socket.onerror = (err) => reject(err);
+      socket.onopen = function (_event) {
+        socket.send(JSON.stringify(objThis.createAuthMsg(creds)));
+        socket.send(JSON.stringify(request));
+      };
+    });
+  }
+
   async connectReadTable(
     uri: string,
     creds: Creds,
@@ -763,6 +762,7 @@ export class SKDB {
       socket.onerror = reconnect;
 
       socket.onopen = function (_event) {
+        socket.send(JSON.stringify(objThis.createAuthMsg(creds)));
         socket.send(JSON.stringify(request));
         failureTimeout = setTimeout(reconnect, failureThresholdMs);
         resolve();
@@ -848,6 +848,7 @@ export class SKDB {
       };
 
       socket.onopen = function (_event) {
+        socket.send(JSON.stringify(objThis.createAuthMsg(creds)));
         socket.send(JSON.stringify(request));
 
         if (!session) {
@@ -1001,7 +1002,7 @@ class SKDBServer {
   }
 
   async sqlRaw(stdin: string): Promise<string> {
-    let result = await makeRequest(this.uri, {
+    let result = await this.client.makeRequest(this.uri, this.creds, {
       request: "query",
       query: stdin,
     });
@@ -1009,7 +1010,7 @@ class SKDBServer {
   }
 
   async sql(stdin: string): Promise<any[]> {
-    let result = await makeRequest(this.uri, {
+    let result = await this.client.makeRequest(this.uri, this.creds, {
       request: "query",
       query: stdin,
       format: "json",
@@ -1022,7 +1023,7 @@ class SKDBServer {
 
   async mirrorTable(tableName: string): Promise<void> {
     let remoteSuffix = "_remote_" + this.serverID;
-    let createRemoteTable = await makeRequest(this.uri, {
+    let createRemoteTable = await this.client.makeRequest(this.uri, this.creds, {
       request: "dumpTable",
       table: tableName,
       suffix: remoteSuffix,
@@ -1030,7 +1031,7 @@ class SKDBServer {
     this.client.runLocal([], createRemoteTable);
 
     let localSuffix = "_local";
-    let createLocalTable = await makeRequest(this.uri, {
+    let createLocalTable = await this.client.makeRequest(this.uri, this.creds, {
       request: "dumpTable",
       table: tableName,
       suffix: localSuffix,
@@ -1069,7 +1070,7 @@ class SKDBServer {
 
   async mirrorView(tableName: string, suffix?: string): Promise<void> {
     suffix = suffix || "";
-    let createRemoteTable = await makeRequest(this.uri, {
+    let createRemoteTable = await this.client.makeRequest(this.uri, this.creds, {
       request: "dumpTable",
       table: tableName,
       suffix: suffix,
