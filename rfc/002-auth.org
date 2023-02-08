@@ -82,21 +82,15 @@ signature = Base-64(
   HMAC-SHA-256(
     UTF8-Encoded(private-key),
     UTF8-Encoded(
-      JSON-Serialized(
-        {
-          request: "auth",
-          accessKey: access-key,
-          date: iso8601-now,
-        }
-      )
+      "auth" || access-key || iso8601-now
     )
   )
 )
 #+END_EXAMPLE
 
-The server must deserialise the ~authenticate~ message, strip the
-signature, compute the signature using the shared private key, and
-lastly check that they match.
+The server must deserialise the ~authenticate~ message, compute the
+signature using the shared private key, and lastly check that they
+match.
 
 The server must reject any authentication request with a date that is
 not within 10 minutes of it's notion of wall time.
