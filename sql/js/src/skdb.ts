@@ -642,12 +642,21 @@ export class SKDB {
     return parseInt(this.runLocal(["watermark", table], ""));
   }
 
-  createAuthMsg(creds: Creds): ProtoAuth {
+  async createAuthMsg(creds: Creds): Promise<ProtoAuth> {
+    const enc = new TextEncoder();
+    const reqType = "auth"
+    const now = (new Date()).toISOString()
+    const bytesToSign = enc.encode(reqType + creds.accessKey + now)
+    const sig = await window.crypto.subtle.sign(
+      "HMAC",
+      creds.privateKey,
+      bytesToSign
+    )
     return {
-      request: "auth",
+      request: reqType,
       accessKey: creds.accessKey,
-      date: "todo",
-      signature: "todo",
+      date: now,
+      signature: btoa(String.fromCharCode(...new Uint8Array(sig))),
     };
   }
 
@@ -658,6 +667,8 @@ export class SKDB {
     const onmessage = function (msg: string) {
       data += msg;
     };
+
+    const authMsg = await objThis.createAuthMsg(creds)
 
     return new Promise((resolve, reject) => {
       socket.onmessage = function (event) {
@@ -687,7 +698,7 @@ export class SKDB {
       };
       socket.onerror = (err) => reject(err);
       socket.onopen = function (_event) {
-        socket.send(JSON.stringify(objThis.createAuthMsg(creds)));
+        socket.send(JSON.stringify(authMsg));
         socket.send(JSON.stringify(request));
       };
     });
@@ -707,6 +718,7 @@ export class SKDB {
       since: objThis.watermark(tableName + suffix),
     };
 
+    const authMsg = await objThis.createAuthMsg(creds)
     return new Promise((resolve, _reject) => {
       const socket = new WebSocket(uri);
       const failureThresholdMs = 60000;
@@ -759,7 +771,7 @@ export class SKDB {
       socket.onerror = reconnect;
 
       socket.onopen = function (_event) {
-        socket.send(JSON.stringify(objThis.createAuthMsg(creds)));
+        socket.send(JSON.stringify(authMsg));
         socket.send(JSON.stringify(request));
         failureTimeout = setTimeout(reconnect, failureThresholdMs);
         resolve();
@@ -781,6 +793,7 @@ export class SKDB {
        table: tableName,
     };
 
+    const authMsg = await objThis.createAuthMsg(creds)
     return new Promise((resolve, _reject) => {
       let sessionId = session;
       const socket = new WebSocket(uri);
@@ -844,7 +857,7 @@ export class SKDB {
       };
 
       socket.onopen = function (_event) {
-        socket.send(JSON.stringify(objThis.createAuthMsg(creds)));
+        socket.send(JSON.stringify(authMsg));
         socket.send(JSON.stringify(request));
 
         if (!session) {
