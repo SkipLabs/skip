@@ -31,14 +31,14 @@ class ProjKey(
   }
 }
 
-class LeftFile(RowValues) extends SKFS.File
+class LeftFile(SKFS.BaseName, RowValues) extends SKFS.File
 class LeftShardedFile{
   leftShardID: Int,
   rightShard: Int,
   value: RowValues,
 } extends SKFS.File
 
-class RightFile(RowValues) extends SKFS.File
+class RightFile(SKFS.BaseName, RowValues) extends SKFS.File
 class RightShardedFile{
   leftShard: Int,
   rightShardID: Int,
@@ -123,7 +123,7 @@ fun pow2(n: Int): Int {
   if (n <= 1) 2 else 2 * pow2(n / 2)
 }
 
-fun genericProj(
+fun noop(
   _context: mutable SKFS.Context,
   writer: mutable SKFS.Writer,
   key: SKFS.BaseName,
@@ -311,11 +311,11 @@ class SelectEvaluator{
     | SubMerge{
       leftDirName,
       leftColNbr,
-      leftIsUnique,
+      leftIsUnique => _,
       leftRanges,
       rightDirName,
       rightColNbr,
-      rightIsUnique,
+      rightIsUnique => _,
       rightRanges,
       childName,
       kinds,
@@ -325,54 +325,77 @@ class SelectEvaluator{
       leftHandle = SKFS.EHandle(Row::fromFile, leftDirName);
       rightHandle = SKFS.EHandle(Row::fromFile, rightDirName);
 
+      statsHandle = getShardStats(context);
+
+      projLeftName = SKFS.DirName::create(childName.toString() + "proj/left/");
+
+      SKFS.EagerDir::applyMany(
+        context,
+        SKFS.FixedSingle::create(
+          mutable Vector[
+            (leftHandle.dirName, (noop, leftRanges)),
+            (statsHandle.dirName, (noop, None())),
+          ],
+        ),
+        projLeftName,
+      );
+
+      projRightName = SKFS.DirName::create(
+        childName.toString() + "proj/right/",
+      );
+
+      SKFS.EagerDir::applyMany(
+        context,
+        SKFS.FixedSingle::create(
+          mutable Vector[
+            (rightHandle.dirName, (noop, rightRanges)),
+            (statsHandle.dirName, (noop, None())),
+          ],
+        ),
+        projRightName,
+      );
+
       projName = SKFS.DirName::create(childName.toString() + "proj/");
 
-      leftSize = context.unsafeGetEagerDir(leftHandle.dirName).totalSize;
-      rightSize = context.unsafeGetEagerDir(rightHandle.dirName).totalSize;
-      leftShard = if (leftIsUnique || rightSize == 0 || rightSize >= leftSize) {
-        1
-      } else {
-        leftSize / rightSize
-      };
-      rightShard = if (
-        rightIsUnique ||
-        leftSize == 0 ||
-        leftSize >= rightSize
-      ) 1 else {
-        rightSize / leftSize;
-      };
-
-      projLeftFun = (_context, writer, _, valueIter) ~> {
-        row = normalizeValueIter(
-          valueIter.next() match {
-          | None() -> return void
-          | Some(x) -> RowValues::fromFile(x)
-          },
-          valueIter,
-        );
+      projLeftFun = (_context, writer, fileKey, valueIter) ~> {
+        (rowOpt, shardStats) = normalizeValueIter(valueIter);
+        row = rowOpt match {
+        | None() -> return void
+        | Some(r) -> r
+        };
+        (leftShard, rightShard) = computeShardSizes(shardStats);
         key = row.getValue(leftColNbr);
+        /*
+                if (shardStats is Some _) {
+                  debug(("Left Stats", fileKey, key, shardStats));
+                };
+        */
         leftShardID = SKFS.genSym(leftShard) % leftShard;
         shardedFile = LeftShardedFile{leftShardID, rightShard, value => row};
         for (i in Range(0, rightShard)) {
           projKey = ProjKey(key, leftShardID, i);
-          writer.write(projKey, LeftFile(shardedFile.value))
+          writer.write(projKey, LeftFile(fileKey, shardedFile.value))
         }
       };
 
-      projRightFun = (_context, writer, _, valueIter) ~> {
-        row = normalizeValueIter(
-          valueIter.next() match {
-          | None() -> return void
-          | Some(x) -> RowValues::fromFile(x)
-          },
-          valueIter,
-        );
+      projRightFun = (_context, writer, fileKey, valueIter) ~> {
+        (rowOpt, shardStats) = normalizeValueIter(valueIter);
+        /*
+                if (shardStats is Some _) {
+                  debug(("right Stats", shardStats));
+                };
+        */
+        row = rowOpt match {
+        | None() -> return void
+        | Some(r) -> r
+        };
+        (leftShard, rightShard) = computeShardSizes(shardStats);
         key = row.getValue(rightColNbr);
         rightShardID = SKFS.genSym(rightShard) % rightShard;
         shardedFile = RightShardedFile{leftShard, rightShardID, value => row};
         for (i in Range(0, leftShard)) {
           projKey = ProjKey(key, i, rightShardID);
-          writer.write(projKey, RightFile(shardedFile.value))
+          writer.write(projKey, RightFile(fileKey, shardedFile.value))
         }
       };
 
@@ -380,8 +403,8 @@ class SelectEvaluator{
         context,
         SKFS.FixedSingle::create(
           mutable Vector[
-            (leftHandle.dirName, (projLeftFun, leftRanges)),
-            (rightHandle.dirName, (projRightFun, rightRanges)),
+            (projLeftName, (projLeftFun, None())),
+            (projRightName, (projRightFun, None())),
           ],
         ),
         projName,
@@ -1238,19 +1261,53 @@ fun makeJoinReducer(
   SKFS.BaseName,
   mutable Iterator<SKFS.File>,
 ) ~> void {
-  (_, writer, _key, files) ~> {
+  (context, writer, _, files) ~> {
     leftRows = mutable Vector[];
     rightRows = mutable Vector[];
     for (file in files) {
       file match {
-      | LeftFile(leftFile) -> leftRows.push(RowValues::fromFile(leftFile))
-      | RightFile(rightFile) -> rightRows.push(RowValues::fromFile(rightFile))
+      | LeftFile(key, leftFile) ->
+        leftRows.push((key, RowValues::fromFile(leftFile)))
+      | RightFile(key, rightFile) ->
+        rightRows.push((key, RowValues::fromFile(rightFile)))
       | _ ->
         debug(file);
         invariant_violation("Unexpected file type in joinReducer")
       }
     };
-    for (left in leftRows) {
+    leftSize = leftRows.size();
+    rightSize = rightRows.size();
+    if (
+      leftSize / max(1, rightSize) > 128 ||
+      rightSize / max(1, leftSize) > 128
+    ) {
+      shardTable = getShardStats(context);
+      oldStats = getStats(context, shardTable, leftRows) match {
+      | None() -> getStats(context, shardTable, rightRows)
+      | x -> x
+      };
+      stats = oldStats match {
+      | None() -> ShardStats(context.tick, pow2(leftSize), pow2(rightSize))
+      | Some(x) -> x
+      };
+      if (oldStats is None() || stats.tick < context.tick) {
+        !stats = stats with {
+          tick => context.tick,
+          left => stats.left * 2,
+          right => stats.right * 2,
+        };
+        for (kv in leftRows) {
+          (key, _) = kv;
+          shardTable.writeArray(context, key, Array[stats]);
+        };
+        for (kv in rightRows) {
+          (key, _) = kv;
+          shardTable.writeArray(context, key, Array[stats]);
+        }
+      }
+    };
+    for (kv in leftRows) {
+      (_, left) = kv;
       if (
         rightRows.isEmpty() &&
         (joinKind is JLeft _ || joinKind is JOuter _)
@@ -1262,7 +1319,8 @@ fun makeJoinReducer(
         row = RowValues::create(values, left.repeat);
         writer.write(RowKey(row, kinds), row);
       };
-      for (right in rightRows) {
+      for (rkv in rightRows) {
+        (_, right) = rkv;
         values = if (onlyLeftValues) left.values else {
           left.values.concat(right.values)
         };
@@ -1275,7 +1333,8 @@ fun makeJoinReducer(
       !onlyLeftValues &&
       leftRows.size() == 0
     ) {
-      for (right in rightRows) {
+      for (kv in rightRows) {
+        (_, right) = kv;
         left = Array::fill(kinds.size() - right.size(), None<CValue>());
         values = left.concat(right.values);
         row = RowValues::create(values, right.repeat);
@@ -1286,13 +1345,62 @@ fun makeJoinReducer(
 }
 
 fun normalizeValueIter(
-  value: RowValues,
   valueIter: mutable Iterator<SKFS.File>,
-): RowValues {
-  repeat = value.repeat;
+): (?RowValues, ?ShardStats) {
+  shardStats: ?ShardStats = None();
+  valueOpt: ?RowValues = None();
+  repeat = 0;
   for (v in valueIter) {
-    !repeat = repeat + RowValues::fromFile(v).repeat;
+    v match {
+    | stats @ ShardStats _ -> !shardStats = Some(stats)
+    | r @ RowValues _ ->
+      if (valueOpt is None()) !valueOpt = Some(r);
+      !repeat = repeat + r.repeat
+    | _ -> invariant_violation("Unexpected type")
+    }
   };
-  !value = value.setRepeat(repeat);
-  value
+  valueOpt match {
+  | None() -> (None(), None())
+  | Some(v) ->
+    if (repeat == 0) (None(), None()) else {
+      !v = v.setRepeat(repeat);
+      (Some(v), shardStats)
+    }
+  }
+}
+
+fun computeShardSizes(stats: ?ShardStats): (Int, Int) {
+  stats match {
+  | None() -> (1, 1)
+  | Some(ShardStats(_, leftSize, rightSize)) ->
+    (
+      if (rightSize == 0 || rightSize >= leftSize) {
+        1
+      } else {
+        leftSize / rightSize
+      },
+      if (leftSize == 0 || leftSize >= rightSize) {
+        1
+      } else {
+        rightSize / leftSize;
+      },
+    )
+  }
+}
+
+fun getStats(
+  context: mutable SKFS.Context,
+  shardTable: SKFS.EHandle<ShardStats>,
+  x: readonly Vector<(SKFS.BaseName, SKFS.File)>,
+): ?ShardStats {
+  for (kv in x) {
+    (key, _) = kv;
+    oldStatsArray = context
+      .unsafeGetEagerDir(shardTable.dirName)
+      .getArrayRaw(key);
+    if (oldStatsArray.size() != 0) {
+      return Some(ShardStats::fromFile(oldStatsArray[0]));
+    }
+  };
+  None()
 }
