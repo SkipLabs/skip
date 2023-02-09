@@ -1,8 +1,10 @@
 package io.skiplabs.skgw
 
 import java.io.BufferedReader
+import java.util.Base64
 
 enum class OutputFormat(val flag: String) {
+  RAW("--format=sql"),
   JSON("--format=json"),
   CSV("--format=csv"),
 }
@@ -111,5 +113,15 @@ class Skdb(val dbPath: String) {
     t.start()
 
     return proc
+  }
+
+  fun privateKeyAsStored(user: String): ByteArray {
+      val key = sql("SELECT privateKey FROM skdb_users WHERE username = '${user}';", OutputFormat.RAW).trim()
+
+      if (key.isEmpty()) {
+          throw IllegalArgumentException("User ${user} could not be found.");
+      }
+
+      return Base64.getDecoder().decode(key)
   }
 }
