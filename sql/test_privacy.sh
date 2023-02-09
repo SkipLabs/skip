@@ -27,7 +27,7 @@ GROUPID2=`(
 
 (echo "begin transaction;";
  for i in {1..1000}; do
-     echo "insert into skdb_users values($i, 'user$i');"
+     echo "insert into skdb_users values($i, 'user$i', 'passkey');"
  done;
  echo "commit;"
 ) | $SKDB
@@ -55,4 +55,3 @@ echo "create table test1 (id integer primary key, skdb_privacy integer, skdb_own
  done;
  echo "commit;"
 ) | $SKDB
-
