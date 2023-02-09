@@ -16,6 +16,9 @@ import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.File
 import java.nio.channels.Channel
+import java.util.Base64
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlin.io.bufferedWriter
 import kotlin.reflect.KClass
 import org.xnio.ChannelListener
@@ -72,7 +75,7 @@ sealed interface Conn {
   fun close(): Conn
 }
 
-class EstablishedConn(val dbPath: String, val proc: Process, val authenticatedAt: Long) : Conn {
+class EstablishedConn(val proc: Process, val authenticatedAt: Long) : Conn {
   private fun unexpectedMsg(channel: WebSocketChannel): Conn {
     if (channel.isOpen()) {
       WebSockets.sendCloseBlocking(1002, "unexpected request on established connection", channel)
@@ -109,8 +112,7 @@ class EstablishedConn(val dbPath: String, val proc: Process, val authenticatedAt
   }
 }
 
-class AuthenticatedConn(val dbPath: String, val accessKey: String, val authenticatedAt: Long) :
-    Conn {
+class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticatedAt: Long) : Conn {
   override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
     when (request) {
       is ProtoQuery -> {
@@ -120,7 +122,7 @@ class AuthenticatedConn(val dbPath: String, val accessKey: String, val authentic
               "json" -> OutputFormat.JSON
               else -> OutputFormat.CSV
             }
-        val result = Skdb(dbPath).sql(request.query, format)
+        val result = skdb.sql(request.query, format)
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
         channel.sendClose()
@@ -128,7 +130,7 @@ class AuthenticatedConn(val dbPath: String, val accessKey: String, val authentic
         return ClosedConn()
       }
       is ProtoDumpTable -> {
-        val result = Skdb(dbPath).dumpTable(request.table, request.suffix)
+        val result = skdb.dumpTable(request.table, request.suffix)
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
         channel.sendClose()
@@ -137,45 +139,43 @@ class AuthenticatedConn(val dbPath: String, val accessKey: String, val authentic
       }
       is ProtoTail -> {
         val proc =
-            Skdb(dbPath)
-                .tail(
-                    accessKey,
-                    request.table,
-                    request.since,
-                    {
-                      if (channel.isOpen()) {
-                        val payload = serialise(ProtoData(it))
-                        WebSockets.sendTextBlocking(payload, channel)
-                      }
-                    },
-                    {
-                      if (channel.isOpen()) {
-                        WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
-                        channel.close()
-                      }
-                    },
-                )
-        return EstablishedConn(dbPath, proc, authenticatedAt)
+            skdb.tail(
+                accessKey,
+                request.table,
+                request.since,
+                {
+                  if (channel.isOpen()) {
+                    val payload = serialise(ProtoData(it))
+                    WebSockets.sendTextBlocking(payload, channel)
+                  }
+                },
+                {
+                  if (channel.isOpen()) {
+                    WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                    channel.close()
+                  }
+                },
+            )
+        return EstablishedConn(proc, authenticatedAt)
       }
       is ProtoWrite -> {
         val proc =
-            Skdb(dbPath)
-                .writeCsv(
-                    accessKey,
-                    request.table,
-                    {
-                      if (channel.isOpen()) {
-                        val payload = serialise(ProtoData(it))
-                        WebSockets.sendTextBlocking(payload, channel)
-                      }
-                    },
-                    {
-                      if (channel.isOpen()) {
-                        WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
-                        channel.close()
-                      }
-                    })
-        return EstablishedConn(dbPath, proc, authenticatedAt)
+            skdb.writeCsv(
+                accessKey,
+                request.table,
+                {
+                  if (channel.isOpen()) {
+                    val payload = serialise(ProtoData(it))
+                    WebSockets.sendTextBlocking(payload, channel)
+                  }
+                },
+                {
+                  if (channel.isOpen()) {
+                    WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                    channel.close()
+                  }
+                })
+        return EstablishedConn(proc, authenticatedAt)
       }
       is ProtoAuth -> {
         WebSockets.sendCloseBlocking(1002, "unexpected re-auth on established connection", channel)
@@ -195,7 +195,8 @@ class AuthenticatedConn(val dbPath: String, val accessKey: String, val authentic
   }
 }
 
-class UnauthenticatedConn(val dbPath: String) : Conn {
+class UnauthenticatedConn(val skdb: Skdb) : Conn {
+
   private fun unexpectedMsg(channel: WebSocketChannel): Conn {
     if (channel.isOpen()) {
       WebSockets.sendCloseBlocking(1002, "connection not yet authenticated", channel)
@@ -203,6 +204,24 @@ class UnauthenticatedConn(val dbPath: String) : Conn {
     }
 
     return ErroredConn()
+  }
+
+  private fun verify(request: ProtoAuth): Boolean {
+    val algo = "HmacSHA256"
+
+    val content: String = request.request + request.accessKey + request.date
+    val contentBytes = content.toByteArray(Charsets.UTF_8)
+
+    val mac = Mac.getInstance(algo)
+    val privateKey = skdb.privateKeyAsStored(request.accessKey)
+    mac.init(SecretKeySpec(privateKey, algo))
+    val ourSig = mac.doFinal(contentBytes)
+    // at least try to keep the private key in memory for as little time as possible
+    privateKey.fill(0)
+
+    val b64sig = Base64.getEncoder().encodeToString(ourSig)
+
+    return b64sig == request.signature
   }
 
   override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
@@ -213,7 +232,16 @@ class UnauthenticatedConn(val dbPath: String) : Conn {
       is ProtoWrite -> return unexpectedMsg(channel)
       is ProtoData -> return unexpectedMsg(channel)
       is ProtoAuth -> {
-        return AuthenticatedConn(dbPath, request.accessKey, System.currentTimeMillis())
+        if (!verify(request)) {
+          if (channel.isOpen()) {
+            WebSockets.sendCloseBlocking(1002, "authentication failed", channel)
+            channel.close()
+          }
+
+          return ErroredConn()
+        }
+
+        return AuthenticatedConn(skdb, request.accessKey, System.currentTimeMillis())
       }
     }
   }
@@ -279,7 +307,9 @@ fun createHttpServer(): Undertow {
                         return
                       }
 
-                      var conn: Conn = UnauthenticatedConn(dbPath)
+                      val skdb = Skdb(dbPath)
+
+                      var conn: Conn = UnauthenticatedConn(skdb)
 
                       channel.receiveSetter.set(
                           object : AbstractReceiveListener() {
