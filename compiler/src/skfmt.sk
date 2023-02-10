@@ -1,0 +1,55 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module SkipPrinter;
+
+fun prettyPrint(
+  contents: String,
+  filename: String,
+): Result<String, SkipError.Error> {
+  parsed = SkipParser.parseSource(contents, false);
+  if (parsed.errors.size() > 0) {
+    // Parse errors are expected. Exceptions are bugs.
+    Failure(SkipError.errorFromSyntaxError(parsed.errors[0], filename))
+  } else {
+    Success(SkipPrinter.printTreeToString(parsed.tree, contents) + "\n")
+  }
+}
+
+untracked fun printToStdoutAndReportErrors(
+  contents: String,
+  filename: String,
+): void {
+  prettyPrint(contents, filename) match {
+  | Failure(error) ->
+    print_error_ln(SkipError.errorsToString(Vector[error]));
+    skipExit(1)
+  | Success(formattedContents) -> print_raw(formattedContents)
+  }
+}
+
+untracked fun main(): void {
+  args = Cli.Command("skfmt")
+    .about("Format skip code")
+    .arg(
+      Cli.StringArg("file")
+        .positional()
+        .required()
+        .about("Skip file to format"),
+    )
+    .arg(
+      Cli.BoolArg("inplace")
+        .short("i")
+        .about("Inplace edit file(s), if specified"),
+    )
+    .help()
+    .parseArgs();
+
+  filename = args.getString("file");
+  printToStdoutAndReportErrors(FileSystem.readTextFile(filename), filename);
+  void
+}

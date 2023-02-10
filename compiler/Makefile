@@ -24,9 +24,12 @@ bootstrap/%.ll: bootstrap/%.ll.gz
 bootstrap/skargo: bootstrap/skargo_out64.ll runtime/libskip_runtime64.a
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lrt -lpthread
 
+bootstrap/skfmt: bootstrap/skfmt_out64.ll runtime/libskip_runtime64.a
+	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lrt -lpthread
+
 stage%:
 	mkdir -p $@
-	$(MAKE) $@/bin/skc $@/bin/skargo $@/lib/libskip_runtime64.a $@/lib/libskip_runtime32.bc $@/lib/skip_preamble64.ll $@/lib/skip_preamble32.ll
+	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libskip_runtime64.a $@/lib/libskip_runtime32.bc $@/lib/skip_preamble64.ll $@/lib/skip_preamble32.ll
 
 stage%/bin/skargo: bootstrap/skargo
 	mkdir -p $(@D)
@@ -48,16 +51,23 @@ stage%/lib/skip_preamble32.ll: preamble/preamble32.ll
 	mkdir -p $(@D)
 	cp $< $@
 
+stage0/bin/skfmt: bootstrap/skfmt_out64.ll runtime/libskip_runtime64.a
+	mkdir -p $(@D)
+	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lrt -lpthread
+
 stage0/bin/skc: bootstrap/skc_out64.ll runtime/libskip_runtime64.a
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lrt -lpthread
 
+stage1/bin/skfmt:
 stage1/bin/skc: stage0
 	PATH=stage0/bin/:$(PATH) skargo build --target-dir stage1/bin
 
+stage2/bin/skfmt:
 stage2/bin/skc: stage1
 	PATH=stage1/bin/:$(PATH) skargo build --target-dir stage2/bin
 
+stage3/bin/skfmt:
 stage3/bin/skc: stage2
 	PATH=stage2/bin/:$(PATH) skargo build --target-dir stage3/bin
 # 	TODO: Ensure stage2 == stage3.
@@ -70,7 +80,7 @@ install: stage$(STAGE)
 	install -m 644 preamble/preamble64.ll $(libdir)/skip_preamble64.ll
 	install -m 644 preamble/preamble32.ll $(libdir)/skip_preamble32.ll
 	install -d $(bindir)
-	install -m 755 stage$(STAGE)/bin/skc stage$(STAGE)/bin/skargo $(bindir)
+	install -m 755 stage$(STAGE)/bin/skc stage$(STAGE)/bin/skfmt stage$(STAGE)/bin/skargo $(bindir)
 
 .PHONY: clean
 clean:
