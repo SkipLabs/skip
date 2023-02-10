@@ -19,6 +19,8 @@ import java.nio.channels.Channel
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.io.bufferedWriter
@@ -317,6 +319,8 @@ fun createHttpServer(): Undertow {
       Handlers.path()
           .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
 
+  val taskPool = Executors.newSingleThreadScheduledExecutor()
+
   var pathHandler =
       PathTemplateHandler(rootHandler)
           .add(
@@ -343,6 +347,11 @@ fun createHttpServer(): Undertow {
 
                       var conn: Conn = UnauthenticatedConn(skdb)
 
+                      val timeout = taskPool.schedule({
+                          conn.close()
+                          channel.close()
+                      }, 10, TimeUnit.MINUTES)
+
                       channel.receiveSetter.set(
                           object : AbstractReceiveListener() {
                             override fun onFullTextMessage(
@@ -362,6 +371,7 @@ fun createHttpServer(): Undertow {
                       channel.closeSetter.set(
                           object : ChannelListener<Channel> {
                             override fun handleEvent(channel: Channel): Unit {
+                              timeout.cancel(false)
                               conn = conn.close()
                               // TODO: wait and ensure the process ends, forcibly close on
                               // timeout
