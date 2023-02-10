@@ -1,8 +1,13 @@
 let SKDB = require('../../../build/skdb_node.js');
+const crypto = require('node:crypto').webcrypto;
 
 const setup = async function(user) {
     const skdb = await SKDB.create(true);
-    await skdb.connect("soak", user, "ws://localhost:8080");
+    const b64key = "test";
+    const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey(
+        "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
+    await skdb.connect("soak", user, key, "ws://localhost:8080");
     await skdb.server().mirrorTable("log");
     return skdb;
 };

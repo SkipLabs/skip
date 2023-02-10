@@ -5,3 +5,4 @@ let readline = require('readline');
 const WebSocket = require('ws');
 const IndexedDB = require('fake-indexeddb');
 const indexedDB = IndexedDB.indexedDB;
+const crypto = require('node:crypto').webcrypto;
