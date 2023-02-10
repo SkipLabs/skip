@@ -16,6 +16,8 @@ import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.File
 import java.nio.channels.Channel
+import java.time.Duration
+import java.time.Instant
 import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -208,6 +210,16 @@ class UnauthenticatedConn(val skdb: Skdb) : Conn {
 
   private fun verify(request: ProtoAuth): Boolean {
     val algo = "HmacSHA256"
+
+    val now = Instant.now()
+    val d = Instant.parse(request.date)
+    // delta represents physical timeline time, regardless of calendars and clock shifts
+    val delta = Duration.between(d, now)
+
+    // do not allow requests that were not recent. the margin is for clock skew.
+    if (delta.abs().compareTo(Duration.ofMinutes(10)) > 0) {
+      return false
+    }
 
     val content: String = request.request + request.accessKey + request.date
     val contentBytes = content.toByteArray(Charsets.UTF_8)
