@@ -4727,7 +4727,7 @@ mutable class SkipParser{
     endDelimiter = this.eatTree(TokenKind.CLOSE_PAREN(), Some(startDelimiter));
 
     arguments = ParseTree.ParseTreeList{
-      range => this.createRange(start),
+      range => Parser.createRangeOfTrees(startDelimiter, endDelimiter),
       startDelimiter => startDelimiter,
       elements => elements.collect(Array),
       separatorKind => Some(TokenKind.COMMA()),
