@@ -647,7 +647,7 @@ export class SKDB {
     const reqType = "auth"
     const now = (new Date()).toISOString()
     const bytesToSign = enc.encode(reqType + creds.accessKey + now)
-    const sig = await window.crypto.subtle.sign(
+    const sig = await crypto.subtle.sign(
       "HMAC",
       creds.privateKey,
       bytesToSign
