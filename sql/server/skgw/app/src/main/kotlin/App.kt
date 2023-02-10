@@ -69,7 +69,10 @@ fun serialise(msg: ProtoMessage): String {
   return Klaxon().toJsonString(msg)
 }
 
+val maxConnectionDuration: Duration = Duration.ofMinutes(10)
+
 sealed interface Conn {
+
   fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn
   fun handleMessage(message: String, channel: WebSocketChannel) =
       handleMessage(parse(message), channel)
@@ -77,7 +80,8 @@ sealed interface Conn {
   fun close(): Conn
 }
 
-class EstablishedConn(val proc: Process, val authenticatedAt: Long) : Conn {
+class EstablishedConn(val proc: Process, val authenticatedAt: Instant) : Conn {
+
   private fun unexpectedMsg(channel: WebSocketChannel): Conn {
     if (channel.isOpen()) {
       WebSockets.sendCloseBlocking(1002, "unexpected request on established connection", channel)
@@ -88,6 +92,13 @@ class EstablishedConn(val proc: Process, val authenticatedAt: Long) : Conn {
   }
 
   override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
+    val now = Instant.now()
+    if (Duration.between(authenticatedAt, now).abs().compareTo(maxConnectionDuration) > 0) {
+      WebSockets.sendCloseBlocking(1011, "session timeout", channel)
+      channel.close()
+      return ErroredConn()
+    }
+
     when (request) {
       is ProtoAuth -> return unexpectedMsg(channel)
       is ProtoQuery -> return unexpectedMsg(channel)
@@ -114,8 +125,17 @@ class EstablishedConn(val proc: Process, val authenticatedAt: Long) : Conn {
   }
 }
 
-class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticatedAt: Long) : Conn {
+class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticatedAt: Instant) :
+    Conn {
+
   override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
+    val now = Instant.now()
+    if (Duration.between(authenticatedAt, now).abs().compareTo(maxConnectionDuration) > 0) {
+      WebSockets.sendCloseBlocking(1011, "session timeout", channel)
+      channel.close()
+      return ErroredConn()
+    }
+
     when (request) {
       is ProtoQuery -> {
         val format =
@@ -253,7 +273,7 @@ class UnauthenticatedConn(val skdb: Skdb) : Conn {
           return ErroredConn()
         }
 
-        return AuthenticatedConn(skdb, request.accessKey, System.currentTimeMillis())
+        return AuthenticatedConn(skdb, request.accessKey, Instant.now())
       }
     }
   }
