@@ -146,30 +146,15 @@ class GlobalEnv{
   }
 }
 
-// A UTF8-encoded string that knows its Skip checksum.
-base class UTF8String{
+class UTF8String{
   // Although this says Int, they are guaranteed to be bytes [0, 255].
   utf8: Array<UInt8>,
   string: String,
 } uses Hashable, Orderable, Show {
-  static fun useShortStrings(): Bool {
-    // Short strings are not supported by the new runtime
-    false
-    //    !targetIsWasm() && !isEmbedded()
-  }
-
   static fun make(string: String): UTF8String {
     utf8 = string.utf8().collect(Array);
-    if (utf8.size() < ptrByteSize && static::useShortStrings()) {
-      ShortUTF8String{utf8, string}
-    } else {
-      LongUTF8String::makeLong(utf8, string)
-    }
+    UTF8String{utf8, string}
   }
-
-  fun isShortString(): Bool
-  | ShortUTF8String _ -> true
-  | LongUTF8String _ -> false
 
   fun compare(other: UTF8String): Order {
     this.utf8.compare(other.utf8)
@@ -179,11 +164,7 @@ base class UTF8String{
     utf8 = this.utf8.concat(other.utf8);
     string = this.string + other.string;
 
-    if (utf8.size() < ptrByteSize && static::useShortStrings()) {
-      ShortUTF8String{utf8, string}
-    } else {
-      LongUTF8String::makeLong(utf8, string)
-    }
+    UTF8String{utf8, string}
   }
 
   fun countCharacters(): Int {
@@ -202,34 +183,6 @@ base class UTF8String{
 
   fun hash(): Int {
     this.utf8.hash()
-  }
-}
-
-class ShortUTF8String extends UTF8String {
-  fun bits(): Int {
-    invariant(
-      UTF8String::useShortStrings(),
-      "Should not be creating ShortString.",
-    );
-
-    shift = -8;
-    this.utf8.foldl(
-      (acc, byte) -> {
-        !shift = shift + 8;
-        acc.or(byte.shl(shift))
-      },
-      (this.utf8.size() - 8).shl(59),
-    )
-  }
-}
-
-class LongUTF8String extends UTF8String {
-  static fun makeLong(utf8: Array<UInt8>, string: String): LongUTF8String {
-    invariant(
-      utf8.size() >= 8 || !UTF8String::useShortStrings(),
-      "This is not a long string.",
-    );
-    LongUTF8String{utf8, string}
   }
 }
 

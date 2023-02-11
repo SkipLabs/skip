@@ -1971,10 +1971,7 @@ mutable class .AsmOutput{
   mutable env: GlobalEnv,
 
   // Skip String -> LLVM expression.
-  strings: mutable UnorderedMap<
-    LongUTF8String,
-    AsmDefID,
-  > = mutable UnorderedMap[],
+  strings: mutable UnorderedMap<UTF8String, AsmDefID> = mutable UnorderedMap[],
 
   // Precomputed constants for byte values.
   private mutable cachedByteConstants: Array<ConstantInt> = Array[],
@@ -2102,7 +2099,7 @@ mutable class .AsmOutput{
 
   // Produces an LLVM expression for a pointer to the first utf8 byte of
   // a Skip LongString object.
-  mutable fun stringToLLVM(str: LongUTF8String): AsmDefID {
+  mutable fun stringToLLVM(str: UTF8String): AsmDefID {
     this.strings.getOrAdd(str, () -> {
       len = str.utf8.size();
       paddedLen = this.paddedStringSize(str);
@@ -2171,7 +2168,7 @@ mutable class .AsmOutput{
 
   // As in the runtime, strings always take a multiple of 8 bytes
   // and strings >= cstr_buffer_size must have a trailing '\0'.
-  private readonly fun paddedStringSize(s: LongUTF8String): Int {
+  private readonly fun paddedStringSize(s: UTF8String): Int {
     size = s.utf8.size();
 
     // WARNING! This must equal CSTR_BUFFER_SIZE in the runtime!
@@ -2590,14 +2587,10 @@ private fun llvmWriteNameConstantString(
   value: UTF8String,
   asm: mutable AsmDefBuilder,
 ): void {
-  value match {
-  | s @ ShortUTF8String _ -> asm.print("inttoptr (i64 %s to i8*)" % s.bits())
-  | s @ LongUTF8String _ ->
-    image = asm.common.stringToLLVM(s);
-    // Strings always point at the first character byte, which is 8
-    // bytes into the raw storage.
-    image.writeGetPointer(asm, 8)
-  }
+  image = asm.common.stringToLLVM(value);
+  // Strings always point at the first character byte, which is 8
+  // bytes into the raw storage.
+  image.writeGetPointer(asm, 8)
 }
 
 private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
@@ -3591,28 +3584,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
   | StringCmp{lhs, rhs} ->
     llvmWriteIntrinsicCall(asm, instr, "SKIP_String_cmp", Array[lhs, rhs])
   | StringCmpEq{lhs, rhs} ->
-    done = optinfo.getInstr(rhs) match {
-    | ConstantString{value} ->
-      value match {
-      | short @ ShortUTF8String _ ->
-        // x == "foo", where "foo" is "short", turns into a simple
-        // numerical comparison against foo's constant bit pattern.
-        asm.print(
-          "  %n = icmp eq %N, inttoptr (i64 %s to i8*), %D\n" %
-            instr %
-            lhs %
-            short.bits() %
-            instr,
-        );
-        true
-      | _ -> false
-      }
-    | _ -> false
-    };
-
-    if (!done) {
-      llvmWriteIntrinsicCall(asm, instr, "SKIP_String_eq", Array[lhs, rhs])
-    }
+    llvmWriteIntrinsicCall(asm, instr, "SKIP_String_eq", Array[lhs, rhs])
   | v @ StringConcat{args} ->
     // The runtime provides special versions for 2, 3 or 4 arguments.
     varargs = v.args.size() < 2 || v.args.size() > 4;
@@ -3715,70 +3687,25 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
 
     defaultBlock = optinfo.getBlock(successors[0].target);
 
-    // Partition the case statements into short and long strings.
-    shortCases = mutable Vector<(Int, ShortUTF8String)>[];
-    longCases = mutable Vector<(Int, LongUTF8String)>[];
+    cases = mutable Vector<(Int, UTF8String)>[];
     for (i in Range(0, v.cases.size())) {
-      v.getCase(i, optinfo) match {
-      | s @ ShortUTF8String _ -> shortCases.push((i, s))
-      | s @ LongUTF8String _ -> longCases.push((i, s))
-      }
+      s = v.getCase(i, optinfo);
+      cases.push((i, s))
     };
-
-    longLabel = "";
 
     // Get raw bits from the string.
     valueInstr = optinfo.getInstr(value);
     bits = asm.llvmIdentifier("%stringswitch.bits");
     asm.print("  %s = ptrtoint %N to i64, %D\n" % bits % valueInstr % instr);
 
-    if (!shortCases.isEmpty()) {
-      asm.print("  switch i64 %s, " % bits);
-
-      // Write out default case.
-      if (longCases.isEmpty()) {
-        // No long strings, so jump to normal default case.
-        asm.print("%N" % defaultBlock)
-      } else {
-        // Emit a new block to check for long strings.
-        !longLabel = asm.llvmIdentifier("stringswitch.checklong");
-        asm.print("label %%%s" % longLabel)
-      };
-
-      // Non-default cases.
-      asm.print(" [");
-      for (case in shortCases) {
-        (c, str) = case;
-        asm.print("\n    i64 %s, %N" % str.bits() % successors[c + 1].target)
-      };
-      asm.print(" ]\n")
-    };
-
-    if (!longCases.isEmpty()) {
-      // Handle long string cases.
-
-      if (longLabel != "") {
-        // Add label for short default case to jump to if needed.
-        asm.print("%s:\n" % longLabel)
-      };
-
-      // If the string is short, jump to the default case.
-      if (UTF8String::useShortStrings()) {
-        isShort = asm.llvmIdentifier("%stringswitch.isShort");
-        asm.print("  %s = icmp slt i64 %s, 0, %D\n" % isShort % bits % instr);
-        asm.print("  br i1 %s, %N" % isShort % defaultBlock);
-        isLongLabel = asm.llvmIdentifier("stringswitch.islong");
-        asm.print(", label %%%s, %D\n" % isLongLabel % instr);
-        asm.print("%s:\n" % isLongLabel)
-      };
-
+    if (!cases.isEmpty()) {
       // Due to T17433959 we need to ignore the high hash bit,
       // so we left-shift it out.
       highHashShift = if (targetIsWasm() || isEmbedded()) 0 else 1;
 
       // Map each long string header word to an array of case indices
       // that have that value.
-      buckets: SortedMap<Int, Array<(Int, LongUTF8String)>> = longCases.foldl(
+      buckets: SortedMap<Int, Array<(Int, UTF8String)>> = cases.foldl(
         (acc, case) -> {
           (_, str) = case;
           hash = if (targetIsWasm() || isEmbedded()) {

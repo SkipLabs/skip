@@ -466,14 +466,9 @@ mutable private class .Lower{
   }
 
   private mutable fun lowerStringHash(sh: StringHash): Bool {
-    if (UTF8String::useShortStrings()) {
-      // We do not currently inline this case.
-      false
-    } else {
-      // All strings are LongString, so we can just load the hash.
-      this.loadInvariantUInt32(sh, -4);
-      true
-    }
+    // All strings are LongString, so we can just load the hash.
+    this.loadInvariantUInt32(sh, -4);
+    true
   }
 
   private mutable fun lowerCallFunction(call: CallFunction): void {
