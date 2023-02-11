@@ -212,9 +212,8 @@ fun solve_call_constraints(
 /*****************************************************************************/
 /* The main entry point */
 /*****************************************************************************/
-fun makeEnv(embeddedMode: Bool): TUtils.Env {
+fun makeEnv(): TUtils.Env {
   TUtils.Env{
-    embeddedMode,
     locals => SortedMap[],
     this_class => None(),
     orig_this_class => None(),
@@ -256,7 +255,6 @@ const dir: SKFS.EHandle<DefFile> = SKFS.EHandle(DefFile::fromFile, dirName);
 
 fun program(
   context: mutable SKFS.Context,
-  embeddedMode: Bool,
   defs: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
 ): SKFS.EHandle<DefFile> {
   defs.contextWriterKeyValues(
@@ -270,9 +268,7 @@ fun program(
         SkipError.keepErrors(3, context, () -> {
           writer.write(
             SKFS.SID(x.name.i1),
-            DefFile(
-              SkipTypedAst.DClass(class_def(context, embeddedMode, x.name)),
-            ),
+            DefFile(SkipTypedAst.DClass(class_def(context, x.name))),
           )
         })
       | GlobalEnv.EConst(x) ->
@@ -286,7 +282,7 @@ fun program(
         SkipError.keepErrors(3, context, () -> {
           writer.write(
             SKFS.SID(x.name.i1),
-            DefFile(SkipTypedAst.DFun(fun_def(context, embeddedMode, x.name))),
+            DefFile(SkipTypedAst.DFun(fun_def(context, x.name))),
           )
         })
       | GlobalEnv.EType(ta) ->
@@ -342,7 +338,7 @@ fun global_const_def(
   constName: N.Name,
 ): TAst.Const_def {
   cst = SkipNaming.getConst(context, constName);
-  env = makeEnv(false);
+  env = makeEnv();
   (pos, _) = constName;
   acc = TUtils.empty_acc;
   annotations = cst.annotations;
@@ -487,11 +483,10 @@ fun method_is_copydown(
 
 fun class_def(
   context: mutable SKFS.Context,
-  embeddedMode: Bool,
   className: SkipAst.Name,
 ): TAst.Class_def {
   cd = SkipNaming.getClass(context, className);
-  env = makeEnv(embeddedMode);
+  env = makeEnv();
   next_id = sk_create_counter();
   depth = cd.depth;
   native_ = cd.native_;
@@ -881,24 +876,22 @@ fun merge_extend(
 
 fun fun_def(
   context: mutable SKFS.Context,
-  embeddedMode: Bool,
   funName: SkipAst.Name,
 ): TAst.Fun_def {
   fd = SkipNaming.getFun(context, funName);
-  if (embeddedMode && fd.name.i1 == "etry") {
+  if (fd.name.i1 == "etry") {
     !fd.native_ = Some(fd.name.i0);
     !fd.body = N.Native()
   };
-  result = named_fun_def(context, embeddedMode, fd);
+  result = named_fun_def(context, fd);
   result
 }
 
 fun named_fun_def(
   context: mutable SKFS.Context,
-  embeddedMode: Bool,
   fd: SkipNamedAst.Fun_def,
 ): TAst.Fun_def {
-  env = makeEnv(embeddedMode);
+  env = makeEnv();
   next_id = sk_create_counter();
   acc = TUtils.empty_acc;
   native_ = fd.native_;
@@ -2470,27 +2463,7 @@ fun magic_call(
 ): ?(TUtils.Acc, TAst.Expr) {
   (base, args) match {
   | ((_, N.Var((_, "freeze"))), Positional(arga)) if (arga.size() == 1) ->
-    if (env.embeddedMode) {
-      SkipError.error(pos, "Cannot use freeze in embedded mode");
-    };
-    check_no_mutable(mut, base.i0);
-    (_, e) = arga[0];
-    (!acc, e1) = expr(context, next_id, env, acc, e);
-    old_ty = TAstUtils.get_type(e1);
-    if (Types.has_unresolved(acc.subst, old_ty)) {
-      SkipError.errorl(
-        List[
-          (
-            old_ty.i0,
-            "Invalid freeze on unresolved type. This type has type parameters that are not yet resolved.",
-          ),
-          (e1.i1.i0, "Try annotating this expression"),
-        ],
-      )
-    };
-    ty = TUtils.freeze(pos, acc, old_ty);
-    e2 = (pos, TAst.Freeze(e1));
-    Some((acc, (ty, e2)))
+    SkipError.error(pos, "Cannot use freeze in embedded mode")
   | ((_, N.Var((_, "class"))), Positional(arga)) if (arga.size() == 1) ->
     check_no_mutable(mut, base.i0);
     (_, e) = arga[0];
@@ -3110,7 +3083,7 @@ fun expr_(
     };
     (acc2, (rty1, e2))
   | N.Try(match_expr, mbl) ->
-    if (env.embeddedMode) {
+    if (true) {
       SkipError.error(pos, "Cannot use try/catch in embedded mode (use etry)");
     };
     (acc1, e1) = expr(context, next_id, env, acc, match_expr);

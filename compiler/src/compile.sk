@@ -18,8 +18,6 @@ class Config private {
   preambleFiles: Array<String>,
   // profilePath: String,
   wasm: Bool,
-  embedded32: Bool,
-  embedded64: Bool,
   asan: Bool,
   autogc: Bool,
   sampleRate: Int,
@@ -47,8 +45,6 @@ class Config private {
     outputFiles = result.getArray("output");
     // profilePath = result.getString("profile-path");
     wasm = result.getBool("wasm");
-    embedded32 = result.getBool("embedded32");
-    embedded64 = result.getBool("embedded64");
     asan = result.getBool("asan");
     autogc = result.getBool("autogc");
     sampleRate = result.getString("sample-rate").toInt();
@@ -89,11 +85,6 @@ class Config private {
       }
     };
 
-    if (embedded32 && embedded64) {
-      print_error("Cannot use embedded 32 and 64 mode at the same time");
-      skipExit(1)
-    };
-
     static{
       exportedFunctions,
       exportedAsFunctions => exportAs.chill(),
@@ -105,8 +96,6 @@ class Config private {
       preambleFiles,
       // profilePath,
       wasm,
-      embedded32,
-      embedded64,
       asan,
       autogc,
       sampleRate,
@@ -121,18 +110,6 @@ module end;
 
 fun targetIsWasm(): Bool {
   kConfig.mainConfig.wasm
-}
-
-fun isEmbedded32(): Bool {
-  kConfig.mainConfig.embedded32
-}
-
-fun isEmbedded64(): Bool {
-  kConfig.mainConfig.embedded64
-}
-
-fun isEmbedded(): Bool {
-  isEmbedded32() || isEmbedded64()
 }
 
 fun createOptimizedFunctions(

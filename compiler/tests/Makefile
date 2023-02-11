@@ -7,11 +7,11 @@ default: ../../build/state.db $(LLVMOBJS)
 
 ../../build/state.db:
 	@mkdir -p ../../build/tests/
-	skc --embedded64 --no-inline --preamble ../preamble/preamble64.ll $(PRELUDE_SOURCES) $(SKFS_SOURCES) --init ../../build/state.db --check
+	skc --no-inline --preamble ../preamble/preamble64.ll $(PRELUDE_SOURCES) $(SKFS_SOURCES) --init ../../build/state.db --check
 
 ../../build/tests/%.test: %.sk
 	@mkdir -p $(dir $@)
-	@- skc --embedded64 --no-inline --preamble ../preamble/preamble64.ll $(PRELUDE_SOURCES) $(SKFS_SOURCES) --export-function-as main=skip_main --data ../../build/state.db $^ 2> $(@:.test=.err) > $(@:.test=.ll) || true
+	@- skc --no-inline --preamble ../preamble/preamble64.ll $(PRELUDE_SOURCES) $(SKFS_SOURCES) --export-function-as main=skip_main --data ../../build/state.db $^ 2> $(@:.test=.err) > $(@:.test=.ll) || true
 	@- sed -i 's/File "/File ".\//' $(@:.test=.err)
 	@./run.sh $@
 

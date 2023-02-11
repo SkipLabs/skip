@@ -2123,11 +2123,7 @@ mutable class .AsmOutput{
                   ConstantInt{
                     id => InstrID::none,
                     typ => tInt32,
-                    value => if (targetIsWasm() || isEmbedded()) {
-                      computeWasmStringHash(str.utf8)
-                    } else {
-                      computeNativeStringHash(str.utf8)
-                    },
+                    value => computeWasmStringHash(str.utf8),
                   },
                   32,
                 )
@@ -3544,21 +3540,12 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
   | ObstackNote _ ->
     llvmWriteIntrinsicCall(asm, instr, "SKIP_Obstack_note_inl", Array[])
   | ObstackShallowClone{byteSize, value} ->
-    if (isEmbedded()) {
-      llvmWriteIntrinsicCall(
-        asm,
-        instr,
-        "SKIP_Obstack_shallowClone",
-        Array[byteSize, value],
-      )
-    } else {
-      llvmWriteIntrinsicCall(
-        asm,
-        instr,
-        "SKIP_Obstack_shallowClone",
-        Array[value],
-      )
-    }
+    llvmWriteIntrinsicCall(
+      asm,
+      instr,
+      "SKIP_Obstack_shallowClone",
+      Array[byteSize, value],
+    )
   | Reinterpret{value} ->
     src = optinfo.getInstr(value);
     srcPrim = src.typ.getScalarType(asm.env());
@@ -3699,23 +3686,14 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     asm.print("  %s = ptrtoint %N to i64, %D\n" % bits % valueInstr % instr);
 
     if (!cases.isEmpty()) {
-      // Due to T17433959 we need to ignore the high hash bit,
-      // so we left-shift it out.
-      highHashShift = if (targetIsWasm() || isEmbedded()) 0 else 1;
-
       // Map each long string header word to an array of case indices
       // that have that value.
       buckets: SortedMap<Int, Array<(Int, UTF8String)>> = cases.foldl(
         (acc, case) -> {
           (_, str) = case;
-          hash = if (targetIsWasm() || isEmbedded()) {
-            computeWasmStringHash(str.utf8)
-          } else {
-            computeNativeStringHash(str.utf8)
-          };
+          hash = computeWasmStringHash(str.utf8);
           header = hash.shl(32).or(str.utf8.size());
-          masked = header.shl(highHashShift);
-          acc.setWith(masked, Array[case], (old, v) -> {
+          acc.setWith(header, Array[case], (old, v) -> {
             old.concat(v)
           })
         },
@@ -3746,7 +3724,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
         "  %s = shl i64 %s, %s, %D\n" %
           hdr %
           unmaskedHdr %
-          highHashShift %
+          0 % // Does this 0 make it a noop?
           instr,
       );
 
