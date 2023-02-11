@@ -1732,15 +1732,7 @@ private fun peepholeStringBinOp(peep: StringBinOp, s: mutable Peephole): Instr {
 
 private fun peepholeStringHash(peep: StringHash, s: mutable Peephole): Instr {
   s.getInstr(peep.value) match {
-  | ConstantString{value} ->
-    s.constantInt(
-      if (targetIsWasm() || isEmbedded()) {
-        computeWasmStringHash(value.utf8)
-      } else {
-        // bytesize | hash<<32
-        computeNativeStringHash(value.utf8).shl(32).or(value.utf8.size())
-      },
-    )
+  | ConstantString{value} -> s.constantInt(computeStringHash(value.utf8))
   | _ -> peep
   }
 }
@@ -1835,68 +1827,7 @@ private fun peepholeStringConcat(
   args.size() match {
   | 0 -> s.constantString("")
   | 1 -> s.getInstr(args[0])
-  | _ ->
-    if (targetIsWasm() || isEmbedded()) {
-      // WASM doesn't bother with runtime functions for different lengths.
-      peep
-    } else {
-      buf = mutable Vector<InstrID>[];
-      changed = false;
-
-      for (arg in args) {
-        s.getInstr(arg) match {
-        | ConstantString{value} ->
-          if (value.utf8.isEmpty()) {
-            // Drop any empty string constants.
-            !changed = true
-          } else if (buf.isEmpty()) {
-            buf.push(arg)
-          } else {
-            s.getInstr(buf.last()) match {
-            | ConstantString{value => value2} ->
-              // Concatenate adjacent string constants now.
-              concat = s.constantUTF8String(value2 + value);
-              buf.set(buf.size() - 1, concat.id);
-              !changed = true
-            | _ -> buf.push(arg)
-            }
-          }
-        | StringConcat{args => args2} ->
-          // (a + "foo") + "bar" -> a + "foo" + "bar".
-          if (
-            s.optinfo.instrUniquelyReferenced(arg) ||
-            (!buf.isEmpty() &&
-              s.getInstr(buf[buf.size() - 1]).isConstant() &&
-              args2.size() <= 2 &&
-              s.getInstr(args2[0]).isConstant())
-          ) {
-            // Combine nested StringConcats into a bigger one.
-            //
-            // It's hard to know when this is a good idea in all
-            // cases, due to common subexpressions -- would you
-            // rather do part of a strcat outside a loop? So we only
-            // absorb another StringConcat when this is the only use,
-            // or if it starts with a constant String that will fold away.
-            args2.each(buf.push);
-            !changed = true
-          } else {
-            // NOTE: Even if not uniquely referenced, if args2.size() == 2
-            // and args2[1] is a string constant that will merge with
-            // one of ours, we would be better off doing it.
-            // But we don't know what our upcoming string is yet.
-            buf.push(arg)
-          }
-        | _ -> buf.push(arg)
-        }
-      };
-
-      if (changed) {
-        peep with {id => s.iid(), args => buf.toArray()}
-      } else {
-        peep.pos.invariant(buf.size() == args.size(), "strcat error");
-        peep
-      }
-    }
+  | _ -> peep
   }
 }
 

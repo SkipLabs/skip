@@ -150,10 +150,6 @@ mutable class .IntrinsicsInliner{
     | "Int::ctzImpl" -> this.makeUnaryOp(IntCtz, call, a[0])
     | "Int::popcountImpl" -> this.makeUnaryOp(IntPopcount, call, a[0])
     | "Int::toFloatImpl" -> this.makeUnaryOp(IntToFloat, call, a[0])
-    | "Int::toStringImpl" ->
-      !targetIsWasm() &&
-        !isEmbedded() &&
-        this.makeUnaryOp(IntToString, call, a[0])
     | "Int8::toInt" | "Int16::toInt" | "Int32::toInt" ->
       this.makeUnaryOp(SignExtend, call, a[0])
     | "Int8::.ConcreteMetaImpl::truncate" | "Int16::.ConcreteMetaImpl::truncate"
