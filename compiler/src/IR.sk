@@ -223,13 +223,13 @@ class ShortUTF8String extends UTF8String {
   }
 }
 
-class LongUTF8String{runtimeHash: Int} extends UTF8String {
+class LongUTF8String extends UTF8String {
   static fun makeLong(utf8: Array<UInt8>, string: String): LongUTF8String {
     invariant(
       utf8.size() >= 8 || !UTF8String::useShortStrings(),
       "This is not a long string.",
     );
-    LongUTF8String{utf8, string, runtimeHash => computeStringHash(utf8)}
+    LongUTF8String{utf8, string}
   }
 }
 

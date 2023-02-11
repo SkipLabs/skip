@@ -1738,10 +1738,10 @@ private fun peepholeStringHash(peep: StringHash, s: mutable Peephole): Instr {
       | x @ ShortUTF8String _ -> x.bits()
       | x @ LongUTF8String _ ->
         if (targetIsWasm() || isEmbedded()) {
-          x.runtimeHash
+          computeWasmStringHash(x.utf8)
         } else {
           // bytesize | hash<<32
-          x.runtimeHash.shl(32).or(value.utf8.size())
+          computeNativeStringHash(x.utf8).shl(32).or(value.utf8.size())
         }
       },
     )

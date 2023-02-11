@@ -2126,7 +2126,11 @@ mutable class .AsmOutput{
                   ConstantInt{
                     id => InstrID::none,
                     typ => tInt32,
-                    value => str.runtimeHash,
+                    value => if (targetIsWasm() || isEmbedded()) {
+                      computeWasmStringHash(str.utf8)
+                    } else {
+                      computeNativeStringHash(str.utf8)
+                    },
                   },
                   32,
                 )
@@ -3777,7 +3781,11 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       buckets: SortedMap<Int, Array<(Int, LongUTF8String)>> = longCases.foldl(
         (acc, case) -> {
           (_, str) = case;
-          hash = str.runtimeHash;
+          hash = if (targetIsWasm() || isEmbedded()) {
+            computeWasmStringHash(str.utf8)
+          } else {
+            computeNativeStringHash(str.utf8)
+          };
           header = hash.shl(32).or(str.utf8.size());
           masked = header.shl(highHashShift);
           acc.setWith(masked, Array[case], (old, v) -> {
