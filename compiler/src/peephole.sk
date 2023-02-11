@@ -1734,15 +1734,11 @@ private fun peepholeStringHash(peep: StringHash, s: mutable Peephole): Instr {
   s.getInstr(peep.value) match {
   | ConstantString{value} ->
     s.constantInt(
-      value match {
-      | x @ ShortUTF8String _ -> x.bits()
-      | x @ LongUTF8String _ ->
-        if (targetIsWasm() || isEmbedded()) {
-          computeWasmStringHash(x.utf8)
-        } else {
-          // bytesize | hash<<32
-          computeNativeStringHash(x.utf8).shl(32).or(value.utf8.size())
-        }
+      if (targetIsWasm() || isEmbedded()) {
+        computeWasmStringHash(value.utf8)
+      } else {
+        // bytesize | hash<<32
+        computeNativeStringHash(value.utf8).shl(32).or(value.utf8.size())
       },
     )
   | _ -> peep
