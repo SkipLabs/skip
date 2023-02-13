@@ -494,6 +494,19 @@ mutable class Compiler{
     invCols = mutable Map[];
     slot = 0;
 
+    origFromMap = mutable Map[];
+    for (tableRange in from) {
+      (table, _range) = tableRange;
+      if (!origFromMap.containsKey(table.name)) {
+        origFromMap![table.name] = table;
+      };
+      table.alias match {
+      | Some(alias) if (!origFromMap.containsKey(alias)) ->
+        origFromMap![alias] = table
+      | _ -> void
+      }
+    };
+
     if (params.isStar) {
       for (dirDescr in from) {
         for (tyName in dirDescr.i0.colNames) {
@@ -509,6 +522,15 @@ mutable class Compiler{
     for (paramIdx => param in params.params) {
       idx = slot + paramIdx;
       param match {
+      | (Binop(".", Literal(tableNameStr, false), Literal("*", false)), _) ->
+        dirDescr = origFromMap[Name::create(tableNameStr)];
+        for (tyName in dirDescr.colNames) {
+          if (!cols.containsKey(tyName)) {
+            !cols[tyName] = slot;
+            invCols![slot] = tyName;
+          };
+          !slot = slot + 1;
+        }
       | (_, Some(colName)) ->
         if (cols.containsKey(colName)) continue;
         !cols[colName] = idx;

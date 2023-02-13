@@ -236,3 +236,9 @@ if cat test/test_table_dot_star.sql | $SKDB --always-allow-joins | grep -q "2|3|
 else
     echo -e "TEST DOT STAR:\tFAILED"
 fi
+
+if cat test/test_index_on_star.sql | $SKDB --show-used-indexes | grep -q "USING INDEX: v1_a"; then
+    echo -e "TEST INDEX DOT STAR:\tOK"
+else
+    echo -e "TEST INDEX DOT STAR:\tFAILED"
+fi
