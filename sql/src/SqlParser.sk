@@ -1259,35 +1259,50 @@ fun parseTypeName(lex: Lexer, pos: Int): (Int, Type) {
 
 fun parseType(lex: Lexer, pos: Int): (Int, Type, Bool, Bool, ?Value, Bool) {
   (!pos, ty) = parseTypeName(lex, pos);
-  isPrimaryKey = if (lex.isEqUpper(pos, "PRIMARY")) {
-    !pos = lex.expectUpper(pos, "PRIMARY");
-    !pos = lex.expectUpper(pos, "KEY");
-    true
-  } else {
-    false
-  };
-  isUnique = if (lex.isEqUpper(pos, "UNIQUE")) {
-    !pos = lex.expectUpper(pos, "UNIQUE");
-    true
-  } else {
-    false
-  };
-  default = if (lex.isEqUpper(pos, "DEFAULT")) {
-    !pos = lex.expectUpper(pos, "DEFAULT");
-    (!pos, e) = parseValue(lex, pos);
-    Some(e)
-  } else {
-    None()
-  };
-  isNotNull = if (lex.isEqUpper(pos, "NOT")) {
-    !pos = lex.expectUpper(pos, "NOT");
-    !pos = lex.expectUpper(pos, "NULL");
-    true
-  } else {
-    false
-  };
+  (!pos, isPrimaryKey, isUnique, default, isNotNull) = parseTypeRest(lex, pos);
   if (!isNotNull && !isPrimaryKey && !isUnique && default is None()) {
     !default = Some(VNull())
   };
   (pos, ty, isPrimaryKey, isUnique, default, isNotNull)
+}
+
+fun parseTypeRest(lex: Lexer, pos: Int): (Int, Bool, Bool, ?Value, Bool) {
+  isPrimaryKey = false;
+  isUnique = false;
+  default: ?Value = None();
+  isNotNull = false;
+
+  while (!isEOF(lex, pos)) {
+    shouldContinue = false;
+    if (lex.isEqUpper(pos, "PRIMARY")) {
+      !pos = lex.expectUpper(pos, "PRIMARY");
+      !pos = lex.expectUpper(pos, "KEY");
+      if (isPrimaryKey) error(pos, "PRIMARY already set");
+      !shouldContinue = true;
+      !isPrimaryKey = true;
+    };
+    if (lex.isEqUpper(pos, "UNIQUE")) {
+      !pos = lex.expectUpper(pos, "UNIQUE");
+      if (isUnique) error(pos, "UNIQUE already set");
+      !shouldContinue = true;
+      !isUnique = true;
+    };
+    if (lex.isEqUpper(pos, "DEFAULT")) {
+      !pos = lex.expectUpper(pos, "DEFAULT");
+      if (default is Some _) error(pos, "DEFAULT already set");
+      !shouldContinue = true;
+      (!pos, e) = parseValue(lex, pos);
+      !default = Some(e);
+    };
+    if (lex.isEqUpper(pos, "NOT")) {
+      !pos = lex.expectUpper(pos, "NOT");
+      !pos = lex.expectUpper(pos, "NULL");
+      if (isNotNull) error(pos, "NOT NULL already set");
+      !shouldContinue = true;
+      !isNotNull = true;
+    };
+    if (shouldContinue) continue;
+    break void
+  };
+  (pos, isPrimaryKey, isUnique, default, isNotNull)
 }
