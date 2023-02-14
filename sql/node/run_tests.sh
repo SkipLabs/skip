@@ -202,3 +202,14 @@ then
 else
     echo -e "TEST COLUMN CASING :\tFAILED"
 fi
+
+if
+    ((
+        cat ../../build/skdb_node.js;
+        cat tests/test_root.js
+    ) | $node 2>&1) | tr '\n' 'S' | grep -q 'todos \[\]S'
+then
+    echo -e "TEST ROOT:\tOK"
+else
+    echo -e "TEST ROOT :\tFAILED"
+fi

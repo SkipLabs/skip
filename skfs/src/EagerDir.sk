@@ -1385,14 +1385,23 @@ class EagerDir{
     this
   }
 
+  fun writeArrayReturnDir(
+    context: mutable Context,
+    key: BaseName,
+    values: Array<File>,
+  ): this {
+    source = Path::create(this.dirName, key);
+    !this = this.writeEntry(context, source, key, values);
+    context.!toReset = context.toReset.set(this.dirName);
+    this
+  }
+
   fun writeArray(
     context: mutable Context,
     key: BaseName,
     values: Array<File>,
   ): void {
-    source = Path::create(this.dirName, key);
-    !this = this.writeEntry(context, source, key, values);
-    context.!toReset = context.toReset.set(this.dirName);
+    !this = this.writeArrayReturnDir(context, key, values);
     context.setDir(this.dirName, this);
   }
 

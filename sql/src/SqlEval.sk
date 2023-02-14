@@ -1840,7 +1840,19 @@ fun initJSRoots(): void {
   saved = SKFS.newObstack();
   vtry(
     () -> {
-      SKFS.runWithGc(SKFS.Context{}, context ~> {
+      SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+        context.unsafeMaybeGetEagerDir(jsRootsInputDirName) match {
+        | None() -> void
+        | Some(dir) ->
+          dir.onFiles(iter -> {
+            for (kv in iter) {
+              (key, _fileIter) = kv;
+              !dir = dir.writeArrayReturnDir(context, key, Array[]);
+            };
+          });
+          context.setDir(dir.dirName, dir);
+          return SKFS.CStop(None())
+        };
         context.!globals = SortedMap[];
         dirDescr = DirDescr::create{
           name => jsRootsName,
@@ -1910,7 +1922,7 @@ fun addRoot(rootName: String, funId: Int32, funArg: String): void {
   saved = SKFS.newObstack();
   vtry(
     () -> {
-      SKFS.runWithGc(SKFS.Context{}, context ~> {
+      SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
         context.!globals = SortedMap[];
         (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
           context,
@@ -1935,7 +1947,7 @@ fun removeRoot(rootName: String): void {
   saved = SKFS.newObstack();
   vtry(
     () -> {
-      SKFS.runWithGc(SKFS.Context{}, context ~> {
+      SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
         context.!globals = SortedMap[];
         if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
           return SKFS.CStop(None());
