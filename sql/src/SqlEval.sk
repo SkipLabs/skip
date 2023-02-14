@@ -1802,6 +1802,26 @@ native fun getLocalContext(): mutable SKFS.Context;
 @cpp_extern("SKIP_call_external_fun")
 native fun callExternalFun(Int32, String): String;
 
+fun withLocalContext<T>(context: mutable SKFS.Context, f: () -> T): T {
+  if (hasLocalContext() == 0) {
+    setLocalContext(context);
+    result = vtry(f, exn -> {
+      removeLocalContext();
+      throw exn
+    });
+    removeLocalContext();
+    result
+  } else {
+    oldContext = getLocalContext();
+    result = vtry(f, exn -> {
+      setLocalContext(oldContext);
+      throw exn
+    });
+    setLocalContext(oldContext);
+    result
+  }
+}
+
 class AlreadyDefiningRoot() extends Exception {
   fun getMessage(): String {
     "Cannot define a root while already defining a root"
@@ -1857,21 +1877,21 @@ fun initJSRoots(): void {
             SKFS.StringFile::fromFile,
             context,
             jsRootsValuesDirName,
-            (context, writer, baseName, values) ~> {
-              setLocalContext(context);
-              name = baseName match {
-              | SKFS.SID(x) -> x
-              | _ -> invariant_violation("Unexpected key type")
-              };
-              invariant(values.size() == 1);
-              value = values[0];
-              result = callExternalFun(value.funId, value.funArg);
-              row = RowValues::create(
-                Array[Some(CString(name)), Some(CString(result))],
-              );
-              writer.write(RowKey(row, kinds), row);
-              removeLocalContext()
-            },
+            (context, writer, baseName, values) ~>
+              withLocalContext(context, () -> {
+                name = baseName match {
+                | SKFS.SID(x) -> x
+                | _ -> invariant_violation("Unexpected key type")
+                };
+                invariant(values.size() == 1);
+                value = values[0];
+                result = callExternalFun(value.funId, value.funArg);
+                row = RowValues::create(
+                  Array[Some(CString(name)), Some(CString(result))],
+                );
+                writer.write(RowKey(row, kinds), row);
+              })
+            ,
           );
         SKFS.CStop(None());
       })
@@ -1902,12 +1922,10 @@ fun addRoot(rootName: String, funId: Int32, funArg: String): void {
       })
     },
     exn -> {
-      removeLocalContext();
       SKFS.destroyObstack(saved);
       throw (exn);
     },
   );
-  removeLocalContext();
   SKFS.destroyObstack(saved);
 }
 
@@ -1954,17 +1972,18 @@ fun initTrackedJSCalls(context: mutable SKFS.Context): void {
     SKFS.StringFile::fromFile,
     context,
     trackedJSCallsDirName,
-    (context, _self, key) ~> {
-      setLocalContext(context);
-      (funIdStr, funArg) = key match {
-      | SKFS.SID(v) -> v.splitFirst("#")
-      | _ -> invariant_violation("Invalid key type")
-      };
-      funId = Int32::truncate(funIdStr.toInt());
-      result = callExternalFun(funId, funArg);
-      removeLocalContext();
-      Array[SKFS.StringFile(result)]
-    },
+    (context, _self, key) ~>
+      withLocalContext(context, () -> {
+        setLocalContext(context);
+        (funIdStr, funArg) = key match {
+        | SKFS.SID(v) -> v.splitFirst("#")
+        | _ -> invariant_violation("Invalid key type")
+        };
+        funId = Int32::truncate(funIdStr.toInt());
+        result = callExternalFun(funId, funArg);
+        Array[SKFS.StringFile(result)]
+      })
+    ,
   );
 }
 
