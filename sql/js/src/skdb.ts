@@ -380,7 +380,6 @@ export class SKDB {
   private lineBuffer: Array<number> = [];
   private storeName: string;
   private nbrInitPages: number = -1;
-  private rootsAreInitialized = false;
   private roots: Map<string, number> = new Map();
   private pageSize: number = -1;
   private db: IDBDatabase | null = null;
@@ -425,6 +424,10 @@ export class SKDB {
       reboot,
       client.pageSize
     );
+
+    client.exports.SKIP_init_jsroots();
+    client.runSubscribeRoots(reboot);
+
     return client;
   }
 
@@ -651,7 +654,7 @@ export class SKDB {
     return this.stdout.join("");
   }
 
-  runSubscribeRoots(): void {
+  runSubscribeRoots(reboot: boolean): void {
     this.roots = new Map();
     this.attach((text) => {
       let changed = new Map();
@@ -676,10 +679,12 @@ export class SKDB {
     });
     this.subscriptionCount++;
     let fileName = "/subscriptions/jsroots";
-    this.runLocal(
-      ["subscribe", "jsroots", "--format=json", "--updates", fileName],
-      ""
-    );
+    if(reboot) {
+      this.runLocal(
+        ["subscribe", "jsroots", "--format=json", "--updates", fileName],
+        ""
+      );
+    }
   }
 
   watermark(table: string): number {
@@ -916,11 +921,6 @@ export class SKDB {
     callable: SKDBCallable<T1, T2>,
     arg: T1
   ): void {
-    if (!this.rootsAreInitialized) {
-      this.rootsAreInitialized = true;
-      this.exports.SKIP_init_jsroots();
-      this.runSubscribeRoots();
-    }
     this.runAddRoot(rootName, callable.getId(), arg);
   }
 
