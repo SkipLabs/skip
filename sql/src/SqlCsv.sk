@@ -161,9 +161,9 @@ fun replayDiff(
   lineNbr: mutable Ref<Int>,
   getLine: () -> String,
   table: SKSQL.DirDescr,
-  user: ?(String, String),
+  user: ?String
 ): SKFS.ContextOp {
-  userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x.i0, x.i1));
+  userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
   if (table.windowSize is Some _) {
     print_error("Cannot use write-csv on a window or a stream");

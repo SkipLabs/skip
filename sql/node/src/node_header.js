@@ -1,3 +1,4 @@
+const crypto = require('node:crypto').webcrypto;
 const util = require('util');
 const fs = require('fs');
 let FileReader = require('filereader');

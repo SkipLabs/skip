@@ -22,8 +22,8 @@ run_server() {
     SKDB="$SKDB_BIN --data $SERVER_DB"
 
     (echo "BEGIN TRANSACTION;";
-     echo "INSERT INTO skdb_users VALUES(1, 'test_user1', 'pass');"
-     echo "INSERT INTO skdb_users VALUES(2, 'test_user2', 'pass');"
+     echo "INSERT INTO skdb_users VALUES(1, 'test_user1', 'test');"
+     echo "INSERT INTO skdb_users VALUES(2, 'test_user2', 'test');"
      echo "COMMIT;"
     ) | $SKDB
 

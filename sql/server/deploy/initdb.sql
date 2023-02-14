@@ -2,11 +2,13 @@
 -- Creating the users
 -------------------------------------------------------------------------------
 
-insert into skdb_users values(id(), 'julienv', 'passjulienv');
-insert into skdb_users values(id(), 'daniell', 'passdaniell');
-insert into skdb_users values(id(), 'gregs', 'passgregs');
-insert into skdb_users values(id(), 'lucash', 'passlucash');
-insert into skdb_users values(id(), 'laurem', 'passlaurem');
+-- private keys here are base64 32 byte keys. generated using a CSRNG.
+-- just for testing, these are not yet stored encrypted.
+insert into skdb_users values(id(), 'julienv', '95Sy1oXnFqEZN9eckBwG5VckcW6eOwyyOkmAFIRLyfc=');
+insert into skdb_users values(id(), 'daniell', 'KfWim+Z5bIqEo4l2TKcMQ7KhefyFzdPIZf4AeOR37ng=');
+insert into skdb_users values(id(), 'gregs', 'CVFyn9bhLC/JgrnlIDB28K2PILUHxHaEEYS+dfkDJd0=');
+insert into skdb_users values(id(), 'lucash', 'UE/7HZ/o1bC2X8PzvHzJwSCmEAPC+ArxxImUCdQhZKA=');
+insert into skdb_users values(id(), 'laurem', 'YP6CFwzl6ROYthbD/7CIyK8gOyazeiwL3bziCPc/c+k=');
 
 create table profiles(
   skdb_owner INTEGER,

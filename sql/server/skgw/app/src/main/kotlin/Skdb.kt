@@ -1,8 +1,10 @@
 package io.skiplabs.skgw
 
 import java.io.BufferedReader
+import java.util.Base64
 
 enum class OutputFormat(val flag: String) {
+  RAW("--format=sql"),
   JSON("--format=json"),
   CSV("--format=csv"),
 }
@@ -51,14 +53,11 @@ class Skdb(val dbPath: String) {
 
   fun writeCsv(
       user: String,
-      password: String,
       table: String,
       callback: (String) -> Unit,
       closed: () -> Unit,
   ): Process {
-    val pb =
-        ProcessBuilder(
-            SKDB_PROC, "write-csv", table, "--data", dbPath, "--user", user, "--password", password)
+    val pb = ProcessBuilder(SKDB_PROC, "write-csv", table, "--data", dbPath, "--user", user)
 
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
 
@@ -78,7 +77,6 @@ class Skdb(val dbPath: String) {
 
   fun tail(
       user: String,
-      password: String,
       table: String,
       since: Int,
       callback: (String) -> Unit,
@@ -88,16 +86,7 @@ class Skdb(val dbPath: String) {
     val connection =
         blockingRun(
             ProcessBuilder(
-                SKDB_PROC,
-                "subscribe",
-                table,
-                "--connect",
-                "--data",
-                dbPath,
-                "--user",
-                user,
-                "--password",
-                password))
+                SKDB_PROC, "subscribe", table, "--connect", "--data", dbPath, "--user", user))
     val pb =
         ProcessBuilder(
             SKDB_PROC,
@@ -124,5 +113,15 @@ class Skdb(val dbPath: String) {
     t.start()
 
     return proc
+  }
+
+  fun privateKeyAsStored(user: String): ByteArray {
+      val key = sql("SELECT privateKey FROM skdb_users WHERE username = '${user}';", OutputFormat.RAW).trim()
+
+      if (key.isEmpty()) {
+          throw IllegalArgumentException("User ${user} could not be found.");
+      }
+
+      return Base64.getDecoder().decode(key)
   }
 }

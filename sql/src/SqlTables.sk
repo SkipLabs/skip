@@ -117,7 +117,7 @@ class SubRequestFile(
   init: Bool,
   cmd: SKFS.CmdKind,
   sessionID: Int,
-  user: ?(String, String),
+  user: ?String,
 ) extends SKFS.File
 
 fun getSubsDirs(
@@ -181,8 +181,8 @@ fun getSubsDirs(
       };
       reset = request.user match {
       | None() -> (_, _) ~> false
-      | Some((userName, password)) ->
-        userFile = SKSQL.UserFile::create(context, userName, password);
+      | Some(userName) ->
+        userFile = SKSQL.UserFile::create(context, userName);
         (context: SKFS.Context, tick: SKFS.Tick) ~> {
           readers = context.unsafeGetEagerDir(SKFS.accessReaders);
           for (rowKey in readers.getChangesAfter(tick)) {
@@ -199,8 +199,8 @@ fun getSubsDirs(
       };
       (userFile, matchesGroup, filter) = request.user match {
       | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
-      | Some((userName, password)) ->
-        userFile = SKSQL.UserFile::create(context, userName, password);
+      | Some(userName) ->
+        userFile = SKSQL.UserFile::create(context, userName);
         accessColNbr = dirDescr.cols.maybeGet(skdbAccess) match {
         | None() ->
           print_error(
