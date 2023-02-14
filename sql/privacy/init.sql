@@ -5,7 +5,7 @@
 create table skdb_users(
   userID integer primary key,
   username string unique not null,
-  password string not null
+  privateKey string not null
 );
 
 -------------------------------------------------------------------------------

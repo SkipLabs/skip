@@ -16,6 +16,13 @@ import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.File
 import java.nio.channels.Channel
+import java.time.Duration
+import java.time.Instant
+import java.util.Base64
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlin.io.bufferedWriter
 import kotlin.reflect.KClass
 import org.xnio.ChannelListener
@@ -23,6 +30,7 @@ import org.xnio.ChannelListener
 class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
   override fun classFor(type: Any): KClass<out ProtoMessage> =
       when (type as String) {
+        "auth" -> ProtoAuth::class
         "query" -> ProtoQuery::class
         "tail" -> ProtoTail::class
         "dumpTable" -> ProtoDumpTable::class
@@ -32,23 +40,22 @@ class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
       }
 }
 
-// TODO: the protocol has no way of communicating errors
 @TypeFor(field = "request", adapter = ProtoTypeAdapter::class)
 sealed class ProtoMessage(val request: String)
+
+data class ProtoAuth(val accessKey: String, val date: String, val signature: String) :
+    ProtoMessage("auth")
 
 data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMessage("query")
 
 data class ProtoTail(
     val table: String,
-    val user: String,
-    val password: String,
     val since: Int = 0,
 ) : ProtoMessage("tail")
 
 data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
 
-data class ProtoWrite(val table: String, val user: String, val password: String) :
-    ProtoMessage("write")
+data class ProtoWrite(val table: String) : ProtoMessage("write")
 
 data class ProtoData(val data: String) : ProtoMessage("pipe")
 
@@ -64,86 +71,239 @@ fun serialise(msg: ProtoMessage): String {
   return Klaxon().toJsonString(msg)
 }
 
-fun handleRequest(message: String, channel: WebSocketChannel, state: ChannelState): Unit {
-  val req = parse(message)
+val maxConnectionDuration: Duration = Duration.ofMinutes(10)
 
-  when (req) {
-    is ProtoQuery -> {
-      val format =
-          when (req.format) {
-            "csv" -> OutputFormat.CSV
-            "json" -> OutputFormat.JSON
-            else -> OutputFormat.CSV
-          }
-      val result = Skdb(state.dbPath).sql(req.query, format)
-      val payload = serialise(ProtoData(result))
-      WebSockets.sendTextBlocking(payload, channel)
-      channel.sendClose()
+sealed interface Conn {
+
+  fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn
+  fun handleMessage(message: String, channel: WebSocketChannel) =
+      handleMessage(parse(message), channel)
+
+  fun close(): Conn
+}
+
+class EstablishedConn(val proc: Process, val authenticatedAt: Instant) : Conn {
+
+  private fun unexpectedMsg(channel: WebSocketChannel): Conn {
+    if (channel.isOpen()) {
+      WebSockets.sendCloseBlocking(1002, "unexpected request on established connection", channel)
       channel.close()
     }
-    is ProtoDumpTable -> {
-      val result = Skdb(state.dbPath).dumpTable(req.table, req.suffix)
-      val payload = serialise(ProtoData(result))
-      WebSockets.sendTextBlocking(payload, channel)
-      channel.sendClose()
+
+    return ErroredConn()
+  }
+
+  override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
+    val now = Instant.now()
+    if (Duration.between(authenticatedAt, now).abs().compareTo(maxConnectionDuration) > 0) {
+      WebSockets.sendCloseBlocking(1011, "session timeout", channel)
       channel.close()
+      return ErroredConn()
     }
-    is ProtoTail -> {
-      val proc =
-          Skdb(state.dbPath)
-              .tail(
-                  req.user,
-                  req.password,
-                  req.table,
-                  req.since,
-                  {
-                    if (channel.isOpen()) {
-                        val payload = serialise(ProtoData(it))
-                        WebSockets.sendTextBlocking(payload, channel)
-                    }
-                  },
-                  {
-                    if (channel.isOpen()) {
-                      WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
-                    }
-                  },
-              )
-      state.proc = proc
-    }
-    is ProtoWrite -> {
-      val proc =
-          Skdb(state.dbPath)
-              .writeCsv(
-                  req.user,
-                  req.password,
-                  req.table,
-                  {
-                    if (channel.isOpen()) {
-                        val payload = serialise(ProtoData(it))
-                        WebSockets.sendTextBlocking(payload, channel)
-                    }
-                  },
-                  {
-                    if (channel.isOpen()) {
-                      WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
-                    }
-                  })
-      state.proc = proc
-    }
-    is ProtoData -> {
-      val stdin = state.proc?.outputStream
-      if (stdin == null) {
-        throw RuntimeException("data received on a connection without a process setup")
+
+    when (request) {
+      is ProtoAuth -> return unexpectedMsg(channel)
+      is ProtoQuery -> return unexpectedMsg(channel)
+      is ProtoDumpTable -> return unexpectedMsg(channel)
+      is ProtoTail -> return unexpectedMsg(channel)
+      is ProtoWrite -> return unexpectedMsg(channel)
+      is ProtoData -> {
+        val stdin = proc.outputStream
+        if (stdin == null) {
+          throw RuntimeException("data received on a connection without a process setup")
+        }
+        // stream data to the process attached to this channel
+        val writer = stdin.bufferedWriter()
+        writer.write(request.data)
+        writer.flush()
+        return this
       }
-      // stream data to the process attached to this channel
-      val writer = stdin.bufferedWriter()
-      writer.write(req.data)
-      writer.flush()
     }
+  }
+
+  override fun close(): Conn {
+    this.proc.outputStream?.close()
+    return ClosedConn()
   }
 }
 
-data class ChannelState(var proc: Process?, val dbPath: String)
+class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticatedAt: Instant) :
+    Conn {
+
+  override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
+    val now = Instant.now()
+    if (Duration.between(authenticatedAt, now).abs().compareTo(maxConnectionDuration) > 0) {
+      WebSockets.sendCloseBlocking(1011, "session timeout", channel)
+      channel.close()
+      return ErroredConn()
+    }
+
+    when (request) {
+      is ProtoQuery -> {
+        val format =
+            when (request.format) {
+              "csv" -> OutputFormat.CSV
+              "json" -> OutputFormat.JSON
+              else -> OutputFormat.CSV
+            }
+        val result = skdb.sql(request.query, format)
+        val payload = serialise(ProtoData(result))
+        WebSockets.sendTextBlocking(payload, channel)
+        channel.sendClose()
+        channel.close()
+        return ClosedConn()
+      }
+      is ProtoDumpTable -> {
+        val result = skdb.dumpTable(request.table, request.suffix)
+        val payload = serialise(ProtoData(result))
+        WebSockets.sendTextBlocking(payload, channel)
+        channel.sendClose()
+        channel.close()
+        return ClosedConn()
+      }
+      is ProtoTail -> {
+        val proc =
+            skdb.tail(
+                accessKey,
+                request.table,
+                request.since,
+                {
+                  if (channel.isOpen()) {
+                    val payload = serialise(ProtoData(it))
+                    WebSockets.sendTextBlocking(payload, channel)
+                  }
+                },
+                {
+                  if (channel.isOpen()) {
+                    WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                    channel.close()
+                  }
+                },
+            )
+        return EstablishedConn(proc, authenticatedAt)
+      }
+      is ProtoWrite -> {
+        val proc =
+            skdb.writeCsv(
+                accessKey,
+                request.table,
+                {
+                  if (channel.isOpen()) {
+                    val payload = serialise(ProtoData(it))
+                    WebSockets.sendTextBlocking(payload, channel)
+                  }
+                },
+                {
+                  if (channel.isOpen()) {
+                    WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                    channel.close()
+                  }
+                })
+        return EstablishedConn(proc, authenticatedAt)
+      }
+      is ProtoAuth -> {
+        WebSockets.sendCloseBlocking(1002, "unexpected re-auth on established connection", channel)
+        channel.close()
+        return ErroredConn()
+      }
+      is ProtoData -> {
+        WebSockets.sendCloseBlocking(1002, "unexpected request on established connection", channel)
+        channel.close()
+        return ErroredConn()
+      }
+    }
+  }
+
+  override fun close(): Conn {
+    return ClosedConn()
+  }
+}
+
+class UnauthenticatedConn(val skdb: Skdb) : Conn {
+
+  private fun unexpectedMsg(channel: WebSocketChannel): Conn {
+    if (channel.isOpen()) {
+      WebSockets.sendCloseBlocking(1002, "connection not yet authenticated", channel)
+      channel.close()
+    }
+
+    return ErroredConn()
+  }
+
+  private fun verify(request: ProtoAuth): Boolean {
+    val algo = "HmacSHA256"
+
+    val now = Instant.now()
+    val d = Instant.parse(request.date)
+    // delta represents physical timeline time, regardless of calendars and clock shifts
+    val delta = Duration.between(d, now)
+
+    // do not allow requests that were not recent. the margin is for clock skew.
+    if (delta.abs().compareTo(Duration.ofMinutes(10)) > 0) {
+      return false
+    }
+
+    val content: String = request.request + request.accessKey + request.date
+    val contentBytes = content.toByteArray(Charsets.UTF_8)
+
+    val mac = Mac.getInstance(algo)
+    val privateKey = skdb.privateKeyAsStored(request.accessKey)
+    mac.init(SecretKeySpec(privateKey, algo))
+    val ourSig = mac.doFinal(contentBytes)
+    // at least try to keep the private key in memory for as little time as possible
+    privateKey.fill(0)
+
+    val b64sig = Base64.getEncoder().encodeToString(ourSig)
+
+    return b64sig == request.signature
+  }
+
+  override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
+    when (request) {
+      is ProtoQuery -> return unexpectedMsg(channel)
+      is ProtoDumpTable -> return unexpectedMsg(channel)
+      is ProtoTail -> return unexpectedMsg(channel)
+      is ProtoWrite -> return unexpectedMsg(channel)
+      is ProtoData -> return unexpectedMsg(channel)
+      is ProtoAuth -> {
+        if (!verify(request)) {
+          if (channel.isOpen()) {
+            WebSockets.sendCloseBlocking(1002, "authentication failed", channel)
+            channel.close()
+          }
+
+          return ErroredConn()
+        }
+
+        return AuthenticatedConn(skdb, request.accessKey, Instant.now())
+      }
+    }
+  }
+
+  override fun close(): Conn {
+    return this
+  }
+}
+
+class ErroredConn() : Conn {
+  override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
+    return this
+  }
+
+  override fun close(): Conn {
+    return this
+  }
+}
+
+class ClosedConn() : Conn {
+  override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
+    return this
+  }
+
+  override fun close(): Conn {
+    return this
+  }
+}
 
 fun resolveDbPath(db: String?): String? {
   if (db == null) {
@@ -158,6 +318,8 @@ fun createHttpServer(): Undertow {
   val rootHandler =
       Handlers.path()
           .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
+
+  val taskPool = Executors.newSingleThreadScheduledExecutor()
 
   var pathHandler =
       PathTemplateHandler(rootHandler)
@@ -177,14 +339,18 @@ fun createHttpServer(): Undertow {
                       if (dbPath == null) {
                         // 1011 is internal error
                         WebSockets.sendCloseBlocking(1011, "resource not found", channel)
+                        channel.close()
                         return
                       }
 
-                      // TODO: should harvest the user/auth, and
-                      // database here. these are
-                      // connection-specific properties
+                      val skdb = Skdb(dbPath)
 
-                      val state = ChannelState(proc = null, dbPath)
+                      var conn: Conn = UnauthenticatedConn(skdb)
+
+                      val timeout = taskPool.schedule({
+                          conn.close()
+                          channel.close()
+                      }, 10, TimeUnit.MINUTES)
 
                       channel.receiveSetter.set(
                           object : AbstractReceiveListener() {
@@ -193,10 +359,11 @@ fun createHttpServer(): Undertow {
                                 message: BufferedTextMessage
                             ) {
                               try {
-                                handleRequest(message.data, channel, state)
+                                conn = conn.handleMessage(message.data, channel)
                               } catch (ex: Exception) {
                                 // 1011 is internal error
                                 WebSockets.sendCloseBlocking(1011, ex.message, channel)
+                                channel.close()
                               }
                             }
                           })
@@ -204,7 +371,8 @@ fun createHttpServer(): Undertow {
                       channel.closeSetter.set(
                           object : ChannelListener<Channel> {
                             override fun handleEvent(channel: Channel): Unit {
-                              state.proc?.outputStream?.close()
+                              timeout.cancel(false)
+                              conn = conn.close()
                               // TODO: wait and ensure the process ends, forcibly close on
                               // timeout
                             }
