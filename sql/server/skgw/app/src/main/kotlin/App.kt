@@ -347,10 +347,14 @@ fun createHttpServer(): Undertow {
 
                       var conn: Conn = UnauthenticatedConn(skdb)
 
-                      val timeout = taskPool.schedule({
-                          conn.close()
-                          channel.close()
-                      }, 10, TimeUnit.MINUTES)
+                      val timeout =
+                          taskPool.schedule(
+                              {
+                                conn.close()
+                                channel.close()
+                              },
+                              10,
+                              TimeUnit.MINUTES)
 
                       channel.receiveSetter.set(
                           object : AbstractReceiveListener() {
