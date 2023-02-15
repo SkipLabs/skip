@@ -2,54 +2,54 @@
 -- Users
 -------------------------------------------------------------------------------
 
-create table skdb_users(
-  userID integer primary key,
-  username string unique not null,
-  privateKey string not null
+CREATE TABLE skdb_users(
+  userID INTEGER PRIMARY KEY,
+  username STRING UNIQUE NOT NULL,
+  privateKey STRING NOT NULL
 );
 
 -------------------------------------------------------------------------------
 -- Groups
 -------------------------------------------------------------------------------
 
-create table skdb_groups(
-  groupID integer primary key,
-  members string not null
+CREATE TABLE skdb_groups(
+  groupID INTEGER PRIMARY KEY,
+  members STRING NOT NULL
 );
 
 -- Passed this point The view skdb_groups_members is created by the db.
-create index skdb_groups_index on skdb_groups(members);
-create index skdb_groups_members_memberID on skdb_groups_members(memberID);
+CREATE INDEX skdb_groups_index ON skdb_groups(members);
+CREATE INDEX skdb_groups_members_memberID ON skdb_groups_members(memberID);
 
-create table whitelist_noone(userID integer);
-create table blacklist_noone(userID integer);
+CREATE TABLE whitelist_noone(userID INTEGER);
+CREATE TABLE blacklist_noone(userID INTEGER);
 
-insert into skdb_groups values (1, 'whitelist_noone');
-insert into skdb_groups values (-1, 'blacklist_noone');
+INSERT INTO skdb_groups VALUES (1, 'whitelist_noone');
+INSERT INTO skdb_groups VALUES (-1, 'blacklist_noone');
 
 -------------------------------------------------------------------------------
 -- Access
 -------------------------------------------------------------------------------
 
-create table skdb_access(
-  accessID integer primary key,
-  readersID integer not null,
-  writersID integer not null,
-  name string unique
+CREATE TABLE skdb_access(
+  accessID INTEGER PRIMARY KEY,
+  readersID INTEGER NOT NULL,
+  writersID INTEGER NOT NULL,
+  name STRING UNIQUE
 );
 
-create virtual view skdb_access_readers as select
-  accessID integer,
-  memberID integer
-from skdb_access, skdb_groups_members
-where readersID = groupID
+CREATE VIRTUAL VIEW skdb_access_readers AS SELECT
+  accessID INTEGER,
+  memberID INTEGER
+FROM skdb_access, skdb_groups_members
+WHERE readersID = groupID
 ;
 
-create virtual view skdb_access_writers as select
-  accessID integer,
-  memberID integer
-from skdb_access, skdb_groups_members
-where writersID = groupID
+CREATE VIRTUAL VIEW skdb_access_writers AS SELECT
+  accessID INTEGER,
+  memberID INTEGER
+FROM skdb_access, skdb_groups_members
+WHERE writersID = groupID
 ;
 
-insert into skdb_access values (-1, -1, -1, 'everyone');
+INSERT INTO skdb_access VALUES (-1, -1, -1, 'everyone');

@@ -6,14 +6,13 @@
 
 set -e
 
-# allow passing a memorable name otherwise generate a random one
-if [[ -z $1 ]]
-then
-    DB_NAME=$(openssl rand -hex 8)
-    echo $DB_NAME
-else
-    DB_NAME=$1
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <db-name> <b64-encrypted-root-psk>"
+    exit 1
 fi
+
+DB_NAME=$1
+ROOT_KEY=$2
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -33,11 +32,9 @@ fi
 SKDB_BIN=/skfs/build/skdb
 SKDB="$SKDB_BIN --data $DB_FILE"
 
-$SKDB_BIN --init $DB_FILE
+$SKDB_BIN --init "$DB_FILE"
 
 # setup the base tables used for access-control
-cat $SCRIPT_DIR/../../privacy/init.sql | $SKDB
+$SKDB < "$SCRIPT_DIR/../../privacy/init.sql"
 
-# setup some test tables
-cat $SCRIPT_DIR/initdb.sql | $SKDB
-
+echo "INSERT INTO skdb_users VALUES (0, 'root', '$ROOT_KEY')" | $SKDB
