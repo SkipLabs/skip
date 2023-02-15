@@ -5,8 +5,12 @@ import com.beust.klaxon.TypeAdapter
 import com.beust.klaxon.TypeFor
 import io.undertow.Handlers
 import io.undertow.Undertow
+import io.undertow.server.HttpHandler
+import io.undertow.server.HttpServerExchange
 import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.server.handlers.resource.FileResourceManager
+import io.undertow.util.Headers
+import io.undertow.util.HttpString
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.WebSocketConnectionCallback
 import io.undertow.websockets.core.AbstractReceiveListener
@@ -16,10 +20,12 @@ import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.File
 import java.nio.channels.Channel
+import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -306,89 +312,116 @@ class ClosedConn() : Conn {
   }
 }
 
-fun resolveDbPath(db: String?): String? {
-  if (db == null) {
-    return null
-  }
+fun connectionHandler(
+    taskPool: ScheduledExecutorService,
+    encryption: EncryptionTransform
+): HttpHandler {
+  return Handlers.websocket(
+      object : WebSocketConnectionCallback {
+        override fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel) {
+          val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+          val db = pathParams["database"]
+          val skdb = openSkdb(db)
 
-  val path = "/var/db/${db}.db"
-  return if (File(path).exists()) path else null
+          if (skdb == null) {
+            // 1011 is internal error
+            WebSockets.sendCloseBlocking(1011, "resource not found", channel)
+            channel.close()
+            return
+          }
+
+          var conn: Conn = UnauthenticatedConn(skdb, encryption)
+
+          val timeout =
+              taskPool.schedule(
+                  {
+                    conn.close()
+                    channel.close()
+                  },
+                  10,
+                  TimeUnit.MINUTES)
+
+          channel.receiveSetter.set(
+              object : AbstractReceiveListener() {
+                override fun onFullTextMessage(
+                    channel: WebSocketChannel,
+                    message: BufferedTextMessage
+                ) {
+                  try {
+                    conn = conn.handleMessage(message.data, channel)
+                  } catch (ex: Exception) {
+                    // 1011 is internal error
+                    WebSockets.sendCloseBlocking(1011, ex.message, channel)
+                    channel.close()
+                  }
+                }
+              })
+
+          channel.closeSetter.set(
+              object : ChannelListener<Channel> {
+                override fun handleEvent(channel: Channel): Unit {
+                  timeout.cancel(false)
+                  conn = conn.close()
+                  // TODO: wait and ensure the process ends, forcibly close on
+                  // timeout
+                }
+              })
+
+          channel.resumeReceives()
+        }
+      })
 }
 
-fun createHttpServer(encryption: EncryptionTransform): Undertow {
+// TODO: AUTH!!
+fun dbHandler(encryption: EncryptionTransform): HttpHandler {
+  val csrng = SecureRandom()
+
+  return object : HttpHandler {
+    override fun handleRequest(exchange: HttpServerExchange): Unit {
+      if (exchange.requestMethod != HttpString("PUT")) {
+        return
+      }
+      // TODO: should not allow this over non-tls connection
+
+      val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+      val db = pathParams["database"]
+      if (db == null) {
+        throw NullPointerException("unexpected null db")
+      }
+
+      // generate a 256 bit random key
+      val plaintextRootKey = ByteArray(32)
+      csrng.nextBytes(plaintextRootKey)
+
+      // store it encrypted
+      val encryptedRootKey = encryption.encrypt(plaintextRootKey)
+      val b64encryptedRootKey = Base64.getEncoder().encodeToString(encryptedRootKey)
+
+      createSkdb(db, b64encryptedRootKey)
+
+      exchange.statusCode = 201
+      exchange.responseHeaders.put(Headers.CONTENT_TYPE, "text/plain")
+      exchange.responseSender.send(Base64.getEncoder().encodeToString(plaintextRootKey))
+
+      // at least try to reduce how long and where we hold the key in memory
+      plaintextRootKey.fill(0)
+    }
+  }
+}
+
+fun createHttpServer(dbHandler: HttpHandler, connectionHandler: HttpHandler): Undertow {
+  // TODO: specify a public resource path to avoid accidentally
+  // leaking or remove this entirely
   val rootHandler =
       Handlers.path()
           .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
 
-  val taskPool = Executors.newSingleThreadScheduledExecutor()
-
   var pathHandler =
       PathTemplateHandler(rootHandler)
-          .add(
-              "/dbs/{database}/connection",
-              Handlers.websocket(
-                  object : WebSocketConnectionCallback {
-                    override fun onConnect(
-                        exchange: WebSocketHttpExchange,
-                        channel: WebSocketChannel
-                    ) {
-                      val pathParams =
-                          exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
-                      val db = pathParams["database"]
-                      val dbPath = resolveDbPath(db)
+          .add("/dbs/{database}", dbHandler)
+          .add("/dbs/{database}/connection", connectionHandler)
 
-                      if (dbPath == null) {
-                        // 1011 is internal error
-                        WebSockets.sendCloseBlocking(1011, "resource not found", channel)
-                        channel.close()
-                        return
-                      }
-
-                      val skdb = Skdb(dbPath)
-
-                      var conn: Conn = UnauthenticatedConn(skdb, encryption)
-
-                      val timeout =
-                          taskPool.schedule(
-                              {
-                                conn.close()
-                                channel.close()
-                              },
-                              10,
-                              TimeUnit.MINUTES)
-
-                      channel.receiveSetter.set(
-                          object : AbstractReceiveListener() {
-                            override fun onFullTextMessage(
-                                channel: WebSocketChannel,
-                                message: BufferedTextMessage
-                            ) {
-                              try {
-                                conn = conn.handleMessage(message.data, channel)
-                              } catch (ex: Exception) {
-                                // 1011 is internal error
-                                WebSockets.sendCloseBlocking(1011, ex.message, channel)
-                                channel.close()
-                              }
-                            }
-                          })
-
-                      channel.closeSetter.set(
-                          object : ChannelListener<Channel> {
-                            override fun handleEvent(channel: Channel): Unit {
-                              timeout.cancel(false)
-                              conn = conn.close()
-                              // TODO: wait and ensure the process ends, forcibly close on
-                              // timeout
-                            }
-                          })
-
-                      channel.resumeReceives()
-                    }
-                  }))
-
-  var server = Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
-  return server
+  return Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
 }
 
 fun main(args: Array<String>) {
@@ -399,6 +432,9 @@ fun main(args: Array<String>) {
     encryption = NoEncryptionTransform()
   }
 
-  val server = createHttpServer(encryption)
+  val taskPool = Executors.newSingleThreadScheduledExecutor()
+  val connHandler = connectionHandler(taskPool, encryption)
+  val dbHandler = dbHandler(encryption)
+  val server = createHttpServer(dbHandler, connHandler)
   server.start()
 }

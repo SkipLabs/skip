@@ -1,5 +1,5 @@
 .PHONY: default
-default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html
+default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html build/init.sql
 
 sql/target/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build
@@ -9,6 +9,9 @@ sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
 
 build/skdb: sql/target/skdb
 	mkdir -p build
+	cp $^ $@
+
+build/init.sql: sql/privacy/init.sql
 	cp $^ $@
 
 build/out32.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
@@ -55,7 +58,7 @@ test: build/skdb_node.js build/skdb
 	./run_all_tests.sh
 
 .PHONY: run-server
-run-server: build/skdb build/out32.wasm build/skdb.js build/index.html
+run-server: build/skdb build/out32.wasm build/skdb.js build/index.html build/init.sql
 	./sql/server/deploy/start.sh --DANGEROUS-no-encryption
 
 .PHONY: run-chaos
