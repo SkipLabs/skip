@@ -36,6 +36,10 @@ dependencies {
 
     // json
     implementation("com.beust:klaxon:5.5")
+
+    // aws
+    implementation("software.amazon.awssdk:bom:2.20.3")
+    implementation("software.amazon.awssdk:kms:2.20.3")
 }
 
 application {
