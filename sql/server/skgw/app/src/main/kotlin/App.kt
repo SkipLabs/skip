@@ -392,7 +392,7 @@ fun createHttpServer(encryption: EncryptionTransform): Undertow {
 }
 
 fun main() {
-  val encryption = NoEncryptionTransform()
+  val encryption = ec2KmsEncryptionTransform()
   val server = createHttpServer(encryption)
   server.start()
 }
