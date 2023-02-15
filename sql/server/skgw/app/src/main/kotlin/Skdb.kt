@@ -116,12 +116,14 @@ class Skdb(val dbPath: String) {
   }
 
   fun privateKeyAsStored(user: String): ByteArray {
-      val key = sql("SELECT privateKey FROM skdb_users WHERE username = '${user}';", OutputFormat.RAW).trim()
+    val key =
+        sql("SELECT privateKey FROM skdb_users WHERE username = '${user}';", OutputFormat.RAW)
+            .trim()
 
-      if (key.isEmpty()) {
-          throw IllegalArgumentException("User ${user} could not be found.");
-      }
+    if (key.isEmpty()) {
+      throw IllegalArgumentException("User ${user} could not be found.")
+    }
 
-      return Base64.getDecoder().decode(key)
+    return Base64.getDecoder().decode(key)
   }
 }
