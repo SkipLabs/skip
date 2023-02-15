@@ -325,7 +325,14 @@ class SelectEvaluator{
       leftHandle = SKFS.EHandle(Row::fromFile, leftDirName);
       rightHandle = SKFS.EHandle(Row::fromFile, rightDirName);
 
-      statsHandle = getShardStats(context);
+      shardsDirName = SKFS.DirName::create(
+        childName.toString() + "proj/shards/",
+      );
+      shards = context.unsafeMaybeGetEagerDir(shardsDirName) match {
+      | None() ->
+        context.mkdir(ShardStats::fromFile, shardsDirName, false, Array[])
+      | Some(x) -> SKFS.EHandle(ShardStats::fromFile, x.dirName)
+      };
 
       projLeftName = SKFS.DirName::create(childName.toString() + "proj/left/");
 
@@ -334,7 +341,7 @@ class SelectEvaluator{
         SKFS.FixedSingle::create(
           mutable Vector[
             (leftHandle.dirName, (noop, leftRanges)),
-            (statsHandle.dirName, (noop, None())),
+            (shardsDirName, (noop, None())),
           ],
         ),
         projLeftName,
@@ -349,7 +356,7 @@ class SelectEvaluator{
         SKFS.FixedSingle::create(
           mutable Vector[
             (rightHandle.dirName, (noop, rightRanges)),
-            (statsHandle.dirName, (noop, None())),
+            (shardsDirName, (noop, None())),
           ],
         ),
         projRightName,
@@ -365,11 +372,6 @@ class SelectEvaluator{
         };
         (leftShard, rightShard) = computeShardSizes(shardStats);
         key = row.getValue(leftColNbr);
-        /*
-                if (shardStats is Some _) {
-                  debug(("Left Stats", fileKey, key, shardStats));
-                };
-        */
         leftShardID = SKFS.genSym(leftShard) % leftShard;
         shardedFile = LeftShardedFile{leftShardID, rightShard, value => row};
         for (i in Range(0, rightShard)) {
@@ -380,11 +382,6 @@ class SelectEvaluator{
 
       projRightFun = (_context, writer, fileKey, valueIter) ~> {
         (rowOpt, shardStats) = normalizeValueIter(valueIter);
-        /*
-                if (shardStats is Some _) {
-                  debug(("right Stats", shardStats));
-                };
-        */
         row = rowOpt match {
         | None() -> return void
         | Some(r) -> r
@@ -415,7 +412,10 @@ class SelectEvaluator{
           mutable Vector[
             (
               projName,
-              (makeJoinReducer(joinKind, kinds, onlyLeftValues), None()),
+              (
+                makeJoinReducer(shards, joinKind, kinds, onlyLeftValues),
+                None(),
+              ),
             ),
           ],
         ),
@@ -1252,6 +1252,7 @@ fun makeGroupByKey(
 /*****************************************************************************/
 
 fun makeJoinReducer(
+  shardTable: SKFS.EHandle<ShardStats>,
   joinKind: JoinKind,
   kinds: Array<(Int, IKind, Type)>,
   onlyLeftValues: Bool,
@@ -1281,7 +1282,6 @@ fun makeJoinReducer(
       leftSize / max(1, rightSize) > 128 ||
       rightSize / max(1, leftSize) > 128
     ) {
-      shardTable = getShardStats(context);
       oldStats = getStats(context, shardTable, leftRows) match {
       | None() -> getStats(context, shardTable, rightRows)
       | x -> x

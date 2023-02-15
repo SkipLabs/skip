@@ -86,16 +86,7 @@ fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
 /* Sharding stats for joins. */
 /*****************************************************************************/
 
-const shardStatsDirName: SKFS.DirName = SKFS.DirName::create(
-  "/sql/shardStats/",
-);
 class ShardStats(tick: SKFS.Tick, left: Int, right: Int) extends SKFS.File
-
-fun getShardStats(context: mutable SKFS.Context): SKFS.EHandle<ShardStats> {
-  makeDir(ShardStats::fromFile, context, shardStatsDirName, () -> {
-    context.mkdir(ShardStats::fromFile, shardStatsDirName, false, Array[])
-  })
-}
 
 /*****************************************************************************/
 /* Views. */
