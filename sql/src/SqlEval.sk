@@ -1397,19 +1397,14 @@ mutable class AccessSolver(
 }
 
 class UserFile(id: Int, name: String) extends SKFS.File {
-  static fun create(
-    context: mutable SKFS.Context,
-    userName: String,
-  ): UserFile {
+  static fun create(context: mutable SKFS.Context, userName: String): UserFile {
     if (userName.contains("'")) {
       print_error("Invalid user name");
       skipExit(2);
     };
     userRows = evalQuery(
       context,
-      "select userID from skdb_users where userName = '" +
-        userName +
-        "';",
+      "select userID from skdb_users where userName = '" + userName + "';",
     );
     if (userRows.size() == 0) {
       print_error("Could not find user: " + userName);
@@ -1802,6 +1797,7 @@ fun withLocalContext<T>(context: mutable SKFS.Context, f: () -> T): T {
     setLocalContext(context);
     result = vtry(f, exn -> {
       removeLocalContext();
+      print_error(exn.getMessage());
       throw exn
     });
     removeLocalContext();
@@ -1810,6 +1806,7 @@ fun withLocalContext<T>(context: mutable SKFS.Context, f: () -> T): T {
     oldContext = getLocalContext();
     result = vtry(f, exn -> {
       setLocalContext(oldContext);
+      print_error(exn.getMessage());
       throw exn
     });
     setLocalContext(oldContext);
