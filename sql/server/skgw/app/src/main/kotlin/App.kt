@@ -219,7 +219,7 @@ class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticated
   }
 }
 
-class UnauthenticatedConn(val skdb: Skdb) : Conn {
+class UnauthenticatedConn(val skdb: Skdb, val encryption: EncryptionTransform) : Conn {
 
   private fun unexpectedMsg(channel: WebSocketChannel): Conn {
     if (channel.isOpen()) {
@@ -247,7 +247,8 @@ class UnauthenticatedConn(val skdb: Skdb) : Conn {
     val contentBytes = content.toByteArray(Charsets.UTF_8)
 
     val mac = Mac.getInstance(algo)
-    val privateKey = skdb.privateKeyAsStored(request.accessKey)
+    val encryptedPrivateKey = skdb.privateKeyAsStored(request.accessKey)
+    val privateKey = encryption.decrypt(encryptedPrivateKey)
     mac.init(SecretKeySpec(privateKey, algo))
     val ourSig = mac.doFinal(contentBytes)
     // at least try to keep the private key in memory for as little time as possible
@@ -314,7 +315,7 @@ fun resolveDbPath(db: String?): String? {
   return if (File(path).exists()) path else null
 }
 
-fun createHttpServer(): Undertow {
+fun createHttpServer(encryption: EncryptionTransform): Undertow {
   val rootHandler =
       Handlers.path()
           .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
@@ -345,7 +346,7 @@ fun createHttpServer(): Undertow {
 
                       val skdb = Skdb(dbPath)
 
-                      var conn: Conn = UnauthenticatedConn(skdb)
+                      var conn: Conn = UnauthenticatedConn(skdb, encryption)
 
                       val timeout =
                           taskPool.schedule(
@@ -391,6 +392,7 @@ fun createHttpServer(): Undertow {
 }
 
 fun main() {
-  var server = createHttpServer()
+  val encryption = NoEncryptionTransform()
+  val server = createHttpServer(encryption)
   server.start()
 }
