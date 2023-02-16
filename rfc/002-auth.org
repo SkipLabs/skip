@@ -99,33 +99,70 @@ Upon successful authentication the server begins processing requests.
 On any other outcome it closes the websocket with error code 1002,
 protocol error.
 
-*** Key generation, storage, and communication
+*** Key management: generation, storage, and communication
 
 Authenticated clients, with permissions to do so, may request new
 users be added to the database.
 
-We generate two pieces of information for a user. The access key that
-identifies the user and a private key that they use for signing - this
-is never transferred as part of API usage.
+We use a CSRNG to generate two pieces of information for a user. The
+access key that identifies the user and a private key that they use
+for signing. The private key is never transferred as part of API
+usage.
 
 The access key is a random 20 character string (ensuring that it
 doesn't collide with a pre-existing key). There is no pattern in the
 generation of access keys. The characters are [A-Za-z0-9]. This allows
 for significant entropy.
 
-The private key is a randomly generated SHA-256 key.
+The private key is a randomly generated 256 bit key for use with HMAC
+SHA-256.
 
 The access key and private key pair are communicated back to the
 requester over a TLS-secured channel. This is how we achieve key
 distribution.
 
-The (access key, private key) pair are also stored in the database so
+The (access key, private key) pair are stored in the database so
 that
 
 - the server can refer to them when processing ~authenticate~
   messages.
 - the database can refer to the access key (user id) when ensuring
   privacy and checking ACLs.
+- the user list is kept consistent by having one source of truth.
+
+**** Key storage in detail
+
+We store the access key as the ~username~ and private key as
+~privateKey~ in the ~skdb_users~ table.
+
+The access key is stored as plain text; it is not a secret.
+
+The private key is stored encrypted and base64 encoded. We use
+symmetric encryption: AES-256-GCM.
+
+The key used for this encryption is not stored with the database.
+Instead we outsource the management of this master key to AWS' KMS,
+which relies on a hardware security module (HSM). We interact with an
+API that allows us to send it byte arrays for encryption or
+decryption.
+
+KSM access is audited and can be revoked. Due to the design of the
+service and the HSM, the master key is never revealed nor is it
+accessible.
+
+The final piece is how to manage the credentials for accessing KSM. We
+use EC2 roles for this. Again this outsources the management of keys
+to AWS. In their words:
+
+#+BEGIN_QUOTE
+When you use a role, you don't have to distribute long-term
+credentials (such as a sign-in credentials or access keys) to an
+Amazon EC2 instance. Instead, the role supplies temporary permissions
+that applications can use when they make calls to other AWS resources.
+When you launch an Amazon EC2 instance, you specify an IAM role to
+associate with the instance. Applications that run on the instance can
+then use the role-supplied temporary credentials to sign API requests.
+#+END_QUOTE
 
 *** Other authentication mechanisms considered and their tradeoffs
 
