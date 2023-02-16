@@ -2,7 +2,7 @@
 # TODO: the deployment image should just copy over the pre-built and not need any of the dev deps
 
 # we use x86-64 in the cloud
-FROM --platform=linux/amd64 ubuntu:20.04
+FROM --platform=linux/amd64 ubuntu:20.04 as base
 RUN apt-get update
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get install -q -y npm git make lld sqlite3 gcc gawk clang llvm
@@ -16,6 +16,7 @@ FROM base as bootstrap
 COPY . /skfs
 
 WORKDIR /skfs/compiler
+RUN make clean
 RUN make install STAGE=0
 
 WORKDIR /skfs
@@ -27,6 +28,7 @@ RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
     sdk install gradle && \
     sdk install java 19.0.1-oracle"
 
+RUN make clean
 RUN make
 
 CMD ./sql/server/deploy/start.sh
