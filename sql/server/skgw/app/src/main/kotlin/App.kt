@@ -28,6 +28,7 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.io.bufferedWriter
 import kotlin.reflect.KClass
+import kotlin.system.exitProcess
 import org.xnio.ChannelListener
 
 val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
@@ -431,12 +432,44 @@ fun createHttpServer(connectionHandler: HttpHandler): Undertow {
   return Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
 }
 
+fun envIsSane(): Boolean {
+  val svcSkdb = openSkdb(SERVICE_MGMT_DB_NAME)
+
+  if (svcSkdb == null) {
+    println("FAIL: Could not open service management database.")
+    return false
+  }
+
+  val successfullyRead =
+      svcSkdb
+          .sql("SELECT COUNT(*) FROM skdb_users WHERE username = 'root';", OutputFormat.RAW)
+          .trim() == "1"
+
+  if (!successfullyRead) {
+    println("FAIL: Could not read from service management database.")
+  }
+
+  return successfullyRead
+}
+
 fun main(args: Array<String>) {
-  var encryption = ec2KmsEncryptionTransform()
   val arglist = args.toList()
+
+  var encryption = ec2KmsEncryptionTransform()
 
   if (arglist.contains("--DANGEROUS-no-encryption")) {
     encryption = NoEncryptionTransform()
+  }
+
+  if (arglist.contains("--init")) {
+    val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
+    println("${serialise(creds)}")
+    return
+  }
+
+  if (!envIsSane()) {
+    println("Environment checks failed. Use --init for a cold start.")
+    exitProcess(1)
   }
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
