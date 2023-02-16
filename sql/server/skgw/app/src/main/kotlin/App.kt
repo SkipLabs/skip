@@ -6,11 +6,8 @@ import com.beust.klaxon.TypeFor
 import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.HttpHandler
-import io.undertow.server.HttpServerExchange
 import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.server.handlers.resource.FileResourceManager
-import io.undertow.util.Headers
-import io.undertow.util.HttpString
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.WebSocketConnectionCallback
 import io.undertow.websockets.core.AbstractReceiveListener
@@ -33,6 +30,8 @@ import kotlin.io.bufferedWriter
 import kotlin.reflect.KClass
 import org.xnio.ChannelListener
 
+val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
+
 class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
   override fun classFor(type: Any): KClass<out ProtoMessage> =
       when (type as String) {
@@ -42,6 +41,8 @@ class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
         "dumpTable" -> ProtoDumpTable::class
         "write" -> ProtoWrite::class
         "pipe" -> ProtoData::class
+        "createDatabase" -> ProtoCreateDb::class
+        "credentials" -> ProtoCredentials::class
         else -> throw IllegalArgumentException("Unknown request type: $type")
       }
 }
@@ -64,6 +65,16 @@ data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMes
 data class ProtoWrite(val table: String) : ProtoMessage("write")
 
 data class ProtoData(val data: String) : ProtoMessage("pipe")
+
+data class ProtoCreateDb(val name: String) : ProtoMessage("createDatabase")
+
+data class ProtoCredentials(val accessKey: String, val privateKey: String) :
+    ProtoMessage("credentials") {
+
+  override fun toString(): String {
+    return "ProtoCredentials(accessKey=${accessKey}, privateKey=**redacted**)"
+  }
+}
 
 fun parse(data: String): ProtoMessage {
   val msg = Klaxon().parse<ProtoMessage>(data)
@@ -108,11 +119,6 @@ class EstablishedConn(val proc: Process, val authenticatedAt: Instant) : Conn {
     }
 
     when (request) {
-      is ProtoAuth -> return unexpectedMsg(channel)
-      is ProtoQuery -> return unexpectedMsg(channel)
-      is ProtoDumpTable -> return unexpectedMsg(channel)
-      is ProtoTail -> return unexpectedMsg(channel)
-      is ProtoWrite -> return unexpectedMsg(channel)
       is ProtoData -> {
         val stdin = proc.outputStream
         if (stdin == null) {
@@ -124,6 +130,7 @@ class EstablishedConn(val proc: Process, val authenticatedAt: Instant) : Conn {
         writer.flush()
         return this
       }
+      else -> return unexpectedMsg(channel)
     }
   }
 
@@ -133,8 +140,42 @@ class EstablishedConn(val proc: Process, val authenticatedAt: Instant) : Conn {
   }
 }
 
-class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticatedAt: Instant) :
-    Conn {
+fun createDb(dbName: String, encryption: EncryptionTransform): ProtoCredentials {
+  val csrng = SecureRandom()
+
+  // generate a 256 bit random key for the root user
+  val plaintextRootKey = ByteArray(32)
+  csrng.nextBytes(plaintextRootKey)
+
+  // store it encrypted
+  val encryptedRootKey = encryption.encrypt(plaintextRootKey)
+  val b64encryptedRootKey = Base64.getEncoder().encodeToString(encryptedRootKey)
+
+  createSkdb(dbName, b64encryptedRootKey)
+
+  val creds = ProtoCredentials("root", Base64.getEncoder().encodeToString(plaintextRootKey))
+
+  // at least try to reduce how long and where we hold the key in memory
+  plaintextRootKey.fill(0)
+
+  return creds
+}
+
+class AuthenticatedConn(
+    val skdb: Skdb,
+    val accessKey: String,
+    val authenticatedAt: Instant,
+    val encryption: EncryptionTransform
+) : Conn {
+
+  private fun unexpectedMsg(channel: WebSocketChannel, msg: String): Conn {
+    if (channel.isOpen()) {
+      WebSockets.sendCloseBlocking(1002, msg, channel)
+      channel.close()
+    }
+
+    return ErroredConn()
+  }
 
   override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
     val now = Instant.now()
@@ -155,6 +196,7 @@ class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticated
         val result = skdb.sql(request.query, format)
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
+        // TODO: no need to close. client can if it doesn't want to re-use
         channel.sendClose()
         channel.close()
         return ClosedConn()
@@ -163,9 +205,20 @@ class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticated
         val result = skdb.dumpTable(request.table, request.suffix)
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
+        // TODO: no need to close. client can if it doesn't want to re-use
         channel.sendClose()
         channel.close()
         return ClosedConn()
+      }
+      is ProtoCreateDb -> {
+        // this side effect is only authorized if you're connected as a service mgmt db user
+        if (skdb.name != SERVICE_MGMT_DB_NAME) {
+          return unexpectedMsg(channel, "error") // deliberately unhelpful error
+        }
+        val creds = createDb(request.name, encryption)
+        val payload = serialise(creds)
+        WebSockets.sendTextBlocking(payload, channel)
+        return this
       }
       is ProtoTail -> {
         val proc =
@@ -208,15 +261,12 @@ class AuthenticatedConn(val skdb: Skdb, val accessKey: String, val authenticated
         return EstablishedConn(proc, authenticatedAt)
       }
       is ProtoAuth -> {
-        WebSockets.sendCloseBlocking(1002, "unexpected re-auth on established connection", channel)
-        channel.close()
-        return ErroredConn()
+        return unexpectedMsg(channel, "unexpected re-auth on established connection")
       }
       is ProtoData -> {
-        WebSockets.sendCloseBlocking(1002, "unexpected request on established connection", channel)
-        channel.close()
-        return ErroredConn()
+        return unexpectedMsg(channel, "unexpected data on non-established connection")
       }
+      else -> return unexpectedMsg(channel, "unexpected message")
     }
   }
 
@@ -267,11 +317,6 @@ class UnauthenticatedConn(val skdb: Skdb, val encryption: EncryptionTransform) :
 
   override fun handleMessage(request: ProtoMessage, channel: WebSocketChannel): Conn {
     when (request) {
-      is ProtoQuery -> return unexpectedMsg(channel)
-      is ProtoDumpTable -> return unexpectedMsg(channel)
-      is ProtoTail -> return unexpectedMsg(channel)
-      is ProtoWrite -> return unexpectedMsg(channel)
-      is ProtoData -> return unexpectedMsg(channel)
       is ProtoAuth -> {
         if (!verify(request)) {
           if (channel.isOpen()) {
@@ -282,8 +327,9 @@ class UnauthenticatedConn(val skdb: Skdb, val encryption: EncryptionTransform) :
           return ErroredConn()
         }
 
-        return AuthenticatedConn(skdb, request.accessKey, Instant.now())
+        return AuthenticatedConn(skdb, request.accessKey, Instant.now(), encryption)
       }
+      else -> return unexpectedMsg(channel)
     }
   }
 
@@ -372,44 +418,7 @@ fun connectionHandler(
       })
 }
 
-// TODO: AUTH!!
-fun dbHandler(encryption: EncryptionTransform): HttpHandler {
-  val csrng = SecureRandom()
-
-  return object : HttpHandler {
-    override fun handleRequest(exchange: HttpServerExchange): Unit {
-      if (exchange.requestMethod != HttpString("PUT")) {
-        return
-      }
-      // TODO: should not allow this over non-tls connection
-
-      val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
-      val db = pathParams["database"]
-      if (db == null) {
-        throw NullPointerException("unexpected null db")
-      }
-
-      // generate a 256 bit random key
-      val plaintextRootKey = ByteArray(32)
-      csrng.nextBytes(plaintextRootKey)
-
-      // store it encrypted
-      val encryptedRootKey = encryption.encrypt(plaintextRootKey)
-      val b64encryptedRootKey = Base64.getEncoder().encodeToString(encryptedRootKey)
-
-      createSkdb(db, b64encryptedRootKey)
-
-      exchange.statusCode = 201
-      exchange.responseHeaders.put(Headers.CONTENT_TYPE, "text/plain")
-      exchange.responseSender.send(Base64.getEncoder().encodeToString(plaintextRootKey))
-
-      // at least try to reduce how long and where we hold the key in memory
-      plaintextRootKey.fill(0)
-    }
-  }
-}
-
-fun createHttpServer(dbHandler: HttpHandler, connectionHandler: HttpHandler): Undertow {
+fun createHttpServer(connectionHandler: HttpHandler): Undertow {
   // TODO: specify a public resource path to avoid accidentally
   // leaking or remove this entirely
   val rootHandler =
@@ -417,9 +426,7 @@ fun createHttpServer(dbHandler: HttpHandler, connectionHandler: HttpHandler): Un
           .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
 
   var pathHandler =
-      PathTemplateHandler(rootHandler)
-          .add("/dbs/{database}", dbHandler)
-          .add("/dbs/{database}/connection", connectionHandler)
+      PathTemplateHandler(rootHandler).add("/dbs/{database}/connection", connectionHandler)
 
   return Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
 }
@@ -434,7 +441,6 @@ fun main(args: Array<String>) {
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
   val connHandler = connectionHandler(taskPool, encryption)
-  val dbHandler = dbHandler(encryption)
-  val server = createHttpServer(dbHandler, connHandler)
+  val server = createHttpServer(connHandler)
   server.start()
 }
