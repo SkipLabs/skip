@@ -13,7 +13,7 @@ enum class OutputFormat(val flag: String) {
 }
 
 // super dumb, mostly synchronous, process facade
-class Skdb(val dbPath: String) {
+class Skdb(val name: String, private val dbPath: String) {
   val SKDB_PROC = "/skfs/build/skdb"
   val SKDB_SETUP = "/skfs/build/init.sql"
 
@@ -154,9 +154,9 @@ fun openSkdb(db: String?): Skdb? {
   val dbPath = resolveDbPath(db)
   if (!File(dbPath).exists()) return null
 
-  return Skdb(dbPath)
+  return Skdb(db, dbPath)
 }
 
 fun createSkdb(db: String, encryptedRootPrivateKey: String): Skdb {
-  return Skdb(resolveDbPath(db)).createDb(encryptedRootPrivateKey)
+  return Skdb(db, resolveDbPath(db)).createDb(encryptedRootPrivateKey)
 }
