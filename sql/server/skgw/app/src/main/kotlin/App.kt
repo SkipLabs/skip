@@ -391,8 +391,14 @@ fun createHttpServer(encryption: EncryptionTransform): Undertow {
   return server
 }
 
-fun main() {
-  val encryption = ec2KmsEncryptionTransform()
+fun main(args: Array<String>) {
+  var encryption = ec2KmsEncryptionTransform()
+  val arglist = args.toList()
+
+  if (arglist.contains("--DANGEROUS-no-encryption")) {
+    encryption = NoEncryptionTransform()
+  }
+
   val server = createHttpServer(encryption)
   server.start()
 }
