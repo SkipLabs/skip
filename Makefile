@@ -56,7 +56,7 @@ test: build/skdb_node.js build/skdb
 
 .PHONY: run-server
 run-server: build/skdb build/out32.wasm build/skdb.js build/index.html
-	./sql/server/deploy/start.sh
+	./sql/server/deploy/start.sh --DANGEROUS-no-encryption
 
 .PHONY: run-chaos
 run-chaos: build/skdb build/out32.wasm build/skdb.js build/index.html
