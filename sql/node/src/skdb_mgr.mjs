@@ -40,12 +40,16 @@ const argSchema = {
   'create-db': {
     type: "string",
     help: "Create database.",
+  },
+  'create-user': {
+    type: "boolean",
+    help: "Create user.",
+    default: false,
   }
 };
 
 const args = parseArgs({
   options: argSchema,
-  strict: false,
   allowPositionals: true,
   tokens: true,
 });
@@ -106,6 +110,16 @@ if (args.values['create-db']) {
   console.log(`Credentials for ${db}: `, result);
 
   creds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
+  fs.writeFileSync(credsFileName, JSON.stringify(creds));
+  console.log(`Credentials were added to ${credsFileName}.`);
+}
+
+if (args.values['create-user']) {
+  const result = await skdb.server().createUser();
+  console.log('Successfully created user: ', result);
+
+  dbCreds[result.accessKey] = result.privateKey;
+
   fs.writeFileSync(credsFileName, JSON.stringify(creds));
   console.log(`Credentials were added to ${credsFileName}.`);
 }

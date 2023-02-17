@@ -44,6 +44,7 @@ class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
         "pipe" -> ProtoData::class
         "createDatabase" -> ProtoCreateDb::class
         "credentials" -> ProtoCredentials::class
+        "createUser" -> ProtoCreateUser::class
         else -> throw IllegalArgumentException("Unknown request type: $type")
       }
 }
@@ -69,11 +70,32 @@ data class ProtoData(val data: String) : ProtoMessage("pipe")
 
 data class ProtoCreateDb(val name: String) : ProtoMessage("createDatabase")
 
+class ProtoCreateUser() : ProtoMessage("createUser")
+
 data class ProtoCredentials(val accessKey: String, val privateKey: String) :
     ProtoMessage("credentials") {
 
   override fun toString(): String {
     return "ProtoCredentials(accessKey=${accessKey}, privateKey=**redacted**)"
+  }
+}
+
+data class Credentials(
+    val accessKey: String,
+    val privateKey: ByteArray,
+    val encryptedPrivateKey: ByteArray
+) {
+  fun b64plaintextKey(): String = Base64.getEncoder().encodeToString(privateKey)
+  fun b64encryptedKey(): String = Base64.getEncoder().encodeToString(encryptedPrivateKey)
+  fun clear(): Unit {
+    privateKey.fill(0)
+    encryptedPrivateKey.fill(0)
+  }
+  fun toProtoCredentials(): ProtoCredentials {
+    return ProtoCredentials(accessKey, b64plaintextKey())
+  }
+  override fun toString(): String {
+    return "Credentials(accessKey=${accessKey}, privateKey=**redacted**)"
   }
 }
 
@@ -141,25 +163,42 @@ class EstablishedConn(val proc: Process, val authenticatedAt: Instant) : Conn {
   }
 }
 
-fun createDb(dbName: String, encryption: EncryptionTransform): ProtoCredentials {
+fun genAccessKey(): String {
+  val csrng = SecureRandom()
+  val keyLength = 20
+  // build a string of keyLength chars: 0-9a-zA-Z, which is 62 symbols
+  val ints = csrng.ints(keyLength.toLong(), 0, 62)
+  val codePoints =
+      ints
+          .map({
+            when {
+              it < 10 -> it + 48 //offset for 0-9
+              it < 10 + 26 -> (it - 10) + 65 //offset for A-Z
+              else -> (it - 10 - 26) + 97    //offset for a-z
+            }
+          })
+          .toArray()
+  return String(codePoints, 0, keyLength)
+}
+
+fun genCredentials(accessKey: String, encryption: EncryptionTransform): Credentials {
   val csrng = SecureRandom()
 
   // generate a 256 bit random key for the root user
   val plaintextRootKey = ByteArray(32)
   csrng.nextBytes(plaintextRootKey)
-
-  // store it encrypted
   val encryptedRootKey = encryption.encrypt(plaintextRootKey)
-  val b64encryptedRootKey = Base64.getEncoder().encodeToString(encryptedRootKey)
-
-  createSkdb(dbName, b64encryptedRootKey)
-
-  val creds = ProtoCredentials("root", Base64.getEncoder().encodeToString(plaintextRootKey))
-
-  // at least try to reduce how long and where we hold the key in memory
-  plaintextRootKey.fill(0)
+  val creds = Credentials(accessKey, plaintextRootKey, encryptedRootKey)
 
   return creds
+}
+
+fun createDb(dbName: String, encryption: EncryptionTransform): ProtoCredentials {
+  val creds = genCredentials("root", encryption)
+  createSkdb(dbName, creds.b64encryptedKey())
+  val protoCreds = creds.toProtoCredentials()
+  creds.clear()
+  return protoCreds
 }
 
 class AuthenticatedConn(
@@ -218,6 +257,14 @@ class AuthenticatedConn(
         }
         val creds = createDb(request.name, encryption)
         val payload = serialise(creds)
+        WebSockets.sendTextBlocking(payload, channel)
+        return this
+      }
+      is ProtoCreateUser -> {
+        val creds = genCredentials(genAccessKey(), encryption)
+        skdb.createUser(creds.accessKey, creds.b64encryptedKey())
+        val payload = serialise(creds.toProtoCredentials())
+        creds.clear()
         WebSockets.sendTextBlocking(payload, channel)
         return this
       }
