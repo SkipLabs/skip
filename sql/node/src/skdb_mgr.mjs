@@ -80,11 +80,9 @@ if (!fs.existsSync(credsFileName)) {
   process.exit(1);
 }
 
-const creds = JSON.parse(fs.readFileSync(credsFileName));
-
 // credentials file schema:
 // { database: { accessKey: privateKey }}
-
+const creds = JSON.parse(fs.readFileSync(credsFileName));
 const dbCreds = creds[args.values.db];
 
 if (!dbCreds || Object.entries(dbCreds).length < 1) {
@@ -106,4 +104,8 @@ if (args.values['create-db']) {
   const result = await skdb.server().createDatabase(db);
   console.log(`Successfully created database: ${db}.`);
   console.log(`Credentials for ${db}: `, result);
+
+  creds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
+  fs.writeFileSync(credsFileName, JSON.stringify(creds));
+  console.log(`Credentials were added to ${credsFileName}.`);
 }
