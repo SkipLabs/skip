@@ -139,10 +139,8 @@ function makeSKDBStore(
 }
 
 /* ***************************************************************************/
-/* Primitives to connect to websockets. */
+/* Protocol schema. */
 /* ***************************************************************************/
-
-// protocol schema
 
 type ProtoAuth = {
   request: "auth";
@@ -174,10 +172,21 @@ type ProtoWrite = {
   table: string;
 }
 
-// control plane
-type ProtoRequest = ProtoQuery | ProtoTail | ProtoDumpTable | ProtoWrite;
+type ProtoCreateDb = {
+  request: "createDatabase";
+  name: string;
+}
 
-// data plane
+type ProtoCredentials = {
+  request: "credentials";
+  accessKey: String;
+  privateKey: String;
+}
+
+type ProtoRequest = ProtoQuery | ProtoDumpTable | ProtoCreateDb | ProtoTail | ProtoWrite
+
+type ProtoResponse = ProtoData | ProtoCredentials
+
 type ProtoData = {
   request: "pipe";
   data: string;
@@ -410,7 +419,10 @@ export class SKDB {
       request: "query",
       query: "select id();",
     });
-    const [sessionID] = result.split("|").map((x) => parseInt(x));
+    if (result.request !== "pipe") {
+      throw new Error("Unexpected response.");
+    }
+    const [sessionID] = result.data.split("|").map((x) => parseInt(x));
     let serverID = this.servers.length;
     let server = new SKDBServer(
       this,
@@ -660,41 +672,20 @@ export class SKDB {
     };
   }
 
-  async makeRequest(uri: string, creds: Creds, request: ProtoRequest): Promise<string> {
+  async makeRequest(uri: string, creds: Creds, request: ProtoRequest): Promise<ProtoResponse> {
     let objThis = this;
-    let data = "";
     let socket = new WebSocket(uri);
-    const onmessage = function (msg: string) {
-      data += msg;
-    };
 
     const authMsg = await objThis.createAuthMsg(creds)
 
     return new Promise((resolve, reject) => {
       socket.onmessage = function (event) {
         const data = event.data;
-        const reader = new FileReader();
-        if(typeof data === "string") {
-          onmessage(data)
-        } else {
-          reader.addEventListener(
-            "load",
-            () => {
-              // we know it will be a string because we called readAsText
-              onmessage((reader.result || "") as string);
-            },
-            false
-          );
-          reader.readAsText(data);
-        }
+        resolve(JSON.parse(data));
+        socket.close();
       };
       socket.onclose = () => {
-        if (data === "") {
-          reject(new Error(`Empty response to request: ${request}`));
-          return;
-        }
-        const recvData = JSON.parse(data) as ProtoData;
-        resolve(recvData.data);
+        reject();
       };
       socket.onerror = (err) => reject(err);
       socket.onopen = function (_event) {
@@ -1010,12 +1001,20 @@ class SKDBServer {
     return `${endpoint}/dbs/${db}/connection`;
   }
 
+  private castData(response: ProtoResponse): ProtoData {
+    if (response.request === "pipe") {
+      return response;
+    }
+    throw new Error(`Unexpected response: ${response}`);
+  }
+
   async sqlRaw(stdin: string): Promise<string> {
     let result = await this.client.makeRequest(this.uri, this.creds, {
       request: "query",
       query: stdin,
     });
-    return result;
+
+    return this.castData(result).data;
   }
 
   async sql(stdin: string): Promise<any[]> {
@@ -1024,7 +1023,8 @@ class SKDBServer {
       query: stdin,
       format: "json",
     });
-    return result
+    return this.castData(result)
+      .data
       .split("\n")
       .filter((x) => x != "")
       .map((x) => JSON.parse(x));
@@ -1037,7 +1037,7 @@ class SKDBServer {
       table: tableName,
       suffix: remoteSuffix,
     });
-    this.client.runLocal([], createRemoteTable);
+    this.client.runLocal([], this.castData(createRemoteTable).data);
 
     let localSuffix = "_local";
     let createLocalTable = await this.client.makeRequest(this.uri, this.creds, {
@@ -1045,7 +1045,7 @@ class SKDBServer {
       table: tableName,
       suffix: localSuffix,
     });
-    this.client.runLocal([], createLocalTable);
+    this.client.runLocal([], this.castData(createLocalTable).data);
 
     await this.client.connectWriteTable(
       this.uri,
@@ -1084,7 +1084,7 @@ class SKDBServer {
       table: tableName,
       suffix: suffix,
     });
-    this.client.runLocal([], createRemoteTable);
+    this.client.runLocal([], this.castData(createRemoteTable).data);
 
     await this.client.connectReadTable(
       this.uri,
@@ -1094,5 +1094,16 @@ class SKDBServer {
     );
 
     this.client.setMirroredTable(tableName, this.sessionID);
+  }
+
+  async createDatabase(dbName: string): Promise<ProtoCredentials> {
+    let result = await this.client.makeRequest(this.uri, this.creds, {
+      request: "createDatabase",
+      name: dbName,
+    });
+    if (result.request !== "credentials") {
+      throw new Error("Unexpected response.");
+    }
+    return result;
   }
 }
