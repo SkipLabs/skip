@@ -24,7 +24,7 @@ sql/js/dist/out32.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 
 # JS version of SKDB
 
-build/skdb_node.js: sql/node/src/node_header.js build/skdb.js build/out32.wasm
+build/skdb_node.js: sql/node/src/node_header.js build/skdb.js build/out32.wasm build/node_modules
 	mkdir -p build
 	cat sql/node/src/node_header.js build/skdb.js \
 	| sed 's/^export //g' \
@@ -43,6 +43,9 @@ sql/node/node_modules: sql/node/package.json
 
 build/node_modules: sql/node/node_modules
 	cp -R $^ $@
+
+build/skdb_mgr.mjs: build/skdb_node.js sql/node/src/skdb_mgr.mjs build/node_modules
+	cp sql/node/src/skdb_mgr.mjs build/skdb_mgr.mjs
 
 build/index.html: sql/js/index.html build/skdb.js
 	mkdir -p build
@@ -64,10 +67,6 @@ run-server: build/skdb build/out32.wasm build/skdb.js build/index.html build/ini
 .PHONY: run-chaos
 run-chaos: build/skdb build/out32.wasm build/skdb.js build/index.html
 	./sql/server/deploy/chaos.sh
-
-.PHONY: node-repl
-node-repl: build/skdb_node.js build/node_modules
-	cd build && ../sql/node/run_node.sh
 
 .PHONY: test-soak
 test-soak: build/skdb build/skdb_node.js build/node_modules
