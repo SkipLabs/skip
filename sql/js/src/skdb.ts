@@ -177,13 +177,17 @@ type ProtoCreateDb = {
   name: string;
 }
 
+type ProtoCreateUser = {
+  request: "createUser";
+}
+
 type ProtoCredentials = {
   request: "credentials";
   accessKey: String;
   privateKey: String;
 }
 
-type ProtoRequest = ProtoQuery | ProtoDumpTable | ProtoCreateDb | ProtoTail | ProtoWrite
+type ProtoRequest = ProtoQuery | ProtoDumpTable | ProtoCreateDb | ProtoTail | ProtoWrite | ProtoCreateUser
 
 type ProtoResponse = ProtoData | ProtoCredentials
 
@@ -1100,6 +1104,16 @@ class SKDBServer {
     let result = await this.client.makeRequest(this.uri, this.creds, {
       request: "createDatabase",
       name: dbName,
+    });
+    if (result.request !== "credentials") {
+      throw new Error("Unexpected response.");
+    }
+    return result;
+  }
+
+  async createUser(): Promise<ProtoCredentials> {
+    let result = await this.client.makeRequest(this.uri, this.creds, {
+      request: "createUser",
     });
     if (result.request !== "credentials") {
       throw new Error("Unexpected response.");

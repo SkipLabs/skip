@@ -140,6 +140,12 @@ class Skdb(val name: String, private val dbPath: String) {
     sql("INSERT INTO skdb_users VALUES (0, 'root', '${encryptedRootPrivateKey}')", OutputFormat.RAW)
     return this
   }
+
+  fun createUser(accessKey: String, encryptedPrivateKey: String): String {
+    return sql(
+        "INSERT INTO skdb_users VALUES (id(), '${accessKey}', '${encryptedPrivateKey}')",
+        OutputFormat.RAW)
+  }
 }
 
 private fun resolveDbPath(db: String): String {
