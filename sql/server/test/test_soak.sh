@@ -17,7 +17,7 @@ trap 'handle_term' SIGTERM SIGINT
 run_server() {
     rm -f "$SERVER_DB"
 
-    "$SCRIPT_DIR"/../deploy/create_db.sh soak
+    "$SCRIPT_DIR"/../deploy/create_db.sh soak abcdef
 
     SKDB="$SKDB_BIN --data $SERVER_DB"
 
