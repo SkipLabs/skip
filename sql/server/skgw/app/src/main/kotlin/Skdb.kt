@@ -1,6 +1,9 @@
 package io.skiplabs.skgw
 
 import java.io.BufferedReader
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.Base64
 
 enum class OutputFormat(val flag: String) {
@@ -10,9 +13,9 @@ enum class OutputFormat(val flag: String) {
 }
 
 // super dumb, mostly synchronous, process facade
-class Skdb(val dbPath: String) {
-
+class Skdb(val name: String, private val dbPath: String) {
   val SKDB_PROC = "/skfs/build/skdb"
+  val SKDB_SETUP = "/skfs/build/init.sql"
 
   private fun blockingRun(pb: ProcessBuilder, input: String? = null): String {
     // TODO: hack for quick debug - should go somewhere useful
@@ -126,4 +129,40 @@ class Skdb(val dbPath: String) {
 
     return Base64.getDecoder().decode(key)
   }
+
+  fun createDb(encryptedRootPrivateKey: String): Skdb {
+    if (File(dbPath).exists()) {
+      throw RuntimeException("db ${dbPath} already exists")
+    }
+    val initScript = Files.readString(Path.of(SKDB_SETUP), Charsets.UTF_8)
+    blockingRun(ProcessBuilder(SKDB_PROC, "--init", dbPath))
+    blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath), initScript)
+    sql("INSERT INTO skdb_users VALUES (0, 'root', '${encryptedRootPrivateKey}')", OutputFormat.RAW)
+    return this
+  }
+
+  fun createUser(accessKey: String, encryptedPrivateKey: String): String {
+    return sql(
+        "INSERT INTO skdb_users VALUES (id(), '${accessKey}', '${encryptedPrivateKey}')",
+        OutputFormat.RAW)
+  }
+}
+
+private fun resolveDbPath(db: String): String {
+  return "/var/db/${db}.db"
+}
+
+fun openSkdb(db: String?): Skdb? {
+  if (db == null) {
+    return null
+  }
+
+  val dbPath = resolveDbPath(db)
+  if (!File(dbPath).exists()) return null
+
+  return Skdb(db, dbPath)
+}
+
+fun createSkdb(db: String, encryptedRootPrivateKey: String): Skdb {
+  return Skdb(db, resolveDbPath(db)).createDb(encryptedRootPrivateKey)
 }
