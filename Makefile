@@ -1,5 +1,5 @@
 .PHONY: default
-default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html
+default: build/out32.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html build/init.sql
 
 sql/target/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build
@@ -9,6 +9,9 @@ sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
 
 build/skdb: sql/target/skdb
 	mkdir -p build
+	cp $^ $@
+
+build/init.sql: sql/privacy/init.sql
 	cp $^ $@
 
 build/out32.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
@@ -21,7 +24,7 @@ sql/js/dist/out32.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 
 # JS version of SKDB
 
-build/skdb_node.js: sql/node/src/node_header.js build/skdb.js build/out32.wasm
+build/skdb_node.js: sql/node/src/node_header.js build/skdb.js build/out32.wasm build/node_modules
 	mkdir -p build
 	cat sql/node/src/node_header.js build/skdb.js \
 	| sed 's/^export //g' \
@@ -41,6 +44,9 @@ sql/node/node_modules: sql/node/package.json
 build/node_modules: sql/node/node_modules
 	cp -R $^ $@
 
+build/skdb_cli.mjs: build/skdb_node.js sql/node/src/skdb_cli.mjs build/node_modules
+	cp sql/node/src/skdb_cli.mjs build/skdb_cli.mjs
+
 build/index.html: sql/js/index.html build/skdb.js
 	mkdir -p build
 	cp sql/js/index.html $@
@@ -55,16 +61,12 @@ test: build/skdb_node.js build/skdb
 	./run_all_tests.sh
 
 .PHONY: run-server
-run-server: build/skdb build/out32.wasm build/skdb.js build/index.html
+run-server: build/skdb build/out32.wasm build/skdb.js build/index.html build/init.sql
 	./sql/server/deploy/start.sh --DANGEROUS-no-encryption
 
 .PHONY: run-chaos
 run-chaos: build/skdb build/out32.wasm build/skdb.js build/index.html
 	./sql/server/deploy/chaos.sh
-
-.PHONY: node-repl
-node-repl: build/skdb_node.js build/node_modules
-	cd build && ../sql/node/run_node.sh
 
 .PHONY: test-soak
 test-soak: build/skdb build/skdb_node.js build/node_modules
