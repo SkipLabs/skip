@@ -52,8 +52,12 @@ class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
 @TypeFor(field = "request", adapter = ProtoTypeAdapter::class)
 sealed class ProtoMessage(val request: String)
 
-data class ProtoAuth(val accessKey: String, val date: String, val signature: String) :
-    ProtoMessage("auth")
+data class ProtoAuth(
+    val accessKey: String,
+    val date: String,
+    val nonce: String,
+    val signature: String
+) : ProtoMessage("auth")
 
 data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMessage("query")
 
@@ -172,9 +176,9 @@ fun genAccessKey(): String {
       ints
           .map({
             when {
-              it < 10 -> it + 48 //offset for 0-9
-              it < 10 + 26 -> (it - 10) + 65 //offset for A-Z
-              else -> (it - 10 - 26) + 97    //offset for a-z
+              it < 10 -> it + 48 // offset for 0-9
+              it < 10 + 26 -> (it - 10) + 65 // offset for A-Z
+              else -> (it - 10 - 26) + 97 // offset for a-z
             }
           })
           .toArray()
@@ -347,7 +351,9 @@ class UnauthenticatedConn(val skdb: Skdb, val encryption: EncryptionTransform) :
       return false
     }
 
-    val content: String = request.request + request.accessKey + request.date
+    // TODO: check nonce against a cache to prevent replay attacks
+
+    val content: String = request.request + request.accessKey + request.date + request.nonce
     val contentBytes = content.toByteArray(Charsets.UTF_8)
 
     val mac = Mac.getInstance(algo)
