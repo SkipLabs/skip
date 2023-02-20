@@ -62,6 +62,7 @@ In the syntax of typescript, an ~authenticate~ message is defined as:
     request: "auth";
     accessKey: string;
     date: string;
+    nonce: string;
     signature: string;
   }
 #+END_SRC
@@ -74,6 +75,8 @@ API.
 
 ~date~ is an ISO8601 datetime string of the client's current time.
 
+~nonce~ is string of 8 randomly chosen bytes, base 64 encoded.
+
 ~signature~ is a base64-encoded HMAC-SHA256. It is the result of the
 following function.
 
@@ -82,7 +85,7 @@ signature = Base-64(
   HMAC-SHA-256(
     UTF8-Encoded(private-key),
     UTF8-Encoded(
-      "auth" || access-key || iso8601-now
+      "auth" || access-key || iso8601-now || nonce
     )
   )
 )
@@ -94,6 +97,11 @@ match.
 
 The server must reject any authentication request with a date that is
 not within 10 minutes of it's notion of wall time.
+
+The server must reject any authentication request with a duplicated
+nonce value to prevent replay attacks. A practical implementation can
+may make use of old dates on requests being rejected and use a cache
+with a TTL.
 
 Upon successful authentication the server begins processing requests.
 On any other outcome it closes the websocket with error code 1002,

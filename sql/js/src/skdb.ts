@@ -146,6 +146,7 @@ type ProtoAuth = {
   request: "auth";
   accessKey: string;
   date: string;
+  nonce: string;
   signature: string;
 }
 
@@ -662,7 +663,10 @@ export class SKDB {
     const enc = new TextEncoder();
     const reqType = "auth"
     const now = (new Date()).toISOString()
-    const bytesToSign = enc.encode(reqType + creds.accessKey + now)
+    const nonce = new Uint8Array(8);
+    crypto.getRandomValues(nonce)
+    const b64nonce = btoa(String.fromCharCode(...nonce));
+    const bytesToSign = enc.encode(reqType + creds.accessKey + now + b64nonce)
     const sig = await crypto.subtle.sign(
       "HMAC",
       creds.privateKey,
@@ -672,6 +676,7 @@ export class SKDB {
       request: reqType,
       accessKey: creds.accessKey,
       date: now,
+      nonce: b64nonce,
       signature: btoa(String.fromCharCode(...new Uint8Array(sig))),
     };
   }
