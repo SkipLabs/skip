@@ -44,8 +44,8 @@ sql/node/node_modules: sql/node/package.json
 build/node_modules: sql/node/node_modules
 	cp -R $^ $@
 
-build/skdb_mgr.mjs: build/skdb_node.js sql/node/src/skdb_mgr.mjs build/node_modules
-	cp sql/node/src/skdb_mgr.mjs build/skdb_mgr.mjs
+build/skdb_cli.mjs: build/skdb_node.js sql/node/src/skdb_cli.mjs build/node_modules
+	cp sql/node/src/skdb_cli.mjs build/skdb_cli.mjs
 
 build/index.html: sql/js/index.html build/skdb.js
 	mkdir -p build
