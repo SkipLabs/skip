@@ -6,6 +6,7 @@ import SKDB from "./skdb_node.js";
 import { webcrypto } from 'node:crypto';
 import * as readline from 'node:readline/promises';
 import process from 'node:process';
+import repl from 'node:repl';
 
 const createConnectedSkdb = async function(endpoint, database, { accessKey, privateKey }) {
   const skdb = await SKDB.create(true);
@@ -272,6 +273,7 @@ const localRepl = async function() {
       console.log("");
       console.log(".help -- This message.");
       console.log(".remote -- Switch to remote repl.");
+      console.log(".js -- Switch to a javascript repl. There is a pre-configured `skdb` global. Currently this is a one-way trip.");
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
@@ -283,6 +285,12 @@ const localRepl = async function() {
     if (query.trim() === '.remote') {
       await remoteRepl();
       continue;
+    }
+
+    if (query.trim() === '.js') {
+      const ctx = repl.start().context;
+      ctx.skdb = skdb;
+      break;
     }
 
     if (query.trim() === '.schema') {
