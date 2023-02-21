@@ -41,7 +41,11 @@ mutable class .Alloc{
   > = mutable UnorderedMap[],
   anythingEscapes: Bool,
 } extends Rewrite {
-  static fun run(f: Function, env: GlobalEnv): (Function, PassResult) {
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): (Function, PassResult) {
     anythingEscapes = (
       f.funType.params.any(t -> t.isMutable()) ||
       f.funType.returnType.any(t -> t.getScalarType(env).isGCPointer())
@@ -52,7 +56,7 @@ mutable class .Alloc{
     !anythingEscapes = true;
 
     optinfo = OptimizerInfo::make(f);
-    d = mutable static{optinfo, env, pos => f.pos, anythingEscapes};
+    d = mutable static{optinfo, env, config, pos => f.pos, anythingEscapes};
     d.go("alloc", true)
   }
 

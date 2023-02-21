@@ -13,8 +13,17 @@ mutable class .IntrinsicsInliner{
     Array<InstrID>,
   > = mutable UnorderedMap[],
 } extends Rewrite {
-  static fun run(f: Function, env: GlobalEnv): (Function, PassResult) {
-    d = mutable static{optinfo => OptimizerInfo::make(f), env, pos => f.pos};
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): (Function, PassResult) {
+    d = mutable static{
+      optinfo => OptimizerInfo::make(f),
+      env,
+      config,
+      pos => f.pos,
+    };
     d.go("intrinsics", true)
   }
 

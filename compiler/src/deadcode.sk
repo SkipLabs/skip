@@ -16,7 +16,11 @@ mutable class .EliminateDeadCode{
   // Eliminates dead code.
   //
   // Returns the resulting function and a bool saying whether it changed.
-  static fun run(f: Function, env: GlobalEnv): (Function, PassResult) {
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): (Function, PassResult) {
     optinfo = OptimizerInfo::make(f);
 
     // Copy aside all the existing BlockParams before we start.
@@ -33,6 +37,7 @@ mutable class .EliminateDeadCode{
     d = mutable static{
       optinfo,
       env,
+      config,
       isLive => Array::mfill(optinfo.idToInstr.size(), false),
       origBlockParams,
       pos => f.pos,

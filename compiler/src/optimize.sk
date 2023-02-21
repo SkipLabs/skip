@@ -90,7 +90,11 @@ mutable class Config private {
   }
 }
 
-private fun checkReady(f: Function, _env: GlobalEnv): (Function, PassResult) {
+private fun checkReady(
+  f: Function,
+  _env: GlobalEnv,
+  _config: Config.Config,
+): (Function, PassResult) {
   // Check for a coroutine "next" method that can't proceed yet.
   deps = f.coroutineInfo match {
   | Some(UnfinishedNext{rampUpID}) -> UnorderedSet[rampUpID]
@@ -101,7 +105,7 @@ private fun checkReady(f: Function, _env: GlobalEnv): (Function, PassResult) {
 }
 
 private const passes: Array<
-  (String, Int, (Function, GlobalEnv) ~> (Function, PassResult)),
+  (String, Int, (Function, GlobalEnv, Config.Config) ~> (Function, PassResult)),
 > = {
   config = kConfig.optConfig;
   Array[
@@ -222,7 +226,7 @@ private fun optimizeOne(
           while ({
             !subIterations = subIterations + 1;
 
-            (!f, passResult) = func(f, env);
+            (!f, passResult) = func(f, env, config);
 
             passResult match {
             | PassChanged() ->
@@ -337,7 +341,12 @@ private fun optimizeOne(
     f.coroutineInfo match {
     | Some(info @ UnfinishedCoroutine _) ->
       // We're ready to split the coroutine into two functions.
-      (rampUp, nextMethod, coroutineState) = LowerCoroutine::run(f, env, info);
+      (rampUp, nextMethod, coroutineState) = LowerCoroutine::run(
+        f,
+        env,
+        config,
+        info,
+      );
       OptimizeOneResult(rampUp, Some(nextMethod), Some(coroutineState))
     | Some _ -> f.die(`Unexpected CoroutineInfo for ${f}`)
     | None() ->
@@ -742,7 +751,7 @@ fun compileAll(
   config: Config.Config,
 ): GlobalEnv {
   !env = optimizeAll(context, env, config, config.optConfig.all());
-  !env = LowerConst.lowerAllConsts(env);
+  !env = LowerConst.lowerAllConsts(env, config);
   !env = optimizeAll(context, env, config, config.optConfig.all());
 
   env

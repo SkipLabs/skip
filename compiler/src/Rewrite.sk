@@ -1398,6 +1398,7 @@ mutable base class .RewriteBase{
 // Base class for general-purpose Function rewriting passes.
 mutable base class .Rewrite{
   env: GlobalEnv,
+  config: Config.Config,
   unfinishedDependencies: mutable UnorderedSet<
     SFunctionID,
   > = mutable UnorderedSet[],
@@ -1551,7 +1552,7 @@ mutable base class .Rewrite{
       };
 
       // Verify that the newly generated function is still valid.
-      if (kConfig.optConfig.verify && verifyAtEnd) {
+      if (this.config.optConfig.verify && verifyAtEnd) {
         Verify.verifyFunction(f2, this.env, passDescription);
       };
 

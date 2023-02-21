@@ -62,11 +62,13 @@ mutable private class LowerConstPass{
   static fun run(
     f: Function,
     env: GlobalEnv,
+    config: Config.Config,
     initConstFuns: mutable UnorderedMap<ConstID, SFunctionID>,
   ): (Function, PassResult) {
     d = mutable static{
       optinfo => OptimizerInfo::make(f),
       env,
+      config,
       initConstFuns,
       pos => f.pos,
     };
@@ -198,6 +200,7 @@ private fun createInitializeConstFun(
   initFlagName: String,
   initAnnotations: SSet,
   env: GlobalEnv,
+  config: Config.Config,
 ): Function {
   pos = computeConst.pos;
   name = constName + kInitializeConstSuffix;
@@ -215,6 +218,7 @@ private fun createInitializeConstFun(
     funInfo,
     Array[],
     env,
+    config,
     UnorderedSet[FunSuperpositionID::empty],
   );
 
@@ -323,13 +327,13 @@ private fun createInitializeConstFun(
 }
 
 // Lower all GetConst instrs to read global variables.
-fun lowerAllConsts(env: GlobalEnv): GlobalEnv {
+fun lowerAllConsts(env: GlobalEnv, config: Config.Config): GlobalEnv {
   initConstFuns = mutable UnorderedMap[];
 
   newFuns = env.sfuns.clone();
   for (f in env.sfuns) {
     if (identifyGetConsts(f, newFuns, initConstFuns)) {
-      (f2, passResult) = LowerConstPass::run(f, env, initConstFuns);
+      (f2, passResult) = LowerConstPass::run(f, env, config, initConstFuns);
       passResult match {
       | PassUnchanged _ -> f2.pos.die("GetConst not removed")
       | PassChanged() -> void
@@ -377,6 +381,7 @@ fun lowerAllConsts(env: GlobalEnv): GlobalEnv {
     initAllFunInfo,
     Array[],
     env,
+    config,
     UnorderedSet[FunSuperpositionID::empty],
   );
 
@@ -434,6 +439,7 @@ fun lowerAllConsts(env: GlobalEnv): GlobalEnv {
         flagFieldName,
         initAnnotations,
         env,
+        config,
       );
 
       // Record it.

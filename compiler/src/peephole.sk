@@ -29,8 +29,17 @@ mutable class .Peephole{
   // Simplifies Instrs, including constant folding and global value numbering.
   //
   // Returns the resulting function and a bool saying whether it changed.
-  static fun run(f: Function, env: GlobalEnv): (Function, PassResult) {
-    d = mutable static{optinfo => OptimizerInfo::make(f), env, pos => f.pos};
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): (Function, PassResult) {
+    d = mutable static{
+      optinfo => OptimizerInfo::make(f),
+      env,
+      config,
+      pos => f.pos,
+    };
     d.go("peephole", true)
   }
 

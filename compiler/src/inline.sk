@@ -51,8 +51,17 @@ mutable class .Inline{
   > = UnorderedMap::mcreate(0),
 } extends Rewrite {
   // Inlines some calls.
-  static fun run(f: Function, env: GlobalEnv): (Function, PassResult) {
-    d = mutable static{optinfo => OptimizerInfo::make(f), env, pos => f.pos};
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): (Function, PassResult) {
+    d = mutable static{
+      optinfo => OptimizerInfo::make(f),
+      env,
+      config,
+      pos => f.pos,
+    };
     d.go("inline", true)
   }
 

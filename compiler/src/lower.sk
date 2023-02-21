@@ -85,10 +85,12 @@ mutable private class .Lower{
     vtableRequests: mutable UnorderedSet<VTable.VTableRequest>,
     classesNeedingVTables: mutable UnorderedSet<SClassID>,
     env: GlobalEnv,
+    config: Config.Config,
   ): (Function, PassResult) {
     d = mutable static{
       optinfo => OptimizerInfo::make(f),
       env,
+      config,
       vtableRequests,
       classesNeedingVTables,
       pos => f.pos,
@@ -1232,15 +1234,15 @@ fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
         f.dump(env);
       };
       f2 = runPass("Lower", f, f -> {
-        Lower::run(f, vtableRequests, classesNeedingVTables, env).i0
+        Lower::run(f, vtableRequests, classesNeedingVTables, env, config).i0
       });
 
       // Run a few more passes right now.
       f3 = runPass("LowerLocalGC", f2, f2 -> {
-        LowerLocalGC::run(f2, env, rng).i0
+        LowerLocalGC::run(f2, env, config, rng).i0
       });
       f4 = runPass("Alloc", f3, f3 -> {
-        Alloc::run(f3, env).i0
+        Alloc::run(f3, env, config).i0
       });
 
       // Scavenge the final result for any constants needing vtables.

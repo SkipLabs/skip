@@ -20,8 +20,17 @@ mutable class .Interprocedural{} extends Rewrite {
   // - "alloc amount": (analysis only). If any instruction may alloc, this
   //    function may alloc. Otherwise, extend unfinishedDependencies if any
   //    callee OptimizationStatus is OptPartial
-  static fun run(f: Function, env: GlobalEnv): (Function, PassResult) {
-    d = mutable static{optinfo => OptimizerInfo::make(f), env, pos => f.pos};
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): (Function, PassResult) {
+    d = mutable static{
+      optinfo => OptimizerInfo::make(f),
+      env,
+      config,
+      pos => f.pos,
+    };
     d.go("ipa", true);
   }
 
