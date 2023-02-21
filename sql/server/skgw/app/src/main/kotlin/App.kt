@@ -473,14 +473,8 @@ fun connectionHandler(
 }
 
 fun createHttpServer(connectionHandler: HttpHandler): Undertow {
-  // TODO: specify a public resource path to avoid accidentally
-  // leaking or remove this entirely
-  val rootHandler =
-      Handlers.path()
-          .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
-
   var pathHandler =
-      PathTemplateHandler(rootHandler).add("/dbs/{database}/connection", connectionHandler)
+      PathTemplateHandler().add("/dbs/{database}/connection", connectionHandler)
 
   return Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
 }
