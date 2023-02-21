@@ -644,8 +644,11 @@ mutable class FunAsmDefBuilder{
 
 mutable class StructAsmDefBuilder extends AsmDefBuilder
 
-fun createAsmDefGraph(env: GlobalEnv): mutable AsmOutput.AsmDefIDToAsmDef {
-  common = AsmOutput::make{env};
+fun createAsmDefGraph(
+  env: GlobalEnv,
+  config: Config.Config,
+): mutable AsmOutput.AsmDefIDToAsmDef {
+  common = AsmOutput::make{env, config};
 
   // Create these immediately so later references can look them up.
   common.writeGlobals();
@@ -800,7 +803,10 @@ private fun defsIsomorphic(
   }
 }
 
-fun mergeIdenticalAsmDefs(defs: mutable AsmOutput.AsmDefIDToAsmDef): void {
+fun mergeIdenticalAsmDefs(
+  defs: mutable AsmOutput.AsmDefIDToAsmDef,
+  verbose: Bool,
+): void {
   hash1 = Array::mfill(defs.size(), 0);
   hash2 = Array::mfill(defs.size(), 0);
 
@@ -898,7 +904,7 @@ fun mergeIdenticalAsmDefs(defs: mutable AsmOutput.AsmDefIDToAsmDef): void {
     }
   };
 
-  if (kConfig.verbose) {
+  if (verbose) {
     print_error_ln(`Merged ${numMerged} out of ${numVisited} defs.`)
   };
 
@@ -1113,8 +1119,9 @@ private fun partitionOutputFiles(
 fun writeOutputFiles(
   defs: readonly AsmOutput.AsmDefIDToAsmDef,
   inputFiles: Array<String>,
+  config: Config.Config,
 ): void {
-  outputs = kConfig.mainConfig.outputFiles;
+  outputs = config.mainConfig.outputFiles;
 
   // Complexity of each def to be emitted.
   real = mutable Vector[];
@@ -1134,15 +1141,12 @@ fun writeOutputFiles(
   // because (at least on Mac) we need a distinct CU filename
   // per output .ll file or the linker gets confused, and we use
   // our input files as the set of CU file names to choose from.
-  maxOutputFiles = min(
-    kConfig.mainConfig.outputFiles.size(),
-    inputFiles.size(),
-  );
+  maxOutputFiles = min(config.mainConfig.outputFiles.size(), inputFiles.size());
 
   files = partitionOutputFiles(real, defs, maxOutputFiles);
 
   sstr = mutable TextOutputStream.StringTextOutputStream{};
-  for (f in kConfig.mainConfig.preambleFiles) {
+  for (f in config.mainConfig.preambleFiles) {
     preamble = FileSystem.readTextFile(f);
     sstr.write(preamble);
     sstr.writeChar('\n')
@@ -1969,6 +1973,7 @@ mutable class Metadata{
 /*FIXME: private*/
 mutable class .AsmOutput{
   mutable env: GlobalEnv,
+  config: Config.Config,
 
   // Skip String -> LLVM expression.
   strings: mutable UnorderedMap<UTF8String, AsmDefID> = mutable UnorderedMap[],
@@ -2018,12 +2023,13 @@ mutable class .AsmOutput{
   // since really they are the same function.
   externs: mutable UnorderedMap<String, AsmDefID> = mutable UnorderedMap[],
 } {
-  static fun make{env: GlobalEnv}: mutable AsmOutput {
+  static fun make{env: GlobalEnv, config: Config.Config}: mutable AsmOutput {
     // Make new IDs from this.defs not overlap with SFunctionID.
     defs = mutable AsmDefIDToAsmDef{pos => FileRange.builtin};
     for (_ in Range(0, env.sfuns.size())) _ = defs.allocID();
     mutable AsmOutput{
       env,
+      config,
       defs,
       megaVTableImage => defs.allocID(),
       globalsImage => defs.allocID(),
@@ -3036,7 +3042,7 @@ private fun llvmWriteStore(
   );
 
   if (!isBitfield) {
-    if (kConfig.mainConfig.asan) {
+    if (asm.common.config.mainConfig.asan) {
       tmp = asm.llvmIdentifier();
       asm.print(
         "  %%%s = bitcast %s* %%%s to i8*, %D\n" %
@@ -3834,7 +3840,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     llvmWriteIntrinsicCall(asm, x, "SKIP_throw", Array[e]);
     asm.print("  unreachable, %D\n" % x)
   | Unreachable{why} ->
-    if (!kConfig.release) {
+    if (!asm.common.config.release) {
       asm.print("  call void @SKIP_unreachableWithExplanation(");
       asm.common.writeCStringRef(asm, UTF8String::make(why + "\0"));
       asm.print("), %D\n" % instr)
@@ -4055,10 +4061,17 @@ fun llvmWriteFunctionDefinition(
 
   common.resetForNewFunction(pos);
 
-  externallyVisible = f.isDisasm || cppIsExported(f.name, f.annotations, pos);
+  externallyVisible =
+    f.isDisasm ||
+    cppIsExported(
+      f.name,
+      f.annotations,
+      pos,
+      common.config.mainConfig.exportedAsFunctions,
+    );
 
   disasm = (
-    (f.isDisasm || kConfig.mainConfig.disasmAll) &&
+    (f.isDisasm || common.config.mainConfig.disasmAll) &&
     !f.superpositions.isEmpty()
   );
 
@@ -4116,7 +4129,15 @@ fun llvmWriteFunctionDefinition(
   writeFunParams(f, asm);
   asm.print(")");
 
-  if (!f.isDisasm && !cppIsExported(f.name, f.annotations, pos)) {
+  if (
+    !f.isDisasm &&
+    !cppIsExported(
+      f.name,
+      f.annotations,
+      pos,
+      common.config.mainConfig.exportedAsFunctions,
+    )
+  ) {
     asm.print(" unnamed_addr")
   };
 
@@ -4206,7 +4227,10 @@ fun llvmWriteFunctionDeclaration(
 }
 
 fun llvmWriteFunction(f: Function, common: mutable AsmOutput): void {
-  symbol = cppExternalName(f) match {
+  symbol = cppExternalName(
+    f,
+    common.config.mainConfig.exportedAsFunctions,
+  ) match {
   | Some(extName) -> extName
   | None() ->
     name = f.gfunction.id;
@@ -4250,7 +4274,10 @@ private fun writeBlacklist(
   sep
 }
 
-fun cppExternalName(f: Function): ?String {
+fun cppExternalName(
+  f: Function,
+  exportedAsFunctions: UnorderedMap<String, String>,
+): ?String {
   pos = f.pos;
 
   annotationsContainParam(f.annotations, "@cpp_export", pos) match {
@@ -4269,15 +4296,20 @@ fun cppExternalName(f: Function): ?String {
   };
 
   // Check for --export-function-as.
-  kConfig.mainConfig.exportedAsFunctions.maybeGet(f.gfunction.id) match {
+  exportedAsFunctions.maybeGet(f.gfunction.id) match {
   | Some(s) if (!s.isEmpty()) -> Some(s)
   | _ -> None()
   }
 }
 
-fun cppIsExported(funName: String, annotations: SSet, pos: Pos): Bool {
+fun cppIsExported(
+  funName: String,
+  annotations: SSet,
+  pos: Pos,
+  exportedAsFunctions: UnorderedMap<String, String>,
+): Bool {
   annotationsContainParam(annotations, "@cpp_export", pos).isSome() ||
-    kConfig.mainConfig.exportedAsFunctions.containsKey(funName)
+    exportedAsFunctions.containsKey(funName)
 }
 
 fun cppIsImported(funInfo: FunInfoCommon, pos: Pos): Bool {

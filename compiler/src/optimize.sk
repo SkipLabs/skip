@@ -168,9 +168,10 @@ private fun finishOptimizingFunction(
 private fun optimizeOne(
   f: Function,
   env: GlobalEnv,
+  config: Config.Config,
   opts: Int,
 ): OptimizeOneResult {
-  verbose = kConfig.verbose;
+  verbose = config.verbose;
 
   // Grab a bit mask of which optimizations are already applied.
   donePasses = f.status match {
@@ -244,7 +245,7 @@ private fun optimizeOne(
                 f.dump(env)
               };
 
-              if (kConfig.optConfig.verify) {
+              if (config.optConfig.verify) {
                 Verify.verifyFunction(f, env, "optimize:" + passName)
               };
 
@@ -268,7 +269,7 @@ private fun optimizeOne(
               // unlikely we'll find anything else to inline until we simplify
               // the resulting code, since the inlined function already did
               // its own inlining.
-              mask.and(kConfig.optConfig.global()) == 0
+              mask.and(config.optConfig.global()) == 0
             | PassUnchanged(unfinishedForPass) ->
               if (!unfinishedForPass.isEmpty()) {
                 unfinishedDependencies.extend(unfinishedForPass);
@@ -370,6 +371,7 @@ private fun findUnfinishedDependencyCycleMember(
   processed: mutable UnorderedSet<SFunctionID>,
   popularity: readonly UnorderedMap<SFunctionID, Int>,
   env: GlobalEnv,
+  config: Config.Config,
 ): ?Function {
   pos = root.pos;
 
@@ -458,7 +460,7 @@ private fun findUnfinishedDependencyCycleMember(
     b != a
   }) void;
 
-  if (kConfig.verbose) {
+  if (config.verbose) {
     bestFunction match {
     | Some(best) ->
       print_error_ln(
@@ -493,9 +495,10 @@ private fun findUnfinishedDependencyCycleMember(
 private fun optimizeAll(
   context: mutable SKFS.Context,
   env: GlobalEnv,
+  config: Config.Config,
   opts: Int,
 ): GlobalEnv {
-  verbose = kConfig.verbose;
+  verbose = config.verbose;
 
   // Extract the functions to optimize.
   allFuns = env.sfuns.clone();
@@ -597,7 +600,7 @@ private fun optimizeAll(
         allFuns[unoptimized[i]]
       ).map(f -> {
         SKFS.withRegion(context, (_, _context) ~> {
-          optimizeOne(f, envSnapshot, opts);
+          optimizeOne(f, envSnapshot, config, opts);
         })
       });
 
@@ -640,7 +643,7 @@ private fun optimizeAll(
         | None() -> void
         };
 
-        if (kConfig.optConfig.verify) {
+        if (config.optConfig.verify) {
           // Now that env is set up properly, we can verify any new funs.
           for (fe in newFuns) {
             fe.extraFun match {
@@ -714,6 +717,7 @@ private fun optimizeAll(
           processed,
           popularity,
           env,
+          config,
         ) match {
         | Some(pretendDone) ->
           // Mark all of this function's optimizations passes as done,
@@ -732,10 +736,14 @@ private fun optimizeAll(
 }
 
 // Note that after we lower, we never inline again, as that may be illegal.
-fun compileAll(context: mutable SKFS.Context, env: GlobalEnv): GlobalEnv {
-  !env = optimizeAll(context, env, kConfig.optConfig.all());
+fun compileAll(
+  context: mutable SKFS.Context,
+  env: GlobalEnv,
+  config: Config.Config,
+): GlobalEnv {
+  !env = optimizeAll(context, env, config, config.optConfig.all());
   !env = LowerConst.lowerAllConsts(env);
-  !env = optimizeAll(context, env, kConfig.optConfig.all());
+  !env = optimizeAll(context, env, config, config.optConfig.all());
 
   env
 }

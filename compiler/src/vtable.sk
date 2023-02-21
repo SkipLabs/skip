@@ -225,6 +225,7 @@ private fun createVTableBuilders(
   requests: Array<VTableRequest>,
   classesNeedingVTables: UnorderedSet<SClassID>,
   env: GlobalEnv,
+  config: Config.Config,
 ): mutable Map<SClassID, mutable VTableBuilder> {
   // Create our return array. Unused slots have a dummy entry identifiable
   // by the SClassID::none.
@@ -251,7 +252,7 @@ private fun createVTableBuilders(
 
       // Seed the VTable with its SkipGcType, which all vtables must have.
       // Note that it goes in the second possible pointer slot, not the first.
-      tentative = createGCType(sclass, env);
+      tentative = createGCType(sclass, env, config);
       gct = gcTypes.maybeGet(tentative) match {
       | Some(old) -> old
       | None() ->
@@ -468,7 +469,11 @@ fun vtableLogicalToPhysicalBitOffset(bo: Int): Int {
 const kMinVTableBitOffset: Int = -128 * 8;
 
 // Create fields for a struct containing the SkipGcType for the given SClass.
-private fun createGCType(sc: SClass, env: GlobalEnv): ConstantStruct {
+private fun createGCType(
+  sc: SClass,
+  env: GlobalEnv,
+  config: Config.Config,
+): ConstantStruct {
   (
     userByteSize,
     numMaskWords,
@@ -588,7 +593,7 @@ private fun createGCType(sc: SClass, env: GlobalEnv): ConstantStruct {
   // between different classes, which prevents their vtables from being
   // shared, which can bloat the binary. So we only include detailed
   // information in release mode.
-  provideName = !kConfig.release;
+  provideName = !config.release;
 
   fields = mutable Vector[];
 
@@ -698,7 +703,7 @@ private fun createGCType(sc: SClass, env: GlobalEnv): ConstantStruct {
     // Append a 0-terminated name to the end of the struct.
 
     name = UTF8String::make(
-      if (kConfig.mainConfig.useSpecializedNames) {
+      if (config.mainConfig.useSpecializedNames) {
         sc.toString()
       } else if (sc.superposition == ClassSuperpositionID::empty) {
         sc.gclassName.id
@@ -1062,6 +1067,7 @@ fun populateVTables(
   requestsSet: mutable UnorderedSet<VTableRequest>,
   classesNeedingVTables: mutable UnorderedSet<SClassID>,
   env: GlobalEnv,
+  config: Config.Config,
 ): VTableInfo {
   // Choose a heuristic order in which to assign vtables (values that
   // appear in more vtables get assigned first).
@@ -1092,7 +1098,12 @@ fun populateVTables(
     }
   };
 
-  builders = createVTableBuilders(requests, classesNeedingVTables.chill(), env);
+  builders = createVTableBuilders(
+    requests,
+    classesNeedingVTables.chill(),
+    env,
+    config,
+  );
 
   // Track the bit offset that each request ended up with.
   bitOffsets = Array::mfill(requests.size(), Int::min);

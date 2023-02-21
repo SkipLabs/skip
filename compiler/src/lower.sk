@@ -1205,7 +1205,7 @@ private fun requestVTablesForConstants(
   }
 }
 
-fun lowerFunctions(env: GlobalEnv): GlobalEnv {
+fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
   classesNeedingVTables = mutable UnorderedSet[];
   vtableRequests = mutable UnorderedSet[];
   constantsSeen = mutable UnorderedSet[];
@@ -1218,7 +1218,7 @@ fun lowerFunctions(env: GlobalEnv): GlobalEnv {
 
   runPass = (name: String, f: Function, pass: Function -> Function) -> {
     f2 = pass(f);
-    if (kConfig.verbose) {
+    if (config.verbose) {
       print_error(`Finished ${name} pass for ${f2}.\n`);
       f2.dump(env);
     };
@@ -1227,7 +1227,7 @@ fun lowerFunctions(env: GlobalEnv): GlobalEnv {
 
   for (f in env.sfuns) {
     if (f.hasImplementation()) {
-      if (kConfig.verbose) {
+      if (config.verbose) {
         print_error(`\nAbout to run lower passes for ${f}.\n`);
         f.dump(env);
       };
@@ -1265,6 +1265,7 @@ fun lowerFunctions(env: GlobalEnv): GlobalEnv {
     vtableRequests,
     classesNeedingVTables,
     env,
+    config,
   );
 
   env with {sfuns => newFuns.chill(), vtables => Some(vtableInfo)}
