@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import SKDB from "./skdb_node.js";
 import { webcrypto } from 'node:crypto';
+import * as readline from 'node:readline/promises';
+import { stdin, stdout } from 'node:process';
 
 const createConnectedSkdb = async function(endpoint, database, { accessKey, privateKey }) {
   const skdb = await SKDB.create(true);
@@ -37,6 +39,17 @@ const argSchema = {
     type: "string",
     help: "Access key to use. Default: first specified in credentials file.",
   },
+  'pipe-separated-output': {
+    type: "boolean",
+    help: "SQL output is separated by a pipe. Default: JSON output.",
+    default: false,
+  },
+  'simple-output': {
+    type: "boolean",
+    help: "No cute terminal usage. E.g. no readline.",
+    default: false,
+  },
+  // operations
   'create-db': {
     type: "string",
     help: "Create database.",
@@ -45,7 +58,12 @@ const argSchema = {
     type: "boolean",
     help: "Create user.",
     default: false,
-  }
+  },
+  'remote-repl': {
+    type: "boolean",
+    help: "Interactively execute SQL queries against the server.",
+    default: false,
+  },
 };
 
 const args = parseArgs({
@@ -122,4 +140,43 @@ if (args.values['create-user']) {
 
   fs.writeFileSync(credsFileName, JSON.stringify(creds));
   console.log(`Credentials were added to ${credsFileName}.`);
+}
+
+if (args.values['remote-repl']) {
+  const rl = readline.createInterface(stdin, stdout, undefined,
+                                      !args.values['simple-output']);
+  while (true) {
+    const query = await rl.question(`${accessKey}@${args.values.host}/${args.values.db}> `);
+
+    if (query.trim() === '.help') {
+      console.log("Send input to the server to be executed as a query.");
+      console.log("Multi-statement queries should (currently) be combined on a single line.");
+      console.log("");
+      console.log("Commands begin with '.'");
+      console.log("");
+      console.log(".help   -- This message.");
+      console.log(".schema -- Output the schema.");
+      continue;
+    }
+
+    if (query.trim() === '.schema') {
+      console.error("TODO");
+      continue;
+    }
+
+    let answer = "";
+    try {
+      if (args.values['pipe-separated-output']) {
+        answer = await skdb.server().sqlRaw(query);
+        answer = answer.trim();
+      } else {
+        answer = await skdb.server().sql(query);
+      }
+      console.log(answer);
+    } catch (ex) {
+      console.error("Could not eval query. Try `.help`");
+      // TODO: this currently contains no information. we need to add errors to the protocol
+      // console.error(ex);
+    }
+  }
 }
