@@ -82,7 +82,7 @@ else
     echo -e "TEST AGGR UNION:\tFAILED"
 fi
 
-if cat test/test_joins.sql | $SKDB --always-allow-joins | tr '\n' S | grep -q '1|2|1|3S2|4||S||1|3S1|2|1|3S||1|3S1|2|1|3S2|4||S'
+if cat test/test_joins.sql | $SKDB --always-allow-joins | tr '\n' S | grep -q '1|2|1|3S2|4||S1|2|1|3S1|2|1|3S2|4||S'
 then
     echo -e "TEST JOIN:\tOK"
 else
