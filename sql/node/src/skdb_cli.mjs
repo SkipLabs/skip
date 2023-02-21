@@ -5,7 +5,7 @@ import path from "node:path";
 import SKDB from "./skdb_node.js";
 import { webcrypto } from 'node:crypto';
 import * as readline from 'node:readline/promises';
-import { stdin, stdout } from 'node:process';
+import process from 'node:process';
 
 const createConnectedSkdb = async function(endpoint, database, { accessKey, privateKey }) {
   const skdb = await SKDB.create(true);
@@ -26,6 +26,7 @@ const argSchema = {
     default: false,
     help: "",
   },
+  // connection params
   db: {
     type: "string",
     help: "Name of database to connect to."
@@ -39,6 +40,7 @@ const argSchema = {
     type: "string",
     help: "Access key to use. Default: first specified in credentials file.",
   },
+  // formatting
   'pipe-separated-output': {
     type: "boolean",
     help: "SQL output is separated by a pipe. Default: JSON output.",
@@ -121,6 +123,16 @@ const skdb = await createConnectedSkdb(args.values.host, args.values.db, {
   privateKey: privateKey,
 });
 
+const evalQuery = async function(skdb_client, query) {
+  if (args.values['pipe-separated-output']) {
+    let answer = await skdb_client.sqlRaw(query);
+    answer = answer.trim();
+    return answer;
+  } else {
+    return skdb_client.sql(query);
+  }
+};
+
 if (args.values['create-db']) {
   const db = args.values['create-db'];
   const result = await skdb.server().createDatabase(db);
@@ -143,7 +155,7 @@ if (args.values['create-user']) {
 }
 
 if (args.values['remote-repl']) {
-  const rl = readline.createInterface(stdin, stdout, undefined,
+  const rl = readline.createInterface(process.stdin, process.stdout, undefined,
                                       !args.values['simple-output']);
   while (true) {
     const query = await rl.question(`${accessKey}@${args.values.host}/${args.values.db}> `);
@@ -164,14 +176,8 @@ if (args.values['remote-repl']) {
       continue;
     }
 
-    let answer = "";
     try {
-      if (args.values['pipe-separated-output']) {
-        answer = await skdb.server().sqlRaw(query);
-        answer = answer.trim();
-      } else {
-        answer = await skdb.server().sql(query);
-      }
+      const answer = await evalQuery(skdb.server(), query);
       console.log(answer);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
@@ -179,4 +185,16 @@ if (args.values['remote-repl']) {
       // console.error(ex);
     }
   }
+}
+
+const query = fs.readFileSync(process.stdin.fd, 'utf-8');
+
+try {
+  const answer = await evalQuery(skdb.server(), query);
+  console.log(answer);
+} catch (ex) {
+  console.error("Could not eval query.");
+  process.exit(1);
+  // TODO: this currently contains no information. we need to add errors to the protocol
+  // console.error(ex);
 }
