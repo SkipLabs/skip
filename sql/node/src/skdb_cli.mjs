@@ -217,8 +217,9 @@ const remoteRepl = async function() {
     }
 
     if (query.trim() === '.local') {
+      rl.close();
       await localRepl();
-      continue;
+      return;
     }
 
     if (query.trim() === '.schema') {
@@ -283,14 +284,16 @@ const localRepl = async function() {
     }
 
     if (query.trim() === '.remote') {
+      rl.close();
       await remoteRepl();
-      continue;
+      return;
     }
 
     if (query.trim() === '.js') {
+      rl.close();
       const ctx = repl.start().context;
       ctx.skdb = skdb;
-      break;
+      return;
     }
 
     if (query.trim() === '.schema') {
