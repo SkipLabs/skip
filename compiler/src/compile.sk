@@ -115,9 +115,10 @@ fun targetIsWasm(): Bool {
 fun createOptimizedFunctions(
   context: mutable SKFS.Context,
   env: GlobalEnv,
+  config: Config.Config,
 ): GlobalEnv {
   runCompilerPhase("native/compile", () -> {
-    !env = Optimize.compileAll(context, env);
+    !env = Optimize.compileAll(context, env, config);
 
     // Find all the functions that are still reachable from the root set,
     // post-inlining, dead code elimination, etc.
@@ -141,7 +142,7 @@ fun createOptimizedFunctions(
     !env = Escape.computeWhetherPointersCanEscape(env);
 
     // optimize.sk steps (5) Lower + (6) Lay out vtables.
-    !env = Lower.lowerFunctions(env)
+    !env = Lower.lowerFunctions(env, config)
   });
 
   env
@@ -149,6 +150,7 @@ fun createOptimizedFunctions(
 
 fun compile(
   isInit: Bool,
+  config: Config.Config,
   context: mutable SKFS.Context,
   fileNames: Array<String>,
 ): void {
@@ -159,7 +161,7 @@ fun compile(
     skipExit(4); // Exit code used by g++ for no input files
   };
 
-  cfg = kConfig.mainConfig;
+  cfg = config.mainConfig;
 
   // Are we in "disassemble" mode?
   disasm = (
@@ -189,6 +191,7 @@ fun compile(
         funDef.origName,
         funDef.annotations,
         funDef.getPos(),
+        config.mainConfig.exportedAsFunctions,
       )
   );
 
@@ -227,7 +230,7 @@ fun compile(
       context,
       backendSinkDirName,
       (context, _writer, _key, _values) ~> {
-        if (kConfig.mainConfig.check) {
+        if (config.mainConfig.check) {
           return void;
         };
 
@@ -241,6 +244,7 @@ fun compile(
 
         env = OuterIstToIR.createIR(
           context,
+          config,
           shouldDisasm,
           shouldRuntimeExport,
           outerIst,
@@ -249,13 +253,13 @@ fun compile(
           defsProj,
         );
 
-        !env = createOptimizedFunctions(context, env);
+        !env = createOptimizedFunctions(context, env, config);
         defs = runCompilerPhase("native/create_asm_graph", () -> {
-          AsmOutput.createAsmDefGraph(env)
+          AsmOutput.createAsmDefGraph(env, config)
         });
 
         runCompilerPhase("native/merge_asm_graph", () -> {
-          AsmOutput.mergeIdenticalAsmDefs(defs)
+          AsmOutput.mergeIdenticalAsmDefs(defs, config.verbose)
         });
 
         runCompilerPhase("native/create_asm_symbols", () -> {
@@ -263,7 +267,7 @@ fun compile(
         });
 
         runCompilerPhase("native/write_asm_files", () -> {
-          AsmOutput.writeOutputFiles(defs, fileNames)
+          AsmOutput.writeOutputFiles(defs, fileNames, config)
         });
       },
     );

@@ -1893,6 +1893,7 @@ mutable class Specializer{
     context: mutable SKFS.Context,
     runtimeFunctionsVec: readonly Vector<FrontEndLazyGFun>,
     env: GlobalEnv,
+    config: Config.Config,
     lconsts: Array<ConstLazyGFun>,
     disasm: readonly UnorderedSet<String>,
   ): GlobalEnv {
@@ -1985,6 +1986,7 @@ mutable class Specializer{
               f.name,
               f.annotations,
               f.pos,
+              config.mainConfig.exportedAsFunctions,
             ) || AsmOutput.cppIsImported(f, f.pos)),
           },
         )
