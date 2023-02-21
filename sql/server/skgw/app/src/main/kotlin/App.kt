@@ -235,24 +235,19 @@ class AuthenticatedConn(
             when (request.format) {
               "csv" -> OutputFormat.CSV
               "json" -> OutputFormat.JSON
+              "raw" -> OutputFormat.RAW
               else -> OutputFormat.CSV
             }
         val result = skdb.sql(request.query, format)
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
-        // TODO: no need to close. client can if it doesn't want to re-use
-        channel.sendClose()
-        channel.close()
-        return ClosedConn()
+        return this
       }
       is ProtoDumpTable -> {
         val result = skdb.dumpTable(request.table, request.suffix)
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
-        // TODO: no need to close. client can if it doesn't want to re-use
-        channel.sendClose()
-        channel.close()
-        return ClosedConn()
+        return this
       }
       is ProtoCreateDb -> {
         // this side effect is only authorized if you're connected as a service mgmt db user
@@ -510,7 +505,7 @@ fun main(args: Array<String>) {
 
   if (arglist.contains("--init")) {
     val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
-    println("${serialise(creds)}")
+    println("{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.privateKey}\"}}")
     return
   }
 

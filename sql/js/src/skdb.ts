@@ -153,7 +153,7 @@ type ProtoAuth = {
 type ProtoQuery = {
   request: "query";
   query: string;
-  format?: "json";
+  format?: "json"|"raw";
 }
 
 type ProtoTail = {
@@ -1021,6 +1021,7 @@ class SKDBServer {
     let result = await this.client.makeRequest(this.uri, this.creds, {
       request: "query",
       query: stdin,
+      format: "raw",
     });
 
     return this.castData(result).data;
