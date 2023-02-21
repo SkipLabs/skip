@@ -58,7 +58,7 @@ mutable class .LowerLocalGC{
     hasNoGC = annotationsContain(f.annotations, "@no_gc", pos);
     hasGC = !hasNoGC && annotationsContain(f.annotations, "@gc", pos);
 
-    if (!static::shouldGC(f, hasNoGC, hasGC)) {
+    if (!static::shouldGC(f, hasNoGC, hasGC, config.mainConfig.autogc)) {
       // No LocalGC, so nothing to do.
       (f, PassUnchanged(kNoFunctions))
     } else {
@@ -78,9 +78,14 @@ mutable class .LowerLocalGC{
 
   // True if this function has a gc annotation, LocalGC or ObstackUsage
   // instructions, or allocates unbounded memory.
-  private static fun shouldGC(f: Function, hasNoGC: Bool, hasGC: Bool): Bool {
+  private static fun shouldGC(
+    f: Function,
+    hasNoGC: Bool,
+    hasGC: Bool,
+    autogc: Bool,
+  ): Bool {
     (!hasNoGC &&
-      kConfig.mainConfig.autogc &&
+      autogc &&
       f.status match {
       | OptDone{allocAmount} -> allocAmount is AllocUnbounded _
       | OptPartial _ ->
@@ -119,7 +124,7 @@ mutable class .LowerLocalGC{
   }
 
   protected readonly fun isSafepoint(instr: Stmt): Bool {
-    static::isGCInstr(instr, this.hasGC || kConfig.mainConfig.autogc)
+    static::isGCInstr(instr, this.hasGC || this.config.mainConfig.autogc)
   }
 
   protected readonly fun isSaved(instr: Instr): Bool {
