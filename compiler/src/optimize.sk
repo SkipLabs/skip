@@ -104,22 +104,6 @@ private fun checkReady(
   (f, PassUnchanged(deps))
 }
 
-private const passes: Array<
-  (String, Int, (Function, GlobalEnv, Config.Config) ~> (Function, PassResult)),
-> = {
-  config = kConfig.optConfig;
-  Array[
-    ("ready", Config::kOptReady, checkReady),
-    ("intrinsics", Config::kOptIntrinsics, IntrinsicsInliner::run),
-    ("dce", config.dce, EliminateDeadCode::run),
-    ("peephole", config.peephole, Peephole::run),
-    ("control", config.control, Control::run),
-    ("regpromote", config.regpromote, RegisterPromote::run),
-    ("ipa", config.ipa, Interprocedural::run),
-    ("inline", config.inline, Inline::run),
-  ]
-};
-
 // The result of optimizeOne optimizing a single function.
 //
 // This almost always this just contains 'f', the new version of the
@@ -173,6 +157,13 @@ private fun optimizeOne(
   f: Function,
   env: GlobalEnv,
   config: Config.Config,
+  passes: Array<
+    (
+      String,
+      Int,
+      (Function, GlobalEnv, Config.Config) ~> (Function, PassResult),
+    ),
+  >,
   opts: Int,
 ): OptimizeOneResult {
   verbose = config.verbose;
@@ -509,6 +500,17 @@ private fun optimizeAll(
 ): GlobalEnv {
   verbose = config.verbose;
 
+  passes = Array[
+    ("ready", Config::kOptReady, checkReady),
+    ("intrinsics", Config::kOptIntrinsics, IntrinsicsInliner::run),
+    ("dce", config.optConfig.dce, EliminateDeadCode::run),
+    ("peephole", config.optConfig.peephole, Peephole::run),
+    ("control", config.optConfig.control, Control::run),
+    ("regpromote", config.optConfig.regpromote, RegisterPromote::run),
+    ("ipa", config.optConfig.ipa, Interprocedural::run),
+    ("inline", config.optConfig.inline, Inline::run),
+  ];
+
   // Extract the functions to optimize.
   allFuns = env.sfuns.clone();
   unoptimized = Vector::mcreate(env.sfuns.size());
@@ -609,7 +611,7 @@ private fun optimizeAll(
         allFuns[unoptimized[i]]
       ).map(f -> {
         SKFS.withRegion(context, (_, _context) ~> {
-          optimizeOne(f, envSnapshot, config, opts);
+          optimizeOne(f, envSnapshot, config, passes, opts);
         })
       });
 
