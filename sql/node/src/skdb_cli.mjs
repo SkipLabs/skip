@@ -29,15 +29,18 @@ const argSchema = {
   // connection params
   db: {
     type: "string",
+    valName: 'db',
     help: "Name of database to connect to."
   },
   host: {
     type: "string",
+    valName: 'host',
     help: "URI to connect to.",
     default: "wss://api.skiplabs.io",
   },
   'access-key': {
     type: "string",
+    valName: 'key',
     help: "Access key to use. Default: first specified in credentials file.",
   },
   // formatting
@@ -54,6 +57,7 @@ const argSchema = {
   // operations
   'create-db': {
     type: "string",
+    valName: 'db',
     help: "Create database.",
   },
   'create-user': {
@@ -65,6 +69,21 @@ const argSchema = {
     type: "boolean",
     help: "Interactively execute SQL queries against the server.",
     default: false,
+  },
+  'schema': {
+    type: "boolean",
+    help: "Dump the database schema as SQL DML.",
+    default: false,
+  },
+  'table-schema': {
+    type: "string",
+    valName: 'table',
+    help: "Dump the table schema as SQL DML.",
+  },
+  'view-schema': {
+    type: "string",
+    valName: 'view',
+    help: "Dump the view schema as SQL DML.",
   },
 };
 
@@ -79,7 +98,7 @@ const printHelp = function() {
 
   const flags = Object.entries(argSchema)
         .map(([key, def]) => {
-          const val = def.type === "string" ? ` <${key}>` : '';
+          const val = def.type === "string" ? ` <${def.valName}>` : '';
           const help = def.help ? `  -- ${def.help}` : '';
           const deflt = def.default ? ` Default: ${def.default}`: '';
           return `[--${key}${val}]${help}${deflt}`;
@@ -154,6 +173,21 @@ if (args.values['create-user']) {
   console.log(`Credentials were added to ${credsFileName}.`);
 }
 
+if (args.values['schema']) {
+  const schema = await skdb.server().schema();
+  console.log(schema.trim());
+}
+
+if (args.values['table-schema']) {
+  const schema = await skdb.server().tableSchema(args.values['table-schema']);
+  console.log(schema.trim());
+}
+
+if (args.values['view-schema']) {
+  const schema = await skdb.server().viewSchema(args.values['view-schema']);
+  console.log(schema.trim());
+}
+
 if (args.values['remote-repl']) {
   const rl = readline.createInterface(process.stdin, process.stdout, undefined,
                                       !args.values['simple-output']);
@@ -168,11 +202,36 @@ if (args.values['remote-repl']) {
       console.log("");
       console.log(".help   -- This message.");
       console.log(".schema -- Output the schema.");
+      console.log(".table-schema <table> -- Output the schema <table>.");
+      console.log(".view-schema <view> -- Output the schema for <view>.");
       continue;
     }
 
     if (query.trim() === '.schema') {
-      console.error("TODO");
+      const schema = await skdb.server().schema();
+      console.log(schema);
+      continue;
+    }
+
+    if (query.startsWith('.table-schema')) {
+      const [_, table] = query.split(" ", 2);
+      try {
+        const schema = await skdb.server().tableSchema(table);
+        console.log(schema);
+      } catch {
+        console.error(`Could not find schema for ${table}.`);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.view-schema')) {
+      const [_, view] = query.split(" ", 2);
+      try {
+        const schema = await skdb.server().viewSchema(view);
+        console.log(schema);
+      } catch {
+        console.error(`Could not find schema for ${view}.`);
+      }
       continue;
     }
 
@@ -187,14 +246,19 @@ if (args.values['remote-repl']) {
   }
 }
 
-const query = fs.readFileSync(process.stdin.fd, 'utf-8');
-
+let query = "";
 try {
-  const answer = await evalQuery(skdb.server(), query);
-  console.log(answer);
-} catch (ex) {
-  console.error("Could not eval query.");
-  process.exit(1);
-  // TODO: this currently contains no information. we need to add errors to the protocol
-  // console.error(ex);
+  query = fs.readFileSync(process.stdin.fd, 'utf-8');
+} catch {}
+
+if (query.trim() !== "") {
+  try {
+    const answer = await evalQuery(skdb.server(), query);
+    console.log(answer);
+  } catch (ex) {
+    console.error("Could not eval query.");
+    process.exit(1);
+    // TODO: this currently contains no information. we need to add errors to the protocol
+    // console.error(ex);
+  }
 }
