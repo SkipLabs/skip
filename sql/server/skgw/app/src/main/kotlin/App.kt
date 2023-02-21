@@ -7,7 +7,6 @@ import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.HttpHandler
 import io.undertow.server.handlers.PathTemplateHandler
-import io.undertow.server.handlers.resource.FileResourceManager
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.WebSocketConnectionCallback
 import io.undertow.websockets.core.AbstractReceiveListener
@@ -15,7 +14,6 @@ import io.undertow.websockets.core.BufferedTextMessage
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
-import java.io.File
 import java.nio.channels.Channel
 import java.security.SecureRandom
 import java.time.Duration
@@ -39,7 +37,7 @@ class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
         "auth" -> ProtoAuth::class
         "query" -> ProtoQuery::class
         "tail" -> ProtoTail::class
-        "dumpTable" -> ProtoDumpTable::class
+        "schema" -> ProtoSchemaQuery::class
         "write" -> ProtoWrite::class
         "pipe" -> ProtoData::class
         "createDatabase" -> ProtoCreateDb::class
@@ -66,7 +64,11 @@ data class ProtoTail(
     val since: Int = 0,
 ) : ProtoMessage("tail")
 
-data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
+data class ProtoSchemaQuery(
+    val table: String? = null,
+    val view: String? = null,
+    val suffix: String = ""
+) : ProtoMessage("schema")
 
 data class ProtoWrite(val table: String) : ProtoMessage("write")
 
@@ -243,8 +245,15 @@ class AuthenticatedConn(
         WebSockets.sendTextBlocking(payload, channel)
         return this
       }
-      is ProtoDumpTable -> {
-        val result = skdb.dumpTable(request.table, request.suffix)
+      is ProtoSchemaQuery -> {
+        val result =
+            if (request.table != null) {
+              skdb.dumpTable(request.table, request.suffix)
+            } else if (request.view != null) {
+              skdb.dumpView(request.view)
+            } else {
+              skdb.dumpSchema()
+            }
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
         return this
@@ -468,8 +477,7 @@ fun connectionHandler(
 }
 
 fun createHttpServer(connectionHandler: HttpHandler): Undertow {
-  var pathHandler =
-      PathTemplateHandler().add("/dbs/{database}/connection", connectionHandler)
+  var pathHandler = PathTemplateHandler().add("/dbs/{database}/connection", connectionHandler)
 
   return Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
 }

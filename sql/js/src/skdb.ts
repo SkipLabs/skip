@@ -162,10 +162,11 @@ type ProtoTail = {
   since: number;
 }
 
-type ProtoDumpTable = {
-  request: "dumpTable";
-  table: string;
-  suffix: string;
+type ProtoSchemaQuery = {
+  request: "schema";
+  table?: string;
+  view?: string;
+  suffix?: string;
 }
 
 type ProtoWrite = {
@@ -188,7 +189,7 @@ type ProtoCredentials = {
   privateKey: String;
 }
 
-type ProtoRequest = ProtoQuery | ProtoDumpTable | ProtoCreateDb | ProtoTail | ProtoWrite | ProtoCreateUser
+type ProtoRequest = ProtoQuery | ProtoSchemaQuery | ProtoCreateDb | ProtoTail | ProtoWrite | ProtoCreateUser
 
 type ProtoResponse = ProtoData | ProtoCredentials
 
@@ -1040,22 +1041,39 @@ class SKDBServer {
       .map((x) => JSON.parse(x));
   }
 
+  async tableSchema(tableName: string, renameSuffix: string = ""): Promise<string> {
+    const resp = await this.client.makeRequest(this.uri, this.creds, {
+      request: "schema",
+      table: tableName,
+      suffix: renameSuffix,
+    });
+    return this.castData(resp).data
+  }
+
+  async viewSchema(viewName: string, renameSuffix: string = ""): Promise<string> {
+    const resp = await this.client.makeRequest(this.uri, this.creds, {
+      request: "schema",
+      view: viewName,
+      suffix: renameSuffix,
+    });
+    return this.castData(resp).data
+  }
+
+  async schema(): Promise<string> {
+    const resp = await this.client.makeRequest(this.uri, this.creds, {
+      request: "schema",
+    });
+    return this.castData(resp).data
+  }
+
   async mirrorTable(tableName: string): Promise<void> {
     let remoteSuffix = "_remote_" + this.serverID;
-    let createRemoteTable = await this.client.makeRequest(this.uri, this.creds, {
-      request: "dumpTable",
-      table: tableName,
-      suffix: remoteSuffix,
-    });
-    this.client.runLocal([], this.castData(createRemoteTable).data);
+    let createRemoteTable = await this.tableSchema(tableName, remoteSuffix);
+    this.client.runLocal([], createRemoteTable);
 
     let localSuffix = "_local";
-    let createLocalTable = await this.client.makeRequest(this.uri, this.creds, {
-      request: "dumpTable",
-      table: tableName,
-      suffix: localSuffix,
-    });
-    this.client.runLocal([], this.castData(createLocalTable).data);
+    let createLocalTable = await this.tableSchema(tableName, localSuffix);
+    this.client.runLocal([], createLocalTable);
 
     await this.client.connectWriteTable(
       this.uri,
@@ -1087,23 +1105,19 @@ class SKDBServer {
     );
   }
 
-  async mirrorView(tableName: string, suffix?: string): Promise<void> {
+  async mirrorView(viewName: string, suffix?: string): Promise<void> {
     suffix = suffix || "";
-    let createRemoteTable = await this.client.makeRequest(this.uri, this.creds, {
-      request: "dumpTable",
-      table: tableName,
-      suffix: suffix,
-    });
-    this.client.runLocal([], this.castData(createRemoteTable).data);
+    let createRemoteTable = await this.viewSchema(viewName, suffix);
+    this.client.runLocal([], createRemoteTable);
 
     await this.client.connectReadTable(
       this.uri,
       this.creds,
-      tableName,
+      viewName,
       suffix,
     );
 
-    this.client.setMirroredTable(tableName, this.sessionID);
+    this.client.setMirroredTable(viewName, this.sessionID);
   }
 
   async createDatabase(dbName: string): Promise<ProtoCredentials> {

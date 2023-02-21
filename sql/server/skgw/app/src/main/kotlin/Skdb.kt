@@ -54,6 +54,16 @@ class Skdb(val name: String, private val dbPath: String) {
         ProcessBuilder(SKDB_PROC, "dump-table", table, "--data", dbPath, "--table-suffix", suffix))
   }
 
+  fun dumpView(view: String): String {
+    return blockingRun(
+        ProcessBuilder(SKDB_PROC, "dump-view", view, "--data", dbPath))
+  }
+
+  fun dumpSchema(): String {
+    return blockingRun(ProcessBuilder(SKDB_PROC, "dump-tables", "--data", dbPath)) +
+        blockingRun(ProcessBuilder(SKDB_PROC, "dump-views", "--data", dbPath))
+  }
+
   fun writeCsv(
       user: String,
       table: String,
