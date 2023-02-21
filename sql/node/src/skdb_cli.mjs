@@ -268,6 +268,8 @@ if (args.values['local-repl']) {
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
+      console.log(".mirror-table <table> -- Mirror the remote table <table>.");
+      console.log(".mirror-view <view> -- Mirror the remote view <view>.");
       continue;
     }
 
@@ -295,6 +297,26 @@ if (args.values['local-repl']) {
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${view}.`);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.mirror-table')) {
+      const [_, table] = query.split(" ", 2);
+      try {
+        await skdb.server().mirrorTable(table);
+      } catch {
+        console.error(`Could not mirror table ${table}.`);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.mirror-view')) {
+      const [_, view] = query.split(" ", 2);
+      try {
+        await skdb.server().mirrorView(view);
+      } catch {
+        console.error(`Could not mirror view ${view}.`);
       }
       continue;
     }
