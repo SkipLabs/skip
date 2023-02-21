@@ -965,6 +965,18 @@ export class SKDB {
       .map((x) => JSON.parse(x));
   }
 
+  tableSchema(tableName: string): string {
+    return this.runLocal(["dump-table", tableName], "");
+  }
+
+  viewSchema(viewName: string, renameSuffix: string = ""): string {
+    return this.runLocal(["dump-view", viewName], "");
+  }
+
+  schema(): string {
+    return this.runLocal(["dump-tables"], "");
+  }
+
   insert(tableName: string, values: Array<any>): void {
     values = values.map((x) => {
       if (typeof x == "string") {
