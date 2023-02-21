@@ -70,6 +70,11 @@ const argSchema = {
     help: "Interactively execute SQL queries against the server.",
     default: false,
   },
+  'local-repl': {
+    type: "boolean",
+    help: "Interactively execute SQL queries against a local db.",
+    default: false,
+  },
   'schema': {
     type: "boolean",
     help: "Dump the database schema as SQL DML.",
@@ -106,6 +111,8 @@ const printHelp = function() {
         .join('\n    ');
 
   console.log(`Usage: ${thisBin} ${flags}`);
+  console.log("");
+  console.log("Anything passed on stdin will be evaluated as sql by the remote db.");
 };
 
 const haveMandatoryValues = ['db', 'host']
@@ -237,6 +244,63 @@ if (args.values['remote-repl']) {
 
     try {
       const answer = await evalQuery(skdb.server(), query);
+      console.log(answer);
+    } catch (ex) {
+      console.error("Could not eval query. Try `.help`");
+      // TODO: this currently contains no information. we need to add errors to the protocol
+      // console.error(ex);
+    }
+  }
+}
+
+if (args.values['local-repl']) {
+  const rl = readline.createInterface(process.stdin, process.stdout, undefined,
+                                      !args.values['simple-output']);
+  while (true) {
+    const query = await rl.question(`local> `);
+
+    if (query.trim() === '.help') {
+      console.log("Evaluate input as a SQL query against a local database.");
+      console.log("");
+      console.log("Commands begin with '.'");
+      console.log("");
+      console.log(".help   -- This message.");
+      console.log(".schema -- Output the schema.");
+      console.log(".table-schema <table> -- Output the schema <table>.");
+      console.log(".view-schema <view> -- Output the schema for <view>.");
+      continue;
+    }
+
+    if (query.trim() === '.schema') {
+      const schema = skdb.schema();
+      console.log(schema);
+      continue;
+    }
+
+    if (query.startsWith('.table-schema')) {
+      const [_, table] = query.split(" ", 2);
+      try {
+        const schema = skdb.tableSchema(table);
+        console.log(schema);
+      } catch {
+        console.error(`Could not find schema for ${table}.`);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.view-schema')) {
+      const [_, view] = query.split(" ", 2);
+      try {
+        const schema = skdb.viewSchema(view);
+        console.log(schema);
+      } catch {
+        console.error(`Could not find schema for ${view}.`);
+      }
+      continue;
+    }
+
+    try {
+      const answer = await evalQuery(skdb, query);
       console.log(answer);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
