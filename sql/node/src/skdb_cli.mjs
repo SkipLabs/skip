@@ -143,7 +143,7 @@ if (!dbCreds || Object.entries(dbCreds).length < 1) {
 
 const firstPair = Object.entries(dbCreds)[0];
 const accessKey = args.values['access-key'] ?? firstPair[0];
-const privateKey = args.values['private-key'] ?? firstPair[1];
+const privateKey = dbCreds[accessKey];
 
 const skdb = await createConnectedSkdb(args.values.host, args.values.db, {
   accessKey: accessKey,
