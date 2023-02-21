@@ -114,7 +114,11 @@ mutable class .RegisterPromote{
   successorsNeedUpdating: mutable Vector<BlockID> = mutable Vector[],
 } extends Rewrite {
   // Promote fields to local variables.
-  static fun run(f: Function, env: GlobalEnv): (Function, PassResult) {
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): (Function, PassResult) {
     optinfo = OptimizerInfo::make(f);
 
     dummyBlock = FlowBlock::make(f.blocks[0]);
@@ -127,6 +131,7 @@ mutable class .RegisterPromote{
     d = mutable static{
       optinfo,
       env,
+      config,
       pos => f.pos,
       currentFlowBlock => dummyBlock,
       objFlags,

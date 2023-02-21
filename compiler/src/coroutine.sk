@@ -194,6 +194,7 @@ private mutable class .LowerCoroutine{
   static fun run(
     f: Function,
     env: GlobalEnv,
+    config: Config.Config,
     info: UnfinishedCoroutine,
   ): (Function, Function, SClass) {
     pos = f.pos;
@@ -209,6 +210,7 @@ private mutable class .LowerCoroutine{
     d = mutable LowerCoroutine{
       optinfo => OptimizerInfo::make(f),
       env,
+      config,
       pos,
       nextMethodID => coroutineStateSClass.getMethod(
         "next",
@@ -736,6 +738,7 @@ private mutable class .LowerCoroutine{
       },
       orig.params.map(p -> p.prettyName),
       env,
+      this.config,
       orig.superpositions,
     );
 

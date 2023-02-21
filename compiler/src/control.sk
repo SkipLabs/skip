@@ -182,11 +182,16 @@ mutable class .Control{
   // Simplifies control flow.
   //
   // Returns the resulting function and a bool saying whether it changed.
-  static fun run(f: Function, env: GlobalEnv): (Function, PassResult) {
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): (Function, PassResult) {
     optinfo = OptimizerInfo::make(f);
     d = mutable static{
       optinfo,
       env,
+      config,
       blocksEmitted => Array::mfill(optinfo.idToBlock.size(), false),
       pos => f.pos,
     };
