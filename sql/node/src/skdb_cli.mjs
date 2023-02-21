@@ -195,7 +195,7 @@ if (args.values['view-schema']) {
   console.log(schema.trim());
 }
 
-if (args.values['remote-repl']) {
+const remoteRepl = async function() {
   const rl = readline.createInterface(process.stdin, process.stdout, undefined,
                                       !args.values['simple-output']);
   while (true) {
@@ -208,9 +208,15 @@ if (args.values['remote-repl']) {
       console.log("Commands begin with '.'");
       console.log("");
       console.log(".help   -- This message.");
+      console.log(".local -- Switch to local repl.");
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
+      continue;
+    }
+
+    if (query.trim() === '.local') {
+      await localRepl();
       continue;
     }
 
@@ -251,9 +257,9 @@ if (args.values['remote-repl']) {
       // console.error(ex);
     }
   }
-}
+};
 
-if (args.values['local-repl']) {
+const localRepl = async function() {
   const rl = readline.createInterface(process.stdin, process.stdout, undefined,
                                       !args.values['simple-output']);
   while (true) {
@@ -264,12 +270,18 @@ if (args.values['local-repl']) {
       console.log("");
       console.log("Commands begin with '.'");
       console.log("");
-      console.log(".help   -- This message.");
+      console.log(".help -- This message.");
+      console.log(".remote -- Switch to remote repl.");
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
       console.log(".mirror-table <table> -- Mirror the remote table <table>.");
       console.log(".mirror-view <view> -- Mirror the remote view <view>.");
+      continue;
+    }
+
+    if (query.trim() === '.remote') {
+      await remoteRepl();
       continue;
     }
 
@@ -330,6 +342,14 @@ if (args.values['local-repl']) {
       // console.error(ex);
     }
   }
+};
+
+if (args.values['remote-repl']) {
+  await remoteRepl();
+}
+
+if (args.values['local-repl']) {
+  await localRepl();
 }
 
 let query = "";
