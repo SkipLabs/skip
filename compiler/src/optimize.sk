@@ -208,7 +208,7 @@ private fun optimizeOne(
             print_error(
               "\nAbout to run " + passName + " pass for " + f + ".\n",
             );
-            // f.dump(env)
+            // f.dump(env, config)
           };
 
           // Iterate this optimization to a fixed point.
@@ -237,11 +237,11 @@ private fun optimizeOne(
                 print_error(
                   "Finished " + passName + " iteration " + subIterations + "\n",
                 );
-                f.dump(env)
+                f.dump(env, config)
               };
 
               if (config.optConfig.verify) {
-                Verify.verifyFunction(f, env, "optimize:" + passName)
+                Verify.verifyFunction(f, env, config, "optimize:" + passName)
               };
 
               !changed = true;
@@ -279,7 +279,7 @@ private fun optimizeOne(
 
           if (verbose) {
             if (thisChanged) {
-              oldFunction.dump(env)
+              oldFunction.dump(env, config)
             };
 
             print_error(
@@ -301,7 +301,7 @@ private fun optimizeOne(
             );
 
             if (thisChanged) {
-              f.dump(env)
+              f.dump(env, config)
             }
           };
 
@@ -658,7 +658,7 @@ private fun optimizeAll(
           // Now that env is set up properly, we can verify any new funs.
           for (fe in newFuns) {
             fe.extraFun match {
-            | Some(ef) -> Verify.verifyFunction(ef, env, "new function")
+            | Some(ef) -> Verify.verifyFunction(ef, env, config, "new function")
             | None() -> void
             }
           }

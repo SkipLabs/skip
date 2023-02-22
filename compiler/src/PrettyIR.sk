@@ -1285,6 +1285,7 @@ mutable class Metadata{
 /*FIXME: private*/
 mutable class .PrettyIR{
   mutable env: GlobalEnv,
+  config: Config.Config,
 
   // Skip String -> LLVM expression.
   strings: mutable UnorderedMap<
@@ -1337,11 +1338,11 @@ mutable class .PrettyIR{
   // since really they are the same function.
   externs: mutable UnorderedMap<String, PrettyDefID> = mutable UnorderedMap[],
 } {
-  static fun make{env: GlobalEnv}: mutable PrettyIR {
+  static fun make{env: GlobalEnv, config: Config.Config}: mutable PrettyIR {
     // Make new IDs from this.defs not overlap with SFunctionID.
     defs = mutable PrettyDefIDToPrettyDef{pos => FileRange.builtin};
     for (_ in Range(0, env.sfuns.size())) _ = defs.allocID();
-    mutable PrettyIR{env, defs, megaVTableImage => defs.allocID()}
+    mutable PrettyIR{env, config, defs, megaVTableImage => defs.allocID()}
   }
 
   mutable fun resetForNewFunction(pos: Pos): void {
@@ -1426,7 +1427,7 @@ mutable class .PrettyIR{
         VTable.kFrozenMask),
     };
 
-    header = if (vtableByteSize == 8) {
+    header = if (this.config.mainConfig.vtableByteSize == 8) {
       Array[StaticImageField(vtable, 0)]
     } else {
       // All object pointers (right after vtable) are aligned mod 8.
@@ -1435,7 +1436,9 @@ mutable class .PrettyIR{
 
     headerSize = header.size();
     vtableField = header[headerSize - 1];
-    firstFieldBitOffset = vtableField.bitOffset + vtableByteSize * 8;
+    firstFieldBitOffset =
+      vtableField.bitOffset +
+      this.config.mainConfig.vtableByteSize * 8;
 
     layout = sc.layout match {
     | Some(l) -> l
@@ -1491,7 +1494,7 @@ mutable class .PrettyIR{
         VTable.kFrozenMask),
     };
 
-    header = if (vtableByteSize == 8) {
+    header = if (this.config.mainConfig.vtableByteSize == 8) {
       Array[
         StaticImageField(pad32, 0),
         StaticImageField(sizeConst, 32),
@@ -1503,7 +1506,9 @@ mutable class .PrettyIR{
 
     headerSize = header.size();
     vtableField = header[headerSize - 1];
-    firstSlotBitOffset = vtableField.bitOffset + vtableByteSize * 8;
+    firstSlotBitOffset =
+      vtableField.bitOffset +
+      this.config.mainConfig.vtableByteSize * 8;
 
     // Create the values and layout for the array elements.
     getField = if (logicalOrderedValues.isEmpty()) {
@@ -1623,7 +1628,11 @@ private fun prettyWriteName(instr: Instr, out: mutable PrettyDefBuilder): void {
     if (value == 0) {
       out.print("null")
     } else {
-      out.print("inttoptr (i%s %s to i8*)" / ptrBitSize / value)
+      out.print(
+        "inttoptr (i%s %s to i8*)" /
+          out.common.config.mainConfig.ptrBitSize /
+          value,
+      )
     }
   | obj @ ConstantObject _ -> out.common.prettyWriteConstantObject(out, obj)
   | ConstantString{value} -> prettyWriteNameConstantString(value, out)
@@ -2201,13 +2210,17 @@ private fun debugWriteBlock(b: Block, out: mutable PrettyDefBuilder): void {
   }
 }
 
-fun debugWriteFunction(f: Function, env: GlobalEnv): void {
+fun debugWriteFunction(
+  f: Function,
+  env: GlobalEnv,
+  config: Config.Config,
+): void {
   optinfo = OptimizerInfo::make(f);
 
   // Force creation of dominator tree so it shows up in the debug output.
   _ = optinfo.getDominator(f.blocks[0].id);
 
-  common = PrettyIR::make{env};
+  common = PrettyIR::make{env, config};
   common.resetForNewFunction(f.pos);
   name = f.toString();
 

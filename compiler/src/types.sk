@@ -24,11 +24,13 @@ const tString: Tclass = Tclass(SClassID("String"), DeepFrozen());
 //
 // TODO: Name comes from C++ stdint, but is confusing compared to
 // tNonGCPointer, which is very different.
-const tIntPtr: Tclass = if (ptrByteSize == 4) {
-  tInt32
-} else {
-  tInt
-};
+fun tIntPtr(ptrByteSize: Int): Tclass {
+  if (ptrByteSize == 4) {
+    tInt32
+  } else {
+    tInt
+  }
+}
 
 // Synthetic type for a uint8_t*.
 const tNonGCPointer: Tclass = Tclass(
@@ -116,19 +118,13 @@ class ScalarType(
     this.llvmTypeName
   }
 
-  const gcPointer: ScalarType = ScalarType(
-    ptrBitSize,
-    ptrBitSize,
-    "i8*",
-    GCPointerScalarKind(),
-  );
+  static fun gcPointer(ptrBitSize: Int): ScalarType {
+    ScalarType(ptrBitSize, ptrBitSize, "i8*", GCPointerScalarKind());
+  }
 
-  const nonGCPointer: ScalarType = ScalarType(
-    ptrBitSize,
-    ptrBitSize,
-    "i8*",
-    NonGCPointerScalarKind(),
-  );
+  static fun nonGCPointer(ptrBitSize: Int): ScalarType {
+    ScalarType(ptrBitSize, ptrBitSize, "i8*", NonGCPointerScalarKind());
+  }
 }
 
 base class Mutability uses Show, Orderable, Hashable {

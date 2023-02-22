@@ -7,16 +7,6 @@
 
 // TODO: Rename "input" to "operand"?
 
-// Mac Clang seems to align stack arrays mod 16 -- is that required to always
-// keep the stack aligned or is 8 OK or what? Does Linux do that too?
-// x86-64 ABI on linux and mac require 16 byte alignment.
-// Does LLVM provide an portable abstraction?
-const stackAlign: Int = if (targetIsWasm()) 8 else 16;
-const stackAlignStr: String = stackAlign.toString();
-const ptrByteSize: Int = if (targetIsWasm()) 4 else 8;
-const ptrBitSize: Int = ptrByteSize * 8;
-const vtableByteSize: Int = ptrByteSize;
-
 // Unique IDs for Instr and Block. These are only unique within the owning
 // Function, and specifically a lambda nested in another function is free
 // to use the same IDs as the containing function, because the lambda
@@ -243,6 +233,7 @@ class SClass{
   // Once computed, the fields assigned bit offsets and sorted by those offsets.
   layout: ?Array<LayoutSlot> = None(),
   bitSize: Int = 0,
+  ptrBitSize: Int,
   // Some types can never have instances at runtime. Tany never can, nor
   // can classes containing a !canInstantiate field. A KBase with no KClasses
   // also cannot be instantiated but we are not currently smart enough to
@@ -273,7 +264,7 @@ class SClass{
       this.kind match {
       | KBase()
       | KClass() ->
-        Some(ScalarType::gcPointer)
+        Some(ScalarType::gcPointer(this.ptrBitSize))
       | KValue() -> None()
       }
     }
@@ -1524,7 +1515,7 @@ class Function{
   }
 
   // Debugging dump routine.
-  fun dump(env: GlobalEnv): void {
-    PrettyIR.debugWriteFunction(this, env)
+  fun dump(env: GlobalEnv, config: Config.Config): void {
+    PrettyIR.debugWriteFunction(this, env, config)
   }
 }
