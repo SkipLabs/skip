@@ -7,7 +7,6 @@ import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.HttpHandler
 import io.undertow.server.handlers.PathTemplateHandler
-import io.undertow.server.handlers.resource.FileResourceManager
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.WebSocketConnectionCallback
 import io.undertow.websockets.core.AbstractReceiveListener
@@ -15,7 +14,6 @@ import io.undertow.websockets.core.BufferedTextMessage
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
-import java.io.File
 import java.nio.channels.Channel
 import java.security.SecureRandom
 import java.time.Duration
@@ -39,7 +37,7 @@ class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
         "auth" -> ProtoAuth::class
         "query" -> ProtoQuery::class
         "tail" -> ProtoTail::class
-        "dumpTable" -> ProtoDumpTable::class
+        "schema" -> ProtoSchemaQuery::class
         "write" -> ProtoWrite::class
         "pipe" -> ProtoData::class
         "createDatabase" -> ProtoCreateDb::class
@@ -66,7 +64,11 @@ data class ProtoTail(
     val since: Int = 0,
 ) : ProtoMessage("tail")
 
-data class ProtoDumpTable(val table: String, val suffix: String = "") : ProtoMessage("dumpTable")
+data class ProtoSchemaQuery(
+    val table: String? = null,
+    val view: String? = null,
+    val suffix: String = ""
+) : ProtoMessage("schema")
 
 data class ProtoWrite(val table: String) : ProtoMessage("write")
 
@@ -235,24 +237,26 @@ class AuthenticatedConn(
             when (request.format) {
               "csv" -> OutputFormat.CSV
               "json" -> OutputFormat.JSON
+              "raw" -> OutputFormat.RAW
               else -> OutputFormat.CSV
             }
         val result = skdb.sql(request.query, format)
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
-        // TODO: no need to close. client can if it doesn't want to re-use
-        channel.sendClose()
-        channel.close()
-        return ClosedConn()
+        return this
       }
-      is ProtoDumpTable -> {
-        val result = skdb.dumpTable(request.table, request.suffix)
+      is ProtoSchemaQuery -> {
+        val result =
+            if (request.table != null) {
+              skdb.dumpTable(request.table, request.suffix)
+            } else if (request.view != null) {
+              skdb.dumpView(request.view)
+            } else {
+              skdb.dumpSchema()
+            }
         val payload = serialise(ProtoData(result))
         WebSockets.sendTextBlocking(payload, channel)
-        // TODO: no need to close. client can if it doesn't want to re-use
-        channel.sendClose()
-        channel.close()
-        return ClosedConn()
+        return this
       }
       is ProtoCreateDb -> {
         // this side effect is only authorized if you're connected as a service mgmt db user
@@ -473,14 +477,7 @@ fun connectionHandler(
 }
 
 fun createHttpServer(connectionHandler: HttpHandler): Undertow {
-  // TODO: specify a public resource path to avoid accidentally
-  // leaking or remove this entirely
-  val rootHandler =
-      Handlers.path()
-          .addPrefixPath("/", Handlers.resource(FileResourceManager(File("/skfs/build/"))))
-
-  var pathHandler =
-      PathTemplateHandler(rootHandler).add("/dbs/{database}/connection", connectionHandler)
+  var pathHandler = PathTemplateHandler().add("/dbs/{database}/connection", connectionHandler)
 
   return Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
 }
@@ -516,7 +513,7 @@ fun main(args: Array<String>) {
 
   if (arglist.contains("--init")) {
     val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
-    println("${serialise(creds)}")
+    println("{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.privateKey}\"}}")
     return
   }
 
