@@ -192,49 +192,40 @@ fun getSubsDirs(
       | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
       | Some(userName) ->
         userFile = SKSQL.UserFile::create(context, userName);
-        accessColNbr = dirDescr.cols.maybeGet(skdbAccess) match {
-        | None() ->
-          print_error(
-            "Cannot access table: " +
-              dirDescr.name +
-              ".\n" +
-              "You are connected as user " +
-              userName +
-              " you can only access tables defining the column skdb_access.",
-          );
-          skipExit(2)
-        | Some(x) -> x
-        };
-        if (!(dirDescr.schema[accessColNbr].ty is INTEGER())) {
-          print_error("skdb_access must be of type integer");
-          skipExit(2)
-        };
-        (
-          Some(userFile.id),
-          ((file: SKFS.BaseName) ~> {
-            file match {
-            | k @ RowKey _ ->
-              k.row.getInt(accessColNbr) match {
-              | None() -> 0
-              | Some(gid) -> gid
-              }
-            | _ -> 0
-            }
-          }),
-          (context ~> {
-            access = mutable AccessSolver(userFile.id);
-            (file: SKFS.BaseName) -> {
+        dirDescr.cols.maybeGet(skdbAccess) match {
+        | None() -> (Some(userFile.id), _ ~> 0, _ctx ~> _ -> true)
+        | Some(accessColNbr) ->
+          if (!(dirDescr.schema[accessColNbr].ty is INTEGER())) {
+            print_error("skdb_access must be of type integer");
+            skipExit(2)
+          };
+          (
+            Some(userFile.id),
+            ((file: SKFS.BaseName) ~> {
               file match {
               | k @ RowKey _ ->
                 k.row.getInt(accessColNbr) match {
-                | None() -> true
-                | Some(accessID) -> access.canRead(context, accessID)
+                | None() -> 0
+                | Some(gid) -> gid
                 }
-              | _ -> true
+              | _ -> 0
               }
-            }
-          }),
-        )
+            }),
+            (context ~> {
+              access = mutable AccessSolver(userFile.id);
+              (file: SKFS.BaseName) -> {
+                file match {
+                | k @ RowKey _ ->
+                  k.row.getInt(accessColNbr) match {
+                  | None() -> true
+                  | Some(accessID) -> access.canRead(context, accessID)
+                  }
+                | _ -> true
+                }
+              }
+            }),
+          )
+        }
       };
       context.subscribe(
         context,

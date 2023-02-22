@@ -14,59 +14,50 @@ fun checkUserRows(
   table: DirDescr,
   rows: Array<RowValues>,
 ): void {
-  table.cols.maybeGet(skdbOwner) match {
-  | None() ->
-    error(
-      pos,
-      "You cannot write into the table " +
-        table.name +
-        " because you are connected as user " +
-        user.name +
-        ".\n" +
-        "You can only write into tables that define the column skdb_owner",
-    )
-  | Some(colNbr) ->
-    table.cols.maybeGet(skdbAccess) match {
-    | None() -> void
-    | Some(accessColNbr) ->
-      access = mutable AccessSolver(user.id);
-      for (row in rows) {
-        row.getValue(colNbr) match {
-        | None() ->
+  (ownerIdx, checkOwner) = table.cols.maybeGet(skdbOwner) match {
+  | None() -> (0, false)
+  | Some(idx) -> (idx, true)
+  };
+  (accessIdx, checkAccess) = table.cols.maybeGet(skdbAccess) match {
+  | None() -> (0, false)
+  | Some(idx) -> (idx, true)
+  };
+  access = mutable AccessSolver(user.id);
+  for (row in rows) {
+    if (checkOwner) {
+      row.getValue(ownerIdx) match {
+      | None() ->
+        error(
+          pos,
+          "The field skdb_owner can only be set to the userID " +
+            "of the connected user (in this case " +
+            user.id +
+            ")",
+        )
+      | Some(CInt(n)) ->
+        if (n != user.id) {
           error(
             pos,
-            "The field skdb_owner can only be set to the userID " +
-              "of the connected user (in this case " +
+            "skdb_owner is set to the wrong id for user " +
+              user.name +
+              " expected " +
               user.id +
+              " (found " +
+              n +
               ")",
-          )
-        | Some(CInt(n)) ->
-          if (n == user.id) {
-            row.getInt(accessColNbr) match {
-            | None() -> void
-            | Some(accessID) ->
-              if (!access.canWrite(context, accessID)) {
-                error(
-                  pos,
-                  "cannot write in col with skdb_access set to " + accessID,
-                )
-              }
-            }
-          } else {
-            error(
-              pos,
-              "skdb_owner is set to the wrong id for user " +
-                user.name +
-                " expected " +
-                user.id +
-                " (found " +
-                n +
-                ")",
-            );
-          }
-        | Some _ -> error(pos, "skdb_owner should be of type INTEGER")
-        };
+          );
+        }
+      | Some _ -> error(pos, "skdb_owner should be of type INTEGER")
       }
+    };
+    if (checkAccess) {
+      row.getInt(accessIdx) match {
+      | None() -> void
+      | Some(accessID) ->
+        if (!access.canWrite(context, accessID)) {
+          error(pos, "cannot write in col with skdb_access set to " + accessID)
+        }
+      };
     }
   }
 }
