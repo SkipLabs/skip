@@ -291,8 +291,10 @@ const localRepl = async function() {
 
     if (query.trim() === '.js') {
       rl.close();
-      const ctx = repl.start().context;
-      ctx.skdb = skdb;
+      const replServer = repl.start({
+        terminal: !args.values['simple-output'],
+      });
+      replServer.context.skdb = skdb;
       return;
     }
 
