@@ -11,8 +11,6 @@ module Lower;
 // a IntSwitch instead.
 private const kCanUseComputedGoto: Bool = false;
 
-private const kArrayMetadataByteSize: Int = 4 + 4 + vtableByteSize;
-
 // Finds the bit index of the first gap between 'layout' entries.
 //
 // We search for these so we can ensure that all bits in an object's
@@ -107,7 +105,11 @@ mutable private class .Lower{
     value = optinfo.getInstr(frz.value);
 
     if (!value.typ.isDeepFrozen()) {
-      vtablePointer = this.emitLoadVTable(frz.value, pos, tIntPtr);
+      vtablePointer = this.emitLoadVTable(
+        frz.value,
+        pos,
+        tIntPtr(this.config.mainConfig.ptrByteSize),
+      );
 
       vtable = this.emitZeroExtend{typ => tInt, pos, value => vtablePointer.id};
 
@@ -152,19 +154,23 @@ mutable private class .Lower{
         lhs => vtable.id,
       };
 
-      storeValue = if (tIntPtr == tInt) {
+      storeValue = if (tIntPtr(this.config.mainConfig.ptrByteSize) == tInt) {
         withFlagSet
       } else {
-        this.emitTruncate{value => withFlagSet.id, pos, typ => tIntPtr}
+        this.emitTruncate{
+          value => withFlagSet.id,
+          pos,
+          typ => tIntPtr(this.config.mainConfig.ptrByteSize),
+        }
       };
 
       // Write back the vtable with the flag set.
       _ = this.emitObstackInit{
-        addrByteAlignment => vtableByteSize,
+        addrByteAlignment => this.config.mainConfig.vtableByteSize,
         pos,
         value => storeValue.id,
         addr => frz.value,
-        bitOffset => vtableByteSize * -8,
+        bitOffset => this.config.mainConfig.vtableByteSize * -8,
       };
 
       if (doneSetFlagBlock != BlockID::none) {
@@ -232,18 +238,20 @@ mutable private class .Lower{
     // 1 obviously means we have no information.
     knownSizeMultiple = 1;
 
+    arrayMetadataByteSize = 4 + 4 + this.config.mainConfig.vtableByteSize;
+
     (numBytes, numContentsBytes) = size.constantInteger() match {
     | Some(n) ->
       // Compile-time constant size, figure out byte size now.
       !knownSizeMultiple = n;
       contentsBytes = n * (slotInfo.bitSize / 8);
       (
-        this.constantInt(kArrayMetadataByteSize + contentsBytes),
+        this.constantInt(arrayMetadataByteSize + contentsBytes),
         this.constantInt(contentsBytes),
       )
     | None() ->
       // Runtime computed size
-      metadataOverhead = this.constantInt(kArrayMetadataByteSize);
+      metadataOverhead = this.constantInt(arrayMetadataByteSize);
 
       if (slotInfo.bitSize == 0) {
         // Vector of void takes no space for the entries.
@@ -282,7 +290,7 @@ mutable private class .Lower{
       pos,
       byteSize => this.emitTruncate{
         value => numBytes.id,
-        typ => tIntPtr,
+        typ => tIntPtr(this.config.mainConfig.ptrByteSize),
         pos,
       }.id,
     };
@@ -349,7 +357,7 @@ mutable private class .Lower{
       typ => tNonGCPointer,
       pos,
       addr => mem.id,
-      offset => this.constantInt(kArrayMetadataByteSize).id,
+      offset => this.constantInt(arrayMetadataByteSize).id,
     };
 
     result = this.emitInstr(
@@ -462,7 +470,7 @@ mutable private class .Lower{
   }
 
   private mutable fun lowerArraySize(vs: ArraySize): void {
-    this.loadInvariantUInt32(vs, -(vtableByteSize + 4))
+    this.loadInvariantUInt32(vs, -(this.config.mainConfig.vtableByteSize + 4))
   }
 
   private mutable fun lowerStringHash(sh: StringHash): Bool {
@@ -508,7 +516,8 @@ mutable private class .Lower{
     );
 
     // Every object has a vtable, and round sizes up to an 8 byte multiple.
-    numBytes = roundUp(vtableByteSize * 8 + numFieldBits, 64) / 8;
+    numBytes =
+      roundUp(this.config.mainConfig.vtableByteSize * 8 + numFieldBits, 64) / 8;
 
     mem = this.emitObstackAlloc{
       // We carefully zero struct padding ourselves, so we don't
@@ -516,7 +525,10 @@ mutable private class .Lower{
       zero => false,
       typ => tNonGCPointer,
       pos,
-      byteSize => this.constantTypedInt(tIntPtr, numBytes).id,
+      byteSize => this.constantTypedInt(
+        tIntPtr(this.config.mainConfig.ptrByteSize),
+        numBytes,
+      ).id,
       pinned => make.pinned,
     };
 
@@ -538,7 +550,7 @@ mutable private class .Lower{
       typ => tNonGCPointer,
       pos,
       addr => mem.id,
-      offset => this.constantInt(vtableByteSize).id,
+      offset => this.constantInt(this.config.mainConfig.vtableByteSize).id,
     };
 
     obj = this.emitInstr(
@@ -659,11 +671,11 @@ mutable private class .Lower{
   ): Instr {
     this.emitLoad{
       typ,
-      addrByteAlignment => vtableByteSize,
+      addrByteAlignment => this.config.mainConfig.vtableByteSize,
       pos,
       canCSE => true,
       addr => obj,
-      bitOffset => vtableByteSize * -8,
+      bitOffset => this.config.mainConfig.vtableByteSize * -8,
     }
   }
 
@@ -1141,12 +1153,17 @@ mutable private class .Lower{
       );
 
       // Every object has a vtable, and round sizes up to an 8 byte multiple.
-      numBytes = roundUp(vtableByteSize * 8 + numFieldBits, 64) / 8;
+      numBytes =
+        roundUp(this.config.mainConfig.vtableByteSize * 8 + numFieldBits, 64) /
+        8;
 
       // Clone the object, but keep the same ID as the old "with".
       mem = this.emitInstr(
         ObstackShallowClone{
-          byteSize => this.constantTypedInt(tIntPtr, numBytes).id,
+          byteSize => this.constantTypedInt(
+            tIntPtr(this.config.mainConfig.ptrByteSize),
+            numBytes,
+          ).id,
           id => w.id,
           typ => w.typ,
           pos,
@@ -1222,7 +1239,7 @@ fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
     f2 = pass(f);
     if (config.verbose) {
       print_error(`Finished ${name} pass for ${f2}.\n`);
-      f2.dump(env);
+      f2.dump(env, config);
     };
     f2
   };
@@ -1231,7 +1248,7 @@ fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
     if (f.hasImplementation()) {
       if (config.verbose) {
         print_error(`\nAbout to run lower passes for ${f}.\n`);
-        f.dump(env);
+        f.dump(env, config);
       };
       f2 = runPass("Lower", f, f -> {
         Lower::run(f, vtableRequests, classesNeedingVTables, env, config).i0

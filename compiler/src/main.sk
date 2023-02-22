@@ -6,7 +6,60 @@
  */
 
 fun main(): void {
-  isInit = arguments().any(x -> x == "--init");
+  results = Cli.Command("skc")
+    .about("Skip compiler")
+    .help()
+    .arg(Cli.BoolArg("disasm-all"))
+    .arg(Cli.BoolArg("disasm-annotated"))
+    .arg(Cli.ArrayArg("disasm-file").default(Array[]))
+    .arg(Cli.ArrayArg("disasm-function").default(Array[]))
+    .arg(Cli.ArrayArg("export-function").default(Array[]))
+    .arg(Cli.ArrayArg("export-function-as").default(Array[]))
+    .arg(Cli.ArrayArg("export-module").default(Array[]))
+    .arg(Cli.ArrayArg("output").long("output").short("o").default(Array["-"]))
+    // .arg(Cli.StringArg("profile-path").default(""))
+    .arg(Cli.ArrayArg("preamble").default(Array[]))
+    .arg(Cli.BoolArg("wasm"))
+    .arg(Cli.BoolArg("asan"))
+    .arg(Cli.BoolArg("autogc").default(true).negatable())
+    .arg(Cli.StringArg("sample-rate").default("0"))
+    .arg(Cli.BoolArg("use-specialized-names"))
+    .arg(Cli.BoolArg("version"))
+    // Global config flags
+    .arg(Cli.BoolArg("release"))
+    .arg(Cli.BoolArg("verbose").short("v").long("verbose"))
+    // Optimization config flags
+    // .arg(Cli.BoolArg("localopts").default(true).negatable())
+    .arg(Cli.BoolArg("dce").default(true).negatable())
+    .arg(Cli.BoolArg("peephole").default(true).negatable())
+    .arg(Cli.BoolArg("control").default(true).negatable())
+    .arg(Cli.BoolArg("regpromote").default(true).negatable())
+    .arg(Cli.BoolArg("inline").default(true).negatable())
+    .arg(Cli.BoolArg("ipa").default(true).negatable())
+    .arg(Cli.BoolArg("verify").default(true).negatable())
+    .arg(Cli.BoolArg("goto").negatable())
+    // .arg(Cli.BoolArg("noopt"))
+    // These are handled in skipUtils.sk
+    // Just allow them to be ignored here
+    .arg(Cli.ArrayArg("debug"))
+    .arg(Cli.BoolArg("profile"))
+    .arg(Cli.StringArg("data"))
+    .arg(Cli.StringArg("init"))
+    .arg(Cli.BoolArg("check"))
+    .arg(Cli.ArrayArg("files").positional().default(Array[]))
+    .parseArgs();
+
+  results.error match {
+  | Some(exn) ->
+    print_error_ln(exn.getMessage().trim());
+    print_error(Cli.usage(results.cmd, false));
+    skipExit(1)
+  | _ -> void
+  };
+
+  config = Config.Config::make(results);
+
+  isInit = results.maybeGetString("init").isSome();
   if (isInit) {
     _ = SKFS.gContextInit(SKFS.Context{});
   };
@@ -16,11 +69,11 @@ fun main(): void {
       if (isInit) {
         SKFS.CStop(
           Some((context, _, _) ~> {
-            _result = compile(isInit, kConfig, context, kConfig.unknown);
+            _result = compile(isInit, config, context, config.unknown);
           }),
         )
       } else {
-        _result = compile(isInit, kConfig, context, kConfig.unknown);
+        _result = compile(isInit, config, context, config.unknown);
         skipExit(0);
         SKFS.CStop(None())
       }

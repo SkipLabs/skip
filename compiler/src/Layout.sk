@@ -62,10 +62,21 @@ private fun alignField(
 }
 
 mutable private class LayoutBuilder(
-  fields: mutable Vector<LayoutSlot> = mutable Vector[],
-  mutable prevIndex: Int = 0,
-  mutable prevType: ScalarType = ScalarType::gcPointer,
+  fields: mutable Vector<LayoutSlot>,
+  mutable prevIndex: Int,
+  mutable prevType: ScalarType,
 ) {
+  static fun mcreate(
+    config: Config.Config,
+    fields: mutable Vector<LayoutSlot> = mutable Vector[],
+  ): mutable LayoutBuilder {
+    mutable LayoutBuilder(
+      fields,
+      0,
+      ScalarType::gcPointer(config.mainConfig.ptrBitSize),
+    )
+  }
+
   // Find the first available bit offset to store a field of the given type,
   // such that the offset is >= startBitOffset.
   mutable fun findOffset(startBitOffset: Int, typ: ScalarType): Int {
@@ -158,6 +169,8 @@ mutable private class LayoutBuilder(
 mutable private class FieldLayoutChooser(
   specializer: mutable Specializer,
 
+  config: Config.Config,
+
   // True for every class which is part of a connected component of classes
   // that has been or is being graph-colored.
   mutable classAlreadyProcessed: SortedSet<SClassID>,
@@ -166,8 +179,11 @@ mutable private class FieldLayoutChooser(
   mutable fieldsDone: SortedSet<FieldKey> = SortedSet[],
 ) {
   // Update the bitOffset field in all SClass fields to have offsets.
-  static fun run(specializer: mutable Specializer): void {
-    flc = mutable FieldLayoutChooser(specializer, SortedSet[]);
+  static fun run(
+    specializer: mutable Specializer,
+    config: Config.Config,
+  ): void {
+    flc = mutable FieldLayoutChooser(specializer, config, SortedSet[]);
 
     // Process all the fixed layout classes first
     for (info in specializer.untrackedSClasses()) {
@@ -346,7 +362,7 @@ mutable private class FieldLayoutChooser(
       // Make sure every class has a LayoutBuilder.
       for (sid in constraint.types) {
         if (classToLayout.maybeSet(sid, classLayouts.size())) {
-          classLayouts.push(mutable LayoutBuilder())
+          classLayouts.push(LayoutBuilder::mcreate(this.config))
         }
       };
 
@@ -413,9 +429,13 @@ mutable private class FieldLayoutChooser(
 fun layoutOneStandaloneClass(
   fields: Array<SField>,
   env: GlobalEnv,
+  config: Config.Config,
   existingLayout: Array<LayoutSlot> = Array[],
 ): Array<LayoutSlot> {
-  builder = mutable LayoutBuilder(Vector::mcreateFromItems(existingLayout));
+  builder = LayoutBuilder::mcreate(
+    config,
+    Vector::mcreateFromItems(existingLayout),
+  );
 
   for (field in fields) {
     offset = builder.findOffset(0, field.typ.getScalarType(env));

@@ -26,6 +26,7 @@ private value class BlockPair(
 mutable private class Verifier(
   optinfo: mutable OptimizerInfo,
   env: GlobalEnv,
+  config: Config.Config,
   dominatesCache: mutable UnorderedMap<BlockPair, Bool>,
   where: String,
   mutable currentInstr: InstrWithPos,
@@ -730,12 +731,17 @@ mutable private class Verifier(
       "'\n";
     print_error("" + this.currentPos + ": Internal error: " + errorMsg);
     print_error("Function causing the error:\n");
-    this.optinfo.f.dump(this.env);
+    this.optinfo.f.dump(this.env, this.config);
     this.currentPos.die(errorMsg);
   }
 }
 
-fun verifyFunction(f: Function, env: GlobalEnv, where: String): void {
+fun verifyFunction(
+  f: Function,
+  env: GlobalEnv,
+  config: Config.Config,
+  where: String,
+): void {
   if (f.hasImplementation()) {
     // Sentinel instr we use to attribute errors.
     pos = f.pos;
@@ -744,6 +750,7 @@ fun verifyFunction(f: Function, env: GlobalEnv, where: String): void {
     v = mutable Verifier(
       OptimizerInfo::make(f),
       env,
+      config,
       mutable UnorderedMap[],
       where,
       dummyInstr,

@@ -27,6 +27,11 @@ class Config private {
   useSpecializedNames: Bool,
   version: Bool,
   check: Bool,
+  stackAlign: Int,
+  stackAlignStr: String,
+  ptrByteSize: Int,
+  ptrBitSize: Int,
+  vtableByteSize: Int,
 } {
   static fun make(result: Cli.ParseResults): this {
     disasmAll = result.getBool("disasm-all");
@@ -85,6 +90,16 @@ class Config private {
       }
     };
 
+    // Mac Clang seems to align stack arrays mod 16 -- is that required to always
+    // keep the stack aligned or is 8 OK or what? Does Linux do that too?
+    // x86-64 ABI on linux and mac require 16 byte alignment.
+    // Does LLVM provide an portable abstraction?
+    stackAlign = if (wasm) 8 else 16;
+    stackAlignStr = stackAlign.toString();
+    ptrByteSize = if (wasm) 4 else 8;
+    ptrBitSize = ptrByteSize * 8;
+    vtableByteSize = ptrByteSize;
+
     static{
       exportedFunctions,
       exportedAsFunctions => exportAs.chill(),
@@ -102,15 +117,16 @@ class Config private {
       useSpecializedNames,
       version,
       check,
+      stackAlign,
+      stackAlignStr,
+      ptrByteSize,
+      ptrBitSize,
+      vtableByteSize,
     }
   }
 }
 
 module end;
-
-fun targetIsWasm(): Bool {
-  kConfig.mainConfig.wasm
-}
 
 fun createOptimizedFunctions(
   context: mutable SKFS.Context,
@@ -148,6 +164,8 @@ fun createOptimizedFunctions(
   env
 }
 
+class TickConfigFile(value: (Int, Config.Config)) extends SKFS.File
+
 fun compile(
   isInit: Bool,
   config: Config.Config,
@@ -160,40 +178,6 @@ fun compile(
     print_error("fatal error: no input files\n");
     skipExit(4); // Exit code used by g++ for no input files
   };
-
-  cfg = config.mainConfig;
-
-  // Are we in "disassemble" mode?
-  disasm = (
-    cfg.disasmAll ||
-    cfg.disasmAnnotated ||
-    !cfg.disasmFiles.isEmpty() ||
-    !cfg.disasmFunctions.isEmpty()
-  );
-
-  // Create a filter for what functions to disassemble.
-  //
-  // Note that for "disasmAll" we do not return true, since we only want
-  // to disassemble code which is actually used, and returning true would
-  // force everything to be compiled just so it could be disassembled.
-  shouldDisasm = (
-    funDef ~>
-      disasm &&
-        (cfg.disasmFunctions.contains(funDef.origName) ||
-          (cfg.disasmAnnotated &&
-            annotationsContain(funDef.annotations, "@disasm", funDef.getPos())))
-  );
-
-  // Create a filter for what functions to compile.
-  shouldRuntimeExport = (
-    funDef ~>
-      AsmOutput.cppIsExported(
-        funDef.origName,
-        funDef.annotations,
-        funDef.getPos(),
-        config.mainConfig.exportedAsFunctions,
-      )
-  );
 
   if (context.unsafeMaybeGetDir(FileCache.fileDirName) is None()) {
     _ = context.mkdir(x ~> x, FileCache.fileDirName, false, Array[]);
@@ -214,23 +198,25 @@ fun compile(
 
     converter = OuterIstToIR.Converter::create(
       context,
+      config,
       SKFS.DirName::create("/converter/"),
       outerIst,
     );
 
     backendDir = context.mkdir(
-      SKFS.IntFile::fromFile,
+      TickConfigFile::fromFile,
       backendDirName,
       false,
-      if (isInit) Array[] else Array[(SKFS.IID(0), SKFS.IntFile(-128))],
+      if (isInit) Array[] else Array[(SKFS.IID(0), TickConfigFile((-128, config)))],
     );
 
     _ = backendDir.contextWriterKeyValues(
-      SKFS.IntFile::fromFile,
+      TickConfigFile::fromFile,
       context,
       backendSinkDirName,
-      (context, _writer, _key, _values) ~> {
-        if (config.mainConfig.check) {
+      (context, _writer, _key, values) ~> {
+        (_, conf) = TickConfigFile::fromFile(values[0]).value;
+        if (conf.mainConfig.check) {
           return void;
         };
 
@@ -242,9 +228,41 @@ fun compile(
           )
         };
 
+        // Create a filter for what functions to compile.
+        shouldRuntimeExport = (
+          funDef ~>
+          AsmOutput.cppIsExported(
+            funDef.origName,
+            funDef.annotations,
+            funDef.getPos(),
+            conf.mainConfig.exportedAsFunctions,
+          )
+        );
+
+        // Are we in "disassemble" mode?
+        disasm = (
+          conf.mainConfig.disasmAll ||
+          conf.mainConfig.disasmAnnotated ||
+          !conf.mainConfig.disasmFiles.isEmpty() ||
+          !conf.mainConfig.disasmFunctions.isEmpty()
+        );
+
+        // Create a filter for what functions to disassemble.
+        //
+        // Note that for "disasmAll" we do not return true, since we only want
+        // to disassemble code which is actually used, and returning true would
+        // force everything to be compiled just so it could be disassembled.
+        shouldDisasm = (
+          funDef ~>
+          disasm &&
+          (conf.mainConfig.disasmFunctions.contains(funDef.origName) ||
+           (conf.mainConfig.disasmAnnotated &&
+            annotationsContain(funDef.annotations, "@disasm", funDef.getPos())))
+        );
+
         env = OuterIstToIR.createIR(
           context,
-          config,
+          conf,
           shouldDisasm,
           shouldRuntimeExport,
           outerIst,
@@ -253,13 +271,13 @@ fun compile(
           defsProj,
         );
 
-        !env = createOptimizedFunctions(context, env, config);
+        !env = createOptimizedFunctions(context, env, conf);
         defs = runCompilerPhase("native/create_asm_graph", () -> {
-          AsmOutput.createAsmDefGraph(env, config)
+          AsmOutput.createAsmDefGraph(env, conf)
         });
 
         runCompilerPhase("native/merge_asm_graph", () -> {
-          AsmOutput.mergeIdenticalAsmDefs(defs, config.verbose)
+          AsmOutput.mergeIdenticalAsmDefs(defs, conf.verbose)
         });
 
         runCompilerPhase("native/create_asm_symbols", () -> {
@@ -267,7 +285,7 @@ fun compile(
         });
 
         runCompilerPhase("native/write_asm_files", () -> {
-          AsmOutput.writeOutputFiles(defs, fileNames, config)
+          AsmOutput.writeOutputFiles(defs, fileNames, conf)
         });
       },
     );
@@ -277,7 +295,7 @@ fun compile(
       .writeArray(
         context,
         SKFS.IID(0),
-        Array[SKFS.IntFile(context.tick.value)],
+        Array[TickConfigFile((context.tick.value, config))],
       );
   };
   context.update()

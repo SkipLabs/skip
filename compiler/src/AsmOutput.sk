@@ -2199,7 +2199,7 @@ mutable class .AsmOutput{
         VTable.kFrozenMask),
     };
 
-    header = if (vtableByteSize == 8) {
+    header = if (this.config.mainConfig.vtableByteSize == 8) {
       Array[StaticImageField(vtable, 0)]
     } else {
       // All object pointers (right after vtable) are aligned mod 8.
@@ -2208,7 +2208,9 @@ mutable class .AsmOutput{
 
     headerSize = header.size();
     vtableField = header[headerSize - 1];
-    firstFieldBitOffset = vtableField.bitOffset + vtableByteSize * 8;
+    firstFieldBitOffset =
+      vtableField.bitOffset +
+      this.config.mainConfig.vtableByteSize * 8;
 
     layout = sc.layout match {
     | Some(l) -> l
@@ -2264,7 +2266,7 @@ mutable class .AsmOutput{
         VTable.kFrozenMask),
     };
 
-    header = if (vtableByteSize == 8) {
+    header = if (this.config.mainConfig.vtableByteSize == 8) {
       Array[
         StaticImageField(pad32, 0),
         StaticImageField(sizeConst, 32),
@@ -2276,7 +2278,9 @@ mutable class .AsmOutput{
 
     headerSize = header.size();
     vtableField = header[headerSize - 1];
-    firstSlotBitOffset = vtableField.bitOffset + vtableByteSize * 8;
+    firstSlotBitOffset =
+      vtableField.bitOffset +
+      this.config.mainConfig.vtableByteSize * 8;
 
     // Create the values and layout for the array elements.
     getField = if (logicalOrderedValues.isEmpty()) {
@@ -2630,7 +2634,11 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
     if (value == 0) {
       asm.print("null")
     } else {
-      asm.print("inttoptr (i%s %s to i8*)" % ptrBitSize % value)
+      asm.print(
+        "inttoptr (i%s %s to i8*)" %
+          asm.common.config.mainConfig.ptrBitSize %
+          value,
+      )
     }
   | obj @ ConstantObject _ -> asm.common.llvmWriteConstantObject(asm, obj)
   | ConstantString{value} -> llvmWriteNameConstantString(value, asm)
@@ -3602,7 +3610,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
         "  %s = alloca %s, align %s, %D\n" %
           bufVar %
           bufType %
-          stackAlignStr %
+          common.config.mainConfig.stackAlignStr %
           instr,
       );
 
@@ -3617,7 +3625,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       );
       lifetimeArgs = (
         "(i64 " +
-        (ptrByteSize * args.size()) +
+        (common.config.mainConfig.ptrByteSize * args.size()) +
         ", i8* " +
         lifetimeVar +
         ")"

@@ -414,6 +414,8 @@ mutable class Specializer{
 
   converter: Converter,
 
+  config: Config.Config,
+
   // Once it's too late to make new SClasses we turn this off.
   mutable canCreateNewSClasses: Bool = true,
   mutable verifyChanged: Bool = false,
@@ -423,11 +425,13 @@ mutable class Specializer{
 } extends ClassLookupEnv {
   static fun make(
     context: mutable SKFS.Context,
+    config: Config.Config,
     converter: Converter,
   ): mutable Specializer {
     mutable Specializer{
       tick => context.tick,
       converter,
+      config,
       pos => FileRange.builtin,
     }
   }
@@ -523,6 +527,7 @@ mutable class Specializer{
       funsNeeded => this.funsNeeded,
       funStack => this.funStack,
       converter => this.converter,
+      config => this.config,
       canCreateNewSClasses => this.canCreateNewSClasses,
       verifyChanged => this.verifyChanged,
       pos => this.pos,
@@ -538,6 +543,7 @@ mutable class Specializer{
       funsNeeded => this.funsNeeded,
       funStack => this.funStack,
       converter => this.converter,
+      config => this.config,
       canCreateNewSClasses => this.canCreateNewSClasses,
       verifyChanged => this.verifyChanged,
       pos => this.pos,
@@ -1498,13 +1504,14 @@ mutable class Specializer{
         annotations => gclass.annotations,
         fields => Array[], // Computed later after being scalarized
         canInstantiate => gclass.canInstantiate,
+        ptrBitSize => this.config.mainConfig.ptrBitSize,
         scalarType => gclass.scalarType match {
         | some @ Some _ -> some
         | None() ->
           kind match {
           | KBase()
           | KClass() ->
-            Some(ScalarType::gcPointer)
+            Some(ScalarType::gcPointer(this.config.mainConfig.ptrBitSize))
           | KValue() -> None()
           }
         },
@@ -1945,6 +1952,7 @@ mutable class Specializer{
         f = this.withRegion(context, (context, specializer) ~> {
           f = FunSpecializer::run(
             context,
+            config,
             specializer,
             gf,
             Array[s.i1],
@@ -2046,6 +2054,7 @@ mutable class Specializer{
 //   three parameters, etc.
 mutable class FunSpecializer{
   gfunction: GFunction,
+  config: Config.Config,
   specializer: mutable Specializer,
   converter: Converter,
   values: mutable UnorderedMap<
@@ -2084,6 +2093,7 @@ mutable class FunSpecializer{
 
   static fun run(
     context: mutable SKFS.Context,
+    config: Config.Config,
     specializer: mutable Specializer,
     gfunction: GFunction,
     callers: Array<FunSuperpositionID>,
@@ -2222,6 +2232,7 @@ mutable class FunSpecializer{
 
     fs = mutable FunSpecializer{
       gfunction,
+      config,
       specializer,
       converter => specializer.converter,
       optinfo,
@@ -2910,7 +2921,7 @@ mutable class FunSpecializer{
       !sentinelField = sentinelField.asInner(pos).getField(field, pos)
     };
     bits = this.emitReinterpret{
-      typ => tIntPtr,
+      typ => tIntPtr(this.config.mainConfig.ptrByteSize),
       pos,
       value => sentinelField.asLeaf(pos).value,
     };
@@ -2922,7 +2933,10 @@ mutable class FunSpecializer{
       Exists(
         InstrLeaf(
           this.emitIntCmpNe{
-            rhs => this.constantTypedInt(tIntPtr, style.pointer).id,
+            rhs => this.constantTypedInt(
+              tIntPtr(this.config.mainConfig.ptrByteSize),
+              style.pointer,
+            ).id,
             pos,
             lhs => bits.id,
           }.id,

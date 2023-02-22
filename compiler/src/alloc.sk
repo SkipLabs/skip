@@ -161,7 +161,10 @@ mutable class .Alloc{
           newAlloc = info match {
           | chunk @ Chunk _ ->
             alloc with {
-              byteSize => this.constantTypedInt(tIntPtr, chunk.size).id,
+              byteSize => this.constantTypedInt(
+                tIntPtr(this.config.mainConfig.ptrByteSize),
+                chunk.size,
+              ).id,
               zero => chunk.zero,
             }
           | Piece(chunk, offset) ->

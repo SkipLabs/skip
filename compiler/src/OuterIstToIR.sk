@@ -1247,6 +1247,7 @@ class GClassFile(value: GClass) extends SKFS.File
 // Manages the overall conversion from OuterIst to IR.
 class Converter private (
   program: I.Program,
+  config: Config.Config,
   funs: SKFS.LHandle<GFunctionFile>,
   classes: SKFS.LHandle<GClassFile>,
   lower: SKFS.LHandle<I.CallableDefFile>,
@@ -1273,6 +1274,7 @@ class Converter private (
 
   static fun create(
     context: mutable SKFS.Context,
+    config: Config.Config,
     name: SKFS.DirName,
     program: I.Program,
   ): this {
@@ -1282,7 +1284,7 @@ class Converter private (
     classes = SKFS.LHandle(GClassFile::fromFile, classDirName);
     lowerDirName: SKFS.DirName = SKFS.DirName::create("/lowerDefs/");
     lower = SKFS.LHandle(I.CallableDefFile::fromFile, lowerDirName);
-    converter = static(program, funs, classes, lower);
+    converter = static(program, config, funs, classes, lower);
     _ = SKFS.LHandle::create(
       GFunctionFile::fromFile,
       context,
@@ -2561,9 +2563,11 @@ class Converter private (
     | "Int16" -> Some(ScalarType(16, 16, "i16", IntegerScalarKind()))
     | "Int32" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
     | "Float" -> Some(ScalarType(64, 64, "double", FloatScalarKind()))
-    | "Runtime.GCPointer" -> Some(ScalarType::gcPointer)
-    | "Runtime.NonGCPointer" -> Some(ScalarType::nonGCPointer)
-    | "String" -> Some(ScalarType::gcPointer)
+    | "Runtime.GCPointer" ->
+      Some(ScalarType::gcPointer(this.config.mainConfig.ptrBitSize))
+    | "Runtime.NonGCPointer" ->
+      Some(ScalarType::nonGCPointer(this.config.mainConfig.ptrBitSize))
+    | "String" -> Some(ScalarType::gcPointer(this.config.mainConfig.ptrBitSize))
     | _ -> None()
     };
 
@@ -5346,7 +5350,7 @@ fun createIR(
   reportMemoryStatistics("native/createIR after force compile constant inits");
 
   // Find every relevant type and function in the program.
-  specializer = Specializer::make(context, converter);
+  specializer = Specializer::make(context, config, converter);
 
   for (gid in forceCompile) {
     _ = specializer.requestFunction(context, gid, Array[])
@@ -5372,7 +5376,7 @@ fun createIR(
 
   specializer.withRegion(context, (_context, specializer) ~> {
     // Choose offsets for every field.
-    FieldLayoutChooser::run(specializer);
+    FieldLayoutChooser::run(specializer, config);
     reportMemoryStatistics("native/createIR after FieldLayoutChooser");
   });
 
