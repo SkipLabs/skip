@@ -17,7 +17,7 @@ COPY . /skfs
 
 WORKDIR /skfs/compiler
 RUN make clean
-RUN make install STAGE=0
+RUN make -B install STAGE=0
 
 WORKDIR /skfs
 
@@ -29,6 +29,6 @@ RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
     sdk install java 19.0.1-oracle"
 
 RUN make clean
-RUN make
+RUN make -B
 
 CMD ./sql/server/deploy/start.sh
