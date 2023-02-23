@@ -20,6 +20,7 @@ docker push 400962513797.dkr.ecr.us-east-1.amazonaws.com/skdb:latest
 # but the steps are:
 # ssh corp # get on to the bastion
 # ssh -i ~/.ssh/gds_id_ed25519 ubuntu@10.0.131.45 # get on to the replication server
-# aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 400962513797.dkr.ecr.us-east-1.amazonaws.com
+# aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 400962513797.dkr.ecr.us-east-1.amazonaws.com
 # sudo /usr/bin/docker pull 400962513797.dkr.ecr.us-east-1.amazonaws.com/skdb:latest
-# sudo /usr/bin/docker run -p 8080:8080 400962513797.dkr.ecr.us-east-1.amazonaws.com/skdb:latest
+# sudo docker stop $(sudo docker ps -q)
+# sudo /usr/bin/docker run -p 8080:8080 -v /var/db:/var/db 400962513797.dkr.ecr.us-east-1.amazonaws.com/skdb:latest
