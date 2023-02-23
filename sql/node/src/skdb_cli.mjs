@@ -132,9 +132,10 @@ if (!fs.existsSync(credsFileName)) {
 }
 
 // credentials file schema:
-// { database: { accessKey: privateKey }}
+// {host: { database: { accessKey: privateKey }}}
 const creds = JSON.parse(fs.readFileSync(credsFileName));
-const dbCreds = creds[args.values.db];
+const hostCreds = creds[args.values.host] ?? {};
+const dbCreds = hostCreds[args.values.db];
 
 if (!dbCreds || Object.entries(dbCreds).length < 1) {
   console.log(`Could not find credentials for ${args.values.db} in ${credsFileName}`);
@@ -166,7 +167,7 @@ if (args.values['create-db']) {
   console.log(`Successfully created database: ${db}.`);
   console.log(`Credentials for ${db}: `, result);
 
-  creds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
+  hostCreds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
   fs.writeFileSync(credsFileName, JSON.stringify(creds));
   console.log(`Credentials were added to ${credsFileName}.`);
 }
@@ -176,7 +177,6 @@ if (args.values['create-user']) {
   console.log('Successfully created user: ', result);
 
   dbCreds[result.accessKey] = result.privateKey;
-
   fs.writeFileSync(credsFileName, JSON.stringify(creds));
   console.log(`Credentials were added to ${credsFileName}.`);
 }
