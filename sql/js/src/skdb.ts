@@ -183,6 +183,17 @@ type ProtoCreateUser = {
   request: "createUser";
 }
 
+type ProtoData = {
+  request: "pipe";
+  data: string;
+}
+
+type ProtoError = {
+  request: "error";
+  code: string;
+  msg: string;
+}
+
 type ProtoCredentials = {
   request: "credentials";
   accessKey: String;
@@ -191,12 +202,7 @@ type ProtoCredentials = {
 
 type ProtoRequest = ProtoQuery | ProtoSchemaQuery | ProtoCreateDb | ProtoTail | ProtoWrite | ProtoCreateUser
 
-type ProtoResponse = ProtoData | ProtoCredentials
-
-type ProtoData = {
-  request: "pipe";
-  data: string;
-}
+type ProtoResponse = ProtoData | ProtoError | ProtoCredentials
 
 interface Creds {
   accessKey: string,
@@ -726,7 +732,7 @@ export class SKDB {
       const failureThresholdMs = 60000;
       let failureTimeout: number|undefined = undefined;
 
-      const reconnect = (_event: Event) => {
+      const reconnect = (_event: Event|undefined) => {
         socket.onmessage = null;
         socket.onclose = null;
         socket.onerror = null;
@@ -742,7 +748,12 @@ export class SKDB {
       socket.onmessage = function (event) {
         clearTimeout(failureTimeout);
 
-        const deliver = (data: ProtoData) => {
+        const deliver = (data: ProtoResponse) => {
+          if (data.request !== "pipe") {
+            console.error("Unexpected message while replicating", tableName, suffix, data);
+            reconnect(undefined);
+            return;
+          }
           let msg = data.data;
           if (msg != "") {
             objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
@@ -802,7 +813,7 @@ export class SKDB {
       const failureThresholdMs = 60000;
       let failureTimeout: number|undefined = undefined;
 
-      const reconnect = (_event: Event) => {
+      const reconnect = (_event: Event|undefined) => {
         socket.onmessage = null;
         socket.onclose = null;
         socket.onerror = null;
@@ -818,7 +829,12 @@ export class SKDB {
       socket.onmessage = function (event) {
         clearTimeout(failureTimeout);
 
-        const deliver = (data: ProtoData) => {
+        const deliver = (data: ProtoResponse) => {
+          if (data.request !== "pipe") {
+            console.error("Unexpected message while replicating", tableName, suffix, data);
+            reconnect(undefined);
+            return;
+          }
           let msg = data.data;
           if (msg != "") {
             // we only expect acks back in the form of checkpoints.
@@ -1028,6 +1044,7 @@ class SKDBServer {
     if (response.request === "pipe") {
       return response;
     }
+    console.error("Unexepected response", response);
     throw new Error(`Unexpected response: ${response}`);
   }
 

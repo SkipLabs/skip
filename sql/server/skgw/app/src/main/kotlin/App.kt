@@ -72,11 +72,14 @@ data class ProtoSchemaQuery(
 
 data class ProtoWrite(val table: String) : ProtoMessage("write")
 
-data class ProtoData(val data: String) : ProtoMessage("pipe")
-
 data class ProtoCreateDb(val name: String) : ProtoMessage("createDatabase")
 
 class ProtoCreateUser() : ProtoMessage("createUser")
+
+data class ProtoData(val data: String) : ProtoMessage("pipe")
+
+data class ProtoError(val code: String, val msg: String, val retryable: Boolean) :
+    ProtoMessage("error")
 
 data class ProtoCredentials(val accessKey: String, val privateKey: String) :
     ProtoMessage("credentials") {
@@ -132,7 +135,9 @@ class EstablishedConn(val proc: Process, val authenticatedAt: Instant) : Conn {
 
   private fun unexpectedMsg(channel: WebSocketChannel): Conn {
     if (channel.isOpen()) {
-      WebSockets.sendCloseBlocking(1002, "unexpected request on established connection", channel)
+      val msg = "unexpected request on established connection"
+      WebSockets.sendTextBlocking(serialise(ProtoError("protocol", msg, false)), channel)
+      WebSockets.sendCloseBlocking(1002, msg, channel)
       channel.close()
     }
 
@@ -144,7 +149,7 @@ class EstablishedConn(val proc: Process, val authenticatedAt: Instant) : Conn {
     if (Duration.between(authenticatedAt, now).abs().compareTo(maxConnectionDuration) > 0) {
       WebSockets.sendCloseBlocking(1011, "session timeout", channel)
       channel.close()
-      return ErroredConn()
+      return ClosedConn()
     }
 
     when (request) {
@@ -216,6 +221,7 @@ class AuthenticatedConn(
 
   private fun unexpectedMsg(channel: WebSocketChannel, msg: String): Conn {
     if (channel.isOpen()) {
+      WebSockets.sendTextBlocking(serialise(ProtoError("protocol", msg, false)), channel)
       WebSockets.sendCloseBlocking(1002, msg, channel)
       channel.close()
     }
@@ -228,7 +234,7 @@ class AuthenticatedConn(
     if (Duration.between(authenticatedAt, now).abs().compareTo(maxConnectionDuration) > 0) {
       WebSockets.sendCloseBlocking(1011, "session timeout", channel)
       channel.close()
-      return ErroredConn()
+      return ClosedConn()
     }
 
     when (request) {
@@ -290,7 +296,9 @@ class AuthenticatedConn(
                 },
                 {
                   if (channel.isOpen()) {
-                    WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                    val msg = "Unexpected EOF"
+                    WebSockets.sendTextBlocking(serialise(ProtoError("tail", msg, true)), channel)
+                    WebSockets.sendCloseBlocking(1011, msg, channel)
                     channel.close()
                   }
                 },
@@ -310,7 +318,9 @@ class AuthenticatedConn(
                 },
                 {
                   if (channel.isOpen()) {
-                    WebSockets.sendCloseBlocking(1011, "unexpected eof", channel)
+                    val msg = "Unexpected EOF"
+                    WebSockets.sendTextBlocking(serialise(ProtoError("write", msg, true)), channel)
+                    WebSockets.sendCloseBlocking(1011, msg, channel)
                     channel.close()
                   }
                 })
@@ -335,7 +345,9 @@ class UnauthenticatedConn(val skdb: Skdb, val encryption: EncryptionTransform) :
 
   private fun unexpectedMsg(channel: WebSocketChannel): Conn {
     if (channel.isOpen()) {
-      WebSockets.sendCloseBlocking(1002, "connection not yet authenticated", channel)
+      val msg = "Connection not yet authenticated"
+      WebSockets.sendTextBlocking(serialise(ProtoError("protocol", msg, false)), channel)
+      WebSockets.sendCloseBlocking(1002, msg, channel)
       channel.close()
     }
 
@@ -378,7 +390,9 @@ class UnauthenticatedConn(val skdb: Skdb, val encryption: EncryptionTransform) :
       is ProtoAuth -> {
         if (!verify(request)) {
           if (channel.isOpen()) {
-            WebSockets.sendCloseBlocking(1002, "authentication failed", channel)
+            val msg = "Authentication failed"
+            WebSockets.sendTextBlocking(serialise(ProtoError("auth", msg, false)), channel)
+            WebSockets.sendCloseBlocking(1002, msg, channel)
             channel.close()
           }
 
@@ -429,7 +443,9 @@ fun connectionHandler(
 
           if (skdb == null) {
             // 1011 is internal error
-            WebSockets.sendCloseBlocking(1011, "resource not found", channel)
+            val msg = "Could not open database"
+            WebSockets.sendTextBlocking(serialise(ProtoError("resource", msg, false)), channel)
+            WebSockets.sendCloseBlocking(1011, msg, channel)
             channel.close()
             return
           }
@@ -455,7 +471,9 @@ fun connectionHandler(
                     conn = conn.handleMessage(message.data, channel)
                   } catch (ex: Exception) {
                     // 1011 is internal error
-                    WebSockets.sendCloseBlocking(1011, ex.message, channel)
+                    val msg = "Internal error"
+                    WebSockets.sendTextBlocking(serialise(ProtoError("internal", msg, true)), channel)
+                    WebSockets.sendCloseBlocking(1011, msg, channel)
                     channel.close()
                   }
                 }
