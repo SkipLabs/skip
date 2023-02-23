@@ -16,14 +16,11 @@ build/init.sql: sql/privacy/init.sql
 	cp $^ $@
 
 sql/js/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
-	mkdir -p build
 	cp $^ $@
 
-sql/js/dist/out32.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
+build/skdb.wasm: sql/js/skdb.wasm
 	mkdir -p build
 	cp $^ $@
-
-# JS version of SKDB
 
 build/skdb_node.js: sql/node/src/node_header.js build/skdb.js build/skdb.wasm build/node_modules
 	mkdir -p build

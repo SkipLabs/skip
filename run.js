@@ -1,6 +1,6 @@
 const util = require('util');
 const fs = require('fs');
-var source = fs.readFileSync('./build/out32.wasm');
+var source = fs.readFileSync('./build/skdb.wasm');
 
 var instance = null;
 var args = ['--all'];
