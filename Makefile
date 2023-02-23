@@ -45,10 +45,6 @@ build/node_modules: sql/node/node_modules
 build/skdb_cli.mjs: build/skdb_node.js sql/node/src/skdb_cli.mjs build/node_modules
 	cp sql/node/src/skdb_cli.mjs build/skdb_cli.mjs
 
-build/index.html: sql/js/index.html build/skdb.js
-	mkdir -p build
-	cp sql/js/index.html $@
-
 
 .PHONY: clean
 clean:
@@ -60,7 +56,7 @@ test: build/skdb_node.js build/skdb
 
 .PHONY: run-server
 
-run-server: build/skdb build/skdb.wasm build/skdb.js build/index.html build/init.sql
+run-server: build/skdb build/init.sql
 	./sql/server/deploy/start.sh --DANGEROUS-no-encryption
 
 .PHONY: run-chaos
