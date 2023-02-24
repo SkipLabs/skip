@@ -1044,7 +1044,11 @@ class SKDBServer {
     if (response.request === "pipe") {
       return response;
     }
-    console.error("Unexepected response", response);
+    if (response.request == "error") {
+      console.error(response.msg);
+    } else {
+      console.error("Unexpected response", response);
+    }
     throw new Error(`Unexpected response: ${response}`);
   }
 
