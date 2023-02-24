@@ -247,7 +247,12 @@ class AuthenticatedConn(
               else -> OutputFormat.CSV
             }
         val result = skdb.sql(request.query, format)
-        val payload = serialise(ProtoData(result))
+        val payload =
+            if (result.exitSuccessfully()) {
+              serialise(ProtoData(result.output))
+            } else {
+              serialise(ProtoError("query", result.output, true))
+            }
         WebSockets.sendTextBlocking(payload, channel)
         return this
       }
@@ -260,7 +265,12 @@ class AuthenticatedConn(
             } else {
               skdb.dumpSchema()
             }
-        val payload = serialise(ProtoData(result))
+        val payload =
+            if (result.exitSuccessfully()) {
+              serialise(ProtoData(result.output))
+            } else {
+              serialise(ProtoError("query", result.output, true))
+            }
         WebSockets.sendTextBlocking(payload, channel)
         return this
       }
@@ -472,7 +482,8 @@ fun connectionHandler(
                   } catch (ex: Exception) {
                     // 1011 is internal error
                     val msg = "Internal error"
-                    WebSockets.sendTextBlocking(serialise(ProtoError("internal", msg, true)), channel)
+                    WebSockets.sendTextBlocking(
+                        serialise(ProtoError("internal", msg, true)), channel)
                     WebSockets.sendCloseBlocking(1011, msg, channel)
                     channel.close()
                   }
@@ -511,6 +522,7 @@ fun envIsSane(): Boolean {
   val successfullyRead =
       svcSkdb
           .sql("SELECT COUNT(*) FROM skdb_users WHERE username = 'root';", OutputFormat.RAW)
+          .getOrThrow()
           .trim() == "1"
 
   if (!successfullyRead) {
