@@ -30,7 +30,7 @@ jobs:
           command: |
             mkdir -p ~/test-results/skc
             cd compiler && make STAGE=1
-            PATH=./stage1/bin:$PATH skargo test --format=xml -o ~/test-results/skc/skc.xml
+            PATH=./stage1/bin:$PATH skargo test --junitxml=~/test-results/skc/skc.xml
       - store_test_results:
           path: ~/test-results/skc/
 
@@ -51,7 +51,7 @@ jobs:
           name: Run skfs tests
           command: |
             mkdir -p ~/test-results/skfs
-            cd skfs && skargo test --format=xml -o ~/test-results/skfs/skfs.xml
+            cd skfs && skargo test --junitxml=~/test-results/skfs/skfs.xml
       - store_test_results:
           path: ~/test-results/skfs/
 

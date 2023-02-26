@@ -12,33 +12,24 @@ fun test_harness(
           "If specified, only run tests containing this string in their names",
         ),
     )
-    .arg(Cli.StringArg("format").about("Output format (xml, default)"))
-    .arg(
-      Cli.StringArg("output")
-        .short("o")
-        .long("output")
-        .about("Output file (defaults to stdout)"),
-    )
+    .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report"))
     .arg(
       Cli.BoolArg("verbose")
         .long("verbose")
         .short("v")
-        .about("User verbose output"),
+        .about("Use verbose output"),
     )
     .help()
     .parseArgs();
 
-  reporter = args.maybeGetString("format") match {
-  | Some("xml") ->
-    mutable XmlTestReporter{output => args.maybeGetString("output")}
-  | None() ->
-    mutable BasicTestReporter{
-      output => args.maybeGetString("output"),
-      color => true,
-    }
-  | Some(fmt) -> invariant_violation(`Unknown test format "${fmt}"`)
-  };
+  reporters = mutable Vector<mutable TestReporter>[
+    mutable BasicTestReporter{color => true}
+  ];
+  args.maybeGetString("junitxml").each(
+    path -> reporters.push(mutable XmlTestReporter{output => Some(path)})
+  );
   filter = args.maybeGetString("filter").default("");
+
   success = true;
   for (testSuite in tests.keys()) {
     for ((testName, testFun) in tests[testSuite].items()) {
@@ -49,16 +40,16 @@ fun test_harness(
         () -> {
           _ = testFun();
           // TODO: reportSuccess/reportFailure.
-          reporter.report(testSuite, testName, None())
+          reporters.each(r -> r.report(testSuite, testName, None()))
         },
         exn -> {
-          reporter.report(testSuite, testName, Some(exn));
+          reporters.each(r -> r.report(testSuite, testName, Some(exn)));
           !success = false
         },
       )
     }
   };
-  reporter.finish();
+  reporters.each(r -> r.finish());
 
   if (!success) {
     skipExit(1)
