@@ -30,8 +30,7 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
   );
   strArgs =
     args.maybeGetString("filter").map(f -> " " + f).default("") +
-    args.maybeGetString("format").map(f -> ` --format=${f}`).default("") +
-    args.maybeGetString("output").map(f -> ` -o ${f}`).default("");
+    args.maybeGetString("junitxml").map(f -> ` --junitxml=${f}`).default("");
   run(Path.join(targetDir, "test") + strArgs, verbose)
 }
 
@@ -114,13 +113,7 @@ fun main(): void {
               "If specified, only run tests with names matching the filter",
             ),
         )
-        .arg(Cli.StringArg("format").about("Output format (xml, default)"))
-        .arg(
-          Cli.StringArg("output")
-            .short("o")
-            .long("output")
-            .about("Output file (defaults to stdout)"),
-        ),
+        .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report")),
     )
     .subcommand(Cli.Command("clean").about("Remove the target directory"))
     .subcommand(
