@@ -204,9 +204,219 @@ type ProtoRequest = ProtoQuery | ProtoSchemaQuery | ProtoCreateDb | ProtoTail | 
 
 type ProtoResponse = ProtoData | ProtoError | ProtoCredentials
 
+type ProtoMessage = ProtoRequest | ProtoResponse
+
 interface Creds {
   accessKey: string,
   privateKey: CryptoKey,
+}
+
+async function createAuthMsg(creds: Creds): Promise<ProtoAuth> {
+  const enc = new TextEncoder();
+  const reqType = "auth"
+  const now = (new Date()).toISOString()
+  const nonce = new Uint8Array(8);
+  crypto.getRandomValues(nonce)
+  const b64nonce = btoa(String.fromCharCode(...nonce));
+  const bytesToSign = enc.encode(reqType + creds.accessKey + now + b64nonce)
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    creds.privateKey,
+    bytesToSign
+  )
+  return {
+    request: reqType,
+    accessKey: creds.accessKey,
+    date: now,
+    nonce: b64nonce,
+    signature: btoa(String.fromCharCode(...new Uint8Array(sig))),
+  };
+}
+
+/* ***************************************************************************/
+/* Resilient connection abstraction
+/* ***************************************************************************/
+
+class ResilientConnection {
+
+  // connection params
+  private uri: string;
+  private creds: Creds;
+  private failureThresholdMs = 60000;
+  private onMessage: (data: ProtoData) => void;
+
+  onReconnect?: () => void;
+
+  // state
+  private socket?: WebSocket;
+  private failureTimeout?: number;
+  private reconnectTimeout?: number;
+  private disconnectedWriteBuffer: Array<ProtoMessage> = new Array();
+
+  private constructor(
+    uri: string,
+    creds: Creds,
+    onMessage: (data: ProtoData) => void,
+  ) {
+    this.uri = uri;
+    this.creds = creds;
+    this.onMessage = onMessage;
+
+    this.socket = undefined;
+    this.failureTimeout = undefined;
+    this.reconnectTimeout = undefined;
+  }
+
+  private setFailureTimeout(timeout?: number): void {
+    clearTimeout(this.failureTimeout);
+    this.failureTimeout = timeout;
+  }
+
+  private setReconnectTimeout(timeout?: number): void {
+    clearTimeout(this.reconnectTimeout);
+    this.reconnectTimeout = timeout;
+  }
+
+  private connectionHealthy(): void {
+    this.setFailureTimeout(undefined);
+  }
+
+  private async connect(): Promise<WebSocket> {
+    if (this.socket) {
+      throw new Error("Connecting a connected socket")
+    }
+
+    const authMsg = await createAuthMsg(this.creds)
+    const objThis = this;
+
+    let opened = false;
+    return new Promise((resolve, reject) => {
+      const socket = new WebSocket(this.uri);
+
+      socket.onclose = _event => {
+        if (opened) {
+          objThis.kickOffReconnect();
+        } else {
+          reject();
+        }
+      };
+      socket.onerror = _event => {
+        if (opened) {
+          objThis.kickOffReconnect();
+        } else {
+          reject();
+        }
+      };
+
+      socket.onmessage = function (event) {
+        objThis.connectionHealthy();
+
+        const deliver = (data: ProtoResponse) => {
+          if (data.request !== "pipe") {
+            console.error("Unexpected message received", data);
+            objThis.kickOffReconnect();
+            return;
+          }
+
+          objThis.onMessage(data);
+        };
+
+        const data = event.data;
+
+        if(typeof data === "string") {
+          deliver(JSON.parse(data))
+        } else {
+          const reader = new FileReader();
+          reader.addEventListener(
+            "load",
+            () => {
+              let msg = JSON.parse((reader.result || "") as string);
+              // we know it will be a string because we called readAsText
+              deliver(msg);
+            },
+            false
+          );
+          reader.readAsText(data);
+        }
+      };
+
+      socket.onopen = function (_event) {
+        socket.send(JSON.stringify(authMsg));
+        opened = true;
+        resolve(socket);
+      };
+    });
+  }
+
+  private kickOffReconnect(): void {
+    if (this.reconnectTimeout) {
+      return
+    }
+
+    if (this.socket) {
+      this.socket.onmessage = null;
+      this.socket.onclose = null;
+      this.socket.onerror = null;
+      this.socket.onopen = null;
+      this.socket.close();
+    }
+
+    this.socket = undefined;
+    this.setFailureTimeout(undefined);
+
+    const backoffMs = 500 + Math.random() * 1000;
+    const objThis = this;
+    const reconnectTimeout = setTimeout(() => {
+      objThis.connect().then(socket => {
+        objThis.socket = socket;
+        objThis.setReconnectTimeout(undefined)
+        if (objThis.onReconnect) {
+          objThis.onReconnect();
+        }
+      }).catch(() => {
+        objThis.setReconnectTimeout(undefined)
+        objThis.kickOffReconnect()
+      });
+    }, backoffMs);
+
+    this.setReconnectTimeout(reconnectTimeout);
+
+    return;
+  }
+
+  static async connect(
+    uri: string, creds: Creds,
+    onMessage: (data: ProtoData) => void
+  ): Promise<ResilientConnection> {
+
+    const conn = new ResilientConnection(uri, creds, onMessage);
+
+    const socket = await conn.connect();
+    conn.socket = socket;
+
+    return conn;
+  }
+
+  expectingData(): void {
+    if (this.failureTimeout) {
+      return;                   // already expecting a response
+    }
+
+    if (!this.socket) {
+      // can't receive data. we'll be re-establishing
+      return;
+    }
+
+    const timeout = setTimeout(this.kickOffReconnect, this.failureThresholdMs);
+    this.setFailureTimeout(timeout);
+  }
+
+  write(data: ProtoMessage): void {
+    if (!this.socket) {
+      return;
+    }
+    this.socket.send(JSON.stringify(data));
+  }
 }
 
 /* ***************************************************************************/
@@ -357,6 +567,8 @@ export class SKDB {
   private mirroredTables: Map<string, number> = new Map();
   // @ts-expect-error
   private exports: WasmExports;
+  private localToServerSyncConnections: Map<string, ResilientConnection> = new Map();
+  private serverToLocalSyncConnections: Map<string, ResilientConnection> = new Map();
 
   private constructor(storeName: string) {
     this.storeName = storeName;
@@ -667,33 +879,11 @@ export class SKDB {
     return parseInt(this.runLocal(["watermark", table], ""));
   }
 
-  async createAuthMsg(creds: Creds): Promise<ProtoAuth> {
-    const enc = new TextEncoder();
-    const reqType = "auth"
-    const now = (new Date()).toISOString()
-    const nonce = new Uint8Array(8);
-    crypto.getRandomValues(nonce)
-    const b64nonce = btoa(String.fromCharCode(...nonce));
-    const bytesToSign = enc.encode(reqType + creds.accessKey + now + b64nonce)
-    const sig = await crypto.subtle.sign(
-      "HMAC",
-      creds.privateKey,
-      bytesToSign
-    )
-    return {
-      request: reqType,
-      accessKey: creds.accessKey,
-      date: now,
-      nonce: b64nonce,
-      signature: btoa(String.fromCharCode(...new Uint8Array(sig))),
-    };
-  }
-
   async makeRequest(uri: string, creds: Creds, request: ProtoRequest): Promise<ProtoResponse> {
     let objThis = this;
     let socket = new WebSocket(uri);
 
-    const authMsg = await objThis.createAuthMsg(creds)
+    const authMsg = await createAuthMsg(creds)
 
     return new Promise((resolve, reject) => {
       socket.onmessage = function (event) {
@@ -719,6 +909,23 @@ export class SKDB {
     suffix: string,
   ): Promise<void> {
     let objThis = this;
+    const fullTableName = tableName + suffix;
+
+    const conn = this.serverToLocalSyncConnections[fullTableName];
+    if (conn) {
+      throw new Error("Trying to connect an already connected table");
+    }
+
+    const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
+      let msg = data.data;
+      if (msg != "") {
+        // we only expect acks back in the form of checkpoints.
+        // let's store these as a watermark against the table.
+        objThis.runLocal(["write-csv", fullTableName], msg + '\n');
+        newConn.expectingData()
+      }
+    });
+    this.localToServerSyncConnections[fullTableName] = newConn;
 
     const request: ProtoTail = {
       request: "tail",
@@ -726,70 +933,13 @@ export class SKDB {
       since: objThis.watermark(tableName + suffix),
     };
 
-    const authMsg = await objThis.createAuthMsg(creds)
-    return new Promise((resolve, _reject) => {
-      const socket = new WebSocket(uri);
-      const failureThresholdMs = 60000;
-      let failureTimeout: number|undefined = undefined;
+    newConn.write(request)
+    newConn.expectingData();
 
-      const reconnect = (_event: Event|undefined) => {
-        socket.onmessage = null;
-        socket.onclose = null;
-        socket.onerror = null;
-        socket.close();
-        clearTimeout(failureTimeout);
-
-        const backoffMs = 500 + Math.random() * 1000;
-        setTimeout(() => {
-          objThis.connectReadTable(uri, creds, tableName, suffix);
-        }, backoffMs)
-      };
-
-      socket.onmessage = function (event) {
-        clearTimeout(failureTimeout);
-
-        const deliver = (data: ProtoResponse) => {
-          if (data.request !== "pipe") {
-            console.error("Unexpected message while replicating", tableName, suffix, data);
-            reconnect(undefined);
-            return;
-          }
-          let msg = data.data;
-          if (msg != "") {
-            objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
-          }
-          failureTimeout = setTimeout(reconnect, failureThresholdMs);
-        };
-
-        const data = event.data;
-
-        if(typeof data === "string") {
-          deliver(JSON.parse(data))
-        } else {
-          const reader = new FileReader();
-          reader.addEventListener(
-            "load",
-            () => {
-              let msg = JSON.parse((reader.result || "") as string);
-              // we know it will be a string because we called readAsText
-              deliver(msg);
-            },
-            false
-          );
-          reader.readAsText(data);
-        }
-      };
-
-      socket.onclose = reconnect;
-      socket.onerror = reconnect;
-
-      socket.onopen = function (_event) {
-        socket.send(JSON.stringify(authMsg));
-        socket.send(JSON.stringify(request));
-        failureTimeout = setTimeout(reconnect, failureThresholdMs);
-        resolve();
-      };
-    });
+    newConn.onReconnect = () => {
+      newConn.write(request);
+      newConn.expectingData();
+    }
   }
 
   async connectWriteTable(
@@ -797,112 +947,65 @@ export class SKDB {
     creds: Creds,
     tableName: string,
     suffix: string,
-    session: string | undefined = undefined,
   ): Promise<void> {
     let objThis = this;
+    const fullTableName = tableName + suffix;
+
+    const conn = this.localToServerSyncConnections[fullTableName];
+
+    if (conn) {
+      throw new Error("Trying to connect an already connected table");
+    }
+
+    const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
+      let msg = data.data;
+      if (msg != "") {
+        // we only expect acks back in the form of checkpoints.
+        // let's store these as a watermark against the table.
+        objThis.runLocal(["write-csv", fullTableName], msg + '\n');
+      }
+    });
+    this.localToServerSyncConnections[fullTableName] = newConn;
 
     const request: ProtoWrite = {
        request: "write",
        table: tableName,
     };
+    newConn.write(request)
+    newConn.expectingData()
 
-    const authMsg = await objThis.createAuthMsg(creds)
-    return new Promise((resolve, _reject) => {
-      let sessionId = session;
-      const socket = new WebSocket(uri);
-      const failureThresholdMs = 60000;
-      let failureTimeout: number|undefined = undefined;
-
-      const reconnect = (_event: Event|undefined) => {
-        socket.onmessage = null;
-        socket.onclose = null;
-        socket.onerror = null;
-        socket.close();
-        clearTimeout(failureTimeout);
-
-        const backoffMs = 500 + Math.random() * 1000;
-        setTimeout(() => {
-          objThis.connectWriteTable(uri, creds, tableName, suffix, sessionId);
-        }, backoffMs)
-      };
-
-      socket.onmessage = function (event) {
-        clearTimeout(failureTimeout);
-
-        const deliver = (data: ProtoResponse) => {
-          if (data.request !== "pipe") {
-            console.error("Unexpected message while replicating", tableName, suffix, data);
-            reconnect(undefined);
-            return;
-          }
-          let msg = data.data;
-          if (msg != "") {
-            // we only expect acks back in the form of checkpoints.
-            // let's store these as a watermark against the table.
-            objThis.runLocal(["write-csv", tableName + suffix], msg + '\n');
-          }
-        };
-
-        const data = event.data;
-
-        if(typeof data === "string") {
-          deliver(JSON.parse(data))
-        } else {
-          const reader = new FileReader();
-          reader.addEventListener(
-            "load",
-            () => {
-              let msg = JSON.parse((reader.result || "") as string);
-              // we know it will be a string because we called readAsText
-              deliver(msg);
-            },
-            false
-          );
-          reader.readAsText(data);
-        }
-      };
-
-      socket.onclose = reconnect;
-      socket.onerror = reconnect;
-
-      const write = (data: string) => {
-        socket.send(JSON.stringify({
-          request: "pipe",
-          data: data,
-        }));
-        // we expect an ack within a reasonable amount of time
-        failureTimeout = setTimeout(reconnect, failureThresholdMs);
-      };
-
-      socket.onopen = function (_event) {
-        socket.send(JSON.stringify(authMsg));
-        socket.send(JSON.stringify(request));
-
-        if (!session) {
-          let fileName = tableName + "_" + creds.accessKey;
-          objThis.attach(change => {
-            write(change);
-          });
-          sessionId = objThis.runLocal(
-            [
-              "subscribe", tableName + suffix, "--connect", "--format=csv", "--updates", fileName
-            ],
-            ""
-          ).trim();
-        } else {
-          const diff = objThis.runLocal(
-            [
-              "diff", "--format=csv",
-              "--since", objThis.watermark(tableName + suffix).toString(),
-              session,
-            ], "");
-
-          write(diff);
-        }
-
-        resolve();
-      };
+    let fileName = tableName + "_" + creds.accessKey;
+    objThis.attach(change => {
+      newConn.write({
+        request: "pipe",
+        data: change,
+      });
+      newConn.expectingData();
     });
+    const session = objThis.runLocal(
+      [
+        "subscribe", fullTableName, "--connect", "--format=csv", "--updates", fileName
+      ],
+      ""
+    ).trim();
+
+    newConn.onReconnect = () => {
+      newConn.write(request);
+
+      const diff = objThis.runLocal(
+        [
+          "diff", "--format=csv",
+          "--since", objThis.watermark(fullTableName).toString(),
+          session,
+        ], "");
+
+      newConn.write({
+        request: "pipe",
+        data: diff,
+      });
+
+      newConn.expectingData();
+    }
   }
 
   getSessionID(tableName: string): number {
