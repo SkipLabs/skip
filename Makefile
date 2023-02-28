@@ -66,3 +66,6 @@ run-chaos: build/skdb sql/js/skdb.wasm build/skdb.js build/index.html
 .PHONY: test-soak
 test-soak: build/skdb build/skdb_node.js build/node_modules
 	./sql/server/test/test_soak.sh
+
+build/index.html: sql/js/index.html
+	cp $^ $@
