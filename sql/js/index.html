@@ -7,9 +7,28 @@
 </head>
 
 <body>
-  Hello from SKDB!
+  <p>A simple index.html for testing the skdb.js client.</p>
+  <p>This page connects to <code>ws://localhost:9999</code> as <code>root</code> with the key <code>test</code>.</p>
+  <p>Run <code>./sql/server/deploy/create_db.sh test test</code> to create an appropriate db.</p>
   <script src="skdb.js" type="module"></script>
-  <script>import('./skdb.js').then(m => SKDB = m.SKDB)</script>
+  <script>
+    let skdb;
+    const test = async function(SKDB) {
+      const skdb = await SKDB.create(true);
+      const b64key = "test"
+      const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0))
+      const key = await window.crypto.subtle.importKey(
+        "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"])
+      await skdb.connect("test", "root", key, "ws://localhost:9999");
+      return skdb;
+    }
+    import('./skdb.js').then(m => {
+      test(m.SKDB).then((client) => {
+        skdb = client;
+        console.log('done!');
+      });
+    })
+  </script>
 </body>
 
 </html>
