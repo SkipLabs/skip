@@ -29,8 +29,7 @@ run_server() {
 
     echo "CREATE TABLE log (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL, skdb_owner INTEGER);" | $SKDB
 
-    # something nasty happens every 5 mins
-    "$SCRIPT_DIR"/../deploy/chaos.sh 300 > /tmp/soak-server-log &
+    "$SCRIPT_DIR"/../deploy/chaos.sh 90 > /tmp/soak-server-log &
 
     echo $! > $SERVER_PID_FILE
 }
