@@ -17,7 +17,7 @@ PAUSED_PROCS_FILE=/tmp/chaos_paused_pids
 rm -f $PAUSED_PROCS_FILE
 
 function start_server {
-    gradle --console plain run >/tmp/server.log 2>&1 &
+    gradle --console plain run --args=--DANGEROUS-no-encryption >/tmp/server.log 2>&1 &
     pid=$!
     echo $pid > $SERVER_PID_FILE
     echo "started server: $pid"
