@@ -407,7 +407,8 @@ class ResilientConnection {
       return;
     }
 
-    const timeout = setTimeout(this.kickOffReconnect, this.failureThresholdMs);
+    const objThis = this;
+    const timeout = setTimeout(() => objThis.kickOffReconnect(), this.failureThresholdMs);
     this.setFailureTimeout(timeout);
   }
 
