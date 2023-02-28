@@ -251,7 +251,11 @@ class ResilientConnection {
   private socket?: WebSocket;
   private failureTimeout?: number;
   private reconnectTimeout?: number;
-  private disconnectedWriteBuffer: Array<ProtoMessage> = new Array();
+  // key invariants:
+  // 1. only one failure timeout in flight
+  // 2. only one reconnect attempt in flight at any one time
+  // 3. the socket is either connected and healthy, or we're actively
+  //    attempting a reconnect
 
   private constructor(
     uri: string,
@@ -350,6 +354,7 @@ class ResilientConnection {
 
   private kickOffReconnect(): void {
     if (this.reconnectTimeout) {
+      // debounce. e.g. socket onclose and onerror can both be called
       return
     }
 
@@ -399,11 +404,12 @@ class ResilientConnection {
 
   expectingData(): void {
     if (this.failureTimeout) {
-      return;                   // already expecting a response
+      // already expecting a response
+      return;
     }
 
     if (!this.socket) {
-      // can't receive data. we'll be re-establishing
+      // can't receive data. we're re-establishing anyway
       return;
     }
 
@@ -414,6 +420,8 @@ class ResilientConnection {
 
   write(data: ProtoMessage): void {
     if (!this.socket) {
+      // black hole the data. we're reconnecting and will call
+      // onReconnect that should address the gap
       return;
     }
     this.socket.send(JSON.stringify(data));
