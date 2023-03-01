@@ -170,6 +170,15 @@ base class BaseName extends FileName uses Orderable {
   overridable fun toKVStringRemove(_csv: OutputFormat): String {
     "" + escape(this.toString()) + "\t\n"
   }
+  overridable fun writeKVString(
+    writer: (String) -> void,
+    format: OutputFormat,
+    files: Array<File>,
+  ): void {
+    for (file in files) {
+      writer(file.toKVString(format, this))
+    }
+  }
 }
 
 class DirTag() extends BaseName {
