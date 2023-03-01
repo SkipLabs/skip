@@ -111,6 +111,18 @@ class RowKey(
   fun toKVStringRemove(format: SKFS.OutputFormat): String {
     this.row.setRepeat(0).toKVString(format, this)
   }
+
+  fun writeKVString(
+    writer: (String) -> void,
+    format: SKFS.OutputFormat,
+    files: Array<SKFS.File>,
+  ): void {
+    repeat = 0;
+    for (file in files) {
+      !repeat = repeat + RowValues::fromFile(file).getRepeat()
+    };
+    writer(this.row.setRepeat(repeat).toKVString(format, this))
+  }
 }
 
 fun escapeString(o: String -> void, s: String): void {

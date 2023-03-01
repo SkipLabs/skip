@@ -927,12 +927,8 @@ export class SKDB {
 
     const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
       let msg = data.data;
-      if (msg != "") {
-        // we only expect acks back in the form of checkpoints.
-        // let's store these as a watermark against the table.
-        objThis.runLocal(["write-csv", fullTableName], msg + '\n');
-        newConn.expectingData()
-      }
+      objThis.runLocal(["write-csv", fullTableName], msg + '\n');
+      newConn.expectingData()
     });
     this.localToServerSyncConnections[fullTableName] = newConn;
 
@@ -968,11 +964,9 @@ export class SKDB {
 
     const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
       let msg = data.data;
-      if (msg != "") {
-        // we only expect acks back in the form of checkpoints.
-        // let's store these as a watermark against the table.
-        objThis.runLocal(["write-csv", fullTableName], msg + '\n');
-      }
+      // we only expect acks back in the form of checkpoints.
+      // let's store these as a watermark against the table.
+      objThis.runLocal(["write-csv", fullTableName], msg + '\n');
     });
     this.localToServerSyncConnections[fullTableName] = newConn;
 

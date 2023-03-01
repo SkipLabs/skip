@@ -305,12 +305,11 @@ class EagerDir{
       if (values.size() == 0) {
         writer.write(key.toKVStringRemove(format))
       } else {
-        for (value in values) {
-          writer.write(value.toKVString(format, key))
-        }
+        key.writeKVString(writer.write, format, values);
       };
     };
 
+    // TODO: this is sql specific
     if (!changes.isEmpty() && !this.reallyRemove) {
       // output a checkpoint, indicated by the leading colon
       writer.write(":" + context.tick.value.toString() + "\n");

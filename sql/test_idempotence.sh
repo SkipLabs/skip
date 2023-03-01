@@ -73,6 +73,11 @@ debug() {
     echo --------------------------------------
 }
 
+fail() {
+    echo FAIL
+    exit 1
+}
+
 assert_line_count() {
     file=$1
     pattern=$2
@@ -395,6 +400,43 @@ EOF
     rm -f "$output"
 }
 
+test_tailing_dups_uses_repeat() {
+    # this test is important. not only is repeat an optimisation
+    # (think sending thousands of duplicate rows over the network) but
+    # it also guarantees correctness when the JS client applies a diff.
+
+    # the JS client does not have a running write-csv process to
+    # stream data in to. it spins up write-csv and passes a chunk of
+    # input, ensuring the chunk ends on a line boundary. the only
+    # guaranteed unit is a single line. as each line carries
+    # assignment semantics, we need the repeat count to be correct as
+    # we cannot rely on all repeating lines being provided together.
+    # if they're not provided together, they will clobber each other.
+
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+
+    output=$(mktemp)
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect --user test_user)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    assert_line_count "$output" foo 1
+    assert_line_count "$output" bar 1
+    grep -q '2	0,"foo"' "$output" || fail
+    rm -f "$output"
+}
+
 # tests:
 run_test test_basic_replication_unique_rows
 run_test test_basic_replication_unique_rows_replayed
@@ -411,3 +453,5 @@ run_test test_basic_replication_with_deletes_server_state_different
 
 run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count
 run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dups
+
+run_test test_tailing_dups_uses_repeat
