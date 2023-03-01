@@ -7,6 +7,7 @@ SERVER_DB=/tmp/server.db
 LOCAL_DB=/tmp/local.db
 UPDATES=/tmp/updates
 WRITE_OUTPUT=/tmp/write-out
+SESSION=/tmp/session
 
 setup_server() {
     db=$SERVER_DB
@@ -37,12 +38,12 @@ setup_local() {
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
     echo "CREATE TABLE test_without_pk (id INTEGER, note STRING);" | $SKDB
 
-    $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES "$table" > /dev/null
+    $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES "$table" > $SESSION
 }
 
 replicate_to_server() {
     table=$1
-    $SKDB_BIN write-csv --data $SERVER_DB "$table" < $UPDATES > $WRITE_OUTPUT
+    cat $UPDATES | $SKDB_BIN write-csv "$table" --data $SERVER_DB --user test_user > $WRITE_OUTPUT
 }
 
 run_test() {
@@ -216,6 +217,44 @@ test_basic_replication_dup_rows_replayed() {
     rm -f "$output"
 }
 
+test_basic_replication_dup_rows_diff_full_replay_using_diff() {
+    # scenario: we write a bunch of times, which do succeed, but we
+    # fail to receive the acks, then re-establish from time zero
+
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    output=$(mktemp)
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+
+    # simulate reconnect using diff. this is different than just
+    # replaying the original updates file. it just outputs a single
+    # txn
+    $SKDB_BIN --data $LOCAL_DB diff --format=csv --since 0 "$(cat $SESSION)" > $UPDATES
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+}
+
 test_basic_replication_dup_rows_server_state_different() {
     setup_server
     setup_local test_without_pk
@@ -363,6 +402,7 @@ run_test test_basic_replication_unique_rows_replayed
 run_test test_basic_replication_dup_rows
 run_test test_basic_replication_dup_rows_in_txn
 run_test test_basic_replication_dup_rows_replayed
+run_test test_basic_replication_dup_rows_diff_full_replay_using_diff
 
 run_test test_basic_replication_dup_rows_server_state_different
 

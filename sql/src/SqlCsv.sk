@@ -161,7 +161,7 @@ fun replayDiff(
   lineNbr: mutable Ref<Int>,
   getLine: () -> String,
   table: SKSQL.DirDescr,
-  user: ?String
+  user: ?String,
 ): SKFS.ContextOp {
   userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
@@ -228,14 +228,7 @@ fun replayDiff(
       loop {
         line = getLine();
         lineNbr.set(lineNbr.get() + 1);
-        if (line == "") {
-          rows = buffer.toArray();
-          buffer.clear();
-          // check to see if this is the initial begin txn markers
-          if (rows.isEmpty() && checkpoint is None _) continue;
-          // otherwise wrap up the previous txn
-          break SKFS.CContinue(makeFun(rows, checkpoint))
-        };
+        if (line == "") continue;
 
         chars = mutable Vector[];
         iter = line.getIter();
@@ -297,11 +290,14 @@ fun replayDiff(
           buffer.extend(newRows.map(x -> x.setRepeat(repeat.fromSome())));
         };
 
-        if (stdinHasData() != 0) continue;
-        rows = buffer.toArray();
-        buffer.clear();
+        checkpoint match {
+        | None() -> void
+        | Some(_) ->
+          rows = buffer.toArray();
+          buffer.clear();
 
-        break SKFS.CContinue(makeFun(rows, checkpoint))
+          break SKFS.CContinue(makeFun(rows, checkpoint))
+        }
       }
     },
     exn -> {
