@@ -1092,12 +1092,14 @@ export class SKDB {
     return this.runLocal(["dump-table", tableName], "");
   }
 
-  viewSchema(viewName: string, renameSuffix: string = ""): string {
+  viewSchema(viewName: string): string {
     return this.runLocal(["dump-view", viewName], "");
   }
 
   schema(): string {
-    return this.runLocal(["dump-tables"], "");
+    const tables = this.runLocal(["dump-tables"], "");
+    const views = this.runLocal(["dump-views"], "");
+    return tables + views;
   }
 
   insert(tableName: string, values: Array<any>): void {
