@@ -966,17 +966,19 @@ export class SKDB {
     });
     this.localToServerSyncConnections[fullTableName] = newConn;
 
-    const request: ProtoTail = {
+    newConn.write({
       request: "tail",
       table: tableName,
-      since: objThis.watermark(tableName + suffix),
-    };
-
-    newConn.write(request)
+      since: objThis.watermark(fullTableName),
+    })
     newConn.expectingData();
 
     newConn.onReconnect = () => {
-      newConn.write(request);
+      newConn.write({
+        request: "tail",
+        table: tableName,
+        since: objThis.watermark(fullTableName),
+      });
       newConn.expectingData();
     }
   }
