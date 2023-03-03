@@ -267,7 +267,11 @@ should be that we want to keep the row otherwise we've wrongly lost
 data. If user A's delete arrives after B's delete and insert, then we
 will clobber it.
 
-We can solve this problem by using a logical clock. On each
+Duplicate rows are another example where you can clobber writes you
+haven't yet seen. A user may be adding a duplicate of the row you are
+deleting.
+
+We can solve these problems by using a logical clock. On each
 transaction that the database commits it bumps its internal clock.
 When we send updates down to clients we inform them of the current
 clock value. When a client replicates updates it tells us the value of
