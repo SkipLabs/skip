@@ -233,6 +233,10 @@ async function createAuthMsg(creds: Creds): Promise<ProtoAuth> {
   };
 }
 
+function metadataTable(tableName: string): string {
+  return `skdb__${tableName}_sync_metadata`;
+}
+
 /* ***************************************************************************/
 /* Resilient connection abstraction
 /* ***************************************************************************/
@@ -996,11 +1000,10 @@ export class SKDB {
     }
 
     const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
-      // TODO:
-      // let msg = data.data;
+      let msg = data.data;
       // we only expect acks back in the form of checkpoints.
       // let's store these as a watermark against the table.
-      // objThis.runLocal(["write-csv", tableName], msg + '\n');
+      objThis.runLocal(["write-csv", metadataTable(tableName)], msg + '\n');
     });
     this.localToServerSyncConnections[tableName] = newConn;
 
@@ -1032,8 +1035,7 @@ export class SKDB {
       const diff = objThis.runLocal(
         [
           "diff", "--format=csv",
-          // TODO:
-          "--since", objThis.watermark("does_not_exist").toString(),
+          "--since", objThis.watermark(metadataTable(tableName)).toString(),
           session,
         ], "");
 
@@ -1245,7 +1247,13 @@ class SKDBServer {
 
   async mirrorTable(tableName: string): Promise<void> {
     let createTable = await this.tableSchema(tableName, "");
+
     this.client.runLocal([], createTable);
+    this.client.runLocal([],
+      `CREATE TABLE ${metadataTable(tableName)} (
+         key STRING PRIMARY KEY,
+         value STRING
+       )`);
 
     await this.client.connectWriteTable(
       this.uri,
