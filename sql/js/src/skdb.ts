@@ -949,27 +949,26 @@ export class SKDB {
     uri: string,
     creds: Creds,
     tableName: string,
-    suffix: string,
   ): Promise<void> {
     let objThis = this;
-    const fullTableName = tableName + suffix;
 
-    const conn = this.serverToLocalSyncConnections[fullTableName];
+    const conn = this.serverToLocalSyncConnections[tableName];
     if (conn) {
       throw new Error("Trying to connect an already connected table");
     }
 
     const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
       let msg = data.data;
-      objThis.runLocal(["write-csv", fullTableName], msg + '\n');
+      // disable-notify to break the cycle
+      objThis.runLocal(["--disable-notify", "write-csv", tableName], msg + '\n');
       newConn.expectingData()
     });
-    this.localToServerSyncConnections[fullTableName] = newConn;
+    this.localToServerSyncConnections[tableName] = newConn;
 
     newConn.write({
       request: "tail",
       table: tableName,
-      since: objThis.watermark(fullTableName),
+      since: objThis.watermark(tableName),
     })
     newConn.expectingData();
 
@@ -977,7 +976,7 @@ export class SKDB {
       newConn.write({
         request: "tail",
         table: tableName,
-        since: objThis.watermark(fullTableName),
+        since: objThis.watermark(tableName),
       });
       newConn.expectingData();
     }
@@ -987,24 +986,23 @@ export class SKDB {
     uri: string,
     creds: Creds,
     tableName: string,
-    suffix: string,
   ): Promise<void> {
     let objThis = this;
-    const fullTableName = tableName + suffix;
 
-    const conn = this.localToServerSyncConnections[fullTableName];
+    const conn = this.localToServerSyncConnections[tableName];
 
     if (conn) {
       throw new Error("Trying to connect an already connected table");
     }
 
     const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
-      let msg = data.data;
+      // TODO:
+      // let msg = data.data;
       // we only expect acks back in the form of checkpoints.
       // let's store these as a watermark against the table.
-      objThis.runLocal(["write-csv", fullTableName], msg + '\n');
+      // objThis.runLocal(["write-csv", tableName], msg + '\n');
     });
-    this.localToServerSyncConnections[fullTableName] = newConn;
+    this.localToServerSyncConnections[tableName] = newConn;
 
     const request: ProtoWrite = {
        request: "write",
@@ -1023,7 +1021,7 @@ export class SKDB {
     });
     const session = objThis.runLocal(
       [
-        "subscribe", fullTableName, "--connect", "--format=csv", "--updates", fileName
+        "subscribe", tableName, "--connect", "--format=csv", "--updates", fileName
       ],
       ""
     ).trim();
@@ -1034,7 +1032,8 @@ export class SKDB {
       const diff = objThis.runLocal(
         [
           "diff", "--format=csv",
-          "--since", objThis.watermark(fullTableName).toString(),
+          // TODO:
+          "--since", objThis.watermark("does_not_exist").toString(),
           session,
         ], "");
 
@@ -1245,42 +1244,22 @@ class SKDBServer {
   }
 
   async mirrorTable(tableName: string): Promise<void> {
-    let remoteSuffix = "_remote_" + this.serverID;
-    let createRemoteTable = await this.tableSchema(tableName, remoteSuffix);
-    this.client.runLocal([], createRemoteTable);
-
-    let localSuffix = "_local";
-    let createLocalTable = await this.tableSchema(tableName, localSuffix);
-    this.client.runLocal([], createLocalTable);
+    let createTable = await this.tableSchema(tableName, "");
+    this.client.runLocal([], createTable);
 
     await this.client.connectWriteTable(
       this.uri,
       this.creds,
       tableName,
-      localSuffix
     );
 
     await this.client.connectReadTable(
       this.uri,
       this.creds,
       tableName,
-      remoteSuffix,
     );
 
     this.client.setMirroredTable(tableName, this.sessionID);
-
-    this.client.runLocal(
-      [],
-      "create virtual view " +
-        tableName +
-        " as select * from " +
-        tableName +
-        localSuffix +
-        " union select * from " +
-        tableName +
-        remoteSuffix +
-        ";"
-    );
   }
 
   async mirrorView(viewName: string, suffix?: string): Promise<void> {
@@ -1291,8 +1270,7 @@ class SKDBServer {
     await this.client.connectReadTable(
       this.uri,
       this.creds,
-      viewName,
-      suffix,
+      viewName + suffix,
     );
 
     this.client.setMirroredTable(viewName, this.sessionID);
