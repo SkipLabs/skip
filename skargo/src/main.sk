@@ -1,10 +1,5 @@
 module Skargo;
 
-private fun hostTarget(): String {
-  // TODO: invoke llvm-config --host-target
-  "x86_64-pc-linux-gnu"
-}
-
 fun execInit(_args: Cli.ParseResults, _env: Env): void {
   invariant_violation("TODO");
   void
@@ -18,13 +13,12 @@ fun execUpdate(_args: Cli.ParseResults, _env: Env): void {
 fun execTest(args: Cli.ParseResults, env: Env): void {
   verbose = args.getBool("verbose");
   targetDir = Path.join(env.rootDir, "target");
-  target = hostTarget();
   build(
     env.manifest,
     "test",
     env.manifest.testHarness,
     targetDir,
-    target,
+    None(),
     env,
     verbose,
   );
@@ -35,9 +29,10 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
 }
 
 fun execBuild(args: Cli.ParseResults, env: Env): void {
-  (target, targetDir) = args.maybeGetString("target") match {
-  | Some(t) -> (t, Path.join(env.rootDir, "target", t))
-  | None() -> (hostTarget(), Path.join(env.rootDir, "target"))
+  target = args.maybeGetString("target");
+  targetDir = target match {
+  | Some(t) -> Path.join(env.rootDir, "target", t)
+  | None() -> Path.join(env.rootDir, "target")
   };
   args.maybeGetString("target-dir").each(d -> !targetDir = d);
 

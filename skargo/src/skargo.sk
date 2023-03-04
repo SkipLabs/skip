@@ -63,16 +63,6 @@ private fun findRootDir(): String {
   }
 }
 
-private fun skcFlags(target: String): String {
-  if (target.startsWith("wasm32")) {
-    "--wasm"
-  } else if (target.startsWith("x86_64")) {
-    ""
-  } else {
-    invariant_violation(`Unsupported target ${target}.`)
-  }
-}
-
 // TODO: This is dirty, the compiler should select the correct preamble.
 private fun skcPreamble(target: String, env: Env): String {
   if (target.startsWith("wasm32")) {
@@ -111,7 +101,7 @@ private fun compile(
   binName: String,
   main: String,
   targetDir: String,
-  target: String,
+  target: ?String,
   env: Env,
   verbose: Bool,
 ): void {
@@ -120,10 +110,7 @@ private fun compile(
   skc = Path.join(env.skipPath, "bin", "skc");
   llFile = Path.join(targetDir, binName + ".ll");
   run(
-    `${skc} ${skcFlags(target)} --preamble ${skcPreamble(
-      target,
-      env,
-    )} ${files.join(
+    `${skc} ${target.map(t -> "--target=" + t)} ${files.join(
       " ",
     )} --export-function-as ${main}=skip_main --output ${llFile}`,
     verbose,
@@ -187,7 +174,7 @@ private fun build(
   name: String,
   main: String,
   targetDir: String,
-  target: String,
+  target: ?String,
   env: Env,
   verbose: Bool,
 ): void {

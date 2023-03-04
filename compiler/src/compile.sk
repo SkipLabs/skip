@@ -7,6 +7,11 @@
 
 module Main;
 
+private fun hostTarget(): String {
+  // TODO: invoke llvm-config --host-target
+  "x86_64-pc-linux-gnu"
+}
+
 class Config private {
   exportedFunctions: UnorderedSet<String>,
   exportedAsFunctions: UnorderedMap<String, String>,
@@ -17,7 +22,7 @@ class Config private {
   output: String,
   preambleFiles: Array<String>,
   // profilePath: String,
-  wasm: Bool,
+  target: String,
   asan: Bool,
   autogc: Bool,
   sampleRate: Int,
@@ -49,7 +54,7 @@ class Config private {
     preambleFiles = result.getArray("preamble");
     output = result.maybeGetString("output").default("-");
     // profilePath = result.getString("profile-path");
-    wasm = result.getBool("wasm");
+    target = result.maybeGetString("target").default(hostTarget());
     asan = result.getBool("asan");
     autogc = result.getBool("autogc");
     sampleRate = result.getString("sample-rate").toInt();
@@ -94,9 +99,11 @@ class Config private {
     // keep the stack aligned or is 8 OK or what? Does Linux do that too?
     // x86-64 ABI on linux and mac require 16 byte alignment.
     // Does LLVM provide an portable abstraction?
-    stackAlign = if (wasm) 8 else 16;
+    // TODO: Make a proper `Target` class that holds the relevant platform-specific
+    // data, with a constructor that takes the target triple.
+    stackAlign = if (target == "wasm32-unknown-unknown") 8 else 16;
+    ptrByteSize = if (target == "wasm32-unknown-unknown") 4 else 8;
     stackAlignStr = stackAlign.toString();
-    ptrByteSize = if (wasm) 4 else 8;
     ptrBitSize = ptrByteSize * 8;
     vtableByteSize = ptrByteSize;
 
@@ -110,7 +117,7 @@ class Config private {
       output,
       preambleFiles,
       // profilePath,
-      wasm,
+      target,
       asan,
       autogc,
       sampleRate,
