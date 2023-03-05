@@ -91,6 +91,32 @@ fun parseArgsFrom(cmd: Command, argv: Sequence<String>): ParseResults {
   parse(cmd, argv.values())
 }
 
+private fun updateValue(
+  values: mutable Map<String, Value>,
+  arg: Arg,
+  value: String,
+): ?ArgumentError {
+  arg match {
+  | ArrayArg _ ->
+    values.maybeGet(arg.name) match {
+    | Some(ArrayValue(arr)) ->
+      values.set(arg.name, ArrayValue(arr.concat(Array[value])))
+    | None() -> values.set(arg.name, ArrayValue(Array[value]))
+    | Some(v) ->
+      invariant_violation(`Unexpected value type ${v} for ArrayArg`)
+    }
+  | StringArg _ ->
+    if (!values.containsKey(arg.name)) {
+      values.set(arg.name, StringValue(value))
+    } else {
+      return Some(DuplicateValueError(arg.name))
+    }
+  | _ -> invariant_violation(`Unexpected argument type ${inspect(arg)}`)
+  };
+
+  None()
+}
+
 private fun parse(
   cmd: Command,
   iterator: mutable Iterator<String>,
@@ -206,23 +232,11 @@ private fun parse(
             break void
           }
         };
-        arg match {
-        | ArrayArg _ ->
-          values.maybeGet(arg.name) match {
-          | Some(ArrayValue(arr)) ->
-            values.set(arg.name, ArrayValue(arr.concat(Array[value])))
-          | None() -> values.set(arg.name, ArrayValue(Array[value]))
-          | Some(v) ->
-            invariant_violation(`Unexpected value type ${v} for ArrayArg`)
-          }
-        | StringArg _ ->
-          if (!values.containsKey(arg.name)) {
-            values.set(arg.name, StringValue(value))
-          } else {
-            !error = Some(DuplicateValueError(arg.name));
-            break void
-          }
-        | _ -> invariant_violation(`Unexpected argument type ${inspect(arg)}`)
+        updateValue(values, arg, value) match {
+        | err @ Some _ ->
+          !error = err;
+          break void
+        | None() -> void
         }
       | Some(arg) ->
         if (!values.containsKey(arg.name)) {
@@ -244,9 +258,21 @@ private fun parse(
           values.set(posArgs[posArgId].name, StringValue(str));
           !posArgId = posArgId + 1
         }
-      | None() ->
-        !error = Some(InvalidArgumentError(str));
-        break void
+      | None() -> // Check for short forms that take values such as `-O2`.
+        !argName = str.take(2);
+        value = str.substring(str.getIter().forward(2));
+        options.maybeGet(argName) match {
+        | Some(arg) if (arg._takesValue()) ->
+          updateValue(values, arg, value) match {
+          | err @ Some _ ->
+            !error = err;
+            break void
+          | None() -> void
+          }
+        | _ ->
+          !error = Some(InvalidArgumentError(str));
+          break void
+        }
       }
     }
   };

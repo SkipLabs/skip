@@ -239,3 +239,11 @@ fun arrayArgsPositionalWithExtra(): void {
 
   T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
 }
+
+@test
+fun shortOnlyWithValueNoSpace(): void {
+  cmd = Cli.Command("foo").arg(Cli.StringArg("bar").short("O"));
+  args = Cli.parseArgsFrom(cmd, Array["-O2"]);
+
+  T.expectEq(args.getString("bar"), "2");
+}
