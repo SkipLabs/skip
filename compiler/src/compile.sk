@@ -14,7 +14,7 @@ class Config private {
   disasmAnnotated: Bool,
   disasmFiles: UnorderedSet<String>,
   disasmFunctions: UnorderedSet<String>,
-  outputFiles: Array<String>,
+  output: String,
   preambleFiles: Array<String>,
   // profilePath: String,
   wasm: Bool,
@@ -47,7 +47,7 @@ class Config private {
       result.getArray("export-function-as"),
     );
     preambleFiles = result.getArray("preamble");
-    outputFiles = result.getArray("output");
+    output = result.maybeGetString("output").default("-");
     // profilePath = result.getString("profile-path");
     wasm = result.getBool("wasm");
     asan = result.getBool("asan");
@@ -107,7 +107,7 @@ class Config private {
       disasmAnnotated,
       disasmFiles,
       disasmFunctions,
-      outputFiles,
+      output,
       preambleFiles,
       // profilePath,
       wasm,
@@ -285,7 +285,12 @@ fun compile(
         });
 
         runCompilerPhase("native/write_asm_files", () -> {
-          AsmOutput.writeOutputFiles(defs, fileNames, conf)
+          AsmOutput.writeOutputFiles(
+            defs,
+            fileNames,
+            config.mainConfig.output,
+            conf,
+          )
         });
       },
     );
