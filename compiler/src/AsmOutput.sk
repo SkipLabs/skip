@@ -968,161 +968,12 @@ fun assignFinalSymbols(defs: mutable AsmOutput.AsmDefIDToAsmDef): void {
   }
 }
 
-// Assigns AsmDefs to files and returns an array of which file each
-// one ended up in (with non-definitions like typedefs having -1) and
-// a Bool that is true iff it can use internal linkage.
-private fun partitionOutputFiles(
-  real: readonly Vector<AsmDef>,
-  defs: readonly AsmOutput.AsmDefIDToAsmDef,
-  maxOutputFiles: Int,
-): Array<(Int, Bool)> {
-  computeComplexity = def -> {
-    if (def.isFunction()) {
-      // Every function takes extra work for LLVM, so assign each an
-      // additional fixed cost (total guess).
-      1000 + def.text.length() + def.refs.size() * 15
-    } else {
-      // Data is very cheap for LLVM to compile, so don't bother
-      // forcing it into multiple files. Let it naturally flow anywhere
-      // it's referenced.
-      0
-    }
-  };
-
-  // Figure out roughly how much to dump into each file.
-  totalComplexity = 0;
-  for (def in real) !totalComplexity = totalComplexity + computeComplexity(def);
-
-  // Even if we are asked to create a many files, don't bother creating
-  // tiny files due to general fixed compile/link overhead.
-  numFiles = max(1, min(totalComplexity / 50000, maxOutputFiles));
-  complexityPerFile = totalComplexity / numFiles;
-
-  // Track which file each ref is in (-1 means "not yet decided").
-  files = Array::mfill(defs.size(), -1);
-
-  // Find how many incoming references each ref has.
-  numRefsTo = Array::mfill(defs.size(), 0);
-  for (def in real) {
-    for (ref in def.refs) {
-      (_, target) = ref;
-      if (target != def.id) {
-        numRefsTo.set(target.id, numRefsTo[target.id] + 1)
-      }
-    }
-  };
-
-  currentFile = 0;
-  currentFileComplexity = 0;
-
-  // What file the first reference to an AsmDef ended up in. This is used to
-  // detect whether an AsmDef will be "static" if we emit it in the current
-  // file.
-  firstReferringFile = Array::mfill(defs.size(), -1);
-
-  deque = mutable Vector[];
-  dequeIndex = 0;
-
-  // Here we use a simple greedy algorithm to try to place AsmDefs in
-  // the same output file in a way that increases the number of them
-  // that are "internal" ("static" in C terms).
-  //
-  // As we pick a file for an AsmDef, if any AsmDef it references is now
-  // known to have all refs coming from the same file, emit it to the same
-  // file recursively, at least until the file "fills up".
-  for (tdef in real) {
-    if (files[tdef.id.id] < 0) {
-      deque.push(tdef);
-
-      while (dequeIndex != deque.size()) {
-        def = deque[dequeIndex];
-        !dequeIndex = dequeIndex + 1;
-
-        // "Slide over" the deque when it gets half empty.
-        if (dequeIndex >= max(10, deque.size().ushr(1))) {
-          deque.splice(0, dequeIndex, Array[]);
-          !dequeIndex = 0
-        };
-
-        index = def.id.id;
-        if (files[index] < 0) {
-          if (
-            currentFileComplexity >= complexityPerFile &&
-            currentFile + 1 < numFiles
-          ) {
-            // The file is full, so move on to the next file.
-            !currentFile = currentFile + 1;
-            !currentFileComplexity = 0;
-          };
-
-          // NOTE: We allow one "overshoot" per file. Because the per-file
-          // limit is rounded down, overshoots are inevitable.
-          !currentFileComplexity =
-            currentFileComplexity + computeComplexity(def);
-
-          // File not yet assigned, assign it to the current file.
-          files.set(index, currentFile);
-          // Try to dump any referenced object into the same file, if all
-          // of its referrers have been seen, and they are also in the
-          // current file.
-          for (ref in def.refs) {
-            refDef = defs[ref.i1];
-            ri = ref.i1.id;
-
-            if (refDef.hasDefinition() && files[ri] < 0) {
-              // Decrement the number of unemitted references.
-              numUnemittedReferences = numRefsTo[ri] - 1;
-              numRefsTo.set(ri, numUnemittedReferences);
-              invariant(numUnemittedReferences >= 0, "Ref count problem");
-
-              inSameFile = firstReferringFile[ri] match {
-              | first if (first < 0) ->
-                // This is the first reference.
-                firstReferringFile.set(ri, currentFile);
-                true
-              | first -> first == currentFile
-              };
-
-              if (inSameFile && numUnemittedReferences == 0) {
-                // All refs to this are from the same file, so it can
-                // be made "static". Greedily try to emit it soon
-                // (hopefully the file doesn't fill up before we get to it).
-                deque.push(refDef)
-              }
-            }
-          }
-        }
-      };
-    }
-  };
-
-  // Determine which defs are only referenced within one file,
-  // and can therefore use internal linkage.
-  isInternal = Array::mfill(defs.size(), true);
-  for (def in real) {
-    if (def.forceExternal) {
-      isInternal.set(def.id.id, false)
-    };
-
-    file = files[def.id.id];
-    for (ref in def.refs) {
-      ri = ref.i1.id;
-      if (files[ri] != file) {
-        isInternal.set(ri, false)
-      }
-    }
-  };
-
-  files.zip(isInternal)
-}
-
 fun writeOutputFiles(
   defs: readonly AsmOutput.AsmDefIDToAsmDef,
   inputFiles: Array<String>,
+  output: String,
   config: Config.Config,
 ): void {
-  outputs = config.mainConfig.outputFiles;
-
   // Complexity of each def to be emitted.
   real = mutable Vector[];
   for (def in defs) if (def.hasDefinition()) real.push(def);
@@ -1135,15 +986,6 @@ fun writeOutputFiles(
       )
     )
   );
-
-  // Don't generate more output files than the user requested.
-  // Additionally, don't generate more than we have input files,
-  // because (at least on Mac) we need a distinct CU filename
-  // per output .ll file or the linker gets confused, and we use
-  // our input files as the set of CU file names to choose from.
-  maxOutputFiles = min(config.mainConfig.outputFiles.size(), inputFiles.size());
-
-  files = partitionOutputFiles(real, defs, maxOutputFiles);
 
   sstr = mutable TextOutputStream.StringTextOutputStream{};
   for (f in config.mainConfig.preambleFiles) {
@@ -1165,73 +1007,64 @@ fun writeOutputFiles(
     }
   };
 
-  outputs.eachWithIndex((fileIndex, path) -> {
-    sstr.clear();
-    sstr.write(preamble);
+  sstr.clear();
+  sstr.write(preamble);
 
-    // Reset what has been emitted so far in this file.
-    for (i in Range(0, emitted.size())) emitted.set(i, false);
+  // arbitrarily pick some unique input file as the CU for this output file.
+  metadata = AsmOutput.Metadata::create(defs, inputFiles[0]);
 
-    // Arbitrarily pick some unique input file as the CU for this output file.
-    metadata = AsmOutput.Metadata::create(defs, inputFiles[fileIndex]);
+  fileEmpty = true;
 
-    fileEmpty = true;
+  for (def in real) {
+    maybePush(def);
 
-    for (def in real) {
-      if (files[def.id.id].i0 == fileIndex) {
-        maybePush(def);
+    while (!stack.isEmpty()) {
+      (d, index) = stack.pop();
 
-        while (!stack.isEmpty()) {
-          (d, index) = stack.pop();
+      if (index < d.refs.size()) {
+        // Some reference is still not emitted, so do it first.
+        stack.push((d, index + 1));
+        maybePush(defs[d.refs[index].i1])
+      } else {
+        // All its refs have been visited already, we can emit this.
+        !fileEmpty = false;
 
-          if (index < d.refs.size()) {
-            // Some reference is still not emitted, so do it first.
-            stack.push((d, index + 1));
-            maybePush(defs[d.refs[index].i1])
-          } else {
-            // All its refs have been visited already, we can emit this.
-            !fileEmpty = false;
-
-            if (!d.hasDefinition()) {
-              d.write(sstr, metadata, false)
-            } else if (files[d.id.id].i0 == fileIndex) {
-              d.write(sstr, metadata, files[def.id.id].i1)
-            } else {
-              d.writeDeclaration(sstr, defs)
-            }
-          }
+        if (!d.hasDefinition()) {
+          d.write(sstr, metadata, false)
+        } else {
+          d.write(sstr, metadata, !def.forceExternal)
         }
       }
-    };
-
-    contents = if (fileEmpty) {
-      ""
-    } else {
-      // Metadata Flags
-      sstr.write("!llvm.module.flags = !{");
-      sep = "";
-      for (v in metadata.moduleFlags) {
-        sstr.write(`${sep}!${v}`);
-        !sep = ", ";
-      };
-      sstr.write("}\n\n");
-
-      sstr.write("!llvm.dbg.cu = !{");
-      sstr.write(metadata.diCompileUnit);
-      sstr.write("}\n\n");
-
-      metadata.metadata.eachWithIndex((k, v) -> {
-        sstr.printf2("!%s = %s\n", k, v);
-      });
-
-      sstr.toString()
-    };
-
-    path match {
-    | "-" -> print_raw(contents)
-    | _ -> FileSystem.writeTextFile(path, contents)
     }
-  })
+  };
+
+  contents = if (fileEmpty) {
+    ""
+  } else {
+    // Metadata Flags
+    sstr.write("!llvm.module.flags = !{");
+    sep = "";
+    for (v in metadata.moduleFlags) {
+      sstr.write(`${sep}!${v}`);
+      !sep = ", ";
+    };
+    sstr.write("}\n\n");
+
+    sstr.write("!llvm.dbg.cu = !{");
+    sstr.write(metadata.diCompileUnit);
+    sstr.write("}\n\n");
+
+    metadata.metadata.eachWithIndex((k, v) -> {
+      sstr.printf2("!%s = %s\n", k, v);
+    });
+
+    sstr.toString()
+  };
+
+  output match {
+  | "-" -> print_raw(contents)
+  | _ -> FileSystem.writeTextFile(output, contents)
+  }
 }
 
 // These versions don't compile yet because of no fall-throughs.
