@@ -20,9 +20,10 @@ class Config private {
   disasmFiles: UnorderedSet<String>,
   disasmFunctions: UnorderedSet<String>,
   output: String,
-  preambleFiles: Array<String>,
   // profilePath: String,
+  emit: String,
   target: String,
+  optLevel: Int,
   asan: Bool,
   autogc: Bool,
   sampleRate: Int,
@@ -51,10 +52,11 @@ class Config private {
     exportedAsFunctions = UnorderedSet::createFromItems(
       result.getArray("export-function-as"),
     );
-    preambleFiles = result.getArray("preamble");
     output = result.maybeGetString("output").default("-");
     // profilePath = result.getString("profile-path");
+    emit = result.getString("emit");
     target = result.maybeGetString("target").default(hostTarget());
+    optLevel = result.getString("opt-level").toInt();
     asan = result.getBool("asan");
     autogc = result.getBool("autogc");
     sampleRate = result.getString("sample-rate").toInt();
@@ -115,9 +117,10 @@ class Config private {
       disasmFiles,
       disasmFunctions,
       output,
-      preambleFiles,
       // profilePath,
+      emit,
       target,
+      optLevel,
       asan,
       autogc,
       sampleRate,
@@ -169,6 +172,136 @@ fun createOptimizedFunctions(
   });
 
   env
+}
+
+// TODO: Move into runtime.
+// Return the path to the main executable, given the value of argv[0] from
+// program startup.
+// Inspired from `llvm/lib/Support/Unix/Path.inc`.
+fun getMainExecutable(argv0: String): String {
+  // First approach: absolute path.
+  if (argv0.startsWith("/")) {
+    path = argv0;
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    }
+  };
+
+  // Second approach: relative path.
+  if (argv0.contains("/")) {
+    path = Path.join(getcwd(), argv0);
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    }
+  };
+
+  // Third approach: $PATH
+  for (p in getenv("PATH").split(":")) {
+    path = Path.join(p, argv0);
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    }
+  };
+
+  invariant_violation("Cannot determine main executable.")
+}
+
+fun link(
+  llFile: String,
+  config: Config.Config,
+): void {
+  basePath = Path.parentname(Path.dirname(getMainExecutable(getArg0())));
+
+  if (config.mainConfig.target.startsWith("wasm32")) {
+    output = config.mainConfig.output;
+    bcFile = output + ".bc";
+    runtime = Path.join(basePath, "lib", "libskip_runtime32.bc");
+    runShell(
+      Array["llvm-link", llFile, runtime, "-o", bcFile],
+      config.verbose,
+    );
+    oFile = output + ".o";
+    runShell(
+      Array[
+        "llc",
+        "-mtriple=wasm32-unknown-unknown",
+        `-O${config.mainConfig.optLevel}`,
+        "-filetype=obj",
+        bcFile,
+        "-o",
+        oFile,
+      ],
+      config.verbose,
+    );
+    // TODO: Proper mechanism to select exports.
+    exportJs = Array[
+      "getCompositeName",
+      "getCompositeSize",
+      "getCompositeAt",
+      "SKIP_String_byteSize",
+      "getLeafValue",
+      "objectKind",
+      "SKIP_call0",
+      "SKIP_Obstack_alloc",
+      "skip_main",
+      "SKIP_init_jsroots",
+      "SKIP_add_root",
+      "SKIP_remove_root",
+      "SKIP_tracked_call",
+      "SKIP_tracked_query",
+      "sk_string_create",
+      "SKIP_initializeSkip",
+      "SKIP_skfs_init",
+      "SKIP_skfs_end_of_init",
+      "SKIP_get_persistent_size",
+      "sk_pop_dirty_page",
+      "SKIP_get_version",
+      "SKIP_throw_EndOfFile",
+    ].map(x -> `-export=${x}`);
+    runShell(
+      Array[
+        "wasm-ld",
+        "--initial-memory=1073741824",
+        oFile,
+        "-o",
+        output,
+        "--no-entry",
+        "-allow-undefined",
+      ].concat(exportJs),
+      config.verbose,
+    );
+  } else {
+    // TODO: Make the runtime a normal dependency.
+    runtime = Path.join(basePath, "lib", "libskip_runtime64.a");
+    runShell(
+      Array[
+        "clang++",
+        "-no-pie",
+        `-O${config.mainConfig.optLevel}`,
+        "-mllvm",
+        "-inline-threshold=0",
+        llFile,
+        "-o",
+        config.mainConfig.output,
+        runtime,
+        "-lrt",
+        "-lpthread",
+      ],
+      config.verbose,
+    );
+  }
+}
+
+fun runShell(args: Array<String>, verbose: Bool = false): void {
+  p = System.subprocess(args);
+  // TODO: Proper logging.
+  if (verbose || p.exitcode != 0) {
+    print_error_raw(p.stderr);
+    if (p.exitcode != 0) {
+      // TODO: Proper exit code.
+      skipExit(1);
+    }
+  }
 }
 
 class TickConfigFile(value: (Int, Config.Config)) extends SKFS.File
@@ -291,14 +424,30 @@ fun compile(
           AsmOutput.assignFinalSymbols(defs)
         });
 
-        runCompilerPhase("native/write_asm_files", () -> {
-          AsmOutput.writeOutputFiles(
-            defs,
-            fileNames,
-            config.mainConfig.output,
-            conf,
+        conf.mainConfig.emit match {
+        | "llvm-ir" ->
+          runCompilerPhase("native/write_asm_files", () -> {
+            AsmOutput.writeOutputFiles(
+              defs,
+              fileNames,
+              conf.mainConfig.output,
+              conf,
+            )
+          })
+        | "link" ->
+          // TODO: Use `mkstemp()` instead.
+          llFile = conf.mainConfig.output + ".ll";
+          runCompilerPhase("native/write_asm_files", () -> {
+            AsmOutput.writeOutputFiles(defs, fileNames, llFile, conf)
+          });
+          runCompilerPhase("native/link", () -> {
+            link(llFile, conf)
+          })
+        | _ ->
+          invariant_violation(
+            "Unsupported value for `--emit`: " + conf.mainConfig.emit,
           )
-        });
+        }
       },
     );
   } else {
