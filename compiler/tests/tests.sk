@@ -9,9 +9,8 @@ private fun compile(
   System.subprocess(
     Array[
       "skc",
+      "-O0",
       "--no-inline",
-      "--preamble",
-      "preamble/preamble64.ll",
       "--export-function-as",
       "main=skip_main",
       "--data",
@@ -35,25 +34,11 @@ private fun genValidTest(
   stdlibSrcs: Array<String>,
 ): () -> void {
   () -> {
-    p = compile(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".ll");
+    p = compile(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".bin");
     if (p.exitcode != 0) {
       print_error(p.stderr);
       invariant_violation("skc") // TODO: Throw error
     };
-    // TODO: Use System.subprocess
-    run(
-      Array[
-        "clang++",
-        "-no-pie",
-        "-O0",
-        basename + ".ll",
-        "runtime/libskip_runtime64.a",
-        "-o",
-        basename + ".bin",
-        "-lrt",
-        "-lpthread",
-      ],
-    );
 
     !p = System.subprocess(Array[basename + ".bin"]);
 
@@ -73,7 +58,7 @@ private fun genInvalidTest(
   stdlibSrcs: Array<String>,
 ): () -> void {
   () -> {
-    p = compile(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".ll");
+    p = compile(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".bin");
 
     if (p.exitcode == 0) {
       T.fail("Expected compile error")

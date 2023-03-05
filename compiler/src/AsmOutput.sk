@@ -987,13 +987,14 @@ fun writeOutputFiles(
     )
   );
 
-  sstr = mutable TextOutputStream.StringTextOutputStream{};
-  for (f in config.mainConfig.preambleFiles) {
-    preamble = FileSystem.readTextFile(f);
-    sstr.write(preamble);
-    sstr.writeChar('\n')
+  // TODO: Have the correct preamble loaded in the `Target` class.
+  basePath = Path.parentname(Path.dirname(getMainExecutable(getArg0())));
+  preambleFile = if (config.mainConfig.target.startsWith("wasm32")) {
+    Path.join(basePath, "lib", "skip_preamble32.ll")
+  } else {
+    Path.join(basePath, "lib", "skip_preamble64.ll")
   };
-  preamble = sstr.toString();
+  preamble = FileSystem.readTextFile(preambleFile);
 
   emitted = Array::mfill(defs.size(), false);
 
@@ -1007,7 +1008,7 @@ fun writeOutputFiles(
     }
   };
 
-  sstr.clear();
+  sstr = mutable TextOutputStream.StringTextOutputStream{};
   sstr.write(preamble);
 
   // arbitrarily pick some unique input file as the CU for this output file.
