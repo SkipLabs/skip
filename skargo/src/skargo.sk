@@ -3,47 +3,14 @@ module Skargo;
 const kVersion: String = "0.1.0";
 const kManifestFile: String = "Skargo.toml";
 
-class Env{skipPath: String, rootDir: String, manifest: Manifest} {
+class Env{rootDir: String, manifest: Manifest} {
   static fun create(): Env {
-    skipPath = Path.parentname(Path.dirname(getMainExecutable(getArg0())));
     rootDir = findRootDir();
     Env{
-      skipPath,
       rootDir,
       manifest => Manifest::read(Path.join(rootDir, kManifestFile)),
     }
   }
-}
-
-// Return the path to the main executable, given the value of argv[0] from
-// program startup.
-// Inspired from `llvm/lib/Support/Unix/Path.inc`.
-private fun getMainExecutable(argv0: String): String {
-  // First approach: absolute path.
-  if (argv0.startsWith("/")) {
-    path = argv0;
-    if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
-    }
-  };
-
-  // Second approach: relative path.
-  if (argv0.contains("/")) {
-    path = Path.join(getcwd(), argv0);
-    if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
-    }
-  };
-
-  // Third approach: $PATH
-  for (p in getenv("PATH").split(":")) {
-    path = Path.join(p, argv0);
-    if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
-    }
-  };
-
-  invariant_violation("Cannot determine main executable.")
 }
 
 private fun findRootDir(): String {
@@ -85,12 +52,11 @@ private fun compile(
 ): void {
   _ = system(`mkdir -p ${targetDir}`);
 
-  // TODO: Invoke `skc` by default, and allow override through `SKC` env var.
-  skc = Path.join(env.skipPath, "bin", "skc");
   output = Path.join(targetDir, binName);
   targetFlag = target.map(t -> " --target=" + t).default("");
+  // TODO: Allow overriding `skc` through `SKC` env var.
   run(
-    `${skc}${targetFlag} ${files.join(
+    `skc${targetFlag} ${files.join(
       " ",
     )} --export-function-as ${main}=skip_main --emit=link --output ${output}`,
     verbose,
