@@ -19,13 +19,12 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
     env.manifest.testHarness,
     targetDir,
     None(),
-    env,
     verbose,
   );
-  strArgs =
-    args.maybeGetString("filter").map(f -> " " + f).default("") +
-    args.maybeGetString("junitxml").map(f -> ` --junitxml=${f}`).default("");
-  run(Path.join(targetDir, "test") + strArgs, verbose)
+  filter = args.maybeGetString("filter");
+  junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
+  rv = system(Array[Path.join(targetDir, "test")].concat(Array[junitxml, filter].filterNone()).join(" "));
+  skipExit(rv)
 }
 
 fun execBuild(args: Cli.ParseResults, env: Env): void {
@@ -43,7 +42,6 @@ fun execBuild(args: Cli.ParseResults, env: Env): void {
       bin.main,
       targetDir,
       target,
-      env,
       args.getBool("verbose"),
     );
   }
@@ -51,7 +49,7 @@ fun execBuild(args: Cli.ParseResults, env: Env): void {
 
 fun execClean(_args: Cli.ParseResults, env: Env): void {
   targetDir = Path.join(env.rootDir, "target");
-  run(`rm -rf ${targetDir}`, /* verbose = */ false)
+  run(Array["rm", "-rf", targetDir], /* verbose = */ false)
 }
 
 fun execCheck(_args: Cli.ParseResults, _env: Env): void {

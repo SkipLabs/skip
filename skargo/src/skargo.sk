@@ -30,13 +30,15 @@ private fun findRootDir(): String {
   }
 }
 
-private fun run(cmd: String, verbose: Bool): void {
+private fun run(args: Array<String>, verbose: Bool): void {
   if (verbose) {
     // TODO: colors
-    print_error(`>> ${cmd}`)
+    print_error(`>> ${args.join(" ")}`)
   };
-  rv = system(cmd);
-  if (rv != 0) {
+  p = System.subprocess(args);
+  if (p.exitcode != 0) {
+    print_raw(p.stdout);
+    print_error_raw(p.stderr);
     invariant_violation("error")
   };
 }
@@ -47,20 +49,22 @@ private fun compile(
   main: String,
   targetDir: String,
   target: ?String,
-  env: Env,
   verbose: Bool,
 ): void {
   _ = system(`mkdir -p ${targetDir}`);
 
   output = Path.join(targetDir, binName);
-  targetFlag = target.map(t -> " --target=" + t).default("");
+  targetFlag = target.map(t -> "--target=" + t);
   // TODO: Allow overriding `skc` through `SKC` env var.
-  run(
-    `skc${targetFlag} ${files.join(
-      " ",
-    )} --export-function-as ${main}=skip_main --emit=link --output ${output}`,
-    verbose,
-  )
+  cmd = Array[
+    "skc",
+    "--export-function-as",
+    `${main}=skip_main`,
+    "--emit=link",
+    "--output",
+    output
+  ].concat(Array[targetFlag].filterNone()).concat(files.collect(Array));
+  run(cmd, verbose)
 }
 
 private fun build(
@@ -69,7 +73,6 @@ private fun build(
   main: String,
   targetDir: String,
   target: ?String,
-  env: Env,
   verbose: Bool,
 ): void {
   files = manifest.srcs.concat(manifest.tests);
@@ -81,6 +84,6 @@ private fun build(
   for (dep in deps) {
     !files = files.concat(dep.srcs)
   };
-  compile(files, name, main, targetDir, target, env, verbose);
+  compile(files, name, main, targetDir, target, verbose);
   void
 }
