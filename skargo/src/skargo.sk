@@ -53,7 +53,10 @@ private fun compile(
 ): void {
   _ = system(`mkdir -p ${targetDir}`);
 
-  output = Path.join(targetDir, binName);
+  output = target match {
+  | Some("wasm32-unknown-unknown") -> binName + ".wasm"
+  | _ -> binName
+  };
   targetFlag = target.map(t -> "--target=" + t);
   // TODO: Allow overriding `skc` through `SKC` env var.
   cmd = Array[
@@ -62,7 +65,7 @@ private fun compile(
     `${main}=skip_main`,
     "--emit=link",
     "--output",
-    output
+    Path.join(targetDir, output),
   ].concat(Array[targetFlag].filterNone()).concat(files.collect(Array));
   run(cmd, verbose)
 }
