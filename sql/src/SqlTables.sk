@@ -109,6 +109,7 @@ class SubRequestFile(
   cmd: SKFS.CmdKind,
   sessionID: Int,
   user: ?String,
+  ignoreSource: ?String,
 ) extends SKFS.File
 
 fun getSubsDirs(
@@ -191,7 +192,7 @@ fun getSubsDirs(
           false
         }
       };
-      (userFile, matchesGroup, filter) = request.user match {
+      (userFile, matchesGroup, accessFilter) = request.user match {
       | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
       | Some(userName) ->
         userFile = SKSQL.UserFile::create(context, userName);
@@ -228,6 +229,20 @@ fun getSubsDirs(
               }
             }),
           )
+        }
+      };
+      filter = request.ignoreSource match {
+      | None() -> accessFilter
+      | Some(src) ->
+        context ~> {
+          tdir = context.unsafeGetEagerDir(dirDescr.dirName);
+          testSrc = SKFS.Source::create(SKFS.Path(dirDescr.dirName, SKFS.SID(src)));
+          composedFilter = accessFilter(context);
+          (file: SKFS.BaseName) -> {
+            rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
+            existsInterestingSrc = rows.any(srcFilesPair -> srcFilesPair.i0 != testSrc);
+            existsInterestingSrc && composedFilter(file)
+          }
         }
       };
       context.subscribe(
