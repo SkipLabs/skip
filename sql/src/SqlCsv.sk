@@ -162,6 +162,7 @@ fun replayDiff(
   getLine: () -> String,
   table: SKSQL.DirDescr,
   user: ?String,
+  identity: SKFS.BaseName,
 ): SKFS.ContextOp {
   userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
@@ -173,7 +174,7 @@ fun replayDiff(
   makeFun = (rows, reset, checkpoint) -> {
     origDir = context.unsafeGetEagerDir(table.dirName);
     Some((context, delta, _) ~> {
-      writer = SKFS.Path(table.dirName, SKFS.IID(SKFS.genSym(0)));
+      writer = SKFS.Path(table.dirName, identity);
       entries = mutable Vector[];
       dir = origDir;
       for (row in rows) {

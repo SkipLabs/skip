@@ -160,6 +160,11 @@ untracked fun main(): void {
                 .required()
                 .about("Table name"),
             )
+            .arg(
+              Cli.StringArg("source").about(
+                "Globally unique identity of this write stream",
+              ),
+            )
             .arg(Cli.StringArg("user").about("Name of the user")),
         )
         .subcommand(
@@ -201,7 +206,8 @@ untracked fun main(): void {
                 "Name of the file updates with time of the last change",
               ),
             )
-            .arg(Cli.StringArg("user").about("Name of the user")),
+            .arg(Cli.StringArg("user").about("Name of the user"))
+            .arg(Cli.StringArg("ignore-src").about("Write stream to ignore")),
         )
         .subcommand(Cli.Command("replay").about("Replay a diff"))
         .subcommand(Cli.Command("debug").about("TODO"))
@@ -666,7 +672,11 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
         buffer.push(c);
       }
     };
-    SKCSV.replayDiff(context, line, myReadLine, table, user)
+    source = args.maybeGetString("source") match {
+    | Some(src) -> SKFS.SID(src)
+    | None() -> SKFS.IID(SKFS.genSym(0))
+    };
+    SKCSV.replayDiff(context, line, myReadLine, table, user, source)
   })
 }
 
@@ -712,14 +722,14 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     viewKey = SKFS.SID(viewName);
     inputDir = context.unsafeGetEagerDir(input.dirName);
     sessionID = SKFS.genSym(0);
-    user = args.maybeGetString("user");
     request = SKSQL.SubRequestFile(
       viewName,
       viewDirName,
       init,
       cmd,
       sessionID,
-      user,
+      args.maybeGetString("user"),
+      args.maybeGetString("ignore-src"),
     );
     inputDir.write(context, viewKey, request);
     context.update();
