@@ -2524,6 +2524,54 @@ fun literal(
   (acc, (ty, (pos, l)))
 }
 
+fun annotate_lambda_return(l: N.Expr, t: N.Type_): N.Expr {
+  l match {
+  | (pos, N.Lambda(mods, params, captured, body, yields)) ->
+    (pos, N.Lambda(mods, params, captured, (pos, N.Annotated(body, t)), yields))
+  | _ -> invariant_violation("Invalid lambda in try/catch implementation.")
+  }
+}
+
+fun expr_try(
+  context: mutable SKFS.Context,
+  next_id: () -> Int,
+  env: TUtils.Env,
+  acc: TUtils.Acc,
+  pos: FileRange,
+  l1: N.Expr,
+  l2: N.Expr,
+  e_ty: N.Type_,
+): (TUtils.Acc, TAst.Expr) {
+  // If the computed type for the try { ... } catch { ... } expression is not an
+  // unconstrained type var, annotate the type of the lambda bodies to help the
+  // typing of the replacement `vtry(l1, l2)`.
+  e_ty match {
+  | (_, N.Tvar _) -> void
+  | _ -> !l1 = annotate_lambda_return(l1, e_ty);
+   !l2 = annotate_lambda_return(l2, e_ty)
+  };
+  expr(
+    context,
+    next_id,
+    env,
+    acc,
+    (
+      pos,
+      N.Call(
+        None(),
+        (pos, N.Var((pos, "vtry"))),
+        Array[],
+        Positional(
+          Array[
+            (0, l1),
+            (1, l2),
+          ],
+        ),
+      ),
+    ),
+  )
+}
+
 fun expr_(
   context: mutable SKFS.Context,
   next_id: () -> Int,
@@ -3082,10 +3130,8 @@ fun expr_(
       check_exhaustive_match(context, next_id, env, acc2, pos, e_ty, mbl1)
     };
     (acc2, (rty1, e2))
-  | N.Try(match_expr, mbl) ->
-    if (true) {
-      SkipError.error(pos, "Cannot use try/catch in embedded mode (use etry)");
-    };
+  | N.Try(match_expr, mbl, l1, l2) ->
+    // First, type the actual `try { ... } catch { ... }`.
     (acc1, e1) = expr(context, next_id, env, acc, match_expr);
     e_ty = TAstUtils.get_type(e1);
     pat_ty = TUtils.make_texn(pos, Ast.Vplus());
@@ -3098,11 +3144,12 @@ fun expr_(
       acc1,
       mbl,
     );
-    e2 = (pos, TAst.Try(e1, mbl1));
     if (env.check_exhaustive_match) {
       check_exhaustive_try(context, next_id, env, acc2, pos, mbl1)
     };
-    (acc2, (e_ty1, e2))
+
+    // Then, if it succeeded, use the inferred expression type to construct the call to vtry.
+    expr_try(context, next_id, env, acc2, pos, l1, l2, e_ty1)
   | N.Concurrent _ -> invariant_violation("TODO concurrent")
   | N.Array(mut, tyl, el) ->
     mode = mut match {

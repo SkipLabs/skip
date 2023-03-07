@@ -615,7 +615,7 @@ base class Expr_ {
     body: Expr,
     yields: ?FileRange,
   )
-  | Try(expr: Expr, branches: List<Match_branch>)
+  | Try(expr: Expr, branches: List<Match_branch>, l1: Expr, l2: Expr)
   | Await(expr: Expr)
   | Return(expr: Expr)
   | Yield(expr: Expr)
@@ -1192,13 +1192,15 @@ fun expr_<TEnv, TAcc>(
   | Lambda(ml, params, locals, e, yields) ->
     (acc1, e1) = expr(f, env, acc, e);
     (acc1, Lambda(ml, params, locals, e1, yields))
-  | Try(e, mbl) ->
+  | Try(e, mbl, l1, l2) ->
     (acc1, e1) = expr(f, env, acc, e);
     (acc2, mbl1) = mbl.map_foldl(
       ((acc3, ex) -> match_branch(f, env, acc3, ex)),
       acc1,
     );
-    (acc2, Try(e1, mbl1))
+    (acc4, l11) = expr(f, env, acc2, l1);
+    (acc5, l12) = expr(f, env, acc4, l2);
+    (acc5, Try(e1, mbl1, l11, l12))
   | Await(e) ->
     (acc1, e1) = expr(f, env, acc, e);
     (acc1, Await(e1))
