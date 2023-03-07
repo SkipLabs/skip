@@ -233,15 +233,28 @@ fun getSubsDirs(
       };
       filter = request.ignoreSource match {
       | None() -> accessFilter
-      | Some(src) ->
+      | Some(inputSrc) ->
         context ~> {
           tdir = context.unsafeGetEagerDir(dirDescr.dirName);
-          testSrc = SKFS.Source::create(SKFS.Path(dirDescr.dirName, SKFS.SID(src)));
+          ignoredSrc = SKFS.Source::create(
+            SKFS.Path(dirDescr.dirName, SKFS.SID(inputSrc)),
+          );
           composedFilter = accessFilter(context);
           (file: SKFS.BaseName) -> {
             rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
-            existsInterestingSrc = rows.any(srcFilesPair -> srcFilesPair.i0 != testSrc);
-            existsInterestingSrc && composedFilter(file)
+            // filter updates that are unambiguously from the ignored source:
+            // 1. all non ignored source updates are tombstones
+            // 2. the ignored source update is not a tombstone
+            existsNonTombstoneFromIgnored = false;
+            updateIsFromIgnoredSource = for ((_tick, src, _writer, files) in rows) {
+              if (src == ignoredSrc) {
+                if (files.isEmpty()) break false;
+                !existsNonTombstoneFromIgnored = true
+              } else if (!files.isEmpty()) break false;
+            } else {
+              existsNonTombstoneFromIgnored
+            };
+            !updateIsFromIgnoredSource && composedFilter(file)
           }
         }
       };
