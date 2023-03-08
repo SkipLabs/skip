@@ -47,6 +47,11 @@ fun execClean(args: Cli.ParseResults, env: Env): void {
   run(Array["rm", "-rf", bc.targetDir], env.verbose)
 }
 
+fun execFmt(_args: Cli.ParseResults, env: Env): void {
+  files = env.manifest.srcs.concat(env.manifest.tests);
+  run(Array["skfmt", "-i"].concat(files), env.verbose)
+}
+
 fun execCheck(args: Cli.ParseResults, env: Env): void {
   bc = BuildContext::create(
     env,
@@ -129,6 +134,7 @@ fun main(): void {
           ),
         ),
     )
+    .subcommand(Cli.Command("fmt").about("Format all files using skfmt"))
     .subcommand(
       Cli.Command("init")
         .about("Create a new skargo package")
@@ -157,6 +163,7 @@ fun main(): void {
       | "build" -> Skargo.execBuild
       | "test" -> Skargo.execTest
       | "clean" -> Skargo.execClean
+      | "fmt" -> Skargo.execFmt
       | "help" -> Skargo.execHelp
       | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
       }
