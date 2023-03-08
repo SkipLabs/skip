@@ -45,9 +45,12 @@ untracked fun main(): void {
     | Failure(error) ->
       print_error_ln(SkipError.errorsToString(Vector[error]));
       skipExit(1)
-    | Success(formattedContents) -> if (inplace) {
+    | Success(formattedContents) ->
+      if (inplace) {
         FileSystem.writeTextFile(file, formattedContents)
-      } else { print_raw(formattedContents) }
+      } else {
+        print_raw(formattedContents)
+      }
     }
   }
 }
