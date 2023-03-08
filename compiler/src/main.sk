@@ -66,18 +66,12 @@ fun main(): void {
   };
   SKFS.runWithGc(
     SKFS.Context{},
-    context ~> {
-      if (isInit) {
-        SKFS.CStop(
-          Some((context, _, _) ~> {
-            _result = compile(isInit, config, context, config.unknown);
-          }),
-        )
-      } else {
-        _result = compile(isInit, config, context, config.unknown);
-        skipExit(0);
-        SKFS.CStop(None())
-      }
+    _context ~> {
+      SKFS.CStop(
+        Some((context, _, _) ~> {
+          _result = compile(isInit, config, context, config.unknown);
+        }),
+      )
     },
     Some(SKFS.Synchronizer(SKFS.import, SKFS.export, _ ~> void)),
   )
