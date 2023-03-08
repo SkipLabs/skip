@@ -38,12 +38,12 @@ setup_local() {
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
     echo "CREATE TABLE test_without_pk (id INTEGER, note STRING);" | $SKDB
 
-    $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source local-replication "$table" > $SESSION
+    $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" > $SESSION
 }
 
 replicate_to_server() {
     table=$1
-    cat $UPDATES | $SKDB_BIN write-csv "$table" --data $SERVER_DB --source server-replication --user test_user > $WRITE_OUTPUT
+    cat $UPDATES | $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
 }
 
 run_test() {
@@ -341,7 +341,7 @@ test_replication_with_a_row_that_has_a_higher_than_two_repeat_count() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
 
     # ensure that the row is written to the server with a repeat of 2
-    $SKDB_BIN write-csv --data $SERVER_DB "$table" --source server-replication > $WRITE_OUTPUT <<EOF
+    $SKDB_BIN write-csv --data $SERVER_DB "$table" --source 1234 > $WRITE_OUTPUT <<EOF
 
 
 2	0,"foo"
@@ -376,7 +376,7 @@ test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dups() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
 
     # ensure that the row is written to the server with a repeat of 2
-    $SKDB_BIN write-csv --data $SERVER_DB "$table" --source server-replication > $WRITE_OUTPUT <<EOF
+    $SKDB_BIN write-csv --data $SERVER_DB "$table" --source 1234 > $WRITE_OUTPUT <<EOF
 
 
 2	0,"foo"
