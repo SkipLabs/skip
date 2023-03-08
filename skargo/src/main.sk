@@ -11,49 +11,49 @@ fun execUpdate(_args: Cli.ParseResults, _env: Env): void {
 }
 
 fun execTest(args: Cli.ParseResults, env: Env): void {
-  verbose = args.getBool("verbose");
-  targetDir = Path.join(env.rootDir, "target");
-  build(
-    env.manifest,
-    "test",
-    env.manifest.testHarness,
-    targetDir,
-    None(),
-    verbose,
+  bc = BuildContext::create(
+    env,
+    args.maybeGetString("target"),
+    args.maybeGetString("target-dir"),
   );
+  compile(bc, "test", env.manifest.testHarness);
   filter = args.maybeGetString("filter");
   junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
-  rv = system(Array[Path.join(targetDir, "test")].concat(Array[junitxml, filter].filterNone()).join(" "));
+  rv = system(
+    Array[Path.join(bc.targetDir, "test")].concat(
+      Array[junitxml, filter].filterNone(),
+    ).join(" "),
+  );
   skipExit(rv)
 }
 
 fun execBuild(args: Cli.ParseResults, env: Env): void {
-  target = args.maybeGetString("target");
-  targetDir = target match {
-  | Some(t) -> Path.join(env.rootDir, "target", t)
-  | None() -> Path.join(env.rootDir, "target")
-  };
-  args.maybeGetString("target-dir").each(d -> !targetDir = d);
-
+  bc = BuildContext::create(
+    env,
+    args.maybeGetString("target"),
+    args.maybeGetString("target-dir"),
+  );
   for (bin in env.manifest.bin) {
-    build(
-      env.manifest,
-      bin.name,
-      bin.main,
-      targetDir,
-      target,
-      args.getBool("verbose"),
-    );
+    compile(bc, bin.name, bin.main)
   }
 }
 
-fun execClean(_args: Cli.ParseResults, env: Env): void {
-  targetDir = Path.join(env.rootDir, "target");
-  run(Array["rm", "-rf", targetDir], /* verbose = */ false)
+fun execClean(args: Cli.ParseResults, env: Env): void {
+  bc = BuildContext::create(
+    env,
+    /* targetOpt = */ None(),
+    args.maybeGetString("target-dir"),
+  );
+  run(Array["rm", "-rf", bc.targetDir], env.verbose)
 }
 
-fun execCheck(_args: Cli.ParseResults, _env: Env): void {
-  invariant_violation("TODO")
+fun execCheck(args: Cli.ParseResults, env: Env): void {
+  bc = BuildContext::create(
+    env,
+    args.maybeGetString("target"),
+    args.maybeGetString("target-dir"),
+  );
+  invokeSkc(bc, Array["--check"])
 }
 
 fun execHelp(_args: Cli.ParseResults, _env: Env): void {
@@ -93,6 +93,12 @@ fun main(): void {
         .short("c")
         .about(
           "Analyze the current package and report errors, but don't build object files",
+        )
+        .arg(Cli.StringArg("target").about("Check for the target triple"))
+        .arg(
+          Cli.StringArg("target-dir").about(
+            "Directory for all generated artifacts",
+          ),
         ),
     )
     .subcommand(
@@ -106,9 +112,23 @@ fun main(): void {
               "If specified, only run tests with names matching the filter",
             ),
         )
+        .arg(Cli.StringArg("target").about("Check for the target triple"))
+        .arg(
+          Cli.StringArg("target-dir").about(
+            "Directory for all generated artifacts",
+          ),
+        )
         .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report")),
     )
-    .subcommand(Cli.Command("clean").about("Remove the target directory"))
+    .subcommand(
+      Cli.Command("clean")
+        .about("Remove the target directory")
+        .arg(
+          Cli.StringArg("target-dir").about(
+            "Directory for all generated artifacts",
+          ),
+        ),
+    )
     .subcommand(
       Cli.Command("init")
         .about("Create a new skargo package")
@@ -142,7 +162,7 @@ fun main(): void {
       }
     );
 
-    env = Env::create();
+    env = Env::create(args.getBool("verbose"));
     subcmd_handler.each(f -> f(args, env))
   };
 

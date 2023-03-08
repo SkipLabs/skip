@@ -3,13 +3,10 @@ module Skargo;
 const kVersion: String = "0.1.0";
 const kManifestFile: String = "Skargo.toml";
 
-class Env{rootDir: String, manifest: Manifest} {
-  static fun create(): Env {
+private class Env{rootDir: String, manifest: Manifest, verbose: Bool} {
+  static fun create(verbose: Bool): Env {
     rootDir = findRootDir();
-    Env{
-      rootDir,
-      manifest => Manifest::read(Path.join(rootDir, kManifestFile)),
-    }
+    Env{rootDir, manifest => Manifest::read(Path.join(rootDir, kManifestFile)), verbose}
   }
 }
 
@@ -43,50 +40,40 @@ private fun run(args: Array<String>, verbose: Bool): void {
   };
 }
 
-private fun compile(
-  files: readonly Sequence<String>,
-  binName: String,
-  main: String,
-  targetDir: String,
-  target: ?String,
-  verbose: Bool,
-): void {
-  _ = system(`mkdir -p ${targetDir}`);
+private fun invokeSkc(bc: BuildContext, args: Array<String>): void {
+  targetFlag = bc.target.map(t -> `--target=${t}`);
+  if (!FileSystem.exists(bc.stateDb)) {
+    // TODO: Use stdlib abstraction instead of relying on the shell.
+    _ = system("mkdir -p " + bc.targetDir);
+    // TODO: Initialize with empty file list?
+    run(
+      Array[bc.skc, "--init", bc.stateDb, "--check"].concat(
+        Array[targetFlag].filterNone(),
+      ).concat(bc.files),
+      bc.env.verbose,
+    )
+  };
 
-  output = target match {
+  run(
+    Array[bc.skc, "--data", bc.stateDb].concat(Array[targetFlag].filterNone())
+      .concat(args)
+      .concat(bc.files),
+    bc.env.verbose,
+  )
+}
+
+private fun compile(bc: BuildContext, binName: String, main: String): void {
+  output = bc.target match {
   | Some("wasm32-unknown-unknown") -> binName + ".wasm"
   | _ -> binName
   };
-  targetFlag = target.map(t -> "--target=" + t);
-  // TODO: Allow overriding `skc` through `SKC` env var.
-  cmd = Array[
-    "skc",
-    "--export-function-as",
-    `${main}=skip_main`,
-    "--emit=link",
-    "--output",
-    Path.join(targetDir, output),
-  ].concat(Array[targetFlag].filterNone()).concat(files.collect(Array));
-  run(cmd, verbose)
-}
-
-private fun build(
-  manifest: Manifest,
-  name: String,
-  main: String,
-  targetDir: String,
-  target: ?String,
-  verbose: Bool,
-): void {
-  files = manifest.srcs.concat(manifest.tests);
-  deps = getDependencies(manifest) match {
-  | Success(v) -> v
-  | Failure(_) -> invariant_violation("Unsatisfiable dep")
-  };
-
-  for (dep in deps) {
-    !files = files.concat(dep.srcs)
-  };
-  compile(files, name, main, targetDir, target, verbose);
-  void
+  invokeSkc(
+    bc,
+    Array[
+      "--export-function-as",
+      `${main}=skip_main`,
+      "-o",
+      Path.join(bc.targetDir, output),
+    ],
+  )
 }
