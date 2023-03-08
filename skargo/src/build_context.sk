@@ -1,0 +1,55 @@
+module Skargo;
+
+private class BuildContext{
+  env: Env,
+  skc: String,
+  targetDir: String,
+  target: ?String,
+  stateDb: String,
+  files: Array<String>,
+} {
+  static fun create(
+    env: Env,
+    target: ?String,
+    targetDirOpt: ?String,
+  ): BuildContext {
+    targetDir = targetDirOpt match {
+    | Some(d) -> d
+    | None() -> getTargetDir(env.rootDir, target)
+    };
+    skc = getenv("SKC");
+    if (skc == "") {
+      !skc = "skc"
+    };
+    BuildContext{
+      env,
+      skc,
+      targetDir,
+      target,
+      stateDb => Path.join(targetDir, "state.db"),
+      files => getFiles(env.manifest),
+    }
+  }
+}
+
+private fun getTargetDir(rootDir: String, targetOpt: ?String): String {
+  dir = Path.join(rootDir, "target");
+  targetOpt match {
+  | Some(t) -> Path.join(dir, t)
+  | None() -> dir
+  }
+}
+
+private fun getFiles(manifest: Manifest): Array<String> {
+  files = manifest.srcs.concat(manifest.tests);
+  deps = getDependencies(manifest) match {
+  | Success(v) -> v
+  | Failure(_) -> invariant_violation("Unsatisfiable dep")
+  };
+
+  for (dep in deps) {
+    !files = files.concat(dep.srcs)
+  };
+
+  files.collect(Array)
+}
