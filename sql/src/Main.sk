@@ -152,6 +152,10 @@ untracked fun main(): void {
             ),
         )
         .subcommand(
+          Cli.Command("uid")
+            .about("Get a unique id for this database")
+        )
+        .subcommand(
           Cli.Command("write-csv")
             .about("Write data from stdin into a directory in CSV format")
             .arg(
@@ -246,6 +250,7 @@ untracked fun main(): void {
           | "write" -> execWrite
           | "tail" -> execTail
           | "watermark" -> execWatermark
+          | "uid" -> execUid
           | "write-csv" -> execWriteCsv
           | "subscribe" -> execSubscribe
           | "replay" -> execReplay
@@ -645,6 +650,11 @@ fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
     print_string(watermark);
     SKFS.CStop(None())
   });
+}
+
+fun execUid(args: Cli.ParseResults, _options: SKSQL.Options): void {
+  ensureContext(args);
+  print_string(SKFS.genSym(0));
 }
 
 fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
