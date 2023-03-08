@@ -583,6 +583,8 @@ export class SKDB {
   private exports: WasmExports;
   private localToServerSyncConnections: Map<string, ResilientConnection> = new Map();
   private serverToLocalSyncConnections: Map<string, ResilientConnection> = new Map();
+  private replication_uid: string = "";
+  private client_uuid: string = "";
 
   private constructor(storeName: string) {
     this.storeName = storeName;
@@ -622,6 +624,9 @@ export class SKDB {
 
     client.exports.SKIP_init_jsroots();
     client.runSubscribeRoots(reboot);
+
+    client.replication_uid = client.runLocal(["uid"], "").trim();
+    client.client_uuid = crypto.randomUUID();
 
     return client;
   }
@@ -963,8 +968,7 @@ export class SKDB {
 
     const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
       let msg = data.data;
-      // disable-notify to break the cycle
-      objThis.runLocal(["--disable-notify", "write-csv", tableName], msg + '\n');
+      objThis.runLocal(["write-csv", tableName, "--source", objThis.replication_uid], msg + '\n');
       newConn.expectingData()
     });
     this.localToServerSyncConnections[tableName] = newConn;
@@ -1024,7 +1028,8 @@ export class SKDB {
     });
     const session = objThis.runLocal(
       [
-        "subscribe", tableName, "--connect", "--format=csv", "--updates", fileName
+        "subscribe", tableName, "--connect", "--format=csv",
+        "--updates", fileName, "--ignore-source", objThis.replication_uid
       ],
       ""
     ).trim();
