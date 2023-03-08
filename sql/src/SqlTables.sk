@@ -109,7 +109,7 @@ class SubRequestFile(
   cmd: SKFS.CmdKind,
   sessionID: Int,
   user: ?String,
-  ignoreSource: ?String,
+  ignoreSource: ?Int,
 ) extends SKFS.File
 
 fun getSubsDirs(
@@ -237,7 +237,7 @@ fun getSubsDirs(
         context ~> {
           tdir = context.unsafeGetEagerDir(dirDescr.dirName);
           ignoredSrc = SKFS.Source::create(
-            SKFS.Path(dirDescr.dirName, SKFS.SID(inputSrc)),
+            SKFS.Path(dirDescr.dirName, SKFS.IID(inputSrc)),
           );
           composedFilter = accessFilter(context);
           (file: SKFS.BaseName) -> {

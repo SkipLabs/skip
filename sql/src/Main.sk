@@ -673,7 +673,7 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
       }
     };
     source = args.maybeGetString("source") match {
-    | Some(src) -> SKFS.SID(src)
+    | Some(src) -> SKFS.IID(src.toInt())
     | None() -> SKFS.IID(SKFS.genSym(0))
     };
     SKCSV.replayDiff(context, line, myReadLine, table, user, source)
@@ -729,7 +729,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
       cmd,
       sessionID,
       args.maybeGetString("user"),
-      args.maybeGetString("ignore-source"),
+      args.maybeGetString("ignore-source").map(x -> x.toInt()),
     );
     inputDir.write(context, viewKey, request);
     context.update();
