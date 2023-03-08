@@ -20,26 +20,14 @@ fun prettyPrint(
   }
 }
 
-untracked fun printToStdoutAndReportErrors(
-  contents: String,
-  filename: String,
-): void {
-  prettyPrint(contents, filename) match {
-  | Failure(error) ->
-    print_error_ln(SkipError.errorsToString(Vector[error]));
-    skipExit(1)
-  | Success(formattedContents) -> print_raw(formattedContents)
-  }
-}
-
 untracked fun main(): void {
   args = Cli.Command("skfmt")
     .about("Format skip code")
     .arg(
-      Cli.StringArg("file")
+      Cli.ArrayArg("files")
         .positional()
         .required()
-        .about("Skip file to format"),
+        .about("Skip file(s) to format"),
     )
     .arg(
       Cli.BoolArg("inplace")
@@ -49,7 +37,17 @@ untracked fun main(): void {
     .help()
     .parseArgs();
 
-  filename = args.getString("file");
-  printToStdoutAndReportErrors(FileSystem.readTextFile(filename), filename);
-  void
+  inplace = args.getBool("inplace");
+  filenames = args.getArray("files");
+  for (file in filenames) {
+    contents = FileSystem.readTextFile(file);
+    prettyPrint(contents, file) match {
+    | Failure(error) ->
+      print_error_ln(SkipError.errorsToString(Vector[error]));
+      skipExit(1)
+    | Success(formattedContents) -> if (inplace) {
+        FileSystem.writeTextFile(file, formattedContents)
+      } else { print_raw(formattedContents) }
+    }
+  }
 }
