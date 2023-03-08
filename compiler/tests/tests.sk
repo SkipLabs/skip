@@ -82,14 +82,7 @@ fun main(): void {
 
   run(Array["rm", "-f", "tests/state.db"]);
 
-  run(
-    Array[
-      "skc",
-      "--init",
-      "tests/state.db",
-      "--check",
-    ].concat(stdlibSrcs),
-  );
+  run(Array["skc", "--init", "tests/state.db", "--check"].concat(stdlibSrcs));
 
   validTests = FileSystem.readFilesRecursive("./tests", fn ->
     fn.endsWith(".exp") && !fn.contains("invalid/")

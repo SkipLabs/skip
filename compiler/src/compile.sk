@@ -206,20 +206,14 @@ fun getMainExecutable(argv0: String): String {
   invariant_violation("Cannot determine main executable.")
 }
 
-fun link(
-  llFile: String,
-  config: Config.Config,
-): void {
+fun link(llFile: String, config: Config.Config): void {
   basePath = Path.parentname(Path.dirname(getMainExecutable(getArg0())));
 
   if (config.mainConfig.target.startsWith("wasm32")) {
     output = config.mainConfig.output;
     bcFile = output + ".bc";
     runtime = Path.join(basePath, "lib", "libskip_runtime32.bc");
-    runShell(
-      Array["llvm-link", llFile, runtime, "-o", bcFile],
-      config.verbose,
-    );
+    runShell(Array["llvm-link", llFile, runtime, "-o", bcFile], config.verbose);
     oFile = output + ".o";
     runShell(
       Array[
@@ -347,7 +341,9 @@ fun compile(
       TickConfigFile::fromFile,
       backendDirName,
       false,
-      if (isInit) Array[] else Array[(SKFS.IID(0), TickConfigFile((-128, config)))],
+      if (isInit) Array[] else {
+        Array[(SKFS.IID(0), TickConfigFile((-128, config)))]
+      },
     );
 
     _ = backendDir.contextWriterKeyValues(
@@ -371,12 +367,12 @@ fun compile(
         // Create a filter for what functions to compile.
         shouldRuntimeExport = (
           funDef ~>
-          AsmOutput.cppIsExported(
-            funDef.origName,
-            funDef.annotations,
-            funDef.getPos(),
-            conf.mainConfig.exportedAsFunctions,
-          )
+            AsmOutput.cppIsExported(
+              funDef.origName,
+              funDef.annotations,
+              funDef.getPos(),
+              conf.mainConfig.exportedAsFunctions,
+            )
         );
 
         // Are we in "disassemble" mode?
@@ -394,10 +390,14 @@ fun compile(
         // force everything to be compiled just so it could be disassembled.
         shouldDisasm = (
           funDef ~>
-          disasm &&
-          (conf.mainConfig.disasmFunctions.contains(funDef.origName) ||
-           (conf.mainConfig.disasmAnnotated &&
-            annotationsContain(funDef.annotations, "@disasm", funDef.getPos())))
+            disasm &&
+              (conf.mainConfig.disasmFunctions.contains(funDef.origName) ||
+                (conf.mainConfig.disasmAnnotated &&
+                  annotationsContain(
+                    funDef.annotations,
+                    "@disasm",
+                    funDef.getPos(),
+                  )))
         );
 
         env = OuterIstToIR.createIR(
