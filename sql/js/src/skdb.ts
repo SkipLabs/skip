@@ -148,6 +148,7 @@ type ProtoAuth = {
   date: string;
   nonce: string;
   signature: string;
+  deviceUuid: string,
 }
 
 type ProtoQuery = {
@@ -230,6 +231,7 @@ async function createAuthMsg(creds: Creds): Promise<ProtoAuth> {
     date: now,
     nonce: b64nonce,
     signature: btoa(String.fromCharCode(...new Uint8Array(sig))),
+    deviceUuid: "TODO",
   };
 }
 
@@ -932,7 +934,6 @@ export class SKDB {
   }
 
   async makeRequest(uri: string, creds: Creds, request: ProtoRequest): Promise<ProtoResponse> {
-    let objThis = this;
     let socket = new WebSocket(uri);
 
     const authMsg = await createAuthMsg(creds)

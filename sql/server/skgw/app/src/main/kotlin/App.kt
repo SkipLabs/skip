@@ -19,9 +19,11 @@ import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.io.bufferedWriter
@@ -54,7 +56,8 @@ data class ProtoAuth(
     val accessKey: String,
     val date: String,
     val nonce: String,
-    val signature: String
+    val signature: String,
+    val deviceUuid: String,
 ) : ProtoMessage("auth")
 
 data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMessage("query")
@@ -216,7 +219,8 @@ class AuthenticatedConn(
     val skdb: Skdb,
     val accessKey: String,
     val authenticatedAt: Instant,
-    val encryption: EncryptionTransform
+    val encryption: EncryptionTransform,
+    val replicationId: String,
 ) : Conn {
 
   private fun unexpectedMsg(channel: WebSocketChannel, msg: String): Conn {
@@ -298,6 +302,7 @@ class AuthenticatedConn(
                 accessKey,
                 request.table,
                 request.since,
+                replicationId,
                 {
                   if (channel.isOpen()) {
                     val payload = serialise(ProtoData(it))
@@ -320,6 +325,7 @@ class AuthenticatedConn(
             skdb.writeCsv(
                 accessKey,
                 request.table,
+                replicationId,
                 {
                   if (channel.isOpen()) {
                     val payload = serialise(ProtoData(it))
@@ -351,7 +357,11 @@ class AuthenticatedConn(
   }
 }
 
-class UnauthenticatedConn(val skdb: Skdb, val encryption: EncryptionTransform) : Conn {
+class UnauthenticatedConn(
+    val skdb: Skdb,
+    val encryption: EncryptionTransform,
+    val deviceUuidToReplicationSource: ConcurrentMap<String, String>
+) : Conn {
 
   private fun unexpectedMsg(channel: WebSocketChannel): Conn {
     if (channel.isOpen()) {
@@ -409,7 +419,11 @@ class UnauthenticatedConn(val skdb: Skdb, val encryption: EncryptionTransform) :
           return ErroredConn()
         }
 
-        return AuthenticatedConn(skdb, request.accessKey, Instant.now(), encryption)
+        val replicationId =
+            deviceUuidToReplicationSource.computeIfAbsent(
+                request.deviceUuid, { skdb.uid().getOrThrow().trim() })
+
+        return AuthenticatedConn(skdb, request.accessKey, Instant.now(), encryption, replicationId)
       }
       else -> return unexpectedMsg(channel)
     }
@@ -442,7 +456,8 @@ class ClosedConn() : Conn {
 
 fun connectionHandler(
     taskPool: ScheduledExecutorService,
-    encryption: EncryptionTransform
+    encryption: EncryptionTransform,
+    deviceUuidToReplicationSource: ConcurrentMap<String, String>,
 ): HttpHandler {
   return Handlers.websocket(
       object : WebSocketConnectionCallback {
@@ -460,7 +475,7 @@ fun connectionHandler(
             return
           }
 
-          var conn: Conn = UnauthenticatedConn(skdb, encryption)
+          var conn: Conn = UnauthenticatedConn(skdb, encryption, deviceUuidToReplicationSource)
 
           val timeout =
               taskPool.schedule(
@@ -553,7 +568,8 @@ fun main(args: Array<String>) {
   }
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
-  val connHandler = connectionHandler(taskPool, encryption)
+  val deviceUuidToReplicationSource = ConcurrentHashMap<String, String>()
+  val connHandler = connectionHandler(taskPool, encryption, deviceUuidToReplicationSource)
   val server = createHttpServer(connHandler)
   server.start()
 }
