@@ -210,6 +210,7 @@ type ProtoMessage = ProtoRequest | ProtoResponse
 interface Creds {
   accessKey: string,
   privateKey: CryptoKey,
+  deviceUuid: string,
 }
 
 async function createAuthMsg(creds: Creds): Promise<ProtoAuth> {
@@ -231,7 +232,7 @@ async function createAuthMsg(creds: Creds): Promise<ProtoAuth> {
     date: now,
     nonce: b64nonce,
     signature: btoa(String.fromCharCode(...new Uint8Array(sig))),
-    deviceUuid: "TODO",
+    deviceUuid: creds.deviceUuid,
   };
 }
 
@@ -659,6 +660,7 @@ export class SKDB {
     const creds = {
       accessKey: accessKey,
       privateKey: privateKey,
+      deviceUuid: this.client_uuid,
     };
 
     let result = await this.makeRequest(SKDBServer.getDbSocketUri(endpoint, db), creds, {
