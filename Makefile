@@ -2,6 +2,8 @@
 
 default: sql/js/skdb.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html build/init.sql
 
+npm: sql/js/package.json sql/js/skdb.wasm sql/js/src/skdb.ts
+
 sql/target/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build
 
