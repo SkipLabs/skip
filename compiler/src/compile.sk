@@ -352,9 +352,6 @@ fun compile(
       backendSinkDirName,
       (context, _writer, _key, values) ~> {
         (_, conf) = TickConfigFile::fromFile(values[0]).value;
-        if (conf.mainConfig.check) {
-          return void;
-        };
 
         context.getGlobal("ERRORS") match {
         | None() -> void
@@ -362,6 +359,10 @@ fun compile(
           SkipError.printErrorsAndExit(
             SkipError.ErrorsFile::fromFile(errors).value.reversed().toArray(),
           )
+        };
+
+        if (conf.mainConfig.check) {
+          return void;
         };
 
         // Create a filter for what functions to compile.
