@@ -162,7 +162,7 @@ base class DMap<Key: Orderable, Value> {
     ref.get()
   }
 
-  fun getChangesAfterIter(after: Tick): mutable Iterator<(Key, Value)> {
+  fun getChangesAfterIter(after: Tick): mutable Iterator<(Tick, Key, Value)> {
     this match {
     | Nil() -> void
     | Node{tick, key, value, left, right} ->
@@ -171,7 +171,7 @@ base class DMap<Key: Orderable, Value> {
           yield elt
         };
         if (tick.current >= after) {
-          yield ((key, value));
+          yield ((tick.current, key, value));
         };
         for (elt in right.getChangesAfterIter(after)) {
           yield elt
@@ -254,11 +254,11 @@ base class DMap<Key: Orderable, Value> {
     | GT() -> static::node(tick, key, value, left, right.remove(k))
     }
 
-  fun filterChanged(f: (Key, Value) -> Bool): (DMap<Key, Value>, Bool)
+  fun filterChanged(f: (Key, Value, Tick) -> Bool): (DMap<Key, Value>, Bool)
   | Nil() -> (this, false)
   | Node{tick, key, value, left, right} ->
     (newLeft, leftChanged) = left.filterChanged(f);
-    keep = f(key, value);
+    keep = f(key, value, tick.current);
     (newRight, rightChanged) = right.filterChanged(f);
     if (keep) {
       if (leftChanged || rightChanged) {
@@ -270,7 +270,7 @@ base class DMap<Key: Orderable, Value> {
       (DMap::merge(left, right), true)
     }
 
-  fun filter(f: (Key, Value) -> Bool): DMap<Key, Value> {
+  fun filter(f: (Key, Value, Tick) -> Bool): DMap<Key, Value> {
     this.filterChanged(f).i0
   }
 

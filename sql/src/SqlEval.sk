@@ -657,7 +657,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       (context, writer, key, rowIter) ~> {
         entries = mutable Vector[];
         dir = context.unsafeGetEagerDir(inputDir.dirName);
-        for ((source, _) in dir.getDataIter(context, key)) {
+        for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
           entries.push((key, (source.path(), Array<SKFS.File>[])));
         };
         dir.writeArraySourceMany(context, entries.iterator());
@@ -723,7 +723,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       if (values.size() > 1) {
         error(pos, "Can only use OR IGNORE/REPLACE with one value");
       };
-      where: Expr = Literal("1", false);
+      where: Expr = Literal("0", false);
       valArr = values[0];
       for (i in Range(0, table.schema.size())) {
         tyDescr = table.schema[i];
@@ -738,10 +738,12 @@ class Evaluator{options: Options, user: ?UserFile} {
             | _ -> error(pos, "Unsupported type for OR IGNORE/REPLACE")
             },
           );
-          !where = Binop("AND", clause, where);
+          !where = Binop("OR", clause, where);
         }
       };
-      _ = this.delete(context, pos, table.name, Some(where), Array[]);
+      if (!(where is Literal _)) {
+        _ = this.delete(context, pos, table.name, Some(where), Array[]);
+      }
     };
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
     this.user match {
@@ -1610,9 +1612,9 @@ fun importNext(
       (targetDirName, version) = makeInputDirName(dirName);
       !hasMultipleVersions = hasMultipleVersions || version != 0;
       updates.maybeGet(targetDirName) match {
-      | Some((_, iversion, _)) if (iversion > version) -> void
+      | Some((_, _, _, iversion, _)) if (iversion > version) -> void
       | _ ->
-        changedKeys = dir.getChangesAfter(tick);
+        (isReset, changedKeys) = dir.getChangesAfter(tick);
         targetCtx.unsafeMaybeGetDir(targetDirName) match {
         | None() ->
           time = targetCtx.timeStamp();
@@ -1630,22 +1632,29 @@ fun importNext(
         };
         entries = mutable Vector[];
         for (key in changedKeys) {
-          for (srcValue in dir.unsafeGetDataIter(key)) {
-            (source, values) = srcValue;
+          for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
+            (_, source, values) = srcValue;
             entries.push((key, (source.path(), values)));
           }
         };
-        updates![targetDirName] = (dir, version, entries)
+        updates![targetDirName] = (isReset, changedKeys, dir, version, entries)
       }
     | _ -> void
     }
   };
   for (targetDirName => src in updates) {
-    (_dir, _, entries) = src;
+    (isReset, changedKeys, _dir, _, entries) = src;
     targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
     | None() -> invariant_violation("Directory should have been created")
     | Some(inputDir) ->
-      inputDir.writeArraySourceMany(targetCtx, entries.iterator())
+      !inputDir = inputDir.writeArraySourceManyReturnDir(
+        targetCtx,
+        entries.iterator(),
+      );
+      if (isReset) {
+        !inputDir = inputDir.reset(targetCtx, changedKeys);
+      };
+      targetCtx.setDir(inputDir.dirName, inputDir)
     }
   };
   hasMultipleVersions
@@ -1729,14 +1738,10 @@ fun printContext(context: mutable SKFS.Context): void {
     }
   | Some(StdoutDiff(format, dirName, time)) ->
     edir = context.unsafeGetEagerDir(dirName);
-    for (key in edir.getChangesAfter(time)) {
-      values = edir.getArrayRaw(key);
-      for (value in values) {
-        print_raw(value.toKVString(format, key))
-      };
-    };
-    // output the checkpoint of where we got to with output
-    print_string(":" + context.tick.value)
+    (isReset, changes) = edir.getChangesAfter(time);
+    filter = _ ~> (_ ~> true);
+    edir.writeDiffStdout(context, isReset, changes, print_raw, format, filter)
+
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
   context.globals.maybeGet("Ack") match {

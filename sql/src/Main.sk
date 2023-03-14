@@ -301,7 +301,7 @@ fun execCompact(args: Cli.ParseResults, options: SKSQL.Options): void {
     for (_dirName => dir in context.dirs.state) {
       dir match {
       | edir @ SKFS.EagerDir _ ->
-        !edir = edir.purge();
+        !edir = edir.purge(context);
         context.setDir(edir.dirName, edir)
       | _ -> void
       }
@@ -531,7 +531,10 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       );
       toAdd = mutable Set[];
       toRemove = mutable Set[];
-      for (rowKey in readers.getChangesAfter(SKFS.Tick(tick))) {
+      // isReset can be ignored, because whenever it's true, it just
+      // makes us do more work than necessary.
+      (_isReset, items) = readers.getChangesAfter(SKFS.Tick(tick));
+      for (rowKey in items) {
         rowKey match {
         | SKSQL.RowKey(row, _) ->
           if (row.getInt(1).fromSome() == userID) {
@@ -580,8 +583,15 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       flushStdout()
     | _ -> void
     };
-    changes = edir.getChangesAfter(SKFS.Tick(tick));
-    edir.writeDiffStdout(context, changes, print_raw, format, sub.filter);
+    (isReset, changes) = edir.getChangesAfter(SKFS.Tick(tick));
+    edir.writeDiffStdout(
+      context,
+      isReset,
+      changes,
+      print_raw,
+      format,
+      sub.filter,
+    );
     !tick = context.tick.value;
     !init = false;
     lock = SKFS.unfreezeLock(sub.lock);
@@ -590,14 +600,18 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     while ({
       newContext = SKFS.gContextGet();
       followMode &&
-        newContext
-          .unsafeGetEagerDir(dirName)
-          .getChangesAfter(SKFS.Tick(tick))
-          .isEmpty() &&
-        newContext
-          .unsafeGetEagerDir(SKFS.accessReaders)
-          .getChangesAfter(SKFS.Tick(tick))
-          .isEmpty()
+        {
+          (newIsReset, newChanges) = newContext
+            .unsafeGetEagerDir(dirName)
+            .getChangesAfter(SKFS.Tick(tick));
+          !newIsReset && newChanges.isEmpty()
+        } &&
+        {
+          (newIsReset, newChanges) = newContext
+            .unsafeGetEagerDir(SKFS.accessReaders)
+            .getChangesAfter(SKFS.Tick(tick));
+          !newIsReset && newChanges.isEmpty()
+        }
     }) {
       timeoutSecs = 10;
       _ = SKFS.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));

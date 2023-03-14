@@ -22,26 +22,26 @@ fun testChangesAfter(): void {
   });
   tick = context.tick;
   context.update();
+  (isReset, changedKeys) = context
+    .unsafeGetEagerDir(dirName)
+    .getChangesAfter(tick);
+  invariant(!isReset);
   T.expectEq(
     Array<SKFS.BaseName>[SKFS.IID(0), SKFS.IID(1)],
-    context
-      .unsafeGetEagerDir(dirName)
-      .getChangesAfter(tick)
-      .collect(Array)
-      .sorted(),
+    changedKeys.collect(Array).sorted(),
     "Test getChangesAfter 0",
   );
   !tick = context.tick;
   write(context, dirName, SKFS.IID(1), Array[]);
   write(context, dirName, SKFS.IID(2), Array[SKFS.StringFile("22")]);
   context.update();
+  (!isReset, !changedKeys) = context
+    .unsafeGetEagerDir(dirName)
+    .getChangesAfter(tick);
+  invariant(!isReset);
   T.expectEq(
     Array<SKFS.BaseName>[SKFS.IID(1), SKFS.IID(2)],
-    context
-      .unsafeGetEagerDir(dirName)
-      .getChangesAfter(tick)
-      .collect(Array)
-      .sorted(),
+    changedKeys.collect(Array).sorted(),
     "Test getChangesAfter 1",
   );
 
@@ -67,10 +67,15 @@ fun testChangesAfter(): void {
     context.update();
 
     dir = context.unsafeGetEagerDir(dirName);
-    if (rand.random(0, 10) > 5) !dir = dir.purge();
+    if (rand.random(0, 10) > 5) !dir = dir.purge(context);
+    (!isReset, !changedKeys) = context
+      .unsafeGetEagerDir(dirName)
+      .getChangesAfter(tick);
+    invariant(!isReset);
+
     T.expectEq(
       changes.collect(Array).sorted(),
-      dir.getChangesAfter(tick).collect(Array).sorted(),
+      changedKeys.collect(Array).sorted(),
       "Test getChangesAfter " + (2 + i),
     );
   }

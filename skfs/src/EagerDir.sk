@@ -235,6 +235,237 @@ native fun writeToFile(Int32, String): void;
 native fun unixNotify(String, Int32): Int32;
 
 /*****************************************************************************/
+/* The map containing the new data. */
+/*****************************************************************************/
+
+class DataMapValue{
+  map: DMap<Source, Array<File>> = DMap::empty(),
+  tombs: DMap<Source, void> = DMap::empty(),
+} {
+  static fun empty(): this {
+    static{}
+  }
+
+  fun isEmpty(): Bool {
+    this.map.isEmpty() && this.tombs.isEmpty()
+  }
+
+  fun set(
+    tick: Tick,
+    isMasking: Bool,
+    source: Source,
+    files: Array<File>,
+  ): this {
+    if (files.size() == 0) {
+      if (isMasking) {
+        !this.map = this.map.set(TickRange::create(tick), source, files)
+      } else {
+        this.map.maybeGet(source) match {
+        | None() -> void
+        | Some _ -> !this.map = this.map.remove(source)
+        };
+        !this.tombs = this.tombs.set(TickRange::create(tick), source, void);
+      }
+    } else {
+      if (this.tombs.containsKey(source)) {
+        !this.tombs = this.tombs.remove(source)
+      };
+      !this.map = this.map.set(TickRange::create(tick), source, files);
+    };
+    this
+  }
+
+  fun itemsAfter(limit: Tick): mutable Iterator<(Tick, Source, Array<File>)> {
+    mapIter = this.map.getChangesAfterIter(limit);
+    tombsIter = this.tombs.getChangesAfterIter(limit);
+    left = mapIter.next();
+    right = tombsIter.next();
+    loop {
+      (left, right) match {
+      | (None(), None()) -> break void
+      | (None(), Some((tick, v, _))) ->
+        yield (tick, v, Array[]);
+        !right = tombsIter.next()
+      | (Some((tick, k, v)), None()) ->
+        yield (tick, k, v);
+        !left = mapIter.next()
+      | (Some((tick, k, v)), Some((_, k2, _))) if (k < k2) ->
+        yield (tick, k, v);
+        !left = mapIter.next()
+      | (Some(_), Some((tick, k2, _))) ->
+        yield (tick, k2, Array[]);
+        !right = tombsIter.next()
+      }
+    }
+  }
+
+  fun items(): mutable Iterator<((Tick, Source), Array<File>)> {
+    mapIter = this.map.itemsWithTick();
+    tombsIter = this.tombs.itemsWithTick();
+    left = mapIter.next();
+    right = tombsIter.next();
+    loop {
+      (left, right) match {
+      | (None(), None()) -> break void
+      | (None(), Some((v, _, tick))) ->
+        yield ((tick.current, v), Array[]);
+        !right = tombsIter.next()
+      | (Some((k, v, tick)), None()) ->
+        yield ((tick.current, k), v);
+        !left = mapIter.next()
+      | (Some((k, v, tick)), Some((k2, _, _))) if (k < k2) ->
+        yield ((tick.current, k), v);
+        !left = mapIter.next()
+      | (Some(_), Some((k2, _, tick))) ->
+        yield ((tick.current, k2), Array[]);
+        !right = tombsIter.next()
+      }
+    }
+  }
+
+  fun maybeGet(source: Source): ?Array<File> {
+    this.map.maybeGet(source) match {
+    | None() -> if (this.tombs.containsKey(source)) Some(Array[]) else None()
+    | x @ Some(_) -> x
+    }
+  }
+
+  fun remove(source: Source): this {
+    // We don't need to maintain the tomb count because this method is only
+    // called in reallyRemove mode (where there are no tombs).
+    !this.map = this.map.remove(source);
+    !this.tombs = this.tombs.remove(source);
+    this
+  }
+}
+
+class DataMap{
+  data: DMap<BaseName, DMap<Source, Array<File>>> = Nil(),
+  tombs: DMap<BaseName, DMap<Source, void>> = Nil(),
+  nbrEntries: Int = 0,
+} {
+  static fun empty(): this {
+    DataMap{}
+  }
+
+  fun set(tickRange: TickRange, key: BaseName, value: DataMapValue): this {
+    if (value.map.isEmpty()) {
+      if (this.data.containsKey(key)) {
+        !this.data = this.data.remove(key)
+      }
+    } else {
+      if (!this.data.containsKey(key)) {
+        !this.nbrEntries = this.nbrEntries + 1;
+      };
+      !this.data = this.data.set(tickRange, key, value.map)
+    };
+    if (value.tombs.isEmpty()) {
+      if (this.tombs.containsKey(key)) {
+        !this.tombs = this.tombs.remove(key);
+      }
+    } else {
+      if (!this.tombs.containsKey(key)) {
+        !this.nbrEntries = this.nbrEntries + 1;
+      };
+      !this.tombs = this.tombs.set(tickRange, key, value.tombs);
+    };
+    this
+  }
+
+  fun maybeGet(k: BaseName): ?DataMapValue {
+    (this.data.maybeGet(k), this.tombs.maybeGet(k)) match {
+    | (None(), None()) -> None()
+    | (Some(map), None()) -> Some(DataMapValue{map, tombs => DMap::empty()})
+    | (None(), Some(tombs)) -> Some(DataMapValue{map => DMap::empty(), tombs})
+    | (Some(map), Some(tombs)) -> Some(DataMapValue{map, tombs})
+    }
+  }
+
+  fun eachWithTick(f: (BaseName, Tick) -> void): void {
+    dataIter = this.data.itemsWithTick();
+    tombsIter = this.tombs.itemsWithTick();
+    left = dataIter.next();
+    right = tombsIter.next();
+    loop {
+      (left, right) match {
+      | (None(), None()) -> break void
+      | (Some((k, _, tick)), None()) ->
+        f(k, tick.current);
+        !left = dataIter.next()
+      | (None(), Some((k, _, tick))) ->
+        f(k, tick.current);
+        !right = tombsIter.next()
+      | (Some((k1, _, tick)), Some((k2, _, _))) if (k1 < k2) ->
+        f(k1, tick.current);
+        !left = dataIter.next()
+      | (Some((k1, _, _)), Some((k2, _, tick))) if (k1 > k2) ->
+        f(k2, tick.current);
+        !right = tombsIter.next()
+      | (Some((k, _, tick1)), Some((_, _, tick2))) ->
+        invariant(tick1.current == tick2.current);
+        f(k, tick1.current);
+        !left = dataIter.next();
+        !right = tombsIter.next()
+      }
+    }
+  }
+
+  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+    this.data.getChangesAfter(tick).union(this.tombs.getChangesAfter(tick))
+  }
+
+  fun items(): mutable Iterator<(BaseName, DataMapValue)> {
+    dataIter = this.data.itemsWithTick();
+    tombsIter = this.tombs.itemsWithTick();
+    left = dataIter.next();
+    right = tombsIter.next();
+    loop {
+      (left, right) match {
+      | (None(), None()) -> break void
+      | (Some((k, map, _)), None()) ->
+        yield (k, DataMapValue{map, tombs => DMap::empty()});
+        !left = dataIter.next()
+      | (None(), Some((k, tombs, _))) ->
+        yield (k, DataMapValue{map => DMap::empty(), tombs});
+        !right = tombsIter.next()
+      | (Some((k1, map, _)), Some((k2, _, _))) if (k1 < k2) ->
+        yield (k1, DataMapValue{map, tombs => DMap::empty()});
+        !left = dataIter.next()
+      | (Some((k1, _, _)), Some((k2, tombs, _))) if (k1 > k2) ->
+        yield (k2, DataMapValue{map => DMap::empty(), tombs});
+        !right = tombsIter.next()
+      | (Some((k, map, _)), Some((_, tombs, _))) ->
+        yield (k, DataMapValue{map, tombs});
+        !left = dataIter.next();
+        !right = tombsIter.next()
+      }
+    }
+  }
+
+  fun itemsAfterKeyHelper(
+    lastSkippedOpt: ?Boundary<BaseName>,
+  ): mutable Iterator<(BaseName, DMap<Source, Array<File>>)> {
+    this.data.itemsAfterKey(lastSkippedOpt).iter
+  }
+
+  fun itemsAfterKey(
+    lastSkippedOpt: ?Boundary<BaseName>,
+  ): mutable IterHolder<BaseName, DMap<Source, Array<File>>> {
+    mutable IterHolder(this.itemsAfterKeyHelper(lastSkippedOpt))
+  }
+
+  fun getHeight(): Int {
+    this.data.getHeight()
+  }
+
+  fun remove(k: BaseName): this {
+    !this.data = this.data.remove(k);
+    !this.tombs = this.tombs.remove(k);
+    this
+  }
+}
+
+/*****************************************************************************/
 /* An Eager Directory. */
 /*****************************************************************************/
 
@@ -247,7 +478,7 @@ class EagerDir{
   creator: ?ArrowKey,
   reallyRemove: Bool,
   fixedOld: FixedSingle<Source, MInfo> = FixedSingle::empty(),
-  data: DMap<BaseName, SortedMap<Source, Array<File>>> = Nil(),
+  data: DataMap = DataMap::empty(),
   old: SortedMap<Source, MInfo> = SortedMap[],
   parents: FixedSingle<
     DirName,
@@ -257,10 +488,31 @@ class EagerDir{
   slices: RangeMapList<BaseName, DirName> = RangeMapList[],
   reducer: ?Reducer = None(),
   purgeCount: Int = 0,
+  tombLimit: ?Tick = None(),
 } extends Dir {
+  fun reset(context: mutable SKFS.Context, keep: SortedSet<BaseName>): this {
+    this.unsafeGetFileIter().each(kv -> {
+      (key, valueIter) = kv;
+      if (!keep.contains(key)) {
+        valueIter.next() match {
+        | None() -> void
+        | Some _ ->
+          this.unsafeGetDataIterWithoutTombs(key).each(kv -> {
+            (_, source, _values) = kv;
+            !this = this.writeEntry(context, source.path(), key, Array[]);
+          })
+        }
+      }
+    });
+    context.!toReset = context.toReset.set(this.dirName);
+
+    this
+  }
+
   fun notify(
     context: readonly SKFS.Context,
     sub: Sub,
+    isReset: Bool,
     changes: SortedSet<BaseName>,
     tick: Tick,
   ): void {
@@ -270,7 +522,7 @@ class EagerDir{
       mutexLock(lock);
       fd = unixOpen(file);
       o = x -> writeToFile(fd, x);
-      this.writeDiffStdout(context, changes, o, csv, sub.filter);
+      this.writeDiffStdout(context, isReset, changes, o, csv, sub.filter);
       _ = unixClose(fd);
       mutexUnlock(lock)
     | NNotify(file) ->
@@ -287,6 +539,7 @@ class EagerDir{
 
   fun writeDiffStdout(
     context: readonly SKFS.Context,
+    isReset: Bool,
     changes: SortedSet<BaseName>,
     o: String -> void,
     format: OutputFormat,
@@ -309,6 +562,12 @@ class EagerDir{
       };
     };
 
+    if (isReset) {
+      // Indicates a reset, meaning all the data that was not in
+      // this transaction should be removed.
+      writer.write("\t\t\n");
+    };
+
     // TODO: this is sql specific
     if (!changes.isEmpty() && !this.reallyRemove) {
       // output a checkpoint, indicated by the leading colon
@@ -322,12 +581,17 @@ class EagerDir{
   fun purgeOld(): FixedSingle<Source, MInfo> {
     current = 0;
     acc = mutable Vector[];
+    add = minfo -> {
+      if (!(minfo.i1 is MInfoEmpty())) {
+        acc.push(minfo)
+      }
+    };
     for (source => minfo in this.old) {
       while (
         current < this.fixedOld.size() &&
         this.fixedOld[current].i0 < source
       ) {
-        acc.push(this.fixedOld[current]);
+        add(this.fixedOld[current]);
         !current = current + 1;
       };
       while (
@@ -337,43 +601,68 @@ class EagerDir{
         !current = current + 1;
       };
       if (!minfo.isEmpty()) {
-        acc.push((source, minfo));
+        add((source, minfo));
       }
     };
     while (current < this.fixedOld.size()) {
-      acc.push(this.fixedOld[current]);
+      add(this.fixedOld[current]);
       !current = current + 1;
     };
     FixedSingle(acc.toArray());
   }
 
-  private fun purgeData(): SKFS.FixedData<Array<SKFS.File>> {
-    FixedDir::create(this.flattenData())
+  private fun purgeData(tick: Tick): FixedData<Array<SKFS.File>> {
+    data = this.flattenData(tick);
+    FixedDir::create(data)
   }
 
-  private fun flattenData(): mutable Vector<FixedRow<Array<SKFS.File>>> {
+  private fun flattenData(
+    limit: Tick,
+  ): mutable Vector<FixedRow<Array<SKFS.File>>> {
     current = 0;
     acc = mutable Vector[];
+    lastOpt: ?FixedRow<Array<File>> = None();
 
-    this.data.eachWithTick((key, time) -> {
+    addHelper = lastRow -> {
+      if (lastRow.value.i1.size() > 0 || lastRow.tag.current > limit) {
+        acc.push(lastRow)
+      }
+    };
+
+    add = fixedRow -> {
+      lastOpt match {
+      | Some(
+        lastRow,
+      ) if (
+        fixedRow.key != lastRow.key ||
+        fixedRow.value.i0 != lastRow.value.i0
+      ) ->
+        addHelper(lastRow)
+      | _ -> void
+      };
+      !lastOpt = Some(fixedRow)
+    };
+
+    for (key => _ in this.data) {
       while (
         current < this.fixedData.size() &&
         this.fixedData[current].key < key
       ) {
-        acc.push(this.fixedData[current]);
+        add(this.fixedData[current]);
         !current = current + 1;
       };
       map = this.data.maybeGet(key).fromSome();
-      for (source => values in map) {
+      for (tickSource => values in map) {
+        (tick, source) = tickSource;
         while (
           current < this.fixedData.size() &&
           this.fixedData[current].key == key &&
           this.fixedData[current].value.i0 < source
         ) {
-          acc.push(this.fixedData[current]);
+          add(this.fixedData[current]);
           !current = current + 1;
         };
-        acc.push(FixedRow(key, (source, values), TickRange::create(time)));
+        add(FixedRow(key, (source, values), TickRange::create(tick)));
         while (
           current < this.fixedData.size() &&
           this.fixedData[current].key == key &&
@@ -386,21 +675,37 @@ class EagerDir{
         current < this.fixedData.size() &&
         this.fixedData[current].key == key
       ) {
-        acc.push(this.fixedData[current]);
+        add(this.fixedData[current]);
         !current = current + 1;
       };
-    });
+    };
+
     while (current < this.fixedData.size()) {
-      acc.push(this.fixedData[current]);
+      add(this.fixedData[current]);
       !current = current + 1;
     };
+
+    lastOpt match {
+    | None() -> void
+    | Some(lastRow) -> addHelper(lastRow)
+    };
+
     acc
   }
 
-  fun purge(): this {
+  fun purge(context: mutable Context): this {
+    limit = Tick(context.tick.value - 1000);
     fixedOld = this.purgeOld();
-    fixedData = this.purgeData();
-    this with {old => SortedMap[], data => DMap::empty(), fixedData, fixedOld};
+    tick = context.tick;
+    fixedData = this.purgeData(limit);
+    context.!purgeLimit = Some(limit);
+    this with {
+      tombLimit => Some(tick),
+      data => DataMap::empty(),
+      old => SortedMap[],
+      fixedData,
+      fixedOld,
+    }
   }
 
   fun isInput(): Bool {
@@ -411,10 +716,24 @@ class EagerDir{
     this.time
   }
 
-  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+  fun getChangesAfter(tick: Tick): (Bool, SortedSet<BaseName>) {
+    this.tombLimit match {
+    | Some(limit) if (tick.value != 0 && tick.value <= limit.value) ->
+      result = SortedSet[];
+      this.unsafeGetFileIter().each(kv -> {
+        (key, valueIter) = kv;
+        valueIter.next() match {
+        | None() -> void
+        | Some _ -> !result = result.set(key)
+        }
+      });
+      return (true, result)
+    | _ -> void
+    };
     new = this.data.getChangesAfter(tick);
     old = this.fixedData.getChangesAfter(tick);
-    new.union(old)
+    result = new.union(old);
+    (false, result)
   }
 
   private static fun fixedMapData(
@@ -786,23 +1105,28 @@ class EagerDir{
       };
 
       (!fixedData, data) = if (reallyRemove) {
-        data = DMap::empty();
+        data = DataMap::empty();
         for (fixedRow in acc) {
           // This is due to a compiler bug, if you remove it, the optimizer
           // believes that the next match Some is never taken.
           if (fixedRow.value.i1.size() < 0) {
-            !data = data.set(fixedRow.tag, fixedRow.key, SortedMap[]);
+            !data = data.set(fixedRow.tag, fixedRow.key, DataMapValue::empty());
           };
           map = data.maybeGet(fixedRow.key) match {
-          | None() -> SortedMap[]
+          | None() -> DataMapValue::empty()
           | Some(x) -> x
           };
-          !map = map.set(fixedRow.value.i0, fixedRow.value.i1);
+          !map = map.set(
+            context.tick,
+            false,
+            fixedRow.value.i0,
+            fixedRow.value.i1,
+          );
           !data = data.set(fixedRow.tag, fixedRow.key, map);
         };
         (FixedDir::create(mutable Vector[]), data)
       } else {
-        (fixedData, DMap::empty())
+        (fixedData, DataMap::empty())
       };
 
       EagerDir{
@@ -856,13 +1180,42 @@ class EagerDir{
     this.getIterRaw(key).collect(Array);
   }
 
-  fun unsafeGetDataValues(key: BaseName): Array<(Source, Array<File>)> {
-    this.unsafeGetDataIter(key).collect(Array)
+  fun unsafeGetAllDataIterAfter(
+    limit: Tick,
+    key: BaseName,
+  ): mutable Iterator<(Tick, Source, Array<File>)> {
+    this.data.maybeGet(key) match {
+    | None() ->
+      fixedIter = this.fixedData.getIterAfter(limit, key);
+      for (rows in fixedIter) {
+        yield rows;
+      }
+    | Some(modified) ->
+      fixed = FixedDataIterator::create(
+        this.fixedData.getIterAfter(limit, key),
+      );
+
+      for (tickSourceFiles in modified.itemsAfter(limit)) {
+        (tick, source, files) = tickSourceFiles;
+        while (!fixed.isEnd() && fixed.current().i1 < source) {
+          yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+          fixed.next();
+        };
+        while (!fixed.isEnd() && fixed.current().i1 == source) {
+          fixed.next();
+        };
+        yield (tick, source, files);
+      };
+      while (!fixed.isEnd()) {
+        yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+        fixed.next();
+      }
+    }
   }
 
-  fun unsafeGetDataIter(
+  fun unsafeGetAllDataIter(
     key: BaseName,
-  ): mutable Iterator<(Source, Array<File>)> {
+  ): mutable Iterator<(Tick, Source, Array<File>)> {
     fixedIter = this.fixedData.getIter(key);
     this.data.maybeGet(key) match {
     | None() ->
@@ -872,18 +1225,58 @@ class EagerDir{
     | Some(modified) ->
       fixed = FixedDataIterator::create(this.fixedData.getIter(key));
 
-      for (source => files in modified) {
-        while (!fixed.isEnd() && fixed.current().i0 < source) {
-          yield (fixed.current().i0, fixed.current().i1);
+      for (tickSource => files in modified) {
+        (tick, source) = tickSource;
+        while (!fixed.isEnd() && fixed.current().i1 < source) {
+          yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
           fixed.next();
         };
-        while (!fixed.isEnd() && fixed.current().i0 == source) {
+        while (!fixed.isEnd() && fixed.current().i1 == source) {
           fixed.next();
         };
-        yield (source, files);
+        yield (tick, source, files);
       };
       while (!fixed.isEnd()) {
-        yield (fixed.current().i0, fixed.current().i1);
+        yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+        fixed.next();
+      }
+    }
+  }
+
+  fun unsafeGetDataIterWithoutTombs(
+    key: BaseName,
+  ): mutable Iterator<(Tick, Source, Array<File>)> {
+    fixedIter = this.fixedData.getIter(key);
+    this.data.maybeGet(key) match {
+    | None() ->
+      for (rows in fixedIter) {
+        if (rows.i2.size() > 0) {
+          yield rows;
+        }
+      }
+    | Some(modified) ->
+      fixed = FixedDataIterator::create(this.fixedData.getIter(key));
+
+      for (sourceFilesTick in modified.map.itemsWithTick()) {
+        (source, files, tickRange) = sourceFilesTick;
+        tick = tickRange.current;
+        while (!fixed.isEnd() && fixed.current().i1 < source) {
+          if (fixed.current().i2.size() > 0) {
+            yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+          };
+          fixed.next();
+        };
+        while (!fixed.isEnd() && fixed.current().i1 == source) {
+          fixed.next();
+        };
+        if (files.size() > 0) {
+          yield (tick, source, files);
+        }
+      };
+      while (!fixed.isEnd()) {
+        if (fixed.current().i2.size() > 0) {
+          yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+        };
         fixed.next();
       }
     }
@@ -892,8 +1285,8 @@ class EagerDir{
   private fun getIterRaw(key: BaseName): mutable Iterator<File> {
     this.reducer match {
     | None() ->
-      for (arr in this.unsafeGetDataIter(key)) {
-        for (elt in arr.i1) {
+      for (arr in this.unsafeGetDataIterWithoutTombs(key)) {
+        for (elt in arr.i2) {
           yield elt
         }
       }
@@ -1049,12 +1442,8 @@ class EagerDir{
       return this;
     };
 
-    if (
-      !this.reallyRemove &&
-      this.data.getHeight() > 10 &&
-      Math.ipow(2, this.data.getHeight()) >= this.fixedData.size()
-    ) {
-      !this = this.purge();
+    if (!this.reallyRemove && (this.data.nbrEntries >= this.fixedData.size())) {
+      context.!toPurge = context.toPurge.set(this.dirName);
     };
 
     totalSize = if (oldValues.size() == 0 && rvalues.size() > 0) {
@@ -1066,19 +1455,26 @@ class EagerDir{
     };
 
     map = this.data.maybeGet(k) match {
-    | None() -> SortedMap[]
+    | None() -> DataMapValue::empty()
     | Some(x) -> x
     };
 
     if (this.reallyRemove && rvalues.isEmpty()) {
-      invariant(this.fixedData.size() == 0);
+      invariant(
+        this.fixedData.size() == 0,
+        "No fixed data expected when really remove is on",
+      );
       !map = map.remove(source);
     } else {
-      !map = map.set(source, rvalues);
+      isMasking = this.fixedData.getIterSourceKey(source, k).next() is Some _;
+      !map = map.set(context.tick, isMasking, source, rvalues);
     };
 
     if (this.reallyRemove && map.isEmpty()) {
-      invariant(this.fixedData.size() == 0);
+      invariant(
+        this.fixedData.size() == 0,
+        "No fixed data expected when really remove is on",
+      );
       !this.data = this.data.remove(k);
     } else {
       tag = TickRange::create(context.tick);
@@ -1091,17 +1487,24 @@ class EagerDir{
       state = cdata.getArray(k);
       if (state.size() == 0) {
         !cdata.modified[k] = cdata.reducer.init(
-          this.unsafeGetDataIter(k).map(x -> x.i1.iterator()).flatten(),
+          this.unsafeGetDataIterWithoutTombs(k)
+            .map(x -> x.i2.iterator())
+            .flatten(),
         )
       } else {
         cdata.reducer.update(state, oldValues, rvalues) match {
         | None() ->
           !cdata.modified[k] = cdata.reducer.init(
-            this.unsafeGetDataIter(k).map(x -> x.i1.iterator()).flatten(),
+            this.unsafeGetDataIterWithoutTombs(k)
+              .map(x -> x.i2.iterator())
+              .flatten(),
           )
         | Some(new) ->
           if (this.reallyRemove && new.size() == 0) {
-            invariant(cdata.fixed.isEmpty());
+            invariant(
+              cdata.fixed.isEmpty(),
+              "No fixed data expected when really remove is on",
+            );
             !cdata.modified = cdata.modified.remove(k);
           } else {
             !cdata.modified[k] = new
@@ -1225,18 +1628,16 @@ class EagerDir{
     };
   }
 
-  private fun getFixedFiles(current: mutable IntRef): mutable Iterator<File> {
-    key = this.fixedData[current.value].key;
-    while (
-      current.value < this.fixedData.size() &&
-      this.fixedData[current.value].key == key
-    ) {
+  private fun getFixedFiles(idx: Int): mutable Iterator<File> {
+    key = this.fixedData[idx].key;
+    while (idx < this.fixedData.size() && this.fixedData[idx].key == key) {
+      fixedValues = this.fixedData[idx].value.i1;
       if (this.reducer is None()) {
-        for (elt in this.fixedData[current.value].value.i1) {
+        for (elt in fixedValues) {
           yield elt;
         };
       };
-      current.incr();
+      !idx = idx + 1;
     };
 
     this.reducer match {
@@ -1267,7 +1668,13 @@ class EagerDir{
         this.fixedData[current.value].key < key
       ) {
         fixedKey = this.fixedData[current.value].key;
-        fixedFiles = this.getFixedFiles(current);
+        fixedFiles = this.getFixedFiles(current.value);
+        while (
+          current.value < this.fixedData.size() &&
+          this.fixedData[current.value].key == fixedKey
+        ) {
+          current.incr();
+        };
         yield (fixedKey, fixedFiles);
       };
       while (
@@ -1280,7 +1687,13 @@ class EagerDir{
     };
     while (current.value < this.fixedData.size()) {
       fixedKey = this.fixedData[current.value].key;
-      fixedFiles = this.getFixedFiles(current);
+      fixedFiles = this.getFixedFiles(current.value);
+      while (
+        current.value < this.fixedData.size() &&
+        this.fixedData[current.value].key == fixedKey
+      ) {
+        current.incr();
+      };
       yield (fixedKey, fixedFiles);
     };
   }
@@ -1295,7 +1708,13 @@ class EagerDir{
         this.fixedData[current.value].key < key
       ) {
         fixedKey = this.fixedData[current.value].key;
-        fixedFiles = this.getFixedFiles(current);
+        fixedFiles = this.getFixedFiles(current.value);
+        while (
+          current.value < this.fixedData.size() &&
+          this.fixedData[current.value].key == key
+        ) {
+          current.incr();
+        };
         yield (fixedKey, fixedFiles);
       };
       while (
@@ -1308,7 +1727,13 @@ class EagerDir{
     };
     while (current.value < this.fixedData.size()) {
       fixedKey = this.fixedData[current.value].key;
-      fixedFiles = this.getFixedFiles(current);
+      fixedFiles = this.getFixedFiles(current.value);
+      while (
+        current.value < this.fixedData.size() &&
+        this.fixedData[current.value].key == fixedKey
+      ) {
+        current.incr();
+      };
       yield (fixedKey, fixedFiles);
     };
   }
@@ -1331,7 +1756,7 @@ class EagerDir{
         };
         !current = current + 1;
       };
-      if (newValues.size() > 0) {
+      if (!newValues.isEmpty()) {
         !keys = keys.set(newKey);
       };
     };
@@ -1404,15 +1829,23 @@ class EagerDir{
     context.setDir(this.dirName, this);
   }
 
-  fun writeArraySourceMany(
+  fun writeArraySourceManyReturnDir(
     context: mutable Context,
     bindings: mutable Iterator<(BaseName, (Path, Array<File>))>,
-  ): void {
+  ): this {
     for (kv in bindings) {
       (key, (source, values)) = kv;
       !this = this.writeEntry(context, source, key, values);
     };
     context.!toReset = context.toReset.set(this.dirName);
+    this
+  }
+
+  fun writeArraySourceMany(
+    context: mutable Context,
+    bindings: mutable Iterator<(BaseName, (Path, Array<File>))>,
+  ): void {
+    !this = this.writeArraySourceManyReturnDir(context, bindings);
     context.setDir(this.dirName, this);
   }
 
@@ -1443,13 +1876,22 @@ class EagerDir{
     this.unsafeGetFileIter()
   }
 
-  fun getDataIter(
+  fun getAllDataIter(
     context: mutable Context,
     key: BaseName,
-  ): mutable Iterator<(Source, Array<File>)> {
+  ): mutable Iterator<(Tick, Source, Array<File>)> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
-    this.unsafeGetDataIter(key)
+    this.unsafeGetAllDataIter(key)
+  }
+
+  fun getDataIterWithoutTombs(
+    context: mutable Context,
+    key: BaseName,
+  ): mutable Iterator<(Tick, Source, Array<File>)> {
+    path = Path::create(this.dirName, key);
+    context.addDep(path);
+    this.unsafeGetDataIterWithoutTombs(key)
   }
 
   fun isEmpty(context: mutable Context): Bool {
