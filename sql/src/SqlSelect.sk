@@ -1107,7 +1107,9 @@ fun isPotentiallyEmpty(
     state[i] match {
     | Some(CInt(n)) -> if (n != 0) return false
     | Some(CFloat(f)) -> if (f < -0.01 || f > 0.01) return false
-    | _ -> invariant_violation("Unexpected type")
+    | x ->
+      debug(x);
+      invariant_violation("Unexpected type")
     }
   };
   true
@@ -1356,7 +1358,9 @@ fun normalizeValueIter(
     | r @ RowValues _ ->
       if (valueOpt is None()) !valueOpt = Some(r);
       !repeat = repeat + r.repeat
-    | _ -> invariant_violation("Unexpected type")
+    | _ ->
+      debug(v);
+      invariant_violation("Unexpected type")
     }
   };
   valueOpt match {

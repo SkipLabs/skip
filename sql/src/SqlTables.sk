@@ -176,7 +176,9 @@ fun getSubsDirs(
         userFile = SKSQL.UserFile::create(context, userName);
         (context: SKFS.Context, tick: SKFS.Tick) ~> {
           readers = context.unsafeGetEagerDir(SKFS.accessReaders);
-          for (rowKey in readers.getChangesAfter(tick)) {
+          (isReset, changes) = readers.getChangesAfter(tick);
+          if (isReset) return true;
+          for (rowKey in changes) {
             rowKey match {
             | RowKey(row, _) ->
               if (row.getInt(1).fromSome() == userFile.id) {
@@ -402,6 +404,7 @@ fun getTable(
         reallyRemove => false,
       };
       context.setDir(dir.dirName, dir);
+      limit = context.tick;
       _ = SKFS.EagerDir::apply(
         context,
         oldDirName,
@@ -410,8 +413,8 @@ fun getTable(
           entries = mutable Vector[];
           for (srcValue in (context.unsafeGetEagerDir(
             oldDirName,
-          )).unsafeGetDataIter(key)) {
-            (source, values) = srcValue;
+          )).unsafeGetAllDataIterAfter(limit, key)) {
+            (_, source, values) = srcValue;
             entries.push((key, (source.path(), values)));
           };
           inputDir = context.unsafeGetEagerDir(nextName);

@@ -170,14 +170,14 @@ fun replayDiff(
     skipExit(23);
   };
 
-  makeFun = (rows, checkpoint) -> {
+  makeFun = (rows, reset, checkpoint) -> {
     origDir = context.unsafeGetEagerDir(table.dirName);
     Some((context, delta, _) ~> {
       entries = mutable Vector[];
       dir = origDir;
       for (row in rows) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((source, _) in dir.getDataIter(context, key)) {
+        for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
           entries.push((key, (source.path(), Array<SKFS.File>[])));
         };
       };
@@ -186,7 +186,7 @@ fun replayDiff(
       };
 
       !dir = context.unsafeGetEagerDir(table.dirName);
-      dir.writeArraySourceMany(
+      !dir = dir.writeArraySourceManyReturnDir(
         context,
         rows
           .iterator()
@@ -202,6 +202,19 @@ fun replayDiff(
             )
           }),
       );
+
+      if (reset) {
+        !dir = dir.reset(
+          context,
+          rows
+            .iterator()
+            .filter(row -> row.repeat != 0)
+            .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
+            .collect(SortedSet),
+        );
+      };
+
+      context.setDir(dir.dirName, dir);
 
       if (checkpoint is Some _) {
         checkpointTick = SKFS.Tick(checkpoint.fromSome());
@@ -222,17 +235,25 @@ fun replayDiff(
   };
 
   checkpoint: ?Int = None();
+  reset = false;
 
   vtry<SKFS.ContextOp>(
     () -> {
       loop {
         line = getLine();
         lineNbr.set(lineNbr.get() + 1);
-        if (line == "") continue;
+        if (line == "") {
+          rows = buffer.toArray();
+          buffer.clear();
+          // check to see if this is the initial begin txn markers
+          if (rows.isEmpty() && checkpoint is None _) continue;
+          // otherwise wrap up the previous txn
+          break SKFS.CContinue(makeFun(rows, reset, checkpoint))
+        };
 
-        chars = mutable Vector[];
+        chars: mutable Vector<Char> = mutable Vector[];
         iter = line.getIter();
-        (repeat, !checkpoint) = loop {
+        (repeat, !reset, !checkpoint) = loop {
           c = iter.next() match {
           | None() ->
             print_error(
@@ -242,12 +263,21 @@ fun replayDiff(
           | Some(':') ->
             break (
               None(),
+              reset,
               Some(line.sub(iter, line.length() - chars.size() - 1).toInt()),
             )
           | Some(x) -> x
           };
           if (c == '\t') {
-            break (Some(String::fromChars(chars.toArray()).toInt()), checkpoint)
+            if (chars.size() == 0 || chars[0] == '\t') {
+              break (None(), true, checkpoint)
+            } else {
+              break (
+                Some(String::fromChars(chars.toArray()).toInt()),
+                reset,
+                checkpoint,
+              )
+            }
           };
           if (c < '0' || c > '9') {
             print_error(
@@ -295,15 +325,14 @@ fun replayDiff(
         | Some(_) ->
           rows = buffer.toArray();
           buffer.clear();
-
-          break SKFS.CContinue(makeFun(rows, checkpoint))
+          break SKFS.CContinue(makeFun(rows, reset, checkpoint))
         }
       }
     },
     exn -> {
       if (exn is EndOfFile _) {
         rows = buffer.toArray();
-        SKFS.CStop(makeFun(rows, checkpoint))
+        SKFS.CStop(makeFun(rows, reset, checkpoint))
       } else {
         flushStdout();
         SKFS.CContinue(None())
@@ -313,61 +342,63 @@ fun replayDiff(
 }
 
 fun replayStdin(): Map<String, (Int, Int)> {
-  map = mutable Map<String, (Int, Int)>[];
-  lineNbr = 1;
   txNbr = 0;
-  vtry(
-    () -> {
-      loop {
-        line = read_line() match {
-        | None() -> break map.chill()
-        | Some("") ->
-          !txNbr = txNbr + 1;
-          continue
-        | Some(l) -> l
-        };
-        chars = mutable Vector[];
-        iter = line.getIter();
-        checkpoint = false;
-        loop {
-          c = iter.next() match {
-          | None() ->
-            print_error("Error, line " + lineNbr + ": unexpected end of line");
-            skipExit(23)
-          | Some(':') ->
-            !checkpoint = true;
-            break void
-          | Some(x) -> x
-          };
-          if (c == '\t') break void;
-          if (c < '0' || c > '9') {
-            print_error("Error, line " + lineNbr + ": expected an integer key");
-            skipExit(23)
-          };
-          chars.push(c);
-        };
-        if (checkpoint) continue;
-        repeat = String::fromChars(chars.toArray()).toInt();
-        value = line.sub(iter, line.length() - chars.size() - 1);
-        if (map.containsKey(value)) {
-          (oldTxNbr, oldRepeat) = map[value];
-          if (oldTxNbr == txNbr) {
-            map![value] = (txNbr, oldRepeat + repeat);
-          } else {
-            map![value] = (txNbr, repeat);
-          }
-        } else {
-          map![value] = (txNbr, repeat);
-        };
-        !lineNbr = lineNbr + 1;
-      }
-    },
-    exn -> {
-      if (!(exn is EndOfFile _)) {
-        print_error("Unexpected error: " + exn.getMessage());
-        skipExit(22);
+  all = mutable Map<String, (Int, Int)>[];
+  tx = mutable Map<String, (Int, Int)>[];
+  commit = () -> {
+    for (x => y in tx) {
+      all![x] = y
+    };
+    tx.clear();
+    !txNbr = txNbr + 1;
+  };
+  lineNbr = 1;
+  loop {
+    line = read_line() match {
+    | None() -> break all.chill()
+    | Some("") -> continue
+    | Some(l) -> l
+    };
+    chars: mutable Vector<Char> = mutable Vector[];
+    iter = line.getIter();
+    checkpoint = false;
+    reset = false;
+    loop {
+      c = iter.next() match {
+      | None() ->
+        print_error("Error, line " + lineNbr + ": unexpected end of line");
+        skipExit(23)
+      | Some(':') ->
+        !checkpoint = true;
+        break void
+      | Some(x) -> x
       };
-      map.chill()
-    },
-  );
+      if (c == '\t') {
+        if (chars.size() == 0 || chars[0] == '\t') {
+          !reset = true;
+          break void
+        } else {
+          break void
+        }
+      };
+      if (c < '0' || c > '9') {
+        print_error("Error, line " + lineNbr + ": expected an integer key");
+        skipExit(23)
+      };
+      chars.push(c);
+    };
+    if (reset) {
+      all.clear();
+      commit();
+      continue;
+    };
+    if (checkpoint) {
+      commit();
+      continue;
+    };
+    repeat = String::fromChars(chars.toArray()).toInt();
+    value = line.sub(iter, line.length() - chars.size() - 1);
+    tx![value] = (txNbr, repeat);
+    !lineNbr = lineNbr + 1;
+  }
 }

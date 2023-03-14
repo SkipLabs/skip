@@ -42,8 +42,13 @@ base class FixedData<T> {
   fun get(idx: Int): FixedRow<T>;
   fun getPos(key: BaseName): Int;
   fun getArray(key: BaseName): Array<(Source, T)>;
-  fun getIter(key: BaseName): mutable Iterator<(Source, T)>;
+  fun getIter(key: BaseName): mutable Iterator<(Tick, Source, T)>;
+  fun getIterAfter(
+    tick: Tick,
+    key: BaseName,
+  ): mutable Iterator<(Tick, Source, T)>;
   fun getArraySourceKey(source: Source, key: BaseName): Array<T>;
+  fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T>;
   fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
 }
 
@@ -115,13 +120,13 @@ class FixedDir private {
     result.toArray();
   }
 
-  fun getIter(key: BaseName): mutable Iterator<(Source, Array<File>)> {
+  fun getIter(key: BaseName): mutable Iterator<(Tick, Source, Array<File>)> {
     pos = this.getPosij(key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
       elt = this.data[pos];
       if (elt.key != key) break void;
-      yield elt.value;
+      yield (elt.tag.current, elt.value.i0, elt.value.i1);
       !pos = pos + 1;
     };
   }
@@ -148,6 +153,135 @@ class FixedDir private {
   static fun computeTags(
     cache: mutable Array<Bool>,
     array: mutable Array<FixedRow<Array<File>>>,
+    i: Int,
+    j: Int,
+  ): TickRange {
+    if (i > j) {
+      return TickRange::create(Tick(0))
+    };
+    pivot = (i + j) / 2;
+    elt = array[pivot];
+    tag = elt.tag;
+    right = static::computeTags(cache, array, pivot + 1, j);
+    left = static::computeTags(cache, array, i, pivot - 1);
+    !tag.max = max(tag.max, max(left.max, right.max));
+    array![pivot] = elt with {tag};
+    cache![pivot] = true;
+    tag
+  }
+
+  fun getChangesAcc(
+    after: Tick,
+    acc: mutable Vector<BaseName>,
+    i: Int,
+    j: Int,
+  ): void {
+    if (i > j) {
+      return void;
+    };
+    pivot = (i + j) / 2;
+    elt = this.data[pivot];
+    tick = elt.tag;
+    if (tick.max < after) return void;
+    if (tick.current >= after) {
+      acc.push(elt.key);
+    };
+    this.getChangesAcc(after, acc, i, pivot - 1);
+    this.getChangesAcc(after, acc, pivot + 1, j);
+  }
+
+  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+    acc = mutable Vector[];
+    this.getChangesAcc(tick, acc, 0, this.data.size() - 1);
+    result = SortedSet[];
+    for (elt in acc) {
+      !result = result.set(elt);
+    };
+    result
+  }
+
+  fun getKeyChangesAfterIter(
+    after: Tick,
+    key: BaseName,
+    i: Int,
+    j: Int,
+  ): mutable Iterator<(Tick, Source, Array<File>)> {
+    if (i <= j) {
+      pivot = (i + j) / 2;
+      elt = this.data[pivot];
+      tick = elt.tag;
+      if (tick.max >= after) {
+        if (key <= elt.key) {
+          for (item in this.getKeyChangesAfterIter(after, key, i, pivot - 1)) {
+            yield item
+          }
+        };
+        if (tick.current >= after) {
+          if (elt.key.compare(key) is EQ()) {
+            yield ((tick.current, elt.value.i0, elt.value.i1));
+          }
+        };
+        if (key >= elt.key) {
+          for (item in this.getKeyChangesAfterIter(after, key, pivot + 1, j)) {
+            yield item
+          }
+        }
+      }
+    }
+  }
+
+  fun getIterAfter(
+    limit: Tick,
+    key: BaseName,
+  ): mutable Iterator<(Tick, Source, Array<File>)> {
+    this.getKeyChangesAfterIter(limit, key, 0, this.data.size() - 1)
+  }
+}
+
+/*****************************************************************************/
+/* Same as FixedDir but with no values. */
+/*****************************************************************************/
+
+value class FixedKey(key: BaseName, tag: TickRange) uses Orderable {
+  fun compare(fixedKey2: FixedKey): Order {
+    this.key.compare(fixedKey2.key) match {
+    | EQ() -> this.tag.current.compare(fixedKey2.tag.current)
+    | x -> x
+    }
+  }
+}
+
+class FixedSet private {data: Array<FixedKey> = Array[]} {
+  static fun create(set: SortedSet<FixedKey> = SortedSet[]): this {
+    data = mutable Vector[];
+    lastOpt: ?FixedKey = None();
+    for (elt in set) {
+      lastOpt match {
+      | None() -> data.push(elt)
+      | Some(last) ->
+        if (last.key == elt.key) {
+          if (elt.tag.current > last.tag.current) {
+            data![data.size() - 1] = elt;
+          }
+        } else {
+          data.push(elt)
+        }
+      };
+      !lastOpt = Some(elt)
+    };
+    result = data.toArray().clone();
+    cache = Array::mfill(result.size(), false);
+    _ = static::computeTags(cache, result, 0, result.size() - 1);
+    FixedSet{data => result.chill()}
+  }
+
+  fun size(): Int {
+    this.data.size()
+  }
+
+  static fun computeTags(
+    cache: mutable Array<Bool>,
+    array: mutable Array<FixedKey>,
     i: Int,
     j: Int,
   ): TickRange {
@@ -222,6 +356,11 @@ class FixedDir private {
   }
 }
 
+/*****************************************************************************/
+/* Immutable set (represented with an Array), where the elements are
+ * guaranteed to be unique. */
+/*****************************************************************************/
+
 class FixedSingle<K: Orderable, +V>(data: Array<(K, V)> = Array[]) {
   static fun empty(): this {
     FixedSingle()
@@ -292,10 +431,10 @@ class FixedSingle<K: Orderable, +V>(data: Array<(K, V)> = Array[]) {
 }
 
 mutable class FixedDataIterator<T> private {
-  iter: mutable Iterator<(Source, T)>,
-  mutable currentOpt: ?(Source, T) = None(),
+  iter: mutable Iterator<(Tick, Source, T)>,
+  mutable currentOpt: ?(Tick, Source, T) = None(),
 } {
-  static fun create(iter: mutable Iterator<(Source, T)>): mutable this {
+  static fun create(iter: mutable Iterator<(Tick, Source, T)>): mutable this {
     mutable static{currentOpt => iter.next(), iter => iter}
   }
 
@@ -303,7 +442,7 @@ mutable class FixedDataIterator<T> private {
     this.currentOpt is None _
   }
 
-  readonly fun current(): (Source, T) {
+  readonly fun current(): (Tick, Source, T) {
     this.currentOpt match {
     | None() -> invariant_violation("Cannot access current")
     | Some(x) -> x
