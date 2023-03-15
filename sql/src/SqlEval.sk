@@ -715,7 +715,6 @@ class Evaluator{options: Options, user: ?UserFile} {
       if (values.size() > 1) {
         error(pos, "Can only use OR IGNORE/REPLACE with one value");
       };
-      where: Expr = Literal("0", false);
       valArr = values[0];
       for (i in Range(0, table.schema.size())) {
         tyDescr = table.schema[i];
@@ -730,11 +729,8 @@ class Evaluator{options: Options, user: ?UserFile} {
             | _ -> error(pos, "Unsupported type for OR IGNORE/REPLACE")
             },
           );
-          !where = Binop("OR", clause, where);
+          _ = this.delete(context, pos, table.name, Some(clause), Array[]);
         }
-      };
-      if (!(where is Literal _)) {
-        _ = this.delete(context, pos, table.name, Some(where), Array[]);
       }
     };
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
@@ -747,6 +743,8 @@ class Evaluator{options: Options, user: ?UserFile} {
       error(pos, "OR IGNORE/REPLACE not supported on streams/windows")
     | None() if (inTransaction && onConflict is Some(OCIgnore())) ->
       error(pos, "OR IGNORE not supported in transactions")
+    | None() if (inTransaction && onConflict is Some(OCReplace())) ->
+      error(pos, "OR REPLACE not supported in transactions")
     | None() if (inTransaction) ->
       this.insertTable(context, table, rows);
       None()
@@ -776,6 +774,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         }
       | _ -> None()
       }
+
     | None() ->
       Some((context, _, _) ~> {
         if (onConflict is Some(OCIgnore())) {
@@ -791,7 +790,50 @@ class Evaluator{options: Options, user: ?UserFile} {
               | _ -> throw exn
               }
             ,
-          );
+          )
+        } else if (onConflict is Some(OCReplace())) {
+          loop {
+            copy = context.clone();
+            shouldContinue = vtry(
+              () -> {
+                this.insertTable(context, table, rows);
+                context.update();
+                false
+              },
+              exn ->
+                exn match {
+                | Conflict(_pos, _msg, conflictingValues) ->
+                  context.replaceFromSaved(copy);
+                  where: ?Expr = None();
+                  for (idxValue in conflictingValues) {
+                    (idx, conValue) = idxValue;
+                    tyDescr = table.schema[idx];
+                    clause = Binop(
+                      "=",
+                      Literal(tyDescr.name.lower, false),
+                      conValue match {
+                      | None() -> Literal("null", false)
+                      | Some(CInt(n)) -> Literal(n.toString(), false)
+                      | Some(CString(s)) -> Literal(s, true)
+                      | _ ->
+                        error(pos, "Unsupported type for OR IGNORE/REPLACE")
+                      },
+                    );
+                    !where = where match {
+                    | None() -> Some(clause)
+                    | Some(w) -> Some(Binop("AND", w, clause))
+                    }
+                  };
+                  tick = context.tick;
+                  _ = this.delete(context, pos, table.name, where, Array[]);
+                  _ = importNext(context, tick, context);
+                  true
+                | _ -> throw exn
+                }
+              ,
+            );
+            if (!shouldContinue) break void
+          }
         } else {
           this.insertTable(context, table, rows);
           context.update();
