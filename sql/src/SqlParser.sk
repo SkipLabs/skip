@@ -780,7 +780,7 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
       !pos = lex.expectUpper(pos, "EXISTS");
       !ifNotExists = true;
     };
-    return parseCreateIndex(lex, posBegin, pos, ifNotExists);
+    return parseCreateIndex(lex, posBegin, pos, ifNotExists, true);
   };
   if (lex.isEqUpper(pos, "INDEX")) {
     !pos = lex.expectUpper(pos, "INDEX");
@@ -791,7 +791,7 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
       !pos = lex.expectUpper(pos, "EXISTS");
       !ifNotExists = true;
     };
-    return parseCreateIndex(lex, posBegin, pos, ifNotExists);
+    return parseCreateIndex(lex, posBegin, pos, ifNotExists, false);
   };
   if (lex.isEqUpper(pos, "VIRTUAL")) {
     !pos = lex.expectUpper(pos, "VIRTUAL");
@@ -867,6 +867,7 @@ fun parseCreateIndex(
   posBegin: Int,
   pos: Int,
   ifNotExists: Bool,
+  unique: Bool,
 ): (Int, Index) {
   origPos = pos;
   (!pos, name) = lex.nextWord(pos);
@@ -880,7 +881,7 @@ fun parseCreateIndex(
       ifNotExists,
       name => Name::create(name),
       fields,
-      unique => false,
+      unique,
       text,
     },
   )

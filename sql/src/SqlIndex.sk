@@ -4,7 +4,7 @@
 
 module SKSQL;
 
-class CValueFile(value: ?CValue) extends SKFS.BaseName
+class CValueFile(values: Array<(Int, ?CValue)>) extends SKFS.BaseName
 
 fun createIndex(
   context: mutable SKFS.Context,
@@ -12,6 +12,7 @@ fun createIndex(
   tableName: Name,
   dirName: SKFS.DirName,
   kinds: Array<(Int, IKind, Type)>,
+  size: Int,
   unique: Bool,
   text: ?String,
 ): IndexDescr {
@@ -43,7 +44,14 @@ fun createIndex(
         (_, writer, _key, values) ~> {
           result = SortedMap<CValueFile, mutable Vector<RowValues>>[];
           for (v in values) {
-            k = CValueFile(v.values[kinds[0].i0]);
+            indexedValues = mutable Vector[];
+            for (i in Range(0, size)) {
+              indexedValues.push((kinds[i].i0, v.values[kinds[i].i0]));
+            };
+            k = CValueFile(indexedValues.toArray());
+            if (v.repeat != 1) {
+              throw Conflict(0, "UNIQUE constraint failed", k.values)
+            };
             if (!result.containsKey(k)) {
               !result[k] = mutable Vector[];
             };
@@ -58,14 +66,21 @@ fun createIndex(
         SKFS.StringFile::fromFile,
         context,
         SKFS.DirName::create(indexName.lower + "unique/sink/"),
-        (_, _, _key, values) ~> {
+        (_, _, key, values) ~> {
           if (values.size() == 0) return void;
           repeat = 0;
           for (r in values) {
             !repeat = repeat + r.repeat;
           };
           if (repeat > 1) {
-            throw Conflict(0, "UNIQUE constraint failed")
+            throw Conflict(
+              0,
+              "UNIQUE constraint failed",
+              key match {
+              | CValueFile(arr) -> arr
+              | _ -> invariant_violation("Unexpected key type")
+              },
+            )
           }
         },
       )
@@ -135,6 +150,7 @@ fun createUserIndex(
     table.name,
     table.dirName,
     kinds,
+    fields.i1.size(),
     unique,
     text,
   )
