@@ -152,6 +152,7 @@ fun getSubsDirs(
         };
         selectAst = selectFile.value;
         compiler = SKSQL.Compiler::create(
+          false,
           options with {virtual => true},
           selectAst.pos,
         );
@@ -361,7 +362,7 @@ fun getTable(
       view = viewArray[0];
       selectFile = SelectFile::fromFile(view);
       dirName = SKFS.DirName::create("/" + selectFile.value.id + "/");
-      compiler = SKSQL.Compiler::create(options, pos);
+      compiler = SKSQL.Compiler::create(false, options, pos);
       cselect = compiler.compileSelect(context, selectFile.value, true);
       dirDescr = SKSQL.Compiler::getDirDescr(
         selectFile.value.params,

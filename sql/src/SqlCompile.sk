@@ -83,6 +83,7 @@ fun errorNoMergeClause(pos: Int): void {
 /*****************************************************************************/
 
 mutable class Compiler{
+  directMode: Bool,
   options: Options,
   pos: Int,
   mutable subst: mutable Map<Name, CGExpr> = mutable Map[],
@@ -94,8 +95,12 @@ mutable class Compiler{
   mutable needGetParam: Bool = false,
   mutable other: mutable Vector<SubSelectTask> = mutable Vector[],
 } {
-  static fun create(options: Options, pos: Int): mutable this {
-    mutable static{options, pos}
+  static fun create(
+    directMode: Bool,
+    options: Options,
+    pos: Int,
+  ): mutable this {
+    mutable static{directMode, options, pos}
   }
 
   mutable fun expandGroupBy(select: Select): Select {
@@ -285,6 +290,26 @@ mutable class Compiler{
       }
     };
 
+    directMode =
+      aggr is None() &&
+      this.directMode &&
+      toplevel &&
+      from.size() <= 1 &&
+      select.kind is SNone() &&
+      having is None() &&
+      orderBy is None() &&
+      groupBy is None() &&
+      rest is None();
+
+    format = this.options.format match {
+    | OFK_CSV() -> SKFS.OCSV()
+    | OFK_JSON() ->
+      schema = static::getSchema(select.params, from, params);
+      fieldNames = schema.map(x -> x.name.origName);
+      SKFS.OJSON(fieldNames)
+    | OFK_SQL() -> SKFS.OSQL()
+    };
+
     cselect = CSelect{
       id => Name::create(
         select.id.lower +
@@ -308,6 +333,8 @@ mutable class Compiler{
       rest,
       needUp => this.needUp,
       needGetParam => this.needGetParam,
+      directMode,
+      format,
       other => this.other.toArray(),
     };
 
@@ -556,13 +583,11 @@ mutable class Compiler{
     (cols, invCols)
   }
 
-  static fun getDirDescr(
+  static fun getSchema(
     params: SelectParams,
     from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
     cparams: Array<CGExpr>,
-    selectId: Name,
-    dirName: SKFS.DirName,
-  ): DirDescr {
+  ): Array<SKSQL.TypeDescr> {
     (cols, invCols) = static::getCols(params, from);
     schema = cparams.mapWithIndex((idx, param) -> {
       ty = TypeDescr{
@@ -581,6 +606,17 @@ mutable class Compiler{
       };
       ty
     });
+    schema
+  }
+
+  static fun getDirDescr(
+    params: SelectParams,
+    from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    cparams: Array<CGExpr>,
+    selectId: Name,
+    dirName: SKFS.DirName,
+  ): DirDescr {
+    schema = static::getSchema(params, from, cparams);
     windowSize: ?Int = None();
     for (kv in from) {
       (kv.i0.windowSize, windowSize) match {
