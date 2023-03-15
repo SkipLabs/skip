@@ -203,6 +203,7 @@ fun makeSelectEvaluator(select: CSelect, up: ?ExprEvaluator): SelectEvaluator {
 
 class SelectEvaluator{
   select: CSelect,
+  directMode: ?Int = None(),
   up: ?ExprEvaluator,
   params: Array<CGExpr>,
   selectName1: SKFS.DirName,
@@ -210,7 +211,22 @@ class SelectEvaluator{
   kinds: Array<(Int, SKSQL.IKind, Type)>,
   types: Array<Type>,
 } {
+  fun evalStaticInt(context: mutable SKFS.Context, expr: CExpr<Int>): Int {
+    emptyEval = ExprEvaluator(None(), Array[], this.select.from, this.up);
+    emptyEval.evalCIExpr(context, expr) match {
+    | ANull() -> 0
+    | ADef(x) -> x
+    | AUndef() -> invariant_violation("Unexpected Undef")
+    }
+  }
+
   fun evalSelect(context: mutable SKFS.Context): SelectDir {
+    if (this.select.directMode) {
+      !this.directMode = this.select.limit match {
+      | None() -> Some(Int::max)
+      | Some(limitExpr) -> Some(this.evalStaticInt(context, limitExpr))
+      };
+    };
     for (subTask in this.select.other) {
       static::evalSubTask(context, subTask);
     };
@@ -225,80 +241,79 @@ class SelectEvaluator{
       !this.selectName2 = SKFS.DirName::create(
         this.selectName2.toString() + "nolimit/",
       );
-      emptyEval = ExprEvaluator(None(), Array[], this.select.from, this.up);
-      limit = emptyEval.evalCIExpr(context, limitExpr) match {
-      | ANull() -> 0
-      | ADef(x) -> x
-      | AUndef() -> invariant_violation("Unexpected Undef")
-      };
-      limitDir = context.unsafeMaybeGetEagerDir(limitName) match {
-      | None() ->
-        h = context.mkdir(Row::fromFile, limitName, false, Array[]);
-        context.unsafeGetEagerDir(h.dirName)
-      | Some(dir) ->
-        context.!newDirs = context.newDirs.set(limitName);
-        dir
-      };
-      selectDir = this.evalSelectNoLimit(context);
-      iter = (context.unsafeGetEagerDir(selectDir.dirName)).getIterator(
-        context,
-      );
-      arr = mutable Vector[];
-      i = 0;
-      while (i < limit) {
-        iter.next() match {
+      limit = this.evalStaticInt(context, limitExpr);
+      if (this.select.directMode) {
+        this.evalSelectNoLimit(context)
+      } else {
+        limitDir = context.unsafeMaybeGetEagerDir(limitName) match {
         | None() ->
-          arr.push(((SKFS.IID(i) : SKFS.BaseName), Array[]));
-          !i = i + 1
-        | Some((_, fileIter)) ->
-          values = fileIter.map(RowValues::fromFile).collect(Array);
-          if (values.size() == 0) continue;
-          value = values[0];
-          repeat = 0;
-          for (v in values) {
-            !repeat = repeat + v.repeat;
-          };
-          if (repeat == 0) continue;
-          !value = value.setRepeat(repeat);
-          arr.push(((SKFS.IID(i) : SKFS.BaseName), Array[value]));
-          !i = i + 1
-        }
-      };
-      j = 0;
-      arr2 = mutable Vector[];
-      source = SKFS.Path::create(limitName, SKFS.IID(0));
-      for (elt in arr) {
-        (key, values) = elt;
-        if (values.size() == 0) {
-          arr2.push((key, (source, Array[])))
-        } else {
-          value = values[0];
-          repeat = if (j + value.repeat >= limit) limit - j else value.repeat;
-          if (repeat > 0) {
+          h = context.mkdir(Row::fromFile, limitName, false, Array[]);
+          context.unsafeGetEagerDir(h.dirName)
+        | Some(dir) ->
+          context.!newDirs = context.newDirs.set(limitName);
+          dir
+        };
+        selectDir = this.evalSelectNoLimit(context);
+        iter = (context.unsafeGetEagerDir(selectDir.dirName)).getIterator(
+          context,
+        );
+        arr = mutable Vector[];
+        i = 0;
+        while (i < limit) {
+          iter.next() match {
+          | None() ->
+            arr.push(((SKFS.IID(i) : SKFS.BaseName), Array[]));
+            !i = i + 1
+          | Some((_, fileIter)) ->
+            values = fileIter.map(RowValues::fromFile).collect(Array);
+            if (values.size() == 0) continue;
+            value = values[0];
+            repeat = 0;
+            for (v in values) {
+              !repeat = repeat + v.repeat;
+            };
+            if (repeat == 0) continue;
             !value = value.setRepeat(repeat);
-            arr2.push((key, (source, Array[(value : SKFS.File)])));
-            !j = j + repeat;
-          } else {
-            arr2.push((key, (source, Array[])));
+            arr.push(((SKFS.IID(i) : SKFS.BaseName), Array[value]));
+            !i = i + 1
           }
-        }
-      };
-      limitDir.writeArraySourceMany(context, arr2.iterator());
-      kinds = this.kinds;
-      SKFS.EagerDir::apply(
-        context,
-        limitDir.dirName,
-        limitMappedName,
-        (_context, writer, _key, valueIter) ~> {
-          values = valueIter.collect(Array);
-          if (values.isEmpty()) return void;
-          writer.writeArray(
-            RowKey(RowValues::fromFile(values[0]), kinds),
-            values,
-          );
-        },
-      );
-      SelectDir(limitMappedName, selectDir.types)
+        };
+        j = 0;
+        arr2 = mutable Vector[];
+        source = SKFS.Path::create(limitName, SKFS.IID(0));
+        for (elt in arr) {
+          (key, values) = elt;
+          if (values.size() == 0) {
+            arr2.push((key, (source, Array[])))
+          } else {
+            value = values[0];
+            repeat = if (j + value.repeat >= limit) limit - j else value.repeat;
+            if (repeat > 0) {
+              !value = value.setRepeat(repeat);
+              arr2.push((key, (source, Array[(value : SKFS.File)])));
+              !j = j + repeat;
+            } else {
+              arr2.push((key, (source, Array[])));
+            }
+          }
+        };
+        limitDir.writeArraySourceMany(context, arr2.iterator());
+        kinds = this.kinds;
+        SKFS.EagerDir::apply(
+          context,
+          limitDir.dirName,
+          limitMappedName,
+          (_context, writer, _key, valueIter) ~> {
+            values = valueIter.collect(Array);
+            if (values.isEmpty()) return void;
+            writer.writeArray(
+              RowKey(RowValues::fromFile(values[0]), kinds),
+              values,
+            );
+          },
+        );
+        SelectDir(limitMappedName, selectDir.types)
+      }
     }
   }
 
@@ -648,6 +663,7 @@ class SelectEvaluator{
     | List.Cons(table, remainingTables) ->
       this.evalSelectTable(
         context,
+
         getDir(table.i0),
         table.i1,
         remainingTables,
@@ -748,13 +764,15 @@ class SelectEvaluator{
     entries: List<Row>,
   ): SKFS.EHandle<Row> {
     parents = this.makeParents(dir.dirName, rangeOpt, remainingTables, entries);
-    SKFS.EHandle::multiContextWriterKeyIter(
+    result = SKFS.EHandle::multiContextWriterKeyIter(
       Row::fromFile,
       context,
       parents,
       this.selectName2,
       this.evalSelectTableReducer(),
-    )
+    );
+    if (this.directMode is Some _) throw IgnoreAndContinue();
+    result
   }
 
   fun evalSelectTableRows(
@@ -803,6 +821,7 @@ class SelectEvaluator{
         inputRow,
         repeat,
       )
+
     | _ ->
       for (inputRow in inputRows) {
         repeat = inputRow match {
@@ -939,7 +958,24 @@ class SelectEvaluator{
       invariant(this.select.groupBy is None());
       key = RowKey::create(row, this.kinds);
       qkind match {
-      | None() -> writer.write(key, row)
+      | None() ->
+        writer.write(key, row);
+        this.directMode match {
+        | None() -> void
+        | Some(limit) ->
+          i = context.getGlobal("DIRECT_MODE_COUNT") match {
+          | None() -> 0
+          | Some(x) -> SKFS.IntFile::fromFile(x).value
+          };
+          for (_ in Range(0, row.repeat)) {
+            print_string(row.toStringSingle(this.select.format));
+            !i = i + 1;
+            if (i >= limit) {
+              throw IgnoreAndContinue()
+            }
+          };
+          context.setGlobal("DIRECT_MODE_COUNT", SKFS.IntFile(i))
+        }
       | Some((order, k)) -> writer.write(key, RowKind(order, k, row))
       }
     };
