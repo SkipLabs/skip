@@ -718,7 +718,7 @@ class EagerDir{
 
   fun getChangesAfter(tick: Tick): (Bool, SortedSet<BaseName>) {
     this.tombLimit match {
-    | Some(limit) if (tick.value != 0 && tick.value <= limit.value) ->
+    | Some(limit) if (tick.value <= limit.value) ->
       result = SortedSet[];
       this.unsafeGetFileIter().each(kv -> {
         (key, valueIter) = kv;
