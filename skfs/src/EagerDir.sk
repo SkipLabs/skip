@@ -240,7 +240,7 @@ native fun unixNotify(String, Int32): Int32;
 
 class DataMapValue{
   map: DMap<Source, Array<File>> = DMap::empty(),
-  tombs: DMap<Source, void> = DMap::empty(),
+  tombs: DMap<Source, Source> = DMap::empty(),
 } {
   static fun empty(): this {
     static{}
@@ -253,29 +253,34 @@ class DataMapValue{
   fun set(
     tick: Tick,
     isMasking: Bool,
-    source: Source,
+    origSource: Source,
+    writer: Source, // different to origSource when explicitly tombstoning
     files: Array<File>,
   ): this {
-    if (files.size() == 0) {
+    invariant(files.isEmpty() || origSource == writer);
+    if (files.isEmpty()) {
       if (isMasking) {
-        !this.map = this.map.set(TickRange::create(tick), source, files)
+        // mask out fixed data, for when you're iterating without tombs.
+        !this.map = this.map.set(TickRange::create(tick), origSource, files)
       } else {
-        this.map.maybeGet(source) match {
+        this.map.maybeGet(origSource) match {
         | None() -> void
-        | Some _ -> !this.map = this.map.remove(source)
+        | Some _ -> !this.map = this.map.remove(origSource)
         };
-        !this.tombs = this.tombs.set(TickRange::create(tick), source, void);
-      }
-    } else {
-      if (this.tombs.containsKey(source)) {
-        !this.tombs = this.tombs.remove(source)
       };
-      !this.map = this.map.set(TickRange::create(tick), source, files);
+      !this.tombs = this.tombs.set(TickRange::create(tick), origSource, writer);
+    } else {
+      if (this.tombs.containsKey(origSource)) {
+        !this.tombs = this.tombs.remove(origSource)
+      };
+      !this.map = this.map.set(TickRange::create(tick), origSource, files);
     };
     this
   }
 
-  fun itemsAfter(limit: Tick): mutable Iterator<(Tick, Source, Array<File>)> {
+  fun itemsAfter(
+    limit: Tick,
+  ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     mapIter = this.map.getChangesAfterIter(limit);
     tombsIter = this.tombs.getChangesAfterIter(limit);
     left = mapIter.next();
@@ -283,23 +288,27 @@ class DataMapValue{
     loop {
       (left, right) match {
       | (None(), None()) -> break void
-      | (None(), Some((tick, v, _))) ->
-        yield (tick, v, Array[]);
+      | (None(), Some((tick, v, w))) ->
+        yield (tick, v, w, Array[]);
         !right = tombsIter.next()
       | (Some((tick, k, v)), None()) ->
-        yield (tick, k, v);
+        yield (tick, k, k, v);
         !left = mapIter.next()
       | (Some((tick, k, v)), Some((_, k2, _))) if (k < k2) ->
-        yield (tick, k, v);
+        yield (tick, k, k, v);
         !left = mapIter.next()
-      | (Some(_), Some((tick, k2, _))) ->
-        yield (tick, k2, Array[]);
+      | (Some((t1, k1, _)), Some((t2, k2, w))) if (k1 == k2 && t1 == t2) ->
+        yield (t2, k2, w, Array[]);
+        !left = mapIter.next();
+        !right = tombsIter.next()
+      | (Some(_), Some((tick, k2, w))) ->
+        yield (tick, k2, w, Array[]);
         !right = tombsIter.next()
       }
     }
   }
 
-  fun items(): mutable Iterator<((Tick, Source), Array<File>)> {
+  fun items(): mutable Iterator<((Tick, Source, Source), Array<File>)> {
     mapIter = this.map.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
     left = mapIter.next();
@@ -307,17 +316,21 @@ class DataMapValue{
     loop {
       (left, right) match {
       | (None(), None()) -> break void
-      | (None(), Some((v, _, tick))) ->
-        yield ((tick.current, v), Array[]);
+      | (None(), Some((v, w, tick))) ->
+        yield ((tick.current, v, w), Array[]);
         !right = tombsIter.next()
       | (Some((k, v, tick)), None()) ->
-        yield ((tick.current, k), v);
+        yield ((tick.current, k, k), v);
         !left = mapIter.next()
-      | (Some((k, v, tick)), Some((k2, _, _))) if (k < k2) ->
-        yield ((tick.current, k), v);
+      | (Some((k, v, tick)), Some((k2, w, _))) if (k < k2) ->
+        yield ((tick.current, k, w), v);
         !left = mapIter.next()
-      | (Some(_), Some((k2, _, tick))) ->
-        yield ((tick.current, k2), Array[]);
+      | (Some((k, v, tick)), Some((k2, w, _))) if (k == k2) ->
+        yield ((tick.current, k, w), v);
+        !left = mapIter.next();
+        !right = tombsIter.next()
+      | (Some(_), Some((k2, w, tick))) ->
+        yield ((tick.current, k2, w), Array[]);
         !right = tombsIter.next()
       }
     }
@@ -341,7 +354,7 @@ class DataMapValue{
 
 class DataMap{
   data: DMap<BaseName, DMap<Source, Array<File>>> = Nil(),
-  tombs: DMap<BaseName, DMap<Source, void>> = Nil(),
+  tombs: DMap<BaseName, DMap<Source, Source>> = Nil(),
   nbrEntries: Int = 0,
 } {
   static fun empty(): this {
@@ -490,7 +503,11 @@ class EagerDir{
   purgeCount: Int = 0,
   tombLimit: ?Tick = None(),
 } extends Dir {
-  fun reset(context: mutable SKFS.Context, keep: SortedSet<BaseName>): this {
+  fun reset(
+    context: mutable SKFS.Context,
+    writerPath: Path,
+    keep: SortedSet<BaseName>,
+  ): this {
     this.unsafeGetFileIter().each(kv -> {
       (key, valueIter) = kv;
       if (!keep.contains(key)) {
@@ -499,7 +516,13 @@ class EagerDir{
         | Some _ ->
           this.unsafeGetDataIterWithoutTombs(key).each(kv -> {
             (_, source, _values) = kv;
-            !this = this.writeEntry(context, source.path(), key, Array[]);
+            !this = this.writeEntry(
+              context,
+              source.path(),
+              writerPath,
+              key,
+              Array[],
+            );
           })
         }
       }
@@ -653,7 +676,8 @@ class EagerDir{
       };
       map = this.data.maybeGet(key).fromSome();
       for (tickSource => values in map) {
-        (tick, source) = tickSource;
+        // TODO: should persist writer in the fixed data when this is a tomb
+        (tick, source, _writer) = tickSource;
         while (
           current < this.fixedData.size() &&
           this.fixedData[current].key == key &&
@@ -1119,6 +1143,7 @@ class EagerDir{
             context.tick,
             false,
             fixedRow.value.i0,
+            fixedRow.value.i0, // TODO: need fixed part to be split in to data and tombs
             fixedRow.value.i1,
           );
           !data = data.set(fixedRow.tag, fixedRow.key, map);
@@ -1182,31 +1207,42 @@ class EagerDir{
   fun unsafeGetAllDataIterAfter(
     limit: Tick,
     key: BaseName,
-  ): mutable Iterator<(Tick, Source, Array<File>)> {
+  ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     this.data.maybeGet(key) match {
     | None() ->
       fixedIter = this.fixedData.getIterAfter(limit, key);
       for (rows in fixedIter) {
-        yield rows;
+        // TODO: yield the writer once this information is in fixed data
+        yield (rows.i0, rows.i1, rows.i1, rows.i2);
       }
     | Some(modified) ->
       fixed = FixedDataIterator::create(
         this.fixedData.getIterAfter(limit, key),
       );
 
-      for (tickSourceFiles in modified.itemsAfter(limit)) {
-        (tick, source, files) = tickSourceFiles;
+      for (tickSourceWriterFiles in modified.itemsAfter(limit)) {
+        (tick, source, writer, files) = tickSourceWriterFiles;
         while (!fixed.isEnd() && fixed.current().i1 < source) {
-          yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+          yield (
+            fixed.current().i0,
+            fixed.current().i1,
+            fixed.current().i1, // TODO:
+            fixed.current().i2,
+          );
           fixed.next();
         };
         while (!fixed.isEnd() && fixed.current().i1 == source) {
           fixed.next();
         };
-        yield (tick, source, files);
+        yield (tick, source, writer, files);
       };
       while (!fixed.isEnd()) {
-        yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+        yield (
+          fixed.current().i0,
+          fixed.current().i1,
+          fixed.current().i1, // TODO:
+          fixed.current().i2,
+        );
         fixed.next();
       }
     }
@@ -1214,29 +1250,40 @@ class EagerDir{
 
   fun unsafeGetAllDataIter(
     key: BaseName,
-  ): mutable Iterator<(Tick, Source, Array<File>)> {
+  ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     fixedIter = this.fixedData.getIter(key);
     this.data.maybeGet(key) match {
     | None() ->
       for (rows in fixedIter) {
-        yield rows;
+        // TODO:
+        yield (rows.i0, rows.i1, rows.i1, rows.i2);
       }
     | Some(modified) ->
       fixed = FixedDataIterator::create(this.fixedData.getIter(key));
 
-      for (tickSource => files in modified) {
-        (tick, source) = tickSource;
+      for (tickSourceWriter => files in modified) {
+        (tick, source, writer) = tickSourceWriter;
         while (!fixed.isEnd() && fixed.current().i1 < source) {
-          yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+          yield (
+            fixed.current().i0,
+            fixed.current().i1,
+            fixed.current().i1, // TODO:
+            fixed.current().i2,
+          );
           fixed.next();
         };
         while (!fixed.isEnd() && fixed.current().i1 == source) {
           fixed.next();
         };
-        yield (tick, source, files);
+        yield (tick, source, writer, files);
       };
       while (!fixed.isEnd()) {
-        yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+        yield (
+          fixed.current().i0,
+          fixed.current().i1,
+          fixed.current().i1, // TODO:
+          fixed.current().i2,
+        );
         fixed.next();
       }
     }
@@ -1391,12 +1438,12 @@ class EagerDir{
         if (oldKeys.contains(k)) {
           !oldKeys = oldKeys.remove(k);
         };
-        !child = child.writeEntry(context, path, k, rvalues);
+        !child = child.writeEntry(context, path, path, k, rvalues);
       };
 
       // Let's remove the keys that no longer exist.
       for (k in oldKeys) {
-        !child = child.writeEntry(context, path, k, Array[]);
+        !child = child.writeEntry(context, path, path, k, Array[]);
       };
 
       // We need to remember what keys we produced for the next
@@ -1430,12 +1477,13 @@ class EagerDir{
 
   fun writeEntry(
     context: mutable Context,
-    sourcePath: Path,
+    origSourcePath: Path,
+    writerPath: Path,
     k: BaseName,
     rvalues: Array<File>,
   ): this {
-    source = Source::create(sourcePath);
-    oldValues = this.getArraySourceKey(source, k);
+    origSource = Source::create(origSourcePath);
+    oldValues = this.getArraySourceKey(origSource, k);
 
     if (native_eq(rvalues, oldValues) == 0) {
       return this;
@@ -1463,10 +1511,14 @@ class EagerDir{
         this.fixedData.size() == 0,
         "No fixed data expected when really remove is on",
       );
-      !map = map.remove(source);
+      !map = map.remove(origSource);
     } else {
-      isMasking = this.fixedData.getIterSourceKey(source, k).next() is Some _;
-      !map = map.set(context.tick, isMasking, source, rvalues);
+      isMasking = this.fixedData.getIterSourceKey(
+        origSource,
+        k,
+      ).next() is Some _;
+      writer = Source::create(writerPath);
+      !map = map.set(context.tick, isMasking, origSource, writer, rvalues);
     };
 
     if (this.reallyRemove && map.isEmpty()) {
@@ -1814,7 +1866,7 @@ class EagerDir{
     values: Array<File>,
   ): this {
     source = Path::create(this.dirName, key);
-    !this = this.writeEntry(context, source, key, values);
+    !this = this.writeEntry(context, source, source, key, values);
     context.!toReset = context.toReset.set(this.dirName);
     this
   }
@@ -1830,11 +1882,11 @@ class EagerDir{
 
   fun writeArraySourceManyReturnDir(
     context: mutable Context,
-    bindings: mutable Iterator<(BaseName, (Path, Array<File>))>,
+    bindings: mutable Iterator<(BaseName, (Path, Path, Array<File>))>,
   ): this {
     for (kv in bindings) {
-      (key, (source, values)) = kv;
-      !this = this.writeEntry(context, source, key, values);
+      (key, (origSource, writer, values)) = kv;
+      !this = this.writeEntry(context, origSource, writer, key, values);
     };
     context.!toReset = context.toReset.set(this.dirName);
     this
@@ -1842,7 +1894,7 @@ class EagerDir{
 
   fun writeArraySourceMany(
     context: mutable Context,
-    bindings: mutable Iterator<(BaseName, (Path, Array<File>))>,
+    bindings: mutable Iterator<(BaseName, (Path, Path, Array<File>))>,
   ): void {
     !this = this.writeArraySourceManyReturnDir(context, bindings);
     context.setDir(this.dirName, this);
@@ -1857,7 +1909,7 @@ class EagerDir{
       bindings.map(kv -> {
         (key, values) = kv;
         source = Path::create(this.dirName, key);
-        (key, (source, values))
+        (key, (source, source, values))
       }),
     );
   }
@@ -1878,7 +1930,7 @@ class EagerDir{
   fun getAllDataIter(
     context: mutable Context,
     key: BaseName,
-  ): mutable Iterator<(Tick, Source, Array<File>)> {
+  ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
     this.unsafeGetAllDataIter(key)

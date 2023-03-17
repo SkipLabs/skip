@@ -402,15 +402,8 @@ class Evaluator{options: Options, user: ?UserFile} {
           selectDir.dirName,
           sinkDirName,
           (context, _writer, key, valueIter) ~> {
-            entries = Vector[
-              (
-                key,
-                (
-                  SKFS.Path::create(selectDir.dirName, key),
-                  valueIter.collect(Array),
-                ),
-              ),
-            ];
+            src = SKFS.Path::create(selectDir.dirName, key);
+            entries = Vector[(key, (src, src, valueIter.collect(Array)))];
             inputDir = context.unsafeGetEagerDir(dir.dirName);
             inputDir.writeArraySourceMany(context, entries.iterator());
           },
@@ -578,12 +571,8 @@ class Evaluator{options: Options, user: ?UserFile} {
         deleteDir,
         sinkDirName,
         (context, _writer, key, valueIter) ~> {
-          entries = Vector[
-            (
-              key,
-              (SKFS.Path::create(deleteDir, key), valueIter.collect(Array)),
-            ),
-          ];
+          src = SKFS.Path::create(deleteDir, key);
+          entries = Vector[(key, (src, src, valueIter.collect(Array)))];
           inputDir = context.unsafeGetEagerDir(dir.dirName);
           inputDir.writeArraySourceMany(context, entries.iterator());
         },
@@ -649,8 +638,9 @@ class Evaluator{options: Options, user: ?UserFile} {
       (context, writer, key, rowIter) ~> {
         entries = mutable Vector[];
         dir = context.unsafeGetEagerDir(inputDir.dirName);
+        writerPath = SKFS.Path(selectDir.dirName, SKFS.IID(SKFS.genSym(0)));
         for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          entries.push((key, (source.path(), Array<SKFS.File>[])));
+          entries.push((key, (source.path(), writerPath, Array<SKFS.File>[])));
         };
         dir.writeArraySourceMany(context, entries.iterator());
         if (select.sets.isEmpty()) return void;
@@ -869,7 +859,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     for (row in rows) {
       key = RowKey(row, kinds);
       source = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0)));
-      !newDir = newDir.writeEntry(context, source, key, Array[row]);
+      !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
     };
     context.setDir(newDir.dirName, newDir);
   }
@@ -886,7 +876,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     for (row in rows) {
       start = context.tick;
       vcontext = context.mclone();
-      !newDir = newDir.writeEntry(vcontext, source, key, Array[row]);
+      !newDir = newDir.writeEntry(vcontext, source, source, key, Array[row]);
       vcontext.setDir(newDir.dirName, newDir);
       vcontext.update();
       vcontext.notifyAll(start);
@@ -918,7 +908,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       };
       key = RowKey(row, kinds);
       source = SKFS.Path(dir.dirName, key);
-      !newDir = newDir.writeEntry(context, source, key, Array[row]);
+      !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
       time = row.getInt(0).fromSome();
 
       for (kv in newDir.unsafeGetFileIter()) {
@@ -930,7 +920,13 @@ class Evaluator{options: Options, user: ?UserFile} {
           break void;
         };
         minSource = SKFS.Path(dir.dirName, minKey);
-        !newDir = newDir.writeEntry(context, minSource, minKey, Array[]);
+        !newDir = newDir.writeEntry(
+          context,
+          minSource,
+          source,
+          minKey,
+          Array[],
+        );
         void
       };
 
@@ -1668,8 +1664,8 @@ fun importNext(
         entries = mutable Vector[];
         for (key in changedKeys) {
           for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
-            (_, source, values) = srcValue;
-            entries.push((key, (source.path(), values)));
+            (_, source, writer, values) = srcValue;
+            entries.push((key, (source.path(), writer.path(), values)));
           }
         };
         updates![targetDirName] = (isReset, changedKeys, dir, version, entries)
@@ -1678,7 +1674,7 @@ fun importNext(
     }
   };
   for (targetDirName => src in updates) {
-    (isReset, changedKeys, _dir, _, entries) = src;
+    (isReset, changedKeys, dir, _, entries) = src;
     targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
     | None() -> invariant_violation("Directory should have been created")
     | Some(inputDir) ->
@@ -1687,7 +1683,8 @@ fun importNext(
         entries.iterator(),
       );
       if (isReset) {
-        !inputDir = inputDir.reset(targetCtx, changedKeys);
+        writerPath = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0)));
+        !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
       };
       targetCtx.setDir(inputDir.dirName, inputDir)
     }
