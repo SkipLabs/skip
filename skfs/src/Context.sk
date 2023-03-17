@@ -553,12 +553,8 @@ mutable class Context{
         };
         dir.unsafeIterKeys((key, _time) -> {
           values = dir.getArrayRaw(key).collect(Array);
-          !preDir = preDir.writeEntry(
-            this,
-            Path::create(preDir.dirName, key),
-            key,
-            values,
-          );
+          source = Path::create(preDir.dirName, key);
+          !preDir = preDir.writeEntry(this, source, source, key, values);
         });
         this.setDir(preDir.dirName, preDir);
         updateDirtyReaders(this, Path::create(preDirName.tag(), DirTag()));
@@ -567,15 +563,12 @@ mutable class Context{
         (isReset, changes) = dir.getChangesAfter(this.tick.prev());
         for (key in changes) {
           values = dir.getArrayRaw(key).collect(Array);
-          !preDir = preDir.writeEntry(
-            this,
-            Path::create(preDir.dirName, key),
-            key,
-            values,
-          );
+          source = Path::create(preDir.dirName, key);
+          !preDir = preDir.writeEntry(this, source, source, key, values);
         };
         if (isReset) {
-          !preDir = preDir.reset(this, changes);
+          writerPath = SKFS.Path(preDir.dirName, SKFS.IID(SKFS.genSym(0)));
+          !preDir = preDir.reset(this, writerPath, changes);
         };
         this.setDir(preDir.dirName, preDir)
       }
@@ -1049,8 +1042,8 @@ fun import(
         entries = mutable Vector[];
         for (key in changedKeys) {
           for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
-            (_, source, values) = srcValue;
-            entries.push((key, (source.path(), values)));
+            (_, source, writer, values) = srcValue;
+            entries.push((key, (source.path(), writer.path(), values)));
           }
         };
         targetCtx.unsafeMaybeGetEagerDir(dir.dirName) match {
@@ -1064,7 +1057,8 @@ fun import(
             entries.iterator(),
           );
           if (isReset) {
-            !inputDir = inputDir.reset(targetCtx, changedKeys);
+            writerPath = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0)));
+            !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
           };
           targetCtx.setDir(inputDir.dirName, inputDir)
         }

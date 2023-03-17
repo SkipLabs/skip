@@ -415,8 +415,8 @@ fun getTable(
           for (srcValue in (context.unsafeGetEagerDir(
             oldDirName,
           )).unsafeGetAllDataIterAfter(limit, key)) {
-            (_, source, values) = srcValue;
-            entries.push((key, (source.path(), values)));
+            (_, source, writer, values) = srcValue;
+            entries.push((key, (source.path(), writer.path(), values)));
           };
           inputDir = context.unsafeGetEagerDir(nextName);
           inputDir.writeArraySourceMany(context, entries.iterator());

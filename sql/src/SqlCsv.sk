@@ -173,12 +173,13 @@ fun replayDiff(
   makeFun = (rows, reset, checkpoint) -> {
     origDir = context.unsafeGetEagerDir(table.dirName);
     Some((context, delta, _) ~> {
+      writer = SKFS.Path(table.dirName, SKFS.IID(SKFS.genSym(0)));
       entries = mutable Vector[];
       dir = origDir;
       for (row in rows) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
         for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          entries.push((key, (source.path(), Array<SKFS.File>[])));
+          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
         };
       };
       if (!entries.isEmpty()) {
@@ -193,19 +194,14 @@ fun replayDiff(
           .filter(row -> row.repeat != 0)
           .map(row -> {
             (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
-            (
-              (k : SKFS.BaseName),
-              (
-                SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0))),
-                (v : Array<SKFS.File>),
-              ),
-            )
+            ((k : SKFS.BaseName), (writer, writer, (v : Array<SKFS.File>)))
           }),
       );
 
       if (reset) {
         !dir = dir.reset(
           context,
+          writer,
           rows
             .iterator()
             .filter(row -> row.repeat != 0)
