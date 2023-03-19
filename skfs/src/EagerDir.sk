@@ -696,11 +696,10 @@ class EagerDir{
   fun purge(context: mutable Context): this {
     limit = Tick(context.tick.value - 1000);
     fixedOld = this.purgeOld();
-    tick = context.tick;
     fixedData = this.purgeData(limit);
     context.!purgeLimit = Some(limit);
     this with {
-      tombLimit => Some(tick),
+      tombLimit => Some(limit),
       data => DataMap::empty(),
       old => SortedMap[],
       fixedData,
