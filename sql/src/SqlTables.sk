@@ -242,19 +242,7 @@ fun getSubsDirs(
           composedFilter = accessFilter(context);
           (file: SKFS.BaseName) -> {
             rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
-            // filter updates that are unambiguously from the ignored source:
-            // 1. all non ignored source updates are tombstones
-            // 2. the ignored source update is not a tombstone
-            existsNonTombstoneFromIgnored = false;
-            updateIsFromIgnoredSource = for ((_tick, src, _writer, files) in rows) {
-              if (src == ignoredSrc) {
-                if (files.isEmpty()) break false;
-                !existsNonTombstoneFromIgnored = true
-              } else if (!files.isEmpty()) break false;
-            } else {
-              existsNonTombstoneFromIgnored
-            };
-            !updateIsFromIgnoredSource && composedFilter(file)
+            !updateIsFromIgnoredSource(ignoredSrc, rows) && composedFilter(file)
           }
         }
       };
@@ -273,6 +261,33 @@ fun getSubsDirs(
     },
   );
   (input, output)
+}
+
+fun updateIsFromIgnoredSource(
+  ignoredSrc: SKFS.Source,
+  rows: Array<(SKFS.Tick, SKFS.Source, SKFS.Source, Array<SKFS.File>)>,
+): Bool {
+  maxTick = SKFS.Tick(0);
+  singleNonTomb: ?(SKFS.Tick, SKFS.Source) = None();
+
+  for ((tick, _origSrc, src, files) in rows) {
+    !maxTick = max(maxTick, tick);
+
+    if (!files.isEmpty()) {
+      // more than one non-tomb cannot be a replication update
+      if (singleNonTomb is Some _) return false;
+      !singleNonTomb = Some((tick, src));
+    };
+  };
+
+  singleNonTomb match {
+  | None() -> // all are tombs
+    rows.all(row -> {
+      (tick, _, src, _) = row;
+      tick != maxTick || src == ignoredSrc
+    })
+  | Some((tick, src)) -> tick == maxTick && src == ignoredSrc
+  }
 }
 
 /*****************************************************************************/
