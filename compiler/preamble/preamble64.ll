@@ -42,6 +42,7 @@ declare i8* @SKIP_Float_toString(double)
 declare double @SKIP_String__toFloat_raw(i8*)
 declare void @SKIP_FileSystem_appendTextFile(i8*, i8*)
 declare i8* @SKIP_System_subprocess(i8*)
+declare void @llvm.debugtrap() nounwind
 
 ; LLVM
 
@@ -127,6 +128,7 @@ define void @SKIP_Obstack_store(i8** %obj, i8* %val) {
 
 ; Function Attrs: alwaysinline nounwind uwtable
 define void @SKIP_debug_break() {
+  tail call void @llvm.debugtrap()
   ret void
 }
 
