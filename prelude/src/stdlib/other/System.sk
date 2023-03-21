@@ -205,12 +205,12 @@ const print_stack_on_invariant_violation: Bool = false;
 
 @no_inline
 fun invariant_violation<T>(msg: String): T {
-  debug_break();
   ex = InvariantViolation(msg);
   if (print_stack_on_invariant_violation) {
     print_last_exception_stack_trace_and_exit(ex);
   };
   print_error("Invariant violation: " + msg);
+  debug_break();
   throw ex;
 }
 

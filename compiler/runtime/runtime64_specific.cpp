@@ -19,13 +19,66 @@
 #include <linux/limits.h>
 #include <pthread.h>
 
+// TODO: Only include in debug mode.
+#include <backtrace.h>
+
+namespace {
+static int
+print_callback (void */* data */, uintptr_t pc, const char *filename, int lineno,
+		const char *function)
+{
+  fprintf(stderr, "0x%lx %s\n\t%s:%d\n",
+          (unsigned long) pc,
+          function == NULL ? "???" : function,
+          filename == NULL ? "???" : filename,
+          lineno);
+  return 0;
+}
+
+static void
+error_callback (void */* data */, const char *msg, int errnum)
+{
+  fprintf(stderr, "libbacktrace: %s", msg);
+  if (errnum > 0)
+    fprintf(stderr, ": %s", strerror(errnum));
+  fputc('\n', stderr);
+}
+} // namespace
+
 namespace skip {
 struct SkipException : std::exception {
   explicit SkipException(void* exc) : m_skipException(exc) {}
 
   void* m_skipException;
 };
+
+void printStackTrace() {
+  struct backtrace_state *state = backtrace_create_state(nullptr, 0, error_callback, nullptr);
+  if (state == nullptr) {
+    fprintf(stderr, "libbacktrace: Failed to initialize backtrace\n");
+    return;
+  }
+
+  backtrace_full(state, 3, print_callback, error_callback, nullptr);
 }
+}
+
+namespace {
+void terminate() {
+  // TODO: Only print backtrace in debug mode.
+  try {
+    std::exception_ptr eptr = std::current_exception();
+    if (eptr) {
+      std::rethrow_exception(eptr);
+    }
+  } catch (std::exception& e) {
+    std::cerr << "*** Uncaught exception of type " << typeid(e).name() << ": "
+              << e.what() << std::endl;
+  }
+  std::cerr << "*** Stack trace:" << std::endl;
+  skip::printStackTrace();
+}
+} // namespace
 
 extern "C" {
 
@@ -163,6 +216,7 @@ void __attribute__ ((constructor)) premain()
 int main(int pargc, char** pargv) {
   argc = pargc;
   argv = pargv;
+  std::set_terminate(terminate);
   SKIP_memory_init(pargc, pargv);
   SKIP_initializeSkip();
   sk_persist_consts();

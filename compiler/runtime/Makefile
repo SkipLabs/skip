@@ -50,12 +50,18 @@ libskip_runtime32.bc: $(BCFILES32)
 libskip_runtime64.a: $(OFILES) runtime64_specific.o $(ONATIVE_FILES)
 	$(AR) rcs $@ $^
 
+.PHONY: libbacktrace
+libbacktrace:
+	(cd libbacktrace && ./configure)
+	$(MAKE) -C libbacktrace
+
 runtime64_specific.o: runtime64_specific.cpp
-	clang++ $(OLEVEL) -o $@ -c $<
+	clang++ $(OLEVEL) -g -o $@ -c -Ilibbacktrace/ $<
 
 %.o: %.c
-	clang $(CC64FLAGS) -o $@ -c $<
+	clang $(CC64FLAGS) -g -o $@ -c $<
 
 .PHONY: clean
 clean:
 	rm -f *.o *.bc magic.c libskip_runtime64.a
+	$(MAKE) -C libbacktrace clean

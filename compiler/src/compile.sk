@@ -267,6 +267,8 @@ fun link(llFile: String, config: Config.Config): void {
   } else {
     // TODO: Make the runtime a normal dependency.
     runtime = Path.join(basePath, "lib", "libskip_runtime64.a");
+    // TODO: Link libbacktrace only when building with a debug/dev profile?
+    libbacktrace = Path.join(basePath, "lib", "libbacktrace.a");
     runShell(
       Array[
         "clang++",
@@ -278,6 +280,7 @@ fun link(llFile: String, config: Config.Config): void {
         "-o",
         config.mainConfig.output,
         runtime,
+        libbacktrace,
         "-lrt",
         "-lpthread",
       ],
