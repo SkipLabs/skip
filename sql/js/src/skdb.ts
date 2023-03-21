@@ -825,11 +825,11 @@ export class SKDB {
         let page = pages[j]!;
         let start = page * this.pageSize;
         let end = page * this.pageSize + this.pageSize;
+        let content = await this.copyPage(start, end);
         if(this.transaction != transaction) {
           resolve(false);
           return;
         }
-        let content = await this.copyPage(start, end);
         copiedPages.push({ pageid: page, content });
       }
       let store = tx.objectStore(this.storeName);
