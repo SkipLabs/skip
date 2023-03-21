@@ -5,6 +5,10 @@ commands:
     description: "Setup skip toolchain"
     steps:
       - run:
+          name: Fetch submodules
+          command: |
+            git submodule update --init --recursive
+      - run:
           name: Build compiler
           command: |
             cd compiler && make STAGE=0 && sudo make install STAGE=0
