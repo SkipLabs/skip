@@ -4,8 +4,6 @@ skdb=../../build/skdb
 cp ../js/skdb.wasm .
 node=./node_modules/node/bin/node
 
-npm install
-
 run_compare_test () {
   echo -en "$1:\t"
   tmpfile1=$(mktemp /tmp/testfile.XXXXXX)

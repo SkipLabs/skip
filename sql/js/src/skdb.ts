@@ -572,7 +572,8 @@ export class SKDB {
   private db: IDBDatabase | null = null;
   private dirtyPagesMap: Array<number> = [];
   private dirtyPages: Array<number> = [];
-  private working: number = 0;
+  private transaction: number = 0;
+  private syncIsRunning: boolean = false;
   private mirroredTables: Map<string, number> = new Map();
   // @ts-expect-error
   private exports: WasmExports;
@@ -781,34 +782,6 @@ export class SKDB {
     };
   }
 
-  private storePages(): void {
-    if (this.working == 0 && this.dirtyPages.length != 0) {
-      this.working++;
-      let pages = this.dirtyPages;
-      this.dirtyPages = [];
-      this.dirtyPagesMap = [];
-      let db = this.db;
-      if(db == null) {
-        return;
-      }
-      let tx = db.transaction(this.storeName, "readwrite");
-      let store = tx.objectStore(this.storeName);
-      for (let j = 0; j < pages.length; j++) {
-        let page = pages[j]!;
-        let memory = this.exports.memory.buffer;
-        let start = page * this.pageSize;
-        let end = page * this.pageSize + this.pageSize;
-        let content = memory.slice(start, end);
-        store.put({ pageid: page, content });
-      }
-      tx.onerror = (err) => console.log("Error sync db: " + err);
-      tx.oncomplete = () => {
-        this.working--;
-        this.storePages();
-      };
-    }
-  }
-
   private runAddRoot(rootName: string, funId: number, arg: any): void {
     this.args = [];
     this.stdin = "";
@@ -821,12 +794,73 @@ export class SKDB {
     );
   }
 
+  private async copyPage(start: number, end: number): Promise<ArrayBuffer> {
+    let memory = this.exports.memory.buffer;
+    return memory.slice(start, end);
+  }
+
+  private async storePages(transaction: number): Promise<boolean> {
+    return new Promise((resolve, reject) => (async () => {
+      if(this.db == null) {
+        resolve(true);
+      }
+
+      let pages = this.dirtyPages;
+      let db = this.db!;
+      let tx = db.transaction(this.storeName, "readwrite");
+      tx.onabort = (err) => {
+        resolve(false);
+      }
+      tx.onerror = (err) => {
+        console.log("Error sync db: " + err);
+        resolve(false);
+      }
+      tx.oncomplete = () => {
+        this.dirtyPages = [];
+        this.dirtyPagesMap = [];
+        resolve(true);
+      }
+      let copiedPages = new Array();
+      for (let j = 0; j < pages.length; j++) {
+        let page = pages[j]!;
+        let start = page * this.pageSize;
+        let end = page * this.pageSize + this.pageSize;
+        if(this.transaction != transaction) {
+          resolve(false);
+          return;
+        }
+        let content = await this.copyPage(start, end);
+        copiedPages.push({ pageid: page, content });
+      }
+      let store = tx.objectStore(this.storeName);
+      for(let j = 0; j < copiedPages.length; j++) {
+        store.put(copiedPages[j]!);
+      }
+    })());
+
+  }
+
+  private async storePagesLoop() {
+    if(this.syncIsRunning) return;
+    this.syncIsRunning = true;
+    let transaction = -1;
+    while(transaction < this.transaction) {
+      transaction = this.transaction;
+      while(!await this.storePages(transaction)) {
+        if(this.transaction != transaction) break;
+      }
+    }
+    this.syncIsRunning = false;
+  }
+
   runLocal(new_args: Array<string>, new_stdin: string): string {
     console.assert(this.nbrInitPages >= 0);
     this.args = new_args;
     this.stdin = new_stdin;
     this.stdout = new Array();
     this.current_stdin = 0;
+    this.transaction++;
+
     this.exports.skip_main();
 
     while (true) {
@@ -847,7 +881,7 @@ export class SKDB {
       }
     }
 
-    this.storePages();
+    this.storePagesLoop();
     return this.stdout.join("");
   }
 
