@@ -82,6 +82,7 @@ echo ""
 
 ./test_idempotence.sh
 ./test_no_acl_replication.sh
+./test_cyclic_replication.sh
 # TODO: these are on PR #118, need to enable them when that lands
 # ./test_privacy.sh
 # ./test_replication.sh

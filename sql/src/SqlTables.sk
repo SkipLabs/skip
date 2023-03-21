@@ -109,6 +109,7 @@ class SubRequestFile(
   cmd: SKFS.CmdKind,
   sessionID: Int,
   user: ?String,
+  ignoreSource: ?Int,
 ) extends SKFS.File
 
 fun getSubsDirs(
@@ -191,7 +192,7 @@ fun getSubsDirs(
           false
         }
       };
-      (userFile, matchesGroup, filter) = request.user match {
+      (userFile, matchesGroup, accessFilter) = request.user match {
       | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
       | Some(userName) ->
         userFile = SKSQL.UserFile::create(context, userName);
@@ -230,6 +231,21 @@ fun getSubsDirs(
           )
         }
       };
+      filter = request.ignoreSource match {
+      | None() -> accessFilter
+      | Some(inputSrc) ->
+        context ~> {
+          tdir = context.unsafeGetEagerDir(dirDescr.dirName);
+          ignoredSrc = SKFS.Source::create(
+            SKFS.Path(dirDescr.dirName, SKFS.IID(inputSrc)),
+          );
+          composedFilter = accessFilter(context);
+          (file: SKFS.BaseName) -> {
+            rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
+            !updateIsFromIgnoredSource(ignoredSrc, rows) && composedFilter(file)
+          }
+        }
+      };
       context.subscribe(
         context,
         edir.dirName,
@@ -245,6 +261,33 @@ fun getSubsDirs(
     },
   );
   (input, output)
+}
+
+fun updateIsFromIgnoredSource(
+  ignoredSrc: SKFS.Source,
+  rows: Array<(SKFS.Tick, SKFS.Source, SKFS.Source, Array<SKFS.File>)>,
+): Bool {
+  maxTick = SKFS.Tick(0);
+  singleNonTomb: ?(SKFS.Tick, SKFS.Source) = None();
+
+  for ((tick, _origSrc, src, files) in rows) {
+    !maxTick = max(maxTick, tick);
+
+    if (!files.isEmpty()) {
+      // more than one non-tomb cannot be a replication update
+      if (singleNonTomb is Some _) return false;
+      !singleNonTomb = Some((tick, src));
+    };
+  };
+
+  singleNonTomb match {
+  | None() -> // all are tombs
+    rows.all(row -> {
+      (tick, _, src, _) = row;
+      tick != maxTick || src == ignoredSrc
+    })
+  | Some((tick, src)) -> tick == maxTick && src == ignoredSrc
+  }
 }
 
 /*****************************************************************************/

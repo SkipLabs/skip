@@ -60,6 +60,10 @@ class Skdb(val name: String, private val dbPath: String) {
     return blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath, format.flag), stmts)
   }
 
+  fun uid(): ProcessOutput {
+    return blockingRun(ProcessBuilder(SKDB_PROC, "uid", "--data", dbPath))
+  }
+
   fun dumpTable(table: String, suffix: String): ProcessOutput {
     return blockingRun(
         ProcessBuilder(SKDB_PROC, "dump-table", table, "--data", dbPath, "--table-suffix", suffix))
@@ -79,10 +83,21 @@ class Skdb(val name: String, private val dbPath: String) {
   fun writeCsv(
       user: String,
       table: String,
+      replicationId: String,
       callback: (String) -> Unit,
       closed: () -> Unit,
   ): Process {
-    val pb = ProcessBuilder(SKDB_PROC, "write-csv", table, "--data", dbPath, "--user", user)
+    val pb =
+        ProcessBuilder(
+            SKDB_PROC,
+            "write-csv",
+            table,
+            "--data",
+            dbPath,
+            "--user",
+            user,
+            "--source",
+            replicationId)
 
     // TODO: for hacky debug
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -105,6 +120,7 @@ class Skdb(val name: String, private val dbPath: String) {
       user: String,
       table: String,
       since: Int,
+      replicationId: String,
       callback: (String) -> Unit,
       closed: () -> Unit,
   ): Process {
@@ -112,7 +128,16 @@ class Skdb(val name: String, private val dbPath: String) {
     val connection =
         blockingRun(
                 ProcessBuilder(
-                    SKDB_PROC, "subscribe", table, "--connect", "--data", dbPath, "--user", user))
+                    SKDB_PROC,
+                    "subscribe",
+                    table,
+                    "--connect",
+                    "--data",
+                    dbPath,
+                    "--user",
+                    user,
+                    "--ignore-source",
+                    replicationId))
             .getOrThrow()
     val pb =
         ProcessBuilder(
