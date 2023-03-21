@@ -37,16 +37,16 @@ class Reducer{
 } {
   static fun create(
     reallyRemove: Bool,
-    fixedData: FixedData<Array<File>>,
+    fixedData: FixedDataMap,
     reducer: IReducer,
   ): this {
     acc = mutable Vector[];
     modified = SortedMap[];
     current = mutable IntRef(0);
-    while (current.value < fixedData.size()) {
-      key = fixedData[current.value].key;
+    while (current.value < fixedData.data.size()) {
+      key = fixedData.data[current.value].key;
       iterator = static::makeCompactKeyIterator(
-        fixedData,
+        fixedData.data,
         key,
         current,
       ).iterator();
@@ -478,6 +478,138 @@ class DataMap{
   }
 }
 
+class FixedDataMap{data: FixedDir<Array<File>>, tombs: FixedDir<Source>} {
+  static fun create(
+    vec: mutable Vector<FixedRow<Array<File>>> = mutable Vector[],
+    tombs: mutable Vector<FixedRow<Source>> = mutable Vector[],
+  ): this {
+    static{data => FixedDir::create(vec), tombs => FixedDir::create(tombs)}
+  }
+
+  fun size(): Int {
+    this.data.size() + this.tombs.size()
+  }
+
+  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+    this.data.getChangesAfter(tick).union(this.tombs.getChangesAfter(tick))
+  }
+
+  fun getIterAll(): mutable Iterator<
+    (Tick, Source, Source, BaseName, Array<File>),
+  > {
+    iter1 = this.data.data.iterator();
+    iter2 = this.tombs.data.iterator();
+    left = iter1.next();
+    right = iter2.next();
+    loop {
+      (left, right) match {
+      | (None(), None()) -> break void
+      | (Some(x), None()) ->
+        !left = iter1.next();
+        yield (x.tag.current, x.value.i0, x.value.i0, x.key, x.value.i1)
+      | (None(), Some(y)) ->
+        !right = iter2.next();
+        yield (y.tag.current, y.value.i0, y.value.i1, y.key, Array[])
+      | (Some(x), Some(y)) ->
+        if ((x.key, x.value.i0) < (y.key, y.value.i0)) {
+          !left = iter1.next();
+          yield (x.tag.current, x.value.i0, x.value.i0, x.key, x.value.i1)
+        } else if ((x.key, x.value.i0) > (y.key, y.value.i0)) {
+          !right = iter2.next();
+          yield (y.tag.current, y.value.i0, y.value.i1, y.key, Array[])
+        } else {
+          invariant_violation("Found a non-empty tomb (getIterAll)");
+        }
+      }
+    }
+  }
+
+  fun getIter(
+    key: BaseName,
+  ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
+    iter1 = this.data.getIter(key);
+    iter2 = this.tombs.getIter(key);
+    left = iter1.next();
+    right = iter2.next();
+    loop {
+      (left, right) match {
+      | (None(), None()) -> break void
+      | (Some(x), None()) ->
+        !left = iter1.next();
+        yield (x.i0, x.i1, x.i1, x.i2)
+      | (None(), Some(y)) ->
+        !right = iter2.next();
+        yield (y.i0, y.i1, y.i2, Array[])
+      | (Some(x), Some(y)) ->
+        if (x.i1 < y.i1) {
+          !left = iter1.next();
+          yield (x.i0, x.i1, x.i1, x.i2)
+        } else if (x.i1 > y.i1) {
+          !right = iter2.next();
+          yield (y.i0, y.i1, y.i2, Array[])
+        } else {
+          invariant_violation("Found a non-empty tomb (getIter)");
+        }
+      }
+    }
+  }
+
+  fun getIterAfter(
+    tick: Tick,
+    key: BaseName,
+  ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
+    iter1 = this.data.getIterAfter(tick, key);
+    iter2 = this.tombs.getIterAfter(tick, key);
+    left = iter1.next();
+    right = iter2.next();
+    loop {
+      (left, right) match {
+      | (None(), None()) -> break void
+      | (Some(x), None()) ->
+        !left = iter1.next();
+        yield (x.i0, x.i1, x.i1, x.i2)
+      | (None(), Some(y)) ->
+        !right = iter2.next();
+        yield (y.i0, y.i1, y.i2, Array[])
+      | (Some(x), Some(y)) ->
+        if (x.i1 < y.i1) {
+          !left = iter1.next();
+          yield (x.i0, x.i1, x.i1, x.i2)
+        } else if (x.i1 > y.i1) {
+          !right = iter2.next();
+          yield (y.i0, y.i1, y.i2, Array[])
+        } else {
+          invariant_violation("Found a non-empty tomb (getIterAfter)");
+        }
+      }
+    }
+  }
+}
+
+mutable class FixedDataMapIterator<T> private {
+  iter: mutable Iterator<T>,
+  mutable currentOpt: ?T = None(),
+} {
+  static fun create(iter: mutable Iterator<T>): mutable this {
+    mutable static{currentOpt => iter.next(), iter => iter}
+  }
+
+  readonly fun isEnd(): Bool {
+    this.currentOpt is None _
+  }
+
+  readonly fun current(): T {
+    this.currentOpt match {
+    | None() -> invariant_violation("Cannot access current")
+    | Some(x) -> x
+    }
+  }
+
+  mutable fun next(): void {
+    this.!currentOpt = this.iter.next();
+  }
+}
+
 /*****************************************************************************/
 /* An Eager Directory. */
 /*****************************************************************************/
@@ -486,7 +618,7 @@ class EagerDir{
   time: Time,
   dirName: DirName,
   input: Bool,
-  fixedData: FixedData<Array<File>>,
+  fixedData: FixedDataMap,
   totalSize: Int,
   creator: ?ArrowKey,
   reallyRemove: Bool,
@@ -634,21 +766,31 @@ class EagerDir{
     FixedSingle(acc.toArray());
   }
 
-  private fun purgeData(tick: Tick): FixedData<Array<SKFS.File>> {
-    data = this.flattenData(tick);
-    FixedDir::create(data)
-  }
-
-  private fun flattenData(
-    limit: Tick,
-  ): mutable Vector<FixedRow<Array<SKFS.File>>> {
-    current = 0;
-    acc = mutable Vector[];
-    lastOpt: ?FixedRow<Array<File>> = None();
+  private fun flattenData(limit: Tick): FixedDataMap {
+    fixedIter = FixedDataMapIterator::create(this.fixedData.getIterAll());
+    data = mutable Vector[];
+    tombs = mutable Vector[];
+    lastOpt: ?(Tick, Source, Source, BaseName, Array<File>) = None();
 
     addHelper = lastRow -> {
-      if (lastRow.value.i1.size() > 0 || lastRow.tag.current > limit) {
-        acc.push(lastRow)
+      if (lastRow.i4.size() > 0 || lastRow.i0 > limit) {
+        if (lastRow.i4.size() > 0) {
+          data.push(
+            FixedRow(
+              lastRow.i3,
+              (lastRow.i1, lastRow.i4),
+              TickRange::create(lastRow.i0),
+            ),
+          );
+        } else {
+          tombs.push(
+            FixedRow(
+              lastRow.i3,
+              (lastRow.i1, lastRow.i2),
+              TickRange::create(lastRow.i0),
+            ),
+          );
+        }
       }
     };
 
@@ -656,10 +798,7 @@ class EagerDir{
       lastOpt match {
       | Some(
         lastRow,
-      ) if (
-        fixedRow.key != lastRow.key ||
-        fixedRow.value.i0 != lastRow.value.i0
-      ) ->
+      ) if (fixedRow.i3 != lastRow.i3 || fixedRow.i1 != lastRow.i1) ->
         addHelper(lastRow)
       | _ -> void
       };
@@ -667,46 +806,39 @@ class EagerDir{
     };
 
     for (key => _ in this.data) {
-      while (
-        current < this.fixedData.size() &&
-        this.fixedData[current].key < key
-      ) {
-        add(this.fixedData[current]);
-        !current = current + 1;
+      while (!fixedIter.isEnd() && fixedIter.current().i3 < key) {
+        add(fixedIter.current());
+        fixedIter.next();
       };
       map = this.data.maybeGet(key).fromSome();
       for (tickSource => values in map) {
-        // TODO: should persist writer in the fixed data when this is a tomb
-        (tick, source, _writer) = tickSource;
+        (tick, source, writer) = tickSource;
         while (
-          current < this.fixedData.size() &&
-          this.fixedData[current].key == key &&
-          this.fixedData[current].value.i0 < source
+          !fixedIter.isEnd() &&
+          fixedIter.current().i3 == key &&
+          fixedIter.current().i1 < source
         ) {
-          add(this.fixedData[current]);
-          !current = current + 1;
+          add(fixedIter.current());
+          fixedIter.next();
         };
-        add(FixedRow(key, (source, values), TickRange::create(tick)));
+        add((tick, source, writer, key, values));
         while (
-          current < this.fixedData.size() &&
-          this.fixedData[current].key == key &&
-          this.fixedData[current].value.i0 == source
+          !fixedIter.isEnd() &&
+          fixedIter.current().i3 == key &&
+          fixedIter.current().i1 == source
         ) {
-          !current = current + 1;
+          fixedIter.next();
         };
       };
-      while (
-        current < this.fixedData.size() &&
-        this.fixedData[current].key == key
-      ) {
-        add(this.fixedData[current]);
-        !current = current + 1;
+      while (!fixedIter.isEnd() && fixedIter.current().i3 == key) {
+        add(fixedIter.current());
+        fixedIter.next();
       };
     };
 
-    while (current < this.fixedData.size()) {
-      add(this.fixedData[current]);
-      !current = current + 1;
+    while (!fixedIter.isEnd()) {
+      add(fixedIter.current());
+      fixedIter.next();
     };
 
     lastOpt match {
@@ -714,13 +846,13 @@ class EagerDir{
     | Some(lastRow) -> addHelper(lastRow)
     };
 
-    acc
+    FixedDataMap::create(data, tombs)
   }
 
   fun purge(context: mutable Context): this {
     limit = Tick(context.tick.value - 1000);
     fixedOld = this.purgeOld();
-    fixedData = this.purgeData(limit);
+    fixedData = this.flattenData(limit);
     context.!purgeLimit = Some(limit);
     this with {
       tombLimit => Some(limit),
@@ -768,14 +900,14 @@ class EagerDir{
     acc: mutable Vector<FixedRow<Array<File>>>,
     current: mutable IntRef,
   ): void {
-    key = parent.fixedData[current.value].key;
+    key = parent.fixedData.data[current.value].key;
     // fast path
     if (
       parent.reducer is None() &&
-      current.value + 1 < parent.fixedData.size() &&
-      parent.fixedData[current.value + 1].key != key
+      current.value + 1 < parent.fixedData.data.size() &&
+      parent.fixedData.data[current.value + 1].key != key
     ) {
-      fixedFiles = parent.fixedData[current.value].value.i1.iterator();
+      fixedFiles = parent.fixedData.data[current.value].value.i1.iterator();
       static::mapRow(
         context,
         acc,
@@ -792,10 +924,10 @@ class EagerDir{
 
     valueAcc = mutable Vector[];
     while (
-      current.value < parent.fixedData.size() &&
-      parent.fixedData[current.value].key == key
+      current.value < parent.fixedData.data.size() &&
+      parent.fixedData.data[current.value].key == key
     ) {
-      for (elt in parent.fixedData[current.value].value.i1) {
+      for (elt in parent.fixedData.data[current.value].value.i1) {
         valueAcc.push(elt);
       };
       current.incr();
@@ -844,9 +976,9 @@ class EagerDir{
       };
       while (
         current.value <= currentEnd &&
-        parent.fixedData[current.value].key < key
+        parent.fixedData.data[current.value].key < key
       ) {
-        fixedKey = parent.fixedData[current.value].key;
+        fixedKey = parent.fixedData.data[current.value].key;
         static::fixedMapData(
           context,
           oldVec,
@@ -863,7 +995,7 @@ class EagerDir{
       };
       while (
         current.value <= currentEnd &&
-        parent.fixedData[current.value].key == key
+        parent.fixedData.data[current.value].key == key
       ) {
         current.incr();
       };
@@ -885,7 +1017,7 @@ class EagerDir{
     };
 
     while (current.value <= currentEnd) {
-      fixedKey = parent.fixedData[current.value].key;
+      fixedKey = parent.fixedData.data[current.value].key;
       static::fixedMapData(context, oldVec, parent, childName, f, acc, current);
       !size = size + 1;
       if (shouldGC(obstack) != 0) {
@@ -911,18 +1043,21 @@ class EagerDir{
     current = rangeOpt match {
     | None() -> 0
     | Some(range) ->
-      pos = parent.fixedData.getPos(range.start);
+      pos = parent.fixedData.data.getPos(range.start);
       if (pos < 0) 0 else pos
     };
     end = rangeOpt.map(r -> r.end);
     currentEnd = end match {
-    | None() -> parent.fixedData.size() - 1
+    | None() -> parent.fixedData.data.size() - 1
     | Some(key) ->
-      pos = parent.fixedData.getPos(key);
-      if (pos < parent.fixedData.size() && parent.fixedData[pos].key != key) {
+      pos = parent.fixedData.data.getPos(key);
+      if (
+        pos < parent.fixedData.data.size() &&
+        parent.fixedData.data[pos].key != key
+      ) {
         !pos = pos - 1;
       };
-      min(parent.fixedData.size() - 1, pos)
+      min(parent.fixedData.data.size() - 1, pos)
     };
 
     loop {
@@ -1113,7 +1248,7 @@ class EagerDir{
         }
       };
 
-      fixedData = FixedDir::create(acc);
+      fixedData = FixedDataMap::create(acc);
       time = context.timeStamp();
       totalSize = acc.size();
       reducer = reducerOpt.map(ireducer ->
@@ -1148,7 +1283,7 @@ class EagerDir{
           );
           !data = data.set(fixedRow.tag, fixedRow.key, map);
         };
-        (FixedDir::create(mutable Vector[]), data)
+        (FixedDataMap::create(), data)
       } else {
         (fixedData, DataMap::empty())
       };
@@ -1211,24 +1346,18 @@ class EagerDir{
     this.data.maybeGet(key) match {
     | None() ->
       fixedIter = this.fixedData.getIterAfter(limit, key);
-      for (rows in fixedIter) {
-        // TODO: yield the writer once this information is in fixed data
-        yield (rows.i0, rows.i1, rows.i1, rows.i2);
+      for (row in fixedIter) {
+        yield row
       }
     | Some(modified) ->
-      fixed = FixedDataIterator::create(
+      fixed = FixedDataMapIterator::create(
         this.fixedData.getIterAfter(limit, key),
       );
 
       for (tickSourceWriterFiles in modified.itemsAfter(limit)) {
         (tick, source, writer, files) = tickSourceWriterFiles;
         while (!fixed.isEnd() && fixed.current().i1 < source) {
-          yield (
-            fixed.current().i0,
-            fixed.current().i1,
-            fixed.current().i1, // TODO:
-            fixed.current().i2,
-          );
+          yield fixed.current();
           fixed.next();
         };
         while (!fixed.isEnd() && fixed.current().i1 == source) {
@@ -1237,12 +1366,7 @@ class EagerDir{
         yield (tick, source, writer, files);
       };
       while (!fixed.isEnd()) {
-        yield (
-          fixed.current().i0,
-          fixed.current().i1,
-          fixed.current().i1, // TODO:
-          fixed.current().i2,
-        );
+        yield fixed.current();
         fixed.next();
       }
     }
@@ -1254,22 +1378,16 @@ class EagerDir{
     fixedIter = this.fixedData.getIter(key);
     this.data.maybeGet(key) match {
     | None() ->
-      for (rows in fixedIter) {
-        // TODO:
-        yield (rows.i0, rows.i1, rows.i1, rows.i2);
+      for (row in fixedIter) {
+        yield row
       }
     | Some(modified) ->
-      fixed = FixedDataIterator::create(this.fixedData.getIter(key));
+      fixed = FixedDataMapIterator::create(this.fixedData.getIter(key));
 
       for (tickSourceWriter => files in modified) {
         (tick, source, writer) = tickSourceWriter;
         while (!fixed.isEnd() && fixed.current().i1 < source) {
-          yield (
-            fixed.current().i0,
-            fixed.current().i1,
-            fixed.current().i1, // TODO:
-            fixed.current().i2,
-          );
+          yield fixed.current();
           fixed.next();
         };
         while (!fixed.isEnd() && fixed.current().i1 == source) {
@@ -1278,12 +1396,7 @@ class EagerDir{
         yield (tick, source, writer, files);
       };
       while (!fixed.isEnd()) {
-        yield (
-          fixed.current().i0,
-          fixed.current().i1,
-          fixed.current().i1, // TODO:
-          fixed.current().i2,
-        );
+        yield fixed.current();
         fixed.next();
       }
     }
@@ -1296,19 +1409,19 @@ class EagerDir{
     this.data.maybeGet(key) match {
     | None() ->
       for (rows in fixedIter) {
-        if (rows.i2.size() > 0) {
-          yield rows;
+        if (rows.i3.size() > 0) {
+          yield (rows.i0, rows.i1, rows.i3);
         }
       }
     | Some(modified) ->
-      fixed = FixedDataIterator::create(this.fixedData.getIter(key));
+      fixed = FixedDataMapIterator::create(this.fixedData.getIter(key));
 
       for (sourceFilesTick in modified.map.itemsWithTick()) {
         (source, files, tickRange) = sourceFilesTick;
         tick = tickRange.current;
         while (!fixed.isEnd() && fixed.current().i1 < source) {
-          if (fixed.current().i2.size() > 0) {
-            yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+          if (fixed.current().i3.size() > 0) {
+            yield (fixed.current().i0, fixed.current().i1, fixed.current().i3);
           };
           fixed.next();
         };
@@ -1320,8 +1433,8 @@ class EagerDir{
         }
       };
       while (!fixed.isEnd()) {
-        if (fixed.current().i2.size() > 0) {
-          yield (fixed.current().i0, fixed.current().i1, fixed.current().i2);
+        if (fixed.current().i3.size() > 0) {
+          yield (fixed.current().i0, fixed.current().i1, fixed.current().i3);
         };
         fixed.next();
       }
@@ -1345,10 +1458,10 @@ class EagerDir{
 
   private fun getArraySourceKey(source: Source, key: BaseName): Array<File> {
     this.data.maybeGet(key) match {
-    | None() -> this.fixedData.getArraySourceKey(source, key).flatten()
+    | None() -> this.fixedData.data.getArraySourceKey(source, key).flatten()
     | Some(modified) ->
       modified.maybeGet(source) match {
-      | None() -> this.fixedData.getArraySourceKey(source, key).flatten()
+      | None() -> this.fixedData.data.getArraySourceKey(source, key).flatten()
       | Some(v) -> v
       }
     }
@@ -1489,10 +1602,9 @@ class EagerDir{
       return this;
     };
 
-    // disable purging temporarily
-    // if (!this.reallyRemove && (this.data.nbrEntries >= this.fixedData.size())) {
-    //   context.!toPurge = context.toPurge.set(this.dirName);
-    // };
+    if (!this.reallyRemove && (this.data.nbrEntries >= this.fixedData.size())) {
+      context.!toPurge = context.toPurge.set(this.dirName);
+    };
 
     totalSize = if (oldValues.size() == 0 && rvalues.size() > 0) {
       this.totalSize + 1
@@ -1508,13 +1620,9 @@ class EagerDir{
     };
 
     if (this.reallyRemove && rvalues.isEmpty()) {
-      invariant(
-        this.fixedData.size() == 0,
-        "No fixed data expected when really remove is on",
-      );
       !map = map.remove(origSource);
     } else {
-      isMasking = this.fixedData.getIterSourceKey(
+      isMasking = this.fixedData.data.getIterSourceKey(
         origSource,
         k,
       ).next() is Some _;
@@ -1523,10 +1631,6 @@ class EagerDir{
     };
 
     if (this.reallyRemove && map.isEmpty()) {
-      invariant(
-        this.fixedData.size() == 0,
-        "No fixed data expected when really remove is on",
-      );
       !this.data = this.data.remove(k);
     } else {
       tag = TickRange::create(context.tick);
@@ -1663,7 +1767,7 @@ class EagerDir{
   }
 
   fun unsafeIterKeys(f: (BaseName, Tick) -> void): void {
-    fixedData = this.fixedData;
+    fixedData = this.fixedData.data;
     current = 0;
     this.data.eachWithTick((newKey, tick) -> {
       while (current < fixedData.size() && fixedData[current].key < newKey) {
@@ -1681,9 +1785,12 @@ class EagerDir{
   }
 
   private fun getFixedFiles(idx: Int): mutable Iterator<File> {
-    key = this.fixedData[idx].key;
-    while (idx < this.fixedData.size() && this.fixedData[idx].key == key) {
-      fixedValues = this.fixedData[idx].value.i1;
+    key = this.fixedData.data[idx].key;
+    while (
+      idx < this.fixedData.data.size() &&
+      this.fixedData.data[idx].key == key
+    ) {
+      fixedValues = this.fixedData.data[idx].value.i1;
       if (this.reducer is None()) {
         for (elt in fixedValues) {
           yield elt;
@@ -1716,33 +1823,33 @@ class EagerDir{
     current = mutable IntRef(0);
     for (key => _ in this.data) {
       while (
-        current.value < this.fixedData.size() &&
-        this.fixedData[current.value].key < key
+        current.value < this.fixedData.data.size() &&
+        this.fixedData.data[current.value].key < key
       ) {
-        fixedKey = this.fixedData[current.value].key;
+        fixedKey = this.fixedData.data[current.value].key;
         fixedFiles = this.getFixedFiles(current.value);
         while (
-          current.value < this.fixedData.size() &&
-          this.fixedData[current.value].key == fixedKey
+          current.value < this.fixedData.data.size() &&
+          this.fixedData.data[current.value].key == fixedKey
         ) {
           current.incr();
         };
         yield (fixedKey, fixedFiles);
       };
       while (
-        current.value < this.fixedData.size() &&
-        this.fixedData[current.value].key == key
+        current.value < this.fixedData.data.size() &&
+        this.fixedData.data[current.value].key == key
       ) {
         current.incr();
       };
       yield (key, this.getIterRaw(key));
     };
-    while (current.value < this.fixedData.size()) {
-      fixedKey = this.fixedData[current.value].key;
+    while (current.value < this.fixedData.data.size()) {
+      fixedKey = this.fixedData.data[current.value].key;
       fixedFiles = this.getFixedFiles(current.value);
       while (
-        current.value < this.fixedData.size() &&
-        this.fixedData[current.value].key == fixedKey
+        current.value < this.fixedData.data.size() &&
+        this.fixedData.data[current.value].key == fixedKey
       ) {
         current.incr();
       };
@@ -1756,33 +1863,33 @@ class EagerDir{
     current = mutable IntRef(0);
     for (key => _ in this.data) {
       while (
-        current.value < this.fixedData.size() &&
-        this.fixedData[current.value].key < key
+        current.value < this.fixedData.data.size() &&
+        this.fixedData.data[current.value].key < key
       ) {
-        fixedKey = this.fixedData[current.value].key;
+        fixedKey = this.fixedData.data[current.value].key;
         fixedFiles = this.getFixedFiles(current.value);
         while (
-          current.value < this.fixedData.size() &&
-          this.fixedData[current.value].key == key
+          current.value < this.fixedData.data.size() &&
+          this.fixedData.data[current.value].key == key
         ) {
           current.incr();
         };
         yield (fixedKey, fixedFiles);
       };
       while (
-        current.value < this.fixedData.size() &&
-        this.fixedData[current.value].key == key
+        current.value < this.fixedData.data.size() &&
+        this.fixedData.data[current.value].key == key
       ) {
         current.incr();
       };
       yield (key, this.getIterRaw(key));
     };
-    while (current.value < this.fixedData.size()) {
-      fixedKey = this.fixedData[current.value].key;
+    while (current.value < this.fixedData.data.size()) {
+      fixedKey = this.fixedData.data[current.value].key;
       fixedFiles = this.getFixedFiles(current.value);
       while (
-        current.value < this.fixedData.size() &&
-        this.fixedData[current.value].key == fixedKey
+        current.value < this.fixedData.data.size() &&
+        this.fixedData.data[current.value].key == fixedKey
       ) {
         current.incr();
       };
@@ -1797,7 +1904,7 @@ class EagerDir{
   }
 
   fun keys(): SortedSet<BaseName> {
-    fixedData = this.fixedData;
+    fixedData = this.fixedData.data;
     current = 0;
     keys = SortedSet[];
     for (newKey => newValues in this.data) {
