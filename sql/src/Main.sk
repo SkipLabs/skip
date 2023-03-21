@@ -152,6 +152,10 @@ untracked fun main(): void {
             ),
         )
         .subcommand(
+          Cli.Command("uid")
+            .about("Get a unique id for this database")
+        )
+        .subcommand(
           Cli.Command("write-csv")
             .about("Write data from stdin into a directory in CSV format")
             .arg(
@@ -159,6 +163,11 @@ untracked fun main(): void {
                 .positional()
                 .required()
                 .about("Table name"),
+            )
+            .arg(
+              Cli.StringArg("source").about(
+                "Globally unique identity of this write stream",
+              ),
             )
             .arg(Cli.StringArg("user").about("Name of the user")),
         )
@@ -201,7 +210,8 @@ untracked fun main(): void {
                 "Name of the file updates with time of the last change",
               ),
             )
-            .arg(Cli.StringArg("user").about("Name of the user")),
+            .arg(Cli.StringArg("user").about("Name of the user"))
+            .arg(Cli.StringArg("ignore-source").about("Write stream to ignore")),
         )
         .subcommand(Cli.Command("replay").about("Replay a diff"))
         .subcommand(Cli.Command("debug").about("TODO"))
@@ -240,6 +250,7 @@ untracked fun main(): void {
           | "write" -> execWrite
           | "tail" -> execTail
           | "watermark" -> execWatermark
+          | "uid" -> execUid
           | "write-csv" -> execWriteCsv
           | "subscribe" -> execSubscribe
           | "replay" -> execReplay
@@ -455,7 +466,7 @@ fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
 
     origContext.setGlobal(
       "Stdout",
-      SKSQL.StdoutDiff(format, sub.dirName, SKFS.Tick(time)),
+      SKSQL.StdoutDiff(format, sub.dirName, SKFS.Tick(time), sub.filter),
     );
     SKFS.CStop(None())
   })
@@ -641,6 +652,11 @@ fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
   });
 }
 
+fun execUid(args: Cli.ParseResults, _options: SKSQL.Options): void {
+  ensureContext(args);
+  print_string(SKFS.genSym(0));
+}
+
 fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   tableName = args.getString("table").lowercase();
@@ -666,7 +682,11 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
         buffer.push(c);
       }
     };
-    SKCSV.replayDiff(context, line, myReadLine, table, user)
+    source = args.maybeGetString("source") match {
+    | Some(src) -> SKFS.IID(src.toInt())
+    | None() -> SKFS.IID(SKFS.genSym(0))
+    };
+    SKCSV.replayDiff(context, line, myReadLine, table, user, source)
   })
 }
 
@@ -712,14 +732,14 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     viewKey = SKFS.SID(viewName);
     inputDir = context.unsafeGetEagerDir(input.dirName);
     sessionID = SKFS.genSym(0);
-    user = args.maybeGetString("user");
     request = SKSQL.SubRequestFile(
       viewName,
       viewDirName,
       init,
       cmd,
       sessionID,
-      user,
+      args.maybeGetString("user"),
+      args.maybeGetString("ignore-source").map(x -> x.toInt()),
     );
     inputDir.write(context, viewKey, request);
     context.update();
