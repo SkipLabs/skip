@@ -52,11 +52,11 @@ base class FixedData<T> {
   fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
 }
 
-class FixedDir private {
-  data: Array<FixedRow<Array<File>>> = Array[],
-} extends FixedData<Array<File>> {
+class FixedDir<T> private {
+  data: Array<FixedRow<T>> = Array[],
+} extends FixedData<T> {
   static fun create(
-    data: mutable Vector<FixedRow<Array<File>>> = mutable Vector[],
+    data: mutable Vector<FixedRow<T>> = mutable Vector[],
   ): this {
     data.sortBy(row ~> (row.key, row.value.i0));
     result = data.toArray().clone();
@@ -69,7 +69,7 @@ class FixedDir private {
     this.data.size()
   }
 
-  fun get(idx: Int): FixedRow<Array<File>> {
+  fun get(idx: Int): FixedRow<T> {
     this.data.unsafe_get(idx)
   }
 
@@ -107,7 +107,7 @@ class FixedDir private {
     }
   }
 
-  fun getArray(key: BaseName): Array<(Source, Array<File>)> {
+  fun getArray(key: BaseName): Array<(Source, T)> {
     pos = this.getPosij(key, 0, this.data.size() - 1);
     result = mutable Vector[];
     loop {
@@ -120,7 +120,7 @@ class FixedDir private {
     result.toArray();
   }
 
-  fun getIter(key: BaseName): mutable Iterator<(Tick, Source, Array<File>)> {
+  fun getIter(key: BaseName): mutable Iterator<(Tick, Source, T)> {
     pos = this.getPosij(key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
@@ -131,10 +131,7 @@ class FixedDir private {
     };
   }
 
-  fun getIterSourceKey(
-    source: Source,
-    key: BaseName,
-  ): mutable Iterator<Array<File>> {
+  fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T> {
     pos = this.getPosSourceKey(source, key, 0, this.data.size() - 1);
     loop {
       if (pos >= this.data.size()) break void;
@@ -146,13 +143,13 @@ class FixedDir private {
     };
   }
 
-  fun getArraySourceKey(source: Source, key: BaseName): Array<Array<File>> {
+  fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
     this.getIterSourceKey(source, key).collect(Array)
   }
 
   static fun computeTags(
     cache: mutable Array<Bool>,
-    array: mutable Array<FixedRow<Array<File>>>,
+    array: mutable Array<FixedRow<T>>,
     i: Int,
     j: Int,
   ): TickRange {
@@ -205,7 +202,7 @@ class FixedDir private {
     key: BaseName,
     i: Int,
     j: Int,
-  ): mutable Iterator<(Tick, Source, Array<File>)> {
+  ): mutable Iterator<(Tick, Source, T)> {
     if (i <= j) {
       pivot = (i + j) / 2;
       elt = this.data[pivot];
@@ -233,7 +230,7 @@ class FixedDir private {
   fun getIterAfter(
     limit: Tick,
     key: BaseName,
-  ): mutable Iterator<(Tick, Source, Array<File>)> {
+  ): mutable Iterator<(Tick, Source, T)> {
     this.getKeyChangesAfterIter(limit, key, 0, this.data.size() - 1)
   }
 }
@@ -427,29 +424,5 @@ class FixedSingle<K: Orderable, +V>(data: Array<(K, V)> = Array[]) {
     elt = this.data[pos];
     if (elt.i0 != key) return None();
     Some(elt.i1);
-  }
-}
-
-mutable class FixedDataIterator<T> private {
-  iter: mutable Iterator<(Tick, Source, T)>,
-  mutable currentOpt: ?(Tick, Source, T) = None(),
-} {
-  static fun create(iter: mutable Iterator<(Tick, Source, T)>): mutable this {
-    mutable static{currentOpt => iter.next(), iter => iter}
-  }
-
-  readonly fun isEnd(): Bool {
-    this.currentOpt is None _
-  }
-
-  readonly fun current(): (Tick, Source, T) {
-    this.currentOpt match {
-    | None() -> invariant_violation("Cannot access current")
-    | Some(x) -> x
-    }
-  }
-
-  mutable fun next(): void {
-    this.!currentOpt = this.iter.next();
   }
 }
