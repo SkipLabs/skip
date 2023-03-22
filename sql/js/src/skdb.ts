@@ -829,8 +829,10 @@ export class SKDB {
         resolve(false);
       }
       tx.oncomplete = () => {
-        this.dirtyPages = [];
-        this.dirtyPagesMap = [];
+        if(transaction == this.transaction) {
+          this.dirtyPages = [];
+          this.dirtyPagesMap = [];
+        };
         resolve(true);
       }
       let copiedPages = new Array();
