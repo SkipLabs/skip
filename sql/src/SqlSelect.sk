@@ -223,7 +223,7 @@ class SelectEvaluator{
   fun evalSelect(context: mutable SKFS.Context): SelectDir {
     if (this.select.directMode) {
       !this.directMode = this.select.limit match {
-      | None() -> Some(Int::max)
+      | None() -> None()
       | Some(limitExpr) -> Some(this.evalStaticInt(context, limitExpr))
       };
     };
@@ -959,9 +959,8 @@ class SelectEvaluator{
       key = RowKey::create(row, this.kinds);
       qkind match {
       | None() ->
-        writer.write(key, row);
         this.directMode match {
-        | None() -> void
+        | None() -> writer.write(key, row)
         | Some(limit) ->
           i = context.getGlobal("DIRECT_MODE_COUNT") match {
           | None() -> 0
