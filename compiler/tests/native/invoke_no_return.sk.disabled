@@ -4,16 +4,11 @@ fun alwaysThrow<T>(): T {
 
 fun main(): void {
   print_raw(
-    vtry(
-      () -> {
-        _ = alwaysThrow();
-        "Fail\n"
-      },
-      exn ->
-        exn match {
-        | KeyNotFound() -> "Pass\n"
-        }
-      ,
-    ),
+    try {
+      _ = alwaysThrow();
+      "Fail\n"
+    } catch {
+    | KeyNotFound() -> "Pass\n"
+    }
   )
 }

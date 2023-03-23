@@ -4,17 +4,12 @@ class C(int: Int) extends P
 fun main(): void {
   x: P = C(5);
   _y = x as C(5);
-  vtry(
-    () -> {
-      _z = x as C(3);
-      print_string("fail")
-    },
-    exn ->
-      exn match {
-      | InvalidCast _ -> void
-      | _ -> print_string("fail")
-      }
-    ,
-  );
+  try {
+    _z = x as C(3);
+    print_string("fail")
+  } catch {
+  | InvalidCast _ -> void
+  | _ -> print_string("fail")
+  };
   print_string("Pass")
 }

@@ -1,32 +1,22 @@
 class MyExn(x: Int) extends Exception
 
 fun test(): void {
-  vtry(
-    () -> {
-      throw MyExn(0)
-    },
-    exn ->
-      exn match {
-      | MyExn(x) if (x == 42) -> invariant_violation("FAIL")
-      | e -> throw e
-      }
-    ,
-  )
+  try {
+    throw MyExn(0)
+  } catch {
+  | MyExn(x) if (x == 42) -> invariant_violation("FAIL")
+  | e -> throw e
+  }
 }
 
 fun main(): void {
   print_raw(
-    vtry(
-      () -> {
-        test();
-        "FAIL"
-      },
-      exn ->
-        exn match {
-        | MyExn(x) if (x == 0) -> "Pass\n"
-        | _ -> "Fail\n"
-        }
-      ,
-    ),
+    try {
+      test();
+      "FAIL"
+    } catch {
+    | MyExn(x) if (x == 0) -> "Pass\n"
+    | _ -> "Fail\n"
+    }
   )
 }

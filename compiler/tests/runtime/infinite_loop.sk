@@ -82,21 +82,16 @@ fun main(): void {
   };
   print_string(s);
 
-  vtry(
-    () -> {
-      _ =
-        1 +
-        (loop {
-          throw MyExn()
-        })
-    },
-    exn ->
-      exn match {
-      | e @ MyExn() -> print_string(e.getMessage())
-      | _ -> print_string("Fail")
-      }
-    ,
-  )
+  try {
+    _ =
+      1 +
+      (loop {
+        throw MyExn()
+      })
+  } catch {
+  | e @ MyExn() -> print_string(e.getMessage())
+  | _ -> print_string("Fail")
+  }
 }
 
 class MyExn() extends Exception {

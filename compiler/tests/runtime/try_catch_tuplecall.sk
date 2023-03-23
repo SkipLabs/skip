@@ -9,17 +9,12 @@ fun mightThrow(die: Bool = false): (String, String, String) {
 
 fun main(): void {
   print_raw(
-    vtry(
-      () -> {
-        // Test returning a tuple inside a try, a special case for NBE.
-        (a, b, c) = mightThrow();
-        a + b + c
-      },
-      exn ->
-        exn match {
-        | _ -> "Fail\n"
-        }
-      ,
-    ),
+    try {
+      // Test returning a tuple inside a try, a special case for NBE.
+      (a, b, c) = mightThrow();
+      a + b + c
+    } catch {
+    | _ -> "Fail\n"
+    }
   );
 }

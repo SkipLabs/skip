@@ -96,23 +96,18 @@ fun main(): void {
     },
   );
 
-  vtry(
-    () -> {
-      _ =
-        1 +
-        (for (_ in mutable MyInfinite()) {
-          throw MyExn()
-        } else {
-          invariant_violation("impossible")
-        });
-    },
-    exn ->
-      exn match {
-      | e @ MyExn() -> print_string(e.getMessage())
-      | _ -> print_string("Fail")
-      }
-    ,
-  )
+  try {
+    _ =
+      1 +
+      (for (_ in mutable MyInfinite()) {
+        throw MyExn()
+      } else {
+        invariant_violation("impossible")
+      });
+  } catch {
+  | e @ MyExn() -> print_string(e.getMessage())
+  | _ -> print_string("Fail")
+  }
 }
 
 class MyExn() extends Exception {

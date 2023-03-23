@@ -5,17 +5,12 @@ class MyExn<T: Show>(x: T) extends Exception {
 }
 
 fun foo(b: Bool): String {
-  vtry(
-    () -> {
-      if (b) throw MyExn(5) else throw MyExn("hi")
-    },
-    exn ->
-      exn match {
-      | e @ MyExn _ -> e.getMessage()
-      | _ -> "fail"
-      }
-    ,
-  )
+  try {
+    if (b) throw MyExn(5) else throw MyExn("hi")
+  } catch {
+  | e @ MyExn _ -> e.getMessage()
+  | _ -> "fail"
+  }
 }
 
 fun main(): void {

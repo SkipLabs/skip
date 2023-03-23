@@ -11,16 +11,11 @@ fun throwExc(): String {
 
 fun main(): void {
   print_raw(
-    vtry(
-      () -> {
-        throwExc()
-      },
-      exn ->
-        exn match {
-        | MyException() -> "Pass\n"
-        | _ -> "Fail"
-        }
-      ,
-    ),
+    try {
+      throwExc()
+    } catch {
+    | MyException() -> "Pass\n"
+    | _ -> "Fail"
+    }
   )
 }

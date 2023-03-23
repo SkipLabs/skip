@@ -10,16 +10,11 @@ fun foo(): String {
 
 fun main(): void {
   print_raw(
-    vtry(
-      () -> {
-        foo() + throw StrExn("Fail")
-      },
-      exn ->
-        exn match {
-        | StrExn(s) -> s
-        | _ -> "Fail"
-        }
-      ,
-    ),
+    try {
+      foo() + throw StrExn("Fail")
+    } catch {
+    | StrExn(s) -> s
+    | _ -> "Fail"
+    }
   )
 }
