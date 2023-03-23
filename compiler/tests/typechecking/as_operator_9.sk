@@ -1,17 +1,12 @@
 fun main(): void {
   x = false;
   _x = x as false;
-  vtry(
-    () -> {
-      y = true;
-      _y = y as false;
-      print_string("Fail")
-    },
-    exn ->
-      exn match {
-      | InvalidCast _ -> print_string("Pass")
-      | _ -> void
-      }
-    ,
-  )
+  try {
+    y = true;
+    _y = y as false;
+    print_string("Fail")
+  } catch {
+  | InvalidCast _ -> print_string("Pass")
+  | _ -> void
+  }
 }

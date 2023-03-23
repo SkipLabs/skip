@@ -14,16 +14,11 @@ fun useless{a: String, b: String}: String {
 
 fun main(): void {
   print_raw(
-    vtry(
-      () -> {
-        useless{b => foo(), a => throw StrExn("Fail")}
-      },
-      exn ->
-        exn match {
-        | StrExn(s) -> s
-        | _ -> "Fail"
-        }
-      ,
-    ),
+    try {
+      useless{b => foo(), a => throw StrExn("Fail")}
+    } catch {
+    | StrExn(s) -> s
+    | _ -> "Fail"
+    }
   )
 }

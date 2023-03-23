@@ -63,23 +63,18 @@ fun main(): void {
   };
   print_string(s);
 
-  vtry(
-    () -> {
-      _ =
-        1 +
-        (do {
-          throw MyExn()
-        } while (true) else {
-          invariant_violation("imposible")
-        })
-    },
-    exn ->
-      exn match {
-      | e @ MyExn() -> print_string(e.getMessage())
-      | _ -> print_string("Fail")
-      }
-    ,
-  )
+  try {
+    _ =
+      1 +
+      (do {
+        throw MyExn()
+      } while (true) else {
+        invariant_violation("imposible")
+      })
+  } catch {
+  | e @ MyExn() -> print_string(e.getMessage())
+  | _ -> print_string("Fail")
+  }
 }
 
 class MyExn() extends Exception {
