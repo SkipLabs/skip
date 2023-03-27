@@ -389,8 +389,8 @@ fun compareContext(
         print_string(`       ${values1}`);
         dir match {
         | SKFS.EagerDir{fixedData} ->
-          for (fixed in fixedData.getArray(key)) {
-            (k, files) = fixed;
+          for (fixed in fixedData.getIter(key)) {
+            (_, k, _, files) = fixed;
             intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
             print_string(`FIXED  ${k.path()} => ${intFiles}`)
           }
@@ -414,7 +414,7 @@ fun compareContext(
           | None() -> print_string("EMPTY DATA")
           | Some(sources) ->
             for (tickSource => files in sources) {
-              (_, k) = tickSource;
+              (_, k, _) = tickSource;
               intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
               print_string(`       ${k.path()} => ${intFiles}`)
             }
@@ -425,8 +425,8 @@ fun compareContext(
         print_string(`       ${values2}`);
         dir2 match {
         | SKFS.EagerDir{fixedData} ->
-          for (fixed in fixedData.getArray(key)) {
-            (k, files) = fixed;
+          for (fixed in fixedData.getIter(key)) {
+            (_, k, _, files) = fixed;
             intFiles = files.map(file -> SKFS.IntFile::fromFile(file));
             print_string(`FIXED  ${k.path()} => ${intFiles}`)
           }
