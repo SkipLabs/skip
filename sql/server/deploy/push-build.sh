@@ -46,5 +46,14 @@ docker push 400962513797.dkr.ecr.us-east-1.amazonaws.com/nginx:latest
 
 # aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 400962513797.dkr.ecr.us-east-1.amazonaws.com
 # sudo /usr/bin/docker pull 400962513797.dkr.ecr.us-east-1.amazonaws.com/skdb:latest
+
+# port over any databases, here's an example
+# sudo docker exec -it -w /skfs -e INSIDE_EMACS=1 <CONTAINER> /bin/bash
+# build/skdb dump --data /var/db/skdb_service_mgmt.db
 # sudo docker stop $(sudo docker ps -q)
+# sudo /usr/bin/docker run -it -p 8080:8080 -v /var/db:/var/db 400962513797.dkr.ecr.us-east-1.amazonaws.com/skdb:latest /bin/bash
+# rm /var/db/skdb_service_mgmt.db
+# build/skdb --init /var/db/skdb_service_mgmt.db
+# build/skdb --data /var/db/skdb_service_mgmt.db << EOF
+
 # sudo /usr/bin/docker run -p 8080:8080 -v /var/db:/var/db 400962513797.dkr.ecr.us-east-1.amazonaws.com/skdb:latest
