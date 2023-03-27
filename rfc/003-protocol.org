@@ -1,0 +1,369 @@
+#+TITLE: SKDB Replication Protocol
+
+* Overview
+
+We have the following entities that need to communicate
+
+#+BEGIN_EXAMPLE
+  SKDB <--[local pipe]--> Server Orchestrator <--[TCP Socket]--> Client Orchestrator <--[shared memory]--> SKDB
+#+END_EXAMPLE
+
+The client and server communicate with each other using a stack that
+looks like this
+
+#+BEGIN_EXAMPLE
+  +---------------------------------------+
+  |                                       |
+  |   SKDB Data Transfer Protocol (DTP)   |
+  |                                       |
+  +---------------------------------------+
+  |                                       |
+  |        Orchestration Protocol         |
+  |                                       |
+  +---------------------------------------+
+  |                                       |
+  |          Stream MUX Protocol          |
+  |                                       |
+  +---------------------------------------+
+  |                                       |
+  |          Websocket Protocol           |
+  |                                       |
+  +---------------------------------------+
+  |                                       |
+  |               TCP/IP                  |
+  |                                       |
+  +---------------------------------------+
+#+END_EXAMPLE
+
+The client and server orchestrate one or more SKDB binaries. SKDB
+communicates with the orchestration using the ~SKDB data transfer
+protocol~ (DTP). This is designed to be streamed end-to-end to another
+SKDB process. Some light-weight control signal is possible to allow
+communication to and from the orchestration.
+
+The ~orchestration protocol~ allows the client and server orchestration
+to communicate. This is used to establish the replication streams and
+administer databases. There is a control plane and a data plane.
+
+The DTP is mostly passed straight through on the data plane. The
+orchestration's responsibility is to act as a router for the DTP. The
+control plane is made up of small control messages that make requests
+or transition a state machine.
+
+The ~Stream MUX protocol~ (MUX) is responsible for establishing an
+authenticated connection and multiplexing independent streams of data
+on to this.
+
+The ~Websocket protocol~ (WS) is the standard WS protocol, defined in
+RFC 6455. It provides a handshake that is useful for routing to the
+correct database shard, tunnelling over HTTP, and a lightweight
+framing. This encodes payload sizes for us.
+
+And TCP/IP I won't describe.
+
+
+To avoid head of line blocking, the MUX protocol encodes chunks of
+streaming data as messages in the WS protocol. To get back to complete
+messages the orchestration protocol has to re-encode the idea of a
+message.
+
+* Stream MUX protocol
+
+There is a connection-level state machine:
+
+#+BEGIN_EXAMPLE
+  ,* -------------> IDLE
+                    ||
+           +--------+|
+           |         |
+           |         V
+           |    AUTHENTICATED -----------+
+           |         |                   |
+           |         |                   V
+           |         |                CLOSING
+           |         V                   |
+           +----> CLOSED <---------------+
+#+END_EXAMPLE
+
+- Initial -> IDLE :: this happens on connection establishment as
+  provided by WS/TCP/IP
+
+- IDLE -> AUTHENTICATED :: on receiving an authentication message that
+  is successful
+
+- IDLE -> CLOSED :: on receiving an authentication message that is not
+  successful or an error from the underlying WS stack
+
+- AUTHENTICATED -> CLOSED :: on receiving an error from the underlying
+  WS stack
+
+- AUTHENTICATED -> CLOSING :: on receiving a close from the underlying
+  WS stack or on initiating the close
+
+- CLOSING -> CLOSED :: once we've sent a close or received one
+  depending on the initiator
+
+In the ~CLOSING~ state, no new streams can be created. You may receive
+data or send data depending on whether you initiated or received the
+close respectively.
+
+In the ~CLOSED~ state, nothing may be sent or received.
+
+While in the ~AUTHENTICATED~ state, streams can be created. These are
+independent (no synchronisation between streams) byte streams. They
+have the following state machine:
+
+#+BEGIN_EXAMPLE
+           ,*
+           |
+           |
+           |
+           V
+  +------ OPEN
+  |        |
+  |        |
+  |        |
+  |        V
+  |     CLOSING
+  |        |
+  |        |
+  |        |
+  |        V
+  +----> CLOSED
+#+END_EXAMPLE
+
+- Initial -> OPEN :: receive a data message with a new stream identifier
+
+- OPEN -> CLOSING :: on sending or receiving a close stream message
+
+- CLOSING -> CLOSED :: on receiving or sending a close stream message,
+  or on receiving or sending a reset message (used for signalling errors)
+
+- OPEN -> CLOSED :: on sending or receiving a stream reset message
+
+** Back-pressure
+
+There is currently no flow control mechanism. With multiplexing this
+is normally necessary but we control the client and server. We may not
+need this as we can be cooperative. We create the protocol without it
+to avoid unnecessary complexity.
+
+If it is needed in the future we can introduce a windowed credit-based
+system (like HTTP/2) with a new message type. We also have some flex
+with the auth message carrying a version and some reserved bits.
+
+Clients should honour the robustness principle and ignore messages
+they don't understand.
+
+** Messages/framing
+
+We use a binary serialisation with the following layout.
+
+Where not specified, strings are UTF-8.
+
+*** Base frame (all frames derive/specialise this)
+
+- type (8)
+- stream id (24)
+- payload
+  - This is the remainder of the Websocket message. Each frame type
+    specialises this.
+
+Stream ids are
+
+- 24-bit integers
+- monotonic
+- created by the originator
+- even numbered for the server
+- odd numbered for the client
+- not reusable
+
+*** (Conn) Auth/init
+
+- type = 0x0
+- stream id = 0x0
+- payload
+  - version (8)
+  - reserved (24) - must be zeroed
+  - access key (20 * 8 = 160) - ASCII encoded 20 char string
+  - nonce (64)
+  - signature (256)
+  - iso length 0 for 24, 1 for 27 (1)
+  - padding (7 or 4 depending on iso length - pad to 32 bits) must be zeroed
+  - iso date (24 or 27 depending on iso length flag)
+
+*** (Conn) Error/goaway
+
+- type = 0x1
+- stream id = 0x0
+- payload
+  - reserved (8) - must be zeroed
+  - last stream id (24)
+  - error code (32)
+  - msg_length (32)
+  - msg (msg_length)
+
+*** (Stream) Data
+
+- type = 0x2
+- payload
+
+*** (Stream) Close
+
+- type = 0x3
+- no payload
+
+*** (Stream) Reset
+
+- type = 0x4
+- payload
+  - error code (32)
+  - msg_length (32)
+  - msg (msg_length)
+
+* Orchestration protocol
+
+This layer is understood and stripped by the orchestration. The
+control messages direct these mechanisms, usually causing some change
+to an SKDB process - starting one usually. The data messages are
+de-framed and then passed through to SKDB. Data may be aggregated
+first if the SKDB binary doesn't support streaming data over a pipe
+(JS does not). This requirement is why the protocol supports a FIN
+flag to indicate data boundaries for processing.
+
+All messages at this layer are sent as data frames in the streaming
+MUX layer.
+
+Control messages are sent 'complete' - there's no streaming. They
+should end up as a single data frame in the streaming layer, a single
+message in the web socket layer, and likely a single datagram at the
+TCP/IP layer.
+
+Data messages can be streamed. They may be broken up in to many data
+messages in the streaming layer to enable interleaving and prevent HOL
+blocking.
+
+All streams and control messages are currently initiated by the
+client, but the stack supports server initiation and we may use this
+in the future.
+
+** State machines
+
+This layer is all about establishing streams and transferring data. We
+have many simple state machines. They are described very briefly here.
+
+- Req/response orchestrating SKDB:
+  - Query request. Result set response in the data plane
+  - Schema query request. SQL response in the data plane
+
+- Req/response but at the level of orchestration
+  - Create db request. Credentials response
+  - Create user request. Credentials response
+
+- Mirror to local - client-driven receive table request
+  - send ~request tail~ message to transition in to client consuming tail output using write-csv
+    - the write-csv acks are dropped
+    - this connection is half-duplex, just the server transmitting
+
+- Mirror to remote - client-driven push table promise
+  - send ~push promise~ message to transition in to server consuming update output using write-csv
+    - the write-csv acks are consumed by a write-csv to the metadata table on the client
+    - this connection is full duplex
+
+** Messaging/framing
+
+We use a binary serialisation with the following layout.
+
+Where not specified, strings are UTF-8.
+
+*** Base frame
+
+- type (8)
+- payload
+
+*** Control messages
+
+- query
+  - type = 0x1
+  - reserved (4) - must be zeroed
+  - format (4) (enum: 0x0 - json, 0x1 - raw)
+  - query_length (32)
+  - query (query_length)
+
+- request tail
+  - type = 0x2
+  - reserved (24) - padding if you like - must be zeroed
+  - since (64)
+  - table_name_length (16)
+  - table_name (table_name_length)
+
+- push promise
+  - type = 0x3
+  - reserved (24) - padding if you like - must be zeroed
+  - table_name_length (16)
+  - table_name (table_name_length)
+
+- schema (we are killing suffix)
+  - type = 0x4
+  - scope enum (4) - 0 if all, 1 if table, 2 if view, other values are reserved
+    - if all, then there is no name nor name_length
+  - reserved (4) - must be zeroed
+  - name_length (16)
+  - name (name_length)
+
+- create db
+  - type = 0x5
+  - name_length (16)
+  - name (name_length)
+
+- create user
+  - type = 0x6
+
+- credentials response
+  - type = 0x128
+  - access key (20 * 8 = 160) - ASCII encoded 20 char string
+  - private key (256)
+
+*** Data message
+
+This must support reading a stream from SKDB, sending a stream in
+chunks to allow interleaving, and reassembling to apply in batch.
+
+It must also support reading a batch and streaming to SKDB - but this
+is the much easier case to handle.
+
+There is no interleaving of different data messages, we use different
+streams in the layer below for that. We can assume that all data
+messages are received in order and are combined when a fin flag is
+set.
+
+Like Websockets, we can allow control messages (with a type other
+than 0) to interleave with the fragments. Although today we have none
+that would make sense and the state machines are too simple to require
+that.
+
+The serialisation is:
+
+- type = 0x0
+- fin flag (1)
+- reserved (7)
+- payload
+
+* SKDB data transfer protocol
+
+Today this is a text-based protocol using a combination of
+tab-separated and comma-separated data fields. There is encoding for a
+reset control signal and a check-pointing mechanism.
+
+The checkpoint line also acts as a control signal to the orchestration
+layer defining when a data batch ends. This allows setting the fin
+flag in the orchestration protocol data message and knowing when to
+flush.
+
+Result sets do not have a end of data marker as the process
+terminates, the file closes, and we close the stream to signal this.
+
+
+There are plans to re-design this protocol and use a binary
+serialisation for efficient processing; this section is intentionally
+brief.
