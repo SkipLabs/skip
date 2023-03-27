@@ -5,7 +5,7 @@
 FROM --platform=linux/amd64 ubuntu:20.04 as base
 RUN apt-get update
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get install -q -y npm git make lld sqlite3 gcc gawk clang llvm
+RUN apt-get install -q -y npm git make lld sqlite3 gcc gawk clang llvm automake-1.15
 RUN update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-10 100
 RUN npm install -g typescript
 
@@ -16,7 +16,6 @@ FROM base as bootstrap
 COPY . /skfs
 
 WORKDIR /skfs/compiler
-RUN make clean
 RUN make -B install STAGE=0
 
 WORKDIR /skfs

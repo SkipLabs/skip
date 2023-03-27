@@ -10,6 +10,8 @@ set -e
 
 cd ~/code/skfs || exit 1
 
+find . -name state.db|xargs rm
+
 echo "Building skgw image"
 docker build -t skgw-deploy --progress=plain -f sql/server/deploy/Dockerfile .
 
