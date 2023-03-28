@@ -436,6 +436,379 @@ class ResilientConnection {
 }
 
 /* ***************************************************************************/
+/* Stream MUX protocol
+/* ***************************************************************************/
+
+enum MuxedSocketState {
+  IDLE,
+  AUTH_SENT,
+  CLOSING,                      // can receive data
+  CLOSEWAIT,                    // can send data
+  CLOSED,
+}
+
+class MuxedSocket {
+
+  private socket: WebSocket;
+  private state: MuxedSocketState = MuxedSocketState.IDLE
+  // streams in the open or closing state
+  private activeStreams: Map<number, Stream> = new Map()
+  private nextStream = 1
+
+  // create the websocket. auth it. translate callbacks to streams.
+
+  // maybe this should compose a resilient connection?
+  // then we introduce a resilient stream? need to re-establish the
+  // connection if multiple streams start failing. correlated failure
+  // implies the connection is at fault
+
+  // states: idle, auth sent, closing, closed
+  // events: onStream, expose most stuff through streams,
+  //         onConnClose, onConnError (both called after all streams have been called)
+  // methods: connect and auth, close, error
+  //          streamOpen, streamClose, streamError, streamSend
+
+  // user facing interface /////////////////////////////////////////////////////
+
+  onStream?: (stream: Stream) => void;
+  onClose?: () => void;
+  onError?: (event: Event) => void;
+
+  constructor(socket: WebSocket) {
+    // pre-condition: socket is open
+    this.socket = socket;
+  }
+
+  openStream(): Stream {
+    switch (this.state) {
+    case MuxedSocketState.AUTH_SENT: {
+      const streamId = this.nextStream;
+      this.nextStream = this.nextStream + 2; // client uses odd-numbered streams
+      const stream = new Stream(this, streamId);
+      this.activeStreams.set(streamId, stream);
+      return stream;
+    }
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSEWAIT:
+      throw new Error("Connection closing");
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSED:
+      throw new Error("Connection not established");
+    }
+  }
+
+  closeSocket(): void {
+    switch (this.state) {
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.IDLE:
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      this.socket.close();
+      break;
+    case MuxedSocketState.CLOSEWAIT: {
+      for (const stream of this.activeStreams.values()) {
+        stream.close();
+      }
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      this.socket.close();
+      break;
+    }
+    case MuxedSocketState.AUTH_SENT: {
+      for (const stream of this.activeStreams.values()) {
+        stream.close();
+      }
+      this.state = MuxedSocketState.CLOSING;
+      this.socket.close();
+      break;
+    }
+    }
+  }
+
+  errorSocket(error: Error): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      this.state = MuxedSocketState.CLOSED;
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT:
+      for (const stream of this.activeStreams.values()) {
+        stream.error(error);
+      }
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      // TODO: send a gowaway message
+      this.socket.close(1002);
+      break;
+    }
+  }
+
+  static async connect(uri: string, creds: Creds): Promise<MuxedSocket> {
+    return new Promise((resolve, reject) => {
+      const socket = new WebSocket(uri)
+      socket.onclose = (_event) => reject(new Error("Socket closed before open"));
+      socket.onerror = (event) => reject(event);
+      socket.onmessage = (_event) => reject(new Error("Socket messaged before open"));
+      socket.onopen = (_event) => {
+        const muxSocket = new MuxedSocket(socket)
+        socket.onclose = muxSocket.onSocketClose
+        socket.onerror = muxSocket.onSocketError
+        socket.onmessage = muxSocket.onSocketMessage
+        muxSocket.sendAuth(creds)
+        resolve(muxSocket)
+      };
+    });
+  }
+
+  // private ///////////////////////////////////////////////////////////////////
+
+  private onSocketClose(_event: CloseEvent): void {
+    switch (this.state) {
+    case MuxedSocketState.CLOSEWAIT:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.AUTH_SENT:
+      for (const stream of this.activeStreams.values()) {
+        stream.onStreamClose();
+      }
+      if (this.onClose) {
+        this.onClose();
+      }
+      this.state = MuxedSocketState.CLOSEWAIT;
+      break;
+    case MuxedSocketState.CLOSING:
+      for (const stream of this.activeStreams.values()) {
+        stream.onStreamClose();
+      }
+      if (this.onClose) {
+        this.onClose();
+      }
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      break;
+    }
+  }
+
+  private onSocketError(event: Event): void {
+    switch (this.state) {
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSEWAIT:
+      for (const stream of this.activeStreams.values()) {
+        stream.onStreamError(event);
+      }
+      if (this.onError) {
+        this.onError(event);
+      }
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+    }
+  }
+
+  private onSocketMessage(event: MessageEvent<any>): void {
+    switch (this.state) {
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSING:
+      // TODO: parse/decode and dispatch
+      break;
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSEWAIT:
+    case MuxedSocketState.CLOSED:
+      break;
+    }
+    // TODO: if it is a new stream, how do we surface the data?
+  }
+
+  private sendAuth(creds: Creds): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    // TODO: encode and send
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSING:
+      throw new Error("Tried to auth an established connection");
+    case MuxedSocketState.CLOSEWAIT:
+    case MuxedSocketState.CLOSED:
+      break;
+    }
+  }
+
+  // interface used by Stream //////////////////////////////////////////////////
+
+  streamClose(stream: number, nowClosed: boolean): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT: {
+      // TODO: send a stream close message
+      if (nowClosed) {
+        this.activeStreams.delete(stream);
+      }
+      break;
+    }
+    }
+  }
+
+  streamError(stream: number): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT:
+      // TODO: send a stream error message
+      this.activeStreams.delete(stream);
+      break;
+    }
+  }
+
+  streamSend(stream: number): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT:
+    // TODO: send the data
+    }
+  }
+}
+
+enum StreamState {
+  OPEN,
+  CLOSING,
+  CLOSEWAIT,
+  CLOSED,
+}
+
+class Stream {
+  // events: onClose, onError, onData
+  // methods: close, error, send
+  // states: open, closing, closed
+  // state: muxedsocket, stream id
+
+  // constants
+  private socket: MuxedSocket
+  private streamId: number
+
+  private state: StreamState = StreamState.OPEN;
+
+  // user facing interface ///////////////////////////////////
+
+  onClose?: () => void
+  onError?: (event: Event) => void
+  onData?: () => void
+
+  close(): void {
+    switch (this.state) {
+    case StreamState.CLOSING:
+    case StreamState.CLOSED:
+      break;
+    case StreamState.OPEN:
+      this.state = StreamState.CLOSED;
+      this.socket.streamClose(this.streamId, false);
+      break;
+    case StreamState.CLOSEWAIT:
+      this.state = StreamState.CLOSED;
+      this.socket.streamClose(this.streamId, true);
+      break;
+    }
+  }
+
+  error(error: Error): void {
+    switch (this.state) {
+    case StreamState.CLOSED:
+    case StreamState.CLOSING:
+      this.state = StreamState.CLOSED;
+      break;
+    case StreamState.OPEN:
+    case StreamState.CLOSEWAIT:
+      this.state = StreamState.CLOSED;
+      this.socket.streamError(this.streamId)
+      break;
+    }
+  }
+
+  send(): void {
+    switch (this.state) {
+    case StreamState.CLOSING:
+    case StreamState.CLOSED:
+      break;
+    case StreamState.OPEN:
+    case StreamState.CLOSEWAIT:
+      this.socket.streamSend(this.streamId)
+    }
+  }
+
+  // interface used by MuxedSocket ///////////////////////////
+
+  constructor(socket: MuxedSocket, streamId: number) {
+    this.socket = socket
+    this.streamId = streamId
+  }
+
+  onStreamClose(): void {
+    switch (this.state) {
+    case StreamState.CLOSED:
+    case StreamState.CLOSEWAIT:
+      break;
+    case StreamState.OPEN:
+      this.state = StreamState.CLOSEWAIT;
+      if (this.onClose) {
+        this.onClose();
+      }
+      break;
+    case StreamState.CLOSING:
+      this.state = StreamState.CLOSED;
+      if (this.onClose) {
+        this.onClose();
+      }
+      break;
+    }
+  }
+
+  onStreamError(event: Event): void {
+    switch (this.state) {
+    case StreamState.CLOSED:
+      break;
+    case StreamState.CLOSING:
+    case StreamState.OPEN:
+    case StreamState.CLOSEWAIT:
+      this.state = StreamState.CLOSED;
+      if (this.onError) {
+        this.onError(event);
+      }
+    }
+  }
+
+  onStreamData(): void {
+    switch (this.state) {
+    case StreamState.CLOSED:
+    case StreamState.CLOSEWAIT:
+      break;
+    case StreamState.CLOSING:
+    case StreamState.OPEN:
+      if (this.onData) {
+        this.onData();
+      }
+    }
+  }
+}
+
+/* ***************************************************************************/
 /* A few primitives to encode/decode utf8. */
 /* ***************************************************************************/
 
