@@ -453,6 +453,7 @@ class MuxedSocket {
   private state: MuxedSocketState = MuxedSocketState.IDLE
   // streams in the open or closing state
   private activeStreams: Map<number, Stream> = new Map()
+  private lastStream = 0
   private nextStream = 1
 
   // create the websocket. auth it. translate callbacks to streams.
@@ -484,6 +485,7 @@ class MuxedSocket {
     case MuxedSocketState.AUTH_SENT: {
       const streamId = this.nextStream;
       this.nextStream = this.nextStream + 2; // client uses odd-numbered streams
+      this.lastStream = streamId;
       const stream = new Stream(this, streamId);
       this.activeStreams.set(streamId, stream);
       return stream;
@@ -527,7 +529,7 @@ class MuxedSocket {
     }
   }
 
-  errorSocket(error: Error): void {
+  errorSocket(errorCode: number, msg: string): void {
     switch (this.state) {
     case MuxedSocketState.IDLE:
     case MuxedSocketState.CLOSING:
@@ -537,17 +539,18 @@ class MuxedSocket {
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSEWAIT:
       for (const stream of this.activeStreams.values()) {
-        stream.error(error);
+        stream.error(errorCode, msg);
       }
       this.activeStreams.clear()
       this.state = MuxedSocketState.CLOSED;
-      // TODO: send a gowaway message
+      this.socket.send(this.encodeGoawayMsg(this.lastStream, errorCode, msg));
       this.socket.close(1002);
       break;
     }
   }
 
   static async connect(uri: string, creds: Creds): Promise<MuxedSocket> {
+    const auth = await MuxedSocket.encodeAuthMsg(creds);
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(uri)
       socket.onclose = (_event) => reject(new Error("Socket closed before open"));
@@ -558,7 +561,7 @@ class MuxedSocket {
         socket.onclose = muxSocket.onSocketClose
         socket.onerror = muxSocket.onSocketError
         socket.onmessage = muxSocket.onSocketMessage
-        muxSocket.sendAuth(creds)
+        muxSocket.sendAuth(auth)
         resolve(muxSocket)
       };
     });
@@ -618,6 +621,7 @@ class MuxedSocket {
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSING:
       // TODO: parse/decode and dispatch
+      // TODO: if creating a stream, set lastStream
       break;
     case MuxedSocketState.IDLE:
     case MuxedSocketState.CLOSEWAIT:
@@ -627,10 +631,11 @@ class MuxedSocket {
     // TODO: if it is a new stream, how do we surface the data?
   }
 
-  private sendAuth(creds: Creds): void {
+  private sendAuth(msg: ArrayBuffer): void {
     switch (this.state) {
     case MuxedSocketState.IDLE:
-    // TODO: encode and send
+      this.state = MuxedSocketState.AUTH_SENT;
+      this.socket.send(msg);
       break;
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSING:
@@ -639,6 +644,97 @@ class MuxedSocket {
     case MuxedSocketState.CLOSED:
       break;
     }
+  }
+
+  private static async encodeAuthMsg(creds: Creds): Promise<ArrayBuffer> {
+    const enc = new TextEncoder();
+    const buf = new ArrayBuffer(96);
+    const uint8View = new Uint8Array(buf);
+    const dataView = new DataView(buf);
+
+    const now = (new Date()).toISOString()
+    const nonce = uint8View.subarray(28, 36);
+    crypto.getRandomValues(nonce)
+    const b64nonce = btoa(String.fromCharCode(...nonce));
+    const bytesToSign = enc.encode("auth" + creds.accessKey + now + b64nonce)
+    const sig = await crypto.subtle.sign(
+      "HMAC",
+      creds.privateKey,
+      bytesToSign
+    )
+
+    dataView.setUint8(0, 0x0);  // type
+    dataView.setUint8(4, 0x0);  // version
+    const encodeAccessKey = enc.encodeInto(creds.accessKey, uint8View.subarray(8));
+    if (encodeAccessKey.written != 20) {
+      throw new Error("Unable to encode access key")
+    }
+    uint8View.set(new Uint8Array(sig), 36);
+    const encodeIsoDate = enc.encodeInto(now, uint8View.subarray(69));
+    switch (encodeIsoDate.written) {
+    case 24:
+      return buf.slice(0, 93);
+    case 27:
+      dataView.setUint8(68, 0x1);
+      return buf;
+    default:
+      throw new Error("Unexpected ISO date length");
+    }
+  }
+
+  private encodeGoawayMsg(lastStream: number, errorCode: number, msg: string): ArrayBuffer {
+    if (lastStream >= 2**24) {
+      throw new Error("Cannot encode lastStream");
+    }
+    const buf = new ArrayBuffer(16 + msg.length * 3); // avoid resizing
+    const uint8View = new Uint8Array(buf);
+    const textEncoder = new TextEncoder();
+    const encodeResult = textEncoder.encodeInto(msg, uint8View.subarray(16));
+    const dataView = new DataView(buf);
+    dataView.setUint8(0, 0x1);  // type
+    dataView.setUint32(4, lastStream, false);
+    dataView.setUint32(8, errorCode, false);
+    dataView.setUint32(12, encodeResult.written || 0, false);
+    return buf.slice(0, 16 + (encodeResult.written || 0));
+  }
+
+  private encodeStreamDataMsg(stream: number, data: ArrayBuffer): ArrayBuffer {
+    if (stream >= 2**24) {
+      throw new Error("Cannot encode stream");
+    }
+    const buf = new ArrayBuffer(4);
+    const dataView = new DataView(buf);
+    const uint8View = new Uint8Array(buf);
+    dataView.setUint32(0, 0x2 << 24 | stream, false);  // type and stream id
+    // TODO: is there a way to avoid the copy?
+    uint8View.set(new Uint8Array(data), 4);
+    return buf;
+  }
+
+  private encodeStreamCloseMsg(stream: number): ArrayBuffer {
+    if (stream >= 2**24) {
+      throw new Error("Cannot encode stream");
+    }
+    const buf = new ArrayBuffer(4);
+    const dataView = new DataView(buf);
+    dataView.setUint32(0, 0x3 << 24 | stream, false);  // type and stream id
+    return buf;
+  }
+
+  private encodeStreamResetMsg(stream: number, errorCode: number, msg: string): ArrayBuffer {
+    if (stream >= 2**24) {
+      throw new Error("Cannot encode stream");
+    }
+    const textEncoder = new TextEncoder();
+    const buf = new ArrayBuffer(12 + msg.length * 3); // avoid resizing
+    const uint8View = new Uint8Array(buf);
+    const dataView = new DataView(buf);
+
+    dataView.setUint32(0, 0x4 << 24 | stream, false);  // type and stream id
+    dataView.setUint32(4, errorCode, false);
+    const encodeResult = textEncoder.encodeInto(msg, uint8View.subarray(12));
+    dataView.setUint32(8, encodeResult.written || 0, false);
+    return buf.slice(0, 12 + (encodeResult.written || 0));
   }
 
   // interface used by Stream //////////////////////////////////////////////////
@@ -651,7 +747,7 @@ class MuxedSocket {
       break;
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSEWAIT: {
-      // TODO: send a stream close message
+      this.socket.send(this.encodeStreamCloseMsg(stream));
       if (nowClosed) {
         this.activeStreams.delete(stream);
       }
@@ -660,7 +756,7 @@ class MuxedSocket {
     }
   }
 
-  streamError(stream: number): void {
+  streamError(stream: number, errorCode: number, msg: string): void {
     switch (this.state) {
     case MuxedSocketState.IDLE:
     case MuxedSocketState.CLOSING:
@@ -668,13 +764,13 @@ class MuxedSocket {
       break;
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSEWAIT:
-      // TODO: send a stream error message
+      this.socket.send(this.encodeStreamResetMsg(stream, errorCode, msg));
       this.activeStreams.delete(stream);
       break;
     }
   }
 
-  streamSend(stream: number): void {
+  streamSend(stream: number, data: ArrayBuffer): void {
     switch (this.state) {
     case MuxedSocketState.IDLE:
     case MuxedSocketState.CLOSING:
@@ -682,7 +778,7 @@ class MuxedSocket {
       break;
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSEWAIT:
-    // TODO: send the data
+      this.socket.send(this.encodeStreamDataMsg(stream, data));
     }
   }
 }
@@ -728,7 +824,7 @@ class Stream {
     }
   }
 
-  error(error: Error): void {
+  error(errorCode: number, msg: string): void {
     switch (this.state) {
     case StreamState.CLOSED:
     case StreamState.CLOSING:
@@ -737,19 +833,19 @@ class Stream {
     case StreamState.OPEN:
     case StreamState.CLOSEWAIT:
       this.state = StreamState.CLOSED;
-      this.socket.streamError(this.streamId)
+      this.socket.streamError(this.streamId, errorCode, msg);
       break;
     }
   }
 
-  send(): void {
+  send(data: ArrayBuffer): void {
     switch (this.state) {
     case StreamState.CLOSING:
     case StreamState.CLOSED:
       break;
     case StreamState.OPEN:
     case StreamState.CLOSEWAIT:
-      this.socket.streamSend(this.streamId)
+      this.socket.streamSend(this.streamId, data);
     }
   }
 
