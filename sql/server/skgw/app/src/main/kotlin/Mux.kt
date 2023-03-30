@@ -9,7 +9,9 @@ import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.nio.ByteBuffer
+import java.nio.CharBuffer
 import java.nio.channels.Channel
+import java.nio.charset.StandardCharsets
 import org.xnio.ChannelListener
 
 // TODO: this all has a blocking interface
@@ -84,6 +86,8 @@ class MuxedSocket(
     CLOSED
   }
 
+  // user-facing interface /////////////////////////////////////////////////////
+
   fun openStream(): Stream? {
     when (state) {
       State.IDLE,
@@ -149,12 +153,14 @@ class MuxedSocket(
         activeStreams.clear()
         state = State.CLOSED
         val lastStream = Math.max(nextStream - 2, clientStreamWatermark)
-        // TODO: send goaway with lastStream
+        WebSockets.sendBinaryBlocking(encodeGoawayMsg(lastStream, errorCode, msg), socket)
         WebSockets.sendCloseBlocking(CloseMessage.PROTOCOL_ERROR, msg, socket)
         socket.close()
       }
     }
   }
+
+  // interface used by WS //////////////////////////////////////////////////////
 
   fun onSocketMessage(msg: ByteBuffer) {
     when (state) {
@@ -211,6 +217,8 @@ class MuxedSocket(
     }
   }
 
+  // interface used by Stream //////////////////////////////////////////////////
+
   fun streamClose(streamId: Int, nowClosed: Boolean) {
     when (state) {
       State.IDLE,
@@ -218,7 +226,7 @@ class MuxedSocket(
       State.CLOSED -> {}
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
-        // TODO: send the stream close message
+        WebSockets.sendBinaryBlocking(encodeStreamCloseMsg(streamId), socket)
         if (nowClosed) {
           activeStreams.remove(streamId)
         }
@@ -233,7 +241,7 @@ class MuxedSocket(
       State.CLOSED -> {}
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
-        // TODO: send the stream error message
+        WebSockets.sendBinaryBlocking(encodeStreamErrorMsg(streamId, errorCode, msg), socket)
         activeStreams.remove(streamId)
       }
     }
@@ -246,9 +254,71 @@ class MuxedSocket(
       State.CLOSED -> {}
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
-        // TODO: send the stream data message
+        WebSockets.sendBinaryBlocking(encodeStreamDataMsg(streamId, data), socket)
       }
     }
+  }
+
+  // internal //////////////////////////////////////////////////////////////////
+
+  fun encodeGoawayMsg(lastStream: Int, errorCode: Int, msg: String): ByteBuffer {
+    if (lastStream > 0xFFFFFF) {
+      throw IllegalArgumentException("lastStream too large")
+    }
+    val encoder = StandardCharsets.UTF_8.newEncoder()
+    val buf = ByteBuffer.allocate(16 + msg.length * 3)
+    buf.putInt(0x01000000) // type 1 and stream 0
+    buf.putInt(lastStream)
+    buf.putInt(errorCode)
+    buf.putInt(0) // msg size placeholder - moves cursor
+
+    var res = encoder.encode(CharBuffer.wrap(msg), buf, true)
+    res.throwException()
+    res = encoder.flush(buf)
+    res.throwException()
+
+    buf.putInt(12, buf.position() - 16) // go back and fill msg size
+
+    return buf.flip()
+  }
+
+  fun encodeStreamDataMsg(stream: Int, data: ByteBuffer): ByteBuffer {
+    if (stream > 0xFFFFFF) {
+      throw IllegalArgumentException("stream too large")
+    }
+    val buf = ByteBuffer.allocate(4)
+    buf.putInt((0x02 shl 24) or stream) // type and stream
+    buf.put(data)
+    return buf.flip()
+  }
+
+  fun encodeStreamCloseMsg(stream: Int): ByteBuffer {
+    if (stream > 0xFFFFFF) {
+      throw IllegalArgumentException("stream too large")
+    }
+    val buf = ByteBuffer.allocate(4)
+    buf.putInt((0x03 shl 24) or stream) // type and stream
+    return buf.flip()
+  }
+
+  fun encodeStreamErrorMsg(stream: Int, errorCode: Int, msg: String): ByteBuffer {
+    if (stream > 0xFFFFFF) {
+      throw IllegalArgumentException("stream too large")
+    }
+    val encoder = StandardCharsets.UTF_8.newEncoder()
+    val buf = ByteBuffer.allocate(12 + msg.length * 3)
+    buf.putInt((0x04 shl 24) or stream) // type 4 and stream
+    buf.putInt(errorCode)
+    buf.putInt(0) // msg size placeholder - moves cursor
+
+    var res = encoder.encode(CharBuffer.wrap(msg), buf, true)
+    res.throwException()
+    res = encoder.flush(buf)
+    res.throwException()
+
+    buf.putInt(8, buf.position() - 12) // go back and fill msg size
+
+    return buf.flip()
   }
 }
 

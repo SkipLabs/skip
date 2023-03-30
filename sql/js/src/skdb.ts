@@ -585,6 +585,51 @@ class MuxedSocket {
     });
   }
 
+  // interface used by Stream //////////////////////////////////////////////////
+
+  streamClose(stream: number, nowClosed: boolean): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT: {
+      this.socket.send(this.encodeStreamCloseMsg(stream));
+      if (nowClosed) {
+        this.activeStreams.delete(stream);
+      }
+      break;
+    }
+    }
+  }
+
+  streamError(stream: number, errorCode: number, msg: string): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT:
+      this.socket.send(this.encodeStreamResetMsg(stream, errorCode, msg));
+      this.activeStreams.delete(stream);
+      break;
+    }
+  }
+
+  streamSend(stream: number, data: ArrayBuffer): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT:
+      this.socket.send(this.encodeStreamDataMsg(stream, data));
+    }
+  }
+
   // private ///////////////////////////////////////////////////////////////////
 
   private onSocketClose(_event: CloseEvent): void {
@@ -852,51 +897,6 @@ class MuxedSocket {
     }
     default:
       return null;
-    }
-  }
-
-  // interface used by Stream //////////////////////////////////////////////////
-
-  streamClose(stream: number, nowClosed: boolean): void {
-    switch (this.state) {
-    case MuxedSocketState.IDLE:
-    case MuxedSocketState.CLOSING:
-    case MuxedSocketState.CLOSED:
-      break;
-    case MuxedSocketState.AUTH_SENT:
-    case MuxedSocketState.CLOSEWAIT: {
-      this.socket.send(this.encodeStreamCloseMsg(stream));
-      if (nowClosed) {
-        this.activeStreams.delete(stream);
-      }
-      break;
-    }
-    }
-  }
-
-  streamError(stream: number, errorCode: number, msg: string): void {
-    switch (this.state) {
-    case MuxedSocketState.IDLE:
-    case MuxedSocketState.CLOSING:
-    case MuxedSocketState.CLOSED:
-      break;
-    case MuxedSocketState.AUTH_SENT:
-    case MuxedSocketState.CLOSEWAIT:
-      this.socket.send(this.encodeStreamResetMsg(stream, errorCode, msg));
-      this.activeStreams.delete(stream);
-      break;
-    }
-  }
-
-  streamSend(stream: number, data: ArrayBuffer): void {
-    switch (this.state) {
-    case MuxedSocketState.IDLE:
-    case MuxedSocketState.CLOSING:
-    case MuxedSocketState.CLOSED:
-      break;
-    case MuxedSocketState.AUTH_SENT:
-    case MuxedSocketState.CLOSEWAIT:
-      this.socket.send(this.encodeStreamDataMsg(stream, data));
     }
   }
 }
