@@ -548,6 +548,7 @@ class MuxedSocket {
     case MuxedSocketState.IDLE:
     case MuxedSocketState.CLOSING:
     case MuxedSocketState.CLOSED:
+      this.activeStreams.clear()
       this.state = MuxedSocketState.CLOSED;
       break;
     case MuxedSocketState.AUTH_SENT:
@@ -659,6 +660,10 @@ class MuxedSocket {
           break;
         }
 
+        // TODO: is the watermark condition necesary? we don't want to
+        // reuse streams but this doesn't allow for creating them with
+        // non-deterministic scheduling. if we don't accept them,
+        // should probably send a stream reset
         if (stream === undefined && msg.stream % 2 == 0 && msg.stream > this.serverStreamWatermark) {
           // new server-initiated stream
           this.serverStreamWatermark = msg.stream;
@@ -923,7 +928,7 @@ class Stream {
     case StreamState.CLOSED:
       break;
     case StreamState.OPEN:
-      this.state = StreamState.CLOSED;
+      this.state = StreamState.CLOSING;
       this.socket.streamClose(this.streamId, false);
       break;
     case StreamState.CLOSEWAIT:
