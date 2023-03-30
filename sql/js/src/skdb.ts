@@ -447,33 +447,48 @@ enum MuxedSocketState {
   CLOSED,
 }
 
-class MuxedSocket {
+type MuxAuth = {
+  type: "auth";
+}
+type MuxGoaway = {
+  type: "goaway";
+  lastStream: number;
+  errorCode: number;
+  msg: string;
+}
+type MuxStreamData = {
+  type: "data";
+  stream: number;
+  payload: ArrayBuffer;
+}
+type MuxStreamClose = {
+  type: "close";
+  stream: number;
+}
+type MuxStreamReset = {
+  type: "reset";
+  stream: number;
+  errorCode: number;
+  msg: string;
+}
+type MuxMessage = MuxAuth | MuxGoaway | MuxStreamData | MuxStreamClose | MuxStreamReset;
 
+class MuxedSocket {
+  // constants
   private socket: WebSocket;
+
+  // state
   private state: MuxedSocketState = MuxedSocketState.IDLE
   // streams in the open or closing state
   private activeStreams: Map<number, Stream> = new Map()
-  private lastStream = 0
+  private serverStreamWatermark = 0
   private nextStream = 1
-
-  // create the websocket. auth it. translate callbacks to streams.
-
-  // maybe this should compose a resilient connection?
-  // then we introduce a resilient stream? need to re-establish the
-  // connection if multiple streams start failing. correlated failure
-  // implies the connection is at fault
-
-  // states: idle, auth sent, closing, closed
-  // events: onStream, expose most stuff through streams,
-  //         onConnClose, onConnError (both called after all streams have been called)
-  // methods: connect and auth, close, error
-  //          streamOpen, streamClose, streamError, streamSend
 
   // user facing interface /////////////////////////////////////////////////////
 
   onStream?: (stream: Stream) => void;
   onClose?: () => void;
-  onError?: (event: Event) => void;
+  onError?: (error: Error) => void;
 
   constructor(socket: WebSocket) {
     // pre-condition: socket is open
@@ -485,7 +500,6 @@ class MuxedSocket {
     case MuxedSocketState.AUTH_SENT: {
       const streamId = this.nextStream;
       this.nextStream = this.nextStream + 2; // client uses odd-numbered streams
-      this.lastStream = streamId;
       const stream = new Stream(this, streamId);
       this.activeStreams.set(streamId, stream);
       return stream;
@@ -537,15 +551,17 @@ class MuxedSocket {
       this.state = MuxedSocketState.CLOSED;
       break;
     case MuxedSocketState.AUTH_SENT:
-    case MuxedSocketState.CLOSEWAIT:
+    case MuxedSocketState.CLOSEWAIT: {
       for (const stream of this.activeStreams.values()) {
         stream.error(errorCode, msg);
       }
       this.activeStreams.clear()
       this.state = MuxedSocketState.CLOSED;
-      this.socket.send(this.encodeGoawayMsg(this.lastStream, errorCode, msg));
+      const lastStream = Math.max(this.nextStream - 2, this.serverStreamWatermark);
+      this.socket.send(this.encodeGoawayMsg(lastStream, errorCode, msg));
       this.socket.close(1002);
       break;
+    }
     }
   }
 
@@ -553,13 +569,14 @@ class MuxedSocket {
     const auth = await MuxedSocket.encodeAuthMsg(creds);
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(uri)
+      socket.binaryType = "arraybuffer";
       socket.onclose = (_event) => reject(new Error("Socket closed before open"));
       socket.onerror = (event) => reject(event);
       socket.onmessage = (_event) => reject(new Error("Socket messaged before open"));
       socket.onopen = (_event) => {
         const muxSocket = new MuxedSocket(socket)
         socket.onclose = muxSocket.onSocketClose
-        socket.onerror = muxSocket.onSocketError
+        socket.onerror = (event) => muxSocket.onSocketError(new Error("Socket error"))
         socket.onmessage = muxSocket.onSocketMessage
         muxSocket.sendAuth(auth)
         resolve(muxSocket)
@@ -597,7 +614,7 @@ class MuxedSocket {
     }
   }
 
-  private onSocketError(event: Event): void {
+  private onSocketError(error: Error): void {
     switch (this.state) {
     case MuxedSocketState.CLOSED:
       break;
@@ -606,10 +623,10 @@ class MuxedSocket {
     case MuxedSocketState.CLOSING:
     case MuxedSocketState.CLOSEWAIT:
       for (const stream of this.activeStreams.values()) {
-        stream.onStreamError(event);
+        stream.onStreamError(error);
       }
       if (this.onError) {
-        this.onError(event);
+        this.onError(error);
       }
       this.activeStreams.clear()
       this.state = MuxedSocketState.CLOSED;
@@ -620,15 +637,59 @@ class MuxedSocket {
     switch (this.state) {
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSING:
-      // TODO: parse/decode and dispatch
-      // TODO: if creating a stream, set lastStream
+      if (!(event.data instanceof ArrayBuffer)) {
+        throw new Error("Received unexpected text data");
+      }
+      const msg = this.decode(event.data);
+      if (msg === null) {
+        // for robustness we ignore messages we don't understand
+        return;
+      }
+      switch (msg.type) {
+      case "auth":
+        throw new Error("Unexepected auth message from server");
+      case "goaway":
+        this.onSocketError(new Error(msg.msg));
+        break;
+      case "data": {
+        let stream = this.activeStreams.get(msg.stream);
+
+        if (stream == undefined && this.state == MuxedSocketState.CLOSING) {
+          // we don't accept new streams while closing
+          break;
+        }
+
+        if (stream === undefined && msg.stream % 2 == 0 && msg.stream > this.serverStreamWatermark) {
+          // new server-initiated stream
+          this.serverStreamWatermark = msg.stream;
+          stream = new Stream(this, msg.stream);
+          this.activeStreams.set(msg.stream, stream);
+          if (this.onStream) {
+            this.onStream(stream);
+          }
+        }
+        stream?.onStreamData(msg.payload);
+        break;
+      }
+      case "close":
+        const closed = this.activeStreams.get(msg.stream)?.onStreamClose();
+        if (closed) {
+          this.activeStreams.delete(msg.stream);
+        }
+        break;
+      case "reset":
+        this.activeStreams.get(msg.stream)?.onStreamError(new Error(msg.msg));
+        this.activeStreams.delete(msg.stream);
+        break;
+      default:
+        throw new Error("Unexpected message type");
+      }
       break;
     case MuxedSocketState.IDLE:
     case MuxedSocketState.CLOSEWAIT:
     case MuxedSocketState.CLOSED:
       break;
     }
-    // TODO: if it is a new stream, how do we surface the data?
   }
 
   private sendAuth(msg: ArrayBuffer): void {
@@ -702,11 +763,10 @@ class MuxedSocket {
     if (stream >= 2**24) {
       throw new Error("Cannot encode stream");
     }
-    const buf = new ArrayBuffer(4);
+    const buf = new ArrayBuffer(4 + data.byteLength);
     const dataView = new DataView(buf);
     const uint8View = new Uint8Array(buf);
     dataView.setUint32(0, 0x2 << 24 | stream, false);  // type and stream id
-    // TODO: is there a way to avoid the copy?
     uint8View.set(new Uint8Array(data), 4);
     return buf;
   }
@@ -735,6 +795,59 @@ class MuxedSocket {
     const encodeResult = textEncoder.encodeInto(msg, uint8View.subarray(12));
     dataView.setUint32(8, encodeResult.written || 0, false);
     return buf.slice(0, 12 + (encodeResult.written || 0));
+  }
+
+  private decode(msg: ArrayBuffer): MuxMessage|null {
+    const dv = new DataView(msg);
+    const typeAndStream = dv.getUint32(0, false);
+    const type = typeAndStream >>> 24;
+    const stream = typeAndStream | 0xFFFFFF;
+    switch (type) {
+    case 0: {                   // auth
+      return {
+        type: "auth",
+      };
+    }
+    case 1: {                   // goaway
+      const msgLength = dv.getUint32(12, false);
+      const errorMsgBytes = new Uint8Array(msg, 16, msgLength);
+      const td = new TextDecoder();
+      const errorMsg = td.decode(errorMsgBytes);
+      return {
+        type: "goaway",
+        lastStream: dv.getUint32(4, false),
+        errorCode: dv.getUint32(8, false),
+        msg: errorMsg,
+      };
+    }
+    case 2: {                   // stream data
+      return {
+        type: "data",
+        stream: stream,
+        payload: new Uint8Array(msg, 4),
+      };
+    }
+    case 3: {                   // stream close
+      return {
+        type: "close",
+        stream: stream,
+      };
+    }
+    case 4: {                   // stream reset
+      const msgLength = dv.getUint32(8, false);
+      const errorMsgBytes = new Uint8Array(msg, 12, msgLength);
+      const td = new TextDecoder();
+      const errorMsg = td.decode(errorMsgBytes);
+      return {
+        type: "reset",
+        stream: stream,
+        errorCode: dv.getUint32(4, false),
+        msg: errorMsg,
+      };
+    }
+    default:
+      return null;
+    }
   }
 
   // interface used by Stream //////////////////////////////////////////////////
@@ -791,22 +904,18 @@ enum StreamState {
 }
 
 class Stream {
-  // events: onClose, onError, onData
-  // methods: close, error, send
-  // states: open, closing, closed
-  // state: muxedsocket, stream id
-
   // constants
   private socket: MuxedSocket
   private streamId: number
 
+  // state
   private state: StreamState = StreamState.OPEN;
 
   // user facing interface ///////////////////////////////////
 
   onClose?: () => void
-  onError?: (event: Event) => void
-  onData?: () => void
+  onError?: (error: Error) => void
+  onData?: (data: ArrayBuffer) => void
 
   close(): void {
     switch (this.state) {
@@ -856,27 +965,28 @@ class Stream {
     this.streamId = streamId
   }
 
-  onStreamClose(): void {
+  onStreamClose(): boolean {
     switch (this.state) {
     case StreamState.CLOSED:
+      return true;
     case StreamState.CLOSEWAIT:
-      break;
+      return false;
     case StreamState.OPEN:
       this.state = StreamState.CLOSEWAIT;
       if (this.onClose) {
         this.onClose();
       }
-      break;
+      return false;
     case StreamState.CLOSING:
       this.state = StreamState.CLOSED;
       if (this.onClose) {
         this.onClose();
       }
-      break;
+      return true;
     }
   }
 
-  onStreamError(event: Event): void {
+  onStreamError(error: Error): void {
     switch (this.state) {
     case StreamState.CLOSED:
       break;
@@ -885,12 +995,12 @@ class Stream {
     case StreamState.CLOSEWAIT:
       this.state = StreamState.CLOSED;
       if (this.onError) {
-        this.onError(event);
+        this.onError(error);
       }
     }
   }
 
-  onStreamData(): void {
+  onStreamData(data: ArrayBuffer): void {
     switch (this.state) {
     case StreamState.CLOSED:
     case StreamState.CLOSEWAIT:
@@ -898,7 +1008,7 @@ class Stream {
     case StreamState.CLOSING:
     case StreamState.OPEN:
       if (this.onData) {
-        this.onData();
+        this.onData(data);
       }
     }
   }
