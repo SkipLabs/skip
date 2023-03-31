@@ -851,7 +851,7 @@ class MuxedSocket {
     const dv = new DataView(msg);
     const typeAndStream = dv.getUint32(0, false);
     const type = typeAndStream >>> 24;
-    const stream = typeAndStream | 0xFFFFFF;
+    const stream = typeAndStream & 0xFFFFFF;
     switch (type) {
     case 0: {                   // auth
       return {
