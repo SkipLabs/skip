@@ -473,7 +473,7 @@ type MuxStreamReset = {
 }
 type MuxMessage = MuxAuth | MuxGoaway | MuxStreamData | MuxStreamClose | MuxStreamReset;
 
-class MuxedSocket {
+export class MuxedSocket {
   // constants
   private socket: WebSocket;
 
