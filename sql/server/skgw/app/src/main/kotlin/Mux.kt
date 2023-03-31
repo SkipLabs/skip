@@ -12,6 +12,11 @@ import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.channels.Channel
 import java.nio.charset.StandardCharsets
+import java.time.Duration
+import java.time.Instant
+import java.util.Base64
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import org.xnio.ChannelListener
 
 // TODO: this all has a blocking interface
@@ -20,13 +25,13 @@ import org.xnio.ChannelListener
 // runs in callbacks on a sharded thread
 
 interface MuxedSocketFactory {
-  fun onConnect(exchange: WebSocketHttpExchange): MuxedSocket
+  fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel): MuxedSocket
 }
 
 class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConnectionCallback {
 
   override fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel) {
-    val muxedSocket = socketFactory.onConnect(exchange)
+    val muxedSocket = socketFactory.onConnect(exchange, channel)
 
     channel.receiveSetter.set(
         object : AbstractReceiveListener() {
@@ -98,6 +103,7 @@ class MuxedSocket(
     val onClose: onCloseFn,
     val onError: onErrorFn,
     val socket: WebSocketChannel,
+    val getDecryptedKey: (String) -> ByteArray,
     private var state: State = State.IDLE,
     private var nextStream: UInt = 1u,
     private var clientStreamWatermark: UInt = 0u,
@@ -193,10 +199,15 @@ class MuxedSocket(
       State.CLOSE_WAIT,
       State.CLOSED -> {}
       State.IDLE -> {
-        // TODO: check auth and transition to auth_recv
         val muxMsg = decodeMsg(msg)
         when (muxMsg) {
-          is MuxAuthMsg -> throw RuntimeException("TODO")
+          is MuxAuthMsg -> {
+            if (!verify(muxMsg)) {
+              onSocketError(3u, "Authentication failed")
+              return
+            }
+            state = State.AUTH_RECV
+          }
           is MuxGoawayMsg -> onSocketError(muxMsg.errorCode, muxMsg.msg)
           is MuxStreamDataMsg,
           is MuxStreamCloseMsg,
@@ -230,11 +241,11 @@ class MuxedSocket(
             if (stream == null &&
                 muxMsg.stream % 2u == 1u &&
                 muxMsg.stream > clientStreamWatermark) {
-                  // legitimate new stream
-                  clientStreamWatermark = muxMsg.stream
-                  stream = Stream(muxMsg.stream, this)
-                  activeStreams.put(muxMsg.stream, stream)
-                  onStream(stream)
+              // legitimate new stream
+              clientStreamWatermark = muxMsg.stream
+              stream = Stream(muxMsg.stream, this)
+              activeStreams.put(muxMsg.stream, stream)
+              onStream(stream)
             }
 
             stream?.onStreamData(muxMsg.payload)
@@ -442,6 +453,38 @@ class MuxedSocket(
       // we throw as the server is assumed to always be ahead of clients
       else -> throw RuntimeException("Could not decode msg")
     }
+  }
+
+  private fun verify(auth: MuxAuthMsg): Boolean {
+    val algo = "HmacSHA256"
+
+    val now = Instant.now()
+    val d = Instant.parse(auth.date)
+    // delta represents physical timeline time, regardless of calendars and clock shifts
+    val delta = Duration.between(d, now)
+
+    // do not allow auths that were not recent. the margin is for clock skew.
+    if (delta.abs().compareTo(Duration.ofMinutes(10)) > 0) {
+      return false
+    }
+
+    // TODO: check nonce against a cache to prevent replay attacks
+
+    val nonce = Base64.getEncoder().encodeToString(auth.nonce)
+    val content: String = "auth" + auth.accessKey + auth.date + nonce
+    val contentBytes = content.toByteArray(Charsets.UTF_8)
+
+    val mac = Mac.getInstance(algo)
+
+    val privateKey = getDecryptedKey(auth.accessKey)
+
+    mac.init(SecretKeySpec(privateKey, algo))
+    val ourSig = mac.doFinal(contentBytes)
+
+    // at least try to keep the private key in memory for as little time as possible
+    privateKey.fill(0)
+
+    return ourSig == auth.signature
   }
 }
 
