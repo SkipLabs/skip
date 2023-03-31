@@ -576,9 +576,9 @@ export class MuxedSocket {
       socket.onmessage = (_event) => reject(new Error("Socket messaged before open"));
       socket.onopen = (_event) => {
         const muxSocket = new MuxedSocket(socket)
-        socket.onclose = muxSocket.onSocketClose
-        socket.onerror = (event) => muxSocket.onSocketError(new Error("Socket error"))
-        socket.onmessage = muxSocket.onSocketMessage
+        socket.onclose = (event) => muxSocket.onSocketClose(event)
+        socket.onerror = (_event) => muxSocket.onSocketError(new Error("Socket error"))
+        socket.onmessage = (event) => muxSocket.onSocketMessage(event)
         muxSocket.sendAuth(auth)
         resolve(muxSocket)
       };

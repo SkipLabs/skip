@@ -14,6 +14,7 @@ import java.nio.channels.Channel
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
+import java.util.Arrays
 import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -60,7 +61,7 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
     channel.closeSetter.set(
         object : ChannelListener<Channel> {
           override fun handleEvent(channel: Channel): Unit {
-            muxedSocket.onSocketError(0u, "tcp socket closed")
+            muxedSocket.onSocketClose()
           }
         })
 
@@ -68,13 +69,15 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
   }
 }
 
-typealias onStreamFn = (Stream) -> Unit
+typealias onStreamFn = (MuxedSocket, Stream) -> Unit
 
 typealias onDataFn = (ByteBuffer) -> Unit
 
-typealias onCloseFn = () -> Unit
+typealias onSocketCloseFn = (MuxedSocket) -> Unit
+typealias onStreamCloseFn = () -> Unit
 
-typealias onErrorFn = (UInt, String) -> Unit
+typealias onSocketErrorFn = (MuxedSocket, UInt, String) -> Unit
+typealias onStreamErrorFn = (UInt, String) -> Unit
 
 sealed class MuxMsg
 
@@ -100,8 +103,8 @@ data class MuxStreamResetMsg(val stream: UInt, val errorCode: UInt, val msg: Str
 
 class MuxedSocket(
     val onStream: onStreamFn,
-    val onClose: onCloseFn,
-    val onError: onErrorFn,
+    val onClose: onSocketCloseFn,
+    val onError: onSocketErrorFn,
     val socket: WebSocketChannel,
     val getDecryptedKey: (String) -> ByteArray,
     private var state: State = State.IDLE,
@@ -145,7 +148,7 @@ class MuxedSocket(
       State.IDLE -> {
         activeStreams.clear()
         state = State.CLOSED
-        WebSockets.sendCloseBlocking(CloseMessage.NORMAL_CLOSURE, "", socket)
+        sendClose(CloseMessage.NORMAL_CLOSURE, "")
         socket.close()
       }
       State.CLOSE_WAIT -> {
@@ -154,7 +157,7 @@ class MuxedSocket(
         }
         activeStreams.clear()
         state = State.CLOSED
-        WebSockets.sendCloseBlocking(CloseMessage.NORMAL_CLOSURE, "", socket)
+        sendClose(CloseMessage.NORMAL_CLOSURE, "")
         socket.close()
       }
       State.AUTH_RECV -> {
@@ -162,7 +165,7 @@ class MuxedSocket(
           stream.close()
         }
         state = State.CLOSING
-        WebSockets.sendCloseBlocking(CloseMessage.NORMAL_CLOSURE, "", socket)
+        sendClose(CloseMessage.NORMAL_CLOSURE, "")
         socket.close()
       }
     }
@@ -185,8 +188,8 @@ class MuxedSocket(
         state = State.CLOSED
         val lastStream =
             if (nextStream - 2u > clientStreamWatermark) nextStream - 2u else clientStreamWatermark
-        WebSockets.sendBinaryBlocking(encodeGoawayMsg(lastStream, errorCode, msg), socket)
-        WebSockets.sendCloseBlocking(CloseMessage.PROTOCOL_ERROR, msg, socket)
+        sendData(encodeGoawayMsg(lastStream, errorCode, msg))
+        sendClose(CloseMessage.PROTOCOL_ERROR, msg)
         socket.close()
       }
     }
@@ -245,7 +248,7 @@ class MuxedSocket(
               clientStreamWatermark = muxMsg.stream
               stream = Stream(muxMsg.stream, this)
               activeStreams.put(muxMsg.stream, stream)
-              onStream(stream)
+              onStream(this, stream)
             }
 
             stream?.onStreamData(muxMsg.payload)
@@ -264,14 +267,14 @@ class MuxedSocket(
         for (stream in activeStreams.values) {
           stream.onStreamClose()
         }
-        onClose()
+        onClose(this)
         state = State.CLOSE_WAIT
       }
       State.CLOSING -> {
         for (stream in activeStreams.values) {
           stream.onStreamClose()
         }
-        onClose()
+        onClose(this)
         activeStreams.clear()
         state = State.CLOSED
       }
@@ -289,7 +292,7 @@ class MuxedSocket(
         for (stream in activeStreams.values) {
           stream.onStreamError(errorCode, msg)
         }
-        onError(errorCode, msg)
+        onError(this, errorCode, msg)
         activeStreams.clear()
         state = State.CLOSED
       }
@@ -305,7 +308,7 @@ class MuxedSocket(
       State.CLOSED -> {}
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
-        WebSockets.sendBinaryBlocking(encodeStreamCloseMsg(streamId), socket)
+        sendData(encodeStreamCloseMsg(streamId))
         if (nowClosed) {
           activeStreams.remove(streamId)
         }
@@ -320,7 +323,7 @@ class MuxedSocket(
       State.CLOSED -> {}
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
-        WebSockets.sendBinaryBlocking(encodeStreamErrorMsg(streamId, errorCode, msg), socket)
+        sendData(encodeStreamErrorMsg(streamId, errorCode, msg))
         activeStreams.remove(streamId)
       }
     }
@@ -333,7 +336,7 @@ class MuxedSocket(
       State.CLOSED -> {}
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
-        WebSockets.sendBinaryBlocking(encodeStreamDataMsg(streamId, data), socket)
+        sendData(encodeStreamDataMsg(streamId, data))
       }
     }
   }
@@ -365,7 +368,7 @@ class MuxedSocket(
     if (stream > 0xFFFFFFu) {
       throw IllegalArgumentException("stream too large")
     }
-    val buf = ByteBuffer.allocate(4)
+    val buf = ByteBuffer.allocate(4 + data.remaining())
     buf.putInt(((0x02u shl 24) or stream).toInt()) // type and stream
     buf.put(data)
     return buf.flip()
@@ -403,7 +406,7 @@ class MuxedSocket(
   private fun decodeMsg(msg: ByteBuffer): MuxMsg {
     val typeAndStream = msg.getInt().toUInt()
     val type = typeAndStream shr 24
-    val stream = typeAndStream or 0xFFFFFFu
+    val stream = typeAndStream and 0xFFFFFFu
     return when (type) {
       // auth
       0u -> {
@@ -484,16 +487,28 @@ class MuxedSocket(
     // at least try to keep the private key in memory for as little time as possible
     privateKey.fill(0)
 
-    return ourSig == auth.signature
+    return Arrays.equals(ourSig, auth.signature)
+  }
+
+  private fun sendClose(code: Int, reason: String) {
+    if (socket.isOpen()) {
+      WebSockets.sendCloseBlocking(code, reason, socket)
+    }
+  }
+
+  private fun sendData(data: ByteBuffer) {
+    if (socket.isOpen()) {
+      WebSockets.sendBinaryBlocking(data, socket)
+    }
   }
 }
 
 class Stream(
     val streamId: UInt,
     val socket: MuxedSocket,
-    var onData: onDataFn = {},
-    var onClose: onCloseFn = {},
-    var onError: onErrorFn = { _, _ -> },
+    var onData: onDataFn = { _ -> },
+    var onClose: onStreamCloseFn = {},
+    var onError: onStreamErrorFn = { _, _ -> },
     private var state: State = State.OPEN,
 ) {
   enum class State {
