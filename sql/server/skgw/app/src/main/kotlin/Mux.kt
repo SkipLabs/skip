@@ -23,7 +23,11 @@ import org.xnio.ChannelListener
 // TODO: this all has a blocking interface
 
 // TODO: none of this is thread safe. the assumption is that it all
-// runs in callbacks on a sharded thread
+// runs in callbacks on a sharded thread. this won't work. currently
+// we read data from many threads and send to streams.
+
+// probably ok if socket is always interacted with on a single thread,
+// and the same for each stream?
 
 interface MuxedSocketFactory {
   fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel): MuxedSocket
