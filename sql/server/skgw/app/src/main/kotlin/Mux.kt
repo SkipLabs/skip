@@ -108,7 +108,7 @@ class MuxedSocket(
     val socket: WebSocketChannel,
     val getDecryptedKey: (String) -> ByteArray,
     private var state: State = State.IDLE,
-    private var nextStream: UInt = 1u,
+    private var nextStream: UInt = 2u,
     private var clientStreamWatermark: UInt = 0u,
     private val activeStreams: MutableMap<UInt, Stream> = HashMap(),
 ) {
@@ -152,8 +152,11 @@ class MuxedSocket(
         socket.close()
       }
       State.CLOSE_WAIT -> {
-        for (stream in activeStreams.values) {
-          stream.close()
+        val keys = activeStreams.keys.toSet()
+        // we do not iterate over entries as we may remove them while iterating
+        for (key in keys) {
+          val stream = activeStreams.get(key)
+          stream?.close()
         }
         activeStreams.clear()
         state = State.CLOSED
@@ -161,8 +164,10 @@ class MuxedSocket(
         socket.close()
       }
       State.AUTH_RECV -> {
-        for (stream in activeStreams.values) {
-          stream.close()
+        val keys = activeStreams.keys.toSet()
+        for (key in keys) {
+          val stream = activeStreams.get(key)
+          stream?.close()
         }
         state = State.CLOSING
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
@@ -181,8 +186,10 @@ class MuxedSocket(
       }
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
-        for (stream in activeStreams.values) {
-          stream.error(errorCode, msg)
+        val keys = activeStreams.keys.toSet()
+        for (key in keys) {
+          val stream = activeStreams.get(key)
+          stream?.error(errorCode, msg)
         }
         activeStreams.clear()
         state = State.CLOSED
@@ -264,15 +271,19 @@ class MuxedSocket(
       State.CLOSE_WAIT -> {}
       State.IDLE,
       State.AUTH_RECV -> {
-        for (stream in activeStreams.values) {
-          stream.onStreamClose()
+        val keys = activeStreams.keys.toSet()
+        for (key in keys) {
+          val stream = activeStreams.get(key)
+          stream?.onStreamClose()
         }
         onClose(this)
         state = State.CLOSE_WAIT
       }
       State.CLOSING -> {
-        for (stream in activeStreams.values) {
-          stream.onStreamClose()
+        val keys = activeStreams.keys.toSet()
+        for (key in keys) {
+          val stream = activeStreams.get(key)
+          stream?.onStreamClose()
         }
         onClose(this)
         activeStreams.clear()
@@ -289,8 +300,10 @@ class MuxedSocket(
       State.CLOSE_WAIT,
       State.AUTH_RECV,
       State.CLOSING -> {
-        for (stream in activeStreams.values) {
-          stream.onStreamError(errorCode, msg)
+        val keys = activeStreams.keys.toSet()
+        for (key in keys) {
+          val stream = activeStreams.get(key)
+          stream?.onStreamError(errorCode, msg)
         }
         onError(this, errorCode, msg)
         activeStreams.clear()
@@ -355,9 +368,13 @@ class MuxedSocket(
     buf.putInt(0) // msg size placeholder - moves cursor
 
     var res = encoder.encode(CharBuffer.wrap(msg), buf, true)
-    res.throwException()
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
     res = encoder.flush(buf)
-    res.throwException()
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
 
     buf.putInt(12, buf.position() - 16) // go back and fill msg size
 
@@ -394,9 +411,13 @@ class MuxedSocket(
     buf.putInt(0) // msg size placeholder - moves cursor
 
     var res = encoder.encode(CharBuffer.wrap(msg), buf, true)
-    res.throwException()
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
     res = encoder.flush(buf)
-    res.throwException()
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
 
     buf.putInt(8, buf.position() - 12) // go back and fill msg size
 
