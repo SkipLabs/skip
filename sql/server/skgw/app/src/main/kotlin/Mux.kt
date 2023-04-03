@@ -182,12 +182,12 @@ class MuxedSocket(
 
   fun errorSocket(errorCode: UInt, msg: String) {
     when (state) {
-      State.IDLE,
       State.CLOSING,
       State.CLOSED -> {
         activeStreams.clear()
         state = State.CLOSED
       }
+      State.IDLE,
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
         val keys = activeStreams.keys.toSet()
@@ -217,7 +217,7 @@ class MuxedSocket(
         when (muxMsg) {
           is MuxAuthMsg -> {
             if (!verify(muxMsg)) {
-              onSocketError(3u, "Authentication failed")
+              errorSocket(3u, "Authentication failed")
               return
             }
             state = State.AUTH_RECV
