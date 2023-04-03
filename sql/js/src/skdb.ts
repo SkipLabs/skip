@@ -579,8 +579,8 @@ export class MuxedSocket {
         socket.onclose = (event) => muxSocket.onSocketClose(event)
         socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
         socket.onmessage = (event) => muxSocket.onSocketMessage(event)
-        muxSocket.sendAuth(auth)
         resolve(muxSocket)
+        muxSocket.sendAuth(auth)
       };
     });
   }

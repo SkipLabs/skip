@@ -287,7 +287,54 @@ const tests = {
 
     socket.onClose = () => assert(receivedError);
     socket.closeSocket();
-  }
+  },
+
+  authFail: async () => {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw", enc.encode("this-is-not-correct"), // <--
+      { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
+
+    const socket = await MuxedSocket.connect("ws://localhost:8080", {
+      accessKey: "ABCDEFGHIJKLMNOPQRST",
+      privateKey: key,
+      deviceUuid: "abcde",
+    });
+
+    let receivedError = false;
+    let receivedData = false;
+
+    socket.onError = (code, msg) => {
+      receivedError = true;
+      assert.equal(code, 3);
+    };
+
+    const stream = socket.openStream();
+
+    stream.onData = (data) => {
+      receivedData = true;
+      assert.equal(toHex(data), "0x00000000");
+    };
+
+    stream.send(request_echo(0));
+
+    // this doesn't get called because the socket errored
+    socket.onClose = () => assert(false);
+    socket.closeSocket();
+  },
+
+  errorConnection: async () => {
+    const socket = await connectAndAuth();
+    const stream = socket.openStream();
+
+    stream.onData = (data) => {
+      assert(false);
+    };
+
+    stream.send(request_echo(0));
+
+    socket.errorSocket(99, "test");
+  },
 };
 
 
