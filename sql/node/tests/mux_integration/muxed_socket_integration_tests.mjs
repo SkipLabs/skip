@@ -275,9 +275,9 @@ const tests = {
       assert(false);
     };
 
-    stream.onError = () => {
+    stream.onError = (code, msg) => {
       receivedError = true;
-      // TODO: assert on code and message
+      assert.equal(code, 5);
     };
 
     stream.send(request_error());

@@ -488,7 +488,7 @@ export class MuxedSocket {
 
   onStream?: (stream: Stream) => void;
   onClose?: () => void;
-  onError?: (error: Error) => void;
+  onError?: (errorCode: number, msg: string) => void;
 
   constructor(socket: WebSocket) {
     // pre-condition: socket is open
@@ -577,7 +577,7 @@ export class MuxedSocket {
       socket.onopen = (_event) => {
         const muxSocket = new MuxedSocket(socket)
         socket.onclose = (event) => muxSocket.onSocketClose(event)
-        socket.onerror = (_event) => muxSocket.onSocketError(new Error("Socket error"))
+        socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
         socket.onmessage = (event) => muxSocket.onSocketMessage(event)
         muxSocket.sendAuth(auth)
         resolve(muxSocket)
@@ -660,7 +660,7 @@ export class MuxedSocket {
     }
   }
 
-  private onSocketError(error: Error): void {
+  private onSocketError(errorCode: number, msg: string): void {
     switch (this.state) {
     case MuxedSocketState.CLOSED:
       break;
@@ -669,10 +669,10 @@ export class MuxedSocket {
     case MuxedSocketState.CLOSING:
     case MuxedSocketState.CLOSEWAIT:
       for (const stream of this.activeStreams.values()) {
-        stream.onStreamError(error);
+        stream.onStreamError(0, msg);
       }
       if (this.onError) {
-        this.onError(error);
+        this.onError(errorCode, msg);
       }
       this.activeStreams.clear()
       this.state = MuxedSocketState.CLOSED;
@@ -695,7 +695,7 @@ export class MuxedSocket {
       case "auth":
         throw new Error("Unexepected auth message from server");
       case "goaway":
-        this.onSocketError(new Error(msg.msg));
+        this.onSocketError(msg.errorCode, msg.msg);
         break;
       case "data": {
         let stream = this.activeStreams.get(msg.stream);
@@ -728,7 +728,7 @@ export class MuxedSocket {
         }
         break;
       case "reset":
-        this.activeStreams.get(msg.stream)?.onStreamError(new Error(msg.msg));
+        this.activeStreams.get(msg.stream)?.onStreamError(msg.errorCode, msg.msg);
         this.activeStreams.delete(msg.stream);
         break;
       default:
@@ -919,7 +919,7 @@ class Stream {
   // user facing interface ///////////////////////////////////
 
   onClose?: () => void
-  onError?: (error: Error) => void
+  onError?: (errorCode: number, msg: string) => void
   onData?: (data: ArrayBuffer) => void
 
   close(): void {
@@ -991,7 +991,7 @@ class Stream {
     }
   }
 
-  onStreamError(error: Error): void {
+  onStreamError(errorCode: number, msg: string): void {
     switch (this.state) {
     case StreamState.CLOSED:
       break;
@@ -1000,7 +1000,7 @@ class Stream {
     case StreamState.CLOSEWAIT:
       this.state = StreamState.CLOSED;
       if (this.onError) {
-        this.onError(error);
+        this.onError(errorCode, msg);
       }
     }
   }
