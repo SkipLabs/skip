@@ -304,7 +304,6 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
 class TickConfigFile(value: (Int, Config.Config)) extends SKFS.File
 
 fun compile(
-  isInit: Bool,
   config: Config.Config,
   context: mutable SKFS.Context,
   fileNames: Array<String>,
@@ -344,9 +343,7 @@ fun compile(
       TickConfigFile::fromFile,
       backendDirName,
       false,
-      if (isInit) Array[] else {
-        Array[(SKFS.IID(0), TickConfigFile((-128, config)))]
-      },
+      Array[(SKFS.IID(0), TickConfigFile((-128, config)))],
     );
 
     _ = backendDir.contextWriterKeyValues(
