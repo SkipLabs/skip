@@ -52,7 +52,20 @@ base class FixedData<T> {
   fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
 }
 
-class FixedDir<T> private {
+fun binSearch<T: Orderable>(get: Int ~> T, key: T, i: Int, j: Int): Int {
+  if (i > j) {
+    return i;
+  };
+  pivot = (i + j) / 2;
+  key.compare(get(pivot)) match {
+  | LT()
+  | EQ() ->
+    binSearch(get, key, i, pivot - 1)
+  | GT() -> binSearch(get, key, pivot + 1, j)
+  }
+}
+
+class FixedDir<T: frozen> private {
   data: Array<FixedRow<T>> = Array[],
 } extends FixedData<T> {
   static fun create(
@@ -73,22 +86,12 @@ class FixedDir<T> private {
     this.data.unsafe_get(idx)
   }
 
-  fun getPos(key: BaseName): Int {
-    this.getPosij(key, 0, this.size() - 1)
+  fun getPosij(key: BaseName, i: Int, j: Int): Int {
+    binSearch(i ~> this.data[i].key, key, i, j)
   }
 
-  fun getPosij(key: BaseName, i: Int, j: Int): Int {
-    if (i > j) {
-      return i;
-    };
-    pivot = (i + j) / 2;
-    elt = this.data[pivot];
-    key.compare(elt.key) match {
-    | LT()
-    | EQ() ->
-      this.getPosij(key, i, pivot - 1)
-    | GT() -> this.getPosij(key, pivot + 1, j)
-    }
+  fun getPos(key: BaseName): Int {
+    this.getPosij(key, 0, this.size() - 1)
   }
 
   fun getPosSourceKey(source: Source, key: BaseName, i: Int, j: Int): Int {

@@ -1487,6 +1487,14 @@ fun eval(options: Options, userOpt: ?String): void {
             return void;
           };
 
+          // FAST PATH
+          if (!isTransaction && lex.isEqUpper(pos, "SELECT")) {
+            origPos = pos;
+            success = SelectFast::run(options, context, lex, pos);
+            if (success) continue;
+            !pos = origPos;
+          };
+
           if (lex.isEqUpper(pos, "BEGIN")) {
             !pos = lex.expectUpper(pos, "BEGIN");
             !pos = lex.expectUpper(pos, "TRANSACTION");

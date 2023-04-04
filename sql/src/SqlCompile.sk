@@ -195,65 +195,9 @@ mutable class Compiler{
     this.!other = mutable Vector[];
 
     origFrom = this.compileFrom(context, select.from);
-    (cond, from) = this.compileJoin(context, origFrom, select);
+    (cond, from) = this.compileJoin(context, origFrom, select.where);
     !select.where = cond;
-    sparams = if (select.params.isStar) {
-      extraParams = select.params.params;
-      params = mutable Vector<(Expr, ?Name)>[];
-      for (dirDescr in origFrom) {
-        tableName = dirDescr.alias match {
-        | None() -> dirDescr.name
-        | Some(x) -> x
-        };
-        for (varName in dirDescr.colNames) {
-          params.push(
-            (Literal(tableName.lower + "." + varName.lower, false), None()),
-          )
-        }
-      };
-      for (extraParam in extraParams) {
-        params.push(extraParam);
-      };
-      params.toArray()
-    } else {
-      select.params.params
-    };
-    origFromMap = mutable Map[];
-    for (table in origFrom) {
-      if (!origFromMap.containsKey(table.name)) {
-        origFromMap![table.name] = table;
-      };
-      table.alias match {
-      | Some(alias) if (!origFromMap.containsKey(alias)) ->
-        origFromMap![alias] = table
-      | _ -> void
-      }
-    };
-    expandedSParams = mutable Vector[];
-    for (sparam in sparams) {
-      sparam match {
-      | (
-        Binop(
-          ".",
-          litTableName @ Literal(tableNameStr, false),
-          Literal("*", false),
-        ),
-        asName,
-      ) ->
-        tableName = Name::create(tableNameStr);
-        if (!origFromMap.containsKey(tableName)) {
-          error(this.pos, "Table not found: " + tableNameStr);
-        };
-        tableDescr = origFromMap[tableName];
-        for (colName in tableDescr.colNames) {
-          expandedSParams.push(
-            (Binop(".", litTableName, Literal(colName.lower, false)), asName),
-          )
-        }
-      | _ -> expandedSParams.push(sparam)
-      }
-    };
-    params = this.compileParams(context, expandedSParams.toArray());
+    params = this.compileParams(context, select.params, origFrom);
     where = this.compileWhere(context, select.where);
     groupBy = this.compileGroupBy(context, select.groupBy, params);
     having = this.compileHaving(context, select.having);
@@ -383,9 +327,67 @@ mutable class Compiler{
 
   mutable fun compileParams(
     context: mutable SKFS.Context,
-    params: Array<(Expr, ?Name)>,
+    selectParams: SelectParams,
+    origFrom: Array<DirDescr>,
   ): Array<CGExpr> {
-    cparams = params.map(param -> {
+    sparams = if (selectParams.isStar) {
+      extraParams = selectParams.params;
+      params = mutable Vector<(Expr, ?Name)>[];
+      for (dirDescr in origFrom) {
+        tableName = dirDescr.alias match {
+        | None() -> dirDescr.name
+        | Some(x) -> x
+        };
+        for (varName in dirDescr.colNames) {
+          params.push(
+            (Literal(tableName.lower + "." + varName.lower, false), None()),
+          )
+        }
+      };
+      for (extraParam in extraParams) {
+        params.push(extraParam);
+      };
+      params.toArray()
+    } else {
+      selectParams.params
+    };
+    origFromMap = mutable Map[];
+    for (table in origFrom) {
+      if (!origFromMap.containsKey(table.name)) {
+        origFromMap![table.name] = table;
+      };
+      table.alias match {
+      | Some(alias) if (!origFromMap.containsKey(alias)) ->
+        origFromMap![alias] = table
+      | _ -> void
+      }
+    };
+    expandedSParams = mutable Vector[];
+    for (sparam in sparams) {
+      sparam match {
+      | (
+        Binop(
+          ".",
+          litTableName @ Literal(tableNameStr, false),
+          Literal("*", false),
+        ),
+        asName,
+      ) ->
+        tableName = Name::create(tableNameStr);
+        if (!origFromMap.containsKey(tableName)) {
+          error(this.pos, "Table not found: " + tableNameStr);
+        };
+        tableDescr = origFromMap[tableName];
+        for (colName in tableDescr.colNames) {
+          expandedSParams.push(
+            (Binop(".", litTableName, Literal(colName.lower, false)), asName),
+          )
+        }
+      | _ -> expandedSParams.push(sparam)
+      }
+    };
+
+    cparams = expandedSParams.toArray().map(param -> {
       (expr, asName) = param;
       (this.compileExpr(context, expr), asName)
     });
@@ -1608,9 +1610,9 @@ mutable class Compiler{
   mutable fun compileJoin(
     context: mutable SKFS.Context,
     origFrom: Array<DirDescr>,
-    select: Select,
+    where: ?Expr,
   ): (?Expr, Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>) {
-    select.where match {
+    where match {
     | None() ->
       if (origFrom.size() > 1) {
         if (this.options.virtual) {

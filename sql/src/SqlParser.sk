@@ -209,17 +209,7 @@ fun parseQuery(lex: Lexer, pos: Int): (Int, Query) {
   parseSelect(lex, pos);
 }
 
-fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
-  posBegin = lex.token(pos).posBegin;
-  kind = if (lex.isEqUpper(pos, "ALL")) {
-    !pos = lex.expectUpper(pos, "ALL");
-    SAll()
-  } else if (lex.isEqUpper(pos, "DISTINCT")) {
-    !pos = lex.expectUpper(pos, "DISTINCT");
-    SDistinct()
-  } else {
-    SNone()
-  };
+fun parseSelectParams(lex: Lexer, pos: Int): (Int, SelectParams) {
   (!pos, colNames) = parseColNames(lex, pos);
   selectParams = colNames match {
   | None() ->
@@ -235,6 +225,21 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
     }
   | Some(params) -> SelectParams(false, params)
   };
+  (pos, selectParams)
+}
+
+fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
+  posBegin = lex.token(pos).posBegin;
+  kind = if (lex.isEqUpper(pos, "ALL")) {
+    !pos = lex.expectUpper(pos, "ALL");
+    SAll()
+  } else if (lex.isEqUpper(pos, "DISTINCT")) {
+    !pos = lex.expectUpper(pos, "DISTINCT");
+    SDistinct()
+  } else {
+    SNone()
+  };
+  (!pos, selectParams) = parseSelectParams(lex, pos);
   (from, join) = if (lex.isEqUpper(pos, "FROM")) {
     (!pos, from, join) = parseFromJoin(lex, pos);
     (Some(from), join)

@@ -466,14 +466,14 @@ class SelectEvaluator{
     if (this.select.from.size() == 0) {
       if (context.unsafeMaybeGetEagerDir(this.selectName1) is None()) {
         emptyEval = ExprEvaluator(None(), Array[], this.select.from, this.up);
-        entry = this.evalRow(context, emptyEval, aggrs.map(y -> y.i1), 1);
+        entry = static::evalRow(context, emptyEval, aggrs.map(y -> y.i1), 1);
         evaluator = ExprEvaluator(
           None(),
           Array[entry],
           this.select.from,
           this.up,
         );
-        row = this.evalRow(context, evaluator, this.select.params, 1);
+        row = static::evalRow(context, evaluator, this.select.params, 1);
         _dir = context.mkdir(
           Row::fromFile,
           this.selectName1,
@@ -521,7 +521,7 @@ class SelectEvaluator{
           );
           this.select.having match {
           | None() ->
-            row = this.evalRow(context, evaluator, this.select.params, 1);
+            row = static::evalRow(context, evaluator, this.select.params, 1);
             writer.write(key, row)
           | Some(cond) ->
             evaluator.evalCIExpr(context, cond) match {
@@ -531,7 +531,7 @@ class SelectEvaluator{
             | AUndef() ->
               invariant_violation("Having should never be undefined")
             | ADef(_) ->
-              row = this.evalRow(context, evaluator, this.select.params, 1);
+              row = static::evalRow(context, evaluator, this.select.params, 1);
               writer.write(key, row)
             }
           }
@@ -560,7 +560,7 @@ class SelectEvaluator{
             this.select.from,
             this.up,
           );
-          emptyRow = this.evalRow(
+          emptyRow = static::evalRow(
             context,
             emptyEvaluator,
             this.select.params,
@@ -610,7 +610,7 @@ class SelectEvaluator{
     }
   }
 
-  fun evalRow(
+  static fun evalRow(
     context: mutable SKFS.Context,
     evaluator: ExprEvaluator,
     params: Array<CGExpr>,
@@ -619,7 +619,9 @@ class SelectEvaluator{
     RowValues::create(
       params.map(param ->
         evaluator.evalCGExpr(context, param) match {
-        | AUndef() -> invariant_violation("Unexpected undefined value")
+        | AUndef() ->
+          debug(param);
+          invariant_violation("Unexpected undefined value")
         | ANull() -> None()
         | ADef(x) -> Some(x)
         }
@@ -637,10 +639,10 @@ class SelectEvaluator{
       row = whereVal match {
       | ANull()
       | ADef(0) ->
-        this.evalRow(context, evaluator, Array[CGNull()], 1)
+        static::evalRow(context, evaluator, Array[CGNull()], 1)
       | AUndef()
       | ADef(_) ->
-        this.evalRow(context, evaluator, this.select.params, 1)
+        static::evalRow(context, evaluator, this.select.params, 1)
       };
       _dir = context.mkdir(
         Row::fromFile,
@@ -946,7 +948,7 @@ class SelectEvaluator{
     writer: mutable MultiWriter,
     repeat: Int,
   ): void {
-    row = this.evalRow(context, evaluator, this.params, repeat);
+    row = static::evalRow(context, evaluator, this.params, repeat);
     if (this.select.aggr is Some _) {
       !evaluator = evaluator with {entries => Array[row]};
       key = this.select.groupBy match {
