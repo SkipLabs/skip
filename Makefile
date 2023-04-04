@@ -1,24 +1,27 @@
-.PHONY: default
+# this builds the aritfacts of this repository, orchestrating the
+# various build systems
 
-default: sql/js/skdb.wasm build/skdb build/skdb.js build/skdb_node.js build/index.html build/init.sql
+all: sql/js/skdb.wasm build/skdb build/skdb.js build/skdb_node.js build/init.sql
 
-npm: sql/js/package.json sql/js/skdb.wasm sql/js/src/skdb.ts
+################################################################################
+# skdb wasm + js client
+################################################################################
 
-sql/target/skdb: sql/src/* skfs/src/*
-	cd sql && skargo build
+npm: sql/js/package.json sql/js/skdb.wasm sql/js/src/skdb.js
 
 sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
 	cd sql && skargo build --target wasm32-unknown-unknown
 
-build/skdb: sql/target/skdb
-	mkdir -p build
-	cp $^ $@
-
-build/init.sql: sql/privacy/init.sql
-	cp $^ $@
-
 sql/js/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 	cp $^ $@
+
+sql/node/node_modules: sql/node/package.json
+	cd sql/node && npm install
+
+# convenient for running artifacts out of build/
+build/node_modules: sql/node/node_modules
+	mkdir -p build
+	cp -R $^ $@
 
 build/skdb.wasm: sql/js/skdb.wasm
 	mkdir -p build
@@ -38,15 +41,34 @@ build/skdb.js: sql/js/src/skdb.ts
 	cd sql/js && tsc --build tsconfig.json --pretty false
 	cp sql/js/dist/skdb.js build/skdb.js
 
-sql/node/node_modules: sql/node/package.json
-	cd sql/node && npm install
-
-build/node_modules: sql/node/node_modules
-	cp -R $^ $@
-
 build/skdb_cli.mjs: build/skdb_node.js sql/node/src/skdb_cli.mjs build/node_modules
+	mkdir -p build
 	cp sql/node/src/skdb_cli.mjs build/skdb_cli.mjs
 
+################################################################################
+# skdb native binary
+################################################################################
+
+sql/target/skdb: sql/src/* skfs/src/*
+	cd sql && skargo build
+
+build/skdb: sql/target/skdb
+	mkdir -p build
+	cp $^ $@
+
+################################################################################
+# skdb server
+################################################################################
+
+# TODO: add server artifact build step here and package in to a docker image
+
+build/init.sql: sql/privacy/init.sql
+	mkdir -p build
+	cp $^ $@
+
+################################################################################
+# dev workflow orchestration
+################################################################################
 
 .PHONY: clean
 clean:
@@ -57,7 +79,6 @@ test: build/skdb_node.js build/skdb
 	./run_all_tests.sh
 
 .PHONY: run-server
-
 run-server: build/skdb build/init.sql
 	./sql/server/deploy/start.sh --DANGEROUS-no-encryption
 
@@ -69,5 +90,7 @@ run-chaos: build/skdb sql/js/skdb.wasm build/skdb.js build/index.html
 test-soak: build/skdb build/skdb_node.js build/node_modules
 	./sql/server/test/test_soak.sh
 
+# useful for testing in a browser
 build/index.html: sql/js/index.html
+	mkdir -p build
 	cp $^ $@
