@@ -10,6 +10,47 @@ module SKFS;
 const PURGE_LIMIT: Int = 30;
 
 /*****************************************************************************/
+/* We need to be able to iterate after a given starting point. This method
+ * should be in SortedMap.sk but I will move it in a separate diff, because
+ * otherwise I force everyone to recompile the compiler.
+ */
+/*****************************************************************************/
+
+mutable class Items<T>(data: mutable Iterator<T>) {
+  static fun create(data: mutable Iterator<T>): mutable this {
+    mutable static(data)
+  }
+  mutable fun items(): mutable Iterator<T> {
+    this.data
+  }
+}
+
+extension base class .SortedMap {
+  fun itemsAfter<K2: Orderable, V2>[K: K2, V: V2](
+    start: ?K2,
+  ): mutable Iterator<(K2, V2)> {
+    this match {
+    | SortedMap.Nil() -> void
+    | SortedMap.Node{key, value, left, right} ->
+      if (
+        start match {
+        | None() -> true
+        | Some(x) -> key >= x
+        }
+      ) {
+        for (x in left.itemsAfter(start)) {
+          yield x;
+        };
+        yield (key, value);
+      };
+      for (x in right.itemsAfter(start)) {
+        yield x;
+      }
+    }
+  }
+}
+
+/*****************************************************************************/
 /* The signature of a function used by apply. */
 /*****************************************************************************/
 
@@ -60,9 +101,18 @@ class Reducer{
     static{reducer, fixed, modified}
   }
 
-  fun unsafeIter(): mutable Iterator<(BaseName, mutable Iterator<File>)> {
-    current = mutable IntRef(0);
-    for (key => values in this.modified) {
+  fun unsafeIter(
+    start: ?BaseName = None(),
+  ): mutable Iterator<(BaseName, mutable Iterator<File>)> {
+    current = mutable IntRef(
+      start match {
+      | None() -> 0
+      | Some(key) ->
+        pos = binSearch(i ~> this.fixed[i].i0, key, 0, this.fixed.size() - 1);
+        if (pos < 0) 0 else pos
+      },
+    );
+    for (key => values in Items::create(this.modified.itemsAfter(start))) {
       while (
         current.value < this.fixed.size() &&
         this.fixed[current.value].i0 < key
@@ -1811,20 +1861,32 @@ class EagerDir{
     }
   }
 
-  fun unsafeGetFileIter(): mutable Iterator<
-    (BaseName, mutable Iterator<File>),
-  > {
+  fun unsafeGetFileIter(
+    start: ?BaseName = None(),
+  ): mutable Iterator<(BaseName, mutable Iterator<File>)> {
     this.reducer match {
-    | None() -> this.unsafeGetFileIterNoReducer()
-    | Some(reducer) -> reducer.unsafeIter()
+    | None() -> this.unsafeGetFileIterNoReducer(start)
+    | Some(reducer) -> reducer.unsafeIter(start)
     }
   }
 
-  fun unsafeGetFileIterNoReducer(): mutable Iterator<
-    (BaseName, mutable Iterator<File>),
-  > {
-    current = mutable IntRef(0);
-    for (key => _ in this.data) {
+  fun unsafeGetFileIterNoReducer(
+    start: ?BaseName,
+  ): mutable Iterator<(BaseName, mutable Iterator<File>)> {
+    current = mutable IntRef(
+      start match {
+      | None() -> 0
+      | Some(key) ->
+        pos = this.fixedData.data.getPos(key);
+        if (pos < 0) 0 else pos
+      },
+    );
+    for (key => _ in this.data.data.itemsAfterKey(
+      start match {
+      | None() -> None()
+      | Some(x) -> Some(Inclusive(x))
+      },
+    )) {
       while (
         current.value < this.fixedData.data.size() &&
         this.fixedData.data[current.value].key < key
