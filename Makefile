@@ -1,13 +1,13 @@
 # this builds the aritfacts of this repository, orchestrating the
 # various build systems
 
-all: sql/js/skdb.wasm build/skdb build/skdb.js build/skdb_node.js build/init.sql
+all: npm build/skdb build/init.sql
 
 ################################################################################
 # skdb wasm + js client
 ################################################################################
 
-npm: sql/js/package.json sql/js/skdb.wasm sql/js/src/skdb.js
+npm: sql/js/skdb.wasm sql/js/dist/skdb.js sql/js/dist/skdb-node.js sql/js/dist/skdb-cli.js
 
 sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
 	cd sql && skargo build --target wasm32-unknown-unknown
@@ -15,35 +15,20 @@ sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
 sql/js/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 	cp $^ $@
 
-sql/node/node_modules: sql/node/package.json
+sql/js/node_modules: sql/node/package.json
 	cd sql/node && npm install
 
-# convenient for running artifacts out of build/
-build/node_modules: sql/node/node_modules
-	mkdir -p build
-	cp -R $^ $@
-
-build/skdb.wasm: sql/js/skdb.wasm
-	mkdir -p build
-	cp $^ $@
-
-build/skdb_node.js: sql/node/src/node_header.js build/skdb.js build/skdb.wasm build/node_modules
-	mkdir -p build
-	cat sql/node/src/node_header.js build/skdb.js \
-	| sed 's/^export //g' \
-        | sed 's/let wasmModule =.*//g' \
-        | sed 's/let wasmBuffer =.*/let wasmBuffer = fs.readFileSync("skdb.wasm");/g'> $@
-	echo >> $@
-	echo "module.exports = SKDB;" >> $@
-
-build/skdb.js: sql/js/src/skdb.ts
-	mkdir -p build
+sql/js/dist/%.js: sql/js/src/%.ts
 	cd sql/js && tsc --build tsconfig.json --pretty false
-	cp sql/js/dist/skdb.js build/skdb.js
 
-build/skdb_cli.mjs: build/skdb_node.js sql/node/src/skdb_cli.mjs build/node_modules
-	mkdir -p build
-	cp sql/node/src/skdb_cli.mjs build/skdb_cli.mjs
+sql/js/dist/%.js: sql/js/src/%.js
+	cd sql/js && tsc --build tsconfig.json --pretty false
+
+sql/js/dist/skdb-node.js: sql/js/dist/skdb.js sql/js/src/node_header.js
+	mkdir -p sql/js/dist
+	cat sql/js/src/node_header.js sql/js/dist/skdb.js \
+	| sed 's/let wasmModule =.*//g' \
+	| sed 's/let wasmBuffer =.*/let wasmBuffer = fs.readFileSync("skdb.wasm");/g'> $@
 
 ################################################################################
 # skdb native binary
@@ -52,6 +37,7 @@ build/skdb_cli.mjs: build/skdb_node.js sql/node/src/skdb_cli.mjs build/node_modu
 sql/target/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build
 
+# TODO: keeping this for now as nearly all test scripts refer to build/skdb
 build/skdb: sql/target/skdb
 	mkdir -p build
 	cp $^ $@

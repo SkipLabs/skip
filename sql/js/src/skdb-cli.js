@@ -2,7 +2,7 @@ import { parseArgs } from "node:util";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import SKDB from "./skdb_node.js";
+import { SKDB } from "skdb";
 import { webcrypto } from 'node:crypto';
 import * as readline from 'node:readline/promises';
 import process from 'node:process';
