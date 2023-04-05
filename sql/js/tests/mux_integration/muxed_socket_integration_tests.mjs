@@ -1,4 +1,4 @@
-import { MuxedSocket } from "../../../../build/skdb_node.js";
+import { MuxedSocket } from "../../dist/skdb-node.js";
 import crypto from 'node:crypto';
 import assert from 'node:assert';
 
