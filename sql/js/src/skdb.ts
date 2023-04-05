@@ -436,6 +436,590 @@ class ResilientConnection {
 }
 
 /* ***************************************************************************/
+/* Stream MUX protocol
+/* ***************************************************************************/
+
+enum MuxedSocketState {
+  IDLE,
+  AUTH_SENT,
+  CLOSING,                      // can receive data
+  CLOSEWAIT,                    // can send data
+  CLOSED,
+}
+
+type MuxAuth = {
+  type: "auth";
+}
+type MuxGoaway = {
+  type: "goaway";
+  lastStream: number;
+  errorCode: number;
+  msg: string;
+}
+type MuxStreamData = {
+  type: "data";
+  stream: number;
+  payload: ArrayBuffer;
+}
+type MuxStreamClose = {
+  type: "close";
+  stream: number;
+}
+type MuxStreamReset = {
+  type: "reset";
+  stream: number;
+  errorCode: number;
+  msg: string;
+}
+type MuxMessage = MuxAuth | MuxGoaway | MuxStreamData | MuxStreamClose | MuxStreamReset;
+
+export class MuxedSocket {
+  // constants
+  private socket: WebSocket;
+
+  // state
+  private state: MuxedSocketState = MuxedSocketState.IDLE
+  // streams in the open or closing state
+  private activeStreams: Map<number, Stream> = new Map()
+  private serverStreamWatermark = 0
+  private nextStream = 1
+
+  // user facing interface /////////////////////////////////////////////////////
+
+  onStream?: (stream: Stream) => void;
+  onClose?: () => void;
+  onError?: (errorCode: number, msg: string) => void;
+
+  constructor(socket: WebSocket) {
+    // pre-condition: socket is open
+    this.socket = socket;
+  }
+
+  openStream(): Stream {
+    switch (this.state) {
+    case MuxedSocketState.AUTH_SENT: {
+      const streamId = this.nextStream;
+      this.nextStream = this.nextStream + 2; // client uses odd-numbered streams
+      const stream = new Stream(this, streamId);
+      this.activeStreams.set(streamId, stream);
+      return stream;
+    }
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSEWAIT:
+      throw new Error("Connection closing");
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSED:
+      throw new Error("Connection not established");
+    }
+  }
+
+  closeSocket(): void {
+    switch (this.state) {
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.IDLE:
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      this.socket.close();
+      break;
+    case MuxedSocketState.CLOSEWAIT: {
+      for (const stream of this.activeStreams.values()) {
+        stream.close();
+      }
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      this.socket.close();
+      break;
+    }
+    case MuxedSocketState.AUTH_SENT: {
+      for (const stream of this.activeStreams.values()) {
+        stream.close();
+      }
+      this.state = MuxedSocketState.CLOSING;
+      this.socket.close();
+      break;
+    }
+    }
+  }
+
+  errorSocket(errorCode: number, msg: string): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT: {
+      for (const stream of this.activeStreams.values()) {
+        stream.error(errorCode, msg);
+      }
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      const lastStream = Math.max(this.nextStream - 2, this.serverStreamWatermark);
+      this.socket.send(this.encodeGoawayMsg(lastStream, errorCode, msg));
+      this.socket.close(1002);
+      break;
+    }
+    }
+  }
+
+  static async connect(uri: string, creds: Creds): Promise<MuxedSocket> {
+    const auth = await MuxedSocket.encodeAuthMsg(creds);
+    return new Promise((resolve, reject) => {
+      const socket = new WebSocket(uri)
+      socket.binaryType = "arraybuffer";
+      socket.onclose = (_event) => reject(new Error("Socket closed before open"));
+      socket.onerror = (event) => reject(event);
+      socket.onmessage = (_event) => reject(new Error("Socket messaged before open"));
+      socket.onopen = (_event) => {
+        const muxSocket = new MuxedSocket(socket)
+        socket.onclose = (event) => muxSocket.onSocketClose(event)
+        socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
+        socket.onmessage = (event) => muxSocket.onSocketMessage(event)
+        resolve(muxSocket)
+        muxSocket.sendAuth(auth)
+      };
+    });
+  }
+
+  // interface used by Stream //////////////////////////////////////////////////
+
+  streamClose(stream: number, nowClosed: boolean): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT: {
+      this.socket.send(this.encodeStreamCloseMsg(stream));
+      if (nowClosed) {
+        this.activeStreams.delete(stream);
+      }
+      break;
+    }
+    }
+  }
+
+  streamError(stream: number, errorCode: number, msg: string): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT:
+      this.socket.send(this.encodeStreamResetMsg(stream, errorCode, msg));
+      this.activeStreams.delete(stream);
+      break;
+    }
+  }
+
+  streamSend(stream: number, data: ArrayBuffer): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT:
+      this.socket.send(this.encodeStreamDataMsg(stream, data));
+    }
+  }
+
+  // private ///////////////////////////////////////////////////////////////////
+
+  private onSocketClose(_event: CloseEvent): void {
+    switch (this.state) {
+    case MuxedSocketState.CLOSEWAIT:
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.AUTH_SENT:
+      for (const stream of this.activeStreams.values()) {
+        stream.onStreamClose();
+      }
+      if (this.onClose) {
+        this.onClose();
+      }
+      this.state = MuxedSocketState.CLOSEWAIT;
+      break;
+    case MuxedSocketState.CLOSING:
+      for (const stream of this.activeStreams.values()) {
+        stream.onStreamClose();
+      }
+      if (this.onClose) {
+        this.onClose();
+      }
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+      break;
+    }
+  }
+
+  private onSocketError(errorCode: number, msg: string): void {
+    switch (this.state) {
+    case MuxedSocketState.CLOSED:
+      break;
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSEWAIT:
+      for (const stream of this.activeStreams.values()) {
+        stream.onStreamError(0, msg);
+      }
+      if (this.onError) {
+        this.onError(errorCode, msg);
+      }
+      this.activeStreams.clear()
+      this.state = MuxedSocketState.CLOSED;
+    }
+  }
+
+  private onSocketMessage(event: MessageEvent<any>): void {
+    switch (this.state) {
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSING:
+      if (!(event.data instanceof ArrayBuffer)) {
+        throw new Error("Received unexpected text data");
+      }
+      const msg = this.decode(event.data);
+      if (msg === null) {
+        // for robustness we ignore messages we don't understand
+        return;
+      }
+      switch (msg.type) {
+      case "auth":
+        throw new Error("Unexepected auth message from server");
+      case "goaway":
+        this.onSocketError(msg.errorCode, msg.msg);
+        break;
+      case "data": {
+        let stream = this.activeStreams.get(msg.stream);
+
+        if (stream == undefined && this.state == MuxedSocketState.CLOSING) {
+          // we don't accept new streams while closing
+          break;
+        }
+
+        // TODO: is the watermark condition necesary? we don't want to
+        // reuse streams but this doesn't allow for creating them with
+        // non-deterministic scheduling. if we don't accept them,
+        // should probably send a stream reset
+        if (stream === undefined && msg.stream % 2 == 0 && msg.stream > this.serverStreamWatermark) {
+          // new server-initiated stream
+          this.serverStreamWatermark = msg.stream;
+          stream = new Stream(this, msg.stream);
+          this.activeStreams.set(msg.stream, stream);
+          if (this.onStream) {
+            this.onStream(stream);
+          }
+        }
+        stream?.onStreamData(msg.payload);
+        break;
+      }
+      case "close":
+        const closed = this.activeStreams.get(msg.stream)?.onStreamClose();
+        if (closed) {
+          this.activeStreams.delete(msg.stream);
+        }
+        break;
+      case "reset":
+        this.activeStreams.get(msg.stream)?.onStreamError(msg.errorCode, msg.msg);
+        this.activeStreams.delete(msg.stream);
+        break;
+      default:
+        throw new Error("Unexpected message type");
+      }
+      break;
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSEWAIT:
+    case MuxedSocketState.CLOSED:
+      break;
+    }
+  }
+
+  private sendAuth(msg: ArrayBuffer): void {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+      this.state = MuxedSocketState.AUTH_SENT;
+      this.socket.send(msg);
+      break;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSING:
+      throw new Error("Tried to auth an established connection");
+    case MuxedSocketState.CLOSEWAIT:
+    case MuxedSocketState.CLOSED:
+      break;
+    }
+  }
+
+  private static async encodeAuthMsg(creds: Creds): Promise<ArrayBuffer> {
+    const enc = new TextEncoder();
+    const buf = new ArrayBuffer(96);
+    const uint8View = new Uint8Array(buf);
+    const dataView = new DataView(buf);
+
+    const now = (new Date()).toISOString()
+    const nonce = uint8View.subarray(28, 36);
+    crypto.getRandomValues(nonce)
+    const b64nonce = btoa(String.fromCharCode(...nonce));
+    const bytesToSign = enc.encode("auth" + creds.accessKey + now + b64nonce)
+    const sig = await crypto.subtle.sign(
+      "HMAC",
+      creds.privateKey,
+      bytesToSign
+    )
+
+    dataView.setUint8(0, 0x0);  // type
+    dataView.setUint8(4, 0x0);  // version
+    const encodeAccessKey = enc.encodeInto(creds.accessKey, uint8View.subarray(8));
+    if (encodeAccessKey.written != 20) {
+      throw new Error("Unable to encode access key")
+    }
+    uint8View.set(new Uint8Array(sig), 36);
+    const encodeIsoDate = enc.encodeInto(now, uint8View.subarray(69));
+    switch (encodeIsoDate.written) {
+    case 24:
+      return buf.slice(0, 93);
+    case 27:
+      dataView.setUint8(68, 0x1);
+      return buf;
+    default:
+      throw new Error("Unexpected ISO date length");
+    }
+  }
+
+  private encodeGoawayMsg(lastStream: number, errorCode: number, msg: string): ArrayBuffer {
+    if (lastStream >= 2**24) {
+      throw new Error("Cannot encode lastStream");
+    }
+    const buf = new ArrayBuffer(16 + msg.length * 3); // avoid resizing
+    const uint8View = new Uint8Array(buf);
+    const textEncoder = new TextEncoder();
+    const encodeResult = textEncoder.encodeInto(msg, uint8View.subarray(16));
+    const dataView = new DataView(buf);
+    dataView.setUint8(0, 0x1);  // type
+    dataView.setUint32(4, lastStream, false);
+    dataView.setUint32(8, errorCode, false);
+    dataView.setUint32(12, encodeResult.written || 0, false);
+    return buf.slice(0, 16 + (encodeResult.written || 0));
+  }
+
+  private encodeStreamDataMsg(stream: number, data: ArrayBuffer): ArrayBuffer {
+    if (stream >= 2**24) {
+      throw new Error("Cannot encode stream");
+    }
+    const buf = new ArrayBuffer(4 + data.byteLength);
+    const dataView = new DataView(buf);
+    const uint8View = new Uint8Array(buf);
+    dataView.setUint32(0, 0x2 << 24 | stream, false);  // type and stream id
+    uint8View.set(new Uint8Array(data), 4);
+    return buf;
+  }
+
+  private encodeStreamCloseMsg(stream: number): ArrayBuffer {
+    if (stream >= 2**24) {
+      throw new Error("Cannot encode stream");
+    }
+    const buf = new ArrayBuffer(4);
+    const dataView = new DataView(buf);
+    dataView.setUint32(0, 0x3 << 24 | stream, false);  // type and stream id
+    return buf;
+  }
+
+  private encodeStreamResetMsg(stream: number, errorCode: number, msg: string): ArrayBuffer {
+    if (stream >= 2**24) {
+      throw new Error("Cannot encode stream");
+    }
+    const textEncoder = new TextEncoder();
+    const buf = new ArrayBuffer(12 + msg.length * 3); // avoid resizing
+    const uint8View = new Uint8Array(buf);
+    const dataView = new DataView(buf);
+
+    dataView.setUint32(0, 0x4 << 24 | stream, false);  // type and stream id
+    dataView.setUint32(4, errorCode, false);
+    const encodeResult = textEncoder.encodeInto(msg, uint8View.subarray(12));
+    dataView.setUint32(8, encodeResult.written || 0, false);
+    return buf.slice(0, 12 + (encodeResult.written || 0));
+  }
+
+  private decode(msg: ArrayBuffer): MuxMessage|null {
+    const dv = new DataView(msg);
+    const typeAndStream = dv.getUint32(0, false);
+    const type = typeAndStream >>> 24;
+    const stream = typeAndStream & 0xFFFFFF;
+    switch (type) {
+    case 0: {                   // auth
+      return {
+        type: "auth",
+      };
+    }
+    case 1: {                   // goaway
+      const msgLength = dv.getUint32(12, false);
+      const errorMsgBytes = new Uint8Array(msg, 16, msgLength);
+      const td = new TextDecoder();
+      const errorMsg = td.decode(errorMsgBytes);
+      return {
+        type: "goaway",
+        lastStream: dv.getUint32(4, false),
+        errorCode: dv.getUint32(8, false),
+        msg: errorMsg,
+      };
+    }
+    case 2: {                   // stream data
+      return {
+        type: "data",
+        stream: stream,
+        payload: new Uint8Array(msg, 4),
+      };
+    }
+    case 3: {                   // stream close
+      return {
+        type: "close",
+        stream: stream,
+      };
+    }
+    case 4: {                   // stream reset
+      const msgLength = dv.getUint32(8, false);
+      const errorMsgBytes = new Uint8Array(msg, 12, msgLength);
+      const td = new TextDecoder();
+      const errorMsg = td.decode(errorMsgBytes);
+      return {
+        type: "reset",
+        stream: stream,
+        errorCode: dv.getUint32(4, false),
+        msg: errorMsg,
+      };
+    }
+    default:
+      return null;
+    }
+  }
+}
+
+enum StreamState {
+  OPEN,
+  CLOSING,
+  CLOSEWAIT,
+  CLOSED,
+}
+
+class Stream {
+  // constants
+  private socket: MuxedSocket
+  private streamId: number
+
+  // state
+  private state: StreamState = StreamState.OPEN;
+
+  // user facing interface ///////////////////////////////////
+
+  onClose?: () => void
+  onError?: (errorCode: number, msg: string) => void
+  onData?: (data: ArrayBuffer) => void
+
+  close(): void {
+    switch (this.state) {
+    case StreamState.CLOSING:
+    case StreamState.CLOSED:
+      break;
+    case StreamState.OPEN:
+      this.state = StreamState.CLOSING;
+      this.socket.streamClose(this.streamId, false);
+      break;
+    case StreamState.CLOSEWAIT:
+      this.state = StreamState.CLOSED;
+      this.socket.streamClose(this.streamId, true);
+      break;
+    }
+  }
+
+  error(errorCode: number, msg: string): void {
+    switch (this.state) {
+    case StreamState.CLOSED:
+    case StreamState.CLOSING:
+      this.state = StreamState.CLOSED;
+      break;
+    case StreamState.OPEN:
+    case StreamState.CLOSEWAIT:
+      this.state = StreamState.CLOSED;
+      this.socket.streamError(this.streamId, errorCode, msg);
+      break;
+    }
+  }
+
+  send(data: ArrayBuffer): void {
+    switch (this.state) {
+    case StreamState.CLOSING:
+    case StreamState.CLOSED:
+      break;
+    case StreamState.OPEN:
+    case StreamState.CLOSEWAIT:
+      this.socket.streamSend(this.streamId, data);
+    }
+  }
+
+  // interface used by MuxedSocket ///////////////////////////
+
+  constructor(socket: MuxedSocket, streamId: number) {
+    this.socket = socket
+    this.streamId = streamId
+  }
+
+  onStreamClose(): boolean {
+    switch (this.state) {
+    case StreamState.CLOSED:
+      return true;
+    case StreamState.CLOSEWAIT:
+      return false;
+    case StreamState.OPEN:
+      this.state = StreamState.CLOSEWAIT;
+      if (this.onClose) {
+        this.onClose();
+      }
+      return false;
+    case StreamState.CLOSING:
+      this.state = StreamState.CLOSED;
+      if (this.onClose) {
+        this.onClose();
+      }
+      return true;
+    }
+  }
+
+  onStreamError(errorCode: number, msg: string): void {
+    switch (this.state) {
+    case StreamState.CLOSED:
+      break;
+    case StreamState.CLOSING:
+    case StreamState.OPEN:
+    case StreamState.CLOSEWAIT:
+      this.state = StreamState.CLOSED;
+      if (this.onError) {
+        this.onError(errorCode, msg);
+      }
+    }
+  }
+
+  onStreamData(data: ArrayBuffer): void {
+    switch (this.state) {
+    case StreamState.CLOSED:
+    case StreamState.CLOSEWAIT:
+      break;
+    case StreamState.CLOSING:
+    case StreamState.OPEN:
+      if (this.onData) {
+        this.onData(data);
+      }
+    }
+  }
+}
+
+/* ***************************************************************************/
 /* A few primitives to encode/decode utf8. */
 /* ***************************************************************************/
 
