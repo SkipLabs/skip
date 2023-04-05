@@ -61,7 +61,7 @@ clean:
 	rm -Rf build
 
 .PHONY: test
-test: build/skdb_node.js build/skdb
+test: sql/js/dist/skdb-node.js build/skdb
 	./run_all_tests.sh
 
 .PHONY: run-server
