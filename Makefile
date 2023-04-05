@@ -69,11 +69,11 @@ run-server: build/skdb build/init.sql
 	./sql/server/deploy/start.sh --DANGEROUS-no-encryption
 
 .PHONY: run-chaos
-run-chaos: build/skdb sql/js/skdb.wasm build/skdb.js build/index.html
+run-chaos: build/skdb
 	./sql/server/deploy/chaos.sh
 
 .PHONY: test-soak
-test-soak: build/skdb build/skdb_node.js build/node_modules
+test-soak: build/skdb build/init.sql sql/js/dist/skdb-node.js
 	./sql/server/test/test_soak.sh
 
 # useful for testing in a browser
