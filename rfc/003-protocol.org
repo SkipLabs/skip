@@ -188,9 +188,9 @@ Stream ids are
   - access key (20 * 8 = 160) - ASCII encoded 20 char string
   - nonce (64)
   - signature (256)
+  - reserved (7) must be zeroed
   - iso length 0 for 24, 1 for 27 (1)
-  - padding (7 or 4 depending on iso length - pad to 32 bits) must be zeroed
-  - iso date (24 or 27 depending on iso length flag)
+  - iso date (24 * 8 = 192 or 27 * 8 = 216 depending on iso length flag)
 
 *** (Conn) Error/goaway
 
@@ -199,7 +199,7 @@ Stream ids are
 - payload
   - reserved (8) - must be zeroed
   - last stream id (24)
-  - error code (32)
+  - error code (32) - zero is used to indicate a fault lower in the stack
   - msg_length (32)
   - msg (msg_length)
 
@@ -217,7 +217,7 @@ Stream ids are
 
 - type = 0x4
 - payload
-  - error code (32)
+  - error code (32) - zero is used to indicate a fault lower in the stack
   - msg_length (32)
   - msg (msg_length)
 
