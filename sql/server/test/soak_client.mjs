@@ -1,5 +1,5 @@
-let SKDB = require('../../../build/skdb_node.js');
-const crypto = require('node:crypto').webcrypto;
+import { SKDB } from '../../js/dist/skdb-node.js';
+import { webcrypto as crypto } from 'node:crypto';
 
 const setup = async function(user) {
   const skdb = await SKDB.create(true);
