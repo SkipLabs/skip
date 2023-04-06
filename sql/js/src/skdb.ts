@@ -1222,8 +1222,20 @@ export class SKDB {
     this.mirroredTables[tableName] = sessionID;
   }
 
-  attach(f: (change: string) => void): void {
-    this.execOnChange[this.fileDescrNbr] = f;
+  openFile(filename: string): number {
+    if (this.fileDescrs[filename] !== undefined) {
+      return this.fileDescrs[filename];
+    }
+    let fd = this.fileDescrNbr;
+    this.files[fd] = new Array();
+    this.fileDescrs[filename] = fd;
+    this.fileDescrNbr++;
+    return fd;
+  }
+
+  watchFile(filename: string, f: (change: string) => void): void {
+    const fd = this.openFile(filename);
+    this.execOnChange[fd] = f;
   }
 
   async connect(
@@ -1355,14 +1367,7 @@ export class SKDB {
       },
       SKIP_unix_open: function (wasmFilename) {
         let filename = wasmStringToJS(data.exports, wasmFilename);
-        if (data.fileDescrs[filename] !== undefined) {
-          return data.fileDescrs[filename];
-        }
-        let fd = data.fileDescrNbr;
-        data.files[fd] = new Array();
-        data.fileDescrs[filename] = fd;
-        data.fileDescrNbr++;
-        return fd;
+        return data.openFile(filename);
       },
       SKIP_write_to_file: function (fd, str) {
         let jsStr = wasmStringToJS(data.exports, str);
@@ -1486,7 +1491,8 @@ export class SKDB {
 
   runSubscribeRoots(reboot: boolean): void {
     this.roots = new Map();
-    this.attach((text) => {
+    let fileName = "/subscriptions/jsroots";
+    this.watchFile(fileName, (text) => {
       let changed = new Map();
       let updates = text.split("\n").filter((x) => x.indexOf("\t") != -1);
       for (const update of updates) {
@@ -1508,7 +1514,6 @@ export class SKDB {
       }
     });
     this.subscriptionCount++;
-    let fileName = "/subscriptions/jsroots";
     if(reboot) {
       this.runLocal(
         ["subscribe", "jsroots", "--format=json", "--updates", fileName],
@@ -1608,7 +1613,7 @@ export class SKDB {
     newConn.expectingData()
 
     let fileName = tableName + "_" + creds.accessKey;
-    objThis.attach(change => {
+    objThis.watchFile(fileName, change => {
       newConn.write({
         request: "pipe",
         data: change,
@@ -1699,8 +1704,8 @@ export class SKDB {
   }
 
   subscribe(viewName: string, f: (change: string) => void): void {
-    this.attach(f);
-    let fileName = "/subscriptions/sub" + this.subscriptionCount;
+    const fileName = "/subscriptions/sub" + this.subscriptionCount;
+    this.watchFile(fileName, f);
     this.subscriptionCount++;
     this.runLocal(
       ["subscribe", viewName, "--format=csv", "--updates", fileName],
