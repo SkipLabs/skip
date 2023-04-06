@@ -300,7 +300,7 @@ char* SKIP_System_subprocess(char *args_obj) {
     exit(1);
   }
 
-  int32_t exitcode = 0;
+  int32_t exitcode = status;
   if (WIFEXITED(status)) {
     exitcode = WEXITSTATUS(status);
   }
