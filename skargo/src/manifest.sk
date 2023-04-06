@@ -19,14 +19,14 @@ base class VersionConstraint {
   | RangeConstraint(low: Version, high: Version)
   | PathConstraint(path: String, version: ?Version)
 
-  static fun fromTOML(toml: TOML.Value): VersionConstraint {
+  static fun fromTOML(basePath: String, toml: TOML.Value): VersionConstraint {
     toml match {
     | TOML.String(v) -> static::fromString(v)
     | t @ TOML.Table _ ->
       t.maybeGetString("path") match {
       | Some(path) ->
         PathConstraint(
-          path,
+          Path.join(basePath, path),
           t.maybeGetString("version").map(Version::fromString),
         )
       | _ -> invariant_violation("TODO")
@@ -95,7 +95,7 @@ class Manifest{
     };
 
     dependencies = toml.getTable("dependencies").map.map((_, v) ->
-      VersionConstraint::fromTOML(v)
+      VersionConstraint::fromTOML(basePath, v)
     );
 
     bin = toml.maybeGetArray("bin") match {
