@@ -701,20 +701,23 @@ class EagerDir{
     filter: ((SKFS.Context) ~> ((SKFS.BaseName) -> Bool)),
   ): void {
     writer = mutable Debug.BufferedWriter(o, 1024);
-    if (!changes.isEmpty() && !this.reallyRemove) {
-      writer.write("\n");
-      writer.write("\n");
-    };
     filterFun = filter(context.clone());
+
+    producedDiffLine = false;
 
     for (key in changes) {
       if (!filterFun(key)) continue;
+      if (!producedDiffLine && !this.reallyRemove) {
+        writer.write("\n");
+        writer.write("\n");
+      };
       values = this.getArrayRaw(key);
       if (values.size() == 0) {
         writer.write(key.toKVStringRemove(format))
       } else {
         key.writeKVString(writer.write, format, values);
       };
+      !producedDiffLine = true;
     };
 
     if (isReset) {
@@ -724,7 +727,7 @@ class EagerDir{
     };
 
     // TODO: this is sql specific
-    if (!changes.isEmpty() && !this.reallyRemove) {
+    if ((producedDiffLine || isReset) && !this.reallyRemove) {
       // output a checkpoint, indicated by the leading colon
       writer.write(":" + context.tick.value.toString() + "\n");
     };

@@ -1614,6 +1614,9 @@ export class SKDB {
 
     let fileName = tableName + "_" + creds.accessKey;
     objThis.watchFile(fileName, change => {
+      if (change == "") {
+        return;
+      }
       newConn.write({
         request: "pipe",
         data: change,
@@ -1637,6 +1640,10 @@ export class SKDB {
           "--since", objThis.watermark(metadataTable(tableName)).toString(),
           session,
         ], "");
+
+      if (diff == "") {
+        return;
+      }
 
       newConn.write({
         request: "pipe",
