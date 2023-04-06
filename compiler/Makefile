@@ -61,18 +61,15 @@ stage0/bin/skc: bootstrap/skc_out64.ll stage0/lib/libskip_runtime64.a stage0/lib
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lrt -lpthread
 
-stage1/bin/skfmt:
-stage1/bin/skc: stage0
+stage1/bin/skc stage1/bin/skfmt stage1/bin/skargo: stage0
 	PATH=stage0/bin/:$(PATH) skargo build --target-dir stage1/bin
 	(cd ../skargo && PATH=../compiler/stage0/bin:$(PATH) skargo build --target-dir ../compiler/stage1/bin)
 
-stage2/bin/skfmt:
-stage2/bin/skc: stage1
+stage2/bin/skc stage2/bin/skfmt stage2/bin/skargo: stage1
 	PATH=stage1/bin/:$(PATH) skargo build --target-dir stage2/bin
 	(cd ../skargo && PATH=../compiler/stage1/bin:$(PATH) skargo build --target-dir ../compiler/stage2/bin)
 
-stage3/bin/skfmt:
-stage3/bin/skc: stage2
+stage3/bin/skc stage3/bin/skfmt stage3/bin/skargo: stage2
 	PATH=stage2/bin/:$(PATH) skargo build --target-dir stage3/bin
 	(cd ../skargo && PATH=../compiler/stage2/bin:$(PATH) skargo build --target-dir ../compiler/stage3/bin)
 # 	TODO: Ensure stage2 == stage3.
@@ -95,4 +92,4 @@ clean:
 
 .PHONY: test
 test: stage$(STAGE)
-	PATH=../stage$(STAGE)/bin:$(PATH) $(MAKE) -C tests 
+	PATH=../stage$(STAGE)/bin:$(PATH) $(MAKE) -C tests
