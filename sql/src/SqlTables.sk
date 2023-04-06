@@ -533,7 +533,10 @@ fun dumpTable(
   suffix: ?String,
 ): void {
   context = SKFS.Context::fromSaved(origContext.clone());
-  printDirDescr(getTableDir(context).get(context, SKFS.SID(tableName)), suffix);
+  getTableDir(context).maybeGet(context, SKFS.SID(tableName)) match {
+  | None() -> void
+  | Some(dirDescr) -> printDirDescr(dirDescr, suffix)
+  }
 }
 
 fun dumpTables(
@@ -598,8 +601,7 @@ fun dumpView(origContext: readonly SKFS.Context, viewName: String): void {
   viewsDir = context.unsafeGetEagerDir(hviews.dirName);
   arr = viewsDir.getArrayRaw(SKFS.SID(viewName));
   if (arr.size() == 0) {
-    print_error("View " + viewName + " not found");
-    skipExit(104);
+    return void
   };
   invariant(arr.size() == 1);
   print_raw(SelectFile::fromFile(arr[0]).text);

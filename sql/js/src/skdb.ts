@@ -1724,8 +1724,16 @@ export class SKDB {
       .map((x) => JSON.parse(x));
   }
 
+  tableExists(tableName: string): boolean {
+    return this.runLocal(["dump-table", tableName], "").trim() != "";
+  }
+
   tableSchema(tableName: string): string {
     return this.runLocal(["dump-table", tableName], "");
+  }
+
+  viewExists(viewName: string): boolean {
+    return this.runLocal(["dump-view", viewName], "") != "";
   }
 
   viewSchema(viewName: string): string {
@@ -1845,14 +1853,17 @@ class SKDBServer {
   }
 
   async mirrorTable(tableName: string): Promise<void> {
-    let createTable = await this.tableSchema(tableName, "");
+    // TODO: just assumes that if it exists the schema is the same
+    if (!this.client.tableExists(tableName)) {
+      let createTable = await this.tableSchema(tableName, "");
 
-    this.client.runLocal([], createTable);
-    this.client.runLocal([],
-      `CREATE TABLE ${metadataTable(tableName)} (
+      this.client.runLocal([], createTable);
+      this.client.runLocal([],
+        `CREATE TABLE ${metadataTable(tableName)} (
          key STRING PRIMARY KEY,
          value STRING
        )`);
+    }
 
     await this.client.connectWriteTable(
       this.uri,
@@ -1870,9 +1881,11 @@ class SKDBServer {
   }
 
   async mirrorView(viewName: string, suffix?: string): Promise<void> {
-    suffix = suffix || "";
-    let createRemoteTable = await this.viewSchema(viewName, suffix);
-    this.client.runLocal([], createRemoteTable);
+    if (!this.client.viewExists(viewName + suffix)) {
+      suffix = suffix || "";
+      let createRemoteTable = await this.viewSchema(viewName, suffix);
+      this.client.runLocal([], createRemoteTable);
+    }
 
     await this.client.connectReadTable(
       this.uri,
