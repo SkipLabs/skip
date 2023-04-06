@@ -326,7 +326,6 @@ fun execDumpTable(args: Cli.ParseResults, options: SKSQL.Options): void {
   suffix = args.maybeGetString("table-suffix");
   SKSQL.runSql(options, context ~> {
     SKSQL.dumpTable(context, tableName.lowercase(), suffix);
-    skipExit(0);
     SKFS.CStop(None())
   })
 }
@@ -336,7 +335,6 @@ fun execDumpTables(args: Cli.ParseResults, options: SKSQL.Options): void {
   suffix = args.maybeGetString("table-suffix");
   SKSQL.runSql(options, context ~> {
     SKSQL.dumpTables(options, context, suffix);
-    skipExit(0);
     SKFS.CStop(None())
   })
 }
@@ -354,7 +352,6 @@ fun execDumpView(args: Cli.ParseResults, options: SKSQL.Options): void {
   viewName = args.getString("view");
   SKSQL.runSql(options, context ~> {
     SKSQL.dumpView(context, viewName.lowercase());
-    skipExit(0);
     SKFS.CStop(None())
   })
 }
