@@ -159,7 +159,17 @@ class Skdb(val name: String, private val dbPath: String) {
 
     val t =
         Thread({
-          output.forEachLine { callback(it) }
+          val buffer = ArrayList<String>()
+          output.forEachLine {
+            buffer.add(it)
+
+            // flush?
+            if (it.startsWith(":")) {
+              val txn = buffer.joinToString("\n", "", "\n")
+              buffer.clear()
+              callback(txn)
+            }
+          }
           closed()
         })
     t.start()
