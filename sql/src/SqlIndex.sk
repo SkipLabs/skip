@@ -20,21 +20,31 @@ fun createIndex(
     (idx, IASC(), field.i2)
   });
   indexName = Name::create("/indexes" + dirName.toString() + hash(kinds) + "/");
-  index = (SKFS.EHandle(RowValues::fromFile, dirName)).contextWriterKeyValues(
-    RowValues::fromFile,
-    context,
-    SKFS.DirName::create(indexName.lower),
-    (_ctx, writer, _key, rows) ~> {
-      if (rows.size() == 0) return void;
-      row = rows[0];
-      values = mutable Vector[];
-      for (kind in kinds) {
-        values.push(row.getValue(kind.i0));
-      };
-      rvalues = RowValues::create(values.toArray());
-      writer.writeArray(RowKey::create(rvalues, idxKinds), rows);
-    },
-  );
+  needsReordering = false;
+  for (i => kind in kinds) {
+    if (i == kind.i0) continue;
+    !needsReordering = true;
+  };
+
+  handle = (SKFS.EHandle(RowValues::fromFile, dirName));
+
+  index = if (!needsReordering) handle else {
+    handle.contextWriterKeyValues(
+      RowValues::fromFile,
+      context,
+      SKFS.DirName::create(indexName.lower),
+      (_ctx, writer, _key, rows) ~> {
+        if (rows.size() == 0) return void;
+        row = rows[0];
+        values = mutable Vector[];
+        for (kind in kinds) {
+          values.push(row.getValue(kind.i0));
+        };
+        rvalues = RowValues::create(values.toArray());
+        writer.writeArray(RowKey::create(rvalues, idxKinds), rows);
+      },
+    )
+  };
   if (unique) {
     _ = index
       .contextWriterKeyValues(
