@@ -213,7 +213,7 @@ else
     echo -e "TEST STAR COMMA:\tFAILED"
 fi
 
-if cat test/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -q "16|test1|test2S23||fooS27|bar|helloS"; then
+if cat test/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -q "14|test1|test2S20||fooS24|bar|helloS"; then
     echo -e "TEST DEFAULT VALUES:\tOK"
 else
     echo -e "TEST DEFAULT VALUES:\tFAILED"
