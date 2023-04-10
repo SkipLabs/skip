@@ -24,7 +24,10 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
       Array[junitxml, filter].filterNone(),
     ).join(" "),
   );
-  skipExit(rv)
+  // TODO: Properly handle subprocess not exiting normally.
+  if (rv != 0) {
+    skipExit(1)
+  }
 }
 
 fun execBuild(args: Cli.ParseResults, env: Env): void {
