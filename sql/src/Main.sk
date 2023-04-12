@@ -3,6 +3,29 @@ native fun dieOnEOF(): void;
 
 module SKDB;
 
+/*****************************************************************************/
+/* Helpers */
+/*****************************************************************************/
+
+fun getFieldNames(
+  context: readonly SKFS.Context,
+  dirName: SKFS.DirName,
+): Array<String> {
+  mcontext = context.mclone();
+  tables = SKSQL.getTableDir(mcontext);
+  dirNameStr = dirName.toString();
+  iter = dirNameStr.getIter();
+  _ = iter.next();
+  tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
+  arr = tables.getArray(mcontext, SKFS.SID(tableName));
+  if (arr.size() == 0) {
+    print_error("There is no sql table associated with dir: " + dirNameStr);
+    skipExit(44);
+  };
+  dirDescr = arr[0];
+  dirDescr.schema.map(x -> x.name.origName);
+}
+
 fun fixUpDirName(dirNameStr: String): SKFS.DirName {
   chars = dirNameStr.chars();
   SKFS.DirName::create(
@@ -11,6 +34,10 @@ fun fixUpDirName(dirNameStr: String): SKFS.DirName {
       (if (chars[chars.size() - 1] != '/') "/" else ""),
   )
 }
+
+/*****************************************************************************/
+/* Main */
+/*****************************************************************************/
 
 untracked fun main(): void {
   saved = SKFS.newObstack();
@@ -228,6 +255,7 @@ untracked fun main(): void {
         | "csv" -> SKSQL.OFK_CSV()
         | "json" -> SKSQL.OFK_JSON()
         | "sql" -> SKSQL.OFK_SQL()
+        | "js" -> SKSQL.OFK_JS()
         | f -> invariant_violation(`Unsupported format: ${f}`)
         },
       };
@@ -445,21 +473,9 @@ fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     format = options.format match {
     | SKSQL.OFK_CSV() -> SKFS.OCSV()
-    | SKSQL.OFK_JSON() ->
-      tables = SKSQL.getTableDir(context);
-      dirNameStr = sub.dirName.toString();
-      iter = dirNameStr.getIter();
-      _ = iter.next();
-      tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
-      arr = tables.getArray(context, SKFS.SID(tableName));
-      if (arr.size() == 0) {
-        print_error("There is no sql table associated with dir: " + dirNameStr);
-        skipExit(44);
-      };
-      dirDescr = arr[0];
-      fieldNames = dirDescr.schema.map(x -> x.name.origName);
-      SKFS.OJSON(fieldNames)
+    | SKSQL.OFK_JSON() -> SKFS.OJSON(getFieldNames(context, sub.dirName))
     | SKSQL.OFK_SQL() -> SKFS.OSQL()
+    | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, sub.dirName))
     };
 
     origContext.setGlobal(
@@ -515,22 +531,9 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     edir = context.unsafeGetEagerDir(dirName);
     format = options.format match {
     | SKSQL.OFK_CSV() -> SKFS.OCSV()
-    | SKSQL.OFK_JSON() ->
-      mcontext = context.mclone();
-      tables = SKSQL.getTableDir(mcontext);
-      dirNameStr = sub.dirName.toString();
-      iter = dirNameStr.getIter();
-      _ = iter.next();
-      tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
-      arr = tables.getArray(mcontext, SKFS.SID(tableName));
-      if (arr.size() == 0) {
-        print_error("There is no sql table associated with dir: " + dirNameStr);
-        skipExit(44);
-      };
-      dirDescr = arr[0];
-      fieldNames = dirDescr.schema.map(x -> x.name.origName);
-      SKFS.OJSON(fieldNames)
+    | SKSQL.OFK_JSON() -> SKFS.OJSON(getFieldNames(context, sub.dirName))
     | SKSQL.OFK_SQL() -> SKFS.OSQL()
+    | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, sub.dirName))
     };
 
     sub.userID match {
@@ -698,22 +701,9 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     SKSQL.forbidNow(context);
     format = options.format match {
     | SKSQL.OFK_CSV() -> SKFS.OCSV()
-    | SKSQL.OFK_JSON() ->
-      mcontext = context.mclone();
-      tables = SKSQL.getTableDir(mcontext);
-      dirNameStr = viewDirName.toString();
-      iter = dirNameStr.getIter();
-      _ = iter.next();
-      tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
-      arr = tables.getArray(mcontext, SKFS.SID(tableName));
-      if (arr.size() == 0) {
-        print_error("There is no sql table associated with dir: " + dirNameStr);
-        skipExit(44);
-      };
-      dirDescr = arr[0];
-      fieldNames = dirDescr.schema.map(x -> x.name.origName);
-      SKFS.OJSON(fieldNames)
+    | SKSQL.OFK_JSON() -> SKFS.OJSON(getFieldNames(context, viewDirName))
     | SKSQL.OFK_SQL() -> SKFS.OSQL()
+    | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, viewDirName))
     };
     cmd = (
       args.maybeGetString("updates"),

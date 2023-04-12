@@ -73,6 +73,10 @@ base class CValue uses Orderable, Show {
           | SKFS.OJSON _ -> result.push('\\')
           | SKFS.OSQL _ -> void
           | SKFS.OCSV _ -> result.push(c)
+          | SKFS.OJS _ ->
+            invariant_violation(
+              "Internal error: JS direct mode should never be pretty-printed",
+            )
           }
         };
         result.push(c);

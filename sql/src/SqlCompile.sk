@@ -252,6 +252,10 @@ mutable class Compiler{
       fieldNames = schema.map(x -> x.name.origName);
       SKFS.OJSON(fieldNames)
     | OFK_SQL() -> SKFS.OSQL()
+    | OFK_JS() ->
+      schema = static::getSchema(select.params, from, params);
+      fieldNames = schema.map(x -> x.name.origName);
+      SKFS.OJS(fieldNames)
     };
 
     cselect = CSelect{
