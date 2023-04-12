@@ -1231,16 +1231,6 @@ fun printErrorAndExit(
   skipExit(2)
 }
 
-fun printRow(format: SKFS.OutputFormat, row: SKSQL.Row): void {
-  row match {
-  | rvalues @ RowValues(_, r) ->
-    for (_ in Range(0, r)) {
-      print_string(rvalues.toStringSingle(format))
-    }
-  | RowKind _ -> invariant_violation("Cannot print a RowKind")
-  }
-}
-
 fun evalWithContext(
   options: Options,
   context: mutable SKFS.Context,
@@ -1297,6 +1287,7 @@ base class OutputFormatKind {
   | OFK_CSV()
   | OFK_JSON()
   | OFK_SQL()
+  | OFK_JS()
 }
 
 class Options{
@@ -1759,12 +1750,19 @@ fun showSelect(
 ): void {
   dirName = sdir.dirName;
   dir = context.unsafeGetEagerDir(dirName);
+  RowValues::printHeader(format);
   dir.onFiles(files ~> {
     for (kv in files) {
       (_key, rows) = kv;
       rowArray = rows.collect(Array);
       for (row in rowArray) {
-        printRow(format, RowValues::fromFile(row));
+        row match {
+        | rvalues @ RowValues(_, r) ->
+          for (_ in Range(0, r)) {
+            RowValues::printItem(format, rvalues)
+          }
+        | _ -> invariant_violation("Invalid row kind")
+        }
       }
     }
   })

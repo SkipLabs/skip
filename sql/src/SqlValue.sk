@@ -1,5 +1,9 @@
 module SKFS;
 
+/*****************************************************************************/
+/* Comparison function used for all types in skdb. */
+/*****************************************************************************/
+
 extension base class BaseName {
   overridable fun compare(y: BaseName): Order {
     (this, y) match {
@@ -57,6 +61,29 @@ extension base class BaseName {
 module end;
 
 module SKSQL;
+
+/*****************************************************************************/
+/* Primitives used to build js objects directly (instead of a string) */
+/*****************************************************************************/
+
+@cpp_extern("SKIP_clear_field_names")
+native fun jsClearFieldNames(): void;
+@cpp_extern("SKIP_push_field_name")
+native fun jsPushFieldName(String): void;
+@cpp_extern("SKIP_clear_object")
+native fun jsClearObject(): void;
+@cpp_extern("SKIP_push_object_field_null")
+native fun jsPushObjectFieldNull(): void;
+@cpp_extern("SKIP_push_object_field_int32")
+native fun jsPushObjectFieldInt32(Int32): void;
+@cpp_extern("SKIP_push_object_field_int64")
+native fun jsPushObjectFieldInt64(String): void;
+@cpp_extern("SKIP_push_object_field_float")
+native fun jsPushObjectFieldFloat(String): void;
+@cpp_extern("SKIP_push_object_field_string")
+native fun jsPushObjectFieldString(String): void;
+@cpp_extern("SKIP_push_object")
+native fun jsPushObject(): void;
 
 fun compareRows(
   kinds: Array<(Int, IKind, Type)>,
@@ -191,6 +218,40 @@ class RowValues private (
 
   fun size(): Int {
     this.values.size()
+  }
+
+  static fun printHeader(format: SKFS.OutputFormat): void {
+    format match {
+    | SKFS.OJS(fieldNames) ->
+      jsClearFieldNames();
+      for (fieldName in fieldNames) {
+        jsPushFieldName(fieldName);
+      }
+    | _ -> void
+    }
+  }
+
+  static fun printItem(format: SKFS.OutputFormat, row: RowValues): void {
+    format match {
+    | SKFS.OJS _ ->
+      jsClearObject();
+      for (v in row.values) {
+        v match {
+        | None() -> jsPushObjectFieldNull()
+        | Some(CInt(n)) ->
+          n32 = Int32::truncate(n);
+          if (n32.toInt() == n) {
+            jsPushObjectFieldInt32(n32)
+          } else {
+            jsPushObjectFieldInt64(n.toString())
+          }
+        | Some(CFloat(f)) -> jsPushObjectFieldFloat(f.toString())
+        | Some(CString(s)) -> jsPushObjectFieldString(s)
+        }
+      };
+      jsPushObject()
+    | _ -> print_string(row.toStringSingle(format))
+    }
   }
 
   fun toStringSingle(format: SKFS.OutputFormat): String {

@@ -137,6 +137,16 @@ mutable class SelectFast{
     };
   }
 
+  static fun printLoop(
+    format: SKFS.OutputFormat,
+    iter: readonly Sequence<RowValues>,
+  ): void {
+    RowValues::printHeader(format);
+    for (row in iter) {
+      RowValues::printItem(format, row);
+    }
+  }
+
   mutable private fun select(pos: Int): Bool {
     !pos = this.lex.expectUpper(pos, "SELECT");
     if (this.lex.isEqUpper(pos, "ALL")) {
@@ -188,13 +198,17 @@ mutable class SelectFast{
       fieldNames = table.schema.map(x -> x.name.origName);
       SKFS.OJSON(fieldNames)
     | OFK_SQL() -> SKFS.OSQL()
+    | OFK_JS() ->
+      fieldNames = table.schema.map(x -> x.name.origName);
+      SKFS.OJS(fieldNames)
     };
     if (this.compiler.aggrVars.isEmpty()) {
       orderBy match {
       | None() ->
-        this.selectLoop(fromRanges, cparams, whereOpt, limitOpt, row ~>
-          print_string(row.toStringSingle(format))
-        )
+        RowValues::printHeader(format);
+        this.selectLoop(fromRanges, cparams, whereOpt, limitOpt, row ~> {
+          RowValues::printItem(format, row)
+        })
       | Some(userOrder) ->
         order = userOrder.map(x -> (x.i0 - 1, x.i1));
         limitOpt match {
@@ -204,22 +218,14 @@ mutable class SelectFast{
             acc.push(row)
           );
           acc.sortBy(x ~> x, (x, y) ~> compareRowsFast(order, x, y));
-          for (row in acc) {
-            for (_ in Range(0, row.repeat)) {
-              print_string(row.toStringSingle(format));
-            }
-          }
+          static::printLoop(format, acc)
         | Some(limit) ->
           acc = mutable FastOrder{capacity => limit, kinds => order};
           this.selectLoop(fromRanges, cparams, whereOpt, None(), row ->
             acc.push(row)
           );
           acc.data.sortBy(x ~> x, (x, y) ~> compareRowsFast(order, x, y));
-          for (row in acc.data) {
-            for (_ in Range(0, row.repeat)) {
-              print_string(row.toStringSingle(format));
-            }
-          }
+          static::printLoop(format, acc.data)
         }
       }
     } else {
@@ -249,10 +255,9 @@ mutable class SelectFast{
           }
         }
       });
-      print_string(
-        RowValues::create(
-          state.toArray().map(x -> Some(CInt(x))),
-        ).toStringSingle(format),
+      static::printLoop(
+        format,
+        Array[RowValues::create(state.toArray().map(x -> Some(CInt(x))))],
       )
     };
     true

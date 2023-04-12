@@ -570,4 +570,37 @@ char* SKIP_call_external_fun(int32_t, char*) {
   exit(2);
 }
 
+/*****************************************************************************/
+/* Primitives used to output js objects directly, doesn't do anything
+ * in native mode.
+ */
+/*****************************************************************************/
+
+void SKIP_clear_field_names() {
+  // Not implemented
+}
+void SKIP_push_field_name(char*) {
+  // Not implemented
+}
+void SKIP_clear_object() {
+  // Not implemented
+}
+void SKIP_push_object_field_null() {
+  // Not implemented
+}
+void SKIP_push_object_field_int32(int32_t) {
+  // Not implemented
+}
+void SKIP_push_object_field_int64(char*) {
+  // Not implemented
+}
+void SKIP_push_object_field_float(char*) {
+  // Not implemented
+}
+void SKIP_push_object_field_string(char*) {
+  // Not implemented
+}
+void SKIP_push_object() {
+  // Not implemented
+}
 }

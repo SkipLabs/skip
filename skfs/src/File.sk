@@ -187,16 +187,25 @@ base class OutputFormat uses Orderable {
   | OSQL()
   | OCSV()
   | OJSON(fieldNames: Array<String>)
+  | OJS(fieldNames: Array<String>)
 
   fun usesComma(): Bool
   | OSQL() -> false
   | OCSV() -> true
   | OJSON(_) -> true
+  | OJS _ ->
+    invariant_violation(
+      "Internal error: JS direct mode should never be printed",
+    )
 
   fun usesDoubleQuotes(): Bool
   | OSQL() -> false
   | OCSV() -> true
   | OJSON(_) -> true
+  | OJS _ ->
+    invariant_violation(
+      "Internal error: JS direct mode should never be printed",
+    )
 }
 
 base class File {
