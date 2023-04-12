@@ -28,8 +28,6 @@ RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
     sdk install java 19.0.1-oracle"
 
 RUN make clean
-RUN make -B
-RUN rm sql/target/state.db
-RUN rm sql/target/wasm32-unknown-unknown/state.db
+RUN make -B && rm sql/target/state.db && rm sql/target/wasm32-unknown-unknown/state.db
 
 CMD ./sql/server/deploy/start.sh
