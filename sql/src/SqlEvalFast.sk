@@ -10,6 +10,8 @@ module SKSQL;
  */
 /*****************************************************************************/
 
+value class SelectOutput<T>{format: SKFS.OutputFormat, items: T}
+
 mutable class SelectFast{
   context: mutable SKFS.Context,
   compiler: mutable Compiler,
@@ -22,12 +24,20 @@ mutable class SelectFast{
     pos: Int,
   ): Bool {
     context = origContext.mclone();
-    result = (mutable static{
+    (mutable static{
       context,
       compiler => Compiler::create(true, options, pos),
       lex,
-    }).select(pos);
-    result
+    }).select(pos) match {
+    | None() -> return false
+    | Some(selectOutput) ->
+      format = selectOutput.format;
+      RowValues::printHeader(format);
+      for (row in selectOutput.items) {
+        RowValues::printItem(format, row);
+      }
+    };
+    true
   }
 
   private mutable fun getFrom(pos: Int): ?(Int, Array<DirDescr>) {
@@ -77,8 +87,7 @@ mutable class SelectFast{
     cparams: ?Array<CGExpr>,
     where: ?CExpr<Int>,
     limitOpt: ?Int,
-    f: RowValues -> void,
-  ): void {
+  ): mutable Iterator<RowValues> {
     limit = limitOpt match {
     | None() -> Int::max
     | Some(x) -> x
@@ -93,14 +102,14 @@ mutable class SelectFast{
     i = 0;
     loop {
       iter.next() match {
-      | None() -> return void
+      | None() -> break void
       | Some((_, files)) ->
-        for (file in files) {
+        shouldBreak = for (file in files) {
           row = RowValues::fromFile(file);
           end match {
           | Some(endRow @ RowKey(RowValues _, kinds)) ->
             if (RowKey(row, kinds) > endRow) {
-              return void
+              break true
             }
           | _ -> void
           };
@@ -113,11 +122,14 @@ mutable class SelectFast{
           | _ ->
             cparams match {
             | None() ->
-              for (_ in Range(0, row.repeat)) {
-                if (i >= limit) return void;
-                f(row);
+              shouldBreak = for (_ in Range(0, row.repeat)) {
+                if (i >= limit) break true;
+                yield row;
                 !i = i + 1;
-              }
+              } else {
+                false
+              };
+              if (shouldBreak) break true
             | Some(cp) ->
               !row = SelectEvaluator::evalRow(
                 this.context,
@@ -125,16 +137,22 @@ mutable class SelectFast{
                 cp,
                 row.repeat,
               );
-              for (_ in Range(0, row.repeat)) {
-                if (i >= limit) return void;
-                f(row);
+              shouldBreak = for (_ in Range(0, row.repeat)) {
+                if (i >= limit) break true;
+                yield row;
                 !i = i + 1;
-              }
+              } else {
+                false
+              };
+              if (shouldBreak) break true
             }
           }
-        }
+        } else {
+          false
+        };
+        if (shouldBreak) break void
       }
-    };
+    }
   }
 
   static fun printLoop(
@@ -147,16 +165,87 @@ mutable class SelectFast{
     }
   }
 
-  mutable private fun select(pos: Int): Bool {
+  static private fun selectNoAggr(
+    limitOpt: ?Int,
+    orderBy: ?Array<(Int, SKSQL.IKind)>,
+    iter: mutable Iterator<RowValues>,
+  ): mutable Iterator<RowValues> {
+    orderBy match {
+    | None() -> iter
+    | Some(userOrder) ->
+      order = userOrder.map(x -> (x.i0 - 1, x.i1));
+      limitOpt match {
+      | None() ->
+        acc = mutable Vector[];
+        for (row in iter) {
+          acc.push(row)
+        };
+        acc.sortBy(x ~> x, (x, y) ~> compareRowsFast(order, x, y));
+        acc.iterator()
+      | Some(limit) ->
+        acc = mutable FastOrder{capacity => limit, kinds => order};
+        for (row in iter) {
+          acc.push(row)
+        };
+        acc.data.sortBy(x ~> x, (x, y) ~> compareRowsFast(order, x, y));
+        acc.data.iterator()
+      }
+    }
+  }
+
+  mutable private fun selectAggr(
+    limitOpt: ?Int,
+    iter: mutable Iterator<RowValues>,
+  ): ?mutable Iterator<RowValues> {
+    limitOpt match {
+    | Some(limit) if (limit < 1) -> return Some(Array[].iterator())
+    | _ -> void
+    };
+    state = mutable Vector<Int>[];
+    for (aggrVar in this.compiler.aggrVars) {
+      aggrVar.i1 match {
+      | CIExpr(SKSQL.CIGetFrom(0, _))
+      | SKSQL.CIExpr(SKSQL.CILiteral(1)) ->
+        void
+      | _ -> return None()
+      };
+      aggrVar.i0 match {
+      | Count(_) -> state.push(0)
+      | _ -> return None()
+      }
+    };
+    for (row in iter) {
+      for (i => aggrVar in this.compiler.aggrVars) {
+        aggrVar.i1 match {
+        | CIExpr(SKSQL.CIGetFrom(0, n)) ->
+          row.getInt(n) match {
+          | None() -> void
+          | Some(_) -> state![i] = state[i] + 1
+          }
+        | SKSQL.CIExpr(SKSQL.CILiteral(1)) -> state![i] = state[i] + 1
+        | _ -> invariant_violation("Unsupported operation")
+        }
+      }
+    };
+    Some(
+      Array[
+        RowValues::create(state.toArray().map(x -> Some(CInt(x)))),
+      ].iterator(),
+    )
+  }
+
+  mutable private fun select(
+    pos: Int,
+  ): ?SelectOutput<mutable Iterator<RowValues>> {
     !pos = this.lex.expectUpper(pos, "SELECT");
     if (this.lex.isEqUpper(pos, "ALL")) {
       !pos = this.lex.expectUpper(pos, "ALL");
     } else if (this.lex.isEqUpper(pos, "DISTINCT")) {
-      return false
+      return None()
     };
     (!pos, params) = parseSelectParams(this.lex, pos);
     (!pos, from) = this.getFrom(pos) match {
-    | None() -> return false
+    | None() -> return None()
     | Some(x) -> x
     };
     (!pos, whereAst) = this.getWhere(pos);
@@ -167,14 +256,14 @@ mutable class SelectFast{
       None()
     };
     (!pos, limitOpt) = this.getLimit(pos) match {
-    | None() -> return false
+    | None() -> return None()
     | Some(x) -> x
     };
     if (this.lex.isEq(pos, ";")) {
       !pos = this.lex.expect(pos, ";");
     } else {
       if (!isEOF(this.lex, pos)) {
-        return false;
+        return None();
       }
     };
     cparams = if (params.isStar && params.params.isEmpty()) None() else {
@@ -202,65 +291,26 @@ mutable class SelectFast{
       fieldNames = table.schema.map(x -> x.name.origName);
       SKFS.OJS(fieldNames)
     };
-    if (this.compiler.aggrVars.isEmpty()) {
-      orderBy match {
-      | None() ->
-        RowValues::printHeader(format);
-        this.selectLoop(fromRanges, cparams, whereOpt, limitOpt, row ~> {
-          RowValues::printItem(format, row)
-        })
-      | Some(userOrder) ->
-        order = userOrder.map(x -> (x.i0 - 1, x.i1));
-        limitOpt match {
-        | None() ->
-          acc = mutable Vector[];
-          this.selectLoop(fromRanges, cparams, whereOpt, None(), row ->
-            acc.push(row)
-          );
-          acc.sortBy(x ~> x, (x, y) ~> compareRowsFast(order, x, y));
-          static::printLoop(format, acc)
-        | Some(limit) ->
-          acc = mutable FastOrder{capacity => limit, kinds => order};
-          this.selectLoop(fromRanges, cparams, whereOpt, None(), row ->
-            acc.push(row)
-          );
-          acc.data.sortBy(x ~> x, (x, y) ~> compareRowsFast(order, x, y));
-          static::printLoop(format, acc.data)
-        }
-      }
-    } else {
-      state = mutable Vector<Int>[];
-      for (aggrVar in this.compiler.aggrVars) {
-        aggrVar.i1 match {
-        | CIExpr(SKSQL.CIGetFrom(0, _))
-        | SKSQL.CIExpr(SKSQL.CILiteral(1)) ->
-          void
-        | _ -> return false
-        };
-        aggrVar.i0 match {
-        | Count(_) -> state.push(0)
-        | _ -> return false
-        }
-      };
-      this.selectLoop(fromRanges, cparams, whereOpt, limitOpt, row -> {
-        for (i => aggrVar in this.compiler.aggrVars) {
-          aggrVar.i1 match {
-          | CIExpr(SKSQL.CIGetFrom(0, n)) ->
-            row.getInt(n) match {
-            | None() -> void
-            | Some(_) -> state![i] = state[i] + 1
-            }
-          | SKSQL.CIExpr(SKSQL.CILiteral(1)) -> state![i] = state[i] + 1
-          | _ -> invariant_violation("Unsupported operation")
-          }
-        }
-      });
-      static::printLoop(
+    isAggr = this.compiler.aggrVars.isEmpty();
+    iter = this.selectLoop(
+      fromRanges,
+      cparams,
+      whereOpt,
+      if (isAggr) None() else limitOpt,
+    );
+    Some(
+      SelectOutput{
         format,
-        Array[RowValues::create(state.toArray().map(x -> Some(CInt(x))))],
-      )
-    };
-    true
+        items => if (isAggr) {
+          static::selectNoAggr(limitOpt, orderBy, iter)
+        } else {
+          this.selectAggr(limitOpt, iter) match {
+          | None() -> return None()
+          | Some(x) -> x
+          }
+        },
+      },
+    )
   }
 }
 
