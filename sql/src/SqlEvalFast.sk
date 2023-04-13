@@ -291,7 +291,7 @@ mutable class SelectFast{
       fieldNames = table.schema.map(x -> x.name.origName);
       SKFS.OJS(fieldNames)
     };
-    isAggr = this.compiler.aggrVars.isEmpty();
+    isAggr = !this.compiler.aggrVars.isEmpty();
     iter = this.selectLoop(
       fromRanges,
       cparams,
@@ -302,12 +302,12 @@ mutable class SelectFast{
       SelectOutput{
         format,
         items => if (isAggr) {
-          static::selectNoAggr(limitOpt, orderBy, iter)
-        } else {
           this.selectAggr(limitOpt, iter) match {
           | None() -> return None()
           | Some(x) -> x
           }
+        } else {
+          static::selectNoAggr(limitOpt, orderBy, iter)
         },
       },
     )
