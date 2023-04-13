@@ -284,11 +284,21 @@ mutable class SelectFast{
     format = this.compiler.options.format match {
     | OFK_CSV() -> SKFS.OCSV()
     | OFK_JSON() ->
-      fieldNames = table.schema.map(x -> x.name.origName);
+      schema = SKSQL.Compiler::getSchema(
+        params,
+        Array[(table, None())],
+        cparams.default(Array[]),
+      );
+      fieldNames = schema.map(x -> x.name.origName);
       SKFS.OJSON(fieldNames)
     | OFK_SQL() -> SKFS.OSQL()
     | OFK_JS() ->
-      fieldNames = table.schema.map(x -> x.name.origName);
+      schema = SKSQL.Compiler::getSchema(
+        params,
+        Array[(table, None())],
+        cparams.default(Array[]),
+      );
+      fieldNames = schema.map(x -> x.name.origName);
       SKFS.OJS(fieldNames)
     };
     isAggr = !this.compiler.aggrVars.isEmpty();
