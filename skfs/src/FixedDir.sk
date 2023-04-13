@@ -52,17 +52,21 @@ base class FixedData<T> {
   fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
 }
 
+// Assuming x <= y implies get(x) <= get(y), binSearch(get, key, i, j)
+// is the least index k where i <= k <= j such that get(k) == key. If
+// there is no such index, then i <= k <= j+1 but otherwise is arbitrary.
 fun binSearch<T: Orderable>(get: Int ~> T, key: T, i: Int, j: Int): Int {
-  if (i > j) {
-    return i;
+  l = i;
+  u = j;
+  while (l <= u) {
+    m = l + (u - l) / 2;
+    if (key > get(m)) {
+      !l = m + 1
+    } else {
+      !u = m - 1
+    }
   };
-  pivot = i + (j - i) / 2;
-  key.compare(get(pivot)) match {
-  | LT()
-  | EQ() ->
-    binSearch(get, key, i, pivot - 1)
-  | GT() -> binSearch(get, key, pivot + 1, j)
-  }
+  l;
 }
 
 class FixedDir<T: frozen> private {
