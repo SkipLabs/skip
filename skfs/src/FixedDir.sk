@@ -56,7 +56,7 @@ fun binSearch<T: Orderable>(get: Int ~> T, key: T, i: Int, j: Int): Int {
   if (i > j) {
     return i;
   };
-  pivot = (i + j) / 2;
+  pivot = i + (j - i) / 2;
   key.compare(get(pivot)) match {
   | LT()
   | EQ() ->
@@ -98,7 +98,7 @@ class FixedDir<T: frozen> private {
     if (i > j) {
       return i;
     };
-    pivot = (i + j) / 2;
+    pivot = i + (j - i) / 2;
     entry = this.data[pivot];
     c1 = key.compare(entry.key);
     c = if (c1 is EQ _) source.compare(entry.value.i0) else c1;
@@ -159,7 +159,7 @@ class FixedDir<T: frozen> private {
     if (i > j) {
       return TickRange::create(Tick(0))
     };
-    pivot = (i + j) / 2;
+    pivot = i + (j - i) / 2;
     elt = array[pivot];
     tag = elt.tag;
     right = static::computeTags(cache, array, pivot + 1, j);
@@ -179,7 +179,7 @@ class FixedDir<T: frozen> private {
     if (i > j) {
       return void;
     };
-    pivot = (i + j) / 2;
+    pivot = i + (j - i) / 2;
     elt = this.data[pivot];
     tick = elt.tag;
     if (tick.max < after) return void;
@@ -207,7 +207,7 @@ class FixedDir<T: frozen> private {
     j: Int,
   ): mutable Iterator<(Tick, Source, T)> {
     if (i <= j) {
-      pivot = (i + j) / 2;
+      pivot = i + (j - i) / 2;
       elt = this.data[pivot];
       tick = elt.tag;
       if (tick.max >= after) {
@@ -306,7 +306,7 @@ class FixedSet private {data: Array<FixedKey> = Array[]} {
         }
       }
     };
-    pivot = (i + j) / 2;
+    pivot = i + (j - i) / 2;
     elt = array[pivot];
     tag = elt.tag;
     right = static::computeTags(cache, array, pivot + 1, j);
@@ -334,7 +334,7 @@ class FixedSet private {data: Array<FixedKey> = Array[]} {
       };
       return void;
     };
-    pivot = (i + j) / 2;
+    pivot = i + (j - i) / 2;
     elt = this.data[pivot];
     tick = elt.tag;
     if (tick.max < after) return void;
@@ -411,7 +411,7 @@ class FixedSingle<K: Orderable, +V>(data: Array<(K, V)> = Array[]) {
     if (i > j) {
       return i;
     };
-    pivot = (i + j) / 2;
+    pivot = i + (j - i) / 2;
     elt = this.data[pivot];
     key.compare(elt.i0) match {
     | LT()
