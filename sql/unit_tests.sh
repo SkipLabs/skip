@@ -242,3 +242,9 @@ if cat test/test_index_on_star.sql | $SKDB --show-used-indexes | grep -q "USING 
 else
     echo -e "TEST INDEX DOT STAR:\tFAILED"
 fi
+
+if cat test/limit_unit.sql | $SKDB | wc |  | tr ' ' 'S' | tr '\n' 'S' | grep -q "SSSSSS1SSSSSSS1SSSSSSS2S"; then
+    echo -e "TEST LIMIT:\tOK"
+else
+    echo -e "TEST LIMIT:\tFAILED"
+fi
