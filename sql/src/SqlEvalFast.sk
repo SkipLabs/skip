@@ -266,9 +266,7 @@ mutable class SelectFast{
         return None();
       }
     };
-    cparams = if (params.isStar && params.params.isEmpty()) None() else {
-      Some(this.compiler.compileParams(this.context, params, from))
-    };
+    cparams = this.compiler.compileParams(this.context, params, from);
     (!whereAst, fromRanges) = this.compiler.compileJoin(
       this.context,
       from,
@@ -287,7 +285,7 @@ mutable class SelectFast{
       schema = SKSQL.Compiler::getSchema(
         params,
         Array[(table, None())],
-        cparams.default(Array[]),
+        cparams,
       );
       fieldNames = schema.map(x -> x.name.origName);
       SKFS.OJSON(fieldNames)
@@ -296,7 +294,7 @@ mutable class SelectFast{
       schema = SKSQL.Compiler::getSchema(
         params,
         Array[(table, None())],
-        cparams.default(Array[]),
+        cparams,
       );
       fieldNames = schema.map(x -> x.name.origName);
       SKFS.OJS(fieldNames)
@@ -304,7 +302,11 @@ mutable class SelectFast{
     isAggr = !this.compiler.aggrVars.isEmpty();
     iter = this.selectLoop(
       fromRanges,
-      cparams,
+      if (params.isStar && params.params.isEmpty()) {
+        None()
+      } else {
+        Some(cparams)
+      },
       whereOpt,
       if (isAggr) None() else limitOpt,
     );
