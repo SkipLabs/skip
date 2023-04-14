@@ -148,6 +148,52 @@ test_basic_replication_unique_rows_replayed() {
     rm -f "$output"
 }
 
+test_basic_replication_null_string() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = NULL WHERE id = 0;"
+
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note is NULL;" > "$output"
+    assert_line_count "$output" 1 1
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = '';" > "$output"
+    assert_line_count "$output" 0 1
+
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect --user test_user)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    # we want the output to contain a null representation
+    assert_line_count "$output" "1	0,$" 1
+    rm -f "$output"
+}
+
+test_basic_replication_empty_string() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = '' WHERE id = 0;"
+
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note is NULL;" > "$output"
+    assert_line_count "$output" 0 1
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = '';" > "$output"
+    assert_line_count "$output" 1 1
+
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect --user test_user)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    # we want the output to contain an empty string
+    assert_line_count "$output" '""' 1
+    rm -f "$output"
+}
+
 test_basic_replication_dup_rows() {
     setup_server
     setup_local test_without_pk
@@ -440,6 +486,9 @@ test_tailing_dups_uses_repeat() {
 # tests:
 run_test test_basic_replication_unique_rows
 run_test test_basic_replication_unique_rows_replayed
+
+run_test test_basic_replication_null_string
+run_test test_basic_replication_empty_string
 
 run_test test_basic_replication_dup_rows
 run_test test_basic_replication_dup_rows_in_txn
