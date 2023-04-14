@@ -68,6 +68,29 @@ fun findFirstBy(delta: Int ~> Order, l: Int, u: Int): Int {
   l;
 }
 
+// Assuming delta is monotone, that is, i <= j implies delta(i) <= delta(j),
+// findAllBy(delta, l, u) enumerates, in increasing order, all the m where l
+// <= m <= u such that delta(m) == EQ().
+fun findAllBy<T>(delta: Int ~> Order, l: Int, u: Int): mutable Iterator<Int> {
+  i = findFirstBy(delta, l, u);
+  // Linear scan to find all elements that compare equal to key. If
+  // the number of such duplicates is expected to be > lg(u-i), this
+  // should be replaced with the findLastBy analogue of findFirstBy.
+  while (i <= u && delta(i) == EQ()) {
+    yield i;
+    !i = i + 1;
+  }
+}
+
+fun findAll<T: Orderable>(
+  get: Int ~> T,
+  key: T,
+  i: Int,
+  j: Int,
+): mutable Iterator<Int> {
+  findAllBy(idx ~> key.compare(get(idx)), i, j)
+}
+
 // Assuming x <= y implies get(x) <= get(y), binSearch(get, key, i, j)
 // is the least index k where i <= k <= j such that get(k) == key. If
 // there is no such index, then i <= k <= j+1 but otherwise is arbitrary.
@@ -100,50 +123,33 @@ class FixedDir<T: frozen> private {
     binSearch(i ~> this.get(i).key, key, 0, this.size() - 1)
   }
 
-  fun getPosSourceKey(source: Source, key: BaseName): Int {
+  fun getAll(key: BaseName): mutable Iterator<Int> {
+    findAll(i ~> this.get(i).key, key, 0, this.size() - 1)
+  }
+
+  fun getAllSourceKey(source: Source, key: BaseName): mutable Iterator<Int> {
     delta = i ~> {
       entry = this.get(i);
       c = key.compare(entry.key);
       if (c != EQ()) return c;
       source.compare(entry.value.i0)
     };
-    findFirstBy(delta, 0, this.size() - 1)
+    findAllBy(delta, 0, this.size() - 1)
   }
 
   fun getArray(key: BaseName): Array<(Source, T)> {
-    pos = this.getPos(key);
-    result = mutable Vector[];
-    loop {
-      if (pos >= this.data.size()) break void;
-      elt = this.data[pos];
-      if (elt.key != key) break void;
-      result.push(elt.value);
-      !pos = pos + 1;
-    };
-    result.toArray();
+    this.getAll(key).map(i ~> this.get(i).value).collect(Array)
   }
 
   fun getIter(key: BaseName): mutable Iterator<(Tick, Source, T)> {
-    pos = this.getPos(key);
-    loop {
-      if (pos >= this.data.size()) break void;
-      elt = this.data[pos];
-      if (elt.key != key) break void;
-      yield (elt.tag.current, elt.value.i0, elt.value.i1);
-      !pos = pos + 1;
-    };
+    this.getAll(key).map(i -> {
+      elt = this.get(i);
+      (elt.tag.current, elt.value.i0, elt.value.i1)
+    })
   }
 
   fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T> {
-    pos = this.getPosSourceKey(source, key);
-    loop {
-      if (pos >= this.data.size()) break void;
-      entry = this.data[pos];
-      if (entry.value.i0 != source) break void;
-      if (entry.key != key) break void;
-      yield entry.value.i1;
-      !pos = pos + 1;
-    };
+    this.getAllSourceKey(source, key).map(i -> this.get(i).value.i1)
   }
 
   fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
