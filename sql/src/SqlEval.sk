@@ -1479,12 +1479,13 @@ fun eval(options: Options, userOpt: ?String): void {
           };
 
           // FAST PATH
-          if (!isTransaction && lex.isEqUpper(pos, "SELECT")) {
-            origPos = pos;
-            success = SelectFast::run(options, context, lex, pos);
-            if (success) continue;
-            !pos = origPos;
-          };
+          // TODO: uncomment soon. disabling to unblock users while we address a query bug
+          // if (!isTransaction && lex.isEqUpper(pos, "SELECT")) {
+          //   origPos = pos;
+          //   success = SelectFast::run(options, context, lex, pos);
+          //   if (success) continue;
+          //   !pos = origPos;
+          // };
 
           if (lex.isEqUpper(pos, "BEGIN")) {
             !pos = lex.expectUpper(pos, "BEGIN");
