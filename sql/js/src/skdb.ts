@@ -1173,6 +1173,7 @@ export class SKDB {
   private serverToLocalSyncConnections: Map<string, ResilientConnection> = new Map();
   private replication_uid: string = "";
   private client_uuid: string = "";
+  private persistTimer?: number;
 
   private constructor(storeName: string) {
     this.storeName = storeName;
@@ -1215,6 +1216,9 @@ export class SKDB {
 
     client.replication_uid = client.runLocal(["uid"], "").trim();
     client.client_uuid = crypto.randomUUID();
+
+    // flush to disk on a poll - TODO: short-term perf workaround
+    client.persistTimer = setInterval(() => client.storePagesLoop(), 10000);
 
     return client;
   }
@@ -1527,7 +1531,6 @@ export class SKDB {
       }
     }
 
-    this.storePagesLoop();
     return this.stdout.join("");
   }
 
