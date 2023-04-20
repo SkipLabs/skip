@@ -766,6 +766,7 @@ class SelectEvaluator{
     entries: List<Row>,
   ): SKFS.EHandle<Row> {
     parents = this.makeParents(dir.dirName, rangeOpt, remainingTables, entries);
+    if (this.directMode is Some _) RowValues::printHeader(this.select.format);
     result = SKFS.EHandle::multiContextWriterKeyIter(
       Row::fromFile,
       context,
@@ -969,7 +970,7 @@ class SelectEvaluator{
           | Some(x) -> SKFS.IntFile::fromFile(x).value
           };
           for (_ in Range(0, row.repeat)) {
-            print_string(row.toStringSingle(this.select.format));
+            RowValues::printItem(this.select.format, row);
             !i = i + 1;
             if (i >= limit) {
               throw IgnoreAndContinue()
