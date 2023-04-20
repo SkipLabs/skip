@@ -19,6 +19,8 @@ run_compare_test () {
   fi
 }
 
+ 
+
 run_compare_test select1
 
 if
@@ -29,6 +31,7 @@ if
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
         echo "  skdb.sqlRaw('insert into t1 values(TRUE, false);');"
         echo "  console.log(skdb.sqlRaw('select true, false, a, b from t1;'));"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
     )| $node) | grep -q '1|0|1|0'
@@ -47,6 +50,7 @@ if
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
         echo "  skdb.sqlRaw('create table if not exists t1 (a BOOLEAN, b boolean);');"
         echo "  console.log(skdb.sqlRaw('select 1;'));"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
     ) | $node)| grep -q '1'
@@ -63,6 +67,7 @@ if
         echo "async function test() {"
         echo "  let skdb = await SKDB.create(true);"
         echo "  skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY);');"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
     ) | $node)
@@ -80,6 +85,7 @@ if
         echo "  let skdb = await SKDB.create(true);"
         echo "  skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');"
         echo "  skdb.sqlRaw('insert into t1 (b) values (22);');";
+        echo "  process.exit();"
         echo "}"
         echo "test()"
     ) | $node)2>&1| grep -q 'Cannot generate a string primary key'
@@ -99,6 +105,7 @@ if
         echo "  skdb.sql('INSERT INTO widgets (id, name) VALUES (\'a\', \'gear\');');"
         echo "  skdb.sql('UPDATE widgets SET id = \'c\', name = \'gear2\';');"
         echo "  console.log(skdb.sqlRaw('select * from widgets;'));"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
      ) | $node) | grep -q 'c|gear2'
@@ -117,6 +124,7 @@ if
         echo "  skdb.sql(\"create table widgets (id text unique , price real not null);\");"
         echo "  skdb.sql(\"INSERT INTO widgets (id, price) values ('a', 10.0);\");"
         echo "  console.log(skdb.sqlRaw('select * from widgets'))"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
      ) | $node) | grep -q 'a|10.0'
@@ -136,6 +144,7 @@ if
         echo "  skdb.sqlRaw('create virtual view v1 as select * from t1;');"
         echo "  skdb.sqlRaw('create virtual view if not exists v1 as select * from t1;');"
         echo "  console.log(skdb.sqlRaw('select 1;'));"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
     ) | $node)| grep -q '1'
@@ -155,6 +164,7 @@ if
         echo "  skdb.sqlRaw('create view v1 as select * from t1;');"
         echo "  skdb.sqlRaw('create view if not exists v1 as select * from t1;');"
         echo "  console.log(skdb.sqlRaw('select 1;'));"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
     ) | $node)| grep -q '1'
@@ -174,6 +184,7 @@ if
         echo "    skdb.sqlRaw('select * from t1;');"
         echo "    console.log('');"
         echo "  }"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
     ) | $node 2>&1)| grep 'does not exist' | awk '{count += 1;} END { print count;}' | grep -q 10000
@@ -192,6 +203,7 @@ if
         echo "  skdb.sql('create table t1 (aBc INTEGER)')"
         echo "  skdb.insert('t1', [11]);"
         echo "  console.log(skdb.sql('select * from t1')[0].aBc);"
+        echo "  process.exit();"
         echo "}"
         echo "test()"
     ) | $node 2>&1) | grep -q "11"
@@ -199,6 +211,25 @@ then
     echo -e "TEST COLUMN CASING:\tOK"
 else
     echo -e "TEST COLUMN CASING :\tFAILED"
+fi
+
+if
+    ((
+        cat $skdb_node;
+        echo "";
+        echo "async function test() {"
+        echo "  let skdb = await SKDB.create(true);"
+        echo "  skdb.sql('create table t1 (aBc INTEGER)')"
+        echo "  skdb.insert('t1', [11]);"
+        echo "  console.log(skdb.sql('select * from t1 limit 1')[0].aBc);"
+        echo "  process.exit();"
+        echo "}"
+        echo "test()"
+    ) | $node 2>&1) | grep -q "11"
+then
+    echo -e "TEST LIMIT:\tOK"
+else
+    echo -e "TEST LIMIT :\tFAILED"
 fi
 
 if

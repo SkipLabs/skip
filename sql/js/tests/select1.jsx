@@ -9918,6 +9918,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
+  process.exit();
 }
 
 test1();
