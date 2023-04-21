@@ -31,6 +31,13 @@ function request_stream() {
   return buf;
 }
 
+function request_concurrent_streaming() {
+  const buf = new ArrayBuffer(8);
+  const dv = new DataView(buf);
+  dv.setUint32(0, 5);
+  return buf;
+}
+
 function toHex(buf) {
   return '0x' + [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, '0')).join('');
 }
@@ -367,6 +374,37 @@ const tests = {
     stream.send(request_echo(0));
 
     socket.errorSocket(99, "test");
+  },
+
+  threads: async () => {
+    const socket = await connectAndAuth();
+    const stream = socket.openStream();
+
+    stream.send(request_concurrent_streaming());
+    stream.close();
+
+    let streamCount = 6;
+
+    socket.onStream = (stream) => {
+      let acc = 0;
+      stream.onData = (data) => {
+        const dataView = new DataView(data);
+        acc += dataView.getUint32(0);
+      };
+
+      stream.onClose = () => {
+        assert.equal(acc, 10001 * (10000 / 2));
+        if (--streamCount < 1) {
+          socket.closeSocket();
+        }
+      };
+
+      stream.close();
+    };
+
+    socket.onClose = () => {
+      socket.closeSocket();
+    };
   },
 };
 

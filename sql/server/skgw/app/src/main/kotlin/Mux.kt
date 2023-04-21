@@ -16,18 +16,14 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Arrays
 import java.util.Base64
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.locks.ReadWriteLock
+import java.util.concurrent.locks.ReentrantReadWriteLock
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.xnio.ChannelListener
 
 // TODO: this all has a blocking interface
-
-// TODO: none of this is thread safe. the assumption is that it all
-// runs in callbacks on a sharded thread. this won't work. currently
-// we read data from many threads and send to streams.
-
-// probably ok if socket is always interacted with on a single thread,
-// and the same for each stream?
 
 interface MuxedSocketFactory {
   fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel): MuxedSocket
@@ -113,6 +109,7 @@ class MuxedSocket(
     val onError: onSocketErrorFn,
     val socket: WebSocketChannel,
     val getDecryptedKey: (String) -> ByteArray,
+    private val mutex: ReadWriteLock = ReentrantReadWriteLock(),
     private var state: State = State.IDLE,
     private var nextStream: UInt = 2u,
     private var clientStreamWatermark: UInt = 0u,
@@ -129,7 +126,7 @@ class MuxedSocket(
   // user-facing interface /////////////////////////////////////////////////////
 
   fun openStream(): Stream? {
-    when (state) {
+    when (getState()) {
       State.IDLE,
       State.CLOSE_WAIT -> {
         return null
@@ -140,42 +137,62 @@ class MuxedSocket(
       }
       State.AUTH_RECV -> {
         val stream = Stream(nextStream, this)
-        activeStreams.put(nextStream, stream)
-        nextStream = nextStream + 2u
+        mutex.writeLock().lock()
+        try {
+          activeStreams.put(nextStream, stream)
+          nextStream = nextStream + 2u
+        } finally {
+          mutex.writeLock().unlock()
+        }
         return stream
       }
     }
   }
 
   fun closeSocket() {
-    when (state) {
+    when (getState()) {
       State.CLOSING,
       State.CLOSED -> {}
       State.IDLE -> {
-        activeStreams.clear()
-        state = State.CLOSED
+        mutex.writeLock().lock()
+        try {
+          activeStreams.clear()
+          state = State.CLOSED
+        } finally {
+          mutex.writeLock().unlock()
+        }
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
         socket.close()
       }
       State.CLOSE_WAIT -> {
-        val keys = activeStreams.keys.toSet()
-        // we do not iterate over entries as we may remove them while iterating
-        for (key in keys) {
-          val stream = activeStreams.get(key)
-          stream?.close()
+        mutex.writeLock().lock()
+        try {
+          val keys = activeStreams.keys.toSet()
+          // we do not iterate over entries as we may remove them while iterating
+          for (key in keys) {
+            val stream = activeStreams.get(key)
+            stream?.close()
+          }
+          activeStreams.clear()
+          state = State.CLOSED
+        } finally {
+          mutex.writeLock().unlock()
         }
-        activeStreams.clear()
-        state = State.CLOSED
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
         socket.close()
       }
       State.AUTH_RECV -> {
-        val keys = activeStreams.keys.toSet()
-        for (key in keys) {
-          val stream = activeStreams.get(key)
-          stream?.close()
+        mutex.writeLock().lock()
+        try {
+          val keys = activeStreams.keys.toSet()
+          for (key in keys) {
+            val stream = activeStreams.get(key)
+            stream?.close()
+          }
+          state = State.CLOSING
+        } finally {
+          mutex.writeLock().unlock()
         }
-        state = State.CLOSING
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
         socket.close()
       }
@@ -183,25 +200,36 @@ class MuxedSocket(
   }
 
   fun errorSocket(errorCode: UInt, msg: String) {
-    when (state) {
+    when (getState()) {
       State.CLOSING,
       State.CLOSED -> {
-        activeStreams.clear()
-        state = State.CLOSED
+        mutex.writeLock().lock()
+        try {
+          activeStreams.clear()
+          state = State.CLOSED
+        } finally {
+          mutex.writeLock().unlock()
+        }
       }
       State.IDLE,
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
-        val keys = activeStreams.keys.toSet()
-        for (key in keys) {
-          val stream = activeStreams.get(key)
-          stream?.error(errorCode, msg)
+        mutex.writeLock().lock()
+        try {
+          val keys = activeStreams.keys.toSet()
+          for (key in keys) {
+            val stream = activeStreams.get(key)
+            stream?.error(errorCode, msg)
+          }
+          activeStreams.clear()
+          state = State.CLOSED
+          val lastStream =
+              if (nextStream - 2u > clientStreamWatermark) nextStream - 2u
+              else clientStreamWatermark
+          sendData(encodeGoawayMsg(lastStream, errorCode, msg))
+        } finally {
+          mutex.writeLock().unlock()
         }
-        activeStreams.clear()
-        state = State.CLOSED
-        val lastStream =
-            if (nextStream - 2u > clientStreamWatermark) nextStream - 2u else clientStreamWatermark
-        sendData(encodeGoawayMsg(lastStream, errorCode, msg))
         sendClose(CloseMessage.PROTOCOL_ERROR, msg)
         socket.close()
       }
@@ -211,7 +239,7 @@ class MuxedSocket(
   // interface used by WS //////////////////////////////////////////////////////
 
   fun onSocketMessage(msg: ByteBuffer) {
-    when (state) {
+    when (getState()) {
       State.CLOSE_WAIT,
       State.CLOSED -> {}
       State.IDLE -> {
@@ -222,7 +250,12 @@ class MuxedSocket(
               errorSocket(3u, "Authentication failed")
               return
             }
-            state = State.AUTH_RECV
+            mutex.writeLock().lock()
+            try {
+              state = State.AUTH_RECV
+            } finally {
+              mutex.writeLock().unlock()
+            }
           }
           is MuxGoawayMsg -> onSocketError(muxMsg.errorCode, muxMsg.msg)
           is MuxStreamDataMsg,
@@ -238,30 +271,40 @@ class MuxedSocket(
           is MuxAuthMsg -> onSocketError(2u, "auth already received")
           is MuxGoawayMsg -> onSocketError(muxMsg.errorCode, muxMsg.msg)
           is MuxStreamResetMsg -> {
-            val stream = activeStreams.get(muxMsg.stream)
+            val stream = getActiveStream(muxMsg.stream)
             stream?.onStreamError(muxMsg.errorCode, muxMsg.msg)
           }
           is MuxStreamCloseMsg -> {
-            val stream = activeStreams.get(muxMsg.stream)
+            val stream = getActiveStream(muxMsg.stream)
             val closed = stream?.onStreamClose()
             if (closed != null && closed) {
-              activeStreams.remove(muxMsg.stream)
+              mutex.writeLock().lock()
+              try {
+                activeStreams.remove(muxMsg.stream)
+              } finally {
+                mutex.writeLock().unlock()
+              }
             }
           }
           is MuxStreamDataMsg -> {
-            var stream = activeStreams.get(muxMsg.stream)
-            if (stream == null && state == State.CLOSING) {
+            var stream = getActiveStream(muxMsg.stream)
+            if (stream == null && getState() == State.CLOSING) {
               return // we don't accept new streams while closing
             }
 
-            if (stream == null &&
-                muxMsg.stream % 2u == 1u &&
-                muxMsg.stream > clientStreamWatermark) {
-              // legitimate new stream
-              clientStreamWatermark = muxMsg.stream
-              stream = Stream(muxMsg.stream, this)
-              activeStreams.put(muxMsg.stream, stream)
-              onStream(this, stream)
+            mutex.writeLock().lock()
+            try {
+              if (stream == null &&
+                  muxMsg.stream % 2u == 1u &&
+                  muxMsg.stream > clientStreamWatermark) {
+                // legitimate new stream
+                clientStreamWatermark = muxMsg.stream
+                stream = Stream(muxMsg.stream, this)
+                activeStreams.put(muxMsg.stream, stream)
+                onStream(this, stream)
+              }
+            } finally {
+              mutex.writeLock().unlock()
             }
 
             stream?.onStreamData(muxMsg.payload)
@@ -272,48 +315,63 @@ class MuxedSocket(
   }
 
   fun onSocketClose() {
-    when (state) {
+    when (getState()) {
       State.CLOSED,
       State.CLOSE_WAIT -> {}
       State.IDLE,
       State.AUTH_RECV -> {
-        val keys = activeStreams.keys.toSet()
-        for (key in keys) {
-          val stream = activeStreams.get(key)
-          stream?.onStreamClose()
+        mutex.writeLock().lock()
+        try {
+          val keys = activeStreams.keys.toSet()
+          for (key in keys) {
+            val stream = activeStreams.get(key)
+            stream?.onStreamClose()
+          }
+          onClose(this)
+          state = State.CLOSE_WAIT
+        } finally {
+          mutex.writeLock().unlock()
         }
-        onClose(this)
-        state = State.CLOSE_WAIT
       }
       State.CLOSING -> {
-        val keys = activeStreams.keys.toSet()
-        for (key in keys) {
-          val stream = activeStreams.get(key)
-          stream?.onStreamClose()
+        mutex.writeLock().lock()
+        try {
+          val keys = activeStreams.keys.toSet()
+          for (key in keys) {
+            val stream = activeStreams.get(key)
+            stream?.onStreamClose()
+          }
+          onClose(this)
+          activeStreams.clear()
+          state = State.CLOSED
+        } finally {
+          mutex.writeLock().unlock()
         }
-        onClose(this)
-        activeStreams.clear()
-        state = State.CLOSED
       }
     }
   }
 
   fun onSocketError(errorCode: UInt, msg: String) {
     // mux gowaway, websocket close with error code, or tcp close
-    when (state) {
+    when (getState()) {
       State.CLOSED -> {}
       State.IDLE,
       State.CLOSE_WAIT,
       State.AUTH_RECV,
       State.CLOSING -> {
-        val keys = activeStreams.keys.toSet()
-        for (key in keys) {
-          val stream = activeStreams.get(key)
-          stream?.onStreamError(errorCode, msg)
+        mutex.writeLock().lock()
+        try {
+          val keys = activeStreams.keys.toSet()
+          for (key in keys) {
+            val stream = activeStreams.get(key)
+            stream?.onStreamError(errorCode, msg)
+          }
+          onError(this, errorCode, msg)
+          activeStreams.clear()
+          state = State.CLOSED
+        } finally {
+          mutex.writeLock().unlock()
         }
-        onError(this, errorCode, msg)
-        activeStreams.clear()
-        state = State.CLOSED
       }
     }
   }
@@ -321,7 +379,7 @@ class MuxedSocket(
   // interface used by Stream //////////////////////////////////////////////////
 
   fun streamClose(streamId: UInt, nowClosed: Boolean) {
-    when (state) {
+    when (getState()) {
       State.IDLE,
       State.CLOSING,
       State.CLOSED -> {}
@@ -329,27 +387,37 @@ class MuxedSocket(
       State.AUTH_RECV -> {
         sendData(encodeStreamCloseMsg(streamId))
         if (nowClosed) {
-          activeStreams.remove(streamId)
+          mutex.writeLock().lock()
+          try {
+            activeStreams.remove(streamId)
+          } finally {
+            mutex.writeLock().unlock()
+          }
         }
       }
     }
   }
 
   fun streamError(streamId: UInt, errorCode: UInt, msg: String) {
-    when (state) {
+    when (getState()) {
       State.IDLE,
       State.CLOSING,
       State.CLOSED -> {}
       State.CLOSE_WAIT,
       State.AUTH_RECV -> {
         sendData(encodeStreamErrorMsg(streamId, errorCode, msg))
-        activeStreams.remove(streamId)
+        mutex.writeLock().lock()
+        try {
+          activeStreams.remove(streamId)
+        } finally {
+          mutex.writeLock().unlock()
+        }
       }
     }
   }
 
   fun streamSend(streamId: UInt, data: ByteBuffer) {
-    when (state) {
+    when (getState()) {
       State.IDLE,
       State.CLOSING,
       State.CLOSED -> {}
@@ -361,6 +429,24 @@ class MuxedSocket(
   }
 
   // internal //////////////////////////////////////////////////////////////////
+
+  private fun getState(): State {
+    try {
+      mutex.readLock().lock()
+      return state
+    } finally {
+      mutex.readLock().unlock()
+    }
+  }
+
+  private fun getActiveStream(streamId: UInt): Stream? {
+    try {
+      mutex.readLock().lock()
+      return activeStreams.get(streamId)
+    } finally {
+      mutex.readLock().unlock()
+    }
+  }
 
   private fun encodeGoawayMsg(lastStream: UInt, errorCode: UInt, msg: String): ByteBuffer {
     if (lastStream > 0xFFFFFFu) {
@@ -542,7 +628,7 @@ class Stream(
     var onData: onDataFn = { _ -> },
     var onClose: onStreamCloseFn = {},
     var onError: onStreamErrorFn = { _, _ -> },
-    private var state: State = State.OPEN,
+    private var state: AtomicReference<State> = AtomicReference(State.OPEN),
 ) {
   enum class State {
     OPEN,
@@ -551,83 +637,93 @@ class Stream(
     CLOSED,
   }
 
+  // user-facing interface /////////////////////////////////////////////////////
+
   fun close() {
-    when (state) {
+    when (state.get()) {
       State.CLOSING,
       State.CLOSED -> {}
       State.OPEN -> {
-        state = State.CLOSING
+        state.set(State.CLOSING)
         socket.streamClose(streamId, nowClosed = false)
       }
       State.CLOSEWAIT -> {
-        state = State.CLOSED
+        state.set(State.CLOSED)
         socket.streamClose(streamId, nowClosed = true)
       }
+      null -> throw RuntimeException()
     }
   }
 
   fun error(errorCode: UInt, msg: String) {
-    when (state) {
+    when (state.get()) {
       State.CLOSING,
       State.CLOSED -> {
-        state = State.CLOSED
+        state.set(State.CLOSED)
       }
       State.OPEN,
       State.CLOSEWAIT -> {
-        state = State.CLOSED
+        state.set(State.CLOSED)
         socket.streamError(streamId, errorCode, msg)
       }
+      null -> throw RuntimeException()
     }
   }
 
   fun send(data: ByteBuffer) {
-    when (state) {
+    when (state.get()) {
       State.CLOSING,
       State.CLOSED -> {}
       State.OPEN,
       State.CLOSEWAIT -> {
         socket.streamSend(streamId, data)
       }
+      null -> throw RuntimeException()
     }
   }
 
+  // interface used by MuxedSocket /////////////////////////////////////////////
+
   fun onStreamClose(): Boolean {
-    return when (state) {
+    return when (state.get()) {
       State.CLOSED -> true
       State.CLOSEWAIT -> false
       State.CLOSING -> {
-        state = State.CLOSED
+        state.set(State.CLOSED)
         onClose()
         true
       }
       State.OPEN -> {
-        state = State.CLOSEWAIT
+        state.set(State.CLOSEWAIT)
         onClose()
         false
       }
+      null -> throw RuntimeException()
     }
   }
 
   fun onStreamError(errorCode: UInt, msg: String) {
-    when (state) {
+    when (state.get()) {
       State.CLOSED -> {}
       State.CLOSEWAIT,
       State.CLOSING,
       State.OPEN -> {
-        state = State.CLOSED
+        state.set(State.CLOSED)
         onError(errorCode, msg)
       }
+      null -> throw RuntimeException()
     }
   }
 
   fun onStreamData(data: ByteBuffer) {
-    when (state) {
+    when (state.get()) {
       State.CLOSED,
       State.CLOSEWAIT -> {}
       State.CLOSING,
       State.OPEN -> {
         onData(data)
       }
+      null -> throw RuntimeException()
     }
   }
 }
