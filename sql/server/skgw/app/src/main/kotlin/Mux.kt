@@ -78,9 +78,11 @@ typealias onStreamFn = (MuxedSocket, Stream) -> Unit
 typealias onDataFn = (ByteBuffer) -> Unit
 
 typealias onSocketCloseFn = (MuxedSocket) -> Unit
+
 typealias onStreamCloseFn = () -> Unit
 
 typealias onSocketErrorFn = (MuxedSocket, UInt, String) -> Unit
+
 typealias onStreamErrorFn = (UInt, String) -> Unit
 
 sealed class MuxMsg
@@ -441,7 +443,13 @@ class MuxedSocket(
         val version = (msg.getInt() ushr 24).toUInt()
         val accessKeyBytes = ByteArray(20)
         msg.get(accessKeyBytes)
-        val accessKey = String(accessKeyBytes, StandardCharsets.US_ASCII)
+        val zeroIdx = accessKeyBytes.indexOf(0)
+        val accessKey =
+            String(
+                accessKeyBytes,
+                0,
+                if (zeroIdx == -1) accessKeyBytes.size else zeroIdx,
+                StandardCharsets.US_ASCII)
         val nonce = ByteArray(8)
         msg.get(nonce)
         val signature = ByteArray(32)
