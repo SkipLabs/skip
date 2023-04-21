@@ -13,11 +13,8 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 val streams: List<Stream> = listOf()
-var lastSocket: MuxedSocket? = null
 
 fun setupStream(sock: MuxedSocket, s: Stream) {
-  lastSocket = sock
-
   s.onData = { data ->
     val type = data.getInt()
     when (type) {
@@ -57,6 +54,29 @@ fun setupStream(sock: MuxedSocket, s: Stream) {
       // error from this side
       4 -> {
         s.error(5u, "server errored stream")
+      }
+      // send a bunch of data concurrently on different streams
+      5 -> {
+        val threads = ArrayList<Thread>()
+
+        for (streamIdx in 0..5) {
+          val newStream = sock.openStream()
+          newStream!!
+
+          val t =
+              Thread({
+                for (i in 0..10000) {
+                  val buf = ByteBuffer.allocate(4)
+                  buf.putInt(i)
+                  buf.flip()
+                  newStream.send(buf)
+                }
+                newStream.close()
+              })
+
+          threads.add(t)
+          t.start()
+        }
       }
       else -> throw RuntimeException("oops")
     }

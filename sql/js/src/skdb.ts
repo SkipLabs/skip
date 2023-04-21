@@ -880,7 +880,7 @@ export class MuxedSocket {
       return {
         type: "data",
         stream: stream,
-        payload: new Uint8Array(msg, 4),
+        payload: msg.slice(4),
       };
     }
     case 3: {                   // stream close
