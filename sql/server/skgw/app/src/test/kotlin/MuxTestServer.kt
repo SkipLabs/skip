@@ -62,7 +62,7 @@ fun setupStream(sock: MuxedSocket, s: Stream) {
     }
   }
   s.onClose = { s.close() }
-  s.onError = { code, reason -> }
+  s.onError = { _, _ -> }
 }
 
 fun createHttpServer(): Undertow {
@@ -78,9 +78,15 @@ fun createHttpServer(): Undertow {
                       MuxedSocket(
                           onStream = ::setupStream,
                           onClose = {},
-                          onError = { socket, code, msg -> },
+                          onError = { _, _, _ -> },
                           socket = channel,
-                          getDecryptedKey = { "test".toByteArray(StandardCharsets.UTF_8) })
+                          getDecryptedKey = {
+                            when (it) {
+                              "ABCDEFGHIJKLMNOPQRST" -> "test".toByteArray(StandardCharsets.UTF_8)
+                              "root" -> "very_secure".toByteArray(StandardCharsets.UTF_8)
+                              else -> throw RuntimeException("illegal!")
+                            }
+                          })
                   return socket
                 }
               }))

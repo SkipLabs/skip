@@ -289,6 +289,39 @@ const tests = {
     socket.closeSocket();
   },
 
+  authShortAccessKey: async () => {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw", enc.encode("very_secure"),
+      { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
+
+    const socket = await MuxedSocket.connect("ws://localhost:8080", {
+      accessKey: "root",
+      privateKey: key,
+      deviceUuid: "abcde",
+    });
+
+    let receivedError = false;
+    let receivedData = false;
+
+    socket.onError = (code, msg) => {
+      receivedError = true;
+    };
+
+    const stream = socket.openStream();
+
+    stream.onData = (data) => {
+      receivedData = true;
+      assert.equal(toHex(data), "0x00000000");
+    };
+
+    stream.send(request_echo(0));
+    stream.close();
+
+    socket.onClose = () => assert(receivedData);
+    socket.closeSocket();
+  },
+
   authFail: async () => {
     const enc = new TextEncoder();
     const key = await crypto.subtle.importKey(

@@ -783,7 +783,7 @@ export class MuxedSocket {
     dataView.setUint8(0, 0x0);  // type
     dataView.setUint8(4, 0x0);  // version
     const encodeAccessKey = enc.encodeInto(creds.accessKey, uint8View.subarray(8));
-    if (encodeAccessKey.written != 20) {
+    if (!encodeAccessKey.written || encodeAccessKey.written > 20) {
       throw new Error("Unable to encode access key")
     }
     uint8View.set(new Uint8Array(sig), 36);
