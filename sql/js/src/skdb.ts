@@ -791,15 +791,6 @@ export class SKDB {
 /* Replication protocol schema. */
 /* ***************************************************************************/
 
-type ProtoAuth = {
-  request: "auth";
-  accessKey: string;
-  date: string;
-  nonce: string;
-  signature: string;
-  deviceUuid: string,
-}
-
 type ProtoQuery = {
   request: "query";
   query: string;
@@ -854,234 +845,14 @@ type ProtoRequest = ProtoQuery | ProtoSchemaQuery | ProtoCreateDb | ProtoTail | 
 
 type ProtoResponse = ProtoData | ProtoError | ProtoCredentials
 
-type ProtoMessage = ProtoRequest | ProtoResponse
-
 interface Creds {
   accessKey: string,
   privateKey: CryptoKey,
   deviceUuid: string,
 }
 
-async function createAuthMsg(creds: Creds): Promise<ProtoAuth> {
-  const enc = new TextEncoder();
-  const reqType = "auth"
-  const now = (new Date()).toISOString()
-  const nonce = new Uint8Array(8);
-  crypto.getRandomValues(nonce)
-  const b64nonce = btoa(String.fromCharCode(...nonce));
-  const bytesToSign = enc.encode(reqType + creds.accessKey + now + b64nonce)
-  const sig = await crypto.subtle.sign(
-    "HMAC",
-    creds.privateKey,
-    bytesToSign
-  )
-  return {
-    request: reqType,
-    accessKey: creds.accessKey,
-    date: now,
-    nonce: b64nonce,
-    signature: btoa(String.fromCharCode(...new Uint8Array(sig))),
-    deviceUuid: creds.deviceUuid,
-  };
-}
-
 function metadataTable(tableName: string): string {
   return `skdb__${tableName}_sync_metadata`;
-}
-
-/* ***************************************************************************/
-/* Resilient connection abstraction */
-/* ***************************************************************************/
-
-class ResilientConnection {
-
-  // connection params
-  private uri: string;
-  private creds: Creds;
-  private failureThresholdMs = 60000;
-  private onMessage: (data: ProtoData) => void;
-
-  onReconnect?: () => void;
-
-  // state
-  private socket?: WebSocket;
-  private failureTimeout?: number;
-  private reconnectTimeout?: number;
-  // key invariants:
-  // 1. only one failure timeout in flight
-  // 2. only one reconnect attempt in flight at any one time
-  // 3. the socket is either connected and healthy, or we're actively
-  //    attempting a reconnect
-
-  private constructor(
-    uri: string,
-    creds: Creds,
-    onMessage: (data: ProtoData) => void,
-  ) {
-    this.uri = uri;
-    this.creds = creds;
-    this.onMessage = onMessage;
-
-    this.socket = undefined;
-    this.failureTimeout = undefined;
-    this.reconnectTimeout = undefined;
-  }
-
-  private setFailureTimeout(timeout?: number): void {
-    clearTimeout(this.failureTimeout);
-    this.failureTimeout = timeout;
-  }
-
-  private setReconnectTimeout(timeout?: number): void {
-    clearTimeout(this.reconnectTimeout);
-    this.reconnectTimeout = timeout;
-  }
-
-  private connectionHealthy(): void {
-    this.setFailureTimeout(undefined);
-  }
-
-  private async connect(): Promise<WebSocket> {
-    if (this.socket) {
-      throw new Error("Connecting a connected socket")
-    }
-
-    const authMsg = await createAuthMsg(this.creds)
-    const objThis = this;
-
-    let opened = false;
-    return new Promise((resolve, reject) => {
-      const socket = new WebSocket(this.uri);
-
-      socket.onclose = _event => {
-        if (opened) {
-          objThis.kickOffReconnect();
-        } else {
-          reject();
-        }
-      };
-      socket.onerror = _event => {
-        if (opened) {
-          objThis.kickOffReconnect();
-        } else {
-          reject();
-        }
-      };
-
-      socket.onmessage = function (event) {
-        objThis.connectionHealthy();
-
-        const deliver = (data: ProtoResponse) => {
-          if (data.request !== "pipe") {
-            console.error("Unexpected message received", data);
-            objThis.kickOffReconnect();
-            return;
-          }
-
-          objThis.onMessage(data);
-        };
-
-        const data = event.data;
-
-        if(typeof data === "string") {
-          deliver(JSON.parse(data))
-        } else {
-          const reader = new FileReader();
-          reader.addEventListener(
-            "load",
-            () => {
-              let msg = JSON.parse((reader.result || "") as string);
-              // we know it will be a string because we called readAsText
-              deliver(msg);
-            },
-            false
-          );
-          reader.readAsText(data);
-        }
-      };
-
-      socket.onopen = function (_event) {
-        socket.send(JSON.stringify(authMsg));
-        opened = true;
-        resolve(socket);
-      };
-    });
-  }
-
-  private kickOffReconnect(): void {
-    if (this.reconnectTimeout) {
-      // debounce. e.g. socket onclose and onerror can both be called
-      return
-    }
-
-    if (this.socket) {
-      this.socket.onmessage = null;
-      this.socket.onclose = null;
-      this.socket.onerror = null;
-      this.socket.onopen = null;
-      this.socket.close();
-    }
-
-    this.socket = undefined;
-    this.setFailureTimeout(undefined);
-
-    const backoffMs = 500 + Math.random() * 1000;
-    const objThis = this;
-    const reconnectTimeout = setTimeout(() => {
-      objThis.connect().then(socket => {
-        objThis.socket = socket;
-        objThis.setReconnectTimeout(undefined)
-        if (objThis.onReconnect) {
-          objThis.onReconnect();
-        }
-      }).catch(() => {
-        objThis.setReconnectTimeout(undefined)
-        objThis.kickOffReconnect()
-      });
-    }, backoffMs);
-
-    this.setReconnectTimeout(reconnectTimeout);
-
-    return;
-  }
-
-  static async connect(
-    uri: string, creds: Creds,
-    onMessage: (data: ProtoData) => void
-  ): Promise<ResilientConnection> {
-
-    const conn = new ResilientConnection(uri, creds, onMessage);
-
-    const socket = await conn.connect();
-    conn.socket = socket;
-
-    return conn;
-  }
-
-  expectingData(): void {
-    if (this.failureTimeout) {
-      // already expecting a response
-      return;
-    }
-
-    if (!this.socket) {
-      // can't receive data. we're re-establishing anyway
-      return;
-    }
-
-    const objThis = this;
-    const timeout = setTimeout(() => objThis.kickOffReconnect(), this.failureThresholdMs);
-    this.setFailureTimeout(timeout);
-  }
-
-  write(data: ProtoMessage): void {
-    if (!this.socket) {
-      // black hole the data. we're reconnecting and will call
-      // onReconnect that should address the gap
-      return;
-    }
-    this.socket.send(JSON.stringify(data));
-  }
 }
 
 /* ***************************************************************************/
@@ -1675,14 +1446,17 @@ class Stream {
 class SKDBServer {
   private client: SKDB;
   private connection: MuxedSocket;
+  private creds: Creds;
   private replication_uid: string = "";
 
   private constructor(
     client: SKDB,
     connection: MuxedSocket,
+    creds: Creds,
   ) {
     this.client = client;
     this.connection = connection;
+    this.creds = creds;
   }
 
   static async connect(
@@ -1693,7 +1467,7 @@ class SKDBServer {
   ): Promise<SKDBServer> {
     const uri = SKDBServer.getDbSocketUri(endpoint, db);
     const conn = await MuxedSocket.connect(uri, creds);
-    const server = new SKDBServer(client, conn);
+    const server = new SKDBServer(client, conn, creds);
     server.replication_uid = client.runLocal(["uid"], "").trim();
     return server
   }
@@ -1724,100 +1498,87 @@ class SKDBServer {
     });
   }
 
-  private async establishServerTail(tableName: string): Promise<void> {
-    let objThis = this;
+  private establishServerTail(tableName: string): void {
+    const stream = this.connection.openStream();
+    const client = this.client;
 
-    const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
-      let msg = data.data;
-      objThis.runLocal(["write-csv", tableName, "--source", objThis.replication_uid], msg + '\n');
-      newConn.expectingData()
-    });
-    this.localToServerSyncConnections[tableName] = newConn;
+    stream.onError = (code, msg) => {
+      console.log("server tail", tableName, "stream errored", code, msg);
+    }
 
-    newConn.write({
+    stream.onClose = () => {
+      console.log("server tail", tableName, "stream closed");
+    }
+
+    stream.onData = (data) => {
+      const decoder = new TextDecoder();
+      const pData = JSON.parse(decoder.decode(data)) as ProtoData;
+      const msg = pData.data;
+      client.runLocal(["write-csv", tableName, "--source", this.replication_uid], msg + '\n');
+    }
+
+    const encoder = new TextEncoder();
+    stream.send(encoder.encode(JSON.stringify({
       request: "tail",
       table: tableName,
-      since: objThis.watermark(tableName),
-    })
-    newConn.expectingData();
-
-    newConn.onReconnect = () => {
-      newConn.write({
-        request: "tail",
-        table: tableName,
-        since: objThis.watermark(tableName),
-      });
-      newConn.expectingData();
-    }
+      since: this.client.watermark(tableName),
+    })));
   }
 
-  private async establishLocalTail(tableName: string): Promise<void> {
-    let objThis = this;
+  private establishLocalTail(tableName: string): void {
+    const stream = this.connection.openStream();
+    const client = this.client;
 
-    const conn = this.localToServerSyncConnections[tableName];
-
-    if (conn) {
-      throw new Error("Trying to connect an already connected table");
+    stream.onError = (code, msg) => {
+      console.log("local tail", tableName, "stream errored", code, msg);
     }
 
-    const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
-      let msg = data.data;
+    stream.onClose = () => {
+      console.log("local tail", tableName, "stream closed");
+    }
+
+    stream.onData = (data) => {
+      const decoder = new TextDecoder();
+      const pData = JSON.parse(decoder.decode(data)) as ProtoData;
+      const msg = pData.data;
       // we only expect acks back in the form of checkpoints.
       // let's store these as a watermark against the table.
-      objThis.runLocal(["write-csv", metadataTable(tableName)], msg + '\n');
-    });
-    this.localToServerSyncConnections[tableName] = newConn;
+      client.runLocal(["write-csv", metadataTable(tableName)], msg + '\n');
+    }
 
     const request: ProtoWrite = {
        request: "write",
        table: tableName,
     };
-    newConn.write(request)
-    newConn.expectingData()
 
-    let fileName = tableName + "_" + creds.accessKey;
-    objThis.watchFile(fileName, change => {
+    const encoder = new TextEncoder();
+    stream.send(encoder.encode(JSON.stringify(request)));
+
+    let fileName = tableName + "_" + this.creds.accessKey;
+
+    client.watchFile(fileName, change => {
       if (change == "") {
         return;
       }
-      newConn.write({
+      const encoder = new TextEncoder();
+      stream.send(encoder.encode(JSON.stringify({
         request: "pipe",
         data: change,
-      });
-      newConn.expectingData();
+      })));
     });
-    const session = objThis.runLocal(
+
+    const _session = client.runLocal(
       [
         "subscribe", tableName, "--connect", "--format=csv",
-        "--updates", fileName, "--ignore-source", objThis.replication_uid
+        "--updates", fileName, "--ignore-source", this.replication_uid
       ],
       ""
     ).trim();
-
-    newConn.onReconnect = () => {
-      newConn.write(request);
-
-      const diff = objThis.runLocal(
-        [
-          "diff", "--format=csv",
-          "--since", objThis.watermark(metadataTable(tableName)).toString(),
-          session,
-        ], "");
-
-      if (diff == "") {
-        return;
-      }
-
-      newConn.write({
-        request: "pipe",
-        data: diff,
-      });
-
-      newConn.expectingData();
-    }
   }
 
   async mirrorTable(tableName: string): Promise<void> {
+    // TODO: don't let the user establish a table twice?
+
     // TODO: just assumes that if it exists the schema is the same
     if (!this.client.tableExists(tableName)) {
       let createTable = await this.tableSchema(tableName, "");
@@ -1830,8 +1591,8 @@ class SKDBServer {
        )`);
     }
 
-    await this.establishServerTail(tableName);
-    await this.establishLocalTail(tableName);
+    this.establishServerTail(tableName);
+    this.establishLocalTail(tableName);
   }
 
   // TODO: this currently just replicates the schema locally assuming
