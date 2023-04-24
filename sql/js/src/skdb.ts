@@ -523,7 +523,7 @@ export class MuxedSocket {
   onClose?: () => void;
   onError?: (errorCode: number, msg: string) => void;
 
-  constructor(socket: WebSocket) {
+  private constructor(socket: WebSocket) {
     // pre-condition: socket is open
     this.socket = socket;
   }
@@ -1188,7 +1188,6 @@ export class SKDB {
   private files: Array<Array<String>> = new Array();
   private changed_files: Array<number> = new Array();
   private execOnChange: Array<(change: string) => void> = new Array();
-  private servers: Array<SKDBServer> = [];
   private lineBuffer: Array<number> = [];
   private storeName: string | null;
   private nbrInitPages: number = -1;
@@ -1197,13 +1196,11 @@ export class SKDB {
   private db: IDBDatabase | null = null;
   private dirtyPagesMap: Array<number> = [];
   private dirtyPages: Array<number> = [];
-  private mirroredTables: Map<string, number> = new Map();
   // @ts-expect-error
   private exports: WasmExports;
-  private localToServerSyncConnections: Map<string, ResilientConnection> = new Map();
-  private serverToLocalSyncConnections: Map<string, ResilientConnection> = new Map();
-  private replication_uid: string = "";
   private client_uuid: string = "";
+  // TODO: null server?
+  private server?: SKDBServer;
 
   private constructor(storeName: string | null) {
     this.storeName = storeName;
@@ -1249,14 +1246,9 @@ export class SKDB {
     client.exports.SKIP_init_jsroots();
     client.runSubscribeRoots(rebootStatus.isReboot);
 
-    client.replication_uid = client.runLocal(["uid"], "").trim();
     client.client_uuid = crypto.randomUUID();
 
     return client;
-  }
-
-  setMirroredTable(tableName: string, sessionID: number): void {
-    this.mirroredTables[tableName] = sessionID;
   }
 
   openFile(filename: string): number {
@@ -1280,7 +1272,7 @@ export class SKDB {
     accessKey: string,
     privateKey: CryptoKey,
     endpoint?: string,
-  ): Promise<number> {
+  ): Promise<SKDBServer> {
     if (!endpoint) {
       if (typeof window === 'undefined') {
         throw new Error("No endpoint passed to connect and no window object to infer from.");
@@ -1296,32 +1288,8 @@ export class SKDB {
       deviceUuid: this.client_uuid,
     };
 
-    let result = await this.makeRequest(SKDBServer.getDbSocketUri(endpoint, db), creds, {
-      request: "query",
-      query: "select id();",
-    });
-    if (result.request !== "pipe") {
-      throw new Error("Unexpected response.");
-    }
-    const [sessionID] = result.data.split("|").map((x) => parseInt(x));
-    let serverID = this.servers.length;
-    let server = new SKDBServer(
-      this,
-      serverID,
-      endpoint,
-      db,
-      creds,
-      sessionID!
-    );
-    this.servers.push(server);
-    return serverID;
-  }
-
-  server(serverID?: number): SKDBServer {
-    if (serverID === undefined) {
-      serverID = this.servers.length - 1;
-    }
-    return this.servers[serverID]!;
+    this.server = await SKDBServer.connect(this, endpoint, db, creds);
+    return this.server;
   }
 
   private makeWasmImports(): {} {
@@ -1590,138 +1558,6 @@ export class SKDB {
     return parseInt(this.runLocal(["watermark", table], ""));
   }
 
-  async makeRequest(uri: string, creds: Creds, request: ProtoRequest): Promise<ProtoResponse> {
-    let socket = new WebSocket(uri);
-
-    const authMsg = await createAuthMsg(creds)
-
-    return new Promise((resolve, reject) => {
-      socket.onmessage = function (event) {
-        const data = event.data;
-        resolve(JSON.parse(data));
-        socket.close();
-      };
-      socket.onclose = () => {
-        reject();
-      };
-      socket.onerror = (err) => reject(err);
-      socket.onopen = function (_event) {
-        socket.send(JSON.stringify(authMsg));
-        socket.send(JSON.stringify(request));
-      };
-    });
-  }
-
-  async connectReadTable(
-    uri: string,
-    creds: Creds,
-    tableName: string,
-  ): Promise<void> {
-    let objThis = this;
-
-    const conn = this.serverToLocalSyncConnections[tableName];
-    if (conn) {
-      throw new Error("Trying to connect an already connected table");
-    }
-
-    const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
-      let msg = data.data;
-      objThis.runLocal(["write-csv", tableName, "--source", objThis.replication_uid], msg + '\n');
-      newConn.expectingData()
-    });
-    this.localToServerSyncConnections[tableName] = newConn;
-
-    newConn.write({
-      request: "tail",
-      table: tableName,
-      since: objThis.watermark(tableName),
-    })
-    newConn.expectingData();
-
-    newConn.onReconnect = () => {
-      newConn.write({
-        request: "tail",
-        table: tableName,
-        since: objThis.watermark(tableName),
-      });
-      newConn.expectingData();
-    }
-  }
-
-  async connectWriteTable(
-    uri: string,
-    creds: Creds,
-    tableName: string,
-  ): Promise<void> {
-    let objThis = this;
-
-    const conn = this.localToServerSyncConnections[tableName];
-
-    if (conn) {
-      throw new Error("Trying to connect an already connected table");
-    }
-
-    const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
-      let msg = data.data;
-      // we only expect acks back in the form of checkpoints.
-      // let's store these as a watermark against the table.
-      objThis.runLocal(["write-csv", metadataTable(tableName)], msg + '\n');
-    });
-    this.localToServerSyncConnections[tableName] = newConn;
-
-    const request: ProtoWrite = {
-       request: "write",
-       table: tableName,
-    };
-    newConn.write(request)
-    newConn.expectingData()
-
-    let fileName = tableName + "_" + creds.accessKey;
-    objThis.watchFile(fileName, change => {
-      if (change == "") {
-        return;
-      }
-      newConn.write({
-        request: "pipe",
-        data: change,
-      });
-      newConn.expectingData();
-    });
-    const session = objThis.runLocal(
-      [
-        "subscribe", tableName, "--connect", "--format=csv",
-        "--updates", fileName, "--ignore-source", objThis.replication_uid
-      ],
-      ""
-    ).trim();
-
-    newConn.onReconnect = () => {
-      newConn.write(request);
-
-      const diff = objThis.runLocal(
-        [
-          "diff", "--format=csv",
-          "--since", objThis.watermark(metadataTable(tableName)).toString(),
-          session,
-        ], "");
-
-      if (diff == "") {
-        return;
-      }
-
-      newConn.write({
-        request: "pipe",
-        data: diff,
-      });
-
-      newConn.expectingData();
-    }
-  }
-
-  getSessionID(tableName: string): number {
-    return this.mirroredTables[tableName];
-  }
-
   cmd(new_args: Array<string>, new_stdin: string): string {
     return this.runLocal(new_args, new_stdin);
   }
@@ -1834,96 +1670,155 @@ export class SKDB {
       "insert into " + tableName + " values (" + values.join(", ") + ");";
     this.runLocal([], stdin);
   }
-
-  private getID(): number {
-    return parseInt(this.runLocal(["--gensym"], ""));
-  }
 }
+
+/* ***************************************************************************/
+/* Server interface
+/* ***************************************************************************/
 
 class SKDBServer {
   private client: SKDB;
-  private serverID: number;
-  private uri: string;
-  private creds: Creds;
-  private sessionID: number;
+  private connection: MuxedSocket;
+  private replication_uid: string = "";
 
-  constructor(
+  private constructor(
     client: SKDB,
-    serverID: number,
+    connection: MuxedSocket,
+  ) {
+    this.client = client;
+    this.connection = connection;
+  }
+
+  static async connect(
+    client: SKDB,
     endpoint: string,
     db: string,
     creds: Creds,
-    sessionID: number
-  ) {
-    this.client = client;
-    this.serverID = serverID;
-    this.uri = SKDBServer.getDbSocketUri(endpoint, db);
-    this.creds = creds;
-    this.sessionID = sessionID;
+  ): Promise<SKDBServer> {
+    const uri = SKDBServer.getDbSocketUri(endpoint, db);
+    const conn = await MuxedSocket.connect(uri, creds);
+    const server = new SKDBServer(client, conn);
+    server.replication_uid = client.runLocal(["uid"], "").trim();
+    return server
   }
 
-  static getDbSocketUri(endpoint: string, db: string) {
+  private static getDbSocketUri(endpoint: string, db: string) {
     return `${endpoint}/dbs/${db}/connection`;
   }
 
-  private castData(response: ProtoResponse): ProtoData {
-    if (response.request === "pipe") {
-      return response;
-    }
-    if (response.request == "error") {
-      console.error(response.msg);
-    } else {
-      console.error("Unexpected response", response);
-    }
-    throw new Error(`Unexpected response: ${response}`);
-  }
-
-  async sqlRaw(stdin: string): Promise<string> {
-    let result = await this.client.makeRequest(this.uri, this.creds, {
-      request: "query",
-      query: stdin,
-      format: "raw",
+  private async makeRequest(request: ProtoRequest): Promise<ProtoResponse> {
+    const stream = this.connection.openStream();
+    const acc = new Array<ArrayBuffer>();
+    return new Promise((resolve, reject) => {
+      stream.onData = function (data) {
+        acc.push(data);
+      };
+      stream.onClose = () => {
+        const decoder = new TextDecoder();
+        let result = "";
+        for (let i = 0; i < acc.length; i++) {
+          result = decoder.decode(acc[i], { stream: i < acc.length - 1 });
+        }
+        resolve(JSON.parse(result));
+      };
+      stream.onError = (_code, msg) => reject(msg);
+      const encoder = new TextEncoder();
+      stream.send(encoder.encode(JSON.stringify(request)));
+      stream.close();
     });
-
-    return this.castData(result).data;
   }
 
-  async sql(stdin: string): Promise<any[]> {
-    let result = await this.client.makeRequest(this.uri, this.creds, {
-      request: "query",
-      query: stdin,
-      format: "json",
+  private async establishServerTail(tableName: string): Promise<void> {
+    let objThis = this;
+
+    const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
+      let msg = data.data;
+      objThis.runLocal(["write-csv", tableName, "--source", objThis.replication_uid], msg + '\n');
+      newConn.expectingData()
     });
-    return this.castData(result)
-      .data
-      .split("\n")
-      .filter((x) => x != "")
-      .map((x) => JSON.parse(x));
-  }
+    this.localToServerSyncConnections[tableName] = newConn;
 
-  async tableSchema(tableName: string, renameSuffix: string = ""): Promise<string> {
-    const resp = await this.client.makeRequest(this.uri, this.creds, {
-      request: "schema",
+    newConn.write({
+      request: "tail",
       table: tableName,
-      suffix: renameSuffix,
-    });
-    return this.castData(resp).data
+      since: objThis.watermark(tableName),
+    })
+    newConn.expectingData();
+
+    newConn.onReconnect = () => {
+      newConn.write({
+        request: "tail",
+        table: tableName,
+        since: objThis.watermark(tableName),
+      });
+      newConn.expectingData();
+    }
   }
 
-  async viewSchema(viewName: string, renameSuffix: string = ""): Promise<string> {
-    const resp = await this.client.makeRequest(this.uri, this.creds, {
-      request: "schema",
-      view: viewName,
-      suffix: renameSuffix,
-    });
-    return this.castData(resp).data
-  }
+  private async establishLocalTail(tableName: string): Promise<void> {
+    let objThis = this;
 
-  async schema(): Promise<string> {
-    const resp = await this.client.makeRequest(this.uri, this.creds, {
-      request: "schema",
+    const conn = this.localToServerSyncConnections[tableName];
+
+    if (conn) {
+      throw new Error("Trying to connect an already connected table");
+    }
+
+    const newConn = await ResilientConnection.connect(uri, creds, (data: ProtoData) => {
+      let msg = data.data;
+      // we only expect acks back in the form of checkpoints.
+      // let's store these as a watermark against the table.
+      objThis.runLocal(["write-csv", metadataTable(tableName)], msg + '\n');
     });
-    return this.castData(resp).data
+    this.localToServerSyncConnections[tableName] = newConn;
+
+    const request: ProtoWrite = {
+       request: "write",
+       table: tableName,
+    };
+    newConn.write(request)
+    newConn.expectingData()
+
+    let fileName = tableName + "_" + creds.accessKey;
+    objThis.watchFile(fileName, change => {
+      if (change == "") {
+        return;
+      }
+      newConn.write({
+        request: "pipe",
+        data: change,
+      });
+      newConn.expectingData();
+    });
+    const session = objThis.runLocal(
+      [
+        "subscribe", tableName, "--connect", "--format=csv",
+        "--updates", fileName, "--ignore-source", objThis.replication_uid
+      ],
+      ""
+    ).trim();
+
+    newConn.onReconnect = () => {
+      newConn.write(request);
+
+      const diff = objThis.runLocal(
+        [
+          "diff", "--format=csv",
+          "--since", objThis.watermark(metadataTable(tableName)).toString(),
+          session,
+        ], "");
+
+      if (diff == "") {
+        return;
+      }
+
+      newConn.write({
+        request: "pipe",
+        data: diff,
+      });
+
+      newConn.expectingData();
+    }
   }
 
   async mirrorTable(tableName: string): Promise<void> {
@@ -1939,39 +1834,86 @@ class SKDBServer {
        )`);
     }
 
-    await this.client.connectWriteTable(
-      this.uri,
-      this.creds,
-      tableName,
-    );
-
-    await this.client.connectReadTable(
-      this.uri,
-      this.creds,
-      tableName,
-    );
-
-    this.client.setMirroredTable(tableName, this.sessionID);
+    await this.establishServerTail(tableName);
+    await this.establishLocalTail(tableName);
   }
 
+  // TODO: this currently just replicates the schema locally assuming
+  // you have all source tables setup. is this what we want? we should
+  // error if this doesn't succeed. it might be easier for the user
+  // just to create this themselves - no need for mirroring. or we
+  // could mirror down a read-only table and have the server keep it
+  // in sync?
   async mirrorView(viewName: string, suffix?: string): Promise<void> {
     if (!this.client.viewExists(viewName + suffix)) {
       suffix = suffix || "";
       let createRemoteTable = await this.viewSchema(viewName, suffix);
       this.client.runLocal([], createRemoteTable);
     }
+  }
 
-    await this.client.connectReadTable(
-      this.uri,
-      this.creds,
-      viewName + suffix,
-    );
+  private castData(response: ProtoResponse): ProtoData {
+    if (response.request === "pipe") {
+      return response;
+    }
+    if (response.request == "error") {
+      console.error(response.msg);
+    } else {
+      console.error("Unexpected response", response);
+    }
+    throw new Error(`Unexpected response: ${response}`);
+  }
 
-    this.client.setMirroredTable(viewName, this.sessionID);
+  async sqlRaw(stdin: string): Promise<string> {
+    let result = await this.makeRequest({
+      request: "query",
+      query: stdin,
+      format: "raw",
+    });
+
+    return this.castData(result).data;
+  }
+
+  async sql(stdin: string): Promise<any[]> {
+    let result = await this.makeRequest({
+      request: "query",
+      query: stdin,
+      format: "json",
+    });
+    return this.castData(result)
+      .data
+      .split("\n")
+      .filter((x) => x != "")
+      .map((x) => JSON.parse(x));
+  }
+
+  async tableSchema(tableName: string, renameSuffix: string = ""): Promise<string> {
+    const resp = await this.makeRequest({
+      request: "schema",
+      table: tableName,
+      suffix: renameSuffix,
+    });
+    return this.castData(resp).data
+  }
+
+  async viewSchema(viewName: string, renameSuffix: string = ""): Promise<string> {
+    const resp = await this.makeRequest({
+      request: "schema",
+      view: viewName,
+      suffix: renameSuffix,
+    });
+    return this.castData(resp).data
+  }
+
+  async schema(): Promise<string> {
+    const resp = await this.makeRequest({
+      request: "schema",
+    });
+    return this.castData(resp).data
   }
 
   async createDatabase(dbName: string): Promise<ProtoCredentials> {
-    let result = await this.client.makeRequest(this.uri, this.creds, {
+    let result = await this.makeRequest({
       request: "createDatabase",
       name: dbName,
     });
@@ -1982,7 +1924,7 @@ class SKDBServer {
   }
 
   async createUser(): Promise<ProtoCredentials> {
-    let result = await this.client.makeRequest(this.uri, this.creds, {
+    let result = await this.makeRequest({
       request: "createUser",
     });
     if (result.request !== "credentials") {
