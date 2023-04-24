@@ -64,13 +64,17 @@ function clearSKDBStore(
   });
 }
 
+class RebootStatus {
+  isReboot: boolean = false;
+}
+
 function makeSKDBStore(
   dbName: string,
   storeName: string,
   version: number,
   memory: ArrayBuffer,
   memorySize: number,
-  init: boolean,
+  rebootStatus: RebootStatus,
   pageSize: number
 ): Promise<IDBDatabase> {
   let memory32 = new Uint32Array(memory);
@@ -90,26 +94,28 @@ function makeSKDBStore(
       let tx = db.transaction(storeName, "readwrite");
       let store = tx.objectStore(storeName);
 
-      if (init) {
-        let i;
-        let cursor = 0;
-        for (i = 0; i < memorySize / pageSize; i++) {
-          const content = memory.slice(cursor, cursor + pageSize);
-          store.put({ pageid: i, content: content });
-          cursor = cursor + pageSize;
+      store.getAll().onsuccess = (event) => {
+        let target = event.target;
+        if(target == null) {
+          reject(new Error("Unexpected null target"));
+          return;
         }
-      } else {
-        store.getAll().onsuccess = (event) => {
-          let target = event.target;
-          if(target == null) {
-            reject(new Error("Unexpected null target"));
-            return;
+        let pages =
+            (
+              target as unknown as
+              { result: Array<{pageid: number, content: ArrayBuffer}>}
+            ).result;
+        if(pages.length == 0) {
+          rebootStatus.isReboot = true;
+          let i;
+          let cursor = 0;
+          for (i = 0; i < memorySize / pageSize; i++) {
+            const content = memory.slice(cursor, cursor + pageSize);
+            store.put({ pageid: i, content: content });
+            cursor = cursor + pageSize;
           }
-          let pages =
-              (
-                target as unknown as
-                { result: Array<{pageid: number, content: ArrayBuffer}>}
-              ).result;
+        }
+        else {
           for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
             let page = pages[pageIdx]!;
             const pageid = page.pageid;
@@ -120,7 +126,7 @@ function makeSKDBStore(
               memory32[start + i] = pageBuffer[i]!;
             }
           }
-        };
+        }
       }
 
       tx.oncomplete = function () {
@@ -1157,15 +1163,13 @@ export class SKDB {
   private execOnChange: Array<(change: string) => void> = new Array();
   private servers: Array<SKDBServer> = [];
   private lineBuffer: Array<number> = [];
-  private storeName: string;
+  private storeName: string | null;
   private nbrInitPages: number = -1;
   private roots: Map<string, number> = new Map();
   private pageSize: number = -1;
   private db: IDBDatabase | null = null;
   private dirtyPagesMap: Array<number> = [];
   private dirtyPages: Array<number> = [];
-  private transaction: number = 0;
-  private syncIsRunning: boolean = false;
   private mirroredTables: Map<string, number> = new Map();
   // @ts-expect-error
   private exports: WasmExports;
@@ -1175,12 +1179,21 @@ export class SKDB {
   private client_uuid: string = "";
   private persistTimer?: number;
 
-  private constructor(storeName: string) {
+  private constructor(storeName: string | null) {
     this.storeName = storeName;
   }
 
-  static async create(reboot: boolean): Promise<SKDB> {
-    let storeName = "SKDBStore";
+  static async clear(dbName: string, storeName: string): Promise<void> {
+    await clearSKDBStore(dbName, storeName);
+  }
+
+  static async create(
+    dbName: string | null = null
+  ): Promise<SKDB> {
+    let storeName: string | null = null;
+    if(dbName != null) {
+      storeName = "SKDBStore";
+    }
     let client = new SKDB(storeName);
     let pageBitSize = 20;
     client.pageSize = 1 << pageBitSize;
@@ -1197,28 +1210,24 @@ export class SKDB {
     exports.SKIP_skfs_end_of_init();
     client.nbrInitPages = exports.SKIP_get_persistent_size() / client.pageSize + 1;
     let version = exports.SKIP_get_version();
-    let dbName = "SKDBIndexedDB";
-    if(reboot) {
-      await clearSKDBStore(dbName, storeName);
+    let rebootStatus = new RebootStatus();
+    if(dbName != null && storeName != null) {
+      client.db = await makeSKDBStore(
+        dbName,
+        storeName,
+        version,
+        exports.memory.buffer,
+        exports.SKIP_get_persistent_size(),
+        rebootStatus,
+        client.pageSize
+      );
     }
-    client.db = await makeSKDBStore(
-      dbName,
-      storeName,
-      version,
-      exports.memory.buffer,
-      exports.SKIP_get_persistent_size(),
-      reboot,
-      client.pageSize
-    );
 
     client.exports.SKIP_init_jsroots();
-    client.runSubscribeRoots(reboot);
+    client.runSubscribeRoots(rebootStatus.isReboot);
 
     client.replication_uid = client.runLocal(["uid"], "").trim();
     client.client_uuid = crypto.randomUUID();
-
-    // flush to disk on a poll - TODO: short-term perf workaround
-    client.persistTimer = setInterval(() => client.storePagesLoop(), 10000);
 
     return client;
   }
@@ -1447,7 +1456,11 @@ export class SKDB {
     return memory.slice(start, end);
   }
 
-  private async storePages(transaction: number): Promise<boolean> {
+  private async storePages(): Promise<boolean> {
+    if(this.storeName == null) {
+      return new Promise((resolve, _) => resolve(true));
+    }
+    let storeName = this.storeName;
     return new Promise((resolve, reject) => (async () => {
       if(this.db == null) {
         resolve(true);
@@ -1455,7 +1468,7 @@ export class SKDB {
 
       let pages = this.dirtyPages;
       let db = this.db!;
-      let tx = db.transaction(this.storeName, "readwrite");
+      let tx = db.transaction(storeName, "readwrite");
       tx.onabort = (err) => {
         resolve(false);
       }
@@ -1464,10 +1477,8 @@ export class SKDB {
         resolve(false);
       }
       tx.oncomplete = () => {
-        if(transaction == this.transaction) {
-          this.dirtyPages = [];
-          this.dirtyPagesMap = [];
-        };
+        this.dirtyPages = [];
+        this.dirtyPagesMap = [];
         resolve(true);
       }
       let copiedPages = new Array();
@@ -1476,13 +1487,9 @@ export class SKDB {
         let start = page * this.pageSize;
         let end = page * this.pageSize + this.pageSize;
         let content = await this.copyPage(start, end);
-        if(this.transaction != transaction) {
-          resolve(false);
-          return;
-        }
         copiedPages.push({ pageid: page, content });
       }
-      let store = tx.objectStore(this.storeName);
+      let store = tx.objectStore(storeName);
       for(let j = 0; j < copiedPages.length; j++) {
         store.put(copiedPages[j]!);
       }
@@ -1490,29 +1497,7 @@ export class SKDB {
 
   }
 
-  private async storePagesLoop() {
-    if(this.syncIsRunning) return;
-    this.syncIsRunning = true;
-    let transaction = -1;
-    while(transaction < this.transaction) {
-      transaction = this.transaction;
-      while(!await this.storePages(transaction)) {
-        if(this.transaction != transaction) break;
-      }
-    }
-    this.syncIsRunning = false;
-  }
-
-  runLocal(new_args: Array<string>, new_stdin: string): string {
-    console.assert(this.nbrInitPages >= 0);
-    this.args = new_args;
-    this.stdin = new_stdin;
-    this.stdout = new Array();
-    this.current_stdin = 0;
-    this.transaction++;
-
-    this.exports.skip_main();
-
+  async save() {
     while (true) {
       let dirtyPage = this.exports.sk_pop_dirty_page();
       if (dirtyPage == -1) break;
@@ -1530,6 +1515,17 @@ export class SKDB {
         this.dirtyPages.push(dirtyPage);
       }
     }
+    await this.storePages();
+  }
+
+  runLocal(new_args: Array<string>, new_stdin: string): string {
+    console.assert(this.nbrInitPages >= 0);
+    this.args = new_args;
+    this.stdin = new_stdin;
+    this.stdout = new Array();
+    this.current_stdin = 0;
+
+    this.exports.skip_main();
 
     return this.stdout.join("");
   }
