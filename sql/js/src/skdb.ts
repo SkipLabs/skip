@@ -315,7 +315,7 @@ export class SKDB {
   private exports: WasmExports;
   private client_uuid: string = "";
   // TODO: null server?
-  private server?: SKDBServer;
+  server?: SKDBServer;
 
   private constructor(storeName: string | null) {
     this.storeName = storeName;

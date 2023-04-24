@@ -165,7 +165,7 @@ const evalQuery = async function(skdb_client, query) {
 
 if (args.values['create-db']) {
   const db = args.values['create-db'];
-  const result = await skdb.server().createDatabase(db);
+  const result = await skdb.server.createDatabase(db);
   console.log(`Successfully created database: ${db}.`);
   console.log(`Credentials for ${db}: `, result);
 
@@ -175,7 +175,7 @@ if (args.values['create-db']) {
 }
 
 if (args.values['create-user']) {
-  const result = await skdb.server().createUser();
+  const result = await skdb.server.createUser();
   console.log('Successfully created user: ', result);
 
   dbCreds[result.accessKey] = result.privateKey;
@@ -184,17 +184,17 @@ if (args.values['create-user']) {
 }
 
 if (args.values['schema']) {
-  const schema = await skdb.server().schema();
+  const schema = await skdb.server.schema();
   console.log(schema.trim());
 }
 
 if (args.values['table-schema']) {
-  const schema = await skdb.server().tableSchema(args.values['table-schema']);
+  const schema = await skdb.server.tableSchema(args.values['table-schema']);
   console.log(schema.trim());
 }
 
 if (args.values['view-schema']) {
-  const schema = await skdb.server().viewSchema(args.values['view-schema']);
+  const schema = await skdb.server.viewSchema(args.values['view-schema']);
   console.log(schema.trim());
 }
 
@@ -225,7 +225,7 @@ const remoteRepl = async function() {
     }
 
     if (query.trim() === '.schema') {
-      const schema = await skdb.server().schema();
+      const schema = await skdb.server.schema();
       console.log(schema);
       continue;
     }
@@ -233,7 +233,7 @@ const remoteRepl = async function() {
     if (query.startsWith('.table-schema')) {
       const [_, table] = query.split(" ", 2);
       try {
-        const schema = await skdb.server().tableSchema(table);
+        const schema = await skdb.server.tableSchema(table);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${table}.`);
@@ -244,7 +244,7 @@ const remoteRepl = async function() {
     if (query.startsWith('.view-schema')) {
       const [_, view] = query.split(" ", 2);
       try {
-        const schema = await skdb.server().viewSchema(view);
+        const schema = await skdb.server.viewSchema(view);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${view}.`);
@@ -253,7 +253,7 @@ const remoteRepl = async function() {
     }
 
     try {
-      const answer = await evalQuery(skdb.server(), query);
+      const answer = await evalQuery(skdb.server, query);
       console.log(answer);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
@@ -331,7 +331,7 @@ const localRepl = async function() {
     if (query.startsWith('.mirror-table')) {
       const [_, table] = query.split(" ", 2);
       try {
-        await skdb.server().mirrorTable(table);
+        await skdb.server.mirrorTable(table);
       } catch {
         console.error(`Could not mirror table ${table}.`);
       }
@@ -341,7 +341,7 @@ const localRepl = async function() {
     if (query.startsWith('.mirror-view')) {
       const [_, view] = query.split(" ", 2);
       try {
-        await skdb.server().mirrorView(view);
+        await skdb.server.mirrorView(view);
       } catch {
         console.error(`Could not mirror view ${view}.`);
       }
@@ -374,7 +374,7 @@ try {
 
 if (query.trim() !== "") {
   try {
-    const answer = await evalQuery(skdb.server(), query);
+    const answer = await evalQuery(skdb.server, query);
     console.log(answer);
   } catch (ex) {
     console.error("Could not eval query.");
