@@ -1177,7 +1177,6 @@ export class SKDB {
   private serverToLocalSyncConnections: Map<string, ResilientConnection> = new Map();
   private replication_uid: string = "";
   private client_uuid: string = "";
-  private persistTimer?: number;
 
   private constructor(storeName: string | null) {
     this.storeName = storeName;
