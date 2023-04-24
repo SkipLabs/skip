@@ -8,7 +8,7 @@ const setup = async function(user) {
   const key = await crypto.subtle.importKey(
     "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
   await skdb.connect("soak", user, key, "ws://localhost:8080");
-  await skdb.server().mirrorTable("log");
+  await skdb.server.mirrorTable("log");
   return skdb;
 };
 
