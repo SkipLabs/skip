@@ -172,7 +172,7 @@ function makeSKDBStore(
 }
 
 /* ***************************************************************************/
-/* A few primitives to encode/decode utf8. */
+/* A few primitives to encode/decode. */
 /* ***************************************************************************/
 
 function encodeUTF8(exports: WasmExports, s: string): number {
@@ -262,10 +262,6 @@ function wasmStringToJS(exports: WasmExports, wasmPointer: number): string {
   return decodeUTF8(data.slice(wasmPointer, wasmPointer + size));
 }
 
-/* ***************************************************************************/
-/* A few primitives to encode/decode JSON. */
-/* ***************************************************************************/
-
 function stringify(obj: any): string {
   if (obj === undefined) {
     obj = null;
@@ -290,7 +286,7 @@ class SKDBCallable<T1, T2> {
 }
 
 /* ***************************************************************************/
-/* The function that creates the database. */
+/* The local database. */
 /* ***************************************************************************/
 
 export class SKDB {
@@ -792,7 +788,7 @@ export class SKDB {
 }
 
 /* ***************************************************************************/
-/* Protocol schema. */
+/* Replication protocol schema. */
 /* ***************************************************************************/
 
 type ProtoAuth = {
@@ -894,7 +890,7 @@ function metadataTable(tableName: string): string {
 }
 
 /* ***************************************************************************/
-/* Resilient connection abstraction
+/* Resilient connection abstraction */
 /* ***************************************************************************/
 
 class ResilientConnection {
@@ -1089,7 +1085,7 @@ class ResilientConnection {
 }
 
 /* ***************************************************************************/
-/* Stream MUX protocol
+/* Stream MUX protocol */
 /* ***************************************************************************/
 
 enum MuxedSocketState {
@@ -1673,7 +1669,7 @@ class Stream {
 }
 
 /* ***************************************************************************/
-/* Server interface
+/* Server-side database. */
 /* ***************************************************************************/
 
 class SKDBServer {
