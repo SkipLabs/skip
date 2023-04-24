@@ -172,6 +172,626 @@ function makeSKDBStore(
 }
 
 /* ***************************************************************************/
+/* A few primitives to encode/decode utf8. */
+/* ***************************************************************************/
+
+function encodeUTF8(exports: WasmExports, s: string): number {
+  let data = new Uint8Array(exports.memory.buffer);
+  let i = 0,
+    addr = exports.SKIP_Obstack_alloc(s.length * 4);
+  for (let ci = 0; ci != s.length; ci++) {
+    let c = s.charCodeAt(ci);
+    if (c < 128) {
+      data[addr + i++] = c;
+      continue;
+    }
+    if (c < 2048) {
+      data[addr + i++] = (c >> 6) | 192;
+    } else {
+      if (c > 0xd7ff && c < 0xdc00) {
+        if (++ci >= s.length)
+          throw new Error("UTF-8 encode: incomplete surrogate pair");
+        let c2 = s.charCodeAt(ci);
+        if (c2 < 0xdc00 || c2 > 0xdfff)
+          throw new Error(
+            "UTF-8 encode: second surrogate character 0x" +
+              c2.toString(16) +
+              " at index " +
+              ci +
+              " out of range"
+          );
+        c = 0x10000 + ((c & 0x03ff) << 10) + (c2 & 0x03ff);
+        data[addr + i++] = (c >> 18) | 240;
+        data[addr + i++] = ((c >> 12) & 63) | 128;
+      } else data[addr + i++] = (c >> 12) | 224;
+      data[addr + i++] = ((c >> 6) & 63) | 128;
+    }
+    data[addr + i++] = (c & 63) | 128;
+  }
+  return exports.sk_string_create(addr, i);
+}
+
+function decodeUTF8(bytes: Uint8Array): string {
+  let i = 0,
+    s = "";
+  while (i < bytes.length) {
+    let c = bytes[i++]!;
+    if (c > 127) {
+      if (c > 191 && c < 224) {
+        if (i >= bytes.length)
+          throw new Error("UTF-8 decode: incomplete 2-byte sequence");
+        c = ((c & 31) << 6) | (bytes[i++]! & 63);
+      } else if (c > 223 && c < 240) {
+        if (i + 1 >= bytes.length)
+          throw new Error("UTF-8 decode: incomplete 3-byte sequence");
+        c = ((c & 15) << 12) | ((bytes[i++]! & 63) << 6) | (bytes[i++]! & 63);
+      } else if (c > 239 && c < 248) {
+        if (i + 2 >= bytes.length)
+          throw new Error("UTF-8 decode: incomplete 4-byte sequence");
+        c =
+          ((c & 7) << 18) |
+          ((bytes[i++]! & 63) << 12) |
+          ((bytes[i++]! & 63) << 6) |
+          (bytes[i++]! & 63);
+      } else
+        throw new Error(
+          "UTF-8 decode: unknown multibyte start 0x" +
+            c.toString(16) +
+            " at index " +
+            (i - 1)
+        );
+    }
+    if (c <= 0xffff) s += String.fromCharCode(c);
+    else if (c <= 0x10ffff) {
+      c -= 0x10000;
+      s += String.fromCharCode((c >> 10) | 0xd800);
+      s += String.fromCharCode((c & 0x3ff) | 0xdc00);
+    } else
+      throw new Error(
+        "UTF-8 decode: code point 0x" + c.toString(16) + " exceeds UTF-16 reach"
+      );
+  }
+  return s;
+}
+
+function wasmStringToJS(exports: WasmExports, wasmPointer: number): string {
+  let data32 = new Uint32Array(exports.memory.buffer);
+  let size = exports["SKIP_String_byteSize"](wasmPointer);
+  let data = new Uint8Array(exports.memory.buffer);
+
+  return decodeUTF8(data.slice(wasmPointer, wasmPointer + size));
+}
+
+/* ***************************************************************************/
+/* A few primitives to encode/decode JSON. */
+/* ***************************************************************************/
+
+function stringify(obj: any): string {
+  if (obj === undefined) {
+    obj = null;
+  }
+  return JSON.stringify(obj);
+}
+
+/* ***************************************************************************/
+/* The type used to represent callables. */
+/* ***************************************************************************/
+
+class SKDBCallable<T1, T2> {
+  private id: number;
+
+  constructor(id: number) {
+    this.id = id;
+  }
+
+  getId(): number {
+    return this.id;
+  }
+}
+
+/* ***************************************************************************/
+/* The function that creates the database. */
+/* ***************************************************************************/
+
+export class SKDB {
+  private subscriptionCount: number = 0;
+  private args: Array<string> = [];
+  private current_stdin: number = 0;
+  private stdin: string = "";
+  private stdout: Array<string> = new Array();
+  private stdout_objects: Array<any> = new Array();
+  private onRootChangeFuns: Array<(rootName: string) => void> = new Array();
+  private externalFuns: Array<(any) => any> = [];
+  private fileDescrs: Map<string, number> = new Map();
+  private fileDescrNbr: number = 2;
+  private files: Array<Array<String>> = new Array();
+  private changed_files: Array<number> = new Array();
+  private execOnChange: Array<(change: string) => void> = new Array();
+  private lineBuffer: Array<number> = [];
+  private storeName: string | null;
+  private nbrInitPages: number = -1;
+  private roots: Map<string, number> = new Map();
+  private pageSize: number = -1;
+  private db: IDBDatabase | null = null;
+  private dirtyPagesMap: Array<number> = [];
+  private dirtyPages: Array<number> = [];
+  // @ts-expect-error
+  private exports: WasmExports;
+  private client_uuid: string = "";
+  // TODO: null server?
+  private server?: SKDBServer;
+
+  private constructor(storeName: string | null) {
+    this.storeName = storeName;
+  }
+
+  static async clear(dbName: string, storeName: string): Promise<void> {
+    await clearSKDBStore(dbName, storeName);
+  }
+
+  static async create(
+    dbName: string | null = null
+  ): Promise<SKDB> {
+    let storeName: string | null = null;
+    if(dbName != null) {
+      storeName = "SKDBStore";
+    }
+    let client = new SKDB(storeName);
+    let pageBitSize = 20;
+    client.pageSize = 1 << pageBitSize;
+    let env = client.makeWasmImports();
+    const wasmBytes = await getWasmSource();
+    let wasm = await WebAssembly.instantiate(wasmBytes, { env: env });
+    let exports = wasm.instance.exports as unknown as WasmExports;
+    client.exports = exports;
+    exports.SKIP_skfs_init();
+    exports.SKIP_initializeSkip();
+    exports.SKIP_skfs_end_of_init();
+    client.nbrInitPages = exports.SKIP_get_persistent_size() / client.pageSize + 1;
+    let version = exports.SKIP_get_version();
+    let rebootStatus = new RebootStatus();
+    if(dbName != null && storeName != null) {
+      client.db = await makeSKDBStore(
+        dbName,
+        storeName,
+        version,
+        exports.memory.buffer,
+        exports.SKIP_get_persistent_size(),
+        rebootStatus,
+        client.pageSize
+      );
+    }
+
+    client.exports.SKIP_init_jsroots();
+    client.runSubscribeRoots(rebootStatus.isReboot);
+
+    client.client_uuid = crypto.randomUUID();
+
+    return client;
+  }
+
+  openFile(filename: string): number {
+    if (this.fileDescrs[filename] !== undefined) {
+      return this.fileDescrs[filename];
+    }
+    let fd = this.fileDescrNbr;
+    this.files[fd] = new Array();
+    this.fileDescrs[filename] = fd;
+    this.fileDescrNbr++;
+    return fd;
+  }
+
+  watchFile(filename: string, f: (change: string) => void): void {
+    const fd = this.openFile(filename);
+    this.execOnChange[fd] = f;
+  }
+
+  async connect(
+    db: string,
+    accessKey: string,
+    privateKey: CryptoKey,
+    endpoint?: string,
+  ): Promise<SKDBServer> {
+    if (!endpoint) {
+      if (typeof window === 'undefined') {
+        throw new Error("No endpoint passed to connect and no window object to infer from.");
+      }
+      const loc = window.location;
+      const scheme = loc.protocol === "https:" ? "wss://" : "ws://"
+      endpoint = `${scheme}${loc.host}`
+    }
+
+    const creds = {
+      accessKey: accessKey,
+      privateKey: privateKey,
+      deviceUuid: this.client_uuid,
+    };
+
+    this.server = await SKDBServer.connect(this, endpoint, db, creds);
+    return this.server;
+  }
+
+  private makeWasmImports(): {} {
+    let data = this;
+    let field_names: Array<string> = new Array();
+    let objectIdx = 0;
+    let object: {[k: string]: any} = {};
+    return {
+      abort: function (err) {
+        throw new Error("abort " + err);
+      },
+      abortOnCannotGrowMemory: function (err) {
+        throw new Error("abortOnCannotGrowMemory " + err);
+      },
+      __cxa_throw: function (ptr, type, destructor) {
+        throw ptr;
+      },
+      SKIP_print_backtrace: function () {
+        console.trace("");
+      },
+      SKIP_etry: function (f, exn_handler) {
+        try {
+          return data.exports.SKIP_call0(f);
+        } catch (_) {
+          return data.exports.SKIP_call0(exn_handler);
+        }
+      },
+      __setErrNo: function (err) {
+        throw new Error("ErrNo " + err);
+      },
+      SKIP_call_external_fun: function (funId, str) {
+        return encodeUTF8(
+          data.exports,
+          stringify(
+            data.externalFuns[funId]!(
+              JSON.parse(wasmStringToJS(data.exports, str))
+            )
+          )
+        );
+      },
+      SKIP_print_error: function (str) {
+        console.error(wasmStringToJS(data.exports, str));
+      },
+      SKIP_read_line_fill: function () {
+        data.lineBuffer = [];
+        const endOfLine = 10;
+        if (data.current_stdin >= data.stdin.length) {
+          data.exports.SKIP_throw_EndOfFile();
+        }
+        while (data.stdin.charCodeAt(data.current_stdin) !== 10) {
+          if (data.current_stdin >= data.stdin.length) {
+            if (data.lineBuffer.length == 0) {
+              data.exports.SKIP_throw_EndOfFile();
+            } else {
+              return data.lineBuffer;
+            }
+          }
+          data.lineBuffer.push(data.stdin.charCodeAt(data.current_stdin));
+          data.current_stdin++;
+        }
+        data.current_stdin++;
+        return data.lineBuffer;
+      },
+      SKIP_read_line_get: function (i) {
+        return data.lineBuffer[i];
+      },
+      SKIP_getchar: function (i) {
+        if (data.current_stdin >= data.stdin.length) {
+          data.exports.SKIP_throw_EndOfFile();
+        }
+        let result = data.stdin.charCodeAt(data.current_stdin);
+        data.current_stdin++;
+        return result;
+      },
+      SKIP_clear_field_names: function() {
+        field_names = new Array();
+      },
+      SKIP_push_field_name: function(str) {
+        field_names.push(wasmStringToJS(data.exports, str))
+      },
+      SKIP_clear_object: function() {
+        objectIdx = 0;
+        object = {};
+      },
+      SKIP_push_object_field_null: function() {
+        let field_name: string = field_names[objectIdx]!;
+        object[field_name] = null;
+        objectIdx++;
+      },
+      SKIP_push_object_field_int32: function(n: number) {
+        let field_name: string = field_names[objectIdx]!;
+        object[field_name] = n;
+        objectIdx++;
+      },
+      SKIP_push_object_field_int64: function(str) {
+        let field_name: string = field_names[objectIdx]!;
+        object[field_name] = parseInt(wasmStringToJS(data.exports, str), 10);
+        objectIdx++;
+      },
+      SKIP_push_object_field_float: function(str) {
+        let field_name: string = field_names[objectIdx]!;
+        object[field_name] = parseFloat(wasmStringToJS(data.exports, str));
+        objectIdx++;
+      },
+      SKIP_push_object_field_string: function(str) {
+        let field_name: string = field_names[objectIdx]!;
+        object[field_name] = wasmStringToJS(data.exports, str);
+        objectIdx++;
+      },
+      SKIP_push_object: function () {
+        data.stdout_objects.push(object);
+      },
+      SKIP_print_raw: function (str) {
+        data.stdout.push(wasmStringToJS(data.exports, str));
+      },
+      SKIP_getArgc: function (i) {
+        return data.args.length;
+      },
+      SKIP_getArgN: function (n) {
+        return encodeUTF8(data.exports, data.args[n]!);
+      },
+      SKIP_unix_open: function (wasmFilename) {
+        let filename = wasmStringToJS(data.exports, wasmFilename);
+        return data.openFile(filename);
+      },
+      SKIP_write_to_file: function (fd, str) {
+        let jsStr = wasmStringToJS(data.exports, str);
+        if (jsStr == "") return;
+        data.files[fd]!.push(jsStr);
+        data.changed_files[fd] = fd;
+        if (data.execOnChange[fd] !== undefined) {
+          data.execOnChange[fd]!(data.files[fd]!.join(""));
+          data.files[fd] = [];
+        }
+      },
+      SKIP_glock: function () {},
+      SKIP_gunlock: function () {},
+    };
+  }
+
+  private runAddRoot(rootName: string, funId: number, arg: any): void {
+    this.args = [];
+    this.stdin = "";
+    this.stdout = new Array();
+    this.current_stdin = 0;
+    this.exports.SKIP_add_root(
+      encodeUTF8(this.exports, rootName),
+      funId,
+      encodeUTF8(this.exports, stringify(arg))
+    );
+  }
+
+  private async copyPage(start: number, end: number): Promise<ArrayBuffer> {
+    let memory = this.exports.memory.buffer;
+    return memory.slice(start, end);
+  }
+
+  private async storePages(): Promise<boolean> {
+    if(this.storeName == null) {
+      return new Promise((resolve, _) => resolve(true));
+    }
+    let storeName = this.storeName;
+    return new Promise((resolve, reject) => (async () => {
+      if(this.db == null) {
+        resolve(true);
+      }
+
+      let pages = this.dirtyPages;
+      let db = this.db!;
+      let tx = db.transaction(storeName, "readwrite");
+      tx.onabort = (err) => {
+        resolve(false);
+      }
+      tx.onerror = (err) => {
+        console.log("Error sync db: " + err);
+        resolve(false);
+      }
+      tx.oncomplete = () => {
+        this.dirtyPages = [];
+        this.dirtyPagesMap = [];
+        resolve(true);
+      }
+      let copiedPages = new Array();
+      for (let j = 0; j < pages.length; j++) {
+        let page = pages[j]!;
+        let start = page * this.pageSize;
+        let end = page * this.pageSize + this.pageSize;
+        let content = await this.copyPage(start, end);
+        copiedPages.push({ pageid: page, content });
+      }
+      let store = tx.objectStore(storeName);
+      for(let j = 0; j < copiedPages.length; j++) {
+        store.put(copiedPages[j]!);
+      }
+    })());
+
+  }
+
+  async save() {
+    while (true) {
+      let dirtyPage = this.exports.sk_pop_dirty_page();
+      if (dirtyPage == -1) break;
+      if (dirtyPage >= this.nbrInitPages) {
+        if (this.dirtyPagesMap[dirtyPage] != dirtyPage) {
+          this.dirtyPagesMap[dirtyPage] = dirtyPage;
+          this.dirtyPages.push(dirtyPage);
+        }
+      }
+    }
+
+    for (let dirtyPage = 0; dirtyPage < this.nbrInitPages; dirtyPage++) {
+      if (this.dirtyPagesMap[dirtyPage] != dirtyPage) {
+        this.dirtyPagesMap[dirtyPage] = dirtyPage;
+        this.dirtyPages.push(dirtyPage);
+      }
+    }
+    await this.storePages();
+  }
+
+  runLocal(new_args: Array<string>, new_stdin: string): string {
+    console.assert(this.nbrInitPages >= 0);
+    this.args = new_args;
+    this.stdin = new_stdin;
+    this.stdout = new Array();
+    this.current_stdin = 0;
+
+    this.exports.skip_main();
+
+    return this.stdout.join("");
+  }
+
+  runSubscribeRoots(reboot: boolean): void {
+    this.roots = new Map();
+    let fileName = "/subscriptions/jsroots";
+    this.watchFile(fileName, (text) => {
+      let changed = new Map();
+      let updates = text.split("\n").filter((x) => x.indexOf("\t") != -1);
+      for (const update of updates) {
+        if (update.substring(0, 1) !== "0") continue;
+        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
+        this.roots.delete(json.name);
+        changed.set(json.name, true);
+      }
+      for (const update of updates) {
+        if (update.substring(0, 1) === "0") continue;
+        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
+        this.roots.set(json.name, json.value);
+        changed.set(json.name, true);
+      }
+      for (const f of this.onRootChangeFuns) {
+        for (const name of changed.keys()) {
+          f(name);
+        }
+      }
+    });
+    this.subscriptionCount++;
+    if(reboot) {
+      this.runLocal(
+        ["subscribe", "jsroots", "--format=json", "--updates", fileName],
+        ""
+      );
+    }
+  }
+
+  watermark(table: string): number {
+    return parseInt(this.runLocal(["watermark", table], ""));
+  }
+
+  cmd(new_args: Array<string>, new_stdin: string): string {
+    return this.runLocal(new_args, new_stdin);
+  }
+
+  registerFun<T1, T2>(f: (obj: T1) => T2): SKDBCallable<T1, T2> {
+    let funId = this.externalFuns.length;
+    this.externalFuns.push(f);
+    return new SKDBCallable(funId);
+  }
+
+  trackedCall<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1): T2 {
+    let result = this.exports.SKIP_tracked_call(
+      callable.getId(),
+      encodeUTF8(this.exports, stringify(arg))
+    );
+    return JSON.parse(wasmStringToJS(this.exports, result));
+  }
+
+  trackedQuery(request: string, start?: number, end?: number): any {
+    if (start === undefined) start = 0;
+    if (end === undefined) end = -1;
+    let result = this.exports.SKIP_tracked_query(
+      encodeUTF8(this.exports, request),
+      start,
+      end
+    );
+    return wasmStringToJS(this.exports, result)
+      .split("\n")
+      .filter((x) => x != "")
+      .map((x) => JSON.parse(x));
+  }
+
+  onRootChange(f: (rootName: string) => void): void {
+    this.onRootChangeFuns.push(f);
+  }
+
+  addRoot<T1, T2>(
+    rootName: string,
+    callable: SKDBCallable<T1, T2>,
+    arg: T1
+  ): void {
+    this.runAddRoot(rootName, callable.getId(), arg);
+  }
+
+  removeRoot(rootName: string): void {
+    this.exports.SKIP_remove_root(encodeUTF8(this.exports, rootName));
+  }
+
+  getRoot(rootName: string): any {
+    return this.roots.get(rootName);
+  }
+
+  subscribe(viewName: string, f: (change: string) => void): void {
+    const fileName = "/subscriptions/sub" + this.subscriptionCount;
+    this.watchFile(fileName, f);
+    this.subscriptionCount++;
+    this.runLocal(
+      ["subscribe", viewName, "--format=csv", "--updates", fileName],
+      ""
+    );
+  }
+
+  sqlRaw(stdin: string): string {
+    return this.runLocal([], stdin);
+  }
+
+  sql(stdin: string): Array<any> | string {
+    let stdout = this.runLocal(["--format=js"], stdin);
+    if(stdout == "") {
+      let result = this.stdout_objects;
+      this.stdout_objects = new Array();
+      return result;
+    }
+    return stdout;
+  }
+
+  tableExists(tableName: string): boolean {
+    return this.runLocal(["dump-table", tableName], "").trim() != "";
+  }
+
+  tableSchema(tableName: string): string {
+    return this.runLocal(["dump-table", tableName], "");
+  }
+
+  viewExists(viewName: string): boolean {
+    return this.runLocal(["dump-view", viewName], "") != "";
+  }
+
+  viewSchema(viewName: string): string {
+    return this.runLocal(["dump-view", viewName], "");
+  }
+
+  schema(): string {
+    const tables = this.runLocal(["dump-tables"], "");
+    const views = this.runLocal(["dump-views"], "");
+    return tables + views;
+  }
+
+  insert(tableName: string, values: Array<any>): void {
+    values = values.map((x) => {
+      if (typeof x == "string") {
+        if (x == undefined) {
+          return "NULL";
+        }
+        return "'" + x + "'";
+      }
+      return x;
+    });
+    let stdin =
+      "insert into " + tableName + " values (" + values.join(", ") + ");";
+    this.runLocal([], stdin);
+  }
+}
+
+/* ***************************************************************************/
 /* Protocol schema. */
 /* ***************************************************************************/
 
@@ -1049,626 +1669,6 @@ class Stream {
         this.onData(data);
       }
     }
-  }
-}
-
-/* ***************************************************************************/
-/* A few primitives to encode/decode utf8. */
-/* ***************************************************************************/
-
-function encodeUTF8(exports: WasmExports, s: string): number {
-  let data = new Uint8Array(exports.memory.buffer);
-  let i = 0,
-    addr = exports.SKIP_Obstack_alloc(s.length * 4);
-  for (let ci = 0; ci != s.length; ci++) {
-    let c = s.charCodeAt(ci);
-    if (c < 128) {
-      data[addr + i++] = c;
-      continue;
-    }
-    if (c < 2048) {
-      data[addr + i++] = (c >> 6) | 192;
-    } else {
-      if (c > 0xd7ff && c < 0xdc00) {
-        if (++ci >= s.length)
-          throw new Error("UTF-8 encode: incomplete surrogate pair");
-        let c2 = s.charCodeAt(ci);
-        if (c2 < 0xdc00 || c2 > 0xdfff)
-          throw new Error(
-            "UTF-8 encode: second surrogate character 0x" +
-              c2.toString(16) +
-              " at index " +
-              ci +
-              " out of range"
-          );
-        c = 0x10000 + ((c & 0x03ff) << 10) + (c2 & 0x03ff);
-        data[addr + i++] = (c >> 18) | 240;
-        data[addr + i++] = ((c >> 12) & 63) | 128;
-      } else data[addr + i++] = (c >> 12) | 224;
-      data[addr + i++] = ((c >> 6) & 63) | 128;
-    }
-    data[addr + i++] = (c & 63) | 128;
-  }
-  return exports.sk_string_create(addr, i);
-}
-
-function decodeUTF8(bytes: Uint8Array): string {
-  let i = 0,
-    s = "";
-  while (i < bytes.length) {
-    let c = bytes[i++]!;
-    if (c > 127) {
-      if (c > 191 && c < 224) {
-        if (i >= bytes.length)
-          throw new Error("UTF-8 decode: incomplete 2-byte sequence");
-        c = ((c & 31) << 6) | (bytes[i++]! & 63);
-      } else if (c > 223 && c < 240) {
-        if (i + 1 >= bytes.length)
-          throw new Error("UTF-8 decode: incomplete 3-byte sequence");
-        c = ((c & 15) << 12) | ((bytes[i++]! & 63) << 6) | (bytes[i++]! & 63);
-      } else if (c > 239 && c < 248) {
-        if (i + 2 >= bytes.length)
-          throw new Error("UTF-8 decode: incomplete 4-byte sequence");
-        c =
-          ((c & 7) << 18) |
-          ((bytes[i++]! & 63) << 12) |
-          ((bytes[i++]! & 63) << 6) |
-          (bytes[i++]! & 63);
-      } else
-        throw new Error(
-          "UTF-8 decode: unknown multibyte start 0x" +
-            c.toString(16) +
-            " at index " +
-            (i - 1)
-        );
-    }
-    if (c <= 0xffff) s += String.fromCharCode(c);
-    else if (c <= 0x10ffff) {
-      c -= 0x10000;
-      s += String.fromCharCode((c >> 10) | 0xd800);
-      s += String.fromCharCode((c & 0x3ff) | 0xdc00);
-    } else
-      throw new Error(
-        "UTF-8 decode: code point 0x" + c.toString(16) + " exceeds UTF-16 reach"
-      );
-  }
-  return s;
-}
-
-function wasmStringToJS(exports: WasmExports, wasmPointer: number): string {
-  let data32 = new Uint32Array(exports.memory.buffer);
-  let size = exports["SKIP_String_byteSize"](wasmPointer);
-  let data = new Uint8Array(exports.memory.buffer);
-
-  return decodeUTF8(data.slice(wasmPointer, wasmPointer + size));
-}
-
-/* ***************************************************************************/
-/* A few primitives to encode/decode JSON. */
-/* ***************************************************************************/
-
-function stringify(obj: any): string {
-  if (obj === undefined) {
-    obj = null;
-  }
-  return JSON.stringify(obj);
-}
-
-/* ***************************************************************************/
-/* The type used to represent callables. */
-/* ***************************************************************************/
-
-class SKDBCallable<T1, T2> {
-  private id: number;
-
-  constructor(id: number) {
-    this.id = id;
-  }
-
-  getId(): number {
-    return this.id;
-  }
-}
-
-/* ***************************************************************************/
-/* The function that creates the database. */
-/* ***************************************************************************/
-
-export class SKDB {
-  private subscriptionCount: number = 0;
-  private args: Array<string> = [];
-  private current_stdin: number = 0;
-  private stdin: string = "";
-  private stdout: Array<string> = new Array();
-  private stdout_objects: Array<any> = new Array();
-  private onRootChangeFuns: Array<(rootName: string) => void> = new Array();
-  private externalFuns: Array<(any) => any> = [];
-  private fileDescrs: Map<string, number> = new Map();
-  private fileDescrNbr: number = 2;
-  private files: Array<Array<String>> = new Array();
-  private changed_files: Array<number> = new Array();
-  private execOnChange: Array<(change: string) => void> = new Array();
-  private lineBuffer: Array<number> = [];
-  private storeName: string | null;
-  private nbrInitPages: number = -1;
-  private roots: Map<string, number> = new Map();
-  private pageSize: number = -1;
-  private db: IDBDatabase | null = null;
-  private dirtyPagesMap: Array<number> = [];
-  private dirtyPages: Array<number> = [];
-  // @ts-expect-error
-  private exports: WasmExports;
-  private client_uuid: string = "";
-  // TODO: null server?
-  private server?: SKDBServer;
-
-  private constructor(storeName: string | null) {
-    this.storeName = storeName;
-  }
-
-  static async clear(dbName: string, storeName: string): Promise<void> {
-    await clearSKDBStore(dbName, storeName);
-  }
-
-  static async create(
-    dbName: string | null = null
-  ): Promise<SKDB> {
-    let storeName: string | null = null;
-    if(dbName != null) {
-      storeName = "SKDBStore";
-    }
-    let client = new SKDB(storeName);
-    let pageBitSize = 20;
-    client.pageSize = 1 << pageBitSize;
-    let env = client.makeWasmImports();
-    const wasmBytes = await getWasmSource();
-    let wasm = await WebAssembly.instantiate(wasmBytes, { env: env });
-    let exports = wasm.instance.exports as unknown as WasmExports;
-    client.exports = exports;
-    exports.SKIP_skfs_init();
-    exports.SKIP_initializeSkip();
-    exports.SKIP_skfs_end_of_init();
-    client.nbrInitPages = exports.SKIP_get_persistent_size() / client.pageSize + 1;
-    let version = exports.SKIP_get_version();
-    let rebootStatus = new RebootStatus();
-    if(dbName != null && storeName != null) {
-      client.db = await makeSKDBStore(
-        dbName,
-        storeName,
-        version,
-        exports.memory.buffer,
-        exports.SKIP_get_persistent_size(),
-        rebootStatus,
-        client.pageSize
-      );
-    }
-
-    client.exports.SKIP_init_jsroots();
-    client.runSubscribeRoots(rebootStatus.isReboot);
-
-    client.client_uuid = crypto.randomUUID();
-
-    return client;
-  }
-
-  openFile(filename: string): number {
-    if (this.fileDescrs[filename] !== undefined) {
-      return this.fileDescrs[filename];
-    }
-    let fd = this.fileDescrNbr;
-    this.files[fd] = new Array();
-    this.fileDescrs[filename] = fd;
-    this.fileDescrNbr++;
-    return fd;
-  }
-
-  watchFile(filename: string, f: (change: string) => void): void {
-    const fd = this.openFile(filename);
-    this.execOnChange[fd] = f;
-  }
-
-  async connect(
-    db: string,
-    accessKey: string,
-    privateKey: CryptoKey,
-    endpoint?: string,
-  ): Promise<SKDBServer> {
-    if (!endpoint) {
-      if (typeof window === 'undefined') {
-        throw new Error("No endpoint passed to connect and no window object to infer from.");
-      }
-      const loc = window.location;
-      const scheme = loc.protocol === "https:" ? "wss://" : "ws://"
-      endpoint = `${scheme}${loc.host}`
-    }
-
-    const creds = {
-      accessKey: accessKey,
-      privateKey: privateKey,
-      deviceUuid: this.client_uuid,
-    };
-
-    this.server = await SKDBServer.connect(this, endpoint, db, creds);
-    return this.server;
-  }
-
-  private makeWasmImports(): {} {
-    let data = this;
-    let field_names: Array<string> = new Array();
-    let objectIdx = 0;
-    let object: {[k: string]: any} = {};
-    return {
-      abort: function (err) {
-        throw new Error("abort " + err);
-      },
-      abortOnCannotGrowMemory: function (err) {
-        throw new Error("abortOnCannotGrowMemory " + err);
-      },
-      __cxa_throw: function (ptr, type, destructor) {
-        throw ptr;
-      },
-      SKIP_print_backtrace: function () {
-        console.trace("");
-      },
-      SKIP_etry: function (f, exn_handler) {
-        try {
-          return data.exports.SKIP_call0(f);
-        } catch (_) {
-          return data.exports.SKIP_call0(exn_handler);
-        }
-      },
-      __setErrNo: function (err) {
-        throw new Error("ErrNo " + err);
-      },
-      SKIP_call_external_fun: function (funId, str) {
-        return encodeUTF8(
-          data.exports,
-          stringify(
-            data.externalFuns[funId]!(
-              JSON.parse(wasmStringToJS(data.exports, str))
-            )
-          )
-        );
-      },
-      SKIP_print_error: function (str) {
-        console.error(wasmStringToJS(data.exports, str));
-      },
-      SKIP_read_line_fill: function () {
-        data.lineBuffer = [];
-        const endOfLine = 10;
-        if (data.current_stdin >= data.stdin.length) {
-          data.exports.SKIP_throw_EndOfFile();
-        }
-        while (data.stdin.charCodeAt(data.current_stdin) !== 10) {
-          if (data.current_stdin >= data.stdin.length) {
-            if (data.lineBuffer.length == 0) {
-              data.exports.SKIP_throw_EndOfFile();
-            } else {
-              return data.lineBuffer;
-            }
-          }
-          data.lineBuffer.push(data.stdin.charCodeAt(data.current_stdin));
-          data.current_stdin++;
-        }
-        data.current_stdin++;
-        return data.lineBuffer;
-      },
-      SKIP_read_line_get: function (i) {
-        return data.lineBuffer[i];
-      },
-      SKIP_getchar: function (i) {
-        if (data.current_stdin >= data.stdin.length) {
-          data.exports.SKIP_throw_EndOfFile();
-        }
-        let result = data.stdin.charCodeAt(data.current_stdin);
-        data.current_stdin++;
-        return result;
-      },
-      SKIP_clear_field_names: function() {
-        field_names = new Array();
-      },
-      SKIP_push_field_name: function(str) {
-        field_names.push(wasmStringToJS(data.exports, str))
-      },
-      SKIP_clear_object: function() {
-        objectIdx = 0;
-        object = {};
-      },
-      SKIP_push_object_field_null: function() {
-        let field_name: string = field_names[objectIdx]!;
-        object[field_name] = null;
-        objectIdx++;
-      },
-      SKIP_push_object_field_int32: function(n: number) {
-        let field_name: string = field_names[objectIdx]!;
-        object[field_name] = n;
-        objectIdx++;
-      },
-      SKIP_push_object_field_int64: function(str) {
-        let field_name: string = field_names[objectIdx]!;
-        object[field_name] = parseInt(wasmStringToJS(data.exports, str), 10);
-        objectIdx++;
-      },
-      SKIP_push_object_field_float: function(str) {
-        let field_name: string = field_names[objectIdx]!;
-        object[field_name] = parseFloat(wasmStringToJS(data.exports, str));
-        objectIdx++;
-      },
-      SKIP_push_object_field_string: function(str) {
-        let field_name: string = field_names[objectIdx]!;
-        object[field_name] = wasmStringToJS(data.exports, str);
-        objectIdx++;
-      },
-      SKIP_push_object: function () {
-        data.stdout_objects.push(object);
-      },
-      SKIP_print_raw: function (str) {
-        data.stdout.push(wasmStringToJS(data.exports, str));
-      },
-      SKIP_getArgc: function (i) {
-        return data.args.length;
-      },
-      SKIP_getArgN: function (n) {
-        return encodeUTF8(data.exports, data.args[n]!);
-      },
-      SKIP_unix_open: function (wasmFilename) {
-        let filename = wasmStringToJS(data.exports, wasmFilename);
-        return data.openFile(filename);
-      },
-      SKIP_write_to_file: function (fd, str) {
-        let jsStr = wasmStringToJS(data.exports, str);
-        if (jsStr == "") return;
-        data.files[fd]!.push(jsStr);
-        data.changed_files[fd] = fd;
-        if (data.execOnChange[fd] !== undefined) {
-          data.execOnChange[fd]!(data.files[fd]!.join(""));
-          data.files[fd] = [];
-        }
-      },
-      SKIP_glock: function () {},
-      SKIP_gunlock: function () {},
-    };
-  }
-
-  private runAddRoot(rootName: string, funId: number, arg: any): void {
-    this.args = [];
-    this.stdin = "";
-    this.stdout = new Array();
-    this.current_stdin = 0;
-    this.exports.SKIP_add_root(
-      encodeUTF8(this.exports, rootName),
-      funId,
-      encodeUTF8(this.exports, stringify(arg))
-    );
-  }
-
-  private async copyPage(start: number, end: number): Promise<ArrayBuffer> {
-    let memory = this.exports.memory.buffer;
-    return memory.slice(start, end);
-  }
-
-  private async storePages(): Promise<boolean> {
-    if(this.storeName == null) {
-      return new Promise((resolve, _) => resolve(true));
-    }
-    let storeName = this.storeName;
-    return new Promise((resolve, reject) => (async () => {
-      if(this.db == null) {
-        resolve(true);
-      }
-
-      let pages = this.dirtyPages;
-      let db = this.db!;
-      let tx = db.transaction(storeName, "readwrite");
-      tx.onabort = (err) => {
-        resolve(false);
-      }
-      tx.onerror = (err) => {
-        console.log("Error sync db: " + err);
-        resolve(false);
-      }
-      tx.oncomplete = () => {
-        this.dirtyPages = [];
-        this.dirtyPagesMap = [];
-        resolve(true);
-      }
-      let copiedPages = new Array();
-      for (let j = 0; j < pages.length; j++) {
-        let page = pages[j]!;
-        let start = page * this.pageSize;
-        let end = page * this.pageSize + this.pageSize;
-        let content = await this.copyPage(start, end);
-        copiedPages.push({ pageid: page, content });
-      }
-      let store = tx.objectStore(storeName);
-      for(let j = 0; j < copiedPages.length; j++) {
-        store.put(copiedPages[j]!);
-      }
-    })());
-
-  }
-
-  async save() {
-    while (true) {
-      let dirtyPage = this.exports.sk_pop_dirty_page();
-      if (dirtyPage == -1) break;
-      if (dirtyPage >= this.nbrInitPages) {
-        if (this.dirtyPagesMap[dirtyPage] != dirtyPage) {
-          this.dirtyPagesMap[dirtyPage] = dirtyPage;
-          this.dirtyPages.push(dirtyPage);
-        }
-      }
-    }
-
-    for (let dirtyPage = 0; dirtyPage < this.nbrInitPages; dirtyPage++) {
-      if (this.dirtyPagesMap[dirtyPage] != dirtyPage) {
-        this.dirtyPagesMap[dirtyPage] = dirtyPage;
-        this.dirtyPages.push(dirtyPage);
-      }
-    }
-    await this.storePages();
-  }
-
-  runLocal(new_args: Array<string>, new_stdin: string): string {
-    console.assert(this.nbrInitPages >= 0);
-    this.args = new_args;
-    this.stdin = new_stdin;
-    this.stdout = new Array();
-    this.current_stdin = 0;
-
-    this.exports.skip_main();
-
-    return this.stdout.join("");
-  }
-
-  runSubscribeRoots(reboot: boolean): void {
-    this.roots = new Map();
-    let fileName = "/subscriptions/jsroots";
-    this.watchFile(fileName, (text) => {
-      let changed = new Map();
-      let updates = text.split("\n").filter((x) => x.indexOf("\t") != -1);
-      for (const update of updates) {
-        if (update.substring(0, 1) !== "0") continue;
-        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        this.roots.delete(json.name);
-        changed.set(json.name, true);
-      }
-      for (const update of updates) {
-        if (update.substring(0, 1) === "0") continue;
-        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        this.roots.set(json.name, json.value);
-        changed.set(json.name, true);
-      }
-      for (const f of this.onRootChangeFuns) {
-        for (const name of changed.keys()) {
-          f(name);
-        }
-      }
-    });
-    this.subscriptionCount++;
-    if(reboot) {
-      this.runLocal(
-        ["subscribe", "jsroots", "--format=json", "--updates", fileName],
-        ""
-      );
-    }
-  }
-
-  watermark(table: string): number {
-    return parseInt(this.runLocal(["watermark", table], ""));
-  }
-
-  cmd(new_args: Array<string>, new_stdin: string): string {
-    return this.runLocal(new_args, new_stdin);
-  }
-
-  registerFun<T1, T2>(f: (obj: T1) => T2): SKDBCallable<T1, T2> {
-    let funId = this.externalFuns.length;
-    this.externalFuns.push(f);
-    return new SKDBCallable(funId);
-  }
-
-  trackedCall<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1): T2 {
-    let result = this.exports.SKIP_tracked_call(
-      callable.getId(),
-      encodeUTF8(this.exports, stringify(arg))
-    );
-    return JSON.parse(wasmStringToJS(this.exports, result));
-  }
-
-  trackedQuery(request: string, start?: number, end?: number): any {
-    if (start === undefined) start = 0;
-    if (end === undefined) end = -1;
-    let result = this.exports.SKIP_tracked_query(
-      encodeUTF8(this.exports, request),
-      start,
-      end
-    );
-    return wasmStringToJS(this.exports, result)
-      .split("\n")
-      .filter((x) => x != "")
-      .map((x) => JSON.parse(x));
-  }
-
-  onRootChange(f: (rootName: string) => void): void {
-    this.onRootChangeFuns.push(f);
-  }
-
-  addRoot<T1, T2>(
-    rootName: string,
-    callable: SKDBCallable<T1, T2>,
-    arg: T1
-  ): void {
-    this.runAddRoot(rootName, callable.getId(), arg);
-  }
-
-  removeRoot(rootName: string): void {
-    this.exports.SKIP_remove_root(encodeUTF8(this.exports, rootName));
-  }
-
-  getRoot(rootName: string): any {
-    return this.roots.get(rootName);
-  }
-
-  subscribe(viewName: string, f: (change: string) => void): void {
-    const fileName = "/subscriptions/sub" + this.subscriptionCount;
-    this.watchFile(fileName, f);
-    this.subscriptionCount++;
-    this.runLocal(
-      ["subscribe", viewName, "--format=csv", "--updates", fileName],
-      ""
-    );
-  }
-
-  sqlRaw(stdin: string): string {
-    return this.runLocal([], stdin);
-  }
-
-  sql(stdin: string): Array<any> | string {
-    let stdout = this.runLocal(["--format=js"], stdin);
-    if(stdout == "") {
-      let result = this.stdout_objects;
-      this.stdout_objects = new Array();
-      return result;
-    }
-    return stdout;
-  }
-
-  tableExists(tableName: string): boolean {
-    return this.runLocal(["dump-table", tableName], "").trim() != "";
-  }
-
-  tableSchema(tableName: string): string {
-    return this.runLocal(["dump-table", tableName], "");
-  }
-
-  viewExists(viewName: string): boolean {
-    return this.runLocal(["dump-view", viewName], "") != "";
-  }
-
-  viewSchema(viewName: string): string {
-    return this.runLocal(["dump-view", viewName], "");
-  }
-
-  schema(): string {
-    const tables = this.runLocal(["dump-tables"], "");
-    const views = this.runLocal(["dump-views"], "");
-    return tables + views;
-  }
-
-  insert(tableName: string, values: Array<any>): void {
-    values = values.map((x) => {
-      if (typeof x == "string") {
-        if (x == undefined) {
-          return "NULL";
-        }
-        return "'" + x + "'";
-      }
-      return x;
-    });
-    let stdin =
-      "insert into " + tableName + " values (" + values.join(", ") + ");";
-    this.runLocal([], stdin);
   }
 }
 
