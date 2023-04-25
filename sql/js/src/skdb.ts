@@ -313,8 +313,8 @@ export class SKDB {
   private dirtyPages: Array<number> = [];
   // @ts-expect-error
   private exports: WasmExports;
-  private client_uuid: string = "";
-  // TODO: null server?
+  private clientUuid: string = "";
+
   server?: SKDBServer;
 
   private constructor(storeName: string | null) {
@@ -361,7 +361,7 @@ export class SKDB {
     client.exports.SKIP_init_jsroots();
     client.runSubscribeRoots(rebootStatus.isReboot);
 
-    client.client_uuid = crypto.randomUUID();
+    client.clientUuid = crypto.randomUUID();
 
     return client;
   }
@@ -400,7 +400,7 @@ export class SKDB {
     const creds = {
       accessKey: accessKey,
       privateKey: privateKey,
-      deviceUuid: this.client_uuid,
+      deviceUuid: this.clientUuid,
     };
 
     this.server = await SKDBServer.connect(this, endpoint, db, creds);
@@ -1447,7 +1447,8 @@ class SKDBServer {
   private client: SKDB;
   private connection: MuxedSocket;
   private creds: Creds;
-  private replication_uid: string = "";
+  private replicationUid: string = "";
+  private mirroredTables: Set<string> = new Set()
 
   private constructor(
     client: SKDB,
@@ -1468,7 +1469,7 @@ class SKDBServer {
     const uri = SKDBServer.getDbSocketUri(endpoint, db);
     const conn = await MuxedSocket.connect(uri, creds);
     const server = new SKDBServer(client, conn, creds);
-    server.replication_uid = client.runLocal(["uid"], "").trim();
+    server.replicationUid = client.runLocal(["uid"], "").trim();
     return server
   }
 
@@ -1503,18 +1504,20 @@ class SKDBServer {
     const client = this.client;
 
     stream.onError = (code, msg) => {
-      console.log("server tail", tableName, "stream errored", code, msg);
+      // will go away when we re-introduce the resiliency abstraction
+      console.error("server tail", tableName, "stream errored", code, msg);
     }
 
     stream.onClose = () => {
-      console.log("server tail", tableName, "stream closed");
+      // will go away when we re-introduce the resiliency abstraction
+      console.error("server tail", tableName, "stream closed");
     }
 
     stream.onData = (data) => {
       const decoder = new TextDecoder();
       const pData = JSON.parse(decoder.decode(data)) as ProtoData;
       const msg = pData.data;
-      client.runLocal(["write-csv", tableName, "--source", this.replication_uid], msg + '\n');
+      client.runLocal(["write-csv", tableName, "--source", this.replicationUid], msg + '\n');
     }
 
     const encoder = new TextEncoder();
@@ -1530,11 +1533,13 @@ class SKDBServer {
     const client = this.client;
 
     stream.onError = (code, msg) => {
-      console.log("local tail", tableName, "stream errored", code, msg);
+      // will go away when we re-introduce the resiliency abstraction
+      console.error("local tail", tableName, "stream errored", code, msg);
     }
 
     stream.onClose = () => {
-      console.log("local tail", tableName, "stream closed");
+      // will go away when we re-introduce the resiliency abstraction
+      console.error("local tail", tableName, "stream closed");
     }
 
     stream.onData = (data) => {
@@ -1570,14 +1575,17 @@ class SKDBServer {
     const _session = client.runLocal(
       [
         "subscribe", tableName, "--connect", "--format=csv",
-        "--updates", fileName, "--ignore-source", this.replication_uid
+        "--updates", fileName, "--ignore-source", this.replicationUid
       ],
       ""
     ).trim();
   }
 
   async mirrorTable(tableName: string): Promise<void> {
-    // TODO: don't let the user establish a table twice?
+    if (this.mirroredTables.has(tableName)) {
+      return;
+    }
+    this.mirroredTables.add(tableName);
 
     // TODO: just assumes that if it exists the schema is the same
     if (!this.client.tableExists(tableName)) {
