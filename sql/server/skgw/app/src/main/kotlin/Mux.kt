@@ -49,7 +49,7 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
 
           // websocket close or error
           override fun onCloseMessage(cm: CloseMessage, channel: WebSocketChannel) {
-            if (cm.code == CloseMessage.NORMAL_CLOSURE) {
+            if (cm.code == CloseMessage.NORMAL_CLOSURE || cm.code == CloseMessage.GOING_AWAY) {
               muxedSocket.onSocketClose()
             } else {
               muxedSocket.onSocketError(0u, "websocket closed")
