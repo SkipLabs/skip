@@ -18,7 +18,6 @@ import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.TimeUnit
 import kotlin.io.bufferedWriter
 import kotlin.reflect.KClass
 import kotlin.system.exitProcess
@@ -330,11 +329,6 @@ fun connectionHandler(
                 throw RuntimeException(msg)
               }
 
-              var socket: MuxedSocket? = null
-
-              // TODO: should this be pushed down? we probably want keep alives to prevent this too
-              val timeout = taskPool.schedule({ socket?.closeSocket() }, 10, TimeUnit.MINUTES)
-
               val replicationId = skdb.uid().getOrThrow().trim()
 
               // TODO: this logic needs to be pushed down in to the mux socket
@@ -346,44 +340,41 @@ fun connectionHandler(
               // }
               var accessKey: String? = null
 
-              socket =
-                  MuxedSocket(
-                      onStream = { _, stream ->
-                        var handler: StreamHandler =
-                            RequestHandler(
-                                skdb,
-                                accessKey!!,
-                                encryption,
-                                replicationId,
-                            )
-                        stream.onData = { data ->
-                          try {
-                            handler = handler.handleMessage(data, stream)
-                          } catch (ex: Exception) {
-                            System.err.println("Exception occurred: ${ex}")
-                            stream.error(14u, "Internal error")
-                          }
-                        }
-                        stream.onClose = { handler.close() }
-                        stream.onError = { code, msg ->
-                          System.err.println("Stream errored: ${code} - ${msg}")
-                          handler.close()
-                        }
-                      },
-                      onClose = { timeout.cancel(false) },
-                      onError = { _, code, msg ->
-                        System.err.println("Socket errored: ${code} - ${msg}")
-                        timeout.cancel(false)
-                      },
-                      socket = channel,
-                      getDecryptedKey = { key ->
-                        accessKey = key
-                        val encryptedPrivateKey = skdb.privateKeyAsStored(key)
-                        encryption.decrypt(encryptedPrivateKey)
-                      },
-                  )
-
-              return socket
+              return MuxedSocket(
+                  socket = channel,
+                  taskPool = taskPool,
+                  onStream = { _, stream ->
+                    var handler: StreamHandler =
+                        RequestHandler(
+                            skdb,
+                            accessKey!!,
+                            encryption,
+                            replicationId,
+                        )
+                    stream.onData = { data ->
+                      try {
+                        handler = handler.handleMessage(data, stream)
+                      } catch (ex: Exception) {
+                        System.err.println("Exception occurred: ${ex}")
+                        stream.error(14u, "Internal error")
+                      }
+                    }
+                    stream.onClose = { handler.close() }
+                    stream.onError = { code, msg ->
+                      System.err.println("Stream errored: ${code} - ${msg}")
+                      handler.close()
+                    }
+                  },
+                  onClose = {},
+                  onError = { _, code, msg ->
+                    System.err.println("Socket errored: ${code} - ${msg}")
+                  },
+                  getDecryptedKey = { key ->
+                    accessKey = key
+                    val encryptedPrivateKey = skdb.privateKeyAsStored(key)
+                    encryption.decrypt(encryptedPrivateKey)
+                  },
+              )
             }
           }))
 }
@@ -426,7 +417,8 @@ fun main(args: Array<String>) {
 
   if (arglist.contains("--init")) {
     val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
-    System.err.println("{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.privateKey}\"}}")
+    System.err.println(
+        "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.privateKey}\"}}")
     return
   }
 

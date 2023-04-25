@@ -19,6 +19,8 @@ import java.util.Base64
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.ScheduledExecutorService
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.xnio.ChannelListener
@@ -104,10 +106,11 @@ data class MuxStreamCloseMsg(val stream: UInt) : MuxMsg()
 data class MuxStreamResetMsg(val stream: UInt, val errorCode: UInt, val msg: String) : MuxMsg()
 
 class MuxedSocket(
+    val socket: WebSocketChannel,
+    val taskPool: ScheduledExecutorService,
     val onStream: onStreamFn,
     val onClose: onSocketCloseFn,
     val onError: onSocketErrorFn,
-    val socket: WebSocketChannel,
     val getDecryptedKey: (String) -> ByteArray,
     private val mutex: ReadWriteLock = ReentrantReadWriteLock(),
     private var state: State = State.IDLE,
@@ -122,6 +125,8 @@ class MuxedSocket(
     CLOSE_WAIT,
     CLOSED
   }
+
+  private val timeout = taskPool.schedule({ this.closeSocket() }, 10, TimeUnit.MINUTES)
 
   // user-facing interface /////////////////////////////////////////////////////
 
@@ -197,6 +202,7 @@ class MuxedSocket(
         socket.close()
       }
     }
+    timeout.cancel(false)
   }
 
   fun errorSocket(errorCode: UInt, msg: String) {
@@ -234,6 +240,7 @@ class MuxedSocket(
         socket.close()
       }
     }
+    timeout.cancel(false)
   }
 
   // interface used by WS //////////////////////////////////////////////////////
@@ -349,6 +356,8 @@ class MuxedSocket(
         }
       }
     }
+    // we do not cancel the timeout here as this has only closed half
+    // of the connection
   }
 
   fun onSocketError(errorCode: UInt, msg: String) {
@@ -374,6 +383,7 @@ class MuxedSocket(
         }
       }
     }
+    timeout.cancel(false)
   }
 
   // interface used by Stream //////////////////////////////////////////////////
