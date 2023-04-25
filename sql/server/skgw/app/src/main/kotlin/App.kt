@@ -164,18 +164,17 @@ fun createDb(dbName: String, encryption: EncryptionTransform): ProtoCredentials 
   return protoCreds
 }
 
-// TODO: rename
-sealed interface Conn {
+sealed interface StreamHandler {
 
-  fun handleMessage(request: ProtoMessage, stream: Stream): Conn
+  fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler
   fun handleMessage(message: ByteBuffer, stream: Stream) = handleMessage(parse(message), stream)
 
   fun close() {}
 }
 
-class EstablishedConn(val proc: Process) : Conn {
+class ProcessPipe(val proc: Process) : StreamHandler {
 
-  override fun handleMessage(request: ProtoMessage, stream: Stream): Conn {
+  override fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler {
     when (request) {
       is ProtoData -> {
         val stdin = proc.outputStream
@@ -197,18 +196,18 @@ class EstablishedConn(val proc: Process) : Conn {
   }
 
   override fun close() {
-    this.proc.outputStream?.close()
+    proc.outputStream?.close()
   }
 }
 
-class AuthenticatedConn(
+class RequestHandler(
     val skdb: Skdb,
     val accessKey: String,
     val encryption: EncryptionTransform,
     val replicationId: String,
-) : Conn {
+) : StreamHandler {
 
-  override fun handleMessage(request: ProtoMessage, stream: Stream): Conn {
+  override fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler {
     when (request) {
       is ProtoQuery -> {
         val format =
@@ -279,7 +278,7 @@ class AuthenticatedConn(
                 },
                 { stream.error(12u, "Unexpected EOF") },
             )
-        return EstablishedConn(proc)
+        return ProcessPipe(proc)
       }
       is ProtoWrite -> {
         val proc =
@@ -292,7 +291,7 @@ class AuthenticatedConn(
                   stream.send(payload)
                 },
                 { stream.error(13u, "Unexpected EOF") })
-        return EstablishedConn(proc)
+        return ProcessPipe(proc)
       }
       is ProtoAuth -> {
         stream.error(10u, "unexpected re-auth on established connection")
@@ -350,8 +349,8 @@ fun connectionHandler(
               socket =
                   MuxedSocket(
                       onStream = { _, stream ->
-                        var conn: Conn =
-                            AuthenticatedConn(
+                        var handler: StreamHandler =
+                            RequestHandler(
                                 skdb,
                                 accessKey!!,
                                 encryption,
@@ -359,16 +358,16 @@ fun connectionHandler(
                             )
                         stream.onData = { data ->
                           try {
-                            conn = conn.handleMessage(data, stream)
+                            handler = handler.handleMessage(data, stream)
                           } catch (ex: Exception) {
                             System.err.println("Exception occurred: ${ex}")
                             stream.error(14u, "Internal error")
                           }
                         }
-                        stream.onClose = { conn.close() }
+                        stream.onClose = { handler.close() }
                         stream.onError = { code, msg ->
                           System.err.println("Stream errored: ${code} - ${msg}")
-                          conn.close()
+                          handler.close()
                         }
                       },
                       onClose = { timeout.cancel(false) },
