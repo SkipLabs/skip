@@ -16,11 +16,11 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Arrays
 import java.util.Base64
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.ScheduledExecutorService
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.xnio.ChannelListener
@@ -113,6 +113,7 @@ class MuxedSocket(
     val onError: onSocketErrorFn,
     val getDecryptedKey: (String) -> ByteArray,
     private val mutex: ReadWriteLock = ReentrantReadWriteLock(),
+  private var authenticatedAt: Instant? = null,
     private var state: State = State.IDLE,
     private var nextStream: UInt = 2u,
     private var clientStreamWatermark: UInt = 0u,
@@ -126,6 +127,7 @@ class MuxedSocket(
     CLOSED
   }
 
+  private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
   private val timeout = taskPool.schedule({ this.closeSocket() }, 10, TimeUnit.MINUTES)
 
   // user-facing interface /////////////////////////////////////////////////////
@@ -260,6 +262,7 @@ class MuxedSocket(
             mutex.writeLock().lock()
             try {
               state = State.AUTH_RECV
+              authenticatedAt = Instant.now()
             } finally {
               mutex.writeLock().unlock()
             }
@@ -272,6 +275,11 @@ class MuxedSocket(
       }
       State.AUTH_RECV,
       State.CLOSING -> {
+        val now = Instant.now()
+        if (Duration.between(authenticatedAt!!, now).abs().compareTo(maxConnectionDuration) > 0) {
+          errorSocket(11u, "session timeout")
+        }
+
         val muxMsg = decodeMsg(msg)
         when (muxMsg) {
           // TODO: we may eventually allow this as a keep-alive
