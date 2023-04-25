@@ -398,7 +398,7 @@ fun envIsSane(): Boolean {
   val svcSkdb = openSkdb(SERVICE_MGMT_DB_NAME)
 
   if (svcSkdb == null) {
-    println("FAIL: Could not open service management database.")
+    System.err.println("FAIL: Could not open service management database.")
     return false
   }
 
@@ -409,7 +409,7 @@ fun envIsSane(): Boolean {
           .trim() == "1"
 
   if (!successfullyRead) {
-    println("FAIL: Could not read from service management database.")
+    System.err.println("FAIL: Could not read from service management database.")
   }
 
   return successfullyRead
@@ -426,12 +426,12 @@ fun main(args: Array<String>) {
 
   if (arglist.contains("--init")) {
     val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
-    println("{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.privateKey}\"}}")
+    System.err.println("{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.privateKey}\"}}")
     return
   }
 
   if (!envIsSane()) {
-    println("Environment checks failed. Use --init for a cold start.")
+    System.err.println("Environment checks failed. Use --init for a cold start.")
     exitProcess(1)
   }
 
