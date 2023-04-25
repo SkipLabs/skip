@@ -1473,6 +1473,10 @@ class SKDBServer {
     return server
   }
 
+  close(): void {
+    this.connection.closeSocket();
+  }
+
   private static getDbSocketUri(endpoint: string, db: string) {
     return `${endpoint}/dbs/${db}/connection`;
   }

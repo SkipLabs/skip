@@ -383,3 +383,5 @@ if (query.trim() !== "") {
     // console.error(ex);
   }
 }
+
+skdb.server?.close();
