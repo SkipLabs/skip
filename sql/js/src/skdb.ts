@@ -1,4 +1,27 @@
 /* ***************************************************************************/
+/* WASM Loading. */
+/* ***************************************************************************/
+
+// for distribution we replace this line with inlined base64-encoded bytes
+const wasmBase64 = "";
+
+async function getWasmSource(): Promise<Uint8Array> {
+  if (wasmBase64 === "") {
+    let wasmModule = await fetch(new URL("../skdb.wasm", import.meta.url));
+    let wasmBuffer = await wasmModule.arrayBuffer();
+    return new Uint8Array(wasmBuffer);
+  }
+  // @ts-ignore
+  let wasmBuffer = (typeof atob === 'undefined') ? Buffer.from(wasmBase64, 'base64') : atob(wasmBase64);
+  let len = wasmBuffer.length;
+  let typedArray = new Uint8Array(len);
+  for (var i = 0; i < len; i++) {
+    typedArray[i] = wasmBuffer.charCodeAt(i);
+  }
+  return typedArray;
+}
+
+/* ***************************************************************************/
 /* Interfaces. */
 /* ***************************************************************************/
 
@@ -1200,18 +1223,9 @@ export class SKDB {
     let client = new SKDB(storeName);
     let pageBitSize = 20;
     client.pageSize = 1 << pageBitSize;
-    let wasmBuffer =
-        (typeof atob === 'undefined') ?
-        // @ts-ignore
-        Buffer.from(wasmBase64, 'base64'):
-        atob(wasmBase64);
-    let len = wasmBuffer.length;
-    let typedArray = new Uint8Array(len);
-    for (var i = 0; i < len; i++) {
-      typedArray[i] = wasmBuffer.charCodeAt(i);
-    }
     let env = client.makeWasmImports();
-    let wasm = await WebAssembly.instantiate(typedArray, { env: env });
+    const wasmBytes = await getWasmSource();
+    let wasm = await WebAssembly.instantiate(wasmBytes, { env: env });
     let exports = wasm.instance.exports as unknown as WasmExports;
     client.exports = exports;
     exports.SKIP_skfs_init();
