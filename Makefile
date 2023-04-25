@@ -15,8 +15,8 @@ sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
 sql/js/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 	cp $^ $@
 
-sql/js/node_modules: sql/node/package.json
-	cd sql/node && npm install
+sql/js/node_modules: sql/js/package.json
+	cd sql/js && npm install
 
 sql/js/dist/%.js: sql/js/src/%.ts
 	cd sql/js && tsc --build tsconfig.json --pretty false
