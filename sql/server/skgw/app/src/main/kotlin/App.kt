@@ -331,13 +331,6 @@ fun connectionHandler(
 
               val replicationId = skdb.uid().getOrThrow().trim()
 
-              // TODO: this logic needs to be pushed down in to the mux socket
-              // val maxConnectionDuration: Duration = Duration.ofMinutes(10)
-              // val now = Instant.now()
-              // if (Duration.between(authenticatedAt, now).abs().compareTo(maxConnectionDuration) >
-              // 0) {
-              //   stream.error(11u, "session timeout")
-              // }
               var accessKey: String? = null
 
               return MuxedSocket(
