@@ -2,23 +2,10 @@
 /* WASM Loading. */
 /* ***************************************************************************/
 
-// for distribution we replace this line with inlined base64-encoded bytes
-const wasmBase64 = "";
-
-async function getWasmSource(): Promise<Uint8Array> {
-  if (wasmBase64 === "") {
-    let wasmModule = await fetch(new URL("../skdb.wasm", import.meta.url));
-    let wasmBuffer = await wasmModule.arrayBuffer();
-    return new Uint8Array(wasmBuffer);
-  }
-  // @ts-ignore
-  let wasmBuffer = (typeof atob === 'undefined') ? Buffer.from(wasmBase64, 'base64') : atob(wasmBase64);
-  let len = wasmBuffer.length;
-  let typedArray = new Uint8Array(len);
-  for (var i = 0; i < len; i++) {
-    typedArray[i] = wasmBuffer.charCodeAt(i);
-  }
-  return typedArray;
+export async function fetchWasmSource(): Promise<Uint8Array> {
+  let wasmModule = await fetch(new URL("../skdb.wasm", import.meta.url));
+  let wasmBuffer = await wasmModule.arrayBuffer();
+  return new Uint8Array(wasmBuffer);
 }
 
 /* ***************************************************************************/
@@ -332,7 +319,8 @@ export class SKDB {
   }
 
   static async create(
-    dbName: string | null = null
+    dbName: string | null = null,
+    getWasmSource?: () => Promise<Uint8Array>
   ): Promise<SKDB> {
     let storeName: string | null = null;
     if(dbName != null) {
@@ -342,7 +330,9 @@ export class SKDB {
     let pageBitSize = 20;
     client.pageSize = 1 << pageBitSize;
     let env = client.makeWasmImports();
-    const wasmBytes = await getWasmSource();
+    // NOTE `skdb-wasm-b64` is imported dynamically to avoid bundling the wasm in the same file.
+    const getWasmSource_ = getWasmSource ?? (() => import('./skdb-wasm-b64').then((mod) => mod.getWasmSource()));
+    const wasmBytes = await getWasmSource_();
     let wasm = await WebAssembly.instantiate(wasmBytes, { env: env });
     let exports = wasm.instance.exports as unknown as WasmExports;
     client.exports = exports;
