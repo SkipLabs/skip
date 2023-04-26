@@ -746,10 +746,10 @@ export class SKDB {
   }
 
   sql(stdin: string): Array<any> | string {
+    this.stdout_objects = new Array();
     let stdout = this.runLocal(["--format=js"], stdin);
     if(stdout == "") {
       let result = this.stdout_objects;
-      this.stdout_objects = new Array();
       return result;
     }
     return stdout;
