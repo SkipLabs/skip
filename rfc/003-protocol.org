@@ -286,42 +286,42 @@ Where not specified, strings are UTF-8.
 - query
   - type = 0x1
   - reserved (4) - must be zeroed
-  - format (4) (enum: 0x0 - json, 0x1 - raw)
-  - query_length (32)
-  - query (query_length)
+  - format (4) (enum: 0x0 - json, 0x1 - raw, 0x2 - csv)
+  - query_length (32) - in bytes
+  - query (query_length * 8)
 
 - request tail
   - type = 0x2
   - reserved (24) - padding if you like - must be zeroed
   - since (64)
-  - table_name_length (16)
-  - table_name (table_name_length)
+  - table_name_length (16) - in bytes
+  - table_name (table_name_length * 8)
 
 - push promise
   - type = 0x3
   - reserved (24) - padding if you like - must be zeroed
-  - table_name_length (16)
-  - table_name (table_name_length)
+  - table_name_length (16) - in bytes
+  - table_name (table_name_length * 8)
 
-- schema (we are killing suffix)
+- schema
   - type = 0x4
+  - reserved (4) - must be zeroed
   - scope enum (4) - 0 if all, 1 if table, 2 if view, other values are reserved
     - if all, then there is no name nor name_length
-  - reserved (4) - must be zeroed
-  - name_length (16)
-  - name (name_length)
+  - name_length (16) - in bytes
+  - name (name_length * 8)
 
 - create db
   - type = 0x5
-  - name_length (16)
-  - name (name_length)
+  - name_length (16) - in bytes
+  - name (name_length * 8)
 
 - create user
   - type = 0x6
 
 - credentials response
-  - type = 0x128
-  - access key (20 * 8 = 160) - ASCII encoded 20 char string
+  - type = 0x80
+  - access key (20 * 8 = 160) - ASCII encoded 20 char string or 0-terminated
   - private key (256)
 
 *** Data message
@@ -345,8 +345,8 @@ that.
 The serialisation is:
 
 - type = 0x0
-- fin flag (1)
 - reserved (7)
+- fin flag (1)
 - payload
 
 * SKDB data transfer protocol
