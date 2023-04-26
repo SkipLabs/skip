@@ -61,6 +61,9 @@ function clearSKDBStore(
   dbName: string,
   storeName: string,
 ): Promise<void> {
+  if (typeof indexedDB === 'undefined') {
+    throw new Error("No indexedDB in this environment.");
+  }
   return new Promise((resolve, reject) => {
     let open = indexedDB.open(dbName, 1);
 
@@ -104,6 +107,9 @@ function makeSKDBStore(
   rebootStatus: RebootStatus,
   pageSize: number
 ): Promise<IDBDatabase> {
+  if (typeof indexedDB === 'undefined') {
+    throw new Error("No indexedDB in this environment.");
+  }
   let memory32 = new Uint32Array(memory);
   // Let's round up the memorySize to be pageSize aligned
   memorySize = (memorySize + (pageSize - 1)) & ~(pageSize - 1);

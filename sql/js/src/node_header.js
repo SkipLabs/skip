@@ -3,4 +3,3 @@ import 'node:util';
 import fs from 'node:fs';
 import 'readline';
 import { WebSocket } from 'ws';
-import indexedDB from 'fake-indexeddb';
