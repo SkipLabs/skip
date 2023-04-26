@@ -11,6 +11,7 @@ import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
 
 val streams: List<Stream> = listOf()
 
@@ -96,10 +97,11 @@ fun createHttpServer(): Undertow {
                 ): MuxedSocket {
                   val socket =
                       MuxedSocket(
+                          socket = channel,
+                          taskPool = Executors.newSingleThreadScheduledExecutor(),
                           onStream = ::setupStream,
                           onClose = {},
                           onError = { _, _, _ -> },
-                          socket = channel,
                           getDecryptedKey = {
                             when (it) {
                               "ABCDEFGHIJKLMNOPQRST" -> "test".toByteArray(StandardCharsets.UTF_8)
