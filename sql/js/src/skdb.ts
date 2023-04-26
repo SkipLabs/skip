@@ -811,8 +811,99 @@ type ProtoResponse = ProtoResponseCreds | ProtoData
 type ProtoMsg = ProtoCtrlMsg | ProtoResponse
 
 function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
-  const buf = new ArrayBuffer(87);
-  return buf;
+  switch (msg.type) {
+      case "query": {
+        const buf = new ArrayBuffer(6 + msg.query.length * 3);
+        const uint8View = new Uint8Array(buf);
+        const dataView = new DataView(buf);
+        const textEncoder = new TextEncoder();
+        const encodeResult = textEncoder.encodeInto(msg.query, uint8View.subarray(6));
+        dataView.setUint8(0, 0x1);  // type
+        const formatLookup = new Map([
+          ["json", 0x0],
+          ["raw", 0x1],
+          ["csv", 0x2],
+        ]);
+        const format = formatLookup.get(msg.format);
+        if (format === undefined) {
+          throw new Error(`Cannot serialize format ${msg.format}`);
+        }
+        dataView.setUint8(1, format);
+        dataView.setUint32(2, encodeResult.written || 0, false);
+        return buf.slice(0, 6 + (encodeResult.written || 0));
+      }
+      case "schema": {
+        const name = msg.name || "";
+        const buf = new ArrayBuffer(4 + name.length * 3);
+        const uint8View = new Uint8Array(buf);
+        const dataView = new DataView(buf);
+        const textEncoder = new TextEncoder();
+        const encodeResult = textEncoder.encodeInto(name, uint8View.subarray(4));
+        dataView.setUint8(0, 0x4);  // type
+        const scopeLookup = new Map([
+          ["all", 0x0],
+          ["table", 0x1],
+          ["view", 0x2],
+        ]);
+        const scope = scopeLookup.get(msg.scope);
+        if (scope === undefined) {
+          throw new Error(`Cannot serialize scope ${msg.scope}`);
+        }
+        dataView.setUint8(1, scope);
+        dataView.setUint16(2, encodeResult.written || 0, false);
+        return buf.slice(0, 4 + (encodeResult.written || 0));
+      }
+      case "tail": {
+        const buf = new ArrayBuffer(14 + msg.table.length * 3);
+        const uint8View = new Uint8Array(buf);
+        const dataView = new DataView(buf);
+        const textEncoder = new TextEncoder();
+        const encodeResult = textEncoder.encodeInto(msg.table, uint8View.subarray(14));
+        dataView.setUint8(0, 0x2);  // type
+        dataView.setBigUint64(4, msg.since, false);
+        dataView.setUint16(12, encodeResult.written || 0, false);
+        return buf.slice(0, 14 + (encodeResult.written || 0));
+      }
+      case "pushPromise": {
+        const buf = new ArrayBuffer(6 + msg.table.length * 3);
+        const uint8View = new Uint8Array(buf);
+        const dataView = new DataView(buf);
+        const textEncoder = new TextEncoder();
+        const encodeResult = textEncoder.encodeInto(msg.table, uint8View.subarray(6));
+        dataView.setUint8(0, 0x3);  // type
+        dataView.setUint16(4, encodeResult.written || 0, false);
+        return buf.slice(0, 6 + (encodeResult.written || 0));
+      }
+      case "createDatabase": {
+        const buf = new ArrayBuffer(3 + msg.name.length * 3);
+        const uint8View = new Uint8Array(buf);
+        const dataView = new DataView(buf);
+        const textEncoder = new TextEncoder();
+        const encodeResult = textEncoder.encodeInto(msg.name, uint8View.subarray(3));
+        dataView.setUint8(0, 0x5);  // type
+        dataView.setUint16(1, encodeResult.written || 0, false);
+        return buf.slice(0, 3 + (encodeResult.written || 0));
+      }
+      case "createUser": {
+        const buf = new ArrayBuffer(1);
+        const dataView = new DataView(buf);
+        dataView.setUint8(0, 0x6);  // type
+        return buf;
+      }
+      case "credentials": {
+        throw new Error("Encoding credentials unsupported");
+      }
+      case "data": {
+        const buf = new ArrayBuffer(2 + msg.payload.byteLength);
+        const uint8View = new Uint8Array(buf);
+        const dataView = new DataView(buf);
+        dataView.setUint8(0, 0x0);  // type
+        // fin flag always set - we currently assume that JS doesn't stream chunks
+        dataView.setUint8(1, 0x1);
+        uint8View.set(new Uint8Array(msg.payload), 2);
+        return buf;
+      }
+  }
 }
 
 function decodeProtoMsg(data: Array<ArrayBuffer>): ProtoMsg | null {
