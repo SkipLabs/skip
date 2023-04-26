@@ -27,7 +27,7 @@ if
     ((cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
         echo "  skdb.sqlRaw('insert into t1 values(TRUE, false);');"
         echo "  console.log(skdb.sqlRaw('select true, false, a, b from t1;'));"
@@ -46,7 +46,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
         echo "  skdb.sqlRaw('create table if not exists t1 (a BOOLEAN, b boolean);');"
         echo "  console.log(skdb.sqlRaw('select 1;'));"
@@ -65,7 +65,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY);');"
         echo "  process.exit();"
         echo "}"
@@ -82,7 +82,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');"
         echo "  skdb.sqlRaw('insert into t1 (b) values (22);');";
         echo "  process.exit();"
@@ -100,7 +100,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sql('create table widgets (id text unique, name text);');"
         echo "  skdb.sql('INSERT INTO widgets (id, name) VALUES (\'a\', \'gear\');');"
         echo "  skdb.sql('UPDATE widgets SET id = \'c\', name = \'gear2\';');"
@@ -120,7 +120,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sql(\"create table widgets (id text unique , price real not null);\");"
         echo "  skdb.sql(\"INSERT INTO widgets (id, price) values ('a', 10.0);\");"
         echo "  console.log(skdb.sqlRaw('select * from widgets'))"
@@ -139,7 +139,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
         echo "  skdb.sqlRaw('create virtual view v1 as select * from t1;');"
         echo "  skdb.sqlRaw('create virtual view if not exists v1 as select * from t1;');"
@@ -159,7 +159,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');"
         echo "  skdb.sqlRaw('create view v1 as select * from t1;');"
         echo "  skdb.sqlRaw('create view if not exists v1 as select * from t1;');"
@@ -179,7 +179,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  for(let i = 0; i < 10000; i++) {"
         echo "    skdb.sqlRaw('select * from t1;');"
         echo "    console.log('');"
@@ -199,7 +199,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sql('create table t1 (aBc INTEGER)')"
         echo "  skdb.insert('t1', [11]);"
         echo "  console.log(skdb.sql('select * from t1')[0].aBc);"
@@ -218,7 +218,7 @@ if
         cat $skdb_node;
         echo "";
         echo "async function test() {"
-        echo "  let skdb = await SKDB.create(true);"
+        echo "  let skdb = await SKDB.create();"
         echo "  skdb.sql('create table t1 (aBc INTEGER)')"
         echo "  skdb.insert('t1', [11]);"
         echo "  console.log(skdb.sql('select * from t1 limit 1')[0].aBc);"

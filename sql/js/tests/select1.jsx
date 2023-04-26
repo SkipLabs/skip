@@ -1,5 +1,5 @@
 async function test1() {
-  let skdb = await SKDB.create(true);
+  let skdb = await SKDB.create();
 
   skdb.sqlRaw(`CREATE TABLE t1(a INTEGER, b INTEGER, c INTEGER, d INTEGER, e INTEGER);`);
 

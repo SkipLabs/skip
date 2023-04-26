@@ -1,6 +1,6 @@
 
 async function test() {
-  let skdb = await SKDB.create(true);
+  let skdb = await SKDB.create();
   skdb.sqlRaw('create table if not exists todos (id text primary key, text text, completed integer);');
 
   const ROOT_ID = 'todosRoot';
