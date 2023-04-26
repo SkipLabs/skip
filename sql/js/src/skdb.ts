@@ -248,6 +248,10 @@ class SKDBCallable<T1, T2> {
 /* The local database. */
 /* ***************************************************************************/
 
+function metadataTable(tableName: string): string {
+  return `skdb__${tableName}_sync_metadata`;
+}
+
 export class SKDB {
   private subscriptionCount: number = 0;
   private args: Array<string> = [];
@@ -634,8 +638,8 @@ export class SKDB {
     }
   }
 
-  watermark(table: string): number {
-    return parseInt(this.runLocal(["watermark", table], ""));
+  watermark(table: string): bigint {
+    return BigInt(this.runLocal(["watermark", table], ""));
   }
 
   cmd(new_args: Array<string>, new_stdin: string): string {
@@ -753,71 +757,69 @@ export class SKDB {
 }
 
 /* ***************************************************************************/
-/* Replication protocol schema. */
+/* Orchestration protocol. */
 /* ***************************************************************************/
 
 type ProtoQuery = {
-  request: "query";
+  type: "query";
   query: string;
-  format?: "json"|"raw";
+  format: "json"|"raw"|"csv";
 }
 
-type ProtoTail = {
-  request: "tail";
+type ProtoQuerySchema = {
+  type: "schema";
+  name?: string;
+  scope: "all"|"table"|"view";
+}
+
+type ProtoRequestTail = {
+  type: "tail";
   table: string;
-  since: number;
+  since: bigint;
 }
 
-type ProtoSchemaQuery = {
-  request: "schema";
-  table?: string;
-  view?: string;
-  suffix?: string;
-}
-
-type ProtoWrite = {
-  request: "write";
+type ProtoPushPromise = {
+  type: "pushPromise";
   table: string;
 }
 
-type ProtoCreateDb = {
-  request: "createDatabase";
+type ProtoRequestCreateDb = {
+  type: "createDatabase";
   name: string;
 }
 
-type ProtoCreateUser = {
-  request: "createUser";
+type ProtoRequestCreateUser = {
+  type: "createUser";
 }
 
-type ProtoData = {
-  request: "pipe";
-  data: string;
-}
-
-type ProtoError = {
-  request: "error";
-  code: string;
-  msg: string;
-}
-
-type ProtoCredentials = {
-  request: "credentials";
+type ProtoResponseCreds = {
+  type: "credentials";
   accessKey: String;
   privateKey: String;
 }
 
-type ProtoRequest = ProtoQuery | ProtoSchemaQuery | ProtoCreateDb | ProtoTail | ProtoWrite | ProtoCreateUser
+type ProtoCtrlMsg = ProtoQuery | ProtoQuerySchema | ProtoRequestCreateDb |
+ ProtoRequestTail | ProtoPushPromise | ProtoRequestCreateUser
 
-type ProtoResponse = ProtoData | ProtoError | ProtoCredentials
-
-interface Creds {
-  accessKey: string,
-  privateKey: CryptoKey,
-  deviceUuid: string,
+type ProtoData = {
+  type: "data";
+  payload: ArrayBuffer;
 }
 
-function metadataTable(tableName: string): string {
-  return `skdb__${tableName}_sync_metadata`;
+type ProtoResponse = ProtoResponseCreds | ProtoData
+
+type ProtoMsg = ProtoCtrlMsg | ProtoResponse
+
+function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
+  const buf = new ArrayBuffer(87);
+  return buf;
+}
+
+function decodeProtoMsg(data: Array<ArrayBuffer>): ProtoMsg | null {
+  return {
+    type: "data",
+    payload: new ArrayBuffer(3)
+  };
 }
 
 /* ***************************************************************************/
@@ -857,6 +859,12 @@ type MuxStreamReset = {
   msg: string;
 }
 type MuxMessage = MuxAuth | MuxGoaway | MuxStreamData | MuxStreamClose | MuxStreamReset;
+
+interface Creds {
+  accessKey: string,
+  privateKey: CryptoKey,
+  deviceUuid: string,
+}
 
 export class MuxedSocket {
   // constants
@@ -1446,7 +1454,17 @@ class SKDBServer {
     return `${endpoint}/dbs/${db}/connection`;
   }
 
-  private async makeRequest(request: ProtoRequest): Promise<ProtoResponse> {
+  private strictCastData(response: ProtoMsg|null): ProtoData {
+    if (response === null) {
+      throw new Error(`Unexpected response: ${response}`);
+    }
+    if (response.type === "data") {
+      return response;
+    }
+    throw new Error(`Unexpected response: ${response}`);
+  }
+
+  private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse|null> {
     const stream = this.connection.openStream();
     const acc = new Array<ArrayBuffer>();
     return new Promise((resolve, reject) => {
@@ -1454,16 +1472,15 @@ class SKDBServer {
         acc.push(data);
       };
       stream.onClose = () => {
-        const decoder = new TextDecoder();
-        let result = "";
-        for (let i = 0; i < acc.length; i++) {
-          result = decoder.decode(acc[i], { stream: i < acc.length - 1 });
+        const msg = decodeProtoMsg(acc);
+        if (msg === null || msg.type !== "credentials" && msg.type !== "data") {
+          resolve(null);
+          return;
         }
-        resolve(JSON.parse(result));
+        resolve(msg);
       };
       stream.onError = (_code, msg) => reject(msg);
-      const encoder = new TextEncoder();
-      stream.send(encoder.encode(JSON.stringify(request)));
+      stream.send(encodeProtoMsg(request));
       stream.close();
     });
   }
@@ -1483,18 +1500,17 @@ class SKDBServer {
     }
 
     stream.onData = (data) => {
-      const decoder = new TextDecoder();
-      const pData = JSON.parse(decoder.decode(data)) as ProtoData;
-      const msg = pData.data;
-      client.runLocal(["write-csv", tableName, "--source", this.replicationUid], msg + '\n');
+      // TODO: need an abstraction that gathers un FIN'd ProtoDatas
+      const msg = decodeProtoMsg([data]);
+      const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
+      client.runLocal(["write-csv", tableName, "--source", this.replicationUid], txtPayload + '\n');
     }
 
-    const encoder = new TextEncoder();
-    stream.send(encoder.encode(JSON.stringify({
-      request: "tail",
+    stream.send(encodeProtoMsg({
+      type: "tail",
       table: tableName,
       since: this.client.watermark(tableName),
-    })));
+    }));
   }
 
   private establishLocalTail(tableName: string): void {
@@ -1512,21 +1528,20 @@ class SKDBServer {
     }
 
     stream.onData = (data) => {
-      const decoder = new TextDecoder();
-      const pData = JSON.parse(decoder.decode(data)) as ProtoData;
-      const msg = pData.data;
+      // TODO: need an abstraction that gathers un FIN'd ProtoDatas
+      const msg = decodeProtoMsg([data]);
+      const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
       // we only expect acks back in the form of checkpoints.
       // let's store these as a watermark against the table.
-      client.runLocal(["write-csv", metadataTable(tableName)], msg + '\n');
+      client.runLocal(["write-csv", metadataTable(tableName)], txtPayload + '\n');
     }
 
-    const request: ProtoWrite = {
-       request: "write",
+    const request: ProtoPushPromise = {
+       type: "pushPromise",
        table: tableName,
     };
 
-    const encoder = new TextEncoder();
-    stream.send(encoder.encode(JSON.stringify(request)));
+    stream.send(encodeProtoMsg(request));
 
     let fileName = tableName + "_" + this.creds.accessKey;
 
@@ -1534,11 +1549,10 @@ class SKDBServer {
       if (change == "") {
         return;
       }
-      const encoder = new TextEncoder();
-      stream.send(encoder.encode(JSON.stringify({
-        request: "pipe",
-        data: change,
-      })));
+      stream.send(encodeProtoMsg({
+        type: "data",
+        payload: encodeUTF8Str(change),
+      }));
     });
 
     const _session = client.runLocal(
@@ -1558,7 +1572,7 @@ class SKDBServer {
 
     // TODO: just assumes that if it exists the schema is the same
     if (!this.client.tableExists(tableName)) {
-      let createTable = await this.tableSchema(tableName, "");
+      let createTable = await this.tableSchema(tableName);
 
       this.client.runLocal([], createTable);
       this.client.runLocal([],
@@ -1578,90 +1592,77 @@ class SKDBServer {
   // just to create this themselves - no need for mirroring. or we
   // could mirror down a read-only table and have the server keep it
   // in sync?
-  async mirrorView(viewName: string, suffix?: string): Promise<void> {
-    if (!this.client.viewExists(viewName + suffix)) {
-      suffix = suffix || "";
-      let createRemoteTable = await this.viewSchema(viewName, suffix);
+  async mirrorView(viewName: string): Promise<void> {
+    if (!this.client.viewExists(viewName)) {
+      let createRemoteTable = await this.viewSchema(viewName);
       this.client.runLocal([], createRemoteTable);
     }
   }
 
-  private castData(response: ProtoResponse): ProtoData {
-    if (response.request === "pipe") {
-      return response;
-    }
-    if (response.request == "error") {
-      console.error(response.msg);
-    } else {
-      console.error("Unexpected response", response);
-    }
-    throw new Error(`Unexpected response: ${response}`);
-  }
-
   async sqlRaw(stdin: string): Promise<string> {
     let result = await this.makeRequest({
-      request: "query",
+      type: "query",
       query: stdin,
       format: "raw",
     });
 
-    return this.castData(result).data;
+    return decodeUTF8(this.strictCastData(result).payload);
   }
 
   async sql(stdin: string): Promise<any[]> {
     let result = await this.makeRequest({
-      request: "query",
+      type: "query",
       query: stdin,
       format: "json",
     });
-    return this.castData(result)
-      .data
+    return decodeUTF8(this.strictCastData(result).payload)
       .split("\n")
       .filter((x) => x != "")
       .map((x) => JSON.parse(x));
   }
 
-  async tableSchema(tableName: string, renameSuffix: string = ""): Promise<string> {
+  async tableSchema(tableName: string): Promise<string> {
     const resp = await this.makeRequest({
-      request: "schema",
-      table: tableName,
-      suffix: renameSuffix,
+      type: "schema",
+      name: tableName,
+      scope: "table",
     });
-    return this.castData(resp).data
+    return decodeUTF8(this.strictCastData(resp).payload)
   }
 
-  async viewSchema(viewName: string, renameSuffix: string = ""): Promise<string> {
+  async viewSchema(viewName: string): Promise<string> {
     const resp = await this.makeRequest({
-      request: "schema",
-      view: viewName,
-      suffix: renameSuffix,
+      type: "schema",
+      name: viewName,
+      scope: "view",
     });
-    return this.castData(resp).data
+    return decodeUTF8(this.strictCastData(resp).payload)
   }
 
   async schema(): Promise<string> {
     const resp = await this.makeRequest({
-      request: "schema",
+      type: "schema",
+      scope: "all",
     });
-    return this.castData(resp).data
+    return decodeUTF8(this.strictCastData(resp).payload)
   }
 
-  async createDatabase(dbName: string): Promise<ProtoCredentials> {
+  async createDatabase(dbName: string): Promise<ProtoResponseCreds> {
     let result = await this.makeRequest({
-      request: "createDatabase",
+      type: "createDatabase",
       name: dbName,
     });
-    if (result.request !== "credentials") {
+    if (result === null || result.type !== "credentials") {
       throw new Error("Unexpected response.");
     }
     return result;
   }
 
-  async createUser(): Promise<ProtoCredentials> {
+  async createUser(): Promise<ProtoResponseCreds> {
     let result = await this.makeRequest({
-      request: "createUser",
+      type: "createUser",
     });
-    if (result.request !== "credentials") {
+    if (result === null || result.type !== "credentials") {
       throw new Error("Unexpected response.");
     }
     return result;
