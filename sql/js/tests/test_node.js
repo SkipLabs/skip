@@ -1,5 +1,5 @@
 async function initDB() {
-  const skdb = await SKDB.create(true);
+  const skdb = await SKDB.create();
   skdb.sql("create table t1 (a INTEGER);");
 
   let sizeCount = 20;
@@ -52,7 +52,7 @@ async function initDB() {
 }
 
 async function testDB() {
-  const skdb = await SKDB.create(true);
+  const skdb = await SKDB.create();
   console.log(skdb.sql("select count(*) from tracks;")[0]);
 
   let then = performance.now();
@@ -68,7 +68,7 @@ async function testDB() {
 //testDB();
 
 async function promptDB() {
-  let skdb = await SKDB.create(true);
+  let skdb = await SKDB.create();
   let sessionID = await skdb.connect(
    "ws://host.docker.internal:9999/skgw",
    "test.db",

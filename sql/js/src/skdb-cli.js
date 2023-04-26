@@ -11,7 +11,7 @@ import process from 'node:process';
 import repl from 'node:repl';
 
 const createConnectedSkdb = async function(endpoint, database, { accessKey, privateKey }) {
-  const skdb = await SKDB.create(true);
+  const skdb = await SKDB.create();
 
   const keyBytes = Uint8Array.from(atob(privateKey), c => c.charCodeAt(0));
 

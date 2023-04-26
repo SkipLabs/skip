@@ -2,7 +2,7 @@ import { SKDB } from '../../js/dist/skdb-node.js';
 import { webcrypto as crypto } from 'node:crypto';
 
 const setup = async function(user) {
-  const skdb = await SKDB.create(true);
+  const skdb = await SKDB.create();
   const b64key = "test";
   const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0));
   const key = await crypto.subtle.importKey(
