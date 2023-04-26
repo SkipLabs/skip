@@ -906,11 +906,87 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
   }
 }
 
-function decodeProtoMsg(data: Array<ArrayBuffer>): ProtoMsg | null {
-  return {
-    type: "data",
-    payload: new ArrayBuffer(3)
-  };
+class ProtoMsgDecoder {
+  private bufs: Array<Uint8Array> = [];
+  private msgs: Array<ProtoMsg|null> = [];
+
+  private popBufs(): ArrayBuffer {
+    if (this.bufs.length == 1) {
+      // avoid copying for the common case of single buffer
+      const buf = this.bufs.pop();
+      if (!buf) {
+        throw new Error("invariant violation");
+      }
+      return buf;
+    }
+
+    let bytes = 0;
+    for (const buf of this.bufs) {
+      bytes += buf.byteLength;
+    }
+
+    const acc = new ArrayBuffer(bytes);
+    const uint8View = new Uint8Array(acc);
+    let offset = 0;
+    for (const buf of this.bufs) {
+      uint8View.set(buf, offset);
+      offset += buf.byteLength;
+    }
+
+    this.bufs = [];
+    return acc;
+  }
+
+  // like a stack machine, you push bytes in until the machine pops
+  // them all, turns them in to a msg, and pushes this on to the stack
+  // to be popped. push returns true when a new msg is ready to be
+  // popped.
+  push(msg: ArrayBuffer): boolean {
+    const dv = new DataView(msg);
+    const type = dv.getUint8(0);
+    switch (type) {
+      // credentials response
+      case 0x80: {
+        const accessKeyBytes = new Uint8Array(msg, 1, 20);
+        const decoder = new TextDecoder();
+        const accessKey = decoder.decode(accessKeyBytes)
+        this.msgs.push({
+          type: "credentials",
+          accessKey: accessKey,
+          privateKey: btoa(String.fromCharCode(...new Uint8Array(msg, 21, 32))),
+        })
+        return true;
+      }
+      // streaming data
+      case 0x0: {
+        const flags = dv.getUint8(1);
+        const fin = (flags & 0x01) === 1;
+        this.bufs.push(new Uint8Array(msg, 2))
+        if (fin) {
+          this.msgs.push({
+            type: "data",
+            payload: this.popBufs(),
+          });
+          return true;
+        }
+        return false;
+      }
+      default: {
+        this.msgs.push(null);
+        return true;
+      }
+    }
+  }
+
+  // returns the last message assembled and clears it off the stack.
+  // null represents a message from a future schema that we don't understand
+  pop(): ProtoMsg | null {
+    const msg = this.msgs.pop();
+    if (msg === undefined) {
+      throw new Error("Popping an empty stack.");
+    }
+    return msg;
+  }
 }
 
 /* ***************************************************************************/
@@ -1557,13 +1633,13 @@ class SKDBServer {
 
   private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse|null> {
     const stream = this.connection.openStream();
-    const acc = new Array<ArrayBuffer>();
+    const decoder = new ProtoMsgDecoder();
     return new Promise((resolve, reject) => {
       stream.onData = function (data) {
-        acc.push(data);
+        decoder.push(data);
       };
       stream.onClose = () => {
-        const msg = decodeProtoMsg(acc);
+        const msg = decoder.pop();
         if (msg === null || msg.type !== "credentials" && msg.type !== "data") {
           resolve(null);
           return;
@@ -1579,6 +1655,7 @@ class SKDBServer {
   private establishServerTail(tableName: string): void {
     const stream = this.connection.openStream();
     const client = this.client;
+    const decoder = new ProtoMsgDecoder();
 
     stream.onError = (code, msg) => {
       // will go away when we re-introduce the resiliency abstraction
@@ -1591,10 +1668,11 @@ class SKDBServer {
     }
 
     stream.onData = (data) => {
-      // TODO: need an abstraction that gathers un FIN'd ProtoDatas
-      const msg = decodeProtoMsg([data]);
-      const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
-      client.runLocal(["write-csv", tableName, "--source", this.replicationUid], txtPayload + '\n');
+      if (decoder.push(data)) {
+        const msg = decoder.pop();
+        const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
+        client.runLocal(["write-csv", tableName, "--source", this.replicationUid], txtPayload + '\n');
+      }
     }
 
     stream.send(encodeProtoMsg({
@@ -1607,6 +1685,7 @@ class SKDBServer {
   private establishLocalTail(tableName: string): void {
     const stream = this.connection.openStream();
     const client = this.client;
+    const decoder = new ProtoMsgDecoder();
 
     stream.onError = (code, msg) => {
       // will go away when we re-introduce the resiliency abstraction
@@ -1619,12 +1698,13 @@ class SKDBServer {
     }
 
     stream.onData = (data) => {
-      // TODO: need an abstraction that gathers un FIN'd ProtoDatas
-      const msg = decodeProtoMsg([data]);
-      const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
-      // we only expect acks back in the form of checkpoints.
-      // let's store these as a watermark against the table.
-      client.runLocal(["write-csv", metadataTable(tableName)], txtPayload + '\n');
+      if (decoder.push(data)) {
+        const msg = decoder.pop();
+        const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
+        // we only expect acks back in the form of checkpoints.
+        // let's store these as a watermark against the table.
+        client.runLocal(["write-csv", metadataTable(tableName)], txtPayload + '\n');
+      }
     }
 
     const request: ProtoPushPromise = {
