@@ -16,6 +16,8 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Arrays
 import java.util.Base64
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -49,7 +51,7 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
 
           // websocket close or error
           override fun onCloseMessage(cm: CloseMessage, channel: WebSocketChannel) {
-            if (cm.code == CloseMessage.NORMAL_CLOSURE) {
+            if (cm.code == CloseMessage.NORMAL_CLOSURE || cm.code == CloseMessage.GOING_AWAY) {
               muxedSocket.onSocketClose()
             } else {
               muxedSocket.onSocketError(0u, "websocket closed")
@@ -104,12 +106,14 @@ data class MuxStreamCloseMsg(val stream: UInt) : MuxMsg()
 data class MuxStreamResetMsg(val stream: UInt, val errorCode: UInt, val msg: String) : MuxMsg()
 
 class MuxedSocket(
+    val socket: WebSocketChannel,
+    val taskPool: ScheduledExecutorService,
     val onStream: onStreamFn,
     val onClose: onSocketCloseFn,
     val onError: onSocketErrorFn,
-    val socket: WebSocketChannel,
     val getDecryptedKey: (String) -> ByteArray,
     private val mutex: ReadWriteLock = ReentrantReadWriteLock(),
+  private var authenticatedAt: Instant? = null,
     private var state: State = State.IDLE,
     private var nextStream: UInt = 2u,
     private var clientStreamWatermark: UInt = 0u,
@@ -122,6 +126,9 @@ class MuxedSocket(
     CLOSE_WAIT,
     CLOSED
   }
+
+  private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
+  private val timeout = taskPool.schedule({ this.closeSocket() }, 10, TimeUnit.MINUTES)
 
   // user-facing interface /////////////////////////////////////////////////////
 
@@ -197,6 +204,7 @@ class MuxedSocket(
         socket.close()
       }
     }
+    timeout.cancel(false)
   }
 
   fun errorSocket(errorCode: UInt, msg: String) {
@@ -234,6 +242,7 @@ class MuxedSocket(
         socket.close()
       }
     }
+    timeout.cancel(false)
   }
 
   // interface used by WS //////////////////////////////////////////////////////
@@ -253,6 +262,7 @@ class MuxedSocket(
             mutex.writeLock().lock()
             try {
               state = State.AUTH_RECV
+              authenticatedAt = Instant.now()
             } finally {
               mutex.writeLock().unlock()
             }
@@ -265,6 +275,11 @@ class MuxedSocket(
       }
       State.AUTH_RECV,
       State.CLOSING -> {
+        val now = Instant.now()
+        if (Duration.between(authenticatedAt!!, now).abs().compareTo(maxConnectionDuration) > 0) {
+          errorSocket(11u, "session timeout")
+        }
+
         val muxMsg = decodeMsg(msg)
         when (muxMsg) {
           // TODO: we may eventually allow this as a keep-alive
@@ -349,6 +364,8 @@ class MuxedSocket(
         }
       }
     }
+    // we do not cancel the timeout here as this has only closed half
+    // of the connection
   }
 
   fun onSocketError(errorCode: UInt, msg: String) {
@@ -374,6 +391,7 @@ class MuxedSocket(
         }
       }
     }
+    timeout.cancel(false)
   }
 
   // interface used by Stream //////////////////////////////////////////////////
