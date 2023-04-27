@@ -113,7 +113,7 @@ class MuxedSocket(
     val onError: onSocketErrorFn,
     val getDecryptedKey: (String) -> ByteArray,
     private val mutex: ReadWriteLock = ReentrantReadWriteLock(),
-  private var authenticatedAt: Instant? = null,
+    private var authenticatedAt: Instant? = null,
     private var state: State = State.IDLE,
     private var nextStream: UInt = 2u,
     private var clientStreamWatermark: UInt = 0u,
@@ -591,7 +591,7 @@ class MuxedSocket(
         MuxStreamResetMsg(stream, errorCode, errorMsg)
       }
       // we throw as the server is assumed to always be ahead of clients
-      else -> throw RuntimeException("Could not decode msg")
+      else -> throw RuntimeException("Could not decode mux layer msg")
     }
   }
 
