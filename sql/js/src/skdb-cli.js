@@ -4,14 +4,14 @@ import { parseArgs } from "node:util";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SKDB } from "skdb";
+import { SKDB, fetchWasmSource } from "skdb";
 import { webcrypto } from 'node:crypto';
 import * as readline from 'node:readline/promises';
 import process from 'node:process';
 import repl from 'node:repl';
 
 const createConnectedSkdb = async function(endpoint, database, { accessKey, privateKey }) {
-  const skdb = await SKDB.create();
+  const skdb = await SKDB.create(null, fetchWasmSource);
 
   const keyBytes = Uint8Array.from(atob(privateKey), c => c.charCodeAt(0));
 

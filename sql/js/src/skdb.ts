@@ -330,8 +330,11 @@ export class SKDB {
     let pageBitSize = 20;
     client.pageSize = 1 << pageBitSize;
     let env = client.makeWasmImports();
-    // NOTE `skdb-wasm-b64` is imported dynamically to avoid bundling the wasm in the same file.
-    const getWasmSource_ = getWasmSource ?? (() => import('./skdb-wasm-b64').then((mod) => mod.getWasmSource()));
+    // NOTE `skdb-wasm-b64` is imported dynamically to avoid bundling
+    // the wasm in the same file.
+    const getWasmSource_ = getWasmSource ?? (
+      () => import('./skdb-wasm-b64.js').then((mod) => mod.getWasmSource())
+    );
     const wasmBytes = await getWasmSource_();
     let wasm = await WebAssembly.instantiate(wasmBytes, { env: env });
     let exports = wasm.instance.exports as unknown as WasmExports;
