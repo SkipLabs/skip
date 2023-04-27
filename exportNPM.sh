@@ -17,6 +17,7 @@ cp sql/js/tsconfig.json "$PUBLIC_SKDB_REPO"/packages/skdb/tsconfig.json
 cp sql/js/skdb.wasm "$PUBLIC_SKDB_REPO"/packages/skdb/skdb.wasm
 
 cp sql/js/src/skdb.ts "$PUBLIC_SKDB_REPO"/packages/skdb/src/skdb-browser.ts
+cp sql/js/src/skdb-wasm-b64.ts "$PUBLIC_SKDB_REPO"/packages/skdb/src/skdb-wasm-b64.ts
 cp sql/js/src/skdb-cli.js "$PUBLIC_SKDB_REPO"/packages/skdb/src/skdb-cli.js
 
 # produced by makefile
