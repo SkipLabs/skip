@@ -1652,34 +1652,47 @@ class SKDBServer {
     });
   }
 
-  private establishServerTail(tableName: string): void {
+  private async establishServerTail(tableName: string): Promise<void> {
     const stream = this.connection.openStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
 
-    stream.onError = (code, msg) => {
-      // will go away when we re-introduce the resiliency abstraction
-      console.error("server tail", tableName, "stream errored", code, msg);
-    }
+    const objThis = this;
+    let resolved = false;
 
-    stream.onClose = () => {
-      // will go away when we re-introduce the resiliency abstraction
-      console.error("server tail", tableName, "stream closed");
-    }
-
-    stream.onData = (data) => {
-      if (decoder.push(data)) {
-        const msg = decoder.pop();
-        const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
-        client.runLocal(["write-csv", tableName, "--source", this.replicationUid], txtPayload + '\n');
+    return new Promise((resolve, reject) => {
+      stream.onError = (code, msg) => {
+        // will go away when we re-introduce the resiliency abstraction
+        console.error("server tail", tableName, "stream errored", code, msg);
+        if (!resolved) {
+          resolved = true;
+          reject(msg);
+        }
       }
-    }
 
-    stream.send(encodeProtoMsg({
-      type: "tail",
-      table: tableName,
-      since: this.client.watermark(tableName),
-    }));
+      stream.onClose = () => {
+        // will go away when we re-introduce the resiliency abstraction
+        console.error("server tail", tableName, "stream closed");
+      }
+
+      stream.onData = (data) => {
+        if (decoder.push(data)) {
+          const msg = decoder.pop();
+          const txtPayload = decodeUTF8(objThis.strictCastData(msg).payload);
+          client.runLocal(["write-csv", tableName, "--source", objThis.replicationUid], txtPayload + '\n');
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
+        }
+      }
+
+      stream.send(encodeProtoMsg({
+        type: "tail",
+        table: tableName,
+        since: objThis.client.watermark(tableName),
+      }));
+    });
   }
 
   private establishLocalTail(tableName: string): void {
@@ -1753,8 +1766,8 @@ class SKDBServer {
        )`);
     }
 
-    this.establishServerTail(tableName);
     this.establishLocalTail(tableName);
+    return this.establishServerTail(tableName);
   }
 
   // TODO: this currently just replicates the schema locally assuming
