@@ -795,7 +795,7 @@ type ProtoRequestCreateUser = {
 type ProtoResponseCreds = {
   type: "credentials";
   accessKey: String;
-  privateKey: String;
+  privateKey: Uint8Array;
 }
 
 type ProtoCtrlMsg = ProtoQuery | ProtoQuerySchema | ProtoRequestCreateDb |
@@ -947,13 +947,16 @@ class ProtoMsgDecoder {
     switch (type) {
       // credentials response
       case 0x80: {
-        const accessKeyBytes = new Uint8Array(msg, 1, 20);
+        const accessKeyFixedWidthBytes = new Uint8Array(msg, 1, 20);
+        // access key is a fixed-width but potentially zero-terminated string
+        const zeroIndex = accessKeyFixedWidthBytes.findIndex((x) => x == 0);
+        const accessKeyBytes = accessKeyFixedWidthBytes.slice(0, zeroIndex < 0 ? 20 : zeroIndex)
         const decoder = new TextDecoder();
         const accessKey = decoder.decode(accessKeyBytes)
         this.msgs.push({
           type: "credentials",
           accessKey: accessKey,
-          privateKey: btoa(String.fromCharCode(...new Uint8Array(msg, 21, 32))),
+          privateKey: new Uint8Array(msg, 21, 32),
         })
         return true;
       }

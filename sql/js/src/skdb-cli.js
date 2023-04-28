@@ -166,6 +166,8 @@ const evalQuery = async function(skdb_client, query) {
 if (args.values['create-db']) {
   const db = args.values['create-db'];
   const result = await skdb.server.createDatabase(db);
+  // b64 encode
+  result.privateKey = btoa(String.fromCharCode(...result.privateKey))
   console.log(`Successfully created database: ${db}.`);
   console.log(`Credentials for ${db}: `, result);
 
@@ -176,6 +178,8 @@ if (args.values['create-db']) {
 
 if (args.values['create-user']) {
   const result = await skdb.server.createUser();
+  // b64 encode
+  result.privateKey = btoa(String.fromCharCode(...result.privateKey))
   console.log('Successfully created user: ', result);
 
   dbCreds[result.accessKey] = result.privateKey;
