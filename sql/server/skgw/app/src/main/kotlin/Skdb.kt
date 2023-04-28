@@ -170,8 +170,20 @@ class Skdb(val name: String, private val dbPath: String) {
 
     val t =
         Thread({
-          val encoder = StandardCharsets.UTF_8.newEncoder()
-          output.forEachLine { callback(encoder.encode(CharBuffer.wrap(it)), it.startsWith(":")) }
+          output.forEachLine {
+            val encoder = StandardCharsets.UTF_8.newEncoder()
+            val buf = ByteBuffer.allocate(it.length * 3 + 1)
+            var res = encoder.encode(CharBuffer.wrap(it), buf, true)
+            if (!res.isUnderflow()) {
+              res.throwException()
+            }
+            res = encoder.flush(buf)
+            if (!res.isUnderflow()) {
+              res.throwException()
+            }
+            buf.put(0x0A)       //add back newline
+            callback(buf.flip(), it.startsWith(":"))
+          }
           closed()
         })
     t.start()
