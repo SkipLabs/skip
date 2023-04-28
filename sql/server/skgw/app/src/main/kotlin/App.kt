@@ -67,12 +67,10 @@ fun genCredentials(accessKey: String, encryption: EncryptionTransform): Credenti
   return creds
 }
 
-fun createDb(dbName: String, encryption: EncryptionTransform): ProtoCredentials {
+fun createDb(dbName: String, encryption: EncryptionTransform): Credentials {
   val creds = genCredentials("root", encryption)
   createSkdb(dbName, creds.b64encryptedKey())
-  val protoCreds = creds.toProtoCredentials()
-  creds.clear()
-  return protoCreds
+  return creds
 }
 
 sealed interface StreamHandler {
@@ -168,7 +166,8 @@ class RequestHandler(
           return this
         }
         val creds = createDb(request.name, encryption)
-        val payload = encodeProtoMsg(creds)
+        val payload = encodeProtoMsg(creds.toProtoCredentials())
+        creds.clear()
         stream.send(payload)
         stream.close()
       }
