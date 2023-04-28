@@ -28,6 +28,10 @@ data class ProcessOutput(val output: ByteArray, val exitCode: Int) {
   }
 
   fun decode(): String {
+    return String(output, StandardCharsets.UTF_8)
+  }
+
+  fun decodeOrThrow(): String {
     return String(getOrThrow(), StandardCharsets.UTF_8)
   }
 }

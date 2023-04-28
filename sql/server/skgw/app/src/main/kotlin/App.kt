@@ -234,7 +234,7 @@ fun connectionHandler(
                 throw RuntimeException(msg)
               }
 
-              val replicationId = skdb.uid().decode().trim()
+              val replicationId = skdb.uid().decodeOrThrow().trim()
 
               var accessKey: String? = null
 
@@ -296,7 +296,7 @@ fun envIsSane(): Boolean {
   val successfullyRead =
       svcSkdb
           .sql("SELECT COUNT(*) FROM skdb_users WHERE username = 'root';", OutputFormat.RAW)
-          .decode()
+          .decodeOrThrow()
           .trim() == "1"
 
   if (!successfullyRead) {
