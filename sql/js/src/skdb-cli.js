@@ -261,8 +261,7 @@ const remoteRepl = async function() {
       console.log(answer);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
-      // TODO: this currently contains no information. we need to add errors to the protocol
-      // console.error(ex);
+      console.error(ex.trim());
     }
   }
 };
@@ -357,8 +356,7 @@ const localRepl = async function() {
       console.log(answer);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
-      // TODO: this currently contains no information. we need to add errors to the protocol
-      // console.error(ex);
+      console.error(ex.trim());
     }
   }
 };
@@ -383,8 +381,7 @@ if (query.trim() !== "") {
   } catch (ex) {
     console.error("Could not eval query.");
     process.exit(1);
-    // TODO: this currently contains no information. we need to add errors to the protocol
-    // console.error(ex);
+    console.error(ex.trim());
   }
 }
 
