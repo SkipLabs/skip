@@ -101,7 +101,7 @@ class ProcessPipe(val proc: Process) : StreamHandler {
       is ProtoData -> {
         val data = request.data
         stdin.write(
-            data.array(), data.arrayOffset() + data.position(), data.limit() - data.position())
+            data.array(), data.arrayOffset() + data.position(), data.remaining())
         if (request.finFlagSet) {
           stdin.flush()
         }
@@ -264,7 +264,9 @@ fun connectionHandler(
                       handler.close()
                     }
                   },
-                  onClose = {},
+                  onClose = { socket ->
+                    socket.closeSocket();
+                  },
                   onError = { _, code, msg ->
                     System.err.println("Socket errored: ${code} - ${msg}")
                   },
