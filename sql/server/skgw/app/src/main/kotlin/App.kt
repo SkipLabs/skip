@@ -1,8 +1,5 @@
 package io.skiplabs.skgw
 
-import com.beust.klaxon.Klaxon
-import com.beust.klaxon.TypeAdapter
-import com.beust.klaxon.TypeFor
 import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.HttpHandler
@@ -11,118 +8,33 @@ import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
+import java.io.BufferedOutputStream
+import java.io.OutputStream
 import java.nio.ByteBuffer
-import java.nio.CharBuffer
-import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
-import kotlin.io.bufferedWriter
-import kotlin.reflect.KClass
 import kotlin.system.exitProcess
 
 val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
-
-class ProtoTypeAdapter : TypeAdapter<ProtoMessage> {
-  override fun classFor(type: Any): KClass<out ProtoMessage> =
-      when (type as String) {
-        "auth" -> ProtoAuth::class
-        "query" -> ProtoQuery::class
-        "tail" -> ProtoTail::class
-        "schema" -> ProtoSchemaQuery::class
-        "write" -> ProtoWrite::class
-        "pipe" -> ProtoData::class
-        "createDatabase" -> ProtoCreateDb::class
-        "credentials" -> ProtoCredentials::class
-        "createUser" -> ProtoCreateUser::class
-        else -> throw IllegalArgumentException("Unknown request type: $type")
-      }
-}
-
-@TypeFor(field = "request", adapter = ProtoTypeAdapter::class)
-sealed class ProtoMessage(val request: String)
-
-data class ProtoAuth(
-    val accessKey: String,
-    val date: String,
-    val nonce: String,
-    val signature: String,
-    val deviceUuid: String,
-) : ProtoMessage("auth")
-
-data class ProtoQuery(val query: String, val format: String = "csv") : ProtoMessage("query")
-
-data class ProtoTail(
-    val table: String,
-    val since: Int = 0,
-) : ProtoMessage("tail")
-
-data class ProtoSchemaQuery(
-    val table: String? = null,
-    val view: String? = null,
-    val suffix: String = ""
-) : ProtoMessage("schema")
-
-data class ProtoWrite(val table: String) : ProtoMessage("write")
-
-data class ProtoCreateDb(val name: String) : ProtoMessage("createDatabase")
-
-class ProtoCreateUser() : ProtoMessage("createUser")
-
-data class ProtoData(val data: String) : ProtoMessage("pipe")
-
-data class ProtoError(val code: String, val msg: String, val retryable: Boolean) :
-    ProtoMessage("error")
-
-data class ProtoCredentials(val accessKey: String, val privateKey: String) :
-    ProtoMessage("credentials") {
-
-  override fun toString(): String {
-    return "ProtoCredentials(accessKey=${accessKey}, privateKey=**redacted**)"
-  }
-}
 
 data class Credentials(
     val accessKey: String,
     val privateKey: ByteArray,
     val encryptedPrivateKey: ByteArray
 ) {
-  fun b64plaintextKey(): String = Base64.getEncoder().encodeToString(privateKey)
   fun b64encryptedKey(): String = Base64.getEncoder().encodeToString(encryptedPrivateKey)
   fun clear(): Unit {
     privateKey.fill(0)
     encryptedPrivateKey.fill(0)
   }
   fun toProtoCredentials(): ProtoCredentials {
-    return ProtoCredentials(accessKey, b64plaintextKey())
+    return ProtoCredentials(accessKey, ByteBuffer.wrap(privateKey))
   }
   override fun toString(): String {
     return "Credentials(accessKey=${accessKey}, privateKey=**redacted**)"
   }
-}
-
-fun parse(data: ByteBuffer): ProtoMessage {
-  val msg = Klaxon().parse<ProtoMessage>(StandardCharsets.UTF_8.decode(data).toString())
-  if (msg == null) {
-    throw RuntimeException("could not parse message")
-  }
-  return msg
-}
-
-fun serialise(msg: ProtoMessage): ByteBuffer {
-  val jsonStr = Klaxon().toJsonString(msg)
-  val buf = ByteBuffer.allocate(16 + jsonStr.length * 3)
-  val encoder = StandardCharsets.UTF_8.newEncoder()
-  var res = encoder.encode(CharBuffer.wrap(jsonStr), buf, true)
-  if (!res.isUnderflow()) {
-    res.throwException()
-  }
-  res = encoder.flush(buf)
-  if (!res.isUnderflow()) {
-    res.throwException()
-  }
-  return buf.flip()
 }
 
 fun genAccessKey(): String {
@@ -155,35 +67,42 @@ fun genCredentials(accessKey: String, encryption: EncryptionTransform): Credenti
   return creds
 }
 
-fun createDb(dbName: String, encryption: EncryptionTransform): ProtoCredentials {
+fun createDb(dbName: String, encryption: EncryptionTransform): Credentials {
   val creds = genCredentials("root", encryption)
   createSkdb(dbName, creds.b64encryptedKey())
-  val protoCreds = creds.toProtoCredentials()
-  creds.clear()
-  return protoCreds
+  return creds
 }
 
 sealed interface StreamHandler {
 
   fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler
-  fun handleMessage(message: ByteBuffer, stream: Stream) = handleMessage(parse(message), stream)
+  fun handleMessage(message: ByteBuffer, stream: Stream) =
+      handleMessage(decodeProtoMsg(message), stream)
 
   fun close() {}
 }
 
 class ProcessPipe(val proc: Process) : StreamHandler {
 
+  private val stdin: OutputStream
+
+  init {
+    val stdin = proc.outputStream
+    if (stdin == null) {
+      throw RuntimeException("creating a pipe to a process that does not accept input")
+    }
+    this.stdin = BufferedOutputStream(stdin)
+  }
+
   override fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler {
     when (request) {
       is ProtoData -> {
-        val stdin = proc.outputStream
-        if (stdin == null) {
-          throw RuntimeException("data received on a connection without a process setup")
+        val data = request.data
+        stdin.write(
+            data.array(), data.arrayOffset() + data.position(), data.remaining())
+        if (request.finFlagSet) {
+          stdin.flush()
         }
-        // stream data to the process attached to this channel
-        val writer = stdin.bufferedWriter()
-        writer.write(request.data)
-        writer.flush()
       }
       else -> {
         close()
@@ -211,38 +130,33 @@ class RequestHandler(
       is ProtoQuery -> {
         val format =
             when (request.format) {
-              "csv" -> OutputFormat.CSV
-              "json" -> OutputFormat.JSON
-              "raw" -> OutputFormat.RAW
-              else -> OutputFormat.CSV
+              QueryResponseFormat.CSV -> OutputFormat.CSV
+              QueryResponseFormat.JSON -> OutputFormat.JSON
+              QueryResponseFormat.RAW -> OutputFormat.RAW
             }
         val result = skdb.sql(request.query, format)
-        val payload =
-            if (result.exitSuccessfully()) {
-              serialise(ProtoData(result.output))
-            } else {
-              serialise(ProtoError("query", result.output, true))
-            }
-        stream.send(payload)
-        stream.close()
+        if (result.exitSuccessfully()) {
+          val payload = encodeProtoMsg(ProtoData(ByteBuffer.wrap(result.output), finFlagSet = true))
+          stream.send(payload)
+          stream.close()
+        } else {
+          stream.error(27u, result.decode())
+        }
       }
       is ProtoSchemaQuery -> {
         val result =
-            if (request.table != null) {
-              skdb.dumpTable(request.table, request.suffix)
-            } else if (request.view != null) {
-              skdb.dumpView(request.view)
-            } else {
-              skdb.dumpSchema()
+            when (request.scope) {
+              SchemaScope.ALL -> skdb.dumpSchema()
+              SchemaScope.TABLE -> skdb.dumpTable(request.name!!)
+              SchemaScope.VIEW -> skdb.dumpView(request.name!!)
             }
-        val payload =
-            if (result.exitSuccessfully()) {
-              serialise(ProtoData(result.output))
-            } else {
-              serialise(ProtoError("query", result.output, true))
-            }
-        stream.send(payload)
-        stream.close()
+        if (result.exitSuccessfully()) {
+          val payload = encodeProtoMsg(ProtoData(ByteBuffer.wrap(result.output), finFlagSet = true))
+          stream.send(payload)
+          stream.close()
+        } else {
+          stream.error(27u, result.decode())
+        }
       }
       is ProtoCreateDb -> {
         // this side effect is only authorized if you're connected as a service mgmt db user
@@ -252,48 +166,40 @@ class RequestHandler(
           return this
         }
         val creds = createDb(request.name, encryption)
-        val payload = serialise(creds)
+        val payload = encodeProtoMsg(creds.toProtoCredentials())
+        creds.clear()
         stream.send(payload)
         stream.close()
       }
       is ProtoCreateUser -> {
         val creds = genCredentials(genAccessKey(), encryption)
         skdb.createUser(creds.accessKey, creds.b64encryptedKey())
-        val payload = serialise(creds.toProtoCredentials())
+        val payload = encodeProtoMsg(creds.toProtoCredentials())
         creds.clear()
         stream.send(payload)
         stream.close()
       }
-      is ProtoTail -> {
+      is ProtoRequestTail -> {
         val proc =
             skdb.tail(
                 accessKey,
                 request.table,
                 request.since,
                 replicationId,
-                {
-                  val payload = serialise(ProtoData(it))
-                  stream.send(payload)
-                },
+                { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
                 { stream.error(12u, "Unexpected EOF") },
             )
         return ProcessPipe(proc)
       }
-      is ProtoWrite -> {
+      is ProtoPushPromise -> {
         val proc =
             skdb.writeCsv(
                 accessKey,
                 request.table,
                 replicationId,
-                {
-                  val payload = serialise(ProtoData(it))
-                  stream.send(payload)
-                },
+                { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
                 { stream.error(13u, "Unexpected EOF") })
         return ProcessPipe(proc)
-      }
-      is ProtoAuth -> {
-        stream.error(10u, "unexpected re-auth on established connection")
       }
       is ProtoData -> {
         stream.error(10u, "unexpected data on non-established connection")
@@ -323,13 +229,12 @@ fun connectionHandler(
               if (skdb == null) {
                 // 1011 is internal error
                 val msg = "Could not open database"
-                WebSockets.sendTextBlocking(serialise(ProtoError("resource", msg, false)), channel)
                 WebSockets.sendCloseBlocking(1011, msg, channel)
                 channel.close()
                 throw RuntimeException(msg)
               }
 
-              val replicationId = skdb.uid().getOrThrow().trim()
+              val replicationId = skdb.uid().decodeOrThrow().trim()
 
               var accessKey: String? = null
 
@@ -358,7 +263,9 @@ fun connectionHandler(
                       handler.close()
                     }
                   },
-                  onClose = {},
+                  onClose = { socket ->
+                    socket.closeSocket();
+                  },
                   onError = { _, code, msg ->
                     System.err.println("Socket errored: ${code} - ${msg}")
                   },
@@ -389,7 +296,7 @@ fun envIsSane(): Boolean {
   val successfullyRead =
       svcSkdb
           .sql("SELECT COUNT(*) FROM skdb_users WHERE username = 'root';", OutputFormat.RAW)
-          .getOrThrow()
+          .decodeOrThrow()
           .trim() == "1"
 
   if (!successfullyRead) {
