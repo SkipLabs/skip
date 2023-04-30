@@ -1,7 +1,9 @@
 package io.skiplabs.skgw
 
-import java.io.BufferedReader
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.CharBuffer
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
@@ -13,16 +15,24 @@ enum class OutputFormat(val flag: String) {
 }
 
 // represents the complete output of a process run.
-data class ProcessOutput(val output: String, val exitCode: Int) {
+data class ProcessOutput(val output: ByteArray, val exitCode: Int) {
   fun exitSuccessfully(): Boolean {
     return exitCode == 0
   }
 
-  fun getOrThrow(): String {
+  fun getOrThrow(): ByteArray {
     if (exitCode != 0) {
       throw RuntimeException("Process exited unsuccessfully: ${exitCode}")
     }
     return output
+  }
+
+  fun decode(): String {
+    return String(output, StandardCharsets.UTF_8)
+  }
+
+  fun decodeOrThrow(): String {
+    return String(getOrThrow(), StandardCharsets.UTF_8)
   }
 }
 
@@ -44,7 +54,7 @@ class Skdb(val name: String, private val dbPath: String) {
       writer.close()
     }
 
-    val output = proc.inputStream.bufferedReader().use(BufferedReader::readText)
+    val output = proc.inputStream.readAllBytes()
 
     // TODO: should have a timeout
     val exitCode = proc.waitFor()
@@ -64,9 +74,8 @@ class Skdb(val name: String, private val dbPath: String) {
     return blockingRun(ProcessBuilder(SKDB_PROC, "uid", "--data", dbPath))
   }
 
-  fun dumpTable(table: String, suffix: String): ProcessOutput {
-    return blockingRun(
-        ProcessBuilder(SKDB_PROC, "dump-table", table, "--data", dbPath, "--table-suffix", suffix))
+  fun dumpTable(table: String): ProcessOutput {
+    return blockingRun(ProcessBuilder(SKDB_PROC, "dump-table", table, "--data", dbPath))
   }
 
   fun dumpView(view: String): ProcessOutput {
@@ -84,7 +93,7 @@ class Skdb(val name: String, private val dbPath: String) {
       user: String,
       table: String,
       replicationId: String,
-      callback: (String) -> Unit,
+      callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
       closed: () -> Unit,
   ): Process {
     val pb =
@@ -104,11 +113,15 @@ class Skdb(val name: String, private val dbPath: String) {
 
     val proc = pb.start()
 
+    // we work with text lines as it is convenient. there's a trivial
+    // amount of work going on to decode and re-encode here - just
+    // checkpoints
     val output = proc.inputStream.bufferedReader()
 
     val t =
         Thread({
-          output.forEachLine { callback(it) }
+          val encoder = StandardCharsets.UTF_8.newEncoder()
+          output.forEachLine { callback(encoder.encode(CharBuffer.wrap(it)), true) }
           closed()
         })
     t.start()
@@ -119,9 +132,9 @@ class Skdb(val name: String, private val dbPath: String) {
   fun tail(
       user: String,
       table: String,
-      since: Int,
+      since: ULong,
       replicationId: String,
-      callback: (String) -> Unit,
+      callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
       closed: () -> Unit,
   ): Process {
     // TODO: check for existing
@@ -138,7 +151,7 @@ class Skdb(val name: String, private val dbPath: String) {
                     user,
                     "--ignore-source",
                     replicationId))
-            .getOrThrow()
+            .decode()
     val pb =
         ProcessBuilder(
             SKDB_PROC,
@@ -149,26 +162,31 @@ class Skdb(val name: String, private val dbPath: String) {
             connection.trim(),
             "--follow",
             "--since",
-            (if (since < 0) 0 else since).toString())
+            (if (since < 0u) 0 else since).toString())
 
     // TODO: for hacky debug
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
     val proc = pb.start()
 
+    // TODO: working with text currently to detect checkpoint flush
+    // markers. this should change as it is expensive.
     val output = proc.inputStream.bufferedReader()
 
     val t =
         Thread({
-          val buffer = ArrayList<String>()
           output.forEachLine {
-            buffer.add(it)
-
-            // flush?
-            if (it.startsWith(":")) {
-              val txn = buffer.joinToString("\n", "", "\n")
-              buffer.clear()
-              callback(txn)
+            val encoder = StandardCharsets.UTF_8.newEncoder()
+            val buf = ByteBuffer.allocate(it.length * 3 + 1)
+            var res = encoder.encode(CharBuffer.wrap(it), buf, true)
+            if (!res.isUnderflow()) {
+              res.throwException()
             }
+            res = encoder.flush(buf)
+            if (!res.isUnderflow()) {
+              res.throwException()
+            }
+            buf.put(0x0A)       //add back newline
+            callback(buf.flip(), it.startsWith(":"))
           }
           closed()
         })
@@ -180,7 +198,7 @@ class Skdb(val name: String, private val dbPath: String) {
   fun privateKeyAsStored(user: String): ByteArray {
     val key =
         sql("SELECT privateKey FROM skdb_users WHERE username = '${user}';", OutputFormat.RAW)
-            .getOrThrow()
+            .decode()
             .trim()
 
     if (key.isEmpty()) {
