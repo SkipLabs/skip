@@ -995,6 +995,179 @@ class ProtoMsgDecoder {
 }
 
 /* ***************************************************************************/
+/* Resilient connection abstraction
+/* ***************************************************************************/
+
+class ResilientMuxedSocket {
+
+  private uri: string;
+  private creds: Creds;
+  private socket?: MuxedSocket;
+  private socketQueue: Array<any> = new Array();
+
+  // streams from the server are not resilient
+  onStream?: (stream: Stream) => void;
+
+  async openStream(): Promise<Stream> {
+    const socket = await this.getSocket();
+    return socket.openStream();
+  }
+
+  async openResilientStream(): Promise<ResilientStream> {
+    const socket = await this.getSocket();
+    return new ResilientStream(this, socket.openStream());
+  }
+
+  async closeSocket(): Promise<void> {
+    const socket = this.socket ?? await this.getSocket();
+    this.socket = undefined;
+    this.socketQueue = new Array();
+    socket.closeSocket();
+  }
+
+  async errorSocket(errorCode: number, msg: string): Promise<void> {
+    const socket = this.socket ?? await this.getSocket();
+    this.socket = undefined;
+    this.socketQueue = new Array();
+    socket.errorSocket(errorCode, msg);
+  }
+
+  static async connect(uri: string, creds: Creds): Promise<ResilientMuxedSocket> {
+    const socket = await MuxedSocket.connect(uri, creds);
+    return new ResilientMuxedSocket(socket, uri, creds);
+  }
+
+  private constructor(socket: MuxedSocket, uri: string, creds: Creds) {
+    this.attachSocket(socket);
+    this.uri = uri;
+    this.creds = creds;
+  }
+
+  private async getSocket(): Promise<MuxedSocket> {
+    if (this.socket) {
+      return this.socket;
+    }
+    return new Promise((resolve, reject) => {
+      this.socketQueue.push({resolve: resolve, reject: reject});
+    });
+  }
+
+  private attachSocket(socket: MuxedSocket): void {
+    socket.onStream = (stream) => {
+      if (this.onStream) {
+        this.onStream(stream);
+      }
+    };
+    socket.onClose = () => {
+      this.replaceFailedSocket();
+    };
+    socket.onError = (_errorCode, _msg) => {
+      this.replaceFailedSocket();
+    };
+    this.socket = socket;
+    for (const promise of this.socketQueue) {
+      promise.resolve(socket);
+    }
+    this.socketQueue = new Array();
+  }
+
+  private async replaceFailedSocket(): Promise<void> {
+    if (!this.socket) {
+      return; // already reconnecting
+    }
+    const oldSocket = this.socket;
+    this.socket.onStream = undefined;
+    this.socket.onClose = undefined;
+    this.socket.onError = undefined;
+    this.socket = undefined;
+    oldSocket.errorSocket(128, "Socket suspected to have failed");
+    // TODO: backoff
+    while (true) {
+      try {
+        const socket = await MuxedSocket.connect(this.uri, this.creds);
+        this.attachSocket(socket);
+        return;
+      } catch (error) {
+        // TODO:
+      }
+    }
+  }
+
+  // interface used by ResilientStream
+
+  async replaceFailedStream(): Promise<Stream> {
+    const socket = await this.getSocket();
+    try {
+      return socket.openStream();
+    } catch {
+      await this.replaceFailedSocket();
+      return this.replaceFailedStream();
+    }
+  }
+}
+
+class ResilientStream {
+
+  private socket: ResilientMuxedSocket;
+  private stream?: Stream;
+
+  onData?: (data: ArrayBuffer) => void
+
+  onReconnect?: () => void;
+
+  send(data: ArrayBuffer): void {
+    if (!this.stream) {
+      // black hole the data. we're reconnecting and will call
+      // onReconnect that should address the gap
+      return;
+    }
+    this.stream.send(data);
+  }
+
+  expectingData(): void {
+    // TODO:
+  }
+
+  private attachStream(stream: Stream): void {
+    stream.onData = (data) => {
+      if (this.onData) {
+        this.onData(data);
+      }
+    };
+    stream.onClose = () => {
+      this.replaceFailedStream();
+    };
+    stream.onError = (_errorCode, _msg) => {
+      this.replaceFailedStream();
+    };
+    this.stream = stream;
+  }
+
+  private async replaceFailedStream(): Promise<void> {
+    if (!this.stream) {
+      return; // already reconnecting
+    }
+    const oldStream = this.stream;
+    oldStream.onData = undefined;
+    oldStream.onClose = undefined;
+    oldStream.onError = undefined;
+    this.stream = undefined;
+    // if it _has_ failed, this is a no-op, otherwise it protects invariants
+    oldStream.error(128, "Stream suspected to have failed");
+    const newStream = await this.socket.replaceFailedStream();
+    this.attachStream(newStream);
+    if (this.onReconnect) {
+      this.onReconnect();
+    }
+  }
+
+  constructor(socket: ResilientMuxedSocket, stream: Stream) {
+    this.socket = socket;
+    this.attachStream(stream);
+  }
+}
+
+/* ***************************************************************************/
 /* Stream MUX protocol */
 /* ***************************************************************************/
 
