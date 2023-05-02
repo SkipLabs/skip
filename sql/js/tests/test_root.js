@@ -17,7 +17,6 @@ async function test() {
   // Add a root for the tracked function and get its result
   skdb.addRoot(ROOT_ID, todos, null);
   console.log('todos', skdb.getRoot(ROOT_ID));
-  process.exit();
 }
 
 test();
