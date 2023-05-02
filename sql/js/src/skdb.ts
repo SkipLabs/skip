@@ -1763,14 +1763,14 @@ class Stream {
 
 class SKDBServer {
   private client: SKDB;
-  private connection: MuxedSocket;
+  private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
   private mirroredTables: Set<string> = new Set()
 
   private constructor(
     client: SKDB,
-    connection: MuxedSocket,
+    connection: ResilientMuxedSocket,
     creds: Creds,
   ) {
     this.client = client;
@@ -1785,7 +1785,7 @@ class SKDBServer {
     creds: Creds,
   ): Promise<SKDBServer> {
     const uri = SKDBServer.getDbSocketUri(endpoint, db);
-    const conn = await MuxedSocket.connect(uri, creds);
+    const conn = await ResilientMuxedSocket.connect(uri, creds);
     const server = new SKDBServer(client, conn, creds);
     server.replicationUid = client.runLocal(["uid"], "").trim();
     return server
@@ -1810,7 +1810,7 @@ class SKDBServer {
   }
 
   private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse|null> {
-    const stream = this.connection.openStream();
+    const stream = await this.connection.openStream();
     const decoder = new ProtoMsgDecoder();
     return new Promise((resolve, reject) => {
       stream.onData = function (data) {
@@ -1831,62 +1831,48 @@ class SKDBServer {
   }
 
   private async establishServerTail(tableName: string): Promise<void> {
-    const stream = this.connection.openStream();
+    const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
 
-    const objThis = this;
     let resolved = false;
 
-    return new Promise((resolve, reject) => {
-      stream.onError = (code, msg) => {
-        // will go away when we re-introduce the resiliency abstraction
-        console.error("server tail", tableName, "stream errored", code, msg);
-        if (!resolved) {
-          resolved = true;
-          reject(msg);
-        }
-      }
-
-      stream.onClose = () => {
-        // will go away when we re-introduce the resiliency abstraction
-        console.error("server tail", tableName, "stream closed");
-      }
-
+    return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
           const msg = decoder.pop();
-          const txtPayload = decodeUTF8(objThis.strictCastData(msg).payload);
-          client.runLocal(["write-csv", tableName, "--source", objThis.replicationUid], txtPayload + '\n');
+          const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
+          client.runLocal(["write-csv", tableName, "--source", this.replicationUid], txtPayload + '\n');
           if (!resolved) {
             resolved = true;
             resolve();
           }
         }
+        stream.expectingData();
       }
+
+      stream.onReconnect = () => {
+        stream.send(encodeProtoMsg({
+          type: "tail",
+          table: tableName,
+          since: this.client.watermark(tableName),
+        }))
+        stream.expectingData();
+      };
 
       stream.send(encodeProtoMsg({
         type: "tail",
         table: tableName,
-        since: objThis.client.watermark(tableName),
+        since: this.client.watermark(tableName),
       }));
+      stream.expectingData();
     });
   }
 
-  private establishLocalTail(tableName: string): void {
-    const stream = this.connection.openStream();
+  private async establishLocalTail(tableName: string): Promise<void> {
+    const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
-
-    stream.onError = (code, msg) => {
-      // will go away when we re-introduce the resiliency abstraction
-      console.error("local tail", tableName, "stream errored", code, msg);
-    }
-
-    stream.onClose = () => {
-      // will go away when we re-introduce the resiliency abstraction
-      console.error("local tail", tableName, "stream closed");
-    }
 
     stream.onData = (data) => {
       if (decoder.push(data)) {
@@ -1915,15 +1901,36 @@ class SKDBServer {
         type: "data",
         payload: encodeUTF8Str(change),
       }));
+      stream.expectingData();
     });
 
-    const _session = client.runLocal(
+    const session = client.runLocal(
       [
         "subscribe", tableName, "--connect", "--format=csv",
         "--updates", fileName, "--ignore-source", this.replicationUid
       ],
       ""
     ).trim();
+
+    stream.onReconnect = () => {
+      stream.send(encodeProtoMsg(request));
+      const diff = client.runLocal(
+        [
+          "diff", "--format=csv",
+          "--since", client.watermark(metadataTable(tableName)).toString(),
+          session,
+        ], "");
+
+      if (diff == "") {
+        return;
+      }
+
+      stream.send(encodeProtoMsg({
+        type: "data",
+        payload: encodeUTF8Str(diff),
+      }));
+      stream.expectingData();
+    };
   }
 
   async mirrorTable(tableName: string): Promise<void> {
@@ -1944,7 +1951,9 @@ class SKDBServer {
        )`);
     }
 
-    this.establishLocalTail(tableName);
+    // TODO: need to join the promises but let them run concurrently
+    // I await here for now so we learn of error
+    await this.establishLocalTail(tableName);
     return this.establishServerTail(tableName);
   }
 
