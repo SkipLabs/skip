@@ -7,4 +7,4 @@ make npm
 
 rm -f /var/db/test.db
 
-node "$SCRIPT_DIR"/index.mjs "$1"
+node "$SCRIPT_DIR"/index.mjs "$1" "$2"
