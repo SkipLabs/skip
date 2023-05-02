@@ -1,7 +1,7 @@
 module Skargo;
 
-const kVersion: String = "0.1.0";
 const kManifestFile: String = "Skargo.toml";
+const kVersionFile: String = "version.sk";
 
 private class Env{rootDir: String, manifest: Manifest, verbose: Bool} {
   static fun create(verbose: Bool): Env {
@@ -80,4 +80,24 @@ private fun compile(bc: BuildContext, binName: String, main: String): void {
       Path.join(bc.targetDir, output),
     ],
   )
+}
+
+private fun genVersionFile(bc: BuildContext): void {
+  _ = system("mkdir -p " + bc.targetDir);
+  // TODO: Ensure cwd.
+  p = System.subprocess(Array["git", "rev-parse", "--short", "HEAD"]);
+  if (p.exitcode != 0) {
+    print_raw(p.stdout);
+    print_error_raw(p.stderr);
+    invariant_violation("error")
+  };
+  hash = p.stdout.trim();
+  contents = `module SkargoVersion;
+const kVersion: String = "${
+    bc.env.manifest.version
+  }";
+const kCommit: String = "${hash}";
+`;
+
+  FileSystem.writeTextFile(Path.join(bc.targetDir, kVersionFile), contents)
 }
