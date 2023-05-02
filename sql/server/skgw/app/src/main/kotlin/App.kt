@@ -24,6 +24,7 @@ data class Credentials(
     val privateKey: ByteArray,
     val encryptedPrivateKey: ByteArray
 ) {
+  fun b64privateKey(): String = Base64.getEncoder().encodeToString(privateKey)
   fun b64encryptedKey(): String = Base64.getEncoder().encodeToString(encryptedPrivateKey)
   fun clear(): Unit {
     privateKey.fill(0)
@@ -318,7 +319,7 @@ fun main(args: Array<String>) {
   if (arglist.contains("--init")) {
     val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
     System.err.println(
-        "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.privateKey}\"}}")
+        "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
     return
   }
 
