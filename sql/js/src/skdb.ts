@@ -325,6 +325,8 @@ export class SKDB {
         rebootStatus,
         client.pageSize
       );
+    } else {
+      rebootStatus.isReboot = true;
     }
 
     client.exports.SKIP_init_jsroots();
