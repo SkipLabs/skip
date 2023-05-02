@@ -10,13 +10,14 @@ async function fetchWasmSource() {
 
 // tests connecting, creating a db and a user
 async function setup() {
+  const host = process.argv[3] || "ws://localhost:8080";
   let skdb = await SKDB.create(null, fetchWasmSource);
   {
     const b64key = process.argv[2];
     const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0));
     const key = await crypto.subtle.importKey(
       "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
-    await skdb.connect("skdb_service_mgmt", "root", key, "ws://localhost:8080");
+    await skdb.connect("skdb_service_mgmt", "root", key, host);
   }
   const testRootCreds = await skdb.server.createDatabase("test");
   skdb.server.close();
@@ -26,7 +27,7 @@ async function setup() {
     const keyData = testRootCreds.privateKey;
     const key = await crypto.subtle.importKey(
       "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
-    await skdb.connect("test", testRootCreds.accessKey, key, "ws://localhost:8080");
+    await skdb.connect("test", testRootCreds.accessKey, key, host);
   }
 
   const testUserCreds = await skdb.server.createUser();
@@ -37,7 +38,7 @@ async function setup() {
     const keyData = testUserCreds.privateKey;
     const key = await crypto.subtle.importKey(
       "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
-    await skdb.connect("test", testUserCreds.accessKey, key, "ws://localhost:8080");
+    await skdb.connect("test", testUserCreds.accessKey, key, host);
   }
 
   return skdb;
