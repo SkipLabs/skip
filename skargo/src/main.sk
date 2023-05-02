@@ -16,6 +16,7 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
     args.maybeGetString("target"),
     args.maybeGetString("target-dir"),
   );
+  genVersionFile(bc);
   compile(bc, "test", env.manifest.testHarness);
   filter = args.maybeGetString("filter");
   junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
@@ -36,6 +37,7 @@ fun execBuild(args: Cli.ParseResults, env: Env): void {
     args.maybeGetString("target"),
     args.maybeGetString("target-dir"),
   );
+  genVersionFile(bc);
   for (bin in env.manifest.bin) {
     compile(bc, bin.name, bin.main)
   }
@@ -61,6 +63,7 @@ fun execCheck(args: Cli.ParseResults, env: Env): void {
     args.maybeGetString("target"),
     args.maybeGetString("target-dir"),
   );
+  genVersionFile(bc);
   invokeSkc(bc, Array["--check"])
 }
 
@@ -152,7 +155,7 @@ fun main(): void {
     .parseArgs();
 
   if (args.getBool("version")) {
-    print_string("skargo " + Skargo.kVersion);
+    print_string("skargo " + SkargoVersion.kVersion);
     skipExit(0);
   } else if (args.maybeGetSubcommand().isNone()) {
     print_string(Cli.usage(args.cmd, true));
