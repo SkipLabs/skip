@@ -258,17 +258,18 @@ fun connectionHandler(
                         stream.error(14u, "Internal error")
                       }
                     }
-                    stream.onClose = { handler.close() }
-                    stream.onError = { code, msg ->
-                      System.err.println("Stream errored: ${code} - ${msg}")
+                    stream.onClose = {
+                      handler.close()
+                      stream.close()
+                    }
+                    stream.onError = { _, _ ->
                       handler.close()
                     }
                   },
                   onClose = { socket ->
                     socket.closeSocket();
                   },
-                  onError = { _, code, msg ->
-                    System.err.println("Socket errored: ${code} - ${msg}")
+                  onError = { _, _, _ ->
                   },
                   getDecryptedKey = { key ->
                     accessKey = key
