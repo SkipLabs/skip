@@ -998,10 +998,16 @@ class ProtoMsgDecoder {
 /* Resilient connection abstraction
 /* ***************************************************************************/
 
+interface ResiliencyPolicy {
+  notifyFailedStream: () => void;
+  shouldReconnect: (socket: ResilientMuxedSocket) => boolean;
+}
+
 class ResilientMuxedSocket {
 
   private uri: string;
   private creds: Creds;
+  private policy: ResiliencyPolicy;
   private socket?: MuxedSocket;
   private socketQueue: Array<any> = new Array();
 
@@ -1032,13 +1038,21 @@ class ResilientMuxedSocket {
     socket.errorSocket(errorCode, msg);
   }
 
-  static async connect(uri: string, creds: Creds): Promise<ResilientMuxedSocket> {
+  static async connect(
+    policy: ResiliencyPolicy,
+    uri: string,
+    creds: Creds
+  ): Promise<ResilientMuxedSocket> {
     const socket = await MuxedSocket.connect(uri, creds);
-    return new ResilientMuxedSocket(socket, uri, creds);
+    return new ResilientMuxedSocket(policy, uri, creds, socket);
   }
 
-  private constructor(socket: MuxedSocket, uri: string, creds: Creds) {
-    this.attachSocket(socket);
+  private constructor(
+    policy: ResiliencyPolicy, uri: string,
+    creds: Creds, initialSocket: MuxedSocket
+  ) {
+    this.attachSocket(initialSocket);
+    this.policy = policy;
     this.uri = uri;
     this.creds = creds;
   }
@@ -1075,20 +1089,22 @@ class ResilientMuxedSocket {
     if (!this.socket) {
       return; // already reconnecting
     }
+
     const oldSocket = this.socket;
     this.socket.onStream = undefined;
     this.socket.onClose = undefined;
     this.socket.onError = undefined;
     this.socket = undefined;
     oldSocket.errorSocket(128, "Socket suspected to have failed");
-    // TODO: backoff
+
     while (true) {
       try {
         const socket = await MuxedSocket.connect(this.uri, this.creds);
         this.attachSocket(socket);
         return;
       } catch (error) {
-        // TODO:
+        const backoffMs = 500 + Math.random() * 1000;
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
       }
     }
   }
@@ -1096,7 +1112,13 @@ class ResilientMuxedSocket {
   // interface used by ResilientStream
 
   async replaceFailedStream(): Promise<Stream> {
+    this.policy.notifyFailedStream();
+    if (this.policy.shouldReconnect(this)) {
+      this.replaceFailedSocket();
+    }
+
     const socket = await this.getSocket();
+
     try {
       return socket.openStream();
     } catch {
@@ -1110,6 +1132,12 @@ class ResilientStream {
 
   private socket: ResilientMuxedSocket;
   private stream?: Stream;
+
+  private failureDetectionTimeout?: number;
+  private setFailureDetectionTimeout(timeout?: number): void {
+    clearTimeout(this.failureDetectionTimeout);
+    this.failureDetectionTimeout = timeout;
+  }
 
   onData?: (data: ArrayBuffer) => void
 
@@ -1125,11 +1153,27 @@ class ResilientStream {
   }
 
   expectingData(): void {
-    // TODO:
+    if (this.failureDetectionTimeout) {
+      // already expecting a response and hasn't arrived
+      return;
+    }
+
+    if (!this.stream) {
+      // we're reconnecting
+      return;
+    }
+
+    const failureThresholdMs = 60000;
+    const timeout = setTimeout(() => {
+      this.replaceFailedStream();
+    }, failureThresholdMs)
+    this.setFailureDetectionTimeout(timeout);
   }
 
   private attachStream(stream: Stream): void {
     stream.onData = (data) => {
+      // data received; connection is healthy
+      this.setFailureDetectionTimeout(undefined);
       if (this.onData) {
         this.onData(data);
       }
@@ -1152,6 +1196,7 @@ class ResilientStream {
     oldStream.onClose = undefined;
     oldStream.onError = undefined;
     this.stream = undefined;
+    this.setFailureDetectionTimeout(undefined);
     // if it _has_ failed, this is a no-op, otherwise it protects invariants
     oldStream.error(128, "Stream suspected to have failed");
     const newStream = await this.socket.replaceFailedStream();
@@ -1785,7 +1830,17 @@ class SKDBServer {
     creds: Creds,
   ): Promise<SKDBServer> {
     const uri = SKDBServer.getDbSocketUri(endpoint, db);
-    const conn = await ResilientMuxedSocket.connect(uri, creds);
+
+    // very simple but aggressive policy. any time a stream fails we
+    // re-establish everything
+    const policy: ResiliencyPolicy = {
+      notifyFailedStream() {},
+      shouldReconnect(_socket: ResilientMuxedSocket): boolean {
+        return true;
+      }
+    };
+    const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
+
     const server = new SKDBServer(client, conn, creds);
     server.replicationUid = client.runLocal(["uid"], "").trim();
     return server
