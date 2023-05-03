@@ -227,7 +227,10 @@ class MuxedSocket(
           val keys = activeStreams.keys.toSet()
           for (key in keys) {
             val stream = activeStreams.get(key)
-            stream?.error(errorCode, msg)
+            // this is different to closing. we just immediately trigger
+            // callbacks on streams and only send the goaway for socket.
+            // this is because erroring is not reciprocated by the client
+            stream?.onStreamError(errorCode, msg)
           }
           activeStreams.clear()
           state = State.CLOSED

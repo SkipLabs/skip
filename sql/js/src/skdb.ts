@@ -1337,7 +1337,10 @@ export class MuxedSocket {
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSEWAIT: {
       for (const stream of this.activeStreams.values()) {
-        stream.error(errorCode, msg);
+        // this is different to closing. we just immediately trigger
+        // callbacks on streams and only send the goaway for socket.
+        // this is because erroring is not reciprocated by the server
+        stream.onStreamError(errorCode, msg);
       }
       this.activeStreams.clear()
       this.state = MuxedSocketState.CLOSED;
