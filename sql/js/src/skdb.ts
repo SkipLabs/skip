@@ -1352,15 +1352,27 @@ export class MuxedSocket {
     }
   }
 
-  static async connect(uri: string, creds: Creds): Promise<MuxedSocket> {
+  static async connect(
+    uri: string, creds: Creds, timeoutMs: number = 60000
+  ): Promise<MuxedSocket> {
     const auth = await MuxedSocket.encodeAuthMsg(creds);
     return new Promise((resolve, reject) => {
+      let failed = false;
+      const timeout = setTimeout(() => {
+        failed = true;
+        reject(new Error("Timeout waiting to connect"));
+      }, timeoutMs);
       const socket = new WebSocket(uri)
       socket.binaryType = "arraybuffer";
       socket.onclose = (_event) => reject(new Error("Socket closed before open"));
       socket.onerror = (event) => reject(event);
       socket.onmessage = (_event) => reject(new Error("Socket messaged before open"));
       socket.onopen = (_event) => {
+        clearTimeout(timeout);
+        if (failed) {
+          socket.close();
+          return;
+        }
         const muxSocket = new MuxedSocket(socket)
         socket.onclose = (event) => muxSocket.onSocketClose(event)
         socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
