@@ -130,10 +130,16 @@ async function testClientTail(skdb) {
 
 const skdb = await setup();
 
+console.log("testQueriesAgainstTheServer");
 await testQueriesAgainstTheServer(skdb);
+console.log("testSchemaQueries");
 await testSchemaQueries(skdb);
+console.log("testMirroring");
 await testMirroring(skdb);
+console.log("testServerTail");
 await testServerTail(skdb);
+console.log("testClientTail");
 await testClientTail(skdb);
+console.log("all PASSED");
 
 skdb.server.close();
