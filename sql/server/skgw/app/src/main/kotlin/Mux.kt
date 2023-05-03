@@ -128,7 +128,17 @@ class MuxedSocket(
   }
 
   private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
-  private val timeout = taskPool.schedule({ this.closeSocket() }, 10, TimeUnit.MINUTES)
+  private val timeout =
+      taskPool.schedule(
+          {
+            // we use error rather than close to trigger error callback
+            // per stream for cleanup. using close would rely on the
+            // client gracefully responding with a close in order to free
+            // resources
+            this.errorSocket(0u, "session timeout")
+          },
+          10,
+          TimeUnit.MINUTES)
 
   // user-facing interface /////////////////////////////////////////////////////
 
