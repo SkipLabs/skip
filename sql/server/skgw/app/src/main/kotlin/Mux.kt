@@ -495,7 +495,7 @@ class MuxedSocket(
       throw IllegalArgumentException("lastStream too large")
     }
     val encoder = StandardCharsets.UTF_8.newEncoder()
-    val buf = ByteBuffer.allocate(16 + msg.length * 3)
+    val buf = ByteBuffer.allocate(16 + msg.length * 4)
     buf.putInt(0x01000000) // type 1 and stream 0
     buf.putInt(lastStream.toInt())
     buf.putInt(errorCode.toInt())
@@ -545,7 +545,7 @@ class MuxedSocket(
       throw IllegalArgumentException("stream too large")
     }
     val encoder = StandardCharsets.UTF_8.newEncoder()
-    val buf = ByteBuffer.allocate(12 + msg.length * 3)
+    val buf = ByteBuffer.allocate(12 + msg.length * 4)
     buf.putInt(((0x04u shl 24) or stream).toInt()) // type 4 and stream
     buf.putInt(errorCode.toInt())
     buf.putInt(0) // msg size placeholder - moves cursor

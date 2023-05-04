@@ -815,7 +815,7 @@ type ProtoMsg = ProtoCtrlMsg | ProtoResponse
 function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
   switch (msg.type) {
       case "query": {
-        const buf = new ArrayBuffer(6 + msg.query.length * 3);
+        const buf = new ArrayBuffer(6 + msg.query.length * 4);
         const uint8View = new Uint8Array(buf);
         const dataView = new DataView(buf);
         const textEncoder = new TextEncoder();
@@ -836,7 +836,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       }
       case "schema": {
         const name = msg.name || "";
-        const buf = new ArrayBuffer(4 + name.length * 3);
+        const buf = new ArrayBuffer(4 + name.length * 4);
         const uint8View = new Uint8Array(buf);
         const dataView = new DataView(buf);
         const textEncoder = new TextEncoder();
@@ -856,7 +856,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
         return buf.slice(0, 4 + (encodeResult.written || 0));
       }
       case "tail": {
-        const buf = new ArrayBuffer(14 + msg.table.length * 3);
+        const buf = new ArrayBuffer(14 + msg.table.length * 4);
         const uint8View = new Uint8Array(buf);
         const dataView = new DataView(buf);
         const textEncoder = new TextEncoder();
@@ -867,7 +867,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
         return buf.slice(0, 14 + (encodeResult.written || 0));
       }
       case "pushPromise": {
-        const buf = new ArrayBuffer(6 + msg.table.length * 3);
+        const buf = new ArrayBuffer(6 + msg.table.length * 4);
         const uint8View = new Uint8Array(buf);
         const dataView = new DataView(buf);
         const textEncoder = new TextEncoder();
@@ -877,7 +877,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
         return buf.slice(0, 6 + (encodeResult.written || 0));
       }
       case "createDatabase": {
-        const buf = new ArrayBuffer(3 + msg.name.length * 3);
+        const buf = new ArrayBuffer(3 + msg.name.length * 4);
         const uint8View = new Uint8Array(buf);
         const dataView = new DataView(buf);
         const textEncoder = new TextEncoder();
@@ -1625,7 +1625,7 @@ export class MuxedSocket {
     if (lastStream >= 2**24) {
       throw new Error("Cannot encode lastStream");
     }
-    const buf = new ArrayBuffer(16 + msg.length * 3); // avoid resizing
+    const buf = new ArrayBuffer(16 + msg.length * 4); // avoid resizing
     const uint8View = new Uint8Array(buf);
     const textEncoder = new TextEncoder();
     const encodeResult = textEncoder.encodeInto(msg, uint8View.subarray(16));
@@ -1678,7 +1678,7 @@ export class MuxedSocket {
       throw new Error("Cannot encode stream");
     }
     const textEncoder = new TextEncoder();
-    const buf = new ArrayBuffer(12 + msg.length * 3); // avoid resizing
+    const buf = new ArrayBuffer(12 + msg.length * 4); // avoid resizing
     const uint8View = new Uint8Array(buf);
     const dataView = new DataView(buf);
 
