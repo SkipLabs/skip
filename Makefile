@@ -73,7 +73,7 @@ run-chaos: build/skdb
 	./sql/server/deploy/chaos.sh
 
 .PHONY: test-soak
-test-soak: build/skdb build/init.sql sql/js/dist/skdb-node.js
+test-soak: build/skdb build/init.sql npm
 	./sql/server/test/test_soak.sh
 
 # useful for testing in a browser
