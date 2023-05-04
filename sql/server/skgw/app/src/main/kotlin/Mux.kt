@@ -99,6 +99,10 @@ data class MuxGoawayMsg(
     val msg: String,
 ) : MuxMsg()
 
+class MuxPongMsg() : MuxMsg()
+
+class MuxPingAlreadyHandledMsg() : MuxMsg()
+
 data class MuxStreamDataMsg(val stream: UInt, val payload: ByteBuffer) : MuxMsg()
 
 data class MuxStreamCloseMsg(val stream: UInt) : MuxMsg()
@@ -258,6 +262,9 @@ class MuxedSocket(
     timeout.cancel(false)
   }
 
+  // TODO: pingSocket() - we don't implement yet as we don't have a use
+  // case and we should make this class async first
+
   // interface used by WS //////////////////////////////////////////////////////
 
   fun onSocketMessage(msg: ByteBuffer) {
@@ -284,6 +291,8 @@ class MuxedSocket(
           is MuxStreamDataMsg,
           is MuxStreamCloseMsg,
           is MuxStreamResetMsg -> onSocketError(1u, "Not yet authenticated")
+          is MuxPongMsg,
+          is MuxPingAlreadyHandledMsg -> {}
         }
       }
       State.AUTH_RECV,
@@ -337,6 +346,8 @@ class MuxedSocket(
 
             stream?.onStreamData(muxMsg.payload)
           }
+          is MuxPongMsg,
+          is MuxPingAlreadyHandledMsg -> {}
         }
       }
     }
@@ -504,6 +515,12 @@ class MuxedSocket(
     return buf.flip()
   }
 
+  private fun encodePongMsg(): ByteBuffer {
+    val buf = ByteBuffer.allocate(4)
+    buf.putInt(0x06000000) // type 6 and stream 0
+    return buf.flip()
+  }
+
   private fun encodeStreamDataMsg(stream: UInt, data: ByteBuffer): ByteBuffer {
     if (stream > 0xFFFFFFu) {
       throw IllegalArgumentException("stream too large")
@@ -602,6 +619,29 @@ class MuxedSocket(
         msg.get(msgBytes)
         val errorMsg = String(msgBytes, StandardCharsets.UTF_8)
         MuxStreamResetMsg(stream, errorCode, errorMsg)
+      }
+      // ping
+      5u -> {
+        if (stream != 0u) {
+          throw RuntimeException("Received ping on non-zero stream")
+        }
+        when (getState()) {
+          State.IDLE,
+          State.CLOSING,
+          State.CLOSED -> {}
+          State.CLOSE_WAIT,
+          State.AUTH_RECV -> {
+            sendData(encodePongMsg())
+          }
+        }
+        MuxPingAlreadyHandledMsg()
+      }
+      // pong
+      6u -> {
+        if (stream != 0u) {
+          throw RuntimeException("Received pong on non-zero stream")
+        }
+        MuxPongMsg()
       }
       // we throw as the server is assumed to always be ahead of clients
       else -> throw RuntimeException("Could not decode mux layer msg")
