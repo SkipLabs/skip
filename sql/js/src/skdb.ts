@@ -37,6 +37,7 @@ interface WasmExports {
   SKIP_tracked_call: (funId: number, funArg: number) => number;
   SKIP_tracked_query: (request: number, start: number, end: number) => number;
   skip_main: () => void;
+  getVersion: () => number;
   memory: Memory;
 }
 
@@ -277,6 +278,7 @@ export class SKDB {
   // @ts-expect-error
   private exports: WasmExports;
   private clientUuid: string = "";
+  private version: string = "unknown";
 
   server?: SKDBServer;
 
@@ -333,6 +335,7 @@ export class SKDB {
     client.runSubscribeRoots(rebootStatus.isReboot);
 
     client.clientUuid = crypto.randomUUID();
+    client.version = wasmStringToJS(exports, exports.getVersion());
 
     return client;
   }
