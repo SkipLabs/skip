@@ -334,7 +334,7 @@ size_t binarySearch(sk_cell_t* arr, int l, int r, char* x) {
     }
   }
 
-  int mid = (l + r) / 2;
+  int mid = l + (r - l) / 2;
 
   if (x < (char*)arr[mid].key)  {
     return binarySearch(arr, l, mid - 1, x);
