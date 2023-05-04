@@ -1000,7 +1000,7 @@ class ProtoMsgDecoder {
 
 interface ResiliencyPolicy {
   notifyFailedStream: () => void;
-  shouldReconnect: (socket: ResilientMuxedSocket) => boolean;
+  shouldReconnect: (socket: ResilientMuxedSocket) => Promise<boolean>;
 }
 
 class ResilientMuxedSocket {
@@ -1036,6 +1036,13 @@ class ResilientMuxedSocket {
     this.socket = undefined;
     this.socketQueue = new Array();
     socket.errorSocket(errorCode, msg);
+  }
+
+  async isSocketResponsive(): Promise<boolean> {
+    if (!this.socket) {
+      return false;
+    }
+    return this.socket.pingSocket();
   }
 
   static async connect(
@@ -1113,7 +1120,7 @@ class ResilientMuxedSocket {
 
   async replaceFailedStream(): Promise<Stream> {
     this.policy.notifyFailedStream();
-    if (this.policy.shouldReconnect(this)) {
+    if (await this.policy.shouldReconnect(this)) {
       this.replaceFailedSocket();
     }
 
@@ -1908,12 +1915,11 @@ class SKDBServer {
   ): Promise<SKDBServer> {
     const uri = SKDBServer.getDbSocketUri(endpoint, db);
 
-    // very simple but aggressive policy. any time a stream fails we
-    // re-establish everything
     const policy: ResiliencyPolicy = {
       notifyFailedStream() {},
-      shouldReconnect(_socket: ResilientMuxedSocket): boolean {
-        return true;
+      async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
+        // perform an active check
+        return !socket.isSocketResponsive();
       }
     };
     const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
