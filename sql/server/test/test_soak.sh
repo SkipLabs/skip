@@ -47,10 +47,10 @@ echo "Starting clients..."
 client1_out=/tmp/client1.out
 client2_out=/tmp/client2.out
 
-./run_node.sh ../server/test/soak_client.mjs 1 > $client1_out 2>&1 &
+/usr/bin/env node ../server/test/soak_client.mjs 1 > $client1_out 2>&1 &
 client1=$!
 
-./run_node.sh ../server/test/soak_client.mjs 2 > $client2_out 2>&1 &
+/usr/bin/env node ../server/test/soak_client.mjs 2 > $client2_out 2>&1 &
 client2=$!
 
 echo "To monitor progress:"

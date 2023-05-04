@@ -1,8 +1,13 @@
 import { SKDB } from '../../js/dist/skdb-node.js';
 import { webcrypto as crypto } from 'node:crypto';
+import fs from 'node:fs';
+
+function getWasm() {
+  return new Uint8Array(fs.readFileSync("/skfs/sql/js/skdb.wasm"));
+}
 
 const setup = async function(user) {
-  const skdb = await SKDB.create();
+  const skdb = await SKDB.create(null, getWasm);
   const b64key = "test";
   const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0));
   const key = await crypto.subtle.importKey(
@@ -23,7 +28,7 @@ const insert_rows = function(client, skdb, i, cb) {
 
   // TODO: more operations: deletes, updates, etc.
   const f = () => {
-    skdb.sql(`INSERT INTO log_local VALUES(${i}, ${client}, ${i}, -1, ${client});`);
+    skdb.sql(`INSERT INTO log VALUES(${i}, ${client}, ${i}, -1, ${client});`);
     // avoid stack overflow by using event loop
     setTimeout(() => insert_rows(client, skdb, i + 1, cb), 0);
   };
