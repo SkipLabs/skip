@@ -1587,7 +1587,7 @@ export class MuxedSocket {
 
   private static async encodeAuthMsg(creds: Creds): Promise<ArrayBuffer> {
     const enc = new TextEncoder();
-    const buf = new ArrayBuffer(96);
+    const buf = new ArrayBuffer(132);
     const uint8View = new Uint8Array(buf);
     const dataView = new DataView(buf);
 
@@ -1609,12 +1609,16 @@ export class MuxedSocket {
       throw new Error("Unable to encode access key")
     }
     uint8View.set(new Uint8Array(sig), 36);
-    const encodeIsoDate = enc.encodeInto(now, uint8View.subarray(69));
+    const encodeDeviceId = enc.encodeInto(creds.deviceUuid, uint8View.subarray(68));
+    if (!encodeDeviceId.written || encodeDeviceId.written != 36) {
+      throw new Error("Unable to encode device id")
+    }
+    const encodeIsoDate = enc.encodeInto(now, uint8View.subarray(105));
     switch (encodeIsoDate.written) {
     case 24:
-      return buf.slice(0, 93);
+      return buf.slice(0, 129);
     case 27:
-      dataView.setUint8(68, 0x1);
+      dataView.setUint8(104, 0x1);
       return buf;
     default:
       throw new Error("Unexpected ISO date length");
