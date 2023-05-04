@@ -169,14 +169,15 @@ class Skdb(val name: String, private val dbPath: String) {
     val proc = pb.start()
 
     // TODO: working with text currently to detect checkpoint flush
-    // markers. this should change as it is expensive.
+    // markers. this should change as it is expensive. I particularly
+    // don't like having to allocate 4x here.
     val output = proc.inputStream.bufferedReader()
 
     val t =
         Thread({
           output.forEachLine {
             val encoder = StandardCharsets.UTF_8.newEncoder()
-            val buf = ByteBuffer.allocate(it.length * 3 + 1)
+            val buf = ByteBuffer.allocate(it.length * 4 + 1)
             var res = encoder.encode(CharBuffer.wrap(it), buf, true)
             if (!res.isUnderflow()) {
               res.throwException()
