@@ -1267,6 +1267,8 @@ export class MuxedSocket {
   private serverStreamWatermark = 0
   private nextStream = 1
 
+  private healthChecks: Array<(isOk: boolean) => void> = new Array()
+
   // user facing interface /////////////////////////////////////////////////////
 
   onStream?: (stream: Stream) => void;
@@ -1349,6 +1351,26 @@ export class MuxedSocket {
       this.socket.close(1002);
       break;
     }
+    }
+  }
+
+  async pingSocket(): Promise<boolean> {
+    switch (this.state) {
+    case MuxedSocketState.IDLE:
+    case MuxedSocketState.CLOSING:
+    case MuxedSocketState.CLOSED:
+      return false;
+    case MuxedSocketState.AUTH_SENT:
+    case MuxedSocketState.CLOSEWAIT:
+      return new Promise((resolve, _reject) => {
+        this.socket.send(this.encodePingMsg());
+        const pingTimeoutMs = 10000;
+        const timeout = setTimeout(() => resolve(false), pingTimeoutMs);
+        this.healthChecks.push((isOk) => {
+          clearTimeout(timeout);
+          resolve(isOk);
+        });
+      });
     }
   }
 
@@ -1486,7 +1508,8 @@ export class MuxedSocket {
       }
       const msg = this.decode(event.data);
       if (msg === null) {
-        // for robustness we ignore messages we don't understand
+        // for robustness we ignore messages we don't understand, or
+        // may have been handled e.g. ping
         return;
       }
       switch (msg.type) {
@@ -1607,6 +1630,20 @@ export class MuxedSocket {
     return buf.slice(0, 16 + (encodeResult.written || 0));
   }
 
+  private encodePingMsg(): ArrayBuffer {
+    const buf = new ArrayBuffer(4);
+    const dataView = new DataView(buf);
+    dataView.setUint8(0, 0x5);  // type
+    return buf;
+  }
+
+  private encodePongMsg(): ArrayBuffer {
+    const buf = new ArrayBuffer(4);
+    const dataView = new DataView(buf);
+    dataView.setUint8(0, 0x6);  // type
+    return buf;
+  }
+
   private encodeStreamDataMsg(stream: number, data: ArrayBuffer): ArrayBuffer {
     if (stream >= 2**24) {
       throw new Error("Cannot encode stream");
@@ -1692,6 +1729,31 @@ export class MuxedSocket {
         errorCode: dv.getUint32(4, false),
         msg: errorMsg,
       };
+    }
+    case 5: {                   // ping
+      if (stream != 0) {
+        return null;
+      }
+      switch (this.state) {
+        case MuxedSocketState.AUTH_SENT:
+        case MuxedSocketState.CLOSEWAIT:
+          this.socket.send(this.encodePongMsg());
+          break;
+        case MuxedSocketState.IDLE:
+        case MuxedSocketState.CLOSING:
+        case MuxedSocketState.CLOSED:
+          break;
+      }
+      return null;
+    }
+    case 6: {                   // pong
+      if (stream != 0) {
+        return null;
+      }
+      for (const resolve of this.healthChecks) {
+        resolve(true);
+      }
+      return null;
     }
     default:
       return null;
