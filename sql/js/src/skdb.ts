@@ -995,6 +995,224 @@ class ProtoMsgDecoder {
 }
 
 /* ***************************************************************************/
+/* Resilient connection abstraction
+/* ***************************************************************************/
+
+interface ResiliencyPolicy {
+  notifyFailedStream: () => void;
+  shouldReconnect: (socket: ResilientMuxedSocket) => boolean;
+}
+
+class ResilientMuxedSocket {
+
+  private uri: string;
+  private creds: Creds;
+  private policy: ResiliencyPolicy;
+  private socket?: MuxedSocket;
+  private socketQueue: Array<any> = new Array();
+
+  // streams from the server are not resilient
+  onStream?: (stream: Stream) => void;
+
+  async openStream(): Promise<Stream> {
+    const socket = await this.getSocket();
+    return socket.openStream();
+  }
+
+  async openResilientStream(): Promise<ResilientStream> {
+    const socket = await this.getSocket();
+    return new ResilientStream(this, socket.openStream());
+  }
+
+  async closeSocket(): Promise<void> {
+    const socket = this.socket ?? await this.getSocket();
+    this.socket = undefined;
+    this.socketQueue = new Array();
+    socket.closeSocket();
+  }
+
+  async errorSocket(errorCode: number, msg: string): Promise<void> {
+    const socket = this.socket ?? await this.getSocket();
+    this.socket = undefined;
+    this.socketQueue = new Array();
+    socket.errorSocket(errorCode, msg);
+  }
+
+  static async connect(
+    policy: ResiliencyPolicy,
+    uri: string,
+    creds: Creds
+  ): Promise<ResilientMuxedSocket> {
+    const socket = await MuxedSocket.connect(uri, creds);
+    return new ResilientMuxedSocket(policy, uri, creds, socket);
+  }
+
+  private constructor(
+    policy: ResiliencyPolicy, uri: string,
+    creds: Creds, initialSocket: MuxedSocket
+  ) {
+    this.attachSocket(initialSocket);
+    this.policy = policy;
+    this.uri = uri;
+    this.creds = creds;
+  }
+
+  private async getSocket(): Promise<MuxedSocket> {
+    if (this.socket) {
+      return this.socket;
+    }
+    return new Promise((resolve, reject) => {
+      this.socketQueue.push({resolve: resolve, reject: reject});
+    });
+  }
+
+  private attachSocket(socket: MuxedSocket): void {
+    socket.onStream = (stream) => {
+      if (this.onStream) {
+        this.onStream(stream);
+      }
+    };
+    socket.onClose = () => {
+      this.replaceFailedSocket();
+    };
+    socket.onError = (_errorCode, _msg) => {
+      this.replaceFailedSocket();
+    };
+    this.socket = socket;
+    for (const promise of this.socketQueue) {
+      promise.resolve(socket);
+    }
+    this.socketQueue = new Array();
+  }
+
+  private async replaceFailedSocket(): Promise<void> {
+    if (!this.socket) {
+      return; // already reconnecting
+    }
+
+    const oldSocket = this.socket;
+    this.socket.onStream = undefined;
+    this.socket.onClose = undefined;
+    this.socket.onError = undefined;
+    this.socket = undefined;
+    oldSocket.errorSocket(128, "Socket suspected to have failed");
+
+    while (true) {
+      try {
+        const socket = await MuxedSocket.connect(this.uri, this.creds);
+        this.attachSocket(socket);
+        return;
+      } catch (error) {
+        const backoffMs = 500 + Math.random() * 1000;
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+    }
+  }
+
+  // interface used by ResilientStream
+
+  async replaceFailedStream(): Promise<Stream> {
+    this.policy.notifyFailedStream();
+    if (this.policy.shouldReconnect(this)) {
+      this.replaceFailedSocket();
+    }
+
+    const socket = await this.getSocket();
+
+    try {
+      return socket.openStream();
+    } catch {
+      await this.replaceFailedSocket();
+      return this.replaceFailedStream();
+    }
+  }
+}
+
+class ResilientStream {
+
+  private socket: ResilientMuxedSocket;
+  private stream?: Stream;
+
+  private failureDetectionTimeout?: number;
+  private setFailureDetectionTimeout(timeout?: number): void {
+    clearTimeout(this.failureDetectionTimeout);
+    this.failureDetectionTimeout = timeout;
+  }
+
+  onData?: (data: ArrayBuffer) => void
+
+  onReconnect?: () => void;
+
+  send(data: ArrayBuffer): void {
+    if (!this.stream) {
+      // black hole the data. we're reconnecting and will call
+      // onReconnect that should address the gap
+      return;
+    }
+    this.stream.send(data);
+  }
+
+  expectingData(): void {
+    if (this.failureDetectionTimeout) {
+      // already expecting a response and hasn't arrived
+      return;
+    }
+
+    if (!this.stream) {
+      // we're reconnecting
+      return;
+    }
+
+    const failureThresholdMs = 60000;
+    const timeout = setTimeout(() => {
+      this.replaceFailedStream();
+    }, failureThresholdMs)
+    this.setFailureDetectionTimeout(timeout);
+  }
+
+  private attachStream(stream: Stream): void {
+    stream.onData = (data) => {
+      // data received; connection is healthy
+      this.setFailureDetectionTimeout(undefined);
+      if (this.onData) {
+        this.onData(data);
+      }
+    };
+    stream.onClose = () => {
+      this.replaceFailedStream();
+    };
+    stream.onError = (_errorCode, _msg) => {
+      this.replaceFailedStream();
+    };
+    this.stream = stream;
+  }
+
+  private async replaceFailedStream(): Promise<void> {
+    if (!this.stream) {
+      return; // already reconnecting
+    }
+    const oldStream = this.stream;
+    oldStream.onData = undefined;
+    oldStream.onClose = undefined;
+    oldStream.onError = undefined;
+    this.stream = undefined;
+    this.setFailureDetectionTimeout(undefined);
+    // if it _has_ failed, this is a no-op, otherwise it protects invariants
+    oldStream.error(128, "Stream suspected to have failed");
+    const newStream = await this.socket.replaceFailedStream();
+    this.attachStream(newStream);
+    if (this.onReconnect) {
+      this.onReconnect();
+    }
+  }
+
+  constructor(socket: ResilientMuxedSocket, stream: Stream) {
+    this.socket = socket;
+    this.attachStream(stream);
+  }
+}
+
+/* ***************************************************************************/
 /* Stream MUX protocol */
 /* ***************************************************************************/
 
@@ -1119,7 +1337,10 @@ export class MuxedSocket {
     case MuxedSocketState.AUTH_SENT:
     case MuxedSocketState.CLOSEWAIT: {
       for (const stream of this.activeStreams.values()) {
-        stream.error(errorCode, msg);
+        // this is different to closing. we just immediately trigger
+        // callbacks on streams and only send the goaway for socket.
+        // this is because erroring is not reciprocated by the server
+        stream.onStreamError(errorCode, msg);
       }
       this.activeStreams.clear()
       this.state = MuxedSocketState.CLOSED;
@@ -1131,15 +1352,27 @@ export class MuxedSocket {
     }
   }
 
-  static async connect(uri: string, creds: Creds): Promise<MuxedSocket> {
+  static async connect(
+    uri: string, creds: Creds, timeoutMs: number = 60000
+  ): Promise<MuxedSocket> {
     const auth = await MuxedSocket.encodeAuthMsg(creds);
     return new Promise((resolve, reject) => {
+      let failed = false;
+      const timeout = setTimeout(() => {
+        failed = true;
+        reject(new Error("Timeout waiting to connect"));
+      }, timeoutMs);
       const socket = new WebSocket(uri)
       socket.binaryType = "arraybuffer";
       socket.onclose = (_event) => reject(new Error("Socket closed before open"));
       socket.onerror = (event) => reject(event);
       socket.onmessage = (_event) => reject(new Error("Socket messaged before open"));
       socket.onopen = (_event) => {
+        clearTimeout(timeout);
+        if (failed) {
+          socket.close();
+          return;
+        }
         const muxSocket = new MuxedSocket(socket)
         socket.onclose = (event) => muxSocket.onSocketClose(event)
         socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
@@ -1590,14 +1823,14 @@ class Stream {
 
 class SKDBServer {
   private client: SKDB;
-  private connection: MuxedSocket;
+  private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
   private mirroredTables: Set<string> = new Set()
 
   private constructor(
     client: SKDB,
-    connection: MuxedSocket,
+    connection: ResilientMuxedSocket,
     creds: Creds,
   ) {
     this.client = client;
@@ -1612,7 +1845,17 @@ class SKDBServer {
     creds: Creds,
   ): Promise<SKDBServer> {
     const uri = SKDBServer.getDbSocketUri(endpoint, db);
-    const conn = await MuxedSocket.connect(uri, creds);
+
+    // very simple but aggressive policy. any time a stream fails we
+    // re-establish everything
+    const policy: ResiliencyPolicy = {
+      notifyFailedStream() {},
+      shouldReconnect(_socket: ResilientMuxedSocket): boolean {
+        return true;
+      }
+    };
+    const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
+
     const server = new SKDBServer(client, conn, creds);
     server.replicationUid = client.runLocal(["uid"], "").trim();
     return server
@@ -1637,7 +1880,7 @@ class SKDBServer {
   }
 
   private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse|null> {
-    const stream = this.connection.openStream();
+    const stream = await this.connection.openStream();
     const decoder = new ProtoMsgDecoder();
     return new Promise((resolve, reject) => {
       stream.onData = function (data) {
@@ -1658,62 +1901,48 @@ class SKDBServer {
   }
 
   private async establishServerTail(tableName: string): Promise<void> {
-    const stream = this.connection.openStream();
+    const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
 
-    const objThis = this;
     let resolved = false;
 
-    return new Promise((resolve, reject) => {
-      stream.onError = (code, msg) => {
-        // will go away when we re-introduce the resiliency abstraction
-        console.error("server tail", tableName, "stream errored", code, msg);
-        if (!resolved) {
-          resolved = true;
-          reject(msg);
-        }
-      }
-
-      stream.onClose = () => {
-        // will go away when we re-introduce the resiliency abstraction
-        console.error("server tail", tableName, "stream closed");
-      }
-
+    return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
           const msg = decoder.pop();
-          const txtPayload = decodeUTF8(objThis.strictCastData(msg).payload);
-          client.runLocal(["write-csv", tableName, "--source", objThis.replicationUid], txtPayload + '\n');
+          const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
+          client.runLocal(["write-csv", tableName, "--source", this.replicationUid], txtPayload + '\n');
           if (!resolved) {
             resolved = true;
             resolve();
           }
         }
+        stream.expectingData();
       }
+
+      stream.onReconnect = () => {
+        stream.send(encodeProtoMsg({
+          type: "tail",
+          table: tableName,
+          since: this.client.watermark(tableName),
+        }))
+        stream.expectingData();
+      };
 
       stream.send(encodeProtoMsg({
         type: "tail",
         table: tableName,
-        since: objThis.client.watermark(tableName),
+        since: this.client.watermark(tableName),
       }));
+      stream.expectingData();
     });
   }
 
-  private establishLocalTail(tableName: string): void {
-    const stream = this.connection.openStream();
+  private async establishLocalTail(tableName: string): Promise<void> {
+    const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
-
-    stream.onError = (code, msg) => {
-      // will go away when we re-introduce the resiliency abstraction
-      console.error("local tail", tableName, "stream errored", code, msg);
-    }
-
-    stream.onClose = () => {
-      // will go away when we re-introduce the resiliency abstraction
-      console.error("local tail", tableName, "stream closed");
-    }
 
     stream.onData = (data) => {
       if (decoder.push(data)) {
@@ -1742,15 +1971,36 @@ class SKDBServer {
         type: "data",
         payload: encodeUTF8Str(change),
       }));
+      stream.expectingData();
     });
 
-    const _session = client.runLocal(
+    const session = client.runLocal(
       [
         "subscribe", tableName, "--connect", "--format=csv",
         "--updates", fileName, "--ignore-source", this.replicationUid
       ],
       ""
     ).trim();
+
+    stream.onReconnect = () => {
+      stream.send(encodeProtoMsg(request));
+      const diff = client.runLocal(
+        [
+          "diff", "--format=csv",
+          "--since", client.watermark(metadataTable(tableName)).toString(),
+          session,
+        ], "");
+
+      if (diff == "") {
+        return;
+      }
+
+      stream.send(encodeProtoMsg({
+        type: "data",
+        payload: encodeUTF8Str(diff),
+      }));
+      stream.expectingData();
+    };
   }
 
   async mirrorTable(tableName: string): Promise<void> {
@@ -1771,7 +2021,9 @@ class SKDBServer {
        )`);
     }
 
-    this.establishLocalTail(tableName);
+    // TODO: need to join the promises but let them run concurrently
+    // I await here for now so we learn of error
+    await this.establishLocalTail(tableName);
     return this.establishServerTail(tableName);
   }
 

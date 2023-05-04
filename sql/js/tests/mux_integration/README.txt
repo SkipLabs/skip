@@ -7,4 +7,4 @@ $ cd $SKFS_REPO/sql/server/skgw
 $ gradle --console plain runMuxTestServer &
 $ cd $SKFS_REPO
 $ make sql/js/dist/skdb-node.js
-$ ./sql/js/run_node.sh ./sql/js/tests/mux_integration/muxed_socket_integration_tests.mjs
+$ node ./sql/js/tests/mux_integration/muxed_socket_integration_tests.mjs
