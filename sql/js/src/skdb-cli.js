@@ -383,6 +383,5 @@ if (query.trim() !== "") {
     process.exit(1);
     console.error(ex.trim());
   }
+  skdb.server?.close();
 }
-
-skdb.server?.close();
