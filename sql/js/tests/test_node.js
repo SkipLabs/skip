@@ -74,8 +74,6 @@ async function promptDB() {
    "test.db",
    "julienv"
  );
- await skdb.server.mirrorView("all_users");
-  //  await skdb.server.mirrorView("all_groups");
   //  await skdb.server.mirrorTable("user_profiles");
   //  await skdb.server.mirrorTable("whitelist_skiplabs_employees");
   //  await skdb.server.mirrorTable("posts");
