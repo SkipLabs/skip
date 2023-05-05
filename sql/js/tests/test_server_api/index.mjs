@@ -99,12 +99,6 @@ async function testMirroring(skdb) {
   const testPkRows = skdb.sql("SELECT * FROM test_pk");
   assert.deepEqual(testPkRows, [{x: 42, y:21}]);
 
-  // mirror down a view
-  await skdb.server.sqlRaw("CREATE VIRTUAL VIEW testView AS SELECT * FROM test_pk");
-  await skdb.server.mirrorView("testView");
-  const viewRows = skdb.sql("SELECT * FROM testView");
-  assert.deepEqual(viewRows, [{x: 42, y:21}]);
-
   // mirror already mirrored table is idempotent
   await skdb.server.mirrorTable("test_pk");
   const testPkRows2 = skdb.sql("SELECT * FROM test_pk");

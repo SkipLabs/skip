@@ -2099,19 +2099,6 @@ class SKDBServer {
     return this.establishServerTail(tableName);
   }
 
-  // TODO: this currently just replicates the schema locally assuming
-  // you have all source tables setup. is this what we want? we should
-  // error if this doesn't succeed. it might be easier for the user
-  // just to create this themselves - no need for mirroring. or we
-  // could mirror down a read-only table and have the server keep it
-  // in sync?
-  async mirrorView(viewName: string): Promise<void> {
-    if (!this.client.viewExists(viewName)) {
-      let createRemoteTable = await this.viewSchema(viewName);
-      this.client.runLocal([], createRemoteTable);
-    }
-  }
-
   async sqlRaw(stdin: string): Promise<string> {
     let result = await this.makeRequest({
       type: "query",
