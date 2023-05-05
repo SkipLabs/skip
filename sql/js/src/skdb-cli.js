@@ -372,5 +372,12 @@ if (query.trim() !== "") {
     process.exit(1);
     console.error(ex.trim());
   }
+}
+
+// we don't close if we've created an interactive session.
+// interactively, you can drop to the js console and the control flow
+// ends up calling this, which you don't want. the user is going to
+// send an interrupt anyway to get out of the shell.
+if (!(args.values['remote-repl'] || args.values['local-repl'])) {
   skdb.server?.close();
 }
