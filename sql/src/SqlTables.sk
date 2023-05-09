@@ -193,11 +193,11 @@ fun getSubsDirs(
         }
       };
       (userFile, matchesGroup, accessFilter) = request.user match {
-      | None() -> (None(), (_ ~> 0), (_ ~> _ ~> true))
+      | None() -> (None(), (_ ~> 0), ((_, _) ~> (_ ~> true)))
       | Some(userName) ->
         userFile = SKSQL.UserFile::create(context, userName);
         dirDescr.cols.maybeGet(skdbAccess) match {
-        | None() -> (Some(userFile.id), _ ~> 0, _ctx ~> _ -> true)
+        | None() -> (Some(userFile.id), _ ~> 0, (_, _) ~> _ -> true)
         | Some(accessColNbr) ->
           if (!(dirDescr.schema[accessColNbr].ty is INTEGER())) {
             print_error("skdb_access must be of type integer");
@@ -215,7 +215,7 @@ fun getSubsDirs(
               | _ -> 0
               }
             }),
-            (context ~> {
+            ((context, _isReset) ~> {
               access = mutable AccessSolver(userFile.id);
               (file: SKFS.BaseName) -> {
                 file match {
@@ -234,12 +234,13 @@ fun getSubsDirs(
       filter = request.ignoreSource match {
       | None() -> accessFilter
       | Some(inputSrc) ->
-        context ~> {
+        (context, isReset) ~> {
+          if (isReset) return accessFilter(context, isReset);
           tdir = context.unsafeGetEagerDir(dirDescr.dirName);
           ignoredSrc = SKFS.Source::create(
             SKFS.Path(dirDescr.dirName, SKFS.IID(inputSrc)),
           );
-          composedFilter = accessFilter(context);
+          composedFilter = accessFilter(context, isReset);
           (file: SKFS.BaseName) -> {
             rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
             !updateIsFromIgnoredSource(ignoredSrc, rows) && composedFilter(file)
