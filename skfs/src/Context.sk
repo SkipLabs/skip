@@ -40,7 +40,7 @@ value class Sub(
   userID: ?Int,
   reset: (SKFS.Context, SKFS.Tick) ~> Bool,
   getGroupID: BaseName ~> Int,
-  filter: SKFS.Context ~> (BaseName -> Bool) = _ ~> (_ -> true),
+  filter: (SKFS.Context, Bool) ~> (BaseName -> Bool) = (_, _) ~> (_ -> true),
 )
 
 /*****************************************************************************/
@@ -305,7 +305,7 @@ mutable class Context{
     userID: ?Int,
     reset: (SKFS.Context, SKFS.Tick) ~> Bool,
     matchesGroup: BaseName ~> Int,
-    filter: Context ~> (BaseName -> Bool),
+    filter: (Context, Bool) ~> (BaseName -> Bool),
   ): void {
     sub = Sub(
       mutexCreate(),

@@ -527,3 +527,36 @@ test_server_tail_filters_write_csv() {
 }
 
 run_test test_server_tail_filters_write_csv
+
+
+################################################################################
+# test behaviour around resets
+################################################################################
+
+
+# we do not want the ignore-source filter to be applied when there is a reset
+test_ignore_source_ignored_on_reset() {
+    setup_server
+
+    server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user --ignore-source 1234 test)
+
+    # 710: binary searched to find the first point where the reset will be generated
+    for i in $(seq 710)
+    do
+        $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
+
+
+0	$i,"a"
+1	$((i+1)),"a"
+EOF
+    done
+
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
+
+    # we just output the final row: 1\t1001,"a" and a reset of course
+    assert_line_count "$SERVER_TAIL" '710,"a"' 0
+    assert_line_count "$SERVER_TAIL" '711,"a"' 1
+    assert_line_count "$SERVER_TAIL" '		' 1
+}
+
+run_test test_ignore_source_ignored_on_reset
