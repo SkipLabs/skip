@@ -1,8 +1,5 @@
 module SKCSV;
 
-// checkpoint watermarks are recorded in to the file system
-const watermarks: SKFS.DirName = SKFS.DirName::create("/watermarks/");
-
 base class Token {
   children =
   | NewLine()
@@ -162,10 +159,13 @@ fun replayDiff(
   getLine: () -> String,
   table: SKSQL.DirDescr,
   user: ?String,
-  identity: SKFS.BaseName,
+  identity: Int,
 ): SKFS.ContextOp {
   userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
+  writer = SKFS.Path(table.dirName, SKFS.IID(identity));
+  watermarkDirname = SKFS.DirName::create(`/watermarks/${identity}/`);
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
+
   if (table.windowSize is Some _) {
     print_error("Cannot use write-csv on a window or a stream");
     skipExit(23);
@@ -174,7 +174,6 @@ fun replayDiff(
   makeFun = (rows, reset, checkpoint) -> {
     Some((context, delta, _) ~> {
       dir = context.unsafeGetEagerDir(table.dirName);
-      writer = SKFS.Path(table.dirName, identity);
       entries = mutable Vector[];
       for (row in rows) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
@@ -234,8 +233,8 @@ fun replayDiff(
       if (checkpoint is Some _) {
         checkpointTick = SKFS.Tick(checkpoint.fromSome());
         delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
-        watermarkDir = context.maybeGetDir(watermarks) match {
-        | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks, false)
+        watermarkDir = context.maybeGetDir(watermarkDirname) match {
+        | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarkDirname, false)
         | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
         };
         watermarkKey = SKFS.SID::create(table.name.lower);

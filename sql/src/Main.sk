@@ -177,6 +177,11 @@ untracked fun main(): void {
           Cli.Command("watermark")
             .about("Get the watermark for table TABLE")
             .arg(
+              Cli.StringArg("source")
+                .required()
+                .about("Globally unique identity of this write stream"),
+            )
+            .arg(
               Cli.StringArg("table")
                 .positional()
                 .required()
@@ -646,9 +651,11 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   tableName = args.getString("table").lowercase();
+  identity = args.getString("source").toInt();
   SKSQL.runSql(options, context ~> {
-    watermarkDir = context.maybeGetDir(SKCSV.watermarks) match {
-    | None() -> context.mkdir(SKFS.TickFile::fromFile, SKCSV.watermarks, false)
+    watermarkDirname = SKFS.DirName::create(`/watermarks/${identity}/`);
+    watermarkDir = context.maybeGetDir(watermarkDirname) match {
+    | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarkDirname, false)
     | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
     };
     arr = watermarkDir.unsafeGetArray(context, SKFS.SID::create(tableName));
@@ -689,8 +696,8 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
       }
     };
     source = args.maybeGetString("source") match {
-    | Some(src) -> SKFS.IID(src.toInt())
-    | None() -> SKFS.IID(SKFS.genSym(0))
+    | Some(src) -> src.toInt()
+    | None() -> SKFS.genSym(0)
     };
     SKCSV.replayDiff(context, line, myReadLine, table, user, source)
   })
