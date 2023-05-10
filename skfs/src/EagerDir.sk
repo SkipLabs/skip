@@ -689,10 +689,11 @@ class EagerDir{
     context: mutable SKFS.Context,
     writerPath: Path,
     keep: SortedSet<BaseName>,
+    isVisible: BaseName -> Bool = _ -> true,
   ): this {
     this.unsafeGetFileIter().each(kv -> {
       (key, valueIter) = kv;
-      if (!keep.contains(key)) {
+      if (!keep.contains(key) && isVisible(key)) {
         valueIter.next() match {
         | None() -> void
         | Some _ ->
