@@ -18,7 +18,15 @@ setup_server() {
     $SKDB < privacy/init.sql
 
     echo "INSERT INTO skdb_users VALUES(id(), 'test_user', 'pass');" | $SKDB
+    echo "INSERT INTO skdb_users VALUES(99, 'test_alt_user', 'pass');" | $SKDB
+
+    echo "CREATE TABLE whitelist_just_alt_user(userID INTEGER);" | $SKDB
+    echo "INSERT INTO whitelist_just_alt_user VALUES (99);" | $SKDB
+    echo "INSERT INTO skdb_access VALUES (2, 2, -1, 'alt user');" | $SKDB
+    echo "INSERT INTO skdb_groups VALUES (2, 'whitelist_just_alt_user');" | $SKDB
+
     echo "CREATE TABLE test (id INTEGER, note STRING);" | $SKDB
+    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_access INTEGER);" | $SKDB
 }
 
 setup_local() {
@@ -560,3 +568,54 @@ EOF
 }
 
 run_test test_ignore_source_ignored_on_reset
+
+
+# if a client sends up a reset it should not wipe out all the rows
+# they can't see due to e.g. privacy
+test_server_should_apply_client_reset_to_their_subset_view_of_data() {
+    setup_server
+
+    # write a row as the source under test
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_access << EOF
+
+
+1	0,"foo",-1
+EOF
+
+    # write a row as another source, but with a private access value
+    $SKDB_BIN write-csv --data $SERVER_DB --source 999 --user test_alt_user test_with_access << EOF
+
+
+1	6,"erase",-1
+1	7,"keep",2
+EOF
+
+    server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user --ignore-source 1234 test_with_access)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
+
+    # just sanity check that test_user can see erase but not keep
+    assert_line_count "$SERVER_TAIL" 'erase' 1
+    assert_line_count "$SERVER_TAIL" 'keep' 0
+
+    # now the source under test sends up a reset for whatever reason -
+    # maybe reconnect. it wipes out its own foo value and the erase
+    # from test_alt_user. but not the keep, because it can't see this
+    # row.
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_access << EOF
+
+
+1	1,"baz",-1
+1	2,"quux",-1
+		
+EOF
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_access" > $SERVER_TAIL
+
+    assert_line_count "$SERVER_TAIL" '1\|baz' 1
+    assert_line_count "$SERVER_TAIL" '2\|quux' 1
+    assert_line_count "$SERVER_TAIL" '7\|keep' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo' 0
+    assert_line_count "$SERVER_TAIL" '0\|erase' 0
+}
+
+run_test test_server_should_apply_client_reset_to_their_subset_view_of_data

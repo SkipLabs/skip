@@ -198,6 +198,25 @@ fun replayDiff(
       );
 
       if (reset) {
+        isVisibleToUser = userFileOpt match {
+        | None() -> _ -> true
+        | Some(userFile) ->
+          access = mutable SKSQL.AccessSolver(userFile.id);
+          table.cols.maybeGet(SKSQL.skdbAccess) match {
+          | None() -> _ -> true
+          | Some(accessColNbr) ->
+            (file: SKFS.BaseName) -> {
+              file match {
+              | k @ SKSQL.RowKey _ ->
+                k.row.getInt(accessColNbr) match {
+                | None() -> true
+                | Some(accessID) -> access.canRead(context, accessID)
+                }
+              | _ -> true
+              }
+            }
+          }
+        };
         !dir = dir.reset(
           context,
           writer,
@@ -206,6 +225,7 @@ fun replayDiff(
             .filter(row -> row.repeat != 0)
             .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
             .collect(SortedSet),
+          isVisibleToUser,
         );
       };
 
