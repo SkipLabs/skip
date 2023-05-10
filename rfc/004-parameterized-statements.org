@@ -1,0 +1,89 @@
+#+TITLE: Parameterized Statements
+
+* Objective
+
+Protect against SQL injection attacks.
+
+Potential Secondary: Enable optimization by preprocessing parameterized statements once and then evaluating multiple instances.
+
+* Overview
+
+When skdb is passed the `--expect-query-params` CLI flag, it reads
+a key-value map encoded as a JSON Object on a single line from stdin
+before proceeding to read the statement. With a parameter line such
+as:
+#+begin_src json
+{ "key1": value1, "key2": value2 }
+#+end_src
+the following statement can contain `@key1` and `@key2` where literal
+values are expected, and they will be interpreted as `value1` or
+`value2`, respectively. The values are interpreted as SQL values
+separately from parsing the statement itself.
+
+Compared to SQLite, passing parameters to skdb with such a JSON map
+corresponds to prefixing SQLite input with the lines:
+#+begin_src sql
+.param set @key1 value1
+.param set @key2 value2
+#+end_src
+
+* Design
+
+In skdb, SQL statements are parsed, compiled to an internal form, and then evaluated. Parameter names, such as `@key1`, are represented in the parsed form as a distinct type of value expression. During statement compilation, each parameter name is replaced by the value associated to it by the parameter key-value map passed to skdb. It is an error for a statement to mention a parameter for which no value is passed. Once statements are compiled, evaluation proceeds identically for parameterized and non-parameterized statements.
+
+* Potential approaches initially considered
+
+** Manual escaping in client implementation
+
+The most primitive option is to simply manually change the client js source to escape all user-controlled strings to prevent them from being interpreted as SQL code.
+
+- Pros:
+  + The skdb backend could be left unchanged, continue to just read SQL statements from stdin
+- Cons:
+  + This is fragile and would be bugs waiting to happen, relying on not forgetting to escape the strings everywhere, while maintaining it over time
+  + This would be a "solution" only for the current JS client
+
+** JS-only API for parameterized statements
+
+It would be possible to provide an API to JS client code that supports parameterized statements, that is implemented by simply lowering to appropriately escaped strings before calling down to skdb.
+
+- Pros:
+  + The skdb backend could be left unchanged, continue to just read SQL statements from stdin
+- Cons:
+  + Likely fragile, it will be difficult to be confident that fiddly escaping mechanisms are applied correctly and thoroughly
+  + This would be a solution only for JS client code, which is dissatisfying and inflexible going forward
+
+** Command-line skdb interface for parameterized statements
+
+An implementation based on escaping strings to lower parameterized statements to the currently-supported non-parameterized query language could be exposed by the skdb command-line interface. That is, skdb could escape the values of parameters and replace parameter keys with their values prior to parsing.
+
+- Pros:
+  + The skdb evaluator could be left unchanged
+  + Would provide a solution for potential uses of skdb other than through the JS client
+- Cons:
+  + Likely fragile, it will be difficult to be confident that fiddly escaping mechanisms are applied correctly and thoroughly
+
+** Core skdb support for parameterized statements
+
+Support for parameterized statements could be added at the bottom layer, to the skdb SQL evaluator itself, and then surfaced with a command-line interface and further by a JS API that wraps it.
+
+This would involve extending the SQL parser to accept `@ParameterKey` (almost?) anywhere string values are permitted. Then the SQL evaluator(s) would need to be extended with an environment associating parameter keys to values, to interpret the parameter key parse tree nodes.
+
+- Pros:
+  + Extending the evaluator with parameters seems more likely to lead to a system that is not vulnerable to injection attacks, compared to approaches based on escaping
+  + Would provide a solution to the general problem that is retargetable to other uses of skdb
+  + Could more readily be extended to perform preprocessing optimizations
+- Cons:
+  + The most invasive code change, would involve adding an environment to the core skdb evaluator(s)
+
+* Interface considerations
+
+** skdb will need to accept SQL statements and parameter values separately
+- could accept statements on stdin as now, and add a cli arg that takes the values of parameters
+  + perhaps as a json dictionary serialized to a string
+  + could use named or positional arguments, named likely better
+
+** Multiple values might be more convenient for some parameters
+- e.g. `insert into table values(val1, val2, ... , valN)`
+- client code could generate multiple keys as needed:
+  `insert into @table values(@val1, @val2, ... , @valN)`
