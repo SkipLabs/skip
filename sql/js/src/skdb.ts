@@ -631,8 +631,8 @@ export class SKDB {
     );
   }
 
-  watermark(table: string): bigint {
-    return BigInt(this.runLocal(["watermark", table], ""));
+  watermark(replicationId: string, table: string): bigint {
+    return BigInt(this.runLocal(["watermark", "--source", replicationId, table], ""));
   }
 
   cmd(new_args: Array<string>, new_stdin: string): string {
@@ -1988,7 +1988,7 @@ class SKDBServer {
         stream.send(encodeProtoMsg({
           type: "tail",
           table: tableName,
-          since: this.client.watermark(tableName),
+          since: this.client.watermark(this.replicationUid, tableName),
         }))
         stream.expectingData();
       };
@@ -1996,7 +1996,7 @@ class SKDBServer {
       stream.send(encodeProtoMsg({
         type: "tail",
         table: tableName,
-        since: this.client.watermark(tableName),
+        since: this.client.watermark(this.replicationUid, tableName),
       }));
       stream.expectingData();
     });
@@ -2050,7 +2050,11 @@ class SKDBServer {
       const diff = client.runLocal(
         [
           "diff", "--format=csv",
-          "--since", client.watermark(metadataTable(tableName)).toString(),
+          "--since",
+          client.watermark(
+            this.replicationUid,
+            metadataTable(tableName)
+          ).toString(),
           session,
         ], "");
 
