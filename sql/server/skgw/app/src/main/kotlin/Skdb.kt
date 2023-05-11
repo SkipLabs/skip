@@ -70,8 +70,8 @@ class Skdb(val name: String, private val dbPath: String) {
     return blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath, format.flag), stmts)
   }
 
-  fun uid(): ProcessOutput {
-    return blockingRun(ProcessBuilder(SKDB_PROC, "uid", "--data", dbPath))
+  fun replicationId(deviceUuid: String): ProcessOutput {
+    return blockingRun(ProcessBuilder(SKDB_PROC, "replication-id", deviceUuid, "--data", dbPath))
   }
 
   fun dumpTable(table: String): ProcessOutput {
@@ -186,7 +186,7 @@ class Skdb(val name: String, private val dbPath: String) {
             if (!res.isUnderflow()) {
               res.throwException()
             }
-            buf.put(0x0A)       //add back newline
+            buf.put(0x0A) // add back newline
             callback(buf.flip(), it.startsWith(":"))
           }
           closed()

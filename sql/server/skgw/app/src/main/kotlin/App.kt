@@ -99,8 +99,7 @@ class ProcessPipe(val proc: Process) : StreamHandler {
     when (request) {
       is ProtoData -> {
         val data = request.data
-        stdin.write(
-            data.array(), data.arrayOffset() + data.position(), data.remaining())
+        stdin.write(data.array(), data.arrayOffset() + data.position(), data.remaining())
         if (request.finFlagSet) {
           stdin.flush()
         }
@@ -235,8 +234,7 @@ fun connectionHandler(
                 throw RuntimeException(msg)
               }
 
-              val replicationId = skdb.uid().decodeOrThrow().trim()
-
+              var replicationId: String? = null
               var accessKey: String? = null
 
               return MuxedSocket(
@@ -248,7 +246,7 @@ fun connectionHandler(
                             skdb,
                             accessKey!!,
                             encryption,
-                            replicationId,
+                            replicationId!!,
                         )
                     stream.onData = { data ->
                       try {
@@ -262,18 +260,14 @@ fun connectionHandler(
                       handler.close()
                       stream.close()
                     }
-                    stream.onError = { _, _ ->
-                      handler.close()
-                    }
+                    stream.onError = { _, _ -> handler.close() }
                   },
-                  onClose = { socket ->
-                    socket.closeSocket();
-                  },
-                  onError = { _, _, _ ->
-                  },
-                  getDecryptedKey = { key ->
-                    accessKey = key
-                    val encryptedPrivateKey = skdb.privateKeyAsStored(key)
+                  onClose = { socket -> socket.closeSocket() },
+                  onError = { _, _, _ -> },
+                  getDecryptedKey = { authMsg ->
+                    accessKey = authMsg.accessKey
+                    replicationId = skdb.replicationId(authMsg.deviceUuid).decodeOrThrow().trim()
+                    val encryptedPrivateKey = skdb.privateKeyAsStored(authMsg.accessKey)
                     encryption.decrypt(encryptedPrivateKey)
                   },
               )
