@@ -750,6 +750,7 @@ class EagerDir{
     o: String -> void,
     format: OutputFormat,
     filter: (SKFS.Context, Bool) ~> (SKFS.BaseName -> Bool),
+    destinationTime: ?Tick = None(),
   ): void {
     writer = mutable Debug.BufferedWriter(o, 1024);
     filterFun = filter(context.clone(), isReset);
@@ -759,8 +760,7 @@ class EagerDir{
     for (key in changes) {
       if (!filterFun(key)) continue;
       if (!producedDiffLine && !this.reallyRemove) {
-        writer.write("\n");
-        writer.write("\n");
+        writer.write("\n\n");
       };
       values = this.getArrayRaw(key);
       if (values.size() == 0) {
@@ -780,7 +780,12 @@ class EagerDir{
     // TODO: this is sql specific
     if ((producedDiffLine || isReset) && !this.reallyRemove) {
       // output a checkpoint, indicated by the leading colon
-      writer.write(":" + context.tick.value.toString() + "\n");
+      ourTime = context.tick.value.toString();
+      theirTime = destinationTime match {
+      | None() -> ""
+      | Some(t) -> " " + t.value.toString()
+      };
+      writer.write(`:${ourTime}${theirTime}\n`);
     };
 
     writer.flush();
