@@ -12,6 +12,29 @@ const indexInput: SKFS.DirName = SKFS.DirName::create("/indexInput/");
 const indexOutput: SKFS.DirName = SKFS.DirName::create("/indexOutput/");
 const indexByCol: SKFS.DirName = SKFS.DirName::create("/indexByCol/");
 
+// TODO: move somewhere
+// TODO: should this produce a Tick always and default to zero? or we
+// can default on reading and keep backward compat output
+fun getWatermark(
+  context: SKFS.Context,
+  tableName: String,
+  replicationSource: ?Int,
+): ?SKFS.Tick {
+  replicationSource match {
+  | None() -> None()
+  | Some(source) ->
+    watermarkDirname = SKFS.DirName::create(`/watermarks/${source}/`);
+    context.unsafeMaybeGetDir(watermarkDirname) match {
+    | None() -> None()
+    | Some(d) ->
+      arr = d.getArrayRaw(SKFS.SID::create(tableName));
+      if (arr.size() > 0) Some(SKFS.TickFile::fromFile(arr[0]).value) else {
+        None()
+      }
+    }
+  }
+}
+
 extension class TypeDescr extends SKFS.File
 
 class DirDescr{
@@ -257,6 +280,7 @@ fun getSubsDirs(
         reset,
         matchesGroup,
         filter,
+        (context) ~> getWatermark(context, request.viewName, request.ignoreSource),
       );
       writer.write(key, SKFS.IntFile(sessionID))
     },
