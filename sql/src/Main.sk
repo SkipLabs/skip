@@ -189,7 +189,14 @@ untracked fun main(): void {
             ),
         )
         .subcommand(
-          Cli.Command("uid").about("Get a unique id for this database"),
+          Cli.Command("replication-id")
+            .about("Get a unique id for CLIENT-UUID")
+            .arg(
+              Cli.StringArg("client-uuid")
+                .positional()
+                .required()
+                .about("UUID of the client instance"),
+            ),
         )
         .subcommand(
           Cli.Command("write-csv")
@@ -289,7 +296,7 @@ untracked fun main(): void {
           | "write" -> execWrite
           | "tail" -> execTail
           | "watermark" -> execWatermark
-          | "uid" -> execUid
+          | "replication-id" -> execReplicationId
           | "write-csv" -> execWriteCsv
           | "subscribe" -> execSubscribe
           | "replay" -> execReplay
@@ -665,9 +672,27 @@ fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
   });
 }
 
-fun execUid(args: Cli.ParseResults, _options: SKSQL.Options): void {
+fun execReplicationId(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
-  print_string(SKFS.genSym(0));
+  clientUuid = args.getString("client-uuid").lowercase();
+  SKSQL.runSql(options, context ~> {
+    clientsDirname = SKFS.DirName::create(`/clients/`);
+    clientsDir = context.maybeGetDir(clientsDirname) match {
+    | None() -> context.mkdir(SKFS.IntFile::fromFile, clientsDirname, false)
+    | Some(d) -> SKFS.EHandle(SKFS.IntFile::fromFile, d.getDirName())
+    };
+    key = SKFS.SID::create(clientUuid);
+    arr = clientsDir.unsafeGetArray(context, key);
+    replicationSource = if (arr.size() > 0) {
+      arr[0].value
+    } else {
+      source = SKFS.genSym(0);
+      clientsDir.writeArray(context, key, Array[SKFS.IntFile(source)]);
+      source
+    };
+    print_string(replicationSource);
+    SKFS.CStop(None())
+  });
 }
 
 fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {

@@ -1920,7 +1920,7 @@ class SKDBServer {
     const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
 
     const server = new SKDBServer(client, conn, creds);
-    server.replicationUid = client.runLocal(["uid"], "").trim();
+    server.replicationUid = client.runLocal(["replication-id", creds.deviceUuid], "").trim();
     return server
   }
 
