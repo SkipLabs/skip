@@ -41,6 +41,13 @@ setup_local() {
     $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" > $SESSION
 }
 
+replicate_to_local() {
+    table=$1
+    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --user test_user --ignore-source 1234 "$table")
+    $SKDB_BIN --data $SERVER_DB tail --format=csv --since 0 "$sub" |
+        $SKDB_BIN write-csv "$table" --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
+}
+
 replicate_to_server() {
     table=$1
     cat $UPDATES | $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
@@ -483,6 +490,157 @@ test_tailing_dups_uses_repeat() {
     rm -f "$output"
 }
 
+
+test_seen_insert_deleted() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 0
+    rm -f "$output"
+}
+
+test_unseen_insert_not_deleted() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    rm -f "$output"
+}
+
+test_unseen_insert_added_to() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 3
+    rm -f "$output"
+}
+
+test_seen_insert_clobbered() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note='bar' WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+}
+
+test_unseen_insert_not_updated() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note='bar' WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+}
+
+test_unseen_delete_does_not_affect_insert() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 1
+    rm -f "$output"
+}
+
+test_unseen_delete_does_not_affect_delete() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 0
+    rm -f "$output"
+}
+
 # tests:
 run_test test_basic_replication_unique_rows
 run_test test_basic_replication_unique_rows_replayed
@@ -504,3 +662,11 @@ run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count
 run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dups
 
 run_test test_tailing_dups_uses_repeat
+
+run_test test_unseen_insert_not_deleted
+run_test test_unseen_insert_added_to
+run_test test_unseen_delete_does_not_affect_insert
+run_test test_unseen_delete_does_not_affect_delete
+run_test test_seen_insert_deleted
+run_test test_seen_insert_clobbered
+run_test test_unseen_insert_not_updated
