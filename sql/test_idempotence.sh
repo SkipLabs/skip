@@ -53,6 +53,13 @@ replicate_to_server() {
     cat $UPDATES | $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
 }
 
+replicate_diff_to_server() {
+    table=$1
+    since=$2
+    $SKDB_BIN --data $LOCAL_DB diff --format=csv --since "$since" "$(cat $SESSION)" |
+        $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
+}
+
 run_test() {
     echo -n "$1.............."
     eval "$1"
@@ -492,7 +499,6 @@ test_tailing_dups_uses_repeat() {
     rm -f "$output"
 }
 
-
 test_seen_insert_deleted() {
     setup_server
     setup_local test_without_pk
@@ -646,6 +652,123 @@ test_unseen_delete_does_not_affect_delete() {
     rm -f "$output"
 }
 
+# AA - idempotentency
+test_reconnect_replayed() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_server test_without_pk
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 2
+    rm -f "$output"
+}
+
+# AB - commutativity
+test_replayed_with_more_local_data() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_server test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 3
+    rm -f "$output"
+}
+
+# AB - commutativity
+test_reconnect_replayed_with_more_local_data() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_server test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    # this is a reconnect, we figure out the diff
+    replicate_diff_to_server test_without_pk 0
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 3
+    rm -f "$output"
+}
+
+# BA - commutativity
+test_old_diff_replayed() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    # stash what would have been sent up
+    save=$(mktemp)
+    cp $UPDATES "$save"
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_server test_without_pk
+
+    # restore and replay
+    mv "$save" $UPDATES
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 3
+    rm -f "$output"
+    rm -f "$save"
+}
+
+# BA - commutativity
+test_reconnect_old_diff_replayed() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_to_local test_without_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    # stash what would have been sent up
+    save=$(mktemp)
+    cp $UPDATES "$save"
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    replicate_diff_to_server test_without_pk 0
+
+    # restore and replay
+    mv "$save" $UPDATES
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    assert_line_count "$output" foo 3
+    rm -f "$output"
+    rm -f "$save"
+}
+
+
 # tests:
 run_test test_basic_replication_unique_rows
 run_test test_basic_replication_unique_rows_replayed
@@ -668,10 +791,18 @@ run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dup
 
 run_test test_tailing_dups_uses_repeat
 
+# local updates
 run_test test_seen_insert_deleted
 run_test test_unseen_insert_not_deleted
 run_test test_unseen_insert_added_to
-run_test test_unseen_delete_gets_clobbered
-run_test test_unseen_delete_does_not_affect_delete
 run_test test_seen_insert_clobbered
 run_test test_unseen_insert_not_updated
+run_test test_unseen_delete_gets_clobbered
+run_test test_unseen_delete_does_not_affect_delete
+
+# still have idempotence and commutativity
+run_test test_reconnect_replayed
+run_test test_replayed_with_more_local_data
+run_test test_reconnect_replayed_with_more_local_data
+run_test test_old_diff_replayed
+run_test test_reconnect_old_diff_replayed
