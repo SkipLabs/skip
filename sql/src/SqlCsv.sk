@@ -171,20 +171,31 @@ fun replayDiff(
     skipExit(23);
   };
 
-  makeFun = (rows, reset, checkpoint, _snapshot) -> {
+  makeFun = (rows, reset, checkpoint, snapshot) -> {
     Some((context, delta, _) ~> {
+      previouslySeen = SKSQL.getWatermark(
+        context,
+        table.name.lower,
+        Some(identity),
+      );
+      (checkpoint, previouslySeen) match {
+      | (Some(x), Some(y)) if (x <= y.value) -> return void
+      | _ -> void
+      };
+
       dir = context.unsafeGetEagerDir(table.dirName);
       entries = mutable Vector[];
       for (row in rows) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          if (tick.value <= snapshot.default(0) || source.path() == writer) {
+            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          }
         };
       };
       if (!entries.isEmpty()) {
         !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
       };
-
       !dir = dir.writeArraySourceManyReturnDir(
         context,
         rows
@@ -231,6 +242,7 @@ fun replayDiff(
       context.setDir(dir.dirName, dir);
 
       if (checkpoint is Some _) {
+        // TODO: factor out setWatermark and keep these together somewhere
         checkpointTick = SKFS.Tick(checkpoint.fromSome());
         delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
         watermarkDir = context.maybeGetDir(watermarkDirname) match {
@@ -252,7 +264,7 @@ fun replayDiff(
   // the tick of the sender that this update takes us in sync to
   checkpoint: ?Int = None();
   // our tick that the sender is in sync with - they applied this
-  // change to our snaphshot at this time
+  // change to our snapshot at this time
   snapshot: ?Int = None();
   reset = false;
 
@@ -288,7 +300,7 @@ fun replayDiff(
                 Some(String::fromChars(chars.toArray()).toInt()),
                 reset,
                 checkpoint,
-                snapshot
+                snapshot,
               )
             }
           };

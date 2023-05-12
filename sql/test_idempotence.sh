@@ -334,10 +334,10 @@ test_basic_replication_dup_rows_server_state_different() {
 
     replicate_to_server test_without_pk
 
-    # last-writer-wins assignment semantic
+    # different writers so they combine
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
-    assert_line_count "$output" foo 2
+    assert_line_count "$output" foo 3
     rm -f "$output"
 }
 
@@ -381,7 +381,9 @@ test_basic_replication_with_deletes_server_state_different() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
     replicate_to_server test_without_pk
-    assert_server_rows_has 0 foo
+
+    # we still have the record as this was concurrently written
+    assert_server_rows_has 1 foo
 }
 
 test_replication_with_a_row_that_has_a_higher_than_two_repeat_count() {
@@ -597,7 +599,7 @@ test_unseen_insert_not_updated() {
     rm -f "$output"
 }
 
-test_unseen_delete_does_not_affect_insert() {
+test_unseen_delete_gets_clobbered() {
     setup_server
     setup_local test_without_pk
 
@@ -613,9 +615,12 @@ test_unseen_delete_does_not_affect_insert() {
 
     replicate_to_server test_without_pk
 
+    # the client now asserts there should be two rows. our concurrency
+    # model is that inserts always beat deletes and need to be
+    # resolved.
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
-    assert_line_count "$output" foo 1
+    assert_line_count "$output" foo 2
     rm -f "$output"
 }
 
@@ -666,7 +671,7 @@ run_test test_tailing_dups_uses_repeat
 run_test test_seen_insert_deleted
 run_test test_unseen_insert_not_deleted
 run_test test_unseen_insert_added_to
-run_test test_unseen_delete_does_not_affect_insert
+run_test test_unseen_delete_gets_clobbered
 run_test test_unseen_delete_does_not_affect_delete
 run_test test_seen_insert_clobbered
 run_test test_unseen_insert_not_updated
