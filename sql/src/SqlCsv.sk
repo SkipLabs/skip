@@ -171,7 +171,7 @@ fun replayDiff(
     skipExit(23);
   };
 
-  makeFun = (rows, reset, checkpoint) -> {
+  makeFun = (rows, reset, checkpoint, _snapshot) -> {
     Some((context, delta, _) ~> {
       dir = context.unsafeGetEagerDir(table.dirName);
       entries = mutable Vector[];
@@ -234,7 +234,8 @@ fun replayDiff(
         checkpointTick = SKFS.Tick(checkpoint.fromSome());
         delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
         watermarkDir = context.maybeGetDir(watermarkDirname) match {
-        | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarkDirname, false)
+        | None() ->
+          context.mkdir(SKFS.TickFile::fromFile, watermarkDirname, false)
         | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
         };
         watermarkKey = SKFS.SID::create(table.name.lower);
@@ -248,7 +249,11 @@ fun replayDiff(
     })
   };
 
+  // the tick of the sender that this update takes us in sync to
   checkpoint: ?Int = None();
+  // our tick that the sender is in sync with - they applied this
+  // change to our snaphshot at this time
+  snapshot: ?Int = None();
   reset = false;
 
   vtry<SKFS.ContextOp>(
@@ -260,7 +265,7 @@ fun replayDiff(
 
         chars: mutable Vector<Char> = mutable Vector[];
         iter = line.getIter();
-        (repeat, !reset, !checkpoint) = loop {
+        (repeat, !reset, !checkpoint, !snapshot) = loop {
           c = iter.next() match {
           | None() ->
             print_error(
@@ -268,21 +273,22 @@ fun replayDiff(
             );
             skipExit(23)
           | Some(':') ->
-            break (
-              None(),
-              reset,
-              Some(line.sub(iter, line.length() - chars.size() - 1).toInt()),
-            )
+            ticks = line
+              .sub(iter, line.length() - chars.size() - 1)
+              .split(" ")
+              .map(x -> x.toInt());
+            break (None(), reset, ticks.maybeGet(0), ticks.maybeGet(1))
           | Some(x) -> x
           };
           if (c == '\t') {
             if (chars.size() == 0 || chars[0] == '\t') {
-              break (None(), true, checkpoint)
+              break (None(), true, checkpoint, snapshot)
             } else {
               break (
                 Some(String::fromChars(chars.toArray()).toInt()),
                 reset,
                 checkpoint,
+                snapshot
               )
             }
           };
@@ -332,14 +338,14 @@ fun replayDiff(
         | Some(_) ->
           rows = buffer.toArray();
           buffer.clear();
-          break SKFS.CContinue(makeFun(rows, reset, checkpoint))
+          break SKFS.CContinue(makeFun(rows, reset, checkpoint, snapshot))
         }
       }
     },
     exn -> {
       if (exn is EndOfFile _) {
         rows = buffer.toArray();
-        SKFS.CStop(makeFun(rows, reset, checkpoint))
+        SKFS.CStop(makeFun(rows, reset, checkpoint, snapshot))
       } else {
         flushStdout();
         SKFS.CContinue(None())
