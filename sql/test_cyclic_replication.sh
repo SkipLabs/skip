@@ -200,7 +200,12 @@ test_updates_filters_write_csv_with_local_input_local_write_first() {
 
     # server sent down 1 row
     assert_line_count "$SERVER_TAIL" hello 1
-    assert_line_count "$LOCAL_UPDATES" hello 1 # still just 1
+    assert_line_count "$LOCAL_UPDATES" hello 2 # update with more output to reflect there are now 2
+
+    # server sends down again for some reason
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
+    assert_line_count "$LOCAL_UPDATES" hello 2 # still just the same 2 updates
 }
 
 run_test test_updates_filters_write_csv_with_local_input_local_write_first
@@ -272,8 +277,14 @@ test_updates_filters_write_csv_with_local_input_then_write_csv_zeros() {
 
     # server sent down 1 row - the zero out row
     assert_line_count "$SERVER_TAIL" hello 1
-    # no more emits
-    assert_line_count "$LOCAL_UPDATES" hello 1
+    # we emit an update - we now only have 1 row
+    assert_line_count "$LOCAL_UPDATES" hello 2
+
+    # replicate full history down again
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
+    # still only have the two
+    assert_line_count "$LOCAL_UPDATES" hello 2
 }
 
 run_test test_updates_filters_write_csv_with_local_input_then_write_csv_zeros
@@ -394,17 +405,21 @@ test_diff_filters_write_csv_mixed_with_local_input_write_first() {
 
     # server sent down 1 row
     assert_line_count "$SERVER_TAIL" hello 1
-    assert_line_count "$LOCAL_UPDATES" hello 1 # still 1
+    assert_line_count "$LOCAL_UPDATES" hello 2 # we update from 1 to 2
 
-    # we end up with just one row. the write-csv clobbers our local
-    # write. this is expected as we have no conflict prevention, so
-    # the write is lost.
-    [[ $($SKDB_BIN --data $LOCAL_DB <<< "select count(*) from test where note = 'hello';") -eq 1 ]] || exit 1
+    # replicate full history to local again
+    rm -f "$SERVER_TAIL"
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
+
+    # the write-csv does not clobber our local write.
+    [[ $($SKDB_BIN --data $LOCAL_DB <<< "select count(*) from test where note = 'hello';") -eq 2 ]] || exit 1
 
     # simulate reconnect
     $SKDB_BIN diff --data $LOCAL_DB --format=csv --since 0 "$local_session" > $LOCAL_DIFF
-    # we send none as our local data was lost and this is all imported now.
-    assert_line_count "$LOCAL_DIFF" hello 0
+    # we send something up because our local data isn't lost
+    assert_line_count "$LOCAL_DIFF" hello 1
 }
 
 run_test test_diff_filters_write_csv_mixed_with_local_input_write_first
@@ -471,7 +486,7 @@ test_diff_filters_write_csv_mixed_with_local_input_then_write_csv_zeros() {
     # simulate reconnect
     $SKDB_BIN diff --data $LOCAL_DB --format=csv --since 0 "$local_session" > $LOCAL_DIFF
     # there was a local write so we need to send this
-    assert_line_count "$LOCAL_DIFF" hello 0
+    assert_line_count "$LOCAL_DIFF" hello 1
 }
 
 run_test test_diff_filters_write_csv_mixed_with_local_input_then_write_csv_zeros
