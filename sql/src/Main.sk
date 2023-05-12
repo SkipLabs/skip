@@ -497,7 +497,13 @@ fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
 
     origContext.setGlobal(
       "Stdout",
-      SKSQL.StdoutDiff(format, sub.dirName, SKFS.Tick(time), sub.filter),
+      SKSQL.StdoutDiff(
+        format,
+        sub.dirName,
+        SKFS.Tick(time),
+        sub.filter,
+        sub.getDestinationWatermark,
+      ),
     );
     SKFS.CStop(None())
   })
@@ -662,8 +668,9 @@ fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
   source = args.getString("source").toIntOption();
   SKSQL.runSql(options, context ~> {
     print_string(
-      SKSQL.getWatermark(context.clone(), tableName, source).default(SKFS.Tick(0))
-        .value,
+      SKSQL.getWatermark(context.clone(), tableName, source).default(
+        SKFS.Tick(0),
+      ).value,
     );
     SKFS.CStop(None())
   });
