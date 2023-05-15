@@ -726,8 +726,6 @@ EOF
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user --ignore-source 1234 test)
     $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
 
-    cat $SERVER_TAIL
-
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
 
 
