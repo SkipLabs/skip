@@ -732,7 +732,7 @@ class EagerDir{
       mutexLock(lock);
       fd = unixOpen(file);
       o = x -> writeToFile(fd, x);
-      this.writeDiffStdout(
+      _ = this.writeDiffStdout(
         context,
         isReset,
         changes,
@@ -763,7 +763,7 @@ class EagerDir{
     format: OutputFormat,
     filter: (SKFS.Context, Bool) ~> (SKFS.BaseName -> Bool),
     destinationTime: ?Tick,
-  ): void {
+  ): Bool {
     writer = mutable Debug.BufferedWriter(o, 1024);
     filterFun = filter(context.clone(), isReset);
 
@@ -802,6 +802,8 @@ class EagerDir{
 
     writer.flush();
     flushStdout();
+
+    producedDiffLine
   }
 
   fun purgeOld(): FixedSingle<Source, MInfo> {
