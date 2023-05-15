@@ -12,6 +12,44 @@ const indexInput: SKFS.DirName = SKFS.DirName::create("/indexInput/");
 const indexOutput: SKFS.DirName = SKFS.DirName::create("/indexOutput/");
 const indexByCol: SKFS.DirName = SKFS.DirName::create("/indexByCol/");
 
+fun getWatermark(
+  context: readonly SKFS.Context,
+  tableName: String,
+  replicationSource: ?Int,
+): ?SKFS.Tick {
+  replicationSource match {
+  | None() -> None()
+  | Some(source) ->
+    watermarkDirname = SKFS.DirName::create(`/watermarks/${source}/`);
+    context.unsafeMaybeGetDir(watermarkDirname) match {
+    | None() -> None()
+    | Some(d) ->
+      arr = d.getArrayRaw(SKFS.SID::create(tableName));
+      if (arr.size() > 0) Some(SKFS.TickFile::fromFile(arr[0]).value) else {
+        None()
+      }
+    }
+  }
+}
+
+fun setWatermark(
+  context: mutable SKFS.Context,
+  tableName: String,
+  replicationSource: Int,
+  checkpointTick: SKFS.Tick,
+): void {
+  watermarkDirname = SKFS.DirName::create(`/watermarks/${replicationSource}/`);
+  watermarkDir = context.maybeGetDir(watermarkDirname) match {
+  | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarkDirname, false)
+  | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
+  };
+  watermarkKey = SKFS.SID::create(tableName);
+  mark = watermarkDir
+    .unsafeGetArray(context, watermarkKey)
+    .reduce(max, SKFS.TickFile(checkpointTick));
+  watermarkDir.writeArray(context, watermarkKey, Array[mark]);
+}
+
 extension class TypeDescr extends SKFS.File
 
 class DirDescr{
@@ -257,6 +295,9 @@ fun getSubsDirs(
         reset,
         matchesGroup,
         filter,
+        (context) ~>
+          getWatermark(context, request.viewName, request.ignoreSource)
+        ,
       );
       writer.write(key, SKFS.IntFile(sessionID))
     },

@@ -177,6 +177,11 @@ untracked fun main(): void {
           Cli.Command("watermark")
             .about("Get the watermark for table TABLE")
             .arg(
+              Cli.StringArg("source")
+                .required()
+                .about("Globally unique identity of this write stream"),
+            )
+            .arg(
               Cli.StringArg("table")
                 .positional()
                 .required()
@@ -184,7 +189,14 @@ untracked fun main(): void {
             ),
         )
         .subcommand(
-          Cli.Command("uid").about("Get a unique id for this database"),
+          Cli.Command("replication-id")
+            .about("Get a unique id for CLIENT-UUID")
+            .arg(
+              Cli.StringArg("client-uuid")
+                .positional()
+                .required()
+                .about("UUID of the client instance"),
+            ),
         )
         .subcommand(
           Cli.Command("write-csv")
@@ -284,7 +296,7 @@ untracked fun main(): void {
           | "write" -> execWrite
           | "tail" -> execTail
           | "watermark" -> execWatermark
-          | "uid" -> execUid
+          | "replication-id" -> execReplicationId
           | "write-csv" -> execWriteCsv
           | "subscribe" -> execSubscribe
           | "replay" -> execReplay
@@ -485,7 +497,13 @@ fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
 
     origContext.setGlobal(
       "Stdout",
-      SKSQL.StdoutDiff(format, sub.dirName, SKFS.Tick(time), sub.filter),
+      SKSQL.StdoutDiff(
+        format,
+        sub.dirName,
+        SKFS.Tick(time),
+        sub.filter,
+        sub.getDestinationWatermark,
+      ),
     );
     SKFS.CStop(None())
   })
@@ -536,9 +554,9 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     edir = context.unsafeGetEagerDir(dirName);
     format = options.format match {
     | SKSQL.OFK_CSV() -> SKFS.OCSV()
-    | SKSQL.OFK_JSON() -> SKFS.OJSON(getFieldNames(context, sub.dirName))
+    | SKSQL.OFK_JSON() -> SKFS.OJSON(getFieldNames(context, dirName))
     | SKSQL.OFK_SQL() -> SKFS.OSQL()
-    | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, sub.dirName))
+    | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, dirName))
     };
 
     sub.userID match {
@@ -608,6 +626,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       print_raw,
       format,
       sub.filter,
+      sub.getDestinationWatermark(context),
     );
     !tick = context.tick.value;
     !init = false;
@@ -646,21 +665,38 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   tableName = args.getString("table").lowercase();
+  source = args.getString("source").toIntOption();
   SKSQL.runSql(options, context ~> {
-    watermarkDir = context.maybeGetDir(SKCSV.watermarks) match {
-    | None() -> context.mkdir(SKFS.TickFile::fromFile, SKCSV.watermarks, false)
-    | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
-    };
-    arr = watermarkDir.unsafeGetArray(context, SKFS.SID::create(tableName));
-    watermark = if (arr.size() > 0) arr[0].value.value else 0;
-    print_string(watermark);
+    print_string(
+      SKSQL.getWatermark(context.clone(), tableName, source).default(
+        SKFS.Tick(0),
+      ).value,
+    );
     SKFS.CStop(None())
   });
 }
 
-fun execUid(args: Cli.ParseResults, _options: SKSQL.Options): void {
+fun execReplicationId(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
-  print_string(SKFS.genSym(0));
+  clientUuid = args.getString("client-uuid").lowercase();
+  SKSQL.runSql(options, context ~> {
+    clientsDirname = SKFS.DirName::create(`/clients/`);
+    clientsDir = context.maybeGetDir(clientsDirname) match {
+    | None() -> context.mkdir(SKFS.IntFile::fromFile, clientsDirname, false)
+    | Some(d) -> SKFS.EHandle(SKFS.IntFile::fromFile, d.getDirName())
+    };
+    key = SKFS.SID::create(clientUuid);
+    arr = clientsDir.unsafeGetArray(context, key);
+    replicationSource = if (arr.size() > 0) {
+      arr[0].value
+    } else {
+      source = SKFS.genSym(0);
+      clientsDir.writeArray(context, key, Array[SKFS.IntFile(source)]);
+      source
+    };
+    print_string(replicationSource);
+    SKFS.CStop(None())
+  });
 }
 
 fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
@@ -689,8 +725,8 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
       }
     };
     source = args.maybeGetString("source") match {
-    | Some(src) -> SKFS.IID(src.toInt())
-    | None() -> SKFS.IID(SKFS.genSym(0))
+    | Some(src) -> src.toInt()
+    | None() -> SKFS.genSym(0)
     };
     SKCSV.replayDiff(context, line, myReadLine, table, user, source)
   })

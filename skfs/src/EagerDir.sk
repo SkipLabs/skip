@@ -690,6 +690,7 @@ class EagerDir{
     writerPath: Path,
     keep: SortedSet<BaseName>,
     isVisible: BaseName -> Bool = _ -> true,
+    wasSeen: (Tick, Source) ~> Bool = (_, _) ~> true,
   ): this {
     this.unsafeGetFileIter().each(kv -> {
       (key, valueIter) = kv;
@@ -698,14 +699,17 @@ class EagerDir{
         | None() -> void
         | Some _ ->
           this.unsafeGetDataIterWithoutTombs(key).each(kv -> {
-            (_, source, _values) = kv;
-            !this = this.writeEntry(
-              context,
-              source.path(),
-              writerPath,
-              key,
-              Array[],
-            );
+            (tick, source, _values) = kv;
+            // do not wipe out data that has not yet been seen
+            if (wasSeen(tick, source)) {
+              !this = this.writeEntry(
+                context,
+                source.path(),
+                writerPath,
+                key,
+                Array[],
+              )
+            }
           })
         }
       }
@@ -728,7 +732,15 @@ class EagerDir{
       mutexLock(lock);
       fd = unixOpen(file);
       o = x -> writeToFile(fd, x);
-      this.writeDiffStdout(context, isReset, changes, o, csv, sub.filter);
+      this.writeDiffStdout(
+        context,
+        isReset,
+        changes,
+        o,
+        csv,
+        sub.filter,
+        sub.getDestinationWatermark(context),
+      );
       _ = unixClose(fd);
       mutexUnlock(lock)
     | NNotify(file) ->
@@ -750,6 +762,7 @@ class EagerDir{
     o: String -> void,
     format: OutputFormat,
     filter: (SKFS.Context, Bool) ~> (SKFS.BaseName -> Bool),
+    destinationTime: ?Tick,
   ): void {
     writer = mutable Debug.BufferedWriter(o, 1024);
     filterFun = filter(context.clone(), isReset);
@@ -759,8 +772,7 @@ class EagerDir{
     for (key in changes) {
       if (!filterFun(key)) continue;
       if (!producedDiffLine && !this.reallyRemove) {
-        writer.write("\n");
-        writer.write("\n");
+        writer.write("\n\n");
       };
       values = this.getArrayRaw(key);
       if (values.size() == 0) {
@@ -780,7 +792,12 @@ class EagerDir{
     // TODO: this is sql specific
     if ((producedDiffLine || isReset) && !this.reallyRemove) {
       // output a checkpoint, indicated by the leading colon
-      writer.write(":" + context.tick.value.toString() + "\n");
+      ourTime = context.tick.value.toString();
+      theirTime = destinationTime match {
+      | None() -> ""
+      | Some(t) -> " " + t.value.toString()
+      };
+      writer.write(`:${ourTime}${theirTime}\n`);
     };
 
     writer.flush();

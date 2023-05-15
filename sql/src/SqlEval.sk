@@ -1740,6 +1740,7 @@ class StdoutDiff(
   dirName: SKFS.DirName,
   time: SKFS.Tick,
   filter: (SKFS.Context, Bool) ~> (SKFS.BaseName -> Bool),
+  getDestinationWatermark: (readonly SKFS.Context) ~> ?SKFS.Tick,
 ) extends SKFS.File
 
 class StdoutCheckpointAck(time: SKFS.Tick) extends SKFS.File
@@ -1776,10 +1777,18 @@ fun printContext(context: mutable SKFS.Context): void {
     for (selectDir in stdout.toArray().reversed()) {
       showSelect(context, format, selectDir)
     }
-  | Some(StdoutDiff(format, dirName, time, filter)) ->
+  | Some(StdoutDiff(format, dirName, time, filter, getWatermark)) ->
     edir = context.unsafeGetEagerDir(dirName);
     (isReset, changes) = edir.getChangesAfter(time);
-    edir.writeDiffStdout(context, isReset, changes, print_raw, format, filter)
+    edir.writeDiffStdout(
+      context,
+      isReset,
+      changes,
+      print_raw,
+      format,
+      filter,
+      getWatermark(context),
+    )
 
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
