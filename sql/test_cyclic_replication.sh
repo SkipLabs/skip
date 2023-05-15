@@ -678,3 +678,67 @@ EOF
 }
 
 run_test test_server_should_apply_client_reset_only_to_writes_seen
+
+
+# replay write-csv exactly but with checkpoint and snapshot increased so it takes affect
+# should still be idempotent
+test_server_write_csv_idempotent_even_when_bumped() {
+    setup_server
+
+    # write a row as the source under test
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
+
+
+1	0,"foo"
+:10
+EOF
+
+    server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user --ignore-source 1234 test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
+
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
+
+
+1	0,"foo"
+:20 1000
+EOF
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
+
+    assert_line_count "$SERVER_TAIL" '0\|foo' 1
+}
+
+run_test test_server_write_csv_idempotent_even_when_bumped
+
+# replay write-csv exactly but with checkpoint and snapshot increased so it takes affect
+# and with a reset - should still be idempotent
+test_server_write_csv_idempotent_even_when_bumped_and_reset() {
+    setup_server
+
+    # write a row as the source under test
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
+
+
+1	0,"foo"
+:10
+EOF
+
+    server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user --ignore-source 1234 test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
+
+    cat $SERVER_TAIL
+
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
+
+
+1	0,"foo"
+		
+:20 1000
+EOF
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
+
+    assert_line_count "$SERVER_TAIL" '0\|foo' 1
+}
+
+run_test test_server_write_csv_idempotent_even_when_bumped_and_reset
