@@ -163,7 +163,6 @@ fun replayDiff(
 ): SKFS.ContextOp {
   userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
   writer = SKFS.Path(table.dirName, SKFS.IID(identity));
-  watermarkDirname = SKFS.DirName::create(`/watermarks/${identity}/`);
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
 
   if (table.windowSize is Some _) {
@@ -248,19 +247,9 @@ fun replayDiff(
       context.setDir(dir.dirName, dir);
 
       if (checkpoint is Some _) {
-        // TODO: factor out setWatermark and keep these together somewhere
         checkpointTick = SKFS.Tick(checkpoint.fromSome());
+        SKSQL.setWatermark(context, table.name.lower, identity, checkpointTick);
         delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
-        watermarkDir = context.maybeGetDir(watermarkDirname) match {
-        | None() ->
-          context.mkdir(SKFS.TickFile::fromFile, watermarkDirname, false)
-        | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
-        };
-        watermarkKey = SKFS.SID::create(table.name.lower);
-        mark = watermarkDir
-          .unsafeGetArray(context, watermarkKey)
-          .reduce(max, SKFS.TickFile(checkpointTick));
-        watermarkDir.writeArray(context, watermarkKey, Array[mark]);
       };
 
       context.update()
