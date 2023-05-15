@@ -634,3 +634,47 @@ EOF
 }
 
 run_test test_server_should_apply_client_reset_to_their_subset_view_of_data
+
+
+# if a client sends up a reset it should not wipe out local writes that haven't sync'd
+test_server_should_apply_client_reset_only_to_writes_seen() {
+    setup_server
+
+    # write a row as the source under test
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
+
+
+1	0,"foo"
+:10
+EOF
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(7,'new');"
+    server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user --ignore-source 1234 test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
+
+    # if we did replicate now we would get the new row
+    assert_line_count "$SERVER_TAIL" 'new' 1
+    # sanity check the tick value - it's important for later - we're at 46 they're at 10
+    assert_line_count "$SERVER_TAIL" ':46 10' 1
+
+    # now the source under test sends up a reset for whatever reason -
+    # maybe reconnect. it wipes out its own foo value but not the new,
+    # because it hasn't seen this row yet: 35 < 46.
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
+
+
+1	1,"baz"
+1	2,"quux"
+		
+:22 35
+EOF
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
+
+    assert_line_count "$SERVER_TAIL" '1\|baz' 1
+    assert_line_count "$SERVER_TAIL" '2\|quux' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo' 0
+    assert_line_count "$SERVER_TAIL" '7\|new' 1
+}
+
+run_test test_server_should_apply_client_reset_only_to_writes_seen

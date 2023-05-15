@@ -690,6 +690,7 @@ class EagerDir{
     writerPath: Path,
     keep: SortedSet<BaseName>,
     isVisible: BaseName -> Bool = _ -> true,
+    wasSeen: (Tick, Source) ~> Bool = (_, _) ~> true,
   ): this {
     this.unsafeGetFileIter().each(kv -> {
       (key, valueIter) = kv;
@@ -698,14 +699,17 @@ class EagerDir{
         | None() -> void
         | Some _ ->
           this.unsafeGetDataIterWithoutTombs(key).each(kv -> {
-            (_, source, _values) = kv;
-            !this = this.writeEntry(
-              context,
-              source.path(),
-              writerPath,
-              key,
-              Array[],
-            );
+            (tick, source, _values) = kv;
+            // do not wipe out data that has not yet been seen
+            if (wasSeen(tick, source)) {
+              !this = this.writeEntry(
+                context,
+                source.path(),
+                writerPath,
+                key,
+                Array[],
+              )
+            }
           })
         }
       }

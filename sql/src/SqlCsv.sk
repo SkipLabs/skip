@@ -185,10 +185,15 @@ fun replayDiff(
 
       dir = context.unsafeGetEagerDir(table.dirName);
       entries = mutable Vector[];
+
+      // we may only affect rows that have been seen
+      isEligibleForTomb = (tick, source) ~>
+        tick.value <= snapshot.default(0) || source.path() == writer;
+
       for (row in rows) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
         for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          if (tick.value <= snapshot.default(0) || source.path() == writer) {
+          if (isEligibleForTomb(tick, source)) {
             entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
           }
         };
@@ -236,6 +241,7 @@ fun replayDiff(
             .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
             .collect(SortedSet),
           isVisibleToUser,
+          isEligibleForTomb,
         );
       };
 
