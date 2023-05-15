@@ -28,7 +28,7 @@ const insert_rows = function(client, skdb, i, cb) {
 
   // TODO: more operations: deletes, updates, etc.
   const f = () => {
-    skdb.sql(`INSERT INTO log VALUES(${i}, ${client}, ${i}, -1, ${client});`);
+    skdb.sql(`INSERT INTO log VALUES(${i}, ${client}, ${i}, -1);`);
     // avoid stack overflow by using event loop
     setTimeout(() => insert_rows(client, skdb, i + 1, cb), 0);
   };

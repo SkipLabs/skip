@@ -27,7 +27,7 @@ run_server() {
      echo "COMMIT;"
     ) | $SKDB
 
-    echo "CREATE TABLE log (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL, skdb_owner INTEGER);" | $SKDB
+    echo "CREATE TABLE log (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
 
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > /tmp/soak-server-log &
 
