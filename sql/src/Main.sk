@@ -619,7 +619,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     | _ -> void
     };
     (isReset, changes) = edir.getChangesAfter(SKFS.Tick(tick));
-    edir.writeDiffStdout(
+    producedOutput = edir.writeDiffStdout(
       context,
       isReset,
       changes,
@@ -628,6 +628,13 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       sub.filter,
       sub.getDestinationWatermark(context),
     );
+    if (!producedOutput && init) {
+      // on first iteration we ensure we output a checkpoint without
+      // delay so that the downstreams knows that it has received
+      // everything without waiting for the condvar timeout
+      print_raw(":" + tick.toString() + "\n");
+      flushStdout();
+    };
     !tick = context.tick.value;
     !init = false;
     lock = SKFS.unfreezeLock(sub.lock);
