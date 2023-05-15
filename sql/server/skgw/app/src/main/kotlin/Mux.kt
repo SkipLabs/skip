@@ -116,7 +116,7 @@ class MuxedSocket(
     val onStream: onStreamFn,
     val onClose: onSocketCloseFn,
     val onError: onSocketErrorFn,
-    val getDecryptedKey: (String) -> ByteArray,
+    val getDecryptedKey: (MuxAuthMsg) -> ByteArray,
     private val mutex: ReadWriteLock = ReentrantReadWriteLock(),
     private var authenticatedAt: Instant? = null,
     private var state: State = State.IDLE,
@@ -673,7 +673,7 @@ class MuxedSocket(
 
     val mac = Mac.getInstance(algo)
 
-    val privateKey = getDecryptedKey(auth.accessKey)
+    val privateKey = getDecryptedKey(auth)
 
     mac.init(SecretKeySpec(privateKey, algo))
     val ourSig = mac.doFinal(contentBytes)

@@ -1,8 +1,5 @@
 module SKCSV;
 
-// checkpoint watermarks are recorded in to the file system
-const watermarks: SKFS.DirName = SKFS.DirName::create("/watermarks/");
-
 base class Token {
   children =
   | NewLine()
@@ -162,30 +159,47 @@ fun replayDiff(
   getLine: () -> String,
   table: SKSQL.DirDescr,
   user: ?String,
-  identity: SKFS.BaseName,
+  identity: Int,
 ): SKFS.ContextOp {
   userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
+  writer = SKFS.Path(table.dirName, SKFS.IID(identity));
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
+
   if (table.windowSize is Some _) {
     print_error("Cannot use write-csv on a window or a stream");
     skipExit(23);
   };
 
-  makeFun = (rows, reset, checkpoint) -> {
+  makeFun = (rows, reset, checkpoint, snapshot) -> {
     Some((context, delta, _) ~> {
+      previouslySeen = SKSQL.getWatermark(
+        context,
+        table.name.lower,
+        Some(identity),
+      );
+      (checkpoint, previouslySeen) match {
+      | (Some(x), Some(y)) if (x <= y.value) -> return void
+      | _ -> void
+      };
+
       dir = context.unsafeGetEagerDir(table.dirName);
-      writer = SKFS.Path(table.dirName, identity);
       entries = mutable Vector[];
+
+      // we may only affect rows that have been seen
+      isEligibleForTomb = (tick, source) ~>
+        tick.value <= snapshot.default(0) || source.path() == writer;
+
       for (row in rows) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          if (isEligibleForTomb(tick, source)) {
+            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          }
         };
       };
       if (!entries.isEmpty()) {
         !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
       };
-
       !dir = dir.writeArraySourceManyReturnDir(
         context,
         rows
@@ -226,6 +240,7 @@ fun replayDiff(
             .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
             .collect(SortedSet),
           isVisibleToUser,
+          isEligibleForTomb,
         );
       };
 
@@ -233,23 +248,19 @@ fun replayDiff(
 
       if (checkpoint is Some _) {
         checkpointTick = SKFS.Tick(checkpoint.fromSome());
+        SKSQL.setWatermark(context, table.name.lower, identity, checkpointTick);
         delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
-        watermarkDir = context.maybeGetDir(watermarks) match {
-        | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks, false)
-        | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
-        };
-        watermarkKey = SKFS.SID::create(table.name.lower);
-        mark = watermarkDir
-          .unsafeGetArray(context, watermarkKey)
-          .reduce(max, SKFS.TickFile(checkpointTick));
-        watermarkDir.writeArray(context, watermarkKey, Array[mark]);
       };
 
       context.update()
     })
   };
 
+  // the tick of the sender that this update takes us in sync to
   checkpoint: ?Int = None();
+  // our tick that the sender is in sync with - they applied this
+  // change to our snapshot at this time
+  snapshot: ?Int = None();
   reset = false;
 
   vtry<SKFS.ContextOp>(
@@ -261,7 +272,7 @@ fun replayDiff(
 
         chars: mutable Vector<Char> = mutable Vector[];
         iter = line.getIter();
-        (repeat, !reset, !checkpoint) = loop {
+        (repeat, !reset, !checkpoint, !snapshot) = loop {
           c = iter.next() match {
           | None() ->
             print_error(
@@ -269,21 +280,22 @@ fun replayDiff(
             );
             skipExit(23)
           | Some(':') ->
-            break (
-              None(),
-              reset,
-              Some(line.sub(iter, line.length() - chars.size() - 1).toInt()),
-            )
+            ticks = line
+              .sub(iter, line.length() - chars.size() - 1)
+              .split(" ")
+              .map(x -> x.toInt());
+            break (None(), reset, ticks.maybeGet(0), ticks.maybeGet(1))
           | Some(x) -> x
           };
           if (c == '\t') {
             if (chars.size() == 0 || chars[0] == '\t') {
-              break (None(), true, checkpoint)
+              break (None(), true, checkpoint, snapshot)
             } else {
               break (
                 Some(String::fromChars(chars.toArray()).toInt()),
                 reset,
                 checkpoint,
+                snapshot,
               )
             }
           };
@@ -333,14 +345,14 @@ fun replayDiff(
         | Some(_) ->
           rows = buffer.toArray();
           buffer.clear();
-          break SKFS.CContinue(makeFun(rows, reset, checkpoint))
+          break SKFS.CContinue(makeFun(rows, reset, checkpoint, snapshot))
         }
       }
     },
     exn -> {
       if (exn is EndOfFile _) {
         rows = buffer.toArray();
-        SKFS.CStop(makeFun(rows, reset, checkpoint))
+        SKFS.CStop(makeFun(rows, reset, checkpoint, snapshot))
       } else {
         flushStdout();
         SKFS.CContinue(None())
