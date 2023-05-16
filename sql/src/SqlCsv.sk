@@ -208,26 +208,37 @@ fun replayDiff(
         tick.value <= snapshot.default(0) || source.path() == writer;
 
       for (row in rows) {
-        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          if (isEligibleForTomb(tick, source)) {
+        key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
+        keyRepeat = row.repeat;
+        for ((tick, source, files) in dir.getDataIterWithoutTombs(
+          context,
+          key,
+        )) {
+          if (!isEligibleForTomb(tick, source)) {
+            continue
+          };
+          srcRepeat = 0;
+          for (file in files) {
+            !srcRepeat = srcRepeat + SKSQL.RowValues::fromFile(file).repeat
+          };
+
+          if (keyRepeat - srcRepeat < 0) {
             entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          } else {
+            !keyRepeat = keyRepeat - srcRepeat;
           }
         };
+
+        if (keyRepeat != 0) {
+          entries.push(
+            (key, (writer, writer, Array[row.setRepeat(keyRepeat)])),
+          );
+        }
       };
+
       if (!entries.isEmpty()) {
         !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
       };
-      !dir = dir.writeArraySourceManyReturnDir(
-        context,
-        rows
-          .iterator()
-          .filter(row -> row.repeat != 0)
-          .map(row -> {
-            (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
-            ((k : SKFS.BaseName), (writer, writer, (v : Array<SKFS.File>)))
-          }),
-      );
 
       isVisibleToUser = userFileOpt match {
       | None() -> _ -> true
