@@ -39,7 +39,6 @@ base class ComparisonKind {
 }
 
 class ExprEvaluator(
-  params: ?Row,
   entries: Array<Row>,
   tables: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
   up: ?ExprEvaluator,
@@ -55,15 +54,7 @@ class ExprEvaluator(
     expr match {
     | CNull() -> ANull()
 
-    | CFGetParam(n) ->
-      this.params match {
-      | None() -> AUndef()
-      | Some(params) ->
-        params.getFloat(n) match {
-        | None() -> ANull()
-        | Some(v) -> ADef(v)
-        }
-      }
+    | CFGetParam(_) -> AUndef()
 
     | CFGetFrom(tableNbr, n) ->
       if (tableNbr >= this.entries.size()) {
@@ -273,15 +264,7 @@ class ExprEvaluator(
     | SKSQL.CSFCast(e) -> this.evalCFExpr(context, e).map(f -> f.toString())
     | SKSQL.CSICast(e) -> this.evalCIExpr(context, e).map(f -> f.toString())
 
-    | CSGetParam(n) ->
-      this.params match {
-      | None() -> AUndef()
-      | Some(params) ->
-        params.getString(n) match {
-        | None() -> ANull()
-        | Some(v) -> ADef(v)
-        }
-      }
+    | CSGetParam(_) -> AUndef()
 
     | CUp(x) ->
       this.up match {
@@ -309,15 +292,7 @@ class ExprEvaluator(
     | CNull() -> ANull()
     | CISize(tableNbr) ->
       ADef(context.getEagerDir(this.tables[tableNbr].i0.dirName).size(context))
-    | CIGetParam(n) ->
-      this.params match {
-      | None() -> AUndef()
-      | Some(params) ->
-        params.getInt(n) match {
-        | None() -> ANull()
-        | Some(v) -> ADef(v)
-        }
-      }
+    | CIGetParam(_) -> AUndef()
     | CIGetFrom(tableNbr, n) ->
       if (tableNbr >= this.entries.size()) {
         AUndef()
