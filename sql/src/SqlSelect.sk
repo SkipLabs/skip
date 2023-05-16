@@ -212,7 +212,7 @@ class SelectEvaluator{
   types: Array<Type>,
 } {
   fun evalStaticInt(context: mutable SKFS.Context, expr: CExpr<Int>): Int {
-    emptyEval = ExprEvaluator(None(), Array[], this.select.from, this.up);
+    emptyEval = ExprEvaluator(Array[], this.select.from, this.up);
     emptyEval.evalCIExpr(context, expr) match {
     | ANull() -> 0
     | ADef(x) -> x
@@ -465,14 +465,9 @@ class SelectEvaluator{
 
     if (this.select.from.size() == 0) {
       if (context.unsafeMaybeGetEagerDir(this.selectName1) is None()) {
-        emptyEval = ExprEvaluator(None(), Array[], this.select.from, this.up);
+        emptyEval = ExprEvaluator(Array[], this.select.from, this.up);
         entry = static::evalRow(context, emptyEval, aggrs.map(y -> y.i1), 1);
-        evaluator = ExprEvaluator(
-          None(),
-          Array[entry],
-          this.select.from,
-          this.up,
-        );
+        evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
         row = static::evalRow(context, evaluator, this.select.params, 1);
         _dir = context.mkdir(
           Row::fromFile,
@@ -513,12 +508,7 @@ class SelectEvaluator{
           | None() -> return void
           | Some(x) -> x
           };
-          evaluator = ExprEvaluator(
-            None(),
-            Array[entry],
-            this.select.from,
-            this.up,
-          );
+          evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
           this.select.having match {
           | None() ->
             row = static::evalRow(context, evaluator, this.select.params, 1);
@@ -555,7 +545,6 @@ class SelectEvaluator{
             ),
           );
           emptyEvaluator = ExprEvaluator(
-            None(),
             Array[emptyEntry],
             this.select.from,
             this.up,
@@ -633,7 +622,7 @@ class SelectEvaluator{
   fun evalEmptyFrom(context: mutable SKFS.Context): void {
     dirName = this.selectName2;
     if (context.unsafeMaybeGetEagerDir(dirName) is None()) {
-      evaluator = ExprEvaluator(None(), Array[], this.select.from, this.up);
+      evaluator = ExprEvaluator(Array[], this.select.from, this.up);
 
       whereVal = evaluator.evalWhere(context, this.select.where);
       row = whereVal match {
@@ -861,7 +850,6 @@ class SelectEvaluator{
     repeat: Int,
   ): void {
     evaluator = ExprEvaluator(
-      None(),
       entries match {
       | List.Nil() -> Array[inputRow]
       | l -> List.Cons(inputRow, l).reversed().collect(Array)
