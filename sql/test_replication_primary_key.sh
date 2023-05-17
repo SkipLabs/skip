@@ -111,6 +111,9 @@ assert_server_rows_has() {
     rm -f "$output"
 }
 
+################################################################################
+# basic replication scenarios
+################################################################################
 
 test_basic_replication_unique_rows() {
     setup_server
@@ -373,6 +376,11 @@ test_tailing_dups_uses_repeat() {
     grep -q '2	0,"foo"' "$output" || fail
     rm -f "$output"
 }
+
+################################################################################
+# these tests replicate data around first so we build some notion of
+# the vector clock and test concurrency
+################################################################################
 
 test_seen_insert_deleted() {
     setup_server

@@ -190,10 +190,50 @@ fun replayDiff(
     };
   };
 
-  // we have two update strategies depending on whether the diff is
-  // assigning rows a repeat value or whether it is communicating
-  // the entire current state (a reset).
+  // we have several update strategies:
 
+  // assignRows - if there are no constraints on the table then we
+  // treat the relations as a multiset CRDT. inserts beat deletes when
+  // concurrent.
+  assignRows = (rows, checkpoint, snapshot) -> {
+    Some((context, delta, _) ~> {
+      if (shouldShortCircuitUpdate(context, checkpoint)) {
+        return void;
+      };
+
+      dir = context.unsafeGetEagerDir(table.dirName);
+      entries = mutable Vector[];
+
+      for (row in rows) {
+        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          if (tick.value <= snapshot.default(0) || source.path() == writer) {
+            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          }
+        };
+      };
+      if (!entries.isEmpty()) {
+        !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+      };
+      !dir = dir.writeArraySourceManyReturnDir(
+        context,
+        rows
+          .iterator()
+          .filter(row -> row.repeat != 0)
+          .map(row -> {
+            (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
+            ((k : SKFS.BaseName), (writer, writer, (v : Array<SKFS.File>)))
+          }),
+      );
+
+      context.setDir(dir.dirName, dir);
+      checkpointAndAck(context, delta, checkpoint);
+      context.update()
+    })
+  };
+
+  // resetRows - if the update is communicating the entire current
+  // state (a reset).
   resetRows = (rows, checkpoint, snapshot) -> {
     Some((context, delta, _) ~> {
       if (shouldShortCircuitUpdate(context, checkpoint)) {
@@ -277,37 +317,11 @@ fun replayDiff(
     })
   };
 
-  assignRows = (rows, checkpoint, snapshot) -> {
+  // lwwRows - if there is a unique constraint on the table (e.g. a
+  // PK) then we resolve this using LWW. the total order is formed
+  // using the vector clock and concurrent tiebreaks use the row data.
+  lwwRows = (rows, checkpoint, snapshot) -> {
     Some((context, delta, _) ~> {
-      if (shouldShortCircuitUpdate(context, checkpoint)) {
-        return void;
-      };
-
-      dir = context.unsafeGetEagerDir(table.dirName);
-      entries = mutable Vector[];
-
-      for (row in rows) {
-        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          if (tick.value <= snapshot.default(0) || source.path() == writer) {
-            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
-          }
-        };
-      };
-      if (!entries.isEmpty()) {
-        !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
-      };
-      !dir = dir.writeArraySourceManyReturnDir(
-        context,
-        rows
-          .iterator()
-          .filter(row -> row.repeat != 0)
-          .map(row -> {
-            (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
-            ((k : SKFS.BaseName), (writer, writer, (v : Array<SKFS.File>)))
-          }),
-      );
-
       context.setDir(dir.dirName, dir);
       checkpointAndAck(context, delta, checkpoint);
       context.update()
