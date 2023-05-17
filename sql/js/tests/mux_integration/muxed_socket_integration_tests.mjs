@@ -56,7 +56,7 @@ async function connectAndAuth() {
   const socket = await MuxedSocket.connect("ws://localhost:8080", {
     accessKey: "ABCDEFGHIJKLMNOPQRST",
     privateKey: key,
-    deviceUuid: "abcde",
+    deviceUuid: "f6a0a084-d21f-487d-813a-971c183309a3",
   });
   return socket;
 }
@@ -305,7 +305,7 @@ const tests = {
     const socket = await MuxedSocket.connect("ws://localhost:8080", {
       accessKey: "root",
       privateKey: key,
-      deviceUuid: "abcde",
+      deviceUuid: "f6a0a084-d21f-487d-813a-971c183309a3",
     });
 
     let receivedError = false;
@@ -338,7 +338,7 @@ const tests = {
     const socket = await MuxedSocket.connect("ws://localhost:8080", {
       accessKey: "ABCDEFGHIJKLMNOPQRST",
       privateKey: key,
-      deviceUuid: "abcde",
+      deviceUuid: "F6A0A084-D21F-487D-813A-971C183309A3",
     });
 
     let receivedError = false;

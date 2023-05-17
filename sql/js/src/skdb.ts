@@ -1346,7 +1346,7 @@ export class MuxedSocket {
       this.state = MuxedSocketState.CLOSED;
       const lastStream = Math.max(this.nextStream - 2, this.serverStreamWatermark);
       this.socket.send(this.encodeGoawayMsg(lastStream, errorCode, msg));
-      this.socket.close(1002);
+      this.socket.close(4000);
       break;
     }
     }
