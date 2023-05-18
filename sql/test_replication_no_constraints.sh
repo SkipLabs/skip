@@ -609,6 +609,56 @@ test_unseen_insert_not_updated() {
     rm -f "$output"
 }
 
+test_unseen_update_is_not_updated() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "UPDATE test_without_pk SET note='bar' WHERE id = 0;"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note='baz' WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 1
+    rm -f "$output"
+}
+
+test_unseen_update_is_not_updated_reversed() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "UPDATE test_without_pk SET note='baz' WHERE id = 0;"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note='bar' WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 1
+    rm -f "$output"
+}
+
 test_unseen_delete_gets_clobbered() {
     setup_server
     setup_local test_without_pk
@@ -801,6 +851,8 @@ run_test test_unseen_insert_not_deleted
 run_test test_unseen_insert_added_to
 run_test test_seen_insert_clobbered
 run_test test_unseen_insert_not_updated
+run_test test_unseen_update_is_not_updated
+run_test test_unseen_update_is_not_updated_reversed
 run_test test_unseen_delete_gets_clobbered
 run_test test_unseen_delete_does_not_affect_delete
 
