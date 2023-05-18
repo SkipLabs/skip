@@ -200,7 +200,7 @@ fun applyDiffStrategy(
     for (row in rows) {
       key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
       for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-        if (tick.value <= snapshot.default(0) || source.path() == writer) {
+        if (tick.value < snapshot.default(0) || source.path() == writer) {
           entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
         }
       };
@@ -236,7 +236,7 @@ fun applyDiffStrategy(
 
     // we may only affect rows that have been seen
     isEligibleForTomb = (tick, source) ~>
-      tick.value <= snapshot.default(0) || source.path() == writer;
+      tick.value < snapshot.default(0) || source.path() == writer;
 
     for (row in rows) {
       key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
@@ -325,7 +325,7 @@ fun applyDiffStrategy(
       if (row.repeat < 1) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
         for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          if (tick.value <= snapshot.default(0) || source.path() == writer) {
+          if (tick.value < snapshot.default(0) || source.path() == writer) {
             entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
           }
         };
