@@ -382,21 +382,32 @@ fun applyDiffStrategy(
       selectHandle = SKSQL.evalSelect(context, select, None());
       selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
 
+      keepingCurrent = false;
       selectDir.unsafeIterKeys((key, _tick) -> {
-        for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          // TODO: do concurrency checks and short-circuit the delete
-          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          if (
+            tick.value < snapshot.default(0) ||
+            source.path() == writer ||
+            SKSQL.RowKey::fromFile(key).row < row
+          ) {
+            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          } else {
+            !keepingCurrent = true;
+          }
         };
       });
-
-      key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
-      entries.push((key, (writer, writer, Array<SKFS.File>[row])));
+      if (!keepingCurrent) {
+        // new row
+        entries.push(
+          (
+            SKSQL.RowKey(row, table.kinds),
+            (writer, writer, Array<SKFS.File>[row]),
+          ),
+        );
+      }
     };
 
-    if (!entries.isEmpty()) {
-      !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
-    };
-
+    !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
     context.setDir(dir.dirName, dir);
     checkpointAndAck(context, delta);
     context.update()
