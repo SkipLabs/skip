@@ -305,15 +305,108 @@ fun applyDiffStrategy(
   // lwwRows - if there is a unique constraint on the table (e.g. a
   // PK) then we resolve this using LWW. the total order is formed
   // using the vector clock and concurrent tiebreaks use the row data.
-  // lwwRows = Some((context, delta, _) ~> {
-  //     context.setDir(dir.dirName, dir);
-  //     checkpointAndAck(context, delta);
-  //     context.update()
-  //   });
+  lwwRows = Some((context, delta, _) ~> {
+    if (shouldShortCircuitUpdate(context)) {
+      return void;
+    };
 
-  if (reset) resetRows else {
-    assignRows
-  }
+    dir = context.unsafeGetEagerDir(table.dirName);
+    entries = mutable Vector[];
+
+    primaryIdx = for ((i, type) in table.schema.items()) {
+      if (type.primary) {
+        break i
+      }
+    } else {
+      invariant_violation("Using LWW without a primary key.")
+    };
+
+    for (row in rows) {
+      if (row.repeat < 1) {
+        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          if (tick.value <= snapshot.default(0) || source.path() == writer) {
+            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          }
+        };
+        continue;
+      };
+
+      select = SKSQL.CSelect{
+        // TODO: does this litter the context with select dirs? how are these cleaned up?
+        id => SKSQL.Name::create("SELECT_" + SKFS.genSym(0)),
+        kind => SKSQL.SAll(),
+        params => table.kinds.map(kind ~> {
+          (idx, _, type) = kind;
+          type match {
+          | SKSQL.FLOAT() -> SKSQL.CFExpr(SKSQL.CFGetFrom(0, idx))
+          | SKSQL.INTEGER() -> SKSQL.CIExpr(SKSQL.CIGetFrom(0, idx))
+          | SKSQL.TEXT() -> SKSQL.CSExpr(SKSQL.CSGetFrom(0, idx))
+          }
+        }),
+        sets => Array[],
+        aggr => None(),
+        kinds => table.kinds,
+        from => Array[(table, None())],
+        where => Some(
+          table.schema[primaryIdx].ty match {
+          | SKSQL.FLOAT() ->
+            SKSQL.CFEq(
+              SKSQL.CFGetFrom(0, primaryIdx),
+              SKSQL.CFLiteral(row.getFloat(primaryIdx).fromSome()),
+            )
+          | SKSQL.INTEGER() ->
+            SKSQL.CIEq(
+              SKSQL.CIGetFrom(0, primaryIdx),
+              SKSQL.CILiteral(row.getInt(primaryIdx).fromSome()),
+            )
+          | SKSQL.TEXT() ->
+            SKSQL.CSEq(
+              SKSQL.CSGetFrom(0, primaryIdx),
+              SKSQL.CSLiteral(row.getString(primaryIdx).fromSome()),
+            )
+          },
+        ),
+        groupBy => None(),
+        having => None(),
+        orderBy => None(),
+        limit => None(),
+        rest => None(),
+        needUp => false,
+        needGetParam => false,
+        directMode => false, // TODO: can I use it? does it use an index?
+        format => SKFS.OSQL(),
+        other => Array[],
+      };
+      // TODO: is it definitely using an index?
+      selectHandle = SKSQL.evalSelect(context, select, None());
+      selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
+
+      selectDir.unsafeIterKeys((key, _tick) -> {
+        for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          // TODO: do concurrency checks and short-circuit the delete
+          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+        };
+      });
+
+      key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
+      entries.push((key, (writer, writer, Array<SKFS.File>[row])));
+    };
+
+    if (!entries.isEmpty()) {
+      !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+    };
+
+    context.setDir(dir.dirName, dir);
+    checkpointAndAck(context, delta);
+    context.update()
+  });
+
+  if (reset) return resetRows;
+
+  if (table.schema.any(x ~> x.primary)) return lwwRows;
+
+  assignRows
 }
 
 fun replayDiff(
