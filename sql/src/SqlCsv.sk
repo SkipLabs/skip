@@ -153,24 +153,18 @@ fun insert(
   SKFS.CStop(f)
 }
 
-fun replayDiff(
-  context: mutable SKFS.Context,
-  lineNbr: mutable Ref<Int>,
-  getLine: () -> String,
+fun applyDiffStrategy(
   table: SKSQL.DirDescr,
-  user: ?String,
   identity: Int,
-): SKFS.ContextOp {
-  userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
+  userFileOpt: ?SKSQL.UserFile,
+  reset: Bool,
+  rows: Array<SKSQL.RowValues>,
+  checkpoint: ?Int,
+  snapshot: ?Int,
+): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
   writer = SKFS.Path(table.dirName, SKFS.IID(identity));
-  buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
 
-  if (table.windowSize is Some _) {
-    print_error("Cannot use write-csv on a window or a stream");
-    skipExit(23);
-  };
-
-  shouldShortCircuitUpdate = (context, checkpoint) ~> {
+  shouldShortCircuitUpdate = (context) ~> {
     previouslySeen = SKSQL.getWatermark(
       context,
       table.name.lower,
@@ -182,7 +176,7 @@ fun replayDiff(
     };
   };
 
-  checkpointAndAck = (context, delta, checkpoint) ~> {
+  checkpointAndAck = (context, delta) ~> {
     if (checkpoint is Some _) {
       checkpointTick = SKFS.Tick(checkpoint.fromSome());
       SKSQL.setWatermark(context, table.name.lower, identity, checkpointTick);
@@ -190,128 +184,254 @@ fun replayDiff(
     };
   };
 
-  // we have two update strategies depending on whether the diff is
-  // assigning rows a repeat value or whether it is communicating
-  // the entire current state (a reset).
+  // we have several update strategies:
 
-  resetRows = (rows, checkpoint, snapshot) -> {
-    Some((context, delta, _) ~> {
-      if (shouldShortCircuitUpdate(context, checkpoint)) {
-        return void;
+  // assignRows - if there are no constraints on the table then we
+  // treat the relations as a multiset CRDT. inserts beat deletes when
+  // concurrent.
+  assignRows = Some((context, delta, _) ~> {
+    if (shouldShortCircuitUpdate(context)) {
+      return void;
+    };
+
+    dir = context.unsafeGetEagerDir(table.dirName);
+    entries = mutable Vector[];
+
+    for (row in rows) {
+      key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+      for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+        if (tick.value < snapshot.default(0) || source.path() == writer) {
+          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+        }
       };
+    };
+    if (!entries.isEmpty()) {
+      !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+    };
+    !dir = dir.writeArraySourceManyReturnDir(
+      context,
+      rows
+        .iterator()
+        .filter(row -> row.repeat != 0)
+        .map(row -> {
+          (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
+          ((k : SKFS.BaseName), (writer, writer, (v : Array<SKFS.File>)))
+        }),
+    );
 
-      dir = context.unsafeGetEagerDir(table.dirName);
-      entries = mutable Vector[];
+    context.setDir(dir.dirName, dir);
+    checkpointAndAck(context, delta);
+    context.update()
+  });
 
-      // we may only affect rows that have been seen
-      isEligibleForTomb = (tick, source) ~>
-        tick.value <= snapshot.default(0) || source.path() == writer;
+  // resetRows - if the update is communicating the entire current
+  // state (a reset).
+  resetRows = Some((context, delta, _) ~> {
+    if (shouldShortCircuitUpdate(context)) {
+      return void;
+    };
 
-      for (row in rows) {
-        key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
-        keyRepeat = row.repeat;
-        for ((tick, source, files) in dir.getDataIterWithoutTombs(
-          context,
-          key,
-        )) {
-          if (!isEligibleForTomb(tick, source)) {
-            continue
-          };
-          srcRepeat = 0;
-          for (file in files) {
-            !srcRepeat = srcRepeat + SKSQL.RowValues::fromFile(file).repeat
-          };
+    dir = context.unsafeGetEagerDir(table.dirName);
+    entries = mutable Vector[];
 
-          if (keyRepeat - srcRepeat < 0) {
-            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
-          } else {
-            !keyRepeat = keyRepeat - srcRepeat;
-          }
+    // we may only affect rows that have been seen
+    isEligibleForTomb = (tick, source) ~>
+      tick.value < snapshot.default(0) || source.path() == writer;
+
+    for (row in rows) {
+      key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
+      keyRepeat = row.repeat;
+      for ((tick, source, files) in dir.getDataIterWithoutTombs(context, key)) {
+        if (!isEligibleForTomb(tick, source)) {
+          continue
+        };
+        srcRepeat = 0;
+        for (file in files) {
+          !srcRepeat = srcRepeat + SKSQL.RowValues::fromFile(file).repeat
         };
 
-        if (keyRepeat != 0) {
-          entries.push(
-            (key, (writer, writer, Array[row.setRepeat(keyRepeat)])),
-          );
+        if (keyRepeat - srcRepeat < 0) {
+          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+        } else {
+          !keyRepeat = keyRepeat - srcRepeat;
         }
       };
 
-      if (!entries.isEmpty()) {
-        !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
-      };
+      if (keyRepeat != 0) {
+        entries.push((key, (writer, writer, Array[row.setRepeat(keyRepeat)])));
+      }
+    };
 
-      isVisibleToUser = userFileOpt match {
+    if (!entries.isEmpty()) {
+      !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+    };
+
+    isVisibleToUser = userFileOpt match {
+    | None() -> _ -> true
+    | Some(userFile) ->
+      access = mutable SKSQL.AccessSolver(userFile.id);
+      table.cols.maybeGet(SKSQL.skdbAccess) match {
       | None() -> _ -> true
-      | Some(userFile) ->
-        access = mutable SKSQL.AccessSolver(userFile.id);
-        table.cols.maybeGet(SKSQL.skdbAccess) match {
-        | None() -> _ -> true
-        | Some(accessColNbr) ->
-          (file: SKFS.BaseName) -> {
-            file match {
-            | k @ SKSQL.RowKey _ ->
-              k.row.getInt(accessColNbr) match {
-              | None() -> true
-              | Some(accessID) -> access.canRead(context, accessID)
-              }
-            | _ -> true
+      | Some(accessColNbr) ->
+        (file: SKFS.BaseName) -> {
+          file match {
+          | k @ SKSQL.RowKey _ ->
+            k.row.getInt(accessColNbr) match {
+            | None() -> true
+            | Some(accessID) -> access.canRead(context, accessID)
             }
+          | _ -> true
           }
         }
-      };
-      !dir = dir.reset(
-        context,
-        writer,
-        rows
-          .iterator()
-          .filter(row -> row.repeat != 0)
-          .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
-          .collect(SortedSet),
-        isVisibleToUser,
-        isEligibleForTomb,
-      );
+      }
+    };
+    !dir = dir.reset(
+      context,
+      writer,
+      rows
+        .iterator()
+        .filter(row -> row.repeat != 0)
+        .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
+        .collect(SortedSet),
+      isVisibleToUser,
+      isEligibleForTomb,
+    );
 
-      context.setDir(dir.dirName, dir);
-      checkpointAndAck(context, delta, checkpoint);
-      context.update()
-    })
-  };
+    context.setDir(dir.dirName, dir);
+    checkpointAndAck(context, delta);
+    context.update()
+  });
 
-  assignRows = (rows, checkpoint, snapshot) -> {
-    Some((context, delta, _) ~> {
-      if (shouldShortCircuitUpdate(context, checkpoint)) {
-        return void;
-      };
+  // lwwRows - if there is a unique constraint on the table (e.g. a
+  // PK) then we resolve this using LWW. the total order is formed
+  // using the vector clock and concurrent tiebreaks use the row data.
+  lwwRows = Some((context, delta, _) ~> {
+    if (shouldShortCircuitUpdate(context)) {
+      return void;
+    };
 
-      dir = context.unsafeGetEagerDir(table.dirName);
-      entries = mutable Vector[];
+    dir = context.unsafeGetEagerDir(table.dirName);
+    entries = mutable Vector[];
 
-      for (row in rows) {
+    primaryIdx = for ((i, type) in table.schema.items()) {
+      if (type.primary) {
+        break i
+      }
+    } else {
+      invariant_violation("Using LWW without a primary key.")
+    };
+
+    for (row in rows) {
+      if (row.repeat < 1) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
         for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          if (tick.value <= snapshot.default(0) || source.path() == writer) {
+          if (tick.value < snapshot.default(0) || source.path() == writer) {
             entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
           }
         };
+        continue;
       };
-      if (!entries.isEmpty()) {
-        !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
-      };
-      !dir = dir.writeArraySourceManyReturnDir(
-        context,
-        rows
-          .iterator()
-          .filter(row -> row.repeat != 0)
-          .map(row -> {
-            (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
-            ((k : SKFS.BaseName), (writer, writer, (v : Array<SKFS.File>)))
-          }),
-      );
 
-      context.setDir(dir.dirName, dir);
-      checkpointAndAck(context, delta, checkpoint);
-      context.update()
-    })
+      select = SKSQL.CSelect{
+        id => SKSQL.Name::create("SELECT_" + SKFS.genSym(0)),
+        kind => SKSQL.SAll(),
+        params => table.kinds.map(kind ~> {
+          (idx, _, type) = kind;
+          type match {
+          | SKSQL.FLOAT() -> SKSQL.CFExpr(SKSQL.CFGetFrom(0, idx))
+          | SKSQL.INTEGER() -> SKSQL.CIExpr(SKSQL.CIGetFrom(0, idx))
+          | SKSQL.TEXT() -> SKSQL.CSExpr(SKSQL.CSGetFrom(0, idx))
+          }
+        }),
+        sets => Array[],
+        aggr => None(),
+        kinds => table.kinds,
+        from => Array[(table, None())],
+        where => Some(
+          table.schema[primaryIdx].ty match {
+          | SKSQL.FLOAT() ->
+            SKSQL.CFEq(
+              SKSQL.CFGetFrom(0, primaryIdx),
+              SKSQL.CFLiteral(row.getFloat(primaryIdx).fromSome()),
+            )
+          | SKSQL.INTEGER() ->
+            SKSQL.CIEq(
+              SKSQL.CIGetFrom(0, primaryIdx),
+              SKSQL.CILiteral(row.getInt(primaryIdx).fromSome()),
+            )
+          | SKSQL.TEXT() ->
+            SKSQL.CSEq(
+              SKSQL.CSGetFrom(0, primaryIdx),
+              SKSQL.CSLiteral(row.getString(primaryIdx).fromSome()),
+            )
+          },
+        ),
+        groupBy => None(),
+        having => None(),
+        orderBy => None(),
+        limit => None(),
+        rest => None(),
+        needUp => false,
+        needGetParam => false,
+        directMode => false,
+        format => SKFS.OSQL(),
+        other => Array[],
+      };
+      selectHandle = SKSQL.evalSelect(context, select, None());
+      selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
+
+      keepingCurrent = false;
+      selectDir.unsafeIterKeys((key, _tick) -> {
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          if (
+            tick.value < snapshot.default(0) ||
+            source.path() == writer ||
+            SKSQL.RowKey::fromFile(key).row < row
+          ) {
+            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          } else {
+            !keepingCurrent = true;
+          }
+        };
+      });
+      if (!keepingCurrent) {
+        // new row
+        entries.push(
+          (
+            SKSQL.RowKey(row, table.kinds),
+            (writer, writer, Array<SKFS.File>[row]),
+          ),
+        );
+      }
+    };
+
+    !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+    context.setDir(dir.dirName, dir);
+    checkpointAndAck(context, delta);
+    context.update()
+  });
+
+  if (reset) return resetRows;
+
+  if (table.schema.any(x ~> x.primary)) return lwwRows;
+
+  assignRows
+}
+
+fun replayDiff(
+  context: mutable SKFS.Context,
+  lineNbr: mutable Ref<Int>,
+  getLine: () -> String,
+  table: SKSQL.DirDescr,
+  user: ?String,
+  identity: Int,
+): SKFS.ContextOp {
+  userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
+  buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
+
+  if (table.windowSize is Some _) {
+    print_error("Cannot use write-csv on a window or a stream");
+    skipExit(23);
   };
 
   // the tick of the sender that this update takes us in sync to
@@ -404,9 +524,15 @@ fun replayDiff(
           rows = buffer.toArray();
           buffer.clear();
           break SKFS.CContinue(
-            if (reset) resetRows(rows, checkpoint, snapshot) else {
-              assignRows(rows, checkpoint, snapshot)
-            },
+            applyDiffStrategy(
+              table,
+              identity,
+              userFileOpt,
+              reset,
+              rows,
+              checkpoint,
+              snapshot,
+            ),
           )
         }
       }
@@ -415,9 +541,15 @@ fun replayDiff(
       if (exn is EndOfFile _) {
         rows = buffer.toArray();
         SKFS.CStop(
-          if (reset) resetRows(rows, checkpoint, snapshot) else {
-            assignRows(rows, checkpoint, snapshot)
-          },
+          applyDiffStrategy(
+            table,
+            identity,
+            userFileOpt,
+            reset,
+            rows,
+            checkpoint,
+            snapshot,
+          ),
         )
       } else {
         flushStdout();

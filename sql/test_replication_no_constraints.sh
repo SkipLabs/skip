@@ -23,7 +23,6 @@ setup_server() {
      echo "COMMIT;"
     ) | $SKDB
 
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
     echo "CREATE TABLE test_without_pk (id INTEGER, note STRING);" | $SKDB
 }
 
@@ -35,7 +34,6 @@ setup_local() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
     echo "CREATE TABLE test_without_pk (id INTEGER, note STRING);" | $SKDB
 
     $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" > $SESSION
@@ -78,11 +76,9 @@ debug() {
     cat $WRITE_OUTPUT
 
     echo local state:
-    $SKDB_BIN --data $LOCAL_DB <<< "select * from test_with_pk;"
     $SKDB_BIN --data $LOCAL_DB <<< "select * from test_without_pk;"
 
     echo server state:
-    $SKDB_BIN --data $SERVER_DB <<< "select * from test_with_pk;"
     $SKDB_BIN --data $SERVER_DB <<< "select * from test_without_pk;"
     echo --------------------------------------
 }
@@ -115,19 +111,22 @@ assert_server_rows_has() {
     rm -f "$output"
 }
 
+################################################################################
+# basic replication scenarios
+################################################################################
 
 test_basic_replication_unique_rows() {
     setup_server
-    setup_local test_with_pk
+    setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(2,'baz');"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_without_pk
 
     output=$(mktemp)
-    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
     assert_line_count "$output" foo 1
     assert_line_count "$output" bar 1
     assert_line_count "$output" baz 1
@@ -136,26 +135,26 @@ test_basic_replication_unique_rows() {
 
 test_basic_replication_unique_rows_replayed() {
     setup_server
-    setup_local test_with_pk
+    setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(2,'baz');"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_without_pk
 
     output=$(mktemp)
-    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
     assert_line_count "$output" foo 1
     assert_line_count "$output" bar 1
     assert_line_count "$output" baz 1
     rm -f "$output"
 
     # simulate a reconnect - resend everything
-    replicate_to_server test_with_pk
+    replicate_to_server test_without_pk
 
     output=$(mktemp)
-    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
     assert_line_count "$output" foo 1
     assert_line_count "$output" bar 1
     assert_line_count "$output" baz 1
@@ -164,21 +163,21 @@ test_basic_replication_unique_rows_replayed() {
 
 test_basic_replication_null_string() {
     setup_server
-    setup_local test_with_pk
+    setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
-    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = NULL WHERE id = 0;"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note = NULL WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_without_pk
 
     output=$(mktemp)
 
-    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note is NULL;" > "$output"
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_without_pk WHERE note is NULL;" > "$output"
     assert_line_count "$output" 1 1
-    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = '';" > "$output"
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_without_pk WHERE note = '';" > "$output"
     assert_line_count "$output" 0 1
 
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect --user test_user)
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect --user test_user)
     $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
     # we want the output to contain a null representation
     assert_line_count "$output" "1	0,$" 1
@@ -187,21 +186,21 @@ test_basic_replication_null_string() {
 
 test_basic_replication_empty_string() {
     setup_server
-    setup_local test_with_pk
+    setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
-    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = '' WHERE id = 0;"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note = '' WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_without_pk
 
     output=$(mktemp)
 
-    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note is NULL;" > "$output"
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_without_pk WHERE note is NULL;" > "$output"
     assert_line_count "$output" 0 1
-    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = '';" > "$output"
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_without_pk WHERE note = '';" > "$output"
     assert_line_count "$output" 1 1
 
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect --user test_user)
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect --user test_user)
     $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
     # we want the output to contain an empty string
     assert_line_count "$output" '""' 1
@@ -499,6 +498,11 @@ test_tailing_dups_uses_repeat() {
     rm -f "$output"
 }
 
+################################################################################
+# these tests replicate data around first so we build some notion of
+# the vector clock and test concurrency
+################################################################################
+
 test_seen_insert_deleted() {
     setup_server
     setup_local test_without_pk
@@ -602,6 +606,56 @@ test_unseen_insert_not_updated() {
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
     assert_line_count "$output" foo 1
     assert_line_count "$output" bar 1
+    rm -f "$output"
+}
+
+test_unseen_update_is_not_updated() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "UPDATE test_without_pk SET note='bar' WHERE id = 0;"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note='baz' WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 1
+    rm -f "$output"
+}
+
+test_unseen_update_is_not_updated_reversed() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo');"
+
+    replicate_to_local test_without_pk
+
+    # local has seen up to 0,'foo'
+    # but not this
+    $SKDB_BIN --data $SERVER_DB <<< "UPDATE test_without_pk SET note='baz' WHERE id = 0;"
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note='bar' WHERE id = 0;"
+
+    replicate_to_server test_without_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 1
     rm -f "$output"
 }
 
@@ -797,6 +851,8 @@ run_test test_unseen_insert_not_deleted
 run_test test_unseen_insert_added_to
 run_test test_seen_insert_clobbered
 run_test test_unseen_insert_not_updated
+run_test test_unseen_update_is_not_updated
+run_test test_unseen_update_is_not_updated_reversed
 run_test test_unseen_delete_gets_clobbered
 run_test test_unseen_delete_does_not_affect_delete
 
