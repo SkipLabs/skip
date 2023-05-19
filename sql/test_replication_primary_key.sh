@@ -597,6 +597,29 @@ test_replayed_with_further_updates() {
 }
 
 # AB - commutativity
+test_replayed_with_further_updates_lesser_row_value() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    replicate_to_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
+    replicate_to_server test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # we honour the causal order of the client, so bar wins
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 0
+    rm -f "$output"
+}
+
+# AB - commutativity
 test_reconnect_replayed_with_more_local_data() {
     setup_server
     setup_local test_with_pk
@@ -641,6 +664,31 @@ test_reconnect_replayed_with_further_updates() {
     assert_line_count "$output" foo 0
     assert_line_count "$output" bar 0
     assert_line_count "$output" baz 1
+    rm -f "$output"
+}
+
+# AB - commutativity
+test_reconnect_replayed_with_further_updates_lesser_row_value() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+
+    replicate_to_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
+    replicate_to_server test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
+    # this is a reconnect, we figure out the diff
+    replicate_diff_to_server test_with_pk 0
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # we honour the causal order of the client, so bar wins
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 0
     rm -f "$output"
 }
 
@@ -760,6 +808,66 @@ test_reconnect_old_diff_replayed_with_update() {
     rm -f "$save"
 }
 
+# BA - commutativity
+test_old_diff_replayed_with_update_lesser_row_value() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    replicate_to_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
+    # stash what would have been sent up
+    save=$(mktemp)
+    cp $UPDATES "$save"
+
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
+    replicate_to_server test_with_pk
+
+    # restore and replay
+    mv "$save" $UPDATES
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # we honour the causal order of the client, so bar wins
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 0
+    rm -f "$output"
+    rm -f "$save"
+}
+
+# BA - commutativity
+test_reconnect_old_diff_replayed_with_update_lesser_row_value() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    replicate_to_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
+    # stash what would have been sent up
+    save=$(mktemp)
+    cp $UPDATES "$save"
+
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
+    replicate_diff_to_server test_with_pk 0
+
+    # restore and replay
+    mv "$save" $UPDATES
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # we honour the causal order of the client, so bar wins
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    assert_line_count "$output" baz 0
+    rm -f "$output"
+    rm -f "$save"
+}
+
 # tests:
 run_test test_basic_replication_unique_rows
 run_test test_basic_replication_unique_rows_replayed
@@ -789,9 +897,13 @@ run_test test_reconnect_replayed
 run_test test_reconnect_replayed_with_update
 run_test test_replayed_with_more_local_data
 run_test test_replayed_with_further_updates
+run_test test_replayed_with_further_updates_lesser_row_value
 run_test test_reconnect_replayed_with_more_local_data
 run_test test_reconnect_replayed_with_further_updates
+run_test test_reconnect_replayed_with_further_updates_lesser_row_value
 run_test test_old_diff_replayed
 run_test test_reconnect_old_diff_replayed
 run_test test_old_diff_replayed_with_update
 run_test test_reconnect_old_diff_replayed_with_update
+run_test test_old_diff_replayed_with_update_lesser_row_value
+run_test test_reconnect_old_diff_replayed_with_update_lesser_row_value
