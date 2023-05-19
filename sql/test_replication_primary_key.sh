@@ -6,8 +6,11 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 SERVER_DB=/tmp/server.db
 LOCAL_DB=/tmp/local.db
 UPDATES=/tmp/updates
-WRITE_OUTPUT=/tmp/write-out
 SESSION=/tmp/session
+WRITE_OUTPUT=/tmp/write-out
+LOCAL2_DB=/tmp/local2.db
+UPDATES2=/tmp/updates2
+SESSION2=/tmp/session2
 
 setup_server() {
     db=$SERVER_DB
@@ -56,6 +59,31 @@ replicate_diff_to_server() {
     since=$2
     $SKDB_BIN --data $LOCAL_DB diff --format=csv --since "$since" "$(cat $SESSION)" |
         $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
+}
+
+setup_local2() {
+    table=$1
+    db=$LOCAL2_DB
+    rm -f "$db" "$UPDATES2"
+
+    SKDB="$SKDB_BIN --data $db"
+    $SKDB_BIN --init "$db"
+
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+
+    $SKDB_BIN subscribe --data $LOCAL2_DB --connect --format=csv --updates $UPDATES2 --ignore-source 7777 "$table" > $SESSION2
+}
+
+replicate_to_local2() {
+    table=$1
+    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --user test_user --ignore-source 5678 "$table")
+    $SKDB_BIN --data $SERVER_DB tail --format=csv --since 0 "$sub" |
+        $SKDB_BIN write-csv "$table" --data $LOCAL2_DB --source 7777 > $WRITE_OUTPUT
+}
+
+replicate_local2_to_server() {
+    table=$1
+    cat $UPDATES2 | $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 5678 --user test_user > $WRITE_OUTPUT
 }
 
 run_test() {
@@ -510,6 +538,96 @@ test_unseen_delete_does_not_affect_delete() {
     rm -f "$output"
 }
 
+test_concurrent_clients_updating_winner_gets_there_first() {
+    setup_server
+    setup_local test_with_pk
+    setup_local2 test_with_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+
+    replicate_to_local test_with_pk
+    replicate_to_local2 test_with_pk
+
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
+    $SKDB_BIN --data $LOCAL2_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
+
+    # baz should win and gets there first:
+    replicate_local2_to_server test_with_pk
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 0
+    assert_line_count "$output" baz 1
+
+    # and now check everything converges:
+
+    replicate_to_local test_with_pk
+    replicate_to_local2 test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 0
+    assert_line_count "$output" baz 1
+
+    $SKDB_BIN --data $LOCAL2_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 0
+    assert_line_count "$output" baz 1
+
+    rm -f "$output"
+}
+
+test_concurrent_clients_updating_winner_gets_there_second() {
+    setup_server
+    setup_local test_with_pk
+    setup_local2 test_with_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+
+    replicate_to_local test_with_pk
+    replicate_to_local2 test_with_pk
+
+    # concurrently:
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
+    $SKDB_BIN --data $LOCAL2_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
+
+    # baz should win and gets there second:
+    replicate_to_server test_with_pk
+    replicate_local2_to_server test_with_pk
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 0
+    assert_line_count "$output" baz 1
+
+    # and now check everything converges:
+
+    replicate_to_local test_with_pk
+    replicate_to_local2 test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 0
+    assert_line_count "$output" baz 1
+
+    $SKDB_BIN --data $LOCAL2_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    # tiebreak the concurrency: foo wins because the foo row > bar row
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 0
+    assert_line_count "$output" baz 1
+
+    rm -f "$output"
+}
+
 # AA - idempotentency
 test_reconnect_replayed() {
     setup_server
@@ -891,6 +1009,8 @@ run_test test_unseen_update_is_not_updated
 run_test test_unseen_insert_is_updated
 run_test test_unseen_delete_gets_clobbered
 run_test test_unseen_delete_does_not_affect_delete
+run_test test_concurrent_clients_updating_winner_gets_there_first
+run_test test_concurrent_clients_updating_winner_gets_there_second
 
 # still have idempotence and commutativity
 run_test test_reconnect_replayed
