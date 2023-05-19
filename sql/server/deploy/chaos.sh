@@ -12,7 +12,7 @@ cd $SCRIPT_DIR/../skgw
 # start server in background
 ################################################################################
 
-SERVER_PID_FILE=/tmp/server.pid
+SERVER_PID_FILE=$(mktemp)
 PAUSED_PROCS_FILE=/tmp/chaos_paused_pids
 rm -f $PAUSED_PROCS_FILE
 
@@ -35,10 +35,11 @@ handle_term() {
     # resume any paused processes so they can go down with the ship.
     # CONT should be idempotent
     cat $PAUSED_PROCS_FILE|xargs kill -CONT >/dev/null 2>&1
-    kill $(cat $SERVER_PID_FILE)
-    exit 0
+    kill "$(cat "$SERVER_PID_FILE")"
+    rm -f "$SERVER_PID_FILE"
+    rm -f $PAUSED_PROCS_FILE
 }
-trap 'handle_term' SIGTERM SIGINT
+trap 'handle_term' EXIT
 
 
 ################################################################################
@@ -103,7 +104,8 @@ targets=(
 
 while true
 do
-    sleep $delay_secs
+    sleep $delay_secs &
+    wait $!
     rand=$(( $RANDOM % ${#targets[@]} ))
     cmd=${targets[$rand]}
     eval $cmd

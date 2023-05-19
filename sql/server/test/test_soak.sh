@@ -5,14 +5,16 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 BUILD=/skfs/build
 SKDB_BIN=$BUILD/skdb
 
-SERVER_PID_FILE=/tmp/server.pid
+SERVER_PID_FILE=$(mktemp)
 SERVER_DB=/var/db/soak.db
 
 handle_term() {
     kill "$(cat "$SERVER_PID_FILE")"
-    exit 1
+    kill "$client1"
+    kill "$client2"
+    rm -f "$SERVER_PID_FILE"
 }
-trap 'handle_term' SIGTERM SIGINT
+trap 'handle_term' EXIT
 
 run_server() {
     rm -f "$SERVER_DB"
@@ -31,7 +33,7 @@ run_server() {
 
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > /tmp/soak-server-log &
 
-    echo $! > $SERVER_PID_FILE
+    echo $! > "$SERVER_PID_FILE"
 }
 
 echo "Starting server..."
