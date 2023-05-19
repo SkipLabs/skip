@@ -333,7 +333,6 @@ fun applyDiffStrategy(
       };
 
       select = SKSQL.CSelect{
-        // TODO: does this litter the context with select dirs? how are these cleaned up?
         id => SKSQL.Name::create("SELECT_" + SKFS.genSym(0)),
         kind => SKSQL.SAll(),
         params => table.kinds.map(kind ~> {
@@ -374,11 +373,10 @@ fun applyDiffStrategy(
         rest => None(),
         needUp => false,
         needGetParam => false,
-        directMode => false, // TODO: can I use it? does it use an index?
+        directMode => false,
         format => SKFS.OSQL(),
         other => Array[],
       };
-      // TODO: is it definitely using an index?
       selectHandle = SKSQL.evalSelect(context, select, None());
       selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
 
