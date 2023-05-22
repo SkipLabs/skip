@@ -411,9 +411,145 @@ fun applyDiffStrategy(
     context.update()
   });
 
-  if (reset) return resetRows;
+  lwwReset = Some((context, delta, _) ~> {
+    if (shouldShortCircuitUpdate(context)) {
+      return void;
+    };
 
-  if (table.schema.any(x ~> x.primary)) return lwwRows;
+    dir = context.unsafeGetEagerDir(table.dirName);
+    entries = mutable Vector[];
+
+    primaryIdx = for ((i, type) in table.schema.items()) {
+      if (type.primary) {
+        break i
+      }
+    } else {
+      invariant_violation("Using LWW without a primary key.")
+    };
+
+    for (row in rows) {
+      if (row.repeat < 1) {
+        continue;
+      };
+
+      select = SKSQL.CSelect{
+        id => SKSQL.Name::create("SELECT_" + SKFS.genSym(0)),
+        kind => SKSQL.SAll(),
+        params => table.kinds.map(kind ~> {
+          (idx, _, type) = kind;
+          type match {
+          | SKSQL.FLOAT() -> SKSQL.CFExpr(SKSQL.CFGetFrom(0, idx))
+          | SKSQL.INTEGER() -> SKSQL.CIExpr(SKSQL.CIGetFrom(0, idx))
+          | SKSQL.TEXT() -> SKSQL.CSExpr(SKSQL.CSGetFrom(0, idx))
+          }
+        }),
+        sets => Array[],
+        aggr => None(),
+        kinds => table.kinds,
+        from => Array[(table, None())],
+        where => Some(
+          table.schema[primaryIdx].ty match {
+          | SKSQL.FLOAT() ->
+            SKSQL.CFEq(
+              SKSQL.CFGetFrom(0, primaryIdx),
+              SKSQL.CFLiteral(row.getFloat(primaryIdx).fromSome()),
+            )
+          | SKSQL.INTEGER() ->
+            SKSQL.CIEq(
+              SKSQL.CIGetFrom(0, primaryIdx),
+              SKSQL.CILiteral(row.getInt(primaryIdx).fromSome()),
+            )
+          | SKSQL.TEXT() ->
+            SKSQL.CSEq(
+              SKSQL.CSGetFrom(0, primaryIdx),
+              SKSQL.CSLiteral(row.getString(primaryIdx).fromSome()),
+            )
+          },
+        ),
+        groupBy => None(),
+        having => None(),
+        orderBy => None(),
+        limit => None(),
+        rest => None(),
+        needUp => false,
+        needGetParam => false,
+        directMode => false,
+        format => SKFS.OSQL(),
+        other => Array[],
+      };
+      selectHandle = SKSQL.evalSelect(context, select, None());
+      selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
+
+      keepingCurrent = false;
+      selectDir.unsafeIterKeys((key, _tick) -> {
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          if (
+            tick.value < snapshot.default(0) ||
+            source.path() == writer ||
+            SKSQL.RowKey::fromFile(key).row < row
+          ) {
+            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          } else {
+            !keepingCurrent = true;
+          }
+        };
+      });
+      if (!keepingCurrent) {
+        // new row
+        entries.push(
+          (
+            SKSQL.RowKey(row, table.kinds),
+            (writer, writer, Array<SKFS.File>[row]),
+          ),
+        );
+      }
+    };
+    !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+
+    isVisibleToUser = userFileOpt match {
+    | None() -> _ -> true
+    | Some(userFile) ->
+      access = mutable SKSQL.AccessSolver(userFile.id);
+      table.cols.maybeGet(SKSQL.skdbAccess) match {
+      | None() -> _ -> true
+      | Some(accessColNbr) ->
+        (file: SKFS.BaseName) -> {
+          file match {
+          | k @ SKSQL.RowKey _ ->
+            k.row.getInt(accessColNbr) match {
+            | None() -> true
+            | Some(accessID) -> access.canRead(context, accessID)
+            }
+          | _ -> true
+          }
+        }
+      }
+    };
+    isEligibleForTomb = (tick, source) ~>
+      tick.value < snapshot.default(0) || source.path() == writer;
+    !dir = dir.reset(
+      context,
+      writer,
+      rows
+        .iterator()
+        .filter(row -> row.repeat != 0)
+        .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
+        .collect(SortedSet),
+      isVisibleToUser,
+      isEligibleForTomb,
+    );
+
+    context.setDir(dir.dirName, dir);
+    checkpointAndAck(context, delta);
+    context.update()
+  });
+
+  if (table.schema.any(x ~> x.primary)) {
+    if (reset) return lwwReset;
+    return lwwRows;
+  };
+
+  if (reset) return resetRows;
 
   assignRows
 }
