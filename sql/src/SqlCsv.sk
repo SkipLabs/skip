@@ -153,6 +153,89 @@ fun insert(
   SKFS.CStop(f)
 }
 
+fun lwwEdits(
+  table: SKSQL.DirDescr,
+  snapshot: Int,
+  writer: SKFS.Path,
+  primaryIdx: Int,
+  context: mutable SKFS.Context,
+  dir: SKFS.EagerDir,
+  row: SKSQL.RowValues,
+): mutable Iterator<(SKFS.BaseName, (SKFS.Path, SKFS.Path, Array<SKFS.File>))> {
+  select = SKSQL.CSelect{
+    id => SKSQL.Name::create("SELECT_" + SKFS.genSym(0)),
+    kind => SKSQL.SAll(),
+    params => table.kinds.map(kind ~> {
+      (idx, _, type) = kind;
+      type match {
+      | SKSQL.FLOAT() -> SKSQL.CFExpr(SKSQL.CFGetFrom(0, idx))
+      | SKSQL.INTEGER() -> SKSQL.CIExpr(SKSQL.CIGetFrom(0, idx))
+      | SKSQL.TEXT() -> SKSQL.CSExpr(SKSQL.CSGetFrom(0, idx))
+      }
+    }),
+    sets => Array[],
+    aggr => None(),
+    kinds => table.kinds,
+    from => Array[(table, None())],
+    where => Some(
+      table.schema[primaryIdx].ty match {
+      | SKSQL.FLOAT() ->
+        SKSQL.CFEq(
+          SKSQL.CFGetFrom(0, primaryIdx),
+          SKSQL.CFLiteral(row.getFloat(primaryIdx).fromSome()),
+        )
+      | SKSQL.INTEGER() ->
+        SKSQL.CIEq(
+          SKSQL.CIGetFrom(0, primaryIdx),
+          SKSQL.CILiteral(row.getInt(primaryIdx).fromSome()),
+        )
+      | SKSQL.TEXT() ->
+        SKSQL.CSEq(
+          SKSQL.CSGetFrom(0, primaryIdx),
+          SKSQL.CSLiteral(row.getString(primaryIdx).fromSome()),
+        )
+      },
+    ),
+    groupBy => None(),
+    having => None(),
+    orderBy => None(),
+    limit => None(),
+    rest => None(),
+    needUp => false,
+    needGetParam => false,
+    directMode => false,
+    format => SKFS.OSQL(),
+    other => Array[],
+  };
+  selectHandle = SKSQL.evalSelect(context, select, None());
+  selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
+
+  entries = mutable Vector[];
+
+  keepingCurrent = false;
+  selectDir.unsafeIterKeys((key, _tick) -> {
+    for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+      if (
+        tick.value < snapshot ||
+        source.path() == writer ||
+        SKSQL.RowKey::fromFile(key).row < row
+      ) {
+        entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+      } else {
+        !keepingCurrent = true;
+        return void;
+      }
+    };
+  });
+  if (!keepingCurrent) {
+    for (entry in entries) yield entry;
+    yield (
+      SKSQL.RowKey(row, table.kinds),
+      (writer, writer, Array<SKFS.File>[row]),
+    );
+  }
+}
+
 fun applyDiffStrategy(
   table: SKSQL.DirDescr,
   identity: Int,
@@ -304,7 +387,7 @@ fun applyDiffStrategy(
 
   // lwwRows - if there is a unique constraint on the table (e.g. a
   // PK) then we resolve this using LWW. the total order is formed
-  // using the vector clock and concurrent tiebreaks use the row data.
+  // using the vector clock. concurrent tiebreaks use the row data.
   lwwRows = Some((context, delta, _) ~> {
     if (shouldShortCircuitUpdate(context)) {
       return void;
@@ -332,76 +415,16 @@ fun applyDiffStrategy(
         continue;
       };
 
-      select = SKSQL.CSelect{
-        id => SKSQL.Name::create("SELECT_" + SKFS.genSym(0)),
-        kind => SKSQL.SAll(),
-        params => table.kinds.map(kind ~> {
-          (idx, _, type) = kind;
-          type match {
-          | SKSQL.FLOAT() -> SKSQL.CFExpr(SKSQL.CFGetFrom(0, idx))
-          | SKSQL.INTEGER() -> SKSQL.CIExpr(SKSQL.CIGetFrom(0, idx))
-          | SKSQL.TEXT() -> SKSQL.CSExpr(SKSQL.CSGetFrom(0, idx))
-          }
-        }),
-        sets => Array[],
-        aggr => None(),
-        kinds => table.kinds,
-        from => Array[(table, None())],
-        where => Some(
-          table.schema[primaryIdx].ty match {
-          | SKSQL.FLOAT() ->
-            SKSQL.CFEq(
-              SKSQL.CFGetFrom(0, primaryIdx),
-              SKSQL.CFLiteral(row.getFloat(primaryIdx).fromSome()),
-            )
-          | SKSQL.INTEGER() ->
-            SKSQL.CIEq(
-              SKSQL.CIGetFrom(0, primaryIdx),
-              SKSQL.CILiteral(row.getInt(primaryIdx).fromSome()),
-            )
-          | SKSQL.TEXT() ->
-            SKSQL.CSEq(
-              SKSQL.CSGetFrom(0, primaryIdx),
-              SKSQL.CSLiteral(row.getString(primaryIdx).fromSome()),
-            )
-          },
-        ),
-        groupBy => None(),
-        having => None(),
-        orderBy => None(),
-        limit => None(),
-        rest => None(),
-        needUp => false,
-        needGetParam => false,
-        directMode => false,
-        format => SKFS.OSQL(),
-        other => Array[],
-      };
-      selectHandle = SKSQL.evalSelect(context, select, None());
-      selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
-
-      keepingCurrent = false;
-      selectDir.unsafeIterKeys((key, _tick) -> {
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          if (
-            tick.value < snapshot.default(0) ||
-            source.path() == writer ||
-            SKSQL.RowKey::fromFile(key).row < row
-          ) {
-            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
-          } else {
-            !keepingCurrent = true;
-          }
-        };
-      });
-      if (!keepingCurrent) {
-        // new row
-        entries.push(
-          (
-            SKSQL.RowKey(row, table.kinds),
-            (writer, writer, Array<SKFS.File>[row]),
-          ),
-        );
+      for (change in lwwEdits(
+        table,
+        snapshot.default(0),
+        writer,
+        primaryIdx,
+        context,
+        dir,
+        row,
+      )) {
+        entries.push(change);
       }
     };
 
@@ -411,6 +434,8 @@ fun applyDiffStrategy(
     context.update()
   });
 
+  // lwwReset - if the update is communicating the entire current
+  // state (a reset) on a table where we use LWW.
   lwwReset = Some((context, delta, _) ~> {
     if (shouldShortCircuitUpdate(context)) {
       return void;
@@ -432,76 +457,16 @@ fun applyDiffStrategy(
         continue;
       };
 
-      select = SKSQL.CSelect{
-        id => SKSQL.Name::create("SELECT_" + SKFS.genSym(0)),
-        kind => SKSQL.SAll(),
-        params => table.kinds.map(kind ~> {
-          (idx, _, type) = kind;
-          type match {
-          | SKSQL.FLOAT() -> SKSQL.CFExpr(SKSQL.CFGetFrom(0, idx))
-          | SKSQL.INTEGER() -> SKSQL.CIExpr(SKSQL.CIGetFrom(0, idx))
-          | SKSQL.TEXT() -> SKSQL.CSExpr(SKSQL.CSGetFrom(0, idx))
-          }
-        }),
-        sets => Array[],
-        aggr => None(),
-        kinds => table.kinds,
-        from => Array[(table, None())],
-        where => Some(
-          table.schema[primaryIdx].ty match {
-          | SKSQL.FLOAT() ->
-            SKSQL.CFEq(
-              SKSQL.CFGetFrom(0, primaryIdx),
-              SKSQL.CFLiteral(row.getFloat(primaryIdx).fromSome()),
-            )
-          | SKSQL.INTEGER() ->
-            SKSQL.CIEq(
-              SKSQL.CIGetFrom(0, primaryIdx),
-              SKSQL.CILiteral(row.getInt(primaryIdx).fromSome()),
-            )
-          | SKSQL.TEXT() ->
-            SKSQL.CSEq(
-              SKSQL.CSGetFrom(0, primaryIdx),
-              SKSQL.CSLiteral(row.getString(primaryIdx).fromSome()),
-            )
-          },
-        ),
-        groupBy => None(),
-        having => None(),
-        orderBy => None(),
-        limit => None(),
-        rest => None(),
-        needUp => false,
-        needGetParam => false,
-        directMode => false,
-        format => SKFS.OSQL(),
-        other => Array[],
-      };
-      selectHandle = SKSQL.evalSelect(context, select, None());
-      selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
-
-      keepingCurrent = false;
-      selectDir.unsafeIterKeys((key, _tick) -> {
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          if (
-            tick.value < snapshot.default(0) ||
-            source.path() == writer ||
-            SKSQL.RowKey::fromFile(key).row < row
-          ) {
-            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
-          } else {
-            !keepingCurrent = true;
-          }
-        };
-      });
-      if (!keepingCurrent) {
-        // new row
-        entries.push(
-          (
-            SKSQL.RowKey(row, table.kinds),
-            (writer, writer, Array<SKFS.File>[row]),
-          ),
-        );
+      for (change in lwwEdits(
+        table,
+        snapshot.default(0),
+        writer,
+        primaryIdx,
+        context,
+        dir,
+        row,
+      )) {
+        entries.push(change);
       }
     };
     !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
