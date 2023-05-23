@@ -352,7 +352,7 @@ mutable native class .Array<+T>
   }
 
   readonly fun filterMap<U>(f: T -> ?U): Array<U> {
-    result = Vector::mcreate(0);
+    result = Vector::mcreate(this.size());
     this.each(value ->
       f(value) match {
       | Some(x) -> result.push(x)
@@ -412,7 +412,7 @@ mutable native class .Array<+T>
   }
 
   readonly fun filterNone<U>[T: ?U](): Array<U> {
-    result = Vector::mcreate(0);
+    result = Vector::mcreate(this.size());
     this.each(value ->
       value match {
       | Some(x) -> result.push(x)
