@@ -351,6 +351,17 @@ mutable native class .Array<+T>
     static::fillBy(count, i -> this[indices[i]])
   }
 
+  readonly fun filterMap<U>(f: T -> ?U): Array<U> {
+    result = Vector::mcreate(0);
+    this.each(value ->
+      f(value) match {
+      | Some(x) -> result.push(x)
+      | None() -> void
+      }
+    );
+    result.toArray();
+  }
+
   readonly fun zip<U, S: readonly Sequence<U>>(second: S): Array<(T, U)> {
     this.zipWith(second, (v1, v2) -> (v1, v2));
   }
