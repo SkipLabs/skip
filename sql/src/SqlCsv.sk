@@ -157,11 +157,15 @@ fun lwwEdits(
   table: SKSQL.DirDescr,
   snapshot: Int,
   writer: SKFS.Path,
-  primaryIdx: Int,
+  primaryIdxOpt: ?Int,
   context: mutable SKFS.Context,
   dir: SKFS.EagerDir,
   row: SKSQL.RowValues,
 ): mutable Iterator<(SKFS.BaseName, (SKFS.Path, SKFS.Path, Array<SKFS.File>))> {
+  primaryIdx = primaryIdxOpt match {
+  | None() -> invariant_violation("Using LWW without a primary key.")
+  | Some(p) -> p
+  };
   select = SKSQL.CSelect{
     id => SKSQL.Name::create("SELECT_" + SKFS.genSym(0)),
     kind => SKSQL.SAll(),
@@ -267,6 +271,36 @@ fun applyDiffStrategy(
     };
   };
 
+  isVisibleToUser = (context) ~> {
+    userFileOpt match {
+    | None() -> _ -> true
+    | Some(userFile) ->
+      access = mutable SKSQL.AccessSolver(userFile.id);
+      table.cols.maybeGet(SKSQL.skdbAccess) match {
+      | None() -> _ -> true
+      | Some(accessColNbr) ->
+        (file: SKFS.BaseName) -> {
+          file match {
+          | k @ SKSQL.RowKey _ ->
+            k.row.getInt(accessColNbr) match {
+            | None() -> true
+            | Some(accessID) -> access.canRead(context, accessID)
+            }
+          | _ -> true
+          }
+        }
+      }
+    };
+  };
+
+  primaryIdx = for ((i, type) in table.schema.items()) {
+    if (type.primary) {
+      break Some(i)
+    }
+  } else {
+    None()
+  };
+
   // we have several update strategies:
 
   // assignRows - if there are no constraints on the table then we
@@ -349,25 +383,6 @@ fun applyDiffStrategy(
       !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
     };
 
-    isVisibleToUser = userFileOpt match {
-    | None() -> _ -> true
-    | Some(userFile) ->
-      access = mutable SKSQL.AccessSolver(userFile.id);
-      table.cols.maybeGet(SKSQL.skdbAccess) match {
-      | None() -> _ -> true
-      | Some(accessColNbr) ->
-        (file: SKFS.BaseName) -> {
-          file match {
-          | k @ SKSQL.RowKey _ ->
-            k.row.getInt(accessColNbr) match {
-            | None() -> true
-            | Some(accessID) -> access.canRead(context, accessID)
-            }
-          | _ -> true
-          }
-        }
-      }
-    };
     !dir = dir.reset(
       context,
       writer,
@@ -376,7 +391,7 @@ fun applyDiffStrategy(
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      isVisibleToUser,
+      isVisibleToUser(context),
       isEligibleForTomb,
     );
 
@@ -395,14 +410,6 @@ fun applyDiffStrategy(
 
     dir = context.unsafeGetEagerDir(table.dirName);
     entries = mutable Vector[];
-
-    primaryIdx = for ((i, type) in table.schema.items()) {
-      if (type.primary) {
-        break i
-      }
-    } else {
-      invariant_violation("Using LWW without a primary key.")
-    };
 
     for (row in rows) {
       if (row.repeat < 1) {
@@ -444,14 +451,6 @@ fun applyDiffStrategy(
     dir = context.unsafeGetEagerDir(table.dirName);
     entries = mutable Vector[];
 
-    primaryIdx = for ((i, type) in table.schema.items()) {
-      if (type.primary) {
-        break i
-      }
-    } else {
-      invariant_violation("Using LWW without a primary key.")
-    };
-
     for (row in rows) {
       if (row.repeat < 1) {
         continue;
@@ -471,27 +470,6 @@ fun applyDiffStrategy(
     };
     !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
 
-    isVisibleToUser = userFileOpt match {
-    | None() -> _ -> true
-    | Some(userFile) ->
-      access = mutable SKSQL.AccessSolver(userFile.id);
-      table.cols.maybeGet(SKSQL.skdbAccess) match {
-      | None() -> _ -> true
-      | Some(accessColNbr) ->
-        (file: SKFS.BaseName) -> {
-          file match {
-          | k @ SKSQL.RowKey _ ->
-            k.row.getInt(accessColNbr) match {
-            | None() -> true
-            | Some(accessID) -> access.canRead(context, accessID)
-            }
-          | _ -> true
-          }
-        }
-      }
-    };
-    isEligibleForTomb = (tick, source) ~>
-      tick.value < snapshot.default(0) || source.path() == writer;
     !dir = dir.reset(
       context,
       writer,
@@ -500,8 +478,10 @@ fun applyDiffStrategy(
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      isVisibleToUser,
-      isEligibleForTomb,
+      isVisibleToUser(context),
+      (tick, source) ~>
+        tick.value < snapshot.default(0) || source.path() == writer
+      ,
     );
 
     context.setDir(dir.dirName, dir);
@@ -509,7 +489,7 @@ fun applyDiffStrategy(
     context.update()
   });
 
-  if (table.schema.any(x ~> x.primary)) {
+  if (primaryIdx is Some _) {
     if (reset) return lwwReset;
     return lwwRows;
   };
