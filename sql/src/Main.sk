@@ -226,6 +226,11 @@ untracked fun main(): void {
                 .about("Session id"),
             )
             .arg(
+              Cli.StringArg("filter")
+                .positional()
+                .about("SQL filter condition"),
+            )
+            .arg(
               Cli.BoolArg("follow")
                 .long("follow")
                 .short("f")
@@ -336,7 +341,7 @@ untracked fun main(): void {
           //   };
           SKSQL.eval(options, /* user = */ None())
         });
-      subcmd_handler(args, options)
+      subcmd_handler(args, options);
     },
     exn -> {
       SKFS.destroyObstack(saved);
@@ -632,13 +637,61 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     | _ -> void
     };
     (isReset, changes) = edir.getChangesAfter(SKFS.Tick(tick));
+    filter = args.maybeGetString("filter") match {
+    | None() -> sub.filter
+    | Some(strCond) ->
+      tableName = dirName.toString().stripPrefix("/").stripSuffix("/");
+      from = Some(
+        Array[
+          SKSQL.TableName(SKSQL.FName(SKSQL.Name::create(tableName)), None()),
+        ],
+      );
+      compiler = SKSQL.Compiler::create(false, options, 0);
+      (_, ast) = SKSQL.parseExpr(SKSQL.Lexer(0, SKSQL.Buffer(strCond)), 0);
+      compilerContext = context.mclone();
+      _ = compiler.compileFrom(compilerContext, from);
+      e = compiler.compileExpr(compilerContext, ast) match {
+      | SKSQL.CIExpr(x) -> x
+      | _ ->
+        print_error("Unexpected type for filter expression");
+        skipExit(2)
+      };
+      (context, isReset) ~> {
+        mcontext = context.mclone();
+        subFilter = sub.filter(context, isReset);
+        baseName -> {
+          inputRow = baseName match {
+          | SKSQL.RowKey(row, _) -> row
+          | _ ->
+            print_error("Unexpected table entry type");
+            skipExit(2)
+          };
+          evaluator = SKSQL.ExprEvaluator(
+            None(),
+            Array[inputRow],
+            Array[],
+            None(),
+          );
+          subFilter(baseName) &&
+            evaluator.evalCIExpr(mcontext, e) match {
+            | SKSQL.ANull()
+            | SKSQL.ADef(0) ->
+              false
+            | SKSQL.AUndef()
+            | SKSQL.ADef(_) ->
+              true
+            };
+        }
+      }
+    };
+
     producedOutput = edir.writeDiffStdout(
       context,
       isReset,
       changes,
       print_raw,
       format,
-      sub.filter,
+      filter,
       sub.getDestinationWatermark(context),
     );
     if (!producedOutput && init) {
