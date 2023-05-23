@@ -6,6 +6,15 @@ function getWasm() {
   return new Uint8Array(fs.readFileSync("/skfs/sql/js/skdb.wasm"));
 }
 
+const tables = [
+  "no_pk_inserts",
+  "pk_inserts",
+  "no_pk_single_row",
+  "pk_single_row",
+  // "no_pk_random",
+  // "pk_random",
+];
+
 const setup = async function(user) {
   const skdb = await SKDB.create(null, getWasm);
   const b64key = "test";
@@ -13,7 +22,11 @@ const setup = async function(user) {
   const key = await crypto.subtle.importKey(
     "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
   await skdb.connect("soak", user, key, "ws://localhost:8080");
-  await skdb.server.mirrorTable("no_pk_inserts");
+
+  for (const table of tables) {
+    await skdb.server.mirrorTable(table);
+  }
+
   return skdb;
 };
 
@@ -27,7 +40,21 @@ const modify_rows = function(client, skdb, i, cb) {
   }
 
   const f = () => {
+    // monotonic inserts - should be no conflict here. just check that
+    // replication works well in the happy case and we don't lose or
+    // dup anything in the chaos
     skdb.sql(`INSERT INTO no_pk_inserts VALUES(${i}, ${client}, ${i}, -1);`);
+    skdb.sql(`INSERT INTO pk_inserts VALUES(${i*2 + (client-1)}, ${client}, ${i}, -1);`);
+
+    // conflict:
+    // fight over single row
+    skdb.sql(`UPDATE pk_single_row SET client = ${client}, value = ${i} WHERE id = 0;`);
+    // for no pk we have a very trivial conflict resolution - I win.
+    skdb.sql(`BEGIN TRANSACTION; DELETE FROM no_pk_single_row WHERE id = 0; INSERT INTO no_pk_single_row VALUES (0,${client},${i}, -1); COMMIT;`);
+
+    // TODO:
+    // random
+
     // avoid stack overflow by using event loop
     setTimeout(() => modify_rows(client, skdb, i + 1, cb), 0);
   };
@@ -60,7 +87,10 @@ setup(`test_user${client}`).then((skdb) => {
   });
 
   modify_rows(client, skdb, 0, () => {
-    console.log(skdb.sql("select * from no_pk_inserts order by id, client"));
+    for (const table of tables) {
+      console.log(table);
+      console.log(skdb.sql(`select * from ${table} order by id, client`));
+    }
     process.exit(0);
   });
 });

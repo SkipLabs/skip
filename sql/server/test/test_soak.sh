@@ -33,6 +33,17 @@ run_server() {
 
     # these tables are for inserts only. there should be no conflict
     echo "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_inserts (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+
+    # these tables have two clients fighting over a single row
+    echo "CREATE TABLE no_pk_single_row (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    echo "INSERT INTO no_pk_single_row VALUES (0,0,0, -1);" | $SKDB
+    echo "CREATE TABLE pk_single_row (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    echo "INSERT INTO pk_single_row VALUES (0,0,0, -1);" | $SKDB
+
+    # clients manipulate these with random operations
+    echo "CREATE TABLE no_pk_random (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_random (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
 
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > $SOAK_SERVER_LOG &
 
