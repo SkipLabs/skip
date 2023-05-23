@@ -15,9 +15,10 @@ cd $SCRIPT_DIR/../skgw
 SERVER_PID_FILE=$(mktemp)
 PAUSED_PROCS_FILE=/tmp/chaos_paused_pids
 rm -f $PAUSED_PROCS_FILE
+SERVER_LOG=/tmp/server.log
 
 function start_server {
-    gradle --console plain run --args=--DANGEROUS-no-encryption >/tmp/server.log 2>&1 &
+    gradle --console plain run --args=--DANGEROUS-no-encryption > $SERVER_LOG 2>&1 &
     pid=$!
     echo $pid > $SERVER_PID_FILE
     echo "started server: $pid"
@@ -40,6 +41,12 @@ handle_term() {
     rm -f $PAUSED_PROCS_FILE
 }
 trap 'handle_term' EXIT
+
+monitor() {
+    # currently don't do anything in response
+    echo "Received SIGUSR1"
+}
+trap 'monitor' SIGUSR1
 
 
 ################################################################################
