@@ -29,7 +29,8 @@ run_server() {
      echo "COMMIT;"
     ) | $SKDB
 
-    echo "CREATE TABLE log (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    # these tables are for inserts only. there should be no conflict
+    echo "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
 
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > /tmp/soak-server-log &
 
@@ -57,7 +58,7 @@ client2=$!
 
 echo "To monitor progress:"
 echo "tail -F /tmp/soak-server-log"
-echo '/skfs/build/skdb --data /var/db/soak.db <<< "select * from log;"'
+echo '/skfs/build/skdb --data /var/db/soak.db <<< "select * from no_pk;"'
 
 wait $client1 $client2
 
