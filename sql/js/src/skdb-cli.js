@@ -334,8 +334,9 @@ const localRepl = async function() {
       const [_, table] = query.split(" ", 2);
       try {
         await skdb.server.mirrorTable(table);
-      } catch {
+      } catch (ex) {
         console.error(`Could not mirror table ${table}.`);
+        console.error(ex);
       }
       continue;
     }
