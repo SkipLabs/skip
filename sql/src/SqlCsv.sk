@@ -153,6 +153,21 @@ fun insert(
   SKFS.CStop(f)
 }
 
+fun reasonSchemaUnsupported(
+  origContext: readonly SKFS.Context,
+  tableName: String,
+): ?String {
+  context = SKFS.Context::fromSaved(origContext.clone());
+  SKSQL.getTableDir(context).maybeGet(context, SKFS.SID(tableName)) match {
+  | None() -> Some("Table does not exist.")
+  | Some(dirDescr) ->
+    if (dirDescr.schema.any(x ~> x.unique)) {
+      return Some("Cannot mirror tables with unique constraints.")
+    };
+    None()
+  };
+}
+
 fun lwwEdits(
   table: SKSQL.DirDescr,
   snapshot: Int,

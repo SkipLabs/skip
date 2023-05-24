@@ -81,7 +81,9 @@ untracked fun main(): void {
             "Initialize SKFS runtime with given capacity",
           ),
         )
-        .subcommand(Cli.Command("sessions").about("TODO"))
+        .subcommand(
+          Cli.Command("sessions").about("List the current subscriptions"),
+        )
         .subcommand(Cli.Command("compact").about("Compact the db"))
         .subcommand(
           Cli.Command("dump-table")
@@ -258,6 +260,16 @@ untracked fun main(): void {
               Cli.StringArg("ignore-source").about("Write stream to ignore"),
             ),
         )
+        .subcommand(
+          Cli.Command("can-mirror")
+            .about("Check that a table is eligible for mirroring")
+            .arg(
+              Cli.StringArg("table")
+                .positional()
+                .required()
+                .about("Table name"),
+            ),
+        )
         .subcommand(Cli.Command("replay").about("Replay a diff"))
         .subcommand(Cli.Command("debug").about("TODO"))
         .help()
@@ -299,6 +311,7 @@ untracked fun main(): void {
           | "replication-id" -> execReplicationId
           | "write-csv" -> execWriteCsv
           | "subscribe" -> execSubscribe
+          | "can-mirror" -> execCanMirror
           | "replay" -> execReplay
           | "debug" -> execDebug
           | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
@@ -783,6 +796,18 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     file = outputDir.getArrayRaw(viewKey)[0];
     invariant(sessionID == SKFS.IntFile::fromFile(file).value);
     print_string(sessionID.toString());
+  })
+}
+
+fun execCanMirror(args: Cli.ParseResults, options: SKSQL.Options): void {
+  ensureContext(args);
+  tableName = args.getString("table");
+  SKSQL.runSql(options, context ~> {
+    SKCSV.reasonSchemaUnsupported(context, tableName.lowercase()) match {
+    | None() -> void
+    | Some(reason) -> print_string(reason)
+    };
+    SKFS.CStop(None())
   })
 }
 

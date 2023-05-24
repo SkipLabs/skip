@@ -747,6 +747,14 @@ export class SKDB {
       "insert into " + tableName + " values (" + values.join(", ") + ");";
     this.runLocal([], stdin);
   }
+
+  assertCanBeMirrored(tableName: string): void {
+    const error = this.runLocal(["can-mirror", tableName], "");
+    if (error === "") {
+      return
+    }
+    throw new Error(error);
+  }
 }
 
 /* ***************************************************************************/
@@ -2087,6 +2095,8 @@ class SKDBServer {
          value STRING
        )`);
     }
+
+    this.client.assertCanBeMirrored(tableName);
 
     // TODO: need to join the promises but let them run concurrently
     // I await here for now so we learn of error
