@@ -27,6 +27,8 @@ setup_server() {
     ) | $SKDB
 
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    # out of first position and a string
+    echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY);" | $SKDB
 }
 
 setup_local() {
@@ -38,6 +40,7 @@ setup_local() {
     $SKDB_BIN --init "$db"
 
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY);" | $SKDB
 
     $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" > $SESSION
 }
@@ -261,6 +264,46 @@ test_basic_replication_empty_string() {
     rm -f "$output"
 }
 
+test_basic_replication_escaped_string() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = 'what''s up?' WHERE id = 0;"
+
+    replicate_to_server test_with_pk
+
+    output=$(mktemp)
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = 'what''s up?';" > "$output"
+    assert_line_count "$output" 1 1
+
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect --user test_user)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    assert_line_count "$output" "what's up?" 1
+    rm -f "$output"
+}
+
+test_basic_replication_escaped_string_alt() {
+    setup_server
+    setup_local test_pk_alt
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_pk_alt VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_pk_alt SET id = 'what''s up?' WHERE x = 0;"
+
+    replicate_to_server test_pk_alt
+
+    output=$(mktemp)
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_pk_alt WHERE id = 'what''s up?';" > "$output"
+    assert_line_count "$output" 1 1
+
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_pk_alt --connect --user test_user)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    assert_line_count "$output" "what's up?" 1
+    rm -f "$output"
+}
+
 test_basic_replication_with_deletes() {
     setup_server
     setup_local test_with_pk
@@ -385,6 +428,27 @@ test_seen_insert_clobbered() {
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
+    assert_line_count "$output" foo 0
+    assert_line_count "$output" bar 1
+    rm -f "$output"
+}
+
+test_seen_insert_clobbered_alt() {
+    setup_server
+    setup_local test_pk_alt
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_pk_alt VALUES(0,'foo');"
+
+    replicate_to_local test_pk_alt
+
+    $SKDB_BIN --data $LOCAL_DB <<< "select * from test_pk_alt"
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_pk_alt SET id='bar' WHERE x = 0;"
+    $SKDB_BIN --data $LOCAL_DB <<< "select * from test_pk_alt"
+
+    replicate_to_server test_pk_alt
+
+    output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_pk_alt;' > "$output"
     assert_line_count "$output" foo 0
     assert_line_count "$output" bar 1
     rm -f "$output"
@@ -994,6 +1058,8 @@ run_test test_basic_replication_unique_rows_server_state_different
 
 run_test test_basic_replication_null_string
 run_test test_basic_replication_empty_string
+run_test test_basic_replication_escaped_string
+run_test test_basic_replication_escaped_string_alt
 
 run_test test_basic_replication_with_deletes
 run_test test_basic_replication_with_deletes_server_state_different
@@ -1003,6 +1069,7 @@ run_test test_seen_insert_deleted
 run_test test_unseen_insert_not_deleted
 run_test test_unseen_insert_added_to
 run_test test_seen_insert_clobbered
+run_test test_seen_insert_clobbered_alt
 run_test test_unseen_insert_not_updated
 run_test test_unseen_update_is_updated
 run_test test_unseen_update_is_not_updated
