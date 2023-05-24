@@ -559,6 +559,63 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   };
   init = true;
   dieOnEOF();
+
+  gContext = SKFS.gContextGet();
+  (subFilter, dirName) = gContext.sessions.maybeGet(sessionID) match {
+  | None() ->
+    print_error("Error: session not found");
+    skipExit(2)
+  | Some(sub) -> (sub.filter, sub.dirName)
+  };
+
+  filter = args.maybeGetString("filter") match {
+  | None() -> subFilter
+  | Some(strCond) ->
+    tableName = dirName.toString().stripPrefix("/").stripSuffix("/");
+    from = Some(
+      Array[
+        SKSQL.TableName(SKSQL.FName(SKSQL.Name::create(tableName)), None()),
+      ],
+    );
+    compiler = SKSQL.Compiler::create(false, options, 0);
+    (_, ast) = SKSQL.parseExpr(SKSQL.Lexer(0, SKSQL.Buffer(strCond)), 0);
+    compilerContext = gContext.mclone();
+    _ = compiler.compileFrom(compilerContext, from);
+    e = compiler.compileExpr(compilerContext, ast) match {
+    | SKSQL.CIExpr(x) -> x
+    | _ ->
+      print_error("Unexpected type for filter expression");
+      skipExit(2)
+    };
+    (context, isReset) ~> {
+      mcontext = context.mclone();
+      privacyFilter = subFilter(context, isReset);
+      baseName -> {
+        inputRow = baseName match {
+        | SKSQL.RowKey(row, _) -> row
+        | _ ->
+          print_error("Unexpected table entry type");
+          skipExit(2)
+        };
+        evaluator = SKSQL.ExprEvaluator(
+          None(),
+          Array[inputRow],
+          Array[],
+          None(),
+        );
+
+        evaluator.evalCIExpr(mcontext, e) match {
+        | SKSQL.ANull()
+        | SKSQL.ADef(0) ->
+          false
+        | SKSQL.AUndef()
+        | SKSQL.ADef(_) ->
+          privacyFilter(baseName)
+        };
+      }
+    }
+  };
+
   loop {
     localObstack = SKFS.newObstack();
     context = SKFS.gContextGet();
@@ -568,7 +625,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       skipExit(2)
     | Some(x) -> x
     };
-    dirName = sub.dirName;
+    invariant(dirName == sub.dirName);
     edir = context.unsafeGetEagerDir(dirName);
     format = options.format match {
     | SKSQL.OFK_CSV() -> SKFS.OCSV()
@@ -637,53 +694,6 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     | _ -> void
     };
     (isReset, changes) = edir.getChangesAfter(SKFS.Tick(tick));
-    filter = args.maybeGetString("filter") match {
-    | None() -> sub.filter
-    | Some(strCond) ->
-      tableName = dirName.toString().stripPrefix("/").stripSuffix("/");
-      from = Some(
-        Array[
-          SKSQL.TableName(SKSQL.FName(SKSQL.Name::create(tableName)), None()),
-        ],
-      );
-      compiler = SKSQL.Compiler::create(false, options, 0);
-      (_, ast) = SKSQL.parseExpr(SKSQL.Lexer(0, SKSQL.Buffer(strCond)), 0);
-      compilerContext = context.mclone();
-      _ = compiler.compileFrom(compilerContext, from);
-      e = compiler.compileExpr(compilerContext, ast) match {
-      | SKSQL.CIExpr(x) -> x
-      | _ ->
-        print_error("Unexpected type for filter expression");
-        skipExit(2)
-      };
-      (context, isReset) ~> {
-        mcontext = context.mclone();
-        subFilter = sub.filter(context, isReset);
-        baseName -> {
-          inputRow = baseName match {
-          | SKSQL.RowKey(row, _) -> row
-          | _ ->
-            print_error("Unexpected table entry type");
-            skipExit(2)
-          };
-          evaluator = SKSQL.ExprEvaluator(
-            None(),
-            Array[inputRow],
-            Array[],
-            None(),
-          );
-          subFilter(baseName) &&
-            evaluator.evalCIExpr(mcontext, e) match {
-            | SKSQL.ANull()
-            | SKSQL.ADef(0) ->
-              false
-            | SKSQL.AUndef()
-            | SKSQL.ADef(_) ->
-              true
-            };
-        }
-      }
-    };
 
     producedOutput = edir.writeDiffStdout(
       context,
