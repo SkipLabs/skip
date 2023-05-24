@@ -560,6 +560,21 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
     if (ty.notNull) {
       o(" NOT NULL");
     };
+    ty.default match {
+    | None() -> void
+    | Some(expr) ->
+      o(" DEFAULT ");
+      expr match {
+      | VNull() -> o("NULL")
+      | VInt(x) -> o(x.toString())
+      | VFloat(x) -> o(x.toString())
+      | VString(s) -> escapeString(o, s)
+      | VLShift(_, _) ->
+        invariant_violation("Invalid expression for default value")
+      | VId(_, _) -> invariant_violation("Invalid expression for default value")
+      | VTime() -> invariant_violation("Invalid expression for default value")
+      }
+    };
     if (colIndex < dirDescr.schema.size() - 1) {
       o(",");
     };
