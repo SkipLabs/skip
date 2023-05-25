@@ -1009,6 +1009,7 @@ class ResilientMuxedSocket {
   private policy: ResiliencyPolicy;
   private socket?: MuxedSocket;
   private socketQueue: Array<any> = new Array();
+  private permanentFailureReason?: string;
 
   // streams from the server are not resilient
   onStream?: (stream: Stream) => void;
@@ -1064,12 +1065,23 @@ class ResilientMuxedSocket {
   }
 
   private async getSocket(): Promise<MuxedSocket> {
+    if (this.permanentFailureReason !== undefined) {
+      throw new Error(this.permanentFailureReason);
+    }
     if (this.socket) {
       return this.socket;
     }
     return new Promise((resolve, reject) => {
       this.socketQueue.push({resolve: resolve, reject: reject});
     });
+  }
+
+  private isSocketErrorRetryable(errorCode: number): boolean {
+    if (errorCode === 1002) {
+      // auth failure - no point in retrying.
+      return false;
+    }
+    return true;
   }
 
   private attachSocket(socket: MuxedSocket): void {
@@ -1081,7 +1093,15 @@ class ResilientMuxedSocket {
     socket.onClose = () => {
       this.replaceFailedSocket();
     };
-    socket.onError = (_errorCode, _msg) => {
+    socket.onError = (errorCode, msg) => {
+      if (!this.isSocketErrorRetryable(errorCode)) {
+        // we do not have a way of communicating upward that we're in
+        // a non-retryable state. there are very few cases where this
+        // can happen and they're checked for explicitly.
+        this.permanentFailureReason = msg;
+        this.socket = undefined;
+        return;
+      }
       this.replaceFailedSocket();
     };
     this.socket = socket;
@@ -1092,6 +1112,9 @@ class ResilientMuxedSocket {
   }
 
   private async replaceFailedSocket(): Promise<void> {
+    if (this.permanentFailureReason !== undefined) {
+      return;
+    }
     if (!this.socket) {
       return; // already reconnecting
     }
@@ -1191,6 +1214,9 @@ class ResilientStream {
       this.replaceFailedStream();
     };
     stream.onError = (_errorCode, _msg) => {
+      // we ignore the error code and attempt to re-establish the
+      // stream from scratch, which should resolve the issue even if
+      // it wasn't in a retryable state.
       this.replaceFailedStream();
     };
     this.stream = stream;
