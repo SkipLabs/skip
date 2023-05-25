@@ -1103,6 +1103,9 @@ class ResilientMuxedSocket {
     this.socket = undefined;
     oldSocket.errorSocket(128, "Socket suspected to have failed");
 
+    const backoffMs = 500 + Math.random() * 1000;
+    await new Promise(resolve => setTimeout(resolve, backoffMs));
+
     while (true) {
       try {
         const socket = await MuxedSocket.connect(this.uri, this.creds);
