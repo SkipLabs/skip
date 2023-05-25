@@ -655,33 +655,37 @@ class MuxedSocket(
   private fun verify(auth: MuxAuthMsg): Boolean {
     val algo = "HmacSHA256"
 
-    val now = Instant.now()
-    val d = Instant.parse(auth.date)
-    // delta represents physical timeline time, regardless of calendars and clock shifts
-    val delta = Duration.between(d, now)
+    try {
+      val now = Instant.now()
+      val d = Instant.parse(auth.date)
+      // delta represents physical timeline time, regardless of calendars and clock shifts
+      val delta = Duration.between(d, now)
 
-    // do not allow auths that were not recent. the margin is for clock skew.
-    if (delta.abs().compareTo(Duration.ofMinutes(10)) > 0) {
+      // do not allow auths that were not recent. the margin is for clock skew.
+      if (delta.abs().compareTo(Duration.ofMinutes(10)) > 0) {
+        return false
+      }
+
+      // TODO: check nonce against a cache to prevent replay attacks
+
+      val nonce = Base64.getEncoder().encodeToString(auth.nonce)
+      val content: String = "auth" + auth.accessKey + auth.date + nonce
+      val contentBytes = content.toByteArray(Charsets.UTF_8)
+
+      val mac = Mac.getInstance(algo)
+
+      val privateKey = getDecryptedKey(auth)
+
+      mac.init(SecretKeySpec(privateKey, algo))
+      val ourSig = mac.doFinal(contentBytes)
+
+      // at least try to keep the private key in memory for as little time as possible
+      privateKey.fill(0)
+
+      return Arrays.equals(ourSig, auth.signature)
+    } catch (ex: Exception) {
       return false
     }
-
-    // TODO: check nonce against a cache to prevent replay attacks
-
-    val nonce = Base64.getEncoder().encodeToString(auth.nonce)
-    val content: String = "auth" + auth.accessKey + auth.date + nonce
-    val contentBytes = content.toByteArray(Charsets.UTF_8)
-
-    val mac = Mac.getInstance(algo)
-
-    val privateKey = getDecryptedKey(auth)
-
-    mac.init(SecretKeySpec(privateKey, algo))
-    val ourSig = mac.doFinal(contentBytes)
-
-    // at least try to keep the private key in memory for as little time as possible
-    privateKey.fill(0)
-
-    return Arrays.equals(ourSig, auth.signature)
   }
 
   private fun sendClose(code: Int, reason: String) {
