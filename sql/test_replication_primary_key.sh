@@ -441,9 +441,7 @@ test_seen_insert_clobbered_alt() {
 
     replicate_to_local test_pk_alt
 
-    $SKDB_BIN --data $LOCAL_DB <<< "select * from test_pk_alt"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_pk_alt SET id='bar' WHERE x = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "select * from test_pk_alt"
 
     replicate_to_server test_pk_alt
 
