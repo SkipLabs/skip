@@ -1101,7 +1101,7 @@ class ResilientMuxedSocket {
     this.socket.onClose = undefined;
     this.socket.onError = undefined;
     this.socket = undefined;
-    oldSocket.errorSocket(128, "Socket suspected to have failed");
+    oldSocket.errorSocket(0, "Socket suspected to have failed");
 
     const backoffMs = 500 + Math.random() * 1000;
     await new Promise(resolve => setTimeout(resolve, backoffMs));
@@ -1207,7 +1207,7 @@ class ResilientStream {
     this.stream = undefined;
     this.setFailureDetectionTimeout(undefined);
     // if it _has_ failed, this is a no-op, otherwise it protects invariants
-    oldStream.error(128, "Stream suspected to have failed");
+    oldStream.error(0, "Stream suspected to have failed");
     const newStream = await this.socket.replaceFailedStream();
     this.attachStream(newStream);
     if (this.onReconnect) {
@@ -1498,7 +1498,7 @@ export class MuxedSocket {
     case MuxedSocketState.CLOSING:
     case MuxedSocketState.CLOSEWAIT:
       for (const stream of this.activeStreams.values()) {
-        stream.onStreamError(0, msg);
+        stream.onStreamError(errorCode, msg);
       }
       if (this.onError) {
         this.onError(errorCode, msg);

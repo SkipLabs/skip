@@ -106,7 +106,7 @@ class ProcessPipe(val proc: Process) : StreamHandler {
       }
       else -> {
         close()
-        stream.error(10u, "unexpected request on established connection")
+        stream.error(2001u, "unexpected request on established connection")
       }
     }
 
@@ -140,7 +140,7 @@ class RequestHandler(
           stream.send(payload)
           stream.close()
         } else {
-          stream.error(27u, result.decode())
+          stream.error(2000u, result.decode())
         }
       }
       is ProtoSchemaQuery -> {
@@ -155,14 +155,13 @@ class RequestHandler(
           stream.send(payload)
           stream.close()
         } else {
-          stream.error(27u, result.decode())
+          stream.error(2000u, result.decode())
         }
       }
       is ProtoCreateDb -> {
         // this side effect is only authorized if you're connected as a service mgmt db user
         if (skdb.name != SERVICE_MGMT_DB_NAME) {
-          stream.error(1u, "error")
-          // deliberately unhelpful error
+          stream.error(2002u, "Authorization error")
           return this
         }
         val creds = createDb(request.name, encryption)
@@ -187,7 +186,7 @@ class RequestHandler(
                 request.since,
                 replicationId,
                 { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
-                { stream.error(12u, "Unexpected EOF") },
+                { stream.error(2000u, "Unexpected EOF") },
             )
         return ProcessPipe(proc)
       }
@@ -198,13 +197,13 @@ class RequestHandler(
                 request.table,
                 replicationId,
                 { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
-                { stream.error(13u, "Unexpected EOF") })
+                { stream.error(2000u, "Unexpected EOF") })
         return ProcessPipe(proc)
       }
       is ProtoData -> {
-        stream.error(10u, "unexpected data on non-established connection")
+        stream.error(2001u, "unexpected data on non-established connection")
       }
-      else -> stream.error(10u, "unexpected message")
+      else -> stream.error(2001u, "unexpected message")
     }
     return this
   }
@@ -253,7 +252,7 @@ fun connectionHandler(
                         handler = handler.handleMessage(data, stream)
                       } catch (ex: Exception) {
                         System.err.println("Exception occurred: ${ex}")
-                        stream.error(14u, "Internal error")
+                        stream.error(2000u, "Internal error")
                       }
                     }
                     stream.onClose = {

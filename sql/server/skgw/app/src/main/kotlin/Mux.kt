@@ -54,7 +54,7 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
             if (cm.code == CloseMessage.NORMAL_CLOSURE || cm.code == CloseMessage.GOING_AWAY) {
               muxedSocket.onSocketClose()
             } else {
-              muxedSocket.onSocketError(0u, "websocket closed")
+              muxedSocket.onSocketError(0u, "websocket closed unexpectedly")
             }
           }
         })
@@ -140,7 +140,7 @@ class MuxedSocket(
             // per stream for cleanup. using close would rely on the
             // client gracefully responding with a close in order to free
             // resources
-            this.errorSocket(0u, "session timeout")
+            this.errorSocket(1003u, "session timeout")
           },
           10,
           TimeUnit.MINUTES)
@@ -277,7 +277,7 @@ class MuxedSocket(
         when (muxMsg) {
           is MuxAuthMsg -> {
             if (!verify(muxMsg)) {
-              errorSocket(3u, "Authentication failed")
+              errorSocket(1002u, "Authentication failed")
               return
             }
             mutex.writeLock().lock()
@@ -291,7 +291,7 @@ class MuxedSocket(
           is MuxGoawayMsg -> onSocketError(muxMsg.errorCode, muxMsg.msg)
           is MuxStreamDataMsg,
           is MuxStreamCloseMsg,
-          is MuxStreamResetMsg -> onSocketError(1u, "Not yet authenticated")
+          is MuxStreamResetMsg -> onSocketError(1001u, "Not yet authenticated")
           is MuxPongMsg,
           is MuxPingAlreadyHandledMsg -> {}
         }
@@ -300,13 +300,13 @@ class MuxedSocket(
       State.CLOSING -> {
         val now = Instant.now()
         if (Duration.between(authenticatedAt!!, now).abs().compareTo(maxConnectionDuration) > 0) {
-          errorSocket(11u, "session timeout")
+          errorSocket(1003u, "session timeout")
         }
 
         val muxMsg = decodeMsg(msg)
         when (muxMsg) {
           // TODO: we may eventually allow this as a keep-alive
-          is MuxAuthMsg -> onSocketError(2u, "auth already received")
+          is MuxAuthMsg -> onSocketError(1001u, "auth already received")
           is MuxGoawayMsg -> onSocketError(muxMsg.errorCode, muxMsg.msg)
           is MuxStreamResetMsg -> {
             val stream = getActiveStream(muxMsg.stream)
