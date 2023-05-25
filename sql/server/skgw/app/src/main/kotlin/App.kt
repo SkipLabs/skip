@@ -6,7 +6,6 @@ import io.undertow.server.HttpHandler
 import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.core.WebSocketChannel
-import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
 import java.io.OutputStream
@@ -225,51 +224,51 @@ fun connectionHandler(
               val db = pathParams["database"]
               val skdb = openSkdb(db)
 
-              if (skdb == null) {
-                // 1011 is internal error
-                val msg = "Could not open database"
-                WebSockets.sendCloseBlocking(1011, msg, channel)
-                channel.close()
-                throw RuntimeException(msg)
-              }
-
               var replicationId: String? = null
               var accessKey: String? = null
 
-              return MuxedSocket(
-                  socket = channel,
-                  taskPool = taskPool,
-                  onStream = { _, stream ->
-                    var handler: StreamHandler =
-                        RequestHandler(
-                            skdb,
-                            accessKey!!,
-                            encryption,
-                            replicationId!!,
-                        )
-                    stream.onData = { data ->
-                      try {
-                        handler = handler.handleMessage(data, stream)
-                      } catch (ex: Exception) {
-                        System.err.println("Exception occurred: ${ex}")
-                        stream.error(2000u, "Internal error")
-                      }
-                    }
-                    stream.onClose = {
-                      handler.close()
-                      stream.close()
-                    }
-                    stream.onError = { _, _ -> handler.close() }
-                  },
-                  onClose = { socket -> socket.closeSocket() },
-                  onError = { _, _, _ -> },
-                  getDecryptedKey = { authMsg ->
-                    accessKey = authMsg.accessKey
-                    replicationId = skdb.replicationId(authMsg.deviceUuid).decodeOrThrow().trim()
-                    val encryptedPrivateKey = skdb.privateKeyAsStored(authMsg.accessKey)
-                    encryption.decrypt(encryptedPrivateKey)
-                  },
-              )
+              val socket =
+                  MuxedSocket(
+                      socket = channel,
+                      taskPool = taskPool,
+                      onStream = { _, stream ->
+                        var handler: StreamHandler =
+                            RequestHandler(
+                                skdb!!,
+                                accessKey!!,
+                                encryption,
+                                replicationId!!,
+                            )
+                        stream.onData = { data ->
+                          try {
+                            handler = handler.handleMessage(data, stream)
+                          } catch (ex: Exception) {
+                            System.err.println("Exception occurred: ${ex}")
+                            stream.error(2000u, "Internal error")
+                          }
+                        }
+                        stream.onClose = {
+                          handler.close()
+                          stream.close()
+                        }
+                        stream.onError = { _, _ -> handler.close() }
+                      },
+                      onClose = { socket -> socket.closeSocket() },
+                      onError = { _, _, _ -> },
+                      getDecryptedKey = { authMsg ->
+                        accessKey = authMsg.accessKey
+                        replicationId =
+                            skdb?.replicationId(authMsg.deviceUuid)?.decodeOrThrow()?.trim()
+                        val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
+                        encryption.decrypt(encryptedPrivateKey!!)
+                      },
+                  )
+
+              if (skdb == null) {
+                socket.errorSocket(1004u, "Connection rejected: could not open database")
+              }
+
+              return socket
             }
           }))
 }

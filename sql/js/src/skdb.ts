@@ -1081,6 +1081,11 @@ class ResilientMuxedSocket {
       // auth failure - no point in retrying.
       return false;
     }
+    if (errorCode === 1004) {
+      // connection request failure - user error - bad uri? - no point
+      // in retrying
+      return false;
+    }
     return true;
   }
 
