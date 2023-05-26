@@ -1009,6 +1009,7 @@ class ResilientMuxedSocket {
   private policy: ResiliencyPolicy;
   private socket?: MuxedSocket;
   private socketQueue: Array<any> = new Array();
+  private permanentFailureReason?: string;
 
   // streams from the server are not resilient
   onStream?: (stream: Stream) => void;
@@ -1064,12 +1065,28 @@ class ResilientMuxedSocket {
   }
 
   private async getSocket(): Promise<MuxedSocket> {
+    if (this.permanentFailureReason !== undefined) {
+      throw new Error(this.permanentFailureReason);
+    }
     if (this.socket) {
       return this.socket;
     }
     return new Promise((resolve, reject) => {
       this.socketQueue.push({resolve: resolve, reject: reject});
     });
+  }
+
+  private isSocketErrorRetryable(errorCode: number): boolean {
+    if (errorCode === 1002) {
+      // auth failure - no point in retrying.
+      return false;
+    }
+    if (errorCode === 1004) {
+      // connection request failure - user error - bad uri? - no point
+      // in retrying
+      return false;
+    }
+    return true;
   }
 
   private attachSocket(socket: MuxedSocket): void {
@@ -1081,7 +1098,15 @@ class ResilientMuxedSocket {
     socket.onClose = () => {
       this.replaceFailedSocket();
     };
-    socket.onError = (_errorCode, _msg) => {
+    socket.onError = (errorCode, msg) => {
+      if (!this.isSocketErrorRetryable(errorCode)) {
+        // we do not have a way of communicating upward that we're in
+        // a non-retryable state. there are very few cases where this
+        // can happen and they're checked for explicitly.
+        this.permanentFailureReason = msg;
+        this.socket = undefined;
+        return;
+      }
       this.replaceFailedSocket();
     };
     this.socket = socket;
@@ -1092,6 +1117,9 @@ class ResilientMuxedSocket {
   }
 
   private async replaceFailedSocket(): Promise<void> {
+    if (this.permanentFailureReason !== undefined) {
+      return;
+    }
     if (!this.socket) {
       return; // already reconnecting
     }
@@ -1101,7 +1129,10 @@ class ResilientMuxedSocket {
     this.socket.onClose = undefined;
     this.socket.onError = undefined;
     this.socket = undefined;
-    oldSocket.errorSocket(128, "Socket suspected to have failed");
+    oldSocket.errorSocket(0, "Socket suspected to have failed");
+
+    const backoffMs = 500 + Math.random() * 1000;
+    await new Promise(resolve => setTimeout(resolve, backoffMs));
 
     while (true) {
       try {
@@ -1188,6 +1219,9 @@ class ResilientStream {
       this.replaceFailedStream();
     };
     stream.onError = (_errorCode, _msg) => {
+      // we ignore the error code and attempt to re-establish the
+      // stream from scratch, which should resolve the issue even if
+      // it wasn't in a retryable state.
       this.replaceFailedStream();
     };
     this.stream = stream;
@@ -1204,7 +1238,7 @@ class ResilientStream {
     this.stream = undefined;
     this.setFailureDetectionTimeout(undefined);
     // if it _has_ failed, this is a no-op, otherwise it protects invariants
-    oldStream.error(128, "Stream suspected to have failed");
+    oldStream.error(0, "Stream suspected to have failed");
     const newStream = await this.socket.replaceFailedStream();
     this.attachStream(newStream);
     if (this.onReconnect) {
@@ -1495,7 +1529,7 @@ export class MuxedSocket {
     case MuxedSocketState.CLOSING:
     case MuxedSocketState.CLOSEWAIT:
       for (const stream of this.activeStreams.values()) {
-        stream.onStreamError(0, msg);
+        stream.onStreamError(errorCode, msg);
       }
       if (this.onError) {
         this.onError(errorCode, msg);

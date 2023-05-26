@@ -210,7 +210,7 @@ Stream ids are
 - payload
   - reserved (8) - must be zeroed
   - last stream id (24)
-  - error code (32) - zero is used to indicate a fault lower in the stack
+  - error code (32) - see section below on errors
   - msg_length (32)
   - msg (msg_length)
 
@@ -228,7 +228,7 @@ Stream ids are
 
 - type = 0x4
 - payload
-  - error code (32) - zero is used to indicate a fault lower in the stack
+  - error code (32) - see section below on errors
   - msg_length (32)
   - msg (msg_length)
 
@@ -378,3 +378,53 @@ terminates, the file closes, and we close the stream to signal this.
 There are plans to re-design this protocol and use a binary
 serialisation for efficient processing; this section is intentionally
 brief.
+
+* Errors
+
+Errors are communicated using the mux layer error messages. The
+orchestration and data transfer protocols do not reimplement error
+communication. They error out the stream or socket at the mux layer
+and communicate the issue using the mechanism provided here. If it is
+ever necessary to communicate more structured errors as messages then
+we can add that at the appropriate layer in the future.
+
+The mux layer allows itself and the above layers to communicate an
+error code and a string. It also allows for either an individual
+stream or the socket as a whole to be put in to a final error state.
+
+Error code ranges are allocated to the different layers and have the
+following semantics.
+
+- [0, 1000) - below mux layer and/or ambiguous/unknown
+  - 0 - non-specific failure - do not assume anything
+
+- [1000, 2000) - mux layer
+  - 1000 - non-specific failure - do not assume anything
+
+  - 1001 - protocol failure - unexpected or invalid message, invalid
+    state machine transition - do not retry without re-establishing
+    the session
+
+  - 1002 - authentication failure - do not retry with same credentials
+
+  - 1003 - session timed out - by design the client should
+    retry/re-establish
+
+  - 1004 - like an HTTP 404 - cannot connect to the resource, it
+    cannot be found or does not exist. Do not retry the same session.
+
+- [2000, 3000) - orchestration layer
+  - 2000 - non-specific failure - do not assume anything
+
+  - 2001 - protocol failure - unexpected or invalid message, invalid
+    state machine transition - do not retry without re-establishing
+    the session
+
+  - 2002 - authorization failure - do not retry this request
+
+- [3000, 4000) - data transfer protocol
+  - 3000 - non-specific failure - do not assume anything
+
+  - 3001 - protocol failure - unexpected or invalid message, invalid
+    state machine transition - do not retry without re-establishing
+    the session
