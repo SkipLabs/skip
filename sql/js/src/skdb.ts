@@ -777,6 +777,7 @@ type ProtoRequestTail = {
   type: "tail";
   table: string;
   since: bigint;
+  filterQuery: string;
 }
 
 type ProtoPushPromise = {
@@ -855,15 +856,21 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
         return buf.slice(0, 4 + (encodeResult.written || 0));
       }
       case "tail": {
-        const buf = new ArrayBuffer(14 + msg.table.length * 4);
+        const buf = new ArrayBuffer(16 + msg.table.length * 4 + msg.filterQuery.length * 4);
         const uint8View = new Uint8Array(buf);
         const dataView = new DataView(buf);
         const textEncoder = new TextEncoder();
-        const encodeResult = textEncoder.encodeInto(msg.table, uint8View.subarray(14));
+        let encodeResult = textEncoder.encodeInto(msg.table, uint8View.subarray(14));
         dataView.setUint8(0, 0x2);  // type
         dataView.setBigUint64(4, msg.since, false);
         dataView.setUint16(12, encodeResult.written || 0, false);
-        return buf.slice(0, 14 + (encodeResult.written || 0));
+        const filterQueryOffset = 14 + (encodeResult.written || 0);
+        encodeResult = textEncoder.encodeInto(
+          msg.filterQuery,
+          uint8View.subarray(filterQueryOffset + 2),
+        );
+        dataView.setUint16(filterQueryOffset, encodeResult.written || 0, false);
+        return buf.slice(0, filterQueryOffset + 2 + (encodeResult.written || 0));
       }
       case "pushPromise": {
         const buf = new ArrayBuffer(6 + msg.table.length * 4);
