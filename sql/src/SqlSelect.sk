@@ -223,7 +223,7 @@ class SelectEvaluator{
   fun evalSelect(context: mutable SKFS.Context): SelectDir {
     if (this.select.directMode) {
       !this.directMode = this.select.limit match {
-      | None() -> None()
+      | None() -> Some(Int::max)
       | Some(limitExpr) -> Some(this.evalStaticInt(context, limitExpr))
       };
     };
@@ -755,16 +755,41 @@ class SelectEvaluator{
     entries: List<Row>,
   ): SKFS.EHandle<Row> {
     parents = this.makeParents(dir.dirName, rangeOpt, remainingTables, entries);
-    if (this.directMode is Some _) RowValues::printHeader(this.select.format);
-    result = SKFS.EHandle::multiContextWriterKeyIter(
-      Row::fromFile,
-      context,
-      parents,
-      this.selectName2,
-      this.evalSelectTableReducer(),
-    );
-    if (this.directMode is Some _) throw IgnoreAndContinue();
-    result
+    this.directMode match {
+    | Some(limit) ->
+      RowValues::printHeader(this.select.format);
+      i = 0;
+      for (kv in context.unsafeGetEagerDir(dir.dirName).unsafeGetFileIter()) {
+        (_, files) = kv;
+        for (file in files) {
+          input = RowValues::fromFile(file);
+          evaluator = ExprEvaluator(None(), Array[input], Array[], None());
+          whereVal = evaluator.evalWhere(context, this.select.where);
+          whereVal match {
+          | ANull()
+          | ADef(0) ->
+            continue
+          | _ -> void
+          };
+          row = static::evalRow(context, evaluator, this.params, input.repeat);
+          for (_ in Range(0, row.repeat)) {
+            RowValues::printItem(this.select.format, row);
+            !i = i + 1;
+            if (i >= limit) throw IgnoreAndContinue();
+          }
+        }
+      };
+      throw IgnoreAndContinue()
+    | None() ->
+      result = SKFS.EHandle::multiContextWriterKeyIter(
+        Row::fromFile,
+        context,
+        parents,
+        this.selectName2,
+        this.evalSelectTableReducer(),
+      );
+      result
+    }
   }
 
   fun evalSelectTableRows(
@@ -949,23 +974,7 @@ class SelectEvaluator{
       invariant(this.select.groupBy is None());
       key = RowKey::create(row, this.kinds);
       qkind match {
-      | None() ->
-        this.directMode match {
-        | None() -> writer.write(key, row)
-        | Some(limit) ->
-          i = context.getGlobal("DIRECT_MODE_COUNT") match {
-          | None() -> 0
-          | Some(x) -> SKFS.IntFile::fromFile(x).value
-          };
-          for (_ in Range(0, row.repeat)) {
-            RowValues::printItem(this.select.format, row);
-            !i = i + 1;
-            if (i >= limit) {
-              throw IgnoreAndContinue()
-            }
-          };
-          context.setGlobal("DIRECT_MODE_COUNT", SKFS.IntFile(i))
-        }
+      | None() -> writer.write(key, row)
       | Some((order, k)) -> writer.write(key, RowKind(order, k, row))
       }
     };
