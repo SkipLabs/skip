@@ -777,7 +777,7 @@ type ProtoRequestTail = {
   type: "tail";
   table: string;
   since: bigint;
-  filterQuery: string;
+  filterExpr: string;
 }
 
 type ProtoPushPromise = {
@@ -856,7 +856,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
         return buf.slice(0, 4 + (encodeResult.written || 0));
       }
       case "tail": {
-        const buf = new ArrayBuffer(16 + msg.table.length * 4 + msg.filterQuery.length * 4);
+        const buf = new ArrayBuffer(16 + msg.table.length * 4 + msg.filterExpr.length * 4);
         const uint8View = new Uint8Array(buf);
         const dataView = new DataView(buf);
         const textEncoder = new TextEncoder();
@@ -864,13 +864,13 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
         dataView.setUint8(0, 0x2);  // type
         dataView.setBigUint64(4, msg.since, false);
         dataView.setUint16(12, encodeResult.written || 0, false);
-        const filterQueryOffset = 14 + (encodeResult.written || 0);
+        const filterExprOffset = 14 + (encodeResult.written || 0);
         encodeResult = textEncoder.encodeInto(
-          msg.filterQuery,
-          uint8View.subarray(filterQueryOffset + 2),
+          msg.filterExpr,
+          uint8View.subarray(filterExprOffset + 2),
         );
-        dataView.setUint16(filterQueryOffset, encodeResult.written || 0, false);
-        return buf.slice(0, filterQueryOffset + 2 + (encodeResult.written || 0));
+        dataView.setUint16(filterExprOffset, encodeResult.written || 0, false);
+        return buf.slice(0, filterExprOffset + 2 + (encodeResult.written || 0));
       }
       case "pushPromise": {
         const buf = new ArrayBuffer(6 + msg.table.length * 4);
@@ -2012,7 +2012,7 @@ class SKDBServer {
     });
   }
 
-  private async establishServerTail(tableName: string, filterQuery: string): Promise<void> {
+  private async establishServerTail(tableName: string, filterExpr: string): Promise<void> {
     const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
@@ -2042,7 +2042,7 @@ class SKDBServer {
           type: "tail",
           table: tableName,
           since: this.client.watermark(this.replicationUid, tableName),
-          filterQuery: filterQuery,
+          filterExpr: filterExpr,
         }))
         stream.expectingData();
       };
@@ -2051,7 +2051,7 @@ class SKDBServer {
         type: "tail",
         table: tableName,
         since: this.client.watermark(this.replicationUid, tableName),
-        filterQuery: filterQuery,
+        filterExpr: filterExpr,
       }));
       stream.expectingData();
     });
@@ -2125,7 +2125,7 @@ class SKDBServer {
     };
   }
 
-  async mirrorTable(tableName: string, filterQuery?: string): Promise<void> {
+  async mirrorTable(tableName: string, filterExpr?: string): Promise<void> {
     if (this.mirroredTables.has(tableName)) {
       return;
     }
@@ -2148,7 +2148,7 @@ class SKDBServer {
     // TODO: need to join the promises but let them run concurrently
     // I await here for now so we learn of error
     await this.establishLocalTail(tableName);
-    return this.establishServerTail(tableName, filterQuery || "");
+    return this.establishServerTail(tableName, filterExpr || "");
   }
 
   async sqlRaw(stdin: string): Promise<string> {
