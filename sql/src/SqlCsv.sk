@@ -217,9 +217,10 @@ fun lwwEdits(
     showUsedIndexes => false,
   };
   compiler = SKSQL.Compiler::create(false, options, selectAst.pos);
-  select = compiler.compileSelect(context, selectAst, true);
-  selectHandle = SKSQL.evalSelect(context, select, None());
-  selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
+  selectContext = context.mclone(); // ensure we don't accumulate the select dirs
+  select = compiler.compileSelect(selectContext, selectAst, true);
+  selectHandle = SKSQL.evalSelect(selectContext, select, None());
+  selectDir = selectContext.unsafeGetEagerDir(selectHandle.dirName);
 
   entries = mutable Vector[];
 
