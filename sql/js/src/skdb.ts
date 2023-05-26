@@ -777,6 +777,7 @@ type ProtoRequestTail = {
   type: "tail";
   table: string;
   since: bigint;
+  filterExpr: string;
 }
 
 type ProtoPushPromise = {
@@ -855,15 +856,21 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
         return buf.slice(0, 4 + (encodeResult.written || 0));
       }
       case "tail": {
-        const buf = new ArrayBuffer(14 + msg.table.length * 4);
+        const buf = new ArrayBuffer(16 + msg.table.length * 4 + msg.filterExpr.length * 4);
         const uint8View = new Uint8Array(buf);
         const dataView = new DataView(buf);
         const textEncoder = new TextEncoder();
-        const encodeResult = textEncoder.encodeInto(msg.table, uint8View.subarray(14));
+        let encodeResult = textEncoder.encodeInto(msg.table, uint8View.subarray(14));
         dataView.setUint8(0, 0x2);  // type
         dataView.setBigUint64(4, msg.since, false);
         dataView.setUint16(12, encodeResult.written || 0, false);
-        return buf.slice(0, 14 + (encodeResult.written || 0));
+        const filterExprOffset = 14 + (encodeResult.written || 0);
+        encodeResult = textEncoder.encodeInto(
+          msg.filterExpr,
+          uint8View.subarray(filterExprOffset + 2),
+        );
+        dataView.setUint16(filterExprOffset, encodeResult.written || 0, false);
+        return buf.slice(0, filterExprOffset + 2 + (encodeResult.written || 0));
       }
       case "pushPromise": {
         const buf = new ArrayBuffer(6 + msg.table.length * 4);
@@ -2005,19 +2012,23 @@ class SKDBServer {
     });
   }
 
-  private async establishServerTail(tableName: string): Promise<void> {
+  private async establishServerTail(tableName: string, filterExpr: string): Promise<void> {
     const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
 
     let resolved = false;
 
+    // TODO: discover failure and reject. this could happen if e.g.
+    // the table is dropped, acls, bad filter, etc.
     return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
           const msg = decoder.pop();
           const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
-          client.runLocal(["write-csv", tableName, "--source", this.replicationUid], txtPayload + '\n');
+          client.runLocal([
+            "write-csv", tableName, "--source", this.replicationUid
+          ], txtPayload + '\n');
           if (!resolved) {
             resolved = true;
             resolve();
@@ -2031,6 +2042,7 @@ class SKDBServer {
           type: "tail",
           table: tableName,
           since: this.client.watermark(this.replicationUid, tableName),
+          filterExpr: filterExpr,
         }))
         stream.expectingData();
       };
@@ -2039,6 +2051,7 @@ class SKDBServer {
         type: "tail",
         table: tableName,
         since: this.client.watermark(this.replicationUid, tableName),
+        filterExpr: filterExpr,
       }));
       stream.expectingData();
     });
@@ -2112,7 +2125,7 @@ class SKDBServer {
     };
   }
 
-  async mirrorTable(tableName: string): Promise<void> {
+  async mirrorTable(tableName: string, filterExpr?: string): Promise<void> {
     if (this.mirroredTables.has(tableName)) {
       return;
     }
@@ -2135,7 +2148,7 @@ class SKDBServer {
     // TODO: need to join the promises but let them run concurrently
     // I await here for now so we learn of error
     await this.establishLocalTail(tableName);
-    return this.establishServerTail(tableName);
+    return this.establishServerTail(tableName, filterExpr || "");
   }
 
   async sqlRaw(stdin: string): Promise<string> {
