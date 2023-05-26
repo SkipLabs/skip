@@ -6,7 +6,6 @@ import io.undertow.server.HttpHandler
 import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.core.WebSocketChannel
-import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
 import java.io.OutputStream
@@ -106,7 +105,7 @@ class ProcessPipe(val proc: Process) : StreamHandler {
       }
       else -> {
         close()
-        stream.error(10u, "unexpected request on established connection")
+        stream.error(2001u, "unexpected request on established connection")
       }
     }
 
@@ -140,7 +139,7 @@ class RequestHandler(
           stream.send(payload)
           stream.close()
         } else {
-          stream.error(27u, result.decode())
+          stream.error(2000u, result.decode())
         }
       }
       is ProtoSchemaQuery -> {
@@ -155,14 +154,13 @@ class RequestHandler(
           stream.send(payload)
           stream.close()
         } else {
-          stream.error(27u, result.decode())
+          stream.error(2000u, result.decode())
         }
       }
       is ProtoCreateDb -> {
         // this side effect is only authorized if you're connected as a service mgmt db user
         if (skdb.name != SERVICE_MGMT_DB_NAME) {
-          stream.error(1u, "error")
-          // deliberately unhelpful error
+          stream.error(2002u, "Authorization error")
           return this
         }
         val creds = createDb(request.name, encryption)
@@ -187,7 +185,7 @@ class RequestHandler(
                 request.since,
                 replicationId,
                 { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
-                { stream.error(12u, "Unexpected EOF") },
+                { stream.error(2000u, "Unexpected EOF") },
             )
         return ProcessPipe(proc)
       }
@@ -198,13 +196,13 @@ class RequestHandler(
                 request.table,
                 replicationId,
                 { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
-                { stream.error(13u, "Unexpected EOF") })
+                { stream.error(2000u, "Unexpected EOF") })
         return ProcessPipe(proc)
       }
       is ProtoData -> {
-        stream.error(10u, "unexpected data on non-established connection")
+        stream.error(2001u, "unexpected data on non-established connection")
       }
-      else -> stream.error(10u, "unexpected message")
+      else -> stream.error(2001u, "unexpected message")
     }
     return this
   }
@@ -226,51 +224,51 @@ fun connectionHandler(
               val db = pathParams["database"]
               val skdb = openSkdb(db)
 
-              if (skdb == null) {
-                // 1011 is internal error
-                val msg = "Could not open database"
-                WebSockets.sendCloseBlocking(1011, msg, channel)
-                channel.close()
-                throw RuntimeException(msg)
-              }
-
               var replicationId: String? = null
               var accessKey: String? = null
 
-              return MuxedSocket(
-                  socket = channel,
-                  taskPool = taskPool,
-                  onStream = { _, stream ->
-                    var handler: StreamHandler =
-                        RequestHandler(
-                            skdb,
-                            accessKey!!,
-                            encryption,
-                            replicationId!!,
-                        )
-                    stream.onData = { data ->
-                      try {
-                        handler = handler.handleMessage(data, stream)
-                      } catch (ex: Exception) {
-                        System.err.println("Exception occurred: ${ex}")
-                        stream.error(14u, "Internal error")
-                      }
-                    }
-                    stream.onClose = {
-                      handler.close()
-                      stream.close()
-                    }
-                    stream.onError = { _, _ -> handler.close() }
-                  },
-                  onClose = { socket -> socket.closeSocket() },
-                  onError = { _, _, _ -> },
-                  getDecryptedKey = { authMsg ->
-                    accessKey = authMsg.accessKey
-                    replicationId = skdb.replicationId(authMsg.deviceUuid).decodeOrThrow().trim()
-                    val encryptedPrivateKey = skdb.privateKeyAsStored(authMsg.accessKey)
-                    encryption.decrypt(encryptedPrivateKey)
-                  },
-              )
+              val socket =
+                  MuxedSocket(
+                      socket = channel,
+                      taskPool = taskPool,
+                      onStream = { _, stream ->
+                        var handler: StreamHandler =
+                            RequestHandler(
+                                skdb!!,
+                                accessKey!!,
+                                encryption,
+                                replicationId!!,
+                            )
+                        stream.onData = { data ->
+                          try {
+                            handler = handler.handleMessage(data, stream)
+                          } catch (ex: Exception) {
+                            System.err.println("Exception occurred: ${ex}")
+                            stream.error(2000u, "Internal error")
+                          }
+                        }
+                        stream.onClose = {
+                          handler.close()
+                          stream.close()
+                        }
+                        stream.onError = { _, _ -> handler.close() }
+                      },
+                      onClose = { socket -> socket.closeSocket() },
+                      onError = { _, _, _ -> },
+                      getDecryptedKey = { authMsg ->
+                        accessKey = authMsg.accessKey
+                        replicationId =
+                            skdb?.replicationId(authMsg.deviceUuid)?.decodeOrThrow()?.trim()
+                        val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
+                        encryption.decrypt(encryptedPrivateKey!!)
+                      },
+                  )
+
+              if (skdb == null) {
+                socket.errorSocket(1004u, "Connection rejected: could not open database")
+              }
+
+              return socket
             }
           }))
 }
