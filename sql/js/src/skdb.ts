@@ -2012,19 +2012,23 @@ class SKDBServer {
     });
   }
 
-  private async establishServerTail(tableName: string): Promise<void> {
+  private async establishServerTail(tableName: string, filterQuery: string): Promise<void> {
     const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
 
     let resolved = false;
 
+    // TODO: discover failure and reject. this could happen if e.g.
+    // the table is dropped, acls, bad filter, etc.
     return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
           const msg = decoder.pop();
           const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
-          client.runLocal(["write-csv", tableName, "--source", this.replicationUid], txtPayload + '\n');
+          client.runLocal([
+            "write-csv", tableName, "--source", this.replicationUid
+          ], txtPayload + '\n');
           if (!resolved) {
             resolved = true;
             resolve();
@@ -2038,6 +2042,7 @@ class SKDBServer {
           type: "tail",
           table: tableName,
           since: this.client.watermark(this.replicationUid, tableName),
+          filterQuery: filterQuery,
         }))
         stream.expectingData();
       };
@@ -2046,6 +2051,7 @@ class SKDBServer {
         type: "tail",
         table: tableName,
         since: this.client.watermark(this.replicationUid, tableName),
+        filterQuery: filterQuery,
       }));
       stream.expectingData();
     });
@@ -2119,7 +2125,7 @@ class SKDBServer {
     };
   }
 
-  async mirrorTable(tableName: string): Promise<void> {
+  async mirrorTable(tableName: string, filterQuery?: string): Promise<void> {
     if (this.mirroredTables.has(tableName)) {
       return;
     }
@@ -2142,7 +2148,7 @@ class SKDBServer {
     // TODO: need to join the promises but let them run concurrently
     // I await here for now so we learn of error
     await this.establishLocalTail(tableName);
-    return this.establishServerTail(tableName);
+    return this.establishServerTail(tableName, filterQuery || "");
   }
 
   async sqlRaw(stdin: string): Promise<string> {

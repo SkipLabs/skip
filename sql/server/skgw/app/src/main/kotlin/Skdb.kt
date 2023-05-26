@@ -133,6 +133,7 @@ class Skdb(val name: String, private val dbPath: String) {
       user: String,
       table: String,
       since: ULong,
+      filter: String?,
       replicationId: String,
       callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
       closed: () -> Unit,
@@ -163,6 +164,10 @@ class Skdb(val name: String, private val dbPath: String) {
             "--follow",
             "--since",
             (if (since < 0u) 0 else since).toString())
+
+    if (filter != null && !filter.isEmpty()) {
+      pb.command().add(filter)
+    }
 
     // TODO: for hacky debug
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
