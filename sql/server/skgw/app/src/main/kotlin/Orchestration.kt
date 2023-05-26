@@ -20,6 +20,7 @@ data class ProtoQuery(val query: String, val format: QueryResponseFormat) : Prot
 data class ProtoRequestTail(
     val table: String,
     val since: ULong = 0u,
+    val filterQuery: String?,
 ) : ProtoMessage()
 
 enum class SchemaScope {
@@ -69,7 +70,20 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
       val tableNameLength = data.getShort()
       val tableNameBytes = ByteArray(tableNameLength.toInt())
       data.get(tableNameBytes)
-      ProtoRequestTail(String(tableNameBytes, StandardCharsets.UTF_8), since.toULong())
+      if (!data.hasRemaining()) {
+        ProtoRequestTail(
+            table = String(tableNameBytes, StandardCharsets.UTF_8),
+            since = since.toULong(),
+            filterQuery = null)
+      } else {
+        val filterQueryLength = data.getShort()
+        val filterBytes = ByteArray(filterQueryLength.toInt())
+        data.get(filterBytes)
+        ProtoRequestTail(
+            String(tableNameBytes, StandardCharsets.UTF_8),
+            since.toULong(),
+            String(filterBytes, StandardCharsets.UTF_8))
+      }
     }
     3u -> {
       data.position(data.position() + 3) // skip over reserved
