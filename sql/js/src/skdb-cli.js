@@ -284,7 +284,7 @@ const localRepl = async function() {
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
       console.log(".mirror-table <table> -- Mirror the remote table <table>.");
-      console.log(".mirror-table <table> <query> -- Mirror the remote table <table> with filter <query>.");
+      console.log(".mirror-table <table> <expr> -- Mirror the remote table <table> with filter <expr>.");
       continue;
     }
 
