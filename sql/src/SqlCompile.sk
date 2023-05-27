@@ -234,11 +234,26 @@ mutable class Compiler{
       }
     };
 
+    /*
+     * Direct mode is a setup where we want to output things on stdout
+     * stdout directly. Of course, that will not work with any kind of
+     * query. So we restrict ourselves to queries of the form:
+     * "select ... from ... where ..."
+     *
+     * (when exactly one table is involved). We don't use direct mode
+     * when an index is involved because the result set is typically
+     * small enough that direct mode won't matter. And it saves us a lot
+     * of headache in the logic running the loop (no need to lookup the
+     * index etc ...).
+     */
+
     directMode =
       aggr is None() &&
       this.directMode &&
       toplevel &&
+      /* There is exactly one table */
       from.size() == 1 &&
+      /* No index is involved (could change in the future?)  */
       from[0].i1 is None() &&
       select.kind is SNone() &&
       having is None() &&
