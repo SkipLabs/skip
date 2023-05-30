@@ -61,6 +61,7 @@ build/init.sql: sql/privacy/init.sql
 .PHONY: clean
 clean:
 	rm -Rf build
+	find . -name 'Skargo.toml' -exec sh -c 'rm -rf $(dirname {})/target' \;
 
 .PHONY: fmt
 fmt:
