@@ -1,4 +1,4 @@
-# this builds the aritfacts of this repository, orchestrating the
+# this builds the artifacts of this repository, orchestrating the
 # various build systems
 
 all: npm build/skdb build/init.sql
@@ -56,9 +56,15 @@ build/init.sql: sql/privacy/init.sql
 # dev workflow orchestration
 ################################################################################
 
+# dummy comment to appease make parser
+
 .PHONY: clean
 clean:
 	rm -Rf build
+
+.PHONY: fmt
+fmt:
+	find . -path ./compiler/tests -not -prune -or -name '*'.sk -exec sh -c 'echo {}; skfmt -i {}' \;
 
 .PHONY: test
 test: npm build/skdb
