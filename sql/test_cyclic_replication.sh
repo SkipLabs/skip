@@ -20,13 +20,11 @@ setup_server() {
     echo "INSERT INTO skdb_users VALUES(id(), 'test_user', 'pass');" | $SKDB
     echo "INSERT INTO skdb_users VALUES(99, 'test_alt_user', 'pass');" | $SKDB
 
-    echo "CREATE TABLE whitelist_just_alt_user(userID INTEGER);" | $SKDB
-    echo "INSERT INTO whitelist_just_alt_user VALUES (99);" | $SKDB
-    echo "INSERT INTO skdb_access VALUES (2, 2, -1, 'alt user');" | $SKDB
-    echo "INSERT INTO skdb_groups VALUES (2, 'whitelist_just_alt_user');" | $SKDB
+    echo "INSERT INTO skdb_group_permissions VALUES (2, 99, 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES ('test', 7);" | $SKDB
 
     echo "CREATE TABLE test (id INTEGER, note STRING);" | $SKDB
-    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_access INTEGER);" | $SKDB
+    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_group INTEGER);" | $SKDB
 }
 
 setup_local() {
@@ -75,8 +73,8 @@ test_write_csv_produces_updates() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -101,8 +99,8 @@ test_write_csv_tombstones() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB test < $SERVER_TAIL > /dev/null
 
     assert_line_count "$SERVER_TAIL" hello 1
@@ -136,8 +134,8 @@ test_updates_filters_write_csv() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -161,8 +159,8 @@ test_updates_filters_write_csv_with_local_input() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -194,8 +192,8 @@ test_updates_filters_write_csv_with_local_input_local_write_first() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -225,8 +223,8 @@ test_updates_with_tombstones_filters_write_csv() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     assert_line_count "$SERVER_TAIL" hello 1
@@ -256,8 +254,8 @@ test_updates_filters_write_csv_with_local_input_then_write_csv_zeros() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -303,8 +301,8 @@ test_updates_filters_write_csv_with_local_identity_update() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -334,8 +332,8 @@ test_diff_filters_write_csv() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -360,8 +358,8 @@ test_diff_filters_write_csv_mixed_with_local_input() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -399,8 +397,8 @@ test_diff_filters_write_csv_mixed_with_local_input_write_first() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -409,8 +407,8 @@ test_diff_filters_write_csv_mixed_with_local_input_write_first() {
 
     # replicate full history to local again
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # the write-csv does not clobber our local write.
@@ -435,8 +433,8 @@ test_diff_filters_write_csv_mixed_with_local_delete() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -465,8 +463,8 @@ test_diff_filters_write_csv_mixed_with_local_input_then_write_csv_zeros() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -502,8 +500,8 @@ test_diff_filters_write_csv_mixed_with_local_update() {
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
-    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user test)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > $SERVER_TAIL
+    session=$($SKDB_BIN subscribe --data $SERVER_DB --connect test)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > $SERVER_TAIL
     $SKDB_BIN write-csv --data $LOCAL_DB --source 1234 test < $SERVER_TAIL > /dev/null
 
     # server sent down 1 row
@@ -533,7 +531,7 @@ test_server_tail_filters_write_csv() {
     setup_local
 
     local_session=$($SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test)
-    server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --user test_user --ignore-source 1234 test)
+    server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
 
     # write in to local
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello');"
@@ -542,7 +540,7 @@ test_server_tail_filters_write_csv() {
     $SKDB_BIN diff --data $LOCAL_DB --format=csv --since 0 "$local_session" > $LOCAL_DIFF
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test < $LOCAL_DIFF > /dev/null
 
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 --user test_user > $SERVER_TAIL
 
     assert_line_count "$LOCAL_DIFF" hello 1
     # server does not echo

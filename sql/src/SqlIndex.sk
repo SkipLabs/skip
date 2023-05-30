@@ -4,7 +4,28 @@
 
 module SKSQL;
 
-class CValueFile(values: Array<(Int, ?CValue)>) extends SKFS.BaseName
+class IndexProjKey(values: Array<(Int, ?CValue)>) extends SKFS.BaseName
+
+fun makeIndexProjKey(
+  v: RowValues,
+  kinds: Array<(Int, IKind, Type)>,
+  size: Int,
+): IndexProjKey {
+  indexedValues = mutable Vector[];
+  for (i in Range(0, size)) {
+    indexedValues.push((kinds[i].i0, v.values[kinds[i].i0]));
+  };
+  IndexProjKey(indexedValues.toArray());
+}
+
+fun createIndexName(
+  tableName: Name,
+  kinds: Array<(Int, IKind, Type)>,
+  size: Int,
+): Name {
+  if (size != kinds.size()) !kinds = kinds.slice(0, size);
+  Name::create("/indexes/" + tableName.lower + "/" + hash(kinds) + "/")
+}
 
 fun createIndex(
   context: mutable SKFS.Context,
@@ -14,12 +35,13 @@ fun createIndex(
   kinds: Array<(Int, IKind, Type)>,
   size: Int,
   unique: Bool,
+  primary: Bool,
   text: ?String,
 ): IndexDescr {
   idxKinds = kinds.mapWithIndex((idx, field) -> {
     (idx, IASC(), field.i2)
   });
-  indexName = Name::create("/indexes" + dirName.toString() + hash(kinds) + "/");
+  indexName = createIndexName(tableName, kinds, size);
   needsReordering = false;
   for (i => kind in kinds) {
     if (i == kind.i0) continue;
@@ -52,13 +74,9 @@ fun createIndex(
         context,
         SKFS.DirName::create(indexName.lower + "unique/proj/"),
         (_, writer, _key, values) ~> {
-          result = SortedMap<CValueFile, mutable Vector<RowValues>>[];
+          result = SortedMap<IndexProjKey, mutable Vector<RowValues>>[];
           for (v in values) {
-            indexedValues = mutable Vector[];
-            for (i in Range(0, size)) {
-              indexedValues.push((kinds[i].i0, v.values[kinds[i].i0]));
-            };
-            k = CValueFile(indexedValues.toArray());
+            k = makeIndexProjKey(v, kinds, size);
             if (v.repeat != 1) {
               throw Conflict(0, "UNIQUE constraint failed", k.values)
             };
@@ -87,7 +105,7 @@ fun createIndex(
               0,
               "UNIQUE constraint failed",
               key match {
-              | CValueFile(arr) -> arr
+              | IndexProjKey(arr) -> arr
               | _ -> invariant_violation("Unexpected key type")
               },
             )
@@ -108,6 +126,7 @@ fun createIndex(
     tableDirName => dirName,
     fields => kinds,
     unique,
+    primary,
     text,
   };
 
@@ -121,6 +140,7 @@ fun createUserIndex(
   pos: Int,
   fields: (Name, Array<(Name, IKind)>),
   unique: Bool,
+  primary: Bool,
   text: ?String,
 ): IndexDescr {
   (tableName, colNames) = fields;
@@ -162,6 +182,7 @@ fun createUserIndex(
     kinds,
     fields.i1.size(),
     unique,
+    primary,
     text,
   )
 }

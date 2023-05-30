@@ -95,6 +95,13 @@ for i in {1..10}; do (cd ./test/concurrent/inserts/ && ./run.sh); done
 for i in {1..10}; do (cd ./test/concurrent/sum/ && ./run.sh); done
 for i in {1..10}; do (cd ./test/concurrent/sum_transaction/ && ./run.sh); done
 
+echo ""
+echo "*******************************************************************************"
+echo "* PRIVACY *"
+echo "*******************************************************************************"
+echo ""
+
+./test_privacy.sh
 
 echo ""
 echo "*******************************************************************************"

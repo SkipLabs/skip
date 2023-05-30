@@ -11,7 +11,7 @@ insert into skdb_users values(id(), 'lucash', 'UE/7HZ/o1bC2X8PzvHzJwSCmEAPC+Arxx
 insert into skdb_users values(id(), 'laurem', 'YP6CFwzl6ROYthbD/7CIyK8gOyazeiwL3bziCPc/c+k=');
 
 create table profiles(
-  skdb_owner INTEGER,
+  skdb_author INTEGER,
   full_name STRING,
   country_code STRING,
   skdb_access INTEGER,
@@ -61,11 +61,11 @@ create virtual view all_groups as
 -------------------------------------------------------------------------------
 
 create virtual view whitelist_skiplabs_employees as
-  select skdb_owner as userID from profiles where employer = 'skiplabs'
+  select skdb_author as userID from profiles where employer = 'skiplabs'
 ;
 
 create virtual view whitelist_skiplabs_employees_FR as
-  select skdb_owner as userID
+  select skdb_author as userID
   from profiles
   where employer = 'skiplabs' AND country_code = 'FR'
 ;
@@ -95,7 +95,7 @@ insert into skdb_access select
 -- Friends
 -------------------------------------------------------------------------------
 
-create table friends (skdb_owner INTEGER, friend INTEGER, skdb_access INTEGER);
+create table friends (skdb_author INTEGER, friend INTEGER, skdb_access INTEGER);
 
 create table whitelist_julienv (userID integer);
 insert into whitelist_julienv
@@ -122,7 +122,7 @@ create virtual view whitelist_julienv_friends as
       (select accessID from skdb_access where name = 'julienv') as skdb_access
     from friends
     where
-      skdb_owner = (select userID from skdb_users where userName = 'julienv')
+      skdb_author = (select userID from skdb_users where userName = 'julienv')
   union
     select
       userID,
@@ -167,7 +167,7 @@ create table posts (
   ID integer,
   data string,
   skdb_access integer not null,
-  skdb_owner integer
+  skdb_author integer
 );
 
 insert into posts select

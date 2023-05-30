@@ -16,6 +16,7 @@ setup_server() {
     $SKDB < privacy/init.sql
 
     echo "INSERT INTO skdb_users VALUES(id(), 'test_user', 'pass');" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES('test_without_access', 7);" | $SKDB
     echo "CREATE TABLE test_without_access (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
 }
 
@@ -78,9 +79,9 @@ test_server_tails_no_access_no_author_cols() {
     # assume data is there
 
     # tail
-    session=$($SKDB_BIN --data $SERVER_DB subscribe --connect --user test_user test_without_access)
+    session=$($SKDB_BIN --data $SERVER_DB subscribe --connect test_without_access)
     output=$(mktemp)
-    $SKDB_BIN --data $SERVER_DB tail --format=csv "$session" > "$output"
+    $SKDB_BIN --data $SERVER_DB tail --user test_user --format=csv "$session" > "$output"
     assert_line_count "$output" hello 1
 
     rm -f "$output"

@@ -20,6 +20,7 @@ setup_server() {
 
     (echo "BEGIN TRANSACTION;";
      echo "INSERT INTO skdb_users VALUES(id('user'), 'test_user', 'test');"
+     echo "INSERT INTO skdb_table_permissions VALUES('test_without_pk', 7);"
      echo "COMMIT;"
     ) | $SKDB
 
@@ -41,8 +42,8 @@ setup_local() {
 
 replicate_to_local() {
     table=$1
-    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --user test_user --ignore-source 1234 "$table")
-    $SKDB_BIN --data $SERVER_DB tail --format=csv --since 0 "$sub" |
+    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 1234 "$table")
+    $SKDB_BIN --data $SERVER_DB tail --format=csv --since 0 "$sub" --user test_user |
         $SKDB_BIN write-csv "$table" --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
 }
 
@@ -177,8 +178,8 @@ test_basic_replication_null_string() {
     $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_without_pk WHERE note = '';" > "$output"
     assert_line_count "$output" 0 1
 
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect --user test_user)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > "$output"
     # we want the output to contain a null representation
     assert_line_count "$output" "1	0,$" 1
     rm -f "$output"
@@ -200,8 +201,8 @@ test_basic_replication_empty_string() {
     $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_without_pk WHERE note = '';" > "$output"
     assert_line_count "$output" 1 1
 
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect --user test_user)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > "$output"
     # we want the output to contain an empty string
     assert_line_count "$output" '""' 1
     rm -f "$output"
@@ -490,8 +491,8 @@ test_tailing_dups_uses_repeat() {
     rm -f "$output"
 
     output=$(mktemp)
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect --user test_user)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > "$output"
     assert_line_count "$output" foo 1
     assert_line_count "$output" bar 1
     grep -q '2	0,"foo"' "$output" || fail
