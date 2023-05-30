@@ -23,10 +23,10 @@ fun test_harness(
     .parseArgs();
 
   reporters = mutable Vector<mutable TestReporter>[
-    mutable BasicTestReporter{color => true}
+    mutable BasicTestReporter{color => true},
   ];
-  args.maybeGetString("junitxml").each(
-    path -> reporters.push(mutable XmlTestReporter{output => Some(path)})
+  args.maybeGetString("junitxml").each(path ->
+    reporters.push(mutable XmlTestReporter{output => Some(path)})
   );
   filter = args.maybeGetString("filter").default("");
 

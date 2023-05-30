@@ -70,14 +70,18 @@ class LazyDir{
       readsCopy = context.reads;
       context.!reads = SortedSet[];
 
-      resultOpt = vtry(() -> { f(context, dirName, key) },
-                       exn -> {
-                         !dir = context.unsafeGetLazyDir(dirName);
-                         !dir.data[key] = LAbsent();
-                         context.setDir(dirName, dir);
-                         context.!reads = readsCopy;
-                         throw exn
-                       });
+      resultOpt = vtry(
+        () -> {
+          f(context, dirName, key)
+        },
+        exn -> {
+          !dir = context.unsafeGetLazyDir(dirName);
+          !dir.data[key] = LAbsent();
+          context.setDir(dirName, dir);
+          context.!reads = readsCopy;
+          throw exn
+        },
+      );
 
       result = resultOpt match {
       | None() -> LAbsent()
