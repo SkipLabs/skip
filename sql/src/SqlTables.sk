@@ -266,7 +266,6 @@ class SubRequestFile(
   init: Bool,
   cmd: SKFS.CmdKind,
   sessionID: Int,
-  user: ?String,
   ignoreSource: ?Int,
 ) extends SKFS.File
 
@@ -330,78 +329,20 @@ fun getSubsDirs(
         edir = context.unsafeGetEagerDir(dirDescr.dirName);
         (edir, dirDescr)
       };
-      reset = request.user match {
-      | None() -> (_, _) ~> false
-      | Some(userName) ->
-        userFile = SKSQL.UserFile::create(context, userName);
-        (context: SKFS.Context, tick: SKFS.Tick) ~> {
-          readers = context.unsafeGetEagerDir(SKFS.accessReaders);
-          (isReset, changes) = readers.getChangesAfter(tick);
-          if (isReset) return true;
-          for (rowKey in changes) {
-            rowKey match {
-            | RowKey(row, _) ->
-              if (row.getInt(1).fromSome() == userFile.id) {
-                return true
-              }
-            | _ -> invariant_violation("Unexpected key type")
-            }
-          };
-          false
-        }
-      };
-      (userFile, matchesGroup, accessFilter) = request.user match {
-      | None() -> (None(), (_ ~> 0), ((_, _) ~> (_ ~> true)))
-      | Some(userName) ->
-        userFile = SKSQL.UserFile::create(context, userName);
-        dirDescr.cols.maybeGet(skdbAccess) match {
-        | None() -> (Some(userFile.id), _ ~> 0, (_, _) ~> _ -> true)
-        | Some(accessColNbr) ->
-          if (!(dirDescr.schema[accessColNbr].ty is INTEGER())) {
-            print_error("skdb_access must be of type integer");
-            skipExit(2)
-          };
-          (
-            Some(userFile.id),
-            ((file: SKFS.BaseName) ~> {
-              file match {
-              | k @ RowKey _ ->
-                k.row.getInt(accessColNbr) match {
-                | None() -> 0
-                | Some(gid) -> gid
-                }
-              | _ -> 0
-              }
-            }),
-            ((context, _isReset) ~> {
-              access = mutable AccessSolver(userFile.id);
-              (file: SKFS.BaseName) -> {
-                file match {
-                | k @ RowKey _ ->
-                  k.row.getInt(accessColNbr) match {
-                  | None() -> true
-                  | Some(accessID) -> access.canRead(context, accessID)
-                  }
-                | _ -> true
-                }
-              }
-            }),
-          )
-        }
-      };
+      reset = (_, _) ~> false;
+      alwaysTrue = (_baseName ~> true);
       filter = request.ignoreSource match {
-      | None() -> accessFilter
+      | None() -> (_context, _isReset) ~> alwaysTrue
       | Some(inputSrc) ->
         (context, isReset) ~> {
-          if (isReset) return accessFilter(context, isReset);
+          if (isReset) return alwaysTrue;
           tdir = context.unsafeGetEagerDir(dirDescr.dirName);
           ignoredSrc = SKFS.Source::create(
             SKFS.Path(dirDescr.dirName, SKFS.IID(inputSrc)),
           );
-          composedFilter = accessFilter(context, isReset);
           (file: SKFS.BaseName) -> {
             rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
-            !updateIsFromIgnoredSource(ignoredSrc, rows) && composedFilter(file)
+            !updateIsFromIgnoredSource(ignoredSrc, rows)
           }
         }
       };
@@ -411,9 +352,7 @@ fun getSubsDirs(
         sessionID,
         cmd,
         init,
-        userFile,
         reset,
-        matchesGroup,
         filter,
         (context) ~>
           getWatermark(context, request.viewName, request.ignoreSource)
@@ -463,6 +402,7 @@ class IndexDescr{
   tableDirName: SKFS.DirName,
   fields: Array<(Int, IKind, Type)>,
   unique: Bool,
+  primary: Bool,
   text: ?String,
 } extends SKFS.File, Descr uses Orderable {
   fun compare(y: IndexDescr): Order {
@@ -494,6 +434,7 @@ fun getIndexOutputDir(
           index.pos,
           index.fields,
           index.unique,
+          index.primary,
           index.text,
         )
       },

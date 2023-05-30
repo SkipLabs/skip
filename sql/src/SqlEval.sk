@@ -1,66 +1,8 @@
 module SKSQL;
 
 /*****************************************************************************/
-/* Functions evaluating SQL. */
+/* Helper functions to evaluate SQL. */
 /*****************************************************************************/
-
-const skdbOwner: Name = Name::create("skdb_owner");
-const skdbAccess: Name = Name::create("skdb_access");
-
-fun checkUserRows(
-  context: readonly SKFS.Context,
-  user: UserFile,
-  pos: Int,
-  table: DirDescr,
-  rows: Array<RowValues>,
-): void {
-  (ownerIdx, checkOwner) = table.cols.maybeGet(skdbOwner) match {
-  | None() -> (0, false)
-  | Some(idx) -> (idx, true)
-  };
-  (accessIdx, checkAccess) = table.cols.maybeGet(skdbAccess) match {
-  | None() -> (0, false)
-  | Some(idx) -> (idx, true)
-  };
-  access = mutable AccessSolver(user.id);
-  for (row in rows) {
-    if (checkOwner) {
-      row.getValue(ownerIdx) match {
-      | None() ->
-        error(
-          pos,
-          "The field skdb_owner can only be set to the userID " +
-            "of the connected user (in this case " +
-            user.id +
-            ")",
-        )
-      | Some(CInt(n)) ->
-        if (n != user.id) {
-          error(
-            pos,
-            "skdb_owner is set to the wrong id for user " +
-              user.name +
-              " expected " +
-              user.id +
-              " (found " +
-              n +
-              ")",
-          );
-        }
-      | Some _ -> error(pos, "skdb_owner should be of type INTEGER")
-      }
-    };
-    if (checkAccess) {
-      row.getInt(accessIdx) match {
-      | None() -> void
-      | Some(accessID) ->
-        if (!access.canWrite(context, accessID)) {
-          error(pos, "cannot write in col with skdb_access set to " + accessID)
-        }
-      };
-    }
-  }
-}
 
 fun computeTableDescr(name: Name, schema: Array<TypeDescr>): DirDescr {
   dirNameStr = "/" + name + "/";
@@ -79,6 +21,7 @@ fun computeInsert(
   paramsOpt: ?Array<Name>,
   valuesArray: Array<Array<Value>>,
   table: DirDescr,
+  repeat: Int = 1,
 ): Array<RowValues> {
   valuesArray.map(vals -> {
     values = vals.mapWithIndex((idx, val) -> {
@@ -148,7 +91,11 @@ fun computeInsert(
 
       unsafe_chill_trust_me(result)
     };
-    RowValues::create(cvalues)
+    result = RowValues::create(cvalues);
+    if (repeat != 1) {
+      !result = result.setRepeat(repeat);
+    };
+    result
   })
 }
 
@@ -667,10 +614,6 @@ class Evaluator{options: Options, user: ?UserFile} {
     values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
-    this.user match {
-    | None() -> void
-    | Some(user) -> checkUserRows(context, user, pos, table, rows)
-    };
     if (inTransaction && onConflict is Some(OCIgnore())) {
       error(pos, "OR IGNORE not supported in transactions")
     } else if (inTransaction && onConflict is Some(OCReplace())) {
@@ -877,7 +820,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       return void;
     };
 
-    dir = context.mkdir(RowValues::fromFile, dirName);
+    _ = context.mkdir(RowValues::fromFile, dirName);
 
     getTableDir(context).writeArray(
       context,
@@ -906,115 +849,16 @@ class Evaluator{options: Options, user: ?UserFile} {
             name => Name::create(name.origName + "_" + tyDescr.name.origName),
             fields => (name, Array[(tyDescr.name, IASC())]),
             unique => true,
+            primary => tyDescr.primary,
             text => None(),
           },
         );
       }
     };
+
     if (context.debugMode) {
       print_string("CREATED: " + name.origName);
     };
-
-    if (name.lower == "skdb_groups") {
-      this.createGroupsMembers(context, pos, dir);
-    };
-
-    if (name.lower == "skdb_access") {
-      this.createAccessMap(context, dir);
-    };
-  }
-
-  fun createAccessMap(
-    context: mutable SKFS.Context,
-    usersDir: SKFS.EHandle<RowValues>,
-  ): void {
-    _ = usersDir.contextWriterKeyValues(
-      RowValues::fromFile,
-      context,
-      SKFS.DirName::create("/skdb_access/map/"),
-      (_, writer, _, rows) ~> {
-        for (row in rows) {
-          writer.write(SKFS.IID(row.getInt(0).fromSome()), row);
-        }
-      },
-    )
-  }
-
-  fun createGroupsMembers(
-    context: mutable SKFS.Context,
-    pos: Int,
-    usersDir: SKFS.EHandle<RowValues>,
-  ): void {
-    groupsMembersName = Name::create("skdb_groups_members");
-    groupsMembersDirName = SKFS.DirName::create("/" + groupsMembersName + "/");
-    dirDescr = DirDescr::create{
-      name => groupsMembersName,
-      schema => Array[
-        TypeDescr{
-          name => Name::create("groupID"),
-          ty => INTEGER(),
-          primary => false,
-          unique => false,
-          default => None(),
-          notNull => true,
-        },
-        TypeDescr{
-          name => Name::create("memberID"),
-          ty => INTEGER(),
-          primary => false,
-          unique => false,
-          default => None(),
-          notNull => true,
-        },
-      ],
-      dirName => groupsMembersDirName,
-      alias => None(),
-      isInput => false,
-    };
-    kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
-    _ = usersDir.contextWriterKeyValues(
-      RowValues::fromFile,
-      context,
-      groupsMembersDirName,
-      (context, writer, _key, values) ~> {
-        invariant(values.size() == 1);
-        groupName = values[0].getString(1).fromSome().lowercase();
-        if (groupName.startsWith("blacklist")) {
-          if (values[0].getInt(0).fromSome() >= 0) {
-            error(pos, "blacklists are expected to have negative identifiers");
-          }
-        } else if (groupName.startsWith("whitelist")) {
-          if (values[0].getInt(0).fromSome() < 0) {
-            error(pos, "whitelistss are expected to have positive identifiers");
-          }
-        } else {
-          error(
-            pos,
-            "Group names should start with 'whitelist' or 'blacklist'",
-          );
-        };
-        groupDirName = SKFS.DirName::create("/" + groupName + "/");
-        groupDirNameProj = SKFS.DirName::create("/" + groupName + "/proj/");
-        dir = SKFS.EHandle(RowValues::fromFile, groupDirName);
-        projDir = dir.contextWriterKeyValues(
-          RowValues::fromFile,
-          context,
-          groupDirNameProj,
-          (_context, writer, _key, values) ~> {
-            writer.writeArray(SKFS.IID(0), values)
-          },
-        );
-        for (row in projDir.getArray(context, SKFS.IID(0))) {
-          newRow = RowValues::create(
-            Array[values[0].getValue(0), row.getValue(0)],
-          );
-          writer.write(RowKey(newRow, kinds), newRow);
-        }
-      },
-    );
-    tableDir = getTableDir(context);
-    fileName = SKFS.SID::create(groupsMembersName.lower);
-    tableDir.writeArray(context, fileName, Array[dirDescr]);
   }
 }
 
@@ -1231,107 +1075,6 @@ fun evalQuery(context: mutable SKFS.Context, query: String): Array<RowValues> {
     }
   });
   result.toArray()
-}
-
-mutable class AccessSolver(
-  userID: Int,
-  canAccessCache: mutable Map<Int, Bool> = mutable Map[],
-  accessTableCache: mutable Map<Int, (Int, Int)> = mutable Map[],
-) {
-  const accessMap: SKFS.DirName = SKFS.DirName::create("/skdb_access/map/");
-
-  const groupMembers: SKFS.DirName = SKFS.DirName::create(
-    "/skdb_groups_members/",
-  );
-
-  const memberFields: Array<(Int, IASC, Type)> = Array[
-    (0, IASC(), INTEGER()),
-    (1, IASC(), INTEGER()),
-  ];
-
-  private mutable fun addAccessTableCache(
-    context: readonly SKFS.Context,
-    accessID: Int,
-  ): void {
-    values = context
-      .unsafeGetEagerDir(static::accessMap)
-      .getArrayRaw(SKFS.IID(accessID))
-      .map(RowValues::fromFile);
-    if (values.size() == 0) {
-      print_error("accessID " + accessID + " not found");
-      skipExit(89);
-    };
-    invariant(values.size() == 1);
-    this.accessTableCache![accessID] = (
-      values[0].getInt(1).fromSome(),
-      values[0].getInt(2).fromSome(),
-    )
-  }
-
-  mutable fun getReaders(context: readonly SKFS.Context, accessID: Int): Int {
-    if (!this.accessTableCache.containsKey(accessID)) {
-      this.addAccessTableCache(context, accessID);
-    };
-    this.accessTableCache[accessID].i0
-  }
-
-  mutable fun getWriters(context: readonly SKFS.Context, accessID: Int): Int {
-    if (!this.accessTableCache.containsKey(accessID)) {
-      this.addAccessTableCache(context, accessID);
-    };
-    this.accessTableCache[accessID].i1
-  }
-
-  private mutable fun canAccess(
-    context: readonly SKFS.Context,
-    groupID: Int,
-  ): Bool {
-    this.canAccessCache.maybeGet(groupID) match {
-    | None() -> void
-    | Some(x) -> return x
-    };
-    readers = context.unsafeGetEagerDir(static::groupMembers);
-    size = readers
-      .getArrayRaw(
-        RowKey(
-          RowValues::create(
-            Array[Some(CInt(groupID)), Some(CInt(this.userID))],
-          ),
-          static::memberFields,
-        ),
-      )
-      .size();
-    result = if (groupID > 0) size != 0 else size == 0;
-    this.canAccessCache![groupID] = result;
-    result
-  }
-
-  mutable fun canRead(context: readonly SKFS.Context, accessID: Int): Bool {
-    this.canAccess(context, this.getReaders(context, accessID));
-  }
-
-  mutable fun canWrite(context: readonly SKFS.Context, accessID: Int): Bool {
-    this.canAccess(context, this.getWriters(context, accessID));
-  }
-}
-
-class UserFile(id: Int, name: String) extends SKFS.File {
-  static fun create(context: mutable SKFS.Context, userName: String): UserFile {
-    if (userName.contains("'")) {
-      print_error("Invalid user name");
-      skipExit(2);
-    };
-    userRows = evalQuery(
-      context,
-      "select userID from skdb_users where userName = '" + userName + "';",
-    );
-    if (userRows.size() == 0) {
-      print_error("Could not find user: " + userName);
-      skipExit(2)
-    };
-    userID = userRows[0].getInt(0).fromSome();
-    UserFile(userID, userName);
-  }
 }
 
 fun eval(options: Options, userOpt: ?String): void {

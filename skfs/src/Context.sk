@@ -12,16 +12,6 @@
 module SKFS;
 
 /*****************************************************************************/
-/* This is a magic directory containing all the pairs of "groupID, readerID".
- * For example, 32/12, means that the user with a userID 12 can see the
- * groupID 32. When the groupID is positive it is a whitelist, when it's
- * negative it is a blacklist.
- */
-/*****************************************************************************/
-
-const accessReaders: DirName = DirName::create("/skdb_access_readers/");
-
-/*****************************************************************************/
 /* Sessions. */
 /*****************************************************************************/
 
@@ -37,9 +27,7 @@ value class Sub(
   cond: Condition,
   cmd: CmdKind,
   dirName: DirName,
-  userID: ?Int,
   reset: (SKFS.Context, SKFS.Tick) ~> Bool,
-  getGroupID: BaseName ~> Int,
   getDestinationWatermark: (readonly SKFS.Context) ~> ?SKFS.Tick,
   filter: (SKFS.Context, Bool) ~> (BaseName -> Bool) = (_, _) ~> (_ -> true),
 )
@@ -302,9 +290,7 @@ mutable class Context{
     sessionId: Int,
     cmd: CmdKind,
     init: Bool,
-    userID: ?Int,
     reset: (SKFS.Context, SKFS.Tick) ~> Bool,
-    matchesGroup: BaseName ~> Int,
     filter: (Context, Bool) ~> (BaseName -> Bool),
     getDestinationWatermark: (readonly Context) ~> ?Tick,
   ): void {
@@ -313,9 +299,7 @@ mutable class Context{
       condCreate(),
       cmd,
       dirName,
-      userID,
       reset,
-      matchesGroup,
       getDestinationWatermark,
       filter,
     );
@@ -740,25 +724,6 @@ mutable class Context{
     }
   }
 
-  readonly fun changeInPrivacy(_start: Tick): readonly Set<Int> {
-    result = mutable Set[];
-    this.unsafeMaybeGetEagerDir(accessReaders) match {
-    | None() -> result
-    | Some(_readers) ->
-      result //invariant_violation("TODO: change in privacy layer")
-    /*
-          changes = readers.getChangesAfter(start);
-          for (rowKey in changes) {
-            rowKey match {
-            | SKSQL.RowKey(row, _) -> result.insert(row.getInt(1).fromSome())
-            | _ -> void
-            }
-          };
-          result
-    */
-    }
-  }
-
   readonly fun notifyAll(start: Tick): void {
     changedDirNames = this.getGlobal("CHANGED_DIRS") match {
     | None() -> this.dirs.state.getChangesAfter(start)
@@ -766,14 +731,9 @@ mutable class Context{
     | _ -> invariant_violation("Wrong type for CHANGED_DIRS")
     };
     if (this.tick == start) return void;
-    usersPrivacyChanges = this.changeInPrivacy(start);
     for (_ => sub in this.sessions) {
       dirName = sub.dirName;
-      privacyChanged = sub.userID match {
-      | None() -> false
-      | Some(userID) -> usersPrivacyChanges.contains(userID)
-      };
-      if (!privacyChanged && !changedDirNames.contains(dirName)) continue;
+      if (!changedDirNames.contains(dirName)) continue;
       this.unsafeMaybeGetDir(dirName) match {
       | Some(dir @ EagerDir _) ->
         (isReset, changes) = dir.getChangesAfter(start);

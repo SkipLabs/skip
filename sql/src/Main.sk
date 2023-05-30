@@ -240,7 +240,8 @@ untracked fun main(): void {
               Cli.StringArg("since")
                 .long("since")
                 .about("Starting time of the tail"),
-            ),
+            )
+            .arg(Cli.StringArg("user").about("Name of the user")),
         )
         // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
         .subcommand(
@@ -260,7 +261,6 @@ untracked fun main(): void {
                 "Name of the file updates with time of the last change",
               ),
             )
-            .arg(Cli.StringArg("user").about("Name of the user"))
             .arg(
               Cli.StringArg("ignore-source").about("Write stream to ignore"),
             ),
@@ -547,6 +547,16 @@ fun execWrite(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
+fun getSqlTableFromDirName(
+  options: SKSQL.Options,
+  context: readonly SKFS.Context,
+  dirName: SKFS.DirName,
+): SKSQL.DirDescr {
+  dirNameStr = dirName.toString();
+  !dirNameStr = dirName.toString().stripPrefix("/").stripSuffix("/");
+  SKSQL.getTable(options, context.mclone(), 0, SKSQL.Name::create(dirNameStr))
+}
+
 fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
@@ -566,15 +576,13 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   | Some(sub) -> (sub.filter, sub.dirName)
   };
 
-  filter = args.maybeGetString("filter") match {
+  tableName = SKSQL.Name::create(
+    dirName.toString().stripPrefix("/").stripSuffix("/"),
+  );
+  filter1 = args.maybeGetString("filter") match {
   | None() -> subFilter
   | Some(strCond) ->
-    tableName = dirName.toString().stripPrefix("/").stripSuffix("/");
-    from = Some(
-      Array[
-        SKSQL.TableName(SKSQL.FName(SKSQL.Name::create(tableName)), None()),
-      ],
-    );
+    from = Some(Array[SKSQL.TableName(SKSQL.FName(tableName), None())]);
     compiler = SKSQL.Compiler::create(false, options, 0);
     (_, ast) = SKSQL.parseExpr(SKSQL.Lexer(0, SKSQL.Buffer(strCond)), 0);
     compilerContext = gContext.mclone();
@@ -587,7 +595,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     (context, isReset) ~> {
       mcontext = context.mclone();
-      privacyFilter = subFilter(context, isReset);
+      conditionFilter = subFilter(context, isReset);
       baseName -> {
         inputRow = baseName match {
         | SKSQL.RowKey(row, _) -> row
@@ -603,11 +611,52 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
           false
         | SKSQL.AUndef()
         | SKSQL.ADef(_) ->
-          privacyFilter(baseName)
-        };
+          conditionFilter(baseName)
+        }
       }
     }
   };
+
+  userNameOpt = args.maybeGetString("user");
+  filter = args.maybeGetString("user") match {
+  | None() -> filter1
+  | Some(userName) ->
+    (context, isReset) ~> {
+      user = SKSQL.UserFile::create(context, userName);
+      sqlTable = getSqlTableFromDirName(options, context, dirName);
+      accessSolver = SKSQL.AccessSolver::create(context, user.id, sqlTable);
+      skdbGroupColNbrOpt = sqlTable.cols.maybeGet(SKSQL.skdbGroupColName);
+
+      if (!accessSolver.canReadTable()) {
+        return _ ~> false;
+      };
+      oldFilter = filter1(context, isReset);
+      baseName -> {
+        inputRow = baseName match {
+        | SKSQL.RowKey(row, _) -> row
+        | _ ->
+          print_error("Unexpected table entry type");
+          skipExit(2)
+        };
+        oldFilter(baseName) &&
+          skdbGroupColNbrOpt match {
+          | None() ->
+            // There is no skdb_group column, but we have access to the table
+            true
+          | Some(colNbr) ->
+            // There is a skdb_group column, let's check that we have the rights
+            inputRow.getInt(colNbr) match {
+            | None() ->
+              // skdb_group is set to NULL: no access
+              false
+            | Some(groupID) -> accessSolver.canRead(context, groupID)
+            }
+          }
+      }
+    }
+  };
+
+  forceReset = false;
 
   loop {
     localObstack = SKFS.newObstack();
@@ -627,66 +676,8 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, dirName))
     };
 
-    sub.userID match {
-    | Some(userID) if (sub.reset(context, SKFS.Tick(tick)) && !init) ->
-      readers = context.unsafeGetEagerDir(
-        SKFS.DirName::create("/skdb_access_readers/"),
-      );
-      toAdd = mutable Set[];
-      toRemove = mutable Set[];
-      // isReset can be ignored, because whenever it's true, it just
-      // makes us do more work than necessary.
-      (_isReset, items) = readers.getChangesAfter(SKFS.Tick(tick));
-      for (rowKey in items) {
-        rowKey match {
-        | SKSQL.RowKey(row, _) ->
-          if (row.getInt(1).fromSome() == userID) {
-            arr = readers.getArrayRaw(rowKey);
-            groupID = row.getInt(0).fromSome();
-            if (groupID > 0) { // Dealing with a whitelist
-              if (arr.isEmpty()) {
-                toRemove.insert(groupID);
-              } else {
-                toAdd.insert(groupID);
-              }
-            } else { // Dealing with a blacklist
-              if (arr.isEmpty()) {
-                toAdd.insert(groupID);
-              } else {
-                toRemove.insert(groupID);
-              }
-            }
-          }
-        | _ -> invariant_violation("Unexpected key type")
-        }
-      };
-      writer = mutable Debug.BufferedWriter(print_raw, 1024);
-      writer.write("\n");
-      writer.write("\n");
-      for (kv in edir.unsafeGetFileIter()) {
-        (key, valueIter) = kv;
-        values = valueIter.collect(Array);
-        if (toAdd.contains(sub.getGroupID(key))) {
-          if (values.size() == 0) {
-            writer.write(key.toKVStringRemove(format))
-          } else {
-            for (value in values) {
-              writer.write(value.toKVString(format, key))
-            }
-          }
-        } else if (toRemove.contains(sub.getGroupID(key))) {
-          key match {
-          | SKSQL.RowKey(row, _) ->
-            writer.write(row.setRepeat(0).toKVString(format, key))
-          | _ -> void
-          }
-        }
-      };
-      writer.flush();
-      flushStdout()
-    | _ -> void
-    };
-    (isReset, changes) = edir.getChangesAfter(SKFS.Tick(tick));
+    (isReset, changes) = edir.getChangesAfter(SKFS.Tick(tick), forceReset);
+    !forceReset = false;
 
     producedOutput = edir.writeDiffStdout(
       context,
@@ -710,25 +701,32 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     cond = SKFS.unfreezeCond(sub.cond);
     SKFS.mutexLock(lock);
     while ({
-      newContext = SKFS.gContextGet();
-      followMode &&
+      !forceReset &&
         {
-          (newIsReset, newChanges) = newContext
-            .unsafeGetEagerDir(dirName)
-            .getChangesAfter(SKFS.Tick(tick));
-          !newIsReset && newChanges.isEmpty()
-        } &&
-        {
-          (newIsReset, newChanges) = newContext
-            .unsafeGetEagerDir(SKFS.accessReaders)
-            .getChangesAfter(SKFS.Tick(tick));
-          !newIsReset && newChanges.isEmpty()
+          newContext = SKFS.gContextGet();
+          followMode &&
+            {
+              (newIsReset, newChanges) = newContext
+                .unsafeGetEagerDir(dirName)
+                .getChangesAfter(SKFS.Tick(tick));
+              !newIsReset && newChanges.isEmpty()
+            }
         }
     }) {
       timeoutSecs = 10;
       _ = SKFS.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
       print_raw(":" + tick.toString() + "\n");
       flushStdout();
+      if (
+        SKSQL.userPrivacyChanged(
+          SKFS.gContextGet(),
+          userNameOpt,
+          tableName,
+          SKFS.Tick(tick),
+        )
+      ) {
+        !forceReset = true;
+      };
     };
     SKFS.mutexUnlock(lock);
     SKFS.destroyObstack(localObstack);
@@ -778,6 +776,10 @@ fun execReplicationId(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   name = SKSQL.Name::create(args.getString("table"));
+  source = args.maybeGetString("source") match {
+  | Some(src) -> src.toInt()
+  | None() -> SKFS.genSym(0)
+  };
   SKSQL.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
@@ -798,10 +800,6 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
         if (c == '\n') return String::fromChars(buffer.toArray());
         buffer.push(c);
       }
-    };
-    source = args.maybeGetString("source") match {
-    | Some(src) -> src.toInt()
-    | None() -> SKFS.genSym(0)
     };
     SKCSV.replayDiff(context, line, myReadLine, table, user, source)
   })
@@ -842,7 +840,6 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
       init,
       cmd,
       sessionID,
-      args.maybeGetString("user"),
       args.maybeGetString("ignore-source").map(x -> x.toInt()),
     );
     inputDir.write(context, viewKey, request);

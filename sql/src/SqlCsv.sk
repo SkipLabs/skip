@@ -276,28 +276,6 @@ fun applyDiffStrategy(
     };
   };
 
-  isVisibleToUser = (context) ~> {
-    userFileOpt match {
-    | None() -> _ -> true
-    | Some(userFile) ->
-      access = mutable SKSQL.AccessSolver(userFile.id);
-      table.cols.maybeGet(SKSQL.skdbAccess) match {
-      | None() -> _ -> true
-      | Some(accessColNbr) ->
-        (file: SKFS.BaseName) -> {
-          file match {
-          | k @ SKSQL.RowKey _ ->
-            k.row.getInt(accessColNbr) match {
-            | None() -> true
-            | Some(accessID) -> access.canRead(context, accessID)
-            }
-          | _ -> true
-          }
-        }
-      }
-    };
-  };
-
   primaryIdx = for ((i, type) in table.schema.items()) {
     if (type.primary) {
       break Some(i)
@@ -318,15 +296,32 @@ fun applyDiffStrategy(
 
     dir = context.unsafeGetEagerDir(table.dirName);
     entries = mutable Vector[];
+    hasError = false;
 
     for (row in rows) {
-      key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-      for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-        if (tick.value < snapshot.default(0) || source.path() == writer) {
-          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+      userFileOpt match {
+      | None() -> void
+      | Some(user) ->
+        SKSQL.checkUserCanWriteRow(context, user, table, row) match {
+        | SKSQL.AROK() -> void
+        | SKSQL.ARError(err) ->
+          !hasError = true;
+          print_error("Error: " + err)
         }
-      };
+      }
     };
+
+    if (!hasError) {
+      for (row in rows) {
+        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          if (tick.value < snapshot.default(0) || source.path() == writer) {
+            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
+          }
+        }
+      }
+    };
+
     if (!entries.isEmpty()) {
       !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
     };
@@ -396,7 +391,7 @@ fun applyDiffStrategy(
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      isVisibleToUser(context),
+      _context ~> true,
       isEligibleForTomb,
     );
 
@@ -483,7 +478,7 @@ fun applyDiffStrategy(
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      isVisibleToUser(context),
+      _context ~> true,
       (tick, source) ~>
         tick.value < snapshot.default(0) || source.path() == writer
       ,
@@ -531,7 +526,7 @@ fun replayDiff(
 
         chars: mutable Vector<Char> = mutable Vector[];
         iter = line.getIter();
-        (repeat, !reset, !checkpoint, !snapshot) = loop {
+        (repeatOpt, !reset, !checkpoint, !snapshot) = loop {
           c = iter.next() match {
           | None() ->
             print_error(
@@ -567,7 +562,7 @@ fun replayDiff(
           chars.push(c);
         };
 
-        if (repeat is Some _) {
+        if (repeatOpt is Some _) {
           str = line.sub(iter, line.length() - chars.size() - 1);
           values = mutable Vector[];
           strIter = str.getIter();
@@ -590,13 +585,25 @@ fun replayDiff(
             None(),
             Array[cvalues.toArray()],
             table,
+            repeatOpt.fromSome(),
           );
           userFileOpt match {
           | None() -> void
           | Some(userFile) ->
-            SKSQL.checkUserRows(context, userFile, pos, table, newRows)
+            hasError = false;
+            for (row in newRows) {
+              SKSQL.checkUserCanWriteRow(context, userFile, table, row) match {
+              | SKSQL.AROK() -> void
+              | SKSQL.ARError(err) ->
+                print_error("Error: " + err.toString());
+                !hasError = true
+              }
+            };
+            if (hasError) {
+              throw SKSQL.IgnoreAndContinue()
+            }
           };
-          buffer.extend(newRows.map(x -> x.setRepeat(repeat.fromSome())));
+          buffer.extend(newRows);
         };
 
         checkpoint match {
@@ -632,9 +639,12 @@ fun replayDiff(
             snapshot,
           ),
         )
-      } else {
+      } else if (exn is SKSQL.IgnoreAndContinue()) {
         flushStdout();
         SKFS.CContinue(None())
+      } else {
+        print_error(exn.getMessage());
+        SKFS.CStop(None())
       }
     },
   );

@@ -26,6 +26,9 @@ setup_server() {
      echo "COMMIT;"
     ) | $SKDB
 
+    echo "INSERT INTO skdb_table_permissions values ('test_with_pk', 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions values ('test_pk_alt', 7);" | $SKDB
+
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
     # out of first position and a string
     echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY);" | $SKDB
@@ -47,8 +50,8 @@ setup_local() {
 
 replicate_to_local() {
     table=$1
-    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --user test_user --ignore-source 1234 "$table")
-    $SKDB_BIN --data $SERVER_DB tail --format=csv --since 0 "$sub" |
+    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 1234 "$table")
+    $SKDB_BIN --data $SERVER_DB tail --user test_user --format=csv --since 0 "$sub" |
         $SKDB_BIN write-csv "$table" --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
 }
 
@@ -79,8 +82,8 @@ setup_local2() {
 
 replicate_to_local2() {
     table=$1
-    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --user test_user --ignore-source 5678 "$table")
-    $SKDB_BIN --data $SERVER_DB tail --format=csv --since 0 "$sub" |
+    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 5678 "$table")
+    $SKDB_BIN --data $SERVER_DB tail --user test_user --format=csv --since 0 "$sub" |
         $SKDB_BIN write-csv "$table" --data $LOCAL2_DB --source 7777 > $WRITE_OUTPUT
 }
 
@@ -234,8 +237,8 @@ test_basic_replication_null_string() {
     $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = '';" > "$output"
     assert_line_count "$output" 0 1
 
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect --user test_user)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect)
+    $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
     # we want the output to contain a null representation
     assert_line_count "$output" "1	0,$" 1
     rm -f "$output"
@@ -257,8 +260,8 @@ test_basic_replication_empty_string() {
     $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = '';" > "$output"
     assert_line_count "$output" 1 1
 
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect --user test_user)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect)
+    $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
     # we want the output to contain an empty string
     assert_line_count "$output" '""' 1
     rm -f "$output"
@@ -278,8 +281,8 @@ test_basic_replication_escaped_string() {
     $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = 'what''s up?';" > "$output"
     assert_line_count "$output" 1 1
 
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect --user test_user)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect)
+    $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
     assert_line_count "$output" "what's up?" 1
     rm -f "$output"
 }
@@ -298,8 +301,8 @@ test_basic_replication_escaped_string_alt() {
     $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_pk_alt WHERE id = 'what''s up?';" > "$output"
     assert_line_count "$output" 1 1
 
-    session=$($SKDB_BIN --data $SERVER_DB subscribe test_pk_alt --connect --user test_user)
-    $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_pk_alt --connect)
+    $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
     assert_line_count "$output" "what's up?" 1
     rm -f "$output"
 }

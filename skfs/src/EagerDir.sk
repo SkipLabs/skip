@@ -951,18 +951,26 @@ class EagerDir{
     this.time
   }
 
-  fun getChangesAfter(tick: Tick): (Bool, SortedSet<BaseName>) {
+  private fun getAllKeysWithValues(): SortedSet<BaseName> {
+    result = SortedSet[];
+    this.unsafeGetFileIter().each(kv -> {
+      (key, valueIter) = kv;
+      valueIter.next() match {
+      | None() -> void
+      | Some _ -> !result = result.set(key)
+      }
+    });
+    result
+  }
+
+  fun getChangesAfter(
+    tick: Tick,
+    forceReset: Bool = false,
+  ): (Bool, SortedSet<BaseName>) {
     this.tombLimit match {
+    | _ if (forceReset) -> return (true, this.getAllKeysWithValues())
     | Some(limit) if (tick.value <= limit.value) ->
-      result = SortedSet[];
-      this.unsafeGetFileIter().each(kv -> {
-        (key, valueIter) = kv;
-        valueIter.next() match {
-        | None() -> void
-        | Some _ -> !result = result.set(key)
-        }
-      });
-      return (true, result)
+      return (true, this.getAllKeysWithValues())
     | _ -> void
     };
     new = this.data.getChangesAfter(tick);
