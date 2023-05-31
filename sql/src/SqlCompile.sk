@@ -1620,10 +1620,7 @@ mutable class Compiler{
       "=",
       Literal(name1, _),
       Literal(name2, _),
-    ) if (
-      this.subst.containsKey(Name::create(name1)) &&
-      this.subst.containsKey(Name::create(name2))
-    ) ->
+    ) if (this.isVar(name1) && this.isVar(name2)) ->
       (this.subst[Name::create(name1)], this.subst[Name::create(name2)]) match {
       | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
       | (CFExpr(CFGetFrom(tableNbr1, col1)), CFExpr(CFGetFrom(tableNbr2, col2)))
@@ -1636,12 +1633,8 @@ mutable class Compiler{
         tableNbr1 != tableNbr2
       ) ->
         if (tableNbr1 > tableNbr2) {
-          (!tableNbr1, !col1, !tableNbr2, !col2) = (
-            tableNbr2,
-            col2,
-            tableNbr1,
-            col1,
-          );
+          (!tableNbr1, !tableNbr2) = (tableNbr2, tableNbr1);
+          (!col1, !col2) = (col2, col1);
         };
         table1 = tables[tableNbr1].fromSome();
         table2 = tables[tableNbr2].fromSome();
