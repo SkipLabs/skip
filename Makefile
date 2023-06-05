@@ -3,16 +3,19 @@
 
 all: npm build/skdb build/init.sql
 
+PLAYWRIGHT_REPORTER?="line"
+
 ################################################################################
 # skdb wasm + js client
 ################################################################################
 
-npm: sql/js/skdb.wasm sql/js/dist/skdb.js sql/js/dist/skdb-node.js sql/js/dist/skdb-cli.js
+npm: sql/js/dist/skdb.wasm sql/js/dist/skdb.js sql/js/dist/skdb-node.js sql/js/dist/skdb-cli.js
 
 sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
 	cd sql && skargo build --target wasm32-unknown-unknown
 
-sql/js/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
+sql/js/dist/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
+	mkdir -p sql/js/dist
 	cp $^ $@
 
 sql/js/node_modules: sql/js/package.json
@@ -27,8 +30,12 @@ sql/js/dist/%.js: sql/js/src/%.js
 sql/js/dist/skdb-node.js: sql/js/dist/skdb.js sql/js/src/node_header.js
 	mkdir -p sql/js/dist
 	cat sql/js/src/node_header.js sql/js/dist/skdb.js \
-	| sed 's/let wasmModule =.*//g' \
-	| sed 's/let wasmBuffer =.*/let wasmBuffer = fs.readFileSync("skdb.wasm");/g'> $@
+	| sed 's|let wasmModule =.*||g' \
+	| sed 's|let wasmBuffer =.*|let wasmBuffer = fs.readFileSync("dist/skdb.wasm");|g'> $@
+
+sql/js/dist/index.html: sql/js/tests/index.html
+	mkdir -p sql/js/dist
+	cp $^ $@
 
 ################################################################################
 # skdb native binary
@@ -68,8 +75,15 @@ fmt:
 	find . -path ./compiler/tests -not -prune -or -name '*'.sk -exec sh -c 'echo {}; skfmt -i {}' \;
 
 .PHONY: test
-test: npm build/skdb
-	./run_all_tests.sh
+test: native-test wasm-test
+
+.PHONY: native-test
+native-test: build/skdb
+	cd sql/ && ./test_sql.sh
+
+.PHONY: wasm-test
+wasm-test: npm sql/js/node_modules sql/js/dist/index.html
+	cd sql/js && npx playwright install && npx playwright test --reporter=$(PLAYWRIGHT_REPORTER)
 
 .PHONY: run-server
 run-server: build/skdb build/init.sql

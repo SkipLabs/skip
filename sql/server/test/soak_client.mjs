@@ -3,7 +3,7 @@ import { webcrypto as crypto } from 'node:crypto';
 import fs from 'node:fs';
 
 function getWasm() {
-  return new Uint8Array(fs.readFileSync("/skfs/sql/js/skdb.wasm"));
+  return new Uint8Array(fs.readFileSync("/skfs/sql/js/dist/skdb.wasm"));
 }
 
 const tables = [

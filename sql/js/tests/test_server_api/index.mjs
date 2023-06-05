@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import assert from 'node:assert';
 
 async function fetchWasmSource() {
-  const wasmBuffer = fs.readFileSync("/skfs/sql/js/skdb.wasm");
+  const wasmBuffer = fs.readFileSync("/skfs/sql/js/dist/skdb.wasm");
   return new Uint8Array(wasmBuffer);
 }
 

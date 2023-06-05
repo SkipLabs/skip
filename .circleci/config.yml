@@ -32,7 +32,7 @@ jobs:
           name: Run compiler tests
           no_output_timeout: 30m
           command: |
-            mkdir -p ~/test-results/skc
+            mkdir -p ~/test-results
             cd compiler && make STAGE=1
             PATH=./stage1/bin:$PATH skargo test --junitxml ~/test-results/skc.xml
       - store_test_results:
@@ -54,7 +54,7 @@ jobs:
       - run:
           name: Run skfs tests
           command: |
-            mkdir -p ~/test-results/skfs
+            mkdir -p ~/test-results
             cd skfs && skargo test --junitxml ~/test-results/skfs.xml
       - store_test_results:
           path: ~/test-results/skfs.xml
@@ -73,9 +73,19 @@ jobs:
             fi
       - setup
       - run:
-          name: Run skdb tests
+          name: Run native skdb tests
           command: |
-            make test
+            make native-test
+      - run:
+          name: Run wasm skdb tests
+          environment:
+            PLAYWRIGHT_REPORTER: junit
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME: /home/circleci/test-results/skdb-browser.xml
+          command: |
+            mkdir -p ~/test-results
+            make wasm-test
+      - store_test_results:
+          path: ~/test-results/skdb-browser.xml
 
 workflows:
   compiler:
