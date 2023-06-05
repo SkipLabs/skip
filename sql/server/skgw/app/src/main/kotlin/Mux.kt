@@ -38,9 +38,31 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
 
     channel.receiveSetter.set(
         object : AbstractReceiveListener() {
+
+          override fun getMaxPongBufferSize(): Long {
+            return 1024
+          }
+
+          override fun getMaxCloseBufferSize(): Long {
+            return 4096
+          }
+
+          override fun getMaxPingBufferSize(): Long {
+            return 1024
+          }
+
+          override fun getMaxTextBufferSize(): Long {
+            return 1024
+          }
+
+          override fun getMaxBinaryBufferSize(): Long {
+            return 100L * 1024 * 1024;
+          }
+
           override fun onFullTextMessage(channel: WebSocketChannel, message: BufferedTextMessage) {
             throw RuntimeException("Unexpected text message received.")
           }
+
           override fun onFullBinaryMessage(
               channel: WebSocketChannel,
               message: BufferedBinaryMessage
