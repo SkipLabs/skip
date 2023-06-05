@@ -701,28 +701,6 @@ class Evaluator{options: Options, user: ?UserFile} {
     paramsOpt: ?Array<Name>,
     values: Array<Array<Value>>,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
-    if (onConflict is Some(OCReplace())) {
-      if (values.size() > 1) {
-        error(pos, "Can only use OR IGNORE/REPLACE with one value");
-      };
-      valArr = values[0];
-      for (i in Range(0, table.schema.size())) {
-        tyDescr = table.schema[i];
-        if (tyDescr.unique || tyDescr.primary) {
-          clause = Binop(
-            "=",
-            Literal(tyDescr.name.lower, false),
-            valArr[i] match {
-            | VNull() -> Literal("null", false)
-            | VInt(n) -> Literal(n.toString(), false)
-            | VString(s) -> Literal(s, true)
-            | _ -> error(pos, "Unsupported type for OR IGNORE/REPLACE")
-            },
-          );
-          _ = this.delete(context, pos, table.name, Some(clause), Array[]);
-        }
-      }
-    };
     rows = computeInsert(context, inTransaction, pos, paramsOpt, values, table);
     this.user match {
     | None() -> void
