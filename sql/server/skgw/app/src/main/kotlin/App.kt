@@ -209,6 +209,8 @@ class RequestHandler(
   }
 }
 
+data class RevealableException(val code: UInt, val msg: String) : RuntimeException(msg)
+
 fun connectionHandler(
     taskPool: ScheduledExecutorService,
     encryption: EncryptionTransform,
@@ -243,6 +245,9 @@ fun connectionHandler(
                         stream.onData = { data ->
                           try {
                             handler = handler.handleMessage(data, stream)
+                          } catch (ex: RevealableException) {
+                            System.err.println("Exception occurred: ${ex}")
+                            stream.error(ex.code, ex.msg)
                           } catch (ex: Exception) {
                             System.err.println("Exception occurred: ${ex}")
                             stream.error(2000u, "Internal error")

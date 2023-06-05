@@ -7,6 +7,9 @@ import java.nio.charset.StandardCharsets
 // the orchestration protocol. App.kt implements the behaviour, this
 // file factors out the encoding/decoding of messages to reduce noise
 
+// 10MiB ought to be enough for anybody
+val MAX_QUERY_LENGTH = 10 * 1024 * 1024
+
 sealed class ProtoMessage()
 
 enum class QueryResponseFormat {
@@ -60,6 +63,9 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
     1u -> {
       val format = QueryResponseFormat.values()[(data.get().toUInt() and 0x0Fu).toInt()]
       val queryLength = data.getInt()
+      if (queryLength > MAX_QUERY_LENGTH) {
+        throw RevealableException(2003u, "Query exceeded max length, try reducing query size or using a mirrored table.")
+      }
       val queryBytes = ByteArray(queryLength)
       data.get(queryBytes)
       ProtoQuery(String(queryBytes, StandardCharsets.UTF_8), format)
