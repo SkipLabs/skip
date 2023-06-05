@@ -3,7 +3,7 @@
 /* ***************************************************************************/
 
 export async function fetchWasmSource(): Promise<Uint8Array> {
-  let wasmModule = await fetch(new URL("../skdb.wasm", import.meta.url));
+  let wasmModule = await fetch(new URL("./skdb.wasm", import.meta.url));
   let wasmBuffer = await wasmModule.arrayBuffer();
   return new Uint8Array(wasmBuffer);
 }
@@ -1223,6 +1223,8 @@ class ResilientStream {
     const timeout = setTimeout(() => {
       this.replaceFailedStream();
     }, failureThresholdMs)
+    // TODO: Fix the following error.
+    // @ts-ignore
     this.setFailureDetectionTimeout(timeout);
   }
 

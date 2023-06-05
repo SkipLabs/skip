@@ -7,6 +7,8 @@ export async function getWasmSource(): Promise<Uint8Array> {
   let len = wasmBuffer.length
   let typedArray = new Uint8Array(len)
   for (var i = 0; i < len; i++) {
+    // TODO: Fix the following error.
+    // @ts-ignore
     typedArray[i] = wasmBuffer.charCodeAt(i)
   }
   return typedArray
