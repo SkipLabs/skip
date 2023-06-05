@@ -41,6 +41,10 @@ run_server() {
     echo "CREATE TABLE pk_single_row (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
     echo "INSERT INTO pk_single_row VALUES (0,0,0, -1);" | $SKDB
 
+    # these are filtered - the clients do intersect over some rows, but also have some rows disjoint
+    echo "CREATE TABLE no_pk_filtered (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_filtered (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+
     # clients manipulate these with random operations
     echo "CREATE TABLE no_pk_random (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
     echo "CREATE TABLE pk_random (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
@@ -105,6 +109,11 @@ monitor() {
     $SKDB <<< "select * from no_pk_single_row limit 20";
     echo "> pk_single_row - are we converging? This is the current row:"
     $SKDB <<< "select * from pk_single_row";
+
+    echo "> no_pk_filtered - most recent 20:"
+    $SKDB <<< "select * from no_pk_filtered order by id desc limit 20;"
+    echo "> pk_filtered - most recent 20:"
+    $SKDB <<< "select * from pk_filtered order by id desc limit 20;"
 
     echo "********************************************************************************"
     echo "Client 1 log:" $client1_out
