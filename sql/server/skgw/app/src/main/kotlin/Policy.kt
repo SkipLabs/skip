@@ -24,7 +24,7 @@ open class NullServerPolicy : ServerPolicy {
 
 val MAX_CONNECTIONS: UInt = 10_000u
 
-class MaxGlobalConnectionsPolicy(val maxConns: UInt = MAX_CONNECTIONS) : NullServerPolicy() {
+class LimitGlobalConnections(val maxConns: UInt = MAX_CONNECTIONS) : NullServerPolicy() {
 
   val n: AtomicInteger = AtomicInteger(0)
 
@@ -51,7 +51,7 @@ class MaxGlobalConnectionsPolicy(val maxConns: UInt = MAX_CONNECTIONS) : NullSer
   }
 }
 
-class MaxConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() {
+class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() {
 
   val openConns: ConcurrentMap<String, Int> = ConcurrentHashMap()
 
