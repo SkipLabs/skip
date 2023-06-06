@@ -55,18 +55,9 @@ class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() 
 
   val openConns: ConcurrentMap<String, Int> = ConcurrentHashMap()
 
-  override fun shouldAcceptConnection(db: String): Boolean {
-    val n = openConns.getOrDefault(db, 0)
-    val acceptable = n < maxConnsPerDatabase.toInt()
-    if (!acceptable) {
-      System.err.println(
-          "Rejecting conn. Database ${db} has too many open connections - ${n} >= ${maxConnsPerDatabase}")
-    }
-    return acceptable
-  }
-
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
-    openConns.merge(db, 1) { oldvalue, _ -> oldvalue + 1 }
+    val n = openConns.merge(db, 1) { oldvalue, _ -> oldvalue + 1 } ?: 1
+
     socket.observeLifecycle { state ->
       when (state) {
         MuxedSocket.State.CLOSED -> openConns.merge(db, 0) { oldvalue, _ -> oldvalue - 1 }
@@ -75,6 +66,10 @@ class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() 
         MuxedSocket.State.CLOSING,
         MuxedSocket.State.CLOSE_WAIT -> Unit
       }
+    }
+
+    if (n > maxConnsPerDatabase.toInt()) {
+      socket.errorSocket(2000u, "Database connection limit reached")
     }
   }
 }
@@ -101,7 +96,7 @@ class LimitConnectionsPerUser(val maxConnsPerUser: UInt) : NullServerPolicy() {
           MuxedSocket.State.AUTH_RECV -> {
             val n = openConns.merge(key, 1) { oldvalue, _ -> oldvalue + 1 }
             if (n != null && n > maxConnsPerUser.toInt()) {
-              socket.errorSocket(2000u, "Too many connections")
+              socket.errorSocket(2000u, "User connection limit reached")
             }
           }
           MuxedSocket.State.IDLE,
