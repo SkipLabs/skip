@@ -346,7 +346,7 @@ const tests = {
 
     socket.onError = (code, msg) => {
       receivedError = true;
-      assert.equal(code, 3);
+      assert.equal(code, 1002);
     };
 
     const stream = socket.openStream();
