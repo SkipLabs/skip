@@ -389,8 +389,8 @@ class MuxedSocket(
             val stream = activeStreams.get(key)
             stream?.onStreamClose()
           }
-          onClose(this)
           state = State.CLOSE_WAIT
+          onClose(this)
         } finally {
           mutex.writeLock().unlock()
         }
@@ -403,9 +403,9 @@ class MuxedSocket(
             val stream = activeStreams.get(key)
             stream?.onStreamClose()
           }
-          onClose(this)
           activeStreams.clear()
           state = State.CLOSED
+          onClose(this)
         } finally {
           mutex.writeLock().unlock()
         }
@@ -430,9 +430,9 @@ class MuxedSocket(
             val stream = activeStreams.get(key)
             stream?.onStreamError(errorCode, msg)
           }
-          onError(this, errorCode, msg)
           activeStreams.clear()
           state = State.CLOSED
+          onError(this, errorCode, msg)
         } finally {
           mutex.writeLock().unlock()
         }
