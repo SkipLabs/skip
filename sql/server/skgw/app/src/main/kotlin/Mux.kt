@@ -56,7 +56,7 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
           }
 
           override fun getMaxBinaryBufferSize(): Long {
-            return 100L * 1024 * 1024;
+            return 100L * 1024 * 1024
           }
 
           override fun onFullTextMessage(channel: WebSocketChannel, message: BufferedTextMessage) {
@@ -145,6 +145,7 @@ class MuxedSocket(
     private var nextStream: UInt = 2u,
     private var clientStreamWatermark: UInt = 0u,
     private val activeStreams: MutableMap<UInt, Stream> = HashMap(),
+    private var observers: MutableList<(State) -> Unit> = ArrayList(),
 ) {
   enum class State {
     IDLE,
@@ -201,7 +202,7 @@ class MuxedSocket(
         mutex.writeLock().lock()
         try {
           activeStreams.clear()
-          state = State.CLOSED
+          setState(State.CLOSED)
         } finally {
           mutex.writeLock().unlock()
         }
@@ -218,7 +219,7 @@ class MuxedSocket(
             stream?.close()
           }
           activeStreams.clear()
-          state = State.CLOSED
+          setState(State.CLOSED)
         } finally {
           mutex.writeLock().unlock()
         }
@@ -233,7 +234,7 @@ class MuxedSocket(
             val stream = activeStreams.get(key)
             stream?.close()
           }
-          state = State.CLOSING
+          setState(State.CLOSING)
         } finally {
           mutex.writeLock().unlock()
         }
@@ -251,7 +252,7 @@ class MuxedSocket(
         mutex.writeLock().lock()
         try {
           activeStreams.clear()
-          state = State.CLOSED
+          setState(State.CLOSED)
         } finally {
           mutex.writeLock().unlock()
         }
@@ -270,7 +271,7 @@ class MuxedSocket(
             stream?.onStreamError(errorCode, msg)
           }
           activeStreams.clear()
-          state = State.CLOSED
+          setState(State.CLOSED)
           val lastStream =
               if (nextStream - 2u > clientStreamWatermark) nextStream - 2u
               else clientStreamWatermark
@@ -288,6 +289,18 @@ class MuxedSocket(
   // TODO: pingSocket() - we don't implement yet as we don't have a use
   // case and we should make this class async first
 
+  fun observeLifecycle(callback: (State) -> Unit) {
+    // callback should be thread-safe, no guarantees as to what thread
+    // this is called on.
+    mutex.writeLock().lock()
+    try {
+      // the mutex is held while calling callback.
+      observers.add(callback)
+    } finally {
+      mutex.writeLock().unlock()
+    }
+  }
+
   // interface used by WS //////////////////////////////////////////////////////
 
   fun onSocketMessage(msg: ByteBuffer) {
@@ -304,7 +317,7 @@ class MuxedSocket(
             }
             mutex.writeLock().lock()
             try {
-              state = State.AUTH_RECV
+              setState(State.AUTH_RECV)
               authenticatedAt = Instant.now()
             } finally {
               mutex.writeLock().unlock()
@@ -389,7 +402,7 @@ class MuxedSocket(
             val stream = activeStreams.get(key)
             stream?.onStreamClose()
           }
-          state = State.CLOSE_WAIT
+          setState(State.CLOSE_WAIT)
           onClose(this)
         } finally {
           mutex.writeLock().unlock()
@@ -404,7 +417,7 @@ class MuxedSocket(
             stream?.onStreamClose()
           }
           activeStreams.clear()
-          state = State.CLOSED
+          setState(State.CLOSED)
           onClose(this)
         } finally {
           mutex.writeLock().unlock()
@@ -431,7 +444,7 @@ class MuxedSocket(
             stream?.onStreamError(errorCode, msg)
           }
           activeStreams.clear()
-          state = State.CLOSED
+          setState(State.CLOSED)
           onError(this, errorCode, msg)
         } finally {
           mutex.writeLock().unlock()
@@ -501,6 +514,14 @@ class MuxedSocket(
       return state
     } finally {
       mutex.readLock().unlock()
+    }
+  }
+
+  private fun setState(state: State) {
+    // invariant: should be holding mutex.writeLock before calling this
+    this.state = state
+    for (observer in observers) {
+      observer(state)
     }
   }
 
