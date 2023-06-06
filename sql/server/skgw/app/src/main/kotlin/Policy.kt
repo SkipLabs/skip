@@ -78,3 +78,37 @@ class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() 
     }
   }
 }
+
+class LimitConnectionsPerUser(val maxConnsPerUser: UInt) : NullServerPolicy() {
+
+  data class DbUser(val user: String, val db: String)
+
+  val openConns: ConcurrentMap<DbUser, Int> = ConcurrentHashMap()
+
+  override fun notifySocketCreated(socket: MuxedSocket, db: String) {
+    socket.observeLifecycle { state ->
+      val user = socket.authenticatedWith?.msg?.accessKey
+
+      if (user != null) {
+        val key = DbUser(user, db)
+        when (state) {
+          MuxedSocket.State.CLOSED -> {
+            openConns.merge(key, 0) { oldvalue, _ ->
+              val n = oldvalue - 1
+              if (n < 1) null else n
+            }
+          }
+          MuxedSocket.State.AUTH_RECV -> {
+            val n = openConns.merge(key, 1) { oldvalue, _ -> oldvalue + 1 }
+            if (n != null && n > maxConnsPerUser.toInt()) {
+              socket.errorSocket(2000u, "Too many connections")
+            }
+          }
+          MuxedSocket.State.IDLE,
+          MuxedSocket.State.CLOSING,
+          MuxedSocket.State.CLOSE_WAIT -> Unit
+        }
+      }
+    }
+  }
+}
