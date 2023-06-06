@@ -347,7 +347,7 @@ fun main(args: Array<String>) {
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
-  val policy = NullServerPolicy()
+  val policy = MaxGlobalConnectionsPolicy()
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)
