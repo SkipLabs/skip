@@ -156,11 +156,33 @@ class TokenBucket(val arrivalRatePerSecond: Double, val size: UInt) {
   }
 }
 
-// global rate limit
-class RateLimitRequests(val maxQps: UInt, val maxSpike: UInt) : NullServerPolicy() {
-  val tokenBucket = TokenBucket(maxQps.toDouble(), maxSpike)
+class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerConn: UInt) :
+    NullServerPolicy() {
+
+  val openConns: ConcurrentMap<MuxedSocket, TokenBucket> = ConcurrentHashMap()
+
+  override fun notifySocketCreated(socket: MuxedSocket, db: String) {
+    openConns.put(socket, TokenBucket(maxQpsPerConn.toDouble(), maxSpikePerConn))
+    socket.observeLifecycle { state ->
+      when (state) {
+        MuxedSocket.State.IDLE,
+        MuxedSocket.State.AUTH_RECV,
+        MuxedSocket.State.CLOSING,
+        MuxedSocket.State.CLOSE_WAIT -> Unit
+        MuxedSocket.State.CLOSED -> {
+          openConns.remove(socket)
+        }
+      }
+    }
+  }
 
   override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
+    val socket = stream.socket
+    val tokenBucket = openConns.get(socket)
+    if (tokenBucket == null) {
+      // something went really wrong
+      return true
+    }
     val wait = tokenBucket.requestTokens(1u)
     if (wait == null) {
       return true
