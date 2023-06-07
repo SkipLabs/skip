@@ -212,6 +212,7 @@ class RequestHandler(
 data class RevealableException(val code: UInt, val msg: String) : RuntimeException(msg)
 
 fun connectionHandler(
+    policy: ServerPolicy,
     taskPool: ScheduledExecutorService,
     encryption: EncryptionTransform,
 ): HttpHandler {
@@ -225,6 +226,21 @@ fun connectionHandler(
               val pathParams =
                   exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
               val db = pathParams["database"]
+
+              if (db == null || !policy.shouldAcceptConnection(db)) {
+                val socket =
+                    MuxedSocket(
+                        socket = channel,
+                        taskPool = taskPool,
+                        onStream = { _, _ -> },
+                        onClose = {},
+                        onError = { _, _, _ -> },
+                        getDecryptedKey = { _ -> ByteArray(0) },
+                    )
+                socket.errorSocket(2000u, "Service unavailable")
+                return socket
+              }
+
               val skdb = openSkdb(db)
 
               var replicationId: String? = null
@@ -271,8 +287,10 @@ fun connectionHandler(
                   )
 
               if (skdb == null) {
-                socket.errorSocket(1004u, "Connection rejected: could not open database")
+                socket.errorSocket(1004u, "Could not open database")
               }
+
+              policy.notifySocketCreated(socket, db)
 
               return socket
             }
@@ -328,7 +346,10 @@ fun main(args: Array<String>) {
   }
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
-  val connHandler = connectionHandler(taskPool, encryption)
+
+  val policy = MaxGlobalConnectionsPolicy()
+  val connHandler = connectionHandler(policy, taskPool, encryption)
+
   val server = createHttpServer(connHandler)
   server.start()
 }
