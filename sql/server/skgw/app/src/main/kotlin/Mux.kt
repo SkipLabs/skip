@@ -139,13 +139,6 @@ class MuxedSocket(
     val onClose: onSocketCloseFn,
     val onError: onSocketErrorFn,
     val getDecryptedKey: (MuxAuthMsg) -> ByteArray,
-    private val mutex: ReadWriteLock = ReentrantReadWriteLock(),
-    private var authenticatedAt: Instant? = null,
-    private var state: State = State.IDLE,
-    private var nextStream: UInt = 2u,
-    private var clientStreamWatermark: UInt = 0u,
-    private val activeStreams: MutableMap<UInt, Stream> = HashMap(),
-    private var observers: MutableList<(State) -> Unit> = ArrayList(),
 ) {
   enum class State {
     IDLE,
@@ -154,6 +147,21 @@ class MuxedSocket(
     CLOSE_WAIT,
     CLOSED
   }
+
+  data class AuthWith(val msg: MuxAuthMsg, val at: Instant)
+
+  private val mutex: ReadWriteLock = ReentrantReadWriteLock()
+  var authenticatedWith: AuthWith? = null
+    get() = field
+  private var state: State = State.IDLE
+  private var nextStream: UInt = 2u
+  private var clientStreamWatermark: UInt = 0u
+  private val activeStreams: MutableMap<UInt, Stream> = HashMap()
+  private var observers: MutableList<(State) -> Unit> = ArrayList()
+
+  data class MuxedSocketEnd(val error: Boolean, val code: UInt?, val msg: String?)
+  var endState: MuxedSocketEnd? = null
+    get() = field
 
   private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
   private val timeout =
@@ -202,6 +210,7 @@ class MuxedSocket(
         mutex.writeLock().lock()
         try {
           activeStreams.clear()
+          endState = MuxedSocketEnd(false, null, null)
           setState(State.CLOSED)
         } finally {
           mutex.writeLock().unlock()
@@ -219,6 +228,7 @@ class MuxedSocket(
             stream?.close()
           }
           activeStreams.clear()
+          endState = MuxedSocketEnd(false, null, null)
           setState(State.CLOSED)
         } finally {
           mutex.writeLock().unlock()
@@ -252,6 +262,7 @@ class MuxedSocket(
         mutex.writeLock().lock()
         try {
           activeStreams.clear()
+          endState = MuxedSocketEnd(true, errorCode, msg)
           setState(State.CLOSED)
         } finally {
           mutex.writeLock().unlock()
@@ -271,6 +282,7 @@ class MuxedSocket(
             stream?.onStreamError(errorCode, msg)
           }
           activeStreams.clear()
+          endState = MuxedSocketEnd(true, errorCode, msg)
           setState(State.CLOSED)
           val lastStream =
               if (nextStream - 2u > clientStreamWatermark) nextStream - 2u
@@ -317,8 +329,8 @@ class MuxedSocket(
             }
             mutex.writeLock().lock()
             try {
+              authenticatedWith = AuthWith(muxMsg, Instant.now())
               setState(State.AUTH_RECV)
-              authenticatedAt = Instant.now()
             } finally {
               mutex.writeLock().unlock()
             }
@@ -334,7 +346,8 @@ class MuxedSocket(
       State.AUTH_RECV,
       State.CLOSING -> {
         val now = Instant.now()
-        if (Duration.between(authenticatedAt!!, now).abs().compareTo(maxConnectionDuration) > 0) {
+        if (Duration.between(authenticatedWith?.at!!, now).abs().compareTo(maxConnectionDuration) >
+            0) {
           errorSocket(1003u, "session timeout")
         }
 
@@ -417,6 +430,7 @@ class MuxedSocket(
             stream?.onStreamClose()
           }
           activeStreams.clear()
+          endState = MuxedSocketEnd(false, null, null)
           setState(State.CLOSED)
           onClose(this)
         } finally {
@@ -444,6 +458,7 @@ class MuxedSocket(
             stream?.onStreamError(errorCode, msg)
           }
           activeStreams.clear()
+          endState = MuxedSocketEnd(true, errorCode, msg)
           setState(State.CLOSED)
           onError(this, errorCode, msg)
         } finally {
@@ -519,6 +534,9 @@ class MuxedSocket(
 
   private fun setState(state: State) {
     // invariant: should be holding mutex.writeLock before calling this
+    if (this.state == state) {
+      return
+    }
     this.state = state
     for (observer in observers) {
       observer(state)
