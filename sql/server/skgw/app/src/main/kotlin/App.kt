@@ -7,6 +7,7 @@ import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.spi.WebSocketHttpExchange
+import io.skiplabs.skgw.RateLimitRequestsPerConnection
 import java.io.BufferedOutputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
@@ -363,7 +364,7 @@ fun main(args: Array<String>) {
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
-  val policy = SimpleDebugLogger(RateLimitRequests(1u, 10u))
+  val policy = SimpleDebugLogger(RateLimitRequestsPerConnection(1u, 10u))
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)
