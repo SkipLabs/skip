@@ -1,8 +1,12 @@
 package io.skiplabs.skgw
 
+import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.Lock
+import java.util.concurrent.locks.ReentrantLock
 
 // this factors out policy and monitoring from mechanism
 interface ServerPolicy {
@@ -116,9 +120,53 @@ class LimitConnectionsPerUser(val maxConnsPerUser: UInt) : NullServerPolicy() {
   }
 }
 
-class RateLimitRequests() : NullServerPolicy() {
+class TokenBucket(val arrivalRatePerSecond: Double, val size: UInt) {
+  private var mutex: Lock = ReentrantLock()
+  private var tokens: UInt = size
+  private var lastArrival: Instant = Instant.now()
+
+  // null if can immediately service otherwise a non-zero duration
+  // estimate of how long to wait before the request should be
+  // servicable - be careful, this could easily lead to unfairness
+  // without a queue.
+  fun requestTokens(n: UInt): Duration? {
+    mutex.lock()
+    try {
+      val now = Instant.now()
+      val deltaMillis = Duration.between(lastArrival, now).toMillis()
+      val oldTokens = tokens
+      tokens = Math.floor(tokens.toLong() + (deltaMillis * arrivalRatePerSecond / 1000)).toUInt()
+      if (tokens > oldTokens) {
+        // this condition protects the floor from starving updates
+        // that arrive fast enough. it ensures progress
+        lastArrival = now
+      }
+      // clip to prevent accumulating enough tokens to allow unacceptable spikes
+      tokens = Math.min(tokens.toLong(), size.toLong()).toUInt()
+
+      if (n <= tokens) {
+        tokens = tokens - n
+        return null
+      }
+
+      return Duration.ofMillis(((n - tokens).toLong() / arrivalRatePerSecond * 1000).toLong())
+    } finally {
+      mutex.unlock()
+    }
+  }
+}
+
+// global rate limit
+class RateLimitRequests(val maxQps: UInt, val maxSpike: UInt) : NullServerPolicy() {
+  val tokenBucket = TokenBucket(maxQps.toDouble(), maxSpike)
+
   override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
-    return false;
+    val wait = tokenBucket.requestTokens(1u)
+    if (wait == null) {
+      return true
+    }
+    stream.error(2000u, "Rate limit exceeded")
+    return false
   }
 }
 
