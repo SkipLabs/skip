@@ -363,7 +363,7 @@ fun main(args: Array<String>) {
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
-  val policy = LimitGlobalConnections()
+  val policy = SimpleDebugLogger(RateLimitRequests())
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)

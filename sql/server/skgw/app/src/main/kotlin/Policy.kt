@@ -115,3 +115,34 @@ class LimitConnectionsPerUser(val maxConnsPerUser: UInt) : NullServerPolicy() {
     }
   }
 }
+
+class RateLimitRequests() : NullServerPolicy() {
+  override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
+    return false;
+  }
+}
+
+class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
+
+  override fun shouldAcceptConnection(db: String): Boolean {
+    val shouldAccept = decorated.shouldAcceptConnection(db)
+    val phrase = if (shouldAccept) "accepted" else "rejected"
+    System.err.println("Connection for db ${db} ${phrase}.")
+    return shouldAccept
+  }
+
+  override fun notifySocketCreated(socket: MuxedSocket, db: String) {
+    System.err.println("Socket created: ${socket} for db ${db}.")
+    socket.observeLifecycle { state ->
+      System.err.println("Socket ${socket} moved to state ${state}")
+    }
+    decorated.notifySocketCreated(socket, db)
+  }
+
+  override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
+    val shouldHandle = decorated.shouldHandleMessage(request, stream)
+    val phrase = if (shouldHandle) "accepted" else "rejected"
+    System.err.println("Request ${request} on stream ${stream} was ${phrase}")
+    return shouldHandle
+  }
+}
