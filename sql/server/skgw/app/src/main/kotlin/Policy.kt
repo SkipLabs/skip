@@ -10,6 +10,10 @@ interface ServerPolicy {
 
   // you can then hook in to socket events by using socket.observeLifecycle
   fun notifySocketCreated(socket: MuxedSocket, db: String)
+
+  // short-circuits message handling if returns false. may manipulate
+  // the stream - e.g. send/close/error it.
+  fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean
 }
 
 // no policy. useful for subclasses that want to define partial policy
@@ -20,6 +24,10 @@ open class NullServerPolicy : ServerPolicy {
   }
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {}
+
+  override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
+    return true
+  }
 }
 
 val MAX_CONNECTIONS: UInt = 10_000u

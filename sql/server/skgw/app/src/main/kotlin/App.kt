@@ -209,6 +209,20 @@ class RequestHandler(
   }
 }
 
+class PolicyLinkedHandler(val policy: ServerPolicy, var decorated: StreamHandler) : StreamHandler {
+
+  override fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler {
+    if (policy.shouldHandleMessage(request, stream)) {
+      decorated = decorated.handleMessage(request, stream)
+    }
+    return this
+  }
+
+  override fun close() {
+    decorated.close()
+  }
+}
+
 data class RevealableException(val code: UInt, val msg: String) : RuntimeException(msg)
 
 fun connectionHandler(
@@ -252,12 +266,14 @@ fun connectionHandler(
                       taskPool = taskPool,
                       onStream = { _, stream ->
                         var handler: StreamHandler =
-                            RequestHandler(
-                                skdb!!,
-                                accessKey!!,
-                                encryption,
-                                replicationId!!,
-                            )
+                            PolicyLinkedHandler(
+                                policy,
+                                RequestHandler(
+                                    skdb!!,
+                                    accessKey!!,
+                                    encryption,
+                                    replicationId!!,
+                                ))
                         stream.onData = { data ->
                           try {
                             handler = handler.handleMessage(data, stream)
