@@ -133,7 +133,7 @@ data class MuxStreamCloseMsg(val stream: UInt) : MuxMsg()
 data class MuxStreamResetMsg(val stream: UInt, val errorCode: UInt, val msg: String) : MuxMsg()
 
 class MuxedSocket(
-    val socket: WebSocketChannel,
+    val channel: WebSocketChannel,
     val taskPool: ScheduledExecutorService,
     val onStream: onStreamFn,
     val onClose: onSocketCloseFn,
@@ -216,7 +216,7 @@ class MuxedSocket(
           mutex.writeLock().unlock()
         }
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
-        socket.close()
+        channel.close()
       }
       State.CLOSE_WAIT -> {
         mutex.writeLock().lock()
@@ -234,7 +234,7 @@ class MuxedSocket(
           mutex.writeLock().unlock()
         }
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
-        socket.close()
+        channel.close()
       }
       State.AUTH_RECV -> {
         mutex.writeLock().lock()
@@ -249,7 +249,7 @@ class MuxedSocket(
           mutex.writeLock().unlock()
         }
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
-        socket.close()
+        channel.close()
       }
     }
     timeout.cancel(false)
@@ -292,7 +292,7 @@ class MuxedSocket(
           mutex.writeLock().unlock()
         }
         sendClose(CloseMessage.PROTOCOL_ERROR, msg)
-        socket.close()
+        channel.close()
       }
     }
     timeout.cancel(false)
@@ -750,14 +750,14 @@ class MuxedSocket(
   }
 
   private fun sendClose(code: Int, reason: String) {
-    if (socket.isOpen()) {
-      WebSockets.sendCloseBlocking(code, reason, socket)
+    if (channel.isOpen()) {
+      WebSockets.sendCloseBlocking(code, reason, channel)
     }
   }
 
   private fun sendData(data: ByteBuffer) {
-    if (socket.isOpen()) {
-      WebSockets.sendBinaryBlocking(data, socket)
+    if (channel.isOpen()) {
+      WebSockets.sendBinaryBlocking(data, channel)
     }
   }
 }

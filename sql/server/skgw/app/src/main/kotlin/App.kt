@@ -245,7 +245,7 @@ fun connectionHandler(
               if (db == null || !policy.shouldAcceptConnection(db)) {
                 val socket =
                     MuxedSocket(
-                        socket = channel,
+                        channel = channel,
                         taskPool = taskPool,
                         onStream = { _, _ -> },
                         onClose = {},
@@ -263,7 +263,7 @@ fun connectionHandler(
 
               val socket =
                   MuxedSocket(
-                      socket = channel,
+                      channel = channel,
                       taskPool = taskPool,
                       onStream = { _, stream ->
                         var handler: StreamHandler =
