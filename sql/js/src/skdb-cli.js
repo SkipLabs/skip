@@ -229,8 +229,13 @@ const remoteRepl = async function() {
     }
 
     if (query.trim() === '.schema') {
-      const schema = await skdb.server.schema();
-      console.log(schema);
+      try {
+        const schema = await skdb.server.schema();
+        console.log(schema);
+      } catch (ex) {
+        console.error("Could not query schema.");
+        console.error(ex);
+      }
       continue;
     }
 
@@ -304,8 +309,13 @@ const localRepl = async function() {
     }
 
     if (query.trim() === '.schema') {
-      const schema = skdb.schema();
-      console.log(schema);
+      try {
+        const schema = skdb.schema();
+        console.log(schema);
+      } catch (ex) {
+        console.error("Could not query schema.");
+        console.error(ex);
+      }
       continue;
     }
 

@@ -7,6 +7,7 @@ import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.spi.WebSocketHttpExchange
+import io.skiplabs.skgw.RateLimitRequestsPerConnection
 import java.io.BufferedOutputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
@@ -209,6 +210,20 @@ class RequestHandler(
   }
 }
 
+class PolicyLinkedHandler(val policy: ServerPolicy, var decorated: StreamHandler) : StreamHandler {
+
+  override fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler {
+    if (policy.shouldHandleMessage(request, stream)) {
+      decorated = decorated.handleMessage(request, stream)
+    }
+    return this
+  }
+
+  override fun close() {
+    decorated.close()
+  }
+}
+
 data class RevealableException(val code: UInt, val msg: String) : RuntimeException(msg)
 
 fun connectionHandler(
@@ -252,12 +267,14 @@ fun connectionHandler(
                       taskPool = taskPool,
                       onStream = { _, stream ->
                         var handler: StreamHandler =
-                            RequestHandler(
-                                skdb!!,
-                                accessKey!!,
-                                encryption,
-                                replicationId!!,
-                            )
+                            PolicyLinkedHandler(
+                                policy,
+                                RequestHandler(
+                                    skdb!!,
+                                    accessKey!!,
+                                    encryption,
+                                    replicationId!!,
+                                ))
                         stream.onData = { data ->
                           try {
                             handler = handler.handleMessage(data, stream)
@@ -347,7 +364,7 @@ fun main(args: Array<String>) {
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
-  val policy = LimitGlobalConnections()
+  val policy = SimpleDebugLogger(RateLimitRequestsPerConnection(1u, 10u))
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)

@@ -998,6 +998,18 @@ class ProtoMsgDecoder {
     }
     return msg;
   }
+
+  // returns the last message assembled and clears it off the stack.
+  // useful if tracking the return from push is annoying. null
+  // ambiguously represents receiving a message from a future schema
+  // that we don't understand or empty stack.
+  tryPop(): ProtoMsg | null {
+    const msg = this.msgs.pop();
+    if (msg === undefined) {
+      return null;
+    }
+    return msg;
+  }
 }
 
 /* ***************************************************************************/
@@ -1999,7 +2011,7 @@ class SKDBServer {
         decoder.push(data);
       };
       stream.onClose = () => {
-        const msg = decoder.pop();
+        const msg = decoder.tryPop();
         if (msg === null || msg.type !== "credentials" && msg.type !== "data") {
           resolve(null);
           return;
