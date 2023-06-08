@@ -97,7 +97,7 @@ fun createHttpServer(): Undertow {
                 ): MuxedSocket {
                   val socket =
                       MuxedSocket(
-                          socket = channel,
+                          channel = channel,
                           taskPool = Executors.newSingleThreadScheduledExecutor(),
                           onStream = ::setupStream,
                           onClose = {},
