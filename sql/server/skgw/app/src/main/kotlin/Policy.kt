@@ -4,6 +4,8 @@ import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
@@ -156,6 +158,17 @@ class TokenBucket(val arrivalRatePerSecond: Double, val size: UInt) {
   }
 }
 
+class LeakyBucket(val drainRatePerSecond: Double) {
+  private var level: AtomicInteger = AtomicInteger(0)
+
+  // add n to the bucket. return how long it will take to drain
+  fun fill(n: Int): Duration {
+    val l = level.addAndGet(n)
+    val tMillis = l / drainRatePerSecond * 1000
+    return Duration.ofMillis(tMillis.toLong()) // truncate, we don't need too much resolution
+  }
+}
+
 class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerConn: UInt) :
     NullServerPolicy() {
 
@@ -189,6 +202,63 @@ class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerCon
     }
     stream.error(2000u, "Rate limit exceeded")
     return false
+  }
+}
+
+class ThrottleDataTransferPerConnection(
+    val maxBytesPerSecPerConn: UInt,
+    val scheduledExecutor: ScheduledExecutorService,
+) : NullServerPolicy() {
+
+  val openConns: ConcurrentMap<MuxedSocket, LeakyBucket> = ConcurrentHashMap()
+
+  override fun notifySocketCreated(socket: MuxedSocket, db: String) {
+    openConns.put(socket, LeakyBucket(maxBytesPerSecPerConn.toDouble()))
+    socket.observeLifecycle { state ->
+      when (state) {
+        MuxedSocket.State.IDLE,
+        MuxedSocket.State.AUTH_RECV,
+        MuxedSocket.State.CLOSING,
+        MuxedSocket.State.CLOSE_WAIT -> Unit
+        MuxedSocket.State.CLOSED -> {
+          openConns.remove(socket)
+        }
+      }
+    }
+  }
+
+  override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
+    // for simplicity we allow a burst but then throttle to average
+    // out the transfer rate. could always combine with a policy that
+    // rejects single requests that are too large
+
+    when (request) {
+      is ProtoData -> {
+        val socket = stream.socket
+        val bucket = openConns.get(socket)
+        if (bucket == null) {
+          // something went really wrong
+          return true
+        }
+
+        val wait = bucket.fill(request.data.remaining())
+
+        // for anything <= threshold, let's not worry, otherwise pause
+        // and schedule resumption
+        val threshold = Duration.ofMillis(1)
+        if (wait.compareTo(threshold) > 0) {
+          socket.channel.suspendReceives()
+          scheduledExecutor.schedule(
+              { socket.channel.resumeReceives() }, wait.toMillis(), TimeUnit.MILLISECONDS)
+        }
+        // TODO: probably want a max threshold where we error out the
+        // connection. otherwise it will just timeout on the client
+        // anyway. this gives us a means of explaining to the user
+      }
+      else -> {}
+    }
+
+    return true
   }
 }
 
