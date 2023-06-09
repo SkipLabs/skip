@@ -20,11 +20,11 @@ interface ServerPolicy {
   // short-circuits message receive if returns false. the message is
   // just dropped. may manipulate the stream - e.g. send/close/error
   // it.
-  fun shouldDeliverMessage(request: ProtoMessage, stream: OrchestrationStream): Boolean
+  fun shouldDeliverMessage(request: ProtoMessage, stream: OrchestrationStream, db: String): Boolean
 
   // short-circuits message sending if returns false. the message is
   // just dropped. may manipulate the stream - e.g. send/close/error.
-  fun shouldEmitMessage(msg: ProtoMessage, stream: OrchestrationStream): Boolean
+  fun shouldEmitMessage(msg: ProtoMessage, stream: OrchestrationStream, db: String): Boolean
 }
 
 // no policy. useful for subclasses that want to define partial policy
@@ -36,11 +36,19 @@ open class NullServerPolicy : ServerPolicy {
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {}
 
-  override fun shouldDeliverMessage(request: ProtoMessage, stream: OrchestrationStream): Boolean {
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
     return true
   }
 
-  override fun shouldEmitMessage(msg: ProtoMessage, stream: OrchestrationStream): Boolean {
+  override fun shouldEmitMessage(
+      msg: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
     return true
   }
 }
@@ -198,7 +206,11 @@ class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerCon
     }
   }
 
-  override fun shouldDeliverMessage(request: ProtoMessage, stream: OrchestrationStream): Boolean {
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
     val socket = stream.stream.socket
     val tokenBucket = openConns.get(socket)
     if (tokenBucket == null) {
@@ -236,7 +248,11 @@ class ThrottleDataTransferPerConnection(
     }
   }
 
-  override fun shouldDeliverMessage(request: ProtoMessage, stream: OrchestrationStream): Boolean {
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
     // for simplicity we allow a burst but then throttle to average
     // out the transfer rate. could always combine with a policy that
     // rejects single requests that are too large
@@ -291,8 +307,12 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
     decorated.notifySocketCreated(socket, db)
   }
 
-  override fun shouldDeliverMessage(request: ProtoMessage, stream: OrchestrationStream): Boolean {
-    val shouldHandle = decorated.shouldDeliverMessage(request, stream)
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    val shouldHandle = decorated.shouldDeliverMessage(request, stream, db)
     val phrase = if (shouldHandle) "accepted" else "rejected"
     System.err.println("Request ${request} on stream ${stream} was ${phrase}")
     val muxstream = stream.stream
@@ -303,8 +323,12 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
     return shouldHandle
   }
 
-  override fun shouldEmitMessage(msg: ProtoMessage, stream: OrchestrationStream): Boolean {
-    val shouldEmit = decorated.shouldEmitMessage(msg, stream)
+  override fun shouldEmitMessage(
+      msg: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    val shouldEmit = decorated.shouldEmitMessage(msg, stream, db)
     val phrase = if (shouldEmit) "allowed" else "blocked"
     System.err.println("Sending ${msg} on stream ${stream} was ${phrase}")
     return shouldEmit
