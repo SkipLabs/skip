@@ -154,7 +154,13 @@ class MuxedSocket(
 
   private val mutex: ReadWriteLock = ReentrantReadWriteLock()
   var authenticatedWith: AuthWith? = null
-    get() = field
+    get() =
+        try {
+          mutex.readLock().lock()
+          field
+        } finally {
+          mutex.readLock().unlock()
+        }
   private var state: State = State.IDLE
   private var nextStream: UInt = 2u
   private var clientStreamWatermark: UInt = 0u
@@ -163,7 +169,13 @@ class MuxedSocket(
 
   data class MuxedSocketEnd(val error: Boolean, val code: UInt?, val msg: String?)
   var endState: MuxedSocketEnd? = null
-    get() = field
+    get() =
+        try {
+          mutex.readLock().lock()
+          field
+        } finally {
+          mutex.readLock().unlock()
+        }
 
   private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
   private val timeout =
