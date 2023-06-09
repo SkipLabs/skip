@@ -386,8 +386,7 @@ fun main(args: Array<String>) {
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
-  val policy =
-      SimpleDebugLogger(ThrottleDataTransferPerConnection((10 * 1024 * 1024).toUInt(), taskPool))
+  val policy = SkdbBackedEventLogger()
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)

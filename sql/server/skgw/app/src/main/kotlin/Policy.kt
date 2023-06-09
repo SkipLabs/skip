@@ -334,3 +334,78 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
     return shouldEmit
   }
 }
+
+class SkdbBackedEventLogger() : ServerPolicy {
+
+  private val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
+
+  init {
+    skdb.sql(
+        """CREATE TABLE IF NOT EXISTS
+             server_events (
+               t INTEGER,
+               db STRING,
+               user STRING,
+               event STRING,
+               metadata STRING
+             );""",
+        OutputFormat.RAW)
+  }
+
+  private fun log(db: String, event: String, user: String? = null, metadata: String? = null) {
+    val t = Instant.now().getEpochSecond()
+    val u = if (user == null) "NULL" else "'${user}'"
+    val md = if (metadata == null) "NULL" else "'${metadata}'"
+    skdb.sql(
+        "INSERT INTO server_events VALUES (${t}, '${db}', ${u}, '${event}', ${md});",
+        OutputFormat.RAW)
+  }
+
+  override fun shouldAcceptConnection(db: String): Boolean {
+    log(db, "conn_attempt")
+    return true
+  }
+
+  override fun notifySocketCreated(socket: MuxedSocket, db: String) {
+    socket.observeLifecycle { state ->
+      if (state == MuxedSocket.State.AUTH_RECV) {
+        log(db, "conn_established", socket.authenticatedWith?.msg?.accessKey)
+      }
+    }
+  }
+
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    val user = stream.stream.socket.authenticatedWith?.msg?.accessKey
+    when (request) {
+      is ProtoQuery -> {
+        log(db, "query", user)
+      }
+      is ProtoRequestTail -> {
+        log(db, "establish_tail", user, request.table)
+      }
+      is ProtoPushPromise -> {
+        log(db, "establish_push", user, request.table)
+      }
+      is ProtoCreateDb -> {
+        log(db, "create-db", user, request.name)
+      }
+      is ProtoCreateUser -> {
+        log(db, "create-user", user)
+      }
+      else -> {}
+    }
+    return true
+  }
+
+  override fun shouldEmitMessage(
+      msg: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    return true
+  }
+}
