@@ -207,8 +207,11 @@ class RequestHandler(
   }
 }
 
-class PolicyLinkedOrchestrationStream(val policy: ServerPolicy, override val stream: Stream) :
-    OrchestrationStream {
+class PolicyLinkedOrchestrationStream(
+    val policy: ServerPolicy,
+    val db: String,
+    override val stream: Stream
+) : OrchestrationStream {
 
   override fun close() {
     stream.close()
@@ -219,16 +222,17 @@ class PolicyLinkedOrchestrationStream(val policy: ServerPolicy, override val str
   }
 
   override fun send(msg: ProtoMessage) {
-    if (policy.shouldEmitMessage(msg, this)) {
+    if (policy.shouldEmitMessage(msg, this, db)) {
       stream.send(encodeProtoMsg(msg))
     }
   }
 }
 
-class PolicyLinkedHandler(val policy: ServerPolicy, var decorated: StreamHandler) : StreamHandler {
+class PolicyLinkedHandler(val policy: ServerPolicy, val db: String, var decorated: StreamHandler) :
+    StreamHandler {
 
   override fun handleMessage(request: ProtoMessage, stream: OrchestrationStream): StreamHandler {
-    if (policy.shouldDeliverMessage(request, stream)) {
+    if (policy.shouldDeliverMessage(request, stream, db)) {
       decorated = decorated.handleMessage(request, stream)
     }
     return this
@@ -284,13 +288,15 @@ fun connectionHandler(
                         var handler: StreamHandler =
                             PolicyLinkedHandler(
                                 policy,
+                                db,
                                 RequestHandler(
                                     skdb!!,
                                     accessKey!!,
                                     encryption,
                                     replicationId!!,
                                 ))
-                        var orchestrationStream = PolicyLinkedOrchestrationStream(policy, stream)
+                        var orchestrationStream =
+                            PolicyLinkedOrchestrationStream(policy, db, stream)
                         stream.onData = { data ->
                           try {
                             handler = handler.handleMessage(data, orchestrationStream)
