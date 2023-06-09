@@ -64,7 +64,8 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
       val format = QueryResponseFormat.values()[(data.get().toUInt() and 0x0Fu).toInt()]
       val queryLength = data.getInt()
       if (queryLength > MAX_QUERY_LENGTH) {
-        throw RevealableException(2003u, "Query exceeded max length, try reducing query size or using a mirrored table.")
+        throw RevealableException(
+            2003u, "Query exceeded max length, try reducing query size or using a mirrored table.")
       }
       val queryBytes = ByteArray(queryLength)
       data.get(queryBytes)
@@ -149,4 +150,13 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
     }
     else -> throw RuntimeException("We don't support encoding ${msg}")
   }
+}
+
+// adapts the stream interface for this layer in the protocol stack
+interface OrchestrationStream {
+  val stream: Stream
+  fun close()
+  fun error(errorCode: UInt, msg: String)
+  // raises the abstraction of this to messages rather than bytes
+  fun send(msg: ProtoMessage)
 }

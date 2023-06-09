@@ -7,7 +7,6 @@ import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.spi.WebSocketHttpExchange
-import io.skiplabs.skgw.RateLimitRequestsPerConnection
 import java.io.BufferedOutputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
@@ -76,8 +75,8 @@ fun createDb(dbName: String, encryption: EncryptionTransform): Credentials {
 
 sealed interface StreamHandler {
 
-  fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler
-  fun handleMessage(message: ByteBuffer, stream: Stream) =
+  fun handleMessage(request: ProtoMessage, stream: OrchestrationStream): StreamHandler
+  fun handleMessage(message: ByteBuffer, stream: OrchestrationStream) =
       handleMessage(decodeProtoMsg(message), stream)
 
   fun close() {}
@@ -95,7 +94,7 @@ class ProcessPipe(val proc: Process) : StreamHandler {
     this.stdin = BufferedOutputStream(stdin)
   }
 
-  override fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler {
+  override fun handleMessage(request: ProtoMessage, stream: OrchestrationStream): StreamHandler {
     when (request) {
       is ProtoData -> {
         val data = request.data
@@ -125,7 +124,7 @@ class RequestHandler(
     val replicationId: String,
 ) : StreamHandler {
 
-  override fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler {
+  override fun handleMessage(request: ProtoMessage, stream: OrchestrationStream): StreamHandler {
     when (request) {
       is ProtoQuery -> {
         val format =
@@ -136,8 +135,7 @@ class RequestHandler(
             }
         val result = skdb.sql(request.query, format)
         if (result.exitSuccessfully()) {
-          val payload = encodeProtoMsg(ProtoData(ByteBuffer.wrap(result.output), finFlagSet = true))
-          stream.send(payload)
+          stream.send(ProtoData(ByteBuffer.wrap(result.output), finFlagSet = true))
           stream.close()
         } else {
           stream.error(2000u, result.decode())
@@ -151,8 +149,7 @@ class RequestHandler(
               SchemaScope.VIEW -> skdb.dumpView(request.name!!)
             }
         if (result.exitSuccessfully()) {
-          val payload = encodeProtoMsg(ProtoData(ByteBuffer.wrap(result.output), finFlagSet = true))
-          stream.send(payload)
+          stream.send(ProtoData(ByteBuffer.wrap(result.output), finFlagSet = true))
           stream.close()
         } else {
           stream.error(2000u, result.decode())
@@ -165,7 +162,7 @@ class RequestHandler(
           return this
         }
         val creds = createDb(request.name, encryption)
-        val payload = encodeProtoMsg(creds.toProtoCredentials())
+        val payload = creds.toProtoCredentials()
         creds.clear()
         stream.send(payload)
         stream.close()
@@ -173,7 +170,7 @@ class RequestHandler(
       is ProtoCreateUser -> {
         val creds = genCredentials(genAccessKey(), encryption)
         skdb.createUser(creds.accessKey, creds.b64encryptedKey())
-        val payload = encodeProtoMsg(creds.toProtoCredentials())
+        val payload = creds.toProtoCredentials()
         creds.clear()
         stream.send(payload)
         stream.close()
@@ -186,7 +183,7 @@ class RequestHandler(
                 request.since,
                 request.filterExpr,
                 replicationId,
-                { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
+                { data, shouldFlush -> stream.send(ProtoData(data, shouldFlush)) },
                 { stream.error(2000u, "Unexpected EOF") },
             )
         return ProcessPipe(proc)
@@ -197,7 +194,7 @@ class RequestHandler(
                 accessKey,
                 request.table,
                 replicationId,
-                { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
+                { data, shouldFlush -> stream.send(ProtoData(data, shouldFlush)) },
                 { stream.error(2000u, "Unexpected EOF") })
         return ProcessPipe(proc)
       }
@@ -210,10 +207,28 @@ class RequestHandler(
   }
 }
 
+class PolicyLinkedOrchestrationStream(val policy: ServerPolicy, override val stream: Stream) :
+    OrchestrationStream {
+
+  override fun close() {
+    stream.close()
+  }
+
+  override fun error(errorCode: UInt, msg: String) {
+    stream.error(errorCode, msg)
+  }
+
+  override fun send(msg: ProtoMessage) {
+    if (policy.shouldEmitMessage(msg, this)) {
+      stream.send(encodeProtoMsg(msg))
+    }
+  }
+}
+
 class PolicyLinkedHandler(val policy: ServerPolicy, var decorated: StreamHandler) : StreamHandler {
 
-  override fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler {
-    if (policy.shouldHandleMessage(request, stream)) {
+  override fun handleMessage(request: ProtoMessage, stream: OrchestrationStream): StreamHandler {
+    if (policy.shouldDeliverMessage(request, stream)) {
       decorated = decorated.handleMessage(request, stream)
     }
     return this
@@ -275,9 +290,10 @@ fun connectionHandler(
                                     encryption,
                                     replicationId!!,
                                 ))
+                        var orchestrationStream = PolicyLinkedOrchestrationStream(policy, stream)
                         stream.onData = { data ->
                           try {
-                            handler = handler.handleMessage(data, stream)
+                            handler = handler.handleMessage(data, orchestrationStream)
                           } catch (ex: RevealableException) {
                             System.err.println("Exception occurred: ${ex}")
                             stream.error(ex.code, ex.msg)
@@ -364,7 +380,8 @@ fun main(args: Array<String>) {
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
-  val policy = SimpleDebugLogger(ThrottleDataTransferPerConnection((10 * 1024 * 1024).toUInt(), taskPool))
+  val policy =
+      SimpleDebugLogger(ThrottleDataTransferPerConnection((10 * 1024 * 1024).toUInt(), taskPool))
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)
