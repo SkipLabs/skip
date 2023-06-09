@@ -274,7 +274,10 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
     System.err.println("Socket created: ${socket} for db ${db}.")
     socket.observeLifecycle { state ->
-      System.err.println("Socket ${socket} moved to state ${state}")
+      if (state == MuxedSocket.State.AUTH_RECV) {
+        System.err.println("User authenticated on ${socket} with: ${socket.authenticatedWith}")
+      }
+      System.err.println("Socket ${socket} moved to state ${state} end state: ${socket.endState}")
     }
     decorated.notifySocketCreated(socket, db)
   }
@@ -283,6 +286,10 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
     val shouldHandle = decorated.shouldHandleMessage(request, stream)
     val phrase = if (shouldHandle) "accepted" else "rejected"
     System.err.println("Request ${request} on stream ${stream} was ${phrase}")
+    stream.observeLifecycle { state ->
+      System.err.println(
+          "Stream ${stream} initiated by request ${request} moved to state ${state} end state: ${stream.endState.get()}")
+    }
     return shouldHandle
   }
 }
