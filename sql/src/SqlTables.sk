@@ -53,16 +53,14 @@ fun setWatermark(
 extension class TypeDescr extends SKFS.File
 
 class DirDescr{
-  name: Name,
   colNames: Array<Name>,
   schema: Array<TypeDescr>,
   kinds: Array<(Int, IKind, Type)>,
   cols: Map<Name, Int>,
-  dirName: SKFS.DirName,
   alias: ?Name,
   windowSize: ?Int,
   isInput: Bool,
-} extends SKFS.File uses Orderable {
+} extends SKFS.File, Descr uses Orderable {
   fun compare(y: DirDescr): Order {
     this.name.compare(y.name)
   }
@@ -118,6 +116,132 @@ fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
   makeDir(DirDescr::fromFile, context, tableInfo, () -> {
     context.mkdir(DirDescr::fromFile, tableInfo, false, Array[])
   })
+}
+
+/*****************************************************************************/
+/* Getting the latest directory descriptor.
+ *
+ * Sometimes, we have to do physical copies of SQL tables or directories.
+ * This will happen when we are dealing with a transaction that is both
+ * reading and writing to the same table.
+ *
+ * For example:
+ * begin transaction;
+ *   delete from t1;
+ *   insert into t1 ...
+ * commit;
+ *
+ * You can guess what the problem here is. Because t1 is reactive, that means
+ * that the delete statement will delete anything added to t1. The solution
+ * is simple, the version that t1 inserts into is not the same than the one
+ * we delete from. To keep track of the different version of table we have
+ * a global called TableMap.
+ *
+ * At commit time, under the global lock, the different versions are thrown
+ * away, and only the result is copied into the real time.
+ */
+/*****************************************************************************/
+
+value class Version(value: Int) uses Orderable
+
+class TableMap{
+  startTick: SKFS.Tick,
+  version: Version,
+  map: SortedMap<SKFS.BaseName, (Version, Descr)>,
+} extends SKFS.File
+
+fun dirDescrCopy(
+  context: mutable SKFS.Context,
+  dirName: SKFS.DirName,
+  tableName: String,
+  version: Version,
+): SKFS.DirName {
+  oldDir = context.unsafeGetEagerDir(dirName);
+  nextName = SKFS.DirName::create(
+    "/next/" + tableName + "/" + version.value + "/",
+  );
+  sinkName = SKFS.DirName::create(
+    "/sink/" + tableName + "/" + version.value + "/",
+  );
+  dir = SKFS.EagerDir{
+    time => context.timeStamp(),
+    dirName => nextName,
+    input => true,
+    fixedData => oldDir.fixedData,
+    data => oldDir.data,
+    totalSize => oldDir.totalSize,
+    creator => context.currentArrow(),
+    reallyRemove => false,
+  };
+  context.setDir(dir.dirName, dir);
+  limit = context.tick;
+  _ = SKFS.EagerDir::apply(
+    context,
+    dirName,
+    sinkName,
+    (context, _writer, key, _valueIter) ~> {
+      entries = mutable Vector[];
+      for (srcValue in (context.unsafeGetEagerDir(
+        dirName,
+      )).unsafeGetAllDataIterAfter(limit, key)) {
+        (_, source, writer, values) = srcValue;
+        entries.push((key, (source.path(), writer.path(), values)));
+      };
+      inputDir = context.unsafeGetEagerDir(nextName);
+      inputDir.writeArraySourceMany(context, entries.iterator());
+    },
+    None(),
+    None(),
+    true,
+  );
+  nextName
+}
+
+base class Descr{name: Name, dirName: SKFS.DirName} {}
+
+fun getLatestDescr(context: mutable SKFS.Context, descr: Descr): Descr {
+  baseName = SKFS.SID(descr.name.lower);
+  context.getGlobal("TableMap") match {
+  | None() -> descr
+  | Some(tableMapFile) ->
+    tableMap = TableMap::fromFile(tableMapFile);
+    oldDescr = tableMap.map.maybeGet(baseName) match {
+    | None() -> descr
+    | Some((version, oldDescr)) if (version == tableMap.version) ->
+      return oldDescr
+    | Some((_, x)) -> x
+    };
+    nextName = dirDescrCopy(
+      context,
+      oldDescr.dirName,
+      descr.name.origName,
+      tableMap.version,
+    );
+    result = descr with {dirName => nextName};
+    !tableMap.map[baseName] = (tableMap.version, result);
+    context.setGlobal("TableMap", tableMap);
+    result
+  }
+}
+
+fun getLatestDirDescr(
+  context: mutable SKFS.Context,
+  dirDescr: DirDescr,
+): DirDescr {
+  getLatestDescr(context, dirDescr) match {
+  | IndexDescr _ -> invariant_violation("Was not expecting an index")
+  | x @ DirDescr _ -> x
+  }
+}
+
+fun getLatestIndexDescr(
+  context: mutable SKFS.Context,
+  indexDescr: IndexDescr,
+): IndexDescr {
+  getLatestDescr(context, indexDescr) match {
+  | DirDescr _ -> invariant_violation("Was not expecting a table")
+  | x @ IndexDescr _ -> x
+  }
 }
 
 /*****************************************************************************/
@@ -339,14 +463,12 @@ fun updateIsFromIgnoredSource(
 extension class Index extends SKFS.File
 
 class IndexDescr{
-  name: Name,
-  dirName: SKFS.DirName,
   tableName: Name,
   tableDirName: SKFS.DirName,
   fields: Array<(Int, IKind, Type)>,
   unique: Bool,
   text: ?String,
-} extends SKFS.File uses Orderable {
+} extends SKFS.File, Descr uses Orderable {
   fun compare(y: IndexDescr): Order {
     this.name.compare(y.name)
   }
@@ -433,14 +555,15 @@ fun getTable(
   options: Options,
   context: mutable SKFS.Context,
   pos: Int,
-  name: SKFS.BaseName,
+  name: Name,
 ): DirDescr {
+  sid = SKFS.SID::create(name.lower);
   tableDir = getTableDir(context);
-  tableDir.maybeGet(context, name) match {
+  tableDir.maybeGet(context, sid) match {
   | None() ->
     hviews = getViewsDir(context);
     viewsDir = context.unsafeGetEagerDir(hviews.dirName);
-    viewArray = viewsDir.getArrayRaw(name);
+    viewArray = viewsDir.getArrayRaw(SKFS.SID(name.lower));
     if (viewArray.size() == 0) {
       error(pos, "Table '" + name + "' does not exist")
     } else {
@@ -461,60 +584,7 @@ fun getTable(
       };
       dirDescr
     }
-  | Some(dirDescr) ->
-    context.getGlobal("TableMap") match {
-    | None() -> dirDescr
-    | Some(tableMapFile) ->
-      tableMap = TableMap::fromFile(tableMapFile);
-      oldDescr = tableMap.map.maybeGet(name) match {
-      | None() -> dirDescr
-      | Some((version, descr)) if (version == tableMap.version) -> return descr
-      | Some((_, x)) -> x
-      };
-      oldDirName = oldDescr.dirName;
-      oldDir = context.unsafeGetEagerDir(oldDirName);
-      nextName = SKFS.DirName::create(
-        "/next/" + dirDescr.name + "/" + tableMap.version.value + "/",
-      );
-      sinkName = SKFS.DirName::create(
-        "/sink/" + dirDescr.name + "/" + tableMap.version.value + "/",
-      );
-      dir = SKFS.EagerDir{
-        time => context.timeStamp(),
-        dirName => nextName,
-        input => true,
-        fixedData => oldDir.fixedData,
-        data => oldDir.data,
-        totalSize => oldDir.totalSize,
-        creator => context.currentArrow(),
-        reallyRemove => false,
-      };
-      context.setDir(dir.dirName, dir);
-      limit = context.tick;
-      _ = SKFS.EagerDir::apply(
-        context,
-        oldDirName,
-        sinkName,
-        (context, _writer, key, _valueIter) ~> {
-          entries = mutable Vector[];
-          for (srcValue in (context.unsafeGetEagerDir(
-            oldDirName,
-          )).unsafeGetAllDataIterAfter(limit, key)) {
-            (_, source, writer, values) = srcValue;
-            entries.push((key, (source.path(), writer.path(), values)));
-          };
-          inputDir = context.unsafeGetEagerDir(nextName);
-          inputDir.writeArraySourceMany(context, entries.iterator());
-        },
-        None(),
-        None(),
-        true,
-      );
-      result = dirDescr with {dirName => nextName};
-      !tableMap.map[name] = (tableMap.version, result);
-      context.setGlobal("TableMap", tableMap);
-      result
-    }
+  | Some(dirDescr) -> getLatestDirDescr(context, dirDescr)
   }
 }
 

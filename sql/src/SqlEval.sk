@@ -380,7 +380,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         select = compiler.compileSelect(context, selectAst, true);
         selectDir = evalSelect(context, select, None());
         updateTableMap(context);
-        table = getTable(this.options, context, pos, baseName);
+        table = getTable(this.options, context, pos, name);
         dir = getDir(table);
         sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
         sinkDirName = SKFS.DirName::create(sinkName);
@@ -411,7 +411,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         None()
 
       | IValues(vals) ->
-        table = getTable(this.options, context, pos, baseName);
+        table = getTable(this.options, context, pos, name);
         this.insert(
           context,
           pos,
@@ -562,7 +562,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       };
       deleteDir = this.delete(context, pos, name, where, sets);
       updateTableMap(context);
-      table = getTable(this.options, context, pos, baseName);
+      table = getTable(this.options, context, pos, name);
       dir = getDir(table);
       sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
       sinkDirName = SKFS.DirName::create(sinkName);
@@ -624,8 +624,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     selectHandle = evalSelect(context, select, None());
     selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
     updateTableMap(context);
-    baseName = SKFS.SID::create(name.lower);
-    table = getTable(this.options, context, pos, baseName);
+    table = getTable(this.options, context, pos, name);
     inputDir = getDir(table);
     if (table.windowSize is Some _) {
       print_error("Error: cannot delete from a window");
@@ -1219,14 +1218,6 @@ fun evalWithContext(
   evaluator = Evaluator{options, user};
   evaluator.stmt(context, stmt, inTransaction);
 }
-
-value class Version(value: Int) uses Orderable
-
-class TableMap{
-  startTick: SKFS.Tick,
-  version: Version,
-  map: SortedMap<SKFS.BaseName, (Version, DirDescr)>,
-} extends SKFS.File
 
 fun extractSql(chars: Buffer): void {
   lex = Lexer(0, chars);

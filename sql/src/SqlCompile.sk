@@ -517,10 +517,7 @@ mutable class Compiler{
     name: FromName,
   ): DirDescr {
     name match {
-    | FName(tableName) ->
-      tableSID = SKFS.SID::create(tableName.lower);
-      table = getTable(this.options, context, this.pos, tableSID);
-      table
+    | FName(tableName) -> getTable(this.options, context, this.pos, tableName)
 
     | FQuery(select @ Select _) ->
       cselect = this.compileSelect(context, select, false);
@@ -2129,6 +2126,9 @@ mutable class Compiler{
       | _ -> return LookUps[]
       };
       table = tables[tableNbr];
+      !table = table with {
+        dirName => SKFS.DirName::create("/" + table.name.lower + "/"),
+      };
       indexEntry = makeIndexEntry(table.dirName, colNbr);
       indexTable = getIndexByColNbr(this.options, context);
       indexes = indexTable.getArray(context, indexEntry);
@@ -2152,6 +2152,7 @@ mutable class Compiler{
         cols = SortedA[
           Col(lookUpColNbr, Array[(ColOp::create(op, value))], unique),
         ];
+        !index = getLatestIndexDescr(context, index);
         LookUp{index, tableNbr, cols}
       });
       LookUps::createFromItems(lookUps)
