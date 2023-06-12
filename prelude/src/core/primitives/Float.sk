@@ -122,15 +122,14 @@ fun floatToString(value: Float): String {
   (integralPart, optDecimalPart, optExponent) = splitFloat(value);
   !str = `${str}${integralPart}`;
   optDecimalPart match {
-  | None() ->
-    if (optExponent == None()) {
-      !str = `${str}.0`
-    }
+  | None() -> !str = `${str}.0`
   | Some(decimalPart) -> !str = `${str}${decimalsPart(decimalPart)}`
   };
   optExponent.each(exponent ->
-    if (exponent < 0) {
+    if (exponent < -9) {
       !str = `${str}e${exponent}`
+    } else if (exponent < 0) {
+      !str = `${str}e-0${-exponent}`
     } else {
       !str = `${str}e+${exponent}`
     }
@@ -138,7 +137,7 @@ fun floatToString(value: Float): String {
   str;
 }
 
-fun splitFloat(value: Float): (UInt32, ?UInt32, ?Int16) {
+fun splitFloat(value: Float): (Int, ?UInt32, ?Int16) {
   (norm_value, exponent) = normalizeFloat(value);
   integralPart = norm_value.toInt();
   remainder = norm_value - integralPart.toFloat();
@@ -160,15 +159,15 @@ fun splitFloat(value: Float): (UInt32, ?UInt32, ?Int16) {
     }
   };
   (
-    UInt32::truncate(integralPart),
+    integralPart,
     if (decimalPart > 0) Some(UInt32::truncate(decimalPart)) else None(),
     if (exponent != zInt16) Some(exponent) else None(),
   )
 }
 
 fun normalizeFloat(value: Float): (Float, Int16) {
-  positiveExpThreshold = 1e7;
-  negativeExpThreshold = 1e-5;
+  positiveExpThreshold = 1e15;
+  negativeExpThreshold = 1e-4;
   exponent = 0;
   if (value >= positiveExpThreshold) {
     if (value >= 1e256) {
@@ -208,7 +207,7 @@ fun normalizeFloat(value: Float): (Float, Int16) {
       !exponent = exponent + 1;
     }
   };
-  if (value > 0.0 && value <= negativeExpThreshold) {
+  if (value > 0.0 && value < negativeExpThreshold) {
     if (value < 1e-255) {
       !value = value * 1e256;
       !exponent = exponent - 256;
