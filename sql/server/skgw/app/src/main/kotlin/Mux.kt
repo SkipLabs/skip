@@ -16,6 +16,8 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Arrays
 import java.util.Base64
+import java.util.Queue
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -152,7 +154,13 @@ class MuxedSocket(
 
   private val mutex: ReadWriteLock = ReentrantReadWriteLock()
   var authenticatedWith: AuthWith? = null
-    get() = field
+    get() =
+        try {
+          mutex.readLock().lock()
+          field
+        } finally {
+          mutex.readLock().unlock()
+        }
   private var state: State = State.IDLE
   private var nextStream: UInt = 2u
   private var clientStreamWatermark: UInt = 0u
@@ -161,7 +169,13 @@ class MuxedSocket(
 
   data class MuxedSocketEnd(val error: Boolean, val code: UInt?, val msg: String?)
   var endState: MuxedSocketEnd? = null
-    get() = field
+    get() =
+        try {
+          mutex.readLock().lock()
+          field
+        } finally {
+          mutex.readLock().unlock()
+        }
 
   private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
   private val timeout =
@@ -777,6 +791,12 @@ class Stream(
     CLOSED,
   }
 
+  private var observers: Queue<(State) -> Unit> = ConcurrentLinkedQueue()
+
+  data class StreamEnd(val error: Boolean, val code: UInt?, val msg: String?)
+  var endState: AtomicReference<StreamEnd> = AtomicReference(null)
+    get() = field
+
   // user-facing interface /////////////////////////////////////////////////////
 
   fun close() {
@@ -784,11 +804,12 @@ class Stream(
       State.CLOSING,
       State.CLOSED -> {}
       State.OPEN -> {
-        state.set(State.CLOSING)
+        setState(State.CLOSING)
         socket.streamClose(streamId, nowClosed = false)
       }
       State.CLOSEWAIT -> {
-        state.set(State.CLOSED)
+        endState.set(StreamEnd(false, null, null))
+        setState(State.CLOSED)
         socket.streamClose(streamId, nowClosed = true)
       }
       null -> throw RuntimeException()
@@ -796,14 +817,15 @@ class Stream(
   }
 
   fun error(errorCode: UInt, msg: String) {
+    endState.set(StreamEnd(true, errorCode, msg))
     when (state.get()) {
       State.CLOSING,
       State.CLOSED -> {
-        state.set(State.CLOSED)
+        setState(State.CLOSED)
       }
       State.OPEN,
       State.CLOSEWAIT -> {
-        state.set(State.CLOSED)
+        setState(State.CLOSED)
         socket.streamError(streamId, errorCode, msg)
       }
       null -> throw RuntimeException()
@@ -822,6 +844,10 @@ class Stream(
     }
   }
 
+  fun observeLifecycle(callback: (State) -> Unit) {
+    observers.add(callback)
+  }
+
   // interface used by MuxedSocket /////////////////////////////////////////////
 
   fun onStreamClose(): Boolean {
@@ -829,12 +855,13 @@ class Stream(
       State.CLOSED -> true
       State.CLOSEWAIT -> false
       State.CLOSING -> {
-        state.set(State.CLOSED)
+        endState.set(StreamEnd(false, null, null))
+        setState(State.CLOSED)
         onClose()
         true
       }
       State.OPEN -> {
-        state.set(State.CLOSEWAIT)
+        setState(State.CLOSEWAIT)
         onClose()
         false
       }
@@ -848,7 +875,8 @@ class Stream(
       State.CLOSEWAIT,
       State.CLOSING,
       State.OPEN -> {
-        state.set(State.CLOSED)
+        endState.set(StreamEnd(true, errorCode, msg))
+        setState(State.CLOSED)
         onError(errorCode, msg)
       }
       null -> throw RuntimeException()
@@ -864,6 +892,15 @@ class Stream(
         onData(data)
       }
       null -> throw RuntimeException()
+    }
+  }
+
+  // internal //////////////////////////////////////////////////////////////////
+
+  fun setState(s: State) {
+    state.set(s)
+    for (observer in observers) {
+      observer(s)
     }
   }
 }
