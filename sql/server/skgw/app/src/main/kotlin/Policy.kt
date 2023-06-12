@@ -1,5 +1,6 @@
 package io.skiplabs.skgw
 
+import java.io.BufferedWriter
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
@@ -17,9 +18,14 @@ interface ServerPolicy {
   // you can then hook in to socket events by using socket.observeLifecycle
   fun notifySocketCreated(socket: MuxedSocket, db: String)
 
-  // short-circuits message handling if returns false. may manipulate
-  // the stream - e.g. send/close/error it.
-  fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean
+  // short-circuits message receive if returns false. the message is
+  // just dropped. may manipulate the stream - e.g. send/close/error
+  // it.
+  fun shouldDeliverMessage(request: ProtoMessage, stream: OrchestrationStream, db: String): Boolean
+
+  // short-circuits message sending if returns false. the message is
+  // just dropped. may manipulate the stream - e.g. send/close/error.
+  fun shouldEmitMessage(msg: ProtoMessage, stream: OrchestrationStream, db: String): Boolean
 }
 
 // no policy. useful for subclasses that want to define partial policy
@@ -31,7 +37,19 @@ open class NullServerPolicy : ServerPolicy {
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {}
 
-  override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    return true
+  }
+
+  override fun shouldEmitMessage(
+      msg: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
     return true
   }
 }
@@ -189,8 +207,12 @@ class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerCon
     }
   }
 
-  override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
-    val socket = stream.socket
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    val socket = stream.stream.socket
     val tokenBucket = openConns.get(socket)
     if (tokenBucket == null) {
       // something went really wrong
@@ -227,14 +249,18 @@ class ThrottleDataTransferPerConnection(
     }
   }
 
-  override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
     // for simplicity we allow a burst but then throttle to average
     // out the transfer rate. could always combine with a policy that
     // rejects single requests that are too large
 
     when (request) {
       is ProtoData -> {
-        val socket = stream.socket
+        val socket = stream.stream.socket
         val bucket = openConns.get(socket)
         if (bucket == null) {
           // something went really wrong
@@ -274,15 +300,115 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
     System.err.println("Socket created: ${socket} for db ${db}.")
     socket.observeLifecycle { state ->
-      System.err.println("Socket ${socket} moved to state ${state}")
+      if (state == MuxedSocket.State.AUTH_RECV) {
+        System.err.println("User authenticated on ${socket} with: ${socket.authenticatedWith}")
+      }
+      System.err.println("Socket ${socket} moved to state ${state} end state: ${socket.endState}")
     }
     decorated.notifySocketCreated(socket, db)
   }
 
-  override fun shouldHandleMessage(request: ProtoMessage, stream: Stream): Boolean {
-    val shouldHandle = decorated.shouldHandleMessage(request, stream)
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    val shouldHandle = decorated.shouldDeliverMessage(request, stream, db)
     val phrase = if (shouldHandle) "accepted" else "rejected"
     System.err.println("Request ${request} on stream ${stream} was ${phrase}")
+    val muxstream = stream.stream
+    muxstream.observeLifecycle { state ->
+      System.err.println(
+          "Stream ${stream} initiated by request ${request} moved to state ${state} end state: ${muxstream.endState.get()}")
+    }
     return shouldHandle
+  }
+
+  override fun shouldEmitMessage(
+      msg: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    val shouldEmit = decorated.shouldEmitMessage(msg, stream, db)
+    val phrase = if (shouldEmit) "allowed" else "blocked"
+    System.err.println("Sending ${msg} on stream ${stream} was ${phrase}")
+    return shouldEmit
+  }
+}
+
+class SkdbBackedEventLogger() : ServerPolicy {
+
+  private var stream: BufferedWriter? = null
+  init {
+    val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
+    val proc = skdb.sqlStream(OutputFormat.RAW)
+    stream = proc.outputStream.bufferedWriter()
+    stream?.write(
+        """CREATE TABLE IF NOT EXISTS
+             server_events (
+               t INTEGER,
+               db STRING,
+               user STRING,
+               event STRING,
+               metadata STRING
+             );""")
+    stream?.write("\nCOMMIT;\n")
+  }
+
+  private fun log(db: String, event: String, user: String? = null, metadata: String? = null) {
+    val t = Instant.now().getEpochSecond()
+    val u = if (user == null) "NULL" else "'${user}'"
+    val md = if (metadata == null) "NULL" else "'${metadata}'"
+    stream?.write("INSERT INTO server_events VALUES (${t}, '${db}', ${u}, '${event}', ${md});\n")
+    stream?.write("COMMIT;\n")
+    stream?.flush() // TODO: server interaction is currently infrequent. as it rises, remove this.
+  }
+
+  override fun shouldAcceptConnection(db: String): Boolean {
+    log(db, "conn_attempt")
+    return true
+  }
+
+  override fun notifySocketCreated(socket: MuxedSocket, db: String) {
+    socket.observeLifecycle { state ->
+      if (state == MuxedSocket.State.AUTH_RECV) {
+        log(db, "conn_established", socket.authenticatedWith?.msg?.accessKey)
+      }
+    }
+  }
+
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    val user = stream.stream.socket.authenticatedWith?.msg?.accessKey
+    when (request) {
+      is ProtoQuery -> {
+        log(db, "query", user)
+      }
+      is ProtoRequestTail -> {
+        log(db, "establish_tail", user, request.table)
+      }
+      is ProtoPushPromise -> {
+        log(db, "establish_push", user, request.table)
+      }
+      is ProtoCreateDb -> {
+        log(db, "create-db", user, request.name)
+      }
+      is ProtoCreateUser -> {
+        log(db, "create-user", user)
+      }
+      else -> {}
+    }
+    return true
+  }
+
+  override fun shouldEmitMessage(
+      msg: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    return true
   }
 }

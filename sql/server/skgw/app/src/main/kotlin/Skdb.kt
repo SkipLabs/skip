@@ -70,6 +70,21 @@ class Skdb(val name: String, private val dbPath: String) {
     return blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath, format.flag), stmts)
   }
 
+  fun sqlStream(format: OutputFormat): Process {
+    val pb =
+        ProcessBuilder(
+            SKDB_PROC,
+            "--data",
+            dbPath,
+            format.flag)
+
+    // TODO: for hacky debug
+    pb.redirectError(ProcessBuilder.Redirect.INHERIT)
+
+    val proc = pb.start()
+    return proc
+  }
+
   fun replicationId(deviceUuid: String): ProcessOutput {
     return blockingRun(ProcessBuilder(SKDB_PROC, "replication-id", deviceUuid, "--data", dbPath))
   }
