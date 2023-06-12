@@ -1,5 +1,6 @@
 package io.skiplabs.skgw
 
+import java.io.BufferedWriter
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
@@ -337,10 +338,12 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
 
 class SkdbBackedEventLogger() : ServerPolicy {
 
-  private val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
-
+  private var stream: BufferedWriter? = null
   init {
-    skdb.sql(
+    val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
+    val proc = skdb.sqlStream(OutputFormat.RAW)
+    stream = proc.outputStream.bufferedWriter()
+    stream?.write(
         """CREATE TABLE IF NOT EXISTS
              server_events (
                t INTEGER,
@@ -348,17 +351,17 @@ class SkdbBackedEventLogger() : ServerPolicy {
                user STRING,
                event STRING,
                metadata STRING
-             );""",
-        OutputFormat.RAW)
+             );""")
+    stream?.write("\nCOMMIT;\n")
   }
 
   private fun log(db: String, event: String, user: String? = null, metadata: String? = null) {
     val t = Instant.now().getEpochSecond()
     val u = if (user == null) "NULL" else "'${user}'"
     val md = if (metadata == null) "NULL" else "'${metadata}'"
-    skdb.sql(
-        "INSERT INTO server_events VALUES (${t}, '${db}', ${u}, '${event}', ${md});",
-        OutputFormat.RAW)
+    stream?.write("INSERT INTO server_events VALUES (${t}, '${db}', ${u}, '${event}', ${md});\n")
+    stream?.write("COMMIT;\n")
+    stream?.flush() // TODO: server interaction is currently infrequent. as it rises, remove this.
   }
 
   override fun shouldAcceptConnection(db: String): Boolean {
