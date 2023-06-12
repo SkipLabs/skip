@@ -439,9 +439,7 @@ fun execDump(args: Cli.ParseResults, options: SKSQL.Options): void {
 }
 
 fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
-  tableNameUpper = args.getString("table");
-  tableName = tableNameUpper.lowercase();
-  name = SKFS.SID::create(tableName);
+  name = SKSQL.Name::create(args.getString("table"));
   SKSQL.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
@@ -779,8 +777,7 @@ fun execReplicationId(args: Cli.ParseResults, options: SKSQL.Options): void {
 
 fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
-  tableName = args.getString("table").lowercase();
-  name = SKFS.SID::create(tableName);
+  name = SKSQL.Name::create(args.getString("table"));
   SKSQL.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
