@@ -71,12 +71,7 @@ class Skdb(val name: String, private val dbPath: String) {
   }
 
   fun sqlStream(format: OutputFormat): Process {
-    val pb =
-        ProcessBuilder(
-            SKDB_PROC,
-            "--data",
-            dbPath,
-            format.flag)
+    val pb = ProcessBuilder(SKDB_PROC, "--data", dbPath, format.flag)
 
     // TODO: for hacky debug
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -193,6 +188,61 @@ class Skdb(val name: String, private val dbPath: String) {
     // don't like having to allocate 4x here.
     val output = proc.inputStream.bufferedReader()
 
+    val t =
+        Thread({
+          output.forEachLine {
+            val encoder = StandardCharsets.UTF_8.newEncoder()
+            val buf = ByteBuffer.allocate(it.length * 4 + 1)
+            var res = encoder.encode(CharBuffer.wrap(it), buf, true)
+            if (!res.isUnderflow()) {
+              res.throwException()
+            }
+            res = encoder.flush(buf)
+            if (!res.isUnderflow()) {
+              res.throwException()
+            }
+            buf.put(0x0A) // add back newline
+            callback(buf.flip(), it.startsWith(":"))
+          }
+          closed()
+        })
+    t.start()
+
+    return proc
+  }
+
+  fun tailInternalPrivacyUnawareDANGEROUS(
+      table: String,
+      filter: String?,
+      callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
+      closed: () -> Unit,
+  ): Process {
+    val connection =
+        blockingRun(ProcessBuilder(SKDB_PROC, "subscribe", table, "--data", dbPath)).decode()
+    val pb =
+        ProcessBuilder(
+            SKDB_PROC,
+            "tail",
+            "--data",
+            dbPath,
+            "--format=csv",
+            connection.trim(),
+            "--follow")
+
+    if (filter != null && !filter.isEmpty()) {
+      pb.command().add(filter)
+    }
+
+    // TODO: for hacky debug
+    pb.redirectError(ProcessBuilder.Redirect.INHERIT)
+    val proc = pb.start()
+
+    // TODO: working with text currently to detect checkpoint flush
+    // markers. this should change as it is expensive. I particularly
+    // don't like having to allocate 4x here.
+    val output = proc.inputStream.bufferedReader()
+
+    // TODO: this is duplicated
     val t =
         Thread({
           output.forEachLine {
