@@ -211,59 +211,36 @@ class Skdb(val name: String, private val dbPath: String) {
     return proc
   }
 
-  fun tailInternalPrivacyUnawareDANGEROUS(
+  fun notify(
       table: String,
-      filter: String?,
-      callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
-      closed: () -> Unit,
-  ): Process {
-    val connection =
-        blockingRun(ProcessBuilder(SKDB_PROC, "subscribe", table, "--data", dbPath)).decode()
-    val pb =
-        ProcessBuilder(
-            SKDB_PROC,
-            "tail",
-            "--data",
-            dbPath,
-            "--format=csv",
-            connection.trim(),
-            "--follow")
+      callback: () -> Unit,
+  ) {
+    val notifyFile = File.createTempFile("notify", table)
+    // TODO: notifyFile.deleteOnExit() -- need to unsubscribe first
 
-    if (filter != null && !filter.isEmpty()) {
-      pb.command().add(filter)
+    val connection =
+        blockingRun(
+            ProcessBuilder(
+                SKDB_PROC, "subscribe", table, "--data", dbPath, "--notify", notifyFile.path))
+
+    if (!connection.exitSuccessfully()) {
+      throw RuntimeException("Notify failed")
     }
 
-    // TODO: for hacky debug
-    pb.redirectError(ProcessBuilder.Redirect.INHERIT)
-    val proc = pb.start()
-
-    // TODO: working with text currently to detect checkpoint flush
-    // markers. this should change as it is expensive. I particularly
-    // don't like having to allocate 4x here.
-    val output = proc.inputStream.bufferedReader()
-
-    // TODO: this is duplicated
+    var tick = ""
+    // super dumb right now. just poll the file.
     val t =
         Thread({
-          output.forEachLine {
-            val encoder = StandardCharsets.UTF_8.newEncoder()
-            val buf = ByteBuffer.allocate(it.length * 4 + 1)
-            var res = encoder.encode(CharBuffer.wrap(it), buf, true)
-            if (!res.isUnderflow()) {
-              res.throwException()
+          while (true) {
+            val now = Files.readString(notifyFile.toPath())
+            if (now != tick) {
+              tick = now
+              callback()
             }
-            res = encoder.flush(buf)
-            if (!res.isUnderflow()) {
-              res.throwException()
-            }
-            buf.put(0x0A) // add back newline
-            callback(buf.flip(), it.startsWith(":"))
+            Thread.sleep(1000)
           }
-          closed()
         })
     t.start()
-
-    return proc
   }
 
   fun privateKeyAsStored(user: String): ByteArray {
