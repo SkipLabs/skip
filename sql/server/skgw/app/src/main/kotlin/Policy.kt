@@ -65,9 +65,10 @@ class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy
   override fun shouldAcceptConnection(db: String): Boolean {
     val n = n.get()
     // params are null: doesn't make sense to specialise this
-    val acceptable = n < maxConns.get(accessKey = null, db = null)
+    val limit = maxConns.get(accessKey = null, db = null)
+    val acceptable = n < limit
     if (!acceptable) {
-      System.err.println("Rejecting conn as ${n} >= ${maxConns}")
+      System.err.println("Rejecting conn as ${n} >= ${limit}")
     }
     return acceptable
   }
@@ -418,6 +419,8 @@ class SkdbBackedEventLogger() : ServerPolicy {
 
 class Config() {
 
+  private data class Target(val accessKey: String?, val db: String?)
+
   inner class Value<T>(
       private val key: String,
       private val default: T,
@@ -425,10 +428,12 @@ class Config() {
       private val toT: (x: String) -> T,
   ) {
 
-    private val value: AtomicReference<T> = AtomicReference()
+    private val cache: MutableMap<Target, T> = ConcurrentHashMap()
 
     fun get(accessKey: String?, db: String?): T {
-      val v = value.get()
+      val target = Target(accessKey, db)
+
+      val v = cache.get(target)
       if (v != null) {
         return v
       }
@@ -440,16 +445,12 @@ class Config() {
           } else {
             toT(x)
           }
-      value.set(y)
+      cache.set(target, y)
       return y
     }
 
     fun invalidate() {
-      value.set(null)
-    }
-
-    override fun toString(): String {
-      return "Config.Value[value=${value.get()}]"
+      cache.clear()
     }
   }
 
