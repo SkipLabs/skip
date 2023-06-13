@@ -31,7 +31,7 @@ sql/js/dist/skdb-node.js: sql/js/dist/skdb.js sql/js/src/node_header.js
 	mkdir -p sql/js/dist
 	cat sql/js/src/node_header.js sql/js/dist/skdb.js \
 	| sed 's|let wasmModule =.*||g' \
-	| sed 's|let wasmBuffer =.*|let wasmBuffer = fs.readFileSync("dist/skdb.wasm");|g'> $@
+	| sed 's|let wasmBuffer =.*|let wasmBuffer = fs.readFileSync(new URL("./skdb.wasm", import.meta.url));|g'> $@
 
 sql/js/dist/index.html: sql/js/tests/index.html
 	mkdir -p sql/js/dist
