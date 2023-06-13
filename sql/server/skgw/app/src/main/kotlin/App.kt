@@ -387,7 +387,7 @@ fun main(args: Array<String>) {
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
   val config = Config()
-  val policy = LimitGlobalConnections(config.getInt("global_conns", 10000))
+  val policy = LimitConnectionsPerUser(config.getInt("user_conns", 2))
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)

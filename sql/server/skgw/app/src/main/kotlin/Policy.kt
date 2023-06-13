@@ -110,7 +110,7 @@ class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() 
   }
 }
 
-class LimitConnectionsPerUser(val maxConnsPerUser: UInt) : NullServerPolicy() {
+class LimitConnectionsPerUser(val maxConns: Config.Value<Int>) : NullServerPolicy() {
 
   data class DbUser(val user: String, val db: String)
 
@@ -131,7 +131,8 @@ class LimitConnectionsPerUser(val maxConnsPerUser: UInt) : NullServerPolicy() {
           }
           MuxedSocket.State.AUTH_RECV -> {
             val n = openConns.merge(key, 1) { oldvalue, _ -> oldvalue + 1 }
-            if (n != null && n > maxConnsPerUser.toInt()) {
+            val limit = maxConns.get(user, db)
+            if (n != null && n > limit) {
               socket.errorSocket(2000u, "User connection limit reached")
             }
           }
