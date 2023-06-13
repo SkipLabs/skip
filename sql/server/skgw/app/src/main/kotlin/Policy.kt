@@ -469,17 +469,11 @@ class Config() {
       );""",
         OutputFormat.RAW)
 
-    skdb.tailInternalPrivacyUnawareDANGEROUS(
-        "server_config",
-        null,
-        { _, flush ->
-          if (flush) {
-            onChange()
-          }
-        },
-        {
-          // TODO: kill server or restart this tail
-        })
+    skdb.notify("server_config") {
+      for (value in handouts) {
+        value.get()?.invalidate()
+      }
+    }
   }
 
   private fun getSerialisedVal(
@@ -555,11 +549,5 @@ class Config() {
     val v = Value<String>(key, default, column = "strVal", String::toString)
     handouts.add(WeakReference(v))
     return v
-  }
-
-  fun onChange() {
-    for (value in handouts) {
-      value.get()?.invalidate()
-    }
   }
 }
