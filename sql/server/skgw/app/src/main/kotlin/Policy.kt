@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
@@ -87,7 +86,7 @@ class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy
   }
 }
 
-class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() {
+class LimitConnectionsPerDb(val maxConns: Config.Value<Int>) : NullServerPolicy() {
 
   val openConns: ConcurrentMap<String, Int> = ConcurrentHashMap()
 
@@ -104,7 +103,8 @@ class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() 
       }
     }
 
-    if (n > maxConnsPerDatabase.toInt()) {
+    val limit = maxConns.get(accessKey = null, db = db)
+    if (n > limit) {
       socket.errorSocket(2000u, "Database connection limit reached")
     }
   }
@@ -192,13 +192,18 @@ class LeakyBucket(val drainRatePerSecond: Double) {
   }
 }
 
-class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerConn: UInt) :
-    NullServerPolicy() {
+class RateLimitRequestsPerConnection(
+    val maxQpsPerConn: Config.Value<Double>,
+    val maxSpikePerConn: Config.Value<Int>
+) : NullServerPolicy() {
 
   val openConns: ConcurrentMap<MuxedSocket, TokenBucket> = ConcurrentHashMap()
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
-    openConns.put(socket, TokenBucket(maxQpsPerConn.toDouble(), maxSpikePerConn))
+    // the token bucket params are fixed for the duration of the socket
+    val maxQps = maxQpsPerConn.get(accessKey = null, db = db)
+    val maxSpike = maxSpikePerConn.get(accessKey = null, db = db)
+    openConns.put(socket, TokenBucket(maxQps, maxSpike.toUInt()))
     socket.observeLifecycle { state ->
       when (state) {
         MuxedSocket.State.IDLE,
@@ -233,14 +238,16 @@ class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerCon
 }
 
 class ThrottleDataTransferPerConnection(
-    val maxBytesPerSecPerConn: UInt,
+    val maxBytesPerSecPerConn: Config.Value<Int>,
     val scheduledExecutor: ScheduledExecutorService,
 ) : NullServerPolicy() {
 
   val openConns: ConcurrentMap<MuxedSocket, LeakyBucket> = ConcurrentHashMap()
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
-    openConns.put(socket, LeakyBucket(maxBytesPerSecPerConn.toDouble()))
+    // the leaky bucket params are fixed for the duration of the socket
+    val maxBytesPerSec = maxBytesPerSecPerConn.get(accessKey = null, db = db)
+    openConns.put(socket, LeakyBucket(maxBytesPerSec.toDouble()))
     socket.observeLifecycle { state ->
       when (state) {
         MuxedSocket.State.IDLE,
@@ -429,6 +436,8 @@ class Config() {
       private val toT: (x: String) -> T,
   ) {
 
+    // no eviction. this amounts to lazily loading in to memory all of
+    // the rules, which will likely be small
     private val cache: MutableMap<Target, T> = ConcurrentHashMap()
 
     fun get(accessKey: String?, db: String?): T {
