@@ -1,13 +1,17 @@
 package io.skiplabs.skgw
 
 import java.io.BufferedWriter
+import java.lang.ref.WeakReference
 import java.time.Duration
 import java.time.Instant
+import java.util.Queue
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
@@ -54,15 +58,14 @@ open class NullServerPolicy : ServerPolicy {
   }
 }
 
-val MAX_CONNECTIONS: UInt = 10_000u
-
-class LimitGlobalConnections(val maxConns: UInt = MAX_CONNECTIONS) : NullServerPolicy() {
+class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy() {
 
   val n: AtomicInteger = AtomicInteger(0)
 
   override fun shouldAcceptConnection(db: String): Boolean {
     val n = n.get()
-    val acceptable = n < maxConns.toInt()
+    // params are null: doesn't make sense to specialise this
+    val acceptable = n < maxConns.get(accessKey = null, db = null)
     if (!acceptable) {
       System.err.println("Rejecting conn as ${n} >= ${maxConns}")
     }
@@ -410,5 +413,153 @@ class SkdbBackedEventLogger() : ServerPolicy {
       db: String
   ): Boolean {
     return true
+  }
+}
+
+class Config() {
+
+  inner class Value<T>(
+      private val key: String,
+      private val default: T,
+      private val column: String,
+      private val toT: (x: String) -> T,
+  ) {
+
+    private val value: AtomicReference<T> = AtomicReference()
+
+    fun get(accessKey: String?, db: String?): T {
+      val v = value.get()
+      if (v != null) {
+        return v
+      }
+
+      val x = getSerialisedVal(key, accessKey, db, column)
+      val y =
+          if (x == null) {
+            default
+          } else {
+            toT(x)
+          }
+      value.set(y)
+      return y
+    }
+
+    fun invalidate() {
+      value.set(null)
+    }
+
+    override fun toString(): String {
+      return "Config.Value[value=${value.get()}]"
+    }
+  }
+
+  private val handouts: Queue<WeakReference<Value<*>>> = ConcurrentLinkedQueue()
+  private val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
+
+  init {
+    skdb.sql(
+        """
+      CREATE TABLE IF NOT EXISTS server_config (
+        key STRING,
+        user STRING,
+        db STRING,
+        intVal INTEGER,
+        dblVal FLOAT,
+        strVal STRING
+      );""",
+        OutputFormat.RAW)
+
+    skdb.tailInternalPrivacyUnawareDANGEROUS(
+        "server_config",
+        null,
+        { _, flush ->
+          if (flush) {
+            onChange()
+          }
+        },
+        {
+          // TODO: kill server or restart this tail
+        })
+  }
+
+  private fun getSerialisedVal(
+      key: String,
+      accessKey: String?,
+      db: String?,
+      column: String
+  ): String? {
+    val uExpr = if (accessKey == null) "is NULL" else "= '${accessKey}'"
+    val dExpr = if (db == null) "is NULL" else "= '${db}'"
+
+    var row =
+        skdb.sql(
+            """SELECT ${column}
+           FROM server_config
+           WHERE key = '${key}'
+           AND db ${dExpr}
+           AND user ${uExpr}
+           LIMIT 1;""",
+            OutputFormat.RAW)
+
+    var result = row.decodeOrThrow().trim()
+    if (result != "") {
+      return result
+    }
+
+    row =
+        skdb.sql(
+            """SELECT ${column}
+           FROM server_config
+           WHERE key = '${key}'
+           AND db ${dExpr}
+           AND user is NULL
+           LIMIT 1;""",
+            OutputFormat.RAW)
+
+    result = row.decodeOrThrow().trim()
+    if (result != "") {
+      return result
+    }
+
+    row =
+        skdb.sql(
+            """SELECT ${column}
+           FROM server_config
+           WHERE key = '${key}'
+           AND db is NULL
+           AND user is NULL
+           LIMIT 1;""",
+            OutputFormat.RAW)
+
+    result = row.decodeOrThrow().trim()
+    if (result != "") {
+      return result
+    }
+
+    return null
+  }
+
+  fun getInt(key: String, default: Int): Value<Int> {
+    val v = Value<Int>(key, default, column = "intVal", String::toInt)
+    handouts.add(WeakReference(v))
+    return v
+  }
+
+  fun getDouble(key: String, default: Double): Value<Double> {
+    val v = Value<Double>(key, default, column = "dblVal", String::toDouble)
+    handouts.add(WeakReference(v))
+    return v
+  }
+
+  fun getString(key: String, default: String): Value<String> {
+    val v = Value<String>(key, default, column = "strVal", String::toString)
+    handouts.add(WeakReference(v))
+    return v
+  }
+
+  fun onChange() {
+    for (value in handouts) {
+      value.get()?.invalidate()
+    }
   }
 }
