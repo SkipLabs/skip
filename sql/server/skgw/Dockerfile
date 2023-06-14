@@ -7,6 +7,7 @@ RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
     sdk install gradle && \
     sdk install java 19.0.1-oracle"
 
+RUN npm install -g typescript
 RUN make && rm sql/target/state.db && rm sql/target/wasm32-unknown-unknown/state.db
 
 CMD ./sql/server/deploy/start.sh
