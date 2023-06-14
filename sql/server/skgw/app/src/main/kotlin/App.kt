@@ -388,7 +388,18 @@ fun main(args: Array<String>) {
 
   val config = Config()
   val logger = SkdbBackedLogger()
-  val policy = LimitConnectionsPerUser(logger, config.getInt("user_conns", 2))
+  val policy =
+      EventAccountant(logger) chain
+          ThrottleDataTransferPerConnection(
+              logger, config.getInt("max_conn_byte_rate", 100 * 1024 * 1024), taskPool) chain
+          RateLimitRequestsPerConnection(
+              logger,
+              config.getDouble("max_conn_qps", 5.0),
+              config.getInt("max_conn_req_spike", 5)) chain
+          LimitConnectionsPerUser(logger, config.getInt("user_conns", 2)) chain
+          LimitConnectionsPerDb(logger, config.getInt("db_conns", 10)) chain
+          LimitGlobalConnections(logger, config.getInt("global_conns", 10_000))
+
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)
