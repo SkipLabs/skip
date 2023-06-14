@@ -57,7 +57,12 @@ open class NullServerPolicy : ServerPolicy {
   }
 }
 
-class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy() {
+interface Logger {
+  fun log(db: String, event: String, user: String? = null, metadata: String? = null)
+}
+
+class LimitGlobalConnections(val logger: Logger, val maxConns: Config.Value<Int>) :
+    NullServerPolicy() {
 
   val n: AtomicInteger = AtomicInteger(0)
 
@@ -67,7 +72,8 @@ class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy
     val limit = maxConns.get(accessKey = null, db = null)
     val acceptable = n < limit
     if (!acceptable) {
-      System.err.println("Rejecting conn as ${n} >= ${limit}")
+      logger.log(
+          db, "global_max_conn", user = null, metadata = "Rejecting conn as ${n} >= ${limit}")
     }
     return acceptable
   }
@@ -86,7 +92,8 @@ class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy
   }
 }
 
-class LimitConnectionsPerDb(val maxConns: Config.Value<Int>) : NullServerPolicy() {
+class LimitConnectionsPerDb(val logger: Logger, val maxConns: Config.Value<Int>) :
+    NullServerPolicy() {
 
   val openConns: ConcurrentMap<String, Int> = ConcurrentHashMap()
 
@@ -105,12 +112,14 @@ class LimitConnectionsPerDb(val maxConns: Config.Value<Int>) : NullServerPolicy(
 
     val limit = maxConns.get(accessKey = null, db = db)
     if (n > limit) {
+      logger.log(db, "db_max_conn", user = null, metadata = "Rejecting conn as ${n} > ${limit}")
       socket.errorSocket(2000u, "Database connection limit reached")
     }
   }
 }
 
-class LimitConnectionsPerUser(val maxConns: Config.Value<Int>) : NullServerPolicy() {
+class LimitConnectionsPerUser(val logger: Logger, val maxConns: Config.Value<Int>) :
+    NullServerPolicy() {
 
   data class DbUser(val user: String, val db: String)
 
@@ -133,6 +142,11 @@ class LimitConnectionsPerUser(val maxConns: Config.Value<Int>) : NullServerPolic
             val n = openConns.merge(key, 1) { oldvalue, _ -> oldvalue + 1 }
             val limit = maxConns.get(user, db)
             if (n != null && n > limit) {
+              logger.log(
+                  db,
+                  "global_max_conn",
+                  user = user,
+                  metadata = "Rejecting conn as ${n} > ${limit}")
               socket.errorSocket(2000u, "User connection limit reached")
             }
           }
@@ -193,6 +207,7 @@ class LeakyBucket(val drainRatePerSecond: Double) {
 }
 
 class RateLimitRequestsPerConnection(
+    val logger: Logger,
     val maxQpsPerConn: Config.Value<Double>,
     val maxSpikePerConn: Config.Value<Int>
 ) : NullServerPolicy() {
@@ -232,12 +247,15 @@ class RateLimitRequestsPerConnection(
     if (wait == null) {
       return true
     }
+    val user = socket.authenticatedWith?.msg?.accessKey
+    logger.log(db, "req_rate_limit_rejection", user = user, metadata = request.toString())
     stream.error(2000u, "Rate limit exceeded")
     return false
   }
 }
 
 class ThrottleDataTransferPerConnection(
+    val logger: Logger,
     val maxBytesPerSecPerConn: Config.Value<Int>,
     val scheduledExecutor: ScheduledExecutorService,
 ) : NullServerPolicy() {
@@ -285,6 +303,8 @@ class ThrottleDataTransferPerConnection(
         // and schedule resumption
         val threshold = Duration.ofMillis(1)
         if (wait.compareTo(threshold) > 0) {
+          val user = socket.authenticatedWith?.msg?.accessKey
+          logger.log(db, "data_rate_limit_suspension", user = user, metadata = wait.toString())
           socket.channel.suspendReceives()
           scheduledExecutor.schedule(
               { socket.channel.resumeReceives() }, wait.toMillis(), TimeUnit.MILLISECONDS)
@@ -348,11 +368,7 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
   }
 }
 
-interface Logger {
-  fun log(db: String, event: String, user: String? = null, metadata: String? = null)
-}
-
-class SkdbBackedLogger(): Logger {
+class SkdbBackedLogger() : Logger {
   private var stream: BufferedWriter? = null
   init {
     val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
