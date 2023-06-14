@@ -388,6 +388,16 @@ class VerboseDebugLogger(val logger: Logger, val decorated: ServerPolicy) : Serv
   }
 }
 
+class StderrLogger() : Logger {
+
+  // just to get the tostring
+  data class Event(val db: String, val event: String, val user: String?, val metadata: String?)
+
+  override fun log(db: String, event: String, user: String?, metadata: String?) {
+    System.err.println(Event(db, event, user, metadata))
+  }
+}
+
 class SkdbBackedLogger() : Logger {
   private var stream: BufferedWriter? = null
   init {
