@@ -4,9 +4,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -q -y git make lld sqlite3 gcc gawk clang llvm automake \
     curl
-RUN apt-get install -q -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 libatspi2.0-0 libxdamage1 libgbm1 libpango-1.0-0 libcairo2 libxcomposite1 libxfixes3 libxrandr2 libgtk-3-0 libpangocairo-1.0-0 libcairo-gobject2 libgdk-pixbuf2.0-0 libdbus-glib-1-2 libx11-xcb1 libxcursor1 libxi6 libasound2 \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -q -y nodejs \
-    && npm install -g typescript
+RUN apt-get install -q -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 libatspi2.0-0 libxdamage1 libgbm1 libpango-1.0-0 libcairo2 libxcomposite1 libxfixes3 libxrandr2 libgtk-3-0 libpangocairo-1.0-0 libcairo-gobject2 libgdk-pixbuf2.0-0 libdbus-glib-1-2 libx11-xcb1 libxcursor1 libxi6 libasound2
+
+# TODO: revert once this is fixed: https://github.com/nodesource/distributions/issues/1576
+# RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -q -y nodejs \
+#     && npm install -g typescript
+RUN apt-get install -q -y build-essential \
+    && curl -fsSL https://nodejs.org/dist/v20.3.0/node-v20.3.0.tar.gz -o /root/node-v20.3.0.tgz \
+    && cd /root \
+    && tar -xzf node-v20.3.0.tgz \
+    && cd node-v20.3.0 \
+    && ./configure && make -j 10 && make install
 
 ENV CC=clang
 ENV CXX=clang++
