@@ -386,7 +386,8 @@ fun main(args: Array<String>) {
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
-  val policy = SkdbBackedEventLogger()
+  val config = Config()
+  val policy = LimitConnectionsPerUser(config.getInt("user_conns", 2))
   val connHandler = connectionHandler(policy, taskPool, encryption)
 
   val server = createHttpServer(connHandler)

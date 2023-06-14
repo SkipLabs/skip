@@ -1,9 +1,12 @@
 package io.skiplabs.skgw
 
 import java.io.BufferedWriter
+import java.lang.ref.WeakReference
 import java.time.Duration
 import java.time.Instant
+import java.util.Queue
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -54,17 +57,17 @@ open class NullServerPolicy : ServerPolicy {
   }
 }
 
-val MAX_CONNECTIONS: UInt = 10_000u
-
-class LimitGlobalConnections(val maxConns: UInt = MAX_CONNECTIONS) : NullServerPolicy() {
+class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy() {
 
   val n: AtomicInteger = AtomicInteger(0)
 
   override fun shouldAcceptConnection(db: String): Boolean {
     val n = n.get()
-    val acceptable = n < maxConns.toInt()
+    // params are null: doesn't make sense to specialise this
+    val limit = maxConns.get(accessKey = null, db = null)
+    val acceptable = n < limit
     if (!acceptable) {
-      System.err.println("Rejecting conn as ${n} >= ${maxConns}")
+      System.err.println("Rejecting conn as ${n} >= ${limit}")
     }
     return acceptable
   }
@@ -83,7 +86,7 @@ class LimitGlobalConnections(val maxConns: UInt = MAX_CONNECTIONS) : NullServerP
   }
 }
 
-class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() {
+class LimitConnectionsPerDb(val maxConns: Config.Value<Int>) : NullServerPolicy() {
 
   val openConns: ConcurrentMap<String, Int> = ConcurrentHashMap()
 
@@ -100,13 +103,14 @@ class LimitConnectionsPerDb(val maxConnsPerDatabase: UInt) : NullServerPolicy() 
       }
     }
 
-    if (n > maxConnsPerDatabase.toInt()) {
+    val limit = maxConns.get(accessKey = null, db = db)
+    if (n > limit) {
       socket.errorSocket(2000u, "Database connection limit reached")
     }
   }
 }
 
-class LimitConnectionsPerUser(val maxConnsPerUser: UInt) : NullServerPolicy() {
+class LimitConnectionsPerUser(val maxConns: Config.Value<Int>) : NullServerPolicy() {
 
   data class DbUser(val user: String, val db: String)
 
@@ -127,7 +131,8 @@ class LimitConnectionsPerUser(val maxConnsPerUser: UInt) : NullServerPolicy() {
           }
           MuxedSocket.State.AUTH_RECV -> {
             val n = openConns.merge(key, 1) { oldvalue, _ -> oldvalue + 1 }
-            if (n != null && n > maxConnsPerUser.toInt()) {
+            val limit = maxConns.get(user, db)
+            if (n != null && n > limit) {
               socket.errorSocket(2000u, "User connection limit reached")
             }
           }
@@ -187,13 +192,18 @@ class LeakyBucket(val drainRatePerSecond: Double) {
   }
 }
 
-class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerConn: UInt) :
-    NullServerPolicy() {
+class RateLimitRequestsPerConnection(
+    val maxQpsPerConn: Config.Value<Double>,
+    val maxSpikePerConn: Config.Value<Int>
+) : NullServerPolicy() {
 
   val openConns: ConcurrentMap<MuxedSocket, TokenBucket> = ConcurrentHashMap()
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
-    openConns.put(socket, TokenBucket(maxQpsPerConn.toDouble(), maxSpikePerConn))
+    // the token bucket params are fixed for the duration of the socket
+    val maxQps = maxQpsPerConn.get(accessKey = null, db = db)
+    val maxSpike = maxSpikePerConn.get(accessKey = null, db = db)
+    openConns.put(socket, TokenBucket(maxQps, maxSpike.toUInt()))
     socket.observeLifecycle { state ->
       when (state) {
         MuxedSocket.State.IDLE,
@@ -228,14 +238,16 @@ class RateLimitRequestsPerConnection(val maxQpsPerConn: UInt, val maxSpikePerCon
 }
 
 class ThrottleDataTransferPerConnection(
-    val maxBytesPerSecPerConn: UInt,
+    val maxBytesPerSecPerConn: Config.Value<Int>,
     val scheduledExecutor: ScheduledExecutorService,
 ) : NullServerPolicy() {
 
   val openConns: ConcurrentMap<MuxedSocket, LeakyBucket> = ConcurrentHashMap()
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
-    openConns.put(socket, LeakyBucket(maxBytesPerSecPerConn.toDouble()))
+    // the leaky bucket params are fixed for the duration of the socket
+    val maxBytesPerSec = maxBytesPerSecPerConn.get(accessKey = null, db = db)
+    openConns.put(socket, LeakyBucket(maxBytesPerSec.toDouble()))
     socket.observeLifecycle { state ->
       when (state) {
         MuxedSocket.State.IDLE,
@@ -410,5 +422,143 @@ class SkdbBackedEventLogger() : ServerPolicy {
       db: String
   ): Boolean {
     return true
+  }
+}
+
+class Config() {
+
+  private data class Target(val accessKey: String?, val db: String?)
+
+  inner class Value<T>(
+      private val key: String,
+      private val default: T,
+      private val column: String,
+      private val toT: (x: String) -> T,
+  ) {
+
+    // no eviction. this amounts to lazily loading in to memory all of
+    // the rules, which will likely be small
+    private val cache: MutableMap<Target, T> = ConcurrentHashMap()
+
+    fun get(accessKey: String?, db: String?): T {
+      val target = Target(accessKey, db)
+
+      val v = cache.get(target)
+      if (v != null) {
+        return v
+      }
+
+      val x = getSerialisedVal(key, accessKey, db, column)
+      val y =
+          if (x == null) {
+            default
+          } else {
+            toT(x)
+          }
+      cache.set(target, y)
+      return y
+    }
+
+    fun invalidate() {
+      cache.clear()
+    }
+  }
+
+  private val handouts: Queue<WeakReference<Value<*>>> = ConcurrentLinkedQueue()
+  private val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
+
+  init {
+    skdb.sql(
+        """
+      CREATE TABLE IF NOT EXISTS server_config (
+        key STRING,
+        user STRING,
+        db STRING,
+        intVal INTEGER,
+        dblVal FLOAT,
+        strVal STRING
+      );""",
+        OutputFormat.RAW)
+
+    skdb.notify("server_config") {
+      for (value in handouts) {
+        value.get()?.invalidate()
+      }
+    }
+  }
+
+  private fun getSerialisedVal(
+      key: String,
+      accessKey: String?,
+      db: String?,
+      column: String
+  ): String? {
+    val uExpr = if (accessKey == null) "is NULL" else "= '${accessKey}'"
+    val dExpr = if (db == null) "is NULL" else "= '${db}'"
+
+    var row =
+        skdb.sql(
+            """SELECT ${column}
+           FROM server_config
+           WHERE key = '${key}'
+           AND db ${dExpr}
+           AND user ${uExpr}
+           LIMIT 1;""",
+            OutputFormat.RAW)
+
+    var result = row.decodeOrThrow().trim()
+    if (result != "") {
+      return result
+    }
+
+    row =
+        skdb.sql(
+            """SELECT ${column}
+           FROM server_config
+           WHERE key = '${key}'
+           AND db ${dExpr}
+           AND user is NULL
+           LIMIT 1;""",
+            OutputFormat.RAW)
+
+    result = row.decodeOrThrow().trim()
+    if (result != "") {
+      return result
+    }
+
+    row =
+        skdb.sql(
+            """SELECT ${column}
+           FROM server_config
+           WHERE key = '${key}'
+           AND db is NULL
+           AND user is NULL
+           LIMIT 1;""",
+            OutputFormat.RAW)
+
+    result = row.decodeOrThrow().trim()
+    if (result != "") {
+      return result
+    }
+
+    return null
+  }
+
+  fun getInt(key: String, default: Int): Value<Int> {
+    val v = Value<Int>(key, default, column = "intVal", String::toInt)
+    handouts.add(WeakReference(v))
+    return v
+  }
+
+  fun getDouble(key: String, default: Double): Value<Double> {
+    val v = Value<Double>(key, default, column = "dblVal", String::toDouble)
+    handouts.add(WeakReference(v))
+    return v
+  }
+
+  fun getString(key: String, default: String): Value<String> {
+    val v = Value<String>(key, default, column = "strVal", String::toString)
+    handouts.add(WeakReference(v))
+    return v
   }
 }

@@ -71,12 +71,7 @@ class Skdb(val name: String, private val dbPath: String) {
   }
 
   fun sqlStream(format: OutputFormat): Process {
-    val pb =
-        ProcessBuilder(
-            SKDB_PROC,
-            "--data",
-            dbPath,
-            format.flag)
+    val pb = ProcessBuilder(SKDB_PROC, "--data", dbPath, format.flag)
 
     // TODO: for hacky debug
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -214,6 +209,38 @@ class Skdb(val name: String, private val dbPath: String) {
     t.start()
 
     return proc
+  }
+
+  fun notify(
+      table: String,
+      callback: () -> Unit,
+  ) {
+    val notifyFile = File.createTempFile("notify", table)
+    // TODO: notifyFile.deleteOnExit() -- need to unsubscribe first
+
+    val connection =
+        blockingRun(
+            ProcessBuilder(
+                SKDB_PROC, "subscribe", table, "--data", dbPath, "--notify", notifyFile.path))
+
+    if (!connection.exitSuccessfully()) {
+      throw RuntimeException("Notify failed")
+    }
+
+    var tick = ""
+    // super dumb right now. just poll the file.
+    val t =
+        Thread({
+          while (true) {
+            val now = Files.readString(notifyFile.toPath())
+            if (now != tick) {
+              tick = now
+              callback()
+            }
+            Thread.sleep(1000)
+          }
+        })
+    t.start()
   }
 
   fun privateKeyAsStored(user: String): ByteArray {
