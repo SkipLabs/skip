@@ -163,8 +163,8 @@ class RequestHandler(
         }
         val creds = createDb(request.name, encryption)
         val payload = creds.toProtoCredentials()
-        creds.clear()
         stream.send(payload)
+        creds.clear()
         stream.close()
       }
       is ProtoCreateUser -> {
