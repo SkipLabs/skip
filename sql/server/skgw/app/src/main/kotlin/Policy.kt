@@ -348,8 +348,11 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
   }
 }
 
-class SkdbBackedEventLogger() : ServerPolicy {
+interface Logger {
+  fun log(db: String, event: String, user: String? = null, metadata: String? = null)
+}
 
+class SkdbBackedLogger(): Logger {
   private var stream: BufferedWriter? = null
   init {
     val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
@@ -367,7 +370,7 @@ class SkdbBackedEventLogger() : ServerPolicy {
     stream?.write("\nCOMMIT;\n")
   }
 
-  private fun log(db: String, event: String, user: String? = null, metadata: String? = null) {
+  override fun log(db: String, event: String, user: String?, metadata: String?) {
     val t = Instant.now().getEpochSecond()
     val u = if (user == null) "NULL" else "'${user}'"
     val md = if (metadata == null) "NULL" else "'${metadata}'"
@@ -375,16 +378,19 @@ class SkdbBackedEventLogger() : ServerPolicy {
     stream?.write("COMMIT;\n")
     stream?.flush() // TODO: server interaction is currently infrequent. as it rises, remove this.
   }
+}
+
+class EventAccountant(val logger: Logger) : ServerPolicy {
 
   override fun shouldAcceptConnection(db: String): Boolean {
-    log(db, "conn_attempt")
+    logger.log(db, "conn_attempt")
     return true
   }
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
     socket.observeLifecycle { state ->
       if (state == MuxedSocket.State.AUTH_RECV) {
-        log(db, "conn_established", socket.authenticatedWith?.msg?.accessKey)
+        logger.log(db, "conn_established", socket.authenticatedWith?.msg?.accessKey)
       }
     }
   }
@@ -397,19 +403,19 @@ class SkdbBackedEventLogger() : ServerPolicy {
     val user = stream.stream.socket.authenticatedWith?.msg?.accessKey
     when (request) {
       is ProtoQuery -> {
-        log(db, "query", user)
+        logger.log(db, "query", user)
       }
       is ProtoRequestTail -> {
-        log(db, "establish_tail", user, request.table)
+        logger.log(db, "establish_tail", user, request.table)
       }
       is ProtoPushPromise -> {
-        log(db, "establish_push", user, request.table)
+        logger.log(db, "establish_push", user, request.table)
       }
       is ProtoCreateDb -> {
-        log(db, "create-db", user, request.name)
+        logger.log(db, "create-db", user, request.name)
       }
       is ProtoCreateUser -> {
-        log(db, "create-user", user)
+        logger.log(db, "create-user", user)
       }
       else -> {}
     }
