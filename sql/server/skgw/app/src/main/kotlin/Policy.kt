@@ -320,12 +320,12 @@ class ThrottleDataTransferPerConnection(
   }
 }
 
-class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
+class VerboseDebugLogger(val logger: Logger, val decorated: ServerPolicy) : ServerPolicy {
 
   override fun shouldAcceptConnection(db: String): Boolean {
     val shouldAccept = decorated.shouldAcceptConnection(db)
     val phrase = if (shouldAccept) "accepted" else "rejected"
-    System.err.println("Connection for db ${db} ${phrase}.")
+    logger.log(db, "conn", user = null, metadata = "Connection for db ${db} ${phrase}.")
     return shouldAccept
   }
 
@@ -333,9 +333,17 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
     System.err.println("Socket created: ${socket} for db ${db}.")
     socket.observeLifecycle { state ->
       if (state == MuxedSocket.State.AUTH_RECV) {
-        System.err.println("User authenticated on ${socket} with: ${socket.authenticatedWith}")
+        logger.log(
+            db,
+            "event",
+            user = socket.authenticatedWith?.msg?.accessKey,
+            metadata = "User authenticated on ${socket} with: ${socket.authenticatedWith}")
       }
-      System.err.println("Socket ${socket} moved to state ${state} end state: ${socket.endState}")
+      logger.log(
+          db,
+          "event",
+          user = socket.authenticatedWith?.msg?.accessKey,
+          metadata = "Socket ${socket} moved to state ${state} end state: ${socket.endState}")
     }
     decorated.notifySocketCreated(socket, db)
   }
@@ -347,11 +355,19 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
   ): Boolean {
     val shouldHandle = decorated.shouldDeliverMessage(request, stream, db)
     val phrase = if (shouldHandle) "accepted" else "rejected"
-    System.err.println("Request ${request} on stream ${stream} was ${phrase}")
+    logger.log(
+        db,
+        "event",
+        user = stream.stream.socket.authenticatedWith?.msg?.accessKey,
+        metadata = "Request ${request} on stream ${stream} was ${phrase}")
     val muxstream = stream.stream
     muxstream.observeLifecycle { state ->
-      System.err.println(
-          "Stream ${stream} initiated by request ${request} moved to state ${state} end state: ${muxstream.endState.get()}")
+      logger.log(
+          db,
+          "event",
+          user = stream.stream.socket.authenticatedWith?.msg?.accessKey,
+          metadata =
+              "Stream ${stream} initiated by request ${request} moved to state ${state} end state: ${muxstream.endState.get()}")
     }
     return shouldHandle
   }
@@ -363,7 +379,11 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
   ): Boolean {
     val shouldEmit = decorated.shouldEmitMessage(msg, stream, db)
     val phrase = if (shouldEmit) "allowed" else "blocked"
-    System.err.println("Sending ${msg} on stream ${stream} was ${phrase}")
+    logger.log(
+        db,
+        "event",
+        user = stream.stream.socket.authenticatedWith?.msg?.accessKey,
+        metadata = "Sending ${msg} on stream ${stream} was ${phrase}")
     return shouldEmit
   }
 }
