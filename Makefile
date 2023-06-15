@@ -68,7 +68,7 @@ build/init.sql: sql/privacy/init.sql
 .PHONY: clean
 clean:
 	rm -Rf build
-	find . -name 'Skargo.toml' -exec sh -c 'rm -rf $(dirname {})/target' \;
+	find . -name 'Skargo.toml' | sed 's|Skargo.toml|target|' | xargs rm -rf
 
 .PHONY: fmt
 fmt:
