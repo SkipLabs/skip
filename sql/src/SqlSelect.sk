@@ -445,6 +445,9 @@ class SelectEvaluator{
       this.evalEmptyFrom(context);
       this.selectName1
     | None() ->
+      if (this.select.isNoop) {
+        return SelectDir(this.select.from[0].i0.dirName, this.types)
+      };
       resultDir = this.evalSelectTableList(
         context,
         List::createFromItems(this.select.from),

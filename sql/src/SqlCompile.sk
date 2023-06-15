@@ -5,6 +5,84 @@
 module SKSQL;
 
 /*****************************************************************************/
+/* Determines if a select can be optimized away. */
+/*****************************************************************************/
+
+fun isNoopParams(
+  params: Array<CGExpr>,
+  from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+): Bool {
+  if (from.size() != 1) return false;
+  kinds = from[0].i0.kinds;
+  if (kinds.size() != params.size()) return false;
+  for (i => param in params) {
+    param match {
+    | CIExpr(SKSQL.CIGetFrom(0, x)) if (x == i) -> void
+    | CFExpr(SKSQL.CFGetFrom(0, x)) if (x == i) -> void
+    | CSExpr(SKSQL.CSGetFrom(0, x)) if (x == i) -> void
+    | _ -> return false
+    }
+  };
+  true
+}
+
+fun noRangeFrom(from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>): Bool {
+  for (tableRange in from) {
+    if (tableRange.i1 is Some _) return false;
+  };
+  true
+}
+
+// The case that interests us specifically is in the case of a join:
+// select * from t1, t2 where a = b;
+
+// What will happen is that the result of the merge is exactly the
+// result we want, so there is nothing left to do in the select.  All
+// the other cases are not very interesting because if they were truly a
+// noop, the query could be trivially rewritten to get rid of the
+// overhead.
+
+// Why not optimize it anyway you may ask? Because the result is going
+// to be in an SKFS directory with the wrong name. Which means, every
+// place where we are looking up select results by dirName are going to
+// be broken.
+
+fun optimizeNoopSelect(select: CSelect): CSelect {
+  if (
+    select.kind is SNone() &&
+    isNoopParams(select.params, select.from) &&
+    noRangeFrom(select.from) &&
+    select.sets.size() == 0 &&
+    select.aggr is None() &&
+    select.where is None() &&
+    select.groupBy is None() &&
+    select.having is None() &&
+    select.orderBy is None() &&
+    select.limit is None() &&
+    select.rest is None() &&
+    !select.needUp &&
+    !select.needGetParam &&
+    !select.directMode &&
+    select.other.size() != 0
+  ) {
+    foundMerge = false;
+    !select.other = select.other.map(task ->
+      task match {
+      | merge @ SubMerge _ if (merge.childName == select.from[0].i0.dirName) ->
+        !foundMerge = true;
+        !merge.childName = SKFS.DirName::create("/" + select.id.lower + "/");
+        merge
+      | _ -> task
+      }
+    );
+    if (!foundMerge) return select;
+    select with {isNoop => true}
+  } else {
+    select
+  }
+}
+
+/*****************************************************************************/
 /* Determines smallest window. */
 /*****************************************************************************/
 
@@ -289,7 +367,7 @@ mutable class Compiler{
       aggr,
       from,
       kinds,
-      where,
+      where => if (where is Some(CILiteral(1))) None() else where,
       groupBy,
       having,
       orderBy,
@@ -301,6 +379,8 @@ mutable class Compiler{
       format,
       other => this.other.toArray(),
     };
+
+    !cselect = optimizeNoopSelect(cselect);
 
     this.!subst = substCopy;
     this.!paramsNbr = paramsNbrCopy;
