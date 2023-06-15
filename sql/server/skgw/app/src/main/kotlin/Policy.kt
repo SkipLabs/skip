@@ -57,7 +57,12 @@ open class NullServerPolicy : ServerPolicy {
   }
 }
 
-class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy() {
+interface Logger {
+  fun log(db: String, event: String, user: String? = null, metadata: String? = null)
+}
+
+class LimitGlobalConnections(val logger: Logger, val maxConns: Config.Value<Int>) :
+    NullServerPolicy() {
 
   val n: AtomicInteger = AtomicInteger(0)
 
@@ -67,7 +72,8 @@ class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy
     val limit = maxConns.get(accessKey = null, db = null)
     val acceptable = n < limit
     if (!acceptable) {
-      System.err.println("Rejecting conn as ${n} >= ${limit}")
+      logger.log(
+          db, "global_max_conn", user = null, metadata = "Rejecting conn as ${n} >= ${limit}")
     }
     return acceptable
   }
@@ -86,7 +92,8 @@ class LimitGlobalConnections(val maxConns: Config.Value<Int>) : NullServerPolicy
   }
 }
 
-class LimitConnectionsPerDb(val maxConns: Config.Value<Int>) : NullServerPolicy() {
+class LimitConnectionsPerDb(val logger: Logger, val maxConns: Config.Value<Int>) :
+    NullServerPolicy() {
 
   val openConns: ConcurrentMap<String, Int> = ConcurrentHashMap()
 
@@ -105,12 +112,14 @@ class LimitConnectionsPerDb(val maxConns: Config.Value<Int>) : NullServerPolicy(
 
     val limit = maxConns.get(accessKey = null, db = db)
     if (n > limit) {
+      logger.log(db, "db_max_conn", user = null, metadata = "Rejecting conn as ${n} > ${limit}")
       socket.errorSocket(2000u, "Database connection limit reached")
     }
   }
 }
 
-class LimitConnectionsPerUser(val maxConns: Config.Value<Int>) : NullServerPolicy() {
+class LimitConnectionsPerUser(val logger: Logger, val maxConns: Config.Value<Int>) :
+    NullServerPolicy() {
 
   data class DbUser(val user: String, val db: String)
 
@@ -133,6 +142,11 @@ class LimitConnectionsPerUser(val maxConns: Config.Value<Int>) : NullServerPolic
             val n = openConns.merge(key, 1) { oldvalue, _ -> oldvalue + 1 }
             val limit = maxConns.get(user, db)
             if (n != null && n > limit) {
+              logger.log(
+                  db,
+                  "global_max_conn",
+                  user = user,
+                  metadata = "Rejecting conn as ${n} > ${limit}")
               socket.errorSocket(2000u, "User connection limit reached")
             }
           }
@@ -193,6 +207,7 @@ class LeakyBucket(val drainRatePerSecond: Double) {
 }
 
 class RateLimitRequestsPerConnection(
+    val logger: Logger,
     val maxQpsPerConn: Config.Value<Double>,
     val maxSpikePerConn: Config.Value<Int>
 ) : NullServerPolicy() {
@@ -232,12 +247,15 @@ class RateLimitRequestsPerConnection(
     if (wait == null) {
       return true
     }
+    val user = socket.authenticatedWith?.msg?.accessKey
+    logger.log(db, "req_rate_limit_rejection", user = user, metadata = request.toString())
     stream.error(2000u, "Rate limit exceeded")
     return false
   }
 }
 
 class ThrottleDataTransferPerConnection(
+    val logger: Logger,
     val maxBytesPerSecPerConn: Config.Value<Int>,
     val scheduledExecutor: ScheduledExecutorService,
 ) : NullServerPolicy() {
@@ -285,6 +303,8 @@ class ThrottleDataTransferPerConnection(
         // and schedule resumption
         val threshold = Duration.ofMillis(1)
         if (wait.compareTo(threshold) > 0) {
+          val user = socket.authenticatedWith?.msg?.accessKey
+          logger.log(db, "data_rate_limit_suspension", user = user, metadata = wait.toString())
           socket.channel.suspendReceives()
           scheduledExecutor.schedule(
               { socket.channel.resumeReceives() }, wait.toMillis(), TimeUnit.MILLISECONDS)
@@ -300,12 +320,12 @@ class ThrottleDataTransferPerConnection(
   }
 }
 
-class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
+class VerboseDebugLogger(val logger: Logger, val decorated: ServerPolicy) : ServerPolicy {
 
   override fun shouldAcceptConnection(db: String): Boolean {
     val shouldAccept = decorated.shouldAcceptConnection(db)
     val phrase = if (shouldAccept) "accepted" else "rejected"
-    System.err.println("Connection for db ${db} ${phrase}.")
+    logger.log(db, "conn", user = null, metadata = "Connection for db ${db} ${phrase}.")
     return shouldAccept
   }
 
@@ -313,9 +333,17 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
     System.err.println("Socket created: ${socket} for db ${db}.")
     socket.observeLifecycle { state ->
       if (state == MuxedSocket.State.AUTH_RECV) {
-        System.err.println("User authenticated on ${socket} with: ${socket.authenticatedWith}")
+        logger.log(
+            db,
+            "event",
+            user = socket.authenticatedWith?.msg?.accessKey,
+            metadata = "User authenticated on ${socket} with: ${socket.authenticatedWith}")
       }
-      System.err.println("Socket ${socket} moved to state ${state} end state: ${socket.endState}")
+      logger.log(
+          db,
+          "event",
+          user = socket.authenticatedWith?.msg?.accessKey,
+          metadata = "Socket ${socket} moved to state ${state} end state: ${socket.endState}")
     }
     decorated.notifySocketCreated(socket, db)
   }
@@ -327,11 +355,19 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
   ): Boolean {
     val shouldHandle = decorated.shouldDeliverMessage(request, stream, db)
     val phrase = if (shouldHandle) "accepted" else "rejected"
-    System.err.println("Request ${request} on stream ${stream} was ${phrase}")
+    logger.log(
+        db,
+        "event",
+        user = stream.stream.socket.authenticatedWith?.msg?.accessKey,
+        metadata = "Request ${request} on stream ${stream} was ${phrase}")
     val muxstream = stream.stream
     muxstream.observeLifecycle { state ->
-      System.err.println(
-          "Stream ${stream} initiated by request ${request} moved to state ${state} end state: ${muxstream.endState.get()}")
+      logger.log(
+          db,
+          "event",
+          user = stream.stream.socket.authenticatedWith?.msg?.accessKey,
+          metadata =
+              "Stream ${stream} initiated by request ${request} moved to state ${state} end state: ${muxstream.endState.get()}")
     }
     return shouldHandle
   }
@@ -343,13 +379,26 @@ class SimpleDebugLogger(val decorated: ServerPolicy) : ServerPolicy {
   ): Boolean {
     val shouldEmit = decorated.shouldEmitMessage(msg, stream, db)
     val phrase = if (shouldEmit) "allowed" else "blocked"
-    System.err.println("Sending ${msg} on stream ${stream} was ${phrase}")
+    logger.log(
+        db,
+        "event",
+        user = stream.stream.socket.authenticatedWith?.msg?.accessKey,
+        metadata = "Sending ${msg} on stream ${stream} was ${phrase}")
     return shouldEmit
   }
 }
 
-class SkdbBackedEventLogger() : ServerPolicy {
+class StderrLogger() : Logger {
 
+  // just to get the tostring
+  data class Event(val db: String, val event: String, val user: String?, val metadata: String?)
+
+  override fun log(db: String, event: String, user: String?, metadata: String?) {
+    System.err.println(Event(db, event, user, metadata))
+  }
+}
+
+class SkdbBackedLogger() : Logger {
   private var stream: BufferedWriter? = null
   init {
     val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
@@ -367,7 +416,7 @@ class SkdbBackedEventLogger() : ServerPolicy {
     stream?.write("\nCOMMIT;\n")
   }
 
-  private fun log(db: String, event: String, user: String? = null, metadata: String? = null) {
+  override fun log(db: String, event: String, user: String?, metadata: String?) {
     val t = Instant.now().getEpochSecond()
     val u = if (user == null) "NULL" else "'${user}'"
     val md = if (metadata == null) "NULL" else "'${metadata}'"
@@ -375,16 +424,19 @@ class SkdbBackedEventLogger() : ServerPolicy {
     stream?.write("COMMIT;\n")
     stream?.flush() // TODO: server interaction is currently infrequent. as it rises, remove this.
   }
+}
+
+class EventAccountant(val logger: Logger) : ServerPolicy {
 
   override fun shouldAcceptConnection(db: String): Boolean {
-    log(db, "conn_attempt")
+    logger.log(db, "conn_attempt")
     return true
   }
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
     socket.observeLifecycle { state ->
       if (state == MuxedSocket.State.AUTH_RECV) {
-        log(db, "conn_established", socket.authenticatedWith?.msg?.accessKey)
+        logger.log(db, "conn_established", socket.authenticatedWith?.msg?.accessKey)
       }
     }
   }
@@ -397,19 +449,19 @@ class SkdbBackedEventLogger() : ServerPolicy {
     val user = stream.stream.socket.authenticatedWith?.msg?.accessKey
     when (request) {
       is ProtoQuery -> {
-        log(db, "query", user)
+        logger.log(db, "query", user)
       }
       is ProtoRequestTail -> {
-        log(db, "establish_tail", user, request.table)
+        logger.log(db, "establish_tail", user, request.table)
       }
       is ProtoPushPromise -> {
-        log(db, "establish_push", user, request.table)
+        logger.log(db, "establish_push", user, request.table)
       }
       is ProtoCreateDb -> {
-        log(db, "create-db", user, request.name)
+        logger.log(db, "create-db", user, request.name)
       }
       is ProtoCreateUser -> {
-        log(db, "create-user", user)
+        logger.log(db, "create-user", user)
       }
       else -> {}
     }
