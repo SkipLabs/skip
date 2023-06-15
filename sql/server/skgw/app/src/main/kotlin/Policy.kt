@@ -30,7 +30,7 @@ interface ServerPolicy {
   // just dropped. may manipulate the stream - e.g. send/close/error.
   fun shouldEmitMessage(msg: ProtoMessage, stream: OrchestrationStream, db: String): Boolean
 
-  infix fun chain(x: ServerPolicy): ServerPolicy {
+  infix fun then(x: ServerPolicy): ServerPolicy {
     return PolicyChain(this, x)
   }
 }
@@ -63,7 +63,6 @@ class PolicyChain(val a: ServerPolicy, val b: ServerPolicy) : ServerPolicy {
     return a.shouldEmitMessage(msg, stream, db) && b.shouldEmitMessage(msg, stream, db)
   }
 }
-
 
 // no policy. useful for subclasses that want to define partial policy
 // -- template method pattern -- or as the default in composition
