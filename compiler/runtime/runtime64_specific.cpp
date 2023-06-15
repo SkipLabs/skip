@@ -313,9 +313,8 @@ int64_t SKIP_unix_open(char* filename_obj) {
 }
 
 int64_t SKIP_unix_close(int64_t fd) {
-//  int status = close((int)fd);
-//  return (int64_t)status;
-  return 0;
+  int status = close((int)fd);
+  return (int64_t)status;
 }
 
 void SKIP_write_to_file(int64_t fd, char* str) {
