@@ -1399,8 +1399,9 @@ class UserFile(id: Int, name: String) extends SKFS.File {
 }
 
 fun eval(options: Options, userOpt: ?String): void {
+  isTTY = isATTY() != 0;
   runSql(options, context ~> {
-    if (isATTY() != 0) {
+    if (isTTY) {
       print_raw("skdb> ");
     };
     lineFile = SKFS.IntFile::fromFile(context.getGlobal("Line").fromSome());
