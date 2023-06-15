@@ -249,13 +249,13 @@ else
     echo -e "TEST LIMIT:\tFAILED"
 fi
 
-if cat test/test_index_transaction.sql | skdb --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:ST1_a"; then
+if cat test/test_index_transaction.sql | $SKDB --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:ST1_a"; then
     echo -e "TEST TRANSACTION INDEX:\tOK"
 else
     echo -e "TEST TRANSACTION INDEX:\tFAILED"
 fi
 
-if cat test/test_index_transaction2.sql | skdb --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:ST1_a"; then
+if cat test/test_index_transaction2.sql | $SKDB --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:ST1_a"; then
     echo -e "TEST TRANSACTION INDEX 2:\tOK"
 else
     echo -e "TEST TRANSACTION INDEX 2:\tFAILED"
