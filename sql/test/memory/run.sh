@@ -22,17 +22,17 @@ $SKDB compact --data /tmp/test.db
 
 size3=$($SKDB size --data /tmp/test.db)
 
-echo $size1
-echo $size2
-echo $size3
-
 if (( size2 > size1 ));
 then
-    echo "TEST CHECKING IF SIZE WENT DOWN AFTER COMPACTION FAILED"
+    echo "TEST CHECKING IF SIZE WENT DOWN AFTER COMPACTION FAILED ($size2 > $size1)"
+else
+    echo "Compaction: OK ($size1 <= $size2)"
 fi
 
 
 if (( size3 > size2 ));
 then
-    echo "TEST CHECKING IF SIZE WENT DOWN AFTER DELETE FAILED"
+    echo "TEST CHECKING IF SIZE WENT DOWN AFTER DELETE FAILED ($size3 > $size2)"
+else
+    echo "Delete:     OK ($size2 <= $size3)"
 fi
