@@ -29,6 +29,39 @@ interface ServerPolicy {
   // short-circuits message sending if returns false. the message is
   // just dropped. may manipulate the stream - e.g. send/close/error.
   fun shouldEmitMessage(msg: ProtoMessage, stream: OrchestrationStream, db: String): Boolean
+
+  infix fun then(x: ServerPolicy): ServerPolicy {
+    return PolicyChain(this, x)
+  }
+}
+
+class PolicyChain(val a: ServerPolicy, val b: ServerPolicy) : ServerPolicy {
+
+  override fun shouldAcceptConnection(db: String): Boolean {
+    return a.shouldAcceptConnection(db) && b.shouldAcceptConnection(db)
+  }
+
+  override fun notifySocketCreated(socket: MuxedSocket, db: String) {
+    a.notifySocketCreated(socket, db)
+    b.notifySocketCreated(socket, db)
+  }
+
+  override fun shouldDeliverMessage(
+      request: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    return a.shouldDeliverMessage(request, stream, db) &&
+        b.shouldDeliverMessage(request, stream, db)
+  }
+
+  override fun shouldEmitMessage(
+      msg: ProtoMessage,
+      stream: OrchestrationStream,
+      db: String
+  ): Boolean {
+    return a.shouldEmitMessage(msg, stream, db) && b.shouldEmitMessage(msg, stream, db)
+  }
 }
 
 // no policy. useful for subclasses that want to define partial policy
