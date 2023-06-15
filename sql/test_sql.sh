@@ -1,18 +1,22 @@
 #!/bin/bash
 
 SKDB=./target/skdb
+export SKDB
 
 run_test () {
   echo -en "$1:\t"
-  cat $1 | $SKDB --always-allow-joins | sort > /tmp/kk1
-  cat $1 | sqlite3 | sort > /tmp/kk2
-  diff /tmp/kk1 /tmp/kk2 > /dev/null
+  kk1=$(mktemp)
+  kk2=$(mktemp)
+  cat $1 | $SKDB --always-allow-joins | sort > $kk1
+  cat $1 | sqlite3 | sort > $kk2
+  diff $kk1 $kk2 > /dev/null
   if [ $? -eq 0 ]; then
       echo "OK"
   else
       echo "FAILED"
   fi
 }
+export -f run_test
 
 run_one_test () {
   cat $1 | time $SKDB --always-allow-joins | sort > /tmp/kk1
@@ -47,31 +51,24 @@ if ! [ -z "$1" ]; then
     exit 0
 fi
 
-run_test 'test/select1.sql';
-run_test 'test/select2.sql';
-run_test 'test/select3.sql';
-run_test 'test/select4.1.sql';
-# run_test 'test/select4.2.sql';
-run_test 'test/select5.1.sql';
-# run_test 'test/select5.2.sql';
-run_test 'test/insert-reorder.sql';
-run_test 'test/case_insensitive.sql';
-
-for i in test/random/expr/*.sql; do
-    run_test $i;
-done
-
-for i in test/random/select/*.sql; do
-    run_test $i;
-done
-
-for i in test/random/groupby/*.sql; do
-    run_test $i;
-done
-
-for i in test/random/aggregates/*.sql; do
-    run_test $i;
-done
+parallel run_test ::: \
+    test/select1_large.sql \
+    test/select2_large.sql \
+    test/select3_large.sql \
+    test/select1.sql \
+    test/select2.sql \
+    test/select3.sql \
+    test/select4.1.sql \
+    test/select5.1.sql \
+    test/insert-reorder.sql \
+    test/case_insensitive.sql \
+    test/random/expr/*.sql \
+    test/random/select/*.sql \
+    test/random/groupby/*.sql \
+    test/random/aggregates/*.sql \
+    test/comments.sql
+    # test/select4.2.sql \
+    # test/select5.2.sql \
 
 echo ""
 echo "*******************************************************************************"
@@ -92,23 +89,6 @@ for i in {1..10}; do (cd ./test/concurrent/inserts/ && ./run.sh); done
 for i in {1..10}; do (cd ./test/concurrent/sum/ && ./run.sh); done
 for i in {1..10}; do (cd ./test/concurrent/sum_transaction/ && ./run.sh); done
 
-echo ""
-echo "*******************************************************************************"
-echo "* SKDB LARGE TESTS *"
-echo "*******************************************************************************"
-echo ""
-
-run_test 'test/select1_large.sql'
-run_test 'test/select2_large.sql'
-run_test 'test/select3_large.sql'
-
-echo ""
-echo "*******************************************************************************"
-echo "* SKDB UNIT TESTS *"
-echo "*******************************************************************************"
-echo ""
-
-run_test 'test/comments.sql'
 
 echo ""
 echo "*******************************************************************************"
