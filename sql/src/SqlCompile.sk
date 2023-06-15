@@ -2126,10 +2126,7 @@ mutable class Compiler{
       | _ -> return LookUps[]
       };
       table = tables[tableNbr];
-      !table = table with {
-        dirName => SKFS.DirName::create("/" + table.name.lower + "/"),
-      };
-      indexEntry = makeIndexEntry(table.dirName, colNbr);
+      indexEntry = makeIndexEntry(table.name, colNbr);
       indexTable = getIndexByColNbr(this.options, context);
       indexes = indexTable.getArray(context, indexEntry);
       !indexes = indexes.filter(index -> !killed.contains(index.tableDirName));
