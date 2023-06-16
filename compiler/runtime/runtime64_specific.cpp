@@ -13,11 +13,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <linux/limits.h>
-#include <pthread.h>
 
 // TODO: Only include in debug mode.
 #include <backtrace.h>
