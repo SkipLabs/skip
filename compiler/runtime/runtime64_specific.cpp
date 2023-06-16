@@ -13,11 +13,11 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <linux/limits.h>
-#include <pthread.h>
+#include <errno.h>
+#include <inttypes.h>
 
 // TODO: Only include in debug mode.
 #include <backtrace.h>
@@ -287,21 +287,13 @@ char* SKIP_open_file(char* filename_obj) {
  return result;
 }
 
-std::map<std::string, int> files;
-
 int64_t SKIP_unix_open(char* filename_obj) {
  size_t filename_size = SKIP_String_byteSize(filename_obj);
  char* filename = (char*)malloc(filename_size+1);
  memcpy(filename, filename_obj, filename_size);
  filename[filename_size] = (char)0;
- std::string s(filename);
-
- if(files.count(s) != 0) {
-   return files[s];
- }
 
  int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0777);
- files[s] = fd;
 
  if(fd == -1) {
    perror("ERROR file open failed");
@@ -313,15 +305,19 @@ int64_t SKIP_unix_open(char* filename_obj) {
 }
 
 int64_t SKIP_unix_close(int64_t fd) {
-//  int status = close((int)fd);
-//  return (int64_t)status;
-  return 0;
+  int status = close((int)fd);
+  return (int64_t)status;
 }
 
 void SKIP_write_to_file(int64_t fd, char* str) {
  size_t size = SKIP_String_byteSize(str);
  while(size > 0) {
-   size_t written = write(fd, str, size);
+   ssize_t written = write(fd, str, size);
+   if (written < 0) {
+       int err = errno;
+       fprintf(stderr, "Could not write to file. %" PRId64 " (%d)\n", fd, err);
+       exit(45);
+   }
    size -= written;
  }
 }

@@ -395,7 +395,7 @@ fun main(args: Array<String>) {
           RateLimitRequestsPerConnection(
               logger,
               config.getDouble("max_conn_qps", 5.0),
-              config.getInt("max_conn_req_spike", 5)) then
+              config.getInt("max_conn_req_spike", 50)) then
           LimitConnectionsPerUser(logger, config.getInt("user_conns", 2)) then
           LimitConnectionsPerDb(logger, config.getInt("db_conns", 10)) then
           LimitGlobalConnections(logger, config.getInt("global_conns", 10_000))
