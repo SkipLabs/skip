@@ -63,12 +63,10 @@ build/init.sql: sql/privacy/init.sql
 # dev workflow orchestration
 ################################################################################
 
-# dummy comment to appease make parser
-
 .PHONY: clean
 clean:
 	rm -Rf build
-	find . -name 'Skargo.toml' | sed 's|Skargo.toml|target|' | xargs rm -rf
+	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
 
 .PHONY: fmt
 fmt:
