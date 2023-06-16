@@ -16,6 +16,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <linux/limits.h>
+#include <errno.h>
+#include <inttypes.h>
 
 // TODO: Only include in debug mode.
 #include <backtrace.h>
@@ -310,7 +312,12 @@ int64_t SKIP_unix_close(int64_t fd) {
 void SKIP_write_to_file(int64_t fd, char* str) {
  size_t size = SKIP_String_byteSize(str);
  while(size > 0) {
-   size_t written = write(fd, str, size);
+   ssize_t written = write(fd, str, size);
+   if (written < 0) {
+       int err = errno;
+       fprintf(stderr, "Could not write to file. %" PRId64 " (%d)\n", fd, err);
+       exit(45);
+   }
    size -= written;
  }
 }
