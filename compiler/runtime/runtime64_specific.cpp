@@ -287,21 +287,13 @@ char* SKIP_open_file(char* filename_obj) {
  return result;
 }
 
-std::map<std::string, int> files;
-
 int64_t SKIP_unix_open(char* filename_obj) {
  size_t filename_size = SKIP_String_byteSize(filename_obj);
  char* filename = (char*)malloc(filename_size+1);
  memcpy(filename, filename_obj, filename_size);
  filename[filename_size] = (char)0;
- std::string s(filename);
-
- if(files.count(s) != 0) {
-   return files[s];
- }
 
  int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0777);
- files[s] = fd;
 
  if(fd == -1) {
    perror("ERROR file open failed");
