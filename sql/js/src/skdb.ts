@@ -1,3 +1,5 @@
+import { npmVersion } from './version.js'
+
 /* ***************************************************************************/
 /* WASM Loading. */
 /* ***************************************************************************/
@@ -1640,8 +1642,9 @@ export class MuxedSocket {
   }
 
   private static async encodeAuthMsg(creds: Creds): Promise<ArrayBuffer> {
+    const clientVersion = "js-" + npmVersion;
     const enc = new TextEncoder();
-    const buf = new ArrayBuffer(132);
+    const buf = new ArrayBuffer(133 + clientVersion.length);
     const uint8View = new Uint8Array(buf);
     const dataView = new DataView(buf);
 
@@ -1667,16 +1670,26 @@ export class MuxedSocket {
     if (!encodeDeviceId.written || encodeDeviceId.written != 36) {
       throw new Error("Unable to encode device id")
     }
-    const encodeIsoDate = enc.encodeInto(now, uint8View.subarray(105));
+    let pos = 105;
+    const encodeIsoDate = enc.encodeInto(now, uint8View.subarray(pos));
     switch (encodeIsoDate.written) {
-    case 24:
-      return buf.slice(0, 129);
-    case 27:
-      dataView.setUint8(104, 0x1);
-      return buf;
-    default:
-      throw new Error("Unexpected ISO date length");
+      case 24:
+        pos = 129;
+        break;
+      case 27:
+        dataView.setUint8(104, 0x1);
+        pos = 132;
+        break;
+      default:
+        throw new Error("Unexpected ISO date length");
     }
+    const encodeClientVersion = enc.encodeInto(clientVersion, uint8View.subarray(pos+1));
+    if (encodeClientVersion.written && encodeClientVersion.written > 255) {
+      throw new Error("Client version too long to encode")
+    }
+    dataView.setUint8(pos, encodeClientVersion.written || 0);
+    pos = pos + 1 + (encodeClientVersion.written || 0);
+    return buf.slice(0, pos);
   }
 
   private encodeGoawayMsg(lastStream: number, errorCode: number, msg: string): ArrayBuffer {
