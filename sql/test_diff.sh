@@ -13,7 +13,6 @@ run_diff () {
     $SKDB_CMD --init $DB
     cat $1 $2 | $SKDB
 
-    pids=""
     for i in $(seq 0 $((nviews))); do
         rm -f /tmp/V$i
         $SKDB subscribe "V$i" --connect --updates "/tmp/V$i" > /dev/null &
@@ -28,6 +27,8 @@ run_diff () {
     done > /tmp/selects.sql;
 
     rm -f /tmp/replays
+
+    wait
 
     for i in $(seq 0 $((nviews))); do
         cat "/tmp/V$i" | $SKDB_CMD replay >> /tmp/replays
