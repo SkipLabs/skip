@@ -21,3 +21,4 @@ cp sql/js/src/skdb-cli.js "$PUBLIC_SKDB_REPO"/packages/skdb/src/skdb-cli.js
 # produced by makefile
 cp sql/js/dist/skdb-node.js "$PUBLIC_SKDB_REPO"/packages/skdb/src/skdb-node.js
 cp sql/js/dist/skdb.wasm "$PUBLIC_SKDB_REPO"/packages/skdb/skdb.wasm
+cp sql/js/src/version.ts "$PUBLIC_SKDB_REPO"/packages/skdb/src/version.ts
