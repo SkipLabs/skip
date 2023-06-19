@@ -647,3 +647,75 @@ class Config() {
     return v
   }
 }
+
+class RejectUnsupportedClients(val logger: Logger, val minJsClient: Config.Value<String>) :
+    NullServerPolicy() {
+
+  override fun notifySocketCreated(socket: MuxedSocket, db: String) {
+    socket.observeLifecycle { state ->
+      when (state) {
+        MuxedSocket.State.AUTH_RECV -> {
+          val clientVersion = socket.authenticatedWith?.msg?.clientVersion
+          val user = socket.authenticatedWith?.msg?.accessKey
+          val minSupportedVersion = SemVer.parse(minJsClient.get(user, db))
+          if (!supportedVersion(clientVersion, minSupportedVersion)) {
+            logger.log(
+                db,
+                "old_client",
+                user = user,
+                metadata = "Rejecting conn as ${clientVersion} is unsupported")
+            socket.errorSocket(2003u, "Client version is no longer supported, please update.")
+          }
+        }
+        MuxedSocket.State.IDLE,
+        MuxedSocket.State.CLOSING,
+        MuxedSocket.State.CLOSE_WAIT,
+        MuxedSocket.State.CLOSED -> Unit
+      }
+    }
+  }
+
+  private fun supportedVersion(version: String?, minComponents: SemVer): Boolean {
+    if (version == null) {
+      return false // all supported clients should announce version
+    }
+
+    // version strings are of the form: <client>-<major>.<minor>.<inc>
+
+    val split = version.split("-", limit = 2)
+    if (split.size != 2) {
+      return false // all supported clients should provide this well formed
+    }
+    val client = split[0]
+    val semVersion = split[1]
+
+    if (client != "js") {
+      return false
+    }
+
+    val clientComponents = SemVer.parse(semVersion)
+    return clientComponents >= minComponents
+  }
+
+  data class SemVer(val major: Int, val minor: Int, val inc: Int) : Comparable<SemVer> {
+    companion object Factory {
+      fun parse(version: String): SemVer {
+        val components = version.split(".", limit = 3)
+        if (components.size != 3) {
+          throw IllegalArgumentException("${version} is not a valid sem ver")
+        }
+        return SemVer(
+            major = Integer.parseInt(components[0]),
+            minor = Integer.parseInt(components[1]),
+            inc = Integer.parseInt(components[2]))
+      }
+    }
+
+    override fun compareTo(other: SemVer): Int {
+      val j = major.compareTo(other.major)
+      val n = minor.compareTo(other.minor)
+      val c = inc.compareTo(other.inc)
+      return if (j != 0) j else if (n != 0) n else c
+    }
+  }
+}
