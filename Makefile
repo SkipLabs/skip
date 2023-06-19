@@ -27,6 +27,13 @@ sql/js/dist/%.js: sql/js/src/%.ts
 sql/js/dist/%.js: sql/js/src/%.js
 	cd sql/js && tsc --build tsconfig.json --pretty false
 
+sql/js/dist/version.js: sql/js/package.json
+	./sql/js/create_version.sh
+	cd sql/js && tsc --build tsconfig.json --pretty false
+
+sql/js/dist/skdb.js: sql/js/dist/version.js sql/js/src/skdb.ts
+	cd sql/js && tsc --build tsconfig.json --pretty false
+
 sql/js/dist/skdb-node.js: sql/js/dist/skdb.js sql/js/src/node_header.js
 	mkdir -p sql/js/dist
 	cat sql/js/src/node_header.js sql/js/dist/skdb.js \

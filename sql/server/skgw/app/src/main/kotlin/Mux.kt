@@ -115,7 +115,8 @@ data class MuxAuthMsg(
     val nonce: ByteArray,
     val signature: ByteArray,
     val deviceUuid: String,
-    val date: String
+    val date: String,
+    val clientVersion: String,
 ) : MuxMsg()
 
 data class MuxGoawayMsg(
@@ -671,7 +672,11 @@ class MuxedSocket(
         val dateBytes = ByteArray(if (dateLength == 0u) 24 else 27)
         msg.get(dateBytes)
         val date = String(dateBytes, StandardCharsets.US_ASCII)
-        MuxAuthMsg(version, accessKey, nonce, signature, deviceUuid, date)
+        val clientVersionLength = msg.get()
+        val clientVersionBytes = ByteArray(clientVersionLength.toInt())
+        msg.get(clientVersionBytes)
+        val clientVersion = String(clientVersionBytes, StandardCharsets.US_ASCII)
+        MuxAuthMsg(version, accessKey, nonce, signature, deviceUuid, date, clientVersion)
       }
       // goaway
       1u -> {
