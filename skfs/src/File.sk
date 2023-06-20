@@ -5,67 +5,75 @@ native fun createExternalPointer(ExternalPointer): ExternalPointer;
 
 base class BExternalPointer {
   fun toString(): String;
-  fun getMagicNumber(): Int;
+  fun getMagicNumber(): UInt32;
 }
 
-class DumbPointer(n: Int) extends BExternalPointer {
+class DumbPointer(n: UInt32) extends BExternalPointer {
   fun toString(): String {
     "dumb:" + this.n
   }
-  fun getMagicNumber(): Int {
-    0
+  fun getMagicNumber(): UInt32 {
+    UInt32::truncate(0)
   }
 }
 
 class ExternalPointer private (
-  magic: Int,
-  value: Int,
-  destructor: Int ~> void,
+  magic: UInt32,
+  value: UInt32,
+  destructor: UInt32 ~> void,
 ) extends File, BExternalPointer {
-  static fun create(value: Int, destructor: Int ~> void): this {
-    createExternalPointer(static(234566 + value % 2, value, destructor));
+  static fun create(value: UInt32, destructor: UInt32 ~> void): this {
+    createExternalPointer(
+      static(UInt32::truncate(234566 + value % 2), value, destructor),
+    );
   }
 
   static fun getExternalPointer(): ExternalPointer {
-    ExternalPointer(0, 0, _ ~> void)
+    ExternalPointer(UInt32::truncate(0), UInt32::truncate(0), _ ~> void)
   }
 
   fun toString(): String {
     "external:" + this.value
   }
 
-  fun getMagicNumber(): Int {
+  fun getMagicNumber(): UInt32 {
     this.magic
   }
 }
 
+@wasm_export("sk_get_magic_number")
 @cpp_export("sk_get_magic_number")
-fun getExternalPointerMagicNumber(ep: BExternalPointer): Int {
+fun getExternalPointerMagicNumber(ep: BExternalPointer): UInt32 {
   ep.getMagicNumber()
 }
 
+@wasm_export("sk_debug_external_pointer")
 @cpp_export("sk_debug_external_pointer")
 fun debugExternalPointer(ep: BExternalPointer): void {
   debug(ep.toString())
 }
 
+@wasm_export("sk_get_external_pointer")
 @cpp_export("sk_get_external_pointer")
 fun getExternalPointer(): ExternalPointer {
   ExternalPointer::getExternalPointer()
 }
 
+@wasm_export("sk_get_external_pointer_value")
 @cpp_export("sk_get_external_pointer_value")
-fun getValue(p: ExternalPointer): Int {
+fun getValue(p: ExternalPointer): UInt32 {
   p.value
 }
 
+@wasm_export("sk_get_external_pointer_destructor")
 @cpp_export("sk_get_external_pointer_destructor")
-fun getDestructor(p: ExternalPointer): Int ~> void {
+fun getDestructor(p: ExternalPointer): UInt32 ~> void {
   p.destructor
 }
 
+@wasm_export("sk_call_external_pointer_descructor")
 @cpp_export("sk_call_external_pointer_descructor")
-fun callDestructor(destructor: Int ~> void, value: Int): void {
+fun callDestructor(destructor: UInt32 ~> void, value: UInt32): void {
   destructor(value)
 }
 
