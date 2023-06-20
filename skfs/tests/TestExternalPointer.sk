@@ -3,7 +3,7 @@ module alias T = SKTest;
 module SKFSTest;
 
 @cpp_extern("SKIP_test_free_external_pointer")
-native fun testFreeEP(Int): void;
+native fun testFreeEP(UInt32): void;
 
 @cpp_extern("SKIP_get_free_test_counter")
 native fun getFreeTestCounter(): Int;
@@ -17,7 +17,7 @@ fun testExternalPointer(): void {
       context.setGlobal("Count", SKFS.IntFile(0));
     };
     round = SKFS.IntFile::fromFile(context.getGlobal("Count").fromSome()).value;
-    epointer = SKFS.ExternalPointer::create(round, testFreeEP);
+    epointer = SKFS.ExternalPointer::create(UInt32::truncate(round), testFreeEP);
     testCounter = getFreeTestCounter();
     T.expectEq(
       round,
