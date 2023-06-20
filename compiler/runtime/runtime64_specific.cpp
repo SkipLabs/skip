@@ -195,7 +195,11 @@ char* SKIP_getArgN(uint32_t n) {
   return sk_string_create(argv[n], strlen(argv[n]));
 }
 
-char* SKIP_getenv(char* name) {
+char* SKIP_getenv(char* skName) {
+  size_t name_size = SKIP_String_byteSize(skName);
+  char* name = (char*)malloc(name_size+1);
+  memcpy(name, skName, name_size);
+  name[name_size] = (char)0;
   char *value = getenv(name);
   if (value == 0) {
     return sk_string_create("", 0);
