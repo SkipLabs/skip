@@ -40,3 +40,13 @@ task("runMuxTestServer", JavaExec::class) {
   mainClass.set("io.skiplabs.skgw.test.MuxTestServerKt")
   classpath = sourceSets["test"].runtimeClasspath
 }
+
+tasks.jar {
+    manifest.attributes["Main-Class"] = "io.skiplabs.skgw.AppKt"
+    val dependencies = configurations
+        .runtimeClasspath
+        .get()
+        .map(::zipTree)
+    from(dependencies)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
