@@ -4,7 +4,7 @@
 
 # we use x86-64 in the cloud so we need to duplicate the build steps
 # here - we can't reuse existing images that might be arm64
-FROM --platform=linux/amd64 ubuntu:20.04 as build
+FROM --platform=linux/amd64 ubuntu:20.04 as skdb
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
@@ -23,23 +23,24 @@ WORKDIR /skfs
 
 RUN make clean && make -B build/skdb && make -B build/init.sql
 
-RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
-RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && sdk install java 19.0.1-oracle"
+# we use native for skgw as gradle does NOT like being emulated and
+# this is faster anyway
+FROM eclipse-temurin:19 as skgw
+
+COPY . /skfs
 
 WORKDIR /skfs/sql/server/skgw
-ENV JAVA_HOME=/root/.sdkman/candidates/java/current
 RUN ./gradlew jar --no-daemon --console plain
 
 ################################################################################
-# Build the production image
+# Build the production image by copying out artifacts
 ################################################################################
 
-FROM --platform=linux/amd64 ubuntu:22.04 as prod
+FROM --platform=linux/amd64 eclipse-temurin:19 as prod
 
 WORKDIR /skfs
 
-COPY --from=build /skfs/build ./
-COPY --from=build /skfs/sql/server/skgw/app/build/libs/app.jar /skfs/build/server.jar
-COPY --from=build /root/.sdkman /root/
+COPY --from=skdb /skfs/build ./build
+COPY --from=skgw /skfs/sql/server/skgw/app/build/libs/app.jar /skfs/build/server.jar
 
-CMD /root/.sdkman/candidates/java/current/bin/java -jar /skfs/build/server.jar
+CMD java -jar /skfs/build/server.jar
