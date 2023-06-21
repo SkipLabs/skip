@@ -8,6 +8,7 @@ import io.undertow.websockets.core.CloseMessage
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
+import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.channels.Channel
@@ -23,21 +24,20 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import java.net.URI
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import org.xnio.ChannelListener
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
+import org.xnio.ChannelListener
 
 interface MuxedSocketFactory {
-  fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel): MuxedSocket
+  fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocket): MuxedSocket
 }
 
 class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConnectionCallback {
 
   override fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel) {
-    val muxedSocket = socketFactory.onConnect(exchange, channel)
+    val muxedSocket = socketFactory.onConnect(exchange, WebSocketChannelAdapter(channel))
 
     channel.receiveSetter.set(
         object : AbstractReceiveListener() {
@@ -96,34 +96,34 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
   }
 }
 
-class MuxedSocketClient(val uri: URI): WebSocketClient(uri) {
+class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
 
-    override fun onOpen(handshake: ServerHandshake) {
-      println("> onOpen [yvlzt]")
-      println(": [hogju] handshake: ${handshake}")
-    }
+  override fun onOpen(handshake: ServerHandshake) {
+    println("> onOpen [yvlzt]")
+    println(": [hogju] handshake: ${handshake}")
+  }
 
-    override fun onMessage(msg: String) {
-      println("> onMessage [zusgq]")
-      println(": [amnba] msg: ${msg}")
-    }
+  override fun onMessage(msg: String) {
+    println("> onMessage [zusgq]")
+    println(": [amnba] msg: ${msg}")
+  }
 
-    override fun onMessage(buf: ByteBuffer) {
-      println("> onMessage [sztjp]")
-      println(": [sfsiv] buf: ${buf}")
-    }
+  override fun onMessage(buf: ByteBuffer) {
+    println("> onMessage [sztjp]")
+    println(": [sfsiv] buf: ${buf}")
+  }
 
-    override fun onClose(code: Int, reason: String, remote: Boolean) {
-      println("> onClose [ukunf]")
-      println(": [fovpr] code: ${code}")
-      println(": [mkiro] reason: ${reason}")
-      println(": [uxubc] remote: ${remote}")
-    }
+  override fun onClose(code: Int, reason: String, remote: Boolean) {
+    println("> onClose [ukunf]")
+    println(": [fovpr] code: ${code}")
+    println(": [mkiro] reason: ${reason}")
+    println(": [uxubc] remote: ${remote}")
+  }
 
-    override fun onError(ex: Exception) {
-      println("> onError [oftsu]")
-      println(": [pijds] ex: ${ex}")
-    }
+  override fun onError(ex: Exception) {
+    println("> onError [oftsu]")
+    println(": [pijds] ex: ${ex}")
+  }
 }
 
 typealias onStreamFn = (MuxedSocket, Stream) -> Unit
@@ -166,13 +166,65 @@ data class MuxStreamCloseMsg(val stream: UInt) : MuxMsg()
 
 data class MuxStreamResetMsg(val stream: UInt, val errorCode: UInt, val msg: String) : MuxMsg()
 
+interface WebSocket {
+  fun close()
+  fun sendData(data: ByteBuffer)
+  fun sendClose(code: Int, reason: String)
+  fun suspendReceives()
+  fun resumeReceives()
+}
+
+// server from undertow
+class WebSocketChannelAdapter(val channel: WebSocketChannel) : WebSocket {
+  override fun close() {
+    channel.close()
+  }
+
+  override fun sendData(data: ByteBuffer) {
+    if (channel.isOpen()) {
+      WebSockets.sendBinaryBlocking(data, channel)
+    }
+  }
+
+  override fun sendClose(code: Int, reason: String) {
+    if (channel.isOpen()) {
+      WebSockets.sendCloseBlocking(code, reason, channel)
+    }
+  }
+
+  override fun suspendReceives() {
+    channel.suspendReceives()
+  }
+
+  override fun resumeReceives() {
+    channel.resumeReceives()
+  }
+}
+
+// client from java_websocket
+class WebSocketClientAdapter(val client: WebSocketClient) : WebSocket {
+  // TODO: implement
+
+  override fun close() {}
+
+  override fun sendData(data: ByteBuffer) {}
+
+  override fun sendClose(code: Int, reason: String) {}
+
+  override fun suspendReceives() {}
+
+  override fun resumeReceives() {}
+}
+
 class MuxedSocket(
-    val channel: WebSocketChannel,
+    val channel: WebSocket,
     val taskPool: ScheduledExecutorService,
     val onStream: onStreamFn,
     val onClose: onSocketCloseFn,
     val onError: onSocketErrorFn,
-    val getDecryptedKey: (MuxAuthMsg) -> ByteArray,
+    val getDecryptedKey: (MuxAuthMsg) -> ByteArray = { _ ->
+      throw RuntimeException("Acting as a client initated socket")
+    },
 ) {
   enum class State {
     IDLE,
@@ -800,15 +852,11 @@ class MuxedSocket(
   }
 
   private fun sendClose(code: Int, reason: String) {
-    if (channel.isOpen()) {
-      WebSockets.sendCloseBlocking(code, reason, channel)
-    }
+    channel.sendClose(code, reason)
   }
 
   private fun sendData(data: ByteBuffer) {
-    if (channel.isOpen()) {
-      WebSockets.sendBinaryBlocking(data, channel)
-    }
+    channel.sendData(data)
   }
 }
 
@@ -941,12 +989,10 @@ class Stream(
   }
 }
 
-fun connect(endpoint: URI): MuxedSocketClient {
+fun connect(endpoint: URI): WebSocket {
   val client = MuxedSocketClient(endpoint)
   client.connect()
-  // TODO:
-  // wait for connection or error (throw exception on error)
-  // val socket = MuxedSocket(client,)
-  // socket.sendAuth(creds)
-  return client
+  // TODO: wait for connection or error (throw exception on error)
+  // TODO: socket.sendAuth(creds)
+  return WebSocketClientAdapter(client)
 }
