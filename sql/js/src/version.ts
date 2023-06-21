@@ -1,1 +1,1 @@
-export const npmVersion = "0.0.40"
+export const npmVersion = "0.0.41"
