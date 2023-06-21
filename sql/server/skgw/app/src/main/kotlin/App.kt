@@ -255,7 +255,7 @@ fun connectionHandler(
           object : MuxedSocketFactory {
             override fun onConnect(
                 exchange: WebSocketHttpExchange,
-                channel: WebSocketChannel
+                channel: WebSocket
             ): MuxedSocket {
               val pathParams =
                   exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
