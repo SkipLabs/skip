@@ -24,6 +24,9 @@ dependencies {
   // aws
   implementation("software.amazon.awssdk:bom:2.20.3")
   implementation("software.amazon.awssdk:kms:2.20.3")
+
+  // ws client
+  implementation("org.java-websocket:Java-WebSocket:1.5.3")
 }
 
 application {
@@ -38,6 +41,11 @@ spotless { kotlin { ktfmt("0.42") } }
 
 task("runMuxTestServer", JavaExec::class) {
   mainClass.set("io.skiplabs.skgw.test.MuxTestServerKt")
+  classpath = sourceSets["test"].runtimeClasspath
+}
+
+task("runMuxTestClient", JavaExec::class) {
+  mainClass.set("io.skiplabs.skgw.test.MuxTestClientKt")
   classpath = sourceSets["test"].runtimeClasspath
 }
 

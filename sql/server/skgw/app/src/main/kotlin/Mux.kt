@@ -23,11 +23,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
+import java.net.URI
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.xnio.ChannelListener
-
-// TODO: this all has a blocking interface
+import org.java_websocket.client.WebSocketClient
+import org.java_websocket.handshake.ServerHandshake
 
 interface MuxedSocketFactory {
   fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel): MuxedSocket
@@ -93,6 +94,36 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
 
     channel.resumeReceives()
   }
+}
+
+class MuxedSocketClient(val uri: URI): WebSocketClient(uri) {
+
+    override fun onOpen(handshake: ServerHandshake) {
+      println("> onOpen [yvlzt]")
+      println(": [hogju] handshake: ${handshake}")
+    }
+
+    override fun onMessage(msg: String) {
+      println("> onMessage [zusgq]")
+      println(": [amnba] msg: ${msg}")
+    }
+
+    override fun onMessage(buf: ByteBuffer) {
+      println("> onMessage [sztjp]")
+      println(": [sfsiv] buf: ${buf}")
+    }
+
+    override fun onClose(code: Int, reason: String, remote: Boolean) {
+      println("> onClose [ukunf]")
+      println(": [fovpr] code: ${code}")
+      println(": [mkiro] reason: ${reason}")
+      println(": [uxubc] remote: ${remote}")
+    }
+
+    override fun onError(ex: Exception) {
+      println("> onError [oftsu]")
+      println(": [pijds] ex: ${ex}")
+    }
 }
 
 typealias onStreamFn = (MuxedSocket, Stream) -> Unit
@@ -908,4 +939,14 @@ class Stream(
       observer(s)
     }
   }
+}
+
+fun connect(endpoint: URI): MuxedSocketClient {
+  val client = MuxedSocketClient(endpoint)
+  client.connect()
+  // TODO:
+  // wait for connection or error (throw exception on error)
+  // val socket = MuxedSocket(client,)
+  // socket.sendAuth(creds)
+  return client
 }
