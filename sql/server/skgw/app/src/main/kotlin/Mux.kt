@@ -34,6 +34,35 @@ import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import org.xnio.ChannelListener
 
+data class Credentials(
+    val accessKey: String,
+    val privateKey: ByteArray,
+    val encryptedPrivateKey: ByteArray,
+    val deviceUuid: String? = null,
+) {
+  fun b64privateKey(): String = Base64.getEncoder().encodeToString(privateKey)
+  fun b64encryptedKey(): String = Base64.getEncoder().encodeToString(encryptedPrivateKey)
+  fun clear(): Unit {
+    privateKey.fill(0)
+    encryptedPrivateKey.fill(0)
+  }
+  override fun toString(): String {
+    return "Credentials(accessKey=${accessKey}, privateKey=**redacted**, deviceId=${deviceUuid})"
+  }
+
+  fun sign(nonce: ByteArray, date: String): ByteArray {
+    val nonce64 = Base64.getEncoder().encodeToString(nonce)
+    val content: String = "auth" + accessKey + date + nonce64
+    val contentBytes = content.toByteArray(Charsets.UTF_8)
+
+    val algo = "HmacSHA256"
+    val mac = Mac.getInstance(algo)
+
+    mac.init(SecretKeySpec(privateKey, algo))
+    return mac.doFinal(contentBytes)
+  }
+}
+
 interface MuxedSocketFactory {
   fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocket): MuxedSocket
 }
@@ -849,6 +878,7 @@ class MuxedSocket(
     }
   }
 
+  // TODO: can this be implemented in terms of Credentials.sign?
   private fun verify(auth: MuxAuthMsg): Boolean {
     val algo = "HmacSHA256"
 
