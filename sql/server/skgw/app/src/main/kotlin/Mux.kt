@@ -298,7 +298,7 @@ class MuxedSocket(
 ) {
   enum class State {
     IDLE,
-    AUTH_RECV,
+    AUTH,
     CLOSING,
     CLOSE_WAIT,
     CLOSED
@@ -361,7 +361,7 @@ class MuxedSocket(
       State.CLOSING -> {
         throw RuntimeException("Connection closed")
       }
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         val stream = Stream(nextStream, this)
         mutex.writeLock().lock()
         try {
@@ -409,7 +409,7 @@ class MuxedSocket(
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
         channel.close()
       }
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         mutex.writeLock().lock()
         try {
           val keys = activeStreams.keys.toSet()
@@ -443,7 +443,7 @@ class MuxedSocket(
       }
       State.IDLE,
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         mutex.writeLock().lock()
         try {
           val keys = activeStreams.keys.toSet()
@@ -490,7 +490,7 @@ class MuxedSocket(
       State.CLOSING,
       State.CLOSED -> {}
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         throw RuntimeException("Trying to send an auth message on an authenticated socket.")
       }
       State.IDLE -> {
@@ -514,7 +514,7 @@ class MuxedSocket(
         mutex.writeLock().lock()
         try {
           authenticatedWith = AuthWith(authMsg, Instant.now())
-          setState(State.AUTH_RECV)
+          setState(State.AUTH)
         } finally {
           mutex.writeLock().unlock()
         }
@@ -540,7 +540,7 @@ class MuxedSocket(
             mutex.writeLock().lock()
             try {
               authenticatedWith = AuthWith(muxMsg, Instant.now())
-              setState(State.AUTH_RECV)
+              setState(State.AUTH)
             } finally {
               mutex.writeLock().unlock()
             }
@@ -553,7 +553,7 @@ class MuxedSocket(
           is MuxPingAlreadyHandledMsg -> {}
         }
       }
-      State.AUTH_RECV,
+      State.AUTH,
       State.CLOSING -> {
         if (!isClient) {
           val now = Instant.now()
@@ -620,7 +620,7 @@ class MuxedSocket(
       State.CLOSED,
       State.CLOSE_WAIT -> {}
       State.IDLE,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         mutex.writeLock().lock()
         try {
           val keys = activeStreams.keys.toSet()
@@ -661,7 +661,7 @@ class MuxedSocket(
       State.CLOSED -> {}
       State.IDLE,
       State.CLOSE_WAIT,
-      State.AUTH_RECV,
+      State.AUTH,
       State.CLOSING -> {
         mutex.writeLock().lock()
         try {
@@ -690,7 +690,7 @@ class MuxedSocket(
       State.CLOSING,
       State.CLOSED -> {}
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         sendData(encodeStreamCloseMsg(streamId))
         if (nowClosed) {
           mutex.writeLock().lock()
@@ -710,7 +710,7 @@ class MuxedSocket(
       State.CLOSING,
       State.CLOSED -> {}
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         sendData(encodeStreamErrorMsg(streamId, errorCode, msg))
         mutex.writeLock().lock()
         try {
@@ -728,7 +728,7 @@ class MuxedSocket(
       State.CLOSING,
       State.CLOSED -> {}
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         sendData(encodeStreamDataMsg(streamId, data))
       }
     }
@@ -981,7 +981,7 @@ class MuxedSocket(
           State.CLOSING,
           State.CLOSED -> {}
           State.CLOSE_WAIT,
-          State.AUTH_RECV -> {
+          State.AUTH -> {
             sendData(encodePongMsg())
           }
         }
