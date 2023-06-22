@@ -26,6 +26,10 @@ import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import org.xnio.ChannelListener
@@ -97,10 +101,19 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
 }
 
 class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
+  // TODO: implement
+
+  private var openContinuation: Continuation<MuxedSocketClient>? = null
 
   override fun onOpen(handshake: ServerHandshake) {
     println("> onOpen [yvlzt]")
     println(": [hogju] handshake: ${handshake}")
+
+    if (openContinuation != null) {
+      val cont = openContinuation
+      openContinuation = null
+      cont?.resume(this)
+    }
   }
 
   override fun onMessage(msg: String) {
@@ -118,11 +131,27 @@ class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
     println(": [fovpr] code: ${code}")
     println(": [mkiro] reason: ${reason}")
     println(": [uxubc] remote: ${remote}")
+
+    if (openContinuation != null) {
+      openContinuation?.resumeWithException(
+          RuntimeException("Close received while waiting for open"))
+      openContinuation = null;
+    }
   }
 
   override fun onError(ex: Exception) {
     println("> onError [oftsu]")
     println(": [pijds] ex: ${ex}")
+
+    if (openContinuation != null) {
+      openContinuation?.resumeWithException(ex)
+      openContinuation = null;
+    }
+  }
+
+  suspend fun open() = suspendCoroutine { cont ->
+    openContinuation = cont
+    this.connect()
   }
 }
 
@@ -205,7 +234,9 @@ class WebSocketChannelAdapter(val channel: WebSocketChannel) : WebSocket {
 class WebSocketClientAdapter(val client: WebSocketClient) : WebSocket {
   // TODO: implement
 
-  override fun close() {}
+  override fun close() {
+    client.close()
+  }
 
   override fun sendData(data: ByteBuffer) {}
 
@@ -989,10 +1020,9 @@ class Stream(
   }
 }
 
-fun connect(endpoint: URI): WebSocket {
+suspend fun connect(endpoint: URI): WebSocket {
   val client = MuxedSocketClient(endpoint)
-  client.connect()
-  // TODO: wait for connection or error (throw exception on error)
+  client.open()
   // TODO: socket.sendAuth(creds)
   return WebSocketClientAdapter(client)
 }
