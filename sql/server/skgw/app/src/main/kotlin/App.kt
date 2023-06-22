@@ -18,23 +18,8 @@ import kotlin.system.exitProcess
 
 val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
 
-data class Credentials(
-    val accessKey: String,
-    val privateKey: ByteArray,
-    val encryptedPrivateKey: ByteArray
-) {
-  fun b64privateKey(): String = Base64.getEncoder().encodeToString(privateKey)
-  fun b64encryptedKey(): String = Base64.getEncoder().encodeToString(encryptedPrivateKey)
-  fun clear(): Unit {
-    privateKey.fill(0)
-    encryptedPrivateKey.fill(0)
-  }
-  fun toProtoCredentials(): ProtoCredentials {
-    return ProtoCredentials(accessKey, ByteBuffer.wrap(privateKey))
-  }
-  override fun toString(): String {
-    return "Credentials(accessKey=${accessKey}, privateKey=**redacted**)"
-  }
+fun Credentials.toProtoCredentials(): ProtoCredentials {
+  return ProtoCredentials(accessKey, ByteBuffer.wrap(privateKey))
 }
 
 fun genAccessKey(): String {
