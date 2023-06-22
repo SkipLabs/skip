@@ -25,6 +25,7 @@ import java.util.Queue
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
@@ -331,17 +332,22 @@ class MuxedSocket(
         }
 
   private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
-  private val timeout =
-      taskPool.schedule(
-          {
-            // we use error rather than close to trigger error callback
-            // per stream for cleanup. using close would rely on the
-            // client gracefully responding with a close in order to free
-            // resources
-            this.errorSocket(1003u, "session timeout")
-          },
-          10,
-          TimeUnit.MINUTES)
+  private var timeout: ScheduledFuture<*>? = null
+  init {
+    if (!isClient) {
+      timeout =
+          taskPool.schedule(
+              {
+                // we use error rather than close to trigger error callback
+                // per stream for cleanup. using close would rely on the
+                // client gracefully responding with a close in order to free
+                // resources
+                this.errorSocket(1003u, "session timeout")
+              },
+              10,
+              TimeUnit.MINUTES)
+    }
+  }
 
   // user-facing interface /////////////////////////////////////////////////////
 
@@ -419,7 +425,7 @@ class MuxedSocket(
         channel.close()
       }
     }
-    timeout.cancel(false)
+    timeout?.cancel(false)
   }
 
   fun errorSocket(errorCode: UInt, msg: String) {
@@ -461,7 +467,7 @@ class MuxedSocket(
         channel.close()
       }
     }
-    timeout.cancel(false)
+    timeout?.cancel(false)
   }
 
   // TODO: pingSocket() - we don't implement yet as we don't have a use
@@ -549,10 +555,13 @@ class MuxedSocket(
       }
       State.AUTH_RECV,
       State.CLOSING -> {
-        val now = Instant.now()
-        if (Duration.between(authenticatedWith?.at!!, now).abs().compareTo(maxConnectionDuration) >
-            0) {
-          errorSocket(1003u, "session timeout")
+        if (!isClient) {
+          val now = Instant.now()
+          if (Duration.between(authenticatedWith?.at!!, now)
+              .abs()
+              .compareTo(maxConnectionDuration) > 0) {
+            errorSocket(1003u, "session timeout")
+          }
         }
 
         val muxMsg = decodeMsg(msg)
@@ -670,7 +679,7 @@ class MuxedSocket(
         }
       }
     }
-    timeout.cancel(false)
+    timeout?.cancel(false)
   }
 
   // interface used by Stream //////////////////////////////////////////////////
