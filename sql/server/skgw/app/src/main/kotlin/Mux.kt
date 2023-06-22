@@ -103,6 +103,8 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
 class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
   // TODO: implement
 
+  var socket: MuxedSocket? = null
+
   private var openContinuation: Continuation<MuxedSocketClient>? = null
 
   override fun onOpen(handshake: ServerHandshake) {
@@ -135,7 +137,7 @@ class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
     if (openContinuation != null) {
       openContinuation?.resumeWithException(
           RuntimeException("Close received while waiting for open"))
-      openContinuation = null;
+      openContinuation = null
     }
   }
 
@@ -145,11 +147,12 @@ class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
 
     if (openContinuation != null) {
       openContinuation?.resumeWithException(ex)
-      openContinuation = null;
+      openContinuation = null
     }
   }
 
-  suspend fun open() = suspendCoroutine { cont ->
+  suspend fun open(muxSocket: MuxedSocket) = suspendCoroutine { cont ->
+    socket = muxSocket
     openContinuation = cont
     this.connect()
   }
@@ -1020,9 +1023,23 @@ class Stream(
   }
 }
 
-suspend fun connect(endpoint: URI): WebSocket {
+suspend fun connect(
+    endpoint: URI,
+    taskPool: ScheduledExecutorService,
+    onStream: onStreamFn,
+    onClose: onSocketCloseFn,
+    onError: onSocketErrorFn,
+): MuxedSocket {
   val client = MuxedSocketClient(endpoint)
-  client.open()
+  val socket =
+      MuxedSocket(
+          channel = WebSocketClientAdapter(client),
+          taskPool,
+          onStream,
+          onClose,
+          onError,
+      )
+  client.open(socket)
   // TODO: socket.sendAuth(creds)
-  return WebSocketClientAdapter(client)
+  return socket
 }
