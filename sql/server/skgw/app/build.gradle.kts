@@ -1,5 +1,5 @@
 plugins {
-  id("org.jetbrains.kotlin.jvm") version "1.7.10"
+  id("org.jetbrains.kotlin.jvm") version "1.8.20"
 
   // for lint and formatting
   id("com.diffplug.spotless") version "6.12.1"
@@ -27,6 +27,8 @@ dependencies {
 
   // ws client
   implementation("org.java-websocket:Java-WebSocket:1.5.3")
+
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
 }
 
 application {
