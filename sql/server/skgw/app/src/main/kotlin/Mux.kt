@@ -999,10 +999,7 @@ class MuxedSocket(
     }
   }
 
-  // TODO: can this be implemented in terms of Credentials.sign?
   private fun verify(auth: MuxAuthMsg): Boolean {
-    val algo = "HmacSHA256"
-
     try {
       val now = Instant.now()
       val d = Instant.parse(auth.date)
@@ -1016,21 +1013,13 @@ class MuxedSocket(
 
       // TODO: check nonce against a cache to prevent replay attacks
 
-      val nonce = Base64.getEncoder().encodeToString(auth.nonce)
-      val content: String = "auth" + auth.accessKey + auth.date + nonce
-      val contentBytes = content.toByteArray(Charsets.UTF_8)
-
-      val mac = Mac.getInstance(algo)
-
-      val privateKey = getDecryptedKey(auth)
-
-      mac.init(SecretKeySpec(privateKey, algo))
-      val ourSig = mac.doFinal(contentBytes)
+      val creds = Credentials(auth.accessKey, getDecryptedKey(auth), ByteArray(0), auth.deviceUuid)
+      val matches = Arrays.equals(creds.sign(auth.nonce, auth.date), auth.signature)
 
       // at least try to keep the private key in memory for as little time as possible
-      privateKey.fill(0)
+      creds.clear()
 
-      return Arrays.equals(ourSig, auth.signature)
+      return matches
     } catch (ex: Exception) {
       return false
     }

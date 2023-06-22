@@ -13,9 +13,15 @@ fun main() = runBlocking {
       connect(
           URI("ws://localhost:8080/"),
           taskPool = taskPool,
-          onStream = { _, _ -> },
-          onClose = {},
-          onError = { _, _, _ -> },
+          onStream = { _, _ ->
+            println("> stream opened [dmfbj]")
+          },
+          onClose = {
+            println("> close [inpep]")
+          },
+          onError = { _, code, reason ->
+            println("error ${code} ${reason}")
+          },
           creds =
               Credentials(
                   "ABCDEFGHIJKLMNOPQRST",
