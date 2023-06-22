@@ -13,6 +13,7 @@ import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.channels.Channel
 import java.nio.charset.StandardCharsets
+import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
@@ -28,7 +29,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import java.security.SecureRandom
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.coroutines.Continuation
@@ -135,16 +135,11 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
 }
 
 class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
-  // TODO: implement
-
   var socket: MuxedSocket? = null
 
   private var openContinuation: Continuation<MuxedSocketClient>? = null
 
   override fun onOpen(handshake: ServerHandshake) {
-    println("> onOpen [yvlzt]")
-    println(": [hogju] handshake: ${handshake}")
-
     if (openContinuation != null) {
       val cont = openContinuation
       openContinuation = null
@@ -153,36 +148,35 @@ class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
   }
 
   override fun onMessage(msg: String) {
-    println("> onMessage [zusgq]")
-    println(": [amnba] msg: ${msg}")
+    throw RuntimeException("Received text data: ${msg}")
   }
 
   override fun onMessage(buf: ByteBuffer) {
-    println("> onMessage [sztjp]")
-    println(": [sfsiv] buf: ${buf}")
+    socket?.onSocketMessage(buf)
   }
 
   override fun onClose(code: Int, reason: String, remote: Boolean) {
-    println("> onClose [ukunf]")
-    println(": [fovpr] code: ${code}")
-    println(": [mkiro] reason: ${reason}")
-    println(": [uxubc] remote: ${remote}")
-
     if (openContinuation != null) {
       openContinuation?.resumeWithException(
           RuntimeException("Close received while waiting for open"))
       openContinuation = null
+      return
+    }
+
+    if (code == CloseMessage.NORMAL_CLOSURE || code == CloseMessage.GOING_AWAY) {
+      socket?.onSocketClose()
+    } else {
+      socket?.onSocketError(0u, "websocket closed unexpectedly")
     }
   }
 
   override fun onError(ex: Exception) {
-    println("> onError [oftsu]")
-    println(": [pijds] ex: ${ex}")
-
     if (openContinuation != null) {
       openContinuation?.resumeWithException(ex)
       openContinuation = null
+      return
     }
+    socket?.onSocketError(0u, "websocket error")
   }
 
   suspend fun open(muxSocket: MuxedSocket) = suspendCoroutine { cont ->
@@ -269,8 +263,6 @@ class WebSocketChannelAdapter(val channel: WebSocketChannel) : WebSocket {
 
 // client from java_websocket
 class WebSocketClientAdapter(val client: WebSocketClient) : WebSocket {
-  // TODO: implement
-
   override fun close() {
     client.close()
   }
@@ -279,11 +271,17 @@ class WebSocketClientAdapter(val client: WebSocketClient) : WebSocket {
     client.send(data)
   }
 
-  override fun sendClose(code: Int, reason: String) {}
+  override fun sendClose(code: Int, reason: String) {
+    client.close(code, reason)
+  }
 
-  override fun suspendReceives() {}
+  override fun suspendReceives() {
+    throw UnsupportedOperationException()
+  }
 
-  override fun resumeReceives() {}
+  override fun resumeReceives() {
+    throw UnsupportedOperationException()
+  }
 }
 
 class MuxedSocket(
@@ -295,6 +293,7 @@ class MuxedSocket(
     val getDecryptedKey: (MuxAuthMsg) -> ByteArray = { _ ->
       throw RuntimeException("Acting as a client initated socket")
     },
+    val isClient: Boolean = false,
 ) {
   enum class State {
     IDLE,
@@ -316,8 +315,8 @@ class MuxedSocket(
           mutex.readLock().unlock()
         }
   private var state: State = State.IDLE
-  private var nextStream: UInt = 2u
-  private var clientStreamWatermark: UInt = 0u
+  private var nextStream: UInt = if (isClient) 1u else 2u
+  private var otherStreamWatermark: UInt = 0u
   private val activeStreams: MutableMap<UInt, Stream> = HashMap()
   private var observers: MutableList<(State) -> Unit> = ArrayList()
 
@@ -453,8 +452,7 @@ class MuxedSocket(
           endState = MuxedSocketEnd(true, errorCode, msg)
           setState(State.CLOSED)
           val lastStream =
-              if (nextStream - 2u > clientStreamWatermark) nextStream - 2u
-              else clientStreamWatermark
+              if (nextStream - 2u > otherStreamWatermark) nextStream - 2u else otherStreamWatermark
           sendData(encodeGoawayMsg(lastStream, errorCode, msg))
         } finally {
           mutex.writeLock().unlock()
@@ -587,10 +585,10 @@ class MuxedSocket(
             mutex.writeLock().lock()
             try {
               if (stream == null &&
-                  muxMsg.stream % 2u == 1u &&
-                  muxMsg.stream > clientStreamWatermark) {
+                  muxMsg.stream % 2u == (if (isClient) 0u else 1u) &&
+                  muxMsg.stream > otherStreamWatermark) {
                 // legitimate new stream
-                clientStreamWatermark = muxMsg.stream
+                otherStreamWatermark = muxMsg.stream
                 stream = Stream(muxMsg.stream, this)
                 activeStreams.put(muxMsg.stream, stream)
                 onStream(this, stream)
@@ -1183,6 +1181,7 @@ suspend fun connect(
           onStream,
           onClose,
           onError,
+          isClient = true,
       )
   client.open(socket)
   socket.sendAuth(creds)
