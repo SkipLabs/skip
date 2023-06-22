@@ -1,5 +1,6 @@
 package io.skiplabs.skgw.test
 
+import io.skiplabs.skgw.Credentials
 import io.skiplabs.skgw.connect
 import java.net.URI
 import java.util.concurrent.Executors
@@ -13,7 +14,13 @@ fun main() = runBlocking {
           taskPool = taskPool,
           onStream = { _, _ -> },
           onClose = {},
-          onError = { _, _, _ -> })
+          onError = { _, _, _ -> },
+          creds =
+              Credentials(
+                  "ABCDEFGHIJKLMNOPQRST",
+                  "test".toByteArray(),
+                  ByteArray(0),
+                  "af72eac9-3611-496c-9894-82f93f61832d"))
   socket.openStream()!!.error(1u, "foo")
   socket.closeSocket()
 }

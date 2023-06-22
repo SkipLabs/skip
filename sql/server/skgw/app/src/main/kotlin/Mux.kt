@@ -15,15 +15,20 @@ import java.nio.channels.Channel
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Arrays
 import java.util.Base64
 import java.util.Queue
+import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
+import java.security.SecureRandom
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.coroutines.Continuation
@@ -270,7 +275,9 @@ class WebSocketClientAdapter(val client: WebSocketClient) : WebSocket {
     client.close()
   }
 
-  override fun sendData(data: ByteBuffer) {}
+  override fun sendData(data: ByteBuffer) {
+    client.send(data)
+  }
 
   override fun sendClose(code: Int, reason: String) {}
 
@@ -471,6 +478,44 @@ class MuxedSocket(
       observers.add(callback)
     } finally {
       mutex.writeLock().unlock()
+    }
+  }
+
+  fun sendAuth(creds: Credentials) {
+    when (getState()) {
+      State.CLOSING,
+      State.CLOSED -> {}
+      State.CLOSE_WAIT,
+      State.AUTH_RECV -> {
+        throw RuntimeException("Trying to send an auth message on an authenticated socket.")
+      }
+      State.IDLE -> {
+        val csrng = SecureRandom()
+        val nonce = ByteArray(8)
+        csrng.nextBytes(nonce)
+        // javascript iso date format is _based_ on iso8601 but not fully compliant. yep.
+        val date =
+            ZonedDateTime.now(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+        val authMsg =
+            MuxAuthMsg(
+                version = 0u,
+                accessKey = creds.accessKey,
+                nonce = nonce,
+                signature = creds.sign(nonce, date),
+                deviceUuid = creds.deviceUuid ?: UUID.randomUUID().toString(),
+                date = date,
+                clientVersion = "kt-0.0.1",
+            )
+        mutex.writeLock().lock()
+        try {
+          authenticatedWith = AuthWith(authMsg, Instant.now())
+          setState(State.AUTH_RECV)
+        } finally {
+          mutex.writeLock().unlock()
+        }
+        sendData(encodeAuthMsg(authMsg))
+      }
     }
   }
 
@@ -711,6 +756,75 @@ class MuxedSocket(
     } finally {
       mutex.readLock().unlock()
     }
+  }
+
+  private fun encodeAuthMsg(msg: MuxAuthMsg): ByteBuffer {
+    val encoder = StandardCharsets.US_ASCII.newEncoder()
+    val buf = ByteBuffer.allocate(133 + msg.clientVersion.length)
+    buf.putInt(0x0) // type 0 and stream 0
+    buf.putInt(0x0) // mux protocol version
+    // access key
+    if (msg.accessKey.length > 20) {
+      throw RuntimeException("accessKey ${msg.accessKey} too long")
+    }
+    var res = encoder.encode(CharBuffer.wrap(msg.accessKey), buf, true)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    res = encoder.flush(buf)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    encoder.reset()
+    buf.position(28) // rely on buf being zeroed out and set position to support short keys
+    // nonce
+    buf.put(msg.nonce)
+    // signature
+    buf.put(msg.signature)
+    // uuid
+    res = encoder.encode(CharBuffer.wrap(msg.deviceUuid), buf, true)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    res = encoder.flush(buf)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    encoder.reset()
+    // date
+    when (msg.date.length) {
+      24 -> {
+        buf.put(0x0)
+      }
+      27 -> {
+        buf.put(0x1)
+      }
+      else -> throw RuntimeException("Date ${msg.date} cannot be encoded")
+    }
+    res = encoder.encode(CharBuffer.wrap(msg.date), buf, true)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    res = encoder.flush(buf)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    encoder.reset()
+    // client version
+    if (msg.clientVersion.length > 255) {
+      throw RuntimeException("Cannot encode client version ${msg.clientVersion}, too long")
+    }
+    buf.put(msg.clientVersion.length.toByte())
+    res = encoder.encode(CharBuffer.wrap(msg.clientVersion), buf, true)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    res = encoder.flush(buf)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    encoder.reset()
+    return buf.flip()
   }
 
   private fun encodeGoawayMsg(lastStream: UInt, errorCode: UInt, msg: String): ByteBuffer {
@@ -1059,6 +1173,7 @@ suspend fun connect(
     onStream: onStreamFn,
     onClose: onSocketCloseFn,
     onError: onSocketErrorFn,
+    creds: Credentials,
 ): MuxedSocket {
   val client = MuxedSocketClient(endpoint)
   val socket =
@@ -1070,6 +1185,6 @@ suspend fun connect(
           onError,
       )
   client.open(socket)
-  // TODO: socket.sendAuth(creds)
+  socket.sendAuth(creds)
   return socket
 }
