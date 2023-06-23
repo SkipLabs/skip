@@ -2,19 +2,21 @@ package io.skiplabs.skgw.client
 
 import io.skiplabs.skgw.Credentials
 import io.skiplabs.skgw.MuxedSocket
+import io.skiplabs.skgw.ProtoData
 import io.skiplabs.skgw.ProtoMessage
+import io.skiplabs.skgw.ProtoQuery
 import io.skiplabs.skgw.ProtoSchemaQuery
+import io.skiplabs.skgw.QueryResponseFormat
 import io.skiplabs.skgw.SchemaScope
 import io.skiplabs.skgw.Skdb
 import io.skiplabs.skgw.Stream
 import io.skiplabs.skgw.connectMux
 import io.skiplabs.skgw.decodeProtoMsg
 import io.skiplabs.skgw.encodeProtoMsg
-import io.skiplabs.skgw.ProtoData
 import java.net.URI
-import java.util.concurrent.ScheduledExecutorService
-import java.nio.charset.StandardCharsets
 import java.nio.CharBuffer
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.ScheduledExecutorService
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.onFailure
@@ -65,20 +67,18 @@ class SkdbConnection(
     return chan
   }
 
-  suspend fun schema(): String {
+  private suspend fun request(req: ProtoMessage): String {
     if (muxedSocket == null) {
       throw RuntimeException("Socket not opened")
     }
 
-    // TODO: extract create and begin consuming?
     val stream = muxedSocket?.openStream()
     if (stream == null) {
       throw RuntimeException("Could not create stream")
     }
     val chan = consume(stream)
 
-    val query = ProtoSchemaQuery(scope = SchemaScope.ALL)
-    stream.send(encodeProtoMsg(query))
+    stream.send(encodeProtoMsg(req))
     stream.close()
 
     val bufs = ArrayList<CharBuffer>()
@@ -101,7 +101,14 @@ class SkdbConnection(
     throw RuntimeException("Did not receive a complete payload")
   }
 
-  // suspend fun sqlRaw(query: String): String {}
+  suspend fun schema(): String {
+    return request(ProtoSchemaQuery(scope = SchemaScope.ALL))
+  }
 
+  suspend fun sqlRaw(query: String): String {
+    return request(ProtoQuery(query, QueryResponseFormat.RAW))
+  }
+
+  // TODO:
   // suspend fun mirrorTable(table: String) {}
 }
