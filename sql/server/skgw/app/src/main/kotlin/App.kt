@@ -373,7 +373,10 @@ fun main(args: Array<String>) {
   val logger = SkdbBackedLogger()
   val policy =
       EventAccountant(logger) then
-          RejectUnsupportedClients(logger, config.getString("min_js_client", "0.0.41")) then
+          RejectUnsupportedClients(
+              logger,
+              config.getString("min_js_client", "0.0.41"),
+              config.getString("min_kt_client", "0.0.1")) then
           ThrottleDataTransferPerConnection(
               logger, config.getInt("max_conn_byte_rate", 100 * 1024 * 1024), taskPool) then
           RateLimitRequestsPerConnection(
