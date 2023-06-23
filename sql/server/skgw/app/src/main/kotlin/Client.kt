@@ -5,6 +5,7 @@ import io.skiplabs.skgw.MuxedSocket
 import io.skiplabs.skgw.ProtoData
 import io.skiplabs.skgw.ProtoMessage
 import io.skiplabs.skgw.ProtoQuery
+import io.skiplabs.skgw.ProtoRequestTail
 import io.skiplabs.skgw.ProtoSchemaQuery
 import io.skiplabs.skgw.QueryResponseFormat
 import io.skiplabs.skgw.SchemaScope
@@ -13,6 +14,7 @@ import io.skiplabs.skgw.Stream
 import io.skiplabs.skgw.connectMux
 import io.skiplabs.skgw.decodeProtoMsg
 import io.skiplabs.skgw.encodeProtoMsg
+import java.io.BufferedOutputStream
 import java.net.URI
 import java.nio.CharBuffer
 import java.nio.charset.StandardCharsets
@@ -109,6 +111,49 @@ class SkdbConnection(
     return request(ProtoQuery(query, QueryResponseFormat.RAW))
   }
 
-  // TODO:
-  // suspend fun mirrorTable(table: String) {}
+  suspend fun establishServerTail(table: String) {
+    if (muxedSocket == null) {
+      throw RuntimeException("Socket not opened")
+    }
+
+    // TODO: user
+    // TODO: replication id
+    val proc =
+        local.writeCsv(
+            "root",
+            table,
+            "123",
+            { _, _ ->
+              // client drops acks
+            },
+            {
+              // TODO: catastrophic failure
+            })
+    val stdin = BufferedOutputStream(proc.outputStream)
+
+    val stream = muxedSocket?.openStream()
+    if (stream == null) {
+      throw RuntimeException("Could not create stream")
+    }
+    val chan = consume(stream)
+
+    // TODO: since and filter
+    val req = ProtoRequestTail(table, since = 0u, filterExpr = null)
+    stream.send(encodeProtoMsg(req))
+
+    for (msg in chan) {
+      when (msg) {
+        is ProtoData -> {
+          val data = msg.data
+          stdin.write(data.array(), data.arrayOffset() + data.position(), data.remaining())
+          if (msg.finFlagSet) {
+            stdin.flush()
+          }
+        }
+        else -> {
+          throw RuntimeException("Unexpected message received in response")
+        }
+      }
+    }
+  }
 }
