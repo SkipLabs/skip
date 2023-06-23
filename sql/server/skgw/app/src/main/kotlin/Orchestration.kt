@@ -148,6 +148,28 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
       buf.put(msg.privateKey)
       buf.flip()
     }
+    is ProtoSchemaQuery -> {
+      val buf = ByteBuffer.allocate(4 + (msg.name?.length ?: 0) * 4)
+      buf.put(0x04.toByte())
+      buf.put(when (msg.scope) {
+        SchemaScope.ALL -> 0x0
+        SchemaScope.TABLE -> 0x1
+        SchemaScope.VIEW -> 0x2
+      })
+      val pos = buf.position()
+      buf.putShort(0x0)
+      val encoder = StandardCharsets.UTF_8.newEncoder()
+      var res = encoder.encode(CharBuffer.wrap(msg.name ?: ""), buf, true)
+      if (!res.isUnderflow()) {
+        res.throwException()
+      }
+      res = encoder.flush(buf)
+      if (!res.isUnderflow()) {
+        res.throwException()
+      }
+      buf.putShort(pos, (buf.position() - pos - 2).toShort())
+      buf.flip()
+    }
     else -> throw RuntimeException("We don't support encoding ${msg}")
   }
 }
