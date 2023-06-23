@@ -156,8 +156,8 @@ class RequestHandler(
         val creds = genCredentials(genAccessKey(), encryption)
         skdb.createUser(creds.accessKey, creds.b64encryptedKey())
         val payload = creds.toProtoCredentials()
-        creds.clear()
         stream.send(payload)
+        creds.clear()
         stream.close()
       }
       is ProtoRequestTail -> {
