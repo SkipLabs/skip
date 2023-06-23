@@ -1,5 +1,5 @@
 plugins {
-  id("org.jetbrains.kotlin.jvm") version "1.7.10"
+  id("org.jetbrains.kotlin.jvm") version "1.8.20"
 
   // for lint and formatting
   id("com.diffplug.spotless") version "6.12.1"
@@ -24,6 +24,11 @@ dependencies {
   // aws
   implementation("software.amazon.awssdk:bom:2.20.3")
   implementation("software.amazon.awssdk:kms:2.20.3")
+
+  // ws client
+  implementation("org.java-websocket:Java-WebSocket:1.5.3")
+
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
 }
 
 application {
@@ -38,6 +43,11 @@ spotless { kotlin { ktfmt("0.42") } }
 
 task("runMuxTestServer", JavaExec::class) {
   mainClass.set("io.skiplabs.skgw.test.MuxTestServerKt")
+  classpath = sourceSets["test"].runtimeClasspath
+}
+
+task("runMuxTestClient", JavaExec::class) {
+  mainClass.set("io.skiplabs.skgw.test.MuxTestClientKt")
   classpath = sourceSets["test"].runtimeClasspath
 }
 
