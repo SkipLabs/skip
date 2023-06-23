@@ -4,10 +4,10 @@ import io.skiplabs.skgw.MuxedSocket
 import io.skiplabs.skgw.MuxedSocketEndpoint
 import io.skiplabs.skgw.MuxedSocketFactory
 import io.skiplabs.skgw.Stream
+import io.skiplabs.skgw.WebSocket
 import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.handlers.PathTemplateHandler
-import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -93,7 +93,7 @@ fun createHttpServer(): Undertow {
               object : MuxedSocketFactory {
                 override fun onConnect(
                     exchange: WebSocketHttpExchange,
-                    channel: WebSocketChannel
+                    channel: WebSocket
                 ): MuxedSocket {
                   val socket =
                       MuxedSocket(

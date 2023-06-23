@@ -117,7 +117,7 @@ class LimitGlobalConnections(val logger: Logger, val maxConns: Config.Value<Int>
       when (state) {
         MuxedSocket.State.CLOSED -> n.decrementAndGet()
         MuxedSocket.State.IDLE,
-        MuxedSocket.State.AUTH_RECV,
+        MuxedSocket.State.AUTH,
         MuxedSocket.State.CLOSING,
         MuxedSocket.State.CLOSE_WAIT -> Unit
       }
@@ -137,7 +137,7 @@ class LimitConnectionsPerDb(val logger: Logger, val maxConns: Config.Value<Int>)
       when (state) {
         MuxedSocket.State.CLOSED -> openConns.merge(db, 0) { oldvalue, _ -> oldvalue - 1 }
         MuxedSocket.State.IDLE,
-        MuxedSocket.State.AUTH_RECV,
+        MuxedSocket.State.AUTH,
         MuxedSocket.State.CLOSING,
         MuxedSocket.State.CLOSE_WAIT -> Unit
       }
@@ -171,7 +171,7 @@ class LimitConnectionsPerUser(val logger: Logger, val maxConns: Config.Value<Int
               if (n < 1) null else n
             }
           }
-          MuxedSocket.State.AUTH_RECV -> {
+          MuxedSocket.State.AUTH -> {
             val n = openConns.merge(key, 1) { oldvalue, _ -> oldvalue + 1 }
             val limit = maxConns.get(user, db)
             if (n != null && n > limit) {
@@ -255,7 +255,7 @@ class RateLimitRequestsPerConnection(
     socket.observeLifecycle { state ->
       when (state) {
         MuxedSocket.State.IDLE,
-        MuxedSocket.State.AUTH_RECV,
+        MuxedSocket.State.AUTH,
         MuxedSocket.State.CLOSING,
         MuxedSocket.State.CLOSE_WAIT -> Unit
         MuxedSocket.State.CLOSED -> {
@@ -302,7 +302,7 @@ class ThrottleDataTransferPerConnection(
     socket.observeLifecycle { state ->
       when (state) {
         MuxedSocket.State.IDLE,
-        MuxedSocket.State.AUTH_RECV,
+        MuxedSocket.State.AUTH,
         MuxedSocket.State.CLOSING,
         MuxedSocket.State.CLOSE_WAIT -> Unit
         MuxedSocket.State.CLOSED -> {
@@ -365,7 +365,7 @@ class VerboseDebugLogger(val logger: Logger, val decorated: ServerPolicy) : Serv
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
     System.err.println("Socket created: ${socket} for db ${db}.")
     socket.observeLifecycle { state ->
-      if (state == MuxedSocket.State.AUTH_RECV) {
+      if (state == MuxedSocket.State.AUTH) {
         logger.log(
             db,
             "event",
@@ -468,7 +468,7 @@ class EventAccountant(val logger: Logger) : ServerPolicy {
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
     socket.observeLifecycle { state ->
-      if (state == MuxedSocket.State.AUTH_RECV) {
+      if (state == MuxedSocket.State.AUTH) {
         logger.log(db, "conn_established", socket.authenticatedWith?.msg?.accessKey)
       }
     }
@@ -654,7 +654,7 @@ class RejectUnsupportedClients(val logger: Logger, val minJsClient: Config.Value
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
     socket.observeLifecycle { state ->
       when (state) {
-        MuxedSocket.State.AUTH_RECV -> {
+        MuxedSocket.State.AUTH -> {
           val clientVersion = socket.authenticatedWith?.msg?.clientVersion
           val user = socket.authenticatedWith?.msg?.accessKey
           val minSupportedVersion = SemVer.parse(minJsClient.get(user, db))

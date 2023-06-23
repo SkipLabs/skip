@@ -8,35 +8,75 @@ import io.undertow.websockets.core.CloseMessage
 import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.core.WebSockets
 import io.undertow.websockets.spi.WebSocketHttpExchange
+import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.channels.Channel
 import java.nio.charset.StandardCharsets
+import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Arrays
 import java.util.Base64
 import java.util.Queue
+import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
+import org.java_websocket.client.WebSocketClient
+import org.java_websocket.handshake.ServerHandshake
 import org.xnio.ChannelListener
 
-// TODO: this all has a blocking interface
+data class Credentials(
+    val accessKey: String,
+    val privateKey: ByteArray,
+    val encryptedPrivateKey: ByteArray,
+    val deviceUuid: String? = null,
+) {
+  fun b64privateKey(): String = Base64.getEncoder().encodeToString(privateKey)
+  fun b64encryptedKey(): String = Base64.getEncoder().encodeToString(encryptedPrivateKey)
+  fun clear(): Unit {
+    privateKey.fill(0)
+    encryptedPrivateKey.fill(0)
+  }
+  override fun toString(): String {
+    return "Credentials(accessKey=${accessKey}, privateKey=**redacted**, deviceId=${deviceUuid})"
+  }
+
+  fun sign(nonce: ByteArray, date: String): ByteArray {
+    val nonce64 = Base64.getEncoder().encodeToString(nonce)
+    val content: String = "auth" + accessKey + date + nonce64
+    val contentBytes = content.toByteArray(Charsets.UTF_8)
+
+    val algo = "HmacSHA256"
+    val mac = Mac.getInstance(algo)
+
+    mac.init(SecretKeySpec(privateKey, algo))
+    return mac.doFinal(contentBytes)
+  }
+}
 
 interface MuxedSocketFactory {
-  fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel): MuxedSocket
+  fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocket): MuxedSocket
 }
 
 class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConnectionCallback {
 
   override fun onConnect(exchange: WebSocketHttpExchange, channel: WebSocketChannel) {
-    val muxedSocket = socketFactory.onConnect(exchange, channel)
+    val muxedSocket = socketFactory.onConnect(exchange, WebSocketChannelAdapter(channel))
 
     channel.receiveSetter.set(
         object : AbstractReceiveListener() {
@@ -95,6 +135,58 @@ class MuxedSocketEndpoint(val socketFactory: MuxedSocketFactory) : WebSocketConn
   }
 }
 
+class MuxedSocketClient(val uri: URI) : WebSocketClient(uri) {
+  var socket: MuxedSocket? = null
+
+  private var openContinuation: Continuation<MuxedSocketClient>? = null
+
+  override fun onOpen(handshake: ServerHandshake) {
+    if (openContinuation != null) {
+      val cont = openContinuation
+      openContinuation = null
+      cont?.resume(this)
+    }
+  }
+
+  override fun onMessage(msg: String) {
+    throw RuntimeException("Received text data: ${msg}")
+  }
+
+  override fun onMessage(buf: ByteBuffer) {
+    socket?.onSocketMessage(buf)
+  }
+
+  override fun onClose(code: Int, reason: String, remote: Boolean) {
+    if (openContinuation != null) {
+      openContinuation?.resumeWithException(
+          RuntimeException("Close received while waiting for open"))
+      openContinuation = null
+      return
+    }
+
+    if (code == CloseMessage.NORMAL_CLOSURE || code == CloseMessage.GOING_AWAY) {
+      socket?.onSocketClose()
+    } else {
+      socket?.onSocketError(0u, "websocket closed unexpectedly")
+    }
+  }
+
+  override fun onError(ex: Exception) {
+    if (openContinuation != null) {
+      openContinuation?.resumeWithException(ex)
+      openContinuation = null
+      return
+    }
+    socket?.onSocketError(0u, "websocket error")
+  }
+
+  suspend fun open(muxSocket: MuxedSocket) = suspendCoroutine { cont ->
+    socket = muxSocket
+    openContinuation = cont
+    this.connect()
+  }
+}
+
 typealias onStreamFn = (MuxedSocket, Stream) -> Unit
 
 typealias onDataFn = (ByteBuffer) -> Unit
@@ -135,17 +227,78 @@ data class MuxStreamCloseMsg(val stream: UInt) : MuxMsg()
 
 data class MuxStreamResetMsg(val stream: UInt, val errorCode: UInt, val msg: String) : MuxMsg()
 
+interface WebSocket {
+  fun close()
+  fun sendData(data: ByteBuffer)
+  fun sendClose(code: Int, reason: String)
+  fun suspendReceives()
+  fun resumeReceives()
+}
+
+// server from undertow
+class WebSocketChannelAdapter(val channel: WebSocketChannel) : WebSocket {
+  override fun close() {
+    channel.close()
+  }
+
+  override fun sendData(data: ByteBuffer) {
+    if (channel.isOpen()) {
+      WebSockets.sendBinaryBlocking(data, channel)
+    }
+  }
+
+  override fun sendClose(code: Int, reason: String) {
+    if (channel.isOpen()) {
+      WebSockets.sendCloseBlocking(code, reason, channel)
+    }
+  }
+
+  override fun suspendReceives() {
+    channel.suspendReceives()
+  }
+
+  override fun resumeReceives() {
+    channel.resumeReceives()
+  }
+}
+
+// client from java_websocket
+class WebSocketClientAdapter(val client: WebSocketClient) : WebSocket {
+  override fun close() {
+    client.close()
+  }
+
+  override fun sendData(data: ByteBuffer) {
+    client.send(data)
+  }
+
+  override fun sendClose(code: Int, reason: String) {
+    client.close(code, reason)
+  }
+
+  override fun suspendReceives() {
+    throw UnsupportedOperationException()
+  }
+
+  override fun resumeReceives() {
+    throw UnsupportedOperationException()
+  }
+}
+
 class MuxedSocket(
-    val channel: WebSocketChannel,
+    val channel: WebSocket,
     val taskPool: ScheduledExecutorService,
     val onStream: onStreamFn,
     val onClose: onSocketCloseFn,
     val onError: onSocketErrorFn,
-    val getDecryptedKey: (MuxAuthMsg) -> ByteArray,
+    val getDecryptedKey: (MuxAuthMsg) -> ByteArray = { _ ->
+      throw RuntimeException("Acting as a client initated socket")
+    },
+    val isClient: Boolean = false,
 ) {
   enum class State {
     IDLE,
-    AUTH_RECV,
+    AUTH,
     CLOSING,
     CLOSE_WAIT,
     CLOSED
@@ -163,8 +316,8 @@ class MuxedSocket(
           mutex.readLock().unlock()
         }
   private var state: State = State.IDLE
-  private var nextStream: UInt = 2u
-  private var clientStreamWatermark: UInt = 0u
+  private var nextStream: UInt = if (isClient) 1u else 2u
+  private var otherStreamWatermark: UInt = 0u
   private val activeStreams: MutableMap<UInt, Stream> = HashMap()
   private var observers: MutableList<(State) -> Unit> = ArrayList()
 
@@ -179,17 +332,22 @@ class MuxedSocket(
         }
 
   private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
-  private val timeout =
-      taskPool.schedule(
-          {
-            // we use error rather than close to trigger error callback
-            // per stream for cleanup. using close would rely on the
-            // client gracefully responding with a close in order to free
-            // resources
-            this.errorSocket(1003u, "session timeout")
-          },
-          10,
-          TimeUnit.MINUTES)
+  private var timeout: ScheduledFuture<*>? = null
+  init {
+    if (!isClient) {
+      timeout =
+          taskPool.schedule(
+              {
+                // we use error rather than close to trigger error callback
+                // per stream for cleanup. using close would rely on the
+                // client gracefully responding with a close in order to free
+                // resources
+                this.errorSocket(1003u, "session timeout")
+              },
+              10,
+              TimeUnit.MINUTES)
+    }
+  }
 
   // user-facing interface /////////////////////////////////////////////////////
 
@@ -203,7 +361,7 @@ class MuxedSocket(
       State.CLOSING -> {
         throw RuntimeException("Connection closed")
       }
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         val stream = Stream(nextStream, this)
         mutex.writeLock().lock()
         try {
@@ -251,7 +409,7 @@ class MuxedSocket(
         sendClose(CloseMessage.NORMAL_CLOSURE, "")
         channel.close()
       }
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         mutex.writeLock().lock()
         try {
           val keys = activeStreams.keys.toSet()
@@ -267,7 +425,7 @@ class MuxedSocket(
         channel.close()
       }
     }
-    timeout.cancel(false)
+    timeout?.cancel(false)
   }
 
   fun errorSocket(errorCode: UInt, msg: String) {
@@ -285,7 +443,7 @@ class MuxedSocket(
       }
       State.IDLE,
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         mutex.writeLock().lock()
         try {
           val keys = activeStreams.keys.toSet()
@@ -300,8 +458,7 @@ class MuxedSocket(
           endState = MuxedSocketEnd(true, errorCode, msg)
           setState(State.CLOSED)
           val lastStream =
-              if (nextStream - 2u > clientStreamWatermark) nextStream - 2u
-              else clientStreamWatermark
+              if (nextStream - 2u > otherStreamWatermark) nextStream - 2u else otherStreamWatermark
           sendData(encodeGoawayMsg(lastStream, errorCode, msg))
         } finally {
           mutex.writeLock().unlock()
@@ -310,7 +467,7 @@ class MuxedSocket(
         channel.close()
       }
     }
-    timeout.cancel(false)
+    timeout?.cancel(false)
   }
 
   // TODO: pingSocket() - we don't implement yet as we don't have a use
@@ -325,6 +482,44 @@ class MuxedSocket(
       observers.add(callback)
     } finally {
       mutex.writeLock().unlock()
+    }
+  }
+
+  fun sendAuth(creds: Credentials) {
+    when (getState()) {
+      State.CLOSING,
+      State.CLOSED -> {}
+      State.CLOSE_WAIT,
+      State.AUTH -> {
+        throw RuntimeException("Trying to send an auth message on an authenticated socket.")
+      }
+      State.IDLE -> {
+        val csrng = SecureRandom()
+        val nonce = ByteArray(8)
+        csrng.nextBytes(nonce)
+        // javascript iso date format is _based_ on iso8601 but not fully compliant. yep.
+        val date =
+            ZonedDateTime.now(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+        val authMsg =
+            MuxAuthMsg(
+                version = 0u,
+                accessKey = creds.accessKey,
+                nonce = nonce,
+                signature = creds.sign(nonce, date),
+                deviceUuid = creds.deviceUuid ?: UUID.randomUUID().toString(),
+                date = date,
+                clientVersion = "kt-0.0.1",
+            )
+        mutex.writeLock().lock()
+        try {
+          authenticatedWith = AuthWith(authMsg, Instant.now())
+          setState(State.AUTH)
+        } finally {
+          mutex.writeLock().unlock()
+        }
+        sendData(encodeAuthMsg(authMsg))
+      }
     }
   }
 
@@ -345,7 +540,7 @@ class MuxedSocket(
             mutex.writeLock().lock()
             try {
               authenticatedWith = AuthWith(muxMsg, Instant.now())
-              setState(State.AUTH_RECV)
+              setState(State.AUTH)
             } finally {
               mutex.writeLock().unlock()
             }
@@ -358,12 +553,15 @@ class MuxedSocket(
           is MuxPingAlreadyHandledMsg -> {}
         }
       }
-      State.AUTH_RECV,
+      State.AUTH,
       State.CLOSING -> {
-        val now = Instant.now()
-        if (Duration.between(authenticatedWith?.at!!, now).abs().compareTo(maxConnectionDuration) >
-            0) {
-          errorSocket(1003u, "session timeout")
+        if (!isClient) {
+          val now = Instant.now()
+          if (Duration.between(authenticatedWith?.at!!, now)
+              .abs()
+              .compareTo(maxConnectionDuration) > 0) {
+            errorSocket(1003u, "session timeout")
+          }
         }
 
         val muxMsg = decodeMsg(msg)
@@ -396,10 +594,10 @@ class MuxedSocket(
             mutex.writeLock().lock()
             try {
               if (stream == null &&
-                  muxMsg.stream % 2u == 1u &&
-                  muxMsg.stream > clientStreamWatermark) {
+                  muxMsg.stream % 2u == (if (isClient) 0u else 1u) &&
+                  muxMsg.stream > otherStreamWatermark) {
                 // legitimate new stream
-                clientStreamWatermark = muxMsg.stream
+                otherStreamWatermark = muxMsg.stream
                 stream = Stream(muxMsg.stream, this)
                 activeStreams.put(muxMsg.stream, stream)
                 onStream(this, stream)
@@ -422,7 +620,7 @@ class MuxedSocket(
       State.CLOSED,
       State.CLOSE_WAIT -> {}
       State.IDLE,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         mutex.writeLock().lock()
         try {
           val keys = activeStreams.keys.toSet()
@@ -463,7 +661,7 @@ class MuxedSocket(
       State.CLOSED -> {}
       State.IDLE,
       State.CLOSE_WAIT,
-      State.AUTH_RECV,
+      State.AUTH,
       State.CLOSING -> {
         mutex.writeLock().lock()
         try {
@@ -481,7 +679,7 @@ class MuxedSocket(
         }
       }
     }
-    timeout.cancel(false)
+    timeout?.cancel(false)
   }
 
   // interface used by Stream //////////////////////////////////////////////////
@@ -492,7 +690,7 @@ class MuxedSocket(
       State.CLOSING,
       State.CLOSED -> {}
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         sendData(encodeStreamCloseMsg(streamId))
         if (nowClosed) {
           mutex.writeLock().lock()
@@ -512,7 +710,7 @@ class MuxedSocket(
       State.CLOSING,
       State.CLOSED -> {}
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         sendData(encodeStreamErrorMsg(streamId, errorCode, msg))
         mutex.writeLock().lock()
         try {
@@ -530,7 +728,7 @@ class MuxedSocket(
       State.CLOSING,
       State.CLOSED -> {}
       State.CLOSE_WAIT,
-      State.AUTH_RECV -> {
+      State.AUTH -> {
         sendData(encodeStreamDataMsg(streamId, data))
       }
     }
@@ -565,6 +763,75 @@ class MuxedSocket(
     } finally {
       mutex.readLock().unlock()
     }
+  }
+
+  private fun encodeAuthMsg(msg: MuxAuthMsg): ByteBuffer {
+    val encoder = StandardCharsets.US_ASCII.newEncoder()
+    val buf = ByteBuffer.allocate(133 + msg.clientVersion.length)
+    buf.putInt(0x0) // type 0 and stream 0
+    buf.putInt(0x0) // mux protocol version
+    // access key
+    if (msg.accessKey.length > 20) {
+      throw RuntimeException("accessKey ${msg.accessKey} too long")
+    }
+    var res = encoder.encode(CharBuffer.wrap(msg.accessKey), buf, true)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    res = encoder.flush(buf)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    encoder.reset()
+    buf.position(28) // rely on buf being zeroed out and set position to support short keys
+    // nonce
+    buf.put(msg.nonce)
+    // signature
+    buf.put(msg.signature)
+    // uuid
+    res = encoder.encode(CharBuffer.wrap(msg.deviceUuid), buf, true)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    res = encoder.flush(buf)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    encoder.reset()
+    // date
+    when (msg.date.length) {
+      24 -> {
+        buf.put(0x0)
+      }
+      27 -> {
+        buf.put(0x1)
+      }
+      else -> throw RuntimeException("Date ${msg.date} cannot be encoded")
+    }
+    res = encoder.encode(CharBuffer.wrap(msg.date), buf, true)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    res = encoder.flush(buf)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    encoder.reset()
+    // client version
+    if (msg.clientVersion.length > 255) {
+      throw RuntimeException("Cannot encode client version ${msg.clientVersion}, too long")
+    }
+    buf.put(msg.clientVersion.length.toByte())
+    res = encoder.encode(CharBuffer.wrap(msg.clientVersion), buf, true)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    res = encoder.flush(buf)
+    if (!res.isUnderflow()) {
+      res.throwException()
+    }
+    encoder.reset()
+    return buf.flip()
   }
 
   private fun encodeGoawayMsg(lastStream: UInt, errorCode: UInt, msg: String): ByteBuffer {
@@ -714,7 +981,7 @@ class MuxedSocket(
           State.CLOSING,
           State.CLOSED -> {}
           State.CLOSE_WAIT,
-          State.AUTH_RECV -> {
+          State.AUTH -> {
             sendData(encodePongMsg())
           }
         }
@@ -733,8 +1000,6 @@ class MuxedSocket(
   }
 
   private fun verify(auth: MuxAuthMsg): Boolean {
-    val algo = "HmacSHA256"
-
     try {
       val now = Instant.now()
       val d = Instant.parse(auth.date)
@@ -748,36 +1013,24 @@ class MuxedSocket(
 
       // TODO: check nonce against a cache to prevent replay attacks
 
-      val nonce = Base64.getEncoder().encodeToString(auth.nonce)
-      val content: String = "auth" + auth.accessKey + auth.date + nonce
-      val contentBytes = content.toByteArray(Charsets.UTF_8)
-
-      val mac = Mac.getInstance(algo)
-
-      val privateKey = getDecryptedKey(auth)
-
-      mac.init(SecretKeySpec(privateKey, algo))
-      val ourSig = mac.doFinal(contentBytes)
+      val creds = Credentials(auth.accessKey, getDecryptedKey(auth), ByteArray(0), auth.deviceUuid)
+      val matches = Arrays.equals(creds.sign(auth.nonce, auth.date), auth.signature)
 
       // at least try to keep the private key in memory for as little time as possible
-      privateKey.fill(0)
+      creds.clear()
 
-      return Arrays.equals(ourSig, auth.signature)
+      return matches
     } catch (ex: Exception) {
       return false
     }
   }
 
   private fun sendClose(code: Int, reason: String) {
-    if (channel.isOpen()) {
-      WebSockets.sendCloseBlocking(code, reason, channel)
-    }
+    channel.sendClose(code, reason)
   }
 
   private fun sendData(data: ByteBuffer) {
-    if (channel.isOpen()) {
-      WebSockets.sendBinaryBlocking(data, channel)
-    }
+    channel.sendData(data)
   }
 }
 
@@ -908,4 +1161,27 @@ class Stream(
       observer(s)
     }
   }
+}
+
+suspend fun connect(
+    endpoint: URI,
+    taskPool: ScheduledExecutorService,
+    onStream: onStreamFn,
+    onClose: onSocketCloseFn,
+    onError: onSocketErrorFn,
+    creds: Credentials,
+): MuxedSocket {
+  val client = MuxedSocketClient(endpoint)
+  val socket =
+      MuxedSocket(
+          channel = WebSocketClientAdapter(client),
+          taskPool,
+          onStream,
+          onClose,
+          onError,
+          isClient = true,
+      )
+  client.open(socket)
+  socket.sendAuth(creds)
+  return socket
 }
