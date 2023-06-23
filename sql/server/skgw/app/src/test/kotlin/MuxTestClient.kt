@@ -1,27 +1,21 @@
 package io.skiplabs.skgw.test
 
 import io.skiplabs.skgw.Credentials
-import io.skiplabs.skgw.connect
+import io.skiplabs.skgw.connectMux
 import java.net.URI
-import java.util.concurrent.Executors
 import java.nio.ByteBuffer
+import java.util.concurrent.Executors
 import kotlinx.coroutines.runBlocking
 
 fun main() = runBlocking {
   val taskPool = Executors.newSingleThreadScheduledExecutor()
   val socket =
-      connect(
+      connectMux(
           URI("ws://localhost:8080/"),
           taskPool = taskPool,
-          onStream = { _, _ ->
-            println("> stream opened [dmfbj]")
-          },
-          onClose = {
-            println("> close [inpep]")
-          },
-          onError = { _, code, reason ->
-            println("error ${code} ${reason}")
-          },
+          onStream = { _, _ -> println("> stream opened [dmfbj]") },
+          onClose = { println("> close [inpep]") },
+          onError = { _, code, reason -> println("error ${code} ${reason}") },
           creds =
               Credentials(
                   "ABCDEFGHIJKLMNOPQRST",
@@ -34,9 +28,7 @@ fun main() = runBlocking {
   buf.putInt(0x1)
   buf.putInt(0x42)
 
-  stream!!.onData = { d ->
-    println(": [wnbts] buf: ${d.getInt()}")
-  }
+  stream!!.onData = { d -> println(": [wnbts] buf: ${d.getInt()}") }
   stream.send(buf.flip())
   stream.close()
   socket.closeSocket()
