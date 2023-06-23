@@ -648,8 +648,11 @@ class Config() {
   }
 }
 
-class RejectUnsupportedClients(val logger: Logger, val minJsClient: Config.Value<String>) :
-    NullServerPolicy() {
+class RejectUnsupportedClients(
+    val logger: Logger,
+    val minJsClient: Config.Value<String>,
+    val minKtClient: Config.Value<String>
+) : NullServerPolicy() {
 
   override fun notifySocketCreated(socket: MuxedSocket, db: String) {
     socket.observeLifecycle { state ->
@@ -657,8 +660,9 @@ class RejectUnsupportedClients(val logger: Logger, val minJsClient: Config.Value
         MuxedSocket.State.AUTH -> {
           val clientVersion = socket.authenticatedWith?.msg?.clientVersion
           val user = socket.authenticatedWith?.msg?.accessKey
-          val minSupportedVersion = SemVer.parse(minJsClient.get(user, db))
-          if (!supportedVersion(clientVersion, minSupportedVersion)) {
+          val minSupportedJsVersion = SemVer.parse(minJsClient.get(user, db))
+          val minSupportedKtVersion = SemVer.parse(minKtClient.get(user, db))
+          if (!supportedVersion(clientVersion, minSupportedJsVersion, minSupportedKtVersion)) {
             logger.log(
                 db,
                 "old_client",
@@ -675,7 +679,11 @@ class RejectUnsupportedClients(val logger: Logger, val minJsClient: Config.Value
     }
   }
 
-  private fun supportedVersion(version: String?, minComponents: SemVer): Boolean {
+  private fun supportedVersion(
+      version: String?,
+      minJsComponents: SemVer,
+      minKtComponents: SemVer
+  ): Boolean {
     if (version == null) {
       return false // all supported clients should announce version
     }
@@ -689,12 +697,16 @@ class RejectUnsupportedClients(val logger: Logger, val minJsClient: Config.Value
     val client = split[0]
     val semVersion = split[1]
 
-    if (client != "js") {
-      return false
+    val clientComponents = SemVer.parse(semVersion)
+    if (client == "js") {
+      return clientComponents >= minJsComponents
     }
 
-    val clientComponents = SemVer.parse(semVersion)
-    return clientComponents >= minComponents
+    if (client == "kt") {
+      return clientComponents >= minKtComponents
+    }
+
+    return false
   }
 
   data class SemVer(val major: Int, val minor: Int, val inc: Int) : Comparable<SemVer> {
