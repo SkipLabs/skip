@@ -1163,7 +1163,7 @@ class Stream(
   }
 }
 
-suspend fun connect(
+suspend fun connectMux(
     endpoint: URI,
     taskPool: ScheduledExecutorService,
     onStream: onStreamFn,
