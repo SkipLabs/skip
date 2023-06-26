@@ -12,7 +12,7 @@ PLAYWRIGHT_REPORTER?="line"
 npm: sql/js/dist/skdb.wasm sql/js/dist/skdb.js sql/js/dist/skdb-node.js sql/js/dist/skdb-cli.js
 
 sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
-	cd sql && skargo build --target wasm32-unknown-unknown
+	cd sql && skargo build -r --target wasm32-unknown-unknown
 
 sql/js/dist/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 	mkdir -p sql/js/dist
@@ -49,7 +49,7 @@ sql/js/dist/index.html: sql/js/tests/index.html
 ################################################################################
 
 sql/target/skdb: sql/src/* skfs/src/*
-	cd sql && skargo build
+	cd sql && skargo build -r
 
 # TODO: keeping this for now as nearly all test scripts refer to build/skdb
 build/skdb: sql/target/skdb
