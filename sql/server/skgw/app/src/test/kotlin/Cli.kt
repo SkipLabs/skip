@@ -3,14 +3,17 @@ package io.skiplabs.skgw.cli
 import io.skiplabs.skgw.Credentials
 import io.skiplabs.skgw.NoEncryptionTransform
 import io.skiplabs.skgw.OutputFormat
+import io.skiplabs.skgw.ProtoData
 import io.skiplabs.skgw.client.SkdbConnection
 import io.skiplabs.skgw.createSkdb
 import io.skiplabs.skgw.genCredentials
 import io.skiplabs.skgw.openSkdb
 import java.net.URI
+import java.nio.charset.StandardCharsets
 import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.Executors
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
@@ -56,8 +59,22 @@ fun main() = runBlocking {
         println(": [xcvtf] result: ${result}")
       }
 
-      launch { conn.establishServerTail("test") }
-      conn.establishLocalTail("test")
+      val localWriteMonitor = Channel<ProtoData>()
+      launch { conn.runRemoteTail("test", localWriteMonitor) }
+      launch {
+        for (msg in localWriteMonitor) {
+          val out = StandardCharsets.UTF_8.decode(msg.data).toString()
+          println(": [vvpcc] local write: ${out}")
+        }
+      }
+      val remoteWriteMonitor = Channel<ProtoData>()
+      launch { conn.runLocalTail("test", remoteWriteMonitor) }
+      launch {
+        for (msg in remoteWriteMonitor) {
+          val out = StandardCharsets.UTF_8.decode(msg.data).toString()
+          println(": [vvpcc] remote write: ${out}")
+        }
+      }
     }
 
     launch {

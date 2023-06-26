@@ -15,7 +15,6 @@ import io.skiplabs.skgw.Stream
 import io.skiplabs.skgw.connectMux
 import io.skiplabs.skgw.decodeProtoMsg
 import io.skiplabs.skgw.encodeProtoMsg
-import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.net.URI
 import java.nio.CharBuffer
@@ -23,6 +22,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ScheduledExecutorService
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.coroutineScope
@@ -113,56 +113,60 @@ class SkdbConnection(
     return request(ProtoQuery(query, QueryResponseFormat.RAW))
   }
 
-  // TODO: this only returns control on failure. currently no way to
-  // know when we're 'caught up'
-  suspend fun establishServerTail(table: String) {
+  suspend fun runRemoteTail(table: String, control: SendChannel<ProtoData>) {
     if (muxedSocket == null) {
       throw RuntimeException("Socket not opened")
     }
-
-    // TODO: should be able to close this proc on close()
-    val proc =
-        local.writeCsv(
-            user = "root", // TODO: user
-            table,
-            replicationId = "123", // TODO: replication id
-            { _, _ ->
-              // do nothing; client drops acks
-            },
-            {
-              // TODO: catastrophic failure
-            })
-    val stdin = BufferedOutputStream(proc.outputStream)
 
     val stream = muxedSocket?.openStream()
     if (stream == null) {
       throw RuntimeException("Could not create stream")
     }
-    val chan = consume(stream)
 
-    // TODO: since and filter
-    val req = ProtoRequestTail(table, since = 0u, filterExpr = null)
-    stream.send(encodeProtoMsg(req))
+    val proc =
+        local.writeCsv(
+            user = "root", // TODO: user
+            table,
+            replicationId = "123", // TODO: replication id
+            { bytes, shouldFlush ->
+              // client does not send acks back to the server. but
+              // useful to report back for tracking
+              val msg = ProtoData(bytes, shouldFlush)
+              control.trySendBlocking(msg).onFailure { throwable ->
+                System.err.println("Failed to enqueue on to a channel: ${throwable}")
+              }
+            },
+            { stream.error(2000u, "Process unexpected EOF") })
+    try {
+      val stdin = BufferedOutputStream(proc.outputStream)
 
-    for (msg in chan) {
-      when (msg) {
-        is ProtoData -> {
-          val data = msg.data
-          stdin.write(data.array(), data.arrayOffset() + data.position(), data.remaining())
-          if (msg.finFlagSet) {
-            stdin.flush()
+      val chan = consume(stream)
+
+      // TODO: since and filter
+      val req = ProtoRequestTail(table, since = 0u, filterExpr = null)
+      stream.send(encodeProtoMsg(req))
+
+      for (msg in chan) {
+        when (msg) {
+          is ProtoData -> {
+            val data = msg.data
+            stdin.write(data.array(), data.arrayOffset() + data.position(), data.remaining())
+            if (msg.finFlagSet) {
+              stdin.flush()
+            }
+          }
+          else -> {
+            control.close(RuntimeException("Unexpected message received in response"))
           }
         }
-        else -> {
-          throw RuntimeException("Unexpected message received in response")
-        }
       }
+    } finally {
+      proc.destroy()
+      control.close()
     }
   }
 
-  // TODO: this immediately returns control. currently no way to know
-  // when we're 'syncd'
-  fun establishLocalTail(table: String) {
+  suspend fun runLocalTail(table: String, control: SendChannel<ProtoData>) {
     if (muxedSocket == null) {
       throw RuntimeException("Socket not opened")
     }
@@ -175,18 +179,35 @@ class SkdbConnection(
     val req = ProtoPushPromise(table)
     stream.send(encodeProtoMsg(req))
 
-    // TODO: should be able to close this proc on close()
-    local.tail(
-      user = "root", // TODO: user - pass this in?
-      table,
-      since = 0u,
-      filter = null,
-      replicationId = "123", // TODO: replication id
-      { bytes, shouldFlush ->
-        val msg = encodeProtoMsg(ProtoData(bytes, shouldFlush))
-        stream.send(msg) },
-      {
-        // TODO: catastrophic failure
-      })
+    val chan = consume(stream)
+
+    val proc =
+        local.tail(
+            user = "root", // TODO: user - pass this in?
+            table,
+            since = 0u,
+            filter = null,
+            replicationId = "123", // TODO: replication id
+            { bytes, shouldFlush ->
+              val msg = encodeProtoMsg(ProtoData(bytes, shouldFlush))
+              stream.send(msg)
+            },
+            { stream.error(2000u, "Process unexpected EOF") })
+
+    try {
+      for (msg in chan) {
+        when (msg) {
+          is ProtoData -> {
+            control.send(msg)
+          }
+          else -> {
+            control.close(RuntimeException("Unexpected message received in response"))
+          }
+        }
+      }
+    } finally {
+      proc.destroy()
+      control.close()
+    }
   }
 }
