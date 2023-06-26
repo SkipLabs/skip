@@ -5,6 +5,7 @@ private class BuildContext{
   skc: String,
   targetDir: String,
   target: ?String,
+  profile: String,
   stateDb: String,
   files: Array<String>,
 } {
@@ -12,6 +13,7 @@ private class BuildContext{
     env: Env,
     target: ?String,
     targetDirOpt: ?String,
+    profile: String,
   ): BuildContext {
     targetDir = targetDirOpt match {
     | Some(d) -> d
@@ -26,6 +28,7 @@ private class BuildContext{
       skc,
       targetDir,
       target,
+      profile,
       stateDb => Path.join(targetDir, "state.db"),
       files => getFiles(env.manifest).concat(
         Array[Path.join(targetDir, kVersionFile)],
@@ -35,6 +38,7 @@ private class BuildContext{
 }
 
 private fun getTargetDir(rootDir: String, targetOpt: ?String): String {
+  // TODO: Build artifacts in subdirectory corresponding to build profile (dev/release).
   dir = Path.join(rootDir, "target");
   targetOpt match {
   | Some(t) -> Path.join(dir, t)

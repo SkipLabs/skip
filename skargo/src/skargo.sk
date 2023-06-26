@@ -2,6 +2,8 @@ module Skargo;
 
 const kManifestFile: String = "Skargo.toml";
 const kVersionFile: String = "version.sk";
+const kDevProfile: String = "dev";
+const kReleaseProfile: String = "release";
 
 private class Env{rootDir: String, manifest: Manifest, verbose: Bool} {
   static fun create(verbose: Bool): Env {
@@ -28,6 +30,16 @@ private fun findRootDir(): String {
     };
 
     !path = Path.parentname(path)
+  }
+}
+
+private fun profileOptions(profile: String): Array<String> {
+  if (profile == kDevProfile) {
+    Array["-O0"]
+  } else if (profile == kReleaseProfile) {
+    Array["-O3"]
+  } else {
+    invariant_violation("Unrecognized profile " + profile)
   }
 }
 
@@ -78,7 +90,7 @@ private fun compile(bc: BuildContext, binName: String, main: String): void {
       `${main}=skip_main`,
       "-o",
       Path.join(bc.targetDir, output),
-    ],
+    ].concat(profileOptions(bc.profile)),
   )
 }
 

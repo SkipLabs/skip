@@ -1,5 +1,13 @@
 module Skargo;
 
+fun getProfile(args: Cli.ParseResults): String {
+  args.maybeGetString("profile") match {
+  | Some(p) -> p
+  | None() if (args.getBool("release")) -> kReleaseProfile
+  | None() -> kDevProfile
+  }
+}
+
 fun execInit(_args: Cli.ParseResults, _env: Env): void {
   invariant_violation("TODO");
   void
@@ -15,6 +23,7 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
     env,
     args.maybeGetString("target"),
     args.maybeGetString("target-dir"),
+    getProfile(args),
   );
   genVersionFile(bc);
   compile(bc, "test", env.manifest.testHarness);
@@ -36,6 +45,7 @@ fun execBuild(args: Cli.ParseResults, env: Env): void {
     env,
     args.maybeGetString("target"),
     args.maybeGetString("target-dir"),
+    getProfile(args),
   );
   genVersionFile(bc);
   for (bin in env.manifest.bin) {
@@ -48,6 +58,7 @@ fun execClean(args: Cli.ParseResults, env: Env): void {
     env,
     /* targetOpt = */ None(),
     args.maybeGetString("target-dir"),
+    getProfile(args),
   );
   run(Array["rm", "-rf", bc.targetDir], env.verbose)
 }
@@ -62,6 +73,7 @@ fun execCheck(args: Cli.ParseResults, env: Env): void {
     env,
     args.maybeGetString("target"),
     args.maybeGetString("target-dir"),
+    getProfile(args),
   );
   genVersionFile(bc);
   invokeSkc(bc, Array["--check"])
@@ -97,6 +109,17 @@ fun main(): void {
           Cli.StringArg("target-dir").about(
             "Directory for all generated artifacts",
           ),
+        )
+        .arg(
+          Cli.StringArg("profile").about(
+            "Build artifacts with the specified profile",
+          ),
+        )
+        .arg(
+          Cli.BoolArg("release")
+            .short("r")
+            .long("release")
+            .about("Build artifacts in release mode, with optimizations"),
         ),
     )
     .subcommand(
@@ -110,6 +133,17 @@ fun main(): void {
           Cli.StringArg("target-dir").about(
             "Directory for all generated artifacts",
           ),
+        )
+        .arg(
+          Cli.StringArg("profile").about(
+            "Build artifacts with the specified profile",
+          ),
+        )
+        .arg(
+          Cli.BoolArg("release")
+            .short("r")
+            .long("release")
+            .about("Build artifacts in release mode, with optimizations"),
         ),
     )
     .subcommand(
@@ -129,6 +163,17 @@ fun main(): void {
             "Directory for all generated artifacts",
           ),
         )
+        .arg(
+          Cli.StringArg("profile").about(
+            "Build artifacts with the specified profile",
+          ),
+        )
+        .arg(
+          Cli.BoolArg("release")
+            .short("r")
+            .long("release")
+            .about("Build artifacts in release mode, with optimizations"),
+        )
         .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report")),
     )
     .subcommand(
@@ -138,6 +183,17 @@ fun main(): void {
           Cli.StringArg("target-dir").about(
             "Directory for all generated artifacts",
           ),
+        )
+        .arg(
+          Cli.StringArg("profile").about(
+            "Build artifacts with the specified profile",
+          ),
+        )
+        .arg(
+          Cli.BoolArg("release")
+            .short("r")
+            .long("release")
+            .about("Build artifacts in release mode, with optimizations"),
         ),
     )
     .subcommand(Cli.Command("fmt").about("Format all files using skfmt"))
