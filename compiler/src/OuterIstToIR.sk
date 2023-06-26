@@ -3890,93 +3890,6 @@ mutable class OuterIstEmitter{
     this.emitMethodCall(context, info, params, false, pos)
   }
 
-  // Handle an "async" block. The strategy is to create a global async
-  // function that takes as parameters every value captured by this
-  // async block, with the same body as this async block, and call it.
-  private mutable fun emitAsync(
-    body: I.Stmt,
-    value: I.Expr,
-    typ: GType,
-    pos: FileRange,
-  ): GInstr {
-    // Find all local variables mentioned in the async block.
-    vars = UnorderedSet::mcreateFromIterator(
-      SkipOptimizeLocals.reads_of_stmt(body).values(),
-    );
-    cap1 = SkipOuterIstUtils.captured_locals_of_statement(body);
-    cap1.keys().each(vars.insert);
-
-    SkipOptimizeLocals.reads_of_expr(value).each(vars.insert);
-    cap2 = SkipOuterIstUtils.captured_locals_of_statement(I.SingleExpr(value));
-    cap2.keys().each(vars.insert);
-
-    // Ignore the rest (which must be declared inside the "async" block).
-    capturesBuf = mutable Vector[];
-    for (varName in vars) {
-      if (this.locals.containsKey(varName)) {
-        capturesBuf.push((varName, this.getLocal(varName, pos)))
-      }
-    };
-    capturesBuf.sortBy(a ~> a.i0);
-    captures = capturesBuf.toArray();
-
-    // We know these values can't be assigned, as async blocks don't allow
-    // such side effects. We don't care if "captured" is correct so we
-    // leave it as false, and assume "read" is true.
-    info = SkipOuterIstUtils.const_binding_info;
-
-    bodyWithReturn = I.Seq(List[body, I.Return(value)]);
-    params = captures.mapWithIndex((i, arg) -> {
-      ParameterInfo{name => arg.i0, value => None(), info, index => i + 1, pos}
-    });
-    args = captures.map(arg -> arg.i1);
-
-    funType = GFunType{
-      isMutable => false,
-      isTracked => this.funInfo.funType.isTracked,
-      params => args.map(g -> g.getType()),
-      returnType => typ,
-    };
-
-    funInfo = GFunInfo{
-      gfunction => GFunctionName(
-        this.funInfo.gfunction.id +
-          "::asyncCoroutine" +
-          this.getNextClosureID(),
-      ),
-      pos,
-      tparams => this.funInfo.tparams,
-      funType,
-      className => None(),
-      isAsync => true,
-    };
-
-    bodyProvider = NormalLazyGFun{
-      params,
-      useOptionalMask => false,
-      funInfo,
-      body => bodyWithReturn,
-    };
-
-    lazy = AsyncCoroutineLazyGFun{
-      params,
-      useOptionalMask => false,
-      funInfo,
-      bodyProvider,
-    };
-
-    // Call the exlined async body to produce the Awaitable.
-    this.emitInstr(
-      GCallFunction{
-        typ,
-        pos,
-        name => lazy,
-        args,
-        targs => this.funInfo.tparams,
-      },
-    )
-  }
-
   mutable fun emitAwait(
     context: mutable SKFS.Context,
     expr: I.Expr,
@@ -4437,7 +4350,7 @@ mutable class OuterIstEmitter{
           args => exprs.collect(Array).map(e -> this.emitExpr(context, e)),
         },
       )
-    | I.Async(stmt, expr) -> this.emitAsync(stmt, expr, typ, pos)
+    | I.Async(_stmt, _expr) -> invariant_violation("Async not implemented")
     | I.Await(expr) -> this.emitAwait(context, expr, typ, pos)
     | I.Freeze(expr) ->
       this.emitInstr(GFreeze{typ, pos, obj => this.emitExpr(context, expr)})
