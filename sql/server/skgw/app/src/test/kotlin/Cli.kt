@@ -57,6 +57,7 @@ fun main() = runBlocking {
       }
 
       launch { conn.establishServerTail("test") }
+      conn.establishLocalTail("test")
     }
 
     launch {
