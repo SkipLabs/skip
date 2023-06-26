@@ -4,6 +4,7 @@ import io.skiplabs.skgw.Credentials
 import io.skiplabs.skgw.MuxedSocket
 import io.skiplabs.skgw.ProtoData
 import io.skiplabs.skgw.ProtoMessage
+import io.skiplabs.skgw.ProtoPushPromise
 import io.skiplabs.skgw.ProtoQuery
 import io.skiplabs.skgw.ProtoRequestTail
 import io.skiplabs.skgw.ProtoSchemaQuery
@@ -14,6 +15,7 @@ import io.skiplabs.skgw.Stream
 import io.skiplabs.skgw.connectMux
 import io.skiplabs.skgw.decodeProtoMsg
 import io.skiplabs.skgw.encodeProtoMsg
+import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.net.URI
 import java.nio.CharBuffer
@@ -111,20 +113,21 @@ class SkdbConnection(
     return request(ProtoQuery(query, QueryResponseFormat.RAW))
   }
 
+  // TODO: this only returns control on failure. currently no way to
+  // know when we're 'caught up'
   suspend fun establishServerTail(table: String) {
     if (muxedSocket == null) {
       throw RuntimeException("Socket not opened")
     }
 
-    // TODO: user
-    // TODO: replication id
+    // TODO: should be able to close this proc on close()
     val proc =
         local.writeCsv(
-            "root",
+            user = "root", // TODO: user
             table,
-            "123",
+            replicationId = "123", // TODO: replication id
             { _, _ ->
-              // client drops acks
+              // do nothing; client drops acks
             },
             {
               // TODO: catastrophic failure
@@ -155,5 +158,35 @@ class SkdbConnection(
         }
       }
     }
+  }
+
+  // TODO: this immediately returns control. currently no way to know
+  // when we're 'syncd'
+  fun establishLocalTail(table: String) {
+    if (muxedSocket == null) {
+      throw RuntimeException("Socket not opened")
+    }
+
+    val stream = muxedSocket?.openStream()
+    if (stream == null) {
+      throw RuntimeException("Could not create stream")
+    }
+
+    val req = ProtoPushPromise(table)
+    stream.send(encodeProtoMsg(req))
+
+    // TODO: should be able to close this proc on close()
+    local.tail(
+      user = "root", // TODO: user - pass this in?
+      table,
+      since = 0u,
+      filter = null,
+      replicationId = "123", // TODO: replication id
+      { bytes, shouldFlush ->
+        val msg = encodeProtoMsg(ProtoData(bytes, shouldFlush))
+        stream.send(msg) },
+      {
+        // TODO: catastrophic failure
+      })
   }
 }
