@@ -92,4 +92,4 @@ clean:
 
 .PHONY: test
 test: stage$(STAGE)
-	PATH=../stage$(STAGE)/bin:$(PATH) $(MAKE) -C tests
+	PATH=stage$(STAGE)/bin:$(PATH) skargo test
