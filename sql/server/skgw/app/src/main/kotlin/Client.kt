@@ -31,7 +31,8 @@ class SkdbConnection(
     val endpoint: URI,
     val creds: Credentials,
     val local: Skdb,
-    val taskPool: ScheduledExecutorService
+    val taskPool: ScheduledExecutorService,
+    val replicationId: UInt,
 ) {
 
   private var muxedSocket: MuxedSocket? = null
@@ -113,7 +114,12 @@ class SkdbConnection(
     return request(ProtoQuery(query, QueryResponseFormat.RAW))
   }
 
-  suspend fun runRemoteTail(table: String, control: SendChannel<ProtoData>) {
+  suspend fun runRemoteTail(
+      table: String,
+      control: SendChannel<ProtoData>,
+      since: ULong = 0u,
+      filterExpr: String? = null
+  ) {
     if (muxedSocket == null) {
       throw RuntimeException("Socket not opened")
     }
@@ -125,9 +131,9 @@ class SkdbConnection(
 
     val proc =
         local.writeCsv(
-            user = "root", // TODO: user
+            user = "root",
             table,
-            replicationId = "123", // TODO: replication id
+            replicationId.toString(),
             { bytes, shouldFlush ->
               // client does not send acks back to the server. but
               // useful to report back for tracking
@@ -142,8 +148,7 @@ class SkdbConnection(
 
       val chan = consume(stream)
 
-      // TODO: since and filter
-      val req = ProtoRequestTail(table, since = 0u, filterExpr = null)
+      val req = ProtoRequestTail(table, since, filterExpr)
       stream.send(encodeProtoMsg(req))
 
       for (msg in chan) {
@@ -183,11 +188,11 @@ class SkdbConnection(
 
     val proc =
         local.tail(
-            user = "root", // TODO: user - pass this in?
+            user = "root",
             table,
             since = 0u,
             filter = null,
-            replicationId = "123", // TODO: replication id
+            replicationId.toString(),
             { bytes, shouldFlush ->
               val msg = encodeProtoMsg(ProtoData(bytes, shouldFlush))
               stream.send(msg)
