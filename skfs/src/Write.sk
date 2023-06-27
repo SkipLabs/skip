@@ -64,8 +64,7 @@ fun unescape(input: readonly Vector<Char>): String {
 
 fun getWriteKey(getChar: () -> Char): (?String, Bool) {
   chars = mutable Vector[];
-  vtry<(?String, Bool)>(
-    () -> {
+  try {
       loop {
         c = getChar();
         if (c == '\\') {
@@ -73,39 +72,40 @@ fun getWriteKey(getChar: () -> Char): (?String, Bool) {
           continue
         };
         if (c == '\n') {
-          return (None(), false);
+          break (None(), false);
         };
         if (c == '\t') {
-          return (Some(unescape(chars)), false)
+          break (Some(unescape(chars)), false)
         };
         chars.push(c);
       }
-    },
-    _ -> return (None(), true),
-  )
+  } catch {
+  | _ -> (None(), true)
+  }
 }
 
 fun getWriteValue(getChar: () -> Char): ?String {
   chars = mutable Vector[];
-  vtry<?String>(
-    () -> {
+  try {
       first = getChar();
-      if (first != '"') return None();
-
-      loop {
-        c = getChar();
-        if (c == '\\') {
+      if (first != '"') {
+        None();
+      } else {
+        loop {
+          c = getChar();
+          if (c == '\\') {
+            chars.push(c);
+            continue
+          };
+          if (c == '\n') {
+            break Some(unescape(chars.slice(0, chars.size() - 1)))
+          };
           chars.push(c);
-          continue
-        };
-        if (c == '\n') {
-          return Some(unescape(chars.slice(0, chars.size() - 1)))
-        };
-        chars.push(c);
+        }
       }
-    },
-    _ -> return None(),
-  )
+  } catch {
+  | _ -> None()
+  }
 }
 
 fun getWriteKeyValueIter(

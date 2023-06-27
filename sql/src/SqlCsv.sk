@@ -112,8 +112,7 @@ fun parseCsv<T>(
 ): (Bool, Array<Array<T>>) {
   array = mutable Vector[];
   eof = false;
-  vtry(
-    () -> {
+  try {
       for (_ in Range(0, 1000)) {
         values = mutable Vector[];
         for (value in lex(() -> getChar())) {
@@ -123,16 +122,14 @@ fun parseCsv<T>(
         array.push(cvalues.toArray());
         line.set(line.get() + 1);
       }
-    },
-    exn -> {
-      if (exn is EndOfFile _) {
+  } catch {
+  | EndOfFile _ ->
         !eof = true;
-        return void;
-      };
+        void
+  | exn ->
       print_error("Error, line " + line.get() + ": " + exn.getMessage());
       skipExit(23);
-    },
-  );
+  };
   (eof, array.toArray())
 }
 
@@ -517,8 +514,7 @@ fun replayDiff(
   snapshot: ?Int = None();
   reset = false;
 
-  vtry<SKFS.ContextOp>(
-    () -> {
+    try {
       loop {
         line = getLine();
         lineNbr.set(lineNbr.get() + 1);
@@ -624,9 +620,8 @@ fun replayDiff(
           )
         }
       }
-    },
-    exn -> {
-      if (exn is EndOfFile _) {
+    } catch {
+    | EndOfFile _ ->
         rows = buffer.toArray();
         SKFS.CStop(
           applyDiffStrategy(
@@ -639,15 +634,13 @@ fun replayDiff(
             snapshot,
           ),
         )
-      } else if (exn is SKSQL.IgnoreAndContinue()) {
+    | SKSQL.IgnoreAndContinue _ ->
         flushStdout();
         SKFS.CContinue(None())
-      } else {
+    | exn ->
         print_error(exn.getMessage());
         SKFS.CStop(None())
-      }
-    },
-  );
+    }
 }
 
 fun replayStdin(): Map<String, (Int, Int)> {

@@ -457,8 +457,7 @@ private fun decodeNumber(iter: mutable Lexer.LexingPosition): JSON.Value {
   hadFraction = skipFractionOpt(iter);
   hadExponent = skipExponentOpt(iter);
   value = start.getText(iter);
-  vtry(
-    () -> {
+  try {
       if (value == "-0") {
         JSON.FloatNumber(-0.0);
       } else if (!hadFraction && !hadExponent) {
@@ -466,9 +465,9 @@ private fun decodeNumber(iter: mutable Lexer.LexingPosition): JSON.Value {
       } else {
         JSON.FloatNumber(value.toFloat())
       }
-    },
-    ex -> reportInvalidJSON(start, "Bad number format: " + ex.getMessage()),
-  );
+  } catch {
+  | ex -> reportInvalidJSON(start, "Bad number format: " + ex.getMessage())
+  }
 }
 
 private fun eatHexDigits(iter: mutable Lexer.LexingPosition): Int {

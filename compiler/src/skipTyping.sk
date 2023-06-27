@@ -574,12 +574,9 @@ fun add_source_info_on_error<T>(
   mem_name: N.Name,
   mk: () -> T,
 ): T {
-  vtry(
-    () -> {
+  try {
       mk()
-    },
-    exn ->
-      exn match {
+  } catch {
       | e @ SkipError.SkipErrorException _ ->
         msg =
           "In '" +
@@ -594,10 +591,8 @@ fun add_source_info_on_error<T>(
           err with {traces => List.Cons(trace, err.traces)}
         );
         throw e
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun con_body(x: ?TAst.Expr): TAst.Expr_body {
@@ -736,8 +731,7 @@ fun make_extend_(
 ): UMap<TAst.Parent> {
   // This addition message is done here instead of on the join
   // incase an error happens during promotion
-  vtry(
-    () -> {
+  try {
       make_extend__(
         context,
         next_id,
@@ -750,9 +744,7 @@ fun make_extend_(
         inherited_source,
         conditions,
       )
-    },
-    exn ->
-      exn match {
+  } catch {
       | e @ SkipError.SkipErrorException _ ->
         this_class = env.this_class.fromSome();
         msg = `For the child: '${
@@ -766,10 +758,8 @@ fun make_extend_(
           err with {traces => List.Cons(trace, err.traces)}
         );
         throw e
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun make_extend__(
@@ -3686,18 +3676,11 @@ fun solve_new_lambdas(
   | List.Nil() -> acc
   | List.Cons((lam_id, _), _) if (lam_id == last_id) -> acc
   | List.Cons((_, lbd), rl) ->
-    acc1 = {
-      vtry(
-        () -> {
+    acc1 = try {
           lambda(context, next_id, true, env, acc, lbd)
-        },
-        exn ->
-          exn match {
+    } catch {
           | TUtils.Delay() -> acc
-          | _ -> throw exn
-          }
-        ,
-      )
+          | exn -> throw exn
     };
     solve_new_lambdas(context, next_id, last_id, env, acc1, rl)
   }
@@ -3798,12 +3781,9 @@ private fun check_if_block_mutable(
   mutability match {
   | N.Echilled(N.Mreadonly _, _) -> ty
   | _ ->
-    vtry(
-      () -> {
+    try {
         Types.to_readonly_exn(pos_local, acc.subst, acc.tparam_constraints, ty)
-      },
-      exn ->
-        exn match {
+    } catch {
         | Types.MutLambdaToReadonly _ ->
           local_msg = (pos_local, TUtils.check_mutable_local_msg);
           mut_msg = (mutability.fr, TUtils.check_mutable_error_msg(mutability));
@@ -3818,10 +3798,8 @@ private fun check_if_block_mutable(
             "Because of this 'if' block." +
             "\nInside mutable locals are viewed as readonly, but awaitables cannot be made readonly\nTry using 'await' in an async context to remove the awaitable";
           SkipError.errorl(List[local_msg, mut_msg, (ifblock.fr, emsg)])
-        | _ -> throw exn
-        }
-      ,
-    )
+        | exn -> throw exn
+    }
   }
 }
 

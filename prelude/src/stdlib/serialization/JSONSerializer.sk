@@ -35,8 +35,7 @@ private class Format() {
     write: .String -> void,
     isPretty: .Bool = false,
   ): Result<void, Serialization.SerializationError> {
-    vtry<Result<void, Serialization.SerializationError>>(
-      () -> {
+    try {
         jsonFormatter = if (isPretty) {
           mutable PrettyFormatter(write)
         } else {
@@ -46,14 +45,10 @@ private class Format() {
         serializer.serialize(value, writer);
         writer.result();
         Success(void)
-      },
-      e ->
-        e match {
+    } catch {
         | exn @ Serialization.SerializationError _ -> Failure(exn)
-        | _ -> throw e
-        }
-      ,
-    )
+        | e -> throw e
+    }
   }
 
   static fun deserialize<T, S: Serialization.Serializer<T>>(
@@ -67,19 +62,14 @@ private class Format() {
     data: mutable Lexer.LexingPosition,
     serializer: S,
   ): Result<T, Serialization.SerializationError> {
-    vtry<Result<T, Serialization.SerializationError>>(
-      () -> {
+    try {
         reader = static::reader(data);
         result = serializer.deserialize(reader);
         Success(result)
-      },
-      e ->
-        e match {
+    } catch {
         | exn @ Serialization.SerializationError _ -> Failure(exn)
-        | _ -> throw e
-        }
-      ,
-    )
+        | e -> throw e
+    }
   }
 }
 

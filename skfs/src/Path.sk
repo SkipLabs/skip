@@ -146,13 +146,12 @@ class DirName(
 
   static fun isValidDirName(dirName: String): Bool {
     validator = mutable SKFSImpl.NameValidator(dirName, dirName.chars(), 0);
-    vtry(
-      () -> {
+    try {
         validator.go();
         true
-      },
-      _ -> false,
-    )
+    } catch {
+    | _ -> false
+    }
   }
 
   fun sub(str: String): this {

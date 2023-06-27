@@ -2250,20 +2250,15 @@ fun check_exhaustive_try(
   class_str = "Exception";
   class_name = (pos, class_str);
   ty = (pos, N.Tapply(N.Mchilled(), class_name, Array[]));
-  vtry(
-    () -> {
+  try {
       is_exhaustive(context, next_id, env, pos, ty, mbl)
-    },
-    exn ->
-      exn match {
+  } catch {
       | e @ Overlapping_pattern _
       | e @ Unused_pattern _ ->
         exhaustiveness_err(context, e)
       | Non_exhaustive_match _ -> void
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun check_exhaustive_match(
@@ -2274,20 +2269,15 @@ fun check_exhaustive_match(
   ety: TAst.Type_,
   mbl: List<TAst.Match_branch>,
 ): void {
-  vtry(
-    () -> {
+  try {
       is_exhaustive(context, next_id, env, pos, ety, mbl)
-    },
-    exn ->
-      exn match {
+  } catch {
       | e @ Overlapping_pattern _
       | e @ Unused_pattern _
       | e @ Non_exhaustive_match _ ->
         exhaustiveness_err(context, e)
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun check_exhaustive_match_is(
@@ -2298,12 +2288,9 @@ fun check_exhaustive_match_is(
   ety: TAst.Type_,
   mbl: List<TAst.Match_branch>,
 ): void {
-  vtry(
-    () -> {
+  try {
       is_exhaustive(context, next_id, env, pos, ety, mbl)
-    },
-    exn ->
-      exn match {
+  } catch {
       | e @ Overlapping_pattern _
       | e @ Non_exhaustive_match _ ->
         exhaustiveness_err(context, e)
@@ -2312,10 +2299,8 @@ fun check_exhaustive_match_is(
           pos1,
           "Unnecessary 'is' expression. The value will always successfully match the pattern given.",
         )
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun check_exhaustive_match_as(
@@ -2326,12 +2311,9 @@ fun check_exhaustive_match_as(
   ety: TAst.Type_,
   mbl: List<TAst.Match_branch>,
 ): void {
-  vtry(
-    () -> {
+  try {
       is_exhaustive(context, next_id, env, pos, ety, mbl)
-    },
-    exn ->
-      exn match {
+  } catch {
       | e @ Overlapping_pattern _
       | e @ Non_exhaustive_match _ ->
         exhaustiveness_err(context, e)
@@ -2343,8 +2325,7 @@ fun check_exhaustive_match_as(
             "ICE Unexpected structure of desugared 'as' expression.",
           )
         };
-        vtry(
-          () -> {
+      try {
             _ = TUtils.join_exn(
               context,
               next_id,
@@ -2364,21 +2345,15 @@ fun check_exhaustive_match_as(
               pat_ty,
             )})'`;
             SkipError.error(pos1, message)
-          },
-          exn ->
-            exn match {
+    } catch {
             | Types.Exception _ ->
               message = "If the second branch is unused, then the one of two cases must exist. Either the value is a subtype (or the same type) of the pattern provided, or the given expression only has exactly one possible instantiable child at this type. The given downcast should be allowed for that child";
               invariant(
                 build_class_set(context, next_id, env, ety).size() == 1,
                 message,
               )
-            | _ -> throw exn
-            }
-          ,
-        )
-      | _ -> throw exn
-      }
-    ,
-  )
+            | exn -> throw exn
+    }
+      | exn -> throw exn
+  }
 }

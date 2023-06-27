@@ -79,15 +79,14 @@ fun runValidTest(tomlFile: String, jsonFile: String): void {
 }
 
 fun runInvalidTest(tomlFile: String): void {
-  vtry(
-    () -> {
+  try {
       actual = toJSON(
         TOML.decode(FileSystem.readTextFile(tomlFile)),
       ).toString();
       throw T.ExpectationError("Expected error", "", actual)
-    },
-    _ -> void,
-  )
+  } catch {
+  | _ -> void
+  }
 }
 
 fun main(): void {

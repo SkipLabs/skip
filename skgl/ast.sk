@@ -60,8 +60,7 @@ fun populateProgram(
   sources: Array<SKFS.StringFile>,
 ): void {
   file = ProgramFile(
-    vtry<Result<Program, Exception>>(
-      () -> {
+    try {
         fileName = key match {
         | SKFS.SID(x) -> x
         | _ -> invariant_violation("Expected filename")
@@ -70,9 +69,9 @@ fun populateProgram(
         parser = SKGL.Parser(0, lexer);
         (_, program) = parser.parseProgram();
         Success(program)
-      },
-      exn -> Failure(exn),
-    ),
+    } catch {
+    | exn -> Failure(exn),
+    }
   );
   writer.write(key, file);
 }

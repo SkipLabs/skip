@@ -50,7 +50,11 @@ fun fail<T>(msg: String = "failure"): T {
 
 fun expectThrow(f: () -> void, msg: String = "expected throw"): void {
   success = false;
-  vtry(f, _ -> !success = true);
+  try {
+    f()
+  } catch {
+  | _ -> !success = true
+  };
   if (!success) {
     fail(msg)
   }
