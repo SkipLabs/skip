@@ -280,6 +280,17 @@ fun connectionHandler(
                                 ))
                         var orchestrationStream =
                             PolicyLinkedOrchestrationStream(policy, db, stream)
+
+                        // use observation rather than callbacks so
+                        // that we also close the handler if _we_
+                        // close the stream
+                        stream.observeLifecycle { state ->
+                          when (state) {
+                            Stream.State.CLOSED -> handler.close()
+                            else -> Unit
+                          }
+                        }
+
                         stream.onData = { data ->
                           try {
                             handler = handler.handleMessage(data, orchestrationStream)
@@ -292,10 +303,9 @@ fun connectionHandler(
                           }
                         }
                         stream.onClose = {
-                          handler.close()
                           stream.close()
                         }
-                        stream.onError = { _, _ -> handler.close() }
+                        stream.onError = { _, _ -> }
                       },
                       onClose = { socket -> socket.closeSocket() },
                       onError = { _, _, _ -> },
