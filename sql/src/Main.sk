@@ -43,9 +43,7 @@ fun fixUpDirName(dirNameStr: String): SKFS.DirName {
 
 untracked fun main(): void {
   saved = SKFS.newObstack();
-  vtry(
-    () -> {
-      args = Cli.Command("skdb")
+      cmd = Cli.Command("skdb")
         .about(
           "The SQL database that tells you when your query results changed",
         )
@@ -274,9 +272,11 @@ untracked fun main(): void {
         )
         .subcommand(Cli.Command("replay").about("Replay a diff"))
         .subcommand(Cli.Command("debug").about("TODO"))
-        .help()
-        .parseArgs();
+        .help();
 
+  vtry(
+    () -> {
+      args = cmd.parseArgs();
       options = SKSQL.Options{
         backtrace => args.getBool("backtrace"),
         alwaysAllowJoins => args.getBool("always-allow-joins"),
