@@ -36,18 +36,18 @@ private class Format() {
     isPretty: .Bool = false,
   ): Result<void, Serialization.SerializationError> {
     try {
-        jsonFormatter = if (isPretty) {
-          mutable PrettyFormatter(write)
-        } else {
-          mutable CompactFormatter(write)
-        };
-        writer = static::writer(jsonFormatter);
-        serializer.serialize(value, writer);
-        writer.result();
-        Success(void)
+      jsonFormatter = if (isPretty) {
+        mutable PrettyFormatter(write)
+      } else {
+        mutable CompactFormatter(write)
+      };
+      writer = static::writer(jsonFormatter);
+      serializer.serialize(value, writer);
+      writer.result();
+      Success(void)
     } catch {
-        | exn @ Serialization.SerializationError _ -> Failure(exn)
-        | e -> throw e
+    | exn @ Serialization.SerializationError _ -> Failure(exn)
+    | e -> throw e
     }
   }
 
@@ -63,12 +63,12 @@ private class Format() {
     serializer: S,
   ): Result<T, Serialization.SerializationError> {
     try {
-        reader = static::reader(data);
-        result = serializer.deserialize(reader);
-        Success(result)
+      reader = static::reader(data);
+      result = serializer.deserialize(reader);
+      Success(result)
     } catch {
-        | exn @ Serialization.SerializationError _ -> Failure(exn)
-        | e -> throw e
+    | exn @ Serialization.SerializationError _ -> Failure(exn)
+    | e -> throw e
     }
   }
 }

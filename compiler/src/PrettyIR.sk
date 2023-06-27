@@ -2189,18 +2189,18 @@ private fun debugWriteBlock(b: Block, out: mutable PrettyDefBuilder): void {
   out.print("\n");
   for (i in b.instrs) {
     try {
-        debugWrite(i, out)
+      debugWrite(i, out)
     } catch {
-        | ex @ OptimizerInfo.IDNotFound _ ->
-          // Struggle on displaying malformed IR as best we can (helpful
-          // to debug bugs in that IR).
-          out.print(
-            "\n*** ERROR Displaying Instr %s (%s): %s\n" /
-              i.id.toString() /
-              i.opname() /
-              ex.getMessage(),
-          )
-        | exn -> throw (exn)
+    | ex @ OptimizerInfo.IDNotFound _ ->
+      // Struggle on displaying malformed IR as best we can (helpful
+      // to debug bugs in that IR).
+      out.print(
+        "\n*** ERROR Displaying Instr %s (%s): %s\n" /
+          i.id.toString() /
+          i.opname() /
+          ex.getMessage(),
+      )
+    | exn -> throw (exn)
     }
   }
 }

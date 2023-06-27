@@ -62,13 +62,13 @@ base class Format private () {
     serializer: S,
   ): Result<this::T_result, SerializationError> {
     try {
-        writer = static::writer();
-        serializer.serialize(value, writer);
-        result = writer.result();
-        Success(result)
+      writer = static::writer();
+      serializer.serialize(value, writer);
+      result = writer.result();
+      Success(result)
     } catch {
-        | exn @ SerializationError _ -> Failure(exn)
-        | e -> throw (e)
+    | exn @ SerializationError _ -> Failure(exn)
+    | e -> throw (e)
     }
   }
 
@@ -77,12 +77,12 @@ base class Format private () {
     serializer: S,
   ): Result<T, SerializationError> {
     try {
-        reader = static::reader(data);
-        result = serializer.deserialize(reader);
-        Success(result)
+      reader = static::reader(data);
+      result = serializer.deserialize(reader);
+      Success(result)
     } catch {
-        | exn @ SerializationError _ -> Failure(exn)
-        | e -> throw (e)
+    | exn @ SerializationError _ -> Failure(exn)
+    | e -> throw (e)
     }
   }
 }

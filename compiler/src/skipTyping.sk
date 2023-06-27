@@ -575,23 +575,23 @@ fun add_source_info_on_error<T>(
   mk: () -> T,
 ): T {
   try {
-      mk()
+    mk()
   } catch {
-      | e @ SkipError.SkipErrorException _ ->
-        msg =
-          "In '" +
-          child.i1 +
-          "'s version of the member '" +
-          mem_name.i1 +
-          "' inherited from '" +
-          parent.i1 +
-          "'";
-        trace = (child.i0, msg);
-        !e.errors = e.errors.map(err ->
-          err with {traces => List.Cons(trace, err.traces)}
-        );
-        throw e
-      | exn -> throw exn
+  | e @ SkipError.SkipErrorException _ ->
+    msg =
+      "In '" +
+      child.i1 +
+      "'s version of the member '" +
+      mem_name.i1 +
+      "' inherited from '" +
+      parent.i1 +
+      "'";
+    trace = (child.i0, msg);
+    !e.errors = e.errors.map(err ->
+      err with {traces => List.Cons(trace, err.traces)}
+    );
+    throw e
+  | exn -> throw exn
   }
 }
 
@@ -732,33 +732,33 @@ fun make_extend_(
   // This addition message is done here instead of on the join
   // incase an error happens during promotion
   try {
-      make_extend__(
-        context,
-        next_id,
-        env,
-        acc,
-        parents,
-        parName,
-        parTargs,
-        effective_source,
-        inherited_source,
-        conditions,
-      )
+    make_extend__(
+      context,
+      next_id,
+      env,
+      acc,
+      parents,
+      parName,
+      parTargs,
+      effective_source,
+      inherited_source,
+      conditions,
+    )
   } catch {
-      | e @ SkipError.SkipErrorException _ ->
-        this_class = env.this_class.fromSome();
-        msg = `For the child: '${
-          this_class.i1
-        }', invalid ${verb} of the parent: '${parName.i1}'`;
-        if (this_class.i1 != inherited_source.i1) {
-          !msg = msg + ` via the parent: '${inherited_source.i1}'`
-        };
-        trace = (this_class.i0, msg);
-        !e.errors = e.errors.map(err ->
-          err with {traces => List.Cons(trace, err.traces)}
-        );
-        throw e
-      | exn -> throw exn
+  | e @ SkipError.SkipErrorException _ ->
+    this_class = env.this_class.fromSome();
+    msg = `For the child: '${this_class.i1}', invalid ${verb} of the parent: '${
+      parName.i1
+    }'`;
+    if (this_class.i1 != inherited_source.i1) {
+      !msg = msg + ` via the parent: '${inherited_source.i1}'`
+    };
+    trace = (this_class.i0, msg);
+    !e.errors = e.errors.map(err ->
+      err with {traces => List.Cons(trace, err.traces)}
+    );
+    throw e
+  | exn -> throw exn
   }
 }
 
@@ -3677,10 +3677,10 @@ fun solve_new_lambdas(
   | List.Cons((lam_id, _), _) if (lam_id == last_id) -> acc
   | List.Cons((_, lbd), rl) ->
     acc1 = try {
-          lambda(context, next_id, true, env, acc, lbd)
+      lambda(context, next_id, true, env, acc, lbd)
     } catch {
-          | TUtils.Delay() -> acc
-          | exn -> throw exn
+    | TUtils.Delay() -> acc
+    | exn -> throw exn
     };
     solve_new_lambdas(context, next_id, last_id, env, acc1, rl)
   }
@@ -3782,23 +3782,23 @@ private fun check_if_block_mutable(
   | N.Echilled(N.Mreadonly _, _) -> ty
   | _ ->
     try {
-        Types.to_readonly_exn(pos_local, acc.subst, acc.tparam_constraints, ty)
+      Types.to_readonly_exn(pos_local, acc.subst, acc.tparam_constraints, ty)
     } catch {
-        | Types.MutLambdaToReadonly _ ->
-          local_msg = (pos_local, TUtils.check_mutable_local_msg);
-          mut_msg = (mutability.fr, TUtils.check_mutable_error_msg(mutability));
-          emsg =
-            "Because of this 'if' block." +
-            "\nInside mutable locals are viewed as readonly, but mutable lambdas cannot be made readonly";
-          SkipError.errorl(List[local_msg, mut_msg, (ifblock.fr, emsg)])
-        | Types.AwaitableToReadonly _ ->
-          local_msg = (pos_local, TUtils.check_mutable_local_msg);
-          mut_msg = (mutability.fr, TUtils.check_mutable_error_msg(mutability));
-          emsg =
-            "Because of this 'if' block." +
-            "\nInside mutable locals are viewed as readonly, but awaitables cannot be made readonly\nTry using 'await' in an async context to remove the awaitable";
-          SkipError.errorl(List[local_msg, mut_msg, (ifblock.fr, emsg)])
-        | exn -> throw exn
+    | Types.MutLambdaToReadonly _ ->
+      local_msg = (pos_local, TUtils.check_mutable_local_msg);
+      mut_msg = (mutability.fr, TUtils.check_mutable_error_msg(mutability));
+      emsg =
+        "Because of this 'if' block." +
+        "\nInside mutable locals are viewed as readonly, but mutable lambdas cannot be made readonly";
+      SkipError.errorl(List[local_msg, mut_msg, (ifblock.fr, emsg)])
+    | Types.AwaitableToReadonly _ ->
+      local_msg = (pos_local, TUtils.check_mutable_local_msg);
+      mut_msg = (mutability.fr, TUtils.check_mutable_error_msg(mutability));
+      emsg =
+        "Because of this 'if' block." +
+        "\nInside mutable locals are viewed as readonly, but awaitables cannot be made readonly\nTry using 'await' in an async context to remove the awaitable";
+      SkipError.errorl(List[local_msg, mut_msg, (ifblock.fr, emsg)])
+    | exn -> throw exn
     }
   }
 }

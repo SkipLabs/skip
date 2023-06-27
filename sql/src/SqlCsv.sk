@@ -113,22 +113,22 @@ fun parseCsv<T>(
   array = mutable Vector[];
   eof = false;
   try {
-      for (_ in Range(0, 1000)) {
-        values = mutable Vector[];
-        for (value in lex(() -> getChar())) {
-          values.push(value);
-        };
-        cvalues = values.map(f);
-        array.push(cvalues.toArray());
-        line.set(line.get() + 1);
-      }
+    for (_ in Range(0, 1000)) {
+      values = mutable Vector[];
+      for (value in lex(() -> getChar())) {
+        values.push(value);
+      };
+      cvalues = values.map(f);
+      array.push(cvalues.toArray());
+      line.set(line.get() + 1);
+    }
   } catch {
   | EndOfFile _ ->
-        !eof = true;
-        void
+    !eof = true;
+    void
   | exn ->
-      print_error("Error, line " + line.get() + ": " + exn.getMessage());
-      skipExit(23);
+    print_error("Error, line " + line.get() + ": " + exn.getMessage());
+    skipExit(23)
   };
   (eof, array.toArray())
 }
@@ -514,116 +514,98 @@ fun replayDiff(
   snapshot: ?Int = None();
   reset = false;
 
-    try {
-      loop {
-        line = getLine();
-        lineNbr.set(lineNbr.get() + 1);
-        if (line == "") continue;
+  try {
+    loop {
+      line = getLine();
+      lineNbr.set(lineNbr.get() + 1);
+      if (line == "") continue;
 
-        chars: mutable Vector<Char> = mutable Vector[];
-        iter = line.getIter();
-        (repeatOpt, !reset, !checkpoint, !snapshot) = loop {
-          c = iter.next() match {
-          | None() ->
-            print_error(
-              "Error, line " + lineNbr.get() + ": unexpected end of line",
-            );
-            skipExit(23)
-          | Some(':') ->
-            ticks = line
-              .sub(iter, line.length() - chars.size() - 1)
-              .split(" ")
-              .map(x -> x.toInt());
-            break (None(), reset, ticks.maybeGet(0), ticks.maybeGet(1))
-          | Some(x) -> x
-          };
-          if (c == '\t') {
-            if (chars.size() == 0 || chars[0] == '\t') {
-              break (None(), true, checkpoint, snapshot)
-            } else {
-              break (
-                Some(String::fromChars(chars.toArray()).toInt()),
-                reset,
-                checkpoint,
-                snapshot,
-              )
-            }
-          };
-          if (c < '0' || c > '9') {
-            print_error(
-              "Error, line " + lineNbr.get() + ": expected an integer",
-            );
-            skipExit(23)
-          };
-          chars.push(c);
-        };
-
-        if (repeatOpt is Some _) {
-          str = line.sub(iter, line.length() - chars.size() - 1);
-          values = mutable Vector[];
-          strIter = str.getIter();
-          next = () -> {
-            val = strIter.next();
-            val match {
-            | None() -> '\n'
-            | Some(x) -> x
-            }
-          };
-          for (value in lex(next)) {
-            values.push(value);
-          };
-          cvalues = values.map(SKSQL.parseCSVValue);
-          pos = lineNbr.get();
-          newRows = SKSQL.computeInsert(
-            context,
-            false,
-            pos,
-            None(),
-            Array[cvalues.toArray()],
-            table,
-            repeatOpt.fromSome(),
+      chars: mutable Vector<Char> = mutable Vector[];
+      iter = line.getIter();
+      (repeatOpt, !reset, !checkpoint, !snapshot) = loop {
+        c = iter.next() match {
+        | None() ->
+          print_error(
+            "Error, line " + lineNbr.get() + ": unexpected end of line",
           );
-          userFileOpt match {
-          | None() -> void
-          | Some(userFile) ->
-            hasError = false;
-            for (row in newRows) {
-              SKSQL.checkUserCanWriteRow(context, userFile, table, row) match {
-              | SKSQL.AROK() -> void
-              | SKSQL.ARError(err) ->
-                print_error("Error: " + err.toString());
-                !hasError = true
-              }
-            };
-            if (hasError) {
-              throw SKSQL.IgnoreAndContinue()
-            }
-          };
-          buffer.extend(newRows);
+          skipExit(23)
+        | Some(':') ->
+          ticks = line
+            .sub(iter, line.length() - chars.size() - 1)
+            .split(" ")
+            .map(x -> x.toInt());
+          break (None(), reset, ticks.maybeGet(0), ticks.maybeGet(1))
+        | Some(x) -> x
         };
-
-        checkpoint match {
-        | None() -> void
-        | Some(_) ->
-          rows = buffer.toArray();
-          buffer.clear();
-          break SKFS.CContinue(
-            applyDiffStrategy(
-              table,
-              identity,
-              userFileOpt,
+        if (c == '\t') {
+          if (chars.size() == 0 || chars[0] == '\t') {
+            break (None(), true, checkpoint, snapshot)
+          } else {
+            break (
+              Some(String::fromChars(chars.toArray()).toInt()),
               reset,
-              rows,
               checkpoint,
               snapshot,
-            ),
-          )
-        }
-      }
-    } catch {
-    | EndOfFile _ ->
+            )
+          }
+        };
+        if (c < '0' || c > '9') {
+          print_error("Error, line " + lineNbr.get() + ": expected an integer");
+          skipExit(23)
+        };
+        chars.push(c);
+      };
+
+      if (repeatOpt is Some _) {
+        str = line.sub(iter, line.length() - chars.size() - 1);
+        values = mutable Vector[];
+        strIter = str.getIter();
+        next = () -> {
+          val = strIter.next();
+          val match {
+          | None() -> '\n'
+          | Some(x) -> x
+          }
+        };
+        for (value in lex(next)) {
+          values.push(value);
+        };
+        cvalues = values.map(SKSQL.parseCSVValue);
+        pos = lineNbr.get();
+        newRows = SKSQL.computeInsert(
+          context,
+          false,
+          pos,
+          None(),
+          Array[cvalues.toArray()],
+          table,
+          repeatOpt.fromSome(),
+        );
+        userFileOpt match {
+        | None() -> void
+        | Some(userFile) ->
+          hasError = false;
+          for (row in newRows) {
+            SKSQL.checkUserCanWriteRow(context, userFile, table, row) match {
+            | SKSQL.AROK() -> void
+            | SKSQL.ARError(err) ->
+              print_error("Error: " + err.toString());
+              !hasError = true
+            }
+          };
+          if (hasError) {
+            throw SKSQL.IgnoreAndContinue()
+          }
+        };
+        buffer.extend(newRows);
+      };
+
+      checkpoint match {
+      | None() -> void
+      | Some(_) ->
         rows = buffer.toArray();
-        SKFS.CStop(
+        buffer.clear();
+        break SKFS.CContinue(
           applyDiffStrategy(
             table,
             identity,
@@ -634,13 +616,29 @@ fun replayDiff(
             snapshot,
           ),
         )
-    | SKSQL.IgnoreAndContinue _ ->
-        flushStdout();
-        SKFS.CContinue(None())
-    | exn ->
-        print_error(exn.getMessage());
-        SKFS.CStop(None())
+      }
     }
+  } catch {
+  | EndOfFile _ ->
+    rows = buffer.toArray();
+    SKFS.CStop(
+      applyDiffStrategy(
+        table,
+        identity,
+        userFileOpt,
+        reset,
+        rows,
+        checkpoint,
+        snapshot,
+      ),
+    )
+  | SKSQL.IgnoreAndContinue _ ->
+    flushStdout();
+    SKFS.CContinue(None())
+  | exn ->
+    print_error(exn.getMessage());
+    SKFS.CStop(None())
+  }
 }
 
 fun replayStdin(): Map<String, (Int, Int)> {

@@ -96,18 +96,18 @@ fun keepErrors(
   f: () -> void,
 ): void {
   try {
-      f()
+    f()
   } catch {
-      | err @ SkipError.SkipErrorException _ ->
-        errors = context.getGlobal("ERRORS") match {
-        | None() -> List[]
-        | Some(x) -> ErrorsFile::fromFile(x).value
-        };
-        !errors = List.Cons(err, errors);
-        context.setGlobal("ERRORS", ErrorsFile(errors))
-      | exn ->
-        debug(exn);
-        throw exn
+  | err @ SkipError.SkipErrorException _ ->
+    errors = context.getGlobal("ERRORS") match {
+    | None() -> List[]
+    | Some(x) -> ErrorsFile::fromFile(x).value
+    };
+    !errors = List.Cons(err, errors);
+    context.setGlobal("ERRORS", ErrorsFile(errors))
+  | exn ->
+    debug(exn);
+    throw exn
   }
 }
 
@@ -117,22 +117,22 @@ fun catchErrors(
   f: () -> void,
 ): void {
   try {
-      f()
+    f()
   } catch {
-      | err @ SkipError.SkipErrorException _ -> printErrorsAndExit(Array[err])
-      | exn ->
-        debug(exn);
-        throw exn
+  | err @ SkipError.SkipErrorException _ -> printErrorsAndExit(Array[err])
+  | exn ->
+    debug(exn);
+    throw exn
   }
 }
 
 fun doWithError<T>(f: () -> T): Result<T, Vector<Error>> {
   try {
-      (Success(f()) : Result<T, Vector<SkipError.Error>>);
+    (Success(f()) : Result<T, Vector<SkipError.Error>>);
   } catch {
-      | SkipErrorException{errors} ->
-        (Failure(errors) : Result<T, Vector<SkipError.Error>>)
-      | exn -> throw exn
+  | SkipErrorException{errors} ->
+    (Failure(errors) : Result<T, Vector<SkipError.Error>>)
+  | exn -> throw exn
   }
 }
 
@@ -235,11 +235,11 @@ private fun get_context_of_pos(
   | Some(contents) -> contents
   | None() ->
     try {
-        FileSystem.readTextFile(t.filename)
+      FileSystem.readTextFile(t.filename)
     } catch {
-      | _ ->
-        !hasError = true;
-        ""
+    | _ ->
+      !hasError = true;
+      ""
     }
   };
   if (hasError) return "";

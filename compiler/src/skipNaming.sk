@@ -3959,13 +3959,19 @@ fun expr_(
       mbl.map(mb -> match_branch(context, acc, env, mb)),
     )
   | A.Lambda(mods, nparams, e) ->
-    env2 = env with { return_forbidden => false, break_continue_forbidden => false };
+    env2 = env with {
+      return_forbidden => false,
+      break_continue_forbidden => false,
+    };
     lambda(context, acc, env2, pos, mods, nparams, e)
   | A.Tuple(el) ->
     N.tuple_expr(context, pos, el.map(ex -> expr(context, acc, env, ex)))
   | A.TemplateLiteral(ep) -> N.TemplateLiteral(call_args(context, acc, env, ep))
   | A.Try(e, mbl) ->
-    env2 = env with { return_forbidden => true, break_continue_forbidden => true };
+    env2 = env with {
+      return_forbidden => true,
+      break_continue_forbidden => true,
+    };
     N.Try(
       expr(context, acc, env2, e),
       mbl.map(mb -> match_branch(context, acc, env2, mb)),
@@ -3997,13 +4003,17 @@ fun expr_(
   | A.Await(e) -> sk_await(context, acc, env, pos, e)
   | A.Return(e) ->
     if (env.return_forbidden) {
-      SkipError.error(pos, "Forbidden use of 'return' inside a 'try ... catch'.", None())
+      SkipError.error(
+        pos,
+        "Forbidden use of 'return' inside a 'try ... catch'.",
+        None(),
+      )
     } else {
       acc.setReturns(pos);
       N.Return(expr(context, acc, env, e))
     }
   | A.Yield(e) ->
-      // TODO: Is 'yield' forbidden as well?
+    // TODO: Is 'yield' forbidden as well?
     acc.setYields(pos);
     N.Yield(expr(context, acc, env, e))
   | A.YieldBreak() ->
@@ -4020,18 +4030,26 @@ fun expr_(
 
   | A.Continue() ->
     if (env.break_continue_forbidden) {
-      SkipError.error(pos, "Forbidden use of 'continue' inside a 'try ... catch'.", None())
+      SkipError.error(
+        pos,
+        "Forbidden use of 'continue' inside a 'try ... catch'.",
+        None(),
+      )
     } else {
       N.Continue()
     }
   | A.Break(eb) ->
     if (env.break_continue_forbidden) {
-      SkipError.error(pos, "Forbidden use of 'break' inside a 'try ... catch'.", None())
+      SkipError.error(
+        pos,
+        "Forbidden use of 'break' inside a 'try ... catch'.",
+        None(),
+      )
     } else {
       N.Break(expr(context, acc, env, eb))
     }
   | A.DoWhile(body, cond, woBreak) ->
-    env2 = env with { break_continue_forbidden => false };
+    env2 = env with {break_continue_forbidden => false};
     N.DoWhile(
       expr(context, acc, env2, body),
       expr(context, acc, env2, cond),
@@ -4049,10 +4067,10 @@ fun expr_(
       ),
     )
   | A.Loop(body) ->
-    env2 = env with { break_continue_forbidden => false };
+    env2 = env with {break_continue_forbidden => false};
     N.Loop(expr(context, acc, env2, body))
   | A.While(cond, body, woBreak) ->
-    env2 = env with { break_continue_forbidden => false };
+    env2 = env with {break_continue_forbidden => false};
     N.While(
       expr(context, acc, env2, cond),
       expr(context, acc, env2, body),

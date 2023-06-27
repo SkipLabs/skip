@@ -767,20 +767,20 @@ class MutPreservationConstraint(
     tfrozen = (fr, N.Tfrozen(Ast.Vminus()));
     tvar_co = promote(context, env, acc, this.tvar);
     try {
-        (!acc, _) = join_exn(context, next_id, env, acc, tvar_co, tfrozen);
-        acc
+      (!acc, _) = join_exn(context, next_id, env, acc, tvar_co, tfrozen);
+      acc
     } catch {
-        | Types.Join _ ->
-          mut_pres = Types.MutPreservation(
-            this.child,
-            this.joined,
-            this.targ,
-            this.tparam,
-          );
-          types_error(context, next_id, true, env, acc, fr, msg, mut_pres)
-        | e @ Types.Exception _ ->
-          types_error(context, next_id, true, env, acc, fr, msg, e)
-        | exn -> throw exn
+    | Types.Join _ ->
+      mut_pres = Types.MutPreservation(
+        this.child,
+        this.joined,
+        this.targ,
+        this.tparam,
+      );
+      types_error(context, next_id, true, env, acc, fr, msg, mut_pres)
+    | e @ Types.Exception _ ->
+      types_error(context, next_id, true, env, acc, fr, msg, e)
+    | exn -> throw exn
     }
   }
 
@@ -1184,20 +1184,20 @@ fun solvableWhenparams(
   };
   // Actual check
   try {
-      for ((lhs, rhss) in whenclauses) {
-        !lhs = promote(context, env, acc, finst(lhs));
-        for (rhs in rhss) {
-          !rhs = contra_promote(context, env, acc, finst(rhs));
-          (!acc, _) = join_exn_(context, next_id, true, env, acc, lhs, rhs)
-        }
-      };
-      _ = acc.constraints.solve(context, next_id, env, acc);
-      Some(true)
+    for ((lhs, rhss) in whenclauses) {
+      !lhs = promote(context, env, acc, finst(lhs));
+      for (rhs in rhss) {
+        !rhs = contra_promote(context, env, acc, finst(rhs));
+        (!acc, _) = join_exn_(context, next_id, true, env, acc, lhs, rhs)
+      }
+    };
+    _ = acc.constraints.solve(context, next_id, env, acc);
+    Some(true)
   } catch {
-      | SkipError.SkipErrorException _
-      | Types.Exception _ ->
-        Some(false)
-      | exn -> throw exn
+  | SkipError.SkipErrorException _
+  | Types.Exception _ ->
+    Some(false)
+  | exn -> throw exn
   }
 }
 
@@ -1712,67 +1712,67 @@ fun suggested_join_fix(
   | (Some(Ast.Vplus()), Some(Ast.Vminus()))
   | (Some(Ast.Vplus()), Some(Ast.Vnone())) ->
     try {
-        prom_ty2 = promote(context, env, acc, ty2);
-        (!acc, new_ty) = join_exn_(
-          context,
-          next_id,
-          solving_constraints,
-          env,
-          acc,
-          ty1,
-          prom_ty2,
-        );
-        new_ty_str = Types.to_string(env.this_class, acc.subst, new_ty);
-        ty2_str = Types.to_string(env.this_class, acc.subst, ty2);
-        invariant(
-          ty2_str != new_ty_str,
-          "ICE the suggested type is the same as the original type. How are they not compatible already?",
-        );
-        List[
-          (
-            ty2.i0,
-            "This type was found to be a fixed upper bound and could not be changed to a compatible type.\nTo make these types compatible, annotate as this type: " +
-              new_ty_str,
-          ),
-        ]
+      prom_ty2 = promote(context, env, acc, ty2);
+      (!acc, new_ty) = join_exn_(
+        context,
+        next_id,
+        solving_constraints,
+        env,
+        acc,
+        ty1,
+        prom_ty2,
+      );
+      new_ty_str = Types.to_string(env.this_class, acc.subst, new_ty);
+      ty2_str = Types.to_string(env.this_class, acc.subst, ty2);
+      invariant(
+        ty2_str != new_ty_str,
+        "ICE the suggested type is the same as the original type. How are they not compatible already?",
+      );
+      List[
+        (
+          ty2.i0,
+          "This type was found to be a fixed upper bound and could not be changed to a compatible type.\nTo make these types compatible, annotate as this type: " +
+            new_ty_str,
+        ),
+      ]
     } catch {
-        | _ -> List.Nil()
+    | _ -> List.Nil()
     }
   // Annotate both types
   | (Some(Ast.Vnone()), Some(Ast.Vnone()))
   | (Some(Ast.Vminus()), Some(Ast.Vnone())) ->
     try {
-        prom_ty1 = promote(context, env, acc, ty1);
-        prom_ty2 = promote(context, env, acc, ty2);
-        (!acc, new_ty) = join_exn_(
-          context,
-          next_id,
-          solving_constraints,
-          env,
-          acc,
-          prom_ty1,
-          prom_ty2,
-        );
-        new_ty_str = Types.to_string(env.this_class, acc.subst, new_ty);
-        ty1_str = Types.to_string(env.this_class, acc.subst, ty1);
-        ty2_str = Types.to_string(env.this_class, acc.subst, ty2);
-        fst_msg = "These types were found to be fixed upper bounds and could not be changed to a compatible type.\nTo make these types compatible, annotate as this type: ";
-        snd_msg = "Also annotate here as this type: ";
-        (ty1_str == new_ty_str, ty2_str == new_ty_str) match {
-        // Annotatation needed on both types
-        | (false, false) ->
-          List[(ty1.i0, fst_msg + new_ty_str), (ty2.i0, snd_msg + new_ty_str)]
-        // Annotation needed just on the first type
-        | (false, true) -> List[(ty1.i0, fst_msg + new_ty_str)]
-        // Annotation needed just on the second type
-        | (true, false) -> List[(ty2.i0, fst_msg + new_ty_str)]
-        | (true, true) ->
-          invariant_violation(
-            "ICE the suggested type is the same as BOTH original types. How are they not compatible already?",
-          )
-        }
+      prom_ty1 = promote(context, env, acc, ty1);
+      prom_ty2 = promote(context, env, acc, ty2);
+      (!acc, new_ty) = join_exn_(
+        context,
+        next_id,
+        solving_constraints,
+        env,
+        acc,
+        prom_ty1,
+        prom_ty2,
+      );
+      new_ty_str = Types.to_string(env.this_class, acc.subst, new_ty);
+      ty1_str = Types.to_string(env.this_class, acc.subst, ty1);
+      ty2_str = Types.to_string(env.this_class, acc.subst, ty2);
+      fst_msg = "These types were found to be fixed upper bounds and could not be changed to a compatible type.\nTo make these types compatible, annotate as this type: ";
+      snd_msg = "Also annotate here as this type: ";
+      (ty1_str == new_ty_str, ty2_str == new_ty_str) match {
+      // Annotatation needed on both types
+      | (false, false) ->
+        List[(ty1.i0, fst_msg + new_ty_str), (ty2.i0, snd_msg + new_ty_str)]
+      // Annotation needed just on the first type
+      | (false, true) -> List[(ty1.i0, fst_msg + new_ty_str)]
+      // Annotation needed just on the second type
+      | (true, false) -> List[(ty2.i0, fst_msg + new_ty_str)]
+      | (true, true) ->
+        invariant_violation(
+          "ICE the suggested type is the same as BOTH original types. How are they not compatible already?",
+        )
+      }
     } catch {
-        | _ -> List.Nil()
+    | _ -> List.Nil()
     }
   | (Some(Ast.Vnone()), _)
   | (Some(Ast.Vminus()), Some(Ast.Vplus())) ->
@@ -2027,20 +2027,11 @@ fun join_(
   ty2: N.Type_,
 ): (Acc, N.Type_) {
   try {
-      join_exn_(context, next_id, solving_constraints, env, acc, ty1, ty2)
+    join_exn_(context, next_id, solving_constraints, env, acc, ty1, ty2)
   } catch {
-      | e @ Types.Exception _ ->
-        types_error(
-          context,
-          next_id,
-          solving_constraints,
-          env,
-          acc,
-          pos,
-          msg,
-          e,
-        )
-      | exn -> throw exn
+  | e @ Types.Exception _ ->
+    types_error(context, next_id, solving_constraints, env, acc, pos, msg, e)
+  | exn -> throw exn
   }
 }
 
@@ -2380,35 +2371,35 @@ value class TparamConstraints private {
       (tc, supertype) -> {
         contrasupertype = contra_promote(context, env, acc, supertype);
         try {
-            (tmp_acc, _) = join_constraints_exn(
-              context,
-              next_id,
-              env,
-              acc,
-              cosubtype,
-              contrasupertype,
-            );
-            subst = tmp_acc.subst;
-            subst.reduce(
-              (tc, id, ty) ->
-                tvars_to_tparams.maybeGet(id) match {
-                | None() -> tc
-                | Some((_, tp)) ->
-                  tc.addForBounds(
-                    context,
-                    env,
-                    acc,
-                    tvars_to_tparams,
-                    subst,
-                    tp.id,
-                    ty,
-                  )
-                },
-              tc,
-            )
+          (tmp_acc, _) = join_constraints_exn(
+            context,
+            next_id,
+            env,
+            acc,
+            cosubtype,
+            contrasupertype,
+          );
+          subst = tmp_acc.subst;
+          subst.reduce(
+            (tc, id, ty) ->
+              tvars_to_tparams.maybeGet(id) match {
+              | None() -> tc
+              | Some((_, tp)) ->
+                tc.addForBounds(
+                  context,
+                  env,
+                  acc,
+                  tvars_to_tparams,
+                  subst,
+                  tp.id,
+                  ty,
+                )
+              },
+            tc,
+          )
         } catch {
-            | Types.Exception _ -> tc
-            | exn -> throw exn
+        | Types.Exception _ -> tc
+        | exn -> throw exn
         }
       },
       this,
@@ -3316,18 +3307,18 @@ fun reconstrain_parent(
              * upper bounds for @tparam_id. */
             bounding_ty = contra_promote(context, env, acc1, upper_bound_ty);
             try {
-                join_exn(context, next_id, env, acc1, prom_ty, bounding_ty).i0
+              join_exn(context, next_id, env, acc1, prom_ty, bounding_ty).i0
             } catch {
-                | e @ Types.Exception _ ->
-                  throw InvalidPattern(
-                    next_id(),
-                    false,
-                    acc1,
-                    orig_pos,
-                    "Invalid pattern. Constraint not satisfied when refining the type for this branch",
-                    e,
-                  )
-                | exn -> throw exn
+            | e @ Types.Exception _ ->
+              throw InvalidPattern(
+                next_id(),
+                false,
+                acc1,
+                orig_pos,
+                "Invalid pattern. Constraint not satisfied when refining the type for this branch",
+                e,
+              )
+            | exn -> throw exn
             }
           },
         acc,
@@ -3491,23 +3482,23 @@ fun reconstrain_child(
       (facc, constraint_ty) -> {
         !constraint_ty = contra_promote(context, env, facc, constraint_ty);
         try {
-            join_constraints_exn(
-              context,
-              next_id,
-              env,
-              facc,
-              constraint_ty,
-              prom_ty,
-            ).i0
+          join_constraints_exn(
+            context,
+            next_id,
+            env,
+            facc,
+            constraint_ty,
+            prom_ty,
+          ).i0
         } catch {
-            | e @ Types.Exception _ ->
-              msg = if (tparam_id.isSome()) {
-                "Invalid pattern. Constraint not satisfied when constraining this pattern's generics"
-              } else {
-                "Unused branch"
-              };
-              throw InvalidPattern(next_id(), true, facc, pos, msg, e)
-            | exn -> throw exn
+        | e @ Types.Exception _ ->
+          msg = if (tparam_id.isSome()) {
+            "Invalid pattern. Constraint not satisfied when constraining this pattern's generics"
+          } else {
+            "Unused branch"
+          };
+          throw InvalidPattern(next_id(), true, facc, pos, msg, e)
+        | exn -> throw exn
         }
       },
       acc,
@@ -3673,18 +3664,11 @@ fun instantiate_pattern_object_no_params_exn_full(
   !case_ty = promote(context, env, acc, case_ty);
   (!acc, _) = {
     try {
-        join_exn(context, next_id, env, acc, obj_ty_tvars, case_ty)
+      join_exn(context, next_id, env, acc, obj_ty_tvars, case_ty)
     } catch {
-        | e @ Types.Exception _ ->
-          throw InvalidPattern(
-            next_id(),
-            false,
-            acc,
-            name.i0,
-            "Invalid pattern",
-            e,
-          )
-        | exn -> throw exn
+    | e @ Types.Exception _ ->
+      throw InvalidPattern(next_id(), false, acc, name.i0, "Invalid pattern", e)
+    | exn -> throw exn
     }
   };
   parents = build_parents(env, acc, obj_ty);
@@ -3808,29 +3792,20 @@ fun instantiate_pattern_object(
   (?Parameters<NestedPat>, SkipNamedAst.Type_, SkipNamedAst.Type_),
 ) {
   try {
-      instantiate_pattern_object_exn(
-        context,
-        next_id,
-        pos,
-        env,
-        acc,
-        obj_ty,
-        name,
-      )
+    instantiate_pattern_object_exn(
+      context,
+      next_id,
+      pos,
+      env,
+      acc,
+      obj_ty,
+      name,
+    )
   } catch {
-      | InvalidPattern(last_id, solving_constraints, acc1, pos1, msg, e) ->
-        new_id = sk_create_counter_from_value(last_id);
-        types_error(
-          context,
-          new_id,
-          solving_constraints,
-          env,
-          acc1,
-          pos1,
-          msg,
-          e,
-        )
-      | exn -> throw exn
+  | InvalidPattern(last_id, solving_constraints, acc1, pos1, msg, e) ->
+    new_id = sk_create_counter_from_value(last_id);
+    types_error(context, new_id, solving_constraints, env, acc1, pos1, msg, e)
+  | exn -> throw exn
   }
 }
 
@@ -4051,20 +4026,20 @@ fun valid_child_for_match(
   child_name: String,
 ): Bool {
   try {
-      !ty = contra_promote(context, env, acc, ty);
-      instantiate_pattern_object_exn_only(
-        context,
-        next_id,
-        ty.i0,
-        env,
-        acc,
-        ty,
-        (ty.i0, child_name),
-      );
-      true
+    !ty = contra_promote(context, env, acc, ty);
+    instantiate_pattern_object_exn_only(
+      context,
+      next_id,
+      ty.i0,
+      env,
+      acc,
+      ty,
+      (ty.i0, child_name),
+    );
+    true
   } catch {
-      | InvalidPattern _ -> false
-      | exn -> throw exn
+  | InvalidPattern _ -> false
+  | exn -> throw exn
   }
 }
 

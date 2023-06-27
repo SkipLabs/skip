@@ -1022,16 +1022,16 @@ class ChangedDirs(value: SortedSet<DirName>) extends File
 
 fun withErrorHandler(delta: readonly Context, f: () -> void): Bool {
   try {
-      f();
-      false
+    f();
+    false
   } catch {
   | exn ->
-      line = delta.getGlobal("Line") match {
-      | None() -> -1
-      | Some(x) -> SKFS.IntFile::fromFile(x).value
-      };
-      print_error("Error, line " + line + ": " + exn.getMessage());
-      true
+    line = delta.getGlobal("Line") match {
+    | None() -> -1
+    | Some(x) -> SKFS.IntFile::fromFile(x).value
+    };
+    print_error("Error, line " + line + ": " + exn.getMessage());
+    true
   }
 }
 
@@ -1330,8 +1330,8 @@ fun runWithGcIntern(
       Some(f(context with {globals}))
     } catch {
     | exn ->
-        print_error(exn.getMessage());
-        None()
+      print_error(exn.getMessage());
+      None()
     }) match {
     | Some(x) -> x
     | None() -> return context

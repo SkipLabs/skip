@@ -80,10 +80,8 @@ fun runValidTest(tomlFile: String, jsonFile: String): void {
 
 fun runInvalidTest(tomlFile: String): void {
   try {
-      actual = toJSON(
-        TOML.decode(FileSystem.readTextFile(tomlFile)),
-      ).toString();
-      throw T.ExpectationError("Expected error", "", actual)
+    actual = toJSON(TOML.decode(FileSystem.readTextFile(tomlFile))).toString();
+    throw T.ExpectationError("Expected error", "", actual)
   } catch {
   | _ -> void
   }

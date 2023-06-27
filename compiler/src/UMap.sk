@@ -85,20 +85,19 @@ class .UMap<+V>(
 
   fun getWithMsg(key: Name, fr: FileRange, msg: String): V {
     try {
-        this.getOrCrash(key.i1)
+      this.getOrCrash(key.i1)
     } catch {
-        | KeyNotFound() ->
-          SkipError.unbound_name_with_msg(fr, msg, key.i0, key.i1)
-        | exn -> throw exn
+    | KeyNotFound() -> SkipError.unbound_name_with_msg(fr, msg, key.i0, key.i1)
+    | exn -> throw exn
     }
   }
 
   fun get(key: Name): V {
     try {
-        this.inner[NameKey(key)]
+      this.inner[NameKey(key)]
     } catch {
-        | KeyNotFound() -> SkipError.unbound_name(key.i1, key.i0)
-        | exn -> throw exn
+    | KeyNotFound() -> SkipError.unbound_name(key.i1, key.i0)
+    | exn -> throw exn
     }
   }
 

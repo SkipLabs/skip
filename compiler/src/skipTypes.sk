@@ -835,10 +835,10 @@ fun to_readonly(
   x: N.Type_,
 ): N.Type_ {
   try {
-      to_readonly_exn(caller_pos, subst, bounds, x)
+    to_readonly_exn(caller_pos, subst, bounds, x)
   } catch {
-      | InvalidToReadonly(msg_list) -> SkipError.errorl(msg_list)
-      | exn -> throw exn
+  | InvalidToReadonly(msg_list) -> SkipError.errorl(msg_list)
+  | exn -> throw exn
   }
 }
 
@@ -1553,34 +1553,25 @@ fun join_(
   ) ->
     exn = Join(ty1, ty2);
     try {
-        tyl1 = env.tparam_constraints.findUppers(pid1);
-        freeze_upper = should_freeze_upper(
-          env.tparam_constraints,
-          acc.subst,
-          frozen1,
-          pid1,
-        );
-        join_try_list(context, next_id, exn, env, acc, tp2, freeze_upper, tyl1)
+      tyl1 = env.tparam_constraints.findUppers(pid1);
+      freeze_upper = should_freeze_upper(
+        env.tparam_constraints,
+        acc.subst,
+        frozen1,
+        pid1,
+      );
+      join_try_list(context, next_id, exn, env, acc, tp2, freeze_upper, tyl1)
     } catch {
-        | Join _ ->
-          tyl2 = env.tparam_constraints.findUppers(pid2);
-          freeze_upper = should_freeze_upper(
-            env.tparam_constraints,
-            acc.subst,
-            frozen2,
-            pid2,
-          );
-          join_try_list(
-            context,
-            next_id,
-            exn,
-            env,
-            acc,
-            tp1,
-            freeze_upper,
-            tyl2,
-          )
-        | e -> throw e
+    | Join _ ->
+      tyl2 = env.tparam_constraints.findUppers(pid2);
+      freeze_upper = should_freeze_upper(
+        env.tparam_constraints,
+        acc.subst,
+        frozen2,
+        pid2,
+      );
+      join_try_list(context, next_id, exn, env, acc, tp1, freeze_upper, tyl2)
+    | e -> throw e
     }
   | ((_, N.Tparam(frozen_, A.Vplus(), pid, _)), ty) ->
     tyl = env.tparam_constraints.findUppers(pid);
@@ -1788,16 +1779,16 @@ fun join_try_list(
     ) continue;
 
     try {
-        ty2_fixed = maybe_freeze_upper_bound(
-          acc.subst,
-          env.tparam_constraints,
-          freeze_upper,
-          ty2,
-        );
-        !result = Some(join(context, next_id, env, acc, ty, ty2_fixed))
+      ty2_fixed = maybe_freeze_upper_bound(
+        acc.subst,
+        env.tparam_constraints,
+        freeze_upper,
+        ty2,
+      );
+      !result = Some(join(context, next_id, env, acc, ty, ty2_fixed))
     } catch {
-        | Join _ -> void
-        | _ -> throw exn
+    | Join _ -> void
+    | _ -> throw exn
     };
 
     result match {
@@ -2400,13 +2391,13 @@ fun join_set_elt_opt(
   conditions: N.InterEltConditions,
 ): ?(Acc, N.InterElt) {
   try {
-      Some(join_set_elt(context, next_id, env, acc, elt1, etl2, conditions))
+    Some(join_set_elt(context, next_id, env, acc, elt1, etl2, conditions))
   } catch {
-      | FrozenPreservation _
-      | MutPreservation _
-      | Join _ ->
-        None()
-      | exn -> throw exn
+  | FrozenPreservation _
+  | MutPreservation _
+  | Join _ ->
+    None()
+  | exn -> throw exn
   }
 }
 
@@ -2522,16 +2513,16 @@ fun filter_condition(
   (lhs, rhss) = condition;
   !lhs = promote(context, env, A.Vplus(), acc.subst, lhs);
   try {
-      for (rhs in rhss) {
-        !rhs = promote(context, env, A.Vminus(), acc.subst, rhs);
-        (!acc, _) = join(context, next_id, env, acc, lhs, rhs);
-      };
+    for (rhs in rhss) {
+      !rhs = promote(context, env, A.Vminus(), acc.subst, rhs);
+      (!acc, _) = join(context, next_id, env, acc, lhs, rhs);
+    };
 
-      if (acc.constraints.isEmpty()) Some(acc) else None()
+    if (acc.constraints.isEmpty()) Some(acc) else None()
   } catch {
-      // Note, doesn't catch .Exception
-      | Exception _ -> None()
-      | exn -> throw exn
+  // Note, doesn't catch .Exception
+  | Exception _ -> None()
+  | exn -> throw exn
   }
 }
 
