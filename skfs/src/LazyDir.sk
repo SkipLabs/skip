@@ -71,14 +71,14 @@ class LazyDir{
       context.!reads = SortedSet[];
 
       resultOpt = try {
-          f(context, dirName, key)
+        f(context, dirName, key)
       } catch {
       | exn ->
-          !dir = context.unsafeGetLazyDir(dirName);
-          !dir.data[key] = LAbsent();
-          context.setDir(dirName, dir);
-          context.!reads = readsCopy;
-          throw exn
+        !dir = context.unsafeGetLazyDir(dirName);
+        !dir.data[key] = LAbsent();
+        context.setDir(dirName, dir);
+        context.!reads = readsCopy;
+        throw exn
       };
 
       result = resultOpt match {

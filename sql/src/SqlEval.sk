@@ -626,14 +626,14 @@ class Evaluator{options: Options, user: ?UserFile} {
       | Some(OCUpdate(update)) ->
         copy = context.clone();
         hasConflict = try {
-            this.insertTable(context, table, rows);
-            context.update();
-            false
+          this.insertTable(context, table, rows);
+          context.update();
+          false
         } catch {
-            | Conflict _ ->
-              context.replaceFromSaved(copy);
-              true
-            | exn -> throw exn
+        | Conflict _ ->
+          context.replaceFromSaved(copy);
+          true
+        | exn -> throw exn
         };
         if (hasConflict) {
           this.stmt(context, update, false)
@@ -647,47 +647,46 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (onConflict is Some(OCIgnore())) {
           copy = context.clone();
           try {
-              this.insertTable(context, table, rows);
-              context.update();
+            this.insertTable(context, table, rows);
+            context.update();
           } catch {
-              | Conflict _ -> context.replaceFromSaved(copy)
-              | exn -> throw exn
+          | Conflict _ -> context.replaceFromSaved(copy)
+          | exn -> throw exn
           }
         } else if (onConflict is Some(OCReplace())) {
           loop {
             copy = context.clone();
             shouldContinue = try {
-                this.insertTable(context, table, rows);
-                context.update();
-                false
+              this.insertTable(context, table, rows);
+              context.update();
+              false
             } catch {
-                | Conflict(_pos, _msg, conflictingValues) ->
-                  context.replaceFromSaved(copy);
-                  where: ?Expr = None();
-                  for (idxValue in conflictingValues) {
-                    (idx, conValue) = idxValue;
-                    tyDescr = table.schema[idx];
-                    clause = Binop(
-                      "=",
-                      Literal(tyDescr.name.lower),
-                      conValue match {
-                      | None() -> VNull()
-                      | Some(CInt(n)) -> VInt(n)
-                      | Some(CString(s)) -> VString(s)
-                      | _ ->
-                        error(pos, "Unsupported type for OR IGNORE/REPLACE")
-                      },
-                    );
-                    !where = where match {
-                    | None() -> Some(clause)
-                    | Some(w) -> Some(Binop("AND", w, clause))
-                    }
-                  };
-                  tick = context.tick;
-                  _ = this.delete(context, pos, table.name, where, Array[]);
-                  _ = importNext(context, tick, context);
-                  true
-                | exn -> throw exn
+            | Conflict(_pos, _msg, conflictingValues) ->
+              context.replaceFromSaved(copy);
+              where: ?Expr = None();
+              for (idxValue in conflictingValues) {
+                (idx, conValue) = idxValue;
+                tyDescr = table.schema[idx];
+                clause = Binop(
+                  "=",
+                  Literal(tyDescr.name.lower),
+                  conValue match {
+                  | None() -> VNull()
+                  | Some(CInt(n)) -> VInt(n)
+                  | Some(CString(s)) -> VString(s)
+                  | _ -> error(pos, "Unsupported type for OR IGNORE/REPLACE")
+                  },
+                );
+                !where = where match {
+                | None() -> Some(clause)
+                | Some(w) -> Some(Binop("AND", w, clause))
+                }
+              };
+              tick = context.tick;
+              _ = this.delete(context, pos, table.name, where, Array[]);
+              _ = importNext(context, tick, context);
+              true
+            | exn -> throw exn
             };
             if (!shouldContinue) break void
           }
@@ -863,59 +862,58 @@ fun read(line: Int): (Int, String) {
   i = 0;
   chars = mutable Vector[];
   try {
-      loop {
-        c = getChar();
-        !i = i + 1;
+    loop {
+      c = getChar();
+      !i = i + 1;
 
-        if (c == '\'') {
-          chars.push(c);
-          loop {
-            c2 = getChar();
-            chars.push(c2);
-            if (c2 == '\'') break void;
-          };
-          continue;
+      if (c == '\'') {
+        chars.push(c);
+        loop {
+          c2 = getChar();
+          chars.push(c2);
+          if (c2 == '\'') break void;
         };
+        continue;
+      };
 
-        if (c == '-') {
-          c2 = getChar();
-          !i = i + 1;
-          if (c2 == '-') {
-            while (getChar() != '\n') {
-              !i = i + 1;
-            };
-            continue
-          } else {
-            chars.push(c);
-            chars.push(c2);
-          }
-        } else if (c == '/') {
-          c2 = getChar();
-          !i = i + 1;
-          if (c2 == '*') {
-            last = getChar();
+      if (c == '-') {
+        c2 = getChar();
+        !i = i + 1;
+        if (c2 == '-') {
+          while (getChar() != '\n') {
             !i = i + 1;
-            loop {
-              c3 = getChar();
-              !i = i + 1;
-              if (last == '*' && c3 == '/') break void;
-              !last = c3;
-            };
-            continue
-          } else {
-            chars.push(c);
-            chars.push(c2);
-          }
+          };
+          continue
         } else {
           chars.push(c);
-        };
+          chars.push(c2);
+        }
+      } else if (c == '/') {
+        c2 = getChar();
+        !i = i + 1;
+        if (c2 == '*') {
+          last = getChar();
+          !i = i + 1;
+          loop {
+            c3 = getChar();
+            !i = i + 1;
+            if (last == '*' && c3 == '/') break void;
+            !last = c3;
+          };
+          continue
+        } else {
+          chars.push(c);
+          chars.push(c2);
+        }
+      } else {
+        chars.push(c);
+      };
 
-        if (c == '\n') !line = line + 1;
-        if (c == ';') break (line, String::fromChars(chars.toArray()));
-      }
+      if (c == '\n') !line = line + 1;
+      if (c == ';') break (line, String::fromChars(chars.toArray()));
+    }
   } catch {
-  | _endOfFile ->
-      (line, String::fromChars(chars.toArray()));
+  | _endOfFile -> (line, String::fromChars(chars.toArray()))
   }
 }
 
@@ -1211,26 +1209,26 @@ fun importFromRoot(
   root: readonly SKFS.Context,
 ): void {
   try {
-      shouldImport = delta.getGlobal("TableMap") match {
-      | None() ->
-        delta.getGlobal("IsRead") match {
-        | None() -> false
-        | Some(_) -> true
-        }
-      | Some(_tableMapFile) -> true
-      };
-      if (shouldImport) {
-        SKFS.import(delta, tick, root);
-        delta.update();
+    shouldImport = delta.getGlobal("TableMap") match {
+    | None() ->
+      delta.getGlobal("IsRead") match {
+      | None() -> false
+      | Some(_) -> true
       }
+    | Some(_tableMapFile) -> true
+    };
+    if (shouldImport) {
+      SKFS.import(delta, tick, root);
+      delta.update();
+    }
   } catch {
   | err ->
-      line = delta.getGlobal("Line") match {
-      | None() -> -1
-      | Some(x) -> SKFS.IntFile::fromFile(x).value
-      };
-      print_error("Error, line " + line + ": " + err.getMessage());
-      skipExit(2);
+    line = delta.getGlobal("Line") match {
+    | None() -> -1
+    | Some(x) -> SKFS.IntFile::fromFile(x).value
+    };
+    print_error("Error, line " + line + ": " + err.getMessage());
+    skipExit(2)
   }
 }
 
@@ -1326,18 +1324,18 @@ fun exportToRoot(
 ): Bool {
   rootCopy = root.clone();
   try {
-      hasVersioning = importNext(root, tick, delta);
-      root.update();
-      hasVersioning
+    hasVersioning = importNext(root, tick, delta);
+    root.update();
+    hasVersioning
   } catch {
   | err ->
-      line = delta.getGlobal("Line") match {
-      | None() -> -1
-      | Some(x) -> SKFS.IntFile::fromFile(x).value
-      };
-      root.replaceFromSaved(rootCopy);
-      print_error("Error, line " + line + ": " + err.getMessage());
-      skipExit(2);
+    line = delta.getGlobal("Line") match {
+    | None() -> -1
+    | Some(x) -> SKFS.IntFile::fromFile(x).value
+    };
+    root.replaceFromSaved(rootCopy);
+    print_error("Error, line " + line + ": " + err.getMessage());
+    skipExit(2)
   }
 }
 
@@ -1506,76 +1504,76 @@ const jsRootsName: Name = Name::create("jsroots");
 fun initJSRoots(): void {
   saved = SKFS.newObstack();
   try {
-      SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
-        context.unsafeMaybeGetEagerDir(jsRootsInputDirName) match {
-        | None() -> void
-        | Some(dir) ->
-          dir.onFiles(iter -> {
-            for (kv in iter) {
-              (key, _fileIter) = kv;
-              !dir = dir.writeArrayReturnDir(context, key, Array[]);
-            };
-          });
-          context.setDir(dir.dirName, dir);
-          return SKFS.CStop(None())
-        };
-        context.!globals = SortedMap[];
-        dirDescr = DirDescr::create{
-          name => jsRootsName,
-          schema => Array[
-            TypeDescr{
-              name => Name::create("name"),
-              ty => TEXT(),
-              primary => false,
-              unique => false,
-              default => None(),
-              notNull => true,
-            },
-            TypeDescr{
-              name => Name::create("value"),
-              ty => TEXT(),
-              primary => false,
-              unique => false,
-              default => None(),
-              notNull => true,
-            },
-          ],
-          dirName => jsRootsValuesDirName,
-          alias => None(),
-          isInput => false,
-        };
-        tableDir = getTableDir(context);
-        fileName = SKFS.SID::create("jsroots");
-        tableDir.writeArray(context, fileName, Array[dirDescr]);
-        kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
-        _ = context
-          .mkdir(JSCall::fromFile, jsRootsInputDirName, Array[])
-          .contextWriterKeyValues(
-            SKFS.StringFile::fromFile,
-            context,
-            jsRootsValuesDirName,
-            (context, writer, baseName, values) ~>
-              withLocalContext(context, () -> {
-                name = baseName match {
-                | SKFS.SID(x) -> x
-                | _ -> invariant_violation("Unexpected key type")
-                };
-                invariant(values.size() == 1);
-                value = values[0];
-                result = callExternalFun(value.funId, value.funArg);
-                row = RowValues::create(
-                  Array[Some(CString(name)), Some(CString(result))],
-                );
-                writer.write(RowKey(row, kinds), row);
-              })
-            ,
-          );
-        SKFS.CStop(None());
+    SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+      context.unsafeMaybeGetEagerDir(jsRootsInputDirName) match {
+      | None() -> void
+      | Some(dir) ->
+        dir.onFiles(iter -> {
+          for (kv in iter) {
+            (key, _fileIter) = kv;
+            !dir = dir.writeArrayReturnDir(context, key, Array[]);
+          };
+        });
+        context.setDir(dir.dirName, dir);
+        return SKFS.CStop(None())
+      };
+      context.!globals = SortedMap[];
+      dirDescr = DirDescr::create{
+        name => jsRootsName,
+        schema => Array[
+          TypeDescr{
+            name => Name::create("name"),
+            ty => TEXT(),
+            primary => false,
+            unique => false,
+            default => None(),
+            notNull => true,
+          },
+          TypeDescr{
+            name => Name::create("value"),
+            ty => TEXT(),
+            primary => false,
+            unique => false,
+            default => None(),
+            notNull => true,
+          },
+        ],
+        dirName => jsRootsValuesDirName,
+        alias => None(),
+        isInput => false,
+      };
+      tableDir = getTableDir(context);
+      fileName = SKFS.SID::create("jsroots");
+      tableDir.writeArray(context, fileName, Array[dirDescr]);
+      kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
+      _ = context
+        .mkdir(JSCall::fromFile, jsRootsInputDirName, Array[])
+        .contextWriterKeyValues(
+          SKFS.StringFile::fromFile,
+          context,
+          jsRootsValuesDirName,
+          (context, writer, baseName, values) ~>
+            withLocalContext(context, () -> {
+              name = baseName match {
+              | SKFS.SID(x) -> x
+              | _ -> invariant_violation("Unexpected key type")
+              };
+              invariant(values.size() == 1);
+              value = values[0];
+              result = callExternalFun(value.funId, value.funArg);
+              row = RowValues::create(
+                Array[Some(CString(name)), Some(CString(result))],
+              );
+              writer.write(RowKey(row, kinds), row);
+            })
+          ,
+        );
+      SKFS.CStop(None());
     })
   } catch {
   | exn ->
-      SKFS.destroyObstack(saved);
-      throw (exn);
+    SKFS.destroyObstack(saved);
+    throw (exn)
   };
   SKFS.destroyObstack(saved);
 }
@@ -1585,20 +1583,20 @@ fun addRoot(rootName: String, funId: Int32, funArg: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
   saved = SKFS.newObstack();
   try {
-      SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
-        context.!globals = SortedMap[];
-        (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
-          context,
-          SKFS.SID(rootName),
-          Array[JSCall(funId, funArg)],
-        );
-        context.update();
-        SKFS.CStop(None())
-      })
+    SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+      context.!globals = SortedMap[];
+      (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
+        context,
+        SKFS.SID(rootName),
+        Array[JSCall(funId, funArg)],
+      );
+      context.update();
+      SKFS.CStop(None())
+    })
   } catch {
   | exn ->
-      SKFS.destroyObstack(saved);
-      throw (exn);
+    SKFS.destroyObstack(saved);
+    throw (exn)
   };
   SKFS.destroyObstack(saved);
 }
@@ -1608,23 +1606,23 @@ fun removeRoot(rootName: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
   saved = SKFS.newObstack();
   try {
-      SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
-        context.!globals = SortedMap[];
-        if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
-          return SKFS.CStop(None());
-        };
-        (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
-          context,
-          SKFS.SID(rootName),
-          Array[],
-        );
-        context.update();
-        SKFS.CStop(None());
-      })
+    SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+      context.!globals = SortedMap[];
+      if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
+        return SKFS.CStop(None());
+      };
+      (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
+        context,
+        SKFS.SID(rootName),
+        Array[],
+      );
+      context.update();
+      SKFS.CStop(None());
+    })
   } catch {
   | exn ->
-      SKFS.destroyObstack(saved);
-      throw (exn);
+    SKFS.destroyObstack(saved);
+    throw (exn)
   };
   SKFS.destroyObstack(saved);
 }

@@ -228,75 +228,75 @@ untracked fun main(): void {
     .subcommand(Cli.Command("debug").about("TODO"))
     .help();
 
-    try {
-      args = cmd.parseArgs();
-      options = SKSQL.Options{
-        backtrace => args.getBool("backtrace"),
-        alwaysAllowJoins => args.getBool("always-allow-joins"),
-        sync => args.getBool("sync"),
-        showUsedIndexes => args.getBool("show-used-indexes"),
-        format => args.getString("format") match {
-        | "csv" -> SKSQL.OFK_CSV()
-        | "json" -> SKSQL.OFK_JSON()
-        | "sql" -> SKSQL.OFK_SQL()
-        | "js" -> SKSQL.OFK_JS()
-        | f -> invariant_violation(`Unsupported format: ${f}`)
-        },
-      };
-
-      subcmd_handler = args.subcommand
-        .map(subcmd ->
-          subcmd match {
-          | "sessions" -> execSessions
-          | "compact" -> execCompact
-          | "dump-table" -> execDumpTable
-          | "dump-tables" -> execDumpTables
-          | "dump-inserts" -> execDumpInserts
-          | "dump-view" -> execDumpView
-          | "dump-views" -> execDumpViews
-          | "dump" -> execDump
-          | "load-csv" -> execLoadCsv
-          | "csv-field" -> execCsvField
-          | "size" -> execSize
-          | "diff" -> execDiff
-          | "disconnect" -> execDisconnect
-          | "write" -> execWrite
-          | "tail" -> execTail
-          | "watermark" -> execWatermark
-          | "replication-id" -> execReplicationId
-          | "write-csv" -> execWriteCsv
-          | "subscribe" -> execSubscribe
-          | "can-mirror" -> execCanMirror
-          | "replay" -> execReplay
-          | "debug" -> execDebug
-          | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
-          }
-        )
-        .default((args, options) -> {
-          // NOTE: This should be a subcommand, but the `--init` flag is currently
-          // hardcoded in the runtime. It should be revisited once the runtime has
-          // a proper two-step init API for persistence.
-          if (args.maybeGetString("init") is Some _) {
-            _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
-            return void
-          } else if (args.maybeGetString("capacity") is Some _) {
-            print_error("cannot use capacity without init");
-            skipExit(2)
-          };
-          // TODO: If `--user` is actually needed, reinstate it. It was clashing with
-          // other options and was removed for convenience.
-          // user = argMap.maybeGet("user") match {
-          //   | Some(AP.StringValue{value => userName}) -> Some(userName)
-          //   | _ -> None()
-          //   };
-          SKSQL.eval(options, /* user = */ None())
-        });
-      subcmd_handler(args, options);
-    } catch {
-    | exn ->
-      SKFS.destroyObstack(saved);
-      throw exn;
+  try {
+    args = cmd.parseArgs();
+    options = SKSQL.Options{
+      backtrace => args.getBool("backtrace"),
+      alwaysAllowJoins => args.getBool("always-allow-joins"),
+      sync => args.getBool("sync"),
+      showUsedIndexes => args.getBool("show-used-indexes"),
+      format => args.getString("format") match {
+      | "csv" -> SKSQL.OFK_CSV()
+      | "json" -> SKSQL.OFK_JSON()
+      | "sql" -> SKSQL.OFK_SQL()
+      | "js" -> SKSQL.OFK_JS()
+      | f -> invariant_violation(`Unsupported format: ${f}`)
+      },
     };
+
+    subcmd_handler = args.subcommand
+      .map(subcmd ->
+        subcmd match {
+        | "sessions" -> execSessions
+        | "compact" -> execCompact
+        | "dump-table" -> execDumpTable
+        | "dump-tables" -> execDumpTables
+        | "dump-inserts" -> execDumpInserts
+        | "dump-view" -> execDumpView
+        | "dump-views" -> execDumpViews
+        | "dump" -> execDump
+        | "load-csv" -> execLoadCsv
+        | "csv-field" -> execCsvField
+        | "size" -> execSize
+        | "diff" -> execDiff
+        | "disconnect" -> execDisconnect
+        | "write" -> execWrite
+        | "tail" -> execTail
+        | "watermark" -> execWatermark
+        | "replication-id" -> execReplicationId
+        | "write-csv" -> execWriteCsv
+        | "subscribe" -> execSubscribe
+        | "can-mirror" -> execCanMirror
+        | "replay" -> execReplay
+        | "debug" -> execDebug
+        | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+        }
+      )
+      .default((args, options) -> {
+        // NOTE: This should be a subcommand, but the `--init` flag is currently
+        // hardcoded in the runtime. It should be revisited once the runtime has
+        // a proper two-step init API for persistence.
+        if (args.maybeGetString("init") is Some _) {
+          _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
+          return void
+        } else if (args.maybeGetString("capacity") is Some _) {
+          print_error("cannot use capacity without init");
+          skipExit(2)
+        };
+        // TODO: If `--user` is actually needed, reinstate it. It was clashing with
+        // other options and was removed for convenience.
+        // user = argMap.maybeGet("user") match {
+        //   | Some(AP.StringValue{value => userName}) -> Some(userName)
+        //   | _ -> None()
+        //   };
+        SKSQL.eval(options, /* user = */ None())
+      });
+    subcmd_handler(args, options);
+  } catch {
+  | exn ->
+    SKFS.destroyObstack(saved);
+    throw exn
+  };
   SKFS.destroyObstack(saved);
 }
 
@@ -406,13 +406,13 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
     | Some(userName) -> Some(SKSQL.UserFile::create(context, userName))
     };
     try {
-        contextOp = SKCSV.insert(context, line, options, table, user);
-        context.setGlobal("Line", SKFS.IntFile(line.get()));
-        contextOp
+      contextOp = SKCSV.insert(context, line, options, table, user);
+      context.setGlobal("Line", SKFS.IntFile(line.get()));
+      contextOp
     } catch {
     | exn ->
-        print_error("Error, line " + line.get() + ": " + exn.getMessage());
-        skipExit(23);
+      print_error("Error, line " + line.get() + ": " + exn.getMessage());
+      skipExit(23)
     };
   })
 }
