@@ -42,5 +42,6 @@ WORKDIR /skfs
 
 COPY --from=skdb /skfs/build ./build
 COPY --from=skgw /skfs/sql/server/skgw/app/build/libs/app.jar /skfs/build/server.jar
+COPY --from=skgw /skfs/sql/server/deploy/start_prod.sh /skfs/build/start.sh
 
-CMD java -jar /skfs/build/server.jar
+CMD /skfs/build/start.sh
