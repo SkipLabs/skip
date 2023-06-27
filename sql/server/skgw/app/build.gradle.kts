@@ -51,6 +51,11 @@ task("runMuxTestClient", JavaExec::class) {
   classpath = sourceSets["test"].runtimeClasspath
 }
 
+task("runCli", JavaExec::class) {
+  mainClass.set("io.skiplabs.skgw.cli.CliKt")
+  classpath = sourceSets["test"].runtimeClasspath
+}
+
 tasks.jar {
     manifest.attributes["Main-Class"] = "io.skiplabs.skgw.AppKt"
     val dependencies = configurations
