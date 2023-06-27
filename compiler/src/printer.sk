@@ -29,16 +29,11 @@ class Context{
   }
 
   fun getParent(n: Int): ParseTree {
-    vtry(
-      () -> {
+    try {
         this.parents.getNth(n)
-      },
-      _exn -> {
-        // TODO: Is there a cleaner way, before we reinstate `try { ... } catch { ... }`?
-        res: ParseTree = ParseTree.EmptyTree{range => TextRange.none};
-        res
-      },
-    )
+    } catch {
+    | _ -> ParseTree.EmptyTree{range => TextRange.none};
+    }
   }
 }
 

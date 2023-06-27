@@ -2188,12 +2188,9 @@ private fun debugWriteBlock(b: Block, out: mutable PrettyDefBuilder): void {
 
   out.print("\n");
   for (i in b.instrs) {
-    vtry(
-      () -> {
+    try {
         debugWrite(i, out)
-      },
-      exn ->
-        exn match {
+    } catch {
         | ex @ OptimizerInfo.IDNotFound _ ->
           // Struggle on displaying malformed IR as best we can (helpful
           // to debug bugs in that IR).
@@ -2203,10 +2200,8 @@ private fun debugWriteBlock(b: Block, out: mutable PrettyDefBuilder): void {
               i.opname() /
               ex.getMessage(),
           )
-        | _ -> throw (exn)
-        }
-      ,
-    )
+        | exn -> throw (exn)
+    }
   }
 }
 

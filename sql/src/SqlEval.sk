@@ -625,21 +625,16 @@ class Evaluator{options: Options, user: ?UserFile} {
       onConflict match {
       | Some(OCUpdate(update)) ->
         copy = context.clone();
-        hasConflict = vtry(
-          () -> {
+        hasConflict = try {
             this.insertTable(context, table, rows);
             context.update();
             false
-          },
-          exn ->
-            exn match {
+        } catch {
             | Conflict _ ->
               context.replaceFromSaved(copy);
               true
-            | _ -> throw exn
-            }
-          ,
-        );
+            | exn -> throw exn
+        };
         if (hasConflict) {
           this.stmt(context, update, false)
         } else {
@@ -651,29 +646,21 @@ class Evaluator{options: Options, user: ?UserFile} {
       Some((context, _, _) ~> {
         if (onConflict is Some(OCIgnore())) {
           copy = context.clone();
-          vtry(
-            () -> {
+          try {
               this.insertTable(context, table, rows);
               context.update();
-            },
-            exn ->
-              exn match {
+          } catch {
               | Conflict _ -> context.replaceFromSaved(copy)
-              | _ -> throw exn
-              }
-            ,
-          )
+              | exn -> throw exn
+          }
         } else if (onConflict is Some(OCReplace())) {
           loop {
             copy = context.clone();
-            shouldContinue = vtry(
-              () -> {
+            shouldContinue = try {
                 this.insertTable(context, table, rows);
                 context.update();
                 false
-              },
-              exn ->
-                exn match {
+            } catch {
                 | Conflict(_pos, _msg, conflictingValues) ->
                   context.replaceFromSaved(copy);
                   where: ?Expr = None();
@@ -700,10 +687,8 @@ class Evaluator{options: Options, user: ?UserFile} {
                   _ = this.delete(context, pos, table.name, where, Array[]);
                   _ = importNext(context, tick, context);
                   true
-                | _ -> throw exn
-                }
-              ,
-            );
+                | exn -> throw exn
+            };
             if (!shouldContinue) break void
           }
         } else {
@@ -877,8 +862,7 @@ native fun unsafeCompareSets(
 fun read(line: Int): (Int, String) {
   i = 0;
   chars = mutable Vector[];
-  vtry(
-    () ->
+  try {
       loop {
         c = getChar();
         !i = i + 1;
@@ -927,12 +911,12 @@ fun read(line: Int): (Int, String) {
         };
 
         if (c == '\n') !line = line + 1;
-        if (c == ';') return (line, String::fromChars(chars.toArray()));
-      },
-    _endOfFile -> {
+        if (c == ';') break (line, String::fromChars(chars.toArray()));
+      }
+  } catch {
+  | _endOfFile ->
       (line, String::fromChars(chars.toArray()));
-    },
-  )
+  }
 }
 
 fun getLine(buffer: Buffer, pos: Int): Int {
@@ -1025,7 +1009,13 @@ fun makeSqlContext(): mutable SKFS.Context {
 }
 
 fun doOnError(options: Options, f: () -> void, error: Exception -> void): void {
-  if (options.backtrace) f() else vtry(f, error)
+  if (options.backtrace) f() else {
+    try {
+      f()
+    } catch {
+    | exn -> error(exn)
+    }
+  }
 }
 
 class StmtFile(stmt: Stmt) extends SKFS.File
@@ -1220,8 +1210,7 @@ fun importFromRoot(
   tick: SKFS.Tick,
   root: readonly SKFS.Context,
 ): void {
-  vtry(
-    () -> {
+  try {
       shouldImport = delta.getGlobal("TableMap") match {
       | None() ->
         delta.getGlobal("IsRead") match {
@@ -1234,16 +1223,15 @@ fun importFromRoot(
         SKFS.import(delta, tick, root);
         delta.update();
       }
-    },
-    (err -> {
+  } catch {
+  | err ->
       line = delta.getGlobal("Line") match {
       | None() -> -1
       | Some(x) -> SKFS.IntFile::fromFile(x).value
       };
       print_error("Error, line " + line + ": " + err.getMessage());
       skipExit(2);
-    }),
-  )
+  }
 }
 
 fun makeInputDirName(dirName: SKFS.DirName): (SKFS.DirName, Int) {
@@ -1337,13 +1325,12 @@ fun exportToRoot(
   delta: readonly SKFS.Context,
 ): Bool {
   rootCopy = root.clone();
-  vtry(
-    () -> {
+  try {
       hasVersioning = importNext(root, tick, delta);
       root.update();
       hasVersioning
-    },
-    (err -> {
+  } catch {
+  | err ->
       line = delta.getGlobal("Line") match {
       | None() -> -1
       | Some(x) -> SKFS.IntFile::fromFile(x).value
@@ -1351,8 +1338,7 @@ fun exportToRoot(
       root.replaceFromSaved(rootCopy);
       print_error("Error, line " + line + ": " + err.getMessage());
       skipExit(2);
-    }),
-  )
+  }
 }
 
 fun updateTableMap(context: mutable SKFS.Context): void {
@@ -1478,20 +1464,26 @@ native fun callExternalFun(Int32, String): String;
 fun withLocalContext<T>(context: mutable SKFS.Context, f: () -> T): T {
   if (hasLocalContext() == 0) {
     setLocalContext(context);
-    result = vtry(f, exn -> {
+    result = try {
+      f()
+    } catch {
+    | exn ->
       removeLocalContext();
       print_error(exn.getMessage());
       throw exn
-    });
+    };
     removeLocalContext();
     result
   } else {
     oldContext = getLocalContext();
-    result = vtry(f, exn -> {
+    result = try {
+      f()
+    } catch {
+    | exn ->
       setLocalContext(oldContext);
       print_error(exn.getMessage());
       throw exn
-    });
+    };
     setLocalContext(oldContext);
     result
   }
@@ -1513,8 +1505,7 @@ const jsRootsName: Name = Name::create("jsroots");
 @cpp_export("SKIP_init_jsroots")
 fun initJSRoots(): void {
   saved = SKFS.newObstack();
-  vtry(
-    () -> {
+  try {
       SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
         context.unsafeMaybeGetEagerDir(jsRootsInputDirName) match {
         | None() -> void
@@ -1580,13 +1571,12 @@ fun initJSRoots(): void {
             ,
           );
         SKFS.CStop(None());
-      })
-    },
-    exn -> {
+    })
+  } catch {
+  | exn ->
       SKFS.destroyObstack(saved);
       throw (exn);
-    },
-  );
+  };
   SKFS.destroyObstack(saved);
 }
 
@@ -1594,8 +1584,7 @@ fun initJSRoots(): void {
 fun addRoot(rootName: String, funId: Int32, funArg: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
   saved = SKFS.newObstack();
-  vtry(
-    () -> {
+  try {
       SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
         context.!globals = SortedMap[];
         (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
@@ -1606,12 +1595,11 @@ fun addRoot(rootName: String, funId: Int32, funArg: String): void {
         context.update();
         SKFS.CStop(None())
       })
-    },
-    exn -> {
+  } catch {
+  | exn ->
       SKFS.destroyObstack(saved);
       throw (exn);
-    },
-  );
+  };
   SKFS.destroyObstack(saved);
 }
 
@@ -1619,8 +1607,7 @@ fun addRoot(rootName: String, funId: Int32, funArg: String): void {
 fun removeRoot(rootName: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
   saved = SKFS.newObstack();
-  vtry(
-    () -> {
+  try {
       SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
         context.!globals = SortedMap[];
         if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
@@ -1634,12 +1621,11 @@ fun removeRoot(rootName: String): void {
         context.update();
         SKFS.CStop(None());
       })
-    },
-    exn -> {
+  } catch {
+  | exn ->
       SKFS.destroyObstack(saved);
       throw (exn);
-    },
-  );
+  };
   SKFS.destroyObstack(saved);
 }
 

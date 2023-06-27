@@ -94,16 +94,11 @@ fun renameString(map: ParamMap, value: String): String {
 }
 
 fun renameName(map: ParamMap, name: O.Name): O.Name {
-  vtry(
-    () -> {
+  try {
       O.Name(name.pos, renameString(map, name.id))
-    },
-    exn ->
-      exn match {
+  } catch {
       | _ -> name.pos.die(`Missing map for ${name.id}`)
-      }
-    ,
-  )
+  }
 }
 
 fun renameBinding(map: ParamMap, binding: O.Binding): O.Binding {

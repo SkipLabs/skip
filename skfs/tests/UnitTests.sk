@@ -46,20 +46,18 @@ fun compareResults(
   values: Array<Int>,
 ): void {
   readV = context.getValue(SKFS.Path::fromString(path));
-  vtry(
-    () -> {
+  try {
       T.expectEq(
         readV,
         values.map(x -> IBox(x)),
         kind + " test for path " + path,
       );
-    },
-    _ -> {
+  } catch {
+  | _ ->
       debug(readV);
       debug(values);
       T.fail("Compare result failed\n")
-    },
-  )
+  }
 }
 
 fun testUpdate(

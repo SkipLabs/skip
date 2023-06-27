@@ -228,8 +228,7 @@ untracked fun main(): void {
     .subcommand(Cli.Command("debug").about("TODO"))
     .help();
 
-  vtry(
-    () -> {
+    try {
       args = cmd.parseArgs();
       options = SKSQL.Options{
         backtrace => args.getBool("backtrace"),
@@ -293,12 +292,11 @@ untracked fun main(): void {
           SKSQL.eval(options, /* user = */ None())
         });
       subcmd_handler(args, options);
-    },
-    exn -> {
+    } catch {
+    | exn ->
       SKFS.destroyObstack(saved);
       throw exn;
-    },
-  );
+    };
   SKFS.destroyObstack(saved);
 }
 
@@ -407,17 +405,15 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
     | None() -> None()
     | Some(userName) -> Some(SKSQL.UserFile::create(context, userName))
     };
-    vtry<SKFS.ContextOp>(
-      () -> {
+    try {
         contextOp = SKCSV.insert(context, line, options, table, user);
         context.setGlobal("Line", SKFS.IntFile(line.get()));
         contextOp
-      },
-      exn -> {
+    } catch {
+    | exn ->
         print_error("Error, line " + line.get() + ": " + exn.getMessage());
         skipExit(23);
-      },
-    );
+    };
   })
 }
 

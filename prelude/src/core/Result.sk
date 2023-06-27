@@ -34,7 +34,11 @@ base class Result<+T, +E> {
   // - If the function completes, returns Success() with the return value
   // - If it throws, returns Failure() with the exception
   static fun guard(f: () -> T): Result<T, Exception> {
-    vtry<Result<T, Exception>>(() -> Success(f()), exn -> Failure(exn))
+    try {
+      Success(f())
+    } catch {
+    | exn -> Failure(exn)
+    }
   }
 
   // # Composition

@@ -61,15 +61,12 @@ fun testRuntime(): void {
   SKTest.expectEq(3, String.byteSize(str).toInt(), "String.byteSize");
   SKTest.expectEq(
     22,
-    vtry(
-      () -> makeExn(),
-      exn -> {
-        exn match {
+    try {
+      makeExn()
+    } catch {
         | MyEx(x) -> x
         | e -> throw e
-        }
-      },
-    ),
+    },
     "throw",
   );
   arr = Array[Array[1], Array[2], Array[3]];

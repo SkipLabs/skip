@@ -1021,20 +1021,18 @@ class Synchronizer(
 class ChangedDirs(value: SortedSet<DirName>) extends File
 
 fun withErrorHandler(delta: readonly Context, f: () -> void): Bool {
-  vtry(
-    () -> {
+  try {
       f();
       false
-    },
-    exn -> {
+  } catch {
+  | exn ->
       line = delta.getGlobal("Line") match {
       | None() -> -1
       | Some(x) -> SKFS.IntFile::fromFile(x).value
       };
       print_error("Error, line " + line + ": " + exn.getMessage());
       true
-    },
-  );
+  }
 }
 
 @cpp_export("SKIP_resolve_context")
@@ -1328,13 +1326,13 @@ fun runWithGcIntern(
   loop {
     startTick = context.tick;
     pos = newObstack();
-    (newContext, newContextOp) = vtry<?(SKFS.Context, SKFS.ContextOp)>(
-      () -> Some(f(context with {globals})),
-      exn -> {
+    (newContext, newContextOp) = (try {
+      Some(f(context with {globals}))
+    } catch {
+    | exn ->
         print_error(exn.getMessage());
         None()
-      },
-    ) match {
+    }) match {
     | Some(x) -> x
     | None() -> return context
     };

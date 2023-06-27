@@ -95,12 +95,9 @@ fun keepErrors(
   context: mutable SKFS.Context,
   f: () -> void,
 ): void {
-  vtry(
-    () -> {
+  try {
       f()
-    },
-    exn ->
-      exn match {
+  } catch {
       | err @ SkipError.SkipErrorException _ ->
         errors = context.getGlobal("ERRORS") match {
         | None() -> List[]
@@ -108,12 +105,10 @@ fun keepErrors(
         };
         !errors = List.Cons(err, errors);
         context.setGlobal("ERRORS", ErrorsFile(errors))
-      | _ ->
+      | exn ->
         debug(exn);
         throw exn
-      }
-    ,
-  )
+  }
 }
 
 fun catchErrors(
@@ -121,34 +116,24 @@ fun catchErrors(
   _context: mutable SKFS.Context,
   f: () -> void,
 ): void {
-  vtry(
-    () -> {
+  try {
       f()
-    },
-    exn ->
-      exn match {
+  } catch {
       | err @ SkipError.SkipErrorException _ -> printErrorsAndExit(Array[err])
-      | _ ->
+      | exn ->
         debug(exn);
         throw exn
-      }
-    ,
-  )
+  }
 }
 
 fun doWithError<T>(f: () -> T): Result<T, Vector<Error>> {
-  vtry(
-    () -> {
+  try {
       (Success(f()) : Result<T, Vector<SkipError.Error>>);
-    },
-    exn ->
-      exn match {
+  } catch {
       | SkipErrorException{errors} ->
         (Failure(errors) : Result<T, Vector<SkipError.Error>>)
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun do2WithError<T1, T2>(f1: () -> T1, f2: () -> T2): (T1, T2) {
@@ -249,15 +234,13 @@ private fun get_context_of_pos(
   contents = fileContents match {
   | Some(contents) -> contents
   | None() ->
-    vtry(
-      () -> {
+    try {
         FileSystem.readTextFile(t.filename)
-      },
-      _ -> {
+    } catch {
+      | _ ->
         !hasError = true;
         ""
-      },
-    )
+    }
   };
   if (hasError) return "";
 

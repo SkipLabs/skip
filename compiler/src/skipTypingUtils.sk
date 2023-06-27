@@ -766,13 +766,10 @@ class MutPreservationConstraint(
     fr = this.tvar.i0;
     tfrozen = (fr, N.Tfrozen(Ast.Vminus()));
     tvar_co = promote(context, env, acc, this.tvar);
-    vtry(
-      () -> {
+    try {
         (!acc, _) = join_exn(context, next_id, env, acc, tvar_co, tfrozen);
         acc
-      },
-      exn -> {
-        exn match {
+    } catch {
         | Types.Join _ ->
           mut_pres = Types.MutPreservation(
             this.child,
@@ -783,10 +780,8 @@ class MutPreservationConstraint(
           types_error(context, next_id, true, env, acc, fr, msg, mut_pres)
         | e @ Types.Exception _ ->
           types_error(context, next_id, true, env, acc, fr, msg, e)
-        | _ -> throw exn
-        }
-      },
-    )
+        | exn -> throw exn
+    }
   }
 
   fun solve_call(
@@ -1188,8 +1183,7 @@ fun solvableWhenparams(
     t
   };
   // Actual check
-  vtry<?Bool>(
-    () -> {
+  try {
       for ((lhs, rhss) in whenclauses) {
         !lhs = promote(context, env, acc, finst(lhs));
         for (rhs in rhss) {
@@ -1199,16 +1193,12 @@ fun solvableWhenparams(
       };
       _ = acc.constraints.solve(context, next_id, env, acc);
       Some(true)
-    },
-    exn ->
-      exn match {
+  } catch {
       | SkipError.SkipErrorException _
       | Types.Exception _ ->
         Some(false)
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun isCDTparam(tps: SSet, ty: N.Type_): Bool {
@@ -1721,8 +1711,7 @@ fun suggested_join_fix(
   // Annotate the minus or none type
   | (Some(Ast.Vplus()), Some(Ast.Vminus()))
   | (Some(Ast.Vplus()), Some(Ast.Vnone())) ->
-    vtry<List<(FileRange, String)>>(
-      () -> {
+    try {
         prom_ty2 = promote(context, env, acc, ty2);
         (!acc, new_ty) = join_exn_(
           context,
@@ -1746,18 +1735,13 @@ fun suggested_join_fix(
               new_ty_str,
           ),
         ]
-      },
-      exn ->
-        exn match {
+    } catch {
         | _ -> List.Nil()
-        }
-      ,
-    )
+    }
   // Annotate both types
   | (Some(Ast.Vnone()), Some(Ast.Vnone()))
   | (Some(Ast.Vminus()), Some(Ast.Vnone())) ->
-    vtry<List<(FileRange, String)>>(
-      () -> {
+    try {
         prom_ty1 = promote(context, env, acc, ty1);
         prom_ty2 = promote(context, env, acc, ty2);
         (!acc, new_ty) = join_exn_(
@@ -1787,13 +1771,9 @@ fun suggested_join_fix(
             "ICE the suggested type is the same as BOTH original types. How are they not compatible already?",
           )
         }
-      },
-      exn ->
-        exn match {
+    } catch {
         | _ -> List.Nil()
-        }
-      ,
-    )
+    }
   | (Some(Ast.Vnone()), _)
   | (Some(Ast.Vminus()), Some(Ast.Vplus())) ->
     invariant_violation("ICE these variances should have been flipped")
@@ -2046,12 +2026,9 @@ fun join_(
   ty1: N.Type_,
   ty2: N.Type_,
 ): (Acc, N.Type_) {
-  vtry(
-    () -> {
+  try {
       join_exn_(context, next_id, solving_constraints, env, acc, ty1, ty2)
-    },
-    exn ->
-      exn match {
+  } catch {
       | e @ Types.Exception _ ->
         types_error(
           context,
@@ -2063,10 +2040,8 @@ fun join_(
           msg,
           e,
         )
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun join_constraints(
@@ -2404,8 +2379,7 @@ value class TparamConstraints private {
     supertypes.reduce(
       (tc, supertype) -> {
         contrasupertype = contra_promote(context, env, acc, supertype);
-        vtry(
-          () -> {
+        try {
             (tmp_acc, _) = join_constraints_exn(
               context,
               next_id,
@@ -2432,14 +2406,10 @@ value class TparamConstraints private {
                 },
               tc,
             )
-          },
-          exn ->
-            exn match {
+        } catch {
             | Types.Exception _ -> tc
-            | _ -> throw exn
-            }
-          ,
-        )
+            | exn -> throw exn
+        }
       },
       this,
     )
@@ -3345,12 +3315,9 @@ fun reconstrain_parent(
             /* the promotion of @ty must join with the contrapromotion of the
              * upper bounds for @tparam_id. */
             bounding_ty = contra_promote(context, env, acc1, upper_bound_ty);
-            vtry(
-              () -> {
+            try {
                 join_exn(context, next_id, env, acc1, prom_ty, bounding_ty).i0
-              },
-              exn ->
-                exn match {
+            } catch {
                 | e @ Types.Exception _ ->
                   throw InvalidPattern(
                     next_id(),
@@ -3360,10 +3327,8 @@ fun reconstrain_parent(
                     "Invalid pattern. Constraint not satisfied when refining the type for this branch",
                     e,
                   )
-                | _ -> throw exn
-                }
-              ,
-            )
+                | exn -> throw exn
+            }
           },
         acc,
       );
@@ -3525,8 +3490,7 @@ fun reconstrain_child(
     ty_constraints.foldl(
       (facc, constraint_ty) -> {
         !constraint_ty = contra_promote(context, env, facc, constraint_ty);
-        vtry(
-          () -> {
+        try {
             join_constraints_exn(
               context,
               next_id,
@@ -3535,9 +3499,7 @@ fun reconstrain_child(
               constraint_ty,
               prom_ty,
             ).i0
-          },
-          exn ->
-            exn match {
+        } catch {
             | e @ Types.Exception _ ->
               msg = if (tparam_id.isSome()) {
                 "Invalid pattern. Constraint not satisfied when constraining this pattern's generics"
@@ -3545,10 +3507,8 @@ fun reconstrain_child(
                 "Unused branch"
               };
               throw InvalidPattern(next_id(), true, facc, pos, msg, e)
-            | _ -> throw exn
-            }
-          ,
-        )
+            | exn -> throw exn
+        }
       },
       acc,
     )
@@ -3712,12 +3672,9 @@ fun instantiate_pattern_object_no_params_exn_full(
   );
   !case_ty = promote(context, env, acc, case_ty);
   (!acc, _) = {
-    vtry(
-      () -> {
+    try {
         join_exn(context, next_id, env, acc, obj_ty_tvars, case_ty)
-      },
-      exn ->
-        exn match {
+    } catch {
         | e @ Types.Exception _ ->
           throw InvalidPattern(
             next_id(),
@@ -3727,10 +3684,8 @@ fun instantiate_pattern_object_no_params_exn_full(
             "Invalid pattern",
             e,
           )
-        | _ -> throw exn
-        }
-      ,
-    )
+        | exn -> throw exn
+    }
   };
   parents = build_parents(env, acc, obj_ty);
   !acc = fix_mismatched_variance(context, next_id, name, parents, subst, acc);
@@ -3852,8 +3807,7 @@ fun instantiate_pattern_object(
   Acc,
   (?Parameters<NestedPat>, SkipNamedAst.Type_, SkipNamedAst.Type_),
 ) {
-  vtry(
-    () -> {
+  try {
       instantiate_pattern_object_exn(
         context,
         next_id,
@@ -3863,9 +3817,7 @@ fun instantiate_pattern_object(
         obj_ty,
         name,
       )
-    },
-    exn ->
-      exn match {
+  } catch {
       | InvalidPattern(last_id, solving_constraints, acc1, pos1, msg, e) ->
         new_id = sk_create_counter_from_value(last_id);
         types_error(
@@ -3878,10 +3830,8 @@ fun instantiate_pattern_object(
           msg,
           e,
         )
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 fun instantiate_object_type_with_targs(
@@ -4100,8 +4050,7 @@ fun valid_child_for_match(
   ty: N.Type_,
   child_name: String,
 ): Bool {
-  vtry(
-    () -> {
+  try {
       !ty = contra_promote(context, env, acc, ty);
       instantiate_pattern_object_exn_only(
         context,
@@ -4113,14 +4062,10 @@ fun valid_child_for_match(
         (ty.i0, child_name),
       );
       true
-    },
-    exn ->
-      exn match {
+  } catch {
       | InvalidPattern _ -> false
-      | _ -> throw exn
-      }
-    ,
-  )
+      | exn -> throw exn
+  }
 }
 
 // None for no error. Some(b) where b iff the tparam has a trait constraint

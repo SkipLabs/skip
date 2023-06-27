@@ -51,8 +51,7 @@ untracked fun main(tests: Array<(String, untracked () -> void)>): void {
   expectError = false;
   allowEmpty = false;
   options = Options{};
-  vtry(
-    () -> {
+  try {
       loop {
         args.next() match {
         | Some("--backend-gen") ->
@@ -89,12 +88,11 @@ untracked fun main(tests: Array<(String, untracked () -> void)>): void {
         | None() -> break void
         }
       };
-    },
-    exn -> {
+  } catch {
+  | exn ->
       debug(arguments());
       throw exn
-    },
-  );
+  };
   projectName = `${backendGen} ${testFile}`;
   if (!allowEmpty && tests.isEmpty()) {
     print_error_ln(
@@ -119,10 +117,11 @@ untracked fun runTests(
   for ((testName, test) in tests) {
     name = `${projectName} ${testName}`;
     // Note: cannot use Result::guard with an untracked lambda
-    result = vtry<Result<void, Exception>>(
-      () -> Success(test()),
-      exn -> Failure(exn),
-    );
+    result = try {
+      Success(test())
+    } catch {
+    | exn -> Failure(exn)
+    };
     result match {
     | Success _ -> print(reportSuccess{name, options})
     | Failure(exception) ->

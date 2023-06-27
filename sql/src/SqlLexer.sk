@@ -230,8 +230,7 @@ class Lexer(idRoot: Int, content: Buffer) {
   }
 
   fun nextInt(pos: Int): (Int, Int) {
-    vtry(
-      () -> {
+    try {
         (!pos, chars) = this.nextIntStr(pos);
         newStr = String::fromChars(chars.toArray());
         (
@@ -240,9 +239,9 @@ class Lexer(idRoot: Int, content: Buffer) {
             newStr.toInt()
           },
         )
-      },
-      _ -> error(pos, "Expected integer"),
-    )
+    } catch {
+    | _ -> error(pos, "Expected integer")
+    }
   }
 
   fun nextInt32(pos: Int): (Int, Int32) {
@@ -252,9 +251,10 @@ class Lexer(idRoot: Int, content: Buffer) {
 
   fun nextIntSize(pos: Int): (Int, Int, Int) {
     (!pos, str) = this.nextWord(pos);
-    vtry(
-      () -> (pos, str.toInt(), str.length()),
-      _ -> error(pos, "Expected integer, found: " + str),
-    )
+    try {
+      (pos, str.toInt(), str.length())
+    } catch {
+    | _ -> error(pos, "Expected integer, found: " + str)
+    }
   }
 }

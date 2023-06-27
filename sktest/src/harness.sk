@@ -36,17 +36,15 @@ fun test_harness(
       if (!(testSuite + "." + testName).contains(filter)) {
         continue
       };
-      vtry(
-        () -> {
+      try {
           _ = testFun();
           // TODO: reportSuccess/reportFailure.
           reporters.each(r -> r.report(testSuite, testName, None()))
-        },
-        exn -> {
+      } catch {
+      | exn ->
           reporters.each(r -> r.report(testSuite, testName, Some(exn)));
           !success = false
-        },
-      )
+      }
     }
   };
   reporters.each(r -> r.finish());
