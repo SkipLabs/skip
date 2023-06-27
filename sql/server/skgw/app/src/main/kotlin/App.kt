@@ -5,13 +5,11 @@ import io.undertow.Undertow
 import io.undertow.server.HttpHandler
 import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.PathTemplateMatch
-import io.undertow.websockets.core.WebSocketChannel
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.security.SecureRandom
-import java.util.Base64
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import kotlin.system.exitProcess
@@ -375,7 +373,10 @@ fun main(args: Array<String>) {
   val logger = SkdbBackedLogger()
   val policy =
       EventAccountant(logger) then
-          RejectUnsupportedClients(logger, config.getString("min_js_client", "0.0.41")) then
+          RejectUnsupportedClients(
+              logger,
+              config.getString("min_js_client", "0.0.41"),
+              config.getString("min_kt_client", "0.0.1")) then
           ThrottleDataTransferPerConnection(
               logger, config.getInt("max_conn_byte_rate", 100 * 1024 * 1024), taskPool) then
           RateLimitRequestsPerConnection(
