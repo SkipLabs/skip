@@ -376,14 +376,19 @@ private fun devColdStart(encryption: EncryptionTransform) {
   val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
   System.err.println(
       "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
-  Runtime.getRuntime()
-      .exec(
-          arrayOf(
-              "/bin/bash",
-              "-c",
-              "cd /skfs/sql/js && npx skdb-cli --add-cred --host ws://localhost:8080" +
-                  " --db ${SERVICE_MGMT_DB_NAME} --access-key ${creds.accessKey}" +
-                  " <<< \"${creds.b64privateKey()}\""))
+  val command =
+    listOf(
+        "/bin/bash",
+        "-c",
+        "cd /skfs/sql/js && npx skdb-cli --add-cred --host ws://localhost:8080" +
+            " --db ${SERVICE_MGMT_DB_NAME} --access-key ${creds.accessKey}" +
+            " <<< \"${creds.b64privateKey()}\"")
+  val proc = ProcessBuilder().inheritIO().command(command).start()
+  val status = proc.waitFor()
+  if (status != 0) {
+    System.err.println("add-cred failed")
+    exitProcess(status)
+  }
 }
 
 fun main(args: Array<String>) {
