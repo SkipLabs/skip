@@ -92,7 +92,7 @@ wasm-test: npm sql/js/node_modules sql/js/dist/index.html
 
 .PHONY: run-server
 run-server: build/skdb build/init.sql
-	./sql/server/deploy/start.sh --DANGEROUS-no-encryption
+	./sql/server/deploy/start.sh --DANGEROUS-no-encryption --dev
 
 .PHONY: run-chaos
 run-chaos: build/skdb

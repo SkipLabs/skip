@@ -274,7 +274,7 @@ class Skdb(val name: String, private val dbPath: String) {
   }
 }
 
-private fun resolveDbPath(db: String): String {
+fun resolveDbPath(db: String): String {
   return "/var/db/${db}.db"
 }
 
