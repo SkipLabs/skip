@@ -7,6 +7,7 @@ import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
+import java.io.File
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.security.SecureRandom
@@ -302,9 +303,7 @@ fun connectionHandler(
                             stream.error(2000u, "Internal error")
                           }
                         }
-                        stream.onClose = {
-                          stream.close()
-                        }
+                        stream.onClose = { stream.close() }
                         stream.onError = { _, _ -> }
                       },
                       onClose = { socket -> socket.closeSocket() },
@@ -336,24 +335,47 @@ fun createHttpServer(connectionHandler: HttpHandler): Undertow {
 }
 
 fun envIsSane(): Boolean {
-  val svcSkdb = openSkdb(SERVICE_MGMT_DB_NAME)
+  try {
+    val svcSkdb = openSkdb(SERVICE_MGMT_DB_NAME)
 
-  if (svcSkdb == null) {
-    System.err.println("FAIL: Could not open service management database.")
+    if (svcSkdb == null) {
+      System.err.println("FAIL: Could not open service management database.")
+      return false
+    }
+
+    val successfullyRead =
+        svcSkdb
+            .sql("SELECT COUNT(*) FROM skdb_users WHERE username = 'root';", OutputFormat.RAW)
+            .decodeOrThrow()
+            .trim() == "1"
+
+    if (!successfullyRead) {
+      System.err.println("FAIL: Could not read from service management database.")
+    }
+
+    return successfullyRead
+  } catch (ex: Exception) {
+    System.err.println("Caught ${ex} while checking env")
     return false
   }
+}
 
-  val successfullyRead =
-      svcSkdb
-          .sql("SELECT COUNT(*) FROM skdb_users WHERE username = 'root';", OutputFormat.RAW)
-          .decodeOrThrow()
-          .trim() == "1"
+private fun createServiceMgmtDb(encryption: EncryptionTransform) {
+  val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
+  System.err.println(
+      "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
+}
 
-  if (!successfullyRead) {
-    System.err.println("FAIL: Could not read from service management database.")
+private fun devColdStart(encryption: EncryptionTransform) {
+  System.err.println("Environment checks failed, cold starting the system because of dev flag")
+  val path = resolveDbPath(SERVICE_MGMT_DB_NAME)
+  val removed = File(path).delete()
+  if (removed) {
+    System.err.println("Removed ${path}")
   }
-
-  return successfullyRead
+  val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
+  System.err.println(
+      "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
 }
 
 fun main(args: Array<String>) {
@@ -366,15 +388,17 @@ fun main(args: Array<String>) {
   }
 
   if (arglist.contains("--init")) {
-    val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
-    System.err.println(
-        "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
+    createServiceMgmtDb(encryption)
     return
   }
 
   if (!envIsSane()) {
-    System.err.println("Environment checks failed. Use --init for a cold start.")
-    exitProcess(1)
+    if (!arglist.contains("--dev")) {
+      System.err.println("Environment checks failed. Use --init for a cold start.")
+      exitProcess(1)
+    }
+
+    devColdStart(encryption)
   }
 
   val taskPool = Executors.newSingleThreadScheduledExecutor()
