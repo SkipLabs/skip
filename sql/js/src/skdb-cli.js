@@ -23,6 +23,9 @@ const createConnectedSkdb = async function(endpoint, database, { accessKey, priv
   return skdb;
 };
 
+const skdbDir = path.join(os.homedir(), ".skdb");
+const credsFileName = path.join(skdbDir, "credentials");
+
 const argSchema = {
   help: {
     type: "boolean",
@@ -58,6 +61,11 @@ const argSchema = {
     default: false,
   },
   // operations
+  'add-cred': {
+    type: "boolean",
+    help: `Add a credential to ${credsFileName}. Pass the private key b64 on stdin.`,
+    default: false,
+  },
   'create-db': {
     type: "string",
     valName: 'db',
@@ -126,18 +134,38 @@ if (args.values.help || !haveMandatoryValues) {
   process.exit(1);
 }
 
-const credsFileName = path.join(os.homedir(), ".skdb", "credentials");
-
 if (!fs.existsSync(credsFileName)) {
-  console.log(`Could not find credentials file at ${credsFileName}`);
-  process.exit(1);
+  fs.mkdirSync(skdbDir);
+  fs.writeFileSync(credsFileName, JSON.stringify({}));
 }
 
 // credentials file schema:
 // {host: { database: { accessKey: privateKey }}}
 const creds = JSON.parse(fs.readFileSync(credsFileName));
 const hostCreds = creds[args.values.host] ?? {};
-const dbCreds = hostCreds[args.values.db];
+creds[args.values.host] = hostCreds;
+const dbCreds = hostCreds[args.values.db] ?? {};
+hostCreds[args.values.db] = dbCreds;
+
+if (args.values['add-cred']) {
+  if (!('access-key' in args.values)) {
+    console.log("Must pass --db --host and --access-key.");
+    process.exit(1);
+  }
+
+  const accessKey = args.values['access-key'].trim();
+  const privateKey = fs.readFileSync(process.stdin.fd, 'utf-8').trim();
+
+  dbCreds[accessKey] = privateKey;
+
+  fs.writeFileSync(credsFileName, JSON.stringify(creds));
+
+  process.exit(0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// past here we're connecting to a server
+////////////////////////////////////////////////////////////////////////////////
 
 if (!dbCreds || Object.entries(dbCreds).length < 1) {
   console.log(`Could not find credentials for ${args.values.db} in ${credsFileName}`);
@@ -179,7 +207,7 @@ if (args.values['create-db']) {
 if (args.values['create-user']) {
   const result = await skdb.server.createUser();
   // b64 encode
-  result.privateKey = btoa(String.fromCharCode(...result.privateKey))
+  result.privateKey = btoa(String.fromCharCode(...result.privateKey));
   console.log('Successfully created user: ', result);
 
   dbCreds[result.accessKey] = result.privateKey;
