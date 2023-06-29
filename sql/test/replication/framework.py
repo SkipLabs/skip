@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Set
+import copy
 
 class Connection:
   def __init__(self, a: SkdbPeer, b: SkdbPeer):
@@ -21,10 +22,10 @@ class Task:
     self.name = name
 
   def __repr__(self):
-    return f"[{self.name}]"
+    return f"{self.name}"
 
   def __str__(self):
-    return f"[{self.name}]"
+    return f"{self.name}"
 
 class SkdbPeer:
   def connectFullDuplex(self, peer: SkdbPeer):
@@ -65,7 +66,38 @@ class Scheduler:
     raise RuntimeError("scheduler is abstract")
 
 class TopoSortScheduler(Scheduler):
-  pass
+  def run(self):
+    # kahn's algo, we pick from multiple choices arbitrarily
+
+    g = copy.deepcopy(self.graph)
+
+    def nodesWithNoIncomingEdge():
+      acc = set()
+      for node in self.tasks:
+        found = False
+        for (_, nodes) in g.items():
+          if node in nodes:
+            found = True
+            break
+        if not found:
+          acc.add(node)
+      return acc
+
+    schedule = []
+    candidates = nodesWithNoIncomingEdge()
+    while candidates != set():
+      n = candidates.pop()
+      schedule.append(n)
+      g[n] = list()
+      candidates.union(nodesWithNoIncomingEdge())
+
+    def hasEdges(g):
+      any(x != list() for x in g.values())
+
+    if hasEdges(g):
+      raise RuntimeError("Graph had a cycle")
+
+    print(f"schedule: {schedule}")
 
 class AllTopoSortsScheduler(Scheduler):
   def run(self):
@@ -121,7 +153,7 @@ class ResultSets():
 cluster = (
   Topology()
   .schema("CREATE TABLE test_without_pk (id INTEGER, note STRING);")
-  .scheduleUsing(AllTopoSortsScheduler())
+  .scheduleUsing(TopoSortScheduler())
 )
 
 server = cluster.add(Server())
