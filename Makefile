@@ -90,6 +90,16 @@ native-test: build/skdb
 wasm-test: npm sql/js/node_modules sql/js/dist/index.html
 	cd sql/js && npx playwright install && npx playwright test --reporter=$(PLAYWRIGHT_REPORTER)
 
+.PHONY: extra-test
+extra-test: test
+	@echo ""
+	@echo "*******************************************************************************"
+	@echo "* TPC-H *"
+	@echo "*******************************************************************************"
+	@echo ""
+	@cd sql/test/TPC-h/ && ./test_tpch.sh
+
+
 .PHONY: run-server
 run-server: build/skdb build/init.sql
 	./sql/server/deploy/start.sh --DANGEROUS-no-encryption --dev
