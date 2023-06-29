@@ -1,7 +1,7 @@
 import scheduling as sched
 from model import Topology, Client, Server
 
-scheduler = sched.AllTopoSortsScheduler()
+scheduler = sched.RandomTopoSortsScheduler(sched.AllTopoSortsScheduler(), 50)
 
 cluster = (
   Topology(scheduler)
