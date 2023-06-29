@@ -1,6 +1,51 @@
 from __future__ import annotations
 from collections import defaultdict
 
+task_id_counter = 0
+
+class Task:
+  def __init__(self, name):
+    self.name = name
+    global task_id_counter
+    self.uid = task_id_counter
+    task_id_counter = task_id_counter + 1
+
+  def __repr__(self):
+    return f"{self.name}"
+
+  def __str__(self):
+    return f"{self.name}"
+
+  def __hash__(self) -> int:
+    return hash(self.uid)
+
+  def __eq__(self, value: Task) -> bool:
+    return self.uid == value.uid
+
+class MutableCompositeTask:
+  taskSeq = []
+
+  def __init__(self):
+    global task_id_counter
+    self.uid = task_id_counter
+    task_id_counter = task_id_counter + 1
+
+  def add(self, task):
+    self.taskSeq.append(task)
+    return self
+
+  def __repr__(self):
+    return " then ".join(str(x) for x in self.taskSeq)
+
+  def __str__(self):
+    return " then ".join(str(x) for x in self.taskSeq)
+
+  def __hash__(self) -> int:
+    return hash(self.uid)
+
+  def __eq__(self, value: Task) -> bool:
+    return self.uid == value.uid
+
 class HalfStream:
   buf = []
 
@@ -28,29 +73,10 @@ class HalfStream:
     # originally we added the two tasks separtely with a
     # happens-before relation, but this blows up the number of
     # schedules even more than I thought it would
+    # TODO:
     composed = Task(f"{send} then {recv}")
     scheduler.add(composed)
     return composed
-
-id_counter = 0
-class Task:
-  def __init__(self, name):
-    self.name = name
-    global id_counter
-    self.uid = id_counter
-    id_counter = id_counter + 1
-
-  def __repr__(self):
-    return f"{self.name}"
-
-  def __str__(self):
-    return f"{self.name}"
-
-  def __hash__(self) -> int:
-    return hash(self.uid)
-
-  def __eq__(self, value: Task) -> bool:
-    return self.uid == value.uid
 
 class SkdbPeer:
   streams = defaultdict(list)
@@ -86,9 +112,7 @@ class SkdbPeer:
     raise NotImplementedError()
 
   def initTask(self) -> Task:
-    init = Task("Error")
-    self.lastTask = init
-    return init
+    return Task("Error")
 
   def tailTask(self, table):
     def factory(stream):
@@ -102,15 +126,11 @@ class SkdbPeer:
 
 class Server(SkdbPeer):
   def initTask(self) -> Task:
-    init = Task(f"create server {self.name}")
-    self.lastTask = init
-    return init
+    return Task(f"create server {self.name}")
 
 class Client(SkdbPeer):
   def initTask(self) -> Task:
-    init = Task(f"create client {self.name}")
-    self.lastTask = init
-    return init
+    return Task(f"create client {self.name}")
 
 class Topology:
   schemaQueries = []
@@ -118,6 +138,8 @@ class Topology:
 
   def __init__(self, scheduler):
     self.scheduler = scheduler
+    self.initTask = MutableCompositeTask()
+    self.scheduler.add(self.initTask)
 
   def schema(self, query):
     self.schemaQueries.append(query)
@@ -128,7 +150,8 @@ class Topology:
     # TODO: topology owns scheduling this so that it can batch all
     # init together. save lots of pointless extra schedules
     # TODO: pass schema queries in
-    self.scheduler.add(peer.initTask())
+    self.initTask.add(peer.initTask())
+    peer.lastTask = self.initTask
     return peer
 
   def mirror(self, table, a, b):
