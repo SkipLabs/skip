@@ -80,6 +80,7 @@ class SkdbPeer:
     for stream in self.streams[table]:
       send = stream.clock(self.scheduler)
       self.scheduler.happensBefore(insert, send)
+    return insert
 
   def query(self, query):
     raise NotImplementedError()
