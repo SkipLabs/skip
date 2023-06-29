@@ -4,8 +4,9 @@ import random
 import copy
 
 class Scheduler:
-  tasks = set()
-  graph = defaultdict(list)
+  def __init__(self):
+    self.tasks = set()
+    self.graph = defaultdict(list)
 
   def add(self, task):
     self.tasks.add(task)

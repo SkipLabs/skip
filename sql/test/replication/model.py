@@ -23,9 +23,9 @@ class Task:
     return self.uid == value.uid
 
 class MutableCompositeTask:
-  taskSeq = []
-
   def __init__(self):
+    self.taskSeq = []
+
     global task_id_counter
     self.uid = task_id_counter
     task_id_counter = task_id_counter + 1
@@ -47,9 +47,8 @@ class MutableCompositeTask:
     return self.uid == value.uid
 
 class HalfStream:
-  buf = []
-
   def __init__(self, sender, receiver, sendTask, recvTask):
+    self.buf = []
     self.sender = sender
     self.receiver = receiver
     self.sendTaskFactory = sendTask
@@ -79,10 +78,9 @@ class HalfStream:
     return composed
 
 class SkdbPeer:
-  streams = defaultdict(list)
-  lastTask = None
-
   def __init__(self, name, scheduler):
+    self.streams = defaultdict(list)
+    self.lastTask: None|Task|MutableCompositeTask = None
     self.name = name
     self.scheduler = scheduler
 
@@ -133,10 +131,9 @@ class Client(SkdbPeer):
     return Task(f"create client {self.name}")
 
 class Topology:
-  schemaQueries = []
-  peers = []
-
   def __init__(self, scheduler):
+    self.schemaQueries = []
+    self.peers = []
     self.scheduler = scheduler
     self.initTask = MutableCompositeTask()
     self.scheduler.add(self.initTask)
