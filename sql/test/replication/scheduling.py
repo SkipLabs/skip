@@ -92,8 +92,3 @@ class RandomTopoSortsScheduler():
   # TODO: you will only test x% of the schedules are you aware?
   # TODO: must be streaming really, we don't want to calculate the schedules repeatedly or keep them
   pass
-
-# allows specifying sync points so that tests can ensure specific
-# schedules are exercised
-class ExtraConstraintsScheduler():
-  pass
