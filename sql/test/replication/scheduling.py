@@ -1,4 +1,6 @@
 from collections import defaultdict
+import itertools
+import random
 import copy
 
 class Scheduler:
@@ -11,11 +13,8 @@ class Scheduler:
   def happensBefore(self, a, b):
     self.graph[a].append(b)
 
-  def run(self):
-    raise RuntimeError("scheduler is abstract")
-
 class ArbitraryTopoSortScheduler(Scheduler):
-  def run(self):
+  def schedules(self):
     # kahn's algo, we pick from multiple choices arbitrarily
 
     g = copy.deepcopy(self.graph)
@@ -46,10 +45,14 @@ class ArbitraryTopoSortScheduler(Scheduler):
     if hasEdges(g):
       raise RuntimeError("Graph had a cycle")
 
+    yield schedule
+
+  def run(self):
     # TODO:
     print("schedule:")
-    for i, s in enumerate(schedule):
-      print(f"{i}: {s}")
+    for schedule in self.schedules():
+      for i, s in enumerate(schedule):
+        print(f"{i}: {s}")
 
 class AllTopoSortsScheduler(Scheduler):
   def _nodesWithNoIncomingEdge(self, g):
@@ -81,14 +84,42 @@ class AllTopoSortsScheduler(Scheduler):
       for s in self._schedules(ourSchedule, ourCandidates, ourG):
         yield s
 
-  def run(self):
+  def schedules(self):
     schedule = []
     candidates = self._nodesWithNoIncomingEdge(self.graph)
-    # TODO: there are more than N schedules, are you sure?
-    for i, schedule in enumerate(self._schedules(schedule, candidates, self.graph)):
+    return self._schedules(schedule, candidates, self.graph)
+
+  def run(self, limit = 100, runAll = False):
+    if not runAll:
+      i = 0
+      for _ in self.schedules():
+        i = i+1
+        if i > limit:
+          raise RuntimeError(f"There are more than {limit} schedules")
+
+    for i, schedule in enumerate(self.schedules()):
+      # TODO:
       print(f"{i}: {schedule}")
 
-class RandomTopoSortsScheduler():
-  # TODO: you will only test x% of the schedules are you aware?
-  # TODO: must be streaming really, we don't want to calculate the schedules repeatedly or keep them
-  pass
+class RandomTopoSortsScheduler(Scheduler):
+  def __init__(self, scheduler, N):
+    self.scheduler = scheduler
+    self.N = N
+
+  def schedules(self):
+    # just simple reservoir sample
+    schedules = self.scheduler.schedules()
+    reservoir = list(itertools.islice(schedules, self.N))
+    i = self.N - 1
+    for schedule in schedules:
+      i = i + 1
+      randIdx = random.randint(0, i)
+      if randIdx < self.N:
+        reservoir[randIdx] = schedule
+    print(f"We will run {self.N} of the {i+1} possible schedules. ~{int((self.N)/(i+1.0)*100)}%")
+    return reservoir
+
+  def run(self):
+    for i, schedule in enumerate(self.schedules()):
+      # TODO:
+      print(f"{i}: {schedule}")
