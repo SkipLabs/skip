@@ -1,50 +1,5 @@
-from __future__ import annotations
 from collections import defaultdict
-
-task_id_counter = 0
-
-class Task:
-  def __init__(self, name):
-    self.name = name
-    global task_id_counter
-    self.uid = task_id_counter
-    task_id_counter = task_id_counter + 1
-
-  def __repr__(self):
-    return f"{self.name}"
-
-  def __str__(self):
-    return f"{self.name}"
-
-  def __hash__(self) -> int:
-    return hash(self.uid)
-
-  def __eq__(self, value: Task) -> bool:
-    return self.uid == value.uid
-
-class MutableCompositeTask:
-  def __init__(self):
-    self.taskSeq = []
-
-    global task_id_counter
-    self.uid = task_id_counter
-    task_id_counter = task_id_counter + 1
-
-  def add(self, task):
-    self.taskSeq.append(task)
-    return self
-
-  def __repr__(self):
-    return " then ".join(str(x) for x in self.taskSeq)
-
-  def __str__(self):
-    return " then ".join(str(x) for x in self.taskSeq)
-
-  def __hash__(self) -> int:
-    return hash(self.uid)
-
-  def __eq__(self, value: Task) -> bool:
-    return self.uid == value.uid
+from scheduling import Task, MutableCompositeTask
 
 class HalfStream:
   def __init__(self, sender, receiver, sendTask, recvTask):

@@ -1,7 +1,62 @@
+from __future__ import annotations
 from collections import defaultdict
 import itertools
 import random
 import copy
+
+task_id_counter = 0
+
+
+class Task:
+  def __init__(self, name, fn):
+    self.name = name
+    self.fn = fn
+    global task_id_counter
+    self.uid = task_id_counter
+    task_id_counter = task_id_counter + 1
+
+  def __repr__(self):
+    return f"{self.name}"
+
+  def __str__(self):
+    return f"{self.name}"
+
+  def __hash__(self) -> int:
+    return hash(self.uid)
+
+  def __eq__(self, value: Task) -> bool:
+    return self.uid == value.uid
+
+  async def run(self, schedule):
+    await self.fn(schedule)
+
+class MutableCompositeTask:
+  def __init__(self):
+    self.taskSeq = []
+
+    global task_id_counter
+    self.uid = task_id_counter
+    task_id_counter = task_id_counter + 1
+
+  def add(self, task):
+    self.taskSeq.append(task)
+    return self
+
+  def __repr__(self):
+    return " then ".join(str(x) for x in self.taskSeq)
+
+  def __str__(self):
+    return " then ".join(str(x) for x in self.taskSeq)
+
+  def __hash__(self) -> int:
+    return hash(self.uid)
+
+  def __eq__(self, value: Task) -> bool:
+    return self.uid == value.uid
+
+  async def run(self, schedule):
+    for t in self.taskSeq:
+      await t.run(schedule)
 
 class Scheduler:
   def __init__(self):
@@ -17,21 +72,22 @@ class Scheduler:
   def schedules(self):
     return []
 
-  def run(self):
+  async def run(self):
     for schedule in self.schedules():
-      schedule.run()
+      # TODO: make concurrent using asycio.create_task, probably
+      # should limit # in flight
+      await schedule.run()
 
 class Schedule:
   def __init__(self, tasks):
+    self.state = {}
     self.tasks = tasks
 
-  # TODO
   def storeScheduleLocal(self, key, value):
-    pass
+    self.state[key] = value
 
-  # TODO
   def getScheduleLocal(self, key):
-    return None
+    return self.state[key]
 
   def __repr__(self):
     lst = "\n".join(str(x) for x in self.tasks)
@@ -40,9 +96,10 @@ class Schedule:
   def __str__(self):
     return self.__repr__()
 
-  def run(self):
-    # TODO:
+  async def run(self):
     print(self)
+    for t in self.tasks:
+      await t.run(self)
 
 class ArbitraryTopoSortScheduler(Scheduler):
   def schedules(self):
@@ -118,7 +175,7 @@ class AllTopoSortsScheduler(Scheduler):
     candidates = self._nodesWithNoIncomingEdge(self.graph)
     return self._schedules(schedule, candidates, self.graph)
 
-  def run(self):
+  async def run(self):
     if not self.runAll:
       i = 0
       for _ in self.schedules():
@@ -126,7 +183,7 @@ class AllTopoSortsScheduler(Scheduler):
         if i > self.limit:
           raise RuntimeError(f"There are more than {self.limit} schedules")
 
-    super().run()
+    await super().run()
 
 class RandomTopoSortsScheduler(Scheduler):
   def __init__(self, scheduler, N):
