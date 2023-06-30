@@ -48,7 +48,6 @@ class MutableCompositeTask:
 
 class HalfStream:
   def __init__(self, sender, receiver, sendTask, recvTask):
-    self.buf = []
     self.sender = sender
     self.receiver = receiver
     self.sendTaskFactory = sendTask
@@ -59,14 +58,18 @@ class HalfStream:
   def __str__(self):
     return f"<{self.sender} -> {self.receiver}>"
 
-  def send(self, payload):
-    self.buf.append(payload)
+  def send(self, schedule, payload):
+    schedule.getScheduleLocal(self).enqueue(payload)
     return self
 
-  def recv(self):
-    return self.buf.pop()
+  def recv(self, schedule):
+    return schedule.getScheduleLocal(self).dequeue()
 
-  def clock(self, scheduler):
+  def initTask(self):
+    # TODO: should stash a queue in schedule local storage
+    return Task(f"setup {self} channel")
+
+  def clockTask(self, scheduler):
     send = self.sendTaskFactory(self)
     recv = self.recvTaskFactory(self)
     # originally we added the two tasks separtely with a
@@ -90,7 +93,7 @@ class SkdbPeer:
   def __str__(self):
     return self.name
 
-  def connect(self, table, stream: HalfStream):
+  def notifyConnection(self, table, stream: HalfStream):
     self.streams[table].append(stream)
     return self
 
@@ -102,7 +105,7 @@ class SkdbPeer:
     self.lastTask = insert
     # TODO: this will need to traverse the graph of connections, not just the current single hop
     for stream in self.streams[table]:
-      send = stream.clock(self.scheduler)
+      send = stream.clockTask(self.scheduler)
       self.scheduler.happensBefore(insert, send)
     return insert
 
@@ -144,8 +147,6 @@ class Topology:
 
   def add(self, peer: SkdbPeer):
     self.peers.append(peer)
-    # TODO: topology owns scheduling this so that it can batch all
-    # init together. save lots of pointless extra schedules
     # TODO: pass schema queries in
     self.initTask.add(peer.initTask())
     peer.lastTask = self.initTask
@@ -154,8 +155,10 @@ class Topology:
   def mirror(self, table, a, b):
     atob = HalfStream(a,b, a.tailTask(table), b.writeTask(table))
     btoa = HalfStream(b,a, b.tailTask(table), a.writeTask(table))
-    a.connect(table, atob)
-    b.connect(table, btoa)
+    self.initTask.add(atob.initTask())
+    self.initTask.add(btoa.initTask())
+    a.notifyConnection(table, atob)
+    b.notifyConnection(table, btoa)
     return self
 
   def eventually(self, query: str):
