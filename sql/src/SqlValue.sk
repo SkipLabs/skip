@@ -1,65 +1,3 @@
-module SKFS;
-
-/*****************************************************************************/
-/* Comparison function used for all types in skdb. */
-/*****************************************************************************/
-
-extension base class BaseName {
-  overridable fun compare(y: BaseName): Order {
-    (this, y) match {
-    | (SKFS.DirTag(), SKFS.DirTag()) -> EQ()
-    | (SKFS.DirTag(), _) -> LT()
-    | (_, SKFS.DirTag()) -> GT()
-
-    | (SKFS.FilesTag(), SKFS.FilesTag()) -> EQ()
-    | (SKFS.FilesTag(), _) -> LT()
-    | (_, SKFS.FilesTag()) -> GT()
-
-    | (SKFS.SizeTag(), SKFS.SizeTag()) -> EQ()
-    | (SKFS.SizeTag(), _) -> LT()
-    | (_, SKFS.SizeTag()) -> GT()
-
-    | (SKFS.IsEmptyTag(), SKFS.IsEmptyTag()) -> EQ()
-    | (SKFS.IsEmptyTag(), _) -> LT()
-    | (_, SKFS.IsEmptyTag()) -> GT()
-
-    | (dir1 @ SKFS.DirName _, SKFS.DirName _) -> dir1.compare(y)
-    | (SKFS.DirName _, _) -> LT()
-    | (_, SKFS.DirName _) -> GT()
-
-    | (SKFS.IID(n1), SKFS.IID(n2)) -> n1.compare(n2)
-    | (SKFS.IID(_), _) -> LT()
-    | (_, SKFS.IID(_)) -> GT()
-
-    | (SKFS.SID(n1), SKFS.SID(n2)) -> n1.compare(n2)
-    | (SKFS.SID(_), _) -> LT()
-    | (_, SKFS.SID(_)) -> GT()
-
-    | (SKSQL.ProjKey(k1, n1, v1), SKSQL.ProjKey(k2, n2, v2)) ->
-      ((k1, n1, v1)).compare((k2, n2, v2))
-    | (SKSQL.ProjKey _, _) -> LT()
-    | (_, SKSQL.ProjKey _) -> GT()
-
-    | (SKSQL.RowKey(row1, kinds), SKSQL.RowKey(row2, _)) ->
-      SKSQL.compareRows(kinds, row1, row2)
-
-    | (
-      SKSQL.TrackedQuery(q1, start1, end1),
-      SKSQL.TrackedQuery(q2, start2, end2),
-    ) ->
-      (q1, start1, end1).compare((q2, start2, end2))
-    | (SKSQL.TrackedQuery _, _) -> LT()
-    | (_, SKSQL.TrackedQuery _) -> GT()
-
-    | (SKSQL.CValueFile(x1), SKSQL.CValueFile(x2)) -> x1.compare(x2)
-    | (SKSQL.CValueFile _, _) -> LT()
-    | (_, SKSQL.CValueFile _) -> GT()
-    }
-  }
-}
-
-module end;
-
 module SKSQL;
 
 /*****************************************************************************/
@@ -129,6 +67,14 @@ class RowKey(
 ) extends SKFS.BaseName {
   static fun create(row: RowValues, kinds: Array<(Int, IKind, Type)>): this {
     static(row, kinds)
+  }
+
+  fun compare(other: SKFS.BaseName): Order {
+    other match {
+    | RowKey(row2, _) -> 
+      SKSQL.compareRows(this.kinds, this.row, row2)
+    | _ -> this.getClassName().compare(other.getClassName())
+    }
   }
 
   fun toString(): String {
