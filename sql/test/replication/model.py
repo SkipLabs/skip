@@ -50,6 +50,26 @@ def runDmlQuery(dbkey, query):
       raise RuntimeError(f"running '{query}' exited non-zero")
   return f
 
+def startStreamingTail(dbkey, tailkey, table, user, replicationId):
+  async def f(schedule):
+    db = schedule.getScheduleLocal(dbkey)
+    if db is None:
+      raise RuntimeError("could not get db")
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "subscribe", table, "--connect",
+                                                # TODO:
+                                                # "--user", user,
+                                                "--ignore-source", replicationId,
+                                                stdout=asyncio.subprocess.PIPE)
+    (out, _) = await proc.communicate()
+    session = out.decode().rstrip()
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "tail",
+                                                "--format=csv", str(session), "--since", "0",
+                                                "--follow",
+                                                stdout=asyncio.subprocess.PIPE)
+    schedule.storeScheduleLocal(tailkey, proc)
+    return proc
+  return f
+
 class HalfStream:
 
   def __init__(self, sender, receiver, sendTask, recvTask):
@@ -65,11 +85,11 @@ class HalfStream:
     return f"<{self.sender} -> {self.receiver}>"
 
   def send(self, schedule, payload):
-    schedule.getScheduleLocal(self).enqueue(payload)
+    schedule.getScheduleLocal(self).append(payload)
     return self
 
   def recv(self, schedule):
-    return schedule.getScheduleLocal(self).dequeue()
+    return schedule.getScheduleLocal(self).pop()
 
   def initTask(self):
     async def f(schedule):
@@ -140,7 +160,24 @@ class Server(SkdbPeer):
   def tailTask(self, table):
     def factory(stream):
       async def f(schedule):
-        print(f"TODO: tail {self.name} {schedule.getScheduleLocal(self)}")
+        tailProc = schedule.getScheduleLocal((self, stream))
+        if tailProc is None:
+          user = "todo"               # TODO:
+          replicationid = "123"       # TODO: get from the stream?
+          start = startStreamingTail(self, (self, stream), table, user, replicationid)
+          tailProc = await start(schedule)
+
+        buf = []
+        while True:
+          # TODO: need timeout
+          data = await tailProc.stdout.readline()
+          line = data.decode()
+          buf.append(line)
+          if line.startswith(":"):
+            payload = "".join(buf)
+            stream.send(schedule, payload)
+            return
+
       return Task(f"read {table} tail from {self} and send to {stream}", f)
     return factory
 
