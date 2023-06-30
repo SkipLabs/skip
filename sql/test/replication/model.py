@@ -1,5 +1,36 @@
-from collections import defaultdict
+import asyncio
+import uuid
+from collections import defaultdict, deque
 from scheduling import Task, MutableCompositeTask
+
+SKDB = "/skfs/build/skdb"
+INITSQL = "/skfs/sql/privacy/init.sql"
+
+def createNativeDb(dbkey, schemaQueries):
+  async def f(schedule):
+    guid = uuid.uuid4()
+    db = f"/tmp/{guid}.db"
+    schedule.storeScheduleLocal(dbkey, db)
+
+    proc = await asyncio.create_subprocess_exec(SKDB, "--init", db)
+    exit = await proc.wait()
+    if exit > 0:
+      raise RuntimeError("init exited non-zero")
+
+    init = open(INITSQL)
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, stdin=init)
+    exit = await proc.wait()
+    init.close()
+    if exit > 0:
+      raise RuntimeError("init exited non-zero")
+
+    qs = "\n".join(schemaQueries)
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db,
+                                                stdin=asyncio.subprocess.PIPE)
+    exit = await proc.communicate(qs.encode())
+    if proc.returncode is None or proc.returncode > 0:
+      raise RuntimeError("init exited non-zero")
+  return f
 
 class HalfStream:
   def __init__(self, sender, receiver, sendTask, recvTask):
@@ -21,22 +52,24 @@ class HalfStream:
     return schedule.getScheduleLocal(self).dequeue()
 
   def initTask(self):
-    # TODO: should stash a queue in schedule local storage
-    return Task(f"setup {self} channel")
+    async def f(schedule):
+      schedule.storeScheduleLocal(self, deque())
+    return Task(f"setup {self} channel", f)
 
-  def clockTask(self, scheduler):
+  def clockTask(self):
     send = self.sendTaskFactory(self)
     recv = self.recvTaskFactory(self)
     # originally we added the two tasks separtely with a
     # happens-before relation, but this blows up the number of
-    # schedules even more than I thought it would
-    # TODO:
-    composed = Task(f"{send} then {recv}")
-    scheduler.add(composed)
-    return composed
+    # schedules
+    async def f(schedule):
+      await send.run(schedule)
+      await recv.run(schedule)
+    return Task(f"{send} then {recv}", f)
 
 class SkdbPeer:
   def __init__(self, name, scheduler):
+    self.schema = ['foo']
     self.streams = defaultdict(list)
     self.lastTask: None|Task|MutableCompositeTask = None
     self.name = name
@@ -53,40 +86,70 @@ class SkdbPeer:
     return self
 
   def insertInto(self, table: str, row):
-    # TODO: the actual task created should be delegated to children
-    insert = Task(f"insert {row} in to '{table}' on {self}")
+    insert = Task(f"insert {row} in to '{table}' on {self}", self.insert(table, row))
     self.scheduler.add(insert)
     self.scheduler.happensBefore(self.lastTask, insert)
     self.lastTask = insert
     # TODO: this will need to traverse the graph of connections, not just the current single hop
     for stream in self.streams[table]:
-      send = stream.clockTask(self.scheduler)
+      send = stream.clockTask()
+      self.scheduler.add(send)
       self.scheduler.happensBefore(insert, send)
     return insert
 
-  def query(self, query):
+  def insert(self, table, row):
+    async def do(schedule):
+      print(f"TODO: insert {table} {row}")
+    return do
+
+  async def query(self, query):
     raise NotImplementedError()
 
   def initTask(self) -> Task:
-    return Task("Error")
+    raise NotImplementedError()
+
+  def tailTask(self, table):
+    raise NotImplementedError()
+
+  def writeTask(self, table):
+    raise NotImplementedError()
+
+
+class Server(SkdbPeer):
+  def initTask(self) -> Task:
+    return Task(f"create server {self.name}", createNativeDb(self, self.schema))
 
   def tailTask(self, table):
     def factory(stream):
-      return Task(f"read {table} tail from {self} and send to {stream}")
+      async def f(schedule):
+        print(f"TODO: tail {self.name} {schedule.getScheduleLocal(self)}")
+      return Task(f"read {table} tail from {self} and send to {stream}", f)
     return factory
 
   def writeTask(self, table):
     def factory(stream):
-      return Task(f"read from {stream} and write to {self} {table}")
+      async def f(schedule):
+        print(f"TODO: write {self.name} {schedule.getScheduleLocal(self)}")
+      return Task(f"read from {stream} and write to {self} {table}", f)
     return factory
-
-class Server(SkdbPeer):
-  def initTask(self) -> Task:
-    return Task(f"create server {self.name}")
 
 class Client(SkdbPeer):
   def initTask(self) -> Task:
-    return Task(f"create client {self.name}")
+    return Task(f"create client {self.name}", createNativeDb(self, self.schema))
+
+  def tailTask(self, table):
+    def factory(stream):
+      async def f(schedule):
+        print(f"TODO: tail {self.name} {schedule.getScheduleLocal(self)}")
+      return Task(f"read {table} tail from {self} and send to {stream}", f)
+    return factory
+
+  def writeTask(self, table):
+    def factory(stream):
+      async def f(schedule):
+        print(f"TODO: write {self.name} {schedule.getScheduleLocal(self)}")
+      return Task(f"read from {stream} and write to {self} {table}", f)
+    return factory
 
 class Topology:
   def __init__(self, scheduler):
@@ -102,7 +165,7 @@ class Topology:
 
   def add(self, peer: SkdbPeer):
     self.peers.append(peer)
-    # TODO: pass schema queries in
+    peer.schema = self.schemaQueries
     self.initTask.add(peer.initTask())
     peer.lastTask = self.initTask
     return peer
