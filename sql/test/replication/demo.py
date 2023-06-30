@@ -1,3 +1,4 @@
+import asyncio
 import scheduling as sched
 from model import Topology, Client, Server
 
@@ -33,4 +34,4 @@ cluster.eventually("SELECT * FROM test_without_pk;").has(
 
 # TODO: cluster.eventually().silent() - no output on processes
 
-scheduler.run()
+asyncio.run(scheduler.run())
