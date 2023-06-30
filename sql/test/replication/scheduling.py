@@ -87,7 +87,7 @@ class Schedule:
     self.state[key] = value
 
   def getScheduleLocal(self, key):
-    return self.state[key]
+    return self.state.get(key)
 
   def __repr__(self):
     lst = "\n".join(str(x) for x in self.tasks)
