@@ -76,6 +76,7 @@ class Scheduler:
     for schedule in self.schedules():
       # TODO: make concurrent using asycio.create_task, probably
       # should limit # in flight
+      print("-------------")
       await schedule.run()
 
 class Schedule:
@@ -97,8 +98,8 @@ class Schedule:
     return self.__repr__()
 
   async def run(self):
-    print(self)
     for t in self.tasks:
+      print(t)
       await t.run(self)
 
 class ArbitraryTopoSortScheduler(Scheduler):
