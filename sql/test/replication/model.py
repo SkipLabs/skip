@@ -6,6 +6,11 @@ from scheduling import Task, MutableCompositeTask
 SKDB = "/skfs/build/skdb"
 INITSQL = "/skfs/sql/privacy/init.sql"
 
+def serialise(val):
+  if isinstance(val, str):
+    return f"'{val}'"
+  return str(val)
+
 def createNativeDb(dbkey, schemaQueries):
   async def f(schedule):
     guid = uuid.uuid4()
@@ -27,12 +32,26 @@ def createNativeDb(dbkey, schemaQueries):
     qs = "\n".join(schemaQueries)
     proc = await asyncio.create_subprocess_exec(SKDB, "--data", db,
                                                 stdin=asyncio.subprocess.PIPE)
-    exit = await proc.communicate(qs.encode())
+    await proc.communicate(qs.encode())
     if proc.returncode is None or proc.returncode > 0:
       raise RuntimeError("init exited non-zero")
   return f
 
+def runDmlQuery(dbkey, query):
+  async def f(schedule):
+    db = schedule.getScheduleLocal(dbkey)
+    if db is None:
+      raise RuntimeError("could not get db")
+
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db,
+                                                stdin=asyncio.subprocess.PIPE)
+    await proc.communicate(query.encode())
+    if proc.returncode is None or proc.returncode > 0:
+      raise RuntimeError(f"running '{query}' exited non-zero")
+  return f
+
 class HalfStream:
+
   def __init__(self, sender, receiver, sendTask, recvTask):
     self.sender = sender
     self.receiver = receiver
@@ -41,6 +60,7 @@ class HalfStream:
 
   def __repr__(self):
     return f"<{self.sender} -> {self.receiver}>"
+
   def __str__(self):
     return f"<{self.sender} -> {self.receiver}>"
 
@@ -68,6 +88,7 @@ class HalfStream:
     return Task(f"{send} then {recv}", f)
 
 class SkdbPeer:
+
   def __init__(self, name, scheduler):
     self.schema = ['foo']
     self.streams = defaultdict(list)
@@ -86,7 +107,9 @@ class SkdbPeer:
     return self
 
   def insertInto(self, table: str, row):
-    insert = Task(f"insert {row} in to '{table}' on {self}", self.insert(table, row))
+    rowStr = ", ".join(serialise(val) for val in row)
+    q = f"INSERT INTO {table} VALUES ({rowStr});"
+    insert = Task(f"insert {row} in to '{table}' on {self}", runDmlQuery(self, q))
     self.scheduler.add(insert)
     self.scheduler.happensBefore(self.lastTask, insert)
     self.lastTask = insert
@@ -96,11 +119,6 @@ class SkdbPeer:
       self.scheduler.add(send)
       self.scheduler.happensBefore(insert, send)
     return insert
-
-  def insert(self, table, row):
-    async def do(schedule):
-      print(f"TODO: insert {table} {row}")
-    return do
 
   async def query(self, query):
     raise NotImplementedError()
@@ -114,8 +132,8 @@ class SkdbPeer:
   def writeTask(self, table):
     raise NotImplementedError()
 
-
 class Server(SkdbPeer):
+
   def initTask(self) -> Task:
     return Task(f"create server {self.name}", createNativeDb(self, self.schema))
 
@@ -134,6 +152,7 @@ class Server(SkdbPeer):
     return factory
 
 class Client(SkdbPeer):
+
   def initTask(self) -> Task:
     return Task(f"create client {self.name}", createNativeDb(self, self.schema))
 
@@ -152,6 +171,7 @@ class Client(SkdbPeer):
     return factory
 
 class Topology:
+
   def __init__(self, scheduler):
     self.schemaQueries = []
     self.peers = []
@@ -187,6 +207,7 @@ class Topology:
     return results
 
 class ResultSets():
+
   def add(self, results):
     raise NotImplementedError()
 
