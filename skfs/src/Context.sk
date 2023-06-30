@@ -954,11 +954,7 @@ mutable class Context{
       }
     };
     this.!deps = this.deps.removeDir(dirName);
-    if (this.reallyRemoveDir) {
-      this.!dirs.state = this.dirs.state.remove(dirName)
-    } else {
-      this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()})
-    };
+    this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()});
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
@@ -1025,6 +1021,7 @@ fun import(
   changedDirNames = sourceCtx.dirs.state.getChangesAfter(tick);
   for (dirName in changedDirNames) {
     sourceCtx.unsafeMaybeGetDir(dirName) match {
+    | Some(DeletedDir{}) -> targetCtx.removeDir(dirName)
     | Some(dir @ EagerDir{input => true, creator => None()}) ->
       (isReset, changedKeys) = dir.getChangesAfter(tick);
       targetCtx.unsafeMaybeGetDir(dirName) match {
@@ -1097,21 +1094,6 @@ fun resolveContext(
   | None() if (tick == root.tick) -> delta
   | None() -> invariant_violation("Concurrent access without synchronizer")
   | Some(sync) ->
-    purgeLimit = (root.purgeLimit, delta.purgeLimit) match {
-    | (None(), None()) -> Tick(0)
-    | (Some(purgeLimit), None())
-    | (None(), Some(purgeLimit)) ->
-      purgeLimit
-    | (Some(purgeLimit1), Some(purgeLimit2)) -> max(purgeLimit1, purgeLimit2)
-    };
-    if (
-      tick <= purgeLimit ||
-      root.tick <= purgeLimit ||
-      delta.tick <= purgeLimit
-    ) {
-      print_error("Transaction cannot go through, it took too long");
-      return root;
-    };
     changedDirs = delta.dirs.state.getChangesAfter(tick);
     hasError = withErrorHandler(delta, () -> {
       sync.importFromRoot(delta, tick, root);
