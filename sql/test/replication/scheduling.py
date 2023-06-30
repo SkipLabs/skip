@@ -14,6 +14,36 @@ class Scheduler:
   def happensBefore(self, a, b):
     self.graph[a].append(b)
 
+  def schedules(self):
+    return []
+
+  def run(self):
+    for schedule in self.schedules():
+      schedule.run()
+
+class Schedule:
+  def __init__(self, tasks):
+    self.tasks = tasks
+
+  # TODO
+  def storeScheduleLocal(self, key, value):
+    pass
+
+  # TODO
+  def getScheduleLocal(self, key):
+    return None
+
+  def __repr__(self):
+    lst = "\n".join(str(x) for x in self.tasks)
+    return f"schedule:\n{lst}"
+
+  def __str__(self):
+    return self.__repr__()
+
+  def run(self):
+    # TODO:
+    print(self)
+
 class ArbitraryTopoSortScheduler(Scheduler):
   def schedules(self):
     # kahn's algo, we pick from multiple choices arbitrarily
@@ -46,16 +76,14 @@ class ArbitraryTopoSortScheduler(Scheduler):
     if hasEdges(g):
       raise RuntimeError("Graph had a cycle")
 
-    yield schedule
-
-  def run(self):
-    # TODO:
-    print("schedule:")
-    for schedule in self.schedules():
-      for i, s in enumerate(schedule):
-        print(f"{i}: {s}")
+    yield Schedule(schedule)
 
 class AllTopoSortsScheduler(Scheduler):
+  def __init__(self, limit = 100, runAll = False):
+    super().__init__()
+    self.limit = limit
+    self.runAll = runAll
+
   def _nodesWithNoIncomingEdge(self, g):
     acc = set()
     for node in self.tasks:
@@ -72,7 +100,7 @@ class AllTopoSortsScheduler(Scheduler):
     if candidates == set():
       if any(x != list() for x in g.values()):
         raise RuntimeError("Graph had a cycle")
-      yield schedule
+      yield Schedule(schedule)
       return
 
     for n in candidates:
@@ -90,17 +118,15 @@ class AllTopoSortsScheduler(Scheduler):
     candidates = self._nodesWithNoIncomingEdge(self.graph)
     return self._schedules(schedule, candidates, self.graph)
 
-  def run(self, limit = 100, runAll = False):
-    if not runAll:
+  def run(self):
+    if not self.runAll:
       i = 0
       for _ in self.schedules():
         i = i+1
-        if i > limit:
-          raise RuntimeError(f"There are more than {limit} schedules")
+        if i > self.limit:
+          raise RuntimeError(f"There are more than {self.limit} schedules")
 
-    for i, schedule in enumerate(self.schedules()):
-      # TODO:
-      print(f"{i}: {schedule}")
+    super().run()
 
 class RandomTopoSortsScheduler(Scheduler):
   def __init__(self, scheduler, N):
@@ -119,8 +145,3 @@ class RandomTopoSortsScheduler(Scheduler):
         reservoir[randIdx] = schedule
     print(f"We will run {self.N} of the {i+1} possible schedules. ~{int((self.N)/(i+1.0)*100)}%")
     return reservoir
-
-  def run(self):
-    for i, schedule in enumerate(self.schedules()):
-      # TODO:
-      print(f"{i}: {schedule}")
