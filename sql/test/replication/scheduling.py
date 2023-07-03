@@ -3,6 +3,7 @@ from collections import defaultdict
 import itertools
 import random
 import copy
+import sys
 
 task_id_counter = 0
 
@@ -83,13 +84,21 @@ class Scheduler:
     return []
 
   async def run(self):
-    for schedule in self.schedules():
+    n = 0
+    for i, schedule in enumerate(self.schedules()):
       # TODO: make concurrent using asycio.create_task, probably
       # should limit # in flight
-      print("-------------")
-      await schedule.run()
-      for t in reversed(self.tasks):
-        await t.finalise(schedule)
+      n = i
+      try:
+        await schedule.run()
+      except AssertionError as err:
+        print(f"Assertion check failed running {schedule}")
+        print(err)
+        sys.exit(1)
+      finally:
+        for t in reversed(self.tasks):
+          await t.finalise(schedule)
+    print(f"Ran {n+1} schedules, all PASSED expectation checks")
 
 class Schedule:
   def __init__(self, tasks):
@@ -111,7 +120,6 @@ class Schedule:
 
   async def run(self):
     for t in self.tasks:
-      print(t)
       await t.run(self)
 
 class ArbitraryTopoSortScheduler(Scheduler):
