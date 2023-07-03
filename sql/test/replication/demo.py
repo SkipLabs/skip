@@ -2,7 +2,7 @@ import asyncio
 import scheduling as sched
 from model import Topology, Client, Server
 
-scheduler = sched.AllTopoSortsScheduler()
+scheduler = sched.AllTopoSortsScheduler(runAll=True)
 
 cluster = (
   Topology(scheduler)

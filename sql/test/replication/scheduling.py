@@ -4,6 +4,7 @@ import itertools
 import random
 import copy
 import sys
+import asyncio
 
 task_id_counter = 0
 
@@ -84,11 +85,7 @@ class Scheduler:
     return []
 
   async def run(self):
-    n = 0
-    for i, schedule in enumerate(self.schedules()):
-      # TODO: make concurrent using asycio.create_task, probably
-      # should limit # in flight
-      n = i
+    async def _run(schedule):
       try:
         await schedule.run()
       except AssertionError as err:
@@ -98,6 +95,20 @@ class Scheduler:
       finally:
         for t in reversed(self.tasks):
           await t.finalise(schedule)
+
+    n = 0
+    tasks = set()
+    for i, schedule in enumerate(self.schedules()):
+      n = i
+      tasks.add(asyncio.create_task(_run(schedule)))
+      # 16 is fairly arbitrary. a few experimental runs suggests it's
+      # quite good on an m1 macbook. this whole batch gather model
+      # isn't great, but it's easy to code and good enough to run
+      # hundreds of schedules in a few secs.
+      if i % 16 == 0:
+        await asyncio.gather(*tasks)
+        tasks = set()
+    await asyncio.gather(*tasks)
     print(f"Ran {n+1} schedules, all PASSED expectation checks")
 
 class Schedule:
@@ -112,7 +123,7 @@ class Schedule:
     return self.state.get(key)
 
   def __repr__(self):
-    lst = "\n".join(str(x) for x in self.tasks)
+    lst = "\n".join(f"{i}: {x}" for i,x in enumerate(self.tasks))
     return f"schedule:\n{lst}"
 
   def __str__(self):
