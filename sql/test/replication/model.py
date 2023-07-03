@@ -51,7 +51,7 @@ def runDmlQuery(dbkey, query):
       raise RuntimeError(f"running '{query}' exited non-zero")
   return f
 
-def startStreamingTail(dbkey, tailkey, table, user, replicationId):
+def subscribe(dbkey, subkey, table, user, replicationId):
   async def f(schedule):
     db = schedule.getScheduleLocal(dbkey)
     if db is None:
@@ -63,13 +63,16 @@ def startStreamingTail(dbkey, tailkey, table, user, replicationId):
                                                 stdout=asyncio.subprocess.PIPE)
     (out, _) = await proc.communicate()
     session = out.decode().rstrip()
-    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "tail",
-                                                "--format=csv", str(session), "--since", "0",
-                                                "--follow",
-                                                stdout=asyncio.subprocess.PIPE)
-    schedule.storeScheduleLocal(tailkey, proc)
-    return proc
+    schedule.storeScheduleLocal(subkey, session)
+    return session
   return f
+
+async def tail(db, session, since):
+  proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "tail",
+                                              "--format=csv", session, "--since", str(since),
+                                              stdout=asyncio.subprocess.PIPE)
+  (out, _) = await proc.communicate()
+  return out
 
 def startStreamingWriteCsv(dbkey, writecsvKey, table, user, replicationId):
   async def f(schedule):
@@ -86,6 +89,13 @@ def startStreamingWriteCsv(dbkey, writecsvKey, table, user, replicationId):
     schedule.storeScheduleLocal(writecsvKey, proc)
     return proc
   return f
+
+def getLastCheckpoint(current, diffOutput):
+  lines = diffOutput.split('\n')
+  cps = [int(l.removeprefix(':')) for l in lines if l.startswith(":")]
+  cps.append(current)
+  cps.append(0)
+  return max(cps)
 
 class HalfStream:
 
@@ -170,35 +180,26 @@ class SkdbPeer:
   def initTask(self) -> Task:
     raise NotImplementedError()
 
-  # TODO: need to implement client specific tailing
-  # def tailTask(self, table, replicationId):
-  #   raise NotImplementedError()
-
   def tailTask(self, table, replicationId):
     def factory(stream, init):
-      tailkey = (self, stream, 'tail')
+      subkey = (self, stream, 'sub')
 
       async def start(schedule):
         user = "todo"               # TODO:
-        start = startStreamingTail(self, tailkey, table, user, replicationId)
+        start = subscribe(self, subkey, table, user, replicationId)
         await start(schedule)
 
       async def pull(schedule):
-        tailProc = schedule.getScheduleLocal(tailkey)
-
-        buf = []
-        while True:
-          # TODO: need timeout
-          data = await tailProc.stdout.readline()
-          line = data.decode()
-          buf.append(line)
-          if line.startswith(":"):
-            payload = "".join(buf)
-            stream.send(schedule, payload)
-            return
+        sinceKey = (self, stream, 'since')
+        db = schedule.getScheduleLocal(self)
+        session = schedule.getScheduleLocal(subkey)
+        since = schedule.getScheduleLocal(sinceKey) or 0
+        payload = await tail(db, session, since)
+        stream.send(schedule, payload)
+        schedule.storeScheduleLocal(sinceKey, getLastCheckpoint(since, payload.decode()))
 
       if init:
-        return Task(f"start tail for {self} {table} {stream}", start)
+        return Task(f"create subscribtion for {self} {table} {stream}", start)
       return Task(f"read {table} tail from {self} and send to {stream}", pull)
     return factory
 
@@ -214,7 +215,7 @@ class SkdbPeer:
         proc = schedule.getScheduleLocal(key)
 
         payload = stream.recv(schedule)
-        proc.stdin.write(payload.encode())
+        proc.stdin.write(payload)
 
       if init:
         return Task(f"start write-csv for {self} {table} {stream}", start)
