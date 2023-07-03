@@ -22,6 +22,7 @@ def createNativeDb(dbkey, schemaQueries):
     if exit > 0:
       raise RuntimeError("init exited non-zero")
 
+    # TODO: should not do on client
     init = open(INITSQL)
     proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, stdin=init)
     exit = await proc.wait()
@@ -80,7 +81,8 @@ def startStreamingWriteCsv(dbkey, writecsvKey, table, user, replicationId):
                                                 # TODO:
                                                 # "--user", user,
                                                 "--source", replicationId,
-                                                stdin=asyncio.subprocess.PIPE)
+                                                stdin=asyncio.subprocess.PIPE,
+                                                stdout=asyncio.subprocess.DEVNULL,)
     schedule.storeScheduleLocal(writecsvKey, proc)
     return proc
   return f
@@ -104,19 +106,26 @@ class HalfStream:
     return self
 
   def recv(self, schedule):
-    return schedule.getScheduleLocal(self).pop()
+    payload =  schedule.getScheduleLocal(self).pop()
+    return payload
 
   def initTask(self):
+    # TODO: shouldn't compose manually like this. will not run any clean up
+    send = self.sendTaskFactory(self, init=True)
+    recv = self.recvTaskFactory(self, init=True)
     async def f(schedule):
       schedule.storeScheduleLocal(self, deque())
+      await send.run(schedule)
+      await recv.run(schedule)
     return Task(f"setup {self} channel", f)
 
   def clockTask(self):
-    send = self.sendTaskFactory(self)
-    recv = self.recvTaskFactory(self)
+    send = self.sendTaskFactory(self, init=False)
+    recv = self.recvTaskFactory(self, init=False)
     # originally we added the two tasks separtely with a
     # happens-before relation, but this blows up the number of
     # schedules
+    # TODO: shouldn't compose manually like this. will not run any clean up
     async def f(schedule):
       await send.run(schedule)
       await recv.run(schedule)
@@ -161,22 +170,55 @@ class SkdbPeer:
   def initTask(self) -> Task:
     raise NotImplementedError()
 
+  # TODO: need to implement client specific tailing
+  # def tailTask(self, table, replicationId):
+  #   raise NotImplementedError()
+
   def tailTask(self, table, replicationId):
-    raise NotImplementedError()
+    def factory(stream, init):
+      tailkey = (self, stream, 'tail')
+
+      async def start(schedule):
+        user = "todo"               # TODO:
+        start = startStreamingTail(self, tailkey, table, user, replicationId)
+        await start(schedule)
+
+      async def pull(schedule):
+        tailProc = schedule.getScheduleLocal(tailkey)
+
+        buf = []
+        while True:
+          # TODO: need timeout
+          data = await tailProc.stdout.readline()
+          line = data.decode()
+          buf.append(line)
+          if line.startswith(":"):
+            payload = "".join(buf)
+            stream.send(schedule, payload)
+            return
+
+      if init:
+        return Task(f"start tail for {self} {table} {stream}", start)
+      return Task(f"read {table} tail from {self} and send to {stream}", pull)
+    return factory
 
   def writeTask(self, table, replicationId):
-    def factory(stream):
-      async def f(schedule):
-        key = (self, stream, 'write')
+    def factory(stream, init):
+      key = (self, stream, 'write')
+      async def start(schedule):
+        user = "todo"               # TODO:
+        start = startStreamingWriteCsv(self, key, table, user, replicationId)
+        await start(schedule)
+
+      async def push(schedule):
         proc = schedule.getScheduleLocal(key)
-        if proc is None:
-          user = "todo"               # TODO:
-          start = startStreamingWriteCsv(self, key, table, user, replicationId)
-          proc = await start(schedule)
 
         payload = stream.recv(schedule)
         proc.stdin.write(payload.encode())
-      return Task(f"read from {stream} and write to {self} {table}", f)
+
+      if init:
+        return Task(f"start write-csv for {self} {table} {stream}", start)
+      return Task(f"read from {stream} and write to {self} {table}", push)
     return factory
 
 class Server(SkdbPeer):
@@ -184,59 +226,10 @@ class Server(SkdbPeer):
   def initTask(self) -> Task:
     return Task(f"create server {self.name}", createNativeDb(self, self.schema))
 
-  def tailTask(self, table, replicationId):
-    def factory(stream):
-      async def f(schedule):
-        tailkey = (self, stream, 'tail')
-        tailProc = schedule.getScheduleLocal(tailkey)
-        if tailProc is None:
-          user = "todo"               # TODO:
-          start = startStreamingTail(self, tailkey, table, user, replicationId)
-          tailProc = await start(schedule)
-
-        buf = []
-        while True:
-          # TODO: need timeout
-          data = await tailProc.stdout.readline()
-          line = data.decode()
-          buf.append(line)
-          if line.startswith(":"):
-            payload = "".join(buf)
-            stream.send(schedule, payload)
-            return
-
-      return Task(f"read {table} tail from {self} and send to {stream}", f)
-    return factory
-
 class Client(SkdbPeer):
 
   def initTask(self) -> Task:
     return Task(f"create client {self.name}", createNativeDb(self, self.schema))
-
-  # TODO:
-  def tailTask(self, table, replicationId):
-    def factory(stream):
-      async def f(schedule):
-        tailkey = (self, stream, 'tail')
-        tailProc = schedule.getScheduleLocal(tailkey)
-        if tailProc is None:
-          user = "todo"               # TODO:
-          start = startStreamingTail(self, tailkey, table, user, replicationId)
-          tailProc = await start(schedule)
-
-        buf = []
-        while True:
-          # TODO: need timeout
-          data = await tailProc.stdout.readline()
-          line = data.decode()
-          buf.append(line)
-          if line.startswith(":"):
-            payload = "".join(buf)
-            stream.send(schedule, payload)
-            return
-
-      return Task(f"read {table} tail from {self} and send to {stream}", f)
-    return factory
 
 class Topology:
 
@@ -265,9 +258,9 @@ class Topology:
 
   def mirror(self, table, a, b):
     repId = self._genReplicationId()
-    atob = HalfStream(a,b, a.tailTask(table, repId), b.writeTask(table, repId))
+    atob = HalfStream(a, b, a.tailTask(table, repId), b.writeTask(table, repId))
     repId = self._genReplicationId()
-    btoa = HalfStream(b,a, b.tailTask(table, repId), a.writeTask(table, repId))
+    btoa = HalfStream(b, a, b.tailTask(table, repId), a.writeTask(table, repId))
     self.initTask.add(atob.initTask())
     self.initTask.add(btoa.initTask())
     a.notifyConnection(table, atob)
