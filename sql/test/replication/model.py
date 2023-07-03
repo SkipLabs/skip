@@ -3,6 +3,7 @@ import uuid
 from collections import defaultdict, deque
 from scheduling import Task, MutableCompositeTask
 import os
+import json
 
 SKDB = "/skfs/build/skdb"
 INITSQL = "/skfs/sql/privacy/init.sql"
@@ -58,6 +59,23 @@ def runDmlQuery(dbkey, query):
     await proc.communicate(query.encode())
     if proc.returncode is None or proc.returncode > 0:
       raise RuntimeError(f"running '{query}' exited non-zero")
+  return f
+
+def runQuery(dbkey, query):
+  async def f(schedule):
+    db = schedule.getScheduleLocal(dbkey)
+    if db is None:
+      raise RuntimeError("could not get db")
+
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "--format=json",
+                                                stdin=asyncio.subprocess.PIPE,
+                                                stdout=asyncio.subprocess.PIPE)
+    (out, _) = await proc.communicate(query.encode())
+    if proc.returncode is None or proc.returncode > 0:
+      raise RuntimeError(f"running '{query}' exited non-zero")
+
+    lines = out.decode().split('\n')
+    return (json.loads(x) for x in lines if x.strip() != '')
   return f
 
 def subscribe(dbkey, subkey, table, user, replicationId):
@@ -183,8 +201,8 @@ class SkdbPeer:
       self.scheduler.happensBefore(insert, send)
     return insert
 
-  async def query(self, query):
-    raise NotImplementedError()
+  async def query(self, schedule, query):
+    return await runQuery(self, query)(schedule)
 
   def initTask(self) -> Task:
     raise NotImplementedError()
@@ -285,17 +303,22 @@ class Topology:
     b.notifyConnection(table, btoa)
     return self
 
-  def eventually(self, query: str):
-    # TODO: capture these to be checked after scheduler
-    results = ResultSets()
-    # for peer in self.peers:
-    #   results.add(peer.query(query))
-    return results
+  def now(self, query: str):
+    expectations = Expectations()
+    async def f(schedule):
+      results = await asyncio.gather(
+        *[peer.query(schedule, query) for peer in self.peers]
+      )
+      expectations.check(results)
+    checkTask = Task(f"Check {expectations} on {query}", f)
+    for scheduled in self.scheduler.tasks:
+      self.scheduler.happensBefore(scheduled, checkTask)
+    self.scheduler.add(checkTask)
+    return expectations
 
-class ResultSets():
+class Expectations():
+  def hasRows(self, *rows):
+    pass
 
-  def add(self, results):
-    raise NotImplementedError()
-
-  def has(self, *rows):
+  def check(self, resultSets):
     pass

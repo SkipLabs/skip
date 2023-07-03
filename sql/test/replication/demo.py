@@ -28,7 +28,7 @@ scheduler.happensBefore(c1ins2, s1ins1)
 # TODO: would this be useful?
 # scheduler.happensConcurrently(c1ins1, c1ins2)
 
-cluster.eventually("SELECT * FROM test_without_pk;").has(
+cluster.now("SELECT * FROM test_without_pk;").hasRows(
   [0, "foo"], [1, "foo"], [2, "foo"]
 )
 
