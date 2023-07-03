@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from collections import defaultdict, deque
 from scheduling import Task, MutableCompositeTask
+import os
 
 SKDB = "/skfs/build/skdb"
 INITSQL = "/skfs/sql/privacy/init.sql"
@@ -36,6 +37,14 @@ def createNativeDb(dbkey, schemaQueries):
     await proc.communicate(qs.encode())
     if proc.returncode is None or proc.returncode > 0:
       raise RuntimeError("init exited non-zero")
+  return f
+
+def destroyNativeDb(dbkey):
+  async def f(schedule):
+    db = schedule.getScheduleLocal(dbkey)
+    if db is None:
+      raise RuntimeError("could not get db")
+    os.remove(db)
   return f
 
 def runDmlQuery(dbkey, query):
@@ -120,26 +129,26 @@ class HalfStream:
     return payload
 
   def initTask(self):
-    # TODO: shouldn't compose manually like this. will not run any clean up
+    t = MutableCompositeTask()
     send = self.sendTaskFactory(self, init=True)
+    t.add(send)
     recv = self.recvTaskFactory(self, init=True)
+    t.add(recv)
     async def f(schedule):
       schedule.storeScheduleLocal(self, deque())
-      await send.run(schedule)
-      await recv.run(schedule)
-    return Task(f"setup {self} channel", f)
+    t.add(Task(f"create {self} channel buffer", f))
+    return t
 
   def clockTask(self):
-    send = self.sendTaskFactory(self, init=False)
-    recv = self.recvTaskFactory(self, init=False)
     # originally we added the two tasks separtely with a
     # happens-before relation, but this blows up the number of
     # schedules
-    # TODO: shouldn't compose manually like this. will not run any clean up
-    async def f(schedule):
-      await send.run(schedule)
-      await recv.run(schedule)
-    return Task(f"{send} then {recv}", f)
+    t = MutableCompositeTask()
+    send = self.sendTaskFactory(self, init=False)
+    t.add(send)
+    recv = self.recvTaskFactory(self, init=False)
+    t.add(recv)
+    return t
 
 class SkdbPeer:
 
@@ -199,7 +208,7 @@ class SkdbPeer:
         schedule.storeScheduleLocal(sinceKey, getLastCheckpoint(since, payload.decode()))
 
       if init:
-        return Task(f"create subscribtion for {self} {table} {stream}", start)
+        return Task(f"create subscription for {self} {table} {stream}", start)
       return Task(f"read {table} tail from {self} and send to {stream}", pull)
     return factory
 
@@ -211,6 +220,10 @@ class SkdbPeer:
         start = startStreamingWriteCsv(self, key, table, user, replicationId)
         await start(schedule)
 
+      async def stop(schedule):
+        proc = schedule.getScheduleLocal(key)
+        proc.terminate()
+
       async def push(schedule):
         proc = schedule.getScheduleLocal(key)
 
@@ -218,19 +231,23 @@ class SkdbPeer:
         proc.stdin.write(payload)
 
       if init:
-        return Task(f"start write-csv for {self} {table} {stream}", start)
+        return Task(f"start write-csv for {self} {table} {stream}", start, stop)
       return Task(f"read from {stream} and write to {self} {table}", push)
     return factory
 
 class Server(SkdbPeer):
 
   def initTask(self) -> Task:
-    return Task(f"create server {self.name}", createNativeDb(self, self.schema))
+    return Task(f"create server {self.name}",
+                createNativeDb(self, self.schema),
+                destroyNativeDb(self))
 
 class Client(SkdbPeer):
 
   def initTask(self) -> Task:
-    return Task(f"create client {self.name}", createNativeDb(self, self.schema))
+    return Task(f"create client {self.name}",
+                createNativeDb(self, self.schema),
+                destroyNativeDb(self))
 
 class Topology:
 
