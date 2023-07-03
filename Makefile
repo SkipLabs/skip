@@ -86,7 +86,7 @@ test: native-test wasm-test
 native-test: build/skdb
 	cd sql/ && ./test_sql.sh \
 	|tee /tmp/native-test.out ; \
-	! grep -v '\*\|^[[:blank:]]*\$\|OK\|PASS' /tmp/native-test.out
+	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 
 .PHONY: wasm-test
 wasm-test: npm sql/js/node_modules sql/js/dist/index.html
