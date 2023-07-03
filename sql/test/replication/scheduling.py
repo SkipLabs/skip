@@ -98,16 +98,17 @@ class Scheduler:
 
     n = 0
     tasks = set()
+    # 8 is fairly arbitrary. a few experimental runs suggests it's
+    # quite good on an m1 macbook. this whole batch gather model
+    # isn't great, but it's easy to code and good enough to run
+    # hundreds of schedules in a few secs.
+    sem = asyncio.Semaphore(8)
     for i, schedule in enumerate(self.schedules()):
       n = i
-      tasks.add(asyncio.create_task(_run(schedule)))
-      # 16 is fairly arbitrary. a few experimental runs suggests it's
-      # quite good on an m1 macbook. this whole batch gather model
-      # isn't great, but it's easy to code and good enough to run
-      # hundreds of schedules in a few secs.
-      if i % 16 == 0:
-        await asyncio.gather(*tasks)
-        tasks = set()
+      await sem.acquire()
+      t = asyncio.create_task(_run(schedule))
+      tasks.add(t)
+      t.add_done_callback(lambda t: (tasks.discard(t), sem.release()))
     await asyncio.gather(*tasks)
     print(f"Ran {n+1} schedules, all PASSED expectation checks")
 
