@@ -29,7 +29,8 @@ scheduler.happensBefore(c1ins2, s1ins1)
 # scheduler.happensConcurrently(c1ins1, c1ins2)
 
 cluster.now("SELECT * FROM test_without_pk;").hasRows(
-  [0, "foo"], [1, "foo"], [2, "foo"]
+  [0, "foo"], [1, "foo"], [2, "foo"],
+  colnames=['id', 'note'],
 )
 
 # TODO: cluster.eventually().silent() - no output on processes

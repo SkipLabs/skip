@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from collections import defaultdict, deque
 from scheduling import Task, MutableCompositeTask
+from expect import Expectations
 import os
 import json
 
@@ -75,7 +76,7 @@ def runQuery(dbkey, query):
       raise RuntimeError(f"running '{query}' exited non-zero")
 
     lines = out.decode().split('\n')
-    return (json.loads(x) for x in lines if x.strip() != '')
+    return list(json.loads(x) for x in lines if x.strip() != '')
   return f
 
 def subscribe(dbkey, subkey, table, user, replicationId):
@@ -315,10 +316,3 @@ class Topology:
       self.scheduler.happensBefore(scheduled, checkTask)
     self.scheduler.add(checkTask)
     return expectations
-
-class Expectations():
-  def hasRows(self, *rows):
-    pass
-
-  def check(self, resultSets):
-    pass
