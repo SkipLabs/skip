@@ -14,7 +14,7 @@ def serialise(val):
     return f"'{val}'"
   return str(val)
 
-def createNativeDb(dbkey, schemaQueries):
+def createNativeDb(dbkey, schemaQueries, shouldInit):
   async def f(schedule):
     guid = uuid.uuid4()
     db = f"/tmp/{guid}.db"
@@ -25,13 +25,13 @@ def createNativeDb(dbkey, schemaQueries):
     if exit > 0:
       raise RuntimeError("init exited non-zero")
 
-    # TODO: should not do on client
-    init = open(INITSQL)
-    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, stdin=init)
-    exit = await proc.wait()
-    init.close()
-    if exit > 0:
-      raise RuntimeError("init exited non-zero")
+    if shouldInit:
+      init = open(INITSQL)
+      proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, stdin=init)
+      exit = await proc.wait()
+      init.close()
+      if exit > 0:
+        raise RuntimeError("init exited non-zero")
 
     qs = "\n".join(schemaQueries)
     proc = await asyncio.create_subprocess_exec(SKDB, "--data", db,
@@ -255,17 +255,15 @@ class SkdbPeer:
     return factory
 
 class Server(SkdbPeer):
-
   def initTask(self) -> Task:
     return Task(f"create server {self.name}",
-                createNativeDb(self, self.schema),
+                createNativeDb(self, self.schema, shouldInit=True),
                 destroyNativeDb(self))
 
 class Client(SkdbPeer):
-
   def initTask(self) -> Task:
     return Task(f"create client {self.name}",
-                createNativeDb(self, self.schema),
+                createNativeDb(self, self.schema, shouldInit=False),
                 destroyNativeDb(self))
 
 class Topology:
