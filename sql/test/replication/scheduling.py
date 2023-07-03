@@ -6,11 +6,14 @@ import copy
 
 task_id_counter = 0
 
+async def nop(*args, **kwargs):
+  pass
 
 class Task:
-  def __init__(self, name, fn):
+  def __init__(self, name, fn, final = nop):
     self.name = name
     self.fn = fn
+    self.final = final
     global task_id_counter
     self.uid = task_id_counter
     task_id_counter = task_id_counter + 1
@@ -29,6 +32,9 @@ class Task:
 
   async def run(self, schedule):
     await self.fn(schedule)
+
+  async def finalise(self, schedule):
+    await self.final(schedule)
 
 class MutableCompositeTask:
   def __init__(self):
@@ -58,13 +64,17 @@ class MutableCompositeTask:
     for t in self.taskSeq:
       await t.run(schedule)
 
+  async def finalise(self, schedule):
+    for t in reversed(self.taskSeq):
+      await t.finalise(schedule)
+
 class Scheduler:
   def __init__(self):
-    self.tasks = set()
+    self.tasks = []
     self.graph = defaultdict(list)
 
   def add(self, task):
-    self.tasks.add(task)
+    self.tasks.append(task)
 
   def happensBefore(self, a, b):
     self.graph[a].append(b)
@@ -78,6 +88,8 @@ class Scheduler:
       # should limit # in flight
       print("-------------")
       await schedule.run()
+      for t in reversed(self.tasks):
+        await t.finalise(schedule)
 
 class Schedule:
   def __init__(self, tasks):
