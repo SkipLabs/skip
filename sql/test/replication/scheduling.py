@@ -8,11 +8,14 @@ import asyncio
 
 task_id_counter = 0
 
-async def nop(*args, **kwargs):
+async def anop(*args, **kwargs):
+  pass
+
+def nop(*args, **kwargs):
   pass
 
 class Task:
-  def __init__(self, name, fn, final = nop):
+  def __init__(self, name, fn, final = anop):
     self.name = name
     self.fn = fn
     self.final = final
@@ -85,16 +88,23 @@ class Scheduler:
     return []
 
   async def run(self):
+    failLock = asyncio.Lock()
     async def _run(schedule):
       try:
         await schedule.run()
       except AssertionError as err:
-        print(f"Assertion check failed running {schedule}")
-        print(err)
-        sys.exit(1)
+        if failLock.locked():
+          return
+        await failLock.acquire() # just deal with first failure
+        debugRun = schedule.clone()
+        try:
+          await debugRun.run(print)
+        except AssertionError as err:
+          sys.exit(1)
+        finally:
+          await debugRun.finalise()
       finally:
-        for t in reversed(self.tasks):
-          await t.finalise(schedule)
+        await schedule.finalise()
 
     n = 0
     tasks = set()
@@ -117,6 +127,9 @@ class Schedule:
     self.state = {}
     self.tasks = tasks
 
+  def clone(self):
+    return Schedule(self.tasks)
+
   def storeScheduleLocal(self, key, value):
     self.state[key] = value
 
@@ -130,9 +143,15 @@ class Schedule:
   def __str__(self):
     return self.__repr__()
 
-  async def run(self):
-    for t in self.tasks:
+  async def run(self, debug=nop):
+    self.debug=debug
+    for i,t in enumerate(self.tasks):
+      debug(f"{i}: {t}")
       await t.run(self)
+
+  async def finalise(self):
+    for t in reversed(self.tasks):
+      await t.finalise(self)
 
 class ArbitraryTopoSortScheduler(Scheduler):
   def schedules(self):

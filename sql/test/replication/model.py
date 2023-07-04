@@ -145,6 +145,7 @@ class HalfStream:
 
   def recv(self, schedule):
     payload =  schedule.getScheduleLocal(self).pop()
+    schedule.debug(payload.decode())
     return payload
 
   def initTask(self):
@@ -234,7 +235,7 @@ class SkdbPeer:
 
       if init:
         return Task(f"create subscription for {self} {table} {stream}", start)
-      return Task(f"read {table} tail from {self} and send to {stream}", pull)
+      return Task(f"<{self} {table}> -> {stream}", pull)
     return factory
 
   def writeTask(self, table, replicationId):
@@ -257,7 +258,7 @@ class SkdbPeer:
 
       if init:
         return Task(f"start write-csv for {self} {table} {stream}", start, stop)
-      return Task(f"read from {stream} and write to {self} {table}", push)
+      return Task(f"{stream} -> <{self} {table}>", push)
     return factory
 
 class Server(SkdbPeer):
