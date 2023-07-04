@@ -130,6 +130,10 @@ def getOurLastCheckpoint(current, diffOutput):
   cps.append(0)
   return max(cps)
 
+def diffOutputIsSilent(diff):
+  lines = diff.split('\n')
+  return all(l.startswith(':') or l.strip() == "" for l in lines)
+
 class HalfStream:
 
   def __init__(self, sender, receiver, sendTask, recvTask):
@@ -165,15 +169,19 @@ class HalfStream:
     t.add(Task(f"create {self} channel buffer", f))
     return t
 
+  def sendTask(self):
+    return self.sendTaskFactory(self, init=False)
+
+  def recvTask(self):
+    return self.recvTaskFactory(self, init=False)
+
   def clockTask(self):
     # originally we added the two tasks separtely with a
     # happens-before relation, but this blows up the number of
     # schedules
     t = MutableCompositeTask()
-    send = self.sendTaskFactory(self, init=False)
-    t.add(send)
-    recv = self.recvTaskFactory(self, init=False)
-    t.add(recv)
+    t.add(self.sendTask())
+    t.add(self.recvTask())
     return t
 
 class SkdbPeer:
@@ -321,7 +329,7 @@ class Topology:
     b.notifyConnection(table, btoa)
     return self
 
-  def now(self, query: str):
+  def state(self, query: str):
     expectations = Expectations()
     async def f(schedule):
       results = await asyncio.gather(
@@ -333,3 +341,24 @@ class Topology:
       self.scheduler.happensBefore(scheduled, checkTask)
     self.scheduler.add(checkTask)
     return expectations
+
+  def isSilent(self):
+    streams = [
+      stream
+      for peer in self.peers
+      for table in peer.streams
+      for stream in peer.streams[table]
+    ]
+    t = MutableCompositeTask()
+    for s in streams:
+      t.add(s.sendTask())
+    async def f(schedule):
+      for s in streams:
+        out = s.recv(schedule).decode()
+        if not diffOutputIsSilent(out):
+          raise AssertionError(f"Not silent: {s} {out}")
+    checkTask = Task(f"Check all tail output silent", f)
+    t.add(checkTask)
+    for scheduled in self.scheduler.tasks():
+      self.scheduler.happensBefore(scheduled, t)
+    self.scheduler.add(t)
