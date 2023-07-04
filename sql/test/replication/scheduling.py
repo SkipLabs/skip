@@ -14,6 +14,41 @@ async def anop(*args, **kwargs):
 def nop(*args, **kwargs):
   pass
 
+async def runSchedules(schedules):
+  failLock = asyncio.Lock()
+  async def _run(schedule):
+    try:
+      await schedule.run()
+    except AssertionError as err:
+      if failLock.locked():
+        return
+      await failLock.acquire() # just deal with first failure
+      debugRun = schedule.clone()
+      try:
+        await debugRun.run(print)
+      except AssertionError as err:
+        sys.exit(1)
+      finally:
+        await debugRun.finalise()
+    finally:
+      await schedule.finalise()
+
+  n = 0
+  tasks = set()
+  # 8 is fairly arbitrary. a few experimental runs suggests it's
+  # quite good on an m1 macbook. this whole batch gather model
+  # isn't great, but it's easy to code and good enough to run
+  # hundreds of schedules in a few secs.
+  sem = asyncio.Semaphore(8)
+  for i, schedule in enumerate(schedules):
+    n = i
+    await sem.acquire()
+    t = asyncio.create_task(_run(schedule))
+    tasks.add(t)
+    t.add_done_callback(lambda t: (tasks.discard(t), sem.release()))
+  await asyncio.gather(*tasks)
+  print(f"Ran {n+1} schedules, all PASSED expectation checks")
+
 class Task:
   def __init__(self, name, fn, final = anop):
     self.name = name
@@ -75,11 +110,11 @@ class MutableCompositeTask:
 
 class Scheduler:
   def __init__(self):
-    self.tasks = []
     self.graph = defaultdict(list)
+    self.t = []
 
   def add(self, task):
-    self.tasks.append(task)
+    self.t.append(task)
 
   def happensBefore(self, a, b):
     self.graph[a].append(b)
@@ -87,40 +122,11 @@ class Scheduler:
   def schedules(self):
     return []
 
-  async def run(self):
-    failLock = asyncio.Lock()
-    async def _run(schedule):
-      try:
-        await schedule.run()
-      except AssertionError as err:
-        if failLock.locked():
-          return
-        await failLock.acquire() # just deal with first failure
-        debugRun = schedule.clone()
-        try:
-          await debugRun.run(print)
-        except AssertionError as err:
-          sys.exit(1)
-        finally:
-          await debugRun.finalise()
-      finally:
-        await schedule.finalise()
+  def tasks(self):
+    return self.t
 
-    n = 0
-    tasks = set()
-    # 8 is fairly arbitrary. a few experimental runs suggests it's
-    # quite good on an m1 macbook. this whole batch gather model
-    # isn't great, but it's easy to code and good enough to run
-    # hundreds of schedules in a few secs.
-    sem = asyncio.Semaphore(8)
-    for i, schedule in enumerate(self.schedules()):
-      n = i
-      await sem.acquire()
-      t = asyncio.create_task(_run(schedule))
-      tasks.add(t)
-      t.add_done_callback(lambda t: (tasks.discard(t), sem.release()))
-    await asyncio.gather(*tasks)
-    print(f"Ran {n+1} schedules, all PASSED expectation checks")
+  async def run(self):
+    return await runSchedules(self.schedules())
 
 class Schedule:
   def __init__(self, tasks):
@@ -161,7 +167,7 @@ class ArbitraryTopoSortScheduler(Scheduler):
 
     def nodesWithNoIncomingEdge():
       acc = set()
-      for node in self.tasks:
+      for node in self.t:
         found = False
         for (_, nodes) in g.items():
           if node in nodes:
@@ -195,7 +201,7 @@ class AllTopoSortsScheduler(Scheduler):
 
   def _nodesWithNoIncomingEdge(self, g):
     acc = set()
-    for node in self.tasks:
+    for node in self.t:
       found = False
       for (_, nodes) in g.items():
         if node in nodes:
@@ -237,10 +243,23 @@ class AllTopoSortsScheduler(Scheduler):
 
     await super().run()
 
-class RandomTopoSortsScheduler(Scheduler):
+class ReservoirSample():
   def __init__(self, scheduler, N):
+    super().__init__()
     self.scheduler = scheduler
     self.N = N
+
+  def add(self, task):
+    return self.scheduler.add(task)
+
+  def happensBefore(self, a, b):
+    return self.scheduler.happensBefore(a,b)
+
+  def tasks(self):
+    return self.scheduler.tasks()
+
+  async def run(self):
+    return await runSchedules(self.schedules())
 
   def schedules(self):
     # just simple reservoir sample

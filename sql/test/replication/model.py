@@ -322,7 +322,7 @@ class Topology:
       )
       expectations.check(results)
     checkTask = Task(f"Check {expectations} on {query}", f)
-    for scheduled in self.scheduler.tasks:
+    for scheduled in self.scheduler.tasks():
       self.scheduler.happensBefore(scheduled, checkTask)
     self.scheduler.add(checkTask)
     return expectations
