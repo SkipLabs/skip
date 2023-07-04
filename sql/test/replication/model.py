@@ -118,9 +118,14 @@ def startStreamingWriteCsv(dbkey, writecsvKey, table, user, replicationId):
     return proc
   return f
 
-def getLastCheckpoint(current, diffOutput):
+def getOurLastCheckpoint(current, diffOutput):
+  def parse(line: str):
+    ticks = line.removeprefix(':').split(' ')
+    if len(ticks) < 1:
+      raise RuntimeError(f"Could not parse checkpoint from {line}")
+    return int(ticks[0])
   lines = diffOutput.split('\n')
-  cps = [int(l.removeprefix(':')) for l in lines if l.startswith(":")]
+  cps = [parse(l) for l in lines if l.startswith(":")]
   cps.append(current)
   cps.append(0)
   return max(cps)
@@ -231,7 +236,7 @@ class SkdbPeer:
         since = schedule.getScheduleLocal(sinceKey) or 0
         payload = await tail(db, session, since)
         stream.send(schedule, payload)
-        schedule.storeScheduleLocal(sinceKey, getLastCheckpoint(since, payload.decode()))
+        schedule.storeScheduleLocal(sinceKey, getOurLastCheckpoint(since, payload.decode()))
 
       if init:
         return Task(f"create subscription for {self} {table} {stream}", start)
