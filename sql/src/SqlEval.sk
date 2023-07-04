@@ -62,25 +62,14 @@ fun checkUserRows(
   }
 }
 
-fun computeTableDescr(
-  name: Name,
-  schema: Array<TypeDescr>,
-  windowSize: ?Int,
-): DirDescr {
+fun computeTableDescr(name: Name, schema: Array<TypeDescr>): DirDescr {
   dirNameStr = "/" + name + "/";
   dirName = SKFS.DirName::create(dirNameStr);
   colVec = mutable Vector[];
   for (i in Range(0, schema.size())) {
     colVec.push((schema[i].name, i));
   };
-  DirDescr::create{
-    name,
-    schema,
-    dirName,
-    alias => None(),
-    windowSize,
-    isInput => true,
-  }
+  DirDescr::create{name, schema, dirName, alias => None(), isInput => true}
 }
 
 fun computeInsert(
@@ -337,31 +326,13 @@ class Evaluator{options: Options, user: ?UserFile} {
     inTransaction: Bool,
   ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
     stmt match {
-    | Table{pos, name, schema, ifNotExists, windowSize} ->
+    | Table{pos, name, schema, ifNotExists} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
       };
       Some((context, _, _) ~> {
-        dirDescr = computeTableDescr(name, schema, windowSize);
-        windowSize match {
-        | Some(x) if (x < 0) ->
-          print_error("Invalid WINDOW size");
-          skipExit(23)
-        | _ -> void
-        };
-        reallyRemove = windowSize match {
-        | Some(0) -> false
-        | Some(_) -> true
-        | None() -> false
-        };
-        this.createTable(
-          context,
-          pos,
-          name,
-          dirDescr,
-          ifNotExists,
-          reallyRemove,
-        );
+        dirDescr = computeTableDescr(name, schema);
+        this.createTable(context, pos, name, dirDescr, ifNotExists);
       })
     | Insert{pos, onConflict, name, paramsOpt, values} ->
       baseName = SKFS.SID::create(name.lower);
@@ -626,10 +597,6 @@ class Evaluator{options: Options, user: ?UserFile} {
     updateTableMap(context);
     table = getTable(this.options, context, pos, name);
     inputDir = getDir(table);
-    if (table.windowSize is Some _) {
-      print_error("Error: cannot delete from a window");
-      skipExit(23);
-    };
     SKFS.EagerDir::apply(
       context,
       selectDir.dirName,
@@ -705,17 +672,14 @@ class Evaluator{options: Options, user: ?UserFile} {
     | None() -> void
     | Some(user) -> checkUserRows(context, user, pos, table, rows)
     };
-    table.windowSize match {
-    | Some _ if (onConflict is Some _) ->
-      error(pos, "OR IGNORE/REPLACE not supported on streams/windows")
-    | None() if (inTransaction && onConflict is Some(OCIgnore())) ->
+    if (inTransaction && onConflict is Some(OCIgnore())) {
       error(pos, "OR IGNORE not supported in transactions")
-    | None() if (inTransaction && onConflict is Some(OCReplace())) ->
+    } else if (inTransaction && onConflict is Some(OCReplace())) {
       error(pos, "OR REPLACE not supported in transactions")
-    | None() if (inTransaction) ->
+    } else if (inTransaction) {
       this.insertTable(context, table, rows);
       None()
-    | None() if (onConflict is Some(OCUpdate(_))) ->
+    } else if (onConflict is Some(OCUpdate(_))) {
       onConflict match {
       | Some(OCUpdate(update)) ->
         copy = context.clone();
@@ -741,8 +705,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         }
       | _ -> None()
       }
-
-    | None() ->
+    } else {
       Some((context, _, _) ~> {
         if (onConflict is Some(OCIgnore())) {
           copy = context.clone();
@@ -806,22 +769,6 @@ class Evaluator{options: Options, user: ?UserFile} {
           context.update();
         }
       })
-
-    | Some(ws) ->
-      if (inTransaction) {
-        print_error("Error: cannot insert into a window within a transaction");
-        skipExit(23);
-      };
-      if (ws == 0) {
-        this.insertStream(context, rows, table);
-        Some((_, _, _) ~> {
-          void
-        })
-      } else {
-        Some((context, _, _) ~> {
-          this.insertWindow(context, ws, rows, table);
-        })
-      }
     }
   }
 
@@ -925,14 +872,13 @@ class Evaluator{options: Options, user: ?UserFile} {
     name: Name,
     dirDescr: DirDescr,
     ifNotExists: Bool,
-    reallyRemove: Bool,
   ): void {
     dirName = dirDescr.dirName;
     if (context.unsafeMaybeGetEagerDir(dirName) is Some _ && ifNotExists) {
       return void;
     };
 
-    dir = context.mkdir(RowValues::fromFile, dirName, reallyRemove);
+    dir = context.mkdir(RowValues::fromFile, dirName);
 
     getTableDir(context).writeArray(
       context,
@@ -941,14 +887,6 @@ class Evaluator{options: Options, user: ?UserFile} {
     );
 
     hasPrimary = false;
-    dirDescr.windowSize match {
-    | Some(0) -> void
-    | Some(_) ->
-      if (!(dirDescr.schema[0].ty is INTEGER())) {
-        error(pos, "WINDOW expects a first column of type INTEGER")
-      }
-    | _ -> void
-    };
 
     for (tyDescr in dirDescr.schema) {
       if (tyDescr.primary) {
@@ -1032,7 +970,6 @@ class Evaluator{options: Options, user: ?UserFile} {
       ],
       dirName => groupsMembersDirName,
       alias => None(),
-      windowSize => None(),
       isInput => false,
     };
     kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
@@ -1617,7 +1554,6 @@ fun importNext(
             fixedData => SKFS.FixedDataMap::create(),
             totalSize => 0,
             creator => None(),
-            reallyRemove => false,
           };
           targetCtx.setDir(targetDir.dirName, targetDir)
         | Some(_) -> void
@@ -1873,7 +1809,6 @@ fun initJSRoots(): void {
           ],
           dirName => jsRootsValuesDirName,
           alias => None(),
-          windowSize => None(),
           isInput => false,
         };
         tableDir = getTableDir(context);
@@ -1881,7 +1816,7 @@ fun initJSRoots(): void {
         tableDir.writeArray(context, fileName, Array[dirDescr]);
         kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
         _ = context
-          .mkdir(JSCall::fromFile, jsRootsInputDirName, false, Array[])
+          .mkdir(JSCall::fromFile, jsRootsInputDirName, Array[])
           .contextWriterKeyValues(
             SKFS.StringFile::fromFile,
             context,

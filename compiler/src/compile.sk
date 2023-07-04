@@ -317,9 +317,9 @@ fun compile(
   };
 
   if (context.unsafeMaybeGetDir(FileCache.fileDirName) is None()) {
-    _ = context.mkdir(x ~> x, FileCache.fileDirName, false, Array[]);
-    _ = context.mkdir(x ~> x, FileCache.fileTimeDirName, false, Array[]);
-    _ = context.mkdir(x ~> x, FileCache.allFilesDirName, false, Array[]);
+    _ = context.mkdir(x ~> x, FileCache.fileDirName, Array[]);
+    _ = context.mkdir(x ~> x, FileCache.fileTimeDirName, Array[]);
+    _ = context.mkdir(x ~> x, FileCache.allFilesDirName, Array[]);
   };
 
   FileCache.writeFiles(context, fileNames);
@@ -343,7 +343,6 @@ fun compile(
     backendDir = context.mkdir(
       TickConfigFile::fromFile,
       backendDirName,
-      false,
       Array[(SKFS.IID(0), TickConfigFile((-128, config)))],
     );
 

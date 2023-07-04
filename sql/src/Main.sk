@@ -758,7 +758,7 @@ fun execReplicationId(args: Cli.ParseResults, options: SKSQL.Options): void {
   SKSQL.runSql(options, context ~> {
     clientsDirname = SKFS.DirName::create(`/clients/`);
     clientsDir = context.maybeGetDir(clientsDirname) match {
-    | None() -> context.mkdir(SKFS.IntFile::fromFile, clientsDirname, false)
+    | None() -> context.mkdir(SKFS.IntFile::fromFile, clientsDirname)
     | Some(d) -> SKFS.EHandle(SKFS.IntFile::fromFile, d.getDirName())
     };
     key = SKFS.SID::create(clientUuid);

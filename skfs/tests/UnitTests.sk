@@ -36,7 +36,7 @@ fun make(
     | y @ SKFS.StringFile _ -> y
     | _ -> invariant_violation("impossible")
     };
-  context.mkdir(conv, SKFS.DirName::create(name), false, kvArray)
+  context.mkdir(conv, SKFS.DirName::create(name), kvArray)
 }
 
 fun compareResults(
@@ -194,7 +194,6 @@ fun testSubDirUnit(): void {
     dir1 = context.mkdir(
       SKFS.StringFile::fromFile,
       SKFS.DirName::create("/dir1/"),
-      false,
       Array[],
     );
     _dir2 = dir1.contextMap(

@@ -76,4 +76,3 @@ run_diff 'test/select5.1-create.sql' 'test/select5.1-views.sql' 'test/select5.1-
 run_diff 'test/groupby_create.sql' 'test/groupby_views.sql' 'test/groupby_inserts.sql'
 run_diff 'test/groupby_create.sql' 'test/groupby_views.sql' 'test/groupby_inserts.sql' 'test/groupby_delete.sql'
 run_diff 'test/slt_good_0_create.sql' 'test/slt_good_0_views.sql' 'test/slt_good_0_inserts.sql'
-run_diff 'test/select2_create_window.sql' 'test/select2_views.sql' 'test/select2_inserts_window.sql'

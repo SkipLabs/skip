@@ -40,7 +40,7 @@ fun setWatermark(
   checkpointTick: SKFS.Tick,
 ): void {
   watermarkDir = context.maybeGetDir(watermarks) match {
-  | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks, false)
+  | None() -> context.mkdir(SKFS.TickFile::fromFile, watermarks)
   | Some(d) -> SKFS.EHandle(SKFS.TickFile::fromFile, d.getDirName())
   };
   key = SKFS.SID::create(`${tableName}_${replicationSource}`);
@@ -58,7 +58,6 @@ class DirDescr{
   kinds: Array<(Int, IKind, Type)>,
   cols: Map<Name, Int>,
   alias: ?Name,
-  windowSize: ?Int,
   isInput: Bool,
 } extends SKFS.File, Descr uses Orderable {
   fun compare(y: DirDescr): Order {
@@ -70,7 +69,6 @@ class DirDescr{
     schema: Array<TypeDescr>,
     dirName: SKFS.DirName,
     alias: ?Name,
-    windowSize: ?Int,
     isInput: Bool,
   }: this {
     cols = mutable Map[];
@@ -86,7 +84,6 @@ class DirDescr{
       cols => cols.chill(),
       dirName,
       alias,
-      windowSize,
       isInput,
     }
   }
@@ -114,7 +111,7 @@ fun makeDir<T: frozen>(
 
 fun getTableDir(context: mutable SKFS.Context): SKFS.EHandle<DirDescr> {
   makeDir(DirDescr::fromFile, context, tableInfo, () -> {
-    context.mkdir(DirDescr::fromFile, tableInfo, false, Array[])
+    context.mkdir(DirDescr::fromFile, tableInfo, Array[])
   })
 }
 
@@ -171,7 +168,6 @@ fun dirDescrCopy(
     data => oldDir.data,
     totalSize => oldDir.totalSize,
     creator => context.currentArrow(),
-    reallyRemove => false,
   };
   context.setDir(dir.dirName, dir);
   limit = context.tick;
@@ -256,7 +252,7 @@ class ShardStats(tick: SKFS.Tick, left: Int, right: Int) extends SKFS.File
 
 fun getViewsDir(context: mutable SKFS.Context): SKFS.EHandle<SelectFile> {
   makeDir(SelectFile::fromFile, context, views, () ->
-    context.mkdir(SelectFile::fromFile, views, false, Array[])
+    context.mkdir(SelectFile::fromFile, views, Array[])
   )
 }
 
@@ -283,7 +279,7 @@ fun getSubsDirs(
     output = SKFS.EHandle(SKFS.IntFile::fromFile, subsOutput);
     return (input, output)
   };
-  input = context.mkdir(SubRequestFile::fromFile, subsInput, false, Array[]);
+  input = context.mkdir(SubRequestFile::fromFile, subsInput, Array[]);
   output = input.contextWriterKeyValues(
     SKFS.IntFile::fromFile,
     context,
@@ -476,7 +472,7 @@ class IndexDescr{
 
 fun getIndexInputDir(context: mutable SKFS.Context): SKFS.EHandle<Index> {
   makeDir(Index::fromFile, context, indexInput, () ->
-    context.mkdir(Index::fromFile, indexInput, false, Array[])
+    context.mkdir(Index::fromFile, indexInput, Array[])
   )
 }
 
@@ -595,13 +591,7 @@ fun getTable(
 fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
   o = print_raw;
   o("CREATE ");
-  o(
-    dirDescr.windowSize match {
-    | None() -> "TABLE "
-    | Some(0) -> "STREAM " + " "
-    | Some(size) -> "WINDOW " + size + " "
-    },
-  );
+  o("TABLE ");
   o(dirDescr.name.origName);
   suffix match {
   | None() -> void

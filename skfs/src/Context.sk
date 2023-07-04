@@ -552,7 +552,6 @@ mutable class Context{
           totalSize => 0,
           fixedData => FixedDataMap::create(),
           creator => this.currentArrow(),
-          reallyRemove => dir.reallyRemove,
         };
         dir.unsafeIterKeys((key, _time) -> {
           values = dir.getArrayRaw(key).collect(Array);
@@ -797,12 +796,10 @@ mutable class Context{
   mutable fun mkdir<T: File>(
     conv: File ~> T,
     dirName: DirName,
-    reallyRemove: Bool,
     content: Array<(BaseName, T)> = Array[],
   ): EHandle<T> {
     this.mkdirMulti(
       dirName,
-      reallyRemove,
       content.map(kv -> {
         (key, value) = kv;
         (key, Array[value])
@@ -813,7 +810,6 @@ mutable class Context{
 
   mutable fun mkdirMulti(
     dirName: DirName,
-    reallyRemove: Bool,
     content: Array<(BaseName, Array<File>)> = Array[],
   ): void {
     if (this.dirs.state.containsKey(dirName)) {
@@ -855,15 +851,7 @@ mutable class Context{
 
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
-    dir = EagerDir{
-      time,
-      input => true,
-      dirName,
-      fixedData,
-      totalSize,
-      creator,
-      reallyRemove,
-    };
+    dir = EagerDir{time, input => true, dirName, fixedData, totalSize, creator};
     this.setDir(dirName, dir);
     this.!newDirs = this.newDirs.add(dirName);
   }
@@ -949,7 +937,7 @@ mutable class Context{
     }
   }
 
-  mutable fun removeDir(dirName: DirName, reallyRemove: Bool = false): void {
+  mutable fun removeDir(dirName: DirName): void {
     if (this.debugMode) {
       print_string("REMOVED: " + dirName);
     };
@@ -966,7 +954,7 @@ mutable class Context{
       }
     };
     this.!deps = this.deps.removeDir(dirName);
-    if (this.reallyRemoveDir || reallyRemove) {
+    if (this.reallyRemoveDir) {
       this.!dirs.state = this.dirs.state.remove(dirName)
     } else {
       this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()})
