@@ -133,6 +133,7 @@ def getOurLastCheckpoint(current, diffOutput):
 class HalfStream:
 
   def __init__(self, sender, receiver, sendTask, recvTask):
+    self.other: HalfStream | None = None
     self.sender = sender
     self.receiver = receiver
     self.sendTaskFactory = sendTask
@@ -201,7 +202,11 @@ class SkdbPeer:
     self.scheduler.add(insert)
     self.scheduler.happensBefore(self.lastTask, insert)
     self.lastTask = insert
-    visited = set()
+    # we prime the visited set with the inverse streams. this has the
+    # effect of not sending echo responses. they are assumed to be
+    # filtered and so are always a no-op. this reduces schedule sizes
+    # dramatically (orders of magnitude), so is worth not testing
+    visited = set(s.other for s in self.streams[table] if s.other)
     def traverse(before, streams):
       for stream in streams:
         if stream in visited:
@@ -308,6 +313,8 @@ class Topology:
     bRepId = self._genReplicationId()
     atob = HalfStream(a, b, a.tailTask(table, aRepId), b.writeTask(table, bRepId))
     btoa = HalfStream(b, a, b.tailTask(table, bRepId), a.writeTask(table, aRepId))
+    atob.other = btoa
+    btoa.other = atob
     self.initTask.add(atob.initTask())
     self.initTask.add(btoa.initTask())
     a.notifyConnection(table, atob)
