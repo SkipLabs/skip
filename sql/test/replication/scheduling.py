@@ -110,14 +110,14 @@ class MutableCompositeTask:
 
 class Scheduler:
   def __init__(self):
-    self.graph = defaultdict(list)
     self.t = []
+    self.graph = defaultdict(set)
 
   def add(self, task):
     self.t.append(task)
 
   def happensBefore(self, a, b):
-    self.graph[a].append(b)
+    self.graph[a].add(b)
 
   def schedules(self):
     return []
@@ -182,7 +182,7 @@ class ArbitraryTopoSortScheduler(Scheduler):
     while candidates != set():
       n = candidates.pop()
       schedule.append(n)
-      g[n] = list()
+      g[n] = set()
       candidates = candidates.union(nodesWithNoIncomingEdge()).difference(set(schedule))
 
     def hasEdges(g):
@@ -219,9 +219,9 @@ class AllTopoSortsScheduler(Scheduler):
       return
 
     for n in candidates:
-      ourCandidates = copy.deepcopy(candidates)
-      ourSchedule = copy.deepcopy(schedule)
-      ourG = copy.deepcopy(g)
+      ourCandidates = copy.copy(candidates)
+      ourSchedule = copy.copy(schedule)
+      ourG = copy.copy(g)
       ourSchedule.append(n)
       ourG[n] = list()
       ourCandidates = ourCandidates.union(self._nodesWithNoIncomingEdge(ourG)).difference(set(ourSchedule))
@@ -265,11 +265,12 @@ class ReservoirSample():
     # just simple reservoir sample
     schedules = self.scheduler.schedules()
     reservoir = list(itertools.islice(schedules, self.N))
-    i = self.N - 1
+    N = len(reservoir)
+    i = N - 1
     for schedule in schedules:
       i = i + 1
       randIdx = random.randint(0, i)
       if randIdx < self.N:
         reservoir[randIdx] = schedule
-    print(f"We will run {self.N} of the {i+1} possible schedules. ~{int((self.N)/(i+1.0)*100)}%")
+    print(f"We will run {N} of the {i+1} possible schedules. ~{int((N)/(i+1.0)*100)}%")
     return reservoir
