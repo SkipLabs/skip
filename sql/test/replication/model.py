@@ -304,10 +304,10 @@ class Topology:
     return str(self.replicationIdGen)
 
   def mirror(self, table, a, b):
-    repId = self._genReplicationId()
-    atob = HalfStream(a, b, a.tailTask(table, repId), b.writeTask(table, repId))
-    repId = self._genReplicationId()
-    btoa = HalfStream(b, a, b.tailTask(table, repId), a.writeTask(table, repId))
+    aRepId = self._genReplicationId()
+    bRepId = self._genReplicationId()
+    atob = HalfStream(a, b, a.tailTask(table, aRepId), b.writeTask(table, bRepId))
+    btoa = HalfStream(b, a, b.tailTask(table, bRepId), a.writeTask(table, aRepId))
     self.initTask.add(atob.initTask())
     self.initTask.add(btoa.initTask())
     a.notifyConnection(table, atob)
