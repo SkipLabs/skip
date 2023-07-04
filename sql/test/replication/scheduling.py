@@ -269,6 +269,8 @@ class ReservoirSample():
     i = N - 1
     for schedule in schedules:
       i = i + 1
+      if (i+1) % 1e6 == 0:
+        print(f"Looked at {i+1} schedules so far")
       randIdx = random.randint(0, i)
       if randIdx < self.N:
         reservoir[randIdx] = schedule
