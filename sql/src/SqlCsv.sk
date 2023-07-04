@@ -518,11 +518,6 @@ fun replayDiff(
   userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
   buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
 
-  if (table.windowSize is Some _) {
-    print_error("Cannot use write-csv on a window or a stream");
-    skipExit(23);
-  };
-
   // the tick of the sender that this update takes us in sync to
   checkpoint: ?Int = None();
   // our tick that the sender is in sync with - they applied this

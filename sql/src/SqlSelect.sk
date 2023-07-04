@@ -247,7 +247,7 @@ class SelectEvaluator{
       } else {
         limitDir = context.unsafeMaybeGetEagerDir(limitName) match {
         | None() ->
-          h = context.mkdir(Row::fromFile, limitName, false, Array[]);
+          h = context.mkdir(Row::fromFile, limitName, Array[]);
           context.unsafeGetEagerDir(h.dirName)
         | Some(dir) ->
           context.!newDirs = context.newDirs.set(limitName);
@@ -344,8 +344,7 @@ class SelectEvaluator{
         childName.toString() + "proj/shards/",
       );
       shards = context.unsafeMaybeGetEagerDir(shardsDirName) match {
-      | None() ->
-        context.mkdir(ShardStats::fromFile, shardsDirName, false, Array[])
+      | None() -> context.mkdir(ShardStats::fromFile, shardsDirName, Array[])
       | Some(x) -> SKFS.EHandle(ShardStats::fromFile, x.dirName)
       };
 
@@ -475,7 +474,6 @@ class SelectEvaluator{
         _dir = context.mkdir(
           Row::fromFile,
           this.selectName1,
-          false,
           Array[(SKFS.IID(0), row)],
         );
       } else {
@@ -561,7 +559,6 @@ class SelectEvaluator{
           _ = context.mkdir(
             Row::fromFile,
             selectName1Empty,
-            false,
             Array[(SKFS.IID(0), emptyRow)],
           );
         } else {
@@ -636,12 +633,7 @@ class SelectEvaluator{
       | ADef(_) ->
         static::evalRow(context, evaluator, this.select.params, 1)
       };
-      _dir = context.mkdir(
-        Row::fromFile,
-        dirName,
-        false,
-        Array[(SKFS.IID(0), row)],
-      );
+      _dir = context.mkdir(Row::fromFile, dirName, Array[(SKFS.IID(0), row)]);
     } else {
       context.!newDirs = context.newDirs.set(dirName);
     }

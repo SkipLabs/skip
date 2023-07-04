@@ -106,7 +106,6 @@ class JTable{
   ranges: ?Array<SKFS.KeyRange>,
   schema: Array<SKSQL.TypeDescr>,
   alias: ?Name,
-  windowSize: ?Int,
 } {
   static fun fromDirDescr(
     dirDescr: DirDescr,
@@ -118,7 +117,6 @@ class JTable{
       ranges,
       schema => dirDescr.schema,
       alias => dirDescr.alias,
-      windowSize => dirDescr.windowSize,
     }
   }
 }
@@ -297,19 +295,6 @@ mutable class Compiler{
         result
       })
     | Some(ekinds) -> computeKinds(params, ekinds)
-    };
-
-    for (dirDescrAndRange in from) {
-      (dirDescr, _) = dirDescrAndRange;
-      if (dirDescr.windowSize == Some(0) && isAggr) {
-        error(
-          this.pos,
-          "Cannot use a stream for aggregates, use a window instead",
-        );
-      };
-      if (dirDescr.windowSize == Some(0) && from.size() > 1) {
-        error(this.pos, "Cannot use multiple streams at the same time");
-      }
     };
 
     /*
@@ -716,19 +701,11 @@ mutable class Compiler{
     dirName: SKFS.DirName,
   ): DirDescr {
     schema = static::getSchema(params, from, cparams);
-    windowSize: ?Int = None();
-    for (kv in from) {
-      (kv.i0.windowSize, windowSize) match {
-      | (Some(v), Some(ws)) if (v < ws) -> !windowSize = Some(v)
-      | _ -> void
-      }
-    };
     DirDescr::create{
       name => selectId,
       schema,
       dirName,
       alias => Some(selectId),
-      windowSize,
       isInput => false,
     }
   }
@@ -1768,7 +1745,6 @@ mutable class Compiler{
                 if (x.primary) x with {unique => true} else x
               ),
               alias => table.alias,
-              windowSize => table.windowSize,
               isInput => false,
             };
             newFrom.push((dirDescr, table.ranges))
@@ -1876,10 +1852,6 @@ mutable class Compiler{
             rightKinds.map(x -> (leftKinds.size() + x.i0, x.i1, x.i2)),
           ),
           joinKind,
-          windowSize => minWindowSize(
-            leftTable.windowSize,
-            rightTable.windowSize,
-          ),
         },
       );
 
@@ -1920,7 +1892,6 @@ mutable class Compiler{
           ranges => None(),
           schema => newSchema,
           alias => None(),
-          windowSize => None(),
         },
       );
     }

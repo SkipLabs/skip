@@ -773,7 +773,7 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
       !pos = lex.expectUpper(pos, "EXISTS");
       !ifNotExists = true;
     };
-    return parseCreateTable(lex, pos, ifNotExists, None());
+    return parseCreateTable(lex, pos, ifNotExists);
   };
   if (lex.isEqUpper(pos, "UNIQUE")) {
     !pos = lex.expectUpper(pos, "UNIQUE");
@@ -820,29 +820,6 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
       !ifNotExists = true;
     };
     return parseView(lex, posBegin, pos, ifNotExists, false);
-  };
-  if (lex.isEqUpper(pos, "WINDOW")) {
-    !pos = lex.expectUpper(pos, "WINDOW");
-    ifNotExists = false;
-    if (lex.isEqUpper(pos, "IF")) {
-      !pos = lex.expectUpper(pos, "IF");
-      !pos = lex.expectUpper(pos, "NOT");
-      !pos = lex.expectUpper(pos, "EXISTS");
-      !ifNotExists = true;
-    };
-    (!pos, wsize) = lex.nextInt(pos);
-    return parseCreateTable(lex, pos, ifNotExists, Some(wsize));
-  };
-  if (lex.isEqUpper(pos, "STREAM")) {
-    !pos = lex.expectUpper(pos, "STREAM");
-    ifNotExists = false;
-    if (lex.isEqUpper(pos, "IF")) {
-      !pos = lex.expectUpper(pos, "IF");
-      !pos = lex.expectUpper(pos, "NOT");
-      !pos = lex.expectUpper(pos, "EXISTS");
-      !ifNotExists = true;
-    };
-    return parseCreateTable(lex, pos, ifNotExists, Some(0));
   };
   error(pos, "Unexpected token");
 }
@@ -1163,15 +1140,10 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
   error(pos, "Invalid value")
 }
 
-fun parseCreateTable(
-  lex: Lexer,
-  pos: Int,
-  ifNotExists: Bool,
-  windowSize: ?Int,
-): (Int, Table) {
+fun parseCreateTable(lex: Lexer, pos: Int, ifNotExists: Bool): (Int, Table) {
   (!pos, name) = lex.nextWord(pos);
   (!pos, schema) = parseTableSchema(lex, pos);
-  (pos, Table{pos, name => Name::create(name), schema, ifNotExists, windowSize})
+  (pos, Table{pos, name => Name::create(name), schema, ifNotExists})
 }
 
 fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {

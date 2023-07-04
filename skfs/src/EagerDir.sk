@@ -76,11 +76,7 @@ class Reducer{
   fixed: Array<(BaseName, Array<File>)>,
   modified: SortedMap<BaseName, Array<File>>,
 } {
-  static fun create(
-    reallyRemove: Bool,
-    fixedData: FixedDataMap,
-    reducer: IReducer,
-  ): this {
+  static fun create(fixedData: FixedDataMap, reducer: IReducer): this {
     acc = mutable Vector[];
     modified = SortedMap[];
     current = mutable IntRef(0);
@@ -91,11 +87,7 @@ class Reducer{
         key,
         current,
       ).iterator();
-      if (reallyRemove) {
-        !modified = modified.set(key, reducer.init(iterator))
-      } else {
-        acc.push((key, reducer.init(iterator)))
-      };
+      acc.push((key, reducer.init(iterator)));
     };
     fixed = acc.toArray();
     static{reducer, fixed, modified}
@@ -392,14 +384,6 @@ class DataMapValue{
     | x @ Some(_) -> x
     }
   }
-
-  fun remove(source: Source): this {
-    // We don't need to maintain the tomb count because this method is only
-    // called in reallyRemove mode (where there are no tombs).
-    !this.map = this.map.remove(source);
-    !this.tombs = this.tombs.remove(source);
-    this
-  }
 }
 
 class DataMap{
@@ -671,7 +655,6 @@ class EagerDir{
   fixedData: FixedDataMap,
   totalSize: Int,
   creator: ?ArrowKey,
-  reallyRemove: Bool,
   fixedOld: FixedSingle<Source, MInfo> = FixedSingle::empty(),
   data: DataMap = DataMap::empty(),
   old: SortedMap<Source, MInfo> = SortedMap[],
@@ -771,7 +754,7 @@ class EagerDir{
 
     for (key in changes) {
       if (!filterFun(key)) continue;
-      if (!producedDiffLine && !this.reallyRemove) {
+      if (!producedDiffLine) {
         writer.write("\n\n");
       };
       values = this.getArrayRaw(key);
@@ -790,7 +773,7 @@ class EagerDir{
     };
 
     // TODO: this is sql specific
-    if ((producedDiffLine || isReset) && !this.reallyRemove) {
+    if (producedDiffLine || isReset) {
       // output a checkpoint, indicated by the leading colon
       ourTime = context.tick.value.toString();
       theirTime = destinationTime match {
@@ -1293,15 +1276,10 @@ class EagerDir{
       acc = mutable Vector<FixedRow<Array<File>>>[];
       oldVec = mutable Vector[];
 
-      reallyRemove = false;
-
       if (!unsafeSkipInit) {
         for (parentName => parentData in parents) {
           (f, rangeOpt) = parentData;
           parent = context.unsafeGetEagerDir(parentName);
-          if (parent.reallyRemove) {
-            !reallyRemove = true;
-          };
           rangeOpt match {
           | None() ->
             static::mapData(context, oldVec, parent, childName, f, acc, None())
@@ -1325,7 +1303,7 @@ class EagerDir{
       time = context.timeStamp();
       totalSize = acc.size();
       reducer = reducerOpt.map(ireducer ->
-        Reducer::create(reallyRemove, fixedData, ireducer)
+        Reducer::create(fixedData, ireducer)
       );
 
       if (context.debugMode) {
@@ -1335,31 +1313,7 @@ class EagerDir{
         );
       };
 
-      (!fixedData, data) = if (reallyRemove) {
-        data = DataMap::empty();
-        for (fixedRow in acc) {
-          // This is due to a compiler bug, if you remove it, the optimizer
-          // believes that the next match Some is never taken.
-          if (fixedRow.value.i1.size() < 0) {
-            !data = data.set(fixedRow.tag, fixedRow.key, DataMapValue::empty());
-          };
-          map = data.maybeGet(fixedRow.key) match {
-          | None() -> DataMapValue::empty()
-          | Some(x) -> x
-          };
-          !map = map.set(
-            context.tick,
-            false,
-            fixedRow.value.i0,
-            fixedRow.value.i0,
-            fixedRow.value.i1,
-          );
-          !data = data.set(fixedRow.tag, fixedRow.key, map);
-        };
-        (FixedDataMap::create(), data)
-      } else {
-        (fixedData, DataMap::empty())
-      };
+      data = DataMap::empty();
 
       EagerDir{
         time,
@@ -1373,7 +1327,6 @@ class EagerDir{
         fixedOld => FixedSingle::create(oldVec),
         childDirs => SortedSet[],
         reducer,
-        reallyRemove,
       }
     };
     updateDirtyReaders(context, Path::create(childName.tag(), DirTag()));
@@ -1675,7 +1628,7 @@ class EagerDir{
       return this;
     };
 
-    if (!this.reallyRemove && (this.data.nbrEntries >= this.fixedData.size())) {
+    if (this.data.nbrEntries >= this.fixedData.size()) {
       context.!toPurge = context.toPurge.set(this.dirName);
     };
 
@@ -1692,23 +1645,15 @@ class EagerDir{
     | Some(x) -> x
     };
 
-    if (this.reallyRemove && rvalues.isEmpty()) {
-      !map = map.remove(origSource);
-    } else {
-      isMasking = this.fixedData.data.getIterSourceKey(
-        origSource,
-        k,
-      ).next() is Some _;
-      writer = Source::create(writerPath);
-      !map = map.set(context.tick, isMasking, origSource, writer, rvalues);
-    };
+    isMasking = this.fixedData.data.getIterSourceKey(
+      origSource,
+      k,
+    ).next() is Some _;
+    writer = Source::create(writerPath);
+    !map = map.set(context.tick, isMasking, origSource, writer, rvalues);
 
-    if (this.reallyRemove && map.isEmpty()) {
-      !this.data = this.data.remove(k);
-    } else {
-      tag = TickRange::create(context.tick);
-      !this.data = this.data.set(tag, k, map);
-    };
+    tag = TickRange::create(context.tick);
+    !this.data = this.data.set(tag, k, map);
 
     reducer = this.reducer match {
     | None() -> None()
@@ -1728,16 +1673,7 @@ class EagerDir{
               .map(x -> x.i2.iterator())
               .flatten(),
           )
-        | Some(new) ->
-          if (this.reallyRemove && new.size() == 0) {
-            invariant(
-              cdata.fixed.isEmpty(),
-              "No fixed data expected when really remove is on",
-            );
-            !cdata.modified = cdata.modified.remove(k);
-          } else {
-            !cdata.modified[k] = new
-          }
+        | Some(new) -> !cdata.modified[k] = new
         }
       };
       Some(cdata)
