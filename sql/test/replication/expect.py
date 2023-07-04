@@ -8,6 +8,14 @@ class Expectations():
   def __repr__(self):
     return f"expectations"
 
+  def equals(self, *rows, colnames=[]):
+    match = list({k: v for (k,v)in zip(colnames, row)} for row in rows)
+    def check(resultSet):
+      if resultSet != match:
+        return f"{resultSet} did not match {match}"
+      return ""
+    self.checks.append(check)
+
   def hasRows(self, *rows, colnames=[]):
     def check(resultSet):
       for row in rows:
