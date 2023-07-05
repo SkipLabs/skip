@@ -50,6 +50,7 @@ base class FixedData<T> {
   fun getArraySourceKey(source: Source, key: BaseName): Array<T>;
   fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T>;
   fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
+  fun getTick(): ?Tick;
 }
 
 // Assuming delta is monotone, that is, i <= j implies delta(i) <= delta(j),
@@ -241,6 +242,16 @@ class FixedDir<T: frozen> private {
     key: BaseName,
   ): mutable Iterator<(Tick, Source, T)> {
     this.getKeyChangesAfterIter(limit, key, 0, this.data.size() - 1)
+  }
+
+  fun getTick(): ?Tick {
+    if (this.data.isEmpty()) {
+      None()
+    } else {
+      middle = (this.data.size() - 1) / 2;
+      tick = this.data[middle].tag;
+      Some(tick.max)
+    }
   }
 }
 
