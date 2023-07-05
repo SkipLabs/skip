@@ -15,11 +15,18 @@ void* SKIP_getExn() {
 
 char* end_of_static;
 extern unsigned char* bump_pointer;
+unsigned char* heap_end;
 void* sk_ftable_holder[SK_FTABLE_SIZE];
 extern void** sk_ftable;
 extern SKIP_gc_type_t* epointer_ty;
 
-void SKIP_skfs_init() {
+unsigned char* decr_heap_end(size_t size) {
+  heap_end -= size;
+  return heap_end;
+}
+
+void SKIP_skfs_init(uint32_t size) {
+  heap_end = bump_pointer + size;
   end_of_static = (char*)bump_pointer;
   sk_ftable = sk_ftable_holder;
   char* obj = sk_get_external_pointer();
@@ -33,8 +40,6 @@ void SKIP_skfs_end_of_init() {
     SKIP_destroy_Obstack((char*)0);
   }
 }
-
-extern char __heap_base;
 
 int sk_is_static(void* ptr) {
   return (char*)ptr < end_of_static;

@@ -76,8 +76,8 @@ void sk_memory_check_init_over() {
 extern unsigned char __heap_base;
 
 unsigned char* bump_pointer = &__heap_base;
-unsigned char* heap_end = &__heap_base + WASM_HEAP_SIZE;
 unsigned long total_size = 0;
+unsigned char* decr_heap_end(size_t size);
 
 void* sk_malloc(size_t size) {
   size = sk_pow2_size(size);
@@ -98,8 +98,7 @@ void* sk_malloc_end(size_t size) {
   if(res != NULL) {
     return res;
   }
-  heap_end -= size;
-  return heap_end;
+  return decr_heap_end(size);
 }
 
 void sk_free_size(void* ptr, size_t size) {
