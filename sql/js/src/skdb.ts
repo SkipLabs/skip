@@ -28,7 +28,7 @@ interface WasmExports {
     funArg: number
   ) => void;
   SKIP_remove_root: (rootNameWasmStr: number) => void;
-  SKIP_skfs_init: () => void;
+  SKIP_skfs_init: (size: number) => void;
   SKIP_initializeSkip: () => void;
   SKIP_skfs_end_of_init: () => void;
   SKIP_init_jsroots: () => void;
@@ -40,6 +40,7 @@ interface WasmExports {
   SKIP_tracked_query: (request: number, start: number, end: number) => number;
   skip_main: () => void;
   getVersion: () => number;
+  __heap_base: any;
   memory: Memory;
 }
 
@@ -307,7 +308,9 @@ export class SKDB {
     let wasm = await WebAssembly.instantiate(wasmBytes, { env: env });
     let exports = wasm.instance.exports as unknown as WasmExports;
     client.exports = exports;
-    exports.SKIP_skfs_init();
+    let heapBase = exports.__heap_base.valueOf();
+    let size = exports.memory.buffer.byteLength - heapBase;
+    exports.SKIP_skfs_init(size);
     exports.SKIP_initializeSkip();
     exports.SKIP_skfs_end_of_init();
     client.nbrInitPages = exports.SKIP_get_persistent_size() / client.pageSize + 1;

@@ -202,9 +202,12 @@ var typedArray = new Uint8Array(source);
 WebAssembly.instantiate(typedArray, {
   env: env
 }).then(result => {
-  SKIP_call0 = result.instance.exports['SKIP_call0'];
+  let exports = result.instance.exports;
+  SKIP_call0 = exports.SKIP_call0;
   instance = result.instance;
-  result.instance.exports.SKIP_skfs_init();
+  let heapBase = exports.__heap_base.valueOf();
+  let size = exports.memory.buffer.byteLength - heapBase;
+  result.instance.exports.SKIP_skfs_init(size);
   result.instance.exports.SKIP_initializeSkip();
   result.instance.exports.SKIP_skfs_end_of_init();
   result.instance.exports.skip_main();
