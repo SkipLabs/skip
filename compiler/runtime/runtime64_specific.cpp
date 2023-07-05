@@ -89,6 +89,25 @@ uint32_t SKIP_String_byteSize(char*);
 char* sk_string_create(const char* buffer, uint32_t size);
 void SKIP_throw_EndOfFile();
 
+char* sk2c_string(char* skstr) {
+  char* cstr;
+  size_t size = SKIP_String_byteSize(skstr);
+  if (skstr[size-1] == (char)0) {
+    cstr = skstr;
+  } else {
+    cstr = (char*)malloc(size+1);
+    memcpy(cstr, skstr, size);
+    cstr[size] = (char)0;
+  }
+  if (strlen(cstr) != size) {
+    fprintf(stderr, "String contains embedded nul character: ");
+    fwrite(skstr, size, 1, stderr);
+    fprintf(stderr, "\n");
+    exit(2);
+  }
+  return cstr;
+}
+
 void SKIP_print_char(uint32_t x) {
   printf("%c", x);
 }
@@ -196,11 +215,9 @@ char* SKIP_getArgN(uint32_t n) {
 }
 
 char* SKIP_getenv(char* skName) {
-  size_t name_size = SKIP_String_byteSize(skName);
-  char* name = (char*)malloc(name_size+1);
-  memcpy(name, skName, name_size);
-  name[name_size] = (char)0;
+  char* name = sk2c_string(skName);
   char *value = getenv(name);
+  if (name != skName) free(name);
   if (value == 0) {
     return sk_string_create("", 0);
   }
@@ -260,10 +277,7 @@ void sk_string_set_hash(char*);
 
 char* SKIP_open_file(char* filename_obj) {
  struct stat s;
- size_t filename_size = SKIP_String_byteSize(filename_obj);
- char* filename = (char*)malloc(filename_size+1);
- memcpy(filename, filename_obj, filename_size);
- filename[filename_size] = (char)0;
+ char* filename = sk2c_string(filename_obj);
 
  int fd = open(filename, O_RDONLY);
  int status = fstat(fd, &s);
@@ -285,19 +299,18 @@ char* SKIP_open_file(char* filename_obj) {
  result = sk_string_alloc(size);
  memcpy(result, f, size);
  sk_string_set_hash(result);
- free(filename);
+ if (filename != filename_obj) free(filename);
  munmap(f, size);
  close(fd);
  return result;
 }
 
 int64_t SKIP_unix_open(char* filename_obj) {
- size_t filename_size = SKIP_String_byteSize(filename_obj);
- char* filename = (char*)malloc(filename_size+1);
- memcpy(filename, filename_obj, filename_size);
- filename[filename_size] = (char)0;
+ char* filename = sk2c_string(filename_obj);
 
  int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0777);
+
+ if (filename != filename_obj) free(filename);
 
  if(fd == -1) {
    perror("ERROR file open failed");
@@ -327,40 +340,32 @@ void SKIP_write_to_file(int64_t fd, char* str) {
 }
 
 void SKIP_FileSystem_appendTextFile(char* filename_obj, char* str_obj) {
-  size_t filename_size = SKIP_String_byteSize(filename_obj);
-  char *filename = (char *)malloc(filename_size+1);
-  memcpy(filename, filename_obj, filename_size);
-  filename[filename_size] = (char)0;
+  char* filename = sk2c_string(filename_obj);
 
   int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0775);
   write(fd, str_obj, SKIP_String_byteSize(str_obj));
   close(fd);
 
-  free(filename);
+  if (filename != filename_obj) free(filename);
 }
 
 bool SKIP_check_if_file_exists(char* filename_obj) {
-  size_t filename_size = SKIP_String_byteSize(filename_obj);
-  char *filename = (char *)malloc(filename_size+1);
-  memcpy(filename, filename_obj, filename_size);
-  filename[filename_size] = (char)0;
+  char* filename = sk2c_string(filename_obj);
 
   bool res = (access(filename, F_OK) == 0);
 
-  free(filename);
+  if (filename != filename_obj) free(filename);
   return res;
 }
 
 int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
-  size_t filename_size = SKIP_String_byteSize(filename_obj);
-  char* filename = (char*)malloc(filename_size+1);
-  memcpy(filename, filename_obj, filename_size);
-  filename[filename_size] = (char)0;
+  char* filename = sk2c_string(filename_obj);
 
   int fd = open(filename, O_CREAT | O_WRONLY, 0644);
 
+  if (filename != filename_obj) free(filename);
+
   if(fd == -1) {
-    free(filename);
     return -1;
   }
 
@@ -372,7 +377,6 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   while(size > 0) {
     size_t written = write(fd, buf, size);
     if(written == -1) {
-      free(filename);
       return -1;
     }
     buf += written;
@@ -380,11 +384,9 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   }
 
   if(close(fd) == -1) {
-    free(filename);
     return -1;
   }
 
-  free(filename);
   return 0;
 }
 
@@ -434,10 +436,7 @@ int64_t SKIP_numThreads() {
 }
 
 void SKIP_string_to_file(char* str, char* file_obj) {
-  size_t file_size = SKIP_String_byteSize(file_obj);
-  char* file = (char *)malloc(file_size+1);
-  memcpy(file, file_obj, file_size);
-  file[file_size] = (char)0;
+  char* file = sk2c_string(file_obj);
 
   FILE *out = fopen(file, "w");
   size_t size = SKIP_String_byteSize(str);
@@ -447,7 +446,7 @@ void SKIP_string_to_file(char* str, char* file_obj) {
   }
   fclose(out);
 
-  free(file);
+  if (file != file_obj) free(file);
 }
 
 int64_t SKIP_get_mtime(char *path) {
@@ -467,27 +466,21 @@ bool SKIP_is_directory(char *path) {
 }
 
 int64_t SKIP_system(char* cmd_obj) {
-  size_t cmd_size = SKIP_String_byteSize(cmd_obj);
-  char *cmd = (char *)malloc(cmd_size+1);
-  memcpy(cmd, cmd_obj, cmd_size);
-  cmd[cmd_size] = (char)0;
+  char* cmd = sk2c_string(cmd_obj);
   int64_t res = system(cmd);
-  free(cmd);
+  if (cmd != cmd_obj) free(cmd);
   return res;
 }
 
 int64_t SKIP_opendir(char *path_obj) {
-  size_t path_size = SKIP_String_byteSize(path_obj);
-  char *path = (char *)malloc(path_size+1);
-  memcpy(path, path_obj, path_size);
-  path[path_size] = (char)0;
+  char* path = sk2c_string(path_obj);
 
   DIR *res = opendir(path);
   if (res == NULL) {
     perror("Error opening dir");
   }
 
-  free(path);
+  if (path != path_obj) free(path);
   return (int64_t)res;
 }
 
@@ -509,21 +502,17 @@ void SKIP_closedir(int64_t dir_handle) {
 }
 
 char* SKIP_realpath(char* path_obj) {
-  size_t path_size = SKIP_String_byteSize(path_obj);
-  char *path = (char *)malloc(path_size+1);
-  memcpy(path, path_obj, path_size);
-  path[path_size] = (char)0;
+  char* path = sk2c_string(path_obj);
 
   char res[PATH_MAX];
   char* rv = realpath(path, res);
+  if (path != path_obj) free(path);
   if (rv == NULL) {
     perror("realpath");
-    free(path);
     // TODO: Ideally, this function would return a ?String instead.
     return sk_string_create(res, 0);
   }
 
-  free(path);
   return sk_string_create(res, strlen(res));
 }
 
