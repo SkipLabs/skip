@@ -62,6 +62,7 @@ run_diff () {
 run_diff 'test/diff/select2_create.sql' 'test/diff/select2_min_views.sql' 'test/diff/select2_inserts.sql'
 run_diff 'test/diff/select2_create.sql' 'test/diff/select2_min_views.sql' 'test/diff/select2_inserts.sql' 'test/diff/select2_deletes.sql'
 run_diff 'test/diff/select2_create.sql' 'test/diff/select2_min_views.sql' 'test/diff/select2_inserts.sql' 'test/diff/select2_deletes.sql' 'test/diff/select2_inserts.sql'
+run_diff 'test/diff/select1_create.sql' 'test/diff/select1_views.sql' 'test/diff/select1_inserts.sql'
 run_diff 'test/diff/select1_float_create.sql' 'test/diff/select1_float_views.sql' 'test/diff/select1_float_inserts.sql'
 run_diff 'test/diff/select2_create.sql' 'test/diff/select2_views.sql' 'test/diff/select2_inserts.sql'
 run_diff 'test/diff/select3_create.sql' 'test/diff/select3_views.sql' 'test/diff/select3_inserts.sql'
