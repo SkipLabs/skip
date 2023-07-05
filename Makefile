@@ -4,6 +4,7 @@
 all: npm build/skdb build/init.sql
 
 PLAYWRIGHT_REPORTER?="line"
+SKARGO_FLAGS=--release
 
 ################################################################################
 # skdb wasm + js client
@@ -12,7 +13,7 @@ PLAYWRIGHT_REPORTER?="line"
 npm: sql/js/dist/skdb.wasm sql/js/dist/skdb.js sql/js/dist/skdb-node.js sql/js/dist/skdb-cli.js
 
 sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
-	cd sql && skargo build -r --target wasm32-unknown-unknown
+	cd sql && skargo build $(SKARGO_FLAGS) --target wasm32-unknown-unknown
 
 sql/js/dist/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
 	mkdir -p sql/js/dist
@@ -49,7 +50,7 @@ sql/js/dist/index.html: sql/js/tests/index.html
 ################################################################################
 
 sql/target/skdb: sql/src/* skfs/src/*
-	cd sql && skargo build -r
+	cd sql && skargo build $(SKARGO_FLAGS)
 
 # TODO: keeping this for now as nearly all test scripts refer to build/skdb
 build/skdb: sql/target/skdb
@@ -59,8 +60,6 @@ build/skdb: sql/target/skdb
 ################################################################################
 # skdb server
 ################################################################################
-
-# TODO: add server artifact build step here and package in to a docker image
 
 build/init.sql: sql/privacy/init.sql
 	mkdir -p build
@@ -80,6 +79,7 @@ fmt:
 	find . -path ./compiler/tests -not -prune -or -name '*'.sk -exec sh -c 'echo {}; skfmt -i {}' \;
 
 .PHONY: test
+test: SKARGO_FLAGS=
 test: native-test wasm-test
 
 .PHONY: native-test
@@ -103,6 +103,7 @@ extra-test: test
 
 
 .PHONY: run-server
+run-server: SKARGO_FLAGS=
 run-server: build/skdb build/init.sql
 	./sql/server/deploy/start.sh --DANGEROUS-no-encryption --dev
 
