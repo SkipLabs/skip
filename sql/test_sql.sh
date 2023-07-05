@@ -52,23 +52,11 @@ if ! [ -z "$1" ]; then
 fi
 
 parallel run_test ::: \
-    test/select1_large.sql \
-    test/select2_large.sql \
-    test/select3_large.sql \
-    test/select1.sql \
-    test/select2.sql \
-    test/select3.sql \
-    test/select4.1.sql \
-    test/select5.1.sql \
-    test/insert-reorder.sql \
-    test/case_insensitive.sql \
+    test/*.sql \
     test/random/expr/*.sql \
     test/random/select/*.sql \
     test/random/groupby/*.sql \
-    test/random/aggregates/*.sql \
-    test/comments.sql
-    # test/select4.2.sql \
-    # test/select5.2.sql \
+    test/random/aggregates/*.sql
 
 echo ""
 echo "*******************************************************************************"
