@@ -11,6 +11,8 @@
 
 module SKStore;
 
+class ToWrite(DirName, Key, readonly Context ~> Array<File>)
+
 /*****************************************************************************/
 /* Sessions. */
 /*****************************************************************************/
@@ -284,7 +286,12 @@ mutable class Context{
   mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
+  mutable postWrites: List<ToWrite> = List[],
 } {
+  mutable fun postpone(toWrite: ToWrite): void {
+    this.!postWrites = List.Cons(toWrite, this.postWrites);
+  }
+
   mutable fun subscribe(
     context: mutable Context,
     dirName: DirName,
@@ -357,6 +364,7 @@ mutable class Context{
       lazyGetsRefCount => this.lazyGetsRefCount,
       sessions => this.sessions,
       removeSubDirs => this.removeSubDirs,
+      postWrites => this.postWrites,
     }
   }
 
@@ -389,6 +397,7 @@ mutable class Context{
       lazyGetsRefCount => this.lazyGetsRefCount,
       sessions => this.sessions,
       removeSubDirs => this.removeSubDirs,
+      postWrites => this.postWrites,
     }
   }
 
@@ -421,6 +430,7 @@ mutable class Context{
       lazyGetsRefCount => ctx.lazyGetsRefCount,
       sessions => ctx.sessions,
       removeSubDirs => ctx.removeSubDirs,
+      postWrites => ctx.postWrites,
     }
   }
 
@@ -452,6 +462,7 @@ mutable class Context{
     this.!lazyGetsRefCount = ctx.lazyGetsRefCount;
     this.!sessions = ctx.sessions;
     this.!removeSubDirs = ctx.removeSubDirs;
+    this.!postWrites = ctx.postWrites;
   }
 
   mutable fun getReads(): SortedSet<Path> {
@@ -511,55 +522,65 @@ mutable class Context{
   }
 
   mutable fun initPre(): void {
-    this.updatePre(this.dirs.state.items().map(x -> x.i0).collect(SortedSet));
+    _ = this.updatePre();
   }
 
-  mutable fun updatePre(toUpdate: SortedSet<DirName>): void {
+  mutable fun updatePre(): Bool {
     if (this.debugMode) {
       print_string(`------------ UPDATE PRE ------------`);
     };
-
-    for (dirName in toUpdate) {
-      if (!this.hasPre.contains(dirName)) continue;
+    withChange = false;
+    this.hasPre.each(dirName -> {
       preDirName = dirName.pre();
-      dir = this.unsafeGetEagerDir(dirName);
-      this.unsafeMaybeGetEagerDir(preDirName) match {
-      | None() ->
-        this.!newDirs = this.newDirs.add(preDirName);
-        time = this.timeStamp();
-        preDir = EagerDir{
-          time,
-          input => false,
-          dirName => preDirName,
-          totalSize => 0,
-          fixedData => FixedDataMap::create(),
-          creator => this.currentArrow(),
-        };
-        dir.unsafeIterKeys((key, _time) -> {
-          values = dir.getArrayRaw(key).collect(Array);
-          source = Path::create(preDir.dirName, key);
-          !preDir = preDir.writeEntry(this, source, source, key, values);
-        });
-        this.setDir(preDir.dirName, preDir);
-        updateDirtyReaders(this, Path::create(preDirName.tag(), DirTag()));
-        this.setDir(preDirName, preDir)
-      | Some(preDir) ->
-        (isReset, changes) = dir.getChangesAfter(this.tick.prev());
-        for (key in changes) {
-          values = dir.getArrayRaw(key).collect(Array);
-          source = Path::create(preDir.dirName, key);
-          !preDir = preDir.writeEntry(this, source, source, key, values);
-        };
-        if (isReset) {
-          writerPath = SKStore.Path(
-            preDir.dirName,
-            SKStore.IID(SKStore.genSym(0)),
-          );
-          !preDir = preDir.reset(this, writerPath, changes);
-        };
-        this.setDir(preDir.dirName, preDir)
-      }
-    }
+      this.unsafeMaybeGetEagerDir(dirName).each(dir -> {
+        this.unsafeMaybeGetEagerDir(preDirName) match {
+        | None() ->
+          this.!newDirs = this.newDirs.add(preDirName);
+          time = this.timeStamp();
+          preDir = EagerDir{
+            time,
+            input => false,
+            dirName => preDirName,
+            totalSize => 0,
+            fixedData => FixedDataMap::create(),
+            creator => this.currentArrow(),
+          };
+          dir.unsafeIterKeys((key, _time) -> {
+            values = dir.getArrayRaw(key).collect(Array);
+            !withChange = true;
+            source = Path::create(preDir.dirName, key);
+            !preDir = preDir.writeEntry(this, source, source, key, values);
+          });
+          this.setDir(preDir.dirName, preDir);
+          updateDirtyReaders(this, Path::create(preDirName.tag(), DirTag()));
+          this.setDir(preDirName, preDir)
+        | Some(preDir) ->
+          (isReset, changes) = dir.getChangesAfter(this.tick.prev());
+          for (key in changes) {
+            values = dir.getArrayRaw(key).collect(Array);
+            !withChange = true;
+            source = Path::create(preDir.dirName, key);
+            !preDir = preDir.writeEntry(this, source, source, key, values);
+          };
+          if (isReset) {
+            writerPath = Path(preDir.dirName, IID(genSym(0)));
+            !preDir = preDir.reset(this, writerPath, changes);
+          };
+          this.setDir(preDir.dirName, preDir)
+        }
+      })
+    });
+    withChange
+  }
+
+  mutable fun checkPostWrites(): Bool {
+    withChange = !this.postWrites.isEmpty();
+    if (withChange) {
+      toWrite = this.postWrites.reversed();
+      this.!postWrites = List[];
+      this.postWrite(toWrite);
+    };
+    withChange;
   }
 
   mutable fun updateLazyGets(): void {
@@ -590,20 +611,22 @@ mutable class Context{
       this.!lazyGetsQueueOut = rl;
       toRemove = mutable Map[];
       for (path in lazyGets) {
-        refCount = this.lazyGetsRefCount.maybeGet(path) match {
-        | None() -> invariant_violation("Not found")
-        | Some(x) -> x
+        this.lazyGetsRefCount.maybeGet(path) match {
+        | None() ->
+          // Not found, but since the aim is to remove them, we can do nothing.
+          void
+        | Some(refCount) ->
+          !refCount = refCount - 1;
+          if (refCount == 0) {
+            this.!lazyGetsRefCount = this.lazyGetsRefCount.remove(path);
+            if (!toRemove.containsKey(path.dirName)) {
+              toRemove![path.dirName] = SortedSet[];
+            };
+            toRemove![path.dirName] = toRemove[path.dirName].set(path.baseName);
+          } else {
+            this.!lazyGetsRefCount[path] = refCount;
+          }
         };
-        !refCount = refCount - 1;
-        if (refCount == 0) {
-          this.!lazyGetsRefCount = this.lazyGetsRefCount.remove(path);
-          if (!toRemove.containsKey(path.dirName)) {
-            toRemove![path.dirName] = SortedSet[];
-          };
-          toRemove![path.dirName] = toRemove[path.dirName].set(path.baseName);
-        } else {
-          this.!lazyGetsRefCount[path] = refCount;
-        }
       };
       for (dirName => keys in toRemove) {
         dir = this.unsafeGetLazyDir(dirName);
@@ -632,6 +655,10 @@ mutable class Context{
   }
 
   mutable fun updateWithStatus(backgroundRounds: Int): Bool {
+    invariant(
+      this.currentArrow().isNone(),
+      "updateWithStatus cannot be called during update.",
+    );
     if (this.debugMode) {
       print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
@@ -694,10 +721,12 @@ mutable class Context{
       | None() ->
         invariant(this.dirty.isEmpty());
         invariant(this.dirtyReaders.isEmpty());
-        this.updatePre(this.toReset);
+        withPostWrites = this.checkPostWrites();
+        withPre = this.updatePre();
+        withChanges = withPostWrites || withPre || !this.asyncList.isEmpty();
         this.!toReset = SortedSet[];
         this.!tick = this.tick.next();
-        return !this.asyncList.isEmpty()
+        break withChanges
       | Some((time, Arrow(parentName, childName))) ->
         this.!toReset = this.toReset.set(childName);
         this.!toUpdate = this.toUpdate.remove(time);
@@ -723,6 +752,19 @@ mutable class Context{
             child,
           )
         }
+      }
+    }
+  }
+
+  mutable fun postWrite(list: List<ToWrite>): void {
+    list match {
+    | List.Nil() -> void
+    | List.Cons(ToWrite(dirName, key, values), rl) ->
+      this.unsafeMaybeGetEagerDir(dirName) match {
+      | Some(dir) ->
+        dir.writeArray(this, key, values(this));
+        this.postWrite(rl)
+      | _ -> void
       }
     }
   }
@@ -771,9 +813,13 @@ mutable class Context{
     dirName: DirName,
     content: Array<(Key, Array<File>)> = Array[],
   ): void {
-    if (this.dirs.state.containsKey(dirName)) {
-      throw DirAlreadyExists(dirName);
-    };
+    this.unsafeMaybeGetEagerDir(dirName).each(dir ->
+      if (dir.creator != this.currentArrow()) {
+        // In eager dir, if several properties are invalidated in same tick
+        // the delete could be called several time so the directory could exist
+        throw DirAlreadyExists(dirName);
+      }
+    );
     !content = content.sortedBy(x ~> x.i0);
     vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
     valueAcc = mutable Vector[];
@@ -899,6 +945,9 @@ mutable class Context{
   mutable fun removeDir(dirName: DirName): void {
     if (this.debugMode) {
       print_string("REMOVED: " + dirName);
+    };
+    if (this.hasPre.contains(dirName)) {
+      this.!hasPre = this.hasPre.remove(dirName);
     };
     this.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> return void

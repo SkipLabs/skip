@@ -68,9 +68,9 @@ fun testPre(): void {
   );
 
   write(context, dirSInput1, SKStore.IID(3), Array[SKStore.StringFile("3")]);
-  context.update();
+  _ = context.updateWithStatus(0);
   write(context, dirSInput1, SKStore.IID(4), Array[SKStore.StringFile("4")]);
-  context.update();
+  _ = context.updateWithStatus(0);
   T.expectEq(
     Array<SKStore.File>[SKStore.IntFile(3)],
     getData(
@@ -81,7 +81,7 @@ fun testPre(): void {
     "Test pre 1",
   );
   write(context, dirSInput1, SKStore.IID(3), Array[]);
-  context.update();
+  _ = context.updateWithStatus(0);
   T.expectEq(
     Array<SKStore.File>[SKStore.IntFile(4)],
     getData(
@@ -92,7 +92,7 @@ fun testPre(): void {
     "Test pre 2",
   );
   write(context, dirSInput1, SKStore.IID(4), Array[]);
-  context.update();
+  _ = context.updateWithStatus(0);
   T.expectEq(
     Array<SKStore.File>[],
     getData(
