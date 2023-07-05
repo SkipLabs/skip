@@ -308,7 +308,7 @@ export class SKDB {
     let wasm = await WebAssembly.instantiate(wasmBytes, { env: env });
     let exports = wasm.instance.exports as unknown as WasmExports;
     client.exports = exports;
-    let heapBase = exports.__heap_base.valueOf();
+    let heapBase = exports.__heap_base ? exports.__heap_base.valueOf(): 0;
     let size = exports.memory.buffer.byteLength - heapBase;
     exports.SKIP_skfs_init(size);
     exports.SKIP_initializeSkip();
