@@ -205,7 +205,7 @@ WebAssembly.instantiate(typedArray, {
   let exports = result.instance.exports;
   SKIP_call0 = exports.SKIP_call0;
   instance = result.instance;
-  let heapBase = exports.__heap_base.valueOf();
+  let heapBase = exports.__heap_base ? exports.__heap_base.valueOf() : 0;
   let size = exports.memory.buffer.byteLength - heapBase;
   result.instance.exports.SKIP_skfs_init(size);
   result.instance.exports.SKIP_initializeSkip();
