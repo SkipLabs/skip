@@ -43,10 +43,7 @@ base class FixedData<T> {
   fun getPos(key: Key): Int;
   fun getArray(key: Key): Array<(Source, T)>;
   fun getIter(key: Key): mutable Iterator<(Tick, Source, T)>;
-  fun getIterAfter(
-    tick: Tick,
-    key: Key,
-  ): mutable Iterator<(Tick, Source, T)>;
+  fun getIterAfter(tick: Tick, key: Key): mutable Iterator<(Tick, Source, T)>;
   fun getArraySourceKey(source: Source, key: Key): Array<T>;
   fun getIterSourceKey(source: Source, key: Key): mutable Iterator<T>;
   fun getChangesAfter(tick: Tick): SortedSet<Key>;
@@ -237,10 +234,7 @@ class FixedDir<T: frozen> private {
     }
   }
 
-  fun getIterAfter(
-    limit: Tick,
-    key: Key,
-  ): mutable Iterator<(Tick, Source, T)> {
+  fun getIterAfter(limit: Tick, key: Key): mutable Iterator<(Tick, Source, T)> {
     this.getKeyChangesAfterIter(limit, key, 0, this.data.size() - 1)
   }
 
