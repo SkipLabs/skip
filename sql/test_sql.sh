@@ -5,15 +5,33 @@ export SKDB
 
 run_test () {
   echo -en "$1:\t"
-  kk1=$(mktemp)
-  kk2=$(mktemp)
-  cat $1 | $SKDB --always-allow-joins | sort > $kk1
-  cat $1 | sqlite3 | sort > $kk2
-  diff $kk1 $kk2 > /dev/null
-  if [ $? -eq 0 ]; then
-      echo "OK"
+  out1=$(mktemp)
+  err1=$(mktemp)
+  out2=$(mktemp)
+  err2=$(mktemp)
+  cat $1 | $SKDB --always-allow-joins 2> $err1 | sort > $out1
+  stat1=${PIPESTATUS[1]}
+  cat $1 | sqlite3 2> $err2 | sort > $out2
+  stat2=${PIPESTATUS[1]}
+  if [ $stat1 -eq 0 ]; then
+      if [ $stat2 -eq 0 ]; then
+          diff $out1 $out2 > /dev/null
+          if [ $? -eq 0 ]; then
+              echo "OK"
+          else
+              echo "FAILED"
+          fi
+      else
+          echo "FAILED (only sqlite exited $stat2)"
+          diff $err1 $err2
+      fi
   else
-      echo "FAILED"
+      if [ $stat2 -eq 0 ]; then
+          echo "FAILED (only skdb exited $stat1)"
+          diff $err1 $err2
+      else
+          echo "OK (both exited non-zero)"
+      fi
   fi
 }
 export -f run_test

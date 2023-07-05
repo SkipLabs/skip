@@ -17,7 +17,7 @@ else
     echo -e "TEST CONCAT:\tFAILED"
 fi
 
-if cat test/unit/test_notnull.sql | $SKDB 2>&1 | grep -q NULL
+if cat test/test_notnull.sql | $SKDB 2>&1 | grep -q NULL
 then
     echo -e "TEST NOT NULL:\tOK"
 else
