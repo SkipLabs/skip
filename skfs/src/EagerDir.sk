@@ -428,6 +428,18 @@ class DataMap{
     }
   }
 
+  fun getTick(): ?Tick {
+    optFTick = this.tombs.getLastTick();
+    optDTick = this.data.getLastTick();
+    (optFTick, optDTick) match {
+    | (None(), None()) -> None()
+    | (Some(t), None())
+    | (None(), Some(t)) ->
+      Some(t)
+    | (Some(ft), Some(dt)) -> Some(max(ft, dt))
+    }
+  }
+
   fun eachWithTick(f: (BaseName, Tick) -> void): void {
     dataIter = this.data.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
@@ -522,6 +534,18 @@ class FixedDataMap{data: FixedDir<Array<File>>, tombs: FixedDir<Source>} {
 
   fun size(): Int {
     this.data.size() + this.tombs.size()
+  }
+
+  fun getTick(): ?Tick {
+    optFTick = this.tombs.getTick();
+    optDTick = this.data.getTick();
+    (optFTick, optDTick) match {
+    | (None(), None()) -> None()
+    | (Some(t), None())
+    | (None(), Some(t)) ->
+      Some(t)
+    | (Some(ft), Some(dt)) -> Some(max(ft, dt))
+    }
   }
 
   fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
@@ -945,6 +969,18 @@ class EagerDir{
     old = this.fixedData.getChangesAfter(tick);
     result = new.union(old);
     (false, result)
+  }
+
+  fun getLastTick(): ?Tick {
+    optFTick = this.fixedData.getTick();
+    optDTick = this.data.getTick();
+    (optFTick, optDTick) match {
+    | (None(), None()) -> None()
+    | (Some(t), None())
+    | (None(), Some(t)) ->
+      Some(t)
+    | (Some(ft), Some(dt)) -> Some(max(ft, dt))
+    }
   }
 
   private static fun fixedMapData(
