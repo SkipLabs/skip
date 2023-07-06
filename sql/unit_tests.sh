@@ -61,7 +61,7 @@ else
     echo -e "TEST PRIMARY INDEX:\tFAILED"
 fi
 
-if cat test/unit/insert_values.sql | $SKDB | grep -q '3'
+if cat test/insert_values.sql | $SKDB | grep -q '3'
 then
     echo -e "TEST MULTIPLE INSERTS:\tOK"
 else
