@@ -40,4 +40,4 @@ cluster.state("SELECT id, note FROM test_without_pk;").hasRows(
   colnames=['id', 'note'],
 )
 
-asyncio.run(scheduler.run())
+asyncio.run(scheduler.run(print))

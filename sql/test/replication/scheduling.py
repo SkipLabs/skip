@@ -14,7 +14,7 @@ async def anop(*args, **kwargs):
 def nop(*args, **kwargs):
   pass
 
-async def runSchedules(schedules):
+async def runSchedules(schedules, log):
   failLock = asyncio.Lock()
   async def _run(schedule):
     try:
@@ -25,7 +25,7 @@ async def runSchedules(schedules):
       await failLock.acquire() # just deal with first failure
       debugRun = schedule.clone()
       try:
-        await debugRun.run(print)
+        await debugRun.run(log)
       except AssertionError as err:
         sys.exit(1)
       finally:
@@ -47,7 +47,7 @@ async def runSchedules(schedules):
     tasks.add(t)
     t.add_done_callback(lambda t: (tasks.discard(t), sem.release()))
   await asyncio.gather(*tasks)
-  print(f"Ran {n+1} schedules, all PASSED expectation checks")
+  return f"Ran {n+1} schedules, all PASSED expectation checks"
 
 class Task:
   def __init__(self, name, fn, final = anop):
@@ -125,8 +125,8 @@ class Scheduler:
   def tasks(self):
     return self.t
 
-  async def run(self):
-    return await runSchedules(self.schedules())
+  async def run(self, log):
+    return await runSchedules(self.schedules(), log)
 
 class Schedule:
   def __init__(self, tasks):
@@ -233,7 +233,7 @@ class AllTopoSortsScheduler(Scheduler):
     candidates = self._nodesWithNoIncomingEdge(self.graph)
     return self._schedules(schedule, candidates, self.graph)
 
-  async def run(self):
+  async def run(self, log):
     if not self.runAll:
       i = 0
       for _ in self.schedules():
@@ -241,7 +241,7 @@ class AllTopoSortsScheduler(Scheduler):
         if i > self.limit:
           raise RuntimeError(f"There are more than {self.limit} schedules")
 
-    await super().run()
+    return await super().run(log)
 
 class ReservoirSample():
   def __init__(self, scheduler, N):
@@ -258,10 +258,10 @@ class ReservoirSample():
   def tasks(self):
     return self.scheduler.tasks()
 
-  async def run(self):
-    return await runSchedules(self.schedules())
+  async def run(self, log):
+    return await runSchedules(self.schedules(log), log)
 
-  def schedules(self):
+  def schedules(self, log):
     # just simple reservoir sample
     schedules = self.scheduler.schedules()
     reservoir = list(itertools.islice(schedules, self.N))
@@ -270,9 +270,9 @@ class ReservoirSample():
     for schedule in schedules:
       i = i + 1
       if (i+1) % 1e6 == 0:
-        print(f"Looked at {i+1} schedules so far")
+        log(f"Looked at {i+1} schedules so far")
       randIdx = random.randint(0, i)
       if randIdx < self.N:
         reservoir[randIdx] = schedule
-    print(f"We will run {N} of the {i+1} possible schedules. ~{int((N)/(i+1.0)*100)}%")
+    log(f"We will run {N} of the {i+1} possible schedules. ~{int((N)/(i+1.0)*100)}%")
     return reservoir
