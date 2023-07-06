@@ -1,20 +1,29 @@
+import asyncio
+import traceback
 import inspect
 import sys
 import multiprocessing as mp
 
 def run_test(args):
   name, f = args
-  prefix = f"{name.replace('test_', '').replace('_', ' ')}......"
+  prefix = f">>> {name.replace('test_', '').replace('_', ' ')}......"
+  loop = asyncio.get_event_loop()
+  log = []
+  def collect(output):
+    log.append(output)
   try:
-    f()
-    return f"{prefix}PASS"
+    info = loop.run_until_complete(f().run(collect))
+    output = "" if log == [] else "\n".join(log)
+    return f"{output}\n{prefix}{info}"
   except:
-    return f"{prefix}FAIL"
+    exn = traceback.format_exc()
+    output = "\n".join(log)
+    return f"{prefix}FAILED:\n{output}\n{exn}"
 
 
 def run_tests(module, nProcs=3):
-  tests = list((name, f) for name, f in inspect.getmembers(module, inspect.isfunction)
-               if name.startswith('test_'))
+  fns = inspect.getmembers(module, inspect.isfunction)
+  tests = list((name, f) for name, f in fns if name.startswith('test_'))
   with mp.Pool(nProcs) as p:
     for result in p.imap_unordered(run_test, tests):
       print(result)
