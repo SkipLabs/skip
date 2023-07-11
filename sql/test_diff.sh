@@ -38,7 +38,7 @@ run_diff () {
 
     cat $2 | sed 's/CREATE VIRTUAL VIEW V[0-9]* AS //' > /tmp/selects2.sql
 
-    cat $1 $3 $4 $5 /tmp/selects2.sql | sed 's/WINDOW [0-9]*/TABLE/g' | sqlite3 | sort -n > /tmp/kk2
+    cat $1 $3 $4 $5 /tmp/selects2.sql | sqlite3 | sort -n > /tmp/kk2
 
     diff /tmp/kk1 /tmp/kk2
     diff /tmp/kk1 /tmp/kk2 > /dev/null
@@ -46,11 +46,6 @@ run_diff () {
         echo -e "$2 (part-1):\tOK"
     else
         echo -e "$2 (part-1):\tFAILED"
-    fi
-
-    if grep -q WINDOW $1;
-    then
-        return;
     fi
 
     cat /tmp/replays | sort -n > /tmp/kk3
