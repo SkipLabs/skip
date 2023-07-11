@@ -162,7 +162,7 @@ base class QUnionKind uses Orderable {
   | UIntersect()
 }
 
-base class Value {
+base class Value extends Expr {
   children =
   | VNull()
   | VInt(Int)
@@ -213,6 +213,7 @@ base class Type uses Orderable {
 
 fun hasAggr(expr: Expr): Bool {
   expr match {
+  | Value _ -> false
   | Literal _ -> false
   | Not(e)
   | All(e)
