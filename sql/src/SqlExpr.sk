@@ -54,8 +54,6 @@ class ExprEvaluator(
     expr match {
     | CNull() -> ANull()
 
-    | CFGetParam(_) -> AUndef()
-
     | CFGetFrom(tableNbr, n) ->
       if (tableNbr >= this.entries.size()) {
         AUndef()
@@ -264,8 +262,6 @@ class ExprEvaluator(
     | SKSQL.CSFCast(e) -> this.evalCFExpr(context, e).map(f -> f.toString())
     | SKSQL.CSICast(e) -> this.evalCIExpr(context, e).map(f -> f.toString())
 
-    | CSGetParam(_) -> AUndef()
-
     | CUp(x) ->
       this.up match {
       | None() -> invariant_violation("Could not find up environment")
@@ -292,7 +288,6 @@ class ExprEvaluator(
     | CNull() -> ANull()
     | CISize(tableNbr) ->
       ADef(context.getEagerDir(this.tables[tableNbr].i0.dirName).size(context))
-    | CIGetParam(_) -> AUndef()
     | CIGetFrom(tableNbr, n) ->
       if (tableNbr >= this.entries.size()) {
         AUndef()

@@ -61,7 +61,6 @@ fun optimizeNoopSelect(select: CSelect): CSelect {
     select.limit is None() &&
     select.rest is None() &&
     !select.needUp &&
-    !select.needGetParam &&
     !select.directMode &&
     select.other.size() != 0
   ) {
@@ -163,12 +162,10 @@ mutable class Compiler{
   options: Options,
   pos: Int,
   mutable subst: mutable Map<Name, CGExpr> = mutable Map[],
-  mutable paramsNbr: mutable Map<Name, Int> = mutable Map[],
   mutable ambiguous: mutable Set<Name> = mutable Set[],
   mutable isAggr: Bool = false,
   mutable aggrVars: mutable Vector<(AggrKind, CGExpr)> = mutable Vector[],
   mutable needUp: Bool = false,
-  mutable needGetParam: Bool = false,
   mutable other: mutable Vector<SubSelectTask> = mutable Vector[],
 } {
   static fun create(
@@ -239,7 +236,6 @@ mutable class Compiler{
     !select = this.expandJoins(context, select.join, select);
 
     substCopy = this.subst;
-    paramsNbrCopy = this.paramsNbr;
     ambiguousCopy = this.ambiguous;
     aggrVarsCopy = this.aggrVars;
     needUpCopy = this.needUp;
@@ -264,7 +260,6 @@ mutable class Compiler{
     };
 
     this.!subst = newSubst;
-    this.!paramsNbr = mutable Map[];
     this.!ambiguous = newAmbiguous;
     this.!aggrVars = mutable Vector[];
     this.!needUp = false;
@@ -359,7 +354,6 @@ mutable class Compiler{
       limit,
       rest,
       needUp => this.needUp,
-      needGetParam => this.needGetParam,
       directMode,
       format,
       other => this.other.toArray(),
@@ -368,7 +362,6 @@ mutable class Compiler{
     !cselect = optimizeNoopSelect(cselect);
 
     this.!subst = substCopy;
-    this.!paramsNbr = paramsNbrCopy;
     this.!ambiguous = ambiguousCopy;
     this.!aggrVars = aggrVarsCopy;
     this.!needUp = needUpCopy;
@@ -472,26 +465,10 @@ mutable class Compiler{
       }
     };
 
-    cparams = expandedSParams.toArray().map(param -> {
-      (expr, asName) = param;
-      (this.compileExpr(context, expr), asName)
-    });
-    for (i => cparam in cparams) {
-      (typedExpr, asNameOpt) = cparam;
-      asNameOpt match {
-      | Some(asName) if (!this.subst.containsKey(asName)) ->
-        this.!needGetParam = true;
-        this.paramsNbr![asName] = i;
-        this.subst![asName] = typedExpr match {
-        | CGNull _ -> CGNull()
-        | CIExpr _ -> CIExpr(CIGetParam(i))
-        | CSExpr _ -> CSExpr(CSGetParam(i))
-        | CFExpr _ -> CFExpr(CFGetParam(i))
-        }
-      | _ -> continue
-      };
-    };
-    cparams.map(x -> x.i0)
+    expandedSParams.toArray().map(param -> {
+      (expr, _) = param;
+      this.compileExpr(context, expr)
+    })
   }
 
   mutable fun compileFrom(
