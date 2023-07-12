@@ -821,22 +821,12 @@ mutable class Compiler{
           order match {
           | VInt(n) -> (n, kind)
           | Literal(n, false) ->
-            first = n.getIter().next().fromSome();
-            if (Chars.isDigit(first)) {
-              for (c in n) {
-                if (Chars.isDigit(c)) continue;
-                errorNbr(11, this.pos, "invalid ORDER BY")
-              };
-              (n.toInt(), kind)
+            colName = Name::create(n);
+            if (cols.containsKey(colName)) {
+              (cols[colName] + 1, kind)
             } else {
-              colName = Name::create(n);
-              if (cols.containsKey(colName)) {
-                (cols[colName] + 1, kind)
-              } else {
-                errorNbr(10, this.pos, "invalid ORDER BY, unbound name " + n)
-              }
+              errorNbr(10, this.pos, "invalid ORDER BY, unbound name " + n)
             }
-
           | _ -> errorNbr(11, this.pos, "invalid ORDER BY")
           }
         }),
@@ -869,55 +859,36 @@ mutable class Compiler{
     | VString(s) -> CSExpr(CSLiteral(s))
     | VId _ -> invariant_violation("Unexpected ID")
     | VTime _ -> invariant_violation("Unexpected TIME")
-    | Literal("null", _) -> CGNull()
-    | Literal(str, isString) ->
-      if (isString) return CSExpr(CSLiteral(str));
-      str.getIter().next() match {
-      | None() -> invariant_violation("Empty literal")
-      | Some(c) if (Chars.isDigit(c) || c == '.') ->
-        if (
-          str.contains(".") ||
-          str.contains("e") ||
-          str.contains("E") ||
-          str.contains("p") ||
-          str.contains("P")
-        ) {
-          CFExpr(CFLiteral(str.toFloat()))
-        } else {
-          CIExpr(CILiteral(str.toInt()))
-        }
-      | _ ->
-        if (this.ambiguous.contains(Name::create(str))) {
-          error(this.pos, "Ambiguous name: " + str);
+    | Literal(str, _) ->
+      if (this.ambiguous.contains(Name::create(str))) {
+        error(this.pos, "Ambiguous name: " + str);
+      };
+      this.subst.maybeGet(Name::create(str)) match {
+      | None() -> error(this.pos, "Unbound name: " + str)
+      | Some(e) ->
+        e match {
+        | CIExpr(CUp _)
+        | CFExpr(CUp _)
+        | CSExpr(CUp _) ->
+          this.!needUp = true
+        | _ -> void
         };
-        this.subst.maybeGet(Name::create(str)) match {
-        | None() -> error(this.pos, "Unbound name: " + str)
-        | Some(e) ->
-          e match {
-          | CIExpr(CUp _)
-          | CFExpr(CUp _)
-          | CSExpr(CUp _) ->
-            this.!needUp = true
-          | _ -> void
-          };
-          if (this.isAggr) {
-            slot = this.aggrVars.size();
-            this.aggrVars.push((Noop(), e));
-            e.getType() match {
-            | INTEGER() -> CIExpr(CIGetFrom(0, slot))
-            | FLOAT() -> CFExpr(CFGetFrom(0, slot))
-            | TEXT() -> CSExpr(CSGetFrom(0, slot))
-            }
-          } else {
-            e
+        if (this.isAggr) {
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Noop(), e));
+          e.getType() match {
+          | INTEGER() -> CIExpr(CIGetFrom(0, slot))
+          | FLOAT() -> CFExpr(CFGetFrom(0, slot))
+          | TEXT() -> CSExpr(CSGetFrom(0, slot))
           }
+        } else {
+          e
         }
       }
     | Binop(".", Literal(ge1, _), Literal(ge2, _)) ->
       this.compileExpr(context, Literal(ge1 + "." + ge2, false))
 
-    | Binop("IS", e, VNull())
-    | Binop("IS", e, Literal("null", _)) ->
+    | Binop("IS", e, VNull()) ->
       CIExpr(
         this.compileExpr(context, e) match {
         | CGNull() -> CILiteral(1)
@@ -927,8 +898,7 @@ mutable class Compiler{
         },
       )
 
-    | Binop("IS", e, Not(VNull()))
-    | Binop("IS", e, Not(Literal("null", _))) ->
+    | Binop("IS", e, Not(VNull())) ->
       CIExpr(
         CNot(
           this.compileExpr(context, e) match {
@@ -1003,9 +973,7 @@ mutable class Compiler{
 
     | Binop("LIKE", ge1, ge2) ->
       pattern = ge2 match {
-      | VString(str)
-      | Literal(str, true) ->
-        str
+      | VString(str) -> str
       | _ -> error(this.pos, "Invalid LIKE, expected a pattern")
       };
 
@@ -1081,8 +1049,7 @@ mutable class Compiler{
         error(this.pos, "id expects one argument")
       };
       args[0] match {
-      | VString(varName)
-      | Literal(varName, true) ->
+      | VString(varName) ->
         globals = context.getGlobal(GLOBALS) match {
         | None() -> error(this.pos, "Unknown id " + varName)
         | Some(file) -> Globals::fromFile(file)
@@ -1400,9 +1367,7 @@ mutable class Compiler{
 
       isStatic = for (arg in args) {
         arg match {
-        | VString _
-        | Literal(_, true) ->
-          void
+        | VString _ -> void
         | _ -> break false
         }
       } else {
@@ -1412,9 +1377,7 @@ mutable class Compiler{
       if (isStatic) {
         sargs = args.map(x ->
           x match {
-          | VString(v)
-          | Literal(v, true) ->
-            v
+          | VString(v) -> v
           | _ -> error(this.pos, "only static dates are supported")
           }
         );
@@ -1608,7 +1571,7 @@ mutable class Compiler{
         | None() -> (cond, JNone(), None())
         | Some(_) ->
           (
-            if (e2 is VInt(1) || e2 is Literal("1", false)) e1 else {
+            if (e2 is VInt(1)) e1 else {
               Binop("AND", e1, e2)
             },
             jk2,
@@ -1617,7 +1580,7 @@ mutable class Compiler{
         }
       | Some(_) ->
         (
-          if (e1 is VInt(1) || e1 is Literal("1", false)) e2 else {
+          if (e1 is VInt(1)) e2 else {
             Binop("AND", e1, e2)
           },
           jk1,
@@ -1970,12 +1933,10 @@ mutable class Compiler{
       op,
       Call("strftime", Some(args)),
       e2,
-    ) if (args.all(x -> x is VString _ || x is Literal(_, true))) ->
+    ) if (args.all(x -> x is VString _)) ->
       sargs = args.map(x ->
         x match {
-        | VString(str)
-        | Literal(str, _) ->
-          str
+        | VString(str) -> str
         | _ -> invariant_violation("Unexpected type")
         }
       );
@@ -1990,12 +1951,10 @@ mutable class Compiler{
       op,
       e1,
       Call("strftime", Some(args)),
-    ) if (args.all(x -> x is VString _ || x is Literal(_, true))) ->
+    ) if (args.all(x -> x is VString _)) ->
       sargs = args.map(x ->
         x match {
-        | VString(str)
-        | Literal(str, _) ->
-          str
+        | VString(str) -> str
         | _ -> invariant_violation("Unexpected type")
         }
       );
