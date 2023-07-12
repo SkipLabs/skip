@@ -664,10 +664,27 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
   } else if (lex.isEqAt(tok, "+")) {
     (!pos, e) = parseExprWithPrio(1, lex, pos);
     UPlus(e)
+  } else if (lex.wordAt(tok) == ">") {
+    invariant_violation("Internal error");
+  } else if (lex.wordAt(tok).lowercase() == "null") {
+    VNull()
   } else {
-    if (lex.wordAt(tok) == ">") invariant_violation("Internal error");
-    if (lex.wordAt(tok).lowercase() == "null") VNull() else {
-      Literal(lex.wordAt(tok), false)
+    str = lex.wordAt(tok);
+    str.getIter().next() match {
+    | None() -> invariant_violation("Empty literal")
+    | Some(c) if (Chars.isDigit(c) || c == '.') ->
+      if (
+        str.contains(".") ||
+        str.contains("e") ||
+        str.contains("E") ||
+        str.contains("p") ||
+        str.contains("P")
+      ) {
+        VFloat(str.toFloat())
+      } else {
+        VInt(str.toInt())
+      }
+    | _ -> Literal(str, false)
     };
   };
 
