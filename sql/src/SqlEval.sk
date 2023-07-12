@@ -741,9 +741,9 @@ class Evaluator{options: Options, user: ?UserFile} {
                       "=",
                       Literal(tyDescr.name.lower, false),
                       conValue match {
-                      | None() -> Literal("null", false)
-                      | Some(CInt(n)) -> Literal(n.toString(), false)
-                      | Some(CString(s)) -> Literal(s, true)
+                      | None() -> VNull()
+                      | Some(CInt(n)) -> VInt(n)
+                      | Some(CString(s)) -> VString(s)
                       | _ ->
                         error(pos, "Unsupported type for OR IGNORE/REPLACE")
                       },

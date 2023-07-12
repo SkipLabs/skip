@@ -621,12 +621,12 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     !pos = lex.expect(pos, ")");
     e
   } else if (lex.isEqUpperAt(tok, "TRUE")) {
-    Literal("1", false)
+    VInt(1)
   } else if (lex.isEqUpperAt(tok, "FALSE")) {
-    Literal("0", false)
+    VInt(0)
   } else if (lex.isEqAt(tok, "'")) {
     (!pos, str) = parseString(lex, tok.posBegin);
-    Literal(str, true)
+    VString(str)
   } else if (lex.isEqUpperAt(tok, "x") && lex.isEq(pos, "'")) {
     (!pos, str) = parseString(lex, pos);
     Literal("x" + str, false)
@@ -666,7 +666,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     UPlus(e)
   } else {
     if (lex.wordAt(tok) == ">") invariant_violation("Internal error");
-    if (lex.wordAt(tok).lowercase() == "null") Literal("null", false) else {
+    if (lex.wordAt(tok).lowercase() == "null") VNull() else {
       Literal(lex.wordAt(tok), false)
     };
   };
