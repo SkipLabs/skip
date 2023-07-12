@@ -4,7 +4,7 @@ SKDB=./target/skdb
 export SKDB
 
 run_test () {
-  echo -en "$1:\t"
+  printf "%-40s " "$1:"
   out1=$(mktemp)
   err1=$(mktemp)
   out2=$(mktemp)

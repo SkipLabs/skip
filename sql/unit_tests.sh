@@ -2,98 +2,101 @@
 
 SKDB=./target/skdb
 
+pass() { printf "%-32s OK\n" "TEST $1:"; }
+fail() { printf "%-32s FAILED\n" "TEST $1:"; }
+
 if cat test/unit/test_unique.sql | $SKDB 2>&1 | grep -q UNIQUE
 then
-    echo -e "TEST UNIQUE:\tOK"
+    pass "UNIQUE"
 else
-    echo -e "TEST UNIQUE:\tFAILED"
+    fail "UNIQUE"
 fi
 
 
 if cat test/test_concat.sql | $SKDB | grep -q hellohello
 then
-    echo -e "TEST CONCAT:\tOK"
+    pass "CONCAT"
 else
-    echo -e "TEST CONCAT:\tFAILED"
+    fail "CONCAT"
 fi
 
 if cat test/test_notnull.sql | $SKDB 2>&1 | grep -q NULL
 then
-    echo -e "TEST NOT NULL:\tOK"
+    pass "NOT NULL"
 else
-    echo -e "TEST NOT NULL:\tFAILED"
+    fail "NOT NULL"
 fi
 
 if cat test/test_delete.sql | $SKDB | grep -v -q 22
 then
-    echo -e "TEST DELETE:\tOK"
+    pass "DELETE"
 else
-    echo -e "TEST DELETE:\tFAILED"
+    fail "DELETE"
 fi
 
 cat test/test_like.sql | $SKDB > /tmp/kk1
 diff /tmp/kk1 test/unit/test_like.expected > /dev/null
 
 if [ $? -eq 0 ]; then
-    echo -e "TEST LIKE:\tOK"
+    pass "LIKE"
 else
-    echo -e "TEST LIKE:\tFAILED"
+    fail "LIKE"
 fi
 
 if cat test/join_select_order.sql | $SKDB --always-allow-joins | grep -q '4|6|4|4|1|4'
 then
-    echo -e "TEST JOIN ORDER:\tOK"
+    pass "JOIN ORDER"
 else
-    echo -e "TEST JOIN ORDER:\tFAILED"
+    fail "JOIN ORDER"
 fi
 
 if cat test/test_update.sql | $SKDB | grep -q '2|3'
 then
-    echo -e "TEST JOIN ORDER:\tOK"
+    pass "JOIN ORDER"
 else
-    echo -e "TEST JOIN ORDER:\tFAILED"
+    fail "JOIN ORDER"
 fi
 
 if cat test/primary_index.sql | $SKDB --show-used-indexes | grep -q 'USING INDEX: t1_id'
 then
-    echo -e "TEST PRIMARY INDEX:\tOK"
+    pass "PRIMARY INDEX"
 else
-    echo -e "TEST PRIMARY INDEX:\tFAILED"
+    fail "PRIMARY INDEX"
 fi
 
 if cat test/insert_values.sql | $SKDB | grep -q '3'
 then
-    echo -e "TEST MULTIPLE INSERTS:\tOK"
+    pass "MULTIPLE INSERTS"
 else
-    echo -e "TEST MULTIPLE INSERTS:\tFAILED"
+    fail "MULTIPLE INSERTS"
 fi
 
 if cat test/test_not_like.sql | $SKDB | grep -q 'def'
 then
-    echo -e "TEST NOT LIKE:\tOK"
+    pass "NOT LIKE"
 else
-    echo -e "TEST NOT LIKE:\tFAILED"
+    fail "NOT LIKE"
 fi
 
 if cat test/aggr_union.sql | $SKDB | awk '{x+=$1}; END {print x}' | grep -q '11'
 then
-    echo -e "TEST AGGR UNION:\tOK"
+    pass "AGGR UNION"
 else
-    echo -e "TEST AGGR UNION:\tFAILED"
+    fail "AGGR UNION"
 fi
 
 if cat test/unit/test_joins.sql | $SKDB --always-allow-joins | tr '\n' S | grep -q '1|2|1|3S2|4||S1|2|1|3S1|2|1|3S2|4||S'
 then
-    echo -e "TEST JOIN:\tOK"
+    pass "JOIN"
 else
-    echo -e "TEST JOIN:\tFAILED"
+    fail "JOIN"
 fi
 
 if cat test/unit_parse_float.sql | $SKDB | tr '\n' S | grep -q '1000000000.0S10000000000.0S100000000000000.0S1.0e+15S1.0e-05S1.1e-05S9.0e-05S0.0001S0.0009S58.0S400.0S1.23456e-65S1000.0S-100000000000000.0S-1.0e+15S-0.0001S-1.0e-05S-1.0e-09S-1.0e-10S-58.0S-400.0S-1.23456e-65S-1000.0S1.0e+15S100000000000000.0S1000.0S400.0S58.0S0.0009S0.0001S0.0001S9.0e-05S1.1e-05S1.0e-05S1.0e-05S1.23456e-65S-1.23456e-65S-1.0e-09S-1.0e-08S-1.0e-05S-0.0001S-58.0S-400.0S-1000.0S-100000000000000.0S-1.0e+15'
 then
-    echo -e "TEST PARSE FLOAT:\tOK"
+    pass "PARSE FLOAT"
 else
-    echo -e "TEST PARSE FLOAT:\tFAILED"
+    fail "PARSE FLOAT"
 fi
 
 gcc test/unit/utf8_string/make_utf8_insert_select.c -o /tmp/make_utf8_insert_select
@@ -102,9 +105,9 @@ gcc test/unit/utf8_string/make_utf8_insert_select.c -o /tmp/make_utf8_insert_sel
 diff /tmp/kk1 test/unit/utf8_string/expected_string.txt > /dev/null
 
 if [ $? -eq 0 ]; then
-    echo -e "TEST UTF8:\tOK"
+    pass "UTF8"
 else
-    echo -e "TEST UTF8:\tFAILED"
+    fail "UTF8"
 fi
 
 ./test_notify.sh
@@ -113,83 +116,83 @@ cat test/join_outside_of_virtual.sql | $SKDB 2> /tmp/kk1
 diff /tmp/kk1 test/unit/join_outside_of_virtual.exp > /dev/null
 
 if [ $? -eq 0 ]; then
-    echo -e "TEST VIRTUAL JOIN:\tOK"
+    pass "VIRTUAL JOIN"
 else
-    echo -e "TEST VIRTUAL JOIN:\tFAILED"
+    fail "VIRTUAL JOIN"
 fi
 
 if cat test/insert_autoid.sql | $SKDB | grep -q "3"
 then
-    echo -e "TEST INSERT AUTOINCREMENT:\tOK"
+    pass "INSERT AUTOINCREMENT"
 else
-    echo -e "TEST INSERT AUTOINCREMENT:\tFAILED"
+    fail "INSERT AUTOINCREMENT"
 fi
 
 if cat test/unit/test_id.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
-    echo -e "TEST ID:\tOK"
+    pass "ID"
 else
-    echo -e "TEST ID:\tFAILED"
+    fail "ID"
 fi
 
 if cat test/lower_upper.sql | $SKDB | grep -q "FOO|bar"; then
-    echo -e "TEST LOWER/UPPER:\tOK"
+    pass "LOWER/UPPER"
 else
-    echo -e "TEST LOWER/UPPER:\tFAILED"
+    fail "LOWER/UPPER"
 fi
 
 if cat test/unit/test_insert_id.sql | $SKDB | grep -q "|22"; then
-    echo -e "TEST INSERT ID:\tOK"
+    pass "INSERT ID"
 else
-    echo -e "TEST INSERT ID:\tFAILED"
+    fail "INSERT ID"
 fi
 
 
 if cat test/test_string_escaping_json.sql | $SKDB --format=json | grep -q '{"a":"\\"Hello world\\""}'; then
-    echo -e "TEST STRING ESCAPING JSON:\tOK"
+    pass "STRING ESCAPING JSON"
 else
-    echo -e "TEST STRING ESCAPING JSON:\tFAILED"
+    fail "STRING ESCAPING JSON"
 fi
 
 if cat test/test_null_encoding_json.sql | $SKDB --format=json | grep -q '{"a":1,"b":null,"c":2}'; then
-    echo -e "TEST NULL ENCODING JSON:\tOK"
+    pass "NULL ENCODING JSON"
 else
-    echo -e "TEST NULL ENCODING JSON:\tFAILED"
+    fail "NULL ENCODING JSON"
 fi
 
 if cat test/test_real.sql | $SKDB | grep -q "1"; then
-    echo -e "TEST REAL:\tOK"
+    pass "REAL"
 else
-    echo -e "TEST REAL:\tFAILED"
+    fail "REAL"
 fi
 
 if cat test/test_missing_semi.sql | $SKDB | grep -q "22"; then
-    echo -e "TEST MISSING SEMI:\tOK"
+    pass "MISSING SEMI"
 else
-    echo -e "TEST MISSING SEMI:\tFAILED"
+    fail "MISSING SEMI"
 fi
 
 if cat test/test_ignore_replace.sql | $SKDB | tr '\n' 'S' | grep -q "22|23S24|26S25|27S31|32S33|34S51|42|43S"; then
-    echo -e "TEST IGNORE/REPLACE:\tOK"
+    pass "IGNORE/REPLACE"
 else
-    echo -e "TEST IGNORE/REPLACE:\tFAILED"
+    fail "IGNORE/REPLACE"
 fi
 
 if cat test/test_ignore_replace2.sql | $SKDB | tr '\n' 'S' | grep -q "50|1S50|2S"; then
-    echo -e "TEST IGNORE/REPLACE2:\tOK"
+    pass "IGNORE/REPLACE2"
 else
-    echo -e "TEST IGNORE/REPLACE2:\tFAILED"
+    fail "IGNORE/REPLACE2"
 fi
 
 if cat test/test_underscore_alias.sql | $SKDB | grep -q "22"; then
-    echo -e "TEST UNDERSCORE ALIAS:\tOK"
+    pass "UNDERSCORE ALIAS"
 else
-    echo -e "TEST UNDERSCORE ALIAS:\tFAILED"
+    fail "UNDERSCORE ALIAS"
 fi
 
 if cat test/create_index_if_not_exists.sql | $SKDB | grep -q "22"; then
-    echo -e "CREATE INDEX IF NOT EXISTS:\tOK"
+    pass "CREATE INDEX IF NOT EXISTS"
 else
-    echo -e "CREATE INDEX IF NOT EXISTS:\tFAILED"
+    fail "CREATE INDEX IF NOT EXISTS"
 fi
 
 tmpfile=$(mktemp /tmp/testfile.XXXXXX)
@@ -202,61 +205,61 @@ $SKDB dump --data $tmpfile > $tmpfile_dump
 diff $tmpfile_dump test/unit/test_dump_index.exp  > /dev/null
 if [ $? -eq 0 ]; then
     rm $tmpfile $tmpfile_dump
-    echo -e "TEST DUMP INDEXES:\tOK"
+    pass "DUMP INDEXES"
 else
-    echo -e "TEST DUMP INDEXES:\tFAILED"
+    fail "DUMP INDEXES"
 fi
 
 if cat test/test_select_star_plus.sql | $SKDB | grep -q "22|23|45"; then
-    echo -e "TEST STAR COMMA:\tOK"
+    pass "STAR COMMA"
 else
-    echo -e "TEST STAR COMMA:\tFAILED"
+    fail "STAR COMMA"
 fi
 
 if cat test/unit/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -q "14|test1|test2S20||fooS24|bar|helloS"; then
-    echo -e "TEST DEFAULT VALUES:\tOK"
+    pass "DEFAULT VALUES"
 else
-    echo -e "TEST DEFAULT VALUES:\tFAILED"
+    fail "DEFAULT VALUES"
 fi
 
 if cat test/test_count_string.sql | $SKDB | grep -q "0"; then
-    echo -e "TEST COUNT STRING:\tOK"
+    pass "COUNT STRING"
 else
-    echo -e "TEST COUNT STRING:\tFAILED"
+    fail "COUNT STRING"
 fi
 
 if cat test/test_insert_or_update.sql | $SKDB | grep -q "1|3"; then
-    echo -e "TEST INSERT OR UPDATE:\tOK"
+    pass "INSERT OR UPDATE"
 else
-    echo -e "TEST INSERT OR UPDATE:\tFAILED"
+    fail "INSERT OR UPDATE"
 fi
 
 if cat test/test_table_dot_star.sql | $SKDB --always-allow-joins | grep -q "2|3|4|5|2|6"; then
-    echo -e "TEST DOT STAR:\tOK"
+    pass "DOT STAR"
 else
-    echo -e "TEST DOT STAR:\tFAILED"
+    fail "DOT STAR"
 fi
 
 if cat test/unit/test_index_on_star.sql | $SKDB --show-used-indexes | grep -q "USING INDEX: v1_a"; then
-    echo -e "TEST INDEX DOT STAR:\tOK"
+    pass "INDEX DOT STAR"
 else
-    echo -e "TEST INDEX DOT STAR:\tFAILED"
+    fail "INDEX DOT STAR"
 fi
 
 if cat test/limit_unit.sql | $SKDB | wc | tr ' ' 'S' | tr '\n' 'S' | grep -q "SSSSSS1SSSSSSS1SSSSSSS2S"; then
-    echo -e "TEST LIMIT:\tOK"
+    pass "LIMIT"
 else
-    echo -e "TEST LIMIT:\tFAILED"
+    fail "LIMIT"
 fi
 
 if cat test/test_index_transaction.sql | $SKDB --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:ST1_a"; then
-    echo -e "TEST TRANSACTION INDEX:\tOK"
+    pass "TRANSACTION INDEX"
 else
-    echo -e "TEST TRANSACTION INDEX:\tFAILED"
+    fail "TRANSACTION INDEX"
 fi
 
 if cat test/test_index_transaction2.sql | $SKDB --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:ST1_a"; then
-    echo -e "TEST TRANSACTION INDEX 2:\tOK"
+    pass "TRANSACTION INDEX 2"
 else
-    echo -e "TEST TRANSACTION INDEX 2:\tFAILED"
+    fail "TRANSACTION INDEX 2"
 fi

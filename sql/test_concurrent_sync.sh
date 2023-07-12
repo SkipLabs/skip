@@ -1,5 +1,8 @@
 #!/bin/bash
 
+pass() { printf "%-20s OK\n" "$1:"; }
+fail() { printf "%-20s FAILED\n" "$1:"; }
+
 SKDB=./target/skdb
 
 # Test that launches a bunch of unix process that insert numbers in a table
@@ -32,7 +35,7 @@ sum=`cat /tmp/test_result | egrep '^[0-9]+$' | awk '{x += $1} END {print x}'`
 
 if [[ sum -eq 51515050 ]]
 then
-   echo -e "Concurrent sync:\tOK"
+  pass "CONCURRENT SYNC"
 else
-    echo -e "Concurrent sync:\tERROR"
+  fail "CONCURRENT SYNC"
 fi
