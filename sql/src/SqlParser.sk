@@ -675,7 +675,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     | None() ->
       str.toFloatOption() match {
       | Some(i) -> VFloat(i)
-      | None() -> Literal(str, false)
+      | None() -> Literal(str)
       }
     };
   };
@@ -695,7 +695,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
         !left = makeCall(pos, left, None());
       } else if (
         left match {
-        | Literal(x, false) -> x.uppercase() == "CAST"
+        | Literal(x) -> x.uppercase() == "CAST"
         | _ -> false
         }
       ) {
@@ -750,7 +750,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
 
 fun makeCall(pos: Int, left: Expr, params: ?Array<Expr>): Expr {
   left match {
-  | Literal(x, false) -> Call(x.lowercase(), params)
+  | Literal(x) -> Call(x.lowercase(), params)
   | _ -> error(pos, "Unexpected function call")
   }
 }
