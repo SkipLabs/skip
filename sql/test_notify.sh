@@ -1,5 +1,8 @@
 #!/bin/bash
 
+pass() { printf "%-32s OK\n" "TEST $1:"; }
+fail() { printf "%-32s FAILED\n" "TEST $1:"; }
+
 SKDB=./target/skdb
 
 rm -f /tmp/test.db
@@ -26,14 +29,14 @@ n3=`cat /tmp/nn`
 
 if (( n1 < n2 ))
 then
-    echo -e "TEST NOTIFY1:\tOK"
+    pass "NOTIFY1"
 else
-    echo -e "TEST NOTIFY1:\tFAILED"
+    fail "NOTIFY1"
 fi
 
 if (( n2 < n3 ))
 then
-    echo -e "TEST NOTIFY2:\tOK"
+    pass "NOTIFY2"
 else
-    echo -e "TEST NOTIFY2:\tFAILED"
+    fail "NOTIFY2"
 fi

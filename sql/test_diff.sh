@@ -4,6 +4,9 @@ DB=/tmp/test.db
 SKDB_CMD=./target/skdb
 SKDB="$SKDB_CMD --always-allow-joins --data $DB"
 
+pass() { printf "%-44s OK\n" "$1:"; }
+fail() { printf "%-44s FAILED\n" "$1:"; }
+
 run_diff () {
 
     rm -f /tmp/kk1 /tmp/kk2 /tmp/kk3 $DB
@@ -43,18 +46,18 @@ run_diff () {
     diff /tmp/kk1 /tmp/kk2
     diff /tmp/kk1 /tmp/kk2 > /dev/null
     if [ $? -eq 0 ]; then
-        echo -e "$2 (part-1):\tOK"
+        pass "$2 (part-1)"
     else
-        echo -e "$2 (part-1):\tFAILED"
+        fail "$2 (part-1)"
     fi
 
     cat /tmp/replays | sort -n > /tmp/kk3
 
     diff /tmp/kk1 /tmp/kk3 > /dev/null
     if [ $? -eq 0 ]; then
-        echo -e "$2 (part-2):\tOK"
+        pass "$2 (part-2)"
     else
-        echo -e "$2 (part-2):\tFAILED"
+        fail "$2 (part-2)"
     fi
 
 }

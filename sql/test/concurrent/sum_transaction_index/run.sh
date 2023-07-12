@@ -1,5 +1,8 @@
 #!/bin/bash
 
+pass() { printf "%-20s OK\n" "$1:"; }
+fail() { printf "%-20s FAILED\n" "$1:"; }
+
 SKDB=../../../target/skdb
 
 rm -f /tmp/test.db
@@ -19,9 +22,7 @@ sum=`cat /tmp/test_result | egrep '^[0-9]+$' | awk '{x += $1} END {print x}'`
 
 if [[ sum -eq 101 ]]
 then
-   echo -e "CONCURRENT SUM:\tOK"
+  pass "CONCURRENT SUM"
 else
-    echo -e "CONCURRENT SUM:\tERROR"
+  fail "CONCURRENT SUM"
 fi
-
-
