@@ -629,7 +629,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     VString(str)
   } else if (lex.isEqUpperAt(tok, "x") && lex.isEq(pos, "'")) {
     (!pos, str) = parseString(lex, pos);
-    Literal("x" + str, false)
+    error(pos, "BLOB values are not supported: x'" + str + "'")
   } else if (lex.isEqUpperAt(tok, "NOT")) {
     (!pos, e) = parseExprWithPrio(opPriority["NOT"], lex, pos);
     Not(e)
