@@ -1238,7 +1238,7 @@ mutable class Compiler{
     | SKSQL.Call("count", arg) ->
       this.noAggr(() -> {
         value = arg match {
-        | None() -> Literal("1", false)
+        | None() -> VInt(1)
         | Some(values) ->
           if (values.size() != 1) {
             error(this.pos, "Invalid number of arguments for sum")
@@ -1367,7 +1367,7 @@ mutable class Compiler{
       };
       this.compileExpr(
         context,
-        Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+        Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
       )
 
     | Call("time", Some(args)) ->
@@ -1376,7 +1376,7 @@ mutable class Compiler{
       };
       this.compileExpr(
         context,
-        Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+        Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
       )
 
     | Call("datetime", Some(args)) ->
@@ -1387,7 +1387,7 @@ mutable class Compiler{
         context,
         Call(
           "strftime",
-          Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+          Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
         ),
       )
 
@@ -1664,7 +1664,7 @@ mutable class Compiler{
         proj1 = TableProj(tableNbr1, col1Name, col1IsUnique);
         col2Name = (col2, IASC(), table2.schema[col2].ty);
         proj2 = TableProj(tableNbr2, col2Name, col2IsUnique);
-        (Literal("1", false), JInner(), Some(EqJoin(proj1, proj2)))
+        (VInt(1), JInner(), Some(EqJoin(proj1, proj2)))
       | _ -> (cond, JNone(), None())
       }
     | _ -> (cond, JNone(), None())
@@ -1983,7 +1983,7 @@ mutable class Compiler{
         context,
         killed,
         tables,
-        Binop(op, Literal(callStrftime(this.pos, context, sargs), true), e2),
+        Binop(op, VString(callStrftime(this.pos, context, sargs)), e2),
       )
 
     | Binop(
@@ -2003,7 +2003,7 @@ mutable class Compiler{
         context,
         killed,
         tables,
-        Binop(op, e1, Literal(callStrftime(this.pos, context, sargs), true)),
+        Binop(op, e1, VString(callStrftime(this.pos, context, sargs))),
       )
 
     | Binop(op, Call("date", Some(args)), e2) ->
@@ -2016,7 +2016,7 @@ mutable class Compiler{
         tables,
         Binop(
           op,
-          Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+          Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
           e2,
         ),
       )
@@ -2031,7 +2031,7 @@ mutable class Compiler{
         tables,
         Binop(
           op,
-          Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+          Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
           e2,
         ),
       )
@@ -2048,7 +2048,7 @@ mutable class Compiler{
           op,
           Call(
             "strftime",
-            Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
           ),
           e2,
         ),
@@ -2065,7 +2065,7 @@ mutable class Compiler{
         Binop(
           op,
           e1,
-          Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+          Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
         ),
       )
 
@@ -2080,7 +2080,7 @@ mutable class Compiler{
         Binop(
           op,
           e1,
-          Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+          Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
         ),
       )
 
@@ -2097,7 +2097,7 @@ mutable class Compiler{
           e1,
           Call(
             "strftime",
-            Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
           ),
         ),
       )
