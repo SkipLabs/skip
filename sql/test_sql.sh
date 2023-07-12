@@ -45,6 +45,16 @@ run_one_test () {
   fi
 }
 
+if ! [ -z "$1" ]; then
+    if test -f "$1"; then
+        echo "RUNNING TEST: $1"
+        run_one_test $1
+    else
+        echo "File does not exist: $1"
+    fi
+    exit 0
+fi
+
 echo ""
 echo "*******************************************************************************"
 echo "* UNIT TESTS *"
@@ -58,16 +68,6 @@ echo "**************************************************************************
 echo "* SKDB TESTS *"
 echo "*******************************************************************************"
 echo ""
-
-if ! [ -z "$1" ]; then
-    if test -f "$1"; then
-        echo "RUNNING TEST: $1"
-        run_one_test $1
-    else
-        echo "File does not exist: $1"
-    fi
-    exit 0
-fi
 
 parallel run_test ::: \
     test/*.sql \
