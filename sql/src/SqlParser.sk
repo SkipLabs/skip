@@ -670,21 +670,13 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     VNull()
   } else {
     str = lex.wordAt(tok);
-    str.getIter().next() match {
-    | None() -> invariant_violation("Empty literal")
-    | Some(c) if (Chars.isDigit(c) || c == '.') ->
-      if (
-        str.contains(".") ||
-        str.contains("e") ||
-        str.contains("E") ||
-        str.contains("p") ||
-        str.contains("P")
-      ) {
-        VFloat(str.toFloat())
-      } else {
-        VInt(str.toInt())
+    str.toIntOption() match {
+    | Some(i) -> VInt(i)
+    | None() ->
+      str.toFloatOption() match {
+      | Some(i) -> VFloat(i)
+      | None() -> Literal(str, false)
       }
-    | _ -> Literal(str, false)
     };
   };
 
