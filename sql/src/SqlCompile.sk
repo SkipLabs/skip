@@ -378,7 +378,7 @@ mutable class Compiler{
     this.noAggr(() -> {
       params.map(set -> {
         (colName, pos, e) = set;
-        this.compileExpr(context, Literal(colName.lower, false)) match {
+        this.compileExpr(context, Literal(colName.lower)) match {
         | (CIExpr(CIGetFrom(0, n))) ->
           this.compileExpr(context, e) match {
           | CGNull() -> (n, CGNull())
@@ -417,9 +417,7 @@ mutable class Compiler{
         | Some(x) -> x
         };
         for (varName in dirDescr.colNames) {
-          params.push(
-            (Literal(tableName.lower + "." + varName.lower, false), None()),
-          )
+          params.push((Literal(tableName.lower + "." + varName.lower), None()))
         }
       };
       for (extraParam in extraParams) {
@@ -444,11 +442,7 @@ mutable class Compiler{
     for (sparam in sparams) {
       sparam match {
       | (
-        Binop(
-          ".",
-          litTableName @ Literal(tableNameStr, false),
-          Literal("*", false),
-        ),
+        Binop(".", litTableName @ Literal(tableNameStr), Literal("*")),
         asName,
       ) ->
         tableName = Name::create(tableNameStr);
@@ -458,7 +452,7 @@ mutable class Compiler{
         tableDescr = origFromMap[tableName];
         for (colName in tableDescr.colNames) {
           expandedSParams.push(
-            (Binop(".", litTableName, Literal(colName.lower, false)), asName),
+            (Binop(".", litTableName, Literal(colName.lower)), asName),
           )
         }
       | _ -> expandedSParams.push(sparam)
@@ -610,7 +604,7 @@ mutable class Compiler{
     for (paramIdx => param in params.params) {
       idx = slot + paramIdx;
       param match {
-      | (Binop(".", Literal(tableNameStr, false), Literal("*", false)), _) ->
+      | (Binop(".", Literal(tableNameStr), Literal("*")), _) ->
         dirDescr = origFromMap[Name::create(tableNameStr)];
         for (tyName in dirDescr.colNames) {
           if (!cols.containsKey(tyName)) {
@@ -623,7 +617,7 @@ mutable class Compiler{
         if (cols.containsKey(colName)) continue;
         !cols[colName] = idx;
         invCols![idx] = colName
-      | (Literal(colNameStr, _), _) ->
+      | (Literal(colNameStr), _) ->
         colName = Name::create(colNameStr);
         if (cols.containsKey(colName)) continue;
         iter = colNameStr.getIter();
@@ -632,7 +626,7 @@ mutable class Compiler{
           !cols[colName] = idx;
           invCols![idx] = colName;
         }
-      | (Binop(".", _, Literal(colNameStr, _)), _) ->
+      | (Binop(".", _, Literal(colNameStr)), _) ->
         colName = Name::create(colNameStr);
         if (cols.containsKey(colName)) continue;
         !cols[colName] = idx;
@@ -820,7 +814,7 @@ mutable class Compiler{
           (order, kind) = kv;
           order match {
           | VInt(n) -> (n, kind)
-          | Literal(n, false) ->
+          | Literal(n) ->
             colName = Name::create(n);
             if (cols.containsKey(colName)) {
               (cols[colName] + 1, kind)
@@ -859,7 +853,7 @@ mutable class Compiler{
     | VString(s) -> CSExpr(CSLiteral(s))
     | VId _ -> invariant_violation("Unexpected ID")
     | VTime _ -> invariant_violation("Unexpected TIME")
-    | Literal(str, _) ->
+    | Literal(str) ->
       if (this.ambiguous.contains(Name::create(str))) {
         error(this.pos, "Ambiguous name: " + str);
       };
@@ -885,8 +879,8 @@ mutable class Compiler{
           e
         }
       }
-    | Binop(".", Literal(ge1, _), Literal(ge2, _)) ->
-      this.compileExpr(context, Literal(ge1 + "." + ge2, false))
+    | Binop(".", Literal(ge1), Literal(ge2)) ->
+      this.compileExpr(context, Literal(ge1 + "." + ge2))
 
     | Binop("IS", e, VNull()) ->
       CIExpr(
@@ -1587,22 +1581,16 @@ mutable class Compiler{
           join1,
         )
       }
-    | Binop("=", Binop(".", Literal(tname1, _), Literal(cname1, _)), e2) ->
-      this.findJoin(
-        tables,
-        Binop("=", Literal(tname1 + "." + cname1, false), e2),
-      )
+    | Binop("=", Binop(".", Literal(tname1), Literal(cname1)), e2) ->
+      this.findJoin(tables, Binop("=", Literal(tname1 + "." + cname1), e2))
 
-    | Binop("=", e1, Binop(".", Literal(tname2, _), Literal(cname2, _))) ->
-      this.findJoin(
-        tables,
-        Binop("=", e1, Literal(tname2 + "." + cname2, false)),
-      )
+    | Binop("=", e1, Binop(".", Literal(tname2), Literal(cname2))) ->
+      this.findJoin(tables, Binop("=", e1, Literal(tname2 + "." + cname2)))
 
     | Binop(
       "=",
-      Literal(name1, _),
-      Literal(name2, _),
+      Literal(name1),
+      Literal(name2),
     ) if (this.isVar(name1) && this.isVar(name2)) ->
       (this.subst[Name::create(name1)], this.subst[Name::create(name2)]) match {
       | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
@@ -2061,20 +2049,20 @@ mutable class Compiler{
         ),
       )
 
-    | Binop(op, Binop(".", Literal(tname1, _), Literal(cname1, _)), e2) ->
+    | Binop(op, Binop(".", Literal(tname1), Literal(cname1)), e2) ->
       this.findLookUps(
         context,
         killed,
         tables,
-        Binop(op, Literal(tname1 + "." + cname1, false), e2),
+        Binop(op, Literal(tname1 + "." + cname1), e2),
       )
 
-    | Binop(op, e1, Binop(".", Literal(tname2, _), Literal(cname2, _))) ->
+    | Binop(op, e1, Binop(".", Literal(tname2), Literal(cname2))) ->
       this.findLookUps(
         context,
         killed,
         tables,
-        Binop(op, e1, Literal(tname2 + "." + cname2, false)),
+        Binop(op, e1, Literal(tname2 + "." + cname2)),
       )
 
     | Binop("AND", e1, e2) ->
@@ -2088,8 +2076,8 @@ mutable class Compiler{
 
     | Binop(
       _,
-      Literal(name1, _),
-      Literal(name2, _),
+      Literal(name1),
+      Literal(name2),
     ) if (this.isVar(name1) && this.isVar(name2)) ->
       LookUps[]
 
@@ -2103,11 +2091,11 @@ mutable class Compiler{
       };
       this.findLookUps(context, killed, tables, acc)
 
-    | Binop(op, e1 @ Value _, e2 @ Literal(name2, _))
+    | Binop(op, e1 @ Value _, e2 @ Literal(name2))
     | Binop(
       op,
       e1 @ Literal _,
-      e2 @ Literal(name2, _),
+      e2 @ Literal(name2),
     ) if (this.isVar(name2)) ->
       !op = op match {
       | "=" -> op
@@ -2119,10 +2107,10 @@ mutable class Compiler{
       };
       this.findLookUps(context, killed, tables, Binop(op, e2, e1))
 
-    | Binop(op, Literal(name1, _), e @ Value _)
+    | Binop(op, Literal(name1), e @ Value _)
     | Binop(
       op,
-      Literal(name1, _),
+      Literal(name1),
       e @ Literal _,
     ) if (this.isVar(name1)) ->
       op match {
