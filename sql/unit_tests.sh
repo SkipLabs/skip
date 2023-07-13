@@ -2,7 +2,7 @@
 
 SKDB=./target/skdb
 
-if cat test/test_unique.sql | $SKDB 2>&1 | grep -q UNIQUE
+if cat test/unit/test_unique.sql | $SKDB 2>&1 | grep -q UNIQUE
 then
     echo -e "TEST UNIQUE:\tOK"
 else
@@ -32,7 +32,7 @@ else
 fi
 
 cat test/test_like.sql | $SKDB > /tmp/kk1
-diff /tmp/kk1 test/test_like.expected > /dev/null
+diff /tmp/kk1 test/unit/test_like.expected > /dev/null
 
 if [ $? -eq 0 ]; then
     echo -e "TEST LIKE:\tOK"
@@ -61,7 +61,7 @@ else
     echo -e "TEST PRIMARY INDEX:\tFAILED"
 fi
 
-if cat test/insert_values.sql | $SKDB | grep -q '3'
+if cat test/unit/insert_values.sql | $SKDB | grep -q '3'
 then
     echo -e "TEST MULTIPLE INSERTS:\tOK"
 else
@@ -82,7 +82,7 @@ else
     echo -e "TEST AGGR UNION:\tFAILED"
 fi
 
-if cat test/test_joins.sql | $SKDB --always-allow-joins | tr '\n' S | grep -q '1|2|1|3S2|4||S1|2|1|3S1|2|1|3S2|4||S'
+if cat test/unit/test_joins.sql | $SKDB --always-allow-joins | tr '\n' S | grep -q '1|2|1|3S2|4||S1|2|1|3S1|2|1|3S2|4||S'
 then
     echo -e "TEST JOIN:\tOK"
 else
@@ -96,10 +96,10 @@ else
     echo -e "TEST PARSE FLOAT:\tFAILED"
 fi
 
-gcc test/utf8_string/make_utf8_insert_select.c -o /tmp/make_utf8_insert_select
+gcc test/unit/utf8_string/make_utf8_insert_select.c -o /tmp/make_utf8_insert_select
 /tmp/make_utf8_insert_select | $SKDB > /tmp/kk1
 
-diff /tmp/kk1 test/utf8_string/expected_string.txt > /dev/null
+diff /tmp/kk1 test/unit/utf8_string/expected_string.txt > /dev/null
 
 if [ $? -eq 0 ]; then
     echo -e "TEST UTF8:\tOK"
@@ -110,7 +110,7 @@ fi
 ./test_notify.sh
 
 cat test/join_outside_of_virtual.sql | $SKDB 2> /tmp/kk1
-diff /tmp/kk1 test/join_outside_of_virtual.exp > /dev/null
+diff /tmp/kk1 test/unit/join_outside_of_virtual.exp > /dev/null
 
 if [ $? -eq 0 ]; then
     echo -e "TEST VIRTUAL JOIN:\tOK"
@@ -125,7 +125,7 @@ else
     echo -e "TEST INSERT AUTOINCREMENT:\tFAILED"
 fi
 
-if cat test/test_id.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
+if cat test/unit/test_id.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
     echo -e "TEST ID:\tOK"
 else
     echo -e "TEST ID:\tFAILED"
@@ -137,7 +137,7 @@ else
     echo -e "TEST LOWER/UPPER:\tFAILED"
 fi
 
-if cat test/test_insert_id.sql | $SKDB | grep -q "|22"; then
+if cat test/unit/test_insert_id.sql | $SKDB | grep -q "|22"; then
     echo -e "TEST INSERT ID:\tOK"
 else
     echo -e "TEST INSERT ID:\tFAILED"
@@ -196,10 +196,10 @@ tmpfile=$(mktemp /tmp/testfile.XXXXXX)
 tmpfile_dump=$(mktemp /tmp/testfile.XXXXXX)
 rm -f $tmpfile $tmpfile_dump
 $SKDB --init $tmpfile
-cat test/test_dump_index.sql | $SKDB --data $tmpfile
+cat test/unit/test_dump_index.sql | $SKDB --data $tmpfile
 $SKDB dump --data $tmpfile > $tmpfile_dump
 
-diff $tmpfile_dump test/test_dump_index.exp  > /dev/null
+diff $tmpfile_dump test/unit/test_dump_index.exp  > /dev/null
 if [ $? -eq 0 ]; then
     rm $tmpfile $tmpfile_dump
     echo -e "TEST DUMP INDEXES:\tOK"
@@ -213,7 +213,7 @@ else
     echo -e "TEST STAR COMMA:\tFAILED"
 fi
 
-if cat test/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -q "14|test1|test2S20||fooS24|bar|helloS"; then
+if cat test/unit/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -q "14|test1|test2S20||fooS24|bar|helloS"; then
     echo -e "TEST DEFAULT VALUES:\tOK"
 else
     echo -e "TEST DEFAULT VALUES:\tFAILED"
@@ -237,7 +237,7 @@ else
     echo -e "TEST DOT STAR:\tFAILED"
 fi
 
-if cat test/test_index_on_star.sql | $SKDB --show-used-indexes | grep -q "USING INDEX: v1_a"; then
+if cat test/unit/test_index_on_star.sql | $SKDB --show-used-indexes | grep -q "USING INDEX: v1_a"; then
     echo -e "TEST INDEX DOT STAR:\tOK"
 else
     echo -e "TEST INDEX DOT STAR:\tFAILED"
