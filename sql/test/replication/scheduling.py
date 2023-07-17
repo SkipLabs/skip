@@ -270,9 +270,9 @@ class ReservoirSample():
     for schedule in schedules:
       i = i + 1
       if (i+1) % 1e6 == 0:
-        log(f"Looked at {i+1} schedules so far")
+        log(f"WARN: Looked at {i+1} schedules so far")
       randIdx = random.randint(0, i)
       if randIdx < self.N:
         reservoir[randIdx] = schedule
-    log(f"We will run {N} of the {i+1} possible schedules. ~{int((N)/(i+1.0)*100)}%")
+    log(f"WARN: We will run {N} of the {i+1} possible schedules. ~{int((N)/(i+1.0)*100)}%")
     return reservoir
