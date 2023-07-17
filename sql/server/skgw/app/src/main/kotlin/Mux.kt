@@ -199,6 +199,8 @@ typealias onSocketErrorFn = (MuxedSocket, UInt, String) -> Unit
 
 typealias onStreamErrorFn = (UInt, String) -> Unit
 
+typealias MuxedSocketLogger = (event: String, user: String, metadata: String?) -> Unit
+
 sealed class MuxMsg
 
 data class MuxAuthMsg(
@@ -295,6 +297,7 @@ class MuxedSocket(
       throw RuntimeException("Acting as a client initated socket")
     },
     val isClient: Boolean = false,
+    val log: MuxedSocketLogger = { _, _, _ -> },
 ) {
   enum class State {
     IDLE,
@@ -1008,6 +1011,7 @@ class MuxedSocket(
 
       // do not allow auths that were not recent. the margin is for clock skew.
       if (delta.abs().compareTo(Duration.ofMinutes(10)) > 0) {
+        log("auth_failure", auth.accessKey, "too_old")
         return false
       }
 
@@ -1019,8 +1023,13 @@ class MuxedSocket(
       // at least try to keep the private key in memory for as little time as possible
       creds.clear()
 
+      if (!matches) {
+        log("auth_failure", auth.accessKey, "bad_sig")
+      }
+
       return matches
     } catch (ex: Exception) {
+      log("auth_failure", auth.accessKey, ex.message)
       return false
     }
   }

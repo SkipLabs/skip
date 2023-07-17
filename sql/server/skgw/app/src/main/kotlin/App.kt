@@ -233,6 +233,7 @@ fun connectionHandler(
     policy: ServerPolicy,
     taskPool: ScheduledExecutorService,
     encryption: EncryptionTransform,
+  logger: Logger,
 ): HttpHandler {
   return Handlers.websocket(
       MuxedSocketEndpoint(
@@ -315,6 +316,9 @@ fun connectionHandler(
                         val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
                         encryption.decrypt(encryptedPrivateKey!!)
                       },
+                      log = { event, user, metadata ->
+                        logger.log(db, event, user, metadata)
+                      }
                   )
 
               if (skdb == null) {
@@ -434,7 +438,7 @@ fun main(args: Array<String>) {
           LimitConnectionsPerDb(logger, config.getInt("db_conns", 10)) then
           LimitGlobalConnections(logger, config.getInt("global_conns", 10_000))
 
-  val connHandler = connectionHandler(policy, taskPool, encryption)
+  val connHandler = connectionHandler(policy, taskPool, encryption, logger)
 
   val server = createHttpServer(connHandler)
   server.start()
