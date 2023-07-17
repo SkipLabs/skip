@@ -35,7 +35,7 @@ scheduler.happensBefore(s1ins1, c2ins1)
 cluster.isSilent()
 
 # and that all nodes have reached this state
-cluster.state("SELECT id, note FROM test_without_pk;").hasRows(
+cluster.state("SELECT id, note FROM test_without_pk;").hasAllRows(
   [0, "foo"],
   colnames=['id', 'note'],
 )

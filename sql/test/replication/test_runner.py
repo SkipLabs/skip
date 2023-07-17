@@ -28,5 +28,8 @@ def run_tests(module, nProcs=3):
     for result in p.imap_unordered(run_test, tests):
       print(result)
 
+def run_just(f):
+  print(run_test(('debug', f)))
+
 if __name__ == '__main__':
   run_tests(sys.modules[__name__])
