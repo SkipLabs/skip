@@ -94,6 +94,7 @@ wasm-test: npm sql/js/node_modules sql/js/dist/index.html
 
 .PHONY: replication-sim-test
 replication-sim-test: build/skdb
+	./sql/test/replication/test_pk.py
 	./sql/test/replication/test_no_pk.py
 
 .PHONY: tpc-test
