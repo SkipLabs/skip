@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import scheduling as sched
 from model import Topology, Client, Server
 from test_runner import run_tests
