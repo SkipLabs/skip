@@ -13,8 +13,8 @@ def run_test(args):
     log.append(output)
   try:
     info = loop.run_until_complete(f().run(collect))
-    output = "" if log == [] else "\n".join(log)
-    return f"{output}\n{prefix}{info}"
+    output = "" if log == [] else ("\n".join(log) + "\n")
+    return f"{output}{prefix}{info}"
   except:
     exn = traceback.format_exc()
     output = "\n".join(log)
