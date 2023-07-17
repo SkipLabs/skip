@@ -96,6 +96,10 @@ char* sk2c_string(char* skstr) {
     cstr = skstr;
   } else {
     cstr = (char*)malloc(size+1);
+    if (cstr == NULL) {
+      perror("malloc");
+      exit(1);
+    }
     memcpy(cstr, skstr, size);
     cstr[size] = (char)0;
   }

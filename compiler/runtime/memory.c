@@ -164,6 +164,10 @@ int memcmp(const void * ptr1, const void * ptr2, size_t num) {
 
 void* sk_malloc(size_t size) {
   void* result = malloc(size);
+  if (result == NULL) {
+    perror("malloc");
+    exit(1);
+  }
   sk_lower_static(result);
 
   if(result == NULL) {
