@@ -563,13 +563,29 @@ void* sk_get_ftable(size_t size) {
 
 static void sk_init_no_file(char* static_limit) {
   ginfo = malloc(sizeof(ginfo_t*));
+  if (ginfo == NULL) {
+    perror("malloc");
+    exit(1);
+  }
   *ginfo = malloc(sizeof(ginfo_t));
+  if (*ginfo == NULL) {
+    perror("malloc");
+    exit(1);
+  }
   (*ginfo)->break_ptr = static_limit;
   (*ginfo)->total_palloc_size = 0;
   (*ginfo)->fileName = NULL;
   gmutex = NULL;
   gid = malloc(sizeof(uint64_t));
+  if (gid == NULL) {
+    perror("malloc");
+    exit(1);
+  }
   pconsts = malloc(sizeof(void**));
+  if (pconsts == NULL) {
+    perror("malloc");
+    exit(1);
+  }
   *gid = 1;
   *pconsts = NULL;
 }
@@ -614,7 +630,12 @@ void SKIP_print_persistent_size() {
 
 void* sk_palloc(size_t size) {
   if((*ginfo)->fileName == NULL) {
-    return malloc(size);
+    void* result = malloc(size);
+    if (result == NULL) {
+      perror("malloc");
+      exit(1);
+    }
+    return result;
   }
   sk_check_has_lock();
   size = sk_pow2_size(size);
