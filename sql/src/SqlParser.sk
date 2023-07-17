@@ -965,27 +965,13 @@ fun parseValues(lex: Lexer, pos: Int): (Int, InsertValues) {
     return (pos, IQuery(select));
   };
   !pos = lex.expectUpper(pos, "VALUES");
-  !pos = lex.expect(pos, "(");
-  if (lex.isEq(pos, "(")) {
-    !pos = lex.expect(pos, "(");
-    return parseMultipleValues(lex, pos);
-  };
-  values = mutable Vector[];
-  loop {
-    (!pos, value) = parseValue(lex, pos);
-    values.push(value);
-    if (lex.isEq(pos, ")")) {
-      !pos = lex.expect(pos, ")");
-      break void;
-    };
-    !pos = lex.expect(pos, ",");
-  };
-  (pos, IValues(Array[values.toArray()]))
+  parseMultipleValues(lex, pos);
 }
 
 fun parseMultipleValues(lex: Lexer, pos: Int): (Int, InsertValues) {
   result = mutable Vector[];
   values = mutable Vector[];
+  !pos = lex.expect(pos, "(");
   loop {
     (!pos, value) = parseValue(lex, pos);
     values.push(value);
@@ -997,9 +983,9 @@ fun parseMultipleValues(lex: Lexer, pos: Int): (Int, InsertValues) {
         !pos = lex.expect(pos, ",");
         !pos = lex.expect(pos, "(");
         continue
+      } else {
+        break void
       };
-      !pos = lex.expect(pos, ")");
-      break void;
     };
     !pos = lex.expect(pos, ",");
   };
