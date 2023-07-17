@@ -13,10 +13,7 @@
 #include <sys/wait.h>
 
 void* SKIP_exec(char* cmd) {
-  size_t size = SKIP_String_byteSize(cmd);
-  char* cstr = malloc(size+1);
-  memcpy(cstr, cmd, size);
-  cstr[size] = 0;
+  char* cstr = sk2c_string(cmd);
 
   FILE* fstream = popen(cstr, "w");
 
