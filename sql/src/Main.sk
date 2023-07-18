@@ -347,7 +347,7 @@ fun execDumpTables(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   suffix = args.maybeGetString("table-suffix");
   SKSQL.runSql(options, context ~> {
-    SKSQL.dumpTables(options, context, suffix);
+    SKSQL.dumpTables(context, suffix);
     SKFS.CStop(None())
   })
 }
@@ -372,7 +372,7 @@ fun execDumpView(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun execDumpViews(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   SKSQL.runSql(options, context ~> {
-    SKSQL.dumpViews(options, context);
+    SKSQL.dumpViews(context);
     SKFS.CStop(None())
   })
 }
@@ -380,9 +380,9 @@ fun execDumpViews(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun execDump(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   SKSQL.runSql(options, context ~> {
-    SKSQL.dumpTables(options, context, None());
+    SKSQL.dumpTables(context, None());
     SKSQL.dumpInserts(context);
-    SKSQL.dumpViews(options, context);
+    SKSQL.dumpViews(context);
     SKFS.CStop(None())
   })
 }
@@ -392,7 +392,7 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   SKSQL.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
-      tableDescr = SKSQL.getTable(options, context, 0, name);
+      tableDescr = SKSQL.getTable(context, 0, name);
       context.setGlobal("CSV_TABLE", tableDescr);
       tableDescr
     | Some(x) -> SKSQL.DirDescr::fromFile(x)
@@ -495,13 +495,12 @@ fun execWrite(args: Cli.ParseResults, options: SKSQL.Options): void {
 }
 
 fun getSqlTableFromDirName(
-  options: SKSQL.Options,
   context: readonly SKFS.Context,
   dirName: SKFS.DirName,
 ): SKSQL.DirDescr {
   dirNameStr = dirName.toString();
   !dirNameStr = dirName.toString().stripPrefix("/").stripSuffix("/");
-  SKSQL.getTable(options, context.mclone(), 0, SKSQL.Name::create(dirNameStr))
+  SKSQL.getTable(context.mclone(), 0, SKSQL.Name::create(dirNameStr))
 }
 
 fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
@@ -569,7 +568,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   | Some(userName) ->
     (context, isReset) ~> {
       user = SKSQL.UserFile::create(context, userName);
-      sqlTable = getSqlTableFromDirName(options, context, dirName);
+      sqlTable = getSqlTableFromDirName(context, dirName);
       accessSolver = SKSQL.AccessSolver::create(context, user.id, sqlTable);
       skdbGroupColNbrOpt = sqlTable.cols.maybeGet(SKSQL.skdbGroupColName);
 
@@ -729,7 +728,7 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   SKSQL.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
-      tableDescr = SKSQL.getTable(options, context, 0, name);
+      tableDescr = SKSQL.getTable(context, 0, name);
       context.setGlobal("CSV_TABLE", tableDescr);
       tableDescr
     | Some(x) -> SKSQL.DirDescr::fromFile(x)
@@ -776,7 +775,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     | (_, Some(x)) -> SKFS.NNotify(x)
     | _ -> SKFS.NTail()
     };
-    (input, output) = SKSQL.getSubsDirs(options, context);
+    (input, output) = SKSQL.getSubsDirs(context);
     viewKey = SKFS.SID(viewName);
     inputDir = context.unsafeGetEagerDir(input.dirName);
     sessionID = SKFS.genSym(0);

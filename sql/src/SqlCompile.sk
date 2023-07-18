@@ -553,7 +553,7 @@ mutable class Compiler{
     name: FromName,
   ): DirDescr {
     name match {
-    | FName(tableName) -> getTable(this.options, context, this.pos, tableName)
+    | FName(tableName) -> getTable(context, this.pos, tableName)
 
     | FQuery(select @ Select _) ->
       cselect = this.compileSelect(context, select, false);
@@ -2125,7 +2125,7 @@ mutable class Compiler{
       };
       table = tables[tableNbr];
       indexEntry = makeIndexEntry(table.name, colNbr);
-      indexTable = getIndexByColNbr(this.options, context);
+      indexTable = getIndexByColNbr(context);
       indexes = indexTable.getArray(context, indexEntry);
       !indexes = indexes.filter(index -> !killed.contains(index.tableDirName));
       ce = this.compileExpr(context, e);

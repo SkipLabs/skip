@@ -134,7 +134,6 @@ fun createIndex(
 }
 
 fun createUserIndex(
-  options: Options,
   context: mutable SKFS.Context,
   userIndexName: Name,
   pos: Int,
@@ -156,7 +155,7 @@ fun createUserIndex(
     error(pos, "Invalid index: missing column names")
   };
 
-  table = getTable(options, context, pos, tableName);
+  table = getTable(context, pos, tableName);
   additionalCols = mutable Vector[];
   for (ty in table.schema) {
     if (colSet.contains(ty.name)) continue;

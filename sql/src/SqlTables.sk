@@ -270,7 +270,6 @@ class SubRequestFile(
 ) extends SKFS.File
 
 fun getSubsDirs(
-  options: Options,
   context: mutable SKFS.Context,
 ): (SKFS.EHandle<SubRequestFile>, SKFS.EHandle<SKFS.IntFile>) {
   if (context.unsafeMaybeGetEagerDir(subsInput) is Some _) {
@@ -308,17 +307,11 @@ fun getSubsDirs(
           print_error("Error: can only connect to virtual views");
           skipExit(23);
         };
-        selectAst = selectFile.value;
-        compiler = SKSQL.Compiler::create(
-          false,
-          options with {virtual => true},
-          selectAst.pos,
-        );
-        cselect = compiler.compileSelect(context, selectAst, true);
+        cselect = selectFile.cselect;
         selectDir = SKSQL.evalSelect(context, cselect, None());
         edir = context.unsafeGetEagerDir(selectDir.dirName);
         dirDescr = Compiler::getDirDescr(
-          selectAst.params,
+          selectFile.sparams,
           cselect.from,
           cselect.params,
           Name::create(selectDir.dirName.toString()),
@@ -416,10 +409,7 @@ fun getIndexInputDir(context: mutable SKFS.Context): SKFS.EHandle<Index> {
   )
 }
 
-fun getIndexOutputDir(
-  options: Options,
-  context: mutable SKFS.Context,
-): SKFS.EHandle<IndexDescr> {
+fun getIndexOutputDir(context: mutable SKFS.Context): SKFS.EHandle<IndexDescr> {
   input = getIndexInputDir(context);
   makeDir(IndexDescr::fromFile, context, indexOutput, () -> {
     input.contextMap(
@@ -428,7 +418,6 @@ fun getIndexOutputDir(
       indexOutput,
       (context, index) ~> {
         createUserIndex(
-          options,
           context,
           index.name,
           index.pos,
@@ -446,11 +435,8 @@ fun makeIndexEntry(tableName: Name, colNbr: Int): SKFS.SID {
   SKFS.SID::create(tableName.lower + ":" + colNbr);
 }
 
-fun getIndexByColNbr(
-  options: Options,
-  context: mutable SKFS.Context,
-): SKFS.EHandle<IndexDescr> {
-  indexes = getIndexOutputDir(options, context);
+fun getIndexByColNbr(context: mutable SKFS.Context): SKFS.EHandle<IndexDescr> {
+  indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
     indexes.contextWriterMap(
       IndexDescr::fromFile,
@@ -467,11 +453,8 @@ fun getIndexByColNbr(
   })
 }
 
-fun getIndexByName(
-  options: Options,
-  context: mutable SKFS.Context,
-): SKFS.EHandle<IndexDescr> {
-  indexes = getIndexOutputDir(options, context);
+fun getIndexByName(context: mutable SKFS.Context): SKFS.EHandle<IndexDescr> {
+  indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
     indexes.contextWriterMap(
       IndexDescr::fromFile,
@@ -488,12 +471,7 @@ fun getIndexByName(
 /* Tables. */
 /*****************************************************************************/
 
-fun getTable(
-  options: Options,
-  context: mutable SKFS.Context,
-  pos: Int,
-  name: Name,
-): DirDescr {
+fun getTable(context: mutable SKFS.Context, pos: Int, name: Name): DirDescr {
   sid = SKFS.SID::create(name.lower);
   tableDir = getTableDir(context);
   tableDir.maybeGet(context, sid) match {
@@ -506,11 +484,10 @@ fun getTable(
     } else {
       view = viewArray[0];
       selectFile = SelectFile::fromFile(view);
-      dirName = SKFS.DirName::create("/" + selectFile.value.id + "/");
-      compiler = SKSQL.Compiler::create(false, options, pos);
-      cselect = compiler.compileSelect(context, selectFile.value, true);
+      dirName = SKFS.DirName::create("/" + selectFile.cselect.id + "/");
+      cselect = selectFile.cselect;
       dirDescr = SKSQL.Compiler::getDirDescr(
-        selectFile.value.params,
+        selectFile.sparams,
         cselect.from,
         cselect.params,
         cselect.id,
@@ -596,18 +573,14 @@ fun dumpTable(
   }
 }
 
-fun dumpTables(
-  options: Options,
-  origContext: readonly SKFS.Context,
-  suffix: ?String,
-): void {
+fun dumpTables(origContext: readonly SKFS.Context, suffix: ?String): void {
   context = SKFS.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
   _ = handle.contextMap(handle.conv, context, sinkName, (context, dirDescr) ~> {
     if (!dirDescr.isInput) return dirDescr;
     printDirDescr(dirDescr, suffix);
-    for (indexDescr in getIndexByName(options, context).getArray(
+    for (indexDescr in getIndexByName(context).getArray(
       context,
       SKFS.SID(dirDescr.dirName.toString()),
     )) {
@@ -666,7 +639,7 @@ fun dumpView(origContext: readonly SKFS.Context, viewName: String): void {
   flushStdout();
 }
 
-fun dumpViews(options: Options, origContext: readonly SKFS.Context): void {
+fun dumpViews(origContext: readonly SKFS.Context): void {
   context = SKFS.Context::fromSaved(origContext.clone());
   handle = getViewsDir(context);
   sinkName = SKFS.DirName::create("/sink_" + SKFS.genSym(0) + "/");
@@ -690,7 +663,7 @@ fun dumpViews(options: Options, origContext: readonly SKFS.Context): void {
       for (view in views) {
         o(view.text);
         o(";\n");
-        for (indexDescr in getIndexByName(options, context).getArray(
+        for (indexDescr in getIndexByName(context).getArray(
           context,
           SKFS.SID(view.name.lower),
         )) {
