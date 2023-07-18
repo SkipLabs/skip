@@ -227,6 +227,30 @@ class SkdbPeer:
     traverse(insert, self.streams[table])
     return insert
 
+  def insertOrReplace(self, table: str, row):
+    rowStr = ", ".join(serialise(val) for val in row)
+    q = f"INSERT OR REPLACE INTO {table} VALUES ({rowStr});"
+    insert = Task(f"insert with replace {row} in to '{table}' on {self}", runDmlQuery(self, q))
+    self.scheduler.add(insert)
+    self.scheduler.happensBefore(self.lastTask, insert)
+    self.lastTask = insert
+    # we prime the visited set with the inverse streams. this has the
+    # effect of not sending echo responses. they are assumed to be
+    # filtered and so are always a no-op. this reduces schedule sizes
+    # dramatically (orders of magnitude), so is worth not testing
+    visited = set(s.other for s in self.streams[table] if s.other)
+    def traverse(before, streams):
+      for stream in streams:
+        if stream in visited:
+          continue
+        visited.add(stream)
+        send = stream.clockTask()
+        self.scheduler.add(send)
+        self.scheduler.happensBefore(before, send)
+        traverse(send, stream.receiver.streams[table])
+    traverse(insert, self.streams[table])
+    return insert
+
   async def query(self, schedule, query):
     return await runQuery(self, query)(schedule)
 
