@@ -981,21 +981,6 @@ fun evalWithContext(
   evaluator.stmt(context, stmt, inTransaction);
 }
 
-fun extractSql(chars: Buffer): void {
-  lex = Lexer(0, chars);
-  pos = 0;
-  while (!isEOF(lex, pos)) {
-    (!pos, test) = parseTest(lex, pos);
-    test match {
-    | TestStmt{posBegin, posEnd}
-    | TestQuery{posBegin, posEnd} ->
-      print_string(chars.slice(posBegin, posEnd));
-      print_string(";\n")
-    | _ -> void
-    }
-  };
-}
-
 fun makeSqlContext(): mutable SKFS.Context {
   gcontext = mutable SKFS.Context{
     unsafeReuse => true,
