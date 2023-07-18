@@ -244,7 +244,8 @@ class SelectFile(
   name: Name,
   virtual: Bool,
   text: String,
-  value: Select,
+  sparams: SelectParams,
+  cselect: CSelect,
 ) extends SKFS.File
 
 class Evaluator{options: Options, user: ?UserFile} {
@@ -297,7 +298,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         select = compiler.compileSelect(context, selectAst, true);
         selectDir = evalSelect(context, select, None());
         updateTableMap(context);
-        table = getTable(this.options, context, pos, name);
+        table = getTable(context, pos, name);
         dir = getDir(table);
         sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
         sinkDirName = SKFS.DirName::create(sinkName);
@@ -328,7 +329,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         None()
 
       | IValues(vals) ->
-        table = getTable(this.options, context, pos, name);
+        table = getTable(context, pos, name);
         this.insert(
           context,
           pos,
@@ -379,10 +380,22 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (ifNotExists) return None();
         error(pos, "VIEW " + viewName + " already exists");
       };
+      cselect1 = SKSQL.Compiler::create(
+        false,
+        this.options with {virtual => true},
+        selectAst.pos,
+      ).compileSelect(context, selectAst, true);
       viewsDir.write(
         context,
         key,
-        SelectFile(context.tick.value, viewName, virtual, text, selectAst),
+        SelectFile(
+          context.tick.value,
+          viewName,
+          virtual,
+          text,
+          selectAst.params,
+          cselect1,
+        ),
       );
       if (virtual) {
         if (inTransaction) {
@@ -390,12 +403,6 @@ class Evaluator{options: Options, user: ?UserFile} {
         };
         startTick = context.tick;
         // This phase just populates the data.
-        compiler1 = SKSQL.Compiler::create(
-          false,
-          this.options with {virtual => true},
-          selectAst.pos,
-        );
-        cselect1 = compiler1.compileSelect(context, selectAst, true);
         _ = SKSQL.evalSelect(context, cselect1, None());
         Some((context, delta, _) ~> {
           sameDeps = unsafeCompareSets(context.deps.data, delta.deps.data);
@@ -479,7 +486,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       };
       deleteDir = this.delete(context, pos, name, where, sets);
       updateTableMap(context);
-      table = getTable(this.options, context, pos, name);
+      table = getTable(context, pos, name);
       dir = getDir(table);
       sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
       sinkDirName = SKFS.DirName::create(sinkName);
@@ -509,7 +516,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       error(index.pos, "INDEX " + index.name.origName + " already exists");
     };
     this.write(context, input.dirName, key, index);
-    _ = getIndexOutputDir(this.options, context);
+    _ = getIndexOutputDir(context);
   }
 
   fun delete(
@@ -541,7 +548,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     selectHandle = evalSelect(context, select, None());
     selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
     updateTableMap(context);
-    table = getTable(this.options, context, pos, name);
+    table = getTable(context, pos, name);
     inputDir = getDir(table);
     SKFS.EagerDir::apply(
       context,
