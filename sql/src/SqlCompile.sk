@@ -161,6 +161,7 @@ mutable class Compiler{
   directMode: Bool,
   options: Options,
   pos: Int,
+  params: Map<String, Value>,
   mutable subst: mutable Map<Name, CGExpr> = mutable Map[],
   mutable ambiguous: mutable Set<Name> = mutable Set[],
   mutable isAggr: Bool = false,
@@ -172,8 +173,9 @@ mutable class Compiler{
     directMode: Bool,
     options: Options,
     pos: Int,
+    params: Map<String, Value>,
   ): mutable this {
-    mutable static{directMode, options, pos}
+    mutable static{directMode, options, pos, params}
   }
 
   mutable fun expandGroupBy(select: Select): Select {
@@ -853,6 +855,11 @@ mutable class Compiler{
     | VString(s) -> CSExpr(CSLiteral(s))
     | VId _ -> invariant_violation("Unexpected ID")
     | VTime _ -> invariant_violation("Unexpected TIME")
+    | VParam(handle) ->
+      this.params.maybeGet(handle) match {
+      | Some(val) -> this.compileExpr(context, val)
+      | None() -> error(this.pos, "Unbound parameter: " + handle)
+      }
     | Literal(str) ->
       if (this.ambiguous.contains(Name::create(str))) {
         error(this.pos, "Ambiguous name: " + str);

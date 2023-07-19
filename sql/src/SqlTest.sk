@@ -6,17 +6,19 @@ const tableStr: String = "CREATE TABLE t1(a INTEGER, b INTEGER);";
 
 fun evalStmt(
   context: mutable SKFS.Context,
+  params: Map<String, SKSQL.Value>,
   evaluator: SKSQL.Evaluator,
   str: String,
 ): void {
   lex = SKSQL.Lexer(0, SKSQL.Buffer(str));
   (_, stmtAst) = SKSQL.parseStmt(lex, 0);
-  _ = evaluator.stmt(context, stmtAst.fromSome(), false)
+  _ = evaluator.stmt(context, params, stmtAst.fromSome(), false)
 }
 
 fun testSql(): mutable SKFS.Context {
   SKFS.run(context ~> {
     context.!debugMode = false;
+    params: Map<String, SKSQL.Value> = Map[];
     options = SKSQL.Options{
       backtrace => false,
       alwaysAllowJoins => false,
@@ -24,28 +26,43 @@ fun testSql(): mutable SKFS.Context {
       showUsedIndexes => false,
     };
     evaluator = SKSQL.Evaluator{options, user => None()};
-    _table = evalStmt(context, evaluator, tableStr);
+    _table = evalStmt(context, params, evaluator, tableStr);
     T.expectThrow(
       () -> {
-        evalStmt(context, evaluator, "INSERT INTO tdumb(e,c) VALUES(103,102)");
+        evalStmt(
+          context,
+          params,
+          evaluator,
+          "INSERT INTO tdumb(e,c) VALUES(103,102)",
+        );
       },
       "INSERT in non-existent table",
     );
     T.expectThrow(
       () -> {
-        evalStmt(context, evaluator, "INSERT INTO t1(e) VALUES(103,102)");
+        evalStmt(
+          context,
+          params,
+          evaluator,
+          "INSERT INTO t1(e) VALUES(103,102)",
+        );
       },
       "INSERT params/values size mismatch",
     );
     T.expectThrow(
       () -> {
-        evalStmt(context, evaluator, "INSERT INTO t1(e) VALUES(103)");
+        evalStmt(context, params, evaluator, "INSERT INTO t1(e) VALUES(103)");
       },
       "INSERT schema/values size mismatch",
     );
     T.expectThrow(
       () -> {
-        evalStmt(context, evaluator, "INSERT INTO t1(b,a) VALUES(103,102)");
+        evalStmt(
+          context,
+          params,
+          evaluator,
+          "INSERT INTO t1(b,a) VALUES(103,102)",
+        );
       },
       "INSERT success",
     )
