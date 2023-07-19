@@ -1070,6 +1070,7 @@ class Options{
   virtual: Bool = false,
   showUsedIndexes: Bool,
   format: OutputFormatKind = OFK_SQL(),
+  expectQueryParams: Bool = false,
 } extends SKFS.File
 
 fun evalQuery(
@@ -1105,9 +1106,7 @@ fun evalQuery(
   result.toArray()
 }
 
-fun eval(options: Options, userOpt: ?String): void {
-  params: Map<String, Value> = Map[];
-
+fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
   isTTY = isATTY() != 0;
   runSql(options, context ~> {
     if (isTTY) {
