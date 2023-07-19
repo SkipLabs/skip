@@ -621,15 +621,15 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     !pos = lex.expect(pos, ")");
     e
   } else if (lex.isEqUpperAt(tok, "TRUE")) {
-    Literal("1", false)
+    VInt(1)
   } else if (lex.isEqUpperAt(tok, "FALSE")) {
-    Literal("0", false)
+    VInt(0)
   } else if (lex.isEqAt(tok, "'")) {
     (!pos, str) = parseString(lex, tok.posBegin);
-    Literal(str, true)
+    VString(str)
   } else if (lex.isEqUpperAt(tok, "x") && lex.isEq(pos, "'")) {
     (!pos, str) = parseString(lex, pos);
-    Literal("x" + str, false)
+    error(pos, "BLOB values are not supported: x'" + str + "'")
   } else if (lex.isEqUpperAt(tok, "NOT")) {
     (!pos, e) = parseExprWithPrio(opPriority["NOT"], lex, pos);
     Not(e)
@@ -664,10 +664,19 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
   } else if (lex.isEqAt(tok, "+")) {
     (!pos, e) = parseExprWithPrio(1, lex, pos);
     UPlus(e)
+  } else if (lex.wordAt(tok) == ">") {
+    invariant_violation("Internal error");
+  } else if (lex.wordAt(tok).lowercase() == "null") {
+    VNull()
   } else {
-    if (lex.wordAt(tok) == ">") invariant_violation("Internal error");
-    if (lex.wordAt(tok).lowercase() == "null") Literal("null", false) else {
-      Literal(lex.wordAt(tok), false)
+    str = lex.wordAt(tok);
+    str.toIntOption() match {
+    | Some(i) -> VInt(i)
+    | None() ->
+      str.toFloatOption() match {
+      | Some(i) -> VFloat(i)
+      | None() -> Literal(str)
+      }
     };
   };
 
@@ -686,7 +695,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
         !left = makeCall(pos, left, None());
       } else if (
         left match {
-        | Literal(x, _) -> x.uppercase() == "CAST"
+        | Literal(x) -> x.uppercase() == "CAST"
         | _ -> false
         }
       ) {
@@ -741,7 +750,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
 
 fun makeCall(pos: Int, left: Expr, params: ?Array<Expr>): Expr {
   left match {
-  | Literal(x, _) -> Call(x.lowercase(), params)
+  | Literal(x) -> Call(x.lowercase(), params)
   | _ -> error(pos, "Unexpected function call")
   }
 }

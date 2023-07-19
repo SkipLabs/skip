@@ -162,11 +162,10 @@ base class QUnionKind uses Orderable {
   | UIntersect()
 }
 
-base class Value {
+base class Value extends Expr {
   children =
   | VNull()
   | VInt(Int)
-  | VLShift(Int, Int)
   | VFloat(Float)
   | VString(String)
   | VId(Bool, ?String)
@@ -175,7 +174,8 @@ base class Value {
 
 base class Expr {
   children =
-  | Literal(String, Bool)
+  // name of function, or schema, table, column, or "*"
+  | Literal(String)
   | Not(Expr)
   | All(Expr)
   | Distinct(Expr)
@@ -214,6 +214,7 @@ base class Type uses Orderable {
 
 fun hasAggr(expr: Expr): Bool {
   expr match {
+  | Value _ -> false
   | Literal _ -> false
   | Not(e)
   | All(e)

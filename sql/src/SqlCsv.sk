@@ -191,14 +191,11 @@ fun lwwEdits(
     where => Some(
       SKSQL.Binop(
         "=",
-        SKSQL.Literal(table.colNames[primaryIdx].origName, false),
+        SKSQL.Literal(table.colNames[primaryIdx].origName),
         table.schema[primaryIdx].ty match {
-        | SKSQL.INTEGER() ->
-          SKSQL.Literal(row.getInt(primaryIdx).fromSome().toString(), false)
-        | SKSQL.FLOAT() ->
-          SKSQL.Literal(row.getFloat(primaryIdx).fromSome().toString(), false)
-        | SKSQL.TEXT() ->
-          SKSQL.Literal(row.getString(primaryIdx).fromSome(), true)
+        | SKSQL.INTEGER() -> SKSQL.VInt(row.getInt(primaryIdx).fromSome())
+        | SKSQL.FLOAT() -> SKSQL.VFloat(row.getFloat(primaryIdx).fromSome())
+        | SKSQL.TEXT() -> SKSQL.VString(row.getString(primaryIdx).fromSome())
         },
       ),
     ),
