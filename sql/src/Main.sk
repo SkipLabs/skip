@@ -528,7 +528,9 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   | None() -> subFilter
   | Some(strCond) ->
     from = Some(Array[SKSQL.TableName(SKSQL.FName(tableName), None())]);
-    compiler = SKSQL.Compiler::create(false, options, 0);
+    // TODO: Accept params to interpret placeholders in tail's filter arg
+    params: Map<String, SKSQL.Value> = Map[];
+    compiler = SKSQL.Compiler::create(false, options, 0, params);
     (_, ast) = SKSQL.parseExpr(SKSQL.Lexer(0, SKSQL.Buffer(strCond)), 0);
     compilerContext = gContext.mclone();
     _ = compiler.compileFrom(compilerContext, from);
