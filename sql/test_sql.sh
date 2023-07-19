@@ -3,24 +3,24 @@
 SKDB=./target/skdb
 export SKDB
 
-run_test () {
-  printf "%-40s " "$1:"
+run_one_test () {
+  printf "%-40s " "$2:"
   out1=$(mktemp)
   err1=$(mktemp)
   out2=$(mktemp)
   err2=$(mktemp)
   # a parameterized test foo.sql expects arguments in foo_args.json and
   # checks skdb on foo_args.json and foo.sql vs sqlite
-  args_file="${1%.*}"_args.json
+  args_file="${2%.*}"_args.json
   if test -f $args_file; then
-    cat $args_file $1 | $SKDB --always-allow-joins --expect-query-params 2> $err1 | sort > $out1
+    cat $args_file $2 | $1 $SKDB --always-allow-joins --expect-query-params 2> $err1 | sort > $out1
     stat1=${PIPESTATUS[1]}
-    cat <(test/params/json_args_to_sqlite_params.sh $args_file) $1 | sqlite3 2> $err2 | sort > $out2
+    cat <(test/params/json_args_to_sqlite_params.sh $args_file) $2 | $1 sqlite3 2> $err2 | sort > $out2
     stat2=${PIPESTATUS[1]}
   else
-    cat $1 | $SKDB --always-allow-joins 2> $err1 | sort > $out1
+    cat $2 | $1 $SKDB --always-allow-joins 2> $err1 | sort > $out1
     stat1=${PIPESTATUS[1]}
-    cat $1 | sqlite3 2> $err2 | sort > $out2
+    cat $2 | $1 sqlite3 2> $err2 | sort > $out2
     stat2=${PIPESTATUS[1]}
   fi
   if [ $stat1 -eq 0 ]; then
@@ -44,21 +44,17 @@ run_test () {
       fi
   fi
 }
-export -f run_test
+export -f run_one_test
 
-run_one_test () {
-  cat $1 | time $SKDB --always-allow-joins | sort > /tmp/kk1
-  cat $1 | time sqlite3 | sort > /tmp/kk2
-  diff /tmp/kk1 /tmp/kk2
-  if [ $? -eq 0 ]; then
-     echo "OK"
-  fi
+run_test () {
+  run_one_test "" $1
 }
+export -f run_test
 
 if ! [ -z "$1" ]; then
     if test -f "$1"; then
         echo "RUNNING TEST: $1"
-        run_one_test $1
+        run_one_test time $1
     else
         echo "File does not exist: $1"
     fi
