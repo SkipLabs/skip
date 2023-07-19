@@ -9,10 +9,20 @@ run_test () {
   err1=$(mktemp)
   out2=$(mktemp)
   err2=$(mktemp)
-  cat $1 | $SKDB --always-allow-joins 2> $err1 | sort > $out1
-  stat1=${PIPESTATUS[1]}
-  cat $1 | sqlite3 2> $err2 | sort > $out2
-  stat2=${PIPESTATUS[1]}
+  # a parameterized test foo.sql expects arguments in foo_args.json and
+  # checks skdb on foo_args.json and foo.sql vs sqlite
+  args_file="${1%.*}"_args.json
+  if test -f $args_file; then
+    cat $args_file $1 | $SKDB --always-allow-joins --expect-query-params 2> $err1 | sort > $out1
+    stat1=${PIPESTATUS[1]}
+    cat <(test/params/json_args_to_sqlite_params.sh $args_file) $1 | sqlite3 2> $err2 | sort > $out2
+    stat2=${PIPESTATUS[1]}
+  else
+    cat $1 | $SKDB --always-allow-joins 2> $err1 | sort > $out1
+    stat1=${PIPESTATUS[1]}
+    cat $1 | sqlite3 2> $err2 | sort > $out2
+    stat2=${PIPESTATUS[1]}
+  fi
   if [ $stat1 -eq 0 ]; then
       if [ $stat2 -eq 0 ]; then
           diff $out1 $out2 > /dev/null
