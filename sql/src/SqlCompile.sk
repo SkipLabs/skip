@@ -378,7 +378,7 @@ mutable class Compiler{
     this.noAggr(() -> {
       params.map(set -> {
         (colName, pos, e) = set;
-        this.compileExpr(context, Literal(colName.lower, false)) match {
+        this.compileExpr(context, Literal(colName.lower)) match {
         | (CIExpr(CIGetFrom(0, n))) ->
           this.compileExpr(context, e) match {
           | CGNull() -> (n, CGNull())
@@ -417,9 +417,7 @@ mutable class Compiler{
         | Some(x) -> x
         };
         for (varName in dirDescr.colNames) {
-          params.push(
-            (Literal(tableName.lower + "." + varName.lower, false), None()),
-          )
+          params.push((Literal(tableName.lower + "." + varName.lower), None()))
         }
       };
       for (extraParam in extraParams) {
@@ -444,11 +442,7 @@ mutable class Compiler{
     for (sparam in sparams) {
       sparam match {
       | (
-        Binop(
-          ".",
-          litTableName @ Literal(tableNameStr, false),
-          Literal("*", false),
-        ),
+        Binop(".", litTableName @ Literal(tableNameStr), Literal("*")),
         asName,
       ) ->
         tableName = Name::create(tableNameStr);
@@ -458,7 +452,7 @@ mutable class Compiler{
         tableDescr = origFromMap[tableName];
         for (colName in tableDescr.colNames) {
           expandedSParams.push(
-            (Binop(".", litTableName, Literal(colName.lower, false)), asName),
+            (Binop(".", litTableName, Literal(colName.lower)), asName),
           )
         }
       | _ -> expandedSParams.push(sparam)
@@ -610,7 +604,7 @@ mutable class Compiler{
     for (paramIdx => param in params.params) {
       idx = slot + paramIdx;
       param match {
-      | (Binop(".", Literal(tableNameStr, false), Literal("*", false)), _) ->
+      | (Binop(".", Literal(tableNameStr), Literal("*")), _) ->
         dirDescr = origFromMap[Name::create(tableNameStr)];
         for (tyName in dirDescr.colNames) {
           if (!cols.containsKey(tyName)) {
@@ -623,7 +617,7 @@ mutable class Compiler{
         if (cols.containsKey(colName)) continue;
         !cols[colName] = idx;
         invCols![idx] = colName
-      | (Literal(colNameStr, _), _) ->
+      | (Literal(colNameStr), _) ->
         colName = Name::create(colNameStr);
         if (cols.containsKey(colName)) continue;
         iter = colNameStr.getIter();
@@ -632,7 +626,7 @@ mutable class Compiler{
           !cols[colName] = idx;
           invCols![idx] = colName;
         }
-      | (Binop(".", _, Literal(colNameStr, _)), _) ->
+      | (Binop(".", _, Literal(colNameStr)), _) ->
         colName = Name::create(colNameStr);
         if (cols.containsKey(colName)) continue;
         !cols[colName] = idx;
@@ -819,23 +813,14 @@ mutable class Compiler{
         orderBy.map(kv -> {
           (order, kind) = kv;
           order match {
-          | Literal(n, false) ->
-            first = n.getIter().next().fromSome();
-            if (Chars.isDigit(first)) {
-              for (c in n) {
-                if (Chars.isDigit(c)) continue;
-                errorNbr(11, this.pos, "invalid ORDER BY")
-              };
-              (n.toInt(), kind)
+          | VInt(n) -> (n, kind)
+          | Literal(n) ->
+            colName = Name::create(n);
+            if (cols.containsKey(colName)) {
+              (cols[colName] + 1, kind)
             } else {
-              colName = Name::create(n);
-              if (cols.containsKey(colName)) {
-                (cols[colName] + 1, kind)
-              } else {
-                errorNbr(10, this.pos, "invalid ORDER BY, unbound name " + n)
-              }
+              errorNbr(10, this.pos, "invalid ORDER BY, unbound name " + n)
             }
-
           | _ -> errorNbr(11, this.pos, "invalid ORDER BY")
           }
         }),
@@ -862,54 +847,42 @@ mutable class Compiler{
 
   mutable fun compileExpr(context: mutable SKFS.Context, expr: Expr): CGExpr {
     expr match {
-    | Literal("null", _) -> CGNull()
-    | Literal(str, isString) ->
-      if (isString) return CSExpr(CSLiteral(str));
-      str.getIter().next() match {
-      | None() -> invariant_violation("Empty literal")
-      | Some(c) if (Chars.isDigit(c) || c == '.') ->
-        if (
-          str.contains(".") ||
-          str.contains("e") ||
-          str.contains("E") ||
-          str.contains("p") ||
-          str.contains("P")
-        ) {
-          CFExpr(CFLiteral(str.toFloat()))
-        } else {
-          CIExpr(CILiteral(str.toInt()))
-        }
-      | _ ->
-        if (this.ambiguous.contains(Name::create(str))) {
-          error(this.pos, "Ambiguous name: " + str);
+    | VNull() -> CGNull()
+    | VInt(i) -> CIExpr(CILiteral(i))
+    | VFloat(f) -> CFExpr(CFLiteral(f))
+    | VString(s) -> CSExpr(CSLiteral(s))
+    | VId _ -> invariant_violation("Unexpected ID")
+    | VTime _ -> invariant_violation("Unexpected TIME")
+    | Literal(str) ->
+      if (this.ambiguous.contains(Name::create(str))) {
+        error(this.pos, "Ambiguous name: " + str);
+      };
+      this.subst.maybeGet(Name::create(str)) match {
+      | None() -> error(this.pos, "Unbound name: " + str)
+      | Some(e) ->
+        e match {
+        | CIExpr(CUp _)
+        | CFExpr(CUp _)
+        | CSExpr(CUp _) ->
+          this.!needUp = true
+        | _ -> void
         };
-        this.subst.maybeGet(Name::create(str)) match {
-        | None() -> error(this.pos, "Unbound name: " + str)
-        | Some(e) ->
-          e match {
-          | CIExpr(CUp _)
-          | CFExpr(CUp _)
-          | CSExpr(CUp _) ->
-            this.!needUp = true
-          | _ -> void
-          };
-          if (this.isAggr) {
-            slot = this.aggrVars.size();
-            this.aggrVars.push((Noop(), e));
-            e.getType() match {
-            | INTEGER() -> CIExpr(CIGetFrom(0, slot))
-            | FLOAT() -> CFExpr(CFGetFrom(0, slot))
-            | TEXT() -> CSExpr(CSGetFrom(0, slot))
-            }
-          } else {
-            e
+        if (this.isAggr) {
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Noop(), e));
+          e.getType() match {
+          | INTEGER() -> CIExpr(CIGetFrom(0, slot))
+          | FLOAT() -> CFExpr(CFGetFrom(0, slot))
+          | TEXT() -> CSExpr(CSGetFrom(0, slot))
           }
+        } else {
+          e
         }
       }
-    | Binop(".", Literal(ge1, _), Literal(ge2, _)) ->
-      this.compileExpr(context, Literal(ge1 + "." + ge2, false))
+    | Binop(".", Literal(ge1), Literal(ge2)) ->
+      this.compileExpr(context, Literal(ge1 + "." + ge2))
 
-    | Binop("IS", e, Literal("null", _)) ->
+    | Binop("IS", e, VNull()) ->
       CIExpr(
         this.compileExpr(context, e) match {
         | CGNull() -> CILiteral(1)
@@ -919,7 +892,7 @@ mutable class Compiler{
         },
       )
 
-    | Binop("IS", e, Not(Literal("null", _))) ->
+    | Binop("IS", e, Not(VNull())) ->
       CIExpr(
         CNot(
           this.compileExpr(context, e) match {
@@ -994,7 +967,7 @@ mutable class Compiler{
 
     | Binop("LIKE", ge1, ge2) ->
       pattern = ge2 match {
-      | Literal(str, true) -> str
+      | VString(str) -> str
       | _ -> error(this.pos, "Invalid LIKE, expected a pattern")
       };
 
@@ -1070,7 +1043,7 @@ mutable class Compiler{
         error(this.pos, "id expects one argument")
       };
       args[0] match {
-      | Literal(varName, true) ->
+      | VString(varName) ->
         globals = context.getGlobal(GLOBALS) match {
         | None() -> error(this.pos, "Unknown id " + varName)
         | Some(file) -> Globals::fromFile(file)
@@ -1226,7 +1199,7 @@ mutable class Compiler{
     | SKSQL.Call("count", arg) ->
       this.noAggr(() -> {
         value = arg match {
-        | None() -> Literal("1", false)
+        | None() -> VInt(1)
         | Some(values) ->
           if (values.size() != 1) {
             error(this.pos, "Invalid number of arguments for sum")
@@ -1355,7 +1328,7 @@ mutable class Compiler{
       };
       this.compileExpr(
         context,
-        Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+        Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
       )
 
     | Call("time", Some(args)) ->
@@ -1364,7 +1337,7 @@ mutable class Compiler{
       };
       this.compileExpr(
         context,
-        Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+        Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
       )
 
     | Call("datetime", Some(args)) ->
@@ -1375,7 +1348,7 @@ mutable class Compiler{
         context,
         Call(
           "strftime",
-          Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+          Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
         ),
       )
 
@@ -1388,7 +1361,7 @@ mutable class Compiler{
 
       isStatic = for (arg in args) {
         arg match {
-        | Literal(_, true) -> void
+        | VString _ -> void
         | _ -> break false
         }
       } else {
@@ -1398,7 +1371,7 @@ mutable class Compiler{
       if (isStatic) {
         sargs = args.map(x ->
           x match {
-          | Literal(v, true) -> v
+          | VString(v) -> v
           | _ -> error(this.pos, "only static dates are supported")
           }
         );
@@ -1592,34 +1565,32 @@ mutable class Compiler{
         | None() -> (cond, JNone(), None())
         | Some(_) ->
           (
-            if (e2 is Literal("1", false)) e1 else Binop("AND", e1, e2),
+            if (e2 is VInt(1)) e1 else {
+              Binop("AND", e1, e2)
+            },
             jk2,
             join2,
           )
         }
       | Some(_) ->
         (
-          if (e1 is Literal("1", false)) e2 else Binop("AND", e1, e2),
+          if (e1 is VInt(1)) e2 else {
+            Binop("AND", e1, e2)
+          },
           jk1,
           join1,
         )
       }
-    | Binop("=", Binop(".", Literal(tname1, _), Literal(cname1, _)), e2) ->
-      this.findJoin(
-        tables,
-        Binop("=", Literal(tname1 + "." + cname1, false), e2),
-      )
+    | Binop("=", Binop(".", Literal(tname1), Literal(cname1)), e2) ->
+      this.findJoin(tables, Binop("=", Literal(tname1 + "." + cname1), e2))
 
-    | Binop("=", e1, Binop(".", Literal(tname2, _), Literal(cname2, _))) ->
-      this.findJoin(
-        tables,
-        Binop("=", e1, Literal(tname2 + "." + cname2, false)),
-      )
+    | Binop("=", e1, Binop(".", Literal(tname2), Literal(cname2))) ->
+      this.findJoin(tables, Binop("=", e1, Literal(tname2 + "." + cname2)))
 
     | Binop(
       "=",
-      Literal(name1, _),
-      Literal(name2, _),
+      Literal(name1),
+      Literal(name2),
     ) if (this.isVar(name1) && this.isVar(name2)) ->
       (this.subst[Name::create(name1)], this.subst[Name::create(name2)]) match {
       | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
@@ -1644,7 +1615,7 @@ mutable class Compiler{
         proj1 = TableProj(tableNbr1, col1Name, col1IsUnique);
         col2Name = (col2, IASC(), table2.schema[col2].ty);
         proj2 = TableProj(tableNbr2, col2Name, col2IsUnique);
-        (Literal("1", false), JInner(), Some(EqJoin(proj1, proj2)))
+        (VInt(1), JInner(), Some(EqJoin(proj1, proj2)))
       | _ -> (cond, JNone(), None())
       }
     | _ -> (cond, JNone(), None())
@@ -1950,10 +1921,10 @@ mutable class Compiler{
       op,
       Call("strftime", Some(args)),
       e2,
-    ) if (args.all(x -> x is Literal(_, true))) ->
+    ) if (args.all(x -> x is VString _)) ->
       sargs = args.map(x ->
         x match {
-        | Literal(str, _) -> str
+        | VString(str) -> str
         | _ -> invariant_violation("Unexpected type")
         }
       );
@@ -1961,17 +1932,17 @@ mutable class Compiler{
         context,
         killed,
         tables,
-        Binop(op, Literal(callStrftime(this.pos, context, sargs), true), e2),
+        Binop(op, VString(callStrftime(this.pos, context, sargs)), e2),
       )
 
     | Binop(
       op,
       e1,
       Call("strftime", Some(args)),
-    ) if (args.all(x -> x is Literal(_, true))) ->
+    ) if (args.all(x -> x is VString _)) ->
       sargs = args.map(x ->
         x match {
-        | Literal(str, _) -> str
+        | VString(str) -> str
         | _ -> invariant_violation("Unexpected type")
         }
       );
@@ -1979,7 +1950,7 @@ mutable class Compiler{
         context,
         killed,
         tables,
-        Binop(op, e1, Literal(callStrftime(this.pos, context, sargs), true)),
+        Binop(op, e1, VString(callStrftime(this.pos, context, sargs))),
       )
 
     | Binop(op, Call("date", Some(args)), e2) ->
@@ -1992,7 +1963,7 @@ mutable class Compiler{
         tables,
         Binop(
           op,
-          Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+          Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
           e2,
         ),
       )
@@ -2007,7 +1978,7 @@ mutable class Compiler{
         tables,
         Binop(
           op,
-          Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+          Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
           e2,
         ),
       )
@@ -2024,7 +1995,7 @@ mutable class Compiler{
           op,
           Call(
             "strftime",
-            Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
           ),
           e2,
         ),
@@ -2041,7 +2012,7 @@ mutable class Compiler{
         Binop(
           op,
           e1,
-          Call("strftime", Some(Array[Literal("%Y-%m-%d", true)].concat(args))),
+          Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
         ),
       )
 
@@ -2056,7 +2027,7 @@ mutable class Compiler{
         Binop(
           op,
           e1,
-          Call("strftime", Some(Array[Literal("%H:%M:%S", true)].concat(args))),
+          Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
         ),
       )
 
@@ -2073,25 +2044,25 @@ mutable class Compiler{
           e1,
           Call(
             "strftime",
-            Some(Array[Literal("%Y-%m-%d %H:%M:%S", true)].concat(args)),
+            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
           ),
         ),
       )
 
-    | Binop(op, Binop(".", Literal(tname1, _), Literal(cname1, _)), e2) ->
+    | Binop(op, Binop(".", Literal(tname1), Literal(cname1)), e2) ->
       this.findLookUps(
         context,
         killed,
         tables,
-        Binop(op, Literal(tname1 + "." + cname1, false), e2),
+        Binop(op, Literal(tname1 + "." + cname1), e2),
       )
 
-    | Binop(op, e1, Binop(".", Literal(tname2, _), Literal(cname2, _))) ->
+    | Binop(op, e1, Binop(".", Literal(tname2), Literal(cname2))) ->
       this.findLookUps(
         context,
         killed,
         tables,
-        Binop(op, e1, Literal(tname2 + "." + cname2, false)),
+        Binop(op, e1, Literal(tname2 + "." + cname2)),
       )
 
     | Binop("AND", e1, e2) ->
@@ -2105,8 +2076,8 @@ mutable class Compiler{
 
     | Binop(
       _,
-      Literal(name1, _),
-      Literal(name2, _),
+      Literal(name1),
+      Literal(name2),
     ) if (this.isVar(name1) && this.isVar(name2)) ->
       LookUps[]
 
@@ -2120,10 +2091,11 @@ mutable class Compiler{
       };
       this.findLookUps(context, killed, tables, acc)
 
+    | Binop(op, e1 @ Value _, e2 @ Literal(name2))
     | Binop(
       op,
       e1 @ Literal _,
-      e2 @ Literal(name2, _),
+      e2 @ Literal(name2),
     ) if (this.isVar(name2)) ->
       !op = op match {
       | "=" -> op
@@ -2135,7 +2107,12 @@ mutable class Compiler{
       };
       this.findLookUps(context, killed, tables, Binop(op, e2, e1))
 
-    | Binop(op, Literal(name1, _), e @ Literal _) if (this.isVar(name1)) ->
+    | Binop(op, Literal(name1), e @ Value _)
+    | Binop(
+      op,
+      Literal(name1),
+      e @ Literal _,
+    ) if (this.isVar(name1)) ->
       op match {
       | "=" | "<" | "<=" | ">" | ">=" -> void
       | _ -> return LookUps[]

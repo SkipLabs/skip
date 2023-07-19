@@ -207,7 +207,6 @@ fun valueToCValue(
         _ = SKFS.genSym(Math.abs(n));
       };
       Some(CInt(n))
-    | VLShift(n1, n2) -> Some(CInt(n1.shl(n2)))
     | v ->
       error(
         pos,
@@ -740,11 +739,11 @@ class Evaluator{options: Options, user: ?UserFile} {
                     tyDescr = table.schema[idx];
                     clause = Binop(
                       "=",
-                      Literal(tyDescr.name.lower, false),
+                      Literal(tyDescr.name.lower),
                       conValue match {
-                      | None() -> Literal("null", false)
-                      | Some(CInt(n)) -> Literal(n.toString(), false)
-                      | Some(CString(s)) -> Literal(s, true)
+                      | None() -> VNull()
+                      | Some(CInt(n)) -> VInt(n)
+                      | Some(CString(s)) -> VString(s)
                       | _ ->
                         error(pos, "Unsupported type for OR IGNORE/REPLACE")
                       },
