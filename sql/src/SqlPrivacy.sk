@@ -1,6 +1,44 @@
 module SKSQL;
 
 /*****************************************************************************/
+// Permission class.
+
+// They are ultimately represented by integers, but in the code, that
+// could be error prone.
+/*****************************************************************************/
+
+value class Permission(private perm: Int) {
+  static fun none(): this {
+    Permission(0)
+  }
+  static fun all(): this {
+    Permission(7)
+  }
+
+  fun canRead(): Bool {
+    this.perm.and(4) != 0
+  }
+  fun canInsert(): Bool {
+    this.perm.and(2) != 0
+  }
+  fun canDelete(): Bool {
+    this.perm.and(1) != 0
+  }
+
+  fun or(y: Permission): Permission {
+    Permission(this.perm.and(y.perm))
+  }
+
+  fun and(y: Permission): Permission {
+    Permission(this.perm.and(y.perm))
+  }
+
+  fun toInt(): Int {
+    this.perm
+  }
+}
+
+/*****************************************************************************/
 // Predefined columns.
 /*****************************************************************************/
 
@@ -485,8 +523,8 @@ fun checkUserCanWriteRow(
 
 mutable class AccessSolver private {
   userID: Int,
-  userMask: Int,
-  private cache: mutable Map<Int, Int> = mutable Map[],
+  userMask: Permission,
+  private cache: mutable Map<Int, Permission> = mutable Map[],
   private mutable currentTick: SKFS.Tick = SKFS.Tick(-1),
 } {
   static fun create(
@@ -504,12 +542,16 @@ mutable class AccessSolver private {
         // We could not find permissions specific to the table. if the
         // column skdb_group is defined then we want to be permissive,
         // otherwise we don't
-        if (table.cols.maybeGet(skdbGroupColName) is Some _) 7 else 0
+        if (table.cols.maybeGet(skdbGroupColName) is Some _) {
+          Permission::all()
+        } else {
+          Permission::none()
+        }
       | Some(allTablesPermissions) ->
-        allTablesPermissions.getInt(permissionsColName)
+        Permission(allTablesPermissions.getInt(permissionsColName))
       }
     | Some(thisTablePermissions) ->
-      thisTablePermissions.getInt(permissionsColName)
+      Permission(thisTablePermissions.getInt(permissionsColName))
     };
     userIndex = skdbUserPermissions.getIndex(context);
     userPermissions = userIndex.get(
@@ -521,32 +563,32 @@ mutable class AccessSolver private {
         // We could not find permissions specific to the user. We want
         // to be permissive, because the skdb_user table is only there
         // to restrict (not grant) access.
-        7
+        Permission::all()
       | Some(allUsersPermissions) ->
-        allUsersPermissions.getInt(permissionsColName)
+        Permission(allUsersPermissions.getInt(permissionsColName))
       }
     | Some(thisUserPermissions) ->
-      thisUserPermissions.getInt(permissionsColName)
+      Permission(thisUserPermissions.getInt(permissionsColName))
     };
     mutable static{userID, userMask => tablePermissions.and(userPermissions)}
   }
 
   readonly fun canReadTable(): Bool {
-    this.userMask.and(4) != 0
+    this.userMask.canRead()
   }
 
   readonly fun canInsertIntoTable(): Bool {
-    this.userMask.and(2) != 0
+    this.userMask.canInsert()
   }
 
   readonly fun canDeleteFromTable(): Bool {
-    this.userMask.and(1) != 0
+    this.userMask.canDelete()
   }
 
-  mutable fun getPermissions(
+  private mutable fun getPermissions(
     context: readonly SKFS.Context,
     groupID: Int,
-  ): Int {
+  ): Permission {
     if (context.tick != this.currentTick) {
       this.cache.clear();
       this.!currentTick = context.tick;
@@ -563,7 +605,7 @@ mutable class AccessSolver private {
   private mutable fun getPermissionsNoCache(
     context: readonly SKFS.Context,
     groupID: Int,
-  ): Int {
+  ): Permission {
     // Let's first check if the groupID is in fact our userID
     userIndex = skdbUsersByID.getIndex(context);
     if (userIndex.get(skdbUsersByID.makeKey(groupID)) is Some _) {
@@ -572,7 +614,7 @@ mutable class AccessSolver private {
       if (groupID == this.userID) {
         return this.userMask;
       } else {
-        return 0
+        return Permission::none()
       };
     };
     // The ID is not a userID, let's lookup the groupID
@@ -584,21 +626,21 @@ mutable class AccessSolver private {
     | x @ Some _ -> x
     };
     row match {
-    | None() -> 0
-    | Some(x) -> x.getInt(permissionsColName)
+    | None() -> Permission::none()
+    | Some(x) -> Permission(x.getInt(permissionsColName))
     }
   }
 
   mutable fun canRead(context: readonly SKFS.Context, groupID: Int): Bool {
-    this.getPermissions(context, groupID).and(4) != 0
+    this.getPermissions(context, groupID).canRead()
   }
 
   mutable fun canInsert(context: readonly SKFS.Context, groupID: Int): Bool {
-    this.getPermissions(context, groupID).and(2) != 0
+    this.getPermissions(context, groupID).canInsert()
   }
 
   mutable fun canDelete(context: readonly SKFS.Context, groupID: Int): Bool {
-    this.getPermissions(context, groupID).and(1) != 0
+    this.getPermissions(context, groupID).canDelete()
   }
 }
 
