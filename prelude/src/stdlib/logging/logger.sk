@@ -1,0 +1,101 @@
+module Logger;
+
+class Metadata(
+  timestamp: Int,
+  typename: String,
+  filename: String,
+  lineno: Int,
+) {
+  static fun create(typename: String, filename: String, lineno: Int): Metadata {
+    Metadata(Time.time(), typename, filename, lineno)
+  }
+}
+
+base class Level uses Show {
+  children =
+  | Trace()
+  | Debug()
+  | Info()
+  | Error()
+
+  fun toString(): String
+  | Trace() -> "TRACE"
+  | Debug() -> "DEBUG"
+  | Info() -> "INFO"
+  | Error() -> "ERROR"
+
+  fun priority(): Int
+  | Trace() -> 0
+  | Debug() -> 1
+  | Info() -> 2
+  | Error() -> 3
+}
+
+class Config{minLevel: Level = Error(), color: Bool = false} {
+  static fun create(str: String, color: String): Config {
+    Config{
+      minLevel => str match {
+      | "TRACE" -> Trace()
+      | "DEBUG" -> Debug()
+      | "INFO" -> Info()
+      | "ERROR" -> Error()
+      | _ -> invariant_violation("Unrecognized log level " + str)
+      },
+      color => color match {
+      | "auto" -> IO.stderr().isatty()
+      | "always" -> true
+      | "never" | _ -> false
+      },
+    }
+  }
+}
+
+base class LoggerBase(config: Config = Config{}) {
+  fun trace(msg: String, meta: Metadata): void {
+    this.log(Trace(), msg, meta)
+  }
+
+  fun debug(msg: String, meta: Metadata): void {
+    this.log(Debug(), msg, meta)
+  }
+
+  fun info(msg: String, meta: Metadata): void {
+    this.log(Info(), msg, meta)
+  }
+
+  fun error(msg: String, meta: Metadata): void {
+    this.log(Error(), msg, meta)
+  }
+
+  fun log(level: Level, msg: String, meta: Metadata): void {
+    if (level.priority() < this.config.minLevel.priority()) {
+      return void
+    };
+
+    this.write(this.format(level, msg, meta))
+  }
+
+  overridable fun format(level: Level, msg: String, meta: Metadata): String {
+    timestamp = Time.strftime("%Y-%m-%dT%H:%M:%S", meta.timestamp);
+    if (this.config.color) {
+      color = level match {
+      | Trace()
+      | Debug() ->
+        TermColor.Default()
+      | Info() -> TermColor.Magenta()
+      | Error() -> TermColor.Red()
+      };
+      `${meta.filename}:${meta.lineno} ${timestamp} ` +
+        TermColor.colored(`[${level}]`, color) +
+        ` - ${msg}`
+    } else {
+      `${meta.filename}:${meta.lineno} ${timestamp} [${level}] - ${msg}`
+    }
+  }
+
+  overridable fun write(msg: String): void {
+    print_error(msg)
+  }
+}
+
+class .Logger() extends LoggerBase {}
