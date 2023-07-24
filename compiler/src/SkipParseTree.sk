@@ -1612,6 +1612,43 @@ class ForEachFunctionMacroTree{
   }
 }
 
+class LogMacroTree{
+  keyword: ParseTree.ParseTree,
+  params: ParseTree.ParseTree,
+} extends ParseTree.ParseTree {
+  fun getNamedFields(): List<(String, ParseTree.ParseTree)> {
+    List<(String, ParseTree.ParseTree)>[
+      ("keyword", this.keyword),
+      ("params", this.params),
+    ];
+  }
+
+  fun getKind(): String {
+    "LogMacro";
+  }
+
+  fun getChildren(): mutable Iterator<ParseTree.ParseTree> {
+    yield this.keyword;
+    yield this.params;
+    yield break;
+  }
+
+  fun transform(
+    codemod: mutable CodeMod,
+  ): (ParseTree.ParseTree, Vector<Subst>) {
+    tx_keyword = codemod.transform(this.keyword);
+    tx_params = codemod.transform(this.params);
+    (
+      LogMacroTree{
+        range => this.range,
+        keyword => tx_keyword.i0,
+        params => tx_params.i0,
+      },
+      Vector[tx_keyword.i1, tx_params.i1].flatten(),
+    );
+  }
+}
+
 class ForEachKeyValueTree{
   key: ParseTree.ParseTree,
   fatArrow: ParseTree.ParseTree,
