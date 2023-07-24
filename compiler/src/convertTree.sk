@@ -701,6 +701,8 @@ class Converter{filename: String} {
       this.convertForEachFieldMacro(this.convertRange(range), params, body)
     | ParseTree.ForEachFunctionMacroTree{range, params, body} ->
       this.convertForEachFunctionMacro(this.convertRange(range), params, body)
+    | ParseTree.LogMacroTree{range, params} ->
+      this.convertLogMacro(this.convertRange(range), params)
     | _ ->
       invariant_violation("Unexpected expression: " + this.treeToString(tree))
     }
@@ -820,6 +822,62 @@ class Converter{filename: String} {
       },
       this.convertExpression(body),
     );
+  }
+
+  fun convertLogMacro(range: FileRange, params: ParseTree): SkipAst.Expr_ {
+    args = (params as ParseTree.PositionalArgumentsTree _).arguments.getList();
+    metadata = (
+      range,
+      SkipAst.Call(
+        (
+          range,
+          SkipAst.StaticDot(
+            (
+              range,
+              SkipAst.Dot(
+                (
+                  range,
+                  SkipAst.Cstr((range, "Logger"), Array[]),
+                ),
+                (range, "Metadata"),
+              ),
+            ),
+            (range, "create"),
+          ),
+        ),
+        Array[],
+        Positional(
+          Array[
+            (
+              0,
+              (
+                range,
+                SkipAst.Literal(SkipAst.StringLiteral("module(todo)")),
+              ),
+            ),
+            (
+              1,
+              (
+                range,
+                SkipAst.Literal(SkipAst.StringLiteral(range.filename)),
+              ),
+            ),
+            (
+              2,
+              (
+                range,
+                SkipAst.Literal(SkipAst.IntLiteral(range.range.start.line())),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    SkipAst.Call(
+      this.convertExpression(args[0]),
+      Array[],
+      Positional(Array[(0, this.convertExpression(args[1])), (1, metadata)]),
+    )
   }
 
   fun convertForEachBinding(binding: ParseTree): SkipAst.ForEachBinding {

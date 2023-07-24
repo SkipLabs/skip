@@ -4512,7 +4512,8 @@ mutable class SkipParser{
     | TokenKind.CONTINUE()
     | TokenKind.YIELD()
     | TokenKind.FOREACH_FIELD()
-    | TokenKind.FOREACH_FUNCTION() ->
+    | TokenKind.FOREACH_FUNCTION()
+    | TokenKind.LOG() ->
       true
     // async, untracked, mutable, static and class can start a declaration, so must disambiguate after functions
     // which have pattern branch lists as bodies
@@ -4554,6 +4555,7 @@ mutable class SkipParser{
     this.peek() match {
     | TokenKind.FOREACH_FIELD() -> this.parseForEachFieldMacro()
     | TokenKind.FOREACH_FUNCTION() -> this.parseForEachFunctionMacro()
+    | TokenKind.LOG() -> this.parseLogMacro()
     | _ -> this.parseWithExpression()
     }
   }
@@ -4748,6 +4750,34 @@ mutable class SkipParser{
     }
   }
 
+  // log:
+  //    #log  (  expression  ,  expression  )
+  mutable fun parseLogMacro(): ParseTree {
+    start = this.mark();
+    keyword = this.eatTree(TokenKind.LOG());
+
+    params = this.parsePositionalArguments() as ParseTree.PositionalArgumentsTree _;
+    arguments = params.arguments as ParseTree.ParseTreeList _;
+    arguments.elements.size() match {
+    | 0
+    | 1 ->
+      this.addErrorAtTree(
+        arguments.endDelimiter,
+        errorExpectedLogArguments,
+        `Not enough arguments to '#log'. Expected 2, found ${arguments.elements.size()}`,
+      )
+    | 2 -> void
+    | _ ->
+      this.addErrorAtTree(
+        arguments.elements[2],
+        errorTooManyLogArguments,
+        `Too many arguments to '#log'. Expected 2, found ${arguments.elements.size()}`,
+      )
+    };
+
+    ParseTree.LogMacroTree{range => this.createRange(start), keyword, params}
+  }
+
   // for-each-loop-expression:
   //    forEach  (  for-each-value  in  expression  )  binding-expression  else-branch-opt
   mutable fun parseForEachLoopExpression(): ParseTree {
@@ -4918,7 +4948,8 @@ mutable class SkipParser{
     | ParseTree.YieldExpressionTree _
     | ParseTree.YieldBreakExpressionTree _
     | ParseTree.ForEachFieldMacroTree _
-    | ParseTree.ForEachFunctionMacroTree _ ->
+    | ParseTree.ForEachFunctionMacroTree _
+    | ParseTree.LogMacroTree _ ->
       void
 
     | ParseTree.CallArrayExpressionTree{func, bang} ->
@@ -5232,5 +5263,7 @@ const errorDeclareOutsideModule: Int = 190;
 const errorExpectedForEachFieldArguments: Int = 191;
 const errorTooManyForEachFieldArguments: Int = 192;
 const errorLambdaTypeExpected: Int = 193;
+const errorExpectedLogArguments: Int = 194;
+const errorTooManyLogArguments: Int = 195;
 
 module end;
