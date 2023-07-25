@@ -18,6 +18,7 @@ base class Value uses Show, Equality {
   children =
   | BoolValue(Bool)
   | StringValue(String)
+  | IntValue(Int)
   | ArrayValue(Array<String>)
   | MissingValue()
 
@@ -25,6 +26,7 @@ base class Value uses Show, Equality {
   | MissingValue() -> "(no value)"
   | BoolValue(v) -> v.toString()
   | StringValue(v) -> `"${v}"`
+  | IntValue(v) -> v.toString()
   | ArrayValue(v) -> "[" + v.map(x -> `"${x}"`).join(", ") + "]"
 }
 
@@ -53,6 +55,22 @@ class ParseResults{
 
   fun getString(name: String): String {
     this.maybeGetString(name) match {
+    | Some(s) -> s
+    | None() -> invariant_violation(`Argument ${name} is missing`)
+    }
+  }
+
+  fun maybeGetInt(name: String): ?Int {
+    this.values.maybeGet(name) match {
+    | Some(IntValue(v)) -> Some(v)
+    | Some(MissingValue()) -> None()
+    | Some(_) -> invariant_violation(`Argument ${name} is not an int`)
+    | None() -> invariant_violation(`Argument ${name} is undefined`)
+    }
+  }
+
+  fun getInt(name: String): Int {
+    this.maybeGetInt(name) match {
     | Some(s) -> s
     | None() -> invariant_violation(`Argument ${name} is missing`)
     }
@@ -107,6 +125,15 @@ private fun updateValue(
   | StringArg _ ->
     if (!values.containsKey(arg.name)) {
       values.set(arg.name, StringValue(value))
+    } else {
+      return Some(DuplicateValueError(arg.name))
+    }
+  | IntArg _ ->
+    if (!values.containsKey(arg.name)) {
+      value.toIntOption() match {
+      | Some(v) -> values.set(arg.name, IntValue(v))
+      | _ -> return Some(InvalidArgumentError(arg.name))
+      }
     } else {
       return Some(DuplicateValueError(arg.name))
     }

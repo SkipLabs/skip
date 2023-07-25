@@ -58,6 +58,24 @@ class StringArg extends Arg {
   }
 }
 
+class IntArg extends Arg {
+  fun default(value: Int): this {
+    this with {_default => Some(IntValue(value))}
+  }
+
+  fun required(value: Bool = true): this {
+    this with {_required => value}
+  }
+
+  fun _defaultValue(): Value {
+    this._default.default(MissingValue())
+  }
+
+  fun _takesValue(): Bool {
+    true
+  }
+}
+
 class BoolArg extends Arg {
   fun default(value: Bool): this {
     this with {_default => Some(BoolValue(value))}

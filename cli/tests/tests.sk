@@ -247,3 +247,41 @@ fun shortOnlyWithValueNoSpace(): void {
 
   T.expectEq(args.getString("bar"), "2");
 }
+
+@test
+fun intArgs(): void {
+  cmd = Cli.Command("foo").arg(Cli.IntArg("bar")).arg(Cli.IntArg("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "1337", "--baz=-123"]);
+
+  T.expectEq(args.getInt("bar"), 1337);
+  T.expectEq(args.getInt("baz"), -123);
+}
+
+@test
+fun intArgsDefault(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.IntArg("bar").default(42))
+    .arg(Cli.IntArg("baz").default(101010));
+  args = Cli.parseArgsFrom(cmd, Array["--baz=1337"]);
+
+  T.expectEq(args.getInt("bar"), 42);
+  T.expectEq(args.getInt("baz"), 1337);
+}
+
+@test
+fun intArgsPositional(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.StringArg("bar"))
+    .arg(Cli.IntArg("baz").positional());
+  args = Cli.parseArgsFrom(cmd, Array["--bar=foo", "1337"]);
+
+  T.expectEq(args.getInt("baz"), 1337);
+}
+
+@test
+fun intArgsInvalid(): void {
+  cmd = Cli.Command("foo").arg(Cli.IntArg("bar")).arg(Cli.IntArg("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "foo", "--baz=123"]);
+
+  T.expectTrue(args.error is Some(Cli.InvalidArgumentError _));
+}
