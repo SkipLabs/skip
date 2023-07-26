@@ -29,10 +29,11 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
   compile(bc, "test", env.manifest.testHarness);
   filter = args.maybeGetString("filter");
   junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
+  jobs = args.getInt("jobs");
 
   Posix.execvp(
     Array[Path.join(bc.targetDir, "test")].concat(
-      Array[junitxml, filter].filterNone(),
+      Array[junitxml, filter, Some(`-j${jobs}`)].filterNone(),
     ),
   )
 }
@@ -153,6 +154,13 @@ fun main(): void {
             .about(
               "If specified, only run tests with names matching the filter",
             ),
+        )
+        .arg(
+          Cli.IntArg("jobs")
+            .long("jobs")
+            .short("j")
+            .default(8)
+            .about("Number of parallel jobs, defaults to # of CPUs"),
         )
         .arg(Cli.StringArg("target").about("Check for the target triple"))
         .arg(

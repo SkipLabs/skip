@@ -1,7 +1,48 @@
 module SKTest;
 
+class TestResult{
+  name: String,
+  suite: String,
+  file: String,
+  line: Int,
+  result: String = "",
+  time: Int = -1,
+  failure_type: String = "",
+  failure_message: String = "",
+  failure_extra: String = "",
+} {
+  static fun fromJSON(s: String): TestResult {
+    v = JSON.decode(s).expectMap();
+    TestResult{
+      name => v["name"].expectString(),
+      suite => v["suite"].expectString(),
+      file => v["file"].expectString(),
+      line => v["line"].expectInt(),
+      result => v["result"].expectString(),
+      time => v["time"].expectInt(),
+      failure_type => v["failure_type"].expectString(),
+      failure_message => v["failure_message"].expectString(),
+      failure_extra => v["failure_extra"].expectString(),
+    }
+  }
+
+  fun toJSON(): String {
+    JSON.Object[
+      "name" => JSON.String(this.name),
+      "suite" => JSON.String(this.suite),
+      "file" => JSON.String(this.file),
+      "line" => JSON.IntNumber(this.line),
+      "result" => JSON.String(this.result),
+      "time" => JSON.IntNumber(this.time),
+      "failure_type" => JSON.String(this.failure_type),
+      "failure_message" => JSON.String(this.failure_message),
+      "failure_extra" => JSON.String(this.failure_extra),
+    ].encode()
+  }
+}
+
 mutable base class TestReporter{output: ?String = None()} {
-  mutable fun report(suite: String, name: String, error: ?Exception): void;
+  mutable fun report(res: TestResult): void;
   mutable fun writeLine(str: String): void {
     this.output match {
     | Some(file) -> FileSystem.appendTextFile(file, str + "\n")
@@ -18,14 +59,14 @@ mutable class BasicTestReporter{
   private mutable successes: Int = 0,
   private mutable failures: Int = 0,
 } extends TestReporter {
-  mutable fun report(suite: String, name: String, error: ?Exception): void {
-    result = error match {
-    | Some(exn) ->
-      this.!failures = this.failures + 1;
-      this.failure() + ` ${suite} ${name}\n${exn.getMessage()}`
-    | None() ->
+  mutable fun report(res: TestResult): void {
+    result = if (res.result == "success") {
       this.!successes = this.successes + 1;
-      this.success() + ` ${suite} ${name}`
+      this.success() + ` ${res.suite} ${res.name}`
+    } else {
+      this.!failures = this.failures + 1;
+      this.failure() +
+        ` ${res.suite} ${res.name}\n${res.failure_type}: ${res.failure_message}`
     };
     this.writeLine(result)
   }
@@ -60,16 +101,13 @@ mutable class BasicTestReporter{
 }
 
 mutable class XmlTestReporter{
-  results: mutable Map<String, mutable Map<String, ?Exception>> = mutable Map[],
+  results: mutable Map<String, mutable Vector<TestResult>> = mutable Map[],
 } extends TestReporter {
-  mutable fun report(suite: String, name: String, error: ?Exception): void {
-    if (!this.results.containsKey(suite)) {
-      this.results.set(suite, mutable Map[])
+  mutable fun report(res: TestResult): void {
+    if (!this.results.containsKey(res.suite)) {
+      this.results.set(res.suite, mutable Vector[])
     };
-    if (this.results[suite].containsKey(name)) {
-      invariant_violation("Duplicate test: " + name)
-    };
-    this.results[suite].set(name, error)
+    this.results[res.suite].push(res)
   }
 
   mutable fun finish(): void {
@@ -78,26 +116,34 @@ mutable class XmlTestReporter{
       .map(x -> x.size())
       .foldl((acc, x) -> acc + x, 0);
     totalFailures = this.results.values()
-      .map(ts -> ts.values().filterNone().collect(Array).size())
+      .map(ts ->
+        ts.values().filter(r -> r.result != "success").collect(Array).size()
+      )
       .foldl((acc, x) -> acc + x, 0);
     this.writeLine(
       `<testsuites tests="${totalTests}" failures="${totalFailures}" errors="0" time="0" timestamp="0" name="AllTests">`,
     );
     for ((testSuiteName, results) in this.results.items()) {
       numTests = results.size();
-      numFailures = results.values().filterNone().collect(Array).size();
+      numFailures = results.filter(r -> r.result == "failure").size();
+      numErrors = results.filter(r -> r.result == "error").size();
+      totalTime = 0; // TODO
       this.writeLine(
-        `  <testsuite name="${testSuiteName}" tests="${numTests}" failures="${numFailures}" errors="0" time="0">`,
+        `  <testsuite name="${testSuiteName}" tests="${numTests}" failures="${numFailures}" errors="${numErrors}" time="${totalTime}">`,
       );
-      for ((testName, error) in results.items()) {
+      for (res in results) {
         this.writeLine(
-          `    <testcase name="${testName}" file="TODO.sk" line="0" status="run" time="0" classname="">`,
+          `    <testcase name="${res.name}" file="${res.file}" line="${
+            res.line
+          }" time="${res.time}" classname="${res.suite}">`,
         );
-        error.each(exn -> {
+        if (res.result != "success") {
           this.writeLine(
-            `      <failure message="${exn.getMessage()}" type="">TODO: test output</failure>`,
+            `      <failure message="${res.failure_message}" type="${
+              res.failure_type
+            }">${res.failure_extra}</failure>`,
           )
-        });
+        };
         this.writeLine("    </testcase>")
       };
       this.writeLine("  </testsuite>");
