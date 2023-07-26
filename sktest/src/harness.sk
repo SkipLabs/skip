@@ -1,5 +1,59 @@
 module SKTest;
 
+fun test_job(
+  tests: readonly Map<String, readonly Map<String, () -> void>>,
+  filter: String,
+  njobs: Int,
+  rank: Int,
+  pipe: mutable IO.File,
+): void {
+  i = 0;
+  for (testSuite in tests.keys()) {
+    for ((testName, testFun) in tests[testSuite].items()) {
+      if (!(testSuite + "." + testName).contains(filter)) {
+        continue
+      };
+      !i = i + 1;
+      if (i % njobs != rank) {
+        continue
+      };
+      res = TestResult{
+        name => testName,
+        suite => testSuite,
+        file => "TODO",
+        line => -1,
+      };
+      !res = try {
+        _ = testFun();
+        res with {
+          result => "success",
+          // TODO: test time
+          time => -1,
+        }
+      } catch {
+      | ExpectationError(msg, _, _) ->
+        res with {
+          result => "failure",
+          time => -1,
+          failure_type => "ExpectationError",
+          failure_message => msg,
+          failure_extra => "TODO",
+        }
+      | exn ->
+        res with {
+          result => "error",
+          time => -1,
+          failure_type => inspect(exn).toString(),
+          failure_message => exn.getMessage(),
+          failure_extra => "TODO",
+        }
+      };
+      pipe.write_all(res.toJSON() + "\n");
+    }
+  };
+  Posix.close(pipe.fileno)
+}
+
 fun test_harness(
   tests: readonly Map<String, readonly Map<String, () -> void>>,
 ): void {
@@ -11,6 +65,13 @@ fun test_harness(
         .about(
           "If specified, only run tests containing this string in their names",
         ),
+    )
+    .arg(
+      Cli.IntArg("jobs")
+        .long("jobs")
+        .short("j")
+        .about("Number of parallel jobs, defaults to # of CPUs")
+        .default(8), // TODO: Properly determine available cores.
     )
     .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report"))
     .arg(
@@ -30,20 +91,48 @@ fun test_harness(
   );
   filter = args.maybeGetString("filter").default("");
 
+  njobs = args.getInt("jobs");
+  fds = Range(0, njobs).map(rank -> {
+    pipe = Posix.pipe();
+    _ = Posix.Popen::createFromLambda{
+      target => () -> {
+        Posix.close(pipe.output);
+        test_job(tests, filter, njobs, rank, mutable IO.File(pipe.input))
+      },
+      stdout => true,
+      stderr => true,
+    };
+    Posix.close(pipe.input);
+
+    pipe.output
+  });
+  readers = Array::createFromItems(
+    fds.map(fd -> mutable IO.BufferedReader(mutable IO.File(fd))),
+  );
+  pollfds = Array::mcreateFromItems(
+    fds.map(fd -> Posix.Pollfd::create(fd)),
+  );
+  open_fds = fds.size();
   success = true;
-  for (testSuite in tests.keys()) {
-    for ((testName, testFun) in tests[testSuite].items()) {
-      if (!(testSuite + "." + testName).contains(filter)) {
-        continue
-      };
-      try {
-        _ = testFun();
-        // TODO: reportSuccess/reportFailure.
-        reporters.each(r -> r.report(testSuite, testName, None()))
-      } catch {
-      | exn ->
-        reporters.each(r -> r.report(testSuite, testName, Some(exn)));
-        !success = false
+  while (open_fds > 0) {
+    _ = Posix.poll(pollfds);
+    for ((i, pfd) in pollfds.items()) {
+      if (pfd.pollin()) {
+        loop {
+          line = readers[i].read_line();
+          res = TestResult::fromJSON(line);
+          if (res.result != "success") {
+            !success = false
+          };
+          reporters.each(x -> x.report(res));
+          if (readers[i].buffer.length() == 0) {
+            break void
+          }
+        }
+      } else if (pfd.fd != -1 && (pfd.pollerr() || pfd.pollhup())) {
+        pollfds.set(i, Posix.Pollfd::create(-1));
+        Posix.close(pfd.fd.toInt());
+        !open_fds = open_fds - 1
       }
     }
   };

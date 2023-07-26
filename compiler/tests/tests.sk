@@ -12,8 +12,6 @@ private fun compile_cmd(
     "--no-inline",
     "--export-function-as",
     "main=skip_main",
-    "--data",
-    "tests/state.db",
     "-o",
     output,
   ].concat(files.collect(Array))
@@ -80,24 +78,6 @@ fun main(): void {
   stdlibSrcs = FileSystem.readFilesRecursive("../prelude/src")
     .concat(FileSystem.readFilesRecursive("../skfs/src"))
     .collect(Array);
-
-  p = System.subprocess(Array["rm", "-f", "tests/state.db"]);
-  if (!p.success()) {
-    print_error(`command failed: ${p.args.join(" ")}`);
-    print_error(`stdout:\n${p.stdout}`);
-    print_error(`stderr:\n${p.stderr}`);
-    skipExit(1)
-  };
-
-  !p = System.subprocess(
-    Array["skc", "--init", "tests/state.db", "--check"].concat(stdlibSrcs),
-  );
-  if (!p.success()) {
-    print_error(`command failed: ${p.args.join(" ")}`);
-    print_error(`stdout:\n${p.stdout}`);
-    print_error(`stderr:\n${p.stderr}`);
-    skipExit(1)
-  };
 
   validTests = FileSystem.readFilesRecursive("./tests", fn ->
     fn.endsWith(".exp") && !fn.contains("invalid/")
