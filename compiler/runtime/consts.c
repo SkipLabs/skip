@@ -14,6 +14,7 @@
 /*****************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "runtime.h"
 
 #define MCONSTS_INIT_SIZE 1024
@@ -38,22 +39,21 @@ void SKIP_unsafe_disable_new_const_mode() {
 }
 
 char* sk_new_const(char* cst) {
-
-  if((*pconsts) != NULL) {
+  if ((*pconsts) != NULL) {
     void* pcst = (*pconsts)[pconsts_count];
-    if(SKIP_isEq(pcst, cst) == 0) {
+    if (SKIP_isEq(pcst, cst) == 0) {
       pconsts_count++;
       return pcst;
     }
-    #ifdef SKIP64
-    if(!sk_is_nofile_mode()) {
-      if(unsafe_new_const_mode) {
+#ifdef SKIP64
+    if (!sk_is_nofile_mode()) {
+      if (unsafe_new_const_mode) {
         return cst;
       }
       fprintf(stderr, "Cannot have a changing constant in persitent mode\n");
       SKIP_throw_cruntime(ERROR_CHANGING_CONST);
     }
-    #endif
+#endif
     sk_global_lock();
     char* icst = SKIP_intern_shared(cst);
     sk_free_root((*pconsts)[pconsts_count]);
@@ -63,12 +63,12 @@ char* sk_new_const(char* cst) {
     return icst;
   }
 
-  if(mconsts == NULL) {
+  if (mconsts == NULL) {
     mconsts = (void**)sk_malloc(MCONSTS_INIT_SIZE * sizeof(void*));
     mconsts_size = MCONSTS_INIT_SIZE;
   }
 
-  if(mconsts_count >= mconsts_size) {
+  if (mconsts_count >= mconsts_size) {
     size_t new_size = mconsts_size * 2;
     void** new_mconsts = (void**)sk_malloc(new_size * sizeof(void*));
     memcpy(new_mconsts, mconsts, mconsts_size * sizeof(void*));
@@ -95,7 +95,7 @@ char* sk_new_const(char* cst) {
 /*****************************************************************************/
 
 void sk_persist_consts() {
-  if((*pconsts) != NULL) return;
+  if ((*pconsts) != NULL) return;
   sk_global_lock();
   *pconsts = (void**)sk_palloc(mconsts_count * sizeof(void*));
   memcpy(*pconsts, mconsts, mconsts_count * sizeof(void*));

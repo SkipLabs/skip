@@ -74,10 +74,10 @@ char* sk_large_page(size_t size) {
   size_t block_size = size + sizeof(char*) + sizeof(size_t);
   block_size += 64;
   char* lpage = (char*)sk_malloc(block_size);
-  if(lpage == NULL) {
-    #ifdef SKIP64
+  if (lpage == NULL) {
+#ifdef SKIP64
     fprintf(stderr, "Out of memory\n");
-    #endif
+#endif
     SKIP_throw_cruntime(ERROR_OUT_OF_MEMORY);
   }
   sk_obstack_attach_page(lpage);
@@ -97,10 +97,10 @@ void sk_new_page() {
 #ifdef SKIP64
   head = (char*)sk_malloc(block_size);
 #endif
-  if(head == NULL) {
-    #ifdef SKIP64
+  if (head == NULL) {
+#ifdef SKIP64
     fprintf(stderr, "Out of memory\n");
-    #endif
+#endif
     SKIP_throw_cruntime(ERROR_OUT_OF_MEMORY);
   }
   end = head + block_size;
@@ -117,12 +117,11 @@ char* SKIP_Obstack_alloc(size_t size) {
   size = (size + 7) & ~7;
 
   if (head + size >= end) {
-    if(size + sizeof(char*) + sizeof(size_t) > PAGE_SIZE) {
+    if (size + sizeof(char*) + sizeof(size_t) > PAGE_SIZE) {
       result = sk_large_page(size);
       result += 8;
       return result;
-    }
-    else {
+    } else {
       sk_new_page();
     }
   }
@@ -141,15 +140,15 @@ void* SKIP_Obstack_calloc(size_t size) {
 }
 
 char* SKIP_Obstack_shallowClone(size_t _size, char* obj) {
-  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
+  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
   size_t size = memsize + leftsize;
 
   char* mem = SKIP_Obstack_alloc(size);
-  memcpy(mem, obj-leftsize, size);
-  return mem+leftsize;
+  memcpy(mem, obj - leftsize, size);
+  return mem + leftsize;
 }
 
 /*****************************************************************************/
@@ -164,7 +163,7 @@ typedef struct {
 
 sk_saved_obstack_t* SKIP_new_Obstack() {
   sk_saved_obstack_t* saved =
-    (sk_saved_obstack_t*)SKIP_Obstack_alloc(sizeof(sk_saved_obstack_t));
+      (sk_saved_obstack_t*)SKIP_Obstack_alloc(sizeof(sk_saved_obstack_t));
   saved->head = head;
   saved->page = page;
   saved->end = end;
@@ -178,22 +177,21 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
   char* saved_page;
   char* saved_head;
   char* saved_end;
-  if(saved == NULL) {
+  if (saved == NULL) {
     saved_page = NULL;
     saved_head = NULL;
     saved_end = NULL;
-  }
-  else {
+  } else {
     saved_page = saved->page;
     saved_head = saved->head;
     saved_end = saved->end;
   }
-  while(saved_head < page || saved_head > end) {
+  while (saved_head < page || saved_head > end) {
     char* tofree = page;
     size_t tosk_free_size = sk_page_size(page);
     page = *(char**)page;
     sk_free_size(tofree, tosk_free_size);
-    if(page == NULL) {
+    if (page == NULL) {
       head = NULL;
       page = NULL;
       end = NULL;
@@ -218,8 +216,8 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   void* result = SKIP_copy_with_pages(toCopy, nbr_pages, pages);
 
   int i;
-  for(i = 0; i < nbr_pages; i++) {
-    if((uint64_t)pages[i].key != pages[i].value) {
+  for (i = 0; i < nbr_pages; i++) {
+    if ((uint64_t)pages[i].key != pages[i].value) {
       char* fpage = (char*)(pages[i].key);
       size_t fnbr_pages = *(size_t*)(fpage + sizeof(char*));
       sk_free_size(fpage, fnbr_pages);
@@ -242,18 +240,15 @@ void SKIP_enable_GC() {
 }
 
 uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
-  return
-    sk_gc_enabled &&
-    ((head < saved->page && head >= saved->end) ||
-    (head >= (saved->head + PAGE_SIZE / 2)));
+  return sk_gc_enabled && ((head < saved->page && head >= saved->end) ||
+                           (head >= (saved->head + PAGE_SIZE / 2)));
 }
 
 /*****************************************************************************/
 /* Collection primitive (disabled). */
 /*****************************************************************************/
 
-void SKIP_Obstack_auto_collect() {
-}
+void SKIP_Obstack_auto_collect() {}
 
 void* SKIP_Obstack_collect1(void* note, void* obj) {
   return obj;
@@ -301,10 +296,10 @@ void sk_heap_sort(sk_cell_t* arr, int n) {
 /* Search. */
 /*****************************************************************************/
 
-size_t sk_get_nbr_pages(void *saved_page) {
+size_t sk_get_nbr_pages(void* saved_page) {
   size_t nbr_page = 0;
   void* cursor = page;
-  while(cursor != NULL && cursor != saved_page) {
+  while (cursor != NULL && cursor != saved_page) {
     cursor = *(char**)cursor;
     nbr_page++;
   }
@@ -315,7 +310,7 @@ sk_cell_t* sk_get_pages(size_t size) {
   sk_cell_t* result = (sk_cell_t*)sk_malloc(sizeof(sk_cell_t) * size);
   int i = 0;
   void* cursor = page;
-  for(i = 0; i < size; i++) {
+  for (i = 0; i < size; i++) {
     result[i].key = cursor;
     result[i].value = (uint64_t)(cursor + *(size_t*)(cursor + sizeof(char*)));
     cursor = *(char**)cursor;
@@ -325,33 +320,29 @@ sk_cell_t* sk_get_pages(size_t size) {
 }
 
 size_t binarySearch(sk_cell_t* arr, int l, int r, char* x) {
-  if(l >= r) {
-    if(((char*)arr[l].key <= x && x < (char*)(arr[l].value))) {
+  if (l >= r) {
+    if (((char*)arr[l].key <= x && x < (char*)(arr[l].value))) {
       return l;
-    }
-    else {
+    } else {
       return -1;
     }
   }
 
   int mid = l + (r - l) / 2;
 
-  if (x < (char*)arr[mid].key)  {
+  if (x < (char*)arr[mid].key) {
     return binarySearch(arr, l, mid - 1, x);
-  }
-  else if(x >= (char*)(arr[mid].value)) {
+  } else if (x >= (char*)(arr[mid].value)) {
     return binarySearch(arr, mid + 1, r, x);
-  }
-  else {
+  } else {
     return mid;
   }
 }
 
-
 size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t size) {
-  if(size == 0 || pages == NULL) {
+  if (size == 0 || pages == NULL) {
     return -1;
   }
-  int result = binarySearch(pages, 0, size-1, ptr);
+  int result = binarySearch(pages, 0, size - 1, ptr);
   return result;
 }

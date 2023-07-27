@@ -2,17 +2,18 @@
 /* Persistent memory storage. */
 /*****************************************************************************/
 
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
-#include <errno.h>
-#include <inttypes.h>
+
 #include "runtime.h"
 
 #define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
@@ -31,7 +32,7 @@ void* program_break = NULL;
 /* Database capacity. */
 /*****************************************************************************/
 
-size_t *capacity = NULL;
+size_t* capacity = NULL;
 
 /*****************************************************************************/
 /* Gensym. */
@@ -43,12 +44,12 @@ uint64_t SKIP_genSym(uint64_t largerThan) {
   uint64_t n = 1;
   uint64_t gid_value = __atomic_load_n(gid, __ATOMIC_RELAXED);
 
-  if(largerThan > 1024L * 1024L * 1024L) {
+  if (largerThan > 1024L * 1024L * 1024L) {
     fprintf(stderr, "ID too large: %" PRIu64 "\n", largerThan);
     exit(2);
   }
 
-  if(largerThan > gid_value) {
+  if (largerThan > gid_value) {
     n += largerThan - gid_value;
   };
 
@@ -66,7 +67,7 @@ pthread_mutex_t* gmutex = (void*)1234;
 int sk_is_locked = 0;
 
 void sk_check_has_lock() {
-  if((gmutex != NULL) && !sk_is_locked) {
+  if ((gmutex != NULL) && !sk_is_locked) {
     fprintf(stderr, "INTERNAL ERROR: unsafe operation\n");
     SKIP_throw_cruntime(ERROR_INTERNAL_LOCK);
   }
@@ -80,18 +81,18 @@ void sk_global_lock_init() {
 }
 
 void sk_global_lock() {
-  if(gmutex == NULL) {
+  if (gmutex == NULL) {
     return;
   }
 
   int code = pthread_mutex_lock(gmutex);
   sk_is_locked = 1;
 
-  if(code == 0) {
+  if (code == 0) {
     return;
   }
 
-  if(code == EOWNERDEAD) {
+  if (code == EOWNERDEAD) {
     pthread_mutex_consistent(gmutex);
     return;
   }
@@ -101,18 +102,19 @@ void sk_global_lock() {
 }
 
 void sk_global_unlock() {
-  if(gmutex == NULL) {
+  if (gmutex == NULL) {
     return;
   }
 
   int code = pthread_mutex_unlock(gmutex);
   sk_is_locked = 0;
 
-  if(code == 0) {
+  if (code == 0) {
     return;
   }
 
-  fprintf(stderr, "Internal error: global unlocking failed, %s\n", strerror(errno));
+  fprintf(stderr, "Internal error: global unlocking failed, %s\n",
+          strerror(errno));
   exit(44);
 }
 
@@ -121,7 +123,7 @@ void sk_global_unlock() {
 /*****************************************************************************/
 
 void SKIP_mutex_init(pthread_mutex_t* lock) {
-  if(sizeof(pthread_mutex_t) > 48) {
+  if (sizeof(pthread_mutex_t) > 48) {
     fprintf(stderr, "Internal error: mutex object too large for this arch\n");
   }
   pthread_mutexattr_t mutex_attr_holder;
@@ -135,11 +137,11 @@ void SKIP_mutex_init(pthread_mutex_t* lock) {
 void SKIP_mutex_lock(pthread_mutex_t* lock) {
   int code = pthread_mutex_lock(lock);
 
-  if(code == 0) {
+  if (code == 0) {
     return;
   }
 
-  if(code == EOWNERDEAD) {
+  if (code == EOWNERDEAD) {
     pthread_mutex_consistent(lock);
     return;
   }
@@ -151,7 +153,7 @@ void SKIP_mutex_lock(pthread_mutex_t* lock) {
 void SKIP_mutex_unlock(pthread_mutex_t* lock) {
   int code = pthread_mutex_unlock(lock);
 
-  if(code == 0) {
+  if (code == 0) {
     return;
   }
 
@@ -160,7 +162,7 @@ void SKIP_mutex_unlock(pthread_mutex_t* lock) {
 }
 
 void SKIP_cond_init(pthread_cond_t* cond) {
-  if(sizeof(pthread_mutex_t) > 48) {
+  if (sizeof(pthread_mutex_t) > 48) {
     fprintf(stderr, "Internal error: mutex object too large for this arch\n");
   }
   pthread_condattr_t cond_attr_value;
@@ -219,8 +221,8 @@ typedef struct {
   size_t total_palloc_size;
 } ginfo_t;
 
-ginfo_t **ginfo_root = NULL;
-ginfo_t **ginfo = NULL;
+ginfo_t** ginfo_root = NULL;
+ginfo_t** ginfo = NULL;
 
 /*****************************************************************************/
 /* Global context access primitives. */
@@ -229,9 +231,9 @@ ginfo_t **ginfo = NULL;
 char* SKIP_context_get_unsafe() {
   char* context = (*ginfo)->context;
 
-  if(context != NULL) {
+  if (context != NULL) {
     sk_incr_ref_count(context);
-    if((*ginfo)->fileName == NULL && sk_get_ref_count(context) > 2) {
+    if ((*ginfo)->fileName == NULL && sk_get_ref_count(context) > 2) {
       SKIP_throwInvalidSynchronization();
     }
   }
@@ -247,14 +249,12 @@ uint32_t SKIP_has_context() {
   return result;
 }
 
-
 SkipInt SKIP_context_ref_count() {
   char* context = (*ginfo)->context;
 
-  if(context == NULL) {
+  if (context == NULL) {
     return (SkipInt)0;
-  }
-  else {
+  } else {
     return sk_get_ref_count(context);
   }
 }
@@ -286,27 +286,26 @@ static char* parse_args(int argc, char** argv, int* is_init) {
   int i;
   int idx = -1;
 
-  for(i = 1; i < argc; i++) {
-    if(strcmp(argv[i], "--data") == 0 || strcmp(argv[i], "--init") == 0) {
-      if(strcmp(argv[i], "--init") == 0) {
+  for (i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--data") == 0 || strcmp(argv[i], "--init") == 0) {
+      if (strcmp(argv[i], "--init") == 0) {
         *is_init = 1;
       }
-      if(i + 1 >= argc) {
+      if (i + 1 >= argc) {
         fprintf(stderr, "Error: --data/--init expects a file name");
         exit(102);
       }
-      if(idx != -1) {
+      if (idx != -1) {
         fprintf(stderr, "Error: incompatible --data/--init options");
         exit(103);
       }
-      idx = i+1;
+      idx = i + 1;
     }
   }
 
-  if(idx == -1) {
+  if (idx == -1) {
     return NULL;
-  }
-  else {
+  } else {
     return argv[idx];
   }
 }
@@ -315,26 +314,24 @@ size_t parse_capacity(int argc, char** argv) {
   int i;
   int idx = -1;
 
-  for(i = 1; i < argc; i++) {
-    if(strcmp(argv[i], "--capacity") == 0) {
-      if(i + 1 < argc) {
-        if(argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
+  for (i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--capacity") == 0) {
+      if (i + 1 < argc) {
+        if (argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') {
           int j = 0;
 
-          while(argv[i+1][j] != 0) {
-            if(argv[i+1][j] >= '0' && argv[i+1][j] <= '9') {
+          while (argv[i + 1][j] != 0) {
+            if (argv[i + 1][j] >= '0' && argv[i + 1][j] <= '9') {
               j++;
               continue;
             };
             fprintf(stderr, "--capacity expects an integer\n");
             exit(2);
           }
-          return atol(argv[i+1]);
-        }
-        else if(argv[i+1][0] == '-') {
+          return atol(argv[i + 1]);
+        } else if (argv[i + 1][0] == '-') {
           return DEFAULT_CAPACITY;
-        }
-        else {
+        } else {
           fprintf(stderr, "--capacity expects an integer\n");
           exit(2);
         }
@@ -349,17 +346,17 @@ size_t parse_capacity(int argc, char** argv) {
 /*****************************************************************************/
 
 void sk_commit(char* new_root, uint32_t sync) {
-  if((*ginfo)->fileName == NULL) {
+  if ((*ginfo)->fileName == NULL) {
     sk_context_set_unsafe(new_root);
     return;
   }
 
   __sync_synchronize();
-  if(sync) {
+  if (sync) {
     msync(BOTTOM_ADDR, *capacity, MS_SYNC);
   }
   sk_context_set_unsafe(new_root);
-  if(sync) {
+  if (sync) {
     msync(BOTTOM_ADDR, *capacity, MS_SYNC);
   }
 }
@@ -369,7 +366,7 @@ void sk_commit(char* new_root, uint32_t sync) {
 /*****************************************************************************/
 
 void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
-  if(access(fileName, F_OK) == 0) {
+  if (access(fileName, F_OK) == 0) {
     fprintf(stderr, "ERROR: File %s already exists!\n", fileName);
     exit(21);
   }
@@ -377,10 +374,11 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   lseek(fd, icapacity, SEEK_SET);
   write(fd, "", 1);
   int prot = PROT_READ | PROT_WRITE;
-  char* begin = mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
+  char* begin =
+      mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   char* end = begin + icapacity;
 
-  if(begin == (void*)-1) {
+  if (begin == (void*)-1) {
     perror("ERROR (MMAP FAILED)");
     exit(23);
   }
@@ -416,7 +414,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   pconsts = (void***)head;
   head += sizeof(void**);
 
-  size_t fileName_length = strlen(fileName)+1;
+  size_t fileName_length = strlen(fileName) + 1;
   char* persistent_fileName = head;
   head += fileName_length;
 
@@ -427,11 +425,11 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   (*ginfo)->ginfo_array = ginfo_data;
 
   int i;
-  for(i = 0; i < FTABLE_SIZE; i++) {
+  for (i = 0; i < FTABLE_SIZE; i++) {
     (*ginfo)->ftable[i] = NULL;
   }
 
-  if(head >= end) {
+  if (head >= end) {
     fprintf(stderr, "Could not initialize memory\n");
     exit(31);
   }
@@ -447,7 +445,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   (*ginfo)->end = end;
   (*ginfo)->fileName = persistent_fileName;
   *gid = 1;
-  if(icapacity != DEFAULT_CAPACITY) {
+  if (icapacity != DEFAULT_CAPACITY) {
     printf("CAPACITY SET TO: %ld\n", icapacity);
   }
   *capacity = icapacity;
@@ -463,7 +461,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
 void sk_load_mapping(char* fileName) {
   int fd = open(fileName, O_RDWR, 0600);
 
-  if(fd == -1) {
+  if (fd == -1) {
     fprintf(stderr, "Error: could not open file (did you run --init?)\n");
     exit(25);
   }
@@ -473,13 +471,13 @@ void sk_load_mapping(char* fileName) {
   lseek(fd, 0L, SEEK_SET);
   int magic_size = read(fd, &magic, sizeof(uint64_t));
 
-  if(magic_size != sizeof(uint64_t) || magic != SKIP_get_version()) {
+  if (magic_size != sizeof(uint64_t) || magic != SKIP_get_version()) {
     fprintf(stderr, "Error: wrong file format\n");
     exit(23);
   }
 
   int bytes = read(fd, &addr, sizeof(void*));
-  if(bytes != sizeof(void*)) {
+  if (bytes != sizeof(void*)) {
     fprintf(stderr, "Error: could not read heap address\n");
     exit(24);
   }
@@ -492,7 +490,7 @@ void sk_load_mapping(char* fileName) {
   char* begin = mmap(addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   close(fd);
 
-  if(begin == (void*)-1) {
+  if (begin == (void*)-1) {
     perror("ERROR (MMAP FAILED)");
     exit(23);
   }
@@ -523,7 +521,7 @@ int sk_is_static(void* ptr) {
 }
 
 void sk_lower_static(void* ptr) {
-  if((char*)ptr < (*ginfo)->break_ptr) {
+  if ((char*)ptr < (*ginfo)->break_ptr) {
     (*ginfo)->break_ptr = ptr;
   }
 }
@@ -537,7 +535,7 @@ size_t sk_bit_size(size_t size) {
 }
 
 size_t sk_pow2_size(size_t size) {
-  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*)-1);
+  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
   return (1 << sk_bit_size(size));
 }
 
@@ -550,7 +548,7 @@ void sk_add_ftable(void* ptr, size_t size) {
 void* sk_get_ftable(size_t size) {
   int slot = sk_bit_size(size);
   void** ptr = (*ginfo)->ftable[slot];
-  if(ptr == NULL) {
+  if (ptr == NULL) {
     return ptr;
   }
   (*ginfo)->ftable[slot] = *(void**)(*ginfo)->ftable[slot];
@@ -604,20 +602,18 @@ void SKIP_memory_init(int argc, char** argv) {
   int is_create = 0;
   char* fileName = parse_args(argc, argv, &is_create);
 
-  if(fileName == NULL) {
+  if (fileName == NULL) {
     sk_init_no_file(program_break);
-  }
-  else if(is_create) {
+  } else if (is_create) {
     size_t capacity = DEFAULT_CAPACITY;
     capacity = parse_capacity(argc, argv);
     sk_create_mapping(fileName, program_break, capacity);
-  }
-  else {
+  } else {
     sk_load_mapping(fileName);
   }
 
   char* obj = sk_get_external_pointer();
-  epointer_ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
+  epointer_ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
 }
 
 /*****************************************************************************/
@@ -629,7 +625,7 @@ void SKIP_print_persistent_size() {
 }
 
 void* sk_palloc(size_t size) {
-  if((*ginfo)->fileName == NULL) {
+  if ((*ginfo)->fileName == NULL) {
     void* result = malloc(size);
     if (result == NULL) {
       perror("malloc");
@@ -641,10 +637,10 @@ void* sk_palloc(size_t size) {
   size = sk_pow2_size(size);
   (*ginfo)->total_palloc_size += size;
   sk_cell_t* ptr = sk_get_ftable(size);
-  if(ptr != NULL) {
+  if (ptr != NULL) {
     return ptr;
   }
-  if((*ginfo)->head + size >= (*ginfo)->end) {
+  if ((*ginfo)->head + size >= (*ginfo)->end) {
     fprintf(stderr, "Error: out of persistent memory.\n");
     exit(45);
   }
@@ -654,7 +650,7 @@ void* sk_palloc(size_t size) {
 }
 
 void sk_pfree_size(void* chunk, size_t size) {
-  if((*ginfo)->fileName == NULL) {
+  if ((*ginfo)->fileName == NULL) {
     free(chunk);
     return;
   }

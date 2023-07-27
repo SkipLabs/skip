@@ -2,22 +2,21 @@
 
 #ifdef SKIP64
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <malloc.h>
-#include <stdlib.h>
 #include <errno.h>
+#include <malloc.h>
 #include <poll.h>
-#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 void* SKIP_exec(char* cmd) {
   char* cstr = sk2c_string(cmd);
 
   FILE* fstream = popen(cstr, "w");
 
-  if(fstream == NULL) {
+  if (fstream == NULL) {
     perror("Could not execute command");
     exit(4);
   }
@@ -30,7 +29,7 @@ void* SKIP_exec(char* cmd) {
 uint32_t SKIP_write_to_proc(FILE* f, char* str) {
   size_t size = SKIP_String_byteSize(str);
   size_t n = fwrite(str, 1, size, f);
-  if(n != size) {
+  if (n != size) {
     return 1;
   };
   return 0;
@@ -47,7 +46,7 @@ uint32_t SKIP_wait_for_proc(FILE* f) {
 void* memset(void* ptr, int value, size_t size) {
   void* result = ptr;
 
-  if(value != 0) {
+  if (value != 0) {
     // memset only implemented for zero
     SKIP_throw_cruntime(ERROR_NOT_IMPLEMENTED);
   }
@@ -55,12 +54,12 @@ void* memset(void* ptr, int value, size_t size) {
   const char* end = (char*)ptr + size;
   const char* lend = (char*)ptr + (size / sizeof(long) * sizeof(long));
 
-  while(ptr < (void*)lend) {
+  while (ptr < (void*)lend) {
     *(long*)ptr = 0;
     ptr += sizeof(long);
   }
 
-  while(ptr < (void*)end) {
+  while (ptr < (void*)end) {
     *(char*)ptr = 0;
     ptr++;
   }
@@ -73,13 +72,13 @@ void* memcpy(void* dest, const void* src, size_t size) {
   const char* end = (char*)src + size;
   const char* lend = (char*)src + (size / sizeof(long) * sizeof(long));
 
-  while(src < (void*)lend) {
+  while (src < (void*)lend) {
     *(long*)dest = *(long*)src;
     dest += sizeof(long);
     src += sizeof(long);
   }
 
-  while(src < (void*)end) {
+  while (src < (void*)end) {
     *(char*)dest = *(char*)src;
     dest++;
     src++;
@@ -92,26 +91,26 @@ void* memcpy(void* dest, const void* src, size_t size) {
 void sk_print_int(uint64_t x) {
   char str[256];
   SkipInt i = 255;
-  if(x == 0) {
+  if (x == 0) {
     SKIP_print_char('0');
     SKIP_print_char('\n');
     return;
   }
-  while(x != 0) {
-    if(x % 10 == 0) str[i] = '0';
-    if(x % 10 == 1) str[i] = '1';
-    if(x % 10 == 2) str[i] = '2';
-    if(x % 10 == 3) str[i] = '3';
-    if(x % 10 == 4) str[i] = '4';
-    if(x % 10 == 5) str[i] = '5';
-    if(x % 10 == 6) str[i] = '6';
-    if(x % 10 == 7) str[i] = '7';
-    if(x % 10 == 8) str[i] = '8';
-    if(x % 10 == 9) str[i] = '9';
+  while (x != 0) {
+    if (x % 10 == 0) str[i] = '0';
+    if (x % 10 == 1) str[i] = '1';
+    if (x % 10 == 2) str[i] = '2';
+    if (x % 10 == 3) str[i] = '3';
+    if (x % 10 == 4) str[i] = '4';
+    if (x % 10 == 5) str[i] = '5';
+    if (x % 10 == 6) str[i] = '6';
+    if (x % 10 == 7) str[i] = '7';
+    if (x % 10 == 8) str[i] = '8';
+    if (x % 10 == 9) str[i] = '9';
     i--;
     x = x / 10;
   };
-  for(i++; i < 256; i++) {
+  for (i++; i < 256; i++) {
     SKIP_print_char(str[i]);
   };
   SKIP_print_char('\n');
@@ -121,18 +120,17 @@ void todo() {
   SKIP_throw_cruntime(ERROR_TODO);
 }
 
-
 char* SKIP_read_line() {
   int32_t size = SKIP_read_line_fill();
 
   if (size < 0) {
-      return NULL;
+    return NULL;
   }
 
   uint32_t i;
   char* result = SKIP_Obstack_alloc(size);
 
-  for(i = 0; i < size; i++) {
+  for (i = 0; i < size; i++) {
     result[i] = SKIP_read_line_get(i);
   }
 
@@ -142,17 +140,18 @@ char* SKIP_read_line() {
 
 #ifdef SKIP64
 
-char* sk_completed_process_create(char* args, SkipInt exitcode, char* stdout, char* stderr);
+char* sk_completed_process_create(char* args, SkipInt exitcode, char* stdout,
+                                  char* stderr);
 
-char* SKIP_System_subprocess(char *args_obj) {
-  size_t num_args = *(uint32_t*)(args_obj-sizeof(char*)-sizeof(uint32_t));
-  char **args = malloc(sizeof(char *) * (num_args + 1));
+char* SKIP_System_subprocess(char* args_obj) {
+  size_t num_args = *(uint32_t*)(args_obj - sizeof(char*) - sizeof(uint32_t));
+  char** args = malloc(sizeof(char*) * (num_args + 1));
   if (args == NULL) {
     perror("malloc");
     exit(1);
   }
   for (int i = 0; i < num_args; ++i) {
-    char *arg_obj = *((char **)args_obj + i);
+    char* arg_obj = *((char**)args_obj + i);
     size_t sz = SKIP_String_byteSize(arg_obj);
     args[i] = malloc(sizeof(char) * (sz + 1));
     if (args[i] == NULL) {
@@ -225,7 +224,7 @@ char* SKIP_System_subprocess(char *args_obj) {
   free(args);
 
   const int nfds = 2;
-  char *out[nfds];
+  char* out[nfds];
   size_t len[nfds];
   size_t size[nfds];
   for (size_t i = 0; i < nfds; ++i) {
@@ -240,8 +239,8 @@ char* SKIP_System_subprocess(char *args_obj) {
 
   int open_fds = nfds;
   struct pollfd pfds[] = {
-    {stdout_fd[0], POLLIN, 0},
-    {stderr_fd[0], POLLIN, 0},
+      {stdout_fd[0], POLLIN, 0},
+      {stderr_fd[0], POLLIN, 0},
   };
   while (open_fds > 0) {
     if (poll(pfds, nfds, -1) == -1) {
@@ -275,7 +274,7 @@ char* SKIP_System_subprocess(char *args_obj) {
           }
         }
         len[i] += count;
-      } else { // POLLERR | POLLHUP
+      } else {  // POLLERR | POLLHUP
         if (close(pfds[i].fd) == -1) {
           perror("close");
           exit(1);
@@ -286,9 +285,9 @@ char* SKIP_System_subprocess(char *args_obj) {
     }
   }
 
-  char *stdout = sk_string_create(out[0], len[0]);
+  char* stdout = sk_string_create(out[0], len[0]);
   free(out[0]);
-  char *stderr = sk_string_create(out[1], len[1]);
+  char* stderr = sk_string_create(out[1], len[1]);
   free(out[1]);
 
   int status;
@@ -305,4 +304,4 @@ char* SKIP_System_subprocess(char *args_obj) {
   return sk_completed_process_create(args_obj, exitcode, stdout, stderr);
 }
 
-#endif // SKIP64
+#endif  // SKIP64

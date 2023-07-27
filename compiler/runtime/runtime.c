@@ -43,8 +43,7 @@ char* SKIP_get_local_context() {
 /* Primitives that are not used in embedded mode. */
 /*****************************************************************************/
 
-void SKIP_Regex_initialize() {
-}
+void SKIP_Regex_initialize() {}
 
 void SKIP_internalExit(uint64_t code) {
   SKIP_exit(code);
@@ -64,8 +63,7 @@ void SKIP_Obstack_vectorUnsafeSet(char** arr, char* x) {
   *arr = x;
 }
 
-void SKIP_Obstack_collect(char* dumb1, char** dumb2, SkipInt dumb3) {
-}
+void SKIP_Obstack_collect(char* dumb1, char** dumb2, SkipInt dumb3) {}
 
 void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
   return memcpy(dest, val, (size_t)len);
@@ -92,7 +90,7 @@ void SKIP_unsafe_remove_local_context(char* obj) {
 }
 
 char* SKIP_unsafe_get_local_context() {
-  if(local_ctx == NULL) {
+  if (local_ctx == NULL) {
 #ifdef SKIP64
     fprintf(stderr, "Error: local context is not set");
 #endif
@@ -116,9 +114,9 @@ void SKIP_unsafe_free(char* context) {
 }
 
 void SKIP_global_lock() {
-  #ifdef SKIP64
+#ifdef SKIP64
   sk_global_lock();
-  #endif
+#endif
 }
 
 #ifdef SKIP64
@@ -126,40 +124,35 @@ extern int sk_is_locked;
 #endif
 
 uint32_t SKIP_global_has_lock() {
-  #ifdef SKIP64
+#ifdef SKIP64
   return (uint32_t)sk_is_locked;
-  #endif
-  #ifdef SKIP32
+#endif
+#ifdef SKIP32
   return 1;
-  #endif
+#endif
 }
 
 void SKIP_global_unlock() {
-  #ifdef SKIP64
+#ifdef SKIP64
   sk_global_unlock();
-  #endif
+#endif
 }
 
-void* SKIP_context_sync_no_lock(
-  uint64_t txTime,
-  char* old_root,
-  char* delta,
-  char* synchronizer,
-  uint32_t sync,
-  char* lockF
-) {
+void* SKIP_context_sync_no_lock(uint64_t txTime, char* old_root, char* delta,
+                                char* synchronizer, uint32_t sync,
+                                char* lockF) {
   char* root = SKIP_context_get_unsafe();
-  if(root == NULL) {
-    #ifdef SKIP64
+  if (root == NULL) {
+#ifdef SKIP64
     fprintf(stderr, "Internal error: you forgot to initialize the context");
-    #endif
+#endif
     SKIP_throw_cruntime(ERROR_CONTEXT_NOT_INITIALIZED);
   }
-  if(root == delta || old_root == delta) {
-    // INVALID use of sync, the root should be different
-    #ifdef SKIP64
+  if (root == delta || old_root == delta) {
+// INVALID use of sync, the root should be different
+#ifdef SKIP64
     fprintf(stderr, "Internal error: tried to sync with the same context");
-    #endif
+#endif
     SKIP_throw_cruntime(ERROR_SYNC_SAME_CONTEXT);
   }
   char* rtmp = SKIP_resolve_context(txTime, root, delta, synchronizer, lockF);
@@ -171,24 +164,11 @@ void* SKIP_context_sync_no_lock(
   return new_root;
 }
 
-void* SKIP_context_sync(
-  uint64_t txTime,
-  char* old_root,
-  char* delta,
-  char* synchronizer,
-  uint32_t sync,
-  char* lockF
-) {
+void* SKIP_context_sync(uint64_t txTime, char* old_root, char* delta,
+                        char* synchronizer, uint32_t sync, char* lockF) {
   sk_global_lock();
-  char* new_root =
-    SKIP_context_sync_no_lock(
-      txTime,
-      old_root,
-      delta,
-      synchronizer,
-      sync,
-      lockF
-   );
+  char* new_root = SKIP_context_sync_no_lock(txTime, old_root, delta,
+                                             synchronizer, sync, lockF);
   sk_global_unlock();
   SKIP_call_after_unlock(synchronizer, delta);
   return new_root;
