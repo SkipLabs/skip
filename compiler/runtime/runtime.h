@@ -85,7 +85,7 @@ sk_cell_t* sk_htbl_find(sk_htbl_t* table, void* key);
 int sk_htbl_mem(sk_htbl_t* table, void* key);
 void sk_htbl_remove(sk_htbl_t* table, void* key);
 SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2);
-size_t sk_get_nbr_pages(void *saved_page);
+size_t sk_get_nbr_pages(void* saved_page);
 sk_cell_t* sk_get_pages(size_t size);
 size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t size);
 
@@ -142,10 +142,10 @@ typedef struct {
   uint16_t m_uninternedMetadataByteSize;
   uint16_t m_internedMetadataByteSize;
   size_t m_userByteSize;
-  #ifdef SKIP32
+#ifdef SKIP32
   void* unused1;
   void* unused2;
-  #endif
+#endif
   void (*m_onStateChange)(void*, long);
   size_t m_refMask[0];
 } SKIP_gc_type_t;
@@ -173,9 +173,9 @@ typedef struct {
 /* Function signatures. */
 /*****************************************************************************/
 
-int memcmp(const void * ptr1, const void * ptr2, size_t num);
+int memcmp(const void* ptr1, const void* ptr2, size_t num);
 void* memcpy(void* dest, const void* src, size_t size);
-void* memset(void *, int, unsigned long);
+void* memset(void*, int, unsigned long);
 
 char* SKIP_Obstack_alloc(size_t size);
 uint32_t SKIP_String_byteSize(char* str);
@@ -192,13 +192,8 @@ uint32_t SKIP_is_string(char* obj);
 void SKIP_print_char(uint32_t);
 int32_t SKIP_read_line_fill();
 uint32_t SKIP_read_line_get(uint32_t);
-char* SKIP_resolve_context(
-  uint64_t,
-  char* context,
-  char* obj,
-  char* synchronizer,
-  char* lockedF
-);
+char* SKIP_resolve_context(uint64_t, char* context, char* obj,
+                           char* synchronizer, char* lockedF);
 void SKIP_call_after_unlock(char*, char*);
 
 void SKIP_throw(void*);

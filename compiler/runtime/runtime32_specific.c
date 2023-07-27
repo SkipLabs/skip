@@ -30,13 +30,13 @@ void SKIP_skfs_init(uint32_t size) {
   end_of_static = (char*)bump_pointer;
   sk_ftable = sk_ftable_holder;
   char* obj = sk_get_external_pointer();
-  epointer_ty = *(*(((SKIP_gc_type_t***)obj)-1)+1);
+  epointer_ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
 }
 
 void SKIP_destroy_Obstack(void*);
 
 void SKIP_skfs_end_of_init() {
-  if((char*)bump_pointer != (char*)0) {
+  if ((char*)bump_pointer != (char*)0) {
     SKIP_destroy_Obstack((char*)0);
   }
 }
@@ -45,8 +45,7 @@ int sk_is_static(void* ptr) {
   return (char*)ptr < end_of_static;
 }
 
-void sk_staging() {
-}
+void sk_staging() {}
 
 void sk_commit(char* new_root, uint32_t sync) {
   sk_context_set_unsafe(new_root);
@@ -59,18 +58,16 @@ char* SKIP_read_file(char* filename_obj) {
 
 void* context;
 
-void sk_global_lock() {
-}
+void sk_global_lock() {}
 
-void sk_global_unlock() {
-}
+void sk_global_unlock() {}
 
 uint32_t SKIP_has_context() {
   return (uint32_t)(context != NULL);
 }
 
 char* SKIP_context_get_unsafe() {
-  if(context != NULL) {
+  if (context != NULL) {
     sk_incr_ref_count(context);
   }
   return context;
@@ -186,30 +183,22 @@ void* SKIP_unfreeze_cond(void* x) {
   return x;
 }
 
-void SKIP_mutex_init(void* lock) {
-}
+void SKIP_mutex_init(void* lock) {}
 
-void SKIP_mutex_lock(void* lock) {
-}
+void SKIP_mutex_lock(void* lock) {}
 
-void SKIP_mutex_unlock(void* lock) {
-}
+void SKIP_mutex_unlock(void* lock) {}
 
-void SKIP_cond_init(void* cond) {
-}
+void SKIP_cond_init(void* cond) {}
 
-void SKIP_cond_wait(void* x, void* y) {
-}
+void SKIP_cond_wait(void* x, void* y) {}
 
-void SKIP_cond_timedwait(void* x, void* y, uint32_t secs) {
-}
+void SKIP_cond_timedwait(void* x, void* y, uint32_t secs) {}
 
-void SKIP_cond_broadcast(void* c) {
-}
+void SKIP_cond_broadcast(void* c) {}
 
 int SKIP_stdin_has_data() {
   return 1;
 }
 
-void SKIP_unix_die_on_EOF() {
-}
+void SKIP_unix_die_on_EOF() {}
