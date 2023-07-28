@@ -226,3 +226,15 @@ uint32_t SKIP_js_write(uint32_t fd, char* buf);
 int64_t SKIP_posix_write(int64_t fd, char* buf) {
   return (int64_t)SKIP_js_write((uint32_t)fd, buf);
 }
+
+int32_t SKIP_js_get_argc();
+
+int64_t SKIP_getArgc() {
+  return (int64_t)SKIP_js_get_argc();
+}
+
+char *SKIP_js_get_argn(int32_t n);
+
+char* SKIP_getArgN(int64_t n) {
+  return SKIP_js_get_argn((int32_t)n);
+}

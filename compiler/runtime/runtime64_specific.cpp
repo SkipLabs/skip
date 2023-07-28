@@ -207,27 +207,57 @@ static int argc = 0;
 static char** argv = NULL;
 
 uint32_t SKIP_getArgc() {
-  return argc-1;
+  return argc;
 }
 
-char* SKIP_getArg0() {
-  return sk_string_create(argv[0], strlen(argv[0]));
-}
-
-char* SKIP_getArgN(uint32_t n) {
-  n = n + 1;
+char* SKIP_getArgN(int64_t n) {
   return sk_string_create(argv[n], strlen(argv[n]));
 }
 
+int64_t SKIP_get_envc() {
+  char **p = nullptr;
+  for (p = environ; *p != nullptr; ++p);
+  return (int)(p - environ);
+}
+
+char *SKIP_get_envN(int64_t n) {
+  return sk_string_create(environ[n], strlen(environ[n]));
+}
+
+char* sk_create_none_string_option();
+char* sk_create_string_option(char *str);
+
 char* SKIP_getenv(char* skName) {
-  char* name = sk2c_string(skName);
+  char *name = sk2c_string(skName);
   char *value = getenv(name);
   if (name != skName) free(name);
-  if (value == 0) {
-    return sk_string_create("", 0);
+  if (value == nullptr) {
+    return sk_create_none_string_option();
   }
 
-  return sk_string_create(value, strlen(value));
+  return sk_create_string_option(sk_string_create(value, strlen(value)));
+}
+
+void SKIP_setenv(char* skName, char *skValue) {
+  char *name = sk2c_string(skName);
+  char *value = sk2c_string(skValue);
+  int rv = setenv(name, value, 1);
+  if (rv != 0) {
+    perror("setenv");
+    exit(EXIT_FAILURE);
+  }
+  if (name != skName) free(name);
+  if (value != skValue) free(value);
+}
+
+void SKIP_unsetenv(char* skName) {
+  char *name = sk2c_string(skName);
+  int rv = unsetenv(name);
+  if (rv != 0) {
+    perror("unsetenv");
+    exit(EXIT_FAILURE);
+  }
+  if (name != skName) free(name);
 }
 
 void SKIP_memory_init(int pargc, char** pargv);
@@ -422,8 +452,22 @@ char* SKIP_strftime(char* formatp, int64_t timestamp) {
 
 char* SKIP_getcwd() {
   char path[PATH_MAX];
-  getcwd(path, PATH_MAX);
+  char *res = getcwd(path, PATH_MAX);
+  if (res == NULL) {
+    perror("getcwd");
+    exit(EXIT_FAILURE);
+  }
   return sk_string_create(path, strlen(path));
+}
+
+void SKIP_chdir(char *path_obj) {
+  char* path = sk2c_string(path_obj);
+  int rv = chdir(path);
+  if (rv != 0) {
+    perror("chdir");
+    exit(EXIT_FAILURE);
+  }
+  if (path != path_obj) free(path);
 }
 
 int64_t SKIP_numThreads() {

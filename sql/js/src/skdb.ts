@@ -489,10 +489,10 @@ export class SKDB {
       SKIP_print_raw: function (str) {
         data.stdout.push(wasmStringToJS(data.exports, str));
       },
-      SKIP_getArgc: function (i) {
+      SKIP_js_get_argc: function (i) {
         return data.args.length;
       },
-      SKIP_getArgN: function (n) {
+      SKIP_js_get_argn: function (n) {
         return encodeUTF8(data.exports, data.args[n]!);
       },
       SKIP_js_open: function (wasmFilename, _opts, _mode) {
@@ -597,7 +597,7 @@ export class SKDB {
 
   runLocal(new_args: Array<string>, new_stdin: string): string {
     console.assert(this.nbrInitPages >= 0);
-    this.args = new_args;
+    this.args = ["skdb"].concat(new_args);
     this.stdin = new_stdin;
     this.stdout = new Array();
     this.current_stdin = 0;
