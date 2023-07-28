@@ -26,7 +26,7 @@ untracked fun main(): void {
     .arg(
       Cli.ArrayArg("files")
         .positional()
-        .required()
+        .default(Array["-"])
         .about("Skip file(s) to format"),
     )
     .arg(
@@ -40,7 +40,12 @@ untracked fun main(): void {
   inplace = args.getBool("inplace");
   filenames = args.getArray("files");
   for (file in filenames) {
-    contents = FileSystem.readTextFile(file);
+    contents = if (file == "-") {
+      !file = "<stdin>";
+      IO.stdin().read_to_end()
+    } else {
+      FileSystem.readTextFile(file)
+    };
     prettyPrint(contents, file) match {
     | Failure(error) ->
       print_error_ln(SkipError.errorsToString(Vector[error]));
