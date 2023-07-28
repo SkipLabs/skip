@@ -349,11 +349,11 @@ class Topology:
     aId = self._genReplicationId()
     bId = self._genReplicationId()
     atob = HalfStream(a, b,
-                      a.tailTask(table, dest=bId, peerId=aId),
-                      b.writeTask(table, source=aId, peerId=bId))
+                      a.tailTask(table, dest=bId, peerId=a.name),
+                      b.writeTask(table, source=aId, peerId=b.name))
     btoa = HalfStream(b, a,
-                      b.tailTask(table, dest=aId, peerId=bId),
-                      a.writeTask(table, source=bId, peerId=aId))
+                      b.tailTask(table, dest=aId, peerId=b.name),
+                      a.writeTask(table, source=bId, peerId=a.name))
     atob.other = btoa
     btoa.other = atob
     self.initTask.add(atob.initTask())
