@@ -19,10 +19,7 @@ private class BuildContext{
     | Some(d) -> d
     | None() -> getTargetDir(env.rootDir, target)
     };
-    skc = getenv("SKC");
-    if (skc == "") {
-      !skc = "skc"
-    };
+    skc = Environ.varOpt("SKC").default("skc");
     BuildContext{
       env,
       skc,

@@ -174,40 +174,8 @@ fun createOptimizedFunctions(
   env
 }
 
-// TODO: Move into runtime.
-// Return the path to the main executable, given the value of argv[0] from
-// program startup.
-// Inspired from `llvm/lib/Support/Unix/Path.inc`.
-fun getMainExecutable(argv0: String): String {
-  // First approach: absolute path.
-  if (argv0.startsWith("/")) {
-    path = argv0;
-    if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
-    }
-  };
-
-  // Second approach: relative path.
-  if (argv0.contains("/")) {
-    path = Path.join(getcwd(), argv0);
-    if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
-    }
-  };
-
-  // Third approach: $PATH
-  for (p in getenv("PATH").split(":")) {
-    path = Path.join(p, argv0);
-    if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
-    }
-  };
-
-  invariant_violation("Cannot determine main executable.")
-}
-
 fun link(llFile: String, config: Config.Config): void {
-  basePath = Path.parentname(Path.dirname(getMainExecutable(getArg0())));
+  basePath = Path.parentname(Path.dirname(Environ.current_exe()));
 
   if (config.mainConfig.target.startsWith("wasm32")) {
     output = config.mainConfig.output;

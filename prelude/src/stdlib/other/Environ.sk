@@ -1,0 +1,107 @@
+module Environ;
+
+// Return the path to the main executable, given the value of argv[0] from
+// program startup.
+// Inspired from `llvm/lib/Support/Unix/Path.inc`.
+fun current_exe(): String {
+  if (internalGetArgc() > 0) {
+    argv0 = args().next().fromSome();
+
+    // First approach: absolute path.
+    if (argv0.startsWith("/")) {
+      path = argv0;
+      if (FileSystem.exists(path)) {
+        return FileSystem.realpath(path)
+      }
+    };
+
+    // Second approach: relative path.
+    if (argv0.contains("/")) {
+      path = Path.join(current_dir(), argv0);
+      if (FileSystem.exists(path)) {
+        return FileSystem.realpath(path)
+      }
+    };
+
+    // Third approach: $PATH
+    for (p in var("PATH").split(":")) {
+      path = Path.join(p, argv0);
+      if (FileSystem.exists(path)) {
+        return FileSystem.realpath(path)
+      }
+    }
+  };
+
+  invariant_violation("Cannot determine main executable.")
+}
+
+@debug
+@cpp_extern("SKIP_getcwd")
+native fun current_dir(): String;
+
+@debug
+@cpp_extern("SKIP_chdir")
+native fun set_current_dir(path: String): void;
+
+@cpp_extern("SKIP_getArgc")
+native fun internalGetArgc(): Int;
+
+@cpp_extern("SKIP_getArgN")
+native fun internalGetArgN(n: Int): String;
+
+fun args(): mutable Iterator<String> {
+  argc = internalGetArgc();
+  for (i in Range(0, argc)) {
+    yield internalGetArgN(i)
+  }
+}
+
+@debug
+@cpp_extern("SKIP_get_envc")
+native fun internalGetEnvc(): Int;
+
+@debug
+@cpp_extern("SKIP_get_envN")
+native fun internalGetEnvN(n: Int): String;
+
+fun vars(): mutable Iterator<(String, String)> {
+  envc = internalGetEnvc();
+  for (i in Range(0, envc)) {
+    yield internalGetEnvN(i).splitFirst("=")
+  }
+}
+
+@cpp_export("sk_create_string_option")
+fun internalCreateStringOption(str: String): ?String {
+  Some(str)
+}
+
+@cpp_export("sk_create_none_string_option")
+fun internalCreateNoneStringOption(): ?String {
+  None()
+}
+
+@debug
+@cpp_extern("SKIP_getenv")
+native fun varOpt(name: String): ?String;
+
+class VarError(name: String) extends Exception {
+  fun getMessage(): String {
+    `Environment variable ${this.name} not found.`
+  }
+}
+
+fun var(name: String): String {
+  varOpt(name) match {
+  | Some(v) -> v
+  | None() -> throw VarError(name)
+  }
+}
+
+@debug
+@cpp_extern("SKIP_setenv")
+native fun set_var(name: String, value: String): void;
+
+@debug
+@cpp_extern("SKIP_unsetenv")
+native fun remove_var(name: String): void;
