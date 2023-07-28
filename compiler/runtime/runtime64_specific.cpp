@@ -18,6 +18,7 @@
 #include <linux/limits.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <time.h>
 
 // TODO: Only include in debug mode.
 #include <backtrace.h>
@@ -374,7 +375,12 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
 }
 
 int64_t SKIP_time() {
-  return (int64_t)time(NULL);
+  time_t res = time(nullptr);
+  if (res == -1) {
+    perror("time");
+    exit(EXIT_FAILURE);
+  }
+  return (int64_t)res;
 }
 
 void SKIP_localtime(int64_t timep, char* resultp) {
@@ -406,6 +412,12 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
   memcpy(cformat, formatp, byteSize);
   size_t size = strftime(buffer, 1024, cformat, tm);
   return sk_string_create(buffer, size);
+}
+
+char* SKIP_strftime(char* formatp, int64_t timestamp) {
+  struct tm tm;
+  localtime_r(&timestamp, &tm);
+  return SKIP_unix_strftime(formatp, (char *)&tm);
 }
 
 char* SKIP_getcwd() {
