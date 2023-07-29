@@ -272,17 +272,15 @@ private fun parse(
           break void
         }
       | None() if (!str.startsWith("-") && posArgId < posArgs.size()) ->
-        if (posArgs[posArgId] is ArrayArg _) {
-          name = posArgs[posArgId].name;
-          values.maybeGet(name) match {
-          | Some(ArrayValue(arr)) ->
-            values.set(name, ArrayValue(arr.concat(Array[str])))
-          | None() -> values.set(name, ArrayValue(Array[str]))
-          | v -> invariant_violation(`Unexpected value type ${v} for ArrayArg`)
-          }
-        } else {
-          values.set(posArgs[posArgId].name, StringValue(str));
-          !posArgId = posArgId + 1
+        updateValue(values, posArgs[posArgId], str) match {
+        | err @ Some _ ->
+          !error = err;
+          break void
+        | _ -> void
+        };
+        posArgs[posArgId] match {
+        | ArrayArg _ -> void
+        | _ -> !posArgId = posArgId + 1
         }
       | None() -> // Check for short forms that take values such as `-O2`.
         !argName = str.take(2);
