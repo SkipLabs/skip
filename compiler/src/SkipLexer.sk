@@ -316,6 +316,10 @@ mutable class SkipCoreLexer extends SkipLexer {
     this.skipChars(Chars.isHexDigit);
   }
 
+  mutable fun skipOctalDigitSequence(): void {
+    this.skipChars(Chars.isOctalDigit);
+  }
+
   mutable fun skipDigitSequence(): void {
     this.skipChars(Chars.isDigit);
   }
@@ -335,6 +339,22 @@ mutable class SkipCoreLexer extends SkipLexer {
     this.advance();
     this.advance();
     this.skipHexDigitSequence();
+    this.createToken(start, TokenKind.INTEGER_LITERAL(), includeTrailingTrivia)
+  }
+
+  readonly fun peekOctalLiteral(start: readonly Lexer.LexingPosition): Bool {
+    start.peekChar('0') &&
+      (this.peekChar('o') || this.peekChar('O')) &&
+      Chars.isOctalDigit(this.peekOffset(1));
+  }
+
+  mutable fun lexOctalLiteral(
+    start: readonly Lexer.LexingPosition,
+    includeTrailingTrivia: Bool,
+  ): Token.Token {
+    this.advance();
+    this.advance();
+    this.skipOctalDigitSequence();
     this.createToken(start, TokenKind.INTEGER_LITERAL(), includeTrailingTrivia)
   }
 
@@ -371,6 +391,8 @@ mutable class SkipCoreLexer extends SkipLexer {
     invariant(Chars.isDigit(start.peek()), "Expected number");
     if (this.peekHexadecimalLiteral(start)) {
       this.lexHexadecimalLiteral(start, includeTrailingTrivia)
+    } else if (this.peekOctalLiteral(start)) {
+      this.lexOctalLiteral(start, includeTrailingTrivia)
     } else {
       this.skipDigitSequence();
       if (this.peekFractionSuffix()) {

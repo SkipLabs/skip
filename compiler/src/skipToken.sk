@@ -28,6 +28,10 @@ extension class Token{} {
     isHexLiteralString(this.value)
   }
 
+  fun isOctLiteralToken(): Bool {
+    isHexLiteralString(this.value)
+  }
+
   fun isIntMinToken(): Bool {
     this.kind match {
     | TokenKind.INTEGER_LITERAL() -> isIntMinString(this.value)
@@ -41,6 +45,8 @@ extension class Token{} {
       Int::min
     } else if (isHexLiteralString(value)) {
       Chars.hexDigitsToInt(value.getIter().forward(2).collectString())
+    } else if (isOctLiteralString(value)) {
+      Chars.octDigitsToInt(value.getIter().forward(2).collectString())
     } else {
       value.toInt()
     }
@@ -73,6 +79,10 @@ fun isIntMinString(value: String): Bool {
 
 fun isHexLiteralString(value: String): Bool {
   value.startsWith("0x") || value.startsWith("0X")
+}
+
+fun isOctLiteralString(value: String): Bool {
+  value.startsWith("0o") || value.startsWith("0O")
 }
 
 fun charLiteralCode(value: String): Int {
