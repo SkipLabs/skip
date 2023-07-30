@@ -308,7 +308,16 @@ private fun parse(
           !error = Some(MissingArgumentError(arg.name));
           break void
         } else {
-          values.set(arg.name, arg._defaultValue())
+          env_var = arg._env.map(v -> Environ.var(v));
+          value = arg match {
+          | StringArg _ -> env_var.map(v -> StringValue(v))
+          | IntArg _ -> env_var.map(v -> IntValue(v.toInt()))
+          | BoolArg _ ->
+            env_var.map(b -> BoolValue(b != "no" && b != "false" && b != "0"))
+          | _ ->
+            env_var.map(_ -> invariant_violation("Unexpected argument type."))
+          };
+          values.set(arg.name, value.default(arg._defaultValue()))
         }
       }
     }
