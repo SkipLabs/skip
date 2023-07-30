@@ -206,13 +206,20 @@ mutable class Popen(
 ) {
   static fun create{
     args: Array<String>,
-    // TODO: env: Array<String>,
+    env: Map<String, String> = Map[],
+    clear_env: Bool = false,
     stdin: Bool = false,
     stdout: Bool = false,
     stderr: Bool = false,
   }: mutable Popen {
     static::createFromLambda{
-      target => () -> execvp(args),
+      target => () -> {
+        if (clear_env) {
+          Environ.vars().each(v -> Environ.remove_var(v.i0))
+        };
+        env.each((k, v) -> Environ.set_var(k, v));
+        execvp(args)
+      },
       stdin,
       stdout,
       stderr,
