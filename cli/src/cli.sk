@@ -6,6 +6,7 @@ base class Arg(
   _long: ?String = None(),
   _about: ?String = None(),
   _global: Bool = false,
+  _env: ?String = None(),
   // NOTE: The following parameters cannot be placed in subclasses, since `name` is required.
   // StringArgs only
   _default: ?Value = None(),
@@ -33,6 +34,10 @@ base class Arg(
 
   fun global(): this {
     this with {_global => true}
+  }
+
+  overridable fun env(name: String): this {
+    this with {_env => Some(name)}
   }
 
   // Internal methods.
@@ -101,6 +106,10 @@ class ArrayArg extends Arg {
 
   fun required(value: Bool = true): this {
     this with {_required => value}
+  }
+
+  fun env(_name: String): this {
+    invariant_violation("TODO")
   }
 
   fun _defaultValue(): Value {

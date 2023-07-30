@@ -489,6 +489,9 @@ export class SKDB {
       SKIP_print_raw: function (str) {
         data.stdout.push(wasmStringToJS(data.exports, str));
       },
+      SKIP_getenv: function() {
+        throw new Error("Attempting to call getenv() from wasm.");
+      },
       SKIP_js_get_argc: function (i) {
         return data.args.length;
       },

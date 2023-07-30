@@ -212,6 +212,7 @@ void SKIP_saveExn(void* e) {
 
 static int argc = 0;
 static char** argv = NULL;
+extern char** environ;
 
 uint32_t SKIP_getArgc() {
   return argc;
