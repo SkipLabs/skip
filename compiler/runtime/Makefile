@@ -47,7 +47,7 @@ libskip_runtime32.bc: $(BCFILES32)
 %.bc: %.c
 	clang $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
 
-libskip_runtime64.a: $(OFILES) runtime64_specific.o $(ONATIVE_FILES)
+libskip_runtime64.a: $(OFILES) posix.o runtime64_specific.o $(ONATIVE_FILES)
 	$(AR) rcs $@ $^
 
 .PHONY: libbacktrace

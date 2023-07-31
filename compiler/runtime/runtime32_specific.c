@@ -202,3 +202,27 @@ int SKIP_stdin_has_data() {
 }
 
 void SKIP_unix_die_on_EOF() {}
+
+int64_t SKIP_posix_open_flags(int64_t read, int64_t write, int64_t append,
+                              int64_t truncate, int64_t create,
+                              int64_t create_new) {
+  return (int64_t)0;
+}
+
+int32_t SKIP_js_open(char* path, int32_t oflag, int32_t mode);
+
+int64_t SKIP_posix_open(char* path, int64_t oflag, int64_t mode) {
+  return (int64_t)SKIP_js_open(path, (int32_t)oflag, (int32_t)mode);
+}
+
+void SKIP_js_close(int32_t fd);
+
+void SKIP_posix_close(int64_t fd) {
+  SKIP_js_close((int32_t)fd);
+}
+
+uint32_t SKIP_js_write(uint32_t fd, char* buf);
+
+int64_t SKIP_posix_write(int64_t fd, char* buf) {
+  return (int64_t)SKIP_js_write((uint32_t)fd, buf);
+}
