@@ -309,27 +309,6 @@ char* SKIP_open_file(char* filename_obj) {
  return result;
 }
 
-int64_t SKIP_unix_open(char* filename_obj) {
- char* filename = sk2c_string(filename_obj);
-
- int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0777);
-
- if (filename != filename_obj) free(filename);
-
- if(fd == -1) {
-   perror("ERROR file open failed");
-   fprintf(stderr, "Could not open file: %s\n", filename);
-   exit(45);
- }
-
- return (int64_t)fd;
-}
-
-int64_t SKIP_unix_close(int64_t fd) {
-  int status = close((int)fd);
-  return (int64_t)status;
-}
-
 void SKIP_write_to_file(int64_t fd, char* str) {
  size_t size = SKIP_String_byteSize(str);
  while(size > 0) {
