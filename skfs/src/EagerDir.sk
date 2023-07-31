@@ -264,15 +264,6 @@ base class MInfo {
 /* The class used for subscriptions. */
 /*****************************************************************************/
 
-@cpp_extern("SKIP_unix_open")
-native fun unixOpen(String): Int32;
-
-@cpp_extern("SKIP_unix_close")
-native fun unixClose(Int32): Int32;
-
-@cpp_extern("SKIP_write_to_file")
-native fun writeToFile(Int32, String): void;
-
 @cpp_extern("SKIP_notify")
 native fun unixNotify(String, Int32): Int32;
 
@@ -735,10 +726,18 @@ class EagerDir{
   ): void {
     lock = unfreezeLock(sub.lock);
     sub.cmd match {
-    | NUpdates(csv, file) ->
+    | NUpdates(csv, filename) ->
       mutexLock(lock);
-      fd = unixOpen(file);
-      o = x -> writeToFile(fd, x);
+      file = IO.File::open(
+        filename,
+        IO.OpenOptions{
+          write => true,
+          create => true,
+          append => true,
+          mode => 0o777,
+        },
+      );
+      o = x -> file.write_all(x);
       _ = this.writeDiffStdout(
         context,
         isReset,
@@ -748,7 +747,7 @@ class EagerDir{
         sub.filter,
         sub.getDestinationWatermark(context),
       );
-      _ = unixClose(fd);
+      file.close();
       mutexUnlock(lock)
     | NNotify(file) ->
       mutexLock(lock);

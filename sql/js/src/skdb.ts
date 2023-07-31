@@ -495,19 +495,21 @@ export class SKDB {
       SKIP_getArgN: function (n) {
         return encodeUTF8(data.exports, data.args[n]!);
       },
-      SKIP_unix_open: function (wasmFilename) {
+      SKIP_js_open: function (wasmFilename, _opts, _mode) {
         let filename = wasmStringToJS(data.exports, wasmFilename);
         return data.openFile(filename);
       },
-      SKIP_write_to_file: function (fd, str) {
+      SKIP_js_close: function (_fd) {},
+      SKIP_js_write: function (fd, str) {
         let jsStr = wasmStringToJS(data.exports, str);
-        if (jsStr == "") return;
+        if (jsStr == "") return 0;
         data.files[fd]!.push(jsStr);
         data.changed_files[fd] = fd;
         if (data.execOnChange[fd] !== undefined) {
           data.execOnChange[fd]!(data.files[fd]!.join(""));
           data.files[fd] = [];
-        }
+        };
+        return jsStr.length;
       },
       SKIP_glock: function () {},
       SKIP_gunlock: function () {},

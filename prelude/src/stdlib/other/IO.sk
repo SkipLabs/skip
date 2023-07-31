@@ -1,0 +1,194 @@
+module IO;
+
+fun stdin(): mutable File {
+  mutable File(0, "/dev/stdin")
+}
+
+fun stdout(): mutable File {
+  mutable File(1, "/dev/stdout")
+}
+
+fun stderr(): mutable File {
+  mutable File(2, "/dev/stderr")
+}
+
+class OpenOptions{
+  read: Bool = false,
+  write: Bool = false,
+  append: Bool = false,
+  truncate: Bool = false,
+  create: Bool = false,
+  create_new: Bool = false,
+  mode: Int = 0o777,
+} {
+  fun flags(): Int {
+    // TODO: Check validity of flags.
+    Posix.open_flags(
+      if (this.read) 1 else 0,
+      if (this.write) 1 else 0,
+      if (this.append) 1 else 0,
+      if (this.truncate) 1 else 0,
+      if (this.create) 1 else 0,
+      if (this.create_new) 1 else 0,
+    )
+  }
+}
+
+// TODO: How to handle String vs Bytes? type parameter?
+trait Readable {
+  mutable fun read(sz: Int): String;
+  mutable fun read_to_end(): String;
+}
+
+trait Writable {
+  mutable fun write(s: String): Int;
+  mutable fun write_all(s: String): void;
+}
+
+trait IsTerminal {
+  fun isatty(): Bool;
+}
+
+// TODO: Proper `Bytes` type (to handle non-utf8 byte sequences).
+mutable class File(
+  fileno: Int,
+  path: String = "unknown",
+) uses Readable, Writable, IsTerminal {
+  const kDefaultBufferSize: Int = 8192;
+
+  static fun open(path: String, opts: OpenOptions): mutable File {
+    mutable File(Posix.open(path, opts.flags(), opts.mode), path)
+  }
+
+  readonly fun isatty(): Bool {
+    Posix.isatty(this.fileno)
+  }
+
+  mutable fun read(sz: Int): String {
+    res = Posix.read(this.fileno, sz);
+    if (res.length() == 0 && sz != 0) {
+      throw EndOfFile()
+    };
+    res
+  }
+
+  mutable fun read_to_end(): String {
+    res = "";
+    loop {
+      s = Posix.read(this.fileno, static::kDefaultBufferSize);
+      if (s.length() == 0) {
+        break void
+      };
+      !res = res + s
+    };
+    res
+  }
+
+  mutable fun write(s: String): Int {
+    Posix.write(this.fileno, s)
+  }
+
+  mutable fun write_all(s: String): void {
+    loop {
+      nbytes = Posix.write(this.fileno, s);
+      // TODO: This is broken for wide utf8 chars.
+      if (nbytes == s.length()) {
+        break void
+      };
+      !s = s.substring(s.getIter().forward(nbytes))
+    }
+  }
+
+  mutable fun close(): void {
+    Posix.close(this.fileno)
+  }
+}
+
+mutable class StringIO(
+  mutable buffer: String = "",
+  mutable pos: Int = 0,
+) uses Readable, Writable, IsTerminal {
+  fun isatty(): Bool {
+    false
+  }
+
+  mutable fun read(sz: Int): String {
+    start = this.buffer.getIter().forward(this.pos);
+    if (sz == 0) {
+      return ""
+    };
+    readSz = min(sz, this.buffer.length() - this.pos);
+    this.!pos = this.pos + readSz;
+    res = this.buffer.sub(start, readSz);
+    if (res.length() == 0 && sz != 0) {
+      throw EndOfFile()
+    };
+    res
+  }
+
+  mutable fun read_to_end(): String {
+    start = this.buffer.getIter().forward(this.pos);
+    this.!pos = this.buffer.length();
+    this.buffer.substring(start)
+  }
+
+  mutable fun write(s: String): Int {
+    this.!buffer = this.buffer + s;
+    s.length()
+  }
+
+  mutable fun write_all(s: String): void {
+    this.!buffer = this.buffer + s;
+  }
+}
+
+mutable class BufferedReader<T: mutable Readable>(
+  stream: T,
+  mutable buffer: String = "",
+) {
+  const kDefaultBufferSize: Int = 8192;
+
+  mutable fun read(sz: Int): String {
+    while (this.buffer.length() < sz) {
+      this.!buffer = this.buffer + this.stream.read(sz - this.buffer.length());
+    };
+    res = this.buffer.sub(this.buffer.getIter(), sz);
+    this.!buffer = this.buffer.substring(this.buffer.getIter().forward(sz));
+    res
+  }
+
+  mutable fun read_to_end(): String {
+    res = this.buffer + this.stream.read_to_end();
+    this.!buffer = "";
+    res
+  }
+
+  mutable fun read_line(): String {
+    pos = 0;
+    try {
+      loop {
+        newlinePos = -1;
+        for (i in Range(pos, this.buffer.length())) {
+          if (this.buffer.chars()[i] == '\n') {
+            !newlinePos = i;
+            break void
+          }
+        };
+        if (newlinePos != -1) {
+          !pos = newlinePos + 1;
+          break void
+        } else {
+          !pos = this.buffer.length();
+          this.!buffer =
+            this.buffer + this.stream.read(static::kDefaultBufferSize)
+        }
+      }
+    } catch {
+    | EndOfFile _ if (this.buffer.length() > 0) -> void
+    | exn -> throw exn
+    };
+    res = this.buffer.sub(this.buffer.getIter(), pos);
+    this.!buffer = this.buffer.substring(this.buffer.getIter().forward(pos));
+    res
+  }
+}
