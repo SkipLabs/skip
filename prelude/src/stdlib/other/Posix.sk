@@ -1,0 +1,236 @@
+module Posix;
+
+@debug
+@cpp_extern("SKIP_posix_open")
+native fun internalOpen(path: String, oflag: Int, mode: Int): Int;
+
+fun open(path: String, oflag: Int, mode: Int = 0): Int {
+  internalOpen(path, oflag, mode)
+}
+
+@debug
+@cpp_extern("SKIP_posix_close")
+native fun close(fd: Int): void;
+
+@debug
+@cpp_extern("SKIP_posix_write")
+native fun write(fd: Int, s: String): Int;
+
+@debug
+@cpp_extern("SKIP_posix_read")
+native fun read(fd: Int, len: Int): String;
+
+@debug
+@cpp_extern("SKIP_posix_pipe")
+native fun pipe(): Pipe;
+
+@debug
+@cpp_extern("SKIP_posix_dup2")
+native fun dup2(oldfd: Int, newfd: Int): void;
+
+@cpp_extern("SKIP_posix_open_flags")
+native fun open_flags(
+  read: Int,
+  write: Int,
+  append: Int,
+  truncate: Int,
+  create: Int,
+  create_new: Int,
+): Int;
+
+@cpp_extern("SKIP_posix_wifexited")
+native fun wifexited(stat_loc: Int): Bool;
+@cpp_extern("SKIP_posix_wifsignaled")
+native fun wifsignaled(stat_loc: Int): Bool;
+@cpp_extern("SKIP_posix_wifstopped")
+native fun wifstopped(stat_loc: Int): Bool;
+@cpp_extern("SKIP_posix_wexitstatus")
+native fun wexitstatus(stat_loc: Int): Int;
+@cpp_extern("SKIP_posix_wtermsig")
+native fun wtermsig(stat_loc: Int): Int;
+@cpp_extern("SKIP_posix_wstopsig")
+native fun wstopsig(stat_loc: Int): Int;
+
+@debug
+@cpp_extern("SKIP_posix_kill")
+native fun kill(pid: Int, sig: Int): void;
+
+@debug
+@cpp_extern("SKIP_posix_waitpid")
+native fun waitpid(pid: Int, nohang: Bool = false): Int;
+
+@debug
+@cpp_extern("SKIP_posix_fork")
+native fun internalFork(): Int;
+
+fun fork(): mutable Process {
+  mutable Process(internalFork())
+}
+
+@debug
+@cpp_extern("SKIP_posix_execvp")
+native fun internalExecvp(args: Array<String>): void;
+
+fun execvp<T>(args: Array<String>): T {
+  internalExecvp(args);
+  invariant_violation("unreachable")
+}
+
+@debug
+@cpp_extern("SKIP_posix_poll")
+native fun poll(pollfds: mutable Array<mutable Pollfd>): Int;
+
+@debug
+@cpp_extern("SKIP_posix_isatty")
+native fun isatty(fd: Int): Bool;
+
+class Pipe(output: Int, input: Int) {}
+
+@cpp_export("sk_create_posix_pipe")
+fun internalCreatePipe(output_fd: Int, input_fd: Int): Pipe {
+  Pipe(output_fd, input_fd)
+}
+
+base class WExitStatus {
+  children =
+  | WExited(status: Int)
+  | WSignaled(sig: Int)
+  | WStopped(sig: Int)
+
+  static fun create(stat_loc: Int): WExitStatus {
+    if (wifexited(stat_loc)) {
+      WExited(wexitstatus(stat_loc))
+    } else if (wifsignaled(stat_loc)) {
+      WSignaled(wtermsig(stat_loc))
+    } else { // wifstopped(stat_loc)
+      WStopped(wstopsig(stat_loc))
+    }
+  }
+
+  fun success(): Bool
+  | WExited(status) -> (status == 0)
+  | _ -> false
+}
+
+base class Signal {
+  children =
+  | SIGHUP()
+  | SIGINT()
+  | SIGQUIT()
+  | SIGILL()
+  | SIGTRAP()
+  | SIGABRT()
+  | SIGEMT()
+  | SIGFPE()
+  | SIGKILL()
+  | SIGBUS()
+  | SIGSEGV()
+  | SIGSYS()
+  | SIGPIPE()
+  | SIGALRM()
+  | SIGTERM()
+  | SIGURG()
+  | SIGSTOP()
+  | SIGTSTP()
+  | SIGCONT()
+  | SIGCHLD()
+  | SIGTTIN()
+  | SIGTTOU()
+  | SIGIO()
+  | SIGXCPU()
+  | SIGXFSZ()
+  | SIGVTALRM()
+  | SIGPROF()
+  | SIGWINCH()
+  | SIGINFO()
+  | SIGUSR1()
+  | SIGUSR2()
+
+  fun code(): Int
+  | SIGHUP() -> 1
+  | SIGINT() -> 2
+  | SIGQUIT() -> 3
+  | SIGILL() -> 4
+  | SIGTRAP() -> 5
+  | SIGABRT() -> 6
+  | SIGEMT() -> 7
+  | SIGFPE() -> 8
+  | SIGKILL() -> 9
+  | SIGBUS() -> 10
+  | SIGSEGV() -> 11
+  | SIGSYS() -> 12
+  | SIGPIPE() -> 13
+  | SIGALRM() -> 14
+  | SIGTERM() -> 15
+  | SIGURG() -> 16
+  | SIGSTOP() -> 17
+  | SIGTSTP() -> 18
+  | SIGCONT() -> 19
+  | SIGCHLD() -> 20
+  | SIGTTIN() -> 21
+  | SIGTTOU() -> 22
+  | SIGIO() -> 23
+  | SIGXCPU() -> 24
+  | SIGXFSZ() -> 25
+  | SIGVTALRM() -> 26
+  | SIGPROF() -> 27
+  | SIGWINCH() -> 28
+  | SIGINFO() -> 29
+  | SIGUSR1() -> 30
+  | SIGUSR2() -> 31
+}
+
+mutable class Process(pid: Int) {
+  mutable fun kill(sig: Signal = SIGKILL()): void {
+    kill(this.pid, sig.code())
+  }
+
+  mutable fun poll(): ?WExitStatus {
+    waitpid(this.pid, /* nohang = */ true) match {
+    | -1 -> None()
+    | stat_loc -> Some(WExitStatus::create(stat_loc))
+    }
+  }
+
+  mutable fun wait(): WExitStatus {
+    WExitStatus::create(waitpid(this.pid))
+  }
+}
+
+base class PollEvents {
+  children =
+  | POLLIN()
+  | POLLERR()
+  | POLLHUP()
+  // TODO: Complete set of events.
+
+  // TODO: Properly derive those values from poll.h.
+  fun value(): Int16
+  | POLLIN() -> Int16::truncate(1)
+  | POLLERR() -> Int16::truncate(8)
+  | POLLHUP() -> Int16::truncate(16)
+}
+
+// TODO: Use proper integer type depending on platform.
+mutable value class Pollfd(fd: Int32, events: Int16, revents: Int16) {
+  static fun create(
+    fd: Int,
+    events: Int16 = POLLIN().value(),
+    revents: Int16 = Int16::truncate(0),
+  ): mutable Pollfd {
+    mutable Pollfd(Int32::truncate(fd), events, revents)
+  }
+
+  readonly fun pollin(): Bool {
+    // NOTE: Unnecessary toInt() because Int32 lacks bitwise operators.
+    this.revents.toInt().and(POLLIN().value()) > 0
+  }
+
+  readonly fun pollerr(): Bool {
+    this.revents.toInt().and(POLLERR().value()) > 0
+  }
+
+  readonly fun pollhup(): Bool {
+    this.revents.toInt().and(POLLHUP().value()) > 0
+  }
+}
