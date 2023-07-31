@@ -29,15 +29,12 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
   compile(bc, "test", env.manifest.testHarness);
   filter = args.maybeGetString("filter");
   junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
-  rv = system(
+
+  Posix.execvp(
     Array[Path.join(bc.targetDir, "test")].concat(
       Array[junitxml, filter].filterNone(),
-    ).join(" "),
-  );
-  // TODO: Properly handle subprocess not exiting normally.
-  if (rv != 0) {
-    skipExit(1)
-  }
+    ),
+  )
 }
 
 fun execBuild(args: Cli.ParseResults, env: Env): void {

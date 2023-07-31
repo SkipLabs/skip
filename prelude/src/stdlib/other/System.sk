@@ -287,25 +287,53 @@ native fun system(cmd: String): Int;
 
 module System;
 
-class CompletedProcess{
+class CompletedProcess(
   args: Array<String>,
-  exitcode: Int,
+  exitstatus: Posix.WExitStatus,
   stdout: String,
   stderr: String,
+) {
+  fun success(): Bool {
+    this.exitstatus.success()
+  }
 }
 
-@cpp_runtime
-@may_alloc
-native fun subprocess(args: Array<String>): CompletedProcess;
-
-@cpp_export("sk_completed_process_create")
-fun createCompletedProcess(
+fun subprocess(
   args: Array<String>,
-  exitcode: Int,
-  stdout: String,
-  stderr: String,
+  stdout: (String) -> void = _ -> void,
+  stderr: (String) -> void = _ -> void,
 ): CompletedProcess {
-  CompletedProcess{args, exitcode, stdout, stderr}
+  p = Posix.Popen::create{args, stdout => true, stderr => true};
+  streams = Array[p.stdout.fromSome(), p.stderr.fromSome()];
+  captured_stdout = "";
+  captured_stderr = "";
+  handlers = Array[
+    s -> {
+      !captured_stdout = captured_stdout + s;
+      stdout(s)
+    },
+    s -> {
+      !captured_stderr = captured_stderr + s;
+      stderr(s)
+    },
+  ];
+  pollfds = Array::mcreateFromItems(
+    streams.map(s -> Posix.Pollfd::create(s.fileno)),
+  );
+  open_fds = streams.size();
+  while (open_fds > 0) {
+    _ = Posix.poll(pollfds);
+    for ((i, pfd) in pollfds.items()) {
+      if (pfd.pollin()) {
+        handlers[i](streams[i].read(4096))
+      } else if (pfd.fd != -1 && (pfd.pollerr() || pfd.pollhup())) {
+        pollfds.set(i, Posix.Pollfd::create(-1));
+        !open_fds = open_fds - 1
+      }
+    }
+  };
+  exitstatus = p.wait();
+  CompletedProcess(args, exitstatus, captured_stdout, captured_stderr)
 }
 
 module end;

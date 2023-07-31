@@ -197,6 +197,94 @@ mutable class Process(pid: Int) {
   }
 }
 
+// TODO: Properly handle redirecting to /dev/null.
+mutable class Popen(
+  process: mutable Process,
+  stdin: ?mutable IO.File,
+  stdout: ?mutable IO.File,
+  stderr: ?mutable IO.File,
+) {
+  static fun create{
+    args: Array<String>,
+    // TODO: env: Array<String>,
+    stdin: Bool = false,
+    stdout: Bool = false,
+    stderr: Bool = false,
+  }: mutable Popen {
+    static::createFromLambda{
+      target => () -> execvp(args),
+      stdin,
+      stdout,
+      stderr,
+    }
+  }
+
+  static fun createFromLambda{
+    target: () -> void,
+    stdin: Bool = false,
+    stdout: Bool = false,
+    stderr: Bool = false,
+  }: mutable Popen {
+    stdin_pipe = if (stdin) Some(pipe()) else None();
+    stdout_pipe = if (stdout) Some(pipe()) else None();
+    stderr_pipe = if (stderr) Some(pipe()) else None();
+    p = fork();
+    if (p.pid == 0) {
+      stdin_pipe.each(pipe -> {
+        dup2(pipe.output, IO.stdin().fileno);
+        close(pipe.input);
+        close(pipe.output)
+      });
+      stdout_pipe.each(pipe -> {
+        dup2(pipe.input, IO.stdout().fileno);
+        close(pipe.input);
+        close(pipe.output)
+      });
+      stderr_pipe.each(pipe -> {
+        dup2(pipe.input, IO.stderr().fileno);
+        close(pipe.input);
+        close(pipe.output)
+      });
+      target();
+      skipExit(0)
+    } else {
+      stdin_pipe.each(pipe -> close(pipe.output));
+      stdout_pipe.each(pipe -> close(pipe.input));
+      stderr_pipe.each(pipe -> close(pipe.input));
+      mutable Popen(
+        p,
+        stdin_pipe.map(pipe -> mutable IO.File(pipe.input)),
+        stdout_pipe.map(pipe -> mutable IO.File(pipe.output)),
+        stderr_pipe.map(pipe -> mutable IO.File(pipe.output)),
+      )
+    }
+  }
+
+  mutable fun kill(sig: Signal = SIGKILL()): void {
+    this.process.kill(sig)
+  }
+
+  mutable fun poll(): ?WExitStatus {
+    res = this.process.poll();
+    if (res.isSome()) {
+      this.closefds()
+    };
+    res
+  }
+
+  mutable fun wait(): WExitStatus {
+    res = this.process.wait();
+    this.closefds();
+    res
+  }
+
+  private mutable fun closefds(): void {
+    this.stdin.each(f -> f.close());
+    this.stdout.each(f -> f.close());
+    this.stderr.each(f -> f.close())
+  }
+}
+
 base class PollEvents {
   children =
   | POLLIN()

@@ -49,11 +49,11 @@ private fun run(args: Array<String>, verbose: Bool): void {
     print_error(`>> ${args.join(" ")}`)
   };
   p = System.subprocess(args);
-  if (p.exitcode != 0) {
+  if (!p.success()) {
     print_raw(p.stdout);
     print_error_raw(p.stderr);
     skipExit(1)
-  };
+  }
 }
 
 private fun invokeSkc(bc: BuildContext, args: Array<String>): void {
@@ -98,15 +98,16 @@ private fun genVersionFile(bc: BuildContext): void {
   _ = system("mkdir -p " + bc.targetDir);
   // TODO: Ensure cwd.
   p = System.subprocess(Array["git", "rev-parse", "--short", "HEAD"]);
-  hash = if (p.exitcode == 127 || p.exitcode == 128) {
+  hash = p.exitstatus match {
+  | Posix.WExited(127)
+  | Posix.WExited(128) ->
     // Fallback if current checkout is not a git repo, or git is not installed.
     "unknown"
-  } else if (p.exitcode != 0) {
+  | Posix.WExited(0) -> p.stdout.trim()
+  | _ ->
     print_raw(p.stdout);
     print_error_raw(p.stderr);
     invariant_violation("error")
-  } else {
-    p.stdout.trim()
   };
 
   contents = `module SkargoVersion;

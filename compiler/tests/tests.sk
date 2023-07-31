@@ -2,31 +2,21 @@ module alias T = SKTest;
 
 module SkcTests;
 
-private fun compile(
+private fun compile_cmd(
   files: readonly Sequence<String>,
   output: String,
-): System.CompletedProcess {
-  System.subprocess(
-    Array[
-      "skc",
-      "-O0",
-      "--no-inline",
-      "--export-function-as",
-      "main=skip_main",
-      "--data",
-      "tests/state.db",
-      "-o",
-      output,
-    ].concat(files.collect(Array)),
-  );
-}
-
-private fun run(argv: Sequence<String>): void {
-  p = System.subprocess(argv.collect(Array));
-  if (p.exitcode != 0) {
-    print_error(p.stderr);
-    skipExit(1)
-  };
+): Array<String> {
+  Array[
+    "skc",
+    "-O0",
+    "--no-inline",
+    "--export-function-as",
+    "main=skip_main",
+    "--data",
+    "tests/state.db",
+    "-o",
+    output,
+  ].concat(files.collect(Array))
 }
 
 private fun genValidTest(
@@ -34,16 +24,22 @@ private fun genValidTest(
   stdlibSrcs: Array<String>,
 ): () -> void {
   () -> {
-    p = compile(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".bin");
-    if (p.exitcode != 0) {
-      print_error(p.stderr);
-      invariant_violation("skc") // TODO: Throw error
+    p = System.subprocess(
+      compile_cmd(
+        stdlibSrcs.concat(Array[basename + ".sk"]),
+        basename + ".bin",
+      ),
+    );
+    if (!p.success()) {
+      T.fail(
+        `Unexpected compile error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`,
+      );
     };
 
     !p = System.subprocess(Array[basename + ".bin"]);
 
-    if (p.exitcode != 0) {
-      T.fail("Unexpected error: " + p.stderr)
+    if (!p.success()) {
+      T.fail(`Unexpected error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`);
     };
 
     actual = p.stdout;
@@ -58,9 +54,14 @@ private fun genInvalidTest(
   stdlibSrcs: Array<String>,
 ): () -> void {
   () -> {
-    p = compile(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".bin");
+    p = System.subprocess(
+      compile_cmd(
+        stdlibSrcs.concat(Array[basename + ".sk"]),
+        basename + ".bin",
+      ),
+    );
 
-    if (p.exitcode == 0) {
+    if (p.success()) {
       T.fail("Expected compile error")
     };
 
@@ -80,9 +81,23 @@ fun main(): void {
     .concat(FileSystem.readFilesRecursive("../skfs/src"))
     .collect(Array);
 
-  run(Array["rm", "-f", "tests/state.db"]);
+  p = System.subprocess(Array["rm", "-f", "tests/state.db"]);
+  if (!p.success()) {
+    print_error(`command failed: ${p.args.join(" ")}`);
+    print_error(`stdout:\n${p.stdout}`);
+    print_error(`stderr:\n${p.stderr}`);
+    skipExit(1)
+  };
 
-  run(Array["skc", "--init", "tests/state.db", "--check"].concat(stdlibSrcs));
+  !p = System.subprocess(
+    Array["skc", "--init", "tests/state.db", "--check"].concat(stdlibSrcs),
+  );
+  if (!p.success()) {
+    print_error(`command failed: ${p.args.join(" ")}`);
+    print_error(`stdout:\n${p.stdout}`);
+    print_error(`stderr:\n${p.stderr}`);
+    skipExit(1)
+  };
 
   validTests = FileSystem.readFilesRecursive("./tests", fn ->
     fn.endsWith(".exp") && !fn.contains("invalid/")
