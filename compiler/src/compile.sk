@@ -292,14 +292,21 @@ fun link(llFile: String, config: Config.Config): void {
 }
 
 fun runShell(args: Array<String>, verbose: Bool = false): void {
-  p = System.subprocess(args);
-  // TODO: Proper logging.
-  if (verbose || p.exitcode != 0) {
-    print_error_raw(p.stderr);
-    if (p.exitcode != 0) {
-      // TODO: Proper exit code.
-      skipExit(1);
-    }
+  p = System.subprocess(
+    args,
+    s -> {
+      if (verbose) {
+        print_error_raw(s)
+      }
+    },
+    s -> {
+      if (verbose) {
+        print_error_raw(s)
+      }
+    },
+  );
+  if (!p.success()) {
+    skipExit(1)
   }
 }
 
