@@ -25,6 +25,7 @@ async def runSchedules(schedules, log):
       await failLock.acquire() # just deal with first failure
       debugRun = schedule.clone()
       try:
+        print("> running debug test", file=sys.stderr)
         await debugRun.run(log)
       except AssertionError as err:
         sys.exit(1)
@@ -152,7 +153,7 @@ class Schedule:
   async def run(self, debug=nop):
     self.debug=debug
     for i,t in enumerate(self.tasks):
-      debug(f"{i}: {t}")
+      debug(f"> {i}: {t}")
       await t.run(self)
 
   async def finalise(self):
