@@ -103,8 +103,8 @@ fun main(): void {
       .splitFirst("/");
 
     tests
-      .getOrAdd(testSuite, () -> mutable Map[])
-      .set(testName, () -> runValidTest(testFile, jsonFile));
+      .getOrAdd(testSuite, () -> mutable Vector[])
+      .push(T.Test{name => testName, func => () ~> runValidTest(testFile, jsonFile)});
   };
   invalidTests = FileSystem.readFilesRecursive("./tests/invalid", fn ->
     fn.endsWith(".toml")
@@ -117,9 +117,9 @@ fun main(): void {
       .splitFirst("/");
 
     tests
-      .getOrAdd(testSuite, () -> mutable Map[])
-      .set(testName + " (invalid)", () -> runInvalidTest(testFile));
+      .getOrAdd(testSuite, () -> mutable Vector[])
+      .push(T.Test{name => testName + " (invalid)", func => () ~> runInvalidTest(testFile)});
   };
 
-  SKTest.test_harness(tests)
+  T.test_harness(tests)
 }

@@ -1,7 +1,14 @@
 module SKTest;
 
+class Test{
+  name: String,
+  func: () ~> void,
+  file: String = "unknown",
+  lineno: Int = -1,
+} {}
+
 fun test_job(
-  tests: readonly Map<String, readonly Map<String, () -> void>>,
+  tests: readonly Map<String, readonly Sequence<Test>>,
   filter: String,
   njobs: Int,
   rank: Int,
@@ -9,8 +16,8 @@ fun test_job(
 ): void {
   i = 0;
   for (testSuite in tests.keys()) {
-    for ((testName, testFun) in tests[testSuite].items()) {
-      if (!(testSuite + "." + testName).contains(filter)) {
+    for (test in tests[testSuite]) {
+      if (!(testSuite + "." + test.name).contains(filter)) {
         continue
       };
       !i = i + 1;
@@ -18,23 +25,25 @@ fun test_job(
         continue
       };
       res = TestResult{
-        name => testName,
+        name => test.name,
         suite => testSuite,
-        file => "TODO",
-        line => -1,
+        file => test.file,
+        line => test.lineno,
       };
+      // TODO: Use more accurate clock.
+      start = Time.time();
       !res = try {
-        _ = testFun();
+        _ = test.func();
         res with {
           result => "success",
           // TODO: test time
-          time => -1,
+          time => Time.time() - start,
         }
       } catch {
       | ExpectationError(msg, _, _) ->
         res with {
           result => "failure",
-          time => -1,
+          time => Time.time() - start,
           failure_type => "ExpectationError",
           failure_message => msg,
           failure_extra => "TODO",
@@ -42,7 +51,7 @@ fun test_job(
       | exn ->
         res with {
           result => "error",
-          time => -1,
+          time => Time.time() - start,
           failure_type => inspect(exn).toString(),
           failure_message => exn.getMessage(),
           failure_extra => "TODO",
@@ -55,7 +64,7 @@ fun test_job(
 }
 
 fun test_harness(
-  tests: readonly Map<String, readonly Map<String, () -> void>>,
+  tests: readonly Map<String, readonly Sequence<Test>>,
 ): void {
   args = Cli.Command("tests")
     .about("Run tests")
@@ -149,9 +158,9 @@ fun main(): void {
     // TODO: Properly handle tests outside of module/suite?
     (testSuite, testName) = #functionName.splitFirst(".");
     if (!tests.containsKey(testSuite)) {
-      tests.set(testSuite, mutable Map[])
+      tests.set(testSuite, mutable Vector[])
     };
-    tests[testSuite].set(testName, #function)
+    tests[testSuite].push(Test{name => testName, func => #function})
   };
   test_harness(tests)
 }

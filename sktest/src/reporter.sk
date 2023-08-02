@@ -100,36 +100,52 @@ mutable class BasicTestReporter{
   }
 }
 
+mutable class TestSuiteStats(
+  mutable tests: Int = 0,
+  mutable failures: Int = 0,
+  mutable errors: Int = 0,
+  mutable time: Int = 0,
+) {
+  mutable fun add(test: TestResult): void {
+    this.!tests = this.tests + 1;
+    this.!time = this.time + test.time;
+    test.result match {
+    | "error" -> this.!errors = this.errors + 1
+    | "failure" -> this.!failures = this.failures + 1
+    | _ -> void
+    }
+  }
+}
+
 mutable class XmlTestReporter{
   results: mutable Map<String, mutable Vector<TestResult>> = mutable Map[],
+  stats: mutable Map<String, mutable TestSuiteStats> = mutable Map[],
 } extends TestReporter {
   mutable fun report(res: TestResult): void {
     if (!this.results.containsKey(res.suite)) {
-      this.results.set(res.suite, mutable Vector[])
+      this.results.set(res.suite, mutable Vector[]);
+      this.stats.set(res.suite, mutable TestSuiteStats())
     };
-    this.results[res.suite].push(res)
+    this.results[res.suite].push(res);
+    this.stats[res.suite].add(res)
   }
 
   mutable fun finish(): void {
     this.writeLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-    totalTests = this.results.values()
-      .map(x -> x.size())
-      .foldl((acc, x) -> acc + x, 0);
-    totalFailures = this.results.values()
-      .map(ts ->
-        ts.values().filter(r -> r.result != "success").collect(Array).size()
-      )
-      .foldl((acc, x) -> acc + x, 0);
+    totalTests = this.stats.values().map(s -> s.tests).foldl((acc, x) -> acc + x, 0);
+    totalFailures = this.stats.values().map(s -> s.failures).foldl((acc, x) -> acc + x, 0);
+    totalErrors = this.stats.values().map(s -> s.errors).foldl((acc, x) -> acc + x, 0);
+    totalTime = this.stats.values().map(s -> s.time).foldl((acc, x) -> acc + x, 0);
     this.writeLine(
-      `<testsuites tests="${totalTests}" failures="${totalFailures}" errors="0" time="0" timestamp="0" name="AllTests">`,
+      `<testsuites tests="${totalTests}" failures="${totalFailures}" errors="${totalErrors}" time="${totalTime}" timestamp="0" name="AllTests">`,
     );
     for ((testSuiteName, results) in this.results.items()) {
       numTests = results.size();
-      numFailures = results.filter(r -> r.result == "failure").size();
-      numErrors = results.filter(r -> r.result == "error").size();
-      totalTime = 0; // TODO
+      numFailures = this.stats[testSuiteName].failures;
+      numErrors = this.stats[testSuiteName].errors;
+      time = this.stats[testSuiteName].time;
       this.writeLine(
-        `  <testsuite name="${testSuiteName}" tests="${numTests}" failures="${numFailures}" errors="${numErrors}" time="${totalTime}">`,
+        `  <testsuite name="${testSuiteName}" tests="${numTests}" failures="${numFailures}" errors="${numErrors}" time="${time}">`,
       );
       for (res in results) {
         this.writeLine(
