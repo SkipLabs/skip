@@ -20,56 +20,52 @@ private fun compile_cmd(
 private fun genValidTest(
   basename: String,
   stdlibSrcs: Array<String>,
-): () -> void {
-  () -> {
-    p = System.subprocess(
-      compile_cmd(
-        stdlibSrcs.concat(Array[basename + ".sk"]),
-        basename + ".bin",
-      ),
+): void {
+  p = System.subprocess(
+    compile_cmd(
+      stdlibSrcs.concat(Array[basename + ".sk"]),
+      basename + ".bin",
+    ),
+  );
+  if (!p.success()) {
+    T.fail(
+      `Unexpected compile error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`,
     );
-    if (!p.success()) {
-      T.fail(
-        `Unexpected compile error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`,
-      );
-    };
-
-    !p = System.subprocess(Array[basename + ".bin"]);
-
-    if (!p.success()) {
-      T.fail(`Unexpected error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`);
-    };
-
-    actual = p.stdout;
-    expected = FileSystem.readTextFile(basename + ".exp");
-
-    T.expectEq(actual, expected)
   };
+
+  !p = System.subprocess(Array[basename + ".bin"]);
+
+  if (!p.success()) {
+    T.fail(`Unexpected error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`);
+  };
+
+  actual = p.stdout;
+  expected = FileSystem.readTextFile(basename + ".exp");
+
+  T.expectEq(actual, expected)
 }
 
 private fun genInvalidTest(
   basename: String,
   stdlibSrcs: Array<String>,
-): () -> void {
-  () -> {
-    p = System.subprocess(
-      compile_cmd(
-        stdlibSrcs.concat(Array[basename + ".sk"]),
-        basename + ".bin",
-      ),
-    );
+): void {
+  p = System.subprocess(
+    compile_cmd(
+      stdlibSrcs.concat(Array[basename + ".sk"]),
+      basename + ".bin",
+    ),
+  );
 
-    if (p.success()) {
-      T.fail("Expected compile error")
-    };
+  if (p.success()) {
+    T.fail("Expected compile error")
+  };
 
-    // NOTE: The `.trim()` is needed because error messages seem to currently
-    // have an extra newline.
-    actual = p.stderr.trim();
-    expected = FileSystem.readTextFile(basename + ".exp_err").trim();
+  // NOTE: The `.trim()` is needed because error messages seem to currently
+  // have an extra newline.
+  actual = p.stderr.trim();
+  expected = FileSystem.readTextFile(basename + ".exp_err").trim();
 
-    T.expectEq(actual, expected)
-  }
+  T.expectEq(actual, expected)
 }
 
 fun main(): void {
@@ -87,8 +83,8 @@ fun main(): void {
     basename = testFile.stripSuffix(".exp");
     (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
     tests
-      .getOrAdd(testSuite, () -> mutable Map[])
-      .set(testName, genValidTest(basename, stdlibSrcs));
+      .getOrAdd(testSuite, () -> mutable Vector[])
+      .push(T.Test{name => testName, func => () ~> genValidTest(basename, stdlibSrcs)});
   };
 
   invalidTests = FileSystem.readFilesRecursive("./tests", fn ->
@@ -99,8 +95,8 @@ fun main(): void {
     basename = testFile.stripSuffix(".exp");
     (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
     tests
-      .getOrAdd(testSuite, () -> mutable Map[])
-      .set(testName, genInvalidTest(basename, stdlibSrcs))
+      .getOrAdd(testSuite, () -> mutable Vector[])
+      .push(T.Test{name => testName, func => () ~> genInvalidTest(basename, stdlibSrcs)})
   };
 
   SKTest.test_harness(tests)
