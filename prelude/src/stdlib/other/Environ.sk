@@ -4,35 +4,42 @@ module Environ;
 // program startup.
 // Inspired from `llvm/lib/Support/Unix/Path.inc`.
 fun current_exe(): String {
-  if (internalGetArgc() > 0) {
-    argv0 = args().next().fromSome();
+  if (internalGetArgc() == 0) {
+    invariant_violation("Could not determine main executable.")
+  };
+  argv0 = args().next().fromSome();
 
-    // First approach: absolute path.
-    if (argv0.startsWith("/")) {
-      path = argv0;
-      if (FileSystem.exists(path)) {
-        return FileSystem.realpath(path)
-      }
-    };
-
-    // Second approach: relative path.
-    if (argv0.contains("/")) {
-      path = Path.join(current_dir(), argv0);
-      if (FileSystem.exists(path)) {
-        return FileSystem.realpath(path)
-      }
-    };
-
-    // Third approach: $PATH
-    for (p in var("PATH").split(":")) {
-      path = Path.join(p, argv0);
-      if (FileSystem.exists(path)) {
-        return FileSystem.realpath(path)
-      }
+  // First approach: absolute path.
+  if (argv0.startsWith("/")) {
+    path = argv0;
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    } else {
+      invariant_violation("Could not determine main executable.")
     }
   };
 
-  invariant_violation("Cannot determine main executable.")
+  // Second approach: relative path.
+  if (argv0.contains("/")) {
+    path = Path.join(current_dir(), argv0);
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    } else {
+      invariant_violation("Could not determine main executable.")
+    }
+  };
+
+  // Third approach: $PATH
+  for (p in var("PATH").split(":")) {
+    path = Path.join(p, argv0);
+    if (FileSystem.exists(path)) {
+      return FileSystem.realpath(path)
+    } else {
+      invariant_violation("Could not determine main executable.")
+    }
+  };
+
+  invariant_violation("Could not determine main executable.")
 }
 
 @debug
