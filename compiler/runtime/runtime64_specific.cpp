@@ -1,50 +1,44 @@
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <linux/limits.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
+
+#include <algorithm>
 #include <cstdint>
 #include <exception>
-#include <string>
-#include <string.h>
 #include <iostream>
-#include <algorithm>
-#include <vector>
 #include <map>
-#include <dirent.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <linux/limits.h>
-#include <errno.h>
-#include <inttypes.h>
-#include <time.h>
+#include <string>
+#include <vector>
 
 // TODO: Only include in debug mode.
 #include <backtrace.h>
 
 namespace {
-static int
-print_callback (void */* data */, uintptr_t pc, const char *filename, int lineno,
-		const char *function)
-{
-  fprintf(stderr, "0x%lx %s\n\t%s:%d\n",
-          (unsigned long) pc,
+static int print_callback(void* /* data */, uintptr_t pc, const char* filename,
+                          int lineno, const char* function) {
+  fprintf(stderr, "0x%lx %s\n\t%s:%d\n", (unsigned long)pc,
           function == NULL ? "???" : function,
-          filename == NULL ? "???" : filename,
-          lineno);
+          filename == NULL ? "???" : filename, lineno);
   return 0;
 }
 
-static void
-error_callback (void */* data */, const char *msg, int errnum)
-{
+static void error_callback(void* /* data */, const char* msg, int errnum) {
   fprintf(stderr, "libbacktrace: %s", msg);
-  if (errnum > 0)
-    fprintf(stderr, ": %s", strerror(errnum));
+  if (errnum > 0) fprintf(stderr, ": %s", strerror(errnum));
   fputc('\n', stderr);
 }
-} // namespace
+}  // namespace
 
 namespace skip {
 struct SkipException : std::exception {
@@ -54,7 +48,8 @@ struct SkipException : std::exception {
 };
 
 void printStackTrace() {
-  struct backtrace_state *state = backtrace_create_state(nullptr, 0, error_callback, nullptr);
+  struct backtrace_state* state =
+      backtrace_create_state(nullptr, 0, error_callback, nullptr);
   if (state == nullptr) {
     fprintf(stderr, "libbacktrace: Failed to initialize backtrace\n");
     return;
@@ -62,7 +57,7 @@ void printStackTrace() {
 
   backtrace_full(state, 3, print_callback, error_callback, nullptr);
 }
-}
+}  // namespace skip
 
 namespace {
 void terminate() {
@@ -79,7 +74,7 @@ void terminate() {
   std::cerr << "*** Stack trace:" << std::endl;
   skip::printStackTrace();
 }
-} // namespace
+}  // namespace
 
 extern "C" {
 
@@ -93,10 +88,10 @@ void SKIP_throw_EndOfFile();
 char* sk2c_string(char* skstr) {
   char* cstr;
   size_t size = SKIP_String_byteSize(skstr);
-  if (skstr[size-1] == (char)0) {
+  if (skstr[size - 1] == (char)0) {
     cstr = skstr;
   } else {
-    cstr = (char*)malloc(size+1);
+    cstr = (char*)malloc(size + 1);
     if (cstr == NULL) {
       perror("malloc");
       exit(1);
@@ -126,7 +121,7 @@ thread_local std::string lineBuffer;
 int32_t SKIP_read_line_fill(void) {
   std::getline(std::cin, lineBuffer);
   if (std::cin.fail()) {
-      return -1;
+    return -1;
   }
   return lineBuffer.size();
 }
@@ -138,7 +133,7 @@ uint32_t SKIP_read_line_get(uint32_t i) {
 uint32_t SKIP_getchar(uint64_t) {
   int c1 = (uint32_t)getc(stdin);
 
-  if(c1 == EOF) {
+  if (c1 == EOF) {
     SKIP_throw_EndOfFile();
   }
 
@@ -148,7 +143,7 @@ uint32_t SKIP_getchar(uint64_t) {
 
   int c2 = (uint32_t)getc(stdin);
 
-  if(c2 == EOF) {
+  if (c2 == EOF) {
     fprintf(stderr, "Invalid utf8");
     exit(23);
   }
@@ -159,29 +154,25 @@ uint32_t SKIP_getchar(uint64_t) {
 
   int c3 = (uint32_t)getc(stdin);
 
-  if(c3 == EOF) {
+  if (c3 == EOF) {
     fprintf(stderr, "Invalid utf8");
     exit(23);
   }
 
-  if((c1 & 0x10) == 0) {
-    return (c1 - 224) * 4096 +
-      (c2 - 128) * 64 +
-      (c3 - 128);
+  if ((c1 & 0x10) == 0) {
+    return (c1 - 224) * 4096 + (c2 - 128) * 64 + (c3 - 128);
   }
 
   int c4 = (uint32_t)getc(stdin);
 
-  if(c4 == EOF) {
+  if (c4 == EOF) {
     fprintf(stderr, "Invalid utf8");
     exit(23);
   }
 
-  if((c1 & 0x8) == 0) {
-    return (c1 - 240) * 262144 +
-      (c2 - 128) * 4096 +
-      (c3 - 128) * 64 +
-      (c4 - 128);
+  if ((c1 & 0x8) == 0) {
+    return (c1 - 240) * 262144 + (c2 - 128) * 4096 + (c3 - 128) * 64 +
+           (c4 - 128);
   }
 
   fprintf(stderr, "Invalid utf8");
@@ -215,21 +206,22 @@ char* SKIP_getArgN(int64_t n) {
 }
 
 int64_t SKIP_get_envc() {
-  char **p = nullptr;
-  for (p = environ; *p != nullptr; ++p);
+  char** p = nullptr;
+  for (p = environ; *p != nullptr; ++p)
+    ;
   return (int)(p - environ);
 }
 
-char *SKIP_get_envN(int64_t n) {
+char* SKIP_get_envN(int64_t n) {
   return sk_string_create(environ[n], strlen(environ[n]));
 }
 
 char* sk_create_none_string_option();
-char* sk_create_string_option(char *str);
+char* sk_create_string_option(char* str);
 
 char* SKIP_getenv(char* skName) {
-  char *name = sk2c_string(skName);
-  char *value = getenv(name);
+  char* name = sk2c_string(skName);
+  char* value = getenv(name);
   if (name != skName) free(name);
   if (value == nullptr) {
     return sk_create_none_string_option();
@@ -238,9 +230,9 @@ char* SKIP_getenv(char* skName) {
   return sk_create_string_option(sk_string_create(value, strlen(value)));
 }
 
-void SKIP_setenv(char* skName, char *skValue) {
-  char *name = sk2c_string(skName);
-  char *value = sk2c_string(skValue);
+void SKIP_setenv(char* skName, char* skValue) {
+  char* name = sk2c_string(skName);
+  char* value = sk2c_string(skValue);
   int rv = setenv(name, value, 1);
   if (rv != 0) {
     perror("setenv");
@@ -251,7 +243,7 @@ void SKIP_setenv(char* skName, char *skValue) {
 }
 
 void SKIP_unsetenv(char* skName) {
-  char *name = sk2c_string(skName);
+  char* name = sk2c_string(skName);
   int rv = unsetenv(name);
   if (rv != 0) {
     perror("unsetenv");
@@ -264,8 +256,7 @@ void SKIP_memory_init(int pargc, char** pargv);
 void sk_persist_consts();
 extern void* program_break;
 
-void __attribute__ ((constructor)) premain()
-{
+void __attribute__((constructor)) premain() {
   program_break = sbrk(0);
 }
 
@@ -311,46 +302,46 @@ char* sk_string_alloc(size_t);
 void sk_string_set_hash(char*);
 
 char* SKIP_open_file(char* filename_obj) {
- struct stat s;
- char* filename = sk2c_string(filename_obj);
+  struct stat s;
+  char* filename = sk2c_string(filename_obj);
 
- int fd = open(filename, O_RDONLY);
- int status = fstat(fd, &s);
- size_t size = s.st_size;
+  int fd = open(filename, O_RDONLY);
+  int status = fstat(fd, &s);
+  size_t size = s.st_size;
 
- char *result = nullptr;
- if (size == 0) {
-   result = sk_string_alloc(0);
-   sk_string_set_hash(result);
-   return result;
- }
+  char* result = nullptr;
+  if (size == 0) {
+    result = sk_string_alloc(0);
+    sk_string_set_hash(result);
+    return result;
+  }
 
- char* f = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
- if(f == (void*)MAP_FAILED) {
-   perror("ERROR (MMap FAILED)");
-   fprintf(stderr, "Could not open file: %s\n", filename);
-   exit(45);
- }
- result = sk_string_alloc(size);
- memcpy(result, f, size);
- sk_string_set_hash(result);
- if (filename != filename_obj) free(filename);
- munmap(f, size);
- close(fd);
- return result;
+  char* f = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (f == (void*)MAP_FAILED) {
+    perror("ERROR (MMap FAILED)");
+    fprintf(stderr, "Could not open file: %s\n", filename);
+    exit(45);
+  }
+  result = sk_string_alloc(size);
+  memcpy(result, f, size);
+  sk_string_set_hash(result);
+  if (filename != filename_obj) free(filename);
+  munmap(f, size);
+  close(fd);
+  return result;
 }
 
 void SKIP_write_to_file(int64_t fd, char* str) {
- size_t size = SKIP_String_byteSize(str);
- while(size > 0) {
-   ssize_t written = write(fd, str, size);
-   if (written < 0) {
-       int err = errno;
-       fprintf(stderr, "Could not write to file. %" PRId64 " (%d)\n", fd, err);
-       exit(45);
-   }
-   size -= written;
- }
+  size_t size = SKIP_String_byteSize(str);
+  while (size > 0) {
+    ssize_t written = write(fd, str, size);
+    if (written < 0) {
+      int err = errno;
+      fprintf(stderr, "Could not write to file. %" PRId64 " (%d)\n", fd, err);
+      exit(45);
+    }
+    size -= written;
+  }
 }
 
 void SKIP_FileSystem_appendTextFile(char* filename_obj, char* str_obj) {
@@ -379,7 +370,7 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
 
   if (filename != filename_obj) free(filename);
 
-  if(fd == -1) {
+  if (fd == -1) {
     return -1;
   }
 
@@ -388,16 +379,16 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   sprintf(buf, "%ld\n", tick);
   size_t size = strlen(buf);
 
-  while(size > 0) {
+  while (size > 0) {
     size_t written = write(fd, buf, size);
-    if(written == -1) {
+    if (written == -1) {
       return -1;
     }
     buf += written;
     size -= written;
   }
 
-  if(close(fd) == -1) {
+  if (close(fd) == -1) {
     return -1;
   }
 
@@ -434,7 +425,7 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
   char buffer[1024];
   char cformat[1024];
   uint32_t byteSize = SKIP_String_byteSize(formatp);
-  if(byteSize >= 1024) {
+  if (byteSize >= 1024) {
     fprintf(stderr, "format string too large");
     exit(23);
   }
@@ -447,12 +438,12 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
 char* SKIP_strftime(char* formatp, int64_t timestamp) {
   struct tm tm;
   localtime_r(&timestamp, &tm);
-  return SKIP_unix_strftime(formatp, (char *)&tm);
+  return SKIP_unix_strftime(formatp, (char*)&tm);
 }
 
 char* SKIP_getcwd() {
   char path[PATH_MAX];
-  char *res = getcwd(path, PATH_MAX);
+  char* res = getcwd(path, PATH_MAX);
   if (res == NULL) {
     perror("getcwd");
     exit(EXIT_FAILURE);
@@ -460,7 +451,7 @@ char* SKIP_getcwd() {
   return sk_string_create(path, strlen(path));
 }
 
-void SKIP_chdir(char *path_obj) {
+void SKIP_chdir(char* path_obj) {
   char* path = sk2c_string(path_obj);
   int rv = chdir(path);
   if (rv != 0) {
@@ -477,9 +468,9 @@ int64_t SKIP_numThreads() {
 void SKIP_string_to_file(char* str, char* file_obj) {
   char* file = sk2c_string(file_obj);
 
-  FILE *out = fopen(file, "w");
+  FILE* out = fopen(file, "w");
   size_t size = SKIP_String_byteSize(str);
-  while(size != 0) {
+  while (size != 0) {
     size_t written = fwrite(str, 1, size, out);
     size -= written;
   }
@@ -488,20 +479,20 @@ void SKIP_string_to_file(char* str, char* file_obj) {
   if (file != file_obj) free(file);
 }
 
-int64_t SKIP_get_mtime(char *path) {
-    struct stat st;
-    if(stat(path, &st) < 0) {
-      return 0;
-    }
-    return st.st_mtime;
+int64_t SKIP_get_mtime(char* path) {
+  struct stat st;
+  if (stat(path, &st) < 0) {
+    return 0;
+  }
+  return st.st_mtime;
 }
 
-bool SKIP_is_directory(char *path) {
-    struct stat st;
-    if(stat(path, &st) < 0) {
-      return 0;
-    }
-    return st.st_mode & S_IFDIR;
+bool SKIP_is_directory(char* path) {
+  struct stat st;
+  if (stat(path, &st) < 0) {
+    return 0;
+  }
+  return st.st_mode & S_IFDIR;
 }
 
 int64_t SKIP_system(char* cmd_obj) {
@@ -511,10 +502,10 @@ int64_t SKIP_system(char* cmd_obj) {
   return res;
 }
 
-int64_t SKIP_opendir(char *path_obj) {
+int64_t SKIP_opendir(char* path_obj) {
   char* path = sk2c_string(path_obj);
 
-  DIR *res = opendir(path);
+  DIR* res = opendir(path);
   if (res == NULL) {
     perror("Error opening dir");
   }
@@ -524,7 +515,7 @@ int64_t SKIP_opendir(char *path_obj) {
 }
 
 char* SKIP_readdir(int64_t dir_handle) {
-  struct dirent *dp = readdir((DIR*)dir_handle);
+  struct dirent* dp = readdir((DIR*)dir_handle);
   if (dp == NULL) {
     return sk_string_create("", 0);
   }
@@ -575,15 +566,15 @@ int32_t SKIP_stdin_has_data() {
 
   if (retval) {
     return 1;
-  }
-  else {
+  } else {
     return 0;
   }
 }
 
 void* wait_for_EOF(void*) {
   char buf[256];
-  while(read(0, buf, 256) > 0);
+  while (read(0, buf, 256) > 0)
+    ;
   exit(0);
   return NULL;
 }

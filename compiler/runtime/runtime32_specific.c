@@ -233,7 +233,7 @@ int64_t SKIP_getArgc() {
   return (int64_t)SKIP_js_get_argc();
 }
 
-char *SKIP_js_get_argn(int32_t n);
+char* SKIP_js_get_argn(int32_t n);
 
 char* SKIP_getArgN(int64_t n) {
   return SKIP_js_get_argn((int32_t)n);
