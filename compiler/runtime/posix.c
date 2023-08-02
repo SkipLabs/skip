@@ -200,14 +200,7 @@ void SKIP_posix_execvp(char *args_obj) {
   }
   for (size_t i = 0; i < num_args; ++i) {
     char *arg_obj = *((char **)args_obj + i);
-    size_t sz = SKIP_String_byteSize(arg_obj);
-    args[i] = (char *)malloc(sizeof(char) * (sz + 1));
-    if (args[i] == NULL) {
-      perror("malloc");
-      exit(EXIT_FAILURE);
-    }
-    memcpy(args[i], arg_obj, sz);
-    args[i][sz] = 0;
+    args[i] = sk2c_string(arg_obj);
   }
   args[num_args] = 0;
 
