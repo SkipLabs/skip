@@ -73,9 +73,8 @@ int64_t SKIP_posix_write(int64_t fd, char *buf) {
 }
 
 char *SKIP_posix_read(int64_t fd, int64_t len) {
-  // TODO: zero-length?
   char *buf = (char *)malloc(len);
-  if (buf == NULL) {
+  if (buf == NULL && len != 0) {
     perror("malloc");
     exit(EXIT_FAILURE);
   }
