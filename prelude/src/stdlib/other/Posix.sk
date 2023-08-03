@@ -64,14 +64,6 @@ native fun kill(pid: Int, sig: Int): void;
 native fun waitpid(pid: Int, nohang: Bool = false): Int;
 
 @debug
-@cpp_extern("SKIP_posix_fork")
-native fun internalFork(): Int;
-
-fun fork(): mutable Process {
-  mutable Process(internalFork())
-}
-
-@debug
 @cpp_extern("SKIP_posix_execvp")
 native fun internalExecvp(args: Array<String>): void;
 
@@ -225,59 +217,48 @@ mutable class Popen(
     stdout: Bool = false,
     stderr: Bool = false,
   }: mutable Popen {
-    static::createFromLambda{
-      target => () -> {
-        if (clear_env) {
-          Environ.vars().each(v -> Environ.remove_var(v.i0))
-        };
-        env.each((k, v) -> Environ.set_var(k, v));
-        execvp(args)
-      },
-      stdin,
-      stdout,
-      stderr,
-    }
-  }
-
-  static fun createFromLambda{
-    target: () -> void,
-    stdin: Bool = false,
-    stdout: Bool = false,
-    stderr: Bool = false,
-  }: mutable Popen {
+    file_actions = SpawnFileActions::init();
     stdin_pipe = if (stdin) Some(pipe()) else None();
     stdout_pipe = if (stdout) Some(pipe()) else None();
     stderr_pipe = if (stderr) Some(pipe()) else None();
-    p = fork();
-    if (p.pid == 0) {
-      stdin_pipe.each(pipe -> {
-        dup2(pipe.output, IO.stdin().fileno);
-        close(pipe.input);
-        close(pipe.output)
-      });
-      stdout_pipe.each(pipe -> {
-        dup2(pipe.input, IO.stdout().fileno);
-        close(pipe.input);
-        close(pipe.output)
-      });
-      stderr_pipe.each(pipe -> {
-        dup2(pipe.input, IO.stderr().fileno);
-        close(pipe.input);
-        close(pipe.output)
-      });
-      target();
-      skipExit(0)
+    stdin_pipe.each(pipe -> {
+      file_actions.dup2(pipe.output, IO.stdin().fileno);
+      file_actions.close(pipe.input);
+      file_actions.close(pipe.output)
+    });
+    stdout_pipe.each(pipe -> {
+      file_actions.dup2(pipe.input, IO.stdout().fileno);
+      file_actions.close(pipe.input);
+      file_actions.close(pipe.output)
+    });
+    stderr_pipe.each(pipe -> {
+      file_actions.dup2(pipe.input, IO.stderr().fileno);
+      file_actions.close(pipe.input);
+      file_actions.close(pipe.output)
+    });
+
+    !env = if (clear_env) {
+      env
     } else {
-      stdin_pipe.each(pipe -> close(pipe.output));
-      stdout_pipe.each(pipe -> close(pipe.input));
-      stderr_pipe.each(pipe -> close(pipe.input));
-      mutable Popen(
-        p,
-        stdin_pipe.map(pipe -> mutable IO.File(pipe.input)),
-        stdout_pipe.map(pipe -> mutable IO.File(pipe.output)),
-        stderr_pipe.map(pipe -> mutable IO.File(pipe.output)),
-      )
-    }
+      e = Map::mcreateFromIterator(Environ.vars());
+      e.extend(env);
+      e.chill()
+    };
+    new_env = env.items().map(e -> `${e.i0}=${e.i1}`).collect(Array);
+
+    p = spawnp(args, new_env, file_actions);
+    file_actions.destroy();
+
+    stdin_pipe.each(pipe -> close(pipe.output));
+    stdout_pipe.each(pipe -> close(pipe.input));
+    stderr_pipe.each(pipe -> close(pipe.input));
+
+    mutable Popen(
+      p,
+      stdin_pipe.map(pipe -> mutable IO.File(pipe.input)),
+      stdout_pipe.map(pipe -> mutable IO.File(pipe.output)),
+      stderr_pipe.map(pipe -> mutable IO.File(pipe.output)),
+    )
   }
 
   mutable fun kill(sig: Signal = SIGKILL()): void {
@@ -341,4 +322,34 @@ mutable value class Pollfd(fd: Int32, events: Int16, revents: Int16) {
   readonly fun pollhup(): Bool {
     this.revents.toInt().and(POLLHUP().value()) > 0
   }
+}
+
+mutable native class SpawnFileActions {
+  @cpp_extern("SKIP_posix_spawn_file_actions_init")
+  native static fun init(): mutable SpawnFileActions;
+
+  @cpp_extern("SKIP_posix_spawn_file_actions_destroy")
+  mutable native fun destroy(): void;
+
+  @cpp_extern("SKIP_posix_spawn_file_actions_adddup2")
+  mutable native fun dup2(oldfd: Int, newfd: Int): void;
+
+  @cpp_extern("SKIP_posix_spawn_file_actions_addclose")
+  mutable native fun close(fd: Int): void;
+}
+
+@cpp_extern("SKIP_posix_spawnp")
+native fun internalSpawnp(
+  argv: Array<String>,
+  env: Array<String>,
+  file_actions: readonly SpawnFileActions,
+): Int;
+
+fun spawnp(
+  argv: Array<String>,
+  env: Array<String>,
+  file_actions: readonly SpawnFileActions,
+): mutable Process {
+  pid = internalSpawnp(argv, env, file_actions);
+  mutable Process(pid)
 }

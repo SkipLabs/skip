@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
+#include <spawn.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -182,12 +183,82 @@ int64_t SKIP_posix_poll(char *pollfds) {
   }
 }
 
-int64_t SKIP_posix_fork() {
-  pid_t pid = fork();
-  if (pid == -1) {
-    perror("fork");
+void *SKIP_posix_spawn_file_actions_init() {
+  posix_spawn_file_actions_t *file_actionsp =
+      malloc(sizeof(posix_spawn_file_actions_t));
+  if (file_actionsp == NULL) {
+    perror("malloc");
     exit(EXIT_FAILURE);
   }
+  int rv = posix_spawn_file_actions_init(file_actionsp);
+  if (rv != 0) {
+    errno = rv;
+    perror("posix_spawn_file_actions_init");
+    exit(EXIT_FAILURE);
+  }
+
+  return file_actionsp;
+}
+
+void SKIP_posix_spawn_file_actions_adddup2(void *file_actionsp, int64_t oldfd,
+                                           int64_t newfd) {
+  int rv = (int)posix_spawn_file_actions_adddup2(
+      (posix_spawn_file_actions_t *)file_actionsp, (int)oldfd, (int)newfd);
+  if (rv != 0) {
+    errno = rv;
+    perror("posix_spawn_file_actions_adddup2");
+    exit(EXIT_FAILURE);
+  }
+}
+
+void SKIP_posix_spawn_file_actions_addclose(void *file_actionsp, int64_t fd) {
+  int rv = (int)posix_spawn_file_actions_addclose(
+      (posix_spawn_file_actions_t *)file_actionsp, (int)fd);
+  if (rv != 0) {
+    errno = rv;
+    perror("posix_spawn_file_actions_addclose");
+    exit(EXIT_FAILURE);
+  }
+}
+
+void SKIP_posix_spawn_file_actions_destroy(void *file_actionsp) {
+  int rv = (int)posix_spawn_file_actions_destroy(
+      (posix_spawn_file_actions_t *)file_actionsp);
+  if (rv != 0) {
+    errno = rv;
+    perror("posix_spawn_file_actions_destroy");
+    exit(EXIT_FAILURE);
+  }
+
+  free(file_actionsp);
+}
+
+int64_t SKIP_posix_spawnp(char *skargv, char *skenvp, char *file_actionsp) {
+  char **argv = sk2c_string_array(skargv);
+  char **envp = sk2c_string_array(skenvp);
+
+  pid_t pid = -1;
+
+  int rv =
+      posix_spawnp(&pid, argv[0], (posix_spawn_file_actions_t *)file_actionsp,
+                   NULL, argv, envp);
+  if (rv != 0) {
+    errno = rv;
+    perror("posix_spawn");
+    exit(EXIT_FAILURE);
+  }
+
+  for (int i = 0; *argv != NULL; ++argv, ++i) {
+    if (*argv != *(char **)skargv + i) {
+      free(*argv);
+    }
+  }
+  for (int i = 0; *envp != NULL; ++envp, ++i) {
+    if (*envp != *(char **)skenvp + i) {
+      free(*envp);
+    }
+  }
+
   return (int64_t)pid;
 }
 
