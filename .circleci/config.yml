@@ -1,99 +1,23 @@
 version: 2.1
 
-commands:
-  setup:
-    description: "Setup skip toolchain"
-    steps:
-      - run:
-          name: Fetch submodules
-          command: |
-            git submodule update --init --recursive
-      - run:
-          name: Build compiler
-          command: |
-            cd compiler && make STAGE=0 && sudo make install STAGE=0
+setup: true
+
+orbs:
+  continuation: circleci/continuation@1.0.0
 
 jobs:
-  compiler:
-    docker:
-      - image: beauby/skiplabs:circleci-0.0.1
-    resource_class: xlarge
+  setup:
+    executor: continuation/default
     steps:
       - checkout
       - run:
-          name: Skip job if irrelevant
+          name: Generate config
           command: |
-            if git diff --quiet HEAD master -- compiler/ prelude/
-            then
-              circleci-agent step halt
-            fi
-      - setup
-      - run:
-          name: Run compiler tests
-          no_output_timeout: 30m
-          command: |
-            mkdir -p ~/test-results
-            cd compiler && make STAGE=1
-            PATH=./stage1/bin:$PATH skargo test --junitxml ~/test-results/skc.xml
-      - store_test_results:
-          path: ~/test-results/skc.xml
-
-  skfs:
-    docker:
-      - image: beauby/skiplabs:circleci-0.0.1
-    steps:
-      - checkout
-      - run:
-          name: Skip job if irrelevant
-          command: |
-            if git diff --quiet HEAD master -- skfs/
-            then
-              circleci-agent step halt
-            fi
-      - setup
-      - run:
-          name: Run skfs tests
-          command: |
-            mkdir -p ~/test-results
-            cd skfs && skargo test --junitxml ~/test-results/skfs.xml
-      - store_test_results:
-          path: ~/test-results/skfs.xml
-
-  skdb:
-    docker:
-      - image: beauby/skiplabs:circleci-0.0.1
-    steps:
-      - checkout
-      - run:
-          name: Skip job if irrelevant
-          command: |
-            if git diff --quiet HEAD master -- sql/
-            then
-              circleci-agent step halt
-            fi
-      - setup
-      - run:
-          name: Run native skdb tests
-          command: |
-            make native-test
-      - run:
-          name: Run wasm skdb tests
-          environment:
-            PLAYWRIGHT_REPORTER: junit
-            PLAYWRIGHT_JUNIT_OUTPUT_NAME: /home/circleci/test-results/skdb-browser.xml
-          command: |
-            mkdir -p ~/test-results
-            make wasm-test
-      - store_test_results:
-          path: ~/test-results/skdb-browser.xml
+            .circleci/generate_config.sh > generated_config.yml
+      - continuation/continue:
+          configuration_path: generated_config.yml
 
 workflows:
-  compiler:
+  setup:
     jobs:
-      - compiler
-  skfs:
-    jobs:
-      - skfs
-  skdb:
-    jobs:
-      - skdb
+      - setup
