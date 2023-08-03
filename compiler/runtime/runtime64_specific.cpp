@@ -108,6 +108,22 @@ char* sk2c_string(char* skstr) {
   return cstr;
 }
 
+char** sk2c_string_array(char* skarr) {
+  size_t sz = *(uint32_t*)(skarr - sizeof(char*) - sizeof(uint32_t));
+  char** arr = (char**)malloc(sizeof(char*) * (sz + 1));
+  if (arr == NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
+  for (size_t i = 0; i < sz; ++i) {
+    char* skstr = *((char**)skarr + i);
+    arr[i] = sk2c_string(skstr);
+  }
+  arr[sz] = 0;
+
+  return arr;
+}
+
 void SKIP_print_char(uint32_t x) {
   printf("%c", x);
 }

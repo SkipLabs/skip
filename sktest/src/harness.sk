@@ -62,6 +62,7 @@ fun test_job(
       stdout.write_all(res.toJSON() + "\n");
     }
   };
+  skipExit(0)
 }
 
 fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
@@ -91,23 +92,31 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
     .help()
     .parseArgs();
 
+  filter = args.maybeGetString("filter").default("");
+  Environ.varOpt("SKTEST_RANK") match {
+  | Some(rank) ->
+    test_job(tests, filter, Environ.var("SKTEST_JOBS").toInt(), rank.toInt())
+  | None() -> void
+  };
+
   reporters = mutable Vector<mutable TestReporter>[
     mutable BasicTestReporter{color => true},
   ];
   args.maybeGetString("junitxml").each(path ->
     reporters.push(mutable XmlTestReporter{output => Some(path)})
   );
-  filter = args.maybeGetString("filter").default("");
 
   njobs = args.getInt("jobs");
   procs = Range(0, njobs).map(rank -> {
-    Posix.Popen::createFromLambda{
-      target => () -> {
-        test_job(tests, filter, njobs, rank)
-      },
+    Posix.Popen::create{
+      args => Array[Environ.current_exe()],
+      env => Map[
+        "SKTEST_RANK" => rank.toString(),
+        "SKTEST_JOBS" => njobs.toString(),
+      ],
       stdout => true,
       stderr => true,
-    };
+    }
   });
   readers = Array::createFromItems(
     procs.map(p -> mutable IO.BufferedReader(p.stdout.fromSome())),

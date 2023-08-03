@@ -227,6 +227,7 @@ void sk_print_int(SkipInt);
 void sk_staging();
 char* sk_string_create(const char* buffer, uint32_t size);
 char* sk2c_string(char* skstr);
+char** sk2c_string_array(char* skarr);
 void throw_Invalid_utf8();
 void todo();
 char* sk_get_external_pointer();
