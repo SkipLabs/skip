@@ -84,6 +84,15 @@ native fun poll(pollfds: mutable Array<mutable Pollfd>): Int;
 @cpp_extern("SKIP_posix_isatty")
 native fun isatty(fd: Int): Bool;
 
+@debug
+@cpp_extern("SKIP_posix_mkstemp")
+native fun internalMkstemp(template: String): Int;
+
+fun mkstemp(template: String): mutable IO.File {
+  // TODO: Properly set filename.
+  mutable IO.File(internalMkstemp(template))
+}
+
 class Pipe(output: Int, input: Int) {}
 
 @cpp_export("sk_create_posix_pipe")
