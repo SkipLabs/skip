@@ -98,6 +98,17 @@ char *SKIP_posix_pipe() {
   return sk_create_posix_pipe((int64_t)fds[0], (int64_t)fds[1]);
 }
 
+int64_t SKIP_posix_dup(int64_t fd) {
+  int rv = -1;
+  while ((rv = dup((int)fd)) == -1) {
+    if (errno == EINTR) continue;
+    perror("dup");
+    exit(EXIT_FAILURE);
+  }
+
+  return (int64_t)rv;
+}
+
 void SKIP_posix_dup2(int64_t oldfd, int64_t newfd) {
   while (dup2((int)oldfd, (int)newfd) == -1) {
     if (errno == EINTR) continue;
