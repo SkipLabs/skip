@@ -12,8 +12,10 @@ fun test_job(
   filter: String,
   njobs: Int,
   rank: Int,
-  pipe: mutable IO.File,
 ): void {
+  stdout = mutable IO.File(Posix.dup(IO.stdout().fileno));
+  stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+  Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
   i = 0;
   for (testSuite in tests.keys()) {
     for (test in tests[testSuite]) {
@@ -46,7 +48,7 @@ fun test_job(
           time => Time.time() - start,
           failure_type => "ExpectationError",
           failure_message => msg,
-          failure_extra => "TODO",
+          failure_extra => stdout_file.read_to_end(),
         }
       | exn ->
         res with {
@@ -54,18 +56,15 @@ fun test_job(
           time => Time.time() - start,
           failure_type => inspect(exn).toString(),
           failure_message => exn.getMessage(),
-          failure_extra => "TODO",
+          failure_extra => stdout_file.read_to_end(),
         }
       };
-      pipe.write_all(res.toJSON() + "\n");
+      stdout.write_all(res.toJSON() + "\n");
     }
   };
-  Posix.close(pipe.fileno)
 }
 
-fun test_harness(
-  tests: readonly Map<String, readonly Sequence<Test>>,
-): void {
+fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
   args = Cli.Command("tests")
     .about("Run tests")
     .arg(
@@ -101,27 +100,22 @@ fun test_harness(
   filter = args.maybeGetString("filter").default("");
 
   njobs = args.getInt("jobs");
-  fds = Range(0, njobs).map(rank -> {
-    pipe = Posix.pipe();
-    _ = Posix.Popen::createFromLambda{
+  procs = Range(0, njobs).map(rank -> {
+    Posix.Popen::createFromLambda{
       target => () -> {
-        Posix.close(pipe.output);
-        test_job(tests, filter, njobs, rank, mutable IO.File(pipe.input))
+        test_job(tests, filter, njobs, rank)
       },
       stdout => true,
       stderr => true,
     };
-    Posix.close(pipe.input);
-
-    pipe.output
   });
   readers = Array::createFromItems(
-    fds.map(fd -> mutable IO.BufferedReader(mutable IO.File(fd))),
+    procs.map(p -> mutable IO.BufferedReader(p.stdout.fromSome())),
   );
   pollfds = Array::mcreateFromItems(
-    fds.map(fd -> Posix.Pollfd::create(fd)),
+    procs.map(p -> Posix.Pollfd::create(p.stdout.fromSome().fileno)),
   );
-  open_fds = fds.size();
+  open_fds = procs.size();
   success = true;
   while (open_fds > 0) {
     _ = Posix.poll(pollfds);
@@ -140,11 +134,11 @@ fun test_harness(
         }
       } else if (pfd.fd != -1 && (pfd.pollerr() || pfd.pollhup())) {
         pollfds.set(i, Posix.Pollfd::create(-1));
-        Posix.close(pfd.fd.toInt());
         !open_fds = open_fds - 1
       }
     }
   };
+  procs.each(p -> _ = p.wait());
   reporters.each(r -> r.finish());
 
   if (!success) {
