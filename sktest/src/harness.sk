@@ -38,8 +38,9 @@ fun test_job(
         _ = test.func();
         res with {
           result => "success",
-          // TODO: test time
           time => Time.time() - start,
+          stdout => stdout_file.read_to_end(),
+          stderr => "TODO",
         }
       } catch {
       | ExpectationError(msg, _, _) ->
@@ -48,7 +49,8 @@ fun test_job(
           time => Time.time() - start,
           failure_type => "ExpectationError",
           failure_message => msg,
-          failure_extra => stdout_file.read_to_end(),
+          stdout => stdout_file.read_to_end(),
+          stderr => "TODO",
         }
       | exn ->
         res with {
@@ -56,7 +58,8 @@ fun test_job(
           time => Time.time() - start,
           failure_type => inspect(exn).toString(),
           failure_message => exn.getMessage(),
-          failure_extra => stdout_file.read_to_end(),
+          stdout => stdout_file.read_to_end(),
+          stderr => "TODO",
         }
       };
       stdout.write_all(res.toJSON() + "\n");
@@ -75,6 +78,7 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
           "If specified, only run tests containing this string in their names",
         ),
     )
+    // TODO: Expose flag(s) to handle test report format(s) selection.
     .arg(
       Cli.IntArg("jobs")
         .long("jobs")

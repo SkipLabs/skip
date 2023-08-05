@@ -9,7 +9,8 @@ class TestResult{
   time: Int = -1,
   failure_type: String = "",
   failure_message: String = "",
-  failure_extra: String = "",
+  stdout: String = "",
+  stderr: String = "",
 } {
   static fun fromJSON(s: String): TestResult {
     v = JSON.decode(s).expectMap();
@@ -22,7 +23,8 @@ class TestResult{
       time => v["time"].expectInt(),
       failure_type => v["failure_type"].expectString(),
       failure_message => v["failure_message"].expectString(),
-      failure_extra => v["failure_extra"].expectString(),
+      stdout => v["stdout"].expectString(),
+      stderr => v["stderr"].expectString(),
     }
   }
 
@@ -36,7 +38,8 @@ class TestResult{
       "time" => JSON.IntNumber(this.time),
       "failure_type" => JSON.String(this.failure_type),
       "failure_message" => JSON.String(this.failure_message),
-      "failure_extra" => JSON.String(this.failure_extra),
+      "stdout" => JSON.String(this.stdout),
+      "stderr" => JSON.String(this.stderr),
     ].encode()
   }
 }
@@ -153,11 +156,15 @@ mutable class XmlTestReporter{
             res.line
           }" time="${res.time}" classname="${res.suite}">`,
         );
+        if (res.stdout != "") {
+          this.writeLine(`      <system-out>${res.stdout}</system-out>`);
+          this.writeLine(`      <system-err>${res.stderr}</system-err>`)
+        };
         if (res.result != "success") {
           this.writeLine(
             `      <failure message="${res.failure_message}" type="${
               res.failure_type
-            }">${res.failure_extra}</failure>`,
+            }"></failure>`,
           )
         };
         this.writeLine("    </testcase>")
@@ -165,5 +172,12 @@ mutable class XmlTestReporter{
       this.writeLine("  </testsuite>");
     };
     this.writeLine("</testsuites>")
+  }
+}
+
+mutable class JSONTestReporter{
+} extends TestReporter {
+  mutable fun report(res: TestResult): void {
+    this.writeLine(res.toJSON())
   }
 }
