@@ -46,7 +46,15 @@ fun execBuild(args: Cli.ParseResults, env: Env): void {
     getProfile(args),
   );
   genVersionFile(bc);
-  for (bin in env.manifest.bin) {
+  bins = args.maybeGetString("bin") match {
+  | Some(name) ->
+    env.manifest.bin.find(b -> b.name == name) match {
+    | Some(bin) -> Array[bin]
+    | None() -> invariant_violation(`Unknown binary ${name}`)
+    }
+  | None() -> env.manifest.bin
+  };
+  for (bin in bins) {
     compile(bc, bin.name, bin.main)
   }
 }
@@ -118,7 +126,8 @@ fun main(): void {
             .short("r")
             .long("release")
             .about("Build artifacts in release mode, with optimizations"),
-        ),
+        )
+        .arg(Cli.StringArg("bin").about("Build only the specified binary")),
     )
     .subcommand(
       Cli.Command("check")
