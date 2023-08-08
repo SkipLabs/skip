@@ -76,7 +76,9 @@ void sk_check_has_lock() {
 void sk_global_lock_init() {
   pthread_mutexattr_init(gmutex_attr);
   pthread_mutexattr_setpshared(gmutex_attr, PTHREAD_PROCESS_SHARED);
+#ifndef __APPLE__
   pthread_mutexattr_setrobust(gmutex_attr, PTHREAD_MUTEX_ROBUST);
+#endif
   pthread_mutex_init(gmutex, gmutex_attr);
 }
 
@@ -92,10 +94,12 @@ void sk_global_lock() {
     return;
   }
 
+#ifndef __APPLE__
   if (code == EOWNERDEAD) {
     pthread_mutex_consistent(gmutex);
     return;
   }
+#endif
 
   fprintf(stderr, "Internal error: locking failed\n");
   exit(44);
@@ -130,7 +134,9 @@ void SKIP_mutex_init(pthread_mutex_t* lock) {
   pthread_mutexattr_t* mutex_attr = &mutex_attr_holder;
   pthread_mutexattr_init(mutex_attr);
   pthread_mutexattr_setpshared(mutex_attr, PTHREAD_PROCESS_SHARED);
+#ifndef __APPLE__
   pthread_mutexattr_setrobust(mutex_attr, PTHREAD_MUTEX_ROBUST);
+#endif
   pthread_mutex_init(lock, mutex_attr);
 }
 
@@ -141,10 +147,12 @@ void SKIP_mutex_lock(pthread_mutex_t* lock) {
     return;
   }
 
+#ifndef __APPLE__
   if (code == EOWNERDEAD) {
     pthread_mutex_consistent(lock);
     return;
   }
+#endif
 
   fprintf(stderr, "Internal error: locking failed\n");
   exit(44);
@@ -602,6 +610,19 @@ void SKIP_memory_init(int argc, char** argv) {
   int is_create = 0;
   char* fileName = parse_args(argc, argv, &is_create);
 
+#ifdef __APPLE__
+  if (fileName != NULL) {
+    fprintf(stderr,
+            "Persistent allocation not supported on this platform. "
+            "Disregarding %s.",
+            fileName);
+  }
+  if (is_create) {
+    exit(EXIT_SUCCESS);
+  }
+  sk_init_no_file(program_break);
+
+#else   // __APPLE__
   if (fileName == NULL) {
     sk_init_no_file(program_break);
   } else if (is_create) {
@@ -611,6 +632,7 @@ void SKIP_memory_init(int argc, char** argv) {
   } else {
     sk_load_mapping(fileName);
   }
+#endif  // __APPLE__
 
   char* obj = sk_get_external_pointer();
   epointer_ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);

@@ -143,27 +143,27 @@ int64_t SKIP_posix_waitpid(int64_t pid, char nohang) {
 }
 
 char SKIP_posix_wifexited(int64_t stat_loc) {
-  return (char)WIFEXITED((int)stat_loc);
+  return (char)WIFEXITED(stat_loc);
 }
 
 char SKIP_posix_wifsignaled(int64_t stat_loc) {
-  return (char)WIFSIGNALED((int)stat_loc);
+  return (char)WIFSIGNALED(stat_loc);
 }
 
 char SKIP_posix_wifstopped(int64_t stat_loc) {
-  return (char)WIFSTOPPED((int)stat_loc);
+  return (char)WIFSTOPPED(stat_loc);
 }
 
 int64_t SKIP_posix_wexitstatus(int64_t stat_loc) {
-  return (int64_t)WEXITSTATUS((int)stat_loc);
+  return (int64_t)WEXITSTATUS(stat_loc);
 }
 
 int64_t SKIP_posix_wtermsig(int64_t stat_loc) {
-  return (int64_t)WTERMSIG((int)stat_loc);
+  return (int64_t)WTERMSIG(stat_loc);
 }
 
 int64_t SKIP_posix_wstopsig(int64_t stat_loc) {
-  return (int64_t)WSTOPSIG((int)stat_loc);
+  return (int64_t)WSTOPSIG(stat_loc);
 }
 
 int64_t SKIP_posix_poll(char *pollfds) {
