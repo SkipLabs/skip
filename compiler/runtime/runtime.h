@@ -173,9 +173,9 @@ typedef struct {
 /* Function signatures. */
 /*****************************************************************************/
 
-int memcmp(const void* ptr1, const void* ptr2, size_t num);
-void* memcpy(void* dest, const void* src, size_t size);
-void* memset(void*, int, unsigned long);
+int (memcmp)(const void* ptr1, const void* ptr2, size_t num);
+void* (memcpy)(void *restrict dst, const void *restrict src, size_t n);
+void* (memset)(void* b, int c, size_t len);
 
 char* SKIP_Obstack_alloc(size_t size);
 uint32_t SKIP_String_byteSize(char* str);

@@ -294,9 +294,18 @@ fun subprocess(
   while (open_fds > 0) {
     _ = Posix.poll(pollfds);
     for ((i, pfd) in pollfds.items()) {
+      eof = false;
       if (pfd.pollin()) {
-        handlers[i](streams[i].read(4096))
+        try {
+          handlers[i](streams[i].read(4096))
+        } catch {
+        | EndOfFile _ -> !eof = true
+        | exn -> throw exn
+        }
       } else if (pfd.fd != -1 && (pfd.pollerr() || pfd.pollhup())) {
+        !eof = true
+      };
+      if (eof) {
         pollfds.set(i, Posix.Pollfd::create(-1));
         !open_fds = open_fds - 1
       }

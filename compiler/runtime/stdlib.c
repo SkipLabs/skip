@@ -3,7 +3,6 @@
 #ifdef SKIP64
 
 #include <errno.h>
-#include <malloc.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>

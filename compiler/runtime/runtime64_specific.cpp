@@ -2,7 +2,11 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#ifdef __APPLE__
+#include <sys/syslimits.h>
+#else
 #include <linux/limits.h>
+#endif
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +27,8 @@
 
 // TODO: Only include in debug mode.
 #include <backtrace.h>
+
+extern char** environ;
 
 namespace {
 static int print_callback(void* /* data */, uintptr_t pc, const char* filename,
@@ -393,7 +399,7 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
 
   char buf_data[256];
   char* buf = buf_data;
-  sprintf(buf, "%ld\n", tick);
+  snprintf(buf, 256, "%" PRIu64 "\n", tick);
   size_t size = strlen(buf);
 
   while (size > 0) {
@@ -422,11 +428,11 @@ int64_t SKIP_time() {
 }
 
 void SKIP_localtime(int64_t timep, char* resultp) {
-  localtime_r(&timep, (struct tm*)resultp);
+  localtime_r((time_t*)&timep, (struct tm*)resultp);
 }
 
 void SKIP_gmtime(int64_t timep, char* resultp) {
-  gmtime_r(&timep, (struct tm*)resultp);
+  gmtime_r((time_t*)&timep, (struct tm*)resultp);
 }
 
 int64_t SKIP_mktime_local(char* timedate) {
@@ -454,7 +460,7 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
 
 char* SKIP_strftime(char* formatp, int64_t timestamp) {
   struct tm tm;
-  localtime_r(&timestamp, &tm);
+  localtime_r((time_t*)&timestamp, &tm);
   return SKIP_unix_strftime(formatp, (char*)&tm);
 }
 
