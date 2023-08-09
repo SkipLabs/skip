@@ -249,7 +249,12 @@ untracked fun main(): void {
             .long("since")
             .about("Starting time of the tail"),
         )
-        .arg(Cli.StringArg("user").about("Name of the user")),
+        .arg(Cli.StringArg("user").about("Name of the user"))
+        .arg(
+          Cli.BoolArg("expect-query-params").about(
+            "Read values of named parameters which may appear in the filter condition. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
+          ),
+        ),
     )
     // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
     .subcommand(
@@ -579,11 +584,15 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     dirName.toString().stripPrefix("/").stripSuffix("/"),
   );
   filter1 = args.maybeGetString("filter") match {
-  | None() -> subFilter
+  | None() ->
+    if (options.expectQueryParams) {
+      print_error("Cannot pass parameters without filter condition");
+      skipExit(2)
+    };
+    subFilter
   | Some(strCond) ->
     from = Some(Array[SKSQL.TableName(SKSQL.FName(tableName), None())]);
-    // TODO: Accept params to interpret placeholders in tail's filter arg
-    params: Map<String, SKSQL.Value> = Map[];
+    params = queryParams(options);
     compiler = SKSQL.Compiler::create(false, options, 0, params);
     (_, ast) = SKSQL.parseExpr(SKSQL.Lexer(0, SKSQL.Buffer(strCond)), 0);
     compilerContext = gContext.mclone();
