@@ -37,6 +37,53 @@ fun fixUpDirName(dirNameStr: String): SKFS.DirName {
   )
 }
 
+// Read a single line from stdin, decode it to a JSON Object, expected
+// to be a map from key strings (parameter names) to values.
+fun queryParams(options: SKSQL.Options): Map<String, SKSQL.Value> {
+  if (!options.expectQueryParams) {
+    return Map[];
+  };
+  try {
+    read_line() match {
+    | Some(line) ->
+      JSON.decode(line) match {
+      | map @ JSON.Object _ ->
+        map.value.mapItems((key, val) -> {
+          !key = key.stripPrefix("@");
+          lit = val match {
+          | JSON.Null() -> SKSQL.VNull()
+          | JSON.IntNumber(v) -> SKSQL.VInt(v)
+          | JSON.Bool(v) -> if (v) SKSQL.VInt(1) else SKSQL.VInt(0)
+          | JSON.FloatNumber(v) -> SKSQL.VFloat(v)
+          | JSON.String(v) -> SKSQL.VString(v)
+          | JSON.Array _
+          | JSON.Object _ ->
+            print_error(
+              "Value " +
+                val +
+                " of statement parameter" +
+                key +
+                " expected to be a literal value",
+            );
+            skipExit(2)
+          };
+          (key, lit)
+        })
+      | _ ->
+        print_error("Expected a JSON Object on a single line, got: " + line);
+        skipExit(2)
+      }
+    | None() ->
+      print_error("Reading stdin for statement parameters failed\n");
+      skipExit(2)
+    }
+  } catch {
+  | exn ->
+    print_error("Reading statement parameters failed: " + exn.getMessage());
+    skipExit(2)
+  }
+}
+
 /*****************************************************************************/
 /* Main */
 /*****************************************************************************/
@@ -68,6 +115,11 @@ untracked fun main(): void {
     .arg(
       Cli.StringArg("capacity").about(
         "Initialize SKFS runtime with given capacity",
+      ),
+    )
+    .arg(
+      Cli.BoolArg("expect-query-params").about(
+        "Read values of named parameters which may appear in the statement. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
       ),
     )
     .subcommand(Cli.Command("sessions").about("List the current subscriptions"))
@@ -197,7 +249,12 @@ untracked fun main(): void {
             .long("since")
             .about("Starting time of the tail"),
         )
-        .arg(Cli.StringArg("user").about("Name of the user")),
+        .arg(Cli.StringArg("user").about("Name of the user"))
+        .arg(
+          Cli.BoolArg("expect-query-params").about(
+            "Read values of named parameters which may appear in the filter condition. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
+          ),
+        ),
     )
     // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
     .subcommand(
@@ -242,6 +299,7 @@ untracked fun main(): void {
       | "js" -> SKSQL.OFK_JS()
       | f -> invariant_violation(`Unsupported format: ${f}`)
       },
+      expectQueryParams => args.getBool("expect-query-params"),
     };
 
     subcmd_handler = args.subcommand
@@ -289,7 +347,8 @@ untracked fun main(): void {
         //   | Some(AP.StringValue{value => userName}) -> Some(userName)
         //   | _ -> None()
         //   };
-        SKSQL.eval(options, /* user = */ None())
+        params = queryParams(options);
+        SKSQL.eval(options, params, /* user = */ None())
       });
     subcmd_handler(args, options);
   } catch {
@@ -347,7 +406,7 @@ fun execDumpTables(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   suffix = args.maybeGetString("table-suffix");
   SKSQL.runSql(options, context ~> {
-    SKSQL.dumpTables(options, context, suffix);
+    SKSQL.dumpTables(context, suffix);
     SKFS.CStop(None())
   })
 }
@@ -372,7 +431,7 @@ fun execDumpView(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun execDumpViews(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   SKSQL.runSql(options, context ~> {
-    SKSQL.dumpViews(options, context);
+    SKSQL.dumpViews(context);
     SKFS.CStop(None())
   })
 }
@@ -380,9 +439,9 @@ fun execDumpViews(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun execDump(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   SKSQL.runSql(options, context ~> {
-    SKSQL.dumpTables(options, context, None());
+    SKSQL.dumpTables(context, None());
     SKSQL.dumpInserts(context);
-    SKSQL.dumpViews(options, context);
+    SKSQL.dumpViews(context);
     SKFS.CStop(None())
   })
 }
@@ -392,7 +451,7 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   SKSQL.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
-      tableDescr = SKSQL.getTable(options, context, 0, name);
+      tableDescr = SKSQL.getTable(context, 0, name);
       context.setGlobal("CSV_TABLE", tableDescr);
       tableDescr
     | Some(x) -> SKSQL.DirDescr::fromFile(x)
@@ -495,13 +554,12 @@ fun execWrite(args: Cli.ParseResults, options: SKSQL.Options): void {
 }
 
 fun getSqlTableFromDirName(
-  options: SKSQL.Options,
   context: readonly SKFS.Context,
   dirName: SKFS.DirName,
 ): SKSQL.DirDescr {
   dirNameStr = dirName.toString();
   !dirNameStr = dirName.toString().stripPrefix("/").stripSuffix("/");
-  SKSQL.getTable(options, context.mclone(), 0, SKSQL.Name::create(dirNameStr))
+  SKSQL.getTable(context.mclone(), 0, SKSQL.Name::create(dirNameStr))
 }
 
 fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
@@ -526,10 +584,16 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     dirName.toString().stripPrefix("/").stripSuffix("/"),
   );
   filter1 = args.maybeGetString("filter") match {
-  | None() -> subFilter
+  | None() ->
+    if (options.expectQueryParams) {
+      print_error("Cannot pass parameters without filter condition");
+      skipExit(2)
+    };
+    subFilter
   | Some(strCond) ->
     from = Some(Array[SKSQL.TableName(SKSQL.FName(tableName), None())]);
-    compiler = SKSQL.Compiler::create(false, options, 0);
+    params = queryParams(options);
+    compiler = SKSQL.Compiler::create(false, options, 0, params);
     (_, ast) = SKSQL.parseExpr(SKSQL.Lexer(0, SKSQL.Buffer(strCond)), 0);
     compilerContext = gContext.mclone();
     _ = compiler.compileFrom(compilerContext, from);
@@ -569,7 +633,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   | Some(userName) ->
     (context, isReset) ~> {
       user = SKSQL.UserFile::create(context, userName);
-      sqlTable = getSqlTableFromDirName(options, context, dirName);
+      sqlTable = getSqlTableFromDirName(context, dirName);
       accessSolver = SKSQL.AccessSolver::create(context, user.id, sqlTable);
       skdbGroupColNbrOpt = sqlTable.cols.maybeGet(SKSQL.skdbGroupColName);
 
@@ -729,7 +793,7 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   SKSQL.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
-      tableDescr = SKSQL.getTable(options, context, 0, name);
+      tableDescr = SKSQL.getTable(context, 0, name);
       context.setGlobal("CSV_TABLE", tableDescr);
       tableDescr
     | Some(x) -> SKSQL.DirDescr::fromFile(x)
@@ -776,7 +840,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     | (_, Some(x)) -> SKFS.NNotify(x)
     | _ -> SKFS.NTail()
     };
-    (input, output) = SKSQL.getSubsDirs(options, context);
+    (input, output) = SKSQL.getSubsDirs(context);
     viewKey = SKFS.SID(viewName);
     inputDir = context.unsafeGetEagerDir(input.dirName);
     sessionID = SKFS.genSym(0);

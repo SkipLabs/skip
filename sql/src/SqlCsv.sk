@@ -140,12 +140,23 @@ fun insert(
   table: SKSQL.DirDescr,
   user: ?SKSQL.UserFile,
 ): SKFS.ContextOp {
+  // empty params since no placeholders in input to skdb load-csv
+  params: Map<String, SKSQL.Value> = Map[];
   eval = SKSQL.Evaluator{options, user};
   pos = 0;
   inTransaction = false;
   paramsOpt = None();
   (eof, array) = parseCsv(line, SKSQL.parseCSVValue);
-  f = eval.insert(context, pos, None(), inTransaction, table, paramsOpt, array);
+  f = eval.insert(
+    context,
+    params,
+    pos,
+    None(),
+    inTransaction,
+    table,
+    paramsOpt,
+    array,
+  );
   if (!eof) return SKFS.CContinue(f);
   SKFS.CStop(f)
 }
@@ -210,7 +221,9 @@ fun lwwEdits(
     sync => false,
     showUsedIndexes => false,
   };
-  compiler = SKSQL.Compiler::create(false, options, selectAst.pos);
+  // empty params since no placeholders in skdb diff write-csv
+  params: Map<String, SKSQL.Value> = Map[];
+  compiler = SKSQL.Compiler::create(false, options, selectAst.pos, params);
   selectContext = context.mclone(); // ensure we don't accumulate the select dirs
   select = compiler.compileSelect(selectContext, selectAst, true);
   selectHandle = SKSQL.evalSelect(selectContext, select, None());
@@ -571,9 +584,12 @@ fun replayDiff(
           values.push(value);
         };
         cvalues = values.map(SKSQL.parseCSVValue);
+        // empty params since no placeholders in skdb diff write-csv
+        params: Map<String, SKSQL.Value> = Map[];
         pos = lineNbr.get();
         newRows = SKSQL.computeInsert(
           context,
+          params,
           false,
           pos,
           None(),

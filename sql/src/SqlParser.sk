@@ -580,6 +580,10 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
   } else if (lex.isEqAt(tok, "+")) {
     (!pos, e) = parseExprWithPrio(1, lex, pos);
     UPlus(e)
+  } else if (lex.isEqAt(tok, "@")) {
+    (!pos, !tok) = lex.next(pos);
+    handle = lex.wordAt(tok);
+    VParam(handle)
   } else if (lex.wordAt(tok) == ">") {
     invariant_violation("Internal error");
   } else if (lex.wordAt(tok).lowercase() == "null") {
@@ -978,6 +982,7 @@ fun makeFloat(
 
 fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
   (!pos, tok) = lex.next(pos);
+
   if (lex.isEqUpperAt(tok, "NULL")) {
     return (tok.posEnd, VNull());
   };
@@ -1049,6 +1054,13 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
     | TKWord() -> invariant_violation("Internal error")
     };
   };
+
+  if (lex.content[tok.posBegin] == '@') {
+    (!pos, !tok) = lex.next(pos);
+    handle = lex.wordAt(tok);
+    return (pos, VParam(handle));
+  };
+
   error(pos, "Invalid value")
 }
 
@@ -1182,6 +1194,17 @@ fun parseTypeRest(lex: Lexer, pos: Int): (Int, Bool, Bool, ?Value, Bool) {
       if (default is Some _) error(pos, "DEFAULT already set");
       !shouldContinue = true;
       (!pos, e) = parseValue(lex, pos);
+      e match {
+      | VNull _
+      | VInt _
+      | VFloat _
+      | VString _ ->
+        void
+      | VId _
+      | VTime _
+      | VParam _ ->
+        error(pos, "Invalid expression for default value")
+      };
       !default = Some(e);
     };
     if (lex.isEqUpper(pos, "NOT")) {
