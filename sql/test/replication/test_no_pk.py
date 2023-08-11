@@ -183,17 +183,21 @@ def test_full_mesh_with_insert_and_delete():
   cluster.mirror("test_without_pk", client2, server)
   cluster.mirror("test_without_pk", client1, client2)
 
-  client1.insertInto("test_without_pk", [0, 'foo'])
-  server.deleteFromWhere("test_without_pk", "id = 0")
+  insert = client1.insertInto("test_without_pk", [0, 'foo'])
+  delete = server.deleteFromWhere("test_without_pk", "id = 0")
 
   # check once all tasks have run that the cluster is silent
   cluster.isSilent()
 
   # and that all nodes have reached this state
-  cluster.state("SELECT id, note FROM test_without_pk;").isOneOf(
-    [0, "foo"],
+  cluster.state("SELECT id, note FROM test_without_pk;").match(
     colnames=['id', 'note'],
-    allowEmpty=True,
+  ).clause(
+    # TODO: should be insert delivered on s1 happensBefore delete on s1
+    lambda schedule: schedule.happensBefore(insert['s1'][0], delete['s1'][0]),
+    []
+  ).elze(
+    [[0, "foo"]]
   )
 
   return scheduler
