@@ -363,7 +363,7 @@ class Topology:
       results = await asyncio.gather(
         *[peer.query(schedule, query) for peer in self.peers]
       )
-      expectations.check(results)
+      expectations.check(dict(zip(self.peers, results)))
     checkTask = Task(f"Check {expectations} on {query}", f)
     for scheduled in self.scheduler.tasks():
       self.scheduler.happensBefore(scheduled, checkTask)

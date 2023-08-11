@@ -45,15 +45,26 @@ class Expectations():
       return f"Did not find any of {rows} in {resultSet}"
     self.checks.append(check)
 
-  def verify(self, resultSets):
-    for resultSet in resultSets:
+  def verifyChecks(self, peerResultMap):
+    for peer, resultSet in peerResultMap.items():
       for check in self.checks:
         msg = check(resultSet)
         if msg != "":
-          return msg
+          return f"{peer}: {msg}"
     return ""
 
-  def check(self, resultSets):
-    firstFailure = self.verify(resultSets)
+  def verifyConvergence(self, peerResultMap):
+    it = iter(peerResultMap.items())
+    firstPeer, firstResultSet = next(it)        # do not catch, there should be one result
+    for peer, resultSet in it:
+      if resultSet != firstResultSet:
+        return f"{firstPeer}: {firstResultSet} != {resultSet} from {peer}"
+    return ""
+
+  def check(self, peerResultMap):
+    firstFailure = self.verifyConvergence(peerResultMap)
+    if firstFailure != "":
+      raise AssertionError(firstFailure)
+    firstFailure = self.verifyChecks(peerResultMap)
     if firstFailure != "":
       raise AssertionError(firstFailure)
