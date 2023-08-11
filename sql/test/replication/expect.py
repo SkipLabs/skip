@@ -34,9 +34,12 @@ class Expectations():
       return f"Did not find any of {rows} in {resultSet}"
     self.checks.append(check)
 
-  def isOneOf(self, *rows, colnames=[]):
+  def isOneOf(self, *rows, colnames=[], allowEmpty=False):
     def check(resultSet):
-      if len(resultSet) != 1:
+      if len(resultSet) < 1:
+        msg = "" if allowEmpty else "Unexpected empty result set"
+        return msg
+      if len(resultSet) > 1:
         return f"Multiple results in {resultSet}"
       for row in rows:
         row = {k: v for (k,v) in zip(colnames, row)}
