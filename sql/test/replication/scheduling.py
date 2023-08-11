@@ -150,6 +150,10 @@ class Schedule:
   def __str__(self):
     return self.__repr__()
 
+  def happensBefore(self, t1, t2) -> bool:
+    rest = itertools.dropwhile(lambda x: x!=t1, self.tasks)
+    return t2 in rest
+
   async def run(self, debug=nop):
     self.debug=debug
     for i,t in enumerate(self.tasks):

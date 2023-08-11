@@ -221,6 +221,9 @@ class SkdbPeer:
     # dramatically (orders of magnitude), so is worth not testing
     visited = set(s.other for s in self.streams[table] if s.other)
 
+    tasks = defaultdict(list)
+    tasks[self.name] = [task]
+
     # traverse the peer graph causing all channels to send and deliver
     # after the modification
     def traverse(before, streams):
@@ -231,10 +234,11 @@ class SkdbPeer:
         send = stream.clockTask()
         self.scheduler.add(send)
         self.scheduler.happensBefore(before, send)
+        tasks[stream.receiver.name].append(send)
         traverse(send, stream.receiver.streams[table])
     traverse(task, self.streams[table])
 
-    return task
+    return tasks
 
   def insertInto(self, table: str, row):
     rowStr = ", ".join(serialise(val) for val in row)
@@ -363,7 +367,7 @@ class Topology:
       results = await asyncio.gather(
         *[peer.query(schedule, query) for peer in self.peers]
       )
-      expectations.check(dict(zip(self.peers, results)))
+      expectations.check(dict(zip(self.peers, results)), schedule)
     checkTask = Task(f"Check {expectations} on {query}", f)
     for scheduled in self.scheduler.tasks():
       self.scheduler.happensBefore(scheduled, checkTask)

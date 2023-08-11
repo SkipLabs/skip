@@ -1,3 +1,24 @@
+class MatchCheck():
+  def __init__(self, colnames):
+    self.clauses = []
+    self.colnames = colnames
+
+  def clause(self, schedPred, rows):
+    self.clauses.append((schedPred, rows))
+    return self
+
+  def elze(self, rows):
+    return self.clause(lambda _: True, rows)
+
+  def __call__(self, resultSet, schedule):
+    for pred, rows in self.clauses:
+      if pred(schedule):
+        match = list({k: v for (k,v) in zip(self.colnames, row)} for row in rows)
+        if resultSet != match:
+            return f"{resultSet} did not match expected: {match}"
+        return ""
+    return "no clauses matched schedule"
+
 class Expectations():
   def __init__(self):
     self.checks = []
@@ -10,48 +31,21 @@ class Expectations():
 
   def equals(self, *rows, colnames=[]):
     match = list({k: v for (k,v) in zip(colnames, row)} for row in rows)
-    def check(resultSet):
+    def check(resultSet, _schedule):
       if resultSet != match:
-        return f"{resultSet} did not match {match}"
+        return f"{resultSet} did not match expected: {match}"
       return ""
     self.checks.append(check)
 
-  def hasAllRows(self, *rows, colnames=[]):
-    def check(resultSet):
-      for row in rows:
-        row = {k: v for (k,v) in zip(colnames, row)}
-        if row not in resultSet:
-          return f"Did not find row {row} in {resultSet}"
-      return ""
+  def match(self, colnames=[]):
+    check = MatchCheck(colnames)
     self.checks.append(check)
+    return check
 
-  def hasAnyRows(self, *rows, colnames=[]):
-    def check(resultSet):
-      for row in rows:
-        row = {k: v for (k,v) in zip(colnames, row)}
-        if row in resultSet:
-          return ""
-      return f"Did not find any of {rows} in {resultSet}"
-    self.checks.append(check)
-
-  def isOneOf(self, *rows, colnames=[], allowEmpty=False):
-    def check(resultSet):
-      if len(resultSet) < 1:
-        msg = "" if allowEmpty else "Unexpected empty result set"
-        return msg
-      if len(resultSet) > 1:
-        return f"Multiple results in {resultSet}"
-      for row in rows:
-        row = {k: v for (k,v) in zip(colnames, row)}
-        if row == resultSet[0]:
-          return ""
-      return f"Did not find any of {rows} in {resultSet}"
-    self.checks.append(check)
-
-  def verifyChecks(self, peerResultMap):
+  def verifyChecks(self, peerResultMap, schedule):
     for peer, resultSet in peerResultMap.items():
       for check in self.checks:
-        msg = check(resultSet)
+        msg = check(resultSet, schedule)
         if msg != "":
           return f"{peer}: {msg}"
     return ""
@@ -64,10 +58,10 @@ class Expectations():
         return f"{firstPeer}: {firstResultSet} != {resultSet} from {peer}"
     return ""
 
-  def check(self, peerResultMap):
+  def check(self, peerResultMap, schedule):
     firstFailure = self.verifyConvergence(peerResultMap)
     if firstFailure != "":
       raise AssertionError(firstFailure)
-    firstFailure = self.verifyChecks(peerResultMap)
+    firstFailure = self.verifyChecks(peerResultMap, schedule)
     if firstFailure != "":
       raise AssertionError(firstFailure)
