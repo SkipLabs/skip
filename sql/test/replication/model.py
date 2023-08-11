@@ -208,18 +208,21 @@ class SkdbPeer:
     self.streams[table].append(stream)
     return self
 
-  def insertInto(self, table: str, row):
-    rowStr = ", ".join(serialise(val) for val in row)
-    q = f"INSERT INTO {table} VALUES ({rowStr});"
-    insert = Task(f"insert {row} in to '{table}' on {self}", runDmlQuery(self, q))
-    self.scheduler.add(insert)
-    self.scheduler.happensBefore(self.lastTask, insert)
-    self.lastTask = insert
+  def _scheduleDmlTask(self, table, task):
+    self.scheduler.add(task)
+
+    # tasks on a peer are sequential
+    self.scheduler.happensBefore(self.lastTask, task)
+    self.lastTask = task
+
     # we prime the visited set with the inverse streams. this has the
     # effect of not sending echo responses. they are assumed to be
     # filtered and so are always a no-op. this reduces schedule sizes
     # dramatically (orders of magnitude), so is worth not testing
     visited = set(s.other for s in self.streams[table] if s.other)
+
+    # traverse the peer graph causing all channels to send and deliver
+    # after the modification
     def traverse(before, streams):
       for stream in streams:
         if stream in visited:
@@ -229,32 +232,31 @@ class SkdbPeer:
         self.scheduler.add(send)
         self.scheduler.happensBefore(before, send)
         traverse(send, stream.receiver.streams[table])
-    traverse(insert, self.streams[table])
-    return insert
+    traverse(task, self.streams[table])
+
+    return task
+
+  def insertInto(self, table: str, row):
+    rowStr = ", ".join(serialise(val) for val in row)
+    q = f"INSERT INTO {table} VALUES ({rowStr});"
+    insert = Task(f"insert {row} in to '{table}' on {self}", runDmlQuery(self, q))
+    return self._scheduleDmlTask(table, insert)
 
   def insertOrReplace(self, table: str, row):
     rowStr = ", ".join(serialise(val) for val in row)
     q = f"INSERT OR REPLACE INTO {table} VALUES ({rowStr});"
     insert = Task(f"insert with replace {row} in to '{table}' on {self}", runDmlQuery(self, q))
-    self.scheduler.add(insert)
-    self.scheduler.happensBefore(self.lastTask, insert)
-    self.lastTask = insert
-    # we prime the visited set with the inverse streams. this has the
-    # effect of not sending echo responses. they are assumed to be
-    # filtered and so are always a no-op. this reduces schedule sizes
-    # dramatically (orders of magnitude), so is worth not testing
-    visited = set(s.other for s in self.streams[table] if s.other)
-    def traverse(before, streams):
-      for stream in streams:
-        if stream in visited:
-          continue
-        visited.add(stream)
-        send = stream.clockTask()
-        self.scheduler.add(send)
-        self.scheduler.happensBefore(before, send)
-        traverse(send, stream.receiver.streams[table])
-    traverse(insert, self.streams[table])
-    return insert
+    return self._scheduleDmlTask(table, insert)
+
+  def deleteFromWhere(self, table: str, where: str):
+    q = f"DELETE FROM {table} WHERE {where};"
+    t = Task(f"'{q}' on {self}", runDmlQuery(self, q))
+    return self._scheduleDmlTask(table, t)
+
+  def updateSetWhere(self, table: str, setExprs: str, where: str):
+    q = f"UPDATE {table} SET {setExprs} WHERE {where};"
+    t = Task(f"'{q}' on {self}", runDmlQuery(self, q))
+    return self._scheduleDmlTask(table, t)
 
   async def query(self, schedule, query):
     return await runQuery(self, query)(schedule)
