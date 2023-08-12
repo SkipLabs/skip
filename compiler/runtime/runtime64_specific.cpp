@@ -28,8 +28,6 @@
 // TODO: Only include in debug mode.
 #include <backtrace.h>
 
-extern char** environ;
-
 namespace {
 static int print_callback(void* /* data */, uintptr_t pc, const char* filename,
                           int lineno, const char* function) {
