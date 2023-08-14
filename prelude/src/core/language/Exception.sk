@@ -5,6 +5,17 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@cpp_export("sk_get_exception_type")
+fun getExceptionType(exn: Exception): String {
+  // TODO: Is there a cleaner way to get just the type name?
+  inspect(exn).toString().splitFirst("(").i0
+}
+
+@cpp_export("sk_get_exception_message")
+fun getExceptionMessage(exn: Exception): String {
+  exn.getMessage()
+}
+
 base class Exception {
   overridable fun getMessage(): String {
     "Exception " + inspect(this).toString()
