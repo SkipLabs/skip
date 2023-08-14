@@ -111,14 +111,14 @@ class MutableCompositeTask:
 
 class AllTopoSortsScheduler():
   def __init__(self, limit = 100, runAll = False):
-    self.t = []
+    self.taskLists = [[]]
     self.graph = defaultdict(set)
     self.limit = limit
     self.runAll = runAll
 
-  def _nodesWithNoIncomingEdge(self, g):
+  def _nodesWithNoIncomingEdge(self, nodeList, g):
     acc = set()
-    for node in self.t:
+    for node in nodeList:
       found = False
       for (_, nodes) in g.items():
         if node in nodes:
@@ -128,33 +128,47 @@ class AllTopoSortsScheduler():
         acc.add(node)
     return acc
 
-  def _schedules(self, schedule, candidates, g):
+  def _schedules(self, nodes, schedule, candidates, g):
     if candidates == set():
-      if any(x != list() for x in g.values()):
+      if any(g[n] != list() for n in nodes):
         raise RuntimeError("Graph had a cycle")
       yield Schedule(schedule)
       return
 
     for n in candidates:
-      ourCandidates = copy.copy(candidates)
       ourSchedule = copy.copy(schedule)
       ourG = copy.copy(g)
       ourSchedule.append(n)
       ourG[n] = list()
-      ourCandidates = ourCandidates.union(self._nodesWithNoIncomingEdge(ourG)).difference(set(ourSchedule))
-      for s in self._schedules(ourSchedule, ourCandidates, ourG):
+      ourCandidates = candidates.union(self._nodesWithNoIncomingEdge(nodes, ourG)).difference(set(ourSchedule))
+      for s in self._schedules(nodes, ourSchedule, ourCandidates, ourG):
         yield s
 
   def schedules(self):
-    schedule = []
-    candidates = self._nodesWithNoIncomingEdge(self.graph)
-    return self._schedules(schedule, candidates, self.graph)
+    for nodes in self.taskLists:
+      schedule = []
+      g = {n: [x for x in self.graph[n] if x in nodes] for n in nodes}
+      candidates = self._nodesWithNoIncomingEdge(nodes, g)
+      for sched in self._schedules(nodes, schedule, candidates, g):
+        yield sched
 
   def tasks(self):
-    return self.t
+    for tasks in self.taskLists:
+      for t in tasks:
+        yield t
 
   def add(self, task):
-    self.t.append(task)
+    for t in self.taskLists:
+      t.append(task)
+
+  def choice(self, taskSets):
+    acc = []
+    for tasks in taskSets:
+      for prefix in self.taskLists:
+        t = copy.copy(prefix)
+        t.extend(tasks)
+        acc.append(t)
+    self.taskLists = acc
 
   def happensBefore(self, a, b):
     self.graph[a].add(b)
@@ -212,6 +226,9 @@ class FirstN():
   def add(self, task):
     return self.scheduler.add(task)
 
+  def choice(self, taskSets):
+    return self.scheduler.choice(taskSets)
+
   def happensBefore(self, a, b):
     return self.scheduler.happensBefore(a,b)
 
@@ -232,6 +249,9 @@ class ReservoirSample():
 
   def add(self, task):
     return self.scheduler.add(task)
+
+  def choice(self, taskSets):
+    return self.scheduler.choice(taskSets)
 
   def happensBefore(self, a, b):
     return self.scheduler.happensBefore(a,b)
