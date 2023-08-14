@@ -218,6 +218,8 @@ class SkdbPeer:
     self.lastTask = task
 
     schedules = list()
+    deliveryTasks = defaultdict(list)
+    deliveryTasks[self.name].append(task)
 
     def buildDeliverySchedules(candidateEdges, sched, tasks, deliveries):
       def receivedFrom(edge, deliveries):
@@ -251,15 +253,17 @@ class SkdbPeer:
           ourSched.append(edge)
           ourDeliveries = updateDeliveries(edge)
           ourCandidateEdges.extend(getNewCandidates(edge, ourDeliveries))
+          task = edge.clockTask()
           ourTasks = copy.copy(tasks)
-          ourTasks.append(edge.clockTask())
+          ourTasks.append(task)
+          deliveryTasks[edge.receiver.name].append(task)
         buildDeliverySchedules(ourCandidateEdges, ourSched, ourTasks, ourDeliveries)
 
-    buildDeliverySchedules(self.streams[table], [], [], defaultdict(set))
+    buildDeliverySchedules(self.streams[table], [], [task], defaultdict(set))
 
     self.scheduler.choice(schedules)
 
-    return None
+    return deliveryTasks
 
   def insertInto(self, table: str, row):
     rowStr = ", ".join(serialise(val) for val in row)

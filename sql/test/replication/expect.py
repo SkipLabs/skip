@@ -15,7 +15,7 @@ class MatchCheck():
       if pred(schedule):
         match = list({k: v for (k,v) in zip(self.colnames, row)} for row in rows)
         if resultSet != match:
-            return f"{resultSet} did not match expected: {match}"
+          return f"{resultSet} did not match expected: {match}"
         return ""
     return "no clauses matched schedule"
 
