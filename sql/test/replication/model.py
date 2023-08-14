@@ -1,10 +1,12 @@
 import asyncio
 import uuid
+import copy
 from collections import defaultdict, deque
 from scheduling import Task, MutableCompositeTask
 from expect import Expectations
 import os
 import json
+import itertools
 
 SKDB = "/skfs/build/skdb"
 INITSQL = "/skfs/sql/privacy/init.sql"
@@ -215,30 +217,49 @@ class SkdbPeer:
     self.scheduler.happensBefore(self.lastTask, task)
     self.lastTask = task
 
-    # we prime the visited set with the inverse streams. this has the
-    # effect of not sending echo responses. they are assumed to be
-    # filtered and so are always a no-op. this reduces schedule sizes
-    # dramatically (orders of magnitude), so is worth not testing
-    visited = set(s.other for s in self.streams[table] if s.other)
+    schedules = list()
 
-    tasks = defaultdict(list)
-    tasks[self.name] = [task]
+    def buildDeliverySchedules(candidateEdges, sched, tasks, deliveries):
+      def receivedFrom(edge, deliveries):
+        # has sender received from receiver? if so, this is a no-op
+        # delivery and can be pruned to avoid schedule explosion
+        return edge.receiver in deliveries[edge.sender]
 
-    # traverse the peer graph causing all channels to send and deliver
-    # after the modification
-    def traverse(before, streams):
-      for stream in streams:
-        if stream in visited:
-          continue
-        visited.add(stream)
-        send = stream.clockTask()
-        self.scheduler.add(send)
-        self.scheduler.happensBefore(before, send)
-        tasks[stream.receiver.name].append(send)
-        traverse(send, stream.receiver.streams[table])
-    traverse(task, self.streams[table])
+      def updateDeliveries(edge):
+        ds = copy.copy(deliveries)
+        ds[edge.receiver] = ds[edge.receiver].union({edge.sender})
+        return ds
 
-    return tasks
+      def getNewCandidates(edge, deliveries):
+        node = edge.receiver
+        return [x for x in node.streams[table]
+                if not receivedFrom(x, deliveries) and x not in sched]
+
+      if candidateEdges == []:
+        for a,b in itertools.pairwise(tasks):
+          self.scheduler.happensBefore(a, b)
+        schedules.append(tasks)
+
+      for edge in candidateEdges:
+        ourCandidateEdges = copy.copy(candidateEdges)
+        ourCandidateEdges.remove(edge)
+        ourSched = sched
+        ourDeliveries = deliveries
+        ourTasks = tasks
+        if not receivedFrom(edge, deliveries):
+          ourSched = copy.copy(sched)
+          ourSched.append(edge)
+          ourDeliveries = updateDeliveries(edge)
+          ourCandidateEdges.extend(getNewCandidates(edge, ourDeliveries))
+          ourTasks = copy.copy(tasks)
+          ourTasks.append(edge.clockTask())
+        buildDeliverySchedules(ourCandidateEdges, ourSched, ourTasks, ourDeliveries)
+
+    buildDeliverySchedules(self.streams[table], [], [], defaultdict(set))
+
+    self.scheduler.choice(schedules)
+
+    return None
 
   def insertInto(self, table: str, row):
     rowStr = ", ".join(serialise(val) for val in row)
