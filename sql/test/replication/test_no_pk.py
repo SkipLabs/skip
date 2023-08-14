@@ -193,8 +193,8 @@ def test_full_mesh_with_insert_and_delete():
   cluster.state("SELECT id, note FROM test_without_pk;").match(
     colnames=['id', 'note'],
   ).clause(
-    # TODO: should be insert delivered on s1 happensBefore delete on s1
-    lambda schedule: schedule.happensBefore(insert['s1'][0], delete['s1'][0]),
+    lambda schedule: any(schedule.happensBefore(delivery, delete['s1'][0])
+                         for delivery in insert['s1']),
     []
   ).elze(
     [[0, "foo"]]
