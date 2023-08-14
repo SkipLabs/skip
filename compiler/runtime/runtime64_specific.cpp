@@ -35,11 +35,29 @@ void* sk_get_exception_message(void* skExn);
 }
 
 namespace {
-static int print_callback(void* /* data */, uintptr_t pc, const char* filename,
+
+struct backtrace_data {
+  bool full_trace;
+  bool before_main = true;
+  bool before_throw = true;
+};
+
+static int print_callback(void* data, uintptr_t pc, const char* filename,
                           int lineno, const char* function) {
-  fprintf(stderr, "0x%lx %s\n\t%s:%d\n", (unsigned long)pc,
-          function == NULL ? "???" : function,
-          filename == NULL ? "???" : filename, lineno);
+  auto ctx = static_cast<backtrace_data*>(data);
+
+  if (ctx->full_trace || (ctx->before_main && !ctx->before_throw)) {
+    fprintf(stderr, "File %s, line %d\n\t%s()\n",
+            filename == NULL ? "???" : filename, lineno,
+            function == NULL ? "???" : function);
+  }
+
+  if (0 == strcmp(function, "SKIP_throw")) {
+    ctx->before_throw = false;
+  } else if (0 == strcmp(function, "skip_main")) {
+    ctx->before_main = false;
+  }
+
   return 0;
 }
 
@@ -73,7 +91,8 @@ void printStackTrace() {
     return;
   }
 
-  backtrace_full(state, 3, print_callback, error_callback, nullptr);
+  backtrace_data data{false};
+  backtrace_full(state, 3, print_callback, error_callback, &data);
 }
 }  // namespace skip
 
