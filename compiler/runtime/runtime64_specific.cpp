@@ -28,6 +28,12 @@
 // TODO: Only include in debug mode.
 #include <backtrace.h>
 
+extern "C" {
+char* sk2c_string(char* skStr);
+void* sk_get_exception_type(void* skExn);
+void* sk_get_exception_message(void* skExn);
+}
+
 namespace {
 static int print_callback(void* /* data */, uintptr_t pc, const char* filename,
                           int lineno, const char* function) {
@@ -47,6 +53,14 @@ static void error_callback(void* /* data */, const char* msg, int errnum) {
 namespace skip {
 struct SkipException : std::exception {
   explicit SkipException(void* exc) : m_skipException(exc) {}
+
+  virtual const char* what() const noexcept override {
+    return sk2c_string((char*)sk_get_exception_message(m_skipException));
+  }
+
+  const char* name() const noexcept {
+    return sk2c_string((char*)sk_get_exception_type(m_skipException));
+  }
 
   void* m_skipException;
 };
@@ -71,9 +85,11 @@ void terminate() {
     if (eptr) {
       std::rethrow_exception(eptr);
     }
-  } catch (std::exception& e) {
-    std::cerr << "*** Uncaught exception of type " << typeid(e).name() << ": "
+  } catch (skip::SkipException& e) {
+    std::cerr << "*** Uncaught exception of type " << e.name() << ": "
               << e.what() << std::endl;
+  } catch (std::exception& e) {
+    std::cerr << "*** Uncaught exception: " << e.what() << std::endl;
   }
   std::cerr << "*** Stack trace:" << std::endl;
   skip::printStackTrace();
