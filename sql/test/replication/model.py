@@ -102,11 +102,12 @@ async def tail(db, session, peerId, since):
   proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "tail",
                                               session, "--since", str(since),
                                               "--peer-id", peerId,
-                                              stdout=asyncio.subprocess.PIPE)
-  (out, _) = await proc.communicate()
-  return out
+                                              stdout=asyncio.subprocess.PIPE,
+                                              stderr=asyncio.subprocess.PIPE)
+  (out, err) = await proc.communicate()
+  return out, err
 
-def startStreamingWriteCsv(dbkey, writecsvKey, table, user, source, peerId):
+def startStreamingWriteCsv(dbkey, writecsvKey, table, user, source, peerId, log):
   async def f(schedule):
     db = schedule.getScheduleLocal(dbkey)
     if db is None:
@@ -118,8 +119,18 @@ def startStreamingWriteCsv(dbkey, writecsvKey, table, user, source, peerId):
                                                 "--source-peer", source,
                                                 "--peer-id", peerId,
                                                 stdin=asyncio.subprocess.PIPE,
-                                                stdout=asyncio.subprocess.DEVNULL,)
+                                                stdout=asyncio.subprocess.DEVNULL,
+                                                stderr=asyncio.subprocess.PIPE)
     schedule.storeScheduleLocal(writecsvKey, proc)
+    async def logStderr():
+      stream = proc.stderr
+      if not stream:
+        return
+      buf = await stream.readline()
+      while len(buf) > 0:
+        log(buf.decode().rstrip())
+        buf = await stream.readline()
+    asyncio.create_task(logStderr())
     return proc
   return f
 
@@ -307,7 +318,8 @@ class SkdbPeer:
         db = schedule.getScheduleLocal(self)
         session = schedule.getScheduleLocal(subkey)
         since = schedule.getScheduleLocal(sinceKey) or 0
-        payload = await tail(db, session, peerId, since)
+        payload, log = await tail(db, session, peerId, since)
+        schedule.debug(log.decode().rstrip())
         stream.send(schedule, payload)
         schedule.storeScheduleLocal(sinceKey, getOurLastCheckpoint(since, payload.decode()))
 
@@ -321,7 +333,7 @@ class SkdbPeer:
       key = (self, stream, 'write')
       async def start(schedule):
         user = "todo"               # TODO:
-        start = startStreamingWriteCsv(self, key, table, user, source, peerId)
+        start = startStreamingWriteCsv(self, key, table, user, source, peerId, schedule.debug)
         await start(schedule)
 
       async def stop(schedule):
