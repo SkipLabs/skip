@@ -80,25 +80,25 @@ fmt:
 
 .PHONY: test
 test: SKARGO_FLAGS=
-test: native-test wasm-test
+test: test-native test-wasm
 
-.PHONY: native-test
-native-test: build/skdb
+.PHONY: test-native
+test-native: build/skdb
 	cd sql/ && ./test_sql.sh \
 	|tee /tmp/native-test.out ; \
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 
-.PHONY: wasm-test
-wasm-test: npm sql/js/node_modules sql/js/dist/index.html
+.PHONY: test-wasm
+test-wasm: npm sql/js/node_modules sql/js/dist/index.html
 	cd sql/js && npx playwright install && npx playwright test --reporter=$(PLAYWRIGHT_REPORTER)
 
-.PHONY: replication-sim-test
-replication-sim-test: build/skdb
+.PHONY: test-replication
+test-replication: build/skdb
 	./sql/test/replication/test_pk.py
 	./sql/test/replication/test_no_pk.py
 
-.PHONY: tpc-test
-tpc-test: test
+.PHONY: test-tpc
+test-tpc: test
 	@echo ""
 	@echo "*******************************************************************************"
 	@echo "* TPC-H *"
