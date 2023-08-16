@@ -85,10 +85,11 @@ test_server_should_apply_client_reset_to_their_subset_view_of_data() {
     setup_server
 
     # write a row as the source under test
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_access << EOF
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_access > /dev/null << EOF
 
 
 1	0,"foo",-1
+:10
 EOF
 
     # write a row as another source, but with a private access value
@@ -105,17 +106,20 @@ EOF
     # just sanity check that test_user can see erase but not keep
     assert_line_count "$SERVER_TAIL" 'erase' 1
     assert_line_count "$SERVER_TAIL" 'keep' 0
+    # and that the server is at 43 and we sent up at 10
+    assert_line_count "$SERVER_TAIL" ':43 10' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value and the erase
     # from test_alt_user. but not the keep, because it can't see this
     # row.
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_access << EOF
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_access > /dev/null << EOF
 
 
 1	1,"baz",-1
 1	2,"quux",-1
 		
+:100 43
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_access" > $SERVER_TAIL
@@ -124,7 +128,7 @@ EOF
     assert_line_count "$SERVER_TAIL" '2\|quux' 1
     assert_line_count "$SERVER_TAIL" '7\|keep' 1
     assert_line_count "$SERVER_TAIL" '0\|foo' 0
-    assert_line_count "$SERVER_TAIL" '0\|erase' 0
+    assert_line_count "$SERVER_TAIL" '6\|erase' 0
 }
 
 run_test test_server_should_apply_client_reset_to_their_subset_view_of_data
