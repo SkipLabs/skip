@@ -26,6 +26,7 @@ setup_server() {
     echo "CREATE TABLE test (id INTEGER, note STRING);" | $SKDB
     echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_group INTEGER);" | $SKDB
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    echo "CREATE TABLE test_with_pk_with_access (id INTEGER PRIMARY KEY, note STRING, skdb_group INTEGER);" | $SKDB
 }
 
 assert_line_count() {
@@ -106,8 +107,8 @@ EOF
     # just sanity check that test_user can see erase but not keep
     assert_line_count "$SERVER_TAIL" 'erase' 1
     assert_line_count "$SERVER_TAIL" 'keep' 0
-    # and that the server is at 43 and we sent up at 10
-    assert_line_count "$SERVER_TAIL" ':43 10' 1
+    # and that the server is at 45 and we sent up at 10
+    assert_line_count "$SERVER_TAIL" ':45 10' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value and the erase
@@ -119,7 +120,7 @@ EOF
 1	1,"baz",-1
 1	2,"quux",-1
 		
-:100 43
+:100 45
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_access" > $SERVER_TAIL
@@ -152,12 +153,12 @@ EOF
 
     # if we did replicate now we would get the new row
     assert_line_count "$SERVER_TAIL" 'new' 1
-    # sanity check the tick value - it's important for later - we're at 44 they're at 10
-    assert_line_count "$SERVER_TAIL" ':44 10' 1
+    # sanity check the tick value - it's important for later - we're at 46 they're at 10
+    assert_line_count "$SERVER_TAIL" ':46 10' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value but not the new,
-    # because it hasn't seen this row yet: 35 < 44.
+    # because it hasn't seen this row yet: 35 < 46.
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test > /dev/null << EOF
 
 
@@ -253,7 +254,7 @@ test_resets_are_aggressively_nooped() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':46' 1
+    assert_line_count "$SERVER_TAIL" ':48' 1
 
     # server crashes and two clients that are up to speed reconnect with resets
 
@@ -264,7 +265,7 @@ test_resets_are_aggressively_nooped() {
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user test_user test > /dev/null << EOF
@@ -274,7 +275,7 @@ EOF
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -298,7 +299,7 @@ test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':46' 1
+    assert_line_count "$SERVER_TAIL" ':48' 1
 
     # server crashes and two clients that are up to speed reconnect with resets
 
@@ -309,7 +310,7 @@ test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update() {
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user test_user test > /dev/null << EOF
@@ -319,7 +320,7 @@ EOF
 1	2,"baz"
 1	3,"quux"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -344,7 +345,7 @@ test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update2() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':46' 1
+    assert_line_count "$SERVER_TAIL" ':48' 1
 
     # server crashes and two clients that are up to speed reconnect with resets
 
@@ -355,7 +356,7 @@ test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update2() {
 1	2,"baz"
 1	3,"quux"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user test_user test > /dev/null << EOF
@@ -365,7 +366,7 @@ EOF
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -396,7 +397,7 @@ test_resets_no_op_repeat_count_logic() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':64' 1
+    assert_line_count "$SERVER_TAIL" ':66' 1
 
     # this is added concurrently and shouldn't be eligible
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz');"
@@ -408,7 +409,7 @@ test_resets_no_op_repeat_count_logic() {
 0	1,"bar"
 2	2,"baz"
 		
-:10 64
+:10 66
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -419,7 +420,7 @@ EOF
 
     $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':73' 1
+    assert_line_count "$SERVER_TAIL" ':75' 1
 
     # this is added concurrently and shouldn't be eligible
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz');"
@@ -431,7 +432,7 @@ EOF
 1	1,"bar"
 2	2,"baz"
 		
-:20 73
+:20 75
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -447,6 +448,60 @@ run_test test_resets_no_op_repeat_count_logic
 ################################################################################
 # concurrency tests against a table with a PK
 ################################################################################
+
+# if a client sends up a reset it should not wipe out all the rows
+# they can't see due to e.g. privacy
+test_server_should_apply_client_reset_to_their_subset_view_of_data_pk() {
+    setup_server
+
+    # write a row as the source under test
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_pk_with_access > /dev/null << EOF
+
+
+1	0,"foo",-1
+:10
+EOF
+
+    # write a row as another source, but with a private access value
+    $SKDB_BIN write-csv --data $SERVER_DB --source 999 --user test_alt_user test_with_pk_with_access << EOF
+
+
+1	6,"erase",-1
+1	7,"keep",2
+EOF
+
+    server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk_with_access)
+    $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 --user test_user > $SERVER_TAIL
+
+    # just sanity check that test_user can see erase but not keep
+    assert_line_count "$SERVER_TAIL" 'erase' 1
+    assert_line_count "$SERVER_TAIL" 'keep' 0
+    # and that the server is at 45 and we sent up at 10
+    assert_line_count "$SERVER_TAIL" ':45 10' 1
+
+    # now the source under test sends up a reset for whatever reason -
+    # maybe reconnect. it wipes out its own foo value and the erase
+    # from test_alt_user. but not the keep, because it can't see this
+    # row.
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_pk_with_access > /dev/null << EOF
+
+
+1	1,"baz",-1
+1	2,"quux",-1
+		
+:100 45
+EOF
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk_with_access" > $SERVER_TAIL
+
+    assert_line_count "$SERVER_TAIL" '1\|baz' 1
+    assert_line_count "$SERVER_TAIL" '2\|quux' 1
+    assert_line_count "$SERVER_TAIL" '7\|keep' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo' 0
+    assert_line_count "$SERVER_TAIL" '6\|erase' 0
+}
+
+run_test test_server_should_apply_client_reset_to_their_subset_view_of_data_pk
 
 # if a client sends up a reset it should not wipe out local writes that haven't sync'd
 test_server_should_apply_client_reset_only_to_writes_seen_pk() {
@@ -466,12 +521,12 @@ EOF
 
     # if we did replicate now we would get the new row
     assert_line_count "$SERVER_TAIL" 'new' 1
-    # sanity check the tick value - it's important for later - we're at 44 they're at 10
-    assert_line_count "$SERVER_TAIL" ':44 10' 1
+    # sanity check the tick value - it's important for later - we're at 46 they're at 10
+    assert_line_count "$SERVER_TAIL" ':46 10' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value but not the new,
-    # because it hasn't seen this row yet: 35 < 44.
+    # because it hasn't seen this row yet: 35 < 46.
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user test_with_pk > /dev/null << EOF
 
 
@@ -504,7 +559,7 @@ test_resets_are_aggressively_nooped_pk() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':46' 1
+    assert_line_count "$SERVER_TAIL" ':48' 1
 
     # server crashes and two clients that are up to speed reconnect with resets
 
@@ -515,7 +570,7 @@ test_resets_are_aggressively_nooped_pk() {
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user test_user test_with_pk > /dev/null << EOF
@@ -525,7 +580,7 @@ EOF
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
@@ -549,7 +604,7 @@ test_resets_are_aggressively_nooped_with_local_change_pk() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':46' 1
+    assert_line_count "$SERVER_TAIL" ':48' 1
 
     # server crashes and two clients that are up to speed reconnect with resets
 
@@ -560,7 +615,7 @@ test_resets_are_aggressively_nooped_with_local_change_pk() {
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user test_user test_with_pk > /dev/null << EOF
@@ -570,7 +625,7 @@ EOF
 1	2,"baz"
 1	3,"quux"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
@@ -595,7 +650,7 @@ test_resets_are_aggressively_nooped_with_local_change_pk_2() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':46' 1
+    assert_line_count "$SERVER_TAIL" ':48' 1
 
     # server crashes and two clients that are up to speed reconnect with resets
 
@@ -606,7 +661,7 @@ test_resets_are_aggressively_nooped_with_local_change_pk_2() {
 1	2,"baz"
 1	3,"quux"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user test_user test_with_pk > /dev/null << EOF
@@ -616,7 +671,7 @@ EOF
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
@@ -641,7 +696,7 @@ test_resets_conflicting_pk() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':46' 1
+    assert_line_count "$SERVER_TAIL" ':48' 1
 
     # server crashes and two clients that are up to speed reconnect with resets
 
@@ -652,7 +707,7 @@ test_resets_conflicting_pk() {
 1	2,"baz"
 1	3,"quux"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user test_user test_with_pk > /dev/null << EOF
@@ -662,7 +717,7 @@ EOF
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
@@ -687,7 +742,7 @@ test_resets_conflicting_reversed_pk() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':46' 1
+    assert_line_count "$SERVER_TAIL" ':48' 1
 
     # server crashes and two clients that are up to speed reconnect with resets
 
@@ -698,7 +753,7 @@ test_resets_conflicting_reversed_pk() {
 1	1,"bar"
 1	2,"baz"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user test_user test_with_pk > /dev/null << EOF
@@ -708,7 +763,7 @@ EOF
 1	2,"baz"
 1	3,"quux"
 		
-:10 46
+:10 48
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL

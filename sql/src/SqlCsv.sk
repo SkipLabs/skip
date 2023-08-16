@@ -505,7 +505,7 @@ fun applyDiffStrategy(
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      _context ~> true,
+      isVisibleToUser(context),
       (tick, source) ~>
         tick.value < snapshot.default(0) || source.path() == writer
       ,
