@@ -18,7 +18,7 @@ rm -f $PAUSED_PROCS_FILE
 SERVER_LOG=/tmp/server.log
 
 function start_server {
-    gradle --console plain run --args=--DANGEROUS-no-encryption > $SERVER_LOG 2>&1 &
+    gradle --console plain run --args="--DANGEROUS-no-encryption --dev" > $SERVER_LOG 2>&1 &
     pid=$!
     echo $pid > $SERVER_PID_FILE
     echo "started server: $pid"
