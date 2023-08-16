@@ -49,6 +49,15 @@ run_server() {
     echo "CREATE TABLE no_pk_random (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
     echo "CREATE TABLE pk_random (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
 
+    echo "INSERT INTO skdb_table_permissions VALUES ('no_pk_inserts', 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES ('pk_inserts', 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES ('no_pk_single_row', 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES ('pk_single_row', 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES ('no_pk_filtered', 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES ('pk_filtered', 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES ('no_pk_random', 7);" | $SKDB
+    echo "INSERT INTO skdb_table_permissions VALUES ('pk_random', 7);" | $SKDB
+
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > $SOAK_SERVER_LOG &
 
     echo $! > "$SERVER_PID_FILE"
