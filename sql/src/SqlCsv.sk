@@ -323,28 +323,12 @@ fun applyDiffStrategy(
 
     dir = context.unsafeGetEagerDir(table.dirName);
     entries = mutable Vector[];
-    hasError = false;
 
     for (row in rows) {
-      userFileOpt match {
-      | None() -> void
-      | Some(user) ->
-        SKSQL.checkUserCanWriteRow(context, user, table, row) match {
-        | SKSQL.AROK() -> void
-        | SKSQL.ARError(err) ->
-          !hasError = true;
-          print_error("Error: " + err)
-        }
-      }
-    };
-
-    if (!hasError) {
-      for (row in rows) {
-        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          if (tick.value < snapshot.default(0) || source.path() == writer) {
-            entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
-          }
+      key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+      for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+        if (tick.value < snapshot.default(0) || source.path() == writer) {
+          entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
         }
       }
     };
