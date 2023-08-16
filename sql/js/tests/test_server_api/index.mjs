@@ -49,6 +49,10 @@ async function testQueriesAgainstTheServer(skdb) {
     "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER);");
   assert.equal(tableCreate, "");
 
+  const permissionInsert = await skdb.server.sqlRaw(
+    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7);");
+  assert.equal(tableCreate, "");
+
   const tableInsert = await skdb.server.sqlRaw(
     "INSERT INTO test_pk VALUES (42,21);");
   assert.equal(tableInsert, "");
@@ -78,11 +82,11 @@ async function testSchemaQueries(skdb) {
 
   // valid views/tables
 
-  const viewSchema = await skdb.server.viewSchema("skdb_access_readers");
-  assert.match(viewSchema, /CREATE VIRTUAL VIEW skdb_access_readers/);
+  const viewSchema = await skdb.server.viewSchema("skdb_groups_users");
+  assert.match(viewSchema, /CREATE VIRTUAL VIEW skdb_groups_users/);
 
-  const tableSchema = await skdb.server.tableSchema("skdb_access_readers");
-  assert.match(tableSchema, /CREATE TABLE skdb_access_readers/);
+  const tableSchema = await skdb.server.tableSchema("skdb_users");
+  assert.match(tableSchema, /CREATE TABLE skdb_users/);
 
   // invalid views/tables
 
