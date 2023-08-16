@@ -158,8 +158,6 @@ class Skdb(val name: String, private val dbPath: String) {
                     "--connect",
                     "--data",
                     dbPath,
-                    "--user",
-                    user,
                     "--ignore-source",
                     replicationId))
             .decode()
@@ -172,6 +170,8 @@ class Skdb(val name: String, private val dbPath: String) {
             "--format=csv",
             connection.trim(),
             "--follow",
+            "--user",
+            user,
             "--since",
             (if (since < 0u) 0 else since).toString())
 
