@@ -707,13 +707,29 @@ export class SKDB {
     );
   }
 
-  sqlRaw(stdin: string): string {
-    return this.runLocal([], stdin);
+  addParams(
+    args: Array<string>,
+    params: Map<string, string|number>,
+    stdin: string
+  ): [Array<string>, string] {
+    let args1 = ["--expect-query-params"].concat(args);
+    let stdin1 = JSON.stringify(Object.fromEntries(params)) + '\n' + stdin;
+    return [args1, stdin1];
   }
 
-  sql(stdin: string): Array<any> | string {
+  sqlRaw(stdin: string, params: Map<string, string|number> = new Map())
+    : string
+  {
+    let [args1, stdin1] = this.addParams([], params, stdin);
+    return this.runLocal(args1, stdin1);
+  }
+
+  sql(stdin: string, params: Map<string, string|number> = new Map())
+    : Array<any> | string
+  {
+    let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
     this.stdout_objects = new Array();
-    let stdout = this.runLocal(["--format=js"], stdin);
+    let stdout = this.runLocal(args1, stdin1);
     if(stdout == "") {
       let result = this.stdout_objects;
       return result;
@@ -743,19 +759,18 @@ export class SKDB {
     return tables + views;
   }
 
-  insert(tableName: string, values: Array<any>): void {
-    values = values.map((x) => {
-      if (typeof x == "string") {
-        if (x == undefined) {
-          return "NULL";
-        }
-        return "'" + x + "'";
-      }
-      return x;
-    });
+  insert(tableName: string, values: Array<string|number>): void {
+    let params = new Map();
+    let keys =
+      values.map((val, i) => {
+        let key = "@key" + i;
+        params.set(key, val);
+        return key;
+      });
     let stdin =
-      "insert into " + tableName + " values (" + values.join(", ") + ");";
-    this.runLocal([], stdin);
+      "insert into " + tableName + " values (" + keys.join(", ") + ");";
+    let [args1, stdin1] = this.addParams([], params, stdin);
+    this.runLocal(args1, stdin1);
   }
 
   assertCanBeMirrored(tableName: string): void {

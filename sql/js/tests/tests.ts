@@ -142,4 +142,24 @@ export const tests = [{
     check: res => {
         expect(res).toEqual("[]");
     }
+}, {
+    name: 'Params 1',
+    fun: skdb => {
+      skdb.sql('CREATE TABLE t1 (a INTEGER);');
+      skdb.sql('INSERT INTO t1 VALUES (@key);', new Map().set("key", 13));
+      return skdb.sqlRaw('SELECT * FROM t1;');
+    },
+    check: res => {
+      expect(res).toEqual("13\n");
+    }
+}, {
+    name: 'Params 2',
+    fun: skdb => {
+      skdb.sql('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
+      skdb.insert('t1', [13, 9, 42])
+      return skdb.sqlRaw('SELECT * FROM t1;');
+    },
+    check: res => {
+      expect(res).toEqual("13|9|42\n");
+    }
 }];
