@@ -1,5 +1,9 @@
 package io.skiplabs.skgw
 
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.adapter
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
@@ -68,6 +72,20 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun sql(stmts: String, format: OutputFormat): ProcessOutput {
     return blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath, format.flag), stmts)
+  }
+
+  fun sql(stmts: String, params: Map<String, Any?>, format: OutputFormat): ProcessOutput {
+    val buf = StringBuilder()
+    val moshi = Moshi.Builder().build()
+    val adapter: JsonAdapter<Map<String, Any?>> =
+        moshi.adapter(
+            Types.newParameterizedType(Map::class.java, String::class.java, Object::class.java))
+    buf.append(adapter.toJson(params))
+    buf.append("\n")
+    buf.append(stmts)
+    return blockingRun(
+        ProcessBuilder(SKDB_PROC, "--data", dbPath, format.flag, "--expect-query-params"),
+        buf.toString())
   }
 
   fun sqlStream(format: OutputFormat): Process {
