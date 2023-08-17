@@ -43,9 +43,9 @@ fun queryParams(options: SKSQL.Options): Map<String, SKSQL.Value> {
   if (!options.expectQueryParams) {
     return Map[];
   };
-  try {
-    read_line() match {
-    | Some(line) ->
+  read_line() match {
+  | Some(line) ->
+    try {
       JSON.decode(line) match {
       | map @ JSON.Object _ ->
         map.value.mapItems((key, val) -> {
@@ -73,13 +73,15 @@ fun queryParams(options: SKSQL.Options): Map<String, SKSQL.Value> {
         print_error("Expected a JSON Object on a single line, got: " + line);
         skipExit(2)
       }
-    | None() ->
-      print_error("Reading stdin for statement parameters failed\n");
+    } catch {
+    | exn ->
+      print_error(
+        "Decoding JSON failed: \"" + line + "\"\n" + exn.getMessage(),
+      );
       skipExit(2)
     }
-  } catch {
-  | exn ->
-    print_error("Reading statement parameters failed: " + exn.getMessage());
+  | None() ->
+    print_error("Reading stdin for statement parameters failed\n");
     skipExit(2)
   }
 }
