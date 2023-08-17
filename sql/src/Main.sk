@@ -634,34 +634,21 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     (context, isReset) ~> {
       user = SKSQL.UserFile::create(context, userName);
       sqlTable = getSqlTableFromDirName(context, dirName);
-      accessSolver = SKSQL.AccessSolver::create(context, user.id, sqlTable);
-      skdbGroupColNbrOpt = sqlTable.cols.maybeGet(SKSQL.skdbGroupColName);
 
-      if (!accessSolver.canReadTable()) {
-        return _ ~> false;
-      };
       oldFilter = filter1(context, isReset);
+
       baseName -> {
-        inputRow = baseName match {
-        | SKSQL.RowKey(row, _) -> row
-        | _ ->
-          print_error("Unexpected table entry type");
-          skipExit(2)
-        };
         oldFilter(baseName) &&
-          skdbGroupColNbrOpt match {
-          | None() ->
-            // There is no skdb_group column, but we have access to the table
-            true
-          | Some(colNbr) ->
-            // There is a skdb_group column, let's check that we have the rights
-            inputRow.getInt(colNbr) match {
-            | None() ->
-              // skdb_group is set to NULL: no access
-              false
-            | Some(groupID) -> accessSolver.canRead(context, groupID)
+          baseName match {
+          | SKSQL.RowKey(row, _) ->
+            SKSQL.checkUserCanReadRow(context, user, sqlTable, row) match {
+            | SKSQL.AROK() -> true
+            | _ -> false
             }
-          }
+          | _ ->
+            print_error("Unexpected table entry type");
+            skipExit(2)
+          };
       }
     }
   };

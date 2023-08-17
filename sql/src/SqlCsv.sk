@@ -294,6 +294,23 @@ fun applyDiffStrategy(
     None()
   };
 
+  isVisibleToUser = (context) ~> {
+    userFileOpt match {
+    | None() -> _ -> true
+    | Some(userFile) ->
+      (file: SKFS.BaseName) -> {
+        file match {
+        | k @ SKSQL.RowKey _ ->
+          SKSQL.checkUserCanReadRow(context, userFile, table, k.row) match {
+          | SKSQL.AROK() -> true
+          | SKSQL.ARError(_err) -> false
+          }
+        | _ -> false
+        }
+      }
+    }
+  };
+
   // we have several update strategies:
 
   // assignRows - if there are no constraints on the table then we
@@ -401,7 +418,7 @@ fun applyDiffStrategy(
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      _context ~> true,
+      isVisibleToUser(context),
       isEligibleForTomb,
     );
 
@@ -488,7 +505,7 @@ fun applyDiffStrategy(
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      _context ~> true,
+      isVisibleToUser(context),
       (tick, source) ~>
         tick.value < snapshot.default(0) || source.path() == writer
       ,
