@@ -1,6 +1,5 @@
 package io.skiplabs.skgw
 
-import java.io.BufferedWriter
 import java.lang.ref.WeakReference
 import java.time.Duration
 import java.time.Instant
@@ -432,12 +431,10 @@ class StderrLogger() : Logger {
 }
 
 class SkdbBackedLogger() : Logger {
-  private var stream: BufferedWriter? = null
+  private var skdb: Skdb? = null
   init {
-    val skdb = openSkdb(SERVICE_MGMT_DB_NAME)!!
-    val proc = skdb.sqlStream(OutputFormat.RAW)
-    stream = proc.outputStream.bufferedWriter()
-    stream?.write(
+    skdb = openSkdb(SERVICE_MGMT_DB_NAME)
+    skdb!!.sql(
         """CREATE TABLE IF NOT EXISTS
              server_events (
                t INTEGER,
@@ -445,17 +442,18 @@ class SkdbBackedLogger() : Logger {
                user STRING,
                event STRING,
                metadata STRING
-             );""")
-    stream?.write("\nCOMMIT;\n")
+             );""",
+        OutputFormat.RAW)
   }
 
   override fun log(db: String, event: String, user: String?, metadata: String?) {
     val t = Instant.now().getEpochSecond()
     val u = if (user == null) "NULL" else "'${user}'"
     val md = if (metadata == null) "NULL" else "'${metadata}'"
-    stream?.write("INSERT INTO server_events VALUES (${t}, '${db}', ${u}, '${event}', ${md});\n")
-    stream?.write("COMMIT;\n")
-    stream?.flush() // TODO: server interaction is currently infrequent. as it rises, remove this.
+    skdb?.sql(
+        "INSERT INTO server_events VALUES (@t, @db, @u, @event, @md);",
+        mapOf("t" to t, "db" to db, "u" to u, "event" to event, "md" to md),
+        OutputFormat.RAW)
   }
 }
 
@@ -578,17 +576,18 @@ class Config() {
       db: String?,
       column: String
   ): String? {
-    val uExpr = if (accessKey == null) "is NULL" else "= '${accessKey}'"
-    val dExpr = if (db == null) "is NULL" else "= '${db}'"
+    val uExpr = if (accessKey == null) "is NULL" else "= @accessKey"
+    val dExpr = if (db == null) "is NULL" else "= @db"
 
     var row =
         skdb.sql(
             """SELECT ${column}
            FROM server_config
-           WHERE key = '${key}'
+           WHERE key = @key
            AND db ${dExpr}
            AND user ${uExpr}
            LIMIT 1;""",
+            mapOf("key" to key, "accessKey" to accessKey, "db" to db),
             OutputFormat.RAW)
 
     var result = row.decodeOrThrow().trim()
@@ -604,6 +603,7 @@ class Config() {
            AND db ${dExpr}
            AND user is NULL
            LIMIT 1;""",
+            mapOf("key" to key, "accessKey" to accessKey, "db" to db),
             OutputFormat.RAW)
 
     result = row.decodeOrThrow().trim()
@@ -619,6 +619,7 @@ class Config() {
            AND db is NULL
            AND user is NULL
            LIMIT 1;""",
+            mapOf("key" to key, "accessKey" to accessKey, "db" to db),
             OutputFormat.RAW)
 
     result = row.decodeOrThrow().trim()
