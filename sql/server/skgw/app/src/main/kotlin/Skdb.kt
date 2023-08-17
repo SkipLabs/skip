@@ -263,7 +263,10 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun privateKeyAsStored(user: String): ByteArray {
     val key =
-        sql("SELECT privateKey FROM skdb_users WHERE username = '${user}';", OutputFormat.RAW)
+        sql(
+                "SELECT privateKey FROM skdb_users WHERE username = @user;",
+                mapOf("user" to user),
+                OutputFormat.RAW)
             .decode()
             .trim()
 
@@ -281,13 +284,17 @@ class Skdb(val name: String, private val dbPath: String) {
     val initScript = Files.readString(Path.of(SKDB_SETUP), Charsets.UTF_8)
     blockingRun(ProcessBuilder(SKDB_PROC, "--init", dbPath))
     blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath), initScript)
-    sql("INSERT INTO skdb_users VALUES (0, 'root', '${encryptedRootPrivateKey}')", OutputFormat.RAW)
+    sql(
+        "INSERT INTO skdb_users VALUES (0, 'root', @key)",
+        mapOf("key" to encryptedRootPrivateKey),
+        OutputFormat.RAW)
     return this
   }
 
   fun createUser(accessKey: String, encryptedPrivateKey: String): ProcessOutput {
     return sql(
-        "INSERT INTO skdb_users VALUES (id(), '${accessKey}', '${encryptedPrivateKey}')",
+        "INSERT INTO skdb_users VALUES (id(), @accessKey, @privateKey)",
+        mapOf("accessKey" to accessKey, "privateKey" to encryptedPrivateKey),
         OutputFormat.RAW)
   }
 }
