@@ -28,7 +28,11 @@ dependencies {
   // ws client
   implementation("org.java-websocket:Java-WebSocket:1.5.3")
 
+  // coroutines
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+
+  // serialisation - used for json
+  implementation("com.squareup.moshi:moshi:1.14.0")
 }
 
 application {
