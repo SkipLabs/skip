@@ -421,21 +421,21 @@ export class SKDB {
         data.lineBuffer = [];
         const endOfLine = 10;
         if (data.current_stdin >= data.stdin.length) {
-          data.exports.SKIP_throw_EndOfFile();
+          return -1;
         }
         while (data.stdin.charCodeAt(data.current_stdin) !== 10) {
           if (data.current_stdin >= data.stdin.length) {
             if (data.lineBuffer.length == 0) {
-              data.exports.SKIP_throw_EndOfFile();
+              return -1;
             } else {
-              return data.lineBuffer;
+              return data.lineBuffer.length;
             }
           }
           data.lineBuffer.push(data.stdin.charCodeAt(data.current_stdin));
           data.current_stdin++;
         }
         data.current_stdin++;
-        return data.lineBuffer;
+        return data.lineBuffer.length;
       },
       SKIP_read_line_get: function (i) {
         return data.lineBuffer[i];
