@@ -413,6 +413,8 @@ base class AccessResultError{userName: String} uses Show {
   | ARECannotInsert{groupID: Int}
   | ARECannotDeleteFromTable{tableName: String}
   | ARECannotInsertIntoTable{tableName: String}
+  | ARECannotRead{groupID: ?Int}
+  | ARECannotReadFromTable{tableName: String}
 
   fun toString(): String
   | ARENullAuthor{userID} ->
@@ -447,10 +449,53 @@ base class AccessResultError{userName: String} uses Show {
       " (user " +
       this.userName +
       ")"
+  | ARECannotRead{groupID} ->
+    "cannot read with skdb_group set to " +
+      groupID +
+      " (user " +
+      this.userName +
+      ")"
   | ARECannotDeleteFromTable{tableName} ->
     "cannot delete from table " + tableName + " (user " + this.userName + ")"
   | ARECannotInsertIntoTable{tableName} ->
     "cannot insert into " + tableName + " (user " + this.userName + ")"
+  | ARECannotReadFromTable{tableName} ->
+    "cannot read from " + tableName + " (user " + this.userName + ")"
+}
+
+fun checkUserCanReadRow(
+  context: readonly SKFS.Context,
+  user: UserFile,
+  table: DirDescr,
+  row: RowValues,
+): AccessResult {
+  access = AccessSolver::create(context, user.id, table);
+  if (!access.canReadTable()) {
+    return ARError(
+      ARECannotReadFromTable{
+        userName => user.name,
+        tableName => table.name.lower,
+      },
+    )
+  };
+  groupIdxOption = table.cols.maybeGet(skdbGroupColName);
+  groupIdxOption match {
+  | None() ->
+    // There is no skdb_group column, but we have access to the table
+    AROK()
+  | Some(colNbr) ->
+    // There is a skdb_group column, let's check that we have the rights
+    row.getInt(colNbr) match {
+    | None() ->
+      // skdb_group is set to NULL: no access
+      ARError(ARECannotRead{userName => user.name, groupID => None()})
+    | Some(groupID) ->
+      access.canRead(context, groupID) match {
+      | true -> AROK()
+      | false -> ARError(ARECannotRead{userName => user.name, groupID => Some(groupID)})
+      }
+    }
+  };
 }
 
 fun checkUserCanWriteRow(
