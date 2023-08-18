@@ -33,6 +33,9 @@ dependencies {
 
   // serialisation - used for json
   implementation("com.squareup.moshi:moshi:1.14.0")
+
+  // log4j2 slf4j binding
+  implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.20.0")
 }
 
 application {
