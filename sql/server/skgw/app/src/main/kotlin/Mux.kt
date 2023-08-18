@@ -570,7 +570,7 @@ class MuxedSocket(
         val muxMsg = decodeMsg(msg)
         when (muxMsg) {
           // TODO: we may eventually allow this as a keep-alive
-          is MuxAuthMsg -> onSocketError(1001u, "auth already received")
+          is MuxAuthMsg -> errorSocket(1001u, "auth already received")
           is MuxGoawayMsg -> onSocketError(muxMsg.errorCode, muxMsg.msg)
           is MuxStreamResetMsg -> {
             val stream = getActiveStream(muxMsg.stream)
