@@ -119,6 +119,11 @@ native fun flush_stdout(): void;
 @cpp_runtime
 native fun print_error(String): void;
 
+@debug
+@no_throw
+@cpp_extern
+native fun print_debug(String): void;
+
 fun print_error_ln<T: readonly Show>(value: T): void {
   print_error(value.toString());
   print_error("\n");
@@ -126,7 +131,7 @@ fun print_error_ln<T: readonly Show>(value: T): void {
 
 class EndOfFile() extends Exception
 
-@cpp_export("SKIP_throw_EndOfFile")
+@export("SKIP_throw_EndOfFile")
 fun throwEndOfFile(): void {
   throw EndOfFile()
 }
@@ -265,6 +270,10 @@ class CompletedProcess(
 ) {
   fun success(): Bool {
     this.exitstatus.success()
+  }
+
+  fun exitcode(): Int {
+    this.exitstatus.exitcode()
   }
 }
 

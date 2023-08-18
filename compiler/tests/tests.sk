@@ -17,15 +17,9 @@ private fun compile_cmd(
   ].concat(files.collect(Array))
 }
 
-private fun genValidTest(
-  basename: String,
-  stdlibSrcs: Array<String>,
-): void {
+private fun genValidTest(basename: String, stdlibSrcs: Array<String>): void {
   p = System.subprocess(
-    compile_cmd(
-      stdlibSrcs.concat(Array[basename + ".sk"]),
-      basename + ".bin",
-    ),
+    compile_cmd(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".bin"),
   );
   if (!p.success()) {
     T.fail(
@@ -45,15 +39,9 @@ private fun genValidTest(
   T.expectEq(actual, expected)
 }
 
-private fun genInvalidTest(
-  basename: String,
-  stdlibSrcs: Array<String>,
-): void {
+private fun genInvalidTest(basename: String, stdlibSrcs: Array<String>): void {
   p = System.subprocess(
-    compile_cmd(
-      stdlibSrcs.concat(Array[basename + ".sk"]),
-      basename + ".bin",
-    ),
+    compile_cmd(stdlibSrcs.concat(Array[basename + ".sk"]), basename + ".bin"),
   );
 
   if (p.success()) {
@@ -84,7 +72,12 @@ fun main(): void {
     (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
     tests
       .getOrAdd(testSuite, () -> mutable Vector[])
-      .push(T.Test{name => testName, func => () ~> genValidTest(basename, stdlibSrcs)});
+      .push(
+        T.Test{
+          name => testName,
+          func => () ~> genValidTest(basename, stdlibSrcs),
+        },
+      );
   };
 
   invalidTests = FileSystem.readFilesRecursive("./tests", fn ->
@@ -96,7 +89,12 @@ fun main(): void {
     (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
     tests
       .getOrAdd(testSuite, () -> mutable Vector[])
-      .push(T.Test{name => testName, func => () ~> genInvalidTest(basename, stdlibSrcs)})
+      .push(
+        T.Test{
+          name => testName,
+          func => () ~> genInvalidTest(basename, stdlibSrcs),
+        },
+      )
   };
 
   SKTest.test_harness(tests)

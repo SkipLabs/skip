@@ -1572,7 +1572,7 @@ const jsRootsValuesDirName: SKStore.DirName = SKStore.DirName::create(
 );
 const jsRootsName: Name = Name::create("jsroots");
 
-@cpp_export("SKIP_init_jsroots")
+@export("SKIP_init_jsroots")
 fun initJSRoots(): void {
   saved = SKStore.newObstack();
   try {
@@ -1650,7 +1650,7 @@ fun initJSRoots(): void {
   SKStore.destroyObstack(saved);
 }
 
-@cpp_export("SKIP_add_root")
+@export("SKIP_add_root")
 fun addRoot(rootName: String, funId: Int32, funArg: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
   saved = SKStore.newObstack();
@@ -1673,7 +1673,7 @@ fun addRoot(rootName: String, funId: Int32, funArg: String): void {
   SKStore.destroyObstack(saved);
 }
 
-@cpp_export("SKIP_remove_root")
+@export("SKIP_remove_root")
 fun removeRoot(rootName: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
   saved = SKStore.newObstack();
@@ -1729,7 +1729,7 @@ fun initTrackedJSCalls(context: mutable SKStore.Context): void {
   );
 }
 
-@cpp_export("SKIP_tracked_call")
+@export("SKIP_tracked_call")
 fun trackedCall(funId: Int32, funArg: String): String {
   if (hasLocalContext() == 0) throw InvalidTrackedCall();
   context = getLocalContext();
@@ -1849,7 +1849,7 @@ fun initTrackedJSQueries(
   );
 }
 
-@cpp_export("SKIP_tracked_query")
+@export("SKIP_tracked_query")
 fun trackedQuery(query: String, start: Int32, end: Int32): String {
   // TODO: Accept params
   params: Map<String, Value> = Map[];

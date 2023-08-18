@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 
+#ifndef RELEASE
 // TODO: Only include in debug mode.
 #include <backtrace.h>
 
@@ -68,6 +69,8 @@ static void error_callback(void* /* data */, const char* msg, int errnum) {
 }
 }  // namespace
 
+#endif // RELEASE
+
 namespace skip {
 struct SkipException : std::exception {
   explicit SkipException(void* exc) : m_skipException(exc) {}
@@ -83,6 +86,8 @@ struct SkipException : std::exception {
   void* m_skipException;
 };
 
+#ifndef RELEASE
+
 void printStackTrace() {
   struct backtrace_state* state =
       backtrace_create_state(nullptr, 0, error_callback, nullptr);
@@ -94,8 +99,11 @@ void printStackTrace() {
   backtrace_data data{false};
   backtrace_full(state, 3, print_callback, error_callback, &data);
 }
-}  // namespace skip
 
+#endif
+}
+
+#ifndef RELEASE
 namespace {
 void terminate() {
   // TODO: Only print backtrace in debug mode.
@@ -113,7 +121,8 @@ void terminate() {
   std::cerr << "*** Stack trace:" << std::endl;
   skip::printStackTrace();
 }
-}  // namespace
+} // namespace
+#endif
 
 extern "C" {
 
@@ -253,7 +262,7 @@ static int argc = 0;
 static char** argv = NULL;
 extern char** environ;
 
-uint32_t SKIP_getArgc() {
+int64_t SKIP_getArgc() {
   return argc;
 }
 
@@ -282,7 +291,6 @@ char* SKIP_getenv(char* skName) {
   if (value == nullptr) {
     return sk_create_none_string_option();
   }
-
   return sk_create_string_option(sk_string_create(value, strlen(value)));
 }
 
@@ -352,6 +360,10 @@ void print_string(char* str) {
 void SKIP_print_error(char* str) {
   print(stderr, str);
   fprintf(stderr, "\n");
+}
+
+void SKIP_print_debug(char* str) {
+  SKIP_print_error(str);
 }
 
 char* sk_string_alloc(size_t);
@@ -495,6 +507,17 @@ char* SKIP_strftime(char* formatp, int64_t timestamp) {
   struct tm tm;
   localtime_r((time_t*)&timestamp, &tm);
   return SKIP_unix_strftime(formatp, (char*)&tm);
+}
+
+char* SKIP_unix_unixepoch(char* timep) {
+  struct tm* tm = (struct tm*)timep;
+  char buffer[50];
+  struct tm timeLocal;
+  time_t rawTime = mktime( tm );
+  localtime_r(&rawTime, &timeLocal);
+  rawTime += timeLocal.tm_gmtoff;
+  sprintf(buffer, "%ld", rawTime);
+  return sk_string_create(buffer, strlen(buffer));
 }
 
 char* SKIP_getcwd() {

@@ -391,6 +391,9 @@ export class SKDB {
       __cxa_throw: function (ptr, type, destructor) {
         throw ptr;
       },
+      SKIP_throw_cruntime: function(code) {
+        throw new Error(code); 
+      },
       SKIP_print_backtrace: function () {
         console.trace("");
       },
@@ -415,6 +418,9 @@ export class SKDB {
         );
       },
       SKIP_print_error: function (str) {
+        console.error(wasmStringToJS(data.exports, str));
+      },
+      SKIP_print_debug: function (str) {
         console.error(wasmStringToJS(data.exports, str));
       },
       SKIP_read_line_fill: function () {
