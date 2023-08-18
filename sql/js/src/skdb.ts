@@ -1330,6 +1330,8 @@ interface Creds {
 export class MuxedSocket {
   // constants
   private socket: WebSocket;
+  private creds: Creds;
+  private reauthTimeoutMs = 5 * 60 * 1000; // 5 mins - half of the 10 min window
 
   // state
   private state: MuxedSocketState = MuxedSocketState.IDLE
@@ -1346,9 +1348,10 @@ export class MuxedSocket {
   onClose?: () => void;
   onError?: (errorCode: number, msg: string) => void;
 
-  private constructor(socket: WebSocket) {
+  private constructor(socket: WebSocket, creds: Creds) {
     // pre-condition: socket is open
     this.socket = socket;
+    this.creds = creds;
   }
 
   openStream(): Stream {
@@ -1448,7 +1451,6 @@ export class MuxedSocket {
   static async connect(
     uri: string, creds: Creds, timeoutMs: number = 60000
   ): Promise<MuxedSocket> {
-    const auth = await MuxedSocket.encodeAuthMsg(creds);
     return new Promise((resolve, reject) => {
       let failed = false;
       const timeout = setTimeout(() => {
@@ -1466,12 +1468,12 @@ export class MuxedSocket {
           socket.close();
           return;
         }
-        const muxSocket = new MuxedSocket(socket)
+        const muxSocket = new MuxedSocket(socket, creds)
         socket.onclose = (event) => muxSocket.onSocketClose(event)
         socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
         socket.onmessage = (event) => muxSocket.onSocketMessage(event)
         resolve(muxSocket)
-        muxSocket.sendAuth(auth)
+        muxSocket.sendAuth()
       };
     });
   }
@@ -1634,15 +1636,18 @@ export class MuxedSocket {
     }
   }
 
-  private sendAuth(msg: ArrayBuffer): void {
+  private async sendAuth(): Promise<void> {
     switch (this.state) {
     case MuxedSocketState.IDLE:
-      this.state = MuxedSocketState.AUTH_SENT;
-      this.socket.send(msg);
-      break;
     case MuxedSocketState.AUTH_SENT:
+      const auth = await MuxedSocket.encodeAuthMsg(this.creds);
+      this.socket.send(auth);
+      this.state = MuxedSocketState.AUTH_SENT;
+      setTimeout(() => {
+        this.sendAuth()
+      }, this.reauthTimeoutMs);
+      break;
     case MuxedSocketState.CLOSING:
-      throw new Error("Tried to auth an established connection");
     case MuxedSocketState.CLOSEWAIT:
     case MuxedSocketState.CLOSED:
       break;
