@@ -337,19 +337,7 @@ class MuxedSocket(
   private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
   private var timeout: ScheduledFuture<*>? = null
   init {
-    if (!isClient) {
-      timeout =
-          taskPool.schedule(
-              {
-                // we use error rather than close to trigger error callback
-                // per stream for cleanup. using close would rely on the
-                // client gracefully responding with a close in order to free
-                // resources
-                this.errorSocket(1003u, "session timeout")
-              },
-              10,
-              TimeUnit.MINUTES)
-    }
+    scheduleSessionTimeout()
   }
 
   // user-facing interface /////////////////////////////////////////////////////
@@ -570,7 +558,6 @@ class MuxedSocket(
         val muxMsg = decodeMsg(msg)
         when (muxMsg) {
           // TODO: we may eventually allow this as a keep-alive
-          is MuxAuthMsg -> onSocketError(1001u, "auth already received")
           is MuxGoawayMsg -> onSocketError(muxMsg.errorCode, muxMsg.msg)
           is MuxStreamResetMsg -> {
             val stream = getActiveStream(muxMsg.stream)
@@ -586,6 +573,19 @@ class MuxedSocket(
               } finally {
                 mutex.writeLock().unlock()
               }
+            }
+          }
+          is MuxAuthMsg -> {
+            if (!verify(muxMsg)) {
+              errorSocket(1002u, "Authentication failed")
+              return
+            }
+            mutex.writeLock().lock()
+            try {
+              authenticatedWith = AuthWith(muxMsg, Instant.now())
+              scheduleSessionTimeout()
+            } finally {
+              mutex.writeLock().unlock()
             }
           }
           is MuxStreamDataMsg -> {
@@ -1040,6 +1040,28 @@ class MuxedSocket(
 
   private fun sendData(data: ByteBuffer) {
     channel.sendData(data)
+  }
+
+  private fun scheduleSessionTimeout() {
+    if (isClient) {
+      return
+    }
+
+    if (timeout != null) {
+      timeout?.cancel(/*interrupt if running=*/ false)
+    }
+
+    timeout =
+        taskPool.schedule(
+            {
+              // we use error rather than close to trigger error callback
+              // per stream for cleanup. using close would rely on the
+              // client gracefully responding with a close in order to free
+              // resources
+              this.errorSocket(1003u, "session timeout")
+            },
+            10,
+            TimeUnit.MINUTES)
   }
 }
 
