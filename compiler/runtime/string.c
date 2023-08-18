@@ -50,7 +50,7 @@ char* SKIP_getBuildVersion() {
 }
 
 char* SKIP_String__fromUtf8(char* class, char* array) {
-  SkipInt size = SKIP_getArraySize(array);
+  uint32_t size = SKIP_getArraySize(array);
   return sk_string_create(array, size);
 }
 
@@ -70,7 +70,7 @@ char* SKIP_String_StringIterator__substring(char* argStart, char* argEnd) {
 unsigned char* SKIP_String__fromChars(const unsigned char* dumb,
                                       unsigned char* src_) {
   uint32_t* src = (uint32_t*)src_;
-  SkipInt size = SKIP_getArraySize((char*)src_);
+  uint32_t size = SKIP_getArraySize((char*)src_);
   SkipInt i;
   size_t result_size = 0;
   for (i = 0; i < size; i++) {

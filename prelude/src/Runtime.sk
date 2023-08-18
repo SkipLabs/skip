@@ -1,4 +1,20 @@
-@cpp_export("SKIP_getArraySize")
-fun getArraySize(arr: Array<Array<Int>>): Int {
-  arr.size()
+
+@export("SKIP_getArraySize")
+fun getArraySize(arr: Array<Array<Int>>): UInt32 {
+  UInt32::truncate(arr.size())
+}
+
+@export("SKIP_createByteArray")
+fun createByteArray(size: UInt32): mutable Array<UInt8> {
+  Array<UInt8>::mfill(size.toInt(), UInt8::truncate(0));
+}
+
+@export("SKIP_createFloatArray")
+fun createFloatArray(size: UInt32): mutable Array<Float> {
+  Array<Float>::mfill(size.toInt(), 0.0);
+}
+
+@export("SKIP_createUInt32Array")
+fun createUInt32Array(size: UInt32): mutable Array<UInt32> {
+  Array<UInt32>::mfill(size.toInt(), UInt32::truncate(0));
 }

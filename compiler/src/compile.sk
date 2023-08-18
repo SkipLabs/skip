@@ -38,6 +38,8 @@ class Config private {
   ptrByteSize: Int,
   ptrBitSize: Int,
   vtableByteSize: Int,
+  links: Array<String>,
+  preambles: Array<String>,
 } {
   static fun make(result: Cli.ParseResults): this {
     disasmAll = result.getBool("disasm-all");
@@ -109,6 +111,27 @@ class Config private {
     ptrBitSize = ptrByteSize * 8;
     vtableByteSize = ptrByteSize;
 
+    basePath = Path.parentname(Path.dirname(Environ.current_exe()));
+    links = Environ.varOpt("SKC_LINK") match {
+    | Some(skcLink) if (!skcLink.trim().isEmpty()) ->
+      skcLink.split(Path.listSeparator).toArray()
+    | _ if (target.startsWith("wasm32")) ->
+      Array[Path.join(basePath, "lib", "libskip_runtime32.bc")]
+    | _ ->
+      // TODO: Link libbacktrace only when building with a debug/dev profile?
+      Array[
+        Path.join(basePath, "lib", "libskip_runtime64.a"),
+        Path.join(basePath, "lib", "libbacktrace.a"),
+        "-lpthread",
+      ]
+    };
+    preambles = Environ.varOpt("SKC_PREAMBLE") match {
+    | Some(skcPreamble) if (!skcPreamble.trim().isEmpty()) ->
+      skcPreamble.split(Path.listSeparator).toArray()
+    | _ if (target.startsWith("wasm32")) ->
+      Array[Path.join(basePath, "lib", "skip_preamble32.ll")]
+    | _ -> Array[Path.join(basePath, "lib", "skip_preamble64.ll")]
+    };
     static{
       exportedFunctions,
       exportedAsFunctions => exportAs.chill(),
@@ -132,7 +155,13 @@ class Config private {
       ptrByteSize,
       ptrBitSize,
       vtableByteSize,
+      links,
+      preambles,
     }
+  }
+
+  fun isWasm(): Bool {
+    this.target.startsWith("wasm32");
   }
 }
 
@@ -174,14 +203,20 @@ fun createOptimizedFunctions(
   env
 }
 
-fun link(llFile: String, config: Config.Config): void {
-  basePath = Path.parentname(Path.dirname(Environ.current_exe()));
-
-  if (config.mainConfig.target.startsWith("wasm32")) {
+fun link(
+  llFile: String,
+  config: Config.Config,
+  exports: Array<String> = Array[],
+): void {
+  if (config.mainConfig.isWasm()) {
     output = config.mainConfig.output;
     bcFile = output + ".bc";
-    runtime = Path.join(basePath, "lib", "libskip_runtime32.bc");
-    runShell(Array["llvm-link", llFile, runtime, "-o", bcFile], config.verbose);
+    runShell(
+      Array["llvm-link", llFile].concat(config.mainConfig.links).concat(
+        Array["-o", bcFile],
+      ),
+      config.verbose,
+    );
     oFile = output + ".o";
     runShell(
       Array[
@@ -196,32 +231,38 @@ fun link(llFile: String, config: Config.Config): void {
       config.verbose,
     );
     // TODO: Proper mechanism to select exports.
-    exportJs = Array[
-      "getCompositeName",
-      "getCompositeSize",
-      "getCompositeAt",
-      "SKIP_String_byteSize",
-      "getLeafValue",
-      "objectKind",
-      "SKIP_call0",
-      "SKIP_Obstack_alloc",
-      "skip_main",
-      "SKIP_init_jsroots",
-      "SKIP_add_root",
-      "SKIP_remove_root",
-      "SKIP_tracked_call",
-      "SKIP_tracked_query",
-      "sk_string_create",
-      "SKIP_initializeSkip",
-      "SKIP_skfs_init",
-      "SKIP_skfs_end_of_init",
-      "SKIP_get_persistent_size",
-      "sk_pop_dirty_page",
-      "SKIP_get_version",
-      "SKIP_throw_EndOfFile",
-      "getVersion",
-      "__heap_base",
-    ].map(x -> `-export=${x}`);
+    exportJs = exports
+      .concat(
+        Array[
+          "getCompositeName",
+          "getCompositeSize",
+          "getCompositeAt",
+          "SKIP_String_byteSize",
+          "getLeafValue",
+          "objectKind",
+          "SKIP_call0",
+          "SKIP_Obstack_alloc",
+          "skip_main",
+          "SKIP_init_jsroots",
+          "SKIP_add_root",
+          "SKIP_remove_root",
+          "SKIP_tracked_call",
+          "SKIP_tracked_query",
+          "sk_string_create",
+          "SKIP_initializeSkip",
+          "SKIP_skfs_init",
+          "SKIP_skfs_end_of_init",
+          "SKIP_get_persistent_size",
+          "sk_pop_dirty_page",
+          "SKIP_get_version",
+          "SKIP_throw_EndOfFile",
+          "SKIP_new_Obstack",
+          "SKIP_destroy_Obstack",
+          "getVersion",
+          "__heap_base",
+        ],
+      )
+      .map(x -> `-export=${x}`);
     runShell(
       Array[
         "wasm-ld",
@@ -235,10 +276,6 @@ fun link(llFile: String, config: Config.Config): void {
       config.verbose,
     );
   } else {
-    // TODO: Make the runtime a normal dependency.
-    runtime = Path.join(basePath, "lib", "libskip_runtime64.a");
-    // TODO: Link libbacktrace only when building with a debug/dev profile?
-    libbacktrace = Path.join(basePath, "lib", "libbacktrace.a");
     runShell(
       Array[
         "clang++",
@@ -249,16 +286,16 @@ fun link(llFile: String, config: Config.Config): void {
         llFile,
         "-o",
         config.mainConfig.output,
-        runtime,
-        libbacktrace,
-        "-lpthread",
-      ],
+      ].concat(config.mainConfig.links),
       config.verbose,
     );
   }
 }
 
 fun runShell(args: Array<String>, verbose: Bool = false): void {
+  if (verbose) {
+    print_error(">> " + args.join(" "))
+  };
   p = System.subprocess(
     args,
     s -> {
@@ -353,6 +390,7 @@ fun compile(
               funDef.annotations,
               funDef.getPos(),
               conf.mainConfig.exportedAsFunctions,
+              conf.mainConfig.isWasm(),
             )
         );
 
@@ -421,8 +459,25 @@ fun compile(
           runCompilerPhase("native/write_asm_files", () -> {
             AsmOutput.writeOutputFiles(defs, fileNames, llFile, conf)
           });
+
+          wasm_exports = outerIst
+            .getFuns(context, defsProj)
+            .filter(f ->
+              annotationsContainParam(
+                f.annotations,
+                "@wasm_export",
+                f.getPos(),
+              ).isSome() ||
+                annotationsContainParam(
+                  f.annotations,
+                  "@export",
+                  f.getPos(),
+                ).isSome()
+            )
+            .map(exportName);
+
           runCompilerPhase("native/link", () -> {
-            link(llFile, conf)
+            link(llFile, conf, wasm_exports)
           })
         | _ ->
           invariant_violation(
@@ -441,4 +496,17 @@ fun compile(
       );
   };
   context.update()
+}
+
+fun exportName(f: OuterIst.FunDef): String {
+  pos = f.getPos();
+  annotationsContainParam(f.annotations, "@wasm_export", pos) match {
+  | Some(s) if (!s.isEmpty()) -> return s
+  | _ -> void
+  };
+  annotationsContainParam(f.annotations, "@export", pos) match {
+  | Some(s) if (!s.isEmpty()) -> return s
+  | _ -> void
+  };
+  "SKIP_" + AsmOutput.mangle(f.origName)
 }

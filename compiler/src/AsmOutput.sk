@@ -987,15 +987,6 @@ fun writeOutputFiles(
     )
   );
 
-  // TODO: Have the correct preamble loaded in the `Target` class.
-  basePath = Path.parentname(Path.dirname(Environ.current_exe()));
-  preambleFile = if (config.mainConfig.target.startsWith("wasm32")) {
-    Path.join(basePath, "lib", "skip_preamble32.ll")
-  } else {
-    Path.join(basePath, "lib", "skip_preamble64.ll")
-  };
-  preamble = FileSystem.readTextFile(preambleFile);
-
   emitted = Array::mfill(defs.size(), false);
 
   stack = mutable Vector[];
@@ -1009,7 +1000,7 @@ fun writeOutputFiles(
   };
 
   sstr = mutable TextOutputStream.StringTextOutputStream{};
-  sstr.write(preamble);
+  config.mainConfig.preambles.each(p -> sstr.write(FileSystem.readTextFile(p)));
 
   // arbitrarily pick some unique input file as the CU for this output file.
   metadata = AsmOutput.Metadata::create(defs, inputFiles[0]);
@@ -3910,6 +3901,7 @@ fun llvmWriteFunctionDefinition(
       f.annotations,
       pos,
       common.config.mainConfig.exportedAsFunctions,
+      common.config.mainConfig.isWasm(),
     );
 
   disasm = (
@@ -3978,6 +3970,7 @@ fun llvmWriteFunctionDefinition(
       f.annotations,
       pos,
       common.config.mainConfig.exportedAsFunctions,
+      common.config.mainConfig.isWasm(),
     )
   ) {
     asm.print(" unnamed_addr")
@@ -4072,6 +4065,7 @@ fun llvmWriteFunction(f: Function, common: mutable AsmOutput): void {
   symbol = cppExternalName(
     f,
     common.config.mainConfig.exportedAsFunctions,
+    common.config.mainConfig.isWasm(),
   ) match {
   | Some(extName) -> extName
   | None() ->
@@ -4119,10 +4113,20 @@ private fun writeBlacklist(
 fun cppExternalName(
   f: Function,
   exportedAsFunctions: UnorderedMap<String, String>,
+  isWasm: Bool,
 ): ?String {
   pos = f.pos;
 
-  annotationsContainParam(f.annotations, "@cpp_export", pos) match {
+  annotationsContainParam(
+    f.annotations,
+    if (isWasm) "@wasm_export" else "@cpp_export",
+    pos,
+  ) match {
+  | r @ Some(s) if (!s.isEmpty()) -> return r
+  | _ -> void
+  };
+
+  annotationsContainParam(f.annotations, "@export", pos) match {
   | r @ Some(s) if (!s.isEmpty()) -> return r
   | _ -> void
   };
@@ -4149,8 +4153,11 @@ fun cppIsExported(
   annotations: SSet,
   pos: Pos,
   exportedAsFunctions: UnorderedMap<String, String>,
+  isWasm: Bool,
 ): Bool {
-  annotationsContainParam(annotations, "@cpp_export", pos).isSome() ||
+  annName = if (isWasm) "@wasm_export" else "@cpp_export";
+  annotationsContainParam(annotations, annName, pos).isSome() ||
+    annotationsContainParam(annotations, "@export", pos).isSome() ||
     exportedAsFunctions.containsKey(funName)
 }
 

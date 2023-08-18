@@ -12,14 +12,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef PAGE_SIZE
 #define PAGE_SIZE (1024 * 1024 * 8)
+#endif
+
 #define STACK_INIT_CAPACITY (1024)
 
 typedef uint64_t SkipInt;
 
 #ifdef SKIP32
 #define WORDSIZE 4
+#ifndef WASM_HEAP_SIZE
 #define WASM_HEAP_SIZE 1073741824
+#endif
 
 #define PERSISTENT_PAGE_BIT_SIZE 20
 #define PERSISTENT_PAGE_SIZE (1 << PERSISTENT_PAGE_BIT_SIZE)
@@ -181,7 +186,7 @@ char* SKIP_Obstack_alloc(size_t size);
 uint32_t SKIP_String_byteSize(char* str);
 char* SKIP_context_get();
 void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages);
-SkipInt SKIP_getArraySize(char*);
+uint32_t SKIP_getArraySize(char*);
 char* SKIP_get_free_slot(uint32_t);
 void* SKIP_intern(void* obj);
 void* SKIP_intern_shared(void* obj);
