@@ -299,12 +299,7 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     parents: FixedSingle<
       DirName,
       (
-        (
-          mutable Context,
-          mutable Writer,
-          Key,
-          mutable Iterator<T2>,
-        ) ~> void,
+        (mutable Context, mutable Writer, Key, mutable Iterator<T2>) ~> void,
         ?Array<KeyRange>,
       ),
     >,
@@ -391,38 +386,6 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
       };
       result = f(context, files[0]);
       writer.write(key, result);
-    })
-  }
-
-  fun contextWriterMap<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, T) ~> void,
-  ): EHandle<T2> {
-    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
-      if (files.size() >= 2) {
-        msg = "Duplicate keys: " + key;
-        print_error(msg);
-        invariant_violation(msg);
-      };
-      f(context, writer, files[0]);
-    })
-  }
-
-  fun contextWriterKeyMap<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, Key, T) ~> void,
-  ): EHandle<T2> {
-    this.genericMap(conv, context, dirName, (context, writer, key, files) ~> {
-      if (files.size() >= 2) {
-        msg = "Duplicate keys: " + key;
-        print_error(msg);
-        invariant_violation(msg);
-      };
-      f(context, writer, key, files[0]);
     })
   }
 
