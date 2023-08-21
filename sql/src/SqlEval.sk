@@ -290,7 +290,11 @@ class Evaluator{options: Options, user: ?UserFile} {
     params: Map<String, Value>,
     stmt: Stmt,
     inTransaction: Bool,
-  ): ?((mutable SKStore.Context, mutable SKStore.Context, SKStore.Context) ~> void) {
+  ): ?((
+    mutable SKStore.Context,
+    mutable SKStore.Context,
+    SKStore.Context,
+  ) ~> void) {
     stmt match {
     | Table{pos, name, schema, ifNotExists} ->
       if (inTransaction) {
@@ -591,9 +595,14 @@ class Evaluator{options: Options, user: ?UserFile} {
       (context, writer, key, rowIter) ~> {
         entries = mutable Vector[];
         dir = context.unsafeGetEagerDir(inputDir.dirName);
-        writerPath = SKStore.Path(selectDir.dirName, SKStore.IID(SKStore.genSym(0)));
+        writerPath = SKStore.Path(
+          selectDir.dirName,
+          SKStore.IID(SKStore.genSym(0)),
+        );
         for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          entries.push((key, (source.path(), writerPath, Array<SKStore.File>[])));
+          entries.push(
+            (key, (source.path(), writerPath, Array<SKStore.File>[])),
+          );
         };
         dir.writeArraySourceMany(context, entries.iterator());
         if (select.sets.isEmpty()) return void;
@@ -654,7 +663,11 @@ class Evaluator{options: Options, user: ?UserFile} {
     table: DirDescr,
     paramsOpt: ?Array<Name>,
     values: Array<Array<Value>>,
-  ): ?((mutable SKStore.Context, mutable SKStore.Context, SKStore.Context) ~> void) {
+  ): ?((
+    mutable SKStore.Context,
+    mutable SKStore.Context,
+    SKStore.Context,
+  ) ~> void) {
     rows = computeInsert(
       context,
       params,
@@ -1026,7 +1039,11 @@ fun evalWithContext(
   params: Map<String, Value>,
   stmt: Stmt,
   inTransaction: Bool,
-): ?((mutable SKStore.Context, mutable SKStore.Context, SKStore.Context) ~> void) {
+): ?((
+  mutable SKStore.Context,
+  mutable SKStore.Context,
+  SKStore.Context,
+) ~> void) {
   user = context.getGlobal("USER").map(UserFile::fromFile);
   evaluator = Evaluator{options, user};
   evaluator.stmt(context, params, stmt, inTransaction);
@@ -1237,7 +1254,10 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
   })
 }
 
-fun runSql(options: Options, f: mutable SKStore.Context ~> SKStore.ContextOp): void {
+fun runSql(
+  options: Options,
+  f: mutable SKStore.Context ~> SKStore.ContextOp,
+): void {
   SKStore.runWithGc(
     SKDB.makeSqlContext().clone(),
     f,
@@ -1295,7 +1315,10 @@ fun makeInputDirName(dirName: SKStore.DirName): (SKStore.DirName, Int) {
       nbr.push(c);
     };
     !dirNameStr = "/" + dirNameStr.sub(dirNameStr.getIter(), i) + "/";
-    (SKStore.DirName::create(dirNameStr), String::fromChars(nbr.toArray()).toInt())
+    (
+      SKStore.DirName::create(dirNameStr),
+      String::fromChars(nbr.toArray()).toInt(),
+    )
   } else {
     (dirName, 0)
   }
@@ -1544,7 +1567,9 @@ class JSCall(funId: Int32, funArg: String) extends SKStore.File
 const jsRootsInputDirName: SKStore.DirName = SKStore.DirName::create(
   "/jsRootsInput/",
 );
-const jsRootsValuesDirName: SKStore.DirName = SKStore.DirName::create("/jsroots/");
+const jsRootsValuesDirName: SKStore.DirName = SKStore.DirName::create(
+  "/jsroots/",
+);
 const jsRootsName: Name = Name::create("jsroots");
 
 @cpp_export("SKIP_init_jsroots")
@@ -1595,7 +1620,7 @@ fun initJSRoots(): void {
       kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
       _ = context
         .mkdir(JSCall::fromFile, jsRootsInputDirName, Array[])
-        .contextWriterKeyValues(
+        .contextWriterKeyIter(
           SKStore.StringFile::fromFile,
           context,
           jsRootsValuesDirName,
@@ -1605,8 +1630,7 @@ fun initJSRoots(): void {
               | SKStore.SID(x) -> x
               | _ -> invariant_violation("Unexpected key type")
               };
-              invariant(values.size() == 1);
-              value = values[0];
+              value = values.first;
               result = callExternalFun(value.funId, value.funArg);
               row = RowValues::create(
                 Array[Some(CString(name)), Some(CString(result))],
@@ -1791,12 +1815,12 @@ fun initTrackedJSQueries(
         selectProj = SKStore.EHandle(
           RowValues::fromFile,
           selectDirName,
-        ).contextWriterKeyValues(
+        ).contextWriterKeyIter(
           RowValues::fromFile,
           context,
           selectProjDirName,
           (_context, writer, _key, values) ~> {
-            writer.writeArray(SKStore.IID(0), values)
+            writer.writeArray(SKStore.IID(0), values.collect(Array))
           },
         );
         proj = selectProj.getIter(context, SKStore.IID(0));

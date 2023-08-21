@@ -282,12 +282,12 @@ fun getSubsDirs(
     return (input, output)
   };
   input = context.mkdir(SubRequestFile::fromFile, subsInput, Array[]);
-  output = input.contextWriterKeyValues(
+  output = input.contextWriterKeyIter(
     SKStore.IntFile::fromFile,
     context,
     subsOutput,
     (context, writer, key, values) ~> {
-      request = SubRequestFile::fromFile(values[0]);
+      request = SubRequestFile::fromFile(values.first);
       viewName = request.viewName;
       cmd = request.cmd;
       init = request.init;
@@ -420,12 +420,12 @@ fun getIndexOutputDir(
 ): SKStore.EHandle<IndexDescr> {
   input = getIndexInputDir(context);
   makeDir(IndexDescr::fromFile, context, indexOutput, () -> {
-    input.contextWriterKeyValues(
+    input.contextWriterKeyIter(
       IndexDescr::fromFile,
       context,
       indexOutput,
       (context, writer, key, values) ~> {
-        index = values[0];
+        index = values.first;
         writer.write(
           key,
           createUserIndex(
@@ -452,12 +452,12 @@ fun getIndexByColNbr(
 ): SKStore.EHandle<IndexDescr> {
   indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
-    indexes.contextWriterKeyValues(
+    indexes.contextWriterKeyIter(
       IndexDescr::fromFile,
       context,
       indexByCol,
       (_context, writer, _key, values) ~> {
-        indexDescr = values[0];
+        indexDescr = values.first;
         for (field in indexDescr.fields) {
           fieldNbr = field.i0;
           indexEntry = makeIndexEntry(indexDescr.tableName, fieldNbr);
@@ -473,12 +473,12 @@ fun getIndexByName(
 ): SKStore.EHandle<IndexDescr> {
   indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
-    indexes.contextWriterKeyValues(
+    indexes.contextWriterKeyIter(
       IndexDescr::fromFile,
       context,
       indexByCol,
       (_context, writer, _key, values) ~> {
-        indexDescr = values[0];
+        indexDescr = values.first;
         writer.write(SKStore.SID(indexDescr.tableName.lower), indexDescr)
       },
     )
@@ -596,12 +596,12 @@ fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
   context = SKStore.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
-  _ = handle.contextWriterKeyValues(
+  _ = handle.contextWriterKeyIter(
     handle.conv,
     context,
     sinkName,
     (context, _writer, _key, values) ~> {
-      dirDescr = values[0];
+      dirDescr = values.first;
       if (!dirDescr.isInput) return void;
       printDirDescr(dirDescr, suffix);
       for (indexDescr in getIndexByName(context).getArray(
@@ -621,12 +621,12 @@ fun dumpInserts(origContext: readonly SKStore.Context): void {
   context = SKStore.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
-  _ = handle.contextWriterKeyValues(
+  _ = handle.contextWriterKeyIter(
     handle.conv,
     context,
     sinkName,
     (context, _writer, _key, values) ~> {
-      dirDescr = values[0];
+      dirDescr = values.first;
       if (!dirDescr.isInput) return void;
       o = print_raw;
       fileIter = context
@@ -675,7 +675,7 @@ fun dumpViews(origContext: readonly SKStore.Context): void {
   handle = getViewsDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   sortedName = SKStore.DirName::create("/sorted_" + SKStore.genSym(0) + "/");
-  sorted = handle.contextWriterKeyValues(
+  sorted = handle.contextWriterKeyIter(
     handle.conv,
     context,
     sortedName,

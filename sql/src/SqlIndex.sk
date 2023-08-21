@@ -51,25 +51,27 @@ fun createIndex(
   handle = (SKStore.EHandle(RowValues::fromFile, dirName));
 
   index = if (!needsReordering) handle else {
-    handle.contextWriterKeyValues(
+    handle.contextWriterKeyIter(
       RowValues::fromFile,
       context,
       SKStore.DirName::create(indexName.lower),
       (_ctx, writer, _key, rows) ~> {
-        if (rows.size() == 0) return void;
-        row = rows[0];
+        row = rows.first;
         values = mutable Vector[];
         for (kind in kinds) {
           values.push(row.getValue(kind.i0));
         };
         rvalues = RowValues::create(values.toArray());
-        writer.writeArray(RowKey::create(rvalues, idxKinds), rows);
+        writer.writeArray(
+          RowKey::create(rvalues, idxKinds),
+          rows.collect(Array),
+        );
       },
     )
   };
   if (unique) {
     _ = index
-      .contextWriterKeyValues(
+      .contextWriterKeyIter(
         RowValues::fromFile,
         context,
         SKStore.DirName::create(indexName.lower + "unique/proj/"),
@@ -90,12 +92,11 @@ fun createIndex(
           }
         },
       )
-      .contextWriterKeyValues(
+      .contextWriterKeyIter(
         SKStore.StringFile::fromFile,
         context,
         SKStore.DirName::create(indexName.lower + "unique/sink/"),
         (_, _, key, values) ~> {
-          if (values.size() == 0) return void;
           repeat = 0;
           for (r in values) {
             !repeat = repeat + r.repeat;
