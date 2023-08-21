@@ -129,7 +129,7 @@ fun noop(
   key: SKStore.Key,
   valueIter: mutable Iterator<SKStore.File>,
 ): void {
-  writer.writeArray(key, valueIter.collect(Array))
+  writer.setArray(key, valueIter.collect(Array))
 }
 
 /*****************************************************************************/
@@ -311,7 +311,7 @@ class SelectEvaluator{
           (_context, writer, _key, valueIter) ~> {
             values = valueIter.collect(Array);
             if (values.isEmpty()) return void;
-            writer.writeArray(
+            writer.setArray(
               RowKey(RowValues::fromFile(values[0]), kinds),
               values,
             );
@@ -397,7 +397,7 @@ class SelectEvaluator{
         shardedFile = LeftShardedFile{leftShardID, rightShard, value => row};
         for (i in Range(0, rightShard)) {
           projKey = ProjKey(key, leftShardID, i);
-          writer.write(projKey, LeftFile(fileKey, shardedFile.value))
+          writer.set(projKey, LeftFile(fileKey, shardedFile.value))
         }
       };
 
@@ -413,7 +413,7 @@ class SelectEvaluator{
         shardedFile = RightShardedFile{leftShard, rightShardID, value => row};
         for (i in Range(0, leftShard)) {
           projKey = ProjKey(key, i, rightShardID);
-          writer.write(projKey, RightFile(fileKey, shardedFile.value))
+          writer.set(projKey, RightFile(fileKey, shardedFile.value))
         }
       };
 
@@ -520,7 +520,7 @@ class SelectEvaluator{
           this.select.having match {
           | None() ->
             row = static::evalRow(context, evaluator, this.select.params, 1);
-            writer.write(key, row)
+            writer.set(key, row)
           | Some(cond) ->
             evaluator.evalCIExpr(context, cond) match {
             | ADef(0)
@@ -530,7 +530,7 @@ class SelectEvaluator{
               invariant_violation("Having should never be undefined")
             | ADef(_) ->
               row = static::evalRow(context, evaluator, this.select.params, 1);
-              writer.write(key, row)
+              writer.set(key, row)
             }
           }
         },
@@ -582,7 +582,7 @@ class SelectEvaluator{
                   (context, writer, key, values) ~> {
                     dataDir = context.unsafeGetEagerDir(dataName);
                     if (dataDir.isEmpty(context)) {
-                      writer.writeArray(key, values.collect(Array))
+                      writer.setArray(key, values.collect(Array))
                     }
                   },
                   None(),
@@ -592,7 +592,7 @@ class SelectEvaluator{
                 dataName,
                 (
                   (_context, writer, key, values) ~> {
-                    writer.writeArray(key, values.collect(Array))
+                    writer.setArray(key, values.collect(Array))
                   },
                   None(),
                 ),
@@ -873,7 +873,7 @@ class SelectEvaluator{
 
     for (rkey => rvaluesIter in mwriter.writes) {
       rvalues = rvaluesIter.toArray();
-      writer.writeArray(rkey, rvalues);
+      writer.setArray(rkey, rvalues);
     }
   }
 
@@ -1366,7 +1366,7 @@ fun makeJoinReducer(
           left.values.concat(right);
         };
         row = RowValues::create(values, left.repeat);
-        writer.write(RowKey(row, kinds), row);
+        writer.set(RowKey(row, kinds), row);
       };
       for (rkv in rightRows) {
         (_, right) = rkv;
@@ -1374,7 +1374,7 @@ fun makeJoinReducer(
           left.values.concat(right.values)
         };
         row = RowValues::create(values, left.repeat * right.repeat);
-        writer.write(RowKey(row, kinds), row);
+        writer.set(RowKey(row, kinds), row);
       }
     };
     if (
@@ -1387,7 +1387,7 @@ fun makeJoinReducer(
         left = Array::fill(kinds.size() - right.size(), None<CValue>());
         values = left.concat(right.values);
         row = RowValues::create(values, right.repeat);
-        writer.write(RowKey(row, kinds), row);
+        writer.set(RowKey(row, kinds), row);
       }
     }
   }

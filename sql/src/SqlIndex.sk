@@ -62,10 +62,7 @@ fun createIndex(
           values.push(row.getValue(kind.i0));
         };
         rvalues = RowValues::create(values.toArray());
-        writer.writeArray(
-          RowKey::create(rvalues, idxKinds),
-          rows.collect(Array),
-        );
+        writer.setArray(RowKey::create(rvalues, idxKinds), rows.collect(Array));
       },
     )
   };
@@ -88,7 +85,7 @@ fun createIndex(
             result[k].push(v);
           };
           for (k => v in result) {
-            writer.writeArray(k, v.toArray());
+            writer.setArray(k, v.toArray());
           }
         },
       )
