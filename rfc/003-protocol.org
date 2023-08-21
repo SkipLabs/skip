@@ -368,22 +368,56 @@ The serialisation is:
 
 * SKDB data transfer protocol
 
+There are plans to re-design this protocol and use a binary
+serialisation for efficient processing; this section is intentionally
+brief.
+
+----
+
 Today this is a text-based protocol using a combination of
 tab-separated and comma-separated data fields. There is encoding for a
-reset control signal and a check-pointing mechanism.
+reset control signal and a check-pointing mechanism - including acks
+from write-csv.
 
 The checkpoint line also acts as a control signal to the orchestration
 layer defining when a data batch ends. This allows setting the fin
 flag in the orchestration protocol data message and knowing when to
 flush.
 
-Result sets do not have a end of data marker as the process
+Result sets do not have an end of data marker as the process
 terminates, the file closes, and we close the stream to signal this.
 
+** Cold start request
 
-There are plans to re-design this protocol and use a binary
-serialisation for efficient processing; this section is intentionally
-brief.
+There are several uncommon and infrequent scenarios that our protocol
+is not yet rich enough to handle. e.g. schema changes, privacy change
+data races.
+
+While we work to address these gaps, we have a stop-gap measure where
+the server may request the client cold start. This is used sparingly
+to inform the client that if it continues it may permanently diverge
+causing potential data loss where it is unable to replicate. The
+client is expected to rebuild its state from scratch on receipt of
+this message.
+
+We allow skdb to communicate this through the SKDB data transfer
+protocol. The orchestration layer listens for this request and acts
+appropriately:
+
+- The server ignores and drops the request if it originates from a
+  client, otherwise it passes it downstream.
+
+- The client does not pass this data on to skdb, but instead signals
+  the cold start request to the application through its API.
+
+The request piggybacks on the checkpoint mechanism. A line of the
+form: ~:reboot\n~ signals the request and should be flushed
+immediately, like any other checkpoint line.
+
+The JS client will throw an SKDBRebootException. Applications are
+expected to catch this and reload entirely or at least re-create their
+SKDB client. Reloading entirely is likely preferable as this may
+signal a schema change which the app should update to accommodate.
 
 * Errors
 
