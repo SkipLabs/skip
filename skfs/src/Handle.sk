@@ -38,18 +38,20 @@ module SKStore;
 /* Iterator capable of answering if it produces at least one element. */
 /*****************************************************************************/
 
-mutable base class IteratorWithIsEmpty<+T> extends Iterator<T> {
-  static fun create(iter: mutable Iterator<T>): mutable IteratorWithIsEmpty<T> {
+mutable base class FileIterator<+T> extends Iterator<T> {
+  static fun create(iter: mutable Iterator<T>): mutable FileIterator<T> {
     iter.next() match {
     | None() -> mutable EmptyIterator()
-    | Some(v) -> mutable NonEmptyIterator(Some(v), iter)
+    | Some(v) -> mutable NonEmptyIterator(v, iter)
     }
   }
 
   readonly fun isEmpty(): Bool;
+  readonly fun first(): T;
+  readonly fun maybeFirst(): ?T;
 }
 
-mutable class EmptyIterator<T>() extends IteratorWithIsEmpty<T> {
+mutable class EmptyIterator<T>() extends FileIterator<T> {
   mutable fun next(): ?T {
     None()
   }
@@ -57,22 +59,36 @@ mutable class EmptyIterator<T>() extends IteratorWithIsEmpty<T> {
   readonly fun isEmpty(): Bool {
     true
   }
+
+  readonly fun first(): T {
+    invariant_violation(
+      "Trying to access the first element of an empty iterator",
+    )
+  }
+
+  readonly fun maybeFirst(): ?T {
+    None()
+  }
 }
 
 mutable class NonEmptyIterator<T>(
-  mutable first: ?T,
+  mutable firstValue: T,
   iter: mutable Iterator<T>,
-) extends IteratorWithIsEmpty<T> {
+  mutable isPassedFirstValue: Bool = false,
+) extends FileIterator<T> {
   mutable fun next(): ?T {
-    this.first match {
-    | None() -> this.iter.next()
-    | x @ Some _ ->
-      this.!first = None();
-      x
-    }
+    if (this.isPassedFirstValue) return this.iter.next();
+    this.!isPassedFirstValue = true;
+    Some(this.firstValue)
   }
   readonly fun isEmpty(): Bool {
     false
+  }
+  readonly fun first(): T {
+    this.firstValue
+  }
+  readonly fun maybeFirst(): ?T {
+    Some(this.firstValue)
   }
 }
 
@@ -253,7 +269,7 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
       (parentName, parentData) = parent;
       (convInput, mapFun, rangeOpt) = parentData;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
-        iter = IteratorWithIsEmpty::create(fileIter);
+        iter = FileIterator::create(fileIter);
         if (iter.isEmpty()) return void;
         mapFun(context, writer, key, iter.map(convInput));
       };
