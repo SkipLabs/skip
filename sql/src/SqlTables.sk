@@ -355,7 +355,7 @@ fun getSubsDirs(
           getWatermark(context, request.viewName, request.ignoreSource)
         ,
       );
-      writer.write(key, SKStore.IntFile(sessionID))
+      writer.set(key, SKStore.IntFile(sessionID))
     },
   );
   (input, output)
@@ -426,7 +426,7 @@ fun getIndexOutputDir(
       indexOutput,
       (context, writer, key, values) ~> {
         index = values.first;
-        writer.write(
+        writer.set(
           key,
           createUserIndex(
             context,
@@ -461,7 +461,7 @@ fun getIndexByColNbr(
         for (field in indexDescr.fields) {
           fieldNbr = field.i0;
           indexEntry = makeIndexEntry(indexDescr.tableName, fieldNbr);
-          writer.write(indexEntry, indexDescr)
+          writer.set(indexEntry, indexDescr)
         }
       },
     )
@@ -479,7 +479,7 @@ fun getIndexByName(
       indexByCol,
       (_context, writer, _key, values) ~> {
         indexDescr = values.first;
-        writer.write(SKStore.SID(indexDescr.tableName.lower), indexDescr)
+        writer.set(SKStore.SID(indexDescr.tableName.lower), indexDescr)
       },
     )
   })
@@ -681,7 +681,7 @@ fun dumpViews(origContext: readonly SKStore.Context): void {
     sortedName,
     (_context, writer, _key, values) ~> {
       for (selectFile in values) {
-        writer.write(SKStore.IID(selectFile.tick), selectFile)
+        writer.set(SKStore.IID(selectFile.tick), selectFile)
       }
     },
   );
