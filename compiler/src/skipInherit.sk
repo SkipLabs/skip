@@ -1654,7 +1654,9 @@ fun merge_ordered_params(
   buildAdded = (remaining, param) -> {
     remaining.maybeGet(param.name) match {
     | None() -> remaining
-    | Some(_) ->
+    | _ ->
+      // With use of Some(_) force to have instance of use type
+      // Using _ prevent some unreachable with explanation errors
       newParams.push(param with {index});
       !index = index + 1;
       remaining.remove(param.name.i1)
