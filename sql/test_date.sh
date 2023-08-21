@@ -1,7 +1,7 @@
 #!/bin/bash
 
 run_test () {
-  cat $1 | ./target/skdb --always-allow-joins | sort > /tmp/kk1
+  cat $1 | ./target/release/skdb --always-allow-joins | sort > /tmp/kk1
   cat $1 | sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2 > /dev/null
   if [ $? -eq 0 ]; then

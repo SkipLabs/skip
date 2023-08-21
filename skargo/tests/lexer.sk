@@ -1,0 +1,246 @@
+module alias T = SKTest;
+
+module SkargoTests;
+
+@test
+fun caretRangeConstraint_1_2_3(): void {
+  lexer = Skargo.VersionLexer::create("1.2.3");
+  // 1.2.3  :=  >=1.2.3, <2.0.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 2, 3),
+    Some(Skargo.Version(2, 0, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun caretRangeConstraint_1_2(): void {
+  lexer = Skargo.VersionLexer::create("1.2");
+  // 1.2    :=  >=1.2.0, <2.0.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 2, 0),
+    Some(Skargo.Version(2, 0, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun caretRangeConstraint_1(): void {
+  lexer = Skargo.VersionLexer::create("1");
+  // 1      :=  >=1.0.0, <2.0.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 0, 0),
+    Some(Skargo.Version(2, 0, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun caretRangeConstraint_0_2_3(): void {
+  lexer = Skargo.VersionLexer::create("0.2.3");
+  // 0.2.3  :=  >=0.2.3, <0.3.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(0, 2, 3),
+    Some(Skargo.Version(0, 3, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun caretRangeConstraint_0_2(): void {
+  lexer = Skargo.VersionLexer::create("0.2");
+  // 0.2    :=  >=0.2.0, <0.3.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(0, 2, 0),
+    Some(Skargo.Version(0, 3, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun caretRangeConstraint_0_0_3(): void {
+  lexer = Skargo.VersionLexer::create("0.0.3");
+  // 0.0.3  :=  >=0.0.3, <0.0.4
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(0, 0, 3),
+    Some(Skargo.Version(0, 0, 4)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun caretRangeConstraint_0_0(): void {
+  lexer = Skargo.VersionLexer::create("0.0");
+  // 0.0    :=  >=0.0.0, <0.1.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(0, 0, 0),
+    Some(Skargo.Version(0, 1, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun caretRangeConstraint_0(): void {
+  lexer = Skargo.VersionLexer::create("0");
+  // 0      :=  >=0.0.0, <1.0.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(0, 0, 0),
+    Some(Skargo.Version(1, 0, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun tildeRangeConstraint_1_2_3(): void {
+  lexer = Skargo.VersionLexer::create("~1.2.3");
+  // ~1.2.3  := >=1.2.3, <1.3.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 2, 3),
+    Some(Skargo.Version(1, 3, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun tildeRangeConstraint_1_2(): void {
+  lexer = Skargo.VersionLexer::create("~1.2");
+  // ~1.2    := >=1.2.0, <1.3.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 2, 0),
+    Some(Skargo.Version(1, 3, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun tildeRangeConstraint_1(): void {
+  lexer = Skargo.VersionLexer::create("~1");
+  // ~1      := >=1.0.0, <2.0.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 0, 0),
+    Some(Skargo.Version(2, 0, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun wildcardRangeConstraint_x(): void {
+  lexer = Skargo.VersionLexer::create("*");
+  // *     := >=0.0.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(Skargo.Version(0, 0, 0), None());
+  T.expectEq(got, expected)
+}
+
+@test
+fun wildcardRangeConstraint_1_x(): void {
+  lexer = Skargo.VersionLexer::create("1.*");
+  // 1.*   := >=1.0.0, <2.0.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 0, 0),
+    Some(Skargo.Version(2, 0, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun wildcardRangeConstraint_1_2_x(): void {
+  lexer = Skargo.VersionLexer::create("1.2.*");
+  // 1.2.* := >=1.2.0, <1.3.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 2, 0),
+    Some(Skargo.Version(1, 3, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun greaterRangeConstraint_1_2_0(): void {
+  lexer = Skargo.VersionLexer::create(">= 1.2.0");
+  // >= 1.2.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(Skargo.Version(1, 2, 0), None());
+  T.expectEq(got, expected)
+}
+
+@test
+fun strictlyGreaterRangeConstraint_1_2_0(): void {
+  lexer = Skargo.VersionLexer::create("> 1.2.0");
+  // > 1.2.0
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(Skargo.Version(1, 2, 1), None());
+  T.expectEq(got, expected)
+}
+
+@test
+fun lowerRangeConstraint_2(): void {
+  lexer = Skargo.VersionLexer::create("< 2");
+  // < 2
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(0, 0, 0),
+    Some(Skargo.Version(2, 0, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun lowerEqualsRangeConstraint_2(): void {
+  lexer = Skargo.VersionLexer::create("<= 2");
+  // <= 2
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(0, 0, 0),
+    Some(Skargo.Version(2, 0, 1)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun equalsRangeConstraint_1_2_3(): void {
+  lexer = Skargo.VersionLexer::create("= 1.2.3");
+  // = 1.2.3
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 2, 3),
+    Some(Skargo.Version(1, 2, 4)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun full(): void {
+  lexer = Skargo.VersionLexer::create(">= 1.2, < 1.5");
+  // = >= 1.2, < 1.5
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 2, 0),
+    Some(Skargo.Version(1, 5, 0)),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun full2(): void {
+  lexer = Skargo.VersionLexer::create("> 1.2, <= 1.5");
+  // = > 1.2, <= 1.5
+  got = lexer.lex();
+  expected = Skargo.RangeConstraint(
+    Skargo.Version(1, 2, 1),
+    Some(Skargo.Version(1, 5, 1)),
+  );
+  T.expectEq(got, expected)
+}

@@ -3,7 +3,7 @@
 pass() { printf "%-20s OK\n" "$1:"; }
 fail() { printf "%-20s FAILED\n" "$1:"; }
 
-SKDB=./target/skdb
+SKDB=./target/release/skdb
 
 # Test that launches a bunch of unix process that insert numbers in a table
 # concurrently. We check at the end that the sum of the numbers is correct.

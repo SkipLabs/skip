@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SKDB=./sql/target/skdb
+SKDB=./sql/target/release/skdb
 
 rm -f /tmp/data
 rm -f /tmp/data2

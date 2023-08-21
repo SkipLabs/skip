@@ -9,8 +9,8 @@ file2=$(mktemp /tmp/file.XXXXXX)
 
 rm -Rf $db $tailfile $file1 $file2
 
-./target/skdb --init $db
-skdb="./target/skdb --data $db"
+./target/release/skdb --init $db
+skdb="./target/release/skdb --data $db"
 
 cat privacy/init.sql | $skdb
 echo "create table t1 (a INTEGER PRIMARY KEY);" | $skdb

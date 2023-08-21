@@ -1,49 +1,114 @@
 module Skargo;
 
-private fun fetchLatestManifest(constraint: VersionConstraint): Manifest {
+private fun fetchLatestManifest(
+  name: String,
+  constraint: VersionConstraint,
+  reps: Array<String>,
+): ?Manifest {
   constraint match {
-  | PathConstraint(path, _) -> Manifest::read(Path.join(path, kManifestFile))
-  | RangeConstraint _ ->
-    invariant_violation("TODO") // Fetch highest available version within range.
+  | PathConstraint(path, _) ->
+    Some(Manifest::read(Path.join(path, kManifestFile)))
+  | r @ RangeConstraint _ ->
+    // Fetch highest available version within range.
+    optLast: ?Manifest = None();
+    for (repo in reps) {
+      dir = Path.join(repo, name);
+      mFile = Path.join(dir, kManifestFile);
+      if (FileSystem.exists(mFile)) {
+        manifest = Manifest::read(mFile);
+        if (contains(r, manifest.version)) {
+          !optLast = optLast match {
+          | Some(last) if (last.version < manifest.version) -> Some(manifest)
+          | None() -> Some(manifest)
+          | _ -> optLast
+          }
+        };
+      }
+    };
+    optLast
   }
+}
+
+private fun contains(range: RangeConstraint, version: Version): Bool {
+  range.low < version && range.high.map(h -> version < h).default(true)
 }
 
 // TODO: Backtrack on conflict, and try previous versions.
 private fun solveDependencies(
   manifest: Manifest,
   solved: mutable Map<String, Manifest>,
-): Bool {
+  reps: Array<String>,
+): ?UnsatisfiableDependency {
   for ((name, constraint) in manifest.dependencies.items()) {
     if (solved.containsKey(name)) {
-      constraint match {
-      | PathConstraint _ ->
-        depManifest = fetchLatestManifest(constraint);
-        if (depManifest.version != solved[name].version) return false
-      // TODO: If version was specified along path, ensure the expected dep version matches the manifest.
-      | RangeConstraint _ -> invariant_violation("TODO")
-      // if (!constraint.matches(solved[name].version)) return false
-      };
-      continue
+      fetchLatestManifest(name, constraint, reps) match {
+      | Some(depManifest) if (depManifest.version != solved[name].version) ->
+        return Some(UnsatisfiableDependency(manifest.path, name, constraint))
+      | None() ->
+        return Some(UnsatisfiableDependency(manifest.path, name, constraint))
+      | _ -> void
+      }
     } else {
-      depManifest = fetchLatestManifest(constraint);
-      solved.set(name, depManifest);
-      if (!solveDependencies(depManifest, solved)) {
-        return false
+      fetchLatestManifest(name, constraint, reps) match {
+      | Some(depManifest) ->
+        solved.set(name, depManifest);
+        res = solveDependencies(depManifest, solved, reps);
+        if (res.isSome()) {
+          return res
+        }
+      | _ ->
+        return Some(UnsatisfiableDependency(manifest.path, name, constraint))
       }
     };
   };
-  true
+  None()
 }
 
-class UnsatisfiableDependency() extends Exception {}
+class UnsatisfiableDependency(
+  path: String,
+  name: String,
+  constraint: VersionConstraint,
+) extends Exception {}
 
 fun getDependencies(
   manifest: Manifest,
-): Result<readonly Map<String, Manifest>, Exception> {
+): Result<Map<String, Manifest>, Exception> {
+  reps = findRepositories();
   result = mutable Map[manifest.name => manifest];
-  if (solveDependencies(manifest, result)) {
-    Success(result)
-  } else {
-    Failure(UnsatisfiableDependency())
-  }
+  solveDependencies(manifest, result, reps)
+    .map(e -> Failure(e))
+    .default(Success(unsafe_chill_trust_me(result)));
+}
+
+private fun findRepositories(): Array<String> {
+  path = getcwd();
+  repositories = mutable Vector<String>[];
+  set = mutable Set<String>[];
+  loop {
+    resp = Path.join(path, kRepositories);
+    if (FileSystem.exists(resp)) {
+      collectRepositories(resp, repositories, set)
+    };
+    if (Path.isRoot(path)) break void;
+    !path = Path.parentname(path)
+  };
+  repositories.toArray();
+}
+
+private fun collectRepositories(
+  path: String,
+  repositories: mutable Vector<String>,
+  set: mutable Set<String>,
+): void {
+  dirname = Path.parentname(path);
+  contents = FileSystem.readTextFile(path).split("\n");
+  contents.each(l ->
+    if (!l.trim().isEmpty()) {
+      rep = Path.resolve(dirname, l);
+      if (FileSystem.exists(rep) && !set.contains(rep)) {
+        repositories.push(rep);
+        set.insert(rep);
+      }
+    }
+  );
 }

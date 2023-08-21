@@ -4,10 +4,11 @@ private class BuildContext{
   env: Env,
   skc: String,
   targetDir: String,
-  target: ?String,
+  target: ?TargetTriplet,
   profile: String,
   stateDb: String,
   files: Array<String>,
+  deps: Map<String, Manifest>,
 } {
   static fun create(
     env: Env,
@@ -17,20 +18,29 @@ private class BuildContext{
   ): BuildContext {
     targetDir = targetDirOpt match {
     | Some(d) -> d
-    | None() -> getTargetDir(env.rootDir, target)
+    | None() -> Path.join(getTargetDir(env.rootDir, target), profile)
     };
     skc = Environ.varOpt("SKC").default("skc");
+    deps = getDependencies(env.manifest) match {
+    | Success(v) -> v
+    | Failure(e) -> throw e
+    };
     BuildContext{
       env,
       skc,
       targetDir,
-      target,
+      target => target.map(TargetTriplet::fromString),
       profile,
       stateDb => Path.join(targetDir, "state.db"),
-      files => getFiles(env.manifest).concat(
+      files => getFiles(env.manifest, deps).concat(
         Array[Path.join(targetDir, kVersionFile)],
       ),
+      deps,
     }
+  }
+
+  fun isWasm32(): Bool {
+    this.target.map(t -> t.isWasm32()).default(false);
   }
 }
 
@@ -43,16 +53,13 @@ private fun getTargetDir(rootDir: String, targetOpt: ?String): String {
   }
 }
 
-private fun getFiles(manifest: Manifest): Array<String> {
+private fun getFiles(
+  manifest: Manifest,
+  deps: Map<String, Manifest>,
+): Array<String> {
   files = manifest.tests;
-  deps = getDependencies(manifest) match {
-  | Success(v) -> v
-  | Failure(_) -> invariant_violation("Unsatisfiable dep")
-  };
-
   for (dep in deps) {
     !files = files.concat(dep.srcs)
   };
-
   files.collect(Array)
 }

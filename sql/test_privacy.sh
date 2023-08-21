@@ -6,7 +6,7 @@ DBFILE=/tmp/test.db
 
 rm -f $DBFILE
 
-SKDB_CMD=./target/skdb
+SKDB_CMD=./target/release/skdb
 
 $SKDB_CMD --init $DBFILE
 

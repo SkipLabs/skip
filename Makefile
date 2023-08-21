@@ -4,7 +4,8 @@
 all: npm build/skdb build/init.sql
 
 PLAYWRIGHT_REPORTER?="line"
-SKARGO_FLAGS=--release
+SKARGO_PROFILE=release
+SKARGO_FLAGS=--$(SKARGO_PROFILE)
 
 ################################################################################
 # skdb wasm + js client
@@ -12,10 +13,10 @@ SKARGO_FLAGS=--release
 
 npm: sql/js/dist/skdb.wasm sql/js/dist/skdb.js sql/js/dist/skdb-node.js sql/js/dist/skdb-cli.js
 
-sql/target/wasm32-unknown-unknown/skdb.wasm: sql/src/* skfs/src/*
-	cd sql && skargo build $(SKARGO_FLAGS) --target wasm32-unknown-unknown
+sql/target/wasm32/$(SKARGO_PROFILE)/skdb.wasm: sql/src/* skfs/src/*
+	cd sql && skargo build $(SKARGO_FLAGS) --target wasm32
 
-sql/js/dist/skdb.wasm: sql/target/wasm32-unknown-unknown/skdb.wasm
+sql/js/dist/skdb.wasm: sql/target/wasm32/$(SKARGO_PROFILE)/skdb.wasm
 	mkdir -p sql/js/dist
 	cp $^ $@
 
@@ -49,11 +50,11 @@ sql/js/dist/index.html: sql/js/tests/index.html
 # skdb native binary
 ################################################################################
 
-sql/target/skdb: sql/src/* skfs/src/*
+sql/target/$(SKARGO_PROFILE)/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build $(SKARGO_FLAGS)
 
 # TODO: keeping this for now as nearly all test scripts refer to build/skdb
-build/skdb: sql/target/skdb
+build/skdb: sql/target/$(SKARGO_PROFILE)/skdb
 	mkdir -p build
 	cp $^ $@
 
@@ -82,7 +83,7 @@ fmt:
 # test targets
 
 .PHONY: test
-test: SKARGO_FLAGS=
+test: SKARGO_PROFILE=dev
 test: test-native test-wasm
 
 .PHONY: test-native
@@ -122,7 +123,7 @@ test-soak: build/skdb build/init.sql npm
 # run targets
 
 .PHONY: run-server
-run-server: SKARGO_FLAGS=
+run-server: SKARGO_PROFILE=dev
 run-server: build/skdb build/init.sql
 	./sql/server/deploy/start.sh --DANGEROUS-no-encryption --dev
 

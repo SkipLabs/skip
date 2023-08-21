@@ -5,7 +5,7 @@ fail() { printf "%-20s FAILED\n" "$1:"; }
 
 rm -f /tmp/test.db
 
-SKDB=../../../target/skdb
+SKDB=../../../target/release/skdb
 
 $SKDB --init /tmp/test.db
 

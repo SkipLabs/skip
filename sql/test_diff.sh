@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DB=/tmp/test.db
-SKDB_CMD=./target/skdb
+SKDB_CMD=./target/release/skdb
 SKDB="$SKDB_CMD --always-allow-joins --data $DB"
 
 pass() { printf "%-44s OK\n" "$1:"; }

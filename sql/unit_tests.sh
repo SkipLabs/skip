@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SKDB=./target/skdb
+SKDB=./target/release/skdb
 
 pass() { printf "%-32s OK\n" "TEST $1:"; }
 fail() { printf "%-32s FAILED\n" "TEST $1:"; }
