@@ -355,23 +355,6 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     })
   }
 
-  fun mapKV<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (Key, T) ~> T2,
-  ): EHandle<T2> {
-    this.genericMap(conv, context, dirName, (_, writer, key, files) ~> {
-      if (files.size() >= 2) {
-        msg = "Duplicate keys: " + key;
-        print_error(msg);
-        invariant_violation(msg);
-      };
-      result = f(key, files[0]);
-      writer.write(key, result);
-    })
-  }
-
   fun contextWriterKeyValues<T2: File>(
     conv: File ~> T2,
     context: mutable Context,
