@@ -228,7 +228,7 @@ class ParameterInfo{
 
 // A GFunction which may or may not be compiled to GIR yet.
 base class LazyGFun{} uses Hashable, Orderable, Show {
-  fun compile(context: mutable SKFS.Context, converter: Converter): GFunction;
+  fun compile(context: mutable SKStore.Context, converter: Converter): GFunction;
 
   fun gname(): GFunctionName;
 
@@ -256,7 +256,7 @@ class DoneLazyGFun{function: GFunction} extends LazyGFun {
   }
 
   fun compile(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     _converter: Converter,
   ): GFunction {
     this.function
@@ -269,7 +269,7 @@ class FrontEndLazyGFun{frontEndName: String} extends LazyGFun {
     GFunctionName(this.frontEndName)
   }
 
-  fun compile(context: mutable SKFS.Context, converter: Converter): GFunction {
+  fun compile(context: mutable SKStore.Context, converter: Converter): GFunction {
     funDef = converter.program.getFun(context, this.frontEndName);
     convertedFunDef = converter.convertFunDef(context, funDef);
     result = converter.getGFunction(context, convertedFunDef);
@@ -289,7 +289,7 @@ base class FunInfoLazyGFun{
 class NativeLazyGFun{} extends FunInfoLazyGFun {
   // Make a no-implementation function.
   fun compile(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     _converter: Converter,
   ): GFunction {
     funInfo = this.funInfo;
@@ -313,7 +313,7 @@ base class ConcreteLazyGFun{
   captured: Array<GField> = Array[],
 } extends FunInfoLazyGFun {
   overridable fun compile(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     converter: Converter,
   ): GFunction {
     emitter = OuterIstEmitter::make(context, converter, this);
@@ -338,12 +338,12 @@ base class ConcreteLazyGFun{
   }
 
   protected fun emitBody(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     emitter: mutable OuterIstEmitter,
   ): void;
 
   overridable fun getParams(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     Converter,
   ): Array<ParameterInfo> {
     this.params
@@ -367,7 +367,7 @@ base class ConcreteLazyGFun{
 
 class InspectLazyGFun extends ConcreteLazyGFun {
   protected fun emitBody(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     emitter: mutable OuterIstEmitter,
   ): void {
     emitter.emitBindParameters(context);
@@ -611,7 +611,7 @@ class InspectLazyGFun extends ConcreteLazyGFun {
   // if they happen to make a method called "inspect" with the wrong signature
   // we'll just ignore it.
   private fun isLegalInspectSignature(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     cls: GClass,
     f: GFunction,
     converter: Converter,
@@ -633,7 +633,7 @@ class InspectLazyGFun extends ConcreteLazyGFun {
 
 class GetClassLazyGFun extends ConcreteLazyGFun {
   protected fun emitBody(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     emitter: mutable OuterIstEmitter,
   ): void {
     pos = emitter.funInfo.pos;
@@ -649,10 +649,10 @@ class GetClassLazyGFun extends ConcreteLazyGFun {
 
 // Lazy functions with either a backing definition or a handbuilt body.
 base class BodyProvidingLazyGFun{} extends ConcreteLazyGFun {
-  fun getBody(context: mutable SKFS.Context, converter: Converter): I.Stmt;
+  fun getBody(context: mutable SKStore.Context, converter: Converter): I.Stmt;
 
   overridable protected fun emitBody(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     emitter: mutable OuterIstEmitter,
   ): void {
     emitter.emitBindParameters(context);
@@ -665,7 +665,7 @@ base class BodyLazyGFun{body: I.Stmt} extends BodyProvidingLazyGFun {
   | NormalLazyGFun
   | ConstLazyGFun{constName: ConstID}
 
-  fun getBody(_context: mutable SKFS.Context, _: Converter): I.Stmt {
+  fun getBody(_context: mutable SKStore.Context, _: Converter): I.Stmt {
     this.body
   }
 }
@@ -676,7 +676,7 @@ class CustomLazyGFun{
   emitBodyHelper: mutable OuterIstEmitter ~> void,
 } extends ConcreteLazyGFun {
   protected fun emitBody(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     e: mutable OuterIstEmitter,
   ): void {
     this.emitBodyHelper(e)
@@ -687,7 +687,7 @@ class MemoizeThunkLazyGFun{
   capturedParams: Array<ParameterInfo>,
 } extends BodyLazyGFun {
   protected fun emitBody(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     emitter: mutable OuterIstEmitter,
   ): void {
     // Create a separate async function for the body.
@@ -802,14 +802,14 @@ class MemoizeLazyGFun{
   bodyProvider: BodyProvidingLazyGFun,
 } extends ConcreteLazyGFun {
   fun getParams(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     converter: Converter,
   ): Array<ParameterInfo> {
     this.bodyProvider.getParams(context, converter)
   }
 
   protected fun emitBody(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     emitter: mutable OuterIstEmitter,
   ): void {
     funInfo = this.funInfo;
@@ -1016,7 +1016,7 @@ class AsyncCoroutineLazyGFun{
   }
 
   fun getParams(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     converter: Converter,
   ): Array<ParameterInfo> {
     this.bodyProvider.getParams(context, converter)
@@ -1040,7 +1040,7 @@ class AsyncCoroutineLazyGFun{
   }
 
   protected fun emitBody(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     emitter: mutable OuterIstEmitter,
   ): void {
     emitter.emitBindParameters(context);
@@ -1122,7 +1122,7 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
   }
 
   private fun getLoweredDef(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     converter: Converter,
     def: I.CallableDef,
   ): I.CallableDef {
@@ -1134,7 +1134,7 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     result
   }
 
-  fun getBody(context: mutable SKFS.Context, converter: Converter): I.Stmt {
+  fun getBody(context: mutable SKStore.Context, converter: Converter): I.Stmt {
     this.getLoweredDef(context, converter, this.def).getBody().asOuter()
   }
 
@@ -1142,7 +1142,7 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
   // (For simplicity we just do this every time getParams() is called,
   // on the assumption it's usually called just once)
   fun getParams(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     converter: Converter,
   ): Array<ParameterInfo> {
     def = this.getLoweredDef(context, converter, this.def);
@@ -1225,8 +1225,8 @@ fun makeGFunTypeWithFlags{
   GFunType{isMutable, isTracked, params => paramsWithFlags, returnType}
 }
 
-class LazyGFunKey(value: LazyGFun) extends SKFS.BaseName {
-  fun compare(other: SKFS.BaseName): Order {
+class LazyGFunKey(value: LazyGFun) extends SKStore.BaseName {
+  fun compare(other: SKStore.BaseName): Order {
     other match {
     | LazyGFunKey(value) -> this.value.toString().compare(value.toString())
     | _ -> invariant_violation("Heterogeneous keys found")
@@ -1234,25 +1234,25 @@ class LazyGFunKey(value: LazyGFun) extends SKFS.BaseName {
   }
 }
 
-class LazyGClassKey(value: LazyGClass) extends SKFS.BaseName {
-  fun compare(other: SKFS.BaseName): Order {
+class LazyGClassKey(value: LazyGClass) extends SKStore.BaseName {
+  fun compare(other: SKStore.BaseName): Order {
     other match {
     | LazyGClassKey(value) -> this.value.name().id.compare(value.name().id)
     | _ -> invariant_violation("Heterogeneous keys found")
     }
   }
 }
-class GClassFile(value: GClass) extends SKFS.File
+class GClassFile(value: GClass) extends SKStore.File
 
 // Manages the overall conversion from OuterIst to IR.
 class Converter private (
   program: I.Program,
   config: Config.Config,
-  funs: SKFS.LHandle<GFunctionFile>,
-  classes: SKFS.LHandle<GClassFile>,
-  lower: SKFS.LHandle<I.CallableDefFile>,
+  funs: SKStore.LHandle<GFunctionFile>,
+  classes: SKStore.LHandle<GClassFile>,
+  lower: SKStore.LHandle<I.CallableDefFile>,
 ) {
-  fun resetCache(context: mutable SKFS.Context): void {
+  fun resetCache(context: mutable SKStore.Context): void {
     funsDir = context.unsafeGetLazyDir(this.funs.dirName);
     !funsDir.data = SortedMap[];
     context.setDir(funsDir.dirName, funsDir);
@@ -1265,41 +1265,41 @@ class Converter private (
   }
 
   fun getConsts(
-    context: mutable SKFS.Context,
-    constsProj: SKFS.EHandle<I.ConstDefFile>,
+    context: mutable SKStore.Context,
+    constsProj: SKStore.EHandle<I.ConstDefFile>,
   ): Array<ConstLazyGFun> {
     consts = this.program.getConsts(context, constsProj);
     consts.map(cst -> this.convertConstDef(context, cst))
   }
 
   static fun create(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     config: Config.Config,
-    name: SKFS.DirName,
+    name: SKStore.DirName,
     program: I.Program,
   ): this {
-    funDirName = SKFS.DirName::create(name.toString() + "funs/");
-    funs = SKFS.LHandle(GFunctionFile::fromFile, funDirName);
-    classDirName = SKFS.DirName::create(name.toString() + "classes/");
-    classes = SKFS.LHandle(GClassFile::fromFile, classDirName);
-    lowerDirName: SKFS.DirName = SKFS.DirName::create("/lowerDefs/");
-    lower = SKFS.LHandle(I.CallableDefFile::fromFile, lowerDirName);
+    funDirName = SKStore.DirName::create(name.toString() + "funs/");
+    funs = SKStore.LHandle(GFunctionFile::fromFile, funDirName);
+    classDirName = SKStore.DirName::create(name.toString() + "classes/");
+    classes = SKStore.LHandle(GClassFile::fromFile, classDirName);
+    lowerDirName: SKStore.DirName = SKStore.DirName::create("/lowerDefs/");
+    lower = SKStore.LHandle(I.CallableDefFile::fromFile, lowerDirName);
     converter = static(program, config, funs, classes, lower);
-    _ = SKFS.LHandle::create(
+    _ = SKStore.LHandle::create(
       GFunctionFile::fromFile,
       context,
       funDirName,
       converter.getGFunctionFun,
       false,
     );
-    _ = SKFS.LHandle::create(
+    _ = SKStore.LHandle::create(
       GClassFile::fromFile,
       context,
       classDirName,
       converter.getGClassImplFun,
       false,
     );
-    _ = SKFS.LHandle::create(
+    _ = SKStore.LHandle::create(
       I.CallableDefFile::fromFile,
       context,
       lowerDirName,
@@ -1322,14 +1322,14 @@ class Converter private (
     converter
   }
 
-  fun getGFunction(context: mutable SKFS.Context, lazy: LazyGFun): GFunction {
+  fun getGFunction(context: mutable SKStore.Context, lazy: LazyGFun): GFunction {
     this.getGFunctionFun(context, this.funs, LazyGFunKey(lazy))[0].value
   }
 
   fun getGFunctionFun(
-    context: mutable SKFS.Context,
-    _self: SKFS.LHandle<GFunctionFile>,
-    key: SKFS.BaseName,
+    context: mutable SKStore.Context,
+    _self: SKStore.LHandle<GFunctionFile>,
+    key: SKStore.BaseName,
   ): Array<GFunctionFile> {
     lazy = key match {
     | LazyGFunKey(x) -> x
@@ -1340,7 +1340,7 @@ class Converter private (
   }
 
   private fun getGClassImpl(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     gid: LazyGClass,
   ): GClass {
     key = LazyGClassKey(gid);
@@ -1348,9 +1348,9 @@ class Converter private (
   }
 
   private fun getGClassImplFun(
-    context: mutable SKFS.Context,
-    _self: SKFS.LHandle<GClassFile>,
-    key: SKFS.BaseName,
+    context: mutable SKStore.Context,
+    _self: SKStore.LHandle<GClassFile>,
+    key: SKStore.BaseName,
   ): Array<GClassFile> {
     gid = key match {
     | LazyGClassKey(x) -> x
@@ -1483,7 +1483,7 @@ class Converter private (
   }
 
   fun finishGClass(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     orig: GClass,
     addInspect: Bool = true,
   ): GClass {
@@ -1548,7 +1548,7 @@ class Converter private (
 
   // Returns the GClassKind, if known.
   fun getGClassKind(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     ref: LazyGClass,
   ): GClassKind {
     ref match {
@@ -1569,7 +1569,7 @@ class Converter private (
   }
 
   fun getGClass(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     gid: LazyGClass,
     _pos: Pos,
   ): GClass {
@@ -1580,7 +1580,7 @@ class Converter private (
   }
 
   fun getMetaClass(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     lazyGClass: LazyGClass,
     g: ?GClass = None(),
   ): LazyGClass {
@@ -1606,7 +1606,7 @@ class Converter private (
   }
 
   private fun createReturnTuple(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: GClassName,
     arity: Int,
   ): GClass {
@@ -1637,7 +1637,7 @@ class Converter private (
   // When you do class(class(class(...(x)))) it quickly ends up in
   // a class that is its own metaclass. You can't do anything interesting
   // with this class but it needs to exist.
-  private fun createMetaMeta(context: mutable SKFS.Context): GClass {
+  private fun createMetaMeta(context: mutable SKStore.Context): GClass {
     this.finishGClass(
       context,
       GClass{
@@ -1657,7 +1657,7 @@ class Converter private (
   // (We can assume this targ congruence for closure classes.)
   // Note: not transitive - we depend on being called on parents before kids.
   fun flattenClosureClassExtends(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     extends_: Array<GTapply>,
     pos: FileRange,
   ): Array<GTapply> {
@@ -1676,7 +1676,7 @@ class Converter private (
 
   // Create a class somewhere in a closure class hierarchy.
   fun createClosureClass(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     className: GClassName,
     callMethodType: GFunType,
     tparams: Array<GTparam>,
@@ -1752,7 +1752,7 @@ class Converter private (
   // Closures are desugared to objects with a "call()" method. This creates
   // the base class to use for all closures with a particular function type.
   private fun createClosureBaseClass(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     cb: ClosureBaseLazyGClass,
   ): GClass {
     // We model the fact that a "pure" ("~>") lambda can be cast to an
@@ -1830,7 +1830,7 @@ class Converter private (
   // Return the fields for a class, if any,
   // with lowered OuterIst in their default initializers
   private fun getLoweredFields(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     cd: I.ClassDef,
   ): Parameters<I.Parameter> {
     cd.params match {
@@ -1840,7 +1840,7 @@ class Converter private (
   }
 
   private fun createFactory(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     returnsMutable: Bool,
     isAbstract: Bool,
     frontEndGClass: I.ClassDef,
@@ -1920,7 +1920,7 @@ class Converter private (
   }
 
   private fun getStaticMethods(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     gc: GClass,
     name: LazyGClass,
   ): mutable UnorderedMap<String, GMethodDef> {
@@ -2157,7 +2157,7 @@ class Converter private (
   // end). But it's not enough to only put those only in the ConcreteMeta
   // hierarchy, since some BaseMeta class could provide an implmentation.
   private fun createBaseMeta(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: BaseMetaLazyGClass,
   ): GClass {
     cls = name.cls;
@@ -2193,7 +2193,7 @@ class Converter private (
   }
 
   private fun createBaseMetaImpl(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: BaseMetaImplLazyGClass,
   ): GClass {
     cls = name.cls;
@@ -2218,7 +2218,7 @@ class Converter private (
   }
 
   private fun createClassMeta(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: ClassMetaLazyGClass,
   ): GClass {
     gc = this.getGClassImpl(context, name.cls);
@@ -2242,7 +2242,7 @@ class Converter private (
   }
 
   private fun createConcreteMeta(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: ConcreteMetaLazyGClass,
   ): GClass {
     gc = this.getGClassImpl(context, name.cls);
@@ -2298,7 +2298,7 @@ class Converter private (
   }
 
   private fun createConcreteMetaImpl(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: ConcreteMetaImplLazyGClass,
   ): GClass {
     gc = this.getGClassImpl(context, name.cls);
@@ -2350,7 +2350,7 @@ class Converter private (
     )
   }
 
-  fun asTfun(context: mutable SKFS.Context, typ: I.Type): I.Tfun {
+  fun asTfun(context: mutable SKStore.Context, typ: I.Type): I.Tfun {
     typ.ty match {
     | t @ I.Tfun _ -> t
     | _ ->
@@ -2361,7 +2361,7 @@ class Converter private (
   }
 
   fun makeGFunType{
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     paramTypes: Parameters<I.Type>,
     returnType: I.Type,
     isMutable: Bool,
@@ -2382,7 +2382,7 @@ class Converter private (
   }
 
   // Convert a GFunType without creating the usual closure wrapper class type.
-  fun convertRawTfun(context: mutable SKFS.Context, f: I.Tfun): GFunType {
+  fun convertRawTfun(context: mutable SKStore.Context, f: I.Tfun): GFunType {
     isMutable = f.modifiers.purity match {
     | I.Fpure() -> false
     | I.Fmutable() -> true
@@ -2402,7 +2402,7 @@ class Converter private (
   }
 
   private fun convertTapply(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: String,
     types: Array<I.Type>,
     mutability: Mutability,
@@ -2416,7 +2416,7 @@ class Converter private (
 
   // Convert an OuterIst type to an IR type.
   fun convertType(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     in_: I.Type,
     mutability: Mutability = DeepFrozen(),
   ): GType {
@@ -2477,7 +2477,7 @@ class Converter private (
   }
 
   fun convertTypes<T: Sequence<I.Type>>(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     types: T,
   ): Array<GType> {
     types.collect(Array).map(t -> this.convertType(context, t))
@@ -2494,7 +2494,7 @@ class Converter private (
   }
 
   fun convertFields(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     fields: Array<I.Parameter>,
   ): Array<GField> {
     fields.map(f -> {
@@ -2510,7 +2510,7 @@ class Converter private (
   }
 
   fun convertExtends(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     in_: I.ClassDef,
     parentMutability: Mutability,
   ): Array<GTapply> {
@@ -2535,7 +2535,7 @@ class Converter private (
   }
 
   private fun convertClassDef(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     in_: I.ClassDef,
     classID: FrontEndLazyGClass,
     pos: FileRange,
@@ -2724,7 +2724,7 @@ class Converter private (
     }
   }
 
-  fun convertFunDef(context: mutable SKFS.Context, in_: I.FunDef): LazyGFun {
+  fun convertFunDef(context: mutable SKStore.Context, in_: I.FunDef): LazyGFun {
     (pos, name) = (in_.name.pos, in_.name.id);
 
     tparams = this.convertTypeParameters(in_.tparams);
@@ -2792,7 +2792,7 @@ class Converter private (
   }
 
   fun convertMethodDef(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     in_: I.MethodDef,
     physicalClassName: GClassName,
     // Usually the same as physicalClassName, but for static methods
@@ -2924,7 +2924,7 @@ class Converter private (
   }
 
   fun convertConstDef(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     in_: I.ConstDef,
   ): ConstLazyGFun {
     // Create a function that unconditionally computes this constant value.
@@ -2974,7 +2974,7 @@ class Converter private (
   // For a value class with two Int fields this would be false, for a value
   // class containing a value class containing one Int it's true, etc.
   private fun scalarizesToNoMoreThanOneScalar(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     gid: LazyGClass,
     pos: Pos,
   ): Bool {
@@ -3004,7 +3004,7 @@ class Converter private (
   }
 
   private fun assertNoStaticMethods(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     lazyGClass: LazyGClass,
     gc: GClass,
   ): void {
@@ -3028,7 +3028,7 @@ class Converter private (
   // particular coroutine state. This produces a new such class
   // for the generator function described by funInfo.
   fun createGeneratorClass(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     funInfo: GFunInfo,
   ): GTapply {
     // We start with Iterator.Generator as a basic template
@@ -3143,7 +3143,7 @@ class Converter private (
   // particular coroutine state. This produces a new such class
   // for the generator function described by funInfo.
   fun createAwaitableClass(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     funInfo: GFunInfo,
   ): GTapply {
     // We start with Iterator.Generator as a basic template
@@ -3304,7 +3304,7 @@ mutable class OuterIstEmitter{
   mutable pos: FileRange,
 } {
   static fun make(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     converter: Converter,
     lazy: ConcreteLazyGFun,
   ): mutable OuterIstEmitter {
@@ -3468,7 +3468,7 @@ mutable class OuterIstEmitter{
     }
   }
 
-  mutable fun emitBindParameters(context: mutable SKFS.Context): void {
+  mutable fun emitBindParameters(context: mutable SKStore.Context): void {
     lazy = this.lazy;
 
     // Bind captured variables as locals.
@@ -3654,7 +3654,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitParams(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     params: Parameters<I.Expr>,
     expectedTypes: Parameters<I.Type>,
     skipOptionalFlags: Bool = false,
@@ -3746,7 +3746,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun convertType(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     typ: I.Type,
   ): GType {
     this.converter.convertType(context, typ)
@@ -3792,7 +3792,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitMethodCall(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     info: I.DotInfo,
     methodArgs: Parameters<I.Expr>,
     staticMethodCall: Bool,
@@ -3862,7 +3862,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitClosureCall(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     funcExpr: I.Expr,
     params: Parameters<I.Expr>,
     pos: FileRange,
@@ -3978,7 +3978,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun emitAwait(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     expr: I.Expr,
     typ: GType,
     pos: FileRange,
@@ -4064,7 +4064,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun emitLambda{
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     paramVars: Array<I.Binding>,
     captured: Array<I.Name>,
     body: I.Stmt,
@@ -4172,7 +4172,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitWith(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     objExpr: I.Expr,
     typ: GType,
     fieldAssignments: UMap<I.WithUpdate>,
@@ -4202,7 +4202,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitFactoryCall(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     runtimeType: I.Expr,
     frontEndType: I.Type,
     name: I.Name,
@@ -4279,7 +4279,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitExpr(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     expr__: I.Expr,
     prettyName: String = "",
   ): GInstr {
@@ -4485,7 +4485,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitJumpBlock(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     entries: List<I.LabeledStmt>,
   ): void {
     items = mutable Vector[];
@@ -4509,7 +4509,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitIf(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     predInstr: GInstr,
     trueBody: I.Stmt,
     falseBody: I.Stmt,
@@ -4543,7 +4543,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitLoopForever(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     pos: FileRange,
     body: I.Stmt,
   ): void {
@@ -4562,7 +4562,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitTypeSwitch(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     switchExpr: I.Expr,
     branchList: List<I.TypeSwitchBranch>,
     defaultBody: ?I.Stmt,
@@ -4654,7 +4654,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitIntSwitch(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     switchValue: GInstr,
     branchList: List<I.SwitchBranch>,
     default: I.Stmt,
@@ -4741,7 +4741,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitStringSwitch(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     switchValue: GInstr,
     branchList: List<I.SwitchBranch>,
     default: I.Stmt,
@@ -4826,7 +4826,7 @@ mutable class OuterIstEmitter{
 
   // We compile a Float switch as an IntSwitch on the raw IEEE FP bits.
   private mutable fun emitFloatSwitch(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     switchValue: GInstr,
     branchList: List<I.SwitchBranch>,
     default: I.Stmt,
@@ -4895,7 +4895,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun emitTry(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     body: I.Stmt,
     emitCatchMatch: () -> void,
     excBinding: I.Binding,
@@ -5051,7 +5051,7 @@ mutable class OuterIstEmitter{
   // From within a generator, figure out the type of values being
   // "yielded", then wrap it in the given generic and mutability.
   private mutable fun generatorOptionType(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     generic: String,
     mutability: Mutability,
   ): GType {
@@ -5077,7 +5077,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun generatorNone(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     pos: FileRange,
   ): GInstr {
     this.emitInstr(
@@ -5090,7 +5090,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitYield(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     value: GInstr,
     pos: FileRange,
   ): void {
@@ -5109,7 +5109,7 @@ mutable class OuterIstEmitter{
   }
 
   private mutable fun emitYieldBreak(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     pos: FileRange,
   ): void {
     // Compute the proper None() type here, to make it easier to access later.
@@ -5117,7 +5117,7 @@ mutable class OuterIstEmitter{
     _ = this.emitInstr(GYieldBreak{pos, none})
   }
 
-  mutable fun emitStmt(context: mutable SKFS.Context, stmt: I.Stmt): void {
+  mutable fun emitStmt(context: mutable SKStore.Context, stmt: I.Stmt): void {
     stmt match {
     | I.JumpTo(name) -> this.emitJumpTo(name)
     | I.JumpBlock(entries, _) -> this.emitJumpBlock(context, entries)
@@ -5244,33 +5244,33 @@ private const kEmptyMethods: UnorderedMap<
   SFunctionID,
 > = UnorderedMap[];
 
-private fun makeOuterIst(context: mutable SKFS.Context): OuterIst.Program {
+private fun makeOuterIst(context: mutable SKStore.Context): OuterIst.Program {
   // run the compiler front end from parsing to type checking
   typedAst = SkipMain.type_program(context);
   // OuterIst skeleton is built here, but code is done lazily
   SkipMakeOuterIst.program(context, typedAst)
 }
 
-class ConstFile(value: OuterIstToIR.ConstLazyGFun) extends SKFS.File
+class ConstFile(value: OuterIstToIR.ConstLazyGFun) extends SKStore.File
 class ConstsArrayFile(
   value: Array<OuterIstToIR.ConstLazyGFun>,
-) extends SKFS.File
+) extends SKStore.File
 
-const constsArrayDirName: SKFS.DirName = SKFS.DirName::create("/constsArray/");
-const constsArrayDir: SKFS.EHandle<ConstsArrayFile> = SKFS.EHandle(
+const constsArrayDirName: SKStore.DirName = SKStore.DirName::create("/constsArray/");
+const constsArrayDir: SKStore.EHandle<ConstsArrayFile> = SKStore.EHandle(
   ConstsArrayFile::fromFile,
   constsArrayDirName,
 );
 
 fun createIR(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   config: Config.Config,
   shouldDisasm: (I.FunDef ~> Bool),
   shouldRuntimeExport: (I.FunDef ~> Bool),
   outerIst: I.Program,
   converter: Converter,
-  constsProj: SKFS.EHandle<I.ConstDefFile>,
-  funDefsProj: SKFS.EHandle<I.FunDefFile>,
+  constsProj: SKStore.EHandle<I.ConstDefFile>,
+  funDefsProj: SKStore.EHandle<I.FunDefFile>,
 ): GlobalEnv {
   consts = converter.getConsts(context, constsProj);
   funDefs = outerIst.getFuns(context, funDefsProj);

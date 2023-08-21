@@ -9,7 +9,7 @@
  */
 /*****************************************************************************/
 
-module SKFS;
+module SKStore;
 
 /*****************************************************************************/
 /* Sessions. */
@@ -27,9 +27,9 @@ value class Sub(
   cond: Condition,
   cmd: CmdKind,
   dirName: DirName,
-  reset: (SKFS.Context, SKFS.Tick) ~> Bool,
-  getDestinationWatermark: (readonly SKFS.Context) ~> ?SKFS.Tick,
-  filter: (SKFS.Context, Bool) ~> (BaseName -> Bool) = (_, _) ~> (_ -> true),
+  reset: (SKStore.Context, SKStore.Tick) ~> Bool,
+  getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
+  filter: (SKStore.Context, Bool) ~> (BaseName -> Bool) = (_, _) ~> (_ -> true),
 )
 
 /*****************************************************************************/
@@ -290,7 +290,7 @@ mutable class Context{
     sessionId: Int,
     cmd: CmdKind,
     init: Bool,
-    reset: (SKFS.Context, SKFS.Tick) ~> Bool,
+    reset: (SKStore.Context, SKStore.Tick) ~> Bool,
     filter: (Context, Bool) ~> (BaseName -> Bool),
     getDestinationWatermark: (readonly Context) ~> ?Tick,
   ): void {
@@ -548,7 +548,7 @@ mutable class Context{
           !preDir = preDir.writeEntry(this, source, source, key, values);
         };
         if (isReset) {
-          writerPath = SKFS.Path(preDir.dirName, SKFS.IID(SKFS.genSym(0)));
+          writerPath = SKStore.Path(preDir.dirName, SKStore.IID(SKStore.genSym(0)));
           !preDir = preDir.reset(this, writerPath, changes);
         };
         this.setDir(preDir.dirName, preDir)
@@ -1000,7 +1000,7 @@ fun import(
             entries.iterator(),
           );
           if (isReset) {
-            writerPath = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0)));
+            writerPath = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
             !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
           };
           targetCtx.setDir(inputDir.dirName, inputDir)
@@ -1028,7 +1028,7 @@ fun withErrorHandler(delta: readonly Context, f: () -> void): Bool {
   | exn ->
     line = delta.getGlobal("Line") match {
     | None() -> -1
-    | Some(x) -> SKFS.IntFile::fromFile(x).value
+    | Some(x) -> SKStore.IntFile::fromFile(x).value
     };
     print_error("Error, line " + line + ": " + exn.getMessage());
     true
@@ -1107,7 +1107,7 @@ fun callAfterUnlock(
 /* Unsafe new consts mode
  * You should never use this. This mode allows new consts to change.
  * You can only use this option if you are absolutely sure that no constant
- * will ever end up in SKFS. If that happend, the system would segfault.
+ * will ever end up in SKStore. If that happend, the system would segfault.
  */
 /*****************************************************************************/
 

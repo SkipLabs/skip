@@ -163,7 +163,7 @@ fun vis_string(x: (FileRange, A.Visibility)): String {
  */
 /*****************************************************************************/
 fun is_subtype(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   child_name: A.Name,
   parent_name: A.Name,
 ): Bool {
@@ -192,7 +192,7 @@ fun is_subtype(
 }
 
 fun tid_matches(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   self: A.Class_def,
   tid: A.TypeIdentifier,
 ): Bool {
@@ -203,7 +203,7 @@ fun tid_matches(
 }
 
 fun pat_matches(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   self: A.Class_def,
   pat: A.Pattern,
 ): Bool {
@@ -583,7 +583,7 @@ fun check_child_kind(pos: FileRange, child: A.Class_def): void {
  */
 /*****************************************************************************/
 fun inherit_method(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   self: A.Class_def,
   parent_name: A.Name,
   met: A.Method_def,
@@ -618,7 +618,7 @@ fun inherit_method(
 }
 
 fun find_matching_pattern_in_mbl(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   self: A.Class_def,
   mbl: List<A.Match_branch>,
 ): ?(A.Pattern, ?A.Expr, A.Expr) {
@@ -633,7 +633,7 @@ fun find_matching_pattern_in_mbl(
 }
 
 fun inherit_algebraic_pats(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   self: A.Class_def,
   parent_name: A.Name,
   explicit: A.Explicity,
@@ -696,7 +696,7 @@ fun arg_patterns_to_params(
 }
 
 fun inherit_algebraic(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   self: A.Class_def,
   parent_name: A.Name,
   explicit: A.Explicity,
@@ -896,16 +896,16 @@ fun remove_algebraic(class_defs: UMap<A.Class_def>): UMap<A.Class_def> {
 /* The main entry point. */
 /*****************************************************************************/
 
-const classesDirName: SKFS.DirName = SKFS.DirName::create("/inheritClasses/");
-const classesDir: SKFS.LHandle<ClassFile> = SKFS.LHandle(
+const classesDirName: SKStore.DirName = SKStore.DirName::create("/inheritClasses/");
+const classesDir: SKStore.LHandle<ClassFile> = SKStore.LHandle(
   ClassFile::fromFile,
   classesDirName,
 );
 
-class ClassFile(value: SkipAst.Class_def) extends SKFS.File
+class ClassFile(value: SkipAst.Class_def) extends SKStore.File
 
 fun getClass(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   className: A.Name,
 ): SkipAst.Class_def {
   maybeGetClass(context, className.i1) match {
@@ -916,15 +916,15 @@ fun getClass(
 }
 
 fun populateClassesDir(
-  context: mutable SKFS.Context,
-): SKFS.LHandle<SkipInherit.ClassFile> {
-  SKFS.LHandle::create(
+  context: mutable SKStore.Context,
+): SKStore.LHandle<SkipInherit.ClassFile> {
+  SKStore.LHandle::create(
     ClassFile::fromFile,
     context,
     classesDirName,
     (context, _self, key) ~> {
       className = key match {
-      | SKFS.SID(x) -> x
+      | SKStore.SID(x) -> x
       | _ -> invariant_violation("Expected an SID")
       };
       result = GlobalEnv.getClass(context, className) match {
@@ -938,15 +938,15 @@ fun populateClassesDir(
 }
 
 fun maybeGetClass(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   className: String,
 ): ?SkipAst.Class_def {
-  arr = classesDir.getArray(context, SKFS.SID(className));
+  arr = classesDir.getArray(context, SKStore.SID(className));
   if (arr.size() == 0) return None();
   Some(arr[0].value)
 }
 
-fun class_def(context: mutable SKFS.Context, cd: A.Class_def): A.Class_def {
+fun class_def(context: mutable SKStore.Context, cd: A.Class_def): A.Class_def {
   verify_methods_and_consts(cd);
   if (cd.value.isSome()) check_value_class(cd);
 
@@ -991,7 +991,7 @@ fun class_def(context: mutable SKFS.Context, cd: A.Class_def): A.Class_def {
 }
 
 fun inherit_class_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   cd: A.Class_def,
   p: A.Parent,
 ): A.Class_def {
@@ -1008,7 +1008,7 @@ fun inherit_class_params(
 }
 
 fun inherit_class(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   cd: A.Class_def,
   p: A.Parent,
 ): A.Class_def {
@@ -1039,7 +1039,7 @@ fun inherit_class(
 }
 
 fun inherit_trait(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   cd: A.Class_def,
   p: A.Parent,
 ): A.Class_def {
@@ -1944,7 +1944,7 @@ fun check_inherit_type_body(
 /* Adds inherited methods. */
 /*****************************************************************************/
 fun inherit_methods(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   self: A.Class_def,
   subst: SMap<A.Type_>,
   conditions: Array<A.When_type_clause>,
@@ -2021,7 +2021,7 @@ fun verify_methods(cd: A.Class_def, consts: UMap<A.Method_def>): void {
 /* Adds a new inherited method. */
 /*****************************************************************************/
 fun add_method(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   explicity: A.Explicity,
   self: A.Class_def,
   parent_name: A.Name,

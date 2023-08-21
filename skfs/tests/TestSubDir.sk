@@ -1,136 +1,136 @@
 module alias T = SKTest;
 
-module SKFSTest;
+module SKStoreTest;
 
 @test
 fun testSubDir(): void {
   dataStr1 = Array[
-    (SKFS.IID(1), SKFS.StringFile("1")),
-    (SKFS.IID(2), SKFS.StringFile("2")),
+    (SKStore.IID(1), SKStore.StringFile("1")),
+    (SKStore.IID(2), SKStore.StringFile("2")),
   ];
-  context = SKFS.run(context ~> {
+  context = SKStore.run(context ~> {
     dirStr1 = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/dirStr1/"),
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/dirStr1/"),
       dataStr1,
     );
     dirSingle = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/dirSingle/"),
-      Array[(SKFS.IID(0), SKFS.StringFile("0"))],
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/dirSingle/"),
+      Array[(SKStore.IID(0), SKStore.StringFile("0"))],
     );
     dir1 = dirStr1.map(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/dir1/"),
-      (v ~> SKFS.IntFile(v.value.toInt())),
+      SKStore.DirName::create("/dir1/"),
+      (v ~> SKStore.IntFile(v.value.toInt())),
     );
     _dir2 = dir1.contextWriterKeyMap(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/dir2/"),
+      SKStore.DirName::create("/dir2/"),
       (context, _writer, _key, v) ~> {
-        dirName = SKFS.DirName::create("/dir2/" + v.value + "/");
-        _ = dir1.map(SKFS.IntFile::fromFile, context, dirName, x ~> x);
+        dirName = SKStore.DirName::create("/dir2/" + v.value + "/");
+        _ = dir1.map(SKStore.IntFile::fromFile, context, dirName, x ~> x);
       },
     );
-    dir3 = SKFS.LHandle::create(
-      SKFS.StringFile::fromFile,
+    dir3 = SKStore.LHandle::create(
+      SKStore.StringFile::fromFile,
       context,
-      SKFS.DirName::create("/dir3/"),
+      SKStore.DirName::create("/dir3/"),
       (context, _self, key) ~> {
         keyStr = key.toString();
-        dirName = SKFS.DirName::create("/dir3/" + keyStr + "/");
-        _ = dirStr1.map(SKFS.StringFile::fromFile, context, dirName, x ~> x);
-        Array[SKFS.StringFile(keyStr)]
+        dirName = SKStore.DirName::create("/dir3/" + keyStr + "/");
+        _ = dirStr1.map(SKStore.StringFile::fromFile, context, dirName, x ~> x);
+        Array[SKStore.StringFile(keyStr)]
       },
     );
     _dir4 = dir1.contextWriterKeyMap(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/dir4/"),
+      SKStore.DirName::create("/dir4/"),
       (context, _writer, _, value) ~> {
-        v = dir3.get(context, SKFS.IID(value.value));
-        dirName = SKFS.DirName::create("/dir4/" + v.value + "/");
-        toAdd = dirSingle.get(context, SKFS.IID(0)).value;
-        _ = dir1.map(SKFS.IntFile::fromFile, context, dirName, x ~>
-          SKFS.IntFile(x.value + toAdd.toInt())
+        v = dir3.get(context, SKStore.IID(value.value));
+        dirName = SKStore.DirName::create("/dir4/" + v.value + "/");
+        toAdd = dirSingle.get(context, SKStore.IID(0)).value;
+        _ = dir1.map(SKStore.IntFile::fromFile, context, dirName, x ~>
+          SKStore.IntFile(x.value + toAdd.toInt())
         );
       },
     );
   });
   T.expectTrue(
-    context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) is Some _,
+    context.maybeGetDir(SKStore.DirName::create("/dir2/1/")) is Some _,
     "Testing subdir exists",
   );
   T.expectTrue(
-    context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) is Some _,
+    context.maybeGetDir(SKStore.DirName::create("/dir3/1/")) is Some _,
     "Testing lazy subdir exists",
   );
-  inputDir = context.unsafeGetEagerDir(SKFS.DirName::create("/dirStr1/"));
-  inputSingle = context.unsafeGetEagerDir(SKFS.DirName::create("/dirSingle/"));
-  inputDir.writeArray(context, SKFS.IID(1), Array[SKFS.StringFile("23")]);
+  inputDir = context.unsafeGetEagerDir(SKStore.DirName::create("/dirStr1/"));
+  inputSingle = context.unsafeGetEagerDir(SKStore.DirName::create("/dirSingle/"));
+  inputDir.writeArray(context, SKStore.IID(1), Array[SKStore.StringFile("23")]);
   context.update();
-  context.maybeGetDir(SKFS.DirName::create("/dir2/1/")) match {
+  context.maybeGetDir(SKStore.DirName::create("/dir2/1/")) match {
   | None() -> T.fail("Expected an empty directory, not None")
   | Some(dir) ->
-    T.expectTrue(dir is SKFS.DeletedDir _, "Testing subdir has been removed")
+    T.expectTrue(dir is SKStore.DeletedDir _, "Testing subdir has been removed")
   };
-  context.maybeGetDir(SKFS.DirName::create("/dir3/1/")) match {
+  context.maybeGetDir(SKStore.DirName::create("/dir3/1/")) match {
   | None() -> T.fail("Expected an empty directory, not None")
   | Some(dir) ->
     T.expectTrue(
-      dir is SKFS.DeletedDir _,
+      dir is SKStore.DeletedDir _,
       "Testing lazy subdir has been removed",
     )
   };
   T.expectTrue(
-    context.maybeGetDir(SKFS.DirName::create("/dir2/23/")) is Some _,
+    context.maybeGetDir(SKStore.DirName::create("/dir2/23/")) is Some _,
     "Testing new subdir exists",
   );
   T.expectTrue(
-    context.maybeGetDir(SKFS.DirName::create("/dir3/23/")) is Some _,
+    context.maybeGetDir(SKStore.DirName::create("/dir3/23/")) is Some _,
     "Testing new lazy subdir exists",
   );
-  inputDir.writeArray(context, SKFS.IID(255), Array[SKFS.StringFile("255")]);
+  inputDir.writeArray(context, SKStore.IID(255), Array[SKStore.StringFile("255")]);
   context.update();
-  inputDir.writeArray(context, SKFS.IID(255), Array[SKFS.StringFile("255")]);
+  inputDir.writeArray(context, SKStore.IID(255), Array[SKStore.StringFile("255")]);
   context.update();
-  inputSingle.writeArray(context, SKFS.IID(0), Array[SKFS.StringFile("1")]);
-  inputDir.writeArray(context, SKFS.IID(255), Array[SKFS.StringFile("255")]);
+  inputSingle.writeArray(context, SKStore.IID(0), Array[SKStore.StringFile("1")]);
+  inputDir.writeArray(context, SKStore.IID(255), Array[SKStore.StringFile("255")]);
   context.update()
 }
 
 @test
 fun testSubSubDirUnit(): void {
-  context = SKFS.run(context ~> {
+  context = SKStore.run(context ~> {
     dir1 = context.mkdir(
-      SKFS.IntFile::fromFile,
-      SKFS.DirName::create("/dir1/"),
-      Array[(SKFS.IID(0), SKFS.IntFile(0))],
+      SKStore.IntFile::fromFile,
+      SKStore.DirName::create("/dir1/"),
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
     );
     dir2 = context.mkdir(
-      SKFS.IntFile::fromFile,
-      SKFS.DirName::create("/dir2/"),
-      Array[(SKFS.IID(0), SKFS.IntFile(0))],
+      SKStore.IntFile::fromFile,
+      SKStore.DirName::create("/dir2/"),
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
     );
     subDir2 = dir2.map(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/subDir2/"),
+      SKStore.DirName::create("/subDir2/"),
       x ~> x + 1,
     );
     _ = dir1.contextMap(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/subDir1/"),
+      SKStore.DirName::create("/subDir1/"),
       (context, x) ~> {
-        !x.value = x.value + subDir2.get(context, SKFS.IID(0)).value;
+        !x.value = x.value + subDir2.get(context, SKStore.IID(0)).value;
         x
       },
     )
   });
-  dir2 = context.unsafeGetEagerDir(SKFS.DirName::create("/dir2/"));
-  dir2.writeArray(context, SKFS.IID(0), Array[SKFS.IntFile(1)]);
+  dir2 = context.unsafeGetEagerDir(SKStore.DirName::create("/dir2/"));
+  dir2.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(1)]);
   context.update()
 }

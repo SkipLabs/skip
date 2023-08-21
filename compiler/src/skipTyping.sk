@@ -66,7 +66,7 @@ fun make_exhaustive_pattern_env(
 }
 
 fun print_pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -83,7 +83,7 @@ fun print_pattern(
 }
 
 fun check_exhaustive_match(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -96,7 +96,7 @@ fun check_exhaustive_match(
 }
 
 fun check_exhaustive_match_is(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -109,7 +109,7 @@ fun check_exhaustive_match_is(
 }
 
 fun check_exhaustive_match_as(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -122,7 +122,7 @@ fun check_exhaustive_match_as(
 }
 
 fun check_exhaustive_try(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: SkipTypingUtils.Acc,
@@ -170,7 +170,7 @@ fun reportLocalsErrors(errors: List<SkipError.Trace>): void {
 /*****************************************************************************/
 
 fun solve_constraints(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -179,7 +179,7 @@ fun solve_constraints(
 }
 
 fun solve_constraints_msg(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   msg: String,
   env: TUtils.Env,
@@ -192,7 +192,7 @@ fun solve_constraints_msg(
  * constraints)
  */
 fun solve_call_constraints(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   last_constraint: Int,
   last_tvar: Int,
@@ -248,15 +248,15 @@ fun programToDefinitions(
 /*****************************************************************************/
 /* The main entry point */
 /*****************************************************************************/
-class DefFile(value: TAst.Def) extends SKFS.File
+class DefFile(value: TAst.Def) extends SKStore.File
 
-const dirName: SKFS.DirName = SKFS.DirName::create("/typing/");
-const dir: SKFS.EHandle<DefFile> = SKFS.EHandle(DefFile::fromFile, dirName);
+const dirName: SKStore.DirName = SKStore.DirName::create("/typing/");
+const dir: SKStore.EHandle<DefFile> = SKStore.EHandle(DefFile::fromFile, dirName);
 
 fun program(
-  context: mutable SKFS.Context,
-  defs: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
-): SKFS.EHandle<DefFile> {
+  context: mutable SKStore.Context,
+  defs: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
+): SKStore.EHandle<DefFile> {
   defs.contextWriterKeyValues(
     DefFile::fromFile,
     context,
@@ -267,21 +267,21 @@ fun program(
       | GlobalEnv.EClass(x) ->
         SkipError.keepErrors(3, context, () -> {
           writer.write(
-            SKFS.SID(x.name.i1),
+            SKStore.SID(x.name.i1),
             DefFile(SkipTypedAst.DClass(class_def(context, x.name))),
           )
         })
       | GlobalEnv.EConst(x) ->
         SkipError.keepErrors(3, context, () -> {
           writer.write(
-            SKFS.SID(x.name.i1),
+            SKStore.SID(x.name.i1),
             DefFile(SkipTypedAst.DConst(global_const_def(context, x.name))),
           )
         })
       | GlobalEnv.EFun(x) ->
         SkipError.keepErrors(3, context, () -> {
           writer.write(
-            SKFS.SID(x.name.i1),
+            SKStore.SID(x.name.i1),
             DefFile(SkipTypedAst.DFun(fun_def(context, x.name))),
           )
         })
@@ -295,7 +295,7 @@ fun program(
 }
 
 fun const_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   type: N.Type_,
@@ -334,7 +334,7 @@ fun const_def(
 }
 
 fun global_const_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   constName: N.Name,
 ): TAst.Const_def {
   cst = SkipNaming.getConst(context, constName);
@@ -376,7 +376,7 @@ fun global_const_def(
 }
 
 fun class_const(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   cst: N.Const_def,
@@ -392,7 +392,7 @@ fun class_const(
 }
 
 fun class_const_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   cst: N.Const_def,
@@ -444,7 +444,7 @@ fun class_const_(
 // This optimization can lead to unsound behavior if combined with lower bounds
 // on generics. And there are possibly other holes around contravariance
 fun method_is_copydown(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   name: N.Name,
   met: N.Method_def,
 ): Bool {
@@ -482,7 +482,7 @@ fun method_is_copydown(
 }
 
 fun class_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   className: SkipAst.Name,
 ): TAst.Class_def {
   cd = SkipNaming.getClass(context, className);
@@ -603,7 +603,7 @@ fun con_body(x: ?TAst.Expr): TAst.Expr_body {
 }
 
 fun type_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   tyd: N.Type_def,
@@ -620,7 +620,7 @@ fun type_def(
 }
 
 fun type_def_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -643,7 +643,7 @@ fun type_def_(
 }
 
 fun check_tyd_default(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -686,7 +686,7 @@ fun check_tyd_default(
 }
 
 fun make_extend(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -717,7 +717,7 @@ fun make_extend(
 }
 
 fun make_extend_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -763,7 +763,7 @@ fun make_extend_(
 }
 
 fun make_extend__(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -828,7 +828,7 @@ fun make_extend__(
 }
 
 fun merge_extend(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -865,7 +865,7 @@ fun merge_extend(
 }
 
 fun fun_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   funName: SkipAst.Name,
 ): TAst.Fun_def {
   fd = SkipNaming.getFun(context, funName);
@@ -878,7 +878,7 @@ fun fun_def(
 }
 
 fun named_fun_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fd: SkipNamedAst.Fun_def,
 ): TAst.Fun_def {
   env = makeEnv();
@@ -974,7 +974,7 @@ private fun assert_legal_memo_return_type(
 
 // Record the return type and, if applicable, yield type, in env.
 fun setReturnType(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1019,7 +1019,7 @@ fun setReturnType(
 }
 
 fun method_body(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1118,7 +1118,7 @@ fun method_body(
 const SOLVABLE_CONDITIONS_EDGE: String = "Note that implementations are not needed if the conditional constraints on the method are impossible to satisfy.\nBut due to conditional trait usage, we were unable to determine if the conditions on this method are possible to satisfy";
 
 fun check_method_defined(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1164,7 +1164,7 @@ fun check_method_defined(
 }
 
 fun method_body_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1205,7 +1205,7 @@ fun method_body_(
 }
 
 fun check_return_ty(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1223,7 +1223,7 @@ fun check_return_ty(
 }
 
 fun method_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1244,7 +1244,7 @@ fun method_def(
 }
 
 fun method_def_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1441,7 +1441,7 @@ fun assert_frozen_type(
 /* Class parameters */
 /*****************************************************************************/
 fun maybeClassParameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1456,7 +1456,7 @@ fun maybeClassParameters(
 }
 
 fun class_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1476,7 +1476,7 @@ fun class_parameters(
 /* Function parameters */
 /*****************************************************************************/
 fun class_fields(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1486,7 +1486,7 @@ fun class_fields(
 }
 
 fun class_field(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1503,7 +1503,7 @@ fun class_field(
 }
 
 fun class_field_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1518,7 +1518,7 @@ fun class_field_(
 }
 
 fun fun_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1528,7 +1528,7 @@ fun fun_parameters(
 }
 
 fun fun_param(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1560,7 +1560,7 @@ fun fun_param(
 }
 
 fun expand_fun_parameter_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   param: TAst.Parameter,
@@ -1570,7 +1570,7 @@ fun expand_fun_parameter_type(
 }
 
 fun expand_fun_parameter_types(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   x: Parameters<TAst.Parameter>,
@@ -1579,7 +1579,7 @@ fun expand_fun_parameter_types(
 }
 
 fun fun_param_value(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1695,7 +1695,7 @@ fun inner_type_for_class_add_outer_frozen(
 }
 
 fun call_or_constructor_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   pos: FileRange,
@@ -1817,7 +1817,7 @@ fun check_args_length<T>(
 }
 
 fun join_args(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -1855,7 +1855,7 @@ fun join_args(
 }
 
 fun call(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -1868,7 +1868,7 @@ fun call(
 }
 
 fun call_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -1924,7 +1924,7 @@ fun call_(
 }
 
 fun tfun_call(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -1956,7 +1956,7 @@ fun tfun_call(
 }
 
 fun constructor_call(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -2042,7 +2042,7 @@ fun constructor_call(
 }
 
 fun check_constructor_call(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   pos: FileRange,
   cd: N.Class_def,
@@ -2204,7 +2204,7 @@ fun maybe_tobject_kind(acc: TUtils.Acc, ty: N.Type_): ?String {
 /* Let bindings. */
 /*****************************************************************************/
 fun expr_bind(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -2223,7 +2223,7 @@ fun expr_bind(
 }
 
 fun expr_annotation(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -2276,7 +2276,7 @@ private base class ExprState {
 }
 
 fun expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -2396,7 +2396,7 @@ fun expr(
 }
 
 fun finish_call(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -2442,7 +2442,7 @@ fun finish_call(
 }
 
 fun magic_call(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -2496,7 +2496,7 @@ fun already_bound_msg(var_name: N.Name): String {
 }
 
 fun literal(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   pos: FileRange,
@@ -2523,7 +2523,7 @@ fun annotate_lambda_return(l: N.Expr, t: N.Type_): N.Expr {
 }
 
 fun expr_try(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -2563,7 +2563,7 @@ fun expr_try(
 }
 
 fun expr_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3459,7 +3459,7 @@ fun expr_(
 
 // Keep this in sync with bind_dot.
 fun get_field_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3486,7 +3486,7 @@ fun get_field_type(
 
 // Keep this in sync with get_field_type above.
 fun bind_dot(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3532,7 +3532,7 @@ fun convert_or_and(op: N.Binop_, e1: TAst.Expr, e2: TAst.Expr): TAst.Expr__ {
 }
 
 fun lam_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3545,7 +3545,7 @@ fun lam_parameters(
 }
 
 fun lam_parameter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   bacc: (Bool, TUtils.Acc),
@@ -3595,7 +3595,7 @@ fun add_field_targs(
 }
 
 fun explicit_targs(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -3634,7 +3634,7 @@ fun explicit_targs(
 }
 
 fun bind_explicit_targs(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3665,7 +3665,7 @@ fun bind_explicit_targs(
 /* Function used to solve lambda types introduced during a call. */
 /*****************************************************************************/
 fun solve_new_lambdas(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   last_id: Int,
   env: TUtils.Env,
@@ -3804,7 +3804,7 @@ private fun check_if_block_mutable(
 }
 
 fun array_element(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   fr: FileRange,
@@ -3827,7 +3827,7 @@ fun array_element(
 }
 
 fun match_branch_list(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   ety: TAst.Type_,
   rty: TAst.Type_,
@@ -3873,7 +3873,7 @@ fun get_mut_pat(acc: TUtils.Acc, ety: N.Type_): (N.Modality, N.Type_) {
 }
 
 fun pattern_guard(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3898,7 +3898,7 @@ fun pattern_guard(
 }
 
 fun patterns_action(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   ety: TAst.Type_,
   rty: TAst.Type_,
@@ -3935,7 +3935,7 @@ fun patterns_action(
 }
 
 fun patterns(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3954,7 +3954,7 @@ fun patterns(
 }
 
 fun pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -3979,7 +3979,7 @@ fun pattern(
 
 // return simple static expr converted to pattern, or error trace
 fun pattern_from_expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   expr: N.Expr,
 ): Result<N.Pattern_, SkipError.Trace> {
   fail_msg = "Constant must be initialized to a literal or static object expression, or a static reference to another such constant.";
@@ -4037,7 +4037,7 @@ fun pattern_from_expr(
 
 // return const's static RHS converted to pattern, or error trace
 fun pattern_from_const(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   def: N.Const_def,
 ): Result<N.Pattern_, SkipError.Trace> {
   def.value match {
@@ -4050,7 +4050,7 @@ fun pattern_from_const(
 }
 
 fun pattern_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4164,7 +4164,7 @@ fun obj_name_of_tid(x: N.Type_identifier): N.Name {
 }
 
 fun object_pattern_args(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   obj_name: N.Name,
@@ -4229,7 +4229,7 @@ fun object_pattern_args(
 }
 
 fun type_pat_arg(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pat_level: Int,
   env: TUtils.Env,
@@ -4262,7 +4262,7 @@ fun type_pat_arg(
 }
 
 fun object_pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -4307,7 +4307,7 @@ fun object_pattern(
 }
 
 fun call_args(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4317,7 +4317,7 @@ fun call_args(
 }
 
 fun ordered_expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4330,7 +4330,7 @@ fun ordered_expr(
 
 // Join types across cross patern binding
 fun bind_pattern_local(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4371,7 +4371,7 @@ fun inaccessible_field_in_pattern_message(fieldName: String): String {
 }
 
 fun check_pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fr: FileRange,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4417,7 +4417,7 @@ fun msg_no_existential_params(cname: String): String {
 const msg_no_existential_in_local: String = "Invalid pattern binding. Cannot bind this expression to a local.\nTry replacing with '_'";
 
 fun check_no_existential_in_local(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: TUtils.Acc,
   pat: TAst.Pattern,
 ): void {
@@ -4450,7 +4450,7 @@ fun check_no_existential_in_local(
 }
 
 fun check_existential_binding_ty(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fr: FileRange,
   acc: TUtils.Acc,
   msg: String,
@@ -4463,7 +4463,7 @@ fun check_existential_binding_ty(
 }
 
 fun check_existential_inner(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fr: FileRange,
   acc: TUtils.Acc,
   msg: String,
@@ -4491,7 +4491,7 @@ fun check_existential_inner(
 }
 
 fun check_concrete_pat_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fr: FileRange,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -4541,7 +4541,7 @@ fun check_concrete_pat_type(
 }
 
 fun check_pat_type_tparam(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: TUtils.Acc,
   id: String,
 ): ?Bool {
@@ -4554,7 +4554,7 @@ fun check_pat_type_tparam(
 }
 
 fun loop_body(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   fr: FileRange,
   env: TUtils.Env,
@@ -4588,7 +4588,7 @@ base class DotResult {
   | DotFound(acc: TUtils.Acc, info: Dot_expr_info, source: N.Name)
 
   fun wrapClassObject(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: TUtils.Env,
     fr: FileRange,
     tobject: N.Name,
@@ -4602,7 +4602,7 @@ base class DotResult {
     this
 
   fun updateTparam(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: TUtils.Env,
     tparam_id: String,
     tparam_name: String,
@@ -4618,7 +4618,7 @@ base class DotResult {
     );
     this
 
-  fun promote(context: mutable SKFS.Context, env: TUtils.Env): this
+  fun promote(context: mutable SKStore.Context, env: TUtils.Env): this
   | DotNone()
   | DotError _ ->
     this
@@ -4639,7 +4639,7 @@ base class DotResult {
 }
 
 fun expr_dot(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   sk_static: Bool,
   env: TUtils.Env,
@@ -4692,7 +4692,7 @@ mutable class ExprDot(
   is_pattern: Bool,
 ) {
   static fun start(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     sk_static: Bool,
     env: TUtils.Env,
@@ -4718,7 +4718,7 @@ mutable class ExprDot(
   }
 
   private mutable fun entry(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     acc: TUtils.Acc,
     obj_ty: TAst.Type_,
   ): DotResult {
@@ -4764,7 +4764,7 @@ mutable class ExprDot(
   }
 
   private mutable fun static_find(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     fr: FileRange,
     tobject: N.Name,
     acc: TUtils.Acc,
@@ -4775,7 +4775,7 @@ mutable class ExprDot(
   }
 
   private mutable fun find(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     tobject: ?N.Name,
     tparam: ?N.Type_,
     acc: TUtils.Acc,
@@ -4842,7 +4842,7 @@ mutable class ExprDot(
   }
 
   private mutable fun tapply(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     tobject: ?N.Name,
     tparam: ?N.Type_,
     acc: TUtils.Acc,
@@ -4926,7 +4926,7 @@ mutable class ExprDot(
 }
 
 fun field_map_for_error(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   sk_static: Bool,
@@ -4946,7 +4946,7 @@ fun field_map_for_error(
 }
 
 fun field_kind_map_for_error(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   acc: TUtils.Acc,
   sk_static: Bool,
@@ -4997,7 +4997,7 @@ fun field_kind_map_for_error(
 }
 
 fun find_fields_for_error(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   name: N.Name,
 ): SMap<(String, N.FieldKind)> {
   cd = SkipNaming.getClass(context, name);
@@ -5118,7 +5118,7 @@ fun fix_fdt_tfun_purity_modifiers(mode: N.Modality, type: N.Type_): N.Type_ {
 /* Checking that the field can be accessed (visibility). */
 /*****************************************************************************/
 fun check_field_visibility(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   pos: FileRange,
   class_name: N.Name,
@@ -5139,7 +5139,7 @@ fun check_field_visibility(
 }
 
 fun check_visibility(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   pos: FileRange,
   class_name: N.Name,
@@ -5175,7 +5175,7 @@ fun check_private(
 }
 
 fun check_protected(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: TUtils.Env,
   pos: FileRange,
   vis_pos: FileRange,
@@ -5314,7 +5314,7 @@ fun specialize_this_type(
  * lambda is used inside another, the captured lambda should be sovled first
  */
 fun solve_lambdas(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
@@ -5341,7 +5341,7 @@ fun solve_lambdas(
 }
 
 fun lambda(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   can_delay: Bool,
   env: TUtils.Env,
@@ -5520,7 +5520,7 @@ fun check_missing_fields(
 }
 
 fun check_implement(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   _extend_str: String,
   env: TUtils.Env,
@@ -5600,7 +5600,7 @@ fun check_field_tparams_add_constraints<Ta, Tb>(
 }
 
 fun check_fields(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: TUtils.Env,
@@ -5907,7 +5907,7 @@ fun check_default_arg(
 /* Returns "Some inst_type" when inst must be treated differently than "this".
  */
 fun make_inst(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   child_field: N.Field_type,
   child_class: N.Class_def,
 ): ?(N.Name, Array<N.Type_>) {
@@ -5928,7 +5928,7 @@ fun make_inst(
 }
 
 fun make_inst_from_class(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   inst_name: N.Name,
 ): (N.Name, Array<N.Type_>) {
   cd = SkipNaming.getClass(context, inst_name);
@@ -5959,7 +5959,7 @@ fun make_inst_from_extends(
  * method, as if it was being called
  */
 fun check_whenparams(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,

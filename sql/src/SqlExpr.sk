@@ -40,7 +40,7 @@ base class ComparisonKind {
 
 class ExprEvaluator(
   entries: Array<Row>,
-  tables: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+  tables: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
   up: ?ExprEvaluator,
 ) {
   fun toString(): String {
@@ -48,7 +48,7 @@ class ExprEvaluator(
   }
 
   private fun evalCFExpr(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     expr: SKSQL.CExpr<Float>,
   ): AValue<Float> {
     expr match {
@@ -151,7 +151,7 @@ class ExprEvaluator(
   }
 
   private fun evalCSExpr(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     expr: SKSQL.CExpr<String>,
   ): AValue<String> {
     expr match {
@@ -271,7 +271,7 @@ class ExprEvaluator(
   }
 
   fun evalWhere(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     expr: ?SKSQL.CExpr<Int>,
   ): AValue<Int> {
     expr match {
@@ -281,7 +281,7 @@ class ExprEvaluator(
   }
 
   fun evalCIExpr(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     expr: SKSQL.CExpr<Int>,
   ): AValue<Int> {
     expr match {
@@ -508,7 +508,7 @@ class ExprEvaluator(
       sdir = evalSelect(context, select, Some(this));
       dir = context.unsafeGetEagerDir(sdir.dirName);
       if (dir.time.value > 0) {
-        !dir.time = SKFS.Time(-dir.time.value);
+        !dir.time = SKStore.Time(-dir.time.value);
         context.setDir(dir.dirName, dir);
       };
       size = dir.size(context);
@@ -674,7 +674,7 @@ class ExprEvaluator(
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
       if (dir.time.value > 0) {
-        !dir.time = SKFS.Time(-dir.time.value);
+        !dir.time = SKStore.Time(-dir.time.value);
         context.setDir(dir.dirName, dir);
       };
       invariant(query.orderBy is None());
@@ -717,7 +717,7 @@ class ExprEvaluator(
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
       if (dir.time.value > 0) {
-        !dir.time = SKFS.Time(-dir.time.value);
+        !dir.time = SKStore.Time(-dir.time.value);
         context.setDir(dir.dirName, dir);
       };
       invariant(query.orderBy is None());
@@ -760,7 +760,7 @@ class ExprEvaluator(
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
       if (dir.time.value > 0) {
-        !dir.time = SKFS.Time(-dir.time.value);
+        !dir.time = SKStore.Time(-dir.time.value);
         context.setDir(dir.dirName, dir);
       };
       invariant(query.orderBy is None());
@@ -805,14 +805,14 @@ class ExprEvaluator(
   }
 
   private fun evalQuery(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     select: CSelect,
   ): AValue<CValue> {
     sdir = evalSelect(context, select, Some(this));
     dirName = sdir.dirName;
     dir = context.unsafeGetEagerDir(dirName);
     if (dir.time.value > 0) {
-      !dir.time = SKFS.Time(-dir.time.value);
+      !dir.time = SKStore.Time(-dir.time.value);
       context.setDir(dir.dirName, dir);
     };
     keys = dir.keys();
@@ -844,7 +844,7 @@ class ExprEvaluator(
   }
 
   fun evalCGExpr(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     e: SKSQL.CGExpr,
   ): AValue<CValue> {
     result = e match {

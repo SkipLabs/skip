@@ -139,7 +139,7 @@ class Config private {
 module end;
 
 fun createOptimizedFunctions(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: GlobalEnv,
   config: Config.Config,
 ): GlobalEnv {
@@ -280,11 +280,11 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
   }
 }
 
-class TickConfigFile(value: (Int, Config.Config)) extends SKFS.File
+class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
 
 fun compile(
   config: Config.Config,
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fileNames: Array<String>,
 ): void {
   // Convert project:program-unit targets to a list of source files.
@@ -302,8 +302,8 @@ fun compile(
 
   FileCache.writeFiles(context, fileNames);
 
-  backendDirName = SKFS.DirName::create("/backend/");
-  backendSinkDirName = SKFS.DirName::create("/backendSink/");
+  backendDirName = SKStore.DirName::create("/backend/");
+  backendSinkDirName = SKStore.DirName::create("/backendSink/");
 
   if (context.unsafeMaybeGetEagerDir(backendDirName) is None()) {
     outerIst = OuterIstToIR.makeOuterIst(context);
@@ -314,14 +314,14 @@ fun compile(
     converter = OuterIstToIR.Converter::create(
       context,
       config,
-      SKFS.DirName::create("/converter/"),
+      SKStore.DirName::create("/converter/"),
       outerIst,
     );
 
     backendDir = context.mkdir(
       TickConfigFile::fromFile,
       backendDirName,
-      Array[(SKFS.IID(0), TickConfigFile((-128, config)))],
+      Array[(SKStore.IID(0), TickConfigFile((-128, config)))],
     );
 
     _ = backendDir.contextWriterKeyValues(
@@ -434,7 +434,7 @@ fun compile(
       .unsafeGetEagerDir(backendDirName)
       .writeArray(
         context,
-        SKFS.IID(0),
+        SKStore.IID(0),
         Array[TickConfigFile((context.tick.value, config))],
       );
   };

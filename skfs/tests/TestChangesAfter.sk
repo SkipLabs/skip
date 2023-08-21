@@ -4,18 +4,18 @@
 
 module alias T = SKTest;
 
-module SKFSTest;
+module SKStoreTest;
 
 @test
 fun testChangesAfter(): void {
-  dirName = SKFS.DirName::create("/sinput/");
-  context = SKFS.run(context ~> {
+  dirName = SKStore.DirName::create("/sinput/");
+  context = SKStore.run(context ~> {
     _ = context.mkdir(
-      SKFS.StringFile::fromFile,
+      SKStore.StringFile::fromFile,
       dirName,
       Array[
-        (SKFS.IID(0), SKFS.StringFile("0")),
-        (SKFS.IID(1), SKFS.StringFile("0")),
+        (SKStore.IID(0), SKStore.StringFile("0")),
+        (SKStore.IID(1), SKStore.StringFile("0")),
       ],
     );
   });
@@ -26,38 +26,38 @@ fun testChangesAfter(): void {
     .getChangesAfter(tick);
   invariant(!isReset);
   T.expectEq(
-    Array<SKFS.BaseName>[SKFS.IID(0), SKFS.IID(1)],
+    Array<SKStore.BaseName>[SKStore.IID(0), SKStore.IID(1)],
     changedKeys.collect(Array).sorted(),
     "Test getChangesAfter 0",
   );
   !tick = context.tick;
-  write(context, dirName, SKFS.IID(1), Array[]);
-  write(context, dirName, SKFS.IID(2), Array[SKFS.StringFile("22")]);
+  write(context, dirName, SKStore.IID(1), Array[]);
+  write(context, dirName, SKStore.IID(2), Array[SKStore.StringFile("22")]);
   context.update();
   (!isReset, !changedKeys) = context
     .unsafeGetEagerDir(dirName)
     .getChangesAfter(tick);
   invariant(!isReset);
   T.expectEq(
-    Array<SKFS.BaseName>[SKFS.IID(1), SKFS.IID(2)],
+    Array<SKStore.BaseName>[SKStore.IID(1), SKStore.IID(2)],
     changedKeys.collect(Array).sorted(),
     "Test getChangesAfter 1",
   );
 
   for (i in Range(0, 1000)) {
-    write(context, dirName, SKFS.IID(i), Array[SKFS.StringFile("23")]);
+    write(context, dirName, SKStore.IID(i), Array[SKStore.StringFile("23")]);
   };
   context.update();
 
   rand = Random::mcreate(23);
   for (i in Range(0, 100)) {
     !tick = context.tick;
-    changes = SortedSet<SKFS.BaseName>[];
+    changes = SortedSet<SKStore.BaseName>[];
     for (_ in Range(0, rand.random(0, 100))) {
       dir = context.unsafeGetEagerDir(dirName);
-      key = SKFS.IID(rand.random(0, 1000));
+      key = SKStore.IID(rand.random(0, 1000));
       current = dir.getArrayRaw(key);
-      value = Array[SKFS.StringFile(rand.random(44, 48).toString())];
+      value = Array[SKStore.StringFile(rand.random(44, 48).toString())];
       if (native_eq(current, value) != 0) {
         !changes = changes.set(key);
       };

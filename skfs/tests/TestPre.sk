@@ -1,48 +1,48 @@
 module alias T = SKTest;
 
-module SKFSTest;
+module SKStoreTest;
 
 @test
 fun testPre(): void {
-  context = SKFS.run(context ~> {
+  context = SKStore.run(context ~> {
     dirSInput1 = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/sinput/"),
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/sinput/"),
       Array[
-        (SKFS.IID(0), SKFS.StringFile("23")),
-        (SKFS.IID(1), SKFS.StringFile("35")),
+        (SKStore.IID(0), SKStore.StringFile("23")),
+        (SKStore.IID(1), SKStore.StringFile("35")),
       ],
     );
 
     _dirSInput2 = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/sinput2/"),
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/sinput2/"),
       Array[
-        (SKFS.IID(0), SKFS.StringFile("44")),
-        (SKFS.IID(1), SKFS.StringFile("45")),
+        (SKStore.IID(0), SKStore.StringFile("44")),
+        (SKStore.IID(1), SKStore.StringFile("45")),
       ],
     );
 
     dirInput = dirSInput1.map(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/input/"),
-      x ~> SKFS.IntFile(x.value.toInt()),
+      SKStore.DirName::create("/input/"),
+      x ~> SKStore.IntFile(x.value.toInt()),
     );
     _dir = dirInput.contextWriterKeyMap(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/diff/"),
+      SKStore.DirName::create("/diff/"),
       (context, writer, key, valueFile) ~> {
         preOpt = dirInput.pre(context);
         preOpt match {
-        | None() -> writer.write(key, SKFS.IntFile(0))
+        | None() -> writer.write(key, SKStore.IntFile(0))
         | Some(pre) ->
           pre.maybeGet(context, key) match {
-          | None() -> writer.write(key, SKFS.IntFile(0))
+          | None() -> writer.write(key, SKStore.IntFile(0))
           | Some(old) ->
             diff = valueFile.value - old.value;
-            writer.write(key, SKFS.IntFile(diff))
+            writer.write(key, SKStore.IntFile(diff))
           }
         }
       },
@@ -52,42 +52,42 @@ fun testPre(): void {
   /***************************************************************************/
   // STARTING TESTS
 
-  dirSInput1 = SKFS.DirName::create("/sinput/");
-  dirInput = SKFS.DirName::create("/input/");
-  dirInputEHandle = SKFS.EHandle(SKFS.IntFile::fromFile, dirInput);
+  dirSInput1 = SKStore.DirName::create("/sinput/");
+  dirInput = SKStore.DirName::create("/input/");
+  dirInputEHandle = SKStore.EHandle(SKStore.IntFile::fromFile, dirInput);
 
-  write(context, dirSInput1, SKFS.IID(3), Array[SKFS.StringFile("3")]);
+  write(context, dirSInput1, SKStore.IID(3), Array[SKStore.StringFile("3")]);
   context.update();
-  write(context, dirSInput1, SKFS.IID(4), Array[SKFS.StringFile("4")]);
+  write(context, dirSInput1, SKStore.IID(4), Array[SKStore.StringFile("4")]);
   context.update();
   T.expectEq(
-    Array<SKFS.File>[SKFS.IntFile(3)],
+    Array<SKStore.File>[SKStore.IntFile(3)],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
-      SKFS.IID(3),
+      SKStore.IID(3),
     ),
     "Test pre 1",
   );
-  write(context, dirSInput1, SKFS.IID(3), Array[]);
+  write(context, dirSInput1, SKStore.IID(3), Array[]);
   context.update();
   T.expectEq(
-    Array<SKFS.File>[SKFS.IntFile(4)],
+    Array<SKStore.File>[SKStore.IntFile(4)],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
-      SKFS.IID(4),
+      SKStore.IID(4),
     ),
     "Test pre 2",
   );
-  write(context, dirSInput1, SKFS.IID(4), Array[]);
+  write(context, dirSInput1, SKStore.IID(4), Array[]);
   context.update();
   T.expectEq(
-    Array<SKFS.File>[],
+    Array<SKStore.File>[],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
-      SKFS.IID(3),
+      SKStore.IID(3),
     ),
     "Test pre 3",
   )

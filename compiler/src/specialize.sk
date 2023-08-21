@@ -394,7 +394,7 @@ private base class OptionStyle uses Equality, Show {
 }
 
 mutable class Specializer{
-  mutable tick: SKFS.Tick,
+  mutable tick: SKStore.Tick,
 
   // For each FrontEndLazyGClass, what are all its SClass instances?
   mutable gclassMap: SortedMap<GClassName, SortedSet<SClassID>> = SortedMap[],
@@ -424,7 +424,7 @@ mutable class Specializer{
   mutable pos: Pos,
 } extends ClassLookupEnv {
   static fun make(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     config: Config.Config,
     converter: Converter,
   ): mutable Specializer {
@@ -610,7 +610,7 @@ mutable class Specializer{
   // use the tparamInherit field to determine the targ values based on
   // information from the class which the method call was compiled against.
   mutable fun computeMethodTargs(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     call: GCallMethodBase,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
   ): Array<Tclass> {
@@ -673,7 +673,7 @@ mutable class Specializer{
 
   // Find the transitive closure of functions and classes
   // reachable from our original root set so we can compile them all.
-  mutable fun findAllFunctionsAndSClasses(context: mutable SKFS.Context): void {
+  mutable fun findAllFunctionsAndSClasses(context: mutable SKStore.Context): void {
     // Make sure our builtin types exist so we can spontaneously create
     // instances later, e.g. during lowering.
     builtinTypes = Array[
@@ -696,7 +696,7 @@ mutable class Specializer{
     tickCopy = this.tick;
 
     for (tt in builtinTypes) {
-      this.!tick = SKFS.Tick(-128);
+      this.!tick = SKStore.Tick(-128);
       (t, lazyGClass) = tt;
       sc = this.getSClass2(
         context,
@@ -748,11 +748,11 @@ mutable class Specializer{
   }
 
   mutable fun withRegion<T>(
-    context: mutable SKFS.Context,
-    f: (mutable SKFS.Context, mutable Specializer) ~> T,
+    context: mutable SKStore.Context,
+    f: (mutable SKStore.Context, mutable Specializer) ~> T,
   ): T {
     frozenSpecializer = this.chill();
-    (newSpecializer, result) = SKFS.withRegion(context, (_, context) ~> {
+    (newSpecializer, result) = SKStore.withRegion(context, (_, context) ~> {
       specializer = frozenSpecializer.mclone();
       result = f(context, specializer);
       (specializer.chill(), result)
@@ -763,7 +763,7 @@ mutable class Specializer{
 
   // Specializes pending functions. Returns true if anything changed.
   private mutable fun specializePendingFuns(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
   ): Bool {
     changed = false;
     while (!this.funStackIsEmpty()) {
@@ -778,7 +778,7 @@ mutable class Specializer{
   }
 
   private mutable fun specializePendingFun(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     f: GFunction,
     targs: Array<Tclass>,
   ): void {
@@ -1053,7 +1053,7 @@ mutable class Specializer{
   // contravariance in generic types. Basically if it is ever legal to cast
   // 'sub' to 'super'
   private mutable fun inherit(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     super: SClassInfo,
     sub: SClassInfo,
   ): (SClassInfo, SClassInfo) {
@@ -1081,7 +1081,7 @@ mutable class Specializer{
   }
 
   mutable fun specializeType2(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     generic: LazyGClass,
     mutability: Mutability,
     targs: Array<Type>,
@@ -1109,7 +1109,7 @@ mutable class Specializer{
 
   // Converts a non-parametric type to a Tclass.
   mutable fun getTclass2(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     generic: LazyGClass,
     targs: Array<Tclass>,
     mutability: Mutability,
@@ -1135,7 +1135,7 @@ mutable class Specializer{
   }
 
   mutable fun getTclass3(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     gt: GType,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     pos: Pos = this.pos,
@@ -1194,7 +1194,7 @@ mutable class Specializer{
   }
 
   mutable fun specializeType(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     t: GType,
     mapCache: mutable UnorderedMap<(GType, Bool), Type>,
     callers: Array<FunSuperpositionID>,
@@ -1227,7 +1227,7 @@ mutable class Specializer{
   // later stages of the compiler we make their return types always be
   // scalarized out to an instance of this if they have more than one argument.
   mutable fun getReturnTuple(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     types: Array<Tclass>,
   ): Tclass {
     invariant(types.size() > 1, "No need for 0- or 1-return tuples.");
@@ -1250,7 +1250,7 @@ mutable class Specializer{
   // can of what's happening without introducing a lot of complexity
   // related to nested value classes etc.
   mutable fun getReturnType(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     typ: Type,
     callers: Array<FunSuperpositionID>,
     pos: Pos,
@@ -1352,7 +1352,7 @@ mutable class Specializer{
   // Base<T>, Concrete<T> and Class<T> to the corresponding metaclass,
   // or return 'hc' if no such conversion is possible.
   private mutable fun maybeConvertMetaClass(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     hc: HalfClass,
   ): HalfClass {
     (gid, targ) = hc.generic match {
@@ -1414,7 +1414,7 @@ mutable class Specializer{
   }
 
   private mutable fun getOptionTagType(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     optionGClass: LazyGClass,
   ): Tclass {
     lazyGClass = optionGClass match {
@@ -1427,7 +1427,7 @@ mutable class Specializer{
   }
 
   mutable fun getSClass2(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     hc: HalfClass,
   ): SClassInfo {
     // Canonicalize a Concrete<T>, etc. to the right metaclass.
@@ -1733,7 +1733,7 @@ mutable class Specializer{
   // add entry to info's method map, and optionally request
   // implementation function
   private mutable fun addMethod(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     info: SClassInfo,
     m: MethodKey,
     requestImpl: Bool,
@@ -1767,7 +1767,7 @@ mutable class Specializer{
   }
 
   private mutable fun noteCalledMethod(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     receiver: SClassInfo,
     m: MethodKey,
   ): SClassInfo {
@@ -1806,7 +1806,7 @@ mutable class Specializer{
   }
 
   mutable fun requestMethod(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     method: String,
     objType: Tclass,
     targs: Array<Tclass>,
@@ -1819,7 +1819,7 @@ mutable class Specializer{
   // Ask that the requested function be compiled to machine code compatible
   // with the given targs.
   mutable fun requestFunction(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: LazyGFun,
     methodTargs: Array<Tclass>,
     classTargs: Array<Tclass> = Array[],
@@ -1897,7 +1897,7 @@ mutable class Specializer{
   // partition every function. The real algorithm needs to examine the GInstrs
   // and other referenced functions to decide what needs to be partitioned.
   mutable fun partitionFunctions(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     runtimeFunctionsVec: readonly Vector<FrontEndLazyGFun>,
     env: GlobalEnv,
     config: Config.Config,
@@ -2092,7 +2092,7 @@ mutable class FunSpecializer{
   }
 
   static fun run(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     config: Config.Config,
     specializer: mutable Specializer,
     gfunction: GFunction,
@@ -2311,7 +2311,7 @@ mutable class FunSpecializer{
   // Given a set of outgoing Targs for a function call, returns the
   // SuperpositionMap for it.
   mutable fun getFunSMap(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     targs: Array<GType>,
   ): SuperpositionMap<FunSuperpositionID> {
     if (targs.isEmpty()) {
@@ -2359,7 +2359,7 @@ mutable class FunSpecializer{
   }
 
   mutable fun specializeType(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     t: GType,
     literalType: Bool = false,
   ): Type {
@@ -2374,7 +2374,7 @@ mutable class FunSpecializer{
   }
 
   mutable fun specializeType2(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     lazyGClass: LazyGClass,
     targs: Array<Type>,
     mutability: Mutability,
@@ -2397,7 +2397,7 @@ mutable class FunSpecializer{
   }
 
   mutable fun getOptionStyle(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     gt: GType,
   ): ?OptionStyle {
     // If we are in a superposition of Option<Foo> and Option<Bar>,
@@ -2426,7 +2426,7 @@ mutable class FunSpecializer{
   //
   // TODO: Delete forceSomeUndef flag once T25379806 is fixed.
   mutable fun getValue(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     val: GInstr,
     forceSomeUndef: Bool = false,
   ): MaybeExists<InstrTree> {
@@ -2516,7 +2516,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGSuspend(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     a: GSuspend,
     pos: Pos,
   ): void {
@@ -2581,7 +2581,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallFunction(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     call: GCallFunctionBase,
     typ: Type,
     pos: Pos,
@@ -2632,7 +2632,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallFunctionWithSmap(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     callID: GInstrID,
     callArgs: Array<GInstr>,
     name: LazyGFun,
@@ -2737,7 +2737,7 @@ mutable class FunSpecializer{
 
   // Call a method on a KValue or KClass.
   private mutable fun emitGCallFinalMethod(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     callID: GInstrID,
     objType: Type,
     method: String,
@@ -2812,7 +2812,7 @@ mutable class FunSpecializer{
 
   // Call a method on a KBase.
   private mutable fun emitGCallVirtualMethod(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     callID: GInstrID,
     method: String,
     targs: Array<Type>,
@@ -2902,7 +2902,7 @@ mutable class FunSpecializer{
   // Implement SentinelOption::isSome by comparing the appropriate
   // field against the chosen sentinel constant.
   private mutable fun emitGCallToIsSome(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     callID: GInstrID,
     args: Array<GInstr>,
     pos: Pos,
@@ -2954,7 +2954,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallMethod(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     call: GCallMethodBase,
     typ: Type,
     pos: Pos,
@@ -3014,7 +3014,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGFreeze(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     frz: GFreeze,
     pos: Pos,
   ): void {
@@ -3061,7 +3061,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCastOrReinterpret(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     c: GTypedStmt,
     resultInstrType: Concrete<SimpleUnaryStmt>,
     castValue: GInstr,
@@ -3108,7 +3108,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGEArray(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     ev: GEArray,
     typ: Type,
     pos: Pos,
@@ -3162,7 +3162,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGGetField(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     gf: GGetField,
     typ: Type,
     pos: Pos,
@@ -3212,7 +3212,7 @@ mutable class FunSpecializer{
   // Converts Some(x) or None() to the corresponding code to construct
   // the analogous FlagOption or SentinelOption.
   private mutable fun optionGObjectValue(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     o: GObject,
     style: OptionStyle,
   ): InstrTree {
@@ -3277,7 +3277,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGObject(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     o: GObject,
     typ: Type,
     pos: Pos,
@@ -3344,7 +3344,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGReturn(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     r: GReturn,
     pos: Pos,
   ): void {
@@ -3356,7 +3356,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGSetField(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     s: GSetField,
     pos: Pos,
   ): void {
@@ -3403,7 +3403,7 @@ mutable class FunSpecializer{
   //      bbb()
   //    }
   private mutable fun emitOptionGTypeSwitch(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     ts: GTypeSwitch,
     style: OptionStyle,
     pos: Pos,
@@ -3462,7 +3462,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGTypeSwitch(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     ts: GTypeSwitch,
     pos: Pos,
   ): void {
@@ -3494,7 +3494,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGWith(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     w: GWith,
     resultType: Type,
     pos: Pos,
@@ -3559,7 +3559,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun initializeGeneratorInfo(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     none: GInstr,
     pos: Pos,
   ): void {
@@ -3587,7 +3587,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGYield(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     r: GYield,
     pos: Pos,
   ): void {
@@ -3601,7 +3601,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGYieldBreak(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     r: GYieldBreak,
     pos: Pos,
   ): void {
@@ -3633,7 +3633,7 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun go(context: mutable SKFS.Context): Function {
+  private mutable fun go(context: mutable SKStore.Context): Function {
     fpos = this.optinfo.f.pos;
 
     for (block in this.gfunction.blocks) {

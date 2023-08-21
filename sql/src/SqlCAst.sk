@@ -61,7 +61,7 @@ base class CValue uses Orderable, Show {
     }
   }
 
-  fun toStringWithFormat(format: SKFS.OutputFormat): String {
+  fun toStringWithFormat(format: SKStore.OutputFormat): String {
     this match {
     | CInt(n) -> n.toString()
     | CFloat(f) -> floatToString(f)
@@ -70,10 +70,10 @@ base class CValue uses Orderable, Show {
       for (c in str) {
         if (c == '"') {
           format match {
-          | SKFS.OJSON _ -> result.push('\\')
-          | SKFS.OSQL _ -> void
-          | SKFS.OCSV _ -> result.push(c)
-          | SKFS.OJS _ ->
+          | SKStore.OJSON _ -> result.push('\\')
+          | SKStore.OSQL _ -> void
+          | SKStore.OCSV _ -> result.push(c)
+          | SKStore.OJS _ ->
             invariant_violation(
               "Internal error: JS direct mode should never be pretty-printed",
             )
@@ -108,15 +108,15 @@ base class SubSelectTask uses Orderable {
   children =
   | SubSelect(CSelect)
   | SubMerge{
-    leftDirName: SKFS.DirName,
+    leftDirName: SKStore.DirName,
     leftColNbr: Int,
     leftIsUnique: Bool,
-    leftRanges: ?Array<SKFS.KeyRange>,
-    rightDirName: SKFS.DirName,
+    leftRanges: ?Array<SKStore.KeyRange>,
+    rightDirName: SKStore.DirName,
     rightColNbr: Int,
     rightIsUnique: Bool,
-    rightRanges: ?Array<SKFS.KeyRange>,
-    childName: SKFS.DirName,
+    rightRanges: ?Array<SKStore.KeyRange>,
+    childName: SKStore.DirName,
     kinds: Array<(Int, IKind, Type)>,
     joinKind: JoinKind,
     onlyLeftValues: Bool = false,
@@ -131,7 +131,7 @@ class CSelect{
   sets: Array<(Int, CGExpr)>,
   aggr: ?Array<(AggrKind, CGExpr)>,
   kinds: Array<(Int, SKSQL.IKind, SKSQL.Type)>,
-  from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+  from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
   where: ?CExpr<Int>,
   groupBy: ?Array<CGroupByElt>,
   having: ?CExpr<Int>,
@@ -140,9 +140,9 @@ class CSelect{
   rest: ?(QueryKind, CSelect),
   needUp: Bool,
   directMode: Bool,
-  format: SKFS.OutputFormat,
+  format: SKStore.OutputFormat,
   other: Array<SubSelectTask>,
-} extends SKFS.File uses Orderable
+} extends SKStore.File uses Orderable
 
 class CJoin{
   kind: JoinKind,

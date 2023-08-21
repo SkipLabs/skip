@@ -1079,7 +1079,7 @@ fun verify_readonly_type_(
  */
 /*****************************************************************************/
 fun promote(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   variance: N.Variance,
   subst: IMap<N.Type_>,
@@ -1139,7 +1139,7 @@ fun has_looped_promotion(env: Env, nm: N.Name): Bool {
 }
 
 fun promote_inter_elt(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   variance: N.Variance,
   mode: N.Modality,
@@ -1153,7 +1153,7 @@ fun promote_inter_elt(
 }
 
 fun contra_promote(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   variance: N.Variance,
   subst: IMap<N.Type_>,
@@ -1205,7 +1205,7 @@ fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
 }
 
 fun promote_tapply(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   var: N.Variance,
@@ -1236,7 +1236,7 @@ fun promote_tapply(
 }
 
 fun force_promote_tapply(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   var: N.Variance,
@@ -1262,7 +1262,7 @@ fun force_promote_tapply(
 }
 
 fun promote_targs(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   variance: N.Variance,
   mode: N.Modality,
@@ -1281,7 +1281,7 @@ fun promote_targs(
 }
 
 fun promote_targ(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   variance: A.Variance,
   subst: IMap<N.Type_>,
@@ -1300,7 +1300,7 @@ fun compare_set_elt(l: N.InterElt, r: N.InterElt): Order {
 }
 
 fun make_promoted(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   variance: N.Variance,
@@ -1365,7 +1365,7 @@ fun make_promoted(
 }
 
 fun make_promoted_elt(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   name: N.Name,
   targs: Array<N.Type_>,
   wcs: Array<Array<N.Whenclause>>,
@@ -1396,7 +1396,7 @@ fun make_promoted_elt(
  *   the property cannot hold, you throw
  */
 fun join(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -1427,7 +1427,7 @@ fun join(
 }
 
 fun join_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -1754,7 +1754,7 @@ fun join_(
 }
 
 fun join_try_list(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   exn: Exception,
   env: Env,
@@ -1801,7 +1801,7 @@ fun join_try_list(
 }
 
 fun is_tset_all_ktype(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   subst: IMap<N.Type_>,
   ty: N.Type_,
 ): Bool {
@@ -1873,7 +1873,7 @@ fun all_ktype(x: Array<N.InterElt>): Bool {
  * which would cause a Foo + Bar which could explode at runtime
  */
 fun drop_extraneous_ktype(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   elts: Array<N.InterElt>,
 ): Array<N.InterElt> {
   if (elts.isEmpty()) return elts;
@@ -1896,7 +1896,7 @@ fun drop_extraneous_ktype(
 }
 
 fun promote_tpromoted(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   subst: IMap<N.Type_>,
@@ -1925,7 +1925,7 @@ fun promote_tpromoted(
  * can be done quicker
  */
 fun join_tpromoted(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2013,7 +2013,7 @@ fun join_tpromoted(
 }
 
 fun join_tpromoted_tyl(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -2036,7 +2036,7 @@ fun join_tpromoted_tyl(
 }
 
 fun join_set(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   exn: Exception,
   env: Env,
@@ -2071,7 +2071,7 @@ fun join_set(
 }
 
 fun join_set_plus_plus(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2129,7 +2129,7 @@ fun join_set_plus_plus(
  * coming from different classes
  */
 fun uniqElt(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2163,7 +2163,7 @@ fun uniqElt(
   }
 }
 fun uniq_join(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2202,7 +2202,7 @@ fun uniq_join(
 }
 
 fun join_set_minus_minus(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2265,7 +2265,7 @@ fun join_set_minus_minus(
 }
 
 fun join_set_minus_plus(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   exn: Exception,
   env: Env,
@@ -2324,7 +2324,7 @@ fun join_set_minus_plus(
 }
 
 fun join_set_inv(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   exn: Exception,
   env: Env,
@@ -2382,7 +2382,7 @@ fun join_set_inv(
 }
 
 fun join_set_elt_opt(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2402,7 +2402,7 @@ fun join_set_elt_opt(
 }
 
 fun join_set_elt(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2456,7 +2456,7 @@ fun satisfyCondition(c: N.InterEltConditions): N.InterEltConditions {
  * we need to know alpha=String before checking the conditions
  */
 fun validConditions(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2478,7 +2478,7 @@ fun validConditions(
 // - they have no unresolved tvars
 // - all constraints are satisfied, i.e. t1 <: t2 & ... & tn
 fun validConditionsList(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2503,7 +2503,7 @@ fun validConditionsList(
 // TODO during the try catch we might generate strings for error messages
 // This is unnecessary work since we will just catch them
 fun filter_condition(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2595,7 +2595,7 @@ fun is_set_eq(s1: SMap<String>, s2: SMap<String>): Bool {
 }
 
 fun join_into_new_tvar(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2609,7 +2609,7 @@ fun join_into_new_tvar(
 }
 
 fun join_tvar(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2717,7 +2717,7 @@ fun flatten_tvar(subst: IMap<N.Type_>, id: Int): (Int, ?N.Type_) {
 }
 
 fun join_array(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2738,7 +2738,7 @@ fun join_array(
 }
 
 fun join_list(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2755,7 +2755,7 @@ fun join_list(
 }
 
 fun join_list_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2770,7 +2770,7 @@ fun join_list_(
 }
 
 fun join_funs(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2801,7 +2801,7 @@ fun join_funs(
 }
 
 fun join_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2838,7 +2838,7 @@ fun join_params(
 }
 
 fun join_named_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2891,7 +2891,7 @@ fun is_not_nullable(env: Env, ty_: N.Type_): Bool {
 }
 
 private fun verify_mutability_preservation_tpromoted(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   child_ty: (FileRange, N.Tpromoted),
@@ -2919,7 +2919,7 @@ private fun verify_mutability_preservation_tpromoted(
 }
 
 private fun verify_mutability_preservation_tset(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   child_ty: (FileRange, N.Tset),
@@ -2951,7 +2951,7 @@ private class CheckMutPreservation(
   parents: SSet,
 ) {
   fun sets(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     acc: Acc,
     child_elts: Array<N.InterElt>,
   ): Acc {
@@ -2964,7 +2964,7 @@ private class CheckMutPreservation(
   }
 
   fun point(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     acc: Acc,
     child_name: N.Name,
     child_tyl: Array<N.Type_>,
@@ -2974,7 +2974,7 @@ private class CheckMutPreservation(
   }
 
   fun point_(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     acc: Acc,
     name: N.Name,
     tyl: Array<N.Type_>,
@@ -3223,7 +3223,7 @@ fun maybe_freeze_upper_bound(
 // If promoting from mutable -> readonly, rerun promotion to remove the invariant
 // restriction on mutable types
 fun maybe_update_tpromoted_variance(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   joined_mode: N.Modality,
   acc: Acc,
@@ -3251,7 +3251,7 @@ fun maybe_update_tpromoted_variance(
 // If promoting from mutable -> readonly, rerun promotion to remove the invariant
 // restriction on mutable types
 fun maybe_update_tpromoted_targs_variance(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   joined_mode: N.Modality,
   orig_mode: N.Modality,
@@ -3272,7 +3272,7 @@ fun maybe_update_tpromoted_targs_variance(
 // If promoting from mutable -> readonly, rerun promotion to remove the invariant
 // restriction on mutable types
 fun maybe_update_elts_variance(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   joined_mode: N.Modality,
   orig_mode: N.Modality,

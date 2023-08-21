@@ -1,6 +1,6 @@
 module alias T = SKTest;
 
-module SKFSTest;
+module SKStoreTest;
 
 @cpp_extern("SKIP_test_free_external_pointer")
 native fun testFreeEP(UInt32): void;
@@ -10,14 +10,14 @@ native fun getFreeTestCounter(): Int;
 
 @test
 fun testExternalPointer(): void {
-  gcontext = SKFS.Context{};
+  gcontext = SKStore.Context{};
 
-  SKFS.runWithGc(gcontext, context ~> {
+  SKStore.runWithGc(gcontext, context ~> {
     if (context.getGlobal("Count") is None()) {
-      context.setGlobal("Count", SKFS.IntFile(0));
+      context.setGlobal("Count", SKStore.IntFile(0));
     };
-    round = SKFS.IntFile::fromFile(context.getGlobal("Count").fromSome()).value;
-    epointer = SKFS.ExternalPointer::create(UInt32::truncate(round), testFreeEP);
+    round = SKStore.IntFile::fromFile(context.getGlobal("Count").fromSome()).value;
+    epointer = SKStore.ExternalPointer::create(UInt32::truncate(round), testFreeEP);
     testCounter = getFreeTestCounter();
     T.expectEq(
       round,
@@ -25,13 +25,13 @@ fun testExternalPointer(): void {
       "Call to free nbr " + round,
     );
     !round = round + 1;
-    context.setGlobal("Count", SKFS.IntFile(round));
+    context.setGlobal("Count", SKStore.IntFile(round));
     context.setGlobal("Pointer", epointer);
     context.update();
     if (round == 10) {
-      SKFS.CStop(None())
+      SKStore.CStop(None())
     } else {
-      SKFS.CContinue(None())
+      SKStore.CContinue(None())
     };
   })
 }

@@ -41,7 +41,7 @@ fun prune_tfun_mods<Ta>(x: Array<Ta>): Array<Ta> {
 /* Type expansion. */
 /*****************************************************************************/
 fun type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   ty_: N.Type_,
@@ -51,7 +51,7 @@ fun type(
 }
 
 fun type__(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   pos: FileRange,
@@ -149,7 +149,7 @@ fun type__(
 }
 
 fun type__inter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   inter: Array<N.InterElt>,
@@ -177,7 +177,7 @@ fun type__inter(
 }
 
 fun type__params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   x: Parameters<N.Type_>,
@@ -202,7 +202,7 @@ fun filter_expanded_tparams(tparams: SMap<String>): SMap<String> {
 }
 
 fun check_tapply(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   pos: FileRange,
   n: N.Name,
@@ -222,7 +222,7 @@ fun check_tapply(
 }
 
 fun check_tpromoted(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   pos: FileRange,
   tparams: SMap<String>,
@@ -286,7 +286,7 @@ private base class ExprState {
 }
 
 fun expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -332,7 +332,7 @@ fun expr(
 }
 
 fun expr_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -482,7 +482,7 @@ fun expr_(
 }
 
 fun ordered_expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -493,7 +493,7 @@ fun ordered_expr(
 }
 
 fun with_updates(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -514,7 +514,7 @@ fun with_updates(
 }
 
 fun expr_option(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -527,7 +527,7 @@ fun expr_option(
 }
 
 fun expr_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -542,7 +542,7 @@ fun expr_parameters(
 }
 
 fun add_source_cast(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -559,7 +559,7 @@ fun add_source_cast(
 }
 
 fun find_source_ty(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   from_with: Bool,
   source: N.Name,
@@ -595,7 +595,7 @@ fun find_source_ty(
 }
 
 fun add_classobj_source_cast(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   source: N.Name,
   e: T.Expr,
@@ -627,7 +627,7 @@ fun unwrap_classobj_ty(ty: N.Type_): (FileRange, N.Name, N.Type_) {
 }
 
 fun build_necessary_cast(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   source: N.Name,
   obj_ty: N.Type_,
@@ -645,7 +645,7 @@ fun build_necessary_cast(
 /* Pattern-matching. */
 /*****************************************************************************/
 fun match_branch(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   lambdas: IMap<T.Expr>,
   subst: IMap<N.Type_>,
@@ -660,7 +660,7 @@ fun match_branch(
 }
 
 fun patterns(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   pats: List<T.Pattern>,
@@ -669,7 +669,7 @@ fun patterns(
 }
 
 fun pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   pat: T.Pattern,
@@ -679,7 +679,7 @@ fun pattern(
 }
 
 fun pattern_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   pat_: T.Pattern_,
@@ -689,7 +689,7 @@ fun pattern_(
 }
 
 fun pattern__(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   x: T.Pattern__,
@@ -708,7 +708,7 @@ fun pattern__(
 }
 
 fun param_pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   param_pat: T.ParamPattern,
@@ -718,7 +718,7 @@ fun param_pattern(
 }
 
 fun local(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   local: T.LocalInfo,
@@ -728,7 +728,7 @@ fun local(
 }
 
 fun binding(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   subst: IMap<N.Type_>,
   binding: T.Binding,

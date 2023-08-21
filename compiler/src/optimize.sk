@@ -493,7 +493,7 @@ private fun findUnfinishedDependencyCycleMember(
 // Optimizes all functions with the given set of optimizations. Returns
 // the new Env.
 private fun optimizeAll(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: GlobalEnv,
   config: Config.Config,
   opts: Int,
@@ -610,7 +610,7 @@ private fun optimizeAll(
       newFuns = Array::fillBy(unoptimized.size(), i ->
         allFuns[unoptimized[i]]
       ).map(f -> {
-        SKFS.withRegion(context, (_, _context) ~> {
+        SKStore.withRegion(context, (_, _context) ~> {
           optimizeOne(f, envSnapshot, config, passes, opts);
         })
       });
@@ -748,7 +748,7 @@ private fun optimizeAll(
 
 // Note that after we lower, we never inline again, as that may be illegal.
 fun compileAll(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: GlobalEnv,
   config: Config.Config,
 ): GlobalEnv {

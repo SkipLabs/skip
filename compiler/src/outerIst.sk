@@ -55,13 +55,13 @@ base class Visibility uses Equality {
   | VProtected()
 }
 
-class Program private (program: SKFS.EHandle<DefFile>) {
-  static fun create(program: SKFS.EHandle<DefFile>): this {
+class Program private (program: SKStore.EHandle<DefFile>) {
+  static fun create(program: SKStore.EHandle<DefFile>): this {
     static(program)
   }
 
-  fun getClass(context: mutable SKFS.Context, className: String): ClassDef {
-    key = SKFS.SID(className);
+  fun getClass(context: mutable SKStore.Context, className: String): ClassDef {
+    key = SKStore.SID(className);
     arr = this.program.getArray(context, key);
     invariant(arr.size() == 1);
     arr[0].value match {
@@ -70,8 +70,8 @@ class Program private (program: SKFS.EHandle<DefFile>) {
     }
   }
 
-  fun getFun(context: mutable SKFS.Context, funName: String): FunDef {
-    key = SKFS.SID(funName);
+  fun getFun(context: mutable SKStore.Context, funName: String): FunDef {
+    key = SKStore.SID(funName);
     arr = this.program.getArray(context, key);
     invariant(arr.size() == 1);
     arr[0].value match {
@@ -80,11 +80,11 @@ class Program private (program: SKFS.EHandle<DefFile>) {
     }
   }
 
-  fun getFunsProj(context: mutable SKFS.Context): SKFS.EHandle<FunDefFile> {
+  fun getFunsProj(context: mutable SKStore.Context): SKStore.EHandle<FunDefFile> {
     this.program.contextWriterKeyValues(
       FunDefFile::fromFile,
       context,
-      SKFS.DirName::create("/funsDefsProj/"),
+      SKStore.DirName::create("/funsDefsProj/"),
       (_context, writer, _, files) ~> {
         invariant(files.size() == 1);
         result = mutable Vector[];
@@ -92,16 +92,16 @@ class Program private (program: SKFS.EHandle<DefFile>) {
         | OuterIst.DFun(funDef) -> result.push(FunDefFile(funDef))
         | _ -> void
         };
-        writer.writeArray(SKFS.IID(0), result.toArray());
+        writer.writeArray(SKStore.IID(0), result.toArray());
       },
     )
   }
 
-  fun getConstsProj(context: mutable SKFS.Context): SKFS.EHandle<ConstDefFile> {
+  fun getConstsProj(context: mutable SKStore.Context): SKStore.EHandle<ConstDefFile> {
     this.program.contextWriterKeyValues(
       ConstDefFile::fromFile,
       context,
-      SKFS.DirName::create("/constsDefsProj/"),
+      SKStore.DirName::create("/constsDefsProj/"),
       (_context, writer, _, files) ~> {
         invariant(files.size() == 1);
         result = mutable Vector[];
@@ -131,27 +131,27 @@ class Program private (program: SKFS.EHandle<DefFile>) {
           }
         | _ -> void
         };
-        writer.writeArray(SKFS.IID(0), result.toArray());
+        writer.writeArray(SKStore.IID(0), result.toArray());
       },
     )
   }
 
   fun getConsts(
-    context: mutable SKFS.Context,
-    constsDir: SKFS.EHandle<ConstDefFile>,
+    context: mutable SKStore.Context,
+    constsDir: SKStore.EHandle<ConstDefFile>,
   ): Array<ConstDef> {
-    constsDir.unsafeGetArray(context, SKFS.IID(0)).map(x -> x.value)
+    constsDir.unsafeGetArray(context, SKStore.IID(0)).map(x -> x.value)
   }
 
   fun getFuns(
-    context: mutable SKFS.Context,
-    funsDir: SKFS.EHandle<FunDefFile>,
+    context: mutable SKStore.Context,
+    funsDir: SKStore.EHandle<FunDefFile>,
   ): Array<FunDef> {
-    funsDir.unsafeGetArray(context, SKFS.IID(0)).map(x -> x.value)
+    funsDir.unsafeGetArray(context, SKStore.IID(0)).map(x -> x.value)
   }
 }
 
-class DefFile(value: Def) extends SKFS.File
+class DefFile(value: Def) extends SKStore.File
 base class Def {
   children =
   | DClass(ClassDef)
@@ -178,8 +178,8 @@ base class SymbolDef{name: Name} {
   }
 }
 
-class ConstsArrayFile(value: Array<ConstDef>) extends SKFS.File
-class ConstDefFile(value: ConstDef) extends SKFS.File
+class ConstsArrayFile(value: Array<ConstDef>) extends SKStore.File
+class ConstDefFile(value: ConstDef) extends SKStore.File
 class ConstDef{
   annotations: SSet,
   native_: ?FileRange,
@@ -199,7 +199,7 @@ class TypeDef{
   source: Name,
 }
 
-class ClassDefFile(value: ClassDef) extends SKFS.File
+class ClassDefFile(value: ClassDef) extends SKStore.File
 
 class ClassDef{
   depth: Int,
@@ -262,8 +262,8 @@ base class Body {
   }
 }
 
-class CallableDefFile(value: CallableDef) extends SKFS.BaseName {
-  fun compare(other: SKFS.BaseName): Order {
+class CallableDefFile(value: CallableDef) extends SKStore.BaseName {
+  fun compare(other: SKStore.BaseName): Order {
     other match {
     | CallableDefFile(x) -> this.value.xhash.compare(x.xhash)
     | _ -> invariant_violation("Heterogeneous keys detected")
@@ -303,7 +303,7 @@ base class CallableDef{
     | _ -> true
     }
   }
-  fun lower(context: mutable SKFS.Context, program: Program): this;
+  fun lower(context: mutable SKStore.Context, program: Program): this;
 }
 
 class MethodDef{
@@ -317,7 +317,7 @@ class MethodDef{
   implicit_param: Binding,
   generic_mapping: SMap<SMap<Type>>,
 } extends CallableDef {
-  fun lower(context: mutable SKFS.Context, program: Program): this {
+  fun lower(context: mutable SKStore.Context, program: Program): this {
     this.body match {
     | Some(TypedBody _) -> SLO.method_def(context, this, program)
     | _ -> this.getPos().die(`already lowered`)
@@ -325,10 +325,10 @@ class MethodDef{
   }
 }
 
-class FunsArrayFile(value: Array<FunDef>) extends SKFS.File
-class FunDefFile(value: FunDef) extends SKFS.File
+class FunsArrayFile(value: Array<FunDef>) extends SKStore.File
+class FunDefFile(value: FunDef) extends SKStore.File
 class FunDef{origName: String} extends CallableDef {
-  fun lower(context: mutable SKFS.Context, program: Program): this {
+  fun lower(context: mutable SKStore.Context, program: Program): this {
     this.body match {
     | Some(TypedBody _) -> SLO.fun_def(context, this, program)
     | _ -> this.getPos().die(`already lowered`)

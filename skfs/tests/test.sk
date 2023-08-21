@@ -8,7 +8,7 @@ class Order{
   orderID: String,
   customerID: String,
   orderDate: String,
-} extends SKFS.File {
+} extends SKStore.File {
   fun toString(): String {
     `Order(${this.orderID}, ${this.customerID}, ${this.orderDate})`
   }
@@ -29,7 +29,7 @@ class Customer{
   customerName: String,
   contactName: String,
   country: String,
-} extends SKFS.File {
+} extends SKStore.File {
   fun toString(): String {
     `Customer(${this.customerID}, ${this.customerName}, ` +
       `${this.contactName}, ${this.country})`
@@ -51,7 +51,7 @@ fun makeCustomerTable(): Array<(String, Array<Customer>)> {
   result.toArray()
 }
 
-class Join{x: String, y: String, date: String} extends SKFS.File {
+class Join{x: String, y: String, date: String} extends SKStore.File {
   fun toString(): String {
     "(" + this.x + ", " + this.y + ", " + this.date + ")"
   }
@@ -72,7 +72,7 @@ class MyObj(String, i1: String, String) extends Boo uses Show {
 }
 
 fun testDB(): void {
-  context = SKFS.run(context -> {
+  context = SKStore.run(context -> {
     orderTable = context.mkdir("/tmp/orders/", Data.makeOrderTable());
     customerTable = context.mkdir("/tmp/customers/", Data.makeCustomerTable());
     join = orderTable.multiMap(
@@ -86,7 +86,7 @@ fun testDB(): void {
         };
         customers = customerTable.getArray(
           context,
-          SKFS.BaseName::create(customerID),
+          SKStore.BaseName::create(customerID),
         );
         if (customers.size() == 0) return Array[];
         customer = customers[0];
@@ -114,7 +114,7 @@ fun testDB(): void {
   });
   ///////////////////////////////// UPDATE
   orders = context.state.dirs[
-    SKFS.DirRef<Data.Order>(SKFS.DirName::create("/tmp/orders/")),
+    SKStore.DirRef<Data.Order>(SKStore.DirName::create("/tmp/orders/")),
   ];
   context.debug("/tmp/orders/order2");
   context.debug("/tmp/customers/customer2");
@@ -122,7 +122,7 @@ fun testDB(): void {
   context.debug("/daniel/order2");
 
   queries = context.state.dirs[
-    SKFS.DirRef<Data.Order>(SKFS.DirName::create("/queries/")),
+    SKStore.DirRef<Data.Order>(SKStore.DirName::create("/queries/")),
   ];
 
   debug(queries.fixedData);
@@ -135,7 +135,7 @@ fun testDB(): void {
   context.debug("/daniel/order2");
 }
 
-class IntFile{value: Int} extends SKFS.File {
+class IntFile{value: Int} extends SKStore.File {
   fun toString(): String {
     this.value.toString()
   }
@@ -146,14 +146,14 @@ fun makeDirName(n: Int): String {
 }
 
 fun genDir{
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   origRandom: mutable Random,
-  dirs: SortedMap<String, SKFS.Dir<IntFile>>,
+  dirs: SortedMap<String, SKStore.Dir<IntFile>>,
   dirName: String,
   maxNbrDirDep: Int,
   maxReadPerDir: Int,
   size: Int,
-}: SKFS.Dir<IntFile> {
+}: SKStore.Dir<IntFile> {
   invariant(dirs.size() > 0);
   dirNameStr = makeDirName(origRandom.random(0, dirs.size()));
   origin = dirs[dirNameStr];
@@ -174,7 +174,7 @@ fun genDir{
       nbrRead = random.random(0, maxReadPerDir);
       for (_ in Range(0, nbrRead)) {
         readKey = random.random(0, dir.fixedData.data.size());
-        fileName = SKFS.BaseName::create(readKey.toString());
+        fileName = SKStore.BaseName::create(readKey.toString());
         if (readKeys.contains(fileName)) continue;
         readKeys.add(fileName);
         readValues.push((fileName, dir.getArray(context, fileName)));
@@ -185,13 +185,13 @@ fun genDir{
 }
 
 fun genInput{
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   random: mutable Random,
   inputName: String,
   size: Int,
   valueMaxSize: Int,
   valueRange: Int,
-}: SKFS.Dir<IntFile> {
+}: SKStore.Dir<IntFile> {
   result = mutable Vector[];
   for (i in Range(0, size)) {
     key = i.toString();
@@ -219,7 +219,7 @@ fun testGen(): void {
   maxReadPerDir = 10;
   random = Random::mcreate(23);
 
-  context = SKFS.run(context -> {
+  context = SKStore.run(context -> {
     for (i in Range(0, nbrInputDirs)) {
       dirName = makeDirName(i);
       inputDir = genInput{
@@ -250,11 +250,11 @@ fun testGen(): void {
   savedDirs = mutable Map[];
   for (i in Range(0, nbrInputDirs + nbrMappedDirs)) {
     dirName = makeDirName(i);
-    dir = context.getDir(SKFS.DirRef<IntFile>(SKFS.DirName::create(dirName)));
+    dir = context.getDir(SKStore.DirRef<IntFile>(SKStore.DirName::create(dirName)));
     saveState = mutable Map<String, Array<IntFile>>[];
     for (key in Range(0, inputDirSize)) {
       keyStr = key.toString();
-      baseName = SKFS.BaseName::create(keyStr);
+      baseName = SKStore.BaseName::create(keyStr);
       arr = dir.getArray(context, baseName);
       saveState![keyStr] = arr;
     };
@@ -262,7 +262,7 @@ fun testGen(): void {
   };
   for (i in Range(0, nbrInputDirs)) {
     dirName = makeDirName(i);
-    dir = context.getDir(SKFS.DirRef<IntFile>(SKFS.DirName::create(dirName)));
+    dir = context.getDir(SKStore.DirRef<IntFile>(SKStore.DirName::create(dirName)));
     for (key in Range(0, inputDirSize)) {
       keyStr = key.toString();
       print_string("************************************************");
@@ -275,10 +275,10 @@ fun testGen(): void {
   };
   for (i in Range(nbrInputDirs, nbrInputDirs + nbrMappedDirs)) {
     dirName = makeDirName(i);
-    dir = context.getDir(SKFS.DirRef<IntFile>(SKFS.DirName::create(dirName)));
+    dir = context.getDir(SKStore.DirRef<IntFile>(SKStore.DirName::create(dirName)));
     for (key in Range(0, inputDirSize)) {
       keyStr = key.toString();
-      baseName = SKFS.BaseName::create(keyStr);
+      baseName = SKStore.BaseName::create(keyStr);
       arr = dir.getArray(context, baseName);
       if (savedDirs[dirName][keyStr] != arr) {
         print_string("Error: should be equal in " + dirName + keyStr);
@@ -291,7 +291,7 @@ fun testGen(): void {
 }
 
 fun testUpdate(): void {
-  context = SKFS.run(context -> {
+  context = SKStore.run(context -> {
     nat = context.mkdir(
       "/nat/",
       Array[("0", Array[IntFile(0)]), ("1", Array[IntFile(1)])],
@@ -306,7 +306,7 @@ fun testUpdate(): void {
       if (file2[0] == IntFile(22)) {
         Array[
           (key, Array[IntFile(file[0].value + file2[0].value)]),
-          (SKFS.BaseName::create("22"), Array[IntFile(22)]),
+          (SKStore.BaseName::create("22"), Array[IntFile(22)]),
         ]
       } else {
         Array[(key, Array[IntFile(file[0].value + file2[0].value)])]
@@ -314,15 +314,15 @@ fun testUpdate(): void {
     });
   });
   _nat = context.state.dirs[
-    SKFS.DirRef<IntFile>(SKFS.DirName::create("/nat/")),
+    SKStore.DirRef<IntFile>(SKStore.DirName::create("/nat/")),
   ];
   nat2 = context.state.dirs[
-    SKFS.DirRef<IntFile>(SKFS.DirName::create("/nat2/")),
+    SKStore.DirRef<IntFile>(SKStore.DirName::create("/nat2/")),
   ];
   context.debug("/natMap/0");
   nat2.writeArray(context, "0", Array[IntFile(22), IntFile(23)]);
   context.update();
-  nat = context.state.dirs[SKFS.DirRef<IntFile>(SKFS.DirName::create("/nat/"))];
+  nat = context.state.dirs[SKStore.DirRef<IntFile>(SKStore.DirName::create("/nat/"))];
   debug((nat.fixedOld, nat.old, nat.compact().fixedOld));
   context.debug("/natMap/0");
 }
@@ -331,31 +331,31 @@ fun testUpdate(): void {
 
 module TestServer;
 
-class NoValue{} extends SKFS.File
+class NoValue{} extends SKStore.File
 
 /*
-class BoolFile{data: String} extends SKFS.File
+class BoolFile{data: String} extends SKStore.File
 const trueFile: BoolFile = BoolFile{data => "true"};
 const falseFile: BoolFile = BoolFile{data => "false"};
 */
 
-class IDFile{} extends SKFS.File
+class IDFile{} extends SKStore.File
 
-class IntFile(value: Int) extends SKFS.File {
-  fun getKey(): SKFS.BaseName {
-    SKFS.SID::create("K" + this.value)
+class IntFile(value: Int) extends SKStore.File {
+  fun getKey(): SKStore.BaseName {
+    SKStore.SID::create("K" + this.value)
   }
 }
 
 class CalendarEvent{
-  userID: SKFS.BaseName,
+  userID: SKStore.BaseName,
   start: Int,
   end: Int,
   description: String,
-} extends SKFS.File
+} extends SKStore.File
 /*
 fun testAfterModification(): void {
-  (context, (_dir1, _dir2, _dirs)) = SKFS.start(context -> {
+  (context, (_dir1, _dir2, _dirs)) = SKStore.start(context -> {
     dir1 = context.mkdirMulti(
       "/tmp/",
       Array[("I1", Array[IntFile(1)]), ("I3", Array[IntFile(23)])],
@@ -374,21 +374,21 @@ fun testAfterModification(): void {
 /*
 
 fun testUsers(): void {
-  (context, (_groupRequests, _groupBlocked)) = SKFS.start(context -> {
-    beSport = SKFS.Group{
-      id => SKFS.SID::create("GID_1"),
+  (context, (_groupRequests, _groupBlocked)) = SKStore.start(context -> {
+    beSport = SKStore.Group{
+      id => SKStore.SID::create("GID_1"),
       name => "BeSport!",
       description => "For people who like sport!",
     };
-    user1 = SKFS.User{
-      id => SKFS.SID::create("UID_1"),
+    user1 = SKStore.User{
+      id => SKStore.SID::create("UID_1"),
       firstName => "Julien",
       lastName => "Verlaguet",
       age => 38,
       groupIDs => Array[beSport.id],
     };
-    user2 = SKFS.User{
-      id => SKFS.SID::create("UID_2"),
+    user2 = SKStore.User{
+      id => SKStore.SID::create("UID_2"),
       firstName => "Daniel",
       lastName => "Lopes",
       age => 42,
@@ -405,10 +405,10 @@ fun testUsers(): void {
       "/groups/",
       Array[(beSport.id.toString(), Array[beSport])],
     );
-    groupRequests = context.mkdirMulti<SKFS.User>(
+    groupRequests = context.mkdirMulti<SKStore.User>(
       "/groups/" + beSport.id + "/requests/",
     );
-    groupBlocked = context.mkdirMulti<SKFS.User>(
+    groupBlocked = context.mkdirMulti<SKStore.User>(
       "/groups/" + beSport.id + "/blocked/",
     );
     _groupMembers = groupRequests.apply(
@@ -424,15 +424,15 @@ fun testUsers(): void {
     );
     (groupRequests, groupBlocked)
   });
-  user: SKFS.File = SKFS.User{
-    id => SKFS.SID::create("UID_2"),
+  user: SKStore.File = SKStore.User{
+    id => SKStore.SID::create("UID_2"),
     firstName => "Daniel",
     lastName => "Lopes",
     age => 42,
     groupIDs => Array[],
   };
   groupRequests = context.getDir(
-    SKFS.DirName::create("/groups/GID_1/requests/"),
+    SKStore.DirName::create("/groups/GID_1/requests/"),
   );
   groupRequests.writeArray(context, "UID_2", Array[user]);
   context.update();
@@ -442,17 +442,17 @@ fun testUsers(): void {
 
 module end;
 
-module SKFSTest;
+module SKStoreTest;
 
-class JsonFile(JSON.Value) extends SKFS.File
+class JsonFile(JSON.Value) extends SKStore.File
 
 class User{
   id: Int,
   firstName: String,
   lastName: String,
   age: Int,
-} extends SKFS.File {
-  static fun fromString(strFile: SKFS.StringFile): User {
+} extends SKStore.File {
+  static fun fromString(strFile: SKStore.StringFile): User {
     str = strFile.value;
     data = JSON.decode(str).expectObject();
     id = data["id"].expectInt();
@@ -469,12 +469,12 @@ class FullUser{
   lastName: String,
   age: Int,
   friends: Array<User>,
-} extends SKFS.File
+} extends SKStore.File
 
-class TestFile(age: Int, User) extends SKFS.File
+class TestFile(age: Int, User) extends SKStore.File
 
-class Request{askingID: Int, askedID: Int} extends SKFS.File {
-  static fun fromString(strFile: SKFS.StringFile): Request {
+class Request{askingID: Int, askedID: Int} extends SKStore.File {
+  static fun fromString(strFile: SKStore.StringFile): Request {
     str = strFile.value;
     data = JSON.decode(str).expectObject();
     askingID = data["askingUserID"].expectInt();
@@ -483,7 +483,7 @@ class Request{askingID: Int, askedID: Int} extends SKFS.File {
   }
 }
 
-class Def{v: Int, parents: Array<Int>} extends SKFS.File {
+class Def{v: Int, parents: Array<Int>} extends SKStore.File {
   fun toString(): String {
     JSON.Object(
       Map[
@@ -495,7 +495,7 @@ class Def{v: Int, parents: Array<Int>} extends SKFS.File {
     ).toString()
   }
 
-  static fun fromStringFile(x: SKFS.StringFile): this {
+  static fun fromStringFile(x: SKStore.StringFile): this {
     json = JSON.decode(x.value).expectObject();
     Def{
       v => json["v"].expectInt(),
@@ -513,7 +513,7 @@ base class Tree {
   | TNode(v: Int, parents: Array<Tree>)
 }
 
-class TreeFile(value: Tree) extends SKFS.File
+class TreeFile(value: Tree) extends SKStore.File
 
 fun makeTrees(acc: mutable Vector<Def>, size: Int): void {
   if (size == 0 || size == 1) {
@@ -527,76 +527,76 @@ fun makeTrees(acc: mutable Vector<Def>, size: Int): void {
   acc.push(tree)
 }
 
-fun testOldLazy(): mutable SKFS.Context {
-  SKFS.run(context ~> {
+fun testOldLazy(): mutable SKStore.Context {
+  SKStore.run(context ~> {
     acc = mutable Vector[];
     makeTrees(acc, 3);
     inputData = acc
-      .map(x -> (SKFS.IID(x.v), SKFS.StringFile(x.toString())))
+      .map(x -> (SKStore.IID(x.v), SKStore.StringFile(x.toString())))
       .toArray();
     srcDir = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/src/"),
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/src/"),
       inputData,
     );
     defDir = srcDir.map(
       Def::fromFile,
       context,
-      SKFS.DirName::create("/defs/"),
+      SKStore.DirName::create("/defs/"),
       Def::fromStringFile,
     );
     _defDiff = defDir.contextWriterKeyMap(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/defDiffs/"),
+      SKStore.DirName::create("/defDiffs/"),
       (context, writer, key, value) ~> {
         prevDir = defDir.pre(context);
         prevDir match {
-        | None() -> writer.write(key, SKFS.IntFile(0))
+        | None() -> writer.write(key, SKStore.IntFile(0))
         | Some(preDir) ->
           _prevDir2 = preDir.pre(context);
           def = preDir.get(context, key);
-          writer.write(key, SKFS.IntFile(def.v - value.v))
+          writer.write(key, SKStore.IntFile(def.v - value.v))
         }
       },
     );
-    treeDir = SKFS.LHandle::create(
+    treeDir = SKStore.LHandle::create(
       TreeFile::fromFile,
       context,
-      SKFS.DirName::create("/lazyTrees/"),
+      SKStore.DirName::create("/lazyTrees/"),
       (context, self, key) ~> {
         def = defDir.get(context, key);
-        parents = def.parents.map(id -> self.get(context, SKFS.IID(id)).value);
+        parents = def.parents.map(id -> self.get(context, SKStore.IID(id)).value);
         Array[TreeFile(TNode(def.v, parents))]
       },
     );
     _unfoldedTrees = defDir.contextMap(
       TreeFile::fromFile,
       context,
-      SKFS.DirName::create("/trees/"),
+      SKStore.DirName::create("/trees/"),
       (context, x) ~> {
-        treeDir.get(context, SKFS.IID(x.v))
+        treeDir.get(context, SKStore.IID(x.v))
       },
     );
   })
 }
 
-fun testOld(): mutable SKFS.Context {
-  SKFS.run(context ~> {
+fun testOld(): mutable SKStore.Context {
+  SKStore.run(context ~> {
     acc = mutable Vector[];
     makeTrees(acc, 3);
     inputData = acc
-      .map(x -> (SKFS.IID(x.v), SKFS.StringFile(x.toString())))
+      .map(x -> (SKStore.IID(x.v), SKStore.StringFile(x.toString())))
       .toArray();
     srcDir = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/src/"),
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/src/"),
       inputData,
     );
     _defDir = srcDir.map(
       Def::fromFile,
       context,
-      SKFS.DirName::create("/defs/"),
+      SKStore.DirName::create("/defs/"),
       Def::fromStringFile,
     );
     context.update();
@@ -604,45 +604,45 @@ fun testOld(): mutable SKFS.Context {
   })
 }
 
-class Page{id: Int, text: String} extends SKFS.File
-class QueryResult(Array<Int>) extends SKFS.File
+class Page{id: Int, text: String} extends SKStore.File
+class QueryResult(Array<Int>) extends SKStore.File
 
 @test
 fun testSearch(): void {
   pagesData = Array[
     Page{id => 1, text => "hello world"},
     Page{id => 2, text => "hello"},
-  ].map(x -> (SKFS.IID(x.id), x));
-  _ = SKFS.run(context ~> {
+  ].map(x -> (SKStore.IID(x.id), x));
+  _ = SKStore.run(context ~> {
     pages = context.mkdir(
       Page::fromFile,
-      SKFS.DirName::create("/pages/"),
+      SKStore.DirName::create("/pages/"),
       pagesData,
     );
     queries = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/queries/"),
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/queries/"),
       Array[],
     );
     index = pages.contextWriterMap(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/index/"),
+      SKStore.DirName::create("/index/"),
       (_context, writer, value) ~> {
         for (token in value.text.split(" ")) {
-          writer.write(SKFS.IID(token.hash()), SKFS.IntFile(value.id))
+          writer.write(SKStore.IID(token.hash()), SKStore.IntFile(value.id))
         }
       },
     );
     _results = queries.contextMap(
       QueryResult::fromFile,
       context,
-      SKFS.DirName::create("/results/"),
+      SKStore.DirName::create("/results/"),
       (context, query) ~> {
         first = true;
         results = mutable Set[];
         for (token in query.value.split(" ")) {
-          newResults = index.getArray(context, SKFS.IID(token.hash()));
+          newResults = index.getArray(context, SKStore.IID(token.hash()));
           if (first) {
             !first = false;
             !results = Set::mcreateFromItems(newResults.map(x -> x.value));

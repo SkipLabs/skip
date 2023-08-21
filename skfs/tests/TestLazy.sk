@@ -1,57 +1,57 @@
 module alias T = SKTest;
 
-module SKFSTest;
+module SKStoreTest;
 
 @test
 fun testLazy(): void {
-  context = SKFS.run(context ~> {
+  context = SKStore.run(context ~> {
     dirInput = context.mkdir(
-      SKFS.IntFile::fromFile,
-      SKFS.DirName::create("/input/"),
-      Array[(SKFS.IID(0), SKFS.IntFile(23))],
+      SKStore.IntFile::fromFile,
+      SKStore.DirName::create("/input/"),
+      Array[(SKStore.IID(0), SKStore.IntFile(23))],
     );
 
     dirInput2 = context.mkdir(
-      SKFS.IntFile::fromFile,
-      SKFS.DirName::create("/input2/"),
-      Array[(SKFS.IID(0), SKFS.IntFile(44))],
+      SKStore.IntFile::fromFile,
+      SKStore.DirName::create("/input2/"),
+      Array[(SKStore.IID(0), SKStore.IntFile(44))],
     );
-    dir1 = SKFS.LHandle::create(
-      SKFS.IntFile::fromFile,
+    dir1 = SKStore.LHandle::create(
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/lazy1/"),
+      SKStore.DirName::create("/lazy1/"),
       (context, _self, x) ~> {
         Array[
-          SKFS.IntFile(
+          SKStore.IntFile(
             x match {
-            | SKFS.IID(v) ->
-              dirInput.getArray(context, SKFS.IID(0))[0].value + v
+            | SKStore.IID(v) ->
+              dirInput.getArray(context, SKStore.IID(0))[0].value + v
             | _ -> T.fail()
             },
           ),
         ]
       },
     );
-    dir2 = SKFS.LHandle::create(
-      SKFS.IntFile::fromFile,
+    dir2 = SKStore.LHandle::create(
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/lazy2/"),
+      SKStore.DirName::create("/lazy2/"),
       (context, _self, key) ~> {
-        Array[SKFS.IntFile(dir1.getArray(context, key)[0].value)]
+        Array[SKStore.IntFile(dir1.getArray(context, key)[0].value)]
       },
     );
 
-    adir1 = SKFS.LHandle::createAsync(
-      SKFS.IntFile::fromFile,
+    adir1 = SKStore.LHandle::createAsync(
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/alazy1/"),
+      SKStore.DirName::create("/alazy1/"),
       (context, _self, x) ~> {
         Some(
           Array[
-            SKFS.IntFile(
+            SKStore.IntFile(
               x match {
-              | SKFS.IID(v) ->
-                dirInput.getArray(context, SKFS.IID(0))[0].value + v
+              | SKStore.IID(v) ->
+                dirInput.getArray(context, SKStore.IID(0))[0].value + v
               | _ -> T.fail()
               },
             ),
@@ -59,70 +59,70 @@ fun testLazy(): void {
         )
       },
     );
-    _adir2 = SKFS.LHandle::createAsync(
-      SKFS.IntFile::fromFile,
+    _adir2 = SKStore.LHandle::createAsync(
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/alazy2/"),
+      SKStore.DirName::create("/alazy2/"),
       (context, _self, key) ~> {
         arr = adir1.getArrayAsync(context, key);
-        if (arr.size() == 0) None() else Some(Array[SKFS.IntFile(arr[0].value)])
+        if (arr.size() == 0) None() else Some(Array[SKStore.IntFile(arr[0].value)])
       },
     );
 
     _dir3 = dirInput2.contextWriterKeyMap(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/eager/"),
+      SKStore.DirName::create("/eager/"),
       (context, writer, key, _) ~> {
         writer.write(key, dir2.getArray(context, key)[0]);
       },
     )
   });
 
-  input = SKFS.DirName::create("/input/");
-  dir2 = SKFS.DirName::create("/lazy2/");
-  adir2 = SKFS.DirName::create("/alazy2/");
-  dir3 = SKFS.DirName::create("/eager/");
+  input = SKStore.DirName::create("/input/");
+  dir2 = SKStore.DirName::create("/lazy2/");
+  adir2 = SKStore.DirName::create("/alazy2/");
+  dir3 = SKStore.DirName::create("/eager/");
 
   T.expectEq(
-    Array<SKFS.File>[],
-    getLazyData(context, adir2, SKFS.IID(0), true),
+    Array<SKStore.File>[],
+    getLazyData(context, adir2, SKStore.IID(0), true),
     "Async Lazy basic",
   );
 
   _ = context.updateWithStatus(0);
 
   T.expectEq(
-    Array<SKFS.File>[],
-    getLazyData(context, adir2, SKFS.IID(0), true),
+    Array<SKStore.File>[],
+    getLazyData(context, adir2, SKStore.IID(0), true),
     "Async Lazy basic with interruption",
   );
 
   _ = context.updateWithStatus(30);
 
   T.expectEq(
-    Array<SKFS.File>[SKFS.IntFile(23)],
-    getLazyData(context, adir2, SKFS.IID(0), true),
+    Array<SKStore.File>[SKStore.IntFile(23)],
+    getLazyData(context, adir2, SKStore.IID(0), true),
     "Async Lazy basic without interruption",
   );
 
   T.expectEq(
-    Array<SKFS.File>[SKFS.IntFile(23)],
-    getData(context, dir2, SKFS.IID(0)),
+    Array<SKStore.File>[SKStore.IntFile(23)],
+    getData(context, dir2, SKStore.IID(0)),
     "Lazy basic",
   );
-  write(context, input, SKFS.IID(0), Array[SKFS.IntFile(22)]);
+  write(context, input, SKStore.IID(0), Array[SKStore.IntFile(22)]);
   _status = context.updateWithStatus(10);
 
   T.expectEq(
-    Array<SKFS.File>[SKFS.IntFile(22)],
-    getData(context, dir2, SKFS.IID(0)),
+    Array<SKStore.File>[SKStore.IntFile(22)],
+    getData(context, dir2, SKStore.IID(0)),
     "Lazy after update",
   );
 
   T.expectEq(
-    Array<SKFS.File>[SKFS.IntFile(22)],
-    getData(context, dir3, SKFS.IID(0)),
+    Array<SKStore.File>[SKStore.IntFile(22)],
+    getData(context, dir3, SKStore.IID(0)),
     "Eeager after update",
   )
 }

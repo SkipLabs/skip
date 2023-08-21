@@ -10,8 +10,8 @@ fun getVersion(): String {
 }
 
 fun getFieldNames(
-  context: readonly SKFS.Context,
-  dirName: SKFS.DirName,
+  context: readonly SKStore.Context,
+  dirName: SKStore.DirName,
 ): Array<String> {
   mcontext = context.mclone();
   tables = SKSQL.getTableDir(mcontext);
@@ -19,7 +19,7 @@ fun getFieldNames(
   iter = dirNameStr.getIter();
   _ = iter.next();
   tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
-  arr = tables.getArray(mcontext, SKFS.SID(tableName));
+  arr = tables.getArray(mcontext, SKStore.SID(tableName));
   if (arr.size() == 0) {
     print_error("There is no sql table associated with dir: " + dirNameStr);
     skipExit(44);
@@ -28,9 +28,9 @@ fun getFieldNames(
   dirDescr.schema.map(x -> x.name.origName);
 }
 
-fun fixUpDirName(dirNameStr: String): SKFS.DirName {
+fun fixUpDirName(dirNameStr: String): SKStore.DirName {
   chars = dirNameStr.chars();
-  SKFS.DirName::create(
+  SKStore.DirName::create(
     (if (chars[0] != '/') "/" else "") +
       dirNameStr +
       (if (chars[chars.size() - 1] != '/') "/" else ""),
@@ -91,11 +91,11 @@ fun queryParams(options: SKSQL.Options): Map<String, SKSQL.Value> {
 /*****************************************************************************/
 
 untracked fun main(): void {
-  saved = SKFS.newObstack();
+  saved = SKStore.newObstack();
   cmd = Cli.Command("skdb")
     .about("The SQL database that tells you when your query results changed")
-    .arg(Cli.StringArg("init").about("Initialize new SKFS runtime data"))
-    .arg(Cli.StringArg("data").about("Use existing SKFS runtime data").global())
+    .arg(Cli.StringArg("init").about("Initialize new SKStore runtime data"))
+    .arg(Cli.StringArg("data").about("Use existing SKStore runtime data").global())
     .arg(Cli.BoolArg("backtrace").about("Internal use").global())
     .arg(Cli.BoolArg("sync").about("Sync to disk").global())
     .arg(
@@ -116,7 +116,7 @@ untracked fun main(): void {
     )
     .arg(
       Cli.StringArg("capacity").about(
-        "Initialize SKFS runtime with given capacity",
+        "Initialize SKStore runtime with given capacity",
       ),
     )
     .arg(
@@ -337,7 +337,7 @@ untracked fun main(): void {
         // hardcoded in the runtime. It should be revisited once the runtime has
         // a proper two-step init API for persistence.
         if (args.maybeGetString("init") is Some _) {
-          _ = SKFS.gContextInit(SKSQL.makeSqlContext().clone());
+          _ = SKStore.gContextInit(SKSQL.makeSqlContext().clone());
           return void
         } else if (args.maybeGetString("capacity") is Some _) {
           print_error("cannot use capacity without init");
@@ -355,14 +355,14 @@ untracked fun main(): void {
     subcmd_handler(args, options);
   } catch {
   | exn ->
-    SKFS.destroyObstack(saved);
+    SKStore.destroyObstack(saved);
     throw exn
   };
-  SKFS.destroyObstack(saved);
+  SKStore.destroyObstack(saved);
 }
 
 private fun ensureContext(args: Cli.ParseResults): void {
-  if (SKFS.gHasContext() == 0) {
+  if (SKStore.gHasContext() == 0) {
     invariant(args.maybeGetString("data") is None _);
     print_error("Error: option --data is missing");
     skipExit(2);
@@ -376,7 +376,7 @@ fun execSessions(args: Cli.ParseResults, options: SKSQL.Options): void {
       dirName = sub.dirName;
       print_string(id.toString() + "\t" + dirName.toString());
     };
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -385,7 +385,7 @@ fun execCompact(args: Cli.ParseResults, options: SKSQL.Options): void {
   SKSQL.runLockedSql(options, context ~> {
     for (_dirName => dir in context.dirs.state) {
       dir match {
-      | edir @ SKFS.EagerDir _ ->
+      | edir @ SKStore.EagerDir _ ->
         !edir = edir.purge(context);
         context.setDir(edir.dirName, edir)
       | _ -> void
@@ -400,7 +400,7 @@ fun execDumpTable(args: Cli.ParseResults, options: SKSQL.Options): void {
   suffix = args.maybeGetString("table-suffix");
   SKSQL.runSql(options, context ~> {
     SKSQL.dumpTable(context, tableName.lowercase(), suffix);
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -409,7 +409,7 @@ fun execDumpTables(args: Cli.ParseResults, options: SKSQL.Options): void {
   suffix = args.maybeGetString("table-suffix");
   SKSQL.runSql(options, context ~> {
     SKSQL.dumpTables(context, suffix);
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -417,7 +417,7 @@ fun execDumpInserts(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   SKSQL.runSql(options, context ~> {
     SKSQL.dumpInserts(context);
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -426,7 +426,7 @@ fun execDumpView(args: Cli.ParseResults, options: SKSQL.Options): void {
   viewName = args.getString("view");
   SKSQL.runSql(options, context ~> {
     SKSQL.dumpView(context, viewName.lowercase());
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -434,7 +434,7 @@ fun execDumpViews(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   SKSQL.runSql(options, context ~> {
     SKSQL.dumpViews(context);
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -444,7 +444,7 @@ fun execDump(args: Cli.ParseResults, options: SKSQL.Options): void {
     SKSQL.dumpTables(context, None());
     SKSQL.dumpInserts(context);
     SKSQL.dumpViews(context);
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -460,7 +460,7 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     line = context.getGlobal("Line") match {
     | None() -> mutable Ref(1)
-    | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
+    | Some(file) -> mutable Ref(SKStore.IntFile::fromFile(file).value)
     };
     user = args.maybeGetString("user") match {
     | None() -> None()
@@ -468,7 +468,7 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     try {
       contextOp = SKCSV.insert(context, line, options, table, user);
-      context.setGlobal("Line", SKFS.IntFile(line.get()));
+      context.setGlobal("Line", SKStore.IntFile(line.get()));
       contextOp
     } catch {
     | exn ->
@@ -495,8 +495,8 @@ fun execCsvField(args: Cli.ParseResults, _options: SKSQL.Options): void {
 fun execSize(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   SKSQL.runSql(options, _context ~> {
-    SKFS.printPersistentSize();
-    SKFS.CStop(None())
+    SKStore.printPersistentSize();
+    SKStore.CStop(None())
   })
 }
 
@@ -513,10 +513,10 @@ fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
     | Some(x) -> x
     };
     format = options.format match {
-    | SKSQL.OFK_CSV() -> SKFS.OCSV()
-    | SKSQL.OFK_JSON() -> SKFS.OJSON(getFieldNames(context, sub.dirName))
-    | SKSQL.OFK_SQL() -> SKFS.OSQL()
-    | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, sub.dirName))
+    | SKSQL.OFK_CSV() -> SKStore.OCSV()
+    | SKSQL.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, sub.dirName))
+    | SKSQL.OFK_SQL() -> SKStore.OSQL()
+    | SKSQL.OFK_JS() -> SKStore.OJS(getFieldNames(context, sub.dirName))
     };
 
     origContext.setGlobal(
@@ -524,12 +524,12 @@ fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
       SKSQL.StdoutDiff(
         format,
         sub.dirName,
-        SKFS.Tick(time),
+        SKStore.Tick(time),
         sub.filter,
         sub.getDestinationWatermark,
       ),
     );
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -550,14 +550,14 @@ fun execWrite(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   dirNameStr = args.getString("directory");
   SKSQL.runSql(options, context ~> {
-    SKFS.writeFromStdin(context, dirNameStr);
-    SKFS.CStop(None())
+    SKStore.writeFromStdin(context, dirNameStr);
+    SKStore.CStop(None())
   })
 }
 
 fun getSqlTableFromDirName(
-  context: readonly SKFS.Context,
-  dirName: SKFS.DirName,
+  context: readonly SKStore.Context,
+  dirName: SKStore.DirName,
 ): SKSQL.DirDescr {
   dirNameStr = dirName.toString();
   !dirNameStr = dirName.toString().stripPrefix("/").stripSuffix("/");
@@ -574,7 +574,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   };
   init = true;
 
-  gContext = SKFS.gContextGet();
+  gContext = SKStore.gContextGet();
   (subFilter, dirName) = gContext.sessions.maybeGet(sessionID) match {
   | None() ->
     print_error("Error: session not found");
@@ -658,8 +658,8 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   forceReset = false;
 
   loop {
-    localObstack = SKFS.newObstack();
-    context = SKFS.gContextGet();
+    localObstack = SKStore.newObstack();
+    context = SKStore.gContextGet();
     sub = context.sessions.maybeGet(sessionID) match {
     | None() ->
       print_error("Error: session not found");
@@ -669,13 +669,13 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     invariant(dirName == sub.dirName);
     edir = context.unsafeGetEagerDir(dirName);
     format = options.format match {
-    | SKSQL.OFK_CSV() -> SKFS.OCSV()
-    | SKSQL.OFK_JSON() -> SKFS.OJSON(getFieldNames(context, dirName))
-    | SKSQL.OFK_SQL() -> SKFS.OSQL()
-    | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, dirName))
+    | SKSQL.OFK_CSV() -> SKStore.OCSV()
+    | SKSQL.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
+    | SKSQL.OFK_SQL() -> SKStore.OSQL()
+    | SKSQL.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
     };
 
-    (isReset, changes) = edir.getChangesAfter(SKFS.Tick(tick), forceReset);
+    (isReset, changes) = edir.getChangesAfter(SKStore.Tick(tick), forceReset);
     !forceReset = false;
 
     producedOutput = edir.writeDiffStdout(
@@ -696,39 +696,39 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     !tick = context.tick.value;
     !init = false;
-    lock = SKFS.unfreezeLock(sub.lock);
-    cond = SKFS.unfreezeCond(sub.cond);
-    SKFS.mutexLock(lock);
+    lock = SKStore.unfreezeLock(sub.lock);
+    cond = SKStore.unfreezeCond(sub.cond);
+    SKStore.mutexLock(lock);
     while ({
       !forceReset &&
         {
-          newContext = SKFS.gContextGet();
+          newContext = SKStore.gContextGet();
           followMode &&
             {
               (newIsReset, newChanges) = newContext
                 .unsafeGetEagerDir(dirName)
-                .getChangesAfter(SKFS.Tick(tick));
+                .getChangesAfter(SKStore.Tick(tick));
               !newIsReset && newChanges.isEmpty()
             }
         }
     }) {
       timeoutSecs = 10;
-      _ = SKFS.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
+      _ = SKStore.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
       print_raw(":" + tick.toString() + "\n");
       flushStdout();
       if (
         SKSQL.userPrivacyChanged(
-          SKFS.gContextGet(),
+          SKStore.gContextGet(),
           userNameOpt,
           tableName,
-          SKFS.Tick(tick),
+          SKStore.Tick(tick),
         )
       ) {
         !forceReset = true;
       };
     };
-    SKFS.mutexUnlock(lock);
-    SKFS.destroyObstack(localObstack);
+    SKStore.mutexUnlock(lock);
+    SKStore.destroyObstack(localObstack);
     if (!followMode) {
       break void
     }
@@ -742,10 +742,10 @@ fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
   SKSQL.runSql(options, context ~> {
     print_string(
       SKSQL.getWatermark(context.clone(), tableName, source).default(
-        SKFS.Tick(0),
+        SKStore.Tick(0),
       ).value,
     );
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   });
 }
 
@@ -753,22 +753,22 @@ fun execReplicationId(args: Cli.ParseResults, options: SKSQL.Options): void {
   ensureContext(args);
   clientUuid = args.getString("client-uuid").lowercase();
   SKSQL.runSql(options, context ~> {
-    clientsDirname = SKFS.DirName::create(`/clients/`);
+    clientsDirname = SKStore.DirName::create(`/clients/`);
     clientsDir = context.maybeGetDir(clientsDirname) match {
-    | None() -> context.mkdir(SKFS.IntFile::fromFile, clientsDirname)
-    | Some(d) -> SKFS.EHandle(SKFS.IntFile::fromFile, d.getDirName())
+    | None() -> context.mkdir(SKStore.IntFile::fromFile, clientsDirname)
+    | Some(d) -> SKStore.EHandle(SKStore.IntFile::fromFile, d.getDirName())
     };
-    key = SKFS.SID::create(clientUuid);
+    key = SKStore.SID::create(clientUuid);
     arr = clientsDir.unsafeGetArray(context, key);
     replicationSource = if (arr.size() > 0) {
       arr[0].value
     } else {
-      source = SKFS.genSym(0);
-      clientsDir.writeArray(context, key, Array[SKFS.IntFile(source)]);
+      source = SKStore.genSym(0);
+      clientsDir.writeArray(context, key, Array[SKStore.IntFile(source)]);
       source
     };
     print_string(replicationSource);
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   });
 }
 
@@ -777,7 +777,7 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   name = SKSQL.Name::create(args.getString("table"));
   source = args.maybeGetString("source") match {
   | Some(src) -> src.toInt()
-  | None() -> SKFS.genSym(0)
+  | None() -> SKStore.genSym(0)
   };
   SKSQL.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
@@ -789,7 +789,7 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     line = context.getGlobal("Line") match {
     | None() -> mutable Ref(1)
-    | Some(file) -> mutable Ref(SKFS.IntFile::fromFile(file).value)
+    | Some(file) -> mutable Ref(SKStore.IntFile::fromFile(file).value)
     };
     user = args.maybeGetString("user");
     myReadLine = () -> {
@@ -813,10 +813,10 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     viewName = userViewName.lowercase();
     SKSQL.forbidNow(context);
     format = options.format match {
-    | SKSQL.OFK_CSV() -> SKFS.OCSV()
-    | SKSQL.OFK_JSON() -> SKFS.OJSON(getFieldNames(context, viewDirName))
-    | SKSQL.OFK_SQL() -> SKFS.OSQL()
-    | SKSQL.OFK_JS() -> SKFS.OJS(getFieldNames(context, viewDirName))
+    | SKSQL.OFK_CSV() -> SKStore.OCSV()
+    | SKSQL.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, viewDirName))
+    | SKSQL.OFK_SQL() -> SKStore.OSQL()
+    | SKSQL.OFK_JS() -> SKStore.OJS(getFieldNames(context, viewDirName))
     };
     cmd = (
       args.maybeGetString("updates"),
@@ -825,14 +825,14 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     | (Some(_), Some(_)) ->
       print_error("Cannot have both --updates and --notify");
       skipExit(4)
-    | (Some(x), _) -> SKFS.NUpdates(format, x)
-    | (_, Some(x)) -> SKFS.NNotify(x)
-    | _ -> SKFS.NTail()
+    | (Some(x), _) -> SKStore.NUpdates(format, x)
+    | (_, Some(x)) -> SKStore.NNotify(x)
+    | _ -> SKStore.NTail()
     };
     (input, output) = SKSQL.getSubsDirs(context);
-    viewKey = SKFS.SID(viewName);
+    viewKey = SKStore.SID(viewName);
     inputDir = context.unsafeGetEagerDir(input.dirName);
-    sessionID = SKFS.genSym(0);
+    sessionID = SKStore.genSym(0);
     request = SKSQL.SubRequestFile(
       viewName,
       viewDirName,
@@ -845,7 +845,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     context.update();
     outputDir = context.unsafeGetEagerDir(output.dirName);
     file = outputDir.getArrayRaw(viewKey)[0];
-    invariant(sessionID == SKFS.IntFile::fromFile(file).value);
+    invariant(sessionID == SKStore.IntFile::fromFile(file).value);
     print_string(sessionID.toString());
   })
 }
@@ -858,7 +858,7 @@ fun execCanMirror(args: Cli.ParseResults, options: SKSQL.Options): void {
     | None() -> void
     | Some(reason) -> print_string(reason)
     };
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }
 
@@ -876,5 +876,5 @@ untracked fun execDebug(
   _args: Cli.ParseResults,
   _options: SKSQL.Options,
 ): void {
-  SKFS.toplevel(SKFS.Context{});
+  SKStore.toplevel(SKStore.Context{});
 }

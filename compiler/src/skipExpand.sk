@@ -63,15 +63,15 @@ module alias A = SkipAst;
 /*****************************************************************************/
 module ChildMap;
 
-const childDirName: SKFS.DirName = SKFS.DirName::create("/childCache/");
+const childDirName: SKStore.DirName = SKStore.DirName::create("/childCache/");
 
 fun getChildren(
-  context: mutable SKFS.Context,
-  childDir: SKFS.EHandle<SKFS.StringFile>,
+  context: mutable SKStore.Context,
+  childDir: SKStore.EHandle<SKStore.StringFile>,
   className: String,
 ): SSet {
   childDir
-    .getArray(context, SKFS.SID(className))
+    .getArray(context, SKStore.SID(className))
     .map(x -> x.value)
     .foldl(
       (result, child) ->
@@ -81,11 +81,11 @@ fun getChildren(
 }
 
 fun populateCache(
-  context: mutable SKFS.Context,
-  defsDir: SKFS.EHandle<SkipExpand.DefsFile>,
-): SKFS.EHandle<SKFS.StringFile> {
+  context: mutable SKStore.Context,
+  defsDir: SKStore.EHandle<SkipExpand.DefsFile>,
+): SKStore.EHandle<SKStore.StringFile> {
   defsDir.contextWriterKeyValues(
-    SKFS.StringFile::fromFile,
+    SKStore.StringFile::fromFile,
     context,
     childDirName,
     (context, writer, _key, defsFiles) ~> {
@@ -104,11 +104,11 @@ fun populateCache(
             if (!map.containsKey(parentStr)) {
               map![parentStr] = mutable Vector[];
             };
-            map[parentStr].push(SKFS.StringFile(childStr));
+            map[parentStr].push(SKStore.StringFile(childStr));
           }
         };
         for (parentStr => childVec in map) {
-          writer.writeArray(SKFS.SID(parentStr), childVec.toArray());
+          writer.writeArray(SKStore.SID(parentStr), childVec.toArray());
         }
       })
     },
@@ -120,13 +120,13 @@ private fun isConcreteClass(defs: UMap<A.Class_def>, c: String): Bool {
 }
 
 fun checkCycles(
-  context: mutable SKFS.Context,
-  defs: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
+  context: mutable SKStore.Context,
+  defs: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
 ): void {
   _ = defs.contextWriterKeyIter(
-    SKFS.StringFile::fromFile,
+    SKStore.StringFile::fromFile,
     context,
-    SKFS.DirName::create("/checkCycle/"),
+    SKStore.DirName::create("/checkCycle/"),
     (context, _writer, _key, defFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
         for (defFile in defFiles) {
@@ -144,9 +144,9 @@ fun checkCycles(
 // Basic check for explicit cycle in a hierarchy. Does not consider
 // implicit cycles due to subtyping
 private fun checkCycle(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   visited: SSet,
-  classDefs: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
+  classDefs: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
   classDef: A.Class_def,
 ): void {
   (classNamePos, className) = classDef.name;
@@ -176,30 +176,30 @@ module end;
 
 module ModuleMap;
 
-const moduleDirName1: SKFS.DirName = SKFS.DirName::create("/moduleCache1/");
-const moduleDirName: SKFS.DirName = SKFS.DirName::create("/moduleCache/");
-const moduleDir: SKFS.EHandle<SKFS.ArrayStringFile> = SKFS.EHandle(
-  SKFS.ArrayStringFile::fromFile,
+const moduleDirName1: SKStore.DirName = SKStore.DirName::create("/moduleCache1/");
+const moduleDirName: SKStore.DirName = SKStore.DirName::create("/moduleCache/");
+const moduleDir: SKStore.EHandle<SKStore.ArrayStringFile> = SKStore.EHandle(
+  SKStore.ArrayStringFile::fromFile,
   moduleDirName,
 );
 
-fun containsKey(context: mutable SKFS.Context, key: String): Bool {
-  moduleDir.getArray(context, SKFS.SID(key)).size() > 0
+fun containsKey(context: mutable SKStore.Context, key: String): Bool {
+  moduleDir.getArray(context, SKStore.SID(key)).size() > 0
 }
 
 fun populateCache(
-  context: mutable SKFS.Context,
-  moduleDefs: SKFS.EHandle<SkipExpand.DefsFile>,
+  context: mutable SKStore.Context,
+  moduleDefs: SKStore.EHandle<SkipExpand.DefsFile>,
 ): void {
   moduleDirName1 = moduleDefs.contextWriterKeyValues(
-    SKFS.StringFile::fromFile,
+    SKStore.StringFile::fromFile,
     context,
     moduleDirName1,
     (context, writer, key, values) ~> {
       if (values.size() == 0) return void;
       SkipError.catchErrors(1, context, () -> {
         moduleName = key match {
-        | SKFS.SID(x) -> x
+        | SKStore.SID(x) -> x
         | _ -> invariant_violation("Unexpected key type")
         };
         SkipExpand.checkConflicts(values[0].value);
@@ -235,22 +235,22 @@ fun populateCache(
         };
         for (defModuleName => defSet in defMap) {
           writer.writeArray(
-            SKFS.SID(defModuleName),
-            defSet.collect(Array).map(x -> SKFS.StringFile(x)),
+            SKStore.SID(defModuleName),
+            defSet.collect(Array).map(x -> SKStore.StringFile(x)),
           );
         }
       })
     },
   );
   _ = moduleDirName1.contextWriterKeyIter(
-    SKFS.ArrayStringFile::fromFile,
+    SKStore.ArrayStringFile::fromFile,
     context,
     moduleDirName,
     (context, writer, key, iter) ~> {
       SkipError.catchErrors(1, context, () -> {
         writer.write(
           key,
-          SKFS.ArrayStringFile(
+          SKStore.ArrayStringFile(
             iter.map(x -> x.value).collect(SortedSet).collect(Array),
           ),
         );
@@ -263,16 +263,16 @@ module end;
 
 module GlobalEnv;
 
-const defMapDirName1: SKFS.DirName = SKFS.DirName::create("/defMap1/");
-const defMapDirName: SKFS.DirName = SKFS.DirName::create("/defMap/");
-const defMapDir: SKFS.EHandle<ExpandedDefFile> = SKFS.EHandle(
+const defMapDirName1: SKStore.DirName = SKStore.DirName::create("/defMap1/");
+const defMapDirName: SKStore.DirName = SKStore.DirName::create("/defMap/");
+const defMapDir: SKStore.EHandle<ExpandedDefFile> = SKStore.EHandle(
   ExpandedDefFile::fromFile,
   defMapDirName,
 );
 
-class ProgramFile(value: A.Program) extends SKFS.File
+class ProgramFile(value: A.Program) extends SKStore.File
 
-class ExpandedDefFile(value: ExpandedDef) extends SKFS.File
+class ExpandedDefFile(value: ExpandedDef) extends SKStore.File
 
 base class ExpandedDef {
   children =
@@ -283,9 +283,9 @@ base class ExpandedDef {
 }
 
 fun populateDefinitions(
-  context: mutable SKFS.Context,
-  expandedDefsDir: SKFS.EHandle<SkipExpand.DefsFile>,
-): SKFS.EHandle<ExpandedDefFile> {
+  context: mutable SKStore.Context,
+  expandedDefsDir: SKStore.EHandle<SkipExpand.DefsFile>,
+): SKStore.EHandle<ExpandedDefFile> {
   phase1 = expandedDefsDir.contextWriterKeyValues(
     ExpandedDefFile::fromFile,
     context,
@@ -296,19 +296,19 @@ fun populateDefinitions(
         defs = defsFiles[0].value.i1;
         for (classDef in defs.class_defs) {
           expandedDefFile = ExpandedDefFile(EClass(classDef));
-          writer.write(SKFS.SID("class:" + classDef.name.i1), expandedDefFile);
+          writer.write(SKStore.SID("class:" + classDef.name.i1), expandedDefFile);
         };
         for (typeDef in defs.type_defs) {
           expandedDefFile = ExpandedDefFile(EType(typeDef));
-          writer.write(SKFS.SID("type:" + typeDef.name.i1), expandedDefFile)
+          writer.write(SKStore.SID("type:" + typeDef.name.i1), expandedDefFile)
         };
         for (constDef in defs.const_defs) {
           expandedDefFile = ExpandedDefFile(EConst(constDef));
-          writer.write(SKFS.SID("const:" + constDef.name.i1), expandedDefFile)
+          writer.write(SKStore.SID("const:" + constDef.name.i1), expandedDefFile)
         };
         for (funDef in defs.fun_defs) {
           expandedDefFile = ExpandedDefFile(EFun(funDef));
-          writer.write(SKFS.SID("fun:" + funDef.name.i1), expandedDefFile)
+          writer.write(SKStore.SID("fun:" + funDef.name.i1), expandedDefFile)
         };
       })
     },
@@ -320,7 +320,7 @@ fun populateDefinitions(
     (context, writer, key, defFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
         name = key match {
-        | SKFS.SID(x) -> x
+        | SKStore.SID(x) -> x
         | _ -> invariant_violation("Unexpected key type")
         };
         if (name.startsWith("class:") && defFiles.size() > 1) {
@@ -380,8 +380,8 @@ fun populateDefinitions(
   );
 }
 
-fun getClass(context: mutable SKFS.Context, className: String): ?A.Class_def {
-  arr = defMapDir.getArray(context, SKFS.SID("class:" + className));
+fun getClass(context: mutable SKStore.Context, className: String): ?A.Class_def {
+  arr = defMapDir.getArray(context, SKStore.SID("class:" + className));
   if (arr.size() == 0) return None();
   if (arr.size() > 1) invariant_violation("TODO multiple classes");
   Some(
@@ -393,10 +393,10 @@ fun getClass(context: mutable SKFS.Context, className: String): ?A.Class_def {
 }
 
 fun getType(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   typeName: String,
 ): ?A.Type_alias_def {
-  arr = defMapDir.getArray(context, SKFS.SID("type:" + typeName));
+  arr = defMapDir.getArray(context, SKStore.SID("type:" + typeName));
   if (arr.size() == 0) return None();
   if (arr.size() > 1) invariant_violation("TODO multiple type");
   Some(
@@ -407,8 +407,8 @@ fun getType(
   )
 }
 
-fun getConst(context: mutable SKFS.Context, constName: String): ?A.Const_def {
-  arr = defMapDir.getArray(context, SKFS.SID("const:" + constName));
+fun getConst(context: mutable SKStore.Context, constName: String): ?A.Const_def {
+  arr = defMapDir.getArray(context, SKStore.SID("const:" + constName));
   if (arr.size() == 0) return None();
   if (arr.size() > 1) invariant_violation("TODO multiple consts");
   Some(
@@ -496,7 +496,7 @@ class DefNames(defs: Array<String>) {
 }
 
 type Module_map_t = SMap<(?FileRange, Defs)>;
-class ModuleMapFile(value: Module_map_t) extends SKFS.File
+class ModuleMapFile(value: Module_map_t) extends SKStore.File
 
 fun name_of_module(x: Module_): String {
   x match {
@@ -505,9 +505,9 @@ fun name_of_module(x: Module_): String {
   }
 }
 
-fun module_names_find(context: mutable SKFS.Context, x: Module_): ?DefNames {
+fun module_names_find(context: mutable SKStore.Context, x: Module_): ?DefNames {
   // TODO: this should return none when the module is not defined
-  mresult = ModuleMap.moduleDir.getArray(context, SKFS.SID(name_of_module(x)));
+  mresult = ModuleMap.moduleDir.getArray(context, SKStore.SID(name_of_module(x)));
   Some(DefNames(if (mresult.size() == 0) Array[] else mresult[0].value))
 }
 
@@ -516,7 +516,7 @@ fun module_map_find(x: Module_, y: Module_map_t): ?Defs {
 }
 
 fun module_names_find_unsafe(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   x: Module_,
 ): DefNames {
   module_names_find(context, x) match {
@@ -525,12 +525,12 @@ fun module_names_find_unsafe(
   }
 }
 
-fun module_names_mem(context: mutable SKFS.Context, x: Module_): Bool {
+fun module_names_mem(context: mutable SKStore.Context, x: Module_): Bool {
   ModuleMap.containsKey(context, name_of_module(x))
 }
 
 fun module_map_fold(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   moduleMap: Module_map_t,
 ): A.Program {
   env = makeEnv();
@@ -569,7 +569,7 @@ fun checkConflicts(posDefs: (?FileRange, Defs)): void {
 }
 
 fun module_expand(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   moduleName: String,
   posDefs: (?FileRange, Defs),
@@ -726,19 +726,19 @@ fun element_privacy(md: DefNames, field_str: String): ?Bool {
 }
 
 fun get_module(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   mname: A.Name,
 ): ?DefNames {
   module_names_find(context, expand_module_name(env, mname))
 }
 
-fun is_module(context: mutable SKFS.Context, env: Env, mname: A.Name): Bool {
+fun is_module(context: mutable SKStore.Context, env: Env, mname: A.Name): Bool {
   is_uppercase(mname) && get_module(context, env, mname).isSome()
 }
 
 fun is_const_cstr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   fr: FileRange,
   name: A.Name,
@@ -752,7 +752,7 @@ fun is_const_cstr(
 }
 
 fun is_const_name(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   mname: A.Name,
   cname: A.Name,
@@ -764,7 +764,7 @@ fun is_const_name(
 }
 
 fun check_module(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   mname: A.Name,
   f: (FileRange, String),
@@ -849,7 +849,7 @@ fun check_const_privacy(env: Env, x: (FileRange, A.Visibility)): void {
   }
 }
 
-fun current_defs_names(context: mutable SKFS.Context, env: Env): DefNames {
+fun current_defs_names(context: mutable SKStore.Context, env: Env): DefNames {
   module_names_find(context, env.current_module) match {
   | None() -> empty_defs_names()
   | Some(value) -> value
@@ -860,7 +860,7 @@ fun current_defs_names(context: mutable SKFS.Context, env: Env): DefNames {
 /* Apply type names. */
 /*****************************************************************************/
 fun cstr_name(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   name: (FileRange, String),
 ): (FileRange, String) {
@@ -880,7 +880,7 @@ fun cstr_name(
 }
 
 fun type_name(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: A.Type_name,
 ): A.Type_name {
@@ -904,7 +904,7 @@ fun type_name(
 /* Apply variable names. */
 /*****************************************************************************/
 fun var_name(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   name: (FileRange, String),
 ): (FileRange, String) {
@@ -988,22 +988,22 @@ const emptyProgram: A.Program = A.Program{
   const_defs => UMap[],
 };
 
-class DefsFile(value: (?FileRange, SkipExpand.Defs)) extends SKFS.File
+class DefsFile(value: (?FileRange, SkipExpand.Defs)) extends SKStore.File
 
 fun program(
-  context: mutable SKFS.Context,
-  files: SKFS.EHandle<SkipParse.DefsFile>,
-): (SKFS.EHandle<GlobalEnv.ExpandedDefFile>, SKFS.EHandle<SKFS.StringFile>) {
+  context: mutable SKStore.Context,
+  files: SKStore.EHandle<SkipParse.DefsFile>,
+): (SKStore.EHandle<GlobalEnv.ExpandedDefFile>, SKStore.EHandle<SKStore.StringFile>) {
   moduleDefsPhase1Dir = files.contextWriterKeyIter(
     DefsFile::fromFile,
     context,
-    SKFS.DirName::create("/moduleMap1/"),
+    SKStore.DirName::create("/moduleMap1/"),
     (context, writer, _key, values) ~> {
       for (fileDefs in values) {
         SkipError.catchErrors(1, context, () -> {
           moduleMap = definitions(context, fileDefs.value);
           for (moduleName => defs in moduleMap) {
-            writer.write(SKFS.SID(moduleName), DefsFile(defs))
+            writer.write(SKStore.SID(moduleName), DefsFile(defs))
           }
         })
       }
@@ -1012,7 +1012,7 @@ fun program(
   moduleDefsDir = moduleDefsPhase1Dir.contextWriterKeyIter(
     DefsFile::fromFile,
     context,
-    SKFS.DirName::create("/moduleMap2/"),
+    SKStore.DirName::create("/moduleMap2/"),
     (context, writer, key, values) ~> {
       SkipError.catchErrors(1, context, () -> {
         acc = values.next() match {
@@ -1023,10 +1023,10 @@ fun program(
           !acc = mergeDefs(acc, defs.value);
         };
         moduleName = key match {
-        | SKFS.SID(x) -> x
+        | SKStore.SID(x) -> x
         | _ -> invariant_violation("Unexpected key")
         };
-        writer.write(SKFS.SID(moduleName), DefsFile(acc))
+        writer.write(SKStore.SID(moduleName), DefsFile(acc))
       })
     },
   );
@@ -1035,11 +1035,11 @@ fun program(
   expandedDefs = moduleDefsDir.contextWriterKeyValues(
     DefsFile::fromFile,
     context,
-    SKFS.DirName::create("/moduleMap3/"),
+    SKStore.DirName::create("/moduleMap3/"),
     (context, writer, key, defsFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
         moduleName = key match {
-        | SKFS.SID(x) -> x
+        | SKStore.SID(x) -> x
         | _ -> invariant_violation("Unexpected key")
         };
         invariant(defsFiles.size() == 1);
@@ -1124,7 +1124,7 @@ fun mergePrograms(prog2: A.Program, prog1: A.Program): A.Program {
 }
 
 fun definitions(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   file: List<SkipAst.Definition>,
 ): Module_map_t {
   env = makeEnv();
@@ -1140,7 +1140,7 @@ fun definitions(
 }
 
 fun definition(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: (Env, Module_map_t),
   x: A.Definition,
 ): (Env, Module_map_t) {
@@ -1430,7 +1430,7 @@ fun malias_type_consts(env: Env, tyd: A.Cla_type_def): A.Cla_type_def {
 }
 
 fun malias_const_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   cst: A.Const_def,
 ): A.Const_def {
@@ -1445,7 +1445,7 @@ fun malias_const_def(
 }
 
 fun malias_fun_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   fd: A.Fun_def,
 ): A.Fun_def {
@@ -1464,7 +1464,7 @@ fun malias_fun_def(
 }
 
 fun malias_class_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   cd: A.Class_def,
 ): A.Class_def {
@@ -1514,7 +1514,7 @@ fun malias_when_clause(env: Env, wc: A.When_type_clause): A.When_type_clause {
 }
 
 fun malias_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   params: Parameters<A.Parameter>,
 ): Parameters<A.Parameter> {
@@ -1522,7 +1522,7 @@ fun malias_params(
 }
 
 fun malias_param(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   p: A.Parameter,
 ): A.Parameter {
@@ -1533,7 +1533,7 @@ fun malias_param(
 }
 
 fun malias_class_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   cp: A.Class_params,
 ): A.Class_params {
@@ -1563,7 +1563,7 @@ fun report_macro_usage(env: Env, pos: FileRange): void {
 }
 
 fun malias_children(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   sk_children: A.Children,
 ): A.Children {
@@ -1571,7 +1571,7 @@ fun malias_children(
 }
 
 fun malias_child(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   child: A.Child,
 ): A.Child {
@@ -1583,7 +1583,7 @@ fun malias_child(
 }
 
 fun malias_methods(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   met: A.Method_def,
 ): A.Method_def {
@@ -1619,7 +1619,7 @@ fun malias_type(env: Env, ty: A.Type_): A.Type_ {
 }
 
 fun malias_key_values(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: (A.Expr, A.Expr),
 ): (A.Expr, A.Expr) {
@@ -1649,7 +1649,7 @@ fun maybe_malias_ty_name(env: Env, x: A.Type_name): A.Type_name {
 }
 
 fun malias_body(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   m: A.Inherited_body,
 ): A.Inherited_body {
@@ -1658,7 +1658,7 @@ fun malias_body(
 }
 
 fun malias_body_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: A.Inherited_body_,
 ): A.Inherited_body_ {
@@ -1670,7 +1670,7 @@ fun malias_body_(
 }
 
 fun malias_expr_body(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: A.Expr_body,
 ): A.Expr_body {
@@ -1698,13 +1698,13 @@ fun malias_lam_params(
   params.map(lp -> malias_lam_param(env, lp))
 }
 
-fun malias_expr(context: mutable SKFS.Context, env: Env, ex: A.Expr): A.Expr {
+fun malias_expr(context: mutable SKStore.Context, env: Env, ex: A.Expr): A.Expr {
   (pos, e) = ex;
   (pos, malias_expr_(context, env, pos, e))
 }
 
 fun malias_expr_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   pos: FileRange,
   e: A.Expr_,
@@ -1794,7 +1794,7 @@ fun malias_expr_(
 }
 
 fun malias_call_args(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   args: A.Call_args,
 ): A.Call_args {
@@ -1802,7 +1802,7 @@ fun malias_call_args(
 }
 
 fun malias_ordered_expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   oe: A.Ordered_expr,
 ): A.Ordered_expr {
@@ -1811,7 +1811,7 @@ fun malias_ordered_expr(
 }
 
 fun malias_lvalue(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   l: A.Lvalue,
 ): A.Lvalue {
@@ -1836,7 +1836,7 @@ fun malias_lvalue(
 }
 
 fun malias_lvalue_assign_value(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   l: A.Lvalue_assign_value,
 ): A.Lvalue_assign_value {
@@ -1857,7 +1857,7 @@ fun malias_lvalue_assign_value(
 }
 
 fun malias_match_branches(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   mbl: List<A.Match_branch>,
 ): List<A.Match_branch> {
@@ -1865,7 +1865,7 @@ fun malias_match_branches(
 }
 
 fun malias_match_branch(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   mb: A.Match_branch,
 ): A.Match_branch {
@@ -1878,7 +1878,7 @@ fun malias_match_branch(
 }
 
 fun malias_pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   pat: A.Pattern,
 ): A.Pattern {
@@ -1887,7 +1887,7 @@ fun malias_pattern(
 }
 
 fun malias_pattern_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: A.Pattern_,
 ): A.Pattern_ {
@@ -2450,7 +2450,7 @@ fun add_tyd_to_acc(
 }
 
 fun module_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   module_name: Module_,
   defs: Defs,
@@ -2470,7 +2470,7 @@ fun module_(
 /*****************************************************************************/
 /* Function definition. */
 /*****************************************************************************/
-fun fun_def(context: mutable SKFS.Context, env: Env, fd: A.Fun_def): A.Fun_def {
+fun fun_def(context: mutable SKStore.Context, env: Env, fd: A.Fun_def): A.Fun_def {
   t__ = fd;
   native_ = t__.native_;
   memoized_ = t__.memoized_;
@@ -2508,7 +2508,7 @@ fun fun_def(context: mutable SKFS.Context, env: Env, fd: A.Fun_def): A.Fun_def {
 /* Constant definition. */
 /*****************************************************************************/
 fun const_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   source: ?(FileRange, String),
   con: A.Const_def,
@@ -2570,7 +2570,7 @@ fun const_def(
 /*****************************************************************************/
 /* type_def map. */
 /*****************************************************************************/
-fun cla_tyd(context: mutable SKFS.Context, env: Env, x: A.Cla_tyd): A.Cla_tyd {
+fun cla_tyd(context: mutable SKStore.Context, env: Env, x: A.Cla_tyd): A.Cla_tyd {
   x match {
   | A.TydAbstract(tyd_type, def) ->
     A.TydAbstract(
@@ -2582,7 +2582,7 @@ fun cla_tyd(context: mutable SKFS.Context, env: Env, x: A.Cla_tyd): A.Cla_tyd {
 }
 
 fun cla_type_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   source: ?A.Name,
   tyd: A.Type_def<A.Cla_tyd>,
@@ -2613,7 +2613,7 @@ fun cla_type_def(
 }
 
 fun type_alias(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   tyd_value: A.Type_,
 ): A.Type_ {
@@ -2621,7 +2621,7 @@ fun type_alias(
 }
 
 fun type_alias_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   tyd: A.Type_alias_def,
 ): A.Type_def<A.Type_> {
@@ -2649,7 +2649,7 @@ fun type_alias_def(
 /* Class definition. */
 /*****************************************************************************/
 fun class_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   cd: A.Class_def,
 ): A.Class_def {
@@ -2857,7 +2857,7 @@ fun child(
 /* Type definition (defined within classes). */
 /*****************************************************************************/
 fun extend_list(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   l: Array<A.Parent>,
 ): Array<A.Parent> {
@@ -2865,7 +2865,7 @@ fun extend_list(
 }
 
 fun type_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   tparams: Array<A.Type_parameter>,
 ): (Env, Array<A.Type_parameter>) {
@@ -2877,7 +2877,7 @@ fun type_parameters(
 }
 
 fun type_parameter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   tp: A.Type_parameter,
 ): (Env, A.Type_parameter) {
@@ -2893,7 +2893,7 @@ fun type_parameter(
 }
 
 fun when_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   wparams: Array<A.When_type_clause>,
 ): Array<A.When_type_clause> {
@@ -2904,7 +2904,7 @@ fun when_params(
   })
 }
 
-fun type(context: mutable SKFS.Context, env: Env, ty: SkipAst.Type_): A.Type_ {
+fun type(context: mutable SKStore.Context, env: Env, ty: SkipAst.Type_): A.Type_ {
   lam = (env1, _, ty1) -> {
     ty1 match {
     | (pos, A.Tapply(x, y)) ->
@@ -2919,7 +2919,7 @@ fun type(context: mutable SKFS.Context, env: Env, ty: SkipAst.Type_): A.Type_ {
 }
 
 fun type_option(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: ?A.Type_,
 ): ?A.Type_ {
@@ -2930,7 +2930,7 @@ fun type_option(
 }
 
 fun named_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   nt: A.Named_type,
 ): A.Named_type {
@@ -2942,7 +2942,7 @@ fun named_type(
 }
 
 fun extend_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   et: A.Parent,
 ): A.Parent {
@@ -2975,7 +2975,7 @@ fun bind_locals_option(env: Env, x: ?Parameters<A.Name>): Env {
 /* Class parameters. */
 /*****************************************************************************/
 fun class_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   source: A.Name,
   x: A.MaybeClassParams,
@@ -2994,7 +2994,7 @@ fun class_parameters(
 /* Function parameters. */
 /*****************************************************************************/
 fun fun_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   source: ?A.Name,
   params: Parameters<A.Parameter>,
@@ -3006,7 +3006,7 @@ fun fun_parameters(
 }
 
 fun parameter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   source: ?A.Name,
   par: A.Parameter,
@@ -3042,7 +3042,7 @@ fun parameter(
 /* Methods. */
 /*****************************************************************************/
 fun method_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   cd: A.Class_def,
   met: A.Method_def,
@@ -3114,7 +3114,7 @@ fun method_def(
 }
 
 fun method_body(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   sk_native: ?FileRange,
   b: A.Inherited_body,
@@ -3124,7 +3124,7 @@ fun method_body(
 }
 
 fun method_body_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   sk_native: ?FileRange,
   x: A.Inherited_body_,
@@ -3137,7 +3137,7 @@ fun method_body_(
 }
 
 fun method_body__(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   sk_native: ?FileRange,
   body: A.Expr_body,
@@ -3174,7 +3174,7 @@ fun check_late_static_body(
 // ported from recursive version to avoid stack overflows
 // on long chains of A.Bind and A.Seq
 //
-fun expr(context: mutable SKFS.Context, env_: Env, ex_: A.Expr): A.Expr {
+fun expr(context: mutable SKStore.Context, env_: Env, ex_: A.Expr): A.Expr {
   kids = e ->
     e match {
     | (_, A.Bind _)
@@ -3235,7 +3235,7 @@ fun expr(context: mutable SKFS.Context, env_: Env, ex_: A.Expr): A.Expr {
 }
 
 fun expr_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   pos: FileRange,
   x: A.Expr_,
@@ -3382,7 +3382,7 @@ fun expr_(
 }
 
 fun key_values(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: (A.Expr, A.Expr),
 ): (A.Expr, A.Expr) {
@@ -3391,7 +3391,7 @@ fun key_values(
 }
 
 fun call_args(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   args: A.Call_args,
 ): A.Call_args {
@@ -3399,7 +3399,7 @@ fun call_args(
 }
 
 fun ordered_expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   oe: A.Ordered_expr,
 ): A.Ordered_expr {
@@ -3408,7 +3408,7 @@ fun ordered_expr(
 }
 
 fun lvalue(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   l: A.Lvalue,
 ): (Env, A.Lvalue) {
@@ -3428,7 +3428,7 @@ fun lvalue(
 }
 
 fun lvalue_assign_value(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   l: A.Lvalue_assign_value,
 ): A.Lvalue_assign_value {
@@ -3458,7 +3458,7 @@ fun forEachBinding(env: Env, fb: A.ForEachBinding): Env {
 }
 
 fun match_branch(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   mb: A.Match_branch,
 ): A.Match_branch {
@@ -3472,7 +3472,7 @@ fun match_branch(
 }
 
 fun pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   pat: A.Pattern,
 ): (Env, A.Pattern) {
@@ -3482,7 +3482,7 @@ fun pattern(
 }
 
 fun pattern_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: A.Pattern_,
 ): (Env, A.Pattern_) {
@@ -3504,7 +3504,7 @@ fun pattern_(
 }
 
 fun type_identifier(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: A.TypeIdentifier,
 ): A.TypeIdentifier {
@@ -3515,7 +3515,7 @@ fun type_identifier(
 }
 
 fun pattern_arguments_opt(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   x: ?Parameters<A.Pattern>,
 ): (Env, ?Parameters<A.Pattern>) {
@@ -3528,7 +3528,7 @@ fun pattern_arguments_opt(
 }
 
 fun pattern_arguments(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   pats: Parameters<A.Pattern>,
 ): (Env, Parameters<A.Pattern>) {

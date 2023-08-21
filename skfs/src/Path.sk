@@ -8,7 +8,7 @@
  */
 /*****************************************************************************/
 
-module SKFS;
+module SKStore;
 
 //const root: DirName = DirName::create("/");
 
@@ -140,12 +140,12 @@ class DirName(
   }
 
   static private fun validateDirName(dirName: String): void {
-    validator = mutable SKFSImpl.NameValidator(dirName, dirName.chars(), 0);
+    validator = mutable SKStoreImpl.NameValidator(dirName, dirName.chars(), 0);
     validator.go()
   }
 
   static fun isValidDirName(dirName: String): Bool {
-    validator = mutable SKFSImpl.NameValidator(dirName, dirName.chars(), 0);
+    validator = mutable SKStoreImpl.NameValidator(dirName, dirName.chars(), 0);
     try {
       validator.go();
       true
@@ -155,7 +155,7 @@ class DirName(
   }
 
   fun sub(str: String): this {
-    validator = mutable SKFSImpl.NameValidator(str, str.chars(), 0);
+    validator = mutable SKStoreImpl.NameValidator(str, str.chars(), 0);
     validator.mustBeBaseName();
     DirName::create(this.dirName + str + "/")
   }
@@ -236,7 +236,7 @@ class SID(value: String) extends BaseName {
 }
 
 base class Exception extends .Exception uses Show
-class InvalidPathExn(reason: String) extends SKFS.Exception {
+class InvalidPathExn(reason: String) extends SKStore.Exception {
   fun toString(): String {
     `Invalid path: ${this.reason}`
   }
@@ -258,7 +258,7 @@ module end;
 /* Implementation details. */
 /*****************************************************************************/
 
-module SKFSImpl;
+module SKStoreImpl;
 
 // This is a state machine that walks the string and checks that is it a
 // correct dirName.
@@ -269,7 +269,7 @@ mutable class NameValidator(
   mutable idx: Int,
 ) {
   readonly fun error(msg: String): void {
-    SKFS.error(msg)
+    SKStore.error(msg)
   }
 
   readonly fun current(): Char {

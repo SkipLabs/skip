@@ -62,17 +62,17 @@ fun main(): void {
 
   isInit = results.maybeGetString("init").isSome();
   if (isInit) {
-    _ = SKFS.gContextInit(SKFS.Context{});
+    _ = SKStore.gContextInit(SKStore.Context{});
   };
-  SKFS.runWithGc(
-    SKFS.Context{},
+  SKStore.runWithGc(
+    SKStore.Context{},
     _context ~> {
-      SKFS.CStop(
+      SKStore.CStop(
         Some((context, _, _) ~> {
           _result = compile(config, context, config.unknown);
         }),
       )
     },
-    Some(SKFS.Synchronizer(SKFS.import, SKFS.export, _ ~> void)),
+    Some(SKStore.Synchronizer(SKStore.import, SKStore.export, _ ~> void)),
   )
 }
