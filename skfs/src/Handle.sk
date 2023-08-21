@@ -231,76 +231,15 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
 /*****************************************************************************/
 
 class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
-  private fun genericMap<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, Key, Array<T>) ~> void,
-    reducerOpt: ?EReducer<T2> = None(),
-  ): EHandle<T2> {
-    EagerDir::apply(
-      context,
-      this.dirName,
-      dirName,
-      (context, writer, key, fileIter) ~> {
-        files = fileIter.collect(Array);
-        if (files.size() == 0) return void;
-        f(context, writer, key, files.map(x -> this.conv(x)));
-      },
-      reducerOpt match {
-      | None() -> None()
-      | Some(reducer) ->
-        Some(
-          IReducer{
-            init => files ~> reducer.init(files.map(conv)),
-            update => (state, old, new) ~>
-              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
-          },
-        )
-      },
-    );
-    EHandle(conv, dirName)
-  }
-
-  fun contextWriterKeyIter<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, Key, mutable Iterator<T>) ~> void,
-    reducerOpt: ?EReducer<T2> = None(),
-  ): EHandle<T2> {
-    EagerDir::apply(
-      context,
-      this.dirName,
-      dirName,
-      (context, writer, key, fileIter) ~> {
-        iter = IteratorWithIsEmpty::create(fileIter);
-        if (iter.isEmpty()) return void;
-        f(context, writer, key, iter.map(this.conv));
-      },
-      reducerOpt match {
-      | None() -> None()
-      | Some(reducer) ->
-        Some(
-          IReducer{
-            init => files ~> reducer.init(files.map(conv)),
-            update => (state, old, new) ~>
-              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
-          },
-        )
-      },
-    );
-    EHandle(conv, dirName)
-  }
-
-  static fun multiContextWriterKeyIter<T2: File>(
-    conv: File ~> T2,
+  static fun multiContextWriterKeyIter<T, T2: File>(
+    convOutput: File ~> T2,
     context: mutable Context,
     parents: Array<
       (
         DirName,
         (
-          (mutable Context, mutable Writer, Key, mutable Iterator<T2>) ~> void,
+          File ~> T,
+          (mutable Context, mutable Writer, Key, mutable Iterator<T>) ~> void,
           ?Array<KeyRange>,
         ),
       ),
@@ -312,11 +251,11 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     parentSet = mutable Set[];
     for (parent in parents) {
       (parentName, parentData) = parent;
-      (mapFun, rangeOpt) = parentData;
+      (convInput, mapFun, rangeOpt) = parentData;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
         iter = IteratorWithIsEmpty::create(fileIter);
         if (iter.isEmpty()) return void;
-        mapFun(context, writer, key, iter.map(conv));
+        mapFun(context, writer, key, iter.map(convInput));
       };
       parentSet.add(parentName);
       dynParents.push((parentName, (dynamicMapFun, rangeOpt)))
@@ -331,14 +270,34 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
       | Some(reducer) ->
         Some(
           IReducer{
-            init => files ~> reducer.init(files.map(conv)),
+            init => files ~> reducer.init(files.map(convOutput)),
             update => (state, old, new) ~>
-              reducer.update(state.map(conv), old.map(conv), new.map(conv)),
+              reducer.update(
+                state.map(convOutput),
+                old.map(convOutput),
+                new.map(convOutput),
+              ),
           },
         )
       },
     );
-    EHandle(conv, dirName)
+    EHandle(convOutput, dirName)
+  }
+
+  fun contextWriterKeyIter<T2: File>(
+    conv: File ~> T2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, mutable Writer, Key, mutable Iterator<T>) ~> void,
+    reducerOpt: ?EReducer<T2> = None(),
+  ): EHandle<T2> {
+    static::multiContextWriterKeyIter(
+      conv,
+      context,
+      Array[(this.dirName, (this.conv, f, None()))],
+      dirName,
+      reducerOpt,
+    )
   }
 
   fun contextWriterKeyValues<T2: File>(
@@ -348,7 +307,14 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     f: (mutable Context, mutable Writer, Key, Array<T>) ~> void,
     reducerOpt: ?(EReducer<T2>) = None(),
   ): EHandle<T2> {
-    this.genericMap(conv, context, dirName, f, reducerOpt)
+    this.contextWriterKeyIter(
+      conv,
+      context,
+      dirName,
+      (context, writer, key, iter) ~>
+        f(context, writer, key, iter.collect(Array)),
+      reducerOpt,
+    )
   }
 
   fun pre(context: mutable Context): ?EHandle<T> {
