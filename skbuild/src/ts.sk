@@ -1,0 +1,74 @@
+module Skbuild;
+
+fun saveResource(env: Env, res: String, resPath: String): (String, String) {
+  ts = env.resourcePath(resPath, ".ts");
+  b64 = env.resourcePath(resPath, ".b64");
+  tsDir = Path.dirname(ts);
+  if (!FileSystem.exists(tsDir)) {
+    run(Array["mkdir", "-p", Path.dirname(ts)], env.verbose);
+  };
+  cmd = Array["bash", "-c", `base64 ${resPath} | tr -d "\\n" > ${b64}`];
+  env.run(cmd);
+  FileSystem.writeTextFile(
+    ts,
+    tsResource(env.name, Path.dirname(res).replace("/", "_"), resPath),
+  );
+  (ts, b64)
+}
+
+fun tsResource(pckName: String, mName: String, path: String): String {
+  name = Path.basename(path).replace(".", "_");
+  fn = `SKIP_${pckName}_${mName}_${name}`;
+  Array[
+    "// for distribution we replace this line with inlined base64-encoded bytes",
+    `export var base64 = "";`,
+    "",
+    "interface ToWasm {",
+    `  ${fn}: () => number;`,
+    "}",
+    "interface Env {",
+    `  base64Decode: (base64: String) => Uint8Array;`,
+    "}",
+    "",
+    "interface Utils {",
+    "  exportBytes: (s: Uint8Array) => number;",
+    "}",
+    "",
+    "class LinksImpl implements ToWasm {",
+    "  env: Env;",
+    "  constructor(env: Env) {",
+    "    this.env = env;",
+    "  }",
+    `  ${fn}: () => number;`,
+    "",
+    "  complete = (utils: Utils, exports: object) => {",
+    `    this.${fn} = () => {`,
+    `      let buffer = this.env.base64Decode(base64);`,
+    "      return utils.exportBytes(buffer);",
+    "    }",
+    "    return null;",
+    "  }",
+    "}",
+    "",
+    "class Manager {",
+    "  env: Env;",
+    "  constructor(env: Env) {",
+    "   this.env = env;",
+    "  }",
+    "  prepare = (wasm: object) => {",
+    "    let toWasm = wasm as ToWasm;",
+    "    let links = new LinksImpl(this.env);",
+    `    toWasm.${fn} =  () => links.${fn}();`,
+    "    return links;",
+    "  }",
+    "}",
+    "",
+    "/** @sk init */",
+    "export function init(env: Env) {",
+    "  return Promise.resolve(new Manager(env));",
+    "}",
+    "",
+  ].join("\n")
+}
+
+module end;

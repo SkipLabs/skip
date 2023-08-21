@@ -1,0 +1,420 @@
+module Skbuild;
+
+class Env(
+  refDir: String,
+  outDir: String,
+  name: String,
+  profile: String,
+  test: Bool,
+  verbose: Bool,
+) {
+  static fun create(): Env {
+    Env(
+      Environ.var("PCK_DIR"),
+      Environ.var("OUT_DIR"),
+      Environ.var("NAME"),
+      Environ.var("PROFILE"),
+      Environ.var("TEST").lowercase() == "true",
+      Environ.var("VERBOSE").lowercase() == "true",
+    )
+  }
+
+  fun resolve(path: String): String {
+    Path.resolve(this.refDir, path)
+  }
+
+  fun outpath(path: String): String {
+    Path.join(this.outDir, path)
+  }
+
+  fun relative(path: String): String {
+    relative(path, this.refDir).fromSome()
+  }
+
+  fun targetPath(path: String, ext: String): String {
+    targetPath(this.outDir, this.relative(path), ext)
+  }
+
+  fun resourcePath(path: String, ext: String): String {
+    targetPath(
+      this.outDir,
+      this.name + "_" + this.relative(path).replace("/", "_"),
+      ext,
+    )
+  }
+
+  fun printString(str: String): void {
+    if (this.verbose) {
+      print_string(str)
+    };
+  }
+
+  fun printError(error: String): void {
+    if (this.verbose) {
+      print_error(error)
+    };
+  }
+
+  fun run(args: Array<String>): void {
+    if (this.verbose) {
+      // TODO: colors
+      print_error(`>> ${args.join(" ")}`)
+    };
+    p = System.subprocess(args, this.printString, this.printError);
+    if (!p.success()) {
+      if (!this.verbose) {
+        print_raw(p.stdout);
+        print_error_raw(p.stderr);
+      };
+      throw RuntimeException(p.exitcode())
+    };
+  }
+}
+
+fun build(isWasm: Bool): Env {
+  env = Env::create();
+  includeDirs = Array[];
+  #forEachFunction (@skbuild_include_dirs, #function, #functionName) {
+    !includeDirs = includeDirs.concat(#function(env));
+  };
+  links = Array[];
+  #forEachFunction (@skbuild_links, #function, #functionName) {
+    !links = links.concat(#function(env));
+  };
+  sourceDirs = Array[];
+  #forEachFunction (@skbuild_source_dirs, #function, #functionName) {
+    !sourceDirs = sourceDirs.concat(#function(env));
+  };
+  preambles = Array[];
+  #forEachFunction (@skbuild_preambles, #function, #functionName) {
+    !preambles = preambles.concat(#function(env));
+  };
+  resources = Array[];
+  #forEachFunction (@skbuild_resources, #function, #functionName) {
+    !resources = resources.concat(#function(env));
+  };
+  resourceDirs = Array[];
+  #forEachFunction (@skbuild_resource_dirs, #function, #functionName) {
+    !resourceDirs = resourceDirs.concat(#function(env));
+  };
+  build_harness(
+    env,
+    isWasm,
+    includeDirs,
+    sourceDirs,
+    preambles,
+    links,
+    resources,
+    resourceDirs,
+  );
+}
+
+fun build_harness(
+  env: Env,
+  isWasm: Bool,
+  includeDirs: Array<String>,
+  sourceDirs: Array<String>,
+  preambles: Array<String>,
+  links: Array<String>,
+  resources: Array<String>,
+  resourceDirs: Array<String>,
+): Env {
+  resourceObjs = Array[];
+  resourceInfos = mutable Map[];
+  resources.each(res -> {
+    resPath = env.resolve(res);
+    if (FileSystem.exists(resPath)) {
+      if (!isWasm) {
+        !resourceObjs = resourceObjs.concat(Array[buildResource(env, resPath)])
+      } else {
+        saved = saveResource(env, res, resPath);
+        resourceInfos.set(saved.i0, saved.i1)
+      }
+    }
+  });
+  resourceDirs.each(res -> {
+    resPath = env.resolve(res);
+    if (FileSystem.exists(resPath)) {
+      name = Path.basename(resPath);
+      archiveDir = Path.parentname(resPath);
+      archive = Path.join(archiveDir, `${name}.tar.gz`);
+      env.run(
+        Array[
+          "bash",
+          "-c",
+          `cd ${archiveDir} && tar -zcvf ${name}.tar.gz ${name}/`,
+        ],
+      );
+      if (!isWasm) {
+        !resourceObjs = resourceObjs.concat(Array[buildResource(env, archive)]);
+      } else {
+        saved = saveResource(env, res, resPath);
+        resourceInfos.set(saved.i0, saved.i1)
+      };
+      env.run(Array["rm", archive])
+    }
+  });
+  if (!resourceInfos.isEmpty()) {
+    rjson = JSON.Object(resourceInfos.map((_, v) -> JSON.String(v)));
+    stream = mutable Vector[];
+    rjson.writeToStream(stream.push, 2);
+    FileSystem.writeTextFile(env.outpath("resources.json"), stream.join(""));
+  };
+  optITime: ?Int = None();
+  !includeDirs = includeDirs.map(id -> {
+    if (!Path.isAbsolute(id)) {
+      !id = env.resolve(id)
+    };
+    if (FileSystem.exists(id)) {
+      FileSystem.readFilesRecursive(
+        id,
+        f ~> f.endsWith(".hpp") || f.endsWith(".h"),
+        _f ~> false,
+      ).each(i -> !optITime = max(optITime, mtime(i)));
+    };
+    id
+  });
+  libname = `lib${env.name}.${if (isWasm) "bc" else "a"}`;
+  target = env.outpath(libname);
+  library = buildLibrary(
+    env,
+    isWasm,
+    sourceDirs,
+    target,
+    resourceObjs,
+    includeDirs,
+    optITime,
+  );
+  library.each(print_library);
+  preambles
+    .map(p -> {
+      if (!Path.isAbsolute(p)) {
+        !p = env.resolve(p)
+      };
+      p
+    })
+    .each(print_preamble);
+  links.each(print_link);
+  env;
+}
+
+fun buildLibrary(
+  env: Env,
+  isWasm: Bool,
+  sourceDirs: Array<String>,
+  target: String,
+  resources: Array<String>,
+  includeDirs: Array<String>,
+  optITime: ?Int,
+): ?String {
+  sources = sourceDirs.map(sd -> {
+    if (!Path.isAbsolute(sd)) {
+      !sd = env.resolve(sd)
+    };
+    FileSystem.readFilesRecursive(
+      sd,
+      f ~> f.endsWith(".cpp") || f.endsWith(".c"),
+      _f ~> false,
+    )
+  });
+  if (sources.isEmpty() && resources.isEmpty()) {
+    return None()
+  };
+  optTime = mtime(target);
+  optSTime = optITime;
+  timedSources = sources.map(sd ->
+    sd.map(s -> {
+      fOptMTime = mtime(s);
+      !optSTime = max(optSTime, fOptMTime);
+      (s, fOptMTime)
+    })
+  );
+  resources.each(rcs -> {
+    fOptMTime = mtime(rcs);
+    !optSTime = max(optSTime, fOptMTime);
+  });
+  includeOptions = includeDirs.map(i -> `-I${i}`);
+  if (optTime.map(t -> optSTime.map(s -> t < s).default(true)).default(true)) {
+    objects = Array[];
+    timedSources.each(tsd ->
+      !objects = objects.concat(
+        tsd
+          .map(f ->
+            compileFile(env, isWasm, f.i0, max(f.i1, optITime), includeOptions)
+          )
+          .toArray(),
+      )
+    );
+    cmd = if (isWasm) {
+      Array["llvm-link", "-o", target].concat(objects).concat(resources)
+    } else {
+      Array["ar", "rcs", target].concat(objects).concat(resources)
+    };
+    run(cmd, env.verbose);
+  };
+  Some(target)
+}
+
+fun buildResource(env: Env, file: String): String {
+  optTime = mtime(file);
+  object = env.targetPath(file, ".o");
+  oTime = mtime(object);
+  create = oTime.isNone() || optTime.isNone() || optTime > oTime;
+  if (create) {
+    ensureDirectory(Path.dirname(object), env.verbose);
+    relative = env.relative(file);
+    nf = file.replace("/", "_").replace(".", "_");
+    nr = relative.replace("/", "_").replace(".", "_");
+    redefs = mutable Vector<String>[];
+    Array["start", "size", "end"].each(suffix -> {
+      redefs.push("--redefine-sym");
+      redefs.push(`_binary_${nf}_${suffix}=_binary_${nr}_${suffix}`);
+    });
+    (b, o) = copyObjOptions();
+    cmd = Array[
+      "objcopy",
+      "-B",
+      b,
+      "-I",
+      "binary",
+      "-O",
+      o,
+      file,
+      object,
+    ].concat(redefs.toArray());
+    run(cmd, env.verbose);
+  };
+  object
+}
+
+fun targetPath(dir: String, file: String, suffix: String): String {
+  dirname = Path.dirname(file);
+  ext = Path.extname(file);
+  basename = Path.basename(file);
+  !basename = basename.take(basename.length() - ext.length());
+  Path.join(dir, Path.join(dirname, `${basename}${suffix}`));
+}
+
+fun relative(path: String, to: String): ?String {
+  if (!to.endsWith("/")) {
+    !to = to + "/";
+  };
+  if (path.startsWith(to)) {
+    Some(path.sub(path.getIter().drop(to.chars().size()), path.chars().size()))
+  } else {
+    None()
+  }
+}
+
+class RuntimeException(code: Int) extends Exception {
+  fun getMessage(): String {
+    `Runtime error with code ${this.code}`
+  }
+}
+
+fun run(args: Array<String>, verbose: Bool): void {
+  if (verbose) {
+    // TODO: colors
+    print_error(`>> ${args.join(" ")}`)
+  };
+  p = System.subprocess(args);
+  if (!p.success()) {
+    print_raw(p.stdout);
+    print_error_raw(p.stderr);
+    throw RuntimeException(p.exitcode())
+  };
+}
+
+fun ensureDirectory(path: String, verbose: Bool): void {
+  if (!FileSystem.exists(path)) {
+    run(Array["mkdir", "-p", path], verbose)
+  }
+}
+
+fun mtime(path: String): ?Int {
+  if (FileSystem.exists(path)) {
+    p = System.subprocess(Array["stat", "-c", "%Y", path]);
+    if (!p.success()) {
+      None()
+    } else {
+      p.stdout.trim().toIntOption()
+    }
+  } else {
+    None()
+  }
+}
+
+fun max(ot1: ?Int, ot2: ?Int): ?Int {
+  (ot1, ot2) match {
+  | (Some(t1), Some(t2)) -> Some(if (t1 > t2) t1 else t2)
+  | (optTime, None()) -> optTime
+  | (None(), optTime) -> optTime
+  }
+}
+
+fun arch(): String {
+  p = System.subprocess(Array["gcc", "-dumpmachine"]);
+  p.stdout.trim();
+}
+
+fun copyObjOptions(): (String, String) {
+  arch().split("-").maybeGet(0) match {
+  | Some("x86_64") -> ("i386:x86-64", "elf64-x86-64")
+  | Some("aarch64")
+  | _ ->
+    ("aarch64", "elf64-littleaarch64")
+  }
+}
+
+fun compileFile(
+  env: Env,
+  isWasm: Bool,
+  source: String,
+  optTime: ?Int,
+  includes: Array<String>,
+): String {
+  ext = if (isWasm) ".bc" else ".o";
+  object = env.targetPath(source, ext);
+  oTime = mtime(object);
+  compile = oTime.isNone() || optTime.isNone() || optTime > oTime;
+  if (compile) {
+    ensureDirectory(Path.dirname(object), env.verbose);
+    cmd = (if (source.endsWith(".c")) Array["clang"] else {
+      Array["clang++", "-std=c++17"]
+    })
+      .concat(
+        if (env.profile == "debug") {
+          Array["-O0", "-g", "-DDEBUG"]
+        } else if (env.profile == "release") {
+          Array["-O3", "-DRELEASE"]
+        } else {
+          Array["-O2", "-g", "-DDEV"]
+        },
+      )
+      .concat(
+        if (isWasm) {
+          Array["-DSKIP32", "--target=wasm32", "-emit-llvm"]
+        } else {
+          Array["-DSKIP64"]
+        },
+      )
+      .concat(includes)
+      .concat(Array["-o", object, "-c", source]);
+    run(cmd, env.verbose);
+  };
+  object
+}
+
+fun print_library(library: String): void {
+  print_string(`skargo:library=${library}`);
+}
+
+fun print_preamble(preamble: String): void {
+  print_string(`skargo:preamble=${preamble}`);
+}
+
+fun print_link(link: String): void {
+  print_string(`skargo:link=${link}`);
+}
+
+module end;
