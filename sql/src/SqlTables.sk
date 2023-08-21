@@ -420,19 +420,23 @@ fun getIndexOutputDir(
 ): SKStore.EHandle<IndexDescr> {
   input = getIndexInputDir(context);
   makeDir(IndexDescr::fromFile, context, indexOutput, () -> {
-    input.contextMap(
+    input.contextWriterKeyValues(
       IndexDescr::fromFile,
       context,
       indexOutput,
-      (context, index) ~> {
-        createUserIndex(
-          context,
-          index.name,
-          index.pos,
-          index.fields,
-          index.unique,
-          index.primary,
-          index.text,
+      (context, writer, key, values) ~> {
+        index = values[0];
+        writer.write(
+          key,
+          createUserIndex(
+            context,
+            index.name,
+            index.pos,
+            index.fields,
+            index.unique,
+            index.primary,
+            index.text,
+          ),
         )
       },
     )
@@ -592,52 +596,64 @@ fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
   context = SKStore.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
-  _ = handle.contextMap(handle.conv, context, sinkName, (context, dirDescr) ~> {
-    if (!dirDescr.isInput) return dirDescr;
-    printDirDescr(dirDescr, suffix);
-    for (indexDescr in getIndexByName(context).getArray(
-      context,
-      SKStore.SID(dirDescr.dirName.toString()),
-    )) {
-      indexDescr.text match {
-      | None() -> void
-      | Some(text) -> print_string(text + ";")
+  _ = handle.contextWriterKeyValues(
+    handle.conv,
+    context,
+    sinkName,
+    (context, _writer, _key, values) ~> {
+      dirDescr = values[0];
+      if (!dirDescr.isInput) return void;
+      printDirDescr(dirDescr, suffix);
+      for (indexDescr in getIndexByName(context).getArray(
+        context,
+        SKStore.SID(dirDescr.dirName.toString()),
+      )) {
+        indexDescr.text match {
+        | None() -> void
+        | Some(text) -> print_string(text + ";")
+        }
       }
-    };
-    dirDescr
-  });
+    },
+  );
 }
 
 fun dumpInserts(origContext: readonly SKStore.Context): void {
   context = SKStore.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
-  _ = handle.contextMap(handle.conv, context, sinkName, (context, dirDescr) ~> {
-    if (!dirDescr.isInput) return dirDescr;
-    o = print_raw;
-    fileIter = context.unsafeGetEagerDir(dirDescr.dirName).unsafeGetFileIter();
-    count = 1;
-    o("BEGIN TRANSACTION;\n");
-    for (kv in fileIter) {
-      if (count % 1024 == 0) {
-        o("COMMIT;\n");
-        o("BEGIN TRANSACTION;\n");
-      };
-      (_, files) = kv;
-      for (file in files) {
-        row = RowValues::fromFile(file);
-        for (_ in Range(0, row.repeat)) {
-          o("INSERT INTO " + dirDescr.name + " VALUES ");
-          o(row.toString());
-          o(";\n");
-          !count = count + 1;
+  _ = handle.contextWriterKeyValues(
+    handle.conv,
+    context,
+    sinkName,
+    (context, _writer, _key, values) ~> {
+      dirDescr = values[0];
+      if (!dirDescr.isInput) return void;
+      o = print_raw;
+      fileIter = context
+        .unsafeGetEagerDir(dirDescr.dirName)
+        .unsafeGetFileIter();
+      count = 1;
+      o("BEGIN TRANSACTION;\n");
+      for (kv in fileIter) {
+        if (count % 1024 == 0) {
+          o("COMMIT;\n");
+          o("BEGIN TRANSACTION;\n");
+        };
+        (_, files) = kv;
+        for (file in files) {
+          row = RowValues::fromFile(file);
+          for (_ in Range(0, row.repeat)) {
+            o("INSERT INTO " + dirDescr.name + " VALUES ");
+            o(row.toString());
+            o(";\n");
+            !count = count + 1;
+          };
         };
       };
-    };
-    o("COMMIT;\n");
-    flushStdout();
-    dirDescr
-  });
+      o("COMMIT;\n");
+      flushStdout();
+    },
+  );
 }
 
 fun dumpView(origContext: readonly SKStore.Context, viewName: String): void {
