@@ -37,7 +37,7 @@ interface WasmExports {
   sk_pop_dirty_page: () => number;
   SKIP_get_version: () => number;
   SKIP_tracked_call: (funId: number, funArg: number) => number;
-  SKIP_tracked_query: (request: number, start: number, end: number) => number;
+  SKIP_tracked_query: (request: number, encoded_params: number, start: number, end: number) => number;
   skip_main: () => void;
   getVersion: () => number;
   __heap_base: any;
@@ -675,11 +675,15 @@ export class SKDB {
     return JSON.parse(wasmStringToJS(this.exports, result));
   }
 
-  trackedQuery(request: string, start?: number, end?: number): any {
-    if (start === undefined) start = 0;
-    if (end === undefined) end = -1;
+  trackedQuery(
+    request: string,
+    params: Map<string, string|number> = new Map(),
+    start: number = 0,
+    end: number = -1
+  ) : any {
     let result = this.exports.SKIP_tracked_query(
       encodeUTF8(this.exports, request),
+      encodeUTF8(this.exports, JSON.stringify(Object.fromEntries(params))),
       start,
       end
     );
