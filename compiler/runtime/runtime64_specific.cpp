@@ -26,7 +26,6 @@
 #include <vector>
 
 #ifndef RELEASE
-// TODO: Only include in debug mode.
 #include <backtrace.h>
 
 extern "C" {
@@ -516,7 +515,7 @@ char* SKIP_unix_unixepoch(char* timep) {
   time_t rawTime = mktime( tm );
   localtime_r(&rawTime, &timeLocal);
   rawTime += timeLocal.tm_gmtoff;
-  sprintf(buffer, "%ld", rawTime);
+  snprintf(buffer, 50, "%ld", rawTime);
   return sk_string_create(buffer, strlen(buffer));
 }
 
