@@ -26,7 +26,7 @@ fun testChangesAfter(): void {
     .getChangesAfter(tick);
   invariant(!isReset);
   T.expectEq(
-    Array<SKStore.BaseName>[SKStore.IID(0), SKStore.IID(1)],
+    Array<SKStore.Key>[SKStore.IID(0), SKStore.IID(1)],
     changedKeys.collect(Array).sorted(),
     "Test getChangesAfter 0",
   );
@@ -39,7 +39,7 @@ fun testChangesAfter(): void {
     .getChangesAfter(tick);
   invariant(!isReset);
   T.expectEq(
-    Array<SKStore.BaseName>[SKStore.IID(1), SKStore.IID(2)],
+    Array<SKStore.Key>[SKStore.IID(1), SKStore.IID(2)],
     changedKeys.collect(Array).sorted(),
     "Test getChangesAfter 1",
   );
@@ -52,7 +52,7 @@ fun testChangesAfter(): void {
   rand = Random::mcreate(23);
   for (i in Range(0, 100)) {
     !tick = context.tick;
-    changes = SortedSet<SKStore.BaseName>[];
+    changes = SortedSet<SKStore.Key>[];
     for (_ in Range(0, rand.random(0, 100))) {
       dir = context.unsafeGetEagerDir(dirName);
       key = SKStore.IID(rand.random(0, 1000));

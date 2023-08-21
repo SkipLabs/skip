@@ -7,38 +7,38 @@ module SKDB;
 type MapFunRow = (
   mutable SKStore.Context,
   mutable SKStore.Writer,
-  SKStore.BaseName,
+  SKStore.Key,
   mutable Iterator<SKDB.Row>,
 ) ~> void;
 
 class SubTask(
   name: String,
-  key: SKStore.BaseName,
+  key: SKStore.Key,
   inputRow: Row,
   entries: List<Row>,
   remainingTables: List<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
 )
 
-class KVFile(value: (SKStore.BaseName, Array<SKStore.File>)) extends SKStore.File
+class KVFile(value: (SKStore.Key, Array<SKStore.File>)) extends SKStore.File
 
 class ProjKey(
   value: ?CValue,
   leftShard: Int,
   rightShard: Int,
-) extends SKStore.BaseName {
+) extends SKStore.Key {
   fun toString(): String {
     this.value.toString()
   }
 }
 
-class LeftFile(SKStore.BaseName, RowValues) extends SKStore.File
+class LeftFile(SKStore.Key, RowValues) extends SKStore.File
 class LeftShardedFile{
   leftShardID: Int,
   rightShard: Int,
   value: RowValues,
 } extends SKStore.File
 
-class RightFile(SKStore.BaseName, RowValues) extends SKStore.File
+class RightFile(SKStore.Key, RowValues) extends SKStore.File
 class RightShardedFile{
   leftShard: Int,
   rightShardID: Int,
@@ -126,7 +126,7 @@ fun pow2(n: Int): Int {
 fun noop(
   _context: mutable SKStore.Context,
   writer: mutable SKStore.Writer,
-  key: SKStore.BaseName,
+  key: SKStore.Key,
   valueIter: mutable Iterator<SKStore.File>,
 ): void {
   writer.writeArray(key, valueIter.collect(Array))
@@ -138,18 +138,18 @@ fun noop(
 
 mutable class MultiWriter{
   mutable writes: SortedMap<
-    SKStore.BaseName,
+    SKStore.Key,
     mutable Vector<SKStore.File>,
   > = SortedMap[],
 } {
-  mutable fun write(key: SKStore.BaseName, value: SKStore.File): void {
+  mutable fun write(key: SKStore.Key, value: SKStore.File): void {
     if (!this.writes.containsKey(key)) {
       this.!writes[key] = mutable Vector[];
     };
     this.writes[key].push(value);
   }
 
-  mutable fun writeArray(key: SKStore.BaseName, values: Array<SKStore.File>): void {
+  mutable fun writeArray(key: SKStore.Key, values: Array<SKStore.File>): void {
     if (!this.writes.containsKey(key)) {
       this.!writes[key] = mutable Vector[];
     };
@@ -262,7 +262,7 @@ class SelectEvaluator{
         while (i < limit) {
           iter.next() match {
           | None() ->
-            arr.push(((SKStore.IID(i) : SKStore.BaseName), Array[]));
+            arr.push(((SKStore.IID(i) : SKStore.Key), Array[]));
             !i = i + 1
           | Some((_, fileIter)) ->
             values = fileIter.map(RowValues::fromFile).collect(Array);
@@ -274,7 +274,7 @@ class SelectEvaluator{
             };
             if (repeat == 0) continue;
             !value = value.setRepeat(repeat);
-            arr.push(((SKStore.IID(i) : SKStore.BaseName), Array[value]));
+            arr.push(((SKStore.IID(i) : SKStore.Key), Array[value]));
             !i = i + 1
           }
         };
@@ -793,7 +793,7 @@ class SelectEvaluator{
     entries: List<Row>,
     context: mutable SKStore.Context,
     writer: mutable SKStore.Writer,
-    key: SKStore.BaseName,
+    key: SKStore.Key,
     inputRows: mutable Iterator<Row>,
   ): void {
     mwriter = mutable MultiWriter{};
@@ -865,7 +865,7 @@ class SelectEvaluator{
     entries: List<Row>,
     context: mutable SKStore.Context,
     mwriter: mutable MultiWriter,
-    key: SKStore.BaseName,
+    key: SKStore.Key,
     inputRow: Row,
     repeat: Int,
   ): void {
@@ -952,7 +952,7 @@ class SelectEvaluator{
   fun evalSelectRow(
     context: mutable SKStore.Context,
     qkind: ?(Int, QueryKind),
-    _inputKey: SKStore.BaseName,
+    _inputKey: SKStore.Key,
     evaluator: SKDB.ExprEvaluator,
     writer: mutable MultiWriter,
     repeat: Int,
@@ -997,7 +997,7 @@ class SelectEvaluator{
     context: mutable SKStore.Context,
     remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-    key: SKStore.BaseName,
+    key: SKStore.Key,
     inputRow: SKDB.Row,
     writer: mutable MultiWriter,
     repeat: Int,
@@ -1291,7 +1291,7 @@ fun makeJoinReducer(
 ): (
   mutable SKStore.Context,
   mutable SKStore.Writer,
-  SKStore.BaseName,
+  SKStore.Key,
   mutable Iterator<SKStore.File>,
 ) ~> void {
   (context, writer, _, files) ~> {
@@ -1425,7 +1425,7 @@ fun computeShardSizes(stats: ?ShardStats): (Int, Int) {
 fun getStats(
   context: mutable SKStore.Context,
   shardTable: SKStore.EHandle<ShardStats>,
-  x: readonly Vector<(SKStore.BaseName, SKStore.File)>,
+  x: readonly Vector<(SKStore.Key, SKStore.File)>,
 ): ?ShardStats {
   for (kv in x) {
     (key, _) = kv;

@@ -144,7 +144,7 @@ value class Version(value: Int) uses Orderable
 class TableMap{
   startTick: SKStore.Tick,
   version: Version,
-  map: SortedMap<SKStore.BaseName, (Version, Descr)>,
+  map: SortedMap<SKStore.Key, (Version, Descr)>,
 } extends SKStore.File
 
 fun dirDescrCopy(
@@ -333,7 +333,7 @@ fun getSubsDirs(
           ignoredSrc = SKStore.Source::create(
             SKStore.Path(dirDescr.dirName, SKStore.IID(inputSrc)),
           );
-          (file: SKStore.BaseName) -> {
+          (file: SKStore.Key) -> {
             rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
             !updateIsFromIgnoredSource(ignoredSrc, rows)
           }

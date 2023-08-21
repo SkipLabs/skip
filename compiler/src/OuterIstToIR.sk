@@ -1225,8 +1225,8 @@ fun makeGFunTypeWithFlags{
   GFunType{isMutable, isTracked, params => paramsWithFlags, returnType}
 }
 
-class LazyGFunKey(value: LazyGFun) extends SKStore.BaseName {
-  fun compare(other: SKStore.BaseName): Order {
+class LazyGFunKey(value: LazyGFun) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
     other match {
     | LazyGFunKey(value) -> this.value.toString().compare(value.toString())
     | _ -> invariant_violation("Heterogeneous keys found")
@@ -1234,8 +1234,8 @@ class LazyGFunKey(value: LazyGFun) extends SKStore.BaseName {
   }
 }
 
-class LazyGClassKey(value: LazyGClass) extends SKStore.BaseName {
-  fun compare(other: SKStore.BaseName): Order {
+class LazyGClassKey(value: LazyGClass) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
     other match {
     | LazyGClassKey(value) -> this.value.name().id.compare(value.name().id)
     | _ -> invariant_violation("Heterogeneous keys found")
@@ -1329,7 +1329,7 @@ class Converter private (
   fun getGFunctionFun(
     context: mutable SKStore.Context,
     _self: SKStore.LHandle<GFunctionFile>,
-    key: SKStore.BaseName,
+    key: SKStore.Key,
   ): Array<GFunctionFile> {
     lazy = key match {
     | LazyGFunKey(x) -> x
@@ -1350,7 +1350,7 @@ class Converter private (
   private fun getGClassImplFun(
     context: mutable SKStore.Context,
     _self: SKStore.LHandle<GClassFile>,
-    key: SKStore.BaseName,
+    key: SKStore.Key,
   ): Array<GClassFile> {
     gid = key match {
     | LazyGClassKey(x) -> x
