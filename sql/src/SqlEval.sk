@@ -6,7 +6,7 @@ module SKSQL;
 
 fun computeTableDescr(name: Name, schema: Array<TypeDescr>): DirDescr {
   dirNameStr = "/" + name + "/";
-  dirName = SKFS.DirName::create(dirNameStr);
+  dirName = SKStore.DirName::create(dirNameStr);
   colVec = mutable Vector[];
   for (i in Range(0, schema.size())) {
     colVec.push((schema[i].name, i));
@@ -15,7 +15,7 @@ fun computeTableDescr(name: Name, schema: Array<TypeDescr>): DirDescr {
 }
 
 fun computeInsert(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   params: Map<String, Value>,
   inTransaction: Bool,
   pos: Int,
@@ -82,7 +82,7 @@ fun computeInsert(
             if (tyDescr.ty is TEXT()) {
               error(pos, "Cannot generate a string primary key");
             };
-            Some(CInt(SKFS.genSym(0)))
+            Some(CInt(SKStore.genSym(0)))
           } else {
             error(pos, "Missing value for column: " + tyDescr.name);
           }
@@ -109,7 +109,7 @@ fun computeInsert(
 }
 
 fun valueToCValue(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   params: Map<String, Value>,
   inTransaction: Bool,
   pos: Int,
@@ -148,7 +148,7 @@ fun valueToCValue(
       };
       globals.maybeGet(varName) match {
       | None() ->
-        id = SKFS.genSym(0);
+        id = SKStore.genSym(0);
         if (!isPositive) !id = -id;
         !globals = globals.set(varName, id);
         context.setGlobal(GLOBALS, globals);
@@ -157,9 +157,9 @@ fun valueToCValue(
       }
     | VId(isPositive, None()) ->
       if (isPositive) {
-        Some(CInt(SKFS.genSym(0)))
+        Some(CInt(SKStore.genSym(0)))
       } else {
-        Some(CInt(-SKFS.genSym(0)))
+        Some(CInt(-SKStore.genSym(0)))
       }
     | VTime() ->
       if (inTransaction) {
@@ -169,7 +169,7 @@ fun valueToCValue(
       Some(CInt(time))
     | VInt(n) ->
       if (schema[idx].primary) {
-        _ = SKFS.genSym(Math.abs(n));
+        _ = SKStore.genSym(Math.abs(n));
       };
       Some(CInt(n))
     | v ->
@@ -264,33 +264,33 @@ class SelectFile(
   text: String,
   sparams: SelectParams,
   cselect: CSelect,
-) extends SKFS.File
+) extends SKStore.File
 
 class Evaluator{options: Options, user: ?UserFile} {
   fun write(
-    context: mutable SKFS.Context,
-    dirName: SKFS.DirName,
-    key: SKFS.BaseName,
-    value: SKFS.File,
+    context: mutable SKStore.Context,
+    dirName: SKStore.DirName,
+    key: SKStore.BaseName,
+    value: SKStore.File,
   ): void {
     context.getEagerDir(dirName).write(context, key, value);
   }
 
   fun writeArray(
-    context: mutable SKFS.Context,
-    dirName: SKFS.DirName,
-    key: SKFS.BaseName,
-    values: Array<SKFS.File>,
+    context: mutable SKStore.Context,
+    dirName: SKStore.DirName,
+    key: SKStore.BaseName,
+    values: Array<SKStore.File>,
   ): void {
     context.getEagerDir(dirName).writeArray(context, key, values);
   }
 
   fun stmt(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     params: Map<String, Value>,
     stmt: Stmt,
     inTransaction: Bool,
-  ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
+  ): ?((mutable SKStore.Context, mutable SKStore.Context, SKStore.Context) ~> void) {
     stmt match {
     | Table{pos, name, schema, ifNotExists} ->
       if (inTransaction) {
@@ -301,7 +301,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         this.createTable(context, pos, name, dirDescr, ifNotExists);
       })
     | Insert{pos, onConflict, name, paramsOpt, values} ->
-      baseName = SKFS.SID::create(name.lower);
+      baseName = SKStore.SID::create(name.lower);
       if (getTableDir(context).maybeGet(context, baseName) is None()) {
         error(pos, "Table not found: " + name);
       };
@@ -311,7 +311,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           error(pos, "Can only use OR IGNORE/REPLACE with values");
         };
         !selectAst.id = Name::create(
-          selectAst.id.origName + "_" + SKFS.genSym(0),
+          selectAst.id.origName + "_" + SKStore.genSym(0),
         );
         compiler = SKSQL.Compiler::create(
           false,
@@ -324,8 +324,8 @@ class Evaluator{options: Options, user: ?UserFile} {
         updateTableMap(context);
         table = getTable(context, pos, name);
         dir = getDir(table);
-        sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
-        sinkDirName = SKFS.DirName::create(sinkName);
+        sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
+        sinkDirName = SKStore.DirName::create(sinkName);
         kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
         if (select.params.size() != kinds.size()) {
           error(pos, "Incompatible select size")
@@ -339,12 +339,12 @@ class Evaluator{options: Options, user: ?UserFile} {
           | _ -> error(pos, "Incompatible select type")
           }
         };
-        _ = SKFS.EagerDir::apply(
+        _ = SKStore.EagerDir::apply(
           context,
           selectDir.dirName,
           sinkDirName,
           (context, _writer, key, valueIter) ~> {
-            src = SKFS.Path::create(selectDir.dirName, key);
+            src = SKStore.Path::create(selectDir.dirName, key);
             entries = Vector[(key, (src, src, valueIter.collect(Array)))];
             inputDir = context.unsafeGetEagerDir(dir.dirName);
             inputDir.writeArraySourceMany(context, entries.iterator());
@@ -401,7 +401,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       selectAst = origSelectAst with {id => viewName};
       views = getViewsDir(context);
       viewsDir = context.unsafeGetEagerDir(views.dirName);
-      key = SKFS.SID(viewName.lower);
+      key = SKStore.SID(viewName.lower);
       if (viewsDir.getArrayRaw(key).size() != 0) {
         if (ifNotExists) return None();
         error(pos, "VIEW " + viewName + " already exists");
@@ -453,7 +453,7 @@ class Evaluator{options: Options, user: ?UserFile} {
             params,
           );
           cselect = compiler.compileSelect(context, selectAst, true);
-          dirName = SKFS.DirName::create("/" + selectAst.id + "/");
+          dirName = SKStore.DirName::create("/" + selectAst.id + "/");
           dirDescr = SKSQL.Compiler::getDirDescr(
             selectAst.params,
             cselect.from,
@@ -463,7 +463,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           );
           _selectDir = SKSQL.evalSelect(context, cselect, None());
           tableDir = getTableDir(context);
-          fileName = SKFS.SID::create(viewName.lower);
+          fileName = SKStore.SID::create(viewName.lower);
           tableDir.writeArray(context, fileName, Array[dirDescr]);
         })
       } else {
@@ -476,7 +476,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       Some((context, _, _) ~> {
         views = getViewsDir(context);
         viewsDir = context.unsafeGetEagerDir(views.dirName);
-        key = SKFS.SID(viewName.lower);
+        key = SKStore.SID(viewName.lower);
         files = viewsDir.getArrayRaw(key);
         if (files.size() == 0) {
           error(pos, "VIEW " + viewName + " does not exist");
@@ -494,11 +494,11 @@ class Evaluator{options: Options, user: ?UserFile} {
     | Drop{kind => TTable(), name} ->
       Some((context, _, _) ~> {
         dirNameStr = "/" + name + "/";
-        dirName = SKFS.DirName::create(dirNameStr);
+        dirName = SKStore.DirName::create(dirNameStr);
         context.removeDir(dirName);
         context.setDir(
           dirName,
-          SKFS.DeletedDir{dirName, time => context.timeStamp()},
+          SKStore.DeletedDir{dirName, time => context.timeStamp()},
         )
       })
     | Delete{pos, colName => None(), name, where} ->
@@ -508,7 +508,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       error(pos, "DELETE colName not supported")
 
     | Update{pos, name, sets, where} ->
-      baseName = SKFS.SID::create(name.lower);
+      baseName = SKStore.SID::create(name.lower);
       if (getTableDir(context).maybeGet(context, baseName) is None()) {
         error(pos, "Table not found: " + name.origName);
       };
@@ -516,14 +516,14 @@ class Evaluator{options: Options, user: ?UserFile} {
       updateTableMap(context);
       table = getTable(context, pos, name);
       dir = getDir(table);
-      sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
-      sinkDirName = SKFS.DirName::create(sinkName);
-      _ = SKFS.EagerDir::apply(
+      sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
+      sinkDirName = SKStore.DirName::create(sinkName);
+      _ = SKStore.EagerDir::apply(
         context,
         deleteDir,
         sinkDirName,
         (context, _writer, key, valueIter) ~> {
-          src = SKFS.Path::create(deleteDir, key);
+          src = SKStore.Path::create(deleteDir, key);
           entries = Vector[(key, (src, src, valueIter.collect(Array)))];
           inputDir = context.unsafeGetEagerDir(dir.dirName);
           inputDir.writeArraySourceMany(context, entries.iterator());
@@ -533,9 +533,9 @@ class Evaluator{options: Options, user: ?UserFile} {
     };
   }
 
-  fun makeIndex(context: mutable SKFS.Context, index: Index): void {
+  fun makeIndex(context: mutable SKStore.Context, index: Index): void {
     input = getIndexInputDir(context);
-    key = SKFS.SID::create(index.name.lower);
+    key = SKStore.SID::create(index.name.lower);
     size = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key).size();
     if (size != 0) {
       if (index.ifNotExists) {
@@ -548,18 +548,18 @@ class Evaluator{options: Options, user: ?UserFile} {
   }
 
   fun delete(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     params: Map<String, Value>,
     pos: Int,
     name: Name,
     where: ?Expr,
     sets: Array<(Name, Pos, Expr)>,
-  ): SKFS.DirName {
-    sinkName = "/sinks/sink" + SKFS.genSym(0) + "/";
-    sinkDirName = SKFS.DirName::create(sinkName);
+  ): SKStore.DirName {
+    sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
+    sinkDirName = SKStore.DirName::create(sinkName);
     from = Some(Array[TableName(FName(name), None(), false)]);
     selectAst = Select{
-      id => Name::create("SELECT_" + SKFS.genSym(pos)),
+      id => Name::create("SELECT_" + SKStore.genSym(pos)),
       pos => pos,
       params => SelectParams(true, Array[]),
       from,
@@ -584,16 +584,16 @@ class Evaluator{options: Options, user: ?UserFile} {
     updateTableMap(context);
     table = getTable(context, pos, name);
     inputDir = getDir(table);
-    SKFS.EagerDir::apply(
+    SKStore.EagerDir::apply(
       context,
       selectDir.dirName,
       sinkDirName,
       (context, writer, key, rowIter) ~> {
         entries = mutable Vector[];
         dir = context.unsafeGetEagerDir(inputDir.dirName);
-        writerPath = SKFS.Path(selectDir.dirName, SKFS.IID(SKFS.genSym(0)));
+        writerPath = SKStore.Path(selectDir.dirName, SKStore.IID(SKStore.genSym(0)));
         for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          entries.push((key, (source.path(), writerPath, Array<SKFS.File>[])));
+          entries.push((key, (source.path(), writerPath, Array<SKStore.File>[])));
         };
         dir.writeArraySourceMany(context, entries.iterator());
         if (select.sets.isEmpty()) return void;
@@ -646,7 +646,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   }
 
   fun insert(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     params: Map<String, Value>,
     pos: Int,
     onConflict: ?OnConflict,
@@ -654,7 +654,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     table: DirDescr,
     paramsOpt: ?Array<Name>,
     values: Array<Array<Value>>,
-  ): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
+  ): ?((mutable SKStore.Context, mutable SKStore.Context, SKStore.Context) ~> void) {
     rows = computeInsert(
       context,
       params,
@@ -749,7 +749,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   }
 
   fun insertTable(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     table: DirDescr,
     rows: Array<RowValues>,
   ): void {
@@ -758,21 +758,21 @@ class Evaluator{options: Options, user: ?UserFile} {
     kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
     for (row in rows) {
       key = RowKey(row, kinds);
-      source = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0)));
+      source = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
       !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
     };
     context.setDir(newDir.dirName, newDir);
   }
 
   fun insertStream(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     rows: Array<RowValues>,
     table: DirDescr,
   ): void {
     dir = getDir(table);
     newDir = context.unsafeGetEagerDir(dir.dirName);
-    key = SKFS.IID(SKFS.genSym(0));
-    source = SKFS.Path(dir.dirName, key);
+    key = SKStore.IID(SKStore.genSym(0));
+    source = SKStore.Path(dir.dirName, key);
     for (row in rows) {
       start = context.tick;
       vcontext = context.mclone();
@@ -784,7 +784,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   }
 
   fun insertWindow(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     ws: Int,
     rows: Array<RowValues>,
     table: DirDescr,
@@ -807,7 +807,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       | Some(x) -> x
       };
       key = RowKey(row, kinds);
-      source = SKFS.Path(dir.dirName, key);
+      source = SKStore.Path(dir.dirName, key);
       !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
       time = row.getInt(0).fromSome();
 
@@ -819,7 +819,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (minValue.getInt(0).fromSome() + ws > time) {
           break void;
         };
-        minSource = SKFS.Path(dir.dirName, minKey);
+        minSource = SKStore.Path(dir.dirName, minKey);
         !newDir = newDir.writeEntry(
           context,
           minSource,
@@ -843,7 +843,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   }
 
   fun createTable(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     pos: Int,
     name: Name,
     dirDescr: DirDescr,
@@ -858,7 +858,7 @@ class Evaluator{options: Options, user: ?UserFile} {
 
     getTableDir(context).writeArray(
       context,
-      SKFS.SID::create(name.lower),
+      SKStore.SID::create(name.lower),
       Array[dirDescr],
     );
 
@@ -904,8 +904,8 @@ native fun isATTY(): UInt32;
 
 @cpp_extern("SKIP_unsafe_compare_sets")
 native fun unsafeCompareSets(
-  SortedMap<SKFS.Path, SortedSet<SKFS.ArrowKey>>,
-  SortedMap<SKFS.Path, SortedSet<SKFS.ArrowKey>>,
+  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
+  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
 ): Int32;
 
 fun read(line: Int): (Int, String) {
@@ -1022,23 +1022,23 @@ fun printErrorAndExit(
 
 fun evalWithContext(
   options: Options,
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   params: Map<String, Value>,
   stmt: Stmt,
   inTransaction: Bool,
-): ?((mutable SKFS.Context, mutable SKFS.Context, SKFS.Context) ~> void) {
+): ?((mutable SKStore.Context, mutable SKStore.Context, SKStore.Context) ~> void) {
   user = context.getGlobal("USER").map(UserFile::fromFile);
   evaluator = Evaluator{options, user};
   evaluator.stmt(context, params, stmt, inTransaction);
 }
 
-fun makeSqlContext(): mutable SKFS.Context {
-  gcontext = mutable SKFS.Context{
+fun makeSqlContext(): mutable SKStore.Context {
+  gcontext = mutable SKStore.Context{
     unsafeReuse => true,
     failOnExn => true,
     removeSubDirs => true,
   };
-  gcontext.setGlobal("Line", SKFS.IntFile(0));
+  gcontext.setGlobal("Line", SKStore.IntFile(0));
   gcontext
 }
 
@@ -1052,8 +1052,8 @@ fun doOnError(options: Options, f: () -> void, error: Exception -> void): void {
   }
 }
 
-class StmtFile(stmt: Stmt) extends SKFS.File
-class TickFile(tick: SKFS.Tick) extends SKFS.File
+class StmtFile(stmt: Stmt) extends SKStore.File
+class TickFile(tick: SKStore.Tick) extends SKStore.File
 
 base class OutputFormatKind {
   children =
@@ -1071,10 +1071,10 @@ class Options{
   showUsedIndexes: Bool,
   format: OutputFormatKind = OFK_SQL(),
   expectQueryParams: Bool = false,
-} extends SKFS.File
+} extends SKStore.File
 
 fun evalQuery(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   params: Map<String, Value>,
   query: String,
 ): Array<RowValues> {
@@ -1112,7 +1112,7 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
     if (isTTY) {
       print_raw("skdb> ");
     };
-    lineFile = SKFS.IntFile::fromFile(context.getGlobal("Line").fromSome());
+    lineFile = SKStore.IntFile::fromFile(context.getGlobal("Line").fromSome());
     context.!globals = SortedMap[];
     userOpt.each(_ -> {
       print_error("Cannot execute queries as user, use --connect instead");
@@ -1130,9 +1130,9 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
     pos = 0;
     shouldContinue = false;
     underLockF: ?((
-      mutable SKFS.Context,
-      mutable SKFS.Context,
-      SKFS.Context,
+      mutable SKStore.Context,
+      mutable SKStore.Context,
+      SKStore.Context,
     ) ~> void) = None();
 
     doOnError(
@@ -1227,33 +1227,33 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
     );
 
     !gline = line;
-    context.setGlobal("Line", SKFS.IntFile(gline));
+    context.setGlobal("Line", SKStore.IntFile(gline));
 
     if (shouldContinue) {
-      SKFS.CContinue(underLockF)
+      SKStore.CContinue(underLockF)
     } else {
-      SKFS.CStop(underLockF)
+      SKStore.CStop(underLockF)
     }
   })
 }
 
-fun runSql(options: Options, f: mutable SKFS.Context ~> SKFS.ContextOp): void {
-  SKFS.runWithGc(
+fun runSql(options: Options, f: mutable SKStore.Context ~> SKStore.ContextOp): void {
+  SKStore.runWithGc(
     SKSQL.makeSqlContext().clone(),
     f,
-    Some(SKFS.Synchronizer(importFromRoot, exportToRoot, printContext)),
+    Some(SKStore.Synchronizer(importFromRoot, exportToRoot, printContext)),
     options.sync,
   )
 }
 
-fun runLockedSql(options: Options, f: mutable SKFS.Context ~> void): void {
-  SKFS.runLocked(SKSQL.makeSqlContext().clone(), f, options.sync)
+fun runLockedSql(options: Options, f: mutable SKStore.Context ~> void): void {
+  SKStore.runLocked(SKSQL.makeSqlContext().clone(), f, options.sync)
 }
 
 fun importFromRoot(
-  delta: mutable SKFS.Context,
-  tick: SKFS.Tick,
-  root: readonly SKFS.Context,
+  delta: mutable SKStore.Context,
+  tick: SKStore.Tick,
+  root: readonly SKStore.Context,
 ): void {
   try {
     shouldImport = delta.getGlobal("TableMap") match {
@@ -1265,21 +1265,21 @@ fun importFromRoot(
     | Some(_tableMapFile) -> true
     };
     if (shouldImport) {
-      SKFS.import(delta, tick, root);
+      SKStore.import(delta, tick, root);
       delta.update();
     }
   } catch {
   | err ->
     line = delta.getGlobal("Line") match {
     | None() -> -1
-    | Some(x) -> SKFS.IntFile::fromFile(x).value
+    | Some(x) -> SKStore.IntFile::fromFile(x).value
     };
     print_error("Error, line " + line + ": " + err.getMessage());
     skipExit(2)
   }
 }
 
-fun makeInputDirName(dirName: SKFS.DirName): (SKFS.DirName, Int) {
+fun makeInputDirName(dirName: SKStore.DirName): (SKStore.DirName, Int) {
   dirNameStr = dirName.toString();
   if (dirNameStr.startsWith("/next/")) {
     !dirNameStr = dirNameStr.stripPrefix("/next/");
@@ -1295,24 +1295,24 @@ fun makeInputDirName(dirName: SKFS.DirName): (SKFS.DirName, Int) {
       nbr.push(c);
     };
     !dirNameStr = "/" + dirNameStr.sub(dirNameStr.getIter(), i) + "/";
-    (SKFS.DirName::create(dirNameStr), String::fromChars(nbr.toArray()).toInt())
+    (SKStore.DirName::create(dirNameStr), String::fromChars(nbr.toArray()).toInt())
   } else {
     (dirName, 0)
   }
 }
 
 fun importNext(
-  targetCtx: mutable SKFS.Context,
-  tick: SKFS.Tick,
-  sourceCtx: readonly SKFS.Context,
+  targetCtx: mutable SKStore.Context,
+  tick: SKStore.Tick,
+  sourceCtx: readonly SKStore.Context,
 ): Bool {
   changedDirNames = sourceCtx.dirs.state.getChangesAfter(tick);
   updates = mutable Map[];
   hasMultipleVersions = false;
   for (dirName in changedDirNames) {
     sourceCtx.unsafeMaybeGetDir(dirName) match {
-    | Some(SKFS.DeletedDir{}) -> targetCtx.removeDir(dirName)
-    | Some(dir @ SKFS.EagerDir{input => true}) ->
+    | Some(SKStore.DeletedDir{}) -> targetCtx.removeDir(dirName)
+    | Some(dir @ SKStore.EagerDir{input => true}) ->
       (targetDirName, version) = makeInputDirName(dirName);
       !hasMultipleVersions = hasMultipleVersions || version != 0;
       updates.maybeGet(targetDirName) match {
@@ -1322,11 +1322,11 @@ fun importNext(
         targetCtx.unsafeMaybeGetDir(targetDirName) match {
         | None() ->
           time = targetCtx.timeStamp();
-          targetDir = SKFS.EagerDir{
+          targetDir = SKStore.EagerDir{
             time,
             input => true,
             dirName => targetDirName,
-            fixedData => SKFS.FixedDataMap::create(),
+            fixedData => SKStore.FixedDataMap::create(),
             totalSize => 0,
             creator => None(),
           };
@@ -1355,7 +1355,7 @@ fun importNext(
         entries.iterator(),
       );
       if (isReset) {
-        writerPath = SKFS.Path(dir.dirName, SKFS.IID(SKFS.genSym(0)));
+        writerPath = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
         !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
       };
       targetCtx.setDir(inputDir.dirName, inputDir)
@@ -1365,9 +1365,9 @@ fun importNext(
 }
 
 fun exportToRoot(
-  root: mutable SKFS.Context,
-  tick: SKFS.Tick,
-  delta: readonly SKFS.Context,
+  root: mutable SKStore.Context,
+  tick: SKStore.Tick,
+  delta: readonly SKStore.Context,
 ): Bool {
   rootCopy = root.clone();
   try {
@@ -1378,7 +1378,7 @@ fun exportToRoot(
   | err ->
     line = delta.getGlobal("Line") match {
     | None() -> -1
-    | Some(x) -> SKFS.IntFile::fromFile(x).value
+    | Some(x) -> SKStore.IntFile::fromFile(x).value
     };
     root.replaceFromSaved(rootCopy);
     print_error("Error, line " + line + ": " + err.getMessage());
@@ -1386,38 +1386,38 @@ fun exportToRoot(
   }
 }
 
-fun updateTableMap(context: mutable SKFS.Context): void {
+fun updateTableMap(context: mutable SKStore.Context): void {
   tableMap = context.getGlobal("TableMap") match {
   | None() ->
     TableMap{
-      version => Version(SKFS.genSym(0)),
+      version => Version(SKStore.genSym(0)),
       startTick => context.tick,
       map => SortedMap[],
     }
   | Some(file) -> TableMap::fromFile(file)
   };
-  !tableMap.version.value = SKFS.genSym(tableMap.version.value);
+  !tableMap.version.value = SKStore.genSym(tableMap.version.value);
   context.setGlobal("TableMap", tableMap)
 }
 
 class StdoutFile(
-  format: SKFS.OutputFormat,
+  format: SKStore.OutputFormat,
   value: List<SelectDir>,
-) extends SKFS.File
+) extends SKStore.File
 
 class StdoutDiff(
-  format: SKFS.OutputFormat,
-  dirName: SKFS.DirName,
-  time: SKFS.Tick,
-  filter: (SKFS.Context, Bool) ~> (SKFS.BaseName -> Bool),
-  getDestinationWatermark: (readonly SKFS.Context) ~> ?SKFS.Tick,
-) extends SKFS.File
+  format: SKStore.OutputFormat,
+  dirName: SKStore.DirName,
+  time: SKStore.Tick,
+  filter: (SKStore.Context, Bool) ~> (SKStore.BaseName -> Bool),
+  getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
+) extends SKStore.File
 
-class StdoutCheckpointAck(time: SKFS.Tick) extends SKFS.File
+class StdoutCheckpointAck(time: SKStore.Tick) extends SKStore.File
 
 fun showSelect(
-  context: mutable SKFS.Context,
-  format: SKFS.OutputFormat,
+  context: mutable SKStore.Context,
+  format: SKStore.OutputFormat,
   sdir: SelectDir,
 ): void {
   dirName = sdir.dirName;
@@ -1440,7 +1440,7 @@ fun showSelect(
   })
 }
 
-fun printContext(context: mutable SKFS.Context): void {
+fun printContext(context: mutable SKStore.Context): void {
   context.globals.maybeGet("Stdout") match {
   | None() -> void
   | Some(StdoutFile(format, stdout)) ->
@@ -1471,12 +1471,12 @@ fun printContext(context: mutable SKFS.Context): void {
   flushStdout();
 }
 
-fun markIfRead(context: mutable SKFS.Context, stmt: Stmt): void {
+fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
   stmt match {
   | Insert{values => IQuery _}
   | Update _
   | Select _ ->
-    context.setGlobal("IsRead", SKFS.BoolFile(true))
+    context.setGlobal("IsRead", SKStore.BoolFile(true))
   | Table _
   | View _
   | Drop _
@@ -1495,18 +1495,18 @@ fun markIfRead(context: mutable SKFS.Context, stmt: Stmt): void {
 native fun hasLocalContext(): Int32;
 
 @cpp_extern("SKIP_set_local_context")
-native fun setLocalContext(mutable SKFS.Context): void;
+native fun setLocalContext(mutable SKStore.Context): void;
 
 @cpp_extern("SKIP_remove_local_context")
 native fun removeLocalContext(): void;
 
 @cpp_extern("SKIP_get_local_context")
-native fun getLocalContext(): mutable SKFS.Context;
+native fun getLocalContext(): mutable SKStore.Context;
 
 @cpp_extern("SKIP_call_external_fun")
 native fun callExternalFun(Int32, String): String;
 
-fun withLocalContext<T>(context: mutable SKFS.Context, f: () -> T): T {
+fun withLocalContext<T>(context: mutable SKStore.Context, f: () -> T): T {
   if (hasLocalContext() == 0) {
     setLocalContext(context);
     result = try {
@@ -1540,18 +1540,18 @@ class AlreadyDefiningRoot() extends Exception {
   }
 }
 
-class JSCall(funId: Int32, funArg: String) extends SKFS.File
-const jsRootsInputDirName: SKFS.DirName = SKFS.DirName::create(
+class JSCall(funId: Int32, funArg: String) extends SKStore.File
+const jsRootsInputDirName: SKStore.DirName = SKStore.DirName::create(
   "/jsRootsInput/",
 );
-const jsRootsValuesDirName: SKFS.DirName = SKFS.DirName::create("/jsroots/");
+const jsRootsValuesDirName: SKStore.DirName = SKStore.DirName::create("/jsroots/");
 const jsRootsName: Name = Name::create("jsroots");
 
 @cpp_export("SKIP_init_jsroots")
 fun initJSRoots(): void {
-  saved = SKFS.newObstack();
+  saved = SKStore.newObstack();
   try {
-    SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
       context.unsafeMaybeGetEagerDir(jsRootsInputDirName) match {
       | None() -> void
       | Some(dir) ->
@@ -1562,7 +1562,7 @@ fun initJSRoots(): void {
           };
         });
         context.setDir(dir.dirName, dir);
-        return SKFS.CStop(None())
+        return SKStore.CStop(None())
       };
       context.!globals = SortedMap[];
       dirDescr = DirDescr::create{
@@ -1590,19 +1590,19 @@ fun initJSRoots(): void {
         isInput => false,
       };
       tableDir = getTableDir(context);
-      fileName = SKFS.SID::create("jsroots");
+      fileName = SKStore.SID::create("jsroots");
       tableDir.writeArray(context, fileName, Array[dirDescr]);
       kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
       _ = context
         .mkdir(JSCall::fromFile, jsRootsInputDirName, Array[])
         .contextWriterKeyValues(
-          SKFS.StringFile::fromFile,
+          SKStore.StringFile::fromFile,
           context,
           jsRootsValuesDirName,
           (context, writer, baseName, values) ~>
             withLocalContext(context, () -> {
               name = baseName match {
-              | SKFS.SID(x) -> x
+              | SKStore.SID(x) -> x
               | _ -> invariant_violation("Unexpected key type")
               };
               invariant(values.size() == 1);
@@ -1615,66 +1615,66 @@ fun initJSRoots(): void {
             })
           ,
         );
-      SKFS.CStop(None());
+      SKStore.CStop(None());
     })
   } catch {
   | exn ->
-    SKFS.destroyObstack(saved);
+    SKStore.destroyObstack(saved);
     throw (exn)
   };
-  SKFS.destroyObstack(saved);
+  SKStore.destroyObstack(saved);
 }
 
 @cpp_export("SKIP_add_root")
 fun addRoot(rootName: String, funId: Int32, funArg: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
-  saved = SKFS.newObstack();
+  saved = SKStore.newObstack();
   try {
-    SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
       context.!globals = SortedMap[];
       (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
         context,
-        SKFS.SID(rootName),
+        SKStore.SID(rootName),
         Array[JSCall(funId, funArg)],
       );
       context.update();
-      SKFS.CStop(None())
+      SKStore.CStop(None())
     })
   } catch {
   | exn ->
-    SKFS.destroyObstack(saved);
+    SKStore.destroyObstack(saved);
     throw (exn)
   };
-  SKFS.destroyObstack(saved);
+  SKStore.destroyObstack(saved);
 }
 
 @cpp_export("SKIP_remove_root")
 fun removeRoot(rootName: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
-  saved = SKFS.newObstack();
+  saved = SKStore.newObstack();
   try {
-    SKFS.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
       context.!globals = SortedMap[];
       if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
-        return SKFS.CStop(None());
+        return SKStore.CStop(None());
       };
       (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
         context,
-        SKFS.SID(rootName),
+        SKStore.SID(rootName),
         Array[],
       );
       context.update();
-      SKFS.CStop(None());
+      SKStore.CStop(None());
     })
   } catch {
   | exn ->
-    SKFS.destroyObstack(saved);
+    SKStore.destroyObstack(saved);
     throw (exn)
   };
-  SKFS.destroyObstack(saved);
+  SKStore.destroyObstack(saved);
 }
 
-const trackedJSCallsDirName: SKFS.DirName = SKFS.DirName::create(
+const trackedJSCallsDirName: SKStore.DirName = SKStore.DirName::create(
   "/jsTrackedCalls/",
 );
 
@@ -1684,21 +1684,21 @@ class InvalidTrackedCall() extends Exception {
   }
 }
 
-fun initTrackedJSCalls(context: mutable SKFS.Context): void {
-  _ = SKFS.LHandle::create(
-    SKFS.StringFile::fromFile,
+fun initTrackedJSCalls(context: mutable SKStore.Context): void {
+  _ = SKStore.LHandle::create(
+    SKStore.StringFile::fromFile,
     context,
     trackedJSCallsDirName,
     (context, _self, key) ~>
       withLocalContext(context, () -> {
         setLocalContext(context);
         (funIdStr, funArg) = key match {
-        | SKFS.SID(v) -> v.splitFirst("#")
+        | SKStore.SID(v) -> v.splitFirst("#")
         | _ -> invariant_violation("Invalid key type")
         };
         funId = Int32::truncate(funIdStr.toInt());
         result = callExternalFun(funId, funArg);
-        Array[SKFS.StringFile(result)]
+        Array[SKStore.StringFile(result)]
       })
     ,
   );
@@ -1714,16 +1714,16 @@ fun trackedCall(funId: Int32, funArg: String): String {
     context.unsafeGetLazyDir(trackedJSCallsDirName)
   | Some(l) -> l
   };
-  arr = ldir.getArray(context, SKFS.SID("" + funId + "#" + funArg));
+  arr = ldir.getArray(context, SKStore.SID("" + funId + "#" + funArg));
   invariant(arr.size() == 1);
-  SKFS.StringFile::fromFile(arr[0]).value
+  SKStore.StringFile::fromFile(arr[0]).value
 }
 
 /*****************************************************************************/
 /* Support for tracked queries. */
 /*****************************************************************************/
 
-const trackedJSQueriesDirName: SKFS.DirName = SKFS.DirName::create(
+const trackedJSQueriesDirName: SKStore.DirName = SKStore.DirName::create(
   "/jsTrackedQueries/",
 );
 
@@ -1733,22 +1733,22 @@ class InvalidTrackedQuery() extends Exception {
   }
 }
 
-class TrackedQuery(query: String, start: Int, end: ?Int) extends SKFS.BaseName {
+class TrackedQuery(query: String, start: Int, end: ?Int) extends SKStore.BaseName {
   fun toString(): String {
     inspect(this).toString()
   }
 }
 
 fun initTrackedJSQueries(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   params: Map<String, Value>,
 ): void {
-  _ = SKFS.LHandle::create(
-    SKFS.StringFile::fromFile,
+  _ = SKStore.LHandle::create(
+    SKStore.StringFile::fromFile,
     context,
     trackedJSQueriesDirName,
     (context, _self, key) ~> {
-      SKFS.withRegion(context, (_, context) ~> {
+      SKStore.withRegion(context, (_, context) ~> {
         query = key match {
         | q @ TrackedQuery _ -> q
         | _ -> invariant_violation("Invalid key type")
@@ -1774,7 +1774,7 @@ fun initTrackedJSQueries(
         };
         selectDir = SKSQL.evalSelect(context, select, None());
         selectDirName = selectDir.dirName;
-        selectProjDirName = SKFS.DirName::create(
+        selectProjDirName = SKStore.DirName::create(
           selectDirName.toString() + "proj/",
         );
 
@@ -1786,9 +1786,9 @@ fun initTrackedJSQueries(
           selectDirName,
         );
         fieldNames = dirDescr.schema.map(x -> x.name.origName);
-        format = SKFS.OJSON(fieldNames);
+        format = SKStore.OJSON(fieldNames);
 
-        selectProj = SKFS.EHandle(
+        selectProj = SKStore.EHandle(
           RowValues::fromFile,
           selectDirName,
         ).contextWriterKeyValues(
@@ -1796,10 +1796,10 @@ fun initTrackedJSQueries(
           context,
           selectProjDirName,
           (_context, writer, _key, values) ~> {
-            writer.writeArray(SKFS.IID(0), values)
+            writer.writeArray(SKStore.IID(0), values)
           },
         );
-        proj = selectProj.getIter(context, SKFS.IID(0));
+        proj = selectProj.getIter(context, SKStore.IID(0));
         acc = mutable Vector[];
         i = 0;
         for (rvalues in proj) {
@@ -1816,7 +1816,7 @@ fun initTrackedJSQueries(
           };
           !i = i + 1;
         };
-        Array[SKFS.StringFile(acc.join("\n"))]
+        Array[SKStore.StringFile(acc.join("\n"))]
       })
     },
   );
@@ -1843,5 +1843,5 @@ fun trackedQuery(query: String, start: Int32, end: Int32): String {
     ),
   );
   invariant(arr.size() == 1);
-  SKFS.StringFile::fromFile(arr[0]).value
+  SKStore.StringFile::fromFile(arr[0]).value
 }

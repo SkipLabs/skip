@@ -1,51 +1,51 @@
 module alias T = SKTest;
 
-module SKFSTest;
+module SKStoreTest;
 
-class IBox(value: Int) extends SKFS.File
+class IBox(value: Int) extends SKStore.File
 
-fun convertIBox(file: SKFS.File): IBox {
+fun convertIBox(file: SKStore.File): IBox {
   file match {
   | x @ IBox _ -> x
   | _ -> invariant_violation("Was expecting an IBox")
   }
 }
 
-fun convertSFile(file: SKFS.File): IBox {
+fun convertSFile(file: SKStore.File): IBox {
   file match {
-  | SKFS.StringFile(v) -> IBox(v.toInt())
+  | SKStore.StringFile(v) -> IBox(v.toInt())
   | _ -> invariant_violation("Was expecting an IBox")
   }
 }
 
-fun convertDir(file: SKFS.File): SKFS.Dir {
+fun convertDir(file: SKStore.File): SKStore.Dir {
   file match {
-  | x @ SKFS.Dir _ -> x
+  | x @ SKStore.Dir _ -> x
   | _ -> invariant_violation("Was expecting an Dir")
   }
 }
 
 fun make(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   name: String,
   values: Array<Int>,
-): SKFS.EHandle<SKFS.StringFile> {
-  kvArray = values.map(x -> (SKFS.IID(x), SKFS.StringFile(x.toString())));
+): SKStore.EHandle<SKStore.StringFile> {
+  kvArray = values.map(x -> (SKStore.IID(x), SKStore.StringFile(x.toString())));
   conv = x ~>
     x match {
-    | y @ SKFS.StringFile _ -> y
+    | y @ SKStore.StringFile _ -> y
     | _ -> invariant_violation("impossible")
     };
-  context.mkdir(conv, SKFS.DirName::create(name), kvArray)
+  context.mkdir(conv, SKStore.DirName::create(name), kvArray)
 }
 
 fun compareResults(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   kind: String,
   path: String,
   values: Array<Int>,
 ): void {
-  readV = context.getValue(SKFS.Path::fromString(path));
+  readV = context.getValue(SKStore.Path::fromString(path));
   try {
     T.expectEq(
       readV,
@@ -61,13 +61,13 @@ fun compareResults(
 }
 
 fun testUpdate(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   writes: Array<(String, Array<Int>)>,
   expects: Array<(String, Array<Int>)>,
 ): void {
   for (kv in writes) {
     (key, values) = kv;
-    path = SKFS.Path::fromString(key);
+    path = SKStore.Path::fromString(key);
     dir = context.unsafeGetEagerDir(path.dirName);
     dir.writeArray(context, path.baseName, values.map(x -> IBox(x)));
   };
@@ -81,7 +81,7 @@ fun testUpdate(
 
 fun testMap(): void {
   // Base case
-  (context, _) = SKFS.start(context ~> {
+  (context, _) = SKStore.start(context ~> {
     dir1 = make(context, "/tmp1/", Array[1, 2, 3]);
     dir2 = dir1.apply(context, "/tmp2/", (_, writer, key, values) ~> {
       writer.writeArray(
@@ -129,14 +129,14 @@ fun testMap(): void {
 }
 
 fun testPartition(): void {
-  (context, _) = SKFS.start(context ~> {
+  (context, _) = SKStore.start(context ~> {
     dir1 = make(context, "/tmp1/", Array[1, 2, 3]);
     dir2 = dir1.apply(context, "/tmp2/", (_context, writer, _key, values) ~> {
       if (values.size() == 0) return void;
-      writer.writeArray(SKFS.IID(1), values);
+      writer.writeArray(SKStore.IID(1), values);
     });
     dir3 = dir2.partition(context, "/tmp3/", x ~>
-      SKFS.IID(convertIBox(x).value)
+      SKStore.IID(convertIBox(x).value)
     );
     _ = dir3.apply(context, "/tmp4/", (context, writer, key, dirs) ~> {
       if (dirs.size() == 0) return void;
@@ -155,7 +155,7 @@ fun testPartition(): void {
           writer.writeArray(key, iboxes)
         },
       );
-      writer.write(SKFS.SID::create(subDirName), newDir);
+      writer.write(SKStore.SID::create(subDirName), newDir);
     });
   });
   testUpdate(
@@ -188,21 +188,21 @@ fun testDirs(): void {
 
 @test
 fun testSubDirUnit(): void {
-  _ = SKFS.run(context ~> {
+  _ = SKStore.run(context ~> {
     dir1 = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/dir1/"),
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/dir1/"),
       Array[],
     );
     _dir2 = dir1.contextMap(
-      SKFS.StringFile::fromFile,
+      SKStore.StringFile::fromFile,
       context,
-      SKFS.DirName::create("/dir1/dir2/"),
+      SKStore.DirName::create("/dir1/dir2/"),
       (context, x) ~> {
         _ = dir1.map(
-          SKFS.StringFile::fromFile,
+          SKStore.StringFile::fromFile,
           context,
-          SKFS.DirName::create("/dir1/dir2/" + x.value + "/"),
+          SKStore.DirName::create("/dir1/dir2/" + x.value + "/"),
           x ~> x,
         );
         x

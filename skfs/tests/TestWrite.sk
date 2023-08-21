@@ -1,6 +1,6 @@
 module alias T = SKTest;
 
-module SKFSTest;
+module SKStoreTest;
 
 fun insertSpecialChars(rand: mutable Random, prob: Int, input: String): String {
   chars = input.chars();
@@ -43,11 +43,11 @@ fun testWriteChunk(): void {
       for (_ in Range(0, rand.random(1, 1 + maxWidth))) {
         valueStr = "v" + rand.random(0, maxValue);
         !valueStr = insertSpecialChars(rand, 10, valueStr);
-        values.push(SKFS.StringFile(valueStr));
+        values.push(SKStore.StringFile(valueStr));
       };
       keyStr = "k" + i;
       !keyStr = insertSpecialChars(rand, 10, keyStr);
-      entries.push((SKFS.SID::create(keyStr), values.toArray()));
+      entries.push((SKStore.SID::create(keyStr), values.toArray()));
     };
 
     entries.sortBy(x ~> x.i0);
@@ -58,9 +58,9 @@ fun testWriteChunk(): void {
     for (kv in entries) {
       (key, values) = kv;
       for (value in values) {
-        o(SKFS.escape(key.toString()));
+        o(SKStore.escape(key.toString()));
         o("\t\"");
-        o(SKFS.escape(value.value.toString()));
+        o(SKStore.escape(value.value.toString()));
         o("\"\n");
       };
     };
@@ -87,16 +87,16 @@ fun testWriteChunk(): void {
     buffer.clear();
 
     parsedEntries = SortedMap[];
-    for (kv in SKFS.getWriteKeyValuesIter(next).collect(Array)) {
+    for (kv in SKStore.getWriteKeyValuesIter(next).collect(Array)) {
       (key, values) = kv;
       !parsedEntries[key] = values;
     };
 
     for (key => values in parsedEntries) {
       for (value in values) {
-        o(SKFS.escape(key.toString()));
+        o(SKStore.escape(key.toString()));
         o("\t\"");
-        o(SKFS.escape(value));
+        o(SKStore.escape(value));
         o("\"\n");
       };
     };

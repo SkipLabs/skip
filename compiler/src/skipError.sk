@@ -67,7 +67,7 @@ fun printErrors(errors: Vector<Error>): void {
 
 class SkipErrorException{
   errors: Vector<Error>,
-} extends Exception, SKFS.File uses Hashable {
+} extends Exception, SKStore.File uses Hashable {
   fun getMessage(): String {
     invariant_violation("Internal Error: should have used printErrors");
   }
@@ -88,11 +88,11 @@ fun printErrorsAndExit<T>(errors: Array<SkipErrorException>): T {
   skipExit(2)
 }
 
-class ErrorsFile(value: List<SkipErrorException>) extends SKFS.File
+class ErrorsFile(value: List<SkipErrorException>) extends SKStore.File
 
 fun keepErrors(
   _phase: Int,
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   f: () -> void,
 ): void {
   try {
@@ -113,7 +113,7 @@ fun keepErrors(
 
 fun catchErrors(
   _phase: Int,
-  _context: mutable SKFS.Context,
+  _context: mutable SKStore.Context,
   f: () -> void,
 ): void {
   try {

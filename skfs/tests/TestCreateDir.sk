@@ -2,16 +2,16 @@
 /* Test that creates a directory. */
 /*****************************************************************************/
 
-module SKFSTest;
+module SKStoreTest;
 
 @test
 fun testCreateDir(): void {
-  _ = SKFS.runWithGcReturnContext(SKFS.Context{}, context ~> {
-    dirName = SKFS.DirName::create("/tmp/");
-    mappedDirName = SKFS.DirName::create("/tmp/mapped/");
-    dir = context.mkdir(SKFS.StringFile::fromFile, dirName, Array[]);
+  _ = SKStore.runWithGcReturnContext(SKStore.Context{}, context ~> {
+    dirName = SKStore.DirName::create("/tmp/");
+    mappedDirName = SKStore.DirName::create("/tmp/mapped/");
+    dir = context.mkdir(SKStore.StringFile::fromFile, dirName, Array[]);
     _ = dir.contextWriterKeyValues(
-      SKFS.StringFile::fromFile,
+      SKStore.StringFile::fromFile,
       context,
       mappedDirName,
       (_context, writer, key, files) ~> {
@@ -24,6 +24,6 @@ fun testCreateDir(): void {
         )
       },
     );
-    SKFS.CStop(None())
+    SKStore.CStop(None())
   })
 }

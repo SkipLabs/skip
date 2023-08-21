@@ -10,7 +10,7 @@ module SKSQL;
 
 fun isNoopParams(
   params: Array<CGExpr>,
-  from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+  from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
 ): Bool {
   if (from.size() != 1) return false;
   kinds = from[0].i0.kinds;
@@ -26,7 +26,7 @@ fun isNoopParams(
   true
 }
 
-fun noRangeFrom(from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>): Bool {
+fun noRangeFrom(from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>): Bool {
   for (tableRange in from) {
     if (tableRange.i1 is Some _) return false;
   };
@@ -43,7 +43,7 @@ fun noRangeFrom(from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>): Bool {
 // overhead.
 
 // Why not optimize it anyway you may ask? Because the result is going
-// to be in an SKFS directory with the wrong name. Which means, every
+// to be in an SKStore directory with the wrong name. Which means, every
 // place where we are looking up select results by dirName are going to
 // be broken.
 
@@ -69,7 +69,7 @@ fun optimizeNoopSelect(select: CSelect): CSelect {
       task match {
       | merge @ SubMerge _ if (merge.childName == select.from[0].i0.dirName) ->
         !foundMerge = true;
-        !merge.childName = SKFS.DirName::create("/" + select.id.lower + "/");
+        !merge.childName = SKStore.DirName::create("/" + select.id.lower + "/");
         merge
       | _ -> task
       }
@@ -101,14 +101,14 @@ fun minWindowSize(x: ?Int, y: ?Int): ?Int {
 
 class JTable{
   name: Name,
-  dirName: SKFS.DirName,
-  ranges: ?Array<SKFS.KeyRange>,
+  dirName: SKStore.DirName,
+  ranges: ?Array<SKStore.KeyRange>,
   schema: Array<SKSQL.TypeDescr>,
   alias: ?Name,
 } {
   static fun fromDirDescr(
     dirDescr: DirDescr,
-    ranges: ?Array<SKFS.KeyRange>,
+    ranges: ?Array<SKStore.KeyRange>,
   ): this {
     JTable{
       name => dirDescr.name,
@@ -218,7 +218,7 @@ mutable class Compiler{
   }
 
   mutable fun compileSelect(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     select: Select,
     toplevel: Bool,
     sets: Array<(Name, Pos, Expr)> = Array[],
@@ -322,16 +322,16 @@ mutable class Compiler{
       rest is None();
 
     format = this.options.format match {
-    | OFK_CSV() -> SKFS.OCSV()
+    | OFK_CSV() -> SKStore.OCSV()
     | OFK_JSON() ->
       schema = static::getSchema(select.params, from, params);
       fieldNames = schema.map(x -> x.name.origName);
-      SKFS.OJSON(fieldNames)
-    | OFK_SQL() -> SKFS.OSQL()
+      SKStore.OJSON(fieldNames)
+    | OFK_SQL() -> SKStore.OSQL()
     | OFK_JS() ->
       schema = static::getSchema(select.params, from, params);
       fieldNames = schema.map(x -> x.name.origName);
-      SKFS.OJS(fieldNames)
+      SKStore.OJS(fieldNames)
     };
 
     cselect = CSelect{
@@ -374,7 +374,7 @@ mutable class Compiler{
   }
 
   mutable fun compileSets(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     params: Array<(Name, Pos, Expr)>,
   ): Array<(Int, CGExpr)> {
     this.noAggr(() -> {
@@ -406,7 +406,7 @@ mutable class Compiler{
   }
 
   mutable fun compileParams(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     selectParams: SelectParams,
     origFrom: Array<DirDescr>,
   ): Array<CGExpr> {
@@ -468,7 +468,7 @@ mutable class Compiler{
   }
 
   mutable fun compileFrom(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     from: ?Array<TableName>,
   ): Array<SKSQL.DirDescr> {
     from match {
@@ -551,7 +551,7 @@ mutable class Compiler{
   }
 
   mutable fun getFromDirDescr(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     name: FromName,
   ): DirDescr {
     name match {
@@ -572,7 +572,7 @@ mutable class Compiler{
 
   static fun getCols(
     params: SelectParams,
-    from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
   ): (SortedMap<Name, Int>, readonly Map<Int, Name>) {
     cols = SortedMap[];
     invCols = mutable Map[];
@@ -642,7 +642,7 @@ mutable class Compiler{
 
   static fun getSchema(
     params: SelectParams,
-    from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
     cparams: Array<CGExpr>,
   ): Array<SKSQL.TypeDescr> {
     (cols, invCols) = static::getCols(params, from);
@@ -668,10 +668,10 @@ mutable class Compiler{
 
   static fun getDirDescr(
     params: SelectParams,
-    from: Array<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
     cparams: Array<CGExpr>,
     selectId: Name,
-    dirName: SKFS.DirName,
+    dirName: SKStore.DirName,
   ): DirDescr {
     schema = static::getSchema(params, from, cparams);
     DirDescr::create{
@@ -684,7 +684,7 @@ mutable class Compiler{
   }
 
   mutable fun expandJoins(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     joinOpt: ?Join,
     select: Select,
   ): Select {
@@ -724,7 +724,7 @@ mutable class Compiler{
   }
 
   mutable fun compileWhere(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     whereOpt: ?Expr,
   ): ?CExpr<Int> {
     this.noAggr(() -> {
@@ -742,7 +742,7 @@ mutable class Compiler{
   }
 
   mutable fun compileGroupBy(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     groupByOpt: ?Array<(Expr, ?Name)>,
     params: Array<CGExpr>,
   ): ?Array<CGroupByElt> {
@@ -768,7 +768,7 @@ mutable class Compiler{
   }
 
   mutable fun compileHaving(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     havingOpt: ?Expr,
   ): ?CExpr<Int> {
     havingOpt.map(e ->
@@ -781,7 +781,7 @@ mutable class Compiler{
   }
 
   mutable fun compileRest(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     cparams: Array<CGExpr>,
     rest: ?(QueryKind, Select),
   ): ?(QueryKind, CSelect) {
@@ -804,7 +804,7 @@ mutable class Compiler{
 
   mutable fun compileOrderBy(
     params: SelectParams,
-    from: Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>,
+    from: Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>,
     orderByOpt: ?Array<(Expr, IKind)>,
   ): ?Array<(Int, IKind)> {
     orderByOpt match {
@@ -831,7 +831,7 @@ mutable class Compiler{
   }
 
   mutable fun compileLimit(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     limit: ?Expr,
   ): ?CExpr<Int> {
     limit match {
@@ -847,7 +847,7 @@ mutable class Compiler{
     }
   }
 
-  mutable fun compileExpr(context: mutable SKFS.Context, expr: Expr): CGExpr {
+  mutable fun compileExpr(context: mutable SKStore.Context, expr: Expr): CGExpr {
     expr match {
     | VNull() -> CGNull()
     | VInt(i) -> CIExpr(CILiteral(i))
@@ -1044,7 +1044,7 @@ mutable class Compiler{
     | Call("id", None()) -> error(this.pos, "id expects one argument")
     | Call("id", Some(args)) ->
       if (args.size() == 0) {
-        return CIExpr(CILiteral(SKFS.genSym(0)))
+        return CIExpr(CILiteral(SKStore.genSym(0)))
       };
       if (args.size() != 1) {
         error(this.pos, "id expects one argument")
@@ -1630,10 +1630,10 @@ mutable class Compiler{
   }
 
   mutable fun compileJoin(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     origFrom: Array<DirDescr>,
     where: ?Expr,
-  ): (?Expr, Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>) {
+  ): (?Expr, Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>) {
     where match {
     | None() ->
       if (origFrom.size() > 1) {
@@ -1666,9 +1666,9 @@ mutable class Compiler{
   }
 
   mutable fun compileMerge(
-    from: Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>,
+    from: Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>,
     cond: Expr,
-  ): (Expr, Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>) {
+  ): (Expr, Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>) {
     tables = mutable Vector<?JTable>[];
     newFrom = mutable Vector[];
     moveMap = mutable Map[];
@@ -1766,7 +1766,7 @@ mutable class Compiler{
           };
         error(this.pos, msg)
       };
-      childName = SKFS.DirName::create(
+      childName = SKStore.DirName::create(
         "/merge/left" +
           leftTable.dirName +
           join.left.col.i0 +
@@ -1846,10 +1846,10 @@ mutable class Compiler{
   }
 
   mutable fun compileIndexes(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     from: Array<DirDescr>,
     cond: Expr,
-  ): Array<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)> {
+  ): Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)> {
     tables = mutable Vector[];
     for (dirDescr in from) {
       tables.push(JTable::fromDirDescr(dirDescr, None()));
@@ -1905,7 +1905,7 @@ mutable class Compiler{
             kinds,
           );
           maxKey = RowKey(RowValues::create(maxValues), kinds);
-          SKFS.KeyRange(minKey, maxKey)
+          SKStore.KeyRange(minKey, maxKey)
         });
         rangeMap![tableNbr] = (index.dirName, rowRanges)
       }
@@ -1918,8 +1918,8 @@ mutable class Compiler{
   }
 
   mutable fun findLookUps(
-    context: mutable SKFS.Context,
-    killed: readonly Set<SKFS.DirName>,
+    context: mutable SKStore.Context,
+    killed: readonly Set<SKStore.DirName>,
     tables: readonly Vector<JTable>,
     cond: Expr,
   ): LookUps {

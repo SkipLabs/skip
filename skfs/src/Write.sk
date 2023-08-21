@@ -2,7 +2,7 @@
 /* Parsing the entries (used the option --write). */
 /*****************************************************************************/
 
-module SKFS;
+module SKStore;
 
 /*****************************************************************************/
 /* Escaping functions. */
@@ -188,14 +188,14 @@ fun getWriteKeyValuesIter(
 }
 
 fun writeFromStdin(context: mutable Context, dirNameStr: String): void {
-  dirName = SKFS.DirName::create(dirNameStr);
+  dirName = SKStore.DirName::create(dirNameStr);
   dir = context.unsafeGetEagerDir(dirName);
   dir.writeArrayMany(
     context,
     getWriteKeyValuesIter(getChar).map(kv ->
       (
-        (SKFS.SID(kv.i0) : SKFS.BaseName),
-        kv.i1.map(x ~> (SKFS.StringFile(x) : SKFS.File)),
+        (SKStore.SID(kv.i0) : SKStore.BaseName),
+        kv.i1.map(x ~> (SKStore.StringFile(x) : SKStore.File)),
       )
     ),
   );

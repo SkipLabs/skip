@@ -1,28 +1,28 @@
 /*****************************************************************************/
 /* Testing that the time in FixedDirs works. */
 /*****************************************************************************/
-module SKFSTest;
+module SKStoreTest;
 
 @test
 fun testFixedDirTime(): void {
   rand = Random::mcreate(23);
-  dmap = SKFS.DMap::empty();
+  dmap = SKStore.DMap::empty();
   size = 100;
   valueSize = 100;
-  dirName = SKFS.DirName::create("/foo/");
+  dirName = SKStore.DirName::create("/foo/");
   for (_ in Range(0, size)) {
     map = SortedMap[];
     for (i in Range(0, valueSize)) {
-      baseName = SKFS.IID(i);
-      path = SKFS.Path::create(dirName, baseName);
-      source = SKFS.Source::create(path);
+      baseName = SKStore.IID(i);
+      path = SKStore.Path::create(dirName, baseName);
+      source = SKStore.Source::create(path);
       !map[source] = Array[
-        (SKFS.IntFile(rand.random(0, valueSize)) : SKFS.File),
+        (SKStore.IntFile(rand.random(0, valueSize)) : SKStore.File),
       ];
     };
     !dmap = dmap.set(
-      SKFS.TickRange::create(SKFS.Tick(rand.random(0, size))),
-      (SKFS.IID(rand.random(0, size)) : SKFS.BaseName),
+      SKStore.TickRange::create(SKStore.Tick(rand.random(0, size))),
+      (SKStore.IID(rand.random(0, size)) : SKStore.BaseName),
       map,
     );
   };
@@ -30,17 +30,17 @@ fun testFixedDirTime(): void {
   dmap.itemsWithTick().each(item -> {
     (key, valueMap, tick) = item;
     for (source => value in valueMap) {
-      acc.push(SKFS.FixedRow(key, (source, value), tick))
+      acc.push(SKStore.FixedRow(key, (source, value), tick))
     }
   });
-  farr = SKFS.FixedDir::create(acc);
+  farr = SKStore.FixedDir::create(acc);
   for (i in Range(0, 1000)) {
-    set1 = dmap.getChangesAfter(SKFS.Tick(i));
-    set2 = farr.getChangesAfter(SKFS.Tick(i));
+    set1 = dmap.getChangesAfter(SKStore.Tick(i));
+    set2 = farr.getChangesAfter(SKStore.Tick(i));
     if (!set1.difference(set2).isEmpty() || !set2.difference(set1).isEmpty()) {
       debug(i);
-      debug(dmap.getChangesAfter(SKFS.Tick(i)));
-      debug(farr.getChangesAfter(SKFS.Tick(i)));
+      debug(dmap.getChangesAfter(SKStore.Tick(i)));
+      debug(farr.getChangesAfter(SKStore.Tick(i)));
       invariant_violation("Should be the same")
     }
   };

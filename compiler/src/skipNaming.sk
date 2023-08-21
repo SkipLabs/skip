@@ -953,7 +953,7 @@ fun check_locals_pattern(bound: Bound, pat: N.Pattern): Bound {
 }
 
 fun class_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   cd: A.Class_def,
@@ -1020,7 +1020,7 @@ fun close_local_scope_fun_parameters(
 /*****************************************************************************/
 
 fun check_type_alias(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   ta: A.Type_alias_def,
 ): void {
   env = make_env();
@@ -1030,7 +1030,7 @@ fun check_type_alias(
 }
 
 fun maybeGetConst(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   constName: String,
 ): ?N.Const_def {
   GlobalEnv.getConst(context, constName) match {
@@ -1039,7 +1039,7 @@ fun maybeGetConst(
   }
 }
 
-fun getConst(context: mutable SKFS.Context, constName: A.Name): N.Const_def {
+fun getConst(context: mutable SKStore.Context, constName: A.Name): N.Const_def {
   maybeGetConst(context, constName.i1) match {
   | None() -> SkipError.error(constName.i0, "Unbound constant")
   | Some(x) -> x
@@ -1047,7 +1047,7 @@ fun getConst(context: mutable SKFS.Context, constName: A.Name): N.Const_def {
 }
 
 fun const_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   cst: A.Const_def,
 ): N.Const_def {
@@ -1055,7 +1055,7 @@ fun const_def(
 }
 
 fun const_def_with_acc(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   cst: A.Const_def,
@@ -1096,7 +1096,7 @@ fun const_def_with_acc(
 }
 
 fun const_val(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   v: A.Inherited_body,
@@ -1116,7 +1116,7 @@ fun const_val(
 }
 
 fun const_val_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   _pos: FileRange,
@@ -1137,7 +1137,7 @@ fun const_val_(
 }
 
 fun cla_type_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   td: A.Type_def<A.Cla_tyd>,
@@ -1156,7 +1156,7 @@ fun cla_type_def(
 }
 
 fun cla_tyd(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   x: A.Cla_tyd,
@@ -1176,7 +1176,7 @@ fun cla_tyd(
 }
 
 fun type_tyd(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   case: ((FileRange) -> Tabstract_case),
@@ -1188,7 +1188,7 @@ fun type_tyd(
 }
 
 fun type_alias(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   tyd: A.Type_alias_def,
 ): N.Type_alias_def {
   env = make_env();
@@ -1204,18 +1204,18 @@ fun type_alias(
   N.Type_alias_def{annotations, name, tparams, body}
 }
 
-const classesDirName: SKFS.DirName = SKFS.DirName::create("/namingClasses/");
-const classesDir: SKFS.EHandle<ClassFile> = SKFS.EHandle(
+const classesDirName: SKStore.DirName = SKStore.DirName::create("/namingClasses/");
+const classesDir: SKStore.EHandle<ClassFile> = SKStore.EHandle(
   ClassFile::fromFile,
   classesDirName,
 );
-class ClassFile(value: N.Class_def) extends SKFS.File
+class ClassFile(value: N.Class_def) extends SKStore.File
 
 fun populateClasses(
-  context: mutable SKFS.Context,
-  defDir: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
-  inhDir: SKFS.LHandle<SkipInherit.ClassFile>,
-  childDir: SKFS.EHandle<SKFS.StringFile>,
+  context: mutable SKStore.Context,
+  defDir: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
+  inhDir: SKStore.LHandle<SkipInherit.ClassFile>,
+  childDir: SKStore.EHandle<SKStore.StringFile>,
 ): void {
   _ = defDir.contextWriterKeyValues(
     ClassFile::fromFile,
@@ -1226,11 +1226,11 @@ fun populateClasses(
         if (values.size() > 1) return void;
         values[0].value match {
         | GlobalEnv.EClass(def) ->
-          inheritedClassArr = inhDir.getArray(context, SKFS.SID(def.name.i1));
+          inheritedClassArr = inhDir.getArray(context, SKStore.SID(def.name.i1));
           if (inheritedClassArr.size() == 0) return void;
           c = inheritedClassArr[0].value;
           writer.write(
-            SKFS.SID(c.name.i1),
+            SKStore.SID(c.name.i1),
             ClassFile(class_def(context, childDir, make_env(), c)),
           )
         | _ -> void
@@ -1241,15 +1241,15 @@ fun populateClasses(
 }
 
 fun maybeGetClass(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   className: String,
 ): ?N.Class_def {
-  arr = classesDir.getArray(context, SKFS.SID(className));
+  arr = classesDir.getArray(context, SKStore.SID(className));
   if (arr.size() == 0) return None();
   Some(ClassFile::fromFile(arr[0]).value);
 }
 
-fun getClass(context: mutable SKFS.Context, className: A.Name): N.Class_def {
+fun getClass(context: mutable SKStore.Context, className: A.Name): N.Class_def {
   maybeGetClass(context, className.i1) match {
   | None() ->
     SkipError.fatalError(className.i0, `Unbound class: '${className.i1}'`)
@@ -1301,8 +1301,8 @@ mutable class Acc{
 }
 
 fun class_def(
-  context: mutable SKFS.Context,
-  childDir: SKFS.EHandle<SKFS.StringFile>,
+  context: mutable SKStore.Context,
+  childDir: SKStore.EHandle<SKStore.StringFile>,
   env: Env,
   cd: A.Class_def,
 ): N.Class_def {
@@ -1381,7 +1381,7 @@ fun class_def(
  * Note that the keys for type arguments are purely syntactic
  */
 fun make_extends(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   extend_list: Array<A.Parent>,
@@ -1448,7 +1448,7 @@ fun make_extends(
 }
 
 fun maxSources(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   es1: N.Name,
   is1: N.Name,
   es2: N.Name,
@@ -1475,7 +1475,7 @@ base class SelectedName(n: N.Name) {
 
 // The source for an extend list is the most senior parent
 fun maxDepthCD(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   n1: N.Name,
   n2: N.Name,
 ): SelectedName {
@@ -1489,7 +1489,7 @@ fun maxDepthCD(
 }
 
 fun class_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   classAcc: mutable ClassAcc,
   env: Env,
   cd: A.Class_def,
@@ -1735,7 +1735,7 @@ fun makeMethodMacros(env: Env, macro_: ?FileRange): UMap<MacroDefinition> {
 }
 
 fun method_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   context_name: String,
   classAcc: mutable ClassAcc,
   env: Env,
@@ -1879,7 +1879,7 @@ fun method_def(
 }
 
 fun when_clause(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   wc: A.When_type_clause,
@@ -1889,7 +1889,7 @@ fun when_clause(
 }
 
 fun method_body(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   bound: Bound,
@@ -1923,7 +1923,7 @@ fun method_body(
 }
 
 fun method_body_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   bound: Bound,
@@ -1969,7 +1969,7 @@ fun macroOnNonExpressionBody(env: Env): List<SkipError.Trace> {
 }
 
 fun method_body__(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   algebraic: Bool,
   isStatic: Bool,
   acc: mutable Acc,
@@ -2042,25 +2042,25 @@ fun check_predefined(x: A.Name): void {
   }
 }
 
-const funsDirName: SKFS.DirName = SKFS.DirName::create("/namingFuns/");
-const funsDir: SKFS.EHandle<FunFile> = SKFS.EHandle(
+const funsDirName: SKStore.DirName = SKStore.DirName::create("/namingFuns/");
+const funsDir: SKStore.EHandle<FunFile> = SKStore.EHandle(
   FunFile::fromFile,
   funsDirName,
 );
-class FunFile(value: N.Fun_def) extends SKFS.File
+class FunFile(value: N.Fun_def) extends SKStore.File
 
-const funsByAnnotationDirName: SKFS.DirName = SKFS.DirName::create(
+const funsByAnnotationDirName: SKStore.DirName = SKStore.DirName::create(
   "/namingFunsByAnnotation/",
 );
-const funsByAnnotationDir: SKFS.EHandle<NameFile> = SKFS.EHandle(
+const funsByAnnotationDir: SKStore.EHandle<NameFile> = SKStore.EHandle(
   NameFile::fromFile,
   funsByAnnotationDirName,
 );
-class NameFile(value: N.Name) extends SKFS.File
+class NameFile(value: N.Name) extends SKStore.File
 
 fun populateFuns(
-  context: mutable SKFS.Context,
-  defDir: SKFS.EHandle<GlobalEnv.ExpandedDefFile>,
+  context: mutable SKStore.Context,
+  defDir: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
 ): void {
   // Gathering all functions with their annotations so that they are available
   // for `#forEachFunction` macro expansion.
@@ -2075,7 +2075,7 @@ fun populateFuns(
         values[0].value match {
         | GlobalEnv.EFun(f) ->
           for (annotation in f.annotations) {
-            writer.write(SKFS.SID(annotation), NameFile(f.name))
+            writer.write(SKStore.SID(annotation), NameFile(f.name))
           }
         | _ -> void
         }
@@ -2094,7 +2094,7 @@ fun populateFuns(
         values[0].value match {
         | GlobalEnv.EFun(f) ->
           writer.write(
-            SKFS.SID(f.name.i1),
+            SKStore.SID(f.name.i1),
             FunFile(fun_def(context, make_env(), f)),
           )
         | _ -> void
@@ -2104,20 +2104,20 @@ fun populateFuns(
   )
 }
 
-fun maybeGetFun(context: mutable SKFS.Context, funName: String): ?N.Fun_def {
-  arr = funsDir.getArray(context, SKFS.SID(funName));
+fun maybeGetFun(context: mutable SKStore.Context, funName: String): ?N.Fun_def {
+  arr = funsDir.getArray(context, SKStore.SID(funName));
   if (arr.size() == 0) return None();
   Some(FunFile::fromFile(arr[0]).value);
 }
 
-fun getFun(context: mutable SKFS.Context, funName: A.Name): N.Fun_def {
+fun getFun(context: mutable SKStore.Context, funName: A.Name): N.Fun_def {
   maybeGetFun(context, funName.i1) match {
   | None() -> SkipError.error(funName.i0, `Unbound fun: '${funName.i1}'`)
   | Some(x) -> x
   }
 }
 
-fun fun_def(context: mutable SKFS.Context, env: Env, fd: A.Fun_def): N.Fun_def {
+fun fun_def(context: mutable SKStore.Context, env: Env, fd: A.Fun_def): N.Fun_def {
   classAcc = mutable ClassAcc{};
   acc = mutable Acc{classAcc};
 
@@ -2223,7 +2223,7 @@ fun check_default_last_array(params: Array<A.Parameter>): void {
 }
 
 fun body(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   bound: Bound,
@@ -2287,7 +2287,7 @@ fun enforce_no_this(ty_: A.Type_): void {
 }
 
 fun type_parameter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   tp: A.Type_parameter,
@@ -2317,7 +2317,7 @@ fun type_alias_parameter(env: Env, tp: A.Type_parameter): Env {
 }
 
 fun parameter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   par: A.Parameter,
@@ -2326,7 +2326,7 @@ fun parameter(
 }
 
 fun parameter_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   cdo: ?A.Class_def,
   env: Env,
@@ -2474,7 +2474,7 @@ Return value is one of:
   N.Tapply (n, targs)
 */
 fun bind_named_type{
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fr: FileRange,
   acc: mutable ClassAcc,
   env: Env,
@@ -2569,7 +2569,7 @@ fun make_tparam(
 }
 
 fun tylist(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   tyl: Array<A.Type_>,
@@ -2578,7 +2578,7 @@ fun tylist(
 }
 
 fun type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   ty: A.Type_,
@@ -2691,7 +2691,7 @@ fun arity_mismatch(pos: FileRange, name: String, arity: Int, given: Int): void {
 }
 
 fun fun_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   tmodifiers: A.Lam_modifier,
@@ -2712,7 +2712,7 @@ fun fun_type(
 }
 
 fun fun_tparams(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   x: Parameters<A.Type_>,
@@ -2726,7 +2726,7 @@ fun fun_tparams(
 }
 
 fun fun_param_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   ty: A.Type_,
@@ -2740,7 +2740,7 @@ fun fun_param_type(
 }
 
 fun reduce_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   pos: FileRange,
   acc: mutable ClassAcc,
   env: Env,
@@ -2780,7 +2780,7 @@ fun reduce_type(
  * see 'get_typedef_type' for more
  */
 fun reduce_type_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   tpos: FileRange,
   acc: mutable ClassAcc,
   env: Env,
@@ -2812,7 +2812,7 @@ fun reduce_type_(
 }
 
 fun reduce_type_array(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   from_self_abstract: Bool,
   _tpos: FileRange,
   acc: mutable ClassAcc,
@@ -2879,7 +2879,7 @@ fun get_name_(pos: FileRange, x: N.Type_): A.Name {
  * abstract/constrained type constant
  */
 fun get_typedef_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   from_self_abstract: Bool,
   acc: mutable ClassAcc,
   env: Env,
@@ -3215,7 +3215,7 @@ fun build_whenparams_for_frozen_cla_tparams(
 
 // TODO support irrefutable patterns
 fun desugar_bind(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   lv: A.Lvalue,
@@ -3300,7 +3300,7 @@ fun appendPositionalArg<T>(
 }
 
 fun desugar_lvalue_assign(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -3360,7 +3360,7 @@ fun desugar_lvalue_assign(
   a = a with {b => a.b.set(i, a.b.get(i).set(j, rv) }
 */
 fun desugar_lvalue_assign_no_side_effects(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   pos: FileRange,
   env: Env,
@@ -3411,7 +3411,7 @@ fun desugar_lvalue_assign_no_side_effects(
 }
 
 fun rhs_lvalue_assign_obj(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -3434,7 +3434,7 @@ fun rhs_lvalue_assign_obj(
 }
 
 fun remove_side_effects_lvalue(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -3542,7 +3542,7 @@ private base class ExprState {
 }
 
 fun expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   ex: A.Expr,
@@ -3602,7 +3602,7 @@ fun expandMacroStaticDot(env: Env, object: N.Expr, n: A.Name): N.Expr_ {
 }
 
 fun expandForEachMacro(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   binding: A.ForEachBinding,
@@ -3691,7 +3691,7 @@ fun maybeReportDuplicateMacro(
 }
 
 fun expandForEachFieldMacro(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   _pos: FileRange,
@@ -3755,7 +3755,7 @@ fun expandForEachFieldMacro(
 }
 
 fun expandForEachFunctionMacro(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   _pos: FileRange,
@@ -3796,7 +3796,7 @@ fun expandForEachFunctionMacro(
 
   List::createFromItems(
     funsByAnnotationDir
-      .getArray(context, SKFS.SID(annotation.i1))
+      .getArray(context, SKStore.SID(annotation.i1))
       .map(f -> f.value)
       .sorted(),
   ) match {
@@ -3810,7 +3810,7 @@ fun expandForEachFunctionMacro(
 }
 
 fun expr_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -4104,7 +4104,7 @@ fun make_mutable_expr(fr: FileRange, e: N.Expr): N.Expr_ {
 }
 
 fun call_args(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   params: A.Call_args,
@@ -4113,7 +4113,7 @@ fun call_args(
 }
 
 fun ordered_expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   ex: A.Ordered_expr,
@@ -4135,7 +4135,7 @@ private fun appendYieldBreak(e: N.Expr): N.Expr {
 }
 
 fun lambda(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   containingAcc: mutable Acc,
   env: Env,
   _pos: FileRange,
@@ -4153,7 +4153,7 @@ fun lambda(
 }
 
 fun sk_async(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -4164,7 +4164,7 @@ fun sk_async(
 }
 
 fun sk_await(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   pos: FileRange,
@@ -4195,7 +4195,7 @@ fun call_from_items(
 }
 
 fun ordered_named_arg_to_pair(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   p: (Int, N.Name, N.Expr),
 ): N.Expr {
   (_, (kpos, s), v) = p;
@@ -4207,7 +4207,7 @@ fun ordered_named_arg_to_pair(
 /* Static expressions. */
 /*****************************************************************************/
 fun bind_object(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   pos: FileRange,
   env: Env,
@@ -4223,7 +4223,7 @@ fun bind_object(
   }
 }
 
-fun check_object(context: mutable SKFS.Context, object_name: N.Name): void {
+fun check_object(context: mutable SKStore.Context, object_name: N.Name): void {
   (pos, _) = object_name;
   cd = SkipInherit.getClass(context, object_name);
   cd.kind match {
@@ -4235,7 +4235,7 @@ fun check_object(context: mutable SKFS.Context, object_name: N.Name): void {
 
 // Standalone class identifiers become Class<_> objects
 fun classname(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fr: FileRange,
   acc: mutable Acc,
   env: Env,
@@ -4271,7 +4271,7 @@ fun classname(
 }
 
 fun match_branch(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   mb: A.Match_branch,
@@ -4285,7 +4285,7 @@ fun match_branch(
 }
 
 fun lambda_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   params: Parameters<A.Lam_parameter>,
@@ -4294,7 +4294,7 @@ fun lambda_parameters(
 }
 
 fun lambda_parameter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   lp: A.Lam_parameter,
@@ -4304,7 +4304,7 @@ fun lambda_parameter(
 }
 
 fun patterns(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   pats: List<A.Pattern>,
@@ -4313,7 +4313,7 @@ fun patterns(
 }
 
 fun pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   pat: A.Pattern,
@@ -4323,7 +4323,7 @@ fun pattern(
 }
 
 fun translate_pattern(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   x: A.Pattern,
@@ -4361,7 +4361,7 @@ fun cla_tyd_object_name(pos: FileRange, tpos: FileRange, x: N.Type__): N.Name {
 }
 
 fun pattern_classname(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fr: FileRange,
   acc: mutable ClassAcc,
   env: Env,
@@ -4396,7 +4396,7 @@ fun pattern_classname(
 }
 
 fun pattern_type_identifier(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   pos: FileRange,
@@ -4428,7 +4428,7 @@ fun pattern_type_identifier(
 }
 
 fun pattern_object_name(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable ClassAcc,
   env: Env,
   pos: FileRange,
@@ -4446,7 +4446,7 @@ fun pattern_object_name(
 }
 
 fun pattern_parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
   nparams: Parameters<A.Pattern>,

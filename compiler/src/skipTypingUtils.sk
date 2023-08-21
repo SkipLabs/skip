@@ -259,7 +259,7 @@ fun make_tenv(env: Env, acc: Acc): Types.Env {
 }
 
 fun promote(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   ty: N.Type_,
@@ -269,7 +269,7 @@ fun promote(
 }
 
 fun contra_promote(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   ty: N.Type_,
@@ -279,7 +279,7 @@ fun contra_promote(
 }
 
 fun inv_promote(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   ty: N.Type_,
@@ -375,7 +375,7 @@ fun make_texn(fr: FileRange, var: N.Variance): N.Type_ {
 }
 
 fun make_tapply(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   pos: FileRange,
@@ -405,7 +405,7 @@ fun is_this_ty_(this_cstr: String, acc: Acc, x: N.Type_): Bool {
 }
 
 fun make_tconcrete(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   pos: FileRange,
@@ -428,7 +428,7 @@ fun make_tconcrete(
 }
 
 fun make_tobject(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   pos: FileRange,
@@ -451,7 +451,7 @@ fun make_tobject(
 }
 
 fun make_tbase(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   pos: FileRange,
@@ -472,7 +472,7 @@ const invalidCastError: String = "InvalidCast";
 
 base class Constraint uses Show {
   fun solve(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     msg: String,
     env: Env,
@@ -480,7 +480,7 @@ base class Constraint uses Show {
   ): Acc;
 
   fun solve_call(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     last_tvar: Int,
     env: Env,
@@ -488,7 +488,7 @@ base class Constraint uses Show {
   ): Acc;
 
   static fun solve_pair(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     msg: String,
     env: Env,
@@ -522,7 +522,7 @@ class RelationalConstraint(
   rtys: Array<N.Type_>,
 ) extends TypingConstraint {
   fun solve(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     msg: String,
     env: Env,
@@ -597,7 +597,7 @@ class RelationalConstraint(
   /***************************************************************************/
 
   fun solve_call(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     last_tvar: Int,
     env: Env,
@@ -651,7 +651,7 @@ class RelationalConstraint(
   }
 
   private fun currentlySolvable(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     lty_co: N.Type_,
     rty: N.Type_,
     env: Env,
@@ -696,7 +696,7 @@ class RelationalConstraint(
   }
 
   private fun rtyKTraits(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     rty: N.Type_,
     env: Env,
     acc: Acc,
@@ -757,7 +757,7 @@ class MutPreservationConstraint(
   tvar: (FileRange, N.Tvar),
 ) extends TypingConstraint {
   fun solve(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     msg: String,
     env: Env,
@@ -785,7 +785,7 @@ class MutPreservationConstraint(
   }
 
   fun solve_call(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     () -> Int,
     Int,
     Env,
@@ -817,7 +817,7 @@ class LocalMutableConstraint(
   ty: N.Type_,
 ) extends Constraint {
   fun solve(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     _next_id: () -> Int,
     _msg: String,
     _env: Env,
@@ -835,7 +835,7 @@ class LocalMutableConstraint(
   }
 
   fun solve_call(
-    _context: mutable SKFS.Context,
+    _context: mutable SKStore.Context,
     () -> Int,
     Int,
     Env,
@@ -964,7 +964,7 @@ value class Constraints(
   }
 
   fun solve(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     env: Env,
     acc: Acc,
@@ -973,7 +973,7 @@ value class Constraints(
   }
 
   fun solve_msg(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     msg: String,
     env: Env,
@@ -1014,7 +1014,7 @@ value class Constraints(
   }
 
   fun solve_at_call(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     last_constraint: Int,
     last_tvar: Int,
@@ -1045,7 +1045,7 @@ value class Constraints(
    * canonical form for constraints
    */
   private static fun check_constraint_consistency(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     env: Env,
     acc: Acc,
@@ -1127,7 +1127,7 @@ value class Constraints(
    * traits are not.
    */
   private static fun is_leaf_type(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: Env,
     acc: Acc,
     ty: N.Type_,
@@ -1157,7 +1157,7 @@ value class Constraints(
 // Check for solveable constraints on methods. If they are not solveable,
 // the method doesn't need to be implemented by the child in question
 fun solvableWhenparams(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   _fr: FileRange,
   env: Env,
@@ -1216,7 +1216,7 @@ fun hasCDTparam(tps: SSet, ty: N.Type_): Bool {
 }
 
 fun ktraits(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   subst: IMap<N.Type_>,
   ty: N.Type_,
 ): SSet {
@@ -1242,7 +1242,7 @@ fun ktraits(
 }
 
 fun hasConditionalTrait(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   subst: IMap<N.Type_>,
   traits: SSet,
   ty: N.Type_,
@@ -1261,7 +1261,7 @@ fun hasConditionalTrait(
 }
 
 fun hasConditionalTraitPoint(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   traits: SSet,
   n: N.Name,
 ): Bool {
@@ -1283,7 +1283,7 @@ fun make_expand_env(env: Env, acc: Acc): Expand.Env {
 }
 
 fun expand_expr(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   e: TAst.Expr,
@@ -1293,7 +1293,7 @@ fun expand_expr(
 }
 
 fun expand_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   ty: N.Type_,
@@ -1691,7 +1691,7 @@ fun suggested_frozen_fix(
 }
 
 fun suggested_join_fix(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   solving_constraints: Bool,
   env: Env,
@@ -1781,7 +1781,7 @@ fun suggested_join_fix(
 }
 
 fun types_error<T>(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   solving_constraints: Bool,
   env: Env,
@@ -1963,7 +1963,7 @@ fun types_error<T>(
 }
 
 fun join_exn_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   solving_constraints: Bool,
   env: Env,
@@ -2016,7 +2016,7 @@ fun join_exn_(
 // }
 
 fun join_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   solving_constraints: Bool,
   env: Env,
@@ -2036,7 +2036,7 @@ fun join_(
 }
 
 fun join_constraints(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2049,7 +2049,7 @@ fun join_constraints(
 }
 
 fun join_constraints_exn(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2060,7 +2060,7 @@ fun join_constraints_exn(
 }
 
 fun join(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -2073,7 +2073,7 @@ fun join(
 }
 
 fun join_exn(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2130,7 +2130,7 @@ value class TparamConstraints private {
 
   // addition encapsoilate any changes needed for canonicalized constraints
   fun addAdditionalTparamConstraints(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: Env,
     acc: Acc,
     id: String,
@@ -2140,7 +2140,7 @@ value class TparamConstraints private {
   }
 
   fun resetTparamConstraints(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: Env,
     acc: Acc,
     id: String,
@@ -2151,7 +2151,7 @@ value class TparamConstraints private {
   }
 
   fun bindTparamConstraints(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: Env,
     acc: Acc,
     tparams: Array<N.Type_parameter>,
@@ -2191,7 +2191,7 @@ value class TparamConstraints private {
    * TODO we dont currently track lowerbounds
    */
   fun addWhenparamConstraints(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     env: Env,
     acc: Acc,
@@ -2273,7 +2273,7 @@ value class TparamConstraints private {
   }
 
   private fun addConstraint(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: Env,
     acc: Acc,
     tparam_id: String,
@@ -2322,7 +2322,7 @@ value class TparamConstraints private {
   }
 
   private fun addForBounds(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: Env,
     acc: Acc,
     tvars_to_tparams: IMap<(FileRange, N.Tparam)>,
@@ -2358,7 +2358,7 @@ value class TparamConstraints private {
   }
 
   private fun solveForBounds(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     next_id: () -> Int,
     env: Env,
     acc: Acc,
@@ -2407,7 +2407,7 @@ value class TparamConstraints private {
   }
 
   private fun addUppers(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     env: Env,
     acc: Acc,
     id: String,
@@ -2475,7 +2475,7 @@ value class TparamConstraints private {
 }
 
 fun add_additional_tparam_constraints(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   id: String,
@@ -2492,7 +2492,7 @@ fun add_additional_tparam_constraints(
 }
 
 fun reset_tparam_constraints(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   id: String,
@@ -2509,7 +2509,7 @@ fun reset_tparam_constraints(
 }
 
 fun bind_tparam_constraints(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   tparams: Array<N.Type_parameter>,
@@ -2524,7 +2524,7 @@ fun bind_tparam_constraints(
 }
 
 fun add_whenparams(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -2684,7 +2684,7 @@ fun make_class_params_type_for_deconstruction(
 /* Adds missing type arguments to the special types "this/inst" */
 /*****************************************************************************/
 fun make_this_type<Ta, Tb>(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   mode: N.Modality,
@@ -2880,7 +2880,7 @@ fun bind_local_var(env: Env, acc: Acc, ty: N.Type_, name: N.Name): (Env, Acc) {
 }
 
 fun bind_param(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   ea: (Env, Acc),
   p: TAst.Parameter,
 ): (Env, Acc) {
@@ -2892,7 +2892,7 @@ fun bind_param(
 }
 
 fun bind_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc,
   x: Parameters<TAst.Parameter>,
@@ -2905,7 +2905,7 @@ fun bind_params(
 }
 
 fun classname_ty(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   sk_this: Bool,
   env: Env,
   acc: Acc,
@@ -2937,7 +2937,7 @@ fun classname_ty(
 }
 
 fun bind_this_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fkind: N.FieldKind,
   env: Env,
   cd: N.Class_def,
@@ -2969,7 +2969,7 @@ fun bind_this_type(
 }
 
 fun bind_static_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   cd: N.Class_def,
 ): N.Type_ {
@@ -2987,7 +2987,7 @@ fun bind_static_type(
 }
 
 fun bind_this_and_static(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fkind: N.FieldKind,
   env: Env,
   cd: N.Class_def,
@@ -3009,7 +3009,7 @@ fun bind_this_and_static(
 /* Object instantiation. */
 /*****************************************************************************/
 fun instantiate(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -3020,7 +3020,7 @@ fun instantiate(
 }
 
 fun instantiate_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -3041,7 +3041,7 @@ fun instantiate_(
 }
 
 fun instantiate_type_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -3112,7 +3112,7 @@ fun instantiate_type_(
 }
 
 fun instantiate_tapply(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -3149,7 +3149,7 @@ fun instantiate_tapply(
 }
 
 fun instantiate_targs(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -3174,7 +3174,7 @@ fun instantiate_targs(
 }
 
 fun instantiate_inter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -3201,7 +3201,7 @@ fun instantiate_inter(
 }
 
 fun instantiate_option(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   caller_pos: FileRange,
   env: Env,
@@ -3217,7 +3217,7 @@ fun instantiate_option(
 }
 
 fun instantiate_object_type_(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   caller_pos: FileRange,
   next_id: () -> Int,
   acc: Acc,
@@ -3231,7 +3231,7 @@ fun instantiate_object_type_(
 }
 
 fun instantiate_object_type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   caller_pos: FileRange,
   next_id: () -> Int,
   acc: Acc,
@@ -3262,7 +3262,7 @@ class InvalidPattern(
  * child's type
  */
 fun reconstrain_parent(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   orig_pos: FileRange,
@@ -3350,7 +3350,7 @@ fun createExistentialName(fr: FileRange): N.Name {
 /* For any unknown type arguments, add a new type parameter to the enverionment
  */
 fun create_existentials(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -3392,7 +3392,7 @@ fun create_existentials(
  * (which are tparams)
  */
 fun rebindPatternExistentials(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -3447,7 +3447,7 @@ fun rebindPatternExistentials(
 }
 
 fun reconstrain_child(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   pos: FileRange,
@@ -3526,7 +3526,7 @@ fun build_parents(env: Env, acc: Acc, obj_ty: N.Type_): SSet {
  * Replace it with an existential to prevent unsound behavior
  */
 fun fix_mismatched_variance<Ta>(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   name: (FileRange, String),
   parents: SSet,
@@ -3613,7 +3613,7 @@ fun instantiate_pattern_object_is_same_type(
 
 /* throws for invalid patterns */
 fun instantiate_pattern_object_no_params_exn(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3641,7 +3641,7 @@ fun instantiate_pattern_object_no_params_exn(
 }
 
 fun instantiate_pattern_object_no_params_exn_full(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3698,7 +3698,7 @@ fun instantiate_pattern_object_no_params_exn_full(
 
 /* throws for invalid patterns */
 fun instantiate_pattern_object_exn(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3749,7 +3749,7 @@ fun instantiate_pattern_object_exn(
 }
 
 fun instantiate_pattern_object_exn_only(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3779,7 +3779,7 @@ fun instantiate_pattern_object_exn_only(
 }
 
 fun instantiate_pattern_object(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   pos: FileRange,
   env: Env,
@@ -3810,7 +3810,7 @@ fun instantiate_pattern_object(
 }
 
 fun instantiate_object_type_with_targs(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   pos: FileRange,
   targs: Array<N.Type_>,
   acc: Acc,
@@ -3824,11 +3824,11 @@ fun instantiate_object_type_with_targs(
 }
 
 fun instantiate_object_impl(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   caller_pos: FileRange,
   next_id: () -> Int,
   k_object_type: (
-    mutable SKFS.Context,
+    mutable SKStore.Context,
     FileRange,
     (() -> Int),
     Acc,
@@ -3860,7 +3860,7 @@ fun instantiate_object_impl(
 }
 
 fun instantiate_object(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   caller_pos: FileRange,
   next_id: () -> Int,
   env: Env,
@@ -3881,7 +3881,7 @@ fun instantiate_object(
 }
 
 fun instantiate_object_with_targs(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   caller_pos: FileRange,
   targs: Array<N.Type_>,
   env: Env,
@@ -3912,7 +3912,7 @@ fun instantiate_object_with_targs(
  * the children for P<Int> we get {C}
  */
 fun build_match_class_set(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -4018,7 +4018,7 @@ fun combine_child_map(x: ?SSet, s: SSet): ?SSet {
 }
 
 fun valid_child_for_match(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   next_id: () -> Int,
   env: Env,
   acc: Acc,
@@ -4045,7 +4045,7 @@ fun valid_child_for_match(
 
 // None for no error. Some(b) where b iff the tparam has a trait constraint
 fun has_concrete_type_for_matching_tparam(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   tc: TparamConstraints,
   subst: IMap<N.Type_>,
   id: String,
@@ -4067,7 +4067,7 @@ fun has_concrete_type_for_matching_tparam(
 }
 
 fun has_concrete_type_for_matching(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   tc: TparamConstraints,
   subst: IMap<N.Type_>,
   ty: N.Type_,

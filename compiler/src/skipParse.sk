@@ -12,54 +12,54 @@ module alias Error = SkipError;
 
 module FileCache;
 
-const fileDirName: SKFS.DirName = SKFS.DirName::create("/fileCache/");
-const fileDir: SKFS.EHandle<SKFS.StringFile> = SKFS.EHandle(
-  SKFS.StringFile::fromFile,
+const fileDirName: SKStore.DirName = SKStore.DirName::create("/fileCache/");
+const fileDir: SKStore.EHandle<SKStore.StringFile> = SKStore.EHandle(
+  SKStore.StringFile::fromFile,
   fileDirName,
 );
 
-const allFilesDirName: SKFS.DirName = SKFS.DirName::create("/allFilesCache/");
-const allFilesDir: SKFS.EHandle<SKFS.StringFile> = SKFS.EHandle(
-  SKFS.StringFile::fromFile,
+const allFilesDirName: SKStore.DirName = SKStore.DirName::create("/allFilesCache/");
+const allFilesDir: SKStore.EHandle<SKStore.StringFile> = SKStore.EHandle(
+  SKStore.StringFile::fromFile,
   allFilesDirName,
 );
 
-const fileTimeDirName: SKFS.DirName = SKFS.DirName::create("/fileTimeCache/");
-const fileTimeDir: SKFS.EHandle<SKFS.IntFile> = SKFS.EHandle(
-  SKFS.IntFile::fromFile,
+const fileTimeDirName: SKStore.DirName = SKStore.DirName::create("/fileTimeCache/");
+const fileTimeDir: SKStore.EHandle<SKStore.IntFile> = SKStore.EHandle(
+  SKStore.IntFile::fromFile,
   fileTimeDirName,
 );
 
 @cpp_extern("SKIP_get_mtime")
 native fun getLastModificationTime(fileName: String): Int;
 
-fun writeFiles(context: mutable SKFS.Context, fileNames: Array<String>): void {
+fun writeFiles(context: mutable SKStore.Context, fileNames: Array<String>): void {
   oldFiles = allFilesDir
-    .unsafeGetArray(context, SKFS.IID(0))
+    .unsafeGetArray(context, SKStore.IID(0))
     .map(x -> x.value)
     .collect(SortedSet);
   for (fileName in fileNames) {
     if (oldFiles.contains(fileName)) {
       !oldFiles = oldFiles.remove(fileName);
     };
-    key = SKFS.SID(fileName);
+    key = SKStore.SID(fileName);
     lastModifTime = getLastModificationTime(fileName);
     timeArr = fileTimeDir.unsafeGetArray(context, key);
     if (timeArr.size() > 0 && timeArr[0].value == lastModifTime) continue;
-    fileTimeDir.writeArray(context, key, Array[SKFS.IntFile(lastModifTime)]);
+    fileTimeDir.writeArray(context, key, Array[SKStore.IntFile(lastModifTime)]);
     fileDir.writeArray(
       context,
-      SKFS.SID(fileName),
-      Array[SKFS.StringFile(FileSystem.readTextFile(fileName))],
+      SKStore.SID(fileName),
+      Array[SKStore.StringFile(FileSystem.readTextFile(fileName))],
     )
   };
   for (fileName in oldFiles) {
-    fileDir.writeArray(context, SKFS.SID(fileName), Array[SKFS.StringFile("")])
+    fileDir.writeArray(context, SKStore.SID(fileName), Array[SKStore.StringFile("")])
   };
   allFilesDir.writeArray(
     context,
-    SKFS.IID(0),
-    fileNames.map(x -> SKFS.StringFile(x)),
+    SKStore.IID(0),
+    fileNames.map(x -> SKStore.StringFile(x)),
   );
 }
 
@@ -67,19 +67,19 @@ module end;
 
 module SkipParse;
 
-const astDirName: SKFS.DirName = SKFS.DirName::create("/astCache/");
-const astDir: SKFS.EHandle<DefsFile> = SKFS.EHandle(
+const astDirName: SKStore.DirName = SKStore.DirName::create("/astCache/");
+const astDir: SKStore.EHandle<DefsFile> = SKStore.EHandle(
   DefsFile::fromFile,
   astDirName,
 );
 
-class DefsFile(value: List<SkipAst.Definition>) extends SKFS.File
+class DefsFile(value: List<SkipAst.Definition>) extends SKStore.File
 
 fun getAst(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fileName: String,
 ): List<SkipAst.Definition> {
-  astDir.get(context, SKFS.SID(fileName)).value
+  astDir.get(context, SKStore.SID(fileName)).value
 }
 
 fun parseFile(fileName: String, source: String): DefsFile {
@@ -104,7 +104,7 @@ fun parse(filename: String, contents: String): List<SkipAst.Definition> {
 }
 
 fun parse_files(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   fileList: Sequence<String>,
 ): Sequence<List<SkipAst.Definition>> {
   fileList.map(x -> getAst(context, x))

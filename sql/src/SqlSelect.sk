@@ -5,45 +5,45 @@
 module SKSQL;
 
 type MapFunRow = (
-  mutable SKFS.Context,
-  mutable SKFS.Writer,
-  SKFS.BaseName,
+  mutable SKStore.Context,
+  mutable SKStore.Writer,
+  SKStore.BaseName,
   mutable Iterator<SKSQL.Row>,
 ) ~> void;
 
 class SubTask(
   name: String,
-  key: SKFS.BaseName,
+  key: SKStore.BaseName,
   inputRow: Row,
   entries: List<Row>,
-  remainingTables: List<(SKSQL.DirDescr, ?Array<SKFS.KeyRange>)>,
+  remainingTables: List<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>,
 )
 
-class KVFile(value: (SKFS.BaseName, Array<SKFS.File>)) extends SKFS.File
+class KVFile(value: (SKStore.BaseName, Array<SKStore.File>)) extends SKStore.File
 
 class ProjKey(
   value: ?CValue,
   leftShard: Int,
   rightShard: Int,
-) extends SKFS.BaseName {
+) extends SKStore.BaseName {
   fun toString(): String {
     this.value.toString()
   }
 }
 
-class LeftFile(SKFS.BaseName, RowValues) extends SKFS.File
+class LeftFile(SKStore.BaseName, RowValues) extends SKStore.File
 class LeftShardedFile{
   leftShardID: Int,
   rightShard: Int,
   value: RowValues,
-} extends SKFS.File
+} extends SKStore.File
 
-class RightFile(SKFS.BaseName, RowValues) extends SKFS.File
+class RightFile(SKStore.BaseName, RowValues) extends SKStore.File
 class RightShardedFile{
   leftShard: Int,
   rightShardID: Int,
   value: RowValues,
-} extends SKFS.File
+} extends SKStore.File
 
 /*****************************************************************************/
 /* Helper */
@@ -124,10 +124,10 @@ fun pow2(n: Int): Int {
 }
 
 fun noop(
-  _context: mutable SKFS.Context,
-  writer: mutable SKFS.Writer,
-  key: SKFS.BaseName,
-  valueIter: mutable Iterator<SKFS.File>,
+  _context: mutable SKStore.Context,
+  writer: mutable SKStore.Writer,
+  key: SKStore.BaseName,
+  valueIter: mutable Iterator<SKStore.File>,
 ): void {
   writer.writeArray(key, valueIter.collect(Array))
 }
@@ -138,18 +138,18 @@ fun noop(
 
 mutable class MultiWriter{
   mutable writes: SortedMap<
-    SKFS.BaseName,
-    mutable Vector<SKFS.File>,
+    SKStore.BaseName,
+    mutable Vector<SKStore.File>,
   > = SortedMap[],
 } {
-  mutable fun write(key: SKFS.BaseName, value: SKFS.File): void {
+  mutable fun write(key: SKStore.BaseName, value: SKStore.File): void {
     if (!this.writes.containsKey(key)) {
       this.!writes[key] = mutable Vector[];
     };
     this.writes[key].push(value);
   }
 
-  mutable fun writeArray(key: SKFS.BaseName, values: Array<SKFS.File>): void {
+  mutable fun writeArray(key: SKStore.BaseName, values: Array<SKStore.File>): void {
     if (!this.writes.containsKey(key)) {
       this.!writes[key] = mutable Vector[];
     };
@@ -161,14 +161,14 @@ mutable class MultiWriter{
 /* The value returned by the evaluator. */
 /*****************************************************************************/
 
-class SelectDir(dirName: SKFS.DirName, types: Array<Type>) extends SKFS.File
+class SelectDir(dirName: SKStore.DirName, types: Array<Type>) extends SKStore.File
 
 /*****************************************************************************/
 /* The main entry point. */
 /*****************************************************************************/
 
 fun evalSelect(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   select: CSelect,
   up: ?ExprEvaluator,
 ): SelectDir {
@@ -181,7 +181,7 @@ fun makeSelectEvaluator(select: CSelect, up: ?ExprEvaluator): SelectEvaluator {
     select.id.lower + if (select.needUp) "_" + hash(up) else "",
   );
   selectName2 = if (select.aggr is Some _) {
-    SKFS.DirName::create(selectName1.toString() + "aggrEnv/")
+    SKStore.DirName::create(selectName1.toString() + "aggrEnv/")
   } else {
     selectName1
   };
@@ -206,12 +206,12 @@ class SelectEvaluator{
   directMode: ?Int = None(),
   up: ?ExprEvaluator,
   params: Array<CGExpr>,
-  selectName1: SKFS.DirName,
-  selectName2: SKFS.DirName,
+  selectName1: SKStore.DirName,
+  selectName2: SKStore.DirName,
   kinds: Array<(Int, SKSQL.IKind, Type)>,
   types: Array<Type>,
 } {
-  fun evalStaticInt(context: mutable SKFS.Context, expr: CExpr<Int>): Int {
+  fun evalStaticInt(context: mutable SKStore.Context, expr: CExpr<Int>): Int {
     emptyEval = ExprEvaluator(Array[], this.select.from, this.up);
     emptyEval.evalCIExpr(context, expr) match {
     | ANull() -> 0
@@ -220,7 +220,7 @@ class SelectEvaluator{
     }
   }
 
-  fun evalSelect(context: mutable SKFS.Context): SelectDir {
+  fun evalSelect(context: mutable SKStore.Context): SelectDir {
     if (this.select.directMode) {
       !this.directMode = this.select.limit match {
       | None() -> Some(Int::max)
@@ -234,11 +234,11 @@ class SelectEvaluator{
     | None() -> this.evalSelectNoLimit(context)
     | Some(limitExpr) ->
       limitMappedName = this.selectName1;
-      limitName = SKFS.DirName::create(this.selectName1.toString() + "limit/");
-      !this.selectName1 = SKFS.DirName::create(
+      limitName = SKStore.DirName::create(this.selectName1.toString() + "limit/");
+      !this.selectName1 = SKStore.DirName::create(
         this.selectName1.toString() + "nolimit/",
       );
-      !this.selectName2 = SKFS.DirName::create(
+      !this.selectName2 = SKStore.DirName::create(
         this.selectName2.toString() + "nolimit/",
       );
       limit = this.evalStaticInt(context, limitExpr);
@@ -262,7 +262,7 @@ class SelectEvaluator{
         while (i < limit) {
           iter.next() match {
           | None() ->
-            arr.push(((SKFS.IID(i) : SKFS.BaseName), Array[]));
+            arr.push(((SKStore.IID(i) : SKStore.BaseName), Array[]));
             !i = i + 1
           | Some((_, fileIter)) ->
             values = fileIter.map(RowValues::fromFile).collect(Array);
@@ -274,13 +274,13 @@ class SelectEvaluator{
             };
             if (repeat == 0) continue;
             !value = value.setRepeat(repeat);
-            arr.push(((SKFS.IID(i) : SKFS.BaseName), Array[value]));
+            arr.push(((SKStore.IID(i) : SKStore.BaseName), Array[value]));
             !i = i + 1
           }
         };
         j = 0;
         arr2 = mutable Vector[];
-        source = SKFS.Path::create(limitName, SKFS.IID(0));
+        source = SKStore.Path::create(limitName, SKStore.IID(0));
         for (elt in arr) {
           (key, values) = elt;
           if (values.size() == 0) {
@@ -290,7 +290,7 @@ class SelectEvaluator{
             repeat = if (j + value.repeat >= limit) limit - j else value.repeat;
             if (repeat > 0) {
               !value = value.setRepeat(repeat);
-              arr2.push((key, (source, source, Array[(value : SKFS.File)])));
+              arr2.push((key, (source, source, Array[(value : SKStore.File)])));
               !j = j + repeat;
             } else {
               arr2.push((key, (source, source, Array[])));
@@ -299,7 +299,7 @@ class SelectEvaluator{
         };
         limitDir.writeArraySourceMany(context, arr2.iterator());
         kinds = this.kinds;
-        SKFS.EagerDir::apply(
+        SKStore.EagerDir::apply(
           context,
           limitDir.dirName,
           limitMappedName,
@@ -318,7 +318,7 @@ class SelectEvaluator{
   }
 
   static fun evalSubTask(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     subTask: SubSelectTask,
   ): void {
     subTask match {
@@ -337,22 +337,22 @@ class SelectEvaluator{
       joinKind,
       onlyLeftValues,
     } ->
-      leftHandle = SKFS.EHandle(Row::fromFile, leftDirName);
-      rightHandle = SKFS.EHandle(Row::fromFile, rightDirName);
+      leftHandle = SKStore.EHandle(Row::fromFile, leftDirName);
+      rightHandle = SKStore.EHandle(Row::fromFile, rightDirName);
 
-      shardsDirName = SKFS.DirName::create(
+      shardsDirName = SKStore.DirName::create(
         childName.toString() + "proj/shards/",
       );
       shards = context.unsafeMaybeGetEagerDir(shardsDirName) match {
       | None() -> context.mkdir(ShardStats::fromFile, shardsDirName, Array[])
-      | Some(x) -> SKFS.EHandle(ShardStats::fromFile, x.dirName)
+      | Some(x) -> SKStore.EHandle(ShardStats::fromFile, x.dirName)
       };
 
-      projLeftName = SKFS.DirName::create(childName.toString() + "proj/left/");
+      projLeftName = SKStore.DirName::create(childName.toString() + "proj/left/");
 
-      SKFS.EagerDir::applyMany(
+      SKStore.EagerDir::applyMany(
         context,
-        SKFS.FixedSingle::create(
+        SKStore.FixedSingle::create(
           mutable Vector[
             (leftHandle.dirName, (noop, leftRanges)),
             (shardsDirName, (noop, None())),
@@ -361,13 +361,13 @@ class SelectEvaluator{
         projLeftName,
       );
 
-      projRightName = SKFS.DirName::create(
+      projRightName = SKStore.DirName::create(
         childName.toString() + "proj/right/",
       );
 
-      SKFS.EagerDir::applyMany(
+      SKStore.EagerDir::applyMany(
         context,
-        SKFS.FixedSingle::create(
+        SKStore.FixedSingle::create(
           mutable Vector[
             (rightHandle.dirName, (noop, rightRanges)),
             (shardsDirName, (noop, None())),
@@ -376,7 +376,7 @@ class SelectEvaluator{
         projRightName,
       );
 
-      projName = SKFS.DirName::create(childName.toString() + "proj/");
+      projName = SKStore.DirName::create(childName.toString() + "proj/");
 
       projLeftFun = (_context, writer, fileKey, valueIter) ~> {
         (rowOpt, shardStats) = normalizeValueIter(valueIter);
@@ -386,7 +386,7 @@ class SelectEvaluator{
         };
         (leftShard, rightShard) = computeShardSizes(shardStats);
         key = row.getValue(leftColNbr);
-        leftShardID = SKFS.genSym(leftShard) % leftShard;
+        leftShardID = SKStore.genSym(leftShard) % leftShard;
         shardedFile = LeftShardedFile{leftShardID, rightShard, value => row};
         for (i in Range(0, rightShard)) {
           projKey = ProjKey(key, leftShardID, i);
@@ -402,7 +402,7 @@ class SelectEvaluator{
         };
         (leftShard, rightShard) = computeShardSizes(shardStats);
         key = row.getValue(rightColNbr);
-        rightShardID = SKFS.genSym(rightShard) % rightShard;
+        rightShardID = SKStore.genSym(rightShard) % rightShard;
         shardedFile = RightShardedFile{leftShard, rightShardID, value => row};
         for (i in Range(0, leftShard)) {
           projKey = ProjKey(key, i, rightShardID);
@@ -410,9 +410,9 @@ class SelectEvaluator{
         }
       };
 
-      SKFS.EagerDir::applyMany(
+      SKStore.EagerDir::applyMany(
         context,
-        SKFS.FixedSingle::create(
+        SKStore.FixedSingle::create(
           mutable Vector[
             (projLeftName, (projLeftFun, None())),
             (projRightName, (projRightFun, None())),
@@ -420,9 +420,9 @@ class SelectEvaluator{
         ),
         projName,
       );
-      SKFS.EagerDir::applyMany(
+      SKStore.EagerDir::applyMany(
         context,
-        SKFS.FixedSingle::create(
+        SKStore.FixedSingle::create(
           mutable Vector[
             (
               projName,
@@ -438,7 +438,7 @@ class SelectEvaluator{
     };
   }
 
-  fun evalSelectNoLimit(context: mutable SKFS.Context): SelectDir {
+  fun evalSelectNoLimit(context: mutable SKStore.Context): SelectDir {
     dirName = this.select.aggr match {
     | None() if (this.select.from.size() == 0) ->
       this.evalEmptyFrom(context);
@@ -462,7 +462,7 @@ class SelectEvaluator{
     SelectDir(dirName, this.types)
   }
 
-  fun evalAggr(context: mutable SKFS.Context): SKFS.DirName {
+  fun evalAggr(context: mutable SKStore.Context): SKStore.DirName {
     aggrs = this.select.aggr.fromSome();
 
     if (this.select.from.size() == 0) {
@@ -474,7 +474,7 @@ class SelectEvaluator{
         _dir = context.mkdir(
           Row::fromFile,
           this.selectName1,
-          Array[(SKFS.IID(0), row)],
+          Array[(SKStore.IID(0), row)],
         );
       } else {
         context.!newDirs = context.newDirs.set(this.selectName1);
@@ -494,7 +494,7 @@ class SelectEvaluator{
         this.select.groupBy is None _;
 
       dataName = if (isGlobalAggr) {
-        SKFS.DirName::create(this.selectName1.toString() + "data/");
+        SKStore.DirName::create(this.selectName1.toString() + "data/");
       } else {
         this.selectName1
       };
@@ -530,7 +530,7 @@ class SelectEvaluator{
       );
 
       if (isGlobalAggr) {
-        selectName1Empty = SKFS.DirName::create(
+        selectName1Empty = SKStore.DirName::create(
           this.selectName1.toString() + "empty/",
         );
         if (context.unsafeMaybeGetEagerDir(selectName1Empty) is None()) {
@@ -559,15 +559,15 @@ class SelectEvaluator{
           _ = context.mkdir(
             Row::fromFile,
             selectName1Empty,
-            Array[(SKFS.IID(0), emptyRow)],
+            Array[(SKStore.IID(0), emptyRow)],
           );
         } else {
           context.!newDirs = context.newDirs.set(selectName1Empty);
         };
 
-        SKFS.EagerDir::applyMany(
+        SKStore.EagerDir::applyMany(
           context,
-          SKFS.FixedSingle::create(
+          SKStore.FixedSingle::create(
             mutable Vector[
               (
                 selectName1Empty,
@@ -600,7 +600,7 @@ class SelectEvaluator{
   }
 
   static fun evalRow(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     evaluator: ExprEvaluator,
     params: Array<CGExpr>,
     repeat: Int,
@@ -619,7 +619,7 @@ class SelectEvaluator{
     )
   }
 
-  fun evalEmptyFrom(context: mutable SKFS.Context): void {
+  fun evalEmptyFrom(context: mutable SKStore.Context): void {
     dirName = this.selectName2;
     if (context.unsafeMaybeGetEagerDir(dirName) is None()) {
       evaluator = ExprEvaluator(Array[], this.select.from, this.up);
@@ -633,17 +633,17 @@ class SelectEvaluator{
       | ADef(_) ->
         static::evalRow(context, evaluator, this.select.params, 1)
       };
-      _dir = context.mkdir(Row::fromFile, dirName, Array[(SKFS.IID(0), row)]);
+      _dir = context.mkdir(Row::fromFile, dirName, Array[(SKStore.IID(0), row)]);
     } else {
       context.!newDirs = context.newDirs.set(dirName);
     }
   }
 
   fun evalSelectTableList(
-    context: mutable SKFS.Context,
-    tables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    context: mutable SKStore.Context,
+    tables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-  ): SKFS.EHandle<Row> {
+  ): SKStore.EHandle<Row> {
     tables match {
     | List.Nil() -> invariant_violation("empty select")
     | List.Cons(table, remainingTables) ->
@@ -686,11 +686,11 @@ class SelectEvaluator{
   }
 
   fun makeParents(
-    dirName: SKFS.DirName,
-    rangeOpt: ?Array<SKFS.KeyRange>,
-    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    dirName: SKStore.DirName,
+    rangeOpt: ?Array<SKStore.KeyRange>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-  ): SKFS.FixedSingle<SKFS.DirName, (MapFunRow, ?Array<SKFS.KeyRange>)> {
+  ): SKStore.FixedSingle<SKStore.DirName, (MapFunRow, ?Array<SKStore.KeyRange>)> {
     queryKind = this.select.rest match {
     | None() -> None()
     | Some((QUnion(UAll()), _)) ->
@@ -739,16 +739,16 @@ class SelectEvaluator{
       !rest = query.rest;
       !order = order + 1
     };
-    SKFS.FixedSingle::create(mparents)
+    SKStore.FixedSingle::create(mparents)
   }
 
   fun evalSelectTable(
-    context: mutable SKFS.Context,
-    dir: SKFS.EHandle<Row>,
-    rangeOpt: ?Array<SKFS.KeyRange>,
-    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    context: mutable SKStore.Context,
+    dir: SKStore.EHandle<Row>,
+    rangeOpt: ?Array<SKStore.KeyRange>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-  ): SKFS.EHandle<Row> {
+  ): SKStore.EHandle<Row> {
     parents = this.makeParents(dir.dirName, rangeOpt, remainingTables, entries);
     this.directMode match {
     | Some(limit) ->
@@ -776,7 +776,7 @@ class SelectEvaluator{
       };
       throw IgnoreAndContinue()
     | None() ->
-      result = SKFS.EHandle::multiContextWriterKeyIter(
+      result = SKStore.EHandle::multiContextWriterKeyIter(
         Row::fromFile,
         context,
         parents,
@@ -789,11 +789,11 @@ class SelectEvaluator{
 
   fun evalSelectTableRows(
     qkind: ?(Int, QueryKind),
-    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-    context: mutable SKFS.Context,
-    writer: mutable SKFS.Writer,
-    key: SKFS.BaseName,
+    context: mutable SKStore.Context,
+    writer: mutable SKStore.Writer,
+    key: SKStore.BaseName,
     inputRows: mutable Iterator<Row>,
   ): void {
     mwriter = mutable MultiWriter{};
@@ -861,11 +861,11 @@ class SelectEvaluator{
 
   fun evalSelectTableRow(
     qkind: ?(Int, QueryKind),
-    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     mwriter: mutable MultiWriter,
-    key: SKFS.BaseName,
+    key: SKStore.BaseName,
     inputRow: Row,
     repeat: Int,
   ): void {
@@ -905,12 +905,12 @@ class SelectEvaluator{
     }
   }
 
-  fun evalSelectTableReducer(): ?SKFS.EReducer<Row> {
+  fun evalSelectTableReducer(): ?SKStore.EReducer<Row> {
     reducer = this.select.aggr match {
     | None() ->
       if (this.select.kind is SDistinct() || this.select.groupBy is Some _) {
         Some(
-          SKFS.EReducer{
+          SKStore.EReducer{
             canReset => true,
             init => firstRowAsArrayRepeat1,
             update => (_, _, _) ~> None(),
@@ -918,7 +918,7 @@ class SelectEvaluator{
         )
       } else {
         Some(
-          SKFS.EReducer{
+          SKStore.EReducer{
             canReset => false,
             init => initRepeatRow,
             update => updateRepeatRow,
@@ -928,7 +928,7 @@ class SelectEvaluator{
     | Some(aggrs) ->
       aggrKinds = aggrs.map(x -> x.i0);
       Some(
-        SKFS.EReducer{
+        SKStore.EReducer{
           canReset => true,
           init => rows ~> reducerInit(aggrKinds, rows),
           update => (state, old, new) ~>
@@ -940,7 +940,7 @@ class SelectEvaluator{
     | None() -> reducer
     | Some(_) ->
       Some(
-        SKFS.EReducer{
+        SKStore.EReducer{
           canReset => true,
           init => initUnion,
           update => (_, _, _) ~> None(),
@@ -950,9 +950,9 @@ class SelectEvaluator{
   }
 
   fun evalSelectRow(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     qkind: ?(Int, QueryKind),
-    _inputKey: SKFS.BaseName,
+    _inputKey: SKStore.BaseName,
     evaluator: SKSQL.ExprEvaluator,
     writer: mutable MultiWriter,
     repeat: Int,
@@ -961,7 +961,7 @@ class SelectEvaluator{
     if (this.select.aggr is Some _) {
       !evaluator = evaluator with {entries => Array[row]};
       key = this.select.groupBy match {
-      | None() -> SKFS.IID(0)
+      | None() -> SKStore.IID(0)
       | Some(groupBy) -> makeGroupByKey(context, evaluator, row, groupBy)
       };
       writer.write(key, row);
@@ -976,11 +976,11 @@ class SelectEvaluator{
   }
 
   fun createSub(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     subTask: SubTask,
   ): mutable Iterator<KVFile> {
     subStr = subTask.name + "sub_" + hash(subTask.key).toString();
-    subSelectName = SKFS.DirName::create(subStr + "/");
+    subSelectName = SKStore.DirName::create(subStr + "/");
     nthis = this;
     !nthis.selectName2 = subSelectName;
     result = nthis.evalSelectTableList(
@@ -994,10 +994,10 @@ class SelectEvaluator{
   }
 
   fun evalSelectCross(
-    context: mutable SKFS.Context,
-    remainingTables: List<(DirDescr, ?Array<SKFS.KeyRange>)>,
+    context: mutable SKStore.Context,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-    key: SKFS.BaseName,
+    key: SKStore.BaseName,
     inputRow: SKSQL.Row,
     writer: mutable MultiWriter,
     repeat: Int,
@@ -1252,7 +1252,7 @@ fun initUnion(rowIter: mutable Iterator<Row>): Array<Row> {
 /*****************************************************************************/
 
 fun makeGroupByKey(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   evaluator: ExprEvaluator,
   row: Row,
   groupBy: Array<CGroupByElt>,
@@ -1284,15 +1284,15 @@ fun makeGroupByKey(
 /*****************************************************************************/
 
 fun makeJoinReducer(
-  shardTable: SKFS.EHandle<ShardStats>,
+  shardTable: SKStore.EHandle<ShardStats>,
   joinKind: JoinKind,
   kinds: Array<(Int, IKind, Type)>,
   onlyLeftValues: Bool,
 ): (
-  mutable SKFS.Context,
-  mutable SKFS.Writer,
-  SKFS.BaseName,
-  mutable Iterator<SKFS.File>,
+  mutable SKStore.Context,
+  mutable SKStore.Writer,
+  SKStore.BaseName,
+  mutable Iterator<SKStore.File>,
 ) ~> void {
   (context, writer, _, files) ~> {
     leftRows = mutable Vector[];
@@ -1377,7 +1377,7 @@ fun makeJoinReducer(
 }
 
 fun normalizeValueIter(
-  valueIter: mutable Iterator<SKFS.File>,
+  valueIter: mutable Iterator<SKStore.File>,
 ): (?RowValues, ?ShardStats) {
   shardStats: ?ShardStats = None();
   valueOpt: ?RowValues = None();
@@ -1423,9 +1423,9 @@ fun computeShardSizes(stats: ?ShardStats): (Int, Int) {
 }
 
 fun getStats(
-  context: mutable SKFS.Context,
-  shardTable: SKFS.EHandle<ShardStats>,
-  x: readonly Vector<(SKFS.BaseName, SKFS.File)>,
+  context: mutable SKStore.Context,
+  shardTable: SKStore.EHandle<ShardStats>,
+  x: readonly Vector<(SKStore.BaseName, SKStore.File)>,
 ): ?ShardStats {
   for (kv in x) {
     (key, _) = kv;

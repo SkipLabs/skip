@@ -308,7 +308,7 @@ fun select_match_column(rows: List<Row>): Int {
  * class. We need to do this in order to get around weird subtyping relationships
  * and multiple inheritance in our generated code. */
 fun concretize_class(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   program: O.Program,
   class_tid: O.TypeIdentifier,
 ): List<O.TypeIdentifier> {
@@ -395,7 +395,7 @@ mutable class Acc{
 mutable class MatchCompiler(
   new_id: () -> Int,
   program: O.Program,
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   mutable acc: mutable Acc = mutable Acc{},
 ) extends OIU.Visitor {
   readonly fun getVisitorName(): String {
@@ -478,7 +478,7 @@ mutable class MatchCompiler(
   }
 
   readonly fun concretizePatterns(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     patterns: List<StrippedPattern>,
   ): (List<StrippedPattern>, List<StrippedPattern>) {
     patterns match {
@@ -513,7 +513,7 @@ mutable class MatchCompiler(
   /* Return separate lists of wildcards and constructors from a pattern column,
      with the constructors concretized and deduped. */
   readonly fun getRootConstructors(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     col: List<StrippedPattern>,
   ): (List<StrippedPattern>, List<StrippedPattern>) {
     (wildcards, ctors) = col.partition(p ~> p.isDefault());
@@ -523,7 +523,7 @@ mutable class MatchCompiler(
   }
 
   readonly fun isChild(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     c: O.TypeIdentifier,
     p: O.TypeIdentifier,
   ): Bool {
@@ -532,7 +532,7 @@ mutable class MatchCompiler(
   }
 
   readonly fun isSubtype(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     c: O.TypeIdentifier,
     p: O.TypeIdentifier,
   ): Bool {
@@ -561,7 +561,7 @@ mutable class MatchCompiler(
 
   /* canonicalize the given parameters to non-optional named form */
   readonly fun namedParams<T>(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     cls_name: O.Name,
     paramsOpt: ?Parameters<T>,
   ): UMap<T> {
@@ -624,7 +624,7 @@ mutable class MatchCompiler(
    * into the constructor arguments, and add those tests to the head of the row.
    */
   readonly fun specializeRow(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     con: StrippedPattern,
     r: Row,
   ): ?Row {
@@ -722,7 +722,7 @@ mutable class MatchCompiler(
 
   /* true if concretized classes of expr's type are covered by pats */
   readonly fun isSaturated(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     expr: O.Expr,
     pats: List<StrippedPattern>,
   ): Bool {
@@ -757,7 +757,7 @@ mutable class MatchCompiler(
   /* The same thing is done here as in @generate_switch, just outputing
    * typeswitches instead. */
   readonly fun generateTypeSwitch(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     expr: O.Expr,
     compiledPats: List<(StrippedPattern, O.Stmt)>,
     defaultBranch: ?O.Stmt,

@@ -213,7 +213,7 @@ fun type_def(tyd: N.Type_def): void {
   check_no_variance(tyd.tparams)
 }
 
-fun class_def(context: mutable SKFS.Context, cd: N.Class_def): N.Class_def {
+fun class_def(context: mutable SKStore.Context, cd: N.Class_def): N.Class_def {
   env = makeEmptyEnv();
   (co_params, contra_params, inv_params) = make_co_contra(cd);
   tparam_constraints = bind_tparams(env.tparam_constraints, cd.tparams);
@@ -236,7 +236,7 @@ fun class_def(context: mutable SKFS.Context, cd: N.Class_def): N.Class_def {
 }
 
 fun method_def(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   _: String,
   met: N.Method_def,
@@ -259,7 +259,7 @@ fun fun_def(fd: N.Fun_def): void {
 }
 
 fun class_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   opt: N.MaybeClassParams,
 ): void {
@@ -276,7 +276,7 @@ fun class_params(
 }
 
 fun class_param(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc<SSet>,
   cp_param: N.Parameter,
@@ -285,7 +285,7 @@ fun class_param(
 }
 
 fun parameters(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
@@ -298,7 +298,7 @@ fun parameters(
 }
 
 fun parameter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
@@ -308,7 +308,7 @@ fun parameter(
 }
 
 fun sk_extends(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   env: Env,
   acc: Acc<SMap<SSet>>,
   n: N.Name,
@@ -329,7 +329,7 @@ fun sk_extends(
 }
 
 fun type(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
@@ -471,7 +471,7 @@ fun variance_error(
 }
 
 fun fun_params(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,
@@ -489,7 +489,7 @@ fun fun_params(
 }
 
 fun type_parameter(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   variance: Position,
   env: Env,
   acc: Acc<SSet>,

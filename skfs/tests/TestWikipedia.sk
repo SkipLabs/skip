@@ -1,8 +1,8 @@
-module SKFSTest;
+module SKStoreTest;
 
-class WikiPage{content: String} extends SKFS.File
+class WikiPage{content: String} extends SKStore.File
 
-fun testWikipedia(path: String): mutable SKFS.Context {
+fun testWikipedia(path: String): mutable SKStore.Context {
   id = 0;
   files = FileSystem.readFilesRecursive(path)
     .map(fileName -> FileSystem.readTextFile(fileName))
@@ -26,44 +26,44 @@ fun testWikipedia(path: String): mutable SKFS.Context {
     .filter(page -> page.content != "")
     .map(page -> {
       !id = id + 1;
-      (SKFS.IID(id), page)
+      (SKStore.IID(id), page)
     })
     .toArray();
   debug("Loaded the files");
-  SKFS.run(context ~> {
+  SKStore.run(context ~> {
     pages = context.mkdir(
       WikiPage::fromFile,
-      SKFS.DirName::create("/input/"),
+      SKStore.DirName::create("/input/"),
       files,
     );
     queries = context.mkdir(
-      SKFS.StringFile::fromFile,
-      SKFS.DirName::create("/queries/"),
+      SKStore.StringFile::fromFile,
+      SKStore.DirName::create("/queries/"),
       Array[],
     );
     index = pages.contextWriterKeyMap(
-      SKFS.IntFile::fromFile,
+      SKStore.IntFile::fromFile,
       context,
-      SKFS.DirName::create("/index/"),
+      SKStore.DirName::create("/index/"),
       (_context, writer, id, value) ~> {
         tokens = mutable Set[];
         for (token in value.content.split(" ")) {
           tokens.insert(token.hash());
         };
         for (token in tokens) {
-          writer.write(SKFS.IID(token), id);
+          writer.write(SKStore.IID(token), id);
         }
       },
     );
     _results = queries.contextMap(
       QueryResult::fromFile,
       context,
-      SKFS.DirName::create("/results/"),
+      SKStore.DirName::create("/results/"),
       (context, query) ~> {
         first = true;
         results = mutable Set[];
         for (token in query.value.split(" ")) {
-          newResults = index.getArray(context, SKFS.IID(token.hash()));
+          newResults = index.getArray(context, SKStore.IID(token.hash()));
           if (first) {
             !first = false;
             !results = Set::mcreateFromItems(newResults.map(x -> x.value));

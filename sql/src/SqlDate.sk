@@ -107,7 +107,7 @@ base class Date {
   }
   | DDate{year: Int, month: Int, day: Int, time: ?DTime = None()}
 
-  fun toTM(context: mutable SKFS.Context, tz: TimeZone): mutable TM {
+  fun toTM(context: mutable SKStore.Context, tz: TimeZone): mutable TM {
     this match {
     | DNow() ->
       now = getNow(context);
@@ -528,13 +528,13 @@ mutable class DateTime(tz: TimeZone, tm: mutable TM) {
 /* Get now. */
 /*****************************************************************************/
 
-fun forbidNow(context: mutable SKFS.Context): void {
-  context.setGlobal("NowForbidden", SKFS.BoolFile(true));
+fun forbidNow(context: mutable SKStore.Context): void {
+  context.setGlobal("NowForbidden", SKStore.BoolFile(true));
 }
 
-fun getNow(context: mutable SKFS.Context): Int {
+fun getNow(context: mutable SKStore.Context): Int {
   context.getGlobal("NowForbidden") match {
-  | Some(SKFS.BoolFile(true)) ->
+  | Some(SKStore.BoolFile(true)) ->
     errorEval("Cannot access 'now' in this context")
   | _ -> void
   };
@@ -542,9 +542,9 @@ fun getNow(context: mutable SKFS.Context): Int {
   context.getGlobal("Now") match {
   | None() ->
     now = getUnixTime();
-    context.setGlobal("Now", SKFS.IntFile(now));
+    context.setGlobal("Now", SKStore.IntFile(now));
     now
-  | Some(file) -> SKFS.IntFile::fromFile(file).value
+  | Some(file) -> SKStore.IntFile::fromFile(file).value
   }
 }
 
@@ -572,7 +572,7 @@ fun check_format(format: String): void {
 
 fun callStrftime(
   pos: Int,
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   sargs: Array<String>,
 ): String {
   if (sargs.size() < 2) error(pos, "missing arguments for strftime");
@@ -580,7 +580,7 @@ fun callStrftime(
 }
 
 fun strftime(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   format: String,
   timeValue: String,
   origModifiers: Array<String>,

@@ -69,10 +69,10 @@ const permissionsColName: Name = Name::create("permissions");
 
 base class PredefinedTable private final {
   private columns: Map<String, Int>,
-  protected dirName: SKFS.DirName,
+  protected dirName: SKStore.DirName,
   private schema: Array<TypeDescr>,
   protected kinds: Array<(Int, IKind, Type)>,
-  private indexDirName: SKFS.DirName,
+  private indexDirName: SKStore.DirName,
 } {
   const name: Name;
   const schemaText: String;
@@ -86,7 +86,7 @@ base class PredefinedTable private final {
     for (i => col in schema) {
       columns![col.name.lower] = i;
     };
-    dirName = SKFS.DirName::create("/" + static::name + "/");
+    dirName = SKStore.DirName::create("/" + static::name + "/");
     kinds = schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
 
     indexName = createIndexName(
@@ -96,11 +96,11 @@ base class PredefinedTable private final {
       ),
       static::indexedFields.size(),
     );
-    indexDirName = SKFS.DirName::create(indexName.lower + "unique/proj/");
+    indexDirName = SKStore.DirName::create(indexName.lower + "unique/proj/");
     static{columns => columns.chill(), dirName, schema, kinds, indexDirName}
   }
 
-  fun getIndex(context: readonly SKFS.Context): PredefinedIndex {
+  fun getIndex(context: readonly SKStore.Context): PredefinedIndex {
     context.unsafeMaybeGetEagerDir(this.indexDirName) match {
     | None() -> error(0, "Privacy layer not initialized")
     | Some(index) -> PredefinedIndex(static::name, index, this.columns)
@@ -122,9 +122,9 @@ base class PredefinedTable private final {
 
   // Determines if a change in a directoy affects a given user
   deferred fun hasChangedForUser(
-    context: readonly SKFS.Context,
+    context: readonly SKStore.Context,
     user: UserFile,
-    tick: SKFS.Tick,
+    tick: SKStore.Tick,
   ): Bool {
     colNbr = this.columns.maybeGet(userIDColName.lower) match {
     | None() -> return false
@@ -198,7 +198,7 @@ class PredefinedRow(
 
 class PredefinedIndex(
   private tableName: Name,
-  private dir: SKFS.EagerDir,
+  private dir: SKStore.EagerDir,
   private columns: Map<String, Int>,
 ) {
   fun get(projKey: IndexProjKey): ?PredefinedRow {
@@ -237,9 +237,9 @@ class SKDBUsersByName extends PredefinedTable {
   }
 }
 
-class UserFile(id: Int, name: String) extends SKFS.File {
+class UserFile(id: Int, name: String) extends SKStore.File {
   static fun create(
-    context: readonly SKFS.Context,
+    context: readonly SKStore.Context,
     userName: String,
   ): UserFile {
     skdbUsersByName
@@ -329,9 +329,9 @@ class SKDBTablePermissions extends PredefinedTable {
 
   // Determines if a change in a directoy affects a given user
   fun hasChanged(
-    context: readonly SKFS.Context,
+    context: readonly SKStore.Context,
     tableName: Name,
-    tick: SKFS.Tick,
+    tick: SKStore.Tick,
   ): Bool {
     colNbr = this.getColNbr(tableNameColName);
     dir = context.unsafeMaybeGetEagerDir(this.dirName) match {
@@ -464,7 +464,7 @@ base class AccessResultError{userName: String} uses Show {
 }
 
 fun checkUserCanReadRow(
-  context: readonly SKFS.Context,
+  context: readonly SKStore.Context,
   user: UserFile,
   table: DirDescr,
   row: RowValues,
@@ -499,7 +499,7 @@ fun checkUserCanReadRow(
 }
 
 fun checkUserCanWriteRow(
-  context: readonly SKFS.Context,
+  context: readonly SKStore.Context,
   user: UserFile,
   table: DirDescr,
   row: RowValues,
@@ -570,10 +570,10 @@ mutable class AccessSolver private {
   userID: Int,
   userMask: Permission,
   private cache: mutable Map<Int, Permission> = mutable Map[],
-  private mutable currentTick: SKFS.Tick = SKFS.Tick(-1),
+  private mutable currentTick: SKStore.Tick = SKStore.Tick(-1),
 } {
   static fun create(
-    context: readonly SKFS.Context,
+    context: readonly SKStore.Context,
     userID: Int,
     table: DirDescr,
   ): mutable this {
@@ -631,7 +631,7 @@ mutable class AccessSolver private {
   }
 
   private mutable fun getPermissions(
-    context: readonly SKFS.Context,
+    context: readonly SKStore.Context,
     groupID: Int,
   ): Permission {
     if (context.tick != this.currentTick) {
@@ -648,7 +648,7 @@ mutable class AccessSolver private {
   }
 
   private mutable fun getPermissionsNoCache(
-    context: readonly SKFS.Context,
+    context: readonly SKStore.Context,
     groupID: Int,
   ): Permission {
     // Let's first check if the groupID is in fact our userID
@@ -676,15 +676,15 @@ mutable class AccessSolver private {
     }
   }
 
-  mutable fun canRead(context: readonly SKFS.Context, groupID: Int): Bool {
+  mutable fun canRead(context: readonly SKStore.Context, groupID: Int): Bool {
     this.getPermissions(context, groupID).canRead()
   }
 
-  mutable fun canInsert(context: readonly SKFS.Context, groupID: Int): Bool {
+  mutable fun canInsert(context: readonly SKStore.Context, groupID: Int): Bool {
     this.getPermissions(context, groupID).canInsert()
   }
 
-  mutable fun canDelete(context: readonly SKFS.Context, groupID: Int): Bool {
+  mutable fun canDelete(context: readonly SKStore.Context, groupID: Int): Bool {
     this.getPermissions(context, groupID).canDelete()
   }
 }
@@ -694,10 +694,10 @@ mutable class AccessSolver private {
 /*****************************************************************************/
 
 fun userPrivacyChanged(
-  context: readonly SKFS.Context,
+  context: readonly SKStore.Context,
   userNameOpt: ?String,
   tableName: Name,
-  tick: SKFS.Tick,
+  tick: SKStore.Tick,
 ): Bool {
   userName = userNameOpt match {
   | None() -> return false

@@ -4,7 +4,7 @@
 
 module SKSQL;
 
-class IndexProjKey(values: Array<(Int, ?CValue)>) extends SKFS.BaseName
+class IndexProjKey(values: Array<(Int, ?CValue)>) extends SKStore.BaseName
 
 fun makeIndexProjKey(
   v: RowValues,
@@ -28,10 +28,10 @@ fun createIndexName(
 }
 
 fun createIndex(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   userIndexNameOpt: ?Name,
   tableName: Name,
-  dirName: SKFS.DirName,
+  dirName: SKStore.DirName,
   kinds: Array<(Int, IKind, Type)>,
   size: Int,
   unique: Bool,
@@ -48,13 +48,13 @@ fun createIndex(
     !needsReordering = true;
   };
 
-  handle = (SKFS.EHandle(RowValues::fromFile, dirName));
+  handle = (SKStore.EHandle(RowValues::fromFile, dirName));
 
   index = if (!needsReordering) handle else {
     handle.contextWriterKeyValues(
       RowValues::fromFile,
       context,
-      SKFS.DirName::create(indexName.lower),
+      SKStore.DirName::create(indexName.lower),
       (_ctx, writer, _key, rows) ~> {
         if (rows.size() == 0) return void;
         row = rows[0];
@@ -72,7 +72,7 @@ fun createIndex(
       .contextWriterKeyValues(
         RowValues::fromFile,
         context,
-        SKFS.DirName::create(indexName.lower + "unique/proj/"),
+        SKStore.DirName::create(indexName.lower + "unique/proj/"),
         (_, writer, _key, values) ~> {
           result = SortedMap<IndexProjKey, mutable Vector<RowValues>>[];
           for (v in values) {
@@ -91,9 +91,9 @@ fun createIndex(
         },
       )
       .contextWriterKeyValues(
-        SKFS.StringFile::fromFile,
+        SKStore.StringFile::fromFile,
         context,
-        SKFS.DirName::create(indexName.lower + "unique/sink/"),
+        SKStore.DirName::create(indexName.lower + "unique/sink/"),
         (_, _, key, values) ~> {
           if (values.size() == 0) return void;
           repeat = 0;
@@ -134,7 +134,7 @@ fun createIndex(
 }
 
 fun createUserIndex(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   userIndexName: Name,
   pos: Int,
   fields: (Name, Array<(Name, IKind)>),

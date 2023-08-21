@@ -1,7 +1,7 @@
 /*****************************************************************************/
 /* Eager directories. */
 /*****************************************************************************/
-module SKFS;
+module SKStore;
 
 /*****************************************************************************/
 /* Constants. */
@@ -684,7 +684,7 @@ class EagerDir{
   tombLimit: ?Tick = None(),
 } extends Dir {
   fun reset(
-    context: mutable SKFS.Context,
+    context: mutable SKStore.Context,
     writerPath: Path,
     keep: SortedSet<BaseName>,
     isVisible: BaseName -> Bool = _ -> true,
@@ -718,7 +718,7 @@ class EagerDir{
   }
 
   fun notify(
-    context: readonly SKFS.Context,
+    context: readonly SKStore.Context,
     sub: Sub,
     isReset: Bool,
     changes: SortedSet<BaseName>,
@@ -762,12 +762,12 @@ class EagerDir{
   }
 
   fun writeDiffStdout(
-    context: readonly SKFS.Context,
+    context: readonly SKStore.Context,
     isReset: Bool,
     changes: SortedSet<BaseName>,
     o: String -> void,
     format: OutputFormat,
-    filter: (SKFS.Context, Bool) ~> (SKFS.BaseName -> Bool),
+    filter: (SKStore.Context, Bool) ~> (SKStore.BaseName -> Bool),
     destinationTime: ?Tick,
   ): Bool {
     writer = mutable Debug.BufferedWriter(o, 1024);
@@ -1791,7 +1791,7 @@ class EagerDir{
 
   fun purgeSlices(
     context: mutable Context,
-  ): RangeMapList<SKFS.BaseName, SKFS.DirName> {
+  ): RangeMapList<SKStore.BaseName, SKStore.DirName> {
     slices = RangeMapList[];
     childDirs = SortedSet[];
     for (slice in this.slices) {
@@ -2093,7 +2093,7 @@ class EagerDir{
 
   fun getIterator(
     context: mutable Context,
-  ): mutable Iterator<(SKFS.BaseName, mutable Iterator<SKFS.File>)> {
+  ): mutable Iterator<(SKStore.BaseName, mutable Iterator<SKStore.File>)> {
     path = Path::create(this.dirName.files(), FilesTag());
     context.addDep(path);
     this.unsafeGetFileIter()

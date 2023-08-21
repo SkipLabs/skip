@@ -1,38 +1,38 @@
-module SKFSTest;
+module SKStoreTest;
 
 fun write(
-  context: mutable SKFS.Context,
-  dirInput: SKFS.DirName,
-  key: SKFS.BaseName,
-  values: Array<SKFS.File>,
+  context: mutable SKStore.Context,
+  dirInput: SKStore.DirName,
+  key: SKStore.BaseName,
+  values: Array<SKStore.File>,
 ): void {
   context.unsafeGetEagerDir(dirInput).writeArray(context, key, values);
 }
 
 fun getData(
-  context: mutable SKFS.Context,
-  dirName: SKFS.DirName,
-  key: SKFS.BaseName,
-): Array<SKFS.File> {
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+  key: SKStore.BaseName,
+): Array<SKStore.File> {
   context.unsafeGetDir(dirName) match {
-  | SKFS.DeletedDir _ ->
+  | SKStore.DeletedDir _ ->
     invariant_violation("Trying to write to an empty directory")
-  | edir @ SKFS.EagerDir _ -> edir.getArrayRaw(key)
-  | ldir @ SKFS.LazyDir _ -> ldir.unsafeGetArray(context, key)
+  | edir @ SKStore.EagerDir _ -> edir.getArrayRaw(key)
+  | ldir @ SKStore.LazyDir _ -> ldir.unsafeGetArray(context, key)
   }
 }
 
 fun getLazyData(
-  context: mutable SKFS.Context,
-  dirName: SKFS.DirName,
-  key: SKFS.BaseName,
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+  key: SKStore.BaseName,
   isAsync: Bool = false,
-): Array<SKFS.File> {
+): Array<SKStore.File> {
   context.unsafeGetDir(dirName) match {
-  | SKFS.DeletedDir _ ->
+  | SKStore.DeletedDir _ ->
     invariant_violation("Trying to write to an empty directory")
-  | SKFS.EagerDir _ -> invariant_violation("Was expecting a Lazy dir")
-  | ldir @ SKFS.LazyDir _ -> ldir.unsafeGetArray(context, key, isAsync)
+  | SKStore.EagerDir _ -> invariant_violation("Was expecting a Lazy dir")
+  | ldir @ SKStore.LazyDir _ -> ldir.unsafeGetArray(context, key, isAsync)
   }
 }
 

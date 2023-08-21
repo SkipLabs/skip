@@ -11,8 +11,8 @@ module SkipMain;
 /*****************************************************************************/
 
 fun type_program(
-  context: mutable SKFS.Context,
-): SKFS.EHandle<SkipTyping.DefFile> {
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SkipTyping.DefFile> {
   parsed_program = FileCache.fileDir.contextWriterKeyValues(
     SkipParse.DefsFile::fromFile,
     context,
@@ -21,7 +21,7 @@ fun type_program(
       source = sources[0];
       SkipError.catchErrors(0, context, () -> {
         fileName = key match {
-        | SKFS.SID(x) -> x
+        | SKStore.SID(x) -> x
         | _ -> invariant_violation("Unexpected key type")
         };
         writer.write(key, SkipParse.parseFile(fileName, source.value))

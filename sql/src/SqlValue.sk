@@ -64,12 +64,12 @@ fun compareRows(
 class RowKey(
   row: RowValues,
   kinds: Array<(Int, IKind, Type)>,
-) extends SKFS.BaseName {
+) extends SKStore.BaseName {
   static fun create(row: RowValues, kinds: Array<(Int, IKind, Type)>): this {
     static(row, kinds)
   }
 
-  fun compare(other: SKFS.BaseName): Order {
+  fun compare(other: SKStore.BaseName): Order {
     other match {
     | RowKey(row2, _) -> SKSQL.compareRows(this.kinds, this.row, row2)
     | _ -> this.getClassName().compare(other.getClassName())
@@ -80,14 +80,14 @@ class RowKey(
     inspect(this).toString();
   }
 
-  fun toKVStringRemove(format: SKFS.OutputFormat): String {
+  fun toKVStringRemove(format: SKStore.OutputFormat): String {
     this.row.setRepeat(0).toKVString(format, this)
   }
 
   fun writeKVString(
     writer: (String) -> void,
-    format: SKFS.OutputFormat,
-    files: Array<SKFS.File>,
+    format: SKStore.OutputFormat,
+    files: Array<SKStore.File>,
   ): void {
     repeat = 0;
     for (file in files) {
@@ -108,14 +108,14 @@ fun escapeString(o: String -> void, s: String): void {
   o("'")
 }
 
-base class Row extends SKFS.File {
+base class Row extends SKStore.File {
   fun size(): Int;
   fun getInt(n: Int): ?Int;
   fun getFloat(n: Int): ?Float;
   fun getString(n: Int): ?String;
   fun getValue(n: Int): ?CValue;
   fun items(): mutable Iterator<(Int, ?CValue)>;
-  static overridable fun fromFile(f: SKFS.File): Row {
+  static overridable fun fromFile(f: SKStore.File): Row {
     f match {
     | r @ RowValues _ -> r
     | r @ RowKind _ -> r
@@ -165,9 +165,9 @@ class RowValues private (
     this.values.size()
   }
 
-  static fun printHeader(format: SKFS.OutputFormat): void {
+  static fun printHeader(format: SKStore.OutputFormat): void {
     format match {
-    | SKFS.OJS(fieldNames) ->
+    | SKStore.OJS(fieldNames) ->
       jsClearFieldNames();
       for (fieldName in fieldNames) {
         jsPushFieldName(fieldName);
@@ -176,9 +176,9 @@ class RowValues private (
     }
   }
 
-  static fun printItem(format: SKFS.OutputFormat, row: RowValues): void {
+  static fun printItem(format: SKStore.OutputFormat, row: RowValues): void {
     format match {
-    | SKFS.OJS _ ->
+    | SKStore.OJS _ ->
       jsClearObject();
       for (v in row.values) {
         v match {
@@ -199,49 +199,49 @@ class RowValues private (
     }
   }
 
-  fun toStringSingle(format: SKFS.OutputFormat): String {
+  fun toStringSingle(format: SKStore.OutputFormat): String {
     values = this.values;
     size = values.size();
-    if (!(format is SKFS.OJSON _) && size == 1) {
+    if (!(format is SKStore.OJSON _) && size == 1) {
       values[0] match {
       | None() -> return ""
       | Some(v) -> return v.toStringWithFormat(format)
       }
     };
     result = mutable Vector[];
-    if (format is SKFS.OJSON _) {
+    if (format is SKStore.OJSON _) {
       result.push("{");
     };
     for (i in Range(0, size - 1)) {
       format match {
-      | SKFS.OJSON(fieldNames) -> result.push("\"" + fieldNames[i] + "\":")
+      | SKStore.OJSON(fieldNames) -> result.push("\"" + fieldNames[i] + "\":")
       | _ -> void
       };
       values[i] match {
-      | None() -> if (format is SKFS.OJSON _) result.push("null") else void
+      | None() -> if (format is SKStore.OJSON _) result.push("null") else void
       | Some(v) -> result.push(v.toStringWithFormat(format))
       };
       result.push(if (format.usesComma()) "," else "|");
     };
     format match {
-    | SKFS.OJSON(fieldNames) -> result.push("\"" + fieldNames[size - 1] + "\":")
+    | SKStore.OJSON(fieldNames) -> result.push("\"" + fieldNames[size - 1] + "\":")
     | _ -> void
     };
     values[size - 1] match {
-    | None() -> if (format is SKFS.OJSON _) result.push("null") else void
+    | None() -> if (format is SKStore.OJSON _) result.push("null") else void
     | Some(v) -> result.push(v.toStringWithFormat(format))
     };
-    if (format is SKFS.OJSON _) {
+    if (format is SKStore.OJSON _) {
       result.push("}");
     };
     Array.concatStringSequence(result)
   }
 
-  fun toKVString(format: SKFS.OutputFormat, _key: SKFS.BaseName): String {
+  fun toKVString(format: SKStore.OutputFormat, _key: SKStore.BaseName): String {
     this.repeat.toString() + "\t" + this.toStringSingle(format) + "\n"
   }
 
-  fun toKVStringRemove(format: SKFS.OutputFormat, _key: SKFS.BaseName): String {
+  fun toKVStringRemove(format: SKStore.OutputFormat, _key: SKStore.BaseName): String {
     0.toString() + "\t" + this.toStringSingle(format) + "\n"
   }
 
@@ -274,7 +274,7 @@ class RowValues private (
     this.values.items()
   }
 
-  static fun fromFile(f: SKFS.File): RowValues {
+  static fun fromFile(f: SKStore.File): RowValues {
     f match {
     | r @ RowValues _ -> r
     | _ -> invariant_violation("Unexpected Row File")
@@ -301,7 +301,7 @@ class RowKind(order: Int, kind: QueryKind, row: Row) extends Row {
   fun items(): mutable Iterator<(Int, ?CValue)> {
     this.row.items()
   }
-  static fun fromFile(f: SKFS.File): RowKind {
+  static fun fromFile(f: SKStore.File): RowKind {
     f match {
     | r @ RowKind _ -> r
     | _ -> invariant_violation("Unexpected Row File")

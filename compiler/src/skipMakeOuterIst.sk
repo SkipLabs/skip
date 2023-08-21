@@ -56,25 +56,25 @@ const EMPTY_ENV: Env = Env{
 
 /************************************************************/
 fun program_phase(
-  context: mutable SKFS.Context,
-  typedDefs: SKFS.EHandle<SkipTyping.DefFile>,
+  context: mutable SKStore.Context,
+  typedDefs: SKStore.EHandle<SkipTyping.DefFile>,
 ): O.Program {
   outerDefs = typedDefs.contextWriterKeyValues(
     O.DefFile::fromFile,
     context,
-    SKFS.DirName::create("/outerDefs/"),
+    SKStore.DirName::create("/outerDefs/"),
     (_context, writer, _key, defFiles) ~> {
       defFile = defFiles[0];
       defFile.value match {
       | SkipTypedAst.DConst(x) ->
         cst = const_def(x);
-        writer.write(SKFS.SID(cst.name.id), O.DefFile(O.DConst(cst)))
+        writer.write(SKStore.SID(cst.name.id), O.DefFile(O.DConst(cst)))
       | SkipTypedAst.DClass(x) ->
         cd = class_def(x);
-        writer.write(SKFS.SID(cd.name.id), O.DefFile(O.DClass(cd)))
+        writer.write(SKStore.SID(cd.name.id), O.DefFile(O.DClass(cd)))
       | SkipTypedAst.DFun(x) ->
         fd = fun_def(x);
-        writer.write(SKFS.SID(fd.name.id), O.DefFile(O.DFun(fd)))
+        writer.write(SKStore.SID(fd.name.id), O.DefFile(O.DFun(fd)))
       };
     },
   );
@@ -82,8 +82,8 @@ fun program_phase(
 }
 
 fun program(
-  context: mutable SKFS.Context,
-  prog: SKFS.EHandle<SkipTyping.DefFile>,
+  context: mutable SKStore.Context,
+  prog: SKStore.EHandle<SkipTyping.DefFile>,
 ): O.Program {
   runCompilerPhase("outer/makeOuter", () -> program_phase(context, prog));
 }

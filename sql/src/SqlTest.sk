@@ -1,11 +1,11 @@
 module alias T = SKTest;
 
-module SKFSTest;
+module SKStoreTest;
 
 const tableStr: String = "CREATE TABLE t1(a INTEGER, b INTEGER);";
 
 fun evalStmt(
-  context: mutable SKFS.Context,
+  context: mutable SKStore.Context,
   params: Map<String, SKSQL.Value>,
   evaluator: SKSQL.Evaluator,
   str: String,
@@ -15,8 +15,8 @@ fun evalStmt(
   _ = evaluator.stmt(context, params, stmtAst.fromSome(), false)
 }
 
-fun testSql(): mutable SKFS.Context {
-  SKFS.run(context ~> {
+fun testSql(): mutable SKStore.Context {
+  SKStore.run(context ~> {
     context.!debugMode = false;
     params: Map<String, SKSQL.Value> = Map[];
     options = SKSQL.Options{
