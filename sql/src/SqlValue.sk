@@ -224,7 +224,8 @@ class RowValues private (
       result.push(if (format.usesComma()) "," else "|");
     };
     format match {
-    | SKStore.OJSON(fieldNames) -> result.push("\"" + fieldNames[size - 1] + "\":")
+    | SKStore.OJSON(fieldNames) ->
+      result.push("\"" + fieldNames[size - 1] + "\":")
     | _ -> void
     };
     values[size - 1] match {
@@ -241,7 +242,10 @@ class RowValues private (
     this.repeat.toString() + "\t" + this.toStringSingle(format) + "\n"
   }
 
-  fun toKVStringRemove(format: SKStore.OutputFormat, _key: SKStore.Key): String {
+  fun toKVStringRemove(
+    format: SKStore.OutputFormat,
+    _key: SKStore.Key,
+  ): String {
     0.toString() + "\t" + this.toStringSingle(format) + "\n"
   }
 

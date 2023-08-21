@@ -1621,6 +1621,7 @@ fun initJSRoots(): void {
       _ = context
         .mkdir(JSCall::fromFile, jsRootsInputDirName, Array[])
         .map(
+          RowKey::fromFile,
           SKStore.StringFile::fromFile,
           context,
           jsRootsValuesDirName,
@@ -1813,6 +1814,7 @@ fun initTrackedJSQueries(
         format = SKStore.OJSON(fieldNames);
 
         selectProj = SKStore.EHandle(RowValues::fromFile, selectDirName).map(
+          RowKey::fromKey,
           RowValues::fromFile,
           context,
           selectProjDirName,
