@@ -55,10 +55,7 @@ fun splitPath(path: String): (String, String) {
 @cpp_extern("SKIP_hash_combine")
 native fun hashCombine(Int, Int): Int;
 
-class Path(
-  dirName: DirName,
-  baseName: Key,
-) extends FileName uses Orderable {
+class Path(dirName: DirName, baseName: Key) extends FileName uses Orderable {
   static fun create(dirName: DirName, baseName: Key): this {
     static(dirName, baseName)
   }
@@ -166,6 +163,12 @@ class DirName(
 }
 
 base class Key extends FileName uses Orderable {
+  deferred macro overridable static fun fromKey(obj: Key): this {
+    obj match {
+    | x @ #ThisClass _ -> x
+    }
+  }
+
   overridable fun toKVStringRemove(_csv: OutputFormat): String {
     "" + escape(this.toString()) + "\t\n"
   }

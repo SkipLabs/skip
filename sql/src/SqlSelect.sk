@@ -508,6 +508,7 @@ class SelectEvaluator{
 
       // Case with actual data
       _ = resultDir.map(
+        RowKey::fromKey,
         Row::fromFile,
         context,
         dataName,
@@ -654,7 +655,7 @@ class SelectEvaluator{
     context: mutable SKStore.Context,
     tables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-  ): SKStore.EHandle<Row> {
+  ): SKStore.EHandle<RowKey, Row> {
     tables match {
     | List.Nil() -> invariant_violation("empty select")
     | List.Cons(table, remainingTables) ->
@@ -701,7 +702,9 @@ class SelectEvaluator{
     rangeOpt: ?Array<SKStore.KeyRange>,
     remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-  ): Array<(SKStore.EHandle<Row>, (MapFunRow, ?Array<SKStore.KeyRange>))> {
+  ): Array<
+    (SKStore.EHandle<RowKey, Row>, (MapFunRow, ?Array<SKStore.KeyRange>)),
+  > {
     queryKind = this.select.rest match {
     | None() -> None()
     | Some((QUnion(UAll()), _)) ->
@@ -762,11 +765,11 @@ class SelectEvaluator{
 
   fun evalSelectTable(
     context: mutable SKStore.Context,
-    dir: SKStore.EHandle<Row>,
+    dir: SKStore.EHandle<RowKey, Row>,
     rangeOpt: ?Array<SKStore.KeyRange>,
     remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-  ): SKStore.EHandle<Row> {
+  ): SKStore.EHandle<RowKey, Row> {
     parents = this.makeParents(dir.dirName, rangeOpt, remainingTables, entries);
     this.directMode match {
     | Some(limit) ->
@@ -1301,7 +1304,7 @@ fun makeGroupByKey(
 /*****************************************************************************/
 
 fun makeJoinReducer(
-  shardTable: SKStore.EHandle<ShardStats>,
+  shardTable: SKStore.EHandle<SKStore.Key, ShardStats>,
   joinKind: JoinKind,
   kinds: Array<(Int, IKind, Type)>,
   onlyLeftValues: Bool,
@@ -1441,7 +1444,7 @@ fun computeShardSizes(stats: ?ShardStats): (Int, Int) {
 
 fun getStats(
   context: mutable SKStore.Context,
-  shardTable: SKStore.EHandle<ShardStats>,
+  shardTable: SKStore.EHandle<SKStore.Key, ShardStats>,
   x: readonly Vector<(SKStore.Key, SKStore.File)>,
 ): ?ShardStats {
   for (kv in x) {

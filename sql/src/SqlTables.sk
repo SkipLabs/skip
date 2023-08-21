@@ -93,7 +93,7 @@ fun makeSelectName(id: String): SKStore.DirName {
   SKStore.DirName::create("/" + id + "/");
 }
 
-fun getDir(dirDescr: DirDescr): SKStore.EHandle<Row> {
+fun getDir(dirDescr: DirDescr): SKStore.EHandle<RowKey, Row> {
   SKStore.EHandle(RowValues::fromFile, dirDescr.dirName)
 }
 
@@ -101,15 +101,17 @@ fun makeDir<T: frozen>(
   fromFile: SKStore.File ~> T,
   context: mutable SKStore.Context,
   dirName: SKStore.DirName,
-  make: () -> SKStore.EHandle<T>,
-): SKStore.EHandle<T> {
+  make: () -> SKStore.EHandle<SKStore.Key, T>,
+): SKStore.EHandle<SKStore.Key, T> {
   context.maybeGetDir(dirName) match {
   | None() -> make()
   | Some(dir) -> SKStore.EHandle(fromFile, dir.getDirName())
   };
 }
 
-fun getTableDir(context: mutable SKStore.Context): SKStore.EHandle<DirDescr> {
+fun getTableDir(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.Key, DirDescr> {
   makeDir(DirDescr::fromFile, context, tableInfo, () -> {
     context.mkdir(DirDescr::fromFile, tableInfo, Array[])
   })
@@ -254,7 +256,9 @@ class ShardStats(
 /* Views. */
 /*****************************************************************************/
 
-fun getViewsDir(context: mutable SKStore.Context): SKStore.EHandle<SelectFile> {
+fun getViewsDir(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.Key, SelectFile> {
   makeDir(SelectFile::fromFile, context, views, () ->
     context.mkdir(SelectFile::fromFile, views, Array[])
   )
@@ -275,7 +279,10 @@ class SubRequestFile(
 
 fun getSubsDirs(
   context: mutable SKStore.Context,
-): (SKStore.EHandle<SubRequestFile>, SKStore.EHandle<SKStore.IntFile>) {
+): (
+  SKStore.EHandle<SKStore.Key, SubRequestFile>,
+  SKStore.EHandle<SKStore.Key, SKStore.IntFile>,
+) {
   if (context.unsafeMaybeGetEagerDir(subsInput) is Some _) {
     input = SKStore.EHandle(SubRequestFile::fromFile, subsInput);
     output = SKStore.EHandle(SKStore.IntFile::fromFile, subsOutput);
@@ -283,6 +290,7 @@ fun getSubsDirs(
   };
   input = context.mkdir(SubRequestFile::fromFile, subsInput, Array[]);
   output = input.map(
+    x ~> x,
     SKStore.IntFile::fromFile,
     context,
     subsOutput,
@@ -409,7 +417,9 @@ class IndexDescr{
   }
 }
 
-fun getIndexInputDir(context: mutable SKStore.Context): SKStore.EHandle<Index> {
+fun getIndexInputDir(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.Key, Index> {
   makeDir(Index::fromFile, context, indexInput, () ->
     context.mkdir(Index::fromFile, indexInput, Array[])
   )
@@ -417,10 +427,11 @@ fun getIndexInputDir(context: mutable SKStore.Context): SKStore.EHandle<Index> {
 
 fun getIndexOutputDir(
   context: mutable SKStore.Context,
-): SKStore.EHandle<IndexDescr> {
+): SKStore.EHandle<SKStore.Key, IndexDescr> {
   input = getIndexInputDir(context);
   makeDir(IndexDescr::fromFile, context, indexOutput, () -> {
     input.map(
+      x ~> x,
       IndexDescr::fromFile,
       context,
       indexOutput,
@@ -449,10 +460,11 @@ fun makeIndexEntry(tableName: Name, colNbr: Int): SKStore.SID {
 
 fun getIndexByColNbr(
   context: mutable SKStore.Context,
-): SKStore.EHandle<IndexDescr> {
+): SKStore.EHandle<SKStore.Key, IndexDescr> {
   indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
     indexes.map(
+      x ~> x,
       IndexDescr::fromFile,
       context,
       indexByCol,
@@ -470,10 +482,11 @@ fun getIndexByColNbr(
 
 fun getIndexByName(
   context: mutable SKStore.Context,
-): SKStore.EHandle<IndexDescr> {
+): SKStore.EHandle<SKStore.Key, IndexDescr> {
   indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
     indexes.map(
+      x ~> x,
       IndexDescr::fromFile,
       context,
       indexByCol,
@@ -597,6 +610,7 @@ fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   _ = handle.map(
+    RowKey::fromKey,
     handle.conv,
     context,
     sinkName,
@@ -622,6 +636,7 @@ fun dumpInserts(origContext: readonly SKStore.Context): void {
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   _ = handle.map(
+    RowKey::fromKey,
     handle.conv,
     context,
     sinkName,
@@ -676,6 +691,7 @@ fun dumpViews(origContext: readonly SKStore.Context): void {
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   sortedName = SKStore.DirName::create("/sorted_" + SKStore.genSym(0) + "/");
   sorted = handle.map(
+    SKStore.IID::fromKey,
     handle.conv,
     context,
     sortedName,
@@ -686,6 +702,7 @@ fun dumpViews(origContext: readonly SKStore.Context): void {
     },
   );
   _ = sorted.map(
+    SKStore.SID::fromKey,
     sorted.conv,
     context,
     sinkName,

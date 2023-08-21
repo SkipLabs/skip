@@ -130,7 +130,7 @@ class EReducer<T>{
 /* The preferred way of accessing the file-system. */
 /*****************************************************************************/
 
-base class Handle<+V: frozen> {
+base class Handle<+K: Orderable, +V: frozen> {
   macro fun getDirName(): DirName {
     this.dirName
   }
@@ -181,14 +181,17 @@ base class Handle<+V: frozen> {
  */
 /*****************************************************************************/
 
-class LHandle<+V: frozen>(conv: File ~> V, dirName: DirName) extends Handle<V> {
+class LHandle<+K: Orderable, +V: frozen>(
+  conv: File ~> V,
+  dirName: DirName,
+) extends Handle<K, V> {
   static fun create<V: File>(
     conv: File ~> V,
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, LHandle<V>, Key) ~> Array<V>,
+    f: (mutable Context, LHandle<K, V>, Key) ~> Array<V>,
     collect: Bool = true,
-  ): LHandle<V> {
+  ): LHandle<K, V> {
     dir = LazyDir::create(
       context,
       dirName,
@@ -204,9 +207,9 @@ class LHandle<+V: frozen>(conv: File ~> V, dirName: DirName) extends Handle<V> {
     conv: File ~> T,
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, LHandle<T>, Key) ~> ?Array<T>,
+    f: (mutable Context, LHandle<K, T>, Key) ~> ?Array<T>,
     collect: Bool = true,
-  ): LHandle<T> {
+  ): LHandle<K, T> {
     dir = LazyDir::create(
       context,
       dirName,
@@ -242,14 +245,17 @@ class LHandle<+V: frozen>(conv: File ~> V, dirName: DirName) extends Handle<V> {
 /* Eager handles. */
 /*****************************************************************************/
 
-class EHandle<+V: frozen>(conv: File ~> V, dirName: DirName) extends Handle<V> {
-  static fun multiMap<T, T2: File>(
-    convOutput: File ~> T2,
+class EHandle<+K: Orderable, +V: frozen>(
+  conv: File ~> V,
+  dirName: DirName,
+) extends Handle<K, V> {
+  static fun multiMap<K, V, K2: Orderable, V2: File>(
+    convOutput: File ~> V2,
     context: mutable Context,
-    parents: Array<(EHandle<T>, (Mapper<T>, ?Array<KeyRange>))>,
+    parents: Array<(EHandle<K, V>, (Mapper<V>, ?Array<KeyRange>))>,
     dirName: DirName,
-    reducerOpt: ?EReducer<T2> = None(),
-  ): EHandle<T2> {
+    reducerOpt: ?EReducer<V2> = None(),
+  ): EHandle<K2, V2> {
     dynParents = mutable Vector[];
     parentSet = mutable Set[];
     for (parent in parents) {
@@ -291,13 +297,14 @@ class EHandle<+V: frozen>(conv: File ~> V, dirName: DirName) extends Handle<V> {
     EHandle(convOutput, dirName)
   }
 
-  fun map<V2: File>(
+  fun map<K2: Key, V2: File>(
+    _convKey: Key ~> K2,
     conv: File ~> V2,
     context: mutable Context,
     dirName: DirName,
     f: Mapper<V>,
     reducerOpt: ?EReducer<V2> = None(),
-  ): EHandle<V2> {
+  ): EHandle<K2, V2> {
     static::multiMap(
       conv,
       context,
@@ -307,7 +314,7 @@ class EHandle<+V: frozen>(conv: File ~> V, dirName: DirName) extends Handle<V> {
     )
   }
 
-  fun pre(context: mutable Context): ?EHandle<V> {
+  fun pre(context: mutable Context): ?EHandle<K, V> {
     if (!context.hasPre.contains(this.dirName)) {
       context.!hasPre = context.hasPre.add(this.dirName);
     };

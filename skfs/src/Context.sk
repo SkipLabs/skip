@@ -548,7 +548,10 @@ mutable class Context{
           !preDir = preDir.writeEntry(this, source, source, key, values);
         };
         if (isReset) {
-          writerPath = SKStore.Path(preDir.dirName, SKStore.IID(SKStore.genSym(0)));
+          writerPath = SKStore.Path(
+            preDir.dirName,
+            SKStore.IID(SKStore.genSym(0)),
+          );
           !preDir = preDir.reset(this, writerPath, changes);
         };
         this.setDir(preDir.dirName, preDir)
@@ -658,10 +661,7 @@ mutable class Context{
     };
 
     dirty = mutable Map<DirName, SortedSet<Key>>[];
-    dirtyReaders = mutable Map<
-      DirName,
-      mutable Map<DirName, SortedSet<Key>>,
-    >[];
+    dirtyReaders = mutable Map<DirName, mutable Map<DirName, SortedSet<Key>>>[];
 
     loop {
       for (path in this.dirty) {
@@ -748,11 +748,11 @@ mutable class Context{
     this.time
   }
 
-  mutable fun mkdir<T: File>(
-    conv: File ~> T,
+  mutable fun mkdir<V: File>(
+    convValue: File ~> V,
     dirName: DirName,
-    content: Array<(Key, T)> = Array[],
-  ): EHandle<T> {
+    content: Array<(Key, V)> = Array[],
+  ): EHandle<SKStore.Key, V> {
     this.mkdirMulti(
       dirName,
       content.map(kv -> {
@@ -760,7 +760,7 @@ mutable class Context{
         (key, Array[value])
       }),
     );
-    EHandle(conv, dirName)
+    EHandle(convValue, dirName)
   }
 
   mutable fun mkdirMulti(
@@ -1000,7 +1000,10 @@ fun import(
             entries.iterator(),
           );
           if (isReset) {
-            writerPath = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
+            writerPath = SKStore.Path(
+              dir.dirName,
+              SKStore.IID(SKStore.genSym(0)),
+            );
             !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
           };
           targetCtx.setDir(inputDir.dirName, inputDir)
