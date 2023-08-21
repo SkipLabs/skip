@@ -15,6 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import kotlin.system.exitProcess
 
+val DB_ROOT_USER = "root"
 val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
 
 fun Credentials.toProtoCredentials(): ProtoCredentials {
@@ -52,7 +53,7 @@ fun genCredentials(accessKey: String, encryption: EncryptionTransform): Credenti
 }
 
 fun createDb(dbName: String, encryption: EncryptionTransform): Credentials {
-  val creds = genCredentials("root", encryption)
+  val creds = genCredentials(DB_ROOT_USER, encryption)
   createSkdb(dbName, creds.b64encryptedKey())
   return creds
 }
@@ -349,7 +350,9 @@ fun envIsSane(): Boolean {
 
     val successfullyRead =
         svcSkdb
-            .sql("SELECT COUNT(*) FROM skdb_users WHERE username = 'root';", OutputFormat.RAW)
+            .sql(
+                "SELECT COUNT(*) FROM skdb_users WHERE username = '${DB_ROOT_USER}';",
+                OutputFormat.RAW)
             .decodeOrThrow()
             .trim() == "1"
 

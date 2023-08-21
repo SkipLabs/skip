@@ -285,7 +285,7 @@ class Skdb(val name: String, private val dbPath: String) {
     blockingRun(ProcessBuilder(SKDB_PROC, "--init", dbPath))
     blockingRun(ProcessBuilder(SKDB_PROC, "--data", dbPath), initScript)
     sql(
-        "INSERT INTO skdb_users VALUES (0, 'root', @key)",
+        "INSERT INTO skdb_users VALUES (0, '${DB_ROOT_USER}', @key)",
         mapOf("key" to encryptedRootPrivateKey),
         OutputFormat.RAW)
     return this
