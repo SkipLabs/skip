@@ -7,7 +7,7 @@
 
 TPCHDB='./tnt-tpch/TPC-H.db'
 
-SKDB=../../target/skdb
+SKDB=../../target/release/skdb
 
 rm -f /tmp/test.db
 

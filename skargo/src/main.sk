@@ -8,89 +8,8 @@ fun getProfile(args: Cli.ParseResults): String {
   }
 }
 
-fun execInit(_args: Cli.ParseResults, _env: Env): void {
-  invariant_violation("TODO");
-  void
-}
-
-fun execUpdate(_args: Cli.ParseResults, _env: Env): void {
-  invariant_violation("TODO");
-  void
-}
-
-fun execTest(args: Cli.ParseResults, env: Env): void {
-  bc = BuildContext::create(
-    env,
-    args.maybeGetString("target"),
-    args.maybeGetString("target-dir"),
-    getProfile(args),
-  );
-  genVersionFile(bc);
-  compile(bc, "test", env.manifest.testHarness);
-  filter = args.maybeGetString("filter");
-  junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
-  jobs = args.getInt("jobs");
-
-  Posix.execvp(
-    Array[Path.join(bc.targetDir, "test")].concat(
-      Array[junitxml, filter, Some(`-j${jobs}`)].filterNone(),
-    ),
-  )
-}
-
-fun execBuild(args: Cli.ParseResults, env: Env): void {
-  bc = BuildContext::create(
-    env,
-    args.maybeGetString("target"),
-    args.maybeGetString("target-dir"),
-    getProfile(args),
-  );
-  genVersionFile(bc);
-  bins = args.maybeGetString("bin") match {
-  | Some(name) ->
-    env.manifest.bin.find(b -> b.name == name) match {
-    | Some(bin) -> Array[bin]
-    | None() -> invariant_violation(`Unknown binary ${name}`)
-    }
-  | None() -> env.manifest.bin
-  };
-  for (bin in bins) {
-    compile(bc, bin.name, bin.main)
-  }
-}
-
-fun execClean(args: Cli.ParseResults, env: Env): void {
-  bc = BuildContext::create(
-    env,
-    /* targetOpt = */ None(),
-    args.maybeGetString("target-dir"),
-    getProfile(args),
-  );
-  run(Array["rm", "-rf", bc.targetDir], env.verbose)
-}
-
-fun execFmt(_args: Cli.ParseResults, env: Env): void {
-  files = env.manifest.srcs.concat(env.manifest.tests);
-  run(Array["skfmt", "-i"].concat(files), env.verbose)
-}
-
-fun execCheck(args: Cli.ParseResults, env: Env): void {
-  bc = BuildContext::create(
-    env,
-    args.maybeGetString("target"),
-    args.maybeGetString("target-dir"),
-    getProfile(args),
-  );
-  genVersionFile(bc);
-  invokeSkc(bc, Array["--check"])
-}
-
-fun execHelp(_args: Cli.ParseResults, _env: Env): void {
-  invariant_violation("TODO: Spawn manpage.")
-}
-
 fun main(): void {
-  args = Cli.Command("skargo")
+  cmd = Cli.Command("skargo")
     .about("Skip's package manager")
     .arg(
       Cli.BoolArg("version")
@@ -104,150 +23,366 @@ fun main(): void {
         .long("verbose")
         .about("Use verbose output")
         .global(),
-    )
-    .help()
-    .subcommand(
-      Cli.Command("build")
-        .short("b")
-        .about("Compile a local package")
-        .arg(Cli.StringArg("target").about("Build for the target triple"))
-        .arg(
-          Cli.StringArg("target-dir").about(
-            "Directory for all generated artifacts",
-          ),
-        )
-        .arg(
-          Cli.StringArg("profile").about(
-            "Build artifacts with the specified profile",
-          ),
-        )
-        .arg(
-          Cli.BoolArg("release")
-            .short("r")
-            .long("release")
-            .about("Build artifacts in release mode, with optimizations"),
-        )
-        .arg(Cli.StringArg("bin").about("Build only the specified binary")),
-    )
-    .subcommand(
-      Cli.Command("check")
-        .short("c")
-        .about(
-          "Analyze the current package and report errors, but don't build object files",
-        )
-        .arg(Cli.StringArg("target").about("Check for the target triple"))
-        .arg(
-          Cli.StringArg("target-dir").about(
-            "Directory for all generated artifacts",
-          ),
-        )
-        .arg(
-          Cli.StringArg("profile").about(
-            "Build artifacts with the specified profile",
-          ),
-        )
-        .arg(
-          Cli.BoolArg("release")
-            .short("r")
-            .long("release")
-            .about("Build artifacts in release mode, with optimizations"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("test")
-        .short("t")
-        .about("Run the tests")
-        .arg(
-          Cli.StringArg("filter")
-            .positional()
-            .about(
-              "If specified, only run tests with names matching the filter",
-            ),
-        )
-        .arg(
-          Cli.IntArg("jobs")
-            .long("jobs")
-            .short("j")
-            .default(8)
-            .about("Number of parallel jobs, defaults to # of CPUs"),
-        )
-        .arg(Cli.StringArg("target").about("Check for the target triple"))
-        .arg(
-          Cli.StringArg("target-dir").about(
-            "Directory for all generated artifacts",
-          ),
-        )
-        .arg(
-          Cli.StringArg("profile").about(
-            "Build artifacts with the specified profile",
-          ),
-        )
-        .arg(
-          Cli.BoolArg("release")
-            .short("r")
-            .long("release")
-            .about("Build artifacts in release mode, with optimizations"),
-        )
-        .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report")),
-    )
-    .subcommand(
-      Cli.Command("clean")
-        .about("Remove the target directory")
-        .arg(
-          Cli.StringArg("target-dir").about(
-            "Directory for all generated artifacts",
-          ),
-        )
-        .arg(
-          Cli.StringArg("profile").about(
-            "Build artifacts with the specified profile",
-          ),
-        )
-        .arg(
-          Cli.BoolArg("release")
-            .short("r")
-            .long("release")
-            .about("Build artifacts in release mode, with optimizations"),
-        ),
-    )
-    .subcommand(Cli.Command("fmt").about("Format all files using skfmt"))
-    .subcommand(
-      Cli.Command("init")
-        .about("Create a new skargo package")
-        .arg(Cli.StringArg("path").default(".")),
-    )
-    .subcommand(
-      Cli.Command("update").about("Update dependencies listed in Skargo.lock"),
-    )
-    .subcommand(
-      Cli.Command("help").about("Displays help for a skargo subcommand"),
-    )
-    .parseArgs();
-
+    );
+  commands = mutable Map[];
+  #forEachFunction (@cmd, #function, #functionName) {
+    (subcommand, cmdFn) = #function();
+    !cmd = cmd.subcommand(subcommand);
+    commands.set(subcommand.name, cmdFn);
+  };
+  !cmd = cmd.help();
+  args = cmd.parseArgs();
   if (args.getBool("version")) {
     print_string("skargo " + SkargoVersion.kVersion);
     skipExit(0);
-  } else if (args.maybeGetSubcommand().isNone()) {
-    print_string(Cli.usage(args.cmd, true));
-    skipExit(0)
   } else {
-    subcmd_handler = args.maybeGetSubcommand().map(subcmd ->
-      subcmd match {
-      | "init" -> Skargo.execInit
-      | "update" -> Skargo.execUpdate
-      | "check" -> Skargo.execCheck
-      | "build" -> Skargo.execBuild
-      | "test" -> Skargo.execTest
-      | "clean" -> Skargo.execClean
-      | "fmt" -> Skargo.execFmt
-      | "help" -> Skargo.execHelp
+    args.maybeGetSubcommand() match {
+    | Some(subcmd) ->
+      commands.maybeGet(subcmd) match {
+      | Some(handler) ->
+        skipExit(
+          try {
+            handler(args);
+            0
+          } catch {
+          | Skargo.SystemCallException(code, _) -> code
+          | exn -> throw exn
+          },
+        )
       | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
       }
-    );
-
-    env = Env::create(args.getBool("verbose"));
-    subcmd_handler.each(f -> f(args, env))
+    | None() ->
+      print_string(Cli.usage(args.cmd, true));
+      skipExit(0)
+    }
   };
+}
 
+fun envCmd(args: Cli.ParseResults, fn: (Cli.ParseResults, Env) ~> void): void {
+  env = Env::create(args.getBool("verbose"));
+  fn(args, env)
+}
+
+/********* Build **********/
+
+@cmd
+fun build(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("build")
+      .short("b")
+      .about("Compile a local package")
+      .arg(Cli.StringArg("target").about("Build for the target triple"))
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Build artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      ),
+    args ~> envCmd(args, execBuild),
+  )
+}
+
+fun execBuild(args: Cli.ParseResults, env: Env): void {
+  bc = BuildContext::create(
+    env,
+    args.maybeGetString("target"),
+    args.maybeGetString("target-dir"),
+    getProfile(args),
+  );
+  execBuildContext(bc, env);
+}
+
+fun execBuildContext(bc: BuildContext, env: Env): void {
+  checkBuildFiles(bc, false);
+  genVersionFile(bc);
+  for (bin in env.manifest.bin) {
+    compile(bc, bin.name, bin.main)
+  };
+}
+
+/********* Test **********/
+
+@cmd
+fun test(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("test")
+      .short("t")
+      .about("Run the tests")
+      .arg(
+        Cli.StringArg("filter")
+          .positional()
+          .about("If specified, only run tests with names matching the filter"),
+      )
+      .arg(
+        Cli.IntArg("jobs")
+          .long("jobs")
+          .short("j")
+          .default(8)
+          .about("Number of parallel jobs, defaults to # of CPUs"),
+      )
+      .arg(Cli.StringArg("target").about("Check for the target triple"))
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Build artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      )
+      .arg(Cli.BoolArg("list").about("Display the list of available tests"))
+      .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report")),
+    args ~> envCmd(args, execTest),
+  )
+}
+
+fun execTest(args: Cli.ParseResults, env: Env): void {
+  bc = BuildContext::create(
+    env,
+    args.maybeGetString("target"),
+    args.maybeGetString("target-dir"),
+    getProfile(args),
+  );
+  checkBuildFiles(bc, true);
+  genVersionFile(bc);
+  compile(bc, "test", env.manifest.testHarness);
+  filter = args.maybeGetString("filter");
+  junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
+  jobs = args.getInt("jobs");
+  list = if (args.getBool("list")) Some("--list") else None();
+  testBinary = Path.join(bc.targetDir, "test");
+
+  if (FileSystem.exists(testBinary)) {
+    Posix.execvp(
+      Array[testBinary].concat(
+        Array[junitxml, filter, list, Some(`-j${jobs}`)].filterNone(),
+      ),
+    )
+  }
+}
+
+/********* Check **********/
+
+@cmd
+fun check(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("check")
+      .short("c")
+      .about(
+        "Analyze the current package and report errors, but don't build object files",
+      )
+      .arg(Cli.StringArg("target").about("Check for the target triple"))
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Build artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      ),
+    args ~> envCmd(args, execCheck),
+  )
+}
+
+fun execCheck(args: Cli.ParseResults, env: Env): void {
+  if (env.config.formatOnCheck) {
+    execFmt(args, env)
+  };
+  bc = BuildContext::create(
+    env,
+    args.maybeGetString("target"),
+    args.maybeGetString("target-dir"),
+    getProfile(args),
+  );
+  genVersionFile(bc);
+  invokeSkc(bc, Array["--check"])
+}
+
+/********* Clean **********/
+
+@cmd
+fun clean(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("clean")
+      .about("Remove the target directory")
+      .arg(Cli.StringArg("target").about("Build for the target triple"))
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Build artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      ),
+    args ~> envCmd(args, execClean),
+  )
+}
+
+fun execClean(args: Cli.ParseResults, env: Env): void {
+  bc = BuildContext::create(
+    env,
+    args.maybeGetString("target"),
+    args.maybeGetString("target-dir"),
+    getProfile(args),
+  );
+  run(Array["rm", "-rf", bc.targetDir], env.verbose)
+}
+
+/********* Format **********/
+
+@cmd
+fun format(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("fmt").about("Format all files using skfmt"),
+    args ~> envCmd(args, execFmt),
+  )
+}
+
+fun execFmt(_args: Cli.ParseResults, env: Env): void {
+  files = env.manifest.srcs
+    .concat(env.manifest.tests)
+    .concat(
+      FileSystem.readFilesRecursive(
+        env.rootDir,
+        f -> f.endsWith(".sk"),
+        _f -> false,
+      ).toArray(),
+    );
+  run(Array["skfmt", "-i"].concat(files), env.verbose);
+  // format ./*.sk
+}
+
+/********* Init **********/
+
+@cmd
+fun init(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("init")
+      .about("Create a new skargo package")
+      .arg(
+        Cli.StringArg("path")
+          .default(".")
+          .about("Directory where to perform the initialization"),
+      )
+      .arg(
+        Cli.StringArg("test-harness")
+          .short("t")
+          .long("test-harness")
+          .about("Specify the test harness"),
+      ),
+    execInit,
+  )
+}
+
+fun execInit(args: Cli.ParseResults): void {
+  path = args
+    .maybeGetString("path")
+    .map(p -> Path.resolve(p))
+    .default(getcwd());
+  _ = system("mkdir -p " + path);
+  rootDir = path;
+  optManifestFile = loop {
+    if (FileSystem.exists(Path.join(path, Skargo.kManifestFile))) {
+      break Some(path)
+    };
+    if (Path.isRoot(path)) {
+      break None()
+    };
+    !path = Path.parentname(path)
+  };
+  optManifestFile match {
+  | Some(manifestFile) ->
+    print_string(`\`${Path.parentname(manifestFile)}\` already initialized.`)
+  | _ ->
+    manifestFile = Path.join(rootDir, Skargo.kManifestFile);
+    name = Path.basename(rootDir);
+    FileSystem.writeTextFile(
+      manifestFile,
+      toml(name, args.maybeGetString("test-harness")),
+    );
+    srcDir = Path.join(rootDir, "src");
+    _ = system("mkdir -p " + srcDir)
+  }
+}
+
+/********* Udapte **********/
+
+@cmd
+fun update(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("update").about("Update dependencies listed in Skargo.lock"),
+    args ~> envCmd(args, execUpdate),
+  )
+}
+
+fun execUpdate(_args: Cli.ParseResults, _env: Env): void {
+  invariant_violation("TODO");
   void
+}
+
+/********* Help **********/
+
+@pckcmd
+@cmd
+fun help(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("help")
+      .arg(
+        Cli.StringArg("command")
+          .positional()
+          .about(
+            "If specified, the subcommand for which help is to be displayed",
+          ),
+      )
+      .about("Displays help for a skargo subcommand"),
+    execHelp,
+  )
+}
+
+fun execHelp(args: Cli.ParseResults): void {
+  optSubcmd = args.maybeGetString("command");
+  optSubcmd.flatMap(subcmd ->
+    args.cmd._subcommands.filter(cmd -> cmd.name == subcmd).maybeGet(0)
+  ) match {
+  | Some(cmd) -> print_string(Cli.usage(cmd, true, Some(args.cmd)))
+  | _ ->
+    optSubcmd match {
+    | Some(subcmd) -> print_error(`error: Invalid subcommand ${subcmd}.`)
+    | _ -> print_error("error: No subcommand specified.")
+    };
+    print_string(Cli.usage(args.cmd, true))
+  };
 }

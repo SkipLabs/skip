@@ -9,8 +9,8 @@ tailfile=$(mktemp)
 out1=$(mktemp)
 out2=$(mktemp)
 
-./target/skdb --init $db
-skdb="./target/skdb --data $db"
+./target/release/skdb --init $db
+skdb="./target/release/skdb --data $db"
 
 echo "create table t1 (a INTEGER);" | $skdb
 

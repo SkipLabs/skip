@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SKDB_BIN=./target/skdb
+SKDB_BIN=./target/release/skdb
 
 SERVER_DB=/tmp/server.db
 SERVER_TAIL=/tmp/server_tail

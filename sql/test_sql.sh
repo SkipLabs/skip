@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SKDB=./target/skdb
+SKDB=./target/release/skdb
 export SKDB
 
 run_one_test () {

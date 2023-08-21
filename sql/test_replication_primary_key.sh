@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SKDB_BIN=./target/skdb
+SKDB_BIN=./target/release/skdb
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 SERVER_DB=/tmp/server.db

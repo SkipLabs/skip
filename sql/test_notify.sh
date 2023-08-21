@@ -3,7 +3,7 @@
 pass() { printf "%-32s OK\n" "TEST $1:"; }
 fail() { printf "%-32s FAILED\n" "TEST $1:"; }
 
-SKDB=./target/skdb
+SKDB=./target/release/skdb
 
 rm -f /tmp/test.db
 

@@ -29,7 +29,7 @@ then
     exit 1
 fi
 
-SKDB_BIN=/skfs/build/skdb
+SKDB_BIN=/skfs/build/dev/skdb
 SKDB="$SKDB_BIN --data $DB_FILE"
 
 $SKDB_BIN --init "$DB_FILE"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SKDB=../build/skdb
+SKDB=../build/dev/skdb
 DB=/tmp/test.db
 
 rm -f /tmp/foo $DB

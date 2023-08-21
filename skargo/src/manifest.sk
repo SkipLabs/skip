@@ -1,6 +1,6 @@
 module Skargo;
 
-class Version(major: Int, minor: Int, patch: Int) uses Equality {
+class Version(major: Int, minor: Int, patch: Int) uses Orderable {
   static fun fromString(str: String): Version {
     components = str.split(".");
     if (components.size() != 3) {
@@ -16,7 +16,7 @@ class Version(major: Int, minor: Int, patch: Int) uses Equality {
 
 base class VersionConstraint {
   children =
-  | RangeConstraint(low: Version, high: Version)
+  | RangeConstraint(low: Version, high: ?Version)
   | PathConstraint(path: String, version: ?Version)
 
   static fun fromTOML(basePath: String, toml: TOML.Value): VersionConstraint {
@@ -36,12 +36,66 @@ base class VersionConstraint {
   }
 
   static fun fromString(str: String): VersionConstraint {
-    // TODO: Operators like (~, >, etc.).
-    if (Chars.isDigit(str.chars()[0])) {
-      version = Version::fromString(str);
-      return RangeConstraint(version, version with {patch => version.patch + 1})
+    lexer = VersionLexer::create(str);
+    lexer.lex();
+  }
+}
+
+class TargetTriplet(
+  machine: String,
+  vendor: ?String,
+  operatingsystem: ?String,
+) uses Orderable, Show {
+  //
+  static fun fromString(str: String): TargetTriplet {
+    components = str.split("-");
+    if (components.isEmpty() || components.size() > 3) {
+      invariant_violation("Invalid target triplet string " + str)
     };
-    invariant_violation("Unsupported version constraint (TODO): " + str)
+    TargetTriplet(
+      components[0],
+      components.maybeGet(1) match {
+      | Some(v) if (v != "unknown") -> Some(v)
+      | _ -> None()
+      },
+      components.maybeGet(2) match {
+      | Some(v) if (v != "unknown") -> Some(v)
+      | _ -> None()
+      },
+    )
+  }
+
+  fun isWasm32(): Bool {
+    this.machine == "wasm32"
+  }
+
+  fun allows(target: TargetTriplet): Bool {
+    this.machine == target.machine &&
+      this.vendor.default("unknown") == target.vendor.default("unknown") &&
+      this.operatingsystem.default("unknown") ==
+        target.operatingsystem.default("unknown")
+  }
+
+  fun checkFile(directory: String, name: String, ext: String): ?String {
+    suffixes = Array[
+      `${this.machine}-${this.vendor.default(
+        "unknown",
+      )}-${this.operatingsystem.default("unknown")}`,
+      `${this.machine}-${this.vendor.default("unknown")}`,
+      this.machine,
+    ];
+    for (suffix in suffixes) {
+      path = Path.join(directory, `${name}_${suffix}${ext}`);
+      if (FileSystem.exists(path)) break Some(path)
+    } else {
+      None()
+    }
+  }
+
+  fun toString(): String {
+    `${this.machine}-${this.vendor.default(
+      "unknown",
+    )}-${this.operatingsystem.default("unknown")}`
   }
 }
 
@@ -62,6 +116,7 @@ class Manifest{
   tests: Array<String>,
   testHarness: String,
   dependencies: Map<String, VersionConstraint>,
+  buildDependencies: Map<String, VersionConstraint>,
   bin: Array<ManifestBinary>,
 } {
   static fun read(path: String): Manifest {
@@ -98,6 +153,12 @@ class Manifest{
       VersionConstraint::fromTOML(basePath, v)
     );
 
+    buildDependencies = toml.maybeGetTable("build-dependencies") match {
+    | Some(bDependencies) ->
+      bDependencies.map.map((_, v) -> VersionConstraint::fromTOML(basePath, v))
+    | _ -> Map[]
+    };
+
     bin = toml.maybeGetArray("bin") match {
     | Some(arr) -> arr.map(t -> ManifestBinary::fromTOML(t.expectTable()))
     | None() -> Array[]
@@ -111,6 +172,7 @@ class Manifest{
       tests,
       testHarness,
       dependencies,
+      buildDependencies,
       bin,
     }
   }
