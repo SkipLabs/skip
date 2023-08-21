@@ -112,6 +112,12 @@ class RequestHandler(
   override fun handleMessage(request: ProtoMessage, stream: OrchestrationStream): StreamHandler {
     when (request) {
       is ProtoQuery -> {
+        // only db root may run queries on the server - queries are
+        // always run as root. privacy is applied at replication time
+        if (accessKey != DB_ROOT_USER) {
+          stream.error(2002u, "Authorization error")
+          return this
+        }
         val format =
             when (request.format) {
               QueryResponseFormat.CSV -> OutputFormat.CSV
@@ -153,6 +159,11 @@ class RequestHandler(
         stream.close()
       }
       is ProtoCreateUser -> {
+        // only db root may create users
+        if (accessKey != DB_ROOT_USER) {
+          stream.error(2002u, "Authorization error")
+          return this
+        }
         val creds = genCredentials(genAccessKey(), encryption)
         skdb.createUser(creds.accessKey, creds.b64encryptedKey())
         val payload = creds.toProtoCredentials()
