@@ -71,7 +71,7 @@ mutable class EmptyIterator<T>() extends FileIterator<T> {
   }
 }
 
-mutable class NonEmptyIterator<T>(
+mutable class NonEmptyIterator<+T>(
   mutable firstValue: T,
   iter: mutable Iterator<T>,
   mutable isPassedFirstValue: Bool = false,
@@ -89,6 +89,9 @@ mutable class NonEmptyIterator<T>(
   }
   readonly fun maybeFirst(): ?T {
     Some(this.firstValue)
+  }
+  mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
+    mutable NonEmptyIterator(f(this.firstValue), this.iter.map(f))
   }
 }
 
@@ -255,7 +258,12 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
         DirName,
         (
           File ~> T,
-          (mutable Context, mutable Writer, Key, mutable Iterator<T>) ~> void,
+          (
+            mutable Context,
+            mutable Writer,
+            Key,
+            mutable NonEmptyIterator<T>,
+          ) ~> void,
           ?Array<KeyRange>,
         ),
       ),
@@ -269,9 +277,11 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
       (parentName, parentData) = parent;
       (convInput, mapFun, rangeOpt) = parentData;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
-        iter = FileIterator::create(fileIter);
-        if (iter.isEmpty()) return void;
-        mapFun(context, writer, key, iter.map(convInput));
+        FileIterator::create(fileIter) match {
+        | EmptyIterator _ -> return void
+        | iter @ NonEmptyIterator _ ->
+          mapFun(context, writer, key, iter.nonEmptyMap(convInput))
+        }
       };
       parentSet.add(parentName);
       dynParents.push((parentName, (dynamicMapFun, rangeOpt)))
@@ -304,7 +314,12 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     conv: File ~> T2,
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, mutable Writer, Key, mutable Iterator<T>) ~> void,
+    f: (
+      mutable Context,
+      mutable Writer,
+      Key,
+      mutable NonEmptyIterator<T>,
+    ) ~> void,
     reducerOpt: ?EReducer<T2> = None(),
   ): EHandle<T2> {
     static::multiContextWriterKeyIter(
