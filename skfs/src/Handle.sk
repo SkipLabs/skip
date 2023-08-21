@@ -243,7 +243,7 @@ class LHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
 /*****************************************************************************/
 
 class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
-  static fun multiContextWriterKeyIter<T, T2: File>(
+  static fun multiMap<T, T2: File>(
     convOutput: File ~> T2,
     context: mutable Context,
     parents: Array<(EHandle<T>, (Mapper<T>, ?Array<KeyRange>))>,
@@ -291,14 +291,14 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     EHandle(convOutput, dirName)
   }
 
-  fun contextWriterKeyIter<T2: File>(
+  fun map<T2: File>(
     conv: File ~> T2,
     context: mutable Context,
     dirName: DirName,
     f: Mapper<T>,
     reducerOpt: ?EReducer<T2> = None(),
   ): EHandle<T2> {
-    static::multiContextWriterKeyIter(
+    static::multiMap(
       conv,
       context,
       Array[(SKStore.EHandle(this.conv, this.dirName), (f, None()))],
