@@ -136,17 +136,17 @@ fun parseCsv<T>(
 fun insert(
   context: mutable SKStore.Context,
   line: mutable Ref<Int>,
-  options: SKSQL.Options,
-  table: SKSQL.DirDescr,
-  user: ?SKSQL.UserFile,
+  options: SKDB.Options,
+  table: SKDB.DirDescr,
+  user: ?SKDB.UserFile,
 ): SKStore.ContextOp {
   // empty params since no placeholders in input to skdb load-csv
-  params: Map<String, SKSQL.Value> = Map[];
-  eval = SKSQL.Evaluator{options, user};
+  params: Map<String, SKDB.Value> = Map[];
+  eval = SKDB.Evaluator{options, user};
   pos = 0;
   inTransaction = false;
   paramsOpt = None();
-  (eof, array) = parseCsv(line, SKSQL.parseCSVValue);
+  (eof, array) = parseCsv(line, SKDB.parseCSVValue);
   f = eval.insert(
     context,
     params,
@@ -166,7 +166,7 @@ fun reasonSchemaUnsupported(
   tableName: String,
 ): ?String {
   context = SKStore.Context::fromSaved(origContext.clone());
-  SKSQL.getTableDir(context).maybeGet(context, SKStore.SID(tableName)) match {
+  SKDB.getTableDir(context).maybeGet(context, SKStore.SID(tableName)) match {
   | None() -> Some("Table does not exist.")
   | Some(dirDescr) ->
     if (dirDescr.schema.any(x ~> x.unique)) {
@@ -177,56 +177,56 @@ fun reasonSchemaUnsupported(
 }
 
 fun lwwEdits(
-  table: SKSQL.DirDescr,
+  table: SKDB.DirDescr,
   snapshot: Int,
   writer: SKStore.Path,
   primaryIdxOpt: ?Int,
   context: mutable SKStore.Context,
   dir: SKStore.EagerDir,
-  row: SKSQL.RowValues,
-): mutable Iterator<(SKStore.BaseName, (SKStore.Path, SKStore.Path, Array<SKStore.File>))> {
+  row: SKDB.RowValues,
+): mutable Iterator<
+  (SKStore.BaseName, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
+> {
   primaryIdx = primaryIdxOpt match {
   | None() -> invariant_violation("Using LWW without a primary key.")
   | Some(p) -> p
   };
-  selectAst = SKSQL.Select{
-    id => SKSQL.Name::create("SELECT_" + SKStore.genSym(0)),
+  selectAst = SKDB.Select{
+    id => SKDB.Name::create("SELECT_" + SKStore.genSym(0)),
     pos => 0,
-    params => SKSQL.SelectParams(true, Array[]),
-    from => Some(
-      Array[SKSQL.TableName(SKSQL.FName(table.name), None(), false)],
-    ),
+    params => SKDB.SelectParams(true, Array[]),
+    from => Some(Array[SKDB.TableName(SKDB.FName(table.name), None(), false)]),
     where => Some(
-      SKSQL.Binop(
+      SKDB.Binop(
         "=",
-        SKSQL.Literal(table.colNames[primaryIdx].origName),
+        SKDB.Literal(table.colNames[primaryIdx].origName),
         table.schema[primaryIdx].ty match {
-        | SKSQL.INTEGER() -> SKSQL.VInt(row.getInt(primaryIdx).fromSome())
-        | SKSQL.FLOAT() -> SKSQL.VFloat(row.getFloat(primaryIdx).fromSome())
-        | SKSQL.TEXT() -> SKSQL.VString(row.getString(primaryIdx).fromSome())
+        | SKDB.INTEGER() -> SKDB.VInt(row.getInt(primaryIdx).fromSome())
+        | SKDB.FLOAT() -> SKDB.VFloat(row.getFloat(primaryIdx).fromSome())
+        | SKDB.TEXT() -> SKDB.VString(row.getString(primaryIdx).fromSome())
         },
       ),
     ),
     groupBy => None(),
     having => None(),
     join => None(),
-    kind => SKSQL.SAll(),
+    kind => SKDB.SAll(),
     limit => None(),
     orderBy => None(),
     rest => None(),
   };
-  options = SKSQL.Options{
+  options = SKDB.Options{
     alwaysAllowJoins => false,
     backtrace => false,
     sync => false,
     showUsedIndexes => false,
   };
   // empty params since no placeholders in skdb diff write-csv
-  params: Map<String, SKSQL.Value> = Map[];
-  compiler = SKSQL.Compiler::create(false, options, selectAst.pos, params);
+  params: Map<String, SKDB.Value> = Map[];
+  compiler = SKDB.Compiler::create(false, options, selectAst.pos, params);
   selectContext = context.mclone(); // ensure we don't accumulate the select dirs
   select = compiler.compileSelect(selectContext, selectAst, true);
-  selectHandle = SKSQL.evalSelect(selectContext, select, None());
+  selectHandle = SKDB.evalSelect(selectContext, select, None());
   selectDir = selectContext.unsafeGetEagerDir(selectHandle.dirName);
 
   entries = mutable Vector[];
@@ -237,7 +237,7 @@ fun lwwEdits(
       if (
         tick.value < snapshot ||
         source.path() == writer ||
-        SKSQL.RowKey::fromFile(key).row < row
+        SKDB.RowKey::fromFile(key).row < row
       ) {
         entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
       } else {
@@ -249,25 +249,29 @@ fun lwwEdits(
   if (!keepingCurrent) {
     for (entry in entries) yield entry;
     yield (
-      SKSQL.RowKey(row, table.kinds),
+      SKDB.RowKey(row, table.kinds),
       (writer, writer, Array<SKStore.File>[row]),
     );
   }
 }
 
 fun applyDiffStrategy(
-  table: SKSQL.DirDescr,
+  table: SKDB.DirDescr,
   identity: Int,
-  userFileOpt: ?SKSQL.UserFile,
+  userFileOpt: ?SKDB.UserFile,
   reset: Bool,
-  rows: Array<SKSQL.RowValues>,
+  rows: Array<SKDB.RowValues>,
   checkpoint: ?Int,
   snapshot: ?Int,
-): ?((mutable SKStore.Context, mutable SKStore.Context, SKStore.Context) ~> void) {
+): ?((
+  mutable SKStore.Context,
+  mutable SKStore.Context,
+  SKStore.Context,
+) ~> void) {
   writer = SKStore.Path(table.dirName, SKStore.IID(identity));
 
   shouldShortCircuitUpdate = (context) ~> {
-    previouslySeen = SKSQL.getWatermark(
+    previouslySeen = SKDB.getWatermark(
       context,
       table.name.lower,
       Some(identity),
@@ -281,8 +285,8 @@ fun applyDiffStrategy(
   checkpointAndAck = (context, delta) ~> {
     if (checkpoint is Some _) {
       checkpointTick = SKStore.Tick(checkpoint.fromSome());
-      SKSQL.setWatermark(context, table.name.lower, identity, checkpointTick);
-      delta.setGlobal("Ack", SKSQL.StdoutCheckpointAck(checkpointTick));
+      SKDB.setWatermark(context, table.name.lower, identity, checkpointTick);
+      delta.setGlobal("Ack", SKDB.StdoutCheckpointAck(checkpointTick));
     };
   };
 
@@ -300,10 +304,10 @@ fun applyDiffStrategy(
     | Some(userFile) ->
       (file: SKStore.BaseName) -> {
         file match {
-        | k @ SKSQL.RowKey _ ->
-          SKSQL.checkUserCanReadRow(context, userFile, table, k.row) match {
-          | SKSQL.AROK() -> true
-          | SKSQL.ARError(_err) -> false
+        | k @ SKDB.RowKey _ ->
+          SKDB.checkUserCanReadRow(context, userFile, table, k.row) match {
+          | SKDB.AROK() -> true
+          | SKDB.ARError(_err) -> false
           }
         | _ -> false
         }
@@ -325,7 +329,7 @@ fun applyDiffStrategy(
     entries = mutable Vector[];
 
     for (row in rows) {
-      key: SKStore.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+      key: SKStore.BaseName = SKDB.RowKey(row.setRepeat(1), table.kinds);
       for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
         if (tick.value < snapshot.default(0) || source.path() == writer) {
           entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
@@ -342,7 +346,7 @@ fun applyDiffStrategy(
         .iterator()
         .filter(row -> row.repeat != 0)
         .map(row -> {
-          (k, v) = (SKSQL.RowKey(row, table.kinds), Array[row]);
+          (k, v) = (SKDB.RowKey(row, table.kinds), Array[row]);
           ((k : SKStore.BaseName), (writer, writer, (v : Array<SKStore.File>)))
         }),
     );
@@ -367,7 +371,7 @@ fun applyDiffStrategy(
       tick.value < snapshot.default(0) || source.path() == writer;
 
     for (row in rows) {
-      key: SKStore.BaseName = SKSQL.RowKey(row, table.kinds);
+      key: SKStore.BaseName = SKDB.RowKey(row, table.kinds);
       keyRepeat = row.repeat;
       for ((tick, source, files) in dir.getDataIterWithoutTombs(newRoot, key)) {
         if (!isEligibleForTomb(tick, source)) {
@@ -375,7 +379,7 @@ fun applyDiffStrategy(
         };
         srcRepeat = 0;
         for (file in files) {
-          !srcRepeat = srcRepeat + SKSQL.RowValues::fromFile(file).repeat
+          !srcRepeat = srcRepeat + SKDB.RowValues::fromFile(file).repeat
         };
 
         if (keyRepeat - srcRepeat < 0) {
@@ -400,7 +404,7 @@ fun applyDiffStrategy(
       rows
         .iterator()
         .filter(row -> row.repeat != 0)
-        .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
+        .map(x -> SKDB.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
       isVisibleToUser(newRoot),
       isEligibleForTomb,
@@ -424,13 +428,8 @@ fun applyDiffStrategy(
 
     for (row in rows) {
       if (row.repeat < 1) {
-<<<<<<< HEAD
-        key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
+        key: SKStore.BaseName = SKDB.RowKey(row.setRepeat(1), table.kinds);
         for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
-=======
-        key: SKStore.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
->>>>>>> 9ba48418 (s/SKFS/SKStore/g)
           if (tick.value < snapshot.default(0) || source.path() == writer) {
             entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
           }
@@ -492,7 +491,7 @@ fun applyDiffStrategy(
       rows
         .iterator()
         .filter(row -> row.repeat != 0)
-        .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
+        .map(x -> SKDB.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
       isVisibleToUser(newRoot),
       (tick, source) ~>
@@ -519,12 +518,12 @@ fun replayDiff(
   context: mutable SKStore.Context,
   lineNbr: mutable Ref<Int>,
   getLine: () -> String,
-  table: SKSQL.DirDescr,
+  table: SKDB.DirDescr,
   user: ?String,
   identity: Int,
 ): SKStore.ContextOp {
-  userFileOpt = user.map(x -> SKSQL.UserFile::create(context, x));
-  buffer: mutable Vector<SKSQL.RowValues> = mutable Vector[];
+  userFileOpt = user.map(x -> SKDB.UserFile::create(context, x));
+  buffer: mutable Vector<SKDB.RowValues> = mutable Vector[];
 
   // the tick of the sender that this update takes us in sync to
   checkpoint: ?Int = None();
@@ -589,11 +588,11 @@ fun replayDiff(
         for (value in lex(next)) {
           values.push(value);
         };
-        cvalues = values.map(SKSQL.parseCSVValue);
+        cvalues = values.map(SKDB.parseCSVValue);
         // empty params since no placeholders in skdb diff write-csv
-        params: Map<String, SKSQL.Value> = Map[];
+        params: Map<String, SKDB.Value> = Map[];
         pos = lineNbr.get();
-        newRows = SKSQL.computeInsert(
+        newRows = SKDB.computeInsert(
           context,
           params,
           false,
@@ -608,15 +607,15 @@ fun replayDiff(
         | Some(userFile) ->
           hasError = false;
           for (row in newRows) {
-            SKSQL.checkUserCanWriteRow(context, userFile, table, row) match {
-            | SKSQL.AROK() -> void
-            | SKSQL.ARError(err) ->
+            SKDB.checkUserCanWriteRow(context, userFile, table, row) match {
+            | SKDB.AROK() -> void
+            | SKDB.ARError(err) ->
               print_error("Error: " + err.toString());
               !hasError = true
             }
           };
           if (hasError) {
-            throw SKSQL.IgnoreAndContinue()
+            throw SKDB.IgnoreAndContinue()
           }
         };
         buffer.extend(newRows);
@@ -654,7 +653,7 @@ fun replayDiff(
         snapshot,
       ),
     )
-  | SKSQL.IgnoreAndContinue _ ->
+  | SKDB.IgnoreAndContinue _ ->
     flushStdout();
     SKStore.CContinue(None())
   | exn ->

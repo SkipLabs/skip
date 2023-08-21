@@ -2,7 +2,7 @@
 /* SQL tables.*/
 /*****************************************************************************/
 
-module SKSQL;
+module SKDB;
 
 const tableInfo: SKStore.DirName = SKStore.DirName::create("/tablesInfo/");
 const views: SKStore.DirName = SKStore.DirName::create("/views/");
@@ -294,7 +294,7 @@ fun getSubsDirs(
         SKStore.SID(request.viewName),
       ) match {
       | None() ->
-        views = SKSQL.getViewsDir(context);
+        views = SKDB.getViewsDir(context);
         viewsDir = context.unsafeGetEagerDir(views.dirName);
         selectFiles = viewsDir.getArrayRaw(SKStore.SID(viewName.toString()));
         invariant(selectFiles.size() <= 1);
@@ -302,13 +302,13 @@ fun getSubsDirs(
           print_error(`Error: view ${viewName.toString()} doesn't exists`);
           skipExit(3)
         };
-        selectFile = SKSQL.SelectFile::fromFile(selectFiles[0]);
+        selectFile = SKDB.SelectFile::fromFile(selectFiles[0]);
         if (!selectFile.virtual) {
           print_error("Error: can only connect to virtual views");
           skipExit(23);
         };
         cselect = selectFile.cselect;
-        selectDir = SKSQL.evalSelect(context, cselect, None());
+        selectDir = SKDB.evalSelect(context, cselect, None());
         edir = context.unsafeGetEagerDir(selectDir.dirName);
         dirDescr = Compiler::getDirDescr(
           selectFile.sparams,
@@ -486,7 +486,7 @@ fun getTable(context: mutable SKStore.Context, pos: Int, name: Name): DirDescr {
       selectFile = SelectFile::fromFile(view);
       dirName = SKStore.DirName::create("/" + selectFile.cselect.id + "/");
       cselect = selectFile.cselect;
-      dirDescr = SKSQL.Compiler::getDirDescr(
+      dirDescr = SKDB.Compiler::getDirDescr(
         selectFile.sparams,
         cselect.from,
         cselect.params,
