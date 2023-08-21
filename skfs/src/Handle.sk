@@ -47,8 +47,6 @@ mutable base class FileIterator<+T> extends Iterator<T> {
   }
 
   readonly fun isEmpty(): Bool;
-  readonly fun first(): T;
-  readonly fun maybeFirst(): ?T;
 }
 
 mutable class EmptyIterator<T>() extends FileIterator<T> {
@@ -59,39 +57,23 @@ mutable class EmptyIterator<T>() extends FileIterator<T> {
   readonly fun isEmpty(): Bool {
     true
   }
-
-  readonly fun first(): T {
-    invariant_violation(
-      "Trying to access the first element of an empty iterator",
-    )
-  }
-
-  readonly fun maybeFirst(): ?T {
-    None()
-  }
 }
 
 mutable class NonEmptyIterator<+T>(
-  mutable firstValue: T,
+  mutable first: T,
   iter: mutable Iterator<T>,
   mutable isPassedFirstValue: Bool = false,
 ) extends FileIterator<T> {
   mutable fun next(): ?T {
     if (this.isPassedFirstValue) return this.iter.next();
     this.!isPassedFirstValue = true;
-    Some(this.firstValue)
+    Some(this.first)
   }
   readonly fun isEmpty(): Bool {
     false
   }
-  readonly fun first(): T {
-    this.firstValue
-  }
-  readonly fun maybeFirst(): ?T {
-    Some(this.firstValue)
-  }
   mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
-    mutable NonEmptyIterator(f(this.firstValue), this.iter.map(f))
+    mutable NonEmptyIterator(f(this.first), this.iter.map(f))
   }
 }
 
@@ -327,23 +309,6 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
       context,
       Array[(this.dirName, (this.conv, f, None()))],
       dirName,
-      reducerOpt,
-    )
-  }
-
-  fun contextWriterKeyValues<T2: File>(
-    conv: File ~> T2,
-    context: mutable Context,
-    dirName: DirName,
-    f: (mutable Context, mutable Writer, Key, Array<T>) ~> void,
-    reducerOpt: ?(EReducer<T2>) = None(),
-  ): EHandle<T2> {
-    this.contextWriterKeyIter(
-      conv,
-      context,
-      dirName,
-      (context, writer, key, iter) ~>
-        f(context, writer, key, iter.collect(Array)),
       reducerOpt,
     )
   }
