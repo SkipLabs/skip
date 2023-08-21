@@ -123,7 +123,7 @@ fun checkCycles(
   context: mutable SKStore.Context,
   defs: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
 ): void {
-  _ = defs.contextWriterKeyIter(
+  _ = defs.map(
     SKStore.StringFile::fromFile,
     context,
     SKStore.DirName::create("/checkCycle/"),
@@ -242,7 +242,7 @@ fun populateCache(
       })
     },
   );
-  _ = moduleDirName1.contextWriterKeyIter(
+  _ = moduleDirName1.map(
     SKStore.ArrayStringFile::fromFile,
     context,
     moduleDirName,
@@ -994,7 +994,7 @@ fun program(
   context: mutable SKStore.Context,
   files: SKStore.EHandle<SkipParse.DefsFile>,
 ): (SKStore.EHandle<GlobalEnv.ExpandedDefFile>, SKStore.EHandle<SKStore.StringFile>) {
-  moduleDefsPhase1Dir = files.contextWriterKeyIter(
+  moduleDefsPhase1Dir = files.map(
     DefsFile::fromFile,
     context,
     SKStore.DirName::create("/moduleMap1/"),
@@ -1009,7 +1009,7 @@ fun program(
       }
     },
   );
-  moduleDefsDir = moduleDefsPhase1Dir.contextWriterKeyIter(
+  moduleDefsDir = moduleDefsPhase1Dir.map(
     DefsFile::fromFile,
     context,
     SKStore.DirName::create("/moduleMap2/"),

@@ -282,7 +282,7 @@ fun getSubsDirs(
     return (input, output)
   };
   input = context.mkdir(SubRequestFile::fromFile, subsInput, Array[]);
-  output = input.contextWriterKeyIter(
+  output = input.map(
     SKStore.IntFile::fromFile,
     context,
     subsOutput,
@@ -420,7 +420,7 @@ fun getIndexOutputDir(
 ): SKStore.EHandle<IndexDescr> {
   input = getIndexInputDir(context);
   makeDir(IndexDescr::fromFile, context, indexOutput, () -> {
-    input.contextWriterKeyIter(
+    input.map(
       IndexDescr::fromFile,
       context,
       indexOutput,
@@ -452,7 +452,7 @@ fun getIndexByColNbr(
 ): SKStore.EHandle<IndexDescr> {
   indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
-    indexes.contextWriterKeyIter(
+    indexes.map(
       IndexDescr::fromFile,
       context,
       indexByCol,
@@ -473,7 +473,7 @@ fun getIndexByName(
 ): SKStore.EHandle<IndexDescr> {
   indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
-    indexes.contextWriterKeyIter(
+    indexes.map(
       IndexDescr::fromFile,
       context,
       indexByCol,
@@ -596,7 +596,7 @@ fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
   context = SKStore.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
-  _ = handle.contextWriterKeyIter(
+  _ = handle.map(
     handle.conv,
     context,
     sinkName,
@@ -621,7 +621,7 @@ fun dumpInserts(origContext: readonly SKStore.Context): void {
   context = SKStore.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
-  _ = handle.contextWriterKeyIter(
+  _ = handle.map(
     handle.conv,
     context,
     sinkName,
@@ -675,7 +675,7 @@ fun dumpViews(origContext: readonly SKStore.Context): void {
   handle = getViewsDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   sortedName = SKStore.DirName::create("/sorted_" + SKStore.genSym(0) + "/");
-  sorted = handle.contextWriterKeyIter(
+  sorted = handle.map(
     handle.conv,
     context,
     sortedName,
@@ -685,7 +685,7 @@ fun dumpViews(origContext: readonly SKStore.Context): void {
       }
     },
   );
-  _ = sorted.contextWriterKeyIter(
+  _ = sorted.map(
     sorted.conv,
     context,
     sinkName,

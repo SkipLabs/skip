@@ -1620,7 +1620,7 @@ fun initJSRoots(): void {
       kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
       _ = context
         .mkdir(JSCall::fromFile, jsRootsInputDirName, Array[])
-        .contextWriterKeyIter(
+        .map(
           SKStore.StringFile::fromFile,
           context,
           jsRootsValuesDirName,
@@ -1815,7 +1815,7 @@ fun initTrackedJSQueries(
         selectProj = SKStore.EHandle(
           RowValues::fromFile,
           selectDirName,
-        ).contextWriterKeyIter(
+        ).map(
           RowValues::fromFile,
           context,
           selectProjDirName,

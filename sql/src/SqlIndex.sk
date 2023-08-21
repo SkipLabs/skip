@@ -51,7 +51,7 @@ fun createIndex(
   handle = (SKStore.EHandle(RowValues::fromFile, dirName));
 
   index = if (!needsReordering) handle else {
-    handle.contextWriterKeyIter(
+    handle.map(
       RowValues::fromFile,
       context,
       SKStore.DirName::create(indexName.lower),
@@ -71,7 +71,7 @@ fun createIndex(
   };
   if (unique) {
     _ = index
-      .contextWriterKeyIter(
+      .map(
         RowValues::fromFile,
         context,
         SKStore.DirName::create(indexName.lower + "unique/proj/"),
@@ -92,7 +92,7 @@ fun createIndex(
           }
         },
       )
-      .contextWriterKeyIter(
+      .map(
         SKStore.StringFile::fromFile,
         context,
         SKStore.DirName::create(indexName.lower + "unique/sink/"),
