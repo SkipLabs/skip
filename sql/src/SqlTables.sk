@@ -244,7 +244,11 @@ fun getLatestIndexDescr(
 /* Sharding stats for joins. */
 /*****************************************************************************/
 
-class ShardStats(tick: SKStore.Tick, left: Int, right: Int) extends SKStore.File
+class ShardStats(
+  tick: SKStore.Tick,
+  left: Int,
+  right: Int,
+) extends SKStore.File
 
 /*****************************************************************************/
 /* Views. */
@@ -359,7 +363,9 @@ fun getSubsDirs(
 
 fun updateIsFromIgnoredSource(
   ignoredSrc: SKStore.Source,
-  rows: Array<(SKStore.Tick, SKStore.Source, SKStore.Source, Array<SKStore.File>)>,
+  rows: Array<
+    (SKStore.Tick, SKStore.Source, SKStore.Source, Array<SKStore.File>),
+  >,
 ): Bool {
   maxTick = SKStore.Tick(0);
   singleNonTomb: ?(SKStore.Tick, SKStore.Source) = None();
@@ -409,7 +415,9 @@ fun getIndexInputDir(context: mutable SKStore.Context): SKStore.EHandle<Index> {
   )
 }
 
-fun getIndexOutputDir(context: mutable SKStore.Context): SKStore.EHandle<IndexDescr> {
+fun getIndexOutputDir(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<IndexDescr> {
   input = getIndexInputDir(context);
   makeDir(IndexDescr::fromFile, context, indexOutput, () -> {
     input.contextMap(
@@ -435,14 +443,17 @@ fun makeIndexEntry(tableName: Name, colNbr: Int): SKStore.SID {
   SKStore.SID::create(tableName.lower + ":" + colNbr);
 }
 
-fun getIndexByColNbr(context: mutable SKStore.Context): SKStore.EHandle<IndexDescr> {
+fun getIndexByColNbr(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<IndexDescr> {
   indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
-    indexes.contextWriterMap(
+    indexes.contextWriterKeyValues(
       IndexDescr::fromFile,
       context,
       indexByCol,
-      (_context, writer, indexDescr) ~> {
+      (_context, writer, _key, values) ~> {
+        indexDescr = values[0];
         for (field in indexDescr.fields) {
           fieldNbr = field.i0;
           indexEntry = makeIndexEntry(indexDescr.tableName, fieldNbr);
@@ -453,14 +464,17 @@ fun getIndexByColNbr(context: mutable SKStore.Context): SKStore.EHandle<IndexDes
   })
 }
 
-fun getIndexByName(context: mutable SKStore.Context): SKStore.EHandle<IndexDescr> {
+fun getIndexByName(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<IndexDescr> {
   indexes = getIndexOutputDir(context);
   makeDir(IndexDescr::fromFile, context, indexByCol, () -> {
-    indexes.contextWriterMap(
+    indexes.contextWriterKeyValues(
       IndexDescr::fromFile,
       context,
       indexByCol,
-      (_context, writer, indexDescr) ~> {
+      (_context, writer, _key, values) ~> {
+        indexDescr = values[0];
         writer.write(SKStore.SID(indexDescr.tableName.lower), indexDescr)
       },
     )
