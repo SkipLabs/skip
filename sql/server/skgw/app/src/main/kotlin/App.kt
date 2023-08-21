@@ -234,7 +234,7 @@ fun connectionHandler(
     policy: ServerPolicy,
     taskPool: ScheduledExecutorService,
     encryption: EncryptionTransform,
-  logger: Logger,
+    logger: Logger,
 ): HttpHandler {
   return Handlers.websocket(
       MuxedSocketEndpoint(
@@ -317,10 +317,7 @@ fun connectionHandler(
                         val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
                         encryption.decrypt(encryptedPrivateKey!!)
                       },
-                      log = { event, user, metadata ->
-                        logger.log(db, event, user, metadata)
-                      }
-                  )
+                      log = { event, user, metadata -> logger.log(db, event, user, metadata) })
 
               if (skdb == null) {
                 socket.errorSocket(1004u, "Could not open database")
@@ -384,12 +381,12 @@ private fun devColdStart(encryption: EncryptionTransform) {
   System.err.println(
       "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
   val command =
-    listOf(
-        "/bin/bash",
-        "-c",
-        "cd /skfs/sql/js && npx skdb-cli --add-cred --host ws://localhost:8080" +
-            " --db ${SERVICE_MGMT_DB_NAME} --access-key ${creds.accessKey}" +
-            " <<< \"${creds.b64privateKey()}\"")
+      listOf(
+          "/bin/bash",
+          "-c",
+          "cd /skfs/sql/js && npx skdb-cli --add-cred --host ws://localhost:8080" +
+              " --db ${SERVICE_MGMT_DB_NAME} --access-key ${creds.accessKey}" +
+              " <<< \"${creds.b64privateKey()}\"")
   val proc = ProcessBuilder().inheritIO().command(command).start()
   val status = proc.waitFor()
   if (status != 0) {
