@@ -161,7 +161,10 @@ mutable class MultiWriter{
 /* The value returned by the evaluator. */
 /*****************************************************************************/
 
-class SelectDir(dirName: SKStore.DirName, types: Array<Type>) extends SKStore.File
+class SelectDir(
+  dirName: SKStore.DirName,
+  types: Array<Type>,
+) extends SKStore.File
 
 /*****************************************************************************/
 /* The main entry point. */
@@ -234,7 +237,9 @@ class SelectEvaluator{
     | None() -> this.evalSelectNoLimit(context)
     | Some(limitExpr) ->
       limitMappedName = this.selectName1;
-      limitName = SKStore.DirName::create(this.selectName1.toString() + "limit/");
+      limitName = SKStore.DirName::create(
+        this.selectName1.toString() + "limit/",
+      );
       !this.selectName1 = SKStore.DirName::create(
         this.selectName1.toString() + "nolimit/",
       );
@@ -348,7 +353,9 @@ class SelectEvaluator{
       | Some(x) -> SKStore.EHandle(ShardStats::fromFile, x.dirName)
       };
 
-      projLeftName = SKStore.DirName::create(childName.toString() + "proj/left/");
+      projLeftName = SKStore.DirName::create(
+        childName.toString() + "proj/left/",
+      );
 
       SKStore.EagerDir::applyMany(
         context,
@@ -633,7 +640,11 @@ class SelectEvaluator{
       | ADef(_) ->
         static::evalRow(context, evaluator, this.select.params, 1)
       };
-      _dir = context.mkdir(Row::fromFile, dirName, Array[(SKStore.IID(0), row)]);
+      _dir = context.mkdir(
+        Row::fromFile,
+        dirName,
+        Array[(SKStore.IID(0), row)],
+      );
     } else {
       context.!newDirs = context.newDirs.set(dirName);
     }
@@ -690,7 +701,7 @@ class SelectEvaluator{
     rangeOpt: ?Array<SKStore.KeyRange>,
     remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-  ): SKStore.FixedSingle<SKStore.DirName, (MapFunRow, ?Array<SKStore.KeyRange>)> {
+  ): Array<(SKStore.DirName, (MapFunRow, ?Array<SKStore.KeyRange>))> {
     queryKind = this.select.rest match {
     | None() -> None()
     | Some((QUnion(UAll()), _)) ->
@@ -739,7 +750,7 @@ class SelectEvaluator{
       !rest = query.rest;
       !order = order + 1
     };
-    SKStore.FixedSingle::create(mparents)
+    mparents.toArray()
   }
 
   fun evalSelectTable(
@@ -1091,8 +1102,7 @@ fun updateState(
 
       | (Noop(), _, x) -> state![i] = x
 
-      | (_, _, Some(SKDB.CString _)) ->
-        invariant_violation("Invalid aggregate")
+      | (_, _, Some(SKDB.CString _)) -> invariant_violation("Invalid aggregate")
       }
     };
     !lastRow = Some(row);

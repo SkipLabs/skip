@@ -296,11 +296,13 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   static fun multiContextWriterKeyIter<T2: File>(
     conv: File ~> T2,
     context: mutable Context,
-    parents: FixedSingle<
-      DirName,
+    parents: Array<
       (
-        (mutable Context, mutable Writer, Key, mutable Iterator<T2>) ~> void,
-        ?Array<KeyRange>,
+        DirName,
+        (
+          (mutable Context, mutable Writer, Key, mutable Iterator<T2>) ~> void,
+          ?Array<KeyRange>,
+        ),
       ),
     >,
     dirName: DirName,
@@ -308,7 +310,8 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   ): EHandle<T2> {
     dynParents = mutable Vector[];
     parentSet = mutable Set[];
-    for (parentName => parentData in parents) {
+    for (parent in parents) {
+      (parentName, parentData) = parent;
       (mapFun, rangeOpt) = parentData;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
         iter = IteratorWithIsEmpty::create(fileIter);
