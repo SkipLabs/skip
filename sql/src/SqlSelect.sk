@@ -701,12 +701,7 @@ class SelectEvaluator{
     rangeOpt: ?Array<SKStore.KeyRange>,
     remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
-  ): Array<
-    (
-      SKStore.DirName,
-      (SKStore.File ~> Row, MapFunRow, ?Array<SKStore.KeyRange>),
-    ),
-  > {
+  ): Array<(SKStore.EHandle<Row>, (MapFunRow, ?Array<SKStore.KeyRange>))> {
     queryKind = this.select.rest match {
     | None() -> None()
     | Some((QUnion(UAll()), _)) ->
@@ -725,7 +720,9 @@ class SelectEvaluator{
         rows,
       );
     };
-    mparents = mutable Vector[(dirName, (Row::fromFile, mapFunRow, rangeOpt))];
+    mparents = mutable Vector[
+      (SKStore.EHandle(Row::fromFile, dirName), (mapFunRow, rangeOpt)),
+    ];
     order = 1;
     rest = this.select.rest;
 
@@ -751,7 +748,12 @@ class SelectEvaluator{
         )
       };
       dirDescr = getDir(rtable.i0);
-      mparents.push((dirDescr.dirName, (Row::fromFile, rmapFun, rtable.i1)));
+      mparents.push(
+        (
+          SKStore.EHandle(Row::fromFile, dirDescr.dirName),
+          (rmapFun, rtable.i1),
+        ),
+      );
       !rest = query.rest;
       !order = order + 1
     };

@@ -35,6 +35,17 @@
 module SKStore;
 
 /*****************************************************************************/
+/* Function type used to map from one directory to another. */
+/*****************************************************************************/
+
+type Mapper<T> = (
+  mutable Context,
+  mutable Writer,
+  Key,
+  mutable NonEmptyIterator<T>,
+) ~> void;
+
+/*****************************************************************************/
 /* Iterator capable of answering if it produces at least one element. */
 /*****************************************************************************/
 
@@ -235,29 +246,17 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
   static fun multiContextWriterKeyIter<T, T2: File>(
     convOutput: File ~> T2,
     context: mutable Context,
-    parents: Array<
-      (
-        DirName,
-        (
-          File ~> T,
-          (
-            mutable Context,
-            mutable Writer,
-            Key,
-            mutable NonEmptyIterator<T>,
-          ) ~> void,
-          ?Array<KeyRange>,
-        ),
-      ),
-    >,
+    parents: Array<(EHandle<T>, (Mapper<T>, ?Array<KeyRange>))>,
     dirName: DirName,
     reducerOpt: ?EReducer<T2> = None(),
   ): EHandle<T2> {
     dynParents = mutable Vector[];
     parentSet = mutable Set[];
     for (parent in parents) {
-      (parentName, parentData) = parent;
-      (convInput, mapFun, rangeOpt) = parentData;
+      (parentHandle, parentData) = parent;
+      (mapFun, rangeOpt) = parentData;
+      convInput = parentHandle.conv;
+      parentName = parentHandle.dirName;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
         FileIterator::create(fileIter) match {
         | EmptyIterator _ -> return void
@@ -296,18 +295,13 @@ class EHandle<+T: frozen>(conv: File ~> T, dirName: DirName) extends Handle<T> {
     conv: File ~> T2,
     context: mutable Context,
     dirName: DirName,
-    f: (
-      mutable Context,
-      mutable Writer,
-      Key,
-      mutable NonEmptyIterator<T>,
-    ) ~> void,
+    f: Mapper<T>,
     reducerOpt: ?EReducer<T2> = None(),
   ): EHandle<T2> {
     static::multiContextWriterKeyIter(
       conv,
       context,
-      Array[(this.dirName, (this.conv, f, None()))],
+      Array[(SKStore.EHandle(this.conv, this.dirName), (f, None()))],
       dirName,
       reducerOpt,
     )
