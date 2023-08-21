@@ -7,8 +7,7 @@
 
 @cpp_export("sk_get_exception_type")
 fun getExceptionType(exn: Exception): String {
-  // TODO: Is there a cleaner way to get just the type name?
-  inspect(exn).toString().splitFirst("(").i0
+  exn.getClassName()
 }
 
 @cpp_export("sk_get_exception_message")
@@ -16,7 +15,7 @@ fun getExceptionMessage(exn: Exception): String {
   exn.getMessage()
 }
 
-base class Exception {
+base class Exception uses HasClassName {
   overridable fun getMessage(): String {
     "Exception " + inspect(this).toString()
   }
