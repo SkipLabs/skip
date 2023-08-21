@@ -1,7 +1,7 @@
 /*****************************************************************************/
 /* SQL expression evaluator. */
 /*****************************************************************************/
-module SKSQL;
+module SKDB;
 
 base class AValue<+T> {
   children =
@@ -49,7 +49,7 @@ class ExprEvaluator(
 
   private fun evalCFExpr(
     context: mutable SKStore.Context,
-    expr: SKSQL.CExpr<Float>,
+    expr: SKDB.CExpr<Float>,
   ): AValue<Float> {
     expr match {
     | CNull() -> ANull()
@@ -152,7 +152,7 @@ class ExprEvaluator(
 
   private fun evalCSExpr(
     context: mutable SKStore.Context,
-    expr: SKSQL.CExpr<String>,
+    expr: SKDB.CExpr<String>,
   ): AValue<String> {
     expr match {
     | CSLiteral(str) -> ADef(str)
@@ -228,11 +228,11 @@ class ExprEvaluator(
         this.evalCSExpr(context, e2)
       }
 
-    | SKSQL.CAdd _
-    | SKSQL.CSub _
-    | SKSQL.CDiv _
-    | SKSQL.CMod _
-    | SKSQL.CMul _ ->
+    | SKDB.CAdd _
+    | SKDB.CSub _
+    | SKDB.CDiv _
+    | SKDB.CMod _
+    | SKDB.CMul _ ->
       invariant_violation("INTERNAL ERROR: invalid operator on strings")
 
     | CCoalesce(el) ->
@@ -259,8 +259,8 @@ class ExprEvaluator(
         }
       }
 
-    | SKSQL.CSFCast(e) -> this.evalCFExpr(context, e).map(f -> f.toString())
-    | SKSQL.CSICast(e) -> this.evalCIExpr(context, e).map(f -> f.toString())
+    | SKDB.CSFCast(e) -> this.evalCFExpr(context, e).map(f -> f.toString())
+    | SKDB.CSICast(e) -> this.evalCIExpr(context, e).map(f -> f.toString())
 
     | CUp(x) ->
       this.up match {
@@ -272,7 +272,7 @@ class ExprEvaluator(
 
   fun evalWhere(
     context: mutable SKStore.Context,
-    expr: ?SKSQL.CExpr<Int>,
+    expr: ?SKDB.CExpr<Int>,
   ): AValue<Int> {
     expr match {
     | None() -> ADef(1)
@@ -282,7 +282,7 @@ class ExprEvaluator(
 
   fun evalCIExpr(
     context: mutable SKStore.Context,
-    expr: SKSQL.CExpr<Int>,
+    expr: SKDB.CExpr<Int>,
   ): AValue<Int> {
     expr match {
     | CNull() -> ANull()
@@ -845,7 +845,7 @@ class ExprEvaluator(
 
   fun evalCGExpr(
     context: mutable SKStore.Context,
-    e: SKSQL.CGExpr,
+    e: SKDB.CGExpr,
   ): AValue<CValue> {
     result = e match {
     | CGNull() -> ANull()

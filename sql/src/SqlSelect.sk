@@ -2,13 +2,13 @@
 /* SQL SELECT */
 /*****************************************************************************/
 
-module SKSQL;
+module SKDB;
 
 type MapFunRow = (
   mutable SKStore.Context,
   mutable SKStore.Writer,
   SKStore.BaseName,
-  mutable Iterator<SKSQL.Row>,
+  mutable Iterator<SKDB.Row>,
 ) ~> void;
 
 class SubTask(
@@ -16,7 +16,7 @@ class SubTask(
   key: SKStore.BaseName,
   inputRow: Row,
   entries: List<Row>,
-  remainingTables: List<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>,
+  remainingTables: List<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
 )
 
 class KVFile(value: (SKStore.BaseName, Array<SKStore.File>)) extends SKStore.File
@@ -208,7 +208,7 @@ class SelectEvaluator{
   params: Array<CGExpr>,
   selectName1: SKStore.DirName,
   selectName2: SKStore.DirName,
-  kinds: Array<(Int, SKSQL.IKind, Type)>,
+  kinds: Array<(Int, SKDB.IKind, Type)>,
   types: Array<Type>,
 } {
   fun evalStaticInt(context: mutable SKStore.Context, expr: CExpr<Int>): Int {
@@ -659,9 +659,9 @@ class SelectEvaluator{
   }
 
   fun makeQueryKind(
-    queryKind: SKSQL.QueryKind,
-    rest: ?(SKSQL.QueryKind, SKSQL.CSelect),
-  ): SKSQL.QueryKind {
+    queryKind: SKDB.QueryKind,
+    rest: ?(SKDB.QueryKind, SKDB.CSelect),
+  ): SKDB.QueryKind {
     isIntersect = false;
     restIter = rest;
     while (!isIntersect && restIter is Some _) {
@@ -953,7 +953,7 @@ class SelectEvaluator{
     context: mutable SKStore.Context,
     qkind: ?(Int, QueryKind),
     _inputKey: SKStore.BaseName,
-    evaluator: SKSQL.ExprEvaluator,
+    evaluator: SKDB.ExprEvaluator,
     writer: mutable MultiWriter,
     repeat: Int,
   ): void {
@@ -998,7 +998,7 @@ class SelectEvaluator{
     remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
     key: SKStore.BaseName,
-    inputRow: SKSQL.Row,
+    inputRow: SKDB.Row,
     writer: mutable MultiWriter,
     repeat: Int,
   ): void {
@@ -1031,7 +1031,7 @@ class SelectEvaluator{
 fun updateState(
   op: (CValue, CValue) ~> CValue,
   adding: Bool,
-  state: mutable Array<?SKSQL.CValue>,
+  state: mutable Array<?SKDB.CValue>,
   rows: mutable Iterator<Row>,
   aggrKinds: Array<AggrKind>,
 ): (Bool, Bool) {
@@ -1091,7 +1091,7 @@ fun updateState(
 
       | (Noop(), _, x) -> state![i] = x
 
-      | (_, _, Some(SKSQL.CString _)) ->
+      | (_, _, Some(SKDB.CString _)) ->
         invariant_violation("Invalid aggregate")
       }
     };

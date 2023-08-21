@@ -211,8 +211,8 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
 }
 
 fun isSQL(str: String): Bool {
-  lex = SKSQL.Lexer(0, SKSQL.Buffer(str));
-  if (SKSQL.isEOF(lex, 0)) return false;
+  lex = SKDB.Lexer(0, SKDB.Buffer(str));
+  if (SKDB.isEOF(lex, 0)) return false;
   lex.word(0).uppercase() match {
   | "CREATE" | "INSERT" | "UPDATE" | "DROP" | "DELETE" | "REPLACE" | "SELECT" ->
     true
@@ -233,7 +233,7 @@ untracked fun toplevel(topContext: Context): void {
     if (isSQL(cmd)) {
       invariant_violation("TODO reenable toplevel");
       /*
-            while (SKSQL.evalWithContext(context) is Some _) {
+            while (SKDB.evalWithContext(context) is Some _) {
               eval(env, cmd);
             }
       */

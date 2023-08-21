@@ -6,26 +6,26 @@ const tableStr: String = "CREATE TABLE t1(a INTEGER, b INTEGER);";
 
 fun evalStmt(
   context: mutable SKStore.Context,
-  params: Map<String, SKSQL.Value>,
-  evaluator: SKSQL.Evaluator,
+  params: Map<String, SKDB.Value>,
+  evaluator: SKDB.Evaluator,
   str: String,
 ): void {
-  lex = SKSQL.Lexer(0, SKSQL.Buffer(str));
-  (_, stmtAst) = SKSQL.parseStmt(lex, 0);
+  lex = SKDB.Lexer(0, SKDB.Buffer(str));
+  (_, stmtAst) = SKDB.parseStmt(lex, 0);
   _ = evaluator.stmt(context, params, stmtAst.fromSome(), false)
 }
 
 fun testSql(): mutable SKStore.Context {
   SKStore.run(context ~> {
     context.!debugMode = false;
-    params: Map<String, SKSQL.Value> = Map[];
-    options = SKSQL.Options{
+    params: Map<String, SKDB.Value> = Map[];
+    options = SKDB.Options{
       backtrace => false,
       alwaysAllowJoins => false,
       sync => false,
       showUsedIndexes => false,
     };
-    evaluator = SKSQL.Evaluator{options, user => None()};
+    evaluator = SKDB.Evaluator{options, user => None()};
     _table = evalStmt(context, params, evaluator, tableStr);
     T.expectThrow(
       () -> {

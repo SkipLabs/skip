@@ -14,7 +14,7 @@ fun getFieldNames(
   dirName: SKStore.DirName,
 ): Array<String> {
   mcontext = context.mclone();
-  tables = SKSQL.getTableDir(mcontext);
+  tables = SKDB.getTableDir(mcontext);
   dirNameStr = dirName.toString();
   iter = dirNameStr.getIter();
   _ = iter.next();
@@ -39,7 +39,7 @@ fun fixUpDirName(dirNameStr: String): SKStore.DirName {
 
 // Read a single line from stdin, decode it to a JSON Object, expected
 // to be a map from key strings (parameter names) to values.
-fun queryParams(options: SKSQL.Options): Map<String, SKSQL.Value> {
+fun queryParams(options: SKDB.Options): Map<String, SKDB.Value> {
   if (!options.expectQueryParams) {
     return Map[];
   };
@@ -51,11 +51,11 @@ fun queryParams(options: SKSQL.Options): Map<String, SKSQL.Value> {
         map.value.mapItems((key, val) -> {
           !key = key.stripPrefix("@");
           lit = val match {
-          | JSON.Null() -> SKSQL.VNull()
-          | JSON.IntNumber(v) -> SKSQL.VInt(v)
-          | JSON.Bool(v) -> if (v) SKSQL.VInt(1) else SKSQL.VInt(0)
-          | JSON.FloatNumber(v) -> SKSQL.VFloat(v)
-          | JSON.String(v) -> SKSQL.VString(v)
+          | JSON.Null() -> SKDB.VNull()
+          | JSON.IntNumber(v) -> SKDB.VInt(v)
+          | JSON.Bool(v) -> if (v) SKDB.VInt(1) else SKDB.VInt(0)
+          | JSON.FloatNumber(v) -> SKDB.VFloat(v)
+          | JSON.String(v) -> SKDB.VString(v)
           | JSON.Array _
           | JSON.Object _ ->
             print_error(
@@ -289,16 +289,16 @@ untracked fun main(): void {
 
   try {
     args = cmd.parseArgs();
-    options = SKSQL.Options{
+    options = SKDB.Options{
       backtrace => args.getBool("backtrace"),
       alwaysAllowJoins => args.getBool("always-allow-joins"),
       sync => args.getBool("sync"),
       showUsedIndexes => args.getBool("show-used-indexes"),
       format => args.getString("format") match {
-      | "csv" -> SKSQL.OFK_CSV()
-      | "json" -> SKSQL.OFK_JSON()
-      | "sql" -> SKSQL.OFK_SQL()
-      | "js" -> SKSQL.OFK_JS()
+      | "csv" -> SKDB.OFK_CSV()
+      | "json" -> SKDB.OFK_JSON()
+      | "sql" -> SKDB.OFK_SQL()
+      | "js" -> SKDB.OFK_JS()
       | f -> invariant_violation(`Unsupported format: ${f}`)
       },
       expectQueryParams => args.getBool("expect-query-params"),
@@ -337,7 +337,7 @@ untracked fun main(): void {
         // hardcoded in the runtime. It should be revisited once the runtime has
         // a proper two-step init API for persistence.
         if (args.maybeGetString("init") is Some _) {
-          _ = SKStore.gContextInit(SKSQL.makeSqlContext().clone());
+          _ = SKStore.gContextInit(SKDB.makeSqlContext().clone());
           return void
         } else if (args.maybeGetString("capacity") is Some _) {
           print_error("cannot use capacity without init");
@@ -350,7 +350,7 @@ untracked fun main(): void {
         //   | _ -> None()
         //   };
         params = queryParams(options);
-        SKSQL.eval(options, params, /* user = */ None())
+        SKDB.eval(options, params, /* user = */ None())
       });
     subcmd_handler(args, options);
   } catch {
@@ -369,9 +369,9 @@ private fun ensureContext(args: Cli.ParseResults): void {
   };
 }
 
-fun execSessions(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  SKSQL.runSql(options, context ~> {
+  SKDB.runSql(options, context ~> {
     for (id => sub in context.sessions) {
       dirName = sub.dirName;
       print_string(id.toString() + "\t" + dirName.toString());
@@ -380,9 +380,9 @@ fun execSessions(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
-fun execCompact(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execCompact(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  SKSQL.runLockedSql(options, context ~> {
+  SKDB.runLockedSql(options, context ~> {
     for (_dirName => dir in context.dirs.state) {
       dir match {
       | edir @ SKStore.EagerDir _ ->
@@ -394,69 +394,69 @@ fun execCompact(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
-fun execDumpTable(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execDumpTable(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   tableName = args.getString("table");
   suffix = args.maybeGetString("table-suffix");
-  SKSQL.runSql(options, context ~> {
-    SKSQL.dumpTable(context, tableName.lowercase(), suffix);
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpTable(context, tableName.lowercase(), suffix);
     SKStore.CStop(None())
   })
 }
 
-fun execDumpTables(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execDumpTables(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   suffix = args.maybeGetString("table-suffix");
-  SKSQL.runSql(options, context ~> {
-    SKSQL.dumpTables(context, suffix);
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpTables(context, suffix);
     SKStore.CStop(None())
   })
 }
 
-fun execDumpInserts(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execDumpInserts(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  SKSQL.runSql(options, context ~> {
-    SKSQL.dumpInserts(context);
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpInserts(context);
     SKStore.CStop(None())
   })
 }
 
-fun execDumpView(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execDumpView(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   viewName = args.getString("view");
-  SKSQL.runSql(options, context ~> {
-    SKSQL.dumpView(context, viewName.lowercase());
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpView(context, viewName.lowercase());
     SKStore.CStop(None())
   })
 }
 
-fun execDumpViews(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execDumpViews(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  SKSQL.runSql(options, context ~> {
-    SKSQL.dumpViews(context);
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpViews(context);
     SKStore.CStop(None())
   })
 }
 
-fun execDump(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execDump(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  SKSQL.runSql(options, context ~> {
-    SKSQL.dumpTables(context, None());
-    SKSQL.dumpInserts(context);
-    SKSQL.dumpViews(context);
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpTables(context, None());
+    SKDB.dumpInserts(context);
+    SKDB.dumpViews(context);
     SKStore.CStop(None())
   })
 }
 
-fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
-  name = SKSQL.Name::create(args.getString("table"));
-  SKSQL.runSql(options, context ~> {
+fun execLoadCsv(args: Cli.ParseResults, options: SKDB.Options): void {
+  name = SKDB.Name::create(args.getString("table"));
+  SKDB.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
-      tableDescr = SKSQL.getTable(context, 0, name);
+      tableDescr = SKDB.getTable(context, 0, name);
       context.setGlobal("CSV_TABLE", tableDescr);
       tableDescr
-    | Some(x) -> SKSQL.DirDescr::fromFile(x)
+    | Some(x) -> SKDB.DirDescr::fromFile(x)
     };
     line = context.getGlobal("Line") match {
     | None() -> mutable Ref(1)
@@ -464,7 +464,7 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     user = args.maybeGetString("user") match {
     | None() -> None()
-    | Some(userName) -> Some(SKSQL.UserFile::create(context, userName))
+    | Some(userName) -> Some(SKDB.UserFile::create(context, userName))
     };
     try {
       contextOp = SKCSV.insert(context, line, options, table, user);
@@ -478,7 +478,7 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
-fun execCsvField(args: Cli.ParseResults, _options: SKSQL.Options): void {
+fun execCsvField(args: Cli.ParseResults, _options: SKDB.Options): void {
   fieldNbr = args.getString("field").toInt();
   line = mutable Ref(1);
   loop {
@@ -492,19 +492,19 @@ fun execCsvField(args: Cli.ParseResults, _options: SKSQL.Options): void {
   }
 }
 
-fun execSize(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execSize(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  SKSQL.runSql(options, _context ~> {
+  SKDB.runSql(options, _context ~> {
     SKStore.printPersistentSize();
     SKStore.CStop(None())
   })
 }
 
-fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
   time = args.getString("since").toInt();
-  SKSQL.runSql(options, origContext ~> {
+  SKDB.runSql(options, origContext ~> {
     context = origContext.mclone();
     sub = context.sessions.maybeGet(sessionID) match {
     | None() ->
@@ -513,15 +513,15 @@ fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
     | Some(x) -> x
     };
     format = options.format match {
-    | SKSQL.OFK_CSV() -> SKStore.OCSV()
-    | SKSQL.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, sub.dirName))
-    | SKSQL.OFK_SQL() -> SKStore.OSQL()
-    | SKSQL.OFK_JS() -> SKStore.OJS(getFieldNames(context, sub.dirName))
+    | SKDB.OFK_CSV() -> SKStore.OCSV()
+    | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, sub.dirName))
+    | SKDB.OFK_SQL() -> SKStore.OSQL()
+    | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, sub.dirName))
     };
 
     origContext.setGlobal(
       "Stdout",
-      SKSQL.StdoutDiff(
+      SKDB.StdoutDiff(
         format,
         sub.dirName,
         SKStore.Tick(time),
@@ -533,10 +533,10 @@ fun execDiff(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
-fun execDisconnect(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execDisconnect(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
-  SKSQL.runLockedSql(options, context ~> {
+  SKDB.runLockedSql(options, context ~> {
     context.sessions.maybeGet(sessionID) match {
     | None() ->
       print_error("Error: session not found");
@@ -546,10 +546,10 @@ fun execDisconnect(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
-fun execWrite(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execWrite(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   dirNameStr = args.getString("directory");
-  SKSQL.runSql(options, context ~> {
+  SKDB.runSql(options, context ~> {
     SKStore.writeFromStdin(context, dirNameStr);
     SKStore.CStop(None())
   })
@@ -558,13 +558,13 @@ fun execWrite(args: Cli.ParseResults, options: SKSQL.Options): void {
 fun getSqlTableFromDirName(
   context: readonly SKStore.Context,
   dirName: SKStore.DirName,
-): SKSQL.DirDescr {
+): SKDB.DirDescr {
   dirNameStr = dirName.toString();
   !dirNameStr = dirName.toString().stripPrefix("/").stripSuffix("/");
-  SKSQL.getTable(context.mclone(), 0, SKSQL.Name::create(dirNameStr))
+  SKDB.getTable(context.mclone(), 0, SKDB.Name::create(dirNameStr))
 }
 
-fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
   followMode = args.getBool("follow");
@@ -582,7 +582,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   | Some(sub) -> (sub.filter, sub.dirName)
   };
 
-  tableName = SKSQL.Name::create(
+  tableName = SKDB.Name::create(
     dirName.toString().stripPrefix("/").stripSuffix("/"),
   );
   filter1 = args.maybeGetString("filter") match {
@@ -593,14 +593,14 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     };
     subFilter
   | Some(strCond) ->
-    from = Some(Array[SKSQL.TableName(SKSQL.FName(tableName), None())]);
+    from = Some(Array[SKDB.TableName(SKDB.FName(tableName), None())]);
     params = queryParams(options);
-    compiler = SKSQL.Compiler::create(false, options, 0, params);
-    (_, ast) = SKSQL.parseExpr(SKSQL.Lexer(0, SKSQL.Buffer(strCond)), 0);
+    compiler = SKDB.Compiler::create(false, options, 0, params);
+    (_, ast) = SKDB.parseExpr(SKDB.Lexer(0, SKDB.Buffer(strCond)), 0);
     compilerContext = gContext.mclone();
     _ = compiler.compileFrom(compilerContext, from);
     e = compiler.compileExpr(compilerContext, ast) match {
-    | SKSQL.CIExpr(x) -> x
+    | SKDB.CIExpr(x) -> x
     | _ ->
       print_error("Unexpected type for filter expression");
       skipExit(2)
@@ -610,19 +610,19 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       conditionFilter = subFilter(context, isReset);
       baseName -> {
         inputRow = baseName match {
-        | SKSQL.RowKey(row, _) -> row
+        | SKDB.RowKey(row, _) -> row
         | _ ->
           print_error("Unexpected table entry type");
           skipExit(2)
         };
-        evaluator = SKSQL.ExprEvaluator(Array[inputRow], Array[], None());
+        evaluator = SKDB.ExprEvaluator(Array[inputRow], Array[], None());
 
         evaluator.evalCIExpr(mcontext, e) match {
-        | SKSQL.ANull()
-        | SKSQL.ADef(0) ->
+        | SKDB.ANull()
+        | SKDB.ADef(0) ->
           false
-        | SKSQL.AUndef()
-        | SKSQL.ADef(_) ->
+        | SKDB.AUndef()
+        | SKDB.ADef(_) ->
           conditionFilter(baseName)
         }
       }
@@ -634,7 +634,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   | None() -> filter1
   | Some(userName) ->
     (context, isReset) ~> {
-      user = SKSQL.UserFile::create(context, userName);
+      user = SKDB.UserFile::create(context, userName);
       sqlTable = getSqlTableFromDirName(context, dirName);
 
       oldFilter = filter1(context, isReset);
@@ -642,9 +642,9 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       baseName -> {
         oldFilter(baseName) &&
           baseName match {
-          | SKSQL.RowKey(row, _) ->
-            SKSQL.checkUserCanReadRow(context, user, sqlTable, row) match {
-            | SKSQL.AROK() -> true
+          | SKDB.RowKey(row, _) ->
+            SKDB.checkUserCanReadRow(context, user, sqlTable, row) match {
+            | SKDB.AROK() -> true
             | _ -> false
             }
           | _ ->
@@ -669,10 +669,10 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
     invariant(dirName == sub.dirName);
     edir = context.unsafeGetEagerDir(dirName);
     format = options.format match {
-    | SKSQL.OFK_CSV() -> SKStore.OCSV()
-    | SKSQL.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
-    | SKSQL.OFK_SQL() -> SKStore.OSQL()
-    | SKSQL.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
+    | SKDB.OFK_CSV() -> SKStore.OCSV()
+    | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
+    | SKDB.OFK_SQL() -> SKStore.OSQL()
+    | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
     };
 
     (isReset, changes) = edir.getChangesAfter(SKStore.Tick(tick), forceReset);
@@ -717,7 +717,7 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
       print_raw(":" + tick.toString() + "\n");
       flushStdout();
       if (
-        SKSQL.userPrivacyChanged(
+        SKDB.userPrivacyChanged(
           SKStore.gContextGet(),
           userNameOpt,
           tableName,
@@ -735,13 +735,13 @@ fun execTail(args: Cli.ParseResults, options: SKSQL.Options): void {
   }
 }
 
-fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execWatermark(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   tableName = args.getString("table").lowercase();
   source = args.getString("source").toIntOption();
-  SKSQL.runSql(options, context ~> {
+  SKDB.runSql(options, context ~> {
     print_string(
-      SKSQL.getWatermark(context.clone(), tableName, source).default(
+      SKDB.getWatermark(context.clone(), tableName, source).default(
         SKStore.Tick(0),
       ).value,
     );
@@ -749,10 +749,10 @@ fun execWatermark(args: Cli.ParseResults, options: SKSQL.Options): void {
   });
 }
 
-fun execReplicationId(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execReplicationId(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   clientUuid = args.getString("client-uuid").lowercase();
-  SKSQL.runSql(options, context ~> {
+  SKDB.runSql(options, context ~> {
     clientsDirname = SKStore.DirName::create(`/clients/`);
     clientsDir = context.maybeGetDir(clientsDirname) match {
     | None() -> context.mkdir(SKStore.IntFile::fromFile, clientsDirname)
@@ -772,20 +772,20 @@ fun execReplicationId(args: Cli.ParseResults, options: SKSQL.Options): void {
   });
 }
 
-fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  name = SKSQL.Name::create(args.getString("table"));
+  name = SKDB.Name::create(args.getString("table"));
   source = args.maybeGetString("source") match {
   | Some(src) -> src.toInt()
   | None() -> SKStore.genSym(0)
   };
-  SKSQL.runSql(options, context ~> {
+  SKDB.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
-      tableDescr = SKSQL.getTable(context, 0, name);
+      tableDescr = SKDB.getTable(context, 0, name);
       context.setGlobal("CSV_TABLE", tableDescr);
       tableDescr
-    | Some(x) -> SKSQL.DirDescr::fromFile(x)
+    | Some(x) -> SKDB.DirDescr::fromFile(x)
     };
     line = context.getGlobal("Line") match {
     | None() -> mutable Ref(1)
@@ -804,19 +804,19 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
-fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   userViewName = args.getString("view").lowercase();
   viewDirName = fixUpDirName(userViewName);
   init = args.getBool("connect");
-  SKSQL.runLockedSql(options, context ~> {
+  SKDB.runLockedSql(options, context ~> {
     viewName = userViewName.lowercase();
-    SKSQL.forbidNow(context);
+    SKDB.forbidNow(context);
     format = options.format match {
-    | SKSQL.OFK_CSV() -> SKStore.OCSV()
-    | SKSQL.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, viewDirName))
-    | SKSQL.OFK_SQL() -> SKStore.OSQL()
-    | SKSQL.OFK_JS() -> SKStore.OJS(getFieldNames(context, viewDirName))
+    | SKDB.OFK_CSV() -> SKStore.OCSV()
+    | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, viewDirName))
+    | SKDB.OFK_SQL() -> SKStore.OSQL()
+    | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, viewDirName))
     };
     cmd = (
       args.maybeGetString("updates"),
@@ -829,11 +829,11 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
     | (_, Some(x)) -> SKStore.NNotify(x)
     | _ -> SKStore.NTail()
     };
-    (input, output) = SKSQL.getSubsDirs(context);
+    (input, output) = SKDB.getSubsDirs(context);
     viewKey = SKStore.SID(viewName);
     inputDir = context.unsafeGetEagerDir(input.dirName);
     sessionID = SKStore.genSym(0);
-    request = SKSQL.SubRequestFile(
+    request = SKDB.SubRequestFile(
       viewName,
       viewDirName,
       init,
@@ -850,10 +850,10 @@ fun execSubscribe(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
-fun execCanMirror(args: Cli.ParseResults, options: SKSQL.Options): void {
+fun execCanMirror(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   tableName = args.getString("table");
-  SKSQL.runSql(options, context ~> {
+  SKDB.runSql(options, context ~> {
     SKCSV.reasonSchemaUnsupported(context, tableName.lowercase()) match {
     | None() -> void
     | Some(reason) -> print_string(reason)
@@ -862,7 +862,7 @@ fun execCanMirror(args: Cli.ParseResults, options: SKSQL.Options): void {
   })
 }
 
-fun execReplay(_args: Cli.ParseResults, _options: SKSQL.Options): void {
+fun execReplay(_args: Cli.ParseResults, _options: SKDB.Options): void {
   state = SKCSV.replayStdin();
   state.each((value, txNbrAndRepeat) -> {
     (_, repeat) = txNbrAndRepeat;
@@ -874,7 +874,7 @@ fun execReplay(_args: Cli.ParseResults, _options: SKSQL.Options): void {
 
 untracked fun execDebug(
   _args: Cli.ParseResults,
-  _options: SKSQL.Options,
+  _options: SKDB.Options,
 ): void {
   SKStore.toplevel(SKStore.Context{});
 }

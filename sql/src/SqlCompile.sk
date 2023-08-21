@@ -2,7 +2,7 @@
 /* Compiles Sql queries from SqlAst to SqlCAst (for "compiled" Ast). */
 /*****************************************************************************/
 
-module SKSQL;
+module SKDB;
 
 /*****************************************************************************/
 /* Determines if a select can be optimized away. */
@@ -17,9 +17,9 @@ fun isNoopParams(
   if (kinds.size() != params.size()) return false;
   for (i => param in params) {
     param match {
-    | CIExpr(SKSQL.CIGetFrom(0, x)) if (x == i) -> void
-    | CFExpr(SKSQL.CFGetFrom(0, x)) if (x == i) -> void
-    | CSExpr(SKSQL.CSGetFrom(0, x)) if (x == i) -> void
+    | CIExpr(SKDB.CIGetFrom(0, x)) if (x == i) -> void
+    | CFExpr(SKDB.CFGetFrom(0, x)) if (x == i) -> void
+    | CSExpr(SKDB.CSGetFrom(0, x)) if (x == i) -> void
     | _ -> return false
     }
   };
@@ -103,7 +103,7 @@ class JTable{
   name: Name,
   dirName: SKStore.DirName,
   ranges: ?Array<SKStore.KeyRange>,
-  schema: Array<SKSQL.TypeDescr>,
+  schema: Array<SKDB.TypeDescr>,
   alias: ?Name,
 } {
   static fun fromDirDescr(
@@ -470,7 +470,7 @@ mutable class Compiler{
   mutable fun compileFrom(
     context: mutable SKStore.Context,
     from: ?Array<TableName>,
-  ): Array<SKSQL.DirDescr> {
+  ): Array<SKDB.DirDescr> {
     from match {
     | None() -> Array[]
     | Some(fromTables) ->
@@ -644,7 +644,7 @@ mutable class Compiler{
     params: SelectParams,
     from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
     cparams: Array<CGExpr>,
-  ): Array<SKSQL.TypeDescr> {
+  ): Array<SKDB.TypeDescr> {
     (cols, invCols) = static::getCols(params, from);
     schema = cparams.mapWithIndex((idx, param) -> {
       ty = TypeDescr{
@@ -804,7 +804,7 @@ mutable class Compiler{
 
   mutable fun compileOrderBy(
     params: SelectParams,
-    from: Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>,
+    from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
     orderByOpt: ?Array<(Expr, IKind)>,
   ): ?Array<(Int, IKind)> {
     orderByOpt match {
@@ -1030,7 +1030,7 @@ mutable class Compiler{
       }
     | Exists(select @ Select _) ->
       CIExpr(CExists(this.compileSelect(context, select, false)))
-    | SKSQL.Call("coalesce", None()) ->
+    | SKDB.Call("coalesce", None()) ->
       error(this.pos, "Missing arguments for COALESCE")
     | Call("uid", _) ->
       context.getGlobal("USER") match {
@@ -1133,7 +1133,7 @@ mutable class Compiler{
         )
       }
 
-    | SKSQL.Call("sum", Some(values)) ->
+    | SKDB.Call("sum", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for sum")
@@ -1157,7 +1157,7 @@ mutable class Compiler{
         }
       })
 
-    | SKSQL.Call("min", Some(values)) ->
+    | SKDB.Call("min", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for min")
@@ -1180,7 +1180,7 @@ mutable class Compiler{
         }
       })
 
-    | SKSQL.Call("max", Some(values)) ->
+    | SKDB.Call("max", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for max")
@@ -1203,7 +1203,7 @@ mutable class Compiler{
         }
       })
 
-    | SKSQL.Call("count", arg) ->
+    | SKDB.Call("count", arg) ->
       this.noAggr(() -> {
         value = arg match {
         | None() -> VInt(1)
@@ -1235,7 +1235,7 @@ mutable class Compiler{
         }
       })
 
-    | SKSQL.Call("avg", Some(values)) ->
+    | SKDB.Call("avg", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for avg")
@@ -1268,7 +1268,7 @@ mutable class Compiler{
         }
       })
 
-    | SKSQL.Call("abs", Some(values)) ->
+    | SKDB.Call("abs", Some(values)) ->
       if (values.size() != 1) {
         error(this.pos, "Invalid number of arguments for abs")
       };
@@ -1394,7 +1394,7 @@ mutable class Compiler{
         CSExpr(CStrftime(sargs[0], sargs[1], sargs.slice(2, sargs.size())))
       }
 
-    | SKSQL.Call("nullif", Some(args)) ->
+    | SKDB.Call("nullif", Some(args)) ->
       if (args.size() != 2) {
         error(this.pos, "NULLIF expects 2 arguments");
       };
@@ -1409,7 +1409,7 @@ mutable class Compiler{
       | (x, _) -> x
       }
 
-    | SKSQL.Case(condOpt, cases, defaultOpt) ->
+    | SKDB.Case(condOpt, cases, defaultOpt) ->
       acc = defaultOpt match {
       | None() -> CGNull()
       | Some(d) -> this.compileExpr(context, d)
@@ -1633,7 +1633,7 @@ mutable class Compiler{
     context: mutable SKStore.Context,
     origFrom: Array<DirDescr>,
     where: ?Expr,
-  ): (?Expr, Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>) {
+  ): (?Expr, Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>) {
     where match {
     | None() ->
       if (origFrom.size() > 1) {
@@ -1666,9 +1666,9 @@ mutable class Compiler{
   }
 
   mutable fun compileMerge(
-    from: Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>,
+    from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
     cond: Expr,
-  ): (Expr, Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)>) {
+  ): (Expr, Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>) {
     tables = mutable Vector<?JTable>[];
     newFrom = mutable Vector[];
     moveMap = mutable Map[];
@@ -1701,23 +1701,23 @@ mutable class Compiler{
 
         for (name => cexpr in this.subst.clone()) {
           cexpr match {
-          | SKSQL.CIExpr(
-            SKSQL.CIGetFrom(tableNbr, colNbr),
+          | SKDB.CIExpr(
+            SKDB.CIGetFrom(tableNbr, colNbr),
           ) if (moveMap.containsKey(tableNbr)) ->
-            this.subst![name] = SKSQL.CIExpr(
-              SKSQL.CIGetFrom(moveMap[tableNbr], colNbr),
+            this.subst![name] = SKDB.CIExpr(
+              SKDB.CIGetFrom(moveMap[tableNbr], colNbr),
             )
-          | SKSQL.CFExpr(
-            SKSQL.CFGetFrom(tableNbr, colNbr),
+          | SKDB.CFExpr(
+            SKDB.CFGetFrom(tableNbr, colNbr),
           ) if (moveMap.containsKey(tableNbr)) ->
-            this.subst![name] = SKSQL.CFExpr(
-              SKSQL.CFGetFrom(moveMap[tableNbr], colNbr),
+            this.subst![name] = SKDB.CFExpr(
+              SKDB.CFGetFrom(moveMap[tableNbr], colNbr),
             )
-          | SKSQL.CSExpr(
-            SKSQL.CSGetFrom(tableNbr, colNbr),
+          | SKDB.CSExpr(
+            SKDB.CSGetFrom(tableNbr, colNbr),
           ) if (moveMap.containsKey(tableNbr)) ->
-            this.subst![name] = SKSQL.CSExpr(
-              SKSQL.CSGetFrom(moveMap[tableNbr], colNbr),
+            this.subst![name] = SKDB.CSExpr(
+              SKDB.CSGetFrom(moveMap[tableNbr], colNbr),
             )
           | _ -> void
           }
@@ -1805,26 +1805,26 @@ mutable class Compiler{
 
       for (name => cexpr in this.subst.clone()) {
         cexpr match {
-        | SKSQL.CIExpr(
-          SKSQL.CIGetFrom(tableNbr, colNbr),
+        | SKDB.CIExpr(
+          SKDB.CIGetFrom(tableNbr, colNbr),
         ) if (tableNbr == join.right.tableNbr) ->
           leftSize = tables[join.left.tableNbr].fromSome().schema.size();
-          this.subst![name] = SKSQL.CIExpr(
-            SKSQL.CIGetFrom(join.left.tableNbr, leftSize + colNbr),
+          this.subst![name] = SKDB.CIExpr(
+            SKDB.CIGetFrom(join.left.tableNbr, leftSize + colNbr),
           )
-        | SKSQL.CFExpr(
-          SKSQL.CFGetFrom(tableNbr, colNbr),
+        | SKDB.CFExpr(
+          SKDB.CFGetFrom(tableNbr, colNbr),
         ) if (tableNbr == join.right.tableNbr) ->
           leftSize = tables[join.left.tableNbr].fromSome().schema.size();
-          this.subst![name] = SKSQL.CFExpr(
-            SKSQL.CFGetFrom(join.left.tableNbr, leftSize + colNbr),
+          this.subst![name] = SKDB.CFExpr(
+            SKDB.CFGetFrom(join.left.tableNbr, leftSize + colNbr),
           )
-        | SKSQL.CSExpr(
-          SKSQL.CSGetFrom(tableNbr, colNbr),
+        | SKDB.CSExpr(
+          SKDB.CSGetFrom(tableNbr, colNbr),
         ) if (tableNbr == join.right.tableNbr) ->
           leftSize = tables[join.left.tableNbr].fromSome().schema.size();
-          this.subst![name] = SKSQL.CSExpr(
-            SKSQL.CSGetFrom(join.left.tableNbr, leftSize + colNbr),
+          this.subst![name] = SKDB.CSExpr(
+            SKDB.CSGetFrom(join.left.tableNbr, leftSize + colNbr),
           )
         | _ -> void
         }
@@ -1849,7 +1849,7 @@ mutable class Compiler{
     context: mutable SKStore.Context,
     from: Array<DirDescr>,
     cond: Expr,
-  ): Array<(SKSQL.DirDescr, ?Array<SKStore.KeyRange>)> {
+  ): Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)> {
     tables = mutable Vector[];
     for (dirDescr in from) {
       tables.push(JTable::fromDirDescr(dirDescr, None()));

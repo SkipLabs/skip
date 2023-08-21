@@ -1,4 +1,4 @@
-module SKSQL;
+module SKDB;
 
 /*****************************************************************************/
 /* Helper functions to evaluate SQL. */
@@ -239,7 +239,7 @@ fun computeOrder(
   ikinds: Array<(Int, IKind)>,
 ): Array<(Int, IKind, Type)> {
   size = paramTypes.size();
-  defaultKinds = Array<?(Int, SKSQL.IKind, SKSQL.Type)>::mfillBy(size, i ->
+  defaultKinds = Array<?(Int, SKDB.IKind, SKDB.Type)>::mfillBy(size, i ->
     Some((i, (INONE() : IKind), paramTypes[i]))
   );
   kinds = mutable Vector[];
@@ -313,7 +313,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         !selectAst.id = Name::create(
           selectAst.id.origName + "_" + SKStore.genSym(0),
         );
-        compiler = SKSQL.Compiler::create(
+        compiler = SKDB.Compiler::create(
           false,
           this.options,
           selectAst.pos,
@@ -366,7 +366,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         )
       }
     | selectAst @ Select{} ->
-      compiler = SKSQL.Compiler::create(
+      compiler = SKDB.Compiler::create(
         !inTransaction,
         this.options,
         selectAst.pos,
@@ -406,7 +406,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (ifNotExists) return None();
         error(pos, "VIEW " + viewName + " already exists");
       };
-      cselect1 = SKSQL.Compiler::create(
+      cselect1 = SKDB.Compiler::create(
         false,
         this.options with {virtual => true},
         selectAst.pos,
@@ -430,7 +430,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         };
         startTick = context.tick;
         // This phase just populates the data.
-        _ = SKSQL.evalSelect(context, cselect1, None());
+        _ = SKDB.evalSelect(context, cselect1, None());
         Some((context, delta, _) ~> {
           sameDeps = unsafeCompareSets(context.deps.data, delta.deps.data);
           // If the deps haven't changed, that means we can reuse
@@ -446,7 +446,7 @@ class Evaluator{options: Options, user: ?UserFile} {
               }
             }
           };
-          compiler = SKSQL.Compiler::create(
+          compiler = SKDB.Compiler::create(
             false,
             this.options with {virtual => true},
             selectAst.pos,
@@ -454,14 +454,14 @@ class Evaluator{options: Options, user: ?UserFile} {
           );
           cselect = compiler.compileSelect(context, selectAst, true);
           dirName = SKStore.DirName::create("/" + selectAst.id + "/");
-          dirDescr = SKSQL.Compiler::getDirDescr(
+          dirDescr = SKDB.Compiler::getDirDescr(
             selectAst.params,
             cselect.from,
             cselect.params,
             cselect.id,
             dirName,
           );
-          _selectDir = SKSQL.evalSelect(context, cselect, None());
+          _selectDir = SKDB.evalSelect(context, cselect, None());
           tableDir = getTableDir(context);
           fileName = SKStore.SID::create(viewName.lower);
           tableDir.writeArray(context, fileName, Array[dirDescr]);
@@ -572,7 +572,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       orderBy => None(),
       rest => None(),
     };
-    compiler = SKSQL.Compiler::create(
+    compiler = SKDB.Compiler::create(
       false,
       this.options,
       selectAst.pos,
@@ -1078,20 +1078,20 @@ fun evalQuery(
   params: Map<String, Value>,
   query: String,
 ): Array<RowValues> {
-  lexer = SKSQL.Lexer(0, SKSQL.Buffer(query));
-  selectAst = SKSQL.parseQuery(lexer, 0).i1 match {
+  lexer = SKDB.Lexer(0, SKDB.Buffer(query));
+  selectAst = SKDB.parseQuery(lexer, 0).i1 match {
   | x @ Select _ -> x
   };
-  skOptions = SKSQL.Options{
+  skOptions = SKDB.Options{
     alwaysAllowJoins => false,
     backtrace => false,
     sync => false,
     virtual => false,
     showUsedIndexes => false,
   };
-  compiler = SKSQL.Compiler::create(false, skOptions, 0, params);
+  compiler = SKDB.Compiler::create(false, skOptions, 0, params);
   cselect = compiler.compileSelect(context, selectAst, true);
-  selectDir = SKSQL.evalSelect(context, cselect, None());
+  selectDir = SKDB.evalSelect(context, cselect, None());
   dirName = selectDir.dirName;
   dir = context.unsafeGetEagerDir(dirName);
   result = mutable Vector[];
@@ -1239,7 +1239,7 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
 
 fun runSql(options: Options, f: mutable SKStore.Context ~> SKStore.ContextOp): void {
   SKStore.runWithGc(
-    SKSQL.makeSqlContext().clone(),
+    SKDB.makeSqlContext().clone(),
     f,
     Some(SKStore.Synchronizer(importFromRoot, exportToRoot, printContext)),
     options.sync,
@@ -1247,7 +1247,7 @@ fun runSql(options: Options, f: mutable SKStore.Context ~> SKStore.ContextOp): v
 }
 
 fun runLockedSql(options: Options, f: mutable SKStore.Context ~> void): void {
-  SKStore.runLocked(SKSQL.makeSqlContext().clone(), f, options.sync)
+  SKStore.runLocked(SKDB.makeSqlContext().clone(), f, options.sync)
 }
 
 fun importFromRoot(
@@ -1551,7 +1551,7 @@ const jsRootsName: Name = Name::create("jsroots");
 fun initJSRoots(): void {
   saved = SKStore.newObstack();
   try {
-    SKStore.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
       context.unsafeMaybeGetEagerDir(jsRootsInputDirName) match {
       | None() -> void
       | Some(dir) ->
@@ -1630,7 +1630,7 @@ fun addRoot(rootName: String, funId: Int32, funArg: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
   saved = SKStore.newObstack();
   try {
-    SKStore.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
       context.!globals = SortedMap[];
       (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
         context,
@@ -1653,7 +1653,7 @@ fun removeRoot(rootName: String): void {
   if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
   saved = SKStore.newObstack();
   try {
-    SKStore.runWithGc(SKSQL.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
       context.!globals = SortedMap[];
       if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
         return SKStore.CStop(None());
@@ -1753,18 +1753,18 @@ fun initTrackedJSQueries(
         | q @ TrackedQuery _ -> q
         | _ -> invariant_violation("Invalid key type")
         };
-        lexer = SKSQL.Lexer(0, SKSQL.Buffer(query.query));
-        selectAst = SKSQL.parseQuery(lexer, 0).i1 match {
+        lexer = SKDB.Lexer(0, SKDB.Buffer(query.query));
+        selectAst = SKDB.parseQuery(lexer, 0).i1 match {
         | x @ Select _ -> x
         };
-        skOptions = SKSQL.Options{
+        skOptions = SKDB.Options{
           alwaysAllowJoins => false,
           backtrace => false,
           sync => false,
           virtual => false,
           showUsedIndexes => false,
         };
-        compiler = SKSQL.Compiler::create(false, skOptions, 0, params);
+        compiler = SKDB.Compiler::create(false, skOptions, 0, params);
         tableMapCopy = context.getGlobal("TableMap");
         context.removeGlobal("TableMap");
         select = compiler.compileSelect(context, selectAst, true);
@@ -1772,7 +1772,7 @@ fun initTrackedJSQueries(
         | None() -> void
         | Some(x) -> context.setGlobal("TableMap", x)
         };
-        selectDir = SKSQL.evalSelect(context, select, None());
+        selectDir = SKDB.evalSelect(context, select, None());
         selectDirName = selectDir.dirName;
         selectProjDirName = SKStore.DirName::create(
           selectDirName.toString() + "proj/",
