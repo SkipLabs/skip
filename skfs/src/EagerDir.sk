@@ -57,7 +57,7 @@ extension base class .SortedMap {
 type MapFun = (
   mutable Context,
   mutable Writer,
-  BaseName,
+  Key,
   mutable Iterator<File>,
 ) ~> void;
 
@@ -73,8 +73,8 @@ value class Aggregate(state: File, reducer: IReducer)
 
 class Reducer{
   reducer: IReducer,
-  fixed: Array<(BaseName, Array<File>)>,
-  modified: SortedMap<BaseName, Array<File>>,
+  fixed: Array<(Key, Array<File>)>,
+  modified: SortedMap<Key, Array<File>>,
 } {
   static fun create(fixedData: FixedDataMap, reducer: IReducer): this {
     acc = mutable Vector[];
@@ -94,8 +94,8 @@ class Reducer{
   }
 
   fun unsafeIter(
-    start: ?BaseName = None(),
-  ): mutable Iterator<(BaseName, mutable Iterator<File>)> {
+    start: ?Key = None(),
+  ): mutable Iterator<(Key, mutable Iterator<File>)> {
     current = mutable IntRef(
       start match {
       | None() -> 0
@@ -132,7 +132,7 @@ class Reducer{
 
   static fun makeCompactKeyIterator(
     fixedData: FixedData<Array<File>>,
-    key: BaseName,
+    key: Key,
     current: mutable IntRef,
   ): Array<File> {
     result = mutable Vector[];
@@ -149,14 +149,14 @@ class Reducer{
     x
   }
 
-  fun getArray(key: BaseName): Array<File> {
+  fun getArray(key: Key): Array<File> {
     this.modified.maybeGet(key) match {
     | None() -> this.getFixedij(key, 0, this.fixed.size() - 1)
     | Some(values) -> values
     }
   }
 
-  private fun getFixedij(key: BaseName, i: Int, j: Int): Array<File> {
+  private fun getFixedij(key: Key, i: Int, j: Int): Array<File> {
     if (i > j) {
       return Array[];
     };
@@ -168,7 +168,7 @@ class Reducer{
     }
   }
 
-  fun getFixed(key: BaseName): Array<File> {
+  fun getFixed(key: Key): Array<File> {
     this.getFixedij(key, 0, this.fixed.size() - 1)
   }
 }
@@ -188,7 +188,7 @@ mutable class IntRef(mutable value: Int) {
 /* Ranges. */
 /*****************************************************************************/
 
-value class KeyRange(start: BaseName, end: BaseName) uses Orderable, Show {
+value class KeyRange(start: Key, end: Key) uses Orderable, Show {
   fun toString(): String {
     `[${this.start}, ${this.end}]`
   }
@@ -201,10 +201,10 @@ value class KeyRange(start: BaseName, end: BaseName) uses Orderable, Show {
 base class MInfo {
   children =
   | MInfoEmpty()
-  | MInfoSingle(BaseName)
-  | MInfoFull(Array<BaseName>, Array<DirName>, Array<Path>)
+  | MInfoSingle(Key)
+  | MInfoFull(Array<Key>, Array<DirName>, Array<Path>)
 
-  fun getKeys(): Array<BaseName> {
+  fun getKeys(): Array<Key> {
     this match {
     | MInfoEmpty() -> Array[]
     | MInfoSingle(x) -> Array[x]
@@ -228,7 +228,7 @@ base class MInfo {
   }
 
   static fun create(
-    keys: Array<BaseName>,
+    keys: Array<Key>,
     newDirs: Array<DirName>,
     reads: Array<Path>,
   ): MInfo {
@@ -378,15 +378,15 @@ class DataMapValue{
 }
 
 class DataMap{
-  data: DMap<BaseName, DMap<Source, Array<File>>> = Nil(),
-  tombs: DMap<BaseName, DMap<Source, Source>> = Nil(),
+  data: DMap<Key, DMap<Source, Array<File>>> = Nil(),
+  tombs: DMap<Key, DMap<Source, Source>> = Nil(),
   nbrEntries: Int = 0,
 } {
   static fun empty(): this {
     DataMap{}
   }
 
-  fun set(tickRange: TickRange, key: BaseName, value: DataMapValue): this {
+  fun set(tickRange: TickRange, key: Key, value: DataMapValue): this {
     if (value.map.isEmpty()) {
       if (this.data.containsKey(key)) {
         !this.data = this.data.remove(key)
@@ -410,7 +410,7 @@ class DataMap{
     this
   }
 
-  fun maybeGet(k: BaseName): ?DataMapValue {
+  fun maybeGet(k: Key): ?DataMapValue {
     (this.data.maybeGet(k), this.tombs.maybeGet(k)) match {
     | (None(), None()) -> None()
     | (Some(map), None()) -> Some(DataMapValue{map, tombs => DMap::empty()})
@@ -431,7 +431,7 @@ class DataMap{
     }
   }
 
-  fun eachWithTick(f: (BaseName, Tick) -> void): void {
+  fun eachWithTick(f: (Key, Tick) -> void): void {
     dataIter = this.data.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
     left = dataIter.next();
@@ -460,11 +460,11 @@ class DataMap{
     }
   }
 
-  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+  fun getChangesAfter(tick: Tick): SortedSet<Key> {
     this.data.getChangesAfter(tick).union(this.tombs.getChangesAfter(tick))
   }
 
-  fun items(): mutable Iterator<(BaseName, DataMapValue)> {
+  fun items(): mutable Iterator<(Key, DataMapValue)> {
     dataIter = this.data.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
     left = dataIter.next();
@@ -493,14 +493,14 @@ class DataMap{
   }
 
   fun itemsAfterKeyHelper(
-    lastSkippedOpt: ?Boundary<BaseName>,
-  ): mutable Iterator<(BaseName, DMap<Source, Array<File>>)> {
+    lastSkippedOpt: ?Boundary<Key>,
+  ): mutable Iterator<(Key, DMap<Source, Array<File>>)> {
     this.data.itemsAfterKey(lastSkippedOpt).iter
   }
 
   fun itemsAfterKey(
-    lastSkippedOpt: ?Boundary<BaseName>,
-  ): mutable IterHolder<BaseName, DMap<Source, Array<File>>> {
+    lastSkippedOpt: ?Boundary<Key>,
+  ): mutable IterHolder<Key, DMap<Source, Array<File>>> {
     mutable IterHolder(this.itemsAfterKeyHelper(lastSkippedOpt))
   }
 
@@ -508,7 +508,7 @@ class DataMap{
     this.data.getHeight()
   }
 
-  fun remove(k: BaseName): this {
+  fun remove(k: Key): this {
     !this.data = this.data.remove(k);
     !this.tombs = this.tombs.remove(k);
     this
@@ -539,12 +539,12 @@ class FixedDataMap{data: FixedDir<Array<File>>, tombs: FixedDir<Source>} {
     }
   }
 
-  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+  fun getChangesAfter(tick: Tick): SortedSet<Key> {
     this.data.getChangesAfter(tick).union(this.tombs.getChangesAfter(tick))
   }
 
   fun getIterAll(): mutable Iterator<
-    (Tick, Source, Source, BaseName, Array<File>),
+    (Tick, Source, Source, Key, Array<File>),
   > {
     iter1 = this.data.data.iterator();
     iter2 = this.tombs.data.iterator();
@@ -574,7 +574,7 @@ class FixedDataMap{data: FixedDir<Array<File>>, tombs: FixedDir<Source>} {
   }
 
   fun getIter(
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     iter1 = this.data.getIter(key);
     iter2 = this.tombs.getIter(key);
@@ -605,7 +605,7 @@ class FixedDataMap{data: FixedDir<Array<File>>, tombs: FixedDir<Source>} {
 
   fun getIterAfter(
     tick: Tick,
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     iter1 = this.data.getIterAfter(tick, key);
     iter2 = this.tombs.getIterAfter(tick, key);
@@ -678,7 +678,7 @@ class EagerDir{
     (MapFun, ?Array<KeyRange>),
   > = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
-  slices: RangeMapList<BaseName, DirName> = RangeMapList[],
+  slices: RangeMapList<Key, DirName> = RangeMapList[],
   reducer: ?Reducer = None(),
   purgeCount: Int = 0,
   tombLimit: ?Tick = None(),
@@ -686,8 +686,8 @@ class EagerDir{
   fun reset(
     context: mutable SKStore.Context,
     writerPath: Path,
-    keep: SortedSet<BaseName>,
-    isVisible: BaseName -> Bool = _ -> true,
+    keep: SortedSet<Key>,
+    isVisible: Key -> Bool = _ -> true,
     wasSeen: (Tick, Source) ~> Bool = (_, _) ~> true,
   ): this {
     this.unsafeGetFileIter().each(kv -> {
@@ -721,7 +721,7 @@ class EagerDir{
     context: readonly SKStore.Context,
     sub: Sub,
     isReset: Bool,
-    changes: SortedSet<BaseName>,
+    changes: SortedSet<Key>,
     tick: Tick,
   ): void {
     lock = unfreezeLock(sub.lock);
@@ -764,10 +764,10 @@ class EagerDir{
   fun writeDiffStdout(
     context: readonly SKStore.Context,
     isReset: Bool,
-    changes: SortedSet<BaseName>,
+    changes: SortedSet<Key>,
     o: String -> void,
     format: OutputFormat,
-    filter: (SKStore.Context, Bool) ~> (SKStore.BaseName -> Bool),
+    filter: (SKStore.Context, Bool) ~> (SKStore.Key -> Bool),
     destinationTime: ?Tick,
   ): Bool {
     writer = mutable Debug.BufferedWriter(o, 1024);
@@ -849,7 +849,7 @@ class EagerDir{
     fixedIter = FixedDataMapIterator::create(this.fixedData.getIterAll());
     data = mutable Vector[];
     tombs = mutable Vector[];
-    lastOpt: ?(Tick, Source, Source, BaseName, Array<File>) = None();
+    lastOpt: ?(Tick, Source, Source, Key, Array<File>) = None();
 
     addHelper = lastRow -> {
       if (lastRow.i4.size() > 0 || lastRow.i0 > limit) {
@@ -950,7 +950,7 @@ class EagerDir{
     this.time
   }
 
-  private fun getAllKeysWithValues(): SortedSet<BaseName> {
+  private fun getAllKeysWithValues(): SortedSet<Key> {
     result = SortedSet[];
     this.unsafeGetFileIter().each(kv -> {
       (key, valueIter) = kv;
@@ -965,7 +965,7 @@ class EagerDir{
   fun getChangesAfter(
     tick: Tick,
     forceReset: Bool = false,
-  ): (Bool, SortedSet<BaseName>) {
+  ): (Bool, SortedSet<Key>) {
     this.tombLimit match {
     | _ if (forceReset) -> return (true, this.getAllKeysWithValues())
     | Some(limit) if (tick.value <= limit.value) ->
@@ -1055,12 +1055,12 @@ class EagerDir{
     f: MapFun,
     currentStart: Int,
     currentEnd: Int,
-    start: ?Boundary<BaseName>,
-    end: ?BaseName,
+    start: ?Boundary<Key>,
+    end: ?Key,
   ): (
     readonly Vector<FixedRow<Array<File>>>,
     readonly Vector<(Source, MInfo)>,
-    ?BaseName,
+    ?Key,
     Int,
   ) {
     acc = mutable Vector[];
@@ -1135,7 +1135,7 @@ class EagerDir{
     acc: mutable Vector<FixedRow<Array<File>>>,
     rangeOpt: ?KeyRange,
   ): void {
-    last: ?Boundary<BaseName> = rangeOpt match {
+    last: ?Boundary<Key> = rangeOpt match {
     | None() -> None()
     | Some(range) -> Some(Inclusive(range.start))
     };
@@ -1196,7 +1196,7 @@ class EagerDir{
     oldVec: mutable Vector<(Source, MInfo)>,
     parentName: DirName,
     childName: DirName,
-    key: BaseName,
+    key: Key,
     valueIter: mutable Iterator<File>,
     f: MapFun,
   ): void {
@@ -1404,13 +1404,13 @@ class EagerDir{
     context.setDir(parent.dirName, parent);
   }
 
-  fun getArrayRaw(key: BaseName): Array<File> {
+  fun getArrayRaw(key: Key): Array<File> {
     this.getIterRaw(key).collect(Array);
   }
 
   fun unsafeGetAllDataIterAfter(
     limit: Tick,
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     this.data.maybeGet(key) match {
     | None() ->
@@ -1442,7 +1442,7 @@ class EagerDir{
   }
 
   fun unsafeGetAllDataIter(
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     fixedIter = this.fixedData.getIter(key);
     this.data.maybeGet(key) match {
@@ -1472,7 +1472,7 @@ class EagerDir{
   }
 
   fun unsafeGetDataIterWithoutTombs(
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, Array<File>)> {
     fixedIter = this.fixedData.getIter(key);
     this.data.maybeGet(key) match {
@@ -1510,7 +1510,7 @@ class EagerDir{
     }
   }
 
-  private fun getIterRaw(key: BaseName): mutable Iterator<File> {
+  private fun getIterRaw(key: Key): mutable Iterator<File> {
     this.reducer match {
     | None() ->
       for (arr in this.unsafeGetDataIterWithoutTombs(key)) {
@@ -1525,7 +1525,7 @@ class EagerDir{
     }
   }
 
-  private fun getArraySourceKey(source: Source, key: BaseName): Array<File> {
+  private fun getArraySourceKey(source: Source, key: Key): Array<File> {
     this.data.maybeGet(key) match {
     | None() -> this.fixedData.data.getArraySourceKey(source, key).flatten()
     | Some(modified) ->
@@ -1538,10 +1538,10 @@ class EagerDir{
 
   static fun update(
     context: mutable Context,
-    contextDirty: readonly Map<DirName, SortedSet<BaseName>>,
+    contextDirty: readonly Map<DirName, SortedSet<Key>>,
     contextDirtyReaders: readonly Map<
       DirName,
-      readonly Map<DirName, SortedSet<BaseName>>,
+      readonly Map<DirName, SortedSet<Key>>,
     >,
     parentName: DirName,
     mapFun: MapFun,
@@ -1647,11 +1647,11 @@ class EagerDir{
     context.setDir(child.dirName, child);
   }
 
-  fun getArray(context: mutable Context, key: BaseName): Array<File> {
+  fun getArray(context: mutable Context, key: Key): Array<File> {
     this.getIter(context, key).collect(Array);
   }
 
-  fun getIter(context: mutable Context, key: BaseName): mutable Iterator<File> {
+  fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
     this.getIterRaw(key)
@@ -1661,7 +1661,7 @@ class EagerDir{
     context: mutable Context,
     origSourcePath: Path,
     writerPath: Path,
-    k: BaseName,
+    k: Key,
     rvalues: Array<File>,
   ): this {
     origSource = Source::create(origSourcePath);
@@ -1791,7 +1791,7 @@ class EagerDir{
 
   fun purgeSlices(
     context: mutable Context,
-  ): RangeMapList<SKStore.BaseName, SKStore.DirName> {
+  ): RangeMapList<SKStore.Key, SKStore.DirName> {
     slices = RangeMapList[];
     childDirs = SortedSet[];
     for (slice in this.slices) {
@@ -1818,7 +1818,7 @@ class EagerDir{
     slices
   }
 
-  fun unsafeIterKeys(f: (BaseName, Tick) -> void): void {
+  fun unsafeIterKeys(f: (Key, Tick) -> void): void {
     fixedData = this.fixedData.data;
     current = 0;
     this.data.eachWithTick((newKey, tick) -> {
@@ -1861,8 +1861,8 @@ class EagerDir{
   }
 
   fun unsafeGetFileIter(
-    start: ?BaseName = None(),
-  ): mutable Iterator<(BaseName, mutable Iterator<File>)> {
+    start: ?Key = None(),
+  ): mutable Iterator<(Key, mutable Iterator<File>)> {
     this.reducer match {
     | None() -> this.unsafeGetFileIterNoReducer(start)
     | Some(reducer) -> reducer.unsafeIter(start)
@@ -1870,8 +1870,8 @@ class EagerDir{
   }
 
   fun unsafeGetFileIterNoReducer(
-    start: ?BaseName,
-  ): mutable Iterator<(BaseName, mutable Iterator<File>)> {
+    start: ?Key,
+  ): mutable Iterator<(Key, mutable Iterator<File>)> {
     current = mutable IntRef(
       start match {
       | None() -> 0
@@ -1922,7 +1922,7 @@ class EagerDir{
   }
 
   fun unsafeGetFileIterWithReducer(): mutable Iterator<
-    (BaseName, mutable Iterator<File>),
+    (Key, mutable Iterator<File>),
   > {
     current = mutable IntRef(0);
     for (key => _ in this.data) {
@@ -1962,12 +1962,12 @@ class EagerDir{
   }
 
   fun onFiles(
-    process: mutable Iterator<(BaseName, mutable Iterator<File>)> -> void,
+    process: mutable Iterator<(Key, mutable Iterator<File>)> -> void,
   ): void {
     process(this.unsafeGetFileIter())
   }
 
-  fun keys(): SortedSet<BaseName> {
+  fun keys(): SortedSet<Key> {
     fixedData = this.fixedData.data;
     current = 0;
     keys = SortedSet[];
@@ -2034,7 +2034,7 @@ class EagerDir{
 
   fun writeArrayReturnDir(
     context: mutable Context,
-    key: BaseName,
+    key: Key,
     values: Array<File>,
   ): this {
     source = Path::create(this.dirName, key);
@@ -2045,7 +2045,7 @@ class EagerDir{
 
   fun writeArray(
     context: mutable Context,
-    key: BaseName,
+    key: Key,
     values: Array<File>,
   ): void {
     !this = this.writeArrayReturnDir(context, key, values);
@@ -2054,7 +2054,7 @@ class EagerDir{
 
   fun writeArraySourceManyReturnDir(
     context: mutable Context,
-    bindings: mutable Iterator<(BaseName, (Path, Path, Array<File>))>,
+    bindings: mutable Iterator<(Key, (Path, Path, Array<File>))>,
   ): this {
     for (kv in bindings) {
       (key, (origSource, writer, values)) = kv;
@@ -2066,7 +2066,7 @@ class EagerDir{
 
   fun writeArraySourceMany(
     context: mutable Context,
-    bindings: mutable Iterator<(BaseName, (Path, Path, Array<File>))>,
+    bindings: mutable Iterator<(Key, (Path, Path, Array<File>))>,
   ): void {
     !this = this.writeArraySourceManyReturnDir(context, bindings);
     context.setDir(this.dirName, this);
@@ -2074,7 +2074,7 @@ class EagerDir{
 
   fun writeArrayMany(
     context: mutable Context,
-    bindings: mutable Iterator<(BaseName, Array<File>)>,
+    bindings: mutable Iterator<(Key, Array<File>)>,
   ): void {
     this.writeArraySourceMany(
       context,
@@ -2093,7 +2093,7 @@ class EagerDir{
 
   fun getIterator(
     context: mutable Context,
-  ): mutable Iterator<(SKStore.BaseName, mutable Iterator<SKStore.File>)> {
+  ): mutable Iterator<(SKStore.Key, mutable Iterator<SKStore.File>)> {
     path = Path::create(this.dirName.files(), FilesTag());
     context.addDep(path);
     this.unsafeGetFileIter()
@@ -2101,7 +2101,7 @@ class EagerDir{
 
   fun getAllDataIter(
     context: mutable Context,
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, Source, Array<File>)> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
@@ -2110,7 +2110,7 @@ class EagerDir{
 
   fun getDataIterWithoutTombs(
     context: mutable Context,
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, Array<File>)> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
@@ -2122,11 +2122,11 @@ class EagerDir{
     this.totalSize == 0
   }
 
-  fun write(context: mutable Context, baseName: BaseName, value: File): void {
+  fun write(context: mutable Context, baseName: Key, value: File): void {
     this.writeArray(context, baseName, Array[value]);
   }
 
-  fun remove(context: mutable Context, baseName: BaseName): void {
+  fun remove(context: mutable Context, baseName: Key): void {
     this.writeArray(context, baseName, Array[]);
   }
 

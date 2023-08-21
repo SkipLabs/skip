@@ -64,12 +64,12 @@ fun compareRows(
 class RowKey(
   row: RowValues,
   kinds: Array<(Int, IKind, Type)>,
-) extends SKStore.BaseName {
+) extends SKStore.Key {
   static fun create(row: RowValues, kinds: Array<(Int, IKind, Type)>): this {
     static(row, kinds)
   }
 
-  fun compare(other: SKStore.BaseName): Order {
+  fun compare(other: SKStore.Key): Order {
     other match {
     | RowKey(row2, _) -> SKDB.compareRows(this.kinds, this.row, row2)
     | _ -> this.getClassName().compare(other.getClassName())
@@ -237,11 +237,11 @@ class RowValues private (
     Array.concatStringSequence(result)
   }
 
-  fun toKVString(format: SKStore.OutputFormat, _key: SKStore.BaseName): String {
+  fun toKVString(format: SKStore.OutputFormat, _key: SKStore.Key): String {
     this.repeat.toString() + "\t" + this.toStringSingle(format) + "\n"
   }
 
-  fun toKVStringRemove(format: SKStore.OutputFormat, _key: SKStore.BaseName): String {
+  fun toKVStringRemove(format: SKStore.OutputFormat, _key: SKStore.Key): String {
     0.toString() + "\t" + this.toStringSingle(format) + "\n"
   }
 

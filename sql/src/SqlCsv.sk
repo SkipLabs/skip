@@ -185,7 +185,7 @@ fun lwwEdits(
   dir: SKStore.EagerDir,
   row: SKDB.RowValues,
 ): mutable Iterator<
-  (SKStore.BaseName, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
+  (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
 > {
   primaryIdx = primaryIdxOpt match {
   | None() -> invariant_violation("Using LWW without a primary key.")
@@ -302,7 +302,7 @@ fun applyDiffStrategy(
     userFileOpt match {
     | None() -> _ -> true
     | Some(userFile) ->
-      (file: SKStore.BaseName) -> {
+      (file: SKStore.Key) -> {
         file match {
         | k @ SKDB.RowKey _ ->
           SKDB.checkUserCanReadRow(context, userFile, table, k.row) match {
@@ -329,7 +329,7 @@ fun applyDiffStrategy(
     entries = mutable Vector[];
 
     for (row in rows) {
-      key: SKStore.BaseName = SKDB.RowKey(row.setRepeat(1), table.kinds);
+      key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
       for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
         if (tick.value < snapshot.default(0) || source.path() == writer) {
           entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
@@ -347,7 +347,7 @@ fun applyDiffStrategy(
         .filter(row -> row.repeat != 0)
         .map(row -> {
           (k, v) = (SKDB.RowKey(row, table.kinds), Array[row]);
-          ((k : SKStore.BaseName), (writer, writer, (v : Array<SKStore.File>)))
+          ((k : SKStore.Key), (writer, writer, (v : Array<SKStore.File>)))
         }),
     );
 
@@ -371,7 +371,7 @@ fun applyDiffStrategy(
       tick.value < snapshot.default(0) || source.path() == writer;
 
     for (row in rows) {
-      key: SKStore.BaseName = SKDB.RowKey(row, table.kinds);
+      key: SKStore.Key = SKDB.RowKey(row, table.kinds);
       keyRepeat = row.repeat;
       for ((tick, source, files) in dir.getDataIterWithoutTombs(newRoot, key)) {
         if (!isEligibleForTomb(tick, source)) {
@@ -428,7 +428,7 @@ fun applyDiffStrategy(
 
     for (row in rows) {
       if (row.repeat < 1) {
-        key: SKStore.BaseName = SKDB.RowKey(row.setRepeat(1), table.kinds);
+        key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
         for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
           if (tick.value < snapshot.default(0) || source.path() == writer) {
             entries.push((key, (source.path(), writer, Array<SKStore.File>[])));

@@ -20,7 +20,7 @@
 /*****************************************************************************/
 module SKStore;
 
-value class Source(dirName: DirName, baseName: BaseName) uses Orderable {
+value class Source(dirName: DirName, baseName: Key) uses Orderable {
   static fun create(value: Path): this {
     static(value.dirName, value.baseName)
   }
@@ -30,7 +30,7 @@ value class Source(dirName: DirName, baseName: BaseName) uses Orderable {
   }
 }
 
-value class FixedRow<T>(key: BaseName, value: (Source, T), tag: TickRange) {
+value class FixedRow<T>(key: Key, value: (Source, T), tag: TickRange) {
   fun changeSource(source: Source): this {
     !this.value.i0 = source;
     this
@@ -40,16 +40,16 @@ value class FixedRow<T>(key: BaseName, value: (Source, T), tag: TickRange) {
 base class FixedData<T> {
   fun size(): Int;
   fun get(idx: Int): FixedRow<T>;
-  fun getPos(key: BaseName): Int;
-  fun getArray(key: BaseName): Array<(Source, T)>;
-  fun getIter(key: BaseName): mutable Iterator<(Tick, Source, T)>;
+  fun getPos(key: Key): Int;
+  fun getArray(key: Key): Array<(Source, T)>;
+  fun getIter(key: Key): mutable Iterator<(Tick, Source, T)>;
   fun getIterAfter(
     tick: Tick,
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, T)>;
-  fun getArraySourceKey(source: Source, key: BaseName): Array<T>;
-  fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T>;
-  fun getChangesAfter(tick: Tick): SortedSet<BaseName>;
+  fun getArraySourceKey(source: Source, key: Key): Array<T>;
+  fun getIterSourceKey(source: Source, key: Key): mutable Iterator<T>;
+  fun getChangesAfter(tick: Tick): SortedSet<Key>;
   fun getTick(): ?Tick;
 }
 
@@ -120,15 +120,15 @@ class FixedDir<T: frozen> private {
     this.data.unsafe_get(idx)
   }
 
-  fun getPos(key: BaseName): Int {
+  fun getPos(key: Key): Int {
     binSearch(i ~> this.get(i).key, key, 0, this.size() - 1)
   }
 
-  fun getAll(key: BaseName): mutable Iterator<Int> {
+  fun getAll(key: Key): mutable Iterator<Int> {
     findAll(i ~> this.get(i).key, key, 0, this.size() - 1)
   }
 
-  fun getAllSourceKey(source: Source, key: BaseName): mutable Iterator<Int> {
+  fun getAllSourceKey(source: Source, key: Key): mutable Iterator<Int> {
     delta = i ~> {
       entry = this.get(i);
       c = key.compare(entry.key);
@@ -138,22 +138,22 @@ class FixedDir<T: frozen> private {
     findAllBy(delta, 0, this.size() - 1)
   }
 
-  fun getArray(key: BaseName): Array<(Source, T)> {
+  fun getArray(key: Key): Array<(Source, T)> {
     this.getAll(key).map(i ~> this.get(i).value).collect(Array)
   }
 
-  fun getIter(key: BaseName): mutable Iterator<(Tick, Source, T)> {
+  fun getIter(key: Key): mutable Iterator<(Tick, Source, T)> {
     this.getAll(key).map(i -> {
       elt = this.get(i);
       (elt.tag.current, elt.value.i0, elt.value.i1)
     })
   }
 
-  fun getIterSourceKey(source: Source, key: BaseName): mutable Iterator<T> {
+  fun getIterSourceKey(source: Source, key: Key): mutable Iterator<T> {
     this.getAllSourceKey(source, key).map(i -> this.get(i).value.i1)
   }
 
-  fun getArraySourceKey(source: Source, key: BaseName): Array<T> {
+  fun getArraySourceKey(source: Source, key: Key): Array<T> {
     this.getIterSourceKey(source, key).collect(Array)
   }
 
@@ -179,7 +179,7 @@ class FixedDir<T: frozen> private {
 
   fun getChangesAcc(
     after: Tick,
-    acc: mutable Vector<BaseName>,
+    acc: mutable Vector<Key>,
     i: Int,
     j: Int,
   ): void {
@@ -197,7 +197,7 @@ class FixedDir<T: frozen> private {
     this.getChangesAcc(after, acc, pivot + 1, j);
   }
 
-  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+  fun getChangesAfter(tick: Tick): SortedSet<Key> {
     acc = mutable Vector[];
     this.getChangesAcc(tick, acc, 0, this.data.size() - 1);
     result = SortedSet[];
@@ -209,7 +209,7 @@ class FixedDir<T: frozen> private {
 
   fun getKeyChangesAfterIter(
     after: Tick,
-    key: BaseName,
+    key: Key,
     i: Int,
     j: Int,
   ): mutable Iterator<(Tick, Source, T)> {
@@ -239,7 +239,7 @@ class FixedDir<T: frozen> private {
 
   fun getIterAfter(
     limit: Tick,
-    key: BaseName,
+    key: Key,
   ): mutable Iterator<(Tick, Source, T)> {
     this.getKeyChangesAfterIter(limit, key, 0, this.data.size() - 1)
   }
@@ -259,7 +259,7 @@ class FixedDir<T: frozen> private {
 /* Same as FixedDir but with no values. */
 /*****************************************************************************/
 
-value class FixedKey(key: BaseName, tag: TickRange) uses Orderable {
+value class FixedKey(key: Key, tag: TickRange) uses Orderable {
   fun compare(fixedKey2: FixedKey): Order {
     this.key.compare(fixedKey2.key) match {
     | EQ() -> this.tag.current.compare(fixedKey2.tag.current)
@@ -336,7 +336,7 @@ class FixedSet private {data: Array<FixedKey> = Array[]} {
 
   fun getChangesAcc(
     after: Tick,
-    acc: mutable Vector<BaseName>,
+    acc: mutable Vector<Key>,
     i: Int,
     j: Int,
   ): void {
@@ -362,7 +362,7 @@ class FixedSet private {data: Array<FixedKey> = Array[]} {
     this.getChangesAcc(after, acc, pivot + 1, j);
   }
 
-  fun getChangesAfter(tick: Tick): SortedSet<BaseName> {
+  fun getChangesAfter(tick: Tick): SortedSet<Key> {
     acc = mutable Vector[];
     this.getChangesAcc(tick, acc, 0, this.data.size() - 1);
     result = SortedSet[];

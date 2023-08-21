@@ -29,7 +29,7 @@ value class Sub(
   dirName: DirName,
   reset: (SKStore.Context, SKStore.Tick) ~> Bool,
   getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
-  filter: (SKStore.Context, Bool) ~> (BaseName -> Bool) = (_, _) ~> (_ -> true),
+  filter: (SKStore.Context, Bool) ~> (Key -> Bool) = (_, _) ~> (_ -> true),
 )
 
 /*****************************************************************************/
@@ -47,8 +47,8 @@ const debugMode: Bool = false;
 
 // Unused constants. Are defined because of a bug in the compiler ... Sigh.
 
-const dummyDirty: Map<DirName, Set<BaseName>> = Map[];
-const dummyDirtyReaders: Map<DirName, Map<DirName, Set<BaseName>>> = Map[];
+const dummyDirty: Map<DirName, Set<Key>> = Map[];
+const dummyDirtyReaders: Map<DirName, Map<DirName, Set<Key>>> = Map[];
 
 /*****************************************************************************/
 /* The types used to manage dependencies. */
@@ -72,7 +72,7 @@ value class Arrow(parentName: DirName, childName: DirName) uses Orderable
 value class ArrowKey(
   parentName: DirName,
   childName: DirName,
-  key: BaseName,
+  key: Key,
 ) uses Orderable
 
 /*****************************************************************************/
@@ -291,7 +291,7 @@ mutable class Context{
     cmd: CmdKind,
     init: Bool,
     reset: (SKStore.Context, SKStore.Tick) ~> Bool,
-    filter: (Context, Bool) ~> (BaseName -> Bool),
+    filter: (Context, Bool) ~> (Key -> Bool),
     getDestinationWatermark: (readonly Context) ~> ?Tick,
   ): void {
     sub = Sub(
@@ -657,10 +657,10 @@ mutable class Context{
       })
     };
 
-    dirty = mutable Map<DirName, SortedSet<BaseName>>[];
+    dirty = mutable Map<DirName, SortedSet<Key>>[];
     dirtyReaders = mutable Map<
       DirName,
-      mutable Map<DirName, SortedSet<BaseName>>,
+      mutable Map<DirName, SortedSet<Key>>,
     >[];
 
     loop {
@@ -751,7 +751,7 @@ mutable class Context{
   mutable fun mkdir<T: File>(
     conv: File ~> T,
     dirName: DirName,
-    content: Array<(BaseName, T)> = Array[],
+    content: Array<(Key, T)> = Array[],
   ): EHandle<T> {
     this.mkdirMulti(
       dirName,
@@ -765,7 +765,7 @@ mutable class Context{
 
   mutable fun mkdirMulti(
     dirName: DirName,
-    content: Array<(BaseName, Array<File>)> = Array[],
+    content: Array<(Key, Array<File>)> = Array[],
   ): void {
     if (this.dirs.state.containsKey(dirName)) {
       throw DirAlreadyExists(dirName);
@@ -773,7 +773,7 @@ mutable class Context{
     !content = content.sortedBy(x ~> x.i0);
     vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
     valueAcc = mutable Vector[];
-    last: ?BaseName = None();
+    last: ?Key = None();
     time = this.timeStamp();
     tick = this.tick;
 

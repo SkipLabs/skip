@@ -45,7 +45,7 @@ fun splitPath(path: String): (String, String) {
     }
   };
   if (baseNameChars.size() == 0) {
-    error("Invalid path, missing BaseName");
+    error("Invalid path, missing Key");
   };
   dirName = String::fromChars(dirNameChars.toArray());
   baseName = String::fromChars(baseNameChars.toArray());
@@ -57,9 +57,9 @@ native fun hashCombine(Int, Int): Int;
 
 class Path(
   dirName: DirName,
-  baseName: BaseName,
+  baseName: Key,
 ) extends FileName uses Orderable {
-  static fun create(dirName: DirName, baseName: BaseName): this {
+  static fun create(dirName: DirName, baseName: Key): this {
     static(dirName, baseName)
   }
 
@@ -79,7 +79,7 @@ class DirName(
   dirName: String,
   hashTag1: Int,
   hashTag2: Int,
-) extends BaseName uses Hashable {
+) extends Key uses Hashable {
   static fun create(dirName: String): DirName {
     !dirName = dirName.lowercase();
     static::validateDirName(dirName);
@@ -88,7 +88,7 @@ class DirName(
     static(dirName, dirNameHash1, dirNameHash2)
   }
 
-  fun compare(base: BaseName): Order {
+  fun compare(base: Key): Order {
     base match {
     | dir @ DirName _ ->
       this.hashTag1.compare(dir.hashTag1) match {
@@ -156,7 +156,7 @@ class DirName(
 
   fun sub(str: String): this {
     validator = mutable SKStoreImpl.NameValidator(str, str.chars(), 0);
-    validator.mustBeBaseName();
+    validator.mustBeKey();
     DirName::create(this.dirName + str + "/")
   }
 
@@ -165,7 +165,7 @@ class DirName(
   }
 }
 
-base class BaseName extends FileName uses Orderable {
+base class Key extends FileName uses Orderable {
   overridable fun toKVStringRemove(_csv: OutputFormat): String {
     "" + escape(this.toString()) + "\t\n"
   }
@@ -180,31 +180,31 @@ base class BaseName extends FileName uses Orderable {
   }
 }
 
-class DirTag() extends BaseName {
+class DirTag() extends Key {
   fun toString(): String {
     "DirTag()"
   }
 }
 
-class SizeTag() extends BaseName {
+class SizeTag() extends Key {
   fun toString(): String {
     "SizeTag()"
   }
 }
 
-class FilesTag() extends BaseName {
+class FilesTag() extends Key {
   fun toString(): String {
     "FilesTag()"
   }
 }
 
-class IsEmptyTag() extends BaseName {
+class IsEmptyTag() extends Key {
   fun toString(): String {
     "IsEmptyTag()"
   }
 }
 
-class IID(value: Int) extends BaseName {
+class IID(value: Int) extends Key {
   static fun create(key: String): IID {
     chars = Vector::mcreateFromItems(key.chars());
     chars.reverse();
@@ -225,7 +225,7 @@ class IID(value: Int) extends BaseName {
     this.value.toString()
   }
 }
-class SID(value: String) extends BaseName {
+class SID(value: String) extends Key {
   static fun create(value: String): this {
     SID(value)
   }
@@ -290,7 +290,7 @@ mutable class NameValidator(
     };
     while (this.idx < this.chars.size() - 1) {
       this.mustBeSlash();
-      this.mustBeBaseName();
+      this.mustBeKey();
     };
     this.mustBeSlash();
     if (!this.reachedEnd()) {
@@ -321,7 +321,7 @@ mutable class NameValidator(
     }
   }
 
-  mutable fun mustBeBaseName(): void {
+  mutable fun mustBeKey(): void {
     if (this.reachedEnd() || this.current() == '/') {
       this.error(`Empty baseName ${this.dirName}`);
     };

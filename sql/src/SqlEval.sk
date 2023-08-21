@@ -270,7 +270,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   fun write(
     context: mutable SKStore.Context,
     dirName: SKStore.DirName,
-    key: SKStore.BaseName,
+    key: SKStore.Key,
     value: SKStore.File,
   ): void {
     context.getEagerDir(dirName).write(context, key, value);
@@ -279,7 +279,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   fun writeArray(
     context: mutable SKStore.Context,
     dirName: SKStore.DirName,
-    key: SKStore.BaseName,
+    key: SKStore.Key,
     values: Array<SKStore.File>,
   ): void {
     context.getEagerDir(dirName).writeArray(context, key, values);
@@ -1409,7 +1409,7 @@ class StdoutDiff(
   format: SKStore.OutputFormat,
   dirName: SKStore.DirName,
   time: SKStore.Tick,
-  filter: (SKStore.Context, Bool) ~> (SKStore.BaseName -> Bool),
+  filter: (SKStore.Context, Bool) ~> (SKStore.Key -> Bool),
   getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
 ) extends SKStore.File
 
@@ -1733,7 +1733,7 @@ class InvalidTrackedQuery() extends Exception {
   }
 }
 
-class TrackedQuery(query: String, start: Int, end: ?Int) extends SKStore.BaseName {
+class TrackedQuery(query: String, start: Int, end: ?Int) extends SKStore.Key {
   fun toString(): String {
     inspect(this).toString()
   }

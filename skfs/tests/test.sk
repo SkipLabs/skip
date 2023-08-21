@@ -86,7 +86,7 @@ fun testDB(): void {
         };
         customers = customerTable.getArray(
           context,
-          SKStore.BaseName::create(customerID),
+          SKStore.Key::create(customerID),
         );
         if (customers.size() == 0) return Array[];
         customer = customers[0];
@@ -174,7 +174,7 @@ fun genDir{
       nbrRead = random.random(0, maxReadPerDir);
       for (_ in Range(0, nbrRead)) {
         readKey = random.random(0, dir.fixedData.data.size());
-        fileName = SKStore.BaseName::create(readKey.toString());
+        fileName = SKStore.Key::create(readKey.toString());
         if (readKeys.contains(fileName)) continue;
         readKeys.add(fileName);
         readValues.push((fileName, dir.getArray(context, fileName)));
@@ -254,7 +254,7 @@ fun testGen(): void {
     saveState = mutable Map<String, Array<IntFile>>[];
     for (key in Range(0, inputDirSize)) {
       keyStr = key.toString();
-      baseName = SKStore.BaseName::create(keyStr);
+      baseName = SKStore.Key::create(keyStr);
       arr = dir.getArray(context, baseName);
       saveState![keyStr] = arr;
     };
@@ -278,7 +278,7 @@ fun testGen(): void {
     dir = context.getDir(SKStore.DirRef<IntFile>(SKStore.DirName::create(dirName)));
     for (key in Range(0, inputDirSize)) {
       keyStr = key.toString();
-      baseName = SKStore.BaseName::create(keyStr);
+      baseName = SKStore.Key::create(keyStr);
       arr = dir.getArray(context, baseName);
       if (savedDirs[dirName][keyStr] != arr) {
         print_string("Error: should be equal in " + dirName + keyStr);
@@ -306,7 +306,7 @@ fun testUpdate(): void {
       if (file2[0] == IntFile(22)) {
         Array[
           (key, Array[IntFile(file[0].value + file2[0].value)]),
-          (SKStore.BaseName::create("22"), Array[IntFile(22)]),
+          (SKStore.Key::create("22"), Array[IntFile(22)]),
         ]
       } else {
         Array[(key, Array[IntFile(file[0].value + file2[0].value)])]
@@ -342,13 +342,13 @@ const falseFile: BoolFile = BoolFile{data => "false"};
 class IDFile{} extends SKStore.File
 
 class IntFile(value: Int) extends SKStore.File {
-  fun getKey(): SKStore.BaseName {
+  fun getKey(): SKStore.Key {
     SKStore.SID::create("K" + this.value)
   }
 }
 
 class CalendarEvent{
-  userID: SKStore.BaseName,
+  userID: SKStore.Key,
   start: Int,
   end: Int,
   description: String,

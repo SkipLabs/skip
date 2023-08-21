@@ -3,7 +3,7 @@
 /*****************************************************************************/
 module SKStore;
 
-class CyclicExn(BaseName) extends Exception, File {
+class CyclicExn(Key) extends Exception, File {
   fun toString(): String {
     inspect(this).toString()
   }
@@ -21,8 +21,8 @@ base class LazyResult {
 class LazyDir{
   time: Time,
   dirName: DirName,
-  data: SortedMap<BaseName, LazyResult> = SortedMap[],
-  lazyFun: ((mutable Context, BaseName) ~> LazyResult),
+  data: SortedMap<Key, LazyResult> = SortedMap[],
+  lazyFun: ((mutable Context, Key) ~> LazyResult),
   collect: Bool,
 } extends Dir {
   fun isInput(): Bool {
@@ -37,7 +37,7 @@ class LazyDir{
     context.setDir(this.dirName, this);
   }
 
-  fun keys(): SortedSet<BaseName> {
+  fun keys(): SortedSet<Key> {
     keys = SortedSet[];
     for (newKey => value in this.data) {
       if (value is LDefined _) {
@@ -58,11 +58,11 @@ class LazyDir{
   static fun create(
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, DirName, BaseName) ~> ?Array<File>,
+    f: (mutable Context, DirName, Key) ~> ?Array<File>,
     collect: Bool = true,
   ): Dir {
     time = context.timeStamp();
-    lazyFun = (context: mutable Context, key: BaseName) ~> {
+    lazyFun = (context: mutable Context, key: Key) ~> {
       dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = LCycle();
       context.setDir(dirName, dir);
@@ -116,7 +116,7 @@ class LazyDir{
     }
   }
 
-  fun getArrayRaw(key: BaseName): Array<File> {
+  fun getArrayRaw(key: Key): Array<File> {
     this.data.maybeGet(key) match {
     | Some(LDefined(arr, _)) -> arr
     | _ -> Array[]
@@ -125,7 +125,7 @@ class LazyDir{
 
   fun update(
     context: mutable Context,
-    dirtyReadersOpt: ?readonly Map<DirName, SortedSet<BaseName>>,
+    dirtyReadersOpt: ?readonly Map<DirName, SortedSet<Key>>,
   ): void {
     dirtyReaders = SortedSet[];
     firstDirtyReaders = dirtyReadersOpt match {
@@ -133,10 +133,10 @@ class LazyDir{
     | Some(m) -> m
     };
 
-    for (dirtyReaderDirName => dirtyReaderBaseNames in firstDirtyReaders) {
-      for (dirtyReaderBaseName in dirtyReaderBaseNames) {
+    for (dirtyReaderDirName => dirtyReaderKeys in firstDirtyReaders) {
+      for (dirtyReaderKey in dirtyReaderKeys) {
         !dirtyReaders = dirtyReaders.set(
-          Path::create(dirtyReaderDirName, dirtyReaderBaseName),
+          Path::create(dirtyReaderDirName, dirtyReaderKey),
         );
       }
     };
@@ -162,7 +162,7 @@ class LazyDir{
 
   fun unsafeGetArray(
     context: mutable Context,
-    key: BaseName,
+    key: Key,
     isAsync: Bool = false,
     throwOnCycle: Bool = true,
   ): Array<File> {
@@ -192,7 +192,7 @@ class LazyDir{
     }
   }
 
-  fun getArray(context: mutable Context, key: BaseName): Array<File> {
+  fun getArray(context: mutable Context, key: Key): Array<File> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
     this.unsafeGetArray(context, key, false, true)
@@ -200,7 +200,7 @@ class LazyDir{
 
   fun getArrayWithOptions(
     context: mutable Context,
-    key: BaseName,
+    key: Key,
     isAsync: Bool = false,
     throwOnCycle: Bool = true,
   ): Array<File> {
@@ -209,11 +209,11 @@ class LazyDir{
     this.unsafeGetArray(context, key, isAsync, throwOnCycle)
   }
 
-  fun getIter(context: mutable Context, key: BaseName): mutable Iterator<File> {
+  fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     this.getArray(context, key).iterator()
   }
 
-  fun getArrayAsync(context: mutable Context, key: BaseName): Array<File> {
+  fun getArrayAsync(context: mutable Context, key: Key): Array<File> {
     path = Path::create(this.dirName, key);
     context.addDep(path);
     this.unsafeGetArray(context, key, true)
