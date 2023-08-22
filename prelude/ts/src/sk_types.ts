@@ -625,9 +625,15 @@ export async function run(
   modules : Array<string>,
   envs : Map<string, Array<string>>,
   main ?: string,
+  getWasmSource?: () => Promise<Uint8Array>,
 ) {
   let env = await loadEnv(envs);
-  let wasm = await import("./" + wasm64 + ".wasm.mjs");
-  let buffer = env.base64Decode(wasm.base64);
+  let buffer: Uint8Array;
+  if (getWasmSource) {
+    buffer = await getWasmSource();
+  } else {
+    let wasm = await import("./" + wasm64 + ".wasm.mjs");
+    buffer = env.base64Decode(wasm.base64);
+  }
   return await start(modules, buffer, env, main);
 }

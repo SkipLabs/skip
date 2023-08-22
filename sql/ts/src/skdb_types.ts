@@ -19,8 +19,8 @@ export interface Utility {
 export interface SKDB {
   subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
 
-  sqlRaw: (query: string, server?: boolean) => Promise<string>;
-  sql: (query: string, server?: boolean) => Promise<Array<any>>;
+  sqlRaw: (query: string, params: Map<string, string|number>, server?: boolean) => Promise<string>;
+  sql: (query: string, params: Map<string, string|number>, server?: boolean) => Promise<Array<any>>;
   cmd: (new_args: Array<string>, new_stdin: string) => Promise<string>;
   tableExists: (tableName: string) => Promise<boolean>;
   tableSchema: (tableName: string, server?: boolean) => Promise<string>;
@@ -69,8 +69,8 @@ export interface Server {
   tableSchema: (tableName: string) => Promise<string>;
   viewSchema: (viewName: string) => Promise<string>;
   mirrorTable: (tableName: string, filterExpr?: string) => Promise<void>;
-  sqlRaw: (query: string) => Promise<string>;
-  sql: (query: string) => Promise<Array<any>>;
+  sqlRaw: (query: string, params: Map<string, string|number>) => Promise<string>;
+  sql: (query: string, params: Map<string, string|number>) => Promise<Array<any>>;
   close(): void;
 }
 
