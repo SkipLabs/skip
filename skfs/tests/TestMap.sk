@@ -1,25 +1,31 @@
 module SKStoreTest;
 
 fun testMap(): mutable SKStore.Context {
-  data = Array[(SKStore.IID(1), SKStore.IntFile(1)), (SKStore.IID(2), SKStore.IntFile(2))];
+  data = Array[
+    (SKStore.IID(1), SKStore.IntFile(1)),
+    (SKStore.IID(2), SKStore.IntFile(2)),
+  ];
   SKStore.run(context ~> {
     dir1 = context.mkdir(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       SKStore.DirName::create("/dir1/"),
       data,
     );
-    dir2 = dir1.contextWriterMap(
-      SKStore.IntFile::fromFile,
+    dir2 = dir1.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/dir2/"),
-      (_context, writer, v) ~> writer.write(SKStore.IID(0), v),
+      (_context, writer, _, v) ~> writer.set(SKStore.IID(0), v.first),
     );
-    _dir3 = dir2.contextWriterKeyValues(
-      SKStore.IntFile::fromFile,
+    _dir3 = dir2.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/dir3/"),
-      (_context, writer, _key, v) ~> {
-        writer.writeArray(SKStore.IID(1), v)
+      (_context, writer, _key, values) ~> {
+        writer.set(SKStore.IID(1), values.first)
       },
     );
   });
@@ -36,35 +42,50 @@ fun testMap2(): mutable SKStore.Context {
   ];
   SKStore.run(context ~> {
     dirStr1 = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/dirStr1/"),
       dataStr1,
     );
     dirStr2 = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/dirStr2/"),
       dataStr2,
     );
     dir1 = dirStr1.map(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/dir1/"),
-      (v ~> SKStore.IntFile(v.value.toInt())),
+      ((_context, writer, key, values) ~>
+        writer.set(key, SKStore.IntFile(values.first.value.toInt()))),
     );
     dir2 = dirStr2.map(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/dir2/"),
-      (v ~> SKStore.IntFile(v.value.toInt())),
+      ((_, writer, key, values) ~>
+        writer.set(key, SKStore.IntFile(values.first.value.toInt()))),
     );
-    _dir3 = dir1.contextWriterKeyMap(
-      SKStore.IntFile::fromFile,
+    _dir3 = dir1.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/dir3/"),
-      (context, writer, key, v) ~> {
+      (context, writer, key, values) ~> {
         dirName = SKStore.DirName::create("/dir3/" + key + "/");
-        _ = dir2.map(SKStore.IntFile::fromFile, context, dirName, (v) ~> v);
-        writer.write(key, v);
+        _ = dir2.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          dirName,
+          (_, writer, key, values) ~>
+            writer.setArray(key, values.collect(Array))
+          ,
+        );
+        writer.set(key, values.first);
       },
     );
   });

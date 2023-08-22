@@ -6,18 +6,21 @@ module SKStoreTest;
 fun testLazy(): void {
   context = SKStore.run(context ~> {
     dirInput = context.mkdir(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       SKStore.DirName::create("/input/"),
       Array[(SKStore.IID(0), SKStore.IntFile(23))],
     );
 
     dirInput2 = context.mkdir(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       SKStore.DirName::create("/input2/"),
       Array[(SKStore.IID(0), SKStore.IntFile(44))],
     );
     dir1 = SKStore.LHandle::create(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/lazy1/"),
       (context, _self, x) ~> {
@@ -26,14 +29,14 @@ fun testLazy(): void {
             x match {
             | SKStore.IID(v) ->
               dirInput.getArray(context, SKStore.IID(0))[0].value + v
-            | _ -> T.fail()
             },
           ),
         ]
       },
     );
     dir2 = SKStore.LHandle::create(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/lazy2/"),
       (context, _self, key) ~> {
@@ -42,7 +45,8 @@ fun testLazy(): void {
     );
 
     adir1 = SKStore.LHandle::createAsync(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/alazy1/"),
       (context, _self, x) ~> {
@@ -52,7 +56,6 @@ fun testLazy(): void {
               x match {
               | SKStore.IID(v) ->
                 dirInput.getArray(context, SKStore.IID(0))[0].value + v
-              | _ -> T.fail()
               },
             ),
           ],
@@ -60,21 +63,25 @@ fun testLazy(): void {
       },
     );
     _adir2 = SKStore.LHandle::createAsync(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/alazy2/"),
       (context, _self, key) ~> {
         arr = adir1.getArrayAsync(context, key);
-        if (arr.size() == 0) None() else Some(Array[SKStore.IntFile(arr[0].value)])
+        if (arr.size() == 0) None() else {
+          Some(Array[SKStore.IntFile(arr[0].value)])
+        }
       },
     );
 
-    _dir3 = dirInput2.contextWriterKeyMap(
-      SKStore.IntFile::fromFile,
+    _dir3 = dirInput2.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/eager/"),
       (context, writer, key, _) ~> {
-        writer.write(key, dir2.getArray(context, key)[0]);
+        writer.set(key, dir2.getArray(context, key)[0]);
       },
     )
   });

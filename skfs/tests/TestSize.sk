@@ -6,7 +6,8 @@ module SKStoreTest;
 fun testSize(): void {
   context = SKStore.run(context ~> {
     dirSInput = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/sinput/"),
       Array[
         (SKStore.IID(0), SKStore.StringFile("23")),
@@ -14,11 +15,14 @@ fun testSize(): void {
       ],
     );
 
-    _dir = dirSInput.contextMap(
-      SKStore.IntFile::fromFile,
+    _dir = dirSInput.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/input/"),
-      (context, _) ~> SKStore.IntFile(dirSInput.size(context)),
+      (context, writer, key, _values) ~>
+        writer.set(key, SKStore.IntFile(dirSInput.size(context)))
+      ,
     );
   });
 

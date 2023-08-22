@@ -9,15 +9,21 @@ fun testCreateDir(): void {
   _ = SKStore.runWithGcReturnContext(SKStore.Context{}, context ~> {
     dirName = SKStore.DirName::create("/tmp/");
     mappedDirName = SKStore.DirName::create("/tmp/mapped/");
-    dir = context.mkdir(SKStore.StringFile::fromFile, dirName, Array[]);
-    _ = dir.contextWriterKeyValues(
-      SKStore.StringFile::fromFile,
+    dir = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
+      dirName,
+      Array[],
+    );
+    _ = dir.map(
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       context,
       mappedDirName,
       (_context, writer, key, files) ~> {
-        writer.writeArray(
+        writer.setArray(
           key,
-          files.map(file -> {
+          files.collect(Array).map(file -> {
             !file.value = file.value + "Mapped";
             file
           }),

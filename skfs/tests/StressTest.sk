@@ -66,13 +66,19 @@ base class DirValue{name: String} {
 /* Interpreter using SKStore. */
 /*****************************************************************************/
 
-fun merge(l1: List<SKStore.IntFile>, l2: List<SKStore.IntFile>): List<SKStore.IntFile> {
+fun merge(
+  l1: List<SKStore.IntFile>,
+  l2: List<SKStore.IntFile>,
+): List<SKStore.IntFile> {
   (l1, l2) match {
   | (List.Nil(), l)
   | (l, List.Nil()) ->
     l
   | (List.Cons(x1, rl1), List.Cons(x2, rl2)) ->
-    List.Cons(SKStore.IntFile((x1.value + x2.value) % VALUE_SIZE), merge(rl1, rl2))
+    List.Cons(
+      SKStore.IntFile((x1.value + x2.value) % VALUE_SIZE),
+      merge(rl1, rl2),
+    )
   }
 }
 
@@ -93,7 +99,7 @@ fun eval(
           key +
           " => " +
           dir.getArrayRaw(key).map(x ->
-            SKStore.IntFile::fromFile(x).value.toString()
+            SKStore.IntFile::type(x).value.toString()
           ),
       );
     }
@@ -109,7 +115,8 @@ fun makeEnv(context: mutable SKStore.Context, inputs: List<Input>): void {
       }
     };
     _ = context.mkdir(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       SKStore.DirName::create(input.name),
       data.toArray(),
     );
@@ -179,7 +186,7 @@ fun evalSub(
 ): List<SKStore.DirName> {
   sumAcc = 0;
 
-  currentValues = currentFiles.map(x -> SKStore.IntFile::fromFile(x).value);
+  currentValues = currentFiles.map(x -> SKStore.IntFile::type(x).value);
 
   for (elt in currentValues) {
     !sumAcc = sumAcc + elt;
@@ -211,23 +218,21 @@ fun evalSub(
       context,
       dir.dirName,
       subDirName,
-      (context, writer, localKey, valueIter) ~> {
-        iterator = SKStore.IteratorWithIsEmpty::create(valueIter);
-        if (iterator.isEmpty()) return void;
+      (context, writer, localKey, iterator) ~> {
         localSum = sum;
         for (readDirName in readDirs) {
           readDir = context.unsafeGetDir(readDirName);
           read = readDir.getArray(context, localKey).map(x ->
-            SKStore.IntFile::fromFile(x)
+            SKStore.IntFile::type(x)
           );
           for (value in read) {
             !localSum = localSum + value.value
           };
         };
         for (value in iterator) {
-          !localSum = localSum + SKStore.IntFile::fromFile(value).value;
+          !localSum = localSum + SKStore.IntFile::type(value).value;
         };
-        writer.write(localKey, SKStore.IntFile(localSum))
+        writer.set(localKey, SKStore.IntFile(localSum))
       },
       None(),
       if (
@@ -266,15 +271,15 @@ fun evalLFun(
     | _ -> T.fail()
     };
     read = dir
-      .getArray(context, SKStore.IID(SKStore.IntFile::fromFile(value).value))
-      .map(x -> SKStore.IntFile::fromFile(x));
+      .getArray(context, SKStore.IID(SKStore.IntFile::type(value).value))
+      .map(x -> SKStore.IntFile::type(x));
     !reads = List.Cons(read, reads);
   };
 
   result = 0;
   for (ilist in reads) {
     for (x in ilist) {
-      !result = result + SKStore.IntFile::fromFile(x).value;
+      !result = result + SKStore.IntFile::type(x).value;
     }
   };
   keyValue = key match {
@@ -285,7 +290,7 @@ fun evalLFun(
     thisDir = context.unsafeGetLazyDir(SKStore.DirName::create(thisDirName));
     !result =
       result +
-      SKStore.IntFile::fromFile(
+      SKStore.IntFile::type(
         thisDir.getArray(context, SKStore.IID(keyValue / 2))[0],
       ).value;
   };
@@ -315,8 +320,8 @@ fun evalFun(
     dir = context.unsafeGetDir(dirName);
     value = currentValues[0];
     read = dir
-      .getArray(context, SKStore.IID(SKStore.IntFile::fromFile(value).value))
-      .map(x -> SKStore.IntFile::fromFile(x));
+      .getArray(context, SKStore.IID(SKStore.IntFile::type(value).value))
+      .map(x -> SKStore.IntFile::type(x));
     !reads = List.Cons(read, reads);
   };
 
@@ -325,14 +330,14 @@ fun evalFun(
   for (ilist in frozenReads) {
     !result = merge(
       result,
-      List::createFromItems(ilist).map(x -> SKStore.IntFile::fromFile(x)),
+      List::createFromItems(ilist).map(x -> SKStore.IntFile::type(x)),
     );
   };
   out = Array::createFromItems(result);
 
   allValues = SortedMap[];
   for (file in out) {
-    key = SKStore.IID(SKStore.IntFile::fromFile(file).value);
+    key = SKStore.IID(SKStore.IntFile::type(file).value);
     if (!allValues.containsKey(key)) !allValues[key] = mutable Vector[];
     allValues[key].push(
       SKStore.IntFile(
@@ -345,7 +350,7 @@ fun evalFun(
   };
 
   for (key => values in allValues) {
-    writer.writeArray(key, values.toArray())
+    writer.setArray(key, values.toArray())
   };
 }
 
@@ -374,8 +379,8 @@ fun compareContext(
     dir2 = context2.unsafeGetDir(dirName);
     isLazy = dir2.getDirName().toString().contains("LAZY");
     for (key in dirFiles) {
-      values1 = dir.getArrayRaw(key).map(x -> SKStore.IntFile::fromFile(x));
-      values2 = dir2.getArrayRaw(key).map(x -> SKStore.IntFile::fromFile(x));
+      values1 = dir.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
+      values2 = dir2.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
       if (dir2 is SKStore.LazyDir _) {
         if (values1 == Array[] || values2 == Array[]) continue;
       };
@@ -390,7 +395,7 @@ fun compareContext(
         | SKStore.EagerDir{fixedData} ->
           for (fixed in fixedData.getIter(key)) {
             (_, k, _, files) = fixed;
-            intFiles = files.map(file -> SKStore.IntFile::fromFile(file));
+            intFiles = files.map(file -> SKStore.IntFile::type(file));
             print_string(`FIXED  ${k.path()} => ${intFiles}`)
           }
         | _ -> void
@@ -405,7 +410,7 @@ fun compareContext(
           | Some(SKStore.LDelayed()) ->
             print_string("EMPTY DATA")
           | Some(SKStore.LDefined(files, _)) ->
-            intFiles = files.map(file -> SKStore.IntFile::fromFile(file));
+            intFiles = files.map(file -> SKStore.IntFile::type(file));
             print_string(`       ${intFiles}`)
           }
         | SKStore.EagerDir{data} ->
@@ -414,7 +419,7 @@ fun compareContext(
           | Some(sources) ->
             for (tickSource => files in sources) {
               (_, k, _) = tickSource;
-              intFiles = files.map(file -> SKStore.IntFile::fromFile(file));
+              intFiles = files.map(file -> SKStore.IntFile::type(file));
               print_string(`       ${k.path()} => ${intFiles}`)
             }
           }
@@ -426,7 +431,7 @@ fun compareContext(
         | SKStore.EagerDir{fixedData} ->
           for (fixed in fixedData.getIter(key)) {
             (_, k, _, files) = fixed;
-            intFiles = files.map(file -> SKStore.IntFile::fromFile(file));
+            intFiles = files.map(file -> SKStore.IntFile::type(file));
             print_string(`FIXED  ${k.path()} => ${intFiles}`)
           }
         | _ -> void
@@ -618,7 +623,7 @@ fun testStress(): void {
   _ = SKStore.runWithGcReturnContext(origContext, context ~> {
     round = context.getGlobal("ROUND") match {
     | None() -> 0
-    | Some(x) -> SKStore.IntFile::fromFile(x).value
+    | Some(x) -> SKStore.IntFile::type(x).value
     };
     context.replaceFromSaved(origContext);
     if (SKStore.debugMode) {
