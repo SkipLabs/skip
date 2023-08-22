@@ -714,10 +714,12 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
         {
           newContext = SKStore.gContextGet();
           followMode &&
-            {
-              (newIsReset, newChanges) = newContext
-                .unsafeGetEagerDir(dirName)
-                .getChangesAfter(SKStore.Tick(tick));
+            newContext.unsafeMaybeGetEagerDir(dirName) match {
+            | None() -> false
+            | Some(dir) ->
+              (newIsReset, newChanges) = dir.getChangesAfter(
+                SKStore.Tick(tick),
+              );
               !newIsReset && newChanges.isEmpty()
             }
         }

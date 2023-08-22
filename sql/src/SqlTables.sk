@@ -104,6 +104,22 @@ fun setFinalState(
   }
 }
 
+fun errorAllExistingSubs(
+  context: mutable SKStore.Context,
+  dir: SKStore.DirName,
+): void {
+  context.sessions.values().each(sub ->
+    if (sub.dirName == dir && sub.destinationSource is Some _) {
+      setFinalState(context, sub.destinationSource.fromSome(), RSError());
+      lock = SKStore.unfreezeLock(sub.lock);
+      SKStore.mutexLock(lock);
+      cond = SKStore.unfreezeCond(sub.cond);
+      _ = SKStore.condBroadcast(cond);
+      SKStore.mutexUnlock(lock)
+    }
+  )
+}
+
 extension class TypeDescr extends SKStore.File
 
 class DirDescr{
