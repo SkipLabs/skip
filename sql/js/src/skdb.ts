@@ -381,6 +381,8 @@ export class SKDB {
     let field_names: Array<string> = new Array();
     let objectIdx = 0;
     let object: {[k: string]: any} = {};
+    let exceptionIdx = 0;
+    let exceptions = new Map<number, Error>();
     return {
       abort: function (err) {
         throw new Error("abort " + err);
@@ -435,7 +437,7 @@ export class SKDB {
         if (data.current_stdin >= data.stdin.length) {
           return -1;
         }
-        while (data.stdin.charCodeAt(data.current_stdin) !== 10) {
+        while (data.stdin.charCodeAt(data.current_stdin) !== endOfLine) {
           if (data.current_stdin >= data.stdin.length) {
             if (data.lineBuffer.length == 0) {
               return -1;
@@ -528,6 +530,21 @@ export class SKDB {
       },
       SKIP_glock: function () {},
       SKIP_gunlock: function () {},
+      SKIP_delete_external_exception: function (exc: number) {
+        exceptions.delete(exc);
+      },
+      SKIP_get_external_exception_message: function (exc: number) {
+        let msg : string;
+        if (exceptions.has(exc)) {
+          msg = exceptions.get(exc)!.message;
+        } else {
+          msg = "No message supplied"
+        }
+        return encodeUTF8(data.exports,msg);
+      },
+      SKIP_js_open_flags: function(read: boolean, write: boolean, append: boolean, truncate: boolean, create: boolean, create_new: boolean) {
+        return 0;
+      }
     };
   }
 

@@ -371,6 +371,11 @@ untracked fun main(): void {
   SKStore.destroyObstack(saved);
 }
 
+@wasm_export("SKDB_factory")
+untracked fun factory(): void {
+  main();
+}
+
 private fun ensureContext(args: Cli.ParseResults): void {
   if (SKStore.gHasContext() == 0) {
     invariant(args.maybeGetString("data") is None _);
