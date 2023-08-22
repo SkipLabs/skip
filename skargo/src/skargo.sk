@@ -79,16 +79,16 @@ private fun findUserConfig(): UserConfig {
     };
     !path = Path.parentname(path)
   };
-  congif = UserConfig{};
+  config = UserConfig{};
   configFiles.reversed().each(cFile ->
     try {
-      jso = JSON.decode(FileSystem.readTextFile(cFile)).expectObject();
-      !congif = congif.update(jso);
+      json = JSON.decode(FileSystem.readTextFile(cFile)).expectObject();
+      !config = config.update(json);
     } catch {
     | _exn -> void
     }
   );
-  congif
+  config
 }
 
 private fun run(args: Array<String>, verbose: Bool): void {
