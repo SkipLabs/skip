@@ -145,51 +145,20 @@ class EReducer<V2, V3: File>{
 }
 
 /*****************************************************************************/
+/* A few predefined Reducers. */
+/*****************************************************************************/
+
+/*****************************************************************************/
 /* The preferred way of accessing the file-system. */
 /*****************************************************************************/
 
-base class Handle<+K: Orderable, +V: frozen> {
+base class Handle<+K: Key, +V: File> {
   macro fun getDirName(): DirName {
     this.dirName
   }
 
   macro overridable fun getType(): SKStore.File ~> V {
     this.type
-  }
-
-  fun getArray(context: mutable Context, key: Key): Array<V> {
-    dir = context.unsafeGetDir(this.getDirName());
-    dir.getArray(context, key).map(this.getType())
-  }
-
-  fun getIter(context: mutable Context, key: Key): mutable Iterator<V> {
-    dir = context.unsafeGetDir(this.getDirName());
-    dir.getIter(context, key).map(this.getType())
-  }
-
-  fun get(context: mutable Context, key: Key): V {
-    values = this.getArray(context, key);
-    if (values.size() >= 2) {
-      msg = `Error: Duplicate keys '${key}' in '${this.getDirName()}'`;
-      print_error(msg);
-      invariant_violation(msg);
-    };
-    if (values.size() == 0) {
-      msg = `Error: No value for keys '${key}' in '${this.getDirName()}'`;
-      print_error(msg);
-      invariant_violation(msg);
-    };
-    values[0]
-  }
-
-  fun containsKey(context: mutable Context, key: Key): Bool {
-    this.getArray(context, key).size() > 0
-  }
-
-  fun maybeGet(context: mutable Context, key: Key): ?V {
-    values = this.getArray(context, key);
-    if (values.size() == 0) return None();
-    Some(values[0])
   }
 }
 
@@ -455,19 +424,54 @@ class EHandle<K: Key, V: File>(
 
   fun writeArray<U: File>[V: U](
     context: mutable Context,
-    key: Key,
+    key: K,
     values: Array<U>,
   ): void {
     dir = context.unsafeGetEagerDir(this.dirName);
     dir.writeArray(context, key, values);
   }
 
-  fun unsafeGetArray(context: mutable Context, key: Key): Array<V> {
+  fun getArray(context: mutable Context, key: K): Array<V> {
+    dir = context.unsafeGetDir(this.getDirName());
+    dir.getArray(context, key).map(this.getType())
+  }
+
+  fun getIter(context: mutable Context, key: K): mutable Iterator<V> {
+    dir = context.unsafeGetDir(this.getDirName());
+    dir.getIter(context, key).map(this.getType())
+  }
+
+  fun get(context: mutable Context, key: K): V {
+    values = this.getArray(context, key);
+    if (values.size() >= 2) {
+      msg = `Error: Duplicate keys '${key}' in '${this.getDirName()}'`;
+      print_error(msg);
+      invariant_violation(msg);
+    };
+    if (values.size() == 0) {
+      msg = `Error: No value for keys '${key}' in '${this.getDirName()}'`;
+      print_error(msg);
+      invariant_violation(msg);
+    };
+    values[0]
+  }
+
+  fun containsKey(context: mutable Context, key: K): Bool {
+    this.getArray(context, key).size() > 0
+  }
+
+  fun maybeGet(context: mutable Context, key: K): ?V {
+    values = this.getArray(context, key);
+    if (values.size() == 0) return None();
+    Some(values[0])
+  }
+
+  fun unsafeGetArray(context: mutable Context, key: K): Array<V> {
     dir = context.unsafeGetDir(this.getDirName());
     dir.getArrayRaw(key).map(this.getType())
   }
 
-  fun unsafeGet(context: mutable Context, key: Key): V {
+  fun unsafeGet(context: mutable Context, key: K): V {
     arr = this.unsafeGetArray(context, key);
     invariant(arr.size() == 1);
     arr[0]
