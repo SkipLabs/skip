@@ -414,10 +414,11 @@ The request piggybacks on the checkpoint mechanism. A line of the
 form: ~:reboot\n~ signals the request and should be flushed
 immediately, like any other checkpoint line.
 
-The JS client will throw an SKDBRebootException. Applications are
-expected to catch this and reload entirely or at least re-create their
-SKDB client. Reloading entirely is likely preferable as this may
-signal a schema change which the app should update to accommodate.
+The JS client will invoke a callback on receiving the reboot.
+Applications should register a handler that will reload entirely or at
+least re-create their SKDB client. Reloading is preferable as the
+reboot could signal a schema change which the app logic itself should
+refresh to work against.
 
 * Errors
 
