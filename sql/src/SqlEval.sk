@@ -144,7 +144,7 @@ fun valueToCValue(
       };
       globals = context.getGlobal(GLOBALS) match {
       | None() -> Globals()
-      | Some(file) -> Globals::fromFile(file)
+      | Some(file) -> Globals::type(file)
       };
       globals.maybeGet(varName) match {
       | None() ->
@@ -485,7 +485,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (files.size() == 0) {
           error(pos, "VIEW " + viewName + " does not exist");
         };
-        selectFile = SelectFile::fromFile(files[0]);
+        selectFile = SelectFile::type(files[0]);
         if (selectFile.virtual) {
           error(pos, "Cannot drop a virtual view");
         } else {
@@ -1044,7 +1044,7 @@ fun evalWithContext(
   mutable SKStore.Context,
   SKStore.Context,
 ) ~> void) {
-  user = context.getGlobal("USER").map(UserFile::fromFile);
+  user = context.getGlobal("USER").map(UserFile::type);
   evaluator = Evaluator{options, user};
   evaluator.stmt(context, params, stmt, inTransaction);
 }
@@ -1129,7 +1129,7 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
     if (isTTY) {
       print_raw("skdb> ");
     };
-    lineFile = SKStore.IntFile::fromFile(context.getGlobal("Line").fromSome());
+    lineFile = SKStore.IntFile::type(context.getGlobal("Line").fromSome());
     context.!globals = SortedMap[];
     userOpt.each(_ -> {
       print_error("Cannot execute queries as user, use --connect instead");
@@ -1203,7 +1203,7 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
           markIfRead(context, stmt);
 
           lastStmtOpt = context.getGlobal("LastStmtOpt").map(file ->
-            StmtFile::fromFile(file).stmt
+            StmtFile::type(file).stmt
           );
 
           (lastStmtOpt, stmt) match {
@@ -1292,7 +1292,7 @@ fun importFromRoot(
   | err ->
     line = delta.getGlobal("Line") match {
     | None() -> -1
-    | Some(x) -> SKStore.IntFile::fromFile(x).value
+    | Some(x) -> SKStore.IntFile::type(x).value
     };
     print_error("Error, line " + line + ": " + err.getMessage());
     skipExit(2)
@@ -1401,7 +1401,7 @@ fun exportToRoot(
   | err ->
     line = delta.getGlobal("Line") match {
     | None() -> -1
-    | Some(x) -> SKStore.IntFile::fromFile(x).value
+    | Some(x) -> SKStore.IntFile::type(x).value
     };
     root.replaceFromSaved(rootCopy);
     print_error("Error, line " + line + ": " + err.getMessage());
@@ -1417,7 +1417,7 @@ fun updateTableMap(context: mutable SKStore.Context): void {
       startTick => context.tick,
       map => SortedMap[],
     }
-  | Some(file) -> TableMap::fromFile(file)
+  | Some(file) -> TableMap::type(file)
   };
   !tableMap.version.value = SKStore.genSym(tableMap.version.value);
   context.setGlobal("TableMap", tableMap)
@@ -1619,7 +1619,7 @@ fun initJSRoots(): void {
       tableDir.writeArray(context, fileName, Array[dirDescr]);
       kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
       _ = context
-        .mkdir(x ~> x, JSCall::fromFile, jsRootsInputDirName, Array[])
+        .mkdir(x ~> x, JSCall::type, jsRootsInputDirName, Array[])
         .map(
           x ~> x,
           RowValues::fromFile,
@@ -1711,7 +1711,8 @@ class InvalidTrackedCall() extends Exception {
 
 fun initTrackedJSCalls(context: mutable SKStore.Context): void {
   _ = SKStore.LHandle::create(
-    SKStore.StringFile::fromFile,
+    SKStore.SID::type,
+    SKStore.StringFile::type,
     context,
     trackedJSCallsDirName,
     (context, _self, key) ~>
@@ -1719,7 +1720,6 @@ fun initTrackedJSCalls(context: mutable SKStore.Context): void {
         setLocalContext(context);
         (funIdStr, funArg) = key match {
         | SKStore.SID(v) -> v.splitFirst("#")
-        | _ -> invariant_violation("Invalid key type")
         };
         funId = Int32::truncate(funIdStr.toInt());
         result = callExternalFun(funId, funArg);
@@ -1741,7 +1741,7 @@ fun trackedCall(funId: Int32, funArg: String): String {
   };
   arr = ldir.getArray(context, SKStore.SID("" + funId + "#" + funArg));
   invariant(arr.size() == 1);
-  SKStore.StringFile::fromFile(arr[0]).value
+  SKStore.StringFile::type(arr[0]).value
 }
 
 /*****************************************************************************/
@@ -1769,14 +1769,14 @@ fun initTrackedJSQueries(
   params: Map<String, Value>,
 ): void {
   _ = SKStore.LHandle::create(
-    SKStore.StringFile::fromFile,
+    TrackedQuery::type,
+    SKStore.StringFile::type,
     context,
     trackedJSQueriesDirName,
     (context, _self, key) ~> {
       SKStore.withRegion(context, (_, context) ~> {
         query = key match {
         | q @ TrackedQuery _ -> q
-        | _ -> invariant_violation("Invalid key type")
         };
         lexer = SKDB.Lexer(0, SKDB.Buffer(query.query));
         selectAst = SKDB.parseQuery(lexer, 0).i1 match {
@@ -1870,5 +1870,5 @@ fun trackedQuery(query: String, start: Int32, end: Int32): String {
     ),
   );
   invariant(arr.size() == 1);
-  SKStore.StringFile::fromFile(arr[0]).value
+  SKStore.StringFile::type(arr[0]).value
 }
