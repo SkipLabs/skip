@@ -148,6 +148,30 @@ class EReducer<V2, V3: File>{
 /* A few predefined Reducers. */
 /*****************************************************************************/
 
+fun countReducer(): EReducer<_, IntFile> {
+  EReducer{
+    type => IntFile::type,
+    canReset => false,
+    init => iter ~> {
+      count = 0;
+      for (_ in iter) {
+        !count = count + 1;
+      };
+      Array[IntFile(count)]
+    },
+    update => (state, old, new) ~> {
+      count = state[0].value;
+      for (_ in old) {
+        !count = count - 1;
+      };
+      for (_ in new) {
+        !count = count + 1;
+      };
+      Some(Array[IntFile(count)])
+    },
+  };
+}
+
 /*****************************************************************************/
 /* The preferred way of accessing the file-system. */
 /*****************************************************************************/
