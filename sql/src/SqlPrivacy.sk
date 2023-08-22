@@ -204,9 +204,7 @@ class PredefinedIndex(
   fun get(projKey: IndexProjKey): ?PredefinedRow {
     arr = this.dir.getArrayRaw(projKey);
     if (arr.size() == 0) return None();
-    Some(
-      PredefinedRow(RowValues::fromFile(arr[0]), this.tableName, this.columns),
-    )
+    Some(PredefinedRow(RowValues::type(arr[0]), this.tableName, this.columns))
   }
 }
 
@@ -492,7 +490,8 @@ fun checkUserCanReadRow(
     | Some(groupID) ->
       access.canRead(context, groupID) match {
       | true -> AROK()
-      | false -> ARError(ARECannotRead{userName => user.name, groupID => Some(groupID)})
+      | false ->
+        ARError(ARECannotRead{userName => user.name, groupID => Some(groupID)})
       }
     }
   };

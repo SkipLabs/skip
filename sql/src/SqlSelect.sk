@@ -249,7 +249,7 @@ class SelectEvaluator{
       } else {
         limitDir = context.unsafeMaybeGetEagerDir(limitName) match {
         | None() ->
-          h = context.mkdir(x ~> x, Row::fromFile, limitName, Array[]);
+          h = context.mkdir(x ~> x, Row::type, limitName, Array[]);
           context.unsafeGetEagerDir(h.dirName)
         | Some(dir) ->
           context.!newDirs = context.newDirs.set(limitName);
@@ -267,7 +267,7 @@ class SelectEvaluator{
             arr.push(((SKStore.IID(i) : SKStore.Key), Array[]));
             !i = i + 1
           | Some((_, fileIter)) ->
-            values = fileIter.map(RowValues::fromFile).collect(Array);
+            values = fileIter.map(RowValues::type).collect(Array);
             if (values.size() == 0) continue;
             value = values[0];
             repeat = 0;
@@ -308,10 +308,7 @@ class SelectEvaluator{
           (_context, writer, _key, valueIter) ~> {
             values = valueIter.collect(Array);
             if (values.isEmpty()) return void;
-            writer.setArray(
-              RowKey(RowValues::fromFile(values[0]), kinds),
-              values,
-            );
+            writer.setArray(RowKey(RowValues::type(values[0]), kinds), values);
           },
         );
         SelectDir(limitMappedName, selectDir.types)
@@ -339,8 +336,8 @@ class SelectEvaluator{
       joinKind,
       onlyLeftValues,
     } ->
-      leftHandle = SKStore.EHandle(x ~> x, Row::fromFile, leftDirName);
-      rightHandle = SKStore.EHandle(x ~> x, Row::fromFile, rightDirName);
+      leftHandle = SKStore.EHandle(x ~> x, Row::type, leftDirName);
+      rightHandle = SKStore.EHandle(x ~> x, Row::type, rightDirName);
 
       shardsDirName = SKStore.DirName::create(
         childName.toString() + "proj/shards/",
@@ -478,7 +475,7 @@ class SelectEvaluator{
         row = static::evalRow(context, evaluator, this.select.params, 1);
         _dir = context.mkdir(
           SKStore.IID::type,
-          Row::fromFile,
+          Row::type,
           this.selectName1,
           Array[(SKStore.IID(0), row)],
         );
@@ -508,7 +505,7 @@ class SelectEvaluator{
       // Case with actual data
       _ = resultDir.map(
         x ~> x,
-        Row::fromFile,
+        Row::type,
         context,
         dataName,
         (context, writer, key, aggrResult) ~> {
@@ -565,7 +562,7 @@ class SelectEvaluator{
           );
           _ = context.mkdir(
             SKStore.IID::type,
-            Row::fromFile,
+            Row::type,
             selectName1Empty,
             Array[(SKStore.IID(0), emptyRow)],
           );
@@ -643,7 +640,7 @@ class SelectEvaluator{
       };
       _dir = context.mkdir(
         SKStore.IID::type,
-        Row::fromFile,
+        Row::type,
         dirName,
         Array[(SKStore.IID(0), row)],
       );
@@ -725,7 +722,7 @@ class SelectEvaluator{
       );
     };
     mparents = mutable Vector[
-      (SKStore.EHandle(x ~> x, Row::fromFile, dirName), (mapFunRow, rangeOpt)),
+      (SKStore.EHandle(x ~> x, Row::type, dirName), (mapFunRow, rangeOpt)),
     ];
     order = 1;
     rest = this.select.rest;
@@ -754,7 +751,7 @@ class SelectEvaluator{
       dirDescr = getDir(rtable.i0);
       mparents.push(
         (
-          SKStore.EHandle(x ~> x, Row::fromFile, dirDescr.dirName),
+          SKStore.EHandle(x ~> x, Row::type, dirDescr.dirName),
           (rmapFun, rtable.i1),
         ),
       );
@@ -779,7 +776,7 @@ class SelectEvaluator{
       for (kv in context.unsafeGetEagerDir(dir.dirName).unsafeGetFileIter()) {
         (_, files) = kv;
         for (file in files) {
-          input = RowValues::fromFile(file);
+          input = RowValues::type(file);
           evaluator = ExprEvaluator(Array[input], Array[], None());
           whereVal = evaluator.evalWhere(context, this.select.where);
           whereVal match {
@@ -800,7 +797,7 @@ class SelectEvaluator{
     | None() ->
       result = SKStore.EHandle::multiMap(
         x ~> x,
-        Row::fromFile,
+        Row::type,
         context,
         parents,
         this.selectName2,
@@ -1322,9 +1319,9 @@ fun makeJoinReducer(
     for (file in files) {
       file match {
       | LeftFile(key, leftFile) ->
-        leftRows.push((key, RowValues::fromFile(leftFile)))
+        leftRows.push((key, RowValues::type(leftFile)))
       | RightFile(key, rightFile) ->
-        rightRows.push((key, RowValues::fromFile(rightFile)))
+        rightRows.push((key, RowValues::type(rightFile)))
       | _ ->
         debug(file);
         invariant_violation("Unexpected file type in joinReducer")
