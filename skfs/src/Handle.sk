@@ -198,44 +198,47 @@ base class Handle<+K: Orderable, +V: frozen> {
  */
 /*****************************************************************************/
 
-class LHandle<+K: Orderable, +V: frozen>(
+class LHandle<+K: Key, +V: File>(
+  convKey: Key ~> K,
   conv: File ~> V,
   dirName: DirName,
 ) extends Handle<K, V> {
   static fun create<V: File>(
+    convKey: Key ~> K,
     conv: File ~> V,
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, LHandle<K, V>, Key) ~> Array<V>,
+    f: (mutable Context, LHandle<K, V>, K) ~> Array<V>,
     collect: Bool = true,
   ): LHandle<K, V> {
     dir = LazyDir::create(
       context,
       dirName,
       (context, dirName, key) ~> {
-        Some(f(context, LHandle(conv, dirName), key));
+        Some(f(context, LHandle(convKey, conv, dirName), convKey(key)));
       },
       collect,
     );
-    LHandle(conv, dir.getDirName())
+    LHandle(convKey, conv, dir.getDirName())
   }
 
-  static fun createAsync<T: File>(
-    conv: File ~> T,
+  static fun createAsync<K: Key, V: File>(
+    convKey: Key ~> K,
+    conv: File ~> V,
     context: mutable Context,
     dirName: DirName,
-    f: (mutable Context, LHandle<K, T>, Key) ~> ?Array<T>,
+    f: (mutable Context, LHandle<K, V>, K) ~> ?Array<V>,
     collect: Bool = true,
-  ): LHandle<K, T> {
+  ): LHandle<K, V> {
     dir = LazyDir::create(
       context,
       dirName,
       (context, dirName, key) ~> {
-        f(context, LHandle(conv, dirName), key);
+        f(context, LHandle(convKey, conv, dirName), convKey(key));
       },
       collect,
     );
-    LHandle(conv, dir.getDirName())
+    LHandle(convKey, conv, dir.getDirName())
   }
 
   fun getArrayAsync(context: mutable Context, key: Key): Array<V> {

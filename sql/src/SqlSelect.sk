@@ -347,8 +347,8 @@ class SelectEvaluator{
       );
       shards = context.unsafeMaybeGetEagerDir(shardsDirName) match {
       | None() ->
-        context.mkdir(x ~> x, ShardStats::fromFile, shardsDirName, Array[])
-      | Some(x) -> SKStore.EHandle(x ~> x, ShardStats::fromFile, x.dirName)
+        context.mkdir(x ~> x, ShardStats::type, shardsDirName, Array[])
+      | Some(x) -> SKStore.EHandle(x ~> x, ShardStats::type, x.dirName)
       };
 
       projLeftName = SKStore.DirName::create(
@@ -477,7 +477,7 @@ class SelectEvaluator{
         evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
         row = static::evalRow(context, evaluator, this.select.params, 1);
         _dir = context.mkdir(
-          SKStore.IID::fromKey,
+          SKStore.IID::type,
           Row::fromFile,
           this.selectName1,
           Array[(SKStore.IID(0), row)],
@@ -564,7 +564,7 @@ class SelectEvaluator{
             1,
           );
           _ = context.mkdir(
-            SKStore.IID::fromKey,
+            SKStore.IID::type,
             Row::fromFile,
             selectName1Empty,
             Array[(SKStore.IID(0), emptyRow)],
@@ -642,7 +642,7 @@ class SelectEvaluator{
         static::evalRow(context, evaluator, this.select.params, 1)
       };
       _dir = context.mkdir(
-        SKStore.IID::fromKey,
+        SKStore.IID::type,
         Row::fromFile,
         dirName,
         Array[(SKStore.IID(0), row)],
@@ -1455,7 +1455,7 @@ fun getStats(
       .unsafeGetEagerDir(shardTable.dirName)
       .getArrayRaw(key);
     if (oldStatsArray.size() != 0) {
-      return Some(ShardStats::fromFile(oldStatsArray[0]));
+      return Some(ShardStats::type(oldStatsArray[0]));
     }
   };
   None()

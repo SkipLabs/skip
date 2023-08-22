@@ -339,8 +339,7 @@ mutable class Compiler{
         select.id.lower +
           context.getGlobal("TableMap") match {
           | None() -> ""
-          | Some(file) ->
-            "_V" + TableMap::fromFile(file).version.value.toString()
+          | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
           },
       ),
       kind => select.kind,
@@ -847,7 +846,10 @@ mutable class Compiler{
     }
   }
 
-  mutable fun compileExpr(context: mutable SKStore.Context, expr: Expr): CGExpr {
+  mutable fun compileExpr(
+    context: mutable SKStore.Context,
+    expr: Expr,
+  ): CGExpr {
     expr match {
     | VNull() -> CGNull()
     | VInt(i) -> CIExpr(CILiteral(i))
@@ -1039,7 +1041,7 @@ mutable class Compiler{
           this.pos,
           "Cannot use a the function uid() if not connected as a user",
         )
-      | Some(user) -> CIExpr(CILiteral(UserFile::fromFile(user).id))
+      | Some(user) -> CIExpr(CILiteral(UserFile::type(user).id))
       }
     | Call("id", None()) -> error(this.pos, "id expects one argument")
     | Call("id", Some(args)) ->
@@ -1053,7 +1055,7 @@ mutable class Compiler{
       | VString(varName) ->
         globals = context.getGlobal(GLOBALS) match {
         | None() -> error(this.pos, "Unknown id " + varName)
-        | Some(file) -> Globals::fromFile(file)
+        | Some(file) -> Globals::type(file)
         };
         if (!globals.containsKey(varName)) {
           error(this.pos, "Unknown id " + varName)

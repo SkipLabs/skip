@@ -458,11 +458,11 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKDB.Options): void {
       tableDescr = SKDB.getTable(context, 0, name);
       context.setGlobal("CSV_TABLE", tableDescr);
       tableDescr
-    | Some(x) -> SKDB.DirDescr::fromFile(x)
+    | Some(x) -> SKDB.DirDescr::type(x)
     };
     line = context.getGlobal("Line") match {
     | None() -> mutable Ref(1)
-    | Some(file) -> mutable Ref(SKStore.IntFile::fromFile(file).value)
+    | Some(file) -> mutable Ref(SKStore.IntFile::type(file).value)
     };
     user = args.maybeGetString("user") match {
     | None() -> None()
@@ -758,17 +758,9 @@ fun execReplicationId(args: Cli.ParseResults, options: SKDB.Options): void {
     clientsDirname = SKStore.DirName::create(`/clients/`);
     clientsDir = context.maybeGetDir(clientsDirname) match {
     | None() ->
-      context.mkdir(
-        SKStore.SID::fromKey,
-        SKStore.IntFile::fromFile,
-        clientsDirname,
-      )
+      context.mkdir(SKStore.SID::type, SKStore.IntFile::type, clientsDirname)
     | Some(d) ->
-      SKStore.EHandle(
-        SKStore.SID::fromKey,
-        SKStore.IntFile::fromFile,
-        d.getDirName(),
-      )
+      SKStore.EHandle(SKStore.SID::type, SKStore.IntFile::type, d.getDirName())
     };
     key = SKStore.SID::create(clientUuid);
     arr = clientsDir.unsafeGetArray(context, key);
@@ -797,11 +789,11 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
       tableDescr = SKDB.getTable(context, 0, name);
       context.setGlobal("CSV_TABLE", tableDescr);
       tableDescr
-    | Some(x) -> SKDB.DirDescr::fromFile(x)
+    | Some(x) -> SKDB.DirDescr::type(x)
     };
     line = context.getGlobal("Line") match {
     | None() -> mutable Ref(1)
-    | Some(file) -> mutable Ref(SKStore.IntFile::fromFile(file).value)
+    | Some(file) -> mutable Ref(SKStore.IntFile::type(file).value)
     };
     user = args.maybeGetString("user");
     myReadLine = () -> {
@@ -857,7 +849,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
     context.update();
     outputDir = context.unsafeGetEagerDir(output.dirName);
     file = outputDir.getArrayRaw(viewKey)[0];
-    invariant(sessionID == SKStore.IntFile::fromFile(file).value);
+    invariant(sessionID == SKStore.IntFile::type(file).value);
     print_string(sessionID.toString());
   })
 }
