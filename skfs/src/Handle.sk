@@ -172,6 +172,30 @@ fun countReducer(): EReducer<_, IntFile> {
   };
 }
 
+fun sumReducer(): EReducer<IntFile, IntFile> {
+  EReducer{
+    type => IntFile::type,
+    canReset => false,
+    init => iter ~> {
+      sum = 0;
+      for (x in iter) {
+        !sum = sum + x.value;
+      };
+      Array[IntFile(sum)]
+    },
+    update => (state, old, new) ~> {
+      sum = state[0].value;
+      for (x in old) {
+        !sum = sum - x.value;
+      };
+      for (x in new) {
+        !sum = sum + x.value;
+      };
+      Some(Array[IntFile(sum)])
+    },
+  };
+}
+
 /*****************************************************************************/
 /* The preferred way of accessing the file-system. */
 /*****************************************************************************/
