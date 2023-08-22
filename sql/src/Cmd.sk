@@ -22,7 +22,7 @@ fun cutAfter(level: Int, str: String): String {
 fun listSubDirs(
   prefix: String,
   dmap: DMap<DirName, Dir>,
-): Array<(FileName, Dir)> {
+): Array<(String, Dir)> {
   prefixLen = prefix.length();
   dmap
     .items()
@@ -31,6 +31,7 @@ fun listSubDirs(
       keyStr = key.toString();
       keyStr.take(prefixLen) == prefix
     })
+    .map(kv -> (kv.i0.toString(), kv.i1))
     .collect(Array);
 }
 
