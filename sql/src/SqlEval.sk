@@ -826,7 +826,7 @@ class Evaluator{options: Options, user: ?UserFile} {
 
       for (kv in newDir.unsafeGetFileIter()) {
         (minKey, minFile) = kv;
-        minValues = minFile.map(x -> RowValues::fromFile(x)).collect(Array);
+        minValues = minFile.map(x -> RowValues::type(x)).collect(Array);
         if (minValues.size() == 0) continue;
         minValue = minValues[0];
         if (minValue.getInt(0).fromSome() + ws > time) {
@@ -867,7 +867,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       return void;
     };
 
-    _ = context.mkdir(x ~> x, RowValues::fromFile, dirName);
+    _ = context.mkdir(x ~> x, RowValues::type, dirName);
 
     getTableDir(context).writeArray(
       context,
@@ -1116,7 +1116,7 @@ fun evalQuery(
     for (kv in files) {
       (_key, rows) = kv;
       for (row in rows) {
-        result.push(RowValues::fromFile(row))
+        result.push(RowValues::type(row))
       }
     }
   });
@@ -1622,7 +1622,7 @@ fun initJSRoots(): void {
         .mkdir(x ~> x, JSCall::type, jsRootsInputDirName, Array[])
         .map(
           x ~> x,
-          RowValues::fromFile,
+          RowValues::type,
           context,
           jsRootsValuesDirName,
           (context, writer, baseName, values) ~>
@@ -1815,11 +1815,11 @@ fun initTrackedJSQueries(
 
         selectProj = SKStore.EHandle(
           x ~> x,
-          RowValues::fromFile,
+          RowValues::type,
           selectDirName,
         ).map(
           x ~> x,
-          RowValues::fromFile,
+          RowValues::type,
           context,
           selectProjDirName,
           (_context, writer, _key, values) ~> {

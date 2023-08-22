@@ -91,7 +91,7 @@ class RowKey(
   ): void {
     repeat = 0;
     for (file in files) {
-      !repeat = repeat + RowValues::fromFile(file).getRepeat()
+      !repeat = repeat + RowValues::type(file).getRepeat()
     };
     writer(this.row.setRepeat(repeat).toKVString(format, this))
   }
@@ -115,7 +115,7 @@ base class Row extends SKStore.File {
   fun getString(n: Int): ?String;
   fun getValue(n: Int): ?CValue;
   fun items(): mutable Iterator<(Int, ?CValue)>;
-  static overridable fun fromFile(f: SKStore.File): Row {
+  static overridable fun type(f: SKStore.File): Row {
     f match {
     | r @ RowValues _ -> r
     | r @ RowKind _ -> r
@@ -278,7 +278,7 @@ class RowValues private (
     this.values.items()
   }
 
-  static fun fromFile(f: SKStore.File): RowValues {
+  static fun type(f: SKStore.File): RowValues {
     f match {
     | r @ RowValues _ -> r
     | _ -> invariant_violation("Unexpected Row File")
@@ -305,7 +305,7 @@ class RowKind(order: Int, kind: QueryKind, row: Row) extends Row {
   fun items(): mutable Iterator<(Int, ?CValue)> {
     this.row.items()
   }
-  static fun fromFile(f: SKStore.File): RowKind {
+  static fun type(f: SKStore.File): RowKind {
     f match {
     | r @ RowKind _ -> r
     | _ -> invariant_violation("Unexpected Row File")
