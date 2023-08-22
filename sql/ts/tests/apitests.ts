@@ -43,36 +43,44 @@ export const apitests = () => {
         // Queries Against The Server
         const tableCreate = await skdb.sqlRaw(
           "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER);",
+          new Map(),
           true
         );
         expect(tableCreate).toEqual("");
 
         const permissionInsert = await skdb.sqlRaw(
-          "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7);", true
+          "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7);",
+          new Map(),
+          true
         );
         expect(permissionInsert).toEqual("");
 
         const tableInsert = await skdb.sqlRaw(
           "INSERT INTO test_pk VALUES (42,21);", 
+          new Map(),
           true
         );
         expect(tableInsert).toEqual("");
       
-        const tableSelect = await skdb.sqlRaw("SELECT * FROM test_pk;", true);
+        const tableSelect = await skdb.sqlRaw(
+          "SELECT * FROM test_pk;", 
+          new Map(),
+          true
+        );
         expect(tableSelect).toEqual("42|21\n");
       
         try {
-          await skdb.sqlRaw("bad query", true);
+          await skdb.sqlRaw("bad query", new Map(), true);
         } catch (error) {
           const lines = (error as string).trim().split('\n');
           expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
         }
       
-        const rows = await skdb.sql("SELECT * FROM test_pk;", true);
+        const rows = await skdb.sql("SELECT * FROM test_pk;", new Map(), true);
         expect(rows).toEqual([{x: 42, y: 21}]);
       
         try {
-          await skdb.sql("bad query", true);
+          await skdb.sql("bad query", new Map(), true);
         } catch (error) {
           const lines = (error as string).trim().split('\n');
           expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
@@ -119,7 +127,7 @@ export const apitests = () => {
         expect(testPkRows2).toEqual([{x: 42, y:21}]);
 
         // Server Tail
-        await skdb.sqlRaw("insert into test_pk values (87,88);", true);
+        await skdb.sqlRaw("insert into test_pk values (87,88);", new Map(), true);
         // we could do something complicated with callbacks, but sleep for now
         await new Promise(resolve => setTimeout(resolve, 100));
         const serverTail = await skdb.sql("select count(*) as cnt from test_pk where x = 87 and y = 88");
@@ -128,11 +136,22 @@ export const apitests = () => {
         // Clients Tail
         await skdb.sqlRaw("insert into test_pk values (97,98);");
         // we could do something complicated with callbacks, but sleep for now
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const clientTail = await skdb.sql(
-          "select count(*) as cnt from test_pk where x = 97 and y = 98",
-          true
-        );
+        let count = 0;
+        const test = (resolve, reject) => {
+          skdb.sql(
+            "select count(*) as cnt from test_pk where x = 97 and y = 98",
+            new Map(),
+            true
+          ).then(clientTail => {
+            if (clientTail[0].cnt == 1 || count == 4) {
+              resolve(clientTail)
+            } else {
+              count++;
+              setTimeout(() => test(resolve, reject), 100);
+            }
+          }).catch(reject);
+        };
+        let clientTail = await new Promise(test);
         expect(clientTail).toEqual([{cnt: 1}]);
         return "";
       },

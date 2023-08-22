@@ -16,8 +16,8 @@ export async function createDatabase(dbName ?: string, asWorker: boolean = true)
   }
 }
 
-export async function createOnMain(dbName ?: string) {
-  let data = await run(wasm64, modules, extensions, "SKDB_factory");
+export async function createOnMain(dbName ?: string, getWasmSource?: () => Promise<Uint8Array>) {
+  let data = await run(wasm64, modules, extensions, "SKDB_factory", getWasmSource);
   return await (data.environment.shared.get("SKDB") as SKDBShared).create(dbName) as SKDBMain;
 }
 
@@ -34,4 +34,13 @@ export async function createWorker(dbName ?: string) {
   let skdb = new SKDBWorker(worker);
   await skdb.create(dbName);
   return skdb;
+}
+
+export class SKDB {
+  static async create(
+    dbName ?:string,
+    getWasmSource?: () => Promise<Uint8Array>
+  ) {
+    return await createOnMain(dbName, getWasmSource)
+  }
 }

@@ -25,7 +25,6 @@ build: $(ROOT_DIR)/server $(SDKMAN_INIT) $(SKGW_DIR) $(SRV_DIR)/skgw.conf
 build: $(shell $(SRV_DIR)/service.sh $(SDKMAN_INIT) $(SKGW_DIR) $(SRV_DIR)/skgw.conf $(SKDB_DATABASES) &> $(SRV_DIR)/service.log)
 build: CREDENTIALS=$(shell cat $(SRV_DIR)/dbs/init.log | grep 'skgw.credentials')
 build:
-	@echo "HOHOHO: $(CREDENTIALS)"
 	@cat $(SRV_DIR)/service.log | grep 'sknpm'
 	@echo $(CREDENTIALS:skgw.credentials%=sknpm.env:SKDB_CREDENTIALS%)
 	@echo sknpm.env:SKDB_BIN=$(REAL_DIR)/target/release/skdb

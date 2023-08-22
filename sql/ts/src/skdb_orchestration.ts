@@ -286,7 +286,8 @@ class ResilientMuxedSocket {
 
   async openResilientStream(): Promise<ResilientStream> {
     const socket = await this.getSocket();
-    return new ResilientStream(this, socket.openStream());
+    const stream = await socket.openStream();
+    return new ResilientStream(this, stream);
   }
 
   async closeSocket(): Promise<void> {
@@ -569,6 +570,9 @@ interface Creds {
 export class MuxedSocket {
   // constants
   private socket: WebSocket;
+  private creds: Creds;
+  private reauthTimeoutMs = 5 * 60 * 1000; // 5 mins - half of the 10 min window
+  private env: Environment;
 
   // state
   private state: MuxedSocketState = MuxedSocketState.IDLE
@@ -585,27 +589,38 @@ export class MuxedSocket {
   onClose?: () => void;
   onError?: (errorCode: number, msg: string) => void;
 
-  private constructor(socket: WebSocket) {
+  private constructor(socket: WebSocket, creds: Creds, env: Environment) {
     // pre-condition: socket is open
     this.socket = socket;
+    this.creds = creds;
+    this.env = env;
   }
 
-  openStream(): Stream {
-    switch (this.state) {
-      case MuxedSocketState.AUTH_SENT: {
-        const streamId = this.nextStream;
-        this.nextStream = this.nextStream + 2; // client uses odd-numbered streams
-        const stream = new Stream(this, streamId);
-        this.activeStreams.set(streamId, stream);
-        return stream;
+  openStream(): Promise<Stream> { 
+    const openTimeoutMs = 10;
+    const fn = (resolve, reject) => {
+      switch (this.state) {
+        case MuxedSocketState.AUTH_SENT: {
+          const streamId = this.nextStream;
+          this.nextStream = this.nextStream + 2; // client uses odd-numbered streams
+          const stream = new Stream(this, streamId);
+          this.activeStreams.set(streamId, stream);
+          resolve(stream);
+          return;
+        }
+        case MuxedSocketState.IDLE:
+          setTimeout(() => fn(resolve, reject), openTimeoutMs);
+          return;
+        case MuxedSocketState.CLOSING:
+        case MuxedSocketState.CLOSEWAIT:
+          reject(new Error("Connection closing"));
+          return;
+        case MuxedSocketState.CLOSED:
+          reject(new Error("Connection not established"));
+          return;
       }
-      case MuxedSocketState.CLOSING:
-      case MuxedSocketState.CLOSEWAIT:
-        throw new Error("Connection closing");
-      case MuxedSocketState.IDLE:
-      case MuxedSocketState.CLOSED:
-        throw new Error("Connection not established");
-    }
+    };
+    return new Promise(fn)
   }
 
   closeSocket(): void {
@@ -687,7 +702,6 @@ export class MuxedSocket {
   static async connect(
     env: Environment, uri: string, creds: Creds, timeoutMs: number = 60000
   ): Promise<MuxedSocket> {
-    const auth = await MuxedSocket.encodeAuthMsg(creds, env.crypto());
     return new Promise((resolve, reject) => {
       let failed = false;
       const timeout = setTimeout(() => {
@@ -705,12 +719,12 @@ export class MuxedSocket {
           socket.close();
           return;
         }
-        const muxSocket = new MuxedSocket(socket)
+        const muxSocket = new MuxedSocket(socket, creds, env);
         socket.onclose = (event) => muxSocket.onSocketClose(event)
         socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
         socket.onmessage = (event) => muxSocket.onSocketMessage(event)
         resolve(muxSocket)
-        muxSocket.sendAuth(auth)
+        muxSocket.sendAuth()
       };
     });
   }
@@ -873,28 +887,31 @@ export class MuxedSocket {
     }
   }
 
-  private sendAuth(msg: ArrayBuffer): void {
+  private async sendAuth(): Promise<void> {
     switch (this.state) {
       case MuxedSocketState.IDLE:
-        this.state = MuxedSocketState.AUTH_SENT;
-        this.socket.send(msg);
-        break;
       case MuxedSocketState.AUTH_SENT:
+        const auth = await MuxedSocket.encodeAuthMsg(this.creds, this.env);
+        this.socket.send(auth);
+        this.state = MuxedSocketState.AUTH_SENT;
+        setTimeout(() => {
+          this.sendAuth()
+        }, this.reauthTimeoutMs);
+        break;
       case MuxedSocketState.CLOSING:
-        throw new Error("Tried to auth an established connection");
       case MuxedSocketState.CLOSEWAIT:
       case MuxedSocketState.CLOSED:
         break;
     }
   }
 
-  private static async encodeAuthMsg(creds: Creds, crypto: Crypto): Promise<ArrayBuffer> {
+  private static async encodeAuthMsg(creds: Creds, env: Environment): Promise<ArrayBuffer> {
     const clientVersion = "js-" + npmVersion;
+    const crypto = env.crypto();
     const enc = new TextEncoder();
     const buf = new ArrayBuffer(133 + clientVersion.length);
     const uint8View = new Uint8Array(buf);
     const dataView = new DataView(buf);
-
     const now = (new Date()).toISOString()
     const nonce = uint8View.subarray(28, 36);
     crypto.getRandomValues(nonce)
@@ -1210,7 +1227,7 @@ export async function connect(
   endpoint: string,
   db: string,
   creds: Creds,
-): Promise < Server > {
+): Promise<Server> {
   return SKDBServer.connect(env, client, endpoint, db, creds)
 }
 
@@ -1422,7 +1439,7 @@ class SKDBServer implements Server {
     return this.establishServerTail(tableName, filterExpr || "");
   }
 
-  async sqlRaw(stdin: string): Promise<string> {
+  async sqlRaw(stdin: string, params: Map<string, string|number> = new Map()): Promise<string> {
     let result = await this.makeRequest({
       type: "query",
       query: stdin,
@@ -1432,7 +1449,8 @@ class SKDBServer implements Server {
     return this.env.decodeUTF8(this.strictCastData(result).payload);
   }
 
-  async sql(stdin: string): Promise<any[]> {
+  async sql(stdin: string, params: Map<string, string|number> = new Map()): Promise<any[]> {
+    // TODO manage params
     let result = await this.makeRequest({
       type: "query",
       query: stdin,

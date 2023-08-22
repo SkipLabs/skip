@@ -159,19 +159,33 @@ export class SKDBImpl implements SKDB {
     );
   }
 
-  sqlRaw = async (stdin: string, server: boolean = false) => {
+  addParams = (
+    args: Array<string>,
+    params: Map<string, string|number>,
+    stdin: string
+  ): [Array<string>, string] => {
+    let args1 = ["--expect-query-params"].concat(args);
+    let stdin1 = JSON.stringify(Object.fromEntries(params)) + '\n' + stdin;
+    return [args1, stdin1];
+  }
+
+  sqlRaw = async (stdin: string, params: Map<string, string|number> = new Map(), server: boolean = false) => {
     if (server) {
-      return await this.server!.sqlRaw(stdin);
+      return await this.server!.sqlRaw(stdin, params);
     } else {
-      return this.runLocal([], stdin);
+      let [args1, stdin1] = this.addParams([], params, stdin);
+      return this.runLocal(args1, stdin1);
     }
   }
 
-  sql = async (stdin: string, server: boolean = false) => {
+  sql = async (stdin: string, params: Map<string, string|number> = new Map(), server: boolean = false) => {
     if (server) {
-      return await this.server!.sql(stdin);
+      return await this.server!.sql(stdin, params);
     } else {
-      return await this.runner(() => this.runLocal(["--format=js"], stdin));
+      return await this.runner(() => {
+        let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
+        return this.runLocal(args1, stdin1)
+      });
     }
   }
 
@@ -210,18 +224,17 @@ export class SKDBImpl implements SKDB {
   }
 
   insert = async (tableName: string, values: Array<any>) => {
-    values = values.map((x) => {
-      if (typeof x == "string") {
-        if (x == undefined) {
-          return "NULL";
-        }
-        return "'" + x + "'";
-      }
-      return x;
-    });
+    let params = new Map();
+    let keys =
+      values.map((val, i) => {
+        let key = "@key" + i;
+        params.set(key, val);
+        return key;
+      });
     let stdin =
-      "insert into " + tableName + " values (" + values.join(", ") + ");";
-    return this.runLocal([], stdin) == "";
+      "insert into " + tableName + " values (" + keys.join(", ") + ");";
+    let [args1, stdin1] = this.addParams([], params, stdin);
+    return this.runLocal(args1, stdin1) == "";
   }
 
   assertCanBeMirrored(tableName: string): void {

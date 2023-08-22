@@ -21,12 +21,12 @@ export class SKDBWorker implements SKDB {
     await this.worker.subscribe(new Function("subscribe", [viewName]), f);
   };
 
-  sqlRaw = async (query: string, server: boolean = false) => {
-    return await this.worker.post(new Function("sqlRaw", [query, server])) as string;
+  sqlRaw = async (query: string, params: Map<string, string|number> = new Map(), server: boolean = false) => {
+    return await this.worker.post(new Function("sqlRaw", [query, params, server])) as string;
   };
 
-  sql = async (query: string, server: boolean = false) => {
-    return await this.worker.post(new Function("sql", [query, server])) as Array<any>;
+  sql = async (query: string, params: Map<string, string|number> = new Map(), server: boolean = false) => {
+    return await this.worker.post(new Function("sql", [query, params, server])) as Array<any>;
   }
 
   cmd = async (new_args: Array<string>, new_stdin: string) => {
