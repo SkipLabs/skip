@@ -945,13 +945,6 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
   }
 }
 
-class SKDBRebootException extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = this.constructor.name;
-  }
-}
-
 class ProtoMsgDecoder {
   private bufs: Array<Uint8Array> = [];
   private msgs: Array<ProtoMsg|null> = [];
@@ -1047,27 +1040,6 @@ class ProtoMsgDecoder {
       return null;
     }
     return msg;
-  }
-
-  // this should be used to retrieve the SKDB data transfer protocol
-  // payload. i.e. if we're expecting pop to return ProtoData. it
-  // handles any orchestration layer signalling in the payload.
-  popData(): string {
-    const msg = this.pop();
-    if (msg === null) {
-      throw new Error(`Unexpected message type`);
-    }
-    if (msg.type !== "data") {
-      throw new Error(`Unexpected response: ${msg}`);
-    }
-    const txtPayload = decodeUTF8(msg.payload);
-
-    const rebootSignalled = txtPayload.split("\n").find(line => line.trim() == ":reboot");
-    if (rebootSignalled) {
-      throw new SKDBRebootException("Reboot signalled from server");
-    }
-
-    return txtPayload;
   }
 }
 
@@ -2037,6 +2009,10 @@ class SKDBServer {
   private replicationUid: string = "";
   private mirroredTables: Set<string> = new Set()
 
+  public onReboot: (server: SKDBServer, skdb: SKDB) => void = () => {
+    throw new Error("Server signalled client should cold start to avoid diverging.");
+  };
+
   private constructor(
     client: SKDB,
     connection: ResilientMuxedSocket,
@@ -2087,6 +2063,17 @@ class SKDBServer {
     throw new Error(`Unexpected response: ${response}`);
   }
 
+  private deliverDataTransferProtoMsg(msg: ProtoMsg|null, deliver: (string) => void) {
+    const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
+    const rebootSignalled = txtPayload.split("\n").find(line => line.trim() == ":reboot");
+    if (rebootSignalled) {
+      this.close();
+      this.onReboot(this, this.client);
+      return;
+    }
+    deliver(txtPayload)
+  }
+
   private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse|null> {
     const stream = await this.connection.openStream();
     const decoder = new ProtoMsgDecoder();
@@ -2118,10 +2105,12 @@ class SKDBServer {
     return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
-          const txtPayload = decoder.popData()
-          client.runLocal([
-            "write-csv", tableName, "--source", this.replicationUid
-          ], txtPayload + '\n');
+          const msg = decoder.pop();
+          this.deliverDataTransferProtoMsg(msg, payload => {
+            client.runLocal([
+              "write-csv", tableName, "--source", this.replicationUid
+            ], payload + '\n');
+          });
           if (!resolved) {
             resolved = true;
             resolve();
@@ -2157,10 +2146,12 @@ class SKDBServer {
 
     stream.onData = (data) => {
       if (decoder.push(data)) {
-        const txtPayload = decoder.popData()
-        // we only expect acks back in the form of checkpoints.
-        // let's store these as a watermark against the table.
-        client.runLocal(["write-csv", metadataTable(tableName)], txtPayload + '\n');
+        const msg = decoder.pop();
+        this.deliverDataTransferProtoMsg(msg, payload => {
+          // we only expect acks back in the form of checkpoints.
+          // let's store these as a watermark against the table.
+          client.runLocal(["write-csv", metadataTable(tableName)], payload + '\n');
+        });
       }
     }
 
