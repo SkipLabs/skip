@@ -32,34 +32,40 @@ fun testWikipedia(path: String): mutable SKStore.Context {
   debug("Loaded the files");
   SKStore.run(context ~> {
     pages = context.mkdir(
-      WikiPage::fromFile,
+      SKStore.IID::keyType,
+      WikiPage::type,
       SKStore.DirName::create("/input/"),
       files,
     );
     queries = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/queries/"),
       Array[],
     );
-    index = pages.contextWriterKeyMap(
-      SKStore.IntFile::fromFile,
+    index = pages.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/index/"),
-      (_context, writer, id, value) ~> {
+      (_context, writer, id, values) ~> {
+        value = values.first;
         tokens = mutable Set[];
         for (token in value.content.split(" ")) {
           tokens.insert(token.hash());
         };
         for (token in tokens) {
-          writer.write(SKStore.IID(token), id);
+          writer.set(SKStore.IID(token), SKStore.IntFile(id.value));
         }
       },
     );
-    _results = queries.contextMap(
-      QueryResult::fromFile,
+    _results = queries.map(
+      SKStore.IID::keyType,
+      QueryResult::type,
       context,
       SKStore.DirName::create("/results/"),
-      (context, query) ~> {
+      (context, writer, key, values) ~> {
+        query = values.first;
         first = true;
         results = mutable Set[];
         for (token in query.value.split(" ")) {
@@ -77,7 +83,7 @@ fun testWikipedia(path: String): mutable SKStore.Context {
             !results = newSet;
           }
         };
-        QueryResult(results.toArray())
+        writer.set(key, QueryResult(results.toArray()))
       },
     );
   })

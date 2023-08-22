@@ -419,7 +419,7 @@ fun testUsers(): void {
         if (arr.size() > 0) {
           return void;
         };
-        writer.writeArray(uid, values);
+        writer.setArray(uid, values);
       },
     );
     (groupRequests, groupBlocked)
@@ -535,47 +535,57 @@ fun testOldLazy(): mutable SKStore.Context {
       .map(x -> (SKStore.IID(x.v), SKStore.StringFile(x.toString())))
       .toArray();
     srcDir = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/src/"),
       inputData,
     );
     defDir = srcDir.map(
-      Def::fromFile,
+      SKStore.IID::keyType,
+      Def::type,
       context,
       SKStore.DirName::create("/defs/"),
-      Def::fromStringFile,
+      (_context, writer, key, values) ~>
+        writer.set(key, Def::fromStringFile(values.first))
+      ,
     );
-    _defDiff = defDir.contextWriterKeyMap(
-      SKStore.IntFile::fromFile,
+    _defDiff = defDir.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/defDiffs/"),
-      (context, writer, key, value) ~> {
+      (context, writer, key, values) ~> {
+        value = values.first;
         prevDir = defDir.pre(context);
         prevDir match {
-        | None() -> writer.write(key, SKStore.IntFile(0))
+        | None() -> writer.set(key, SKStore.IntFile(0))
         | Some(preDir) ->
           _prevDir2 = preDir.pre(context);
           def = preDir.get(context, key);
-          writer.write(key, SKStore.IntFile(def.v - value.v))
+          writer.set(key, SKStore.IntFile(def.v - value.v))
         }
       },
     );
     treeDir = SKStore.LHandle::create(
-      TreeFile::fromFile,
+      SKStore.IID::keyType,
+      TreeFile::type,
       context,
       SKStore.DirName::create("/lazyTrees/"),
       (context, self, key) ~> {
         def = defDir.get(context, key);
-        parents = def.parents.map(id -> self.get(context, SKStore.IID(id)).value);
+        parents = def.parents.map(id ->
+          self.get(context, SKStore.IID(id)).value
+        );
         Array[TreeFile(TNode(def.v, parents))]
       },
     );
-    _unfoldedTrees = defDir.contextMap(
-      TreeFile::fromFile,
+    _unfoldedTrees = defDir.map(
+      SKStore.IID::keyType,
+      TreeFile::type,
       context,
       SKStore.DirName::create("/trees/"),
-      (context, x) ~> {
-        treeDir.get(context, SKStore.IID(x.v))
+      (context, writer, key, values) ~> {
+        writer.set(key, treeDir.get(context, SKStore.IID(values.first.v)))
       },
     );
   })
@@ -589,15 +599,19 @@ fun testOld(): mutable SKStore.Context {
       .map(x -> (SKStore.IID(x.v), SKStore.StringFile(x.toString())))
       .toArray();
     srcDir = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/src/"),
       inputData,
     );
     _defDir = srcDir.map(
-      Def::fromFile,
+      SKStore.IID::keyType,
+      Def::type,
       context,
       SKStore.DirName::create("/defs/"),
-      Def::fromStringFile,
+      (_, writer, key, values) ~>
+        writer.set(key, Def::fromStringFile(values.first))
+      ,
     );
     context.update();
     context.update();
@@ -615,30 +629,36 @@ fun testSearch(): void {
   ].map(x -> (SKStore.IID(x.id), x));
   _ = SKStore.run(context ~> {
     pages = context.mkdir(
-      Page::fromFile,
+      SKStore.IID::keyType,
+      Page::type,
       SKStore.DirName::create("/pages/"),
       pagesData,
     );
     queries = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/queries/"),
       Array[],
     );
-    index = pages.contextWriterMap(
-      SKStore.IntFile::fromFile,
+    index = pages.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/index/"),
-      (_context, writer, value) ~> {
+      (_context, writer, _key, values) ~> {
+        value = values.first;
         for (token in value.text.split(" ")) {
-          writer.write(SKStore.IID(token.hash()), SKStore.IntFile(value.id))
+          writer.set(SKStore.IID(token.hash()), SKStore.IntFile(value.id))
         }
       },
     );
-    _results = queries.contextMap(
-      QueryResult::fromFile,
+    _results = queries.map(
+      SKStore.IID::keyType,
+      QueryResult::type,
       context,
       SKStore.DirName::create("/results/"),
-      (context, query) ~> {
+      (context, writer, key, values) ~> {
+        query = values.first;
         first = true;
         results = mutable Set[];
         for (token in query.value.split(" ")) {
@@ -656,7 +676,7 @@ fun testSearch(): void {
             !results = newSet;
           }
         };
-        QueryResult(results.toArray())
+        writer.set(key, QueryResult(results.toArray()))
       },
     );
   })

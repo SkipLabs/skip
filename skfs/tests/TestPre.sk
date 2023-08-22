@@ -6,7 +6,8 @@ module SKStoreTest;
 fun testPre(): void {
   context = SKStore.run(context ~> {
     dirSInput1 = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/sinput/"),
       Array[
         (SKStore.IID(0), SKStore.StringFile("23")),
@@ -15,7 +16,8 @@ fun testPre(): void {
     );
 
     _dirSInput2 = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/sinput2/"),
       Array[
         (SKStore.IID(0), SKStore.StringFile("44")),
@@ -24,25 +26,30 @@ fun testPre(): void {
     );
 
     dirInput = dirSInput1.map(
-      SKStore.IntFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/input/"),
-      x ~> SKStore.IntFile(x.value.toInt()),
+      (_context, writer, key, values) ~>
+        writer.set(key, SKStore.IntFile(values.first.value.toInt()))
+      ,
     );
-    _dir = dirInput.contextWriterKeyMap(
-      SKStore.IntFile::fromFile,
+    _dir = dirInput.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/diff/"),
-      (context, writer, key, valueFile) ~> {
+      (context, writer, key, values) ~> {
+        valueFile = values.first;
         preOpt = dirInput.pre(context);
         preOpt match {
-        | None() -> writer.write(key, SKStore.IntFile(0))
+        | None() -> writer.set(key, SKStore.IntFile(0))
         | Some(pre) ->
           pre.maybeGet(context, key) match {
-          | None() -> writer.write(key, SKStore.IntFile(0))
+          | None() -> writer.set(key, SKStore.IntFile(0))
           | Some(old) ->
             diff = valueFile.value - old.value;
-            writer.write(key, SKStore.IntFile(diff))
+            writer.set(key, SKStore.IntFile(diff))
           }
         }
       },
@@ -54,7 +61,11 @@ fun testPre(): void {
 
   dirSInput1 = SKStore.DirName::create("/sinput/");
   dirInput = SKStore.DirName::create("/input/");
-  dirInputEHandle = SKStore.EHandle(SKStore.IntFile::fromFile, dirInput);
+  dirInputEHandle = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    dirInput,
+  );
 
   write(context, dirSInput1, SKStore.IID(3), Array[SKStore.StringFile("3")]);
   context.update();

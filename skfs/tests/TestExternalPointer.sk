@@ -16,8 +16,11 @@ fun testExternalPointer(): void {
     if (context.getGlobal("Count") is None()) {
       context.setGlobal("Count", SKStore.IntFile(0));
     };
-    round = SKStore.IntFile::fromFile(context.getGlobal("Count").fromSome()).value;
-    epointer = SKStore.ExternalPointer::create(UInt32::truncate(round), testFreeEP);
+    round = SKStore.IntFile::type(context.getGlobal("Count").fromSome()).value;
+    epointer = SKStore.ExternalPointer::create(
+      UInt32::truncate(round),
+      testFreeEP,
+    );
     testCounter = getFreeTestCounter();
     T.expectEq(
       round,

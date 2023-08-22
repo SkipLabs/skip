@@ -29,14 +29,14 @@ fun make(
   context: mutable SKStore.Context,
   name: String,
   values: Array<Int>,
-): SKStore.EHandle<SKStore.StringFile> {
+): SKStore.EHandle<SKStore.IID, SKStore.StringFile> {
   kvArray = values.map(x -> (SKStore.IID(x), SKStore.StringFile(x.toString())));
-  conv = x ~>
-    x match {
-    | y @ SKStore.StringFile _ -> y
-    | _ -> invariant_violation("impossible")
-    };
-  context.mkdir(conv, SKStore.DirName::create(name), kvArray)
+  context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.StringFile::type,
+    SKStore.DirName::create(name),
+    kvArray,
+  )
 }
 
 fun compareResults(
@@ -84,7 +84,7 @@ fun testMap(): void {
   (context, _) = SKStore.start(context ~> {
     dir1 = make(context, "/tmp1/", Array[1, 2, 3]);
     dir2 = dir1.apply(context, "/tmp2/", (_, writer, key, values) ~> {
-      writer.writeArray(
+      writer.setArray(
         key,
         values.map(x -> {
           x match {
@@ -105,7 +105,7 @@ fun testMap(): void {
         for (i in Range(0, size)) {
           result.push(IBox(values1[i].value + values2[i].value));
         };
-        writer.writeArray(key, result.toArray());
+        writer.setArray(key, result.toArray());
       },
     );
     compareResults(context, "Map", "/tmp2/1", Array[2]);
@@ -133,7 +133,7 @@ fun testPartition(): void {
     dir1 = make(context, "/tmp1/", Array[1, 2, 3]);
     dir2 = dir1.apply(context, "/tmp2/", (_context, writer, _key, values) ~> {
       if (values.size() == 0) return void;
-      writer.writeArray(SKStore.IID(1), values);
+      writer.setArray(SKStore.IID(1), values);
     });
     dir3 = dir2.partition(context, "/tmp3/", x ~>
       SKStore.IID(convertIBox(x).value)
@@ -152,10 +152,10 @@ fun testPartition(): void {
             !v.value = v.value + 1;
             v
           });
-          writer.writeArray(key, iboxes)
+          writer.setArray(key, iboxes)
         },
       );
-      writer.write(SKStore.SID::create(subDirName), newDir);
+      writer.set(SKStore.SID::create(subDirName), newDir);
     });
   });
   testUpdate(
@@ -190,22 +190,26 @@ fun testDirs(): void {
 fun testSubDirUnit(): void {
   _ = SKStore.run(context ~> {
     dir1 = context.mkdir(
-      SKStore.StringFile::fromFile,
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       SKStore.DirName::create("/dir1/"),
       Array[],
     );
-    _dir2 = dir1.contextMap(
-      SKStore.StringFile::fromFile,
+    _dir2 = dir1.map(
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
       context,
       SKStore.DirName::create("/dir1/dir2/"),
-      (context, x) ~> {
+      (context, writer, key, values) ~> {
+        x = values.first;
         _ = dir1.map(
-          SKStore.StringFile::fromFile,
+          SKStore.IID::keyType,
+          SKStore.StringFile::type,
           context,
           SKStore.DirName::create("/dir1/dir2/" + x.value + "/"),
-          x ~> x,
+          (_context, writer, key, values) ~> writer.set(key, values.first),
         );
-        x
+        writer.set(key, x)
       },
     );
   })

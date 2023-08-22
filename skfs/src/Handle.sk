@@ -318,7 +318,7 @@ class LHandle<K: Key, +V: File>(
 /*****************************************************************************/
 
 class EHandle<K: Key, V: File>(
-  typeKey: Key ~> K,
+  keyType: Key ~> K,
   type: File ~> V,
   dirName: DirName,
 ) extends Handle<K, V> {
@@ -347,7 +347,7 @@ class EHandle<K: Key, V: File>(
     for (parent in parents) {
       (parentHandle, parentData) = parent;
       (mapFun, rangeOpt) = parentData;
-      typeInputKey = parentHandle.typeKey;
+      typeInputKey = parentHandle.keyType;
       typeInput = parentHandle.type;
       parentName = parentHandle.dirName;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
@@ -398,7 +398,7 @@ class EHandle<K: Key, V: File>(
     for (parent in parents) {
       (parentHandle, parentData) = parent;
       (mapFun, rangeOpt) = parentData;
-      typeInputKey = parentHandle.typeKey;
+      typeInputKey = parentHandle.keyType;
       typeInput = parentHandle.type;
       parentName = parentHandle.dirName;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
@@ -455,7 +455,7 @@ class EHandle<K: Key, V: File>(
       type,
       context,
       Array[
-        (SKStore.EHandle(this.typeKey, this.type, this.dirName), (f, None())),
+        (SKStore.EHandle(this.keyType, this.type, this.dirName), (f, None())),
       ],
       dirName,
     )
@@ -479,7 +479,7 @@ class EHandle<K: Key, V: File>(
       type,
       context,
       Array[
-        (SKStore.EHandle(this.typeKey, this.type, this.dirName), (f, None())),
+        (SKStore.EHandle(this.keyType, this.type, this.dirName), (f, None())),
       ],
       dirName,
       reducer,
@@ -492,7 +492,7 @@ class EHandle<K: Key, V: File>(
     };
     context.maybeGetDir(this.dirName.pre()) match {
     | None() -> None()
-    | Some(dir) -> Some(EHandle(this.typeKey, this.type, dir.getDirName()))
+    | Some(dir) -> Some(EHandle(this.keyType, this.type, dir.getDirName()))
     }
   }
 
