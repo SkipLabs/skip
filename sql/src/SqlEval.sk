@@ -867,7 +867,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       return void;
     };
 
-    _ = context.mkdir(RowValues::fromFile, dirName);
+    _ = context.mkdir(x ~> x, RowValues::fromFile, dirName);
 
     getTableDir(context).writeArray(
       context,
@@ -1619,10 +1619,10 @@ fun initJSRoots(): void {
       tableDir.writeArray(context, fileName, Array[dirDescr]);
       kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
       _ = context
-        .mkdir(JSCall::fromFile, jsRootsInputDirName, Array[])
+        .mkdir(x ~> x, JSCall::fromFile, jsRootsInputDirName, Array[])
         .map(
-          RowKey::fromFile,
-          SKStore.StringFile::fromFile,
+          x ~> x,
+          RowValues::fromFile,
           context,
           jsRootsValuesDirName,
           (context, writer, baseName, values) ~>
@@ -1813,8 +1813,12 @@ fun initTrackedJSQueries(
         fieldNames = dirDescr.schema.map(x -> x.name.origName);
         format = SKStore.OJSON(fieldNames);
 
-        selectProj = SKStore.EHandle(RowValues::fromFile, selectDirName).map(
-          RowKey::fromKey,
+        selectProj = SKStore.EHandle(
+          x ~> x,
+          RowValues::fromFile,
+          selectDirName,
+        ).map(
+          x ~> x,
           RowValues::fromFile,
           context,
           selectProjDirName,
