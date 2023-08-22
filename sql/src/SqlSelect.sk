@@ -795,14 +795,25 @@ class SelectEvaluator{
       };
       throw IgnoreAndContinue()
     | None() ->
-      result = SKStore.EHandle::multiMap(
-        x ~> x,
-        Row::type,
-        context,
-        parents,
-        this.selectName2,
-        this.evalSelectTableReducer(),
-      );
+      result = this.evalSelectTableReducer() match {
+      | None() ->
+        SKStore.EHandle::multiMap(
+          x ~> x,
+          Row::type,
+          context,
+          parents,
+          this.selectName2,
+        )
+      | Some(reducer) ->
+        SKStore.EHandle::multiMapReduce(
+          x ~> x,
+          Row::type,
+          context,
+          parents,
+          this.selectName2,
+          reducer,
+        )
+      };
       result
     }
   }
