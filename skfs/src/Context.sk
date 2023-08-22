@@ -748,11 +748,12 @@ mutable class Context{
     this.time
   }
 
-  mutable fun mkdir<V: File>(
+  mutable fun mkdir<K: Key, V: File>(
+    convKey: Key ~> K,
     convValue: File ~> V,
     dirName: DirName,
-    content: Array<(Key, V)> = Array[],
-  ): EHandle<SKStore.Key, V> {
+    content: Array<(K, V)> = Array[],
+  ): EHandle<K, V> {
     this.mkdirMulti(
       dirName,
       content.map(kv -> {
@@ -760,7 +761,7 @@ mutable class Context{
         (key, Array[value])
       }),
     );
-    EHandle(convValue, dirName)
+    EHandle(convKey, convValue, dirName)
   }
 
   mutable fun mkdirMulti(

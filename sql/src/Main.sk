@@ -95,7 +95,9 @@ untracked fun main(): void {
   cmd = Cli.Command("skdb")
     .about("The SQL database that tells you when your query results changed")
     .arg(Cli.StringArg("init").about("Initialize new SKStore runtime data"))
-    .arg(Cli.StringArg("data").about("Use existing SKStore runtime data").global())
+    .arg(
+      Cli.StringArg("data").about("Use existing SKStore runtime data").global(),
+    )
     .arg(Cli.BoolArg("backtrace").about("Internal use").global())
     .arg(Cli.BoolArg("sync").about("Sync to disk").global())
     .arg(
@@ -755,8 +757,18 @@ fun execReplicationId(args: Cli.ParseResults, options: SKDB.Options): void {
   SKDB.runSql(options, context ~> {
     clientsDirname = SKStore.DirName::create(`/clients/`);
     clientsDir = context.maybeGetDir(clientsDirname) match {
-    | None() -> context.mkdir(SKStore.IntFile::fromFile, clientsDirname)
-    | Some(d) -> SKStore.EHandle(SKStore.IntFile::fromFile, d.getDirName())
+    | None() ->
+      context.mkdir(
+        SKStore.SID::fromKey,
+        SKStore.IntFile::fromFile,
+        clientsDirname,
+      )
+    | Some(d) ->
+      SKStore.EHandle(
+        SKStore.SID::fromKey,
+        SKStore.IntFile::fromFile,
+        d.getDirName(),
+      )
     };
     key = SKStore.SID::create(clientUuid);
     arr = clientsDir.unsafeGetArray(context, key);
@@ -872,9 +884,6 @@ fun execReplay(_args: Cli.ParseResults, _options: SKDB.Options): void {
   })
 }
 
-untracked fun execDebug(
-  _args: Cli.ParseResults,
-  _options: SKDB.Options,
-): void {
+untracked fun execDebug(_args: Cli.ParseResults, _options: SKDB.Options): void {
   SKStore.toplevel(SKStore.Context{});
 }

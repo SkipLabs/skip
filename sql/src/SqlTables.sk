@@ -40,8 +40,14 @@ fun setWatermark(
   checkpointTick: SKStore.Tick,
 ): void {
   watermarkDir = context.maybeGetDir(watermarks) match {
-  | None() -> context.mkdir(SKStore.TickFile::fromFile, watermarks)
-  | Some(d) -> SKStore.EHandle(SKStore.TickFile::fromFile, d.getDirName())
+  | None() ->
+    context.mkdir(SKStore.IID::fromKey, SKStore.TickFile::fromFile, watermarks)
+  | Some(d) ->
+    SKStore.EHandle(
+      SKStore.IID::fromKey,
+      SKStore.TickFile::fromFile,
+      d.getDirName(),
+    )
   };
   key = SKStore.SID::create(`${tableName}_${replicationSource}`);
   mark = watermarkDir
@@ -93,11 +99,11 @@ fun makeSelectName(id: String): SKStore.DirName {
   SKStore.DirName::create("/" + id + "/");
 }
 
-fun getDir(dirDescr: DirDescr): SKStore.EHandle<RowKey, Row> {
-  SKStore.EHandle(RowValues::fromFile, dirDescr.dirName)
+fun getDir(dirDescr: DirDescr): SKStore.EHandle<SKStore.Key, Row> {
+  SKStore.EHandle(x ~> x, Row::fromFile, dirDescr.dirName)
 }
 
-fun makeDir<T: frozen>(
+fun makeDir<T: SKStore.File>(
   fromFile: SKStore.File ~> T,
   context: mutable SKStore.Context,
   dirName: SKStore.DirName,
@@ -105,7 +111,7 @@ fun makeDir<T: frozen>(
 ): SKStore.EHandle<SKStore.Key, T> {
   context.maybeGetDir(dirName) match {
   | None() -> make()
-  | Some(dir) -> SKStore.EHandle(fromFile, dir.getDirName())
+  | Some(dir) -> SKStore.EHandle(x ~> x, fromFile, dir.getDirName())
   };
 }
 
@@ -113,7 +119,7 @@ fun getTableDir(
   context: mutable SKStore.Context,
 ): SKStore.EHandle<SKStore.Key, DirDescr> {
   makeDir(DirDescr::fromFile, context, tableInfo, () -> {
-    context.mkdir(DirDescr::fromFile, tableInfo, Array[])
+    context.mkdir(x ~> x, DirDescr::fromFile, tableInfo, Array[])
   })
 }
 
@@ -260,7 +266,7 @@ fun getViewsDir(
   context: mutable SKStore.Context,
 ): SKStore.EHandle<SKStore.Key, SelectFile> {
   makeDir(SelectFile::fromFile, context, views, () ->
-    context.mkdir(SelectFile::fromFile, views, Array[])
+    context.mkdir(x ~> x, SelectFile::fromFile, views, Array[])
   )
 }
 
@@ -284,11 +290,11 @@ fun getSubsDirs(
   SKStore.EHandle<SKStore.Key, SKStore.IntFile>,
 ) {
   if (context.unsafeMaybeGetEagerDir(subsInput) is Some _) {
-    input = SKStore.EHandle(SubRequestFile::fromFile, subsInput);
-    output = SKStore.EHandle(SKStore.IntFile::fromFile, subsOutput);
+    input = SKStore.EHandle(x ~> x, SubRequestFile::fromFile, subsInput);
+    output = SKStore.EHandle(x ~> x, SKStore.IntFile::fromFile, subsOutput);
     return (input, output)
   };
-  input = context.mkdir(SubRequestFile::fromFile, subsInput, Array[]);
+  input = context.mkdir(x ~> x, SubRequestFile::fromFile, subsInput, Array[]);
   output = input.map(
     x ~> x,
     SKStore.IntFile::fromFile,
@@ -421,7 +427,7 @@ fun getIndexInputDir(
   context: mutable SKStore.Context,
 ): SKStore.EHandle<SKStore.Key, Index> {
   makeDir(Index::fromFile, context, indexInput, () ->
-    context.mkdir(Index::fromFile, indexInput, Array[])
+    context.mkdir(x ~> x, Index::fromFile, indexInput, Array[])
   )
 }
 
