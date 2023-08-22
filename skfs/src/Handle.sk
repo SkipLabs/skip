@@ -137,10 +137,11 @@ mutable class TWriter<K: Key, V: File>{
 /* Typed version of the Reducer. */
 /*****************************************************************************/
 
-class EReducer<T>{
+class EReducer<V2, V3: File>{
+  type: File ~> V3,
   canReset: Bool,
-  init: (mutable Iterator<T> ~> Array<T>),
-  update: (Array<T>, Array<T>, Array<T>) ~> ?Array<T>,
+  init: (mutable Iterator<V2> ~> Array<V3>),
+  update: (Array<V3>, Array<V2>, Array<V3>) ~> ?Array<V3>,
 }
 
 /*****************************************************************************/
@@ -320,7 +321,7 @@ class EHandle<K: Key, V: File>(
     EHandle(convOutputKey, convOutput, dirName)
   }
 
-  static fun multiMapReduce<K, V, K2: Key, V2: File>(
+  static fun multiMapReduce<K, V, K2: Key, V2: File, V3: File>(
     convOutputKey: Key ~> K2,
     convOutput: File ~> V2,
     context: mutable Context,
@@ -339,8 +340,8 @@ class EHandle<K: Key, V: File>(
       ),
     >,
     dirName: DirName,
-    reducer: EReducer<V2>,
-  ): EHandle<K2, V2> {
+    reducer: EReducer<V2, V3>,
+  ): EHandle<K2, V3> {
     dynParents = mutable Vector[];
     parentSet = mutable Set[];
     for (parent in parents) {
@@ -376,14 +377,14 @@ class EHandle<K: Key, V: File>(
           init => files ~> reducer.init(files.map(convOutput)),
           update => (state, old, new) ~>
             reducer.update(
-              state.map(convOutput),
+              state.map(reducer.type),
               old.map(convOutput),
-              new.map(convOutput),
+              new.map(reducer.type),
             ),
         },
       ),
     );
-    EHandle(convOutputKey, convOutput, dirName)
+    EHandle(convOutputKey, reducer.type, dirName)
   }
 
   fun map<K2: Key, V2: File>(
@@ -409,7 +410,7 @@ class EHandle<K: Key, V: File>(
     )
   }
 
-  fun mapReduce<K2: Key, V2: File>(
+  fun mapReduce<K2: Key, V2: File, V3: File>(
     convKey: Key ~> K2,
     conv: File ~> V2,
     context: mutable Context,
@@ -420,8 +421,8 @@ class EHandle<K: Key, V: File>(
       K,
       mutable NonEmptyIterator<V>,
     ) ~> void,
-    reducer: EReducer<V2>,
-  ): EHandle<K2, V2> {
+    reducer: EReducer<V2, V3>,
+  ): EHandle<K2, V3> {
     static::multiMapReduce(
       convKey,
       conv,

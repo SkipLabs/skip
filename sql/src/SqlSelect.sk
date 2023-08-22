@@ -936,12 +936,13 @@ class SelectEvaluator{
     }
   }
 
-  fun evalSelectTableReducer(): ?SKStore.EReducer<Row> {
+  fun evalSelectTableReducer(): ?SKStore.EReducer<Row, Row> {
     reducer = this.select.aggr match {
     | None() ->
       if (this.select.kind is SDistinct() || this.select.groupBy is Some _) {
         Some(
           SKStore.EReducer{
+            type => Row::type,
             canReset => true,
             init => firstRowAsArrayRepeat1,
             update => (_, _, _) ~> None(),
@@ -950,6 +951,7 @@ class SelectEvaluator{
       } else {
         Some(
           SKStore.EReducer{
+            type => Row::type,
             canReset => false,
             init => initRepeatRow,
             update => updateRepeatRow,
@@ -960,6 +962,7 @@ class SelectEvaluator{
       aggrKinds = aggrs.map(x -> x.i0);
       Some(
         SKStore.EReducer{
+          type => Row::type,
           canReset => true,
           init => rows ~> reducerInit(aggrKinds, rows),
           update => (state, old, new) ~>
@@ -972,6 +975,7 @@ class SelectEvaluator{
     | Some(_) ->
       Some(
         SKStore.EReducer{
+          type => Row::type,
           canReset => true,
           init => initUnion,
           update => (_, _, _) ~> None(),
