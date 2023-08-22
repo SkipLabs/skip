@@ -41,9 +41,9 @@ fun setWatermark(
 ): void {
   watermarkDir = context.maybeGetDir(watermarks) match {
   | None() ->
-    context.mkdir(SKStore.IID::type, SKStore.TickFile::type, watermarks)
+    context.mkdir(SKStore.SID::type, SKStore.TickFile::type, watermarks)
   | Some(d) ->
-    SKStore.EHandle(SKStore.IID::type, SKStore.TickFile::type, d.getDirName())
+    SKStore.EHandle(SKStore.SID::type, SKStore.TickFile::type, d.getDirName())
   };
   key = SKStore.SID::create(`${tableName}_${replicationSource}`);
   mark = watermarkDir
