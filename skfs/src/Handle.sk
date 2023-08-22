@@ -69,11 +69,25 @@ mutable class NonEmptyIterator<+T>(
     this.!isPassedFirstValue = true;
     Some(this.first)
   }
+
   readonly fun isEmpty(): Bool {
     false
   }
+
   mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
     mutable NonEmptyIterator(f(this.first), this.iter.map(f))
+  }
+
+  mutable fun assertUnique<T>(
+    err: () -> T = () ->
+      invariant_violation("Expected an iterator with only one element"),
+  ): T {
+    if (this.isPassedFirstValue) {
+      invariant_violation(
+        "Cannot use assertUnique on an iterator that has already been used",
+      )
+    };
+    err()
   }
 }
 
@@ -200,13 +214,33 @@ fun sumReducer(): EReducer<IntFile, IntFile> {
 /* The preferred way of accessing the file-system. */
 /*****************************************************************************/
 
-base class Handle<+K: Key, +V: File> {
+base class Handle<K: Key, +V: File> {
   macro fun getDirName(): DirName {
     this.dirName
   }
 
   macro overridable fun getType(): SKStore.File ~> V {
     this.type
+  }
+
+  fun getArray(context: mutable Context, key: K): Array<V> {
+    dir = context.unsafeGetDir(this.getDirName());
+    dir.getArray(context, key).map(this.getType())
+  }
+
+  fun get(context: mutable Context, key: K): V {
+    values = this.getArray(context, key);
+    if (values.size() >= 2) {
+      msg = `Error: Duplicate keys '${key}' in '${this.getDirName()}'`;
+      print_error(msg);
+      invariant_violation(msg);
+    };
+    if (values.size() == 0) {
+      msg = `Error: No value for keys '${key}' in '${this.getDirName()}'`;
+      print_error(msg);
+      invariant_violation(msg);
+    };
+    values[0]
   }
 }
 
@@ -216,7 +250,7 @@ base class Handle<+K: Key, +V: File> {
  */
 /*****************************************************************************/
 
-class LHandle<+K: Key, +V: File>(
+class LHandle<K: Key, +V: File>(
   typeKey: Key ~> K,
   type: File ~> V,
   dirName: DirName,
@@ -479,29 +513,9 @@ class EHandle<K: Key, V: File>(
     dir.writeArray(context, key, values);
   }
 
-  fun getArray(context: mutable Context, key: K): Array<V> {
-    dir = context.unsafeGetDir(this.getDirName());
-    dir.getArray(context, key).map(this.getType())
-  }
-
   fun getIter(context: mutable Context, key: K): mutable Iterator<V> {
     dir = context.unsafeGetDir(this.getDirName());
     dir.getIter(context, key).map(this.getType())
-  }
-
-  fun get(context: mutable Context, key: K): V {
-    values = this.getArray(context, key);
-    if (values.size() >= 2) {
-      msg = `Error: Duplicate keys '${key}' in '${this.getDirName()}'`;
-      print_error(msg);
-      invariant_violation(msg);
-    };
-    if (values.size() == 0) {
-      msg = `Error: No value for keys '${key}' in '${this.getDirName()}'`;
-      print_error(msg);
-      invariant_violation(msg);
-    };
-    values[0]
   }
 
   fun containsKey(context: mutable Context, key: K): Bool {

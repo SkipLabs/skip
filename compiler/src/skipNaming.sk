@@ -1204,32 +1204,39 @@ fun type_alias(
   N.Type_alias_def{annotations, name, tparams, body}
 }
 
-const classesDirName: SKStore.DirName = SKStore.DirName::create("/namingClasses/");
-const classesDir: SKStore.EHandle<ClassFile> = SKStore.EHandle(
-  ClassFile::fromFile,
+const classesDirName: SKStore.DirName = SKStore.DirName::create(
+  "/namingClasses/",
+);
+const classesDir: SKStore.EHandle<SKStore.SID, ClassFile> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  ClassFile::type,
   classesDirName,
 );
 class ClassFile(value: N.Class_def) extends SKStore.File
 
 fun populateClasses(
   context: mutable SKStore.Context,
-  defDir: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
-  inhDir: SKStore.LHandle<SkipInherit.ClassFile>,
-  childDir: SKStore.EHandle<SKStore.StringFile>,
+  defDir: SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
+  inhDir: SKStore.LHandle<SKStore.SID, SkipInherit.ClassFile>,
+  childDir: SKStore.EHandle<SKStore.SID, SKStore.StringFile>,
 ): void {
-  _ = defDir.contextWriterKeyValues(
-    ClassFile::fromFile,
+  _ = defDir.map(
+    SKStore.SID::keyType,
+    ClassFile::type,
     context,
     classesDirName,
     (context, writer, _key, values) ~> {
       SkipError.catchErrors(2, context, () -> {
-        if (values.size() > 1) return void;
-        values[0].value match {
+        if (values.collect(Array).size() > 1) return void;
+        values.first.value match {
         | GlobalEnv.EClass(def) ->
-          inheritedClassArr = inhDir.getArray(context, SKStore.SID(def.name.i1));
+          inheritedClassArr = inhDir.getArray(
+            context,
+            SKStore.SID(def.name.i1),
+          );
           if (inheritedClassArr.size() == 0) return void;
           c = inheritedClassArr[0].value;
-          writer.write(
+          writer.set(
             SKStore.SID(c.name.i1),
             ClassFile(class_def(context, childDir, make_env(), c)),
           )
@@ -1246,7 +1253,7 @@ fun maybeGetClass(
 ): ?N.Class_def {
   arr = classesDir.getArray(context, SKStore.SID(className));
   if (arr.size() == 0) return None();
-  Some(ClassFile::fromFile(arr[0]).value);
+  Some(ClassFile::type(arr[0]).value);
 }
 
 fun getClass(context: mutable SKStore.Context, className: A.Name): N.Class_def {
@@ -1302,7 +1309,7 @@ mutable class Acc{
 
 fun class_def(
   context: mutable SKStore.Context,
-  childDir: SKStore.EHandle<SKStore.StringFile>,
+  childDir: SKStore.EHandle<SKStore.SID, SKStore.StringFile>,
   env: Env,
   cd: A.Class_def,
 ): N.Class_def {
@@ -2043,8 +2050,9 @@ fun check_predefined(x: A.Name): void {
 }
 
 const funsDirName: SKStore.DirName = SKStore.DirName::create("/namingFuns/");
-const funsDir: SKStore.EHandle<FunFile> = SKStore.EHandle(
-  FunFile::fromFile,
+const funsDir: SKStore.EHandle<SKStore.SID, FunFile> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  FunFile::type,
   funsDirName,
 );
 class FunFile(value: N.Fun_def) extends SKStore.File
@@ -2052,30 +2060,35 @@ class FunFile(value: N.Fun_def) extends SKStore.File
 const funsByAnnotationDirName: SKStore.DirName = SKStore.DirName::create(
   "/namingFunsByAnnotation/",
 );
-const funsByAnnotationDir: SKStore.EHandle<NameFile> = SKStore.EHandle(
-  NameFile::fromFile,
+const funsByAnnotationDir: SKStore.EHandle<
+  SKStore.SID,
+  NameFile,
+> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  NameFile::type,
   funsByAnnotationDirName,
 );
 class NameFile(value: N.Name) extends SKStore.File
 
 fun populateFuns(
   context: mutable SKStore.Context,
-  defDir: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
+  defDir: SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
 ): void {
   // Gathering all functions with their annotations so that they are available
   // for `#forEachFunction` macro expansion.
-  _ = defDir.contextWriterKeyValues(
-    NameFile::fromFile,
+  _ = defDir.map(
+    SKStore.SID::keyType,
+    NameFile::type,
     context,
     funsByAnnotationDirName,
     (context, writer, _key, values) ~> {
       SkipError.catchErrors(2, context, () -> {
-        if (values.size() > 1) return void;
+        if (values.collect(Array).size() > 1) return void;
 
-        values[0].value match {
+        values.first.value match {
         | GlobalEnv.EFun(f) ->
           for (annotation in f.annotations) {
-            writer.write(SKStore.SID(annotation), NameFile(f.name))
+            writer.set(SKStore.SID(annotation), NameFile(f.name))
           }
         | _ -> void
         }
@@ -2083,17 +2096,18 @@ fun populateFuns(
     },
   );
 
-  _ = defDir.contextWriterKeyValues(
-    FunFile::fromFile,
+  _ = defDir.map(
+    SKStore.SID::keyType,
+    FunFile::type,
     context,
     funsDirName,
     (context, writer, _key, values) ~> {
       SkipError.catchErrors(2, context, () -> {
-        if (values.size() > 1) return void;
+        if (values.collect(Array).size() > 1) return void;
 
-        values[0].value match {
+        values.first.value match {
         | GlobalEnv.EFun(f) ->
-          writer.write(
+          writer.set(
             SKStore.SID(f.name.i1),
             FunFile(fun_def(context, make_env(), f)),
           )
@@ -2107,7 +2121,7 @@ fun populateFuns(
 fun maybeGetFun(context: mutable SKStore.Context, funName: String): ?N.Fun_def {
   arr = funsDir.getArray(context, SKStore.SID(funName));
   if (arr.size() == 0) return None();
-  Some(FunFile::fromFile(arr[0]).value);
+  Some(FunFile::type(arr[0]).value);
 }
 
 fun getFun(context: mutable SKStore.Context, funName: A.Name): N.Fun_def {
@@ -2117,7 +2131,11 @@ fun getFun(context: mutable SKStore.Context, funName: A.Name): N.Fun_def {
   }
 }
 
-fun fun_def(context: mutable SKStore.Context, env: Env, fd: A.Fun_def): N.Fun_def {
+fun fun_def(
+  context: mutable SKStore.Context,
+  env: Env,
+  fd: A.Fun_def,
+): N.Fun_def {
   classAcc = mutable ClassAcc{};
   acc = mutable Acc{classAcc};
 

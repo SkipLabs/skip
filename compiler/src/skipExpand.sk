@@ -67,7 +67,7 @@ const childDirName: SKStore.DirName = SKStore.DirName::create("/childCache/");
 
 fun getChildren(
   context: mutable SKStore.Context,
-  childDir: SKStore.EHandle<SKStore.StringFile>,
+  childDir: SKStore.EHandle<SKStore.SID, SKStore.StringFile>,
   className: String,
 ): SSet {
   childDir
@@ -82,17 +82,18 @@ fun getChildren(
 
 fun populateCache(
   context: mutable SKStore.Context,
-  defsDir: SKStore.EHandle<SkipExpand.DefsFile>,
-): SKStore.EHandle<SKStore.StringFile> {
-  defsDir.contextWriterKeyValues(
-    SKStore.StringFile::fromFile,
+  defsDir: SKStore.EHandle<SKStore.SID, SkipExpand.DefsFile>,
+): SKStore.EHandle<SKStore.SID, SKStore.StringFile> {
+  defsDir.map(
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
     context,
     childDirName,
     (context, writer, _key, defsFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
         map = mutable Map[];
-        invariant(defsFiles.size() == 1);
-        defs = defsFiles[0].value.i1;
+        defsFiles.assertUnique();
+        defs = defsFiles.first.value.i1;
         for (classDef in defs.class_defs) {
           (_fileRange, childStr) = classDef.name;
           for (classExtends in classDef.extends_) {
@@ -108,7 +109,7 @@ fun populateCache(
           }
         };
         for (parentStr => childVec in map) {
-          writer.writeArray(SKStore.SID(parentStr), childVec.toArray());
+          writer.setArray(SKStore.SID(parentStr), childVec.toArray());
         }
       })
     },
@@ -121,10 +122,11 @@ private fun isConcreteClass(defs: UMap<A.Class_def>, c: String): Bool {
 
 fun checkCycles(
   context: mutable SKStore.Context,
-  defs: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
+  defs: SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
 ): void {
   _ = defs.map(
-    SKStore.StringFile::fromFile,
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
     context,
     SKStore.DirName::create("/checkCycle/"),
     (context, _writer, _key, defFiles) ~> {
@@ -146,7 +148,7 @@ fun checkCycles(
 private fun checkCycle(
   context: mutable SKStore.Context,
   visited: SSet,
-  classDefs: SKStore.EHandle<GlobalEnv.ExpandedDefFile>,
+  classDefs: SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
   classDef: A.Class_def,
 ): void {
   (classNamePos, className) = classDef.name;
@@ -176,10 +178,16 @@ module end;
 
 module ModuleMap;
 
-const moduleDirName1: SKStore.DirName = SKStore.DirName::create("/moduleCache1/");
+const moduleDirName1: SKStore.DirName = SKStore.DirName::create(
+  "/moduleCache1/",
+);
 const moduleDirName: SKStore.DirName = SKStore.DirName::create("/moduleCache/");
-const moduleDir: SKStore.EHandle<SKStore.ArrayStringFile> = SKStore.EHandle(
-  SKStore.ArrayStringFile::fromFile,
+const moduleDir: SKStore.EHandle<
+  SKStore.SID,
+  SKStore.ArrayStringFile,
+> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  SKStore.ArrayStringFile::type,
   moduleDirName,
 );
 
@@ -189,20 +197,19 @@ fun containsKey(context: mutable SKStore.Context, key: String): Bool {
 
 fun populateCache(
   context: mutable SKStore.Context,
-  moduleDefs: SKStore.EHandle<SkipExpand.DefsFile>,
+  moduleDefs: SKStore.EHandle<SKStore.SID, SkipExpand.DefsFile>,
 ): void {
-  moduleDirName1 = moduleDefs.contextWriterKeyValues(
-    SKStore.StringFile::fromFile,
+  moduleDirName1 = moduleDefs.map(
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
     context,
     moduleDirName1,
     (context, writer, key, values) ~> {
-      if (values.size() == 0) return void;
       SkipError.catchErrors(1, context, () -> {
         moduleName = key match {
         | SKStore.SID(x) -> x
-        | _ -> invariant_violation("Unexpected key type")
         };
-        SkipExpand.checkConflicts(values[0].value);
+        SkipExpand.checkConflicts(values.first.value);
         defMap = mutable Map[];
         pushDef = (prefix, moduleName, defName) -> {
           if (defName.startsWith(".")) {
@@ -215,7 +222,7 @@ fun populateCache(
           };
           defMap![moduleName] = defMap[moduleName].set(defName);
         };
-        (_, defs) = values[0].value;
+        (_, defs) = values.first.value;
 
         for (cd in defs.class_defs) {
           (_fileRange, defName) = cd.name;
@@ -234,7 +241,7 @@ fun populateCache(
           pushDef("type:", moduleName, defName);
         };
         for (defModuleName => defSet in defMap) {
-          writer.writeArray(
+          writer.setArray(
             SKStore.SID(defModuleName),
             defSet.collect(Array).map(x -> SKStore.StringFile(x)),
           );
@@ -243,12 +250,13 @@ fun populateCache(
     },
   );
   _ = moduleDirName1.map(
-    SKStore.ArrayStringFile::fromFile,
+    SKStore.SID::keyType,
+    SKStore.ArrayStringFile::type,
     context,
     moduleDirName,
     (context, writer, key, iter) ~> {
       SkipError.catchErrors(1, context, () -> {
-        writer.write(
+        writer.set(
           key,
           SKStore.ArrayStringFile(
             iter.map(x -> x.value).collect(SortedSet).collect(Array),
@@ -265,10 +273,10 @@ module GlobalEnv;
 
 const defMapDirName1: SKStore.DirName = SKStore.DirName::create("/defMap1/");
 const defMapDirName: SKStore.DirName = SKStore.DirName::create("/defMap/");
-const defMapDir: SKStore.EHandle<ExpandedDefFile> = SKStore.EHandle(
-  ExpandedDefFile::fromFile,
-  defMapDirName,
-);
+const defMapDir: SKStore.EHandle<
+  SKStore.SID,
+  ExpandedDefFile,
+> = SKStore.EHandle(SKStore.SID::keyType, ExpandedDefFile::type, defMapDirName);
 
 class ProgramFile(value: A.Program) extends SKStore.File
 
@@ -284,46 +292,47 @@ base class ExpandedDef {
 
 fun populateDefinitions(
   context: mutable SKStore.Context,
-  expandedDefsDir: SKStore.EHandle<SkipExpand.DefsFile>,
-): SKStore.EHandle<ExpandedDefFile> {
-  phase1 = expandedDefsDir.contextWriterKeyValues(
-    ExpandedDefFile::fromFile,
+  expandedDefsDir: SKStore.EHandle<SKStore.SID, SkipExpand.DefsFile>,
+): SKStore.EHandle<SKStore.SID, ExpandedDefFile> {
+  phase1 = expandedDefsDir.map(
+    SKStore.SID::keyType,
+    ExpandedDefFile::type,
     context,
     defMapDirName1,
     (context, writer, _key, defsFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
-        invariant(defsFiles.size() == 1);
-        defs = defsFiles[0].value.i1;
+        defsFiles.assertUnique();
+        defs = defsFiles.first.value.i1;
         for (classDef in defs.class_defs) {
           expandedDefFile = ExpandedDefFile(EClass(classDef));
-          writer.write(SKStore.SID("class:" + classDef.name.i1), expandedDefFile);
+          writer.set(SKStore.SID("class:" + classDef.name.i1), expandedDefFile);
         };
         for (typeDef in defs.type_defs) {
           expandedDefFile = ExpandedDefFile(EType(typeDef));
-          writer.write(SKStore.SID("type:" + typeDef.name.i1), expandedDefFile)
+          writer.set(SKStore.SID("type:" + typeDef.name.i1), expandedDefFile)
         };
         for (constDef in defs.const_defs) {
           expandedDefFile = ExpandedDefFile(EConst(constDef));
-          writer.write(SKStore.SID("const:" + constDef.name.i1), expandedDefFile)
+          writer.set(SKStore.SID("const:" + constDef.name.i1), expandedDefFile)
         };
         for (funDef in defs.fun_defs) {
           expandedDefFile = ExpandedDefFile(EFun(funDef));
-          writer.write(SKStore.SID("fun:" + funDef.name.i1), expandedDefFile)
+          writer.set(SKStore.SID("fun:" + funDef.name.i1), expandedDefFile)
         };
       })
     },
   );
-  phase1.contextWriterKeyValues(
-    ExpandedDefFile::fromFile,
+  phase1.map(
+    SKStore.SID::keyType,
+    ExpandedDefFile::type,
     context,
     defMapDirName,
     (context, writer, key, defFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
         name = key match {
         | SKStore.SID(x) -> x
-        | _ -> invariant_violation("Unexpected key type")
         };
-        if (name.startsWith("class:") && defFiles.size() > 1) {
+        if (name.startsWith("class:")) {
           roots = mutable Vector[];
           exts = mutable Vector[];
           for (cd in defFiles) {
@@ -342,13 +351,13 @@ fun populateDefinitions(
           };
 
           if (roots.size() == 0) {
-            writer.writeArray(key, defFiles);
+            writer.setArray(key, defFiles.collect(Array));
             SkipError.error(
               exts[0].name.i0,
               "Undefined class " + exts[0].name.i1,
             );
           } else if (roots.size() > 1) {
-            writer.writeArray(
+            writer.setArray(
               key,
               roots.map(x -> ExpandedDefFile(EClass(x))).toArray(),
             );
@@ -371,16 +380,19 @@ fun populateDefinitions(
             invariant(c.extension is Some _);
             !root = SkipExpand.merge_class(root, c)
           };
-          writer.write(key, ExpandedDefFile(EClass(root)))
+          writer.set(key, ExpandedDefFile(EClass(root)))
         } else {
-          writer.writeArray(key, defFiles)
+          writer.setArray(key, defFiles.collect(Array))
         }
       })
     },
   );
 }
 
-fun getClass(context: mutable SKStore.Context, className: String): ?A.Class_def {
+fun getClass(
+  context: mutable SKStore.Context,
+  className: String,
+): ?A.Class_def {
   arr = defMapDir.getArray(context, SKStore.SID("class:" + className));
   if (arr.size() == 0) return None();
   if (arr.size() > 1) invariant_violation("TODO multiple classes");
@@ -407,7 +419,10 @@ fun getType(
   )
 }
 
-fun getConst(context: mutable SKStore.Context, constName: String): ?A.Const_def {
+fun getConst(
+  context: mutable SKStore.Context,
+  constName: String,
+): ?A.Const_def {
   arr = defMapDir.getArray(context, SKStore.SID("const:" + constName));
   if (arr.size() == 0) return None();
   if (arr.size() > 1) invariant_violation("TODO multiple consts");
@@ -507,7 +522,10 @@ fun name_of_module(x: Module_): String {
 
 fun module_names_find(context: mutable SKStore.Context, x: Module_): ?DefNames {
   // TODO: this should return none when the module is not defined
-  mresult = ModuleMap.moduleDir.getArray(context, SKStore.SID(name_of_module(x)));
+  mresult = ModuleMap.moduleDir.getArray(
+    context,
+    SKStore.SID(name_of_module(x)),
+  );
   Some(DefNames(if (mresult.size() == 0) Array[] else mresult[0].value))
 }
 
@@ -992,10 +1010,14 @@ class DefsFile(value: (?FileRange, SkipExpand.Defs)) extends SKStore.File
 
 fun program(
   context: mutable SKStore.Context,
-  files: SKStore.EHandle<SkipParse.DefsFile>,
-): (SKStore.EHandle<GlobalEnv.ExpandedDefFile>, SKStore.EHandle<SKStore.StringFile>) {
+  files: SKStore.EHandle<SKStore.SID, SkipParse.DefsFile>,
+): (
+  SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
+  SKStore.EHandle<SKStore.SID, SKStore.StringFile>,
+) {
   moduleDefsPhase1Dir = files.map(
-    DefsFile::fromFile,
+    SKStore.SID::keyType,
+    DefsFile::type,
     context,
     SKStore.DirName::create("/moduleMap1/"),
     (context, writer, _key, values) ~> {
@@ -1003,14 +1025,15 @@ fun program(
         SkipError.catchErrors(1, context, () -> {
           moduleMap = definitions(context, fileDefs.value);
           for (moduleName => defs in moduleMap) {
-            writer.write(SKStore.SID(moduleName), DefsFile(defs))
+            writer.set(SKStore.SID(moduleName), DefsFile(defs))
           }
         })
       }
     },
   );
   moduleDefsDir = moduleDefsPhase1Dir.map(
-    DefsFile::fromFile,
+    SKStore.SID::keyType,
+    DefsFile::type,
     context,
     SKStore.DirName::create("/moduleMap2/"),
     (context, writer, key, values) ~> {
@@ -1024,27 +1047,26 @@ fun program(
         };
         moduleName = key match {
         | SKStore.SID(x) -> x
-        | _ -> invariant_violation("Unexpected key")
         };
-        writer.write(SKStore.SID(moduleName), DefsFile(acc))
+        writer.set(SKStore.SID(moduleName), DefsFile(acc))
       })
     },
   );
   ModuleMap.populateCache(context, moduleDefsDir);
   expandEnv = makeEnv();
-  expandedDefs = moduleDefsDir.contextWriterKeyValues(
-    DefsFile::fromFile,
+  expandedDefs = moduleDefsDir.map(
+    SKStore.SID::keyType,
+    DefsFile::type,
     context,
     SKStore.DirName::create("/moduleMap3/"),
     (context, writer, key, defsFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
         moduleName = key match {
         | SKStore.SID(x) -> x
-        | _ -> invariant_violation("Unexpected key")
         };
-        invariant(defsFiles.size() == 1);
-        defs = defsFiles[0].value;
-        writer.write(
+        defsFiles.assertUnique();
+        defs = defsFiles.first.value;
+        writer.set(
           key,
           DefsFile(module_expand(context, expandEnv, moduleName, defs)),
         );
@@ -1698,7 +1720,11 @@ fun malias_lam_params(
   params.map(lp -> malias_lam_param(env, lp))
 }
 
-fun malias_expr(context: mutable SKStore.Context, env: Env, ex: A.Expr): A.Expr {
+fun malias_expr(
+  context: mutable SKStore.Context,
+  env: Env,
+  ex: A.Expr,
+): A.Expr {
   (pos, e) = ex;
   (pos, malias_expr_(context, env, pos, e))
 }
@@ -2470,7 +2496,11 @@ fun module_(
 /*****************************************************************************/
 /* Function definition. */
 /*****************************************************************************/
-fun fun_def(context: mutable SKStore.Context, env: Env, fd: A.Fun_def): A.Fun_def {
+fun fun_def(
+  context: mutable SKStore.Context,
+  env: Env,
+  fd: A.Fun_def,
+): A.Fun_def {
   t__ = fd;
   native_ = t__.native_;
   memoized_ = t__.memoized_;
@@ -2570,7 +2600,11 @@ fun const_def(
 /*****************************************************************************/
 /* type_def map. */
 /*****************************************************************************/
-fun cla_tyd(context: mutable SKStore.Context, env: Env, x: A.Cla_tyd): A.Cla_tyd {
+fun cla_tyd(
+  context: mutable SKStore.Context,
+  env: Env,
+  x: A.Cla_tyd,
+): A.Cla_tyd {
   x match {
   | A.TydAbstract(tyd_type, def) ->
     A.TydAbstract(
@@ -2904,7 +2938,11 @@ fun when_params(
   })
 }
 
-fun type(context: mutable SKStore.Context, env: Env, ty: SkipAst.Type_): A.Type_ {
+fun type(
+  context: mutable SKStore.Context,
+  env: Env,
+  ty: SkipAst.Type_,
+): A.Type_ {
   lam = (env1, _, ty1) -> {
     ty1 match {
     | (pos, A.Tapply(x, y)) ->

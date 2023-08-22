@@ -55,8 +55,8 @@ base class Visibility uses Equality {
   | VProtected()
 }
 
-class Program private (program: SKStore.EHandle<DefFile>) {
-  static fun create(program: SKStore.EHandle<DefFile>): this {
+class Program private (program: SKStore.EHandle<SKStore.SID, DefFile>) {
+  static fun create(program: SKStore.EHandle<SKStore.SID, DefFile>): this {
     static(program)
   }
 
@@ -80,32 +80,36 @@ class Program private (program: SKStore.EHandle<DefFile>) {
     }
   }
 
-  fun getFunsProj(context: mutable SKStore.Context): SKStore.EHandle<FunDefFile> {
-    this.program.contextWriterKeyValues(
-      FunDefFile::fromFile,
+  fun getFunsProj(
+    context: mutable SKStore.Context,
+  ): SKStore.EHandle<SKStore.IID, FunDefFile> {
+    this.program.map(
+      SKStore.IID::keyType,
+      FunDefFile::type,
       context,
       SKStore.DirName::create("/funsDefsProj/"),
       (_context, writer, _, files) ~> {
-        invariant(files.size() == 1);
         result = mutable Vector[];
-        files[0].value match {
+        files.first.value match {
         | OuterIst.DFun(funDef) -> result.push(FunDefFile(funDef))
         | _ -> void
         };
-        writer.writeArray(SKStore.IID(0), result.toArray());
+        writer.setArray(SKStore.IID(0), result.toArray());
       },
     )
   }
 
-  fun getConstsProj(context: mutable SKStore.Context): SKStore.EHandle<ConstDefFile> {
-    this.program.contextWriterKeyValues(
-      ConstDefFile::fromFile,
+  fun getConstsProj(
+    context: mutable SKStore.Context,
+  ): SKStore.EHandle<SKStore.IID, ConstDefFile> {
+    this.program.map(
+      SKStore.IID::keyType,
+      ConstDefFile::type,
       context,
       SKStore.DirName::create("/constsDefsProj/"),
       (_context, writer, _, files) ~> {
-        invariant(files.size() == 1);
         result = mutable Vector[];
-        files[0].value match {
+        files.first.value match {
         | OuterIst.DConst(constDef) -> result.push(ConstDefFile(constDef))
         | OuterIst.DClass(classDef) ->
           if (!(classDef.kind is KTrait _)) {
@@ -131,21 +135,21 @@ class Program private (program: SKStore.EHandle<DefFile>) {
           }
         | _ -> void
         };
-        writer.writeArray(SKStore.IID(0), result.toArray());
+        writer.setArray(SKStore.IID(0), result.toArray());
       },
     )
   }
 
   fun getConsts(
     context: mutable SKStore.Context,
-    constsDir: SKStore.EHandle<ConstDefFile>,
+    constsDir: SKStore.EHandle<SKStore.IID, ConstDefFile>,
   ): Array<ConstDef> {
     constsDir.unsafeGetArray(context, SKStore.IID(0)).map(x -> x.value)
   }
 
   fun getFuns(
     context: mutable SKStore.Context,
-    funsDir: SKStore.EHandle<FunDefFile>,
+    funsDir: SKStore.EHandle<SKStore.IID, FunDefFile>,
   ): Array<FunDef> {
     funsDir.unsafeGetArray(context, SKStore.IID(0)).map(x -> x.value)
   }
@@ -262,7 +266,7 @@ base class Body {
   }
 }
 
-class CallableDefFile(value: CallableDef) extends SKStore.Key {
+class CallableDefFile(value: CallableDef) extends SKStore.File, SKStore.Key {
   fun compare(other: SKStore.Key): Order {
     other match {
     | CallableDefFile(x) -> this.value.xhash.compare(x.xhash)
