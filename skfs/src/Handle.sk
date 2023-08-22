@@ -289,7 +289,57 @@ class EHandle<K: Key, V: File>(
       ),
     >,
     dirName: DirName,
-    reducerOpt: ?EReducer<V2> = None(),
+  ): EHandle<K2, V2> {
+    dynParents = mutable Vector[];
+    parentSet = mutable Set[];
+    for (parent in parents) {
+      (parentHandle, parentData) = parent;
+      (mapFun, rangeOpt) = parentData;
+      convInputKey = parentHandle.convKey;
+      convInput = parentHandle.conv;
+      parentName = parentHandle.dirName;
+      dynamicMapFun = (context, writer, key, fileIter) ~> {
+        FileIterator::create(fileIter) match {
+        | EmptyIterator _ -> return void
+        | iter @ NonEmptyIterator _ ->
+          twriter = mutable TWriter<K2, V2>{writes => writer.writes};
+          mapFun(
+            context,
+            twriter,
+            convInputKey(key),
+            iter.nonEmptyMap(convInput),
+          );
+          writer.!writes = twriter.writes
+        }
+      };
+      parentSet.add(parentName);
+      dynParents.push((parentName, (dynamicMapFun, rangeOpt)))
+    };
+    fixedParents = FixedSingle::create(dynParents);
+    EagerDir::applyMany(context, fixedParents, dirName, None());
+    EHandle(convOutputKey, convOutput, dirName)
+  }
+
+  static fun multiMapReduce<K, V, K2: Key, V2: File>(
+    convOutputKey: Key ~> K2,
+    convOutput: File ~> V2,
+    context: mutable Context,
+    parents: Array<
+      (
+        EHandle<K, V>,
+        (
+          (
+            mutable Context,
+            mutable TWriter<K2, V2>,
+            K,
+            mutable NonEmptyIterator<V>,
+          ) ~> void,
+          ?Array<KeyRange>,
+        ),
+      ),
+    >,
+    dirName: DirName,
+    reducer: EReducer<V2>,
   ): EHandle<K2, V2> {
     dynParents = mutable Vector[];
     parentSet = mutable Set[];
@@ -321,21 +371,17 @@ class EHandle<K: Key, V: File>(
       context,
       fixedParents,
       dirName,
-      reducerOpt match {
-      | None() -> None()
-      | Some(reducer) ->
-        Some(
-          IReducer{
-            init => files ~> reducer.init(files.map(convOutput)),
-            update => (state, old, new) ~>
-              reducer.update(
-                state.map(convOutput),
-                old.map(convOutput),
-                new.map(convOutput),
-              ),
-          },
-        )
-      },
+      Some(
+        IReducer{
+          init => files ~> reducer.init(files.map(convOutput)),
+          update => (state, old, new) ~>
+            reducer.update(
+              state.map(convOutput),
+              old.map(convOutput),
+              new.map(convOutput),
+            ),
+        },
+      ),
     );
     EHandle(convOutputKey, convOutput, dirName)
   }
@@ -351,7 +397,6 @@ class EHandle<K: Key, V: File>(
       K,
       mutable NonEmptyIterator<V>,
     ) ~> void,
-    reducerOpt: ?EReducer<V2> = None(),
   ): EHandle<K2, V2> {
     static::multiMap(
       convKey,
@@ -361,7 +406,31 @@ class EHandle<K: Key, V: File>(
         (SKStore.EHandle(this.convKey, this.conv, this.dirName), (f, None())),
       ],
       dirName,
-      reducerOpt,
+    )
+  }
+
+  fun mapReduce<K2: Key, V2: File>(
+    convKey: Key ~> K2,
+    conv: File ~> V2,
+    context: mutable Context,
+    dirName: DirName,
+    f: (
+      mutable Context,
+      mutable TWriter<K2, V2>,
+      K,
+      mutable NonEmptyIterator<V>,
+    ) ~> void,
+    reducer: EReducer<V2>,
+  ): EHandle<K2, V2> {
+    static::multiMapReduce(
+      convKey,
+      conv,
+      context,
+      Array[
+        (SKStore.EHandle(this.convKey, this.conv, this.dirName), (f, None())),
+      ],
+      dirName,
+      reducer,
     )
   }
 
