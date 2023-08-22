@@ -13,27 +13,46 @@ module alias Error = SkipError;
 module FileCache;
 
 const fileDirName: SKStore.DirName = SKStore.DirName::create("/fileCache/");
-const fileDir: SKStore.EHandle<SKStore.StringFile> = SKStore.EHandle(
-  SKStore.StringFile::fromFile,
+const fileDir: SKStore.EHandle<
+  SKStore.SID,
+  SKStore.StringFile,
+> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  SKStore.StringFile::type,
   fileDirName,
 );
 
-const allFilesDirName: SKStore.DirName = SKStore.DirName::create("/allFilesCache/");
-const allFilesDir: SKStore.EHandle<SKStore.StringFile> = SKStore.EHandle(
-  SKStore.StringFile::fromFile,
+const allFilesDirName: SKStore.DirName = SKStore.DirName::create(
+  "/allFilesCache/",
+);
+const allFilesDir: SKStore.EHandle<
+  SKStore.IID,
+  SKStore.StringFile,
+> = SKStore.EHandle(
+  SKStore.IID::keyType,
+  SKStore.StringFile::type,
   allFilesDirName,
 );
 
-const fileTimeDirName: SKStore.DirName = SKStore.DirName::create("/fileTimeCache/");
-const fileTimeDir: SKStore.EHandle<SKStore.IntFile> = SKStore.EHandle(
-  SKStore.IntFile::fromFile,
+const fileTimeDirName: SKStore.DirName = SKStore.DirName::create(
+  "/fileTimeCache/",
+);
+const fileTimeDir: SKStore.EHandle<
+  SKStore.SID,
+  SKStore.IntFile,
+> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  SKStore.IntFile::type,
   fileTimeDirName,
 );
 
 @cpp_extern("SKIP_get_mtime")
 native fun getLastModificationTime(fileName: String): Int;
 
-fun writeFiles(context: mutable SKStore.Context, fileNames: Array<String>): void {
+fun writeFiles(
+  context: mutable SKStore.Context,
+  fileNames: Array<String>,
+): void {
   oldFiles = allFilesDir
     .unsafeGetArray(context, SKStore.IID(0))
     .map(x -> x.value)
@@ -54,7 +73,11 @@ fun writeFiles(context: mutable SKStore.Context, fileNames: Array<String>): void
     )
   };
   for (fileName in oldFiles) {
-    fileDir.writeArray(context, SKStore.SID(fileName), Array[SKStore.StringFile("")])
+    fileDir.writeArray(
+      context,
+      SKStore.SID(fileName),
+      Array[SKStore.StringFile("")],
+    )
   };
   allFilesDir.writeArray(
     context,
@@ -68,8 +91,9 @@ module end;
 module SkipParse;
 
 const astDirName: SKStore.DirName = SKStore.DirName::create("/astCache/");
-const astDir: SKStore.EHandle<DefsFile> = SKStore.EHandle(
-  DefsFile::fromFile,
+const astDir: SKStore.EHandle<SKStore.SID, DefsFile> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  DefsFile::type,
   astDirName,
 );
 

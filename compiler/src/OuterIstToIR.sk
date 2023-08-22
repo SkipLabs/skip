@@ -228,7 +228,10 @@ class ParameterInfo{
 
 // A GFunction which may or may not be compiled to GIR yet.
 base class LazyGFun{} uses Hashable, Orderable, Show {
-  fun compile(context: mutable SKStore.Context, converter: Converter): GFunction;
+  fun compile(
+    context: mutable SKStore.Context,
+    converter: Converter,
+  ): GFunction;
 
   fun gname(): GFunctionName;
 
@@ -269,7 +272,10 @@ class FrontEndLazyGFun{frontEndName: String} extends LazyGFun {
     GFunctionName(this.frontEndName)
   }
 
-  fun compile(context: mutable SKStore.Context, converter: Converter): GFunction {
+  fun compile(
+    context: mutable SKStore.Context,
+    converter: Converter,
+  ): GFunction {
     funDef = converter.program.getFun(context, this.frontEndName);
     convertedFunDef = converter.convertFunDef(context, funDef);
     result = converter.getGFunction(context, convertedFunDef);
@@ -1248,9 +1254,9 @@ class GClassFile(value: GClass) extends SKStore.File
 class Converter private (
   program: I.Program,
   config: Config.Config,
-  funs: SKStore.LHandle<GFunctionFile>,
-  classes: SKStore.LHandle<GClassFile>,
-  lower: SKStore.LHandle<I.CallableDefFile>,
+  funs: SKStore.LHandle<SKStore.Key, GFunctionFile>,
+  classes: SKStore.LHandle<SKStore.Key, GClassFile>,
+  lower: SKStore.LHandle<SKStore.Key, I.CallableDefFile>,
 ) {
   fun resetCache(context: mutable SKStore.Context): void {
     funsDir = context.unsafeGetLazyDir(this.funs.dirName);
@@ -1266,7 +1272,7 @@ class Converter private (
 
   fun getConsts(
     context: mutable SKStore.Context,
-    constsProj: SKStore.EHandle<I.ConstDefFile>,
+    constsProj: SKStore.EHandle<SKStore.IID, I.ConstDefFile>,
   ): Array<ConstLazyGFun> {
     consts = this.program.getConsts(context, constsProj);
     consts.map(cst -> this.convertConstDef(context, cst))
@@ -1279,28 +1285,43 @@ class Converter private (
     program: I.Program,
   ): this {
     funDirName = SKStore.DirName::create(name.toString() + "funs/");
-    funs = SKStore.LHandle(GFunctionFile::fromFile, funDirName);
+    funs = SKStore.LHandle(
+      SKStore.Key::unTyped,
+      GFunctionFile::type,
+      funDirName,
+    );
     classDirName = SKStore.DirName::create(name.toString() + "classes/");
-    classes = SKStore.LHandle(GClassFile::fromFile, classDirName);
+    classes = SKStore.LHandle(
+      SKStore.Key::unTyped,
+      GClassFile::type,
+      classDirName,
+    );
     lowerDirName: SKStore.DirName = SKStore.DirName::create("/lowerDefs/");
-    lower = SKStore.LHandle(I.CallableDefFile::fromFile, lowerDirName);
+    lower = SKStore.LHandle(
+      SKStore.Key::unTyped,
+      I.CallableDefFile::type,
+      lowerDirName,
+    );
     converter = static(program, config, funs, classes, lower);
     _ = SKStore.LHandle::create(
-      GFunctionFile::fromFile,
+      SKStore.Key::unTyped,
+      GFunctionFile::type,
       context,
       funDirName,
       converter.getGFunctionFun,
       false,
     );
     _ = SKStore.LHandle::create(
-      GClassFile::fromFile,
+      SKStore.Key::unTyped,
+      GClassFile::type,
       context,
       classDirName,
       converter.getGClassImplFun,
       false,
     );
     _ = SKStore.LHandle::create(
-      I.CallableDefFile::fromFile,
+      SKStore.Key::unTyped,
+      I.CallableDefFile::type,
       context,
       lowerDirName,
       (context, _, key) ~> {
@@ -1322,13 +1343,16 @@ class Converter private (
     converter
   }
 
-  fun getGFunction(context: mutable SKStore.Context, lazy: LazyGFun): GFunction {
+  fun getGFunction(
+    context: mutable SKStore.Context,
+    lazy: LazyGFun,
+  ): GFunction {
     this.getGFunctionFun(context, this.funs, LazyGFunKey(lazy))[0].value
   }
 
   fun getGFunctionFun(
     context: mutable SKStore.Context,
-    _self: SKStore.LHandle<GFunctionFile>,
+    _self: SKStore.LHandle<SKStore.Key, GFunctionFile>,
     key: SKStore.Key,
   ): Array<GFunctionFile> {
     lazy = key match {
@@ -1349,7 +1373,7 @@ class Converter private (
 
   private fun getGClassImplFun(
     context: mutable SKStore.Context,
-    _self: SKStore.LHandle<GClassFile>,
+    _self: SKStore.LHandle<SKStore.Key, GClassFile>,
     key: SKStore.Key,
   ): Array<GClassFile> {
     gid = key match {
@@ -5256,9 +5280,15 @@ class ConstsArrayFile(
   value: Array<OuterIstToIR.ConstLazyGFun>,
 ) extends SKStore.File
 
-const constsArrayDirName: SKStore.DirName = SKStore.DirName::create("/constsArray/");
-const constsArrayDir: SKStore.EHandle<ConstsArrayFile> = SKStore.EHandle(
-  ConstsArrayFile::fromFile,
+const constsArrayDirName: SKStore.DirName = SKStore.DirName::create(
+  "/constsArray/",
+);
+const constsArrayDir: SKStore.EHandle<
+  SKStore.SID,
+  ConstsArrayFile,
+> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  ConstsArrayFile::type,
   constsArrayDirName,
 );
 
@@ -5269,8 +5299,8 @@ fun createIR(
   shouldRuntimeExport: (I.FunDef ~> Bool),
   outerIst: I.Program,
   converter: Converter,
-  constsProj: SKStore.EHandle<I.ConstDefFile>,
-  funDefsProj: SKStore.EHandle<I.FunDefFile>,
+  constsProj: SKStore.EHandle<SKStore.IID, I.ConstDefFile>,
+  funDefsProj: SKStore.EHandle<SKStore.IID, I.FunDefFile>,
 ): GlobalEnv {
   consts = converter.getConsts(context, constsProj);
   funDefs = outerIst.getFuns(context, funDefsProj);

@@ -295,9 +295,9 @@ fun compile(
   };
 
   if (context.unsafeMaybeGetDir(FileCache.fileDirName) is None()) {
-    _ = context.mkdir(x ~> x, FileCache.fileDirName, Array[]);
-    _ = context.mkdir(x ~> x, FileCache.fileTimeDirName, Array[]);
-    _ = context.mkdir(x ~> x, FileCache.allFilesDirName, Array[]);
+    _ = context.mkdir(x ~> x, x ~> x, FileCache.fileDirName, Array[]);
+    _ = context.mkdir(x ~> x, x ~> x, FileCache.fileTimeDirName, Array[]);
+    _ = context.mkdir(x ~> x, x ~> x, FileCache.allFilesDirName, Array[]);
   };
 
   FileCache.writeFiles(context, fileNames);
@@ -319,23 +319,25 @@ fun compile(
     );
 
     backendDir = context.mkdir(
-      TickConfigFile::fromFile,
+      SKStore.IID::keyType,
+      TickConfigFile::type,
       backendDirName,
       Array[(SKStore.IID(0), TickConfigFile((-128, config)))],
     );
 
-    _ = backendDir.contextWriterKeyValues(
-      TickConfigFile::fromFile,
+    _ = backendDir.map(
+      SKStore.SID::keyType,
+      TickConfigFile::type,
       context,
       backendSinkDirName,
       (context, _writer, _key, values) ~> {
-        (_, conf) = TickConfigFile::fromFile(values[0]).value;
+        (_, conf) = TickConfigFile::type(values.first).value;
 
         context.getGlobal("ERRORS") match {
         | None() -> void
         | Some(errors) ->
           SkipError.printErrorsAndExit(
-            SkipError.ErrorsFile::fromFile(errors).value.reversed().toArray(),
+            SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
           )
         };
 

@@ -12,19 +12,19 @@ module SkipMain;
 
 fun type_program(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SkipTyping.DefFile> {
-  parsed_program = FileCache.fileDir.contextWriterKeyValues(
-    SkipParse.DefsFile::fromFile,
+): SKStore.EHandle<SKStore.SID, SkipTyping.DefFile> {
+  parsed_program = FileCache.fileDir.map(
+    SKStore.SID::keyType,
+    SkipParse.DefsFile::type,
     context,
     SkipParse.astDirName,
     (context, writer, key, sources) ~> {
-      source = sources[0];
+      source = sources.first;
       SkipError.catchErrors(0, context, () -> {
         fileName = key match {
         | SKStore.SID(x) -> x
-        | _ -> invariant_violation("Unexpected key type")
         };
-        writer.write(key, SkipParse.parseFile(fileName, source.value))
+        writer.set(key, SkipParse.parseFile(fileName, source.value))
       })
     },
   );

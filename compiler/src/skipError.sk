@@ -101,7 +101,7 @@ fun keepErrors(
   | err @ SkipError.SkipErrorException _ ->
     errors = context.getGlobal("ERRORS") match {
     | None() -> List[]
-    | Some(x) -> ErrorsFile::fromFile(x).value
+    | Some(x) -> ErrorsFile::type(x).value
     };
     !errors = List.Cons(err, errors);
     context.setGlobal("ERRORS", ErrorsFile(errors))

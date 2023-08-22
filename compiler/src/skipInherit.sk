@@ -896,9 +896,12 @@ fun remove_algebraic(class_defs: UMap<A.Class_def>): UMap<A.Class_def> {
 /* The main entry point. */
 /*****************************************************************************/
 
-const classesDirName: SKStore.DirName = SKStore.DirName::create("/inheritClasses/");
-const classesDir: SKStore.LHandle<ClassFile> = SKStore.LHandle(
-  ClassFile::fromFile,
+const classesDirName: SKStore.DirName = SKStore.DirName::create(
+  "/inheritClasses/",
+);
+const classesDir: SKStore.LHandle<SKStore.SID, ClassFile> = SKStore.LHandle(
+  SKStore.SID::keyType,
+  ClassFile::type,
   classesDirName,
 );
 
@@ -917,15 +920,15 @@ fun getClass(
 
 fun populateClassesDir(
   context: mutable SKStore.Context,
-): SKStore.LHandle<SkipInherit.ClassFile> {
+): SKStore.LHandle<SKStore.SID, SkipInherit.ClassFile> {
   SKStore.LHandle::create(
-    ClassFile::fromFile,
+    SKStore.SID::keyType,
+    ClassFile::type,
     context,
     classesDirName,
     (context, _self, key) ~> {
       className = key match {
       | SKStore.SID(x) -> x
-      | _ -> invariant_violation("Expected an SID")
       };
       result = GlobalEnv.getClass(context, className) match {
       | None() -> Array[]
