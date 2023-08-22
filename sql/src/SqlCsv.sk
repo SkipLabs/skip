@@ -316,17 +316,17 @@ fun applyDiffStrategy(
   // assignRows - if there are no constraints on the table then we
   // treat the relations as a multiset CRDT. inserts beat deletes when
   // concurrent.
-  assignRows = Some((context, delta, _) ~> {
-    if (shouldShortCircuitUpdate(context)) {
+  assignRows = Some((newRoot, delta, root) ~> {
+    if (shouldShortCircuitUpdate(root)) {
       return void;
     };
 
-    dir = context.unsafeGetEagerDir(table.dirName);
+    dir = newRoot.unsafeGetEagerDir(table.dirName);
     entries = mutable Vector[];
 
     for (row in rows) {
       key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-      for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+      for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
         if (tick.value < snapshot.default(0) || source.path() == writer) {
           entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
         }
@@ -334,10 +334,10 @@ fun applyDiffStrategy(
     };
 
     if (!entries.isEmpty()) {
-      !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+      !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
     };
     !dir = dir.writeArraySourceManyReturnDir(
-      context,
+      newRoot,
       rows
         .iterator()
         .filter(row -> row.repeat != 0)
@@ -347,19 +347,19 @@ fun applyDiffStrategy(
         }),
     );
 
-    context.setDir(dir.dirName, dir);
-    checkpointAndAck(context, delta);
-    context.update()
+    newRoot.setDir(dir.dirName, dir);
+    checkpointAndAck(newRoot, delta);
+    newRoot.update()
   });
 
   // resetRows - if the update is communicating the entire current
   // state (a reset).
-  resetRows = Some((context, delta, _) ~> {
-    if (shouldShortCircuitUpdate(context)) {
+  resetRows = Some((newRoot, delta, root) ~> {
+    if (shouldShortCircuitUpdate(root)) {
       return void;
     };
 
-    dir = context.unsafeGetEagerDir(table.dirName);
+    dir = newRoot.unsafeGetEagerDir(table.dirName);
     entries = mutable Vector[];
 
     // we may only affect rows that have been seen
@@ -369,7 +369,7 @@ fun applyDiffStrategy(
     for (row in rows) {
       key: SKFS.BaseName = SKSQL.RowKey(row, table.kinds);
       keyRepeat = row.repeat;
-      for ((tick, source, files) in dir.getDataIterWithoutTombs(context, key)) {
+      for ((tick, source, files) in dir.getDataIterWithoutTombs(newRoot, key)) {
         if (!isEligibleForTomb(tick, source)) {
           continue
         };
@@ -391,41 +391,41 @@ fun applyDiffStrategy(
     };
 
     if (!entries.isEmpty()) {
-      !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+      !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
     };
 
     !dir = dir.reset(
-      context,
+      newRoot,
       writer,
       rows
         .iterator()
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      isVisibleToUser(context),
+      isVisibleToUser(newRoot),
       isEligibleForTomb,
     );
 
-    context.setDir(dir.dirName, dir);
-    checkpointAndAck(context, delta);
-    context.update()
+    newRoot.setDir(dir.dirName, dir);
+    checkpointAndAck(newRoot, delta);
+    newRoot.update()
   });
 
   // lwwRows - if there is a unique constraint on the table (e.g. a
   // PK) then we resolve this using LWW. the total order is formed
   // using the vector clock. concurrent tiebreaks use the row data.
-  lwwRows = Some((context, delta, _) ~> {
-    if (shouldShortCircuitUpdate(context)) {
+  lwwRows = Some((newRoot, delta, root) ~> {
+    if (shouldShortCircuitUpdate(root)) {
       return void;
     };
 
-    dir = context.unsafeGetEagerDir(table.dirName);
+    dir = newRoot.unsafeGetEagerDir(table.dirName);
     entries = mutable Vector[];
 
     for (row in rows) {
       if (row.repeat < 1) {
         key: SKFS.BaseName = SKSQL.RowKey(row.setRepeat(1), table.kinds);
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+        for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
           if (tick.value < snapshot.default(0) || source.path() == writer) {
             entries.push((key, (source.path(), writer, Array<SKFS.File>[])));
           }
@@ -438,7 +438,7 @@ fun applyDiffStrategy(
         snapshot.default(0),
         writer,
         primaryIdx,
-        context,
+        newRoot,
         dir,
         row,
       )) {
@@ -446,20 +446,20 @@ fun applyDiffStrategy(
       }
     };
 
-    !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
-    context.setDir(dir.dirName, dir);
-    checkpointAndAck(context, delta);
-    context.update()
+    !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
+    newRoot.setDir(dir.dirName, dir);
+    checkpointAndAck(newRoot, delta);
+    newRoot.update()
   });
 
   // lwwReset - if the update is communicating the entire current
   // state (a reset) on a table where we use LWW.
-  lwwReset = Some((context, delta, _) ~> {
-    if (shouldShortCircuitUpdate(context)) {
+  lwwReset = Some((newRoot, delta, root) ~> {
+    if (shouldShortCircuitUpdate(root)) {
       return void;
     };
 
-    dir = context.unsafeGetEagerDir(table.dirName);
+    dir = newRoot.unsafeGetEagerDir(table.dirName);
     entries = mutable Vector[];
 
     for (row in rows) {
@@ -472,32 +472,32 @@ fun applyDiffStrategy(
         snapshot.default(0),
         writer,
         primaryIdx,
-        context,
+        newRoot,
         dir,
         row,
       )) {
         entries.push(change);
       }
     };
-    !dir = dir.writeArraySourceManyReturnDir(context, entries.iterator());
+    !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
 
     !dir = dir.reset(
-      context,
+      newRoot,
       writer,
       rows
         .iterator()
         .filter(row -> row.repeat != 0)
         .map(x -> SKSQL.RowKey(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
-      isVisibleToUser(context),
+      isVisibleToUser(newRoot),
       (tick, source) ~>
         tick.value < snapshot.default(0) || source.path() == writer
       ,
     );
 
-    context.setDir(dir.dirName, dir);
-    checkpointAndAck(context, delta);
-    context.update()
+    newRoot.setDir(dir.dirName, dir);
+    checkpointAndAck(newRoot, delta);
+    newRoot.update()
   });
 
   if (primaryIdx is Some _) {
