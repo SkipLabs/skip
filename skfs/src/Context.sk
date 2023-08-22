@@ -30,6 +30,7 @@ value class Sub(
   reset: (SKStore.Context, SKStore.Tick) ~> Bool,
   getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
   filter: (SKStore.Context, Bool) ~> (Key -> Bool) = (_, _) ~> (_ -> true),
+  destinationSource: ?Int = None(),
 )
 
 /*****************************************************************************/
@@ -293,6 +294,7 @@ mutable class Context{
     reset: (SKStore.Context, SKStore.Tick) ~> Bool,
     filter: (Context, Bool) ~> (Key -> Bool),
     getDestinationWatermark: (readonly Context) ~> ?Tick,
+    destinationSource: ?Int,
   ): void {
     sub = Sub(
       mutexCreate(),
@@ -302,6 +304,7 @@ mutable class Context{
       reset,
       getDestinationWatermark,
       filter,
+      destinationSource,
     );
     if (init) {
       tick0 = Tick(0);

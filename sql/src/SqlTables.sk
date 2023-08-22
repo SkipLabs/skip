@@ -357,7 +357,7 @@ fun getSubsDirs(
       tableDir = getTableDir(context);
       (edir, dirDescr) = tableDir.maybeGet(
         context,
-        SKStore.SID(request.viewName),
+        SKStore.SID(viewName),
       ) match {
       | None() ->
         views = SKDB.getViewsDir(context);
@@ -413,9 +413,8 @@ fun getSubsDirs(
         init,
         reset,
         filter,
-        (context) ~>
-          getWatermark(context, request.viewName, request.ignoreSource)
-        ,
+        (context) ~> getWatermark(context, viewName, request.ignoreSource),
+        request.ignoreSource,
       );
       writer.set(key, SKStore.IntFile(sessionID))
     },
