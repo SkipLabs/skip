@@ -153,18 +153,18 @@ base class Handle<+K: Orderable, +V: frozen> {
     this.dirName
   }
 
-  macro overridable fun getConv(): SKStore.File ~> V {
-    this.conv
+  macro overridable fun getType(): SKStore.File ~> V {
+    this.type
   }
 
   fun getArray(context: mutable Context, key: Key): Array<V> {
     dir = context.unsafeGetDir(this.getDirName());
-    dir.getArray(context, key).map(this.getConv())
+    dir.getArray(context, key).map(this.getType())
   }
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<V> {
     dir = context.unsafeGetDir(this.getDirName());
-    dir.getIter(context, key).map(this.getConv())
+    dir.getIter(context, key).map(this.getType())
   }
 
   fun get(context: mutable Context, key: Key): V {
@@ -200,13 +200,13 @@ base class Handle<+K: Orderable, +V: frozen> {
 /*****************************************************************************/
 
 class LHandle<+K: Key, +V: File>(
-  convKey: Key ~> K,
-  conv: File ~> V,
+  typeKey: Key ~> K,
+  type: File ~> V,
   dirName: DirName,
 ) extends Handle<K, V> {
   static fun create<V: File>(
-    convKey: Key ~> K,
-    conv: File ~> V,
+    typeKey: Key ~> K,
+    type: File ~> V,
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, LHandle<K, V>, K) ~> Array<V>,
@@ -216,16 +216,16 @@ class LHandle<+K: Key, +V: File>(
       context,
       dirName,
       (context, dirName, key) ~> {
-        Some(f(context, LHandle(convKey, conv, dirName), convKey(key)));
+        Some(f(context, LHandle(typeKey, type, dirName), typeKey(key)));
       },
       collect,
     );
-    LHandle(convKey, conv, dir.getDirName())
+    LHandle(typeKey, type, dir.getDirName())
   }
 
   static fun createAsync<K: Key, V: File>(
-    convKey: Key ~> K,
-    conv: File ~> V,
+    typeKey: Key ~> K,
+    type: File ~> V,
     context: mutable Context,
     dirName: DirName,
     f: (mutable Context, LHandle<K, V>, K) ~> ?Array<V>,
@@ -235,16 +235,16 @@ class LHandle<+K: Key, +V: File>(
       context,
       dirName,
       (context, dirName, key) ~> {
-        f(context, LHandle(convKey, conv, dirName), convKey(key));
+        f(context, LHandle(typeKey, type, dirName), typeKey(key));
       },
       collect,
     );
-    LHandle(convKey, conv, dir.getDirName())
+    LHandle(typeKey, type, dir.getDirName())
   }
 
   fun getArrayAsync(context: mutable Context, key: Key): Array<V> {
     dir = context.unsafeGetLazyDir(this.getDirName());
-    results = dir.getArrayAsync(context, key).map(this.getConv());
+    results = dir.getArrayAsync(context, key).map(this.getType());
     results
   }
 
@@ -257,7 +257,7 @@ class LHandle<+K: Key, +V: File>(
     dir = context.unsafeGetLazyDir(this.getDirName());
     results = dir
       .getArrayWithOptions(context, key, isAsync, throwOnCycle)
-      .map(this.getConv());
+      .map(this.getType());
     results
   }
 }
@@ -267,13 +267,13 @@ class LHandle<+K: Key, +V: File>(
 /*****************************************************************************/
 
 class EHandle<K: Key, V: File>(
-  convKey: Key ~> K,
-  conv: File ~> V,
+  typeKey: Key ~> K,
+  type: File ~> V,
   dirName: DirName,
 ) extends Handle<K, V> {
   static fun multiMap<K, V, K2: Key, V2: File>(
-    convOutputKey: Key ~> K2,
-    convOutput: File ~> V2,
+    typeOutputKey: Key ~> K2,
+    typeOutput: File ~> V2,
     context: mutable Context,
     parents: Array<
       (
@@ -296,8 +296,8 @@ class EHandle<K: Key, V: File>(
     for (parent in parents) {
       (parentHandle, parentData) = parent;
       (mapFun, rangeOpt) = parentData;
-      convInputKey = parentHandle.convKey;
-      convInput = parentHandle.conv;
+      typeInputKey = parentHandle.typeKey;
+      typeInput = parentHandle.type;
       parentName = parentHandle.dirName;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
         FileIterator::create(fileIter) match {
@@ -307,8 +307,8 @@ class EHandle<K: Key, V: File>(
           mapFun(
             context,
             twriter,
-            convInputKey(key),
-            iter.nonEmptyMap(convInput),
+            typeInputKey(key),
+            iter.nonEmptyMap(typeInput),
           );
           writer.!writes = twriter.writes
         }
@@ -318,12 +318,12 @@ class EHandle<K: Key, V: File>(
     };
     fixedParents = FixedSingle::create(dynParents);
     EagerDir::applyMany(context, fixedParents, dirName, None());
-    EHandle(convOutputKey, convOutput, dirName)
+    EHandle(typeOutputKey, typeOutput, dirName)
   }
 
   static fun multiMapReduce<K, V, K2: Key, V2: File, V3: File>(
-    convOutputKey: Key ~> K2,
-    convOutput: File ~> V2,
+    typeOutputKey: Key ~> K2,
+    typeOutput: File ~> V2,
     context: mutable Context,
     parents: Array<
       (
@@ -347,8 +347,8 @@ class EHandle<K: Key, V: File>(
     for (parent in parents) {
       (parentHandle, parentData) = parent;
       (mapFun, rangeOpt) = parentData;
-      convInputKey = parentHandle.convKey;
-      convInput = parentHandle.conv;
+      typeInputKey = parentHandle.typeKey;
+      typeInput = parentHandle.type;
       parentName = parentHandle.dirName;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
         FileIterator::create(fileIter) match {
@@ -358,8 +358,8 @@ class EHandle<K: Key, V: File>(
           mapFun(
             context,
             twriter,
-            convInputKey(key),
-            iter.nonEmptyMap(convInput),
+            typeInputKey(key),
+            iter.nonEmptyMap(typeInput),
           );
           writer.!writes = twriter.writes
         }
@@ -374,22 +374,22 @@ class EHandle<K: Key, V: File>(
       dirName,
       Some(
         IReducer{
-          init => files ~> reducer.init(files.map(convOutput)),
+          init => files ~> reducer.init(files.map(typeOutput)),
           update => (state, old, new) ~>
             reducer.update(
               state.map(reducer.type),
-              old.map(convOutput),
+              old.map(typeOutput),
               new.map(reducer.type),
             ),
         },
       ),
     );
-    EHandle(convOutputKey, reducer.type, dirName)
+    EHandle(typeOutputKey, reducer.type, dirName)
   }
 
   fun map<K2: Key, V2: File>(
-    convKey: Key ~> K2,
-    conv: File ~> V2,
+    typeKey: Key ~> K2,
+    type: File ~> V2,
     context: mutable Context,
     dirName: DirName,
     f: (
@@ -400,19 +400,19 @@ class EHandle<K: Key, V: File>(
     ) ~> void,
   ): EHandle<K2, V2> {
     static::multiMap(
-      convKey,
-      conv,
+      typeKey,
+      type,
       context,
       Array[
-        (SKStore.EHandle(this.convKey, this.conv, this.dirName), (f, None())),
+        (SKStore.EHandle(this.typeKey, this.type, this.dirName), (f, None())),
       ],
       dirName,
     )
   }
 
   fun mapReduce<K2: Key, V2: File, V3: File>(
-    convKey: Key ~> K2,
-    conv: File ~> V2,
+    typeKey: Key ~> K2,
+    type: File ~> V2,
     context: mutable Context,
     dirName: DirName,
     f: (
@@ -424,11 +424,11 @@ class EHandle<K: Key, V: File>(
     reducer: EReducer<V2, V3>,
   ): EHandle<K2, V3> {
     static::multiMapReduce(
-      convKey,
-      conv,
+      typeKey,
+      type,
       context,
       Array[
-        (SKStore.EHandle(this.convKey, this.conv, this.dirName), (f, None())),
+        (SKStore.EHandle(this.typeKey, this.type, this.dirName), (f, None())),
       ],
       dirName,
       reducer,
@@ -441,7 +441,7 @@ class EHandle<K: Key, V: File>(
     };
     context.maybeGetDir(this.dirName.pre()) match {
     | None() -> None()
-    | Some(dir) -> Some(EHandle(this.convKey, this.conv, dir.getDirName()))
+    | Some(dir) -> Some(EHandle(this.typeKey, this.type, dir.getDirName()))
     }
   }
 
@@ -464,7 +464,7 @@ class EHandle<K: Key, V: File>(
 
   fun unsafeGetArray(context: mutable Context, key: Key): Array<V> {
     dir = context.unsafeGetDir(this.getDirName());
-    dir.getArrayRaw(key).map(this.getConv())
+    dir.getArrayRaw(key).map(this.getType())
   }
 
   fun unsafeGet(context: mutable Context, key: Key): V {
