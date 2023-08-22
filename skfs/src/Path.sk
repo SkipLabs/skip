@@ -10,14 +10,6 @@
 
 module SKStore;
 
-//const root: DirName = DirName::create("/");
-
-base class FileName extends File uses Show {
-  overridable fun toString(): String {
-    inspect(this).toString()
-  }
-}
-
 // Decomposes the string into the tuple: (directory name, base name).
 fun splitPath(path: String): (String, String) {
   chars = path.chars();
@@ -55,7 +47,7 @@ fun splitPath(path: String): (String, String) {
 @cpp_extern("SKIP_hash_combine")
 native fun hashCombine(Int, Int): Int;
 
-class Path(dirName: DirName, baseName: Key) extends FileName uses Orderable {
+class Path(dirName: DirName, baseName: Key) uses Orderable {
   static fun create(dirName: DirName, baseName: Key): this {
     static(dirName, baseName)
   }
@@ -76,7 +68,7 @@ class DirName(
   dirName: String,
   hashTag1: Int,
   hashTag2: Int,
-) extends Key uses Hashable {
+) extends Key uses Hashable, Show {
   static fun create(dirName: String): DirName {
     !dirName = dirName.lowercase();
     static::validateDirName(dirName);
@@ -162,7 +154,7 @@ class DirName(
   }
 }
 
-base class Key extends FileName uses Orderable {
+base class Key uses Orderable, Show {
   deferred macro overridable static fun fromKey(obj: Key): this {
     obj match {
     | x @ #ThisClass _ -> x
@@ -180,6 +172,10 @@ base class Key extends FileName uses Orderable {
     for (file in files) {
       writer(file.toKVString(format, this))
     }
+  }
+
+  overridable fun toString(): String {
+    inspect(this).toString()
   }
 }
 
