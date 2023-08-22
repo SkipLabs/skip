@@ -613,7 +613,7 @@ fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   _ = handle.map(
     RowKey::type,
-    handle.conv,
+    handle.type,
     context,
     sinkName,
     (context, _writer, _key, values) ~> {
@@ -639,7 +639,7 @@ fun dumpInserts(origContext: readonly SKStore.Context): void {
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   _ = handle.map(
     RowKey::type,
-    handle.conv,
+    handle.type,
     context,
     sinkName,
     (context, _writer, _key, values) ~> {
@@ -694,7 +694,7 @@ fun dumpViews(origContext: readonly SKStore.Context): void {
   sortedName = SKStore.DirName::create("/sorted_" + SKStore.genSym(0) + "/");
   sorted = handle.map(
     SKStore.IID::type,
-    handle.conv,
+    handle.type,
     context,
     sortedName,
     (_context, writer, _key, values) ~> {
@@ -705,7 +705,7 @@ fun dumpViews(origContext: readonly SKStore.Context): void {
   );
   _ = sorted.map(
     SKStore.SID::type,
-    sorted.conv,
+    sorted.type,
     context,
     sinkName,
     (context, _writer, _key, views) ~> {
