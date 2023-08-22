@@ -15,6 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import kotlin.system.exitProcess
 
+val DB_ROOT_USER = "root"
 val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
 
 fun Credentials.toProtoCredentials(): ProtoCredentials {
@@ -52,7 +53,7 @@ fun genCredentials(accessKey: String, encryption: EncryptionTransform): Credenti
 }
 
 fun createDb(dbName: String, encryption: EncryptionTransform): Credentials {
-  val creds = genCredentials("root", encryption)
+  val creds = genCredentials(DB_ROOT_USER, encryption)
   createSkdb(dbName, creds.b64encryptedKey())
   return creds
 }
@@ -111,6 +112,12 @@ class RequestHandler(
   override fun handleMessage(request: ProtoMessage, stream: OrchestrationStream): StreamHandler {
     when (request) {
       is ProtoQuery -> {
+        // only db root may run queries on the server - queries are
+        // always run as root. privacy is applied at replication time
+        if (accessKey != DB_ROOT_USER) {
+          stream.error(2002u, "Authorization error")
+          return this
+        }
         val format =
             when (request.format) {
               QueryResponseFormat.CSV -> OutputFormat.CSV
@@ -152,6 +159,11 @@ class RequestHandler(
         stream.close()
       }
       is ProtoCreateUser -> {
+        // only db root may create users
+        if (accessKey != DB_ROOT_USER) {
+          stream.error(2002u, "Authorization error")
+          return this
+        }
         val creds = genCredentials(genAccessKey(), encryption)
         skdb.createUser(creds.accessKey, creds.b64encryptedKey())
         val payload = creds.toProtoCredentials()
@@ -233,7 +245,7 @@ fun connectionHandler(
     policy: ServerPolicy,
     taskPool: ScheduledExecutorService,
     encryption: EncryptionTransform,
-  logger: Logger,
+    logger: Logger,
 ): HttpHandler {
   return Handlers.websocket(
       MuxedSocketEndpoint(
@@ -316,10 +328,7 @@ fun connectionHandler(
                         val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
                         encryption.decrypt(encryptedPrivateKey!!)
                       },
-                      log = { event, user, metadata ->
-                        logger.log(db, event, user, metadata)
-                      }
-                  )
+                      log = { event, user, metadata -> logger.log(db, event, user, metadata) })
 
               if (skdb == null) {
                 socket.errorSocket(1004u, "Could not open database")
@@ -349,7 +358,9 @@ fun envIsSane(): Boolean {
 
     val successfullyRead =
         svcSkdb
-            .sql("SELECT COUNT(*) FROM skdb_users WHERE username = 'root';", OutputFormat.RAW)
+            .sql(
+                "SELECT COUNT(*) FROM skdb_users WHERE username = '${DB_ROOT_USER}';",
+                OutputFormat.RAW)
             .decodeOrThrow()
             .trim() == "1"
 
@@ -381,12 +392,12 @@ private fun devColdStart(encryption: EncryptionTransform) {
   System.err.println(
       "{\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
   val command =
-    listOf(
-        "/bin/bash",
-        "-c",
-        "cd /skfs/sql/js && npx skdb-cli --add-cred --host ws://localhost:8080" +
-            " --db ${SERVICE_MGMT_DB_NAME} --access-key ${creds.accessKey}" +
-            " <<< \"${creds.b64privateKey()}\"")
+      listOf(
+          "/bin/bash",
+          "-c",
+          "cd /skfs/sql/js && npx skdb-cli --add-cred --host ws://localhost:8080" +
+              " --db ${SERVICE_MGMT_DB_NAME} --access-key ${creds.accessKey}" +
+              " <<< \"${creds.b64privateKey()}\"")
   val proc = ProcessBuilder().inheritIO().command(command).start()
   val status = proc.waitFor()
   if (status != 0) {
