@@ -503,7 +503,8 @@ class Evaluator{options: Options, user: ?UserFile} {
         context.setDir(
           dirName,
           SKStore.DeletedDir{dirName, time => context.timeStamp()},
-        )
+        );
+        errorAllExistingSubs(context, dirName)
       })
     | Delete{pos, colName => None(), name, where} ->
       _ = this.delete(context, params, pos, name, where, Array[]);
