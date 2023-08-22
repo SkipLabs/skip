@@ -1,0 +1,431 @@
+#!/usr/bin/env node
+
+import { parseArgs } from "util";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { createOnMain } from "#skdb/skdb";
+import { webcrypto } from 'crypto';
+import * as readline from 'readline/promises';
+import * as process from 'process';
+import * as repl from 'repl';
+
+const createConnectedSkdb = async function(endpoint, database, { accessKey, privateKey }) {
+  const skdb = await createOnMain();
+  const keyBytes = Buffer.from(privateKey, 'base64');
+  const key = await webcrypto.subtle.importKey(
+    "raw", keyBytes, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
+
+  await skdb.connect(database, accessKey, key, endpoint);
+
+  return skdb;
+};
+
+const skdbDir = path.join(os.homedir(), ".skdb");
+const credsFileName = path.join(skdbDir, "credentials");
+
+type Cmd = {
+  type: string;
+  valName: string;
+  default: boolean;
+  help: string;
+}
+
+const argSchema = {
+  help: {
+    type: "boolean",
+    default: false,
+    help: "",
+  },
+  // connection params
+  db: {
+    type: "string",
+    valName: 'db',
+    help: "Name of database to connect to."
+  },
+  host: {
+    type: "string",
+    valName: 'host',
+    help: "URI to connect to.",
+    default: "wss://api.skiplabs.io",
+  },
+  'access-key': {
+    type: "string",
+    valName: 'key',
+    help: "Access key to use. Default: first specified in credentials file.",
+  },
+  // formatting
+  'pipe-separated-output': {
+    type: "boolean",
+    help: "SQL output is separated by a pipe. Default: JSON output.",
+    default: false,
+  },
+  'simple-output': {
+    type: "boolean",
+    help: "No cute terminal usage. E.g. no readline.",
+    default: false,
+  },
+  // operations
+  'add-cred': {
+    type: "boolean",
+    help: `Add a credential to ${credsFileName}. Pass the private key b64 on stdin.`,
+    default: false,
+  },
+  'create-db': {
+    type: "string",
+    valName: 'db',
+    help: "Create database.",
+  },
+  'create-user': {
+    type: "boolean",
+    help: "Create user.",
+    default: false,
+  },
+  'remote-repl': {
+    type: "boolean",
+    help: "Interactively execute SQL queries against the server.",
+    default: false,
+  },
+  'local-repl': {
+    type: "boolean",
+    help: "Interactively execute SQL queries against a local db.",
+    default: false,
+  },
+  'schema': {
+    type: "boolean",
+    help: "Dump the database schema as SQL DML.",
+    default: false,
+  },
+  'table-schema': {
+    type: "string",
+    valName: 'table',
+    help: "Dump the table schema as SQL DML.",
+  },
+  'view-schema': {
+    type: "string",
+    valName: 'view',
+    help: "Dump the view schema as SQL DML.",
+  },
+};
+
+const args = parseArgs({
+  options: argSchema as any,
+  allowPositionals: true,
+  tokens: true,
+});
+
+const printHelp = function() {
+  const thisBin = process.argv[1];
+
+  const flags = Object.entries(argSchema)
+        .map(([key, def]) => {
+          const val = def.type === "string" ? ` <${(def as Cmd).valName}>` : '';
+          const help = def.help ? `  -- ${def.help}` : '';
+          const deflt = (def as Cmd).default ? ` Default: ${(def as Cmd).default}`: '';
+          return `[--${key}${val}]${help}${deflt}`;
+        })
+        .join('\n    ');
+
+  console.log(`Usage: ${thisBin} ${flags}`);
+  console.log("");
+  console.log("Anything passed on stdin will be evaluated as sql by the remote db.");
+};
+
+const haveMandatoryValues = ['db', 'host']
+      .every(flag => flag in args.values);
+
+if ((args.values as any).help || !haveMandatoryValues) {
+  printHelp();
+  process.exit(1);
+}
+
+if (!fs.existsSync(credsFileName)) {
+  fs.mkdirSync(skdbDir);
+  fs.writeFileSync(credsFileName, JSON.stringify({}));
+}
+
+// credentials file schema:
+// {host: { database: { accessKey: privateKey }}}
+let values = args.values as any;
+const creds = JSON.parse(fs.readFileSync(credsFileName).toString());
+const hostCreds = creds[values.host as string] ?? {};
+creds[values.host as string] = hostCreds;
+const dbCreds = hostCreds[values.db as string] ?? {};
+hostCreds[values.db as string] = dbCreds;
+
+if (args.values['add-cred']) {
+  if (!('access-key' in args.values)) {
+    console.log("Must pass --db --host and --access-key.");
+    process.exit(1);
+  }
+
+  const accessKey = (args.values['access-key'] as string).trim();
+  const privateKey = fs.readFileSync(process.stdin.fd, 'utf-8').trim();
+
+  dbCreds[accessKey] = privateKey;
+
+  fs.writeFileSync(credsFileName, JSON.stringify(creds));
+
+  process.exit(0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// past here we're connecting to a server
+////////////////////////////////////////////////////////////////////////////////
+
+if (!dbCreds || Object.entries(dbCreds).length < 1) {
+  console.log(`Could not find credentials for ${values.db} in ${credsFileName}`);
+  process.exit(1);
+}
+
+const firstPair = Object.entries(dbCreds)[0];
+const accessKey = (args.values['access-key'] ?? firstPair[0]) as string;
+const privateKey = dbCreds[accessKey];
+
+const skdb = await createConnectedSkdb(values.host, values.db, {
+  accessKey: accessKey,
+  privateKey: privateKey,
+});
+
+const evalQuery = async function(skdb_client, query) {
+  if (args.values['pipe-separated-output']) {
+    let answer = await skdb_client.sqlRaw(query);
+    answer = answer.trim();
+    return answer;
+  } else {
+    return skdb_client.sql(query);
+  }
+};
+
+if (args.values['create-db']) {
+  const db = args.values['create-db'] as string;
+  const result = await skdb.server.createDatabase(db);
+  // b64 encode
+  result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
+  console.log(`Successfully created database: ${db}.`);
+  console.log(`Credentials for ${db}: `, result);
+
+  hostCreds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
+  fs.writeFileSync(credsFileName, JSON.stringify(creds));
+  console.log(`Credentials were added to ${credsFileName}.`);
+}
+
+if (args.values['create-user']) {
+  const result = await skdb.server.createUser();
+  // b64 encode
+  result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
+  console.log('Successfully created user: ', result);
+
+  dbCreds[result.accessKey] = result.privateKey;
+  fs.writeFileSync(credsFileName, JSON.stringify(creds));
+  console.log(`Credentials were added to ${credsFileName}.`);
+}
+
+if (args.values['schema']) {
+  const schema = await skdb.server.schema();
+  console.log(schema.trim());
+}
+
+if (args.values['table-schema']) {
+  const schema = await skdb.server.tableSchema(args.values['table-schema'] as string);
+  console.log(schema.trim());
+}
+
+if (args.values['view-schema']) {
+  const schema = await skdb.server.viewSchema(args.values['view-schema'] as string);
+  console.log(schema.trim());
+}
+
+const remoteRepl = async function() {
+  const rl = readline.createInterface(process.stdin, process.stdout, undefined,
+                                      !args.values['simple-output']);
+  while (true) {
+    const query = await rl.question(`${accessKey}@${values.host}/${values.db}> `);
+
+    if (query.trim() === '.help') {
+      console.log("Send input to the server to be executed as a query.");
+      console.log("Multi-statement queries should (currently) be combined on a single line.");
+      console.log("");
+      console.log("Commands begin with '.'");
+      console.log("");
+      console.log(".help   -- This message.");
+      console.log(".local -- Switch to local repl.");
+      console.log(".schema -- Output the schema.");
+      console.log(".table-schema <table> -- Output the schema <table>.");
+      console.log(".view-schema <view> -- Output the schema for <view>.");
+      continue;
+    }
+
+    if (query.trim() === '.local') {
+      rl.close();
+      await localRepl();
+      return;
+    }
+
+    if (query.trim() === '.schema') {
+      try {
+        const schema = await skdb.server.schema();
+        console.log(schema);
+      } catch (ex) {
+        console.error("Could not query schema.");
+        console.error(ex);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.table-schema')) {
+      const [_, table] = query.split(" ", 2);
+      try {
+        const schema = await skdb.server.tableSchema(table);
+        console.log(schema);
+      } catch {
+        console.error(`Could not find schema for ${table}.`);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.view-schema')) {
+      const [_, view] = query.split(" ", 2);
+      try {
+        const schema = await skdb.server.viewSchema(view);
+        console.log(schema);
+      } catch {
+        console.error(`Could not find schema for ${view}.`);
+      }
+      continue;
+    }
+
+    try {
+      const answer = await evalQuery(skdb.server, query);
+      console.log(answer);
+    } catch (ex) {
+      console.error("Could not eval query. Try `.help`");
+      console.error(ex.trim());
+    }
+  }
+};
+
+const localRepl = async function() {
+  const rl = readline.createInterface(process.stdin, process.stdout, undefined,
+                                      !args.values['simple-output']);
+  while (true) {
+    const query = await rl.question(`local> `);
+
+    if (query.trim() === '.help') {
+      console.log("Evaluate input as a SQL query against a local database.");
+      console.log("");
+      console.log("Commands begin with '.'");
+      console.log("");
+      console.log(".help -- This message.");
+      console.log(".remote -- Switch to remote repl.");
+      console.log(".js -- Switch to a javascript repl. There is a pre-configured `skdb` global. Currently this is a one-way trip.");
+      console.log(".schema -- Output the schema.");
+      console.log(".table-schema <table> -- Output the schema <table>.");
+      console.log(".view-schema <view> -- Output the schema for <view>.");
+      console.log(".mirror-table <table> -- Mirror the remote table <table>.");
+      console.log(".mirror-table <table> <expr> -- Mirror the remote table <table> with filter <expr>.");
+      continue;
+    }
+
+    if (query.trim() === '.remote') {
+      rl.close();
+      await remoteRepl();
+      return;
+    }
+
+    if (query.trim() === '.js') {
+      rl.close();
+      const replServer = repl.start({
+        terminal: !args.values['simple-output'],
+      });
+      replServer.context.skdb = skdb;
+      return;
+    }
+
+    if (query.trim() === '.schema') {
+      try {
+        const schema = skdb.schema();
+        console.log(schema);
+      } catch (ex) {
+        console.error("Could not query schema.");
+        console.error(ex);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.table-schema')) {
+      const [_, table] = query.split(" ", 2);
+      try {
+        const schema = skdb.tableSchema(table);
+        console.log(schema);
+      } catch {
+        console.error(`Could not find schema for ${table}.`);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.view-schema')) {
+      const [_, view] = query.split(" ", 2);
+      try {
+        const schema = skdb.viewSchema(view);
+        console.log(schema);
+      } catch {
+        console.error(`Could not find schema for ${view}.`);
+      }
+      continue;
+    }
+
+    if (query.startsWith('.mirror-table')) {
+      const args = query.split(" ");
+      const table = args[1];
+      const filter = args.slice(2).join(' ');
+      try {
+        await skdb.server.mirrorTable(table, filter);
+      } catch (ex) {
+        console.error(`Could not mirror table ${table}.`);
+        console.error(ex);
+      }
+      continue;
+    }
+
+    try {
+      const answer = await evalQuery(skdb, query);
+      console.log(answer);
+    } catch (ex) {
+      console.error("Could not eval query. Try `.help`");
+      console.error(ex.trim());
+    }
+  }
+};
+
+if (args.values['remote-repl']) {
+  await remoteRepl();
+}
+
+if (args.values['local-repl']) {
+  await localRepl();
+}
+
+let query = "";
+try {
+  query = fs.readFileSync(process.stdin.fd, 'utf-8');
+} catch {}
+
+if (query.trim() !== "") {
+  try {
+    const answer = await evalQuery(skdb.server, query);
+    console.log(answer);
+  } catch (ex) {
+    console.error("Could not eval query.");
+    process.exit(1);
+    console.error(ex.trim());
+  }
+}
+
+// we don't close if we've created an interactive session.
+// interactively, you can drop to the js console and the control flow
+// ends up calling this, which you don't want. the user is going to
+// send an interrupt anyway to get out of the shell.
+if (!(args.values['remote-repl'] || args.values['local-repl'])) {
+  skdb.server?.close();
+}
