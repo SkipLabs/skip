@@ -4,7 +4,7 @@
 all: npm build/skdb build/init.sql
 
 PLAYWRIGHT_REPORTER?="line"
-SKARGO_PROFILE=release
+SKARGO_PROFILE?=release
 SKARGO_FLAGS=--$(SKARGO_PROFILE)
 
 ################################################################################
