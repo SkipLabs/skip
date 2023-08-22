@@ -1,0 +1,850 @@
+module Sknpm;
+
+const kAuthor: String = "Skiplabs";
+
+fun main(): void {
+  cmd = Cli.Command("sknpm")
+    .about("Skip's npm package builder")
+    .arg(
+      Cli.BoolArg("version")
+        .short("V")
+        .long("version")
+        .about("Print version info and exit"),
+    )
+    .arg(
+      Cli.BoolArg("verbose")
+        .short("v")
+        .long("verbose")
+        .about("Use verbose output")
+        .global(),
+    );
+  commands = mutable Map[];
+  #forEachFunction (@pckcmd, #function, #functionName) {
+    (subcommand, cmdFn) = #function();
+    !cmd = cmd.subcommand(subcommand);
+    commands.set(subcommand.name, cmdFn);
+  };
+  !cmd = cmd.help();
+  args = cmd.parseArgs();
+  if (args.getBool("version")) {
+    print_string("skargo " + SkargoVersion.kVersion);
+    skipExit(0);
+  } else {
+    args.maybeGetSubcommand() match {
+    | Some(subcmd) ->
+      commands.maybeGet(subcmd) match {
+      | Some(handler) ->
+        skipExit(
+          vtry<Int>(
+            () -> {
+              handler(args);
+              0
+            },
+            exn ->
+              exn match {
+              | Skargo.SystemCallException(code, _) -> code
+              | _ -> throw exn
+              }
+            ,
+          ),
+        )
+      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+      }
+    | None() ->
+      print_string(Cli.usage(args.cmd, true));
+      skipExit(0)
+    }
+  };
+}
+
+@pckcmd
+fun build(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("build")
+      .short("b")
+      .about("Build the npm package")
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Build artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      )
+      .arg(
+        Cli.StringArg("html").about(
+          "Build minimal html support for specified launcher",
+        ),
+      ),
+    args ~> Skargo.envCmd(args, execPackage),
+  )
+}
+
+@pckcmd
+fun test(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("test")
+      .short("t")
+      .about("Run the tests")
+      .arg(
+        Cli.StringArg("filter")
+          .positional()
+          .about("If specified, only run tests with names matching the filter"),
+      )
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Build artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      ),
+    args ~> Skargo.envCmd(args, execTest),
+  )
+}
+
+class Package(
+  name: String,
+  author: ?String,
+  version: String,
+  optNodeVersion: ?String = None(),
+  optBinary: ?String = None(),
+  sideEffects: Bool = false,
+) {
+  static fun create(manifest: Skargo.Manifest, test: Bool = false): Package {
+    file = Path.join(manifest.path, "npm.json");
+    if (FileSystem.exists(file)) {
+      contents = FileSystem.readTextFile(file);
+      json = JSON.decode(contents).expectObject();
+      Package(
+        json.getString("name"),
+        json.maybeGetString("author"),
+        json.getString("version"),
+        json.maybeGetString("node-version"),
+        json.maybeGetString("binary"),
+        json.maybeGetBool("sideEffects").default(false),
+      )
+    } else {
+      if (!test) print_debug("The npm.json file is not defined");
+      Package(
+        if (test) "sk_tests" else manifest.name,
+        Some(kAuthor),
+        SkargoVersion.kVersion,
+      )
+    }
+  }
+}
+
+fun execPackage(args: Cli.ParseResults, env: Skargo.Env): void {
+  bc = Skargo.BuildContext::create(
+    env,
+    Some("wasm32"),
+    args.maybeGetString("target-dir"),
+    Skargo.getProfile(args),
+  );
+  manage(bc, Package::create(env.manifest));
+  args.maybeGetString("html") match {
+  | Some(launcher) ->
+    writeIndex(bc.targetDir, launcher);
+    writeRun(bc.targetDir, env.verbose)
+  | _ -> void
+  }
+}
+
+fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
+  package = Package::create(env.manifest, true);
+  bc = Skargo.BuildContext::create(
+    env,
+    Some("wasm32"),
+    args.maybeGetString("target-dir"),
+    Skargo.getProfile(args),
+  );
+  tests = Path.join(env.manifest.path, "ts/tests");
+  targetDir = Path.join(bc.targetDir, "tests");
+  customTests = FileSystem.exists(tests);
+  if (customTests) {
+    Skargo.run(Array["cp", "-R", tests, bc.targetDir], env.verbose);
+  } else {
+    !bc.env.manifest.bin = Array[
+      Skargo.ManifestBinary("test", env.manifest.testHarness),
+    ];
+    saveArchive(bc.targetDir);
+  };
+  Skargo.run(
+    Array["npm", "i", "--prefix", targetDir, "--save-dev", "@types/node"],
+    bc.env.verbose,
+  );
+  tsDir = Path.join(bc.targetDir, "ts");
+  optBinName: ?String = None();
+  if (!customTests) {
+    _ = system("mkdir -p " + tsDir);
+    saveSkTestsTs(tsDir);
+    !optBinName = Some("sk_tests")
+  };
+  packageDir = Path.join(Path.join(targetDir, "node_modules"), package.name);
+  manage(bc, package, Some(packageDir), optBinName);
+  serviceFile = Path.join(targetDir, "service.mk");
+  processes = mutable Vector[];
+  environment = mutable Map[];
+  if (FileSystem.exists(serviceFile)) {
+    cmd = Array["make", "-f", serviceFile, `ROOT_DIR=${bc.env.manifest.path}`];
+    if (bc.env.verbose) {
+      print_error(`>> ${cmd.join(" ")}`)
+    };
+    p = System.subprocess(cmd);
+    if (bc.env.verbose || !p.success()) {
+      print_raw(p.stdout);
+      print_error_raw(p.stderr);
+    };
+    if (!p.success()) {
+      throw Skargo.SystemCallException(p.exitcode());
+    };
+    p.stdout.split("\n").each(line -> {
+      indexOf(line, "sknpm") match {
+      | Some(index) ->
+        siter = line.getIter().drop(index);
+        cleaned = line.substring(siter);
+        elems = cleaned.split("=");
+        if (elems.size() >= 2) {
+          elems[0] match {
+          | "sknpm.process" -> processes.push(elems[1].toInt())
+          | s if (s.startsWith("sknpm.env:")) ->
+            envName = s.split(":")[1];
+            envValue = elems.drop(1).join("=");
+            environment.add(envName, envValue)
+          | _ -> print_error("Unmanaged command: " + line)
+          }
+        } else {
+          print_error("Unmanaged command: " + line)
+        }
+      | _ -> void
+      }
+    });
+  };
+  environment.each(Environ.set_var);
+  cmd =
+    "bash -c 'cd " +
+    targetDir +
+    " && npx playwright install && npx playwright test --reporter=line'";
+  if (bc.env.verbose) {
+    print_error(`>> ${cmd}`)
+  };
+  _ = system(cmd);
+  processes.each(p -> Skargo.run(Array["kill", p.toString()], bc.env.verbose))
+}
+
+fun manage(
+  bc: Skargo.BuildContext,
+  package: Package,
+  optTarget: ?String = None(),
+  optBinName: ?String = None(),
+): void {
+  npmDir = optTarget.default(Path.join(bc.targetDir, "npm"));
+  invariant(FileSystem.exists(bc.targetDir), "Binaries not built.");
+  tsDir = Path.join(bc.targetDir, "ts");
+  _ = system("mkdir -p " + tsDir);
+  dependencies = mutable Vector[];
+  resources = mutable Map[];
+  bc.deps.each((_k, v) -> {
+    depsDir = Path.join(v.path, "ts/src");
+    if (FileSystem.exists(depsDir)) {
+      dependencies.push(v)
+    };
+    depsResFile = Path.join(bc.targetDir, `deps/${v.name}/resources.json`);
+    if (FileSystem.exists(depsResFile)) {
+      contents = FileSystem.readTextFile(depsResFile);
+      json = JSON.decode(contents).expectObject();
+      json.value.each((f, v) -> {
+        _ = system("cp " + f + " " + Path.join(tsDir, Path.basename(f)));
+        resources.add(f, v.expectString())
+      })
+    }
+  });
+  pckDependencies = mutable Map[];
+  dependencies.each(dep -> {
+    tsd = Path.join(dep.path, "ts/src");
+    FileSystem.readFilesRecursive(
+      tsd,
+      f -> f.endsWith(".ts"),
+      f -> Path.basename(f) != "node_modules",
+    ).each(f ->
+      _ = system(
+        "cp " +
+          f +
+          " " +
+          Path.join(tsDir, relative(f, tsd).default(Path.basename(f))),
+      )
+    );
+    // TODO manage same package usage
+    packageFile = Path.join(tsd, "package.json");
+    if (FileSystem.exists(packageFile)) {
+      contents = FileSystem.readTextFile(packageFile);
+      json = JSON.decode(contents).expectObject();
+      json.maybeGetObject("dependencies").each(dps ->
+        dps.value.each((k, v) -> pckDependencies.add(k, v.expectString()))
+      )
+    }
+  });
+  for (bin in bc.env.manifest.bin) {
+    wasmFile = Path.join(bc.targetDir, bin.name + ".wasm");
+    invariant(FileSystem.exists(wasmFile), `${bin.name}.wasm not built.`);
+    tsWasmFile = Path.join(tsDir, bin.name + ".wasm.ts");
+    FileSystem.writeTextFile(
+      tsWasmFile,
+      `// for distribution we replace this line with inlined base64-encoded bytes\nexport var base64 = "";\n`,
+    );
+  };
+  packageFile = Path.join(tsDir, "package.json");
+  packageContents = JSON.Object(
+    Map[
+      "dependencies" => JSON.Object(
+        pckDependencies.map((_, v) -> JSON.String(v)),
+      ),
+    ],
+  );
+
+  FileSystem.writeTextFile(packageFile, packageContents.toString());
+
+  tsconfig = Path.join(tsDir, "tsconfig.json");
+  FileSystem.writeTextFile(tsconfig, tsConfig(dependencies.map(d -> d.name)));
+  Skargo.run(
+    Array["npm", "i", "--prefix", tsDir, "--save-dev", "@types/node"],
+    bc.env.verbose,
+  );
+  Skargo.run(Array["tsc", "--project", tsconfig], bc.env.verbose);
+
+  jsDir = Path.join(tsDir, "js");
+  invariant(FileSystem.exists(jsDir), "Invalid typescript build");
+  // TODO: manage subdirectories
+  jsFiles = FileSystem.readFilesRecursive(
+    jsDir,
+    f ~> f.endsWith(".js"),
+    _f ~> false,
+  );
+  mapFiles = FileSystem.readFilesRecursive(
+    jsDir,
+    f ~> f.endsWith(".map"),
+    _f ~> false,
+  );
+  declFiles = FileSystem.readFilesRecursive(
+    jsDir,
+    f ~> f.endsWith(".d.ts"),
+    _f ~> false,
+  );
+  distDir = Path.join(npmDir, "dist");
+  _ = system("mkdir -p " + distDir);
+  jsResources = mutable Map[];
+  resources.each((k, f) ->
+    jsResources.add(
+      Path.join(jsDir, Path.basename(k.take(k.length() - 3))) + ".js",
+      f,
+    )
+  );
+  copyAndConvertImport(
+    package.version,
+    distDir,
+    bc.targetDir,
+    unsafe_chill_trust_me(jsResources),
+    jsFiles,
+    () -> {
+      bins = bc.env.manifest.bin;
+      invariant(bins.size() == 1, "Unable to get binary name");
+      bins[0].name
+    },
+    bc.env.verbose,
+  );
+  if (bc.env.verbose) {
+    print_string(">> Copy mapping files associating '.mjs' instead of '.js'.");
+  };
+  mapFiles.each(mapFile -> {
+    contents = FileSystem.readTextFile(mapFile);
+    json = JSON.decode(contents).expectObject();
+    file = Path.basename(mapFile);
+    newJS = JSON.Object(
+      json.value.map((k, v) ->
+        k match {
+        | "file" ->
+          f = v.expectString().replace(".js", ".mjs");
+          !file = f + ".map";
+          JSON.String(f)
+        | "sources" ->
+          JSON.Array(
+            v.expectArray().value.map(src ->
+              JSON.String(src.expectString().replace("../", "../src/"))
+            ),
+          )
+        | _ -> v
+        }
+      ),
+    );
+    jsMapfile = Path.join(distDir, file);
+    FileSystem.writeTextFile(jsMapfile, newJS.toString());
+  });
+  if (bc.env.verbose) {
+    print_string(">> Copy types declaration files.");
+  };
+  declFiles.each(f -> copyToDir(f, distDir));
+  srcDir = Path.join(npmDir, "src");
+  _ = system("mkdir -p " + srcDir);
+  if (bc.env.verbose) {
+    print_string(">> Copy source files.");
+  };
+  FileSystem.readFilesRecursive(
+    tsDir,
+    f -> f.endsWith(".ts"),
+    _f -> false,
+  ).each(f -> copyToDir(f, srcDir, ""));
+  if (bc.env.verbose) {
+    print_string(">> Manage license and package files.");
+  };
+  licenseFile = Path.join(npmDir, "LICENSE");
+  FileSystem.writeTextFile(licenseFile, license());
+  npmPackageFile = Path.join(npmDir, "package.json");
+  npmPackage = mutable Map[
+    "name" => JSON.String(package.name),
+    "version" => JSON.String(package.version),
+    "type" => JSON.String("module"),
+    "dependencies" => JSON.Object(
+      pckDependencies.map((_, v) -> JSON.String(v)),
+    ),
+    "sideEffects" => JSON.Bool(package.sideEffects),
+  ];
+  bins = bc.env.manifest.bin;
+  if (bins.size() == 1) {
+    binName = optBinName.default(bins[0].name);
+    npmPackage.add("main", JSON.String(`./dist/${binName}.mjs`));
+    npmPackage.add("types", JSON.String(`./dist/${binName}.d.ts`));
+  } else {
+    exports = mutable Map[];
+    typesVersions = mutable Map[];
+    for (bin in bins) {
+      exports.add(`./${bin.name}`, JSON.String(`./dist/${bin.name}.mjs`));
+      typesVersions.add(
+        `./${bin.name}`,
+        JSON.String(`./dist/${bin.name}.d.ts`),
+      );
+    };
+    npmPackage.add("exports", JSON.Object(unsafe_chill_trust_me(exports)));
+    npmPackage.add(
+      "typesVersions",
+      JSON.Object(unsafe_chill_trust_me(typesVersions)),
+    );
+  };
+  package.author.each(a -> npmPackage.add("author", JSON.String(a)));
+  package.optNodeVersion.each(version ->
+    npmPackage.add("engines", JSON.Object(Map["node" => JSON.String(version)]))
+  );
+  package.optBinary.each(binary -> {
+    npmPackage.add(
+      "bin",
+      JSON.Object(Map[binary => JSON.String(`./dist/${binary}.mjs`)]),
+    );
+    npmPackage.add(
+      "scripts",
+      JSON.Object(Map["cli" => JSON.String(`node ./dist/${binary}.mjs`)]),
+    );
+  });
+  npmPackageContents = JSON.Object(unsafe_chill_trust_me(npmPackage));
+  stream = mutable Vector[];
+  npmPackageContents.writeToStream(stream.push, 2);
+  FileSystem.writeTextFile(npmPackageFile, stream.join(""));
+  Skargo.run(Array["rm", "-rf", tsDir], bc.env.verbose);
+}
+
+fun relative(path: String, to: String): ?String {
+  if (!to.endsWith("/")) {
+    !to = to + "/";
+  };
+  if (path.startsWith(to)) {
+    Some(path.sub(path.getIter().drop(to.chars().size()), path.chars().size()))
+  } else {
+    None()
+  }
+}
+
+fun tsConfig(deps: Vector<String>): String {
+  path = JSON.Array(Vector[JSON.String("./*")]);
+  paths = mutable Map<String, JSON.Value>[];
+  deps.each(v -> paths.set(`#${v}` + "/*", path));
+  config = JSON.Object(
+    Map[
+      "compilerOptions" => JSON.Object(
+        Map[
+          "target" => JSON.String("ES2021"),
+          "outDir" => JSON.String("js"),
+          "baseUrl" => JSON.String("."),
+          "paths" => JSON.Object(unsafe_chill_trust_me(paths)),
+          "strictNullChecks" => JSON.Bool(true),
+          "module" => JSON.String("esnext"),
+          "sourceMap" => JSON.Bool(true),
+          "declaration" => JSON.Bool(true),
+          "declarationMap" => JSON.Bool(true),
+          "moduleResolution" => JSON.String("NodeNext"),
+        ],
+      ),
+    ],
+  );
+  stream = mutable Vector[];
+  config.writeToStream(stream.push, 2);
+  stream.join("")
+}
+
+fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
+  contents = FileSystem.readTextFile(tsFile);
+  target = Path.join(dir, Path.basename(tsFile));
+  lines = contents.split("\n").map(line -> {
+    if (line.startsWith("import ")) {
+      elements = line.split(" from ");
+      if (elements.size() == 2) {
+        imported = elements[1].split("\"");
+        if (imported.size() == 3) {
+          elems = imported[1].split("/");
+          size = elems.size();
+          if (size > 1 && elems[0].startsWith("#")) {
+            !elems = elems.mapWithIndex((idx, v) ->
+              if (idx == 0) "." else if (idx == size - 1) {
+                `${v}${ext}`
+              } else {
+                v
+              }
+            );
+            !line = `${elements[0]} from "${elems.join("/")}"`
+          }
+        }
+      }
+    } else {
+      indexOf(line, "import(\"#") match {
+      | Some(index) ->
+        indexOf(line, "/", index) match {
+        | Some(end) ->
+          prefix = line.take(index);
+          siter = line.getIter().drop(end);
+          suffix = line.substring(siter);
+          !line = `${prefix}import(\".${suffix}`
+        | _ -> void
+        }
+      | _ -> void
+      }
+    };
+    line;
+  });
+  FileSystem.writeTextFile(target, lines.join("\n"));
+}
+
+fun copyAndConvertImport(
+  version: String,
+  distDir: String,
+  targetDir: String,
+  resources: Map<String, String>,
+  jsFiles: Vector<String>,
+  binary: () -> String,
+  verbose: Bool,
+): void {
+  if (verbose) {
+    print_string(">> Copy js files and convert to valid imports.");
+  };
+  nameLine = "var wasm64 = \"/*--NAME--*/\";";
+  modulesLines = "var modules = [ /*--MODULES--*/];";
+  base64Line = "export var base64 = \"\";";
+  versionLine = "const npmVersion = \"\";";
+  extensionsLine = "/*--EXTENSIONS--*/";
+  envPrefix = "/** @sk env ";
+  envSuffix = " */";
+
+  sourceMappingPrefix = "//# sourceMappingURL=";
+  runtime = "";
+  loaderFiles = mutable Vector<String>[];
+  moduleFiles = mutable Vector<String>[];
+  extensionsFiles = mutable Map<String, mutable Vector<String>>[];
+  tmplFiles = mutable Vector[];
+  jsFiles.each(f -> {
+    saved = SKFS.newObstack();
+    optLoaderFile: ?String = None();
+    optModuleFile: ?String = None();
+    optRuntimeFile: ?String = None();
+    optExtensionFile: ?(String, String) = None();
+    jsBasename = Path.basename(f);
+    mjsBasename = jsBasename.replace(".js", ".mjs");
+    jsSourceMapping = `${sourceMappingPrefix}${jsBasename}.map`;
+    mjsSourceMapping = `${sourceMappingPrefix}${mjsBasename}.map`;
+    contents = FileSystem.readTextFile(f);
+    withInit = false;
+    withLoader = false;
+    withRuntime = false;
+    withTmpl = false;
+    optCategory: ?String = None();
+    lines = contents.split("\n").map(line -> {
+      if (line.startsWith("import ")) {
+        elements = line.split(" from ");
+        if (elements.size() == 2) {
+          imported = elements[1].split("\"");
+          if (imported.size() == 3) {
+            elems = imported[1].split("/");
+            size = elems.size();
+            if (size > 1 && elems[0].startsWith("#")) {
+              !elems = elems.mapWithIndex((idx, v) ->
+                if (idx == 0) "." else if (idx == size - 1) {
+                  `${v}.mjs`
+                } else {
+                  v
+                }
+              );
+              !line = `${elements[0]} from "${elems.join("/")}"`
+            }
+          }
+        }
+      };
+      cLine = line.trim();
+      if (
+        cLine == nameLine ||
+        cLine == modulesLines ||
+        cLine == base64Line ||
+        cLine == versionLine ||
+        cLine == extensionsLine
+      ) {
+        !withTmpl = true;
+      } else if (cLine == "/** @sk init */") {
+        !withInit = true;
+      } else if (cLine == "/** @sk loader */") {
+        !withLoader = true;
+      } else if (cLine == "/** @sk runtime */") {
+        !withRuntime = true;
+      } else if (cLine == jsSourceMapping) {
+        !line = mjsSourceMapping;
+      } else if (cLine.startsWith(envPrefix) && cLine.endsWith(envSuffix)) {
+        len = cLine.length();
+        pSize = envPrefix.length();
+        sSize = envSuffix.length();
+        siter = cLine.getIter().drop(pSize);
+        inSize = len - pSize - sSize;
+        !optCategory = Some(cLine.sub(siter, inSize).trim());
+      };
+      line;
+    });
+    tf = Path.join(distDir, mjsBasename);
+    invariant(
+      i(withInit) + i(withLoader) + i(withRuntime) + i(optCategory.isSome()) <=
+        1,
+      `The file ${Path.basename(f).replace(
+        ".js",
+        ".ts",
+      )} cannot have multiple behaviors.`,
+    );
+    if (withInit) {
+      !optModuleFile = Some(Path.basename(tf));
+    } else if (withLoader) {
+      !optLoaderFile = Some(Path.basename(tf));
+    } else if (withRuntime) {
+      invariant(runtime.isEmpty(), "Multiple runtime defined");
+      !optRuntimeFile = Some(Path.basename(tf));
+    };
+    !optExtensionFile = optCategory.map(cat -> (cat, Path.basename(tf)));
+    copied = if (!withTmpl) {
+      FileSystem.writeTextFile(tf, lines.join("\n"));
+      SKFS.destroyObstackWithValue(
+        saved,
+        List[(optModuleFile, optLoaderFile, optRuntimeFile, optExtensionFile)],
+      ).getHead();
+    } else {
+      copied = SKFS.destroyObstackWithValue(
+        saved,
+        List[
+          (
+            (f, tf, lines),
+            (optModuleFile, optLoaderFile, optRuntimeFile, optExtensionFile),
+          ),
+        ],
+      );
+      head = copied.getHead();
+      tmplFiles.push(head.i0);
+      head.i1
+    };
+    copied.i0.each(moduleFiles.push);
+    copied.i1.each(loaderFiles.push);
+    copied.i2.each(f -> !runtime = f);
+    copied.i3.each(f -> {
+      if (!extensionsFiles.containsKey(f.i0)) {
+        extensionsFiles.set(f.i0, mutable Vector[]);
+      };
+      extensionsFiles[f.i0].push(f.i1);
+    });
+  });
+  if (verbose) {
+    print_string(">> Manage found templates.");
+  };
+  invariant(!runtime.isEmpty(), "Runtime must be defined.");
+  saved = SKFS.newObstack();
+  strModules = Vector[`"./${runtime}"`].concat(loaderFiles.map(m -> `"./${m}"`))
+    .concat(moduleFiles.map(m -> `"./${m}"`))
+    .join(", ");
+  strExtensions = "";
+  extensionsFiles
+    .map((_, v) -> "[" + v.map(c -> `"./${c}"`).join(", ") + "]")
+    .each((k, v) ->
+      !strExtensions = strExtensions + `extensions.set("${k}", ${v});\n`
+    );
+  tmplFiles.each(fi -> {
+    inner = SKFS.newObstack();
+    (sf, tf, lines) = fi;
+    if (verbose) {
+      print_string(`>> Manage ${sf} template.`);
+    };
+    !lines = lines.map(line -> {
+      cLine = line.trim();
+      if (cLine == nameLine) {
+        `var wasm64 = "${binary()}";`
+      } else if (cLine == modulesLines) {
+        `var modules = [${strModules}];`
+      } else if (cLine == base64Line) {
+        resources.maybeGet(sf) match {
+        | Some(b64File) ->
+          `export var base64 = "${FileSystem.readTextFile(b64File)}";`
+        | _ ->
+          wasmFile = Path.join(
+            targetDir,
+            Path.basename(sf.take(sf.length() - 3)),
+          );
+          invariant(FileSystem.exists(wasmFile), "Wasm file not found.");
+          wasm(wasmFile, verbose)
+        }
+      } else if (cLine == versionLine) {
+        `const npmVersion = "${version}";`
+      } else if (cLine == extensionsLine) {
+        strExtensions
+      } else {
+        line
+      }
+    });
+    FileSystem.writeTextFile(tf, lines.join("\n"));
+    SKFS.destroyObstack(inner);
+  });
+  SKFS.destroyObstack(saved);
+}
+
+fun i(v: Bool): Int {
+  if (v) 1 else 0;
+}
+
+fun wasm(path: String, verbose: Bool): String {
+  b64File = path + ".b64";
+  cmd = Array["bash", "-c", `base64 ${path} | tr -d "\\n" > ${b64File}`];
+  if (verbose) {
+    print_error(`>> ${cmd.join(" ")}`)
+  };
+  _ = System.subprocess(cmd);
+  res = `export var base64 = "${FileSystem.readTextFile(b64File)}";`;
+  Skargo.run(Array["rm", b64File], verbose);
+  res
+}
+
+fun check(
+  several: String,
+  files: readonly Vector<String>,
+  optSingle: ?String,
+): void {
+  optSingle.each(single ->
+    invariant(!files.isEmpty(), `${single} must be defined.`)
+  );
+  if (files.size() > 1) {
+    invariant_violation(
+      `Several ${several} have been found (${files.map(f ->
+        f.split(".").take(files.size() - 1).join(".")
+      )}), please specify which one to use.`,
+    )
+  }
+}
+
+fun writeIndex(target: String, name: String): void {
+  FileSystem.writeTextFile(
+    Path.join(target, "index.html"),
+    Array[
+      "<!DOCTYPE html>",
+      "<html>",
+      "  <head lang=\"en\">",
+      "    <meta charset=\"utf-8\">",
+      "    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />",
+      `    <script type="module" src=\"./npm/dist/${name}.mjs\"></script>`,
+      "    <link rel=\"icon\" href=\"data:,\">",
+      "  </head>",
+      "  <body>",
+      "  </body>",
+      "</html>",
+    ].join("\n"),
+  )
+}
+
+fun writeRun(target: String, verbose: Bool): void {
+  runFile = Path.join(target, "run.sh");
+  FileSystem.writeTextFile(
+    runFile,
+    "#!/bin/bash\npython3 -m http.server 8000\n",
+  );
+  Skargo.run(Array["chmod", "+x", runFile], verbose);
+}
+
+fun license(): String {
+  `MIT License
+
+Copyright (c) 2023 SkipLabs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`
+}
+
+fun indexOf(inStr: String, s: String, start: Int = 0): ?Int {
+  chars1 = inStr.chars();
+  chars2 = s.chars();
+  for (i in Range(start, chars1.size())) {
+    if (chars2.size() > chars1.size() - i) {
+      return None();
+    };
+    j = 0;
+    while (j < chars2.size()) {
+      if (chars1[i + j] != chars2[j]) {
+        break void;
+      };
+      !j = j + 1;
+    };
+    if (j == chars2.size()) {
+      return Some(i);
+    }
+  };
+  None()
+}
+
+@cpp_extern("SKIP_sknpm_save_sk_tests_ts")
+native fun saveSkTestsTs(targetDir: String): void;
+
+@cpp_extern("SKIP_sknpm_save_archive")
+native fun saveArchive(targetDir: String): void;
