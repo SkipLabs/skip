@@ -14,8 +14,6 @@ fun test_job(
   rank: Int,
 ): void {
   stdout = mutable IO.File(Posix.dup(IO.stdout().fileno));
-  stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
-  Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
   i = 0;
   for (testSuite in tests.keys()) {
     for (test in tests[testSuite]) {
@@ -26,6 +24,12 @@ fun test_job(
       if (i % njobs != rank) {
         continue
       };
+
+      stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+      Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
+      stderr_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+      Posix.dup2(stderr_file.fileno, IO.stderr().fileno);
+
       res = TestResult{
         name => test.name,
         suite => testSuite,
@@ -36,12 +40,7 @@ fun test_job(
       start = Time.time();
       !res = try {
         _ = test.func();
-        res with {
-          result => "success",
-          time => Time.time() - start,
-          stdout => stdout_file.read_to_end(),
-          stderr => "TODO",
-        }
+        res with {result => "success", time => Time.time() - start}
       } catch {
       | ExpectationError(msg, _, _) ->
         res with {
@@ -49,8 +48,6 @@ fun test_job(
           time => Time.time() - start,
           failure_type => "ExpectationError",
           failure_message => msg,
-          stdout => stdout_file.read_to_end(),
-          stderr => "TODO",
         }
       | exn ->
         res with {
@@ -58,10 +55,20 @@ fun test_job(
           time => Time.time() - start,
           failure_type => inspect(exn).toString(),
           failure_message => exn.getMessage(),
-          stdout => stdout_file.read_to_end(),
-          stderr => "TODO",
         }
       };
+
+      flushStdout();
+      _ = Posix.lseek(stdout_file.fileno, 0, Posix.SeekSet());
+      _ = Posix.lseek(stderr_file.fileno, 0, Posix.SeekSet());
+      !res = res with {
+        stdout => stdout_file.read_to_end(),
+        stderr => stderr_file.read_to_end(),
+      };
+
+      stdout_file.close();
+      stderr_file.close();
+
       stdout.write_all(res.toJSON() + "\n");
     }
   };
