@@ -11,7 +11,7 @@ async function fetchWasmSource() {
 // tests connecting, creating a db and a user
 async function setup() {
   const host = process.argv[3] || "ws://localhost:8080";
-  let skdb = await SKDB.create(null, fetchWasmSource);
+  const skdb = await SKDB.create(null, fetchWasmSource);
   {
     const b64key = process.argv[2];
     const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0));
@@ -22,26 +22,25 @@ async function setup() {
   const testRootCreds = await skdb.server.createDatabase("test");
   skdb.server.close();
 
-  skdb = await SKDB.create(null, fetchWasmSource);
+  const rootSkdb = await SKDB.create(null, fetchWasmSource);
   {
     const keyData = testRootCreds.privateKey;
     const key = await crypto.subtle.importKey(
       "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
-    await skdb.connect("test", testRootCreds.accessKey, key, host);
+    await rootSkdb.connect("test", testRootCreds.accessKey, key, host);
   }
 
-  const testUserCreds = await skdb.server.createUser();
-  skdb.server.close();
+  const testUserCreds = await rootSkdb.server.createUser();
 
-  skdb = await SKDB.create(null, fetchWasmSource);
+  const userSkdb = await SKDB.create(null, fetchWasmSource);
   {
     const keyData = testUserCreds.privateKey;
     const key = await crypto.subtle.importKey(
       "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
-    await skdb.connect("test", testUserCreds.accessKey, key, host);
+    await userSkdb.connect("test", testUserCreds.accessKey, key, host);
   }
 
-  return skdb;
+  return {root: rootSkdb, user: userSkdb};
 }
 
 async function testQueriesAgainstTheServer(skdb) {
@@ -109,35 +108,36 @@ async function testMirroring(skdb) {
   assert.deepEqual(testPkRows2, [{x: 42, y:21}]);
 }
 
-async function testServerTail(skdb) {
-  await skdb.server.sqlRaw("insert into test_pk values (87,88);");
+async function testServerTail(root, user) {
+  await root.server.sqlRaw("insert into test_pk values (87,88);");
   // we could do something complicated with callbacks, but sleep for now
   await new Promise(resolve => setTimeout(resolve, 100));
-  const res = skdb.sql("select count(*) as cnt from test_pk where x = 87 and y = 88");
+  const res = user.sql("select count(*) as cnt from test_pk where x = 87 and y = 88");
   assert.deepEqual(res, [{cnt: 1}]);
 }
 
-async function testClientTail(skdb) {
-  await skdb.sqlRaw("insert into test_pk values (97,98);");
+async function testClientTail(root, user) {
+  await user.sqlRaw("insert into test_pk values (97,98);");
   // we could do something complicated with callbacks, but sleep for now
   await new Promise(resolve => setTimeout(resolve, 100));
-  const res = await skdb.server.sql(
+  const res = await root.server.sql(
     "select count(*) as cnt from test_pk where x = 97 and y = 98");
   assert.deepEqual(res, [{cnt: 1}]);
 }
 
-const skdb = await setup();
+const dbs = await setup();
 
 console.log("testQueriesAgainstTheServer");
-await testQueriesAgainstTheServer(skdb);
+await testQueriesAgainstTheServer(dbs.root);
 console.log("testSchemaQueries");
-await testSchemaQueries(skdb);
+await testSchemaQueries(dbs.user);
 console.log("testMirroring");
-await testMirroring(skdb);
+await testMirroring(dbs.user);
 console.log("testServerTail");
-await testServerTail(skdb);
+await testServerTail(dbs.root, dbs.user);
 console.log("testClientTail");
-await testClientTail(skdb);
+await testClientTail(dbs.root, dbs.user);
 console.log("all PASSED");
 
-skdb.server.close();
+dbs.root.server.close();
+dbs.user.server.close();
