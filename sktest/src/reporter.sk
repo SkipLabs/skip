@@ -62,6 +62,8 @@ mutable class BasicTestReporter{
   private mutable successes: Int = 0,
   private mutable failures: Int = 0,
 } extends TestReporter {
+  const kSeparator: String = "\n==========\n";
+
   mutable fun report(res: TestResult): void {
     result = if (res.result == "success") {
       this.!successes = this.successes + 1;
@@ -69,7 +71,17 @@ mutable class BasicTestReporter{
     } else {
       this.!failures = this.failures + 1;
       this.failure() +
-        ` ${res.suite} ${res.name}\n${res.failure_type}: ${res.failure_message}`
+        ` ${res.suite} ${res.name}\n${res.failure_type}: ${
+          res.failure_message
+        }\n` +
+        "\nstdout:" +
+        static::kSeparator +
+        res.stdout +
+        static::kSeparator +
+        "\nstderr:" +
+        static::kSeparator +
+        res.stderr +
+        static::kSeparator;
     };
     this.writeLine(result)
   }
