@@ -78,16 +78,23 @@ mutable class NonEmptyIterator<+T>(
     mutable NonEmptyIterator(f(this.first), this.iter.map(f))
   }
 
-  mutable fun assertUnique<T>(
-    err: () -> T = () ->
+  mutable fun assertUnique(
+    err: () -> void = () ->
       invariant_violation("Expected an iterator with only one element"),
-  ): T {
+  ): void {
     if (this.isPassedFirstValue) {
       invariant_violation(
         "Cannot use assertUnique on an iterator that has already been used",
       )
     };
-    err()
+    this.next() match {
+    | None() -> void
+    | Some _ ->
+      this.next() match {
+      | None() -> this.!isPassedFirstValue = false
+      | Some _ -> err()
+      }
+    }
   }
 }
 
