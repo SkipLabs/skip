@@ -716,7 +716,7 @@ export class SKDB {
     );
   }
 
-  addParams(
+  private addParams(
     args: Array<string>,
     params: Map<string, string|number>,
     stdin: string
@@ -727,15 +727,13 @@ export class SKDB {
   }
 
   sqlRaw(stdin: string, params: Map<string, string|number> = new Map())
-    : string
-  {
+    : string {
     let [args1, stdin1] = this.addParams([], params, stdin);
     return this.runLocal(args1, stdin1);
   }
 
   sql(stdin: string, params: Map<string, string|number> = new Map())
-    : Array<any> | string
-  {
+    : Array<any> | string {
     let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
     this.stdout_objects = new Array();
     let stdout = this.runLocal(args1, stdin1);
