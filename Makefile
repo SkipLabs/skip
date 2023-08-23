@@ -8,6 +8,14 @@ PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
+SKNPM_BIN=sql/target/host/$(SKARGO_PROFILE)/sknpm
+STDMAN_DIR?=$(HOME)/.sdkman
+
+ifndef PLAYWRIGHT_JUNIT_OUTPUT_NAME
+SKNPM_FLAG=
+else
+SKNPM_FLAG=--junitxml $(PLAYWRIGHT_JUNIT_OUTPUT_NAME)
+endif # ifdef PROFILE
 
 ################################################################################
 # skdb wasm + js client
@@ -53,6 +61,23 @@ sql/js/dist/skdb-node.js: sql/js/dist/skdb.js sql/js/src/node_header.js
 
 sql/js/dist/index.html: sql/js/tests/index.html
 	mkdir -p sql/js/dist
+	cp $^ $@
+
+$(STDMAN_DIR):
+	cd $(dirname $(STDMAN_DIR)) && sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
+
+################################################################################
+# sknpm native binary
+################################################################################
+
+sknpm/target/host/dev/sknpm: sknpm/src/* skargo/src/* prelude/src/*
+	cd sknpm && skargo build
+
+sknpm/target/host/release/sknpm: sknpm/src/* skargo/src/* prelude/src/*
+	cd sknpm && skargo build --release
+
+build/sknpm: $(SKNPM_BIN)
+	mkdir -p build
 	cp $^ $@
 
 ################################################################################
@@ -103,6 +128,10 @@ test-native: build/skdb
 	cd sql/ && SKARGO_PROFILE=$(SKARGO_PROFILE) ./test_sql.sh \
 	|tee /tmp/native-test.out ; \
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
+
+.PHONY: test-wasm2
+test-wasm2: build/sknpm $(SKDB_WASM) $(STDMAN_DIR)
+	cd sql && ../build/sknpm test $(SKARGO_FLAGS) $(SKNPM_FLAG)
 
 .PHONY: test-wasm
 test-wasm: npm sql/js/node_modules sql/js/dist/index.html

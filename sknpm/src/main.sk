@@ -155,6 +155,7 @@ fun test(): (Cli.Command, Cli.ParseResults ~> void) {
           "Build artifacts with the specified profile",
         ),
       )
+      .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report"))
       .arg(
         Cli.BoolArg("release")
           .short("r")
@@ -236,15 +237,20 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
     });
   };
   environment.each(Environ.set_var);
-  cmd =
-    "bash -c 'cd " +
-    targetDir +
-    " && npx playwright install && npx playwright test --reporter=line'";
+  pCmd = args.maybeGetString("junitxml") match {
+  | Some(junitxml) ->
+    `PLAYWRIGHT_JUNIT_OUTPUT_NAME=${junitxml} npx playwright test --reporter=junit`
+  | _ -> "npx playwright test --reporter=line"
+  };
+  cmd = `bash -c 'cd ${targetDir} && npx playwright install && ${pCmd}'`;
   if (bc.env.verbose) {
     print_error(`>> ${cmd}`)
   };
-  _ = system(cmd);
-  processes.each(p -> Skargo.run(Array["kill", p.toString()], bc.env.verbose))
+  res = system(cmd);
+  processes.each(p -> Skargo.run(Array["kill", p.toString()], bc.env.verbose));
+  if (res != 0) {
+    throw Skargo.SystemCallException(res);
+  }
 }
 
 fun manage(
