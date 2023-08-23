@@ -1105,6 +1105,10 @@ class ResilientMuxedSocket {
     return new ResilientMuxedSocket(policy, uri, creds, socket);
   }
 
+  isSocketConsideredHealthy(): boolean {
+    return this.socket !== undefined;
+  }
+
   private constructor(
     policy: ResiliencyPolicy, uri: string,
     creds: Creds, initialSocket: MuxedSocket
@@ -2182,6 +2186,10 @@ class SKDBServer {
     };
 
     return session;
+  }
+
+  isConnectionHealthy(): boolean {
+    return this.connection.isSocketConsideredHealthy();
   }
 
   tablesAwaitingSync(): Set<string> {
