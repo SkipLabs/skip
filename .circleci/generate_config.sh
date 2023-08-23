@@ -41,5 +41,6 @@ then
   skdb:
     jobs:
       - skdb
+      - skdb-wasm
 EOF
 fi

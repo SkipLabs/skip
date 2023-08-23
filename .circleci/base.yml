@@ -65,3 +65,19 @@ jobs:
             make test-wasm
       - store_test_results:
           path: ~/test-results/skdb-browser.xml
+  skdb-wasm:
+    docker:
+      - image: beauby/skiplabs:circleci-0.0.1
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Run wasm skdb tests
+          environment:
+            PLAYWRIGHT_REPORTER: junit
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME: /home/circleci/test-results/skdb-wasm.xml
+          command: |
+            mkdir -p ~/test-results
+            make test-wasm2
+      - store_test_results:
+          path: ~/test-results/skdb-wasm.xml

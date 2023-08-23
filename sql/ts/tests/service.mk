@@ -5,11 +5,11 @@ ifndef ROOT_DIR
 $(error ROOT_DIR must be defined.)
 endif
 
-STDMAN_DIR?=$(HOME)
+SDKMAN_DIR?=$(HOME)/.sdkman
 
 REAL_DIR=$(shell realpath $(ROOT_DIR))
 SERVER_DIR=$(ROOT_DIR)/server
-SDKMAN_INIT=$(STDMAN_DIR)/.sdkman/bin/sdkman-init.sh
+SDKMAN_INIT=$(SDKMAN_DIR)/bin/sdkman-init.sh
 SKDB_CLI=$(SRV_DIR)/node_modules/skdb/dist/skdb-cli.mjs
 SKDB_CLI_DIR=$(SRV_DIR)/node_modules/skdb
 SKDB_CLI_CMD=./dist/skdb-cli.mjs
@@ -22,10 +22,10 @@ default: build
 
 .PHONY: build
 build: $(ROOT_DIR)/server $(SDKMAN_INIT) $(SKGW_DIR) $(SRV_DIR)/skgw.conf
-build: $(shell $(SRV_DIR)/service.sh $(SDKMAN_INIT) $(SKGW_DIR) $(SRV_DIR)/skgw.conf $(SKDB_DATABASES) &> $(SRV_DIR)/service.log)
+build: SLOG=$(shell $(SRV_DIR)/service.sh $(SDKMAN_DIR) $(SKGW_DIR) $(SRV_DIR)/skgw.conf $(SKDB_DATABASES))
 build: CREDENTIALS=$(shell cat $(SRV_DIR)/dbs/init.log | grep 'skgw.credentials')
 build:
-	@cat $(SRV_DIR)/service.log | grep 'sknpm'
+	@echo $(SLOG)
 	@echo $(CREDENTIALS:skgw.credentials%=sknpm.env:SKDB_CREDENTIALS%)
 	@echo sknpm.env:SKDB_BIN=$(REAL_DIR)/target/release/skdb
 	@echo sknpm.env:SKDB_CLI=$(SRV_DIR)/node_modules/skdb/dist/skdb-cli.mjs
