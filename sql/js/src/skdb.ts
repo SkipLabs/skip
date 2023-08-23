@@ -2008,7 +2008,7 @@ class SKDBServer {
   private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
-  private mirroredTables: Set<string> = new Set()
+  private mirroredTables: Map<string, string> = new Map()
 
   private constructor(
     client: SKDB,
@@ -2110,7 +2110,7 @@ class SKDBServer {
     });
   }
 
-  private async establishLocalTail(tableName: string): Promise<void> {
+  private async establishLocalTail(tableName: string): Promise<string> {
     const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
@@ -2180,6 +2180,9 @@ class SKDBServer {
       }));
       stream.expectingData();
     };
+
+    return session;
+  }
   }
 
   public onReboot: (server: SKDBServer, skdb: SKDB) => void = () => {
@@ -2216,7 +2219,6 @@ class SKDBServer {
     if (this.mirroredTables.has(tableName)) {
       return;
     }
-    this.mirroredTables.add(tableName);
 
     // TODO: just assumes that if it exists the schema is the same
     if (!this.client.tableExists(tableName)) {
@@ -2232,9 +2234,8 @@ class SKDBServer {
 
     this.client.assertCanBeMirrored(tableName);
 
-    // TODO: need to join the promises but let them run concurrently
-    // I await here for now so we learn of error
-    await this.establishLocalTail(tableName);
+    const session = await this.establishLocalTail(tableName);
+    this.mirroredTables.set(tableName, session);
     return this.establishServerTail(tableName, filterExpr || "");
   }
 
