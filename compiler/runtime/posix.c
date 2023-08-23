@@ -87,6 +87,15 @@ char *SKIP_posix_read(int64_t fd, int64_t len) {
   return sk_string_create(buf, rv);
 }
 
+int64_t SKIP_posix_lseek(int64_t fd, int64_t offset, int64_t whence) {
+  int rv = lseek((int)fd, (int)offset, (int)whence);
+  if (rv == -1) {
+    perror("read");
+    exit(EXIT_FAILURE);
+  }
+  return rv;
+}
+
 char *sk_create_posix_pipe(int64_t output_fd, int64_t input_fd);
 
 char *SKIP_posix_pipe() {

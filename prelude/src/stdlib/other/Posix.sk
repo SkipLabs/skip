@@ -21,6 +21,14 @@ native fun write(fd: Int, s: String): Int;
 native fun read(fd: Int, len: Int): String;
 
 @debug
+@cpp_extern("SKIP_posix_lseek")
+native fun internalLseek(fd: Int, offset: Int, whence: Int): Int;
+
+fun lseek(fd: Int, offset: Int, whence: SeekWhence): Int {
+  internalLseek(fd, offset, whence.toInt())
+}
+
+@debug
 @cpp_extern("SKIP_posix_pipe")
 native fun pipe(): Pipe;
 
@@ -94,6 +102,22 @@ class Pipe(output: Int, input: Int) {}
 @cpp_export("sk_create_posix_pipe")
 fun internalCreatePipe(output_fd: Int, input_fd: Int): Pipe {
   Pipe(output_fd, input_fd)
+}
+
+base class SeekWhence {
+  children =
+  | SeekSet()
+  | SeekCur()
+  | SeekEnd()
+  | SeekHole()
+  | SeekData()
+
+  fun toInt(): Int
+  | SeekSet() -> 0
+  | SeekCur() -> 1
+  | SeekEnd() -> 2
+  | SeekHole() -> 3
+  | SeekData() -> 4
 }
 
 base class WExitStatus {
