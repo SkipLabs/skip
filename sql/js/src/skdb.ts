@@ -2121,7 +2121,10 @@ class SKDBServer {
         this.deliverDataTransferProtoMsg(msg, payload => {
           // we only expect acks back in the form of checkpoints.
           // let's store these as a watermark against the table.
-          client.runLocal(["write-csv", metadataTable(tableName)], payload + '\n');
+          client.runLocal([
+            "write-csv", metadataTable(tableName),
+            "--source", this.replicationUid
+          ], payload + '\n');
         });
       }
     }
