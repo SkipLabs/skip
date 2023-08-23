@@ -2183,6 +2183,27 @@ class SKDBServer {
 
     return session;
   }
+
+  tablesAwaitingSync(): Set<string> {
+    const acc = new Set<string>();
+    for (const [table, session] of this.mirroredTables.entries()) {
+      // TODO: if we parse the diff output we can provide an object
+      // model representing the rows not yet ack'd.
+      const diff = this.client.runLocal(
+        [
+          "diff", "--format=json",
+          "--since",
+          this.client.watermark(
+            this.replicationUid,
+            metadataTable(table)
+          ).toString(),
+          session,
+        ], "");
+      if (diff.trim() !== '') {
+        acc.add(table);
+      }
+    }
+    return acc;
   }
 
   public onReboot: (server: SKDBServer, skdb: SKDB) => void = () => {
