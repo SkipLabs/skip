@@ -346,6 +346,10 @@ void SKIP_print_error_raw(char* str) {
   print(stderr, str);
 }
 
+void SKIP_print_debug_raw(char* str) {
+  SKIP_print_error_raw(str);
+}
+
 void SKIP_flush_stdout() {
   fflush(stdout);
   fflush(stderr);
