@@ -2009,10 +2009,6 @@ class SKDBServer {
   private replicationUid: string = "";
   private mirroredTables: Set<string> = new Set()
 
-  public onReboot: (server: SKDBServer, skdb: SKDB) => void = () => {
-    throw new Error("Server signalled client should cold start to avoid diverging.");
-  };
-
   private constructor(
     client: SKDB,
     connection: ResilientMuxedSocket,
@@ -2021,32 +2017,6 @@ class SKDBServer {
     this.client = client;
     this.connection = connection;
     this.creds = creds;
-  }
-
-  static async connect(
-    client: SKDB,
-    endpoint: string,
-    db: string,
-    creds: Creds,
-  ): Promise<SKDBServer> {
-    const uri = SKDBServer.getDbSocketUri(endpoint, db);
-
-    const policy: ResiliencyPolicy = {
-      notifyFailedStream() {},
-      async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
-        // perform an active check
-        return !socket.isSocketResponsive();
-      }
-    };
-    const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
-
-    const server = new SKDBServer(client, conn, creds);
-    server.replicationUid = client.runLocal(["replication-id", creds.deviceUuid], "").trim();
-    return server
-  }
-
-  close(): void {
-    this.connection.closeSocket();
   }
 
   private static getDbSocketUri(endpoint: string, db: string) {
@@ -2206,6 +2176,36 @@ class SKDBServer {
       }));
       stream.expectingData();
     };
+  }
+
+  public onReboot: (server: SKDBServer, skdb: SKDB) => void = () => {
+    throw new Error("Server signalled client should cold start to avoid diverging.");
+  };
+
+  static async connect(
+    client: SKDB,
+    endpoint: string,
+    db: string,
+    creds: Creds,
+  ): Promise<SKDBServer> {
+    const uri = SKDBServer.getDbSocketUri(endpoint, db);
+
+    const policy: ResiliencyPolicy = {
+      notifyFailedStream() {},
+      async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
+        // perform an active check
+        return !socket.isSocketResponsive();
+      }
+    };
+    const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
+
+    const server = new SKDBServer(client, conn, creds);
+    server.replicationUid = client.runLocal(["replication-id", creds.deviceUuid], "").trim();
+    return server
+  }
+
+  close(): void {
+    this.connection.closeSocket();
   }
 
   async mirrorTable(tableName: string, filterExpr?: string): Promise<void> {
