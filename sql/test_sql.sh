@@ -2,7 +2,7 @@
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB=./target/$SKARGO_PROFILE/skdb
+SKDB=./target/host/$SKARGO_PROFILE/skdb
 export SKDB
 
 run_one_test () {

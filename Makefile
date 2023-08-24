@@ -50,11 +50,11 @@ sql/js/dist/index.html: sql/js/tests/index.html
 # skdb native binary
 ################################################################################
 
-sql/target/$(SKARGO_PROFILE)/skdb: sql/src/* skfs/src/*
+sql/target/host/$(SKARGO_PROFILE)/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build $(SKARGO_FLAGS)
 
 # TODO: keeping this for now as nearly all test scripts refer to build/skdb
-build/skdb: sql/target/$(SKARGO_PROFILE)/skdb
+build/skdb: sql/target/host/$(SKARGO_PROFILE)/skdb
 	mkdir -p build
 	cp $^ $@
 

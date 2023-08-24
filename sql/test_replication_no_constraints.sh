@@ -3,7 +3,7 @@
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB_BIN=./target/$SKARGO_PROFILE/skdb
+SKDB_BIN=./target/host/$SKARGO_PROFILE/skdb
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
