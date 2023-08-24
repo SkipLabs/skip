@@ -24,7 +24,16 @@ fun main(): void {
         .about("Use verbose output")
         .global(),
     );
-  suppliers = Array[build, test, check, clean, format, init, update, help];
+  suppliers = Array[
+    check,
+    build,
+    test,
+    clean,
+    format,
+    init,
+    update,
+    help,
+  ];
   commands = mutable Map[];
   for (supplier in suppliers) {
     (subcommand, cmdFn) = supplier();
@@ -87,7 +96,8 @@ fun build(): (Cli.Command, Cli.ParseResults ~> void) {
           .short("r")
           .long("release")
           .about("Build artifacts in release mode, with optimizations"),
-      ),
+      )
+      .arg(Cli.StringArg("bin").about("Build only the specified binary")),
     args ~> envCmd(args, execBuild),
   )
 }
@@ -99,13 +109,24 @@ fun execBuild(args: Cli.ParseResults, env: Env): void {
     args.maybeGetString("target-dir"),
     getProfile(args),
   );
-  execBuildContext(bc, env);
+  execBuildContext(bc, collectBinaries(args, env));
 }
 
-fun execBuildContext(bc: BuildContext, env: Env): void {
+fun collectBinaries(args: Cli.ParseResults, env: Env): Array<ManifestBinary> {
+  args.maybeGetString("bin") match {
+  | Some(name) ->
+    env.manifest.bin.find(b -> b.name == name) match {
+    | Some(bin) -> Array[bin]
+    | None() -> invariant_violation(`Unknown binary ${name}`)
+    }
+  | None() -> env.manifest.bin
+  };
+}
+
+fun execBuildContext(bc: BuildContext, bins: Array<ManifestBinary>): void {
   checkBuildFiles(bc, false);
   genVersionFile(bc);
-  for (bin in env.manifest.bin) {
+  for (bin in bins) {
     compile(bc, bin.name, bin.main)
   };
 }
@@ -174,6 +195,8 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
         Array[junitxml, filter, list, Some(`-j${jobs}`)].filterNone(),
       ),
     )
+  } else {
+    skipExit(1)
   }
 }
 
