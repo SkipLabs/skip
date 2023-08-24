@@ -12,6 +12,7 @@ const indexInput: SKStore.DirName = SKStore.DirName::create("/indexInput/");
 const indexOutput: SKStore.DirName = SKStore.DirName::create("/indexOutput/");
 const indexByCol: SKStore.DirName = SKStore.DirName::create("/indexByCol/");
 const watermarks: SKStore.DirName = SKStore.DirName::create("/watermarks/");
+const replication: SKStore.DirName = SKStore.DirName::create("/replication/");
 
 fun getWatermark(
   context: readonly SKStore.Context,
@@ -54,6 +55,69 @@ fun setWatermark(
     .unsafeGetArray(context, key)
     .reduce(max, SKStore.TickFile(checkpointTick));
   watermarkDir.writeArray(context, key, Array[mark]);
+}
+
+base class ReplicationState {
+  // gds: I envision an RSGarbageCollected to help with vector clock
+  // growth, thus the base class
+  children =
+  | RSError()
+}
+class ReplicationStateFile(state: ReplicationState) extends SKStore.File
+
+fun getFinalState(
+  context: readonly SKStore.Context,
+  replicationSource: ?Int,
+): ?ReplicationState {
+  replicationSource match {
+  | None() -> None()
+  | Some(source) ->
+    context.unsafeMaybeGetDir(replication) match {
+    | None() -> None()
+    | Some(d) ->
+      key = SKStore.IID(source);
+      arr = d.getArrayRaw(key);
+      if (arr.size() > 0) {
+        Some(ReplicationStateFile::type(arr[0]).state)
+      } else {
+        None()
+      }
+    }
+  }
+}
+
+fun setFinalState(
+  context: mutable SKStore.Context,
+  replicationSource: Int,
+  state: ReplicationState,
+): void {
+  replicationDir = context.maybeGetDir(replication) match {
+  | None() -> context.mkdir(x ~> x, ReplicationStateFile::type, replication)
+  | Some(d) ->
+    SKStore.EHandle(x ~> x, ReplicationStateFile::type, d.getDirName())
+  };
+  key = SKStore.IID(replicationSource);
+  arr = replicationDir.unsafeGetArray(context, key);
+  // all states are final states, first writer wins
+  if (arr.size() < 1) {
+    replicationDir.writeArray(context, key, Array[ReplicationStateFile(state)])
+  }
+}
+
+fun errorAllExistingSubs(
+  context: mutable SKStore.Context,
+  dir: SKStore.DirName,
+): void {
+  context.sessions.values().each(sub ->
+    if (sub.dirName == dir && sub.destinationSource is Some _) {
+      setFinalState(context, sub.destinationSource.fromSome(), RSError());
+      lock = SKStore.unfreezeLock(sub.lock);
+      SKStore.mutexLock(lock);
+      cond = SKStore.unfreezeCond(sub.cond);
+      _ = SKStore.condBroadcast(cond);
+      SKStore.mutexUnlock(lock)
+    }
+  )
 }
 
 extension class TypeDescr extends SKStore.File
@@ -309,7 +373,7 @@ fun getSubsDirs(
       tableDir = getTableDir(context);
       (edir, dirDescr) = tableDir.maybeGet(
         context,
-        SKStore.SID(request.viewName),
+        SKStore.SID(viewName),
       ) match {
       | None() ->
         views = SKDB.getViewsDir(context);
@@ -365,9 +429,8 @@ fun getSubsDirs(
         init,
         reset,
         filter,
-        (context) ~>
-          getWatermark(context, request.viewName, request.ignoreSource)
-        ,
+        (context) ~> getWatermark(context, viewName, request.ignoreSource),
+        request.ignoreSource,
       );
       writer.set(key, SKStore.IntFile(sessionID))
     },
