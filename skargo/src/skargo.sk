@@ -5,7 +5,6 @@ const kVersionFile: String = "version.sk";
 const kDevProfile: String = "dev";
 const kReleaseProfile: String = "release";
 const kDebugProfile: String = "debug";
-const kRepositories: String = ".skargoreps";
 const kUserConfiguration: String = ".skargoconfig";
 
 class SystemCallException(code: Int, error: ?String = None()) extends Exception
@@ -13,10 +12,14 @@ class SystemCallException(code: Int, error: ?String = None()) extends Exception
 private class UserConfig{
   formatOnCheck: Bool = false,
   autoRemoveState: Bool = false,
+  repositories: Array<String> = Array[],
 } {
-  fun update(jso: JSON.Object): UserConfig {
-    jso.maybeGetBool("auto-remove-state").each(v -> !this.autoRemoveState = v);
-    jso.maybeGetBool("format-on-check").each(v -> !this.formatOnCheck = v);
+  fun update(json: JSON.Object): UserConfig {
+    json.maybeGetBool("auto-remove-state").each(v -> !this.autoRemoveState = v);
+    json.maybeGetBool("format-on-check").each(v -> !this.formatOnCheck = v);
+    json.maybeGetArray("repositories").each(v ->
+      !this.repositories = v.value.map(jv -> jv.expectString()).toArray()
+    );
     this;
   }
 }
@@ -36,6 +39,13 @@ private class Env{
       verbose,
       config,
     }
+  }
+
+  fun getDependencies(): Map<String, Manifest> {
+    getDependencies(this.manifest, this.config.repositories) match {
+    | Success(v) -> v
+    | Failure(e) -> throw e
+    };
   }
 }
 
@@ -316,10 +326,7 @@ fun checkBuildFile(
       verbose => bc.env.verbose,
       config => bc.env.config,
     };
-    deps = getDependencies(bManifest) match {
-    | Success(v) -> v
-    | Failure(e) -> throw e
-    };
+    deps = env.getDependencies();
     sbc = BuildContext{
       env,
       skc => bc.skc,

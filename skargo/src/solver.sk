@@ -74,43 +74,10 @@ class UnsatisfiableDependency(
 
 fun getDependencies(
   manifest: Manifest,
+  reps: Array<String>,
 ): Result<Map<String, Manifest>, Exception> {
-  reps = findRepositories();
   result = mutable Map[manifest.name => manifest];
   solveDependencies(manifest, result, reps)
     .map(e -> Failure(e))
     .default(Success(result.chill()));
-}
-
-private fun findRepositories(): Array<String> {
-  path = getcwd();
-  repositories = mutable Vector<String>[];
-  set = mutable Set<String>[];
-  loop {
-    resp = Path.join(path, kRepositories);
-    if (FileSystem.exists(resp)) {
-      collectRepositories(resp, repositories, set)
-    };
-    if (Path.isRoot(path)) break void;
-    !path = Path.parentname(path)
-  };
-  repositories.toArray();
-}
-
-private fun collectRepositories(
-  path: String,
-  repositories: mutable Vector<String>,
-  set: mutable Set<String>,
-): void {
-  dirname = Path.parentname(path);
-  contents = FileSystem.readTextFile(path).split("\n");
-  contents.each(l ->
-    if (!l.trim().isEmpty()) {
-      rep = Path.resolve(dirname, l);
-      if (FileSystem.exists(rep) && !set.contains(rep)) {
-        repositories.push(rep);
-        set.insert(rep);
-      }
-    }
-  );
 }

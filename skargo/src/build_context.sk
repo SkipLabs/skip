@@ -21,10 +21,7 @@ private class BuildContext{
     | None() -> Path.join(getTargetDir(env.rootDir, target), profile)
     };
     skc = Environ.varOpt("SKC").default("skc");
-    deps = getDependencies(env.manifest) match {
-    | Success(v) -> v
-    | Failure(e) -> throw e
-    };
+    deps = env.getDependencies();
     BuildContext{
       env,
       skc,
