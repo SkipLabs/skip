@@ -1,6 +1,9 @@
 #!/bin/bash
 
-SKDB=./target/release/skdb
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB=./target/$SKARGO_PROFILE/skdb
 
 pass() { printf "%-32s OK\n" "TEST $1:"; }
 fail() { printf "%-32s FAILED\n" "TEST $1:"; }

@@ -1,7 +1,11 @@
 #!/bin/bash
 
 DB=/tmp/test.db
-SKDB_CMD=./target/release/skdb
+
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB_CMD=./target/$SKARGO_PROFILE/skdb
 SKDB="$SKDB_CMD --always-allow-joins --data $DB"
 
 pass() { printf "%-44s OK\n" "$1:"; }

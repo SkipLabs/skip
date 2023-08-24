@@ -6,7 +6,11 @@ DBFILE=/tmp/test.db
 
 rm -f $DBFILE
 
-SKDB_CMD=./target/release/skdb
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+
+SKDB_CMD=./target/$SKARGO_PROFILE/skdb
 
 $SKDB_CMD --init $DBFILE
 

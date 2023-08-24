@@ -26,8 +26,13 @@ file10=$(mktemp /tmp/file.XXXXXX)
 
 rm -Rf $db $tailfile2 $tailfile3 $tailfile4 $tailfile5 $tailfile6 $tailfile7 $tailfile8 $tailfile9 $tailfile10 $file1 $file2 $file3 $file4 $file5 $file6 $file7 $file8 $file9 $file10
 
-./target/release/skdb --init $db
-skdb="./target/release/skdb --data $db"
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB_BIN=./target/$SKARGO_PROFILE/skdb
+
+$SKDB_BIN --init $db
+skdb="$SKDB_BIN --data $db"
 
 cat privacy/init.sql | $skdb
 echo "create table t1 (a INTEGER PRIMARY KEY, b INTEGER);" | $skdb

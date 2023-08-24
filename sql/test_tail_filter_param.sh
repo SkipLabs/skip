@@ -9,8 +9,14 @@ tailfile=$(mktemp)
 out1=$(mktemp)
 out2=$(mktemp)
 
-./target/release/skdb --init $db
-skdb="./target/release/skdb --data $db"
+
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB_BIN=./target/$SKARGO_PROFILE/skdb
+
+$SKDB_BIN --init $db
+skdb="$SKDB_BIN --data $db"
 
 echo "create table t1 (a INTEGER);" | $skdb
 
