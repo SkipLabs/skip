@@ -24,9 +24,10 @@ fun main(): void {
         .about("Use verbose output")
         .global(),
     );
+  suppliers = Array[build, test, check, clean, format, init, update, help];
   commands = mutable Map[];
-  #forEachFunction (@cmd, #function, #functionName) {
-    (subcommand, cmdFn) = #function();
+  for (supplier in suppliers) {
+    (subcommand, cmdFn) = supplier();
     !cmd = cmd.subcommand(subcommand);
     commands.set(subcommand.name, cmdFn);
   };
@@ -65,7 +66,6 @@ fun envCmd(args: Cli.ParseResults, fn: (Cli.ParseResults, Env) ~> void): void {
 
 /********* Build **********/
 
-@cmd
 fun build(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("build")
@@ -112,7 +112,6 @@ fun execBuildContext(bc: BuildContext, env: Env): void {
 
 /********* Test **********/
 
-@cmd
 fun test(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("test")
@@ -180,7 +179,6 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
 
 /********* Check **********/
 
-@cmd
 fun check(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("check")
@@ -225,7 +223,6 @@ fun execCheck(args: Cli.ParseResults, env: Env): void {
 
 /********* Clean **********/
 
-@cmd
 fun clean(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("clean")
@@ -263,7 +260,6 @@ fun execClean(args: Cli.ParseResults, env: Env): void {
 
 /********* Format **********/
 
-@cmd
 fun format(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("fmt").about("Format all files using skfmt"),
@@ -287,7 +283,6 @@ fun execFmt(_args: Cli.ParseResults, env: Env): void {
 
 /********* Init **********/
 
-@cmd
 fun init(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("init")
@@ -340,7 +335,6 @@ fun execInit(args: Cli.ParseResults): void {
 
 /********* Udapte **********/
 
-@cmd
 fun update(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("update").about("Update dependencies listed in Skargo.lock"),
@@ -356,7 +350,6 @@ fun execUpdate(_args: Cli.ParseResults, _env: Env): void {
 /********* Help **********/
 
 @pckcmd
-@cmd
 fun help(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("help")

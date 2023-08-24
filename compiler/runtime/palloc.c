@@ -376,7 +376,7 @@ void sk_commit(char* new_root, uint32_t sync) {
 void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   if (access(fileName, F_OK) == 0) {
     fprintf(stderr, "ERROR: File %s already exists!\n", fileName);
-    exit(21);
+    exit(ERROR_MAPPING_EXISTS);
   }
   int fd = open(fileName, O_RDWR | O_CREAT, 0600);
   lseek(fd, icapacity, SEEK_SET);
@@ -388,7 +388,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
 
   if (begin == (void*)-1) {
     perror("ERROR (MMAP FAILED)");
-    exit(23);
+    exit(ERROR_MAPPING_FAILED);
   }
 
   close(fd);
@@ -439,7 +439,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
 
   if (head >= end) {
     fprintf(stderr, "Could not initialize memory\n");
-    exit(31);
+    exit(ERROR_MAPPING_MEMORY);
   }
 
   (*ginfo)->break_ptr = static_limit;
@@ -481,13 +481,13 @@ void sk_load_mapping(char* fileName) {
 
   if (magic_size != sizeof(uint64_t) || magic != SKIP_get_version()) {
     fprintf(stderr, "Error: wrong file format\n");
-    exit(23);
+    exit(ERROR_MAPPING_VERSION);
   }
 
   int bytes = read(fd, &addr, sizeof(void*));
   if (bytes != sizeof(void*)) {
     fprintf(stderr, "Error: could not read heap address\n");
-    exit(24);
+    exit(ERROR_MAPPING_MEMORY);
   }
 
   lseek(fd, 0L, SEEK_SET);
@@ -500,7 +500,7 @@ void sk_load_mapping(char* fileName) {
 
   if (begin == (void*)-1) {
     perror("ERROR (MMAP FAILED)");
-    exit(23);
+    exit(ERROR_MAPPING_FAILED);
   }
 
   char* head = begin;

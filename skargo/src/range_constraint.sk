@@ -100,81 +100,81 @@ class LexVersion(
 mutable class VersionLexer private {position: mutable Lexer.LexingPosition} {
   //
   mutable fun lex(): RangeConstraint {
-    this.skipWhitespace();
-    this.peek() match {
+    this.skipChars(Chars.isWhitespace);
+    this.position.peek() match {
     | '~' ->
-      this.advance();
+      this.position.advance();
       this.lexVersion().toTildeRangeConstraint()
     | '*' -> RangeConstraint(Version(0, 0, 0), None())
     | '=' ->
-      this.advance();
-      this.skipWhitespace();
+      this.position.advance();
+      this.skipChars(Chars.isWhitespace);
       this.lexVersion().toEquals()
     | '>' ->
-      this.advance();
+      this.position.advance();
       lstrict = true;
-      this.peek() match {
+      this.position.peek() match {
       | '=' ->
-        this.advance();
+        this.position.advance();
         !lstrict = false
       | _ -> void
       };
-      this.skipWhitespace();
+      this.skipChars(Chars.isWhitespace);
       low = this.lexVersion().toVersion(lstrict);
-      this.skipWhitespace();
-      this.peek() match {
+      this.skipChars(Chars.isWhitespace);
+      this.position.peek() match {
       | ',' ->
         hstrict = true;
-        this.advance();
-        this.skipWhitespace();
-        this.peek() match {
+        this.position.advance();
+        this.skipChars(Chars.isWhitespace);
+        this.position.peek() match {
         | '<' ->
-          this.advance();
-          this.peek() match {
+          this.position.advance();
+          this.position.peek() match {
           | '=' ->
-            this.advance();
+            this.position.advance();
             !hstrict = false
           | _ -> void
           }
         | _ -> void
         };
-        this.skipWhitespace();
+        this.skipChars(Chars.isWhitespace);
         high = this.lexVersion().toVersion(!hstrict);
         RangeConstraint(low, Some(high))
       | c if (c == Chars.null) -> RangeConstraint(low, None())
       | _ -> this.version_violation()
       }
     | '<' ->
-      this.advance();
-      this.skipWhitespace();
+      this.position.advance();
+      this.skipChars(Chars.isWhitespace);
       hstrict = true;
-      this.peek() match {
+      this.position.peek() match {
       | '=' ->
-        this.advance();
-        this.skipWhitespace();
+        this.position.advance();
+        this.skipChars(Chars.isWhitespace);
         !hstrict = false
       | _ -> void
       };
       high = this.lexVersion().toVersion(!hstrict);
       RangeConstraint(Version(0, 0, 0), Some(high))
     | '^' ->
-      this.advance();
+      this.position.advance();
       this.lexVersion().toCaretRangeConstraint()
     | c if (Chars.isDigit(c)) ->
       major = this.lexInt();
-      this.peek() match {
+      this.position.peek() match {
       | '.' ->
-        this.advance();
-        this.peek() match {
+        this.position.advance();
+        this.position.peek() match {
         | '*' ->
           // 1.*   := >=1.0.0, <2.0.0
           RangeConstraint(Version(major, 0, 0), Some(Version(major + 1, 0, 0)))
         | _ ->
           minor = this.lexInt();
-          this.peek() match {
+          this.position.peek() match {
           | '.' ->
-            this.advance();
-            this.peek() match {
+            this.position.advance();
+            this.position.peek() match {
             | '*' ->
               // 1.2.* := >=1.2.0, <1.3.0
               RangeConstraint(
@@ -204,13 +204,13 @@ mutable class VersionLexer private {position: mutable Lexer.LexingPosition} {
 
   mutable fun lexVersion(): LexVersion {
     major = this.lexInt();
-    this.peek() match {
+    this.position.peek() match {
     | '.' ->
-      this.advance();
+      this.position.advance();
       minor = this.lexInt();
-      this.peek() match {
+      this.position.peek() match {
       | '.' ->
-        this.advance();
+        this.position.advance();
         patch = this.lexInt();
         LexVersion(major, Some(minor), Some(patch))
       | c if (c == Chars.null || Chars.isWhitespace(c) || c == ',') ->
@@ -224,14 +224,14 @@ mutable class VersionLexer private {position: mutable Lexer.LexingPosition} {
   }
 
   mutable fun lexInt(): Int {
-    c = this.peek();
+    c = this.position.peek();
     invariant(Chars.isDigit(c), "Expected digit");
     current = 0;
     while (Chars.isDigit(c)) {
       v = c.code() - 48;
       !current = current * 10 + v;
-      this.advance();
-      !c = this.peek();
+      this.position.advance();
+      !c = this.position.peek();
     };
     current
   }
@@ -247,65 +247,12 @@ mutable class VersionLexer private {position: mutable Lexer.LexingPosition} {
     mutable static{position}
   }
 
-  mutable fun skipWhitespace(): void {
-    this.skipChars(Chars.isWhitespace);
-  }
-
-  mutable fun skipDigitSequence(): void {
-    this.skipChars(Chars.isDigit);
-  }
-
-  // Used to mark the start of the next token.
-  mutable fun mark(): mutable Lexer.LexingPosition {
-    this.position.clone();
-  }
-
   // Skip characters while predicate is true.
   protected mutable fun skipChars(predicate: Char ~> Bool): void {
     loop {
-      if (!predicate(this.peek())) break void;
-      this.advance();
+      if (!predicate(this.position.peek())) break void;
+      this.position.advance();
     }
-  }
-
-  // Returns the next character.
-  protected readonly fun peek(): Char {
-    this.position.peek();
-  }
-
-  // Returns the char at offset beyond the current character.
-  protected readonly fun peekOffset(offset: Int): Char {
-    this.position.peekOffset(offset);
-  }
-
-  // Is the next char ch?
-  protected readonly fun peekChar(ch: Char): Bool {
-    this.position.peekChar(ch);
-  }
-
-  // Is the char at offset ch?
-  protected readonly fun peekCharOffset(ch: Char, offset: Int): Bool {
-    this.position.peekCharOffset(ch, offset);
-  }
-
-  // Consume a character.
-  protected mutable fun advance(): void {
-    this.position.advance();
-  }
-
-  // Consume a char and return the consumed char.
-  protected mutable fun next(): Char {
-    this.position.next();
-  }
-
-  protected readonly fun atEnd(): Bool {
-    this.position.atEnd()
-  }
-
-  protected readonly fun getTokenText(
-    start: readonly Lexer.LexingPosition,
-  ): String {
-    start.getText(this.position);
   }
 
   protected readonly fun version_violation<T>(): T {
