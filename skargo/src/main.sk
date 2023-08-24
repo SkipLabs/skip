@@ -282,15 +282,11 @@ fun format(): (Cli.Command, Cli.ParseResults ~> void) {
 }
 
 fun execFmt(_args: Cli.ParseResults, env: Env): void {
-  files = env.manifest.srcs
-    .concat(env.manifest.tests)
-    .concat(
-      FileSystem.readFilesRecursive(
-        env.rootDir,
-        f -> f.endsWith(".sk"),
-        _f -> false,
-      ).toArray(),
-    );
+  files = env.manifest.srcs.concat(env.manifest.tests);
+  buildSk = Path.join(env.rootDir, "build.sk");
+  if (FileSystem.exists(buildSk)) {
+    !files = files.concat(Array[buildSk]);
+  };
   run(Array["skfmt", "-i"].concat(files), env.verbose);
   // format ./*.sk
 }
