@@ -716,7 +716,7 @@ export class SKDB {
     );
   }
 
-  addParams(
+  private addParams(
     args: Array<string>,
     params: Map<string, string|number>,
     stdin: string
@@ -727,15 +727,13 @@ export class SKDB {
   }
 
   sqlRaw(stdin: string, params: Map<string, string|number> = new Map())
-    : string
-  {
+    : string {
     let [args1, stdin1] = this.addParams([], params, stdin);
     return this.runLocal(args1, stdin1);
   }
 
   sql(stdin: string, params: Map<string, string|number> = new Map())
-    : Array<any> | string
-  {
+    : Array<any> | string {
     let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
     this.stdout_objects = new Array();
     let stdout = this.runLocal(args1, stdin1);
@@ -1105,6 +1103,10 @@ class ResilientMuxedSocket {
   ): Promise<ResilientMuxedSocket> {
     const socket = await MuxedSocket.connect(uri, creds);
     return new ResilientMuxedSocket(policy, uri, creds, socket);
+  }
+
+  isSocketConsideredHealthy(): boolean {
+    return this.socket !== undefined;
   }
 
   private constructor(
@@ -2010,7 +2012,7 @@ class SKDBServer {
   private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
-  private mirroredTables: Set<string> = new Set()
+  private mirroredTables: Map<string, string> = new Map()
 
   private constructor(
     client: SKDB,
@@ -2112,7 +2114,7 @@ class SKDBServer {
     });
   }
 
-  private async establishLocalTail(tableName: string): Promise<void> {
+  private async establishLocalTail(tableName: string): Promise<string> {
     const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
@@ -2123,7 +2125,10 @@ class SKDBServer {
         this.deliverDataTransferProtoMsg(msg, payload => {
           // we only expect acks back in the form of checkpoints.
           // let's store these as a watermark against the table.
-          client.runLocal(["write-csv", metadataTable(tableName)], payload + '\n');
+          client.runLocal([
+            "write-csv", metadataTable(tableName),
+            "--source", this.replicationUid
+          ], payload + '\n');
         });
       }
     }
@@ -2179,6 +2184,34 @@ class SKDBServer {
       }));
       stream.expectingData();
     };
+
+    return session;
+  }
+
+  isConnectionHealthy(): boolean {
+    return this.connection.isSocketConsideredHealthy();
+  }
+
+  tablesAwaitingSync(): Set<string> {
+    const acc = new Set<string>();
+    for (const [table, session] of this.mirroredTables.entries()) {
+      // TODO: if we parse the diff output we can provide an object
+      // model representing the rows not yet ack'd.
+      const diff = this.client.runLocal(
+        [
+          "diff", "--format=json",
+          "--since",
+          this.client.watermark(
+            this.replicationUid,
+            metadataTable(table)
+          ).toString(),
+          session,
+        ], "");
+      if (diff.trim() !== '') {
+        acc.add(table);
+      }
+    }
+    return acc;
   }
 
   public onReboot: (server: SKDBServer, skdb: SKDB) => void = () => {
@@ -2215,7 +2248,6 @@ class SKDBServer {
     if (this.mirroredTables.has(tableName)) {
       return;
     }
-    this.mirroredTables.add(tableName);
 
     // TODO: just assumes that if it exists the schema is the same
     if (!this.client.tableExists(tableName)) {
@@ -2231,9 +2263,8 @@ class SKDBServer {
 
     this.client.assertCanBeMirrored(tableName);
 
-    // TODO: need to join the promises but let them run concurrently
-    // I await here for now so we learn of error
-    await this.establishLocalTail(tableName);
+    const session = await this.establishLocalTail(tableName);
+    this.mirroredTables.set(tableName, session);
     return this.establishServerTail(tableName, filterExpr || "");
   }
 
