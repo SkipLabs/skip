@@ -42,6 +42,7 @@ private class Env{
   }
 
   fun getDependencies(): Map<String, Manifest> {
+    // TODO When we start having remote repositories, this will also download the dependencies.
     getDependencies(this.manifest, this.config.repositories) match {
     | Success(v) -> v
     | Failure(e) -> throw e
@@ -287,23 +288,9 @@ fun checkBuildFile(
   test: Bool,
 ): SortedSet<String> {
   // TODO manage version
-  (optSkBuidPath, optMkBuidPath) = bc.target match {
-  | Some(target) ->
-    (
-      target.checkFile(dependency.path, "build", ".sk"),
-      target.checkFile(dependency.path, "build", ".mk"),
-    )
-  | _ ->
-    skbuildPath = Path.join(dependency.path, "build.sk");
-    mkbuildPath = Path.join(dependency.path, "build.mk");
-    (
-      if (FileSystem.exists(skbuildPath)) Some(skbuildPath) else None(),
-      if (FileSystem.exists(mkbuildPath)) Some(mkbuildPath) else None(),
-    )
-  };
+  skbuildPath = Path.join(dependency.path, "build.sk");
   targetDir = Path.join(bc.targetDir, `deps/${dependency.name}`);
-  optCmd = if (optSkBuidPath.isSome()) {
-    skbuildPath = optSkBuidPath.fromSome();
+  optCmd = if (FileSystem.exists(skbuildPath)) {
     _ = system("mkdir -p " + targetDir);
     bin = ManifestBinary(
       dependency.name + "Build",
@@ -348,22 +335,8 @@ fun checkBuildFile(
     Environ.set_var("PROFILE", bc.profile);
     Environ.set_var("VERBOSE", bc.env.verbose.toString());
     Environ.set_var("TEST", test.toString());
+    bc.target.each(t -> Environ.set_var("TARGET", t.toString()));
     Some(Array[binPath])
-  } else if (optMkBuidPath.isSome()) {
-    mkbuildPath = optMkBuidPath.fromSome();
-    Some(
-      Array[
-        "make",
-        "-f",
-        mkbuildPath,
-        `OUT_DIR=${targetDir}`,
-        `PCK_DIR=${dependency.path}`,
-        `NAME=${dependency.name}`,
-        `PROFILE=${bc.profile}`,
-        `VERBOSE=${bc.env.verbose}`,
-        `TEST=${test}`,
-      ],
-    )
   } else {
     None()
   };
