@@ -24,7 +24,17 @@ fun main(): void {
         .about("Use verbose output")
         .global(),
     );
-  suppliers = Array[check, build, test, clean, format, init, update, help];
+  suppliers = Array[
+    check,
+    build,
+    test,
+    runner,
+    clean,
+    format,
+    init,
+    update,
+    help,
+  ];
   commands = mutable Map[];
   for (supplier in suppliers) {
     (subcommand, cmdFn) = supplier();
@@ -392,4 +402,60 @@ fun execHelp(args: Cli.ParseResults): void {
     };
     print_string(Cli.usage(args.cmd, true))
   };
+}
+
+/********* Run **********/
+
+fun runner(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("run")
+      .short("r")
+      .about("Run the built host binary of the local package")
+      .arg(
+        Cli.StringArg("profile").about(
+          "Run the binary with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Run the binary in release mode"),
+      )
+      .arg(Cli.StringArg("bin").about("Run the specified binary"))
+      .arg(Cli.StringArg("path").about("Path of the package to run"))
+      .extra(),
+    execRun,
+  )
+}
+
+fun execRun(args: Cli.ParseResults): void {
+  env = args.maybeGetString("path") match {
+  | Some(path) ->
+    manifestFile = Path.join(Path.resolve(path), Skargo.kManifestFile);
+    invariant(
+      FileSystem.exists(manifestFile),
+      `Invalid skargo directory ${path}`,
+    );
+    Env::fromFile(manifestFile, args.getBool("verbose"))
+  | _ -> Env::create(args.getBool("verbose"))
+  };
+  bins = collectBinaries(args, env);
+  invariant(!bins.isEmpty(), "No binary to run");
+  invariant(bins.size() == 1, "Multiple binary please select one");
+  hostBinary = BuildContext::hostBinary(
+    env,
+    getProfile(args),
+    bins.first().name,
+  );
+  invariant(FileSystem.exists(hostBinary), "No binary to run, build first");
+  cmdArgs = Array[hostBinary].concat(args.extra);
+  if (env.verbose) {
+    // TODO: colors
+    print_error(`>> ${cmdArgs.join(" ")}`)
+  };
+  p = system(cmdArgs.join(" "));
+  if (p != 0) {
+    throw SystemCallException(p);
+  }
 }

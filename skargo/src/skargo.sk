@@ -48,6 +48,12 @@ private class Env{
     | Failure(e) -> throw e
     };
   }
+
+  static fun fromFile(path: String, verbose: Bool): Env {
+    rootDir = Path.dirname(path);
+    config = findUserConfig(Some(rootDir));
+    Env{rootDir, manifest => Manifest::read(path), verbose, config}
+  }
 }
 
 private fun findRootDir(): String {
@@ -77,9 +83,9 @@ private fun profileOptions(profile: String): Array<String> {
   }
 }
 
-private fun findUserConfig(): UserConfig {
+private fun findUserConfig(optPath: ?String = None()): UserConfig {
   configFiles = mutable Vector<String>[];
-  path = getcwd();
+  path = optPath.default(getcwd());
   loop {
     file = Path.join(path, kUserConfiguration);
     if (FileSystem.exists(file)) {
