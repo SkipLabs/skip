@@ -423,6 +423,9 @@ export class SKDB {
       SKIP_print_debug: function (str) {
         console.error(wasmStringToJS(data.exports, str));
       },
+      SKIP_print_debug_raw: function (str) {
+        console.error(wasmStringToJS(data.exports, str));
+      },
       SKIP_read_line_fill: function () {
         data.lineBuffer = [];
         const endOfLine = 10;
