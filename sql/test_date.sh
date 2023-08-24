@@ -1,7 +1,12 @@
 #!/bin/bash
 
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB=./target/$SKARGO_PROFILE/skdb
+
 run_test () {
-  cat $1 | ./target/release/skdb --always-allow-joins | sort > /tmp/kk1
+  cat $1 | $(SKDB) --always-allow-joins | sort > /tmp/kk1
   cat $1 | sqlite3 | sort > /tmp/kk2
   diff /tmp/kk1 /tmp/kk2 > /dev/null
   if [ $? -eq 0 ]; then

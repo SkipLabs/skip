@@ -1,6 +1,9 @@
 #!/bin/bash
 
-SKDB_BIN=./target/release/skdb
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB_BIN=./target/$SKARGO_PROFILE/skdb
 
 SERVER_DB=/tmp/server.db
 SERVER_TAIL=/tmp/server_tail

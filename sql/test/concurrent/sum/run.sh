@@ -5,7 +5,10 @@ fail() { printf "%-20s FAILED\n" "$1:"; }
 
 rm -f /tmp/test.db
 
-SKDB=../../../target/release/skdb
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB=../../../target/$SKARGO_PROFILE/skdb
 
 $SKDB --init /tmp/test.db
 

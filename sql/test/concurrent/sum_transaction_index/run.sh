@@ -3,7 +3,11 @@
 pass() { printf "%-20s OK\n" "$1:"; }
 fail() { printf "%-20s FAILED\n" "$1:"; }
 
-SKDB=../../../target/release/skdb
+
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB=../../../target/$SKARGO_PROFILE/skdb
 
 rm -f /tmp/test.db
 

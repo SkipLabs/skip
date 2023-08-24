@@ -5,7 +5,7 @@ all: npm build/skdb build/init.sql
 
 PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
-SKARGO_FLAGS=--$(SKARGO_PROFILE)
+SKARGO_FLAGS=--profile $(SKARGO_PROFILE)
 
 ################################################################################
 # skdb wasm + js client
@@ -88,7 +88,7 @@ test: test-native test-wasm
 
 .PHONY: test-native
 test-native: build/skdb
-	cd sql/ && ./test_sql.sh \
+	cd sql/ && SKARGO_PROFILE=$(SKARGO_PROFILE) ./test_sql.sh \
 	|tee /tmp/native-test.out ; \
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 

@@ -1,6 +1,9 @@
 #!/bin/bash
 
-SKDB=./sql/target/release/skdb
+if [ -z "$SKARGO_PROFILE" ]; then
+    SKARGO_PROFILE=dev
+fi
+SKDB=./sql/target/$SKARGO_PROFILE/skdb
 
 rm -f /tmp/data
 rm -f /tmp/data2
