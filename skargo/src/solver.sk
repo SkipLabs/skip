@@ -18,7 +18,10 @@ private fun fetchLatestManifest(
         manifest = Manifest::read(mFile);
         if (contains(r, manifest.version)) {
           !optLast = optLast match {
-          | Some(last) if (last.version < manifest.version) -> Some(manifest)
+          | Some(
+            last,
+          ) if (contains(r, last.version) && last.version < manifest.version) ->
+            Some(manifest)
           | None() -> Some(manifest)
           | _ -> optLast
           }
@@ -30,7 +33,7 @@ private fun fetchLatestManifest(
 }
 
 private fun contains(range: RangeConstraint, version: Version): Bool {
-  range.low < version && range.high.map(h -> version < h).default(true)
+  range.low <= version && range.high.map(h -> version < h).default(true)
 }
 
 // TODO: Backtrack on conflict, and try previous versions.
@@ -42,11 +45,10 @@ private fun solveDependencies(
   for ((name, constraint) in manifest.dependencies.items()) {
     if (solved.containsKey(name)) {
       fetchLatestManifest(name, constraint, reps) match {
-      | Some(depManifest) if (depManifest.version != solved[name].version) ->
+      | Some(depManifest) if (depManifest.version == solved[name].version) ->
+        void
+      | _ ->
         return Some(UnsatisfiableDependency(manifest.path, name, constraint))
-      | None() ->
-        return Some(UnsatisfiableDependency(manifest.path, name, constraint))
-      | _ -> void
       }
     } else {
       fetchLatestManifest(name, constraint, reps) match {
@@ -77,7 +79,7 @@ fun getDependencies(
   result = mutable Map[manifest.name => manifest];
   solveDependencies(manifest, result, reps)
     .map(e -> Failure(e))
-    .default(Success(unsafe_chill_trust_me(result)));
+    .default(Success(result.chill()));
 }
 
 private fun findRepositories(): Array<String> {

@@ -106,6 +106,20 @@ private fun run(args: Array<String>, verbose: Bool): void {
   }
 }
 
+const errorMappingAbort: Int = 6;
+const errorMappingFailed: Int = 40;
+const errorMappingMemory: Int = 41;
+const errorMappingVersion: Int = 42;
+const errorChangingCont: Int = 22;
+
+fun isMappingError(code: Int): Bool {
+  code == errorMappingAbort ||
+    code == errorMappingFailed ||
+    code == errorMappingMemory ||
+    code == errorMappingVersion ||
+    code == errorChangingCont
+}
+
 private fun invokeSkc(
   bc: BuildContext,
   args: Array<String>,
@@ -134,11 +148,7 @@ private fun invokeSkc(
   | SystemCallException(
     code,
     _,
-  ) if (
-    bc.env.config.autoRemoveState &&
-    retry &&
-    (code == 6 || code == 22 || code == 23)
-  ) ->
+  ) if (bc.env.config.autoRemoveState && retry && isMappingError(code)) ->
     // TODO check the 6 origin
     run(Array["rm", bc.stateDb], bc.env.verbose);
     invokeSkc(bc, args, false)
@@ -179,7 +189,7 @@ private fun genVersionFile(bc: BuildContext): void {
   };
   kTarget = bc.target.map(t -> t.toString()).default("");
   kWasm32 = bc.isWasm32();
-
+  // Workaround for conditional compilation, but we should not rely on it long term
   contents = `module SkargoVersion;
 const kVersion: String = "${
     bc.env.manifest.version
@@ -195,7 +205,7 @@ const kWasm32: Bool = ${kWasm32};
   FileSystem.writeTextFile(Path.join(bc.targetDir, kVersionFile), contents)
 }
 
-private fun moduleName(name: String): String {
+private fun pascalCase(name: String): String {
   toupper = true;
   String::fromChars(
     name
@@ -232,7 +242,7 @@ private fun toml(
         "",
         "#[[bin]]",
         `#name = "${name.replace("_", "")}"`,
-        `#main = "${moduleName(name)}.main"`,
+        `#main = "${pascalCase(name)}.main"`,
         "",
       ],
     )
@@ -287,7 +297,7 @@ fun checkBuildFile(
     _ = system("mkdir -p " + targetDir);
     bin = ManifestBinary(
       dependency.name + "Build",
-      `${moduleName(dependency.name)}Build.main`,
+      `${pascalCase(dependency.name)}Build.main`,
     );
     bManifest = Manifest{
       name => dependency.name + "_build",
@@ -358,7 +368,7 @@ fun checkBuildFile(
     buffer = "";
     onLine = line -> {
       if (line.startsWith("skargo:")) {
-        artifact = line.substring(line.getIter().drop(7));
+        artifact = line.splitFirst(":").i1;
         if (artifact.startsWith("library=")) {
           libraries.push(artifact.substring(artifact.getIter().drop(8)));
         } else if (artifact.startsWith("preamble=")) {
