@@ -47,10 +47,7 @@ private class BuildContext{
 private fun getTargetDir(rootDir: String, targetOpt: ?String): String {
   // TODO: Build artifacts in subdirectory corresponding to build profile (dev/release).
   dir = Path.join(rootDir, "target");
-  targetOpt match {
-  | Some(t) -> Path.join(dir, t)
-  | None() -> dir
-  }
+  Path.join(dir, targetOpt.default("host"))
 }
 
 private fun getFiles(

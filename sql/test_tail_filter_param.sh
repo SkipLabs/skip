@@ -13,7 +13,7 @@ out2=$(mktemp)
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB_BIN=./target/$SKARGO_PROFILE/skdb
+SKDB_BIN=./target/host/$SKARGO_PROFILE/skdb
 
 $SKDB_BIN --init $db
 skdb="$SKDB_BIN --data $db"

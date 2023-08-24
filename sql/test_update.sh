@@ -29,7 +29,7 @@ rm -Rf $db $tailfile2 $tailfile3 $tailfile4 $tailfile5 $tailfile6 $tailfile7 $ta
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB_BIN=./target/$SKARGO_PROFILE/skdb
+SKDB_BIN=./target/host/$SKARGO_PROFILE/skdb
 
 $SKDB_BIN --init $db
 skdb="$SKDB_BIN --data $db"

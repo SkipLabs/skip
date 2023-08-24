@@ -12,7 +12,7 @@ rm -Rf $db $tailfile $file1 $file2
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB_BIN=./target/$SKARGO_PROFILE/skdb
+SKDB_BIN=./target/host/$SKARGO_PROFILE/skdb
 
 $SKDB_BIN --init $db
 skdb="$SKDB_BIN --data $db"

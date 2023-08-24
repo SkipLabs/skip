@@ -11,7 +11,7 @@ TPCHDB='./tnt-tpch/TPC-H.db'
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB=../../target/$SKARGO_PROFILE/skdb
+SKDB=../../target/host/$SKARGO_PROFILE/skdb
 
 rm -f /tmp/test.db
 
