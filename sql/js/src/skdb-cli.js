@@ -411,8 +411,8 @@ if (query.trim() !== "") {
     console.log(answer);
   } catch (ex) {
     console.error("Could not eval query.");
-    process.exit(1);
     console.error(ex.trim());
+    process.exit(1);
   }
 }
 

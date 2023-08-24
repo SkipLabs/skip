@@ -2019,32 +2019,6 @@ class SKDBServer {
     this.creds = creds;
   }
 
-  static async connect(
-    client: SKDB,
-    endpoint: string,
-    db: string,
-    creds: Creds,
-  ): Promise<SKDBServer> {
-    const uri = SKDBServer.getDbSocketUri(endpoint, db);
-
-    const policy: ResiliencyPolicy = {
-      notifyFailedStream() {},
-      async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
-        // perform an active check
-        return !socket.isSocketResponsive();
-      }
-    };
-    const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
-
-    const server = new SKDBServer(client, conn, creds);
-    server.replicationUid = client.runLocal(["replication-id", creds.deviceUuid], "").trim();
-    return server
-  }
-
-  close(): void {
-    this.connection.closeSocket();
-  }
-
   private static getDbSocketUri(endpoint: string, db: string) {
     return `${endpoint}/dbs/${db}/connection`;
   }
@@ -2057,6 +2031,17 @@ class SKDBServer {
       return response;
     }
     throw new Error(`Unexpected response: ${response}`);
+  }
+
+  private deliverDataTransferProtoMsg(msg: ProtoMsg|null, deliver: (string) => void) {
+    const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
+    const rebootSignalled = txtPayload.split("\n").find(line => line.trim() == ":reboot");
+    if (rebootSignalled) {
+      this.close();
+      this.onReboot(this, this.client);
+      return;
+    }
+    deliver(txtPayload)
   }
 
   private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse|null> {
@@ -2087,16 +2072,15 @@ class SKDBServer {
 
     let resolved = false;
 
-    // TODO: discover failure and reject. this could happen if e.g.
-    // the table is dropped, acls, bad filter, etc.
     return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
           const msg = decoder.pop();
-          const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
-          client.runLocal([
-            "write-csv", tableName, "--source", this.replicationUid
-          ], txtPayload + '\n');
+          this.deliverDataTransferProtoMsg(msg, payload => {
+            client.runLocal([
+              "write-csv", tableName, "--source", this.replicationUid
+            ], payload + '\n');
+          });
           if (!resolved) {
             resolved = true;
             resolve();
@@ -2133,10 +2117,11 @@ class SKDBServer {
     stream.onData = (data) => {
       if (decoder.push(data)) {
         const msg = decoder.pop();
-        const txtPayload = decodeUTF8(this.strictCastData(msg).payload);
-        // we only expect acks back in the form of checkpoints.
-        // let's store these as a watermark against the table.
-        client.runLocal(["write-csv", metadataTable(tableName)], txtPayload + '\n');
+        this.deliverDataTransferProtoMsg(msg, payload => {
+          // we only expect acks back in the form of checkpoints.
+          // let's store these as a watermark against the table.
+          client.runLocal(["write-csv", metadataTable(tableName)], payload + '\n');
+        });
       }
     }
 
@@ -2191,6 +2176,36 @@ class SKDBServer {
       }));
       stream.expectingData();
     };
+  }
+
+  public onReboot: (server: SKDBServer, skdb: SKDB) => void = () => {
+    throw new Error("Server signalled client should cold start to avoid diverging.");
+  };
+
+  static async connect(
+    client: SKDB,
+    endpoint: string,
+    db: string,
+    creds: Creds,
+  ): Promise<SKDBServer> {
+    const uri = SKDBServer.getDbSocketUri(endpoint, db);
+
+    const policy: ResiliencyPolicy = {
+      notifyFailedStream() {},
+      async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
+        // perform an active check
+        return !socket.isSocketResponsive();
+      }
+    };
+    const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
+
+    const server = new SKDBServer(client, conn, creds);
+    server.replicationUid = client.runLocal(["replication-id", creds.deviceUuid], "").trim();
+    return server
+  }
+
+  close(): void {
+    this.connection.closeSocket();
   }
 
   async mirrorTable(tableName: string, filterExpr?: string): Promise<void> {

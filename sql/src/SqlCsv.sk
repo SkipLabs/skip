@@ -532,6 +532,13 @@ fun replayDiff(
   snapshot: ?Int = None();
   reset = false;
 
+  SKDB.getFinalState(context, Some(identity)) match {
+  | Some(SKDB.RSError()) ->
+    print_raw(":reboot\n");
+    return SKStore.CStop(None())
+  | _ -> void
+  };
+
   try {
     loop {
       line = getLine();
@@ -548,6 +555,12 @@ fun replayDiff(
           );
           skipExit(23)
         | Some(':') ->
+          if (line.trim() == ":reboot") {
+            // reboot should be handled by the orchestration layer.
+            // ensure we don't process further
+            print_error("Reboot received");
+            skipExit(1)
+          };
           ticks = line
             .sub(iter, line.length() - chars.size() - 1)
             .split(" ")

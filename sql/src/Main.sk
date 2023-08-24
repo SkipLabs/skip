@@ -669,6 +669,14 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
     | Some(x) -> x
     };
     invariant(dirName == sub.dirName);
+
+    SKDB.getFinalState(context, sub.destinationSource) match {
+    | Some(SKDB.RSError()) ->
+      print_raw(":reboot\n");
+      break void
+    | _ -> void
+    };
+
     edir = context.unsafeGetEagerDir(dirName);
     format = options.format match {
     | SKDB.OFK_CSV() -> SKStore.OCSV()
@@ -706,10 +714,12 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
         {
           newContext = SKStore.gContextGet();
           followMode &&
-            {
-              (newIsReset, newChanges) = newContext
-                .unsafeGetEagerDir(dirName)
-                .getChangesAfter(SKStore.Tick(tick));
+            newContext.unsafeMaybeGetEagerDir(dirName) match {
+            | None() -> false
+            | Some(dir) ->
+              (newIsReset, newChanges) = dir.getChangesAfter(
+                SKStore.Tick(tick),
+              );
               !newIsReset && newChanges.isEmpty()
             }
         }
