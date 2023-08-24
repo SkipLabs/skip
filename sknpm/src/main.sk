@@ -574,7 +574,7 @@ fun copyAndConvertImport(
   extensionsFiles = mutable Map<String, mutable Vector<String>>[];
   tmplFiles = mutable Vector[];
   jsFiles.each(f -> {
-    saved = SKFS.newObstack();
+    saved = SKStore.newObstack();
     optLoaderFile: ?String = None();
     optModuleFile: ?String = None();
     optRuntimeFile: ?String = None();
@@ -657,12 +657,12 @@ fun copyAndConvertImport(
     !optExtensionFile = optCategory.map(cat -> (cat, Path.basename(tf)));
     copied = if (!withTmpl) {
       FileSystem.writeTextFile(tf, lines.join("\n"));
-      SKFS.destroyObstackWithValue(
+      SKStore.destroyObstackWithValue(
         saved,
         List[(optModuleFile, optLoaderFile, optRuntimeFile, optExtensionFile)],
       ).getHead();
     } else {
-      copied = SKFS.destroyObstackWithValue(
+      copied = SKStore.destroyObstackWithValue(
         saved,
         List[
           (
@@ -689,7 +689,7 @@ fun copyAndConvertImport(
     print_string(">> Manage found templates.");
   };
   invariant(!runtime.isEmpty(), "Runtime must be defined.");
-  saved = SKFS.newObstack();
+  saved = SKStore.newObstack();
   strModules = Vector[`"./${runtime}"`].concat(loaderFiles.map(m -> `"./${m}"`))
     .concat(moduleFiles.map(m -> `"./${m}"`))
     .join(", ");
@@ -700,7 +700,7 @@ fun copyAndConvertImport(
       !strExtensions = strExtensions + `extensions.set("${k}", ${v});\n`
     );
   tmplFiles.each(fi -> {
-    inner = SKFS.newObstack();
+    inner = SKStore.newObstack();
     (sf, tf, lines) = fi;
     if (verbose) {
       print_string(`>> Manage ${sf} template.`);
@@ -732,9 +732,9 @@ fun copyAndConvertImport(
       }
     });
     FileSystem.writeTextFile(tf, lines.join("\n"));
-    SKFS.destroyObstack(inner);
+    SKStore.destroyObstack(inner);
   });
-  SKFS.destroyObstack(saved);
+  SKStore.destroyObstack(saved);
 }
 
 fun i(v: Bool): Int {
