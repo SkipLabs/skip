@@ -76,22 +76,6 @@ class TargetTriplet(
         target.operatingsystem.default("unknown")
   }
 
-  fun checkFile(directory: String, name: String, ext: String): ?String {
-    suffixes = Array[
-      `${this.machine}-${this.vendor.default(
-        "unknown",
-      )}-${this.operatingsystem.default("unknown")}`,
-      `${this.machine}-${this.vendor.default("unknown")}`,
-      this.machine,
-    ];
-    for (suffix in suffixes) {
-      path = Path.join(directory, `${name}_${suffix}${ext}`);
-      if (FileSystem.exists(path)) break Some(path)
-    } else {
-      None()
-    }
-  }
-
   fun toString(): String {
     `${this.machine}-${this.vendor.default(
       "unknown",
