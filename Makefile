@@ -78,6 +78,9 @@ clean:
 fmt:
 	find . -path ./compiler/tests -not -prune -or -name '*'.sk -exec sh -c 'echo {}; skfmt -i {}' \;
 
+
+# test targets
+
 .PHONY: test
 test: SKARGO_FLAGS=
 test: test-native test-wasm
@@ -106,6 +109,18 @@ test-tpc: test
 	@echo ""
 	@cd sql/test/TPC-h/ && ./test_tpch.sh
 
+.PHONY: test-server
+test-server: SKARGO_FLAGS=
+test-server: npm
+	./sql/js/tests/test_server_api/run.sh
+
+.PHONY: test-soak
+test-soak: build/skdb build/init.sql npm
+	./sql/server/test/test_soak.sh
+
+
+# run targets
+
 .PHONY: run-server
 run-server: SKARGO_FLAGS=
 run-server: build/skdb build/init.sql
@@ -114,10 +129,6 @@ run-server: build/skdb build/init.sql
 .PHONY: run-chaos
 run-chaos: build/skdb
 	./sql/server/deploy/chaos.sh
-
-.PHONY: test-soak
-test-soak: build/skdb build/init.sql npm
-	./sql/server/test/test_soak.sh
 
 # useful for testing in a browser
 build/index.html: sql/js/index.html
