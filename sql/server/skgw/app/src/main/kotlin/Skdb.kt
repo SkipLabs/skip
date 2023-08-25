@@ -82,7 +82,8 @@ class Skdb(val name: String, private val dbPath: String) {
     buf.append("\n")
     buf.append(stmts)
     return blockingRun(
-        ProcessBuilder(USER_CONFIG.skdb_path, "--data", dbPath, format.flag, "--expect-query-params"),
+        ProcessBuilder(
+            USER_CONFIG.skdb_path, "--data", dbPath, format.flag, "--expect-query-params"),
         buf.toString())
   }
 
@@ -97,7 +98,8 @@ class Skdb(val name: String, private val dbPath: String) {
   }
 
   fun replicationId(deviceUuid: String): ProcessOutput {
-    return blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "replication-id", deviceUuid, "--data", dbPath))
+    return blockingRun(
+        ProcessBuilder(USER_CONFIG.skdb_path, "replication-id", deviceUuid, "--data", dbPath))
   }
 
   fun dumpTable(table: String): ProcessOutput {
@@ -237,7 +239,13 @@ class Skdb(val name: String, private val dbPath: String) {
     val connection =
         blockingRun(
             ProcessBuilder(
-                USER_CONFIG.skdb_path, "subscribe", table, "--data", dbPath, "--notify", notifyFile.path))
+                USER_CONFIG.skdb_path,
+                "subscribe",
+                table,
+                "--data",
+                dbPath,
+                "--notify",
+                notifyFile.path))
 
     if (!connection.exitSuccessfully()) {
       throw RuntimeException("Notify failed")
