@@ -187,19 +187,19 @@ const skdb = await createConnectedSkdb(values.host, values.db, {
   privateKey: privateKey,
 });
 
-const evalQuery = async function(skdb_client, query) {
+const evalQuery = async function(skdb, query) {
   if (args.values['pipe-separated-output']) {
-    let answer = await skdb_client.sqlRaw(query);
+    let answer = await skdb.sqlRaw(query, new Map(), true);
     answer = answer.trim();
     return answer;
   } else {
-    return skdb_client.sql(query);
+    return skdb.sql(query, new Map(), true);
   }
 };
 
 if (args.values['create-db']) {
   const db = args.values['create-db'] as string;
-  const result = await skdb.server.createDatabase(db);
+  const result = await skdb.createServerDatabase(db);
   // b64 encode
   result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
   console.log(`Successfully created database: ${db}.`);
@@ -211,7 +211,7 @@ if (args.values['create-db']) {
 }
 
 if (args.values['create-user']) {
-  const result = await skdb.server.createUser();
+  const result = await skdb.createServerUser();
   // b64 encode
   result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
   console.log('Successfully created user: ', result);
@@ -222,17 +222,17 @@ if (args.values['create-user']) {
 }
 
 if (args.values['schema']) {
-  const schema = await skdb.server.schema();
+  const schema = await skdb.schema(true);
   console.log(schema.trim());
 }
 
 if (args.values['table-schema']) {
-  const schema = await skdb.server.tableSchema(args.values['table-schema'] as string);
+  const schema = await skdb.tableSchema(args.values['table-schema'] as string, true);
   console.log(schema.trim());
 }
 
 if (args.values['view-schema']) {
-  const schema = await skdb.server.viewSchema(args.values['view-schema'] as string);
+  const schema = await skdb.viewSchema(args.values['view-schema'] as string, true);
   console.log(schema.trim());
 }
 
@@ -264,7 +264,7 @@ const remoteRepl = async function() {
 
     if (query.trim() === '.schema') {
       try {
-        const schema = await skdb.server.schema();
+        const schema = await skdb.schema(true);
         console.log(schema);
       } catch (ex) {
         console.error("Could not query schema.");
@@ -276,7 +276,7 @@ const remoteRepl = async function() {
     if (query.startsWith('.table-schema')) {
       const [_, table] = query.split(" ", 2);
       try {
-        const schema = await skdb.server.tableSchema(table);
+        const schema = await skdb.tableSchema(table, true);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${table}.`);
@@ -287,7 +287,7 @@ const remoteRepl = async function() {
     if (query.startsWith('.view-schema')) {
       const [_, view] = query.split(" ", 2);
       try {
-        const schema = await skdb.server.viewSchema(view);
+        const schema = await skdb.viewSchema(view, true);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${view}.`);
@@ -296,7 +296,7 @@ const remoteRepl = async function() {
     }
 
     try {
-      const answer = await evalQuery(skdb.server, query);
+      const answer = await evalQuery(skdb, query);
       console.log(answer);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
@@ -380,7 +380,7 @@ const localRepl = async function() {
       const table = args[1];
       const filter = args.slice(2).join(' ');
       try {
-        await skdb.server.mirrorTable(table, filter);
+        await skdb.mirrorServerTable(table, filter);
       } catch (ex) {
         console.error(`Could not mirror table ${table}.`);
         console.error(ex);
@@ -413,7 +413,7 @@ try {
 
 if (query.trim() !== "") {
   try {
-    const answer = await evalQuery(skdb.server, query);
+    const answer = await evalQuery(skdb, query);
     console.log(answer);
   } catch (ex) {
     console.error("Could not eval query.");
@@ -427,5 +427,5 @@ if (query.trim() !== "") {
 // ends up calling this, which you don't want. the user is going to
 // send an interrupt anyway to get out of the shell.
 if (!(args.values['remote-repl'] || args.values['local-repl'])) {
-  skdb.server?.close();
+  skdb.serverClose();
 }

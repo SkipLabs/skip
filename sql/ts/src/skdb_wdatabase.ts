@@ -76,4 +76,8 @@ export class SKDBWorker implements SKDB {
   serverClose = async ()  => {
     return await this.worker.post(new Function("serverClose", []));
   }
+
+  connect = async (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => {
+    return await this.worker.post(new Function("connect", [db, accessKey, privateKey, endpoint]));
+  }
 }

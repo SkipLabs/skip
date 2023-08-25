@@ -1,7 +1,7 @@
 import { run, loadEnv, isNode} from "#std/sk_types";
-import { SKDBShared, SKDBMain } from "#skdb/skdb_types";
+import { SKDBShared } from "#skdb/skdb_types";
 import { SKDBWorker } from "#skdb/skdb_wdatabase";
-
+export {SKDB as TSKDB} from "#skdb/skdb_types";
 
 var wasm64 = "skdb";
 var modules = [ /*--MODULES--*/];
@@ -18,7 +18,7 @@ export async function createDatabase(dbName ?: string, asWorker: boolean = true)
 
 export async function createOnMain(dbName ?: string, getWasmSource?: () => Promise<Uint8Array>) {
   let data = await run(wasm64, modules, extensions, "SKDB_factory", getWasmSource);
-  return await (data.environment.shared.get("SKDB") as SKDBShared).create(dbName) as SKDBMain;
+  return await (data.environment.shared.get("SKDB") as SKDBShared).create(dbName);
 }
 
 export async function createWorker(dbName ?: string) {
