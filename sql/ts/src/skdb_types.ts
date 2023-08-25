@@ -29,6 +29,7 @@ export interface SKDB {
   schema: (server?: boolean) => Promise<string>;
   insert: (tableName: string, values: Array<any>) => Promise<boolean>;
   save: () => Promise<boolean>;
+  connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
 
   createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createServerUser: () => Promise<ProtoResponseCreds>;
@@ -72,16 +73,6 @@ export interface Server {
   sqlRaw: (query: string, params: Map<string, string|number>) => Promise<string>;
   sql: (query: string, params: Map<string, string|number>) => Promise<Array<any>>;
   close(): void;
-}
-
-export interface SKDBMain extends SKDB {
-  server: Server;
-  connect: (
-    db: string,
-    accessKey: string,
-    privateKey: CryptoKey,
-    endpoint?: string,
-  ) => Promise<Server>;
 }
 
 export type Page = { pageid: number, content: any };

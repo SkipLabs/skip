@@ -115,7 +115,7 @@ export class SKDBImpl implements SKDB {
     accessKey: string,
     privateKey: CryptoKey,
     endpoint?: string,
-  ): Promise<Server> {
+  ): Promise<void> {
     if (!endpoint) {
       if (typeof window === 'undefined') {
         throw new Error("No endpoint passed to connect and no window object to infer from.");
@@ -138,7 +138,6 @@ export class SKDBImpl implements SKDB {
       db,
       creds
     );
-    return this.server;
   }
 
   watermark(replicationId: string, table: string): bigint {
