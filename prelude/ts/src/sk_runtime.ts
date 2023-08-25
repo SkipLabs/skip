@@ -19,6 +19,7 @@ class LinksImpl implements Links {
 
   SKIP_print_error: (strPtr: ptr) => void;
   SKIP_print_debug: (strPtr: ptr) => void;
+  SKIP_print_debug_raw: (strPtr: ptr) => void;
   SKIP_print_raw: (strPtr: ptr) => void;
   SKIP_print_char: (code: int) => void;
   SKIP_print_string: (strPtr: ptr) => void;
@@ -45,26 +46,26 @@ class LinksImpl implements Links {
 
     this.SKIP_etry = utils.etry;
     this.SKIP_print_error = (msg: ptr) => {
-      utils.log(msg, Stream.ERR);
+      utils.sklog(msg, Stream.ERR, true);
     };
 
     this.SKIP_print_debug = (msg: ptr) => {
-      utils.log(msg, Stream.DEBUG);
+      utils.sklog(msg, Stream.DEBUG, true);
     };
-    this.SKIP_print_raw = utils.log;
-    this.SKIP_print_string = utils.log;
+    this.SKIP_print_debug_raw = (msg: ptr) => {
+      utils.sklog(msg, Stream.DEBUG);
+    };
+    this.SKIP_print_raw = (msg: ptr) => {
+      utils.sklog(msg, Stream.OUT);
+    };
+    this.SKIP_print_string = (msg: ptr) => {
+      utils.sklog(msg, Stream.OUT, true);
+    };
     this.__cxa_throw = (exc: ptr) => utils.ethrow(exc);
     this.SKIP_throw_cruntime = utils.exit;
     this.SKIP_print_char = (c: int) => {
       var str = String.fromCharCode(c);
-      if (str == "\n") {
-        if (consoleBuffer.trim() != "") {
-          console.log(consoleBuffer + "\n");
-        }
-        consoleBuffer = "";
-      } else {
-        consoleBuffer += str;
-      }
+      utils.log(str, Stream.OUT);
     };
     this.SKIP_delete_external_exception = utils.deleteException;
     this.SKIP_get_external_exception_message = utils.getExceptionMessage;
@@ -158,6 +159,7 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_JS_timeStamp = () => links.SKIP_JS_timeStamp();
     toWasm.SKIP_print_error =  (strPtr: ptr) => links.SKIP_print_error(strPtr);
     toWasm.SKIP_print_debug =  (strPtr: ptr) => links.SKIP_print_debug(strPtr);
+    toWasm.SKIP_print_debug_raw =  (strPtr: ptr) => links.SKIP_print_debug_raw(strPtr);
     toWasm.SKIP_print_raw =  (strPtr: ptr) => links.SKIP_print_raw(strPtr);
     toWasm.SKIP_print_char =  (strPtr: ptr) => links.SKIP_print_char(strPtr);
     toWasm.SKIP_print_string =  (strPtr: ptr) => links.SKIP_print_string(strPtr);
@@ -178,8 +180,6 @@ class Manager implements ToWasmManager {
     return links;
   }
 }
-
-var consoleBuffer = "";
 
 interface ToWasm {
   _ZSt9terminatev: () => void;
@@ -207,6 +207,7 @@ interface ToWasm {
   SKIP_Math_exp: (v: float) => float;
   SKIP_print_error: (strPtr: ptr) => void;
   SKIP_print_debug: (strPtr: ptr) => void;
+  SKIP_print_debug_raw: (strPtr: ptr) => void;
   SKIP_print_raw: (strPtr: ptr) => void;
   SKIP_print_char: (strPtr: ptr) => void;
   SKIP_print_string: (strPtr: ptr) => void;

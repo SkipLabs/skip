@@ -217,20 +217,20 @@ export class Utils {
     this.state = new State();
     this.mainFn = mainFn;
   }
-  log = (strPtr: ptr, kind?: Stream) => {
-    let toDisplay = this.importString(strPtr);
-    if (toDisplay != "") {
-      kind = kind ? kind : Stream.OUT;
-      if (kind == Stream.DEBUG) {
-        console.log(toDisplay);
-        this.stddebug.push(toDisplay);
-      } else if (kind == Stream.ERR) {
-          this.stderr.push(toDisplay);
-      } else {
-        this.stdout.push(toDisplay);
-      }
+  log = (str: string, kind?: Stream, newLine: boolean = false) => {
+    kind = kind ? kind : Stream.OUT;
+    if (kind == Stream.DEBUG) {
+      this.stddebug.push(str);
+    } else if (kind == Stream.ERR) {
+        this.stderr.push(str);
+    } else {
+      this.stdout.push(str);
     }
-  };
+  }
+  sklog = (strPtr: ptr, kind?: Stream, newLine: boolean = false) => {
+    let str = this.importString(strPtr) + (newLine ? "\n" : "");
+    this.log(str, kind, newLine);
+  }
 
   clearMainEnvironment = (new_args: Array<string> = [], new_stdin: string = "") => {
     this.args = [this.mainFn ?? "main"].concat(new_args);
