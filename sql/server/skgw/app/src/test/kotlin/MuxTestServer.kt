@@ -86,7 +86,7 @@ fun setupStream(sock: MuxedSocket, s: Stream) {
   s.onError = { _, _ -> }
 }
 
-fun createHttpServer(): Undertow {
+fun createHttpServer(port: Int): Undertow {
   val muxHandler =
       Handlers.websocket(
           MuxedSocketEndpoint(
@@ -115,10 +115,14 @@ fun createHttpServer(): Undertow {
 
   var pathHandler = PathTemplateHandler().add("/", muxHandler)
 
-  return Undertow.builder().addHttpListener(8080, "0.0.0.0").setHandler(pathHandler).build()
+  return Undertow.builder().addHttpListener(port, "0.0.0.0").setHandler(pathHandler).build()
 }
 
-fun main() {
-  val server = createHttpServer()
+fun main(args: Array<String>) {
+  var port = 8080
+  if (args.size > 0) {
+    port = Integer.parseInt(args[0])
+  }
+  val server = createHttpServer(port)
   server.start()
 }
