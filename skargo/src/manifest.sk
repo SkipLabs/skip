@@ -41,18 +41,18 @@ base class VersionConstraint uses Equality {
   }
 }
 
-class TargetTriplet(
+class TargetTriple(
   machine: String,
   vendor: ?String,
   operatingsystem: ?String,
 ) uses Orderable, Show {
   //
-  static fun fromString(str: String): TargetTriplet {
+  static fun fromString(str: String): TargetTriple {
     components = str.split("-");
     if (components.isEmpty() || components.size() > 3) {
       invariant_violation("Invalid target triplet string " + str)
     };
-    TargetTriplet(
+    TargetTriple(
       components[0],
       components.maybeGet(1) match {
       | Some(v) if (v != "unknown") -> Some(v)
@@ -69,7 +69,7 @@ class TargetTriplet(
     this.machine == "wasm32"
   }
 
-  fun allows(target: TargetTriplet): Bool {
+  fun allows(target: TargetTriple): Bool {
     this.machine == target.machine &&
       this.vendor.default("unknown") == target.vendor.default("unknown") &&
       this.operatingsystem.default("unknown") ==
