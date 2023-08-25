@@ -50,7 +50,7 @@ export const tests = (asWorker: boolean) => {
         }
       },
       check: res => {
-        expect(res).toMatch(/Error: line 1, characters 0-0:Cannot generate a string primary/);
+        expect(res).toMatch(/Error: line 1, characters 0-0:\sCannot generate a string primary/);
       }
     },
     {
