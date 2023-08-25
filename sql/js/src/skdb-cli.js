@@ -294,7 +294,7 @@ const remoteRepl = async function() {
       console.log(answer);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
-      console.error(ex.trim());
+      console.error(ex);
     }
   }
 };
@@ -387,7 +387,7 @@ const localRepl = async function() {
       console.log(answer);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
-      console.error(ex.trim());
+      console.error(ex);
     }
   }
 };
@@ -411,7 +411,7 @@ if (query.trim() !== "") {
     console.log(answer);
   } catch (ex) {
     console.error("Could not eval query.");
-    console.error(ex.trim());
+    console.error(ex);
     process.exit(1);
   }
 }
