@@ -39,12 +39,6 @@ class Env(
     Path.join(this.outDir, path)
   }
 
-  fun printString(str: String): void {
-    if (this.verbose) {
-      print_string(str)
-    };
-  }
-
   fun printError(error: String): void {
     if (this.verbose) {
       print_error(error)
@@ -56,10 +50,9 @@ class Env(
       // TODO: colors
       print_error(`>> ${args.join(" ")}`)
     };
-    p = System.subprocess(args, this.printString, this.printError);
+    p = System.subprocess(args, print_string, this.printError);
     if (!p.success()) {
       if (!this.verbose) {
-        print_raw(p.stdout);
         print_error_raw(p.stderr);
       };
       throw RuntimeException(p.exitcode())
