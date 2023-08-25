@@ -260,14 +260,28 @@ private fun generateManifestTemplate(
     .join("\n");
 }
 
-fun checkBuildFiles(bc: BuildContext, test: Bool): void {
+fun checkBuildFiles(
+  bc: BuildContext,
+  test: Bool,
+  building: List<Manifest>,
+): void {
   // TODO manage when same dependency added multiple time with different name
   links = SortedSet[];
   libraries = mutable Vector[];
   preambles = mutable Vector[];
-  bc.deps.each((_k, v) ->
-    !links = checkBuildFile(bc, v, links, libraries, preambles, test)
-  );
+  bc.deps.each((_k, v) -> {
+    if (!building.any(e -> v.name == e.name)) {
+      !links = checkBuildFile(
+        bc,
+        v,
+        links,
+        libraries,
+        preambles,
+        test,
+        building,
+      )
+    }
+  });
   if (!libraries.isEmpty()) {
     Environ.set_var(
       "SKC_LINK",
@@ -286,6 +300,7 @@ fun checkBuildFile(
   libraries: mutable Vector<String>,
   preambles: mutable Vector<String>,
   test: Bool,
+  building: List<Manifest>,
 ): SortedSet<String> {
   // TODO manage version
   skbuildPath = Path.join(dependency.path, "build.sk");
@@ -327,7 +342,7 @@ fun checkBuildFile(
       deps,
     };
     bc.deps.each((_k, v) -> _ = Environ.set_var(`PCK_${v.name}`, v.path));
-    execBuildContext(sbc, bManifest.bin);
+    execBuildContext(sbc, bManifest.bin, List.Cons(dependency, building));
     binPath = Path.join(bc.targetDir, bin.name);
     Environ.set_var("OUT_DIR", targetDir);
     Environ.set_var("PCK_DIR", dependency.path);

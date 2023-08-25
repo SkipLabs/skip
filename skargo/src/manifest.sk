@@ -14,7 +14,7 @@ class Version(major: Int, minor: Int, patch: Int) uses Orderable {
   }
 }
 
-base class VersionConstraint {
+base class VersionConstraint uses Equality {
   children =
   | RangeConstraint(low: Version, high: ?Version)
   | PathConstraint(path: String, version: ?Version)
@@ -83,7 +83,7 @@ class TargetTriplet(
   }
 }
 
-class ManifestBinary(name: String, main: String) {
+class ManifestBinary(name: String, main: String) uses Equality {
   static fun fromTOML(toml: TOML.Table): ManifestBinary {
     name = toml.getString("name");
     main = toml.getString("main");
@@ -102,7 +102,14 @@ class Manifest{
   dependencies: Map<String, VersionConstraint>,
   buildDependencies: Map<String, VersionConstraint>,
   bin: Array<ManifestBinary>,
-} {
+} uses Equality {
+  //
+  fun ==(other: Manifest): Bool {
+    this.name == other.name &&
+      this.path == other.path &&
+      this.version == other.version
+  }
+
   static fun read(path: String): Manifest {
     basePath = Path.dirname(path);
     toml = TOML.decode(FileSystem.readTextFile(path));

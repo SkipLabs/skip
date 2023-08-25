@@ -114,8 +114,12 @@ fun collectBinaries(args: Cli.ParseResults, env: Env): Array<ManifestBinary> {
   };
 }
 
-fun execBuildContext(bc: BuildContext, bins: Array<ManifestBinary>): void {
-  checkBuildFiles(bc, false);
+fun execBuildContext(
+  bc: BuildContext,
+  bins: Array<ManifestBinary>,
+  building: List<Manifest> = List.Nil(),
+): void {
+  checkBuildFiles(bc, false, building);
   genVersionFile(bc);
   for (bin in bins) {
     compile(bc, bin.name, bin.main)
@@ -171,7 +175,7 @@ fun execTest(args: Cli.ParseResults, env: Env): void {
     args.maybeGetString("target-dir"),
     getProfile(args),
   );
-  checkBuildFiles(bc, true);
+  checkBuildFiles(bc, true, List.Nil());
   genVersionFile(bc);
   compile(bc, "test", env.manifest.testHarness);
   filter = args.maybeGetString("filter");
