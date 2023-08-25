@@ -1,0 +1,95 @@
+module StdBuild;
+
+class RuntimeException(code: Int) extends Exception {
+  fun getMessage(): String {
+    `Runtime error with code ${this.code}`
+  }
+}
+
+class Env(
+  refDir: String,
+  outDir: String,
+  name: String,
+  profile: String,
+  optTarget: ?String,
+  test: Bool,
+  verbose: Bool,
+) {
+  static fun create(): Env {
+    Env(
+      Environ.var("PCK_DIR"),
+      Environ.var("OUT_DIR"),
+      Environ.var("NAME"),
+      Environ.var("PROFILE"),
+      Environ.varOpt("TARGET"),
+      Environ.var("TEST").lowercase() == "true",
+      Environ.var("VERBOSE").lowercase() == "true",
+    )
+  }
+
+  fun isWasm32(): Bool {
+    this.optTarget.map(t -> t.startsWith("wasm32")).default(false)
+  }
+
+  fun resolve(path: String): String {
+    Path.resolve(this.refDir, path)
+  }
+
+  fun outpath(path: String): String {
+    Path.join(this.outDir, path)
+  }
+
+  fun printString(str: String): void {
+    if (this.verbose) {
+      print_string(str)
+    };
+  }
+
+  fun printError(error: String): void {
+    if (this.verbose) {
+      print_error(error)
+    };
+  }
+
+  fun run(args: Array<String>): void {
+    if (this.verbose) {
+      // TODO: colors
+      print_error(`>> ${args.join(" ")}`)
+    };
+    p = System.subprocess(args, this.printString, this.printError);
+    if (!p.success()) {
+      if (!this.verbose) {
+        print_raw(p.stdout);
+        print_error_raw(p.stderr);
+      };
+      throw RuntimeException(p.exitcode())
+    };
+  }
+
+  fun vars(): Array<String> {
+    vars = Array[
+      `OUT_DIR=${this.outDir}`,
+      `PCK_DIR=${this.refDir}`,
+      `NAME=${this.name}`,
+      `PROFILE=${this.profile}`,
+      `VERBOSE=${this.verbose}`,
+      `TEST=${this.test}`,
+    ];
+    this.optTarget.each(t -> !vars = vars.concat(Array[`TARGET=${t}`]));
+    vars
+  }
+}
+
+@debug
+fun main(): void {
+  env = Env::create();
+  name = if (env.isWasm32()) {
+    "build_wasm32.mk"
+  } else {
+    "build.mk"
+  };
+  mkbuildPath = env.resolve(name);
+  if (FileSystem.exists(mkbuildPath)) {
+    env.run(Array["make", "-f", mkbuildPath].concat(env.vars()))
+  }
+}
