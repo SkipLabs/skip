@@ -3,8 +3,10 @@ import { webcrypto as crypto } from 'node:crypto';
 import fs from 'node:fs';
 import assert from 'node:assert';
 
+const wasmFile = (process.env.SKFS_DIR ?? "/skfs") + "/sql/js/dist/skdb.wasm";
+
 async function fetchWasmSource() {
-  const wasmBuffer = fs.readFileSync("/skfs/sql/js/dist/skdb.wasm");
+  const wasmBuffer = fs.readFileSync(wasmFile);
   return new Uint8Array(wasmBuffer);
 }
 
