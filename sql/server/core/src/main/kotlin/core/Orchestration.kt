@@ -52,6 +52,8 @@ data class ProtoCredentials(val accessKey: String, val privateKey: ByteBuffer) :
   }
 }
 
+data class RevealableException(val code: UInt, val msg: String) : RuntimeException(msg)
+
 fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
   val type = data.get().toUInt()
   return when (type) {
