@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import java.io.FileInputStream
 import java.nio.file.Files
@@ -6,7 +6,7 @@ import java.nio.file.Paths
 import java.util.Optional
 import java.util.Properties
 
-val USER_CONFIG_FILE = ".skgw.conf"
+val USER_CONFIG_FILE = ".skdb.conf"
 var USER_CONFIG = UserConfig.create()
 val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
 

@@ -36,7 +36,7 @@ dependencies {
 }
 
 application {
-  mainClass.set("io.skiplabs.skgw.AppKt")
+  mainClass.set("io.skiplabs.skdb.AppKt")
 }
 
 tasks.named<Test>("test") {
@@ -46,22 +46,22 @@ tasks.named<Test>("test") {
 spotless { kotlin { ktfmt("0.42") } }
 
 task("runMuxTestServer", JavaExec::class) {
-  mainClass.set("io.skiplabs.skgw.test.MuxTestServerKt")
+  mainClass.set("io.skiplabs.skdb.test.MuxTestServerKt")
   classpath = sourceSets["test"].runtimeClasspath
 }
 
 task("runMuxTestClient", JavaExec::class) {
-  mainClass.set("io.skiplabs.skgw.test.MuxTestClientKt")
+  mainClass.set("io.skiplabs.skdb.test.MuxTestClientKt")
   classpath = sourceSets["test"].runtimeClasspath
 }
 
 task("runCli", JavaExec::class) {
-  mainClass.set("io.skiplabs.skgw.cli.CliKt")
+  mainClass.set("io.skiplabs.skdb.cli.CliKt")
   classpath = sourceSets["test"].runtimeClasspath
 }
 
 tasks.jar {
-    manifest.attributes["Main-Class"] = "io.skiplabs.skgw.AppKt"
+    manifest.attributes["Main-Class"] = "io.skiplabs.skdb.AppKt"
     val dependencies = configurations
         .runtimeClasspath
         .get()

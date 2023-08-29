@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
