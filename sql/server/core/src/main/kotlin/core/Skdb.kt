@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi

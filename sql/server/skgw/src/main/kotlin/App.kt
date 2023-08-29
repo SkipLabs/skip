@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import io.undertow.Handlers
 import io.undertow.Undertow
@@ -375,7 +375,7 @@ fun envIsSane(): Boolean {
 private fun createServiceMgmtDb(encryption: EncryptionTransform) {
   val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
   System.err.println(
-      "skgw.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
+      "skdb.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
 }
 
 private fun devColdStart(encryption: EncryptionTransform) {
@@ -387,7 +387,7 @@ private fun devColdStart(encryption: EncryptionTransform) {
   }
   val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
   System.err.println(
-      "skgw.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
+      "skdb.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
 
   val command = listOf("/bin/bash", "-c", USER_CONFIG.cliCommand(creds))
   val proc = ProcessBuilder().inheritIO().command(command).start()

@@ -1,10 +1,10 @@
-package io.skiplabs.skgw.test
+package io.skiplabs.skdb.test
 
-import io.skiplabs.skgw.MuxedSocket
-import io.skiplabs.skgw.MuxedSocketEndpoint
-import io.skiplabs.skgw.MuxedSocketFactory
-import io.skiplabs.skgw.Stream
-import io.skiplabs.skgw.WebSocket
+import io.skiplabs.skdb.MuxedSocket
+import io.skiplabs.skdb.MuxedSocketEndpoint
+import io.skiplabs.skdb.MuxedSocketFactory
+import io.skiplabs.skdb.Stream
+import io.skiplabs.skdb.WebSocket
 import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.handlers.PathTemplateHandler

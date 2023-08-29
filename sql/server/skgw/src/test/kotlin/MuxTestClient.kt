@@ -1,7 +1,7 @@
-package io.skiplabs.skgw.test
+package io.skiplabs.skdb.test
 
-import io.skiplabs.skgw.Credentials
-import io.skiplabs.skgw.connectMux
+import io.skiplabs.skdb.Credentials
+import io.skiplabs.skdb.connectMux
 import java.net.URI
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
