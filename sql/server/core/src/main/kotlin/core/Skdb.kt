@@ -12,6 +12,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
 
+val DB_ROOT_USER = "root"
+
 enum class OutputFormat(val flag: String) {
   RAW("--format=sql"),
   JSON("--format=json"),

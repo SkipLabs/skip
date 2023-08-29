@@ -16,8 +16,6 @@ dependencies {
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
 
-  implementation("com.google.guava:guava:31.1-jre")
-
   // http/ws server
   implementation("io.undertow:undertow-core:2.3.2.Final")
 
@@ -31,11 +29,10 @@ dependencies {
   // coroutines
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
 
-  // serialisation - used for json
-  implementation("com.squareup.moshi:moshi:1.14.0")
-
   // log4j2 slf4j binding
   implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.20.0")
+
+  implementation(project(":core"))
 }
 
 application {
