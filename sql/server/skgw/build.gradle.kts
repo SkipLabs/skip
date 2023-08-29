@@ -1,5 +1,5 @@
 plugins {
-  id("org.jetbrains.kotlin.jvm") version "1.8.20"
+  id("org.jetbrains.kotlin.jvm")
 
   // for lint and formatting
   id("com.diffplug.spotless") version "6.12.1"
