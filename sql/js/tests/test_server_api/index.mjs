@@ -49,10 +49,14 @@ async function testQueriesAgainstTheServer(skdb) {
   const tableCreate = await skdb.server.sqlRaw(
     "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER);");
   assert.equal(tableCreate, "");
+  
+  const viewCreate = await skdb.server.sqlRaw(
+    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y FROM test_pk;");
+  assert.equal(viewCreate, "");
 
   const permissionInsert = await skdb.server.sqlRaw(
-    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7);");
-  assert.equal(tableCreate, "");
+    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7), ('view_pk', 7);");
+  assert.equal(permissionInsert, "");
 
   const tableInsert = await skdb.server.sqlRaw(
     "INSERT INTO test_pk VALUES (42,21);");
@@ -60,6 +64,9 @@ async function testQueriesAgainstTheServer(skdb) {
 
   const tableSelect = await skdb.server.sqlRaw("SELECT * FROM test_pk;");
   assert.equal(tableSelect, "42|21\n");
+
+  const viewSelect = await skdb.server.sqlRaw("SELECT * FROM view_pk;");
+  assert.equal(viewSelect, "42|63\n");
 
   try {
     await skdb.server.sqlRaw("bad query");
@@ -89,6 +96,9 @@ async function testSchemaQueries(skdb) {
   const tableSchema = await skdb.server.tableSchema("skdb_users");
   assert.match(tableSchema, /CREATE TABLE skdb_users/);
 
+  const viewTableSchema = await skdb.server.tableSchema("view_pk");
+  assert.match(viewTableSchema, /CREATE TABLE view_pk \(\n  x INTEGER,\n  y INTEGER\n\);/);
+
   // invalid views/tables
 
   const emptyView = await skdb.server.viewSchema("nope");
@@ -100,31 +110,55 @@ async function testSchemaQueries(skdb) {
 
 async function testMirroring(skdb) {
   // mirror table
-  await skdb.server.mirrorTable("test_pk");
+  await skdb.server.mirror("test_pk");
   const testPkRows = skdb.sql("SELECT * FROM test_pk");
   assert.deepEqual(testPkRows, [{x: 42, y:21}]);
 
+
+  await skdb.server.mirror("view_pk");
+  const viewPkRows = skdb.sql("SELECT * FROM view_pk");
+  assert.deepEqual(viewPkRows, [{x: 42, y:63}]);
+
   // mirror already mirrored table is idempotent
-  await skdb.server.mirrorTable("test_pk");
+  await skdb.server.mirror("test_pk");
   const testPkRows2 = skdb.sql("SELECT * FROM test_pk");
   assert.deepEqual(testPkRows2, [{x: 42, y:21}]);
 }
 
 async function testServerTail(root, user) {
+  try {
+    await root.server.sqlRaw("insert into view_pk values (87,88);");
+  } catch (exn) {
+    assert.deepEqual(exn, "insert into view_pk values (87,88);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\n");
+  }
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const vres = user.sql("select count(*) as cnt from view_pk where x = 87 and y = 88");
+  assert.deepEqual(vres, [{cnt: 0}]);
+
   await root.server.sqlRaw("insert into test_pk values (87,88);");
   // we could do something complicated with callbacks, but sleep for now
   await new Promise(resolve => setTimeout(resolve, 100));
   const res = user.sql("select count(*) as cnt from test_pk where x = 87 and y = 88");
   assert.deepEqual(res, [{cnt: 1}]);
+  const resv = user.sql("select count(*) as cnt from view_pk where x = 87 and y = 264");
+  assert.deepEqual(resv, [{cnt: 1}]);
 }
 
 async function testClientTail(root, user) {
+  await user.sqlRaw("insert into view_pk values (97,98);");
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const vres = await root.server.sql(
+    "select count(*) as cnt from test_pk where x = 97 and y = 98");
+  assert.deepEqual(vres, [{cnt: 0}]);
+
   await user.sqlRaw("insert into test_pk values (97,98);");
   // we could do something complicated with callbacks, but sleep for now
   await new Promise(resolve => setTimeout(resolve, 100));
   const res = await root.server.sql(
     "select count(*) as cnt from test_pk where x = 97 and y = 98");
-  assert.deepEqual(res, [{cnt: 1}]);
+  const resv = await root.server.sql(
+    "select count(*) as cnt from view_pk where x = 97 and y = 294");
+  assert.deepEqual(resv, [{cnt: 1}]);
 }
 
 const dbs = await setup();

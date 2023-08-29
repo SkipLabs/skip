@@ -2202,6 +2202,9 @@ class SKDBServer {
   tablesAwaitingSync(): Set<string> {
     const acc = new Set<string>();
     for (const [table, session] of this.mirroredTables.entries()) {
+      if (session == "@view") {
+        continue;
+      }
       // TODO: if we parse the diff output we can provide an object
       // model representing the rows not yet ack'd.
       const diff = this.client.runLocal(
@@ -2251,11 +2254,11 @@ class SKDBServer {
     this.connection.closeSocket();
   }
 
-  async mirrorTable(tableName: string, filterExpr?: string): Promise<void> {
+  async mirror(tableName: string, filterExpr?: string): Promise<void> {
     if (this.mirroredTables.has(tableName)) {
       return;
     }
-
+    let viewExists = await this.viewSchema(tableName) != "";
     // TODO: just assumes that if it exists the schema is the same
     if (!this.client.tableExists(tableName)) {
       let createTable = await this.tableSchema(tableName);
@@ -2266,11 +2269,17 @@ class SKDBServer {
          key STRING PRIMARY KEY,
          value STRING
        )`);
+      if (viewExists) {
+        this.client.runLocal(["toggle-view", tableName], "");
+      }
+    }
+    
+    this.client.assertCanBeMirrored(tableName);
+    let session = "@view"
+    if (!viewExists) {
+      session = await this.establishLocalTail(tableName);
     }
 
-    this.client.assertCanBeMirrored(tableName);
-
-    const session = await this.establishLocalTail(tableName);
     this.mirroredTables.set(tableName, session);
     return this.establishServerTail(tableName, filterExpr || "");
   }

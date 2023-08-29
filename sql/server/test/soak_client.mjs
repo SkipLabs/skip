@@ -30,14 +30,14 @@ const setup = async function(client) {
   await skdb.connect("soak", user, key, "ws://localhost:8080");
 
   for (const table of tables) {
-    await skdb.server.mirrorTable(table);
+    await skdb.server.mirror(table);
   }
 
   for (const table of filtered_tables) {
     // clients are 1 indexed. this gives us some stuff no clients care
     // about (0), stuff we care about ($client), stuff we both care
     // about (3)
-    await skdb.server.mirrorTable(table, `value % 4 IN (${client}, 3)`);
+    await skdb.server.mirror(table, `value % 4 IN (${client}, 3)`);
   }
 
   return skdb;
