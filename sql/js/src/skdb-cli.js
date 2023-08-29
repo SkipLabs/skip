@@ -135,7 +135,7 @@ if (args.values.help || !haveMandatoryValues) {
 }
 
 if (!fs.existsSync(credsFileName)) {
-  fs.mkdirSync(skdbDir);
+  fs.mkdirSync(skdbDir, { recursive: true });
   fs.writeFileSync(credsFileName, JSON.stringify({}));
 }
 
