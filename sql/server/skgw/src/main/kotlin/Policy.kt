@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import java.lang.ref.WeakReference
 import java.time.Duration

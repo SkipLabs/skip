@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider

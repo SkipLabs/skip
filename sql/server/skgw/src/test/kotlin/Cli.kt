@@ -1,13 +1,13 @@
-package io.skiplabs.skgw.cli
+package io.skiplabs.skdb.cli
 
-import io.skiplabs.skgw.Credentials
-import io.skiplabs.skgw.NoEncryptionTransform
-import io.skiplabs.skgw.OutputFormat
-import io.skiplabs.skgw.ProtoData
-import io.skiplabs.skgw.client.SkdbConnection
-import io.skiplabs.skgw.createSkdb
-import io.skiplabs.skgw.genCredentials
-import io.skiplabs.skgw.openSkdb
+import io.skiplabs.skdb.Credentials
+import io.skiplabs.skdb.NoEncryptionTransform
+import io.skiplabs.skdb.OutputFormat
+import io.skiplabs.skdb.ProtoData
+import io.skiplabs.skdb.client.SkdbConnection
+import io.skiplabs.skdb.createSkdb
+import io.skiplabs.skdb.genCredentials
+import io.skiplabs.skdb.openSkdb
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.Base64

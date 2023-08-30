@@ -1,11 +1,10 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.StandardCharsets
 
-// the orchestration protocol. App.kt implements the behaviour, this
-// file factors out the encoding/decoding of messages to reduce noise
+// the orchestration protocol
 
 // 10MiB ought to be enough for anybody
 val MAX_QUERY_LENGTH = 10 * 1024 * 1024
@@ -51,6 +50,8 @@ data class ProtoCredentials(val accessKey: String, val privateKey: ByteBuffer) :
     return "ProtoCredentials(accessKey=${accessKey}, privateKey=**redacted**)"
   }
 }
+
+data class RevealableException(val code: UInt, val msg: String) : RuntimeException(msg)
 
 fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
   val type = data.get().toUInt()

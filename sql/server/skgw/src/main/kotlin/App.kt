@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import io.undertow.Handlers
 import io.undertow.Undertow
@@ -8,98 +8,12 @@ import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.security.SecureRandom
-import java.util.Optional
-import java.util.Properties
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import kotlin.system.exitProcess
-
-val DB_ROOT_USER = "root"
-val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
-val USER_CONFIG_FILE = ".skgw.conf"
-
-var USER_CONFIG = UserConfig.create()
-
-class UserConfig(
-    val port: Int,
-    val skdb_path: String,
-    val skdb_init_path: String,
-    val skdb_databases: String,
-    val addCredFormat: String,
-) {
-  companion object {
-    val SKDB_PORT = 8080
-    val SKDB = "/skfs/build/skdb"
-    val SKDB_INIT = "/skfs/build/init.sql"
-    val SKDB_DATABASES = "/var/db"
-    val SKDB_ADD_CRED =
-        "cd /skfs/sql/js && npx skdb-cli --add-cred --host ws://localhost:%d --db %s --access-key %s <<< \"%s\""
-
-    private fun userConfigFile(): Optional<String> {
-      var path = Paths.get("").toAbsolutePath()
-      while (path != null) {
-        var file = path.resolve(USER_CONFIG_FILE)
-        if (Files.exists(file)) {
-          return Optional.of(file.toString())
-        }
-        path = path.getParent()
-      }
-      return Optional.empty()
-    }
-
-    fun default(): UserConfig {
-      return UserConfig(
-          SKDB_PORT,
-          SKDB,
-          SKDB_INIT,
-          SKDB_DATABASES,
-          SKDB_ADD_CRED,
-      )
-    }
-
-    fun fromFile(file: String): UserConfig {
-      FileInputStream(file).use {
-        var prop = Properties()
-        // load a properties file
-        prop.load(it)
-        return UserConfig(
-            Integer.parseInt(prop.getProperty("skdb_port", "" + SKDB_PORT)),
-            prop.getProperty("skdb", SKDB),
-            prop.getProperty("skdb_init", SKDB_INIT),
-            prop.getProperty("skdb_databases", SKDB_DATABASES),
-            prop.getProperty("skdb_add_cred", SKDB_ADD_CRED),
-        )
-      }
-    }
-
-    fun create(): UserConfig {
-      var user_config_file = userConfigFile()
-      if (user_config_file.isPresent()) {
-        return fromFile(user_config_file.get())
-      }
-      return default()
-    }
-  }
-
-  fun cliCommand(credentials: Credentials): String {
-    return String.format(
-        this.addCredFormat,
-        this.port,
-        SERVICE_MGMT_DB_NAME,
-        credentials.accessKey,
-        credentials.b64privateKey())
-  }
-
-  fun resolveDbPath(db: String): String {
-    return Paths.get(this.skdb_databases).resolve(db + ".db").toString()
-  }
-}
 
 fun Credentials.toProtoCredentials(): ProtoCredentials {
   return ProtoCredentials(accessKey, ByteBuffer.wrap(privateKey))
@@ -322,8 +236,6 @@ class PolicyLinkedHandler(val policy: ServerPolicy, val db: String, var decorate
   }
 }
 
-data class RevealableException(val code: UInt, val msg: String) : RuntimeException(msg)
-
 fun connectionHandler(
     policy: ServerPolicy,
     taskPool: ScheduledExecutorService,
@@ -426,10 +338,7 @@ fun connectionHandler(
 
 fun createHttpServer(connectionHandler: HttpHandler): Undertow {
   var pathHandler = PathTemplateHandler().add("/dbs/{database}/connection", connectionHandler)
-  return Undertow.builder()
-      .addHttpListener(USER_CONFIG.port, "0.0.0.0")
-      .setHandler(pathHandler)
-      .build()
+  return Undertow.builder().addHttpListener(ENV.port, "0.0.0.0").setHandler(pathHandler).build()
 }
 
 fun envIsSane(): Boolean {
@@ -463,21 +372,30 @@ fun envIsSane(): Boolean {
 private fun createServiceMgmtDb(encryption: EncryptionTransform) {
   val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
   System.err.println(
-      "skgw.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
+      "skdb.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
 }
 
 private fun devColdStart(encryption: EncryptionTransform) {
   System.err.println("Environment checks failed, cold starting the system because of dev flag")
-  val path = USER_CONFIG.resolveDbPath(SERVICE_MGMT_DB_NAME)
+  val path = ENV.resolveDbPath(SERVICE_MGMT_DB_NAME)
   val removed = File(path).delete()
   if (removed) {
     System.err.println("Removed ${path}")
   }
   val creds = createDb(SERVICE_MGMT_DB_NAME, encryption)
   System.err.println(
-      "skgw.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
+      "skdb.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
 
-  val command = listOf("/bin/bash", "-c", USER_CONFIG.cliCommand(creds))
+  val command =
+      listOf(
+          "/bin/bash",
+          "-c",
+          String.format(
+              ENV.addCredFormat,
+              ENV.port,
+              SERVICE_MGMT_DB_NAME,
+              creds.accessKey,
+              creds.b64privateKey()))
   val proc = ProcessBuilder().inheritIO().command(command).start()
   val status = proc.waitFor()
   if (status != 0) {
@@ -499,7 +417,7 @@ fun main(args: Array<String>) {
   if (configIdx >= 0 && arglist.size > configIdx + 1) {
     val configFile = arglist.get(configIdx + 1)
     if (File(configFile).exists()) {
-      USER_CONFIG = UserConfig.fromFile(configFile)
+      ENV = UserConfig.fromFile(configFile)
     }
   }
 
