@@ -35,18 +35,13 @@ fun main(): void {
       commands.maybeGet(subcmd) match {
       | Some(handler) ->
         skipExit(
-          vtry<Int>(
-            () -> {
-              handler(args);
-              0
-            },
-            exn ->
-              exn match {
-              | Skargo.SystemCallException(code, _) -> code
-              | _ -> throw exn
-              }
-            ,
-          ),
+          try {
+            handler(args);
+            0
+          } catch {
+          | Skargo.SystemCallException(code, _) -> code
+          | exn -> throw exn
+          },
         )
       | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
       }
