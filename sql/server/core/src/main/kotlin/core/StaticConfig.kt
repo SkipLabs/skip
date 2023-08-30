@@ -7,14 +7,14 @@ import java.util.Optional
 import java.util.Properties
 
 val USER_CONFIG_FILE = ".skdb.conf"
-var USER_CONFIG = UserConfig.create()
+var ENV = UserConfig.create()
 val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
 
 class UserConfig(
     val port: Int,
-    val skdb_path: String,
-    val skdb_init_path: String,
-    val skdb_databases: String,
+    val skdbPath: String,
+    val skdbInitPath: String,
+    val skdbDatabases: String,
     val addCredFormat: String,
 ) {
   companion object {
@@ -71,16 +71,7 @@ class UserConfig(
     }
   }
 
-  fun cliCommand(credentials: Credentials): String {
-    return String.format(
-        this.addCredFormat,
-        this.port,
-        SERVICE_MGMT_DB_NAME,
-        credentials.accessKey,
-        credentials.b64privateKey())
-  }
-
   fun resolveDbPath(db: String): String {
-    return Paths.get(this.skdb_databases).resolve(db + ".db").toString()
+    return Paths.get(this.skdbDatabases).resolve(db + ".db").toString()
   }
 }
