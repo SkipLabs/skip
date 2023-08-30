@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
+
+val DB_ROOT_USER = "root"
 
 enum class OutputFormat(val flag: String) {
   RAW("--format=sql"),
@@ -65,11 +67,11 @@ class Skdb(val name: String, private val dbPath: String) {
   }
 
   fun init() {
-    blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "--init", dbPath))
+    blockingRun(ProcessBuilder(ENV.skdbPath, "--init", dbPath))
   }
 
   fun sql(stmts: String, format: OutputFormat): ProcessOutput {
-    return blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "--data", dbPath, format.flag), stmts)
+    return blockingRun(ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag), stmts)
   }
 
   fun sql(stmts: String, params: Map<String, Any?>, format: OutputFormat): ProcessOutput {
@@ -82,13 +84,12 @@ class Skdb(val name: String, private val dbPath: String) {
     buf.append("\n")
     buf.append(stmts)
     return blockingRun(
-        ProcessBuilder(
-            USER_CONFIG.skdb_path, "--data", dbPath, format.flag, "--expect-query-params"),
+        ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag, "--expect-query-params"),
         buf.toString())
   }
 
   fun sqlStream(format: OutputFormat): Process {
-    val pb = ProcessBuilder(USER_CONFIG.skdb_path, "--data", dbPath, format.flag)
+    val pb = ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag)
 
     // TODO: for hacky debug
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -99,21 +100,21 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun replicationId(deviceUuid: String): ProcessOutput {
     return blockingRun(
-        ProcessBuilder(USER_CONFIG.skdb_path, "replication-id", deviceUuid, "--data", dbPath))
+        ProcessBuilder(ENV.skdbPath, "replication-id", deviceUuid, "--data", dbPath))
   }
 
   fun dumpTable(table: String): ProcessOutput {
-    return blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "dump-table", table, "--data", dbPath))
+    return blockingRun(ProcessBuilder(ENV.skdbPath, "dump-table", table, "--data", dbPath))
   }
 
   fun dumpView(view: String): ProcessOutput {
-    return blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "dump-view", view, "--data", dbPath))
+    return blockingRun(ProcessBuilder(ENV.skdbPath, "dump-view", view, "--data", dbPath))
   }
 
   fun dumpSchema(): ProcessOutput {
-    val tables = blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "dump-tables", "--data", dbPath))
+    val tables = blockingRun(ProcessBuilder(ENV.skdbPath, "dump-tables", "--data", dbPath))
     if (!tables.exitSuccessfully()) return tables
-    val views = blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "dump-views", "--data", dbPath))
+    val views = blockingRun(ProcessBuilder(ENV.skdbPath, "dump-views", "--data", dbPath))
     return ProcessOutput(tables.output + views.output, views.exitCode)
   }
 
@@ -126,7 +127,7 @@ class Skdb(val name: String, private val dbPath: String) {
   ): Process {
     val pb =
         ProcessBuilder(
-            USER_CONFIG.skdb_path,
+            ENV.skdbPath,
             "write-csv",
             table,
             "--data",
@@ -170,7 +171,7 @@ class Skdb(val name: String, private val dbPath: String) {
     val connection =
         blockingRun(
                 ProcessBuilder(
-                    USER_CONFIG.skdb_path,
+                    ENV.skdbPath,
                     "subscribe",
                     table,
                     "--connect",
@@ -181,7 +182,7 @@ class Skdb(val name: String, private val dbPath: String) {
             .decode()
     val pb =
         ProcessBuilder(
-            USER_CONFIG.skdb_path,
+            ENV.skdbPath,
             "tail",
             "--data",
             dbPath,
@@ -239,13 +240,7 @@ class Skdb(val name: String, private val dbPath: String) {
     val connection =
         blockingRun(
             ProcessBuilder(
-                USER_CONFIG.skdb_path,
-                "subscribe",
-                table,
-                "--data",
-                dbPath,
-                "--notify",
-                notifyFile.path))
+                ENV.skdbPath, "subscribe", table, "--data", dbPath, "--notify", notifyFile.path))
 
     if (!connection.exitSuccessfully()) {
       throw RuntimeException("Notify failed")
@@ -287,9 +282,9 @@ class Skdb(val name: String, private val dbPath: String) {
     if (File(dbPath).exists()) {
       throw RuntimeException("db ${dbPath} already exists")
     }
-    val initScript = Files.readString(Path.of(USER_CONFIG.skdb_init_path), Charsets.UTF_8)
-    blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "--init", dbPath))
-    blockingRun(ProcessBuilder(USER_CONFIG.skdb_path, "--data", dbPath), initScript)
+    val initScript = Files.readString(Path.of(ENV.skdbInitPath), Charsets.UTF_8)
+    blockingRun(ProcessBuilder(ENV.skdbPath, "--init", dbPath))
+    blockingRun(ProcessBuilder(ENV.skdbPath, "--data", dbPath), initScript)
     sql(
         "INSERT INTO skdb_users VALUES (0, '${DB_ROOT_USER}', @key)",
         mapOf("key" to encryptedRootPrivateKey),
@@ -310,12 +305,12 @@ fun openSkdb(db: String?): Skdb? {
     return null
   }
 
-  val dbPath = USER_CONFIG.resolveDbPath(db)
+  val dbPath = ENV.resolveDbPath(db)
   if (!File(dbPath).exists()) return null
 
   return Skdb(db, dbPath)
 }
 
 fun createSkdb(db: String, encryptedRootPrivateKey: String): Skdb {
-  return Skdb(db, USER_CONFIG.resolveDbPath(db)).createDb(encryptedRootPrivateKey)
+  return Skdb(db, ENV.resolveDbPath(db)).createDb(encryptedRootPrivateKey)
 }

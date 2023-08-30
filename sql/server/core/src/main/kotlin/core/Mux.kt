@@ -1,4 +1,4 @@
-package io.skiplabs.skgw
+package io.skiplabs.skdb
 
 import io.undertow.websockets.WebSocketConnectionCallback
 import io.undertow.websockets.core.AbstractReceiveListener
