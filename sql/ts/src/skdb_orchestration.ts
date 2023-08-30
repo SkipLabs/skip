@@ -1,5 +1,5 @@
 import { Environment } from "#std/sk_types";
-import { Orchestrable, metadataTable, Server } from "#skdb/skdb_types";
+import { SkdbMechanism, metadataTable, Server } from "#skdb/skdb_types";
 
 const npmVersion = "";
 
@@ -1223,7 +1223,7 @@ class Stream {
 
 export async function connect(
   env: Environment,
-  client: Orchestrable,
+  client: SkdbMechanism,
   endpoint: string,
   db: string,
   creds: Creds,
@@ -1237,7 +1237,7 @@ export async function connect(
 
 class SKDBServer implements Server {
   private env: Environment;
-  private client: Orchestrable;
+  private client: SkdbMechanism;
   private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
@@ -1245,7 +1245,7 @@ class SKDBServer implements Server {
 
   private constructor(
     env: Environment,
-    client: Orchestrable,
+    client: SkdbMechanism,
     connection: ResilientMuxedSocket,
     creds: Creds,
   ) {
@@ -1257,7 +1257,7 @@ class SKDBServer implements Server {
 
   static async connect(
     env: Environment,
-    client: Orchestrable,
+    client: SkdbMechanism,
     endpoint: string,
     db: string,
     creds: Creds,

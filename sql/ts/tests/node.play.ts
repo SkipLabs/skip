@@ -7,7 +7,7 @@ import { ms_tests } from './muxed_socket';
 // @ts-ignore
 import { setup, apitests } from './apitests';
 // @ts-ignore
-import { createDatabase } from 'skdb';
+import { createSkdb } from 'skdb';
 // @ts-ignore
 import { webcrypto as crypto } from 'crypto';
 // @ts-ignore
@@ -22,13 +22,12 @@ var encoder = new util.TextEncoder();
 
 function gatherCredential() {
   // @ts-ignore
-  let result = [...process.env.SKDB_CREDENTIALS.matchAll(/\{skdb_service_mgmt: \{root: ([^\}]+)\}\}/g)];
-  return result[0][1];
+  return process.env.SKDB_CREDENTIAL;
 }
 
 function run(t, asWorker: boolean) {
   test(t.name, async () => {
-    let skdb = await createDatabase(undefined, asWorker);
+    let skdb = await createSkdb({asWorker: asWorker});
     let res = await t.fun(skdb);
     t.check(res);
   });

@@ -1,13 +1,13 @@
 // @ts-ignore
 import { expect } from '@playwright/test';
 // @ts-ignore
-import { createDatabase, TSKDB } from 'skdb';
+import { createSkdb, TSKDB } from 'skdb';
 
 type dbs = { root: TSKDB, user: TSKDB };
 
 export async function setup(credentials: string, port: number, crypto) {
   const host = "ws://localhost:" + port;
-  let skdb = await createDatabase(undefined, false);
+  let skdb = await createSkdb({asWorker: false});
   {
     const b64key = credentials;
     const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0));
@@ -18,7 +18,7 @@ export async function setup(credentials: string, port: number, crypto) {
   const testRootCreds = await skdb.createServerDatabase("test");
   skdb.serverClose();
   
-  const rootSkdb = await createDatabase(undefined, false);
+  const rootSkdb = await createSkdb({asWorker: false});
   {
     const keyData = testRootCreds.privateKey;
     const key = await crypto.subtle.importKey(
@@ -28,7 +28,7 @@ export async function setup(credentials: string, port: number, crypto) {
 
   const testUserCreds = await rootSkdb.createServerUser();
 
-  const userSkdb = await createDatabase(undefined, false);
+  const userSkdb = await createSkdb({asWorker: false});
   {
     const keyData = testUserCreds.privateKey;
     const key = await crypto.subtle.importKey(

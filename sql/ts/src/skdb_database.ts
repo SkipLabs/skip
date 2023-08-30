@@ -1,9 +1,9 @@
 
 import { Environment, FileSystem} from "#std/sk_types";
-import { Orchestrable, SKDB, Server, SKDBCallable, Utility} from "#skdb/skdb_types";
+import { SkdbMechanism, SKDB, Server, SKDBCallable, Utility} from "#skdb/skdb_types";
 import { connect } from "#skdb/skdb_orchestration";
 
-class OrchestrableImpl implements Orchestrable {
+class SkdbMechanismImpl implements SkdbMechanism {
   writeCsv: (table: string, payload: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
@@ -133,7 +133,7 @@ export class SKDBImpl implements SKDB {
     
     this.server = await connect(
       this.environment, 
-      new OrchestrableImpl(this, this.fs, this.environment.encodeUTF8),
+      new SkdbMechanismImpl(this, this.fs, this.environment.encodeUTF8),
       endpoint,
       db,
       creds

@@ -1,4 +1,4 @@
-import { createOnMain } from "#skdb/skdb";
+import { createSkdb } from "#skdb/skdb";
 import { SKDB } from "#skdb/skdb_types";
 import {Function, Return, Message} from "#std/sk_worker";
 
@@ -24,7 +24,10 @@ var onMessage = (message: MessageEvent) => {
       if (db) {
         post(new Message(data.id, new Return(false, "Database already created")));
       } else {
-        createOnMain(parameters[0]).then(
+        createSkdb({
+          dbName: parameters[0],
+          asWorker: false,
+        }).then(
           created => {
             db = created;
             post(new Message(data!.id, new Return(true, null)))

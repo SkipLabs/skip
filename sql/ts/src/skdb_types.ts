@@ -37,7 +37,7 @@ export interface SKDB {
   serverClose: () => Promise<void>;
 }
 
-export interface Orchestrable {
+export interface SkdbMechanism {
   writeCsv: (table: string, payload: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
