@@ -25,7 +25,7 @@ function run(t, asWorker: boolean) {
       // @ts-ignore
       let m = await import('./node_modules/skdb/dist/skdb.mjs');
       // @ts-ignore
-      let skdb = await m.createDatabase(undefined, window.asWorker);
+      let skdb = await m.createSkdb({asWorker: window.asWorker});
       // @ts-ignore
       return await window.test(skdb);
     });

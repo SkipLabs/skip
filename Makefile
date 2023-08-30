@@ -63,8 +63,8 @@ sql/js/dist/index.html: sql/js/tests/index.html
 	mkdir -p sql/js/dist
 	cp $^ $@
 
-$(STDMAN_DIR):
-	cd $(dirname $(STDMAN_DIR)) && sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
+$(SDKMAN_DIR):
+	cd $(dirname $(SDKMAN_DIR)) && sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
 
 ################################################################################
 # sknpm native binary

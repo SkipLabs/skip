@@ -14,11 +14,7 @@ import java.nio.ByteBuffer
 import java.security.SecureRandom
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
-import java.util.Properties
-import java.util.Optional
 import kotlin.system.exitProcess
-import java.nio.file.Paths
-import java.nio.file.Files
 
 fun Credentials.toProtoCredentials(): ProtoCredentials {
   return ProtoCredentials(accessKey, ByteBuffer.wrap(privateKey))

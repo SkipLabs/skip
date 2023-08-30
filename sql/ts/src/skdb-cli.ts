@@ -4,14 +4,14 @@ import { parseArgs } from "util";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { createOnMain } from "#skdb/skdb";
+import { createSkdb } from "#skdb/skdb";
 import { webcrypto } from 'crypto';
 import * as readline from 'readline/promises';
 import * as process from 'process';
 import * as repl from 'repl';
 
 const createConnectedSkdb = async function(endpoint, database, { accessKey, privateKey }) {
-  const skdb = await createOnMain();
+  const skdb = await createSkdb({asWorker:false});
   const keyBytes = Buffer.from(privateKey, 'base64');
   const key = await webcrypto.subtle.importKey(
     "raw", keyBytes, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
