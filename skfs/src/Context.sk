@@ -48,11 +48,6 @@ native fun genSym(Int): Int;
 
 const debugMode: Bool = false;
 
-// Unused constants. Are defined because of a bug in the compiler ... Sigh.
-
-const dummyDirty: Map<DirName, Set<Key>> = Map[];
-const dummyDirtyReaders: Map<DirName, Map<DirName, Set<Key>>> = Map[];
-
 /*****************************************************************************/
 /* The types used to manage dependencies. */
 /*****************************************************************************/
@@ -1160,20 +1155,6 @@ fun callAfterUnlock(
 }
 
 /*****************************************************************************/
-/* Unsafe new consts mode
- * You should never use this. This mode allows new consts to change.
- * You can only use this option if you are absolutely sure that no constant
- * will ever end up in SKStore. If that happend, the system would segfault.
- */
-/*****************************************************************************/
-
-@cpp_extern("SKIP_unsafe_enable_new_const_mode")
-native fun unsafeEnableNewConstMode(): void;
-
-@cpp_extern("SKIP_unsafe_disable_new_const_mode")
-native fun unsafeDisableNewConstMode(): void;
-
-/*****************************************************************************/
 /* Locks/Conditions. */
 /*****************************************************************************/
 
@@ -1233,19 +1214,6 @@ native fun freezeCond(cond: mutable Condition): Condition;
 
 @cpp_extern("SKIP_unfreeze_cond")
 native fun unfreezeCond(cond: Condition): mutable Condition;
-
-/*****************************************************************************/
-/* External process handling. Basically a thin layer on top of popen/pclose. */
-/*****************************************************************************/
-
-@cpp_extern("SKIP_exec")
-native fun exec(String): Int32;
-
-@cpp_extern("SKIP_write_to_proc")
-native fun writeToProc(Int32, String): void;
-
-@cpp_extern("SKIP_wait_for_proc")
-native fun waitForProc(Int32): Int32;
 
 /*****************************************************************************/
 /* Runtime primitives. */
@@ -1333,24 +1301,8 @@ native fun gHasContext(): UInt32;
 native fun gUnsafeFree(Context): void;
 
 @debug
-@cpp_extern("SKIP_context_ref_count")
-native fun gContextRefCount(): Int;
-
-@debug
-@cpp_extern("sk_verify_shared")
-native fun .verify(Context): void;
-
-@debug
 @cpp_extern("SKIP_should_GC")
 native fun shouldGC(Obstack): UInt32;
-
-@debug
-@cpp_extern("SKIP_disable_GC")
-native fun disableGC(): void;
-
-@debug
-@cpp_extern("SKIP_enable_GC")
-native fun enableGC(): void;
 
 @cpp_extern("SKIP_print_persistent_size")
 native fun printPersistentSize(): void;
