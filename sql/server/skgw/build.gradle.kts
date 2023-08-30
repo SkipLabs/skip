@@ -61,6 +61,7 @@ task("runCli", JavaExec::class) {
 }
 
 tasks.jar {
+    dependsOn(":core:jar")
     manifest.attributes["Main-Class"] = "io.skiplabs.skdb.AppKt"
     val dependencies = configurations
         .runtimeClasspath
