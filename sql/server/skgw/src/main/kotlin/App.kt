@@ -338,10 +338,7 @@ fun connectionHandler(
 
 fun createHttpServer(connectionHandler: HttpHandler): Undertow {
   var pathHandler = PathTemplateHandler().add("/dbs/{database}/connection", connectionHandler)
-  return Undertow.builder()
-      .addHttpListener(USER_CONFIG.port, "0.0.0.0")
-      .setHandler(pathHandler)
-      .build()
+  return Undertow.builder().addHttpListener(ENV.port, "0.0.0.0").setHandler(pathHandler).build()
 }
 
 fun envIsSane(): Boolean {
@@ -380,7 +377,7 @@ private fun createServiceMgmtDb(encryption: EncryptionTransform) {
 
 private fun devColdStart(encryption: EncryptionTransform) {
   System.err.println("Environment checks failed, cold starting the system because of dev flag")
-  val path = USER_CONFIG.resolveDbPath(SERVICE_MGMT_DB_NAME)
+  val path = ENV.resolveDbPath(SERVICE_MGMT_DB_NAME)
   val removed = File(path).delete()
   if (removed) {
     System.err.println("Removed ${path}")
@@ -389,7 +386,16 @@ private fun devColdStart(encryption: EncryptionTransform) {
   System.err.println(
       "skdb.credentials={\"${SERVICE_MGMT_DB_NAME}\": {\"${creds.accessKey}\": \"${creds.b64privateKey()}\"}}")
 
-  val command = listOf("/bin/bash", "-c", USER_CONFIG.cliCommand(creds))
+  val command =
+      listOf(
+          "/bin/bash",
+          "-c",
+          String.format(
+              ENV.addCredFormat,
+              ENV.port,
+              SERVICE_MGMT_DB_NAME,
+              creds.accessKey,
+              creds.b64privateKey()))
   val proc = ProcessBuilder().inheritIO().command(command).start()
   val status = proc.waitFor()
   if (status != 0) {
@@ -411,7 +417,7 @@ fun main(args: Array<String>) {
   if (configIdx >= 0 && arglist.size > configIdx + 1) {
     val configFile = arglist.get(configIdx + 1)
     if (File(configFile).exists()) {
-      USER_CONFIG = UserConfig.fromFile(configFile)
+      ENV = UserConfig.fromFile(configFile)
     }
   }
 

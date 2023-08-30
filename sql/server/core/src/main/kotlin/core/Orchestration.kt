@@ -4,8 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.StandardCharsets
 
-// the orchestration protocol. App.kt implements the behaviour, this
-// file factors out the encoding/decoding of messages to reduce noise
+// the orchestration protocol
 
 // 10MiB ought to be enough for anybody
 val MAX_QUERY_LENGTH = 10 * 1024 * 1024
