@@ -3,7 +3,9 @@
 set -x
 set -e
 
-cd ~/code/skfs || exit 1
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+REPO="$SCRIPT_DIR/../../.."
+cd $REPO || exit 1
 
 find . -name state.db|xargs rm
 
