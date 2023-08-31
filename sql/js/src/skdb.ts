@@ -420,6 +420,9 @@ export class SKDB {
       SKIP_print_error: function (str) {
         console.error(wasmStringToJS(data.exports, str));
       },
+      SKIP_print_error_raw: function (str) {
+        console.error(wasmStringToJS(data.exports, str));
+      },
       SKIP_print_debug: function (str) {
         console.error(wasmStringToJS(data.exports, str));
       },
