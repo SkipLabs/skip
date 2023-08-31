@@ -176,6 +176,11 @@ const firstPair = Object.entries(dbCreds)[0];
 const accessKey = args.values['access-key'] ?? firstPair[0];
 const privateKey = dbCreds[accessKey];
 
+if (!privateKey) {
+  console.log(`Could not find private key for access key: ${accessKey}`);
+  process.exit(1);
+}
+
 const skdb = await createConnectedSkdb(args.values.host, args.values.db, {
   accessKey: accessKey,
   privateKey: privateKey,
