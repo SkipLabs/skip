@@ -618,17 +618,18 @@ fun replayDiff(
         userFileOpt match {
         | None() -> void
         | Some(userFile) ->
-          hasError = false;
           for (row in newRows) {
             SKDB.checkUserCanWriteRow(context, userFile, table, row) match {
             | SKDB.AROK() -> void
             | SKDB.ARError(err) ->
               print_error("Error: " + err.toString());
-              !hasError = true
+              // either a user is doing something nefarious or we've
+              // hit a race which currently will lead to diverging
+              // state that cannot heal. notify the client asap to
+              // prevent further divergence.
+              SKDB.setFinalState(context, identity, SKDB.RSError());
+              throw SKDB.IgnoreAndContinue() // will reboot on next iteration
             }
-          };
-          if (hasError) {
-            throw SKDB.IgnoreAndContinue()
           }
         };
         buffer.extend(newRows);
