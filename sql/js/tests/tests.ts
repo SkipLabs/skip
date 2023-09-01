@@ -120,7 +120,6 @@ export const tests = [{
 }, {
     name: 'Integer root is computed',
     fun: skdb => {
-      // setup
       skdb.sqlRaw(
         'create table if not exists todos (id integer primary key, text text, completed integer);'
       );
@@ -143,7 +142,6 @@ export const tests = [{
 }, {
     name: 'String root is computed',
     fun: skdb => {
-      // setup
       skdb.sqlRaw(
         'create table if not exists todos (id integer primary key, text text, completed integer);'
       );
@@ -166,7 +164,6 @@ export const tests = [{
 }, {
     name: 'Composite root is computed',
     fun: skdb => {
-      // setup
       skdb.sqlRaw(
         'create table if not exists todos (id integer primary key, text text, completed integer);'
       );
@@ -187,6 +184,31 @@ export const tests = [{
     },
     check: res => {
       expect(res).toEqual({text: "foo"});
+    }
+}, {
+    name: 'Multiple roots',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (1, 'bar', 1);");
+
+      const foo = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return results[0].text
+      });
+      const bar = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 1");
+        return results[0].text
+      });
+
+      skdb.addRoot("foo", foo);
+      skdb.addRoot("bar", bar);
+      return [skdb.getRoot("foo"), skdb.getRoot("bar")];
+    },
+    check: res => {
+      expect(res).toEqual(["foo", "bar"]);
     }
 }, {
     name: 'Params 1',
