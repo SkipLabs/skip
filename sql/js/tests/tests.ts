@@ -211,6 +211,38 @@ export const tests = [{
       expect(res).toEqual(["foo", "bar"]);
     }
 }, {
+    name: 'Registered function called only when tracked query changes',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+
+      const ROOT_ID = 'app';
+
+      let counter = 0;
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        counter = counter + 1;
+        return {
+          text: results[0].text,
+        }
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+      skdb.sqlRaw("insert into todos values (1, 'bar', 1);")
+      skdb.sqlRaw("update todos set text = 'baz' where id = 1;");
+
+      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+      skdb.sqlRaw("update todos set text = 'quux';");
+
+      return counter;
+    },
+    check: res => {
+      expect(res).toEqual(3);   // once for initial and then two updates
+    }
+}, {
     name: 'Params 1',
     fun: skdb => {
       skdb.sql('CREATE TABLE t1 (a INTEGER);');
