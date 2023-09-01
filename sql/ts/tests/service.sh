@@ -28,9 +28,11 @@ mkdir -p $4
 
 source $1/bin/sdkman-init.sh
 
-if [ ! -d "$1/candidates/java" ]
+sdk list java > $4/list.log
+
+if [ ! -d "$1/candidates/java/20.0.2-tem" ]
 then
-    sdk install java 1>&2 > $4/install.log
+    sdk install java 20.0.2-tem 1>&2 > $4/install.log
 fi
 
 if [ ! -d "$1/candidates/gradle" ]
@@ -67,6 +69,17 @@ do
     sleep 1
     i=$((i+1))
 done
+
+if [ $i -lt 10 ]; then
+  i=0
+  while ! [ -f ~/.skdb/credentials ];
+  do
+    sleep 1
+    i=$((i+1))
+  done
+fi
+
+sleep 2
 
 key=$(jq -r ".[\"ws://localhost:$skdb_port\"].skdb_service_mgmt.root" < ~/.skdb/credentials)
 
