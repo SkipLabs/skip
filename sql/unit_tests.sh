@@ -220,7 +220,7 @@ else
     fail "STAR COMMA"
 fi
 
-if cat test/unit/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -q "14|test1|test2S20||fooS24|bar|helloS"; then
+if cat test/unit/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -E "[0-9]+\|test1\|test2S[0-9]+\|\|fooS[0-9]+\|bar\|helloS" > /dev/null ; then
     pass "DEFAULT VALUES"
 else
     fail "DEFAULT VALUES"

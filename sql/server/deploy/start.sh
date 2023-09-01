@@ -11,9 +11,9 @@ if [ -f ~/.skdb/config.prop ];then
     eval ${key}="\${value}"
   done < "$file"
   if [[ $# -gt 0 ]]; then
-    server_args="$* --config $(realpath ~/.skdb/config.prop)"
+    server_args="$* --config $file"
   else
-    server_args="--config $(realpath ~/.skdb/config.prop)"
+    server_args="--config $file"
   fi
 else
   if [[ $# -gt 0 ]]; then
