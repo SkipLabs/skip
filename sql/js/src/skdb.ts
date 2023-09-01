@@ -637,7 +637,7 @@ export class SKDB {
       for (const update of updates) {
         if (update.substring(0, 1) === "0") continue;
         let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        this.roots.set(json.name, json.value);
+        this.roots.set(json.name, JSON.parse(json.value));
         changed.set(json.name, true);
       }
       for (const f of this.onRootChangeFuns) {

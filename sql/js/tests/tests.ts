@@ -118,29 +118,75 @@ export const tests = [{
         expect(res).toEqual(11);
     }
 }, {
-    name: 'Adding a root',
+    name: 'Integer root is computed',
     fun: skdb => {
-        skdb.sqlRaw(
-            'create table if not exists todos (id text primary key, text text, completed integer);'
-        );
+      // setup
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw(
+        "insert into todos values (0, 'foo', 0);"
+      );
+      const ROOT_ID = 'app';
 
-        const ROOT_ID = 'todosRoot';
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select id from todos where id = 0");
+        return results[0].id
+      });
 
-        // Make a callable that returns the SQL query string we want to run
-        const queryStringCallable = skdb.registerFun(() => `select * from todos`);
-
-        // Make a tracked function which fetches the query string and then runs the query
-        const todos = skdb.registerFun(() => {
-            const queryString = skdb.trackedCall(queryStringCallable, null);
-            return skdb.trackedQuery(queryString);
-        });
-
-        // Add a root for the tracked function and get its result
-        skdb.addRoot(ROOT_ID, todos, null);
-        return skdb.getRoot(ROOT_ID);
+      skdb.addRoot(ROOT_ID, todos, null);
+      return skdb.getRoot(ROOT_ID);
     },
     check: res => {
-        expect(res).toEqual("[]");
+      expect(res).toEqual(0);
+    }
+}, {
+    name: 'String root is computed',
+    fun: skdb => {
+      // setup
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw(
+        "insert into todos values (0, 'foo', 0);"
+      );
+      const ROOT_ID = 'app';
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return results[0].text
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+      return skdb.getRoot(ROOT_ID);
+    },
+    check: res => {
+      expect(res).toEqual("foo");
+    }
+}, {
+    name: 'Composite root is computed',
+    fun: skdb => {
+      // setup
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw(
+        "insert into todos values (0, 'foo', 0);"
+      );
+      const ROOT_ID = 'app';
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return {
+          text: results[0].text,
+        }
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+      return skdb.getRoot(ROOT_ID);
+    },
+    check: res => {
+      expect(res).toEqual({text: "foo"});
     }
 }, {
     name: 'Params 1',
