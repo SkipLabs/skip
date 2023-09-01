@@ -2258,7 +2258,7 @@ class SKDBServer {
     if (this.mirroredTables.has(tableName)) {
       return;
     }
-    let viewExists = await this.viewSchema(tableName) != "";
+    let isViewOnRemote = await this.viewSchema(tableName) != "";
     // TODO: just assumes that if it exists the schema is the same
     if (!this.client.tableExists(tableName)) {
       let createTable = await this.tableSchema(tableName);
@@ -2269,14 +2269,14 @@ class SKDBServer {
          key STRING PRIMARY KEY,
          value STRING
        )`);
-      if (viewExists) {
+      if (isViewOnRemote) {
         this.client.runLocal(["toggle-view", tableName], "");
       }
     }
     
     this.client.assertCanBeMirrored(tableName);
     let session = "@view"
-    if (!viewExists) {
+    if (!isViewOnRemote) {
       session = await this.establishLocalTail(tableName);
     }
 

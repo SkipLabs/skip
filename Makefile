@@ -5,8 +5,8 @@ all: npm build/skdb build/init.sql
 
 PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
-SKARGO_WASM=sql/target/wasm32/$(SKARGO_PROFILE)/skdb.wasm
-SKARGO_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
+SKDB_WASM=sql/target/wasm32/$(SKARGO_PROFILE)/skdb.wasm
+SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 
 ################################################################################
 # skdb wasm + js client
@@ -24,9 +24,9 @@ sql/target/wasm32/dev/skdb.wasm: sql/src/* skfs/src/*
 sql/target/wasm32/release/skdb.wasm: sql/src/* skfs/src/*
 	cd sql && skargo build --release --target wasm32
 
-sql/js/dist/skdb.wasm: $(SKARGO_WASM)
+sql/js/dist/skdb.wasm: $(SKDB_WASM)
 	mkdir -p sql/js/dist
-	cp $(SKARGO_WASM) $@
+	cp $(SKDB_WASM) $@
 
 sql/js/node_modules: sql/js/package.json
 	cd sql/js && npm install
@@ -65,7 +65,7 @@ sql/target/host/release/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build --release
 
 # TODO: keeping this for now as nearly all test scripts refer to build/skdb
-build/skdb: $(SKARGO_BIN)
+build/skdb: $(SKDB_BIN)
 	mkdir -p build
 	cp $^ $@
 
@@ -95,8 +95,8 @@ fmt:
 
 .PHONY: test
 test: SKARGO_PROFILE=dev
-test: SKARGO_WASM=sql/target/wasm32/dev/skdb.wasm
-test: SKARGO_BIN=sql/target/host/dev/skdb
+test: SKDB_WASM=sql/target/wasm32/dev/skdb.wasm
+test: SKDB_BIN=sql/target/host/dev/skdb
 test: test-native test-wasm
 
 .PHONY: test-native
