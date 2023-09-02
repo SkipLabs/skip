@@ -454,8 +454,5 @@ fun execRun(args: Cli.ParseResults): void {
     // TODO: colors
     print_error(`>> ${cmdArgs.join(" ")}`)
   };
-  p = system(cmdArgs.join(" "));
-  if (p != 0) {
-    throw SystemCallException(p);
-  }
+  Posix.execvp(cmdArgs)
 }
