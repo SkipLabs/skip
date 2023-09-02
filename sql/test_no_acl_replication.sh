@@ -3,7 +3,8 @@
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB_BIN=./target/host/$SKARGO_PROFILE/skdb
+
+SKDB_BIN="skargo run --profile $SKARGO_PROFILE -- "
 
 SERVER_DB=/tmp/server.db
 LOCAL_DB=/tmp/local.db
