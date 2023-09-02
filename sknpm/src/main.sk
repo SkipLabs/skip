@@ -251,7 +251,10 @@ fun manage(
   optBinName: ?String = None(),
 ): void {
   npmDir = optTarget.default(Path.join(bc.targetDir, "npm"));
-  invariant(FileSystem.exists(bc.targetDir), "Binaries not built.");
+  invariant(
+    FileSystem.exists(bc.targetDir),
+    "Wasm not generated. Run 'skargo b --target wasm32' before",
+  );
   tsDir = Path.join(bc.targetDir, "ts");
   _ = system("mkdir -p " + tsDir);
   dependencies = mutable Vector[];
@@ -364,6 +367,10 @@ fun manage(
     },
     bc.env.verbose,
   );
+  for (bin in bc.env.manifest.bin) {
+    wasmFile = Path.join(bc.targetDir, bin.name + ".wasm");
+    Skargo.run(Array["cp", wasmFile, distDir], bc.env.verbose);
+  };
   if (bc.env.verbose) {
     print_string(">> Copy mapping files associating '.mjs' instead of '.js'.");
   };
