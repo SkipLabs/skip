@@ -291,6 +291,10 @@ void sk_context_set_unsafe(char* obj) {
 /*****************************************************************************/
 
 static char* parse_args(int argc, char** argv, int* is_init) {
+  if (argc > 0 && strcmp(argv[0], "skargo") == 0 ) {
+    return NULL;
+  }
+
   int i;
   int idx = -1;
 
