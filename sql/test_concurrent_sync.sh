@@ -6,7 +6,8 @@ fail() { printf "%-20s FAILED\n" "$1:"; }
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB=./target/host/$SKARGO_PROFILE/skdb
+
+SKDB="skargo run --profile $SKARGO_PROFILE -- "
 
 # Test that launches a bunch of unix process that insert numbers in a table
 # concurrently. We check at the end that the sum of the numbers is correct.
