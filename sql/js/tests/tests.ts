@@ -245,7 +245,7 @@ export const tests = [{
       let counter = 0;
 
       const todos = skdb.registerFun(() => {
-        let results = skdb.trackedQuery("select text from todos where id = 0");
+        let results = skdb.trackedQuery("select text from todos where id < 10");
         counter = counter + 1;
         return {
           text: results[0].text,
@@ -253,16 +253,17 @@ export const tests = [{
       });
 
       skdb.addRoot(ROOT_ID, todos, null);
-      skdb.sqlRaw("insert into todos values (1, 'bar', 1);")
-      skdb.sqlRaw("update todos set text = 'baz' where id = 1;");
+      skdb.sqlRaw("insert into todos values (11, 'bar', 1);")
+      skdb.sqlRaw("update todos set text = 'baz' where id = 11;");
 
+      skdb.sqlRaw("insert into todos values (1, 'bar', 1);")
       skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
       skdb.sqlRaw("update todos set text = 'quux';");
 
       return counter;
     },
     check: res => {
-      expect(res).toEqual(3);   // once for initial and then two updates
+      expect(res).toEqual(4);   // once for initial, insert, and then two updates
     }
 }, {
     name: 'Registered function called only when complex tracked query changes',
