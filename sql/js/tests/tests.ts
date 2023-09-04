@@ -243,6 +243,41 @@ export const tests = [{
       expect(res).toEqual(3);   // once for initial and then two updates
     }
 }, {
+    name: 'Registered function called only when complex tracked query changes',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (1, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (2, 'foo', 1);");
+      skdb.sqlRaw("insert into todos values (3, 'foo', 0);");
+
+      const ROOT_ID = 'app';
+
+      let counter = 0;
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select completed, count(*) as n from (select * from todos where id > 0) group by completed");
+        counter = counter + 1;
+        const acc = {}
+        for (const row of results) {
+          acc[row.completed] = row.n
+        }
+        return acc
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+
+      skdb.sqlRaw("insert into todos values (4, 'foo', 1);");
+      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+
+      return [counter, skdb.getRoot(ROOT_ID)];
+    },
+    check: res => {
+      expect(res).toEqual([2, {0: 2, 1: 2}]);
+    }
+}, {
     name: 'onRootChange called when root changes',
     fun: skdb => {
       skdb.sqlRaw(
