@@ -35,12 +35,13 @@ class File {
     if (!this.options || !this.options.write) {
       throw new Error("The file cannot be written")
     }
-    if (this.options.append || append) {
+    if (this.contents && this.options.append || append) {
       this.contents += contents;
+      this.withChange = true;
     } else {
       this.contents = contents;
+      this.withChange = this.contents != "";
     }
-    this.withChange = true;
     return contents.length;
   }
 
