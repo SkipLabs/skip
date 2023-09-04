@@ -1235,119 +1235,213 @@ class Options{
   expectQueryParams: Bool = false,
 } extends SKStore.File
 
+private mutable class SQLContext(
+  synchronizer: SKStore.Synchronizer,
+  sync: UInt32,
+  mutable globals: SortedMap<String, SKStore.File>,
+  mutable context: SKStore.Context,
+) {
+  static fun withContext<T>(sync: Bool, f: (mutable SQLContext) ~> T): T {
+    initCtx = SKDB.makeSqlContext().clone();
+    if (SKStore.gHasContext() == 0) {
+      SKStore.gContextInit(initCtx)
+    };
+    ctx = mutable SQLContext(
+      SKStore.Synchronizer(importFromRoot, exportToRoot, printContext),
+      UInt32::truncate(if (sync) 1 else 0),
+      initCtx.globals,
+      SKStore.gUnsafeContextGet(),
+    );
+    res = f(ctx);
+    SKStore.gUnsafeFree(ctx.context);
+    res
+  }
+
+  private mutable fun _exec(
+    f: SKStore.Context ~> (
+      SKStore.Context,
+      ?(
+        mutable SKStore.Context,
+        mutable SKStore.Context,
+        SKStore.Context,
+      ) ~> void,
+      Bool,
+    ),
+  ): Bool {
+    startTick = this.context.tick;
+    pos = SKStore.newObstack();
+    (newContext, underLockF, shouldContinue) = try {
+      Some(f(this.context with {globals => this.globals}))
+    } catch {
+    | exn ->
+      print_error(exn.getMessage());
+      None()
+    } match {
+    | Some(x) -> x
+    | None() ->
+      SKStore.destroyObstack(pos);
+      return false
+    };
+    this.!context = SKStore.gContextSync(
+      startTick,
+      this.context,
+      newContext,
+      Some(this.synchronizer),
+      this.sync,
+      underLockF,
+    );
+    this.context.notifyAll(startTick);
+
+    if (!shouldContinue) {
+      SKStore.destroyObstack(pos);
+      return false
+    };
+    SKStore.destroyObstack(pos);
+
+    this.!globals = this.context.globals;
+
+    true
+  }
+
+  mutable fun exec(
+    f: mutable SKStore.Context ~> (
+      ?(
+        mutable SKStore.Context,
+        mutable SKStore.Context,
+        SKStore.Context,
+      ) ~> void,
+      Bool,
+    ),
+  ): Bool {
+    this._exec(icontext ~> {
+      context = SKStore.Context::fromSaved(icontext);
+      (underLockF, shouldContinue) = f(context);
+      (context.clone(), underLockF, shouldContinue);
+    })
+  }
+}
+
 fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
   isTTY = isATTY() != 0;
-  runSql(options, context ~> {
-    if (isTTY) {
-      print_raw("skdb> ");
-    };
-    lineFile = SKStore.IntFile::type(context.getGlobal("Line").fromSome());
-    context.!globals = SortedMap[];
-    userOpt.each(_ -> {
-      print_error("Cannot execute queries as user, use --connect instead");
-      skipExit(88);
-    });
-    context.setGlobal("Line", lineFile);
-    context.removeGlobal("TableMap");
-
-    gline = lineFile.value;
-
-    line = 0;
-    lineStr = "";
-    buffer = Buffer(lineStr);
-    lex = Lexer(0, buffer);
-    pos = 0;
-    shouldContinue = false;
-    underLockF: ?((
-      mutable SKStore.Context,
-      mutable SKStore.Context,
-      SKStore.Context,
-    ) ~> void) = None();
-
-    doOnError(
-      options,
-      () -> {
-        !shouldContinue = true;
-        isTransaction = false;
-
-        loop {
-          !underLockF = None();
-          (!line, !lineStr) = read(gline);
-          !buffer = Buffer(lineStr);
-          !lex = Lexer(0, buffer);
-          !pos = 0;
-
-          if (isEOF(lex, pos)) {
-            !shouldContinue = false;
-            if (isTransaction) {
-              printErrorAndExit(line, buffer, pos, "Unfinished transaction");
-            };
-            return void;
-          };
-
-          if (lex.isEqUpper(pos, "BEGIN")) {
-            !pos = lex.expectUpper(pos, "BEGIN");
-            !pos = lex.expectUpper(pos, "TRANSACTION");
-            !pos = lex.expect(pos, ";");
-
-            if (isTransaction) {
-              printErrorAndExit(line, buffer, pos, "Nested transaction");
-            };
-            !isTransaction = true;
-            continue;
-          };
-
-          if (lex.isEqUpper(pos, "COMMIT")) {
-            !pos = lex.expectUpper(pos, "COMMIT");
-            !pos = lex.expect(pos, ";");
-            context.getGlobal(GLOBALS) match {
-            | None() -> void
-            | Some(_) -> context.removeGlobal(GLOBALS)
-            };
-            context.getGlobal(NAMEDIDS) match {
-            | None() -> void
-            | Some(_) -> context.removeGlobal(NAMEDIDS)
-            };
-            break void;
-          };
-
-          (!pos, stmtOpt) = parseStmt(lex, pos);
-          stmt = stmtOpt match {
-          | None() -> break void
-          | Some(x) -> x
-          };
-          markIfRead(context, stmt);
-
-          !underLockF = evalWithContext(
-            options,
-            context,
-            params,
-            stmt,
-            isTransaction,
-          );
-
-          if (!isTransaction) break void;
+  SQLContext::withContext(options.sync, (ctx) ~> {
+    loop {
+      shouldContinue = ctx.exec(context ~> {
+        if (isTTY) {
+          print_raw("skdb> ");
         };
-      },
-      err -> {
-        err match {
-        | IgnoreAndContinue() -> void
-        | Error(posError, str) ->
-          printErrorAndExit(gline, buffer, posError, str)
-        | exn ->
-          print_error(exn.getMessage());
-          skipExit(44)
-        }
-      },
-    );
+        lineFile = SKStore.IntFile::type(context.getGlobal("Line").fromSome());
+        context.!globals = SortedMap[];
+        userOpt.each(_ -> {
+          print_error("Cannot execute queries as user, use --connect instead");
+          skipExit(88);
+        });
+        context.setGlobal("Line", lineFile);
+        context.removeGlobal("TableMap");
 
-    !gline = line;
-    context.setGlobal("Line", SKStore.IntFile(gline));
+        gline = lineFile.value;
 
-    if (shouldContinue) {
-      SKStore.CContinue(underLockF)
-    } else {
-      SKStore.CStop(underLockF)
+        line = 0;
+        lineStr = "";
+        buffer = Buffer(lineStr);
+        lex = Lexer(0, buffer);
+        pos = 0;
+        shouldContinue = false;
+        underLockF: ?((
+          mutable SKStore.Context,
+          mutable SKStore.Context,
+          SKStore.Context,
+        ) ~> void) = None();
+
+        doOnError(
+          options,
+          () -> {
+            !shouldContinue = true;
+            isTransaction = false;
+
+            loop {
+              !underLockF = None();
+              (!line, !lineStr) = read(gline);
+              !buffer = Buffer(lineStr);
+              !lex = Lexer(0, buffer);
+              !pos = 0;
+
+              if (isEOF(lex, pos)) {
+                !shouldContinue = false;
+                if (isTransaction) {
+                  printErrorAndExit(
+                    line,
+                    buffer,
+                    pos,
+                    "Unfinished transaction",
+                  );
+                };
+                return void;
+              };
+
+              if (lex.isEqUpper(pos, "BEGIN")) {
+                !pos = lex.expectUpper(pos, "BEGIN");
+                !pos = lex.expectUpper(pos, "TRANSACTION");
+                !pos = lex.expect(pos, ";");
+
+                if (isTransaction) {
+                  printErrorAndExit(line, buffer, pos, "Nested transaction");
+                };
+                !isTransaction = true;
+                continue;
+              };
+
+              if (lex.isEqUpper(pos, "COMMIT")) {
+                !pos = lex.expectUpper(pos, "COMMIT");
+                !pos = lex.expect(pos, ";");
+                context.getGlobal(GLOBALS) match {
+                | None() -> void
+                | Some(_) -> context.removeGlobal(GLOBALS)
+                };
+                context.getGlobal(NAMEDIDS) match {
+                | None() -> void
+                | Some(_) -> context.removeGlobal(NAMEDIDS)
+                };
+                break void;
+              };
+
+              (!pos, stmtOpt) = parseStmt(lex, pos);
+              stmt = stmtOpt match {
+              | None() -> break void
+              | Some(x) -> x
+              };
+              markIfRead(context, stmt);
+
+              !underLockF = evalWithContext(
+                options,
+                context,
+                params,
+                stmt,
+                isTransaction,
+              );
+
+              if (!isTransaction) break void;
+            };
+          },
+          err -> {
+            err match {
+            | IgnoreAndContinue() -> void
+            | Error(posError, str) ->
+              printErrorAndExit(gline, buffer, posError, str)
+            | exn ->
+              print_error(exn.getMessage());
+              skipExit(44)
+            }
+          },
+        );
+
+        !gline = line;
+        context.setGlobal("Line", SKStore.IntFile(gline));
+
+        (underLockF, shouldContinue)
+      });
+      if (!shouldContinue) {
+        break void
+      }
     }
   })
 }
