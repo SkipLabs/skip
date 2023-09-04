@@ -339,6 +339,82 @@ export const tests = [{
       expect(res).toEqual([0, 0, 2]);
     }
 }, {
+    name: 'Tracked calls allow composing views made of tracked queries',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (1, 'bar', 1);");
+      skdb.sqlRaw("insert into todos values (2, 'baz', 0);");
+
+      let todoTextInvocations = 0;
+      const todoText = skdb.registerFun((id: number) => {
+        todoTextInvocations = todoTextInvocations + 1;
+        let results = skdb.trackedQuery(`select text from todos where id = ${id}`);
+        return {
+          text: results[0].text,
+        }
+      });
+
+      let uncompletedTodosInvocations = 0;
+      // somewhat convoluted example of view logic composition
+      let uncompletedTodos = skdb.registerFun(() => {
+        uncompletedTodosInvocations = uncompletedTodosInvocations + 1;
+        const ids = skdb.trackedQuery("select id from todos where completed = 0")
+        const acc = [];
+        for (const id of ids.map(x => x.id)) {
+          const t = skdb.trackedCall(todoText, id);
+          acc.push(t.text);
+        }
+        return acc;
+      });
+
+      const beforeRoot = [todoTextInvocations, uncompletedTodosInvocations];
+      skdb.addRoot("uncompleted", uncompletedTodos);
+      const afterRoot = [todoTextInvocations, uncompletedTodosInvocations];
+
+      // no invocations
+      skdb.sqlRaw("insert into todos values (3, 'bar', 1);")
+      skdb.sqlRaw("update todos set text = 'quux' where id = 1;");
+      const afterBenign = [todoTextInvocations, uncompletedTodosInvocations];
+
+      // only need to re-call one tracked query
+      skdb.sqlRaw("insert into todos values (4, 'new', 0);")
+      const afterInsert = [todoTextInvocations, uncompletedTodosInvocations];
+
+      // delete
+      skdb.sqlRaw("delete from todos where id = 0;")
+      const afterDelete = [todoTextInvocations, uncompletedTodosInvocations];
+
+      // everything updated (2 rows)
+      skdb.sqlRaw("update todos set text = 'update' where completed = 0");
+      const afterUpdate = [todoTextInvocations, uncompletedTodosInvocations];
+
+      const root = skdb.getRoot("uncompleted");
+
+      return [
+        beforeRoot, afterRoot, afterBenign, afterInsert,
+        afterDelete, afterUpdate, root
+      ];
+    },
+    check: res => {
+      expect(res).toEqual([
+        [0, 0],                 // no calls yet, definitions don't get run eagerly
+        [2, 1],                 // initial state built as now added to root
+        [2, 1],                 // no change as these mutations didn't touch interesting rows
+        [3, 2],                 // one new row, so one tracked query to execute and cascade up for the select id
+        [3, 4],                 // one less row, so tracked call twice (once for select id and once for the row select)
+        // TODO: this is currently quadratic behaviour. on updating 2
+        // rows, uncompletedTodos is called for each - which is fine - this
+        // calls the trackedCall for each row. but these are not
+        // cached as they should be and the trackedCall's query is
+        // re-run for each invocation. the following should be [5,6]
+        // not [6,6].
+        [6, 6],                 // 2 rows changed, so tracked call twice for each, tracked query 3 times??
+        ["update", "update"]]);
+    }
+}, {
     name: 'Params 1',
     fun: skdb => {
       skdb.sql('CREATE TABLE t1 (a INTEGER);');
