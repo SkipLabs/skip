@@ -211,6 +211,28 @@ export const tests = [{
       expect(res).toEqual(["foo", "bar"]);
     }
 }, {
+    name: 'Remove root',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 1);");
+
+      const foo = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return results[0].text
+      });
+
+      skdb.addRoot("foo", foo);
+      const root = skdb.getRoot("foo");
+      skdb.removeRoot("foo");
+      const rootAfterRemove = skdb.getRoot("foo");
+      return [root, rootAfterRemove];
+    },
+    check: res => {
+      expect(res).toEqual(["foo", undefined]);
+    }
+}, {
     name: 'Registered function called only when tracked query changes',
     fun: skdb => {
       skdb.sqlRaw(
