@@ -18,7 +18,7 @@ interface Exported {
   ) => void;
   SKIP_remove_root: (rootNameWasmStr: number) => void;
   SKIP_tracked_call: (funId: number, funArg: number) => number;
-  SKIP_tracked_query: (request: number, start: number, end: number) => number;
+  SKIP_tracked_query: (request: number, encoded_params: number, start: number, end: number) => number;
   getVersion: () => number;
 }
 
@@ -77,15 +77,16 @@ class UtilityImpl implements Utility {
     return JSON.parse(this.utils.importString(result));
   }
 
-  trackAndRegister<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, start?: number, end?: number) {
-    return this.registerFun(() => this.trackedQuery(this.trackedCall(callable, arg), start, end));
+  trackAndRegister<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, params: Map<string, string|number> = new Map(), start?: number, end?: number) {
+    return this.registerFun(() => this.trackedQuery(this.trackedCall(callable, arg), params, start, end));
   }
 
-  trackedQuery(request: string, start?: number, end?: number) {
+  trackedQuery(request: string, params: Map<string, string|number> = new Map(), start?: number, end?: number) {
     if (start === undefined) start = 0;
     if (end === undefined) end = -1;
     let result = this.exported.SKIP_tracked_query(
       this.utils.exportString(request),
+      this.utils.exportString(JSON.stringify(params ? params : null)),
       start,
       end
     );

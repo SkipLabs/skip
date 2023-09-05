@@ -73,7 +73,7 @@ export class SKDBImpl implements SKDB {
   removeRoot: (rootName: string) => void;
   getRoot: (rootName: string) => any;
   trackedCall: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => T2;
-  trackedQuery: (request: string, start?: number, end?: number) => any;
+  trackedQuery: (request: string, params: Map<string, string|number>, start?: number, end?: number) => any;
   onRootChange: (f: (rootName: string) => void) => void;
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
@@ -103,7 +103,7 @@ export class SKDBImpl implements SKDB {
     client.removeRoot = (rootName) => utility.removeRoot(rootName);
     client.getRoot = (rootName) => utility.getRoot(rootName);
     client.trackedCall = <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => utility.trackedCall(callable, arg);
-    client.trackedQuery = (request: string, start?: number, end?: number) => utility.trackedQuery(request, start, end);
+    client.trackedQuery = (request: string, params: Map<string, string|number> = new Map(), start?: number, end?: number) => utility.trackedQuery(request, params, start, end);
     client.runner = utility.runner;
     client.registerFun = <T1, T2>(f: (obj: T1) => T2) => utility.registerFun(f);
     client.runSubscribeRoots(utility);
