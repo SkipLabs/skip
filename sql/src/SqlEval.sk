@@ -306,8 +306,14 @@ class Evaluator{options: Options, user: ?UserFile} {
       })
     | Insert{pos, onConflict, name, paramsOpt, values} ->
       baseName = SKStore.SID::create(name.lower);
-      if (getTableDir(context).maybeGet(context, baseName) is None()) {
-        error(pos, "Table not found: " + name);
+      getTableDir(context).maybeGet(context, baseName) match {
+      | None() -> error(pos, "Table not found: " + name)
+      | Some(dirDescr) if (dirDescr.view) ->
+        error(pos, "Cannot write in view: " + name)
+      | _ -> void
+      };
+      if (!(getViewsDir(context).maybeGet(context, baseName) is None())) {
+        error(pos, "Cannot write in view: " + name);
       };
       values match {
       | IQuery(selectAst @ Select _) ->
@@ -409,6 +415,12 @@ class Evaluator{options: Options, user: ?UserFile} {
       if (viewsDir.getArrayRaw(key).size() != 0) {
         if (ifNotExists) return None();
         error(pos, "VIEW " + viewName + " already exists");
+      } else {
+        tables = getTableDir(context);
+        tablesDir = context.unsafeGetEagerDir(tables.dirName);
+        if (tablesDir.getArrayRaw(key).size() != 0) {
+          error(pos, "Table " + viewName + " exists");
+        };
       };
       cselect1 = SKDB.Compiler::create(
         false,
@@ -464,6 +476,7 @@ class Evaluator{options: Options, user: ?UserFile} {
             cselect.params,
             cselect.id,
             dirName,
+            true,
           );
           _selectDir = SKDB.evalSelect(context, cselect, None());
           tableDir = getTableDir(context);
