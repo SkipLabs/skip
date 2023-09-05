@@ -339,6 +339,66 @@ export const tests = [{
       expect(res).toEqual([0, 0, 2]);
     }
 }, {
+    name: 'A root can be updated/re-rendered with a new argument',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (1, 'bar', 0);");
+
+      const ROOT_ID = 'app';
+
+      const todos = skdb.registerFun((id) => {
+        let results = skdb.trackedQuery(`select text from todos where id = ${id}`);
+        return {
+          text: results[0].text,
+        }
+      });
+
+      skdb.addRoot(ROOT_ID, todos, 0);
+
+      let counter = 0;
+      skdb.onRootChange((_rootName) => {
+        counter = counter + 1;
+      });
+
+      const startCounter = counter;
+      const valueBefore = skdb.getRoot(ROOT_ID);
+      skdb.addRoot(ROOT_ID, todos, 1);
+      const valueAfter = skdb.getRoot(ROOT_ID);
+      const counterAfterRootChange = counter;
+
+      // change
+      skdb.sqlRaw("update todos set text = 'quux' where id = 1;");
+      const counterAfterChange = counter;
+
+      // would have updated the old root but not the new
+      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+      skdb.sqlRaw("update todos set text = 'xyz' where id = 0;");
+
+      return [
+        startCounter, counterAfterRootChange,
+        valueBefore, valueAfter,
+        skdb.getRoot(ROOT_ID),
+        counterAfterChange, counter,
+      ];
+    },
+    check: res => {
+      expect(res).toEqual([
+        0,                      // no executions, no changes yet
+        1,                      // root changed, because we updated it
+        {text: "foo"},          // initial value
+        {text: "bar"},          // after we change the arg
+        {text: "quux"},         // after we update the row the value changes
+        2,                      // change to the root so this bumps
+        // TODO: this should be 2. we wrongly trigger an update on the
+        // js subscription on the first update to the old value, but
+        // no more after that.
+        3,                      // not tracking the id=0 so this does not bump
+      ]);
+    }
+}, {
     name: 'Tracked calls allow composing views made of tracked queries',
     fun: skdb => {
       skdb.sqlRaw(
