@@ -74,13 +74,13 @@ async function promptDB() {
    "test.db",
    "julienv"
  );
-  //  await skdb.server.mirrorTable("user_profiles");
-  //  await skdb.server.mirrorTable("whitelist_skiplabs_employees");
-  //  await skdb.server.mirrorTable("posts");
-  //  await skdb.server.mirrorTable("all_access");
+  //  await skdb.server.mirror("user_profiles");
+  //  await skdb.server.mirror("whitelist_skiplabs_employees");
+  //  await skdb.server.mirror("posts");
+  //  await skdb.server.mirror("all_access");
 
   //  skdb.newServer("ws://127.0.0.1:3048", "test.db", "user6");
-  //  await skdb.server.mirrorTable('posts');
+  //  await skdb.server.mirror('posts');
   //  skdb.sql('create virtual view posts2 as select * from posts where localID % 2 = 0;');
   //  skdb.subscribe('posts2', function(str) {
   //    console.log('Recieved a change: ' + str);

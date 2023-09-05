@@ -286,6 +286,13 @@ untracked fun main(): void {
         ),
     )
     .subcommand(Cli.Command("replay").about("Replay a diff"))
+    .subcommand(
+      Cli.Command("toggle-view")
+        .about("Toggle view status of specified table")
+        .arg(
+          Cli.StringArg("table").positional().required().about("Table name"),
+        ),
+    )
     .subcommand(Cli.Command("debug").about("TODO"))
     .help();
 
@@ -330,6 +337,7 @@ untracked fun main(): void {
         | "subscribe" -> execSubscribe
         | "can-mirror" -> execCanMirror
         | "replay" -> execReplay
+        | "toggle-view" -> execToggleView
         | "debug" -> execDebug
         | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
         }
@@ -887,6 +895,25 @@ fun execReplay(_args: Cli.ParseResults, _options: SKDB.Options): void {
     for (_ in Range(0, repeat)) {
       print_string(value);
     }
+  })
+}
+
+fun execToggleView(args: Cli.ParseResults, _options: SKDB.Options): void {
+  ensureContext(args);
+  tableName = args.getString("table");
+  SKDB.runSql(_options, context ~> {
+    tables = getTableDir(context);
+    baseName = SKStore.SID::create(tableName.lowercase());
+    tables.maybeGet(context, baseName) match {
+    | None() -> error(0, "Table not found: " + tableName)
+    | Some(dirDescr) ->
+      tables.writeArray(
+        context,
+        baseName,
+        Array[dirDescr with {view => !dirDescr.view}],
+      )
+    };
+    SKStore.CStop(None())
   })
 }
 
