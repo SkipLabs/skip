@@ -29,10 +29,13 @@ export const tests = [{
 }, {
     name: 'Primary key 2',
     fun: skdb => {
-        skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
-        skdb.sqlRaw('insert into t1 (b) values (22);');
+      skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
+      skdb.sqlRaw("insert into t1 (a, b) values ('foo', 22);");
+      return skdb.sql('select a, b from t1');
     },
-    check: res => {}
+    check: res => {
+      expect(res).toEqual([{a: 'foo', b: 22}]);
+    }
 }, {
     name: 'Multiple field updates',
     fun: skdb => {
