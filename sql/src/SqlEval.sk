@@ -1759,16 +1759,58 @@ class InvalidTrackedQuery() extends Exception {
   }
 }
 
-class TrackedQuery(query: String, start: Int, end: ?Int) extends SKStore.Key {
+class TrackedQuery(
+  query: String,
+  encoded_params: String,
+  start: Int,
+  end: ?Int,
+) extends SKStore.Key {
   fun toString(): String {
     inspect(this).toString()
   }
 }
 
-fun initTrackedJSQueries(
-  context: mutable SKStore.Context,
-  params: Map<String, Value>,
-): void {
+// Decode a string to a JSON Object, expected to be a map from key
+// strings (parameter names) to values.
+fun decodeParams(encoded_params: String): Map<String, Value> {
+  try {
+    JSON.decode(encoded_params) match {
+    | map @ JSON.Object _ ->
+      map.value.mapItems((key, val) -> {
+        !key = key.stripPrefix("@");
+        lit = val match {
+        | JSON.Null() -> SKDB.VNull()
+        | JSON.IntNumber(v) -> SKDB.VInt(v)
+        | JSON.Bool(v) -> if (v) SKDB.VInt(1) else SKDB.VInt(0)
+        | JSON.FloatNumber(v) -> SKDB.VFloat(v)
+        | JSON.String(v) -> SKDB.VString(v)
+        | JSON.Array _
+        | JSON.Object _ ->
+          print_error(
+            "Value " +
+              val +
+              " of statement parameter" +
+              key +
+              " expected to be a literal value",
+          );
+          skipExit(2)
+        };
+        (key, lit)
+      })
+    | _ ->
+      print_error("Expected an encoded JSON Object, got: " + encoded_params);
+      skipExit(2)
+    }
+  } catch {
+  | exn ->
+    print_error(
+      "Decoding JSON failed: \"" + encoded_params + "\"\n" + exn.getMessage(),
+    );
+    skipExit(2)
+  }
+}
+
+fun initTrackedJSQueries(context: mutable SKStore.Context): void {
   _ = SKStore.LHandle::create(
     TrackedQuery::keyType,
     SKStore.StringFile::type,
@@ -1790,6 +1832,7 @@ fun initTrackedJSQueries(
           virtual => false,
           showUsedIndexes => false,
         };
+        params = decodeParams(query.encoded_params);
         compiler = SKDB.Compiler::create(false, skOptions, 0, params);
         tableMapCopy = context.getGlobal("TableMap");
         context.removeGlobal("TableMap");
@@ -1851,14 +1894,17 @@ fun initTrackedJSQueries(
 }
 
 @export("SKIP_tracked_query")
-fun trackedQuery(query: String, start: Int32, end: Int32): String {
-  // TODO: Accept params
-  params: Map<String, Value> = Map[];
+fun trackedQuery(
+  query: String,
+  encoded_params: String,
+  start: Int32,
+  end: Int32,
+): String {
   if (hasLocalContext() == 0) throw InvalidTrackedQuery();
   context = getLocalContext();
   ldir = context.unsafeMaybeGetLazyDir(trackedJSQueriesDirName) match {
   | None() ->
-    initTrackedJSQueries(context, params);
+    initTrackedJSQueries(context);
     context.unsafeGetLazyDir(trackedJSQueriesDirName)
   | Some(l) -> l
   };
@@ -1866,6 +1912,7 @@ fun trackedQuery(query: String, start: Int32, end: Int32): String {
     context,
     TrackedQuery(
       query,
+      encoded_params,
       start.toInt(),
       if (end == -1) None() else Some(end.toInt()),
     ),
