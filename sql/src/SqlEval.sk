@@ -4,6 +4,46 @@ module SKDB;
 /* Helper functions to evaluate SQL. */
 /*****************************************************************************/
 
+// Decode a string to a JSON Object, expected to be a map from key
+// strings (parameter names) to values.
+fun decodeParams(encoded_params: String): Map<String, Value> {
+  try {
+    JSON.decode(encoded_params) match {
+    | map @ JSON.Object _ ->
+      map.value.mapItems((key, val) -> {
+        !key = key.stripPrefix("@");
+        lit = val match {
+        | JSON.Null() -> SKDB.VNull()
+        | JSON.IntNumber(v) -> SKDB.VInt(v)
+        | JSON.Bool(v) -> if (v) SKDB.VInt(1) else SKDB.VInt(0)
+        | JSON.FloatNumber(v) -> SKDB.VFloat(v)
+        | JSON.String(v) -> SKDB.VString(v)
+        | JSON.Array _
+        | JSON.Object _ ->
+          print_error(
+            "Value " +
+              val +
+              " of statement parameter" +
+              key +
+              " expected to be a literal value",
+          );
+          skipExit(2)
+        };
+        (key, lit)
+      })
+    | _ ->
+      print_error("Expected an encoded JSON Object, got: " + encoded_params);
+      skipExit(2)
+    }
+  } catch {
+  | exn ->
+    print_error(
+      "Decoding JSON failed: \"" + encoded_params + "\"\n" + exn.getMessage(),
+    );
+    skipExit(2)
+  }
+}
+
 fun computeTableDescr(name: Name, schema: Array<TypeDescr>): DirDescr {
   dirNameStr = "/" + name + "/";
   dirName = SKStore.DirName::create(dirNameStr);
@@ -1473,46 +1513,6 @@ fun getQueryDepsHandle(
   | Some(dir) ->
     SKStore.EHandle(SKStore.IID::keyType, QueryDeps::type, dir.getDirName())
   };
-}
-
-// Decode a string to a JSON Object, expected to be a map from key
-// strings (parameter names) to values.
-fun decodeParams(encoded_params: String): Map<String, Value> {
-  try {
-    JSON.decode(encoded_params) match {
-    | map @ JSON.Object _ ->
-      map.value.mapItems((key, val) -> {
-        !key = key.stripPrefix("@");
-        lit = val match {
-        | JSON.Null() -> SKDB.VNull()
-        | JSON.IntNumber(v) -> SKDB.VInt(v)
-        | JSON.Bool(v) -> if (v) SKDB.VInt(1) else SKDB.VInt(0)
-        | JSON.FloatNumber(v) -> SKDB.VFloat(v)
-        | JSON.String(v) -> SKDB.VString(v)
-        | JSON.Array _
-        | JSON.Object _ ->
-          print_error(
-            "Value " +
-              val +
-              " of statement parameter" +
-              key +
-              " expected to be a literal value",
-          );
-          skipExit(2)
-        };
-        (key, lit)
-      })
-    | _ ->
-      print_error("Expected an encoded JSON Object, got: " + encoded_params);
-      skipExit(2)
-    }
-  } catch {
-  | exn ->
-    print_error(
-      "Decoding JSON failed: \"" + encoded_params + "\"\n" + exn.getMessage(),
-    );
-    skipExit(2)
-  }
 }
 
 fun printReactiveQueryResult(
