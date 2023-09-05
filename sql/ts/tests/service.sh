@@ -28,24 +28,27 @@ mkdir -p $4
 
 source $1/bin/sdkman-init.sh
 
-sdk list java > $4/list.log
-
 if [ ! -d "$1/candidates/java/20.0.2-tem" ]
 then
-    sdk install java 20.0.2-tem 1>&2 > $4/install.log
+    sdk install java 20.0.2-tem 1>&2 > $4/install_java.log
+    sleep 2
 fi
 
 if [ ! -d "$1/candidates/gradle" ]
 then
     echo "Installing gradle" 1>&2
-    sdk install gradle 8.3 1>&2 > $4/install.log
+    sdk install gradle 8.3 1>&2 > $4/install_gradle.log
+    sleep 2
 fi
+
 
 cd $2
 if [ ! -d "$2/.gradle" ] 
 then
     ./gradlew jar --no-daemon --console plain
+    sleep 2
 fi
+
 
 while IFS='=' read -r key value
 do
@@ -53,7 +56,7 @@ eval ${key}="\${value}"
 done < "$3"
 
 echo "Running local server"
-exec gradle --console plain -q run "--args=--DANGEROUS-no-encryption --dev --config $3 &> /dev/null" &> $4/server.log & 
+exec gradle --console plain -q clean run "--args=--DANGEROUS-no-encryption --dev --config $3 &> /dev/null" &> $4/server.log & 
 pid1=$!
 echo -e "sknpm.process=$pid1"
 
@@ -91,7 +94,7 @@ if [ "$key" = "null" ]; then
     exit 1
 fi
 
-exec gradle --console plain -q runMuxTestServer "--args=8090 &> /dev/null" &> $4/test_server.log & 
+exec gradle --console plain -q clean runMuxTestServer "--args=8090 &> /dev/null" &> $4/test_server.log & 
 echo -e "sknpm.process=$!"
 
 thost="http://localhost:8090"
