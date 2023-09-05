@@ -683,7 +683,7 @@ export class SKDB {
   ) : any {
     let result = this.exports.SKIP_tracked_query(
       encodeUTF8(this.exports, request),
-      encodeUTF8(this.exports, JSON.stringify(Object.fromEntries(params))),
+      encodeUTF8(this.exports, stringify(params)),
       start,
       end
     );
