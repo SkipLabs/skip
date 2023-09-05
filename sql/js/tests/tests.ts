@@ -29,10 +29,13 @@ export const tests = [{
 }, {
     name: 'Primary key 2',
     fun: skdb => {
-        skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
-        skdb.sqlRaw('insert into t1 (b) values (22);');
+      skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
+      skdb.sqlRaw("insert into t1 (a, b) values ('foo', 22);");
+      return skdb.sql('select a, b from t1');
     },
-    check: res => {}
+    check: res => {
+      expect(res).toEqual([{a: 'foo', b: 22}]);
+    }
 }, {
     name: 'Multiple field updates',
     fun: skdb => {
@@ -118,29 +121,361 @@ export const tests = [{
         expect(res).toEqual(11);
     }
 }, {
-    name: 'Adding a root',
+    name: 'Integer root is computed',
     fun: skdb => {
-        skdb.sqlRaw(
-            'create table if not exists todos (id text primary key, text text, completed integer);'
-        );
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw(
+        "insert into todos values (0, 'foo', 0);"
+      );
+      const ROOT_ID = 'app';
 
-        const ROOT_ID = 'todosRoot';
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select id from todos where id = 0");
+        return results[0].id
+      });
 
-        // Make a callable that returns the SQL query string we want to run
-        const queryStringCallable = skdb.registerFun(() => `select * from todos`);
-
-        // Make a tracked function which fetches the query string and then runs the query
-        const todos = skdb.registerFun(() => {
-            const queryString = skdb.trackedCall(queryStringCallable, null);
-            return skdb.trackedQuery(queryString);
-        });
-
-        // Add a root for the tracked function and get its result
-        skdb.addRoot(ROOT_ID, todos, null);
-        return skdb.getRoot(ROOT_ID);
+      skdb.addRoot(ROOT_ID, todos, null);
+      return skdb.getRoot(ROOT_ID);
     },
     check: res => {
-        expect(res).toEqual("[]");
+      expect(res).toEqual(0);
+    }
+}, {
+    name: 'String root is computed',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw(
+        "insert into todos values (0, 'foo', 0);"
+      );
+      const ROOT_ID = 'app';
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return results[0].text
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+      return skdb.getRoot(ROOT_ID);
+    },
+    check: res => {
+      expect(res).toEqual("foo");
+    }
+}, {
+    name: 'Composite root is computed',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw(
+        "insert into todos values (0, 'foo', 0);"
+      );
+      const ROOT_ID = 'app';
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return {
+          text: results[0].text,
+        }
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+      return skdb.getRoot(ROOT_ID);
+    },
+    check: res => {
+      expect(res).toEqual({text: "foo"});
+    }
+}, {
+    name: 'Multiple roots',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (1, 'bar', 1);");
+
+      const foo = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return results[0].text
+      });
+      const bar = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 1");
+        return results[0].text
+      });
+
+      skdb.addRoot("foo", foo);
+      skdb.addRoot("bar", bar);
+      return [skdb.getRoot("foo"), skdb.getRoot("bar")];
+    },
+    check: res => {
+      expect(res).toEqual(["foo", "bar"]);
+    }
+}, {
+    name: 'Remove root',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 1);");
+
+      const foo = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return results[0].text
+      });
+
+      skdb.addRoot("foo", foo);
+      const root = skdb.getRoot("foo");
+      skdb.removeRoot("foo");
+      const rootAfterRemove = skdb.getRoot("foo");
+      return [root, rootAfterRemove];
+    },
+    check: res => {
+      expect(res).toEqual(["foo", undefined]);
+    }
+}, {
+    name: 'Registered function called only when tracked query changes',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+
+      const ROOT_ID = 'app';
+
+      let counter = 0;
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id < 10");
+        counter = counter + 1;
+        return {
+          text: results[0].text,
+        }
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+      skdb.sqlRaw("insert into todos values (11, 'bar', 1);")
+      skdb.sqlRaw("update todos set text = 'baz' where id = 11;");
+
+      skdb.sqlRaw("insert into todos values (1, 'bar', 1);")
+      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+      skdb.sqlRaw("update todos set text = 'quux';");
+
+      return counter;
+    },
+    check: res => {
+      expect(res).toEqual(4);   // once for initial, insert, and then two updates
+    }
+}, {
+    name: 'Registered function called only when complex tracked query changes',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (1, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (2, 'foo', 1);");
+      skdb.sqlRaw("insert into todos values (3, 'foo', 0);");
+
+      const ROOT_ID = 'app';
+
+      let counter = 0;
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select completed, count(*) as n from (select * from todos where id > 0) group by completed");
+        counter = counter + 1;
+        const acc = {}
+        for (const row of results) {
+          acc[row.completed] = row.n
+        }
+        return acc
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+
+      skdb.sqlRaw("insert into todos values (4, 'foo', 1);");
+      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+
+      return [counter, skdb.getRoot(ROOT_ID)];
+    },
+    check: res => {
+      expect(res).toEqual([2, {0: 2, 1: 2}]);
+    }
+}, {
+    name: 'onRootChange called when root changes',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+
+      const ROOT_ID = 'app';
+
+      const todos = skdb.registerFun(() => {
+        let results = skdb.trackedQuery("select text from todos where id = 0");
+        return {
+          text: results[0].text,
+        }
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+
+      let counter = 0;
+      skdb.onRootChange((_rootName) => {
+        counter = counter + 1;
+      });
+
+      // no change
+      const counterBefore = counter;
+      skdb.sqlRaw("insert into todos values (1, 'bar', 1);")
+      skdb.sqlRaw("update todos set text = 'baz' where id = 1;");
+      const counterAfterNoOp = counter;
+      // change
+      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+      skdb.sqlRaw("update todos set text = 'quux';");
+
+      return [counterBefore, counterAfterNoOp, counter];
+    },
+    check: res => {
+      expect(res).toEqual([0, 0, 2]);
+    }
+}, {
+    name: 'A root can be updated/re-rendered with a new argument',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (1, 'bar', 0);");
+
+      const ROOT_ID = 'app';
+
+      const todos = skdb.registerFun((id) => {
+        let results = skdb.trackedQuery(`select text from todos where id = ${id}`);
+        return {
+          text: results[0].text,
+        }
+      });
+
+      skdb.addRoot(ROOT_ID, todos, 0);
+
+      let counter = 0;
+      skdb.onRootChange((_rootName) => {
+        counter = counter + 1;
+      });
+
+      const startCounter = counter;
+      const valueBefore = skdb.getRoot(ROOT_ID);
+      skdb.addRoot(ROOT_ID, todos, 1);
+      const valueAfter = skdb.getRoot(ROOT_ID);
+      const counterAfterRootChange = counter;
+
+      // change
+      skdb.sqlRaw("update todos set text = 'quux' where id = 1;");
+      const counterAfterChange = counter;
+
+      // would have updated the old root but not the new
+      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+      skdb.sqlRaw("update todos set text = 'xyz' where id = 0;");
+
+      return [
+        startCounter, counterAfterRootChange,
+        valueBefore, valueAfter,
+        skdb.getRoot(ROOT_ID),
+        counterAfterChange, counter,
+      ];
+    },
+    check: res => {
+      expect(res).toEqual([
+        0,                      // no executions, no changes yet
+        1,                      // root changed, because we updated it
+        {text: "foo"},          // initial value
+        {text: "bar"},          // after we change the arg
+        {text: "quux"},         // after we update the row the value changes
+        2,                      // change to the root so this bumps
+        // TODO: this should be 2. we wrongly trigger an update on the
+        // js subscription on the first update to the old value, but
+        // no more after that.
+        3,                      // not tracking the id=0 so this does not bump
+      ]);
+    }
+}, {
+    name: 'Tracked calls allow composing views made of tracked queries',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.sqlRaw("insert into todos values (0, 'foo', 0);");
+      skdb.sqlRaw("insert into todos values (1, 'bar', 1);");
+      skdb.sqlRaw("insert into todos values (2, 'baz', 0);");
+
+      let todoTextInvocations = 0;
+      const todoText = skdb.registerFun((id: number) => {
+        todoTextInvocations = todoTextInvocations + 1;
+        let results = skdb.trackedQuery(`select text from todos where id = ${id}`);
+        return {
+          text: results[0].text,
+        }
+      });
+
+      let uncompletedTodosInvocations = 0;
+      // somewhat convoluted example of view logic composition
+      let uncompletedTodos = skdb.registerFun(() => {
+        uncompletedTodosInvocations = uncompletedTodosInvocations + 1;
+        const ids = skdb.trackedQuery("select id from todos where completed = 0")
+        const acc = [];
+        for (const id of ids.map(x => x.id)) {
+          const t = skdb.trackedCall(todoText, id);
+          acc.push(t.text);
+        }
+        return acc;
+      });
+
+      const beforeRoot = [todoTextInvocations, uncompletedTodosInvocations];
+      skdb.addRoot("uncompleted", uncompletedTodos);
+      const afterRoot = [todoTextInvocations, uncompletedTodosInvocations];
+
+      // no invocations
+      skdb.sqlRaw("insert into todos values (3, 'bar', 1);")
+      skdb.sqlRaw("update todos set text = 'quux' where id = 1;");
+      const afterBenign = [todoTextInvocations, uncompletedTodosInvocations];
+
+      // only need to re-call one tracked query
+      skdb.sqlRaw("insert into todos values (4, 'new', 0);")
+      const afterInsert = [todoTextInvocations, uncompletedTodosInvocations];
+
+      // delete
+      skdb.sqlRaw("delete from todos where id = 0;")
+      const afterDelete = [todoTextInvocations, uncompletedTodosInvocations];
+
+      // everything updated (2 rows)
+      skdb.sqlRaw("update todos set text = 'update' where completed = 0");
+      const afterUpdate = [todoTextInvocations, uncompletedTodosInvocations];
+
+      const root = skdb.getRoot("uncompleted");
+
+      return [
+        beforeRoot, afterRoot, afterBenign, afterInsert,
+        afterDelete, afterUpdate, root
+      ];
+    },
+    check: res => {
+      expect(res).toEqual([
+        [0, 0],                 // no calls yet, definitions don't get run eagerly
+        [2, 1],                 // initial state built as now added to root
+        [2, 1],                 // no change as these mutations didn't touch interesting rows
+        [3, 2],                 // one new row, so one tracked query to execute and cascade up for the select id
+        [3, 4],                 // one less row, so tracked call twice (once for select id and once for the row select)
+        // TODO: this is currently quadratic behaviour. on updating 2
+        // rows, uncompletedTodos is called for each - which is fine - this
+        // calls the trackedCall for each row. but these are not
+        // cached as they should be and the trackedCall's query is
+        // re-run for each invocation. the following should be [5,6]
+        // not [6,6].
+        [6, 6],                 // 2 rows changed, so tracked call twice for each, tracked query 3 times??
+        ["update", "update"]]);
     }
 }, {
     name: 'Params 1',
