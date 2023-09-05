@@ -501,29 +501,28 @@ export const tests = [{
     name: 'Tracked queries support params',
     fun: skdb => {
       skdb.sqlRaw(
-        'create table if not exists test (x integer primary key, y string, z float);'
+        'create table if not exists test (x integer primary key, y string, z float, w integer);'
       );
       skdb.sqlRaw(
-        "insert into test values (0, 'foo', 1.2);"
+        "insert into test values (0, 'foo', 1.2, 42);"
       );
       const ROOT_ID = 'app';
 
       const todos = skdb.registerFun(() => {
-        const x = skdb.trackedQuery(
-          "select x from test where x = @x and y = @y and z = @zed",
+        return skdb.trackedQuery(
+          "select w from test where x = @x and y = @y and z = @zed",
           {x: 0, y: 'foo', zed: 1.2}
         );
-        return x
       });
 
       skdb.addRoot(ROOT_ID, todos, null);
 
       // check the root gets reactively updated
-      // skdb.sqlRaw("update test set x = 1 where y = 'foo'");
+      skdb.sqlRaw("update test set w = 21 where y = 'foo';");
 
       return skdb.getRoot(ROOT_ID);
     },
     check: res => {
-      expect(res).toEqual([{x:0}]);
+      expect(res).toEqual([{w:21}]);
     }
 }];
