@@ -8,8 +8,8 @@ PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
-SKNPM_BIN=sql/target/host/$(SKARGO_PROFILE)/sknpm
-STDMAN_DIR?=$(HOME)/.sdkman
+SKNPM_BIN=sknpm/target/host/$(SKARGO_PROFILE)/sknpm
+SDKMAN_DIR?=$(HOME)/.sdkman
 
 ifndef PLAYWRIGHT_JUNIT_OUTPUT_NAME
 SKNPM_FLAG=
@@ -85,7 +85,7 @@ build/sknpm: $(SKNPM_BIN)
 ################################################################################
 
 sql/target/host/dev/skdb: sql/src/* skfs/src/*
-	cd sql && skargo build -v
+	cd sql && skargo build
 
 sql/target/host/release/skdb: sql/src/* skfs/src/*
 	cd sql && skargo build --release
@@ -130,8 +130,8 @@ test-native: build/skdb
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 
 .PHONY: test-wasm2
-test-wasm2: build/sknpm $(SKDB_WASM) $(STDMAN_DIR)
-	cd sql && ../build/sknpm test $(SKARGO_FLAGS) $(SKNPM_FLAG)
+test-wasm2: build/sknpm $(SKDB_WASM) $(SDKMAN_DIR)
+	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
 
 .PHONY: test-wasm
 test-wasm: npm sql/js/node_modules sql/js/dist/index.html

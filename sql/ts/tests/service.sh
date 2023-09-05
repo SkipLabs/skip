@@ -56,33 +56,83 @@ eval ${key}="\${value}"
 done < "$3"
 
 echo "Running local server"
-exec gradle --console plain -q clean run "--args=--DANGEROUS-no-encryption --dev --config $3 &> /dev/null" &> $4/server.log & 
-pid1=$!
-echo -e "sknpm.process=$pid1"
+run_server () {
+    exec gradle --console plain -q clean run "--args=--DANGEROUS-no-encryption --dev --config $2 &> /dev/null" &> $3/server.log & 
+    pid1=$!
 
-host="http://localhost:$skdb_port"
+    host="http://localhost:$1"
+    
+    i=0
+    while [[ $i -lt 10 ]];
+    do
+        if curl $host >/dev/null 2>&1; then
+            echo "Server is running on port $1" 1>&2
+            break;
+        fi
+        sleep 1
+        i=$((i+1))
+    done
 
+    exists=$(kill -0 $pid1);
+    if [[ -z "$exists" ]]; then
+        echo "$pid1"
+    else
+        return 1
+    fi
+}
+
+run_test_server () {
+    exec gradle --console plain -q clean runMuxTestServer "--args=8090 &> /dev/null" &> $1/test_server.log & 
+    pid2=$!
+
+    thost="http://localhost:8090"
+    i=0
+    while [[ $i -lt 10 ]];
+    do
+        if curl $thost >/dev/null 2>&1; then
+            echo "Test server is running on port 8090" 1>&2
+            break;
+        fi
+        sleep 1
+        i=$((i+1))
+    done
+
+    exists=$(kill -0 $pid2);
+    if [[ -z "$exists" ]]; then
+        echo "$pid2"
+    else
+        return 1
+    fi
+}
+
+pid1=""
 i=0
 while [[ $i -lt 10 ]];
 do
-    if curl $host >/dev/null 2>&1; then
-        echo "Server is running on port $skdb_port" 1>&2
+    pid1=$(run_server $skdb_port $3 $4)
+    if [[ -n "$pid1" ]]; then
+        echo -e "sknpm.process=$pid1"
         break;
     fi
     sleep 1
     i=$((i+1))
 done
 
-if [ $i -lt 10 ]; then
-  i=0
-  while ! [ -f ~/.skdb/credentials ];
-  do
-    sleep 1
-    i=$((i+1))
-  done
+if [ $i -ge 10 ]; then
+  exit 2
 fi
 
-sleep 2
+i=0
+while ! [ -f ~/.skdb/credentials ];
+do
+  echo "~/.skdb/credentials not exist"
+  sleep 2
+  i=$((i+1))
+  if [ $i -e 30 ]; then
+    kill $pid1
+    exit 2
+  fi
+done
 
 key=$(jq -r ".[\"ws://localhost:$skdb_port\"].skdb_service_mgmt.root" < ~/.skdb/credentials)
 
@@ -94,17 +144,19 @@ if [ "$key" = "null" ]; then
     exit 1
 fi
 
-exec gradle --console plain -q clean runMuxTestServer "--args=8090 &> /dev/null" &> $4/test_server.log & 
-echo -e "sknpm.process=$!"
-
-thost="http://localhost:8090"
 i=0
 while [[ $i -lt 10 ]];
 do
-    if curl $thost >/dev/null 2>&1; then
-        echo "Test server is running on port 8090" 1>&2
+    pid=$(run_test_server $4)
+    if [[ -n "$pid" ]]; then
+        echo -e "sknpm.process=$pid"
         break;
     fi
     sleep 1
     i=$((i+1))
 done
+
+if [ $i -ge 10 ]; then
+  kill $pid1
+  exit 2
+fi
