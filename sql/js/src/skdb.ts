@@ -677,10 +677,13 @@ export class SKDB {
 
   trackedQuery(
     request: string,
-    params: Map<string, string|number> = new Map(),
+    params: Map<string, string|number>|Object = new Map(),
     start: number = 0,
     end: number = -1
   ) : any {
+    if (params instanceof Map) {
+      params = Object.fromEntries(params);
+    }
     let result = this.exports.SKIP_tracked_query(
       encodeUTF8(this.exports, request),
       encodeUTF8(this.exports, stringify(params)),
@@ -725,21 +728,24 @@ export class SKDB {
 
   private addParams(
     args: Array<string>,
-    params: Map<string, string|number>,
+    params: Map<string, string|number>|Object,
     stdin: string
   ): [Array<string>, string] {
+    if (params instanceof Map) {
+      params = Object.fromEntries(params);
+    }
     let args1 = ["--expect-query-params"].concat(args);
-    let stdin1 = JSON.stringify(Object.fromEntries(params)) + '\n' + stdin;
+    let stdin1 = JSON.stringify(params) + '\n' + stdin;
     return [args1, stdin1];
   }
 
-  sqlRaw(stdin: string, params: Map<string, string|number> = new Map())
+  sqlRaw(stdin: string, params: Map<string, string|number>|Object = new Map())
     : string {
     let [args1, stdin1] = this.addParams([], params, stdin);
     return this.runLocal(args1, stdin1);
   }
 
-  sql(stdin: string, params: Map<string, string|number> = new Map())
+  sql(stdin: string, params: Map<string, string|number>|Object = new Map())
     : Array<any> | string {
     let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
     this.stdout_objects = new Array();
