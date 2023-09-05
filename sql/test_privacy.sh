@@ -10,7 +10,7 @@ if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
 
-SKDB_CMD=./target/host/$SKARGO_PROFILE/skdb
+SKDB_CMD="skargo run --profile $SKARGO_PROFILE -- "
 
 $SKDB_CMD --init $DBFILE
 

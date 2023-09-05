@@ -3,7 +3,8 @@
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB=./target/host/$SKARGO_PROFILE/skdb
+
+SKDB="skargo run --profile $SKARGO_PROFILE -- "
 
 pass() { printf "%-32s OK\n" "TEST $1:"; }
 fail() { printf "%-32s FAILED\n" "TEST $1:"; }
@@ -23,7 +24,7 @@ else
     fail "CONCAT"
 fi
 
-if cat test/test_notnull.sql | $SKDB 2>&1 | grep -q NULL
+if cat test/test_notnull.sql | $SKDB 2>&1 | grep -E 'cannot insert NULL in column declared as NOT NULL' &> /dev/null
 then
     pass "NOT NULL"
 else
