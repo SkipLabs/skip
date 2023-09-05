@@ -488,6 +488,16 @@ export const tests = [{
       expect(res).toEqual("13\n");
     }
 }, {
+    name: 'Params as object',
+    fun: skdb => {
+      skdb.sql('CREATE TABLE t1 (a INTEGER);');
+      skdb.sql('INSERT INTO t1 VALUES (@key);', {key: 13});
+      return skdb.sqlRaw('SELECT * FROM t1;');
+    },
+    check: res => {
+      expect(res).toEqual("13\n");
+    }
+}, {
     name: 'Params 2',
     fun: skdb => {
       skdb.sql('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
@@ -499,6 +509,34 @@ export const tests = [{
     }
 }, {
     name: 'Tracked queries support params',
+    fun: skdb => {
+      skdb.sqlRaw(
+        'create table if not exists test (x integer primary key, y string, z float, w integer);'
+      );
+      skdb.sqlRaw(
+        "insert into test values (0, 'foo', 1.2, 42);"
+      );
+      const ROOT_ID = 'app';
+
+      const todos = skdb.registerFun(() => {
+        return skdb.trackedQuery(
+          "select w from test where x = @x and y = @y and z = @zed",
+          new Map<string, string|number>([["x", 0], ["y", "foo"], ["zed", 1.2]]),
+        );
+      });
+
+      skdb.addRoot(ROOT_ID, todos, null);
+
+      // check the root gets reactively updated
+      skdb.sqlRaw("update test set w = 21 where y = 'foo';");
+
+      return skdb.getRoot(ROOT_ID);
+    },
+    check: res => {
+      expect(res).toEqual([{w:21}]);
+    }
+}, {
+    name: 'Tracked queries support object params',
     fun: skdb => {
       skdb.sqlRaw(
         'create table if not exists test (x integer primary key, y string, z float, w integer);'
