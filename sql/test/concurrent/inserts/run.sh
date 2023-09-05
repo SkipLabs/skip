@@ -8,7 +8,8 @@ rm -f /tmp/test.db
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB=../../../target/host/$SKARGO_PROFILE/skdb
+
+SKDB="skargo run --profile $SKARGO_PROFILE -- "
 
 $SKDB --init /tmp/test.db
 

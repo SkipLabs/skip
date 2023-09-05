@@ -3,7 +3,8 @@
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
-SKDB=./target/host/$SKARGO_PROFILE/skdb
+
+SKDB="skargo run --profile $SKARGO_PROFILE -- "
 
 run_test () {
   cat $1 | $(SKDB) --always-allow-joins | sort > /tmp/kk1
