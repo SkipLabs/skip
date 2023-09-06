@@ -1,6 +1,6 @@
 
 import { Environment, FileSystem} from "#std/sk_types";
-import { SkdbMechanism, SKDB, Server, SKDBCallable, Utility} from "#skdb/skdb_types";
+import { SkdbMechanism, SKDB, Server, SKDBCallable, SkdbTracked, SkdbHandle} from "#skdb/skdb_types";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
@@ -88,25 +88,26 @@ export class SKDBImpl implements SKDB {
   }
 
   static async create(
-    utility: Utility,
+    handle: SkdbHandle,
+    tracked: SkdbTracked,
     env: Environment,
     save: () => Promise<boolean> 
   ): Promise<SKDB> {
     let client = new SKDBImpl(env);
     client.save = save;
-    client.runLocal = utility.main;
+    client.runLocal = handle.main;
     client.clientUuid = env.crypto().randomUUID();
     client.onRootChange =  (f: (rootName: string) => void) => {
-      utility.addRootChangeListener(f);
+      tracked.addRootChangeListener(f);
     };
-    client.addRoot = <T1, T2>(rootName: string, callable: (obj: T1) => T2 | SKDBCallable<T1, T2>, arg: T1) => utility.addRoot(rootName, callable, arg);
-    client.removeRoot = (rootName) => utility.removeRoot(rootName);
-    client.getRoot = (rootName) => utility.getRoot(rootName);
-    client.trackedCall = <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => utility.trackedCall(callable, arg);
-    client.trackedQuery = (request: string, params: Map<string, string|number> = new Map(), start?: number, end?: number) => utility.trackedQuery(request, params, start, end);
-    client.runner = utility.runner;
-    client.registerFun = <T1, T2>(f: (obj: T1) => T2) => utility.registerFun(f);
-    client.runSubscribeRoots(utility);
+    client.addRoot = <T1, T2>(rootName: string, callable: (obj: T1) => T2 | SKDBCallable<T1, T2>, arg: T1) => tracked.addRoot(rootName, callable, arg);
+    client.removeRoot = (rootName) => tracked.removeRoot(rootName);
+    client.getRoot = (rootName) => tracked.getRoot(rootName);
+    client.trackedCall = <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => tracked.trackedCall(callable, arg);
+    client.trackedQuery = (request: string, params: Map<string, string|number> = new Map(), start?: number, end?: number) => tracked.trackedQuery(request, params, start, end);
+    client.runner = handle.runner;
+    client.registerFun = <T1, T2>(f: (obj: T1) => T2) => tracked.registerFun(f);
+    client.runSubscribeRoots(tracked);
     return client;
   }
 
@@ -249,7 +250,7 @@ export class SKDBImpl implements SKDB {
   mirrorServerTable = (tableName: string, filterExpr?: string) => this.server!.mirrorTable(tableName, filterExpr);
   serverClose = () => Promise.resolve(this.server!.close());
 
-  private runSubscribeRoots(utility: Utility): void {
+  private runSubscribeRoots(tracked: SkdbTracked): void {
     let fileName = "/subscriptions/jsroots";
     this.fs.watchFile(fileName, (text) => {
       let changed = new Map();
@@ -257,16 +258,16 @@ export class SKDBImpl implements SKDB {
       for (const update of updates) {
         if (update.substring(0, 1) !== "0") continue;
         let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        utility.removeSubscribedRoot(json.name);
+        tracked.removeSubscribedRoot(json.name);
         changed.set(json.name, true);
       }
       for (const update of updates) {
         if (update.substring(0, 1) === "0") continue;
         let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        utility.addSubscribedRoot(json.name, json.value);
+        tracked.addSubscribedRoot(json.name, json.value);
         changed.set(json.name, true);
       }
-      for (const f of utility.getRootChangeListeners()) {
+      for (const f of tracked.getRootChangeListeners()) {
         for (const name of changed.keys()) {
           f(name);
         }
