@@ -380,7 +380,7 @@ const localRepl = async function() {
       const table = args[1];
       const filter = args.slice(2).join(' ');
       try {
-        await skdb.mirrorServerTable(table, filter);
+        await skdb.mirror(table, filter);
       } catch (ex) {
         console.error(`Could not mirror table ${table}.`);
         console.error(ex);

@@ -321,6 +321,10 @@ class ResilientMuxedSocket {
     return new ResilientMuxedSocket(env, policy, uri, creds, socket);
   }
 
+  isSocketConsideredHealthy(): boolean {
+    return this.socket !== undefined;
+  }
+
   private constructor(
     env: Environment,
     policy: ResiliencyPolicy, uri: string,
@@ -1241,7 +1245,7 @@ class SKDBServer implements Server {
   private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
-  private mirroredTables: Set<string> = new Set()
+  private mirroredTables: Map<string, string> = new Map()
 
   private constructor(
     env: Environment,
@@ -1296,6 +1300,17 @@ class SKDBServer implements Server {
     throw new Error(`Unexpected response: ${response}`);
   }
 
+  private deliverDataTransferProtoMsg(msg: ProtoMsg|null, deliver: (string) => void) {
+    const txtPayload = this.env.decodeUTF8(this.strictCastData(msg).payload);
+    const rebootSignalled = txtPayload.split("\n").find(line => line.trim() == ":reboot");
+    if (rebootSignalled) {
+      this.close();
+      this.onReboot(this, this.client);
+      return;
+    }
+    deliver(txtPayload)
+  }
+
   private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse | null> {
     const stream = await this.connection.openStream();
     const decoder = new ProtoMsgDecoder();
@@ -1317,6 +1332,12 @@ class SKDBServer implements Server {
     });
   }
 
+  private async makeStringRequest(request: ProtoCtrlMsg): Promise<string> {
+    return this.makeRequest(request).then(
+      result => this.env.decodeUTF8(this.strictCastData(result).payload)
+    );
+  }
+
   private async establishServerTail(tableName: string, filterExpr: string): Promise<void> {
     const stream = await this.connection.openResilientStream();
     const client = this.client;
@@ -1324,14 +1345,11 @@ class SKDBServer implements Server {
 
     let resolved = false;
 
-    // TODO: discover failure and reject. this could happen if e.g.
-    // the table is dropped, acls, bad filter, etc.
     return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
           const msg = decoder.pop();
-          const txtPayload = this.env.decodeUTF8(this.strictCastData(msg).payload);
-          client.writeCsv(tableName, txtPayload);
+          this.deliverDataTransferProtoMsg(msg, payload => client.writeCsv(tableName, payload));
           if (!resolved) {
             resolved = true;
             resolve();
@@ -1360,7 +1378,7 @@ class SKDBServer implements Server {
     });
   }
 
-  private async establishLocalTail(tableName: string): Promise<void> {
+  private async establishLocalTail(tableName: string): Promise<string> {
     const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
@@ -1368,10 +1386,11 @@ class SKDBServer implements Server {
     stream.onData = (data) => {
       if (decoder.push(data)) {
         const msg = decoder.pop();
-        const txtPayload = this.env.decodeUTF8(this.strictCastData(msg).payload);
-        // we only expect acks back in the form of checkpoints.
-        // let's store these as a watermark against the table.
-        client.writeCsv(tableName, txtPayload);
+        this.deliverDataTransferProtoMsg(msg, payload => {
+          // we only expect acks back in the form of checkpoints.
+          // let's store these as a watermark against the table.
+          client.writeCsv(tableName, payload);
+        });
       }
     }
 
@@ -1412,14 +1431,45 @@ class SKDBServer implements Server {
       }));
       stream.expectingData();
     };
+
+    return session;
   }
 
-  async mirrorTable(tableName: string, filterExpr?: string): Promise<void> {
+  isConnectionHealthy(): boolean {
+    return this.connection.isSocketConsideredHealthy();
+  }
+
+  tablesAwaitingSync(): Set<string> {
+    const acc = new Set<string>();
+    for (const [table, session] of this.mirroredTables.entries()) {
+      if (session == "@view") {
+        continue;
+      }
+      // TODO: if we parse the diff output we can provide an object
+      // model representing the rows not yet ack'd.
+      const diff = this.client.diff(
+        this.client.watermark(
+          this.replicationUid,
+          metadataTable(table)
+        ),
+        session
+      );
+      if (diff !== null) {
+        acc.add(table);
+      }
+    }
+    return acc;
+  }
+
+  public onReboot: (server: SKDBServer, skdb: SkdbMechanism) => void = () => {
+    throw new Error("Server signalled client should cold start to avoid diverging.");
+  };
+
+  async mirror(tableName: string, filterExpr?: string): Promise<void> {
     if (this.mirroredTables.has(tableName)) {
       return;
     }
-    this.mirroredTables.add(tableName);
-
+    let isViewOnRemote = await this.viewSchema(tableName) != "";
     // TODO: just assumes that if it exists the schema is the same
     if (!await this.client.tableExists(tableName)) {
       let createTable = await this.tableSchema(tableName);
@@ -1430,82 +1480,85 @@ class SKDBServer implements Server {
             value STRING
           )`),
       ]);
+      if (isViewOnRemote) {
+        this.client.toggleView(tableName);
+      }
     }
+    
     this.client.assertCanBeMirrored(tableName);
+    let session = "@view"
+    if (!isViewOnRemote) {
+      session = await this.establishLocalTail(tableName);
+    }
 
-    // TODO: need to join the promises but let them run concurrently
-    // I await here for now so we learn of error
-    await this.establishLocalTail(tableName);
+    this.mirroredTables.set(tableName, session);
     return this.establishServerTail(tableName, filterExpr || "");
   }
 
   async sqlRaw(stdin: string, params: Map<string, string|number> = new Map()): Promise<string> {
-    let result = await this.makeRequest({
+    return this.makeStringRequest({
       type: "query",
       query: stdin,
       format: "raw",
     });
-
-    return this.env.decodeUTF8(this.strictCastData(result).payload);
   }
 
   async sql(stdin: string, params: Map<string, string|number> = new Map()): Promise<any[]> {
     // TODO manage params
-    let result = await this.makeRequest({
+    return this.makeStringRequest({
       type: "query",
       query: stdin,
       format: "json",
-    });
-    return this.env.decodeUTF8(this.strictCastData(result).payload)
-      .split("\n")
+    }).then(result => 
+      result.split("\n")
       .filter((x) => x != "")
-      .map((x) => JSON.parse(x));
+      .map((x) => JSON.parse(x))
+    );
   }
 
   async tableSchema(tableName: string): Promise<string> {
-    const resp = await this.makeRequest({
+   return this.makeStringRequest({
       type: "schema",
       name: tableName,
       scope: "table",
     });
-    return this.env.decodeUTF8(this.strictCastData(resp).payload)
   }
 
   async viewSchema(viewName: string): Promise<string> {
-    const resp = await this.makeRequest({
+    return this.makeStringRequest({
       type: "schema",
       name: viewName,
       scope: "view",
-    });
-    return this.env.decodeUTF8(this.strictCastData(resp).payload)
+    }); 
   }
 
   async schema(): Promise<string> {
-    const resp = await this.makeRequest({
+    return this.makeStringRequest({
       type: "schema",
       scope: "all",
     });
-    return this.env.decodeUTF8(this.strictCastData(resp).payload)
   }
 
   async createDatabase(dbName: string): Promise<ProtoResponseCreds> {
-    let result = await this.makeRequest({
+    return this.makeRequest({
       type: "createDatabase",
       name: dbName,
+    }).then(result => {
+      if (result === null || result.type !== "credentials") {
+        throw new Error("Unexpected response.");
+      }
+      return result;
     });
-    if (result === null || result.type !== "credentials") {
-      throw new Error("Unexpected response.");
-    }
-    return result;
   }
 
   async createUser(): Promise<ProtoResponseCreds> {
-    let result = await this.makeRequest({
+    return this.makeRequest({
       type: "createUser",
+    }).then(result => {
+      if (result === null || result.type !== "credentials") {
+        throw new Error("Unexpected response.");
+      }
+      return result;
     });
-    if (result === null || result.type !== "credentials") {
-      throw new Error("Unexpected response.");
-    }
-    return result;
   }
 }
