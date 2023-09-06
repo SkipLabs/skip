@@ -125,7 +125,6 @@ fi
 i=0
 while ! [ -f ~/.skdb/credentials ];
 do
-  echo "~/.skdb/credentials not exist"
   sleep 2
   i=$((i+1))
   if [ $i -e 30 ]; then
@@ -133,6 +132,8 @@ do
     exit 2
   fi
 done
+
+sleep 2
 
 key=$(jq -r ".[\"ws://localhost:$skdb_port\"].skdb_service_mgmt.root" < ~/.skdb/credentials)
 

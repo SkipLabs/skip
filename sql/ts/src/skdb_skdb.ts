@@ -1,6 +1,6 @@
 
 import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared} from "#std/sk_types";
-import {PagedMemory, Page, Utility, SKDBCallable, Storage, SKDB, ExternalFuns} from "#skdb/skdb_types";
+import {PagedMemory, Page, SkdbTracked, SKDBCallable, Storage, SKDB, ExternalFuns, SkdbHandle} from "#skdb/skdb_types";
 import {IDBStorage} from "#skdb/skdb_storage";
 import {SKDBImpl} from "#skdb/skdb_database";
 
@@ -22,28 +22,36 @@ interface Exported {
   getVersion: () => number;
 }
 
-class UtilityImpl implements Utility {
+class SkdbHamdleImpl implements SkdbHandle {
+  runner: (fn: () => string) => Promise<Array<any>>;
+  main: (new_args: Array<string>, new_stdin: string) => string;
+  
+  constructor(
+    utils : Utils,
+    runner: (fn: () => string) => Promise<Array<any>>,
+  ) {
+    this.runner = runner;
+    this.main = utils.main;
+  }
+}
+
+class SkdbTrackedImpl implements SkdbTracked {
   private roots: Map<string, number> = new Map();
   private onRootChangeFuns: Array<(rootName: string) => void>;
   private exported : Exported;
   private utils : Utils;
-  runner: (fn: () => string) => Promise<Array<any>>;
   registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>;
-  main: (new_args: Array<string>, new_stdin: string) => string;
   
   constructor(
     exported : Exported,
     utils : Utils,
-    runner: (fn: () => string) => Promise<Array<any>>,
     registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>,
   ) {
     exported.SKIP_init_jsroots();
     this.roots = new Map();
     this.exported = exported;
     this.utils = utils;
-    this.runner = runner;
     this.registerFun = registerFun;
-    this.main = utils.main;
     this.onRootChangeFuns = new Array();
   }
 
@@ -325,7 +333,8 @@ class LinksImpl implements Links, ToWasm {
       }
       throw new Error(stdout)
     };
-    let utility = new UtilityImpl(exported, utils, runner, <T1, T2>(f: (obj: T1) => T2) => this.state.register(f));
+    let handle = new SkdbHamdleImpl(utils, runner);
+    let tracked = new SkdbTrackedImpl(exported, utils, <T1, T2>(f: (obj: T1) => T2) => this.state.register(f));
     let create = async (dbName ?: string) => {
       let save: () => Promise<boolean> = async () => true;
       let storeName = dbName ? "SKDBStore" : null;
@@ -343,7 +352,7 @@ class LinksImpl implements Links, ToWasm {
         );
         save = this.storage!.save;
       };
-      return await SKDBImpl.create(utility, this.environment, save);
+      return await SKDBImpl.create(handle, tracked, this.environment, save);
     };
     this.environment.shared.set("SKDB", new SKDBShared(create));
   };

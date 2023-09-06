@@ -1,18 +1,21 @@
 import { Shared } from "#std/sk_types";
 
-export interface Utility {
+export interface SkdbTracked {
   addRoot: <T1, T2>(rootName: string, callable: (obj: T1) => T2 | SKDBCallable<T1, T2>, arg: T1) => void;
   removeRoot: (rootName: string) => void;
   getRoot: (rootName: string) => any;
   trackedCall: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => T2;
   trackedQuery: (request: string, params: Map<string, string|number>, start?: number, end?: number) => any;
   trackAndRegister: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, params: Map<string, string|number>, start?: number, end?: number) => SKDBCallable<T1, T2>;
-  runner: (fn: () => string) => Promise<Array<any>>;
   registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>;
   addSubscribedRoot: (name: string, value: any) => void;
   removeSubscribedRoot: (name: string) => void;
   getRootChangeListeners: () => Array<(rootName: string) => void>;
   addRootChangeListener: (f: (rootName: string) => void) => void;
+}
+
+export interface SkdbHandle {
+  runner: (fn: () => string) => Promise<Array<any>>;
   main: (new_args: Array<string>, new_stdin: string) => string;
 }
 
