@@ -1,6 +1,8 @@
 SCRIPT_DIR:=$(shell dirname $(shell realpath $(firstword $(MAKEFILE_LIST))))
 COMP_DIR:=$(shell realpath $(SCRIPT_DIR)/../compiler)
 
+LIB_DIR?=/usr/local/lib
+
 ifdef PROFILE
 PRFDEF=$(shell echo $(PROFILE) | tr  '[:lower:]' '[:upper:]')
 DEFINITIONS=-D$(PRFDEF)
@@ -18,6 +20,7 @@ DEFINITIONS=
 OLEVEL=-O2 -g
 endif # ifdef PROFILE
 
+LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
 CC64FLAGS=$(OLEVEL) -DSKIP64
 
 CRELFILES=\
@@ -52,7 +55,7 @@ OFILES=$(addprefix $(BUILD_DIR),$(CRELFILES:.c=.o))
 ONATIVE_FILES=$(BUILD_DIR)magic.o $(addprefix $(BUILD_DIR),$(NATIVE_RELFILES:.c=.o))
 
 .PHONY: default
-default: libbacktrace $(BUILD_DIR)libskip_runtime64.a
+default: $(BUILD_DIR)libbacktrace.a $(BUILD_DIR)libskip_runtime64.a
 	@echo "skargo:library=$(BUILD_DIR)libskip_runtime64.a"
 	@echo "skargo:library=$(BUILD_DIR)libbacktrace.a"
 	@echo "skargo:preamble=$(COMP_DIR)/preamble/preamble64.ll"
@@ -70,12 +73,17 @@ $(BUILD_DIR)magic.o: $(BUILD_DIR)magic.c
 $(BUILD_DIR)libskip_runtime64.a: $(OFILES) $(BUILD_DIR)runtime/runtime64_specific.o $(ONATIVE_FILES)
 	@ar rcs $@ $^
 
-.PHONY: libbacktrace
-libbacktrace:
+
+ifeq ($(LBT_EXISTS), 1)
+$(BUILD_DIR)libbacktrace.a:
+	@cp $(LIB_DIR)/libbacktrace.a $(BUILD_DIR)libbacktrace.a
+else
+$(BUILD_DIR)libbacktrace.a:
 	@[ -d $(BUILD_DIR) ] || mkdir -p $(BUILD_DIR)
 	@(cd $(COMP_DIR)/runtime/libbacktrace && ./configure >> /dev/null) 
 	@$(MAKE) -C $(COMP_DIR)/runtime/libbacktrace 2>&1 >> /dev/null
 	@cp $(COMP_DIR)/runtime/libbacktrace/.libs/libbacktrace.a $(BUILD_DIR)libbacktrace.a
+endif
 
 $(BUILD_DIR)runtime/runtime64_specific.o: $(COMP_DIR)/runtime/runtime64_specific.cpp
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
