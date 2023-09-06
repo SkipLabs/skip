@@ -69,8 +69,8 @@ export class SKDBWorker implements SKDB {
     return await this.worker.post(new Function("createServerUser", [])) as ProtoResponseCreds;
   }
 
-  mirrorServerTable = async (tableName: string, filterExpr?: string) => {
-    return await this.worker.post(new Function("mirrorServerTable", [tableName, filterExpr]));
+  mirror = async (tableName: string, filterExpr?: string) => {
+    return await this.worker.post(new Function("mirror", [tableName, filterExpr]));
   }
 
   serverClose = async ()  => {

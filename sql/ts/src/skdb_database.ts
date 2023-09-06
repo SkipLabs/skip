@@ -13,6 +13,7 @@ class SkdbMechanismImpl implements SkdbMechanism {
   assertCanBeMirrored: (tableName: string) => void;
   tableExists: (tableName: string) => Promise<boolean>;
   sql: (query: string) => Promise<Array<any>>;
+  toggleView: (tableName: string) => void;
 
   constructor(client: SKDBImpl, fs: FileSystem, utf8Encode: (v: string) => Uint8Array) {
     this.tableExists = (tableName: string) => client.tableExists(tableName);
@@ -54,10 +55,13 @@ class SkdbMechanismImpl implements SkdbMechanism {
         ], 
         ""
       );
-      if (d == "") {
+      if (d.trim() == "") {
         return null;
       }
       return utf8Encode(d);
+    };
+    this.toggleView = (table: string) => {
+      return client.runLocal(["toggle-view", table], "");
     };
   }
 }
@@ -247,7 +251,7 @@ export class SKDBImpl implements SKDB {
 
   createServerDatabase = (dbName: string) => this.server!.createDatabase(dbName);
   createServerUser = () => this.server!.createUser();
-  mirrorServerTable = (tableName: string, filterExpr?: string) => this.server!.mirrorTable(tableName, filterExpr);
+  mirror = (tableName: string, filterExpr?: string) => this.server!.mirror(tableName, filterExpr);
   serverClose = () => Promise.resolve(this.server!.close());
 
   private runSubscribeRoots(tracked: SkdbTracked): void {

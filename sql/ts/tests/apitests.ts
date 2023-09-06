@@ -46,8 +46,12 @@ async function testQueriesAgainstTheServer(skdb: TSKDB) {
   );
   expect(tableCreate).toEqual("");
 
+  const viewCreate = await skdb.server.sqlRaw(
+    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y FROM test_pk;");
+  expect(viewCreate).toEqual("");
+
   const permissionInsert = await skdb.sqlRaw(
-    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7);",
+    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7), ('view_pk', 7);",
     new Map(),
     true
   );
@@ -66,6 +70,13 @@ async function testQueriesAgainstTheServer(skdb: TSKDB) {
     true
   );
   expect(tableSelect).toEqual("42|21\n");
+
+  const viewSelect = await skdb.server.sqlRaw(
+    "SELECT * FROM view_pk;",
+    new Map(),
+    true
+  );
+  expect(viewSelect).toEqual("42|63\n");
 
   try {
     await skdb.sqlRaw("bad query", new Map(), true);
@@ -105,6 +116,11 @@ async function testSchemaQueries(skdb: TSKDB) {
   const tableContains = tableSchema.includes(tableExpected);
   expect(tableContains ? tableExpected : tableSchema).toEqual(tableExpected);
 
+  const viewTableExpected = /CREATE TABLE view_pk \(\n  x INTEGER,\n  y INTEGER\n\);/;
+  const viewTableSchema = await skdb.tableSchema("view_pk", true);
+  const viewTableContains = viewTableSchema.match(viewTableExpected);
+  expect(viewTableContains ? viewTableExpected : viewTableSchema).toEqual(viewTableExpected);
+
   // invalid views/tables
   const emptyView = await skdb.viewSchema("nope", true);
   expect(emptyView).toEqual("");
@@ -115,12 +131,24 @@ async function testSchemaQueries(skdb: TSKDB) {
 
 async function testMirroring(skdb: TSKDB) {
   // mirror table
-  await skdb.mirrorServerTable("test_pk");
-  const testPkRows = await skdb.sql("SELECT * FROM test_pk");
+  await skdb.mirror("test_pk");
+  const testPkRows = await waitSynch(
+    skdb,
+    "SELECT * FROM test_pk",
+    tail => tail[0] && tail[0].x == 42
+  );
   expect(testPkRows).toEqual([{ x: 42, y: 21 }]);
 
+  await skdb.mirror("view_pk");
+  const viewPkRows = await waitSynch(
+    skdb,
+    "SELECT * FROM view_pk",
+    tail => tail[0] && tail[0].x == 42
+  );
+  expect(viewPkRows).toEqual([{ x: 42, y: 63 }]);
+
   // mirror already mirrored table is idempotent
-  await skdb.mirrorServerTable("test_pk");
+  await skdb.mirror("test_pk");
   const testPkRows2 = await skdb.sql("SELECT * FROM test_pk");
   expect(testPkRows2).toEqual([{ x: 42, y: 21 }]);
 }
@@ -128,9 +156,9 @@ async function testMirroring(skdb: TSKDB) {
 function waitSynch(skdb: TSKDB, query: string, check: (v: any) => boolean, server: boolean = false, max: number = 6) {
   let count = 0;
   const test = (resolve, reject) => {
-    skdb.sql(query, new Map(), server).then(clientTail => {
-      if (clientTail[0].cnt == 1 || count == max) {
-        resolve(clientTail)
+    skdb.sql(query, new Map(), server).then(value => {
+      if (check(value) || count == max) {
+        resolve(value)
       } else {
         count++;
         setTimeout(() => test(resolve, reject), 100);
@@ -141,16 +169,45 @@ function waitSynch(skdb: TSKDB, query: string, check: (v: any) => boolean, serve
 }
 
 async function testServerTail(root: TSKDB, user: TSKDB) {
-  await root.server.sqlRaw("insert into test_pk values (87,88);");
+  try {
+    await root.sqlRaw("insert into view_pk values (87,88);", new Map(), true);
+    throw new Error("Shall throw exception.");
+  } catch (exn) {
+    expect(exn).toEqual("insert into view_pk values (87,88);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\n");
+  }
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const vres = await user.sql("select count(*) as cnt from view_pk where x = 87 and y = 88");
+  expect(vres).toEqual([{cnt: 0}]);
+
+  await root.sqlRaw("insert into test_pk values (87,88);", new Map(), true);
   const res = await waitSynch(
     user,
     "select count(*) as cnt from test_pk where x = 87 and y = 88",
     tail => tail[0].cnt == 1
   );
   expect(res).toEqual([{ cnt: 1 }]);
+
+  const resv = await waitSynch(
+    user,
+    "select count(*) as cnt from view_pk where x = 87 and y = 264",
+    tail => tail[0].cnt == 1
+  );
+  expect(resv).toEqual([{ cnt: 1 }]);
 }
 
 async function testClientTail(root: TSKDB, user: TSKDB) {
+  try {
+    await user.sqlRaw("insert into view_pk values (97,98);");
+    throw new Error("Shall throw exception.");
+  } catch (exn: any) {
+    expect(exn.message).toEqual("insert into view_pk values (97,98);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\nRuntime exit with code: 2\n");
+  }
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const vres = await root.sql(
+    "select count(*) as cnt from test_pk where x = 97 and y = 98", new Map(), true
+  );
+  expect(vres).toEqual([{ cnt: 0 }]);
+
   await user.sqlRaw("insert into test_pk values (97,98);");
   const res = await waitSynch(
     root,
@@ -159,6 +216,13 @@ async function testClientTail(root: TSKDB, user: TSKDB) {
     true,
   );
   expect(res).toEqual([{ cnt: 1 }]);
+  const resv = await waitSynch(
+    root,
+    "select count(*) as cnt from view_pk where x = 97 and y = 294",
+    tail => tail[0].cnt == 1,
+    true,
+  );
+  expect(resv).toEqual([{ cnt: 1 }]);
 }
 
 export const apitests = () => {

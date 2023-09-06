@@ -36,7 +36,7 @@ export interface SKDB {
 
   createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createServerUser: () => Promise<ProtoResponseCreds>;
-  mirrorServerTable: (tableName: string, filterExpr?: string) => Promise<void>;
+  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
   serverClose: () => Promise<void>;
 }
 
@@ -50,6 +50,7 @@ export interface SkdbMechanism {
   tableExists: (tableName: string) => Promise<boolean>;
   sql: (query: string) => Promise<Array<any>>;
   assertCanBeMirrored: (tableName: string) => void;
+  toggleView: (tableName: string) => void;
 }
 
 export var metadataTable = (tableName: string) => {
@@ -72,7 +73,7 @@ export interface Server {
   schema: () => Promise<string>;
   tableSchema: (tableName: string) => Promise<string>;
   viewSchema: (viewName: string) => Promise<string>;
-  mirrorTable: (tableName: string, filterExpr?: string) => Promise<void>;
+  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
   sqlRaw: (query: string, params: Map<string, string|number>) => Promise<string>;
   sql: (query: string, params: Map<string, string|number>) => Promise<Array<any>>;
   close(): void;

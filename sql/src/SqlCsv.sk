@@ -167,7 +167,7 @@ fun reasonSchemaUnsupported(
 ): ?String {
   context = SKStore.Context::fromSaved(origContext.clone());
   SKDB.getTableDir(context).maybeGet(context, SKStore.SID(tableName)) match {
-  | None() -> Some("Table does not exist.")
+  | None() -> Some(`Table '${tableName}' does not exist.`)
   | Some(dirDescr) ->
     if (dirDescr.schema.any(x ~> x.unique)) {
       return Some("Cannot mirror tables with unique constraints.")
