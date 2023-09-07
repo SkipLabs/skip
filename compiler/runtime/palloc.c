@@ -457,6 +457,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   (*ginfo)->head = head;
   (*ginfo)->end = end;
   (*ginfo)->fileName = persistent_fileName;
+  (*ginfo)->context = NULL;
   *gid = 1;
   if (icapacity != DEFAULT_CAPACITY) {
     printf("CAPACITY SET TO: %ld\n", icapacity);
@@ -586,6 +587,7 @@ static void sk_init_no_file(char* static_limit) {
   (*ginfo)->break_ptr = static_limit;
   (*ginfo)->total_palloc_size = 0;
   (*ginfo)->fileName = NULL;
+  (*ginfo)->context = NULL;
   gmutex = NULL;
   gid = malloc(sizeof(uint64_t));
   if (gid == NULL) {
