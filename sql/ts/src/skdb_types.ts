@@ -5,8 +5,8 @@ export interface SkdbTracked {
   removeRoot: (rootName: string) => void;
   getRoot: (rootName: string) => any;
   trackedCall: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => T2;
-  trackedQuery: (request: string, params: Map<string, string|number>, start?: number, end?: number) => any;
-  trackAndRegister: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, params: Map<string, string|number>, start?: number, end?: number) => SKDBCallable<T1, T2>;
+  trackedQuery: (request: string, params: Params, start?: number, end?: number) => any;
+  trackAndRegister: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, params: Params, start?: number, end?: number) => SKDBCallable<T1, T2>;
   registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>;
   addSubscribedRoot: (name: string, value: any) => void;
   removeSubscribedRoot: (name: string) => void;
@@ -22,8 +22,8 @@ export interface SkdbHandle {
 export interface SKDB {
   subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
 
-  sqlRaw: (query: string, params: Map<string, string|number>, server?: boolean) => Promise<string>;
-  sql: (query: string, params: Map<string, string|number>, server?: boolean) => Promise<Array<any>>;
+  sqlRaw: (query: string, params: Params, server?: boolean) => Promise<string>;
+  sql: (query: string, params: Params, server?: boolean) => Promise<Array<any>>;
   cmd: (new_args: Array<string>, new_stdin: string) => Promise<string>;
   tableExists: (tableName: string) => Promise<boolean>;
   tableSchema: (tableName: string, server?: boolean) => Promise<string>;
@@ -67,6 +67,8 @@ export type ProtoResponseCreds = {
   privateKey: Uint8Array;
 }
 
+export type Params = Map<string, string|number> | Object;
+
 export interface Server {
   createDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createUser(): Promise<ProtoResponseCreds>;
@@ -74,12 +76,13 @@ export interface Server {
   tableSchema: (tableName: string) => Promise<string>;
   viewSchema: (viewName: string) => Promise<string>;
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
-  sqlRaw: (query: string, params: Map<string, string|number>) => Promise<string>;
-  sql: (query: string, params: Map<string, string|number>) => Promise<Array<any>>;
+  sqlRaw: (query: string, params: Params) => Promise<string>;
+  sql: (query: string, params: Params) => Promise<Array<any>>;
   close(): void;
 }
 
 export type Page = { pageid: number, content: any };
+
 
 export interface PagedMemory {
   init(fn: (page: Page) => void): void;

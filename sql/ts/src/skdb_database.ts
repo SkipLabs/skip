@@ -1,6 +1,6 @@
 
 import { Environment, FileSystem} from "#std/sk_types";
-import { SkdbMechanism, SKDB, Server, SKDBCallable, SkdbTracked, SkdbHandle} from "#skdb/skdb_types";
+import { SkdbMechanism, SKDB, Server, SKDBCallable, SkdbTracked, SkdbHandle, Params} from "#skdb/skdb_types";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
@@ -77,7 +77,7 @@ export class SKDBImpl implements SKDB {
   removeRoot: (rootName: string) => void;
   getRoot: (rootName: string) => any;
   trackedCall: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => T2;
-  trackedQuery: (request: string, params: Map<string, string|number>, start?: number, end?: number) => any;
+  trackedQuery: (request: string, params: Params, start?: number, end?: number) => any;
   onRootChange: (f: (rootName: string) => void) => void;
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
@@ -108,7 +108,7 @@ export class SKDBImpl implements SKDB {
     client.removeRoot = (rootName) => tracked.removeRoot(rootName);
     client.getRoot = (rootName) => tracked.getRoot(rootName);
     client.trackedCall = <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => tracked.trackedCall(callable, arg);
-    client.trackedQuery = (request: string, params: Map<string, string|number> = new Map(), start?: number, end?: number) => tracked.trackedQuery(request, params, start, end);
+    client.trackedQuery = (request: string, params: Params = new Map(), start?: number, end?: number) => tracked.trackedQuery(request, params, start, end);
     client.runner = handle.runner;
     client.registerFun = <T1, T2>(f: (obj: T1) => T2) => tracked.registerFun(f);
     client.runSubscribeRoots(tracked);
@@ -165,15 +165,18 @@ export class SKDBImpl implements SKDB {
 
   addParams = (
     args: Array<string>,
-    params: Map<string, string|number>,
+    params: Params,
     stdin: string
   ): [Array<string>, string] => {
+    if (params instanceof Map) {
+      params = Object.fromEntries(params);
+    }
     let args1 = ["--expect-query-params"].concat(args);
-    let stdin1 = JSON.stringify(Object.fromEntries(params)) + '\n' + stdin;
+    let stdin1 = JSON.stringify(params) + '\n' + stdin;
     return [args1, stdin1];
   }
 
-  sqlRaw = async (stdin: string, params: Map<string, string|number> = new Map(), server: boolean = false) => {
+  sqlRaw = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
     if (server) {
       return await this.server!.sqlRaw(stdin, params);
     } else {
@@ -182,7 +185,7 @@ export class SKDBImpl implements SKDB {
     }
   }
 
-  sql = async (stdin: string, params: Map<string, string|number> = new Map(), server: boolean = false) => {
+  sql = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
     if (server) {
       return await this.server!.sql(stdin, params);
     } else {
@@ -268,7 +271,7 @@ export class SKDBImpl implements SKDB {
       for (const update of updates) {
         if (update.substring(0, 1) === "0") continue;
         let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        tracked.addSubscribedRoot(json.name, json.value);
+        tracked.addSubscribedRoot(json.name, JSON.parse(json.value));
         changed.set(json.name, true);
       }
       for (const f of tracked.getRootChangeListeners()) {
