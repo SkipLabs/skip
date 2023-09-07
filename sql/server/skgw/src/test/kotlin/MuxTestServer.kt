@@ -64,9 +64,14 @@ fun setupStream(sock: MuxedSocket, s: Stream) {
           val newStream = sock.openStream()
           newStream!!
 
+          val buf = ByteBuffer.allocate(4)
+          buf.putInt(0)
+          buf.flip()
+          newStream.send(buf)
+
           val t =
               Thread({
-                for (i in 0..10000) {
+                for (i in 1..10000) {
                   val buf = ByteBuffer.allocate(4)
                   buf.putInt(i)
                   buf.flip()
