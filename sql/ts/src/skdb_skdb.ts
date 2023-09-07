@@ -1,8 +1,8 @@
 
-import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared} from "#std/sk_types";
-import {PagedMemory, Page, SkdbTracked, SKDBCallable, Storage, SKDB, ExternalFuns, SkdbHandle} from "#skdb/skdb_types";
-import {IDBStorage} from "#skdb/skdb_storage";
-import {SKDBImpl} from "#skdb/skdb_database";
+import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types";
+import { PagedMemory, Page, SkdbTracked, SKDBCallable, Storage, SKDB, ExternalFuns, SkdbHandle, Params } from "#skdb/skdb_types";
+import { IDBStorage } from "#skdb/skdb_storage";
+import { SKDBImpl } from "#skdb/skdb_database";
 
 
 interface Exported {
@@ -25,9 +25,9 @@ interface Exported {
 class SkdbHamdleImpl implements SkdbHandle {
   runner: (fn: () => string) => Promise<Array<any>>;
   main: (new_args: Array<string>, new_stdin: string) => string;
-  
+
   constructor(
-    utils : Utils,
+    utils: Utils,
     runner: (fn: () => string) => Promise<Array<any>>,
   ) {
     this.runner = runner;
@@ -38,13 +38,13 @@ class SkdbHamdleImpl implements SkdbHandle {
 class SkdbTrackedImpl implements SkdbTracked {
   private roots: Map<string, number> = new Map();
   private onRootChangeFuns: Array<(rootName: string) => void>;
-  private exported : Exported;
-  private utils : Utils;
+  private exported: Exported;
+  private utils: Utils;
   registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>;
-  
+
   constructor(
-    exported : Exported,
-    utils : Utils,
+    exported: Exported,
+    utils: Utils,
     registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>,
   ) {
     exported.SKIP_init_jsroots();
@@ -60,10 +60,10 @@ class SkdbTrackedImpl implements SkdbTracked {
     this.exported.SKIP_add_root(
       this.utils.exportString(rootName),
       funId,
-      this.utils.exportString(JSON.stringify(arg ? arg : null)) 
+      this.utils.exportString(JSON.stringify(arg === undefined ? null : arg))
     )
   }
-  
+
   addRoot<T1, T2>(rootName: string, callable: (obj: T1) => T2 | SKDBCallable<T1, T2>, arg: T1) {
     let fCallable = "id" in callable ? new SKDBCallable(callable.id as number) : this.registerFun(callable);
     this.runAddRoot(rootName, fCallable.getId(), arg);
@@ -80,21 +80,24 @@ class SkdbTrackedImpl implements SkdbTracked {
   trackedCall<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) {
     let result = this.exported.SKIP_tracked_call(
       callable.getId(),
-      this.utils.exportString(JSON.stringify(arg ? arg : null))
+      this.utils.exportString(JSON.stringify(arg === undefined ? null : arg))
     );
     return JSON.parse(this.utils.importString(result));
   }
 
-  trackAndRegister<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, params: Map<string, string|number> = new Map(), start?: number, end?: number) {
+  trackAndRegister<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, params: Params = new Map(), start?: number, end?: number) {
     return this.registerFun(() => this.trackedQuery(this.trackedCall(callable, arg), params, start, end));
   }
 
-  trackedQuery(request: string, params: Map<string, string|number> = new Map(), start?: number, end?: number) {
+  trackedQuery(request: string, params: Params = new Map(), start?: number, end?: number) {
     if (start === undefined) start = 0;
     if (end === undefined) end = -1;
+    if (params instanceof Map) {
+      params = Object.fromEntries(params);
+    }
     let result = this.exported.SKIP_tracked_query(
       this.utils.exportString(request),
-      this.utils.exportString(JSON.stringify(params ? params : null)),
+      this.utils.exportString(JSON.stringify(params === undefined ? null : params)),
       start,
       end
     );
@@ -191,7 +194,7 @@ class SKDBMemory implements PagedMemory {
   init(fn: (page: Page) => void) {
     // Let's round up the memorySize to be pageSize aligned
     let memorySize = (this.persistentSize + (this.pageSize - 1)) & ~(this.pageSize - 1);
-    let i : number;
+    let i: number;
     let cursor = 0;
     for (i = 0; i < memorySize / this.pageSize; i++) {
       const content = this.memory.slice(cursor, cursor + this.pageSize);
@@ -230,9 +233,9 @@ class SKDBMemory implements PagedMemory {
 
 class SKDBShared implements Shared {
   getName = () => "SKDB";
-  create: (dbName ?: string, asWorker ?: boolean) => Promise<SKDB>;
-  constructor(create: (dbName ?: string) => Promise<SKDB>) {
-    this.create = async (dbName ?: string, asWorker ?: boolean) => {
+  create: (dbName?: string, asWorker?: boolean) => Promise<SKDB>;
+  constructor(create: (dbName?: string) => Promise<SKDB>) {
+    this.create = async (dbName?: string, asWorker?: boolean) => {
       asWorker = asWorker === false ? false : true;
       // todo Manage worker
       return await create(dbName);
@@ -245,9 +248,9 @@ class LinksImpl implements Links, ToWasm {
   private state: ExternalFuns;
   private field_names: Array<string>;
   private objectIdx: number;
-  private object: {[k: string]: any};
+  private object: { [k: string]: any };
   private stdout_objects: Array<any>;
-  private storage ?: Storage;
+  private storage?: Storage;
 
   SKIP_call_external_fun: (funId: int, skParam: ptr) => ptr;
   SKIP_clear_field_names: () => void;
@@ -278,7 +281,8 @@ class LinksImpl implements Links, ToWasm {
         funId,
         JSON.parse(utils.importString(skParam))
       )
-      return utils.exportString(JSON.stringify( res ? res : null));
+      let strRes = JSON.stringify(res === undefined ? null : res);
+      return utils.exportString(strRes);
     };
     this.SKIP_clear_field_names = () => {
       this.field_names = new Array();
@@ -310,14 +314,14 @@ class LinksImpl implements Links, ToWasm {
       this.object[field_name] = parseFloat(utils.importString(skV));
       this.objectIdx++;
     },
-    this.SKIP_push_object_field_string = (skV: ptr) => {
-      let field_name: string = this.field_names[this.objectIdx]!;
-      this.object[field_name] = utils.importString(skV);
-      this.objectIdx++;
-    },
-    this.SKIP_push_object = () => {
-      this.stdout_objects.push(this.object);
-    };
+      this.SKIP_push_object_field_string = (skV: ptr) => {
+        let field_name: string = this.field_names[this.objectIdx]!;
+        this.object[field_name] = utils.importString(skV);
+        this.objectIdx++;
+      },
+      this.SKIP_push_object = () => {
+        this.stdout_objects.push(this.object);
+      };
     this.SKIP_unix_unixepoch = (tm: ptr) => {
       return utils.exportString("TODO")
     };
@@ -327,7 +331,7 @@ class LinksImpl implements Links, ToWasm {
     let runner = async (fn: () => string) => {
       this.stdout_objects = new Array();
       let stdout = fn();
-      if(stdout == "") {
+      if (stdout == "") {
         let result = this.stdout_objects;
         return result;
       }
@@ -335,7 +339,7 @@ class LinksImpl implements Links, ToWasm {
     };
     let handle = new SkdbHamdleImpl(utils, runner);
     let tracked = new SkdbTrackedImpl(exported, utils, <T1, T2>(f: (obj: T1) => T2) => this.state.register(f));
-    let create = async (dbName ?: string) => {
+    let create = async (dbName?: string) => {
       let save: () => Promise<boolean> = async () => true;
       let storeName = dbName ? "SKDBStore" : null;
       if (storeName != null) {
@@ -368,18 +372,18 @@ class Manager implements ToWasmManager {
   prepare = (wasm: object) => {
     let toWasm = wasm as ToWasm;
     let links = new LinksImpl(this.environment);
-    toWasm.SKIP_call_external_fun =  (funId: int, skParam: ptr) => links.SKIP_call_external_fun(funId, skParam);
-    toWasm.SKIP_clear_field_names =  () => links.SKIP_clear_field_names();
-    toWasm.SKIP_push_field_name =  (skName: ptr) =>  links.SKIP_push_field_name(skName);
-    toWasm.SKIP_clear_object =  () =>  links.SKIP_clear_object();
-    toWasm.SKIP_push_object_field_null =  () => links.SKIP_push_object_field_null();
-    toWasm.SKIP_push_object_field_int32 =  (field: int) =>  links.SKIP_push_object_field_int32(field);
-    toWasm.SKIP_push_object_field_int64 =  (field: ptr) =>  links.SKIP_push_object_field_int64(field);
-    toWasm.SKIP_push_object_field_float =  (field: ptr) =>  links.SKIP_push_object_field_float(field);
-    toWasm.SKIP_push_object_field_string =  (field: ptr) =>  links.SKIP_push_object_field_string(field);
-    toWasm.SKIP_push_object =  () =>  links.SKIP_push_object();
-    toWasm.SKIP_unix_unixepoch =  (tm: ptr) =>  links.SKIP_unix_unixepoch(tm);
-    toWasm.SKIP_unix_strftime =  (tm: ptr) =>  links.SKIP_unix_strftime(tm);
+    toWasm.SKIP_call_external_fun = (funId: int, skParam: ptr) => links.SKIP_call_external_fun(funId, skParam);
+    toWasm.SKIP_clear_field_names = () => links.SKIP_clear_field_names();
+    toWasm.SKIP_push_field_name = (skName: ptr) => links.SKIP_push_field_name(skName);
+    toWasm.SKIP_clear_object = () => links.SKIP_clear_object();
+    toWasm.SKIP_push_object_field_null = () => links.SKIP_push_object_field_null();
+    toWasm.SKIP_push_object_field_int32 = (field: int) => links.SKIP_push_object_field_int32(field);
+    toWasm.SKIP_push_object_field_int64 = (field: ptr) => links.SKIP_push_object_field_int64(field);
+    toWasm.SKIP_push_object_field_float = (field: ptr) => links.SKIP_push_object_field_float(field);
+    toWasm.SKIP_push_object_field_string = (field: ptr) => links.SKIP_push_object_field_string(field);
+    toWasm.SKIP_push_object = () => links.SKIP_push_object();
+    toWasm.SKIP_unix_unixepoch = (tm: ptr) => links.SKIP_unix_unixepoch(tm);
+    toWasm.SKIP_unix_strftime = (tm: ptr) => links.SKIP_unix_strftime(tm);
     return links;
   }
 }

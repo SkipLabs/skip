@@ -128,6 +128,7 @@ async function testMirroring(skdb) {
 async function testServerTail(root, user) {
   try {
     await root.server.sqlRaw("insert into view_pk values (87,88);");
+    throw new Error("Shall throw exception.");
   } catch (exn) {
     assert.deepEqual(exn, "insert into view_pk values (87,88);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\n");
   }
