@@ -3,6 +3,7 @@ import { int, FileSystem, Options, System } from "#std/sk_types";
 
 class File {
   contents: string;
+  changes: string;
   options ?: Options;
   cursor: int;
   onChange?: (contents: string) => void
@@ -18,6 +19,7 @@ class File {
     this.options = options;
     this.cursor = 0;
     this.withChange = false;
+    this.changes = "";
   }
 
   watch(onChange: (change: string) => void) {
@@ -26,9 +28,10 @@ class File {
 
   close() {
     if (this.withChange && this.onChange) {
-      this.onChange!(this.contents);
+      this.onChange!(this.changes);
     }
     this.options = undefined;
+    this.changes = "";
   }
 
   write(contents: string, append: boolean = false) {
@@ -37,11 +40,12 @@ class File {
     }
     if (this.contents && this.options.append || append) {
       this.contents += contents;
-      this.withChange = true;
     } else {
       this.contents = contents;
-      this.withChange = this.contents != "";
     }
+    let old = this.changes;
+    this.changes += contents;
+    this.withChange = this.changes != old;
     return contents.length;
   }
 

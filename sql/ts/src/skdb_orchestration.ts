@@ -1,5 +1,5 @@
 import { Environment } from "#std/sk_types";
-import { SkdbMechanism, metadataTable, Server } from "#skdb/skdb_types";
+import { SkdbMechanism, metadataTable, Server, Params } from "#skdb/skdb_types";
 
 const npmVersion = "";
 
@@ -1495,7 +1495,7 @@ class SKDBServer implements Server {
     return this.establishServerTail(tableName, filterExpr || "");
   }
 
-  async sqlRaw(stdin: string, params: Map<string, string|number> = new Map()): Promise<string> {
+  async sqlRaw(stdin: string, params: Params = new Map()): Promise<string> {
     return this.makeStringRequest({
       type: "query",
       query: stdin,
@@ -1503,7 +1503,7 @@ class SKDBServer implements Server {
     });
   }
 
-  async sql(stdin: string, params: Map<string, string|number> = new Map()): Promise<any[]> {
+  async sql(stdin: string, params: Params = new Map()): Promise<any[]> {
     // TODO manage params
     return this.makeStringRequest({
       type: "query",

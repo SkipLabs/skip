@@ -1,6 +1,6 @@
 import {Wrk} from "#std/sk_types";
 import {PromiseWorker, Function} from "#std/sk_worker";
-import {SKDB, ProtoResponseCreds} from "#skdb/skdb_types";
+import {SKDB, ProtoResponseCreds, Params} from "#skdb/skdb_types";
 
 export class SKDBWorker implements SKDB {
   private worker: PromiseWorker;
@@ -21,11 +21,11 @@ export class SKDBWorker implements SKDB {
     await this.worker.subscribe(new Function("subscribe", [viewName]), f);
   };
 
-  sqlRaw = async (query: string, params: Map<string, string|number> = new Map(), server: boolean = false) => {
+  sqlRaw = async (query: string, params: Params = new Map(), server: boolean = false) => {
     return await this.worker.post(new Function("sqlRaw", [query, params, server])) as string;
   };
 
-  sql = async (query: string, params: Map<string, string|number> = new Map(), server: boolean = false) => {
+  sql = async (query: string, params: Params = new Map(), server: boolean = false) => {
     return await this.worker.post(new Function("sql", [query, params, server])) as Array<any>;
   }
 
