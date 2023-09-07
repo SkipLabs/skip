@@ -1,6 +1,7 @@
 # this builds the artifacts of this repository, orchestrating the
 # various build systems
 
+.PHONY: all
 all: npm build/skdb build/init.sql
 
 PLAYWRIGHT_REPORTER?="line"
@@ -94,10 +95,8 @@ fmt:
 # test targets
 
 .PHONY: test
-test: SKARGO_PROFILE=dev
-test: SKDB_WASM=sql/target/wasm32/dev/skdb.wasm
-test: SKDB_BIN=sql/target/host/dev/skdb
-test: test-native test-wasm
+test:
+	$(MAKE) SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb test-native test-wasm
 
 .PHONY: test-native
 test-native: build/skdb
