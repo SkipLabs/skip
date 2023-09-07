@@ -2,118 +2,6 @@ module Sknpm;
 
 const kAuthor: String = "Skiplabs";
 
-fun main(): void {
-  cmd = Cli.Command("sknpm")
-    .about("Skip's npm package builder")
-    .arg(
-      Cli.BoolArg("version")
-        .short("V")
-        .long("version")
-        .about("Print version info and exit"),
-    )
-    .arg(
-      Cli.BoolArg("verbose")
-        .short("v")
-        .long("verbose")
-        .about("Use verbose output")
-        .global(),
-    );
-  commands = mutable Map[];
-  #forEachFunction (@pckcmd, #function, #functionName) {
-    (subcommand, cmdFn) = #function();
-    !cmd = cmd.subcommand(subcommand);
-    commands.set(subcommand.name, cmdFn);
-  };
-  !cmd = cmd.help();
-  args = cmd.parseArgs();
-  if (args.getBool("version")) {
-    print_string("skargo " + SkargoVersion.kVersion);
-    skipExit(0);
-  } else {
-    args.maybeGetSubcommand() match {
-    | Some(subcmd) ->
-      commands.maybeGet(subcmd) match {
-      | Some(handler) ->
-        skipExit(
-          try {
-            handler(args);
-            0
-          } catch {
-          | Skargo.SystemCallException(code, _) -> code
-          | exn -> throw exn
-          },
-        )
-      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
-      }
-    | None() ->
-      print_string(Cli.usage(args.cmd, true));
-      skipExit(0)
-    }
-  };
-}
-
-@pckcmd
-fun build(): (Cli.Command, Cli.ParseResults ~> void) {
-  (
-    Cli.Command("build")
-      .short("b")
-      .about("Build the npm package")
-      .arg(
-        Cli.StringArg("target-dir").about(
-          "Directory for all generated artifacts",
-        ),
-      )
-      .arg(
-        Cli.StringArg("profile").about(
-          "Build artifacts with the specified profile",
-        ),
-      )
-      .arg(
-        Cli.BoolArg("release")
-          .short("r")
-          .long("release")
-          .about("Build artifacts in release mode, with optimizations"),
-      )
-      .arg(
-        Cli.StringArg("html").about(
-          "Build minimal html support for specified launcher",
-        ),
-      ),
-    args ~> Skargo.envCmd(args, execPackage),
-  )
-}
-
-@pckcmd
-fun test(): (Cli.Command, Cli.ParseResults ~> void) {
-  (
-    Cli.Command("test")
-      .short("t")
-      .about("Run the tests")
-      .arg(
-        Cli.StringArg("filter")
-          .positional()
-          .about("If specified, only run tests with names matching the filter"),
-      )
-      .arg(
-        Cli.StringArg("target-dir").about(
-          "Directory for all generated artifacts",
-        ),
-      )
-      .arg(
-        Cli.StringArg("profile").about(
-          "Build artifacts with the specified profile",
-        ),
-      )
-      .arg(
-        Cli.BoolArg("release")
-          .short("r")
-          .long("release")
-          .about("Build artifacts in release mode, with optimizations"),
-      ),
-    args ~> Skargo.envCmd(args, execTest),
-  )
-}
-
 class Package(
   name: String,
   author: ?String,
@@ -146,7 +34,90 @@ class Package(
   }
 }
 
-fun execPackage(args: Cli.ParseResults, env: Skargo.Env): void {
+fun main(): void {
+  cmd = Cli.Command("sknpm")
+    .about("Skip's npm package builder")
+    .arg(
+      Cli.BoolArg("version")
+        .short("V")
+        .long("version")
+        .about("Print version info and exit"),
+    )
+    .arg(
+      Cli.BoolArg("verbose")
+        .short("v")
+        .long("verbose")
+        .about("Use verbose output")
+        .global(),
+    );
+  suppliers = Array[build, test, runner, Skargo.help];
+  commands = mutable Map[];
+  for (supplier in suppliers) {
+    (subcommand, cmdFn) = supplier();
+    !cmd = cmd.subcommand(subcommand);
+    commands.set(subcommand.name, cmdFn);
+  };
+  !cmd = cmd.help();
+  args = cmd.parseArgs();
+  if (args.getBool("version")) {
+    print_string("skargo " + SkargoVersion.kVersion);
+    skipExit(0);
+  } else {
+    args.maybeGetSubcommand() match {
+    | Some(subcmd) ->
+      commands.maybeGet(subcmd) match {
+      | Some(handler) ->
+        skipExit(
+          try {
+            handler(args);
+            0
+          } catch {
+          | Skargo.SystemCallException(code, _) -> code
+          | exn -> throw exn
+          },
+        )
+      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+      }
+    | None() ->
+      print_string(Cli.usage(args.cmd, true));
+      skipExit(0)
+    }
+  };
+}
+
+/********* Build **********/
+
+fun build(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("build")
+      .short("b")
+      .about("Build the npm package")
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Build artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      )
+      .arg(
+        Cli.StringArg("html").about(
+          "Build minimal html support for specified launcher",
+        ),
+      ),
+    args ~> Skargo.envCmd(args, execBuild),
+  )
+}
+
+fun execBuild(args: Cli.ParseResults, env: Skargo.Env): void {
   bc = Skargo.BuildContext::create(
     env,
     Some("wasm32"),
@@ -160,6 +131,38 @@ fun execPackage(args: Cli.ParseResults, env: Skargo.Env): void {
     writeRun(bc.targetDir, env.verbose)
   | _ -> void
   }
+}
+
+/********* Test **********/
+
+fun test(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("test")
+      .short("t")
+      .about("Run the tests")
+      .arg(
+        Cli.StringArg("filter")
+          .positional()
+          .about("If specified, only run tests with names matching the filter"),
+      )
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Build artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      ),
+    args ~> Skargo.envCmd(args, execTest),
+  )
 }
 
 fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
@@ -843,6 +846,61 @@ fun indexOf(inStr: String, s: String, start: Int = 0): ?Int {
     }
   };
   None()
+}
+
+/********* Run **********/
+
+fun runner(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("run")
+      .short("r")
+      .about("Call npm run on generated npm package")
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(Cli.StringArg("profile").about("Run for the specified profile"))
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Run for release profile"),
+      )
+      .arg(Cli.StringArg("bin").about("Run the specified binary"))
+      .arg(Cli.StringArg("path").about("Path of the package to run"))
+      .extra(),
+    execRun,
+  )
+}
+
+fun execRun(args: Cli.ParseResults): void {
+  env = args.maybeGetString("path") match {
+  | Some(path) ->
+    manifestFile = Path.join(Path.resolve(path), Skargo.kManifestFile);
+    invariant(
+      FileSystem.exists(manifestFile),
+      `Invalid skargo directory ${path}`,
+    );
+    Skargo.Env::fromFile(manifestFile, args.getBool("verbose"))
+  | _ -> Skargo.Env::create(args.getBool("verbose"))
+  };
+  bc = Skargo.BuildContext::create(
+    env,
+    Some("wasm32"),
+    args.maybeGetString("target-dir"),
+    Skargo.getProfile(args),
+  );
+  npmDir = Path.join(bc.targetDir, "npm");
+  cmdArgs = Array["npm", "--prefix", npmDir, "run"].concat(args.extra);
+  if (env.verbose) {
+    // TODO: colors
+    print_error(`>> ${cmdArgs.join(" ")}`)
+  };
+  p = system(cmdArgs.join(" "));
+  if (p != 0) {
+    throw Skargo.SystemCallException(p);
+  }
 }
 
 @cpp_extern("SKIP_sknpm_save_sk_tests_ts")
