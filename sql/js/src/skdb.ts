@@ -37,7 +37,6 @@ interface WasmExports {
   sk_pop_dirty_page: () => number;
   SKIP_get_version: () => number;
   SKIP_tracked_call: (funId: number, funArg: number) => number;
-  SKIP_tracked_query: (request: number, encoded_params: number, start: number, end: number) => number;
   skip_main: () => void;
   getVersion: () => number;
   __heap_base: any;
@@ -394,7 +393,7 @@ export class SKDB {
         throw ptr;
       },
       SKIP_throw_cruntime: function(code) {
-        throw new Error(code); 
+        throw new Error(code);
       },
       SKIP_print_backtrace: function () {
         console.trace("");
@@ -690,27 +689,6 @@ export class SKDB {
       encodeUTF8(this.exports, stringify(arg))
     );
     return JSON.parse(wasmStringToJS(this.exports, result));
-  }
-
-  trackedQuery(
-    request: string,
-    params: Map<string, string|number>|Object = new Map(),
-    start: number = 0,
-    end: number = -1
-  ) : any {
-    if (params instanceof Map) {
-      params = Object.fromEntries(params);
-    }
-    let result = this.exports.SKIP_tracked_query(
-      encodeUTF8(this.exports, request),
-      encodeUTF8(this.exports, stringify(params)),
-      start,
-      end
-    );
-    return wasmStringToJS(this.exports, result)
-      .split("\n")
-      .filter((x) => x != "")
-      .map((x) => JSON.parse(x));
   }
 
   onRootChange(f: (rootName: string) => void): void {
@@ -2296,7 +2274,7 @@ class SKDBServer {
         this.client.runLocal(["toggle-view", tableName], "");
       }
     }
-    
+
     this.client.assertCanBeMirrored(tableName);
     let session = "@view"
     if (!isViewOnRemote) {
