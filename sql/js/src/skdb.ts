@@ -31,12 +31,10 @@ interface WasmExports {
   SKIP_skfs_init: (size: number) => void;
   SKIP_initializeSkip: () => void;
   SKIP_skfs_end_of_init: () => void;
-  SKIP_init_jsroots: () => void;
   SKIP_call0: (f: () => void) => void;
   SKIP_get_persistent_size: () => number;
   sk_pop_dirty_page: () => number;
   SKIP_get_version: () => number;
-  SKIP_tracked_call: (funId: number, funArg: number) => number;
   skip_main: () => void;
   getVersion: () => number;
   __heap_base: any;
@@ -256,8 +254,6 @@ export class SKDB {
   private stdin: string = "";
   private stdout: Array<string> = new Array();
   private stdout_objects: Array<any> = new Array();
-  private onRootChangeFuns: Array<(rootName: string) => void> = new Array();
-  private externalFuns: Array<(any) => any> = [];
   private fileDescrs: Map<string, number> = new Map();
   private fileDescrNbr: number = 2;
   private files: Array<Array<String>> = new Array();
@@ -266,7 +262,6 @@ export class SKDB {
   private lineBuffer: Array<number> = [];
   private storeName: string | null;
   private nbrInitPages: number = -1;
-  private roots: Map<string, number> = new Map();
   private pageSize: number = -1;
   private db: IDBDatabase | null = null;
   private dirtyPagesMap: Array<number> = [];
@@ -324,9 +319,6 @@ export class SKDB {
         client.pageSize
       );
     }
-
-    client.exports.SKIP_init_jsroots();
-    client.runSubscribeRoots();
 
     client.clientUuid = crypto.randomUUID();
     client.version = wasmStringToJS(exports, exports.getVersion());
@@ -407,16 +399,6 @@ export class SKDB {
       },
       __setErrNo: function (err) {
         throw new Error("ErrNo " + err);
-      },
-      SKIP_call_external_fun: function (funId, str) {
-        return encodeUTF8(
-          data.exports,
-          stringify(
-            data.externalFuns[funId]!(
-              JSON.parse(wasmStringToJS(data.exports, str))
-            )
-          )
-        );
       },
       SKIP_print_error: function (str) {
         console.error(wasmStringToJS(data.exports, str));
@@ -547,18 +529,6 @@ export class SKDB {
     };
   }
 
-  private runAddRoot(rootName: string, funId: number, arg: any): void {
-    this.args = [];
-    this.stdin = "";
-    this.stdout = new Array();
-    this.current_stdin = 0;
-    this.exports.SKIP_add_root(
-      encodeUTF8(this.exports, rootName),
-      funId,
-      encodeUTF8(this.exports, stringify(arg))
-    );
-  }
-
   private async copyPage(start: number, end: number): Promise<ArrayBuffer> {
     let memory = this.exports.memory.buffer;
     return memory.slice(start, end);
@@ -638,77 +608,12 @@ export class SKDB {
     return this.stdout.join("");
   }
 
-  runSubscribeRoots(): void {
-    this.roots = new Map();
-    let fileName = "/subscriptions/jsroots";
-    this.watchFile(fileName, (text) => {
-      let changed = new Map();
-      let updates = text.split("\n").filter((x) => x.indexOf("\t") != -1);
-      for (const update of updates) {
-        if (update.substring(0, 1) !== "0") continue;
-        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        this.roots.delete(json.name);
-        changed.set(json.name, true);
-      }
-      for (const update of updates) {
-        if (update.substring(0, 1) === "0") continue;
-        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        this.roots.set(json.name, JSON.parse(json.value));
-        changed.set(json.name, true);
-      }
-      for (const f of this.onRootChangeFuns) {
-        for (const name of changed.keys()) {
-          f(name);
-        }
-      }
-    });
-    this.subscriptionCount++;
-    this.runLocal(
-      ["subscribe", "jsroots", "--format=json", "--updates", fileName],
-      ""
-    );
-  }
-
   watermark(replicationId: string, table: string): bigint {
     return BigInt(this.runLocal(["watermark", "--source", replicationId, table], ""));
   }
 
   cmd(new_args: Array<string>, new_stdin: string): string {
     return this.runLocal(new_args, new_stdin);
-  }
-
-  registerFun<T1, T2>(f: (obj: T1) => T2): SKDBCallable<T1, T2> {
-    let funId = this.externalFuns.length;
-    this.externalFuns.push(f);
-    return new SKDBCallable(funId);
-  }
-
-  trackedCall<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1): T2 {
-    let result = this.exports.SKIP_tracked_call(
-      callable.getId(),
-      encodeUTF8(this.exports, stringify(arg))
-    );
-    return JSON.parse(wasmStringToJS(this.exports, result));
-  }
-
-  onRootChange(f: (rootName: string) => void): void {
-    this.onRootChangeFuns.push(f);
-  }
-
-  addRoot<T1, T2>(
-    rootName: string,
-    callable: SKDBCallable<T1, T2>,
-    arg: T1
-  ): void {
-    this.runAddRoot(rootName, callable.getId(), arg);
-  }
-
-  removeRoot(rootName: string): void {
-    this.exports.SKIP_remove_root(encodeUTF8(this.exports, rootName));
-  }
-
-  getRoot(rootName: string): any {
-    return this.roots.get(rootName);
   }
 
   subscribe(viewName: string, f: (change: string) => void): void {
