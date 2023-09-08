@@ -162,7 +162,7 @@ fun build_harness(
     rjson.writeToStream(stream.push, 2);
     FileSystem.writeTextFile(env.outpath("resources.json"), stream.join(""));
   };
-  optITime: ?Int = None();
+  includeChecker = TimeChecker();
   !includeDirs = includeDirs.map(id -> {
     if (!Path.isAbsolute(id)) {
       !id = env.resolve(id)
@@ -172,7 +172,7 @@ fun build_harness(
         id,
         f ~> f.endsWith(".hpp") || f.endsWith(".h"),
         _f ~> false,
-      ).each(i -> !optITime = max(optITime, mtime(i)));
+      ).each(i -> !includeChecker = includeChecker.add(i));
     };
     id
   });
@@ -185,7 +185,7 @@ fun build_harness(
     target,
     resourceObjs,
     includeDirs,
-    optITime,
+    includeChecker,
   );
   library.each(print_library);
   preambles
@@ -207,7 +207,7 @@ fun buildLibrary(
   target: String,
   resources: Array<String>,
   includeDirs: Array<String>,
-  optITime: ?Int,
+  includeChecker: TimeChecker,
 ): ?String {
   sources = sourceDirs.map(sd -> {
     if (!Path.isAbsolute(sd)) {
@@ -222,28 +222,16 @@ fun buildLibrary(
   if (sources.isEmpty() && resources.isEmpty()) {
     return None()
   };
-  optTime = mtime(target);
-  optSTime = optITime;
-  timedSources = sources.map(sd ->
-    sd.map(s -> {
-      fOptMTime = mtime(s);
-      !optSTime = max(optSTime, fOptMTime);
-      (s, fOptMTime)
-    })
-  );
-  resources.each(rcs -> {
-    fOptMTime = mtime(rcs);
-    !optSTime = max(optSTime, fOptMTime);
-  });
+  sourcesTime = includeChecker;
+  sources.each(sd -> sd.each(s -> !sourcesTime = sourcesTime.add(s)));
+  resources.each(rcs -> !sourcesTime = sourcesTime.add(rcs));
   includeOptions = includeDirs.map(i -> `-I${i}`);
-  if (optTime.map(t -> optSTime.map(s -> t < s).default(true)).default(true)) {
+  if (sourcesTime.isYoungerThan(target)) {
     objects = Array[];
-    timedSources.each(tsd ->
+    sources.each(tsd ->
       !objects = objects.concat(
         tsd
-          .map(f ->
-            compileFile(env, isWasm, f.i0, max(f.i1, optITime), includeOptions)
-          )
+          .map(f -> compileFile(env, isWasm, f, includeChecker, includeOptions))
           .toArray(),
       )
     );
@@ -258,11 +246,9 @@ fun buildLibrary(
 }
 
 fun buildResource(env: Env, file: String): String {
-  optTime = mtime(file);
+  checker = TimeChecker(mtime(file));
   object = env.targetPath(file, ".o");
-  oTime = mtime(object);
-  create = oTime.isNone() || optTime.isNone() || optTime > oTime;
-  if (create) {
+  if (checker.isYoungerThan(object)) {
     ensureDirectory(Path.dirname(object), env.verbose);
     relative = env.relative(file);
     nf = file.replace("/", "_").replace(".", "_");
@@ -333,27 +319,6 @@ fun ensureDirectory(path: String, verbose: Bool): void {
   }
 }
 
-fun mtime(path: String): ?Int {
-  if (FileSystem.exists(path)) {
-    p = System.subprocess(Array["stat", "-c", "%Y", path]);
-    if (!p.success()) {
-      None()
-    } else {
-      p.stdout.trim().toIntOption()
-    }
-  } else {
-    None()
-  }
-}
-
-fun max(ot1: ?Int, ot2: ?Int): ?Int {
-  (ot1, ot2) match {
-  | (Some(t1), Some(t2)) -> Some(if (t1 > t2) t1 else t2)
-  | (optTime, None()) -> optTime
-  | (None(), optTime) -> optTime
-  }
-}
-
 fun arch(): String {
   p = System.subprocess(Array["gcc", "-dumpmachine"]);
   p.stdout.trim();
@@ -372,14 +337,12 @@ fun compileFile(
   env: Env,
   isWasm: Bool,
   source: String,
-  optTime: ?Int,
+  includesChecker: TimeChecker,
   includes: Array<String>,
 ): String {
   ext = if (isWasm) ".bc" else ".o";
   object = env.targetPath(source, ext);
-  oTime = mtime(object);
-  compile = oTime.isNone() || optTime.isNone() || optTime > oTime;
-  if (compile) {
+  if (includesChecker.add(source).isYoungerThan(object)) {
     ensureDirectory(Path.dirname(object), env.verbose);
     cmd = (if (source.endsWith(".c")) Array["clang"] else {
       Array["clang++", "-std=c++17"]
