@@ -1,0 +1,35 @@
+module Skbuild;
+
+class TimeChecker(optTime: ?Int = None()) {
+  //
+  fun add(file: String): TimeChecker {
+    !this.optTime = max(this.optTime, mtime(file));
+    this
+  }
+
+  fun isYoungerThan(file: String): Bool {
+    optTime = mtime(file);
+    optTime.isNone() || this.optTime.isNone() || this.optTime > optTime
+  }
+}
+
+fun mtime(path: String): ?Int {
+  if (FileSystem.exists(path)) {
+    p = System.subprocess(Array["stat", "-c", "%Y", path]);
+    if (!p.success()) {
+      None()
+    } else {
+      p.stdout.trim().toIntOption()
+    }
+  } else {
+    None()
+  }
+}
+
+fun max(ot1: ?Int, ot2: ?Int): ?Int {
+  (ot1, ot2) match {
+  | (Some(t1), Some(t2)) -> Some(if (t1 > t2) t1 else t2)
+  | (optTime, None()) -> optTime
+  | (None(), optTime) -> optTime
+  }
+}

@@ -124,6 +124,7 @@ fun execBuild(args: Cli.ParseResults, env: Skargo.Env): void {
     args.maybeGetString("target-dir"),
     Skargo.getProfile(args),
   );
+  checkBuild(bc, false);
   manage(bc, Package::create(env.manifest));
   args.maybeGetString("html") match {
   | Some(launcher) ->
@@ -174,15 +175,19 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
     args.maybeGetString("target-dir"),
     Skargo.getProfile(args),
   );
+
   tests = Path.join(env.manifest.path, "ts/tests");
   targetDir = Path.join(bc.targetDir, "tests");
   customTests = FileSystem.exists(tests);
-  if (customTests) {
-    Skargo.run(Array["cp", "-R", tests, bc.targetDir], env.verbose);
-  } else {
+  if (!customTests) {
     !bc.env.manifest.bin = Array[
       Skargo.ManifestBinary("test", env.manifest.testHarness),
     ];
+  };
+  checkBuild(bc, !customTests);
+  if (customTests) {
+    Skargo.run(Array["cp", "-R", tests, bc.targetDir], env.verbose);
+  } else {
     saveArchive(bc.targetDir);
   };
   Skargo.run(
@@ -253,6 +258,30 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
   }
 }
 
+fun checkBuild(bc: Skargo.BuildContext, test: Bool): void {
+  checker = Skbuild.TimeChecker();
+  bc.files.each(f -> !checker = checker.add(f));
+  buildNeeded = for (bin in bc.env.manifest.bin) {
+    wasmFile = Path.join(bc.targetDir, bin.name + ".wasm");
+    if (checker.isYoungerThan(wasmFile)) break true;
+  } else {
+    false
+  };
+  if (buildNeeded) {
+    Skargo.run(
+      Array[
+        "skargo",
+        if (test) "test" else "build",
+        "--target",
+        "wasm32",
+        "--profile",
+        bc.profile,
+      ],
+      bc.env.verbose,
+    );
+  };
+}
+
 fun manage(
   bc: Skargo.BuildContext,
   package: Package,
@@ -260,10 +289,6 @@ fun manage(
   optBinName: ?String = None(),
 ): void {
   npmDir = optTarget.default(Path.join(bc.targetDir, "npm"));
-  invariant(
-    FileSystem.exists(bc.targetDir),
-    "Wasm not generated. Run 'skargo b --target wasm32' before",
-  );
   tsDir = Path.join(bc.targetDir, "ts");
   _ = system("mkdir -p " + tsDir);
   dependencies = mutable Vector[];
