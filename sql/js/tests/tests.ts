@@ -150,4 +150,23 @@ export const tests = [{
     check: res => {
       expect(res).toEqual("13|9|42\n");
     }
+}, {
+    name: 'Test reactive query',
+    fun: skdb => {
+      skdb.sql('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
+      skdb.insert('t1', [13, 9, 42]);
+      let result = [];
+      let handle = skdb.watch('SELECT * FROM t1;', {}, (changes) => {
+        result.push(changes);
+      });
+      skdb.insert('t1', [14, 9, 44]);
+      handle.close();
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [[{"a": 13, "b": 9, "c": 42}],
+         [{"a": 13, "b": 9, "c": 42}, {"a": 14, "b": 9, "c": 44}]
+        ]);
+    }
 }];

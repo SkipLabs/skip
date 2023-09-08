@@ -166,19 +166,28 @@ class SelectDir(
 /*****************************************************************************/
 /* The main entry point. */
 /*****************************************************************************/
+const queryPrefix: String = "query/";
 
 fun evalSelect(
   context: mutable SKStore.Context,
   select: CSelect,
   up: ?ExprEvaluator,
 ): SelectDir {
-  result = makeSelectEvaluator(select, up).evalSelect(context);
+  result = makeSelectEvaluator(context, select, up).evalSelect(context);
   result
 }
 
-fun makeSelectEvaluator(select: CSelect, up: ?ExprEvaluator): SelectEvaluator {
+fun makeSelectEvaluator(
+  context: mutable SKStore.Context,
+  select: CSelect,
+  up: ?ExprEvaluator,
+): SelectEvaluator {
   selectName1 = makeSelectName(
-    select.id.lower + if (select.needUp) "_" + hash(up) else "",
+    if (context.canReuse is SKStore.CRNever()) {
+      queryPrefix + SKStore.genSym(0)
+    } else {
+      select.id.lower + if (select.needUp) "_" + hash(up) else ""
+    },
   );
   selectName2 = if (select.aggr is Some _) {
     SKStore.DirName::create(selectName1.toString() + "aggrEnv/")
@@ -696,6 +705,7 @@ class SelectEvaluator{
   }
 
   fun makeParents(
+    context: mutable SKStore.Context,
     dirName: SKStore.DirName,
     rangeOpt: ?Array<SKStore.KeyRange>,
     remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
@@ -730,7 +740,7 @@ class SelectEvaluator{
     while (rest is Some _) {
       currentOrder = order;
       (qKind, query) = rest.fromSome();
-      ev = makeSelectEvaluator(query, this.up);
+      ev = makeSelectEvaluator(context, query, this.up);
       rtables = List::createFromItems(query.from);
       (rtable, rremainingTables) = rtables match {
       | List.Nil() -> invariant_violation("Should have been expanded")
@@ -768,7 +778,13 @@ class SelectEvaluator{
     remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
     entries: List<Row>,
   ): SKStore.EHandle<SKStore.Key, Row> {
-    parents = this.makeParents(dir.dirName, rangeOpt, remainingTables, entries);
+    parents = this.makeParents(
+      context,
+      dir.dirName,
+      rangeOpt,
+      remainingTables,
+      entries,
+    );
     this.directMode match {
     | Some(limit) ->
       RowValues::printHeader(this.select.format);

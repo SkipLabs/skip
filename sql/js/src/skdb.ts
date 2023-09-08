@@ -22,12 +22,6 @@ interface WasmExports {
   SKIP_Obstack_alloc: (size: number) => number;
   sk_string_create: (addr: number, size: number) => number;
   SKIP_throw_EndOfFile: () => void;
-  SKIP_add_root: (
-    rootNameWasmStr: number,
-    funId: number,
-    funArg: number
-  ) => void;
-  SKIP_remove_root: (rootNameWasmStr: number) => void;
   SKIP_skfs_init: (size: number) => void;
   SKIP_initializeSkip: () => void;
   SKIP_skfs_end_of_init: () => void;
@@ -35,6 +29,8 @@ interface WasmExports {
   SKIP_get_persistent_size: () => number;
   sk_pop_dirty_page: () => number;
   SKIP_get_version: () => number;
+  SKIP_reactive_query: (queryID: number, query: number, encoded_params: number) => void;
+  SKIP_delete_reactive_query: (queryID: number) => void;
   skip_main: () => void;
   getVersion: () => number;
   __heap_base: any;
@@ -224,22 +220,6 @@ function stringify(obj: any): string {
 }
 
 /* ***************************************************************************/
-/* The type used to represent callables. */
-/* ***************************************************************************/
-
-class SKDBCallable<T1, T2> {
-  private id: number;
-
-  constructor(id: number) {
-    this.id = id;
-  }
-
-  getId(): number {
-    return this.id;
-  }
-}
-
-/* ***************************************************************************/
 /* The local database. */
 /* ***************************************************************************/
 
@@ -253,6 +233,10 @@ export class SKDB {
   private current_stdin: number = 0;
   private stdin: string = "";
   private stdout: Array<string> = new Array();
+  private queryID: number = 0;
+  private userFuns: Array<() => void> = new Array();
+  private freeQueryIDs: Array<number> = new Array();
+  private stderr: Array<string> = new Array();
   private stdout_objects: Array<any> = new Array();
   private fileDescrs: Map<string, number> = new Map();
   private fileDescrNbr: number = 2;
@@ -401,10 +385,10 @@ export class SKDB {
         throw new Error("ErrNo " + err);
       },
       SKIP_print_error: function (str) {
-        console.error(wasmStringToJS(data.exports, str));
+        data.stderr.push(wasmStringToJS(data.exports, str));
       },
       SKIP_print_error_raw: function (str) {
-        console.error(wasmStringToJS(data.exports, str));
+        data.stderr.push(wasmStringToJS(data.exports, str));
       },
       SKIP_print_debug: function (str) {
         console.error(wasmStringToJS(data.exports, str));
@@ -526,6 +510,7 @@ export class SKDB {
       SKIP_js_open_flags: function(read: boolean, write: boolean, append: boolean, truncate: boolean, create: boolean, create_new: boolean) {
         return 0;
       }
+      SKIP_js_user_fun: function (queryID) { data.userFuns[queryID]!() },
     };
   }
 
@@ -601,9 +586,14 @@ export class SKDB {
     this.args = ["skdb"].concat(new_args);
     this.stdin = new_stdin;
     this.stdout = new Array();
+    this.stdout_objects = new Array();
+    this.stderr = new Array();
     this.current_stdin = 0;
-
     this.exports.skip_main();
+
+    if(this.stderr.length != 0) {
+      throw new Error(this.stderr.join(""));
+    }
 
     return this.stdout.join("");
   }
@@ -646,15 +636,54 @@ export class SKDB {
   }
 
   sql(stdin: string, params: Map<string, string|number>|Object = new Map())
-    : Array<any> | string {
-    let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
+    : Array<Object> {
+    let [new_args, new_stdin] = this.addParams(["--format=js"], params, stdin);
+    console.assert(this.nbrInitPages >= 0);
+
+    this.args = ["skdb"].concat(new_args);
+    this.stdin = new_stdin;
+    this.stdout = new Array();
     this.stdout_objects = new Array();
-    let stdout = this.runLocal(args1, stdin1);
-    if(stdout == "") {
-      let result = this.stdout_objects;
-      return result;
+    this.stderr = new Array();
+    this.current_stdin = 0;
+    this.exports.skip_main();
+
+    if(this.stderr.length != 0) {
+      throw new Error(this.stderr.join(""));
     }
-    return stdout;
+
+    return this.stdout_objects;
+  }
+
+  watch(query: string,
+        params: Map<string, string|number>|Object,
+        onChange): { close: () => void } {
+    this.stdout_objects = new Array();
+    this.stderr = new Array();
+    let queryID;
+    if(this.freeQueryIDs.length == 0) {
+      queryID = this.queryID;
+      this.queryID++;
+    }
+    else {
+      queryID = this.freeQueryIDs.pop();
+    }
+    this.userFuns[queryID] = () => onChange(this.stdout_objects);
+    this.exports.SKIP_reactive_query(
+      queryID,
+      encodeUTF8(this.exports, query),
+      encodeUTF8(this.exports, stringify(params)),
+    );
+    if(this.stderr.length != 0) {
+      throw new Error(this.stderr.join(""))
+    }
+    onChange(this.stdout_objects);
+    return { close: () => {
+        this.exports.SKIP_delete_reactive_query(queryID);
+        this.userFuns[queryID] = () => {};
+        this.freeQueryIDs.push(queryID);
+      }
+    }
   }
 
   tableExists(tableName: string): boolean {
