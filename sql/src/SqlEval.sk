@@ -1536,6 +1536,28 @@ fun printReactiveQueryResult(
 @cpp_extern("SKIP_js_user_fun")
 native fun jsCallUserFun(queryID32: Int32): void;
 
+@cpp_extern("SKIP_js_mark_query")
+native fun jsMarkQuery(
+  queryID32: Int32,
+  notify: (mutable SKStore.Context) ~> void,
+): void;
+
+@wasm_export("SKIP_js_notify_user")
+fun notifyUser(notify: (mutable SKStore.Context) ~> void): void {
+  saved = SKStore.newObstack();
+  try {
+    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+      notify(context);
+      SKStore.CStop(None())
+    })
+  } catch {
+  | exn ->
+    print_error(exn.getMessage());
+    SKStore.destroyObstack(saved)
+  };
+  SKStore.destroyObstack(saved);
+}
+
 @wasm_export("SKIP_reactive_query")
 fun reactiveQuery(
   queryID32: Int32,
@@ -1580,9 +1602,11 @@ fun reactiveQuery(
         context,
         selectDir.dirName,
         SKStore.DirName::create(selectDir.dirName.toString() + "sink/"),
-        (context, _writer, _key, _valueIter) ~> {
-          printReactiveQueryResult(context, selectDir.dirName, fieldNames);
-          jsCallUserFun(queryID32);
+        (_context, _writer, _key, _valueIter) ~> {
+          jsMarkQuery(queryID32, context ~> {
+            printReactiveQueryResult(context, selectDir.dirName, fieldNames);
+            jsCallUserFun(queryID32);
+          })
         },
         None(),
         None(),
@@ -1602,6 +1626,7 @@ fun reactiveQuery(
         Array[QueryDeps(deps)],
       );
 
+      context.!newDirs = SortedSet[];
       SKStore.CStop(None())
     })
   } catch {
