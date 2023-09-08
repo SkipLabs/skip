@@ -31,6 +31,7 @@ interface WasmExports {
   SKIP_get_version: () => number;
   SKIP_reactive_query: (queryID: number, query: number, encoded_params: number) => void;
   SKIP_delete_reactive_query: (queryID: number) => void;
+  SKIP_js_notify_user: (notify: number) => void;
   skip_main: () => void;
   getVersion: () => number;
   __heap_base: any;
@@ -236,6 +237,7 @@ export class SKDB {
   private queryID: number = 0;
   private userFuns: Array<() => void> = new Array();
   private freeQueryIDs: Array<number> = new Array();
+  private queriesToNotify: Map<number, number> = new Map();
   private stderr: Array<string> = new Array();
   private stdout_objects: Array<any> = new Array();
   private fileDescrs: Map<string, number> = new Map();
@@ -512,7 +514,12 @@ export class SKDB {
       SKIP_js_open_flags: function(read: boolean, write: boolean, append: boolean, truncate: boolean, create: boolean, create_new: boolean) {
         return 0;
       },
-      SKIP_js_user_fun: function (queryID) { data.userFuns[queryID]!() }
+      SKIP_js_user_fun: function (queryID) {
+        data.userFuns[queryID]!()
+      },
+      SKIP_js_mark_query: function(queryID: number, notify: number) {
+        data.queriesToNotify.set(queryID, notify);
+      }
     };
   }
 
@@ -583,6 +590,16 @@ export class SKDB {
     await this.storePages();
   }
 
+  notifyAllJS(): void {
+    this.queriesToNotify.forEach((value, key, map) => {
+      this.exports.SKIP_js_notify_user(value);
+    });
+    this.queriesToNotify = new Map();
+    if(this.stderr.length != 0) {
+      throw new Error(this.stderr.join(""));
+    }
+  }
+
   runLocal(new_args: Array<string>, new_stdin: string): string {
     console.assert(this.nbrInitPages >= 0);
     this.args = ["skdb"].concat(new_args);
@@ -596,6 +613,8 @@ export class SKDB {
     if(this.stderr.length != 0) {
       throw new Error(this.stderr.join(""));
     }
+
+    this.notifyAllJS();
 
     return this.stdout.join("");
   }
@@ -648,6 +667,8 @@ export class SKDB {
       throw new Error(this.stderr.join(""));
     }
 
+    this.notifyAllJS();
+
     return this.stdout_objects;
   }
 
@@ -668,15 +689,19 @@ export class SKDB {
       onChange(this.stdout_objects);
       this.stdout_objects = new Array()
     }
+
     this.exports.SKIP_reactive_query(
       queryID,
       encodeUTF8(this.exports, query),
       encodeUTF8(this.exports, stringify(params)),
     );
+
     if(this.stderr.length != 0) {
       throw new Error(this.stderr.join(""))
     }
+
     onChange(this.stdout_objects);
+
     return { close: () => {
         this.exports.SKIP_delete_reactive_query(queryID);
         this.userFuns[queryID] = () => {};

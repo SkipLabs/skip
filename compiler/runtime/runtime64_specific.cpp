@@ -707,4 +707,7 @@ void SKIP_push_object() {
 void SKIP_js_user_fun() {
   // Not implemented
 }
+void SKIP_js_notify_user() {
+  // Not implemented
+}
 }
