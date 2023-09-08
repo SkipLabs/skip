@@ -250,6 +250,17 @@ value class Time(value: Int) uses Orderable, Show {
 }
 
 /*****************************************************************************/
+/* Tells the context if we can reuse directories or not. */
+/*****************************************************************************/
+
+base class CanReuse {
+  children =
+  | CRNever()
+  | CRAlways()
+  | CRIfMatch()
+}
+
+/*****************************************************************************/
 /* The context */
 /*****************************************************************************/
 
@@ -273,7 +284,7 @@ mutable class Context{
   mutable asyncList: List<Path> = List[],
   mutable dirty: List<Path> = List[],
   mutable dirtyReaders: List<ArrowKey> = List[],
-  mutable unsafeReuse: Bool = false,
+  mutable canReuse: CanReuse = CRIfMatch(),
   mutable arrowStack: List<ArrowKey> = List[],
   mutable lazyGets: SortedSet<Path> = SortedSet[],
   mutable lazyGetsQueueIn: List<Array<Path>> = List[],
@@ -351,7 +362,7 @@ mutable class Context{
       asyncList => this.asyncList,
       dirty => this.dirty,
       dirtyReaders => this.dirtyReaders,
-      unsafeReuse => this.unsafeReuse,
+      canReuse => this.canReuse,
       arrowStack => this.arrowStack,
       lazyGets => this.lazyGets,
       lazyGetsQueueIn => this.lazyGetsQueueIn,
@@ -384,7 +395,7 @@ mutable class Context{
       asyncList => this.asyncList,
       dirty => this.dirty,
       dirtyReaders => this.dirtyReaders,
-      unsafeReuse => this.unsafeReuse,
+      canReuse => this.canReuse,
       arrowStack => this.arrowStack,
       lazyGets => this.lazyGets,
       lazyGetsQueueIn => this.lazyGetsQueueIn,
@@ -417,7 +428,7 @@ mutable class Context{
       asyncList => ctx.asyncList,
       dirty => ctx.dirty,
       dirtyReaders => ctx.dirtyReaders,
-      unsafeReuse => ctx.unsafeReuse,
+      canReuse => ctx.canReuse,
       arrowStack => ctx.arrowStack,
       lazyGets => ctx.lazyGets,
       lazyGetsQueueIn => ctx.lazyGetsQueueIn,
@@ -449,7 +460,7 @@ mutable class Context{
     this.!asyncList = ctx.asyncList;
     this.!dirty = ctx.dirty;
     this.!dirtyReaders = ctx.dirtyReaders;
-    this.!unsafeReuse = ctx.unsafeReuse;
+    this.!canReuse = ctx.canReuse;
     this.!arrowStack = ctx.arrowStack;
     this.!lazyGets = ctx.lazyGets;
     this.!lazyGetsQueueIn = ctx.lazyGetsQueueIn;
