@@ -2,14 +2,46 @@ module Sknpm;
 
 const kAuthor: String = "Skiplabs";
 
+class NpmVersionException(
+  version: Skargo.Version,
+  existing: Skargo.Version,
+) extends Exception {
+  fun getMessage(): String {
+    `You are trying to publish a package with an earlier or identical version (${
+      this.version
+    }) to an existing one (${
+      this.existing
+    }).\nIf this is what you really want to do please use the --force option.`;
+  }
+}
+
+class NpmDefinitionException() extends Exception {
+  fun getMessage(): String {
+    "npm.json file must be defined";
+  }
+}
+
+class GitDiffException() extends Exception {
+  fun getMessage(): String {
+    "You have git local changes.\nPlease, commit your changes or stash them before publishing.";
+  }
+}
+
 class Package(
   name: String,
   author: ?String,
-  version: String,
+  version: Skargo.Version,
   optNodeVersion: ?String = None(),
   optBinary: ?String = None(),
   sideEffects: Bool = false,
 ) {
+  static fun check(manifest: Skargo.Manifest): void {
+    file = Path.join(manifest.path, "npm.json");
+    if (!FileSystem.exists(file)) {
+      throw NpmDefinitionException()
+    }
+  }
+
   static fun create(manifest: Skargo.Manifest, test: Bool = false): Package {
     file = Path.join(manifest.path, "npm.json");
     if (FileSystem.exists(file)) {
@@ -18,7 +50,7 @@ class Package(
       Package(
         json.getString("name"),
         json.maybeGetString("author"),
-        json.getString("version"),
+        Skargo.Version::fromString(json.getString("version")),
         json.maybeGetString("node-version"),
         json.maybeGetString("binary"),
         json.maybeGetBool("sideEffects").default(false),
@@ -28,9 +60,30 @@ class Package(
       Package(
         if (test) "sk_tests" else manifest.name,
         Some(kAuthor),
-        SkargoVersion.kVersion,
+        Skargo.Version::fromString(SkargoVersion.kVersion),
       )
     }
+  }
+
+  fun update(path: String, version: Skargo.Version): void {
+    file = Path.join(path, "npm.json");
+    stream = mutable Vector[];
+    (this with {version}).toJSON().writeToStream(stream.push, 2);
+    FileSystem.writeTextFile(file, stream.join(""));
+  }
+
+  fun toJSON(): JSON.Value {
+    map = mutable Map<String, JSON.Value>[
+      "name" => JSON.String(this.name),
+      "version" => JSON.String(this.version.toString()),
+    ];
+    this.author.each(a -> map.set("author", JSON.String(a)));
+    this.optNodeVersion.each(v -> map.set("node-version", JSON.String(v)));
+    this.optBinary.each(b -> map.set("binary", JSON.String(b)));
+    if (this.sideEffects) {
+      map.set("sideEffects", JSON.Bool(this.sideEffects))
+    };
+    JSON.Object(map.chill());
   }
 }
 
@@ -50,7 +103,7 @@ fun main(): void {
         .about("Use verbose output")
         .global(),
     );
-  suppliers = Array[build, test, runner, Skargo.help];
+  suppliers = Array[build, test, runner, publish, Skargo.help];
   commands = mutable Map[];
   for (supplier in suppliers) {
     (subcommand, cmdFn) = supplier();
@@ -60,7 +113,9 @@ fun main(): void {
   !cmd = cmd.help();
   args = cmd.parseArgs();
   if (args.getBool("version")) {
-    print_string("skargo " + SkargoVersion.kVersion);
+    print_string(
+      Environ.args().next().default("sknpm") + " " + SkargoVersion.kVersion,
+    );
     skipExit(0);
   } else {
     args.maybeGetSubcommand() match {
@@ -73,6 +128,10 @@ fun main(): void {
             0
           } catch {
           | Skargo.SystemCallException(code, _) -> code
+          | e @ NpmDefinitionException _
+          | e @ GitDiffException _ ->
+            print_error(e.getMessage());
+            2
           | exn -> throw exn
           },
         )
@@ -125,7 +184,7 @@ fun execBuild(args: Cli.ParseResults, env: Skargo.Env): void {
     Skargo.getProfile(args),
   );
   checkBuild(bc, false);
-  manage(bc, Package::create(env.manifest));
+  _ = manage(bc, Package::create(env.manifest));
   args.maybeGetString("html") match {
   | Some(launcher) ->
     writeIndex(bc.targetDir, launcher);
@@ -202,7 +261,7 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
     !optBinName = Some("sk_tests")
   };
   packageDir = Path.join(Path.join(targetDir, "node_modules"), package.name);
-  manage(bc, package, Some(packageDir), optBinName);
+  _ = manage(bc, package, Some(packageDir), optBinName);
   serviceFile = Path.join(targetDir, "service.mk");
   processes = mutable Vector[];
   environment = mutable Map[];
@@ -287,7 +346,7 @@ fun manage(
   package: Package,
   optTarget: ?String = None(),
   optBinName: ?String = None(),
-): void {
+): String {
   npmDir = optTarget.default(Path.join(bc.targetDir, "npm"));
   tsDir = Path.join(bc.targetDir, "ts");
   _ = system("mkdir -p " + tsDir);
@@ -454,7 +513,7 @@ fun manage(
   npmPackageFile = Path.join(npmDir, "package.json");
   npmPackage = mutable Map[
     "name" => JSON.String(package.name),
-    "version" => JSON.String(package.version),
+    "version" => JSON.String(package.version.toString()),
     "type" => JSON.String("module"),
     "dependencies" => JSON.Object(
       pckDependencies.map((_, v) -> JSON.String(v)),
@@ -496,11 +555,12 @@ fun manage(
       JSON.Object(Map["cli" => JSON.String(`node ./dist/${binary}.mjs`)]),
     );
   });
-  npmPackageContents = JSON.Object(unsafe_chill_trust_me(npmPackage));
+  npmPackageContents = JSON.Object(npmPackage.chill());
   stream = mutable Vector[];
   npmPackageContents.writeToStream(stream.push, 2);
   FileSystem.writeTextFile(npmPackageFile, stream.join(""));
   Skargo.run(Array["rm", "-rf", tsDir], bc.env.verbose);
+  npmDir
 }
 
 fun relative(path: String, to: String): ?String {
@@ -584,7 +644,7 @@ fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
 }
 
 fun copyAndConvertImport(
-  version: String,
+  version: Skargo.Version,
   distDir: String,
   targetDir: String,
   resources: Map<String, String>,
@@ -780,10 +840,7 @@ fun i(v: Bool): Int {
 fun wasm(path: String, verbose: Bool): String {
   b64File = path + ".b64";
   cmd = Array["bash", "-c", `base64 ${path} | tr -d "\\n" > ${b64File}`];
-  if (verbose) {
-    print_error(`>> ${cmd.join(" ")}`)
-  };
-  _ = System.subprocess(cmd);
+  _ = run(cmd, verbose);
   res = `export var base64 = "${FileSystem.readTextFile(b64File)}";`;
   Skargo.run(Array["rm", b64File], verbose);
   res
@@ -932,6 +989,85 @@ fun execRun(args: Cli.ParseResults): void {
   if (p != 0) {
     throw Skargo.SystemCallException(p);
   }
+}
+
+/********* Publish **********/
+
+fun publish(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("publish")
+      .short("p")
+      .about("Call npm publish on generated npm package")
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(Cli.StringArg("profile").about("Publish with the specified profile"))
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Publish with release profile"),
+      )
+      .arg(Cli.StringArg("bin").about("Publish for specified binary"))
+      .arg(Cli.StringArg("npmVersion").about("Publish with specified version"))
+      .arg(Cli.BoolArg("force").short("f").about("Do not check version"))
+      .extra(),
+    args ~> Skargo.envCmd(args, execPublish),
+  )
+}
+
+fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
+  gdiff = run(Array["git", "diff"], env.verbose);
+  if (!gdiff.isEmpty()) {
+    throw GitDiffException()
+  };
+  Package::check(env.manifest);
+  package = Package::create(env.manifest);
+  version = args
+    .maybeGetString("npmVersion")
+    .map(Skargo.Version::fromString)
+    .default(package.version);
+  if (!args.getBool("force")) {
+    view = run(Array["npm", "view", package.name, "--json"], env.verbose);
+    json = JSON.decode(view).expectObject();
+    optVersion = json.maybeGetArray("versions").flatMap(versions -> {
+      sorted = versions.value
+        .map(v -> v.expectString())
+        .map(Skargo.Version::fromString)
+        .sorted();
+      sorted.maybeGet(sorted.size() - 1)
+    });
+    optVersion match {
+    | Some(v) if (version <= v) -> throw NpmVersionException(version, v)
+    | _ -> void
+    }
+  };
+  if (package.version != version) {
+    package.update(env.manifest.path, version)
+  };
+  bc = Skargo.BuildContext::create(
+    env,
+    Some("wasm32"),
+    args.maybeGetString("target-dir"),
+    Skargo.getProfile(args),
+  );
+  Skargo.run(
+    Array["skargo", "build", "--target", "wasm32", "--profile", bc.profile],
+    bc.env.verbose,
+  );
+  npmDir = manage(bc, Package::create(env.manifest));
+  Environ.set_current_dir(npmDir);
+  Skargo.run(Array["npm", "publish"].concat(args.extra), bc.env.verbose);
+}
+
+fun run(args: Array<String>, verbose: Bool): String {
+  if (verbose) {
+    print_error(`>> ${args.join(" ")}`)
+  };
+  p = System.subprocess(args);
+  p.stdout
 }
 
 @cpp_extern("SKIP_sknpm_save_sk_tests_ts")
