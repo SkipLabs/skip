@@ -84,7 +84,9 @@ char *SKIP_posix_read(int64_t fd, int64_t len) {
     perror("read");
     exit(EXIT_FAILURE);
   }
-  return sk_string_create(buf, rv);
+  char *str = sk_string_create(buf, rv);
+  free(buf);
+  return str;
 }
 
 int64_t SKIP_posix_lseek(int64_t fd, int64_t offset, int64_t whence) {
