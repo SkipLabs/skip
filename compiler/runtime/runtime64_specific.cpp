@@ -704,4 +704,7 @@ void SKIP_push_object_field_string(char*) {
 void SKIP_push_object() {
   // Not implemented
 }
+void SKIP_js_user_fun() {
+  // Not implemented
+}
 }
