@@ -509,8 +509,8 @@ export class SKDB {
       },
       SKIP_js_open_flags: function(read: boolean, write: boolean, append: boolean, truncate: boolean, create: boolean, create_new: boolean) {
         return 0;
-      }
-      SKIP_js_user_fun: function (queryID) { data.userFuns[queryID]!() },
+      },
+      SKIP_js_user_fun: function (queryID) { data.userFuns[queryID]!() }
     };
   }
 
