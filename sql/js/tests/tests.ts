@@ -31,7 +31,7 @@ export const tests = [{
     fun: skdb => {
       skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
       skdb.sqlRaw("insert into t1 (a, b) values ('foo', 22);");
-      return skdb.sql('select a, b from t1');
+      return skdb.exec('select a, b from t1');
     },
     check: res => {
       expect(res).toEqual([{a: 'foo', b: 22}]);
@@ -39,9 +39,9 @@ export const tests = [{
 }, {
     name: 'Multiple field updates',
     fun: skdb => {
-        skdb.sql('create table widgets (id text unique, name text);');
-        skdb.sql('INSERT INTO widgets (id, name) VALUES (\'a\', \'gear\');');
-        skdb.sql('UPDATE widgets SET id = \'c\', name = \'gear2\';');
+        skdb.exec('create table widgets (id text unique, name text);');
+        skdb.exec('INSERT INTO widgets (id, name) VALUES (\'a\', \'gear\');');
+        skdb.exec('UPDATE widgets SET id = \'c\', name = \'gear2\';');
         return skdb.sqlRaw('select * from widgets;');
     },
     check: res => {
@@ -50,8 +50,8 @@ export const tests = [{
 }, {
     name: 'Parse/print float',
     fun: skdb => {
-        skdb.sql("create table widgets (id text unique , price real not null);");
-        skdb.sql("INSERT INTO widgets (id, price) values ('a', 10.0);");
+        skdb.exec("create table widgets (id text unique , price real not null);");
+        skdb.exec("INSERT INTO widgets (id, price) values ('a', 10.0);");
         return skdb.sqlRaw('select * from widgets');
     },
     check: res => {
@@ -103,9 +103,9 @@ export const tests = [{
   {
     name: 'Column casting',
     fun: skdb => {
-        skdb.sql('create table t1 (aBc INTEGER)');
+        skdb.exec('create table t1 (aBc INTEGER)');
         skdb.insert('t1', [11]);
-        return skdb.sql('select * from t1')[0].aBc;
+        return skdb.exec('select * from t1')[0].aBc;
     },
     check: res => {
         expect(res).toEqual(11);
@@ -113,9 +113,9 @@ export const tests = [{
 }, {
     name: 'Limit',
     fun: skdb => {
-        skdb.sql('create table t1 (aBc INTEGER)');
+        skdb.exec('create table t1 (aBc INTEGER)');
         skdb.insert('t1', [11]);
-        return skdb.sql('select * from t1 limit 1')[0].aBc;
+        return skdb.exec('select * from t1 limit 1')[0].aBc;
     },
     check: res => {
         expect(res).toEqual(11);
@@ -123,8 +123,8 @@ export const tests = [{
 }, {
     name: 'Params 1',
     fun: skdb => {
-      skdb.sql('CREATE TABLE t1 (a INTEGER);');
-      skdb.sql('INSERT INTO t1 VALUES (@key);', new Map().set("key", 13));
+      skdb.exec('CREATE TABLE t1 (a INTEGER);');
+      skdb.exec('INSERT INTO t1 VALUES (@key);', new Map().set("key", 13));
       return skdb.sqlRaw('SELECT * FROM t1;');
     },
     check: res => {
@@ -133,8 +133,8 @@ export const tests = [{
 }, {
     name: 'Params as object',
     fun: skdb => {
-      skdb.sql('CREATE TABLE t1 (a INTEGER);');
-      skdb.sql('INSERT INTO t1 VALUES (@key);', {key: 13});
+      skdb.exec('CREATE TABLE t1 (a INTEGER);');
+      skdb.exec('INSERT INTO t1 VALUES (@key);', {key: 13});
       return skdb.sqlRaw('SELECT * FROM t1;');
     },
     check: res => {
@@ -143,7 +143,7 @@ export const tests = [{
 }, {
     name: 'Params 2',
     fun: skdb => {
-      skdb.sql('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
       skdb.insert('t1', [13, 9, 42])
       return skdb.sqlRaw('SELECT * FROM t1;');
     },
@@ -153,7 +153,7 @@ export const tests = [{
 }, {
     name: 'Test reactive query',
     fun: skdb => {
-      skdb.sql('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
       skdb.insert('t1', [13, 9, 42]);
       let result = [];
       let handle = skdb.watch('SELECT * FROM t1;', {}, (changes) => {

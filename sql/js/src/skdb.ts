@@ -635,7 +635,7 @@ export class SKDB {
     return this.runLocal(args1, stdin1);
   }
 
-  sql(stdin: string, params: Map<string, string|number>|Object = new Map())
+  exec(stdin: string, params: Map<string, string|number>|Object = new Map())
     : Array<Object> {
     let [new_args, new_stdin] = this.addParams(["--format=js"], params, stdin);
     console.assert(this.nbrInitPages >= 0);
