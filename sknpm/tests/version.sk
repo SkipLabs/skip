@@ -1,0 +1,52 @@
+module alias T = SKTest;
+
+module SknpmTests;
+
+@test
+fun parse1(): void {
+  got = Sknpm.Version::fromString("1.2.3");
+  expected = Sknpm.Version(Skargo.Version(1, 2, 3), None());
+  T.expectEq(got, expected)
+}
+
+@test
+fun parse2(): void {
+  got = Sknpm.Version::fromString("1.2.3-beta");
+  expected = Sknpm.Version(
+    Skargo.Version(1, 2, 3),
+    Some(Sknpm.Tag("beta", None())),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun parse3(): void {
+  got = Sknpm.Version::fromString("1.2.3-beta.1");
+  expected = Sknpm.Version(
+    Skargo.Version(1, 2, 3),
+    Some(Sknpm.Tag("beta", Some(1))),
+  );
+  T.expectEq(got, expected)
+}
+
+@test
+fun order(): void {
+  versions = Array[
+    "1.2.3-beta.1",
+    "1.2.3-alpha",
+    "1.2.3",
+    "1.3.0",
+    "1.3.0-alpha",
+    "0.0.54",
+  ].map(Sknpm.Version::fromString);
+  expected = Array[
+    "0.0.54",
+    "1.2.3-alpha",
+    "1.2.3-beta.1",
+    "1.2.3",
+    "1.3.0-alpha",
+    "1.3.0",
+  ].map(Sknpm.Version::fromString);
+  got = versions.sorted();
+  T.expectEq(got, expected)
+}

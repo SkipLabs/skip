@@ -3,8 +3,8 @@ module Sknpm;
 const kAuthor: String = "Skiplabs";
 
 class NpmVersionException(
-  version: Skargo.Version,
-  existing: Skargo.Version,
+  version: Version,
+  existing: Version,
 ) extends Exception {
   fun getMessage(): String {
     `You are trying to publish a package with an earlier or identical version (${
@@ -21,6 +21,100 @@ class NpmDefinitionException() extends Exception {
   }
 }
 
+class Tag(name: String, version: ?Int) uses Orderable {
+  static fun fromString(str: String): Tag {
+    components = str.split(".");
+    if (components.size() > 2) {
+      invariant_violation("Invalid tag string " + str)
+    };
+    v = components.maybeGet(1).map(v -> v.toInt());
+    v.each(vn -> invariant(vn >= 0, "Tag version nust be positive"));
+    Tag(components[0], v)
+  }
+
+  fun compare(other: Tag): Order {
+    (this, other) match {
+    | (Tag(n1, None()), Tag(n2, None())) -> n1.compare(n2)
+    | (Tag(n1, Some(v1)), Tag(n2, Some(v2))) ->
+      nComp = n1.compare(n2);
+      if (nComp == EQ()) {
+        v1.compare(v2);
+      } else {
+        nComp
+      }
+    | (Tag(n1, None()), Tag(n2, Some(v2))) ->
+      nComp = n1.compare(n2);
+      if (nComp == EQ()) {
+        0.compare(v2);
+      } else {
+        nComp
+      }
+    | (Tag(n1, Some(v1)), Tag(n2, None())) ->
+      nComp = n1.compare(n2);
+      if (nComp == EQ()) {
+        v1.compare(0);
+      } else {
+        nComp
+      }
+    }
+  }
+
+  fun toString(): String {
+    this.version match {
+    | Some(v) -> `${this.name}.${v}`
+    | _ -> this.name
+    }
+  }
+}
+
+class Version(version: Skargo.Version, tag: ?Tag) uses Orderable {
+  //
+  static fun fromString(str: String): Version {
+    components = str.split("-");
+    if (components.size() > 2) {
+      invariant_violation("Invalid version-tag string " + str)
+    };
+    Version(
+      Skargo.Version::fromString(components[0]),
+      components.maybeGet(1).map(Tag::fromString),
+    )
+  }
+
+  fun toString(): String {
+    this.tag match {
+    | Some(tag) -> `${this.version}-${tag}`
+    | _ -> this.version.toString()
+    }
+  }
+
+  fun compare(other: Version): Order {
+    (this, other) match {
+    | (Version(v1, None()), Version(v2, None())) -> v1.compare(v2)
+    | (Version(v1, Some(t1)), Version(v2, Some(t2))) ->
+      vComp = v1.compare(v2);
+      if (vComp == EQ()) {
+        t1.compare(t2);
+      } else {
+        vComp
+      }
+    | (Version(v1, Some(_)), Version(v2, None())) ->
+      vComp = v1.compare(v2);
+      if (vComp == EQ()) {
+        LT();
+      } else {
+        vComp
+      }
+    | (Version(v1, None()), Version(v2, Some(_))) ->
+      vComp = v1.compare(v2);
+      if (vComp == EQ()) {
+        GT();
+      } else {
+        vComp
+      }
+    }
+  }
+}
+
 class GitDiffException() extends Exception {
   fun getMessage(): String {
     "You have git local changes.\nPlease, commit your changes or stash them before publishing.";
@@ -30,7 +124,7 @@ class GitDiffException() extends Exception {
 class Package(
   name: String,
   author: ?String,
-  version: Skargo.Version,
+  version: Version,
   optNodeVersion: ?String = None(),
   optBinary: ?String = None(),
   sideEffects: Bool = false,
@@ -50,7 +144,7 @@ class Package(
       Package(
         json.getString("name"),
         json.maybeGetString("author"),
-        Skargo.Version::fromString(json.getString("version")),
+        Version::fromString(json.getString("version")),
         json.maybeGetString("node-version"),
         json.maybeGetString("binary"),
         json.maybeGetBool("sideEffects").default(false),
@@ -60,12 +154,12 @@ class Package(
       Package(
         if (test) "sk_tests" else manifest.name,
         Some(kAuthor),
-        Skargo.Version::fromString(SkargoVersion.kVersion),
+        Version::fromString(SkargoVersion.kVersion),
       )
     }
   }
 
-  fun update(path: String, version: Skargo.Version): void {
+  fun update(path: String, version: Version): void {
     file = Path.join(path, "npm.json");
     stream = mutable Vector[];
     (this with {version}).toJSON().writeToStream(stream.push, 2);
@@ -644,7 +738,7 @@ fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
 }
 
 fun copyAndConvertImport(
-  version: Skargo.Version,
+  version: Version,
   distDir: String,
   targetDir: String,
   resources: Map<String, String>,
@@ -1027,7 +1121,7 @@ fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
   package = Package::create(env.manifest);
   version = args
     .maybeGetString("npmVersion")
-    .map(Skargo.Version::fromString)
+    .map(Version::fromString)
     .default(package.version);
   if (!args.getBool("force")) {
     view = run(Array["npm", "view", package.name, "--json"], env.verbose);
@@ -1035,7 +1129,7 @@ fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
     optVersion = json.maybeGetArray("versions").flatMap(versions -> {
       sorted = versions.value
         .map(v -> v.expectString())
-        .map(Skargo.Version::fromString)
+        .map(Version::fromString)
         .sorted();
       sorted.maybeGet(sorted.size() - 1)
     });
@@ -1059,7 +1153,11 @@ fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
   );
   npmDir = manage(bc, Package::create(env.manifest));
   Environ.set_current_dir(npmDir);
-  Skargo.run(Array["npm", "publish"].concat(args.extra), bc.env.verbose);
+  cmdArgs = version.tag match {
+  | Some(tag) -> args.extra.concat(Array["--tag", tag.toString()])
+  | _ -> args.extra
+  };
+  Skargo.run(Array["npm", "publish"].concat(cmdArgs), bc.env.verbose);
 }
 
 fun run(args: Array<String>, verbose: Bool): String {
