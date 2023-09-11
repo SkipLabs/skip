@@ -1,9 +1,10 @@
 import { expect } from '@playwright/test';
+import { SKDB } from '../src/skdb';
 
 export const tests = [
   {
     name: 'Boolean',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');
       skdb.sqlRaw('insert into t1 values(TRUE, false);');
       return skdb.sqlRaw('select true, false, a, b from t1;');
@@ -14,7 +15,7 @@ export const tests = [
   },
   {
     name: 'Create table if not exists',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');
       skdb.sqlRaw('create table if not exists t1 (a BOOLEAN, b boolean);');
       return skdb.sqlRaw('select 1;');
@@ -25,14 +26,14 @@ export const tests = [
   },
   {
     name: 'Primary key',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY);');
     },
     check: _res => {}
   },
   {
     name: 'Primary key 2',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
       skdb.sqlRaw("insert into t1 (a, b) values ('foo', 22);");
       return skdb.exec('select a, b from t1');
@@ -43,7 +44,7 @@ export const tests = [
   },
   {
     name: 'Multiple field updates',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.exec('create table widgets (id text unique, name text);');
       skdb.exec('INSERT INTO widgets (id, name) VALUES (\'a\', \'gear\');');
       skdb.exec('UPDATE widgets SET id = \'c\', name = \'gear2\';');
@@ -55,7 +56,7 @@ export const tests = [
   },
   {
     name: 'Parse/print float',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.exec("create table widgets (id text unique , price real not null);");
       skdb.exec("INSERT INTO widgets (id, price) values ('a', 10.0);");
       return skdb.sqlRaw('select * from widgets');
@@ -66,7 +67,7 @@ export const tests = [
   },
   {
     name: 'Virtual view if not exists',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');
       skdb.sqlRaw('create virtual view v1 as select * from t1;');
       skdb.sqlRaw('create virtual view if not exists v1 as select * from t1;');
@@ -78,7 +79,7 @@ export const tests = [
   },
   {
     name: 'View if not exists',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');
       skdb.sqlRaw('create view v1 as select * from t1;');
       skdb.sqlRaw('create view if not exists v1 as select * from t1;');
@@ -94,7 +95,7 @@ export const tests = [
   // printed on stderr).
   // {
   //     name: 'Error memory',
-  //     fun: skdb => {
+  //     fun: (skdb: SKDB) => {
   //         let res = 0;
   //         for(let i = 0; i < 10000; i++) {
   //             let queryRes = skdb.sqlRaw('select * from t1;');
@@ -110,7 +111,7 @@ export const tests = [
   // },
   {
     name: 'Column casting',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.exec('create table t1 (aBc INTEGER)');
       skdb.insert('t1', [11]);
       return skdb.exec('select * from t1')[0].aBc;
@@ -121,7 +122,7 @@ export const tests = [
   },
   {
     name: 'Limit',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.exec('create table t1 (aBc INTEGER)');
       skdb.insert('t1', [11]);
       return skdb.exec('select * from t1 limit 1')[0].aBc;
@@ -132,7 +133,7 @@ export const tests = [
   },
   {
     name: 'Params 1',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.exec('CREATE TABLE t1 (a INTEGER);');
       skdb.exec('INSERT INTO t1 VALUES (@key);', new Map().set("key", 13));
       return skdb.sqlRaw('SELECT * FROM t1;');
@@ -143,7 +144,7 @@ export const tests = [
   },
   {
     name: 'Params as object',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.exec('CREATE TABLE t1 (a INTEGER);');
       skdb.exec('INSERT INTO t1 VALUES (@key);', {key: 13});
       return skdb.sqlRaw('SELECT * FROM t1;');
@@ -154,7 +155,7 @@ export const tests = [
   },
   {
     name: 'Params 2',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.exec('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
       skdb.insert('t1', [13, 9, 42])
       return skdb.sqlRaw('SELECT * FROM t1;');
@@ -165,10 +166,10 @@ export const tests = [
   },
   {
     name: 'Test reactive query',
-    fun: skdb => {
+    fun: (skdb: SKDB) => {
       skdb.exec('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
       skdb.insert('t1', [13, 9, 42]);
-      let result = [];
+      let result: Array<any> = [];
       let handle = skdb.watch('SELECT * FROM t1;', {}, (changes) => {
         result.push(changes);
       });
