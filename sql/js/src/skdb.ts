@@ -2226,7 +2226,7 @@ class SKDBServer {
     });
     return decodeUTF8(this.strictCastData(result).payload)
       .split("\n")
-      .filter((x) => x != "")
+      .filter((x) => x.trim() != "")
       .map((x) => JSON.parse(x));
   }
 
