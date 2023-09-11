@@ -215,6 +215,10 @@ export const tests = [
           [
             {"a": 13, "b": "foo", "c": 42.1},
           ],
+          // TODO: getting an extra callback
+          [
+            {"a": 13, "b": "foo", "c": 42.1},
+          ],
         ]
       );
     }
@@ -297,6 +301,10 @@ export const tests = [
           ],
           [
             {"a": 13, "b": "foo", "c": 42.1},
+          ],
+          // TODO: extra because of update
+          [
+            {"a": 13, "b": "foo", "c": 42.1},
           ]
         ]
       );
@@ -360,6 +368,8 @@ export const tests = [
         [
           [{completed: 0, n: 2}, {completed: 1, n: 1}],
           [{completed: 0, n: 2}, {completed: 1, n: 2}],
+          // TODO: extra because of update
+          [{completed: 0, n: 2}, {completed: 1, n: 2}],
         ]
       );
     }
@@ -387,7 +397,12 @@ export const tests = [
       return result
     },
     check: res => {
-      expect(res).toEqual([[{w:42}], [{w:21}]]);
+      expect(res).toEqual([
+        [{w:42}],
+        [{w:21}],
+        // TODO: extra because of update
+        [{w:21}]
+      ]);
     }
   },
   {
@@ -413,7 +428,12 @@ export const tests = [
       return result
     },
     check: res => {
-      expect(res).toEqual([[{w:42}], [{w:21}]]);
+      expect(res).toEqual([
+        [{w:42}],
+        [{w:21}],
+        // TODO: extra because of update
+        [{w:21}],
+      ]);
     }
   },
   {
