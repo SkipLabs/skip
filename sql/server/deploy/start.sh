@@ -36,7 +36,7 @@ source "$SDKMAN/bin/sdkman-init.sh"
 
 cd "$SCRIPT_DIR/../skgw" || exit 1
 
-mkdir -p $skdb_databases || exit 1
+mkdir -p /var/db || exit 1
 
 if [[ -z "$server_args" ]];then
     exec gradle --console plain run 
