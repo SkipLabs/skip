@@ -629,12 +629,6 @@ export class SKDB {
     return [args1, stdin1];
   }
 
-  sqlRaw(stdin: string, params: Map<string, string|number>|Object = new Map())
-    : string {
-    let [args1, stdin1] = this.addParams([], params, stdin);
-    return this.runLocal(args1, stdin1);
-  }
-
   exec(query: string, params: Map<string, string|number>|Object = new Map())
     : Array<any> {
     let [new_args, new_stdin] = this.addParams(["--format=js"], params, query);
@@ -2222,20 +2216,10 @@ class SKDBServer {
     return this.establishServerTail(tableName, filterExpr || "");
   }
 
-  async sqlRaw(stdin: string): Promise<string> {
+  async exec(query: string): Promise<any[]> {
     let result = await this.makeRequest({
       type: "query",
-      query: stdin,
-      format: "raw",
-    });
-
-    return decodeUTF8(this.strictCastData(result).payload);
-  }
-
-  async sql(stdin: string): Promise<any[]> {
-    let result = await this.makeRequest({
-      type: "query",
-      query: stdin,
+      query: query,
       format: "json",
     });
     return decodeUTF8(this.strictCastData(result).payload)

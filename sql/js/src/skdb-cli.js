@@ -188,8 +188,7 @@ const skdb = await createConnectedSkdb(args.values.host, args.values.db, {
 
 const evalQuery = async function(skdb_client, query) {
   if (args.values['pipe-separated-output']) {
-    let answer = await skdb_client.sqlRaw(query);
-    answer = answer.trim();
+    let answer = await skdb_client.exec(query);
     return answer;
   } else {
     return skdb_client.sql(query);
