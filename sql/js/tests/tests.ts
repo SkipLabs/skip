@@ -5,37 +5,37 @@ export const tests = [
   {
     name: 'Boolean',
     fun: (skdb: SKDB) => {
-      skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');
-      skdb.sqlRaw('insert into t1 values(TRUE, false);');
-      return skdb.sqlRaw('select true, false, a, b from t1;');
+      skdb.exec('create table t1 (a BOOLEAN, b boolean);');
+      skdb.exec('insert into t1 values(TRUE, false);');
+      return skdb.exec('select true, false, a, b from t1;');
     },
     check: res => {
-      expect(res).toEqual("1|0|1|0\n")
+      expect(res).toEqual([{"a": 1, "b": 0, "col<0>": 1, "col<1>": 0}])
     }
   },
   {
     name: 'Create table if not exists',
     fun: (skdb: SKDB) => {
-      skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');
-      skdb.sqlRaw('create table if not exists t1 (a BOOLEAN, b boolean);');
-      return skdb.sqlRaw('select 1;');
+      skdb.exec('create table t1 (a BOOLEAN, b boolean);');
+      skdb.exec('create table if not exists t1 (a BOOLEAN, b boolean);');
+      return skdb.exec('select 1;');
     },
     check: res => {
-      expect(res).toEqual("1\n");
+      expect(res).toEqual([{"col<0>": 1}]);
     }
   },
   {
     name: 'Primary key',
     fun: (skdb: SKDB) => {
-      skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY);');
+      skdb.exec('create table t1 (a STRING PRIMARY KEY);');
     },
     check: _res => {}
   },
   {
     name: 'Primary key 2',
     fun: (skdb: SKDB) => {
-      skdb.sqlRaw('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
-      skdb.sqlRaw("insert into t1 (a, b) values ('foo', 22);");
+      skdb.exec('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
+      skdb.exec("insert into t1 (a, b) values ('foo', 22);");
       return skdb.exec('select a, b from t1');
     },
     check: res => {
@@ -48,10 +48,10 @@ export const tests = [
       skdb.exec('create table widgets (id text unique, name text);');
       skdb.exec('INSERT INTO widgets (id, name) VALUES (\'a\', \'gear\');');
       skdb.exec('UPDATE widgets SET id = \'c\', name = \'gear2\';');
-      return skdb.sqlRaw('select * from widgets;');
+      return skdb.exec('select * from widgets;');
     },
     check: res => {
-      expect(res).toEqual("c|gear2\n");
+      expect(res).toEqual([{"id": "c", "name": "gear2"}]);
     }
   },
   {
@@ -59,34 +59,34 @@ export const tests = [
     fun: (skdb: SKDB) => {
       skdb.exec("create table widgets (id text unique , price real not null);");
       skdb.exec("INSERT INTO widgets (id, price) values ('a', 10.0);");
-      return skdb.sqlRaw('select * from widgets');
+      return skdb.exec('select * from widgets');
     },
     check: res => {
-      expect(res).toEqual("a|10.0\n");
+      expect(res).toEqual([{"id": "a", "price": 10}]);
     }
   },
   {
     name: 'Virtual view if not exists',
     fun: (skdb: SKDB) => {
-      skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');
-      skdb.sqlRaw('create virtual view v1 as select * from t1;');
-      skdb.sqlRaw('create virtual view if not exists v1 as select * from t1;');
-      return skdb.sqlRaw('select 1;');
+      skdb.exec('create table t1 (a BOOLEAN, b boolean);');
+      skdb.exec('create virtual view v1 as select * from t1;');
+      skdb.exec('create virtual view if not exists v1 as select * from t1;');
+      return skdb.exec('select 1;');
     },
     check: res => {
-      expect(res).toEqual("1\n");
+      expect(res).toEqual([{"col<0>": 1}]);
     }
   },
   {
     name: 'View if not exists',
     fun: (skdb: SKDB) => {
-      skdb.sqlRaw('create table t1 (a BOOLEAN, b boolean);');
-      skdb.sqlRaw('create view v1 as select * from t1;');
-      skdb.sqlRaw('create view if not exists v1 as select * from t1;');
-      return skdb.sqlRaw('select 1;');
+      skdb.exec('create table t1 (a BOOLEAN, b boolean);');
+      skdb.exec('create view v1 as select * from t1;');
+      skdb.exec('create view if not exists v1 as select * from t1;');
+      return skdb.exec('select 1;');
     },
     check: res => {
-      expect(res).toEqual("1\n");
+      expect(res).toEqual([{"col<0>": 1}]);
     }
   },
   // TODO: uncomment this once we have errors propagated back to the JS
@@ -98,7 +98,7 @@ export const tests = [
   //     fun: (skdb: SKDB) => {
   //         let res = 0;
   //         for(let i = 0; i < 10000; i++) {
-  //             let queryRes = skdb.sqlRaw('select * from t1;');
+  //             let queryRes = skdb.exec('select * from t1;');
   //             if (queryRes.includes('does not exist')) {
   //                 res += 1;
   //             }
@@ -136,10 +136,10 @@ export const tests = [
     fun: (skdb: SKDB) => {
       skdb.exec('CREATE TABLE t1 (a INTEGER);');
       skdb.exec('INSERT INTO t1 VALUES (@key);', new Map().set("key", 13));
-      return skdb.sqlRaw('SELECT * FROM t1;');
+      return skdb.exec('SELECT * FROM t1;');
     },
     check: res => {
-      expect(res).toEqual("13\n");
+      expect(res).toEqual([{"a": 13}]);
     }
   },
   {
@@ -147,10 +147,10 @@ export const tests = [
     fun: (skdb: SKDB) => {
       skdb.exec('CREATE TABLE t1 (a INTEGER);');
       skdb.exec('INSERT INTO t1 VALUES (@key);', {key: 13});
-      return skdb.sqlRaw('SELECT * FROM t1;');
+      return skdb.exec('SELECT * FROM t1;');
     },
     check: res => {
-      expect(res).toEqual("13\n");
+      expect(res).toEqual([{"a": 13}]);
     }
   },
   {
@@ -158,10 +158,10 @@ export const tests = [
     fun: (skdb: SKDB) => {
       skdb.exec('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
       skdb.insert('t1', [13, 9, 42])
-      return skdb.sqlRaw('SELECT * FROM t1;');
+      return skdb.exec('SELECT * FROM t1;');
     },
     check: res => {
-      expect(res).toEqual("13|9|42\n");
+      expect(res).toEqual([{"a": 13, "b": 9, "c": 42}]);
     }
   },
   {
@@ -357,8 +357,8 @@ export const tests = [
         result.push(changes);
       });
 
-      skdb.sqlRaw("insert into todos values (4, 'foo', 1);");
-      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+      skdb.exec("insert into todos values (4, 'foo', 1);");
+      skdb.exec("update todos set text = 'baz' where id = 0;");
 
       handle.close();
       return result
@@ -377,10 +377,10 @@ export const tests = [
   {
     name: 'Reactive queries support params',
     fun: (skdb: SKDB) => {
-      skdb.sqlRaw(
+      skdb.exec(
         'create table if not exists test (x integer primary key, y string, z float, w integer);'
       );
-      skdb.sqlRaw("insert into test values (0, 'foo', 1.2, 42);");
+      skdb.exec("insert into test values (0, 'foo', 1.2, 42);");
 
 
       let result: Array<any> = [];
@@ -408,10 +408,10 @@ export const tests = [
   {
     name: 'Reactive queries support object params',
     fun: (skdb: SKDB) => {
-      skdb.sqlRaw(
+      skdb.exec(
         'create table if not exists test (x integer primary key, y string, z float, w integer);'
       );
-      skdb.sqlRaw("insert into test values (0, 'foo', 1.2, 42);");
+      skdb.exec("insert into test values (0, 'foo', 1.2, 42);");
 
 
       let result: Array<any> = [];
