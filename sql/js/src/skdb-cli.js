@@ -188,10 +188,27 @@ const skdb = await createConnectedSkdb(args.values.host, args.values.db, {
 
 const evalQuery = async function(skdb_client, query) {
   if (args.values['pipe-separated-output']) {
-    let answer = await skdb_client.exec(query);
-    return answer;
+    let rows = await skdb_client.exec(query);
+    if (rows.length < 1) {
+      return "";
+    }
+
+    const acc = [];
+    const keys = Object.keys(rows[0]);
+
+    acc.push(keys.join("|"));
+
+    for (const row of rows) {
+      const rowacc = [];
+      for (const key of keys) {
+        rowacc.push(row[key]);
+      }
+      acc.push(rowacc.join("|"));
+    }
+
+    return acc.join("\n");
   } else {
-    return skdb_client.sql(query);
+    return skdb_client.exec(query);
   }
 };
 
