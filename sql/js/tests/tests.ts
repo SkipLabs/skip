@@ -165,12 +165,96 @@ export const tests = [
     }
   },
   {
-    name: 'Test reactive query',
+    name: 'Test reactive query updated on insert and then closed',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      let result: Array<any> = [];
+      let handle = skdb.watch('SELECT * FROM t1;', {}, (changes) => {
+        result.push(changes);
+      });
+      skdb.insert('t1', [14, "bar", 44.5]);
+      handle.close();
+      skdb.insert('t1', [15, "foo", 46.8]);
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            {"a": 13, "b": "9", "c": 42.1}
+          ],
+          [
+            {"a": 13, "b": "9", "c": 42.1},
+            {"a": 14, "b": "bar", "c": 44.5}
+          ]
+        ]
+      );
+    }
+  },
+  {
+    name: 'Test reactive query updated on update and then closed',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      let result: Array<any> = [];
+      let handle = skdb.watch('SELECT * FROM t1;', {}, (changes) => {
+        result.push(changes);
+      });
+      skdb.exec("update t1 set b = 'foo' where a = 13")
+      handle.close();
+      skdb.exec("update t1 set b = 'bar' where a = 13")
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            {"a": 13, "b": "9", "c": 42.1}
+          ],
+          [
+            {"a": 13, "b": "foo", "c": 42.1},
+          ],
+        ]
+      );
+    }
+  },
+  {
+    name: 'Test reactive query updated on delete and then closed',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      skdb.insert('t1', [14, "9", 42.1]);
+      let result: Array<any> = [];
+      let handle = skdb.watch('SELECT * FROM t1;', {}, (changes) => {
+        result.push(changes);
+      });
+      skdb.exec("delete from t1 where a = 13");
+      handle.close();
+      skdb.exec("delete from t1 where a = 14");
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            {"a": 13, "b": "9", "c": 42.1},
+            {"a": 14, "b": "9", "c": 42.1}
+          ],
+          [
+            {"a": 14, "b": "9", "c": 42.1}
+          ]
+        ]
+      );
+    }
+  },
+  {
+    name: 'Test filtering reactive query updated on insert and then closed',
     fun: (skdb: SKDB) => {
       skdb.exec('CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);');
       skdb.insert('t1', [13, 9, 42]);
       let result: Array<any> = [];
-      let handle = skdb.watch('SELECT * FROM t1;', {}, (changes) => {
+      let handle = skdb.watch('SELECT * FROM t1 where a = 13 or a = 14;', {}, (changes) => {
         result.push(changes);
       });
       skdb.insert('t1', [14, 9, 44]);
@@ -179,9 +263,219 @@ export const tests = [
     },
     check: res => {
       expect(res).toEqual(
-        [[{"a": 13, "b": 9, "c": 42}],
-          [{"a": 13, "b": 9, "c": 42}, {"a": 14, "b": 9, "c": 44}]
-        ]);
+        [
+          [
+            {"a": 13, "b": 9, "c": 42}
+          ],
+          [
+            {"a": 13, "b": 9, "c": 42},
+            {"a": 14, "b": 9, "c": 44}
+          ]
+        ]
+      );
     }
-  }
+  },
+  {
+    name: 'Test filtering reactive query updated on update and then closed',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      let result: Array<any> = [];
+      let handle = skdb.watch('SELECT * FROM t1 where a = 13 or a = 14;', {}, (changes) => {
+        result.push(changes);
+      });
+      skdb.exec("update t1 set b = 'foo' where a = 13")
+      handle.close();
+      skdb.exec("update t1 set b = 'bar' where a = 13")
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            {"a": 13, "b": "9", "c": 42.1}
+          ],
+          [
+            {"a": 13, "b": "foo", "c": 42.1},
+          ]
+        ]
+      );
+    }
+  },
+  {
+    name: 'Test filtering reactive query updated on delete and then closed',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      skdb.insert('t1', [14, "9", 42.1]);
+      let result: Array<any> = [];
+      let handle = skdb.watch('SELECT * FROM t1 where a = 13 or a = 14;', {}, (changes) => {
+        result.push(changes);
+      });
+      skdb.exec("delete from t1 where a = 13");
+      handle.close();
+      skdb.exec("delete from t1 where a = 14");
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            {"a": 13, "b": "9", "c": 42.1},
+            {"a": 14, "b": "9", "c": 42.1}
+          ],
+          [
+            {"a": 14, "b": "9", "c": 42.1}
+          ]
+        ]
+      );
+    }
+  },
+  {
+    name: 'Complex reactive query updated on insert, update, delete, then closed',
+    fun: (skdb: SKDB) => {
+      skdb.exec(
+        'create table if not exists todos (id integer primary key, text text, completed integer);'
+      );
+      skdb.exec("insert into todos values (0, 'foo', 0);");
+      skdb.exec("insert into todos values (1, 'foo', 0);");
+      skdb.exec("insert into todos values (2, 'foo', 1);");
+      skdb.exec("insert into todos values (3, 'foo', 0);");
+
+      let result: Array<any> = [];
+      let handle = skdb.watch(
+        'select completed, count(*) as n from (select * from todos where id > 0) group by completed',
+        {}, (changes) => {
+        result.push(changes);
+      });
+
+      skdb.sqlRaw("insert into todos values (4, 'foo', 1);");
+      skdb.sqlRaw("update todos set text = 'baz' where id = 0;");
+
+      handle.close();
+      return result
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [{completed: 0, n: 2}, {completed: 1, n: 1}],
+          [{completed: 0, n: 2}, {completed: 1, n: 2}],
+        ]
+      );
+    }
+  },
+  {
+    name: 'Reactive queries support params',
+    fun: (skdb: SKDB) => {
+      skdb.sqlRaw(
+        'create table if not exists test (x integer primary key, y string, z float, w integer);'
+      );
+      skdb.sqlRaw("insert into test values (0, 'foo', 1.2, 42);");
+
+
+      let result: Array<any> = [];
+      let handle = skdb.watch(
+        "select w from test where x = @x and y = @y and z = @zed",
+        new Map<string, string|number>([["x", 0], ["y", "foo"], ["zed", 1.2]]),
+        (changes) => {
+        result.push(changes);
+      });
+
+      skdb.exec("update test set w = 21 where y = 'foo';");
+
+      handle.close();
+      return result
+    },
+    check: res => {
+      expect(res).toEqual([[{w:42}], [{w:21}]]);
+    }
+  },
+  {
+    name: 'Reactive queries support object params',
+    fun: (skdb: SKDB) => {
+      skdb.sqlRaw(
+        'create table if not exists test (x integer primary key, y string, z float, w integer);'
+      );
+      skdb.sqlRaw("insert into test values (0, 'foo', 1.2, 42);");
+
+
+      let result: Array<any> = [];
+      let handle = skdb.watch(
+        "select w from test where x = @x and y = @y and z = @zed",
+        {x: 0, y: 'foo', zed: 1.2},
+        (changes) => {
+        result.push(changes);
+      });
+
+      skdb.exec("update test set w = 21 where y = 'foo';");
+
+      handle.close();
+      return result
+    },
+    check: res => {
+      expect(res).toEqual([[{w:42}], [{w:21}]]);
+    }
+  },
+  {
+    name: 'A reactive query can be updated with new spliced arguments',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      let result: Array<any> = [];
+      let handle = skdb.watch('SELECT * FROM t1 where a = 13;', {}, (changes) => {
+        result.push(changes);
+      });
+      skdb.insert('t1', [14, "bar", 44.5]);
+      handle.close();
+      handle = skdb.watch('SELECT * FROM t1 where a = 14;', {}, (changes) => {
+        result.push(changes);
+      });
+      skdb.insert('t1', [15, "foo", 46.8]);
+      handle.close();
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            {"a": 13, "b": "9", "c": 42.1}
+          ],
+          [
+            {"a": 14, "b": "bar", "c": 44.5}
+          ]
+        ]
+      );
+    }
+  },
+  {
+    name: 'A reactive query can be replaced with new params',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      let result: Array<any> = [];
+      let handle = skdb.watch('SELECT * FROM t1 where a = @a;', {a: 13}, (changes) => {
+        result.push(changes);
+      });
+      skdb.insert('t1', [14, "bar", 44.5]);
+      handle.close();
+      handle = skdb.watch('SELECT * FROM t1 where a = @a;', {a: 14}, (changes) => {
+        result.push(changes);
+      });
+      skdb.insert('t1', [15, "foo", 46.8]);
+      handle.close();
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            {"a": 13, "b": "9", "c": 42.1}
+          ],
+          [
+            {"a": 14, "b": "bar", "c": 44.5}
+          ]
+        ]
+      );
+    }
+  },
 ];
