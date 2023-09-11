@@ -635,9 +635,9 @@ export class SKDB {
     return this.runLocal(args1, stdin1);
   }
 
-  exec(stdin: string, params: Map<string, string|number>|Object = new Map())
-    : Array<Object> {
-    let [new_args, new_stdin] = this.addParams(["--format=js"], params, stdin);
+  exec(query: string, params: Map<string, string|number>|Object = new Map())
+    : Array<any> {
+    let [new_args, new_stdin] = this.addParams(["--format=js"], params, query);
     console.assert(this.nbrInitPages >= 0);
 
     this.args = ["skdb"].concat(new_args);
@@ -655,9 +655,11 @@ export class SKDB {
     return this.stdout_objects;
   }
 
-  watch(query: string,
-        params: Map<string, string|number>|Object,
-        onChange): { close: () => void } {
+  watch(
+    query: string,
+    params: Map<string, string|number>|Object,
+    onChange: (rows: Array<any>) => void,
+  ): { close: () => void } {
     this.stdout_objects = new Array();
     this.stderr = new Array();
     let queryID;
