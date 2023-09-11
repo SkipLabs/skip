@@ -307,6 +307,8 @@ export class SKDB {
     client.clientUuid = crypto.randomUUID();
     client.version = wasmStringToJS(exports, exports.getVersion());
 
+    client.runLocal([],'');     // HACK: has the side effect of creating the gcontext
+
     return client;
   }
 

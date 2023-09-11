@@ -3,6 +3,16 @@ import { SKDB } from '../src/skdb';
 
 export const tests = [
   {
+    name: 'Run local',
+    // basic sanity test. does wasm load up and can we call it?
+    fun: (skdb: SKDB) => {
+      return skdb.runLocal(['dump'], '');
+    },
+    check: res => {
+      expect(res).toEqual("")
+    }
+  },
+  {
     name: 'Boolean',
     fun: (skdb: SKDB) => {
       skdb.exec('create table t1 (a BOOLEAN, b boolean);');
