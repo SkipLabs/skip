@@ -660,17 +660,18 @@ export class SKDB {
     params: Map<string, string|number>|Object,
     onChange: (rows: Array<any>) => void,
   ): { close: () => void } {
+    if (params instanceof Map) {
+      params = Object.fromEntries(params);
+    }
     this.stdout_objects = new Array();
     this.stderr = new Array();
-    let queryID;
-    if(this.freeQueryIDs.length == 0) {
-      queryID = this.queryID;
-      this.queryID++;
+
+    const queryID = this.freeQueryIDs.pop() || this.queryID++;
+
+    this.userFuns[queryID] = () => {
+      onChange(this.stdout_objects);
+      this.stdout_objects = new Array()
     }
-    else {
-      queryID = this.freeQueryIDs.pop();
-    }
-    this.userFuns[queryID] = () => onChange(this.stdout_objects);
     this.exports.SKIP_reactive_query(
       queryID,
       encodeUTF8(this.exports, query),
