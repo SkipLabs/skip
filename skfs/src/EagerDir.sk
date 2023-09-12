@@ -1249,19 +1249,23 @@ class EagerDir{
     child: EagerDir,
     parents: FixedSingle<DirName, (MapFun, ?Array<KeyRange>)>,
   ): Bool {
-    if (context.unsafeReuse) return true;
-    same = (native_eq(parents, child.parents) == 0);
-    if (same && child.creator != context.currentArrow()) {
-      invariant_violation(
-        "Duplicate subdirectory: " +
-          child.dirName.toString() +
-          "\nFirst created: " +
-          inspect(child.creator).toString() +
-          "\nThen: " +
-          inspect(context.currentArrow()).toString(),
-      );
-    };
-    same
+    context.canReuse match {
+    | CRAlways() -> true
+    | CRNever() -> false
+    | CRIfMatch() ->
+      same = (native_eq(parents, child.parents) == 0);
+      if (same && child.creator != context.currentArrow()) {
+        invariant_violation(
+          "Duplicate subdirectory: " +
+            child.dirName.toString() +
+            "\nFirst created: " +
+            inspect(child.creator).toString() +
+            "\nThen: " +
+            inspect(context.currentArrow()).toString(),
+        );
+      };
+      same
+    }
   }
 
   static fun reuseDir(context: mutable Context, childName: DirName): void {

@@ -1,51 +1,51 @@
 async function test1() {
   let skdb = await SKDB.create(null, fetchWasmSource);
 
-  skdb.sqlRaw(`CREATE TABLE t1(a INTEGER, b INTEGER, c INTEGER, d INTEGER, e INTEGER);`);
+  skdb.exec(`CREATE TABLE t1(a INTEGER, b INTEGER, c INTEGER, d INTEGER, e INTEGER);`);
 
-  skdb.sqlRaw(`INSERT INTO t1(e,c,b,d,a) VALUES(103,102,100,101,104);`);
-  skdb.sqlRaw(`INSERT INTO t1(a,c,d,e,b) VALUES(107,106,108,109,105);`);
-  skdb.sqlRaw(`INSERT INTO t1(e,d,b,a,c) VALUES(110,114,112,111,113);`);
-  skdb.sqlRaw(`INSERT INTO t1(d,c,e,a,b) VALUES(116,119,117,115,118);`);
-  skdb.sqlRaw(`INSERT INTO t1(c,d,b,e,a) VALUES(123,122,124,120,121);`);
-  skdb.sqlRaw(`INSERT INTO t1(a,d,b,e,c) VALUES(127,128,129,126,125);`);
-  skdb.sqlRaw(`INSERT INTO t1(e,c,a,d,b) VALUES(132,134,131,133,130);`);
-  skdb.sqlRaw(`INSERT INTO t1(a,d,b,e,c) VALUES(138,136,139,135,137);`);
-  skdb.sqlRaw(`INSERT INTO t1(e,c,d,a,b) VALUES(144,141,140,142,143);`);
-  skdb.sqlRaw(`INSERT INTO t1(b,a,e,d,c) VALUES(145,149,146,148,147);`);
-  skdb.sqlRaw(`INSERT INTO t1(b,c,a,d,e) VALUES(151,150,153,154,152);`);
-  skdb.sqlRaw(`INSERT INTO t1(c,e,a,d,b) VALUES(155,157,159,156,158);`);
-  skdb.sqlRaw(`INSERT INTO t1(c,b,a,d,e) VALUES(161,160,163,164,162);`);
-  skdb.sqlRaw(`INSERT INTO t1(b,d,a,e,c) VALUES(167,169,168,165,166);`);
-  skdb.sqlRaw(`INSERT INTO t1(d,b,c,e,a) VALUES(171,170,172,173,174);`);
-  skdb.sqlRaw(`INSERT INTO t1(e,c,a,d,b) VALUES(177,176,179,178,175);`);
-  skdb.sqlRaw(`INSERT INTO t1(b,e,a,d,c) VALUES(181,180,182,183,184);`);
-  skdb.sqlRaw(`INSERT INTO t1(c,a,b,e,d) VALUES(187,188,186,189,185);`);
-  skdb.sqlRaw(`INSERT INTO t1(d,b,c,e,a) VALUES(190,194,193,192,191);`);
-  skdb.sqlRaw(`INSERT INTO t1(a,e,b,d,c) VALUES(199,197,198,196,195);`);
-  skdb.sqlRaw(`INSERT INTO t1(b,c,d,a,e) VALUES(200,202,203,201,204);`);
-  skdb.sqlRaw(`INSERT INTO t1(c,e,a,b,d) VALUES(208,209,205,206,207);`);
-  skdb.sqlRaw(`INSERT INTO t1(c,e,a,d,b) VALUES(214,210,213,212,211);`);
-  skdb.sqlRaw(`INSERT INTO t1(b,c,a,d,e) VALUES(218,215,216,217,219);`);
-  skdb.sqlRaw(`INSERT INTO t1(b,e,d,a,c) VALUES(223,221,222,220,224);`);
-  skdb.sqlRaw(`INSERT INTO t1(d,e,b,a,c) VALUES(226,227,228,229,225);`);
-  skdb.sqlRaw(`INSERT INTO t1(a,c,b,e,d) VALUES(234,231,232,230,233);`);
-  skdb.sqlRaw(`INSERT INTO t1(e,b,a,c,d) VALUES(237,236,239,235,238);`);
-  skdb.sqlRaw(`INSERT INTO t1(e,c,b,a,d) VALUES(242,244,240,243,241);`);
-  skdb.sqlRaw(`INSERT INTO t1(e,d,c,b,a) VALUES(246,248,247,249,245);`);
+  skdb.exec(`INSERT INTO t1(e,c,b,d,a) VALUES(103,102,100,101,104);`);
+  skdb.exec(`INSERT INTO t1(a,c,d,e,b) VALUES(107,106,108,109,105);`);
+  skdb.exec(`INSERT INTO t1(e,d,b,a,c) VALUES(110,114,112,111,113);`);
+  skdb.exec(`INSERT INTO t1(d,c,e,a,b) VALUES(116,119,117,115,118);`);
+  skdb.exec(`INSERT INTO t1(c,d,b,e,a) VALUES(123,122,124,120,121);`);
+  skdb.exec(`INSERT INTO t1(a,d,b,e,c) VALUES(127,128,129,126,125);`);
+  skdb.exec(`INSERT INTO t1(e,c,a,d,b) VALUES(132,134,131,133,130);`);
+  skdb.exec(`INSERT INTO t1(a,d,b,e,c) VALUES(138,136,139,135,137);`);
+  skdb.exec(`INSERT INTO t1(e,c,d,a,b) VALUES(144,141,140,142,143);`);
+  skdb.exec(`INSERT INTO t1(b,a,e,d,c) VALUES(145,149,146,148,147);`);
+  skdb.exec(`INSERT INTO t1(b,c,a,d,e) VALUES(151,150,153,154,152);`);
+  skdb.exec(`INSERT INTO t1(c,e,a,d,b) VALUES(155,157,159,156,158);`);
+  skdb.exec(`INSERT INTO t1(c,b,a,d,e) VALUES(161,160,163,164,162);`);
+  skdb.exec(`INSERT INTO t1(b,d,a,e,c) VALUES(167,169,168,165,166);`);
+  skdb.exec(`INSERT INTO t1(d,b,c,e,a) VALUES(171,170,172,173,174);`);
+  skdb.exec(`INSERT INTO t1(e,c,a,d,b) VALUES(177,176,179,178,175);`);
+  skdb.exec(`INSERT INTO t1(b,e,a,d,c) VALUES(181,180,182,183,184);`);
+  skdb.exec(`INSERT INTO t1(c,a,b,e,d) VALUES(187,188,186,189,185);`);
+  skdb.exec(`INSERT INTO t1(d,b,c,e,a) VALUES(190,194,193,192,191);`);
+  skdb.exec(`INSERT INTO t1(a,e,b,d,c) VALUES(199,197,198,196,195);`);
+  skdb.exec(`INSERT INTO t1(b,c,d,a,e) VALUES(200,202,203,201,204);`);
+  skdb.exec(`INSERT INTO t1(c,e,a,b,d) VALUES(208,209,205,206,207);`);
+  skdb.exec(`INSERT INTO t1(c,e,a,d,b) VALUES(214,210,213,212,211);`);
+  skdb.exec(`INSERT INTO t1(b,c,a,d,e) VALUES(218,215,216,217,219);`);
+  skdb.exec(`INSERT INTO t1(b,e,d,a,c) VALUES(223,221,222,220,224);`);
+  skdb.exec(`INSERT INTO t1(d,e,b,a,c) VALUES(226,227,228,229,225);`);
+  skdb.exec(`INSERT INTO t1(a,c,b,e,d) VALUES(234,231,232,230,233);`);
+  skdb.exec(`INSERT INTO t1(e,b,a,c,d) VALUES(237,236,239,235,238);`);
+  skdb.exec(`INSERT INTO t1(e,c,b,a,d) VALUES(242,244,240,243,241);`);
+  skdb.exec(`INSERT INTO t1(e,d,c,b,a) VALUES(246,248,247,249,245);`);
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        (a+b+c+d+e)/5
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        abs(b-c),
@@ -58,7 +58,7 @@ async function test1() {
  ORDER BY 4,2,1,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        d-e,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -71,7 +71,7 @@ async function test1() {
  ORDER BY 1,5,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (a+b+c+d+e)/5,
        abs(a),
        e,
@@ -84,7 +84,7 @@ async function test1() {
  ORDER BY 3,4,5,1,2,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -94,20 +94,20 @@ async function test1() {
  ORDER BY 4,2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE (a>b-2 AND a<b+2)
     OR c>d
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        b-c,
        a-b,
@@ -120,7 +120,7 @@ async function test1() {
  ORDER BY 1,4,3,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -136,7 +136,7 @@ async function test1() {
  ORDER BY 4,1,5,2,6,3,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3,
@@ -150,7 +150,7 @@ async function test1() {
  ORDER BY 5,3,6,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d,
        a+b*2+c*3+d*4,
        a-b,
@@ -161,7 +161,7 @@ async function test1() {
  ORDER BY 3,5,4,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a-b,
        abs(b-c),
        c,
@@ -172,7 +172,7 @@ async function test1() {
  ORDER BY 4,3,6,2,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a,
        a+b*2+c*3+d*4+e*5,
        (a+b+c+d+e)/5,
@@ -185,13 +185,13 @@ async function test1() {
  ORDER BY 5,4,6,2,1,7,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        b
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a-b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
@@ -199,7 +199,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4+e*5,
        abs(b-c),
        b-c,
@@ -213,7 +213,7 @@ async function test1() {
  ORDER BY 2,1,6,4,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        abs(a),
        b-c,
        c-d,
@@ -226,7 +226,7 @@ async function test1() {
  ORDER BY 1,5,4,2,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -239,7 +239,7 @@ async function test1() {
  ORDER BY 4,3,5,1,6,2,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3+d*4+e*5,
        c-d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -249,7 +249,7 @@ async function test1() {
  ORDER BY 6,2,4,5,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        abs(a),
        b,
        c-d,
@@ -264,7 +264,7 @@ async function test1() {
  ORDER BY 1,3,7,5,2,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
@@ -277,7 +277,7 @@ async function test1() {
  ORDER BY 2,5,1,7,3,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a-b,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -289,14 +289,14 @@ async function test1() {
  ORDER BY 1,4,5,6,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
    AND c>d
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        abs(b-c),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -310,7 +310,7 @@ async function test1() {
  ORDER BY 6,1,7,3,4,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a+b*2+c*3,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c,
@@ -323,7 +323,7 @@ async function test1() {
  ORDER BY 2,3,1,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a,
@@ -337,7 +337,7 @@ async function test1() {
  ORDER BY 4,5,3,7,1,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -348,7 +348,7 @@ async function test1() {
  ORDER BY 3,5,4,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
    AND a>b
@@ -356,7 +356,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        b,
        a+b*2,
@@ -370,7 +370,7 @@ async function test1() {
  ORDER BY 3,2,1,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a+b*2+c*3+d*4+e*5,
        a+b*2+c*3,
        c-d,
@@ -380,7 +380,7 @@ async function test1() {
  ORDER BY 3,4,2,6,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4+e*5,
        (a+b+c+d+e)/5,
@@ -393,7 +393,7 @@ async function test1() {
  ORDER BY 7,2,5,1,3,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b,
        c,
@@ -403,7 +403,7 @@ async function test1() {
  ORDER BY 1,2,4,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a,
        a+b*2+c*3,
        b,
@@ -414,7 +414,7 @@ async function test1() {
  ORDER BY 2,6,4,1,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2,
        c-d,
        a,
@@ -425,7 +425,7 @@ async function test1() {
  ORDER BY 2,6,5,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        (a+b+c+d+e)/5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -436,7 +436,7 @@ async function test1() {
  ORDER BY 2,5,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a,
        a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -445,7 +445,7 @@ async function test1() {
  ORDER BY 1,4,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c,
        d-e
@@ -455,7 +455,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a-b
@@ -463,7 +463,7 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        e,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
@@ -472,7 +472,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d-e
@@ -482,14 +482,14 @@ async function test1() {
  ORDER BY 4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2
+  console.log(skdb.exec(`SELECT a+b*2
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
     OR a>b
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d-e,
@@ -502,7 +502,7 @@ async function test1() {
  ORDER BY 2,6,3,5,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        c-d,
        d
   FROM t1
@@ -512,7 +512,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
        c,
        (a+b+c+d+e)/5,
@@ -521,7 +521,7 @@ async function test1() {
  ORDER BY 5,4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c-d,
        abs(a),
@@ -532,7 +532,7 @@ async function test1() {
  ORDER BY 1,5,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        abs(a),
@@ -546,7 +546,7 @@ async function test1() {
  ORDER BY 4,5,3,1,2,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4+e*5,
@@ -557,7 +557,7 @@ async function test1() {
  ORDER BY 3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(a),
        a+b*2+c*3+d*4
@@ -567,12 +567,12 @@ async function test1() {
  ORDER BY 2,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3
+  console.log(skdb.exec(`SELECT a+b*2+c*3
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -583,14 +583,14 @@ async function test1() {
  ORDER BY 3,4,1,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a-b
   FROM t1
  WHERE b>c
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -601,7 +601,7 @@ async function test1() {
  ORDER BY 4,1,5,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
@@ -609,7 +609,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a+b*2,
        a,
        b,
@@ -621,21 +621,21 @@ async function test1() {
  ORDER BY 5,2,7,1,4,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e
+  console.log(skdb.exec(`SELECT e
   FROM t1
  WHERE b>c
    AND d>e
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        e
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        d-e,
        c-d,
        a+b*2+c*3
@@ -643,7 +643,7 @@ async function test1() {
  ORDER BY 1,2,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
@@ -653,7 +653,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
@@ -662,14 +662,14 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a+b*2+c*3+d*4+e*5,
        c-d
   FROM t1
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -682,7 +682,7 @@ async function test1() {
  ORDER BY 5,3,1,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c-d,
@@ -694,7 +694,7 @@ async function test1() {
  ORDER BY 2,5,6,4,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d,
        b-c,
        (a+b+c+d+e)/5,
@@ -710,7 +710,7 @@ async function test1() {
  ORDER BY 7,2,4,1,5,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        d,
        a,
        b-c,
@@ -723,7 +723,7 @@ async function test1() {
  ORDER BY 1,2,4,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        c,
        a+b*2+c*3+d*4+e*5
@@ -732,14 +732,14 @@ async function test1() {
  ORDER BY 3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e
+  console.log(skdb.exec(`SELECT e
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
    AND (a>b-2 AND a<b+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a+b*2+c*3+d*4+e*5,
        d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -750,7 +750,7 @@ async function test1() {
  ORDER BY 3,4,5,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4+e*5
   FROM t1
@@ -759,12 +759,12 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c
+  console.log(skdb.exec(`SELECT b-c
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(b-c),
        a+b*2+c*3+d*4,
        (a+b+c+d+e)/5,
@@ -775,7 +775,7 @@ async function test1() {
  ORDER BY 1,6,2,4,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        c,
        b,
        a+b*2+c*3+d*4,
@@ -789,7 +789,7 @@ async function test1() {
  ORDER BY 3,5,6,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        (a+b+c+d+e)/5,
        c-d,
        b,
@@ -803,7 +803,7 @@ async function test1() {
  ORDER BY 1,3,2,5,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a+b*2+c*3+d*4+e*5,
        a,
        (a+b+c+d+e)/5
@@ -811,7 +811,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        c,
        a-b,
        d-e,
@@ -822,7 +822,7 @@ async function test1() {
  ORDER BY 2,1,4,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
@@ -832,7 +832,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        abs(a),
        a,
        c
@@ -843,7 +843,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        c-d,
        a+b*2
@@ -853,7 +853,7 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        abs(b-c)
   FROM t1
  WHERE c>d
@@ -862,7 +862,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d-e,
        b,
@@ -874,7 +874,7 @@ async function test1() {
  ORDER BY 4,5,1,3,7,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(b-c),
        a+b*2+c*3+d*4+e*5,
@@ -885,7 +885,7 @@ async function test1() {
  ORDER BY 1,6,2,3,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -894,7 +894,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        abs(b-c),
        c-d
   FROM t1
@@ -902,7 +902,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        abs(a),
        d
   FROM t1
@@ -912,7 +912,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE (e>a AND e<b)
@@ -921,7 +921,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        abs(a),
        d
   FROM t1
@@ -931,7 +931,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a+b*2+c*3+d*4+e*5,
        a-b,
        abs(b-c),
@@ -943,7 +943,7 @@ async function test1() {
  ORDER BY 4,5,3,6,2,1,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        d,
        a+b*2+c*3+d*4+e*5,
        a-b,
@@ -955,7 +955,7 @@ async function test1() {
  ORDER BY 1,3,5,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3,
        d-e,
        b,
@@ -969,7 +969,7 @@ async function test1() {
  ORDER BY 5,6,3,7,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -981,7 +981,7 @@ async function test1() {
  ORDER BY 1,3,5,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2,
@@ -996,7 +996,7 @@ async function test1() {
  ORDER BY 4,6,5,1,3,7,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        (a+b+c+d+e)/5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -1007,14 +1007,14 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -1027,7 +1027,7 @@ async function test1() {
  ORDER BY 1,3,7,2,5,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2,
@@ -1041,7 +1041,7 @@ async function test1() {
  ORDER BY 6,2,4,3,1,7,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a-b,
        b,
        a+b*2,
@@ -1053,7 +1053,7 @@ async function test1() {
  ORDER BY 4,2,5,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d,
        e,
        c-d,
@@ -1067,7 +1067,7 @@ async function test1() {
  ORDER BY 1,4,3,2,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a,
@@ -1081,7 +1081,7 @@ async function test1() {
  ORDER BY 7,2,6,1,3,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        d-e,
        abs(a),
        a,
@@ -1092,7 +1092,7 @@ async function test1() {
  ORDER BY 1,5,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a,
        abs(a),
        a-b,
@@ -1104,7 +1104,7 @@ async function test1() {
  ORDER BY 4,6,3,1,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a
   FROM t1
  WHERE (e>c OR e<d)
@@ -1112,7 +1112,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        c-d,
        a+b*2+c*3
@@ -1123,7 +1123,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -1134,12 +1134,12 @@ async function test1() {
  ORDER BY 4,2,1,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e
+  console.log(skdb.exec(`SELECT e
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        b,
        d,
        a+b*2+c*3+d*4+e*5,
@@ -1150,7 +1150,7 @@ async function test1() {
  ORDER BY 4,3,5,6,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        c-d,
        a,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -1162,7 +1162,7 @@ async function test1() {
  ORDER BY 4,2,1,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b-c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3
@@ -1173,12 +1173,12 @@ async function test1() {
  ORDER BY 3,4,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -1190,7 +1190,7 @@ async function test1() {
  ORDER BY 6,5,4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d,
@@ -1200,7 +1200,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2,
        a-b,
        a+b*2+c*3+d*4+e*5
@@ -1211,7 +1211,7 @@ async function test1() {
  ORDER BY 2,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
@@ -1220,7 +1220,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        d,
        e,
        a+b*2+c*3+d*4,
@@ -1234,7 +1234,7 @@ async function test1() {
  ORDER BY 3,2,7,6,4,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        d,
        a+b*2+c*3,
        a-b,
@@ -1243,7 +1243,7 @@ async function test1() {
  ORDER BY 3,2,1,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b-c,
        (a+b+c+d+e)/5,
@@ -1258,7 +1258,7 @@ async function test1() {
  ORDER BY 6,7,2,1,3,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -1271,7 +1271,7 @@ async function test1() {
  ORDER BY 2,3,4,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2,
@@ -1285,7 +1285,7 @@ async function test1() {
  ORDER BY 3,5,4,2,6,7,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(a),
        a+b*2+c*3+d*4+e*5,
@@ -1299,7 +1299,7 @@ async function test1() {
  ORDER BY 2,3,1,5,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2,
        a,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -1312,7 +1312,7 @@ async function test1() {
  ORDER BY 1,3,6,2,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE (e>c OR e<d)
@@ -1321,7 +1321,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        abs(a)
   FROM t1
  WHERE (e>a AND e<b)
@@ -1330,7 +1330,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a+b*2+c*3+d*4+e*5,
        b,
        c-d,
@@ -1344,7 +1344,7 @@ async function test1() {
  ORDER BY 5,1,4,7,3,2,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE (e>a AND e<b)
    AND (e>c OR e<d)
@@ -1352,7 +1352,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        b,
        a-b
   FROM t1
@@ -1362,12 +1362,12 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b
+  console.log(skdb.exec(`SELECT a-b
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -1378,7 +1378,7 @@ async function test1() {
  ORDER BY 3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        e,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -1388,7 +1388,7 @@ async function test1() {
  ORDER BY 2,4,1,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        c,
        d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -1400,7 +1400,7 @@ async function test1() {
  ORDER BY 3,5,4,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE b>c
@@ -1409,7 +1409,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        b-c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
@@ -1419,7 +1419,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d,
        b-c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -1431,7 +1431,7 @@ async function test1() {
  ORDER BY 3,5,1,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        (a+b+c+d+e)/5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -1441,7 +1441,7 @@ async function test1() {
  ORDER BY 2,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        e
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
@@ -1449,7 +1449,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
  WHERE (e>a AND e<b)
@@ -1458,7 +1458,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        b-c
   FROM t1
  WHERE b>c
@@ -1467,7 +1467,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
@@ -1475,13 +1475,13 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b-c,
        a+b*2
   FROM t1
@@ -1489,19 +1489,19 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        a+b*2+c*3
   FROM t1
  WHERE b>c
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a,
        a+b*2+c*3,
        b,
@@ -1512,7 +1512,7 @@ async function test1() {
  ORDER BY 4,5,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        b-c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
@@ -1520,7 +1520,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        (a+b+c+d+e)/5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -1530,7 +1530,7 @@ async function test1() {
  ORDER BY 3,1,2,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c,
        (a+b+c+d+e)/5,
        a+b*2,
@@ -1542,7 +1542,7 @@ async function test1() {
  ORDER BY 5,3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a+b*2,
        abs(b-c)
   FROM t1
@@ -1551,7 +1551,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c-d,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d-e,
@@ -1562,7 +1562,7 @@ async function test1() {
  ORDER BY 7,3,2,6,4,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        abs(a),
        a-b
   FROM t1
@@ -1570,14 +1570,14 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  WHERE (e>a AND e<b)
     OR EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        abs(b-c),
        c,
        a+b*2+c*3+d*4+e*5,
@@ -1589,13 +1589,13 @@ async function test1() {
  ORDER BY 4,5,6,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3
+  console.log(skdb.exec(`SELECT a+b*2+c*3
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b,
        a
@@ -1605,7 +1605,7 @@ async function test1() {
  ORDER BY 4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (a+b+c+d+e)/5,
        a,
        abs(a),
@@ -1615,14 +1615,14 @@ async function test1() {
  ORDER BY 2,5,4,6,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        b,
        e
   FROM t1
@@ -1630,7 +1630,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a-b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(b-c),
@@ -1639,20 +1639,20 @@ async function test1() {
  ORDER BY 3,1,4,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        e
   FROM t1
  WHERE c>d
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4+e*5,
        a,
@@ -1667,13 +1667,13 @@ async function test1() {
  ORDER BY 7,2,4,6,1,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        e
   FROM t1
  WHERE d>e
@@ -1682,7 +1682,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2
   FROM t1
  WHERE a>b
@@ -1690,7 +1690,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        d,
        a+b*2+c*3+d*4
   FROM t1
@@ -1699,13 +1699,13 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        c-d
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        a+b*2+c*3+d*4+e*5,
        a,
        a+b*2
@@ -1716,7 +1716,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -1730,7 +1730,7 @@ async function test1() {
  ORDER BY 2,3,1,6,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -1738,7 +1738,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4+e*5,
        c-d,
        d
@@ -1747,17 +1747,17 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b
+  console.log(skdb.exec(`SELECT b
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3
+  console.log(skdb.exec(`SELECT a+b*2+c*3
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
@@ -1767,7 +1767,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2,
        a+b*2+c*3+d*4+e*5,
        a,
@@ -1779,7 +1779,7 @@ async function test1() {
  ORDER BY 1,5,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3
+  console.log(skdb.exec(`SELECT a+b*2+c*3
   FROM t1
  WHERE b>c
     OR a>b
@@ -1787,7 +1787,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        e,
        a-b
   FROM t1
@@ -1796,7 +1796,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        a,
        b,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -1805,7 +1805,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -1819,7 +1819,7 @@ async function test1() {
  ORDER BY 6,5,2,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2+c*3
   FROM t1
  WHERE b>c
@@ -1828,7 +1828,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        c-d,
        a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -1839,7 +1839,7 @@ async function test1() {
  ORDER BY 1,2,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        abs(a),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -1851,7 +1851,7 @@ async function test1() {
  ORDER BY 3,5,1,2,7,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        abs(a),
        d,
        (a+b+c+d+e)/5,
@@ -1862,7 +1862,7 @@ async function test1() {
  ORDER BY 2,1,3,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c,
@@ -1873,7 +1873,7 @@ async function test1() {
  ORDER BY 1,5,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2,
@@ -1889,7 +1889,7 @@ async function test1() {
  ORDER BY 7,2,1,5,6,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (a+b+c+d+e)/5,
@@ -1902,7 +1902,7 @@ async function test1() {
  ORDER BY 7,6,5,2,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -1916,7 +1916,7 @@ async function test1() {
  ORDER BY 6,5,4,2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a+b*2,
        e
   FROM t1
@@ -1925,7 +1925,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4,
        b,
@@ -1939,7 +1939,7 @@ async function test1() {
  ORDER BY 3,2,1,6,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4,
        c
   FROM t1
@@ -1948,14 +1948,14 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c-d
   FROM t1
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        abs(b-c),
        (a+b+c+d+e)/5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -1967,7 +1967,7 @@ async function test1() {
  ORDER BY 3,4,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3,
        b-c,
@@ -1976,14 +1976,14 @@ async function test1() {
  ORDER BY 1,2,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a+b*2+c*3
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        d,
        a+b*2+c*3+d*4,
        c,
@@ -1996,7 +1996,7 @@ async function test1() {
  ORDER BY 4,6,2,5,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        abs(b-c),
        c,
        a-b,
@@ -2007,7 +2007,7 @@ async function test1() {
  ORDER BY 2,6,7,4,1,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
@@ -2018,7 +2018,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2+c*3+d*4,
        d,
        e
@@ -2026,7 +2026,7 @@ async function test1() {
  ORDER BY 2,4,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        c-d,
        d-e,
        abs(a),
@@ -2038,7 +2038,7 @@ async function test1() {
  ORDER BY 3,2,1,4,7,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        e,
        a+b*2+c*3+d*4,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -2052,7 +2052,7 @@ async function test1() {
  ORDER BY 1,4,2,5,7,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        (a+b+c+d+e)/5,
        a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
@@ -2065,14 +2065,14 @@ async function test1() {
  ORDER BY 2,3,1,4,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
     OR c BETWEEN b-2 AND d+2
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d
@@ -2081,7 +2081,7 @@ async function test1() {
  ORDER BY 1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        b,
        c,
@@ -2091,7 +2091,7 @@ async function test1() {
  ORDER BY 1,3,2,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -2101,7 +2101,7 @@ async function test1() {
  ORDER BY 4,1,2,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        e,
@@ -2113,12 +2113,12 @@ async function test1() {
  ORDER BY 3,4,2,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a)
+  console.log(skdb.exec(`SELECT abs(a)
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        d,
        a-b,
        abs(a),
@@ -2130,7 +2130,7 @@ async function test1() {
  ORDER BY 5,2,1,4,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(a),
        a-b,
        a+b*2+c*3,
@@ -2144,7 +2144,7 @@ async function test1() {
  ORDER BY 1,5,6,2,4,7,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a+b*2+c*3,
        a-b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -2157,7 +2157,7 @@ async function test1() {
  ORDER BY 2,4,6,5,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a,
@@ -2167,14 +2167,14 @@ async function test1() {
  ORDER BY 4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c-d,
        b-c,
@@ -2186,7 +2186,7 @@ async function test1() {
  ORDER BY 2,1,4,5,6,3,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a+b*2+c*3+d*4,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -2198,7 +2198,7 @@ async function test1() {
  ORDER BY 5,4,2,1,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a,
        abs(b-c),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -2213,14 +2213,14 @@ async function test1() {
  ORDER BY 3,5,1,4,7,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b
   FROM t1
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a-b,
        c,
        abs(b-c),
@@ -2232,7 +2232,7 @@ async function test1() {
  ORDER BY 1,6,4,5,2,7,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a+b*2+c*3+d*4,
        a,
        abs(b-c),
@@ -2243,7 +2243,7 @@ async function test1() {
  ORDER BY 2,4,5,6,3,7,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(a),
        e,
@@ -2257,7 +2257,7 @@ async function test1() {
  ORDER BY 7,4,1,2,6,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        b,
        d-e,
        a,
@@ -2268,14 +2268,14 @@ async function test1() {
  ORDER BY 1,2,5,4,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  WHERE (e>a AND e<b)
     OR (e>c OR e<d)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(a),
        d,
@@ -2289,7 +2289,7 @@ async function test1() {
  ORDER BY 5,6,3,1,2,4,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d-e
   FROM t1
@@ -2299,7 +2299,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a+b*2+c*3+d*4,
        a+b*2+c*3,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -2309,7 +2309,7 @@ async function test1() {
  ORDER BY 2,4,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3
+  console.log(skdb.exec(`SELECT a+b*2+c*3
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
    AND c BETWEEN b-2 AND d+2
@@ -2317,7 +2317,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        abs(b-c),
        a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -2329,7 +2329,7 @@ async function test1() {
  ORDER BY 2,6,3,5,7,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4,
        a+b*2+c*3
@@ -2337,7 +2337,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(a),
        d-e,
@@ -2348,7 +2348,7 @@ async function test1() {
  ORDER BY 6,1,4,2,5,3,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a+b*2+c*3+d*4+e*5,
        a+b*2+c*3,
        e
@@ -2358,7 +2358,7 @@ async function test1() {
  ORDER BY 2,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a,
        a+b*2+c*3,
        abs(b-c),
@@ -2369,7 +2369,7 @@ async function test1() {
  ORDER BY 3,2,6,4,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        a+b*2+c*3+d*4,
        d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -2381,14 +2381,14 @@ async function test1() {
  ORDER BY 2,4,3,6,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
    AND c>d
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        c-d,
        a+b*2+c*3+d*4,
        a+b*2+c*3+d*4+e*5,
@@ -2402,7 +2402,7 @@ async function test1() {
  ORDER BY 7,1,5,3,2,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2+c*3
   FROM t1
  WHERE (a>b-2 AND a<b+2)
@@ -2411,7 +2411,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4,
        c-d,
@@ -2421,7 +2421,7 @@ async function test1() {
  ORDER BY 2,3,4,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
  WHERE a>b
@@ -2430,14 +2430,14 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e
+  console.log(skdb.exec(`SELECT d-e
   FROM t1
  WHERE a>b
    AND (c<=d-2 OR c>=d+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
@@ -2446,7 +2446,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
@@ -2455,7 +2455,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -2467,7 +2467,7 @@ async function test1() {
  ORDER BY 2,4,5,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        abs(a),
        (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -2475,7 +2475,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2,
@@ -2489,7 +2489,7 @@ async function test1() {
  ORDER BY 3,5,6,7,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a-b,
        abs(b-c)
   FROM t1
@@ -2498,7 +2498,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d,
        a+b*2+c*3
   FROM t1
@@ -2508,7 +2508,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a,
        b
   FROM t1
@@ -2516,7 +2516,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a-b,
        abs(a),
@@ -2526,7 +2526,7 @@ async function test1() {
  ORDER BY 2,4,5,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a-b,
        a+b*2+c*3,
        abs(b-c),
@@ -2538,7 +2538,7 @@ async function test1() {
  ORDER BY 5,3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -2552,7 +2552,7 @@ async function test1() {
  ORDER BY 2,5,4,6,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        abs(b-c),
        a,
        abs(a),
@@ -2564,12 +2564,12 @@ async function test1() {
  ORDER BY 1,6,3,5,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        b-c,
        d-e,
        a+b*2+c*3+d*4,
@@ -2583,7 +2583,7 @@ async function test1() {
  ORDER BY 6,4,1,5,3,7,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
        c-d,
@@ -2595,7 +2595,7 @@ async function test1() {
  ORDER BY 2,4,5,6,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
     OR (c<=d-2 OR c>=d+2)
@@ -2603,12 +2603,12 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e
+  console.log(skdb.exec(`SELECT e
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a+b*2
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
@@ -2616,7 +2616,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4
@@ -2624,13 +2624,13 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a,
        d,
        c,
@@ -2639,7 +2639,7 @@ async function test1() {
  ORDER BY 4,2,3,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2+c*3,
        a+b*2+c*3+d*4,
        d,
@@ -2649,20 +2649,20 @@ async function test1() {
  ORDER BY 4,5,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e
+  console.log(skdb.exec(`SELECT d-e
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a+b*2+c*3,
        a+b*2
   FROM t1
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a,
@@ -2674,7 +2674,7 @@ async function test1() {
  ORDER BY 4,3,5,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        e,
@@ -2687,7 +2687,7 @@ async function test1() {
  ORDER BY 1,2,5,3,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        b-c,
@@ -2701,7 +2701,7 @@ async function test1() {
  ORDER BY 4,1,5,6,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        abs(b-c),
        b-c,
@@ -2715,7 +2715,7 @@ async function test1() {
  ORDER BY 3,5,2,1,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a-b,
        a,
        abs(a)
@@ -2724,7 +2724,7 @@ async function test1() {
  ORDER BY 1,2,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        c,
        b-c,
        a+b*2+c*3+d*4,
@@ -2738,14 +2738,14 @@ async function test1() {
  ORDER BY 7,5,3,2,6,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        b-c,
        d-e
   FROM t1
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a
   FROM t1
@@ -2755,7 +2755,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        e,
        abs(a),
@@ -2769,7 +2769,7 @@ async function test1() {
  ORDER BY 7,1,5,3,4,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2+c*3,
        a-b,
        abs(b-c),
@@ -2780,7 +2780,7 @@ async function test1() {
  ORDER BY 2,1,5,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (a+b+c+d+e)/5
@@ -2791,19 +2791,19 @@ async function test1() {
  ORDER BY 1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        c
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
        abs(b-c),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -2815,7 +2815,7 @@ async function test1() {
  ORDER BY 3,2,1,6,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a-b,
        a,
@@ -2824,7 +2824,7 @@ async function test1() {
  ORDER BY 1,2,3,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -2832,7 +2832,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2,
        abs(a),
        b
@@ -2840,7 +2840,7 @@ async function test1() {
  ORDER BY 4,2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -2852,7 +2852,7 @@ async function test1() {
  ORDER BY 5,3,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a-b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -2862,12 +2862,12 @@ async function test1() {
  ORDER BY 6,1,3,5,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a-b,
        (a+b+c+d+e)/5
   FROM t1
@@ -2876,7 +2876,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        e,
        b-c
@@ -2887,7 +2887,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d,
@@ -2899,7 +2899,7 @@ async function test1() {
  ORDER BY 2,4,3,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -2911,21 +2911,21 @@ async function test1() {
  ORDER BY 4,6,2,5,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4+e*5
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        b
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        b,
        a,
        a+b*2+c*3+d*4+e*5,
@@ -2939,7 +2939,7 @@ async function test1() {
  ORDER BY 3,7,2,5,6,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2+c*3+d*4+e*5,
        b-c,
        a,
@@ -2954,7 +2954,7 @@ async function test1() {
  ORDER BY 6,5,7,4,3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        c,
        abs(a),
        d,
@@ -2970,14 +2970,14 @@ async function test1() {
  ORDER BY 2,4,5,6,3,7,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE (e>a AND e<b)
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -2986,7 +2986,7 @@ async function test1() {
  ORDER BY 4,5,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
  WHERE (e>a AND e<b)
@@ -2995,7 +2995,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
     OR d>e
@@ -3003,14 +3003,14 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        b-c
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(a),
@@ -3023,13 +3023,13 @@ async function test1() {
  ORDER BY 2,1,5,6,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a-b
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (a+b+c+d+e)/5,
@@ -3044,7 +3044,7 @@ async function test1() {
  ORDER BY 4,7,5,2,1,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a-b,
        b,
        b-c,
@@ -3055,7 +3055,7 @@ async function test1() {
  ORDER BY 1,5,4,3,2,6,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -3066,7 +3066,7 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d,
        abs(a),
        e,
@@ -3076,7 +3076,7 @@ async function test1() {
  ORDER BY 3,4,2,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        abs(b-c),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -3088,7 +3088,7 @@ async function test1() {
  ORDER BY 2,1,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        e,
        c-d,
        a-b
@@ -3099,14 +3099,14 @@ async function test1() {
  ORDER BY 4,1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (a+b+c+d+e)/5,
        b
   FROM t1
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        (a+b+c+d+e)/5,
        abs(b-c),
        c,
@@ -3117,14 +3117,14 @@ async function test1() {
  ORDER BY 4,2,3,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d,
        abs(b-c)
   FROM t1
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2+c*3,
        abs(b-c),
        d-e
@@ -3132,7 +3132,7 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        abs(a),
        d-e,
        e
@@ -3140,7 +3140,7 @@ async function test1() {
  ORDER BY 2,4,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE (e>a AND e<b)
@@ -3148,21 +3148,21 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a-b,
        a+b*2
   FROM t1
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        abs(b-c)
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(a),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
@@ -3171,14 +3171,14 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d
+  console.log(skdb.exec(`SELECT c-d
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
     OR d>e
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        d,
        a+b*2+c*3,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -3189,7 +3189,7 @@ async function test1() {
  ORDER BY 1,5,3,7,4,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        a,
        c-d,
        abs(b-c),
@@ -3201,7 +3201,7 @@ async function test1() {
  ORDER BY 4,3,2,5,1,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        (a+b+c+d+e)/5,
        d,
        b,
@@ -3211,7 +3211,7 @@ async function test1() {
  ORDER BY 4,6,2,1,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3+d*4+e*5,
        b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -3221,19 +3221,19 @@ async function test1() {
  ORDER BY 1,4,5,3,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a)
+  console.log(skdb.exec(`SELECT abs(a)
   FROM t1
  WHERE a>b
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -3248,7 +3248,7 @@ async function test1() {
  ORDER BY 4,6,3,1,5,7,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3+d*4+e*5,
@@ -3259,13 +3259,13 @@ async function test1() {
  ORDER BY 3,4,5,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(b-c),
        c,
@@ -3275,7 +3275,7 @@ async function test1() {
  ORDER BY 6,1,3,5,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c,
        a,
        (a+b+c+d+e)/5
@@ -3283,7 +3283,7 @@ async function test1() {
  ORDER BY 2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a)
+  console.log(skdb.exec(`SELECT abs(a)
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
    AND d>e
@@ -3291,7 +3291,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4+e*5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -3302,7 +3302,7 @@ async function test1() {
  ORDER BY 2,4,5,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -3313,7 +3313,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2,
@@ -3325,7 +3325,7 @@ async function test1() {
  ORDER BY 3,2,4,5,7,1,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        abs(a),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -3335,7 +3335,7 @@ async function test1() {
  ORDER BY 4,5,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        d,
@@ -3346,7 +3346,7 @@ async function test1() {
  ORDER BY 3,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -3359,7 +3359,7 @@ async function test1() {
  ORDER BY 1,2,4,5,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (a+b+c+d+e)/5,
        d,
        e,
@@ -3368,14 +3368,14 @@ async function test1() {
  ORDER BY 2,3,4,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        e,
        b-c
   FROM t1
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        abs(a),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d,
@@ -3389,7 +3389,7 @@ async function test1() {
  ORDER BY 1,5,3,4,6,2,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
@@ -3398,7 +3398,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a+b*2,
        d,
        b-c,
@@ -3410,13 +3410,13 @@ async function test1() {
  ORDER BY 3,1,2,5,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        b
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -3425,13 +3425,13 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        e
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4,
        a-b,
        a+b*2
@@ -3442,7 +3442,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a+b*2+c*3,
        d-e
   FROM t1
@@ -3450,7 +3450,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a,
        d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -3462,7 +3462,7 @@ async function test1() {
  ORDER BY 4,5,1,6,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        abs(a),
        a+b*2+c*3,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -3472,14 +3472,14 @@ async function test1() {
  ORDER BY 4,2,5,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2
+  console.log(skdb.exec(`SELECT a+b*2
   FROM t1
  WHERE a>b
     OR (e>c OR e<d)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4
@@ -3490,7 +3490,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3,
        b,
@@ -3500,7 +3500,7 @@ async function test1() {
  ORDER BY 1,5,4,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a+b*2
   FROM t1
  WHERE (e>a AND e<b)
@@ -3509,7 +3509,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a-b,
@@ -3522,7 +3522,7 @@ async function test1() {
  ORDER BY 3,2,5,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2,
@@ -3534,7 +3534,7 @@ async function test1() {
  ORDER BY 4,3,6,5,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        e,
        d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -3543,14 +3543,14 @@ async function test1() {
  ORDER BY 4,2,5,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a,
        d-e
   FROM t1
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3+d*4+e*5,
        c-d
   FROM t1
@@ -3560,12 +3560,12 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -3578,7 +3578,7 @@ async function test1() {
  ORDER BY 5,2,1,7,3,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        (a+b+c+d+e)/5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -3587,7 +3587,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b,
        b-c
@@ -3596,7 +3596,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        c-d,
        a+b*2+c*3+d*4+e*5,
        c,
@@ -3605,7 +3605,7 @@ async function test1() {
  ORDER BY 1,4,3,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a-b,
        abs(a),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -3618,7 +3618,7 @@ async function test1() {
  ORDER BY 4,3,1,5,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4,
@@ -3629,7 +3629,7 @@ async function test1() {
  ORDER BY 2,5,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        b,
@@ -3643,7 +3643,7 @@ async function test1() {
  ORDER BY 2,6,1,4,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        d-e,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -3655,7 +3655,7 @@ async function test1() {
  ORDER BY 6,5,1,7,2,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4
@@ -3666,7 +3666,7 @@ async function test1() {
  ORDER BY 3,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (a+b+c+d+e)/5,
        abs(b-c)
   FROM t1
@@ -3674,19 +3674,19 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b
+  console.log(skdb.exec(`SELECT a-b
   FROM t1
  WHERE c>d
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d,
        e,
        a+b*2+c*3+d*4+e*5,
@@ -3699,7 +3699,7 @@ async function test1() {
  ORDER BY 1,4,5,2,6,7,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a,
        abs(a),
@@ -3709,7 +3709,7 @@ async function test1() {
  ORDER BY 5,4,1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3,
@@ -3721,26 +3721,26 @@ async function test1() {
  ORDER BY 4,3,2,1,5,7,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        c
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e
+  console.log(skdb.exec(`SELECT d-e
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
    AND a>b
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4+e*5,
        a+b*2,
@@ -3753,7 +3753,7 @@ async function test1() {
  ORDER BY 4,3,2,5,7,1,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        b-c,
        a-b,
        a+b*2+c*3+d*4,
@@ -3762,7 +3762,7 @@ async function test1() {
  ORDER BY 1,5,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
@@ -3770,7 +3770,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        (a+b+c+d+e)/5,
        a-b,
@@ -3783,7 +3783,7 @@ async function test1() {
  ORDER BY 2,3,6,7,4,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2+c*3+d*4,
        c-d,
        a-b
@@ -3791,7 +3791,7 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -3802,7 +3802,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
@@ -3811,7 +3811,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        b-c,
        a+b*2+c*3,
        abs(a),
@@ -3823,19 +3823,19 @@ async function test1() {
  ORDER BY 4,6,1,3,7,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
     OR c>d
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a+b*2+c*3,
        a-b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
@@ -3843,7 +3843,7 @@ async function test1() {
  ORDER BY 4,1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        b-c,
@@ -3854,7 +3854,7 @@ async function test1() {
  ORDER BY 6,4,5,1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d-e,
        a,
        abs(a)
@@ -3862,21 +3862,21 @@ async function test1() {
  ORDER BY 3,1,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
    AND a>b
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b,
@@ -3887,14 +3887,14 @@ async function test1() {
  ORDER BY 5,3,1,2,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(b-c),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -3908,7 +3908,7 @@ async function test1() {
  ORDER BY 4,1,5,6,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE (e>c OR e<d)
@@ -3917,7 +3917,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a
   FROM t1
  WHERE b>c
@@ -3926,7 +3926,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        b,
        abs(a),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
@@ -3936,7 +3936,7 @@ async function test1() {
  ORDER BY 2,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d-e,
        a+b*2+c*3+d*4,
        d,
@@ -3949,14 +3949,14 @@ async function test1() {
  ORDER BY 2,3,4,5,6,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(b-c)
   FROM t1
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3,
        a-b
   FROM t1
@@ -3965,13 +3965,13 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b
+  console.log(skdb.exec(`SELECT b
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d,
        a,
        a+b*2+c*3,
@@ -3981,7 +3981,7 @@ async function test1() {
  ORDER BY 2,5,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        b,
        c,
@@ -3994,14 +3994,14 @@ async function test1() {
  ORDER BY 5,3,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a-b,
        a+b*2+c*3
   FROM t1
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -4010,13 +4010,13 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        b-c,
@@ -4027,7 +4027,7 @@ async function test1() {
  ORDER BY 3,4,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        c,
        b,
        (a+b+c+d+e)/5,
@@ -4038,13 +4038,13 @@ async function test1() {
  ORDER BY 6,5,3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c
+  console.log(skdb.exec(`SELECT b-c
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -4056,7 +4056,7 @@ async function test1() {
  ORDER BY 3,7,1,4,6,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        e
   FROM t1
@@ -4064,7 +4064,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -4078,14 +4078,14 @@ async function test1() {
  ORDER BY 5,1,2,4,3,6,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
@@ -4095,7 +4095,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3,
@@ -4107,7 +4107,7 @@ async function test1() {
  ORDER BY 4,2,6,5,3,7,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a-b,
        a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -4115,7 +4115,7 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (a+b+c+d+e)/5,
        d,
@@ -4127,7 +4127,7 @@ async function test1() {
  ORDER BY 5,4,2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c,
@@ -4137,7 +4137,7 @@ async function test1() {
  ORDER BY 4,5,2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        abs(b-c),
        a+b*2
   FROM t1
@@ -4146,7 +4146,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2+c*3
   FROM t1
  WHERE (e>a AND e<b)
@@ -4155,12 +4155,12 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        a+b*2+c*3+d*4+e*5,
        a,
        b,
@@ -4172,14 +4172,14 @@ async function test1() {
  ORDER BY 5,1,2,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2+c*3+d*4,
        (a+b+c+d+e)/5
   FROM t1
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4,
@@ -4193,7 +4193,7 @@ async function test1() {
  ORDER BY 5,4,1,2,7,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b-c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -4204,7 +4204,7 @@ async function test1() {
  ORDER BY 6,3,1,2,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        d-e,
        d,
        a+b*2+c*3
@@ -4212,14 +4212,14 @@ async function test1() {
  ORDER BY 3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
    AND (c<=d-2 OR c>=d+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -4230,7 +4230,7 @@ async function test1() {
  ORDER BY 4,3,2,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(a),
        a+b*2
@@ -4240,7 +4240,7 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -4254,7 +4254,7 @@ async function test1() {
  ORDER BY 7,3,6,5,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -4265,7 +4265,7 @@ async function test1() {
  ORDER BY 1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        c-d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4,
@@ -4275,21 +4275,21 @@ async function test1() {
  ORDER BY 1,6,5,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  WHERE (e>c OR e<d)
     OR e+d BETWEEN a+b-10 AND c+130
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a,
        a+b*2+c*3+d*4
   FROM t1
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        e,
        b
   FROM t1
@@ -4299,7 +4299,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a+b*2+c*3,
        (a+b+c+d+e)/5,
        b-c
@@ -4309,12 +4309,12 @@ async function test1() {
  ORDER BY 1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b
+  console.log(skdb.exec(`SELECT a-b
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        d-e,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -4323,13 +4323,13 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  WHERE (e>c OR e<d)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        abs(b-c),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -4338,14 +4338,14 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a)
+  console.log(skdb.exec(`SELECT abs(a)
   FROM t1
  WHERE (e>c OR e<d)
     OR (c<=d-2 OR c>=d+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -4354,7 +4354,7 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a+b*2+c*3+d*4+e*5,
        b,
        (a+b+c+d+e)/5,
@@ -4365,7 +4365,7 @@ async function test1() {
  ORDER BY 4,5,6,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(b-c),
@@ -4374,7 +4374,7 @@ async function test1() {
  ORDER BY 2,1,3,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -4388,7 +4388,7 @@ async function test1() {
  ORDER BY 6,1,5,2,4,7,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d
@@ -4396,7 +4396,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a-b,
        a+b*2+c*3+d*4,
        a+b*2+c*3+d*4+e*5,
@@ -4405,7 +4405,7 @@ async function test1() {
  ORDER BY 3,2,4,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        c-d
@@ -4416,14 +4416,14 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        e
   FROM t1
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        c,
@@ -4434,7 +4434,7 @@ async function test1() {
  ORDER BY 3,4,6,5,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a-b,
        c,
        a,
@@ -4447,12 +4447,12 @@ async function test1() {
  ORDER BY 5,3,2,7,4,6,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        c,
        abs(a),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -4462,7 +4462,7 @@ async function test1() {
  ORDER BY 4,5,1,6,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -4472,7 +4472,7 @@ async function test1() {
  ORDER BY 1,4,3,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        c
   FROM t1
  WHERE d>e
@@ -4481,7 +4481,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        c-d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2,
@@ -4492,7 +4492,7 @@ async function test1() {
  ORDER BY 5,2,4,1,6,3,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a,
        b,
@@ -4504,12 +4504,12 @@ async function test1() {
  ORDER BY 1,6,5,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4,
        e,
@@ -4521,7 +4521,7 @@ async function test1() {
  ORDER BY 2,1,5,3,6,4,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        c-d,
        a
   FROM t1
@@ -4531,7 +4531,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -4546,7 +4546,7 @@ async function test1() {
  ORDER BY 3,5,6,2,1,7,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        e,
        (a+b+c+d+e)/5,
@@ -4558,7 +4558,7 @@ async function test1() {
  ORDER BY 1,4,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        c-d,
@@ -4572,7 +4572,7 @@ async function test1() {
  ORDER BY 3,4,1,5,6,2,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3,
        a,
@@ -4584,14 +4584,14 @@ async function test1() {
  ORDER BY 6,1,2,3,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d
+  console.log(skdb.exec(`SELECT c-d
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
     OR (c<=d-2 OR c>=d+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        d-e,
        abs(a),
        c-d
@@ -4599,7 +4599,7 @@ async function test1() {
  ORDER BY 2,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        c
   FROM t1
  WHERE d>e
@@ -4607,14 +4607,14 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3+d*4,
        d
   FROM t1
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        d-e,
@@ -4627,7 +4627,7 @@ async function test1() {
  ORDER BY 3,2,1,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        (a+b+c+d+e)/5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -4639,13 +4639,13 @@ async function test1() {
  ORDER BY 6,4,5,3,1,2,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        d-e,
        abs(a),
        a-b,
@@ -4657,14 +4657,14 @@ async function test1() {
  ORDER BY 5,4,3,2,1,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE c>d
     OR e+d BETWEEN a+b-10 AND c+130
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
  WHERE d>e
@@ -4672,14 +4672,14 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a+b*2+c*3,
        a
   FROM t1
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
@@ -4689,7 +4689,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        abs(a),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -4700,14 +4700,14 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE (a>b-2 AND a<b+2)
     OR c BETWEEN b-2 AND d+2
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  WHERE c>d
    AND d NOT BETWEEN 110 AND 150
@@ -4715,7 +4715,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -4724,7 +4724,7 @@ async function test1() {
  ORDER BY 4,2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4,
@@ -4738,7 +4738,7 @@ async function test1() {
  ORDER BY 1,2,5,3,4,7,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a-b,
        a+b*2+c*3
   FROM t1
@@ -4746,7 +4746,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        abs(a),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -4756,7 +4756,7 @@ async function test1() {
  ORDER BY 3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        c-d,
        a+b*2+c*3+d*4+e*5
   FROM t1
@@ -4765,7 +4765,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a+b*2+c*3,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c-d
@@ -4776,7 +4776,7 @@ async function test1() {
  ORDER BY 1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
@@ -4785,7 +4785,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        b-c,
        abs(b-c),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
@@ -4794,7 +4794,7 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b,
        a+b*2+c*3
@@ -4803,7 +4803,7 @@ async function test1() {
  ORDER BY 3,4,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d,
@@ -4815,12 +4815,12 @@ async function test1() {
  ORDER BY 4,2,3,1,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(b-c),
        abs(a),
        a+b*2,
@@ -4835,7 +4835,7 @@ async function test1() {
  ORDER BY 4,2,3,7,1,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        abs(a),
@@ -4847,7 +4847,7 @@ async function test1() {
  ORDER BY 2,1,5,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -4858,7 +4858,7 @@ async function test1() {
  ORDER BY 2,5,1,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4+e*5,
        b,
@@ -4871,7 +4871,7 @@ async function test1() {
  ORDER BY 2,4,1,5,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        abs(b-c),
        a+b*2+c*3,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -4882,14 +4882,14 @@ async function test1() {
  ORDER BY 3,4,1,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        d-e,
        abs(a)
   FROM t1
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e
+  console.log(skdb.exec(`SELECT e
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
    AND (c<=d-2 OR c>=d+2)
@@ -4897,12 +4897,12 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        abs(a),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3,
@@ -4911,7 +4911,7 @@ async function test1() {
  ORDER BY 4,1,5,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        e,
        a+b*2,
        b,
@@ -4922,7 +4922,7 @@ async function test1() {
  ORDER BY 2,5,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        abs(a),
        c-d,
        a,
@@ -4934,7 +4934,7 @@ async function test1() {
  ORDER BY 2,7,6,5,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3
+  console.log(skdb.exec(`SELECT a+b*2+c*3
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
     OR e+d BETWEEN a+b-10 AND c+130
@@ -4942,7 +4942,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a-b,
        c,
        a
@@ -4950,7 +4950,7 @@ async function test1() {
  ORDER BY 1,4,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a-b,
@@ -4964,7 +4964,7 @@ async function test1() {
  ORDER BY 3,4,6,5,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        abs(b-c),
        e,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -4978,7 +4978,7 @@ async function test1() {
  ORDER BY 4,3,6,1,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        abs(b-c),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -4990,7 +4990,7 @@ async function test1() {
  ORDER BY 2,5,3,6,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d-e,
        a-b
@@ -4998,7 +4998,7 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4,
        d-e
@@ -5006,7 +5006,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b,
        a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -5016,7 +5016,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -5025,7 +5025,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        abs(a),
        a,
        e,
@@ -5034,7 +5034,7 @@ async function test1() {
  ORDER BY 2,4,3,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
@@ -5045,7 +5045,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a-b,
        d-e
@@ -5053,7 +5053,7 @@ async function test1() {
  ORDER BY 1,4,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c
@@ -5063,7 +5063,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a-b,
        (a+b+c+d+e)/5,
@@ -5074,14 +5074,14 @@ async function test1() {
  ORDER BY 4,1,3,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        e,
        a-b
   FROM t1
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
@@ -5091,7 +5091,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -5103,12 +5103,12 @@ async function test1() {
  ORDER BY 6,2,5,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -5120,7 +5120,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c-d,
        b-c,
@@ -5132,7 +5132,7 @@ async function test1() {
  ORDER BY 4,2,5,6,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a+b*2,
        a+b*2+c*3+d*4,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -5146,7 +5146,7 @@ async function test1() {
  ORDER BY 6,5,4,2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
    AND c>d
@@ -5154,14 +5154,14 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        d-e
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b,
        b-c,
@@ -5174,7 +5174,7 @@ async function test1() {
  ORDER BY 3,2,4,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d-e,
        c,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -5183,14 +5183,14 @@ async function test1() {
  ORDER BY 1,2,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
    AND c>d
@@ -5198,7 +5198,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c-d,
        c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -5208,7 +5208,7 @@ async function test1() {
  ORDER BY 4,2,1,3,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a-b,
        abs(a),
        d,
@@ -5221,18 +5221,18 @@ async function test1() {
  ORDER BY 2,1,3,6,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        c-d
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
@@ -5241,13 +5241,13 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  WHERE b>c
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b-c
   FROM t1
  WHERE b>c
@@ -5255,7 +5255,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        abs(a)
   FROM t1
  WHERE d>e
@@ -5263,7 +5263,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -5277,7 +5277,7 @@ async function test1() {
  ORDER BY 1,5,2,6,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b,
        a-b
@@ -5287,7 +5287,7 @@ async function test1() {
  ORDER BY 1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3,
        a+b*2+c*3+d*4+e*5
   FROM t1
@@ -5296,13 +5296,13 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        abs(a),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4,
@@ -5313,7 +5313,7 @@ async function test1() {
  ORDER BY 3,1,4,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a+b*2+c*3+d*4+e*5,
        abs(b-c),
        d-e,
@@ -5325,7 +5325,7 @@ async function test1() {
  ORDER BY 4,1,3,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a+b*2+c*3,
        c-d,
        abs(b-c),
@@ -5334,14 +5334,14 @@ async function test1() {
  ORDER BY 3,4,1,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        d-e
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
@@ -5350,7 +5350,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (a+b+c+d+e)/5,
@@ -5361,7 +5361,7 @@ async function test1() {
  ORDER BY 5,4,6,2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        c,
        b
   FROM t1
@@ -5371,7 +5371,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        c,
        abs(a),
        a+b*2+c*3+d*4+e*5,
@@ -5383,7 +5383,7 @@ async function test1() {
  ORDER BY 3,4,2,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -5395,7 +5395,7 @@ async function test1() {
  ORDER BY 3,5,1,4,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a+b*2+c*3,
        c-d,
        abs(a),
@@ -5407,7 +5407,7 @@ async function test1() {
  ORDER BY 1,3,5,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a+b*2
   FROM t1
  WHERE (a>b-2 AND a<b+2)
@@ -5416,14 +5416,14 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (a+b+c+d+e)/5
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        abs(a),
@@ -5436,7 +5436,7 @@ async function test1() {
  ORDER BY 3,4,2,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a+b*2+c*3+d*4,
        d,
        a-b,
@@ -5446,7 +5446,7 @@ async function test1() {
  ORDER BY 2,1,5,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a,
        a+b*2+c*3+d*4,
        c-d,
@@ -5457,12 +5457,12 @@ async function test1() {
  ORDER BY 6,3,1,4,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        e,
        a+b*2,
@@ -5474,7 +5474,7 @@ async function test1() {
  ORDER BY 1,5,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a-b,
@@ -5486,7 +5486,7 @@ async function test1() {
  ORDER BY 3,2,4,6,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
@@ -5494,7 +5494,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b
+  console.log(skdb.exec(`SELECT a-b
   FROM t1
  WHERE (a>b-2 AND a<b+2)
    AND EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
@@ -5502,12 +5502,12 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -5519,7 +5519,7 @@ async function test1() {
  ORDER BY 3,2,5,7,1,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a-b,
@@ -5530,7 +5530,7 @@ async function test1() {
  ORDER BY 3,1,4,2,6,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -5542,7 +5542,7 @@ async function test1() {
  ORDER BY 4,2,1,6,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        b,
        (a+b+c+d+e)/5
   FROM t1
@@ -5550,7 +5550,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        d-e,
        c-d,
        abs(a),
@@ -5561,7 +5561,7 @@ async function test1() {
  ORDER BY 3,1,5,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        c-d,
        abs(b-c),
        a+b*2+c*3
@@ -5570,7 +5570,7 @@ async function test1() {
  ORDER BY 3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        e,
        b,
        abs(a),
@@ -5582,7 +5582,7 @@ async function test1() {
  ORDER BY 5,3,2,1,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2
   FROM t1
  WHERE b>c
@@ -5590,13 +5590,13 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        abs(b-c)
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        a+b*2+c*3,
        a-b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
@@ -5607,7 +5607,7 @@ async function test1() {
  ORDER BY 3,4,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        d-e,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -5620,7 +5620,7 @@ async function test1() {
  ORDER BY 3,1,5,6,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -5629,7 +5629,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c-d,
@@ -5641,7 +5641,7 @@ async function test1() {
  ORDER BY 1,2,5,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        c-d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3,
@@ -5653,7 +5653,7 @@ async function test1() {
  ORDER BY 1,2,5,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (a+b+c+d+e)/5
   FROM t1
@@ -5663,7 +5663,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        b-c,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -5672,7 +5672,7 @@ async function test1() {
  ORDER BY 3,1,2,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a+b*2+c*3+d*4,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -5685,7 +5685,7 @@ async function test1() {
  ORDER BY 3,5,2,1,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2+c*3+d*4,
        a,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -5699,7 +5699,7 @@ async function test1() {
  ORDER BY 1,4,7,6,5,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -5713,7 +5713,7 @@ async function test1() {
  ORDER BY 6,2,5,4,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        abs(a),
        e,
        c,
@@ -5726,7 +5726,7 @@ async function test1() {
  ORDER BY 5,2,4,1,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        abs(a),
        d,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -5736,7 +5736,7 @@ async function test1() {
  ORDER BY 5,1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -5749,14 +5749,14 @@ async function test1() {
  ORDER BY 3,1,6,4,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2,
        b
   FROM t1
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d
   FROM t1
  WHERE a>b
@@ -5765,13 +5765,13 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a
+  console.log(skdb.exec(`SELECT a
   FROM t1
  WHERE (e>c OR e<d)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a+b*2+c*3+d*4,
        c-d,
        a+b*2+c*3+d*4+e*5
@@ -5779,7 +5779,7 @@ async function test1() {
  ORDER BY 4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(b-c),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
@@ -5787,7 +5787,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        b-c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
@@ -5795,7 +5795,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a+b*2+c*3,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
@@ -5803,19 +5803,19 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        abs(b-c),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
  WHERE d>e
@@ -5824,7 +5824,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a+b*2+c*3+d*4
   FROM t1
  WHERE b>c
@@ -5833,7 +5833,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(a)
   FROM t1
  WHERE c>d
@@ -5841,7 +5841,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2+c*3+d*4+e*5,
        d-e,
        b-c,
@@ -5852,19 +5852,19 @@ async function test1() {
  ORDER BY 2,4,6,1,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a
+  console.log(skdb.exec(`SELECT a
   FROM t1
  WHERE d>e
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  WHERE b>c
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3+d*4,
        abs(b-c),
@@ -5873,7 +5873,7 @@ async function test1() {
  ORDER BY 3,4,5,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        b-c,
        abs(b-c),
        a+b*2+c*3+d*4+e*5,
@@ -5884,12 +5884,12 @@ async function test1() {
  ORDER BY 3,6,2,1,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c
+  console.log(skdb.exec(`SELECT b-c
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(a),
@@ -5900,7 +5900,7 @@ async function test1() {
  ORDER BY 3,4,6,1,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        abs(b-c)
   FROM t1
  WHERE (e>c OR e<d)
@@ -5908,7 +5908,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d,
        a+b*2+c*3+d*4,
@@ -5919,7 +5919,7 @@ async function test1() {
  ORDER BY 1,4,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        abs(a),
        b-c
   FROM t1
@@ -5927,13 +5927,13 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  WHERE b>c
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a,
        a+b*2,
@@ -5948,7 +5948,7 @@ async function test1() {
  ORDER BY 6,1,5,7,4,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a-b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d,
@@ -5960,7 +5960,7 @@ async function test1() {
  ORDER BY 3,4,7,5,2,6,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d-e,
        a+b*2+c*3,
        a-b,
@@ -5973,7 +5973,7 @@ async function test1() {
  ORDER BY 5,1,3,6,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        a-b,
        a+b*2,
        abs(a),
@@ -5984,7 +5984,7 @@ async function test1() {
  ORDER BY 1,5,4,2,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        abs(b-c),
        b-c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -5994,7 +5994,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        b-c
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
@@ -6002,7 +6002,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        c,
        a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -6014,7 +6014,7 @@ async function test1() {
  ORDER BY 7,2,5,4,1,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(a),
        b-c,
        a-b,
@@ -6025,7 +6025,7 @@ async function test1() {
  ORDER BY 3,6,1,2,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        d
   FROM t1
  WHERE (e>a AND e<b)
@@ -6034,7 +6034,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        c,
        e,
        a+b*2+c*3,
@@ -6047,19 +6047,19 @@ async function test1() {
  ORDER BY 1,5,3,6,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        abs(a)
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        b
   FROM t1
  WHERE b>c
@@ -6067,7 +6067,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        b,
        b-c,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -6078,7 +6078,7 @@ async function test1() {
  ORDER BY 3,4,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
  WHERE b>c
@@ -6087,7 +6087,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        d,
@@ -6097,13 +6097,13 @@ async function test1() {
  ORDER BY 3,4,2,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
@@ -6112,7 +6112,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        abs(b-c),
        d,
        a+b*2+c*3+d*4
@@ -6121,7 +6121,7 @@ async function test1() {
  ORDER BY 2,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d,
@@ -6135,7 +6135,7 @@ async function test1() {
  ORDER BY 1,5,6,4,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
@@ -6145,7 +6145,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        e,
        d-e,
@@ -6156,18 +6156,18 @@ async function test1() {
  ORDER BY 3,5,6,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        b
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3+d*4+e*5,
        abs(b-c),
        d
@@ -6176,7 +6176,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        e,
        a+b*2,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -6188,7 +6188,7 @@ async function test1() {
  ORDER BY 4,2,6,1,7,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        abs(a),
        e,
@@ -6202,7 +6202,7 @@ async function test1() {
  ORDER BY 3,1,5,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        abs(b-c)
@@ -6210,14 +6210,14 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
    AND d>e
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        (a+b+c+d+e)/5,
        a-b,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -6230,7 +6230,7 @@ async function test1() {
  ORDER BY 1,3,4,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3+d*4+e*5,
        a+b*2,
        abs(a)
@@ -6240,7 +6240,7 @@ async function test1() {
  ORDER BY 2,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a-b
   FROM t1
@@ -6250,7 +6250,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        d-e,
        a,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -6261,7 +6261,7 @@ async function test1() {
  ORDER BY 2,4,3,1,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        a+b*2,
        e,
        (a+b+c+d+e)/5
@@ -6271,7 +6271,7 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2+c*3+d*4+e*5,
        d
   FROM t1
@@ -6281,7 +6281,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(a),
        a+b*2+c*3+d*4,
        (a+b+c+d+e)/5,
@@ -6296,7 +6296,7 @@ async function test1() {
  ORDER BY 2,1,3,7,5,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d,
@@ -6306,7 +6306,7 @@ async function test1() {
  ORDER BY 4,1,5,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        b,
        a+b*2+c*3+d*4+e*5,
        c,
@@ -6317,14 +6317,14 @@ async function test1() {
  ORDER BY 2,5,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        c-d
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a+b*2+c*3+d*4+e*5,
        abs(a)
   FROM t1
@@ -6333,7 +6333,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d-e,
        b,
        a+b*2+c*3+d*4
@@ -6341,7 +6341,7 @@ async function test1() {
  ORDER BY 1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -6349,7 +6349,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a,
        abs(b-c)
   FROM t1
@@ -6359,7 +6359,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (a+b+c+d+e)/5,
        a+b*2+c*3+d*4
   FROM t1
@@ -6369,7 +6369,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        abs(b-c),
        c-d,
@@ -6381,7 +6381,7 @@ async function test1() {
  ORDER BY 3,4,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
@@ -6390,7 +6390,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
@@ -6399,7 +6399,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d,
@@ -6410,7 +6410,7 @@ async function test1() {
  ORDER BY 1,3,5,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        b,
        a+b*2+c*3+d*4,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -6422,7 +6422,7 @@ async function test1() {
  ORDER BY 2,3,1,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(b-c),
        (a+b+c+d+e)/5,
@@ -6432,7 +6432,7 @@ async function test1() {
  ORDER BY 1,3,2,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a,
        abs(b-c),
        a+b*2+c*3+d*4+e*5,
@@ -6444,13 +6444,13 @@ async function test1() {
  ORDER BY 4,1,2,7,5,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -6463,7 +6463,7 @@ async function test1() {
  ORDER BY 4,1,5,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3,
        a+b*2+c*3+d*4
@@ -6472,7 +6472,7 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b-c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -6481,7 +6481,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d,
        a,
        a+b*2+c*3+d*4,
@@ -6491,7 +6491,7 @@ async function test1() {
  ORDER BY 2,3,5,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        abs(b-c),
        e,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -6502,7 +6502,7 @@ async function test1() {
  ORDER BY 3,4,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4,
        c-d
@@ -6513,14 +6513,14 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
  WHERE (e>c OR e<d)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        b-c,
        c,
@@ -6532,7 +6532,7 @@ async function test1() {
  ORDER BY 1,3,2,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        c-d,
        a+b*2+c*3+d*4+e*5,
        a+b*2+c*3+d*4,
@@ -6542,7 +6542,7 @@ async function test1() {
  ORDER BY 1,2,5,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -6554,7 +6554,7 @@ async function test1() {
  ORDER BY 6,2,1,3,4,7,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -6567,7 +6567,7 @@ async function test1() {
  ORDER BY 5,6,3,7,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        e,
        abs(a)
@@ -6575,14 +6575,14 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e
+  console.log(skdb.exec(`SELECT e
   FROM t1
  WHERE c>d
     OR d NOT BETWEEN 110 AND 150
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        b,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -6597,7 +6597,7 @@ async function test1() {
  ORDER BY 6,2,1,7,5,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        (a+b+c+d+e)/5,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
@@ -6605,7 +6605,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        d-e,
        b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -6620,7 +6620,7 @@ async function test1() {
  ORDER BY 3,4,1,5,7,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -6634,7 +6634,7 @@ async function test1() {
  ORDER BY 1,6,2,4,3,7,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2,
@@ -6646,7 +6646,7 @@ async function test1() {
  ORDER BY 3,4,2,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        abs(b-c),
        a+b*2+c*3,
        c,
@@ -6658,7 +6658,7 @@ async function test1() {
  ORDER BY 6,3,5,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
@@ -6667,13 +6667,13 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE a>b
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2+c*3+d*4,
        d-e,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -6685,27 +6685,27 @@ async function test1() {
  ORDER BY 1,4,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c
+  console.log(skdb.exec(`SELECT b-c
   FROM t1
  WHERE d>e
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        c
   FROM t1
  WHERE (e>c OR e<d)
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b
+  console.log(skdb.exec(`SELECT b
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
     OR b>c
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        b,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -6721,7 +6721,7 @@ async function test1() {
  ORDER BY 2,5,3,1,7,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d-e,
        a-b
   FROM t1
@@ -6731,7 +6731,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
        d-e,
        (a+b+c+d+e)/5,
@@ -6740,14 +6740,14 @@ async function test1() {
  ORDER BY 2,5,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2
   FROM t1
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -6758,7 +6758,7 @@ async function test1() {
  ORDER BY 2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a-b,
        a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -6766,7 +6766,7 @@ async function test1() {
  ORDER BY 4,2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        b,
        e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
@@ -6775,7 +6775,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        c,
        a
   FROM t1
@@ -6785,13 +6785,13 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  WHERE b>c
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        b-c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -6800,7 +6800,7 @@ async function test1() {
  ORDER BY 4,3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3,
@@ -6812,7 +6812,7 @@ async function test1() {
  ORDER BY 3,4,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -6824,13 +6824,13 @@ async function test1() {
  ORDER BY 6,3,1,5,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b
+  console.log(skdb.exec(`SELECT a-b
   FROM t1
  WHERE (e>c OR e<d)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
@@ -6841,7 +6841,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a-b,
@@ -6853,7 +6853,7 @@ async function test1() {
  ORDER BY 5,1,3,6,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
@@ -6861,7 +6861,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE (e>c OR e<d)
    AND e+d BETWEEN a+b-10 AND c+130
@@ -6869,7 +6869,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -6880,7 +6880,7 @@ async function test1() {
  ORDER BY 1,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        abs(b-c),
        c,
@@ -6891,7 +6891,7 @@ async function test1() {
  ORDER BY 3,1,2,5,4,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b-c,
        b,
        d-e,
@@ -6902,14 +6902,14 @@ async function test1() {
  ORDER BY 6,3,2,1,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE a>b
     OR (e>a AND e<b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        b-c,
        a+b*2+c*3+d*4+e*5,
        a,
@@ -6923,7 +6923,7 @@ async function test1() {
  ORDER BY 1,3,6,2,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4+e*5,
        d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -6933,7 +6933,7 @@ async function test1() {
  ORDER BY 1,3,6,2,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        c-d,
        abs(b-c),
@@ -6945,7 +6945,7 @@ async function test1() {
  ORDER BY 4,1,5,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a,
        (a+b+c+d+e)/5,
        b-c,
@@ -6956,7 +6956,7 @@ async function test1() {
  ORDER BY 3,1,2,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        d-e,
        (a+b+c+d+e)/5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -6967,7 +6967,7 @@ async function test1() {
  ORDER BY 2,3,5,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b-c,
@@ -6978,7 +6978,7 @@ async function test1() {
  ORDER BY 2,5,6,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -6989,14 +6989,14 @@ async function test1() {
  ORDER BY 2,3,4,5,6,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3
+  console.log(skdb.exec(`SELECT a+b*2+c*3
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
     OR d NOT BETWEEN 110 AND 150
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d,
@@ -7006,7 +7006,7 @@ async function test1() {
  ORDER BY 5,4,3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        abs(a)
   FROM t1
  WHERE b>c
@@ -7014,7 +7014,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -7024,18 +7024,18 @@ async function test1() {
  ORDER BY 2,1,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (a+b+c+d+e)/5
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4+e*5,
        abs(a),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -7045,7 +7045,7 @@ async function test1() {
  ORDER BY 5,3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
@@ -7054,7 +7054,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a-b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
@@ -7064,7 +7064,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        d-e,
        (a+b+c+d+e)/5
   FROM t1
@@ -7074,7 +7074,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(b-c)
@@ -7083,7 +7083,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a,
        (a+b+c+d+e)/5,
        c,
@@ -7093,14 +7093,14 @@ async function test1() {
  ORDER BY 3,5,1,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(a)
   FROM t1
  WHERE (e>a AND e<b)
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        abs(b-c),
        b-c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
@@ -7108,7 +7108,7 @@ async function test1() {
  ORDER BY 3,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a+b*2+c*3+d*4,
        e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -7120,13 +7120,13 @@ async function test1() {
  ORDER BY 6,7,4,1,5,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        d-e
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        b-c,
        a+b*2+c*3,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -7135,7 +7135,7 @@ async function test1() {
  ORDER BY 3,4,2,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4
   FROM t1
  WHERE b>c
@@ -7143,7 +7143,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3+d*4+e*5,
        d-e,
@@ -7155,7 +7155,7 @@ async function test1() {
  ORDER BY 6,5,3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a-b
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
@@ -7163,14 +7163,14 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b
+  console.log(skdb.exec(`SELECT a-b
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
    AND e+d BETWEEN a+b-10 AND c+130
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d,
        b-c,
        a,
@@ -7181,7 +7181,7 @@ async function test1() {
  ORDER BY 4,3,6,1,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3,
@@ -7193,7 +7193,7 @@ async function test1() {
  ORDER BY 1,4,2,5,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4,
        a-b,
@@ -7206,7 +7206,7 @@ async function test1() {
  ORDER BY 1,3,4,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        abs(a),
        d,
        b,
@@ -7218,7 +7218,7 @@ async function test1() {
  ORDER BY 1,4,3,5,6,7,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -7231,7 +7231,7 @@ async function test1() {
  ORDER BY 3,5,6,4,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a,
        (a+b+c+d+e)/5
@@ -7240,7 +7240,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        e
   FROM t1
  WHERE b>c
@@ -7249,7 +7249,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a-b
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
@@ -7258,7 +7258,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        c-d
   FROM t1
  WHERE d>e
@@ -7267,7 +7267,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        c,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -7281,7 +7281,7 @@ async function test1() {
  ORDER BY 6,2,1,3,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a+b*2+c*3
   FROM t1
  WHERE b>c
@@ -7290,7 +7290,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a+b*2+c*3,
        abs(b-c),
        a-b
@@ -7299,7 +7299,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3,
        d,
        b
@@ -7307,13 +7307,13 @@ async function test1() {
  ORDER BY 2,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d
+  console.log(skdb.exec(`SELECT c-d
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        e,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -7326,7 +7326,7 @@ async function test1() {
  ORDER BY 4,3,5,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -7335,7 +7335,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a-b,
        c-d
   FROM t1
@@ -7343,7 +7343,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a+b*2+c*3,
        a+b*2,
        (a+b+c+d+e)/5,
@@ -7355,7 +7355,7 @@ async function test1() {
  ORDER BY 1,2,3,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3,
        c,
@@ -7367,7 +7367,7 @@ async function test1() {
  ORDER BY 3,1,7,6,4,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        e,
        (a+b+c+d+e)/5,
        a+b*2+c*3+d*4+e*5
@@ -7375,14 +7375,14 @@ async function test1() {
  ORDER BY 4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a
   FROM t1
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(b-c),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -7397,7 +7397,7 @@ async function test1() {
  ORDER BY 4,6,2,5,7,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
@@ -7407,13 +7407,13 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        c
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4+e*5,
@@ -7427,13 +7427,13 @@ async function test1() {
  ORDER BY 3,2,6,5,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  WHERE d>e
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -7442,7 +7442,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        e,
        c-d,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -7455,7 +7455,7 @@ async function test1() {
  ORDER BY 5,3,6,1,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        b-c,
@@ -7464,7 +7464,7 @@ async function test1() {
  ORDER BY 4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        abs(a),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -7474,14 +7474,14 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a+b*2+c*3,
        (a+b+c+d+e)/5
   FROM t1
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -7495,7 +7495,7 @@ async function test1() {
  ORDER BY 2,4,1,3,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a+b*2
   FROM t1
  WHERE b>c
@@ -7504,7 +7504,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
@@ -7514,7 +7514,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b
+  console.log(skdb.exec(`SELECT b
   FROM t1
  WHERE d>e
     OR (e>a AND e<b)
@@ -7522,20 +7522,20 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        b-c,
        a
   FROM t1
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(a)
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c,
        e
@@ -7545,7 +7545,7 @@ async function test1() {
  ORDER BY 3,2,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        d-e,
        a+b*2+c*3,
        abs(b-c),
@@ -7557,7 +7557,7 @@ async function test1() {
  ORDER BY 3,7,1,6,5,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        b-c,
        abs(b-c)
   FROM t1
@@ -7565,7 +7565,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        b,
@@ -7577,7 +7577,7 @@ async function test1() {
  ORDER BY 5,3,1,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d,
        a+b*2+c*3+d*4+e*5,
@@ -7587,7 +7587,7 @@ async function test1() {
  ORDER BY 2,6,3,1,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2+c*3,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
@@ -7595,7 +7595,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        abs(b-c)
   FROM t1
@@ -7603,7 +7603,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a,
        a+b*2
   FROM t1
@@ -7611,7 +7611,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b
+  console.log(skdb.exec(`SELECT b
   FROM t1
  WHERE a>b
     OR EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
@@ -7619,7 +7619,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        c-d,
        d,
        a
@@ -7627,7 +7627,7 @@ async function test1() {
  ORDER BY 3,2,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2+c*3+d*4,
        c-d,
        a,
@@ -7638,7 +7638,7 @@ async function test1() {
  ORDER BY 3,4,1,5,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        c,
        abs(a),
        a+b*2+c*3
@@ -7648,7 +7648,7 @@ async function test1() {
  ORDER BY 1,4,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        abs(b-c),
        (a+b+c+d+e)/5
   FROM t1
@@ -7657,7 +7657,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -7667,7 +7667,7 @@ async function test1() {
  ORDER BY 2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        a,
        c,
        d-e,
@@ -7677,7 +7677,7 @@ async function test1() {
  ORDER BY 1,6,3,5,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        c,
        a+b*2+c*3,
        b,
@@ -7688,7 +7688,7 @@ async function test1() {
  ORDER BY 4,3,5,6,2,1,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        d-e,
        c,
        a+b*2,
@@ -7700,7 +7700,7 @@ async function test1() {
  ORDER BY 2,3,5,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        b-c,
        e,
@@ -7714,7 +7714,7 @@ async function test1() {
  ORDER BY 3,6,2,1,5,7,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -7724,7 +7724,7 @@ async function test1() {
  ORDER BY 2,3,1,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d-e,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -7736,7 +7736,7 @@ async function test1() {
  ORDER BY 3,5,4,6,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a+b*2+c*3,
        (a+b+c+d+e)/5,
@@ -7749,7 +7749,7 @@ async function test1() {
  ORDER BY 3,5,7,2,4,6,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a-b,
        a+b*2+c*3+d*4+e*5,
        a+b*2+c*3,
@@ -7760,7 +7760,7 @@ async function test1() {
  ORDER BY 5,3,4,6,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        b,
        a+b*2+c*3+d*4+e*5,
        d-e,
@@ -7771,7 +7771,7 @@ async function test1() {
  ORDER BY 5,2,1,4,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b-c,
        a+b*2+c*3+d*4
@@ -7782,7 +7782,7 @@ async function test1() {
  ORDER BY 2,1,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a-b,
        a+b*2+c*3+d*4,
@@ -7795,7 +7795,7 @@ async function test1() {
  ORDER BY 7,3,2,4,6,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        (a+b+c+d+e)/5,
        d-e,
        a,
@@ -7807,7 +7807,7 @@ async function test1() {
  ORDER BY 5,2,1,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d-e,
        c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -7819,39 +7819,39 @@ async function test1() {
  ORDER BY 1,2,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (a+b+c+d+e)/5,
        b
   FROM t1
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a
+  console.log(skdb.exec(`SELECT a
   FROM t1
  WHERE d>e
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3+d*4+e*5,
        a-b
   FROM t1
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        b-c,
        a+b*2+c*3
   FROM t1
@@ -7859,7 +7859,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (a+b+c+d+e)/5,
        a+b*2+c*3+d*4,
@@ -7870,7 +7870,7 @@ async function test1() {
  ORDER BY 4,3,1,7,2,5,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a,
        abs(b-c),
@@ -7879,7 +7879,7 @@ async function test1() {
  ORDER BY 2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
@@ -7887,13 +7887,13 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2
+  console.log(skdb.exec(`SELECT a+b*2
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        abs(a)
@@ -7903,7 +7903,7 @@ async function test1() {
  ORDER BY 4,3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        c,
        e,
        a+b*2+c*3+d*4+e*5,
@@ -7916,7 +7916,7 @@ async function test1() {
  ORDER BY 5,6,1,2,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -7926,7 +7926,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
@@ -7935,7 +7935,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        (a+b+c+d+e)/5,
        c-d,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -7947,7 +7947,7 @@ async function test1() {
  ORDER BY 2,5,1,3,7,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a-b,
        a+b*2+c*3+d*4
   FROM t1
@@ -7956,7 +7956,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        d,
        b-c
   FROM t1
@@ -7965,7 +7965,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2,
        a+b*2+c*3,
@@ -7979,7 +7979,7 @@ async function test1() {
  ORDER BY 4,3,1,5,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
    AND (e>a AND e<b)
@@ -7987,7 +7987,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a+b*2+c*3+d*4+e*5,
        a+b*2,
        abs(a),
@@ -7998,7 +7998,7 @@ async function test1() {
  ORDER BY 2,5,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2,
        abs(b-c),
@@ -8009,7 +8009,7 @@ async function test1() {
  ORDER BY 1,4,2,7,3,6,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4+e*5
   FROM t1
@@ -8019,7 +8019,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        b-c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -8028,7 +8028,7 @@ async function test1() {
  ORDER BY 3,1,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a-b,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -8036,7 +8036,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        d-e,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -8048,13 +8048,13 @@ async function test1() {
  ORDER BY 4,3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3,
@@ -8069,7 +8069,7 @@ async function test1() {
  ORDER BY 4,2,1,6,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (a+b+c+d+e)/5,
@@ -8085,12 +8085,12 @@ async function test1() {
  ORDER BY 2,1,4,3,5,6,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d
+  console.log(skdb.exec(`SELECT c-d
   FROM t1
  WHERE d>e
    AND e+d BETWEEN a+b-10 AND c+130
@@ -8098,7 +8098,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        d,
        e,
        a+b*2+c*3+d*4
@@ -8109,7 +8109,7 @@ async function test1() {
  ORDER BY 2,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        e,
        a+b*2+c*3+d*4,
@@ -8121,7 +8121,7 @@ async function test1() {
  ORDER BY 7,4,2,6,5,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b-c,
        a,
        (a+b+c+d+e)/5,
@@ -8133,7 +8133,7 @@ async function test1() {
  ORDER BY 6,1,4,2,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3+d*4,
@@ -8146,7 +8146,7 @@ async function test1() {
  ORDER BY 6,3,1,5,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  WHERE d>e
    AND (a>b-2 AND a<b+2)
@@ -8154,7 +8154,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c,
        a+b*2+c*3
   FROM t1
@@ -8163,7 +8163,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
    AND EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
@@ -8171,7 +8171,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b
+  console.log(skdb.exec(`SELECT a-b
   FROM t1
  WHERE (e>c OR e<d)
     OR EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
@@ -8179,7 +8179,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c-d
   FROM t1
@@ -8188,7 +8188,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        d-e,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -8201,7 +8201,7 @@ async function test1() {
  ORDER BY 2,5,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        c-d
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
@@ -8210,7 +8210,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        e,
@@ -8223,7 +8223,7 @@ async function test1() {
  ORDER BY 5,6,2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        (a+b+c+d+e)/5
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
@@ -8232,7 +8232,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4+e*5,
        a+b*2+c*3+d*4
   FROM t1
@@ -8240,7 +8240,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a-b,
        a+b*2
@@ -8248,7 +8248,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
     OR (e>c OR e<d)
@@ -8256,7 +8256,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        c,
@@ -8267,7 +8267,7 @@ async function test1() {
  ORDER BY 2,3,1,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a-b,
        b-c,
@@ -8277,7 +8277,7 @@ async function test1() {
  ORDER BY 1,4,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -8289,13 +8289,13 @@ async function test1() {
  ORDER BY 6,2,5,1,4,7,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  WHERE b>c
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a,
        a+b*2+c*3+d*4,
        d
@@ -8306,7 +8306,7 @@ async function test1() {
  ORDER BY 4,2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        d-e,
        a+b*2+c*3+d*4+e*5,
        a+b*2+c*3,
@@ -8318,7 +8318,7 @@ async function test1() {
  ORDER BY 3,4,2,6,5,7,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (a+b+c+d+e)/5,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -8330,7 +8330,7 @@ async function test1() {
  ORDER BY 4,2,3,6,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a+b*2+c*3,
        e,
        a,
@@ -8341,7 +8341,7 @@ async function test1() {
  ORDER BY 6,4,3,1,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        d,
        e
   FROM t1
@@ -8350,7 +8350,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2,
        c,
        a+b*2+c*3+d*4+e*5,
@@ -8362,7 +8362,7 @@ async function test1() {
  ORDER BY 4,2,3,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d,
@@ -8373,7 +8373,7 @@ async function test1() {
  ORDER BY 3,5,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        c-d,
        b
@@ -8381,7 +8381,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        e,
        a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -8393,7 +8393,7 @@ async function test1() {
  ORDER BY 1,2,7,6,4,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        e,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -8401,7 +8401,7 @@ async function test1() {
  ORDER BY 2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a+b*2+c*3,
        a+b*2+c*3+d*4
   FROM t1
@@ -8410,7 +8410,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (a+b+c+d+e)/5,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
@@ -8420,7 +8420,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a+b*2+c*3+d*4+e*5,
        a+b*2,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -8431,14 +8431,14 @@ async function test1() {
  ORDER BY 3,4,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        d-e,
        a+b*2+c*3
   FROM t1
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        e,
        a,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -8451,7 +8451,7 @@ async function test1() {
  ORDER BY 1,5,7,2,6,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        c-d,
        d-e
   FROM t1
@@ -8460,7 +8460,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2+c*3,
        a,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -8472,7 +8472,7 @@ async function test1() {
  ORDER BY 6,4,7,5,2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -8481,14 +8481,14 @@ async function test1() {
  ORDER BY 3,4,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
    AND EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
   FROM t1
  WHERE (e>c OR e<d)
@@ -8496,7 +8496,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
     OR (a>b-2 AND a<b+2)
@@ -8504,7 +8504,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a+b*2,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -8514,7 +8514,7 @@ async function test1() {
  ORDER BY 2,3,1,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c-d,
@@ -8524,7 +8524,7 @@ async function test1() {
  ORDER BY 2,4,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        d,
@@ -8536,7 +8536,7 @@ async function test1() {
  ORDER BY 1,5,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        a,
        a+b*2,
        a-b,
@@ -8546,7 +8546,7 @@ async function test1() {
  ORDER BY 2,3,1,6,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        c,
        a+b*2+c*3,
        b,
@@ -8561,7 +8561,7 @@ async function test1() {
  ORDER BY 3,5,1,2,4,6,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        c,
@@ -8573,7 +8573,7 @@ async function test1() {
  ORDER BY 1,4,6,3,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        c-d,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a-b,
@@ -8585,13 +8585,13 @@ async function test1() {
  ORDER BY 1,6,2,5,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE (e>a AND e<b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3+d*4,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
@@ -8601,14 +8601,14 @@ async function test1() {
  ORDER BY 2,4,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE c>d
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        abs(b-c),
        a+b*2+c*3+d*4,
        d,
@@ -8623,7 +8623,7 @@ async function test1() {
  ORDER BY 1,4,5,2,6,7,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        c,
        a+b*2,
        a+b*2+c*3+d*4,
@@ -8634,7 +8634,7 @@ async function test1() {
  ORDER BY 5,3,4,1,6,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  WHERE (e>a AND e<b)
@@ -8643,7 +8643,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        c-d,
        b
   FROM t1
@@ -8651,7 +8651,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -8664,7 +8664,7 @@ async function test1() {
  ORDER BY 6,1,2,3,7,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        a-b,
        b
   FROM t1
@@ -8672,7 +8672,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        e,
        (a+b+c+d+e)/5,
@@ -8683,7 +8683,7 @@ async function test1() {
  ORDER BY 3,4,2,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        d-e
   FROM t1
@@ -8692,7 +8692,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        abs(a),
@@ -8705,12 +8705,12 @@ async function test1() {
  ORDER BY 6,7,5,4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e
+  console.log(skdb.exec(`SELECT d-e
   FROM t1
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
    AND (e>a AND e<b)
@@ -8718,13 +8718,13 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        e
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a,
        b-c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -8736,7 +8736,7 @@ async function test1() {
  ORDER BY 3,1,2,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        a+b*2+c*3,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -8751,7 +8751,7 @@ async function test1() {
  ORDER BY 1,5,4,6,3,2,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        a+b*2,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b-c,
@@ -8761,7 +8761,7 @@ async function test1() {
  ORDER BY 6,1,4,3,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a,
@@ -8771,7 +8771,7 @@ async function test1() {
  ORDER BY 6,4,3,2,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        abs(b-c),
@@ -8782,14 +8782,14 @@ async function test1() {
  ORDER BY 2,1,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        (a+b+c+d+e)/5
   FROM t1
  WHERE (a>b-2 AND a<b+2)
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a-b,
        a+b*2
   FROM t1
@@ -8798,7 +8798,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2+c*3,
@@ -8810,13 +8810,13 @@ async function test1() {
  ORDER BY 3,5,1,4,2,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(a)
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        (a+b+c+d+e)/5,
        a+b*2+c*3+d*4,
@@ -8828,7 +8828,7 @@ async function test1() {
  ORDER BY 4,5,3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
@@ -8838,7 +8838,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        (a+b+c+d+e)/5,
        a+b*2,
        a,
@@ -8851,7 +8851,7 @@ async function test1() {
  ORDER BY 6,7,3,4,5,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -8861,7 +8861,7 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        abs(b-c),
        d,
        a-b,
@@ -8872,7 +8872,7 @@ async function test1() {
  ORDER BY 2,5,1,4,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a,
        d
@@ -8881,13 +8881,13 @@ async function test1() {
  ORDER BY 4,2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        a+b*2
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
@@ -8896,7 +8896,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        b,
        abs(b-c),
        e,
@@ -8909,7 +8909,7 @@ async function test1() {
  ORDER BY 6,1,7,2,5,4,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a-b,
        e,
        d,
@@ -8922,7 +8922,7 @@ async function test1() {
  ORDER BY 2,1,5,3,6,4,7
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        c-d
   FROM t1
@@ -8930,7 +8930,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        e,
        a-b,
        d-e,
@@ -8944,7 +8944,7 @@ async function test1() {
  ORDER BY 6,5,7,2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        d,
@@ -8957,7 +8957,7 @@ async function test1() {
  ORDER BY 3,4,1,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a-b,
        a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
@@ -8968,7 +8968,7 @@ async function test1() {
  ORDER BY 1,2,3,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b,
        a+b*2+c*3,
@@ -8979,7 +8979,7 @@ async function test1() {
  ORDER BY 4,3,5,2,7,1,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        b,
        abs(b-c),
        c,
@@ -8991,7 +8991,7 @@ async function test1() {
  ORDER BY 4,6,7,2,5,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        c,
        abs(a),
        b,
@@ -9002,14 +9002,14 @@ async function test1() {
  ORDER BY 5,2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2
+  console.log(skdb.exec(`SELECT a+b*2
   FROM t1
  WHERE (a>b-2 AND a<b+2)
    AND b>c
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        d-e,
        a+b*2,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -9021,7 +9021,7 @@ async function test1() {
  ORDER BY 4,2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        d,
@@ -9031,7 +9031,7 @@ async function test1() {
  ORDER BY 1,2,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c
   FROM t1
@@ -9040,13 +9040,13 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3+d*4
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -9057,7 +9057,7 @@ async function test1() {
  ORDER BY 6,4,5,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -9066,7 +9066,7 @@ async function test1() {
  ORDER BY 2,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        e,
        d-e
   FROM t1
@@ -9076,7 +9076,7 @@ async function test1() {
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c-d,
        e
   FROM t1
@@ -9084,7 +9084,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        (a+b+c+d+e)/5
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
@@ -9093,7 +9093,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3,
        abs(a),
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -9107,7 +9107,7 @@ async function test1() {
  ORDER BY 4,2,5,1,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        (a+b+c+d+e)/5,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
@@ -9118,7 +9118,7 @@ async function test1() {
  ORDER BY 1,5,3,6,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        d,
        abs(a),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -9130,7 +9130,7 @@ async function test1() {
  ORDER BY 2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        a+b*2+c*3+d*4+e*5,
        abs(b-c),
        (a+b+c+d+e)/5
@@ -9139,7 +9139,7 @@ async function test1() {
  ORDER BY 4,3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -9147,7 +9147,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(b-c),
        abs(a)
   FROM t1
@@ -9157,7 +9157,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d-e,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
@@ -9170,7 +9170,7 @@ async function test1() {
  ORDER BY 3,4,2,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
   FROM t1
  WHERE a>b
    AND c>d
@@ -9178,7 +9178,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        c
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
@@ -9186,7 +9186,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        c-d,
        c,
        (a+b+c+d+e)/5,
@@ -9196,7 +9196,7 @@ async function test1() {
  ORDER BY 1,2,5,4,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        d,
        abs(a),
        c-d,
@@ -9205,7 +9205,7 @@ async function test1() {
  ORDER BY 1,3,4,2,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        e,
@@ -9218,7 +9218,7 @@ async function test1() {
  ORDER BY 1,7,6,2,3,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        d,
        b-c,
@@ -9227,14 +9227,14 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  WHERE b>c
     OR (e>c OR e<d)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        e
@@ -9245,7 +9245,7 @@ async function test1() {
  ORDER BY 3,1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d-e,
        c,
@@ -9255,7 +9255,7 @@ async function test1() {
  ORDER BY 4,1,3,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        e,
        c-d,
        a+b*2+c*3,
@@ -9269,13 +9269,13 @@ async function test1() {
  ORDER BY 5,4,3,1,2,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        c
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        a-b,
        b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -9284,7 +9284,7 @@ async function test1() {
  ORDER BY 1,5,4,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3,
        e,
        d,
@@ -9296,7 +9296,7 @@ async function test1() {
  ORDER BY 2,4,5,6,1,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a,
        d-e
@@ -9304,7 +9304,7 @@ async function test1() {
  ORDER BY 1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        e,
        d,
@@ -9316,7 +9316,7 @@ async function test1() {
  ORDER BY 4,3,5,1,7,2,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        c-d,
        a+b*2+c*3+d*4,
        d-e,
@@ -9327,7 +9327,7 @@ async function test1() {
  ORDER BY 7,1,2,4,6,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        b
   FROM t1
  WHERE a>b
@@ -9335,7 +9335,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        a,
@@ -9348,13 +9348,13 @@ async function test1() {
  ORDER BY 1,5,2,4,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3
+  console.log(skdb.exec(`SELECT a+b*2+c*3
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(b-c),
        abs(a),
        b,
@@ -9366,7 +9366,7 @@ async function test1() {
  ORDER BY 1,5,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        d-e,
@@ -9376,7 +9376,7 @@ async function test1() {
  ORDER BY 1,3,4,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
+  console.log(skdb.exec(`SELECT CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -9388,7 +9388,7 @@ async function test1() {
  ORDER BY 2,3,1,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        abs(b-c),
@@ -9402,7 +9402,7 @@ async function test1() {
  ORDER BY 5,4,2,3,1,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e
+  console.log(skdb.exec(`SELECT e
   FROM t1
  WHERE (e>c OR e<d)
     OR (c<=d-2 OR c>=d+2)
@@ -9410,14 +9410,14 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b)
   FROM t1
  WHERE (a>b-2 AND a<b+2)
    AND (e>c OR e<d)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a)
+  console.log(skdb.exec(`SELECT abs(a)
   FROM t1
  WHERE (a>b-2 AND a<b+2)
     OR d>e
@@ -9425,7 +9425,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        c,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
@@ -9436,14 +9436,14 @@ async function test1() {
  ORDER BY 4,2,3,6,1,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  WHERE (c<=d-2 OR c>=d+2)
     OR d NOT BETWEEN 110 AND 150
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        d,
        a+b*2,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
@@ -9454,7 +9454,7 @@ async function test1() {
  ORDER BY 6,7,2,4,1,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        (a+b+c+d+e)/5,
@@ -9466,7 +9466,7 @@ async function test1() {
  ORDER BY 5,1,6,7,2,3,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a-b,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -9474,7 +9474,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        e,
        a-b,
        a,
@@ -9488,7 +9488,7 @@ async function test1() {
  ORDER BY 4,6,1,2,3,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        b,
        a+b*2+c*3+d*4+e*5,
@@ -9500,7 +9500,7 @@ async function test1() {
  ORDER BY 4,2,1,6,5,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2+c*3,
        a+b*2,
        c-d,
@@ -9513,7 +9513,7 @@ async function test1() {
  ORDER BY 6,1,5,3,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(a),
        a+b*2,
        a,
@@ -9524,14 +9524,14 @@ async function test1() {
  ORDER BY 4,2,3,5,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        b,
        a-b
   FROM t1
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        c-d,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        abs(b-c),
@@ -9544,13 +9544,13 @@ async function test1() {
  ORDER BY 2,1,3,5,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d,
+  console.log(skdb.exec(`SELECT d,
        a+b*2+c*3+d*4
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2+c*3+d*4,
        e,
@@ -9563,7 +9563,7 @@ async function test1() {
  ORDER BY 5,1,7,2,3,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(a),
+  console.log(skdb.exec(`SELECT abs(a),
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END
   FROM t1
@@ -9573,7 +9573,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b
+  console.log(skdb.exec(`SELECT a-b
   FROM t1
  WHERE d NOT BETWEEN 110 AND 150
    AND (e>c OR e<d)
@@ -9581,7 +9581,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        (a+b+c+d+e)/5,
        c
   FROM t1
@@ -9591,7 +9591,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        a-b,
        b,
        a+b*2+c*3+d*4,
@@ -9605,27 +9605,27 @@ async function test1() {
  ORDER BY 4,2,1,7,5,6,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2
+  console.log(skdb.exec(`SELECT a+b*2
   FROM t1
  WHERE a>b
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        d-e
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d
+  console.log(skdb.exec(`SELECT d
   FROM t1
  WHERE e+d BETWEEN a+b-10 AND c+130
     OR (e>a AND e<b)
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        c-d,
        b,
        b-c,
@@ -9638,7 +9638,7 @@ async function test1() {
  ORDER BY 5,3,4,2,6,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4,
        d,
        c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -9650,7 +9650,7 @@ async function test1() {
  ORDER BY 6,3,7,2,1,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
    AND (e>a AND e<b)
@@ -9658,14 +9658,14 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2,
+  console.log(skdb.exec(`SELECT a+b*2,
        a+b*2+c*3
   FROM t1
  WHERE b>c
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b-c,
+  console.log(skdb.exec(`SELECT b-c,
        a+b*2+c*3+d*4
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
@@ -9673,7 +9673,7 @@ async function test1() {
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT e,
+  console.log(skdb.exec(`SELECT e,
        a+b*2+c*3+d*4+e*5,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END
@@ -9681,13 +9681,13 @@ async function test1() {
  ORDER BY 2,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c)
+  console.log(skdb.exec(`SELECT abs(b-c)
   FROM t1
  WHERE c BETWEEN b-2 AND d+2
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
        b,
        abs(a),
@@ -9698,7 +9698,7 @@ async function test1() {
  ORDER BY 6,5,4,1,3,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a-b,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2,
@@ -9709,7 +9709,7 @@ async function test1() {
  ORDER BY 1,3,4,5,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        CASE a+1 WHEN b THEN 111 WHEN c THEN 222
         WHEN d THEN 333  WHEN e THEN 444 ELSE 555 END,
        c-d,
@@ -9722,14 +9722,14 @@ async function test1() {
  ORDER BY 2,3,6,7,1,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4
   FROM t1
  WHERE (e>c OR e<d)
    AND c BETWEEN b-2 AND d+2
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        e,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        c-d,
@@ -9740,21 +9740,21 @@ async function test1() {
  ORDER BY 2,1,3,4,5
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        c,
        d
   FROM t1
  ORDER BY 3,2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        c
   FROM t1
  WHERE (e>a AND e<b)
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
+  console.log(skdb.exec(`SELECT (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        b-c,
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        abs(b-c),
@@ -9766,7 +9766,7 @@ async function test1() {
  ORDER BY 1,3,2,5,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3,
+  console.log(skdb.exec(`SELECT a+b*2+c*3,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END
@@ -9777,7 +9777,7 @@ async function test1() {
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
+  console.log(skdb.exec(`SELECT CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
        a+b*2
   FROM t1
  WHERE (e>c OR e<d)
@@ -9785,7 +9785,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        e,
        a-b,
@@ -9798,7 +9798,7 @@ async function test1() {
  ORDER BY 1,3,5,2,6,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2
+  console.log(skdb.exec(`SELECT a+b*2
   FROM t1
  WHERE c>d
     OR e+d BETWEEN a+b-10 AND c+130
@@ -9806,7 +9806,7 @@ async function test1() {
  ORDER BY 1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        (SELECT count(*) FROM t1 AS x WHERE x.c>t1.c AND x.d<t1.d)
   FROM t1
  WHERE b>c
@@ -9815,7 +9815,7 @@ async function test1() {
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a-b,
+  console.log(skdb.exec(`SELECT a-b,
        d,
        d-e,
        a,
@@ -9828,7 +9828,7 @@ async function test1() {
  ORDER BY 3,5,4,2,1,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a+b*2+c*3+d*4+e*5,
+  console.log(skdb.exec(`SELECT a+b*2+c*3+d*4+e*5,
        b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        e
@@ -9836,7 +9836,7 @@ async function test1() {
  ORDER BY 2,3,4,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c,
+  console.log(skdb.exec(`SELECT c,
        a+b*2+c*3+d*4,
        a
   FROM t1
@@ -9845,7 +9845,7 @@ async function test1() {
  ORDER BY 1,2,3
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT (a+b+c+d+e)/5,
+  console.log(skdb.exec(`SELECT (a+b+c+d+e)/5,
        b,
        a+b*2+c*3+d*4+e*5,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
@@ -9858,20 +9858,20 @@ async function test1() {
  ORDER BY 1,3,2,5,4,7,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT d-e,
+  console.log(skdb.exec(`SELECT d-e,
        a+b*2+c*3
   FROM t1
  ORDER BY 2,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
+  console.log(skdb.exec(`SELECT CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a
   FROM t1
  ORDER BY 1,2
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT abs(b-c),
+  console.log(skdb.exec(`SELECT abs(b-c),
        a+b*2+c*3+d*4+e*5,
        b,
        d-e
@@ -9881,7 +9881,7 @@ async function test1() {
  ORDER BY 3,1,2,4
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c-d,
+  console.log(skdb.exec(`SELECT c-d,
        CASE WHEN a<b-3 THEN 111 WHEN a<=b THEN 222
         WHEN a<b+3 THEN 333 ELSE 444 END,
        a+b*2,
@@ -9894,7 +9894,7 @@ async function test1() {
  ORDER BY 2,4,6,5,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT b,
+  console.log(skdb.exec(`SELECT b,
        a-b,
        (SELECT count(*) FROM t1 AS x WHERE x.b<t1.b),
        CASE WHEN c>(SELECT CAST(avg(c) AS INTEGER) FROM t1) THEN a*2 ELSE b*10 END,
@@ -9905,14 +9905,14 @@ async function test1() {
  ORDER BY 5,2,4,1,3,6
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT a,
+  console.log(skdb.exec(`SELECT a,
        a+b*2+c*3,
        (a+b+c+d+e)/5
   FROM t1
  ORDER BY 2,3,1
 ;`));
 
-  console.log(skdb.sqlRaw(`SELECT c
+  console.log(skdb.exec(`SELECT c
   FROM t1
  WHERE EXISTS(SELECT 1 FROM t1 AS x WHERE x.b<t1.b)
  ORDER BY 1
