@@ -1,6 +1,6 @@
 
 import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types";
-import { PagedMemory, Page, SkdbTracked, SKDBCallable, Storage, SKDB, ExternalFuns, SkdbHandle, Params } from "#skdb/skdb_types";
+import { PagedMemory, Page, SKDBCallable, Storage, SKDB, ExternalFuns, SkdbHandle, Params } from "#skdb/skdb_types";
 import { IDBStorage } from "#skdb/skdb_storage";
 import { SKDBImpl } from "#skdb/skdb_database";
 
@@ -10,123 +10,33 @@ interface Exported {
   SKIP_get_version: () => number;
   skip_main: () => void;
   //
-  SKIP_init_jsroots: () => void;
-  SKIP_add_root: (
-    rootNameWasmStr: number,
-    funId: number,
-    funArg: number | null
-  ) => void;
-  SKIP_remove_root: (rootNameWasmStr: number) => void;
-  SKIP_tracked_call: (funId: number, funArg: number) => number;
-  SKIP_tracked_query: (request: number, encoded_params: number, start: number, end: number) => number;
+  SKIP_reactive_query: (queryID: number, query: number, encoded_params: number) => void;
+  SKIP_delete_reactive_query: (queryID: number) => void;
+  SKIP_js_notify_user: (notify: number) => void;
   getVersion: () => number;
 }
 
 class SkdbHamdleImpl implements SkdbHandle {
   runner: (fn: () => string) => Promise<Array<any>>;
   main: (new_args: Array<string>, new_stdin: string) => string;
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
 
   constructor(
-    utils: Utils,
+    main: (new_args: Array<string>, new_stdin: string) => string,
     runner: (fn: () => string) => Promise<Array<any>>,
+    watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
   ) {
     this.runner = runner;
-    this.main = utils.main;
-  }
-}
-
-class SkdbTrackedImpl implements SkdbTracked {
-  private roots: Map<string, number> = new Map();
-  private onRootChangeFuns: Array<(rootName: string) => void>;
-  private exported: Exported;
-  private utils: Utils;
-  registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>;
-
-  constructor(
-    exported: Exported,
-    utils: Utils,
-    registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>,
-  ) {
-    exported.SKIP_init_jsroots();
-    this.roots = new Map();
-    this.exported = exported;
-    this.utils = utils;
-    this.registerFun = registerFun;
-    this.onRootChangeFuns = new Array();
+    this.main = main;
+    this.watch = watch;
   }
 
-  private runAddRoot(rootName: string, funId: number, arg: any): void {
-    this.utils.clearMainEnvironment();
-    this.exported.SKIP_add_root(
-      this.utils.exportString(rootName),
-      funId,
-      this.utils.exportString(JSON.stringify(arg === undefined ? null : arg))
-    )
-  }
-
-  addRoot<T1, T2>(rootName: string, callable: (obj: T1) => T2 | SKDBCallable<T1, T2>, arg: T1) {
-    let fCallable = "id" in callable ? new SKDBCallable(callable.id as number) : this.registerFun(callable);
-    this.runAddRoot(rootName, fCallable.getId(), arg);
-  }
-
-  removeRoot(rootName: string) {
-    this.exported.SKIP_remove_root(this.utils.exportString(rootName));
-  }
-
-  getRoot(rootName: string) {
-    return this.roots.get(rootName);
-  }
-
-  trackedCall<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) {
-    let result = this.exported.SKIP_tracked_call(
-      callable.getId(),
-      this.utils.exportString(JSON.stringify(arg === undefined ? null : arg))
-    );
-    return JSON.parse(this.utils.importString(result));
-  }
-
-  trackAndRegister<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, params: Params = new Map(), start?: number, end?: number) {
-    return this.registerFun(() => this.trackedQuery(this.trackedCall(callable, arg), params, start, end));
-  }
-
-  trackedQuery(request: string, params: Params = new Map(), start?: number, end?: number) {
-    if (start === undefined) start = 0;
-    if (end === undefined) end = -1;
-    if (params instanceof Map) {
-      params = Object.fromEntries(params);
-    }
-    let result = this.exported.SKIP_tracked_query(
-      this.utils.exportString(request),
-      this.utils.exportString(JSON.stringify(params === undefined ? null : params)),
-      start,
-      end
-    );
-    return this.utils.importString(result)
-      .split("\n")
-      .filter((x) => x != "")
-      .map((x) => JSON.parse(x));
-  }
-
-
-  addSubscribedRoot(name: string, value: any) {
-    this.roots.set(name, value);
-  }
-
-  removeSubscribedRoot(name: string) {
-    this.roots.delete(name);
-  }
-
-  getRootChangeListeners() {
-    return this.onRootChangeFuns
-  }
-
-  addRootChangeListener(f: (rootName: string) => void) {
-    this.onRootChangeFuns.push(f)
+  init() {
+    this.main([], "");
   }
 }
 
 interface ToWasm {
-  SKIP_call_external_fun: (funId: int, skParam: ptr) => ptr;
   SKIP_clear_field_names: () => void;
   SKIP_push_field_name: (skName: ptr) => void;
   SKIP_clear_object: () => void;
@@ -138,6 +48,8 @@ interface ToWasm {
   SKIP_push_object: () => void;
   SKIP_unix_unixepoch: (tm: ptr) => ptr;
   SKIP_unix_strftime: (tm: ptr) => ptr;
+  SKIP_js_user_fun: (queryID: int) => void;
+  SKIP_js_mark_query: (queryID: int, notify: int) => void;
 }
 
 class SKDBMemory implements PagedMemory {
@@ -251,6 +163,11 @@ class LinksImpl implements Links, ToWasm {
   private object: { [k: string]: any };
   private stdout_objects: Array<any>;
   private storage?: Storage;
+  //
+  private queryID: number;
+  private userFuns: Array<() => void>;
+  private queriesToNotify: Map<number, number>;
+  private freeQueryIDs: Array<number>;
 
   SKIP_call_external_fun: (funId: int, skParam: ptr) => ptr;
   SKIP_clear_field_names: () => void;
@@ -264,11 +181,18 @@ class LinksImpl implements Links, ToWasm {
   SKIP_push_object: () => void;
   SKIP_unix_unixepoch: (tm: ptr) => ptr;
   SKIP_unix_strftime: (tm: ptr) => ptr;
+  SKIP_js_user_fun: (queryID: int) => void;
+  SKIP_js_mark_query: (queryID: int, notify: int) => void;
+  notifyAllJS: () => void;
 
   constructor(environment: Environment) {
     this.environment = environment;
     this.state = new ExternalFuns();
     this.field_names = new Array();
+    this.queryID = 0;
+    this.userFuns = new Array();
+    this.freeQueryIDs = new Array();
+    this.queriesToNotify = new Map();
     this.objectIdx = 0;
     this.object = {};
     this.stdout_objects = new Array();
@@ -276,6 +200,12 @@ class LinksImpl implements Links, ToWasm {
 
   complete = (utils: Utils, exports: object) => {
     let exported = exports as Exported;
+    this.notifyAllJS = () => {
+      this.queriesToNotify.forEach((value, key, map) => {
+        exported.SKIP_js_notify_user(value);
+      });
+      this.queriesToNotify = new Map();
+    }
     this.SKIP_call_external_fun = (funId: int, skParam: ptr) => {
       let res = this.state.call(
         funId,
@@ -328,6 +258,12 @@ class LinksImpl implements Links, ToWasm {
     this.SKIP_unix_strftime = (tm: ptr) => {
       return utils.exportString("TODO")
     }
+    this.SKIP_js_user_fun = (queryID: int) => {
+      this.userFuns[queryID]!()
+    }
+    this.SKIP_js_mark_query = (queryID: int, notify: int) => {
+      this.queriesToNotify.set(queryID, notify);
+    }
     let runner = async (fn: () => string) => {
       this.stdout_objects = new Array();
       let stdout = fn();
@@ -337,8 +273,44 @@ class LinksImpl implements Links, ToWasm {
       }
       throw new Error(stdout)
     };
-    let handle = new SkdbHamdleImpl(utils, runner);
-    let tracked = new SkdbTrackedImpl(exported, utils, <T1, T2>(f: (obj: T1) => T2) => this.state.register(f));
+    let main = (new_args: Array<string>, new_stdin: string) => {
+      let res = utils.main(new_args, new_stdin);
+      this.notifyAllJS();
+      return res;
+    }
+    let watch = (
+      query: string,
+      params: Params,
+      onChange: (rows: Array<any>) => void,
+    ) => {
+      if (params instanceof Map) {
+        params = Object.fromEntries(params);
+      }
+      this.stdout_objects = new Array();
+      const queryID = this.freeQueryIDs.pop() || this.queryID++;
+      
+      this.userFuns[queryID] = () => {
+        onChange(this.stdout_objects);
+        this.stdout_objects = new Array()
+      }
+      utils.runWithGc(() => {
+        utils.runCheckError(() => {
+          exported.SKIP_reactive_query(
+            queryID,
+            utils.exportString(query),
+            utils.exportString(JSON.stringify(params))
+          )
+        })
+      });  
+      onChange(this.stdout_objects);
+      return { close: () => {
+          exported.SKIP_delete_reactive_query(queryID);
+          this.userFuns[queryID] = () => {};
+          this.freeQueryIDs.push(queryID);
+        }
+      }
+    }
+    let handle = new SkdbHamdleImpl(main, runner, watch);
     let create = async (dbName?: string) => {
       let save: () => Promise<boolean> = async () => true;
       let storeName = dbName ? "SKDBStore" : null;
@@ -356,7 +328,8 @@ class LinksImpl implements Links, ToWasm {
         );
         save = this.storage!.save;
       };
-      return await SKDBImpl.create(handle, tracked, this.environment, save);
+      handle.init();
+      return await SKDBImpl.create(handle, this.environment, save);
     };
     this.environment.shared.set("SKDB", new SKDBShared(create));
   };
@@ -372,7 +345,6 @@ class Manager implements ToWasmManager {
   prepare = (wasm: object) => {
     let toWasm = wasm as ToWasm;
     let links = new LinksImpl(this.environment);
-    toWasm.SKIP_call_external_fun = (funId: int, skParam: ptr) => links.SKIP_call_external_fun(funId, skParam);
     toWasm.SKIP_clear_field_names = () => links.SKIP_clear_field_names();
     toWasm.SKIP_push_field_name = (skName: ptr) => links.SKIP_push_field_name(skName);
     toWasm.SKIP_clear_object = () => links.SKIP_clear_object();
@@ -384,6 +356,8 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_push_object = () => links.SKIP_push_object();
     toWasm.SKIP_unix_unixepoch = (tm: ptr) => links.SKIP_unix_unixepoch(tm);
     toWasm.SKIP_unix_strftime = (tm: ptr) => links.SKIP_unix_strftime(tm);
+    toWasm.SKIP_js_user_fun = (id: int) => links.SKIP_js_user_fun(id);
+    toWasm.SKIP_js_mark_query = (id: int, notify: int) => links.SKIP_js_mark_query(id, notify);
     return links;
   }
 }

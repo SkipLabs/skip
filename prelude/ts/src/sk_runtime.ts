@@ -29,7 +29,6 @@ class LinksImpl implements Links {
   SKIP_JS_timeStamp: () => float;
 
   SKIP_delete_external_exception: (actor: int) => void;
-  SKIP_get_external_exception_message: (actor: int) => ptr;
   SKIP_FileSystem_appendTextFile: (path: ptr, contents: ptr) => void;
   SKIP_js_get_argc: () => int;
   SKIP_js_get_argn: (index: int) => ptr;
@@ -68,7 +67,6 @@ class LinksImpl implements Links {
       utils.log(str, Stream.OUT);
     };
     this.SKIP_delete_external_exception = utils.deleteException;
-    this.SKIP_get_external_exception_message = utils.getExceptionMessage;
 
     this.SKIP_js_get_argc = () => utils.args.length;
     this.SKIP_js_get_argn = (index: int) => utils.exportString(utils.args[index]);
@@ -165,7 +163,6 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_print_string =  (strPtr: ptr) => links.SKIP_print_string(strPtr);
     toWasm.SKIP_etry =  (f: ptr, exn_handler: ptr) => links.SKIP_etry(f, exn_handler);
     toWasm.SKIP_delete_external_exception = (actor: int) => links.SKIP_delete_external_exception(actor);
-    toWasm.SKIP_get_external_exception_message = (actor: int) => links.SKIP_get_external_exception_message(actor);
     toWasm.SKIP_js_get_argc = () => links.SKIP_js_get_argc();
     toWasm.SKIP_js_get_argn = (index: int) => links.SKIP_js_get_argn(index);
     toWasm.SKIP_js_get_envc = () => links.SKIP_js_get_envc();
@@ -213,7 +210,6 @@ interface ToWasm {
   SKIP_print_string: (strPtr: ptr) => void;
   SKIP_etry: (f: ptr, exn_handler: ptr) => ptr;
   SKIP_delete_external_exception: (actor: int) => void;
-  SKIP_get_external_exception_message: (actor: int) => ptr;
   SKIP_js_get_argc: () => int;
   SKIP_js_get_argn: (index: int) => ptr;
   SKIP_js_get_envc: () => int;

@@ -1,6 +1,6 @@
 
 import { Environment, FileSystem} from "#std/sk_types";
-import { SkdbMechanism, SKDB, Server, SKDBCallable, SkdbTracked, SkdbHandle, Params} from "#skdb/skdb_types";
+import { SkdbMechanism, SKDB, Server, SKDBCallable, SkdbHandle, Params} from "#skdb/skdb_types";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
@@ -17,7 +17,7 @@ class SkdbMechanismImpl implements SkdbMechanism {
 
   constructor(client: SKDBImpl, fs: FileSystem, utf8Encode: (v: string) => Uint8Array) {
     this.tableExists = (tableName: string) => client.tableExists(tableName);
-    this.sql = (query: string) => client.sql(query);
+    this.sql = (query: string) => client.exec(query);
     this.assertCanBeMirrored = (tableName: string) => client.assertCanBeMirrored(tableName);
     this.watermark = (replicationId: string, table: string) => {
       return BigInt(client.runLocal(["watermark", "--source", replicationId, table], ""));
@@ -72,15 +72,9 @@ export class SKDBImpl implements SKDB {
   private clientUuid: string = "";
   private fs: FileSystem;
 
-  registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>;
-  addRoot: <T1, T2>(rootName: string, callable: (obj: T1) => T2 | SKDBCallable<T1, T2>, arg: T1) => void;
-  removeRoot: (rootName: string) => void;
-  getRoot: (rootName: string) => any;
-  trackedCall: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => T2;
-  trackedQuery: (request: string, params: Params, start?: number, end?: number) => any;
-  onRootChange: (f: (rootName: string) => void) => void;
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => void }>
   
   private runner: (fn: () => string) => Promise<Array<any>>;
 
@@ -93,7 +87,6 @@ export class SKDBImpl implements SKDB {
 
   static async create(
     handle: SkdbHandle,
-    tracked: SkdbTracked,
     env: Environment,
     save: () => Promise<boolean> 
   ): Promise<SKDB> {
@@ -101,17 +94,10 @@ export class SKDBImpl implements SKDB {
     client.save = save;
     client.runLocal = handle.main;
     client.clientUuid = env.crypto().randomUUID();
-    client.onRootChange =  (f: (rootName: string) => void) => {
-      tracked.addRootChangeListener(f);
-    };
-    client.addRoot = <T1, T2>(rootName: string, callable: (obj: T1) => T2 | SKDBCallable<T1, T2>, arg: T1) => tracked.addRoot(rootName, callable, arg);
-    client.removeRoot = (rootName) => tracked.removeRoot(rootName);
-    client.getRoot = (rootName) => tracked.getRoot(rootName);
-    client.trackedCall = <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => tracked.trackedCall(callable, arg);
-    client.trackedQuery = (request: string, params: Params = new Map(), start?: number, end?: number) => tracked.trackedQuery(request, params, start, end);
     client.runner = handle.runner;
-    client.registerFun = <T1, T2>(f: (obj: T1) => T2) => tracked.registerFun(f);
-    client.runSubscribeRoots(tracked);
+    client.watch = (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
+      return Promise.resolve(handle.watch(query, params, onChange))
+    };
     return client;
   }
 
@@ -149,10 +135,6 @@ export class SKDBImpl implements SKDB {
     return BigInt(this.runLocal(["watermark", "--source", replicationId, table], ""));
   }
 
-  cmd(new_args: Array<string>, new_stdin: string): Promise<string> {
-    return Promise.resolve(this.runLocal(new_args, new_stdin));
-  }
-
   subscribe = async (viewName: string, f: (change: string) => void) => {
     const fileName = "/subscriptions/sub" + this.subscriptionCount;
     this.fs.watchFile(fileName, f);
@@ -176,16 +158,7 @@ export class SKDBImpl implements SKDB {
     return [args1, stdin1];
   }
 
-  sqlRaw = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
-    if (server) {
-      return await this.server!.sqlRaw(stdin, params);
-    } else {
-      let [args1, stdin1] = this.addParams([], params, stdin);
-      return this.runLocal(args1, stdin1);
-    }
-  }
-
-  sql = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
+  exec = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
     if (server) {
       return await this.server!.sql(stdin, params);
     } else {
@@ -195,6 +168,8 @@ export class SKDBImpl implements SKDB {
       });
     }
   }
+
+  
 
   tableExists = async (tableName: string) => {
     return this.runLocal(["dump-table", tableName], "").trim() != "";
@@ -256,34 +231,4 @@ export class SKDBImpl implements SKDB {
   createServerUser = () => this.server!.createUser();
   mirror = (tableName: string, filterExpr?: string) => this.server!.mirror(tableName, filterExpr);
   serverClose = () => Promise.resolve(this.server!.close());
-
-  private runSubscribeRoots(tracked: SkdbTracked): void {
-    let fileName = "/subscriptions/jsroots";
-    this.fs.watchFile(fileName, (text) => {
-      let changed = new Map();
-      let updates = text.split("\n").filter((x) => x.indexOf("\t") != -1);
-      for (const update of updates) {
-        if (update.substring(0, 1) !== "0") continue;
-        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        tracked.removeSubscribedRoot(json.name);
-        changed.set(json.name, true);
-      }
-      for (const update of updates) {
-        if (update.substring(0, 1) === "0") continue;
-        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        tracked.addSubscribedRoot(json.name, JSON.parse(json.value));
-        changed.set(json.name, true);
-      }
-      for (const f of tracked.getRootChangeListeners()) {
-        for (const name of changed.keys()) {
-          f(name);
-        }
-      }
-    });
-    this.subscriptionCount++;
-    this.runLocal(
-      ["subscribe", "jsroots", "--format=json", "--updates", fileName],
-      ""
-    );
-  }
 }

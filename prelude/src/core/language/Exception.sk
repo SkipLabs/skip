@@ -87,19 +87,18 @@ fun call0(f: () -> void): void {
 @cpp_runtime("SKIP_saveExn")
 native fun saveExn(exn: Exception): void;
 
-class ExternalException(private eptr: SKStore.ExternalPointer) extends Exception {
+class ExternalException(
+  private eptr: SKStore.ExternalPointer,
+) extends Exception {
   //
   static fun make(id: UInt32): this {
     static(SKStore.ExternalPointer::create(id, deleteExternalException))
   }
 
   fun getMessage(): String {
-    getExternalExceptionMessage(this.eptr.value)
+    `external:${this.eptr.value}`
   }
 }
-
-@cpp_extern("SKIP_get_external_exception_message")
-native fun getExternalExceptionMessage(actor: UInt32): String;
 
 @cpp_extern("SKIP_delete_external_exception")
 native fun deleteExternalException(actor: UInt32): void;

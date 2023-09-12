@@ -1,33 +1,20 @@
 import { Shared } from "#std/sk_types";
 
-export interface SkdbTracked {
-  addRoot: <T1, T2>(rootName: string, callable: (obj: T1) => T2 | SKDBCallable<T1, T2>, arg: T1) => void;
-  removeRoot: (rootName: string) => void;
-  getRoot: (rootName: string) => any;
-  trackedCall: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1) => T2;
-  trackedQuery: (request: string, params: Params, start?: number, end?: number) => any;
-  trackAndRegister: <T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1, params: Params, start?: number, end?: number) => SKDBCallable<T1, T2>;
-  registerFun: <T1, T2>(f: (obj: T1) => T2) => SKDBCallable<T1, T2>;
-  addSubscribedRoot: (name: string, value: any) => void;
-  removeSubscribedRoot: (name: string) => void;
-  getRootChangeListeners: () => Array<(rootName: string) => void>;
-  addRootChangeListener: (f: (rootName: string) => void) => void;
-}
+
 
 export interface SkdbHandle {
   runner: (fn: () => string) => Promise<Array<any>>;
   main: (new_args: Array<string>, new_stdin: string) => string;
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
 }
 
 export interface SKDB {
   subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
 
-  sqlRaw: (query: string, params: Params, server?: boolean) => Promise<string>;
-  sql: (query: string, params: Params, server?: boolean) => Promise<Array<any>>;
-  cmd: (new_args: Array<string>, new_stdin: string) => Promise<string>;
-  tableExists: (tableName: string) => Promise<boolean>;
+  exec: (query: string, params: Params, server?: boolean) => Promise<Array<any>>;
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => void }>
+  
   tableSchema: (tableName: string, server?: boolean) => Promise<string>;
-  viewExists: (viewName: string) => Promise<boolean>;
   viewSchema: (viewName: string, server?: boolean) => Promise<string>;
   schema: (server?: boolean) => Promise<string>;
   insert: (tableName: string, values: Array<any>) => Promise<boolean>;
