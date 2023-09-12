@@ -508,4 +508,194 @@ export const tests = [
       );
     }
   },
+  {
+    name: 'Concurrent non-overlapping reactive queries can co-exist',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.exec('CREATE TABLE t2 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      skdb.insert('t2', [13, "9", 42.1]);
+
+      let result1: Array<any> = [];
+      let result2: Array<any> = [];
+
+      let handle1 = skdb.watch('SELECT * FROM t1 where a = @a;', {a: 13}, (changes) => {
+        result1.push(changes);
+      });
+      let handle2 = skdb.watch('SELECT * FROM t2 where a = @a;', {a: 13}, (changes) => {
+        result2.push(changes);
+      });
+
+      skdb.exec("update t1 set b = 'foo';");
+      skdb.exec("update t2 set b = 'bar';");
+
+      handle1.close();
+      handle2.close();
+
+      return [result1, result2];
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            [
+              {"a": 13, "b": "9", "c": 42.1}
+            ],
+            [
+              {"a": 13, "b": "foo", "c": 42.1}
+            ],
+            // TODO: extra because of update
+            [
+              {"a": 13, "b": "foo", "c": 42.1}
+            ]
+          ],
+          [
+            [
+              {"a": 13, "b": "9", "c": 42.1}
+            ],
+            [
+              {"a": 13, "b": "bar", "c": 42.1}
+            ],
+            // TODO: extra because of update
+            [
+              {"a": 13, "b": "bar", "c": 42.1}
+            ]
+          ]
+        ]
+      );
+    }
+  },
+  {
+    name: 'Concurrent non-overlapping (same table) reactive queries can co-exist',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      skdb.insert('t1', [15, "9", 42.1]);
+
+      let result1: Array<any> = [];
+      let result2: Array<any> = [];
+
+      let handle1 = skdb.watch('SELECT * FROM t1 where a < @a;', {a: 15}, (changes) => {
+        result1.push(changes);
+      });
+      let handle2 = skdb.watch('SELECT * FROM t1 where a > @a;', {a: 13}, (changes) => {
+        result2.push(changes);
+      });
+
+      skdb.exec("update t1 set b = 'foo';");
+
+      handle1.close();
+      handle2.close();
+
+      return [result1, result2];
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            [
+              {"a": 13, "b": "9", "c": 42.1},
+            ],
+            [
+              {"a": 13, "b": "foo", "c": 42.1},
+            ],
+            // TODO: extra because of update
+            [
+              {"a": 13, "b": "foo", "c": 42.1},
+            ],
+          ],
+          [
+            [
+              {"a": 15, "b": "9", "c": 42.1},
+            ],
+            [
+              {"a": 15, "b": "foo", "c": 42.1},
+            ],
+            // TODO: extra because of update
+            [
+              {"a": 15, "b": "foo", "c": 42.1},
+            ],
+          ]
+        ]
+      );
+    }
+  },
+  {
+    name: 'Concurrent overlapping reactive queries can co-exist',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      skdb.insert('t1', [14, "9", 42.1]);
+      skdb.insert('t1', [15, "9", 42.1]);
+
+      let result1: Array<any> = [];
+      let result2: Array<any> = [];
+
+      let handle1 = skdb.watch('SELECT * FROM t1 where a < @a;', {a: 15}, (changes) => {
+        result1.push(changes);
+      });
+      let handle2 = skdb.watch('SELECT * FROM t1 where a > @a;', {a: 13}, (changes) => {
+        result2.push(changes);
+      });
+
+      skdb.exec("update t1 set b = 'foo';");
+
+      handle1.close();
+      handle2.close();
+
+      return [result1, result2];
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            [
+              {"a": 13, "b": "9", "c": 42.1},
+              {"a": 14, "b": "9", "c": 42.1}
+            ],
+            [
+              {"a": 13, "b": "foo", "c": 42.1},
+              {"a": 14, "b": "foo", "c": 42.1}
+            ],
+            // TODO: extra because of update
+            [
+              {"a": 13, "b": "foo", "c": 42.1},
+              {"a": 14, "b": "foo", "c": 42.1}
+            ],
+            [
+              {"a": 13, "b": "foo", "c": 42.1},
+              {"a": 14, "b": "foo", "c": 42.1}
+            ],
+            [
+              {"a": 13, "b": "foo", "c": 42.1},
+              {"a": 14, "b": "foo", "c": 42.1}
+            ],
+          ],
+          [
+            [
+              {"a": 14, "b": "9", "c": 42.1},
+              {"a": 15, "b": "9", "c": 42.1},
+            ],
+            [
+              {"a": 14, "b": "foo", "c": 42.1},
+              {"a": 15, "b": "foo", "c": 42.1},
+            ],
+            // TODO: extra because of update
+            [
+              {"a": 14, "b": "foo", "c": 42.1},
+              {"a": 15, "b": "foo", "c": 42.1},
+            ],
+            [
+              {"a": 14, "b": "foo", "c": 42.1},
+              {"a": 15, "b": "foo", "c": 42.1},
+            ],
+            [
+              {"a": 14, "b": "foo", "c": 42.1},
+              {"a": 15, "b": "foo", "c": 42.1},
+            ],
+          ]
+        ]
+      );
+    }
+  },
 ];
