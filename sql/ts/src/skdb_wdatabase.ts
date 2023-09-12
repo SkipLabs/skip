@@ -10,74 +10,62 @@ export class SKDBWorker implements SKDB {
   }
 
   create = async (dbName ?: string): Promise<void> => {
-    await this.worker.post(new Function("create", [dbName]));
+    return this.worker.post(new Function("create", [dbName]));
   }
 
   onRootChange = async (f: (rootName: string) => void) => {
-    await this.worker.subscribe(new Function("onRootChange", []), f);
+    return this.worker.subscribe(new Function("onRootChange", []), f);
   };
   
   subscribe = async (viewName: string, f: (change: string) => void) => {
-    await this.worker.subscribe(new Function("subscribe", [viewName]), f);
+    return this.worker.subscribe(new Function("subscribe", [viewName]), f);
   };
 
-  sqlRaw = async (query: string, params: Params = new Map(), server: boolean = false) => {
-    return await this.worker.post(new Function("sqlRaw", [query, params, server])) as string;
-  };
-
-  sql = async (query: string, params: Params = new Map(), server: boolean = false) => {
-    return await this.worker.post(new Function("sql", [query, params, server])) as Array<any>;
+  exec = async (query: string, params: Params = new Map(), server: boolean = false) => {
+    return this.worker.post(new Function("exec", [query, params, server])) as Promise<Array<any>>;
   }
 
-  cmd = async (new_args: Array<string>, new_stdin: string) => {
-    return await this.worker.post(new Function("cmd", [new_args, new_stdin])) as string;
-  };
-
-  tableExists = async (tableName: string) => {
-    return await this.worker.post(new Function("tableExists", [tableName])) as boolean;
-  };
+  watch = (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
+    return Promise.reject("TODO");
+  }
 
   tableSchema = async(tableName: string, server: boolean = false) => {
-    return await this.worker.post(new Function("tableSchema", [tableName, server])) as string;
-  };
-
-  viewExists = async (viewName: string) => {
-    return await this.worker.post(new Function("viewExists", [viewName])) as boolean;
+    return this.worker.post(new Function("tableSchema", [tableName, server])) as Promise<string>;
   };
 
   viewSchema = async(viewName: string, server: boolean = false) => {
-    return await this.worker.post(new Function("viewSchema", [viewName, server])) as string;
+    return this.worker.post(new Function("viewSchema", [viewName, server])) as Promise<string>;
   };
 
   schema = async(server: boolean = false) => {
-    return await this.worker.post(new Function("schema", [server])) as string;
+    return this.worker.post(new Function("schema", [server])) as Promise<string>;
   };
 
   insert = async (tableName: string, values: Array<any>) => {
-    return await this.worker.post(new Function("insert", [tableName, values])) as boolean;
+    return this.worker.post(new Function("insert", [tableName, values])) as Promise<boolean>;
   };
 
   save = async () => {
-    return await this.worker.post(new Function("save", [])) as boolean;
+    return this.worker.post(new Function("save", [])) as Promise<boolean>;
   }
 
   createServerDatabase = async (dbName: string) => {
-    return await this.worker.post(new Function("createServerDatabase", [dbName])) as ProtoResponseCreds;
+    return this.worker.post(new Function("createServerDatabase", [dbName])) as Promise<ProtoResponseCreds>;
   }
 
   createServerUser = async () => {
-    return await this.worker.post(new Function("createServerUser", [])) as ProtoResponseCreds;
+    return this.worker.post(new Function("createServerUser", [])) as Promise<ProtoResponseCreds>;
   }
 
   mirror = async (tableName: string, filterExpr?: string) => {
-    return await this.worker.post(new Function("mirror", [tableName, filterExpr]));
+    return this.worker.post(new Function("mirror", [tableName, filterExpr]));
   }
 
   serverClose = async ()  => {
-    return await this.worker.post(new Function("serverClose", []));
+    return this.worker.post(new Function("serverClose", []));
   }
 
   connect = async (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => {
-    return await this.worker.post(new Function("connect", [db, accessKey, privateKey, endpoint]));
+    return this.worker.post(new Function("connect", [db, accessKey, privateKey, endpoint]));
   }
 }

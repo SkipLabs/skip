@@ -198,7 +198,8 @@ export class Utils {
   private mainFn ?: string;
   
   exit = (code: int) => {
-    throw new SkRuntimeExit(code);
+    let message = (code != 0 && this.stderr.length > 0) ? this.stderr.join("") : undefined;
+    throw new SkRuntimeExit(code, message);
   };
 
   constructor(
@@ -241,6 +242,18 @@ export class Utils {
     this.stddebug = new Array();
   }
 
+  runCheckError = <T>(fn: () => T) => {
+    this.clearMainEnvironment();
+    let res = fn();
+    if (this.stddebug.length > 0) {
+      console.log(this.stddebug.join(""));
+    }
+    if (this.stderr.length > 0) {
+      throw new Error(this.stderr.join(""))
+    }
+    return res;
+  }
+
   main = (new_args: Array<string>, new_stdin: string) => {
     let exitCode = 0;
     this.clearMainEnvironment(new_args, new_stdin);
@@ -262,7 +275,17 @@ export class Utils {
     }
     if (exitCode != 0 || this.stderr.length > 0) {
       let message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
-      throw new SkRuntimeExit(exitCode, message);
+      message = message?.split("\n").map(line => {
+        if (line.startsWith("external:")) {
+          let id = parseInt(line.substring(9));
+          if (this.state.exceptions.has(id)) {
+            return this.state.exceptions.get(id)!.err;
+          } else {
+            return "Unknown";
+          }
+        }
+      }).join("\n");
+      throw new SkRuntimeExit(exitCode, message?.trim());
     }
     return this.stdout.join("");
   }
@@ -366,7 +389,6 @@ export class Utils {
     try {
       return this.call(f);
     } catch (exn) {
-      //console.error(JSON.stringify(["Catched", exn]));
       let exception = (exn instanceof SkException) ? null : new Exception(exn, this.state);
       return this.callWithException(exn_handler, exception);
     }
@@ -375,19 +397,18 @@ export class Utils {
     if (this.env && this.env.onException) this.env.onException();
     let skMessage = skExc != null && skExc != 0 ? this.exports.SKIP_getExceptionMessage(skExc) : null;
     let message = skMessage != null && skMessage != 0 ? this.importString(skMessage) : "SKFS Internal error";
+    if (message.startsWith("external:")) {
+      let id = parseInt(message.substring(9));
+      if (this.state.exceptions.has(id)) {
+        throw this.state.exceptions.get(id);
+      } else {
+        message = "SKFS Internal error";
+      }
+    }
     throw new SkException(message);
   }
   deleteException = (actor: int) => {
     this.state.exceptions.delete(actor);
-  }
-  getExceptionMessage = (actor: int) => {
-    let msg : string;
-    if (this.state.exceptions.has(actor)) {
-      msg = this.state.exceptions.get(actor)!.err.message;
-    } else {
-      msg = "No message supplied"
-    }
-    return this.exportString(msg);
   }
   getPersistentSize = () => this.exports.SKIP_get_persistent_size();
   getVersion = () => this.exports.SKIP_get_version();

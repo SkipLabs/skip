@@ -502,15 +502,6 @@ export class SKDB {
       SKIP_delete_external_exception: function (exc: number) {
         exceptions.delete(exc);
       },
-      SKIP_get_external_exception_message: function (exc: number) {
-        let msg : string;
-        if (exceptions.has(exc)) {
-          msg = exceptions.get(exc)!.message;
-        } else {
-          msg = "No message supplied"
-        }
-        return encodeUTF8(data.exports,msg);
-      },
       SKIP_js_open_flags: function(read: boolean, write: boolean, append: boolean, truncate: boolean, create: boolean, create_new: boolean) {
         return 0;
       },
