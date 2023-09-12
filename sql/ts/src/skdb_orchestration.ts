@@ -1496,6 +1496,10 @@ class SKDBServer implements Server {
   }
 
   async sqlRaw(stdin: string, params: Params = new Map()): Promise<string> {
+    if (params instanceof Map) {
+      params = Object.fromEntries(params);
+    }
+    stdin = JSON.stringify(params) + '\n' + stdin;
     return this.makeStringRequest({
       type: "query",
       query: stdin,
@@ -1504,7 +1508,10 @@ class SKDBServer implements Server {
   }
 
   async sql(stdin: string, params: Params = new Map()): Promise<any[]> {
-    // TODO manage params
+    if (params instanceof Map) {
+      params = Object.fromEntries(params);
+    }
+    stdin = JSON.stringify(params) + '\n' + stdin;
     return this.makeStringRequest({
       type: "query",
       query: stdin,
