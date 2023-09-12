@@ -70,8 +70,11 @@ class Skdb(val name: String, private val dbPath: String) {
     blockingRun(ProcessBuilder(ENV.skdbPath, "--init", dbPath))
   }
 
-  fun sql(stmts: String, format: OutputFormat): ProcessOutput {
-    return blockingRun(ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag), stmts)
+  fun sql(stmts: String, format: OutputFormat, expectQueryParams: Boolean = false): ProcessOutput {
+    val pb = if (expectQueryParams)
+      ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag, "--expect-query-params")
+    else ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag)
+    return blockingRun(pb, stmts)
   }
 
   fun sql(stmts: String, params: Map<String, Any?>, format: OutputFormat): ProcessOutput {

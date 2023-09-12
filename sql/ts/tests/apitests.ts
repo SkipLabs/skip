@@ -57,11 +57,24 @@ async function testQueriesAgainstTheServer(skdb: TSKDB) {
   const tableInsert = await skdb.exec("INSERT INTO test_pk VALUES (42,21);", {}, true);
   expect(tableInsert).toEqual([]);
 
+  const tableInsertWithParam = await skdb.exec(
+    "INSERT INTO test_pk VALUES (@x,@y);",
+    new Map().set("x", 43).set("y", 22),
+    true
+  );
+  expect(tableInsertWithParam).toEqual([]);
+  const tableInsertWithOParam = await skdb.exec(
+    "INSERT INTO test_pk VALUES (@x,@y);",
+    { "x": 44, "y": 23 },
+    true
+  );
+  expect(tableInsertWithOParam).toEqual([]);
+
   const tableSelect = await skdb.exec("SELECT * FROM test_pk;", {}, true);
-  expect(tableSelect).toEqual([{ x: 42, y: 21 }]);
+  expect(tableSelect).toEqual([{ x: 42, y: 21 }, { x: 43, y: 22 }, { x: 44, y: 23 }]);
 
   const viewSelect = await skdb.exec("SELECT * FROM view_pk;", {}, true);
-  expect(viewSelect).toEqual([{ x: 42, y: 63 }]);
+  expect(viewSelect).toEqual([{ x: 42, y: 63 }, { x: 43, y: 66 }, { x: 44, y: 69 }]);
 
   try {
     await skdb.exec("bad query", {}, true);
@@ -70,9 +83,9 @@ async function testQueriesAgainstTheServer(skdb: TSKDB) {
     expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
   }
 
-  const rows = await skdb.exec("SELECT * FROM test_pk;", {}, true);
+  const rows = await skdb.exec("SELECT * FROM test_pk WHERE x=@x;", { x: 42 }, true);
   expect(rows).toEqual([{ x: 42, y: 21 }]);
-
+  await skdb.exec("delete from test_pk where x in (43,44);", {}, true)
   try {
     await skdb.exec("bad query", {}, true);
   } catch (error) {
