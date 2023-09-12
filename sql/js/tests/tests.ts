@@ -225,10 +225,6 @@ export const tests = [
           [
             {"a": 13, "b": "foo", "c": 42.1},
           ],
-          // TODO: getting an extra callback
-          [
-            {"a": 13, "b": "foo", "c": 42.1},
-          ],
         ]
       );
     }
@@ -258,6 +254,42 @@ export const tests = [
           [
             {"a": 14, "b": "9", "c": 42.1}
           ]
+        ]
+      );
+    }
+  },
+  {
+    name: 'Test reactive query is not n^2',
+    fun: (skdb: SKDB) => {
+      skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+      skdb.insert('t1', [13, "9", 42.1]);
+      skdb.insert('t1', [14, "9", 42.1]);
+      skdb.insert('t1', [15, "9", 42.1]);
+      skdb.insert('t1', [16, "9", 42.1]);
+      let result: Array<any> = [];
+      let handle = skdb.watch('SELECT * FROM t1 WHERE a > 13;', {}, (changes) => {
+        result.push(changes);
+      });
+      // update all 4 rows. we're checking this doesn't result in 16
+      // objects built in js.
+      skdb.exec("update t1 set b = 'foo';")
+      handle.close();
+      skdb.exec("update t1 set b = 'bar';")
+      return result;
+    },
+    check: res => {
+      expect(res).toEqual(
+        [
+          [
+            {"a": 14, "b": "9", "c": 42.1},
+            {"a": 15, "b": "9", "c": 42.1},
+            {"a": 16, "b": "9", "c": 42.1},
+          ],
+          [
+            {"a": 14, "b": "foo", "c": 42.1},
+            {"a": 15, "b": "foo", "c": 42.1},
+            {"a": 16, "b": "foo", "c": 42.1},
+          ],
         ]
       );
     }
@@ -312,10 +344,6 @@ export const tests = [
           [
             {"a": 13, "b": "foo", "c": 42.1},
           ],
-          // TODO: extra because of update
-          [
-            {"a": 13, "b": "foo", "c": 42.1},
-          ]
         ]
       );
     }
@@ -378,8 +406,6 @@ export const tests = [
         [
           [{completed: 0, n: 2}, {completed: 1, n: 1}],
           [{completed: 0, n: 2}, {completed: 1, n: 2}],
-          // TODO: extra because of update
-          [{completed: 0, n: 2}, {completed: 1, n: 2}],
         ]
       );
     }
@@ -410,8 +436,6 @@ export const tests = [
       expect(res).toEqual([
         [{w:42}],
         [{w:21}],
-        // TODO: extra because of update
-        [{w:21}]
       ]);
     }
   },
@@ -440,8 +464,6 @@ export const tests = [
     check: res => {
       expect(res).toEqual([
         [{w:42}],
-        [{w:21}],
-        // TODO: extra because of update
         [{w:21}],
       ]);
     }
@@ -544,10 +566,6 @@ export const tests = [
             [
               {"a": 13, "b": "foo", "c": 42.1}
             ],
-            // TODO: extra because of update
-            [
-              {"a": 13, "b": "foo", "c": 42.1}
-            ]
           ],
           [
             [
@@ -556,10 +574,6 @@ export const tests = [
             [
               {"a": 13, "b": "bar", "c": 42.1}
             ],
-            // TODO: extra because of update
-            [
-              {"a": 13, "b": "bar", "c": 42.1}
-            ]
           ]
         ]
       );
@@ -599,19 +613,11 @@ export const tests = [
             [
               {"a": 13, "b": "foo", "c": 42.1},
             ],
-            // TODO: extra because of update
-            [
-              {"a": 13, "b": "foo", "c": 42.1},
-            ],
           ],
           [
             [
               {"a": 15, "b": "9", "c": 42.1},
             ],
-            [
-              {"a": 15, "b": "foo", "c": 42.1},
-            ],
-            // TODO: extra because of update
             [
               {"a": 15, "b": "foo", "c": 42.1},
             ],
@@ -657,37 +663,11 @@ export const tests = [
               {"a": 13, "b": "foo", "c": 42.1},
               {"a": 14, "b": "foo", "c": 42.1}
             ],
-            // TODO: extra because of update
-            [
-              {"a": 13, "b": "foo", "c": 42.1},
-              {"a": 14, "b": "foo", "c": 42.1}
-            ],
-            [
-              {"a": 13, "b": "foo", "c": 42.1},
-              {"a": 14, "b": "foo", "c": 42.1}
-            ],
-            [
-              {"a": 13, "b": "foo", "c": 42.1},
-              {"a": 14, "b": "foo", "c": 42.1}
-            ],
           ],
           [
             [
               {"a": 14, "b": "9", "c": 42.1},
               {"a": 15, "b": "9", "c": 42.1},
-            ],
-            [
-              {"a": 14, "b": "foo", "c": 42.1},
-              {"a": 15, "b": "foo", "c": 42.1},
-            ],
-            // TODO: extra because of update
-            [
-              {"a": 14, "b": "foo", "c": 42.1},
-              {"a": 15, "b": "foo", "c": 42.1},
-            ],
-            [
-              {"a": 14, "b": "foo", "c": 42.1},
-              {"a": 15, "b": "foo", "c": 42.1},
             ],
             [
               {"a": 14, "b": "foo", "c": 42.1},
