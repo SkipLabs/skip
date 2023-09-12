@@ -979,6 +979,13 @@ mutable class Compiler{
     | Binop("LIKE", ge1, ge2) ->
       pattern = ge2 match {
       | VString(str) -> str
+      | VParam(handle) ->
+        this.params.maybeGet(handle) match {
+        | Some(VString(str)) -> str
+        | Some(_) -> error(this.pos, "Expected string parameter: " + handle)
+        | None() -> error(this.pos, "Unbound parameter: " + handle)
+        }
+
       | _ -> error(this.pos, "Invalid LIKE, expected a pattern")
       };
 
