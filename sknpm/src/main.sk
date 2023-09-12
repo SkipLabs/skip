@@ -262,6 +262,11 @@ fun build(): (Cli.Command, Cli.ParseResults ~> void) {
           .about("Build artifacts in release mode, with optimizations"),
       )
       .arg(
+        Cli.StringArg("dry-run").about(
+          "Directory for all generated npm package",
+        ),
+      )
+      .arg(
         Cli.StringArg("html").about(
           "Build minimal html support for specified launcher",
         ),
@@ -278,7 +283,11 @@ fun execBuild(args: Cli.ParseResults, env: Skargo.Env): void {
     Skargo.getProfile(args),
   );
   checkBuild(bc, false);
-  _ = manage(bc, Package::create(env.manifest));
+  _ = manage(
+    bc,
+    Package::create(env.manifest),
+    args.maybeGetString("dry-run"),
+  );
   args.maybeGetString("html") match {
   | Some(launcher) ->
     writeIndex(bc.targetDir, launcher);
@@ -440,8 +449,12 @@ fun manage(
   package: Package,
   optTarget: ?String = None(),
   optBinName: ?String = None(),
+  clean: Bool = false,
 ): String {
   npmDir = optTarget.default(Path.join(bc.targetDir, "npm"));
+  if (clean && FileSystem.exists(npmDir)) {
+    Skargo.run(Array["rm", "-rf", Path.join(npmDir, "*")], bc.env.verbose);
+  };
   tsDir = Path.join(bc.targetDir, "ts");
   _ = system("mkdir -p " + tsDir);
   dependencies = mutable Vector[];
@@ -1051,6 +1064,11 @@ fun runner(): (Cli.Command, Cli.ParseResults ~> void) {
       )
       .arg(Cli.StringArg("bin").about("Run the specified binary"))
       .arg(Cli.StringArg("path").about("Path of the package to run"))
+      .arg(
+        Cli.StringArg("dry-run").about(
+          "Directory for all generated npm package",
+        ),
+      )
       .extra(),
     execRun,
   )
@@ -1073,7 +1091,9 @@ fun execRun(args: Cli.ParseResults): void {
     args.maybeGetString("target-dir"),
     Skargo.getProfile(args),
   );
-  npmDir = Path.join(bc.targetDir, "npm");
+  npmDir = args
+    .maybeGetString("dry-run")
+    .default(Path.join(bc.targetDir, "npm"));
   cmdArgs = Array["npm", "--prefix", npmDir, "run"].concat(args.extra);
   if (env.verbose) {
     // TODO: colors
@@ -1107,6 +1127,11 @@ fun publish(): (Cli.Command, Cli.ParseResults ~> void) {
       .arg(Cli.StringArg("bin").about("Publish for specified binary"))
       .arg(Cli.StringArg("npmVersion").about("Publish with specified version"))
       .arg(Cli.BoolArg("force").short("f").about("Do not check version"))
+      .arg(
+        Cli.StringArg("dry-run").about(
+          "Directory for all generated npm package",
+        ),
+      )
       .extra(),
     args ~> Skargo.envCmd(args, execPublish),
   )
@@ -1151,8 +1176,15 @@ fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
     Array["skargo", "build", "--target", "wasm32", "--profile", bc.profile],
     bc.env.verbose,
   );
-  npmDir = manage(bc, Package::create(env.manifest));
+  userNpmDir = args.maybeGetString("dry-run");
+  npmDir = manage(bc, Package::create(env.manifest), userNpmDir, None(), true);
   Environ.set_current_dir(npmDir);
+  if (userNpmDir.isSome()) {
+    udiff = run(Array["git", "diff"], env.verbose);
+    if (!udiff.isEmpty()) {
+      throw GitDiffException()
+    }
+  };
   cmdArgs = version.tag match {
   | Some(tag) -> args.extra.concat(Array["--tag", tag.toString()])
   | _ -> args.extra
