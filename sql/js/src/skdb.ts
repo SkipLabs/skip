@@ -22,22 +22,16 @@ interface WasmExports {
   SKIP_Obstack_alloc: (size: number) => number;
   sk_string_create: (addr: number, size: number) => number;
   SKIP_throw_EndOfFile: () => void;
-  SKIP_add_root: (
-    rootNameWasmStr: number,
-    funId: number,
-    funArg: number
-  ) => void;
-  SKIP_remove_root: (rootNameWasmStr: number) => void;
   SKIP_skfs_init: (size: number) => void;
   SKIP_initializeSkip: () => void;
   SKIP_skfs_end_of_init: () => void;
-  SKIP_init_jsroots: () => void;
   SKIP_call0: (f: () => void) => void;
   SKIP_get_persistent_size: () => number;
   sk_pop_dirty_page: () => number;
   SKIP_get_version: () => number;
-  SKIP_tracked_call: (funId: number, funArg: number) => number;
-  SKIP_tracked_query: (request: number, encoded_params: number, start: number, end: number) => number;
+  SKIP_reactive_query: (queryID: number, query: number, encoded_params: number) => void;
+  SKIP_delete_reactive_query: (queryID: number) => void;
+  SKIP_js_notify_user: (notify: number) => void;
   skip_main: () => void;
   getVersion: () => number;
   __heap_base: any;
@@ -227,22 +221,6 @@ function stringify(obj: any): string {
 }
 
 /* ***************************************************************************/
-/* The type used to represent callables. */
-/* ***************************************************************************/
-
-class SKDBCallable<T1, T2> {
-  private id: number;
-
-  constructor(id: number) {
-    this.id = id;
-  }
-
-  getId(): number {
-    return this.id;
-  }
-}
-
-/* ***************************************************************************/
 /* The local database. */
 /* ***************************************************************************/
 
@@ -256,9 +234,12 @@ export class SKDB {
   private current_stdin: number = 0;
   private stdin: string = "";
   private stdout: Array<string> = new Array();
+  private queryID: number = 0;
+  private userFuns: Array<() => void> = new Array();
+  private freeQueryIDs: Array<number> = new Array();
+  private queriesToNotify: Map<number, number> = new Map();
+  private stderr: Array<string> = new Array();
   private stdout_objects: Array<any> = new Array();
-  private onRootChangeFuns: Array<(rootName: string) => void> = new Array();
-  private externalFuns: Array<(any) => any> = [];
   private fileDescrs: Map<string, number> = new Map();
   private fileDescrNbr: number = 2;
   private files: Array<Array<String>> = new Array();
@@ -267,7 +248,6 @@ export class SKDB {
   private lineBuffer: Array<number> = [];
   private storeName: string | null;
   private nbrInitPages: number = -1;
-  private roots: Map<string, number> = new Map();
   private pageSize: number = -1;
   private db: IDBDatabase | null = null;
   private dirtyPagesMap: Array<number> = [];
@@ -326,11 +306,10 @@ export class SKDB {
       );
     }
 
-    client.exports.SKIP_init_jsroots();
-    client.runSubscribeRoots();
-
     client.clientUuid = crypto.randomUUID();
     client.version = wasmStringToJS(exports, exports.getVersion());
+
+    client.runLocal([],'');     // HACK: has the side effect of creating the gcontext
 
     return client;
   }
@@ -394,7 +373,7 @@ export class SKDB {
         throw ptr;
       },
       SKIP_throw_cruntime: function(code) {
-        throw new Error(code); 
+        throw new Error(code);
       },
       SKIP_print_backtrace: function () {
         console.trace("");
@@ -409,21 +388,11 @@ export class SKDB {
       __setErrNo: function (err) {
         throw new Error("ErrNo " + err);
       },
-      SKIP_call_external_fun: function (funId, str) {
-        return encodeUTF8(
-          data.exports,
-          stringify(
-            data.externalFuns[funId]!(
-              JSON.parse(wasmStringToJS(data.exports, str))
-            )
-          )
-        );
-      },
       SKIP_print_error: function (str) {
-        console.error(wasmStringToJS(data.exports, str));
+        data.stderr.push(wasmStringToJS(data.exports, str));
       },
       SKIP_print_error_raw: function (str) {
-        console.error(wasmStringToJS(data.exports, str));
+        data.stderr.push(wasmStringToJS(data.exports, str));
       },
       SKIP_print_debug: function (str) {
         console.error(wasmStringToJS(data.exports, str));
@@ -544,20 +513,14 @@ export class SKDB {
       },
       SKIP_js_open_flags: function(read: boolean, write: boolean, append: boolean, truncate: boolean, create: boolean, create_new: boolean) {
         return 0;
+      },
+      SKIP_js_user_fun: function (queryID) {
+        data.userFuns[queryID]!()
+      },
+      SKIP_js_mark_query: function(queryID: number, notify: number) {
+        data.queriesToNotify.set(queryID, notify);
       }
     };
-  }
-
-  private runAddRoot(rootName: string, funId: number, arg: any): void {
-    this.args = [];
-    this.stdin = "";
-    this.stdout = new Array();
-    this.current_stdin = 0;
-    this.exports.SKIP_add_root(
-      encodeUTF8(this.exports, rootName),
-      funId,
-      encodeUTF8(this.exports, stringify(arg))
-    );
   }
 
   private async copyPage(start: number, end: number): Promise<ArrayBuffer> {
@@ -627,47 +590,33 @@ export class SKDB {
     await this.storePages();
   }
 
+  notifyAllJS(): void {
+    this.queriesToNotify.forEach((value, key, map) => {
+      this.exports.SKIP_js_notify_user(value);
+    });
+    this.queriesToNotify = new Map();
+    if(this.stderr.length != 0) {
+      throw new Error(this.stderr.join(""));
+    }
+  }
+
   runLocal(new_args: Array<string>, new_stdin: string): string {
     console.assert(this.nbrInitPages >= 0);
     this.args = ["skdb"].concat(new_args);
     this.stdin = new_stdin;
     this.stdout = new Array();
+    this.stdout_objects = new Array();
+    this.stderr = new Array();
     this.current_stdin = 0;
-
     this.exports.skip_main();
 
-    return this.stdout.join("");
-  }
+    if(this.stderr.length != 0) {
+      throw new Error(this.stderr.join(""));
+    }
 
-  runSubscribeRoots(): void {
-    this.roots = new Map();
-    let fileName = "/subscriptions/jsroots";
-    this.watchFile(fileName, (text) => {
-      let changed = new Map();
-      let updates = text.split("\n").filter((x) => x.indexOf("\t") != -1);
-      for (const update of updates) {
-        if (update.substring(0, 1) !== "0") continue;
-        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        this.roots.delete(json.name);
-        changed.set(json.name, true);
-      }
-      for (const update of updates) {
-        if (update.substring(0, 1) === "0") continue;
-        let json = JSON.parse(update.substring(update.indexOf("\t") + 1));
-        this.roots.set(json.name, JSON.parse(json.value));
-        changed.set(json.name, true);
-      }
-      for (const f of this.onRootChangeFuns) {
-        for (const name of changed.keys()) {
-          f(name);
-        }
-      }
-    });
-    this.subscriptionCount++;
-    this.runLocal(
-      ["subscribe", "jsroots", "--format=json", "--updates", fileName],
-      ""
-    );
+    this.notifyAllJS();
+
+    return this.stdout.join("");
   }
 
   watermark(replicationId: string, table: string): bigint {
@@ -676,61 +625,6 @@ export class SKDB {
 
   cmd(new_args: Array<string>, new_stdin: string): string {
     return this.runLocal(new_args, new_stdin);
-  }
-
-  registerFun<T1, T2>(f: (obj: T1) => T2): SKDBCallable<T1, T2> {
-    let funId = this.externalFuns.length;
-    this.externalFuns.push(f);
-    return new SKDBCallable(funId);
-  }
-
-  trackedCall<T1, T2>(callable: SKDBCallable<T1, T2>, arg: T1): T2 {
-    let result = this.exports.SKIP_tracked_call(
-      callable.getId(),
-      encodeUTF8(this.exports, stringify(arg))
-    );
-    return JSON.parse(wasmStringToJS(this.exports, result));
-  }
-
-  trackedQuery(
-    request: string,
-    params: Map<string, string|number>|Object = new Map(),
-    start: number = 0,
-    end: number = -1
-  ) : any {
-    if (params instanceof Map) {
-      params = Object.fromEntries(params);
-    }
-    let result = this.exports.SKIP_tracked_query(
-      encodeUTF8(this.exports, request),
-      encodeUTF8(this.exports, stringify(params)),
-      start,
-      end
-    );
-    return wasmStringToJS(this.exports, result)
-      .split("\n")
-      .filter((x) => x != "")
-      .map((x) => JSON.parse(x));
-  }
-
-  onRootChange(f: (rootName: string) => void): void {
-    this.onRootChangeFuns.push(f);
-  }
-
-  addRoot<T1, T2>(
-    rootName: string,
-    callable: SKDBCallable<T1, T2>,
-    arg: T1
-  ): void {
-    this.runAddRoot(rootName, callable.getId(), arg);
-  }
-
-  removeRoot(rootName: string): void {
-    this.exports.SKIP_remove_root(encodeUTF8(this.exports, rootName));
-  }
-
-  getRoot(rootName: string): any {
-    return this.roots.get(rootName);
   }
 
   subscribe(viewName: string, f: (change: string) => void): void {
@@ -756,22 +650,64 @@ export class SKDB {
     return [args1, stdin1];
   }
 
-  sqlRaw(stdin: string, params: Map<string, string|number>|Object = new Map())
-    : string {
-    let [args1, stdin1] = this.addParams([], params, stdin);
-    return this.runLocal(args1, stdin1);
+  exec(query: string, params: Map<string, string|number>|Object = new Map())
+    : Array<any> {
+    let [new_args, new_stdin] = this.addParams(["--format=js"], params, query);
+    console.assert(this.nbrInitPages >= 0);
+
+    this.args = ["skdb"].concat(new_args);
+    this.stdin = new_stdin;
+    this.stdout = new Array();
+    this.stdout_objects = new Array();
+    this.stderr = new Array();
+    this.current_stdin = 0;
+    this.exports.skip_main();
+
+    if(this.stderr.length != 0) {
+      throw new Error(this.stderr.join(""));
+    }
+
+    this.notifyAllJS();
+
+    return this.stdout_objects;
   }
 
-  sql(stdin: string, params: Map<string, string|number>|Object = new Map())
-    : Array<any> | string {
-    let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
-    this.stdout_objects = new Array();
-    let stdout = this.runLocal(args1, stdin1);
-    if(stdout == "") {
-      let result = this.stdout_objects;
-      return result;
+  watch(
+    query: string,
+    params: Map<string, string|number>|Object,
+    onChange: (rows: Array<any>) => void,
+  ): { close: () => void } {
+    if (params instanceof Map) {
+      params = Object.fromEntries(params);
     }
-    return stdout;
+    this.stdout_objects = new Array();
+    this.stderr = new Array();
+
+    const queryID = this.freeQueryIDs.pop() || this.queryID++;
+
+    this.userFuns[queryID] = () => {
+      onChange(this.stdout_objects);
+      this.stdout_objects = new Array()
+    }
+
+    this.exports.SKIP_reactive_query(
+      queryID,
+      encodeUTF8(this.exports, query),
+      encodeUTF8(this.exports, stringify(params)),
+    );
+
+    if(this.stderr.length != 0) {
+      throw new Error(this.stderr.join(""))
+    }
+
+    onChange(this.stdout_objects);
+
+    return { close: () => {
+        this.exports.SKIP_delete_reactive_query(queryID);
+        this.userFuns[queryID] = () => {};
+        this.freeQueryIDs.push(queryID);
+      }
+    }
   }
 
   tableExists(tableName: string): boolean {
@@ -2296,7 +2232,7 @@ class SKDBServer {
         this.client.runLocal(["toggle-view", tableName], "");
       }
     }
-    
+
     this.client.assertCanBeMirrored(tableName);
     let session = "@view"
     if (!isViewOnRemote) {
@@ -2307,25 +2243,15 @@ class SKDBServer {
     return this.establishServerTail(tableName, filterExpr || "");
   }
 
-  async sqlRaw(stdin: string): Promise<string> {
+  async exec(query: string): Promise<any[]> {
     let result = await this.makeRequest({
       type: "query",
-      query: stdin,
-      format: "raw",
-    });
-
-    return decodeUTF8(this.strictCastData(result).payload);
-  }
-
-  async sql(stdin: string): Promise<any[]> {
-    let result = await this.makeRequest({
-      type: "query",
-      query: stdin,
+      query: query,
       format: "json",
     });
     return decodeUTF8(this.strictCastData(result).payload)
       .split("\n")
-      .filter((x) => x != "")
+      .filter((x) => x.trim() != "")
       .map((x) => JSON.parse(x));
   }
 

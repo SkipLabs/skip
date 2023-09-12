@@ -988,7 +988,7 @@ fun evalWithContext(
 
 fun makeSqlContext(): mutable SKStore.Context {
   gcontext = mutable SKStore.Context{
-    unsafeReuse => true,
+    canReuse => SKStore.CRAlways(),
     failOnExn => true,
     removeSubDirs => true,
   };
@@ -1448,262 +1448,31 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
 }
 
 /*****************************************************************************/
-/* Primitives storing external functions to be computed in a lazy directory. */
+/* Support for reactive queries. */
 /*****************************************************************************/
 
-@cpp_extern("SKIP_has_local_context")
-native fun hasLocalContext(): Int32;
+// The directory where we keep track of what directories were created
+// for each reactive query. Useful to then later cleanup after ourselves.
 
-@cpp_extern("SKIP_set_local_context")
-native fun setLocalContext(mutable SKStore.Context): void;
-
-@cpp_extern("SKIP_remove_local_context")
-native fun removeLocalContext(): void;
-
-@cpp_extern("SKIP_get_local_context")
-native fun getLocalContext(): mutable SKStore.Context;
-
-@cpp_extern("SKIP_call_external_fun")
-native fun callExternalFun(Int32, String): String;
-
-fun withLocalContext<T>(context: mutable SKStore.Context, f: () -> T): T {
-  if (hasLocalContext() == 0) {
-    setLocalContext(context);
-    result = try {
-      f()
-    } catch {
-    | exn ->
-      removeLocalContext();
-      print_error(exn.getMessage());
-      throw exn
-    };
-    removeLocalContext();
-    result
-  } else {
-    oldContext = getLocalContext();
-    result = try {
-      f()
-    } catch {
-    | exn ->
-      setLocalContext(oldContext);
-      print_error(exn.getMessage());
-      throw exn
-    };
-    setLocalContext(oldContext);
-    result
-  }
-}
-
-class AlreadyDefiningRoot() extends Exception {
-  fun getMessage(): String {
-    "Cannot define a root while already defining a root"
-  }
-}
-
-class JSCall(funId: Int32, funArg: String) extends SKStore.File
-const jsRootsInputDirName: SKStore.DirName = SKStore.DirName::create(
-  "/jsRootsInput/",
-);
-const jsRootsValuesDirName: SKStore.DirName = SKStore.DirName::create(
-  "/jsroots/",
-);
-const jsRootsName: Name = Name::create("jsroots");
-
-@export("SKIP_init_jsroots")
-fun initJSRoots(): void {
-  saved = SKStore.newObstack();
-  try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
-      context.unsafeMaybeGetEagerDir(jsRootsInputDirName) match {
-      | None() -> void
-      | Some(dir) ->
-        dir.onFiles(iter -> {
-          for (kv in iter) {
-            (key, _fileIter) = kv;
-            !dir = dir.writeArrayReturnDir(context, key, Array[]);
-          };
-        });
-        context.setDir(dir.dirName, dir);
-        return SKStore.CStop(None())
-      };
-      context.!globals = SortedMap[];
-      dirDescr = DirDescr::create{
-        name => jsRootsName,
-        schema => Array[
-          TypeDescr{
-            name => Name::create("name"),
-            ty => TEXT(),
-            primary => false,
-            unique => false,
-            default => None(),
-            notNull => true,
-          },
-          TypeDescr{
-            name => Name::create("value"),
-            ty => TEXT(),
-            primary => false,
-            unique => false,
-            default => None(),
-            notNull => true,
-          },
-        ],
-        dirName => jsRootsValuesDirName,
-        alias => None(),
-        isInput => false,
-      };
-      tableDir = getTableDir(context);
-      fileName = SKStore.SID::create("jsroots");
-      tableDir.writeArray(context, fileName, Array[dirDescr]);
-      kinds = dirDescr.schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty));
-      _ = context
-        .mkdir(x ~> x, JSCall::type, jsRootsInputDirName, Array[])
-        .map(
-          x ~> x,
-          RowValues::type,
-          context,
-          jsRootsValuesDirName,
-          (context, writer, baseName, values) ~>
-            withLocalContext(context, () -> {
-              name = baseName match {
-              | SKStore.SID(x) -> x
-              | _ -> invariant_violation("Unexpected key type")
-              };
-              value = values.first;
-              result = callExternalFun(value.funId, value.funArg);
-              row = RowValues::create(
-                Array[Some(CString(name)), Some(CString(result))],
-              );
-              writer.set(RowKey(row, kinds), row);
-            })
-          ,
-        );
-      SKStore.CStop(None());
-    })
-  } catch {
-  | exn ->
-    SKStore.destroyObstack(saved);
-    throw (exn)
-  };
-  SKStore.destroyObstack(saved);
-}
-
-@export("SKIP_add_root")
-fun addRoot(rootName: String, funId: Int32, funArg: String): void {
-  if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
-  saved = SKStore.newObstack();
-  try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
-      context.!globals = SortedMap[];
-      (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
-        context,
-        SKStore.SID(rootName),
-        Array[JSCall(funId, funArg)],
-      );
-      context.update();
-      SKStore.CStop(None())
-    })
-  } catch {
-  | exn ->
-    SKStore.destroyObstack(saved);
-    throw (exn)
-  };
-  SKStore.destroyObstack(saved);
-}
-
-@export("SKIP_remove_root")
-fun removeRoot(rootName: String): void {
-  if (hasLocalContext() != 0) throw AlreadyDefiningRoot();
-  saved = SKStore.newObstack();
-  try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
-      context.!globals = SortedMap[];
-      if (context.unsafeMaybeGetEagerDir(jsRootsInputDirName) is None()) {
-        return SKStore.CStop(None());
-      };
-      (context.unsafeGetEagerDir(jsRootsInputDirName)).writeArray(
-        context,
-        SKStore.SID(rootName),
-        Array[],
-      );
-      context.update();
-      SKStore.CStop(None());
-    })
-  } catch {
-  | exn ->
-    SKStore.destroyObstack(saved);
-    throw (exn)
-  };
-  SKStore.destroyObstack(saved);
-}
-
-const trackedJSCallsDirName: SKStore.DirName = SKStore.DirName::create(
-  "/jsTrackedCalls/",
+class QueryDeps(dirNames: Array<SKStore.DirName>) extends SKStore.File
+const queryDepsDirName: SKStore.DirName = SKStore.DirName::create(
+  "/queries/deps/",
 );
 
-class InvalidTrackedCall() extends Exception {
-  fun getMessage(): String {
-    "Tracked calls can only be made while defining a root."
-  }
-}
-
-fun initTrackedJSCalls(context: mutable SKStore.Context): void {
-  _ = SKStore.LHandle::create(
-    SKStore.SID::keyType,
-    SKStore.StringFile::type,
-    context,
-    trackedJSCallsDirName,
-    (context, _self, key) ~>
-      withLocalContext(context, () -> {
-        setLocalContext(context);
-        (funIdStr, funArg) = key match {
-        | SKStore.SID(v) -> v.splitFirst("#")
-        };
-        funId = Int32::truncate(funIdStr.toInt());
-        result = callExternalFun(funId, funArg);
-        Array[SKStore.StringFile(result)]
-      })
-    ,
-  );
-}
-
-@export("SKIP_tracked_call")
-fun trackedCall(funId: Int32, funArg: String): String {
-  if (hasLocalContext() == 0) throw InvalidTrackedCall();
-  context = getLocalContext();
-  ldir = context.unsafeMaybeGetLazyDir(trackedJSCallsDirName) match {
+fun getQueryDepsHandle(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.IID, QueryDeps> {
+  context.maybeGetDir(queryDepsDirName) match {
   | None() ->
-    initTrackedJSCalls(context);
-    context.unsafeGetLazyDir(trackedJSCallsDirName)
-  | Some(l) -> l
+    context.mkdir(
+      SKStore.IID::keyType,
+      QueryDeps::type,
+      queryDepsDirName,
+      Array[],
+    )
+  | Some(dir) ->
+    SKStore.EHandle(SKStore.IID::keyType, QueryDeps::type, dir.getDirName())
   };
-  arr = ldir.getArray(context, SKStore.SID("" + funId + "#" + funArg));
-  invariant(arr.size() == 1);
-  SKStore.StringFile::type(arr[0]).value
-}
-
-/*****************************************************************************/
-/* Support for tracked queries. */
-/*****************************************************************************/
-
-const trackedJSQueriesDirName: SKStore.DirName = SKStore.DirName::create(
-  "/jsTrackedQueries/",
-);
-
-class InvalidTrackedQuery() extends Exception {
-  fun getMessage(): String {
-    "Tracked queries can only be made while defining a root."
-  }
-}
-
-class TrackedQuery(
-  query: String,
-  encoded_params: String,
-  start: Int,
-  end: ?Int,
-) extends SKStore.Key {
-  fun toString(): String {
-    inspect(this).toString()
-  }
 }
 
 // Decode a string to a JSON Object, expected to be a map from key
@@ -1746,113 +1515,155 @@ fun decodeParams(encoded_params: String): Map<String, Value> {
   }
 }
 
-fun initTrackedJSQueries(context: mutable SKStore.Context): void {
-  _ = SKStore.LHandle::create(
-    TrackedQuery::keyType,
-    SKStore.StringFile::type,
-    context,
-    trackedJSQueriesDirName,
-    (context, _self, key) ~> {
-      SKStore.withRegion(context, (_, context) ~> {
-        query = key match {
-        | q @ TrackedQuery _ -> q
-        };
-        lexer = SKDB.Lexer(0, SKDB.Buffer(query.query));
-        selectAst = SKDB.parseQuery(lexer, 0).i1 match {
-        | x @ Select _ -> x
-        };
-        skOptions = SKDB.Options{
-          alwaysAllowJoins => false,
-          backtrace => false,
-          sync => false,
-          virtual => false,
-          showUsedIndexes => false,
-        };
-        params = decodeParams(query.encoded_params);
-        compiler = SKDB.Compiler::create(false, skOptions, 0, params);
-        tableMapCopy = context.getGlobal("TableMap");
-        context.removeGlobal("TableMap");
-        select = compiler.compileSelect(context, selectAst, true);
-        tableMapCopy match {
-        | None() -> void
-        | Some(x) -> context.setGlobal("TableMap", x)
-        };
-        selectDir = SKDB.evalSelect(context, select, None());
-        selectDirName = selectDir.dirName;
-        selectProjDirName = SKStore.DirName::create(
-          selectDirName.toString() + "proj/",
-        );
-
-        dirDescr = Compiler::getDirDescr(
-          selectAst.params,
-          select.from,
-          select.params,
-          Name::create(selectDirName.toString()),
-          selectDirName,
-        );
-        fieldNames = dirDescr.schema.map(x -> x.name.origName);
-        format = SKStore.OJSON(fieldNames);
-
-        selectProj = SKStore.EHandle(
-          x ~> x,
-          RowValues::type,
-          selectDirName,
-        ).map(
-          x ~> x,
-          RowValues::type,
-          context,
-          selectProjDirName,
-          (_context, writer, _key, values) ~> {
-            writer.setArray(SKStore.IID(0), values.collect(Array))
-          },
-        );
-        proj = selectProj.getIter(context, SKStore.IID(0));
-        acc = mutable Vector[];
-        i = 0;
-        for (rvalues in proj) {
-          if (i < query.start) {
-            !i = i + 1;
-            continue
-          };
-          query.end match {
-          | Some(end) -> if (i >= end) break void
-          | _ -> void
-          };
-          for (_ in Range(0, rvalues.getRepeat())) {
-            acc.push(rvalues.toStringSingle(format))
-          };
-          !i = i + 1;
-        };
-        Array[SKStore.StringFile(acc.join("\n"))]
-      })
-    },
-  );
+fun printReactiveQueryResult(
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+  fieldNames: Array<String>,
+): void {
+  format = SKStore.OJS(fieldNames);
+  RowValues::printHeader(format);
+  for (kv in context.unsafeGetEagerDir(dirName).unsafeGetFileIter()) {
+    (_, files) = kv;
+    for (file in files) {
+      row = RowValues::type(file);
+      for (_ in Range(0, row.repeat)) {
+        RowValues::printItem(format, row);
+      }
+    }
+  }
 }
 
-@export("SKIP_tracked_query")
-fun trackedQuery(
+@cpp_extern("SKIP_js_user_fun")
+native fun jsCallUserFun(queryID32: Int32): void;
+
+@cpp_extern("SKIP_js_mark_query")
+native fun jsMarkQuery(
+  queryID32: Int32,
+  notify: (mutable SKStore.Context) ~> void,
+): void;
+
+@wasm_export("SKIP_js_notify_user")
+fun notifyUser(notify: (mutable SKStore.Context) ~> void): void {
+  saved = SKStore.newObstack();
+  try {
+    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+      notify(context);
+      SKStore.CStop(None())
+    })
+  } catch {
+  | exn ->
+    print_error(exn.getMessage());
+    SKStore.destroyObstack(saved)
+  };
+  SKStore.destroyObstack(saved);
+}
+
+@wasm_export("SKIP_reactive_query")
+fun reactiveQuery(
+  queryID32: Int32,
   query: String,
   encoded_params: String,
-  start: Int32,
-  end: Int32,
-): String {
-  if (hasLocalContext() == 0) throw InvalidTrackedQuery();
-  context = getLocalContext();
-  ldir = context.unsafeMaybeGetLazyDir(trackedJSQueriesDirName) match {
-  | None() ->
-    initTrackedJSQueries(context);
-    context.unsafeGetLazyDir(trackedJSQueriesDirName)
-  | Some(l) -> l
+): void {
+  saved = SKStore.newObstack();
+  try {
+    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+      context.!globals = SortedMap[];
+      context.!newDirs = SortedSet[];
+      tick = context.tick;
+      // We want canReuse set to CRNever, because we want a guarantee
+      // that no one will try to reuse our directories for something
+      // else. Otherwise we would not be able to remove them safely.
+      context.!canReuse = SKStore.CRNever();
+      queryID = queryID32.toInt();
+      lexer = SKDB.Lexer(0, SKDB.Buffer(query));
+      selectAst = SKDB.parseQuery(lexer, 0).i1 match {
+      | x @ Select _ -> x
+      };
+      skOptions = SKDB.Options{
+        alwaysAllowJoins => false,
+        backtrace => false,
+        sync => false,
+        virtual => false,
+        showUsedIndexes => false,
+      };
+      params = decodeParams(encoded_params);
+      compiler = SKDB.Compiler::create(false, skOptions, 0, params);
+      cselect = compiler.compileSelect(context, selectAst, true);
+      selectDir = SKDB.evalSelect(context, cselect, None());
+      schema = SKDB.Compiler::getSchema(
+        selectAst.params,
+        cselect.from,
+        cselect.params,
+      );
+      fieldNames = schema.map(x -> x.name.origName);
+      printReactiveQueryResult(context, selectDir.dirName, fieldNames);
+
+      SKStore.EagerDir::apply(
+        context,
+        selectDir.dirName,
+        SKStore.DirName::create(selectDir.dirName.toString() + "sink/"),
+        (_context, _writer, _key, _valueIter) ~> {
+          jsMarkQuery(queryID32, context ~> {
+            printReactiveQueryResult(context, selectDir.dirName, fieldNames);
+            jsCallUserFun(queryID32);
+          })
+        },
+        None(),
+        None(),
+        true,
+      );
+
+      deps = context.dirs.state
+        .getChangesAfter(tick)
+        .filter(x -> x.toString().startsWith("/" + queryPrefix))
+        .collect(Array);
+
+      invariant(deps.size() > 0);
+
+      getQueryDepsHandle(context).writeArray(
+        context,
+        SKStore.IID(queryID),
+        Array[QueryDeps(deps)],
+      );
+
+      context.!newDirs = SortedSet[];
+      SKStore.CStop(None())
+    })
+  } catch {
+  | exn ->
+    print_error(exn.getMessage());
+    SKStore.destroyObstack(saved)
   };
-  arr = ldir.getArray(
-    context,
-    TrackedQuery(
-      query,
-      encoded_params,
-      start.toInt(),
-      if (end == -1) None() else Some(end.toInt()),
-    ),
-  );
-  invariant(arr.size() == 1);
-  SKStore.StringFile::type(arr[0]).value
+  SKStore.destroyObstack(saved);
+}
+
+@wasm_export("SKIP_delete_reactive_query")
+fun deleteReactiveQuery(queryID32: Int32): void {
+  saved = SKStore.newObstack();
+  try {
+    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+      queryID = SKStore.IID(queryID32.toInt());
+      depsDir = getQueryDepsHandle(context);
+      arr = depsDir.unsafeGetArray(context, queryID);
+      invariant(arr.size() == 1);
+      for (dirName in arr[0].dirNames) {
+        context.removeDir(dirName);
+        // Normally we would use a place-holder when removing a
+        // directory, because we typically want to be able to know what
+        // changed. But in this case we really want to pretend the
+        // directory never existed, so that we don't leak memory.  This
+        // is because reactive queries are not supposed to be used for
+        // anything else (other than serving the JS). If the JS doesn't
+        // need it anymore, we can pretend the directory never existed.
+        context.!dirs.state = context.dirs.state.remove(dirName);
+      };
+      depsDir.writeArray(context, queryID, Array[]);
+      SKStore.CStop(None())
+    })
+  } catch {
+  | exn ->
+    print_error(exn.getMessage());
+    SKStore.destroyObstack(saved)
+  };
+  SKStore.destroyObstack(saved);
 }
