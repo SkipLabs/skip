@@ -287,7 +287,8 @@ class LinksImpl implements Links, ToWasm {
         params = Object.fromEntries(params);
       }
       this.stdout_objects = new Array();
-      const queryID = this.freeQueryIDs.pop() || this.queryID++;
+      const freeQueryID = this.freeQueryIDs.pop();
+      const queryID = (freeQueryID === undefined ? this.queryID++ : freeQueryID);
       let userFun = () => {
         onChange(this.stdout_objects);
         this.stdout_objects = new Array()
