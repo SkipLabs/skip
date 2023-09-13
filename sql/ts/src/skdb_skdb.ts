@@ -288,11 +288,11 @@ class LinksImpl implements Links, ToWasm {
       }
       this.stdout_objects = new Array();
       const queryID = this.freeQueryIDs.pop() || this.queryID++;
-      
-      this.userFuns[queryID] = () => {
+      let userFun = () => {
         onChange(this.stdout_objects);
         this.stdout_objects = new Array()
-      }
+      };
+      this.userFuns[queryID] = userFun;
       utils.runWithGc(() => {
         utils.runCheckError(() => {
           exported.SKIP_reactive_query(
@@ -301,11 +301,12 @@ class LinksImpl implements Links, ToWasm {
             utils.exportString(JSON.stringify(params))
           )
         })
-      });  
-      onChange(this.stdout_objects);
-      return { close: () => {
+      });
+      userFun();
+      return {
+        close: () => {
           exported.SKIP_delete_reactive_query(queryID);
-          this.userFuns[queryID] = () => {};
+          this.userFuns[queryID] = () => { };
           this.freeQueryIDs.push(queryID);
         }
       }

@@ -13,22 +13,54 @@ export class Function implements Payload {
   fn: string;
   parameters: Array<any>;
   subscription ?: MessageId;
+  wrap?: { wrap: boolean, autoremove: boolean};
 
 
-  constructor(fn: string, parameters: Array<any>) {
+  constructor(fn: string, parameters: Array<any>, wrap?: { wrap: boolean, autoremove: boolean}) {
     this.fn = fn;
     this.parameters = parameters;
+    this.wrap = wrap;
   }
 
 
   static as(obj: object) {
     if (!("fn" in obj) || !("parameters" in obj)) return null;
     let subscription = "subscription" in obj ? MessageId.as(obj.subscription!) : null;
+    let wrap = "wrap" in obj ? obj.wrap! as { wrap: boolean, autoremove: boolean} : undefined;
     let fn = new Function(
       obj.fn! as string,
       obj.parameters! as Array<any>,
+      wrap
     );
     fn.subscription = subscription ? subscription: undefined;
+    return fn;
+  }
+
+  static isValid(obj: object) {
+    return "fn" in obj && "parameters" in obj;
+  }
+}
+
+export class Caller implements Payload {
+  wrapped: number;
+  fn: string;
+  parameters: Array<any>;
+
+
+  constructor(wrapped: number, fn: string, parameters: Array<any>) {
+    this.wrapped = wrapped;
+    this.fn = fn;
+    this.parameters = parameters;
+  }
+
+
+  static convert(obj: object) {
+    if (!("wrapped" in obj) ||  !("fn" in obj) || !("parameters" in obj)) return null;
+    let fn = new Caller(
+      obj.wrapped! as number,
+      obj.fn! as string,
+      obj.parameters! as Array<any>,
+    );
     return fn;
   }
 
@@ -68,6 +100,19 @@ export class MessageId {
   }
 }
 
+export class Wrapped {
+  wrapped: number;
+
+  constructor(wrapped: number) {
+    this.wrapped = wrapped;
+  }
+
+  static as(obj: object) {
+    if (!("wrapped" in obj)) return null;
+    return new Wrapped(obj.wrapped! as number);
+  }
+}
+
 function asKey(messageId) {
   return "" + messageId.source + ":" + messageId.id;
 }
@@ -85,6 +130,16 @@ export class Message {
     if (!("id" in obj) || !("payload" in obj)) return null;
     let messageId = MessageId.as(obj.id!);
     let payload = Function.as(obj.payload!);
+    if (messageId && payload) {
+      return new Message(messageId, payload);
+    }
+    return null;
+  }
+
+  static asCaller(obj: object) {
+    if (!("id" in obj) || !("payload" in obj)) return null;
+    let messageId = MessageId.as(obj.id!);
+    let payload = Caller.convert(obj.payload!);
     if (messageId && payload) {
       return new Message(messageId, payload);
     }
@@ -140,7 +195,7 @@ export class PromiseWorker {
     };
     this.subscribe = (fn: Function, value: (...args: any[]) => void) => {
       let subscriptionId = new MessageId(this.source, ++this.lastId);
-      this.subscriptions.set(asKey(subscriptionId), (result: Return) => value(result.value))
+      this.subscriptions.set(asKey(subscriptionId), (result: Return) => value.apply(null, result.value))
       fn.subscription = subscriptionId;
       return this.post(fn);
     }

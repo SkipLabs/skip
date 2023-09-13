@@ -1,9 +1,9 @@
 // @ts-ignore
 import { expect } from '@playwright/test';
 // @ts-ignore
-import { createSkdb, TSKDB } from 'skdb';
+import { createSkdb, SKDB } from 'skdb';
 
-type dbs = { root: TSKDB, user: TSKDB };
+type dbs = { root: SKDB, user: SKDB };
 
 export async function setup(credentials: string, port: number, crypto) {
   const host = "ws://localhost:" + port;
@@ -38,7 +38,7 @@ export async function setup(credentials: string, port: number, crypto) {
   return { root: rootSkdb, user: userSkdb };
 }
 
-async function testQueriesAgainstTheServer(skdb: TSKDB) {
+async function testQueriesAgainstTheServer(skdb: SKDB) {
   const tableCreate = await skdb.exec(
     "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER);",
     new Map(),
@@ -95,7 +95,7 @@ async function testQueriesAgainstTheServer(skdb: TSKDB) {
 }
 
 
-async function testSchemaQueries(skdb: TSKDB) {
+async function testSchemaQueries(skdb: SKDB) {
   const expected = "CREATE TABLE test_pk (";
   const schema = await skdb.schema(true);
   const contains = schema.includes(expected);
@@ -127,7 +127,7 @@ async function testSchemaQueries(skdb: TSKDB) {
   expect(emptyTable).toEqual("");
 }
 
-async function testMirroring(skdb: TSKDB) {
+async function testMirroring(skdb: SKDB) {
   // mirror table
   await skdb.mirror("test_pk");
   const testPkRows = await waitSynch(
@@ -151,7 +151,7 @@ async function testMirroring(skdb: TSKDB) {
   expect(testPkRows2).toEqual([{ x: 42, y: 21 }]);
 }
 
-function waitSynch(skdb: TSKDB, query: string, check: (v: any) => boolean, server: boolean = false, max: number = 6) {
+function waitSynch(skdb: SKDB, query: string, check: (v: any) => boolean, server: boolean = false, max: number = 6) {
   let count = 0;
   const test = (resolve, reject) => {
     skdb.exec(query, new Map(), server).then(value => {
@@ -166,7 +166,7 @@ function waitSynch(skdb: TSKDB, query: string, check: (v: any) => boolean, serve
   return new Promise(test);
 }
 
-async function testServerTail(root: TSKDB, user: TSKDB) {
+async function testServerTail(root: SKDB, user: SKDB) {
   try {
     await root.exec("insert into view_pk values (87,88);", new Map(), true);
     throw new Error("Shall throw exception.");
@@ -193,7 +193,7 @@ async function testServerTail(root: TSKDB, user: TSKDB) {
   expect(resv).toEqual([{ cnt: 1 }]);
 }
 
-async function testClientTail(root: TSKDB, user: TSKDB) {
+async function testClientTail(root: SKDB, user: SKDB) {
   try {
     await user.exec("insert into view_pk values (97,98);");
     throw new Error("Shall throw exception.");
