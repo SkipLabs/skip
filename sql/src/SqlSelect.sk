@@ -787,25 +787,79 @@ class SelectEvaluator{
     );
     this.directMode match {
     | Some(limit) ->
-      RowValues::printHeader(this.select.format);
-      i = 0;
-      for (kv in context.unsafeGetEagerDir(dir.dirName).unsafeGetFileIter()) {
-        (_, files) = kv;
-        for (file in files) {
-          input = RowValues::type(file);
-          evaluator = ExprEvaluator(Array[input], Array[], None());
-          whereVal = evaluator.evalWhere(context, this.select.where);
-          whereVal match {
-          | ANull()
-          | ADef(0) ->
-            continue
-          | _ -> void
+      this.select.format match {
+      | SKStore.OTable(fieldNames) ->
+        data = mutable Vector[];
+        trailing = false;
+        limited = false;
+        i = 0;
+        for (kv in context.unsafeGetEagerDir(dir.dirName).unsafeGetFileIter()) {
+          (_, files) = kv;
+          for (file in files) {
+            input = RowValues::type(file);
+            evaluator = ExprEvaluator(Array[input], Array[], None());
+            whereVal = evaluator.evalWhere(context, this.select.where);
+            whereVal match {
+            | ANull()
+            | ADef(0) ->
+              continue
+            | _ -> void
+            };
+            row = static::evalRow(
+              context,
+              evaluator,
+              this.params,
+              input.repeat,
+            );
+            for (_ in Range(0, row.repeat)) {
+              !i = i + 1;
+              if (i >= limit) {
+                !limited = true;
+                break void
+              };
+              if (data.size() > kMaxOutputRowsTable) {
+                !trailing = true;
+                break void
+              };
+              data.push(row.values)
+            };
+            if (trailing || limited) {
+              break void
+            }
           };
-          row = static::evalRow(context, evaluator, this.params, input.repeat);
-          for (_ in Range(0, row.repeat)) {
-            RowValues::printItem(this.select.format, row);
-            !i = i + 1;
-            if (i >= limit) throw IgnoreAndContinue();
+          if (trailing || limited) {
+            break void
+          }
+        };
+
+        printTable(fieldNames, data.toArray(), trailing)
+
+      | _ ->
+        RowValues::printHeader(this.select.format);
+        i = 0;
+        for (kv in context.unsafeGetEagerDir(dir.dirName).unsafeGetFileIter()) {
+          (_, files) = kv;
+          for (file in files) {
+            input = RowValues::type(file);
+            evaluator = ExprEvaluator(Array[input], Array[], None());
+            whereVal = evaluator.evalWhere(context, this.select.where);
+            whereVal match {
+            | ANull()
+            | ADef(0) ->
+              continue
+            | _ -> void
+            };
+            row = static::evalRow(
+              context,
+              evaluator,
+              this.params,
+              input.repeat,
+            );
+            for (_ in Range(0, row.repeat)) {
+              RowValues::printItem(this.select.format, row);
+              !i = i + 1;
+              if (i >= limit) throw IgnoreAndContinue();
+            }
           }
         }
       };

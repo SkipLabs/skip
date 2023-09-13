@@ -72,7 +72,9 @@ base class CValue uses Orderable, Show {
           format match {
           | SKStore.OJSON _ -> result.push('\\')
           | SKStore.OSQL _ -> void
-          | SKStore.OCSV _ -> result.push(c)
+          | SKStore.OTable _
+          | SKStore.OCSV _ ->
+            result.push(c)
           | SKStore.OJS _ ->
             invariant_violation(
               "Internal error: JS direct mode should never be pretty-printed",

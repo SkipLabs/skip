@@ -68,8 +68,8 @@ untracked fun main(): void {
     .arg(Cli.BoolArg("sync").about("Sync to disk").global())
     .arg(
       Cli.StringArg("format")
-        .default("sql")
-        .about("Output format (sql, csv, or json)")
+        .default(if (isATTY() != 0) "table" else "sql")
+        .about("Output format (sql, csv, json, or table)")
         .global(),
     )
     .arg(
@@ -274,6 +274,7 @@ untracked fun main(): void {
       | "json" -> SKDB.OFK_JSON()
       | "sql" -> SKDB.OFK_SQL()
       | "js" -> SKDB.OFK_JS()
+      | "table" -> SKDB.OFK_Table()
       | f -> invariant_violation(`Unsupported format: ${f}`)
       },
       expectQueryParams => args.getBool("expect-query-params"),
@@ -498,6 +499,7 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
     | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, sub.dirName))
     | SKDB.OFK_SQL() -> SKStore.OSQL()
     | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, sub.dirName))
+    | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, sub.dirName))
     };
 
     origContext.setGlobal(
@@ -662,6 +664,7 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
     | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
     | SKDB.OFK_SQL() -> SKStore.OSQL()
     | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
+    | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
     };
 
     (isReset, changes) = edir.getChangesAfter(SKStore.Tick(tick), forceReset);
@@ -814,6 +817,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
     | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, viewDirName))
     | SKDB.OFK_SQL() -> SKStore.OSQL()
     | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, viewDirName))
+    | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, viewDirName))
     };
     cmd = (
       args.maybeGetString("updates"),

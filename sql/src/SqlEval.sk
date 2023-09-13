@@ -1055,6 +1055,7 @@ base class OutputFormatKind {
   | OFK_JSON()
   | OFK_SQL()
   | OFK_JS()
+  | OFK_Table()
 }
 
 class Options{
@@ -1415,6 +1416,8 @@ class StdoutDiff(
 
 class StdoutCheckpointAck(time: SKStore.Tick) extends SKStore.File
 
+const kMaxOutputRowsTable: Int = 1024;
+
 fun showSelect(
   context: mutable SKStore.Context,
   format: SKStore.OutputFormat,
@@ -1422,22 +1425,51 @@ fun showSelect(
 ): void {
   dirName = sdir.dirName;
   dir = context.unsafeGetEagerDir(dirName);
-  RowValues::printHeader(format);
-  dir.onFiles(files ~> {
-    for (kv in files) {
-      (_key, rows) = kv;
-      rowArray = rows.collect(Array);
-      for (row in rowArray) {
-        row match {
-        | rvalues @ RowValues(_, r) ->
-          for (_ in Range(0, r)) {
-            RowValues::printItem(format, rvalues)
+  // TODO: Unify handling of the various output formats.
+  format match {
+  | SKStore.OTable(fieldNames) ->
+    data = mutable Vector[];
+    trailing = false;
+    dir.onFiles(files -> {
+      for (kv in files) {
+        (_key, rows) = kv;
+        rowArray = rows.collect(Array);
+        for (row in rowArray) {
+          row match {
+          | RowValues(values, r) ->
+            for (_ in Range(0, r)) {
+              if (data.size() > kMaxOutputRowsTable) {
+                !trailing = true;
+                return void
+              };
+              data.push(values)
+            }
+          | _ -> invariant_violation("Invalid row kind")
+          };
+        };
+      }
+    });
+
+    printTable(fieldNames, data.toArray(), trailing)
+
+  | _ ->
+    RowValues::printHeader(format);
+    dir.onFiles(files ~> {
+      for (kv in files) {
+        (_key, rows) = kv;
+        rowArray = rows.collect(Array);
+        for (row in rowArray) {
+          row match {
+          | rvalues @ RowValues(_, r) ->
+            for (_ in Range(0, r)) {
+              RowValues::printItem(format, rvalues)
+            }
+          | _ -> invariant_violation("Invalid row kind")
           }
-        | _ -> invariant_violation("Invalid row kind")
         }
       }
-    }
-  })
+    })
+  }
 }
 
 fun printContext(context: mutable SKStore.Context): void {
@@ -1658,8 +1690,118 @@ fun deleteReactiveQuery(queryID32: Int32): void {
       SKStore.CStop(None())
     })
   } catch {
-  | exn ->
-    print_error(exn.getMessage());
+  | exn -> print_error(exn.getMessage())
   };
   SKStore.destroyObstack(saved);
+}
+
+fun printTable(
+  fieldNames: Array<String>,
+  values: Sequence<Array<?CValue>>,
+  trailing: Bool,
+): void {
+  colWidth = Array::mcreateFromItems(fieldNames.map(n -> n.length()));
+  stringAndColor = values.map(row ->
+    row.map(v ->
+      v match {
+      | None() -> ("null", TermColor.Default())
+      | Some(val) ->
+        (
+          val.toStringWithFormat(SKStore.OTable(fieldNames)),
+          val match {
+          | CString _ -> TermColor.Blue()
+          | CInt _
+          | CFloat _ ->
+            TermColor.Green()
+          },
+        )
+      }
+    )
+  );
+
+  for (row in stringAndColor) {
+    for ((i, v) in row.map(x -> x.i0).items()) {
+      colWidth![i] = max(colWidth[i], v.length())
+    }
+  };
+
+  // Add spacing
+  for (i in Range(0, colWidth.size())) {
+    colWidth![i] = colWidth[i] + 2;
+  };
+
+  topLeftCorner = "┌";
+  topRightCorner = "┐";
+  bottomLeftCorner = "└";
+  bottomRightCorner = "┘";
+  topSeparator = "┬";
+  midSeparator = "┼";
+  bottomSeparator = "┴";
+  leftSeparator = "├";
+  rightSeparator = "┤";
+  lineSeparator = "─";
+  colSeparator = "│";
+
+  printLine = (
+    left: String,
+    right: String,
+    elements: Sequence<String>,
+    separator: String,
+  ) ~> {
+    print_raw(left);
+    print_raw(elements.join(separator));
+    print_string(right)
+  };
+
+  justify = (str, width) ~> {
+    totalPadding = width - str.length();
+    paddingLeft = totalPadding / 2;
+    paddingRight = totalPadding - paddingLeft;
+    Range(0, paddingLeft).map(_ -> " ").join("") +
+      str +
+      Range(0, paddingRight).map(_ -> " ").join("")
+  };
+
+  lineSeparatorElements = colWidth.map(w ->
+    Range(0, w).map(_ -> lineSeparator).join("")
+  );
+
+  // Header
+  printLine(topLeftCorner, topRightCorner, lineSeparatorElements, topSeparator);
+  printLine(
+    colSeparator,
+    colSeparator,
+    fieldNames.mapWithIndex((i, name) -> justify(name, colWidth[i])),
+    colSeparator,
+  );
+  printLine(leftSeparator, rightSeparator, lineSeparatorElements, midSeparator);
+
+  for (row in stringAndColor) {
+    printLine(
+      colSeparator,
+      colSeparator,
+      row.mapWithIndex((i, v) -> {
+        (str, color) = v;
+        TermColor.colored(justify(str, colWidth[i]), color)
+      }),
+      colSeparator,
+    )
+  };
+
+  if (trailing) {
+    printLine(
+      colSeparator,
+      colSeparator,
+      colWidth.map(w -> justify("...", w)),
+      colSeparator,
+    )
+  };
+
+  // Footer
+  printLine(
+    bottomLeftCorner,
+    bottomRightCorner,
+    lineSeparatorElements,
+    bottomSeparator,
+  )
 }
