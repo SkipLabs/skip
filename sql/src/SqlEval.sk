@@ -1551,8 +1551,7 @@ fun notifyUser(notify: (mutable SKStore.Context) ~> void): void {
       SKStore.CStop(None())
     })
   } catch {
-  | exn ->
-    print_error(exn.getMessage())
+  | exn -> print_error(exn.getMessage())
   };
   SKStore.destroyObstack(saved);
 }
@@ -1626,11 +1625,11 @@ fun reactiveQuery(
       );
 
       context.!newDirs = SortedSet[];
+      context.update();
       SKStore.CStop(None())
     })
   } catch {
-  | exn ->
-    print_error(exn.getMessage())
+  | exn -> print_error(exn.getMessage())
   };
   SKStore.destroyObstack(saved);
 }

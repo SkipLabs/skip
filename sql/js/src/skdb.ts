@@ -674,7 +674,8 @@ export class SKDB {
     this.stdout_objects = new Array();
     this.stderr = new Array();
 
-    const queryID = this.freeQueryIDs.pop() || this.queryID++;
+    const freeQueryID = this.freeQueryIDs.pop();
+    const queryID = (freeQueryID === undefined ? this.queryID++ : freeQueryID);
 
     this.userFuns[queryID] = () => {
       onChange(this.stdout_objects);
