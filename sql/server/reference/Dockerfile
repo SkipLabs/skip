@@ -17,7 +17,7 @@ WORKDIR /skfs
 
 RUN make clean && make -B build/skdb && make -B build/init.sql
 
-FROM eclipse-temurin:19 as skgw
+FROM eclipse-temurin:20 as skgw
 
 COPY . /skfs
 
@@ -28,7 +28,7 @@ RUN ../gradlew jar --no-daemon --console plain
 # Build the production image by copying out artifacts
 ################################################################################
 
-FROM eclipse-temurin:19 as prod
+FROM eclipse-temurin:20 as prod
 
 WORKDIR /skfs
 
