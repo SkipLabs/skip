@@ -196,11 +196,13 @@ base class OutputFormat uses Orderable {
   | OCSV()
   | OJSON(fieldNames: Array<String>)
   | OJS(fieldNames: Array<String>)
+  | OTable(fieldNames: Array<String>)
 
   fun usesComma(): Bool
   | OSQL() -> false
   | OCSV() -> true
   | OJSON(_) -> true
+  | OTable(_) -> false
   | OJS _ ->
     invariant_violation(
       "Internal error: JS direct mode should never be printed",
@@ -210,6 +212,7 @@ base class OutputFormat uses Orderable {
   | OSQL() -> false
   | OCSV() -> true
   | OJSON(_) -> true
+  | OTable(_) -> true
   | OJS _ ->
     invariant_violation(
       "Internal error: JS direct mode should never be printed",

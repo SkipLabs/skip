@@ -323,6 +323,10 @@ mutable class Compiler{
 
     format = this.options.format match {
     | OFK_CSV() -> SKStore.OCSV()
+    | OFK_Table() ->
+      schema = static::getSchema(select.params, from, params);
+      fieldNames = schema.map(x -> x.name.origName);
+      SKStore.OTable(fieldNames)
     | OFK_JSON() ->
       schema = static::getSchema(select.params, from, params);
       fieldNames = schema.map(x -> x.name.origName);
