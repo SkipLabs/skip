@@ -74,7 +74,7 @@ export class SKDBImpl implements SKDB {
 
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => void }>
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
   
   private runner: (fn: () => string) => Promise<Array<any>>;
 
@@ -96,7 +96,8 @@ export class SKDBImpl implements SKDB {
     client.clientUuid = env.crypto().randomUUID();
     client.runner = handle.runner;
     client.watch = (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
-      return Promise.resolve(handle.watch(query, params, onChange))
+      let closable = handle.watch(query, params, onChange);
+      return Promise.resolve({close: () => Promise.resolve(closable.close())})
     };
     return client;
   }
@@ -160,9 +161,9 @@ export class SKDBImpl implements SKDB {
 
   exec = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
     if (server) {
-      return await this.server!.sql(stdin, params);
+      return this.server!.sql(stdin, params);
     } else {
-      return await this.runner(() => {
+      return this.runner(() => {
         let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
         return this.runLocal(args1, stdin1)
       });
@@ -177,7 +178,7 @@ export class SKDBImpl implements SKDB {
 
   tableSchema = async (tableName: string, server: boolean = false) => {
     if (server) {
-      return await this.server!.tableSchema(tableName);
+      return this.server!.tableSchema(tableName);
     } else {
       return this.runLocal(["dump-table", tableName], "");
     }
@@ -189,7 +190,7 @@ export class SKDBImpl implements SKDB {
 
   viewSchema = async (viewName: string, server: boolean = false) => {
     if (server) {
-      return await this.server!.viewSchema(viewName);
+      return this.server!.viewSchema(viewName);
     } else {
       return this.runLocal(["dump-view", viewName], "");
     }
@@ -197,7 +198,7 @@ export class SKDBImpl implements SKDB {
 
   schema = async (server: boolean = false) => {
     if (server) {
-      return await this.server!.schema();
+      return this.server!.schema();
     } else {
       const tables = this.runLocal(["dump-tables"], "");
       const views = this.runLocal(["dump-views"], "");
