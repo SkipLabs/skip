@@ -1,7 +1,7 @@
 import { run, loadEnv, isNode} from "#std/sk_types";
 import { SKDBShared } from "#skdb/skdb_types";
 import { SKDBWorker } from "#skdb/skdb_wdatabase";
-export {SKDB as TSKDB} from "#skdb/skdb_types";
+export {SKDB} from "#skdb/skdb_types";
 
 var wasm64 = "skdb";
 var modules = [ /*--MODULES--*/];

@@ -1,43 +1,42 @@
-import {Wrk} from "#std/sk_types";
-import {PromiseWorker, Function} from "#std/sk_worker";
-import {SKDB, ProtoResponseCreds, Params} from "#skdb/skdb_types";
+import { Wrk } from "#std/sk_types";
+import { PromiseWorker, Function, Caller } from "#std/sk_worker";
+import { SKDB, ProtoResponseCreds, Params } from "#skdb/skdb_types";
 
 export class SKDBWorker implements SKDB {
   private worker: PromiseWorker;
-  
+
   constructor(worker: Wrk) {
     this.worker = new PromiseWorker(worker);
   }
 
-  create = async (dbName ?: string): Promise<void> => {
+  create = async (dbName?: string): Promise<void> => {
     return this.worker.post(new Function("create", [dbName]));
   }
 
-  onRootChange = async (f: (rootName: string) => void) => {
-    return this.worker.subscribe(new Function("onRootChange", []), f);
-  };
-  
   subscribe = async (viewName: string, f: (change: string) => void) => {
     return this.worker.subscribe(new Function("subscribe", [viewName]), f);
-  };
+  }
 
   exec = async (query: string, params: Params = new Map(), server: boolean = false) => {
     return this.worker.post(new Function("exec", [query, params, server])) as Promise<Array<any>>;
   }
 
-  watch = (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
-    return Promise.reject("TODO");
+  watch = async (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
+    return this.worker.subscribe(new Function("watch", [query, params], {wrap: true, autoremove: true}), onChange).then(wrapped => {
+      let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
+      return { close: close};
+    });
   }
 
-  tableSchema = async(tableName: string, server: boolean = false) => {
+  tableSchema = async (tableName: string, server: boolean = false) => {
     return this.worker.post(new Function("tableSchema", [tableName, server])) as Promise<string>;
   };
 
-  viewSchema = async(viewName: string, server: boolean = false) => {
+  viewSchema = async (viewName: string, server: boolean = false) => {
     return this.worker.post(new Function("viewSchema", [viewName, server])) as Promise<string>;
   };
 
-  schema = async(server: boolean = false) => {
+  schema = async (server: boolean = false) => {
     return this.worker.post(new Function("schema", [server])) as Promise<string>;
   };
 
@@ -61,7 +60,7 @@ export class SKDBWorker implements SKDB {
     return this.worker.post(new Function("mirror", [tableName, filterExpr]));
   }
 
-  serverClose = async ()  => {
+  serverClose = async () => {
     return this.worker.post(new Function("serverClose", []));
   }
 

@@ -12,7 +12,7 @@ export interface SKDB {
   subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
 
   exec: (query: string, params: Params, server?: boolean) => Promise<Array<any>>;
-  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => void }>
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
   
   tableSchema: (tableName: string, server?: boolean) => Promise<string>;
   viewSchema: (viewName: string, server?: boolean) => Promise<string>;
