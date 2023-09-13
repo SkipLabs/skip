@@ -25,7 +25,7 @@ RUN make clean && make -B build/skdb && make -B build/init.sql
 
 # we use native for skgw as gradle does NOT like being emulated and
 # this is faster anyway
-FROM eclipse-temurin:19 as skgw
+FROM eclipse-temurin:20 as skgw
 
 COPY . /skfs
 
@@ -36,7 +36,7 @@ RUN ../gradlew jar --no-daemon --console plain
 # Build the production image by copying out artifacts
 ################################################################################
 
-FROM --platform=linux/amd64 eclipse-temurin:19 as prod
+FROM --platform=linux/amd64 eclipse-temurin:20 as prod
 
 WORKDIR /skfs
 
