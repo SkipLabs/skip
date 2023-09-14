@@ -1,35 +1,45 @@
-;;; Provide a skip-mode for emacs
-;;;
-;;; Add this to your .emacs file:
-;;; (load "<path to skip>/skip/ide/emacs/skip.el")
+;;; skip.el --- Skip mode for GNU Emacs  -*- lexical-binding:t -*-
 
-;;; One construct that this indenter doesn't properly handle:
-;;; | Foo _ as x ->
-;;;   bar();
-;;;   baz();
-;;;
-;;; Will be indented as:
-;;; | Foo _ as x ->
-;;;     bar();
-;;; baz();
-;;;
-;;; Adding braces will correct this.
+;; Package-Requires: ((derived) (cc-mode))
+;; URL: https://github.com/skiplabs/skfs
+
+;;; Commentary:
+
+;; This package provides a major mode for editing skip source files.
+
+;; To enable by default, add this to your .emacs file:
+;;   (require 'skip)
+;;   (add-to-list 'auto-mode-alist '("\\.sk$" . skip-mode))
+
+;; One construct that the indenter doesn't properly handle:
+;; | Foo _ as x ->
+;;   bar();
+;;   baz();
+;;
+;; It will be indented as:
+;; | Foo _ as x ->
+;;     bar();
+;; baz();
+;;
+;; Using skip-formatter.el will fix the issue on save.
+
+;;; Code:
 
 (require 'derived)
 (require 'cc-mode)
 
-;;; Debugging: Uncomment the (apply 'message e) line below and then indent your
-;;; line.  Examine the message buffer using M-x view-echo-area-messages (C-h e).
+;; Debugging: Uncomment the (apply 'message e) line below and then indent your
+;; line.  Examine the message buffer using M-x view-echo-area-messages (C-h e).
 (defun skip-debug (&rest e)
-;;;  (apply 'message e)
+;;  (apply 'message e)
   )
 
 (defvar skip-keywords
-  '("alias" "as" "async" "await" "base" "catch" "children" "class" "concurrent"
-    "const" "else" "extends" "false" "from" "for" "fun" "if" "in" "uses" "trait" "match"
-    "module" "mutable" "native" "private" "protected" "public" "readonly"
-    "static" "this" "throw" "true" "try" "void" "watch" "with" "while"
-    "overridable" "memoized" "frozen" "deferred" "return"))
+  '( "as" "async" "await" "base" "catch" "children" "class" "concurrent" "const"
+     "else" "extends" "false" "from" "for" "fun" "if" "in" "uses" "trait" "match"
+     "module" "mutable" "native" "private" "protected" "public" "readonly"
+     "static" "this" "throw" "true" "try" "void" "watch" "with" "while"
+     "overridable" "memoized" "frozen" "deferred" "return"))
 
 (defvar skip-tab-width 2 "Width of a tab for SKIP mode")
 
@@ -548,7 +558,7 @@
     table))
 
 (define-derived-mode skip-mode prog-mode "Skip"
-  "SKIP mode is a major mode for editing Skip files"
+  "SKIP mode is a major mode for editing Skip files."
   (setq comment-end ""
         comment-start "//"
         font-lock-defaults skip-font-lock-defaults
@@ -561,14 +571,18 @@
 (defun skip-default-skip-mode-hook ()
   (c-set-offset 'block-close '-)
   (c-set-offset 'arglist-intro '+)
-  (setq show-trailing-whitespace t)
-  (add-to-list 'write-file-functions 'delete-trailing-whitespace))
+  (setq show-trailing-whitespace t))
 
 (add-hook 'skip-mode-hook 'skip-default-skip-mode-hook)
 
-(setq auto-mode-alist
-      (append
-       '(("\\.sk$" . skip-mode))
-       auto-mode-alist))
+;; Change the default command for M-x compile to `skargo build`.
+(add-hook 'skip-mode-hook
+          (lambda ()
+            (set (make-local-variable 'compile-command)
+                 "skargo build")))
 
-(provide 'skip-mode)
+;; Enable `subword-mode' for proper handling of pascal case identifier.
+(add-hook 'skip-mode-hook #'subword-mode)
+
+(provide 'skip)
+;;; skip.el ends here
