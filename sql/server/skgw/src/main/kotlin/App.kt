@@ -9,7 +9,6 @@ import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.OutputStream
-import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.security.SecureRandom
 import java.util.concurrent.Executors
