@@ -55,9 +55,14 @@ const argSchema = {
     help: "Access key to use. Default: first specified in credentials file.",
   },
   // formatting
+  'json-output': {
+    type: "boolean",
+    help: "Rows are output as JSON objects. Default: false.",
+    default: false,
+  },
   'pipe-separated-output': {
     type: "boolean",
-    help: "SQL output is separated by a pipe. Default: JSON output.",
+    help: "SQL output is separated by a pipe. Default: false.",
     default: false,
   },
   'simple-output': {
@@ -182,18 +187,49 @@ const firstPair = Object.entries(dbCreds)[0];
 const accessKey = (args.values['access-key'] ?? firstPair[0]) as string;
 const privateKey = dbCreds[accessKey];
 
+if (!privateKey) {
+  console.log(`Could not find private key for access key: ${accessKey}`);
+  process.exit(1);
+}
+
 const skdb = await createConnectedSkdb(values.host, values.db, {
   accessKey: accessKey,
   privateKey: privateKey,
 });
 
-const evalQuery = async function(skdb, query) {
-  if (args.values['pipe-separated-output']) {
-    let answer = await skdb.sqlRaw(query, new Map(), true);
-    answer = answer.trim();
-    return answer;
+const evalQuery = async function(skdb_client, query) {
+  const rows = await skdb_client.exec(query);
+  if (args.values['json-output']) {
+    const acc: Array<string> = [];
+    for (const row of rows) {
+      acc.push(JSON.stringify(row));
+    }
+
+    console.log(acc.join("\n"));
+  } else if (args.values['pipe-separated-output']) {
+    if (rows.length < 1) {
+      return;
+    }
+
+    const acc: Array<string> = [];
+    const keys = Object.keys(rows[0]);
+
+    acc.push(keys.join("|"));
+
+    for (const row of rows) {
+      const rowacc: Array<string> = [];
+      for (const key of keys) {
+        rowacc.push(row[key]);
+      }
+      acc.push(rowacc.join("|"));
+    }
+
+    console.log(acc.join("\n"));
   } else {
-    return skdb.sql(query, new Map(), true);
+    if (rows.length < 1) {
+      return;
+    }
+    console.table(rows);
   }
 };
 
@@ -296,11 +332,10 @@ const remoteRepl = async function() {
     }
 
     try {
-      const answer = await evalQuery(skdb, query);
-      console.log(answer);
+      await evalQuery(skdb, query);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
-      console.error(ex.trim());
+      console.error(ex);
     }
   }
 };
@@ -375,7 +410,7 @@ const localRepl = async function() {
       continue;
     }
 
-    if (query.startsWith('.mirror-table')) {
+    if (query.startsWith('.mirror')) {
       const args = query.split(" ");
       const table = args[1];
       const filter = args.slice(2).join(' ');
@@ -389,11 +424,10 @@ const localRepl = async function() {
     }
 
     try {
-      const answer = await evalQuery(skdb, query);
-      console.log(answer);
+      await evalQuery(skdb, query);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
-      console.error(ex.trim());
+      console.error(ex);
     }
   }
 };
@@ -413,12 +447,11 @@ try {
 
 if (query.trim() !== "") {
   try {
-    const answer = await evalQuery(skdb, query);
-    console.log(answer);
+    await evalQuery(skdb, query);
   } catch (ex) {
     console.error("Could not eval query.");
+    console.error(ex);
     process.exit(1);
-    console.error(ex.trim());
   }
 }
 
