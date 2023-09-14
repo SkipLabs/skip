@@ -56,7 +56,7 @@ libbacktrace:
 	$(MAKE) -C libbacktrace
 
 runtime64_specific.o: runtime64_specific.cpp
-	clang++ $(OLEVEL) -g -o $@ -c -Ilibbacktrace/ $<
+	clang++ -std=c++11 $(OLEVEL) -g -o $@ -c -Ilibbacktrace/ $<
 
 %.o: %.c
 	clang $(CC64FLAGS) -g -o $@ -c $<

@@ -38,8 +38,8 @@ namespace {
 
 struct backtrace_data {
   bool full_trace;
-  bool before_main = true;
-  bool before_throw = true;
+  bool before_main;
+  bool before_throw;
 };
 
 static int print_callback(void* data, uintptr_t pc, const char* filename,
@@ -95,7 +95,7 @@ void printStackTrace() {
     return;
   }
 
-  backtrace_data data{false};
+  backtrace_data data{false, true, true};
   backtrace_full(state, 3, print_callback, error_callback, &data);
 }
 
