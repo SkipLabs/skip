@@ -64,3 +64,91 @@ fun migrationDiff(
 
   tableChanges.collect(Map)
 }
+
+fun adjustSerialisedValues(
+  row: RowValues,
+  nameToIndex: Map<Name, Int>,
+  colChanges: Array<TableChange>,
+): mutable Iterator<String> {
+  for (newCol in colChanges) {
+    newCol match {
+    | TcNoChange(col) ->
+      v = row.values[nameToIndex.get(col.name)];
+      yield v match {
+      | None() -> "NULL"
+      | Some(CInt(n)) -> n.toString()
+      | Some(CFloat(f)) -> f.toString()
+      | Some(CString(s)) -> escapeStringStr(s)
+      }
+    | TcNewCol(_col) -> yield "NULL" // TODO: what if not null? etc.
+    | TcChange(_old, new) -> // TODO: type, primary, unique, not null. default should not matter.
+      v = row.values[nameToIndex.get(new.name)];
+      yield v match {
+      | None() -> "NULL"
+      | Some(CInt(n)) -> n.toString()
+      | Some(CFloat(f)) -> f.toString()
+      | Some(CString(s)) -> escapeStringStr(s)
+      }
+    }
+  }
+}
+
+fun dumpAdjustedInserts(
+  origContext: readonly SKStore.Context,
+  changes: Map<Name, SchemaChange>,
+): void {
+  context = SKStore.Context::fromSaved(origContext.clone());
+  handle = getTableDir(context);
+  sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
+  _ = handle.map(
+    RowKey::keyType,
+    handle.type,
+    context,
+    sinkName,
+    (context, _writer, _key, values) ~> {
+      dirDescr = values.first;
+      if (!dirDescr.isInput) return void;
+
+      changes.maybeGet(dirDescr.name) match {
+      | None() -> invariant_violation(`Could not find ${dirDescr.name}`)
+      | Some(ScRemoveTable()) -> return void
+      | Some(ScMigrateTable(colChanges)) ->
+        o = print_raw;
+        fileIter = context
+          .unsafeGetEagerDir(dirDescr.dirName)
+          .unsafeGetFileIter();
+        o("BEGIN TRANSACTION;\n");
+        for (kv in fileIter) {
+          (_, files) = kv;
+          for (file in files) {
+            row = RowValues::type(file);
+            colNames = colChanges
+              .map(tc ->
+                tc match {
+                | TcNoChange(col) -> Some(col.name.origName)
+                | TcNewCol(col) -> Some(col.name.origName)
+                | TcChange(_old, new) -> Some(new.name.origName)
+                }
+              )
+              .filterNone();
+            colNamesStr = "(" + colNames.join(", ") + ")";
+            serialisedValues = adjustSerialisedValues(
+              row,
+              dirDescr.cols,
+              colChanges,
+            ).collect(Array);
+            valuesStr = "(" + serialisedValues.join(", ") + ")";
+            insert = `INSERT INTO ${
+              dirDescr.name
+            } ${colNamesStr} VALUES ${valuesStr};\n`;
+            for (_ in Range(0, row.repeat)) {
+              o(insert);
+            };
+          };
+        };
+        o("COMMIT;\n");
+        flushStdout()
+      };
+    },
+  );
+}
