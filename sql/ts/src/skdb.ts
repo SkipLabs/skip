@@ -1,7 +1,7 @@
 import { run, loadEnv, isNode} from "#std/sk_types";
-import { SKDBShared } from "#skdb/skdb_types";
+import { SKDB, SKDBSync, SKDBShared } from "#skdb/skdb_types";
 import { SKDBWorker } from "#skdb/skdb_wdatabase";
-export {SKDB} from "#skdb/skdb_types";
+export {SKDB, SKDBSync} from "#skdb/skdb_types";
 
 var wasm64 = "skdb";
 var modules = [ /*--MODULES--*/];
@@ -12,21 +12,29 @@ export async function createSkdb(options: {
   dbName ?: string,
   asWorker?: boolean,
   getWasmSource?: () => Promise<Uint8Array>
-} = {}) {
+} = {}) : Promise<SKDB> {
   const asWorker = (options.asWorker != undefined) ? options.asWorker : !options.getWasmSource;
   if (!asWorker) {
-    return await createOnMain(options.dbName, options.getWasmSource);
+    return createOnMain(options.dbName, options.getWasmSource);
   } else {
     if (options.getWasmSource) {
       throw new Error("getWasmSource is not compatible with worker")
     }
-    return await createWorker(options.dbName);
+    return createWorker(options.dbName);
   }
+}
+
+export async function createSkdbSync(options: {
+  dbName ?: string,
+  getWasmSource?: () => Promise<Uint8Array>
+} = {}) : Promise<SKDBSync> {
+  let data = await run(wasm64, modules, extensions, "SKDB_factory", options.getWasmSource);
+  return (data.environment.shared.get("SKDB") as SKDBShared).createSync(options.dbName);
 }
 
 async function createOnMain(dbName ?: string, getWasmSource?: () => Promise<Uint8Array>) {
   let data = await run(wasm64, modules, extensions, "SKDB_factory", getWasmSource);
-  return await (data.environment.shared.get("SKDB") as SKDBShared).create(dbName);
+  return (data.environment.shared.get("SKDB") as SKDBShared).create(dbName);
 }
 
 async function createWorker(dbName ?: string) {

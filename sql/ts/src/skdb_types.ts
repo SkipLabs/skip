@@ -1,11 +1,53 @@
 import { Shared } from "#std/sk_types";
 
-
-
 export interface SkdbHandle {
-  runner: (fn: () => string) => Promise<Array<any>>;
+  runner: (fn: () => string) => Array<any>;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
+}
+
+export interface SKDBSync {
+  // CLIENT
+  exec: (query: string, params: Params) => Array<any>;
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
+  insert: (tableName: string, values: Array<any>) => boolean;
+
+  tableSchema: (tableName: string) => string;
+  viewSchema: (viewName: string) => string;
+  schema: () => string;
+  subscribe: (viewName: string, f: (change: string) => void) => void;
+  save: () => Promise<boolean>;
+  
+  // SERVEUR
+  connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
+  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+  
+  createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
+  createServerUser: () => Promise<ProtoResponseCreds>;
+  serverExec: (query: string, params: Params) => Promise<Array<any>>;
+  serverTableSchema: (tableName: string) => Promise<string>;
+  serverViewSchema: (tableName: string) => Promise<string>;
+  serverSchema: () => Promise<string>;
+  serverClose: () => void;
+}
+
+export interface SKDB {
+  exec: (query: string, params: Params, server?: boolean) => Promise<Array<any>>;
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
+  insert: (tableName: string, values: Array<any>) => Promise<boolean>;
+
+  connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
+  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+  createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
+  createServerUser: () => Promise<ProtoResponseCreds>;
+  serverClose: () => Promise<void>;
+
+  tableSchema: (tableName: string, server?: boolean) => Promise<string>;
+  viewSchema: (viewName: string, server?: boolean) => Promise<string>;
+  schema: (server?: boolean) => Promise<string>;
+  
+  subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
+  save: () => Promise<boolean>;
 }
 
 export interface SKDB {
@@ -34,8 +76,8 @@ export interface SkdbMechanism {
   getReplicationUid: (deviceUuid: string) => string;
   subscribe: (replicationUid: string, table: string, updateFile: string) => string;
   diff: (watermark: bigint, session: string) => ArrayBuffer | null;
-  tableExists: (tableName: string) => Promise<boolean>;
-  sql: (query: string) => Promise<Array<any>>;
+  tableExists: (tableName: string) => boolean;
+  exec: (query: string) => Array<any>;
   assertCanBeMirrored: (tableName: string) => void;
   toggleView: (tableName: string) => void;
 }
@@ -63,8 +105,7 @@ export interface Server {
   tableSchema: (tableName: string) => Promise<string>;
   viewSchema: (viewName: string) => Promise<string>;
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
-  sqlRaw: (query: string, params: Params) => Promise<string>;
-  sql: (query: string, params: Params) => Promise<Array<any>>;
+  exec: (query: string, params: Params) => Promise<Array<any>>;
   close(): void;
 }
 
@@ -81,6 +122,7 @@ export interface PagedMemory {
 
 export interface SKDBShared extends Shared {
   create: (dbName ?: string, asWorker ?: boolean) => Promise<SKDB>;
+  createSync: (dbName ?: string, asWorker ?: boolean) => Promise<SKDBSync>;
 }
 
 /* ***************************************************************************/
