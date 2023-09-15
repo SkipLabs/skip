@@ -436,7 +436,12 @@ fun execDump(args: Cli.ParseResults, options: SKDB.Options): void {
 
 fun execMigrate(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  _stmts = SKDB.slurpStmts(options);
+  stmts = SKDB.slurpStmts(options);
+  SKDB.runSql(options, context ~> {
+    schema = SKDB.getTables(context);
+    _def = migrationDiff(stmts, schema);
+    SKStore.CStop(None())
+  })
 }
 
 fun execLoadCsv(args: Cli.ParseResults, options: SKDB.Options): void {
