@@ -1199,6 +1199,49 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
   })
 }
 
+fun slurpStmts(options: Options): Array<Stmt> {
+  line = 0;
+  lineStr = "";
+  buffer = Buffer(lineStr);
+  lex = Lexer(0, buffer);
+  pos = 0;
+  stmts = mutable Vector[];
+
+  doOnError(
+    options,
+    () -> {
+      loop {
+        (!line, !lineStr) = read(line);
+        !buffer = Buffer(lineStr);
+        !lex = Lexer(0, buffer);
+        !pos = 0;
+
+        if (isEOF(lex, pos)) {
+          return void;
+        };
+
+        (!pos, stmtOpt) = parseStmt(lex, pos);
+        stmt = stmtOpt match {
+        | None() -> continue
+        | Some(x) -> x
+        };
+        stmts.push(stmt);
+      };
+    },
+    err -> {
+      err match {
+      | IgnoreAndContinue() -> void
+      | Error(posError, str) -> printErrorAndExit(line, buffer, posError, str)
+      | exn ->
+        print_error(exn.getMessage());
+        skipExit(44)
+      }
+    },
+  );
+
+  stmts.collect(Array)
+}
+
 fun runSql(
   options: Options,
   f: mutable SKStore.Context ~> SKStore.ContextOp,
