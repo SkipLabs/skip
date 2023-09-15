@@ -2,11 +2,29 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-BUILD=/skfs/build
-SKDB_BIN=$BUILD/skdb
+SQL_PATH=$(realpath $SCRIPT_DIR/../..)
+
+SKDB_BIN="skargo run --path $SQL_PATH --"
+
+if [ -f ~/.skdb/config.prop ];then
+  file=$(realpath ~/.skdb/config.prop)
+  while IFS='=' read -r key value
+  do
+    eval ${key}="\${value}"
+  done < "$file"
+  if [[ $# -gt 0 ]]; then
+    server_args="$* --config $file"
+  else
+    server_args="--config $file"
+  fi
+fi
+
+if [ -z "$skdb_port" ]; then
+    skdb_port=8080
+fi
 
 SERVER_PID_FILE=$(mktemp)
-SERVER_DB=/var/db/soak.db
+SERVER_DB="$skdb_databases"soak.db
 SOAK_SERVER_LOG=/tmp/soak-server-log
 SERVER_LOG=/tmp/server.log
 
@@ -23,7 +41,7 @@ trap 'handle_term' EXIT
 run_server() {
     rm -f "$SERVER_DB"
 
-    "$SCRIPT_DIR"/../deploy/create_db.sh soak abcdef
+    DB_PREFIX=$skdb_databases "$SCRIPT_DIR"/../deploy/create_db.sh soak abcdef
 
     (echo "BEGIN TRANSACTION;";
      echo "INSERT INTO skdb_users VALUES(1, 'test_user1', 'test');"
@@ -69,17 +87,15 @@ run_server
 # TODO: should wait on some signal from the server
 sleep 10
 
-cd /skfs/sql/js || exit 1
-
 echo "Starting clients..."
 
 client1_out=/tmp/client1.out
 client2_out=/tmp/client2.out
 
-/usr/bin/env node ../server/test/soak_client.mjs 1 > $client1_out 2>&1 &
+/usr/bin/env node $SCRIPT_DIR/soak_client.mjs 1 $skdb_port > $client1_out 2>&1 &
 client1=$!
 
-/usr/bin/env node ../server/test/soak_client.mjs 2 > $client2_out 2>&1 &
+/usr/bin/env node $SCRIPT_DIR/soak_client.mjs 2 $skdb_port > $client2_out 2>&1 &
 client2=$!
 
 monitor() {
