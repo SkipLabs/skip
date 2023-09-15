@@ -578,7 +578,11 @@ fun getIndexByName(
 fun getTables(origContext: readonly SKStore.Context): Array<DirDescr> {
   context = SKStore.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);
-  handle.items(context).flatMap(x -> x.i1).collect(Array);
+  handle
+    .items(context)
+    .flatMap(x -> x.i1)
+    .filter(x -> x.isInput)
+    .collect(Array);
 }
 
 fun getTable(context: mutable SKStore.Context, pos: Int, name: Name): DirDescr {
