@@ -1,8 +1,8 @@
 
 import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types";
-import { PagedMemory, Page, SKDBCallable, Storage, SKDB, ExternalFuns, SkdbHandle, Params } from "#skdb/skdb_types";
+import { PagedMemory, Page, Storage, SKDB, ExternalFuns, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
 import { IDBStorage } from "#skdb/skdb_storage";
-import { SKDBImpl } from "#skdb/skdb_database";
+import { SKDBImpl, SKDBSyncImpl } from "#skdb/skdb_database";
 
 
 interface Exported {
@@ -17,13 +17,13 @@ interface Exported {
 }
 
 class SkdbHamdleImpl implements SkdbHandle {
-  runner: (fn: () => string) => Promise<Array<any>>;
+  runner: (fn: () => string) => Array<any>;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
 
   constructor(
     main: (new_args: Array<string>, new_stdin: string) => string,
-    runner: (fn: () => string) => Promise<Array<any>>,
+    runner: (fn: () => string) => Array<any>,
     watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
   ) {
     this.runner = runner;
@@ -145,14 +145,17 @@ class SKDBMemory implements PagedMemory {
 
 class SKDBShared implements Shared {
   getName = () => "SKDB";
-  create: (dbName?: string, asWorker?: boolean) => Promise<SKDB>;
-  constructor(create: (dbName?: string) => Promise<SKDB>) {
-    this.create = async (dbName?: string, asWorker?: boolean) => {
-      asWorker = asWorker === false ? false : true;
-      // todo Manage worker
-      return await create(dbName);
-    };
+  createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
+  constructor(
+    createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>
+  ) {
+    this.createSync = createSync;
   }
+
+  async create(dbName?: string, asWorker?: boolean) {
+    let skdbSync = await this.createSync(dbName)
+    return new SKDBImpl(skdbSync);
+  } 
 }
 
 class LinksImpl implements Links, ToWasm {
@@ -183,8 +186,9 @@ class LinksImpl implements Links, ToWasm {
   SKIP_unix_strftime: (tm: ptr) => ptr;
   SKIP_js_user_fun: (queryID: int) => void;
   SKIP_js_mark_query: (queryID: int, notify: int) => void;
-  notifyAllJS: () => void;
-
+  // Utils
+  notifyAllJS: () => void;  
+  
   constructor(environment: Environment) {
     this.environment = environment;
     this.state = new ExternalFuns();
@@ -264,7 +268,7 @@ class LinksImpl implements Links, ToWasm {
     this.SKIP_js_mark_query = (queryID: int, notify: int) => {
       this.queriesToNotify.set(queryID, notify);
     }
-    let runner = async (fn: () => string) => {
+    let runner = (fn: () => string) => {
       this.stdout_objects = new Array();
       let stdout = fn();
       if (stdout == "") {
@@ -313,7 +317,7 @@ class LinksImpl implements Links, ToWasm {
       }
     }
     let handle = new SkdbHamdleImpl(main, runner, watch);
-    let create = async (dbName?: string) => {
+    let createSync = async (dbName?: string) => {
       let save: () => Promise<boolean> = async () => true;
       let storeName = dbName ? "SKDBStore" : null;
       if (storeName != null) {
@@ -331,9 +335,9 @@ class LinksImpl implements Links, ToWasm {
         save = this.storage!.save;
       };
       handle.init();
-      return await SKDBImpl.create(handle, this.environment, save);
+      return SKDBSyncImpl.create(handle, this.environment, save);
     };
-    this.environment.shared.set("SKDB", new SKDBShared(create));
+    this.environment.shared.set("SKDB", new SKDBShared(createSync));
   };
 }
 

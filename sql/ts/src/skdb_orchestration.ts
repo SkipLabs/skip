@@ -1474,8 +1474,8 @@ class SKDBServer implements Server {
     if (!await this.client.tableExists(tableName)) {
       let createTable = await this.tableSchema(tableName);
       await Promise.all([
-        this.client.sql(createTable),
-        this.client.sql(`CREATE TABLE ${metadataTable(tableName)} (
+        this.client.exec(createTable),
+        this.client.exec(`CREATE TABLE ${metadataTable(tableName)} (
             key STRING PRIMARY KEY,
             value STRING
           )`),
@@ -1495,19 +1495,7 @@ class SKDBServer implements Server {
     return this.establishServerTail(tableName, filterExpr || "");
   }
 
-  async sqlRaw(stdin: string, params: Params = new Map()): Promise<string> {
-    if (params instanceof Map) {
-      params = Object.fromEntries(params);
-    }
-    stdin = JSON.stringify(params) + '\n' + stdin;
-    return this.makeStringRequest({
-      type: "query",
-      query: stdin,
-      format: "raw",
-    });
-  }
-
-  async sql(stdin: string, params: Params = new Map()): Promise<any[]> {
+  async exec(stdin: string, params: Params = new Map()): Promise<any[]> {
     if (params instanceof Map) {
       params = Object.fromEntries(params);
     }

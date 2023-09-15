@@ -1,6 +1,6 @@
 
-import { Environment, FileSystem} from "#std/sk_types";
-import { SkdbMechanism, SKDB, Server, SKDBCallable, SkdbHandle, Params} from "#skdb/skdb_types";
+import { Environment, FileSystem } from "#std/sk_types";
+import { SkdbMechanism, SKDB, Server, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
@@ -11,13 +11,13 @@ class SkdbMechanismImpl implements SkdbMechanism {
   subscribe: (replicationUid: string, table: string, updateFile: string) => string;
   diff: (watermark: bigint, session: string) => ArrayBuffer | null;
   assertCanBeMirrored: (tableName: string) => void;
-  tableExists: (tableName: string) => Promise<boolean>;
-  sql: (query: string) => Promise<Array<any>>;
+  tableExists: (tableName: string) => boolean;
+  exec: (query: string) => Array<any>;
   toggleView: (tableName: string) => void;
 
-  constructor(client: SKDBImpl, fs: FileSystem, utf8Encode: (v: string) => Uint8Array) {
-    this.tableExists = (tableName: string) => client.tableExists(tableName);
-    this.sql = (query: string) => client.exec(query);
+  constructor(client: SKDBSyncImpl, fs: FileSystem, utf8Encode: (v: string) => Uint8Array) {
+    this.tableExists = (tableName: string) => client.tableSchema(tableName) != "";
+    this.exec = (query: string) => client.exec(query);
     this.assertCanBeMirrored = (tableName: string) => client.assertCanBeMirrored(tableName);
     this.watermark = (replicationId: string, table: string) => {
       return BigInt(client.runLocal(["watermark", "--source", replicationId, table], ""));
@@ -52,7 +52,7 @@ class SkdbMechanismImpl implements SkdbMechanism {
           "--since",
           watermark.toString(),
           session,
-        ], 
+        ],
         ""
       );
       if (d.trim() == "") {
@@ -66,7 +66,7 @@ class SkdbMechanismImpl implements SkdbMechanism {
   }
 }
 
-export class SKDBImpl implements SKDB {
+export class SKDBSyncImpl implements SKDBSync {
   private environment: Environment;
   private subscriptionCount: number = 0;
   private clientUuid: string = "";
@@ -74,9 +74,9 @@ export class SKDBImpl implements SKDB {
 
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
-  
-  private runner: (fn: () => string) => Promise<Array<any>>;
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
+
+  private runner: (fn: () => string) => Array<any>;
 
   server?: Server;
 
@@ -85,20 +85,17 @@ export class SKDBImpl implements SKDB {
     this.fs = environment.fs();
   }
 
-  static async create(
+  static create(
     handle: SkdbHandle,
     env: Environment,
-    save: () => Promise<boolean> 
-  ): Promise<SKDB> {
-    let client = new SKDBImpl(env);
+    save: () => Promise<boolean>
+  ): SKDBSync {
+    let client = new SKDBSyncImpl(env);
     client.save = save;
     client.runLocal = handle.main;
     client.clientUuid = env.crypto().randomUUID();
     client.runner = handle.runner;
-    client.watch = (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
-      let closable = handle.watch(query, params, onChange);
-      return Promise.resolve({close: () => Promise.resolve(closable.close())})
-    };
+    client.watch = handle.watch;
     return client;
   }
 
@@ -122,9 +119,9 @@ export class SKDBImpl implements SKDB {
       privateKey: privateKey,
       deviceUuid: this.clientUuid,
     };
-    
+
     this.server = await connect(
-      this.environment, 
+      this.environment,
       new SkdbMechanismImpl(this, this.fs, this.environment.encodeUTF8),
       endpoint,
       db,
@@ -136,7 +133,7 @@ export class SKDBImpl implements SKDB {
     return BigInt(this.runLocal(["watermark", "--source", replicationId, table], ""));
   }
 
-  subscribe = async (viewName: string, f: (change: string) => void) => {
+  subscribe = (viewName: string, f: (change: string) => void) => {
     const fileName = "/subscriptions/sub" + this.subscriptionCount;
     this.fs.watchFile(fileName, f);
     this.subscriptionCount++;
@@ -159,54 +156,28 @@ export class SKDBImpl implements SKDB {
     return [args1, stdin1];
   }
 
-  exec = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
-    if (server) {
-      return this.server!.sql(stdin, params);
-    } else {
-      return this.runner(() => {
-        let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
-        return this.runLocal(args1, stdin1)
-      });
-    }
+  exec = (stdin: string, params: Params = new Map()) => {
+    return this.runner(() => {
+      let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
+      return this.runLocal(args1, stdin1)
+    });
   }
 
-  
-
-  tableExists = async (tableName: string) => {
-    return this.runLocal(["dump-table", tableName], "").trim() != "";
+  tableSchema = (tableName: string) => {
+    return this.runLocal(["dump-table", tableName], "");
   }
 
-  tableSchema = async (tableName: string, server: boolean = false) => {
-    if (server) {
-      return this.server!.tableSchema(tableName);
-    } else {
-      return this.runLocal(["dump-table", tableName], "");
-    }
+  viewSchema = (viewName: string) => {
+    return this.runLocal(["dump-view", viewName], "")
   }
 
-  viewExists = async (viewName: string) => {
-    return this.runLocal(["dump-view", viewName], "") != "";
+  schema = () => {
+    const tables = this.runLocal(["dump-tables"], "");
+    const views = this.runLocal(["dump-views"], "");
+    return tables + views;
   }
 
-  viewSchema = async (viewName: string, server: boolean = false) => {
-    if (server) {
-      return this.server!.viewSchema(viewName);
-    } else {
-      return this.runLocal(["dump-view", viewName], "");
-    }
-  }
-
-  schema = async (server: boolean = false) => {
-    if (server) {
-      return this.server!.schema();
-    } else {
-      const tables = this.runLocal(["dump-tables"], "");
-      const views = this.runLocal(["dump-views"], "");
-      return tables + views;
-    }
-  }
-
-  insert = async (tableName: string, values: Array<any>) => {
+  insert = (tableName: string, values: Array<any>) => {
     let params = new Map();
     let keys =
       values.map((val, i) => {
@@ -228,8 +199,107 @@ export class SKDBImpl implements SKDB {
     throw new Error(error);
   }
 
+  async serverExec(query: string, params: Params) {
+    return this.server!.exec(query, params);
+  }
+
+  async serverTableSchema(tableName: string) {
+    return this.server!.tableSchema(tableName);
+  };
+
+  async serverViewSchema(tableName: string) {
+    return this.server!.viewSchema(tableName);
+  };
+
+  async serverSchema() {
+    return this.server!.schema();
+  }
+
   createServerDatabase = (dbName: string) => this.server!.createDatabase(dbName);
   createServerUser = () => this.server!.createUser();
   mirror = (tableName: string, filterExpr?: string) => this.server!.mirror(tableName, filterExpr);
-  serverClose = () => Promise.resolve(this.server!.close());
+  serverClose = () => this.server!.close();
 }
+
+export class SKDBImpl implements SKDB {
+  private skdbSync: SKDBSync;
+
+  constructor(skdbSync: SKDBSync) {
+    this.skdbSync = skdbSync;
+  }
+
+  async connect(
+    db: string,
+    accessKey: string,
+    privateKey: CryptoKey,
+    endpoint?: string,
+  ): Promise<void> {
+    return this.skdbSync.connect(db, accessKey, privateKey, endpoint);
+  }
+
+  subscribe = async (viewName: string, f: (change: string) => void) => {
+    return this.skdbSync.subscribe(viewName, f);
+  }
+
+  exec = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
+    if (server) {
+      return this.skdbSync.serverExec(stdin, params);
+    } else {
+      return this.skdbSync.exec(stdin, params);
+    }
+  }
+
+  async watch(query: string, params: Params, onChange: (rows: Array<any>) => void) {
+    let closable = this.skdbSync.watch(query, params, onChange);
+    return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
+  }
+
+  tableSchema = async (tableName: string, server: boolean = false) => {
+    if (server) {
+      return this.skdbSync.serverTableSchema(tableName);
+    } else {
+      return this.skdbSync.tableSchema(tableName);
+    }
+  }
+
+  viewSchema = async (viewName: string, server: boolean = false) => {
+    if (server) {
+      return this.skdbSync.serverViewSchema(viewName);
+    } else {
+      return this.skdbSync.viewSchema(viewName);
+    }
+  }
+
+  schema = async (server: boolean = false) => {
+    if (server) {
+      return this.skdbSync.serverSchema();
+    } else {
+      return this.skdbSync.schema();
+    }
+  }
+
+  async insert(tableName: string, values: Array<any>) {
+    return this.skdbSync.insert(tableName, values);
+  }
+
+  async createServerDatabase(dbName: string) {
+    return this.skdbSync.createServerDatabase(dbName);
+  }
+
+  async createServerUser() {
+    return this.skdbSync.createServerUser();
+  }
+
+  async mirror(tableName: string, filterExpr?: string) {
+    return this.skdbSync.mirror(tableName, filterExpr);
+  }
+
+  async serverClose() {
+    this.skdbSync.serverClose()
+  }
+
+  async save() {
+    return this.skdbSync.save()
+  }
+}
+
