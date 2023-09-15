@@ -29,8 +29,13 @@ import io.skiplabs.skdb.openSkdb
 import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.HttpHandler
+import io.undertow.server.HttpServerExchange
 import io.undertow.server.handlers.PathTemplateHandler
+import io.undertow.util.Headers
+import io.undertow.util.HttpString
+import io.undertow.util.Methods
 import io.undertow.util.PathTemplateMatch
+import io.undertow.util.StatusCodes
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
 import java.io.OutputStream
@@ -287,28 +292,54 @@ fun connectionHandler(
           }))
 }
 
-fun createHttpServer(connectionHandler: HttpHandler): Undertow {
-  var pathHandler = PathTemplateHandler().add("/dbs/{database}/connection", connectionHandler)
+fun usersHandler(): HttpHandler {
+  return object : HttpHandler {
+
+    override fun handleRequest(exchange: HttpServerExchange) {
+      val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+      val db = pathParams["database"]
+
+      if (db == null) {
+        throw RuntimeException("database not provided")
+      }
+
+      if (exchange.requestMethod == Methods.GET) {
+        var skdb = openSkdb(db)
+        if (skdb == null) {
+          createDb(db)
+          skdb = openSkdb(db)
+        }
+        exchange.responseHeaders.put(Headers.CONTENT_TYPE, "application/json")
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
+        exchange.responseSender.send(
+            skdb!!
+                .sql("SELECT userName as accessKey, privateKey FROM skdb_users", OutputFormat.JSON)
+                .decodeOrThrow())
+      } else {
+        exchange.statusCode = StatusCodes.METHOD_NOT_ALLOWED
+      }
+    }
+  }
+}
+
+fun createHttpServer(connectionHandler: HttpHandler, usersHandler: HttpHandler): Undertow {
+  var pathHandler =
+      PathTemplateHandler()
+          .add("/dbs/{database}/connection", connectionHandler)
+          .add("/dbs/{database}/users", usersHandler)
   return Undertow.builder().addHttpListener(ENV.port, "0.0.0.0").setHandler(pathHandler).build()
 }
 
-fun main(args: Array<String>) {
-  val arglist = args.toList()
-
-  val createIdx = arglist.indexOf("--create-db")
-  if (createIdx >= 0 && arglist.size > createIdx + 1) {
-    val db = arglist.get(createIdx + 1)
-    val creds = createDb(db)
-    println("------------------------------------------------------")
-    println("Database `${db}` successfully created.")
-    println("Use the following credentials to connect to it.")
-    println("access key: ${creds.accessKey}")
-    println("private key: ${creds.b64privateKey()}")
-    println("------------------------------------------------------")
-  }
-
+fun main() {
   val taskPool = Executors.newSingleThreadScheduledExecutor()
   val connHandler = connectionHandler(taskPool)
-  val server = createHttpServer(connHandler)
+  val usersHandler = usersHandler()
+  val server = createHttpServer(connHandler, usersHandler)
   server.start()
+
+  println("SKDB dev server has started")
+  println("------------------------------------------------------")
+  println("The following dev resources are available:")
+  println("GET /dbs/{database}/users")
+  println("------------------------------------------------------")
 }

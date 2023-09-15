@@ -11,7 +11,7 @@ git clean -xdn | sed 's|Would remove |/|g' > .dockerignore
 
 echo "Building ref server image"
 # TODO: needs to buildx for x86 and arm
-docker build -t skdb-ref-server --progress=plain -f sql/server/reference/Dockerfile .
+docker build -t skdb-dev-server --progress=plain -f sql/server/dev/Dockerfile .
 
 git restore .dockerignore
 echo "Pushing image to docker"
