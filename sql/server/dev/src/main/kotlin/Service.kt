@@ -30,6 +30,7 @@ import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.HttpHandler
 import io.undertow.server.HttpServerExchange
+import io.undertow.server.handlers.BlockingHandler
 import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.Headers
 import io.undertow.util.HttpString
@@ -39,8 +40,10 @@ import io.undertow.util.StatusCodes
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
 import java.io.OutputStream
+import java.io.File
 import java.nio.ByteBuffer
 import java.security.SecureRandom
+import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 
@@ -294,7 +297,6 @@ fun connectionHandler(
 
 fun usersHandler(): HttpHandler {
   return object : HttpHandler {
-
     override fun handleRequest(exchange: HttpServerExchange) {
       val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
       val db = pathParams["database"]
@@ -322,11 +324,76 @@ fun usersHandler(): HttpHandler {
   }
 }
 
-fun createHttpServer(connectionHandler: HttpHandler, usersHandler: HttpHandler): Undertow {
+fun schemaHandler(): HttpHandler {
+  return BlockingHandler(
+      object : HttpHandler {
+        override fun handleRequest(exchange: HttpServerExchange) {
+          val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+          val db = pathParams["database"]
+
+          if (db == null) {
+            throw RuntimeException("database not provided")
+          }
+
+          if (exchange.requestMethod == Methods.GET) {
+            // TODO: dump the schema
+            return
+          }
+
+          if (exchange.requestMethod == Methods.PUT) {
+            var old = openSkdb(db)
+            val tmp_name = UUID.randomUUID().toString()
+            createDb(tmp_name)
+            var new = openSkdb(tmp_name)
+
+            val schema = exchange.inputStream.bufferedReader().use { it.readText() }
+
+            try {
+              new?.sql(schema, OutputFormat.RAW)?.decodeOrThrow()
+              println("Schema successfully applied.")
+            } catch (ex: Exception) {
+              println("Could not create a database with the new schema:\n${schema}")
+              exchange.statusCode = StatusCodes.BAD_REQUEST
+              return
+            }
+
+            if (old != null) {
+              try {
+                val inserts = old.migrate(schema).decodeOrThrow()
+                println("Auto-migration:\n${inserts}")
+                new?.sql(inserts, OutputFormat.RAW)?.decodeOrThrow()
+                println("Old data successfully migrated to the new schema.")
+              } catch (ex: Exception) {
+                println("Failed to migrate data to the new schema.")
+                // TODO: why? what did skdb complain about? why isn't this in the log?
+                exchange.statusCode = StatusCodes.BAD_REQUEST
+                return
+              }
+            }
+
+            val dbPath = ENV.resolveDbPath(db)
+            val tmpPath = ENV.resolveDbPath(tmp_name)
+            // val archivePath = ENV.resolveDbPath(tmp_name)
+            File(tmpPath).renameTo(File(dbPath))
+            return
+          }
+
+          exchange.statusCode = StatusCodes.METHOD_NOT_ALLOWED
+          return
+        }
+      })
+}
+
+fun createHttpServer(
+    connectionHandler: HttpHandler,
+    usersHandler: HttpHandler,
+    schemaHandler: HttpHandler
+): Undertow {
   var pathHandler =
       PathTemplateHandler()
           .add("/dbs/{database}/connection", connectionHandler)
           .add("/dbs/{database}/users", usersHandler)
+          .add("/dbs/{database}/schema", schemaHandler)
   return Undertow.builder().addHttpListener(ENV.port, "0.0.0.0").setHandler(pathHandler).build()
 }
 
@@ -334,12 +401,14 @@ fun main() {
   val taskPool = Executors.newSingleThreadScheduledExecutor()
   val connHandler = connectionHandler(taskPool)
   val usersHandler = usersHandler()
-  val server = createHttpServer(connHandler, usersHandler)
+  val schemaHandler = schemaHandler()
+  val server = createHttpServer(connHandler, usersHandler, schemaHandler)
   server.start()
 
   println("SKDB dev server has started")
   println("------------------------------------------------------")
   println("The following dev resources are available:")
   println("GET /dbs/{database}/users")
+  println("PUT /dbs/{database}/schema")
   println("------------------------------------------------------")
 }
