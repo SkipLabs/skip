@@ -16,7 +16,9 @@ ROOT_KEY=$2
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-DB_PREFIX=/var/db/
+if [ -z "$DB_PREFIX" ]; then
+    DB_PREFIX=/var/db/
+fi
 DB_SUFFIX=.db
 
 DB_FILE=$DB_PREFIX$DB_NAME$DB_SUFFIX
@@ -29,7 +31,7 @@ then
     exit 1
 fi
 
-SKDB_BIN=/skfs/build/dev/skdb
+SKDB_BIN="skargo run --path sql --"
 SKDB="$SKDB_BIN --data $DB_FILE"
 
 $SKDB_BIN --init "$DB_FILE"
