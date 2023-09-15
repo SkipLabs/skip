@@ -1068,39 +1068,6 @@ class Options{
   expectQueryParams: Bool = false,
 } extends SKStore.File
 
-fun evalQuery(
-  context: mutable SKStore.Context,
-  params: Map<String, Value>,
-  query: String,
-): Array<RowValues> {
-  lexer = SKDB.Lexer(0, SKDB.Buffer(query));
-  selectAst = SKDB.parseQuery(lexer, 0).i1 match {
-  | x @ Select _ -> x
-  };
-  skOptions = SKDB.Options{
-    alwaysAllowJoins => false,
-    backtrace => false,
-    sync => false,
-    virtual => false,
-    showUsedIndexes => false,
-  };
-  compiler = SKDB.Compiler::create(false, skOptions, 0, params);
-  cselect = compiler.compileSelect(context, selectAst, true);
-  selectDir = SKDB.evalSelect(context, cselect, None());
-  dirName = selectDir.dirName;
-  dir = context.unsafeGetEagerDir(dirName);
-  result = mutable Vector[];
-  dir.onFiles(files -> {
-    for (kv in files) {
-      (_key, rows) = kv;
-      for (row in rows) {
-        result.push(RowValues::type(row))
-      }
-    }
-  });
-  result.toArray()
-}
-
 fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
   isTTY = isATTY() != 0;
   runSql(options, context ~> {
