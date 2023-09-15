@@ -23,7 +23,7 @@ class UserConfig(
     val SKDB_INIT = "/skfs/build/init.sql"
     val SKDB_DATABASES = "/var/db"
     val SKDB_ADD_CRED =
-        "cd /skfs/sql/js && npx skdb-cli --add-cred --host ws://localhost:%d --db %s --access-key %s <<< \"%s\""
+        "cd /skfs/build/package && npx skdb-cli --add-cred --host ws://localhost:%d --db %s --access-key %s <<< \"%s\""
 
     private fun userConfigFile(): Optional<String> {
       var path = Paths.get("").toAbsolutePath()

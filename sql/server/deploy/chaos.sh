@@ -4,7 +4,15 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-source "/root/.sdkman/bin/sdkman-init.sh"
+
+if [ -d ~/.sdkman ]
+then
+    SDKMAN=$(realpath ~/.sdkman)
+else
+    SDKMAN=/root/.sdkman
+fi
+
+source "$SDKMAN/bin/sdkman-init.sh"
 
 cd $SCRIPT_DIR/../skgw
 
@@ -17,8 +25,15 @@ PAUSED_PROCS_FILE=/tmp/chaos_paused_pids
 rm -f $PAUSED_PROCS_FILE
 SERVER_LOG=/tmp/server.log
 
+if [ -f ~/.skdb/config.prop ];then
+    file=$(realpath ~/.skdb/config.prop)
+    SERVER_ARGS="--config $file"
+else
+    SERVER_ARGS=
+fi
+
 function start_server {
-    gradle --console plain run --args="--DANGEROUS-no-encryption --dev" > $SERVER_LOG 2>&1 &
+    gradle --console plain run --args="--DANGEROUS-no-encryption --dev $SERVER_ARGS" > $SERVER_LOG 2>&1 &
     pid=$!
     echo $pid > $SERVER_PID_FILE
     echo "started server: $pid"

@@ -22,46 +22,24 @@ endif # ifdef PROFILE
 ################################################################################
 
 .PHONY: npm
-npm: sql/js/dist/skdb.wasm jss
+npm: $(SKDB_WASM) build/package/skdb build/package/package.json
+	cd build/package && npm install
 
-.PHONY: jss
-jss: sql/js/dist/skdb.js sql/js/dist/skdb-node.js sql/js/dist/skdb-cli.js
+build/package/package.json:
+	@echo -e "{" > build/package/package.json
+	@echo -e "  \"dependencies\": {" >> build/package/package.json
+	@echo -e "      \"skdb\": \"file:skdb\"" >> build/package/package.json
+	@echo -e "  }" >> build/package/package.json
+	@echo -e "}" >> build/package/package.json
+
+build/package/skdb: build/sknpm
+	cd sql && ../build/sknpm build --profile $(SKARGO_PROFILE) --dry-run ../build/package/skdb
 
 sql/target/wasm32/dev/skdb.wasm: sql/src/* skfs/src/*
 	cd sql && skargo build --target wasm32
 
 sql/target/wasm32/release/skdb.wasm: sql/src/* skfs/src/*
 	cd sql && skargo build --release --target wasm32
-
-sql/js/dist/skdb.wasm: $(SKDB_WASM)
-	mkdir -p sql/js/dist
-	cp $(SKDB_WASM) $@
-
-sql/js/node_modules: sql/js/package.json
-	cd sql/js && npm install
-
-sql/js/dist/%.js: sql/js/src/%.ts
-	cd sql/js && tsc --build tsconfig.json --pretty false
-
-sql/js/dist/%.js: sql/js/src/%.js
-	cd sql/js && tsc --build tsconfig.json --pretty false
-
-sql/js/dist/version.js: sql/js/package.json
-	./sql/js/create_version.sh
-	cd sql/js && tsc --build tsconfig.json --pretty false
-
-sql/js/dist/skdb.js: sql/js/dist/version.js sql/js/src/skdb.ts
-	cd sql/js && tsc --build tsconfig.json --pretty false
-
-sql/js/dist/skdb-node.js: sql/js/dist/skdb.js sql/js/src/node_header.js
-	mkdir -p sql/js/dist
-	cat sql/js/src/node_header.js sql/js/dist/skdb.js \
-	| sed 's|let wasmModule =.*||g' \
-	| sed 's|let wasmBuffer =.*|let wasmBuffer = fs.readFileSync(new URL("./skdb.wasm", import.meta.url));|g'> $@
-
-sql/js/dist/index.html: sql/js/tests/index.html
-	mkdir -p sql/js/dist
-	cp $^ $@
 
 $(SDKMAN_DIR):
 	cd $(dirname $(SDKMAN_DIR)) && sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
@@ -129,13 +107,9 @@ test-native: build/skdb
 	|tee /tmp/native-test.out ; \
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 
-.PHONY: test-wasm2
-test-wasm2: build/sknpm $(SKDB_WASM) $(SDKMAN_DIR)
-	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
-
 .PHONY: test-wasm
-test-wasm: npm sql/js/node_modules sql/js/dist/index.html
-	cd sql/js && npx playwright install && npx playwright test --reporter=$(PLAYWRIGHT_REPORTER)
+test-wasm: build/sknpm $(SKDB_WASM) $(SDKMAN_DIR)
+	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
 
 .PHONY: test-replication
 test-replication: build/skdb
@@ -151,16 +125,15 @@ test-tpc: test
 	@echo ""
 	@cd sql/test/TPC-h/ && ./test_tpch.sh
 
-.PHONY: test-server
-test-server: jss sql/target/wasm32/dev/skdb.wasm
-	mkdir -p sql/js/dist
-	cp sql/target/wasm32/dev/skdb.wasm sql/js/dist
-	./sql/js/tests/test_server_api/run.sh
 
-.PHONY: test-soak
-test-soak: build/skdb build/init.sql npm
+
+.PHONY: test-soak-priv
+test-soak-priv: $(SKNPM_BIN) build/skdb build/init.sql npm
 	./sql/server/test/test_soak.sh
 
+.PHONY: test-soak
+test-soak:
+	$(MAKE) SKARGO_PROFILE=dev test-soak-priv
 
 # run targets
 
