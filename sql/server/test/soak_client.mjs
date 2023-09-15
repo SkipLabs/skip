@@ -1,10 +1,5 @@
-import { SKDB } from '../../js/dist/skdb-node.js';
+import { createSkdbSync } from '../../../build/package/skdb/dist/skdb.mjs';
 import { webcrypto as crypto } from 'node:crypto';
-import fs from 'node:fs';
-
-function getWasm() {
-  return new Uint8Array(fs.readFileSync("/skfs/sql/js/dist/skdb.wasm"));
-}
 
 const tables = [
   "no_pk_inserts",
@@ -21,25 +16,24 @@ const filtered_tables = [
 ];
 
 const setup = async function(client) {
-  const skdb = await SKDB.create(null, getWasm);
+  const skdb = await createSkdbSync();
   const b64key = "test";
   const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0));
   const key = await crypto.subtle.importKey(
     "raw", keyData, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
   const user = `test_user${client}`;
-  await skdb.connect("soak", user, key, "ws://localhost:8080");
+  await skdb.connect("soak", user, key, "ws://localhost:" + (port ?? 8080));
 
   for (const table of tables) {
-    await skdb.server.mirror(table);
+    await skdb.mirror(table);
   }
 
   for (const table of filtered_tables) {
     // clients are 1 indexed. this gives us some stuff no clients care
     // about (0), stuff we care about ($client), stuff we both care
     // about (3)
-    await skdb.server.mirror(table, `value % 4 IN (${client}, 3)`);
+    await skdb.mirror(table, `value % 4 IN (${client}, 3)`);
   }
-
   return skdb;
 };
 
@@ -82,8 +76,9 @@ const modify_rows = function(client, skdb, i, cb) {
 };
 
 const client = process.argv[2];
+const port = process.argv[3];
 
-setup(client).then((skdb) => {
+setup(client, port).then((skdb) => {
 
   process.on('SIGUSR1', () => {
     console.log(`Dumping state in response to SIGUSR1.`);
@@ -120,4 +115,6 @@ setup(client).then((skdb) => {
     }
     process.exit(0);
   });
-});
+}).catch(
+  exn => console.error(exn)
+);
