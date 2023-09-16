@@ -1330,14 +1330,12 @@ fun initUnion(rowIter: mutable Iterator<Row>): Array<Row> {
 
   if (rows.size() == 0) return Array[];
   count = 0;
-  countIntersect = 0;
   intersectOrder = -1;
 
   for (row in rows) {
     row.kind match {
     | QUnion(UIntersect()) ->
       if (row.order > intersectOrder) {
-        !countIntersect = countIntersect + 1;
         !intersectOrder = row.order;
       }
     | QUnion(USingle()) -> !count = 1
@@ -1345,7 +1343,6 @@ fun initUnion(rowIter: mutable Iterator<Row>): Array<Row> {
     | QIntersect(nextIsIntersect) ->
       if (intersectOrder + 1 == row.order) {
         if (nextIsIntersect) {
-          !countIntersect = countIntersect + 1;
           !intersectOrder = row.order;
           !count = 0;
         } else {
@@ -1353,7 +1350,6 @@ fun initUnion(rowIter: mutable Iterator<Row>): Array<Row> {
         }
       } else {
         !count = 0;
-        !countIntersect = 0;
         !intersectOrder = -1;
       }
     | QExcept() -> !count = 0
