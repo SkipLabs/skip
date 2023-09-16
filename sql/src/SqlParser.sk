@@ -393,23 +393,17 @@ fun parseFromJoin(lex: Lexer, pos: Int): (Int, Array<TableName>, ?Join) {
     Some(join)
   } else if (lex.isEqUpper(pos, "LEFT")) {
     !pos = lex.expectUpper(pos, "LEFT");
-    outer = if (lex.isEqUpper(pos, "OUTER")) {
-      !pos = lex.expectUpper(pos, "OUTER");
-      true
-    } else {
-      false
+    if (lex.isEqUpper(pos, "OUTER")) {
+      !pos = lex.expectUpper(pos, "OUTER")
     };
-    (!pos, join) = parseJoin(lex, pos, JLeft(outer));
+    (!pos, join) = parseJoin(lex, pos, JLeft());
     Some(join)
   } else if (lex.isEqUpper(pos, "RIGHT")) {
     !pos = lex.expectUpper(pos, "RIGHT");
-    outer = if (lex.isEqUpper(pos, "OUTER")) {
-      !pos = lex.expectUpper(pos, "OUTER");
-      true
-    } else {
-      false
+    if (lex.isEqUpper(pos, "OUTER")) {
+      !pos = lex.expectUpper(pos, "OUTER")
     };
-    (!pos, join) = parseJoin(lex, pos, JRight(outer));
+    (!pos, join) = parseJoin(lex, pos, JRight());
     Some(join)
   } else if (lex.isEqUpper(pos, "INNER")) {
     !pos = lex.expectUpper(pos, "INNER");
