@@ -46,7 +46,9 @@ base class Stmt {
     primary: Bool,
     text: ?String,
   }
-  | Drop{pos: Int, kind: TableKind, name: Name}
+  | DropTable{pos: Int, name: Name}
+  | DropView{pos: Int, name: Name}
+  | DropIndex{pos: Int, name: Name}
   | Delete{pos: Int, colName: ?Name, name: Name, where: ?Expr}
   | Insert{
     pos: Int,
@@ -66,13 +68,6 @@ base class OnConflict {
 }
 
 class TableName(name: FromName, asName: ?Name, indexed: Bool = true)
-
-base class TableKind {
-  children =
-  | TView()
-  | TIndex()
-  | TTable()
-}
 
 base class InsertValues {
   children =

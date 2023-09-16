@@ -527,7 +527,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       } else {
         None()
       }
-    | Drop{pos, kind => TView(), name => viewName} ->
+    | DropView{pos, name => viewName} ->
       if (inTransaction) {
         error(pos, "Cannot drop a view in a transaction");
       };
@@ -547,9 +547,8 @@ class Evaluator{options: Options, user: ?UserFile} {
         }
       })
 
-    | Drop{pos, kind => TIndex(), name => _} ->
-      error(pos, "Drop index not supported")
-    | Drop{kind => TTable(), name} ->
+    | DropIndex{pos} -> error(pos, "Drop index not supported")
+    | DropTable{name} ->
       Some((context, _, _) ~> {
         dirNameStr = "/" + name + "/";
         dirName = SKStore.DirName::create(dirNameStr);
@@ -1504,7 +1503,9 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
   | CreateTable _
   | CreateView _
   | CreateIndex _
-  | Drop _
+  | DropTable _
+  | DropView _
+  | DropIndex _
   | Delete _
   | Insert _ ->
     void
