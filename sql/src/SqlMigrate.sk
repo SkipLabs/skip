@@ -13,7 +13,7 @@ base class TableChange {
   | TcChange(old: TypeDescr, new: TypeDescr)
 }
 
-fun tableDiff(desired: Table, existing: DirDescr): Array<TableChange> {
+fun tableDiff(desired: CreateTable, existing: DirDescr): Array<TableChange> {
   desiredCols = desired.schema;
   existingCols = existing.schema;
 
@@ -39,10 +39,10 @@ fun migrationDiff(
   desired: Array<Stmt>,
   existing: Array<DirDescr>,
 ): Map<Name, SchemaChange> {
-  desiredTables: Array<Table> = desired
+  desiredTables: Array<CreateTable> = desired
     .map(x ->
       x match {
-      | t @ Table _ -> Some(t)
+      | t @ CreateTable _ -> Some(t)
       | _ -> None()
       }
     )

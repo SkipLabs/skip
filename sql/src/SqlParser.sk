@@ -1072,10 +1072,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
   error(pos, "Invalid value")
 }
 
-fun parseCreateTable(lex: Lexer, pos: Int, ifNotExists: Bool): (Int, Table) {
+fun parseCreateTable(
+  lex: Lexer,
+  pos: Int,
+  ifNotExists: Bool,
+): (Int, CreateTable) {
   (!pos, name) = lex.nextWord(pos);
   (!pos, schema) = parseTableSchema(lex, pos);
-  (pos, Table{pos, name => Name::create(name), schema, ifNotExists})
+  (pos, CreateTable{pos, name => Name::create(name), schema, ifNotExists})
 }
 
 fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
