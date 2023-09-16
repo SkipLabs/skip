@@ -1032,7 +1032,7 @@ class SelectEvaluator{
   fun evalSelectTableReducer(): ?SKStore.EReducer<Row, Row> {
     reducer = this.select.aggr match {
     | None() ->
-      if (this.select.kind is SDistinct() || this.select.groupBy is Some _) {
+      if (this.select.distinct || this.select.groupBy is Some _) {
         Some(
           SKStore.EReducer{
             type => Row::type,
@@ -1186,7 +1186,7 @@ fun updateState(
         if (!adding) return (true, false);
         state![i] = vOpt
       | (
-        Sum(SDistinct()),
+        Sum(true),
         Some(lrow),
         Some(_),
       ) if (lrow.getInt(i) == vOpt.flatMap(x -> x.getInt())) ->
@@ -1205,7 +1205,7 @@ fun updateState(
         }
 
       | (
-        Count(SDistinct()),
+        Count(true),
         Some(lrow),
         Some(_),
       ) if (lrow.getInt(i) == vOpt.flatMap(x -> x.getInt())) ->

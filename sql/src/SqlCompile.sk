@@ -49,7 +49,7 @@ fun noRangeFrom(from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>): Bool {
 
 fun optimizeNoopSelect(select: CSelect): CSelect {
   if (
-    select.kind is SNone() &&
+    !select.distinct &&
     isNoopParams(select.params, select.from) &&
     noRangeFrom(select.from) &&
     select.sets.size() == 0 &&
@@ -186,7 +186,7 @@ mutable class Compiler{
     Select{
       pos => select.pos,
       id => select.id,
-      kind => select.kind,
+      distinct => select.distinct,
       params => SelectParams(true, Array[]),
       from => Some(
         Array[
@@ -194,7 +194,7 @@ mutable class Compiler{
             FQuery(
               select with {
                 id => Name::create(select.id.lower + "-groupBy"),
-                kind => SNone(),
+                distinct => false,
                 orderBy => None(),
                 limit => None(),
                 rest => None(),
@@ -224,7 +224,7 @@ mutable class Compiler{
     sets: Array<(Name, Pos, Expr)> = Array[],
   ): CSelect {
     if (
-      select.kind is SDistinct _ ||
+      select.distinct ||
       select.shouldExpand ||
       toplevel &&
         (select.orderBy is Some _ || select.limit is Some _) &&
@@ -315,7 +315,7 @@ mutable class Compiler{
       from.size() == 1 &&
       /* No index is involved (could change in the future?)  */
       from[0].i1 is None() &&
-      select.kind is SNone() &&
+      !select.distinct &&
       having is None() &&
       orderBy is None() &&
       groupBy is None() &&
@@ -346,7 +346,7 @@ mutable class Compiler{
           | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
           },
       ),
-      kind => select.kind,
+      distinct => select.distinct,
       params,
       sets => this.compileSets(context, sets),
       aggr,
@@ -1197,19 +1197,18 @@ mutable class Compiler{
           if (values.size() != 1) {
             error(this.pos, "Invalid number of arguments for sum")
           };
-          (skind, value) = values[0] match {
-          | Distinct(e) -> (SDistinct(), e)
-          | All(e) -> (SAll(), e)
-          | e -> (SNone(), e)
+          (distinct, value) = values[0] match {
+          | Distinct(e) -> (true, e)
+          | e -> (false, e)
           };
           this.compileExpr(context, value) match {
           | e @ CIExpr(_) ->
             slot = this.aggrVars.size();
-            this.aggrVars.push((Sum(skind), e));
+            this.aggrVars.push((Sum(distinct), e));
             CIExpr(CIGetFrom(0, slot))
           | e @ CFExpr(_) ->
             slot = this.aggrVars.size();
-            this.aggrVars.push((Sum(skind), e));
+            this.aggrVars.push((Sum(distinct), e));
             CFExpr(CFGetFrom(0, slot))
           | CSExpr _ -> error(this.pos, "Cannot call sum on a string")
           | CGNull _ -> CGNull()
@@ -1272,23 +1271,22 @@ mutable class Compiler{
             };
             values[0]
           };
-          (skind, !value) = value match {
-          | Distinct(e) -> (SDistinct(), e)
-          | All(e) -> (SAll(), e)
-          | e -> (SNone(), e)
+          (distinct, !value) = value match {
+          | Distinct(e) -> (true, e)
+          | e -> (false, e)
           };
           this.compileExpr(context, value) match {
           | e @ CIExpr(_) ->
             slot = this.aggrVars.size();
-            this.aggrVars.push((Count(skind), e));
+            this.aggrVars.push((Count(distinct), e));
             CIExpr(CIGetFrom(0, slot))
           | e @ CFExpr(_) ->
             slot = this.aggrVars.size();
-            this.aggrVars.push((Count(skind), e));
+            this.aggrVars.push((Count(distinct), e));
             CIExpr(CIGetFrom(0, slot))
           | e @ CSExpr(_) ->
             slot = this.aggrVars.size();
-            this.aggrVars.push((Count(skind), e));
+            this.aggrVars.push((Count(distinct), e));
             CIExpr(CIGetFrom(0, slot))
           | CGNull _ -> CGNull()
           }
@@ -1299,17 +1297,16 @@ mutable class Compiler{
           if (values.size() != 1) {
             error(this.pos, "Invalid number of arguments for avg")
           };
-          (skind, value) = values[0] match {
-          | Distinct(e) -> (SDistinct(), e)
-          | All(e) -> (SAll(), e)
-          | e -> (SNone(), e)
+          (distinct, value) = values[0] match {
+          | Distinct(e) -> (true, e)
+          | e -> (false, e)
           };
           this.compileExpr(context, value) match {
           | e @ CIExpr(_) ->
             sumSlot = this.aggrVars.size();
-            this.aggrVars.push((Sum(skind), e));
+            this.aggrVars.push((Sum(distinct), e));
             countSlot = this.aggrVars.size();
-            this.aggrVars.push((Count(skind), e));
+            this.aggrVars.push((Count(distinct), e));
             CFExpr(
               CDiv(
                 CFICast(CIGetFrom(0, sumSlot)),
@@ -1318,9 +1315,9 @@ mutable class Compiler{
             )
           | e @ CFExpr(_) ->
             sumSlot = this.aggrVars.size();
-            this.aggrVars.push((Sum(skind), e));
+            this.aggrVars.push((Sum(distinct), e));
             countSlot = this.aggrVars.size();
-            this.aggrVars.push((Count(skind), e));
+            this.aggrVars.push((Count(distinct), e));
             CFExpr(
               CDiv(CFGetFrom(0, sumSlot), CFICast(CIGetFrom(0, countSlot))),
             )
@@ -1468,7 +1465,6 @@ mutable class Compiler{
       | _ -> error(this.pos, "Unexpected type for ON")
       }
 
-    | All _ -> error(this.pos, "Unexpected ALL")
     | Distinct _ -> error(this.pos, "Unexpected Distinct")
     | Between _ -> error(this.pos, "Unexpected BETWEEN")
     }

@@ -95,7 +95,7 @@ class SelectParams(isStar: Bool, params: Array<(Expr, ?Name)>)
 class Select{
   id: Name,
   pos: Int,
-  kind: SelectKind,
+  distinct: Bool,
   params: SelectParams,
   from: ?Array<TableName>,
   join: ?Join,
@@ -118,13 +118,6 @@ base class JoinKind uses Orderable {
   | JOuter()
   | JInner()
   | JNone()
-}
-
-base class SelectKind uses Orderable {
-  children =
-  | SAll()
-  | SDistinct()
-  | SNone()
 }
 
 base class QueryKind uses Orderable {
@@ -155,7 +148,6 @@ base class Value extends Expr uses Equality {
 base class Expr {
   children =
   | Not(Expr)
-  | All(Expr)
   | Distinct(Expr)
   | In(Expr, Array<Expr>)
   | Between(Expr)
@@ -216,7 +208,6 @@ fun hasAggr(expr: Expr): Bool {
   | Value _ -> false
   | Identifier _ -> false
   | Not(e)
-  | All(e)
   | Between(e)
   | UMinus(e)
   | UPlus(e)

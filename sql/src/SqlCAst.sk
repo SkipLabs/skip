@@ -13,8 +13,8 @@ value class Pattern{
 base class AggrKind uses Orderable {
   children =
   | Noop()
-  | Sum(SelectKind)
-  | Count(SelectKind)
+  | Sum(Bool)
+  | Count(Bool)
   | Min()
   | Max()
 }
@@ -128,7 +128,7 @@ base class SubSelectTask uses Orderable {
 class CSelect{
   isNoop: Bool = false,
   id: Name,
-  kind: SelectKind,
+  distinct: Bool,
   params: Array<CGExpr>,
   sets: Array<(Int, CGExpr)>,
   aggr: ?Array<(AggrKind, CGExpr)>,

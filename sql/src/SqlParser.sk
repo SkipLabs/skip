@@ -146,14 +146,14 @@ fun parseSelectParams(lex: Lexer, pos: Int): (Int, SelectParams) {
 
 fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
   posBegin = lex.token(pos).posBegin;
-  kind = if (lex.isEqUpper(pos, "ALL")) {
+  distinct = if (lex.isEqUpper(pos, "ALL")) {
     !pos = lex.expectUpper(pos, "ALL");
-    SAll()
+    false
   } else if (lex.isEqUpper(pos, "DISTINCT")) {
     !pos = lex.expectUpper(pos, "DISTINCT");
-    SDistinct()
+    true
   } else {
-    SNone()
+    false
   };
   (!pos, selectParams) = parseSelectParams(lex, pos);
   (from, join) = if (lex.isEqUpper(pos, "FROM")) {
@@ -200,7 +200,7 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
   query = Select{
     id => Name::create(""),
     pos => posBegin,
-    kind,
+    distinct,
     params => selectParams,
     from,
     join,
@@ -550,7 +550,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     Not(e)
   } else if (lex.isEqUpperAt(tok, "ALL")) {
     (!pos, e) = parseExprWithPrio(opPriority["ALL"], lex, pos);
-    All(e)
+    e
   } else if (lex.isEqUpperAt(tok, "DISTINCT")) {
     (!pos, e) = parseExprWithPrio(opPriority["DISTINCT"], lex, pos);
     Distinct(e)
