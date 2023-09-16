@@ -1100,7 +1100,7 @@ mutable class Compiler{
       }
 
     | Call(fname, fargs) ->
-      (fname, fargs) match {
+      (fname.lower, fargs) match {
       | ("coalesce", None()) ->
         error(this.pos, "Missing arguments for COALESCE")
       | ("uid", _) ->
@@ -1361,7 +1361,10 @@ mutable class Compiler{
         };
         this.compileExpr(
           context,
-          Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%Y-%m-%d")].concat(args)),
+          ),
         )
 
       | ("time", Some(args)) ->
@@ -1370,7 +1373,10 @@ mutable class Compiler{
         };
         this.compileExpr(
           context,
-          Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%H:%M:%S")].concat(args)),
+          ),
         )
 
       | ("datetime", Some(args)) ->
@@ -1380,7 +1386,7 @@ mutable class Compiler{
         this.compileExpr(
           context,
           Call(
-            "strftime",
+            Name::create("strftime"),
             Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
           ),
         )
@@ -1435,7 +1441,7 @@ mutable class Compiler{
         | (x, _) -> x
         }
 
-      | _ -> error(this.pos, "Unknown function: " + fname)
+      | _ -> error(this.pos, `Unknown function: ${fname}`)
       }
 
     | SKDB.Case(condOpt, cases, defaultOpt) ->
@@ -1954,9 +1960,9 @@ mutable class Compiler{
     cond match {
     | Binop(
       op,
-      Call("strftime", Some(args)),
+      Call(fname, Some(args)),
       e2,
-    ) if (args.all(x -> x is VString _)) ->
+    ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
       sargs = args.map(x ->
         x match {
         | VString(str) -> str
@@ -1973,8 +1979,8 @@ mutable class Compiler{
     | Binop(
       op,
       e1,
-      Call("strftime", Some(args)),
-    ) if (args.all(x -> x is VString _)) ->
+      Call(fname, Some(args)),
+    ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
       sargs = args.map(x ->
         x match {
         | VString(str) -> str
@@ -1988,37 +1994,7 @@ mutable class Compiler{
         Binop(op, e1, VString(callStrftime(this.pos, context, sargs))),
       )
 
-    | Binop(op, Call("date", Some(args)), e2) ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(
-          op,
-          Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
-          e2,
-        ),
-      )
-
-    | Binop(op, Call("time", Some(args)), e2) ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(
-          op,
-          Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
-          e2,
-        ),
-      )
-
-    | Binop(op, Call("datetime", Some(args)), e2) ->
+    | Binop(op, Call(fname, Some(args)), e2) if (fname.lower == "date") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
       };
@@ -2029,44 +2005,50 @@ mutable class Compiler{
         Binop(
           op,
           Call(
-            "strftime",
+            Name::create("strftime"),
+            Some(Array[VString("%Y-%m-%d")].concat(args)),
+          ),
+          e2,
+        ),
+      )
+
+    | Binop(op, Call(fname, Some(args)), e2) if (fname.lower == "time") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%H:%M:%S")].concat(args)),
+          ),
+          e2,
+        ),
+      )
+
+    | Binop(op, Call(fname, Some(args)), e2) if (fname.lower == "datetime") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          Call(
+            Name::create("strftime"),
             Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
           ),
           e2,
         ),
       )
 
-    | Binop(op, e1, Call("date", Some(args))) ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(
-          op,
-          e1,
-          Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
-        ),
-      )
-
-    | Binop(op, e1, Call("time", Some(args))) ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(
-          op,
-          e1,
-          Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
-        ),
-      )
-
-    | Binop(op, e1, Call("datetime", Some(args))) ->
+    | Binop(op, e1, Call(fname, Some(args))) if (fname.lower == "date") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
       };
@@ -2078,7 +2060,43 @@ mutable class Compiler{
           op,
           e1,
           Call(
-            "strftime",
+            Name::create("strftime"),
+            Some(Array[VString("%Y-%m-%d")].concat(args)),
+          ),
+        ),
+      )
+
+    | Binop(op, e1, Call(fname, Some(args))) if (fname.lower == "time") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          e1,
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%H:%M:%S")].concat(args)),
+          ),
+        ),
+      )
+
+    | Binop(op, e1, Call(fname, Some(args))) if (fname.lower == "datetime") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Binop(
+          op,
+          e1,
+          Call(
+            Name::create("strftime"),
             Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
           ),
         ),
