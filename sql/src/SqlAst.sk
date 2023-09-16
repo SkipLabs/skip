@@ -154,8 +154,6 @@ base class Value extends Expr uses Equality {
 
 base class Expr {
   children =
-  // name of function, or schema, table, column, or "*"
-  | Literal(String)
   | Not(Expr)
   | All(Expr)
   | Distinct(Expr)
@@ -170,6 +168,27 @@ base class Expr {
   | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
   | Call(Name, ?Array<Expr>)
   | Cast(Expr, Type)
+}
+
+class Identifier(
+  name: Name,
+  table: ?Name = None(),
+) extends Expr uses Orderable, Hashable, Show {
+  fun compare(y: Identifier): Order {
+    res = this.table.compare(y.table);
+    if (res == EQ()) {
+      this.name.compare(y.name)
+    } else {
+      res
+    }
+  }
+
+  fun toString(): String {
+    this.table match {
+    | Some(table) -> `${table}.${this.name}`
+    | None() -> this.name.toString()
+    }
+  }
 }
 
 class TypeDescr{
@@ -195,7 +214,7 @@ base class Type uses Orderable {
 fun hasAggr(expr: Expr): Bool {
   expr match {
   | Value _ -> false
-  | Literal _ -> false
+  | Identifier _ -> false
   | Not(e)
   | All(e)
   | Between(e)
