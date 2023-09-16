@@ -1147,22 +1147,6 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
           };
           markIfRead(context, stmt);
 
-          lastStmtOpt = context.getGlobal("LastStmtOpt").map(file ->
-            StmtFile::type(file).stmt
-          );
-
-          (lastStmtOpt, stmt) match {
-          | (Some(Select _), Drop _)
-          | (Some(Select _), Delete _)
-          | (Some(Select _), Insert _)
-          | (Some(CreateView _), Drop _)
-          | (Some(CreateView _), Delete _)
-          | (Some(CreateView _), Insert _) ->
-            updateTableMap(context)
-
-          | _ -> void
-          };
-
           !underLockF = evalWithContext(
             options,
             context,
@@ -1170,8 +1154,6 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
             stmt,
             isTransaction,
           );
-
-          context.setGlobal("LastStmt", StmtFile(stmt));
 
           if (!isTransaction) break void;
         };
