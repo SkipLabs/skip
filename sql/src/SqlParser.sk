@@ -105,19 +105,22 @@ fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
   (pos, Delete{pos => posBegin, colName, name => Name::create(name), where})
 }
 
-fun parseDrop(lex: Lexer, pos: Int): (Int, Drop) {
-  kind = if (lex.isEqUpper(pos, "VIEW")) {
+fun parseDrop(lex: Lexer, pos: Int): (Int, Stmt) {
+  drop = if (lex.isEqUpper(pos, "VIEW")) {
     !pos = lex.expectUpper(pos, "VIEW");
-    TView()
+    (!pos, name) = lex.nextWord(pos);
+    DropView{pos, name => Name::create(name)}
   } else if (lex.isEqUpper(pos, "INDEX")) {
     !pos = lex.expectUpper(pos, "INDEX");
-    TIndex()
+    (!pos, name) = lex.nextWord(pos);
+    DropIndex{pos, name => Name::create(name)}
   } else {
     !pos = lex.expectUpper(pos, "TABLE");
-    TTable()
+    (!pos, name) = lex.nextWord(pos);
+    DropTable{pos, name => Name::create(name)}
   };
-  (!pos, name) = lex.nextWord(pos);
-  (pos, Drop{pos, kind, name => Name::create(name)})
+
+  (pos, drop)
 }
 
 fun parseQuery(lex: Lexer, pos: Int): (Int, Query) {
