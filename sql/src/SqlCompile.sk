@@ -1051,7 +1051,55 @@ mutable class Compiler{
       }
     | Exists(select @ Select _) ->
       CIExpr(CExists(this.compileSelect(context, select, false)))
-    | SKDB.Call("coalesce", None()) ->
+
+    | In(e, arr) ->
+      this.compileExpr(context, e) match {
+      | CGNull() -> CGNull()
+      | CIExpr(i) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CIExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CIIn(i, set))
+
+      | CFExpr(f) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CFExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CFIn(f, set))
+
+      | CSExpr(s) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CSExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CSIn(s, set))
+      }
+
+    | UMinus(e) ->
+      val = this.compileExpr(context, e);
+      val match {
+      | CGNull() -> CGNull()
+      | CIExpr(i) -> CIExpr(CSub(CILiteral(0), i))
+      | CFExpr(f) -> CFExpr(CSub(CFLiteral(0.0), f))
+      | CSExpr _ -> error(this.pos, "cannot apply - on a string")
+      }
+
+    | UPlus(e) ->
+      val = this.compileExpr(context, e);
+      val match {
+      | CSExpr _ -> error(this.pos, "cannot apply + on a string")
+      | x -> x
+      }
+
+    | Call("coalesce", None()) ->
       error(this.pos, "Missing arguments for COALESCE")
     | Call("uid", _) ->
       context.getGlobal("USER") match {
@@ -1154,7 +1202,7 @@ mutable class Compiler{
         )
       }
 
-    | SKDB.Call("sum", Some(values)) ->
+    | Call("sum", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for sum")
@@ -1178,7 +1226,7 @@ mutable class Compiler{
         }
       })
 
-    | SKDB.Call("min", Some(values)) ->
+    | Call("min", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for min")
@@ -1201,7 +1249,7 @@ mutable class Compiler{
         }
       })
 
-    | SKDB.Call("max", Some(values)) ->
+    | Call("max", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for max")
@@ -1224,7 +1272,7 @@ mutable class Compiler{
         }
       })
 
-    | SKDB.Call("count", arg) ->
+    | Call("count", arg) ->
       this.noAggr(() -> {
         value = arg match {
         | None() -> VInt(1)
@@ -1256,7 +1304,7 @@ mutable class Compiler{
         }
       })
 
-    | SKDB.Call("avg", Some(values)) ->
+    | Call("avg", Some(values)) ->
       this.noAggr(() -> {
         if (values.size() != 1) {
           error(this.pos, "Invalid number of arguments for avg")
@@ -1289,7 +1337,7 @@ mutable class Compiler{
         }
       })
 
-    | SKDB.Call("abs", Some(values)) ->
+    | Call("abs", Some(values)) ->
       if (values.size() != 1) {
         error(this.pos, "Invalid number of arguments for abs")
       };
@@ -1301,53 +1349,6 @@ mutable class Compiler{
           this.pos,
           "Invalid arguments for abs, expected an integer or a float",
         )
-      }
-
-    | In(e, arr) ->
-      this.compileExpr(context, e) match {
-      | CGNull() -> CGNull()
-      | CIExpr(i) ->
-        set = arr.map(x ->
-          this.compileExpr(context, x) match {
-          | CIExpr(n) -> n
-          | _ -> error(this.pos, "Incompatible types: IN")
-          }
-        );
-        CIExpr(CIIn(i, set))
-
-      | CFExpr(f) ->
-        set = arr.map(x ->
-          this.compileExpr(context, x) match {
-          | CFExpr(n) -> n
-          | _ -> error(this.pos, "Incompatible types: IN")
-          }
-        );
-        CIExpr(CFIn(f, set))
-
-      | CSExpr(s) ->
-        set = arr.map(x ->
-          this.compileExpr(context, x) match {
-          | CSExpr(n) -> n
-          | _ -> error(this.pos, "Incompatible types: IN")
-          }
-        );
-        CIExpr(CSIn(s, set))
-      }
-
-    | UMinus(e) ->
-      val = this.compileExpr(context, e);
-      val match {
-      | CGNull() -> CGNull()
-      | CIExpr(i) -> CIExpr(CSub(CILiteral(0), i))
-      | CFExpr(f) -> CFExpr(CSub(CFLiteral(0.0), f))
-      | CSExpr _ -> error(this.pos, "cannot apply - on a string")
-      }
-
-    | UPlus(e) ->
-      val = this.compileExpr(context, e);
-      val match {
-      | CSExpr _ -> error(this.pos, "cannot apply + on a string")
-      | x -> x
       }
 
     | Call("date", Some(args)) ->
@@ -1415,7 +1416,7 @@ mutable class Compiler{
         CSExpr(CStrftime(sargs[0], sargs[1], sargs.slice(2, sargs.size())))
       }
 
-    | SKDB.Call("nullif", Some(args)) ->
+    | Call("nullif", Some(args)) ->
       if (args.size() != 2) {
         error(this.pos, "NULLIF expects 2 arguments");
       };
@@ -1429,6 +1430,8 @@ mutable class Compiler{
       | (CSExpr(e1), CSExpr(e2)) -> CSExpr(CNullIf(e1, e2))
       | (x, _) -> x
       }
+
+    | Call(fname, _) -> error(this.pos, "Unknown function: " + fname)
 
     | SKDB.Case(condOpt, cases, defaultOpt) ->
       acc = defaultOpt match {
@@ -1469,7 +1472,6 @@ mutable class Compiler{
     | All _ -> error(this.pos, "Unexpected ALL")
     | Distinct _ -> error(this.pos, "Unexpected Distinct")
     | Between _ -> error(this.pos, "Unexpected BETWEEN")
-    | Call(fname, _) -> error(this.pos, "Unknown function: " + fname)
     }
   }
 
