@@ -1099,339 +1099,344 @@ mutable class Compiler{
       | x -> x
       }
 
-    | Call("coalesce", None()) ->
-      error(this.pos, "Missing arguments for COALESCE")
-    | Call("uid", _) ->
-      context.getGlobal("USER") match {
-      | None() ->
-        error(
-          this.pos,
-          "Cannot use a the function uid() if not connected as a user",
-        )
-      | Some(user) -> CIExpr(CILiteral(UserFile::type(user).id))
-      }
-    | Call("id", None()) -> error(this.pos, "id expects one argument")
-    | Call("id", Some(args)) ->
-      if (args.size() == 0) {
-        return CIExpr(CILiteral(SKStore.genSym(0)))
-      };
-      if (args.size() != 1) {
-        error(this.pos, "id expects one argument")
-      };
-      args[0] match {
-      | VString(varName) ->
-        globals = context.getGlobal(GLOBALS) match {
-        | None() -> error(this.pos, "Unknown id " + varName)
-        | Some(file) -> Globals::type(file)
-        };
-        if (!globals.containsKey(varName)) {
-          error(this.pos, "Unknown id " + varName)
-        };
-        CIExpr(CILiteral(globals[varName]))
-      | _ -> error(this.pos, "id expects a string literal")
-      }
-    | Call("upper", None()) -> error(this.pos, "upper expects one argument")
-    | Call("lower", None()) -> error(this.pos, "lower expects one argument")
-    | Call("upper", Some(values)) ->
-      if (values.size() != 1) {
-        error(this.pos, "upper expects one argument")
-      };
-      this.compileExpr(context, values[0]) match {
-      | CGNull _ -> CGNull()
-      | CSExpr(e) -> CSExpr(CSUpper(e))
-      | _ -> error(this.pos, "upper expects a string")
-      }
-    | Call("lower", Some(values)) ->
-      if (values.size() != 1) {
-        error(this.pos, "lower expects one argument")
-      };
-      this.compileExpr(context, values[0]) match {
-      | CGNull _ -> CGNull()
-      | CSExpr(e) -> CSExpr(CSLower(e))
-      | _ -> error(this.pos, "lower expects a string")
-      }
-    | Call("coalesce", Some(values)) ->
-      tvalues = values.map(x -> this.compileExpr(context, x));
-      ty = for (val in tvalues) {
-        val match {
-        | CGNull _ -> continue
-        | CIExpr _ -> break Some(INTEGER())
-        | CFExpr _ -> break Some(FLOAT())
-        | CSExpr _ -> break Some(TEXT())
+    | Call(fname, fargs) ->
+      (fname, fargs) match {
+      | ("coalesce", None()) ->
+        error(this.pos, "Missing arguments for COALESCE")
+      | ("uid", _) ->
+        context.getGlobal("USER") match {
+        | None() ->
+          error(
+            this.pos,
+            "Cannot use a the function uid() if not connected as a user",
+          )
+        | Some(user) -> CIExpr(CILiteral(UserFile::type(user).id))
         }
-      } else {
-        None()
-      };
-      ty match {
-      | None() -> CGNull()
-      | Some(INTEGER()) ->
-        CIExpr(
-          CCoalesce(
-            tvalues.map(tvalue ->
-              tvalue match {
-              | CGNull() -> CNull()
-              | CIExpr(e) -> e
-              | _ -> error(this.pos, "Inconsistent types in coalesce")
-              }
-            ),
-          ),
-        )
-      | Some(FLOAT()) ->
-        CFExpr(
-          CCoalesce(
-            tvalues.map(tvalue ->
-              tvalue match {
-              | CGNull() -> CNull()
-              | CFExpr(e) -> e
-              | _ -> error(this.pos, "Inconsistent types in coalesce")
-              }
-            ),
-          ),
-        )
-      | Some(TEXT()) ->
-        CSExpr(
-          CCoalesce(
-            tvalues.map(tvalue ->
-              tvalue match {
-              | CGNull() -> CNull()
-              | CSExpr(e) -> e
-              | _ -> error(this.pos, "Inconsistent types in coalesce")
-              }
-            ),
-          ),
-        )
-      }
-
-    | Call("sum", Some(values)) ->
-      this.noAggr(() -> {
+      | ("id", None()) -> error(this.pos, "id expects one argument")
+      | ("id", Some(args)) ->
+        if (args.size() == 0) {
+          return CIExpr(CILiteral(SKStore.genSym(0)))
+        };
+        if (args.size() != 1) {
+          error(this.pos, "id expects one argument")
+        };
+        args[0] match {
+        | VString(varName) ->
+          globals = context.getGlobal(GLOBALS) match {
+          | None() -> error(this.pos, "Unknown id " + varName)
+          | Some(file) -> Globals::type(file)
+          };
+          if (!globals.containsKey(varName)) {
+            error(this.pos, "Unknown id " + varName)
+          };
+          CIExpr(CILiteral(globals[varName]))
+        | _ -> error(this.pos, "id expects a string literal")
+        }
+      | ("upper", None()) -> error(this.pos, "upper expects one argument")
+      | ("lower", None()) -> error(this.pos, "lower expects one argument")
+      | ("upper", Some(values)) ->
         if (values.size() != 1) {
-          error(this.pos, "Invalid number of arguments for sum")
+          error(this.pos, "upper expects one argument")
         };
-        (skind, value) = values[0] match {
-        | Distinct(e) -> (SDistinct(), e)
-        | All(e) -> (SAll(), e)
-        | e -> (SNone(), e)
-        };
-        this.compileExpr(context, value) match {
-        | e @ CIExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Sum(skind), e));
-          CIExpr(CIGetFrom(0, slot))
-        | e @ CFExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Sum(skind), e));
-          CFExpr(CFGetFrom(0, slot))
-        | CSExpr _ -> error(this.pos, "Cannot call sum on a string")
+        this.compileExpr(context, values[0]) match {
         | CGNull _ -> CGNull()
+        | CSExpr(e) -> CSExpr(CSUpper(e))
+        | _ -> error(this.pos, "upper expects a string")
         }
-      })
-
-    | Call("min", Some(values)) ->
-      this.noAggr(() -> {
+      | ("lower", Some(values)) ->
         if (values.size() != 1) {
-          error(this.pos, "Invalid number of arguments for min")
+          error(this.pos, "lower expects one argument")
         };
-        value = values[0];
-        this.compileExpr(context, value) match {
-        | e @ CIExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Min(), e));
-          CIExpr(CIGetFrom(0, slot))
-        | e @ CFExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Min(), e));
-          CFExpr(CFGetFrom(0, slot))
-        | e @ CSExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Min(), e));
-          CSExpr(CSGetFrom(0, slot))
+        this.compileExpr(context, values[0]) match {
         | CGNull _ -> CGNull()
+        | CSExpr(e) -> CSExpr(CSLower(e))
+        | _ -> error(this.pos, "lower expects a string")
         }
-      })
-
-    | Call("max", Some(values)) ->
-      this.noAggr(() -> {
-        if (values.size() != 1) {
-          error(this.pos, "Invalid number of arguments for max")
+      | ("coalesce", Some(values)) ->
+        tvalues = values.map(x -> this.compileExpr(context, x));
+        ty = for (val in tvalues) {
+          val match {
+          | CGNull _ -> continue
+          | CIExpr _ -> break Some(INTEGER())
+          | CFExpr _ -> break Some(FLOAT())
+          | CSExpr _ -> break Some(TEXT())
+          }
+        } else {
+          None()
         };
-        value = values[0];
-        this.compileExpr(context, value) match {
-        | e @ CIExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Max(), e));
-          CIExpr(CIGetFrom(0, slot))
-        | e @ CFExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Max(), e));
-          CFExpr(CFGetFrom(0, slot))
-        | e @ CSExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Max(), e));
-          CSExpr(CSGetFrom(0, slot))
-        | CGNull _ -> CGNull()
+        ty match {
+        | None() -> CGNull()
+        | Some(INTEGER()) ->
+          CIExpr(
+            CCoalesce(
+              tvalues.map(tvalue ->
+                tvalue match {
+                | CGNull() -> CNull()
+                | CIExpr(e) -> e
+                | _ -> error(this.pos, "Inconsistent types in coalesce")
+                }
+              ),
+            ),
+          )
+        | Some(FLOAT()) ->
+          CFExpr(
+            CCoalesce(
+              tvalues.map(tvalue ->
+                tvalue match {
+                | CGNull() -> CNull()
+                | CFExpr(e) -> e
+                | _ -> error(this.pos, "Inconsistent types in coalesce")
+                }
+              ),
+            ),
+          )
+        | Some(TEXT()) ->
+          CSExpr(
+            CCoalesce(
+              tvalues.map(tvalue ->
+                tvalue match {
+                | CGNull() -> CNull()
+                | CSExpr(e) -> e
+                | _ -> error(this.pos, "Inconsistent types in coalesce")
+                }
+              ),
+            ),
+          )
         }
-      })
 
-    | Call("count", arg) ->
-      this.noAggr(() -> {
-        value = arg match {
-        | None() -> VInt(1)
-        | Some(values) ->
+      | ("sum", Some(values)) ->
+        this.noAggr(() -> {
           if (values.size() != 1) {
             error(this.pos, "Invalid number of arguments for sum")
           };
-          values[0]
-        };
-        (skind, !value) = value match {
-        | Distinct(e) -> (SDistinct(), e)
-        | All(e) -> (SAll(), e)
-        | e -> (SNone(), e)
-        };
-        this.compileExpr(context, value) match {
-        | e @ CIExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Count(skind), e));
-          CIExpr(CIGetFrom(0, slot))
-        | e @ CFExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Count(skind), e));
-          CIExpr(CIGetFrom(0, slot))
-        | e @ CSExpr(_) ->
-          slot = this.aggrVars.size();
-          this.aggrVars.push((Count(skind), e));
-          CIExpr(CIGetFrom(0, slot))
-        | CGNull _ -> CGNull()
-        }
-      })
+          (skind, value) = values[0] match {
+          | Distinct(e) -> (SDistinct(), e)
+          | All(e) -> (SAll(), e)
+          | e -> (SNone(), e)
+          };
+          this.compileExpr(context, value) match {
+          | e @ CIExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Sum(skind), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CFExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Sum(skind), e));
+            CFExpr(CFGetFrom(0, slot))
+          | CSExpr _ -> error(this.pos, "Cannot call sum on a string")
+          | CGNull _ -> CGNull()
+          }
+        })
 
-    | Call("avg", Some(values)) ->
-      this.noAggr(() -> {
+      | ("min", Some(values)) ->
+        this.noAggr(() -> {
+          if (values.size() != 1) {
+            error(this.pos, "Invalid number of arguments for min")
+          };
+          value = values[0];
+          this.compileExpr(context, value) match {
+          | e @ CIExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Min(), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CFExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Min(), e));
+            CFExpr(CFGetFrom(0, slot))
+          | e @ CSExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Min(), e));
+            CSExpr(CSGetFrom(0, slot))
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | ("max", Some(values)) ->
+        this.noAggr(() -> {
+          if (values.size() != 1) {
+            error(this.pos, "Invalid number of arguments for max")
+          };
+          value = values[0];
+          this.compileExpr(context, value) match {
+          | e @ CIExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Max(), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CFExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Max(), e));
+            CFExpr(CFGetFrom(0, slot))
+          | e @ CSExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Max(), e));
+            CSExpr(CSGetFrom(0, slot))
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | ("count", arg) ->
+        this.noAggr(() -> {
+          value = arg match {
+          | None() -> VInt(1)
+          | Some(values) ->
+            if (values.size() != 1) {
+              error(this.pos, "Invalid number of arguments for sum")
+            };
+            values[0]
+          };
+          (skind, !value) = value match {
+          | Distinct(e) -> (SDistinct(), e)
+          | All(e) -> (SAll(), e)
+          | e -> (SNone(), e)
+          };
+          this.compileExpr(context, value) match {
+          | e @ CIExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(skind), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CFExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(skind), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CSExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(skind), e));
+            CIExpr(CIGetFrom(0, slot))
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | ("avg", Some(values)) ->
+        this.noAggr(() -> {
+          if (values.size() != 1) {
+            error(this.pos, "Invalid number of arguments for avg")
+          };
+          (skind, value) = values[0] match {
+          | Distinct(e) -> (SDistinct(), e)
+          | All(e) -> (SAll(), e)
+          | e -> (SNone(), e)
+          };
+          this.compileExpr(context, value) match {
+          | e @ CIExpr(_) ->
+            sumSlot = this.aggrVars.size();
+            this.aggrVars.push((Sum(skind), e));
+            countSlot = this.aggrVars.size();
+            this.aggrVars.push((Count(skind), e));
+            CFExpr(
+              CDiv(
+                CFICast(CIGetFrom(0, sumSlot)),
+                CFICast(CIGetFrom(0, countSlot)),
+              ),
+            )
+          | e @ CFExpr(_) ->
+            sumSlot = this.aggrVars.size();
+            this.aggrVars.push((Sum(skind), e));
+            countSlot = this.aggrVars.size();
+            this.aggrVars.push((Count(skind), e));
+            CFExpr(
+              CDiv(CFGetFrom(0, sumSlot), CFICast(CIGetFrom(0, countSlot))),
+            )
+          | CSExpr _ -> error(this.pos, "Cannot call avg on a string")
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | ("abs", Some(values)) ->
         if (values.size() != 1) {
-          error(this.pos, "Invalid number of arguments for avg")
+          error(this.pos, "Invalid number of arguments for abs")
         };
-        (skind, value) = values[0] match {
-        | Distinct(e) -> (SDistinct(), e)
-        | All(e) -> (SAll(), e)
-        | e -> (SNone(), e)
-        };
-        this.compileExpr(context, value) match {
-        | e @ CIExpr(_) ->
-          sumSlot = this.aggrVars.size();
-          this.aggrVars.push((Sum(skind), e));
-          countSlot = this.aggrVars.size();
-          this.aggrVars.push((Count(skind), e));
-          CFExpr(
-            CDiv(
-              CFICast(CIGetFrom(0, sumSlot)),
-              CFICast(CIGetFrom(0, countSlot)),
-            ),
+        this.compileExpr(context, values[0]) match {
+        | CIExpr(n) -> CIExpr(CIAbs(n))
+        | CFExpr(f) -> CFExpr(CFAbs(f))
+        | _ ->
+          error(
+            this.pos,
+            "Invalid arguments for abs, expected an integer or a float",
           )
-        | e @ CFExpr(_) ->
-          sumSlot = this.aggrVars.size();
-          this.aggrVars.push((Sum(skind), e));
-          countSlot = this.aggrVars.size();
-          this.aggrVars.push((Count(skind), e));
-          CFExpr(CDiv(CFGetFrom(0, sumSlot), CFICast(CIGetFrom(0, countSlot))))
-        | CSExpr _ -> error(this.pos, "Cannot call avg on a string")
-        | CGNull _ -> CGNull()
         }
-      })
 
-    | Call("abs", Some(values)) ->
-      if (values.size() != 1) {
-        error(this.pos, "Invalid number of arguments for abs")
-      };
-      this.compileExpr(context, values[0]) match {
-      | CIExpr(n) -> CIExpr(CIAbs(n))
-      | CFExpr(f) -> CFExpr(CFAbs(f))
-      | _ ->
-        error(
-          this.pos,
-          "Invalid arguments for abs, expected an integer or a float",
+      | ("date", Some(args)) ->
+        if (args.size() < 1) {
+          error(this.pos, "Missing arguments");
+        };
+        this.compileExpr(
+          context,
+          Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
         )
-      }
 
-    | Call("date", Some(args)) ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.compileExpr(
-        context,
-        Call("strftime", Some(Array[VString("%Y-%m-%d")].concat(args))),
-      )
+      | ("time", Some(args)) ->
+        if (args.size() < 1) {
+          error(this.pos, "Missing arguments");
+        };
+        this.compileExpr(
+          context,
+          Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
+        )
 
-    | Call("time", Some(args)) ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.compileExpr(
-        context,
-        Call("strftime", Some(Array[VString("%H:%M:%S")].concat(args))),
-      )
+      | ("datetime", Some(args)) ->
+        if (args.size() < 1) {
+          error(this.pos, "Missing arguments");
+        };
+        this.compileExpr(
+          context,
+          Call(
+            "strftime",
+            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
+          ),
+        )
 
-    | Call("datetime", Some(args)) ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.compileExpr(
-        context,
-        Call(
-          "strftime",
-          Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
-        ),
-      )
+      | ("julianday", _) -> error(this.pos, "julianday not supported")
 
-    | Call("julianday", _) -> error(this.pos, "julianday not supported")
+      | ("strftime", Some(args)) ->
+        if (args.size() < 2) {
+          error(this.pos, "Missing arguments strftime");
+        };
 
-    | Call("strftime", Some(args)) ->
-      if (args.size() < 2) {
-        error(this.pos, "Missing arguments strftime");
-      };
+        isStatic = for (arg in args) {
+          arg match {
+          | VString _ -> void
+          | _ -> break false
+          }
+        } else {
+          true
+        };
 
-      isStatic = for (arg in args) {
-        arg match {
-        | VString _ -> void
-        | _ -> break false
+        if (isStatic) {
+          sargs = args.map(x ->
+            x match {
+            | VString(v) -> v
+            | _ -> error(this.pos, "only static dates are supported")
+            }
+          );
+
+          CSExpr(CSLiteral(callStrftime(this.pos, context, sargs)))
+        } else {
+          sargs = args.map(arg ->
+            this.compileExpr(context, arg) match {
+            | CSExpr(x) -> x
+            | _ -> error(this.pos, "Expected a string")
+            }
+          );
+          CSExpr(CStrftime(sargs[0], sargs[1], sargs.slice(2, sargs.size())))
         }
-      } else {
-        true
-      };
 
-      if (isStatic) {
-        sargs = args.map(x ->
-          x match {
-          | VString(v) -> v
-          | _ -> error(this.pos, "only static dates are supported")
-          }
-        );
+      | ("nullif", Some(args)) ->
+        if (args.size() != 2) {
+          error(this.pos, "NULLIF expects 2 arguments");
+        };
+        (
+          this.compileExpr(context, args[0]),
+          this.compileExpr(context, args[1]),
+        ) match {
+        | (CGNull(), CGNull()) -> CGNull()
+        | (CIExpr(e1), CIExpr(e2)) -> CIExpr(CNullIf(e1, e2))
+        | (CFExpr(e1), CFExpr(e2)) -> CFExpr(CNullIf(e1, e2))
+        | (CSExpr(e1), CSExpr(e2)) -> CSExpr(CNullIf(e1, e2))
+        | (x, _) -> x
+        }
 
-        CSExpr(CSLiteral(callStrftime(this.pos, context, sargs)))
-      } else {
-        sargs = args.map(arg ->
-          this.compileExpr(context, arg) match {
-          | CSExpr(x) -> x
-          | _ -> error(this.pos, "Expected a string")
-          }
-        );
-        CSExpr(CStrftime(sargs[0], sargs[1], sargs.slice(2, sargs.size())))
+      | _ -> error(this.pos, "Unknown function: " + fname)
       }
-
-    | Call("nullif", Some(args)) ->
-      if (args.size() != 2) {
-        error(this.pos, "NULLIF expects 2 arguments");
-      };
-      (
-        this.compileExpr(context, args[0]),
-        this.compileExpr(context, args[1]),
-      ) match {
-      | (CGNull(), CGNull()) -> CGNull()
-      | (CIExpr(e1), CIExpr(e2)) -> CIExpr(CNullIf(e1, e2))
-      | (CFExpr(e1), CFExpr(e2)) -> CFExpr(CNullIf(e1, e2))
-      | (CSExpr(e1), CSExpr(e2)) -> CSExpr(CNullIf(e1, e2))
-      | (x, _) -> x
-      }
-
-    | Call(fname, _) -> error(this.pos, "Unknown function: " + fname)
 
     | SKDB.Case(condOpt, cases, defaultOpt) ->
       acc = defaultOpt match {
