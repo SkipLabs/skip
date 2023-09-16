@@ -162,8 +162,8 @@ mutable class Compiler{
   options: Options,
   pos: Int,
   params: Map<String, Value>,
-  mutable subst: mutable Map<Name, CGExpr> = mutable Map[],
-  mutable ambiguous: mutable Set<Name> = mutable Set[],
+  mutable subst: mutable Map<Identifier, CGExpr> = mutable Map[],
+  mutable ambiguous: mutable Set<Identifier> = mutable Set[],
   mutable isAggr: Bool = false,
   mutable aggrVars: mutable Vector<(AggrKind, CGExpr)> = mutable Vector[],
   mutable needUp: Bool = false,
@@ -249,14 +249,14 @@ mutable class Compiler{
 
     newSubst = mutable Map[];
     for (key => value in this.subst) {
-      if (key.lower.contains(".")) {
+      if (key.table is Some _) {
         newSubst![key] = value.up();
       }
     };
 
     newAmbiguous = mutable Set[];
     for (key in this.ambiguous) {
-      if (key.lower.contains(".")) {
+      if (key.table is Some _) {
         newAmbiguous.add(key);
       }
     };
@@ -383,7 +383,7 @@ mutable class Compiler{
     this.noAggr(() -> {
       params.map(set -> {
         (colName, pos, e) = set;
-        this.compileExpr(context, Literal(colName.lower)) match {
+        this.compileExpr(context, Identifier(colName)) match {
         | (CIExpr(CIGetFrom(0, n))) ->
           this.compileExpr(context, e) match {
           | CGNull() -> (n, CGNull())
@@ -424,7 +424,7 @@ mutable class Compiler{
         | Some(x) -> x
         };
         for (varName in dirDescr.colNames) {
-          params.push((Literal(tableName.lower + "." + varName.lower), None()))
+          params.push((Identifier(varName, Some(tableName)), None()))
         }
       };
       for (extraParam in extraParams) {
@@ -448,19 +448,13 @@ mutable class Compiler{
     expandedSParams = mutable Vector[];
     for (sparam in sparams) {
       sparam match {
-      | (
-        Binop(".", litTableName @ Literal(tableNameStr), Literal("*")),
-        asName,
-      ) ->
-        tableName = Name::create(tableNameStr);
+      | (Identifier(star, Some(tableName)), None()) if (star.lower == "*") ->
         if (!origFromMap.containsKey(tableName)) {
-          error(this.pos, "Table not found: " + tableNameStr);
+          error(this.pos, `Table not found: ${tableName}`);
         };
         tableDescr = origFromMap[tableName];
         for (colName in tableDescr.colNames) {
-          expandedSParams.push(
-            (Binop(".", litTableName, Literal(colName.lower)), asName),
-          )
+          expandedSParams.push((Identifier(colName, Some(tableName)), None()))
         }
       | _ -> expandedSParams.push(sparam)
       }
@@ -496,24 +490,25 @@ mutable class Compiler{
         tableName = table.name;
 
         for (colName => colNbr in table.cols) {
-          this.addGetFrom(tableNbr, table.schema, colName, colNbr);
-
+          this.addGetFrom(tableNbr, table.schema, Identifier(colName), colNbr);
           if (fromName.asName is None _) {
-            dotName = Name::create(
-              table.alias.fromSome().origName + "." + colName.origName,
-            );
-            this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
+            this.addGetFrom(
+              tableNbr,
+              table.schema,
+              Identifier(colName, Some(table.alias.fromSome())),
+              colNbr,
+            )
           }
         };
         fromName.asName match {
         | None() ->
           for (colName => colNbr in table.cols) {
-            dotName = Name::create(tableName.origName + "." + colName.origName);
+            dotName = Identifier(colName, Some(tableName));
             this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
           }
         | Some(asName) ->
           for (colName => colNbr in table.cols) {
-            dotName = Name::create(asName.origName + "." + colName.origName);
+            dotName = Identifier(colName, Some(asName));
             this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
           }
         };
@@ -531,7 +526,7 @@ mutable class Compiler{
         | None() -> void
         | Some(_) ->
           for (colName => colNbr in table.cols) {
-            dotName = Name::create(tableName.origName + "." + colName.origName);
+            dotName = Identifier(colName, Some(tableName));
             if (!this.subst.containsKey(dotName)) {
               this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
             }
@@ -548,7 +543,7 @@ mutable class Compiler{
   mutable fun addGetFrom(
     tableNbr: Int,
     schema: Array<TypeDescr>,
-    colName: Name,
+    colName: Identifier,
     colNbr: Int,
   ): void {
     if (this.subst.containsKey(colName)) {
@@ -618,8 +613,8 @@ mutable class Compiler{
     for (paramIdx => param in params.params) {
       idx = slot + paramIdx;
       param match {
-      | (Binop(".", Literal(tableNameStr), Literal("*")), _) ->
-        dirDescr = origFromMap[Name::create(tableNameStr)];
+      | (Identifier(star, Some(tableName)), _) if (star.lower == "*") ->
+        dirDescr = origFromMap[tableName];
         for (tyName in dirDescr.colNames) {
           if (!cols.containsKey(tyName)) {
             !cols[tyName] = slot;
@@ -627,21 +622,11 @@ mutable class Compiler{
           };
           !slot = slot + 1;
         }
-      | (_, Some(colName)) ->
-        if (cols.containsKey(colName)) continue;
-        !cols[colName] = idx;
-        invCols![idx] = colName
-      | (Literal(colNameStr), _) ->
-        colName = Name::create(colNameStr);
-        if (cols.containsKey(colName)) continue;
-        iter = colNameStr.getIter();
-        first = iter.next().fromSome();
-        if (!Chars.isDigit(first)) {
-          !cols[colName] = idx;
-          invCols![idx] = colName;
-        }
-      | (Binop(".", _, Literal(colNameStr)), _) ->
-        colName = Name::create(colNameStr);
+      | (_, Some(aliasColName)) ->
+        if (cols.containsKey(aliasColName)) continue;
+        !cols[aliasColName] = idx;
+        invCols![idx] = aliasColName
+      | (Identifier(colName, _), None _) ->
         if (cols.containsKey(colName)) continue;
         !cols[colName] = idx;
         invCols![idx] = colName
@@ -658,11 +643,12 @@ mutable class Compiler{
     cparams: Array<CGExpr>,
   ): Array<SKDB.TypeDescr> {
     (cols, invCols) = static::getCols(params, from);
-    schema = cparams.mapWithIndex((idx, param) -> {
-      ty = TypeDescr{
+    cparams.mapWithIndex((idx, param) -> {
+      TypeDescr{
         name => invCols.maybeGet(idx) match {
         | None() ->
           col = Name::create("col<" + idx + ">");
+          // FIXME: This is a noop?
           !cols[col] = idx;
           col
         | Some(x) -> x
@@ -672,10 +658,8 @@ mutable class Compiler{
         primary => false,
         default => None(),
         notNull => false,
-      };
-      ty
-    });
-    schema
+      }
+    })
   }
 
   static fun getDirDescr(
@@ -830,12 +814,18 @@ mutable class Compiler{
           (order, kind) = kv;
           order match {
           | VInt(n) -> (n, kind)
-          | Literal(n) ->
-            colName = Name::create(n);
-            if (cols.containsKey(colName)) {
-              (cols[colName] + 1, kind)
+          | colName @ Identifier _ ->
+            if (colName.table is Some _) {
+              error(this.pos, "ORDER BY foo.bar not supported")
+            };
+            if (cols.containsKey(colName.name)) {
+              (cols[colName.name] + 1, kind)
             } else {
-              errorNbr(10, this.pos, "invalid ORDER BY, unbound name " + n)
+              errorNbr(
+                10,
+                this.pos,
+                `invalid ORDER BY, unbound name ${colName}`,
+              )
             }
           | _ -> errorNbr(11, this.pos, "invalid ORDER BY")
           }
@@ -874,12 +864,12 @@ mutable class Compiler{
       | Some(val) -> this.compileExpr(context, val)
       | None() -> error(this.pos, "Unbound parameter: " + handle)
       }
-    | Literal(str) ->
-      if (this.ambiguous.contains(Name::create(str))) {
-        error(this.pos, "Ambiguous name: " + str);
+    | id @ Identifier _ ->
+      if (this.ambiguous.contains(id)) {
+        error(this.pos, `Ambiguous name: ${id}`);
       };
-      this.subst.maybeGet(Name::create(str)) match {
-      | None() -> error(this.pos, "Unbound name: " + str)
+      this.subst.maybeGet(id) match {
+      | None() -> error(this.pos, `Unbound name: ${id}`)
       | Some(e) ->
         e match {
         | CIExpr(CUp _)
@@ -900,8 +890,6 @@ mutable class Compiler{
           e
         }
       }
-    | Binop(".", Literal(ge1), Literal(ge2)) ->
-      this.compileExpr(context, Literal(ge1 + "." + ge2))
 
     | Binop("IS", e, VNull()) ->
       CIExpr(
@@ -1622,18 +1610,13 @@ mutable class Compiler{
           join1,
         )
       }
-    | Binop("=", Binop(".", Literal(tname1), Literal(cname1)), e2) ->
-      this.findJoin(tables, Binop("=", Literal(tname1 + "." + cname1), e2))
-
-    | Binop("=", e1, Binop(".", Literal(tname2), Literal(cname2))) ->
-      this.findJoin(tables, Binop("=", e1, Literal(tname2 + "." + cname2)))
 
     | Binop(
       "=",
-      Literal(name1),
-      Literal(name2),
+      name1 @ Identifier _,
+      name2 @ Identifier _,
     ) if (this.isVar(name1) && this.isVar(name2)) ->
-      (this.subst[Name::create(name1)], this.subst[Name::create(name2)]) match {
+      (this.subst[name1], this.subst[name2]) match {
       | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
       | (CFExpr(CFGetFrom(tableNbr1, col1)), CFExpr(CFGetFrom(tableNbr2, col2)))
       | (
@@ -1947,8 +1930,8 @@ mutable class Compiler{
   }
 
   // TODO: use this everywhere!
-  readonly fun isVar(name: String): Bool {
-    this.subst.containsKey(Name::create(name))
+  readonly fun isVar(name: Identifier): Bool {
+    this.subst.containsKey(name)
   }
 
   mutable fun findLookUps(
@@ -2102,22 +2085,6 @@ mutable class Compiler{
         ),
       )
 
-    | Binop(op, Binop(".", Literal(tname1), Literal(cname1)), e2) ->
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(op, Literal(tname1 + "." + cname1), e2),
-      )
-
-    | Binop(op, e1, Binop(".", Literal(tname2), Literal(cname2))) ->
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(op, e1, Literal(tname2 + "." + cname2)),
-      )
-
     | Binop("AND", e1, e2) ->
       this.findLookUps(context, killed, tables, e1).and(
         this.findLookUps(context, killed, tables, e2),
@@ -2129,8 +2096,8 @@ mutable class Compiler{
 
     | Binop(
       _,
-      Literal(name1),
-      Literal(name2),
+      name1 @ Identifier _,
+      name2 @ Identifier _,
     ) if (this.isVar(name1) && this.isVar(name2)) ->
       LookUps[]
 
@@ -2144,12 +2111,12 @@ mutable class Compiler{
       };
       this.findLookUps(context, killed, tables, acc)
 
-    | Binop(op, e1 @ Value _, e2 @ Literal(name2))
+    | Binop(op, e1 @ Value _, e2 @ Identifier _)
     | Binop(
       op,
-      e1 @ Literal _,
-      e2 @ Literal(name2),
-    ) if (this.isVar(name2)) ->
+      e1 @ Identifier _,
+      e2 @ Identifier _,
+    ) if (this.isVar(e2)) ->
       !op = op match {
       | "=" -> op
       | "<" -> ">"
@@ -2160,17 +2127,17 @@ mutable class Compiler{
       };
       this.findLookUps(context, killed, tables, Binop(op, e2, e1))
 
-    | Binop(op, Literal(name1), e @ Value _)
+    | Binop(op, name1 @ Identifier _, e @ Value _)
     | Binop(
       op,
-      Literal(name1),
-      e @ Literal _,
+      name1 @ Identifier _,
+      e @ Identifier _,
     ) if (this.isVar(name1)) ->
       op match {
       | "=" | "<" | "<=" | ">" | ">=" -> void
       | _ -> return LookUps[]
       };
-      (tableNbr, colNbr) = this.subst[Name::create(name1)] match {
+      (tableNbr, colNbr) = this.subst[name1] match {
       | (CIExpr(CIGetFrom(x, y))) -> (x, y)
       | (CFExpr(CFGetFrom(x, y))) -> (x, y)
       | (CSExpr(CSGetFrom(x, y))) -> (x, y)
