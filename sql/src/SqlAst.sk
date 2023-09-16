@@ -37,9 +37,7 @@ base class Stmt {
     query: Query,
     text: String,
   }
-  | Drop{pos: Int, kind: TableKind, name: Name}
-  | Delete{pos: Int, colName: ?Name, name: Name, where: ?Expr}
-  | Index{
+  | CreateIndex{
     pos: Int,
     ifNotExists: Bool,
     name: Name,
@@ -48,6 +46,8 @@ base class Stmt {
     primary: Bool,
     text: ?String,
   }
+  | Drop{pos: Int, kind: TableKind, name: Name}
+  | Delete{pos: Int, colName: ?Name, name: Name, where: ?Expr}
   | Insert{
     pos: Int,
     onConflict: ?OnConflict,
