@@ -767,7 +767,7 @@ fun parseView(
   pos: Int,
   ifNotExists: Bool,
   virtual: Bool,
-): (Int, View) {
+): (Int, CreateView) {
   (!pos, name) = lex.nextWord(pos);
   if (lex.isEqUpper(pos, "AS")) {
     !pos = lex.expectUpper(pos, "AS");
@@ -777,7 +777,14 @@ fun parseView(
   text = lex.content.slice(posBegin, pos);
   (
     pos,
-    View{pos, ifNotExists, virtual, name => Name::create(name), query, text},
+    CreateView{
+      pos,
+      ifNotExists,
+      virtual,
+      name => Name::create(name),
+      query,
+      text,
+    },
   )
 }
 
