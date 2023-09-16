@@ -21,28 +21,6 @@ value class Name private (
   }
 }
 
-base class Test {
-  children =
-  | HashThreshold(Int)
-  | TestStmt{expect: String, posBegin: Int, stmt: Stmt, posEnd: Int}
-  | TestSkip()
-  | TestQuery{
-    qtype: String,
-    sort: String,
-    posBegin: Int,
-    query: Query,
-    posEnd: Int,
-  }
-
-  fun getStmt(): ?Stmt {
-    this match {
-    | TestStmt{stmt} -> Some(stmt)
-    | TestQuery{query => stmt @ Select _} -> Some(stmt)
-    | _ -> None()
-    }
-  }
-}
-
 base class Stmt {
   children =
   | Table{pos: Int, name: Name, schema: Array<TypeDescr>, ifNotExists: Bool}
