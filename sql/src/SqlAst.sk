@@ -168,7 +168,7 @@ base class Expr {
   | UMinus(Expr)
   | UPlus(Expr)
   | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
-  | Call(String, ?Array<Expr>)
+  | Call(Name, ?Array<Expr>)
   | Cast(Expr, Type)
 }
 
@@ -228,11 +228,10 @@ fun hasAggr(expr: Expr): Bool {
     | Some(e) if (hasAggr(e)) -> true
     | _ -> false
     }
-  | Call("min", _)
-  | Call("max", _)
-  | Call("sum", _)
-  | Call("avg", _)
-  | Call("count", _) ->
+  | Call(
+    fname,
+    _,
+  ) if (Array["min", "max", "sum", "avg", "count"].contains(fname.lower)) ->
     true
   | Call(_, None()) -> false
   | Call(_, Some(arr)) ->
