@@ -794,7 +794,7 @@ fun parseCreateIndex(
   pos: Int,
   ifNotExists: Bool,
   unique: Bool,
-): (Int, Index) {
+): (Int, CreateIndex) {
   origPos = pos;
   (!pos, name) = lex.nextWord(pos);
   !pos = lex.expectUpper(pos, "ON");
@@ -802,7 +802,7 @@ fun parseCreateIndex(
   text = Some(lex.content.slice(posBegin, pos));
   (
     pos,
-    Index{
+    CreateIndex{
       pos => origPos,
       ifNotExists,
       name => Name::create(name),

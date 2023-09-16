@@ -433,7 +433,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       context.setGlobal("Stdout", StdoutFile(select.format, stdout));
       None()
 
-    | index @ Index _ ->
+    | index @ CreateIndex _ ->
       Some((context, _, _) ~> {
         this.makeIndex(context, index);
         context.update()
@@ -592,7 +592,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     };
   }
 
-  fun makeIndex(context: mutable SKStore.Context, index: Index): void {
+  fun makeIndex(context: mutable SKStore.Context, index: CreateIndex): void {
     input = getIndexInputDir(context);
     key = SKStore.SID::create(index.name.lower);
     size = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key).size();
@@ -867,7 +867,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       if (tyDescr.unique || tyDescr.primary) {
         this.makeIndex(
           context,
-          Index{
+          CreateIndex{
             pos => pos,
             ifNotExists => false,
             name => Name::create(name.origName + "_" + tyDescr.name.origName),
@@ -1521,9 +1521,9 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
     context.setGlobal("IsRead", SKStore.BoolFile(true))
   | CreateTable _
   | CreateView _
+  | CreateIndex _
   | Drop _
   | Delete _
-  | Index _
   | Insert _ ->
     void
   }
