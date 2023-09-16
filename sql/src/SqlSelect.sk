@@ -1463,10 +1463,7 @@ fun makeJoinReducer(
     };
     for (kv in leftRows) {
       (_, left) = kv;
-      if (
-        rightRows.isEmpty() &&
-        (joinKind is JLeft _ || joinKind is JOuter _)
-      ) {
+      if (rightRows.isEmpty() && (joinKind is JLeft _ || joinKind is JFull _)) {
         values = if (onlyLeftValues) left.values else {
           right = Array::fill(kinds.size() - left.size(), None<CValue>());
           left.values.concat(right);
@@ -1484,7 +1481,7 @@ fun makeJoinReducer(
       }
     };
     if (
-      (joinKind is JRight _ || joinKind is JOuter _) &&
+      (joinKind is JRight _ || joinKind is JFull _) &&
       !onlyLeftValues &&
       leftRows.size() == 0
     ) {
