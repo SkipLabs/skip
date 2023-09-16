@@ -438,7 +438,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         this.makeIndex(context, index);
         context.update()
       })
-    | View{
+    | CreateView{
       pos,
       name => viewName,
       ifNotExists,
@@ -1155,9 +1155,9 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
           | (Some(Select _), Drop _)
           | (Some(Select _), Delete _)
           | (Some(Select _), Insert _)
-          | (Some(View _), Drop _)
-          | (Some(View _), Delete _)
-          | (Some(View _), Insert _) ->
+          | (Some(CreateView _), Drop _)
+          | (Some(CreateView _), Delete _)
+          | (Some(CreateView _), Insert _) ->
             updateTableMap(context)
 
           | _ -> void
@@ -1520,7 +1520,7 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
   | Select _ ->
     context.setGlobal("IsRead", SKStore.BoolFile(true))
   | CreateTable _
-  | View _
+  | CreateView _
   | Drop _
   | Delete _
   | Index _
