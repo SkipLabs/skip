@@ -336,7 +336,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     SKStore.Context,
   ) ~> void) {
     stmt match {
-    | Table{pos, name, schema, ifNotExists} ->
+    | CreateTable{pos, name, schema, ifNotExists} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
       };
@@ -1519,7 +1519,7 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
   | Update _
   | Select _ ->
     context.setGlobal("IsRead", SKStore.BoolFile(true))
-  | Table _
+  | CreateTable _
   | View _
   | Drop _
   | Delete _
