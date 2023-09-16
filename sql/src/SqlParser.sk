@@ -410,12 +410,12 @@ fun parseFromJoin(lex: Lexer, pos: Int): (Int, Array<TableName>, ?Join) {
     (!pos, join) = parseJoin(lex, pos, JInner());
     Some(join)
   } else if (lex.isEqUpper(pos, "JOIN")) {
-    (!pos, join) = parseJoin(lex, pos, JNone());
+    (!pos, join) = parseJoin(lex, pos, JInner());
     Some(join)
   } else if (lex.isEqUpper(pos, "FULL")) {
     !pos = lex.expectUpper(pos, "FULL");
     !pos = lex.expectUpper(pos, "OUTER");
-    (!pos, join) = parseJoin(lex, pos, JOuter());
+    (!pos, join) = parseJoin(lex, pos, JFull());
     Some(join)
   } else {
     None()

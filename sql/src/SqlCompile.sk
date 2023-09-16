@@ -1570,13 +1570,12 @@ mutable class Compiler{
       jk match {
       | JLeft()
       | JRight()
-      | JOuter() ->
+      | JFull() ->
         if (eqJoin is None()) {
           error(this.pos, "Invalid ON expression for JOIN");
         }
       | JCross()
-      | JInner()
-      | JNone() ->
+      | JInner() ->
         void
       };
       (e, jk, eqJoin)
@@ -1587,7 +1586,7 @@ mutable class Compiler{
       | None() ->
         (!e2, jk2, join2) = this.findJoin(tables, e2);
         join2 match {
-        | None() -> (cond, JNone(), None())
+        | None() -> (cond, JInner(), None())
         | Some(_) ->
           (
             if (e2 is VInt(1)) e1 else {
@@ -1636,9 +1635,9 @@ mutable class Compiler{
         col2Name = (col2, IASC(), table2.schema[col2].ty);
         proj2 = TableProj(tableNbr2, col2Name, col2IsUnique);
         (VInt(1), JInner(), Some(EqJoin(proj1, proj2)))
-      | _ -> (cond, JNone(), None())
+      | _ -> (cond, JInner(), None())
       }
-    | _ -> (cond, JNone(), None())
+    | _ -> (cond, JInner(), None())
     }
   }
 
