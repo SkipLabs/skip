@@ -1568,8 +1568,8 @@ mutable class Compiler{
     | On(jk, e) ->
       (!e, _, eqJoin) = this.findJoin(tables, e);
       jk match {
-      | JLeft(_)
-      | JRight(_)
+      | JLeft()
+      | JRight()
       | JOuter() ->
         if (eqJoin is None()) {
           error(this.pos, "Invalid ON expression for JOIN");
