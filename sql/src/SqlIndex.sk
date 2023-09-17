@@ -138,13 +138,19 @@ fun createUserIndex(
   context: mutable SKStore.Context,
   userIndexName: Name,
   pos: Int,
-  fields: (Name, Array<(Name, IKind)>),
+  tableName: Name,
+  columns: Array<IndexedColumn>,
   unique: Bool,
   primary: Bool,
   text: ?String,
 ): IndexDescr {
-  (tableName, colNames) = fields;
-  !colNames = colNames.map(x -> (x.i0, IASC()));
+  colNames = columns.map(x -> {
+    name = x.expr match {
+    | Identifier(name, None()) -> name
+    | _ -> error(pos, "Indexing on expressions not implemented")
+    };
+    (name, IASC())
+  });
   colSet = mutable Set[];
   for (colName in colNames) {
     if (colSet.contains(colName.i0)) {
@@ -180,7 +186,7 @@ fun createUserIndex(
     table.name,
     table.dirName,
     kinds,
-    fields.i1.size(),
+    columns.size(),
     unique,
     primary,
     text,

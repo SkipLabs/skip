@@ -819,7 +819,14 @@ fun parseCreateIndex(
       pos => origPos,
       ifNotExists,
       name => Name::create(name),
-      fields,
+      on => fields.i0,
+      columns => fields.i1.map(x ->
+        IndexedColumn{
+          expr => Identifier(x.i0),
+          order => x.i1,
+          collate => None(),
+        }
+      ),
       unique,
       primary => false,
       text,
