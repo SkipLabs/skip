@@ -351,7 +351,10 @@ class Evaluator{options: Options, user: ?UserFile} {
       })
     | CreateTableAs _ ->
       invariant_violation("CREATE TABLE AS SELECT not implemented")
-    | Insert{pos, onConflict, name, paramsOpt, values} ->
+    | Insert{pos, onConflict, name, alias, paramsOpt, values} ->
+      if (alias is Some _) {
+        error(pos, "INSERT INTO table AS not implemented")
+      };
       baseName = SKStore.SID::create(name.lower);
       getTableDir(context).maybeGet(context, baseName) match {
       | None() -> error(pos, "Table not found: " + name)
