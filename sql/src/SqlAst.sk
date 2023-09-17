@@ -158,6 +158,7 @@ base class Expr {
   | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
   | Call(Name, Array<Expr>, distinct: Bool)
   | Cast(Expr, Type)
+  | Collate(Expr, Name)
 }
 
 class Identifier(
@@ -347,6 +348,7 @@ fun hasAggr(expr: Expr): Bool {
     false
   | Cast(e, _) -> hasAggr(e)
   | Tuple(values) -> values.any(hasAggr)
+  | Collate(e, _) -> hasAggr(e)
   }
 }
 
