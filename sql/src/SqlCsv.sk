@@ -197,8 +197,8 @@ fun lwwEdits(
     params => SKDB.SelectParams(true, Array[]),
     from => Some(Array[SKDB.TableName(SKDB.FName(table.name), None(), false)]),
     where => Some(
-      SKDB.Binop(
-        "=",
+      SKDB.BinOp(
+        SKDB.OEq(),
         SKDB.Identifier(table.colNames[primaryIdx]),
         table.schema[primaryIdx].ty match {
         | SKDB.INTEGER() -> SKDB.VInt(row.getInt(primaryIdx).fromSome())

@@ -151,7 +151,7 @@ base class Expr {
   | Between(Expr, Expr, Expr, negated: Bool)
   | Like(Expr, Expr, escape: ?Expr, negated: Bool)
   | On(JoinKind, Expr)
-  | Binop(String, Expr, Expr)
+  | BinOp(BinaryOperator, Expr, Expr)
   | Subquery(Query)
   | Exists(Query, negated: Bool)
   | UnOp(UnaryOperator, Expr)
@@ -188,6 +188,92 @@ base class UnaryOperator {
   | UnaryMinus()
   | UnaryBitNot()
   | UnaryIsNull(negated: Bool)
+}
+
+base class BinaryOperator uses Show {
+  children =
+  | OPlus()
+  | OMinus()
+  | OConcat()
+  //  | OArrow() // (->)
+  //  | OLongArrow() // (->>)
+  | OMul()
+  | ODiv()
+  | OMod()
+  | OBitAnd()
+  | OBitOr()
+  | OBitShiftLeft()
+  | OBitShiftRight()
+  | OAnd()
+  | OOr()
+  | OLt()
+  | OLtEq()
+  | OGt()
+  | OGtEq()
+  | OEq()
+  | ONeq()
+  | OIs(negated: Bool)
+  | OGlob(negated: Bool)
+  | ORegexp(negated: Bool)
+  | OMatch(negated: Bool)
+
+  static fun fromString(str: String): BinaryOperator {
+    str match {
+    | "+" -> OPlus()
+    | "-" -> OMinus()
+    | "||" -> OConcat()
+    //  | OArrow() // (->)
+    //  | OLongArrow() // (->>)
+    | "*" -> OMul()
+    | "/" -> ODiv()
+    | "%" -> OMod()
+    | "&" -> OBitAnd()
+    | "|" -> OBitOr()
+    | "<<" -> OBitShiftLeft()
+    | ">>" -> OBitShiftRight()
+    | "AND" -> OAnd()
+    | "OR" -> OOr()
+    | "<" -> OLt()
+    | "<=" -> OLtEq()
+    | ">" -> OGt()
+    | ">=" -> OGtEq()
+    | "=" | "==" -> OEq()
+    | "!=" | "<>" -> ONeq()
+    | "IS NOT" -> OIs(true)
+    | "IS" -> OIs(false)
+    | "NOT GLOB" -> OGlob(true)
+    | "GLOB" -> OGlob(false)
+    | "NOT REGEXP" -> ORegexp(true)
+    | "REGEXP" -> ORegexp(false)
+    | "NOT MATCH" -> OMatch(true)
+    | "MATCH" -> OMatch(false)
+    | _ -> invariant_violation("Unrecognized binary op: " + str)
+    }
+  }
+
+  fun toString(): String
+  | OPlus() -> "+"
+  | OMinus() -> "-"
+  | OConcat() -> "||"
+  | OMul() -> "*"
+  | ODiv() -> "/"
+  | OMod() -> "%"
+  | OBitAnd() -> "&"
+  | OBitOr() -> "|"
+  | OBitShiftLeft() -> "<<"
+  | OBitShiftRight() -> ">>"
+  | OAnd() -> "AND"
+  | OOr() -> "OR"
+  | OLt() -> "<"
+  | OLtEq() -> "<="
+  | OGt() -> ">"
+  | OGtEq() -> ">="
+  | OEq() -> "="
+  | ONeq() -> "<>"
+  | OIs(negated) -> if (negated) "IS NOT" else "IS"
+  | OGlob(negated) -> if (negated) "NOT GLOB" else "GLOB"
+  | ORegexp(negated) -> if (negated) "NOT REGEXP" else "REGEXP"
+  | OMatch(negated) -> if (negated) "NOT MATCH" else "MATCH"
 }
 
 base class InValues {
@@ -232,7 +318,7 @@ fun hasAggr(expr: Expr): Bool {
         false
       }
   | In(_, InSelect _, _) -> invariant_violation("IN SELECT not implemented")
-  | Binop(_, e1, e2)
+  | BinOp(_, e1, e2)
   | Like(e1, e2, _, _) ->
     hasAggr(e1) || hasAggr(e2)
   | On(_, e) -> hasAggr(e)

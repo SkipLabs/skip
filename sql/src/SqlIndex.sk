@@ -260,13 +260,13 @@ base class ColOp uses Orderable {
   | COLike(String)
   | CORange(CValue, CValue)
 
-  static fun create(op: String, value: CValue): ColOp {
+  static fun create(op: BinaryOperator, value: CValue): ColOp {
     op match {
-    | "=" -> COEq(value)
-    | "<" -> COLt(value)
-    | "<=" -> COLte(value)
-    | ">" -> COGt(value)
-    | ">=" -> COGte(value)
+    | OEq() -> COEq(value)
+    | OLt() -> COLt(value)
+    | OLtEq() -> COLte(value)
+    | OGt() -> COGt(value)
+    | OGtEq() -> COGte(value)
     | _ -> invariant_violation("Unknown operation: " + op)
     }
   }
