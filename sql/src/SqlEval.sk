@@ -440,7 +440,10 @@ class Evaluator{options: Options, user: ?UserFile} {
       context.setGlobal("Stdout", StdoutFile(select.format, stdout));
       None()
 
-    | index @ CreateIndex _ ->
+    | index @ CreateIndex{pos, where} ->
+      if (where is Some _) {
+        error(pos, "INDEX ... WHERE not implemented")
+      };
       Some((context, _, _) ~> {
         this.makeIndex(context, index);
         context.update()
@@ -886,6 +889,7 @@ class Evaluator{options: Options, user: ?UserFile} {
               },
             ],
             unique => true,
+            where => None(),
             text => None(),
           },
         );
