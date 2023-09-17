@@ -967,10 +967,13 @@ mutable class Compiler{
       | _ -> error(this.pos, "Type error: NOT BETWEEN")
       }
 
-    | Binop("NOT LIKE", ge1, ge2) ->
-      this.compileExpr(context, Not(Binop("LIKE", ge1, ge2)))
+    | Like(ge1, ge2, escape, true) ->
+      this.compileExpr(context, Not(Like(ge1, ge2, escape, false)))
 
-    | Binop("LIKE", ge1, ge2) ->
+    | Like(ge1, ge2, escape, false) ->
+      if (escape is Some _) {
+        error(this.pos, "LIKE ESCAPE not implemented")
+      };
       pattern = ge2 match {
       | VString(str) -> str
       | VParam(handle) ->
@@ -1967,6 +1970,30 @@ mutable class Compiler{
         Binop(op, VString(callStrftime(this.pos, context, sargs)), e2),
       )
 
+    | Like(
+      Call(fname, Some(args)),
+      e2,
+      escape,
+      negated,
+    ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
+      sargs = args.map(x ->
+        x match {
+        | VString(str) -> str
+        | _ -> invariant_violation("Unexpected type")
+        }
+      );
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Like(
+          VString(callStrftime(this.pos, context, sargs)),
+          e2,
+          escape,
+          negated,
+        ),
+      )
+
     | Binop(
       op,
       e1,
@@ -1985,6 +2012,30 @@ mutable class Compiler{
         Binop(op, e1, VString(callStrftime(this.pos, context, sargs))),
       )
 
+    | Like(
+      e1,
+      Call(fname, Some(args)),
+      escape,
+      negated,
+    ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
+      sargs = args.map(x ->
+        x match {
+        | VString(str) -> str
+        | _ -> invariant_violation("Unexpected type")
+        }
+      );
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Like(
+          e1,
+          VString(callStrftime(this.pos, context, sargs)),
+          escape,
+          negated,
+        ),
+      )
+
     | Binop(op, Call(fname, Some(args)), e2) if (fname.lower == "date") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
@@ -2000,6 +2051,30 @@ mutable class Compiler{
             Some(Array[VString("%Y-%m-%d")].concat(args)),
           ),
           e2,
+        ),
+      )
+
+    | Like(
+      Call(fname, Some(args)),
+      e2,
+      escape,
+      negated,
+    ) if (fname.lower == "date") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Like(
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%Y-%m-%d")].concat(args)),
+          ),
+          e2,
+          escape,
+          negated,
         ),
       )
 
@@ -2021,6 +2096,30 @@ mutable class Compiler{
         ),
       )
 
+    | Like(
+      Call(fname, Some(args)),
+      e2,
+      escape,
+      negated,
+    ) if (fname.lower == "time") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Like(
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%H:%M:%S")].concat(args)),
+          ),
+          e2,
+          escape,
+          negated,
+        ),
+      )
+
     | Binop(op, Call(fname, Some(args)), e2) if (fname.lower == "datetime") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
@@ -2036,6 +2135,30 @@ mutable class Compiler{
             Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
           ),
           e2,
+        ),
+      )
+
+    | Like(
+      Call(fname, Some(args)),
+      e2,
+      escape,
+      negated,
+    ) if (fname.lower == "datetime") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Like(
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
+          ),
+          e2,
+          escape,
+          negated,
         ),
       )
 
@@ -2057,6 +2180,30 @@ mutable class Compiler{
         ),
       )
 
+    | Like(
+      e1,
+      Call(fname, Some(args)),
+      escape,
+      negated,
+    ) if (fname.lower == "date") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Like(
+          e1,
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%Y-%m-%d")].concat(args)),
+          ),
+          escape,
+          negated,
+        ),
+      )
+
     | Binop(op, e1, Call(fname, Some(args))) if (fname.lower == "time") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
@@ -2072,6 +2219,30 @@ mutable class Compiler{
             Name::create("strftime"),
             Some(Array[VString("%H:%M:%S")].concat(args)),
           ),
+        ),
+      )
+
+    | Like(
+      e1,
+      Call(fname, Some(args)),
+      escape,
+      negated,
+    ) if (fname.lower == "time") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Like(
+          e1,
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%H:%M:%S")].concat(args)),
+          ),
+          escape,
+          negated,
         ),
       )
 
@@ -2093,6 +2264,30 @@ mutable class Compiler{
         ),
       )
 
+    | Like(
+      e1,
+      Call(fname, Some(args)),
+      escape,
+      negated,
+    ) if (fname.lower == "datetime") ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        Like(
+          e1,
+          Call(
+            Name::create("strftime"),
+            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
+          ),
+          escape,
+          negated,
+        ),
+      )
+
     | Binop("AND", e1, e2) ->
       this.findLookUps(context, killed, tables, e1).and(
         this.findLookUps(context, killed, tables, e2),
@@ -2102,10 +2297,12 @@ mutable class Compiler{
         this.findLookUps(context, killed, tables, e2),
       )
 
-    | Binop(
-      _,
+    | Binop(_, name1 @ Identifier _, name2 @ Identifier _)
+    | Like(
       name1 @ Identifier _,
       name2 @ Identifier _,
+      _,
+      _,
     ) if (this.isVar(name1) && this.isVar(name2)) ->
       LookUps[]
 
@@ -2134,6 +2331,15 @@ mutable class Compiler{
       | _ -> return LookUps[]
       };
       this.findLookUps(context, killed, tables, Binop(op, e2, e1))
+
+    | Like(e1 @ Value _, e2 @ Identifier _, escape, negated)
+    | Like(
+      e1 @ Identifier _,
+      e2 @ Identifier _,
+      escape,
+      negated,
+    ) if (this.isVar(e2)) ->
+      this.findLookUps(context, killed, tables, Like(e2, e1, escape, negated))
 
     | Binop(op, name1 @ Identifier _, e @ Value _)
     | Binop(
@@ -2175,6 +2381,42 @@ mutable class Compiler{
         cols = SortedA[
           Col(lookUpColNbr, Array[(ColOp::create(op, value))], unique),
         ];
+        !index = getLatestIndexDescr(context, index);
+        LookUp{index, tableNbr, cols}
+      });
+      LookUps::createFromItems(lookUps)
+
+    | Like(name1 @ Identifier _, e @ Value _, _, false)
+    | Like(
+      name1 @ Identifier _,
+      e @ Identifier _,
+      _,
+      false,
+    ) if (this.isVar(name1)) ->
+      (tableNbr, colNbr) = this.subst[name1] match {
+      | (CSExpr(CSGetFrom(x, y))) -> (x, y)
+      | _ -> return LookUps[]
+      };
+      table = tables[tableNbr];
+      indexEntry = makeIndexEntry(table.name, colNbr);
+      indexTable = getIndexByColNbr(context);
+      indexes = indexTable.getArray(context, indexEntry);
+      !indexes = indexes.filter(index -> !killed.contains(index.tableDirName));
+      ce = this.compileExpr(context, e);
+      if (ce.getType() != table.schema[colNbr].ty) {
+        error(this.pos, "Incompatible types");
+      };
+      value = ce match {
+      | CSExpr(CSLiteral(s)) -> CString(s)
+      | _ -> return LookUps[]
+      };
+      lookUps = indexes.map(index -> {
+        (lookUpColNbr, unique) = for (slot => field in index.fields) {
+          if (field.i0 == colNbr) break (slot, isUnique(table.schema[colNbr]))
+        } else {
+          invariant_violation("Could not find column: " + colNbr)
+        };
+        cols = SortedA[Col(lookUpColNbr, Array[(COLike(value.value))], unique)];
         !index = getLatestIndexDescr(context, index);
         LookUp{index, tableNbr, cols}
       });
