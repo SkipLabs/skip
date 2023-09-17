@@ -396,26 +396,26 @@ fun parseFromJoin(lex: Lexer, pos: Int): (Int, Array<TableName>, ?Join) {
     if (lex.isEqUpper(pos, "OUTER")) {
       !pos = lex.expectUpper(pos, "OUTER")
     };
-    (!pos, join) = parseJoin(lex, pos, JLeft());
+    (!pos, join) = parseJoin(lex, pos, JLeft(false));
     Some(join)
   } else if (lex.isEqUpper(pos, "RIGHT")) {
     !pos = lex.expectUpper(pos, "RIGHT");
     if (lex.isEqUpper(pos, "OUTER")) {
       !pos = lex.expectUpper(pos, "OUTER")
     };
-    (!pos, join) = parseJoin(lex, pos, JRight());
+    (!pos, join) = parseJoin(lex, pos, JRight(false));
     Some(join)
   } else if (lex.isEqUpper(pos, "INNER")) {
     !pos = lex.expectUpper(pos, "INNER");
-    (!pos, join) = parseJoin(lex, pos, JInner());
+    (!pos, join) = parseJoin(lex, pos, JInner(false));
     Some(join)
   } else if (lex.isEqUpper(pos, "JOIN")) {
-    (!pos, join) = parseJoin(lex, pos, JInner());
+    (!pos, join) = parseJoin(lex, pos, JInner(false));
     Some(join)
   } else if (lex.isEqUpper(pos, "FULL")) {
     !pos = lex.expectUpper(pos, "FULL");
     !pos = lex.expectUpper(pos, "OUTER");
-    (!pos, join) = parseJoin(lex, pos, JFull());
+    (!pos, join) = parseJoin(lex, pos, JFull(false));
     Some(join)
   } else {
     None()
