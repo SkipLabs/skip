@@ -154,6 +154,7 @@ base class Expr {
   | Subquery(Query)
   | Exists(Query, negated: Bool)
   | UnOp(UnaryOperator, Expr)
+  | Tuple(Array<Expr>)
   | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
   | Call(Name, Array<Expr>, distinct: Bool)
   | Cast(Expr, Type)
@@ -345,6 +346,7 @@ fun hasAggr(expr: Expr): Bool {
     };
     false
   | Cast(e, _) -> hasAggr(e)
+  | Tuple(values) -> values.any(hasAggr)
   }
 }
 
