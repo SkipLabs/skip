@@ -23,6 +23,8 @@ value class Name private (
 
 base class Stmt {
   children =
+  | BeginTransaction{kind: TransactionKind}
+  | EndTransaction{}
   | CreateTable{
     pos: Int,
     name: Name,
@@ -297,6 +299,13 @@ base class Type uses Orderable {
   | FLOAT()
   | INTEGER()
   | TEXT()
+}
+
+base class TransactionKind {
+  children =
+  | TransactionDeferred()
+  | TransactionImmediate()
+  | TransactionExclusive()
 }
 
 /*****************************************************************************/
