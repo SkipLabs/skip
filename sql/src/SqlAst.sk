@@ -152,7 +152,7 @@ base class Expr {
   | Like(Expr, Expr, escape: ?Expr, negated: Bool)
   | On(JoinKind, Expr)
   | Binop(String, Expr, Expr)
-  | EQuery(Query)
+  | Subquery(Query)
   | Exists(Query, negated: Bool)
   | UMinus(Expr)
   | UPlus(Expr)
@@ -229,7 +229,7 @@ fun hasAggr(expr: Expr): Bool {
   | Like(e1, e2, _, _) ->
     hasAggr(e1) || hasAggr(e2)
   | On(_, e) -> hasAggr(e)
-  | EQuery(_)
+  | Subquery(_)
   | Exists _ ->
     false
   | Case(condOpt, whenCases, elseCase) ->
