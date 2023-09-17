@@ -1086,17 +1086,14 @@ mutable class Compiler{
       | x -> x
       }
 
-    | Call(fname, fargs) ->
-      (fname.lower, fargs) match {
-      | ("coalesce", None()) ->
-        error(this.pos, "Missing arguments for COALESCE")
-      | ("id", None()) -> error(this.pos, "id expects one argument")
-      | ("id", Some(args)) ->
+    | Call(fname, args, distinct) ->
+      fname.lower match {
+      | "id" ->
         if (args.size() == 0) {
           return CIExpr(CILiteral(SKStore.genSym(0)))
         };
         if (args.size() != 1) {
-          error(this.pos, "id expects one argument")
+          error(this.pos, "id expects at most one argument")
         };
         args[0] match {
         | VString(varName) ->
@@ -1110,7 +1107,7 @@ mutable class Compiler{
           CIExpr(CILiteral(globals[varName]))
         | _ -> error(this.pos, "id expects a string literal")
         }
-      | ("skdb_permission", Some(args)) ->
+      | "skdb_permission" ->
         if (args.size() != 1) {
           error(this.pos, "skdb_permission expects one argument")
         };
@@ -1132,28 +1129,29 @@ mutable class Compiler{
           !res = res.or(kInsertPermission).or(kDeletePermission)
         };
         CIExpr(CILiteral(res))
-      | ("upper", None()) -> error(this.pos, "upper expects one argument")
-      | ("lower", None()) -> error(this.pos, "lower expects one argument")
-      | ("upper", Some(values)) ->
-        if (values.size() != 1) {
+      | "upper" ->
+        if (args.size() != 1) {
           error(this.pos, "upper expects one argument")
         };
-        this.compileExpr(context, values[0]) match {
+        this.compileExpr(context, args[0]) match {
         | CGNull _ -> CGNull()
         | CSExpr(e) -> CSExpr(CSUpper(e))
         | _ -> error(this.pos, "upper expects a string")
         }
-      | ("lower", Some(values)) ->
-        if (values.size() != 1) {
+      | "lower" ->
+        if (args.size() != 1) {
           error(this.pos, "lower expects one argument")
         };
-        this.compileExpr(context, values[0]) match {
+        this.compileExpr(context, args[0]) match {
         | CGNull _ -> CGNull()
         | CSExpr(e) -> CSExpr(CSLower(e))
         | _ -> error(this.pos, "lower expects a string")
         }
-      | ("coalesce", Some(values)) ->
-        tvalues = values.map(x -> this.compileExpr(context, x));
+      | "coalesce" ->
+        if (args.isEmpty()) {
+          error(this.pos, "Missing arguments for COALESCE")
+        };
+        tvalues = args.map(x -> this.compileExpr(context, x));
         ty = for (val in tvalues) {
           val match {
           | CGNull _ -> continue
@@ -1204,16 +1202,12 @@ mutable class Compiler{
           )
         }
 
-      | ("sum", Some(values)) ->
+      | "sum" ->
         this.noAggr(() -> {
-          if (values.size() != 1) {
+          if (args.size() != 1) {
             error(this.pos, "Invalid number of arguments for sum")
           };
-          (distinct, value) = values[0] match {
-          | Distinct(e) -> (true, e)
-          | e -> (false, e)
-          };
-          this.compileExpr(context, value) match {
+          this.compileExpr(context, args[0]) match {
           | e @ CIExpr(_) ->
             slot = this.aggrVars.size();
             this.aggrVars.push((Sum(distinct), e));
@@ -1227,13 +1221,12 @@ mutable class Compiler{
           }
         })
 
-      | ("min", Some(values)) ->
+      | "min" ->
         this.noAggr(() -> {
-          if (values.size() != 1) {
+          if (args.size() != 1) {
             error(this.pos, "Invalid number of arguments for min")
           };
-          value = values[0];
-          this.compileExpr(context, value) match {
+          this.compileExpr(context, args[0]) match {
           | e @ CIExpr(_) ->
             slot = this.aggrVars.size();
             this.aggrVars.push((Min(), e));
@@ -1250,13 +1243,12 @@ mutable class Compiler{
           }
         })
 
-      | ("max", Some(values)) ->
+      | "max" ->
         this.noAggr(() -> {
-          if (values.size() != 1) {
+          if (args.size() != 1) {
             error(this.pos, "Invalid number of arguments for max")
           };
-          value = values[0];
-          this.compileExpr(context, value) match {
+          this.compileExpr(context, args[0]) match {
           | e @ CIExpr(_) ->
             slot = this.aggrVars.size();
             this.aggrVars.push((Max(), e));
@@ -1273,19 +1265,12 @@ mutable class Compiler{
           }
         })
 
-      | ("count", arg) ->
+      | "count" ->
         this.noAggr(() -> {
-          value = arg match {
-          | None() -> VInt(1)
-          | Some(values) ->
-            if (values.size() != 1) {
-              error(this.pos, "Invalid number of arguments for sum")
-            };
-            values[0]
-          };
-          (distinct, !value) = value match {
-          | Distinct(e) -> (true, e)
-          | e -> (false, e)
+          value = args.size() match {
+          | 0 -> VInt(1)
+          | 1 -> args[0]
+          | _ -> error(this.pos, "Invalid number of arguments for sum")
           };
           this.compileExpr(context, value) match {
           | e @ CIExpr(_) ->
@@ -1304,16 +1289,12 @@ mutable class Compiler{
           }
         })
 
-      | ("avg", Some(values)) ->
+      | "avg" ->
         this.noAggr(() -> {
-          if (values.size() != 1) {
+          if (args.size() != 1) {
             error(this.pos, "Invalid number of arguments for avg")
           };
-          (distinct, value) = values[0] match {
-          | Distinct(e) -> (true, e)
-          | e -> (false, e)
-          };
-          this.compileExpr(context, value) match {
+          this.compileExpr(context, args[0]) match {
           | e @ CIExpr(_) ->
             sumSlot = this.aggrVars.size();
             this.aggrVars.push((Sum(distinct), e));
@@ -1338,11 +1319,11 @@ mutable class Compiler{
           }
         })
 
-      | ("abs", Some(values)) ->
-        if (values.size() != 1) {
+      | "abs" ->
+        if (args.size() != 1) {
           error(this.pos, "Invalid number of arguments for abs")
         };
-        this.compileExpr(context, values[0]) match {
+        this.compileExpr(context, args[0]) match {
         | CIExpr(n) -> CIExpr(CIAbs(n))
         | CFExpr(f) -> CFExpr(CFAbs(f))
         | _ ->
@@ -1352,7 +1333,7 @@ mutable class Compiler{
           )
         }
 
-      | ("date", Some(args)) ->
+      | "date" ->
         if (args.size() < 1) {
           error(this.pos, "Missing arguments");
         };
@@ -1360,11 +1341,12 @@ mutable class Compiler{
           context,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d")].concat(args)),
+            Array[VString("%Y-%m-%d")].concat(args),
+            false,
           ),
         )
 
-      | ("time", Some(args)) ->
+      | "time" ->
         if (args.size() < 1) {
           error(this.pos, "Missing arguments");
         };
@@ -1372,25 +1354,27 @@ mutable class Compiler{
           context,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%H:%M:%S")].concat(args)),
+            Array[VString("%H:%M:%S")].concat(args),
+            false,
           ),
         )
 
-      | ("datetime", Some(args)) ->
-        if (args.size() < 1) {
+      | "datetime" ->
+        if (args.isEmpty()) {
           error(this.pos, "Missing arguments");
         };
         this.compileExpr(
           context,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
+            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
+            false,
           ),
         )
 
-      | ("julianday", _) -> error(this.pos, "julianday not supported")
+      | "julianday" -> error(this.pos, "julianday not supported")
 
-      | ("strftime", Some(args)) ->
+      | "strftime" ->
         if (args.size() < 2) {
           error(this.pos, "Missing arguments strftime");
         };
@@ -1423,7 +1407,7 @@ mutable class Compiler{
           CSExpr(CStrftime(sargs[0], sargs[1], sargs.slice(2, sargs.size())))
         }
 
-      | ("nullif", Some(args)) ->
+      | "nullif" ->
         if (args.size() != 2) {
           error(this.pos, "NULLIF expects 2 arguments");
         };
@@ -1954,7 +1938,7 @@ mutable class Compiler{
     cond match {
     | Binop(
       op,
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       e2,
     ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
       sargs = args.map(x ->
@@ -1971,7 +1955,7 @@ mutable class Compiler{
       )
 
     | Like(
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       e2,
       escape,
       negated,
@@ -1997,7 +1981,7 @@ mutable class Compiler{
     | Binop(
       op,
       e1,
-      Call(fname, Some(args)),
+      Call(fname, args, _),
     ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
       sargs = args.map(x ->
         x match {
@@ -2014,7 +1998,7 @@ mutable class Compiler{
 
     | Like(
       e1,
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       escape,
       negated,
     ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
@@ -2036,7 +2020,7 @@ mutable class Compiler{
         ),
       )
 
-    | Binop(op, Call(fname, Some(args)), e2) if (fname.lower == "date") ->
+    | Binop(op, Call(fname, args, _), e2) if (fname.lower == "date") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
       };
@@ -2048,14 +2032,15 @@ mutable class Compiler{
           op,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d")].concat(args)),
+            Array[VString("%Y-%m-%d")].concat(args),
+            false,
           ),
           e2,
         ),
       )
 
     | Like(
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       e2,
       escape,
       negated,
@@ -2070,7 +2055,8 @@ mutable class Compiler{
         Like(
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d")].concat(args)),
+            Array[VString("%Y-%m-%d")].concat(args),
+            false,
           ),
           e2,
           escape,
@@ -2078,7 +2064,7 @@ mutable class Compiler{
         ),
       )
 
-    | Binop(op, Call(fname, Some(args)), e2) if (fname.lower == "time") ->
+    | Binop(op, Call(fname, args, _), e2) if (fname.lower == "time") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
       };
@@ -2090,14 +2076,15 @@ mutable class Compiler{
           op,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%H:%M:%S")].concat(args)),
+            Array[VString("%H:%M:%S")].concat(args),
+            false,
           ),
           e2,
         ),
       )
 
     | Like(
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       e2,
       escape,
       negated,
@@ -2112,7 +2099,8 @@ mutable class Compiler{
         Like(
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%H:%M:%S")].concat(args)),
+            Array[VString("%H:%M:%S")].concat(args),
+            false,
           ),
           e2,
           escape,
@@ -2120,7 +2108,7 @@ mutable class Compiler{
         ),
       )
 
-    | Binop(op, Call(fname, Some(args)), e2) if (fname.lower == "datetime") ->
+    | Binop(op, Call(fname, args, _), e2) if (fname.lower == "datetime") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
       };
@@ -2132,14 +2120,15 @@ mutable class Compiler{
           op,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
+            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
+            false,
           ),
           e2,
         ),
       )
 
     | Like(
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       e2,
       escape,
       negated,
@@ -2154,7 +2143,8 @@ mutable class Compiler{
         Like(
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
+            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
+            false,
           ),
           e2,
           escape,
@@ -2162,7 +2152,7 @@ mutable class Compiler{
         ),
       )
 
-    | Binop(op, e1, Call(fname, Some(args))) if (fname.lower == "date") ->
+    | Binop(op, e1, Call(fname, args, _)) if (fname.lower == "date") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
       };
@@ -2175,14 +2165,15 @@ mutable class Compiler{
           e1,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d")].concat(args)),
+            Array[VString("%Y-%m-%d")].concat(args),
+            false,
           ),
         ),
       )
 
     | Like(
       e1,
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       escape,
       negated,
     ) if (fname.lower == "date") ->
@@ -2197,14 +2188,15 @@ mutable class Compiler{
           e1,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d")].concat(args)),
+            Array[VString("%Y-%m-%d")].concat(args),
+            false,
           ),
           escape,
           negated,
         ),
       )
 
-    | Binop(op, e1, Call(fname, Some(args))) if (fname.lower == "time") ->
+    | Binop(op, e1, Call(fname, args, _)) if (fname.lower == "time") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
       };
@@ -2217,14 +2209,15 @@ mutable class Compiler{
           e1,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%H:%M:%S")].concat(args)),
+            Array[VString("%H:%M:%S")].concat(args),
+            false,
           ),
         ),
       )
 
     | Like(
       e1,
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       escape,
       negated,
     ) if (fname.lower == "time") ->
@@ -2239,14 +2232,15 @@ mutable class Compiler{
           e1,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%H:%M:%S")].concat(args)),
+            Array[VString("%H:%M:%S")].concat(args),
+            false,
           ),
           escape,
           negated,
         ),
       )
 
-    | Binop(op, e1, Call(fname, Some(args))) if (fname.lower == "datetime") ->
+    | Binop(op, e1, Call(fname, args, _)) if (fname.lower == "datetime") ->
       if (args.size() < 1) {
         error(this.pos, "Missing arguments");
       };
@@ -2259,14 +2253,15 @@ mutable class Compiler{
           e1,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
+            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
+            false,
           ),
         ),
       )
 
     | Like(
       e1,
-      Call(fname, Some(args)),
+      Call(fname, args, _),
       escape,
       negated,
     ) if (fname.lower == "datetime") ->
@@ -2281,7 +2276,8 @@ mutable class Compiler{
           e1,
           Call(
             Name::create("strftime"),
-            Some(Array[VString("%Y-%m-%d %H:%M:%S")].concat(args)),
+            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
+            false,
           ),
           escape,
           negated,
