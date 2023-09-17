@@ -555,7 +555,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     !pos = lex.expect(pos, "(");
     (!pos, q) = parseQuery(lex, pos);
     !pos = lex.expect(pos, ")");
-    Exists(q)
+    Exists(q, false)
   } else if (lex.isEqUpperAt(tok, "CASE")) {
     condOpt = if (!lex.isEqUpper(pos, "WHEN")) {
       (!pos, cond) = parseExpr(lex, pos);
