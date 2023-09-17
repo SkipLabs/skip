@@ -671,7 +671,7 @@ class EagerDir{
   old: SortedMap<Source, MInfo> = SortedMap[],
   parents: FixedSingle<
     DirName,
-    (MapFun, ?Array<KeyRange>),
+    (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
   > = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
   slices: RangeMapList<Key, DirName> = RangeMapList[],
@@ -730,7 +730,7 @@ class EagerDir{
           write => true,
           create => true,
           append => true,
-          mode => 0o777,
+          mode => 511,
         },
       );
       o = x -> file.write_all(x);
@@ -1247,7 +1247,10 @@ class EagerDir{
   static fun isReusable(
     context: readonly Context,
     child: EagerDir,
-    parents: FixedSingle<DirName, (MapFun, ?Array<KeyRange>)>,
+    parents: FixedSingle<
+      DirName,
+      (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+    >,
   ): Bool {
     context.canReuse match {
     | CRAlways() -> true
@@ -1282,15 +1285,21 @@ class EagerDir{
     f: MapFun,
     reducerOpt: ?IReducer = None(),
     rangeOpt: ?Array<KeyRange> = None(),
+    onUpdate: ?((mutable Context, SortedSet<Key>) ~> void) = None(),
     unsafeSkipInit: Bool = false,
   ): void {
-    parents = FixedSingle::create(mutable Vector[(parentName, (f, rangeOpt))]);
+    parents = FixedSingle::create(
+      mutable Vector[(parentName, (f, rangeOpt, onUpdate))],
+    );
     static::applyMany(context, parents, childName, reducerOpt, unsafeSkipInit);
   }
 
   static fun applyMany(
     context: mutable Context,
-    parents: FixedSingle<DirName, (MapFun, ?Array<KeyRange>)>,
+    parents: FixedSingle<
+      DirName,
+      (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+    >,
     childName: DirName,
     reducerOpt: ?IReducer = None(),
     unsafeSkipInit: Bool = false,
@@ -1316,12 +1325,12 @@ class EagerDir{
     | _ ->
       context.!newDirs = context.newDirs.add(childName);
 
-      acc = mutable Vector<FixedRow<Array<File>>>[];
+      acc = mutable Vector[];
       oldVec = mutable Vector[];
 
       if (!unsafeSkipInit) {
         for (parentName => parentData in parents) {
-          (f, rangeOpt) = parentData;
+          (f, rangeOpt, _) = parentData;
           parent = context.unsafeGetEagerDir(parentName);
           rangeOpt match {
           | None() ->
@@ -1375,7 +1384,7 @@ class EagerDir{
     updateDirtyReaders(context, Path::create(childName.tag(), DirTag()));
     context.setDir(childName, dir);
     for (parentName => parentData in parents) {
-      (_, rangeOpt) = parentData;
+      (_, rangeOpt, _) = parentData;
       static::addChildToParent(context, parentName, childName, rangeOpt);
     };
   }
@@ -1546,6 +1555,7 @@ class EagerDir{
     parentName: DirName,
     mapFun: MapFun,
     rangeOpt: ?Array<KeyRange>,
+    onUpdate: ?((mutable Context, SortedSet<Key>) ~> void),
     child: EagerDir,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
@@ -1645,6 +1655,11 @@ class EagerDir{
     };
 
     context.setDir(child.dirName, child);
+
+    onUpdate match {
+    | None() -> void
+    | Some(f) -> f(context, dirty)
+    }
   }
 
   fun getArray(context: mutable Context, key: Key): Array<File> {

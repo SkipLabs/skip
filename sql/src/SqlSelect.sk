@@ -230,98 +230,116 @@ class SelectEvaluator{
   }
 
   fun evalSelect(context: mutable SKStore.Context): SelectDir {
-    if (this.select.directMode) {
-      !this.directMode = this.select.limit match {
-      | None() -> Some(Int::max)
-      | Some(limitExpr) -> Some(this.evalStaticInt(context, limitExpr))
-      };
-    };
     for (subTask in this.select.other) {
       static::evalSubTask(context, subTask);
     };
     this.select.limit match {
-    | None() -> this.evalSelectNoLimit(context)
-    | Some(limitExpr) ->
-      limitMappedName = this.selectName1;
-      limitName = SKStore.DirName::create(
-        this.selectName1.toString() + "limit/",
-      );
+    | Some(limitExpr) if (!this.select.directMode) ->
+      limit = this.evalStaticInt(context, limitExpr);
+      this.evalSelectLimit(context, limit)
+    | _ ->
+      if (this.select.directMode) {
+        !this.directMode = this.select.limit match {
+        | None() -> Some(Int::max)
+        | Some(limitExpr) -> Some(this.evalStaticInt(context, limitExpr))
+        };
+      };
+      this.evalSelectNoLimitOrDirectMode(context)
+    }
+  }
+
+  fun evalSelectLimit(context: mutable SKStore.Context, limit: Int): SelectDir {
+    invariant(!this.select.directMode);
+    childName = this.selectName2;
+    if (
+      this.select.sets.size() != 0 ||
+      this.select.aggr is Some _ ||
+      this.select.from.size() != 1 ||
+      this.select.groupBy is Some _ ||
+      this.select.having is Some _ ||
+      this.select.orderBy is Some _ ||
+      this.select.rest is Some _ ||
+      this.up is Some _
+    ) {
+      !this.select.limit = None();
       !this.selectName1 = SKStore.DirName::create(
         this.selectName1.toString() + "nolimit/",
       );
       !this.selectName2 = SKStore.DirName::create(
         this.selectName2.toString() + "nolimit/",
       );
-      limit = this.evalStaticInt(context, limitExpr);
-      if (this.select.directMode) {
-        this.evalSelectNoLimit(context)
-      } else {
-        limitDir = context.unsafeMaybeGetEagerDir(limitName) match {
-        | None() ->
-          h = context.mkdir(x ~> x, Row::type, limitName, Array[]);
-          context.unsafeGetEagerDir(h.dirName)
-        | Some(dir) ->
-          context.!newDirs = context.newDirs.set(limitName);
-          dir
-        };
-        selectDir = this.evalSelectNoLimit(context);
-        iter = (context.unsafeGetEagerDir(selectDir.dirName)).getIterator(
-          context,
-        );
-        arr = mutable Vector[];
-        i = 0;
-        while (i < limit) {
-          iter.next() match {
-          | None() ->
-            arr.push(((SKStore.IID(i) : SKStore.Key), Array[]));
-            !i = i + 1
-          | Some((_, fileIter)) ->
-            values = fileIter.map(RowValues::type).collect(Array);
-            if (values.size() == 0) continue;
-            value = values[0];
-            repeat = 0;
-            for (v in values) {
-              !repeat = repeat + v.repeat;
-            };
-            if (repeat == 0) continue;
-            !value = value.setRepeat(repeat);
-            arr.push(((SKStore.IID(i) : SKStore.Key), Array[value]));
-            !i = i + 1
+      result = this.evalSelectNoLimitOrDirectMode(context);
+      handle = SKStore.EHandle(
+        RowKey::keyType,
+        RowValues::type,
+        result.dirName,
+      );
+      filtered = handle.filter(
+        context,
+        childName,
+        limit,
+        (_, _key, _value) ~> true,
+        value ~> value.repeat,
+        (value, n) ~> {
+          !value = value.setRepeat(value.repeat - n);
+          value
+        },
+        None(),
+      );
+      SelectDir(filtered.dirName, this.types)
+    } else {
+      handle = SKStore.EHandle(
+        SKStore.Key::unTyped,
+        RowValues::type,
+        this.select.from[0].i0.dirName,
+      );
+      select = this.select;
+      up = this.up;
+      invariant(up is None());
+      filtered = handle.filter(
+        context,
+        SKStore.DirName::create(childName.toString() + "noparams/"),
+        limit,
+        (context, _key, value) ~> {
+          evaluator = ExprEvaluator(Array[value], select.from, up);
+          whereVal = evaluator.evalWhere(context, select.where);
+          whereVal match {
+          | ANull()
+          | ADef(0) ->
+            false
+          | AUndef()
+          | ADef(_) ->
+            true
           }
-        };
-        j = 0;
-        arr2 = mutable Vector[];
-        source = SKStore.Path::create(limitName, SKStore.IID(0));
-        for (elt in arr) {
-          (key, values) = elt;
-          if (values.size() == 0) {
-            arr2.push((key, (source, source, Array[])))
-          } else {
-            value = values[0];
-            repeat = if (j + value.repeat >= limit) limit - j else value.repeat;
-            if (repeat > 0) {
-              !value = value.setRepeat(repeat);
-              arr2.push((key, (source, source, Array[(value : SKStore.File)])));
-              !j = j + repeat;
-            } else {
-              arr2.push((key, (source, source, Array[])));
-            }
-          }
-        };
-        limitDir.writeArraySourceMany(context, arr2.iterator());
-        kinds = this.kinds;
-        SKStore.EagerDir::apply(
-          context,
-          limitDir.dirName,
-          limitMappedName,
-          (_context, writer, _key, valueIter) ~> {
-            values = valueIter.collect(Array);
-            if (values.isEmpty()) return void;
-            writer.setArray(RowKey(RowValues::type(values[0]), kinds), values);
-          },
-        );
-        SelectDir(limitMappedName, selectDir.types)
-      }
+        },
+        value ~> value.repeat,
+        (value, n) ~> {
+          !value = value.setRepeat(value.repeat - n);
+          value
+        },
+        this.select.from[0].i1,
+      );
+      kinds = this.kinds;
+      _ = filtered.map(
+        SKStore.Key::unTyped,
+        RowValues::type,
+        context,
+        childName,
+        (context, writer, _key, fileIter) ~> {
+          entry = fileIter.first;
+          repeat = 0;
+          for (file in fileIter) {
+            !repeat = repeat + file.repeat;
+          };
+          if (repeat != entry.repeat) {
+            !entry = entry.setRepeat(repeat);
+          };
+          evaluator = ExprEvaluator(Array[entry], select.from, up);
+          row = static::evalRow(context, evaluator, select.params, repeat);
+          writer.set(RowKey(row, kinds), row)
+        },
+      );
+      SelectDir(childName, this.types)
     }
   }
 
@@ -365,8 +383,8 @@ class SelectEvaluator{
         context,
         SKStore.FixedSingle::create(
           mutable Vector[
-            (leftHandle.dirName, (noop, leftRanges)),
-            (shardsDirName, (noop, None())),
+            (leftHandle.dirName, (noop, leftRanges, None())),
+            (shardsDirName, (noop, None(), None())),
           ],
         ),
         projLeftName,
@@ -380,8 +398,8 @@ class SelectEvaluator{
         context,
         SKStore.FixedSingle::create(
           mutable Vector[
-            (rightHandle.dirName, (noop, rightRanges)),
-            (shardsDirName, (noop, None())),
+            (rightHandle.dirName, (noop, rightRanges, None())),
+            (shardsDirName, (noop, None(), None())),
           ],
         ),
         projRightName,
@@ -425,8 +443,8 @@ class SelectEvaluator{
         context,
         SKStore.FixedSingle::create(
           mutable Vector[
-            (projLeftName, (projLeftFun, None())),
-            (projRightName, (projRightFun, None())),
+            (projLeftName, (projLeftFun, None(), None())),
+            (projRightName, (projRightFun, None(), None())),
           ],
         ),
         projName,
@@ -440,6 +458,7 @@ class SelectEvaluator{
               (
                 makeJoinReducer(shards, joinKind, kinds, onlyLeftValues),
                 None(),
+                None(),
               ),
             ),
           ],
@@ -449,7 +468,9 @@ class SelectEvaluator{
     };
   }
 
-  fun evalSelectNoLimit(context: mutable SKStore.Context): SelectDir {
+  fun evalSelectNoLimitOrDirectMode(
+    context: mutable SKStore.Context,
+  ): SelectDir {
     dirName = this.select.aggr match {
     | None() if (this.select.from.size() == 0) ->
       this.evalEmptyFrom(context);
@@ -593,6 +614,7 @@ class SelectEvaluator{
                     }
                   },
                   None(),
+                  None(),
                 ),
               ),
               (
@@ -601,6 +623,7 @@ class SelectEvaluator{
                   (_context, writer, key, values) ~> {
                     writer.setArray(key, values.collect(Array))
                   },
+                  None(),
                   None(),
                 ),
               ),

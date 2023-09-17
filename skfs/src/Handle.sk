@@ -372,7 +372,7 @@ class EHandle<K: Key, V: File>(
         }
       };
       parentSet.add(parentName);
-      dynParents.push((parentName, (dynamicMapFun, rangeOpt)))
+      dynParents.push((parentName, (dynamicMapFun, rangeOpt, None())))
     };
     fixedParents = FixedSingle::create(dynParents);
     EagerDir::applyMany(context, fixedParents, dirName, None());
@@ -423,7 +423,7 @@ class EHandle<K: Key, V: File>(
         }
       };
       parentSet.add(parentName);
-      dynParents.push((parentName, (dynamicMapFun, rangeOpt)))
+      dynParents.push((parentName, (dynamicMapFun, rangeOpt, None())))
     };
     fixedParents = FixedSingle::create(dynParents);
     EagerDir::applyMany(
@@ -491,6 +491,28 @@ class EHandle<K: Key, V: File>(
       dirName,
       reducer,
     )
+  }
+
+  fun filter(
+    context: mutable Context,
+    childName: DirName,
+    capacity: Int,
+    f: (mutable SKStore.Context, K, V) ~> Bool,
+    fileSize: V ~> Int,
+    removeFromFile: (V, Int) ~> File,
+    rangesOpt: ?Array<KeyRange>,
+  ): EHandle<K, V> {
+    EagerFilter::create(
+      context,
+      this.dirName,
+      childName,
+      capacity,
+      (file: File) ~> fileSize(this.type(file)),
+      (file: File, n: Int) ~> removeFromFile(this.type(file), n),
+      (context, key, file) ~> f(context, this.keyType(key), this.type(file)),
+      rangesOpt,
+    );
+    EHandle(this.keyType, this.type, childName)
   }
 
   fun pre(context: mutable Context): ?EHandle<K, V> {
