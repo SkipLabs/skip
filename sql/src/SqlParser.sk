@@ -569,10 +569,10 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     Case(condOpt, whenCases, elseCase)
   } else if (lex.isEqAt(tok, "-")) {
     (!pos, e) = parseExprWithPrio(1, lex, pos);
-    UMinus(e)
+    UnOp(UnaryMinus(), e)
   } else if (lex.isEqAt(tok, "+")) {
     (!pos, e) = parseExprWithPrio(1, lex, pos);
-    UPlus(e)
+    UnOp(UnaryPlus(), e)
   } else if (lex.isEqAt(tok, "@")) {
     (!pos, !tok) = lex.next(pos);
     handle = lex.wordAt(tok);

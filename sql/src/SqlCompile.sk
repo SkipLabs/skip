@@ -1075,7 +1075,7 @@ mutable class Compiler{
         CIExpr(CSIn(s, set))
       }
 
-    | UMinus(e) ->
+    | UnOp(UnaryMinus(), e) ->
       val = this.compileExpr(context, e);
       val match {
       | CGNull() -> CGNull()
@@ -1084,12 +1084,14 @@ mutable class Compiler{
       | CSExpr _ -> error(this.pos, "cannot apply - on a string")
       }
 
-    | UPlus(e) ->
+    | UnOp(UnaryPlus(), e) ->
       val = this.compileExpr(context, e);
       val match {
+      // FIXME: SQLite treats unary plus as a noop regardless of type.
       | CSExpr _ -> error(this.pos, "cannot apply + on a string")
       | x -> x
       }
+    | UnOp _ -> error(this.pos, "operator not implemented")
 
     | Call(fname, args, distinct) ->
       fname.lower match {

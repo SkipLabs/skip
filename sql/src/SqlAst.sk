@@ -154,8 +154,7 @@ base class Expr {
   | Binop(String, Expr, Expr)
   | Subquery(Query)
   | Exists(Query, negated: Bool)
-  | UMinus(Expr)
-  | UPlus(Expr)
+  | UnOp(UnaryOperator, Expr)
   | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
   | Call(Name, Array<Expr>, distinct: Bool)
   | Cast(Expr, Type)
@@ -180,6 +179,15 @@ class Identifier(
     | None() -> this.name.toString()
     }
   }
+}
+
+base class UnaryOperator {
+  children =
+  | UnaryNot()
+  | UnaryPlus()
+  | UnaryMinus()
+  | UnaryBitNot()
+  | UnaryIsNull(negated: Bool)
 }
 
 base class InValues {
@@ -214,8 +222,7 @@ fun hasAggr(expr: Expr): Bool {
   | Identifier _ -> false
   | Not(e)
   | Between(e, _, _, _)
-  | UMinus(e)
-  | UPlus(e) ->
+  | UnOp(_, e) ->
     hasAggr(e)
   | In(e, InList(arr), _) ->
     hasAggr(e) ||
