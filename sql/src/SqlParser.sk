@@ -70,14 +70,14 @@ fun parseUpdateWithName(
   )
 }
 
-fun parseSets(lex: Lexer, pos: Int): (Int, Array<(Name, Pos, Expr)>) {
+fun parseSets(lex: Lexer, pos: Int): (Int, Array<UpdateSet>) {
   (!pos, firstNameStr) = lex.nextWord(pos);
   firstName = Name::create(firstNameStr);
   !pos = lex.skipSpaces(pos);
   posEq = pos;
   !pos = lex.expect(pos, "=");
   (!pos, firstValue) = parseExpr(lex, pos);
-  result = mutable Vector[(firstName, Pos(posEq), firstValue)];
+  result = mutable Vector[UpdateSet(Array[(posEq, firstName)], firstValue)];
   loop {
     if (!lex.isEq(pos, ",")) {
       break void;
@@ -89,7 +89,7 @@ fun parseSets(lex: Lexer, pos: Int): (Int, Array<(Name, Pos, Expr)>) {
     !posEq = pos;
     !pos = lex.expect(pos, "=");
     (!pos, value) = parseExpr(lex, pos);
-    result.push((name, Pos(posEq), value));
+    result.push(UpdateSet(Array[(posEq, name)], value));
   };
   (pos, result.toArray())
 }
