@@ -661,9 +661,10 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
             if (op == "NOT BETWEEN" || op == "BETWEEN") {
               !pos = lex.expectUpper(pos, "AND");
               (!pos, right2) = parseExprWithPrio(opPrio, lex, pos);
-              !right = Binop("AND", right, right2);
-            };
-            !left = Binop(op, left, right);
+              !left = Between(left, right, right2, op == "NOT BETWEEN")
+            } else {
+              !left = Binop(op, left, right)
+            }
           } else {
             return posLeft;
           }

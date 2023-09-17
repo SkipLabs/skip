@@ -913,7 +913,7 @@ mutable class Compiler{
         ),
       )
 
-    | Binop("BETWEEN", e1, Binop("AND", e2, e3)) ->
+    | Between(e1, e2, e3, false) ->
       (
         this.compileExpr(context, e1),
         this.compileExpr(context, e2),
@@ -937,9 +937,7 @@ mutable class Compiler{
       | _ -> error(this.pos, "Type error: BETWEEN")
       }
 
-    | Binop("BETWEEN", _, _) -> invariant_violation("Invalid between")
-
-    | Binop("NOT BETWEEN", e1, Binop("AND", e2, e3)) ->
+    | Between(e1, e2, e3, true) ->
       (
         this.compileExpr(context, e1),
         this.compileExpr(context, e2),
@@ -968,8 +966,6 @@ mutable class Compiler{
 
       | _ -> error(this.pos, "Type error: NOT BETWEEN")
       }
-
-    | Binop("NOT BETWEEN", _, _) -> invariant_violation("Invalid between")
 
     | Binop("NOT LIKE", ge1, ge2) ->
       this.compileExpr(context, Not(Binop("LIKE", ge1, ge2)))
@@ -1466,7 +1462,6 @@ mutable class Compiler{
       }
 
     | Distinct _ -> error(this.pos, "Unexpected Distinct")
-    | Between _ -> error(this.pos, "Unexpected BETWEEN")
     }
   }
 
