@@ -877,7 +877,14 @@ class Evaluator{options: Options, user: ?UserFile} {
             pos => pos,
             ifNotExists => false,
             name => Name::create(name.origName + "_" + tyDescr.name.origName),
-            fields => (name, Array[(tyDescr.name, IASC())]),
+            on => name,
+            columns => Array[
+              IndexedColumn{
+                expr => Identifier(tyDescr.name),
+                order => IASC(),
+                collate => None(),
+              },
+            ],
             unique => true,
             primary => tyDescr.primary is Some _,
             text => None(),
