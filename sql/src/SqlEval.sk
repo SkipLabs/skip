@@ -370,6 +370,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         error(pos, "Cannot write in view: " + name);
       };
       values match {
+      | IDefault() -> error(pos, "DEFAULT VALUES not implemented")
       | IQuery(selectAst @ Select _) ->
         if (onConflict is Some _) {
           error(pos, "Can only use OR IGNORE/REPLACE with values");
