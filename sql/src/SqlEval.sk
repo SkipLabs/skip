@@ -60,12 +60,16 @@ fun computeInsert(
   inTransaction: Bool,
   pos: Int,
   columnParamsOpt: ?Array<Name>,
-  valuesArray: Array<Array<Value>>,
+  valuesArray: Array<Array<Expr>>,
   table: DirDescr,
   repeat: Int = 1,
 ): Array<RowValues> {
   valuesArray.map(vals -> {
-    values = vals.mapWithIndex((idx, val) -> {
+    values = vals.mapWithIndex((idx, expr) -> {
+      val = expr match {
+      | x @ Value _ -> x
+      | _ -> error(pos, "Arbitrary expressions not supported for INSERT")
+      };
       schemaIdx = columnParamsOpt match {
       | None() -> idx
       | Some(columnParams) ->
@@ -739,7 +743,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     inTransaction: Bool,
     table: DirDescr,
     paramsOpt: ?Array<Name>,
-    values: Array<Array<Value>>,
+    values: Array<Array<Expr>>,
   ): ?((
     mutable SKStore.Context,
     mutable SKStore.Context,
