@@ -784,8 +784,8 @@ class Evaluator{options: Options, user: ?UserFile} {
               for (idxValue in conflictingValues) {
                 (idx, conValue) = idxValue;
                 tyDescr = table.schema[idx];
-                clause = Binop(
-                  "=",
+                clause = BinOp(
+                  OEq(),
                   Identifier(tyDescr.name),
                   conValue match {
                   | None() -> VNull()
@@ -796,7 +796,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                 );
                 !where = where match {
                 | None() -> Some(clause)
-                | Some(w) -> Some(Binop("AND", w, clause))
+                | Some(w) -> Some(BinOp(OAnd(), w, clause))
                 }
               };
               tick = context.tick;

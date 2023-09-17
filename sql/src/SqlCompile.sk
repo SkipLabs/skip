@@ -709,11 +709,11 @@ mutable class Compiler{
           clauseIter = clauses.iterator();
 
           for (clause in clauseIter) {
-            !onClause = Binop("AND", onClause, clause);
+            !onClause = BinOp(OAnd(), onClause, clause);
           };
           !select.where = select.where match {
           | None() -> Some(On(join.kind, onClause))
-          | Some(where) -> Some(Binop("AND", On(join.kind, onClause), where))
+          | Some(where) -> Some(BinOp(OAnd(), On(join.kind, onClause), where))
           };
           select
         }
@@ -891,7 +891,10 @@ mutable class Compiler{
         }
       }
 
-    | Binop("IS", e, VNull()) ->
+    | BinOp(OIs(true), e1, e2) ->
+      this.compileExpr(context, Not(BinOp(OIs(false), e1, e2)))
+
+    | BinOp(OIs(false), e, VNull()) ->
       CIExpr(
         this.compileExpr(context, e) match {
         | CGNull() -> CILiteral(1)
@@ -901,7 +904,7 @@ mutable class Compiler{
         },
       )
 
-    | Binop("IS", e, Not(VNull())) ->
+    | BinOp(OIs(false), e, Not(VNull())) ->
       CIExpr(
         CNot(
           this.compileExpr(context, e) match {
@@ -991,7 +994,7 @@ mutable class Compiler{
       | _ -> error(this.pos, "Invalid LIKE, expected a string")
       }
 
-    | Binop(bop, ge1, ge2) ->
+    | BinOp(bop, ge1, ge2) ->
       cge1 = this.compileExpr(context, ge1);
       cge2 = this.compileExpr(context, ge2);
       this.compileBinop(cge1, cge2, bop)
@@ -1020,7 +1023,7 @@ mutable class Compiler{
       for (whenCase in whenCases.reversed()) {
         (matchValue, action) = whenCase;
         !result = this.makeIf(
-          this.compileExpr(context, Binop("=", value, matchValue)),
+          this.compileExpr(context, BinOp(OEq(), value, matchValue)),
           this.compileExpr(context, action),
           result,
         );
@@ -1441,7 +1444,7 @@ mutable class Compiler{
         (pat, action) = case;
         cond = condOpt match {
         | None() -> this.compileExpr(context, pat)
-        | Some(v) -> this.compileExpr(context, Binop("=", v, pat))
+        | Some(v) -> this.compileExpr(context, BinOp(OEq(), v, pat))
         };
         !acc = this.makeIf(cond, this.compileExpr(context, action), acc);
       };
@@ -1477,52 +1480,56 @@ mutable class Compiler{
     result
   }
 
-  mutable fun compileBinop(cge1: CGExpr, cge2: CGExpr, op: String): CGExpr {
+  mutable fun compileBinop(
+    cge1: CGExpr,
+    cge2: CGExpr,
+    op: BinaryOperator,
+  ): CGExpr {
     (cge1, cge2, op) match {
     | (CGNull(), CGNull(), _) -> CGNull()
 
-    | (CIExpr(e1), CIExpr(e2), "OR") -> CIExpr(COr(e1, e2))
-    | (CGNull(), CIExpr(e2), "OR") -> CIExpr(COr(CNull(), e2))
-    | (CIExpr(e1), CGNull(), "OR") -> CIExpr(COr(e1, CNull()))
+    | (CIExpr(e1), CIExpr(e2), OOr()) -> CIExpr(COr(e1, e2))
+    | (CGNull(), CIExpr(e2), OOr()) -> CIExpr(COr(CNull(), e2))
+    | (CIExpr(e1), CGNull(), OOr()) -> CIExpr(COr(e1, CNull()))
 
     | (CGNull(), _, _)
     | (_, CGNull(), _) ->
       CGNull()
 
-    | (CIExpr(e1), CIExpr(e2), "<") -> CIExpr(CILt(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), "<=") -> CIExpr(CILte(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), ">=") -> CIExpr(CIGte(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), ">") -> CIExpr(CIGt(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), "=") -> CIExpr(CIEq(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), "<>") -> CIExpr(CIDiff(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OLt()) -> CIExpr(CILt(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OLtEq()) -> CIExpr(CILte(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OGtEq()) -> CIExpr(CIGte(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OGt()) -> CIExpr(CIGt(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OEq()) -> CIExpr(CIEq(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), ONeq()) -> CIExpr(CIDiff(e1, e2))
 
-    | (CFExpr(e1), CFExpr(e2), "<") -> CIExpr(CFLt(e1, e2))
-    | (CFExpr(e1), CFExpr(e2), "<=") -> CIExpr(CFLte(e1, e2))
-    | (CFExpr(e1), CFExpr(e2), ">=") -> CIExpr(CFGte(e1, e2))
-    | (CFExpr(e1), CFExpr(e2), ">") -> CIExpr(CFGt(e1, e2))
-    | (CFExpr(e1), CFExpr(e2), "=") -> CIExpr(CFEq(e1, e2))
-    | (CFExpr(e1), CFExpr(e2), "<>") -> CIExpr(CFDiff(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), OLt()) -> CIExpr(CFLt(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), OLtEq()) -> CIExpr(CFLte(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), OGtEq()) -> CIExpr(CFGte(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), OGt()) -> CIExpr(CFGt(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), OEq()) -> CIExpr(CFEq(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), ONeq()) -> CIExpr(CFDiff(e1, e2))
 
-    | (CSExpr(e1), CSExpr(e2), "<") -> CIExpr(CSLt(e1, e2))
-    | (CSExpr(e1), CSExpr(e2), "<=") -> CIExpr(CSLte(e1, e2))
-    | (CSExpr(e1), CSExpr(e2), ">=") -> CIExpr(CSGte(e1, e2))
-    | (CSExpr(e1), CSExpr(e2), ">") -> CIExpr(CSGt(e1, e2))
-    | (CSExpr(e1), CSExpr(e2), "=") -> CIExpr(CSEq(e1, e2))
-    | (CSExpr(e1), CSExpr(e2), "<>") -> CIExpr(CSDiff(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), OLt()) -> CIExpr(CSLt(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), OLtEq()) -> CIExpr(CSLte(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), OGtEq()) -> CIExpr(CSGte(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), OGt()) -> CIExpr(CSGt(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), OEq()) -> CIExpr(CSEq(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), ONeq()) -> CIExpr(CSDiff(e1, e2))
 
-    | (CIExpr(e1), CIExpr(e2), "+") -> CIExpr(CAdd(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), "-") -> CIExpr(CSub(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), "*") -> CIExpr(CMul(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), "/") -> CIExpr(CDiv(e1, e2))
-    | (CIExpr(e1), CIExpr(e2), "%") -> CIExpr(CMod(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OPlus()) -> CIExpr(CAdd(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OMinus()) -> CIExpr(CSub(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OMul()) -> CIExpr(CMul(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), ODiv()) -> CIExpr(CDiv(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OMod()) -> CIExpr(CMod(e1, e2))
 
-    | (CFExpr(e1), CFExpr(e2), "+") -> CFExpr(CAdd(e1, e2))
-    | (CFExpr(e1), CFExpr(e2), "-") -> CFExpr(CSub(e1, e2))
-    | (CFExpr(e1), CFExpr(e2), "*") -> CFExpr(CMul(e1, e2))
-    | (CFExpr(e1), CFExpr(e2), "/") -> CFExpr(CDiv(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), OPlus()) -> CFExpr(CAdd(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), OMinus()) -> CFExpr(CSub(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), OMul()) -> CFExpr(CMul(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), ODiv()) -> CFExpr(CDiv(e1, e2))
 
-    | (CIExpr(e1), CIExpr(e2), "AND") -> CIExpr(CAnd(e1, e2))
-    | (CSExpr(e1), CSExpr(e2), "||") -> CSExpr(CSConcat(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), OAnd()) -> CIExpr(CAnd(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), OConcat()) -> CSExpr(CSConcat(e1, e2))
 
     | _ -> error(this.pos, "Incompatible types: " + op)
     }
@@ -1585,7 +1592,7 @@ mutable class Compiler{
       };
       (e, jk, eqJoin)
 
-    | Binop("AND", e1, e2) ->
+    | BinOp(OAnd(), e1, e2) ->
       (!e1, jk1, join1) = this.findJoin(tables, e1);
       join1 match {
       | None() ->
@@ -1595,7 +1602,7 @@ mutable class Compiler{
         | Some(_) ->
           (
             if (e2 is VInt(1)) e1 else {
-              Binop("AND", e1, e2)
+              BinOp(OAnd(), e1, e2)
             },
             jk2,
             join2,
@@ -1604,15 +1611,15 @@ mutable class Compiler{
       | Some(_) ->
         (
           if (e1 is VInt(1)) e2 else {
-            Binop("AND", e1, e2)
+            BinOp(OAnd(), e1, e2)
           },
           jk1,
           join1,
         )
       }
 
-    | Binop(
-      "=",
+    | BinOp(
+      OEq(),
       name1 @ Identifier _,
       name2 @ Identifier _,
     ) if (this.isVar(name1) && this.isVar(name2)) ->
@@ -1941,7 +1948,7 @@ mutable class Compiler{
     cond: Expr,
   ): LookUps {
     cond match {
-    | Binop(op, Call(fname, args, _), e2) ->
+    | BinOp(op, Call(fname, args, _), e2) ->
       if (
         !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
       ) {
@@ -1951,10 +1958,10 @@ mutable class Compiler{
         context,
         killed,
         tables,
-        Binop(op, this.evalTimeFun(context, fname, args), e2),
+        BinOp(op, this.evalTimeFun(context, fname, args), e2),
       )
 
-    | Binop(op, e1, Call(fname, args, _)) ->
+    | BinOp(op, e1, Call(fname, args, _)) ->
       if (
         !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
       ) {
@@ -1964,7 +1971,7 @@ mutable class Compiler{
         context,
         killed,
         tables,
-        Binop(op, e1, this.evalTimeFun(context, fname, args)),
+        BinOp(op, e1, this.evalTimeFun(context, fname, args)),
       )
 
     | Like(Call(fname, args, _), e2, escape, negated) ->
@@ -1993,16 +2000,16 @@ mutable class Compiler{
         Like(e1, this.evalTimeFun(context, fname, args), escape, negated),
       )
 
-    | Binop("AND", e1, e2) ->
+    | BinOp(OAnd(), e1, e2) ->
       this.findLookUps(context, killed, tables, e1).and(
         this.findLookUps(context, killed, tables, e2),
       )
-    | Binop("OR", e1, e2) ->
+    | BinOp(OOr(), e1, e2) ->
       this.findLookUps(context, killed, tables, e1).or(
         this.findLookUps(context, killed, tables, e2),
       )
 
-    | Binop(_, name1 @ Identifier _, name2 @ Identifier _)
+    | BinOp(_, name1 @ Identifier _, name2 @ Identifier _)
     | Like(
       name1 @ Identifier _,
       name2 @ Identifier _,
@@ -2015,27 +2022,27 @@ mutable class Compiler{
       if (values.size() == 0) {
         error(this.pos, "Invalid IN")
       };
-      acc = Binop("=", e, values[0]);
+      acc = BinOp(OEq(), e, values[0]);
       for (i in Range(1, values.size())) {
-        !acc = Binop("OR", acc, Binop("=", e, values[i]))
+        !acc = BinOp(OOr(), acc, BinOp(OEq(), e, values[i]))
       };
       this.findLookUps(context, killed, tables, acc)
 
-    | Binop(op, e1 @ Value _, e2 @ Identifier _)
-    | Binop(
+    | BinOp(op, e1 @ Value _, e2 @ Identifier _)
+    | BinOp(
       op,
       e1 @ Identifier _,
       e2 @ Identifier _,
     ) if (this.isVar(e2)) ->
       !op = op match {
-      | "=" -> op
-      | "<" -> ">"
-      | "<=" -> ">="
-      | ">" -> "<"
-      | ">=" -> "<="
+      | OEq() -> op
+      | OLt() -> OGt()
+      | OLtEq() -> OGtEq()
+      | OGt() -> OLt()
+      | OGtEq() -> OLtEq()
       | _ -> return LookUps[]
       };
-      this.findLookUps(context, killed, tables, Binop(op, e2, e1))
+      this.findLookUps(context, killed, tables, BinOp(op, e2, e1))
 
     | Like(e1 @ Value _, e2 @ Identifier _, escape, negated)
     | Like(
@@ -2046,14 +2053,19 @@ mutable class Compiler{
     ) if (this.isVar(e2)) ->
       this.findLookUps(context, killed, tables, Like(e2, e1, escape, negated))
 
-    | Binop(op, name1 @ Identifier _, e @ Value _)
-    | Binop(
+    | BinOp(op, name1 @ Identifier _, e @ Value _)
+    | BinOp(
       op,
       name1 @ Identifier _,
       e @ Identifier _,
     ) if (this.isVar(name1)) ->
       op match {
-      | "=" | "<" | "<=" | ">" | ">=" -> void
+      | OEq()
+      | OLt()
+      | OLtEq()
+      | OGt()
+      | OGtEq() ->
+        void
       | _ -> return LookUps[]
       };
       (tableNbr, colNbr) = this.subst[name1] match {
