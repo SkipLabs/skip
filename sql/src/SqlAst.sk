@@ -147,7 +147,7 @@ base class Value extends Expr uses Equality {
 base class Expr {
   children =
   | Not(Expr)
-  | In(Expr, Array<Expr>)
+  | In(Expr, Array<Expr>, negated: Bool)
   | Between(Expr, Expr, Expr, negated: Bool)
   | Like(Expr, Expr, escape: ?Expr, negated: Bool)
   | On(JoinKind, Expr)
@@ -211,7 +211,7 @@ fun hasAggr(expr: Expr): Bool {
   | UMinus(e)
   | UPlus(e) ->
     hasAggr(e)
-  | In(e, arr) ->
+  | In(e, arr, _) ->
     hasAggr(e) ||
       for (x in arr) {
         if (hasAggr(x)) break true;

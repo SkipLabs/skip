@@ -653,11 +653,11 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
       if (op == "IN") {
         !pos = lex.expect(pos, "(");
         (!pos, el) = parseExprList(lex, pos);
-        !left = In(left, el);
+        !left = In(left, el, false);
       } else if (op == "NOT IN") {
         !pos = lex.expect(pos, "(");
         (!pos, el) = parseExprList(lex, pos);
-        !left = Not(In(left, el));
+        !left = In(left, el, true);
       } else {
         opPriority.maybeGet(op) match {
         | None() -> return posLeft
