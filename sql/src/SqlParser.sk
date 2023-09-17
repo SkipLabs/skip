@@ -109,7 +109,7 @@ fun parseDrop(lex: Lexer, pos: Int): (Int, Stmt) {
   drop = if (lex.isEqUpper(pos, "VIEW")) {
     !pos = lex.expectUpper(pos, "VIEW");
     (!pos, name) = lex.nextWord(pos);
-    DropView{pos, name => Name::create(name)}
+    DropView{pos, name => Name::create(name), ifExists => false}
   } else if (lex.isEqUpper(pos, "INDEX")) {
     !pos = lex.expectUpper(pos, "INDEX");
     (!pos, name) = lex.nextWord(pos);

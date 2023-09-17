@@ -537,7 +537,10 @@ class Evaluator{options: Options, user: ?UserFile} {
       } else {
         None()
       }
-    | DropView{pos, name => viewName} ->
+    | DropView{pos, name => viewName, ifExists} ->
+      if (ifExists) {
+        error(pos, "DROP VIEW IF EXISTS not implemented")
+      };
       if (inTransaction) {
         error(pos, "Cannot drop a view in a transaction");
       };
