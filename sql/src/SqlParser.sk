@@ -544,7 +544,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     error(pos, "BLOB values are not supported: x'" + str + "'")
   } else if (lex.isEqUpperAt(tok, "NOT")) {
     (!pos, e) = parseExprWithPrio(opPriority["NOT"], lex, pos);
-    Not(e)
+    UnOp(UnaryNot(), e)
   } else if (lex.isEqUpperAt(tok, "ALL")) {
     (!pos, e) = parseExprWithPrio(opPriority["ALL"], lex, pos);
     e
