@@ -52,7 +52,12 @@ base class Stmt{pos: Int} uses Equality {
     paramsOpt: ?Array<Name>,
     values: InsertValues,
   }
-  | Update{name: Name, sets: Array<(Name, Pos, Expr)>, where: ?Expr}
+  | Update{
+    name: Name,
+    alias: ?Name,
+    sets: Array<(Name, Pos, Expr)>,
+    where: ?Expr,
+  }
 }
 
 base class CreateTable{ifNotExists: Bool, name: Name} extends Stmt {
