@@ -902,7 +902,17 @@ fun parseInsert(lex: Lexer, pos: Int): (Int, Stmt) {
     (!pos, update) = parseUpdateWithName(lex, posBegin, pos, name);
     !onConflict = Some(OCUpdate(update));
   };
-  (pos, Insert{pos => posName, onConflict, name, paramsOpt, values})
+  (
+    pos,
+    Insert{
+      pos => posName,
+      onConflict,
+      name,
+      alias => None(),
+      paramsOpt,
+      values,
+    },
+  )
 }
 
 fun parseParamsOpt(lex: Lexer, pos: Int): (Int, ?Array<Name>) {
