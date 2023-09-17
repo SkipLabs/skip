@@ -113,7 +113,7 @@ fun parseDrop(lex: Lexer, pos: Int): (Int, Stmt) {
   } else if (lex.isEqUpper(pos, "INDEX")) {
     !pos = lex.expectUpper(pos, "INDEX");
     (!pos, name) = lex.nextWord(pos);
-    DropIndex{pos, name => Name::create(name)}
+    DropIndex{pos, name => Name::create(name), ifExists => false}
   } else {
     !pos = lex.expectUpper(pos, "TABLE");
     (!pos, name) = lex.nextWord(pos);
