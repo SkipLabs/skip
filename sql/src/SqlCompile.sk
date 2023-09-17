@@ -221,7 +221,7 @@ mutable class Compiler{
     context: mutable SKStore.Context,
     select: Select,
     toplevel: Bool,
-    sets: Array<(Name, Pos, Expr)> = Array[],
+    sets: Array<UpdateSet> = Array[],
   ): CSelect {
     if (
       select.distinct ||
@@ -378,31 +378,35 @@ mutable class Compiler{
 
   mutable fun compileSets(
     context: mutable SKStore.Context,
-    params: Array<(Name, Pos, Expr)>,
+    params: Array<UpdateSet>,
   ): Array<(Int, CGExpr)> {
     this.noAggr(() -> {
       params.map(set -> {
-        (colName, pos, e) = set;
+        if (set.columns.size() != 1) {
+          error(this.pos, "UPDATE ... SET a, b, c = expr not implemented")
+        };
+        (pos, colName) = set.columns[0];
+        e = set.value;
         this.compileExpr(context, Identifier(colName)) match {
         | (CIExpr(CIGetFrom(0, n))) ->
           this.compileExpr(context, e) match {
           | CGNull() -> (n, CGNull())
           | v @ CIExpr(_) -> (n, v)
-          | _ -> errorNbr(2, pos.value, "Incompatible types for set")
+          | _ -> errorNbr(2, pos, "Incompatible types for set")
           }
         | (CFExpr(CFGetFrom(0, n))) ->
           this.compileExpr(context, e) match {
           | CGNull() -> (n, CGNull())
           | v @ CFExpr(_) -> (n, v)
-          | _ -> errorNbr(2, pos.value, "Incompatible types for set")
+          | _ -> errorNbr(2, pos, "Incompatible types for set")
           }
         | (CSExpr(CSGetFrom(0, n))) ->
           this.compileExpr(context, e) match {
           | CGNull() -> (n, CGNull())
           | v @ CSExpr(_) -> (n, v)
-          | _ -> errorNbr(2, pos.value, "Incompatible types for set")
+          | _ -> errorNbr(2, pos, "Incompatible types for set")
           }
-        | _ -> errorNbr(3, pos.value, "Invalid set")
+        | _ -> errorNbr(3, pos, "Invalid set")
         };
       })
     })

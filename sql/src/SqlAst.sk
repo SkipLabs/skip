@@ -56,10 +56,12 @@ base class Stmt{pos: Int} uses Equality {
     name: Name,
     alias: ?Name,
     indexed: ?Name,
-    sets: Array<(Name, Pos, Expr)>,
+    sets: Array<UpdateSet>,
     where: ?Expr,
   }
 }
+
+class UpdateSet(columns: Array<(Int, Name)>, value: Expr) uses Equality
 
 base class CreateTable{ifNotExists: Bool, name: Name} extends Stmt {
   children =
