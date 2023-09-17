@@ -336,6 +336,11 @@ class Evaluator{options: Options, user: ?UserFile} {
     SKStore.Context,
   ) ~> void) {
     stmt match {
+    | BeginTransaction _
+    | EndTransaction _ ->
+      invariant_violation(
+        "BEGIN/END TRANSACTION should be handled at top level",
+      )
     | CreateTable{pos, name, schema, ifNotExists} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
@@ -1500,6 +1505,8 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
   | Update _
   | Select _ ->
     context.setGlobal("IsRead", SKStore.BoolFile(true))
+  | BeginTransaction _
+  | EndTransaction _
   | CreateTable _
   | CreateView _
   | CreateIndex _
