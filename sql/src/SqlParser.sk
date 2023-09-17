@@ -548,9 +548,6 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
   } else if (lex.isEqUpperAt(tok, "ALL")) {
     (!pos, e) = parseExprWithPrio(opPriority["ALL"], lex, pos);
     e
-  } else if (lex.isEqUpperAt(tok, "DISTINCT")) {
-    (!pos, e) = parseExprWithPrio(opPriority["DISTINCT"], lex, pos);
-    Distinct(e)
   } else if (lex.isEqUpperAt(tok, "SELECT")) {
     (!pos, select) = parseSelect(lex, pos);
     EQuery(select)
@@ -617,7 +614,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
       if (lex.isEq(pos, "*")) {
         !pos = lex.expect(pos, "*");
         !pos = lex.expect(pos, ")");
-        !left = makeCall(pos, left, None());
+        !left = makeCall(pos, left, Array[], false);
       } else if (
         left match {
         | Identifier(x, None()) -> x.lower == "cast"
@@ -630,8 +627,17 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
         !pos = lex.expect(pos, ")");
         !left = Cast(e, ty);
       } else {
+        distinct = if (lex.isEqUpper(pos, "DISTINCT")) {
+          !pos = lex.expectUpper(pos, "DISTINCT");
+          true
+        } else {
+          if (lex.isEqUpper(pos, "ALL")) {
+            !pos = lex.expectUpper(pos, "ALL");
+          };
+          false
+        };
         (!pos, params) = parseExprList(lex, pos);
-        !left = makeCall(pos, left, Some(params));
+        !left = makeCall(pos, left, params, distinct);
       }
     } else {
       opOpt = parseOperator(lex, pos);
@@ -676,20 +682,14 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
   }
 }
 
-fun makeCall(pos: Int, left: Expr, params: ?Array<Expr>): Expr {
+fun makeCall(pos: Int, left: Expr, args: Array<Expr>, distinct: Bool): Expr {
   left match {
   | Identifier(fname, None()) ->
-    (args, distinct) = params match {
-    | Some(a) ->
-      if (a.size() == 1) {
-        a[0] match {
-        | Distinct(e) -> (Array[e], true)
-        | e -> (Array[e], false)
-        }
-      } else {
-        (a, false)
-      }
-    | None() -> (Array[], false)
+    if (distinct && args.size() != 1) {
+      error(
+        pos,
+        "DISTINCT is only allowed for aggregate functions taking a single argument",
+      )
     };
     Call(fname, args, distinct)
   | _ -> error(pos, "Unexpected function call")
