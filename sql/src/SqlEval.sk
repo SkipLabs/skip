@@ -558,7 +558,10 @@ class Evaluator{options: Options, user: ?UserFile} {
       })
 
     | DropIndex{pos} -> error(pos, "Drop index not supported")
-    | DropTable{name} ->
+    | DropTable{pos, name, ifExists} ->
+      if (ifExists) {
+        error(pos, "DROP TABLE IF EXISTS not implemented")
+      };
       Some((context, _, _) ~> {
         dirNameStr = "/" + name + "/";
         dirName = SKStore.DirName::create(dirNameStr);
