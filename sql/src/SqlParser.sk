@@ -86,14 +86,7 @@ fun parseSets(lex: Lexer, pos: Int): (Int, Array<(Name, Pos, Expr)>) {
 
 fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
   posBegin = pos;
-  colName = if (lex.isEqUpper(pos, "FROM")) {
-    !pos = lex.expectUpper(pos, "FROM");
-    None()
-  } else {
-    (!pos, name) = lex.nextWord(pos);
-    !pos = lex.expectUpper(pos, "FROM");
-    Some(Name::create(name))
-  };
+  !pos = lex.expectUpper(pos, "FROM");
   (!pos, name) = lex.nextWord(pos);
   where = if (lex.isEqUpper(pos, "WHERE")) {
     !pos = lex.expectUpper(pos, "WHERE");
@@ -102,7 +95,7 @@ fun parseDelete(lex: Lexer, pos: Int): (Int, Delete) {
   } else {
     None()
   };
-  (pos, Delete{pos => posBegin, colName, name => Name::create(name), where})
+  (pos, Delete{pos => posBegin, name => Name::create(name), where})
 }
 
 fun parseDrop(lex: Lexer, pos: Int): (Int, Stmt) {

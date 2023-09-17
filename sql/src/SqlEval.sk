@@ -575,11 +575,9 @@ class Evaluator{options: Options, user: ?UserFile} {
         );
         errorAllExistingSubs(context, dirName)
       })
-    | Delete{pos, colName => None(), name, where} ->
+    | Delete{pos, name, where} ->
       _ = this.delete(context, params, pos, name, where, Array[]);
       None()
-    | Delete{pos, colName => Some _} ->
-      error(pos, "DELETE colName not supported")
 
     | Update{pos, name, sets, where} ->
       baseName = SKStore.SID::create(name.lower);
