@@ -147,7 +147,7 @@ base class Value extends Expr uses Equality {
 base class Expr {
   children =
   | Not(Expr)
-  | In(Expr, Array<Expr>, negated: Bool)
+  | In(Expr, InValues, negated: Bool)
   | Between(Expr, Expr, Expr, negated: Bool)
   | Like(Expr, Expr, escape: ?Expr, negated: Bool)
   | On(JoinKind, Expr)
@@ -182,6 +182,12 @@ class Identifier(
   }
 }
 
+base class InValues {
+  children =
+  | InList(Array<Expr>)
+  | InSelect(Select)
+}
+
 class TypeDescr{
   name: Name,
   ty: Type,
@@ -211,13 +217,14 @@ fun hasAggr(expr: Expr): Bool {
   | UMinus(e)
   | UPlus(e) ->
     hasAggr(e)
-  | In(e, arr, _) ->
+  | In(e, InList(arr), _) ->
     hasAggr(e) ||
       for (x in arr) {
         if (hasAggr(x)) break true;
       } else {
         false
       }
+  | In(_, InSelect _, _) -> invariant_violation("IN SELECT not implemented")
   | Binop(_, e1, e2)
   | Like(e1, e2, _, _) ->
     hasAggr(e1) || hasAggr(e2)
