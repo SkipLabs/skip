@@ -1568,15 +1568,20 @@ mutable class Compiler{
     | On(jk, e) ->
       (!e, _, eqJoin) = this.findJoin(tables, e);
       jk match {
-      | JLeft()
-      | JRight()
-      | JFull() ->
+      | JLeft(natural)
+      | JRight(natural)
+      | JFull(natural) ->
+        if (natural) {
+          error(this.pos, "NATURAL JOINs not implemented")
+        };
         if (eqJoin is None()) {
           error(this.pos, "Invalid ON expression for JOIN");
         }
-      | JCross()
-      | JInner() ->
-        void
+      | JInner(natural) ->
+        if (natural) {
+          error(this.pos, "NATURAL JOINs not implemented")
+        }
+      | JCross() -> void
       };
       (e, jk, eqJoin)
 
@@ -1586,7 +1591,7 @@ mutable class Compiler{
       | None() ->
         (!e2, jk2, join2) = this.findJoin(tables, e2);
         join2 match {
-        | None() -> (cond, JInner(), None())
+        | None() -> (cond, JInner(false), None())
         | Some(_) ->
           (
             if (e2 is VInt(1)) e1 else {
@@ -1634,10 +1639,10 @@ mutable class Compiler{
         proj1 = TableProj(tableNbr1, col1Name, col1IsUnique);
         col2Name = (col2, IASC(), table2.schema[col2].ty);
         proj2 = TableProj(tableNbr2, col2Name, col2IsUnique);
-        (VInt(1), JInner(), Some(EqJoin(proj1, proj2)))
-      | _ -> (cond, JInner(), None())
+        (VInt(1), JInner(false), Some(EqJoin(proj1, proj2)))
+      | _ -> (cond, JInner(false), None())
       }
-    | _ -> (cond, JInner(), None())
+    | _ -> (cond, JInner(false), None())
     }
   }
 
