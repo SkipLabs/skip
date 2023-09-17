@@ -1036,7 +1036,9 @@ mutable class Compiler{
       | FLOAT() -> CFExpr(CFQuery(cselect))
       | TEXT() -> CSExpr(CSQuery(cselect))
       }
-    | Exists(select @ Select _) ->
+    | Exists(select, true) ->
+      this.compileExpr(context, Not(Exists(select, false)))
+    | Exists(select @ Select _, false) ->
       CIExpr(CExists(this.compileSelect(context, select, false)))
 
     | In(e, arr) ->
