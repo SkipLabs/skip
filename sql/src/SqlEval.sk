@@ -593,9 +593,12 @@ class Evaluator{options: Options, user: ?UserFile} {
       _ = this.delete(context, params, pos, name, where, Array[]);
       None()
 
-    | Update{pos, name, alias, sets, where} ->
+    | Update{pos, name, alias, indexed, sets, where} ->
       if (alias is Some _) {
         error(pos, "UPDATE table AS alias not implemented")
+      };
+      if (indexed is Some _) {
+        error(pos, "UPDATE table INDEXED BY not implemented")
       };
       baseName = SKStore.SID::create(name.lower);
       if (getTableDir(context).maybeGet(context, baseName) is None()) {
