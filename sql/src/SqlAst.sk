@@ -149,7 +149,7 @@ base class Expr {
   | Not(Expr)
   | Distinct(Expr)
   | In(Expr, Array<Expr>)
-  | Between(Expr)
+  | Between(Expr, Expr, Expr, negated: Bool)
   | On(JoinKind, Expr)
   | Binop(String, Expr, Expr)
   | EQuery(Query)
@@ -207,7 +207,7 @@ fun hasAggr(expr: Expr): Bool {
   | Value _ -> false
   | Identifier _ -> false
   | Not(e)
-  | Between(e)
+  | Between(e, _, _, _)
   | UMinus(e)
   | UPlus(e)
   | Distinct(e) ->
