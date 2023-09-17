@@ -678,7 +678,20 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
 
 fun makeCall(pos: Int, left: Expr, params: ?Array<Expr>): Expr {
   left match {
-  | Identifier(fname, None()) -> Call(fname, params)
+  | Identifier(fname, None()) ->
+    (args, distinct) = params match {
+    | Some(a) ->
+      if (a.size() == 1) {
+        a[0] match {
+        | Distinct(e) -> (Array[e], true)
+        | e -> (Array[e], false)
+        }
+      } else {
+        (a, false)
+      }
+    | None() -> (Array[], false)
+    };
+    Call(fname, args, distinct)
   | _ -> error(pos, "Unexpected function call")
   }
 }
