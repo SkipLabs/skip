@@ -575,9 +575,12 @@ class Evaluator{options: Options, user: ?UserFile} {
         );
         errorAllExistingSubs(context, dirName)
       })
-    | Delete{pos, name, where, alias} ->
+    | Delete{pos, name, where, alias, indexed} ->
       if (alias is Some _) {
         error(pos, "DELETE FROM table AS not implemented")
+      };
+      if (indexed is Some _) {
+        error(pos, "DELETE FROM table INDEXED BY not implemented")
       };
       _ = this.delete(context, params, pos, name, where, Array[]);
       None()
