@@ -21,12 +21,11 @@ value class Name private (
   }
 }
 
-base class Stmt uses Equality {
+base class Stmt{pos: Int} uses Equality {
   children =
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
   | CreateView{
-    pos: Int,
     virtual: Bool,
     name: Name,
     ifNotExists: Bool,
@@ -34,7 +33,6 @@ base class Stmt uses Equality {
     text: String,
   }
   | CreateIndex{
-    pos: Int,
     ifNotExists: Bool,
     name: Name,
     on: Name,
@@ -43,21 +41,20 @@ base class Stmt uses Equality {
     primary: Bool,
     text: ?String,
   }
-  | DropTable{pos: Int, name: Name}
-  | DropView{pos: Int, name: Name}
-  | DropIndex{pos: Int, name: Name}
-  | Delete{pos: Int, colName: ?Name, name: Name, where: ?Expr}
+  | DropTable{name: Name}
+  | DropView{name: Name}
+  | DropIndex{name: Name}
+  | Delete{colName: ?Name, name: Name, where: ?Expr}
   | Insert{
-    pos: Int,
     onConflict: ?OnConflict,
     name: Name,
     paramsOpt: ?Array<Name>,
     values: InsertValues,
   }
-  | Update{pos: Int, name: Name, sets: Array<(Name, Pos, Expr)>, where: ?Expr}
+  | Update{name: Name, sets: Array<(Name, Pos, Expr)>, where: ?Expr}
 }
 
-base class CreateTable{pos: Int, ifNotExists: Bool, name: Name} extends Stmt {
+base class CreateTable{ifNotExists: Bool, name: Name} extends Stmt {
   children =
   | CreateTableSchema{schema: TableSchema}
   | CreateTableAs{select: Select}
@@ -150,7 +147,6 @@ class SelectParams(isStar: Bool, params: Array<(Expr, ?Name)>) uses Equality
 
 class Select{
   id: Name,
-  pos: Int,
   distinct: Bool,
   params: SelectParams,
   from: ?Array<TableName>,
