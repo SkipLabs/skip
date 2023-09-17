@@ -25,7 +25,6 @@ base class Stmt uses Equality {
   children =
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
-  | CreateTable{pos: Int, name: Name, schema: TableSchema, ifNotExists: Bool}
   | CreateView{
     pos: Int,
     virtual: Bool,
@@ -55,6 +54,12 @@ base class Stmt uses Equality {
     values: InsertValues,
   }
   | Update{pos: Int, name: Name, sets: Array<(Name, Pos, Expr)>, where: ?Expr}
+}
+
+base class CreateTable{pos: Int, ifNotExists: Bool, name: Name} extends Stmt {
+  children =
+  | CreateTableSchema{schema: TableSchema}
+  | CreateTableAs{select: Select}
 }
 
 class TableSchema{

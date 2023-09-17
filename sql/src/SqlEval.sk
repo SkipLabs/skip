@@ -341,7 +341,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       invariant_violation(
         "BEGIN/END TRANSACTION should be handled at top level",
       )
-    | CreateTable{pos, name, schema, ifNotExists} ->
+    | CreateTableSchema{pos, name, schema, ifNotExists} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
       };
@@ -349,6 +349,8 @@ class Evaluator{options: Options, user: ?UserFile} {
         dirDescr = computeTableDescr(name, schema.columns);
         this.createTable(context, pos, name, dirDescr, ifNotExists);
       })
+    | CreateTableAs _ ->
+      invariant_violation("CREATE TABLE AS SELECT not implemented")
     | Insert{pos, onConflict, name, paramsOpt, values} ->
       baseName = SKStore.SID::create(name.lower);
       getTableDir(context).maybeGet(context, baseName) match {
