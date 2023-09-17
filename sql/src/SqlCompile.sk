@@ -339,6 +339,7 @@ mutable class Compiler{
     };
 
     cselect = CSelect{
+      isStar => select.params.isStar && select.params.params.size() == 0,
       id => Name::create(
         select.id.lower +
           context.getGlobal("TableMap") match {
@@ -842,9 +843,6 @@ mutable class Compiler{
     limit match {
     | None() -> None()
     | Some(e) ->
-      if (this.options.virtual) {
-        errorNbr(12, this.pos, "Cannot use LIMIT in a virtual view")
-      };
       this.compileExpr(context, e) match {
       | CIExpr(i) -> Some(i)
       | _ -> errorNbr(13, this.pos, "Invalid limit")
