@@ -340,6 +340,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     SKStore.Context,
   ) ~> void) {
     stmt match {
+    | Pragma _ -> invariant_violation("PRAGMA should be handled at top level")
     | BeginTransaction _
     | EndTransaction _ ->
       invariant_violation(
@@ -1546,6 +1547,7 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
     context.setGlobal("IsRead", SKStore.BoolFile(true))
   | BeginTransaction _
   | EndTransaction _
+  | Pragma _
   | CreateTable _
   | CreateView _
   | CreateIndex _
