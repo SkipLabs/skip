@@ -1041,8 +1041,10 @@ mutable class Compiler{
     | Exists(select @ Select _, false) ->
       CIExpr(CExists(this.compileSelect(context, select, false)))
 
-    | In(e, arr, true) -> this.compileExpr(context, Not(In(e, arr, false)))
-    | In(e, arr, false) ->
+    | In(_, InSelect _, _) -> error(this.pos, "IN SELECT not implemented")
+    | e @ In(_, _, true) ->
+      this.compileExpr(context, Not(e with {negated => false}))
+    | In(e, InList(arr), false) ->
       this.compileExpr(context, e) match {
       | CGNull() -> CGNull()
       | CIExpr(i) ->
@@ -2007,7 +2009,7 @@ mutable class Compiler{
     ) if (this.isVar(name1) && this.isVar(name2)) ->
       LookUps[]
 
-    | In(e, values, _) ->
+    | In(e, InList(values), _) ->
       if (values.size() == 0) {
         error(this.pos, "Invalid IN")
       };
