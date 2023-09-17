@@ -267,13 +267,6 @@ base class ColOp uses Orderable {
     | "<=" -> COLte(value)
     | ">" -> COGt(value)
     | ">=" -> COGte(value)
-    | "LIKE" ->
-      COLike(
-        value match {
-        | CString(x) -> x
-        | _ -> invariant_violation("Unexpected LIKE type")
-        },
-      )
     | _ -> invariant_violation("Unknown operation: " + op)
     }
   }

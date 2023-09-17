@@ -662,6 +662,8 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
               !pos = lex.expectUpper(pos, "AND");
               (!pos, right2) = parseExprWithPrio(opPrio, lex, pos);
               !left = Between(left, right, right2, op == "NOT BETWEEN")
+            } else if (op == "NOT LIKE" || op == "LIKE") {
+              !left = Like(left, right, None(), op == "NOT LIKE")
             } else {
               !left = Binop(op, left, right)
             }

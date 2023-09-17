@@ -150,6 +150,7 @@ base class Expr {
   | Distinct(Expr)
   | In(Expr, Array<Expr>)
   | Between(Expr, Expr, Expr, negated: Bool)
+  | Like(Expr, Expr, escape: ?Expr, negated: Bool)
   | On(JoinKind, Expr)
   | Binop(String, Expr, Expr)
   | EQuery(Query)
@@ -219,7 +220,9 @@ fun hasAggr(expr: Expr): Bool {
       } else {
         false
       }
-  | Binop(_, e1, e2) -> hasAggr(e1) || hasAggr(e2)
+  | Binop(_, e1, e2)
+  | Like(e1, e2, _, _) ->
+    hasAggr(e1) || hasAggr(e2)
   | On(_, e) -> hasAggr(e)
   | EQuery(_)
   | Exists(_) ->
