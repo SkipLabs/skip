@@ -44,7 +44,7 @@ fun decodeParams(encoded_params: String): Map<String, Value> {
   }
 }
 
-fun computeTableDescr(name: Name, schema: Array<TypeDescr>): DirDescr {
+fun computeTableDescr(name: Name, schema: Array<ColumnDefinition>): DirDescr {
   dirNameStr = "/" + name + "/";
   dirName = SKStore.DirName::create(dirNameStr);
   colVec = mutable Vector[];
@@ -118,7 +118,7 @@ fun computeInsert(
       for (tyDescr in missingCols) {
         value = tyDescr.default match {
         | None() ->
-          if (tyDescr.primary) {
+          if (tyDescr.primary is Some _) {
             if (tyDescr.ty is TEXT()) {
               error(pos, "Cannot generate a string primary key");
             };
@@ -126,8 +126,8 @@ fun computeInsert(
           } else {
             error(pos, "Missing value for column: " + tyDescr.name);
           }
-        | Some(v) ->
-          v match {
+        | Some(CCDefault{expr}) ->
+          expr match {
           | VNull() -> None()
           | VInt(n) -> Some(CInt(n))
           | VFloat(f) -> Some(CFloat(f))
@@ -153,7 +153,7 @@ fun valueToCValue(
   params: Map<String, Value>,
   inTransaction: Bool,
   pos: Int,
-  schema: Array<TypeDescr>,
+  schema: Array<ColumnDefinition>,
   idx: Int,
   val: Value,
 ): ?CValue {
@@ -169,7 +169,7 @@ fun valueToCValue(
   | _ -> val
   };
   if (val is VNull _) {
-    if (schema[idx].notNull) {
+    if (schema[idx].notNull is Some _) {
       error(pos, "cannot insert NULL in column declared as NOT NULL")
     } else {
       return (None() : ?CValue)
@@ -208,7 +208,7 @@ fun valueToCValue(
       time = getUnixTime();
       Some(CInt(time))
     | VInt(n) ->
-      if (schema[idx].primary) {
+      if (schema[idx].primary is Some _) {
         _ = SKStore.genSym(Math.abs(n));
       };
       Some(CInt(n))
@@ -346,7 +346,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         error(pos, "Cannot create a table in a transaction");
       };
       Some((context, _, _) ~> {
-        dirDescr = computeTableDescr(name, schema);
+        dirDescr = computeTableDescr(name, schema.columns);
         this.createTable(context, pos, name, dirDescr, ifNotExists);
       })
     | Insert{pos, onConflict, name, paramsOpt, values} ->
@@ -859,7 +859,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     hasPrimary = false;
 
     for (tyDescr in dirDescr.schema) {
-      if (tyDescr.primary) {
+      if (tyDescr.primary is Some _) {
         if (hasPrimary) {
           error(pos, "multiple primary keys detected");
         };
@@ -868,7 +868,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         };
         !hasPrimary = true;
       };
-      if (tyDescr.unique || tyDescr.primary) {
+      if (tyDescr.unique is Some _ || tyDescr.primary is Some _) {
         this.makeIndex(
           context,
           CreateIndex{
@@ -877,7 +877,7 @@ class Evaluator{options: Options, user: ?UserFile} {
             name => Name::create(name.origName + "_" + tyDescr.name.origName),
             fields => (name, Array[(tyDescr.name, IASC())]),
             unique => true,
-            primary => tyDescr.primary,
+            primary => tyDescr.primary is Some _,
             text => None(),
           },
         );

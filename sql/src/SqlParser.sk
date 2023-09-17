@@ -1124,11 +1124,24 @@ fun parseCreateTable(
   ifNotExists: Bool,
 ): (Int, CreateTable) {
   (!pos, name) = lex.nextWord(pos);
-  (!pos, schema) = parseTableSchema(lex, pos);
-  (pos, CreateTable{pos, name => Name::create(name), schema, ifNotExists})
+  (!pos, columns) = parseTableSchema(lex, pos);
+  (
+    pos,
+    CreateTable{
+      pos,
+      name => Name::create(name),
+      schema => TableSchema{
+        columns,
+        constraints => Array[],
+        withoutRowid => false,
+        strict => false,
+      },
+      ifNotExists,
+    },
+  )
 }
 
-fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
+fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<ColumnDefinition>) {
   !pos = lex.expect(pos, "(");
   schema = mutable Vector[];
   loop {
@@ -1164,13 +1177,17 @@ fun parseTableSchema(lex: Lexer, pos: Int): (Int, Array<TypeDescr>) {
       (!pos, name) = lex.nextWord(pos);
       (!pos, ty, primary, unique, default, notNull) = parseType(lex, pos);
       schema.push(
-        TypeDescr{
+        ColumnDefinition{
           name => Name::create(name),
           ty,
-          primary,
-          unique,
-          default,
-          notNull,
+          primary => if (primary) {
+            Some(CCPrimaryKey{order => IASC(), autoincrement => true})
+          } else {
+            None()
+          },
+          unique => if (unique) Some(CCUnique{}) else None(),
+          default => default.map(v -> CCDefault{expr => v}),
+          notNull => if (notNull) Some(CCNotNull{}) else None(),
         },
       );
     };

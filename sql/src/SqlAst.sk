@@ -25,12 +25,7 @@ base class Stmt {
   children =
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
-  | CreateTable{
-    pos: Int,
-    name: Name,
-    schema: Array<TypeDescr>,
-    ifNotExists: Bool,
-  }
+  | CreateTable{pos: Int, name: Name, schema: TableSchema, ifNotExists: Bool}
   | CreateView{
     pos: Int,
     virtual: Bool,
@@ -61,6 +56,57 @@ base class Stmt {
   }
   | Update{pos: Int, name: Name, sets: Array<(Name, Pos, Expr)>, where: ?Expr}
 }
+
+class TableSchema{
+  columns: Array<ColumnDefinition>,
+  constraints: Array<TableConstraint>,
+  withoutRowid: Bool,
+  strict: Bool,
+}
+
+class ColumnDefinition{
+  name: Name,
+  // TODO: SQLite allows unspecified type.
+  ty: Type,
+  primary: ?CCPrimaryKey = None(),
+  notNull: ?CCNotNull = None(),
+  unique: ?CCUnique = None(),
+  default: ?CCDefault = None(),
+  check: ?CCCheck = None(),
+  collate: ?CCCollate = None(),
+  foreignKey: ?CCForeignKey = None(),
+  generated: ?CCGenerated = None(),
+}
+
+// TODO: Add `pos` for better error messages.
+base class ColumnConstraint{constraintName: ?Name = None()} {
+  children =
+  | CCPrimaryKey{
+    order: IKind,
+    autoincrement: Bool,
+    onConflict: ?OnConflict = None(),
+  }
+  | CCNotNull{onConflict: ?OnConflict = None()}
+  | CCUnique{onConflict: ?OnConflict = None()}
+  | CCCheck{expr: Expr}
+  | CCDefault{expr: Expr}
+  | CCCollate{name: String}
+  | CCForeignKey{references: ForeignKeyClause}
+  | CCGenerated{expr: Expr, stored: Bool, virtual: Bool}
+}
+
+base class TableConstraint{constraintName: ?String} {
+  children =
+  | TCPrimaryKey{columns: Array<IndexedColumn>, onConflict: ?OnConflict}
+  | TCUnique{columns: Array<IndexedColumn>, onConflict: ?OnConflict}
+  | TCCheck{expr: Expr}
+  | TCForeignKey{columns: Array<Name>, references: ?ForeignKeyClause}
+}
+
+class IndexedColumn{expr: Expr, collate: ?Name, order: IKind} {}
+
+// TODO
+class ForeignKeyClause{}
 
 base class OnConflict {
   children =
@@ -282,15 +328,6 @@ base class InValues {
   | InList(Array<Expr>)
   | InSelect(Select)
 }
-
-class TypeDescr{
-  name: Name,
-  ty: Type,
-  primary: Bool,
-  unique: Bool,
-  default: ?Value,
-  notNull: Bool,
-} uses Equality
 
 base class Type uses Orderable {
   children =

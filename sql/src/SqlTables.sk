@@ -120,11 +120,9 @@ fun errorAllExistingSubs(
   )
 }
 
-extension class TypeDescr extends SKStore.File
-
 class DirDescr{
   colNames: Array<Name>,
-  schema: Array<TypeDescr>,
+  schema: Array<ColumnDefinition>,
   kinds: Array<(Int, IKind, Type)>,
   cols: Map<Name, Int>,
   alias: ?Name,
@@ -137,7 +135,7 @@ class DirDescr{
 
   static fun create{
     name: Name,
-    schema: Array<TypeDescr>,
+    schema: Array<ColumnDefinition>,
     dirName: SKStore.DirName,
     alias: ?Name,
     isInput: Bool,
@@ -643,18 +641,18 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
       | TEXT() -> "TEXT"
       },
     );
-    if (ty.unique) {
+    if (ty.unique is Some _) {
       o(" UNIQUE");
     };
-    if (ty.primary) {
+    if (ty.primary is Some _) {
       o(" PRIMARY KEY");
     };
-    if (ty.notNull) {
+    if (ty.notNull is Some _) {
       o(" NOT NULL");
     };
     ty.default match {
     | None() -> void
-    | Some(expr) ->
+    | Some(CCDefault{expr}) ->
       expr match {
       | VNull() -> void
       | VInt(x) -> o(` DEFAULT ${x.toString()}`)
@@ -665,6 +663,7 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
       | VId(_, _) -> invariant_violation("Invalid expression for default value")
       | VTime() -> invariant_violation("Invalid expression for default value")
       | VParam(_) -> invariant_violation("Invalid expression for default value")
+      | _ -> invariant_violation("Invalid expression for default value")
       }
     };
     if (colIndex < dirDescr.schema.size() - 1) {

@@ -103,7 +103,7 @@ class JTable{
   name: Name,
   dirName: SKStore.DirName,
   ranges: ?Array<SKStore.KeyRange>,
-  schema: Array<SKDB.TypeDescr>,
+  schema: Array<SKDB.ColumnDefinition>,
   alias: ?Name,
 } {
   static fun fromDirDescr(
@@ -123,8 +123,8 @@ class JTable{
 value class TableProj(tableNbr: Int, col: (Int, IKind, Type), isUnique: Bool)
 value class EqJoin(left: TableProj, right: TableProj)
 
-fun isUnique(tyDescr: TypeDescr): Bool {
-  tyDescr.primary || tyDescr.unique
+fun isUnique(tyDescr: ColumnDefinition): Bool {
+  tyDescr.primary is Some _ || tyDescr.unique is Some _
 }
 
 const crossJoinMsg: String = `
@@ -542,7 +542,7 @@ mutable class Compiler{
 
   mutable fun addGetFrom(
     tableNbr: Int,
-    schema: Array<TypeDescr>,
+    schema: Array<ColumnDefinition>,
     colName: Identifier,
     colNbr: Int,
   ): void {
@@ -641,10 +641,10 @@ mutable class Compiler{
     params: SelectParams,
     from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
     cparams: Array<CGExpr>,
-  ): Array<SKDB.TypeDescr> {
+  ): Array<ColumnDefinition> {
     (cols, invCols) = static::getCols(params, from);
     cparams.mapWithIndex((idx, param) -> {
-      TypeDescr{
+      ColumnDefinition{
         name => invCols.maybeGet(idx) match {
         | None() ->
           col = Name::create("col<" + idx + ">");
@@ -654,10 +654,6 @@ mutable class Compiler{
         | Some(x) -> x
         },
         ty => param.getType(),
-        unique => false,
-        primary => false,
-        default => None(),
-        notNull => false,
       }
     })
   }
@@ -1719,7 +1715,11 @@ mutable class Compiler{
               name => Name::create(table.dirName.toString()),
               dirName => table.dirName,
               schema => table.schema.map(x ->
-                if (x.primary) x with {unique => true} else x
+                if (x.primary is Some _) {
+                  x with {unique => Some(CCUnique{})}
+                } else {
+                  x
+                }
               ),
               alias => table.alias,
               isInput => false,

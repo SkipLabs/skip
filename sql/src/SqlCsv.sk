@@ -169,7 +169,7 @@ fun reasonSchemaUnsupported(
   SKDB.getTableDir(context).maybeGet(context, SKStore.SID(tableName)) match {
   | None() -> Some(`Table '${tableName}' does not exist.`)
   | Some(dirDescr) ->
-    if (dirDescr.schema.any(x ~> x.unique)) {
+    if (dirDescr.schema.any(x ~> x.unique is Some _)) {
       return Some("Cannot mirror tables with unique constraints.")
     };
     None()
@@ -291,7 +291,7 @@ fun applyDiffStrategy(
   };
 
   primaryIdx = for ((i, type) in table.schema.items()) {
-    if (type.primary) {
+    if (type.primary is Some _) {
       break Some(i)
     }
   } else {
