@@ -892,7 +892,7 @@ mutable class Compiler{
       }
 
     | BinOp(OIs(true), e1, e2) ->
-      this.compileExpr(context, Not(BinOp(OIs(false), e1, e2)))
+      this.compileExpr(context, UnOp(UnaryNot(), BinOp(OIs(false), e1, e2)))
 
     | BinOp(OIs(false), e, VNull()) ->
       CIExpr(
@@ -904,7 +904,7 @@ mutable class Compiler{
         },
       )
 
-    | BinOp(OIs(false), e, Not(VNull())) ->
+    | BinOp(OIs(false), e, UnOp(UnaryNot(), VNull())) ->
       CIExpr(
         CNot(
           this.compileExpr(context, e) match {
@@ -971,7 +971,7 @@ mutable class Compiler{
       }
 
     | Like(ge1, ge2, escape, true) ->
-      this.compileExpr(context, Not(Like(ge1, ge2, escape, false)))
+      this.compileExpr(context, UnOp(UnaryNot(), Like(ge1, ge2, escape, false)))
 
     | Like(ge1, ge2, escape, false) ->
       if (escape is Some _) {
@@ -999,14 +999,6 @@ mutable class Compiler{
       cge2 = this.compileExpr(context, ge2);
       this.compileBinop(cge1, cge2, bop)
 
-    | Not(e) ->
-      this.compileExpr(context, e) match {
-      | CGNull() -> CGNull()
-      | CIExpr(b) -> CIExpr(CNot(b))
-      | _ ->
-        debug(e);
-        error(this.pos, "Invalid type for NOT")
-      }
     | Case(None(), whenCases, Some(last)) ->
       result = this.compileExpr(context, last);
       for (whenCase in whenCases.reversed()) {
@@ -1040,13 +1032,13 @@ mutable class Compiler{
       | TEXT() -> CSExpr(CSQuery(cselect))
       }
     | Exists(select, true) ->
-      this.compileExpr(context, Not(Exists(select, false)))
+      this.compileExpr(context, UnOp(UnaryNot(), Exists(select, false)))
     | Exists(select @ Select _, false) ->
       CIExpr(CExists(this.compileSelect(context, select, false)))
 
     | In(_, InSelect _, _) -> error(this.pos, "IN SELECT not implemented")
     | e @ In(_, _, true) ->
-      this.compileExpr(context, Not(e with {negated => false}))
+      this.compileExpr(context, UnOp(UnaryNot(), e with {negated => false}))
     | In(e, InList(arr), false) ->
       this.compileExpr(context, e) match {
       | CGNull() -> CGNull()
@@ -1076,6 +1068,15 @@ mutable class Compiler{
           }
         );
         CIExpr(CSIn(s, set))
+      }
+
+    | UnOp(UnaryNot(), e) ->
+      this.compileExpr(context, e) match {
+      | CGNull() -> CGNull()
+      | CIExpr(b) -> CIExpr(CNot(b))
+      | _ ->
+        debug(e);
+        error(this.pos, "Invalid type for NOT")
       }
 
     | UnOp(UnaryMinus(), e) ->

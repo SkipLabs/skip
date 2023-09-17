@@ -146,7 +146,6 @@ base class Value extends Expr uses Equality {
 
 base class Expr {
   children =
-  | Not(Expr)
   | In(Expr, InValues, negated: Bool)
   | Between(Expr, Expr, Expr, negated: Bool)
   | Like(Expr, Expr, escape: ?Expr, negated: Bool)
@@ -306,7 +305,6 @@ fun hasAggr(expr: Expr): Bool {
   expr match {
   | Value _ -> false
   | Identifier _ -> false
-  | Not(e)
   | Between(e, _, _, _)
   | UnOp(_, e) ->
     hasAggr(e)
