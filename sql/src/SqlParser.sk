@@ -182,8 +182,8 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
   groupBy = if (lex.isEqUpper(pos, "GROUP")) {
     !pos = lex.expectUpper(pos, "GROUP");
     !pos = lex.expectUpper(pos, "BY");
-    (!pos, groupBy) = parseColNames(lex, pos);
-    groupBy
+    (!pos, cols) = parseColNames(lex, pos);
+    Some(cols.fromSome().map(c -> c.i0))
   } else {
     None()
   };

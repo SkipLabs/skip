@@ -739,15 +739,14 @@ mutable class Compiler{
 
   mutable fun compileGroupBy(
     context: mutable SKStore.Context,
-    groupByOpt: ?Array<(Expr, ?Name)>,
+    groupByOpt: ?Array<Expr>,
     params: Array<CGExpr>,
   ): ?Array<CGroupByElt> {
     groupByOpt match {
     | None() -> None()
     | Some(groupBy) ->
       Some(
-        groupBy.map(kv -> {
-          (group, _) = kv;
+        groupBy.map(group -> {
           this.compileExpr(context, group) match {
           | CIExpr(CILiteral(nIndexedAt1)) ->
             n = nIndexedAt1 - 1;
