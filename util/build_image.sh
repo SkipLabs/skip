@@ -9,6 +9,7 @@ set -x
 cd $REPO
 
 git clean -xdn | sed 's|Would remove |/|g' > .dockerignore
+echo ".git" >> .dockerignore
 
 docker build --no-cache --tag skfs --progress=plain .
 docker build --no-cache --tag skgw --progress=plain --file sql/server/skgw/Dockerfile .
