@@ -80,14 +80,26 @@ fun adjustSerialisedValues(
       | Some(CFloat(f)) -> f.toString()
       | Some(CString(s)) -> escapeStringStr(s)
       }
-    | TcNewCol(_col) -> yield "NULL" // TODO: what if not null? etc.
-    | TcChange(_old, new) -> // TODO: type, primary, unique, not null. default should not matter.
+    | TcNewCol(_col) -> yield "NULL"
+    | TcChange(_old, new) ->
+      // possible changes:
+      // 1. primary, unique, and not null changes are currently ignored.
+      //    you should change the schema incrementally and ensure the
+      //    data is compatible.
+      // 2. default does not matter to migration
+      // 3. type, which we handle
       v = row.values[nameToIndex.get(new.name)];
-      yield v match {
-      | None() -> "NULL"
-      | Some(CInt(n)) -> n.toString()
-      | Some(CFloat(f)) -> f.toString()
-      | Some(CString(s)) -> escapeStringStr(s)
+      yield (v, new.ty) match {
+      | (None(), _) -> "NULL"
+      | (Some(CInt(n)), INTEGER()) -> n.toString()
+      | (Some(CInt(n)), FLOAT()) -> n.toString()
+      | (Some(CInt(n)), TEXT()) -> escapeStringStr(n.toString())
+      | (Some(CFloat(f)), INTEGER()) -> f.toInt().toString()
+      | (Some(CFloat(f)), FLOAT()) -> f.toString()
+      | (Some(CFloat(f)), TEXT()) -> escapeStringStr(f.toString())
+      | (Some(CString(s)), INTEGER()) -> s
+      | (Some(CString(s)), FLOAT()) -> s
+      | (Some(CString(s)), TEXT()) -> escapeStringStr(s)
       }
     }
   }
