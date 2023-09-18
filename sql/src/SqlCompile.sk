@@ -778,9 +778,19 @@ mutable class Compiler{
   mutable fun compileRest(
     context: mutable SKStore.Context,
     cparams: Array<CGExpr>,
-    rest: ?(QueryKind, Select),
+    rest: ?(CompoundOperator, Select),
   ): ?(QueryKind, CSelect) {
-    crest = rest.map(x -> (x.i0, this.compileSelect(context, x.i1, false)));
+    crest = rest.map(x ->
+      (
+        x.i0 match {
+        | COUnion() -> QUnion(USingle())
+        | COUnionAll() -> QUnion(UAll())
+        | COExcept() -> QExcept()
+        | COIntersect() -> QIntersect(false)
+        },
+        this.compileSelect(context, x.i1, false),
+      )
+    );
     crest match {
     | None() -> void
     | Some((_, query)) ->

@@ -226,19 +226,18 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
   loop {
     rkind = if (lex.isEqUpper(pos, "EXCEPT")) {
       !pos = lex.expectUpper(pos, "EXCEPT");
-      QExcept()
+      COExcept()
     } else if (lex.isEqUpper(pos, "UNION")) {
       !pos = lex.expectUpper(pos, "UNION");
-      all = if (lex.isEqUpper(pos, "ALL")) {
+      if (lex.isEqUpper(pos, "ALL")) {
         !pos = lex.expectUpper(pos, "ALL");
-        true
+        COUnionAll()
       } else {
-        false
+        COUnion()
       };
-      QUnion(if (all) UAll() else USingle())
     } else if (lex.isEqUpper(pos, "INTERSECT")) {
       !pos = lex.expectUpper(pos, "INTERSECT");
-      QIntersect(false)
+      COIntersect()
     } else {
       break void;
     };
