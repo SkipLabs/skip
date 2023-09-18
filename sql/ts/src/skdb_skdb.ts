@@ -1,4 +1,3 @@
-
 import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types";
 import { PagedMemory, Page, Storage, SKDB, ExternalFuns, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
 import { IDBStorage } from "#skdb/skdb_storage";
@@ -155,7 +154,7 @@ class SKDBShared implements Shared {
   async create(dbName?: string, asWorker?: boolean) {
     let skdbSync = await this.createSync(dbName)
     return new SKDBImpl(skdbSync);
-  } 
+  }
 }
 
 class LinksImpl implements Links, ToWasm {
@@ -187,8 +186,8 @@ class LinksImpl implements Links, ToWasm {
   SKIP_js_user_fun: (queryID: int) => void;
   SKIP_js_mark_query: (queryID: int, notify: int) => void;
   // Utils
-  notifyAllJS: () => void;  
-  
+  notifyAllJS: () => void;
+
   constructor(environment: Environment) {
     this.environment = environment;
     this.state = new ExternalFuns();

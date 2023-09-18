@@ -1,5 +1,3 @@
-
-
 import { Storage, PagedMemory } from "#skdb/skdb_types";
 
 
@@ -65,7 +63,7 @@ export class IDBStorage implements Storage {
   private storeName: string;
   private memory: PagedMemory;
   private db: IDBDatabase;
-  
+
   private constructor(
     storeName: string,
     db: IDBDatabase,
