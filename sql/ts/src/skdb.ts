@@ -6,7 +6,7 @@ export {SKDB, SKDBSync} from "#skdb/skdb_types";
 var wasm64 = "skdb";
 var modules = [ /*--MODULES--*/];
 var extensions = new Map();
-/*--EXTENSIONS--*/ 
+/*--EXTENSIONS--*/
 
 export async function createSkdb(options: {
   dbName ?: string,

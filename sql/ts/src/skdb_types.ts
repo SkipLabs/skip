@@ -17,11 +17,11 @@ export interface SKDBSync {
   schema: () => string;
   subscribe: (viewName: string, f: (change: string) => void) => void;
   save: () => Promise<boolean>;
-  
+
   // SERVEUR
   connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
-  
+
   createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createServerUser: () => Promise<ProtoResponseCreds>;
   serverExec: (query: string, params: Params) => Promise<Array<any>>;
@@ -45,7 +45,7 @@ export interface SKDB {
   tableSchema: (tableName: string, server?: boolean) => Promise<string>;
   viewSchema: (viewName: string, server?: boolean) => Promise<string>;
   schema: (server?: boolean) => Promise<string>;
-  
+
   subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
   save: () => Promise<boolean>;
 }
@@ -55,7 +55,7 @@ export interface SKDB {
 
   exec: (query: string, params: Params, server?: boolean) => Promise<Array<any>>;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
-  
+
   tableSchema: (tableName: string, server?: boolean) => Promise<string>;
   viewSchema: (viewName: string, server?: boolean) => Promise<string>;
   schema: (server?: boolean) => Promise<string>;
@@ -161,4 +161,3 @@ export class ExternalFuns {
     return this.externalFuns[funId]!(jso);
   }
 }
-

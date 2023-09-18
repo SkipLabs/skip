@@ -600,7 +600,7 @@ export class MuxedSocket {
     this.env = env;
   }
 
-  openStream(): Promise<Stream> { 
+  openStream(): Promise<Stream> {
     const openTimeoutMs = 10;
     const fn = (resolve, reject) => {
       switch (this.state) {
@@ -1484,7 +1484,7 @@ class SKDBServer implements Server {
         this.client.toggleView(tableName);
       }
     }
-    
+
     this.client.assertCanBeMirrored(tableName);
     let session = "@view"
     if (!isViewOnRemote) {
@@ -1504,7 +1504,7 @@ class SKDBServer implements Server {
       type: "query",
       query: stdin,
       format: "json",
-    }).then(result => 
+    }).then(result =>
       result.split("\n")
       .filter((x) => x != "")
       .map((x) => JSON.parse(x))
@@ -1524,7 +1524,7 @@ class SKDBServer implements Server {
       type: "schema",
       name: viewName,
       scope: "view",
-    }); 
+    });
   }
 
   async schema(): Promise<string> {
