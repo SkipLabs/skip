@@ -7,6 +7,6 @@ RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
     sdk install gradle && \
     sdk install java 19.0.1-oracle"
 
-RUN make && find sql/target -name state.db -delete
+RUN make && find . -name state.db -delete
 
 CMD ./sql/server/deploy/start.sh
