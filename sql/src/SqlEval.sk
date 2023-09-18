@@ -430,16 +430,20 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (onConflict is Some _) {
           error(pos, "Can only use OR IGNORE/REPLACE with values");
         };
-        !selectAst.id = Name::create(
-          selectAst.id.origName + "_" + SKStore.genSym(0),
-        );
         compiler = SKDB.Compiler::create(
           false,
           this.options,
           selectAst.pos,
           params,
         );
-        select = compiler.compileSelect(context, selectAst, true);
+        select = compiler.compileSelect(
+          context,
+          selectAst,
+          Name::create(
+            genSelectId(selectAst).origName + "_" + SKStore.genSym(0),
+          ),
+          true,
+        );
         selectDir = evalSelect(context, select, None());
         updateTableMap(context);
         table = getTable(context, pos, name);
@@ -492,7 +496,12 @@ class Evaluator{options: Options, user: ?UserFile} {
         selectAst.pos,
         params,
       );
-      select = compiler.compileSelect(context, selectAst, true);
+      select = compiler.compileSelect(
+        context,
+        selectAst,
+        genSelectId(selectAst),
+        true,
+      );
       selectDir = evalSelect(context, select, None());
       stdout = context.getGlobal("Stdout") match {
       | Some(StdoutFile(_, l)) -> l
@@ -515,14 +524,13 @@ class Evaluator{options: Options, user: ?UserFile} {
       pos,
       name => viewName,
       ifNotExists,
-      query => origSelectAst @ Select _,
+      query => selectAst @ Select _,
       virtual,
       text,
     } ->
       if (inTransaction) {
         error(pos, "Cannot create a view in a transaction");
       };
-      selectAst = origSelectAst with {id => viewName};
       views = getViewsDir(context);
       viewsDir = context.unsafeGetEagerDir(views.dirName);
       key = SKStore.SID(viewName.lower);
@@ -541,7 +549,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         this.options with {virtual => true},
         selectAst.pos,
         params,
-      ).compileSelect(context, selectAst, true);
+      ).compileSelect(context, selectAst, viewName, true);
       viewsDir.write(
         context,
         key,
@@ -582,9 +590,8 @@ class Evaluator{options: Options, user: ?UserFile} {
             selectAst.pos,
             params,
           );
-          cselect = compiler.compileSelect(context, selectAst, true);
-          assert(cselect.id == selectAst.id);
-          dirName = SKStore.DirName::create("/" + selectAst.id + "/");
+          cselect = compiler.compileSelect(context, selectAst, viewName, true);
+          dirName = SKStore.DirName::create("/" + viewName + "/");
           dirDescr = SKDB.Compiler::getDirDescr(
             selectAst.params,
             cselect.from,
@@ -710,7 +717,6 @@ class Evaluator{options: Options, user: ?UserFile} {
     sinkDirName = SKStore.DirName::create(sinkName);
     from = Some(Array[TableName(FName(name), None(), false)]);
     selectAst = Select{
-      id => Name::create("SELECT_" + SKStore.genSym(pos)),
       pos => pos,
       params => Array[SelectStar(None())],
       from,
@@ -729,7 +735,13 @@ class Evaluator{options: Options, user: ?UserFile} {
       selectAst.pos,
       params,
     );
-    select = compiler.compileSelect(context, selectAst, true, sets);
+    select = compiler.compileSelect(
+      context,
+      selectAst,
+      Name::create("SELECT_" + SKStore.genSym(pos)),
+      true,
+      sets,
+    );
     selectHandle = evalSelect(context, select, None());
     selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
     updateTableMap(context);
@@ -1813,7 +1825,12 @@ fun manageReactiveQuery(
       };
       params = decodeParams(encoded_params);
       compiler = SKDB.Compiler::create(false, skOptions, 0, params);
-      cselect = compiler.compileSelect(context, selectAst, true);
+      cselect = compiler.compileSelect(
+        context,
+        selectAst,
+        genSelectId(selectAst),
+        true,
+      );
       selectDir = SKDB.evalSelect(context, cselect, None());
       schema = SKDB.Compiler::getSchema(
         selectAst.params,

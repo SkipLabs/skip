@@ -208,7 +208,6 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
     None()
   };
   query = Select{
-    id => Name::create(""),
     pos => posBegin,
     distinct,
     params => selectParams,
@@ -248,11 +247,6 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
   invariant(restVector.size() <= 1);
   !query = query with {
     rest => if (restVector.size() > 0) Some(restVector[0]) else None(),
-  };
-  !query = query with {
-    id => Name::create(
-      "SELECT_" + hash(query with {id => Name::create(""), pos => 0}),
-    ),
   };
   (pos, query)
 }

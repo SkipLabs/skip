@@ -157,6 +157,10 @@ fun errorNoMergeClause(pos: Int): void {
 /* Finds table */
 /*****************************************************************************/
 
+fun genSelectId(select: Select): Name {
+  Name::create("SELECT_" + hash(select with {pos => 0}))
+}
+
 mutable class Compiler{
   directMode: Bool,
   options: Options,
@@ -185,7 +189,6 @@ mutable class Compiler{
 
     Select{
       pos => select.pos,
-      id => select.id,
       distinct => select.distinct,
       params => Array[SelectStar(None())],
       from => Some(
@@ -193,7 +196,6 @@ mutable class Compiler{
           TableName(
             FQuery(
               select with {
-                id => Name::create(select.id.lower + "-groupBy"),
                 distinct => false,
                 orderBy => None(),
                 limit => None(),
@@ -220,6 +222,7 @@ mutable class Compiler{
   mutable fun compileSelect(
     context: mutable SKStore.Context,
     select: Select,
+    selectId: Name,
     toplevel: Bool,
     sets: Array<UpdateSet> = Array[],
   ): CSelect {
@@ -352,7 +355,7 @@ mutable class Compiler{
 
     cselect = CSelect{
       id => Name::create(
-        select.id.lower +
+        selectId.lower +
           (if (this.options.virtual) "" else params.hash().toString()) +
           context.getGlobal("TableMap") match {
           | None() -> ""
@@ -571,7 +574,7 @@ mutable class Compiler{
     | FName(tableName) -> getTable(context, this.pos, tableName)
 
     | FQuery(select @ Select _) ->
-      cselect = this.compileSelect(context, select, false);
+      cselect = this.compileSelect(context, select, genSelectId(select), false);
       selectDir = evalSelect(context, cselect, None());
       static::getDirDescr(
         select.params,
@@ -790,7 +793,7 @@ mutable class Compiler{
         | COExcept() -> QExcept()
         | COIntersect() -> QIntersect(false)
         },
-        this.compileSelect(context, x.i1, false),
+        this.compileSelect(context, x.i1, genSelectId(x.i1), false),
       )
     );
     crest match {
@@ -1040,7 +1043,7 @@ mutable class Compiler{
       };
       result
     | Subquery(select @ Select _) ->
-      cselect = this.compileSelect(context, select, false);
+      cselect = this.compileSelect(context, select, genSelectId(select), false);
       if (cselect.params.size() != 1) {
         error(this.pos, "Invalid type for inner SELECT");
       };
@@ -1052,7 +1055,11 @@ mutable class Compiler{
     | Exists(select, true) ->
       this.compileExpr(context, UnOp(UnaryNot(), Exists(select, false)))
     | Exists(select @ Select _, false) ->
-      CIExpr(CExists(this.compileSelect(context, select, false)))
+      CIExpr(
+        CExists(
+          this.compileSelect(context, select, genSelectId(select), false),
+        ),
+      )
 
     | In(_, InSelect _, _) -> error(this.pos, "IN SELECT not implemented")
     | e @ In(_, _, true) ->
