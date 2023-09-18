@@ -197,8 +197,7 @@ const skdb = await createConnectedSkdb(values.host, values.db, {
   privateKey: privateKey,
 });
 
-const evalQuery = async function(skdb_client, query) {
-  const rows = await skdb_client.exec(query);
+const display = function(rows) {
   if (args.values['json-output']) {
     const acc: Array<string> = [];
     for (const row of rows) {
@@ -332,7 +331,8 @@ const remoteRepl = async function() {
     }
 
     try {
-      await evalQuery(skdb, query);
+      const rows = await skdb.exec(query, {}, true);
+      display(rows);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
       console.error(ex);
@@ -424,7 +424,8 @@ const localRepl = async function() {
     }
 
     try {
-      await evalQuery(skdb, query);
+      const rows = await skdb.exec(query, {}, false);
+      display(rows);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
       console.error(ex);
@@ -447,7 +448,8 @@ try {
 
 if (query.trim() !== "") {
   try {
-    await evalQuery(skdb, query);
+    const rows = await skdb.exec(query, {}, true);
+    display(rows);
   } catch (ex) {
     console.error("Could not eval query.");
     console.error(ex);
