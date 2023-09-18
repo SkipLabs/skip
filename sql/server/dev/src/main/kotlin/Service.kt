@@ -147,7 +147,7 @@ class RequestHandler(
               QueryResponseFormat.JSON -> OutputFormat.JSON
               QueryResponseFormat.RAW -> OutputFormat.RAW
             }
-        val result = skdb.sql(request.query, format)
+        val result = skdb.sql(request.query, format, true)
         if (result.exitSuccessfully()) {
           stream.send(encodeProtoMsg(ProtoData(ByteBuffer.wrap(result.output), finFlagSet = true)))
           stream.close()
