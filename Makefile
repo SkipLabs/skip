@@ -26,11 +26,11 @@ npm: $(SKDB_WASM) build/package/skdb build/package/package.json
 	cd build/package && npm install
 
 build/package/package.json:
-	@echo -e "{" > build/package/package.json
-	@echo -e "  \"dependencies\": {" >> build/package/package.json
-	@echo -e "      \"skdb\": \"file:skdb\"" >> build/package/package.json
-	@echo -e "  }" >> build/package/package.json
-	@echo -e "}" >> build/package/package.json
+	@echo "{" > build/package/package.json
+	@echo "  \"dependencies\": {" >> build/package/package.json
+	@echo "      \"skdb\": \"file:skdb\"" >> build/package/package.json
+	@echo "  }" >> build/package/package.json
+	@echo "}" >> build/package/package.json
 
 build/package/skdb: build/sknpm
 	cd sql && ../build/sknpm build --profile $(SKARGO_PROFILE) --dry-run ../build/package/skdb
