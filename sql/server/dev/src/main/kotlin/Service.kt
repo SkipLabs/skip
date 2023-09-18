@@ -328,16 +328,15 @@ fun schemaHandler(): HttpHandler {
   return BlockingHandler(
       object : HttpHandler {
         override fun handleRequest(exchange: HttpServerExchange) {
+
+          exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
+          exchange.responseHeaders.put(HttpString("Access-Control-Allow-Methods"), "PUT")
+
           val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
           val db = pathParams["database"]
 
           if (db == null) {
             throw RuntimeException("database not provided")
-          }
-
-          if (exchange.requestMethod == Methods.GET) {
-            // TODO: dump the schema
-            return
           }
 
           if (exchange.requestMethod == Methods.PUT) {
@@ -377,9 +376,6 @@ fun schemaHandler(): HttpHandler {
             File(tmpPath).renameTo(File(dbPath))
             return
           }
-
-          exchange.statusCode = StatusCodes.METHOD_NOT_ALLOWED
-          return
         }
       })
 }
