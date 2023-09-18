@@ -4,6 +4,20 @@
 
 module SKDB;
 
+base class QueryKind uses Orderable {
+  children =
+  | QExcept()
+  | QUnion(QUnionKind)
+  | QIntersect(Bool)
+}
+
+base class QUnionKind uses Orderable {
+  children =
+  | USingle()
+  | UAll()
+  | UIntersect()
+}
+
 type MapFunRow = (
   mutable SKStore.Context,
   mutable SKStore.TWriter<SKStore.Key, Row>,

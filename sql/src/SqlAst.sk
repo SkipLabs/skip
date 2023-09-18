@@ -166,7 +166,7 @@ class Select{
   having: ?Expr,
   orderBy: ?Array<(Expr, IKind)>,
   limit: ?Expr,
-  rest: ?(QueryKind, Select),
+  rest: ?(CompoundOperator, Select),
   shouldExpand: Bool = false,
 } extends Stmt
 
@@ -191,18 +191,12 @@ base class JoinKind uses Orderable {
   | JCross()
 }
 
-base class QueryKind uses Orderable {
+base class CompoundOperator uses Orderable {
   children =
-  | QExcept()
-  | QUnion(QUnionKind)
-  | QIntersect(Bool)
-}
-
-base class QUnionKind uses Orderable {
-  children =
-  | USingle()
-  | UAll()
-  | UIntersect()
+  | COUnion()
+  | COUnionAll()
+  | COIntersect()
+  | COExcept()
 }
 
 base class Value extends Expr {
