@@ -39,8 +39,8 @@ import io.undertow.util.PathTemplateMatch
 import io.undertow.util.StatusCodes
 import io.undertow.websockets.spi.WebSocketHttpExchange
 import java.io.BufferedOutputStream
-import java.io.OutputStream
 import java.io.File
+import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.security.SecureRandom
 import java.util.UUID
@@ -348,11 +348,11 @@ fun schemaHandler(): HttpHandler {
             val schema = exchange.inputStream.bufferedReader().use { it.readText() }
 
             try {
-              new?.sql(schema, OutputFormat.RAW)?.decodeOrThrow()
-              println("Schema successfully applied.")
+              new!!.sql(schema, OutputFormat.RAW).decodeOrThrow()
             } catch (ex: Exception) {
-              println("Could not create a database with the new schema:\n${schema}")
               exchange.statusCode = StatusCodes.BAD_REQUEST
+              exchange.responseSender.send(
+                  "Could not create a database with the new schema:\n${schema}")
               return
             }
 
@@ -360,12 +360,16 @@ fun schemaHandler(): HttpHandler {
               try {
                 val inserts = old.migrate(schema).decodeOrThrow()
                 println("Auto-migration:\n${inserts}")
-                new?.sql(inserts, OutputFormat.RAW)?.decodeOrThrow()
-                println("Old data successfully migrated to the new schema.")
+                val output = new.sql(inserts, OutputFormat.RAW)
+                if (!output.exitSuccessfully()) {
+                  exchange.statusCode = StatusCodes.BAD_REQUEST
+                  exchange.responseSender.send(
+                      "Failed to migrate data to the new schema:\n${output.decode()}")
+                  return
+                }
               } catch (ex: Exception) {
-                println("Failed to migrate data to the new schema.")
-                // TODO: why? what did skdb complain about? why isn't this in the log?
                 exchange.statusCode = StatusCodes.BAD_REQUEST
+                exchange.responseSender.send("Failed to migrate data to the new schema.")
                 return
               }
             }
