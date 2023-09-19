@@ -87,6 +87,8 @@ export interface RemoteSKDB {
   viewSchema: (viewName: string) => Promise<string>;
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
   exec: (query: string, params: Params) => Promise<Array<any>>;
+  isConnectionHealthy: () => boolean;
+  tablesAwaitingSync: () => Set<string>;
   close(): void;
 }
 
