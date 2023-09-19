@@ -235,13 +235,15 @@ fun parseSelect(lex: Lexer, pos: Int, toplevel: Bool): (Int, Select) {
 
   query = Select{
     pos => posBegin,
-    distinct,
-    params => selectParams,
-    from,
-    join,
-    where,
-    groupBy,
-    having,
+    core => SelectCore{
+      distinct,
+      params => selectParams,
+      from,
+      join,
+      where,
+      groupBy,
+      having,
+    },
     orderBy,
     limit,
     rest => restVector.toArray(),
