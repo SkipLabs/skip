@@ -542,6 +542,15 @@ class EHandle<K: Key, V: File>(
     dir.writeArray(context, key, values);
   }
 
+  fun items(
+    context: mutable Context,
+  ): mutable Iterator<(K, mutable Iterator<V>)> {
+    dir = context.unsafeGetEagerDir(this.getDirName());
+    dir.getIterator(context).map(kv ->
+      (this.keyType(kv.i0), kv.i1.map(this.getType()))
+    )
+  }
+
   fun getIter(context: mutable Context, key: K): mutable Iterator<V> {
     dir = context.unsafeGetDir(this.getDirName());
     dir.getIter(context, key).map(this.getType())

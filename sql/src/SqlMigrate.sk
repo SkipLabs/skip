@@ -1,0 +1,166 @@
+module SKDB;
+
+base class SchemaChange {
+  children =
+  | ScRemoveTable()
+  | ScMigrateTable(schema: Array<TableChange>)
+}
+
+base class TableChange {
+  children =
+  | TcNoChange(col: TypeDescr)
+  | TcNewCol(col: TypeDescr)
+  | TcChange(old: TypeDescr, new: TypeDescr)
+}
+
+fun tableDiff(desired: Table, existing: DirDescr): Array<TableChange> {
+  desiredCols = desired.schema;
+  existingCols = existing.schema;
+
+  acc = mutable Vector[];
+
+  // very simple algo. cols form a set (with some position info), so
+  // no need to find minimum edits
+  for (desiredCol in desiredCols) {
+    acc.push(
+      existingCols.find(c -> c.name == desiredCol.name) match {
+      | None() -> TcNewCol(desiredCol)
+      | Some(existingCol) if (desiredCol == existingCol) ->
+        TcNoChange(desiredCol)
+      | Some(existingCol) -> TcChange(existingCol, desiredCol)
+      },
+    )
+  };
+
+  acc.collect(Array)
+}
+
+fun migrationDiff(
+  desired: Array<Stmt>,
+  existing: Array<DirDescr>,
+): Map<Name, SchemaChange> {
+  desiredTables: Array<Table> = desired
+    .map(x ->
+      x match {
+      | t @ Table _ -> Some(t)
+      | _ -> None()
+      }
+    )
+    .filterNone();
+  desiredTableNames = desiredTables.map(x -> x.name).collect(Set);
+  existingTableNames = existing.map(x -> x.name).collect(Set);
+  tablesToRemove = existingTableNames.difference(desiredTableNames);
+
+  tableChanges = Vector::mcreateFromItems(
+    tablesToRemove.map(name -> (name, (ScRemoveTable() : SchemaChange))),
+  );
+
+  for (name in desiredTableNames.intersection(existingTableNames)) {
+    desiredTable = desiredTables.find(t -> t.name == name).fromSome();
+    existingTable = existing.find(t -> t.name == name).fromSome();
+    diff = tableDiff(desiredTable, existingTable);
+    tableChanges.push((name, ScMigrateTable(diff)))
+  };
+
+  tableChanges.collect(Map)
+}
+
+fun adjustSerialisedValues(
+  row: RowValues,
+  nameToIndex: Map<Name, Int>,
+  colChanges: Array<TableChange>,
+): mutable Iterator<String> {
+  for (newCol in colChanges) {
+    newCol match {
+    | TcNoChange(col) ->
+      v = row.values[nameToIndex.get(col.name)];
+      yield v match {
+      | None() -> "NULL"
+      | Some(CInt(n)) -> n.toString()
+      | Some(CFloat(f)) -> f.toString()
+      | Some(CString(s)) -> escapeStringStr(s)
+      }
+    | TcNewCol(_col) -> yield "NULL"
+    | TcChange(_old, new) ->
+      // possible changes:
+      // 1. primary, unique, and not null changes are currently ignored.
+      //    you should change the schema incrementally and ensure the
+      //    data is compatible.
+      // 2. default does not matter to migration
+      // 3. type, which we handle
+      v = row.values[nameToIndex.get(new.name)];
+      yield (v, new.ty) match {
+      | (None(), _) -> "NULL"
+      | (Some(CInt(n)), INTEGER()) -> n.toString()
+      | (Some(CInt(n)), FLOAT()) -> n.toString()
+      | (Some(CInt(n)), TEXT()) -> escapeStringStr(n.toString())
+      | (Some(CFloat(f)), INTEGER()) -> f.toInt().toString()
+      | (Some(CFloat(f)), FLOAT()) -> f.toString()
+      | (Some(CFloat(f)), TEXT()) -> escapeStringStr(f.toString())
+      | (Some(CString(s)), INTEGER()) -> s
+      | (Some(CString(s)), FLOAT()) -> s
+      | (Some(CString(s)), TEXT()) -> escapeStringStr(s)
+      }
+    }
+  }
+}
+
+fun dumpAdjustedInserts(
+  origContext: readonly SKStore.Context,
+  changes: Map<Name, SchemaChange>,
+): void {
+  context = SKStore.Context::fromSaved(origContext.clone());
+  handle = getTableDir(context);
+  sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
+  _ = handle.map(
+    RowKey::keyType,
+    handle.type,
+    context,
+    sinkName,
+    (context, _writer, _key, values) ~> {
+      dirDescr = values.first;
+      if (!dirDescr.isInput) return void;
+
+      changes.maybeGet(dirDescr.name) match {
+      | None() -> invariant_violation(`Could not find ${dirDescr.name}`)
+      | Some(ScRemoveTable()) -> return void
+      | Some(ScMigrateTable(colChanges)) ->
+        o = print_raw;
+        fileIter = context
+          .unsafeGetEagerDir(dirDescr.dirName)
+          .unsafeGetFileIter();
+        o("BEGIN TRANSACTION;\n");
+        for (kv in fileIter) {
+          (_, files) = kv;
+          for (file in files) {
+            row = RowValues::type(file);
+            colNames = colChanges
+              .map(tc ->
+                tc match {
+                | TcNoChange(col) -> Some(col.name.origName)
+                | TcNewCol(col) -> Some(col.name.origName)
+                | TcChange(_old, new) -> Some(new.name.origName)
+                }
+              )
+              .filterNone();
+            colNamesStr = "(" + colNames.join(", ") + ")";
+            serialisedValues = adjustSerialisedValues(
+              row,
+              dirDescr.cols,
+              colChanges,
+            ).collect(Array);
+            valuesStr = "(" + serialisedValues.join(", ") + ")";
+            insert = `INSERT INTO ${
+              dirDescr.name
+            } ${colNamesStr} VALUES ${valuesStr};\n`;
+            for (_ in Range(0, row.repeat)) {
+              o(insert);
+            };
+          };
+        };
+        o("COMMIT;\n");
+        flushStdout()
+      };
+    },
+  );
+}
