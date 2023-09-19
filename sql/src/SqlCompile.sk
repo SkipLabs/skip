@@ -235,7 +235,7 @@ mutable class Compiler{
       !select = this.expandGroupBy(select);
     };
 
-    !select = this.expandJoins(context, select.join, select);
+    !select = this.expandJoins(select);
 
     substCopy = this.subst;
     ambiguousCopy = this.ambiguous;
@@ -684,12 +684,8 @@ mutable class Compiler{
     }
   }
 
-  mutable fun expandJoins(
-    _context: mutable SKStore.Context,
-    joinOpt: ?Join,
-    select: Select,
-  ): Select {
-    joinOpt match {
+  readonly fun expandJoins(select: Select): Select {
+    select.join match {
     | None() -> select
     | Some(join) ->
       join.kind match {
