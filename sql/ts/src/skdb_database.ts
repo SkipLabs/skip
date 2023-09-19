@@ -77,7 +77,7 @@ export class SKDBSyncImpl implements SKDBSync {
 
   private runner: (fn: () => string) => Array<any>;
 
-  server?: RemoteSKDB;
+  connectedRemote?: RemoteSKDB;
 
   private constructor(environment: Environment) {
     this.environment = environment;
@@ -119,7 +119,7 @@ export class SKDBSyncImpl implements SKDBSync {
       deviceUuid: this.clientUuid,
     };
 
-    this.server = await connect(
+    this.connectedRemote = await connect(
       this.environment,
       new SkdbMechanismImpl(this, this.fs, this.environment.encodeUTF8),
       endpoint,
@@ -199,25 +199,25 @@ export class SKDBSyncImpl implements SKDBSync {
   }
 
   async serverExec(query: string, params: Params) {
-    return this.server!.exec(query, params);
+    return this.connectedRemote!.exec(query, params);
   }
 
   async serverTableSchema(tableName: string) {
-    return this.server!.tableSchema(tableName);
+    return this.connectedRemote!.tableSchema(tableName);
   };
 
   async serverViewSchema(tableName: string) {
-    return this.server!.viewSchema(tableName);
+    return this.connectedRemote!.viewSchema(tableName);
   };
 
   async serverSchema() {
-    return this.server!.schema();
+    return this.connectedRemote!.schema();
   }
 
-  createServerDatabase = (dbName: string) => this.server!.createDatabase(dbName);
-  createServerUser = () => this.server!.createUser();
-  mirror = (tableName: string, filterExpr?: string) => this.server!.mirror(tableName, filterExpr);
-  serverClose = () => this.server!.close();
+  createServerDatabase = (dbName: string) => this.connectedRemote!.createDatabase(dbName);
+  createServerUser = () => this.connectedRemote!.createUser();
+  mirror = (tableName: string, filterExpr?: string) => this.connectedRemote!.mirror(tableName, filterExpr);
+  serverClose = () => this.connectedRemote!.close();
 }
 
 export class SKDBImpl implements SKDB {
@@ -236,16 +236,16 @@ export class SKDBImpl implements SKDB {
     return this.skdbSync.connect(db, accessKey, privateKey, endpoint);
   }
 
+  connectedRemote = async () => {
+    return this.skdbSync.connectedRemote;
+  }
+
   subscribe = async (viewName: string, f: (change: string) => void) => {
     return this.skdbSync.subscribe(viewName, f);
   }
 
-  exec = async (stdin: string, params: Params = new Map(), server: boolean = false) => {
-    if (server) {
-      return this.skdbSync.serverExec(stdin, params);
-    } else {
-      return this.skdbSync.exec(stdin, params);
-    }
+  exec = async (stdin: string, params: Params = new Map()) => {
+    return this.skdbSync.exec(stdin, params);
   }
 
   async watch(query: string, params: Params, onChange: (rows: Array<any>) => void) {
@@ -253,48 +253,28 @@ export class SKDBImpl implements SKDB {
     return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
   }
 
-  tableSchema = async (tableName: string, server: boolean = false) => {
-    if (server) {
-      return this.skdbSync.serverTableSchema(tableName);
-    } else {
-      return this.skdbSync.tableSchema(tableName);
-    }
+  tableSchema = async (tableName: string) => {
+    return this.skdbSync.tableSchema(tableName);
   }
 
-  viewSchema = async (viewName: string, server: boolean = false) => {
-    if (server) {
-      return this.skdbSync.serverViewSchema(viewName);
-    } else {
-      return this.skdbSync.viewSchema(viewName);
-    }
+  viewSchema = async (viewName: string) => {
+    return this.skdbSync.viewSchema(viewName);
   }
 
-  schema = async (server: boolean = false) => {
-    if (server) {
-      return this.skdbSync.serverSchema();
-    } else {
-      return this.skdbSync.schema();
-    }
+  schema = async () => {
+    return this.skdbSync.schema();
   }
 
   async insert(tableName: string, values: Array<any>) {
     return this.skdbSync.insert(tableName, values);
   }
 
-  async createServerDatabase(dbName: string) {
-    return this.skdbSync.createServerDatabase(dbName);
-  }
-
-  async createServerUser() {
-    return this.skdbSync.createServerUser();
-  }
-
   async mirror(tableName: string, filterExpr?: string) {
     return this.skdbSync.mirror(tableName, filterExpr);
   }
 
-  async serverClose() {
-    this.skdbSync.serverClose()
+  async closeConnection() {
+    return this.skdbSync.serverClose()
   }
 
   async save() {
