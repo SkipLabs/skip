@@ -13,7 +13,9 @@ echo ".git" >> .dockerignore
 
 docker build --no-cache --tag skfs --progress=plain .
 docker build --no-cache --tag skgw --progress=plain --file sql/server/skgw/Dockerfile .
-docker build --tag $USER-skfs --progress=plain --file $USER/Dockerfile .
+if [[ -f $USER/Dockerfile ]] ;
+then docker build --tag $USER-skfs --progress=plain --file $USER/Dockerfile .
+fi
 
 git restore .dockerignore
 
