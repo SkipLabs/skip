@@ -18,7 +18,7 @@ export interface SKDBSync {
   subscribe: (viewName: string, f: (change: string) => void) => void;
   save: () => Promise<boolean>;
 
-  // SERVEUR
+  // SERVER
   connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
 
@@ -42,8 +42,8 @@ export interface SKDB {
   schema: (server?: boolean) => Promise<string>;
   insert: (tableName: string, values: Array<any>) => Promise<boolean>;
   save: () => Promise<boolean>;
-  connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
 
+  connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
   createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createServerUser: () => Promise<ProtoResponseCreds>;
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
@@ -79,7 +79,7 @@ export type ProtoResponseCreds = {
 
 export type Params = Map<string, string|number> | Object;
 
-export interface Server {
+export interface RemoteSKDB {
   createDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createUser(): Promise<ProtoResponseCreds>;
   schema: () => Promise<string>;

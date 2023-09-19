@@ -1,5 +1,5 @@
 import { Environment } from "#std/sk_types";
-import { SkdbMechanism, metadataTable, Server, Params } from "#skdb/skdb_types";
+import { SkdbMechanism, metadataTable, RemoteSKDB, Params } from "#skdb/skdb_types";
 
 const npmVersion = "";
 
@@ -1231,7 +1231,7 @@ export async function connect(
   endpoint: string,
   db: string,
   creds: Creds,
-): Promise<Server> {
+): Promise<RemoteSKDB> {
   return SKDBServer.connect(env, client, endpoint, db, creds)
 }
 
@@ -1239,7 +1239,7 @@ export async function connect(
 /* Server-side database. */
 /* ***************************************************************************/
 
-class SKDBServer implements Server {
+class SKDBServer implements RemoteSKDB {
   private env: Environment;
   private client: SkdbMechanism;
   private connection: ResilientMuxedSocket;
