@@ -558,7 +558,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           viewName,
           virtual,
           text,
-          selectAst.params,
+          selectAst.core.params,
           cselect1,
         ),
       );
@@ -593,7 +593,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           cselect = compiler.compileSelect(context, selectAst, viewName, true);
           dirName = SKStore.DirName::create("/" + viewName + "/");
           dirDescr = SKDB.Compiler::getDirDescr(
-            selectAst.params,
+            selectAst.core.params,
             cselect.from,
             cselect.params,
             cselect.id,
@@ -718,13 +718,15 @@ class Evaluator{options: Options, user: ?UserFile} {
     from = Some(Array[TableName(FName(name), None(), false)]);
     selectAst = Select{
       pos => pos,
-      params => Array[SelectStar(None())],
-      from,
-      where,
-      groupBy => None(),
-      having => None(),
-      join => None(),
-      distinct => false,
+      core => SelectCore{
+        params => Array[SelectStar(None())],
+        from,
+        where,
+        groupBy => None(),
+        having => None(),
+        join => None(),
+        distinct => false,
+      },
       limit => None(),
       orderBy => None(),
       rest => Array[],
@@ -1833,7 +1835,7 @@ fun manageReactiveQuery(
       );
       selectDir = SKDB.evalSelect(context, cselect, None());
       schema = SKDB.Compiler::getSchema(
-        selectAst.params,
+        selectAst.core.params,
         cselect.from,
         cselect.params,
       );

@@ -182,21 +182,21 @@ mutable class Compiler{
     mutable static{directMode, options, pos, params}
   }
 
-  mutable fun expandGroupBy(select: Select): Select {
+  mutable fun expandGroupBy(select: SelectCore): SelectCore {
     // Tranforms:
     // 'select ... from ... group by ...'
     // ==> 'select * from (select ... from ... group by ...)'
 
-    Select{
-      pos => select.pos,
+    SelectCore{
       distinct => select.distinct,
       params => Array[SelectStar(None())],
       from => Some(
         Array[
           TableName(
             FQuery(
-              select with {
-                distinct => false,
+              Select{
+                pos => 0,
+                core => select with {distinct => false},
                 orderBy => None(),
                 limit => None(),
                 rest => Array[],
@@ -212,10 +212,6 @@ mutable class Compiler{
       groupBy => None(),
       having => None(),
       join => None(),
-      orderBy => select.orderBy,
-      limit => select.limit,
-      shouldExpand => false,
-      rest => select.rest.map(x -> (x.i0, x.i1 with {shouldExpand => true})),
     }
   }
 
@@ -254,29 +250,32 @@ mutable class Compiler{
     this.!other = mutable Vector[];
 
     if (
-      select.distinct ||
+      select.core.distinct ||
       select.shouldExpand ||
       toplevel &&
         (select.orderBy is Some _ || select.limit is Some _) &&
-        (select.groupBy is Some _) ||
+        (select.core.groupBy is Some _) ||
       (!select.rest.isEmpty() || toplevel) &&
         selectOrRestIsAggrOrEmptyFrom(select)
     ) {
-      !select = this.expandGroupBy(select);
+      !select.core = this.expandGroupBy(select.core);
+      !select.rest = select.rest.map(x ->
+        (x.i0, x.i1 with {shouldExpand => true})
+      )
     };
 
-    !select = this.expandJoins(select);
+    !select.core = this.expandJoins(select.core);
 
-    isAggr = selectIsAggr(select);
+    isAggr = selectIsAggr(select.core);
     this.!isAggr = isAggr;
 
-    origFrom = this.compileFrom(context, select.from);
-    (cond, from) = this.compileJoin(context, origFrom, select.where);
-    !select.where = cond;
-    params = this.compileParams(context, select.params, origFrom);
-    where = this.compileWhere(context, select.where);
-    groupBy = this.compileGroupBy(context, select.groupBy, params);
-    having = this.compileHaving(context, select.having);
+    origFrom = this.compileFrom(context, select.core.from);
+    (cond, from) = this.compileJoin(context, origFrom, select.core.where);
+    !select.core.where = cond;
+    params = this.compileParams(context, select.core.params, origFrom);
+    where = this.compileWhere(context, select.core.where);
+    groupBy = this.compileGroupBy(context, select.core.groupBy, params);
+    having = this.compileHaving(context, select.core.having);
 
     aggr: ?Array<(AggrKind, CGExpr)> = None();
     if (this.aggrVars.size() != 0) {
@@ -292,7 +291,7 @@ mutable class Compiler{
           | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
           },
       ),
-      distinct => select.distinct,
+      distinct => select.core.distinct,
       params,
       sets => this.compileSets(context, sets),
       aggr,
@@ -310,7 +309,14 @@ mutable class Compiler{
       limit => None(),
     };
 
-    orderBy = this.compileOrderBy(select.params, from, select.orderBy);
+    this.!subst = substCopy;
+    this.!ambiguous = ambiguousCopy;
+    this.!aggrVars = aggrVarsCopy;
+    this.!needUp = needUpCopy;
+    this.!isAggr = isAggrCopy;
+    this.!other = otherCopy;
+
+    orderBy = this.compileOrderBy(select.core.params, from, select.orderBy);
     limit = this.compileLimit(context, select.limit);
 
     kinds = orderBy match {
@@ -323,13 +329,6 @@ mutable class Compiler{
       })
     | Some(ekinds) -> computeKinds(params, ekinds)
     };
-
-    this.!subst = substCopy;
-    this.!ambiguous = ambiguousCopy;
-    this.!aggrVars = aggrVarsCopy;
-    this.!needUp = needUpCopy;
-    this.!isAggr = isAggrCopy;
-    this.!other = otherCopy;
 
     rest = this.compileRest(context, params, select.rest);
 
@@ -354,7 +353,7 @@ mutable class Compiler{
       from.size() == 1 &&
       /* No index is involved (could change in the future?)  */
       from[0].i1 is None() &&
-      !select.distinct &&
+      !select.core.distinct &&
       having is None() &&
       orderBy is None() &&
       groupBy is None() &&
@@ -363,16 +362,16 @@ mutable class Compiler{
     format = this.options.format match {
     | OFK_CSV() -> SKStore.OCSV()
     | OFK_Table() ->
-      schema = static::getSchema(select.params, from, params);
+      schema = static::getSchema(select.core.params, from, params);
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OTable(fieldNames)
     | OFK_JSON() ->
-      schema = static::getSchema(select.params, from, params);
+      schema = static::getSchema(select.core.params, from, params);
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OJSON(fieldNames)
     | OFK_SQL() -> SKStore.OSQL()
     | OFK_JS() ->
-      schema = static::getSchema(select.params, from, params);
+      schema = static::getSchema(select.core.params, from, params);
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OJS(fieldNames)
     };
@@ -576,7 +575,7 @@ mutable class Compiler{
       cselect = this.compileSelect(context, select, genSelectId(select), false);
       selectDir = evalSelect(context, cselect, None());
       static::getDirDescr(
-        select.params,
+        select.core.params,
         cselect.from,
         cselect.params,
         Name::create(selectDir.dirName.toString()),
@@ -687,7 +686,7 @@ mutable class Compiler{
     }
   }
 
-  readonly fun expandJoins(select: Select): Select {
+  readonly fun expandJoins(select: SelectCore): SelectCore {
     select.join match {
     | None() -> select
     | Some(join) ->

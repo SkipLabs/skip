@@ -156,6 +156,14 @@ base class FromName uses Equality {
 }
 
 class Select{
+  core: SelectCore,
+  orderBy: ?Array<(Expr, IKind)>,
+  limit: ?Expr,
+  rest: Array<(CompoundOperator, Select)>,
+  shouldExpand: Bool = false,
+} extends Stmt
+
+class SelectCore{
   distinct: Bool,
   params: Array<SelectResult>,
   from: ?Array<TableName>,
@@ -163,11 +171,7 @@ class Select{
   where: ?Expr,
   groupBy: ?Array<Expr>,
   having: ?Expr,
-  orderBy: ?Array<(Expr, IKind)>,
-  limit: ?Expr,
-  rest: Array<(CompoundOperator, Select)>,
-  shouldExpand: Bool = false,
-} extends Stmt
+} uses Equality
 
 base class SelectResult uses Equality {
   children =
@@ -408,7 +412,7 @@ fun hasAggr(expr: Expr): Bool {
   }
 }
 
-fun selectIsAggr(select: Select): Bool {
+fun selectIsAggr(select: SelectCore): Bool {
   select.groupBy is Some _ ||
     {
       for (param in select.params) {
@@ -422,7 +426,7 @@ fun selectIsAggr(select: Select): Bool {
 }
 
 fun selectOrRestIsAggrOrEmptyFrom(select: Select): Bool {
-  selectIsAggr(select) ||
-    select.from is None() ||
-    select.rest.any(x -> selectIsAggr(x.i1) || x.i1.from is None())
+  selectIsAggr(select.core) ||
+    select.core.from is None() ||
+    select.rest.any(x -> selectIsAggr(x.i1.core) || x.i1.core.from is None())
 }
