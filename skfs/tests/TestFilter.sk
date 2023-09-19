@@ -1,15 +1,14 @@
 /*****************************************************************************/
-// This file tests the behavior of the newly introduced feature in
-// SKStore to filter a certain amount of files in a directory. What is
-// new is not the ability to filter (you could have done that with a
-// map), it's the ability to define a maximum capacity for that
-// filter. So if you decide to have, let's say, a capacity of 5, the
-// filtering method will only return the first 5 elements. Although
-// that is completely trivial to write in a non-incremental mode (just
-// stop after you outputed 5 files), it's actually a lot more
-// complicated than it seems in an incremental environment. Especially
-// in one where you have to deal with ranges of values to filter over
-// etc ...
+// This file tests the behavior of the EagerFilter in SKStore to
+// filter a certain amount of files in a directory. What is new is not
+// the ability to filter (you could have done that with a map), it's
+// the ability to define a maximum capacity for that filter. So if you
+// decide to have, let's say, a capacity of 5, the filtering method
+// will only return the first 5 elements. Although that is completely
+// trivial to write in a non-incremental mode (just stop after you
+// outputed 5 files), it's actually a lot more complicated than it
+// seems in an incremental environment. Especially in one where you
+// have to deal with ranges of values to filter over etc ...
 //
 // So this file tests this behavior. How? By generating modifications
 // to a directory that has been filtered with a maximum capacity. How
@@ -133,7 +132,7 @@ class RepeatFile(
 }
 
 /*****************************************************************************/
-// We need two seperate paths to check if a key is in Range. This just
+// We need two separate paths to check if a key is in Range. This just
 // rechecks everything from scratch, as opposed to the logic in
 // EagerFilter that iterates over the ranges (and is therefore much
 // more efficient). Basically we want to keep things dumb to make sure
@@ -278,7 +277,7 @@ fun writeAndUpdate(
 /*****************************************************************************/
 // Generates ranges, a range is a way to limit the scope of the
 // filter, so a filter on range [12, 12] means that I only want the
-// elements that a in that range, nothing else. This is how indexes
+// elements that are in that range, nothing else. This is how indexes
 // are implemented in SKDB. A index lookup is nothing but a map with a
 // range.
 /*****************************************************************************/
