@@ -13,7 +13,7 @@ RUN apt-get install -q -y ca-certificates curl gnupg \
  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
  && apt-get update \
  && apt-get install -q -y nodejs \
- && npm install -g typescript \
+ && npm install -g typescript@5.1 \
  && npx playwright install-deps
 
 ENV CC=clang
