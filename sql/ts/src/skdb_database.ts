@@ -1,5 +1,5 @@
 import { Environment, FileSystem } from "#std/sk_types";
-import { SkdbMechanism, SKDB, Server, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
+import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
@@ -77,7 +77,7 @@ export class SKDBSyncImpl implements SKDBSync {
 
   private runner: (fn: () => string) => Array<any>;
 
-  server?: Server;
+  server?: RemoteSKDB;
 
   private constructor(environment: Environment) {
     this.environment = environment;
