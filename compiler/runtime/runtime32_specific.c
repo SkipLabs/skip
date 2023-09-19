@@ -155,6 +155,15 @@ void SKIP_time() {
   // Not implemented
 }
 
+uint32_t SKIP_js_time_ms_lo();
+uint32_t SKIP_js_time_ms_hi();
+
+uint64_t SKIP_time_ms() {
+  uint32_t lo = SKIP_js_time_ms_lo();
+  uint32_t hi = SKIP_js_time_ms_hi();
+  return (((uint64_t)hi) << 32) | ((uint64_t)lo);
+}
+
 void SKIP_flush_stdout() {
   // Not implemented
 }
