@@ -71,9 +71,10 @@ class Skdb(val name: String, private val dbPath: String) {
   }
 
   fun sql(stmts: String, format: OutputFormat, expectQueryParams: Boolean = false): ProcessOutput {
-    val pb = if (expectQueryParams)
-      ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag, "--expect-query-params")
-    else ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag)
+    val pb =
+        if (expectQueryParams)
+            ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag, "--expect-query-params")
+        else ProcessBuilder(ENV.skdbPath, "--data", dbPath, format.flag)
     return blockingRun(pb, stmts)
   }
 
@@ -102,8 +103,7 @@ class Skdb(val name: String, private val dbPath: String) {
   }
 
   fun replicationId(deviceUuid: String): ProcessOutput {
-    return blockingRun(
-        ProcessBuilder(ENV.skdbPath, "replication-id", deviceUuid, "--data", dbPath))
+    return blockingRun(ProcessBuilder(ENV.skdbPath, "replication-id", deviceUuid, "--data", dbPath))
   }
 
   fun dumpTable(table: String): ProcessOutput {
@@ -119,6 +119,10 @@ class Skdb(val name: String, private val dbPath: String) {
     if (!tables.exitSuccessfully()) return tables
     val views = blockingRun(ProcessBuilder(ENV.skdbPath, "dump-views", "--data", dbPath))
     return ProcessOutput(tables.output + views.output, views.exitCode)
+  }
+
+  fun migrate(schema: String): ProcessOutput {
+    return blockingRun(ProcessBuilder(ENV.skdbPath, "migrate", "--data", dbPath), schema)
   }
 
   fun writeCsv(

@@ -118,6 +118,9 @@ untracked fun main(): void {
       Cli.Command("dump").about("Dumps tables/inserts/views in SQL format"),
     )
     .subcommand(
+      Cli.Command("migrate").about("Dumps to a new schema, read on stdin"),
+    )
+    .subcommand(
       Cli.Command("csv-field")
         .about("Output a specific CSV field")
         .arg(
@@ -291,6 +294,7 @@ untracked fun main(): void {
         | "dump-view" -> execDumpView
         | "dump-views" -> execDumpViews
         | "dump" -> execDump
+        | "migrate" -> execMigrate
         | "load-csv" -> execLoadCsv
         | "csv-field" -> execCsvField
         | "size" -> execSize
@@ -426,6 +430,17 @@ fun execDump(args: Cli.ParseResults, options: SKDB.Options): void {
     SKDB.dumpTables(context, None());
     SKDB.dumpInserts(context);
     SKDB.dumpViews(context);
+    SKStore.CStop(None())
+  })
+}
+
+fun execMigrate(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  stmts = SKDB.slurpStmts(options);
+  SKDB.runSql(options, context ~> {
+    schema = SKDB.getTables(context);
+    def = migrationDiff(stmts, schema);
+    SKDB.dumpAdjustedInserts(context, def);
     SKStore.CStop(None())
   })
 }

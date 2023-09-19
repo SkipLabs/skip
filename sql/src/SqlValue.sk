@@ -97,6 +97,17 @@ class RowKey(
   }
 }
 
+fun escapeStringStr(s: String): String {
+  chars = mutable Vector[];
+  chars.push('\'');
+  for (c in s) {
+    if (c == '\'') chars.push(c);
+    chars.push(c);
+  };
+  chars.push('\'');
+  String::fromChars(chars.toArray());
+}
+
 fun escapeString(o: String -> void, s: String): void {
   o("'");
   chars = mutable Vector[];
