@@ -15,8 +15,9 @@ export async function setup(credentials: string, port: number, crypto) {
       "raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     await skdb.connect("skdb_service_mgmt", "root", key, host);
   }
-  const testRootCreds = await skdb.createServerDatabase("test");
-  skdb.serverClose();
+  const remote = await skdb.connectedRemote();
+  const testRootCreds = await remote.createDatabase("test");
+  skdb.closeConnection();
 
   const rootSkdb = await createSkdb({ asWorker: false });
   {
@@ -26,7 +27,8 @@ export async function setup(credentials: string, port: number, crypto) {
     await rootSkdb.connect("test", testRootCreds.accessKey, key, host);
   }
 
-  const testUserCreds = await rootSkdb.createServerUser();
+  const rootRemote = await rootSkdb.connectedRemote();
+  const testUserCreds = await rootRemote.createUser();
 
   const userSkdb = await createSkdb({ asWorker: false });
   {
@@ -39,55 +41,54 @@ export async function setup(credentials: string, port: number, crypto) {
 }
 
 async function testQueriesAgainstTheServer(skdb: SKDB) {
-  const tableCreate = await skdb.exec(
+  const remote = await skdb.connectedRemote();
+
+  const tableCreate = await remote.exec(
     "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER);",
     new Map(),
-    true
   );
   expect(tableCreate).toEqual([]);
 
-  const viewCreate = await skdb.exec(
-    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y FROM test_pk;", {}, true);
+  const viewCreate = await remote.exec(
+    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y FROM test_pk;", {});
   expect(viewCreate).toEqual([]);
 
-  const permissionInsert = await skdb.exec(
-    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7), ('view_pk', 7);", {}, true);
+  const permissionInsert = await remote.exec(
+    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7), ('view_pk', 7);", {});
   expect(permissionInsert).toEqual([]);
 
-  const tableInsert = await skdb.exec("INSERT INTO test_pk VALUES (42,21);", {}, true);
+  const tableInsert = await remote.exec("INSERT INTO test_pk VALUES (42,21);", {});
   expect(tableInsert).toEqual([]);
 
-  const tableInsertWithParam = await skdb.exec(
+  const tableInsertWithParam = await remote.exec(
     "INSERT INTO test_pk VALUES (@x,@y);",
     new Map().set("x", 43).set("y", 22),
-    true
   );
   expect(tableInsertWithParam).toEqual([]);
-  const tableInsertWithOParam = await skdb.exec(
+  const tableInsertWithOParam = await remote.exec(
     "INSERT INTO test_pk VALUES (@x,@y);",
     { "x": 44, "y": 23 },
-    true
   );
   expect(tableInsertWithOParam).toEqual([]);
 
-  const tableSelect = await skdb.exec("SELECT * FROM test_pk;", {}, true);
+  const tableSelect = await remote.exec("SELECT * FROM test_pk;", {});
   expect(tableSelect).toEqual([{ x: 42, y: 21 }, { x: 43, y: 22 }, { x: 44, y: 23 }]);
 
-  const viewSelect = await skdb.exec("SELECT * FROM view_pk;", {}, true);
+  const viewSelect = await remote.exec("SELECT * FROM view_pk;", {});
   expect(viewSelect).toEqual([{ x: 42, y: 63 }, { x: 43, y: 66 }, { x: 44, y: 69 }]);
 
   try {
-    await skdb.exec("bad query", {}, true);
+    await remote.exec("bad query", {});
   } catch (error) {
     const lines = (error as string).trim().split('\n');
     expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
   }
 
-  const rows = await skdb.exec("SELECT * FROM test_pk WHERE x=@x;", { x: 42 }, true);
+  const rows = await remote.exec("SELECT * FROM test_pk WHERE x=@x;", { x: 42 });
   expect(rows).toEqual([{ x: 42, y: 21 }]);
-  await skdb.exec("delete from test_pk where x in (43,44);", {}, true)
+  await remote.exec("delete from test_pk where x in (43,44);", {})
   try {
-    await skdb.exec("bad query", {}, true);
+    await remote.exec("bad query", {});
   } catch (error) {
     const lines = (error as string).trim().split('\n');
     expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
@@ -96,34 +97,36 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
 
 
 async function testSchemaQueries(skdb: SKDB) {
+  const remote = await skdb.connectedRemote();
+
   const expected = "CREATE TABLE test_pk (";
-  const schema = await skdb.schema(true);
+  const schema = await remote.schema();
   const contains = schema.includes(expected);
   expect(contains ? expected : schema).toEqual(expected);
 
   // valid views/tables
 
   const viewExpected = "CREATE VIRTUAL VIEW skdb_groups_users";
-  const viewSchema = await skdb.viewSchema("skdb_groups_users", true);
+  const viewSchema = await remote.viewSchema("skdb_groups_users");
   const viewContains = viewSchema.includes(viewExpected);
   expect(viewContains ? viewExpected : viewSchema).toEqual(viewExpected);
 
 
   const tableExpected = "CREATE TABLE skdb_users";
-  const tableSchema = await skdb.tableSchema("skdb_users", true);
+  const tableSchema = await remote.tableSchema("skdb_users");
   const tableContains = tableSchema.includes(tableExpected);
   expect(tableContains ? tableExpected : tableSchema).toEqual(tableExpected);
 
   const viewTableExpected = /CREATE TABLE view_pk \(\n  x INTEGER,\n  y INTEGER\n\);/;
-  const viewTableSchema = await skdb.tableSchema("view_pk", true);
+  const viewTableSchema = await remote.tableSchema("view_pk");
   const viewTableContains = viewTableSchema.match(viewTableExpected);
   expect(viewTableContains ? viewTableExpected : viewTableSchema).toEqual(viewTableExpected);
 
   // invalid views/tables
-  const emptyView = await skdb.viewSchema("nope", true);
+  const emptyView = await remote.viewSchema("nope");
   expect(emptyView).toEqual("");
 
-  const emptyTable = await skdb.viewSchema("nope", true);
+  const emptyTable = await remote.viewSchema("nope");
   expect(emptyTable).toEqual("");
 }
 
@@ -154,21 +157,27 @@ async function testMirroring(skdb: SKDB) {
 function waitSynch(skdb: SKDB, query: string, check: (v: any) => boolean, server: boolean = false, max: number = 6) {
   let count = 0;
   const test = (resolve, reject) => {
-    skdb.exec(query, new Map(), server).then(value => {
+    const cb = value => {
       if (check(value) || count == max) {
         resolve(value)
       } else {
         count++;
         setTimeout(() => test(resolve, reject), 100);
       }
-    }).catch(reject);
+    };
+    if (server) {
+      skdb.connectedRemote().then(remote => remote.exec(query, new Map())).then(cb).catch(reject);
+    } else {
+      skdb.exec(query, new Map()).then(cb).catch(reject);
+    }
   };
   return new Promise(test);
 }
 
 async function testServerTail(root: SKDB, user: SKDB) {
+  const remote = await root.connectedRemote();
   try {
-    await root.exec("insert into view_pk values (87,88);", new Map(), true);
+    await remote.exec("insert into view_pk values (87,88);", new Map());
     throw new Error("Shall throw exception.");
   } catch (exn) {
     expect(exn).toEqual("insert into view_pk values (87,88);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\n");
@@ -177,7 +186,7 @@ async function testServerTail(root: SKDB, user: SKDB) {
   const vres = await user.exec("select count(*) as cnt from view_pk where x = 87 and y = 88");
   expect(vres).toEqual([{ cnt: 0 }]);
 
-  await root.exec("insert into test_pk values (87,88);", new Map(), true);
+  await remote.exec("insert into test_pk values (87,88);", new Map());
   const res = await waitSynch(
     user,
     "select count(*) as cnt from test_pk where x = 87 and y = 88",
@@ -194,6 +203,7 @@ async function testServerTail(root: SKDB, user: SKDB) {
 }
 
 async function testClientTail(root: SKDB, user: SKDB) {
+  const remote = await root.connectedRemote();
   try {
     await user.exec("insert into view_pk values (97,98);");
     throw new Error("Shall throw exception.");
@@ -201,8 +211,8 @@ async function testClientTail(root: SKDB, user: SKDB) {
     expect(exn.message).toEqual("Error: insert into view_pk values (97,98);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
   }
   await new Promise(resolve => setTimeout(resolve, 100));
-  const vres = await root.exec(
-    "select count(*) as cnt from test_pk where x = 97 and y = 98", new Map(), true
+  const vres = await remote.exec(
+    "select count(*) as cnt from test_pk where x = 97 and y = 98", new Map()
   );
   expect(vres).toEqual([{ cnt: 0 }]);
 
@@ -242,8 +252,8 @@ export const apitests = () => {
 
         // Client Tail
         await testClientTail(dbs.root, dbs.user);
-        dbs.root.serverClose();
-        dbs.user.serverClose();
+        dbs.root.closeConnection();
+        dbs.user.closeConnection();
         return "";
       },
       check: res => {
