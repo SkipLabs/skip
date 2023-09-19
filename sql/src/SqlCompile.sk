@@ -277,7 +277,6 @@ mutable class Compiler{
 
     orderBy = this.compileOrderBy(select.params, from, select.orderBy);
     limit = this.compileLimit(context, select.limit);
-    rest = this.compileRest(context, params, select.rest);
     aggr: ?Array<(AggrKind, CGExpr)> = None();
     if (this.aggrVars.size() != 0) {
       !aggr = Some(this.aggrVars.toArray());
@@ -293,6 +292,19 @@ mutable class Compiler{
       })
     | Some(ekinds) -> computeKinds(params, ekinds)
     };
+
+    needUp = this.needUp;
+    other = this.other.toArray();
+    csets = this.compileSets(context, sets);
+
+    this.!subst = substCopy;
+    this.!ambiguous = ambiguousCopy;
+    this.!aggrVars = aggrVarsCopy;
+    this.!needUp = needUpCopy;
+    this.!isAggr = isAggrCopy;
+    this.!other = otherCopy;
+
+    rest = this.compileRest(context, params, select.rest);
 
     /*
      * Direct mode is a setup where we want to output things on stdout
@@ -348,7 +360,7 @@ mutable class Compiler{
       ),
       distinct => select.distinct,
       params,
-      sets => this.compileSets(context, sets),
+      sets => csets,
       aggr,
       from,
       kinds,
@@ -358,20 +370,13 @@ mutable class Compiler{
       orderBy,
       limit,
       rest,
-      needUp => this.needUp,
+      needUp,
       directMode,
       format,
-      other => this.other.toArray(),
+      other,
     };
 
     !cselect = optimizeNoopSelect(cselect);
-
-    this.!subst = substCopy;
-    this.!ambiguous = ambiguousCopy;
-    this.!aggrVars = aggrVarsCopy;
-    this.!needUp = needUpCopy;
-    this.!isAggr = isAggrCopy;
-    this.!other = otherCopy;
 
     cselect
   }
