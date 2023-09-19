@@ -21,6 +21,23 @@ const createConnectedSkdb = async function(endpoint, database, { accessKey, priv
   return skdb;
 };
 
+async function getCredsFromDevServer(host: string, port: number, database: string) {
+  const creds = new Map();
+  try {
+    const resp = await fetch(`http://${host}:${port}/dbs/${database}/users`)
+    const data = await resp.text();
+    const users = data.split("\n").filter(line => line.trim() != '').map(line => JSON.parse(line))
+    for (const user of users) {
+      creds.set(user.accessKey, user.privateKey)
+    }
+  } catch (ex: any) {
+    console.log("Could not fetch from the dev server, is it running? Trying because `--dev` was passed.");
+    process.exit(1);
+  }
+
+  return Object.fromEntries(creds);
+}
+
 const skdbDir = path.join(os.homedir(), ".skdb");
 const credsFileName = path.join(skdbDir, "credentials");
 
@@ -53,6 +70,11 @@ const argSchema = {
     type: "string",
     valName: 'key',
     help: "Access key to use. Default: first specified in credentials file.",
+  },
+  dev: {
+    type: "boolean",
+    help: `Connect to the local dev server, use this to access credentials.`,
+    default: false,
   },
   // formatting
   'json-output': {
@@ -144,34 +166,68 @@ if ((args.values as any).help || !haveMandatoryValues) {
   process.exit(1);
 }
 
-if (!fs.existsSync(credsFileName)) {
-  fs.mkdirSync(skdbDir, { recursive: true });
-  fs.writeFileSync(credsFileName, JSON.stringify({}));
-}
-
-// credentials file schema:
-// {host: { database: { accessKey: privateKey }}}
 let values = args.values as any;
-const creds = JSON.parse(fs.readFileSync(credsFileName).toString());
-const hostCreds = creds[values.host as string] ?? {};
-creds[values.host as string] = hostCreds;
-const dbCreds = hostCreds[values.db as string] ?? {};
-hostCreds[values.db as string] = dbCreds;
 
-if (args.values['add-cred']) {
-  if (!('access-key' in args.values)) {
-    console.log("Must pass --db --host and --access-key.");
-    process.exit(1);
+let creds: any;
+let hostCreds: any;
+let dbCreds: any;
+
+if (args.values['dev']) {
+  if (args.values['add-cred']) {
+    console.log("Cannot add-cred when credentials are managed by the dev server (--dev was passed).");
   }
 
-  const accessKey = (args.values['access-key'] as string).trim();
-  const privateKey = fs.readFileSync(process.stdin.fd, 'utf-8').trim();
+  let host: string = args.values['host'];
+  if (host === "wss://api.skiplabs.io") {
+    host = "ws://localhost:8080";
+  }
 
-  dbCreds[accessKey] = privateKey;
+  const schemeAndRest = host.split("://", 2);
+  const hostAndPort = schemeAndRest[schemeAndRest.length - 1].split(":", 2)
 
-  fs.writeFileSync(credsFileName, JSON.stringify(creds));
+  if (hostAndPort.length < 1) {
+    console.log("Invalid host");
+    process.exit(1);
+  } else if (hostAndPort.length === 1) {
+    dbCreds = await getCredsFromDevServer(hostAndPort[0], 8080, values.db);
+  } else {
+    dbCreds = await getCredsFromDevServer(
+      hostAndPort[0],
+      parseInt(hostAndPort[1]),
+      values.db
+    );
+  }
+} else {
+  // using the local `credsFileName` file
 
-  process.exit(0);
+  if (!fs.existsSync(credsFileName)) {
+    fs.mkdirSync(skdbDir, { recursive: true });
+    fs.writeFileSync(credsFileName, JSON.stringify({}));
+  }
+
+  // credentials file schema:
+  // {host: { database: { accessKey: privateKey }}}
+  creds = JSON.parse(fs.readFileSync(credsFileName).toString());
+  hostCreds = creds[values.host as string] ?? {};
+  creds[values.host as string] = hostCreds;
+  dbCreds = hostCreds[values.db as string] ?? {};
+  hostCreds[values.db as string] = dbCreds;
+
+  if (args.values['add-cred']) {
+    if (!('access-key' in args.values)) {
+      console.log("Must pass --db --host and --access-key.");
+      process.exit(1);
+    }
+
+    const accessKey = (args.values['access-key'] as string).trim();
+    const privateKey = fs.readFileSync(process.stdin.fd, 'utf-8').trim();
+
+    dbCreds[accessKey] = privateKey;
+
+    fs.writeFileSync(credsFileName, JSON.stringify(creds));
+
+    process.exit(0);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -197,7 +253,7 @@ const skdb = await createConnectedSkdb(values.host, values.db, {
   privateKey: privateKey,
 });
 
-const display = function(rows) {
+const display = function(rows: Array<any>) {
   if (args.values['json-output']) {
     const acc: Array<string> = [];
     for (const row of rows) {
@@ -240,9 +296,11 @@ if (args.values['create-db']) {
   console.log(`Successfully created database: ${db}.`);
   console.log(`Credentials for ${db}: `, result);
 
-  hostCreds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
-  fs.writeFileSync(credsFileName, JSON.stringify(creds));
-  console.log(`Credentials were added to ${credsFileName}.`);
+  if (!args.values['dev']) {
+    hostCreds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
+    fs.writeFileSync(credsFileName, JSON.stringify(creds));
+    console.log(`Credentials were added to ${credsFileName}.`);
+  }
 }
 
 if (args.values['create-user']) {
@@ -251,9 +309,11 @@ if (args.values['create-user']) {
   result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
   console.log('Successfully created user: ', result);
 
-  dbCreds[result.accessKey] = result.privateKey;
-  fs.writeFileSync(credsFileName, JSON.stringify(creds));
-  console.log(`Credentials were added to ${credsFileName}.`);
+  if (!args.values['dev']) {
+    dbCreds[result.accessKey] = result.privateKey;
+    fs.writeFileSync(credsFileName, JSON.stringify(creds));
+    console.log(`Credentials were added to ${credsFileName}.`);
+  }
 }
 
 if (args.values['schema']) {
