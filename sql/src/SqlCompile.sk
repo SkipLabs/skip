@@ -226,29 +226,12 @@ mutable class Compiler{
     toplevel: Bool,
     sets: Array<UpdateSet> = Array[],
   ): CSelect {
-    if (
-      select.distinct ||
-      select.shouldExpand ||
-      toplevel &&
-        (select.orderBy is Some _ || select.limit is Some _) &&
-        (select.groupBy is Some _) ||
-      (!select.rest.isEmpty() || toplevel) &&
-        selectOrRestIsAggrOrEmptyFrom(select)
-    ) {
-      !select = this.expandGroupBy(select);
-    };
-
-    !select = this.expandJoins(select);
-
     substCopy = this.subst;
     ambiguousCopy = this.ambiguous;
     aggrVarsCopy = this.aggrVars;
     needUpCopy = this.needUp;
     isAggrCopy = this.isAggr;
     otherCopy = this.other;
-
-    isAggr = selectIsAggr(select);
-    this.!isAggr = isAggr;
 
     newSubst = mutable Map[];
     for (key => value in this.subst) {
@@ -269,6 +252,23 @@ mutable class Compiler{
     this.!aggrVars = mutable Vector[];
     this.!needUp = false;
     this.!other = mutable Vector[];
+
+    if (
+      select.distinct ||
+      select.shouldExpand ||
+      toplevel &&
+        (select.orderBy is Some _ || select.limit is Some _) &&
+        (select.groupBy is Some _) ||
+      (!select.rest.isEmpty() || toplevel) &&
+        selectOrRestIsAggrOrEmptyFrom(select)
+    ) {
+      !select = this.expandGroupBy(select);
+    };
+
+    !select = this.expandJoins(select);
+
+    isAggr = selectIsAggr(select);
+    this.!isAggr = isAggr;
 
     origFrom = this.compileFrom(context, select.from);
     (cond, from) = this.compileJoin(context, origFrom, select.where);
