@@ -8,6 +8,7 @@ interface Env extends Environment {
 class LinksImpl implements Links {
   env: Env | undefined;
   lineBuffer: Array<int>;
+  lastTime: int;
 
   constructor(env?: Env) {
     this.env = env;
@@ -31,6 +32,9 @@ class LinksImpl implements Links {
 
   SKIP_delete_external_exception: (actor: int) => void;
   SKIP_FileSystem_appendTextFile: (path: ptr, contents: ptr) => void;
+  SKIP_js_time_ms_lo: () => int;
+  SKIP_js_time_ms_hi: () => int;
+
   SKIP_js_get_argc: () => int;
   SKIP_js_get_argn: (index: int) => ptr;
   SKIP_js_get_envc: () => int;
@@ -70,6 +74,18 @@ class LinksImpl implements Links {
       utils.log(str, Stream.OUT);
     };
     this.SKIP_delete_external_exception = utils.deleteException;
+
+    this.SKIP_js_time_ms_lo = () => {
+      this.lastTime = Date.now();
+      // right shift forces a coercion to 32-bit int, so this yields
+      // the low 32 bits
+      return this.lastTime >>> 0;
+    };
+    this.SKIP_js_time_ms_hi = () => {
+      // the high 32 bits, cannot use shift right without it implicitly
+      // coercing to 32-bit, thereby clearing the bits we want
+      return (Math.floor(this.lastTime / (2**32)));
+    };
 
     this.SKIP_js_get_argc = () => utils.args.length;
     this.SKIP_js_get_argn = (index: int) => utils.exportString(utils.args[index]);
@@ -167,6 +183,8 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_print_string =  (strPtr: ptr) => links.SKIP_print_string(strPtr);
     toWasm.SKIP_etry =  (f: ptr, exn_handler: ptr) => links.SKIP_etry(f, exn_handler);
     toWasm.SKIP_delete_external_exception = (actor: int) => links.SKIP_delete_external_exception(actor);
+    toWasm.SKIP_js_time_ms_lo = () => links.SKIP_js_time_ms_lo();
+    toWasm.SKIP_js_time_ms_hi = () => links.SKIP_js_time_ms_hi();
     toWasm.SKIP_js_get_argc = () => links.SKIP_js_get_argc();
     toWasm.SKIP_js_get_argn = (index: int) => links.SKIP_js_get_argn(index);
     toWasm.SKIP_js_get_envc = () => links.SKIP_js_get_envc();
@@ -215,6 +233,8 @@ interface ToWasm {
   SKIP_print_string: (strPtr: ptr) => void;
   SKIP_etry: (f: ptr, exn_handler: ptr) => ptr;
   SKIP_delete_external_exception: (actor: int) => void;
+  SKIP_js_time_ms_lo: () => int;
+  SKIP_js_time_ms_hi: () => int;
   SKIP_js_get_argc: () => int;
   SKIP_js_get_argn: (index: int) => ptr;
   SKIP_js_get_envc: () => int;

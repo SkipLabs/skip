@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <exception>
 #include <iostream>
@@ -473,6 +474,15 @@ int64_t SKIP_time() {
     exit(EXIT_FAILURE);
   }
   return (int64_t)res;
+}
+
+uint64_t SKIP_time_ms() {
+  using namespace std::chrono;
+
+  return
+    duration_cast<milliseconds>
+      (steady_clock::now().time_since_epoch())
+      .count();
 }
 
 void SKIP_localtime(int64_t timep, char* resultp) {
