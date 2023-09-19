@@ -32,25 +32,6 @@ export interface SKDBSync {
 }
 
 export interface SKDB {
-  exec: (query: string, params: Params, server?: boolean) => Promise<Array<any>>;
-  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
-  insert: (tableName: string, values: Array<any>) => Promise<boolean>;
-
-  connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
-  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
-  createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
-  createServerUser: () => Promise<ProtoResponseCreds>;
-  serverClose: () => Promise<void>;
-
-  tableSchema: (tableName: string, server?: boolean) => Promise<string>;
-  viewSchema: (viewName: string, server?: boolean) => Promise<string>;
-  schema: (server?: boolean) => Promise<string>;
-
-  subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
-  save: () => Promise<boolean>;
-}
-
-export interface SKDB {
   subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
 
   exec: (query: string, params: Params, server?: boolean) => Promise<Array<any>>;
