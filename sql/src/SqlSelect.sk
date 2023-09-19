@@ -272,7 +272,7 @@ class SelectEvaluator{
       this.select.groupBy is Some _ ||
       this.select.having is Some _ ||
       this.select.orderBy is Some _ ||
-      this.select.rest is Some _ ||
+      !this.select.rest.isEmpty() ||
       this.up is Some _
     ) {
       !this.select.limit = None();
@@ -502,7 +502,7 @@ class SelectEvaluator{
       );
       resultDir.dirName
     | Some(_) ->
-      if (this.select.rest is Some _) {
+      if (!this.select.rest.isEmpty()) {
         invariant_violation("Unexpected select type for aggregate function")
       };
       this.evalAggr(context)
@@ -722,21 +722,13 @@ class SelectEvaluator{
 
   fun makeQueryKind(
     queryKind: SKDB.QueryKind,
-    rest: ?(SKDB.QueryKind, SKDB.CSelect),
+    rest: List<(SKDB.QueryKind, SKDB.CSelect)>,
   ): SKDB.QueryKind {
-    isIntersect = false;
-    restIter = rest;
-    while (!isIntersect && restIter is Some _) {
-      !isIntersect = restIter is Some((QIntersect(_), _));
-      !restIter = restIter.fromSome().i1.rest;
-    };
+    isIntersect = rest.any(x -> x.i0 is QIntersect _);
 
-    isUnionAll = queryKind is QUnion(UAll());
-    !restIter = rest;
-    while (isUnionAll && restIter is Some _) {
-      !isUnionAll = restIter is Some((QUnion(UAll()), _));
-      !restIter = restIter.fromSome().i1.rest;
-    };
+    isUnionAll =
+      queryKind is QUnion(UAll()) &&
+      rest.all(x -> x.i0 is QUnion(UAll()));
 
     queryKind match {
     | _ if (isUnionAll) -> QUnion(UAll())
@@ -757,10 +749,10 @@ class SelectEvaluator{
     (SKStore.EHandle<SKStore.Key, Row>, (MapFunRow, ?Array<SKStore.KeyRange>)),
   > {
     queryKind = this.select.rest match {
-    | None() -> None()
-    | Some((QUnion(UAll()), _)) ->
+    | List.Nil() -> None()
+    | List.Cons((QUnion(UAll()), _), _) ->
       Some((0, this.makeQueryKind(QUnion(UAll()), this.select.rest)))
-    | Some(_) ->
+    | List.Cons _ ->
       Some((0, this.makeQueryKind(QUnion(USingle()), this.select.rest)))
     };
     mapFunRow = (ctx, wrt, key, rows) ~> {
@@ -778,11 +770,12 @@ class SelectEvaluator{
       (SKStore.EHandle(x ~> x, Row::type, dirName), (mapFunRow, rangeOpt)),
     ];
     order = 1;
-    rest = this.select.rest;
 
-    while (rest is Some _) {
+    rest = this.select.rest;
+    for ((qKind, query) in this.select.rest) {
+      !rest = rest.getTail();
       currentOrder = order;
-      (qKind, query) = rest.fromSome();
+      currentRest = rest;
       ev = makeSelectEvaluator(context, query, this.up);
       rtables = List::createFromItems(query.from);
       (rtable, rremainingTables) = rtables match {
@@ -792,7 +785,7 @@ class SelectEvaluator{
       rentries = List<Row>[];
       rmapFun: MapFunRow = (ctx, wrt, key, rows) ~> {
         ev.evalSelectTableRows(
-          Some((currentOrder, this.makeQueryKind(qKind, query.rest))),
+          Some((currentOrder, this.makeQueryKind(qKind, currentRest))),
           rremainingTables,
           rentries,
           ctx,
@@ -808,7 +801,6 @@ class SelectEvaluator{
           (rmapFun, rtable.i1),
         ),
       );
-      !rest = query.rest;
       !order = order + 1
     };
     mparents.toArray()
@@ -1084,8 +1076,8 @@ class SelectEvaluator{
       )
     };
     this.select.rest match {
-    | None() -> reducer
-    | Some(_) ->
+    | List.Nil _ -> reducer
+    | List.Cons _ ->
       Some(
         SKStore.EReducer{
           type => Row::type,

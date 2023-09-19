@@ -165,7 +165,7 @@ class Select{
   having: ?Expr,
   orderBy: ?Array<(Expr, IKind)>,
   limit: ?Expr,
-  rest: ?(CompoundOperator, Select),
+  rest: Array<(CompoundOperator, Select)>,
   shouldExpand: Bool = false,
 } extends Stmt
 
@@ -424,8 +424,5 @@ fun selectIsAggr(select: Select): Bool {
 fun selectOrRestIsAggrOrEmptyFrom(select: Select): Bool {
   selectIsAggr(select) ||
     select.from is None() ||
-    select.rest match {
-    | Some((_, q)) -> selectOrRestIsAggrOrEmptyFrom(q)
-    | None() -> false
-    }
+    select.rest.any(x -> selectIsAggr(x.i1) || x.i1.from is None())
 }

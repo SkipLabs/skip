@@ -59,7 +59,7 @@ fun optimizeNoopSelect(select: CSelect): CSelect {
     select.having is None() &&
     select.orderBy is None() &&
     select.limit is None() &&
-    select.rest is None() &&
+    select.rest.isEmpty() &&
     !select.needUp &&
     !select.directMode &&
     select.other.size() != 0
@@ -199,7 +199,7 @@ mutable class Compiler{
                 distinct => false,
                 orderBy => None(),
                 limit => None(),
-                rest => None(),
+                rest => Array[],
                 shouldExpand => false,
               },
             ),
@@ -232,7 +232,7 @@ mutable class Compiler{
       toplevel &&
         (select.orderBy is Some _ || select.limit is Some _) &&
         (select.groupBy is Some _) ||
-      (select.rest is Some _ || toplevel) &&
+      (!select.rest.isEmpty() || toplevel) &&
         selectOrRestIsAggrOrEmptyFrom(select)
     ) {
       !select = this.expandGroupBy(select);
@@ -334,7 +334,7 @@ mutable class Compiler{
       having is None() &&
       orderBy is None() &&
       groupBy is None() &&
-      rest is None();
+      rest.isEmpty();
 
     format = this.options.format match {
     | OFK_CSV() -> SKStore.OCSV()
@@ -783,33 +783,30 @@ mutable class Compiler{
   mutable fun compileRest(
     context: mutable SKStore.Context,
     cparams: Array<CGExpr>,
-    rest: ?(CompoundOperator, Select),
-  ): ?(QueryKind, CSelect) {
-    crest = rest.map(x ->
-      (
-        x.i0 match {
+    rest: Array<(CompoundOperator, Select)>,
+  ): List<(QueryKind, CSelect)> {
+    List::createFromItems(
+      rest.map(x -> {
+        qkind = x.i0 match {
         | COUnion() -> QUnion(USingle())
         | COUnionAll() -> QUnion(UAll())
         | COExcept() -> QExcept()
         | COIntersect() -> QIntersect(false)
-        },
-        this.compileSelect(context, x.i1, genSelectId(x.i1), false),
-      )
-    );
-    crest match {
-    | None() -> void
-    | Some((_, query)) ->
-      qparams = query.params;
-      if (cparams.size() != qparams.size()) {
-        errorNbr(8, this.pos, "Incompatible select width for union");
-      };
-      for (i in Range(0, qparams.size())) {
-        if (qparams[i].getType() != cparams[i].getType()) {
-          errorNbr(9, this.pos, "Incompatible types for union");
-        }
-      }
-    };
-    crest
+        };
+        query = this.compileSelect(context, x.i1, genSelectId(x.i1), false);
+        qparams = query.params;
+        if (cparams.size() != qparams.size()) {
+          // TODO: Better error message (for INTERSECT/EXCEPT).
+          errorNbr(8, this.pos, "Incompatible select width for union");
+        };
+        for (i in Range(0, qparams.size())) {
+          if (qparams[i].getType() != cparams[i].getType()) {
+            errorNbr(9, this.pos, "Incompatible types for union");
+          }
+        };
+        (qkind, query)
+      }),
+    )
   }
 
   mutable fun compileOrderBy(
