@@ -278,12 +278,40 @@ mutable class Compiler{
     groupBy = this.compileGroupBy(context, select.groupBy, params);
     having = this.compileHaving(context, select.having);
 
-    orderBy = this.compileOrderBy(select.params, from, select.orderBy);
-    limit = this.compileLimit(context, select.limit);
     aggr: ?Array<(AggrKind, CGExpr)> = None();
     if (this.aggrVars.size() != 0) {
       !aggr = Some(this.aggrVars.toArray());
     };
+
+    cselect = CSelect{
+      id => Name::create(
+        selectId.lower +
+          (if (this.options.virtual) "" else params.hash().toString()) +
+          context.getGlobal("TableMap") match {
+          | None() -> ""
+          | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
+          },
+      ),
+      distinct => select.distinct,
+      params,
+      sets => this.compileSets(context, sets),
+      aggr,
+      from,
+      where => if (where is Some(CILiteral(1))) None() else where,
+      groupBy,
+      having,
+      needUp => this.needUp,
+      other => this.other.toArray(),
+      format => SKStore.OSQL(),
+      directMode => false,
+      rest => List.Nil(),
+      kinds => Array[],
+      orderBy => None(),
+      limit => None(),
+    };
+
+    orderBy = this.compileOrderBy(select.params, from, select.orderBy);
+    limit = this.compileLimit(context, select.limit);
 
     kinds = orderBy match {
     | None() ->
@@ -295,10 +323,6 @@ mutable class Compiler{
       })
     | Some(ekinds) -> computeKinds(params, ekinds)
     };
-
-    needUp = this.needUp;
-    other = this.other.toArray();
-    csets = this.compileSets(context, sets);
 
     this.!subst = substCopy;
     this.!ambiguous = ambiguousCopy;
@@ -353,32 +377,7 @@ mutable class Compiler{
       SKStore.OJS(fieldNames)
     };
 
-    cselect = CSelect{
-      id => Name::create(
-        selectId.lower +
-          (if (this.options.virtual) "" else params.hash().toString()) +
-          context.getGlobal("TableMap") match {
-          | None() -> ""
-          | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
-          },
-      ),
-      distinct => select.distinct,
-      params,
-      sets => csets,
-      aggr,
-      from,
-      kinds,
-      where => if (where is Some(CILiteral(1))) None() else where,
-      groupBy,
-      having,
-      orderBy,
-      limit,
-      rest,
-      needUp,
-      directMode,
-      format,
-      other,
-    };
+    !cselect = cselect with {format, directMode, rest, kinds, orderBy, limit};
 
     !cselect = optimizeNoopSelect(cselect);
 
