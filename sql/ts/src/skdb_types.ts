@@ -89,6 +89,7 @@ export interface RemoteSKDB {
   exec: (query: string, params: Params) => Promise<Array<any>>;
   isConnectionHealthy: () => boolean;
   tablesAwaitingSync: () => Set<string>;
+  onReboot: (server: RemoteSKDB, skdb: SkdbMechanism) => void;
   close(): void;
 }
 
