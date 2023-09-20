@@ -208,11 +208,15 @@ fun lwwEdits(
   keepingCurrent = false;
   iter = indexDir.unsafeGetFileIter(Some(startKey));
   loop {
-    (key, _) = iter.next() match {
+    (key, valueIter) = iter.next() match {
     | None() -> break void
     | Some(x) -> x
     };
     rowKey = SKDB.RowKey::keyType(key);
+    valueIter.next() match {
+    | None() -> continue
+    | _ -> void
+    };
     if (rowKey.row.getValue(0) != primaryKey) break void;
 
     for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
