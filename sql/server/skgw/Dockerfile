@@ -5,7 +5,7 @@ RUN apt-get install -y curl zip
 RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
 RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
     sdk install gradle && \
-    sdk install java 19.0.1-oracle"
+    sdk install java 20.0.2-tem"
 
 RUN make && find . -name state.db -delete
 
