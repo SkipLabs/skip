@@ -18,7 +18,7 @@ export class State {
 export class Exception {
   id: int;
   err: Error;
-  
+
   constructor(err: Error, state) {
     this.id = ++state.exceptionId;
     this.err = err;
@@ -196,7 +196,7 @@ export class Utils {
   private stderr: Array<string>;
   private stddebug: Array<string>;
   private mainFn ?: string;
-  
+
   exit = (code: int) => {
     let message = (code != 0 && this.stderr.length > 0) ? this.stderr.join("") : undefined;
     throw new SkRuntimeExit(code, message);
@@ -593,7 +593,7 @@ export function loadWasm(
       utils.init();
       links.forEach(link => {
         if (link) {
-          link.complete(utils, exports);        
+          link.complete(utils, exports);
         }
       });
       return {environment: environment, main: utils.main};
@@ -625,14 +625,13 @@ export function isNode() {
 
 
 export async function loadEnv(envExtends : Map<string, Array<string>>, envVals?: Array<string>) {
-  var environment : any;
+  let envModule;
   if (isNode()) {
-    // @ts-ignore
-    environment = await import("./sk_node.mjs");
+    envModule = "./sk_node.mjs";
   } else {
-    // @ts-ignore
-    environment = await import("./sk_browser.mjs");
+    envModule = "./sk_browser.mjs";
   }
+  const environment = await import(envModule);
   let env = environment.environment(envVals) as Environment;
   let extensions = envExtends.get(env.name());
   if (extensions) {
