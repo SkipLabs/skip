@@ -187,6 +187,7 @@ fun lwwEdits(
 ): mutable Iterator<
   (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
 > {
+  !context = context.mclone();
   primaryIdx = primaryIdxOpt match {
   | None() -> invariant_violation("Using LWW without a primary key.")
   | Some(p) -> p
@@ -214,13 +215,12 @@ fun lwwEdits(
     rowKey = SKDB.RowKey::keyType(key);
     if (rowKey.row.getValue(0) != primaryKey) break void;
 
-    if (rowKey.row >= row) {
-      !keepingCurrent = true;
-      break void;
-    };
-
     for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-      if (tick.value < snapshot || source.path() == writer) {
+      if (
+        tick.value < snapshot ||
+        source.path() == writer ||
+        rowKey.row < row
+      ) {
         entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
       } else {
         !keepingCurrent = true;
@@ -228,6 +228,7 @@ fun lwwEdits(
       }
     }
   };
+
   if (!keepingCurrent) {
     for (entry in entries) yield entry;
     yield (
