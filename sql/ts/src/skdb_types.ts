@@ -8,7 +8,7 @@ export interface SkdbHandle {
 
 export interface SKDBSync {
   // CLIENT
-  exec: (query: string, params: Params) => Array<any>;
+  exec: (query: string, params?: Params) => Array<any>;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
   insert: (tableName: string, values: Array<any>) => boolean;
 
@@ -25,7 +25,7 @@ export interface SKDBSync {
   connectedRemote?: RemoteSKDB;
   createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createServerUser: () => Promise<ProtoResponseCreds>;
-  serverExec: (query: string, params: Params) => Promise<Array<any>>;
+  serverExec: (query: string, params?: Params) => Promise<Array<any>>;
   serverTableSchema: (tableName: string) => Promise<string>;
   serverViewSchema: (tableName: string) => Promise<string>;
   serverSchema: () => Promise<string>;
@@ -35,7 +35,7 @@ export interface SKDBSync {
 export interface SKDB {
   subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
 
-  exec: (query: string, params: Params) => Promise<Array<any>>;
+  exec: (query: string, params?: Params) => Promise<Array<any>>;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
 
   tableSchema: (tableName: string) => Promise<string>;
@@ -86,7 +86,7 @@ export interface RemoteSKDB {
   tableSchema: (tableName: string) => Promise<string>;
   viewSchema: (viewName: string) => Promise<string>;
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
-  exec: (query: string, params: Params) => Promise<Array<any>>;
+  exec: (query: string, params?: Params) => Promise<Array<any>>;
   isConnectionHealthy: () => boolean;
   tablesAwaitingSync: () => Set<string>;
   onReboot: (server: RemoteSKDB, skdb: SkdbMechanism) => void;
