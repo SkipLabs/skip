@@ -24,7 +24,7 @@ export class SKDBWorker implements SKDB {
   watch = async (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
     return this.worker.subscribe(new Function("watch", [query, params], {wrap: true, autoremove: true}), onChange).then(wrapped => {
       let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
-      return { close: close};
+      return { close: close };
     });
   }
 

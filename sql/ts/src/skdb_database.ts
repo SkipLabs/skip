@@ -3,7 +3,7 @@ import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync } from "#
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
-  writeCsv: (table: string, payload: string) => void;
+  writeCsv: (table: string, payload: string, source: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
@@ -21,8 +21,8 @@ class SkdbMechanismImpl implements SkdbMechanism {
     this.watermark = (replicationId: string, table: string) => {
       return BigInt(client.runLocal(["watermark", "--source", replicationId, table], ""));
     };
-    this.writeCsv = (table: string, payload: string) => {
-      return client.runLocal(["write-csv", table], payload + '\n');
+    this.writeCsv = (table: string, payload: string, source: string) => {
+      return client.runLocal(["write-csv", table, "--source", source], payload + '\n');
     };
     this.watchFile = (fileName: string, fn: (change: ArrayBuffer) => void) => {
       fs.watchFile(fileName, change => {
