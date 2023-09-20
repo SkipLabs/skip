@@ -282,12 +282,8 @@ fun execBuild(args: Cli.ParseResults, env: Skargo.Env): void {
     args.maybeGetString("target-dir"),
     Skargo.getProfile(args),
   );
-  checkBuild(bc, false);
-  _ = manage(
-    bc,
-    Package::create(env.manifest),
-    args.maybeGetString("dry-run"),
-  );
+  _ = buildIfNeeded(bc, false);
+  _ = manage(bc, Package::create(env.manifest), args.maybeGetString("dry-run"));
   args.maybeGetString("html") match {
   | Some(launcher) ->
     writeIndex(bc.targetDir, launcher);
@@ -346,7 +342,7 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
       Skargo.ManifestBinary("test", env.manifest.testHarness),
     ];
   };
-  checkBuild(bc, !customTests);
+  _ = buildIfNeeded(bc, !customTests);
   if (customTests) {
     Skargo.run(Array["cp", "-R", tests, bc.targetDir], env.verbose);
   } else {
@@ -420,7 +416,7 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
   }
 }
 
-fun checkBuild(bc: Skargo.BuildContext, test: Bool): void {
+fun buildIfNeeded(bc: Skargo.BuildContext, test: Bool): Bool {
   checker = Skbuild.TimeChecker();
   bc.files.each(f -> !checker = checker.add(f));
   buildNeeded = for (bin in bc.env.manifest.bin) {
@@ -442,6 +438,7 @@ fun checkBuild(bc: Skargo.BuildContext, test: Bool): void {
       bc.env.verbose,
     );
   };
+  buildNeeded
 }
 
 fun manage(
@@ -1094,6 +1091,15 @@ fun execRun(args: Cli.ParseResults): void {
   npmDir = args
     .maybeGetString("dry-run")
     .default(Path.join(bc.targetDir, "npm"));
+
+  neededBuild = buildIfNeeded(bc, false);
+  if (neededBuild) {
+    npmInstall = Array["npm", "--prefix", npmDir, "install"];
+    exitCode = system(npmInstall.join(" "));
+    if (exitCode != 0) {
+      throw Skargo.SystemCallException(exitCode);
+    }
+  };
   cmdArgs = Array["npm", "--prefix", npmDir, "run"].concat(args.extra);
   if (env.verbose) {
     // TODO: colors
