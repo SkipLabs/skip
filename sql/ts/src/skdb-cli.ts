@@ -290,7 +290,8 @@ const display = function(rows: Array<any>) {
 
 if (args.values['create-db']) {
   const db = args.values['create-db'] as string;
-  const result = await skdb.createServerDatabase(db);
+  const remote = await skdb.connectedRemote();
+  const result = await remote!.createDatabase(db);
   // b64 encode
   result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
   console.log(`Successfully created database: ${db}.`);
@@ -304,7 +305,8 @@ if (args.values['create-db']) {
 }
 
 if (args.values['create-user']) {
-  const result = await skdb.createServerUser();
+  const remote = await skdb.connectedRemote();
+  const result = await remote!.createUser();
   // b64 encode
   result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
   console.log('Successfully created user: ', result);
@@ -317,17 +319,20 @@ if (args.values['create-user']) {
 }
 
 if (args.values['schema']) {
-  const schema = await skdb.schema(true);
+  const remote = await skdb.connectedRemote();
+  const schema = await remote!.schema();
   console.log(schema.trim());
 }
 
 if (args.values['table-schema']) {
-  const schema = await skdb.tableSchema(args.values['table-schema'] as string, true);
+  const remote = await skdb.connectedRemote();
+  const schema = await remote!.tableSchema(args.values['table-schema'] as string);
   console.log(schema.trim());
 }
 
 if (args.values['view-schema']) {
-  const schema = await skdb.viewSchema(args.values['view-schema'] as string, true);
+  const remote = await skdb.connectedRemote();
+  const schema = await remote!.viewSchema(args.values['view-schema'] as string);
   console.log(schema.trim());
 }
 
@@ -359,7 +364,8 @@ const remoteRepl = async function() {
 
     if (query.trim() === '.schema') {
       try {
-        const schema = await skdb.schema(true);
+        const remote = await skdb.connectedRemote();
+        const schema = await remote!.schema();
         console.log(schema);
       } catch (ex) {
         console.error("Could not query schema.");
@@ -371,7 +377,8 @@ const remoteRepl = async function() {
     if (query.startsWith('.table-schema')) {
       const [_, table] = query.split(" ", 2);
       try {
-        const schema = await skdb.tableSchema(table, true);
+        const remote = await skdb.connectedRemote();
+        const schema = await remote!.tableSchema(table);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${table}.`);
@@ -382,7 +389,8 @@ const remoteRepl = async function() {
     if (query.startsWith('.view-schema')) {
       const [_, view] = query.split(" ", 2);
       try {
-        const schema = await skdb.viewSchema(view, true);
+        const remote = await skdb.connectedRemote();
+        const schema = await remote!.viewSchema(view);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${view}.`);
@@ -391,7 +399,8 @@ const remoteRepl = async function() {
     }
 
     try {
-      const rows = await skdb.exec(query, {}, true);
+      const remote = await skdb.connectedRemote();
+      const rows = await remote!.exec(query, {});
       display(rows);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
@@ -484,7 +493,7 @@ const localRepl = async function() {
     }
 
     try {
-      const rows = await skdb.exec(query, {}, false);
+      const rows = await skdb.exec(query, {});
       display(rows);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
@@ -508,7 +517,8 @@ try {
 
 if (query.trim() !== "") {
   try {
-    const rows = await skdb.exec(query, {}, true);
+    const remote = await skdb.connectedRemote();
+    const rows = await remote!.exec(query, {});
     display(rows);
   } catch (ex) {
     console.error("Could not eval query.");
@@ -522,5 +532,5 @@ if (query.trim() !== "") {
 // ends up calling this, which you don't want. the user is going to
 // send an interrupt anyway to get out of the shell.
 if (!(args.values['remote-repl'] || args.values['local-repl'])) {
-  skdb.serverClose();
+  skdb.closeConnection();
 }

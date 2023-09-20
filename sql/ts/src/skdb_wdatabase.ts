@@ -60,11 +60,15 @@ export class SKDBWorker implements SKDB {
     return this.worker.post(new Function("mirror", [tableName, filterExpr]));
   }
 
-  serverClose = async () => {
+  closeConnection = async () => {
     return this.worker.post(new Function("serverClose", []));
   }
 
   connect = async (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => {
     return this.worker.post(new Function("connect", [db, accessKey, privateKey, endpoint]));
+  }
+
+  connectedRemote = async () => {
+    return this.worker.post(new Function("connectedRemote", []));
   }
 }
