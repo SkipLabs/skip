@@ -8,14 +8,17 @@ set -x
 
 cd $REPO
 
-git clean -xdn | sed 's|Would remove |/|g' > .dockerignore
+git clean -xdn | sed 's|Would remove |/|g' >> .dockerignore
 echo ".git" >> .dockerignore
 
-docker build --no-cache --tag skfs --progress=plain .
-docker build --no-cache --tag skgw --progress=plain --file sql/server/skgw/Dockerfile .
-if [[ -f $USER/Dockerfile ]] ;
-then docker build --tag $USER-skfs --progress=plain --file $USER/Dockerfile .
-fi
+dockerbuild () {
+    docker build . --no-cache --progress=plain --tag $1 --file $2/Dockerfile
+}
+
+dockerbuild skfs .
+dockerbuild skgw sql/server/skgw
+dockerbuild skdb-dev-server sql/server/dev
+[[ -f $USER/Dockerfile ]] && dockerbuild $USER-skfs $USER
 
 git restore .dockerignore
 
