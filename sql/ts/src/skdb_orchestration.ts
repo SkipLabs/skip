@@ -580,6 +580,7 @@ export class MuxedSocket {
 
   // state
   private state: MuxedSocketState = MuxedSocketState.IDLE
+  private reauthTimer?: any;
   // streams in the open or closing state
   private activeStreams: Map<number, Stream> = new Map()
   private serverStreamWatermark = 0
@@ -634,6 +635,7 @@ export class MuxedSocket {
         break;
       case MuxedSocketState.IDLE:
         this.activeStreams.clear()
+        clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         this.socket.close();
         break;
@@ -642,6 +644,7 @@ export class MuxedSocket {
           stream.close();
         }
         this.activeStreams.clear()
+        clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         this.socket.close();
         break;
@@ -663,6 +666,7 @@ export class MuxedSocket {
       case MuxedSocketState.CLOSING:
       case MuxedSocketState.CLOSED:
         this.activeStreams.clear()
+        clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         break;
       case MuxedSocketState.AUTH_SENT:
@@ -674,6 +678,7 @@ export class MuxedSocket {
           stream.onStreamError(errorCode, msg);
         }
         this.activeStreams.clear()
+        clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         const lastStream = Math.max(this.nextStream - 2, this.serverStreamWatermark);
         this.socket.send(this.encodeGoawayMsg(lastStream, errorCode, msg));
@@ -727,8 +732,7 @@ export class MuxedSocket {
         socket.onclose = (event) => muxSocket.onSocketClose(event)
         socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
         socket.onmessage = (event) => muxSocket.onSocketMessage(event)
-        resolve(muxSocket)
-        muxSocket.sendAuth()
+        muxSocket.sendAuth().then(() => resolve(muxSocket)).catch((reason) => reject(reason))
       };
     });
   }
@@ -803,6 +807,7 @@ export class MuxedSocket {
           this.onClose();
         }
         this.activeStreams.clear()
+        clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         break;
     }
@@ -823,6 +828,7 @@ export class MuxedSocket {
           this.onError(errorCode, msg);
         }
         this.activeStreams.clear()
+        clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
     }
   }
@@ -898,7 +904,8 @@ export class MuxedSocket {
         const auth = await MuxedSocket.encodeAuthMsg(this.creds, this.env);
         this.socket.send(auth);
         this.state = MuxedSocketState.AUTH_SENT;
-        setTimeout(() => {
+        clearTimeout(this.reauthTimer);
+        this.reauthTimer = setTimeout(() => {
           this.sendAuth()
         }, this.reauthTimeoutMs);
         break;
