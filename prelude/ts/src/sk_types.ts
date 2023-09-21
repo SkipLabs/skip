@@ -625,12 +625,7 @@ export function isNode() {
 
 
 export async function loadEnv(envExtends : Map<string, Array<string>>, envVals?: Array<string>) {
-  let envModule;
-  if (isNode()) {
-    envModule = "./sk_node.mjs";
-  } else {
-    envModule = "./sk_browser.mjs";
-  }
+  const envModule = (isNode() ? "./sk_node.mjs" : "./sk_browser.mjs");
   const environment = await import(envModule);
   let env = environment.environment(envVals) as Environment;
   let extensions = envExtends.get(env.name());
