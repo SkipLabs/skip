@@ -448,7 +448,7 @@ const localRepl = async function() {
 
     if (query.trim() === '.schema') {
       try {
-        const schema = skdb.schema();
+        const schema = await skdb.schema();
         console.log(schema);
       } catch (ex) {
         console.error("Could not query schema.");
@@ -460,7 +460,7 @@ const localRepl = async function() {
     if (query.startsWith('.table-schema')) {
       const [_, table] = query.split(" ", 2);
       try {
-        const schema = skdb.tableSchema(table);
+        const schema = await skdb.tableSchema(table);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${table}.`);
@@ -471,7 +471,7 @@ const localRepl = async function() {
     if (query.startsWith('.view-schema')) {
       const [_, view] = query.split(" ", 2);
       try {
-        const schema = skdb.viewSchema(view);
+        const schema = await skdb.viewSchema(view);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${view}.`);
@@ -532,5 +532,5 @@ if (query.trim() !== "") {
 // ends up calling this, which you don't want. the user is going to
 // send an interrupt anyway to get out of the shell.
 if (!(args.values['remote-repl'] || args.values['local-repl'])) {
-  skdb.closeConnection();
+  await skdb.closeConnection();
 }
