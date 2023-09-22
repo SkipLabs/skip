@@ -46,6 +46,7 @@ import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ConcurrentHashMap
 
 fun Credentials.toProtoCredentials(): ProtoCredentials {
   return ProtoCredentials(accessKey, ByteBuffer.wrap(privateKey))
@@ -326,6 +327,7 @@ fun usersHandler(): HttpHandler {
 }
 
 fun schemaHandler(): HttpHandler {
+  val schemas = ConcurrentHashMap<String, String>()
   return BlockingHandler(
       object : HttpHandler {
         override fun handleRequest(exchange: HttpServerExchange) {
@@ -347,6 +349,18 @@ fun schemaHandler(): HttpHandler {
             var new = openSkdb(tmp_name)
 
             val schema = exchange.inputStream.bufferedReader().use { it.readText() }
+
+            val prevSchema = schemas.put(db, schema);
+
+            // this check is more than just optimisation. it ensures
+            // that clients with the same schema end up connected to
+            // the same db file and thus replicate.
+            if (prevSchema == schema) {
+              exchange.statusCode = StatusCodes.OK;
+              return;
+            }
+
+            exchange.statusCode = StatusCodes.CREATED;
 
             try {
               new!!.sql(schema, OutputFormat.RAW).decodeOrThrow()
