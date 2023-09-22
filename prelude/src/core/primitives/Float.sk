@@ -111,30 +111,48 @@ fun floatToString(value: Float): String {
   if (value.isNaN()) {
     return "nan";
   };
-  str = "";
+  result = Vector::mcreate(32);
   if (value.toBits().and(0x8000000000000000) != 0) {
-    !str = "-";
+    result.push("-");
     !value = -value;
   };
   if (value == Float::inf) {
-    return `${str}inf`;
+    result.push("inf");
+    return Array.concatStringSequence(result)
   };
   (integralPart, optDecimalPart, optExponent) = splitFloat(value);
-  !str = `${str}${integralPart}`;
+  result.push(integralPart.toString());
   optDecimalPart match {
-  | None() -> !str = `${str}.0`
-  | Some(decimalPart) -> !str = `${str}${decimalsPart(decimalPart)}`
+  | None() -> result.push(".0")
+  | Some(decimalPart) ->
+    iValue = decimalPart.toInt();
+    width = 9;
+    // remove trailing zeros
+    while (iValue % 10 == 0 && width > 0) {
+      !iValue = iValue / 10;
+      !width = width - 1;
+    };
+    result.push(".");
+    ivalstr = iValue.toString();
+    while (width - ivalstr.length() > 0) {
+      result.push("0");
+      !width = width - 1;
+    };
+    result.push(ivalstr)
   };
-  optExponent.each(exponent ->
+  optExponent.each(exponent -> {
     if (exponent < -9) {
-      !str = `${str}e${exponent}`
+      result.push("e");
+      result.push(exponent.toString())
     } else if (exponent < 0) {
-      !str = `${str}e-0${-exponent}`
+      result.push("e-0");
+      result.push((-exponent).toString())
     } else {
-      !str = `${str}e+${exponent}`
+      result.push("e+");
+      result.push(exponent.toString())
     }
-  );
-  str;
+  });
+  Array.concatStringSequence(result)
 }
 
 fun splitFloat(value: Float): (Int, ?UInt32, ?Int16) {
@@ -246,21 +264,4 @@ fun normalizeFloat(value: Float): (Float, Int16) {
     }
   };
   (value, Int16::truncate(exponent))
-}
-
-fun decimalsPart(value: UInt32): String {
-  iValue = value.toInt();
-  width = 9;
-  // remove trailing zeros
-  while (iValue % 10 == 0 && width > 0) {
-    !iValue = iValue / 10;
-    !width = width - 1;
-  };
-  str = "";
-  while (width > 0) {
-    !str = `${iValue % 10}${str}`;
-    !iValue = iValue / 10;
-    !width = width - 1;
-  };
-  `.${str}`
 }

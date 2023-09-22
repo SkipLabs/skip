@@ -181,7 +181,6 @@ class Skdb(val name: String, private val dbPath: String) {
                     ENV.skdbPath,
                     "subscribe",
                     table,
-                    "--connect",
                     "--data",
                     dbPath,
                     "--ignore-source",
@@ -216,19 +215,33 @@ class Skdb(val name: String, private val dbPath: String) {
 
     val t =
         Thread({
+          val acc = ArrayList<String>()
           output.forEachLine {
-            val encoder = StandardCharsets.UTF_8.newEncoder()
-            val buf = ByteBuffer.allocate(it.length * 4 + 1)
-            var res = encoder.encode(CharBuffer.wrap(it), buf, true)
-            if (!res.isUnderflow()) {
-              res.throwException()
+            acc.add(it)
+
+            val shouldFlush = it.startsWith(":")
+            // threshold is fairly arbitrary. tested a handful of
+            // values. it's mostly a guess at a good value to save the
+            // arraylist from doing another double allocate/copy
+            val shouldSend = acc.size > 8191 || shouldFlush
+
+            if (shouldSend) {
+              val payload = acc.joinToString(separator = "\n", postfix = "\n")
+
+              val encoder = StandardCharsets.UTF_8.newEncoder()
+              val buf = ByteBuffer.allocate(payload.length * 4 + 1)
+              var res = encoder.encode(CharBuffer.wrap(payload), buf, true)
+              if (!res.isUnderflow()) {
+                res.throwException()
+              }
+              res = encoder.flush(buf)
+              if (!res.isUnderflow()) {
+                res.throwException()
+              }
+
+              callback(buf.flip(), shouldFlush)
+              acc.clear()
             }
-            res = encoder.flush(buf)
-            if (!res.isUnderflow()) {
-              res.throwException()
-            }
-            buf.put(0x0A) // add back newline
-            callback(buf.flip(), it.startsWith(":"))
           }
           closed()
         })
