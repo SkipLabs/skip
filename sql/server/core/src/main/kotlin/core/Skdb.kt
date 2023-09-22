@@ -181,7 +181,6 @@ class Skdb(val name: String, private val dbPath: String) {
                     ENV.skdbPath,
                     "subscribe",
                     table,
-                    "--connect",
                     "--data",
                     dbPath,
                     "--ignore-source",
