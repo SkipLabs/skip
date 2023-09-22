@@ -128,6 +128,7 @@ class ProcessPipe(val proc: Process) : StreamHandler {
 
   override fun close() {
     proc.outputStream?.close()
+    proc.destroy()
   }
 }
 
