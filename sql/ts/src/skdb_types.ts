@@ -87,10 +87,10 @@ export interface RemoteSKDB {
   viewSchema: (viewName: string) => Promise<string>;
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
   exec: (query: string, params?: Params) => Promise<Array<any>>;
-  isConnectionHealthy: () => boolean;
-  tablesAwaitingSync: () => Set<string>;
-  onReboot: (server: RemoteSKDB, skdb: SkdbMechanism) => void;
-  close(): void;
+  isConnectionHealthy: () => Promise<boolean>;
+  tablesAwaitingSync: () => Promise<Set<string>>;
+  setOnReboot: (fn: (server: RemoteSKDB, skdb: SkdbMechanism) => void) => Promise<void>;
+  close(): Promise<void>;
 }
 
 export type Page = { pageid: number, content: any };

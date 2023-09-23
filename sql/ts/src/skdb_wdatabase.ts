@@ -1,6 +1,60 @@
 import { Wrk } from "#std/sk_types";
 import { PromiseWorker, Function, Caller } from "#std/sk_worker";
-import { SKDB, ProtoResponseCreds, Params } from "#skdb/skdb_types";
+import { SKDB, ProtoResponseCreds, Params, RemoteSKDB, SkdbMechanism } from "#skdb/skdb_types";
+
+export class WrappedRemote implements RemoteSKDB {
+  private worker: PromiseWorker;
+  private wrapped: number;
+
+  constructor(worker: PromiseWorker, wrapped: number) {
+    this.worker = worker;
+    this.wrapped = wrapped;
+  }
+
+  createDatabase(dbName: string) {
+    return this.worker.post(new Caller(this.wrapped, "createDatabase", [dbName]));
+  }
+
+  createUser() {
+    return this.worker.post(new Caller(this.wrapped, "createUser", []));
+  }
+
+  schema() {
+    return this.worker.post(new Caller(this.wrapped, "schema", []));
+  }
+
+  tableSchema(tableName: string) {
+    return this.worker.post(new Caller(this.wrapped, "tableSchema", [tableName]));
+  }
+
+  viewSchema(viewName: string) {
+    return this.worker.post(new Caller(this.wrapped, "viewSchema", [viewName]));
+  }
+
+  mirror(tableName: string, filterExpr?: string) {
+    return this.worker.post(new Caller(this.wrapped, "mirror", [tableName, filterExpr]));
+  }
+
+  exec(query: string, params?: Params)  {
+    return this.worker.post(new Caller(this.wrapped, "mirror", [query, params]));
+  }
+  
+  isConnectionHealthy() {
+    return this.worker.post(new Caller(this.wrapped, "isConnectionHealthy", []));
+  }
+
+  tablesAwaitingSync() {
+    return this.worker.post(new Caller(this.wrapped, "tablesAwaitingSync", []));
+  }
+
+  close() {
+    return this.worker.post(new Caller(this.wrapped, "close", [], true));
+  }
+
+  setOnReboot(onReboot: (server: RemoteSKDB, skdb: SkdbMechanism) => void): Promise<void> {
+    throw new Error("On reboot cannot be defined in worker mode");
+  };
+}
 
 export class SKDBWorker implements SKDB {
   private worker: PromiseWorker;
@@ -69,6 +123,8 @@ export class SKDBWorker implements SKDB {
   }
 
   connectedRemote = async () => {
-    return this.worker.post(new Function("connectedRemote", []));
+    return this.worker.post(new Function("connectedRemote", [], {wrap: true, autoremove: true})).then(wrapped => {
+      return new WrappedRemote(this.worker, wrapped.wrapped) as any as RemoteSKDB;
+    });
   }
 }

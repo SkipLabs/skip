@@ -71,7 +71,7 @@ var onMessage = (message: MessageEvent) => {
         result => post(new Message(data!.id, new Return(true, result)))
       ).catch(e => post(new Message(data!.id, new Return(false, e))))
     }
-    if (obj?.autoremove) {
+    if (obj?.autoremove || caller.remove) {
       wrapped.delete(caller.wrapped);
     }
   }
