@@ -45,21 +45,24 @@ export class Caller implements Payload {
   wrapped: number;
   fn: string;
   parameters: Array<any>;
+  remove: boolean;
 
 
-  constructor(wrapped: number, fn: string, parameters: Array<any>) {
+  constructor(wrapped: number, fn: string, parameters: Array<any>, remove: boolean = false) {
     this.wrapped = wrapped;
     this.fn = fn;
     this.parameters = parameters;
+    this.remove = remove;
   }
 
 
   static convert(obj: object) {
-    if (!("wrapped" in obj) ||  !("fn" in obj) || !("parameters" in obj)) return null;
+    if (!("wrapped" in obj) ||  !("fn" in obj) || !("parameters" in obj) || !("remove" in obj)) return null;
     let fn = new Caller(
       obj.wrapped! as number,
       obj.fn! as string,
       obj.parameters! as Array<any>,
+      obj.remove! as boolean,
     );
     return fn;
   }
