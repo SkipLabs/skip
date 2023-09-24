@@ -21,7 +21,7 @@ value class Name private (
   }
 }
 
-base class Stmt {
+base class Stmt uses Equality {
   children =
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
@@ -62,7 +62,7 @@ class TableSchema{
   constraints: Array<TableConstraint>,
   withoutRowid: Bool,
   strict: Bool,
-}
+} uses Equality
 
 class ColumnDefinition{
   name: Name,
@@ -76,10 +76,10 @@ class ColumnDefinition{
   collate: ?CCCollate = None(),
   foreignKey: ?CCForeignKey = None(),
   generated: ?CCGenerated = None(),
-}
+} uses Equality
 
 // TODO: Add `pos` for better error messages.
-base class ColumnConstraint{constraintName: ?Name = None()} {
+base class ColumnConstraint{constraintName: ?Name = None()} uses Equality {
   children =
   | CCPrimaryKey{
     order: IKind,
@@ -95,7 +95,7 @@ base class ColumnConstraint{constraintName: ?Name = None()} {
   | CCGenerated{expr: Expr, stored: Bool, virtual: Bool}
 }
 
-base class TableConstraint{constraintName: ?String} {
+base class TableConstraint{constraintName: ?String} uses Equality {
   children =
   | TCPrimaryKey{columns: Array<IndexedColumn>, onConflict: ?OnConflict}
   | TCUnique{columns: Array<IndexedColumn>, onConflict: ?OnConflict}
@@ -103,21 +103,25 @@ base class TableConstraint{constraintName: ?String} {
   | TCForeignKey{columns: Array<Name>, references: ?ForeignKeyClause}
 }
 
-class IndexedColumn{expr: Expr, collate: ?Name, order: IKind} {}
+class IndexedColumn{expr: Expr, collate: ?Name, order: IKind} uses Equality
 
 // TODO
-class ForeignKeyClause{}
+class ForeignKeyClause{} uses Equality
 
-base class OnConflict {
+base class OnConflict uses Equality {
   children =
   | OCIgnore()
   | OCReplace()
   | OCUpdate(Update)
 }
 
-class TableName(name: FromName, asName: ?Name, indexed: Bool = true)
+class TableName(
+  name: FromName,
+  asName: ?Name,
+  indexed: Bool = true,
+) uses Equality
 
-base class InsertValues {
+base class InsertValues uses Equality {
   children =
   | IValues(Array<Array<Value>>)
   | IQuery(Select)
@@ -130,13 +134,13 @@ base class IKind uses Orderable {
   | IDESC()
 }
 
-base class FromName {
+base class FromName uses Equality {
   children =
   | FName(Name)
   | FQuery(Select)
 }
 
-class SelectParams(isStar: Bool, params: Array<(Expr, ?Name)>)
+class SelectParams(isStar: Bool, params: Array<(Expr, ?Name)>) uses Equality
 
 class Select{
   id: Name,
@@ -154,7 +158,11 @@ class Select{
   shouldExpand: Bool = false,
 } extends Stmt
 
-class Join{kind: JoinKind, names: Array<TableName>, on: ?(Expr, Array<Expr>)}
+class Join{
+  kind: JoinKind,
+  names: Array<TableName>,
+  on: ?(Expr, Array<Expr>),
+} uses Equality
 
 base class JoinKind uses Orderable {
   children =
@@ -179,7 +187,7 @@ base class QUnionKind uses Orderable {
   | UIntersect()
 }
 
-base class Value extends Expr uses Equality {
+base class Value extends Expr {
   children =
   | VNull()
   | VInt(Int)
@@ -190,7 +198,7 @@ base class Value extends Expr uses Equality {
   | VParam(String)
 }
 
-base class Expr {
+base class Expr uses Equality {
   children =
   | In(Expr, InValues, negated: Bool)
   | Between(Expr, Expr, Expr, negated: Bool)
@@ -210,16 +218,7 @@ base class Expr {
 class Identifier(
   name: Name,
   table: ?Name = None(),
-) extends Expr uses Orderable, Hashable, Show {
-  fun compare(y: Identifier): Order {
-    res = this.table.compare(y.table);
-    if (res == EQ()) {
-      this.name.compare(y.name)
-    } else {
-      res
-    }
-  }
-
+) extends Expr uses Hashable, Show {
   fun toString(): String {
     this.table match {
     | Some(table) -> `${table}.${this.name}`
@@ -228,7 +227,7 @@ class Identifier(
   }
 }
 
-base class UnaryOperator {
+base class UnaryOperator uses Equality {
   children =
   | UnaryNot()
   | UnaryPlus()
@@ -237,7 +236,7 @@ base class UnaryOperator {
   | UnaryIsNull(negated: Bool)
 }
 
-base class BinaryOperator uses Show {
+base class BinaryOperator uses Equality, Show {
   children =
   | OPlus()
   | OMinus()
@@ -323,7 +322,7 @@ base class BinaryOperator uses Show {
   | OMatch(negated) -> if (negated) "NOT MATCH" else "MATCH"
 }
 
-base class InValues {
+base class InValues uses Equality {
   children =
   | InList(Array<Expr>)
   | InSelect(Select)
@@ -336,7 +335,7 @@ base class Type uses Orderable {
   | TEXT()
 }
 
-base class TransactionKind {
+base class TransactionKind uses Equality {
   children =
   | TransactionDeferred()
   | TransactionImmediate()
