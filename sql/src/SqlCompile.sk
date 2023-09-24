@@ -187,7 +187,7 @@ mutable class Compiler{
       pos => select.pos,
       id => select.id,
       distinct => select.distinct,
-      params => SelectParams(true, Array[]),
+      params => Array[SelectStar(None())],
       from => Some(
         Array[
           TableName(
@@ -414,30 +414,9 @@ mutable class Compiler{
 
   mutable fun compileParams(
     context: mutable SKStore.Context,
-    selectParams: SelectParams,
+    selectParams: Array<SelectResult>,
     origFrom: Array<DirDescr>,
   ): Array<CGExpr> {
-    sparams = if (selectParams.isStar) {
-      extraParams = selectParams.params;
-      params = mutable Vector<(Expr, ?Name)>[];
-      for (tableNbr => dirDescr in origFrom) {
-        tableName = dirDescr.alias match {
-        // NOTE: This branch is actually never taken because `compileFrom()`
-        // unconditionally sets `dirDescr.alias` to the desired value.
-        | None() -> Name::create(`${dirDescr.name.origName}_${tableNbr}`)
-        | Some(x) -> x
-        };
-        for (varName in dirDescr.colNames) {
-          params.push((Identifier(varName, Some(tableName)), None()))
-        }
-      };
-      for (extraParam in extraParams) {
-        params.push(extraParam);
-      };
-      params.toArray()
-    } else {
-      selectParams.params
-    };
     origFromMap = mutable Map[];
     for (table in origFrom) {
       if (!origFromMap.containsKey(table.name)) {
@@ -450,23 +429,40 @@ mutable class Compiler{
       }
     };
     expandedSParams = mutable Vector[];
-    for (sparam in sparams) {
-      sparam match {
-      | (Identifier(star, Some(tableName)), None()) if (star.lower == "*") ->
+    for (tableNbr => param in selectParams) {
+      param match {
+      | SelectStar(None()) ->
+        for (dirDescr in origFrom) {
+          tableName = dirDescr.alias match {
+          // NOTE: This branch is actually never taken because `compileFrom()`
+          // unconditionally sets `dirDescr.alias` to the desired value.
+          | None() -> Name::create(`${dirDescr.name.origName}_${tableNbr}`)
+          | Some(x) -> x
+          };
+          for (varName in dirDescr.colNames) {
+            expandedSParams.push(
+              SelectExpr(Identifier(varName, Some(tableName)), None()),
+            )
+          }
+        }
+
+      | SelectStar(Some(tableName)) ->
         if (!origFromMap.containsKey(tableName)) {
           error(this.pos, `Table not found: ${tableName}`);
         };
         tableDescr = origFromMap[tableName];
         for (colName in tableDescr.colNames) {
-          expandedSParams.push((Identifier(colName, Some(tableName)), None()))
+          expandedSParams.push(
+            SelectExpr(Identifier(colName, Some(tableName)), None()),
+          )
         }
-      | _ -> expandedSParams.push(sparam)
+
+      | p @ SelectExpr _ -> expandedSParams.push(p)
       }
     };
 
     expandedSParams.toArray().map(param -> {
-      (expr, _) = param;
-      this.compileExpr(context, expr)
+      this.compileExpr(context, param.expr)
     })
   }
 
@@ -582,7 +578,7 @@ mutable class Compiler{
   }
 
   static fun getCols(
-    params: SelectParams,
+    params: Array<SelectResult>,
     from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
   ): (SortedMap<Name, Int>, readonly Map<Int, Name>) {
     cols = SortedMap[];
@@ -602,22 +598,20 @@ mutable class Compiler{
       }
     };
 
-    if (params.isStar) {
-      for (dirDescr in from) {
-        for (tyName in dirDescr.i0.colNames) {
-          if (!cols.containsKey(tyName)) {
-            !cols[tyName] = slot;
-            invCols![slot] = tyName;
-          };
-          !slot = slot + 1;
-        }
-      }
-    };
-
-    for (paramIdx => param in params.params) {
-      idx = slot + paramIdx;
+    for (param in params) {
       param match {
-      | (Identifier(star, Some(tableName)), _) if (star.lower == "*") ->
+      | SelectStar(None()) ->
+        for (dirDescr in from) {
+          for (tyName in dirDescr.i0.colNames) {
+            if (!cols.containsKey(tyName)) {
+              !cols[tyName] = slot;
+              invCols![slot] = tyName;
+            };
+            !slot = slot + 1;
+          }
+        }
+
+      | SelectStar(Some(tableName)) ->
         dirDescr = origFromMap[tableName];
         for (tyName in dirDescr.colNames) {
           if (!cols.containsKey(tyName)) {
@@ -626,15 +620,19 @@ mutable class Compiler{
           };
           !slot = slot + 1;
         }
-      | (_, Some(aliasColName)) ->
+
+      | SelectExpr(_, Some(aliasColName)) ->
         if (cols.containsKey(aliasColName)) continue;
-        !cols[aliasColName] = idx;
-        invCols![idx] = aliasColName
-      | (Identifier(colName, _), None _) ->
+        !cols[aliasColName] = slot;
+        invCols![slot] = aliasColName;
+        !slot = slot + 1
+
+      | SelectExpr(Identifier(colName, _), None _) ->
         if (cols.containsKey(colName)) continue;
-        !cols[colName] = idx;
-        invCols![idx] = colName
-      | _ -> void
+        !cols[colName] = slot;
+        invCols![slot] = colName;
+        !slot = slot + 1
+      | _ -> !slot = slot + 1
       }
     };
 
@@ -642,7 +640,7 @@ mutable class Compiler{
   }
 
   static fun getSchema(
-    params: SelectParams,
+    params: Array<SelectResult>,
     from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
     cparams: Array<CGExpr>,
   ): Array<ColumnDefinition> {
@@ -663,7 +661,7 @@ mutable class Compiler{
   }
 
   static fun getDirDescr(
-    params: SelectParams,
+    params: Array<SelectResult>,
     from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
     cparams: Array<CGExpr>,
     selectId: Name,
@@ -801,7 +799,7 @@ mutable class Compiler{
   }
 
   mutable fun compileOrderBy(
-    params: SelectParams,
+    params: Array<SelectResult>,
     from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
     orderByOpt: ?Array<(Expr, IKind)>,
   ): ?Array<(Int, IKind)> {
