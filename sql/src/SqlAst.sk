@@ -36,7 +36,7 @@ base class Stmt {
     virtual: Bool,
     name: Name,
     ifNotExists: Bool,
-    query: Query,
+    query: Select,
     text: String,
   }
   | CreateIndex{
@@ -74,7 +74,7 @@ class TableName(name: FromName, asName: ?Name, indexed: Bool = true)
 base class InsertValues {
   children =
   | IValues(Array<Array<Value>>)
-  | IQuery(Query)
+  | IQuery(Select)
 }
 
 base class IKind uses Orderable {
@@ -87,10 +87,8 @@ base class IKind uses Orderable {
 base class FromName {
   children =
   | FName(Name)
-  | FQuery(Query)
+  | FQuery(Select)
 }
-
-base class Query
 
 class SelectParams(isStar: Bool, params: Array<(Expr, ?Name)>)
 
@@ -108,7 +106,7 @@ class Select{
   limit: ?Expr,
   rest: ?(QueryKind, Select),
   shouldExpand: Bool = false,
-} extends Query, Stmt
+} extends Stmt
 
 class Join{kind: JoinKind, names: Array<TableName>, on: ?(Expr, Array<Expr>)}
 
@@ -153,8 +151,8 @@ base class Expr {
   | Like(Expr, Expr, escape: ?Expr, negated: Bool)
   | On(JoinKind, Expr)
   | BinOp(BinaryOperator, Expr, Expr)
-  | Subquery(Query)
-  | Exists(Query, negated: Bool)
+  | Subquery(Select)
+  | Exists(Select, negated: Bool)
   | UnOp(UnaryOperator, Expr)
   | Tuple(Array<Expr>)
   | Case(condOpt: ?Expr, whenCases: Array<(Expr, Expr)>, elseCase: ?Expr)
