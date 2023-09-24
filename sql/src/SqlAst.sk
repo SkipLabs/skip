@@ -155,12 +155,10 @@ base class FromName uses Equality {
   | FQuery(Select)
 }
 
-class SelectParams(isStar: Bool, params: Array<(Expr, ?Name)>) uses Equality
-
 class Select{
   id: Name,
   distinct: Bool,
-  params: SelectParams,
+  params: Array<SelectResult>,
   from: ?Array<TableName>,
   join: ?Join,
   where: ?Expr,
@@ -171,6 +169,12 @@ class Select{
   rest: ?(QueryKind, Select),
   shouldExpand: Bool = false,
 } extends Stmt
+
+base class SelectResult uses Equality {
+  children =
+  | SelectStar(table: ?Name)
+  | SelectExpr(expr: Expr, alias: ?Name)
+}
 
 class Join{
   kind: JoinKind,
@@ -412,8 +416,11 @@ fun hasAggr(expr: Expr): Bool {
 fun selectIsAggr(select: Select): Bool {
   select.groupBy is Some _ ||
     {
-      for (e in select.params.params) {
-        if (hasAggr(e.i0)) return true;
+      for (param in select.params) {
+        param match {
+        | SelectExpr(e, _) if (hasAggr(e)) -> return true
+        | _ -> void
+        }
       };
       false
     }

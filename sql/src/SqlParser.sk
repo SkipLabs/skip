@@ -141,22 +141,16 @@ fun parseQuery(lex: Lexer, pos: Int): (Int, Select) {
   parseSelect(lex, pos);
 }
 
-fun parseSelectParams(lex: Lexer, pos: Int): (Int, SelectParams) {
+fun parseSelectParams(lex: Lexer, pos: Int): (Int, Array<SelectResult>) {
   (!pos, colNames) = parseColNames(lex, pos);
-  selectParams = colNames match {
-  | None() ->
-    if (lex.isEq(pos, ",")) {
-      !pos = lex.expect(pos, ",");
-      (!pos, extraParamsOpt) = parseColNames(lex, pos);
-      extraParamsOpt match {
-      | None() -> error(pos, "*, * not allowed")
-      | Some(extraParams) -> SelectParams(true, extraParams)
-      }
-    } else {
-      SelectParams(true, Array[])
+  selectParams = colNames.fromSome().map(p ->
+    p.i0 match {
+    | Identifier(star, None()) if (star.lower == "*") -> SelectStar(None())
+    | Identifier(star, Some(tableName)) if (star.lower == "*") ->
+      SelectStar(Some(tableName))
+    | _ -> SelectExpr(p.i0, p.i1)
     }
-  | Some(params) -> SelectParams(false, params)
-  };
+  );
   (pos, selectParams)
 }
 
@@ -265,10 +259,7 @@ fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
 }
 
 fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?Name)>) {
-  (_, tok) = lex.next(pos);
-  if (lex.isEqAt(tok, "*")) {
-    return (tok.posEnd, None());
-  };
+  _ = lex.next(pos);
   params = mutable Vector[];
   loop {
     (!pos, param) = parseExpr(lex, pos);
