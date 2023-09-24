@@ -416,9 +416,11 @@ mutable class Compiler{
     sparams = if (selectParams.isStar) {
       extraParams = selectParams.params;
       params = mutable Vector<(Expr, ?Name)>[];
-      for (dirDescr in origFrom) {
+      for (tableNbr => dirDescr in origFrom) {
         tableName = dirDescr.alias match {
-        | None() -> dirDescr.name
+        // NOTE: This branch is actually never taken because `compileFrom()`
+        // unconditionally sets `dirDescr.alias` to the desired value.
+        | None() -> Name::create(`${dirDescr.name.origName}_${tableNbr}`)
         | Some(x) -> x
         };
         for (varName in dirDescr.colNames) {
@@ -479,11 +481,11 @@ mutable class Compiler{
     | Some(fromTables) ->
       tableNbr = 0;
 
-      tables = fromTables.map(fromTable -> {
+      tables = fromTables.mapWithIndex((tableNbr, fromTable) -> {
         table = this.getFromDirDescr(context, fromTable.name);
         tableAlias = fromTable.asName match {
         | Some(x) -> x
-        | None() -> table.name
+        | None() -> Name::create(`${table.name.origName}_${tableNbr}`)
         };
         !table.alias = Some(tableAlias);
         table
@@ -495,6 +497,13 @@ mutable class Compiler{
 
         for (colName => colNbr in table.cols) {
           this.addGetFrom(tableNbr, table.schema, colName, colNbr);
+
+          if (fromName.asName is None _) {
+            dotName = Name::create(
+              table.alias.fromSome().origName + "." + colName.origName,
+            );
+            this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
+          }
         };
         fromName.asName match {
         | None() ->

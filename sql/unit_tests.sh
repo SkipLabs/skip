@@ -267,3 +267,10 @@ if cat test/test_index_transaction2.sql | $SKDB --show-used-indexes | tr ' ' 'S'
 else
     fail "TRANSACTION INDEX 2"
 fi
+
+if cat test/unit/test_duplicate_join.sql | $SKDB --always-allow-joins | grep -q '1|1';
+then
+    pass "DUPLICATE JOIN"
+else
+    fail "DUPLICATE JOIN"
+fi
