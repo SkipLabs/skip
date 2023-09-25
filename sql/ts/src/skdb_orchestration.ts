@@ -1398,7 +1398,7 @@ class SKDBServer implements RemoteSKDB {
         this.deliverDataTransferProtoMsg(msg, payload => {
           // we only expect acks back in the form of checkpoints.
           // let's store these as a watermark against the table.
-          client.writeCsv(tableName, payload, this.replicationUid);
+          client.writeCsv(metadataTable(tableName), payload, this.replicationUid);
         });
       }
     }
