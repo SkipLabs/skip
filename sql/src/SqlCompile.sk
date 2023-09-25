@@ -701,6 +701,9 @@ mutable class Compiler{
     select.join match {
     | None() -> select
     | Some(join) ->
+      if (join.using is Some _) {
+        error(this.pos, "JOIN USING not implemented")
+      };
       join.kind match {
       | JCross() ->
         !select.from = select.from match {
