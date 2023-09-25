@@ -715,7 +715,9 @@ class Evaluator{options: Options, user: ?UserFile} {
   ): SKStore.DirName {
     sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
     sinkDirName = SKStore.DirName::create(sinkName);
-    from = Some(Array[TableName(FName(name), None(), false)]);
+    from = Some(
+      FromName{name => FName(name), asName => None(), indexed => false},
+    );
     selectAst = Select{
       pos => pos,
       core => SelectCore{
@@ -724,7 +726,6 @@ class Evaluator{options: Options, user: ?UserFile} {
         where,
         groupBy => None(),
         having => None(),
-        join => None(),
         distinct => false,
       },
       limit => None(),

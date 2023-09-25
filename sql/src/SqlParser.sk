@@ -165,11 +165,11 @@ fun parseSelectCore(lex: Lexer, pos: Int): (Int, SelectCore) {
     false
   };
   (!pos, selectParams) = parseSelectParams(lex, pos);
-  (from, join) = if (lex.isEqUpper(pos, "FROM")) {
-    (!pos, from, join) = parseFromJoin(lex, pos);
-    (Some(from), join)
+  from = if (lex.isEqUpper(pos, "FROM")) {
+    (!pos, join) = parseFromJoin(lex, pos);
+    Some(join)
   } else {
-    (None(), None())
+    None()
   };
   where = if (lex.isEqUpper(pos, "WHERE")) {
     !pos = lex.expectUpper(pos, "WHERE");
@@ -196,15 +196,7 @@ fun parseSelectCore(lex: Lexer, pos: Int): (Int, SelectCore) {
 
   (
     pos,
-    SelectCore{
-      distinct,
-      params => selectParams,
-      from,
-      join,
-      where,
-      groupBy,
-      having,
-    },
+    SelectCore{distinct, params => selectParams, from, where, groupBy, having},
   )
 }
 
@@ -292,7 +284,7 @@ fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?Name)>) {
   (pos, Some(params.toArray()))
 }
 
-fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
+fun parseTableName(lex: Lexer, pos: Int): (Int, FromName) {
   sfrom = if (lex.isEq(pos, "(")) {
     !pos = lex.expect(pos, "(");
     (!pos, query) = parseQuery(lex, pos);
@@ -304,11 +296,11 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
   };
   posMark = pos;
   if (isEOF(lex, pos)) {
-    return (posMark, TableName(sfrom, None()));
+    return (posMark, FromName{name => sfrom, asName => None()});
   };
   (!pos, tok) = lex.next(pos);
   if (isSymbol(lex.content[tok.posBegin])) {
-    return (posMark, TableName(sfrom, None()))
+    return (posMark, FromName{name => sfrom, asName => None()})
   };
   word = lex.wordAt(tok);
   wordUpper = word.uppercase();
@@ -343,10 +335,10 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, TableName) {
   } else {
     true
   };
-  (pos, TableName(sfrom, asStr, indexed))
+  (pos, FromName{name => sfrom, asName => asStr, indexed})
 }
 
-fun parseTableNames(lex: Lexer, pos: Int): (Int, Array<TableName>) {
+fun parseTableNames(lex: Lexer, pos: Int): (Int, Array<FromName>) {
   (!pos, first) = parseTableName(lex, pos);
   tableNames = mutable Vector[first];
   loop {
@@ -361,7 +353,10 @@ fun parseTableNames(lex: Lexer, pos: Int): (Int, Array<TableName>) {
   (pos, tableNames.toArray())
 }
 
-fun parseJoin(lex: Lexer, pos: Int, kind: JoinKind): (Int, Join) {
+fun parseJoin(
+  lex: Lexer,
+  pos: Int,
+): (Int, Array<FromName>, ?(Expr, Array<Expr>)) {
   !pos = lex.expectUpper(pos, "JOIN");
   (!pos, names) = parseTableNames(lex, pos);
   on = if (lex.isEqUpper(pos, "ON")) {
@@ -377,10 +372,10 @@ fun parseJoin(lex: Lexer, pos: Int, kind: JoinKind): (Int, Join) {
   } else {
     None()
   };
-  (pos, Join{kind, names, on, using => None()})
+  (pos, names, on)
 }
 
-fun parseFromJoin(lex: Lexer, pos: Int): (Int, Array<TableName>, ?Join) {
+fun parseFromJoin(lex: Lexer, pos: Int): (Int, SelectFrom) {
   !pos = lex.expectUpper(pos, "FROM");
   posBeforeParen = pos;
   hasParen = lex.isEq(pos, "(");
@@ -391,42 +386,63 @@ fun parseFromJoin(lex: Lexer, pos: Int): (Int, Array<TableName>, ?Join) {
       !hasParen = false;
     }
   };
+  arrToJoin = (init: SelectFrom, arr: Array<FromName>) -> {
+    res = init;
+    for (rhs in arr) {
+      !res = Join{
+        kind => JComma(),
+        lhs => res,
+        rhs,
+        on => None(),
+        using => None(),
+      }
+    };
+
+    res
+  };
+
   (!pos, result) = parseTableNames(lex, pos);
-  join = if (lex.isEqUpper(pos, "CROSS")) {
+  join = arrToJoin(result[0], result.drop(1));
+  kind = if (lex.isEqUpper(pos, "CROSS")) {
     !pos = lex.expectUpper(pos, "CROSS");
-    (!pos, join) = parseJoin(lex, pos, JCross());
-    Some(join)
+    Some(JCross())
   } else if (lex.isEqUpper(pos, "LEFT")) {
     !pos = lex.expectUpper(pos, "LEFT");
     if (lex.isEqUpper(pos, "OUTER")) {
       !pos = lex.expectUpper(pos, "OUTER")
     };
-    (!pos, join) = parseJoin(lex, pos, JLeft(false));
-    Some(join)
+    Some(JLeft(false))
   } else if (lex.isEqUpper(pos, "RIGHT")) {
     !pos = lex.expectUpper(pos, "RIGHT");
     if (lex.isEqUpper(pos, "OUTER")) {
       !pos = lex.expectUpper(pos, "OUTER")
     };
-    (!pos, join) = parseJoin(lex, pos, JRight(false));
-    Some(join)
+    Some(JRight(false))
   } else if (lex.isEqUpper(pos, "INNER")) {
     !pos = lex.expectUpper(pos, "INNER");
-    (!pos, join) = parseJoin(lex, pos, JInner(false));
-    Some(join)
+    Some(JInner(false))
   } else if (lex.isEqUpper(pos, "JOIN")) {
-    (!pos, join) = parseJoin(lex, pos, JInner(false));
-    Some(join)
+    Some(JInner(false))
   } else if (lex.isEqUpper(pos, "FULL")) {
     !pos = lex.expectUpper(pos, "FULL");
     !pos = lex.expectUpper(pos, "OUTER");
-    (!pos, join) = parseJoin(lex, pos, JFull(false));
-    Some(join)
+    Some(JFull(false))
   } else {
     None()
   };
+
+  kind match {
+  | None() -> void
+  | Some(k) ->
+    (!pos, names, on) = parseJoin(lex, pos);
+    !join = arrToJoin(
+      Join{kind => k, lhs => join, rhs => names[0], on, using => None()},
+      names.drop(1),
+    )
+  };
+
   if (hasParen) !pos = lex.expect(pos, ")");
-  (pos, result, join)
+  (pos, join)
 }
 
 fun parseOrderByElt(lex: Lexer, pos: Int): (Int, (Expr, IKind)) {
