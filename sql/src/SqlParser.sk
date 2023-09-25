@@ -20,7 +20,7 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
     (!pos, x) = parseDelete(lex, pos);
     (pos, Some(x))
   | "SELECT" ->
-    (!pos, x) = parseSelect(lex, pos, true);
+    (!pos, x) = parseSelect(lex, pos);
     (pos, Some(x))
   | "PRAGMA" ->
     while (!lex.isEq(pos, ";")) {
@@ -138,7 +138,7 @@ fun parseDrop(lex: Lexer, pos: Int): (Int, Stmt) {
 
 fun parseQuery(lex: Lexer, pos: Int): (Int, Select) {
   !pos = lex.expectUpper(pos, "SELECT");
-  parseSelect(lex, pos, true);
+  parseSelect(lex, pos);
 }
 
 fun parseSelectParams(lex: Lexer, pos: Int): (Int, Array<SelectResult>) {
@@ -154,8 +154,7 @@ fun parseSelectParams(lex: Lexer, pos: Int): (Int, Array<SelectResult>) {
   (pos, selectParams)
 }
 
-fun parseSelect(lex: Lexer, pos: Int, toplevel: Bool): (Int, Select) {
-  posBegin = lex.token(pos).posBegin;
+fun parseSelectCore(lex: Lexer, pos: Int): (Int, SelectCore) {
   distinct = if (lex.isEqUpper(pos, "ALL")) {
     !pos = lex.expectUpper(pos, "ALL");
     false
@@ -195,47 +194,9 @@ fun parseSelect(lex: Lexer, pos: Int, toplevel: Bool): (Int, Select) {
     None()
   };
 
-  limit: ?Expr = None();
-  orderBy: ?Array<(Expr, IKind)> = None();
-  restVector = mutable Vector[];
-  if (toplevel) {
-    loop {
-      rkind = if (lex.isEqUpper(pos, "EXCEPT")) {
-        !pos = lex.expectUpper(pos, "EXCEPT");
-        COExcept()
-      } else if (lex.isEqUpper(pos, "UNION")) {
-        !pos = lex.expectUpper(pos, "UNION");
-        if (lex.isEqUpper(pos, "ALL")) {
-          !pos = lex.expectUpper(pos, "ALL");
-          COUnionAll()
-        } else {
-          COUnion()
-        };
-      } else if (lex.isEqUpper(pos, "INTERSECT")) {
-        !pos = lex.expectUpper(pos, "INTERSECT");
-        COIntersect()
-      } else {
-        break void;
-      };
-      !pos = lex.expectUpper(pos, "SELECT");
-      (!pos, select) = parseSelect(lex, pos, false);
-      restVector.push((rkind, select));
-    };
-
-    if (lex.isEqUpper(pos, "ORDER")) {
-      (!pos, x) = parseOrderBy(lex, pos);
-      !orderBy = Some(x)
-    };
-    if (lex.isEqUpper(pos, "LIMIT")) {
-      !pos = lex.expectUpper(pos, "LIMIT");
-      (!pos, x) = parseExpr(lex, pos);
-      !limit = Some(x)
-    };
-  };
-
-  query = Select{
-    pos => posBegin,
-    core => SelectCore{
+  (
+    pos,
+    SelectCore{
       distinct,
       params => selectParams,
       from,
@@ -244,6 +205,52 @@ fun parseSelect(lex: Lexer, pos: Int, toplevel: Bool): (Int, Select) {
       groupBy,
       having,
     },
+  )
+}
+
+fun parseSelect(lex: Lexer, pos: Int): (Int, Select) {
+  posBegin = lex.token(pos).posBegin;
+
+  (!pos, core) = parseSelectCore(lex, pos);
+  limit: ?Expr = None();
+  orderBy: ?Array<(Expr, IKind)> = None();
+  restVector = mutable Vector[];
+  loop {
+    rkind = if (lex.isEqUpper(pos, "EXCEPT")) {
+      !pos = lex.expectUpper(pos, "EXCEPT");
+      COExcept()
+    } else if (lex.isEqUpper(pos, "UNION")) {
+      !pos = lex.expectUpper(pos, "UNION");
+      if (lex.isEqUpper(pos, "ALL")) {
+        !pos = lex.expectUpper(pos, "ALL");
+        COUnionAll()
+      } else {
+        COUnion()
+      };
+    } else if (lex.isEqUpper(pos, "INTERSECT")) {
+      !pos = lex.expectUpper(pos, "INTERSECT");
+      COIntersect()
+    } else {
+      break void;
+    };
+    !pos = lex.expectUpper(pos, "SELECT");
+    (!pos, select) = parseSelectCore(lex, pos);
+    restVector.push((rkind, select));
+  };
+
+  if (lex.isEqUpper(pos, "ORDER")) {
+    (!pos, x) = parseOrderBy(lex, pos);
+    !orderBy = Some(x)
+  };
+  if (lex.isEqUpper(pos, "LIMIT")) {
+    !pos = lex.expectUpper(pos, "LIMIT");
+    (!pos, x) = parseExpr(lex, pos);
+    !limit = Some(x)
+  };
+
+  query = Select{
+    pos => posBegin,
+    core,
     orderBy,
     limit,
     rest => restVector.toArray(),
@@ -547,7 +554,7 @@ fun parseExprWithPrio(priority: Int, lex: Lexer, pos: Int): (Int, Expr) {
     (!pos, e) = parseExprWithPrio(opPriority["ALL"], lex, pos);
     e
   } else if (lex.isEqUpperAt(tok, "SELECT")) {
-    (!pos, select) = parseSelect(lex, pos, true);
+    (!pos, select) = parseSelect(lex, pos);
     Subquery(select)
   } else if (lex.isEqUpperAt(tok, "EXISTS")) {
     !pos = lex.expect(pos, "(");
@@ -784,7 +791,7 @@ fun parseView(
     !pos = lex.expectUpper(pos, "AS");
   };
   !pos = lex.expectUpper(pos, "SELECT");
-  (!pos, query) = parseSelect(lex, pos, true);
+  (!pos, query) = parseSelect(lex, pos);
   text = lex.content.slice(posBegin, pos);
   (
     pos,
@@ -934,7 +941,7 @@ fun parseParamsOpt(lex: Lexer, pos: Int): (Int, ?Array<Name>) {
 fun parseValues(lex: Lexer, pos: Int): (Int, InsertValues) {
   if (lex.isEqUpper(pos, "SELECT")) {
     !pos = lex.expectUpper(pos, "SELECT");
-    (!pos, select) = parseSelect(lex, pos, true);
+    (!pos, select) = parseSelect(lex, pos);
     return (pos, IQuery(select));
   };
   !pos = lex.expectUpper(pos, "VALUES");
