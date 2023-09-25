@@ -191,26 +191,23 @@ mutable class Compiler{
       distinct => select.distinct,
       params => Array[SelectStar(None())],
       from => Some(
-        Array[
-          TableName(
-            FQuery(
-              Select{
-                pos => 0,
-                core => select with {distinct => false},
-                orderBy => None(),
-                limit => None(),
-                rest => Array[],
-              },
-            ),
-            None(),
-            false,
+        FromName{
+          name => FQuery(
+            Select{
+              pos => 0,
+              core => select with {distinct => false},
+              orderBy => None(),
+              limit => None(),
+              rest => Array[],
+            },
           ),
-        ],
+          asName => None(),
+          indexed => false,
+        },
       ),
       where => None(),
       groupBy => None(),
       having => None(),
-      join => None(),
     }
   }
 
@@ -250,8 +247,18 @@ mutable class Compiler{
     isAggr = selectIsAggr(select);
     this.!isAggr = isAggr;
 
-    origFrom = this.compileFrom(context, select.from);
-    (cond, from) = this.compileJoin(context, origFrom, select.where);
+    (joinFrom, cond) = select.from match {
+    | Some(x) -> this.expandJoins(x)
+    | None() -> (Array[], None())
+    };
+    !select.where = (cond, select.where) match {
+    | (None(), c)
+    | (c, None()) ->
+      c
+    | (Some(c), Some(w)) -> Some(BinOp(OAnd(), c, w))
+    };
+    origFrom = this.compileFrom(context, joinFrom);
+    (!cond, from) = this.compileJoin(context, origFrom, select.where);
     !select.where = cond;
     params = this.compileParams(context, select.params, origFrom);
     where = this.compileWhere(context, select.where);
@@ -318,8 +325,6 @@ mutable class Compiler{
       !select.core = this.expandGroupBy(select.core);
       !select.rest = select.rest.map(x -> (x.i0, this.expandGroupBy(x.i1)))
     };
-
-    !select.core = this.expandJoins(select.core);
 
     core = this.compileSelectCore(context, select.core, selectId, sets);
 
@@ -486,76 +491,72 @@ mutable class Compiler{
 
   mutable fun compileFrom(
     context: mutable SKStore.Context,
-    from: ?Array<TableName>,
+    fromTables: Array<FromName>,
   ): Array<SKDB.DirDescr> {
-    from match {
-    | None() -> Array[]
-    | Some(fromTables) ->
-      tableNbr = 0;
+    tableNbr = 0;
 
-      tables = fromTables.mapWithIndex((tableNbr, fromTable) -> {
-        table = this.getFromDirDescr(context, fromTable.name);
-        tableAlias = fromTable.asName match {
-        | Some(x) -> x
-        | None() -> Name::create(`${table.name.origName}_${tableNbr}`)
-        };
-        !table.alias = Some(tableAlias);
-        table
-      });
+    tables = fromTables.mapWithIndex((tableNbr, fromTable) -> {
+      table = this.getFromDirDescr(context, fromTable.name);
+      tableAlias = fromTable.asName match {
+      | Some(x) -> x
+      | None() -> Name::create(`${table.name.origName}_${tableNbr}`)
+      };
+      !table.alias = Some(tableAlias);
+      table
+    });
 
-      for (i => fromName in fromTables) {
-        table = tables[i];
-        tableName = table.name;
+    for (i => fromName in fromTables) {
+      table = tables[i];
+      tableName = table.name;
 
+      for (colName => colNbr in table.cols) {
+        this.addGetFrom(tableNbr, table.schema, Identifier(colName), colNbr);
+        if (fromName.asName is None _) {
+          this.addGetFrom(
+            tableNbr,
+            table.schema,
+            Identifier(colName, Some(table.alias.fromSome())),
+            colNbr,
+          )
+        }
+      };
+      fromName.asName match {
+      | None() ->
         for (colName => colNbr in table.cols) {
-          this.addGetFrom(tableNbr, table.schema, Identifier(colName), colNbr);
-          if (fromName.asName is None _) {
-            this.addGetFrom(
-              tableNbr,
-              table.schema,
-              Identifier(colName, Some(table.alias.fromSome())),
-              colNbr,
-            )
-          }
-        };
-        fromName.asName match {
-        | None() ->
-          for (colName => colNbr in table.cols) {
-            dotName = Identifier(colName, Some(tableName));
-            this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
-          }
-        | Some(asName) ->
-          for (colName => colNbr in table.cols) {
-            dotName = Identifier(colName, Some(asName));
-            this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
-          }
-        };
-
-        !tableNbr = tableNbr + 1;
+          dotName = Identifier(colName, Some(tableName));
+          this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
+        }
+      | Some(asName) ->
+        for (colName => colNbr in table.cols) {
+          dotName = Identifier(colName, Some(asName));
+          this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
+        }
       };
 
-      !tableNbr = 0;
+      !tableNbr = tableNbr + 1;
+    };
 
-      for (i => fromName in fromTables) {
-        table = tables[i];
-        tableName = table.name;
+    !tableNbr = 0;
 
-        fromName.asName match {
-        | None() -> void
-        | Some(_) ->
-          for (colName => colNbr in table.cols) {
-            dotName = Identifier(colName, Some(tableName));
-            if (!this.subst.containsKey(dotName)) {
-              this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
-            }
+    for (i => fromName in fromTables) {
+      table = tables[i];
+      tableName = table.name;
+
+      fromName.asName match {
+      | None() -> void
+      | Some(_) ->
+        for (colName => colNbr in table.cols) {
+          dotName = Identifier(colName, Some(tableName));
+          if (!this.subst.containsKey(dotName)) {
+            this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
           }
-        };
-
-        !tableNbr = tableNbr + 1;
+        }
       };
 
-      tables
-    }
+      !tableNbr = tableNbr + 1;
+    };
+
+    tables
   }
 
   mutable fun addGetFrom(
@@ -577,7 +578,7 @@ mutable class Compiler{
 
   mutable fun getFromDirDescr(
     context: mutable SKStore.Context,
-    name: FromName,
+    name: FromTableName,
   ): DirDescr {
     name match {
     | FName(tableName) -> getTable(context, this.pos, tableName)
@@ -697,28 +698,35 @@ mutable class Compiler{
     }
   }
 
-  readonly fun expandJoins(select: SelectCore): SelectCore {
-    select.join match {
-    | None() -> select
-    | Some(join) ->
-      if (join.using is Some _) {
+  readonly fun expandJoins(from: SelectFrom): (Array<FromName>, ?Expr) {
+    mergeConds = (lhs, rhs) -> {
+      (lhs, rhs) match {
+      | (None(), x)
+      | (x, None()) ->
+        x
+      | (Some(c1), Some(c2)) -> Some(BinOp(OAnd(), c1, c2))
+      }
+    };
+    from match {
+    | name @ FromName _ -> (Array[name], None())
+    | Join{kind, lhs, rhs, on, using} ->
+      if (using is Some _) {
         error(this.pos, "JOIN USING not implemented")
       };
-      join.kind match {
+      kind match {
+      | JComma()
       | JCross() ->
-        !select.from = select.from match {
-        | None() -> Some(join.names)
-        | Some(names) -> Some(names.concat(join.names))
-        };
-        !select.join = None();
-        select
+        expandedLhs = this.expandJoins(lhs);
+        expandedRhs = this.expandJoins(rhs);
+        (
+          expandedLhs.i0.concat(expandedRhs.i0),
+          mergeConds(expandedLhs.i1, expandedRhs.i1),
+        )
       | _ ->
-        !select.from = select.from match {
-        | None() -> Some(join.names)
-        | Some(names) -> Some(names.concat(join.names))
-        };
-        !select.join = None();
-        join.on match {
+        expandedLhs = this.expandJoins(lhs);
+        expandedRhs = this.expandJoins(rhs);
+        where = mergeConds(expandedLhs.i1, expandedRhs.i1);
+        on match {
         | None() -> errorNbr(4, this.pos, "Expected ON after JOIN")
         | Some((onClause, clauses)) ->
           clauseIter = clauses.iterator();
@@ -726,11 +734,11 @@ mutable class Compiler{
           for (clause in clauseIter) {
             !onClause = BinOp(OAnd(), onClause, clause);
           };
-          !select.where = select.where match {
-          | None() -> Some(On(join.kind, onClause))
-          | Some(where) -> Some(BinOp(OAnd(), On(join.kind, onClause), where))
+          !where = where match {
+          | None() -> Some(On(kind, onClause))
+          | Some(cond) -> Some(BinOp(OAnd(), On(kind, onClause), cond))
           };
-          select
+          (expandedLhs.i0.concat(expandedRhs.i0), where)
         }
       }
     }
@@ -1639,7 +1647,9 @@ mutable class Compiler{
         if (natural) {
           error(this.pos, "NATURAL JOINs not implemented")
         }
-      | JCross() -> void
+      | JComma()
+      | JCross() ->
+        void
       };
       (e, jk, eqJoin)
 
