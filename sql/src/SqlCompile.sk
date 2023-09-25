@@ -191,18 +191,15 @@ mutable class Compiler{
       distinct => select.distinct,
       params => Array[SelectStar(None())],
       from => Some(
-        FromName{
-          name => FQuery(
-            Select{
-              pos => 0,
-              core => select with {distinct => false},
-              orderBy => None(),
-              limit => None(),
-              rest => Array[],
-            },
-          ),
+        FromQuery{
+          select => Select{
+            pos => 0,
+            core => select with {distinct => false},
+            orderBy => None(),
+            limit => None(),
+            rest => Array[],
+          },
           asName => None(),
-          indexed => false,
         },
       ),
       where => None(),
@@ -491,12 +488,12 @@ mutable class Compiler{
 
   mutable fun compileFrom(
     context: mutable SKStore.Context,
-    fromTables: Array<FromName>,
+    fromTables: Array<SelectSource>,
   ): Array<SKDB.DirDescr> {
     tableNbr = 0;
 
     tables = fromTables.mapWithIndex((tableNbr, fromTable) -> {
-      table = this.getFromDirDescr(context, fromTable.name);
+      table = this.getFromDirDescr(context, fromTable);
       tableAlias = fromTable.asName match {
       | Some(x) -> x
       | None() -> Name::create(`${table.name.origName}_${tableNbr}`)
@@ -578,12 +575,12 @@ mutable class Compiler{
 
   mutable fun getFromDirDescr(
     context: mutable SKStore.Context,
-    name: FromTableName,
+    from: SelectSource,
   ): DirDescr {
-    name match {
-    | FName(tableName) -> getTable(context, this.pos, tableName)
+    from match {
+    | FromTable{name => tableName} -> getTable(context, this.pos, tableName)
 
-    | FQuery(select @ Select _) ->
+    | FromQuery{select} ->
       cselect = this.compileSelect(context, select, genSelectId(select), false);
       selectDir = evalSelect(context, cselect, None());
       static::getDirDescr(
@@ -698,7 +695,7 @@ mutable class Compiler{
     }
   }
 
-  readonly fun expandJoins(from: SelectFrom): (Array<FromName>, ?Expr) {
+  readonly fun expandJoins(from: SelectFrom): (Array<SelectSource>, ?Expr) {
     mergeConds = (lhs, rhs) -> {
       (lhs, rhs) match {
       | (None(), x)
@@ -708,7 +705,7 @@ mutable class Compiler{
       }
     };
     from match {
-    | name @ FromName _ -> (Array[name], None())
+    | source @ SelectSource _ -> (Array[source], None())
     | Join{kind, lhs, rhs, on, using} ->
       if (using is Some _) {
         error(this.pos, "JOIN USING not implemented")

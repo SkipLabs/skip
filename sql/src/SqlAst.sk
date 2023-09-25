@@ -143,12 +143,6 @@ base class IKind uses Orderable {
   | IDESC()
 }
 
-base class FromTableName uses Equality {
-  children =
-  | FName(Name)
-  | FQuery(Select)
-}
-
 class Select{
   core: SelectCore,
   orderBy: ?Array<(Expr, IKind)>,
@@ -171,17 +165,21 @@ base class SelectResult uses Equality {
   | SelectExpr(expr: Expr, alias: ?Name)
 }
 
-base class SelectFrom uses Equality {
+base class SelectFrom uses Equality
+
+base class SelectSource{asName: ?Name} extends SelectFrom {
   children =
-  | FromName{name: FromTableName, asName: ?Name, indexed: Bool = true}
-  | Join{
-    kind: JoinKind,
-    lhs: SelectFrom,
-    rhs: SelectFrom,
-    on: ?(Expr, Array<Expr>),
-    using: ?Array<Name>,
-  }
+  | FromTable{name: Name, indexed: Bool = true}
+  | FromQuery{select: Select}
 }
+
+class Join{
+  kind: JoinKind,
+  lhs: SelectFrom,
+  rhs: SelectFrom,
+  on: ?(Expr, Array<Expr>),
+  using: ?Array<Name>,
+} extends SelectFrom
 
 base class JoinKind uses Orderable, Hashable {
   children =
