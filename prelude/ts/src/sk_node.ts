@@ -1,6 +1,7 @@
 import { float, int, Environment, Wrk, Shared } from "#std/sk_types";
 import { MemFS, MemSys } from "#std/sk_mem_utils";
 
+import * as fs from "fs";
 import * as util from 'util';
 import * as perf_hooks from 'perf_hooks';
 import * as crypto from 'crypto';
@@ -53,6 +54,20 @@ class Env implements Environment {
   }
   name() {
     return "node";
+  }
+  fetch(path: string) {
+    return new Promise<Uint8Array>(function (resolve, reject) {
+      fs.readFile(path, {}, (err, data) => {
+        err ? reject(err) : resolve(data);
+      });
+    });
+  }
+  rootPath() {
+    let processPath = process.cwd()
+    if (!processPath.startsWith("file://")) {
+      processPath = "file://" + processPath;
+    }
+    return processPath;
   }
 
   constructor(environment?: Array<string>) {
