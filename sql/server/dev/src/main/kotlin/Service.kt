@@ -374,7 +374,6 @@ fun schemaHandler(): HttpHandler {
             if (old != null) {
               try {
                 val inserts = old.migrate(schema).decodeOrThrow()
-                println("Auto-migration:\n${inserts}")
                 val output = new.sql(inserts, OutputFormat.RAW)
                 if (!output.exitSuccessfully()) {
                   exchange.statusCode = StatusCodes.BAD_REQUEST
