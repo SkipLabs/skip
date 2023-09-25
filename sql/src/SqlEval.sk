@@ -656,7 +656,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       _ = this.delete(context, params, pos, name, where, Array[]);
       None()
 
-    | Update{pos, name, alias, indexed, sets, where, onConflict} ->
+    | Update{pos, name, alias, indexed, sets, where, from, onConflict} ->
       if (alias is Some _) {
         error(pos, "UPDATE table AS alias not implemented")
       };
@@ -665,6 +665,9 @@ class Evaluator{options: Options, user: ?UserFile} {
       };
       if (onConflict is Some _) {
         error(pos, "UPDATE OR not implemented")
+      };
+      if (from is Some _) {
+        error(pos, "UPDATE FROM not implemented")
       };
       baseName = SKStore.SID::create(name.lower);
       if (getTableDir(context).maybeGet(context, baseName) is None()) {
