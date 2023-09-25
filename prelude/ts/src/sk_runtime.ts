@@ -18,6 +18,7 @@ class LinksImpl implements Links {
   SKIP_getchar: () => int;
 
   SKIP_print_error: (strPtr: ptr) => void;
+  SKIP_print_error_raw: (strPtr: ptr) => void;
   SKIP_print_debug: (strPtr: ptr) => void;
   SKIP_print_debug_raw: (strPtr: ptr) => void;
   SKIP_print_raw: (strPtr: ptr) => void;
@@ -47,7 +48,9 @@ class LinksImpl implements Links {
     this.SKIP_print_error = (msg: ptr) => {
       utils.sklog(msg, Stream.ERR, true);
     };
-
+    this.SKIP_print_error_raw = (msg: ptr) => {
+      utils.sklog(msg, Stream.ERR);
+    };
     this.SKIP_print_debug = (msg: ptr) => {
       utils.sklog(msg, Stream.DEBUG, true);
     };
@@ -72,7 +75,7 @@ class LinksImpl implements Links {
     this.SKIP_js_get_argn = (index: int) => utils.exportString(utils.args[index]);
     this.SKIP_js_get_envc = () => this.env && this.env.environment ? this.env.environment.length : 0;
     this.SKIP_js_get_envn = (index: int) => utils.exportString(this.env!.environment[index]);
-    
+
     this.SKIP_read_line_fill = () => {
       this.lineBuffer = utils.readStdInLine();
       return this.lineBuffer.length;
@@ -156,6 +159,7 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_Math_exp =  Math.exp;
     toWasm.SKIP_JS_timeStamp = () => links.SKIP_JS_timeStamp();
     toWasm.SKIP_print_error =  (strPtr: ptr) => links.SKIP_print_error(strPtr);
+    toWasm.SKIP_print_error_raw =  (strPtr: ptr) => links.SKIP_print_error_raw(strPtr);
     toWasm.SKIP_print_debug =  (strPtr: ptr) => links.SKIP_print_debug(strPtr);
     toWasm.SKIP_print_debug_raw =  (strPtr: ptr) => links.SKIP_print_debug_raw(strPtr);
     toWasm.SKIP_print_raw =  (strPtr: ptr) => links.SKIP_print_raw(strPtr);
@@ -203,6 +207,7 @@ interface ToWasm {
   SKIP_Math_log10: (v: float) => float;
   SKIP_Math_exp: (v: float) => float;
   SKIP_print_error: (strPtr: ptr) => void;
+  SKIP_print_error_raw: (strPtr: ptr) => void;
   SKIP_print_debug: (strPtr: ptr) => void;
   SKIP_print_debug_raw: (strPtr: ptr) => void;
   SKIP_print_raw: (strPtr: ptr) => void;
