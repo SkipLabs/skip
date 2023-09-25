@@ -284,23 +284,23 @@ fun parseColNames(lex: Lexer, pos: Int): (Int, ?Array<(Expr, ?Name)>) {
   (pos, Some(params.toArray()))
 }
 
-fun parseTableName(lex: Lexer, pos: Int): (Int, FromName) {
+fun parseTableName(lex: Lexer, pos: Int): (Int, SelectSource) {
   sfrom = if (lex.isEq(pos, "(")) {
     !pos = lex.expect(pos, "(");
     (!pos, query) = parseQuery(lex, pos);
     !pos = lex.expect(pos, ")");
-    FQuery(query);
+    FromQuery{select => query, asName => None()};
   } else {
     (!pos, sfrom) = lex.nextWord(pos);
-    FName(Name::create(sfrom))
+    FromTable{name => Name::create(sfrom), asName => None()}
   };
   posMark = pos;
   if (isEOF(lex, pos)) {
-    return (posMark, FromName{name => sfrom, asName => None()});
+    return (posMark, sfrom)
   };
   (!pos, tok) = lex.next(pos);
   if (isSymbol(lex.content[tok.posBegin])) {
-    return (posMark, FromName{name => sfrom, asName => None()})
+    return (posMark, sfrom)
   };
   word = lex.wordAt(tok);
   wordUpper = word.uppercase();
@@ -328,17 +328,22 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, FromName) {
       Some(Name::create(word))
     }
   };
-  indexed = if (lex.isEqUpper(pos, "NOT")) {
-    !pos = lex.expectUpper(pos, "NOT");
-    !pos = lex.expectUpper(pos, "INDEXED");
-    false
-  } else {
-    true
+  !sfrom.asName = asStr;
+
+  if (sfrom is FromTable _) {
+    indexed = if (lex.isEqUpper(pos, "NOT")) {
+      !pos = lex.expectUpper(pos, "NOT");
+      !pos = lex.expectUpper(pos, "INDEXED");
+      false
+    } else {
+      true
+    };
+    !sfrom = (sfrom as FromTable _) with {indexed}
   };
-  (pos, FromName{name => sfrom, asName => asStr, indexed})
+  (pos, sfrom)
 }
 
-fun parseTableNames(lex: Lexer, pos: Int): (Int, Array<FromName>) {
+fun parseTableNames(lex: Lexer, pos: Int): (Int, Array<SelectSource>) {
   (!pos, first) = parseTableName(lex, pos);
   tableNames = mutable Vector[first];
   loop {
@@ -356,7 +361,7 @@ fun parseTableNames(lex: Lexer, pos: Int): (Int, Array<FromName>) {
 fun parseJoin(
   lex: Lexer,
   pos: Int,
-): (Int, Array<FromName>, ?(Expr, Array<Expr>)) {
+): (Int, Array<SelectSource>, ?(Expr, Array<Expr>)) {
   !pos = lex.expectUpper(pos, "JOIN");
   (!pos, names) = parseTableNames(lex, pos);
   on = if (lex.isEqUpper(pos, "ON")) {
@@ -386,7 +391,7 @@ fun parseFromJoin(lex: Lexer, pos: Int): (Int, SelectFrom) {
       !hasParen = false;
     }
   };
-  arrToJoin = (init: SelectFrom, arr: Array<FromName>) -> {
+  arrToJoin = (init: SelectFrom, arr: Array<SelectSource>) -> {
     res = init;
     for (rhs in arr) {
       !res = Join{
