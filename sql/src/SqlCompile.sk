@@ -196,11 +196,10 @@ mutable class Compiler{
             FQuery(
               Select{
                 pos => 0,
-                core => select with {distinct => false},
+                core => select with {distinct => false, shouldExpand => false},
                 orderBy => None(),
                 limit => None(),
                 rest => Array[],
-                shouldExpand => false,
               },
             ),
             None(),
@@ -212,6 +211,7 @@ mutable class Compiler{
       groupBy => None(),
       having => None(),
       join => None(),
+      shouldExpand => false,
     }
   }
 
@@ -310,7 +310,7 @@ mutable class Compiler{
   ): CSelect {
     if (
       select.core.distinct ||
-      select.shouldExpand ||
+      select.core.shouldExpand ||
       toplevel &&
         (select.orderBy is Some _ || select.limit is Some _) &&
         (select.core.groupBy is Some _) ||
@@ -796,7 +796,7 @@ mutable class Compiler{
   mutable fun compileRest(
     context: mutable SKStore.Context,
     cparams: Array<CGExpr>,
-    rest: Array<(CompoundOperator, Select)>,
+    rest: Array<(CompoundOperator, SelectCore)>,
   ): List<(QueryKind, CSelect)> {
     List::createFromItems(
       rest.map(x -> {
@@ -806,7 +806,14 @@ mutable class Compiler{
         | COExcept() -> QExcept()
         | COIntersect() -> QIntersect(false)
         };
-        query = this.compileSelect(context, x.i1, genSelectId(x.i1), false);
+        select = Select{
+          pos => 0,
+          core => x.i1,
+          orderBy => None(),
+          limit => None(),
+          rest => Array[],
+        };
+        query = this.compileSelect(context, select, genSelectId(select), false);
         qparams = query.params;
         if (cparams.size() != qparams.size()) {
           // TODO: Better error message (for INTERSECT/EXCEPT).

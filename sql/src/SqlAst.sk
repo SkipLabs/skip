@@ -159,8 +159,7 @@ class Select{
   core: SelectCore,
   orderBy: ?Array<(Expr, IKind)>,
   limit: ?Expr,
-  rest: Array<(CompoundOperator, Select)>,
-  shouldExpand: Bool = false,
+  rest: Array<(CompoundOperator, SelectCore)>,
 } extends Stmt
 
 class SelectCore{
@@ -171,6 +170,7 @@ class SelectCore{
   where: ?Expr,
   groupBy: ?Array<Expr>,
   having: ?Expr,
+  shouldExpand: Bool = false,
 } uses Equality
 
 base class SelectResult uses Equality {
@@ -428,5 +428,5 @@ fun selectIsAggr(select: SelectCore): Bool {
 fun selectOrRestIsAggrOrEmptyFrom(select: Select): Bool {
   selectIsAggr(select.core) ||
     select.core.from is None() ||
-    select.rest.any(x -> selectIsAggr(x.i1.core) || x.i1.core.from is None())
+    select.rest.any(x -> selectIsAggr(x.i1) || x.i1.from is None())
 }
