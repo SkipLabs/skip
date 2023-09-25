@@ -149,6 +149,8 @@ export interface Environment {
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
+  fetch: (path: string) => Promise<Uint8Array>;
+  rootPath: () => string;
 }
 
 export interface Memory {
@@ -560,6 +562,42 @@ export class Format implements Text {
   };
 }
 
+export function resolve(path: string) {
+  let elements = import.meta.url.split("/");
+  elements.pop();
+  let pelems = path.split("/");
+  pelems.forEach(e => {
+    if (e == "..") {
+      if (elements.length == 1) {
+        throw new Error("Invalid path: " + path);
+      } else {
+        elements.pop();
+      }
+    } else if (e != ".") {
+      elements.push(e);
+    }
+  });
+  return elements.join("/");
+}
+
+export function trimEndChar(str: string, ch: string) {
+  var end = str.length;
+  while(end > 0 && str[end - 1] === ch)
+    --end;
+  return end < str.length ? str.substring(0, end) : str;
+}
+
+function relativeto(path: string, ref: string) {
+  if (ref.length == 0) {
+    return path;
+  }
+  if (path.startsWith(ref)) {
+    ref = trimEndChar(ref, '/');
+    return "." + path.substring(ref.length);
+  }
+  return path;
+}
+
 export function humanSize(bytes: int) {
   const thresh = 1024;
   if (Math.abs(bytes) < thresh) {
@@ -647,8 +685,8 @@ export async function run(
   if (getWasmSource) {
     buffer = await getWasmSource();
   } else {
-    let wasm = await import("./" + wasm64 + ".wasm.mjs");
-    buffer = env.base64Decode(wasm.base64);
+    let path = relativeto(resolve("./" + wasm64 + '.wasm'), env.rootPath());
+    buffer = await env.fetch(path);
   }
   return await start(modules, buffer, env, main);
 }
