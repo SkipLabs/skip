@@ -215,11 +215,10 @@ mutable class Compiler{
     }
   }
 
-  mutable fun compileSelect(
+  mutable fun compileSelectCore(
     context: mutable SKStore.Context,
-    select: Select,
+    select: SelectCore,
     selectId: Name,
-    toplevel: Bool,
     sets: Array<UpdateSet> = Array[],
   ): CSelect {
     substCopy = this.subst;
@@ -249,33 +248,16 @@ mutable class Compiler{
     this.!needUp = false;
     this.!other = mutable Vector[];
 
-    if (
-      select.core.distinct ||
-      select.shouldExpand ||
-      toplevel &&
-        (select.orderBy is Some _ || select.limit is Some _) &&
-        (select.core.groupBy is Some _) ||
-      (!select.rest.isEmpty() || toplevel) &&
-        selectOrRestIsAggrOrEmptyFrom(select)
-    ) {
-      !select.core = this.expandGroupBy(select.core);
-      !select.rest = select.rest.map(x ->
-        (x.i0, x.i1 with {shouldExpand => true})
-      )
-    };
-
-    !select.core = this.expandJoins(select.core);
-
-    isAggr = selectIsAggr(select.core);
+    isAggr = selectIsAggr(select);
     this.!isAggr = isAggr;
 
-    origFrom = this.compileFrom(context, select.core.from);
-    (cond, from) = this.compileJoin(context, origFrom, select.core.where);
-    !select.core.where = cond;
-    params = this.compileParams(context, select.core.params, origFrom);
-    where = this.compileWhere(context, select.core.where);
-    groupBy = this.compileGroupBy(context, select.core.groupBy, params);
-    having = this.compileHaving(context, select.core.having);
+    origFrom = this.compileFrom(context, select.from);
+    (cond, from) = this.compileJoin(context, origFrom, select.where);
+    !select.where = cond;
+    params = this.compileParams(context, select.params, origFrom);
+    where = this.compileWhere(context, select.where);
+    groupBy = this.compileGroupBy(context, select.groupBy, params);
+    having = this.compileHaving(context, select.having);
 
     aggr: ?Array<(AggrKind, CGExpr)> = None();
     if (this.aggrVars.size() != 0) {
@@ -291,7 +273,7 @@ mutable class Compiler{
           | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
           },
       ),
-      distinct => select.core.distinct,
+      distinct => select.distinct,
       params,
       sets => this.compileSets(context, sets),
       aggr,
@@ -316,21 +298,54 @@ mutable class Compiler{
     this.!isAggr = isAggrCopy;
     this.!other = otherCopy;
 
-    orderBy = this.compileOrderBy(select.core.params, from, select.orderBy);
+    cselect
+  }
+
+  mutable fun compileSelect(
+    context: mutable SKStore.Context,
+    select: Select,
+    selectId: Name,
+    toplevel: Bool,
+    sets: Array<UpdateSet> = Array[],
+  ): CSelect {
+    if (
+      select.core.distinct ||
+      select.shouldExpand ||
+      toplevel &&
+        (select.orderBy is Some _ || select.limit is Some _) &&
+        (select.core.groupBy is Some _) ||
+      (!select.rest.isEmpty() || toplevel) &&
+        selectOrRestIsAggrOrEmptyFrom(select)
+    ) {
+      !select.core = this.expandGroupBy(select.core);
+      !select.rest = select.rest.map(x ->
+        (x.i0, x.i1 with {shouldExpand => true})
+      )
+    };
+
+    !select.core = this.expandJoins(select.core);
+
+    core = this.compileSelectCore(context, select.core, selectId, sets);
+
+    orderBy = this.compileOrderBy(
+      select.core.params,
+      core.from,
+      select.orderBy,
+    );
     limit = this.compileLimit(context, select.limit);
 
     kinds = orderBy match {
     | None() ->
       i = 0;
-      params.map(param -> {
+      core.params.map(param -> {
         result = (i, IASC(), param.getType());
         !i = i + 1;
         result
       })
-    | Some(ekinds) -> computeKinds(params, ekinds)
+    | Some(ekinds) -> computeKinds(core.params, ekinds)
     };
 
-    rest = this.compileRest(context, params, select.rest);
+    rest = this.compileRest(context, core.params, select.rest);
 
     /*
      * Direct mode is a setup where we want to output things on stdout
@@ -346,37 +361,37 @@ mutable class Compiler{
      */
 
     directMode =
-      aggr is None() &&
+      core.aggr is None() &&
       this.directMode &&
       toplevel &&
       /* There is exactly one table */
-      from.size() == 1 &&
+      core.from.size() == 1 &&
       /* No index is involved (could change in the future?)  */
-      from[0].i1 is None() &&
+      core.from[0].i1 is None() &&
       !select.core.distinct &&
-      having is None() &&
+      core.having is None() &&
       orderBy is None() &&
-      groupBy is None() &&
+      core.groupBy is None() &&
       rest.isEmpty();
 
     format = this.options.format match {
     | OFK_CSV() -> SKStore.OCSV()
     | OFK_Table() ->
-      schema = static::getSchema(select.core.params, from, params);
+      schema = static::getSchema(select.core.params, core.from, core.params);
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OTable(fieldNames)
     | OFK_JSON() ->
-      schema = static::getSchema(select.core.params, from, params);
+      schema = static::getSchema(select.core.params, core.from, core.params);
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OJSON(fieldNames)
     | OFK_SQL() -> SKStore.OSQL()
     | OFK_JS() ->
-      schema = static::getSchema(select.core.params, from, params);
+      schema = static::getSchema(select.core.params, core.from, core.params);
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OJS(fieldNames)
     };
 
-    !cselect = cselect with {format, directMode, rest, kinds, orderBy, limit};
+    cselect = core with {format, directMode, rest, kinds, orderBy, limit};
 
     !cselect = optimizeNoopSelect(cselect);
 
