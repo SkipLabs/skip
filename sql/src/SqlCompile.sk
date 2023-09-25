@@ -196,7 +196,7 @@ mutable class Compiler{
             FQuery(
               Select{
                 pos => 0,
-                core => select with {distinct => false, shouldExpand => false},
+                core => select with {distinct => false},
                 orderBy => None(),
                 limit => None(),
                 rest => Array[],
@@ -211,7 +211,6 @@ mutable class Compiler{
       groupBy => None(),
       having => None(),
       join => None(),
-      shouldExpand => false,
     }
   }
 
@@ -310,7 +309,6 @@ mutable class Compiler{
   ): CSelect {
     if (
       select.core.distinct ||
-      select.core.shouldExpand ||
       toplevel &&
         (select.orderBy is Some _ || select.limit is Some _) &&
         (select.core.groupBy is Some _) ||
@@ -318,9 +316,7 @@ mutable class Compiler{
         selectOrRestIsAggrOrEmptyFrom(select)
     ) {
       !select.core = this.expandGroupBy(select.core);
-      !select.rest = select.rest.map(x ->
-        (x.i0, x.i1 with {shouldExpand => true})
-      )
+      !select.rest = select.rest.map(x -> (x.i0, this.expandGroupBy(x.i1)))
     };
 
     !select.core = this.expandJoins(select.core);
