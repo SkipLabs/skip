@@ -1253,7 +1253,7 @@ class SKDBServer implements RemoteSKDB {
   private creds: Creds;
   private replicationUid: string = "";
   private mirroredTables: Map<string, string> = new Map()
-  private onReboot ?: (server: SKDBServer, skdb: SkdbMechanism) => void;
+  private onRebootFn ?: () => void;
 
   private constructor(
     env: Environment,
@@ -1313,15 +1313,15 @@ class SKDBServer implements RemoteSKDB {
     const rebootSignalled = txtPayload.split("\n").find(line => line.trim() == ":reboot");
     if (rebootSignalled) {
       this.close();
-      this.callOnReboot(this, this.client);
+      this.callOnReboot();
       return;
     }
     deliver(txtPayload)
   }
 
-  private callOnReboot(server: SKDBServer, skdb: SkdbMechanism): void {
-    if (this.onReboot) {
-      this.onReboot(this, this.client);
+  private callOnReboot(): void {
+    if (this.onRebootFn) {
+      this.onRebootFn();
     } else {
       throw new Error("Server signalled client should cold start to avoid diverging.");
     }
@@ -1571,7 +1571,7 @@ class SKDBServer implements RemoteSKDB {
     });
   }
 
-  async setOnReboot(onReboot: (server: SKDBServer, skdb: SkdbMechanism) => void) {
-    this.onReboot = onReboot;
+  async onReboot(fn: () => void) {
+    this.onRebootFn = fn;
   };
 }
