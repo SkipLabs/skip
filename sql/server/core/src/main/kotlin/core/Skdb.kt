@@ -300,7 +300,7 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun createDb(encryptedRootPrivateKey: String): Skdb {
     if (File(dbPath).exists()) {
-      throw RevealableException("Database already exists")
+      throw RevealableException(2003u, "Database already exists")
     }
     val initScript = Files.readString(Path.of(ENV.skdbInitPath), Charsets.UTF_8)
     blockingRun(ProcessBuilder(ENV.skdbPath, "--init", dbPath))
