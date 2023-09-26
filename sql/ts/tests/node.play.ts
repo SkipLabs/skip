@@ -33,14 +33,13 @@ function run(t, asWorker: boolean) {
   });
 }
 
-function runServer(t) {
+function runServer(t, asWorker, suffix: string = "") {
   test(t.name, async () => {
-    let skdb = await setup(gatherCredential(), 8110, crypto);
+    let skdb = await setup(gatherCredential(), 8110, crypto, asWorker, suffix);
     let res = await t.fun(skdb);
     t.check(res);
   });
 }
-
 
 class Env {
   crypto = () => crypto;
@@ -59,4 +58,5 @@ function runMS(t) {
 tests(false).forEach(t => run(t, false));
 tests(true).forEach(t => run(t, true));
 ms_tests().forEach(t => runMS(t));
-apitests().forEach(t => runServer(t));
+apitests(false).forEach(t => runServer(t, false));
+apitests(true).forEach(t => runServer(t, true, "_node_worker"));
