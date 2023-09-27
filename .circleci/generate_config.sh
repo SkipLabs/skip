@@ -10,11 +10,6 @@ skdb=$?
 
 cat .circleci/base.yml
 
-if (($skc == 0 && $skfs == 0 && $skdb == 0))
-then
-    circleci-agent step halt
-fi
-
 echo "workflows:"
 
 if (( $skc != 0 ))
