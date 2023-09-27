@@ -90,8 +90,8 @@ export class SKDBWorker implements SKDB {
     return this.worker.post(new Function("viewSchema", [viewName])) as Promise<string>;
   };
 
-  schema = async () => {
-    return this.worker.post(new Function("schema", [])) as Promise<string>;
+  schema = async (tableName?: string) => {
+    return this.worker.post(new Function("schema", [tableName])) as Promise<string>;
   };
 
   insert = async (tableName: string, values: Array<any>) => {

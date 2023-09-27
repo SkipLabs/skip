@@ -170,10 +170,19 @@ export class SKDBSyncImpl implements SKDBSync {
     return this.runLocal(["dump-view", viewName], "")
   }
 
-  schema = () => {
-    const tables = this.runLocal(["dump-tables"], "");
-    const views = this.runLocal(["dump-views"], "");
-    return tables + views;
+  schema = (tableName?: string) => {
+    if (tableName === undefined) {
+      const tables = this.runLocal(["dump-tables"], "");
+      const views = this.runLocal(["dump-views"], "");
+      return tables + views;
+    }
+
+    const tableSchema = this.tableSchema(tableName);
+    if (tableSchema.trim() != '') {
+      return tableSchema
+    }
+
+    return this.viewSchema(tableName);
   }
 
   insert = (tableName: string, values: Array<any>) => {
@@ -261,8 +270,8 @@ export class SKDBImpl implements SKDB {
     return this.skdbSync.viewSchema(viewName);
   }
 
-  schema = async () => {
-    return this.skdbSync.schema();
+  schema = async (tableName?: string) => {
+    return this.skdbSync.schema(tableName);
   }
 
   async insert(tableName: string, values: Array<any>) {
