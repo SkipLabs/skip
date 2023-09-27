@@ -317,6 +317,19 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
   }
 }
 
+fun ensureCompatibleLLVMVersion(): void {
+  kLLVMVersion = "15.";
+
+  p = System.subprocess(Array["llvm-config", "--version"]);
+  if (!p.success()) {
+    print_error_raw(p.stderr);
+    skipExit(1)
+  } else if (!p.stdout.startsWith(kLLVMVersion)) {
+    print_error(`Incompatible llvm version ${p.stdout}, expected LLVM ${kLLVMVersion}`);
+    skipExit(1)
+  }
+}
+
 class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
 
 fun compile(
@@ -330,6 +343,8 @@ fun compile(
     print_error("fatal error: no input files\n");
     skipExit(4); // Exit code used by g++ for no input files
   };
+
+  ensureCompatibleLLVMVersion();
 
   if (context.unsafeMaybeGetDir(FileCache.fileDirName) is None()) {
     _ = context.mkdir(x ~> x, x ~> x, FileCache.fileDirName, Array[]);
