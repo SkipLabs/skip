@@ -765,11 +765,14 @@ class EagerDir{
     format: OutputFormat,
     filter: (SKStore.Context, Bool) ~> (SKStore.Key -> Bool),
     destinationTime: ?Tick,
+    checkpointInterval: Int = Int::max,
   ): Bool {
     writer = mutable Debug.BufferedWriter(o, 1024);
     filterFun = filter(context.clone(), isReset);
 
     producedDiffLine = false;
+
+    changesWritten = 0;
 
     for (key in changes) {
       if (!filterFun(key)) continue;
@@ -783,6 +786,12 @@ class EagerDir{
         key.writeKVString(writer.write, format, values);
       };
       !producedDiffLine = true;
+      !changesWritten = changesWritten + 1;
+      if (changesWritten % checkpointInterval == 0) {
+        writer.write(`:0\n`);
+        writer.flush();
+        flushStdout();
+      };
     };
 
     if (isReset) {
