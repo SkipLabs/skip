@@ -685,7 +685,13 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
     (isReset, changes) = edir.getChangesAfter(SKStore.Tick(tick), forceReset);
     !forceReset = false;
 
-    producedOutput = edir.writeDiffStdout(
+    // Write checkpoints out at least every `checkpointInterval` rows during
+    // initialization, so that the client can start processing without waiting
+    // for the full changeset.
+    // this value is chosen based on some unscientific local testing
+    checkpointInterval = if (init) 512 else Int::max;
+
+    _ = edir.writeDiffStdout(
       context,
       isReset,
       changes,
@@ -693,8 +699,9 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
       format,
       filter,
       sub.getDestinationWatermark(context),
+      checkpointInterval,
     );
-    if (!producedOutput && init) {
+    if (init) {
       // on first iteration we ensure we output a checkpoint without
       // delay so that the downstreams knows that it has received
       // everything without waiting for the condvar timeout
