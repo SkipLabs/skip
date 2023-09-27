@@ -496,15 +496,6 @@ fun manage(
       )
     }
   });
-  for (bin in bc.env.manifest.bin) {
-    wasmFile = Path.join(bc.targetDir, bin.name + ".wasm");
-    invariant(FileSystem.exists(wasmFile), `${bin.name}.wasm not built.`);
-    tsWasmFile = Path.join(tsDir, bin.name + ".wasm.ts");
-    FileSystem.writeTextFile(
-      tsWasmFile,
-      `// for distribution we replace this line with inlined base64-encoded bytes\nexport var base64 = "";\n`,
-    );
-  };
   packageFile = Path.join(tsDir, "package.json");
   packageContents = JSON.Object(
     Map[
@@ -554,8 +545,7 @@ fun manage(
   copyAndConvertImport(
     package.version,
     distDir,
-    bc.targetDir,
-    unsafe_chill_trust_me(jsResources),
+    jsResources.chill(),
     jsFiles,
     () -> {
       bins = bc.env.manifest.bin;
@@ -750,7 +740,6 @@ fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
 fun copyAndConvertImport(
   version: Version,
   distDir: String,
-  targetDir: String,
   resources: Map<String, String>,
   jsFiles: Vector<String>,
   binary: () -> String,
@@ -916,12 +905,7 @@ fun copyAndConvertImport(
         | Some(b64File) ->
           `export var base64 = "${FileSystem.readTextFile(b64File)}";`
         | _ ->
-          wasmFile = Path.join(
-            targetDir,
-            Path.basename(sf.take(sf.length() - 3)),
-          );
-          invariant(FileSystem.exists(wasmFile), "Wasm file not found.");
-          wasm(wasmFile, verbose)
+          invariant_violation("Resource file not found.");
         }
       } else if (cLine == versionLine) {
         `const npmVersion = "${version}";`
@@ -939,15 +923,6 @@ fun copyAndConvertImport(
 
 fun i(v: Bool): Int {
   if (v) 1 else 0;
-}
-
-fun wasm(path: String, verbose: Bool): String {
-  b64File = path + ".b64";
-  cmd = Array["bash", "-c", `base64 ${path} | tr -d "\\n" > ${b64File}`];
-  _ = run(cmd, verbose);
-  res = `export var base64 = "${FileSystem.readTextFile(b64File)}";`;
-  Skargo.run(Array["rm", b64File], verbose);
-  res
 }
 
 fun check(
