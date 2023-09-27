@@ -460,7 +460,7 @@ const localRepl = async function() {
     if (query.startsWith('.table-schema')) {
       const [_, table] = query.split(" ", 2);
       try {
-        const schema = await skdb.tableSchema(table);
+        const schema = await skdb.schema(table);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${table}.`);
@@ -471,7 +471,7 @@ const localRepl = async function() {
     if (query.startsWith('.view-schema')) {
       const [_, view] = query.split(" ", 2);
       try {
-        const schema = await skdb.viewSchema(view);
+        const schema = await skdb.schema(view);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${view}.`);
