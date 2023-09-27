@@ -1,0 +1,415 @@
+/*****************************************************************************/
+// First phase of parsing. We figure out the overall structure of the
+// document, but without trying to parse within strings. That means
+// that links and things like that are not parsed.
+/*****************************************************************************/
+
+module SKMD;
+
+value class Line(indent: Int, content: Array<Char>)
+
+base class TextLine {
+  children =
+  | LHeader(Int, Array<Char>)
+  | LText(Line)
+}
+
+fun parseTextLines(str: mutable Iterator<Char>): mutable Iterator<TextLine> {
+  indent = 0;
+  loop {
+    nextChar = str.next() match {
+    | None() -> break void
+    | Some(c) -> c
+    };
+    nextChar match {
+    | '\n' ->
+      if (indent == 0) {
+        yield (LText(Line(0, Array[])));
+      } else {
+        !indent = 0;
+      };
+      continue
+    | ' ' -> !indent = indent + 1
+    | '\t' -> !indent = indent + 4
+    | '#' if (indent == 0) ->
+      yield (parseHeader1(str));
+      !indent = 0
+    | c ->
+      yield (LText(Line(indent, parseUntilEOL(Some(c), str))));
+      !indent = 0
+    }
+  }
+}
+
+fun parseHeader1(str: mutable Iterator<Char>): TextLine {
+  str.next() match {
+  | None() -> LHeader(1, Array[])
+  | Some('#') -> parseHeader2(str)
+  | Some(c) -> LHeader(1, parseUntilEOL(Some(c), str))
+  }
+}
+
+fun parseHeader2(str: mutable Iterator<Char>): TextLine {
+  str.next() match {
+  | None() -> LHeader(2, Array[])
+  | Some('#') -> LHeader(3, parseUntilEOL(None(), str))
+  | Some(c) -> LHeader(2, parseUntilEOL(Some(c), str))
+  }
+}
+
+fun parseUntilEOL(first: ?Char, str: mutable Iterator<Char>): Array<Char> {
+  acc = mutable Vector[];
+  first match {
+  | None() -> void
+  | Some(c) -> acc.push(c)
+  };
+  loop {
+    nextChar = str.next() match {
+    | None() -> return acc.toArray()
+    | Some(c) -> c
+    };
+    nextChar match {
+    | '\n' -> return acc.toArray()
+    | '\t' ->
+      acc.push(' ');
+      acc.push(' ');
+      acc.push(' ');
+      acc.push(' ')
+    | c -> acc.push(c)
+    }
+  }
+}
+
+/*****************************************************************************/
+/* Phase 2, we put together multi-line things. */
+/*****************************************************************************/
+
+// Intermediate elements
+base class IElement {
+  children =
+  | IHeader(Int, Array<Char>)
+  | IBlock(BlockKind, Array<Line>)
+}
+
+base class Element {
+  children =
+  | Header(Int, Array<TextElement>)
+  | Block(BlockKind, Array<Array<TextElement>>)
+}
+
+base class BlockKind uses Equality {
+  children =
+  | KParagraph()
+  | KBullet()
+  | KBlockQuotes()
+  | KNumbered()
+  | KCode()
+}
+
+fun parseElements(
+  lines: mutable Iterator<TextLine>,
+): mutable Iterator<IElement> {
+  acc = mutable Vector[];
+  loop {
+    textLine = lines.next() match {
+    | None() ->
+      if (acc.size() != 0) {
+        yield IBlock(KParagraph(), acc.toArray());
+      };
+      break void
+    | Some(x) -> x
+    };
+    textLine match {
+    | LHeader(headerKind, lineContent) ->
+      if (acc.size() != 0) {
+        yield IBlock(KParagraph(), acc.toArray());
+        acc.clear()
+      };
+      yield IHeader(headerKind, lineContent)
+    | LText(line) -> acc.push(line)
+    }
+  }
+}
+
+/*****************************************************************************/
+/* Parse parens and brackets. */
+/*****************************************************************************/
+
+fun lex(input: Array<Char>): mutable Iterator<(Char, Int)> {
+  i = 0;
+  loop {
+    if (i >= input.size()) break void;
+    c = input[i];
+    if (c == '*' || c == '_' || c == '`') {
+      j = i;
+      loop {
+        if (j >= input.size()) break void;
+        if (input[j] != c) break void;
+        !i = i + 1;
+        !j = j + 1;
+      };
+      yield (c, j);
+    } else {
+      yield (c, 1);
+      !i = i + 1;
+    }
+  }
+}
+
+fun parseParens(input: Array<Char>): Array<(Char, Array<Char>)> {
+  iter = lex(input);
+  acc = mutable Vector[];
+  result = mutable Vector[];
+  openingOpt: ?Char = None();
+  flush = (c) -> {
+    if (acc.size() != 0) {
+      result.push((c, acc.toArray()));
+      acc.clear();
+    }
+  };
+  loop {
+    loop {
+      (c, _repeat) = iter.next() match {
+      | None() ->
+        flush(' ');
+        return result.toArray()
+      | Some(c) -> c
+      };
+      if (c == '(' || c == '[') {
+        !openingOpt = Some(c);
+        flush(' ');
+        acc.push(c);
+        break void;
+      };
+      if (c == '*' || c == '_' || c == '`') {
+        !openingOpt = Some(c);
+        flush(' ');
+        acc.push(c);
+        break void;
+      };
+      acc.push(c);
+    };
+    loop {
+      (c, _repeat) = iter.next() match {
+      | None() ->
+        flush(' ');
+        return result.toArray()
+      | Some(c) -> c
+      };
+      if (c == '\\') {
+        iter.next() match {
+        | None() ->
+          acc.push(c);
+          flush(' ');
+          return result.toArray()
+        | Some((x, _)) ->
+          acc.push(x);
+          continue
+        };
+      };
+      acc.push(c);
+      opening = openingOpt.fromSome();
+      if (opening == '(' && c == ')') {
+        !openingOpt = None();
+        flush(opening);
+        break void;
+      };
+      if (opening == '[' && c == ']') {
+        !openingOpt = None();
+        flush(opening);
+        break void;
+      };
+      if (opening == '*' && c == '*') {
+        !openingOpt = None();
+        flush(opening);
+        break void;
+      };
+      if (opening == '_' && c == '_') {
+        !openingOpt = None();
+        flush(opening);
+        break void;
+      };
+      if (opening == '`' && c == '`') {
+        !openingOpt = None();
+        flush(opening);
+        break void;
+      };
+    }
+  }
+}
+
+base class TextElement {
+  children =
+  | TELink(String, String)
+  | TEBold(String)
+  | TEEmphasis(String)
+  | TECode(String)
+  | TEText(String)
+}
+
+fun makeElement(elt: (Char, Array<Char>)): TextElement {
+  str = String::fromChars(elt.i1);
+  elt.i0 match {
+  | '*' -> TEBold(str)
+  | '_' -> TEEmphasis(str)
+  | '`' -> TECode(str)
+  | _ -> TEText(str)
+  }
+}
+
+fun splitText(input: Array<Char>): Array<TextElement> {
+  iter = parseParens(input).iterator();
+  text = mutable Vector[];
+  acc = mutable Vector<TextElement>[];
+  curr = iter.next() match {
+  | None() -> return Array[]
+  | Some(elt) -> elt
+  };
+  push = (elt: TextElement) -> {
+    if (!text.isEmpty()) {
+      acc.push(TEText(String::fromChars(text.toArray())));
+      text.clear();
+    };
+    acc.push(elt);
+  };
+  for (nextElt in iter) {
+    if (curr.i0 == '[' && nextElt.i0 == '(') {
+      push(
+        TELink(
+          String::fromChars(curr.i1.slice(1, curr.i1.size() - 1)),
+          String::fromChars(nextElt.i1.slice(1, curr.i1.size() - 1)),
+        ),
+      );
+    } else if (curr.i0 == '*' || curr.i0 == '_' || curr.i0 == '`') {
+      push(makeElement(curr));
+    } else {
+      text.extend(curr.i1)
+    };
+    !curr = nextElt;
+  };
+  push(makeElement(curr));
+  acc.toArray()
+}
+
+/*****************************************************************************/
+/* Parse multi-line bullet points etc ... */
+/*****************************************************************************/
+
+fun parseMulti(
+  elements: mutable Iterator<IElement>,
+): mutable Iterator<Element> {
+  for (elt in elements) {
+    elt match {
+    | IHeader(x, y) -> yield Header(x, splitText(y).collect(Array))
+    | IBlock(blockKind, arr) ->
+      invariant(blockKind == KParagraph());
+      parser = mutable ParseMulti();
+      for (x in parser.go(arr)) {
+        yield x
+      }
+    }
+  }
+}
+
+mutable class ParseMulti(
+  mutable mode: BlockKind = KParagraph(),
+  acc: mutable Vector<Array<TextElement>> = mutable Vector[],
+  elements: mutable Vector<Element> = mutable Vector[],
+) {
+  private mutable fun pushLine(line: Line): void {
+    if (line.content.size() == 0) return void;
+    this.acc.push(splitText(line.content).collect(Array));
+  }
+
+  private mutable fun flush(): void {
+    if (this.acc.isEmpty() && this.mode == KParagraph()) return void;
+    this.elements.push(Block(this.mode, this.acc.toArray()));
+    this.acc.clear();
+  }
+
+  private mutable fun changeMode(
+    mode: BlockKind,
+    line: Line,
+    toRemove: Int,
+    forceFlush: Bool = false,
+  ): void {
+    if (toRemove != 0) {
+      !line.content = line.content.slice(toRemove, Int::max);
+    };
+    trimmed = mutable Vector[];
+    lineIter = line.content.iterator();
+    for (c in lineIter) {
+      if (c != ' ') {
+        trimmed.push(c);
+        break void;
+      }
+    };
+    for (c in lineIter) {
+      trimmed.push(c);
+    };
+    !line.content = trimmed.toArray();
+    if (mode == this.mode && !forceFlush) {
+      this.pushLine(line);
+      return void;
+    };
+    this.flush();
+    this.pushLine(line);
+    this.!mode = mode;
+  }
+
+  mutable fun go(lines: Array<Line>): Array<Element> {
+    for (line in lines) {
+      iter = line.content.iterator();
+      firstChar = iter.next() match {
+      | None() ->
+        if (line.indent == 0) {
+          this.changeMode(KParagraph(), line, 0, true)
+        } else {
+          this.pushLine(line);
+        };
+        continue
+      | Some(c) -> c
+      };
+      firstChar match {
+      | '*' ->
+        if (iter.next() == Some('*')) {
+          void
+        } else {
+          this.changeMode(KBullet(), line, 1, true)
+        }
+      | '>' if (line.indent == 0) -> this.changeMode(KBlockQuotes(), line, 1)
+      | x if (Chars.isDigit(x)) ->
+        if (iter.next() is Some('.')) {
+          this.changeMode(KNumbered(), line, 2)
+        }
+      | '`' if (line.indent == 0) ->
+        if (iter.next() == Some('`')) {
+          if (iter.next() == Some('`')) {
+            this.changeMode(KCode(), line, 3)
+          } else {
+            void
+          }
+        } else {
+          void
+        }
+      | _ if (
+        line.indent >= 4 &&
+        this.mode != KNumbered() &&
+        this.mode != KBullet()
+      ) ->
+        this.changeMode(KCode(), line, 0)
+      | _ -> this.pushLine(line)
+      }
+    };
+    this.flush();
+    this.elements.toArray()
+  }
+}
+
+/*****************************************************************************/
+/* Let's put it all together */
+/*****************************************************************************/
+
+fun parse(str: String): mutable Iterator<Element> {
+  parseMulti(parseElements(parseTextLines(str.getIter())));
+}
