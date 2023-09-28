@@ -247,6 +247,16 @@ async function testClientTail(root: SKDB, user: SKDB) {
   expect(resv).toEqual([{ cnt: 1 }]);
 }
 
+async function testReboot(root: SKDB, user: SKDB) {
+  const remote = await user.connectedRemote();
+  let rebooted = false;
+  remote.onReboot(() => rebooted = true);
+  const rremote = await root.connectedRemote();
+  await rremote.exec("DROP TABLE test_pk;");
+  await new Promise(resolve => setTimeout(resolve, 100));
+  expect(rebooted).toEqual(true);
+}
+
 export const apitests = (asWorker) => {
   return [
     {
@@ -267,6 +277,11 @@ export const apitests = (asWorker) => {
 
         // Client Tail
         await testClientTail(dbs.root, dbs.user);
+
+
+        // Reboot
+        await testReboot(dbs.root, dbs.user);
+
         dbs.root.closeConnection();
         dbs.user.closeConnection();
         return "";

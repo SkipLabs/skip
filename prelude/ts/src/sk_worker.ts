@@ -51,7 +51,7 @@ export class Caller implements Payload {
   fn: string;
   parameters: Array<any>;
   remove: boolean;
-
+  subscription ?: MessageId;
 
   constructor(wrapped: number, fn: string, parameters: Array<any>, remove: boolean = false) {
     this.wrapped = wrapped;
@@ -63,12 +63,14 @@ export class Caller implements Payload {
 
   static convert(obj: object) {
     if (!("wrapped" in obj) ||  !("fn" in obj) || !("parameters" in obj) || !("remove" in obj)) return null;
+    let subscription = "subscription" in obj ? MessageId.as(obj.subscription!) : null;
     let fn = new Caller(
       obj.wrapped! as number,
       obj.fn! as string,
       obj.parameters! as Array<any>,
       obj.remove! as boolean,
     );
+    fn.subscription = subscription ? subscription: undefined;
     return fn;
   }
 
@@ -201,9 +203,10 @@ export class PromiseWorker {
         self.worker.postMessage(message);
       })
     };
-    this.subscribe = (fn: Function, value: (...args: any[]) => void) => {
+    this.subscribe = (fn: Function | Caller, value: (...args: any[]) => void) => {
       let subscriptionId = new MessageId(this.source, ++this.lastId);
-      this.subscriptions.set(asKey(subscriptionId), (result: Return) => value.apply(null, result.value))
+      let wfn = (result: Return) => value.apply(null, result.value);
+      this.subscriptions.set(asKey(subscriptionId), wfn);
       fn.subscription = subscriptionId;
       return this.post(fn);
     }
@@ -296,6 +299,11 @@ export const onWorkerMessage = <T>(message: MessageEvent, post: (message: any) =
     let parameters = caller.parameters;
     let obj = wrapped.get(caller.wrapped);
     let fni = caller.fn == "" ? {fn: obj?.value, obj: null} : {fn: obj?.value[caller.fn] , obj: obj?.value};
+    if (caller.subscription) {
+      parameters.push((...args: any[]) => {
+        post(new Message(caller.subscription!, new Return(true, args)))
+      })
+    }
     if (typeof fni.fn !== "function") {
       post(new Message(data.id, new Return(false, "Invalid function " + caller.fn)));
     } else {
