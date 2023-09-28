@@ -18,7 +18,7 @@ DEFINITIONS=
 OLEVEL=-O2 -g
 endif # ifdef PROFILE
 
-CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
+CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc
 
 CRELFILES=\
 	runtime/copy.c \
