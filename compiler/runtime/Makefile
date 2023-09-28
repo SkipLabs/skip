@@ -1,7 +1,7 @@
 MEMSIZE32=1073741824
 
 OLEVEL=-O2
-CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm
+CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc
 CC64FLAGS=$(OLEVEL) -DSKIP64
 
 CFILES=\
