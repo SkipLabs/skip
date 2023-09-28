@@ -262,7 +262,7 @@ fun build(): (Cli.Command, Cli.ParseResults ~> void) {
           .about("Build artifacts in release mode, with optimizations"),
       )
       .arg(
-        Cli.StringArg("dry-run").about(
+        Cli.StringArg("npm-out").about(
           "Directory for all generated npm package",
         ),
       )
@@ -283,7 +283,7 @@ fun execBuild(args: Cli.ParseResults, env: Skargo.Env): void {
     Skargo.getProfile(args),
   );
   _ = buildIfNeeded(bc, false);
-  _ = manage(bc, Package::create(env.manifest), args.maybeGetString("dry-run"));
+  _ = manage(bc, Package::create(env.manifest), args.maybeGetString("npm-out"));
   args.maybeGetString("html") match {
   | Some(launcher) ->
     writeIndex(bc.targetDir, launcher);
@@ -1037,7 +1037,7 @@ fun runner(): (Cli.Command, Cli.ParseResults ~> void) {
       .arg(Cli.StringArg("bin").about("Run the specified binary"))
       .arg(Cli.StringArg("path").about("Path of the package to run"))
       .arg(
-        Cli.StringArg("dry-run").about(
+        Cli.StringArg("npm-out").about(
           "Directory for all generated npm package",
         ),
       )
@@ -1064,7 +1064,7 @@ fun execRun(args: Cli.ParseResults): void {
     Skargo.getProfile(args),
   );
   npmDir = args
-    .maybeGetString("dry-run")
+    .maybeGetString("npm-out")
     .default(Path.join(bc.targetDir, "npm"));
 
   neededBuild = buildIfNeeded(bc, false);
@@ -1109,7 +1109,7 @@ fun publish(): (Cli.Command, Cli.ParseResults ~> void) {
       .arg(Cli.StringArg("npmVersion").about("Publish with specified version"))
       .arg(Cli.BoolArg("force").short("f").about("Do not check version"))
       .arg(
-        Cli.StringArg("dry-run").about(
+        Cli.StringArg("npm-out").about(
           "Directory for all generated npm package",
         ),
       )
@@ -1157,7 +1157,7 @@ fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
     Array["skargo", "build", "--target", "wasm32", "--profile", bc.profile],
     bc.env.verbose,
   );
-  userNpmDir = args.maybeGetString("dry-run");
+  userNpmDir = args.maybeGetString("npm-out");
   npmDir = manage(bc, Package::create(env.manifest), userNpmDir, None(), true);
   Environ.set_current_dir(npmDir);
   if (userNpmDir.isSome()) {
