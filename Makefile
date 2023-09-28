@@ -42,7 +42,7 @@ sql/target/wasm32/release/skdb.wasm: sql/src/* skfs/src/*
 	cd sql && skargo build --release --target wasm32
 
 $(SDKMAN_DIR):
-	cd $(dirname $(SDKMAN_DIR)) && sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
+	cd $(dirname $(SDKMAN_DIR)) && sh -c 'wget -q -O- "https://get.sdkman.io?rcupdate=false" | bash'
 
 ################################################################################
 # sknpm native binary
