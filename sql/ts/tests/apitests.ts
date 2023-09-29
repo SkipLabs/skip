@@ -5,9 +5,25 @@ import { createSkdb, SKDB } from 'skdb';
 
 type dbs = { root: SKDB, user: SKDB };
 
-export async function setup(credentials: string, port: number, crypto) {
+function getErrorMessage(error: any) {
+  if (typeof error == "string") {
+    return error.trim();
+  } else {
+    try {
+      return JSON.parse((error as Error).message).trim();
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        return (error as Error).message.trim()
+      }
+      throw e;
+    }
+  }
+}
+
+export async function setup(credentials: string, port: number, crypto, asWorker: boolean, suffix: string = "") {
   const host = "ws://localhost:" + port;
-  let skdb = await createSkdb({ asWorker: false });
+  const dbName = "test" + suffix;
+  let skdb = await createSkdb({ asWorker: asWorker });
   {
     const b64key = credentials;
     const keyData = Uint8Array.from(atob(b64key), c => c.charCodeAt(0));
@@ -16,26 +32,26 @@ export async function setup(credentials: string, port: number, crypto) {
     await skdb.connect("skdb_service_mgmt", "root", key, host);
   }
   const remote = await skdb.connectedRemote();
-  const testRootCreds = await remote.createDatabase("test");
+  const testRootCreds = await remote.createDatabase(dbName);
   skdb.closeConnection();
-
-  const rootSkdb = await createSkdb({ asWorker: false });
+  
+  const rootSkdb = await createSkdb({ asWorker: asWorker });
   {
     const keyData = testRootCreds.privateKey;
     const key = await crypto.subtle.importKey(
       "raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    await rootSkdb.connect("test", testRootCreds.accessKey, key, host);
+    await rootSkdb.connect(dbName, testRootCreds.accessKey, key, host);
   }
 
   const rootRemote = await rootSkdb.connectedRemote();
   const testUserCreds = await rootRemote.createUser();
 
-  const userSkdb = await createSkdb({ asWorker: false });
+  const userSkdb = await createSkdb({ asWorker: asWorker });
   {
     const keyData = testUserCreds.privateKey;
     const key = await crypto.subtle.importKey(
       "raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    await userSkdb.connect("test", testUserCreds.accessKey, key, host);
+    await userSkdb.connect(dbName, testUserCreds.accessKey, key, host);
   }
   return { root: rootSkdb, user: userSkdb };
 }
@@ -80,7 +96,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   try {
     await remote.exec("bad query", {});
   } catch (error) {
-    const lines = (error as string).trim().split('\n');
+    const lines = getErrorMessage(error).split('\n');
     expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
   }
 
@@ -90,7 +106,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   try {
     await remote.exec("bad query", {});
   } catch (error) {
-    const lines = (error as string).trim().split('\n');
+    const lines = getErrorMessage(error).split('\n');
     expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
   }
 }
@@ -98,14 +114,12 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
 
 async function testSchemaQueries(skdb: SKDB) {
   const remote = await skdb.connectedRemote();
-
   const expected = "CREATE TABLE test_pk (";
   const schema = await remote.schema();
   const contains = schema.includes(expected);
   expect(contains ? expected : schema).toEqual(expected);
 
   // valid views/tables
-
   const viewExpected = "CREATE VIRTUAL VIEW skdb_groups_users";
   const viewSchema = await remote.viewSchema("skdb_groups_users");
   const viewContains = viewSchema.includes(viewExpected);
@@ -180,7 +194,7 @@ async function testServerTail(root: SKDB, user: SKDB) {
     await remote.exec("insert into view_pk values (87,88);", new Map());
     throw new Error("Shall throw exception.");
   } catch (exn) {
-    expect(exn).toEqual("insert into view_pk values (87,88);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\n");
+    expect(getErrorMessage(exn)).toEqual("insert into view_pk values (87,88);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
   }
   await new Promise(resolve => setTimeout(resolve, 100));
   const vres = await user.exec("select count(*) as cnt from view_pk where x = 87 and y = 88");
@@ -208,7 +222,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     await user.exec("insert into view_pk values (97,98);");
     throw new Error("Shall throw exception.");
   } catch (exn: any) {
-    expect(exn.message).toEqual("Error: insert into view_pk values (97,98);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
+    expect(getErrorMessage(exn)).toEqual("Error: insert into view_pk values (97,98);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
   }
   await new Promise(resolve => setTimeout(resolve, 100));
   const vres = await remote.exec(
@@ -233,11 +247,22 @@ async function testClientTail(root: SKDB, user: SKDB) {
   expect(resv).toEqual([{ cnt: 1 }]);
 }
 
-export const apitests = () => {
+async function testReboot(root: SKDB, user: SKDB) {
+  const remote = await user.connectedRemote();
+  let rebooted = false;
+  remote.onReboot(() => rebooted = true);
+  const rremote = await root.connectedRemote();
+  await rremote.exec("DROP TABLE test_pk;");
+  await new Promise(resolve => setTimeout(resolve, 100));
+  expect(rebooted).toEqual(true);
+}
+
+export const apitests = (asWorker) => {
   return [
     {
-      name: 'API',
+      name: asWorker ? 'API in Worker' : 'API',
       fun: async (dbs: dbs) => {
+
         // Queries Against The Server
         await testQueriesAgainstTheServer(dbs.root);
 
@@ -252,6 +277,11 @@ export const apitests = () => {
 
         // Client Tail
         await testClientTail(dbs.root, dbs.user);
+
+
+        // Reboot
+        await testReboot(dbs.root, dbs.user);
+
         dbs.root.closeConnection();
         dbs.user.closeConnection();
         return "";
