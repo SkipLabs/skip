@@ -94,7 +94,7 @@ base class IElement {
 base class Element {
   children =
   | Header(Int, Array<TextElement>)
-  | Block(BlockKind, Array<Array<TextElement>>)
+  | Block(BlockKind, Array<Array<TextElement>>, Int)
 }
 
 base class BlockKind uses Equality {
@@ -238,9 +238,9 @@ fun parseParens(input: Array<Char>): Array<(Char, Array<Char>)> {
   }
 }
 
-base class TextElement {
+base class TextElement uses Equality {
   children =
-  | TELink(String, String)
+  | TELink(String, String, ?String)
   | TEBold(String)
   | TEEmphasis(String)
   | TECode(String)
@@ -272,14 +272,23 @@ fun splitText(input: Array<Char>): Array<TextElement> {
     };
     acc.push(elt);
   };
+  ignore = false;
   for (nextElt in iter) {
+    if (ignore) {
+      !ignore = false;
+      !curr = nextElt;
+      continue
+    };
     if (curr.i0 == '[' && nextElt.i0 == '(') {
+      link = parseLink(nextElt.i1.slice(1, nextElt.i1.size() - 1));
       push(
         TELink(
           String::fromChars(curr.i1.slice(1, curr.i1.size() - 1)),
-          String::fromChars(nextElt.i1.slice(1, curr.i1.size() - 1)),
+          link.i0,
+          link.i1,
         ),
       );
+      !ignore = true;
     } else if (curr.i0 == '*' || curr.i0 == '_' || curr.i0 == '`') {
       push(makeElement(curr));
     } else {
@@ -287,13 +296,43 @@ fun splitText(input: Array<Char>): Array<TextElement> {
     };
     !curr = nextElt;
   };
-  push(makeElement(curr));
+  if (!ignore) {
+    push(makeElement(curr));
+  };
   acc.toArray()
 }
 
 /*****************************************************************************/
 /* Parse multi-line bullet points etc ... */
 /*****************************************************************************/
+
+fun parseLink(input: Array<Char>): (String, ?String) {
+  title: ?Int = None();
+  end = input.size();
+  iter = input.iterator();
+  curr = 0;
+  for (c in iter) {
+    title match {
+    | Some(t) if (c == '\'') ->
+      return (
+        String::fromChars(input.slice(0, end)),
+        Some(String::fromChars(input.slice(t, curr))),
+      )
+    | None() if (c == '\'') ->
+      !title = Some(curr + 1);
+      !end = curr;
+      while (end - 1 > 0 && Chars.isWhitespace(input[end - 1])) {
+        !end = end - 1;
+      }
+    | _ -> void
+    };
+    !curr = curr + 1;
+  };
+  (
+    String::fromChars(input.slice(0, end)),
+    title.map(t -> String::fromChars(input.slice(t, input.size()))),
+  )
+}
 
 fun parseMulti(
   elements: mutable Iterator<IElement>,
@@ -312,7 +351,7 @@ fun parseMulti(
 }
 
 mutable class ParseMulti(
-  mutable mode: BlockKind = KParagraph(),
+  mutable mode: (BlockKind, Int) = (KParagraph(), 0),
   acc: mutable Vector<Array<TextElement>> = mutable Vector[],
   elements: mutable Vector<Element> = mutable Vector[],
 ) {
@@ -322,8 +361,8 @@ mutable class ParseMulti(
   }
 
   private mutable fun flush(): void {
-    if (this.acc.isEmpty() && this.mode == KParagraph()) return void;
-    this.elements.push(Block(this.mode, this.acc.toArray()));
+    if (this.acc.isEmpty() && this.mode.i0 == KParagraph()) return void;
+    this.elements.push(Block(this.mode.i0, this.acc.toArray(), this.mode.i1));
     this.acc.clear();
   }
 
@@ -348,13 +387,13 @@ mutable class ParseMulti(
       trimmed.push(c);
     };
     !line.content = trimmed.toArray();
-    if (mode == this.mode && !forceFlush) {
+    if (mode == this.mode.i0 && !forceFlush) {
       this.pushLine(line);
       return void;
     };
     this.flush();
     this.pushLine(line);
-    this.!mode = mode;
+    this.!mode = (mode, line.indent);
   }
 
   mutable fun go(lines: Array<Line>): Array<Element> {
@@ -394,8 +433,8 @@ mutable class ParseMulti(
         }
       | _ if (
         line.indent >= 4 &&
-        this.mode != KNumbered() &&
-        this.mode != KBullet()
+        this.mode.i0 != KNumbered() &&
+        this.mode.i0 != KBullet()
       ) ->
         this.changeMode(KCode(), line, 0)
       | _ -> this.pushLine(line)
