@@ -1,0 +1,112 @@
+module alias T = SKTest;
+
+module SKMDTests;
+
+@test
+fun link(): void {
+  parseTest(
+    "This is [an example](http://example.com/ 'Title') inline link.",
+    Array[
+      SKMD.Block(
+        SKMD.KParagraph(),
+        Array[
+          Array[
+            SKMD.TEText("This is "),
+            SKMD.TELink("an example", "http://example.com/", Some("Title")),
+            SKMD.TEText(" inline link."),
+          ],
+        ],
+        0,
+      ),
+    ],
+  )
+}
+
+@test
+fun header1(): void {
+  parseTest(
+    "# Markdown: Syntax",
+    Array[SKMD.Header(1, Array[SKMD.TEText(" Markdown: Syntax")])],
+  )
+}
+
+@test
+fun header2(): void {
+  parseTest(
+    "## Block Elements # Just to see",
+    Array[SKMD.Header(2, Array[SKMD.TEText(" Block Elements # Just to see")])],
+  )
+}
+
+@test
+fun list(): void {
+  parseTest(
+    Array[
+      "*   [Overview](#overview)",
+      "A line",
+      "Other line",
+      "    *   [Philosophy](#philosophy)",
+      "    *   [Inline HTML](#html)",
+      "    *   [Automatic Escaping for Special Characters](#autoescape)",
+      "*   [Miscellaneous](#misc)",
+      "    *   [Backslash Escapes](#backslash)",
+      "    *   [Automatic Links](#autolink)",
+      "    ",
+    ].join("\n"),
+    Array[
+      SKMD.Block(
+        SKMD.KBullet(),
+        Array[
+          Array[SKMD.TELink("Overview", "#overview", None())],
+          Array[SKMD.TEText("A line")],
+          Array[SKMD.TEText("Other line")],
+        ],
+        0,
+      ),
+      SKMD.Block(
+        SKMD.KBullet(),
+        Array[Array[SKMD.TELink("Philosophy", "#philosophy", None())]],
+        4,
+      ),
+      SKMD.Block(
+        SKMD.KBullet(),
+        Array[Array[SKMD.TELink("Inline HTML", "#html", None())]],
+        4,
+      ),
+      SKMD.Block(
+        SKMD.KBullet(),
+        Array[
+          Array[
+            SKMD.TELink(
+              "Automatic Escaping for Special Characters",
+              "#autoescape",
+              None(),
+            ),
+          ],
+        ],
+        4,
+      ),
+      SKMD.Block(
+        SKMD.KBullet(),
+        Array[Array[SKMD.TELink("Miscellaneous", "#misc", None())]],
+        0,
+      ),
+      SKMD.Block(
+        SKMD.KBullet(),
+        Array[Array[SKMD.TELink("Backslash Escapes", "#backslash", None())]],
+        4,
+      ),
+      SKMD.Block(
+        SKMD.KBullet(),
+        Array[Array[SKMD.TELink("Automatic Links", "#autolink", None())]],
+        4,
+      ),
+    ],
+  )
+}
+
+fun parseTest(test: String, expect: Array<SKMD.Element>): void {
+  got = SKMD.parse(test).collect(Array);
+  debug((got, expect));
+  T.expectEq(got, expect)
+}
