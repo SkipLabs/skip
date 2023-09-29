@@ -127,7 +127,7 @@ while ! [ -f ~/.skdb/credentials ];
 do
   sleep 2
   i=$((i+1))
-  if [ $i -e 30 ]; then
+  if [ $i -eq 30 ]; then
     kill $pid1
     exit 2
   fi
