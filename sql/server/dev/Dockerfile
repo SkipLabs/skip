@@ -1,21 +1,10 @@
-FROM ubuntu:20.04 as skdb
-
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
-    apt-get install -q -y git make lld sqlite3 gcc gawk clang llvm automake-1.15 \
-    curl zip
-
-ENV CC=clang
-ENV CXX=clang++
+FROM skiplabs/skdb-base as skdb
 
 COPY . /skfs
 
-WORKDIR /skfs/compiler
-RUN make -B install STAGE=0
-
 WORKDIR /skfs
 
-RUN make clean && make -B build/skdb && make -B build/init.sql
+RUN make clean && make build/skdb && make build/init.sql
 
 FROM eclipse-temurin:20 as skgw
 
