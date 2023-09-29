@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 as base
+FROM ubuntu:22.04 as stage0
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && \
@@ -23,20 +23,14 @@ RUN update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm
 ENV CC=clang
 ENV CXX=clang++
 
-FROM base as bootstrap
+FROM stage0 as bootstrap
 
-COPY . /skfs
+COPY . /work
 
-WORKDIR /skfs/compiler
+WORKDIR /work/compiler
 RUN make STAGE=0
 
-FROM base
+FROM stage0 as base
 
-COPY --from=bootstrap /skfs/compiler/stage0/bin/skc /usr/bin/skc
-COPY --from=bootstrap /skfs/compiler/stage0/bin/skargo /usr/bin/skargo
-COPY --from=bootstrap /skfs/compiler/stage0/bin/skfmt /usr/bin/skfmt
-COPY --from=bootstrap /skfs/compiler/stage0/lib/libskip_runtime64.a /usr/lib/libskip_runtime64.a
-COPY --from=bootstrap /skfs/compiler/stage0/lib/libskip_runtime32.bc /usr/lib/libskip_runtime32.bc
-COPY --from=bootstrap /skfs/compiler/stage0/lib/libbacktrace.a /usr/lib/libbacktrace.a
-COPY --from=bootstrap /skfs/compiler/stage0/lib/skip_preamble64.ll /usr/lib/skip_preamble64.ll
-COPY --from=bootstrap /skfs/compiler/stage0/lib/skip_preamble32.ll /usr/lib/skip_preamble32.ll
+COPY --from=bootstrap /work/compiler/stage0/bin/ /usr/bin/
+COPY --from=bootstrap /work/compiler/stage0/lib/ /usr/lib/

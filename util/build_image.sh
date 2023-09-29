@@ -15,9 +15,8 @@ dockerbuild () {
     docker build . --no-cache --progress=plain --tag $1 --file $2/Dockerfile
 }
 
-dockerbuild skfs .
-dockerbuild skgw sql/server/skgw
-dockerbuild skdb-dev-server sql/server/dev
+dockerbuild skiplabs/skdb-base .
+dockerbuild skiplabs/skdb-dev-server sql/server/dev
 [[ -f $USER/Dockerfile ]] && dockerbuild $USER-skfs $USER
 
 git restore .dockerignore
