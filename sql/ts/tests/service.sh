@@ -23,6 +23,11 @@ fi
 
 [ -e "$4/skdb_service_mgmt.db" ] && rm "$4/skdb_service_mgmt.db" 1>&2
 [ -e "$4/test.db" ] && rm "$4/test.db" 1>&2
+[ -e "$4/test_node_worker.db" ] && rm "$4/test_node_worker.db" 1>&2
+[ -e "$4/test_firefox.db" ] && rm "$4/test_firefox.db" 1>&2
+[ -e "$4/test_firefox_worker.db" ] && rm "$4/test_firefox_worker.db" 1>&2
+[ -e "$4/test_chrome.db" ] && rm "$4/test_chrome.db" 1>&2
+[ -e "$4/test_chrome_worker.db" ] && rm "$4/test_chrome_worker.db" 1>&2
 
 mkdir -p $4
 

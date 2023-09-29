@@ -1253,6 +1253,7 @@ class SKDBServer implements RemoteSKDB {
   private creds: Creds;
   private replicationUid: string = "";
   private mirroredTables: Map<string, string> = new Map()
+  private onRebootFn ?: () => void;
 
   private constructor(
     env: Environment,
@@ -1289,7 +1290,7 @@ class SKDBServer implements RemoteSKDB {
     return server
   }
 
-  close(): void {
+  async close() {
     this.connection.closeSocket();
   }
 
@@ -1312,10 +1313,18 @@ class SKDBServer implements RemoteSKDB {
     const rebootSignalled = txtPayload.split("\n").find(line => line.trim() == ":reboot");
     if (rebootSignalled) {
       this.close();
-      this.onReboot(this, this.client);
+      this.callOnReboot();
       return;
     }
     deliver(txtPayload)
+  }
+
+  private callOnReboot(): void {
+    if (this.onRebootFn) {
+      this.onRebootFn();
+    } else {
+      throw new Error("Server signalled client should cold start to avoid diverging.");
+    }
   }
 
   private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse | null> {
@@ -1444,11 +1453,11 @@ class SKDBServer implements RemoteSKDB {
     return session;
   }
 
-  isConnectionHealthy(): boolean {
+  async isConnectionHealthy() {
     return this.connection.isSocketConsideredHealthy();
   }
 
-  tablesAwaitingSync(): Set<string> {
+  async tablesAwaitingSync() {
     const acc = new Set<string>();
     for (const [table, session] of this.mirroredTables.entries()) {
       if (session == "@view") {
@@ -1469,10 +1478,6 @@ class SKDBServer implements RemoteSKDB {
     }
     return acc;
   }
-
-  public onReboot: (server: SKDBServer, skdb: SkdbMechanism) => void = () => {
-    throw new Error("Server signalled client should cold start to avoid diverging.");
-  };
 
   async mirror(tableName: string, filterExpr?: string): Promise<void> {
     if (this.mirroredTables.has(tableName)) {
@@ -1565,4 +1570,8 @@ class SKDBServer implements RemoteSKDB {
       return result;
     });
   }
+
+  async onReboot(fn: () => void) {
+    this.onRebootFn = fn;
+  };
 }
