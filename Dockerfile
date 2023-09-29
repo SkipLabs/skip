@@ -9,7 +9,7 @@ RUN apt update && \
     echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
     echo "deb https://deb.nodesource.com/node_20.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
     apt update && \
-    apt install -q -y git zip unzip make lld-15 sqlite3 gcc gawk clang-15 llvm-15 automake jq parallel nodejs && \
+    apt install -q -y git zip unzip curl make lld-15 sqlite3 gcc gawk clang-15 llvm-15 automake jq parallel nodejs && \
     npm install -g typescript@5.1 && \
     npx playwright install-deps
 
@@ -24,9 +24,19 @@ ENV CC=clang
 ENV CXX=clang++
 
 FROM base as bootstrap
+
 COPY . /skfs
 
 WORKDIR /skfs/compiler
-RUN make install STAGE=0
+RUN make STAGE=0
 
-WORKDIR /skfs
+FROM base
+
+COPY --from=bootstrap /skfs/compiler/stage0/bin/skc /usr/bin/skc
+COPY --from=bootstrap /skfs/compiler/stage0/bin/skargo /usr/bin/skargo
+COPY --from=bootstrap /skfs/compiler/stage0/bin/skfmt /usr/bin/skfmt
+COPY --from=bootstrap /skfs/compiler/stage0/lib/libskip_runtime64.a /usr/lib/libskip_runtime64.a
+COPY --from=bootstrap /skfs/compiler/stage0/lib/libskip_runtime32.bc /usr/lib/libskip_runtime32.bc
+COPY --from=bootstrap /skfs/compiler/stage0/lib/libbacktrace.a /usr/lib/libbacktrace.a
+COPY --from=bootstrap /skfs/compiler/stage0/lib/skip_preamble64.ll /usr/lib/skip_preamble64.ll
+COPY --from=bootstrap /skfs/compiler/stage0/lib/skip_preamble32.ll /usr/lib/skip_preamble32.ll
