@@ -156,9 +156,13 @@ class Skdb(val name: String, private val dbPath: String) {
 
     val t =
         Thread({
-          val encoder = StandardCharsets.UTF_8.newEncoder()
-          output.forEachLine { callback(encoder.encode(CharBuffer.wrap(it)), true) }
-          closed()
+          try {
+            val encoder = StandardCharsets.UTF_8.newEncoder()
+            output.forEachLine { callback(encoder.encode(CharBuffer.wrap(it)), true) }
+            closed()
+          } catch (ex: Exception) {
+            closed()
+          }
         })
     t.start()
 
@@ -215,35 +219,39 @@ class Skdb(val name: String, private val dbPath: String) {
 
     val t =
         Thread({
-          val acc = ArrayList<String>()
-          output.forEachLine {
-            acc.add(it)
+          try {
+            val acc = ArrayList<String>()
+            output.forEachLine {
+              acc.add(it)
 
-            val shouldFlush = it.startsWith(":")
-            // threshold is fairly arbitrary. tested a handful of
-            // values. it's mostly a guess at a good value to save the
-            // arraylist from doing another double allocate/copy
-            val shouldSend = acc.size > 8191 || shouldFlush
+              val shouldFlush = it.startsWith(":")
+              // threshold is fairly arbitrary. tested a handful of
+              // values. it's mostly a guess at a good value to save the
+              // arraylist from doing another double allocate/copy
+              val shouldSend = acc.size > 8191 || shouldFlush
 
-            if (shouldSend) {
-              val payload = acc.joinToString(separator = "\n", postfix = "\n")
+              if (shouldSend) {
+                val payload = acc.joinToString(separator = "\n", postfix = "\n")
 
-              val encoder = StandardCharsets.UTF_8.newEncoder()
-              val buf = ByteBuffer.allocate(payload.length * 4 + 1)
-              var res = encoder.encode(CharBuffer.wrap(payload), buf, true)
-              if (!res.isUnderflow()) {
-                res.throwException()
+                val encoder = StandardCharsets.UTF_8.newEncoder()
+                val buf = ByteBuffer.allocate(payload.length * 4 + 1)
+                var res = encoder.encode(CharBuffer.wrap(payload), buf, true)
+                if (!res.isUnderflow()) {
+                  res.throwException()
+                }
+                res = encoder.flush(buf)
+                if (!res.isUnderflow()) {
+                  res.throwException()
+                }
+
+                callback(buf.flip(), shouldFlush)
+                acc.clear()
               }
-              res = encoder.flush(buf)
-              if (!res.isUnderflow()) {
-                res.throwException()
-              }
-
-              callback(buf.flip(), shouldFlush)
-              acc.clear()
             }
+            closed()
+          } catch (ex: Exception) {
+            closed()
           }
-          closed()
         })
     t.start()
 
