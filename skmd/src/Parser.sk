@@ -6,12 +6,53 @@
 
 module SKMD;
 
-value class Line(indent: Int, content: Array<Char>)
+value class Line(indent: Int, content: Array<Char>) {
+  fun drop(v: Int): this {
+    Line(this.indent, this.content.drop(v))
+  }
+}
 
 base class TextLine {
   children =
-  | LHeader(Int, Array<Char>)
+  | LHeader(Int, Array<Char>, Int)
+  | LHtml(Array<Char>, Int)
   | LText(Line)
+
+  fun ind(): Int
+  | LHeader(_, _, i)
+  | LHtml(_, i) ->
+    i
+  | LText(l) -> l.indent
+
+  fun startsWith(c: Char): Bool
+  | LHeader(_, t, _) -> t.maybeFirst() == Some(c)
+  | LHtml _ -> false
+  | LText(l) -> l.content.maybeFirst() == Some(c)
+
+  fun isNumbered(): Bool
+  | LHeader(_, t, _) ->
+    t.maybeFirst().map(Chars.isDigit).default(false) &&
+      t.maybeGet(1) == Some('.')
+  | LHtml _ -> false
+  | LText(l) ->
+    l.content.maybeFirst().map(Chars.isDigit).default(false) &&
+      l.content.maybeGet(1) == Some('.')
+
+  fun toString(): String
+  | LHeader(l, t, i) -> `Header[${l}]:${i} ${String::fromChars(t)}`
+  | LHtml(t, i) -> `Html:${i} ${String::fromChars(t)}`
+  | LText(l) -> `Text:${l.indent} ${String::fromChars(l.content)}`
+
+  fun isEmpty(): Bool
+  | LHeader _
+  | LHtml _ ->
+    false
+  | LText(l) -> l.content.isEmpty() || l.content.all(Chars.isWhitespace)
+
+  fun update(decr: Int, filter: Array<Char> ~> Array<Char>): this
+  | LHeader(l, t, i) -> LHeader(l, filter(t), max(i - 4, 0))
+  | LHtml(t, i) -> LHtml(filter(t), max(i - 4, 0))
+  | LText(l) -> LText(Line(max(l.indent - 4, 0), filter(l.content)))
 }
 
 fun parseTextLines(str: mutable Iterator<Char>): mutable Iterator<TextLine> {
@@ -26,13 +67,18 @@ fun parseTextLines(str: mutable Iterator<Char>): mutable Iterator<TextLine> {
       if (indent == 0) {
         yield (LText(Line(0, Array[])));
       } else {
+        i = indent;
         !indent = 0;
+        yield (LText(Line(i, Array[])));
       };
       continue
     | ' ' -> !indent = indent + 1
     | '\t' -> !indent = indent + 4
     | '#' if (indent == 0) ->
-      yield (parseHeader1(str));
+      yield (parseHeader(str, 1, indent));
+      !indent = 0
+    | '<' if (indent == 0) ->
+      yield (LHtml(parseUntilEOL(Some('<'), str), indent));
       !indent = 0
     | c ->
       yield (LText(Line(indent, parseUntilEOL(Some(c), str))));
@@ -41,19 +87,15 @@ fun parseTextLines(str: mutable Iterator<Char>): mutable Iterator<TextLine> {
   }
 }
 
-fun parseHeader1(str: mutable Iterator<Char>): TextLine {
+fun parseHeader(
+  str: mutable Iterator<Char>,
+  level: Int,
+  indent: Int,
+): TextLine {
   str.next() match {
-  | None() -> LHeader(1, Array[])
-  | Some('#') -> parseHeader2(str)
-  | Some(c) -> LHeader(1, parseUntilEOL(Some(c), str))
-  }
-}
-
-fun parseHeader2(str: mutable Iterator<Char>): TextLine {
-  str.next() match {
-  | None() -> LHeader(2, Array[])
-  | Some('#') -> LHeader(3, parseUntilEOL(None(), str))
-  | Some(c) -> LHeader(2, parseUntilEOL(Some(c), str))
+  | None() -> LHeader(level, Array[], indent)
+  | Some('#') -> parseHeader(str, level + 1, indent)
+  | Some(c) -> LHeader(level, parseUntilEOL(Some(c), str), indent)
   }
 }
 
@@ -87,14 +129,16 @@ fun parseUntilEOL(first: ?Char, str: mutable Iterator<Char>): Array<Char> {
 // Intermediate elements
 base class IElement {
   children =
-  | IHeader(Int, Array<Char>)
+  | IHtml(Array<Char>, Int)
+  | IHeader(Int, Array<Char>, Int)
   | IBlock(BlockKind, Array<Line>)
 }
 
 base class Element {
   children =
-  | Header(Int, Array<TextElement>)
-  | Block(BlockKind, Array<Array<TextElement>>, Int)
+  | Header(Int, Array<TextElement>, indent: Int)
+  | Html(Array<TextElement>, indent: Int)
+  | Block(BlockKind, lines: Array<Array<TextElement>>, indent: Int)
 }
 
 base class BlockKind uses Equality {
@@ -120,13 +164,14 @@ fun parseElements(
     | Some(x) -> x
     };
     textLine match {
-    | LHeader(headerKind, lineContent) ->
+    | LHeader(headerKind, lineContent, indent) ->
       if (acc.size() != 0) {
         yield IBlock(KParagraph(), acc.toArray());
         acc.clear()
       };
-      yield IHeader(headerKind, lineContent)
+      yield IHeader(headerKind, lineContent, indent)
     | LText(line) -> acc.push(line)
+    | LHtml(lineContent, indent) -> yield IHtml(lineContent, indent)
     }
   }
 }
@@ -248,13 +293,29 @@ base class TextElement uses Equality {
 }
 
 fun makeElement(elt: (Char, Array<Char>)): TextElement {
-  str = String::fromChars(elt.i1);
+  full = () -> String::fromChars(elt.i1);
+  stripped = () -> String::fromChars(elt.i1.slice(1, elt.i1.size() - 1));
   elt.i0 match {
-  | '*' -> TEBold(str)
-  | '_' -> TEEmphasis(str)
-  | '`' -> TECode(str)
-  | _ -> TEText(str)
-  }
+  | '*' if (
+    elt.i1.maybeFirst() == Some('*') &&
+    elt.i1.maybeLast() == Some('*')
+  ) ->
+    TEBold(stripped())
+  | '_' if (
+    elt.i1.maybeFirst() == Some('_') &&
+    elt.i1.maybeLast() == Some('_')
+  ) ->
+    TEBold(stripped())
+  | '`' if (
+    elt.i1.maybeFirst() == Some('`') &&
+    elt.i1.maybeLast() == Some('`')
+  ) ->
+    TECode(stripped())
+  | '*' -> TEEmphasis(full())
+  | '_' -> TEEmphasis(full())
+  | '`' -> TECode(full())
+  | _ -> TEText(full())
+  };
 }
 
 fun splitText(input: Array<Char>): Array<TextElement> {
@@ -339,7 +400,8 @@ fun parseMulti(
 ): mutable Iterator<Element> {
   for (elt in elements) {
     elt match {
-    | IHeader(x, y) -> yield Header(x, splitText(y).collect(Array))
+    | IHeader(x, y, i) -> yield Header(x, splitText(y).collect(Array), i)
+    | IHtml(y, i) -> yield Html(splitText(y).collect(Array), i)
     | IBlock(blockKind, arr) ->
       invariant(blockKind == KParagraph());
       parser = mutable ParseMulti();
