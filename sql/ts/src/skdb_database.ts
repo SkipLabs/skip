@@ -177,12 +177,12 @@ export class SKDBSyncImpl implements SKDBSync {
       return tables + views;
     }
 
-    const tableSchema = this.tableSchema(tableName);
-    if (tableSchema.trim() != '') {
-      return tableSchema
+    const viewSchema = this.viewSchema(tableName);
+    if (viewSchema.trim() != '') {
+      return viewSchema
     }
 
-    return this.viewSchema(tableName);
+    return this.tableSchema(tableName);
   }
 
   insert = (tableName: string, values: Array<any>) => {
