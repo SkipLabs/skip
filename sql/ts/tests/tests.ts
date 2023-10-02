@@ -666,6 +666,37 @@ export const tests = (asWorker: boolean) => {
       );
     }
   },
+  {
+    name: n('Schema for all', asWorker),
+    fun: async (skdb: SKDB) => {
+      await skdb.exec('create table t1 (a BOOLEAN, b boolean);');
+      return await skdb.schema();
+    },
+    check: res => {
+      expect(res).toMatch(/^CREATE TABLE t1/);
+    }
+  },
+  {
+    name: n('Schema for table', asWorker),
+    fun: async (skdb: SKDB) => {
+      await skdb.exec('create table t1 (a BOOLEAN, b boolean);');
+      return await skdb.schema('t1');
+    },
+    check: res => {
+      expect(res).toMatch(/^CREATE TABLE t1/);
+    }
+  },
+  {
+    name: n('Schema for view', asWorker),
+    fun: async (skdb: SKDB) => {
+      await skdb.exec('create table t1 (a BOOLEAN, b boolean);');
+      await skdb.exec('create virtual view v1 as select * from t1;');
+      return await skdb.schema('v1');
+    },
+    check: res => {
+      expect(res).toMatch(/^create virtual view v1/);
+    }
+  },
   ];
   return tests;
 }
