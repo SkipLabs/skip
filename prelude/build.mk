@@ -59,7 +59,6 @@ default: $(BUILD_DIR)libbacktrace.a $(BUILD_DIR)libskip_runtime64.a
 	@echo "skargo:library=$(BUILD_DIR)libskip_runtime64.a"
 	@echo "skargo:library=$(BUILD_DIR)libbacktrace.a"
 	@echo "skargo:preamble=$(COMP_DIR)/preamble/preamble64.ll"
-	@echo "skargo:link=-lrt"
 	@echo "skargo:link=-lpthread"
 
 $(BUILD_DIR)magic.c:
