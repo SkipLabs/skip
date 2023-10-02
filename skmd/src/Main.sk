@@ -1,15 +1,101 @@
 module SKMD;
 
 fun main(): void {
+  saved = SKStore.newObstack();
+  cmd = Cli.Command("skmd")
+    .about("Skip's Markdown converter")
+    .arg(
+      Cli.BoolArg("version")
+        .short("V")
+        .long("version")
+        .about("Print version info and exit"),
+    )
+    .arg(
+      Cli.BoolArg("verbose")
+        .short("v")
+        .long("verbose")
+        .about("Use verbose output")
+        .global(),
+    );
+  suppliers = Array[html, Skargo.help];
+  commands = mutable Map[];
+  for (supplier in suppliers) {
+    (subcommand, cmdFn) = supplier();
+    !cmd = cmd.subcommand(subcommand);
+    commands.set(subcommand.name, cmdFn);
+  };
+  !cmd = cmd.help();
+  args = cmd.parseArgs();
+  if (args.getBool("version")) {
+    print_string(
+      Environ.args().next().default("skmd") + " " + SkargoVersion.kVersion,
+    );
+    SKStore.destroyObstack(saved);
+    skipExit(0);
+  } else {
+    args.maybeGetSubcommand() match {
+    | Some(subcmd) ->
+      commands.maybeGet(subcmd) match {
+      | Some(handler) ->
+        skipExit(
+          try {
+            handler(args);
+            0
+          } catch {
+          | exn ->
+            e = SKStore.destroyObstackWithValue(saved, List[exn]).getHead();
+            throw e
+          },
+        )
+      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+      }
+    | None() ->
+      print_string(Cli.usage(args.cmd, true));
+      SKStore.destroyObstack(saved);
+      skipExit(0)
+    }
+  };
+}
+
+/********* Build **********/
+fun html(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("html")
+      .about("Convert to html")
+      .arg(
+        Cli.StringArg("target-dir").about(
+          "Directory for all generated artifacts",
+        ),
+      )
+      .arg(Cli.StringArg("head").about("Build with the specified head file"))
+      .arg(Cli.StringArg("header").about("Build with de specified header file"))
+      .arg(Cli.StringArg("footer").about("Build with de specified footer file"))
+      .arg(
+        Cli.StringArg("lang").about("Specify the document lang").default("en"),
+      ),
+    execHtml,
+  )
+}
+
+fun execHtml(args: Cli.ParseResults): void {
   acc = mutable Vector[];
   loop {
     read_line() match {
     | None() ->
-      _ = debug(parse(acc.join("")).collect(Array));
-      return void
+      buffer = mutable Vector[];
+      convertToHtml{
+        markdown => acc.join(""),
+        buffer,
+        lang => args.getString("lang"),
+        head => args.maybeGetString("head").map(FileSystem.readTextFile),
+        header => args.maybeGetString("header").map(FileSystem.readTextFile),
+        footer => args.maybeGetString("footer").map(FileSystem.readTextFile),
+      };
+      print_string(buffer.join("\n"));
+      break void
     | Some(str) ->
       acc.push(str);
       acc.push("\n")
     }
-  };
+  }
 }
