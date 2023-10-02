@@ -14,7 +14,7 @@ export interface SKDBSync {
 
   tableSchema: (tableName: string) => string;
   viewSchema: (viewName: string) => string;
-  schema: () => string;
+  schema: (tableName?: string) => string;
   subscribe: (viewName: string, f: (change: string) => void) => void;
   save: () => Promise<boolean>;
 
@@ -33,21 +33,17 @@ export interface SKDBSync {
 }
 
 export interface SKDB {
-  subscribe: (viewName: string, f: (change: string) => void) => Promise<void>;
-
   exec: (query: string, params?: Params) => Promise<Array<any>>;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
 
-  tableSchema: (tableName: string) => Promise<string>;
-  viewSchema: (viewName: string) => Promise<string>;
-  schema: () => Promise<string>;
-  insert: (tableName: string, values: Array<any>) => Promise<boolean>;
-  save: () => Promise<boolean>;
-
   connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
   connectedRemote: () => Promise<RemoteSKDB|undefined>;
-  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
   closeConnection: () => Promise<void>;
+
+  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+
+  schema: (tableName?: string) => Promise<string>;
+  save: () => Promise<boolean>;
 }
 
 export interface SkdbMechanism {
@@ -80,16 +76,21 @@ export type ProtoResponseCreds = {
 export type Params = Map<string, string|number> | Object;
 
 export interface RemoteSKDB {
-  createDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createUser(): Promise<ProtoResponseCreds>;
   schema: () => Promise<string>;
   tableSchema: (tableName: string) => Promise<string>;
   viewSchema: (viewName: string) => Promise<string>;
+
+  createDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
+
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
   exec: (query: string, params?: Params) => Promise<Array<any>>;
+
   isConnectionHealthy: () => Promise<boolean>;
   tablesAwaitingSync: () => Promise<Set<string>>;
+
   onReboot: (fn: () => void) => Promise<void>;
+
   close(): Promise<void>;
 }
 
