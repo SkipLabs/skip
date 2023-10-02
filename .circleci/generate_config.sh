@@ -8,6 +8,11 @@ skfs=$?
 git diff --quiet HEAD master -- sql/
 skdb=$?
 
+if (($skc == 0 && $skfs == 0 && $skdb == 0))
+then
+    circleci-agent step halt
+fi
+
 cat .circleci/base.yml
 
 echo "workflows:"
