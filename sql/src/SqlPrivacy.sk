@@ -7,6 +7,10 @@ module SKDB;
 // could be error prone.
 /*****************************************************************************/
 
+const kDeletePermission: Int = 1;
+const kInsertPermission: Int = 2;
+const kReadPermission: Int = 4;
+
 value class Permission(private perm: Int) {
   static fun none(): this {
     Permission(0)
@@ -16,13 +20,13 @@ value class Permission(private perm: Int) {
   }
 
   fun canRead(): Bool {
-    this.perm.and(4) != 0
+    this.perm.and(kReadPermission) != 0
   }
   fun canInsert(): Bool {
-    this.perm.and(2) != 0
+    this.perm.and(kInsertPermission) != 0
   }
   fun canDelete(): Bool {
-    this.perm.and(1) != 0
+    this.perm.and(kDeletePermission) != 0
   }
 
   fun or(y: Permission): Permission {
