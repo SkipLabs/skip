@@ -64,6 +64,63 @@ function UserSelector({users, select}: {users: string[], select: (accessKey: str
   )
 }
 
+function ReactiveQueryViewer() {
+  const [query, setQuery] = useState('');
+  const [queries, setQueries] = useState<string[]>([]);
+
+  const show = async (query: string) => {
+    setQueries(queries.concat(query))
+  }
+
+  const removeQuery = (q) => {
+    const qIdx = queries.findIndex((x) => x === q)
+    setQueries(queries.filter((val, idx) => idx != qIdx))
+  }
+
+  const tables = queries.map(q => <SKDBTable key={q} query={q} removeQuery={removeQuery} />);
+
+  return (
+    <div>
+      <input value={query}
+        onChange={e => setQuery(e.target.value)}
+        onKeyDown={e => {if (e.key === 'Enter') show(query)}} />
+      {tables}
+    </div>
+  )
+}
+
+function SKDBTable({query, removeQuery}) {
+  const rows = useQuery(query);
+  const keys = rows.length < 1 ? [] : Object.keys(rows[0])
+  let i = 0;
+  const acc = rows.map(row => {
+    let j = 0;
+    const tds: JSX.Element[] = [];
+    for (const k of keys) {
+      tds.push(<td key={j++}>{row[k]}</td>);
+    }
+    return (
+      <tr key={i++}>{tds}</tr>
+    )
+  })
+  return (
+    <div>
+      <span>{query}</span>
+      <button onClick={e => removeQuery(query)}>X</button>
+      <table>
+        <thead>
+          <tr>
+            {keys.map((k,idx) => <th key={idx}>{k}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {acc}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // TODO: need to migrate the users table and permissions. need to ensure idempotent
 export function SKDBMultiUserProvider(
   { children, skdbAsRoot, create }: {
@@ -109,10 +166,7 @@ export function SKDBMultiUserProvider(
   };
 
   // TODO: need a callback for this? no, dev console!
-  // @ts-ignore
-  window.skdb = skdbs[currentUser];
 
-  // TODO: need to get at user ids easily
   // TODO: could expand on this greatly to allow conveniently defining
   // groups, setting permisssions, etc. console! and watch tables!
 
@@ -121,6 +175,7 @@ export function SKDBMultiUserProvider(
       <div id="skdb_user_picker">
         <UserSelector users={users} select={changeUser} />
         <button onClick={e => addUser()}>+</button>
+        <ReactiveQueryViewer />
       </div>
       {children}
     </SKDBContext.Provider>
