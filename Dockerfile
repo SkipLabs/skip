@@ -1,15 +1,15 @@
 FROM ubuntu:22.04 as stage0
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && \
-    apt install -q -y wget gnupg && \
+RUN apt-get update && \
+    apt-get install -q -y wget gnupg && \
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
     wget -O - https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | apt-key add - && \
     echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
     echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
     echo "deb https://deb.nodesource.com/node_20.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
-    apt update && \
-    apt install -q -y git zip unzip curl make lld-15 sqlite3 gcc gawk clang-15 llvm-15 automake jq parallel nodejs && \
+    apt-get update && \
+    apt-get install -q -y git zip unzip curl make lld-15 sqlite3 gcc gawk clang-15 llvm-15 automake jq parallel nodejs && \
     npm install -g typescript@5.1 && \
     npx playwright install-deps
 
