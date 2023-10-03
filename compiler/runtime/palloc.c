@@ -621,7 +621,7 @@ void SKIP_memory_init(int argc, char** argv) {
   if (fileName != NULL) {
     fprintf(stderr,
             "Persistent allocation not supported on this platform. "
-            "Disregarding %s.",
+            "Disregarding %s.\n",
             fileName);
   }
   if (is_create) {
