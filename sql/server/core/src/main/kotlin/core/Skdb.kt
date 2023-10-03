@@ -314,7 +314,7 @@ class Skdb(val name: String, private val dbPath: String) {
     blockingRun(ProcessBuilder(ENV.skdbPath, "--init", dbPath))
     blockingRun(ProcessBuilder(ENV.skdbPath, "--data", dbPath), initScript)
     sql(
-        "INSERT INTO skdb_users VALUES (0, '${DB_ROOT_USER}', @key)",
+        "INSERT INTO skdb_users VALUES ('${DB_ROOT_USER}', @key)",
         mapOf("key" to encryptedRootPrivateKey),
         OutputFormat.RAW)
     return this
@@ -322,7 +322,7 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun createUser(accessKey: String, encryptedPrivateKey: String): ProcessOutput {
     return sql(
-        "INSERT INTO skdb_users VALUES (id(), @accessKey, @privateKey)",
+        "INSERT INTO skdb_users VALUES (@accessKey, @privateKey)",
         mapOf("accessKey" to accessKey, "privateKey" to encryptedPrivateKey),
         OutputFormat.RAW)
   }
