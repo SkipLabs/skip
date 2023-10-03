@@ -1116,6 +1116,25 @@ mutable class Compiler{
           CIExpr(CILiteral(globals[varName]))
         | _ -> error(this.pos, "id expects a string literal")
         }
+      | ("skdb_permission", Some(args)) ->
+        if (args.size() != 1) {
+          error(this.pos, "skdb_permission expects one argument")
+        };
+        perm_str = args[0] match {
+        | VString(str) -> str
+        | _ -> error(this.pos, "skdb_permission expects a string literal")
+        };
+        res = 0;
+        if (perm_str.contains("r")) {
+          !res = res.or(kReadPermission)
+        };
+        if (perm_str.contains("i")) {
+          !res = res.or(kInsertPermission)
+        };
+        if (perm_str.contains("d")) {
+          !res = res.or(kDeletePermission)
+        };
+        CIExpr(CILiteral(res))
       | ("upper", None()) -> error(this.pos, "upper expects one argument")
       | ("lower", None()) -> error(this.pos, "lower expects one argument")
       | ("upper", Some(values)) ->
