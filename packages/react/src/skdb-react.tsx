@@ -31,6 +31,7 @@ export function useQuery(
   const [state, setState] = useState(defaultRows);
 
   const deps = Object.values(params);
+  deps.push(skdb);
   deps.push(query);
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export function useQuery(
   return state;
 }
 
+// TODO: move this stuff out to another file and check that it doesn't compile/link in if not used
 function UserSelector({users, select}: {users: string[], select: (accessKey: string) => void}) {
   const list = users.map(user => <option value={user} key={user}>{user}</option>)
   return (
@@ -64,50 +66,60 @@ function UserSelector({users, select}: {users: string[], select: (accessKey: str
 
 // TODO: need to migrate the users table and permissions. need to ensure idempotent
 export function SKDBMultiUserProvider(
-  { children, skdb, create }: {
+  { children, skdbAsRoot, create }: {
     children: React.ReactNode,
-    skdb: SKDB,
+    skdbAsRoot: SKDB,
     create: (accessKey: string) => Promise<SKDB>
   }
 ) {
-// TODO: this won't be sticky between reloads. need to useEffect to query skdb users table for list of users
-  const [users, setUsers] = useState({"root": skdb});
+  const [users, setUsers] = useState(["root"]);
   const [currentUser, setCurrentUser] = useState("root");
+  const [skdbs, setSkdbs] = useState({"root": skdbAsRoot})
+
+  useEffect(() => {
+    skdbAsRoot.connectedRemote().then((remote) => {
+      if (remote === undefined) {
+        throw new Error("SKDB not connected");
+      }
+      remote.exec("SELECT userName FROM skdb_users").then((userRows) => {
+        setUsers(userRows.map(row => row.userName));
+      });
+    });
+  });
 
   const addUser = async () => {
-    const remote = await skdb.connectedRemote();
+    const remote = await skdbAsRoot.connectedRemote();
     if (remote === undefined) {
       throw new Error("SKDB not connected");
     }
     const cred = await remote.createUser();
-    const newUserSkdb = await create(cred.accessKey)
-    // TODO: create a connected skdb lazily
-    users[cred.accessKey] = newUserSkdb;
-    setUsers({
-      ...users,
-    });
+    setUsers(users.concat(cred.accessKey));
     // TODO: maybe give a friendly name to each? or a colour?
   };
 
-  const changeUser = (key: string) => {
-    // TODO: create a connected skdb lazily
-    if (!(key in users)) {
-      throw new Error("Chose a user that does not exist")
+  const changeUser = async (key: string) => {
+    if (!(key in skdbs)) {
+      const newUserSkdb = await create(key)
+      skdbs[key] = newUserSkdb;
+      setSkdbs({
+        ...skdbs
+      })
     }
     setCurrentUser(key);
   };
 
-  // TODO: need a callback for this?
+  // TODO: need a callback for this? no, dev console!
   // @ts-ignore
-  window.skdb = users[currentUser];
+  window.skdb = skdbs[currentUser];
 
   // TODO: need to get at user ids easily
-  // TODO: could expand on this greatly to allow conveniently defining groups, setting permisssions, etc.
+  // TODO: could expand on this greatly to allow conveniently defining
+  // groups, setting permisssions, etc. console! and watch tables!
 
   return (
-    <SKDBContext.Provider value={users[currentUser]}>
+    <SKDBContext.Provider value={skdbs[currentUser]}>
       <div id="skdb_user_picker">
-        <UserSelector users={Object.keys(users)} select={changeUser} />
+        <UserSelector users={users} select={changeUser} />
         <button onClick={e => addUser()}>+</button>
       </div>
       {children}
