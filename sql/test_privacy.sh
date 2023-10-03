@@ -223,7 +223,7 @@ tailerID=$!
 
 sleep 1
 
-# let's kick user3 out of the group 22
+# let's kick ID3 out of the group 22
 echo "delete from skdb_group_permissions where groupName='ID22' and userName='ID3';" | $SKDB
 
 # As long as the row (238,22) is still there, the update did not kick in
@@ -234,12 +234,12 @@ done
 # The reset was successful
 echo -e "TEST GROUP PERMISSION UPDATE:\tOK"
 
-# let's block the user3 all together
-userName=`echo "select userName from skdb_users where userName='user3'" | $SKDB`
-echo "insert into skdb_user_permissions values('$userName', 0);" | $SKDB
+# let's block the ID3 all together
+echo "insert into skdb_user_permissions values('ID3', 0);" | $SKDB
 
 # As long as the row (240,22) is still there, the update did not kick in
 while echo "select * from t3" | $SKDB | grep -q "240"; do
+    echo "select * from t3" | $SKDB | grep -q "240"
     sleep 1
 done
 
@@ -248,10 +248,10 @@ echo -e "TEST GROUP PERMISSION UPDATE2:\tOK"
 
 # let's reset all the permissions and make sure all the data is back
 
-# let's kick user3 out of the group 22
+# let's kick ID3 out of the group 22
 (echo "begin transaction;";
  echo "insert into skdb_group_permissions values('ID22', 'ID3', 7);";
- echo "delete from skdb_user_permissions where userName='$userName';"
+ echo "delete from skdb_user_permissions where userName='ID3';"
  echo "commit;"
 )| $SKDB
 
