@@ -1087,15 +1087,6 @@ mutable class Compiler{
       (fname.lower, fargs) match {
       | ("coalesce", None()) ->
         error(this.pos, "Missing arguments for COALESCE")
-      | ("uid", _) ->
-        context.getGlobal("USER") match {
-        | None() ->
-          error(
-            this.pos,
-            "Cannot use a the function uid() if not connected as a user",
-          )
-        | Some(user) -> CSExpr(CSLiteral(UserFile::type(user).id))
-        }
       | ("id", None()) -> error(this.pos, "id expects one argument")
       | ("id", Some(args)) ->
         if (args.size() == 0) {
