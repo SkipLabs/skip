@@ -18,19 +18,19 @@ SKDB="$SKDB_CMD --data $DBFILE"
 
 cat privacy/init.sql | $SKDB
 
-echo "create table t1 (id INTEGER primary key, skdb_group INTEGER);" | $SKDB
+echo "create table t1 (id INTEGER primary key, skdb_group STRING);" | $SKDB
 subt1=`$SKDB subscribe t1`
 
 echo "create table t2 (id INTEGER primary key);" | $SKDB
-echo "create table t3 (id INTEGER primary key, skdb_group INTEGER);" | $SKDB
-echo "create virtual view t1 as select id, id as skdb_group from t1 ;" | $SKDB
+echo "create table t3 (id INTEGER primary key, skdb_group STRING);" | $SKDB
+echo "create virtual view v1 as select id, id as skdb_group from t1 ;" | $SKDB
 
 ###############################################################################
 # Creating the users
 ###############################################################################
 
 for i in {1..10}; do
-    echo "insert into skdb_users values($i, 'user$i', 'pass');"
+    echo "insert into skdb_users values('ID$i', 'user$i', 'pass');"
 done | $SKDB
 
 ###############################################################################
@@ -77,7 +77,7 @@ else
 fi
 
 # Let's check that user permissions are respected for a specific user
-echo "insert into skdb_user_permissions values (1, 6);" | $SKDB
+echo "insert into skdb_user_permissions values ('ID1', 6);" | $SKDB
 
 if echo -e "1\t235" | $SKDB write-csv t2 --user user1 2>&1 | grep -q Error; then
     echo -e "TEST USER PERMISSIONS2:\tFAILED"
@@ -91,33 +91,33 @@ fi
 
 # Let's create a group
 # user1 can write, all the others can only read
-echo "insert into skdb_group_permissions values (22, 1, 7);" | $SKDB
-echo "insert into skdb_group_permissions values (22, 2, 4);" | $SKDB
-echo "insert into skdb_group_permissions values (22, 3, 4);" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID1', 7);" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID2', 4);" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID3', 4);" | $SKDB
 
 # Let's check user1 can write
-if echo -e "1\t238,22" | $SKDB write-csv t1 --user user1 2>&1 | grep -q Error; then
+if echo -e "1\t238,\"ID22\"" | $SKDB write-csv t1 --user user1 2>&1 | grep -q Error; then
     echo -e "TEST GROUP PERMISSIONS:\tFAILED"
 else
     echo -e "TEST GROUP PERMISSIONS:\tOK"
 fi
 
 # Let's check user2 cannot write
-if echo -e "1\t239,22" | $SKDB write-csv t1 --user user2 2>&1 | grep -q Error; then
+if echo -e "1\t239,\"ID22\"" | $SKDB write-csv t1 --user user2 2>&1 | grep -q Error; then
     echo -e "TEST GROUP PERMISSIONS2:\tOK"
 else
     echo -e "TEST GROUP PERMISSIONS2:\tFAILED"
 fi
 
 # Let's check user3 cannot write
-if echo -e "1\t239,22" | $SKDB write-csv t1 --user user3 2>&1 | grep -q Error; then
+if echo -e "1\t239,\"ID22\"" | $SKDB write-csv t1 --user user3 2>&1 | grep -q Error; then
     echo -e "TEST GROUP PERMISSIONS3:\tOK"
 else
     echo -e "TEST GROUP PERMISSIONS3:\tFAILED"
 fi
 
 # Let's check that user2 can read
-if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|22"; then
+if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|\"ID22\""; then
     echo -e "TEST GROUP PERMISSIONS4:\tOK"
 else
     echo -e "TEST GROUP PERMISSIONS4:\tFAILED"
@@ -127,7 +127,7 @@ fi
 echo "insert into skdb_table_permissions values (NULL, 0)" | $SKDB
 
 # Let's check that user2 cannot read
-if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|22"; then
+if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|\"ID22\""; then
     echo -e "TEST GROUP PERMISSIONS5:\tFAILED"
 else
     echo -e "TEST GROUP PERMISSIONS5:\tOK"
@@ -136,29 +136,29 @@ fi
 echo "delete from skdb_table_permissions;" | $SKDB
 
 # Let's change the user permissions and see what happens
-echo "insert into skdb_user_permissions values (2, 0)" | $SKDB
+echo "insert into skdb_user_permissions values ('ID2', 0)" | $SKDB
 
 # Let's check that user2 cannot read
-if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|22"; then
+if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|\"ID22\""; then
     echo -e "TEST GROUP PERMISSIONS6:\tFAILED"
 else
     echo -e "TEST GROUP PERMISSIONS6:\tOK"
 fi
 
-echo "delete from skdb_user_permissions where userID=2;" | $SKDB
+echo "delete from skdb_user_permissions where userID='ID2';" | $SKDB
 
 # Let's check that user2 can read again
-if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|22"; then
+if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|\"ID22\""; then
     echo -e "TEST GROUP PERMISSIONS7:\tOK"
 else
     echo -e "TEST GROUP PERMISSIONS7:\tFAILED"
 fi
 
 # Let's kick user2 out of the group
-echo "delete from skdb_group_permissions where groupID=22 and userID=2;" | $SKDB
+echo "delete from skdb_group_permissions where groupID='ID22' and userID='ID2';" | $SKDB
 
 # Let's check that user2 cannot read (after being kicked out)
-if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|22"; then
+if $SKDB tail $subt1 --user user2 2>&1 | grep -q "238|\"ID22\""; then
     echo -e "TEST GROUP PERMISSIONS8:\tFAILED"
 else
     echo -e "TEST GROUP PERMISSIONS8:\tOK"
@@ -170,40 +170,40 @@ fi
 
 # Let's create a block list
 # Everybody can read/insert/delete, except for user1 who can only read
-echo "insert into skdb_group_permissions values (23, 1, 4);" | $SKDB
-echo "insert into skdb_group_permissions values (23, NULL, 7);" | $SKDB
+echo "insert into skdb_group_permissions values ('ID23', 'ID1', 4);" | $SKDB
+echo "insert into skdb_group_permissions values ('ID23', NULL, 7);" | $SKDB
 
 # Let's check user2 can write
-if echo -e "1\t240,23" | $SKDB write-csv t1 --user user2 2>&1 | grep -q Error; then
+if echo -e "1\t240,\"ID23\"" | $SKDB write-csv t1 --user user2 2>&1 | grep -q Error; then
     echo -e "TEST GROUP PERMISSIONS9:\tFAILED"
 else
     echo -e "TEST GROUP PERMISSIONS9:\tOK"
 fi
 
 # Let's check user1 cannot write
-if echo -e "1\t241,23" | $SKDB write-csv t1 --user user1 2>&1 | grep -q Error; then
+if echo -e "1\t241,\"ID23\"" | $SKDB write-csv t1 --user user1 2>&1 | grep -q Error; then
     echo -e "TEST GROUP PERMISSIONS10:\tOK"
 else
     echo -e "TEST GROUP PERMISSIONS10:\tFAILED"
 fi
 
 # Let's check that user1 can read
-if $SKDB tail $subt1 --user user1 2>&1 | grep -q "240|23"; then
-    echo -e "TEST GROUP PERMISSIONS7:\tOK"
+if $SKDB tail $subt1 --user user1 2>&1 | grep -q "240|\"ID23\""; then
+    echo -e "TEST GROUP PERMISSIONS11:\tOK"
 else
-    echo -e "TEST GROUP PERMISSIONS7:\tFAILED"
+    echo -e "TEST GROUP PERMISSIONS11:\tFAILED"
 fi
 
 ###############################################################################
 # SKDB_AUTHOR CHECK
 ###############################################################################
 
-echo "create table t4 (id INTEGER, skdb_author INTEGER);" | $SKDB
-if echo -e "1\t240,23" | $SKDB write-csv t4 --user user3 2>&1 | grep -q Error
+echo "create table t4 (id INTEGER, skdb_author STRING);" | $SKDB
+if echo -e "1\t240,\"ID23\"" | $SKDB write-csv t4 --user user3 2>&1 | grep -q Error
 then echo -e "TEST AUTHOR:\tOK"
 else echo -e "TEST AUTHOR:\tFAILED"
 fi
-if echo -e "1\t240,3" | $SKDB write-csv t4 --user user3 2>&1 | grep -q Error
+if echo -e "1\t240,\"ID3\"" | $SKDB write-csv t4 --user user3 2>&1 | grep -q Error
 then echo -e "TEST AUTHOR2:\tOK"
 else echo -e "TEST AUTHOR2:\tFAILED"
 fi
@@ -224,7 +224,7 @@ tailerID=$!
 sleep 1
 
 # let's kick user3 out of the group 22
-echo "delete from skdb_group_permissions where groupID=22 and userID=3;" | $SKDB
+echo "delete from skdb_group_permissions where groupID='ID22' and userID='ID3';" | $SKDB
 
 # As long as the row (238,22) is still there, the update did not kick in
 while echo "select * from t3" | $SKDB | grep -q "238"; do
@@ -236,7 +236,7 @@ echo -e "TEST GROUP PERMISSION UPDATE:\tOK"
 
 # let's block the user3 all together
 userID=`echo "select userID from skdb_users where userName='user3'" | $SKDB`
-echo "insert into skdb_user_permissions values($userID, 0);" | $SKDB
+echo "insert into skdb_user_permissions values('$userID', 0);" | $SKDB
 
 # As long as the row (240,22) is still there, the update did not kick in
 while echo "select * from t3" | $SKDB | grep -q "240"; do
@@ -250,8 +250,8 @@ echo -e "TEST GROUP PERMISSION UPDATE2:\tOK"
 
 # let's kick user3 out of the group 22
 (echo "begin transaction;";
- echo "insert into skdb_group_permissions values(22, 3, 7);";
- echo "delete from skdb_user_permissions where userID=$userID;"
+ echo "insert into skdb_group_permissions values('ID22', 'ID3', 7);";
+ echo "delete from skdb_user_permissions where userID='$userID';"
  echo "commit;"
 )| $SKDB
 
