@@ -24,7 +24,7 @@ setup_server() {
     $SKDB < "$SCRIPT_DIR/privacy/init.sql"
 
     (echo "BEGIN TRANSACTION;";
-     echo "INSERT INTO skdb_users VALUES(id('user'), 'test_user', 'test');"
+     echo "INSERT INTO skdb_users VALUES('test_user', 'test');"
      echo "INSERT INTO skdb_table_permissions VALUES('test_without_pk', 7);"
      echo "COMMIT;"
     ) | $SKDB

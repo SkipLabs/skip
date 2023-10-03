@@ -19,7 +19,7 @@ setup_server() {
 
     $SKDB < privacy/init.sql
 
-    echo "INSERT INTO skdb_users VALUES(id(), 'test_user', 'pass');" | $SKDB
+    echo "INSERT INTO skdb_users VALUES('test_user', 'pass');" | $SKDB
     echo "INSERT INTO skdb_table_permissions VALUES('test_without_access', 7);" | $SKDB
     echo "CREATE TABLE test_without_access (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
 }
