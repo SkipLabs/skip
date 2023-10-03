@@ -1134,6 +1134,9 @@ mutable class Compiler{
         if (perm_str.contains("d")) {
           !res = res.or(kDeletePermission)
         };
+        if (perm_str.contains("w")) {
+          !res = res.or(kInsertPermission).or(kDeletePermission)
+        };
         CIExpr(CILiteral(res))
       | ("upper", None()) -> error(this.pos, "upper expects one argument")
       | ("lower", None()) -> error(this.pos, "lower expects one argument")
