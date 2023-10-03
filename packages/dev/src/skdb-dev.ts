@@ -83,7 +83,7 @@ class DevServer {
 export async function skdbDevServerDb(
   database: string = "test",
   host: string = "localhost",
-  port: number = 8080,
+  port: number = 3456,
 ): Promise<DevServer> {
   if (host.startsWith("http") || host.startsWith("https")) {
     throw new Error("host should be the hostname without scheme. Drop the http://.")

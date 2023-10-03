@@ -179,7 +179,7 @@ if (args.values['dev']) {
 
   let host: string = args.values['host'];
   if (host === "wss://api.skiplabs.io") {
-    host = "ws://localhost:8080";
+    host = "ws://localhost:3456";
   }
 
   const schemeAndRest = host.split("://", 2);
@@ -189,7 +189,7 @@ if (args.values['dev']) {
     console.log("Invalid host");
     process.exit(1);
   } else if (hostAndPort.length === 1) {
-    dbCreds = await getCredsFromDevServer(hostAndPort[0], 8080, values.db);
+    dbCreds = await getCredsFromDevServer(hostAndPort[0], 3456, values.db);
   } else {
     dbCreds = await getCredsFromDevServer(
       hostAndPort[0],
