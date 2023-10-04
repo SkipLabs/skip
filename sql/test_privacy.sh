@@ -38,7 +38,7 @@ done | $SKDB
 ###############################################################################
 
 # Checking that if a table is readonly, the user cannot write
-echo "insert into skdb_table_permissions values ('t2', 4);" | $SKDB
+echo "insert into skdb_table_permissions values ('t2', skdb_permission('r'));" | $SKDB
 
 if echo -e "1\t234" | $SKDB write-csv t2 --user ID1 2>&1 | grep -q Error; then
     echo -e "TEST TABLE PERMISSIONS:\tOK"
@@ -47,7 +47,7 @@ else
 fi
 
 # Let's change the permissions and see if we can write now
-echo "update skdb_table_permissions set permissions=6 where name='t2';" | $SKDB
+echo "update skdb_table_permissions set permissions=skdb_permission('ri') where name='t2';" | $SKDB
 
 if echo -e "1\t234" | $SKDB write-csv t2 --user ID1 2>&1 | grep -q Error; then
     echo -e "TEST TABLE PERMISSIONS2:\tFAILED"
@@ -68,7 +68,7 @@ fi
 
 # Let's check that user permissions are respected
 # This should turn every user into "readonly"
-echo "insert into skdb_user_permissions values (NULL, 4);" | $SKDB
+echo "insert into skdb_user_permissions values (NULL, skdb_permission('r'));" | $SKDB
 
 if echo -e "1\t235" | $SKDB write-csv t2 --user ID1 2>&1 | grep -q Error; then
     echo -e "TEST USER PERMISSIONS:\tOK"
@@ -77,7 +77,7 @@ else
 fi
 
 # Let's check that user permissions are respected for a specific user
-echo "insert into skdb_user_permissions values ('ID1', 6);" | $SKDB
+echo "insert into skdb_user_permissions values ('ID1', skdb_permission('ri'));" | $SKDB
 
 if echo -e "1\t235" | $SKDB write-csv t2 --user ID1 2>&1 | grep -q Error; then
     echo -e "TEST USER PERMISSIONS2:\tFAILED"
@@ -91,9 +91,9 @@ fi
 
 # Let's create a group
 # user1 can write, all the others can only read
-echo "insert into skdb_group_permissions values ('ID22', 'ID1', 7);" | $SKDB
-echo "insert into skdb_group_permissions values ('ID22', 'ID2', 4);" | $SKDB
-echo "insert into skdb_group_permissions values ('ID22', 'ID3', 4);" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID1', skdb_permission('rw'));" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID2', skdb_permission('r'));" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID3', skdb_permission('r'));" | $SKDB
 
 # Let's check user1 can write
 if echo -e "1\t238,\"ID22\"" | $SKDB write-csv t1 --user ID1 2>&1 | grep -q Error; then
@@ -136,7 +136,7 @@ fi
 echo "delete from skdb_table_permissions;" | $SKDB
 
 # Let's change the user permissions and see what happens
-echo "insert into skdb_user_permissions values ('ID2', 0)" | $SKDB
+echo "insert into skdb_user_permissions values ('ID2', skdb_permission(''))" | $SKDB
 
 # Let's check that user2 cannot read
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
@@ -170,8 +170,8 @@ fi
 
 # Let's create a block list
 # Everybody can read/insert/delete, except for user1 who can only read
-echo "insert into skdb_group_permissions values ('ID23', 'ID1', 4);" | $SKDB
-echo "insert into skdb_group_permissions values ('ID23', NULL, 7);" | $SKDB
+echo "insert into skdb_group_permissions values ('ID23', 'ID1', skdb_permission('r'));" | $SKDB
+echo "insert into skdb_group_permissions values ('ID23', NULL, skdb_permission('rw'));" | $SKDB
 
 # Let's check user2 can write
 if echo -e "1\t240,\"ID23\"" | $SKDB write-csv t1 --user ID2 2>&1 | grep -q Error; then
@@ -235,7 +235,7 @@ done
 echo -e "TEST GROUP PERMISSION UPDATE:\tOK"
 
 # let's block the ID3 all together
-echo "insert into skdb_user_permissions values('ID3', 0);" | $SKDB
+echo "insert into skdb_user_permissions values('ID3', skdb_permission(''));" | $SKDB
 
 # As long as the row (240,22) is still there, the update did not kick in
 while echo "select * from t3" | $SKDB | grep -q "240"; do
@@ -250,7 +250,7 @@ echo -e "TEST GROUP PERMISSION UPDATE2:\tOK"
 
 # let's kick ID3 out of the group 22
 (echo "begin transaction;";
- echo "insert into skdb_group_permissions values('ID22', 'ID3', 7);";
+ echo "insert into skdb_group_permissions values('ID22', 'ID3', skdb_permission('rw'));";
  echo "delete from skdb_user_permissions where userName='ID3';"
  echo "commit;"
 )| $SKDB
@@ -273,7 +273,7 @@ echo -e "TEST GROUP PERMISSION UPDATE3:\tOK"
 
 # Finally, let's block that table
 
-echo "insert into skdb_table_permissions values ('t1', 0);" | $SKDB
+echo "insert into skdb_table_permissions values ('t1', skdb_permission(''));" | $SKDB
 
 sleep 1
 
