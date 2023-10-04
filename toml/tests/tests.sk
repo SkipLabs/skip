@@ -104,7 +104,12 @@ fun main(): void {
 
     tests
       .getOrAdd(testSuite, () -> mutable Vector[])
-      .push(T.Test{name => testName, func => () ~> runValidTest(testFile, jsonFile)});
+      .push(
+        T.Test{
+          name => testName,
+          func => () ~> runValidTest(testFile, jsonFile),
+        },
+      );
   };
   invalidTests = FileSystem.readFilesRecursive("./tests/invalid", fn ->
     fn.endsWith(".toml")
@@ -118,7 +123,12 @@ fun main(): void {
 
     tests
       .getOrAdd(testSuite, () -> mutable Vector[])
-      .push(T.Test{name => testName + " (invalid)", func => () ~> runInvalidTest(testFile)});
+      .push(
+        T.Test{
+          name => testName + " (invalid)",
+          func => () ~> runInvalidTest(testFile),
+        },
+      );
   };
 
   T.test_harness(tests)

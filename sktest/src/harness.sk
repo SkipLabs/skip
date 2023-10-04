@@ -106,7 +106,12 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
   filter = args.maybeGetString("filter").default("");
   Environ.varOpt("SKTEST_RANK") match {
   | Some(rank) ->
-    test_job(tests, Environ.var("SKTEST_FILTER"), Environ.var("SKTEST_JOBS").toInt(), rank.toInt())
+    test_job(
+      tests,
+      Environ.var("SKTEST_FILTER"),
+      Environ.var("SKTEST_JOBS").toInt(),
+      rank.toInt(),
+    )
   | None() -> void
   };
 

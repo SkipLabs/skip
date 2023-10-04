@@ -147,10 +147,18 @@ mutable class XmlTestReporter{
 
   mutable fun finish(): void {
     this.writeLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-    totalTests = this.stats.values().map(s -> s.tests).foldl((acc, x) -> acc + x, 0);
-    totalFailures = this.stats.values().map(s -> s.failures).foldl((acc, x) -> acc + x, 0);
-    totalErrors = this.stats.values().map(s -> s.errors).foldl((acc, x) -> acc + x, 0);
-    totalTime = this.stats.values().map(s -> s.time).foldl((acc, x) -> acc + x, 0);
+    totalTests = this.stats.values()
+      .map(s -> s.tests)
+      .foldl((acc, x) -> acc + x, 0);
+    totalFailures = this.stats.values()
+      .map(s -> s.failures)
+      .foldl((acc, x) -> acc + x, 0);
+    totalErrors = this.stats.values()
+      .map(s -> s.errors)
+      .foldl((acc, x) -> acc + x, 0);
+    totalTime = this.stats.values()
+      .map(s -> s.time)
+      .foldl((acc, x) -> acc + x, 0);
     this.writeLine(
       `<testsuites tests="${totalTests}" failures="${totalFailures}" errors="${totalErrors}" time="${totalTime}" timestamp="0" name="AllTests">`,
     );
@@ -187,8 +195,7 @@ mutable class XmlTestReporter{
   }
 }
 
-mutable class JSONTestReporter{
-} extends TestReporter {
+mutable class JSONTestReporter{} extends TestReporter {
   mutable fun report(res: TestResult): void {
     this.writeLine(res.toJSON())
   }
