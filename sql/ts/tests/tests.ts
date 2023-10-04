@@ -69,8 +69,8 @@ export const tests = (asWorker: boolean) => {
     {
       name: n('Parse/print float', asWorker),
       fun: async (skdb: SKDB) => {
-        skdb.exec("create table widgets (id text unique , price real not null);");
-        skdb.exec("INSERT INTO widgets (id, price) values ('a', 10.0);");
+        await skdb.exec("create table widgets (id text unique , price real not null);");
+        await skdb.exec("INSERT INTO widgets (id, price) values ('a', 10.0);");
         return await skdb.exec('select * from widgets');
       },
       check: res => {
