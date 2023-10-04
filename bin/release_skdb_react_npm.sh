@@ -22,5 +22,7 @@ then
     exit 1
 fi
 
+npx tsc -p src/tsconfig.json
+
 npm publish
 
