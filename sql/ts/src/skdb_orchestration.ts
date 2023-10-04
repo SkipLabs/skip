@@ -1372,10 +1372,10 @@ class SKDBServer implements RemoteSKDB {
           let resolveSignalled = false
           this.deliverDataTransferProtoMsg(msg, payload => {
             if (!resolved) {
-	      // a non-zero checkpoint indicates that we have received a fully consistent
-	      // snapshot of the remote table, so should resolve the promise
-	      resolveSignalled = payload.split("\n").find(line => line.match(/^:[1-9]/g));
-	    }
+              // a non-zero checkpoint indicates that we have received a fully consistent
+              // snapshot of the remote table, so should resolve the promise
+              resolveSignalled = payload.split("\n").find(line => line.match(/^:[1-9]/g));
+            }
             return client.writeCsv(tableName, payload, this.replicationUid)
           });
           if (!resolved && resolveSignalled) {
