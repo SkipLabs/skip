@@ -28,7 +28,7 @@ FROM stage0 as bootstrap
 COPY . /work
 
 WORKDIR /work/compiler
-RUN make STAGE=0
+RUN make clean && make STAGE=0
 
 FROM stage0 as base
 
