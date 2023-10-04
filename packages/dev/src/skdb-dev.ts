@@ -95,7 +95,6 @@ export async function skdbDevServerDb(
 export async function createLocalDbConnectedTo(
   devServer: DevServer, accessKey: string = "root"
 ): Promise<SKDB> {
-  // TODO: change back, why is this broken?
-  let db = await createSkdb({asWorker: false});
+  let db = await createSkdb({asWorker: true});
   return devServer.connect(db, accessKey);
 }
