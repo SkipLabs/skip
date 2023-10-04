@@ -54,6 +54,10 @@ class WrappedRemote implements RemoteSKDB {
   onReboot(fn: () => void): Promise<void> {
     return this.worker.subscribe(new Caller(this.wrapped, "onReboot", []), fn);
   }
+
+  connectedAs(): Promise<string> {
+    return this.worker.post(new Caller(this.wrapped, "connectedAs", []));
+  }
 }
 
 export class SKDBWorker implements SKDB {

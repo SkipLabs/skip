@@ -1290,6 +1290,10 @@ class SKDBServer implements RemoteSKDB {
     return server
   }
 
+  async connectedAs(): Promise<string> {
+    return this.creds.accessKey;
+  }
+
   async close() {
     this.connection.closeSocket();
   }

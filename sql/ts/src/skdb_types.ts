@@ -76,6 +76,8 @@ export type ProtoResponseCreds = {
 export type Params = Map<string, string|number> | Object;
 
 export interface RemoteSKDB {
+  connectedAs(): Promise<string>;
+
   createUser(): Promise<ProtoResponseCreds>;
   schema: () => Promise<string>;
   tableSchema: (tableName: string) => Promise<string>;
