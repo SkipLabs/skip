@@ -701,11 +701,11 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
       sub.getDestinationWatermark(context),
       checkpointInterval,
     );
-    if (init) {
+    if (init && changes.isEmpty()) {
       // on first iteration we ensure we output a checkpoint without
       // delay so that the downstreams knows that it has received
       // everything without waiting for the condvar timeout
-      print_raw(":" + tick.toString() + "\n");
+      print_raw(":" + context.tick.value.toString() + "\n");
       flushStdout();
     };
     !tick = context.tick.value;
