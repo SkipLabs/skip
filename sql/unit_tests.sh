@@ -138,6 +138,12 @@ else
     fail "ID"
 fi
 
+if cat test/unit/test_sid.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
+    pass "SID"
+else
+    fail "SID"
+fi
+
 if cat test/lower_upper.sql | $SKDB | grep -q "FOO|bar"; then
     pass "LOWER/UPPER"
 else
@@ -148,6 +154,12 @@ if cat test/unit/test_insert_id.sql | $SKDB | grep -q "|22"; then
     pass "INSERT ID"
 else
     fail "INSERT ID"
+fi
+
+if cat test/unit/test_insert_sid.sql | $SKDB | grep -q "|22"; then
+    pass "INSERT SID"
+else
+    fail "INSERT SID"
 fi
 
 

@@ -124,9 +124,10 @@ fun computeInsert(
         | None() ->
           if (tyDescr.primary is Some _) {
             if (tyDescr.ty is TEXT()) {
-              error(pos, "Cannot generate a string primary key");
+              Some(CString(Ksuid::create().toString()))
+            } else {
+              Some(CInt(SKStore.genSym(0)))
             };
-            Some(CInt(SKStore.genSym(0)))
           } else {
             error(pos, "Missing value for column: " + tyDescr.name);
           }
@@ -242,6 +243,23 @@ fun valueToCValue(
     }
   | TEXT() ->
     val match {
+    | VSId(Some(varName)) ->
+      if (!inTransaction) {
+        error(pos, "named id can only be used in a transaction");
+      };
+      namedIDs = context.getGlobal(NAMEDIDS) match {
+      | None() -> NamedIDs()
+      | Some(file) -> NamedIDs::type(file)
+      };
+      namedIDs.maybeGet(varName) match {
+      | None() ->
+        id = Ksuid::create().toString();
+        !namedIDs = namedIDs.set(varName, id);
+        context.setGlobal(NAMEDIDS, namedIDs);
+        Some(CString(id))
+      | Some(id) -> Some(CString(id))
+      }
+    | VSId(None()) -> Some(CString(Ksuid::create().toString()))
     | VString(str) -> Some(CString(str))
     | v ->
       error(
