@@ -521,7 +521,10 @@ fun parameters_length_of_type(
 }
 
 /* Give us the arity of this constructor */
-fun constructor_arity(context: mutable SKStore.Context, con: TAst.Pattern__): Int {
+fun constructor_arity(
+  context: mutable SKStore.Context,
+  con: TAst.Pattern__,
+): Int {
   con match {
   | TAst.Pat_var _
   | TAst.Pat_literal _ ->
@@ -2181,7 +2184,10 @@ fun is_exhaustive(
 /*                    Error reporting and entry points                     */
 /***************************************************************************/
 
-fun exhaustiveness_err<Ta>(context: mutable SKStore.Context, exn: Exception): Ta {
+fun exhaustiveness_err<Ta>(
+  context: mutable SKStore.Context,
+  exn: Exception,
+): Ta {
   exn match {
   | Overlapping_pattern(pos, env, (pat, idx), class_set, pat_matrix) ->
     (orig_pat, _) = pat_matrix.getNth(idx);
