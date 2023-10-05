@@ -290,68 +290,6 @@ class SKDBUserPermissions extends PredefinedTable {
 }
 
 /*****************************************************************************/
-/* The skdb_table_permissions table. */
-/*****************************************************************************/
-
-const skdbTablePermissions: SKDBTablePermissions = SKDBTablePermissions::create();
-
-class SKDBTablePermissions extends PredefinedTable {
-  const name: Name = Name::create("skdb_table_permissions");
-
-  const schemaText: String = `(
-    tableName STRING PRIMARY KEY,
-    permissions INTEGER NOT NULL
-  )`;
-
-  // Be careful when changing this schema, make sure that the
-  // indexedFields match the function that creates the key.
-
-  const indexedFields: Array<Name> = Array[Name::create("tableName")];
-
-  fun makeKey(tableName: ?String): IndexProjKey {
-    IndexProjKey(
-      Array[(this.getColNbr(tableNameColName), tableName.map(x -> CString(x)))],
-    )
-  }
-
-  // Determines if a change in a directoy affects a given user
-  fun hasChanged(
-    context: readonly SKStore.Context,
-    tableName: Name,
-    tick: SKStore.Tick,
-  ): Bool {
-    colNbr = this.getColNbr(tableNameColName);
-    dir = context.unsafeMaybeGetEagerDir(this.dirName) match {
-    | None() ->
-      print_error(
-        "Error: could not find ${static::name}, privacy layer not initialized",
-      );
-      skipExit(2)
-    | Some(x) -> x
-    };
-
-    (isReset, changes) = dir.getChangesAfter(tick);
-    if (isReset) return true;
-    for (change in changes) {
-      change match {
-      | RowKey(row, _) ->
-        row.getString(colNbr) match {
-        | None() ->
-          // The permissions for all tables changed
-          return true
-        | Some(x) if (x == tableName.lower) ->
-          // The permissions for this specific table changed
-          return true
-        | Some _ -> void
-        }
-      | _ -> invariant_violation("Unexpected key type")
-      }
-    };
-    false
-  }
-}
-
-/*****************************************************************************/
 /* The skdb_group_permissions table. */
 /*****************************************************************************/
 
@@ -565,26 +503,10 @@ mutable class AccessSolver private {
     userName: String,
     table: DirDescr,
   ): mutable this {
-    tableIndex = skdbTablePermissions.getIndex(context);
-    tablePermissions = tableIndex.get(
-      skdbTablePermissions.makeKey(Some(table.name.lower)),
-    ) match {
-    | None() ->
-      tableIndex.get(skdbTablePermissions.makeKey(None())) match {
-      | None() ->
-        // We could not find permissions specific to the table. if the
-        // column skdb_access is defined then we want to be permissive,
-        // otherwise we don't
-        if (table.cols.maybeGet(skdbAccessColName) is Some _) {
-          Permission::all()
-        } else {
-          Permission::none()
-        }
-      | Some(allTablesPermissions) ->
-        Permission(allTablesPermissions.getInt(permissionsColName))
-      }
-    | Some(thisTablePermissions) ->
-      Permission(thisTablePermissions.getInt(permissionsColName))
+    tablePermissions = if (table.cols.maybeGet(skdbAccessColName) is Some _) {
+      Permission::all()
+    } else {
+      Permission::none()
     };
     userIndex = skdbUserPermissions.getIndex(context);
     userPermissions = userIndex.get(
@@ -660,7 +582,7 @@ mutable class AccessSolver private {
     };
     row match {
     | None() -> Permission::none()
-    | Some(x) -> Permission(x.getInt(permissionsColName))
+    | Some(x) -> this.userMask.and(Permission(x.getInt(permissionsColName)))
     }
   }
 
@@ -693,7 +615,6 @@ mutable class AccessSolver private {
 fun userPrivacyChanged(
   context: readonly SKStore.Context,
   userNameOpt: ?String,
-  tableName: Name,
   tick: SKStore.Tick,
 ): Bool {
   userName = userNameOpt match {
@@ -702,6 +623,5 @@ fun userPrivacyChanged(
   };
   user = UserFile::create(context, userName);
   skdbGroupPermissions.hasChangedForUser(context, user, tick) ||
-    skdbUserPermissions.hasChangedForUser(context, user, tick) ||
-    skdbTablePermissions.hasChanged(context, tableName, tick)
+    skdbUserPermissions.hasChangedForUser(context, user, tick)
 }

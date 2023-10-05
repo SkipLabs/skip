@@ -15,16 +15,6 @@ CREATE TABLE skdb_user_permissions(
 );
 
 -------------------------------------------------------------------------------
--- Tables permissions
--------------------------------------------------------------------------------
-
--- INTERNAL TABLE: DO NOT CHANGE DEFINITION
-CREATE TABLE skdb_table_permissions(
-  name STRING PRIMARY KEY,
-  permissions INTEGER NOT NULL
-);
-
--------------------------------------------------------------------------------
 -- Groups
 -------------------------------------------------------------------------------
 
