@@ -47,7 +47,7 @@ value class Permission(private perm: Int) {
 /*****************************************************************************/
 
 const skdbAuthorColName: Name = Name::create("skdb_author");
-const skdbGroupColName: Name = Name::create("skdb_group");
+const skdbAccessColName: Name = Name::create("skdb_access");
 const tableNameColName: Name = Name::create("tableName");
 const groupNameColName: Name = Name::create("groupName");
 const userNameColName: Name = Name::create("userName");
@@ -423,19 +423,19 @@ base class AccessResultError{userName: String} uses Show {
   | AREWrongAuthorType{} ->
     "skdb_author is expected to be an integer" + " (user " + this.userName + ")"
   | ARECannotDelete{groupName} ->
-    "cannot delete with skdb_group set to " +
+    "cannot delete with skdb_access set to " +
       groupName +
       " (user " +
       this.userName +
       ")"
   | ARECannotInsert{groupName} ->
-    "cannot insert with skdb_group set to " +
+    "cannot insert with skdb_access set to " +
       groupName +
       " (user " +
       this.userName +
       ")"
   | ARECannotRead{groupName} ->
-    "cannot read with skdb_group set to " +
+    "cannot read with skdb_access set to " +
       groupName +
       " (user " +
       this.userName +
@@ -463,16 +463,16 @@ fun checkUserCanReadRow(
       },
     )
   };
-  groupIdxOption = table.cols.maybeGet(skdbGroupColName);
+  groupIdxOption = table.cols.maybeGet(skdbAccessColName);
   groupIdxOption match {
   | None() ->
-    // There is no skdb_group column, but we have access to the table
+    // There is no skdb_access column, but we have access to the table
     AROK()
   | Some(colNbr) ->
-    // There is a skdb_group column, let's check that we have the rights
+    // There is a skdb_access column, let's check that we have the rights
     row.getString(colNbr) match {
     | None() ->
-      // skdb_group is set to NULL: no access
+      // skdb_access is set to NULL: no access
       ARError(ARECannotRead{userName => user.name, groupName => None()})
     | Some(groupName) ->
       access.canRead(context, groupName) match {
@@ -493,7 +493,7 @@ fun checkUserCanWriteRow(
   row: RowValues,
 ): AccessResult {
   authorIdxOption = table.cols.maybeGet(skdbAuthorColName);
-  groupIdxOption = table.cols.maybeGet(skdbGroupColName);
+  groupIdxOption = table.cols.maybeGet(skdbAccessColName);
   userName = user.name;
   access = AccessSolver::create(context, userName, table);
   authorIdxOption match {
@@ -573,9 +573,9 @@ mutable class AccessSolver private {
       tableIndex.get(skdbTablePermissions.makeKey(None())) match {
       | None() ->
         // We could not find permissions specific to the table. if the
-        // column skdb_group is defined then we want to be permissive,
+        // column skdb_access is defined then we want to be permissive,
         // otherwise we don't
-        if (table.cols.maybeGet(skdbGroupColName) is Some _) {
+        if (table.cols.maybeGet(skdbAccessColName) is Some _) {
           Permission::all()
         } else {
           Permission::none()

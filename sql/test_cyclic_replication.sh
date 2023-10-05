@@ -28,7 +28,7 @@ setup_server() {
     echo "INSERT INTO skdb_table_permissions VALUES ('test', 7);" | $SKDB
 
     echo "CREATE TABLE test (id INTEGER, note STRING);" | $SKDB
-    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_group INTEGER);" | $SKDB
+    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_access INTEGER);" | $SKDB
 }
 
 setup_local() {

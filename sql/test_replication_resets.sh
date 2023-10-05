@@ -28,9 +28,9 @@ setup_server() {
     echo "INSERT INTO skdb_table_permissions VALUES ('test_with_pk', 7);" | $SKDB
 
     echo "CREATE TABLE test (id INTEGER, note STRING);" | $SKDB
-    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_group STRING);" | $SKDB
+    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
-    echo "CREATE TABLE test_with_pk_with_access (id INTEGER PRIMARY KEY, note STRING, skdb_group STRING);" | $SKDB
+    echo "CREATE TABLE test_with_pk_with_access (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
 }
 
 assert_line_count() {
