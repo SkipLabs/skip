@@ -1936,352 +1936,56 @@ mutable class Compiler{
     cond: Expr,
   ): LookUps {
     cond match {
-    | Binop(
-      op,
-      Call(fname, args, _),
-      e2,
-    ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
-      sargs = args.map(x ->
-        x match {
-        | VString(str) -> str
-        | _ -> invariant_violation("Unexpected type")
-        }
-      );
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(op, VString(callStrftime(this.pos, context, sargs)), e2),
-      )
-
-    | Like(
-      Call(fname, args, _),
-      e2,
-      escape,
-      negated,
-    ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
-      sargs = args.map(x ->
-        x match {
-        | VString(str) -> str
-        | _ -> invariant_violation("Unexpected type")
-        }
-      );
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Like(
-          VString(callStrftime(this.pos, context, sargs)),
-          e2,
-          escape,
-          negated,
-        ),
-      )
-
-    | Binop(
-      op,
-      e1,
-      Call(fname, args, _),
-    ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
-      sargs = args.map(x ->
-        x match {
-        | VString(str) -> str
-        | _ -> invariant_violation("Unexpected type")
-        }
-      );
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(op, e1, VString(callStrftime(this.pos, context, sargs))),
-      )
-
-    | Like(
-      e1,
-      Call(fname, args, _),
-      escape,
-      negated,
-    ) if (fname.lower == "strftime" && args.all(x -> x is VString _)) ->
-      sargs = args.map(x ->
-        x match {
-        | VString(str) -> str
-        | _ -> invariant_violation("Unexpected type")
-        }
-      );
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Like(
-          e1,
-          VString(callStrftime(this.pos, context, sargs)),
-          escape,
-          negated,
-        ),
-      )
-
-    | Binop(op, Call(fname, args, _), e2) if (fname.lower == "date") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
+    | Binop(op, Call(fname, args, _), e2) ->
+      if (
+        !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
+      ) {
+        return LookUps[];
       };
       this.findLookUps(
         context,
         killed,
         tables,
-        Binop(
-          op,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%Y-%m-%d")].concat(args),
-            false,
-          ),
-          e2,
-        ),
+        Binop(op, this.evalTimeFun(context, fname, args), e2),
       )
 
-    | Like(
-      Call(fname, args, _),
-      e2,
-      escape,
-      negated,
-    ) if (fname.lower == "date") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
+    | Binop(op, e1, Call(fname, args, _)) ->
+      if (
+        !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
+      ) {
+        return LookUps[];
       };
       this.findLookUps(
         context,
         killed,
         tables,
-        Like(
-          Call(
-            Name::create("strftime"),
-            Array[VString("%Y-%m-%d")].concat(args),
-            false,
-          ),
-          e2,
-          escape,
-          negated,
-        ),
+        Binop(op, e1, this.evalTimeFun(context, fname, args)),
       )
 
-    | Binop(op, Call(fname, args, _), e2) if (fname.lower == "time") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
+    | Like(Call(fname, args, _), e2, escape, negated) ->
+      if (
+        !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
+      ) {
+        return LookUps[];
       };
       this.findLookUps(
         context,
         killed,
         tables,
-        Binop(
-          op,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%H:%M:%S")].concat(args),
-            false,
-          ),
-          e2,
-        ),
+        Like(this.evalTimeFun(context, fname, args), e2, escape, negated),
       )
 
-    | Like(
-      Call(fname, args, _),
-      e2,
-      escape,
-      negated,
-    ) if (fname.lower == "time") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
+    | Like(e1, Call(fname, args, _), escape, negated) ->
+      if (
+        !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
+      ) {
+        return LookUps[];
       };
       this.findLookUps(
         context,
         killed,
         tables,
-        Like(
-          Call(
-            Name::create("strftime"),
-            Array[VString("%H:%M:%S")].concat(args),
-            false,
-          ),
-          e2,
-          escape,
-          negated,
-        ),
-      )
-
-    | Binop(op, Call(fname, args, _), e2) if (fname.lower == "datetime") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(
-          op,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
-            false,
-          ),
-          e2,
-        ),
-      )
-
-    | Like(
-      Call(fname, args, _),
-      e2,
-      escape,
-      negated,
-    ) if (fname.lower == "datetime") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Like(
-          Call(
-            Name::create("strftime"),
-            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
-            false,
-          ),
-          e2,
-          escape,
-          negated,
-        ),
-      )
-
-    | Binop(op, e1, Call(fname, args, _)) if (fname.lower == "date") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(
-          op,
-          e1,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%Y-%m-%d")].concat(args),
-            false,
-          ),
-        ),
-      )
-
-    | Like(
-      e1,
-      Call(fname, args, _),
-      escape,
-      negated,
-    ) if (fname.lower == "date") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Like(
-          e1,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%Y-%m-%d")].concat(args),
-            false,
-          ),
-          escape,
-          negated,
-        ),
-      )
-
-    | Binop(op, e1, Call(fname, args, _)) if (fname.lower == "time") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(
-          op,
-          e1,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%H:%M:%S")].concat(args),
-            false,
-          ),
-        ),
-      )
-
-    | Like(
-      e1,
-      Call(fname, args, _),
-      escape,
-      negated,
-    ) if (fname.lower == "time") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Like(
-          e1,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%H:%M:%S")].concat(args),
-            false,
-          ),
-          escape,
-          negated,
-        ),
-      )
-
-    | Binop(op, e1, Call(fname, args, _)) if (fname.lower == "datetime") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Binop(
-          op,
-          e1,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
-            false,
-          ),
-        ),
-      )
-
-    | Like(
-      e1,
-      Call(fname, args, _),
-      escape,
-      negated,
-    ) if (fname.lower == "datetime") ->
-      if (args.size() < 1) {
-        error(this.pos, "Missing arguments");
-      };
-      this.findLookUps(
-        context,
-        killed,
-        tables,
-        Like(
-          e1,
-          Call(
-            Name::create("strftime"),
-            Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
-            false,
-          ),
-          escape,
-          negated,
-        ),
+        Like(e1, this.evalTimeFun(context, fname, args), escape, negated),
       )
 
     | Binop("AND", e1, e2) ->
@@ -2418,6 +2122,51 @@ mutable class Compiler{
       });
       LookUps::createFromItems(lookUps)
     | _ -> LookUps[]
+    }
+  }
+
+  readonly fun evalTimeFun(
+    context: mutable SKStore.Context,
+    fname: Name,
+    args: Array<Expr>,
+  ): Expr {
+    fname.lower match {
+    | "strftime" ->
+      sargs = args.map(x ->
+        x match {
+        | VString(str) -> str
+        | _ -> invariant_violation("Unexpected type")
+        }
+      );
+      VString(callStrftime(this.pos, context, sargs))
+    | "date" ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      Call(
+        Name::create("strftime"),
+        Array[VString("%Y-%m-%d")].concat(args),
+        false,
+      )
+    | "time" ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      Call(
+        Name::create("strftime"),
+        Array[VString("%H:%M:%S")].concat(args),
+        false,
+      )
+    | "datetime" ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      Call(
+        Name::create("strftime"),
+        Array[VString("%Y-%m-%d %H:%M:%S")].concat(args),
+        false,
+      )
+    | _ -> invariant_violation("unreachable")
     }
   }
 }
