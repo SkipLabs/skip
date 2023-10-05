@@ -65,6 +65,7 @@ function ReactiveQueryViewer() {
 }
 
 function SKDBTable({query, removeQuery}) {
+  const [visible, setVisible] = useState(true);
   const rows = useQuery(query);
   const keys = rows.length < 1 ? [] : Object.keys(rows[0])
   let i = 0;
@@ -81,11 +82,13 @@ function SKDBTable({query, removeQuery}) {
   return (
     <div className="skdb-table">
       <div className="skdb-table-header">
-        <div className="skdb-table-query">{query}</div>
+        <div onClick={() => setVisible(!visible)} className="skdb-table-query">
+          {visible ? "\u25BC" : "\u25B2"}  {query}
+        </div>
         <button className="close-query" onClick={e => removeQuery(query)}>&#x2718;</button>
       </div>
       <div className="skdb-table-body">
-        <table>
+        <table className={visible ? "visible" : "hidden"}>
           <thead>
             <tr>
               {keys.map((k,idx) => <th key={idx}>{k}</th>)}
@@ -109,7 +112,8 @@ export function SKDBDevConsoleProvider(
 ) {
   const [users, setUsers] = useState(["root"]);
   const [currentUser, setCurrentUser] = useState("root");
-  const [skdbs, setSkdbs] = useState({"root": skdbAsRoot})
+  const [skdbs, setSkdbs] = useState({"root": skdbAsRoot});
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     skdbAsRoot.connectedRemote().then((remote) => {
@@ -145,9 +149,12 @@ export function SKDBDevConsoleProvider(
   return (
     <SKDBContext.Provider value={skdbs[currentUser]}>
       <div id="skdb_dev_console">
-        <img src={skLogo} alt="SKDB Dev Console" className="logo collapse" />
-        <UserSelector users={users} select={changeUser} add={addUser} />
-        <ReactiveQueryViewer />
+        <img src={skLogo} alt="SKDB Dev Console" className="logo collapse"
+          onClick={() => setExpanded(!expanded)}/>
+        <div className={expanded ? "visible" : "hidden"}>
+          <UserSelector users={users} select={changeUser} add={addUser} />
+          <ReactiveQueryViewer />
+        </div>
       </div>
       {children}
     </SKDBContext.Provider>
