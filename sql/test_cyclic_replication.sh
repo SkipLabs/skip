@@ -25,10 +25,9 @@ setup_server() {
     echo "INSERT INTO skdb_users VALUES('test_alt_user', 'pass');" | $SKDB
 
     echo "INSERT INTO skdb_group_permissions VALUES ('G2', 'test_alt_user', 7);" | $SKDB
-    echo "INSERT INTO skdb_table_permissions VALUES ('test', 7);" | $SKDB
+    echo "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7);" | $SKDB
 
-    echo "CREATE TABLE test (id INTEGER, note STRING);" | $SKDB
-    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_access INTEGER);" | $SKDB
+    echo "CREATE TABLE test (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
 }
 
 setup_local() {
@@ -38,7 +37,7 @@ setup_local() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
-    echo "CREATE TABLE test (id INTEGER, note STRING);" | $SKDB
+    echo "CREATE TABLE test (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
 }
 
 assert_line_count() {
@@ -70,7 +69,7 @@ test_write_csv_produces_updates() {
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES test > /dev/null
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # we haven't seen the update yet
     assert_line_count "$LOCAL_UPDATES" hello 0
@@ -97,7 +96,7 @@ test_write_csv_tombstones() {
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES test > /dev/null
 
     # write in to server - will have a unique source
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     assert_line_count "$LOCAL_UPDATES" hello 0
 
@@ -131,7 +130,7 @@ test_updates_filters_write_csv() {
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test > /dev/null
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # we haven't seen the update yet
     assert_line_count "$LOCAL_UPDATES" hello 0
@@ -156,7 +155,7 @@ test_updates_filters_write_csv_with_local_input() {
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test > /dev/null
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # we haven't seen the update yet
     assert_line_count "$LOCAL_UPDATES" hello 0
@@ -172,7 +171,7 @@ test_updates_filters_write_csv_with_local_input() {
     assert_line_count "$LOCAL_UPDATES" hello 0
 
     # local change
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
     assert_line_count "$LOCAL_UPDATES" hello 1 # output my local change for replication
 }
 
@@ -185,13 +184,13 @@ test_updates_filters_write_csv_with_local_input_local_write_first() {
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test > /dev/null
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # we haven't seen the update yet
     assert_line_count "$LOCAL_UPDATES" hello 0
 
     # local change
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
     assert_line_count "$LOCAL_UPDATES" hello 1
 
     # replicate full history to local
@@ -221,7 +220,7 @@ test_updates_with_tombstones_filters_write_csv() {
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test > /dev/null
 
     # write in to server - will have a unique source
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     assert_line_count "$LOCAL_UPDATES" hello 0
 
@@ -251,7 +250,7 @@ test_updates_filters_write_csv_with_local_input_then_write_csv_zeros() {
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test > /dev/null
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # we haven't seen the update yet
     assert_line_count "$LOCAL_UPDATES" hello 0
@@ -267,7 +266,7 @@ test_updates_filters_write_csv_with_local_input_then_write_csv_zeros() {
     assert_line_count "$LOCAL_UPDATES" hello 0
 
     # local change
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
     assert_line_count "$LOCAL_UPDATES" hello 1 # output my local change for replication
 
     # delete on server
@@ -298,7 +297,7 @@ test_updates_filters_write_csv_with_local_identity_update() {
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test > /dev/null
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # we haven't seen the update yet
     assert_line_count "$LOCAL_UPDATES" hello 0
@@ -332,7 +331,7 @@ test_diff_filters_write_csv() {
     local_session=$($SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test)
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
@@ -358,7 +357,7 @@ test_diff_filters_write_csv_mixed_with_local_input() {
     local_session=$($SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test)
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
@@ -374,7 +373,7 @@ test_diff_filters_write_csv_mixed_with_local_input() {
     assert_line_count "$LOCAL_DIFF" hello 0
 
     # local change
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     [[ $($SKDB_BIN --data $LOCAL_DB <<< "select count(*) from test where note = 'hello';") -eq 2 ]] || exit 1
 
@@ -393,10 +392,10 @@ test_diff_filters_write_csv_mixed_with_local_input_write_first() {
     local_session=$($SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test)
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # local change
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
     assert_line_count "$LOCAL_UPDATES" hello 1
 
     # replicate full history to local
@@ -433,7 +432,7 @@ test_diff_filters_write_csv_mixed_with_local_delete() {
     local_session=$($SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test)
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
@@ -463,7 +462,7 @@ test_diff_filters_write_csv_mixed_with_local_input_then_write_csv_zeros() {
     local_session=$($SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test)
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
@@ -476,7 +475,7 @@ test_diff_filters_write_csv_mixed_with_local_input_then_write_csv_zeros() {
     assert_line_count "$LOCAL_UPDATES" hello 0
 
     # local change
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # write csv zeros
     $SKDB_BIN --data $SERVER_DB <<< "DELETE FROM test WHERE id = 0;"
@@ -500,7 +499,7 @@ test_diff_filters_write_csv_mixed_with_local_update() {
     local_session=$($SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $LOCAL_UPDATES --ignore-source 1234 test)
 
     # write in to server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # replicate full history to local
     rm -f "$SERVER_TAIL"
@@ -538,7 +537,7 @@ test_server_tail_filters_write_csv() {
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
 
     # write in to local
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     # replicate diff to server
     $SKDB_BIN diff --data $LOCAL_DB --format=csv --since 0 "$local_session" > $LOCAL_DIFF

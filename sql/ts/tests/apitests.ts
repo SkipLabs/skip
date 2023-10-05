@@ -69,10 +69,6 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
     "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y FROM test_pk;", {});
   expect(viewCreate).toEqual([]);
 
-  const permissionInsert = await remote.exec(
-    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7), ('view_pk', 7);", {});
-  expect(permissionInsert).toEqual([]);
-
   const tableInsert = await remote.exec("INSERT INTO test_pk VALUES (42,21);", {});
   expect(tableInsert).toEqual([]);
 
