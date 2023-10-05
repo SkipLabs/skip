@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { SKDBContext, useQuery } from './skdb-react.js'
 import type { SKDB } from 'skdb'
 import skLogo from './assets/sk.svg'
@@ -80,7 +80,7 @@ function SKDBTable({query, removeQuery}) {
     )
   })
   return (
-    <div className="skdb-table">
+    <div className="skdb-table" onMouseDown={e => e.stopPropagation()}>
       <div className="skdb-table-header">
         <div onClick={() => setVisible(!visible)} className="skdb-table-query">
           {visible ? "\u25BC" : "\u25B2"}  {query}
@@ -99,6 +99,54 @@ function SKDBTable({query, removeQuery}) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+function Draggable({children}) {
+  const [position, setPosition] = useState<{x?:number, y?:number}>({x: undefined, y: undefined})
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Monitor changes to position state and update DOM
+  useEffect(() => {
+    if (ref.current) {
+      if (position.x !== undefined || position.y !== undefined) {
+        const right = window.innerWidth - ((position.x||0) + ref.current.offsetWidth);
+        ref.current.style.top = `${position.y}px`;
+        ref.current.style.right = `${right}px`;
+      }
+    }
+  }, [position])
+
+  const globalMousemove = (offsetX, offsetY) => {
+    return (event) => {
+      setPosition({
+        x: event.clientX - offsetX,
+        y: event.clientY - offsetY
+      })
+      event.preventDefault();
+    }
+  }
+
+  const globalMouseup = (move) => {
+    return (_event) => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', globalMouseup);
+    }
+  }
+
+  const mouseDown = (e) => {
+    const move = globalMousemove(
+      e.clientX - (ref.current?.offsetLeft||0),
+      e.clientY - (ref.current?.offsetTop||0),
+    );
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', globalMouseup(move));
+  }
+
+  return (
+    <div ref={ref} className="draggable" onMouseDown={mouseDown}>
+      {children}
     </div>
   )
 }
@@ -148,14 +196,16 @@ export function SKDBDevConsoleProvider(
 
   return (
     <SKDBContext.Provider value={skdbs[currentUser]}>
-      <div id="skdb_dev_console">
-        <img src={skLogo} alt="SKDB Dev Console" className="logo collapse"
-          onClick={() => setExpanded(!expanded)}/>
-        <div className={expanded ? "visible" : "hidden"}>
-          <UserSelector users={users} select={changeUser} add={addUser} />
-          <ReactiveQueryViewer />
+      <Draggable>
+        <div id="skdb_dev_console">
+          <img src={skLogo} alt="SKDB Dev Console" className="logo collapse"
+            onClick={() => setExpanded(!expanded)}/>
+          <div className={expanded ? "visible" : "hidden"}>
+            <UserSelector users={users} select={changeUser} add={addUser} />
+            <ReactiveQueryViewer />
+          </div>
         </div>
-      </div>
+      </Draggable>
       {children}
     </SKDBContext.Provider>
   )
