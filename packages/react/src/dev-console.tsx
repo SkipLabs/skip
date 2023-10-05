@@ -1,21 +1,41 @@
 import { useState, useEffect } from 'react'
 import { SKDBContext, useQuery } from './skdb-react.js'
 import type { SKDB } from 'skdb'
+import skLogo from './assets/sk.svg'
 
-function UserSelector({users, select}: {users: string[], select: (accessKey: string) => void}) {
-  const list = users.map(user => <option value={user} key={user}>{user}</option>)
+function Section({children, heading}: {children: React.ReactNode, heading: string}) {
   return (
-    <div>
-      <div>Users</div>
-      <select onChange={e => select(e.target.value)}>
-        {list}
-      </select>
+    <div className="section">
+      <div className="section-heading">{heading}</div>
+      <div className="section-body">
+        {children}
+      </div>
     </div>
   )
 }
 
+function UserSelector(
+  {users, select, add}: {
+    users: string[],
+    select: (accessKey: string) => void,
+    add: () => void,
+  },
+) {
+  const list = users.map(user => <option value={user} key={user}>{user}</option>)
+  return (
+    <Section heading="Current user">
+      <div className="users-panel">
+        <select onChange={e => select(e.target.value)}>
+          {list}
+        </select>
+        <button className="add-user" onClick={_e => add()}>&#x002B;</button>
+      </div>
+    </Section>
+  )
+}
+
 function ReactiveQueryViewer() {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState('SELECT * FROM');
   const [queries, setQueries] = useState<string[]>([]);
 
   const show = async (query: string) => {
@@ -27,16 +47,20 @@ function ReactiveQueryViewer() {
     setQueries(queries.filter((val, idx) => idx != qIdx))
   }
 
-  const tables = queries.map(q => <SKDBTable key={q} query={q} removeQuery={removeQuery} />);
+  const tables = queries.map(q => (
+    <SKDBTable key={q} query={q} removeQuery={removeQuery} />
+  ));
 
   return (
-    <div>
-      <div>Watched queries</div>
-      <input value={query}
-        onChange={e => setQuery(e.target.value)}
-        onKeyDown={e => {if (e.key === 'Enter') show(query)}} />
+    <Section heading="Watched queries">
+      <div className="queries-panel">
+        <input value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => {if (e.key === 'Enter') show(query)}} />
+        <button className="add-query" onClick={_e => show(query)}>&#x002B;</button>
+      </div>
       {tables}
-    </div>
+    </Section>
   )
 }
 
@@ -55,19 +79,23 @@ function SKDBTable({query, removeQuery}) {
     )
   })
   return (
-    <div>
-      <span>{query}</span>
-      <button onClick={e => removeQuery(query)}>X</button>
-      <table>
-        <thead>
-          <tr>
-            {keys.map((k,idx) => <th key={idx}>{k}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {acc}
-        </tbody>
-      </table>
+    <div className="skdb-table">
+      <div className="skdb-table-header">
+        <div className="skdb-table-query">{query}</div>
+        <button className="close-query" onClick={e => removeQuery(query)}>&#x2718;</button>
+      </div>
+      <div className="skdb-table-body">
+        <table>
+          <thead>
+            <tr>
+              {keys.map((k,idx) => <th key={idx}>{k}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {acc}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -114,12 +142,11 @@ export function SKDBDevConsoleProvider(
     setCurrentUser(key);
   };
 
-  // TODO: move button in to user selector
   return (
     <SKDBContext.Provider value={skdbs[currentUser]}>
-      <div id="skdb_user_picker">
-        <UserSelector users={users} select={changeUser} />
-        <button onClick={e => addUser()}>+</button>
+      <div id="skdb_dev_console">
+        <img src={skLogo} alt="SKDB Dev Console" className="logo collapse" />
+        <UserSelector users={users} select={changeUser} add={addUser} />
         <ReactiveQueryViewer />
       </div>
       {children}
