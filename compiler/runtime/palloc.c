@@ -486,7 +486,7 @@ void sk_load_mapping(char* fileName) {
   int magic_size = read(fd, &magic, sizeof(uint64_t));
 
   if (magic_size != sizeof(uint64_t) || magic != SKIP_get_version()) {
-    fprintf(stderr, "Error: wrong file format\n");
+    fprintf(stderr, "Error: wrong file format: %s\n", fileName);
     exit(ERROR_MAPPING_VERSION);
   }
 
