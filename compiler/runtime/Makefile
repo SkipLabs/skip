@@ -23,7 +23,6 @@ NATIVE_FILES=\
 	consts.c
 
 CFILES32=$(CFILES) runtime32_specific.c
-CFILES64=$(CFILES) runtime64_specific.cpp $(NATIVE_FILES)
 BCFILES32=magic.bc $(CFILES32:.c=.bc)
 OFILES=$(CFILES:.c=.o)
 ONATIVE_FILES=magic.o $(NATIVE_FILES:.c=.o)
