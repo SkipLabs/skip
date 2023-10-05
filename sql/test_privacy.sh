@@ -107,7 +107,7 @@ else
     echo -e "TEST GROUP PERMISSIONS6:\tOK"
 fi
 
-echo "delete from skdb_user_permissions where userName='ID2';" | $SKDB
+echo "delete from skdb_user_permissions where userUUID='ID2';" | $SKDB
 
 # Let's check that user2 can read again
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
@@ -117,7 +117,7 @@ else
 fi
 
 # Let's kick user2 out of the group
-echo "delete from skdb_group_permissions where groupName='ID22' and userName='ID2';" | $SKDB
+echo "delete from skdb_group_permissions where groupUUID='ID22' and userUUID='ID2';" | $SKDB
 
 # Let's check that user2 cannot read (after being kicked out)
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
@@ -187,7 +187,7 @@ tailerID=$!
 sleep 1
 
 # let's kick ID3 out of the group 22
-echo "delete from skdb_group_permissions where groupName='ID22' and userName='ID3';" | $SKDB
+echo "delete from skdb_group_permissions where groupUUID='ID22' and userUUID='ID3';" | $SKDB
 
 # As long as the row (238,22) is still there, the update did not kick in
 while echo "select * from t3" | $SKDB | grep -q "238"; do
@@ -214,7 +214,7 @@ echo -e "TEST GROUP PERMISSION UPDATE2:\tOK"
 # let's kick ID3 out of the group 22
 (echo "begin transaction;";
  echo "insert into skdb_group_permissions values('ID22', 'ID3', skdb_permission('rw'));";
- echo "delete from skdb_user_permissions where userName='ID3';"
+ echo "delete from skdb_user_permissions where userUUID='ID3';"
  echo "commit;"
 )| $SKDB
 
