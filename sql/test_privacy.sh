@@ -18,12 +18,12 @@ SKDB="$SKDB_CMD --data $DBFILE"
 
 cat privacy/init.sql | $SKDB
 
-echo "create table t1 (id INTEGER primary key, skdb_group STRING);" | $SKDB
+echo "create table t1 (id INTEGER primary key, skdb_access STRING);" | $SKDB
 subt1=`$SKDB subscribe t1`
 
 echo "create table t2 (id INTEGER primary key);" | $SKDB
-echo "create table t3 (id INTEGER primary key, skdb_group STRING);" | $SKDB
-echo "create virtual view v1 as select id, id as skdb_group from t1 ;" | $SKDB
+echo "create table t3 (id INTEGER primary key, skdb_access STRING);" | $SKDB
+echo "create virtual view v1 as select id, id as skdb_access from t1 ;" | $SKDB
 
 ###############################################################################
 # Creating the users

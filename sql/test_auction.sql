@@ -30,6 +30,6 @@ create virtual view best_bids as
 group by itemID;
 
 create virtual view bids_by_user as
-  select itemID, price, skdb_author as skdb_group from bids;
+  select itemID, price, skdb_author as skdb_access from bids;
 
 
