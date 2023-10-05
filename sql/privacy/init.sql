@@ -4,13 +4,13 @@
 
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_users(
-  userName STRING PRIMARY KEY,
+  userUUID STRING PRIMARY KEY,
   privateKey STRING NOT NULL
 );
 
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_user_permissions(
-  userName STRING PRIMARY KEY,
+  userUUID STRING PRIMARY KEY,
   permissions INTEGER NOT NULL
 );
 
@@ -20,18 +20,18 @@ CREATE TABLE skdb_user_permissions(
 
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_group_permissions(
-  groupName STRING NOT NULL,
-  userName STRING,
+  groupUUID STRING NOT NULL,
+  userUUID STRING,
   permissions INTEGER NOT NULL
 );
 
 CREATE UNIQUE INDEX skdb_group_permissions_index on
-  skdb_group_permissions(groupName, userName)
+  skdb_group_permissions(groupUUID, userUUID)
 ;
 
 CREATE VIRTUAL VIEW skdb_groups_users as
-  SELECT userName as groupName from skdb_users UNION ALL
-  SELECT groupName from skdb_group_permissions GROUP BY groupName
+  SELECT userUUID as groupUUID from skdb_users UNION ALL
+  SELECT groupUUID from skdb_group_permissions GROUP BY groupUUID
 ;
 
-CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupName);
+CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupUUID);
