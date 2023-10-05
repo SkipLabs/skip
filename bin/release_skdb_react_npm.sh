@@ -22,7 +22,7 @@ then
     exit 1
 fi
 
-npx tsc -p src/tsconfig.json
+yarn build
 
 npm publish
 
