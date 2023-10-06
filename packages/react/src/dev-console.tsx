@@ -55,7 +55,7 @@ function ReactiveQueryViewer() {
 
   return (
     <Section heading="Watched queries">
-      <div className="queries-panel">
+      <div className="queries-panel" onMouseDown={e => e.stopPropagation()}>
         <input value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => {if (e.key === 'Enter') show(query)}} />
