@@ -354,7 +354,7 @@ fun envIsSane(): Boolean {
     val successfullyRead =
         svcSkdb
             .sql(
-                "SELECT COUNT(*) FROM skdb_users WHERE username = '${DB_ROOT_USER}';",
+                "SELECT COUNT(*) FROM skdb_users WHERE userUUID = '${DB_ROOT_USER}';",
                 OutputFormat.RAW)
             .decodeOrThrow()
             .trim() == "1"
