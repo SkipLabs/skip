@@ -24,8 +24,10 @@ setup_server() {
     echo "INSERT INTO skdb_users VALUES('test_user', 'pass');" | $SKDB
     echo "INSERT INTO skdb_users VALUES('test_alt_user', 'pass');" | $SKDB
 
-    echo "INSERT INTO skdb_group_permissions VALUES ('G2', 'test_alt_user', 7);" | $SKDB
-    echo "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7);" | $SKDB
+    echo "INSERT INTO skdb_groups VALUES ('G2', NULL, 'root', 'root');" | $SKDB
+    echo "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');" | $SKDB
+    echo "INSERT INTO skdb_group_permissions VALUES ('G2', 'test_alt_user', 7, 'root');" | $SKDB
+    echo "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7, 'root');" | $SKDB
 
     echo "CREATE TABLE test (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
 }

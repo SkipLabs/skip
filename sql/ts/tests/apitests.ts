@@ -60,10 +60,16 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   const remote = await skdb.connectedRemote();
 
   const groupGALL = await remote.exec(
-    "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7);",
+    "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');",
     new Map(),
   );
   expect(groupGALL).toEqual([]);
+
+  const groupPermissionsGALL = await remote.exec(
+    "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7, 'root');",
+    new Map(),
+  );
+  expect(groupPermissionsGALL).toEqual([]);
 
   const tableCreate = await remote.exec(
     "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER, skdb_access STRING);",
