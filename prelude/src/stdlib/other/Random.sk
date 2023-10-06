@@ -7,6 +7,14 @@
 
 module Random;
 
+@cpp_extern("SKIP_random_init")
+private native fun init(): void;
+
+const _unit: void = init();
+
+@cpp_extern("SKIP_random_next")
+native fun next(): Int;
+
 // Default RNG using the Xoroshiro128plus algorithm. This is a robust RNG with
 // 128 bits of state. Note that low bits have less entropy than higher bits:
 // use sign test to derive random booleans (or randomBool()), and use right
