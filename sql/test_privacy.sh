@@ -175,6 +175,93 @@ else echo -e "TEST AUTHOR2:\tFAILED"
 fi
 
 ###############################################################################
+# Checking that we can encode a group ownership transfer.
+###############################################################################
+
+echo "DELETE FROM skdb_user_permissions WHERE userUUID IS NULL" | $SKDB
+
+# We want to make sure that we can create a group that we can later
+# transfer to someone else. The machinery is a little bit awkward.
+
+# We first create a normal group, created by a user and controlled by
+# a user, and then we transfer ownership to the group itself. This
+# way, the only people who will be able to control the group (outside
+# of the root of course), are the members of the group themselves. In
+# this scenario, transfering ownership just consists in added a new
+# member and removing the another.
+
+echo "insert into skdb_users VALUES ('julienv', 'pass');" | $SKDB
+echo "insert into skdb_users VALUES ('daniell', 'pass');" | $SKDB
+
+# Prepare a group with only one member, julienv
+echo -e "1\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"" |
+  $SKDB write-csv skdb_groups --user julienv --source 1234
+echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"julienv\"" |
+  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+
+# Passed this point, julienv can do anything in the group myAdminGroup
+
+# Add an entry so that julienv would also be admin if the admins of
+# myAdminGroup were to change to myAdminGroup (itself).  This entry is
+# not active because myAdminGroup is still pointing at julienv as an
+# admin, but the moment we switch, that will not longer be the case.
+
+echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"" |
+  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+
+# Now let's make the switch! Let's make myAdminGroup use myAdmingGroup
+# (itself) as an admin. Note that the delete and the insert have to
+# happen in the same transaction, otherwise we would lose access after
+# the delete.
+(echo -e "0\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"";
+ echo -e "1\t\"myAdminGroup\", \"julienv\",\"myAdminGroup\", \"myAdminGroup\"") |
+  $SKDB write-csv skdb_groups --user julienv --source 1234
+
+# Let's clean up after ourselves, this permission is no longer in use
+
+echo -e "0\t\"myAdminGroup\", \"julienv\",7, \"julienv\"" |
+  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+
+# We have successfully create a group that is controlled by
+# itself. And that contains one member, julienv.
+# Let's try to transfer ownership to another user.
+
+# First by adding the new user to the group
+
+echo -e "1\t\"myAdminGroup\", \"daniell\",7, \"myAdminGroup\"" |
+  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+
+# And then by removing the original user
+
+echo -e "0\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"" |
+  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+
+# That's it! daniell is in control now. Let's see if julienv can still
+# modify the permissions (it should not be the case).
+
+echo -e "0\t\"myAdminGroup\", \"daniell\",7, \"myAdminGroup\"" |
+  $SKDB write-csv skdb_group_permissions --user julienv --source 1234 2>&1 |
+  grep -q 'Error'
+
+if [ "$?" -eq "0" ]; then
+  echo -e "TEST CHANGE OWNERSHIP:\tOK"
+else
+  echo -e "TEST CHANGE OWNERSHIP:\tFAILED"
+fi
+
+# Let's check if daniell can indeed modify the permissions of the group
+
+echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"" |
+  $SKDB write-csv skdb_group_permissions --user daniell --source 1235 2>&1 |
+  grep -q 'Error'
+
+if [ "$?" -eq "0" ]; then
+  echo -e "TEST CHANGE OWNERSHIP2:\tFAILED"
+else
+  echo -e "TEST CHANGE OWNERSHIP2:\tOK"
+fi
+
+###############################################################################
 # PERMISSION CHANGES WHILE TAILING
 ###############################################################################
 
