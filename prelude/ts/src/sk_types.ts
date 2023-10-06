@@ -70,6 +70,10 @@ export class Options {
     this.create_new = create_new;
   }
 
+  static w() {
+    return new Options(false,true)
+  }
+
   toFlags() {
 
     let res = 0;

@@ -1,38 +1,123 @@
 module SKMD;
 
+fun read_to_end(file: mutable IO.File): String {
+  res = mutable Vector[];
+  loop {
+    s = try {
+      Posix.read(file.fileno, IO.File::kDefaultBufferSize)
+    } catch {
+    | EndOfFile _ -> ""
+    | exn -> throw exn
+    };
+    if (s.length() == 0) {
+      break void
+    };
+    res.push(s)
+  };
+  res.join("")
+}
+
+fun readTextFile(filename: String): String {
+  read_to_end(IO.File::open(filename, IO.OpenOptions{read => true}))
+}
+
+class Config{
+  title: ?String = None(),
+  description: ?String = None(),
+  icon: ?String = None(),
+  styles: Vector<String> = Vector[],
+  scripts: Vector<String> = Vector[],
+  customs: Vector<String> = Vector[],
+  header: ?String = None(),
+  footer: ?String = None(),
+  lang: ?String = None(),
+  charset: ?String = None(),
+} {
+  //
+  static fun fromJSON(jsv: JSON.Value): Config {
+    jso = jsv.expectObject();
+    getVector = name ->
+      jso
+        .maybeGetArray(name)
+        .map(a -> a.value.map(v -> v.expectString()))
+        .default(Vector[]);
+    static{
+      title => jso.maybeGetString("title"),
+      description => jso.maybeGetString("description"),
+      icon => jso.maybeGetString("icon"),
+      styles => getVector("styles"),
+      scripts => getVector("scripts"),
+      customs => getVector("customs").map(readTextFile),
+      header => jso.maybeGetString("header").map(readTextFile),
+      footer => jso.maybeGetString("footer").map(readTextFile),
+      lang => jso.maybeGetString("lang"),
+      charset => jso.maybeGetString("charset"),
+    }
+  }
+
+  fun fill(elements: mutable Vector<HTMLEntity>): void {
+    elements.push(
+      HTMLSimple(
+        "meta",
+        Map["charset" => JSON.String(this.charset.default("UTF-8"))],
+      ),
+    );
+    this.title.each(t -> elements.push(HTMLTextContainer("title", t)));
+    this.description.each(d ->
+      elements.push(
+        HTMLSimple(
+          "meta",
+          Map[
+            "name" => JSON.String("description"),
+            "content" => JSON.String(d),
+          ],
+        ),
+      )
+    );
+    this.icon.each(i ->
+      elements.push(
+        HTMLSimple(
+          "link",
+          Map[
+            "rel" => JSON.String("shortcut icon"),
+            "type" => JSON.String("image/svg"),
+            "href" => JSON.String(i),
+          ],
+        ),
+      )
+    );
+    this.styles.each(s ->
+      elements.push(
+        HTMLSimple(
+          "link",
+          Map["rel" => JSON.String("stylesheet"), "href" => JSON.String(s)],
+        ),
+      )
+    );
+    this.scripts.each(s ->
+      elements.push(
+        HTMLElement("script", None(), Map["src" => JSON.String(s)], Vector[]),
+      )
+    );
+    this.customs.each(h -> elements.push(HTMLInclude(h)));
+  }
+}
+
 fun convertToHtml{
   markdown: String,
   buffer: mutable Vector<String>,
-  lang: String,
-  head: ?String = None(),
-  header: ?String = None(),
-  footer: ?String = None(),
+  conf: Config,
 }: void {
   builder = mutable HTMLBuilder();
   body_content = builder.convert(markdown);
-  withCharset = head.map(v -> v.contains(" charset=")).default(false);
+  elements = mutable Vector<HTMLEntity>[];
+  conf.fill(elements);
   html = HTMLElement(
     "html",
     None(),
-    Map["lang" => JSON.String(lang)],
+    Map["lang" => JSON.String(conf.lang.default("en"))],
     Vector[
-      HTMLElement(
-        "head",
-        None(),
-        Map[],
-        head
-          .map(h -> Vector<HTMLEntity>[HTMLInclude(h)])
-          .default(Vector[])
-          .concat(
-            if (!withCharset) {
-              Vector<HTMLEntity>[
-                HTMLSimple("meta", Map["charset" => JSON.String("UTF-8")]),
-              ]
-            } else {
-              Vector[]
-            },
-          ),
-      ),
+      HTMLElement("head", None(), Map[], elements.chill()),
       HTMLElement(
         "body",
         None(),
@@ -42,14 +127,14 @@ fun convertToHtml{
             "div",
             None(),
             Map["class" => JSON.String("header")],
-            header.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
+            conf.header.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
           ),
           body_content,
           HTMLElement(
             "div",
             None(),
             Map["class" => JSON.String("footer")],
-            footer.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
+            conf.footer.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
           ),
         ],
       ),
@@ -84,6 +169,12 @@ class HTMLSimple(
     } else {
       buffer.push(`${prefix}<${this.tag}/>`);
     };
+  }
+}
+
+class HTMLTextContainer(tag: String, text: String) extends HTMLEntity {
+  fun print(buffer: mutable Vector<String>, prefix: String): void {
+    buffer.push(`${prefix}<${this.tag}>${this.text}</${this.tag}>`);
   }
 }
 
