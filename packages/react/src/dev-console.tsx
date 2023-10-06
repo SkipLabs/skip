@@ -53,9 +53,9 @@ function ReactiveQueryViewer() {
     }
   }
 
-  const removeQuery = (q) => {
+  const removeQuery = (q: string) => {
     const qIdx = queries.findIndex((x) => x === q)
-    setQueries(queries.filter((val, idx) => idx != qIdx))
+    setQueries(queries.filter((_val, idx) => idx != qIdx))
   }
 
   const tables = queries.map(q => (
@@ -87,7 +87,7 @@ function SKDBTable({query, removeQuery}) {
   const rows = useQuery(query);
   const keys = rows.length < 1 ? [] : Object.keys(rows[0])
   let i = 0;
-  const acc = rows.map(row => {
+  const acc = rows.map((row: Object) => {
     let j = 0;
     const tds: JSX.Element[] = [];
     for (const k of keys) {
@@ -103,7 +103,7 @@ function SKDBTable({query, removeQuery}) {
         <div onClick={() => setVisible(!visible)} className="skdb-table-query">
           {visible ? "\u25BC" : "\u25B2"}  {query}
         </div>
-        <button className="close-query" onClick={e => removeQuery(query)}>&#x2718;</button>
+        <button className="close-query" onClick={_e => removeQuery(query)}>&#x2718;</button>
       </div>
       <div className="skdb-table-body">
         <table className={visible ? "visible" : "hidden"}>
@@ -136,8 +136,8 @@ function Draggable({children}) {
     }
   }, [position])
 
-  const globalMousemove = (offsetX, offsetY) => {
-    return (event) => {
+  const globalMousemove = (offsetX: number, offsetY: number) => {
+    return (event: MouseEvent) => {
       setPosition({
         x: event.clientX - offsetX,
         y: event.clientY - offsetY
@@ -146,14 +146,14 @@ function Draggable({children}) {
     }
   }
 
-  const globalMouseup = (move) => {
-    return (_event) => {
+  const globalMouseup = (move: (event: MouseEvent) => void) => {
+    return (_event: MouseEvent) => {
       document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', globalMouseup);
+      document.removeEventListener('mouseup', this);
     }
   }
 
-  const mouseDown = (e) => {
+  const mouseDown = (e: React.MouseEvent) => {
     const move = globalMousemove(
       e.clientX - (ref.current?.offsetLeft||0),
       e.clientY - (ref.current?.offsetTop||0),
