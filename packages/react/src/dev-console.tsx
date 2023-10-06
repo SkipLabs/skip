@@ -163,7 +163,7 @@ function Draggable({children}) {
   }
 
   return (
-    <div ref={ref} className="draggable" onMouseDown={mouseDown}>
+    <div ref={ref} className="skdb-dev-console-draggable" onMouseDown={mouseDown}>
       {children}
     </div>
   )
