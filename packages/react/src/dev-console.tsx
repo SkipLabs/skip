@@ -39,7 +39,9 @@ function ReactiveQueryViewer() {
   const [queries, setQueries] = useState<string[]>([]);
 
   const show = async (query: string) => {
-    setQueries(queries.concat(query))
+    const qs = queries.slice();
+    qs.unshift(query);
+    setQueries(qs);
   }
 
   const removeQuery = (q) => {
