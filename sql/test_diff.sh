@@ -9,8 +9,8 @@ fi
 SKDB_CMD="skargo run --profile $SKARGO_PROFILE -- "
 SKDB="$SKDB_CMD --always-allow-joins --data $DB"
 
-pass() { printf "%-44s OK\n" "$1:"; }
-fail() { printf "%-44s FAILED\n" "$1:"; }
+pass() { printf "%-50s OK\n" "$1:"; }
+fail() { printf "%-50s FAILED\n" "$1:"; }
 
 run_diff () {
     rm -f /tmp/kk1 /tmp/kk2 /tmp/kk3 $DB
