@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { SKDBContext, useQuery, useSKDB } from './skdb-react.js'
 import type { SKDB } from 'skdb'
 import skLogo from './assets/sk.svg'
+import './dev-console.css'
 
 function Section({children, heading}: {children: React.ReactNode, heading: string}) {
   return (
