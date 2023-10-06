@@ -53,10 +53,11 @@ class File {
     if (!this.options || !this.options.read) {
       throw new Error("The file cannot be read")
     }
-    if (this.cursor >= this.contents.length) {
+    let clen = this.contents ? this.contents.length : 0;
+    if (this.cursor >= clen) {
       return null;
     }
-    let end = Math.min(this.contents.length, this.cursor + len);
+    let end = Math.min(clen, this.cursor + len);
     let res = this.contents.substring(this.cursor, end);
     this.cursor = end;
     return res;

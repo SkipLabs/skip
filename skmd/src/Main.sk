@@ -40,6 +40,7 @@ fun main(): void {
         skipExit(
           try {
             handler(args);
+            SKStore.destroyObstack(saved);
             0
           } catch {
           | exn ->
@@ -67,11 +68,10 @@ fun html(): (Cli.Command, Cli.ParseResults ~> void) {
           "Directory for all generated artifacts",
         ),
       )
-      .arg(Cli.StringArg("head").about("Build with the specified head file"))
-      .arg(Cli.StringArg("header").about("Build with de specified header file"))
-      .arg(Cli.StringArg("footer").about("Build with de specified footer file"))
       .arg(
-        Cli.StringArg("lang").about("Specify the document lang").default("en"),
+        Cli.StringArg("conf").about(
+          "Build with the specified configuration file",
+        ),
       ),
     execHtml,
   )
@@ -79,18 +79,25 @@ fun html(): (Cli.Command, Cli.ParseResults ~> void) {
 
 fun execHtml(args: Cli.ParseResults): void {
   acc = mutable Vector[];
+  rl = () -> {
+    try {
+      read_line()
+    } catch {
+    | EndOfFile _ -> None()
+    | exn -> throw exn
+    };
+  };
   loop {
-    read_line() match {
+    rl() match {
     | None() ->
+      conf = args
+        .maybeGetString("conf")
+        .map(readTextFile)
+        .map(JSON.decode)
+        .map(Config::fromJSON)
+        .default(Config{});
       buffer = mutable Vector[];
-      convertToHtml{
-        markdown => acc.join(""),
-        buffer,
-        lang => args.getString("lang"),
-        head => args.maybeGetString("head").map(FileSystem.readTextFile),
-        header => args.maybeGetString("header").map(FileSystem.readTextFile),
-        footer => args.maybeGetString("footer").map(FileSystem.readTextFile),
-      };
+      convertToHtml{markdown => acc.join(""), buffer, conf};
       print_string(buffer.join("\n"));
       break void
     | Some(str) ->
