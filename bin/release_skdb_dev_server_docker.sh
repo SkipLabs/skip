@@ -12,7 +12,7 @@ docker buildx build \
        --progress=plain \
        --platform linux/amd64,linux/arm64 \
        -t skiplabs/skdb-dev-server:latest \
-       -f sql/server/dev/Dockerfile
+       -f sql/server/dev/Dockerfile \
        --push \
        .
 
