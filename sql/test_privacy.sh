@@ -38,7 +38,8 @@ done | $SKDB
 ###############################################################################
 
 # We need a group that doesn't restrict anyone.
-echo "insert into skdb_group_permissions values ('myGroup', NULL, skdb_permission('rid'));" | $SKDB
+echo "insert into skdb_groups values('myGroup', NULL, 'root', 'root');" | $SKDB
+echo "insert into skdb_group_permissions values ('myGroup', NULL, skdb_permission('rid'), 'root');" | $SKDB
 
 # Let's check that user permissions are respected
 # This should turn every user into "readonly"
@@ -65,9 +66,10 @@ fi
 
 # Let's create a group
 # user1 can write, all the others can only read
-echo "insert into skdb_group_permissions values ('ID22', 'ID1', skdb_permission('rw'));" | $SKDB
-echo "insert into skdb_group_permissions values ('ID22', 'ID2', skdb_permission('r'));" | $SKDB
-echo "insert into skdb_group_permissions values ('ID22', 'ID3', skdb_permission('r'));" | $SKDB
+echo "insert into skdb_groups values('ID22', NULL, 'root', 'root');" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID1', skdb_permission('rw'), 'root');" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID2', skdb_permission('r'), 'root');" | $SKDB
+echo "insert into skdb_group_permissions values ('ID22', 'ID3', skdb_permission('r'), 'root');" | $SKDB
 
 # Let's check user1 can write
 if echo -e "1\t238,\"ID22\"" | $SKDB write-csv t1 --user ID1 2>&1 | grep -q Error; then
@@ -132,8 +134,9 @@ fi
 
 # Let's create a block list
 # Everybody can read/insert/delete, except for user1 who can only read
-echo "insert into skdb_group_permissions values ('ID23', 'ID1', skdb_permission('r'));" | $SKDB
-echo "insert into skdb_group_permissions values ('ID23', NULL, skdb_permission('rw'));" | $SKDB
+echo "insert into skdb_groups values('ID23', NULL, 'root', 'root');" | $SKDB
+echo "insert into skdb_group_permissions values ('ID23', 'ID1', skdb_permission('r'), 'root');" | $SKDB
+echo "insert into skdb_group_permissions values ('ID23', NULL, skdb_permission('rw'), 'root');" | $SKDB
 echo "insert into skdb_user_permissions values ('ID2', skdb_permission('ri'));" | $SKDB
 
 # Let's check user2 can write
@@ -213,7 +216,7 @@ echo -e "TEST GROUP PERMISSION UPDATE2:\tOK"
 
 # let's kick ID3 out of the group 22
 (echo "begin transaction;";
- echo "insert into skdb_group_permissions values('ID22', 'ID3', skdb_permission('rw'));";
+ echo "insert into skdb_group_permissions values('ID22', 'ID3', skdb_permission('rw'), 'root');";
  echo "delete from skdb_user_permissions where userUUID='ID3';"
  echo "commit;"
 )| $SKDB

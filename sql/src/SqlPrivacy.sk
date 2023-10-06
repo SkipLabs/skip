@@ -290,18 +290,19 @@ class SKDBUserPermissions extends PredefinedTable {
 }
 
 /*****************************************************************************/
-/* The skdb_group_permissions table. */
+/* The skdb_group_permissions_joined table. */
 /*****************************************************************************/
 
 const skdbGroupPermissions: SKDBGroupPermissions = SKDBGroupPermissions::create();
 
 class SKDBGroupPermissions extends PredefinedTable {
-  const name: Name = Name::create("skdb_group_permissions");
+  const name: Name = Name::create("skdb_group_permissions_joined");
 
   const schemaText: String = `(
     groupUUID STRING NOT NULL,
     userUUID STRING,
-    permissions INTEGER NOT NULL
+    permissions INTEGER NOT NULL,
+    skdb_access STRING
   )`;
 
   const indexedFields: Array<Name> = Array[
