@@ -16,7 +16,9 @@ CFILES=\
 	stdlib.c \
 	stack.c \
 	string.c \
-	native_eq.c
+	native_eq.c \
+	splitmix64.c \
+	xoroshiro128plus.c
 
 NATIVE_FILES=\
 	palloc.c\
