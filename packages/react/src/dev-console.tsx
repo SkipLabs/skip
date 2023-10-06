@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { SKDBContext, useQuery } from './skdb-react.js'
+import { SKDBContext, useQuery, useSKDB } from './skdb-react.js'
 import type { SKDB } from 'skdb'
 import skLogo from './assets/sk.svg'
 
@@ -37,11 +37,19 @@ function UserSelector(
 function ReactiveQueryViewer() {
   const [query, setQuery] = useState('SELECT * FROM');
   const [queries, setQueries] = useState<string[]>([]);
+  const [error, setError] = useState<string|undefined>(undefined);
+  const skdb = useSKDB();
 
   const show = async (query: string) => {
-    const qs = queries.slice();
-    qs.unshift(query);
-    setQueries(qs);
+    try {
+      setError(undefined);
+      await skdb.exec(query);   // run it up front to catch any errors
+      const qs = queries.slice();
+      qs.unshift(query);
+      setQueries(qs);
+    } catch (ex: any) {
+      setError(ex.message);
+    }
   }
 
   const removeQuery = (q) => {
@@ -53,6 +61,12 @@ function ReactiveQueryViewer() {
     <SKDBTable key={q} query={q} removeQuery={removeQuery} />
   ));
 
+  const errorComponent =  error ? (
+    <div className="query-error">
+      <pre><code>{error}</code></pre>
+    </div>
+  ) : <div />
+
   return (
     <Section heading="Watched queries">
       <div className="queries-panel" onMouseDown={e => e.stopPropagation()}>
@@ -61,6 +75,7 @@ function ReactiveQueryViewer() {
           onKeyDown={e => {if (e.key === 'Enter') show(query)}} />
         <button className="add-query" onClick={_e => show(query)}>&#x002B;</button>
       </div>
+      {errorComponent}
       {tables}
     </Section>
   )
