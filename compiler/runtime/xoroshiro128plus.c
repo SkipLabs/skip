@@ -7,6 +7,7 @@ worldwide. This software is distributed without any warranty.
 See <http://creativecommons.org/publicdomain/zero/1.0/>. */
 
 #include <stdint.h>
+#include "splitmix64.h"
 
 /* This is xoroshiro128+ 1.0, our best and fastest small-state generator
    for floating-point numbers, but its state space is large enough only
@@ -39,7 +40,15 @@ static inline uint64_t rotl(const uint64_t x, int k) {
 
 static uint64_t s[2];
 
-uint64_t next(void) {
+
+void xoroshiro128plus_init(uint64_t seed) {
+	splitmix64_init(seed);
+	do { s[0] = splitmix64_next(); } while (s[0] == 0);
+	do { s[1] = splitmix64_next(); } while (s[1] == 0);
+}
+
+
+uint64_t xoroshiro128plus_next(void) {
 	const uint64_t s0 = s[0];
 	uint64_t s1 = s[1];
 	const uint64_t result = s0 + s1;
@@ -56,7 +65,7 @@ uint64_t next(void) {
    to 2^64 calls to next(); it can be used to generate 2^64
    non-overlapping subsequences for parallel computations. */
 
-void jump(void) {
+void xoroshiro128plus_jump(void) {
 	static const uint64_t JUMP[] = { 0xdf900294d8f554a5, 0x170865df4b3201fc };
 
 	uint64_t s0 = 0;
@@ -67,7 +76,7 @@ void jump(void) {
 				s0 ^= s[0];
 				s1 ^= s[1];
 			}
-			next();
+			xoroshiro128plus_next();
 		}
 
 	s[0] = s0;
@@ -80,7 +89,7 @@ void jump(void) {
    from each of which jump() will generate 2^32 non-overlapping
    subsequences for parallel distributed computations. */
 
-void long_jump(void) {
+void xoroshiro128plus_long_jump(void) {
 	static const uint64_t LONG_JUMP[] = { 0xd2a98b26625eee7b, 0xdddf9b1090aa7ac1 };
 
 	uint64_t s0 = 0;
@@ -91,7 +100,7 @@ void long_jump(void) {
 				s0 ^= s[0];
 				s1 ^= s[1];
 			}
-			next();
+			xoroshiro128plus_next();
 		}
 
 	s[0] = s0;
