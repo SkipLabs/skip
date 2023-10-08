@@ -277,13 +277,25 @@ fun clean(): (Cli.Command, Cli.ParseResults ~> void) {
 }
 
 fun execClean(args: Cli.ParseResults, env: Env): void {
-  bc = BuildContext::create(
-    env,
-    args.maybeGetString("target"),
-    args.maybeGetString("target-dir"),
-    getProfile(args),
-  );
-  run(Array["rm", "-rf", bc.targetDir], env.verbose)
+  targetDir = args.maybeGetString("target-dir") match {
+  | Some(d) -> d
+  | None() ->
+    dir = Path.join(env.rootDir, kTargetDir);
+    optProfile = args.maybeGetString("profile") match {
+    | Some(p) -> Some(p)
+    | None() if (args.getBool("release")) -> Some(kReleaseProfile)
+    | None() -> None()
+    };
+    (optProfile, args.maybeGetString("target")) match {
+    | (None(), None()) -> dir
+    | (Some(target), None()) -> Path.join(dir, target)
+    | (None(), Some(profile)) ->
+      Path.join(Path.join(dir, kDefaultTarget), profile)
+    | (Some(target), Some(profile)) ->
+      Path.join(Path.join(dir, target), profile)
+    }
+  };
+  run(Array["rm", "-rf", targetDir], env.verbose)
 }
 
 /********* Format **********/
