@@ -385,7 +385,7 @@ class FixedSingle<K: Orderable, +V: frozen>(data: Array<(K, V)> = Array[]) {
     static::create(Vector::mcreateFromItems(items));
   }
 
-  static fun create(data: mutable Vector<(K, V)>): this {
+  static fun create(data: mutable Vector<(K, V)>, dedup: Bool = false): this {
     data.sortBy(x ~> x.i0);
 
     lastOpt: ?K = None();
@@ -394,7 +394,7 @@ class FixedSingle<K: Orderable, +V: frozen>(data: Array<(K, V)> = Array[]) {
       lastOpt match {
       | None() -> !lastOpt = Some(k)
       | Some(last) ->
-        if (last == k) {
+        if (last == k && !dedup) {
           debug((last, k));
           invariant_violation("Duplicate value in single")
         } else {

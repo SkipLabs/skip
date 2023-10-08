@@ -397,8 +397,8 @@ class SelectEvaluator{
         context,
         SKStore.FixedSingle::create(
           mutable Vector[
-            (leftHandle.dirName, (noop, leftRanges, None())),
-            (shardsDirName, (noop, None(), None())),
+            (leftHandle.dirName, Array[(noop, leftRanges, None())]),
+            (shardsDirName, Array[(noop, None(), None())]),
           ],
         ),
         projLeftName,
@@ -412,8 +412,8 @@ class SelectEvaluator{
         context,
         SKStore.FixedSingle::create(
           mutable Vector[
-            (rightHandle.dirName, (noop, rightRanges, None())),
-            (shardsDirName, (noop, None(), None())),
+            (rightHandle.dirName, Array[(noop, rightRanges, None())]),
+            (shardsDirName, Array[(noop, None(), None())]),
           ],
         ),
         projRightName,
@@ -457,8 +457,8 @@ class SelectEvaluator{
         context,
         SKStore.FixedSingle::create(
           mutable Vector[
-            (projLeftName, (projLeftFun, None(), None())),
-            (projRightName, (projRightFun, None(), None())),
+            (projLeftName, Array[(projLeftFun, None(), None())]),
+            (projRightName, Array[(projRightFun, None(), None())]),
           ],
         ),
         projName,
@@ -469,11 +469,13 @@ class SelectEvaluator{
           mutable Vector[
             (
               projName,
-              (
-                makeJoinReducer(shards, joinKind, kinds, onlyLeftValues),
-                None(),
-                None(),
-              ),
+              Array[
+                (
+                  makeJoinReducer(shards, joinKind, kinds, onlyLeftValues),
+                  None(),
+                  None(),
+                ),
+              ],
             ),
           ],
         ),
@@ -620,26 +622,30 @@ class SelectEvaluator{
             mutable Vector[
               (
                 selectName1Empty,
-                (
-                  (context, writer, key, values) ~> {
-                    dataDir = context.unsafeGetEagerDir(dataName);
-                    if (dataDir.isEmpty(context)) {
-                      writer.setArray(key, values.collect(Array))
-                    }
-                  },
-                  None(),
-                  None(),
-                ),
+                Array[
+                  (
+                    (context, writer, key, values) ~> {
+                      dataDir = context.unsafeGetEagerDir(dataName);
+                      if (dataDir.isEmpty(context)) {
+                        writer.setArray(key, values.collect(Array))
+                      }
+                    },
+                    None(),
+                    None(),
+                  ),
+                ],
               ),
               (
                 dataName,
-                (
-                  (_context, writer, key, values) ~> {
-                    writer.setArray(key, values.collect(Array))
-                  },
-                  None(),
-                  None(),
-                ),
+                Array[
+                  (
+                    (_context, writer, key, values) ~> {
+                      writer.setArray(key, values.collect(Array))
+                    },
+                    None(),
+                    None(),
+                  ),
+                ],
               ),
             ],
           ),

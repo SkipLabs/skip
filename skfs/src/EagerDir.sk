@@ -671,7 +671,9 @@ class EagerDir{
   old: SortedMap<Source, MInfo> = SortedMap[],
   parents: FixedSingle<
     DirName,
-    (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+    Array<
+      (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+    >,
   > = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
   slices: RangeMapList<Key, DirName> = RangeMapList[],
@@ -1211,7 +1213,13 @@ class EagerDir{
     child: EagerDir,
     parents: FixedSingle<
       DirName,
-      (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+      Array<
+        (
+          MapFun,
+          ?Array<KeyRange>,
+          ?((mutable Context, SortedSet<Key>) ~> void),
+        ),
+      >,
     >,
   ): Bool {
     context.canReuse match {
@@ -1251,7 +1259,7 @@ class EagerDir{
     unsafeSkipInit: Bool = false,
   ): void {
     parents = FixedSingle::create(
-      mutable Vector[(parentName, (f, rangeOpt, onUpdate))],
+      mutable Vector[(parentName, Array[(f, rangeOpt, onUpdate)])],
     );
     static::applyMany(context, parents, childName, reducerOpt, unsafeSkipInit);
   }
@@ -1260,7 +1268,13 @@ class EagerDir{
     context: mutable Context,
     parents: FixedSingle<
       DirName,
-      (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+      Array<
+        (
+          MapFun,
+          ?Array<KeyRange>,
+          ?((mutable Context, SortedSet<Key>) ~> void),
+        ),
+      >,
     >,
     childName: DirName,
     reducerOpt: ?IReducer = None(),
@@ -1292,13 +1306,11 @@ class EagerDir{
 
       if (!unsafeSkipInit) {
         for (parentName => parentData in parents) {
-          (f, rangeOpt, _) = parentData;
-          parent = context.unsafeGetEagerDir(parentName);
-          rangeOpt match {
-          | None() ->
-            static::mapData(context, oldVec, parent, childName, f, acc, None())
-          | Some(ranges) ->
-            for (range in ranges) {
+          for (p in parentData) {
+            (f, rangeOpt, _) = p;
+            parent = context.unsafeGetEagerDir(parentName);
+            rangeOpt match {
+            | None() ->
               static::mapData(
                 context,
                 oldVec,
@@ -1306,8 +1318,20 @@ class EagerDir{
                 childName,
                 f,
                 acc,
-                Some(range),
-              );
+                None(),
+              )
+            | Some(ranges) ->
+              for (range in ranges) {
+                static::mapData(
+                  context,
+                  oldVec,
+                  parent,
+                  childName,
+                  f,
+                  acc,
+                  Some(range),
+                );
+              }
             }
           }
         }
@@ -1321,7 +1345,10 @@ class EagerDir{
       );
 
       if (context.debugMode) {
-        parentNames = parents.items().map(x -> (x.i0, x.i1.i1)).collect(Array);
+        parentNames = parents
+          .items()
+          .map(x -> (x.i0, x.i1.map(p -> p.i1)))
+          .collect(Array);
         print_string(
           `CREATED:  ${childName} (time: ${time}, parents: ${parentNames})`,
         );
@@ -1338,7 +1365,7 @@ class EagerDir{
         data,
         totalSize,
         creator => context.currentArrow(),
-        fixedOld => FixedSingle::create(oldVec),
+        fixedOld => FixedSingle::create(oldVec, true),
         childDirs => SortedSet[],
         reducer,
       }
@@ -1346,8 +1373,10 @@ class EagerDir{
     updateDirtyReaders(context, Path::create(childName.tag(), DirTag()));
     context.setDir(childName, dir);
     for (parentName => parentData in parents) {
-      (_, rangeOpt, _) = parentData;
-      static::addChildToParent(context, parentName, childName, rangeOpt);
+      for (p in parentData) {
+        (_, rangeOpt, _) = p;
+        static::addChildToParent(context, parentName, childName, rangeOpt);
+      }
     };
   }
 
@@ -1515,9 +1544,9 @@ class EagerDir{
       readonly Map<DirName, SortedSet<Key>>,
     >,
     parentName: DirName,
-    mapFun: MapFun,
-    rangeOpt: ?Array<KeyRange>,
-    onUpdate: ?((mutable Context, SortedSet<Key>) ~> void),
+    parentMaps: Array<
+      (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+    >,
     child: EagerDir,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
@@ -1527,6 +1556,25 @@ class EagerDir{
     if (contextDirtyReaders.containsKey(parent.dirName)) {
       if (contextDirtyReaders[parent.dirName].containsKey(childName)) {
         for (key in contextDirtyReaders[parent.dirName][childName]) {
+          for (p in parentMaps) {
+            (_, rangeOpt, _) = p;
+            rangeOpt match {
+            | Some(
+              ranges,
+            ) if (
+              !ranges.any(range -> range.start <= key && key <= range.end)
+            ) ->
+              void
+            | _ -> !dirty = dirty.set(key)
+            }
+          }
+        }
+      };
+    };
+    if (contextDirty.containsKey(parent.dirName)) {
+      for (key in contextDirty[parent.dirName]) {
+        for (p in parentMaps) {
+          (_, rangeOpt, _) = p;
           rangeOpt match {
           | Some(
             ranges,
@@ -1537,32 +1585,40 @@ class EagerDir{
         }
       };
     };
-    if (contextDirty.containsKey(parent.dirName)) {
-      for (key in contextDirty[parent.dirName]) {
-        rangeOpt match {
-        | Some(
-          ranges,
-        ) if (!ranges.any(range -> range.start <= key && key <= range.end)) ->
-          void
-        | _ -> !dirty = dirty.set(key)
-        }
-      };
-    };
 
     for (key in dirty) {
       context.enter(ArrowKey(parentName, childName, key));
-      values = parent.getIterRaw(key);
       path = Path::create(parentName, key);
       source = Source::create(path);
       oldInfo = static::getOld(child, source);
       oldKeys = SortedSet::createFromItems(oldInfo.getKeys());
-      writer = mutable Writer{};
       newDirsCopy = context.newDirs;
       readsCopy = context.reads;
       context.!newDirs = SortedSet[];
       context.!reads = SortedSet[];
 
-      mapFun(context, writer, key, values);
+      keys = mutable Vector[];
+      mvalues = SortedMap[];
+
+      for (p in parentMaps) {
+        writer = mutable Writer{};
+        (mapFun, _, _) = p;
+        mapFun(context, writer, key, parent.getIterRaw(key));
+        mapped = writer.getWrites();
+        for (kv in mapped) {
+          (k, rvalues) = kv;
+
+          keys.push(k);
+          if (oldKeys.contains(k)) {
+            !oldKeys = oldKeys.remove(k);
+          };
+
+          if (!mvalues.containsKey(k)) {
+            !mvalues = mvalues.set(k, mutable Vector[]);
+          };
+          mvalues[k].extend(rvalues);
+        };
+      };
 
       newDirs = context.newDirs;
       reads = context.getReads();
@@ -1570,7 +1626,6 @@ class EagerDir{
       context.!reads = readsCopy;
 
       !child = child.updateNewDirs(context, source, newDirs);
-      mapped = writer.getWrites();
 
       for (read in reads) {
         arrowKey = ArrowKey(parentName, child.dirName, key);
@@ -1583,16 +1638,8 @@ class EagerDir{
         context.!deps = context.deps.remove(oldRead, arrowKey);
       };
 
-      keys = mutable Vector[];
-
-      for (kv in mapped) {
-        (k, rvalues) = kv;
-
-        keys.push(k);
-        if (oldKeys.contains(k)) {
-          !oldKeys = oldKeys.remove(k);
-        };
-        !child = child.writeEntry(context, path, path, k, rvalues);
+      for (k => v in mvalues) {
+        !child = child.writeEntry(context, path, path, k, v.toArray());
       };
 
       // Let's remove the keys that no longer exist.
@@ -1618,9 +1665,12 @@ class EagerDir{
 
     context.setDir(child.dirName, child);
 
-    onUpdate match {
-    | None() -> void
-    | Some(f) -> f(context, dirty)
+    for (p in parentMaps) {
+      (_, _, onUpdate) = p;
+      onUpdate match {
+      | None() -> void
+      | Some(f) -> f(context, dirty)
+      }
     }
   }
 
@@ -1782,11 +1832,13 @@ class EagerDir{
       | Some(childDir) ->
         for (parent in childDir.parents.items()) {
           if (parent.i0 != this.dirName) continue;
-          parent.i1.i1 match {
-          | None() -> continue
-          | Some(ranges) ->
-            for (range in ranges) {
-              !slices = slices.add(range.start, range.end, childDir.dirName)
+          for (p in parent.i1) {
+            p.i1 match {
+            | None() -> continue
+            | Some(ranges) ->
+              for (range in ranges) {
+                !slices = slices.add(range.start, range.end, childDir.dirName)
+              }
             }
           }
         }

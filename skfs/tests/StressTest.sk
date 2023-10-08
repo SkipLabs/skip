@@ -140,23 +140,25 @@ fun evalMDir(context: mutable SKStore.Context, dir: MDir): void {
     parents.push(
       (
         SKStore.DirName::create(input),
-        (
-          (context, writer, key, valueIter) ~> {
-            values = valueIter.collect(Array);
-            if (values.size() == 0) return void;
-            evalFun(
-              input,
-              context,
-              writer,
-              name.toString(),
-              readDirs,
-              key,
-              values,
-            )
-          },
-          None(),
-          None(),
-        ),
+        Array[
+          (
+            (context, writer, key, valueIter) ~> {
+              values = valueIter.collect(Array);
+              if (values.size() == 0) return void;
+              evalFun(
+                input,
+                context,
+                writer,
+                name.toString(),
+                readDirs,
+                key,
+                values,
+              )
+            },
+            None(),
+            None(),
+          ),
+        ],
       ),
     )
   };
