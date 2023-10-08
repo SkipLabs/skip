@@ -740,9 +740,7 @@ mutable class Context{
           child.update(this, dirtyReaders.maybeGet(child.dirName))
         | Some(child @ EagerDir _) ->
           this.!toReset = this.toReset.set(parentName);
-          (mapFun, rangeOpt, onUpdate) = child.parents.maybeGet(
-            parentName,
-          ) match {
+          parentMaps = child.parents.maybeGet(parentName) match {
           | None() -> invariant_violation("Could not find parent")
           | Some(f) -> f
           };
@@ -751,9 +749,7 @@ mutable class Context{
             dirty,
             dirtyReaders,
             parentName,
-            mapFun,
-            rangeOpt,
-            onUpdate,
+            parentMaps,
             child,
           )
         }

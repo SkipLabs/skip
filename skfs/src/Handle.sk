@@ -349,7 +349,7 @@ class EHandle<K: Key, V: File>(
     >,
     dirName: DirName,
   ): EHandle<K2, V2> {
-    dynParents = mutable Vector[];
+    dynParents = mutable Map[];
     parentSet = mutable Set[];
     for (parent in parents) {
       (parentHandle, parentData) = parent;
@@ -371,10 +371,17 @@ class EHandle<K: Key, V: File>(
           writer.!writes = twriter.writes
         }
       };
-      parentSet.add(parentName);
-      dynParents.push((parentName, (dynamicMapFun, rangeOpt, None())))
+      if (!parentSet.contains(parentName)) {
+        parentSet.add(parentName);
+        dynParents.set(parentName, mutable Vector[])
+      };
+      dynParents[parentName].push((dynamicMapFun, rangeOpt, None()))
     };
-    fixedParents = FixedSingle::create(dynParents);
+    fixedParents = FixedSingle::create(
+      Vector::mcreateFromItems(
+        dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())).collect(Array),
+      ),
+    );
     EagerDir::applyMany(context, fixedParents, dirName, None());
     EHandle(typeOutputKey, typeOutput, dirName)
   }
@@ -400,7 +407,7 @@ class EHandle<K: Key, V: File>(
     dirName: DirName,
     reducer: EReducer<V2, V3>,
   ): EHandle<K2, V3> {
-    dynParents = mutable Vector[];
+    dynParents = mutable Map[];
     parentSet = mutable Set[];
     for (parent in parents) {
       (parentHandle, parentData) = parent;
@@ -422,10 +429,17 @@ class EHandle<K: Key, V: File>(
           writer.!writes = twriter.writes
         }
       };
-      parentSet.add(parentName);
-      dynParents.push((parentName, (dynamicMapFun, rangeOpt, None())))
+      if (!parentSet.contains(parentName)) {
+        parentSet.add(parentName);
+        dynParents.set(parentName, mutable Vector[])
+      };
+      dynParents[parentName].push((dynamicMapFun, rangeOpt, None()))
     };
-    fixedParents = FixedSingle::create(dynParents);
+    fixedParents = FixedSingle::create(
+      Vector::mcreateFromItems(
+        dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())).collect(Array),
+      ),
+    );
     EagerDir::applyMany(
       context,
       fixedParents,
