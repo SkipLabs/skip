@@ -242,15 +242,38 @@ fun main(): void {
 
 fun checker(): (Cli.Command, Cli.ParseResults ~> void) {
   (
-    Cli.Command("check").short("c").about("Run tsc on ts source files"),
+    Cli.Command("check")
+      .short("c")
+      .about("Run tsc on ts source files")
+      .arg(
+        Cli.BoolArg("test")
+          .short("t")
+          .long("test")
+          .about("Run tsc on ts tests files, with build package"),
+      ),
     args ~> Skargo.envCmd(args, execCheck),
   )
 }
 
-fun execCheck(_args: Cli.ParseResults, env: Skargo.Env): void {
-  tsDir = Path.join(env.rootDir, "ts/src");
-  invariant(FileSystem.exists(tsDir), "No typescript source");
-  tsc(tsDir, env.verbose);
+fun execCheck(args: Cli.ParseResults, env: Skargo.Env): void {
+  (tsDir, info, n) = if (args.getBool("test")) {
+    tsDir = Path.join(env.rootDir, "ts/tests");
+    invariant(FileSystem.exists(tsDir), "No typescript test to check");
+    bc = Skargo.BuildContext::create(
+      env,
+      Some("wasm32"),
+      None(),
+      Skargo.kDevProfile,
+    );
+    _ = buildIfNeeded(bc, false);
+    package = Package::create(env.manifest);
+    npmDir = manage(bc, package, None());
+    (tsDir, Some((package.name, npmDir)), "tests")
+  } else {
+    (Path.join(env.rootDir, "ts/src"), None(), "source")
+  };
+  invariant(FileSystem.exists(tsDir), `No ${n} typescript to check`);
+  tsc(tsDir, info, env.verbose);
 }
 
 /********* Build **********/
@@ -358,8 +381,12 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
     ];
   };
   _ = buildIfNeeded(bc, !customTests);
+  _ = manage(bc, Package::create(env.manifest), args.maybeGetString("npm-out"));
   if (customTests) {
-    Skargo.run(Array["cp", "-R", tests, bc.targetDir], env.verbose);
+    Skargo.run(
+      Array["rsync", "-ax", "--exclude", "./node_modules", tests, bc.targetDir],
+      env.verbose,
+    );
   } else {
     saveArchive(bc.targetDir);
   };
@@ -524,7 +551,7 @@ fun manage(
 
   tsconfig = Path.join(tsDir, "tsconfig.json");
   FileSystem.writeTextFile(tsconfig, tsConfig(dependencies.map(d -> d.name)));
-  tsc(tsDir, bc.env.verbose);
+  tsc(tsDir, None(), bc.env.verbose);
   jsDir = Path.join(tsDir, "js");
   invariant(FileSystem.exists(jsDir), "Invalid typescript build");
   // TODO: manage subdirectories
@@ -705,12 +732,23 @@ fun tsConfig(deps: Vector<String>): String {
   stream.join("")
 }
 
-fun tsc(tsDir: String, verbose: Bool): void {
+fun tsc(tsDir: String, link: ?(String, String), verbose: Bool): void {
   tsconfig = Path.join(tsDir, "tsconfig.json");
   Skargo.run(
     Array["npm", "i", "--prefix", tsDir, "--save-dev", "@types/node"],
     verbose,
   );
+  link.each(l -> {
+    node_modules = Path.join(tsDir, "node_modules");
+    if (FileSystem.exists(node_modules)) {
+      (name, path) = l;
+      symlink = Path.join(node_modules, name);
+      if (FileSystem.exists(symlink)) {
+        Skargo.run(Array["rm", symlink], verbose);
+      };
+      Skargo.run(Array["ln", "-s", path, symlink], verbose)
+    }
+  });
   Skargo.run(Array["tsc", "--project", tsconfig], verbose);
 }
 
