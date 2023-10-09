@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { tests } from './tests';
+import { ms_tests } from './muxed_socket';
 
 
 test.beforeEach(async ({ page }) => {
@@ -13,22 +13,24 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-function run(t, asWorker: boolean) {
+function runMS(t) {
   test(t.name, async ({ page }) => {
-    await page.evaluate(`window.asWorker = ${asWorker};`);
+    await page.evaluate(`window.testName = "${t.name}";`);
     await page.evaluate(`window.test = ${t.fun};`);
     let res = await page.evaluate(async () => {
+      var encoder = new TextEncoder();
+      class Env {
+        crypto = () => crypto;
+        createSocket = (uri: string) => new WebSocket(uri);
+        encodeUTF8 = (v) => encoder.encode(v);
+      }
       // @ts-ignore
-      let m = await import('./node_modules/skdb/dist/skdb.mjs');
+      var mu = await import('./muxed_utils.mjs');
       // @ts-ignore
-      let skdb = await m.createSkdb({asWorker: window.asWorker});
-      // @ts-ignore
-      return await window.test(skdb);
+      return await window.test(new Env(), mu);
     });
     t.check(res);
   });
 }
 
-tests(false).forEach(t => run(t, false));
-tests(true).forEach(t => run(t, true));
-
+ms_tests().forEach(t => runMS(t));
