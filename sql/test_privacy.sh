@@ -199,7 +199,7 @@ echo -e "1\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"" |
 echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"julienv\"" |
   $SKDB write-csv skdb_group_permissions --user julienv --source 1234
 
-# Passed this point, julienv can do anything in the group myAdminGroup
+# Past this point, julienv can do anything in the group myAdminGroup
 
 # Add an entry so that julienv would also be admin if the admins of
 # myAdminGroup were to change to myAdminGroup (itself).  This entry is
