@@ -23,6 +23,7 @@ endif # ifdef PROFILE
 LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
 CC64FLAGS=$(OLEVEL) -DSKIP64
 
+# NB: this MUST be the same as CFILES in compiler/runtime/Makefile
 CRELFILES=\
 	runtime/copy.c \
 	runtime/free.c \
@@ -36,7 +37,9 @@ CRELFILES=\
 	runtime/stack.c \
 	runtime/string.c \
 	runtime/posix.c \
-	runtime/native_eq.c
+	runtime/native_eq.c \
+	runtime/splitmix64.c \
+	runtime/xoroshiro128plus.c
 
 NATIVE_RELFILES=\
 	runtime/palloc.c\
