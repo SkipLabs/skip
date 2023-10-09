@@ -17,13 +17,9 @@ docker buildx build \
        --no-cache \
        --progress=plain \
        --platform linux/amd64,linux/arm64 \
-       -t skiplabs/skdb-dev-server:latest \
-       -f sql/server/dev/Dockerfile \
+       -t skiplabs/skdb-base:latest \
        --push \
        .
 
-# TODO: keep versions and alias latest
-
 docker buildx stop "$builder"
 docker buildx rm "$builder"
-
