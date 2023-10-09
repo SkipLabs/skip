@@ -1,28 +1,19 @@
-// @ts-ignore
 import { test, type Page } from '@playwright/test';
-// @ts-ignore
 import { tests } from './tests';
-// @ts-ignore
 import { ms_tests } from './muxed_socket';
-// @ts-ignore
 import { setup, apitests } from './apitests';
-// @ts-ignore
 import { createSkdb } from 'skdb';
-// @ts-ignore
 import { webcrypto as crypto } from 'crypto';
-// @ts-ignore
 import { WebSocket } from 'ws';
-// @ts-ignore
 import * as util from 'util';
-// @ts-ignore
-import * as mu from './muxed_utils';
+import * as mu from './muxed_utils.mjs';
 
 var encoder = new util.TextEncoder();
 
 
 function gatherCredential() {
   // @ts-ignore
-  return process.env.SKDB_CREDENTIAL;
+  return process.env.SKDB_CREDENTIAL!;
 }
 
 function run(t, asWorker: boolean) {

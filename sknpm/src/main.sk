@@ -718,7 +718,7 @@ fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
   contents = FileSystem.readTextFile(tsFile);
   target = Path.join(dir, Path.basename(tsFile));
   lines = contents.split("\n").map(line -> {
-    if (line.startsWith("import ") || line.startsWith("export ")) {
+    if (line.startsWith("import ") || line.startsWith("export {")) {
       elements = line.split(" from ");
       if (elements.size() == 2) {
         imported = elements[1].split("\"");
@@ -798,7 +798,7 @@ fun copyAndConvertImport(
     withTmpl = false;
     optCategory: ?String = None();
     lines = contents.split("\n").map(line -> {
-      if (line.startsWith("import ")) {
+      if (line.startsWith("import ") || line.startsWith("export {")) {
         elements = line.split(" from ");
         if (elements.size() == 2) {
           imported = elements[1].split("\"");

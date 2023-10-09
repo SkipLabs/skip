@@ -1,8 +1,5 @@
-// @ts-ignore
 import { test } from '@playwright/test';
-// @ts-ignore
 import { tests } from './tests';
-// @ts-ignore
 import { ms_tests } from './muxed_socket';
 
 
@@ -54,7 +51,6 @@ function runMS(t) {
     t.check(res);
   });
 }
-
 
 tests(false).forEach(t => run(t, false));
 tests(true).forEach(t => run(t, true));
