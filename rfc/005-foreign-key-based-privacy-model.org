@@ -1,0 +1,248 @@
+#+TITLE: What if access rules were on relations, not rows?
+
+Let me try to communicate how this will work through an evolving
+example use case. Imagine we're building FB and we want to control
+posts and commenting on posts.
+
+* Posting
+
+We want to express the following:
+
+- only friends of the post author can read the post
+- only the author can create (insert) a post with themselves as the author
+- only the author can delete a post written by the author
+
+We start with the following graph:
+
+#+BEGIN_EXAMPLE
+  user *
+#+END_EXAMPLE
+
+When we create a post we are trying to create this graph. The edge is
+the author relationship.
+
+#+BEGIN_EXAMPLE
+  user *<--------* post
+#+END_EXAMPLE
+
+We can encode the above access/privacy rules by putting them on this
+edge.
+
+But first, we encode a graph edge in a relational model using foreign
+keys (FKs) - which we would need to build for this proposal. So we
+have:
+
+#+BEGIN_SRC sql
+  CREATE TABLE users (id STRING PRIMARY KEY, ...);
+  CREATE TABLE posts (
+    id STRING PRIMARY KEY,
+    authorID STRING REFERENCES users(id),
+    body STRING
+  )
+#+END_SRC
+
+IMPORTANT: The database ensures that authorID points to an existing users.id.
+
+The question is then who is allowed to write, delete, or read a row
+with that edge (that value in the field)?
+
+We have a table ~skdb_access~:
+
+#+BEGIN_SRC sql
+  CREATE TABLE skdb_access (
+    from_table STRING NOT NULL,   --e.g. posts
+    to_table STRING NOT NULL,     --e.g. users
+    from_col STRING NOT NULL,     --e.g. authorID
+    id STRING NOT NULL,           --e.g. 1234
+    permission STRING NOT NULL,   --read, insert, or delete
+    user_group INTEGER NOT NULL   --e.g. 4567 - encoded elsewhere, represents a list of users
+  );
+#+END_SRC
+
+Let's insert a post:
+
+| id     | authorID | body           |
+|--------+----------+----------------|
+| POSTID | USERID   | my first post! |
+
+When the user ~USERID~ was created - when the ~USERID~ row was written
+in the users table - the following rows were also written in to
+~skdb_access~:
+
+| from_table | to_table | from_col | id     | permission | user_group                  |
+|------------+----------+----------+--------+------------+-----------------------------|
+| posts      | users    | authorID | USERID | read       | GROUPID_FOR_USERIDS_FRIENDS |
+| posts      | users    | authorID | USERID | insert     | GROUPID_FOR_JUST_USERID     |
+| posts      | users    | authorID | USERID | delete     | GROUPID_FOR_JUST_USERID     |
+
+Now when USERID tries to write to posts, we can check whether they
+have insert permissions for ~authorID~. In this case we can ensure that
+only ~USERID~ can create posts with ~USERID~ as the ~authorID~. This
+replaces the need for ~skdb_author~.
+
+Hopefully you can see how this would work for deletes and reads.
+
+* Commenting on a post
+
+Let's keep going and make things more interesting. I want to express
+the following rules for commenting on a post:
+
+- only friends of the poster can read the comment
+- only friends of the poster can write (insert) a comment on the post
+- only the commenter can delete the comment
+
+So we have a comments table:
+
+#+BEGIN_SRC sql
+    CREATE TABLE post_comments (
+      id STRING PRIMARY KEY,
+      postID STRING REFERENCES posts(id),
+      authorID STRING REFERENCES users(id),
+      body STRING
+    )
+#+END_SRC
+
+With two foreign key relations we're encoding this graph:
+
+#+BEGIN_EXAMPLE
+  user *<--------* post
+       ^         ^
+       |         |
+       +---------* comment
+#+END_EXAMPLE
+
+Let's say ~FRIENDID~ is writing a comment on ~POSTID~. When ~FRIENDID~ was created in the users table, the following rules were written in ~skdb_access~.
+
+| from_table    | to_table | from_col | id       | permission | user_group                          |
+|---------------+----------+----------+----------+------------+-------------------------------------|
+| post_comments | users    | authorID | FRIENDID | read       | GROUPID_FOR_EVERYONE                |
+| post_comments | users    | authorID | FRIENDID | insert     | GROUPID_FOR_JUST_FRIENDID           |
+| post_comments | users    | authorID | FRIENDID | delete     | GROUPID_FOR_JUST_FRIENDID           |
+
+NOTE: we specify everyone can read FRIENDID's comments.
+
+And when ~POSTID~ was created these rules were writen:
+
+| from_table    | to_table | from_col | id     | permission | user_group                  |
+|---------------+----------+----------+--------+------------+-----------------------------|
+| post_comments | posts    | postID   | POSTID | read       | GROUPID_FOR_USERIDS_FRIENDS |
+| post_comments | posts    | postID   | POSTID | insert     | GROUPID_FOR_USERIDS_FRIENDS |
+| post_comments | posts    | postID   | POSTID | delete     | GROUPID_FOR_USERIDS_FRIENDS |
+
+So can ~FRIENDID~ write the following row in ~post_comments~?
+
+| id        | postID | authorID | body       |
+|-----------+--------+----------+------------|
+| COMMENTID | POSTID | FRIENDID | nice post! |
+
+We AND together the FK relation privacy rules. So we do:
+
+GROUPID_FOR_JUST_FRIENDID AND GROUPID_FOR_USERIDS_FRIENDS
+
+FRIENDID belongs to this intersection group so they can insert a
+comment on this post.
+
+For reads we and together GROUPID_FOR_EVERYONE and
+GROUPID_FOR_USERIDS_FRIENDS. We use the everyone set for 'who can read
+a comment written by this author?' because we don't care. But this
+mechanism can be used to narrow down privacy.
+
+* Posting in a group
+
+Last example. What if we want to post in a group and allow the user to
+delete the post OR the group admins to delete it?
+
+An interesting thing here is that when the group is created (the row
+is written) the group creator specifies privacy rules against the
+posts table for that relation. We add a ~groupID~ column to the posts
+table that forces users to specify the group they're writing in to,
+and the creator of the group gets to specify access rules here - not
+the user writing the post! So the group creator can control who can
+insert posts in to a group (group members presumably). They can also
+specify that the group admins get to delete.
+
+So we create a group posts table like this:
+
+#+BEGIN_SRC sql
+  CREATE TABLE group_posts (
+    id STRING PRIMARY KEY,
+    authorID STRING REFERENCES users(id),
+    groupID STRING REFERENCES groups(id),
+    body STRING
+  )
+#+END_SRC
+
+Rows in ~skdb_access~ that might look like:
+
+| from_table  | to_table | from_col | id      | permission | user_group                  |
+|-------------+----------+----------+---------+------------+-----------------------------|
+| group_posts | users    | authorID | USERID  | read       | GROUPID_FOR_JUST_USERID     |
+| group_posts | users    | authorID | USERID  | insert     | GROUPID_FOR_JUST_USERID     |
+| group_posts | users    | authorID | USERID  | delete     | GROUPID_FOR_JUST_USERID     |
+| group_posts | groups   | groupID  | GROUPID | read       | GROUPID_FOR_GROUPID_MEMBERS |
+| group_posts | groups   | groupID  | GROUPID | insert     | GROUPID_FOR_GROUPID_MEMBERS |
+| group_posts | groups   | groupID  | GROUPID | delete     | GROUPID_FOR_GROUPID_ADMINS  |
+
+Then when we're computing read or delete rules, in this case we OR
+them together. So the author can always read their post, even if they
+leave the group. The author or admins can delete the post.
+
+But we AND together insert rules. To insert a post in to a group you
+must be the USER you're claiming is the author AND you must be a
+member of the group.
+
+We will need a way of encoding these boolean expressions for the FK
+relations in a table. Maybe this is done through a virtual view?
+
+With expressions per table like this we could make it so that only the
+author of a comment can delete the comment OR the post author.
+
+That's the gist of the idea. An intuition for it is: all new data is
+added to the existing graph, and we encode who can add to the graph by
+setting rules on the edges/relations. We control who can read data by
+specifying who can traverse an edge. And likewise with deletes.
+
+* Appendix
+
+- How does the system bootstrap?
+  - Probably all tables should have at least one foreign key so that
+    there is always a privacy rule applied. Only the root user can
+    create rows in tables that don't have FKs. These become 'roots' in
+    the graph. You can use this to hang initial nodes off of, but only
+    if the insert rules check out. So, for example, the root user
+    probably creates a user row and then that user can start inserting
+    data with themselves as an author field.
+
+- Does this allow for users to manage this all locally?
+
+  - Yes.
+
+  - Checking for read permission is done by the server. We don't need
+    to send down skdb_access rows to users. So the privacy rules are
+    always private.
+
+  - You should be allowed to insert rows in to skdb_access about a row
+    if and only if you're allowed to write that row. Intuition: if
+    you're allowed to write a row you should be allowed to specify the
+    privacy around it.
+
+  - Deletes should be automatic. If you delete a row, the privacy
+    rules about it should be deleted for you. So you could do deletes
+    or updates by re-writing a row and the rules around it at once.
+
+  - In all 3 scenarios we don't /need/ to share the rules with another
+    user. We might want to share something cut down though so that
+    this stuff can be checked locally. Just how the rules apply to
+    this user.
+
+- Isn't that a lot of rows in the skdb_access table?
+
+  - Maybe. These rules need to be encoded somewhere. We can use NULLs
+    in skdb_access to specify defaults so not every single object and
+    possible relation needs to be specified. We can probably optimise
+    this data structure.
+
+- If all tables have PKs and FKs, do we end up with LWW everywhere?
+
+  - Yes. But it's trivial to emulate our current non-pk conflict model
+    using sid() for yourself.
