@@ -4,6 +4,7 @@ OLEVEL=-O2
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc
 CC64FLAGS=$(OLEVEL) -DSKIP64
 
+# NB: this MUST be the same as CRELFILES in prelude/build.mk
 CFILES=\
 	copy.c \
 	free.c \
