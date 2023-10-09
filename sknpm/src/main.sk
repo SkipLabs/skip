@@ -197,7 +197,7 @@ fun main(): void {
         .about("Use verbose output")
         .global(),
     );
-  suppliers = Array[build, test, runner, publish, Skargo.help];
+  suppliers = Array[checker, build, test, runner, publish, Skargo.help];
   commands = mutable Map[];
   for (supplier in suppliers) {
     (subcommand, cmdFn) = supplier();
@@ -236,6 +236,21 @@ fun main(): void {
       skipExit(0)
     }
   };
+}
+
+/********* Check **********/
+
+fun checker(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("check").short("c").about("Run tsc on ts source files"),
+    args ~> Skargo.envCmd(args, execCheck),
+  )
+}
+
+fun execCheck(_args: Cli.ParseResults, env: Skargo.Env): void {
+  tsDir = Path.join(env.rootDir, "ts/src");
+  invariant(FileSystem.exists(tsDir), "No typescript source");
+  tsc(tsDir, env.verbose);
 }
 
 /********* Build **********/
@@ -509,12 +524,7 @@ fun manage(
 
   tsconfig = Path.join(tsDir, "tsconfig.json");
   FileSystem.writeTextFile(tsconfig, tsConfig(dependencies.map(d -> d.name)));
-  Skargo.run(
-    Array["npm", "i", "--prefix", tsDir, "--save-dev", "@types/node"],
-    bc.env.verbose,
-  );
-  Skargo.run(Array["tsc", "--project", tsconfig], bc.env.verbose);
-
+  tsc(tsDir, bc.env.verbose);
   jsDir = Path.join(tsDir, "js");
   invariant(FileSystem.exists(jsDir), "Invalid typescript build");
   // TODO: manage subdirectories
@@ -693,6 +703,15 @@ fun tsConfig(deps: Vector<String>): String {
   stream = mutable Vector[];
   config.writeToStream(stream.push, 2);
   stream.join("")
+}
+
+fun tsc(tsDir: String, verbose: Bool): void {
+  tsconfig = Path.join(tsDir, "tsconfig.json");
+  Skargo.run(
+    Array["npm", "i", "--prefix", tsDir, "--save-dev", "@types/node"],
+    verbose,
+  );
+  Skargo.run(Array["tsc", "--project", tsconfig], verbose);
 }
 
 fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
