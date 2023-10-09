@@ -565,7 +565,7 @@ type MuxStreamReset = {
 }
 type MuxMessage = MuxAuth | MuxGoaway | MuxStreamData | MuxStreamClose | MuxStreamReset;
 
-interface Creds {
+export interface Creds {
   accessKey: string,
   privateKey: CryptoKey,
   deviceUuid: string,
