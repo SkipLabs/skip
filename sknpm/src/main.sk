@@ -450,15 +450,19 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
     })
   };
   processes = mutable Vector<Int>[];
+  done = mutable Set<String>[];
   environment = mutable Map<String, String>[];
   services.each(s -> {
-    runService(
-      Path.join(targetDir, s),
-      bc.env.manifest.path,
-      processes,
-      environment,
-      bc.env.verbose,
-    )
+    if (!done.contains(s)) {
+      runService(
+        Path.join(targetDir, s),
+        bc.env.manifest.path,
+        processes,
+        environment,
+        bc.env.verbose,
+      );
+      done.insert(s);
+    }
   });
   Environ.set_current_dir(targetDir);
   environment.each(Environ.set_var);
@@ -509,9 +513,9 @@ fun runService(
     if (verbose) {
       print_error(`>> ${cmd.join(" ")}`)
     };
-    p = System.subprocess(cmd);
+    p = System.subprocess(cmd, s -> if (verbose) print_raw(s));
     if (verbose || !p.success()) {
-      print_raw(p.stdout);
+      if (!verbose) print_raw(p.stdout);
       print_error_raw(p.stderr);
     };
     if (!p.success()) {
@@ -529,7 +533,7 @@ fun runService(
           | s if (s.startsWith("sknpm.env:")) ->
             envName = s.split(":")[1];
             envValue = elems.drop(1).join("=");
-            environment.add(envName, envValue)
+            environment.set(envName, envValue)
           | _ -> print_error("Unmanaged command: " + line)
           }
         } else {
