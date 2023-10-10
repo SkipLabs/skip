@@ -3329,17 +3329,30 @@ fun expr_(
     } else {
       A.Dot(expr(context, env, e), field_name)
     }
-  | A.Dot((_, A.Cstr(cname, tyl)), field_name) ->
+  | A.Dot(e @ (_, A.Cstr(cname, tyl)), field_name) ->
     tyl1 = tyl.map(cur1 -> type(context, env, cur1));
-    check_module(context, env, cname, field_name);
-    expanded_name = make_dotted_name(env, pos, cname, field_name);
-    if (
-      is_uppercase(field_name) &&
-      !is_const_name(context, env, cname, field_name)
-    ) {
-      A.Cstr(expanded_name, tyl1)
-    } else {
-      A.Var(expanded_name)
+    SkipError.doWithError(() ->
+      check_module(context, env, cname, field_name)
+    ) match {
+    | Success _ ->
+      expanded_name = make_dotted_name(env, pos, cname, field_name);
+      if (
+        is_uppercase(field_name) &&
+        !is_const_name(context, env, cname, field_name)
+      ) {
+        A.Cstr(expanded_name, tyl1)
+      } else {
+        A.Var(expanded_name)
+      }
+    | Failure(errors) ->
+      (_, cname_str) = cname;
+      if (current_defs_names(context, env).containsClass(cname_str)) {
+        // Don't error out if there is a class by the same name in scope
+        // so as to produce clearer error messages
+        A.Dot(expr(context, env, e), field_name)
+      } else {
+        throw SkipError.SkipErrorException{errors}
+      }
     }
   | A.Dot(e, n) -> A.Dot(expr(context, env, e), n)
   | A.StaticDot(e, n) -> A.StaticDot(expr(context, env, e), n)
