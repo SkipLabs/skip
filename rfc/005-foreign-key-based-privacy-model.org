@@ -246,3 +246,75 @@ specifying who can traverse an edge. And likewise with deletes.
 
   - Yes. But it's trivial to emulate our current non-pk conflict model
     using sid() for yourself.
+
+* A worked example demonstrating virtual views and aggregation
+
+Let's look at how an auction might work. Here we want to share derived
+data in the form of a virtual view with some users.
+
+We have the following schema.
+
+#+BEGIN_SRC sql
+  CREATE TABLE auctions (
+    id STRING PRIMARY KEY,
+    creator STRING REFERENCES users(id),
+    ends_at INTEGER NOT NULL,
+    ...
+  );
+
+  CREATE TABLE bids (
+    id STRING PRIMARY KEY,
+    auction STRING REFERENCES auctions(id),
+    bidder STRING REFERENCES users(id),
+    amount INTEGER NOT NULL,
+    ...
+  );
+#+END_SRC
+
+Representing the graph:
+
+#+BEGIN_EXAMPLE
+   auction *--------->* users
+           ^          ^
+           |          |
+      bids *----------+
+#+END_EXAMPLE
+
+Then we define the ~winners~ vitual view on the server:
+
+#+BEGIN_SRC sql
+  CREATE VIRTUAL VIEW winners AS
+    SELECT
+      id as auction,
+      max_by(amount, bidder) as winner,
+      max(amount) as winning_bid
+    FROM auctions
+    WHERE ends_at < now()
+    GROUP BY id
+#+END_SRC
+
+Let's say we want the privacy to be that only the winner and the
+auction creator can see the row for the winner of an auction. We would
+write the following in to ~skdb_access~ and specify that the auction
+field and the winner field are ORd together for ~winners~.
+
+| from_table | to_table | from_col | id            | permission | user_group                              |
+|------------+----------+----------+---------------+------------+-----------------------------------------|
+| winners    | auctions | auction  | AN_AUCTION_ID | read       | GROUPID_FOR_JUST_AUCTION_CREATOR_USERID |
+| winners    | users    | winner   | A_USER_ID     | read       | GROUPID_FOR_JUST_USER_ID                |
+
+NOTE that:
+
+- we only need to define read permission as winners is a view and can
+  only be read.
+
+- these rows are written when the auctions row is written or the users
+  row is written. We don't need to worry about virtual views managing
+  privacy. In other words: the user that creates the data specifies
+  the privacy of that data. Downstream tables that reference multiple
+  pieces of data specify how that is combined at table/view creation
+  time.
+
+- neither the auction winner nor the auction creator control the
+  privacy in entirety. They both are guaranteed to be able to see the
+  result.
