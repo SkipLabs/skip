@@ -36,6 +36,10 @@ export default defineConfig({
       testMatch: /node.play.server.ts/,
     },
     {
+      name: 'mux_nodejs',
+      testMatch: /node.play.mux.ts/,
+    },
+    {
       name: 'client_chromium',
       use: { ...devices['Desktop Chrome'] },
       testMatch: /browser.play.ts/,
@@ -46,6 +50,11 @@ export default defineConfig({
       testMatch: /browser.play.server.ts/,
     },
     {
+      name: 'mux_chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /browser.play.mux.ts/,
+    },
+    {
       name: 'client_firefox',
       use: { ...devices['Desktop Firefox'] },
       testMatch: /browser.play.ts/,
@@ -54,6 +63,11 @@ export default defineConfig({
       name: 'server_firefox',
       use: { ...devices['Desktop Firefox'] },
       testMatch: /browser.play.server.ts/,
+    },
+    {
+      name: 'mux_firefox',
+      use: { ...devices['Desktop Firefox'] },
+      testMatch: /browser.play.mux.ts/,
     },
 
     // {
