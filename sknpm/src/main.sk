@@ -409,10 +409,7 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
   _ = buildIfNeeded(bc, !customTests);
   _ = manage(bc, Package::create(env.manifest), None());
   if (customTests) {
-    Skargo.run(
-      Array["rsync", "-ax", "--exclude", "node_modules", tests, bc.targetDir],
-      env.verbose,
-    );
+    syncDirs(tests, targetDir, Set["node_modules"], bc.env.verbose);
   } else {
     saveArchive(bc.targetDir);
   };
@@ -1321,6 +1318,60 @@ fun run(args: Array<String>, verbose: Bool): String {
   };
   p = System.subprocess(args);
   p.stdout
+}
+
+fun syncDirs(
+  fromDir: String,
+  toDir: String,
+  exclude: Set<String>,
+  verbose: Bool,
+): void {
+  _ = system("mkdir -p " + toDir);
+  FileSystem.readFilesRecursive(
+    fromDir,
+    _f -> true,
+    src -> {
+      if (!exclude.contains(Path.basename(src))) {
+        relative(src, fromDir).each(rp -> {
+          dst = Path.join(toDir, rp);
+          _ = system("mkdir -p " + Path.basename(dst));
+        });
+        true
+      } else {
+        false
+      }
+    },
+  ).each(src ->
+    relative(src, fromDir).each(rp -> {
+      dst = Path.join(toDir, rp);
+      if (isYoungerThan(src, dst)) {
+        cmd = "cp " + src + " " + dst;
+        if (verbose) {
+          print_error(`>> ${cmd}`)
+        };
+        _ = system(cmd)
+      }
+    })
+  )
+}
+
+fun mtime(path: String): ?Int {
+  if (FileSystem.exists(path)) {
+    p = System.subprocess(Array["stat", "-c", "%Y", path]);
+    if (!p.success()) {
+      None()
+    } else {
+      p.stdout.trim().toIntOption()
+    }
+  } else {
+    None()
+  }
+}
+
+fun isYoungerThan(file1: String, file2: String): Bool {
+  optTime1 = mtime(file1);
+  optTime2 = mtime(file2);
+  optTime1.isNone() || optTime2.isNone() || optTime1 > optTime2
 }
 
 @cpp_extern("SKIP_sknpm_save_sk_tests_ts")
