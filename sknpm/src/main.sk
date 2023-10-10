@@ -776,7 +776,6 @@ fun manage(
   stream = mutable Vector[];
   npmPackageContents.writeToStream(stream.push, 2);
   FileSystem.writeTextFile(npmPackageFile, stream.join(""));
-  Skargo.run(Array["rm", "-rf", tsDir], bc.env.verbose);
   npmDir
 }
 
@@ -808,6 +807,7 @@ fun tsConfig(deps: Vector<String>): String {
           "sourceMap" => JSON.Bool(true),
           "declaration" => JSON.Bool(true),
           "declarationMap" => JSON.Bool(true),
+          "incremental" => JSON.Bool(true),
           "moduleResolution" => JSON.String("Node"),
         ],
       ),
