@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createContext, useContext } from 'react';
 import type { SKDB } from 'skdb'
 
-const SKDBContext = createContext<SKDB|undefined>(undefined);
+export const SKDBContext = createContext<SKDB|undefined>(undefined);
 
 export function SKDBProvider({ children, skdb }: { children: React.ReactNode, skdb: SKDB }) {
   return (
@@ -31,6 +31,7 @@ export function useQuery(
   const [state, setState] = useState(defaultRows);
 
   const deps = Object.values(params);
+  deps.push(skdb);
   deps.push(query);
 
   useEffect(() => {
