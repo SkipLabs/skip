@@ -109,13 +109,18 @@ fun errorAllExistingSubs(
   dir: SKStore.DirName,
 ): void {
   context.sessions.values().each(sub ->
-    if (sub.dirName == dir && sub.destinationSource is Some _) {
-      setFinalState(context, sub.destinationSource.fromSome(), RSError());
-      lock = SKStore.unfreezeLock(sub.lock);
-      SKStore.mutexLock(lock);
-      cond = SKStore.unfreezeCond(sub.cond);
-      _ = SKStore.condBroadcast(cond);
-      SKStore.mutexUnlock(lock)
+    if (sub.destinationSource is Some _) {
+      for (dirSub in sub.dirSubs) {
+        if (dirSub.dirName == dir) {
+          setFinalState(context, sub.destinationSource.fromSome(), RSError());
+          lock = SKStore.unfreezeLock(sub.lock);
+          SKStore.mutexLock(lock);
+          cond = SKStore.unfreezeCond(sub.cond);
+          _ = SKStore.condBroadcast(cond);
+          SKStore.mutexUnlock(lock);
+          return void
+        }
+      }
     }
   )
 }
@@ -341,12 +346,12 @@ fun getViewsDir(
 /*****************************************************************************/
 
 class SubRequestFile(
-  viewName: String,
-  viewDirName: SKStore.DirName,
+  viewNames: Array<String>,
+  format: OutputFormatKind,
   init: Bool,
   cmd: SKStore.CmdKind,
   sessionID: Int,
-  ignoreSource: ?Int,
+  destinationSource: ?Int,
 ) extends SKStore.File
 
 fun getSubsDirs(
@@ -368,73 +373,85 @@ fun getSubsDirs(
     subsOutput,
     (context, writer, key, values) ~> {
       request = SubRequestFile::type(values.first);
-      viewName = request.viewName;
-      cmd = request.cmd;
-      init = request.init;
-      sessionID = request.sessionID;
       tableDir = getTableDir(context);
-      (edir, dirDescr) = tableDir.maybeGet(
-        context,
-        SKStore.SID(viewName),
-      ) match {
-      | None() ->
-        views = SKDB.getViewsDir(context);
-        viewsDir = context.unsafeGetEagerDir(views.dirName);
-        selectFiles = viewsDir.getArrayRaw(SKStore.SID(viewName.toString()));
-        invariant(selectFiles.size() <= 1);
-        if (selectFiles.size() == 0) {
-          print_error(`Error: view ${viewName.toString()} doesn't exists`);
-          skipExit(3)
-        };
-        selectFile = SKDB.SelectFile::type(selectFiles[0]);
-        if (!selectFile.virtual) {
-          print_error("Error: can only connect to virtual views");
-          skipExit(23);
-        };
-        cselect = selectFile.cselect;
-        selectDir = SKDB.evalSelect(context, cselect, None());
-        edir = context.unsafeGetEagerDir(selectDir.dirName);
-        dirDescr = Compiler::getDirDescr(
-          selectFile.sparams,
-          cselect.from,
-          cselect.params,
-          Name::create(selectDir.dirName.toString()),
-          selectDir.dirName,
-        );
-        (edir, dirDescr)
-      | Some(dirDescr) ->
-        edir = context.unsafeGetEagerDir(dirDescr.dirName);
-        (edir, dirDescr)
-      };
-      reset = (_, _) ~> false;
-      alwaysTrue = (_baseName ~> true);
-      filter = request.ignoreSource match {
-      | None() -> (_context, _isReset) ~> alwaysTrue
-      | Some(inputSrc) ->
-        (context, isReset) ~> {
-          if (isReset) return alwaysTrue;
-          tdir = context.unsafeGetEagerDir(dirDescr.dirName);
-          ignoredSrc = SKStore.Source::create(
-            SKStore.Path(dirDescr.dirName, SKStore.IID(inputSrc)),
+      dirSubs = request.viewNames.map(viewName -> {
+        (edir, dirDescr) = tableDir.maybeGet(
+          context,
+          SKStore.SID(viewName),
+        ) match {
+        | None() ->
+          views = SKDB.getViewsDir(context);
+          viewsDir = context.unsafeGetEagerDir(views.dirName);
+          selectFiles = viewsDir.getArrayRaw(SKStore.SID(viewName.toString()));
+          invariant(selectFiles.size() <= 1);
+          if (selectFiles.size() == 0) {
+            print_error(`Error: view ${viewName.toString()} doesn't exists`);
+            skipExit(3)
+          };
+          selectFile = SKDB.SelectFile::type(selectFiles[0]);
+          if (!selectFile.virtual) {
+            print_error("Error: can only connect to virtual views");
+            skipExit(23);
+          };
+          cselect = selectFile.cselect;
+          selectDir = SKDB.evalSelect(context, cselect, None());
+          edir = context.unsafeGetEagerDir(selectDir.dirName);
+          dirDescr = Compiler::getDirDescr(
+            selectFile.sparams,
+            cselect.from,
+            cselect.params,
+            Name::create(selectDir.dirName.toString()),
+            selectDir.dirName,
           );
-          (file: SKStore.Key) -> {
-            rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
-            !updateIsFromIgnoredSource(ignoredSrc, rows)
+          (edir, dirDescr)
+        | Some(dirDescr) ->
+          edir = context.unsafeGetEagerDir(dirDescr.dirName);
+          (edir, dirDescr)
+        };
+        alwaysTrue = (_baseName ~> true);
+        filter = request.destinationSource match {
+        | None() -> (_context, _isReset) ~> alwaysTrue
+        | Some(inputSrc) ->
+          (context, isReset) ~> {
+            if (isReset) return alwaysTrue;
+            tdir = context.unsafeGetEagerDir(dirDescr.dirName);
+            ignoredSrc = SKStore.Source::create(
+              SKStore.Path(dirDescr.dirName, SKStore.IID(inputSrc)),
+            );
+            (file: SKStore.Key) -> {
+              rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
+              !updateIsFromIgnoredSource(ignoredSrc, rows)
+            }
           }
-        }
-      };
+        };
+
+        format = request.format match {
+        | SKDB.OFK_CSV() -> SKStore.OCSV()
+        | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, edir.dirName))
+        | SKDB.OFK_SQL() -> SKStore.OSQL()
+        | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, edir.dirName))
+        | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, edir.dirName))
+        };
+
+        SKStore.DirSub(
+          edir.dirName,
+          viewName,
+          format,
+          (context) ~>
+            getWatermark(context, viewName, request.destinationSource),
+          filter,
+        )
+      });
+
       context.subscribe(
         context,
-        edir.dirName,
-        sessionID,
-        cmd,
-        init,
-        reset,
-        filter,
-        (context) ~> getWatermark(context, viewName, request.ignoreSource),
-        request.ignoreSource,
+        request.sessionID,
+        request.init,
+        request.cmd,
+        request.destinationSource,
+        dirSubs,
       );
-      writer.set(key, SKStore.IntFile(sessionID))
+      writer.set(key, SKStore.IntFile(request.sessionID))
     },
   );
   (input, output)
