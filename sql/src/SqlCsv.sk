@@ -187,65 +187,52 @@ fun lwwEdits(
 ): mutable Iterator<
   (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
 > {
+  !context = context.mclone();
   primaryIdx = primaryIdxOpt match {
   | None() -> invariant_violation("Using LWW without a primary key.")
   | Some(p) -> p
   };
-  selectAst = SKDB.Select{
-    id => SKDB.Name::create("SELECT_" + SKStore.genSym(0)),
-    pos => 0,
-    params => Array[SKDB.SelectStar(None())],
-    from => Some(Array[SKDB.TableName(SKDB.FName(table.name), None(), false)]),
-    where => Some(
-      SKDB.BinOp(
-        SKDB.OEq(),
-        SKDB.Identifier(table.colNames[primaryIdx]),
-        table.schema[primaryIdx].ty match {
-        | SKDB.INTEGER() -> SKDB.VInt(row.getInt(primaryIdx).fromSome())
-        | SKDB.FLOAT() -> SKDB.VFloat(row.getFloat(primaryIdx).fromSome())
-        | SKDB.TEXT() -> SKDB.VString(row.getString(primaryIdx).fromSome())
-        },
-      ),
-    ),
-    groupBy => None(),
-    having => None(),
-    join => None(),
-    distinct => false,
-    limit => None(),
-    orderBy => None(),
-    rest => None(),
-  };
-  options = SKDB.Options{
-    alwaysAllowJoins => false,
-    backtrace => false,
-    sync => false,
-    showUsedIndexes => false,
-  };
-  // empty params since no placeholders in skdb diff write-csv
-  params: Map<String, SKDB.Value> = Map[];
-  compiler = SKDB.Compiler::create(false, options, selectAst.pos, params);
-  selectContext = context.mclone(); // ensure we don't accumulate the select dirs
-  select = compiler.compileSelect(selectContext, selectAst, true);
-  selectHandle = SKDB.evalSelect(selectContext, select, None());
-  selectDir = selectContext.unsafeGetEagerDir(selectHandle.dirName);
-
+  indexEntry = SKDB.makeIndexEntry(table.name, primaryIdx);
+  indexTable = SKDB.getIndexByColNbr(context);
+  indexes = indexTable.unsafeGetArray(context, indexEntry);
+  invariant(indexes.size() > 0);
+  index = indexes[0];
+  indexDir = context.unsafeGetEagerDir(index.dirName);
+  primaryKey = row.getValue(primaryIdx);
+  startKey = SKDB.RowKey::create(
+    SKDB.RowValues::create(Array[primaryKey], 1),
+    index.fields,
+  );
   entries = mutable Vector[];
 
   keepingCurrent = false;
-  selectDir.unsafeIterKeys((key, _tick) -> {
+  iter = indexDir.unsafeGetFileIter(Some(startKey));
+  loop {
+    (key, valueIter) = iter.next() match {
+    | None() -> break void
+    | Some(x) -> x
+    };
+    rowKey = SKDB.RowKey::keyType(key);
+    valueIter.next() match {
+    | None() -> continue
+    | _ -> void
+    };
+    if (rowKey.row.getValue(0) != primaryKey) break void;
+
     for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
       if (
         tick.value < snapshot ||
         source.path() == writer ||
-        SKDB.RowKey::keyType(key).row < row
+        rowKey.row < row
       ) {
         entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
       } else {
         !keepingCurrent = true;
-        return void;
+        break void;
       }
-    };
-  });
+    }
+  };
+
   if (!keepingCurrent) {
     for (entry in entries) yield entry;
     yield (

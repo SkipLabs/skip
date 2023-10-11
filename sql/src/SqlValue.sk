@@ -31,9 +31,10 @@ fun compareRows(
   xsize = x.size();
   ysize = y.size();
   for (i in Range(0, kinds.size())) {
-    if (i >= xsize) return LT();
-    if (i >= ysize) return GT();
     (idx, direction, _ty) = kinds[i];
+    if (idx >= xsize && idx >= ysize) return EQ();
+    if (idx >= xsize) return LT();
+    if (idx >= ysize) return GT();
     value1 = x.getValue(idx);
     value2 = y.getValue(idx);
     (value1, value2) match {
