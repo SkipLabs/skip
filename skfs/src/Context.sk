@@ -19,7 +19,7 @@ class ToWrite(DirName, Key, readonly Context ~> Array<File>)
 
 base class CmdKind {
   children =
-  | NUpdates(OutputFormat, String)
+  | NUpdates(String)
   | NNotify(String)
   | NTail()
 }
@@ -28,11 +28,18 @@ value class Sub(
   lock: Mutex,
   cond: Condition,
   cmd: CmdKind,
+  destinationSource: ?Int,
+  dirSubs: Array<DirSub>,
+)
+
+class DirSub(
   dirName: DirName,
-  reset: (SKStore.Context, SKStore.Tick) ~> Bool,
+  entity: String,
+  format: OutputFormat,
+  // TODO: once we're x-table everywhere, this should not be dir-specific
   getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
+  // this is a dir-specific filter
   filter: (SKStore.Context, Bool) ~> (Key -> Bool) = (_, _) ~> (_ -> true),
-  destinationSource: ?Int = None(),
 )
 
 /*****************************************************************************/
@@ -300,31 +307,29 @@ mutable class Context{
 
   mutable fun subscribe(
     context: mutable Context,
-    dirName: DirName,
     sessionId: Int,
-    cmd: CmdKind,
     init: Bool,
-    reset: (SKStore.Context, SKStore.Tick) ~> Bool,
-    filter: (Context, Bool) ~> (Key -> Bool),
-    getDestinationWatermark: (readonly Context) ~> ?Tick,
+    cmd: CmdKind,
     destinationSource: ?Int,
+    dirSubs: Array<DirSub>,
   ): void {
     sub = Sub(
       mutexCreate(),
       condCreate(),
       cmd,
-      dirName,
-      reset,
-      getDestinationWatermark,
-      filter,
       destinationSource,
+      dirSubs,
     );
+
+    // TODO:
     if (init) {
-      tick0 = Tick(0);
-      dir = this.unsafeGetEagerDir(dirName);
-      (isReset, changes) = dir.getChangesAfter(tick0);
-      dir.notify(context, sub, isReset, changes, tick0);
+      // tick0 = Tick(0);
+      // dir = this.unsafeGetEagerDir(dirName);
+      // (isReset, changes) = dir.getChangesAfter(tick0);
+      // dir.notify(context, sub, isReset, changes, tick0);
+      void
     };
+
     context.!sessions[sessionId] = sub;
   }
 
@@ -786,13 +791,67 @@ mutable class Context{
     };
     if (this.tick == start) return void;
     for (_ => sub in this.sessions) {
-      dirName = sub.dirName;
-      if (!changedDirNames.contains(dirName)) continue;
-      this.unsafeMaybeGetDir(dirName) match {
-      | Some(dir @ EagerDir _) ->
-        (isReset, changes) = dir.getChangesAfter(start);
-        _ = dir.notify(this.clone(), sub, isReset, changes, start)
-      | _ -> void
+      // TODO: can we not do any of this if not necessary?
+      lock = unfreezeLock(sub.lock);
+      sub.cmd match {
+      | NUpdates(filename) ->
+          mutexLock(lock);
+        file = IO.File::open(
+          filename,
+          IO.OpenOptions{
+            write => true,
+            create => true,
+            append => true,
+            mode => 0o777,
+          },
+        );
+        o = x -> file.write_all(x);
+        writer = mutable Debug.BufferedWriter(o, 4096);
+
+        // TODO: factor out this pattern so that diff and tail can use it too
+        producedAnyOutput = false;
+        for (dirSub in sub.dirSubs) {
+          dirName = dirSub.dirName;
+          if (!changedDirNames.contains(dirName)) continue;
+          this.unsafeMaybeGetDir(dirName) match {
+          | Some(dir @ EagerDir _) ->
+              (isReset, changes) = dir.getChangesAfter(start);
+            ctx = this.clone();
+            producedOutput = dir.writeDiff(
+              ctx,
+              isReset,
+              changes,
+              writer,
+              dirSub.entity,
+              dirSub.format,
+              dirSub.filter,
+              dirSub.getDestinationWatermark(ctx),
+            );
+            !producedAnyOutput = producedAnyOutput || producedOutput
+          | _ -> void
+          }
+        };
+        if (producedAnyOutput) {
+          // then we need to produce a checkpoint for flushing and committing
+          ourTime = this.tick.value.toString();
+          writer.write(`:${ourTime}\n`);
+          writer.flush();
+          flushStdout();        // TODO: this should be covered by writer.flush if it wraps stdout
+        };
+
+        file.close();
+        mutexUnlock(lock);
+      | NNotify(file) ->
+        // TODO: need to check if any of the dirsubs are affected
+          mutexLock(lock);
+        _ = unixNotify(file, Int32::truncate(start.value));
+        mutexUnlock(lock);
+      | NTail() ->
+        // TODO: need to check if any of the dirsubs are affected
+          mutexLock(lock);
+        cond = unfreezeCond(sub.cond);
+        _ = condBroadcast(cond);
+        mutexUnlock(lock);
       }
     }
   }

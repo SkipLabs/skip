@@ -1461,11 +1461,8 @@ class StdoutFile(
 ) extends SKStore.File
 
 class StdoutDiff(
-  format: SKStore.OutputFormat,
-  dirName: SKStore.DirName,
-  time: SKStore.Tick,
-  filter: (SKStore.Context, Bool) ~> (SKStore.Key -> Bool),
-  getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
+  since: SKStore.Tick,
+  sub: SKStore.Sub,
 ) extends SKStore.File
 
 class StdoutCheckpointAck(time: SKStore.Tick) extends SKStore.File
@@ -1533,18 +1530,8 @@ fun printContext(context: mutable SKStore.Context): void {
     for (selectDir in stdout.toArray().reversed()) {
       showSelect(context, format, selectDir)
     }
-  | Some(StdoutDiff(format, dirName, time, filter, getWatermark)) ->
-    edir = context.unsafeGetEagerDir(dirName);
-    (isReset, changes) = edir.getChangesAfter(time);
-    _ = edir.writeDiffStdout(
-      context,
-      isReset,
-      changes,
-      print_raw,
-      format,
-      filter,
-      getWatermark(context),
-    )
+  | Some(StdoutDiff(_since, _sub)) ->
+      invariant_violation("diff not yet implemented")
 
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
