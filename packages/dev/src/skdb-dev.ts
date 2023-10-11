@@ -31,6 +31,7 @@ class DevServer {
   }
 
   async connect(skdb: SKDB, accessKey: string): Promise<SKDB> {
+    this.creds = await getCreds(this.host, this.port, this.database);
     const b64privateKey = this.creds.get(accessKey);
 
     if (b64privateKey === undefined) {
@@ -53,9 +54,6 @@ class DevServer {
     return skdb;
   }
 
-  // TODO:
-  async createUser() {}
-
   async schema(...stmts: string[]) {
     let resp;
     try {
@@ -75,8 +73,6 @@ class DevServer {
     if (resp.status == 201) {
       console.warn("[skdb] Auto-migrated data to a new schema on a new database. Other clients may still be connected to the old database and will not replicate with this client.")
     }
-
-    this.creds = await getCreds(this.host, this.port, this.database);
   }
 }
 
