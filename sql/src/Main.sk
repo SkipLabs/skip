@@ -193,7 +193,6 @@ untracked fun main(): void {
     .subcommand(
       Cli.Command("write-csv")
         .about("Write data from stdin into a directory in CSV format")
-        .arg(Cli.StringArg("table").positional().required().about("Table name"))
         .arg(
           Cli.StringArg("source").about(
             "Globally unique identity of this write stream",
@@ -791,23 +790,11 @@ fun execReplicationId(args: Cli.ParseResults, options: SKDB.Options): void {
 
 fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  name = SKDB.Name::create(args.getString("table"));
   source = args.maybeGetString("source") match {
   | Some(src) -> src.toInt()
   | None() -> SKStore.genSym(0)
   };
   SKDB.runSql(options, context ~> {
-    table = context.getGlobal("CSV_TABLE") match {
-    | None() ->
-      tableDescr = SKDB.getTable(context, 0, name);
-      context.setGlobal("CSV_TABLE", tableDescr);
-      tableDescr
-    | Some(x) -> SKDB.DirDescr::type(x)
-    };
-    line = context.getGlobal("Line") match {
-    | None() -> mutable Ref(1)
-    | Some(file) -> mutable Ref(SKStore.IntFile::type(file).value)
-    };
     user = args.maybeGetString("user");
     myReadLine = () -> {
       buffer = mutable Vector[];
@@ -817,7 +804,7 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
         buffer.push(c);
       }
     };
-    SKCSV.replayDiff(context, line, myReadLine, table, user, source)
+    SKCSV.replayDiff(context, myReadLine, user, source)
   })
 }
 
