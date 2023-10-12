@@ -1376,7 +1376,7 @@ class SKDBServer implements RemoteSKDB {
               // snapshot of the remote table, so should resolve the promise
               resolveSignalled = payload.split("\n").find(line => line.match(/^:[1-9]/g));
             }
-            return client.writeCsv(tableName, payload, this.replicationUid)
+            return client.writeCsv(payload, this.replicationUid)
           });
           if (!resolved && resolveSignalled) {
             resolved = true;
@@ -1417,7 +1417,7 @@ class SKDBServer implements RemoteSKDB {
         this.deliverDataTransferProtoMsg(msg, payload => {
           // we only expect acks back in the form of checkpoints.
           // let's store these as a watermark against the table.
-          client.writeCsv(metadataTable(tableName), payload, this.replicationUid);
+          client.writeCsv(payload, this.replicationUid);
         });
       }
     }
