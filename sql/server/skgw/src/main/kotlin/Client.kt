@@ -132,7 +132,6 @@ class SkdbConnection(
     val proc =
         local.writeCsv(
             user = "root",
-            table,
             replicationId.toString(),
             { bytes, shouldFlush ->
               // client does not send acks back to the server. but
