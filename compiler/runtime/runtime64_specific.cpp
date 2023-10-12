@@ -23,8 +23,13 @@
 #include <exception>
 #include <iostream>
 #include <map>
+#include <random>
 #include <string>
 #include <vector>
+
+extern "C" {
+#include "xoroshiro128plus.h"
+}
 
 #ifndef RELEASE
 #include <backtrace.h>
@@ -465,6 +470,17 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   }
 
   return 0;
+}
+
+void SKIP_random_init() {
+  std::random_device rd;
+  std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
+  uint64_t seed = dist(rd);
+  xoroshiro128plus_init(seed);
+}
+
+uint64_t SKIP_random_next() {
+  return xoroshiro128plus_next();
 }
 
 int64_t SKIP_time() {
