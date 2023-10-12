@@ -127,7 +127,6 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun writeCsv(
       user: String,
-      table: String,
       replicationId: String,
       callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
       closed: () -> Unit,
@@ -136,7 +135,6 @@ class Skdb(val name: String, private val dbPath: String) {
         ProcessBuilder(
             ENV.skdbPath,
             "write-csv",
-            table,
             "--data",
             dbPath,
             "--user",

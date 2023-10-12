@@ -189,7 +189,6 @@ class RequestHandler(
         val proc =
             skdb.writeCsv(
                 accessKey,
-                request.table,
                 replicationId,
                 { data, shouldFlush -> stream.send(ProtoData(data, shouldFlush)) },
                 { stream.error(2000u, "Unexpected EOF") })
