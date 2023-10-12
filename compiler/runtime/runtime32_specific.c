@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include <stdbool.h>
+#include "xoroshiro128plus.h"
 
 void __cxa_throw(void*, void*, void*);
 
@@ -171,6 +172,19 @@ void SKIP_flush_stdout() {
 uint64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   // Not implemented
   return 0;
+}
+
+uint32_t SKIP_js_get_entropy();
+
+void SKIP_random_init() {
+  uint32_t lo = SKIP_js_get_entropy();
+  uint32_t hi = SKIP_js_get_entropy();
+  uint64_t seed = (((uint64_t)hi) << 32) | ((uint64_t)lo);
+  xoroshiro128plus_init(seed);
+}
+
+uint64_t SKIP_random_next() {
+  return xoroshiro128plus_next();
 }
 
 void SKIP_exit(uint64_t code) {
