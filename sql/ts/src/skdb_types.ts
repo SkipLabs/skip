@@ -48,7 +48,7 @@ export interface SKDB {
 }
 
 export interface SkdbMechanism {
-  writeCsv: (table: string, payload: string, source: string) => void;
+  writeCsv: (payload: string, source: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
