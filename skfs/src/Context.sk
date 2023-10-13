@@ -808,7 +808,6 @@ mutable class Context{
         o = x -> file.write_all(x);
         writer = mutable Debug.BufferedWriter(o, 4096);
 
-        // TODO: factor out this pattern so that diff and tail can use it too
         producedAnyOutput = false;
         for (dirSub in sub.dirSubs) {
           dirName = dirSub.dirName;
@@ -836,7 +835,7 @@ mutable class Context{
           ourTime = this.tick.value.toString();
           writer.write(`:${ourTime}\n`);
           writer.flush();
-          flushStdout();        // TODO: this should be covered by writer.flush if it wraps stdout
+          flushStdout();
         };
 
         file.close();
