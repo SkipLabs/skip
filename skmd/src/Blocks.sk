@@ -208,12 +208,6 @@ class Accessor(
 
 mutable base class Entity uses HasClassName, Show
 
-class TextEntity(chars: Accessor) extends Entity {
-  fun toString(): String {
-    (this.getClassName(), this.chars.toString()).toString()
-  }
-}
-
 mutable base class BlockEntity extends Entity {
   // Returns: None() if the line is consumed
   //          Some(false) if the block shall stop and the line is not consumed
@@ -231,9 +225,9 @@ base class ListKind uses Equality, HasClassName, Show {
   | BulletList(_, kind) -> kind + 1
   | OrederedList(size) -> size + 2
 
-  fun toString(): String {
-    inspect(this).toString()
-  }
+  fun toString(): String
+  | BulletList(c, kind) -> `ul-${c}-${kind}`
+  | OrederedList(size) -> `ol-${size}`
 }
 
 mutable class ParagraphBlock(
@@ -446,7 +440,6 @@ mutable class ListBlock(
   }
 
   static fun create(line: Accessor): ?mutable this {
-    debug(("ListBlock", "create", line.toString()));
     (indent, sline) = line.checkIndent();
     static::getKind(sline).map(kind -> {
       lb = mutable ListBlock(indent, kind);
@@ -458,9 +451,6 @@ mutable class ListBlock(
 
   mutable fun check(line: Accessor): ?Bool {
     (indent, sline) = line.checkIndent();
-    debug(
-      (this.getClassName(), "check", line.toString(), indent, sline.toString()),
-    );
     if (
       indent < this.indent ||
       (indent == this.indent && ListBlock::getKind(sline).isSome())
@@ -468,12 +458,12 @@ mutable class ListBlock(
       return Some(false)
     };
     ListBlock::create(sline) match {
-      |Some(hb) -> 
-        this.optBlock.each(block -> {
-          this.entities.push(block.close());
-          this.!optBlock = Some(hb);
-        })
-      | _ -> this.manage(line.decr(this.indent));
+    | Some(hb) ->
+      this.optBlock.each(block -> {
+        this.entities.push(block.close());
+        this.!optBlock = Some(hb);
+      })
+    | _ -> this.manage(line.decr(this.indent))
     };
     None()
   }
