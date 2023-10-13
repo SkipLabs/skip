@@ -23,7 +23,8 @@ endif # ifdef PROFILE
 LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
 CC64FLAGS=$(OLEVEL) -DSKIP64
 
-# NB: this MUST be the same as CFILES in compiler/runtime/Makefile
+# NB: this MUST be kept in sync with CFILES in compiler/runtime/Makefile
+# and CRELFILES in prelude/build_wasm32.mk
 CRELFILES=\
 	runtime/copy.c \
 	runtime/free.c \
