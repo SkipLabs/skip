@@ -1439,7 +1439,7 @@ class SKDBServer implements RemoteSKDB {
       stream.expectingData();
     });
 
-    const session = client.subscribe(this.replicationUid, tableName, fileName);
+    const session = client.subscribe(this.replicationUid, [tableName], fileName);
 
     stream.onReconnect = () => {
       stream.send(encodeProtoMsg(request));
@@ -1495,7 +1495,7 @@ class SKDBServer implements RemoteSKDB {
     }
     let isViewOnRemote = await this.viewSchema(tableName) != "";
     // TODO: just assumes that if it exists the schema is the same
-    if (!await this.client.tableExists(tableName)) {
+    if (!this.client.tableExists(tableName)) {
       let createTable = await this.tableSchema(tableName);
       await Promise.all([
         this.client.exec(createTable),

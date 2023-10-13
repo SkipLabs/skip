@@ -649,8 +649,7 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)
-    | Some(s) if (s.dirSubs.size() == 1) ->
-      (s, s.dirSubs[0])
+    | Some(s) if (s.dirSubs.size() == 1) -> (s, s.dirSubs[0])
     | Some(_) ->
       print_error("Error: tail only supports a single dir sub currently");
       skipExit(2)
@@ -826,7 +825,9 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
     | _ -> SKStore.NTail()
     };
     (input, output) = SKDB.getSubsDirs(context);
-    viewKey = SKStore.SID(views.get(1));
+    viewKey = SKStore.SID(
+      views.maybeGet(0).fromSome("Must specify at least one view or table"),
+    );
     inputDir = context.unsafeGetEagerDir(input.dirName);
     sessionID = SKStore.genSym(0);
     request = SKDB.SubRequestFile(
