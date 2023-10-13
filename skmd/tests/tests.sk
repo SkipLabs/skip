@@ -78,7 +78,175 @@ fun block6(): void {
       "    + [Automatic Links](#autolink)",
       "    ",
     ].join("\n"),
-    "Array[(SKMD.ListBlock, 0, SKMD.BulletList(Char(42,\"*\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(45,\"-\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Philosophy](#philosophy)])]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(45,\"-\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Inline HTML](#html)])]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(45,\"-\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Escaping for Special Characters](#autoescape)])])]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(42,\"*\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Miscellaneous](#misc)]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(43,\"+\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Backslash Escapes](#backslash)])]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(43,\"+\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Links](#autolink),     ])])])]",
+    "Array[(SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line]), (SKMD.ListBlock, 0, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Philosophy](#philosophy)])]), (SKMD.ListBlock, 0, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Inline HTML](#html)])]), (SKMD.ListBlock, 0, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Escaping for Special Characters](#autoescape)])])]), (SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Miscellaneous](#misc)]), (SKMD.ListBlock, 0, ul-+-1, Array[(SKMD.ParagraphBlock, 0, Array[[Backslash Escapes](#backslash)])]), (SKMD.ListBlock, 0, ul-+-1, Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Links](#autolink),     ])])])]",
+  )
+}
+
+@test
+fun html1(): void {
+  convertToHTMLTest(
+    "This is [an example](http://example.com/ 'Title') inline link.",
+    `Vector[<p>
+  This is <a href="http://example.com/" title="Title">an example</a> inline link.
+</p>]`,
+  )
+}
+
+@test
+fun html2(): void {
+  convertToHTMLTest(
+    Array["# Markdown: Syntax", "other line", "", "paragraph"].join("\n"),
+    `Vector[<div md-kind="chapter" md-level="1">
+  <h1>
+    Markdown: Syntax
+    other line
+  </h1>
+  <p>
+    paragraph
+  </p>
+</div>]`,
+  )
+}
+
+@test
+fun html3(): void {
+  convertToHTMLTest(
+    Array[
+      "# Header 1.0",
+      "other line",
+      "",
+      "## Header 1.1",
+      "",
+      "paragraph 1.1",
+      "# Header 2.0",
+      "",
+      "paragraph 2.0",
+    ].join("\n"),
+    `Vector[<div md-kind="chapter" md-level="1">
+  <h1>
+    Header 1.0
+    other line
+  </h1>
+  <div md-kind="chapter" md-level="2">
+    <h2>
+      Header 1.1
+    </h2>
+    <p>
+      paragraph 1.1
+    </p>
+  </div>
+</div>, <div md-kind="chapter" md-level="1">
+  <h1>
+    Header 2.0
+  </h1>
+  <p>
+    paragraph 2.0
+  </p>
+</div>]`,
+  )
+}
+
+@test
+fun html4(): void {
+  convertToHTMLTest(
+    Array["> First line", "> Second line"].join("\n"),
+    `Vector[<div md-kind="blockquote">
+  <p>
+    First line
+    Second line
+  </p>
+</div>]`,
+  )
+}
+
+@test
+fun html5(): void {
+  convertToHTMLTest(
+    Array[
+      "```bash",
+      "git clone git@github.com:SkipLabs/task-board.git",
+      "```",
+      "",
+      "Next, jump into the directory you just created and start the application:",
+      "",
+      "```bash",
+      "cd task-board && yarn dev",
+      "```",
+      "",
+    ].join("\n"),
+    `Vector[<pre class="language-bash" md-level="3">
+<code class="language-bash" md-level="3">
+git clone git@github.com:SkipLabs/task-board.git
+</code>
+</pre>, <p>
+  Next, jump into the directory you just created and start the application:
+</p>, <pre class="language-bash" md-level="3">
+<code class="language-bash" md-level="3">
+cd task-board && yarn dev
+</code>
+</pre>]`,
+  )
+}
+
+@test
+fun html6(): void {
+  convertToHTMLTest(
+    Array[
+      "* [Overview](#overview)",
+      "A line",
+      "Other line",
+      "    - [Philosophy](#philosophy)",
+      "    - [Inline HTML](#html)",
+      "    - [Automatic Escaping for Special Characters](#autoescape)",
+      "* [Miscellaneous](#misc)",
+      "    + [Backslash Escapes](#backslash)",
+      "    + [Automatic Links](#autolink)",
+      "    ",
+    ].join("\n"),
+    `Vector[<ul>
+  <li md-kind="ul-*-1">
+    <p>
+      <a href="#overview">Overview</a>
+      A line
+      Other line
+    </p>
+    <ul>
+      <li md-kind="ul---1">
+        <p>
+          <a href="#philosophy">Philosophy</a>
+        </p>
+      </li>
+      <li md-kind="ul---1">
+        <p>
+          <a href="#html">Inline HTML</a>
+        </p>
+      </li>
+      <li md-kind="ul---1">
+        <p>
+          <a href="#autoescape">Automatic Escaping for Special Characters</a>
+        </p>
+      </li>
+    </ul>
+  </li>
+  <li md-kind="ul-*-1">
+    <p>
+      <a href="#misc">Miscellaneous</a>
+    </p>
+    <ul>
+      <li md-kind="ul-+-1">
+        <p>
+          <a href="#backslash">Backslash Escapes</a>
+        </p>
+      </li>
+      <li md-kind="ul-+-1">
+        <p>
+          <a href="#autolink">Automatic Links</a>
+              
+        </p>
+      </li>
+    </ul>
+  </li>
+</ul>]`,
   )
 }
 
@@ -88,585 +256,9 @@ fun parseToBlockTest(test: String, expect: String): void {
   T.expectEq(got, expect)
 }
 
-/*
-
-Array[
-  (
-    SKMD.ListBlock, 
-    0,
-    SKMD.BulletList,
-    Array[
-      (SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line]),
-      (SKMD.ListBlock, 0, SKMD.BulletList, 
-        Array[
-          (SKMD.ParagraphBlock, 0, Array[[Philosophy](#philosophy)])
-        ]
-      ),
-      (SKMD.ListBlock, 0, SKMD.BulletList, 
-        Array[
-          (SKMD.ParagraphBlock, 0, Array[[Inline HTML](#html)])
-        ]
-      ),
-      (SKMD.ListBlock, 0, SKMD.BulletList, 
-        Array[
-          (SKMD.ParagraphBlock, 0, Array[[Automatic Escaping for Special Characters](#autoescape)])
-        ]
-      )
-    ]
-  ),
-  (SKMD.ListBlock, 0, SKMD.BulletList, 
-    Array[
-      (SKMD.ParagraphBlock, 0, Array[[Miscellaneous](#misc)]),
-      (SKMD.ListBlock, 0, SKMD.BulletList, 
-        Array[
-          (SKMD.ParagraphBlock, 0, Array[[Backslash Escapes](#backslash)])
-        ]
-      ),
-      (SKMD.ListBlock, 0, SKMD.BulletList,
-        Array[
-          (SKMD.ParagraphBlock, 0, Array[[Automatic Links](#autolink),     ])
-        ]
-      )
-    ]
-  )
-]
-
-@test
-fun link(): void {
-  parseTest(
-    "This is [an example](http://example.com/ 'Title') inline link.",
-    Array[
-      SKMD.Block(
-        SKMD.KParagraph(),
-        Array[
-          Array[
-            SKMD.TEText("This is "),
-            SKMD.TELink("an example", "http://example.com/", Some("Title")),
-            SKMD.TEText(" inline link."),
-          ],
-        ],
-        0,
-      ),
-    ],
-  )
-}
-
-@test
-fun header1(): void {
-  parseTest(
-    "# Markdown: Syntax",
-    Array[SKMD.Header(1, Array[SKMD.TEText(" Markdown: Syntax")], 0)],
-  )@test
-fun blockquote1(): void {
-  parseTest(
-    "> First line\n> Second line",
-    Array[
-      SKMD.Block(
-        SKMD.KBlockQuotes(),
-        Array[
-          Array[SKMD.TEText("First line")],
-          Array[SKMD.TEText("Second line")],
-        ],
-        0,
-      ),
-    ],
-  )
-}
-    "## Block Elements # Just to see",
-    Array[
-      SKMD.Header(2, Array[SKMD.TEText(" Block Elements # Just to see")], 0),
-    ],
-  )
-}
-
-@test
-fun list(): void {
-  parseTest(
-    Array[
-      "*   [Overview](#overview)",
-      "A line",
-      "Other line",
-      "    *   [Philosophy](#philosophy)",
-      "    *   [Inline HTML](#html)",
-      "    *   [Automatic Escaping for Special Characters](#autoescape)",
-      "*   [Miscellaneous](#misc)",
-      "    *   [Backslash Escapes](#backslash)",
-      "    *   [Automatic Links](#autolink)",
-      "    ",
-    ].join("\n"),
-    Array[
-      SKMD.Block(
-        SKMD.KBullet(),
-        Array[
-          Array[SKMD.TELink("Overview", "#overview", None())],
-          Array[SKMD.TEText("A line")],
-          Array[SKMD.TEText("Other line")],
-        ],
-        0,
-      ),
-      SKMD.Block(
-        SKMD.KBullet(),
-        Array[Array[SKMD.TELink("Philosophy", "#philosophy", None())]],
-        4,
-      ),
-      SKMD.Block(
-        SKMD.KBullet(),
-        Array[Array[SKMD.TELink("Inline HTML", "#html", None())]],
-        4,
-      ),
-      SKMD.Block(
-        SKMD.KBullet(),
-        Array[
-          Array[
-            SKMD.TELink(
-              "Automatic Escaping for Special Characters",
-              "#autoescape",
-              None(),
-            ),
-          ],
-        ],
-        4,
-      ),
-      SKMD.Block(
-        SKMD.KBullet(),
-        Array[Array[SKMD.TELink("Miscellaneous", "#misc", None())]],
-        0,
-      ),
-      SKMD.Block(
-        SKMD.KBullet(),
-        Array[Array[SKMD.TELink(@test
-fun blockquote1(): void {
-  parseTest(
-    "> First line\n> Second line",
-    Array[
-      SKMD.Block(
-        SKMD.KBlockQuotes(),
-        Array[
-          Array[SKMD.TEText("First line")],
-          Array[SKMD.TEText("Second line")],
-        ],
-        0,
-      ),
-    ],
-  )
-}"Automatic Links", "#autolink", None())]],
-        4,
-      ),
-    ],
-  )
-}
-
-@test
-fun blockquote1(): void {
-  parseTest(
-    "> First line\n> Second line",
-    Array[
-      SKMD.Block(
-        SKMD.KBlockQuotes(),
-        Array[
-          Array[SKMD.TEText("First line")],
-          Array[SKMD.TEText("Second line")],
-        ],
-        0,
-      ),
-    ],
-  )
-}
-
-@test
-fun testList1(): void {
-  text = Array[
-    "1.    Privacy",
-    "    Fine grained privacy controls are built in. Control who should see the data and who can modify it.",
-    "2.    Support Offline",
-    "    Working with local data naturally makes your app work offline. SKDB reconnects are fast by transmitting only what has changed.",
-    "    ",
-    "    Conflict resolution is supported.",
-    "",
-  ].join("\n");
-  parseHTML(
-    text,
-    SKMD.HTMLElement(
-      "div",
-      Some(0),
-      Map[],
-      Vector[
-        SKMD.HTMLElement(
-          "ol",
-          None(),
-          Map[],
-          Vector[
-            SKMD.HTMLElement(
-              "li",
-              Some(0),
-              Map[],
-              Vector[
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(Array[SKMD.TEText("    Privacy")]),
-                    SKMD.HTMLText(
-                      Array[
-                        SKMD.TEText(
-                          "Fine grained privacy controls are built in. Control who should see the data and who can modify it.",
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SKMD.HTMLElement(
-              "li",
-              Some(0),
-              Map[],
-              Vector[
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(Array[SKMD.TEText("    Support Offline")]),
-                    SKMD.HTMLText(
-                      Array[
-                        SKMD.TEText(
-                          "Working with local data naturally makes your app work offline. SKDB reconnects are fast by transmitting only what has changed.",
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(
-                      Array[SKMD.TEText("Conflict resolution is supported.")],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    ),
-  )
-}
-
-@test
-fun testList2(): void {
-  parseHTML(
-    Array[
-      "1.    Effortless Reactivity",
-      "    Build your app by simply querying and modifying local data.",
-      "    ",
-      "    The latest state is always reflected in your UI, automatically.",
-      "2.    No Round-trips",
-      "    Build user experiences that are instantly responsive.",
-      "    ",
-      "    Not dealing with the network dramatically simplifies your code base.",
-      "3.    Incremental Engine",
-      "    Query results are updated as the data changes without re-running the query.",
-      "    ",
-      "    Powered by a new purpose-built engine. ",
-      "",
-    ].join("\n"),
-    SKMD.HTMLElement(
-      "div",
-      Some(0),
-      Map[],
-      Vector[
-        SKMD.HTMLElement(
-          "ol",
-          None(),
-          Map[],
-          Vector[
-            SKMD.HTMLElement(
-              "li",
-              Some(0),
-              Map[],
-              Vector[
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(
-                      Array[SKMD.TEText("    Effortless Reactivity")],
-                    ),
-                    SKMD.HTMLText(
-                      Array[
-                        SKMD.TEText(
-                          "Build your app by simply querying and modifying local data.",
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(
-                      Array[
-                        SKMD.TEText(
-                          "The latest state is always reflected in your UI, automatically.",
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SKMD.HTMLElement(
-              "li",
-              Some(0),
-              Map[],
-              Vector[
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(Array[SKMD.TEText("    No Round-trips")]),
-                    SKMD.HTMLText(
-                      Array[
-                        SKMD.TEText(
-                          "Build user experiences that are instantly responsive.",
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(
-                      Array[
-                        SKMD.TEText(
-                          "Not dealing with the network dramatically simplifies your code base.",
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SKMD.HTMLElement(
-              "li",
-              Some(0),
-              Map[],
-              Vector[
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(Array[SKMD.TEText("    Incremental Engine")]),
-                    SKMD.HTMLText(
-                      Array[
-                        SKMD.TEText(
-                          "Query results are updated as the data changes without re-running the query.",
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SKMD.HTMLElement(
-                  "p",
-                  None(),
-                  Map[],
-                  Vector[
-                    SKMD.HTMLText(
-                      Array[
-                        SKMD.TEText("Powered by a new purpose-built engine. "),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    ),
-  )
-}
-
-@test
-fun testCode1(): void {
-  parseHTML(
-    Array[
-      "```",
-      "git clone git@github.com:SkipLabs/task-board.git",
-      "```",
-      "",
-      "Next, jump into the directory you just created and start the application:",
-      "",
-      "```",
-      "cd task-board && yarn dev",
-      "```",
-      "",
-    ].join("\n"),
-    SKMD.HTMLElement(
-      "div",
-      Some(0),
-      Map[],
-      Vector[
-        SKMD.HTMLElement(
-          "pre",
-          None(),
-          Map[],
-          Vector[
-            SKMD.HTMLElement(
-              "code",
-              None(),
-              Map[],
-              Vector[
-                SKMD.HTMLCode(
-                  Array[
-                    'g',
-                    'i',
-                    't',
-                    ' ',
-                    'c',
-                    'l',
-                    'o',
-                    'n',
-                    'e',
-                    ' ',
-                    'g',
-                    'i',
-                    't',
-                    '@',
-                    'g',
-                    'i',
-                    't',
-                    'h',
-                    'u',
-                    'b',
-                    '.',
-                    'c',
-                    'o',
-                    'm',
-                    ':',
-                    'S',
-                    'k',
-                    'i',
-                    'p',
-                    'L',
-                    'a',
-                    'b',
-                    's',
-                    '/',
-                    't',
-                    'a',
-                    's',
-                    'k',
-                    '-',
-                    'b',
-                    'o',
-                    'a',
-                    'r',
-                    'd',
-                    '.',
-                    'g',
-                    'i',
-                    't',
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-        SKMD.HTMLElement(
-          "p",
-          None(),
-          Map[],
-          Vector[
-            SKMD.HTMLText(
-              Array[
-                SKMD.TEText(
-                  "Next, jump into the directory you just created and start the application:",
-                ),
-              ],
-            ),
-          ],
-        ),
-        SKMD.HTMLElement(
-          "pre",
-          None(),
-          Map[],
-          Vector[
-            SKMD.HTMLElement(
-              "code",
-              None(),
-              Map[],
-              Vector[
-                SKMD.HTMLCode(
-                  Array[
-                    'c',
-                    'd',
-                    ' ',
-                    't',
-                    'a',
-                    's',
-                    'k',
-                    '-',
-                    'b',
-                    'o',
-                    'a',
-                    'r',
-                    'd',
-                    ' ',
-                    '&',
-                    '&',
-                    ' ',
-                    'y',
-                    'a',
-                    'r',
-                    'n',
-                    ' ',
-                    'd',
-                    'e',
-                    'v',
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    ),
-  )
-}
-
-fun parseTest(test: String, expect: Array<SKMD.Element>): void {
-  got = SKMD.parse(test).collect(Array);
-  debug((got, expect));
+fun convertToHTMLTest(test: String, expect: String): void {
+  blocks = SKMD.parseToBlocks(test);
+  got = SKMD.convert(blocks).map(b -> b.toString()).toString();
+  print_error(got + "\n===============\n" + expect);
   T.expectEq(got, expect)
 }
-
-fun parseHTML(text: String, expect: SKMD.HTMLEntity): void {
-  builder = mutable SKMD.HTMLBuilder();
-  got = builder.convert(text, "div");
-  debug(got);
-  print_error(got.toString() + "\n===============\n" + expect.toString());
-  T.expectEq(got, expect)
-}
-
-fun formatHTML(text: String, expect: String): void {
-  builder = mutable SKMD.HTMLBuilder();
-  got = builder.convert(text, "div");
-  buffer = mutable Vector<String>[];
-  got.print(buffer, "");
-  debug((buffer.join("\n"), expect));
-  T.expectEq(buffer.join("\n"), expect)
-}*/

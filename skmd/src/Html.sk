@@ -96,7 +96,7 @@ class Config{
     );
     this.scripts.each(s ->
       elements.push(
-        HTMLElement("script", None(), Map["src" => JSON.String(s)], Vector[]),
+        HTMLElement("script", Map["src" => JSON.String(s)], Vector[]),
       )
     );
     this.customs.each(h -> elements.push(HTMLInclude(h)));
@@ -108,31 +108,26 @@ fun convertToHtml{
   buffer: mutable Vector<String>,
   conf: Config,
 }: void {
-  builder = mutable HTMLBuilder();
-  body_content = builder.convert(markdown);
+  body_content = convert(parseToBlocks(markdown));
   elements = mutable Vector<HTMLEntity>[];
   conf.fill(elements);
   html = HTMLElement(
     "html",
-    None(),
     Map["lang" => JSON.String(conf.lang.default("en"))],
     Vector[
-      HTMLElement("head", None(), Map[], elements.chill()),
+      HTMLElement("head", Map[], elements.chill()),
       HTMLElement(
         "body",
-        None(),
         Map[],
         Vector[
           HTMLElement(
             "div",
-            None(),
             Map["class" => JSON.String("header")],
             conf.header.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
           ),
-          body_content,
+          HTMLElement("div", Map["class" => JSON.String("body")], body_content),
           HTMLElement(
             "div",
-            None(),
             Map["class" => JSON.String("footer")],
             conf.footer.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
           ),
@@ -141,6 +136,105 @@ fun convertToHtml{
     ],
   );
   html.print(buffer, "");
+}
+
+fun convert(entities: Vector<Entity>): Vector<HTMLElement> {
+  elements = mutable Vector<HTMLElement>[];
+  idx = 0;
+  while (idx < entities.size()) {
+    entities[idx] match {
+    | ParagraphBlock(lines, header) ->
+      children_ = lines.map(l -> HTMLText(splitAccessor(l)));
+      if (header > 6) {
+        elements.push(
+          HTMLElement(
+            "div",
+            Map[
+              "md-kind" => JSON.String("h"),
+              "md-level" => JSON.String(header.toString()),
+            ],
+            children_,
+          ),
+        )
+      } else if (header > 0) {
+        elements.push(HTMLElement(`h${header}`, Map[], children_))
+      } else {
+        elements.push(HTMLElement("p", Map[], children_))
+      }
+    | CodeBlock(count, language, lines) ->
+      strl = language.toString().trim();
+      children_ = lines.map(l -> HTMLCode(splitAccessor(l)));
+      attrs = if (strl.isEmpty()) {
+        Map["md-level" => JSON.String(count.toString())]
+      } else {
+        Map[
+          "class" => JSON.String(`language-${strl}`),
+          "md-level" => JSON.String(count.toString()),
+        ]
+      };
+      elements.push(
+        HTMLElement(
+          "pre",
+          attrs,
+          Vector<HTMLEntity>[HTMLElement("code", attrs, children_)],
+        ),
+      )
+    | ConfigBlock(_lines) -> print_error("The config block has been ignored.")
+    | HeaderBlock(level, subentities, _) ->
+      elements.push(
+        HTMLElement(
+          "div",
+          Map[
+            "md-kind" => JSON.String("chapter"),
+            "md-level" => JSON.String(level.toString()),
+          ],
+          convert(subentities),
+        ),
+      )
+    | ListBlock(_, kind, subentities, _) ->
+      htmlEntities = mutable Vector[];
+      htmlEntities.push(
+        HTMLElement(
+          "li",
+          Map["md-kind" => JSON.String(kind.toString())],
+          convert(subentities),
+        ),
+      );
+      !idx = idx + 1;
+      while (
+        idx < entities.size() &&
+        entities[idx] match {
+        | ListBlock(_, skind, _, _) if (skind == kind) -> true
+        | _ -> false
+        }
+      ) {
+        slist = (entities[idx] as ListBlock _);
+        htmlEntities.push(
+          HTMLElement(
+            "li",
+            Map["md-kind" => JSON.String(slist.kind.toString())],
+            convert(slist.entities),
+          ),
+        );
+        !idx = idx + 1;
+      };
+      tag = kind match {
+      | BulletList _ -> "ul"
+      | OrederedList _ -> "ol"
+      };
+      elements.push(HTMLElement(tag, Map[], htmlEntities.chill()))
+    | BlockQuote(subentities, _) ->
+      elements.push(
+        HTMLElement(
+          "div",
+          Map["md-kind" => JSON.String("blockquote")],
+          convert(subentities),
+        ),
+      )
+    };
+    !idx = idx + 1;
+  };
+  elements.chill()
 }
 
 mutable base class HTMLEntity {
@@ -186,19 +280,21 @@ class HTMLInclude(html: String) extends HTMLEntity {
 
 class HTMLText(text: Array<TextElement>) extends HTMLEntity {
   fun print(buffer: mutable Vector<String>, prefix: String): void {
-    buffer.push(`${prefix}${toLine(this.text)}`)
+    buffer.push(`${prefix}${toText(this.text)}`)
   }
 }
 
-class HTMLCode(text: Array<Char>, prefix: String = "") extends HTMLEntity {
+class HTMLCode(
+  text: Array<TextElement>,
+  prefix: String = "",
+) extends HTMLEntity {
   fun print(buffer: mutable Vector<String>, _prefix: String): void {
-    buffer.push(`${this.prefix}${toEncoded(this.text)}`)
+    buffer.push(`${this.prefix}${toText(this.text)}`)
   }
 }
 
 mutable class HTMLElement(
   tag: String,
-  level: ?Int,
   attributes: mutable Map<String, JSON.String>,
   children_: mutable Vector<HTMLEntity>,
 ) extends HTMLEntity {
@@ -230,300 +326,11 @@ mutable class HTMLElement(
   }
 
   readonly fun chill(): this {
-    HTMLElement(
-      this.tag,
-      this.level,
-      this.attributes.chill(),
-      this.children_.chill(),
-    )
-  }
-
-  readonly fun mclone(): mutable this {
-    mutable HTMLElement(
-      this.tag,
-      this.level,
-      this.attributes.clone(),
-      this.children_.clone(),
-    )
+    HTMLElement(this.tag, this.attributes.chill(), this.children_.chill())
   }
 }
 
-fun header(level: Int, text: Array<TextElement>): HTMLEntity {
-  HTMLElement(
-    if (level < 7) `h${level}` else "div",
-    None(),
-    if (level < 7) Map[] else {
-      Map["class" => JSON.String(`h${level}_title`)]
-    },
-    Vector[HTMLText(text)],
-  )
-}
-
-fun isEmpty(line: Line): Bool {
-  line.content.isEmpty() || line.content.all(Chars.isWhitespace)
-}
-
-mutable class HTMLBuilder(
-  stack: mutable Vector<mutable HTMLElement> = mutable Vector[],
-  mutable current: Int = 0,
-  mutable code: Bool = false,
-  mutable optBlock: ?(
-    TextLine ~> Bool,
-    mutable Vector<TextLine>,
-    String,
-    Array<Char> ~> Array<Char>,
-    Int,
-  ) = None(),
-) {
-  mutable fun build(
-    lines: mutable Iterator<TextLine>,
-    tag: String = "div.body",
-  ): HTMLEntity {
-    telements = tag.split(".");
-    root = mutable HTMLElement(
-      telements[0],
-      Some(0),
-      mutable Map[],
-      mutable Vector[],
-    );
-    remaining = telements.drop(1);
-    if (!remaining.isEmpty()) {
-      root.attributes.set("class", JSON.String(remaining.join(" ")))
-    };
-    this.stack.push(root);
-    for (line in lines) {
-      this.optBlock match {
-      | Some(block) if (block.i0(line)) ->
-        block.i1.push(line);
-        continue
-      | Some(block) ->
-        this.checkBlock(block.i1, block.i2, block.i3, block.i4);
-        this.!optBlock = None()
-      | _ -> void
-      };
-      line match {
-      | LHeader(l, t, _i) ->
-        this.collapseto((_, e) -> e.level.map(el -> el >= l).default(true));
-        this.stack.push(
-          mutable HTMLElement(
-            "div",
-            Some(l),
-            mutable Map["class" => JSON.String(`h${l}`)],
-            mutable Vector<HTMLEntity>[header(l, splitText(t))],
-          ),
-        );
-        this.!current = l
-      | LHtml(t, _i) -> this.push(HTMLInclude(String::fromChars(t)))
-      | LText(l) if (isEmpty(l)) ->
-        if (this.is(Array["p"])) {
-          this.collapseto((_, e) -> e.tag == "p")
-        } else if (this.is(Array["ul"])) {
-          this.collapseto((_, e) -> e.tag == "ul")
-        } else if (this.is(Array["ol"])) {
-          this.collapseto((_, e) -> e.tag == "ol")
-        }
-      | LText(l) if (this.code) ->
-        if (
-          l.content.maybeGet(0) == Some('`') &&
-          l.content.maybeGet(1) == Some('`') &&
-          l.content.maybeGet(2) == Some('`')
-        ) {
-          this.collapseto((_, e) -> e.tag == "code" || e.tag == "pre");
-          this.!code = false
-        } else {
-          this.push(HTMLCode(l.content, Array::fill(l.indent, " ").join("")))
-        }
-      | LText(l) ->
-        checkParagraph = l -> {
-          if (!this.is(Array["p"])) {
-            this.sstack("p")
-          };
-          this.push(HTMLText(splitText(l.content)));
-        };
-        checkBullet = l -> {
-          if (!this.is(Array["ul"])) {
-            this.sstack("ul")
-          };
-          this.!optBlock = Some(
-            (
-              sl ~>
-                sl.ind() > l.indent &&
-                  !(sl.ind() == l.indent && sl.startsWith('*')),
-              mutable Vector<TextLine>[LText(l.drop(2))],
-              "li",
-              cs ~> cs,
-              4,
-            ),
-          )
-        };
-        checkNumbered = (l, size) -> {
-          if (!this.is(Array["ol"])) {
-            this.sstack("ol")
-          };
-          this.!optBlock = Some(
-            (
-              sl ~>
-                sl.ind() > l.indent &&
-                  !(sl.ind() == l.indent && sl.isNumbered()),
-              mutable Vector<TextLine>[LText(l.drop(size))],
-              "li",
-              cs ~> cs,
-              4,
-            ),
-          )
-        };
-        checkBlockquotes = l -> {
-          this.!optBlock = Some(
-            (
-              sl ~> sl.startsWith('>') && sl.ind() == l.indent,
-              mutable Vector<TextLine>[LText(l)],
-              "div.blockquotes",
-              cs ~> cs.drop(2),
-              2,
-            ),
-          );
-        };
-        l.content.first() match {
-        | '*' ->
-          if (l.content.maybeGet(1) == Some(' ')) {
-            checkBullet(l)
-          } else {
-            checkParagraph(l)
-          }
-        | '>' ->
-          if (l.content.maybeGet(1) == Some(' ')) {
-            checkBlockquotes(l)
-          } else {
-            checkParagraph(l)
-          }
-        | x if (Chars.isDigit(x)) ->
-          idx = 1;
-          while (l.content.maybeGet(idx).map(Chars.isDigit).default(false)) {
-            !idx = idx + 1;
-          };
-          if (
-            l.content.maybeGet(idx) == Some('.') &&
-            l.content.maybeGet(idx + 1) == Some(' ')
-          ) {
-            checkNumbered(l, idx + 1)
-          } else {
-            checkParagraph(l)
-          }
-        | '`' ->
-          if (
-            l.content.maybeGet(1) == Some('`') &&
-            l.content.maybeGet(2) == Some('`')
-          ) {
-            this.stack.push(
-              mutable HTMLElement(
-                "pre",
-                None(),
-                mutable Map[],
-                mutable Vector<HTMLEntity>[],
-              ),
-            );
-            this.stack.push(
-              mutable HTMLElement(
-                "code",
-                None(),
-                mutable Map[],
-                mutable Vector<HTMLEntity>[],
-              ),
-            );
-            this.!code = true
-          } else {
-            checkParagraph(l)
-          }
-        | _ -> checkParagraph(l)
-        }
-      }
-    };
-    this.optBlock.each(b -> this.checkBlock(b.i1, b.i2, b.i3, b.i4));
-    this.collapseto((idx, _) -> idx > 0);
-    this.stack.first().chill()
-  }
-
-  mutable fun checkBlock(
-    block: readonly Vector<TextLine>,
-    tag: String,
-    filter: Array<Char> ~> Array<Char>,
-    decr: Int,
-  ): void {
-    !block = block.map(b -> b.update(decr, filter));
-    if (block.isEmpty()) return void;
-    builder = mutable HTMLBuilder();
-    element = builder.build(block.iterator(), tag);
-    this.push(element);
-  }
-
-  mutable fun convert(str: String, tag: String = "div.body"): HTMLEntity {
-    this.build(parseTextLines(str.getIter()), tag)
-  }
-
-  // to fix
-  private mutable fun collapseto(
-    test: (idx: Int, v: mutable HTMLElement) -> Bool,
-  ): void {
-    idx = this.stack.size() - 1;
-    while (idx >= 0 && test(idx, this.stack[idx])) {
-      !idx = idx - 1;
-    };
-    invariant(idx >= 0, `No parent found`);
-    while (this.stack.size() > idx + 1) {
-      elem = this.stack.pop();
-      this.push(elem.chill())
-    }
-  }
-
-  private mutable fun push(elem: HTMLEntity): void {
-    this.stack.last().children_.push(elem)
-  }
-
-  private mutable fun addAttr(name: String, value: String): void {
-    this.stack.last().attributes.set(name, JSON.String(value))
-  }
-
-  private mutable fun sstack(tag: String): void {
-    this.stack.push(
-      mutable HTMLElement(
-        tag,
-        None(),
-        mutable Map[],
-        mutable Vector<HTMLEntity>[],
-      ),
-    )
-  }
-
-  private mutable fun lstack(tag: String, line: Line): void {
-    this.stack.push(
-      mutable HTMLElement(
-        tag,
-        None(),
-        mutable Map[],
-        mutable Vector<HTMLEntity>[HTMLText(splitText(line.content))],
-      ),
-    )
-  }
-
-  private readonly fun is(tags: Array<String>): Bool {
-    if (this.stack.size() < tags.size()) false else {
-      s = this.stack.size();
-      for (i in Range(0, tags.size())) {
-        if (this.stack.get(s - 1 - i).tag != tags[i]) break false
-      } else {
-        true
-      }
-    }
-  }
-}
-
-fun toLines(lines: Array<Array<TextElement>>): String {
-  lines
-    .map(line -> `<span class="md_line">${toLine(line)}</span>`)
-    .join("<br/>\n")
-}
-
-fun toLine(elements: Array<TextElement>): String {
+fun toText(elements: Array<TextElement>): String {
   elements.map(textElementToHtml).join("");
 }
 
