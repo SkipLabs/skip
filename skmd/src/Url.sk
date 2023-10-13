@@ -1,0 +1,514 @@
+// Package url parses URLs and implements query escaping.
+module SKMD;
+
+const upperhex: Array<Char> = Array[
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  'A',
+  'B',
+  'C',
+  'D',
+  'E',
+  'F',
+];
+
+class EscapeError(reason: String) extends Exception {
+  fun toString(): String {
+    this.reason
+  }
+}
+
+class InvalidHostError(reason: String) extends Exception {
+  fun toString(): String {
+    this.reason
+  }
+}
+
+class UrlFormatError(reason: String) extends Exception {
+  fun toString(): String {
+    this.reason
+  }
+}
+
+base class Charset {
+  fun lower(c: Char): Char;
+  fun isLetter(c: Char): Bool;
+  fun isNumber(c: Char): Bool;
+}
+
+class ASCII() extends Charset {
+  fun lower(c: Char): Char {
+    c.uncapitalize()
+  }
+
+  fun isLetter(c: Char): Bool {
+    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+  }
+
+  fun isNumber(c: Char): Bool {
+    Chars.isDigit(c)
+  }
+}
+
+base class Encoding uses Equality {
+  children =
+  | EncodePath()
+  | EncodePathSegment()
+  | EncodeHost()
+  | EncodeZone()
+  | EncodeUserPassword()
+  | EncodeQueryComponent()
+  | EncodeFragment()
+}
+
+// Return true if the specified character should be escaped when
+// appearing in a URL string, according to RFC 3986.
+//
+// TODO check all reserved characters.
+fun shouldEscape(c: Char, mode: Encoding): Bool {
+  // §2.3 Unreserved characters (alphanum)
+  if (
+    ('a' <= c && c <= 'z') ||
+    ('A' <= c && c <= 'Z') ||
+    ('0' <= c && c <= '9')
+  ) {
+    return false
+  };
+
+  if (mode == EncodeHost() || mode == EncodeZone()) {
+    // §3.2.2 Host allows
+    //	sub-delims = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
+    // as part of reg-name.
+    // We add : because we include :port as part of host.
+    // We add [ ] because we include [ipv6]:port as part of host.
+    // We add < > because they're the only characters left that
+    // we could possibly allow, and Parse will reject them if we
+    // escape them (because hosts can't use %-encoding for
+    // ASCII bytes).
+    c match {
+    | '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | ':'
+    | '[' | ']' | '<' | '>' | '"' ->
+      return false
+    | _ -> void
+    }
+  };
+
+  c match {
+  | '-' | '_' | '.' | '~' -> // §2.3 Unreserved characters (mark)
+    return false
+  | '$' | '&' | '+' | ',' | '/' | ':' | ';' | '=' | '?' | '@' -> // §2.2 Reserved characters (reserved)
+    // Different sections of the URL allow a few of
+    // the reserved characters to appear unescaped.
+    mode match {
+    | EncodePath() -> // §3.3
+      // The RFC allows : @ & = + $ but saves / ; , for assigning
+      // meaning to individual path segments. This package
+      // only manipulates the path as a whole, so we allow those
+      // last three as well. That leaves only ? to escape.
+      return c == '?'
+
+    | EncodePathSegment() -> // §3.3
+      // The RFC allows : @ & = + $ but saves / ; , for assigning
+      // meaning to individual path segments.
+      return c == '/' || c == ';' || c == ',' || c == '?'
+
+    | EncodeUserPassword() -> // §3.2.1
+      // The RFC allows ';', ':', '&', '=', '+', '$', and ',' in
+      // userinfo, so we must escape only '@', '/', and '?'.
+      // The parsing of userinfo treats ':' as special so we must escape
+      // that too.
+      return c == '@' || c == '/' || c == '?' || c == ':'
+
+    | EncodeQueryComponent() -> // §3.4
+      // The RFC reserves (so we must escape) everything.
+      return true
+
+    | EncodeFragment() -> // §4.1
+      // The RFC text is silent but the grammar allows
+      // everything, so escape nothing.
+      return false
+    | _ -> void
+    }
+  | _ -> void
+  };
+
+  if (mode == EncodeFragment()) {
+    // RFC 3986 §2.2 allows not escaping sub-delims. A subset of sub-delims are
+    // included in reserved from RFC 2396 §2.2. The remaining sub-delims do not
+    // need to be escaped. To minimize potential breakage, we apply two restrictions:
+    // (1) we always escape sub-delims outside of the fragment, and (2) we always
+    // escape single quote to avoid breaking callers that had previously assumed that
+    // single quotes would be escaped. See issue #19917.
+    c match {
+    | '!' | '(' | ')' | '*' -> return false
+    | _ -> void
+    }
+  };
+  // Everything else must be escaped.
+  true
+}
+
+// unescape unescapes a string; the mode specifies
+// which section of the URL string is being unescaped.
+fun unescape(s: Accessor, mode: Encoding): String {
+  // Count %, check that they're well-formed.
+  n = 0;
+  hasPlus = false;
+  for (i in Range(0, s.size())) {
+    s.get(i) match {
+    | '%' ->
+      !n = n + 1;
+      if (
+        !s.maybeGet(i + 1).map(Chars.isHexDigit).default(false) ||
+        !s.maybeGet(i + 2).map(Chars.isHexDigit).default(false)
+      ) {
+        !s = s.drop(i);
+        if (s.size() > 3) {
+          !s = s.slice(0, 3)
+        };
+        throw EscapeError(s.toString())
+      };
+      // Per https://tools.ietf.org/html/rfc3986#page-21
+      // in the host component %-encoding can only be used
+      // for non-ASCII bytes.
+      // But https://tools.ietf.org/html/rfc6874#section-2
+      // introduces %25 being allowed to escape a percent sign
+      // in IPv6 scoped-address literals. Yay.
+      if (
+        mode == EncodeHost() &&
+        Chars.hexDigitToInt(s[i + 1]) < 8 &&
+        !s.slice(i, i + 3).equals("%25")
+      ) {
+        throw EscapeError(s.slice(i, i + 3).toString())
+      };
+      if (mode == EncodeZone()) {
+        // RFC 6874 says basically "anything goes" for zone identifiers
+        // and that even non-ASCII can be redundantly escaped,
+        // but it seems prudent to restrict %-escaped bytes here to those
+        // that are valid host name bytes in their unescaped form.
+        // That is, you can use escaping in the zone identifier but not
+        // to introduce bytes you couldn't just write directly.
+        // But Windows puts spaces here! Yay.
+        v = Char::fromCode(s.slice(i + 1, i + 2).hexToInt());
+        if (
+          !s.slice(i, i + 3).equals("%25") &&
+          v != ' ' &&
+          shouldEscape(v, EncodeHost())
+        ) {
+          throw EscapeError(s.slice(i, i + 3).toString())
+        }
+      };
+      !i = i + 3
+    | '+' ->
+      !hasPlus = mode == EncodeQueryComponent();
+      !i = i + 1
+    | _ ->
+      if (
+        (mode == EncodeHost() || mode == EncodeZone()) &&
+        s[i].code() < 0x80 &&
+        shouldEscape(s[i], mode)
+      ) {
+        throw InvalidHostError(s.slice(i, i + 1).toString())
+      };
+      !i = i + 1
+    }
+  };
+  if (n == 0 && !hasPlus) {
+    return s.toString()
+  };
+  t = mutable Vector<Char>[];
+  i = 0;
+  while (i < s.size()) {
+    s[i] match {
+    | '%' ->
+      v = s.slice(i + 1, i + 2).hexToInt();
+      t.push(Char::fromCode(v));
+      !i = i + 2
+    | '+' ->
+      if (mode == EncodeQueryComponent()) {
+        t.push(' ');
+      } else {
+        t.push('+');
+      };
+      !i = i + 1
+    | _ ->
+      t.push(s[i]);
+      !i = i + 1
+    }
+  };
+  String::fromChars(t.toArray())
+}
+
+// QueryUnescape does the inverse transformation of QueryEscape,
+// converting each 3-byte encoded substring of the form "%AB" into the
+// hex-decoded byte 0xAB.
+// It returns an error if any % is not followed by two hexadecimal
+// digits.
+fun queryUnescape(s: Accessor): String {
+  unescape(s, EncodeQueryComponent())
+}
+
+// PathUnescape does the inverse transformation of PathEscape,
+// converting each 3-byte encoded substring of the form "%AB" into the
+// hex-decoded byte 0xAB. It returns an error if any % is not followed
+// by two hexadecimal digits.
+//
+// PathUnescape is identical to QueryUnescape except that it does not
+// unescape '+' to ' ' (space).
+fun pathUnescape(s: Accessor): String {
+  unescape(s, EncodePathSegment())
+}
+
+fun escape(s: Accessor, mode: Encoding): String {
+  spaceCount = 0;
+  hexCount = 0;
+  for (i in Range(0, s.size())) {
+    c = s[i];
+    if (shouldEscape(c, mode)) {
+      if (c == ' ' && mode == EncodeQueryComponent()) {
+        !spaceCount = spaceCount + 1;
+      } else {
+        !hexCount = hexCount + 1;
+      }
+    }
+  };
+  if (spaceCount == 0 && hexCount == 0) {
+    return s.toString()
+  };
+  t = mutable Vector<Char>[];
+  if (hexCount == 0) {
+    for (i in Range(0, s.size())) {
+      c = s[i];
+      t.push(if (c == ' ') '+' else c)
+    };
+    return String::fromChars(t.toArray());
+  };
+  for (i in Range(0, s.size())) {
+    s[i] match {
+    | ' ' if (mode == EncodeQueryComponent()) -> t.push('+')
+    | c if (shouldEscape(c, mode)) ->
+      t.push('%');
+      t.push(upperhex[c.code().shr(4)]);
+      t.push(upperhex[c.code().and(15)])
+    | c -> t.push(c)
+    }
+  };
+  String::fromChars(t.toArray());
+}
+
+fun escapeStr(s: String, mode: Encoding): String {
+  escape(Accessor::fromVector(s.chars()), mode)
+}
+
+// QueryEscape escapes the string so it can be safely placed
+// inside a URL query.
+fun queryEscape(s: Accessor): String {
+  escape(s, EncodeQueryComponent())
+}
+
+// PathEscape escapes the string so it can be safely placed inside a URL path segment,
+// replacing special characters (including /) with %XX sequences as needed.
+fun pathEscape(s: Accessor): String {
+  escape(s, EncodePathSegment())
+}
+
+class Url{
+  protocol: String,
+  host: String,
+  optPort: ?Int = None(),
+  optPath: ?String = None(),
+  optQuery: ?String = None(),
+  optUserInfo: ?String = None(),
+} uses Show {
+  static fun parse(spec: Accessor, charset: Charset = ASCII()): this {
+    limit = spec.size();
+    while ((limit > 0) && (spec[limit - 1] <= ' ')) {
+      !limit = limit - 1; //eliminate trailing whitespace
+    };
+    start = 0;
+    while ((start < limit) && (spec[start] <= ' ')) {
+      !start = start + 1; // eliminate leading whitespace
+    };
+    if (
+      spec.slice(start, start + 4).toArray().map(charset.lower) ==
+      Array['u', 'r', 'l', ':']
+    ) {
+      !start = start + 4;
+    };
+    optProtocol = for (i in Range(start, limit)) {
+      if (spec[i] == '/') {
+        break None()
+      } else if (spec[i] == ':') {
+        protocol = spec.slice(start, i).toArray().map(charset.lower);
+        invariant(checkValidProtocol(protocol, charset));
+        !start = i + 1;
+        break Some(String::fromChars(protocol));
+      }
+    } else {
+      None()
+    };
+    invariant(optProtocol.isSome(), "no protocol");
+    optQuery = for (i in Range(start, limit).reversed()) {
+      if (spec[i] == '?') {
+        query = spec.slice(i + 1, limit);
+        !limit = i;
+        break Some(query.toArray());
+      }
+    } else {
+      None()
+    };
+    // Parse the authority part if any
+    isUNCName =
+      (start <= limit - 4) &&
+      (spec[start] == '/') &&
+      (spec[start + 1] == '/') &&
+      (spec[start + 2] == '/') &&
+      (spec[start + 3] == '/');
+    withAuthority =
+      !isUNCName &&
+      (start <= limit - 2) &&
+      (spec[start] == '/') &&
+      (spec[start + 1] == '/');
+    (host, optPort, optUserInfo) = if (withAuthority) {
+      !start = start + 2;
+      end = for (i in Range(start, limit)) {
+        if (spec[i] == '/') {
+          break i
+        }
+      } else {
+        limit
+      };
+      authority = spec.slice(start, end).toArray();
+      elems = String::fromChars(authority).split("@");
+      invariant(
+        elems.size() <= 2,
+        `invalid authority ${String::fromChars(authority)}`,
+      );
+      (optUserInfo, host) = if (elems.size() == 2) {
+        (Some(elems[0]), elems[1].chars().toArray())
+      } else {
+        (None(), authority)
+      };
+      // If the host is surrounded by [ and ] then its an IPv6
+      // literal address as specified in RFC2732
+      (!host, optPort) = if (host.size() > 0 && (host[0] == '[')) {
+        host.indexOf(']') match {
+        | Some(idx) if (idx > 2) ->
+          (
+            host.slice(0, idx + 1),
+            if (host.size() > idx + 1) {
+              invariant(
+                host[idx + 1] == ':',
+                `invalid authority ${String::fromChars(authority)}`,
+              );
+              !idx = idx + 1;
+              if (host.size() > idx + 1) {
+                Some(String::fromChars(host.drop(idx)).toInt())
+              } else {
+                None()
+              }
+            } else {
+              None()
+            },
+          )
+        | _ ->
+          invariant_violation(
+            `invalid authority ${String::fromChars(authority)}`,
+          )
+        }
+      } else {
+        hostPort = String::fromChars(host).split(":");
+        invariant(
+          hostPort.size() <= 2,
+          `invalid host ${String::fromChars(host)}`,
+        );
+        if (hostPort.size() == 2) {
+          (hostPort[0].chars().toArray(), Some(hostPort[1].toInt()))
+        } else {
+          (host, None())
+        }
+      };
+      optPort.each(port -> invariant(port >= 0, `invalid port number ${port}`));
+      !start = end;
+      (host, optPort, optUserInfo)
+    } else {
+      (Array[], None(), None())
+    };
+    // Parse the file path if any
+    optPath = if (start < limit) {
+      if (spec[start] == '/' || !withAuthority) {
+        Some(spec.slice(start, limit).toArray())
+      } else {
+        Some(Array['/'].concat(spec.slice(start, limit).toArray()))
+      }
+    } else {
+      None()
+    };
+    Url{
+      protocol => optProtocol.fromSome(),
+      host => String::fromChars(host),
+      optPort,
+      optPath => optPath.map(path -> String::fromChars(path)),
+      optQuery => optQuery.map(query -> String::fromChars(query)),
+      optUserInfo,
+    }
+  }
+
+  fun toString(): String {
+    vec = mutable Vector[this.protocol, ":"];
+    this.optUserInfo match {
+    | Some(userInfo) ->
+      vec.push("//");
+      vec.push(userInfo);
+      vec.push("@");
+      vec.push(this.host)
+    | _ ->
+      if (!this.host.isEmpty()) {
+        vec.push("//");
+        vec.push(this.host);
+      }
+    };
+    this.optPort.each(port -> {
+      vec.push(":");
+      vec.push(port.toString());
+    });
+    this.optPath.each(path -> vec.push(path));
+    this.optQuery.each(query -> {
+      vec.push("?");
+      vec.push(query)
+    });
+    vec.join("");
+  }
+}
+
+fun checkValidProtocol(protocol: Array<Char>, charset: Charset): Bool {
+  len = protocol.size();
+  if (len < 1) {
+    return false;
+  };
+  c = protocol[0];
+  if (!charset.isLetter(c)) {
+    return false;
+  };
+  for (i in Range(1, len)) {
+    !c = protocol[i];
+    if (
+      !charset.isLetter(c) &&
+      !charset.isNumber(c) &&
+      c != '.' &&
+      c != '+' &&
+      c != '-'
+    ) {
+      return false;
+    }
+  };
+  true;
+}
