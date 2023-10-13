@@ -52,7 +52,7 @@ export interface SkdbMechanism {
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
-  subscribe: (replicationUid: string, table: string, updateFile: string) => string;
+  subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
   diff: (watermark: bigint, session: string) => ArrayBuffer | null;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => Array<any>;

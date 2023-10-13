@@ -7,7 +7,7 @@ class SkdbMechanismImpl implements SkdbMechanism {
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
-  subscribe: (replicationUid: string, table: string, updateFile: string) => string;
+  subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
   diff: (watermark: bigint, session: string) => ArrayBuffer | null;
   assertCanBeMirrored: (tableName: string) => void;
   tableExists: (tableName: string) => boolean;
@@ -35,12 +35,12 @@ class SkdbMechanismImpl implements SkdbMechanism {
     this.getReplicationUid = (deviceUuid: string) => {
       return client.runLocal(["replication-id", deviceUuid], "").trim()
     };
-    this.subscribe = (replicationUid: string, table: string, updateFile: string) => {
+    this.subscribe = (replicationUid: string, tables: string[], updateFile: string) => {
       return client.runLocal(
         [
-          "subscribe", table, "--connect", "--format=csv",
+          "subscribe", "--connect", "--format=csv",
           "--updates", updateFile, "--ignore-source", replicationUid
-        ],
+        ].concat(tables),
         ""
       ).trim()
     };
