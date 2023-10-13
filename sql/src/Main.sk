@@ -682,7 +682,7 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
     checkpointInterval = if (init) 512 else Int::max;
 
     writer = mutable Debug.BufferedWriter(print_raw, 4096);
-    _ = edir.writeDiff(
+    producedOutput = edir.writeDiff(
       context,
       isReset,
       changes,
@@ -693,15 +693,17 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
       dirSub.getDestinationWatermark(context),
       checkpointInterval,
     );
-    writer.flush();
-
-    if (init && changes.isEmpty()) {
-      // on first iteration we ensure we output a checkpoint without
-      // delay so that the downstreams knows that it has received
-      // everything without waiting for the condvar timeout
-      print_raw(":" + context.tick.value.toString() + "\n");
+    // produce checkpoint for flushing and committing
+    if (init || producedOutput) {
+      // always do this on first iteration to ensure we output a
+      // checkpoint without delay so that the downstreams knows that
+      // it has received everything without waiting for the condvar
+      // timeout
+      writer.write(":" + context.tick.value.toString() + "\n");
+      writer.flush();
       flushStdout();
     };
+
     !tick = context.tick.value;
     !init = false;
     lock = SKStore.unfreezeLock(sub.lock);
