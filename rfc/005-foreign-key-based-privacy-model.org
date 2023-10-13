@@ -252,8 +252,7 @@ specifying who can traverse an edge. And likewise with deletes.
 
 * A worked example demonstrating virtual views and aggregation
 
-Let's look at how an auction might work. Here we want to share derived
-data in the form of a virtual view with some users.
+Let's look at how an auction might work.
 
 We have the following schema.
 
@@ -283,7 +282,50 @@ Representing the graph:
       bids *----------+
 #+END_EXAMPLE
 
-Then we define the ~winners~ vitual view on the server:
+** Worked example for how and when privacy would be recorded for the above data model
+
+Let's say we want the following privacy rules:
+
+- only user $x$ may create an auction with $x$ as the creator
+- only user $x$ may delete an auction that has been created by $x$
+- all users may see all auctions
+
+- only user $y$ may enter a bid on an auction with $y$ as the bidder
+- any user may enter a bid on any auction
+- only the bidder may see their bids
+- no one can delete a bid
+
+This is achieved by:
+
+When the /system/ creates a user, ~$A_USER_ID~, it inserts the following
+rows in ~skdb_access~:
+
+| from_table | to_table | from_col | id         | permission | user_group                   |
+|------------+----------+----------+------------+------------+------------------------------|
+| auctions   | users    | creator  | $A_USER_ID | read       | GROUP_ID_FOR_EVERYONE        |
+| auctions   | users    | creator  | $A_USER_ID | insert     | GROUP_ID_FOR_JUST_$A_USER_ID |
+| auctions   | users    | creator  | $A_USER_ID | delete     | GROUP_ID_FOR_JUST_$A_USER_ID |
+| bids       | users    | bidder   | $A_USER_ID | read       | GROUP_ID_FOR_JUST_$A_USER_ID |
+| bids       | users    | bidder   | $A_USER_ID | insert     | GROUP_ID_FOR_JUST_$A_USER_ID |
+| bids       | users    | bidder   | $A_USER_ID | delete     | GROUP_ID_FOR_NO_ONE          |
+
+When a /user/ creates an auction, ~$AN_AUCTION_ID~, the user inserts the
+following rows in ~skdb_access~:
+
+| from_table | to_table | from_col | id             | permission | user_group            |
+|------------+----------+----------+----------------+------------+-----------------------|
+| bids       | auctions | auction  | $AN_AUCTION_ID | read       | GROUP_ID_FOR_EVERYONE |
+| bids       | auctions | auction  | $AN_AUCTION_ID | insert     | GROUP_ID_FOR_EVERYONE |
+| bids       | auctions | auction  | $AN_AUCTION_ID | delete     | <does not matter>     |
+
+The rules on the bids table are ANDed together. There is only one
+reference on the auctions table so there's no equation to specify.
+
+** Aggregation
+
+Let's communicate who won an auction. We want to share derived data in
+the form of a virtual view with some users. We define the ~winners~
+vitual view on the server:
 
 #+BEGIN_SRC sql
   CREATE VIRTUAL VIEW winners AS
@@ -308,16 +350,60 @@ field and the winner field are ORd together for ~winners~.
 
 NOTE that:
 
-- we only need to define read permission as winners is a view and can
+- We only need to define read permission as winners is a view and can
   only be read.
 
-- these rows are written when the auctions row is written or the users
+- These rows are written when the auctions row is written or the users
   row is written. We don't need to worry about virtual views managing
   privacy. In other words: the user that creates the data specifies
   the privacy of that data. Downstream tables that reference multiple
   pieces of data specify how that is combined at table/view creation
   time.
 
-- neither the auction winner nor the auction creator control the
+- Neither the auction winner nor the auction creator control the
   privacy in entirety. They both are guaranteed to be able to see the
   result.
+
+** Aggregation combining multiple values
+
+The last example of aggregation picked a single value (max) so it's
+relatively easy to see how this would work in a graph. But what about
+something like count or sum that is aggregating many values?
+
+Let's see how this works with another use case. We'll choose a fairly
+arbitrary rule that (perhaps) isn't realistic but demonstrates you can
+express complex privacy rules:
+
+- only users that have bidded on an auction, and the auction creator,
+  can see the total count of bids
+
+First we need the total count:
+
+#+BEGIN_SRC sql
+  CREATE VIRTUAL VIEW auction_bid_counts AS
+    SELECT
+      auction,
+      bidder,
+      n_bids
+    FROM
+        (SELECT
+           auction, bidder
+         FROM bids
+         GROUP BY auction, bidder) auction_bidders
+      INNER JOIN
+        (SELECT
+          auction,
+          count(*) as n_bids
+        FROM bids
+        GROUP BY auction) total_bids_per_auction
+      ON auction_bidders.auction = total_bids_per_auction.auction
+#+END_SRC
+
+We get a table with the total bids that references an auction and a bidder. So we just set the privac rules as:
+
+| from_table         | to_table | from_col | id            | permission | user_group                              |
+|--------------------+----------+----------+---------------+------------+-----------------------------------------|
+| auction_bid_counts | auctions | auction  | AN_AUCTION_ID | read       | GROUPID_FOR_JUST_AUCTION_CREATOR_USERID |
+| auction_bid_counts | users    | winner   | A_USER_ID     | read       | GROUPID_FOR_JUST_USER_ID                |
+
+and OR them together.
