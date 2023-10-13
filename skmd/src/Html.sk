@@ -192,20 +192,7 @@ class HTMLText(text: Array<TextElement>) extends HTMLEntity {
 
 class HTMLCode(text: Array<Char>, prefix: String = "") extends HTMLEntity {
   fun print(buffer: mutable Vector<String>, _prefix: String): void {
-    buffer.push(`${this.prefix}${static::toCodeString(this.text)}`)
-  }
-
-  static fun toCodeString(text: Sequence<Char>): String {
-    tmp = mutable Vector<Char>[];
-    text.each(c ->
-      c match {
-      | '&' -> Array['&', 'a', 'm', 'p', ';'].each(tmp.push)
-      | '<' -> Array['&', 'l', 't', ';'].each(tmp.push)
-      | '>' -> Array['&', 'g', 't', ';'].each(tmp.push)
-      | _ -> tmp.push(c)
-      }
-    );
-    String::fromChars(tmp.toArray())
+    buffer.push(`${this.prefix}${toEncoded(this.text)}`)
   }
 }
 
@@ -542,7 +529,8 @@ fun toLine(elements: Array<TextElement>): String {
 
 fun textElementToHtml(elem: TextElement): String {
   elem match {
-  | TELink(text, link, optTitle) ->
+  | TELink(ltext, link, optTitle) ->
+    text = toEncoded(ltext.chars());
     optTitle match {
     | Some(title) ->
       if (link.endsWith("#")) {
@@ -561,7 +549,7 @@ fun textElementToHtml(elem: TextElement): String {
     }
   | TEBold(text) -> `<strong>${text}</strong>`
   | TEEmphasis(text) -> `<em>${text}</em>`
-  | TECode(text) -> `<code>${HTMLCode::toCodeString(text.chars())}</code>`
+  | TECode(text) -> `<code>${text}</code>`
   | TEText(text) -> `${text}`
   }
 }

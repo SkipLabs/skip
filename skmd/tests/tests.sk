@@ -3,6 +3,135 @@ module alias T = SKTest;
 module SKMDTests;
 
 @test
+fun block1(): void {
+  parseToBlockTest(
+    "This is [an example](http://example.com/ 'Title') inline link.",
+    "Array[(SKMD.ParagraphBlock, 0, Array[This is [an example](http://example.com/ 'Title') inline link.])]",
+  )
+}
+
+@test
+fun block2(): void {
+  parseToBlockTest(
+    Array["# Markdown: Syntax", "other line", "", "paragraph"].join("\n"),
+    "Array[(SKMD.HeaderBlock, 1, Array[(SKMD.ParagraphBlock, 1, Array[Markdown: Syntax, other line]), (SKMD.ParagraphBlock, 0, Array[paragraph])])]",
+  )
+}
+
+@test
+fun block3(): void {
+  parseToBlockTest(
+    Array[
+      "# Header 1.0",
+      "other line",
+      "",
+      "## Header 1.1",
+      "",
+      "paragraph 1.1",
+      "# Header 2.0",
+      "",
+      "paragraph 2.0",
+    ].join("\n"),
+    "Array[(SKMD.HeaderBlock, 1, Array[(SKMD.ParagraphBlock, 1, Array[Header 1.0, other line]), (SKMD.HeaderBlock, 2, Array[(SKMD.ParagraphBlock, 2, Array[Header 1.1]), (SKMD.ParagraphBlock, 0, Array[paragraph 1.1])])]), (SKMD.HeaderBlock, 1, Array[(SKMD.ParagraphBlock, 1, Array[Header 2.0]), (SKMD.ParagraphBlock, 0, Array[paragraph 2.0])])]",
+  )
+}
+
+@test
+fun block4(): void {
+  parseToBlockTest(
+    Array["> First line", "> Second line"].join("\n"),
+    "Array[(SKMD.BlockQuote, Array[(SKMD.ParagraphBlock, 0, Array[First line, Second line])])]",
+  )
+}
+
+@test
+fun block5(): void {
+  parseToBlockTest(
+    Array[
+      "```bash",
+      "git clone git@github.com:SkipLabs/task-board.git",
+      "```",
+      "",
+      "Next, jump into the directory you just created and start the application:",
+      "",
+      "```bash",
+      "cd task-board && yarn dev",
+      "```",
+      "",
+    ].join("\n"),
+    "Array[(SKMD.CodeBlock, 3, bash, Array[git clone git@github.com:SkipLabs/task-board.git]), (SKMD.ParagraphBlock, 0, Array[Next, jump into the directory you just created and start the application:]), (SKMD.CodeBlock, 3, bash, Array[cd task-board && yarn dev])]",
+  )
+}
+
+@test
+fun block6(): void {
+  parseToBlockTest(
+    Array[
+      "* [Overview](#overview)",
+      "A line",
+      "Other line",
+      "    - [Philosophy](#philosophy)",
+      "    - [Inline HTML](#html)",
+      "    - [Automatic Escaping for Special Characters](#autoescape)",
+      "* [Miscellaneous](#misc)",
+      "    + [Backslash Escapes](#backslash)",
+      "    + [Automatic Links](#autolink)",
+      "    ",
+    ].join("\n"),
+    "Array[(SKMD.ListBlock, 0, SKMD.BulletList(Char(42,\"*\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(45,\"-\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Philosophy](#philosophy)])]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(45,\"-\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Inline HTML](#html)])]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(45,\"-\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Escaping for Special Characters](#autoescape)])])]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(42,\"*\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Miscellaneous](#misc)]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(43,\"+\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Backslash Escapes](#backslash)])]), (SKMD.ListBlock, 0, SKMD.BulletList(Char(43,\"+\"),1), Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Links](#autolink),     ])])])]",
+  )
+}
+
+fun parseToBlockTest(test: String, expect: String): void {
+  got = SKMD.parseToBlocks(test).map(b -> b.toString()).toArray().toString();
+  debug((got, expect));
+  T.expectEq(got, expect)
+}
+
+/*
+
+Array[
+  (
+    SKMD.ListBlock, 
+    0,
+    SKMD.BulletList,
+    Array[
+      (SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line]),
+      (SKMD.ListBlock, 0, SKMD.BulletList, 
+        Array[
+          (SKMD.ParagraphBlock, 0, Array[[Philosophy](#philosophy)])
+        ]
+      ),
+      (SKMD.ListBlock, 0, SKMD.BulletList, 
+        Array[
+          (SKMD.ParagraphBlock, 0, Array[[Inline HTML](#html)])
+        ]
+      ),
+      (SKMD.ListBlock, 0, SKMD.BulletList, 
+        Array[
+          (SKMD.ParagraphBlock, 0, Array[[Automatic Escaping for Special Characters](#autoescape)])
+        ]
+      )
+    ]
+  ),
+  (SKMD.ListBlock, 0, SKMD.BulletList, 
+    Array[
+      (SKMD.ParagraphBlock, 0, Array[[Miscellaneous](#misc)]),
+      (SKMD.ListBlock, 0, SKMD.BulletList, 
+        Array[
+          (SKMD.ParagraphBlock, 0, Array[[Backslash Escapes](#backslash)])
+        ]
+      ),
+      (SKMD.ListBlock, 0, SKMD.BulletList,
+        Array[
+          (SKMD.ParagraphBlock, 0, Array[[Automatic Links](#autolink),     ])
+        ]
+      )
+    ]
+  )
+]
+
+@test
 fun link(): void {
   parseTest(
     "This is [an example](http://example.com/ 'Title') inline link.",
@@ -27,12 +156,22 @@ fun header1(): void {
   parseTest(
     "# Markdown: Syntax",
     Array[SKMD.Header(1, Array[SKMD.TEText(" Markdown: Syntax")], 0)],
+  )@test
+fun blockquote1(): void {
+  parseTest(
+    "> First line\n> Second line",
+    Array[
+      SKMD.Block(
+        SKMD.KBlockQuotes(),
+        Array[
+          Array[SKMD.TEText("First line")],
+          Array[SKMD.TEText("Second line")],
+        ],
+        0,
+      ),
+    ],
   )
 }
-
-@test
-fun header2(): void {
-  parseTest(
     "## Block Elements # Just to see",
     Array[
       SKMD.Header(2, Array[SKMD.TEText(" Block Elements # Just to see")], 0),
@@ -95,12 +234,22 @@ fun list(): void {
       ),
       SKMD.Block(
         SKMD.KBullet(),
-        Array[Array[SKMD.TELink("Backslash Escapes", "#backslash", None())]],
-        4,
-      ),
+        Array[Array[SKMD.TELink(@test
+fun blockquote1(): void {
+  parseTest(
+    "> First line\n> Second line",
+    Array[
       SKMD.Block(
-        SKMD.KBullet(),
-        Array[Array[SKMD.TELink("Automatic Links", "#autolink", None())]],
+        SKMD.KBlockQuotes(),
+        Array[
+          Array[SKMD.TEText("First line")],
+          Array[SKMD.TEText("Second line")],
+        ],
+        0,
+      ),
+    ],
+  )
+}"Automatic Links", "#autolink", None())]],
         4,
       ),
     ],
@@ -372,12 +521,12 @@ fun testCode1(): void {
       Map[],
       Vector[
         SKMD.HTMLElement(
-          "code",
+          "pre",
           None(),
           Map[],
           Vector[
             SKMD.HTMLElement(
-              "pre",
+              "code",
               None(),
               Map[],
               Vector[
@@ -452,12 +601,12 @@ fun testCode1(): void {
           ],
         ),
         SKMD.HTMLElement(
-          "code",
+          "pre",
           None(),
           Map[],
           Vector[
             SKMD.HTMLElement(
-              "pre",
+              "code",
               None(),
               Map[],
               Vector[
@@ -520,4 +669,4 @@ fun formatHTML(text: String, expect: String): void {
   got.print(buffer, "");
   debug((buffer.join("\n"), expect));
   T.expectEq(buffer.join("\n"), expect)
-}
+}*/
