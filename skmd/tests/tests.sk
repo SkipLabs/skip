@@ -3,6 +3,36 @@ module alias T = SKTest;
 module SKMDTests;
 
 @test
+fun decr1(): void {
+  decrTest("Test", 4, "Test")
+}
+
+@test
+fun decr2(): void {
+  decrTest("    Test", 4, "Test")
+}
+
+@test
+fun decr3(): void {
+  decrTest("\tTest", 4, "Test")
+}
+
+@test
+fun decr4(): void {
+  decrTest(" \tTest", 4, "Test")
+}
+
+@test
+fun decr5(): void {
+  decrTest("\tTest", 3, " Test")
+}
+
+@test
+fun decr6(): void {
+  decrTest("    Test", 3, " Test")
+}
+
+@test
 fun block1(): void {
   parseToBlockTest(
     "This is [an example](http://example.com/ 'Title') inline link.",
@@ -78,7 +108,38 @@ fun block6(): void {
       "    + [Automatic Links](#autolink)",
       "    ",
     ].join("\n"),
-    "Array[(SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line]), (SKMD.ListBlock, 0, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Philosophy](#philosophy)])]), (SKMD.ListBlock, 0, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Inline HTML](#html)])]), (SKMD.ListBlock, 0, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Escaping for Special Characters](#autoescape)])])]), (SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Miscellaneous](#misc)]), (SKMD.ListBlock, 0, ul-+-1, Array[(SKMD.ParagraphBlock, 0, Array[[Backslash Escapes](#backslash)])]), (SKMD.ListBlock, 0, ul-+-1, Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Links](#autolink),     ])])])]",
+    "Array[(SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line]), (SKMD.ListBlock, 4, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Philosophy](#philosophy)])]), (SKMD.ListBlock, 4, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Inline HTML](#html)])]), (SKMD.ListBlock, 4, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Escaping for Special Characters](#autoescape)])])]), (SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Miscellaneous](#misc)]), (SKMD.ListBlock, 4, ul-+-1, Array[(SKMD.ParagraphBlock, 0, Array[[Backslash Escapes](#backslash)])]), (SKMD.ListBlock, 4, ul-+-1, Array[(SKMD.ParagraphBlock, 0, Array[[Automatic Links](#autolink)])])])]",
+  )
+}
+
+@test
+fun block7(): void {
+  parseToBlockTest(
+    Array[
+      "* [Overview](#overview)",
+      "A line",
+      "Other line",
+      "    - [Philosophy](#philosophy)",
+      "",
+      "    Philosophy content",
+      "* [Miscellaneous](#misc)",
+    ].join("\n"),
+    "Array[(SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line]), (SKMD.ListBlock, 4, ul---1, Array[(SKMD.ParagraphBlock, 0, Array[[Philosophy](#philosophy)]), (SKMD.ParagraphBlock, 0, Array[Philosophy content])])]), (SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Miscellaneous](#misc)])])]",
+  )
+}
+
+@test
+fun block8(): void {
+  parseToBlockTest(
+    Array[
+      "* [Overview](#overview)",
+      "A line",
+      "Other line",
+      "",
+      "",
+      "Just to see what happen",
+    ].join("\n"),
+    "Array[(SKMD.ListBlock, 0, ul-*-1, Array[(SKMD.ParagraphBlock, 0, Array[[Overview](#overview), A line, Other line])]), (SKMD.ParagraphBlock, 0, Array[Just to see what happen])]",
   )
 }
 
@@ -96,7 +157,7 @@ fun html1(): void {
 fun html2(): void {
   convertToHTMLTest(
     Array["# Markdown: Syntax", "other line", "", "paragraph"].join("\n"),
-    `Vector[<div md-kind="chapter" md-level="1">
+    `Vector[<div md-kind="chapter" md-level="1" id="markdown__syntax-other_line">
   <h1>
     Markdown: Syntax
     other line
@@ -122,12 +183,12 @@ fun html3(): void {
       "",
       "paragraph 2.0",
     ].join("\n"),
-    `Vector[<div md-kind="chapter" md-level="1">
+    `Vector[<div md-kind="chapter" md-level="1" id="header_1_0-other_line">
   <h1>
     Header 1.0
     other line
   </h1>
-  <div md-kind="chapter" md-level="2">
+  <div md-kind="chapter" md-level="2" id="header_1_1">
     <h2>
       Header 1.1
     </h2>
@@ -135,7 +196,7 @@ fun html3(): void {
       paragraph 1.1
     </p>
   </div>
-</div>, <div md-kind="chapter" md-level="1">
+</div>, <div md-kind="chapter" md-level="1" id="header_2_0">
   <h1>
     Header 2.0
   </h1>
@@ -241,13 +302,82 @@ fun html6(): void {
       <li md-kind="ul-+-1">
         <p>
           <a href="#autolink">Automatic Links</a>
-              
         </p>
       </li>
     </ul>
   </li>
 </ul>]`,
   )
+}
+
+@test
+fun html7(): void {
+  convertToHTMLTest(
+    Array[
+      "* [Overview](#overview)",
+      "A line",
+      "Other line",
+      "    - [Philosophy](#philosophy)",
+      "",
+      "    Philosophy content",
+      "* [Miscellaneous](#misc)",
+    ].join("\n"),
+    `Vector[<ul>
+  <li md-kind="ul-*-1">
+    <p>
+      <a href="#overview">Overview</a>
+      A line
+      Other line
+    </p>
+    <ul>
+      <li md-kind="ul---1">
+        <p>
+          <a href="#philosophy">Philosophy</a>
+        </p>
+        <p>
+          Philosophy content
+        </p>
+      </li>
+    </ul>
+  </li>
+  <li md-kind="ul-*-1">
+    <p>
+      <a href="#misc">Miscellaneous</a>
+    </p>
+  </li>
+</ul>]`,
+  )
+}
+
+@test
+fun html8(): void {
+  convertToHTMLTest(
+    Array[
+      "* [Overview](#overview)",
+      "A line",
+      "Other line",
+      "",
+      "",
+      "Just to see what happen",
+    ].join("\n"),
+    `Vector[<ul>
+  <li md-kind="ul-*-1">
+    <p>
+      <a href="#overview">Overview</a>
+      A line
+      Other line
+    </p>
+  </li>
+</ul>, <p>
+  Just to see what happen
+</p>]`,
+  )
+}
+
+fun decrTest(test: String, indent: Int, expect: String): void {
+  got = SKMD.Accessor::fromVector(test.chars()).decr(indent).toString();
+  debug((got, expect));
+  T.expectEq(got, expect)
 }
 
 fun parseToBlockTest(test: String, expect: String): void {

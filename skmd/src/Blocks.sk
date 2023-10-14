@@ -82,6 +82,9 @@ class Accessor(
   }
 
   fun decr(v: Int, size: Int = 4): Accessor {
+    if (this.isEmpty()) {
+      return this
+    };
     idx = 0;
     indent = 0;
     loop {
@@ -199,6 +202,23 @@ class Accessor(
 
   fun toArray(): Array<Char> {
     Array::fillBy(this.size(), this.get)
+  }
+
+  fun toIdent(): String {
+    String::fromChars(
+      Array::fillBy(this.size(), idx -> {
+        c = this.get(idx);
+        if (
+          !((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9'))
+        ) {
+          '_'
+        } else {
+          c.uncapitalize()
+        }
+      }),
+    )
   }
 
   fun toString(): String {
@@ -412,7 +432,7 @@ mutable class BodyBlock extends MainBlock {
 }
 
 mutable class ListBlock(
-  indent: Int,
+  mutable indent: Int,
   kind: ListKind,
 ) extends BlockEntity, MainBlock {
   //
@@ -450,6 +470,9 @@ mutable class ListBlock(
   }
 
   mutable fun check(line: Accessor): ?Bool {
+    if (this.optBlock.isNone() && line.isBlank()) {
+      return Some(true)
+    };
     (indent, sline) = line.checkIndent();
     if (
       indent < this.indent ||
@@ -459,6 +482,7 @@ mutable class ListBlock(
     };
     ListBlock::create(sline) match {
     | Some(hb) ->
+      hb.!indent = this.indent + indent;
       this.optBlock.each(block -> {
         this.entities.push(block.close());
         this.!optBlock = Some(hb);
@@ -516,9 +540,20 @@ mutable class BlockQuote extends BlockEntity, MainBlock {
 
 mutable class HeaderBlock(level: Int) extends BlockEntity, MainBlock {
   //
+  readonly fun getId(): ?String {
+    this.entities.maybeGet(0) match {
+    | Some(ParagraphBlock(lines, _header)) ->
+      Some(lines.map(l -> l.toIdent()).join("-"))
+    | _ -> None()
+    }
+  }
+
   static fun create(line: Accessor): ?mutable this {
     count = line.countAsLongAs(c ~> c == '#');
-    if (line.maybeGet(count).map(Chars.isWhitespace).default(true)) {
+    if (
+      count > 0 &&
+      line.maybeGet(count).map(Chars.isWhitespace).default(true)
+    ) {
       hb = mutable HeaderBlock(count);
       header = mutable ParagraphBlock(
         mutable Vector[line.drop(count + 1)],
