@@ -180,17 +180,21 @@ fun convert(entities: Vector<Entity>): Vector<HTMLElement> {
         ),
       )
     | ConfigBlock(_lines) -> print_error("The config block has been ignored.")
-    | HeaderBlock(level, subentities, _) ->
-      elements.push(
-        HTMLElement(
-          "div",
-          Map[
-            "md-kind" => JSON.String("chapter"),
-            "md-level" => JSON.String(level.toString()),
-          ],
-          convert(subentities),
-        ),
-      )
+    | hb @ HeaderBlock(level, subentities, _) ->
+      attrs = hb.getId() match {
+      | Some(id) ->
+        Map[
+          "md-kind" => JSON.String("chapter"),
+          "md-level" => JSON.String(level.toString()),
+          "id" => JSON.String(id),
+        ]
+      | _ ->
+        Map[
+          "md-kind" => JSON.String("chapter"),
+          "md-level" => JSON.String(level.toString()),
+        ]
+      };
+      elements.push(HTMLElement("div", attrs, convert(subentities)))
     | ListBlock(_, kind, subentities, _) ->
       htmlEntities = mutable Vector[];
       htmlEntities.push(
@@ -222,7 +226,8 @@ fun convert(entities: Vector<Entity>): Vector<HTMLElement> {
       | BulletList _ -> "ul"
       | OrederedList _ -> "ol"
       };
-      elements.push(HTMLElement(tag, Map[], htmlEntities.chill()))
+      elements.push(HTMLElement(tag, Map[], htmlEntities.chill()));
+      !idx = idx - 1
     | BlockQuote(subentities, _) ->
       elements.push(
         HTMLElement(
