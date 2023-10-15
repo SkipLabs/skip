@@ -375,24 +375,24 @@ fun toText(elements: Array<TextElement>): String {
   elements.map(textElementToHtml).join("");
 }
 
+// TODO: fill html element
 fun textElementToHtml(elem: TextElement): String {
   elem match {
   | TELink(ltext, link, optTitle) ->
+    url = Url::parse(Accessor::fromVector(link.chars()));
     text = toEncoded(ltext.chars());
     optTitle match {
     | Some(title) ->
-      if (link.endsWith("#")) {
-        `<a href="${link.take(
-          link.length() - 1,
-        )}" title="${title}" target="_blank">${text}</a>`
+      if (url.isAbsolute()) {
+        `<a href="${url.escaped()}" title="${title}" target="_blank">${text}</a>`
       } else {
-        `<a href="${link}" title="${title}">${text}</a>`
+        `<a href="${url.escaped()}" title="${title}">${text}</a>`
       }
     | _ ->
-      if (link.endsWith("#")) {
-        `<a href="${link.take(link.length() - 1)}" target="_blank">${text}</a>`
+      if (url.isAbsolute()) {
+        `<a href="${url.escaped()}" target="_blank">${text}</a>`
       } else {
-        `<a href="${link}">${text}</a>`
+        `<a href="${url.escaped()}">${text}</a>`
       }
     }
   | TEBold(text) -> `<strong>${text}</strong>`

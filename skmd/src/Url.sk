@@ -320,11 +320,71 @@ fun pathEscape(s: Accessor): String {
   escape(s, EncodePathSegment())
 }
 
+fun pathEscapeStr(s: String): String {
+  escapeStr(s, EncodePathSegment())
+}
+
+class Path(elements: Array<String>, hashtag: ?String, withAuthority: Bool) {
+  static fun parse(spec: Accessor, withAuthority: Bool): Path {
+    start = 0;
+    idx = 0;
+    elements = mutable Vector[];
+    hashtag: ?String = None();
+    while (idx < spec.size()) {
+      spec[idx] match {
+      | '/' ->
+        elements.push(spec.slice(start, idx).toString());
+        !start = idx + 1
+      | '#' ->
+        if (start < idx) {
+          elements.push(spec.slice(start, idx).toString());
+          !start = idx + 1
+        };
+        !hashtag = Some(spec.slice(idx + 1, spec.size()).toString());
+        break void
+      | _ -> void
+      };
+      !idx = idx + 1
+    };
+    if (start < idx) {
+      elements.push(spec.slice(start, idx).toString());
+      !start = idx + 1
+    };
+    Path(elements.toArray(), hashtag, withAuthority);
+  }
+
+  fun escaped(): String {
+    isEmpty = this.elements.maybeGet(0).map(v -> v.isEmpty()).default(true);
+    withFirst = isEmpty && this.withAuthority;
+    path =
+      (if (withFirst) "/" else "") + this.elements.map(pathEscapeStr).join("/");
+    this.hashtag match {
+    | Some(hashtag) if (!this.elements.isEmpty()) ->
+      `${path}#${pathEscapeStr(hashtag)}`
+    | Some(hashtag) -> `#${pathEscapeStr(hashtag)}`
+    | _ if (!this.elements.isEmpty()) -> path
+    | _ -> ""
+    }
+  }
+
+  fun toString(): String {
+    isEmpty = this.elements.maybeGet(0).map(v -> v.isEmpty()).default(true);
+    withFirst = isEmpty && this.withAuthority;
+    path = (if (withFirst) "/" else "") + this.elements.join("/");
+    this.hashtag match {
+    | Some(hashtag) if (!this.elements.isEmpty()) -> `${path}#${hashtag}`
+    | Some(hashtag) -> `#${hashtag}`
+    | _ if (!this.elements.isEmpty()) -> path
+    | _ -> ""
+    }
+  }
+}
+
 class Url{
-  protocol: String,
-  host: String,
+  optProtocol: ?String,
+  optHost: ?String,
   optPort: ?Int = None(),
-  optPath: ?String = None(),
+  optPath: ?Path = None(),
   optQuery: ?String = None(),
   optUserInfo: ?String = None(),
 } uses Show {
@@ -355,7 +415,6 @@ class Url{
     } else {
       None()
     };
-    invariant(optProtocol.isSome(), "no protocol");
     optQuery = for (i in Range(start, limit).reversed()) {
       if (spec[i] == '?') {
         query = spec.slice(i + 1, limit);
@@ -444,43 +503,71 @@ class Url{
     };
     // Parse the file path if any
     optPath = if (start < limit) {
-      if (spec[start] == '/' || !withAuthority) {
-        Some(spec.slice(start, limit).toArray())
-      } else {
-        Some(Array['/'].concat(spec.slice(start, limit).toArray()))
-      }
+      Some(Path::parse(spec.slice(start, limit), withAuthority))
     } else {
       None()
     };
     Url{
-      protocol => optProtocol.fromSome(),
-      host => String::fromChars(host),
+      optProtocol,
+      optHost => if (!host.isEmpty()) Some(String::fromChars(host)) else None(),
       optPort,
-      optPath => optPath.map(path -> String::fromChars(path)),
+      optPath,
       optQuery => optQuery.map(query -> String::fromChars(query)),
       optUserInfo,
     }
   }
 
-  fun toString(): String {
-    vec = mutable Vector[this.protocol, ":"];
+  fun isAbsolute(): Bool {
+    this.optProtocol.isSome() && this.optHost.isSome();
+  }
+
+  fun escaped(): String {
+    vec = mutable Vector[];
+    this.optProtocol.each(protocol -> vec.push(protocol + ":"));
     this.optUserInfo match {
     | Some(userInfo) ->
       vec.push("//");
       vec.push(userInfo);
       vec.push("@");
-      vec.push(this.host)
+      this.optHost.each(vec.push)
     | _ ->
-      if (!this.host.isEmpty()) {
+      this.optHost.each(host -> {
         vec.push("//");
-        vec.push(this.host);
-      }
+        vec.push(host);
+      })
     };
     this.optPort.each(port -> {
       vec.push(":");
       vec.push(port.toString());
     });
-    this.optPath.each(path -> vec.push(path));
+    this.optPath.each(path -> vec.push(path.escaped()));
+    this.optQuery.each(query -> {
+      vec.push("?");
+      vec.push(escapeStr(query, EncodeQueryComponent()))
+    });
+    vec.join("");
+  }
+
+  fun toString(): String {
+    vec = mutable Vector[];
+    this.optProtocol.each(protocol -> vec.push(protocol + ":"));
+    this.optUserInfo match {
+    | Some(userInfo) ->
+      vec.push("//");
+      vec.push(userInfo);
+      vec.push("@");
+      this.optHost.each(vec.push)
+    | _ ->
+      this.optHost.each(host -> {
+        vec.push("//");
+        vec.push(host);
+      })
+    };
+    this.optPort.each(port -> {
+      vec.push(":");
+      vec.push(port.toString());
+    });
+    this.optPath.each(path -> vec.push(path.toString()));
     this.optQuery.each(query -> {
       vec.push("?");
       vec.push(query)
