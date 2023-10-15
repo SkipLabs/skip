@@ -548,6 +548,13 @@ mutable class HeaderBlock(level: Int) extends BlockEntity, MainBlock {
     }
   }
 
+  readonly fun getTitle(): Vector<Accessor> {
+    this.entities.maybeGet(0) match {
+    | Some(ParagraphBlock(lines, _header)) -> lines
+    | _ -> Vector[]
+    }
+  }
+
   static fun create(line: Accessor): ?mutable this {
     count = line.countAsLongAs(c ~> c == '#');
     if (

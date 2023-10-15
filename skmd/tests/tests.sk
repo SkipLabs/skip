@@ -374,6 +374,16 @@ fun html8(): void {
   )
 }
 
+@test
+fun html9(): void {
+  convertToHTMLTest(
+    "<strong>test &acute;</strong>",
+    `Vector[<p>
+  <strong>test &acute;</strong>
+</p>]`,
+  )
+}
+
 fun decrTest(test: String, indent: Int, expect: String): void {
   got = SKMD.Accessor::fromVector(test.chars()).decr(indent).toString();
   debug((got, expect));

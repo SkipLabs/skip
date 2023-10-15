@@ -32,6 +32,7 @@ class Config{
   footer: ?String = None(),
   lang: ?String = None(),
   charset: ?String = None(),
+  tableOfContent: Int = -1,
 } {
   //
   static fun fromJSON(jsv: JSON.Value): Config {
@@ -52,6 +53,7 @@ class Config{
       footer => jso.maybeGetString("footer").map(readTextFile),
       lang => jso.maybeGetString("lang"),
       charset => jso.maybeGetString("charset"),
+      tableOfContent => jso.maybeGetInt("tableOfContent").default(-1),
     }
   }
 
@@ -108,32 +110,54 @@ fun convertToHtml{
   buffer: mutable Vector<String>,
   conf: Config,
 }: void {
-  body_content = convert(parseToBlocks(markdown));
+  entities = parseToBlocks(markdown);
+  body_content = convert(entities);
   elements = mutable Vector<HTMLEntity>[];
   conf.fill(elements);
+  sublinks = toMenu(entities, conf.tableOfContent, 0);
+  tableOfContent = if (!sublinks.isEmpty()) {
+    Vector[
+      HTMLElement(
+        "ul",
+        Map[
+          "class" => JSON.String("tableOfContent"),
+          "md-depth" => JSON.String("0"),
+        ],
+        sublinks,
+      ),
+    ]
+  } else {
+    Vector[]
+  };
   html = HTMLElement(
     "html",
     Map["lang" => JSON.String(conf.lang.default("en"))],
-    Vector[
-      HTMLElement("head", Map[], elements.chill()),
-      HTMLElement(
-        "body",
-        Map[],
-        Vector[
-          HTMLElement(
-            "div",
-            Map["class" => JSON.String("header")],
-            conf.header.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
-          ),
-          HTMLElement("div", Map["class" => JSON.String("body")], body_content),
-          HTMLElement(
-            "div",
-            Map["class" => JSON.String("footer")],
-            conf.footer.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
-          ),
-        ],
-      ),
-    ],
+    tableOfContent.concat(
+      Vector[
+        HTMLElement("head", Map[], elements.chill()),
+        HTMLElement(
+          "body",
+          Map[],
+          Vector[
+            HTMLElement(
+              "div",
+              Map["class" => JSON.String("header")],
+              conf.header.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
+            ),
+            HTMLElement(
+              "div",
+              Map["class" => JSON.String("body")],
+              body_content,
+            ),
+            HTMLElement(
+              "div",
+              Map["class" => JSON.String("footer")],
+              conf.footer.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
+            ),
+          ],
+        ),
+      ],
+    ),
   );
   html.print(buffer, "");
 }
@@ -144,7 +168,13 @@ fun convert(entities: Vector<Entity>): Vector<HTMLElement> {
   while (idx < entities.size()) {
     entities[idx] match {
     | ParagraphBlock(lines, header) ->
-      children_ = lines.map(l -> HTMLText(splitAccessor(l)));
+      children_ = lines.map(l ->
+        if (l.maybeGet(0) == Some('<')) {
+          HTMLHtml(l.toString());
+        } else {
+          HTMLText(splitAccessor(l));
+        }
+      );
       if (header > 6) {
         elements.push(
           HTMLElement(
@@ -283,6 +313,12 @@ class HTMLInclude(html: String) extends HTMLEntity {
   }
 }
 
+class HTMLHtml(text: String) extends HTMLEntity {
+  fun print(buffer: mutable Vector<String>, prefix: String): void {
+    buffer.push(`${prefix}${this.text}`)
+  }
+}
+
 class HTMLText(text: Array<TextElement>) extends HTMLEntity {
   fun print(buffer: mutable Vector<String>, prefix: String): void {
     buffer.push(`${prefix}${toText(this.text)}`)
@@ -364,4 +400,45 @@ fun textElementToHtml(elem: TextElement): String {
   | TECode(text) -> `<code>${text}</code>`
   | TEText(text) -> `${text}`
   }
+}
+
+fun toMenu(entities: Vector<Entity>, max: Int, depth: Int): Vector<HTMLEntity> {
+  if (max == depth) {
+    return Vector[];
+  };
+  items = mutable Vector<HTMLEntity>[];
+  entities.each(entity ->
+    entity match {
+    | hb @ HeaderBlock _ ->
+      hb.getId().each(id -> {
+        title = hb.getTitle().map(l -> HTMLText(splitAccessor(l)));
+        sublinks = toMenu(hb.entities, max, depth + 1);
+        children_ = if (!sublinks.isEmpty()) {
+          Vector[
+            HTMLElement(
+              "ul",
+              Map[
+                "class" => JSON.String("tableOfContent"),
+                "md-depth" => JSON.String(depth.toString()),
+              ],
+              sublinks,
+            ),
+          ]
+        } else {
+          Vector[]
+        };
+        items.push(
+          HTMLElement(
+            "li",
+            Map[],
+            Vector[
+              HTMLElement("a", Map["href" => JSON.String(`#${id}`)], title),
+            ].concat(children_),
+          ),
+        )
+      })
+    | _ -> void
+    }
+  );
+  items.chill();
 }
