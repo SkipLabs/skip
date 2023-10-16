@@ -521,19 +521,9 @@ mutable class AccessSolver private {
     mutable static{
       userUUID,
       userMask => userPermissions,
-      tables => SortedMap[],
       cache => SortedMap[],
       currentTick => SKStore.Tick(-1),
     }
-  }
-
-  mutable fun addTable(
-    dirName: SKStore.DirName,
-    authorIdx: ?Int,
-    accessIdx: ?Int,
-  ): void {
-    tableIndexes = SKStore.TableIndexes(authorIdx, accessIdx);
-    this.!tables[dirName] = tableIndexes;
   }
 
   private mutable fun getPermissions(
@@ -601,26 +591,6 @@ mutable class AccessSolver private {
     groupUUID: String,
   ): Bool {
     this.getPermissions(context, groupUUID).canDelete()
-  }
-
-  readonly fun clone(): this {
-    static{
-      userUUID => this.userUUID,
-      userMask => this.userMask,
-      tables => this.tables,
-      cache => this.cache,
-      currentTick => this.currentTick,
-    }
-  }
-
-  readonly fun mclone(): mutable this {
-    mutable static{
-      userUUID => this.userUUID,
-      userMask => this.userMask,
-      tables => this.tables,
-      cache => this.cache,
-      currentTick => this.currentTick,
-    }
   }
 }
 

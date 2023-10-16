@@ -526,6 +526,15 @@ fun replayDiff(
   | _ -> void
   };
 
+  accessSolverOpt = userFileOpt.map(userFile ->
+    (
+      SKDB.AccessSolver::create(context, userFile.name),
+      table.name.origName,
+      SKDB.getAuthorIdx(table),
+      SKDB.getGroupIdx(table),
+    )
+  );
+
   try {
     loop {
       line = getLine();
@@ -602,11 +611,18 @@ fun replayDiff(
           table,
           repeatOpt.fromSome(),
         );
-        userFileOpt match {
-        | None() -> void
-        | Some(userFile) ->
-          for (row in newRows) {
-            SKDB.checkUserCanWriteRow(context, userFile, table, row) match {
+        for (row in newRows) {
+          accessSolverOpt match {
+          | None() -> void
+          | Some((accessSolver, tableName, authorCol, accessCol)) ->
+            SKDB.checkUserCanWriteRow(
+              context,
+              accessSolver,
+              () ~> tableName,
+              authorCol,
+              accessCol,
+              row,
+            ) match {
             | SKDB.AROK() -> void
             | SKDB.ARError(err) ->
               print_error("Error: " + err.toString());
