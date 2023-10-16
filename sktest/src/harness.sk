@@ -36,23 +36,22 @@ fun test_job(
         file => test.file,
         line => test.lineno,
       };
-      // TODO: Use more accurate clock.
-      start = Time.time();
+      start = Time.time_ms();
       !res = try {
         _ = test.func();
-        res with {result => "success", time => Time.time() - start}
+        res with {result => "success", time => Time.time_ms() - start}
       } catch {
       | ExpectationError(msg, _, _) ->
         res with {
           result => "failure",
-          time => Time.time() - start,
+          time => Time.time_ms() - start,
           failure_type => "ExpectationError",
           failure_message => msg,
         }
       | exn ->
         res with {
           result => "error",
-          time => Time.time() - start,
+          time => Time.time_ms() - start,
           failure_type => inspect(exn).toString(),
           failure_message => exn.getMessage(),
         }
