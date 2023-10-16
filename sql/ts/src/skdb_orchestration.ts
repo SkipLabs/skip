@@ -1,5 +1,5 @@
 import { Environment } from "#std/sk_types";
-import { SkdbMechanism, metadataTable, RemoteSKDB, Params } from "#skdb/skdb_types";
+import { SkdbMechanism, metadataTable, RemoteSKDB, Params, MirrorDefn } from "#skdb/skdb_types";
 
 const npmVersion = "";
 
@@ -1406,7 +1406,11 @@ class SKDBServer implements RemoteSKDB {
     });
   }
 
-  private async establishLocalTail(tableName: string): Promise<string> {
+  private async establishLocalTail(tables: string[]): Promise<string> {
+    if (tables.length < 1) {
+      throw new Error("Must specify at least one table")
+    }
+
     const stream = await this.connection.openResilientStream();
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
@@ -1424,12 +1428,12 @@ class SKDBServer implements RemoteSKDB {
 
     const request: ProtoPushPromise = {
       type: "pushPromise",
-      table: tableName,
+      table: tables[0],
     };
 
     stream.send(encodeProtoMsg(request));
 
-    let fileName = tableName + "_" + this.creds.accessKey;
+    let fileName = tables.join("_") + "_" + this.creds.accessKey;
 
     client.watchFile(fileName, payload => {
       stream.send(encodeProtoMsg({
@@ -1439,25 +1443,26 @@ class SKDBServer implements RemoteSKDB {
       stream.expectingData();
     });
 
-    const session = client.subscribe(this.replicationUid, [tableName], fileName);
+    const session = client.subscribe(this.replicationUid, tables, fileName);
 
     stream.onReconnect = () => {
       stream.send(encodeProtoMsg(request));
-      const diff = client.diff(
-        client.watermark(
-          this.replicationUid,
-          metadataTable(tableName)
-        ),
-        session
-      );
-      if (!diff) {
-        return;
-      }
-      stream.send(encodeProtoMsg({
-        type: "data",
-        payload: diff,
-      }));
-      stream.expectingData();
+      // TODO: uncomment once we have multi-table diff
+      // const diff = client.diff(
+      //   client.watermark(
+      //     this.replicationUid,
+      //     metadataTable(tableName)
+      //   ),
+      //   session
+      // );
+      // if (!diff) {
+      //   return;
+      // }
+      // stream.send(encodeProtoMsg({
+      //   type: "data",
+      //   payload: diff,
+      // }));
+      // stream.expectingData();
     };
 
     return session;
@@ -1489,34 +1494,54 @@ class SKDBServer implements RemoteSKDB {
     return acc;
   }
 
-  async mirror(tableName: string, filterExpr?: string): Promise<void> {
-    if (this.mirroredTables.has(tableName)) {
-      return;
-    }
-    let isViewOnRemote = await this.viewSchema(tableName) != "";
-    // TODO: just assumes that if it exists the schema is the same
-    if (!this.client.tableExists(tableName)) {
-      let createTable = await this.tableSchema(tableName);
-      await Promise.all([
-        this.client.exec(createTable),
-        this.client.exec(`CREATE TABLE ${metadataTable(tableName)} (
+  async mirror(...tables: MirrorDefn[]): Promise<void> {
+    const setupTable = async (tableName: string) => {
+      if (this.mirroredTables.has(tableName)) {
+        throw new Error(`${tableName} is already a member of a mirror set.`);
+      }
+
+      let isViewOnRemote = await this.viewSchema(tableName) != "";
+
+      if (!this.client.tableExists(tableName)) {
+        let createTable = await this.tableSchema(tableName);
+        await Promise.all([
+          this.client.exec(createTable),
+          this.client.exec(`CREATE TABLE ${metadataTable(tableName)} (
             key STRING PRIMARY KEY,
             value STRING
           )`),
-      ]);
-      if (isViewOnRemote) {
-        this.client.toggleView(tableName);
+        ]);
+        if (isViewOnRemote) {
+          this.client.toggleView(tableName);
+        }
       }
-    }
 
-    this.client.assertCanBeMirrored(tableName);
-    let session = "@view"
-    if (!isViewOnRemote) {
-      session = await this.establishLocalTail(tableName);
-    }
+      this.client.assertCanBeMirrored(tableName);
 
-    this.mirroredTables.set(tableName, session);
-    return this.establishServerTail(tableName, filterExpr || "");
+      if (isViewOnRemote) {
+        this.mirroredTables.set(tableName, "@view");
+      }
+    };
+
+    const tableNames = tables.map(
+      mirrorDef => (typeof mirrorDef === "string") ? mirrorDef : mirrorDef.table
+    );
+
+    await Promise.all(tableNames.map(tableName => setupTable(tableName)));
+
+    const session = await this.establishLocalTail(tableNames);
+    tableNames.forEach(tableName => {
+      // if it's a view, will already be there
+      if (!this.mirroredTables.has(tableName)) {
+        this.mirroredTables.set(tableName, session);
+      }
+    });
+
+    await Promise.all(tables.map(mirrorDef => {
+      const tableName = (typeof mirrorDef === "string") ? mirrorDef : mirrorDef.table;
+      const filterExpr = (typeof mirrorDef === "string") ? "" : (mirrorDef.filterExpr || "");
+      return this.establishServerTail(tableName, filterExpr);
+    }));
   }
 
   async exec(stdin: string, params: Params = new Map()): Promise<any[]> {
