@@ -56,6 +56,9 @@ class Env implements Environment {
     return "node";
   }
   fetch(path: string) {
+    if (path.startsWith("file://")) {
+      path = path.substring(7);
+    }
     return new Promise<Uint8Array>(function (resolve, reject) {
       fs.readFile(path, {}, (err, data) => {
         err ? reject(err) : resolve(data);
