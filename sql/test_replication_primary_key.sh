@@ -25,17 +25,14 @@ setup_server() {
 
     $SKDB < "$SCRIPT_DIR/privacy/init.sql"
 
-    (echo "BEGIN TRANSACTION;";
-     echo "INSERT INTO skdb_users VALUES('test_user', 'test');"
-     echo "COMMIT;"
-    ) | $SKDB
+    echo "INSERT INTO skdb_users VALUES('test_user', 'test');" | $SKDB
 
-    echo "INSERT INTO skdb_table_permissions values ('test_with_pk', 7);" | $SKDB
-    echo "INSERT INTO skdb_table_permissions values ('test_pk_alt', 7);" | $SKDB
+    echo "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');" | $SKDB
+    echo "INSERT INTO skdb_group_permissions VALUES('GALL', NULL, 7, 'root');" | $SKDB
 
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
     # out of first position and a string
-    echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY);" | $SKDB
+    echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY, skdb_access STRING);" | $SKDB
 }
 
 setup_local() {
@@ -46,8 +43,8 @@ setup_local() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
-    echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY);" | $SKDB
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY, skdb_access STRING);" | $SKDB
 
     $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" > $SESSION
 }
@@ -79,7 +76,7 @@ setup_local2() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
 
     $SKDB_BIN subscribe --data $LOCAL2_DB --connect --format=csv --updates $UPDATES2 --ignore-source 7777 "$table" > $SESSION2
 }
@@ -157,9 +154,9 @@ test_basic_replication_unique_rows() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar','GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz','GALL');"
 
     replicate_to_server test_with_pk
 
@@ -175,9 +172,9 @@ test_basic_replication_unique_rows_replayed() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar','GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz','GALL');"
 
     replicate_to_server test_with_pk
 
@@ -203,8 +200,8 @@ test_basic_replication_unique_rows_server_state_different() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     output=$(mktemp)
     $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -229,7 +226,7 @@ test_basic_replication_null_string() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = NULL WHERE id = 0;"
 
     replicate_to_server test_with_pk
@@ -244,7 +241,7 @@ test_basic_replication_null_string() {
     session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect)
     $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
     # we want the output to contain a null representation
-    assert_line_count "$output" "1	0,$" 1
+    assert_line_count "$output" "1	0,,\"GALL\"$" 1
     rm -f "$output"
 }
 
@@ -252,7 +249,7 @@ test_basic_replication_empty_string() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = '' WHERE id = 0;"
 
     replicate_to_server test_with_pk
@@ -275,7 +272,7 @@ test_basic_replication_escaped_string() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = 'what''s up?' WHERE id = 0;"
 
     replicate_to_server test_with_pk
@@ -295,7 +292,7 @@ test_basic_replication_escaped_string_alt() {
     setup_server
     setup_local test_pk_alt
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_pk_alt VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_pk_alt VALUES(0,'foo','GALL');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_pk_alt SET id = 'what''s up?' WHERE x = 0;"
 
     replicate_to_server test_pk_alt
@@ -315,7 +312,7 @@ test_basic_replication_with_deletes() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_server test_with_pk
     assert_server_rows_has 1 foo
 
@@ -323,25 +320,25 @@ test_basic_replication_with_deletes() {
     replicate_to_server test_with_pk
     assert_server_rows_has 0 foo
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     replicate_to_server test_with_pk
     assert_server_rows_has 0 foo
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_server test_with_pk
     assert_server_rows_has 1 foo
 }
 
 test_basic_replication_with_deletes_server_state_different() {
     setup_server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     setup_local test_with_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     replicate_to_server test_with_pk
 
@@ -358,7 +355,7 @@ test_seen_insert_deleted() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -377,14 +374,14 @@ test_unseen_insert_not_deleted() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
     # local has seen up to 0,'foo'
     # but not this
     $SKDB_BIN --data $SERVER_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
 
@@ -400,17 +397,17 @@ test_unseen_insert_added_to() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
     # local has seen up to 0,'foo'
     # but not this
     $SKDB_BIN --data $SERVER_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_server test_with_pk
 
@@ -424,7 +421,7 @@ test_seen_insert_clobbered() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -444,7 +441,7 @@ test_seen_insert_clobbered_alt() {
     setup_server
     setup_local test_pk_alt
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_pk_alt VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_pk_alt VALUES(0,'foo','GALL');"
 
     replicate_to_local test_pk_alt
 
@@ -463,14 +460,14 @@ test_unseen_insert_not_updated() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
     # local has seen up to 0,'foo'
     # but not this
     $SKDB_BIN --data $SERVER_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
 
@@ -488,7 +485,7 @@ test_unseen_update_is_updated() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -513,7 +510,7 @@ test_unseen_update_is_not_updated() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -538,7 +535,7 @@ test_unseen_insert_is_updated() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -547,7 +544,7 @@ test_unseen_insert_is_updated() {
     $SKDB_BIN --data $SERVER_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_server test_with_pk
 
@@ -563,7 +560,7 @@ test_unseen_delete_gets_clobbered() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -572,7 +569,7 @@ test_unseen_delete_gets_clobbered() {
     $SKDB_BIN --data $SERVER_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_server test_with_pk
 
@@ -589,7 +586,7 @@ test_unseen_delete_does_not_affect_delete() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -612,7 +609,7 @@ test_concurrent_clients_updating_winner_gets_there_first() {
     setup_local test_with_pk
     setup_local2 test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
     replicate_to_local2 test_with_pk
@@ -657,7 +654,7 @@ test_concurrent_clients_updating_winner_gets_there_second() {
     setup_local test_with_pk
     setup_local2 test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
     replicate_to_local2 test_with_pk
@@ -702,12 +699,12 @@ test_reconnect_replayed() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_server test_with_pk
     replicate_to_server test_with_pk
@@ -723,7 +720,7 @@ test_reconnect_replayed_with_update() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -744,15 +741,15 @@ test_replayed_with_more_local_data() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_server test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_server test_with_pk
 
     output=$(mktemp)
@@ -766,7 +763,7 @@ test_replayed_with_further_updates() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
@@ -788,7 +785,7 @@ test_replayed_with_further_updates_lesser_row_value() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
@@ -811,16 +808,16 @@ test_reconnect_replayed_with_more_local_data() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_server test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     # this is a reconnect, we figure out the diff
     replicate_diff_to_server test_with_pk 0
 
@@ -835,7 +832,7 @@ test_reconnect_replayed_with_further_updates() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -859,7 +856,7 @@ test_reconnect_replayed_with_further_updates_lesser_row_value() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
 
     replicate_to_local test_with_pk
 
@@ -884,17 +881,17 @@ test_old_diff_replayed() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     # stash what would have been sent up
     save=$(mktemp)
     cp $UPDATES "$save"
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_server test_with_pk
 
     # restore and replay
@@ -913,17 +910,17 @@ test_reconnect_old_diff_replayed() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     # stash what would have been sent up
     save=$(mktemp)
     cp $UPDATES "$save"
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_diff_to_server test_with_pk 0
 
     # restore and replay
@@ -942,7 +939,7 @@ test_old_diff_replayed_with_update() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
@@ -971,7 +968,7 @@ test_reconnect_old_diff_replayed_with_update() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
@@ -1000,7 +997,7 @@ test_old_diff_replayed_with_update_lesser_row_value() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
@@ -1030,7 +1027,7 @@ test_reconnect_old_diff_replayed_with_update_lesser_row_value() {
     setup_server
     setup_local test_with_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','GALL');"
     replicate_to_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"

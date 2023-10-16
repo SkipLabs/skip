@@ -20,8 +20,9 @@ setup_server() {
     $SKDB < privacy/init.sql
 
     echo "INSERT INTO skdb_users VALUES('test_user', 'pass');" | $SKDB
-    echo "INSERT INTO skdb_table_permissions VALUES('test_without_access', 7);" | $SKDB
-    echo "CREATE TABLE test_without_access (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    echo "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');" | $SKDB
+    echo "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7, 'root');" | $SKDB
+    echo "CREATE TABLE test (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
 }
 
 setup_local() {
@@ -31,13 +32,13 @@ setup_local() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
-    echo "CREATE TABLE test_without_access (id INTEGER PRIMARY KEY, note STRING);" | $SKDB
+    echo "CREATE TABLE test (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
 
-    $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $UPDATES test_without_access > /dev/null
+    $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $UPDATES test > /dev/null
 }
 
 replicate_to_server() {
-    $SKDB_BIN write-csv --data $SERVER_DB --user test_user test_without_access < $UPDATES > /dev/null
+    $SKDB_BIN write-csv --data $SERVER_DB --user test_user test < $UPDATES > /dev/null
 }
 
 assert_line_count() {
@@ -61,13 +62,13 @@ test_server_accepts_write_no_access_no_author_cols() {
     setup_local
 
     # write in to local
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_access VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     replicate_to_server
 
     # expect data at server
     output=$(mktemp)
-    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_access;' > "$output"
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test;' > "$output"
     assert_line_count "$output" hello 1
     rm -f "$output"
 }
@@ -77,13 +78,13 @@ test_server_tails_no_access_no_author_cols() {
     setup_local
 
     # write in to local
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_access VALUES(0,'hello');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
 
     replicate_to_server
     # assume data is there
 
     # tail
-    session=$($SKDB_BIN --data $SERVER_DB subscribe --connect test_without_access)
+    session=$($SKDB_BIN --data $SERVER_DB subscribe --connect test)
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB tail --user test_user --format=csv "$session" > "$output"
     assert_line_count "$output" hello 1

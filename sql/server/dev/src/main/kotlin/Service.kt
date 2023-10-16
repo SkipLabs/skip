@@ -317,7 +317,7 @@ fun usersHandler(): HttpHandler {
         exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
         exchange.responseSender.send(
             skdb!!
-                .sql("SELECT userName as accessKey, privateKey FROM skdb_users", OutputFormat.JSON)
+                .sql("SELECT userUUID as accessKey, privateKey FROM skdb_users", OutputFormat.JSON)
                 .decodeOrThrow())
       } else {
         exchange.statusCode = StatusCodes.METHOD_NOT_ALLOWED
