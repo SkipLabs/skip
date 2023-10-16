@@ -129,35 +129,29 @@ fun convertToHtml{
   } else {
     Vector[]
   };
+  body_elements = Vector[
+    HTMLElement(
+      "div",
+      Map["class" => JSON.String("header")],
+      conf.header.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
+    ),
+  ].concat(tableOfContent).concat(
+    Vector[
+      HTMLElement("div", Map["class" => JSON.String("body")], body_content),
+      HTMLElement(
+        "div",
+        Map["class" => JSON.String("footer")],
+        conf.footer.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
+      ),
+    ],
+  );
   html = HTMLElement(
     "html",
     Map["lang" => JSON.String(conf.lang.default("en"))],
-    tableOfContent.concat(
-      Vector[
-        HTMLElement("head", Map[], elements.chill()),
-        HTMLElement(
-          "body",
-          Map[],
-          Vector[
-            HTMLElement(
-              "div",
-              Map["class" => JSON.String("header")],
-              conf.header.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
-            ),
-            HTMLElement(
-              "div",
-              Map["class" => JSON.String("body")],
-              body_content,
-            ),
-            HTMLElement(
-              "div",
-              Map["class" => JSON.String("footer")],
-              conf.footer.map(h -> Vector[HTMLInclude(h)]).default(Vector[]),
-            ),
-          ],
-        ),
-      ],
-    ),
+    Vector[
+      HTMLElement("head", Map[], elements.chill()),
+      HTMLElement("body", Map[], body_elements),
+    ],
   );
   html.print(buffer, "");
 }
@@ -272,10 +266,10 @@ fun convert(entities: Vector<Entity>): Vector<HTMLElement> {
   elements.chill()
 }
 
-mutable base class HTMLEntity {
+mutable base class HTMLEntity uses Show {
   readonly fun print(buffer: mutable Vector<String>, prefix: String): void;
 
-  fun toString(): String {
+  readonly fun toString(): String {
     buffer = mutable Vector<String>[];
     this.print(buffer, "");
     buffer.join("\n");
