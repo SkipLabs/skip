@@ -25,7 +25,7 @@ function UserSelector(
   const list = users.map(user => <option value={user} key={user}>{user}</option>)
   return (
     <Section heading="Current user">
-      <div className="users-panel">
+      <div className="users-panel" onMouseDown={e => e.stopPropagation()}>
         <select onChange={e => select(e.target.value)}>
           {list}
         </select>
