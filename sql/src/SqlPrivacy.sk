@@ -47,10 +47,10 @@ value class Permission(private perm: Int) {
 /*****************************************************************************/
 
 const skdbAuthorColName: Name = Name::create("skdb_author");
-const skdbGroupColName: Name = Name::create("skdb_group");
+const skdbAccessColName: Name = Name::create("skdb_access");
 const tableNameColName: Name = Name::create("tableName");
-const groupNameColName: Name = Name::create("groupName");
-const userNameColName: Name = Name::create("userName");
+const groupUUIDColName: Name = Name::create("groupUUID");
+const userUUIDColName: Name = Name::create("userUUID");
 const permissionsColName: Name = Name::create("permissions");
 
 /*****************************************************************************/
@@ -129,7 +129,7 @@ base class PredefinedTable private final {
     user: UserFile,
     tick: SKStore.Tick,
   ): Bool {
-    colNbr = this.columns.maybeGet(userNameColName.lower) match {
+    colNbr = this.columns.maybeGet(userUUIDColName.lower) match {
     | None() -> return false
     | Some(x) -> x
     };
@@ -228,15 +228,15 @@ class PredefinedIndex(
 class UserFile(name: String) extends SKStore.File {
   static fun create(
     context: readonly SKStore.Context,
-    userName: String,
+    userUUID: String,
   ): UserFile {
     skdbUsersByName
       .getIndex(context)
-      .get(skdbUsersByName.makeKey(userName)) match {
+      .get(skdbUsersByName.makeKey(userUUID)) match {
     | None() ->
-      print_error("Could not find user: " + userName);
+      print_error("Could not find user: " + userUUID);
       skipExit(2)
-    | Some(_) -> UserFile(userName)
+    | Some(_) -> UserFile(userUUID)
     }
   }
 }
@@ -247,18 +247,18 @@ class SKDBUsersByName extends PredefinedTable {
   const name: Name = Name::create("skdb_users");
 
   const schemaText: String = `(
-    userName STRING PRIMARY KEY,
+    userUUID STRING PRIMARY KEY,
     permissions INTEGER NOT NULL
   )`;
 
   // Be careful when changing this schema, make sure that the
   // indexedFields match the function that creates the key.
 
-  const indexedFields: Array<Name> = Array[Name::create("userName")];
+  const indexedFields: Array<Name> = Array[Name::create("userUUID")];
 
-  fun makeKey(userName: String): IndexProjKey {
+  fun makeKey(userUUID: String): IndexProjKey {
     IndexProjKey(
-      Array[(this.getColNbr(userNameColName), Some(CString(userName)))],
+      Array[(this.getColNbr(userUUIDColName), Some(CString(userUUID)))],
     )
   }
 }
@@ -273,109 +273,48 @@ class SKDBUserPermissions extends PredefinedTable {
   const name: Name = Name::create("skdb_user_permissions");
 
   const schemaText: String = `(
-    userName STRING PRIMARY KEY,
+    userUUID STRING PRIMARY KEY,
     permissions INTEGER NOT NULL
   )`;
 
   // Be careful when changing this schema, make sure that the
   // indexedFields match the function that creates the key.
 
-  const indexedFields: Array<Name> = Array[Name::create("userName")];
+  const indexedFields: Array<Name> = Array[Name::create("userUUID")];
 
-  fun makeKey(userName: ?String): IndexProjKey {
+  fun makeKey(userUUID: ?String): IndexProjKey {
     IndexProjKey(
-      Array[(this.getColNbr(userNameColName), userName.map(x -> CString(x)))],
+      Array[(this.getColNbr(userUUIDColName), userUUID.map(x -> CString(x)))],
     )
   }
 }
 
 /*****************************************************************************/
-/* The skdb_table_permissions table. */
-/*****************************************************************************/
-
-const skdbTablePermissions: SKDBTablePermissions = SKDBTablePermissions::create();
-
-class SKDBTablePermissions extends PredefinedTable {
-  const name: Name = Name::create("skdb_table_permissions");
-
-  const schemaText: String = `(
-    tableName STRING PRIMARY KEY,
-    permissions INTEGER NOT NULL
-  )`;
-
-  // Be careful when changing this schema, make sure that the
-  // indexedFields match the function that creates the key.
-
-  const indexedFields: Array<Name> = Array[Name::create("tableName")];
-
-  fun makeKey(tableName: ?String): IndexProjKey {
-    IndexProjKey(
-      Array[(this.getColNbr(tableNameColName), tableName.map(x -> CString(x)))],
-    )
-  }
-
-  // Determines if a change in a directoy affects a given user
-  fun hasChanged(
-    context: readonly SKStore.Context,
-    tableName: Name,
-    tick: SKStore.Tick,
-  ): Bool {
-    colNbr = this.getColNbr(tableNameColName);
-    dir = context.unsafeMaybeGetEagerDir(this.dirName) match {
-    | None() ->
-      print_error(
-        "Error: could not find ${static::name}, privacy layer not initialized",
-      );
-      skipExit(2)
-    | Some(x) -> x
-    };
-
-    (isReset, changes) = dir.getChangesAfter(tick);
-    if (isReset) return true;
-    for (change in changes) {
-      change match {
-      | RowKey(row, _) ->
-        row.getString(colNbr) match {
-        | None() ->
-          // The permissions for all tables changed
-          return true
-        | Some(x) if (x == tableName.lower) ->
-          // The permissions for this specific table changed
-          return true
-        | Some _ -> void
-        }
-      | _ -> invariant_violation("Unexpected key type")
-      }
-    };
-    false
-  }
-}
-
-/*****************************************************************************/
-/* The skdb_group_permissions table. */
+/* The skdb_group_permissions_joined table. */
 /*****************************************************************************/
 
 const skdbGroupPermissions: SKDBGroupPermissions = SKDBGroupPermissions::create();
 
 class SKDBGroupPermissions extends PredefinedTable {
-  const name: Name = Name::create("skdb_group_permissions");
+  const name: Name = Name::create("skdb_group_permissions_joined");
 
   const schemaText: String = `(
-    groupName STRING NOT NULL,
-    userName STRING,
-    permissions INTEGER NOT NULL
+    groupUUID STRING NOT NULL,
+    userUUID STRING,
+    permissions INTEGER NOT NULL,
+    skdb_access STRING
   )`;
 
   const indexedFields: Array<Name> = Array[
-    Name::create("groupName"),
-    Name::create("userName"),
+    Name::create("groupUUID"),
+    Name::create("userUUID"),
   ];
 
-  fun makeKey(groupName: String, userName: ?String): IndexProjKey {
+  fun makeKey(groupUUID: String, userUUID: ?String): IndexProjKey {
     IndexProjKey(
       Array[
-        (this.getColNbr(groupNameColName), Some(CString(groupName))),
-        (this.getColNbr(userNameColName), userName.map(x -> CString(x))),
+        (this.getColNbr(groupUUIDColName), Some(CString(groupUUID))),
+        (this.getColNbr(userUUIDColName), userUUID.map(x -> CString(x))),
       ],
     )
   }
@@ -391,61 +330,61 @@ base class AccessResult() {
   | ARError(AccessResultError)
 }
 
-base class AccessResultError{userName: String} uses Show {
+base class AccessResultError{userUUID: String} uses Show {
   children =
   | ARENullAuthor{}
   | AREWrongAuthor{foundUserName: String}
   | AREWrongAuthorType{}
-  | ARECannotDelete{groupName: String}
-  | ARECannotInsert{groupName: String}
+  | ARECannotDelete{groupUUID: String}
+  | ARECannotInsert{groupUUID: String}
   | ARECannotDeleteFromTable{tableName: String}
   | ARECannotInsertIntoTable{tableName: String}
-  | ARECannotRead{groupName: ?String}
+  | ARECannotRead{groupUUID: ?String}
   | ARECannotReadFromTable{tableName: String}
 
   fun toString(): String
   | ARENullAuthor{} ->
-    "The field skdb_author can only be set to the userName " +
+    "The field skdb_author can only be set to the userUUID " +
       "of the connected user " +
       " (user " +
-      this.userName +
+      this.userUUID +
       ")"
   | AREWrongAuthor{foundUserName} ->
     "skdb_author is set to the wrong id " +
       " expected " +
-      this.userName +
+      this.userUUID +
       " (found " +
       foundUserName +
       ")" +
       " (user " +
-      this.userName +
+      this.userUUID +
       ")"
   | AREWrongAuthorType{} ->
-    "skdb_author is expected to be an integer" + " (user " + this.userName + ")"
-  | ARECannotDelete{groupName} ->
-    "cannot delete with skdb_group set to " +
-      groupName +
+    "skdb_author is expected to be an integer" + " (user " + this.userUUID + ")"
+  | ARECannotDelete{groupUUID} ->
+    "cannot delete with skdb_access set to " +
+      groupUUID +
       " (user " +
-      this.userName +
+      this.userUUID +
       ")"
-  | ARECannotInsert{groupName} ->
-    "cannot insert with skdb_group set to " +
-      groupName +
+  | ARECannotInsert{groupUUID} ->
+    "cannot insert with skdb_access set to " +
+      groupUUID +
       " (user " +
-      this.userName +
+      this.userUUID +
       ")"
-  | ARECannotRead{groupName} ->
-    "cannot read with skdb_group set to " +
-      groupName +
+  | ARECannotRead{groupUUID} ->
+    "cannot read with skdb_access set to " +
+      groupUUID +
       " (user " +
-      this.userName +
+      this.userUUID +
       ")"
   | ARECannotDeleteFromTable{tableName} ->
-    "cannot delete from table " + tableName + " (user " + this.userName + ")"
+    "cannot delete from table " + tableName + " (user " + this.userUUID + ")"
   | ARECannotInsertIntoTable{tableName} ->
-    "cannot insert into " + tableName + " (user " + this.userName + ")"
+    "cannot insert into " + tableName + " (user " + this.userUUID + ")"
   | ARECannotReadFromTable{tableName} ->
-    "cannot read from " + tableName + " (user " + this.userName + ")"
+    "cannot read from " + tableName + " (user " + this.userUUID + ")"
 }
 
 fun checkUserCanReadRow(
@@ -454,94 +393,92 @@ fun checkUserCanReadRow(
   table: DirDescr,
   row: RowValues,
 ): AccessResult {
-  access = AccessSolver::create(context, user.name, table);
-  if (!access.canReadTable()) {
-    return ARError(
-      ARECannotReadFromTable{
-        userName => user.name,
-        tableName => table.name.lower,
-      },
-    )
-  };
-  groupIdxOption = table.cols.maybeGet(skdbGroupColName);
+  access = AccessSolver::create(context, user.name);
+  groupIdxOption = table.cols.maybeGet(skdbAccessColName);
   groupIdxOption match {
   | None() ->
-    // There is no skdb_group column, but we have access to the table
+    // There is no skdb_access column, but we have access to the table
     AROK()
   | Some(colNbr) ->
-    // There is a skdb_group column, let's check that we have the rights
+    // There is a skdb_access column, let's check that we have the rights
     row.getString(colNbr) match {
     | None() ->
-      // skdb_group is set to NULL: no access
-      ARError(ARECannotRead{userName => user.name, groupName => None()})
-    | Some(groupName) ->
-      access.canRead(context, groupName) match {
+      // skdb_access is set to NULL: no access
+      ARError(ARECannotRead{userUUID => user.name, groupUUID => None()})
+    | Some(groupUUID) ->
+      access.canRead(context, groupUUID) match {
       | true -> AROK()
       | false ->
         ARError(
-          ARECannotRead{userName => user.name, groupName => Some(groupName)},
+          ARECannotRead{userUUID => user.name, groupUUID => Some(groupUUID)},
         )
       }
     }
   };
 }
 
+fun getAuthorIdx(table: DirDescr): ?Int {
+  table.cols.maybeGet(skdbAuthorColName);
+}
+
+fun getGroupIdx(table: DirDescr): ?Int {
+  table.cols.maybeGet(skdbAccessColName);
+}
+
 fun checkUserCanWriteRow(
   context: readonly SKStore.Context,
-  user: UserFile,
-  table: DirDescr,
+  access: mutable AccessSolver,
+  makeTableName: () ~> String,
+  authorIdxOption: ?Int,
+  groupIdxOption: ?Int,
   row: RowValues,
 ): AccessResult {
-  authorIdxOption = table.cols.maybeGet(skdbAuthorColName);
-  groupIdxOption = table.cols.maybeGet(skdbGroupColName);
-  userName = user.name;
-  access = AccessSolver::create(context, userName, table);
   authorIdxOption match {
   | None() -> void
   | Some(authorIdx) ->
     row.getValue(authorIdx) match {
-    | None() -> return ARError(ARENullAuthor{userName => user.name})
+    | None() -> return ARError(ARENullAuthor{userUUID => access.userUUID})
     | Some(CString(n)) ->
-      if (n != user.name) {
+      if (n != access.userUUID) {
         return ARError(
-          AREWrongAuthor{userName => user.name, foundUserName => n},
+          AREWrongAuthor{userUUID => access.userUUID, foundUserName => n},
         )
       }
-    | Some _ -> return ARError(AREWrongAuthorType{userName => user.name})
+    | Some _ -> return ARError(AREWrongAuthorType{userUUID => access.userUUID})
     }
   };
   groupIdxOption match {
   | None() ->
     if (row.repeat == 0) {
-      if (!access.canDeleteFromTable()) {
-        return ARError(
-          ARECannotDeleteFromTable{
-            userName => user.name,
-            tableName => table.name.lower,
-          },
-        );
-      }
+      return ARError(
+        ARECannotDeleteFromTable{
+          userUUID => access.userUUID,
+          tableName => makeTableName(),
+        },
+      );
     } else {
-      if (!access.canInsertIntoTable()) {
-        return ARError(
-          ARECannotInsertIntoTable{
-            userName => user.name,
-            tableName => table.name.lower,
-          },
-        );
-      }
+      return ARError(
+        ARECannotInsertIntoTable{
+          userUUID => access.userUUID,
+          tableName => makeTableName(),
+        },
+      );
     }
   | Some(groupIdx) ->
     row.getString(groupIdx) match {
     | None() -> void
-    | Some(groupName) ->
+    | Some(groupUUID) ->
       if (row.repeat == 0) {
-        if (!access.canDelete(context, groupName)) {
-          return ARError(ARECannotDelete{userName => user.name, groupName});
+        if (!access.canDelete(context, groupUUID)) {
+          return ARError(
+            ARECannotDelete{userUUID => access.userUUID, groupUUID},
+          );
         }
       } else {
-        if (!access.canInsert(context, groupName)) {
-          return ARError(ARECannotInsert{userName => user.name, groupName});
+        if (!access.canInsert(context, groupUUID)) {
+          return ARError(
+            ARECannotInsert{userUUID => access.userUUID, groupUUID},
+          );
         }
       }
     }
@@ -555,40 +492,18 @@ fun checkUserCanWriteRow(
 /*****************************************************************************/
 
 mutable class AccessSolver private {
-  userName: String,
+  userUUID: String,
   userMask: Permission,
-  private cache: mutable Map<String, Permission> = mutable Map[],
-  private mutable currentTick: SKStore.Tick = SKStore.Tick(-1),
+  private mutable cache: SortedMap<String, Permission>,
+  private mutable currentTick: SKStore.Tick,
 } {
   static fun create(
     context: readonly SKStore.Context,
-    userName: String,
-    table: DirDescr,
+    userUUID: String,
   ): mutable this {
-    tableIndex = skdbTablePermissions.getIndex(context);
-    tablePermissions = tableIndex.get(
-      skdbTablePermissions.makeKey(Some(table.name.lower)),
-    ) match {
-    | None() ->
-      tableIndex.get(skdbTablePermissions.makeKey(None())) match {
-      | None() ->
-        // We could not find permissions specific to the table. if the
-        // column skdb_group is defined then we want to be permissive,
-        // otherwise we don't
-        if (table.cols.maybeGet(skdbGroupColName) is Some _) {
-          Permission::all()
-        } else {
-          Permission::none()
-        }
-      | Some(allTablesPermissions) ->
-        Permission(allTablesPermissions.getInt(permissionsColName))
-      }
-    | Some(thisTablePermissions) ->
-      Permission(thisTablePermissions.getInt(permissionsColName))
-    };
     userIndex = skdbUserPermissions.getIndex(context);
     userPermissions = userIndex.get(
-      skdbUserPermissions.makeKey(Some(userName)),
+      skdbUserPermissions.makeKey(Some(userUUID)),
     ) match {
     | None() ->
       userIndex.get(skdbUserPermissions.makeKey(None())) match {
@@ -603,33 +518,26 @@ mutable class AccessSolver private {
     | Some(thisUserPermissions) ->
       Permission(thisUserPermissions.getInt(permissionsColName))
     };
-    mutable static{userName, userMask => tablePermissions.and(userPermissions)}
-  }
-
-  readonly fun canReadTable(): Bool {
-    this.userMask.canRead()
-  }
-
-  readonly fun canInsertIntoTable(): Bool {
-    this.userMask.canInsert()
-  }
-
-  readonly fun canDeleteFromTable(): Bool {
-    this.userMask.canDelete()
+    mutable static{
+      userUUID,
+      userMask => userPermissions,
+      cache => SortedMap[],
+      currentTick => SKStore.Tick(-1),
+    }
   }
 
   private mutable fun getPermissions(
     context: readonly SKStore.Context,
-    groupName: String,
+    groupUUID: String,
   ): Permission {
     if (context.tick != this.currentTick) {
-      this.cache.clear();
+      this.!cache = SortedMap[];
       this.!currentTick = context.tick;
     };
-    this.cache.maybeGet(groupName) match {
+    this.cache.maybeGet(groupUUID) match {
     | None() ->
-      result = this.getPermissionsNoCache(context, groupName);
-      this.cache![groupName] = result;
+      result = this.getPermissionsNoCache(context, groupUUID);
+      this.!cache[groupUUID] = result;
       result
     | Some(x) -> x
     }
@@ -637,52 +545,52 @@ mutable class AccessSolver private {
 
   private mutable fun getPermissionsNoCache(
     context: readonly SKStore.Context,
-    groupName: String,
+    groupUUID: String,
   ): Permission {
-    // Let's first check if the groupName is in fact our userName
+    // Let's first check if the groupUUID is in fact our userUUID
     userIndex = skdbUsersByName.getIndex(context);
-    if (userIndex.get(skdbUsersByName.makeKey(groupName)) is Some _) {
+    if (userIndex.get(skdbUsersByName.makeKey(groupUUID)) is Some _) {
       // We found the user!
       // Is this data for us?
-      if (groupName == this.userName) {
+      if (groupUUID == this.userUUID) {
         return this.userMask;
       } else {
         return Permission::none()
       };
     };
-    // The Name is not a userName, let's lookup the groupName
+    // The Name is not a userUUID, let's lookup the groupUUID
     groupIndex = skdbGroupPermissions.getIndex(context);
     row = groupIndex.get(
-      skdbGroupPermissions.makeKey(groupName, Some(this.userName)),
+      skdbGroupPermissions.makeKey(groupUUID, Some(this.userUUID)),
     ) match {
-    | None() -> groupIndex.get(skdbGroupPermissions.makeKey(groupName, None()))
+    | None() -> groupIndex.get(skdbGroupPermissions.makeKey(groupUUID, None()))
     | x @ Some _ -> x
     };
     row match {
     | None() -> Permission::none()
-    | Some(x) -> Permission(x.getInt(permissionsColName))
+    | Some(x) -> this.userMask.and(Permission(x.getInt(permissionsColName)))
     }
   }
 
   mutable fun canRead(
     context: readonly SKStore.Context,
-    groupName: String,
+    groupUUID: String,
   ): Bool {
-    this.getPermissions(context, groupName).canRead()
+    this.getPermissions(context, groupUUID).canRead()
   }
 
   mutable fun canInsert(
     context: readonly SKStore.Context,
-    groupName: String,
+    groupUUID: String,
   ): Bool {
-    this.getPermissions(context, groupName).canInsert()
+    this.getPermissions(context, groupUUID).canInsert()
   }
 
   mutable fun canDelete(
     context: readonly SKStore.Context,
-    groupName: String,
+    groupUUID: String,
   ): Bool {
-    this.getPermissions(context, groupName).canDelete()
+    this.getPermissions(context, groupUUID).canDelete()
   }
 }
 
@@ -692,16 +600,14 @@ mutable class AccessSolver private {
 
 fun userPrivacyChanged(
   context: readonly SKStore.Context,
-  userNameOpt: ?String,
-  tableName: Name,
+  userUUIDOpt: ?String,
   tick: SKStore.Tick,
 ): Bool {
-  userName = userNameOpt match {
+  userUUID = userUUIDOpt match {
   | None() -> return false
   | Some(x) -> x
   };
-  user = UserFile::create(context, userName);
+  user = UserFile::create(context, userUUID);
   skdbGroupPermissions.hasChangedForUser(context, user, tick) ||
-    skdbUserPermissions.hasChangedForUser(context, user, tick) ||
-    skdbTablePermissions.hasChanged(context, tableName, tick)
+    skdbUserPermissions.hasChangedForUser(context, user, tick)
 }

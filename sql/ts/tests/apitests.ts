@@ -59,38 +59,46 @@ export async function setup(credentials: string, port: number, crypto, asWorker:
 async function testQueriesAgainstTheServer(skdb: SKDB) {
   const remote = await skdb.connectedRemote();
 
+  const groupGALL = await remote.exec(
+    "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');",
+    new Map(),
+  );
+  expect(groupGALL).toEqual([]);
+
+  const groupPermissionsGALL = await remote.exec(
+    "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7, 'root');",
+    new Map(),
+  );
+  expect(groupPermissionsGALL).toEqual([]);
+
   const tableCreate = await remote.exec(
-    "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER);",
+    "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER, skdb_access STRING);",
     new Map(),
   );
   expect(tableCreate).toEqual([]);
 
   const viewCreate = await remote.exec(
-    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y FROM test_pk;", {});
+    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y, 'GALL' as skdb_access FROM test_pk;", {});
   expect(viewCreate).toEqual([]);
 
-  const permissionInsert = await remote.exec(
-    "INSERT INTO skdb_table_permissions VALUES ('test_pk', 7), ('view_pk', 7);", {});
-  expect(permissionInsert).toEqual([]);
-
-  const tableInsert = await remote.exec("INSERT INTO test_pk VALUES (42,21);", {});
+  const tableInsert = await remote.exec("INSERT INTO test_pk VALUES (42,21,'GALL');", {});
   expect(tableInsert).toEqual([]);
 
   const tableInsertWithParam = await remote.exec(
-    "INSERT INTO test_pk VALUES (@x,@y);",
+    "INSERT INTO test_pk VALUES (@x,@y,'GALL');",
     new Map().set("x", 43).set("y", 22),
   );
   expect(tableInsertWithParam).toEqual([]);
   const tableInsertWithOParam = await remote.exec(
-    "INSERT INTO test_pk VALUES (@x,@y);",
+    "INSERT INTO test_pk VALUES (@x,@y,'GALL');",
     { "x": 44, "y": 23 },
   );
   expect(tableInsertWithOParam).toEqual([]);
 
-  const tableSelect = await remote.exec("SELECT * FROM test_pk;", {});
+  const tableSelect = await remote.exec("SELECT x,y FROM test_pk;", {});
   expect(tableSelect).toEqual([{ x: 42, y: 21 }, { x: 43, y: 22 }, { x: 44, y: 23 }]);
 
-  const viewSelect = await remote.exec("SELECT * FROM view_pk;", {});
+  const viewSelect = await remote.exec("SELECT x,y FROM view_pk;", {});
   expect(viewSelect).toEqual([{ x: 42, y: 63 }, { x: 43, y: 66 }, { x: 44, y: 69 }]);
 
   try {
@@ -100,7 +108,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
     expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
   }
 
-  const rows = await remote.exec("SELECT * FROM test_pk WHERE x=@x;", { x: 42 });
+  const rows = await remote.exec("SELECT x,y FROM test_pk WHERE x=@x;", { x: 42 });
   expect(rows).toEqual([{ x: 42, y: 21 }]);
   await remote.exec("delete from test_pk where x in (43,44);", {})
   try {
@@ -131,7 +139,7 @@ async function testSchemaQueries(skdb: SKDB) {
   const tableContains = tableSchema.includes(tableExpected);
   expect(tableContains ? tableExpected : tableSchema).toEqual(tableExpected);
 
-  const viewTableExpected = /CREATE TABLE view_pk \(\n  x INTEGER,\n  y INTEGER\n\);/;
+  const viewTableExpected = /CREATE TABLE view_pk \(\n  x INTEGER,\n  y INTEGER,\n  skdb_access TEXT\n\);/;
   const viewTableSchema = await remote.tableSchema("view_pk");
   const viewTableContains = viewTableSchema.match(viewTableExpected);
   expect(viewTableContains ? viewTableExpected : viewTableSchema).toEqual(viewTableExpected);
@@ -149,7 +157,7 @@ async function testMirroring(skdb: SKDB) {
   await skdb.mirror("test_pk");
   const testPkRows = await waitSynch(
     skdb,
-    "SELECT * FROM test_pk",
+    "SELECT x,y FROM test_pk",
     tail => tail[0] && tail[0].x == 42
   );
   expect(testPkRows).toEqual([{ x: 42, y: 21 }]);
@@ -157,14 +165,14 @@ async function testMirroring(skdb: SKDB) {
   await skdb.mirror("view_pk");
   const viewPkRows = await waitSynch(
     skdb,
-    "SELECT * FROM view_pk",
+    "SELECT x,y FROM view_pk",
     tail => tail[0] && tail[0].x == 42
   );
   expect(viewPkRows).toEqual([{ x: 42, y: 63 }]);
 
   // mirror already mirrored table is idempotent
   await skdb.mirror("test_pk");
-  const testPkRows2 = await skdb.exec("SELECT * FROM test_pk");
+  const testPkRows2 = await skdb.exec("SELECT x,y FROM test_pk");
   expect(testPkRows2).toEqual([{ x: 42, y: 21 }]);
 }
 
@@ -191,16 +199,16 @@ function waitSynch(skdb: SKDB, query: string, check: (v: any) => boolean, server
 async function testServerTail(root: SKDB, user: SKDB) {
   const remote = await root.connectedRemote();
   try {
-    await remote.exec("insert into view_pk values (87,88);", new Map());
+    await remote.exec("insert into view_pk values (87,88,'GALL');", new Map());
     throw new Error("Shall throw exception.");
   } catch (exn) {
-    expect(getErrorMessage(exn)).toEqual("insert into view_pk values (87,88);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
+    expect(getErrorMessage(exn)).toEqual("insert into view_pk values (87,88,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
   }
   await new Promise(resolve => setTimeout(resolve, 100));
   const vres = await user.exec("select count(*) as cnt from view_pk where x = 87 and y = 88");
   expect(vres).toEqual([{ cnt: 0 }]);
 
-  await remote.exec("insert into test_pk values (87,88);", new Map());
+  await remote.exec("insert into test_pk values (87,88,'GALL');", new Map());
   const res = await waitSynch(
     user,
     "select count(*) as cnt from test_pk where x = 87 and y = 88",
@@ -219,10 +227,10 @@ async function testServerTail(root: SKDB, user: SKDB) {
 async function testClientTail(root: SKDB, user: SKDB) {
   const remote = await root.connectedRemote();
   try {
-    await user.exec("insert into view_pk values (97,98);");
+    await user.exec("insert into view_pk values (97,98,'GALL');");
     throw new Error("Shall throw exception.");
   } catch (exn: any) {
-    expect(getErrorMessage(exn)).toEqual("Error: insert into view_pk values (97,98);\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
+    expect(getErrorMessage(exn)).toEqual("Error: insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
   }
   await new Promise(resolve => setTimeout(resolve, 100));
   const vres = await remote.exec(
@@ -230,7 +238,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
   );
   expect(vres).toEqual([{ cnt: 0 }]);
 
-  await user.exec("insert into test_pk values (97,98);");
+  await user.exec("insert into test_pk values (97,98,'GALL');");
   const res = await waitSynch(
     root,
     "select count(*) as cnt from test_pk where x = 97 and y = 98",
