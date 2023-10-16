@@ -1,5 +1,5 @@
 import { Environment, FileSystem } from "#std/sk_types";
-import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
+import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync, MirrorDefn } from "#skdb/skdb_types";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
@@ -225,7 +225,7 @@ export class SKDBSyncImpl implements SKDBSync {
 
   createServerDatabase = (dbName: string) => this.connectedRemote!.createDatabase(dbName);
   createServerUser = () => this.connectedRemote!.createUser();
-  mirror = (tableName: string, filterExpr?: string) => this.connectedRemote!.mirror(tableName, filterExpr);
+  mirror = (...tables: MirrorDefn[]) => this.connectedRemote!.mirror(...tables);
   serverClose = () => this.connectedRemote!.close();
 }
 
@@ -281,8 +281,8 @@ export class SKDBImpl implements SKDB {
     return this.skdbSync.insert(tableName, values);
   }
 
-  async mirror(tableName: string, filterExpr?: string) {
-    return this.skdbSync.mirror(tableName, filterExpr);
+  async mirror(...tables: MirrorDefn[]) {
+    return this.skdbSync.mirror(...tables);
   }
 
   async closeConnection() {

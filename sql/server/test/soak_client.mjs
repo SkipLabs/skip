@@ -32,7 +32,7 @@ const setup = async function(client) {
     // clients are 1 indexed. this gives us some stuff no clients care
     // about (0), stuff we care about ($client), stuff we both care
     // about (3)
-    await skdb.mirror(table, `value % 4 IN (${client}, 3)`);
+    await skdb.mirror({table: table, filterExpr: `value % 4 IN (${client}, 3)`});
   }
   return skdb;
 };

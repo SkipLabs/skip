@@ -6,6 +6,11 @@ export interface SkdbHandle {
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
 }
 
+export type MirrorDefn = {
+  table: string,
+  filterExpr?: string,
+} | string;
+
 export interface SKDBSync {
   // CLIENT
   exec: (query: string, params?: Params) => Array<any>;
@@ -20,7 +25,7 @@ export interface SKDBSync {
 
   // SERVER
   connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
-  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+  mirror: (...tables: MirrorDefn[]) => Promise<void>;
 
   connectedRemote?: RemoteSKDB;
   createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
@@ -41,7 +46,7 @@ export interface SKDB {
   closeConnection: () => Promise<void>;
   currentUser?: string;
 
-  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+  mirror: (...tables: MirrorDefn[]) => Promise<void>;
 
   schema: (tableName?: string) => Promise<string>;
   save: () => Promise<boolean>;
@@ -86,7 +91,7 @@ export interface RemoteSKDB {
 
   createDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
 
-  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+  mirror: (...tables: MirrorDefn[]) => Promise<void>;
   exec: (query: string, params?: Params) => Promise<Array<any>>;
 
   isConnectionHealthy: () => Promise<boolean>;
