@@ -104,6 +104,7 @@ const overrideConf = (c1: Conf, c2: Conf) => {
   if (c2.footer) c1.footer = c2.footer;
   if (c2.lang) c1.lang = c2.lang;
   if (c2.charset) c1.charset = c2.charset;
+  if (c2.tableOfContent != undefined) c1.tableOfContent = c2.tableOfContent;
   return c1;
 }
 
