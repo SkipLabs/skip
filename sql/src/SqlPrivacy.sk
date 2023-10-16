@@ -393,15 +393,7 @@ fun checkUserCanReadRow(
   table: DirDescr,
   row: RowValues,
 ): AccessResult {
-  access = AccessSolver::create(context, user.name, table);
-  if (!access.canReadTable()) {
-    return ARError(
-      ARECannotReadFromTable{
-        userUUID => user.name,
-        tableName => table.name.lower,
-      },
-    )
-  };
+  access = AccessSolver::create(context, user.name);
   groupIdxOption = table.cols.maybeGet(skdbAccessColName);
   groupIdxOption match {
   | None() ->
@@ -425,50 +417,52 @@ fun checkUserCanReadRow(
   };
 }
 
+fun getAuthorIdx(table: DirDescr): ?Int {
+  table.cols.maybeGet(skdbAuthorColName);
+}
+
+fun getGroupIdx(table: DirDescr): ?Int {
+  table.cols.maybeGet(skdbAccessColName);
+}
+
 fun checkUserCanWriteRow(
   context: readonly SKStore.Context,
-  user: UserFile,
-  table: DirDescr,
+  access: mutable AccessSolver,
+  makeTableName: () ~> String,
+  authorIdxOption: ?Int,
+  groupIdxOption: ?Int,
   row: RowValues,
 ): AccessResult {
-  authorIdxOption = table.cols.maybeGet(skdbAuthorColName);
-  groupIdxOption = table.cols.maybeGet(skdbAccessColName);
-  userUUID = user.name;
-  access = AccessSolver::create(context, userUUID, table);
   authorIdxOption match {
   | None() -> void
   | Some(authorIdx) ->
     row.getValue(authorIdx) match {
-    | None() -> return ARError(ARENullAuthor{userUUID => user.name})
+    | None() -> return ARError(ARENullAuthor{userUUID => access.userUUID})
     | Some(CString(n)) ->
-      if (n != user.name) {
+      if (n != access.userUUID) {
         return ARError(
-          AREWrongAuthor{userUUID => user.name, foundUserName => n},
+          AREWrongAuthor{userUUID => access.userUUID, foundUserName => n},
         )
       }
-    | Some _ -> return ARError(AREWrongAuthorType{userUUID => user.name})
+    | Some _ -> return ARError(AREWrongAuthorType{userUUID => access.userUUID})
     }
   };
   groupIdxOption match {
   | None() ->
     if (row.repeat == 0) {
-      if (!access.canDeleteFromTable()) {
-        return ARError(
-          ARECannotDeleteFromTable{
-            userUUID => user.name,
-            tableName => table.name.lower,
-          },
-        );
-      }
+      return ARError(
+        ARECannotDeleteFromTable{
+          userUUID => access.userUUID,
+          tableName => makeTableName(),
+        },
+      );
     } else {
-      if (!access.canInsertIntoTable()) {
-        return ARError(
-          ARECannotInsertIntoTable{
-            userUUID => user.name,
-            tableName => table.name.lower,
-          },
-        );
-      }
+      return ARError(
+        ARECannotInsertIntoTable{
+          userUUID => access.userUUID,
+          tableName => makeTableName(),
+        },
+      );
     }
   | Some(groupIdx) ->
     row.getString(groupIdx) match {
@@ -476,11 +470,15 @@ fun checkUserCanWriteRow(
     | Some(groupUUID) ->
       if (row.repeat == 0) {
         if (!access.canDelete(context, groupUUID)) {
-          return ARError(ARECannotDelete{userUUID => user.name, groupUUID});
+          return ARError(
+            ARECannotDelete{userUUID => access.userUUID, groupUUID},
+          );
         }
       } else {
         if (!access.canInsert(context, groupUUID)) {
-          return ARError(ARECannotInsert{userUUID => user.name, groupUUID});
+          return ARError(
+            ARECannotInsert{userUUID => access.userUUID, groupUUID},
+          );
         }
       }
     }
@@ -496,19 +494,13 @@ fun checkUserCanWriteRow(
 mutable class AccessSolver private {
   userUUID: String,
   userMask: Permission,
-  private cache: mutable Map<String, Permission> = mutable Map[],
-  private mutable currentTick: SKStore.Tick = SKStore.Tick(-1),
+  private mutable cache: SortedMap<String, Permission>,
+  private mutable currentTick: SKStore.Tick,
 } {
   static fun create(
     context: readonly SKStore.Context,
     userUUID: String,
-    table: DirDescr,
   ): mutable this {
-    tablePermissions = if (table.cols.maybeGet(skdbAccessColName) is Some _) {
-      Permission::all()
-    } else {
-      Permission::none()
-    };
     userIndex = skdbUserPermissions.getIndex(context);
     userPermissions = userIndex.get(
       skdbUserPermissions.makeKey(Some(userUUID)),
@@ -526,19 +518,22 @@ mutable class AccessSolver private {
     | Some(thisUserPermissions) ->
       Permission(thisUserPermissions.getInt(permissionsColName))
     };
-    mutable static{userUUID, userMask => tablePermissions.and(userPermissions)}
+    mutable static{
+      userUUID,
+      userMask => userPermissions,
+      tables => SortedMap[],
+      cache => SortedMap[],
+      currentTick => SKStore.Tick(-1),
+    }
   }
 
-  readonly fun canReadTable(): Bool {
-    this.userMask.canRead()
-  }
-
-  readonly fun canInsertIntoTable(): Bool {
-    this.userMask.canInsert()
-  }
-
-  readonly fun canDeleteFromTable(): Bool {
-    this.userMask.canDelete()
+  mutable fun addTable(
+    dirName: SKStore.DirName,
+    authorIdx: ?Int,
+    accessIdx: ?Int,
+  ): void {
+    tableIndexes = SKStore.TableIndexes(authorIdx, accessIdx);
+    this.!tables[dirName] = tableIndexes;
   }
 
   private mutable fun getPermissions(
@@ -546,13 +541,13 @@ mutable class AccessSolver private {
     groupUUID: String,
   ): Permission {
     if (context.tick != this.currentTick) {
-      this.cache.clear();
+      this.!cache = SortedMap[];
       this.!currentTick = context.tick;
     };
     this.cache.maybeGet(groupUUID) match {
     | None() ->
       result = this.getPermissionsNoCache(context, groupUUID);
-      this.cache![groupUUID] = result;
+      this.!cache[groupUUID] = result;
       result
     | Some(x) -> x
     }
@@ -606,6 +601,26 @@ mutable class AccessSolver private {
     groupUUID: String,
   ): Bool {
     this.getPermissions(context, groupUUID).canDelete()
+  }
+
+  readonly fun clone(): this {
+    static{
+      userUUID => this.userUUID,
+      userMask => this.userMask,
+      tables => this.tables,
+      cache => this.cache,
+      currentTick => this.currentTick,
+    }
+  }
+
+  readonly fun mclone(): mutable this {
+    mutable static{
+      userUUID => this.userUUID,
+      userMask => this.userMask,
+      tables => this.tables,
+      cache => this.cache,
+      currentTick => this.currentTick,
+    }
   }
 }
 
