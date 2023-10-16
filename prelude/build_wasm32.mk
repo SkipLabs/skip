@@ -20,6 +20,8 @@ endif # ifdef PROFILE
 
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc
 
+# NB: this MUST be kept in sync with CFILES in compiler/runtime/Makefile
+# and CRELFILES in prelude/build.mk
 CRELFILES=\
 	runtime/copy.c \
 	runtime/free.c \
@@ -33,6 +35,8 @@ CRELFILES=\
 	runtime/stack.c \
 	runtime/string.c \
 	runtime/native_eq.c \
+	runtime/splitmix64.c \
+	runtime/xoroshiro128plus.c \
 	runtime/runtime32_specific.c
 
 ifdef OUT_DIR

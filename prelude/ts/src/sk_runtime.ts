@@ -34,7 +34,14 @@ class LinksImpl implements Links {
   SKIP_FileSystem_appendTextFile: (path: ptr, contents: ptr) => void;
   SKIP_js_time_ms_lo: () => int;
   SKIP_js_time_ms_hi: () => int;
-  SKIP_js_get_entropy: () => int;
+
+  SKIP_js_get_entropy = () => {
+    const buf = new Uint8Array(4);
+    const crypto =
+      this.env == undefined ? new Crypto() : this.env.crypto();
+    crypto.getRandomValues(buf);
+    return ((new Uint32Array(buf))[0]);
+  };
 
   SKIP_js_get_argc: () => int;
   SKIP_js_get_argn: (index: int) => ptr;
@@ -86,14 +93,6 @@ class LinksImpl implements Links {
       // the high 32 bits, cannot use shift right without it implicitly
       // coercing to 32-bit, thereby clearing the bits we want
       return (Math.floor(this.lastTime / (2**32)));
-    };
-
-    this.SKIP_js_get_entropy = () => {
-      const buf = new Uint8Array(4);
-      const crypto =
-        this.env == undefined ? new Crypto() : this.env.crypto();
-      crypto.getRandomValues(buf);
-      return ((new Uint32Array(buf))[0]);
     };
 
     this.SKIP_js_get_argc = () => utils.args.length;
