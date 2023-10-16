@@ -265,6 +265,7 @@ const onDocs2 = (f: string) => {
         console.log(`stderr: ${stderr}`);
       };
       allfiles.forEach(onChange2);
+      loaded = true;
   });
 }
 
@@ -272,14 +273,20 @@ const onChange = (f: string) => {
   setTimeout(onChange2, 10, f);
 }
 
+var loaded : boolean = false;
+
 const onAdd = (f: string) => {
-  const ext = path.extname(f);
-  if (ext == ".md") {
-    allfiles.add(f);
-  } else if (ext == ".scss") {
-    allfiles.add(f);
-  } else if (isAsset(f)) {
-    allfiles.add(f);
+  if (loaded) {
+    onChange(f)
+  } else {
+    const ext = path.extname(f);
+    if (ext == ".md") {
+      allfiles.add(f);
+    } else if (ext == ".scss") {
+      allfiles.add(f);
+    } else if (isAsset(f)) {
+      allfiles.add(f);
+    }
   }
 }
 
