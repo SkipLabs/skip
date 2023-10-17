@@ -6,7 +6,7 @@ class TestResult{
   file: String,
   line: Int,
   result: String = "",
-  time: Int = -1,
+  time: Float = -1.0,
   failure_type: String = "",
   failure_message: String = "",
   stdout: String = "",
@@ -20,7 +20,7 @@ class TestResult{
       file => v["file"].expectString(),
       line => v["line"].expectInt(),
       result => v["result"].expectString(),
-      time => v["time"].expectInt(),
+      time => v["time"].expectFloat(),
       failure_type => v["failure_type"].expectString(),
       failure_message => v["failure_message"].expectString(),
       stdout => v["stdout"].expectString(),
@@ -35,7 +35,7 @@ class TestResult{
       "file" => JSON.String(this.file),
       "line" => JSON.IntNumber(this.line),
       "result" => JSON.String(this.result),
-      "time" => JSON.IntNumber(this.time),
+      "time" => JSON.FloatNumber(this.time),
       "failure_type" => JSON.String(this.failure_type),
       "failure_message" => JSON.String(this.failure_message),
       "stdout" => JSON.String(this.stdout),
@@ -119,7 +119,7 @@ mutable class TestSuiteStats(
   mutable tests: Int = 0,
   mutable failures: Int = 0,
   mutable errors: Int = 0,
-  mutable time: Int = 0,
+  mutable time: Float = 0.0,
 ) {
   mutable fun add(test: TestResult): void {
     this.!tests = this.tests + 1;
@@ -158,7 +158,7 @@ mutable class XmlTestReporter{
       .foldl((acc, x) -> acc + x, 0);
     totalTime = this.stats.values()
       .map(s -> s.time)
-      .foldl((acc, x) -> acc + x, 0);
+      .foldl((acc, x) -> acc + x, 0.0);
     this.writeLine(
       `<testsuites tests="${totalTests}" failures="${totalFailures}" errors="${totalErrors}" time="${totalTime}" timestamp="0" name="AllTests">`,
     );
