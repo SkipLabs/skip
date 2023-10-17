@@ -866,6 +866,7 @@ mutable class Compiler{
     | VFloat(f) -> CFExpr(CFLiteral(f))
     | VString(s) -> CSExpr(CSLiteral(s))
     | VId _ -> invariant_violation("Unexpected ID")
+    | VSId _ -> invariant_violation("Unexpected SID")
     | VTime _ -> invariant_violation("Unexpected TIME")
     | VParam(handle) ->
       this.params.maybeGet(handle) match {
@@ -1127,6 +1128,25 @@ mutable class Compiler{
           };
           CIExpr(CILiteral(globals[varName]))
         | _ -> error(this.pos, "id expects a string literal")
+        }
+      | "sid" ->
+        if (args.size() == 0) {
+          return CSExpr(CSLiteral(Ksuid::create().toString()))
+        };
+        if (args.size() != 1) {
+          error(this.pos, "sid expects at most one argument")
+        };
+        args[0] match {
+        | VString(varName) ->
+          namedIDs = context.getGlobal(NAMEDIDS) match {
+          | None() -> error(this.pos, "Unknown id " + varName)
+          | Some(file) -> NamedIDs::type(file)
+          };
+          if (!namedIDs.containsKey(varName)) {
+            error(this.pos, "Unknown id " + varName)
+          };
+          CSExpr(CSLiteral(namedIDs[varName]))
+        | _ -> error(this.pos, "sid expects a string literal")
         }
       | "skdb_permission" ->
         if (args.size() != 1) {
