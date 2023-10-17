@@ -1,6 +1,4 @@
-// @ts-ignore
 import { expect } from '@playwright/test';
-// @ts-ignore
 import { createSkdb, SKDB } from 'skdb';
 
 type dbs = { root: SKDB, user: SKDB };
@@ -32,7 +30,7 @@ export async function setup(credentials: string, port: number, crypto, asWorker:
     await skdb.connect("skdb_service_mgmt", "root", key, host);
   }
   const remote = await skdb.connectedRemote();
-  const testRootCreds = await remote.createDatabase(dbName);
+  const testRootCreds = await remote!.createDatabase(dbName);
   skdb.closeConnection();
   
   const rootSkdb = await createSkdb({ asWorker: asWorker });
@@ -44,7 +42,7 @@ export async function setup(credentials: string, port: number, crypto, asWorker:
   }
 
   const rootRemote = await rootSkdb.connectedRemote();
-  const testUserCreds = await rootRemote.createUser();
+  const testUserCreds = await rootRemote!.createUser();
 
   const userSkdb = await createSkdb({ asWorker: asWorker });
   {
@@ -57,7 +55,7 @@ export async function setup(credentials: string, port: number, crypto, asWorker:
 }
 
 async function testQueriesAgainstTheServer(skdb: SKDB) {
-  const remote = await skdb.connectedRemote();
+  const remote = (await skdb.connectedRemote())!;
 
   const groupGALL = await remote.exec(
     "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');",
@@ -121,7 +119,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
 
 
 async function testSchemaQueries(skdb: SKDB) {
-  const remote = await skdb.connectedRemote();
+  const remote = (await skdb.connectedRemote())!;
   const expected = "CREATE TABLE test_pk (";
   const schema = await remote.schema();
   const contains = schema.includes(expected);
@@ -188,7 +186,7 @@ function waitSynch(skdb: SKDB, query: string, check: (v: any) => boolean, server
       }
     };
     if (server) {
-      skdb.connectedRemote().then(remote => remote.exec(query, new Map())).then(cb).catch(reject);
+      skdb.connectedRemote().then(remote => remote!.exec(query, new Map())).then(cb).catch(reject);
     } else {
       skdb.exec(query, new Map()).then(cb).catch(reject);
     }
@@ -197,7 +195,7 @@ function waitSynch(skdb: SKDB, query: string, check: (v: any) => boolean, server
 }
 
 async function testServerTail(root: SKDB, user: SKDB) {
-  const remote = await root.connectedRemote();
+  const remote = (await root.connectedRemote())!;
   try {
     await remote.exec("insert into view_pk values (87,88,'GALL');", new Map());
     throw new Error("Shall throw exception.");
@@ -233,7 +231,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     expect(getErrorMessage(exn)).toEqual("Error: insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
   }
   await new Promise(resolve => setTimeout(resolve, 100));
-  const vres = await remote.exec(
+  const vres = await remote!.exec(
     "select count(*) as cnt from test_pk where x = 97 and y = 98", new Map()
   );
   expect(vres).toEqual([{ cnt: 0 }]);
@@ -258,9 +256,9 @@ async function testClientTail(root: SKDB, user: SKDB) {
 async function testReboot(root: SKDB, user: SKDB) {
   const remote = await user.connectedRemote();
   let rebooted = false;
-  remote.onReboot(() => rebooted = true);
+  remote!.onReboot(() => rebooted = true);
   const rremote = await root.connectedRemote();
-  await rremote.exec("DROP TABLE test_pk;");
+  await rremote!.exec("DROP TABLE test_pk;");
   await new Promise(resolve => setTimeout(resolve, 100));
   expect(rebooted).toEqual(true);
 }
