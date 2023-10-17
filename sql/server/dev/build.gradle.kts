@@ -14,7 +14,7 @@ dependencies {
   testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
 
   // http/ws server
-  implementation("io.undertow:undertow-core:2.3.2.Final")
+  implementation("io.undertow:undertow-core:2.3.9.Final")
 
   implementation(project(":core"))
 }

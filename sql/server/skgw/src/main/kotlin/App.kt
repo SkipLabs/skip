@@ -3,6 +3,7 @@ package io.skiplabs.skdb
 import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.HttpHandler
+import io.undertow.server.handlers.BlockingHandler
 import io.undertow.server.handlers.PathTemplateHandler
 import io.undertow.util.PathTemplateMatch
 import io.undertow.websockets.spi.WebSocketHttpExchange
@@ -11,8 +12,10 @@ import java.io.File
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.security.SecureRandom
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.system.exitProcess
 
 fun Credentials.toProtoCredentials(): ProtoCredentials {
@@ -239,102 +242,111 @@ class PolicyLinkedHandler(val policy: ServerPolicy, val db: String, var decorate
 
 fun connectionHandler(
     policy: ServerPolicy,
+    workerPool: ExecutorService,
     taskPool: ScheduledExecutorService,
     encryption: EncryptionTransform,
     logger: Logger,
 ): HttpHandler {
-  return Handlers.websocket(
-      MuxedSocketEndpoint(
-          object : MuxedSocketFactory {
-            override fun onConnect(
-                exchange: WebSocketHttpExchange,
-                channel: WebSocket
-            ): MuxedSocket {
-              val pathParams =
-                  exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
-              val db = pathParams["database"]
+  return BlockingHandler(
+      Handlers.websocket(
+          MuxedSocketEndpoint(
+              object : MuxedSocketFactory {
+                override fun onConnect(
+                    exchange: WebSocketHttpExchange,
+                    channel: WebSocket
+                ): MuxedSocket {
+                  val pathParams =
+                      exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+                  val db = pathParams["database"]
 
-              if (db == null || !policy.shouldAcceptConnection(db)) {
-                val socket =
-                    MuxedSocket(
-                        channel = channel,
-                        taskPool = taskPool,
-                        onStream = { _, _ -> },
-                        onClose = {},
-                        onError = { _, _, _ -> },
-                        getDecryptedKey = { _ -> ByteArray(0) },
-                    )
-                socket.errorSocket(2000u, "Service unavailable")
-                return socket
-              }
+                  if (db == null || !policy.shouldAcceptConnection(db)) {
+                    val socket =
+                        MuxedSocket(
+                            channel = channel,
+                            taskPool = taskPool,
+                            onStream = { _, _ -> },
+                            onClose = {},
+                            onError = { _, _, _ -> },
+                            getDecryptedKey = { _ -> ByteArray(0) },
+                        )
+                    socket.errorSocket(2000u, "Service unavailable")
+                    return socket
+                  }
 
-              val skdb = openSkdb(db)
+                  val skdb = openSkdb(db)
 
-              var replicationId: String? = null
-              var accessKey: String? = null
+                  var replicationId: String? = null
+                  var accessKey: String? = null
 
-              val socket =
-                  MuxedSocket(
-                      channel = channel,
-                      taskPool = taskPool,
-                      onStream = { _, stream ->
-                        var handler: StreamHandler =
-                            PolicyLinkedHandler(
-                                policy,
-                                db,
-                                RequestHandler(
-                                    skdb!!,
-                                    accessKey!!,
-                                    encryption,
-                                    replicationId!!,
-                                ))
-                        var orchestrationStream =
-                            PolicyLinkedOrchestrationStream(policy, db, stream)
+                  val socket =
+                      MuxedSocket(
+                          channel = channel,
+                          taskPool = taskPool,
+                          onStream = { _, stream ->
+                            var handler: AtomicReference<StreamHandler> =
+                                AtomicReference(
+                                    PolicyLinkedHandler(
+                                        policy,
+                                        db,
+                                        RequestHandler(
+                                            skdb!!,
+                                            accessKey!!,
+                                            encryption,
+                                            replicationId!!,
+                                        )))
+                            var orchestrationStream =
+                                PolicyLinkedOrchestrationStream(policy, db, stream)
 
-                        // use observation rather than callbacks so
-                        // that we also close the handler if _we_
-                        // close the stream
-                        stream.observeLifecycle { state ->
-                          when (state) {
-                            Stream.State.CLOSED -> handler.close()
-                            else -> Unit
-                          }
-                        }
+                            // use observation rather than callbacks so
+                            // that we also close the handler if _we_
+                            // close the stream
+                            stream.observeLifecycle { state ->
+                              when (state) {
+                                Stream.State.CLOSED -> handler.get().close()
+                                else -> Unit
+                              }
+                            }
 
-                        stream.onData = { data ->
-                          try {
-                            handler = handler.handleMessage(data, orchestrationStream)
-                          } catch (ex: RevealableException) {
-                            System.err.println("Exception occurred: ${ex}")
-                            stream.error(ex.code, ex.msg)
-                          } catch (ex: Exception) {
-                            System.err.println("Exception occurred: ${ex}")
-                            stream.error(2000u, "Internal error")
-                          }
-                        }
-                        stream.onClose = { stream.close() }
-                        stream.onError = { _, _ -> }
-                      },
-                      onClose = { socket -> socket.closeSocket() },
-                      onError = { _, _, _ -> },
-                      getDecryptedKey = { authMsg ->
-                        accessKey = authMsg.accessKey
-                        replicationId =
-                            skdb?.replicationId(authMsg.deviceUuid)?.decodeOrThrow()?.trim()
-                        val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
-                        encryption.decrypt(encryptedPrivateKey!!)
-                      },
-                      log = { event, user, metadata -> logger.log(db, event, user, metadata) })
+                            stream.onData = { data ->
+                              workerPool.execute {
+                                try {
+                                  handler.set(
+                                      handler.get().handleMessage(data, orchestrationStream))
+                                } catch (ex: RevealableException) {
+                                  System.err.println("Exception occurred: ${ex}")
+                                  stream.error(ex.code, ex.msg)
+                                } catch (ex: Exception) {
+                                  System.err.println("Exception occurred: ${ex}")
+                                  stream.error(2000u, "Internal error")
+                                }
+                              }
+                            }
+                            stream.onClose = {
+                              // must happen on the sharded worker to ensure ordering
+                              workerPool.execute { stream.close() }
+                            }
+                            stream.onError = { _, _ -> }
+                          },
+                          onClose = { socket -> socket.closeSocket() },
+                          onError = { _, _, _ -> },
+                          getDecryptedKey = { authMsg ->
+                            accessKey = authMsg.accessKey
+                            replicationId =
+                                skdb?.replicationId(authMsg.deviceUuid)?.decodeOrThrow()?.trim()
+                            val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
+                            encryption.decrypt(encryptedPrivateKey!!)
+                          },
+                          log = { event, user, metadata -> logger.log(db, event, user, metadata) })
 
-              if (skdb == null) {
-                socket.errorSocket(1004u, "Could not open database")
-              }
+                  if (skdb == null) {
+                    socket.errorSocket(1004u, "Could not open database")
+                  }
 
-              policy.notifySocketCreated(socket, db)
+                  policy.notifySocketCreated(socket, db)
 
-              return socket
-            }
-          }))
+                  return socket
+                }
+              })))
 }
 
 fun createHttpServer(connectionHandler: HttpHandler): Undertow {
@@ -436,6 +448,10 @@ fun main(args: Array<String>) {
     devColdStart(encryption)
   }
 
+  // TODO: this should be a sharded service or better the whole
+  // Mux/Stream api should be based around co-routines. currently this
+  // is an unbounded pool and so there's ultimately no back-pressure.
+  val workerPool = Executors.newSingleThreadExecutor()
   val taskPool = Executors.newSingleThreadScheduledExecutor()
 
   val config = Config()
@@ -456,7 +472,7 @@ fun main(args: Array<String>) {
           LimitConnectionsPerDb(logger, config.getInt("db_conns", 10)) then
           LimitGlobalConnections(logger, config.getInt("global_conns", 10_000))
 
-  val connHandler = connectionHandler(policy, taskPool, encryption, logger)
+  val connHandler = connectionHandler(policy, workerPool, taskPool, encryption, logger)
 
   val server = createHttpServer(connHandler)
   server.start()

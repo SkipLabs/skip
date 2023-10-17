@@ -44,9 +44,11 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.security.SecureRandom
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 fun Credentials.toProtoCredentials(): ProtoCredentials {
   return ProtoCredentials(accessKey, ByteBuffer.wrap(privateKey))
@@ -222,108 +224,119 @@ class RequestHandler(
 }
 
 fun connectionHandler(
+    workerPool: ExecutorService,
     taskPool: ScheduledExecutorService,
 ): HttpHandler {
-  return Handlers.websocket(
-      MuxedSocketEndpoint(
-          object : MuxedSocketFactory {
-            override fun onConnect(
-                exchange: WebSocketHttpExchange,
-                channel: WebSocket
-            ): MuxedSocket {
-              val pathParams =
-                  exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
-              val db = pathParams["database"]
+  return BlockingHandler(
+      Handlers.websocket(
+          MuxedSocketEndpoint(
+              object : MuxedSocketFactory {
+                override fun onConnect(
+                    exchange: WebSocketHttpExchange,
+                    channel: WebSocket
+                ): MuxedSocket {
+                  val pathParams =
+                      exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+                  val db = pathParams["database"]
 
-              if (db == null) {
-                throw RuntimeException("database not provided")
-              }
+                  if (db == null) {
+                    throw RuntimeException("database not provided")
+                  }
 
-              val skdb = openSkdb(db)
+                  val skdb = openSkdb(db)
 
-              var replicationId: String? = null
-              var accessKey: String? = null
+                  var replicationId: String? = null
+                  var accessKey: String? = null
 
-              val socket =
-                  MuxedSocket(
-                      channel = channel,
-                      taskPool = taskPool,
-                      onStream = { _, stream ->
-                        var handler: StreamHandler =
-                            RequestHandler(
-                                skdb!!,
-                                accessKey!!,
-                                replicationId!!,
-                            )
+                  val socket =
+                      MuxedSocket(
+                          channel = channel,
+                          taskPool = taskPool,
+                          onStream = { _, stream ->
+                            var handler: AtomicReference<StreamHandler> =
+                                AtomicReference(
+                                    RequestHandler(
+                                        skdb!!,
+                                        accessKey!!,
+                                        replicationId!!,
+                                    ))
 
-                        stream.observeLifecycle { state ->
-                          when (state) {
-                            Stream.State.CLOSED -> handler.close()
-                            else -> Unit
-                          }
-                        }
+                            stream.observeLifecycle { state ->
+                              when (state) {
+                                Stream.State.CLOSED -> handler.get().close()
+                                else -> Unit
+                              }
+                            }
 
-                        stream.onData = { data ->
-                          try {
-                            handler = handler.handleMessage(data, stream)
-                          } catch (ex: RevealableException) {
-                            System.err.println("Exception occurred: ${ex}")
-                            stream.error(ex.code, ex.msg)
-                          } catch (ex: Exception) {
-                            System.err.println("Exception occurred: ${ex}")
-                            stream.error(2000u, "Internal error")
-                          }
-                        }
-                        stream.onClose = { stream.close() }
-                        stream.onError = { _, _ -> }
-                      },
-                      onClose = { socket -> socket.closeSocket() },
-                      onError = { _, _, _ -> },
-                      getDecryptedKey = { authMsg ->
-                        accessKey = authMsg.accessKey
-                        replicationId =
-                            skdb?.replicationId(authMsg.deviceUuid)?.decodeOrThrow()?.trim()
-                        val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
-                        encryptedPrivateKey!!
-                      },
-                      log = { _, _, _ -> })
+                            stream.onData = { data ->
+                              workerPool.execute {
+                                try {
+                                  handler.set(handler.get().handleMessage(data, stream))
+                                } catch (ex: RevealableException) {
+                                  System.err.println("Exception occurred: ${ex}")
+                                  stream.error(ex.code, ex.msg)
+                                } catch (ex: Exception) {
+                                  System.err.println("Exception occurred: ${ex}")
+                                  stream.error(2000u, "Internal error")
+                                }
+                              }
+                            }
+                            stream.onClose = {
+                              // must happen on the worker to ensure ordering
+                              workerPool.execute { stream.close() }
+                            }
+                            stream.onError = { _, _ -> }
+                          },
+                          onClose = { socket -> socket.closeSocket() },
+                          onError = { _, _, _ -> },
+                          getDecryptedKey = { authMsg ->
+                            accessKey = authMsg.accessKey
+                            replicationId =
+                                skdb?.replicationId(authMsg.deviceUuid)?.decodeOrThrow()?.trim()
+                            val encryptedPrivateKey = skdb?.privateKeyAsStored(authMsg.accessKey)
+                            encryptedPrivateKey!!
+                          },
+                          log = { _, _, _ -> })
 
-              if (skdb == null) {
-                socket.errorSocket(1004u, "Could not open database")
-              }
+                  if (skdb == null) {
+                    socket.errorSocket(1004u, "Could not open database")
+                  }
 
-              return socket
-            }
-          }))
+                  return socket
+                }
+              })))
 }
 
 fun usersHandler(): HttpHandler {
-  return object : HttpHandler {
-    override fun handleRequest(exchange: HttpServerExchange) {
-      val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
-      val db = pathParams["database"]
+  return BlockingHandler(
+      object : HttpHandler {
+        override fun handleRequest(exchange: HttpServerExchange) {
+          val pathParams = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY).getParameters()
+          val db = pathParams["database"]
 
-      if (db == null) {
-        throw RuntimeException("database not provided")
-      }
+          if (db == null) {
+            throw RuntimeException("database not provided")
+          }
 
-      if (exchange.requestMethod == Methods.GET) {
-        var skdb = openSkdb(db)
-        if (skdb == null) {
-          createDb(db)
-          skdb = openSkdb(db)
+          if (exchange.requestMethod == Methods.GET) {
+            var skdb = openSkdb(db)
+            if (skdb == null) {
+              createDb(db)
+              skdb = openSkdb(db)
+            }
+            exchange.responseHeaders.put(Headers.CONTENT_TYPE, "application/json")
+            exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
+            exchange.responseSender.send(
+                skdb!!
+                    .sql(
+                        "SELECT userUUID as accessKey, privateKey FROM skdb_users",
+                        OutputFormat.JSON)
+                    .decodeOrThrow())
+          } else {
+            exchange.statusCode = StatusCodes.METHOD_NOT_ALLOWED
+          }
         }
-        exchange.responseHeaders.put(Headers.CONTENT_TYPE, "application/json")
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
-        exchange.responseSender.send(
-            skdb!!
-                .sql("SELECT userUUID as accessKey, privateKey FROM skdb_users", OutputFormat.JSON)
-                .decodeOrThrow())
-      } else {
-        exchange.statusCode = StatusCodes.METHOD_NOT_ALLOWED
-      }
-    }
-  }
+      })
 }
 
 fun schemaHandler(): HttpHandler {
@@ -350,17 +363,17 @@ fun schemaHandler(): HttpHandler {
 
             val schema = exchange.inputStream.bufferedReader().use { it.readText() }
 
-            val prevSchema = schemas.put(db, schema);
+            val prevSchema = schemas.put(db, schema)
 
             // this check is more than just optimisation. it ensures
             // that clients with the same schema end up connected to
             // the same db file and thus replicate.
             if (prevSchema == schema) {
-              exchange.statusCode = StatusCodes.OK;
-              return;
+              exchange.statusCode = StatusCodes.OK
+              return
             }
 
-            exchange.statusCode = StatusCodes.CREATED;
+            exchange.statusCode = StatusCodes.CREATED
 
             try {
               new!!.sql(schema, OutputFormat.RAW).decodeOrThrow()
@@ -413,7 +426,8 @@ fun createHttpServer(
 
 fun main() {
   val taskPool = Executors.newSingleThreadScheduledExecutor()
-  val connHandler = connectionHandler(taskPool)
+  val workerPool = Executors.newSingleThreadExecutor()
+  val connHandler = connectionHandler(workerPool, taskPool)
   val usersHandler = usersHandler()
   val schemaHandler = schemaHandler()
   val server = createHttpServer(connHandler, usersHandler, schemaHandler)
