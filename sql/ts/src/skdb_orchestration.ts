@@ -453,6 +453,17 @@ class ResilientStream {
 
   onReconnect?: () => void;
 
+  close(): void {
+    if (this.stream !== undefined) {
+      this.stream.onClose = undefined;
+      this.stream.onData = undefined;
+      this.stream.onError = undefined;
+      this.stream.close()
+      this.stream = undefined;
+    }
+    this.setFailureDetectionTimeout(undefined);
+  }
+
   send(data: ArrayBuffer): void {
     if (!this.stream) {
       // black hole the data. we're reconnecting and will call
@@ -1252,7 +1263,9 @@ class SKDBServer implements RemoteSKDB {
   private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
-  private mirroredTables: Map<string, string> = new Map()
+  private localTailSession: string|undefined = undefined;
+  private mirroredTables: Set<string> = new Set();
+  private mirrorStreams: Set<ResilientStream> = new Set();
   private onRebootFn ?: () => void;
 
   private constructor(
@@ -1360,6 +1373,7 @@ class SKDBServer implements RemoteSKDB {
 
   private async establishServerTail(tableName: string, filterExpr: string): Promise<void> {
     const stream = await this.connection.openResilientStream();
+    this.mirrorStreams.add(stream);
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
 
@@ -1412,6 +1426,7 @@ class SKDBServer implements RemoteSKDB {
     }
 
     const stream = await this.connection.openResilientStream();
+    this.mirrorStreams.add(stream);
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
 
@@ -1474,10 +1489,7 @@ class SKDBServer implements RemoteSKDB {
 
   async tablesAwaitingSync() {
     const acc = new Set<string>();
-    for (const [table, session] of this.mirroredTables.entries()) {
-      if (session == "@view") {
-        continue;
-      }
+    for (const table of this.mirroredTables) {
       // TODO: if we parse the diff output we can provide an object
       // model representing the rows not yet ack'd.
       const diff = this.client.diff(
@@ -1485,7 +1497,7 @@ class SKDBServer implements RemoteSKDB {
           this.replicationUid,
           metadataTable(table)
         ),
-        session
+        this.localTailSession || ""
       );
       if (diff !== null) {
         acc.add(table);
@@ -1496,10 +1508,6 @@ class SKDBServer implements RemoteSKDB {
 
   async mirror(...tables: MirrorDefn[]): Promise<void> {
     const setupTable = async (tableName: string) => {
-      if (this.mirroredTables.has(tableName)) {
-        throw new Error(`${tableName} is already a member of a mirror set.`);
-      }
-
       let isViewOnRemote = await this.viewSchema(tableName) != "";
 
       if (!this.client.tableExists(tableName)) {
@@ -1518,10 +1526,22 @@ class SKDBServer implements RemoteSKDB {
 
       this.client.assertCanBeMirrored(tableName);
 
-      if (isViewOnRemote) {
-        this.mirroredTables.set(tableName, "@view");
+      if (!isViewOnRemote) {
+        this.mirroredTables.add(tableName);
       }
     };
+
+    // mirror has replace semantics. start by tearing down any current
+    // mirror session. re-establishing is relatively cheap.
+    if (this.localTailSession !== undefined) {
+      this.client.unsubscribe(this.localTailSession);
+      this.localTailSession = undefined;
+    }
+    for (const stream of this.mirrorStreams) {
+      stream.close();
+    }
+    this.mirrorStreams.clear();
+    this.mirroredTables.clear();
 
     const tableNames = tables.map(
       mirrorDef => (typeof mirrorDef === "string") ? mirrorDef : mirrorDef.table
@@ -1529,16 +1549,14 @@ class SKDBServer implements RemoteSKDB {
 
     await Promise.all(tableNames.map(tableName => setupTable(tableName)));
 
-    const session = await this.establishLocalTail(tableNames);
-    tableNames.forEach(tableName => {
-      // if it's a view, will already be there
-      if (!this.mirroredTables.has(tableName)) {
-        this.mirroredTables.set(tableName, session);
-      }
-    });
+    this.localTailSession = await this.establishLocalTail(tableNames); // TODO: but not views
 
     await Promise.all(tables.map(mirrorDef => {
       const tableName = (typeof mirrorDef === "string") ? mirrorDef : mirrorDef.table;
+      // TODO: changing the expression on a table that has already
+      // been mirrored is not going to work well currently. but when
+      // we have client-driven table reboots this can easily be
+      // accommodated.
       const filterExpr = (typeof mirrorDef === "string") ? "" : (mirrorDef.filterExpr || "");
       return this.establishServerTail(tableName, filterExpr);
     }));

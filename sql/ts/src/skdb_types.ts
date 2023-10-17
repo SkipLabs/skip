@@ -58,6 +58,7 @@ export interface SkdbMechanism {
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
   subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
+  unsubscribe: (session: string) => void;
   diff: (watermark: bigint, session: string) => ArrayBuffer | null;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => Array<any>;
