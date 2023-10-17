@@ -653,15 +653,20 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
     | None() -> void
     | Some(CCDefault{expr}) ->
       expr match {
-      | VNull() -> void
-      | VInt(x) -> o(` DEFAULT ${x.toString()}`)
-      | VFloat(x) -> o(` DEFAULT ${x.toString()}`)
-      | VString(s) ->
-        o(` DEFAULT `);
-        escapeString(o, s)
-      | VId(_, _) -> invariant_violation("Invalid expression for default value")
-      | VTime() -> invariant_violation("Invalid expression for default value")
-      | VParam(_) -> invariant_violation("Invalid expression for default value")
+      | v @ Value _ ->
+        v match {
+        | VNull() -> void
+        | VInt(x) -> o(` DEFAULT ${x.toString()}`)
+        | VFloat(x) -> o(` DEFAULT ${x.toString()}`)
+        | VString(s) ->
+          o(` DEFAULT `);
+          escapeString(o, s)
+        | VId _
+        | VSId _
+        | VTime()
+        | VParam _ ->
+          invariant_violation("Invalid expression for default value")
+        }
       | _ -> invariant_violation("Invalid expression for default value")
       }
     };
@@ -825,6 +830,26 @@ class Globals(map: SortedMap<String, Int> = SortedMap[]) extends SKStore.File {
     this.map[var]
   }
   fun maybeGet(var: String): ?Int {
+    this.map.maybeGet(var)
+  }
+}
+
+const NAMEDIDS: String = "NAMEDIDS";
+
+class NamedIDs(
+  map: SortedMap<String, String> = SortedMap[],
+) extends SKStore.File {
+  fun set(var: String, val: String): this {
+    !this.map[var] = val;
+    this
+  }
+  fun containsKey(var: String): Bool {
+    this.map.containsKey(var)
+  }
+  fun get(var: String): String {
+    this.map[var]
+  }
+  fun maybeGet(var: String): ?String {
     this.map.maybeGet(var)
   }
 }

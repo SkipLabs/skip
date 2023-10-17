@@ -46,12 +46,13 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec('create table t1 (a STRING PRIMARY KEY, b INTEGER);');
         try {
           await skdb.exec('insert into t1 (b) values (22);');
+          return await skdb.exec('select b from t1;');
         } catch (e) {
           return (e as Error).message;
         }
       },
       check: res => {
-        expect(res).toMatch(/Error: line 1, characters 0-0:\sCannot generate a string primary/);
+        expect(res).toEqual([{"b": 22}]);
       }
     },
     {

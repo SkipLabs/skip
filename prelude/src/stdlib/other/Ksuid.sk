@@ -1,0 +1,181 @@
+// k-sortable unique identifiers
+//
+// A version of k-sortable unique identifiers based on
+// https://github.com/segmentio/ksuid. Each Ksuid consists of a 32-bit
+// timestamp, followed by 128 bits of random data. The timestamp portion is
+// interpreted as the number of seconds since 2014-05-13T16:53:20.000Z,
+// which is 14e8 seconds after 1970-01-01T00:00:00.000Z, the beginning of
+// the Unix epoch. In this scheme, using 32 bits allows the ~136 year range
+// of times between 2014-05-13T16:53:20.000Z and 2150-06-19T23:21:35.000Z to
+// be expressed.  Big-endian byte order is used in the textual
+// representation so that ordering ids as strings is consistent with
+// ordering by timestamp.
+
+value class Ksuid(bytes: Array<UInt8>) uses Hashable, Orderable, Show {
+  static fun create_raw(
+    timestamp: UInt32,
+    payload_hi: Int,
+    payload_lo: Int,
+  ): this {
+    Ksuid(
+      Array::fillBy(20, (i) -> {
+        if (i < 4) {
+          timestamp.toInt().bigEndianByte(i + 4)
+        } else if (i < 12) {
+          payload_hi.bigEndianByte(i - 4)
+        } else {
+          payload_lo.bigEndianByte(i - 12)
+        }
+      }),
+    )
+  }
+
+  const ksuid_epoch: Int = 1400000000;
+
+  static fun time_sec_since_ksuid_epoch(): UInt32 {
+    UInt32::truncate((Time.time_ms() / 1000) - static::ksuid_epoch)
+  }
+
+  static fun create(): this {
+    static::create_raw(
+      static::time_sec_since_ksuid_epoch(),
+      Random.next(),
+      Random.next(),
+    );
+  }
+
+  // timestamp in seconds since the beginning of the Unix epoch
+  fun timestamp(): Int {
+    b = this.bytes;
+    t = 0;
+    for (i in Range(0, 4)) {
+      !t = t.or(b[i].shl((3 - i) * 8))
+    };
+    t + static::ksuid_epoch
+  }
+
+  fun payload(): (Int, Int) {
+    b = this.bytes;
+    h = 0;
+    for (i in Range(0, 8)) {
+      !h = h.or(b[i + 4].shl((7 - i) * 8))
+    };
+    l = 0;
+    for (i in Range(0, 8)) {
+      !l = l.or(b[i + 12].shl((7 - i) * 8))
+    };
+    (h, l)
+  }
+
+  // sextets, 6-bit ints, and characters in the 64-char sequence
+  // "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz" are
+  // interconvertible by treating sextets as indices into the char
+  // sequence. These are the same 64 chars as used by the base64url encoding
+  // scheme, but in ASCII order so that comparing as strings or byte arrays
+  // is equivalent.
+
+  const indexOf0: Int = 1;
+  const indexOfA: Int = 11;
+  const indexOf_: Int = 37;
+  const indexOfa: Int = 38;
+
+  static fun sextet_to_char(sextet: Int): Char {
+    if (sextet == 0) {
+      '-' // (sextet + '-'.code() - 0).chr()
+    } else if (sextet < static::indexOfA) {
+      (sextet + '0'.code() - static::indexOf0).chr()
+    } else if (sextet < static::indexOf_) {
+      (sextet + 'A'.code() - static::indexOfA).chr()
+    } else if (sextet == static::indexOf_) {
+      '_' // (sextet + '_'.code() - static::indexOf_).chr()
+    } else {
+      (sextet + 'a'.code() - static::indexOfa).chr()
+    }
+  }
+
+  static fun char_to_sextet(char: Char): Int {
+    if (char == '-') {
+      0 // char.code() - '-'.code() + 0
+    } else if (char <= '9') {
+      char.code() - '0'.code() + static::indexOf0
+    } else if (char <= 'Z') {
+      char.code() - 'A'.code() + static::indexOfA
+    } else if (char == '_') {
+      37 // char.code() - '_'.code() + static::indexOf_
+    } else {
+      char.code() - 'a'.code() + static::indexOfa
+    }
+  }
+
+  fun to_sextets(): Array<Char> {
+    b = this.bytes;
+    v = Vector::mcreate(27);
+    push = (sextet -> v.push(static::sextet_to_char(sextet)));
+    i = 0;
+    // encode octets [0,18) to 24 sextets in chunks of 3 octets to 4 sextets
+    while (i < 18) {
+      // combine 3 octets into a 24-bit int
+      o0 = (b[i].toInt().shl(16));
+      o1 = (b[i + 1].toInt().shl(8));
+      o2 = (b[i + 2].toInt());
+      n = o0.or(o1.or(o2));
+      // split 24-bit int into 4 sextets
+      push(n.shr(18).and(0x3F));
+      push(n.shr(12).and(0x3F));
+      push(n.shr(6).and(0x3F));
+      push(n.and(0x3F));
+      !i = i + 3;
+    };
+    // encode octets 18 and 19 to 3 sextets
+    // combine 2 octets into a 16-bit int
+    o18 = (b[18].toInt().shl(8));
+    o19 = (b[19].toInt());
+    n = o18.or(o19);
+    // split 16-bit int into 3 sextets
+    push(n.shr(10).and(0x3F));
+    push(n.shr(4).and(0x3F));
+    push(n.and(0xF)); // only 4 bits of final sextet are used
+    v.toArray();
+  }
+
+  static fun of_sextets(sextets: Array<Int>): Array<UInt8> {
+    v = Vector::mcreate(20);
+    push = (octet -> v.push(UInt8::truncate(octet)));
+    i = 0;
+    // encode sextets [0,24) to 18 octets in chunks of 4 sextets to 3 octets
+    while (i < 24) {
+      // combine 4 sextets into a 24-bit int
+      s0 = sextets[i].shl(18);
+      s1 = sextets[i + 1].shl(12);
+      s2 = sextets[i + 2].shl(6);
+      s3 = sextets[i + 3];
+      n = s0.or(s1.or(s2.or(s3)));
+      // split 24-bit int into 3 octets
+      push(n.shr(16).and(0xFF));
+      push(n.shr(8).and(0xFF));
+      push(n.and(0xFF));
+      !i = i + 4;
+    };
+    // encode sextets 24, 25, and (4 bits of) 26 to 2 octets
+    s24 = sextets[24].shl(10);
+    s25 = sextets[25].shl(4);
+    s26 = sextets[26].and(0xF);
+    n = s24.or(s25.or(s26));
+    // split 16-bit int into 2 octets
+    push(n.shr(8).and(0xFF));
+    push(n.and(0xFF));
+    v.toArray();
+  }
+
+  fun toString(): String {
+    String::fromChars(this.to_sextets());
+  }
+
+  static fun fromString(s: String): this {
+    Ksuid(
+      static::of_sextets(
+        s.getIter().map(static::char_to_sextet).collect(Array),
+      ),
+    );
+  }
+}
