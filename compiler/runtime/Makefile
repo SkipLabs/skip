@@ -67,4 +67,4 @@ runtime64_specific.o: runtime64_specific.cpp
 .PHONY: clean
 clean:
 	rm -f *.o *.bc magic.c libskip_runtime64.a
-	$(MAKE) -C libbacktrace clean
+	(test ! -f libbacktrace/Makefile && echo "Warning: libbacktrace submodule not initialized") || $(MAKE) -C libbacktrace clean
