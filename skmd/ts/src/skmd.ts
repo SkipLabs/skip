@@ -17,6 +17,7 @@ export type Conf = {
     lang?: string,
     charset?: string,
     extends?: string,
+    tableOfContent?: number,
 };
 
 export async function createMDConverter() {

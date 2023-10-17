@@ -180,7 +180,7 @@ fun parseElements(
 /* Parse parens and brackets. */
 /*****************************************************************************/
 
-fun lex(input: Array<Char>): mutable Iterator<(Char, Int)> {
+fun lex(input: Accessor): mutable Iterator<(Char, Int)> {
   i = 0;
   loop {
     if (i >= input.size()) break void;
@@ -201,7 +201,7 @@ fun lex(input: Array<Char>): mutable Iterator<(Char, Int)> {
   }
 }
 
-fun parseParens(input: Array<Char>): Array<(Char, Array<Char>)> {
+fun parseParens(input: Accessor): Array<(Char, Array<Char>)> {
   iter = lex(input);
   acc = mutable Vector[];
   result = mutable Vector[];
@@ -319,6 +319,10 @@ fun makeElement(elt: (Char, Array<Char>)): TextElement {
 }
 
 fun splitText(input: Array<Char>): Array<TextElement> {
+  splitAccessor(Accessor::fromArray(input))
+}
+
+fun splitAccessor(input: Accessor): Array<TextElement> {
   iter = parseParens(input).iterator();
   text = mutable Vector[];
   acc = mutable Vector<TextElement>[];

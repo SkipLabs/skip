@@ -1,0 +1,611 @@
+module SKMD;
+
+class Accessor(
+  getter: Int ~> Char,
+  maybeGetter: Int ~> ?Char,
+  range: Range,
+  first: Bool = false,
+) {
+  //
+  static fun empty(): this {
+    Accessor(_ ~> '\0', _ ~> None(), Range(0, 0))
+  }
+
+  static fun fromArray(arr: Array<Char>): this {
+    Accessor(arr.get, arr.maybeGet, Range(0, arr.size()))
+  }
+
+  static fun fromVector(vec: Vector<Char>, optRange: ?Range = None()): this {
+    Accessor(vec.get, vec.maybeGet, optRange.default(Range(0, vec.size())))
+  }
+
+  fun get(idx: Int): Char {
+    this.getter(idx + this.range.start)
+  }
+
+  fun maybeGet(idx: Int): ?Char {
+    this.maybeGetter(idx + this.range.start)
+  }
+
+  fun isEmpty(): Bool {
+    this.range.isEmpty()
+  }
+
+  fun isBlank(): Bool {
+    for (idx in Range(0, this.size())) {
+      if (!Chars.isWhitespace(this.get(idx))) break false
+    } else {
+      true
+    }
+  }
+
+  fun isWhitespace(idx: Int, def: Bool = false): Bool {
+    this.maybeGet(idx).map(Chars.isWhitespace).default(def)
+  }
+
+  fun isChar(c: Char, idx: Int, def: Bool = false): Bool {
+    this.maybeGet(idx).map(v ~> v == c).default(def)
+  }
+
+  fun size(): Int {
+    this.range.size()
+  }
+
+  fun slice(start: Int, end: Int): this {
+    nStart = this.range.start + start;
+    nEnd = this.range.start + end;
+    Accessor(this.getter, this.maybeGetter, Range(nStart, nEnd))
+  }
+
+  fun drop(size: Int): this {
+    nStart = this.range.start + size;
+    Accessor(this.getter, this.maybeGetter, Range(nStart, this.range.end))
+  }
+
+  fun take(size: Int): this {
+    nEnd = this.range.start + size;
+    Accessor(this.getter, this.maybeGetter, Range(this.range.start, nEnd))
+  }
+
+  fun checkIndent(size: Int = 4): (Int, Accessor) {
+    idx = 0;
+    indent = 0;
+    loop {
+      this.maybeGet(idx) match {
+      | Some('\t') -> !indent = size * (indent / size + 1)
+      | Some(c) if (Chars.isWhitespace(c)) -> !indent = indent + 1
+      | _ -> break void
+      };
+      !idx = idx + 1;
+    };
+    (indent, this.drop(idx))
+  }
+
+  fun decr(v: Int, size: Int = 4): Accessor {
+    if (this.isEmpty()) {
+      return this
+    };
+    idx = 0;
+    indent = 0;
+    loop {
+      this.maybeGet(idx) match {
+      | Some('\t') -> !indent = size * (indent / size + 1)
+      | Some(c) if (Chars.isWhitespace(c)) -> !indent = indent + 1
+      | _ -> return this.drop(idx)
+      };
+      !idx = idx + 1;
+      if (indent > v) {
+        return Accessor::fromArray(
+          Array::fill(indent - v, ' ').concat(this.drop(idx).toArray()),
+        )
+      } else if (indent == v) {
+        return this.drop(idx);
+      };
+    };
+  }
+
+  fun countAsLongAs(
+    predicate: Char ~> Bool,
+    idx: Int = 0,
+    count: Int = 0,
+  ): Int {
+    while (this.maybeGet(idx).map(predicate).default(false)) {
+      !idx = idx + 1;
+      !count = count + 1;
+    };
+    count
+  }
+
+  fun equals(str: String): Bool {
+    chars = str.chars();
+    if (chars.size() != this.size()) {
+      return false;
+    };
+    for (i in Range(0, chars.size())) {
+      if (chars[i] != this[i]) {
+        break false
+      }
+    } else {
+      true
+    }
+  }
+
+  fun split(c: Char): Array<Accessor> {
+    res = mutable Vector[];
+    s = this;
+    loop {
+      count = s.countAsLongAs(v ~> v == c);
+      res.push(s.take(count));
+      if (count == s.size()) return res.toArray();
+      !s = s.drop(count);
+    }
+  }
+
+  fun splitFirst(c: Char): (Accessor, Accessor) {
+    count = this.countAsLongAs(v ~> v != c);
+    (this.take(count), this.drop(count + 1))
+  }
+
+  fun splitLast(c: Char): (Accessor, Accessor) {
+    count = 0;
+    while (
+      this.maybeGet(this.size() - 1 - count).map(v ~> v != c).default(false)
+    ) {
+      !count = count + 1;
+    };
+    idx = this.size() - count;
+    (this.take(idx - 1), this.drop(idx))
+  }
+
+  fun count(c: Char): Int {
+    count = 0;
+    for (i in Range(0, this.size())) {
+      if (this[i] == c) {
+        !count = count + 1;
+      }
+    };
+    count
+  }
+
+  fun contains(c: Char): Bool {
+    count = this.countAsLongAs(v ~> v != c);
+    count < this.size()
+  }
+
+  // reports whether the accessor contains any ASCII control character.
+  fun containsCTLByte(): Bool {
+    count = this.countAsLongAs(v ~> !Chars.isControlCharacter(v));
+    count < this.size()
+  }
+
+  fun startsWith(str: String): Bool {
+    chars = str.chars();
+    if (chars.size() > this.size()) {
+      return false;
+    };
+    for (i in Range(0, chars.size())) {
+      if (chars[i] != this[i]) {
+        break false
+      }
+    } else {
+      true
+    }
+  }
+
+  fun hexToInt(): Int {
+    current = 0;
+    for (i in Range(0, this.size())) {
+      !current = current * 16 + Chars.hexDigitToInt(this[i])
+    };
+    current
+  }
+
+  fun toArray(): Array<Char> {
+    Array::fillBy(this.size(), this.get)
+  }
+
+  fun toIdent(): String {
+    String::fromChars(
+      Array::fillBy(this.size(), idx -> {
+        c = this.get(idx);
+        if (
+          !((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9'))
+        ) {
+          '_'
+        } else {
+          c.uncapitalize()
+        }
+      }),
+    )
+  }
+
+  fun toString(): String {
+    String::fromChars(this.toArray());
+  }
+}
+
+mutable base class Entity uses HasClassName, Show
+
+mutable base class BlockEntity extends Entity {
+  // Returns: None() if the line is consumed
+  //          Some(false) if the block shall stop and the line is not consumed
+  //          Some(true) if the block shall stop and the line is consumed
+  mutable fun check(line: Accessor): ?Bool;
+  readonly fun close(): this;
+}
+
+base class ListKind uses Equality, HasClassName, Show {
+  children =
+  | BulletList(c: Char, kind: Int)
+  | OrederedList(size: Int)
+
+  fun count(): Int
+  | BulletList(_, kind) -> kind + 1
+  | OrederedList(size) -> size + 2
+
+  fun toString(): String
+  | BulletList(c, kind) -> `ul-${c}-${kind}`
+  | OrederedList(size) -> `ol-${size}`
+}
+
+mutable class ParagraphBlock(
+  lines: mutable Vector<Accessor> = mutable Vector[],
+  mutable header: Int = 0,
+) extends BlockEntity {
+  //
+  mutable fun check(line: Accessor): ?Bool {
+    if (line.isEmpty()) {
+      return Some(true)
+    };
+    this.lines.push(line);
+    None()
+  }
+
+  readonly fun close(): this {
+    ParagraphBlock(this.lines.chill(), this.header)
+  }
+
+  readonly fun toString(): String {
+    (
+      this.getClassName(),
+      this.header.toString(),
+      this.lines.map(l -> l.toString()).toArray(),
+    ).toString()
+  }
+}
+
+mutable class ConfigBlock(
+  lines: mutable Vector<Accessor> = mutable Vector[],
+) extends BlockEntity {
+  //
+  static fun create(line: Accessor): ?mutable this {
+    if (
+      line.maybeGet(0) == Some('-') &&
+      line.maybeGet(1) == Some('-') &&
+      line.maybeGet(2) == Some('-') &&
+      line.first
+    ) Some(mutable static()) else {
+      None()
+    }
+  }
+
+  mutable fun check(line: Accessor): ?Bool {
+    if (
+      line.maybeGet(0) == Some('-') &&
+      line.maybeGet(1) == Some('-') &&
+      line.maybeGet(2) == Some('-')
+    ) {
+      return Some(true)
+    };
+    this.lines.push(line);
+    None()
+  }
+
+  readonly fun close(): this {
+    ConfigBlock(this.lines.chill())
+  }
+
+  readonly fun toString(): String {
+    (
+      this.getClassName(),
+      this.lines.map(l -> l.toString()).toArray(),
+    ).toString()
+  }
+}
+
+mutable class CodeBlock(
+  count: Int,
+  language: Accessor,
+  lines: mutable Vector<Accessor> = mutable Vector[],
+) extends BlockEntity {
+  //
+  static fun create(line: Accessor): ?mutable this {
+    count = line.countAsLongAs(c ~> c == '`');
+    if (count >= 3) {
+      Some(mutable CodeBlock(count, line.drop(count)))
+    } else {
+      None()
+    }
+  }
+
+  mutable fun check(line: Accessor): ?Bool {
+    if (
+      line.maybeGet(0) == Some('`') &&
+      line.maybeGet(1) == Some('`') &&
+      line.maybeGet(2) == Some('`')
+    ) {
+      return Some(true)
+    };
+    this.lines.push(line);
+    None()
+  }
+
+  readonly fun close(): this {
+    CodeBlock(this.count, this.language, this.lines.chill())
+  }
+
+  readonly fun toString(): String {
+    (
+      this.getClassName(),
+      this.count.toString(),
+      this.language.toString(),
+      this.lines.map(l -> l.toString()).toArray(),
+    ).toString()
+  }
+}
+
+const blocks: Array<Accessor ~> ?mutable BlockEntity> = Array[
+  ConfigBlock::create,
+  HeaderBlock::create,
+  ListBlock::create,
+  CodeBlock::create,
+  BlockQuote::create,
+];
+
+mutable base class MainBlock(
+  entities: mutable Vector<Entity> = mutable Vector[],
+  mutable optBlock: ?mutable BlockEntity = None(),
+) uses HasClassName {
+  //
+  mutable fun manage(line: Accessor): void {
+    this.optBlock match {
+    | None() ->
+      if (line.isBlank()) return void;
+      optBlock = for (creator in blocks) {
+        optBlock = creator(line);
+        if (optBlock.isSome()) break optBlock
+      } else {
+        None()
+      };
+      this.!optBlock = Some(
+        optBlock.default(mutable ParagraphBlock(mutable Vector[line])),
+      )
+    | Some(block) ->
+      block.check(line) match {
+      | Some(consumed) ->
+        this.entities.push(block.close());
+        this.!optBlock = None();
+        if (!consumed) {
+          this.manage(line)
+        }
+      | _ -> void
+      }
+    }
+  }
+
+  readonly fun getEntities(): Vector<Entity> {
+    this.optBlock match {
+    | Some(block) ->
+      entities = this.entities.clone();
+      entities.push(block.close());
+      entities.chill()
+    | _ -> this.entities.chill()
+    }
+  }
+}
+
+fun parseToBlocks(markdown: String): Vector<Entity> {
+  body = mutable BodyBlock();
+  body.parse(markdown);
+  body.getEntities();
+}
+
+mutable class BodyBlock extends MainBlock {
+  mutable fun parse(markdown: String): void {
+    chars = markdown.chars();
+    start = 0;
+    current = 0;
+    while (current < chars.size()) {
+      c = chars[current];
+      if (c == '\n') {
+        this.manage(Accessor::fromVector(chars, Some(Range(start, current))));
+        !start = current + 1;
+      };
+      !current = current + 1;
+    };
+    if (current > start) {
+      this.manage(Accessor::fromVector(chars, Some(Range(start, current))));
+    }
+  }
+}
+
+mutable class ListBlock(
+  mutable indent: Int,
+  kind: ListKind,
+) extends BlockEntity, MainBlock {
+  //
+  static fun getKind(line: Accessor): ?ListKind {
+    chars = Array['*', '+', '-'];
+    optKind = for (c in chars) {
+      count = line.countAsLongAs(x ~> x == c);
+      if (count >= 1 && line.isWhitespace(count)) {
+        break Some(BulletList(c, count))
+      }
+    } else {
+      None()
+    };
+    if (optKind.isNone()) {
+      count = line.countAsLongAs(Chars.isDigit);
+      if (
+        count >= 1 &&
+        line.isChar('.', count) &&
+        line.isWhitespace(count + 1)
+      ) {
+        return Some(OrederedList(count))
+      }
+    };
+    optKind
+  }
+
+  static fun create(line: Accessor): ?mutable this {
+    (indent, sline) = line.checkIndent();
+    static::getKind(sline).map(kind -> {
+      lb = mutable ListBlock(indent, kind);
+      p = mutable ParagraphBlock(mutable Vector[sline.drop(kind.count())]);
+      lb.!optBlock = Some(p);
+      lb
+    })
+  }
+
+  mutable fun check(line: Accessor): ?Bool {
+    if (this.optBlock.isNone() && line.isBlank()) {
+      return Some(true)
+    };
+    (indent, sline) = line.checkIndent();
+    if (
+      indent < this.indent ||
+      (indent == this.indent && ListBlock::getKind(sline).isSome())
+    ) {
+      return Some(false)
+    };
+    ListBlock::create(sline) match {
+    | Some(hb) ->
+      hb.!indent = this.indent + indent;
+      this.optBlock.each(block -> {
+        this.entities.push(block.close());
+        this.!optBlock = Some(hb);
+      })
+    | _ -> this.manage(line.decr(this.indent))
+    };
+    None()
+  }
+
+  readonly fun close(): this {
+    ListBlock(this.indent, this.kind, this.getEntities())
+  }
+
+  readonly fun toString(): String {
+    (
+      this.getClassName(),
+      this.indent.toString(),
+      this.kind.toString(),
+      this.getEntities().map(l -> l.toString()).toArray(),
+    ).toString()
+  }
+}
+
+mutable class BlockQuote extends BlockEntity, MainBlock {
+  //
+  static fun create(line: Accessor): ?mutable this {
+    if (line.maybeGet(0) == Some('>') && line.maybeGet(1) == Some(' ')) {
+      bq = mutable BlockQuote();
+      bq.manage(line.drop(2));
+      Some(bq)
+    } else {
+      None()
+    }
+  }
+
+  mutable fun check(line: Accessor): ?Bool {
+    if (line.maybeGet(0) != Some('>') || line.maybeGet(1) != Some(' ')) {
+      return Some(false)
+    };
+    this.manage(line.drop(2));
+    None()
+  }
+
+  readonly fun close(): this {
+    BlockQuote(this.getEntities())
+  }
+
+  readonly fun toString(): String {
+    (
+      this.getClassName(),
+      this.getEntities().map(l -> l.toString()).toArray(),
+    ).toString()
+  }
+}
+
+mutable class HeaderBlock(level: Int) extends BlockEntity, MainBlock {
+  //
+  readonly fun getId(): ?String {
+    this.entities.maybeGet(0) match {
+    | Some(ParagraphBlock(lines, _header)) ->
+      Some(lines.map(l -> l.toIdent()).join("-"))
+    | _ -> None()
+    }
+  }
+
+  readonly fun getTitle(): Vector<Accessor> {
+    this.entities.maybeGet(0) match {
+    | Some(ParagraphBlock(lines, _header)) -> lines
+    | _ -> Vector[]
+    }
+  }
+
+  static fun create(line: Accessor): ?mutable this {
+    count = line.countAsLongAs(c ~> c == '#');
+    if (
+      count > 0 &&
+      line.maybeGet(count).map(Chars.isWhitespace).default(true)
+    ) {
+      hb = mutable HeaderBlock(count);
+      header = mutable ParagraphBlock(
+        mutable Vector[line.drop(count + 1)],
+        count,
+      );
+      hb.!optBlock = Some(header);
+      Some(hb)
+    } else {
+      None()
+    }
+  }
+
+  mutable fun check(line: Accessor): ?Bool {
+    count = line.countAsLongAs(c ~> c == '#');
+    if (count == this.level) {
+      return Some(false)
+    };
+    this.manage(line);
+    None()
+  }
+
+  readonly fun close(): this {
+    HeaderBlock(this.level, this.getEntities())
+  }
+
+  readonly fun toString(): String {
+    (
+      this.getClassName(),
+      this.level.toString(),
+      this.getEntities().map(l -> l.toString()).toArray(),
+    ).toString()
+  }
+}
+
+//
+
+fun toEncoded(text: Sequence<Char>): String {
+  tmp = mutable Vector<Char>[];
+  text.each(c ->
+    c match {
+    | '&' -> Array['&', 'a', 'm', 'p', ';'].each(tmp.push)
+    | '<' -> Array['&', 'l', 't', ';'].each(tmp.push)
+    | '>' -> Array['&', 'g', 't', ';'].each(tmp.push)
+    | _ -> tmp.push(c)
+    }
+  );
+  String::fromChars(tmp.toArray())
+}
