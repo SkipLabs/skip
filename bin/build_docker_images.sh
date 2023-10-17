@@ -8,7 +8,7 @@ set -x
 
 cd $REPO
 
-git clean -xdn | sed 's|Would remove |/|g' >> .dockerignore
+git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
 echo ".git" >> .dockerignore
 
 dockerbuild () {
