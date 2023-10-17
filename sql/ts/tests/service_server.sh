@@ -58,6 +58,9 @@ run_server () {
         sleep 1
         i=$((i+1))
     done
+    if [[ $i -ge 10 ]]; then
+        echo "Gave up waiting for server $pid1 to start at $host" 1>&2;
+    fi
 
     exists=$(kill -0 $pid1);
     if [[ -z "$exists" ]]; then
