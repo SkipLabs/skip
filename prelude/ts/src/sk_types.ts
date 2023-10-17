@@ -219,6 +219,7 @@ export class Utils {
     this.stdin = "";
     this.stdout = new Array();
     this.stderr = new Array();
+    this.stddebug = new Array();
     this.exports = exports as any as Exported;
     this.env = env;
     this.state = new State();
@@ -395,7 +396,7 @@ export class Utils {
     try {
       return this.call(f);
     } catch (exn) {
-      let exception = (exn instanceof SkException) ? null : new Exception(exn, this.state);
+      let exception = (exn instanceof SkException) ? null : new Exception(exn as Error, this.state);
       return this.callWithException(exn_handler, exception);
     }
   }

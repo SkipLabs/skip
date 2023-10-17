@@ -266,7 +266,7 @@ export const onWorkerMessage = <T>(message: MessageEvent, post: (message: any) =
         } else {
           creator.create.apply(creator, parameters).then(
             created => {
-              runner = created;
+              runner = created as object;
               post(new Message(data!.id, new Return(true, null)))
             }
           ).catch(e => post(new Message(data!.id, new Return(false, e))))

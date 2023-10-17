@@ -28,20 +28,46 @@ export default defineConfig({
   /* Configure projects for major browsers */
     projects: [
     {
-      name: 'nodejs',
+      name: 'client_nodejs',
       testMatch: /node.play.ts/,
     },
-
     {
-      name: 'chromium',
+      name: 'server_nodejs',
+      testMatch: /node.play.server.ts/,
+    },
+    {
+      name: 'mux_nodejs',
+      testMatch: /node.play.mux.ts/,
+    },
+    {
+      name: 'client_chromium',
       use: { ...devices['Desktop Chrome'] },
       testMatch: /browser.play.ts/,
     },
-
     {
-      name: 'firefox',
+      name: 'server_chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /browser.play.server.ts/,
+    },
+    {
+      name: 'mux_chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /browser.play.mux.ts/,
+    },
+    {
+      name: 'client_firefox',
       use: { ...devices['Desktop Firefox'] },
       testMatch: /browser.play.ts/,
+    },
+    {
+      name: 'server_firefox',
+      use: { ...devices['Desktop Firefox'] },
+      testMatch: /browser.play.server.ts/,
+    },
+    {
+      name: 'mux_firefox',
+      use: { ...devices['Desktop Firefox'] },
+      testMatch: /browser.play.mux.ts/,
     },
 
     // {

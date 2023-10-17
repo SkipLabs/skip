@@ -181,6 +181,25 @@ class Package(
   }
 }
 
+class Target(paths: Array<String>, services: Array<String>) {
+  //
+  static fun fromJSON(value: JSON.Value): Target {
+    json = value.expectObject();
+    strArray = name ->
+      json
+        .maybeGetArray(name)
+        .map(arr -> arr.value.map(v -> v.expectString()).toArray())
+        .default(Array[]);
+    Target(strArray("paths"), strArray("services"))
+  }
+}
+
+fun targets(file: String): Map<String, Target> {
+  contents = FileSystem.readTextFile(file);
+  json = JSON.decode(contents).expectObject();
+  json.value.map((_, v) -> Target::fromJSON(v));
+}
+
 fun main(): void {
   cmd = Cli.Command("sknpm")
     .about("Skip's npm package builder")
@@ -242,15 +261,38 @@ fun main(): void {
 
 fun checker(): (Cli.Command, Cli.ParseResults ~> void) {
   (
-    Cli.Command("check").short("c").about("Run tsc on ts source files"),
+    Cli.Command("check")
+      .short("c")
+      .about("Run tsc on ts source files")
+      .arg(
+        Cli.BoolArg("test")
+          .short("t")
+          .long("test")
+          .about("Run tsc on ts tests files, with build package"),
+      ),
     args ~> Skargo.envCmd(args, execCheck),
   )
 }
 
-fun execCheck(_args: Cli.ParseResults, env: Skargo.Env): void {
-  tsDir = Path.join(env.rootDir, "ts/src");
-  invariant(FileSystem.exists(tsDir), "No typescript source");
-  tsc(tsDir, env.verbose);
+fun execCheck(args: Cli.ParseResults, env: Skargo.Env): void {
+  (tsDir, info, n) = if (args.getBool("test")) {
+    tsDir = Path.join(env.rootDir, "ts/tests");
+    invariant(FileSystem.exists(tsDir), "No typescript test to check");
+    bc = Skargo.BuildContext::create(
+      env,
+      Some("wasm32"),
+      None(),
+      Skargo.kDevProfile,
+    );
+    _ = buildIfNeeded(bc, false);
+    package = Package::create(env.manifest);
+    npmDir = manage(bc, package, None());
+    (tsDir, Some((package.name, npmDir)), "tests")
+  } else {
+    (Path.join(env.rootDir, "ts/src"), None(), "source")
+  };
+  invariant(FileSystem.exists(tsDir), `No ${n} typescript to check`);
+  tsc(tsDir, info, env.verbose);
 }
 
 /********* Build **********/
@@ -315,8 +357,16 @@ fun test(): (Cli.Command, Cli.ParseResults ~> void) {
       .short("t")
       .about("Run the tests")
       .arg(
-        Cli.StringArg("filter")
+        Cli.ArrayArg("target")
           .positional()
+          .about(
+            "If specified, only run tests for the specified test targets (defined in target.json)",
+          ),
+      )
+      .arg(
+        Cli.ArrayArg("filter")
+          .short("f")
+          .long("filter")
           .about("If specified, only run tests with names matching the filter"),
       )
       .arg(
@@ -348,7 +398,6 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
     args.maybeGetString("target-dir"),
     Skargo.getProfile(args),
   );
-
   tests = Path.join(env.manifest.path, "ts/tests");
   targetDir = Path.join(bc.targetDir, "tests");
   customTests = FileSystem.exists(tests);
@@ -358,8 +407,9 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
     ];
   };
   _ = buildIfNeeded(bc, !customTests);
+  _ = manage(bc, Package::create(env.manifest), None());
   if (customTests) {
-    Skargo.run(Array["cp", "-R", tests, bc.targetDir], env.verbose);
+    syncDirs(tests, targetDir, Set["node_modules"], bc.env.verbose);
   } else {
     saveArchive(bc.targetDir);
   };
@@ -376,17 +426,96 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
   };
   packageDir = Path.join(Path.join(targetDir, "node_modules"), package.name);
   _ = manage(bc, package, Some(packageDir), optBinName);
-  serviceFile = Path.join(targetDir, "service.mk");
-  processes = mutable Vector[];
-  environment = mutable Map[];
-  if (FileSystem.exists(serviceFile)) {
-    cmd = Array["make", "-f", serviceFile, `ROOT_DIR=${bc.env.manifest.path}`];
+  targetsFile = Path.join(targetDir, "targets.json");
+  availables = if (FileSystem.exists(targetsFile)) {
+    targets(targetsFile);
+  } else {
+    Map[]
+  };
+  services = Array<String>[];
+  targets = Array<String>[];
+  args.maybeGetArray("target") match {
+  | Some(a) ->
+    a.each(v ->
+      availables.maybeGet(v) match {
+      | Some(target) ->
+        !services = services.concat(target.services);
+        !targets = services.concat(target.paths)
+      | _ -> invariant_violation(`${v} target not defined.`)
+      }
+    )
+  | _ ->
+    availables.each((_, target) -> {
+      !services = services.concat(target.services);
+    })
+  };
+  processes = mutable Vector<Int>[];
+  done = mutable Set<String>[];
+  environment = mutable Map<String, String>[];
+  services.each(s -> {
+    if (!done.contains(s)) {
+      runService(
+        Path.join(targetDir, s),
+        bc.env.manifest.path,
+        processes,
+        environment,
+        bc.env.verbose,
+      );
+      done.insert(s);
+    }
+  });
+  Environ.set_current_dir(targetDir);
+  environment.each(Environ.set_var);
+  reporter = args.maybeGetString("junitxml").map(v -> {
+    Environ.set_var("PLAYWRIGHT_JUNIT_OUTPUT_NAME", v);
+    "junit"
+  });
+  filters = args
+    .maybeGetArray("filter")
+    .map(a -> Array["-g", a.join("|")])
+    .default(Array[]);
+  cmd = Array[
+    "npx",
+    "playwright",
+    "test",
+    `--reporter=${reporter.default("line")}`,
+  ].concat(filters).concat(targets);
+  try {
+    Skargo.run(Array["npx", "playwright", "install"], bc.env.verbose);
     if (bc.env.verbose) {
       print_error(`>> ${cmd.join(" ")}`)
     };
-    p = System.subprocess(cmd);
-    if (bc.env.verbose || !p.success()) {
-      print_raw(p.stdout);
+    p = System.subprocess(cmd, print_raw, print_error_raw);
+    if (!p.success()) {
+      throw Skargo.SystemCallException(p.exitcode());
+    };
+    processes.each(p ->
+      Skargo.run(Array["kill", p.toString()], bc.env.verbose)
+    );
+  } catch {
+  | exn ->
+    processes.each(p ->
+      Skargo.run(Array["kill", p.toString()], bc.env.verbose)
+    );
+    throw exn
+  }
+}
+
+fun runService(
+  serviceFile: String,
+  root: String,
+  processes: mutable Vector<Int>,
+  environment: mutable Map<String, String>,
+  verbose: Bool,
+): void {
+  if (FileSystem.exists(serviceFile)) {
+    cmd = Array["make", "-f", serviceFile, `ROOT_DIR=${root}`];
+    if (verbose) {
+      print_error(`>> ${cmd.join(" ")}`)
+    };
+    p = System.subprocess(cmd, s -> if (verbose) print_raw(s));
+    if (verbose || !p.success()) {
+      if (!verbose) print_raw(p.stdout);
       print_error_raw(p.stderr);
     };
     if (!p.success()) {
@@ -404,7 +533,7 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
           | s if (s.startsWith("sknpm.env:")) ->
             envName = s.split(":")[1];
             envValue = elems.drop(1).join("=");
-            environment.add(envName, envValue)
+            environment.set(envName, envValue)
           | _ -> print_error("Unmanaged command: " + line)
           }
         } else {
@@ -414,21 +543,6 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
       }
     });
   };
-  environment.each(Environ.set_var);
-  pCmd = args.maybeGetString("junitxml") match {
-  | Some(junitxml) ->
-    `PLAYWRIGHT_JUNIT_OUTPUT_NAME=${junitxml} npx playwright test --reporter=junit`
-  | _ -> "npx playwright test --reporter=line"
-  };
-  cmd = `bash -c 'cd ${targetDir} && npx playwright install && ${pCmd}'`;
-  if (bc.env.verbose) {
-    print_error(`>> ${cmd}`)
-  };
-  res = system(cmd);
-  processes.each(p -> Skargo.run(Array["kill", p.toString()], bc.env.verbose));
-  if (res != 0) {
-    throw Skargo.SystemCallException(2);
-  }
 }
 
 fun buildIfNeeded(bc: Skargo.BuildContext, test: Bool): Bool {
@@ -524,7 +638,7 @@ fun manage(
 
   tsconfig = Path.join(tsDir, "tsconfig.json");
   FileSystem.writeTextFile(tsconfig, tsConfig(dependencies.map(d -> d.name)));
-  tsc(tsDir, bc.env.verbose);
+  tsc(tsDir, None(), bc.env.verbose);
   jsDir = Path.join(tsDir, "js");
   invariant(FileSystem.exists(jsDir), "Invalid typescript build");
   // TODO: manage subdirectories
@@ -663,7 +777,6 @@ fun manage(
   stream = mutable Vector[];
   npmPackageContents.writeToStream(stream.push, 2);
   FileSystem.writeTextFile(npmPackageFile, stream.join(""));
-  Skargo.run(Array["rm", "-rf", tsDir], bc.env.verbose);
   npmDir
 }
 
@@ -695,6 +808,7 @@ fun tsConfig(deps: Vector<String>): String {
           "sourceMap" => JSON.Bool(true),
           "declaration" => JSON.Bool(true),
           "declarationMap" => JSON.Bool(true),
+          "incremental" => JSON.Bool(true),
           "moduleResolution" => JSON.String("Node"),
         ],
       ),
@@ -705,12 +819,23 @@ fun tsConfig(deps: Vector<String>): String {
   stream.join("")
 }
 
-fun tsc(tsDir: String, verbose: Bool): void {
+fun tsc(tsDir: String, link: ?(String, String), verbose: Bool): void {
   tsconfig = Path.join(tsDir, "tsconfig.json");
   Skargo.run(
     Array["npm", "i", "--prefix", tsDir, "--save-dev", "@types/node"],
     verbose,
   );
+  link.each(l -> {
+    node_modules = Path.join(tsDir, "node_modules");
+    if (FileSystem.exists(node_modules)) {
+      (name, path) = l;
+      symlink = Path.join(node_modules, name);
+      if (FileSystem.exists(symlink)) {
+        Skargo.run(Array["rm", symlink], verbose);
+      };
+      Skargo.run(Array["ln", "-s", path, symlink], verbose)
+    }
+  });
   Skargo.run(Array["tsc", "--project", tsconfig], verbose);
 }
 
@@ -718,7 +843,7 @@ fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
   contents = FileSystem.readTextFile(tsFile);
   target = Path.join(dir, Path.basename(tsFile));
   lines = contents.split("\n").map(line -> {
-    if (line.startsWith("import ") || line.startsWith("export ")) {
+    if (line.startsWith("import ") || line.startsWith("export {")) {
       elements = line.split(" from ");
       if (elements.size() == 2) {
         imported = elements[1].split("\"");
@@ -798,7 +923,7 @@ fun copyAndConvertImport(
     withTmpl = false;
     optCategory: ?String = None();
     lines = contents.split("\n").map(line -> {
-      if (line.startsWith("import ")) {
+      if (line.startsWith("import ") || line.startsWith("export {")) {
         elements = line.split(" from ");
         if (elements.size() == 2) {
           imported = elements[1].split("\"");
@@ -1197,6 +1322,60 @@ fun run(args: Array<String>, verbose: Bool): String {
   };
   p = System.subprocess(args);
   p.stdout
+}
+
+fun syncDirs(
+  fromDir: String,
+  toDir: String,
+  exclude: Set<String>,
+  verbose: Bool,
+): void {
+  _ = system("mkdir -p " + toDir);
+  FileSystem.readFilesRecursive(
+    fromDir,
+    _f -> true,
+    src -> {
+      if (!exclude.contains(Path.basename(src))) {
+        relative(src, fromDir).each(rp -> {
+          dst = Path.join(toDir, rp);
+          _ = system("mkdir -p " + Path.basename(dst));
+        });
+        true
+      } else {
+        false
+      }
+    },
+  ).each(src ->
+    relative(src, fromDir).each(rp -> {
+      dst = Path.join(toDir, rp);
+      if (isYoungerThan(src, dst)) {
+        cmd = "cp " + src + " " + dst;
+        if (verbose) {
+          print_error(`>> ${cmd}`)
+        };
+        _ = system(cmd)
+      }
+    })
+  )
+}
+
+fun mtime(path: String): ?Int {
+  if (FileSystem.exists(path)) {
+    p = System.subprocess(Array["stat", "-c", "%Y", path]);
+    if (!p.success()) {
+      None()
+    } else {
+      p.stdout.trim().toIntOption()
+    }
+  } else {
+    None()
+  }
+}
+
+fun isYoungerThan(file1: String, file2: String): Bool {
+  optTime1 = mtime(file1);
+  optTime2 = mtime(file2);
+  optTime1.isNone() || optTime2.isNone() || optTime1 > optTime2
 }
 
 @cpp_extern("SKIP_sknpm_save_sk_tests_ts")
