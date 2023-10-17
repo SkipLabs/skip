@@ -11,6 +11,9 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 cd "$SCRIPT_DIR/../" || exit 1
 
+git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
+echo ".git" >> .dockerignore
+
 builder=$(docker buildx create --use)
 
 docker buildx build \
@@ -27,3 +30,4 @@ docker buildx build \
 docker buildx stop "$builder"
 docker buildx rm "$builder"
 
+git restore .dockerignore
