@@ -36,22 +36,25 @@ fun test_job(
         file => test.file,
         line => test.lineno,
       };
-      start = Time.time_ms();
+      start = Time.time_ms().toFloat() / 1000.0;
       !res = try {
         _ = test.func();
-        res with {result => "success", time => Time.time_ms() - start}
+        res with {
+          result => "success",
+          time => Time.time_ms().toFloat() / 1000.0 - start,
+        }
       } catch {
       | ExpectationError(msg, _, _) ->
         res with {
           result => "failure",
-          time => Time.time_ms() - start,
+          time => Time.time_ms().toFloat() - start,
           failure_type => "ExpectationError",
           failure_message => msg,
         }
       | exn ->
         res with {
           result => "error",
-          time => Time.time_ms() - start,
+          time => Time.time_ms().toFloat() / 1000.0 - start,
           failure_type => inspect(exn).toString(),
           failure_message => exn.getMessage(),
         }
