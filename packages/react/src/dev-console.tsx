@@ -25,11 +25,11 @@ function UserSelector(
   const list = users.map(user => <option value={user} key={user}>{user}</option>)
   return (
     <Section heading="Current user">
-      <div className="users-panel" onMouseDown={e => e.stopPropagation()}>
+      <div className="panel" onMouseDown={e => e.stopPropagation()}>
         <select onChange={e => select(e.target.value)}>
           {list}
         </select>
-        <button className="add-user" onClick={_e => add()}>&#x002B;</button>
+        <button className="add-item" onClick={_e => add()}>&#x002B;</button>
       </div>
     </Section>
   )
@@ -70,11 +70,11 @@ function ReactiveQueryViewer() {
 
   return (
     <Section heading="Watched queries">
-      <div className="queries-panel" onMouseDown={e => e.stopPropagation()}>
+      <div className="panel" onMouseDown={e => e.stopPropagation()}>
         <input value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => {if (e.key === 'Enter') show(query)}} />
-        <button className="add-query" onClick={_e => show(query)}>&#x002B;</button>
+        <button className="add-item" onClick={_e => show(query)}>&#x002B;</button>
       </div>
       {errorComponent}
       {tables}
