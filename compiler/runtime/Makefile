@@ -54,12 +54,14 @@ libskip_runtime64.a: $(OFILES) posix.o runtime64_specific.o $(ONATIVE_FILES)
 	$(AR) rcs $@ $^
 
 .PHONY: libbacktrace
-libbacktrace:
+libbacktrace: .libs/libbacktrace.a
+
+.libs/libbacktrace.a:
 	test -f libbacktrace/configure || (echo "Warning: libbacktrace submodule not initialized" && false)
 	(cd libbacktrace && ./configure)
 	$(MAKE) -C libbacktrace
 
-runtime64_specific.o: runtime64_specific.cpp
+runtime64_specific.o: runtime64_specific.cpp .libs/libbacktrace.a
 	clang++ -std=c++11 $(OLEVEL) -g -o $@ -c -Ilibbacktrace/ $<
 
 %.o: %.c
