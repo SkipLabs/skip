@@ -1,5 +1,5 @@
 import { Environment } from "#std/sk_types";
-import { SkdbMechanism, metadataTable, RemoteSKDB, Params, MirrorDefn } from "#skdb/skdb_types";
+import { SkdbMechanism, RemoteSKDB, Params, MirrorDefn } from "#skdb/skdb_types";
 
 const npmVersion = "";
 
@@ -17,6 +17,7 @@ type ProtoQuerySchema = {
   type: "schema";
   name?: string;
   scope: "all" | "table" | "view";
+  suffix?: string;
 }
 
 type ProtoRequestTail = {
@@ -1257,6 +1258,11 @@ export async function connect(
 /* Server-side database. */
 /* ***************************************************************************/
 
+const server_response_suffix = "__skdb_mirror_feedback";
+const serverResponseTable = (tableName: string) => {
+  return `${tableName}${server_response_suffix}`;
+}
+
 class SKDBServer implements RemoteSKDB {
   private env: Environment;
   private client: SkdbMechanism;
@@ -1466,7 +1472,7 @@ class SKDBServer implements RemoteSKDB {
       // const diff = client.diff(
       //   client.watermark(
       //     this.replicationUid,
-      //     metadataTable(tableName)
+      //     serverResponseTable(tableName)
       //   ),
       //   session
       // );
@@ -1495,7 +1501,7 @@ class SKDBServer implements RemoteSKDB {
       const diff = this.client.diff(
         this.client.watermark(
           this.replicationUid,
-          metadataTable(table)
+          serverResponseTable(table)
         ),
         this.localTailSession || ""
       );
@@ -1510,18 +1516,20 @@ class SKDBServer implements RemoteSKDB {
     const setupTable = async (tableName: string) => {
       let isViewOnRemote = await this.viewSchema(tableName) != "";
 
+      const [createTable, createResponseTable] = await Promise.all(
+        [
+          this.tableSchema(tableName),
+          this.tableSchema(tableName, server_response_suffix),
+        ]
+      );
       if (!this.client.tableExists(tableName)) {
-        let createTable = await this.tableSchema(tableName);
-        await Promise.all([
-          this.client.exec(createTable),
-          this.client.exec(`CREATE TABLE ${metadataTable(tableName)} (
-            key STRING PRIMARY KEY,
-            value STRING
-          )`),
-        ]);
+        this.client.exec(createTable);
         if (isViewOnRemote) {
           this.client.toggleView(tableName);
         }
+      }
+      if (!this.client.tableExists(serverResponseTable(tableName))) {
+        this.client.exec(createResponseTable);
       }
 
       this.client.assertCanBeMirrored(tableName);
@@ -1578,11 +1586,12 @@ class SKDBServer implements RemoteSKDB {
     );
   }
 
-  async tableSchema(tableName: string): Promise<string> {
-   return this.makeStringRequest({
+  async tableSchema(tableName: string, suffix: string = ""): Promise<string> {
+    return this.makeStringRequest({
       type: "schema",
       name: tableName,
       scope: "table",
+      suffix: suffix,
     });
   }
 
@@ -1591,6 +1600,7 @@ class SKDBServer implements RemoteSKDB {
       type: "schema",
       name: viewName,
       scope: "view",
+      suffix: "",
     });
   }
 
