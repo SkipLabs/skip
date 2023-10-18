@@ -66,10 +66,6 @@ export interface SkdbMechanism {
   toggleView: (tableName: string) => void;
 }
 
-export var metadataTable = (tableName: string) => {
-  return `skdb__${tableName}_sync_metadata`;
-}
-
 export interface Storage {
   save(): Promise<boolean>;
 }
