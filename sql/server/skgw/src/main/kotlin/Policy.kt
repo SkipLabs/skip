@@ -486,7 +486,7 @@ class EventAccountant(val logger: Logger) : ServerPolicy {
         logger.log(db, "establish_tail", user, request.table)
       }
       is ProtoPushPromise -> {
-        logger.log(db, "establish_push", user, request.table)
+        logger.log(db, "establish_push", user)
       }
       is ProtoCreateDb -> {
         logger.log(db, "create-db", user, request.name)
