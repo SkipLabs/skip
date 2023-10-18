@@ -1043,14 +1043,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
     return (tok.posEnd, VInt(0));
   };
 
-  if (lex.isEqUpperAt(tok, "ID")) {
+  if (lex.isEqUpperAt(tok, "LOCAL_SEQUENCE_NUMBER")) {
     !pos = lex.expect(pos, "(");
     (!pos, !tok) = lex.next(pos);
     if (lex.content[tok.posBegin] == ')') {
       return (pos, VId(true, None()));
     };
     if (lex.content[tok.posBegin] != '\'') {
-      error(pos, "id expects a string literal");
+      error(pos, "local_sequence_number expects a string literal");
     };
     (!pos, str) = parseString(lex, tok.posBegin);
     !pos = lex.expect(pos, ")");
@@ -1093,14 +1093,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
       };
     };
 
-    if (lex.isEqUpperAt(tok, "ID")) {
+    if (lex.isEqUpperAt(tok, "LOCAL_SEQUENCE_NUMBER")) {
       !pos = lex.expect(pos, "(");
       (!pos, !tok) = lex.next(pos);
       if (lex.content[tok.posBegin] == ')') {
         return (pos, VId(false, None()));
       };
       if (lex.content[tok.posBegin] != '\'') {
-        error(pos, "id expects a string literal");
+        error(pos, "local_sequence_number expects a string literal");
       };
       (!pos, str) = parseString(lex, tok.posBegin);
       !pos = lex.expect(pos, ")");
