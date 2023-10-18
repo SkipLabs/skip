@@ -1460,12 +1460,13 @@ class StdoutFile(
   value: List<SelectDir>,
 ) extends SKStore.File
 
-class StdoutDiff(
-  since: SKStore.Tick,
-  sub: SKStore.Sub,
-) extends SKStore.File
+class StdoutDiff(since: SKStore.Tick, sub: SKStore.Sub) extends SKStore.File
 
-class StdoutCheckpointAck(time: SKStore.Tick) extends SKStore.File
+class StdoutCheckpointAck(
+  table: String,
+  time: SKStore.Tick,
+  acks: ?StdoutCheckpointAck,
+) extends SKStore.File
 
 const kMaxOutputRowsTable: Int = 1024;
 
@@ -1523,6 +1524,19 @@ fun showSelect(
   }
 }
 
+fun printConsumeDiffResponse(acks: ?StdoutCheckpointAck): void {
+  acks match {
+  | None() -> void
+  | Some(StdoutCheckpointAck(table, tick, rest)) ->
+    // WARNING: this must be kept in sync with the clients and how
+    // they create a table. the format of this table name forms part
+    // of the protocol.
+    print_raw("^" + table + "__skdb_mirror_feedback\n");
+    print_raw(":" + tick.value.toString() + "\n");
+    printConsumeDiffResponse(rest)
+  }
+}
+
 fun printContext(context: mutable SKStore.Context): void {
   context.globals.maybeGet("Stdout") match {
   | None() -> void
@@ -1531,14 +1545,13 @@ fun printContext(context: mutable SKStore.Context): void {
       showSelect(context, format, selectDir)
     }
   | Some(StdoutDiff(_since, _sub)) ->
-      invariant_violation("diff not yet implemented")
+    invariant_violation("diff not yet implemented")
 
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
   context.globals.maybeGet("Ack") match {
   | None() -> void
-  | Some(StdoutCheckpointAck(tick)) ->
-    print_raw(":" + tick.value.toString() + "\n")
+  | Some(acks @ StdoutCheckpointAck _) -> printConsumeDiffResponse(Some(acks))
   | Some _ -> invariant_violation("Unexpected Ack type")
   };
   flushStdout();
