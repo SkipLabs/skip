@@ -172,6 +172,15 @@ fun reasonSchemaUnsupported(
     if (dirDescr.schema.any(x ~> x.unique is Some _)) {
       return Some("Cannot mirror tables with unique constraints.")
     };
+    dirDescr.cols.maybeGet(SKDB.skdbAccessColName) match {
+    | Some _ -> void
+    | None() ->
+      return Some(
+        `Cannot mirror tables without ${
+          SKDB.skdbAccessColName.origName
+        } column.`,
+      )
+    };
     None()
   };
 }
