@@ -180,7 +180,7 @@ class SkdbConnection(
       throw RuntimeException("Could not create stream")
     }
 
-    val req = ProtoPushPromise(table)
+    val req = ProtoPushPromise()
     stream.send(encodeProtoMsg(req))
 
     val chan = consume(stream)

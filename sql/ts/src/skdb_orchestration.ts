@@ -29,7 +29,6 @@ type ProtoRequestTail = {
 
 type ProtoPushPromise = {
   type: "pushPromise";
-  table: string;
 }
 
 type ProtoRequestCreateDb = {
@@ -124,14 +123,10 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       return buf.slice(0, filterExprOffset + 2 + (encodeResult.written || 0));
     }
     case "pushPromise": {
-      const buf = new ArrayBuffer(6 + msg.table.length * 4);
-      const uint8View = new Uint8Array(buf);
+      const buf = new ArrayBuffer(4);
       const dataView = new DataView(buf);
-      const textEncoder = new TextEncoder();
-      const encodeResult = textEncoder.encodeInto(msg.table, uint8View.subarray(6));
       dataView.setUint8(0, 0x3);  // type
-      dataView.setUint16(4, encodeResult.written || 0, false);
-      return buf.slice(0, 6 + (encodeResult.written || 0));
+      return buf.slice(0, 4);
     }
     case "createDatabase": {
       const buf = new ArrayBuffer(3 + msg.name.length * 4);
@@ -1453,7 +1448,6 @@ class SKDBServer implements RemoteSKDB {
 
     const request: ProtoPushPromise = {
       type: "pushPromise",
-      table: tables[0],
     };
 
     stream.send(encodeProtoMsg(request));
