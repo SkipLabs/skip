@@ -106,8 +106,10 @@ class Skdb(val name: String, private val dbPath: String) {
     return blockingRun(ProcessBuilder(ENV.skdbPath, "replication-id", deviceUuid, "--data", dbPath))
   }
 
-  fun dumpTable(table: String): ProcessOutput {
-    return blockingRun(ProcessBuilder(ENV.skdbPath, "dump-table", table, "--data", dbPath))
+  fun dumpTable(table: String, suffix: String): ProcessOutput {
+    return blockingRun(
+        ProcessBuilder(
+            ENV.skdbPath, "dump-table", table, "--data", dbPath, "--table-suffix", suffix))
   }
 
   fun dumpView(view: String): ProcessOutput {
@@ -133,14 +135,7 @@ class Skdb(val name: String, private val dbPath: String) {
   ): Process {
     val pb =
         ProcessBuilder(
-            ENV.skdbPath,
-            "write-csv",
-            "--data",
-            dbPath,
-            "--user",
-            user,
-            "--source",
-            replicationId)
+            ENV.skdbPath, "write-csv", "--data", dbPath, "--user", user, "--source", replicationId)
 
     // TODO: for hacky debug
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
