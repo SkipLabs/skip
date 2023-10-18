@@ -55,6 +55,7 @@ libskip_runtime64.a: $(OFILES) posix.o runtime64_specific.o $(ONATIVE_FILES)
 
 .PHONY: libbacktrace
 libbacktrace:
+	test -f libbacktrace/configure || (echo "Warning: libbacktrace submodule not initialized" && false)
 	(cd libbacktrace && ./configure)
 	$(MAKE) -C libbacktrace
 
