@@ -166,7 +166,7 @@ class RequestHandler(
         val result =
             when (request.scope) {
               SchemaScope.ALL -> skdb.dumpSchema()
-              SchemaScope.TABLE -> skdb.dumpTable(request.name!!)
+              SchemaScope.TABLE -> skdb.dumpTable(request.name!!, request.suffix!!)
               SchemaScope.VIEW -> skdb.dumpView(request.name!!)
             }
         if (result.exitSuccessfully()) {
