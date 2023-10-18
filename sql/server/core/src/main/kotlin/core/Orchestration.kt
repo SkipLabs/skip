@@ -34,6 +34,7 @@ enum class SchemaScope {
 data class ProtoSchemaQuery(
     val name: String? = null,
     val scope: SchemaScope,
+    val suffix: String? = null,
 ) : ProtoMessage()
 
 data class ProtoPushPromise(val table: String) : ProtoMessage()
@@ -108,7 +109,15 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
       } else {
         val tableNameBytes = ByteArray(tableNameLength.toInt())
         data.get(tableNameBytes)
-        ProtoSchemaQuery(String(tableNameBytes, StandardCharsets.UTF_8), scope)
+
+        val suffixLength = data.getShort()
+        val suffixBytes = ByteArray(suffixLength.toInt())
+        data.get(suffixBytes)
+
+        ProtoSchemaQuery(
+            String(tableNameBytes, StandardCharsets.UTF_8),
+            scope,
+            String(suffixBytes, StandardCharsets.UTF_8))
       }
     }
     5u -> {

@@ -83,11 +83,13 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
     }
     case "schema": {
       const name = msg.name || "";
-      const buf = new ArrayBuffer(4 + name.length * 4);
+      const suffix = msg.suffix || "";
+      const buf = new ArrayBuffer(6 + name.length * 4 + suffix.length * 4);
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
       const textEncoder = new TextEncoder();
-      const encodeResult = textEncoder.encodeInto(name, uint8View.subarray(4));
+      let encodeResult = textEncoder.encodeInto(name, uint8View.subarray(4));
+      const suffixIdx = 4 + (encodeResult.written || 0);
       dataView.setUint8(0, 0x4);  // type
       const scopeLookup = new Map([
         ["all", 0x0],
@@ -100,7 +102,9 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       }
       dataView.setUint8(1, scope);
       dataView.setUint16(2, encodeResult.written || 0, false);
-      return buf.slice(0, 4 + (encodeResult.written || 0));
+      encodeResult = textEncoder.encodeInto(suffix, uint8View.subarray(suffixIdx + 2));
+      dataView.setUint16(suffixIdx, encodeResult.written || 0, false);
+      return buf.slice(0, suffixIdx + 2 + (encodeResult.written || 0));
     }
     case "tail": {
       const buf = new ArrayBuffer(16 + msg.table.length * 4 + msg.filterExpr.length * 4);
