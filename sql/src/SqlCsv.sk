@@ -282,7 +282,14 @@ fun applyDiffStrategy(
     if (checkpoint is Some _) {
       checkpointTick = SKStore.Tick(checkpoint.fromSome());
       SKDB.setWatermark(context, table.name.lower, identity, checkpointTick);
-      delta.setGlobal("Ack", SKDB.StdoutCheckpointAck(checkpointTick));
+      delta.setGlobal(
+        "Ack",
+        SKDB.StdoutCheckpointAck(
+          table.name.origName,
+          checkpointTick,
+          delta.getGlobal("Ack").map(SKDB.StdoutCheckpointAck::type),
+        ),
+      );
     };
   };
 
@@ -606,24 +613,24 @@ fun parseTableChange(
     accessSolverOpt match {
     | None() -> void
     | Some((accessSolver, tableName, authorCol, accessCol)) ->
-        SKDB.checkUserCanWriteRow(
-          context,
-          accessSolver,
-          () ~> tableName,
-          authorCol,
-          accessCol,
-          row,
-        ) match {
-        | SKDB.AROK() -> void
-        | SKDB.ARError(err) ->
-            print_error("Error: " + err.toString());
-          // either a user is doing something nefarious or we've
-          // hit a race which currently will lead to diverging
-          // state that cannot heal. notify the client asap to
-          // prevent further divergence.
-          SKDB.setFinalState(context, identity, SKDB.RSError());
-          throw SKDB.IgnoreAndContinue() // will reboot on next iteration
-        }
+      SKDB.checkUserCanWriteRow(
+        context,
+        accessSolver,
+        () ~> tableName,
+        authorCol,
+        accessCol,
+        row,
+      ) match {
+      | SKDB.AROK() -> void
+      | SKDB.ARError(err) ->
+        print_error("Error: " + err.toString());
+        // either a user is doing something nefarious or we've
+        // hit a race which currently will lead to diverging
+        // state that cannot heal. notify the client asap to
+        // prevent further divergence.
+        SKDB.setFinalState(context, identity, SKDB.RSError());
+        throw SKDB.IgnoreAndContinue() // will reboot on next iteration
+      }
     }
   };
 

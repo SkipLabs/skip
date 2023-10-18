@@ -151,7 +151,9 @@ class Skdb(val name: String, private val dbPath: String) {
         Thread({
           try {
             val encoder = StandardCharsets.UTF_8.newEncoder()
-            output.forEachLine { callback(encoder.encode(CharBuffer.wrap(it)), true) }
+            output.forEachLine {
+              callback(encoder.encode(CharBuffer.wrap(it + "\n")), it.startsWith(":"))
+            }
             closed()
           } catch (ex: Exception) {
             closed()
