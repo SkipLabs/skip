@@ -1047,14 +1047,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
     !pos = lex.expect(pos, "(");
     (!pos, !tok) = lex.next(pos);
     if (lex.content[tok.posBegin] == ')') {
-      return (pos, VId(true, None()));
+      return (pos, VSeqNum(true, None()));
     };
     if (lex.content[tok.posBegin] != '\'') {
       error(pos, "local_sequence_number expects a string literal");
     };
     (!pos, str) = parseString(lex, tok.posBegin);
     !pos = lex.expect(pos, ")");
-    return (pos, VId(true, Some(str)));
+    return (pos, VSeqNum(true, Some(str)));
   };
 
   if (lex.isEqUpperAt(tok, "SID")) {
@@ -1097,14 +1097,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
       !pos = lex.expect(pos, "(");
       (!pos, !tok) = lex.next(pos);
       if (lex.content[tok.posBegin] == ')') {
-        return (pos, VId(false, None()));
+        return (pos, VSeqNum(false, None()));
       };
       if (lex.content[tok.posBegin] != '\'') {
         error(pos, "local_sequence_number expects a string literal");
       };
       (!pos, str) = parseString(lex, tok.posBegin);
       !pos = lex.expect(pos, ")");
-      return (pos, VId(false, Some(str)));
+      return (pos, VSeqNum(false, Some(str)));
     };
   };
 
@@ -1309,7 +1309,7 @@ fun parseTypeRest(lex: Lexer, pos: Int): (Int, Bool, Bool, ?Value, Bool) {
       | VFloat _
       | VString _ ->
         void
-      | VId _
+      | VSeqNum _
       | VSId _
       | VTime _
       | VParam _ ->
