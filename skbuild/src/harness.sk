@@ -1,5 +1,7 @@
 module Skbuild;
 
+const kBUFFER_LEN: Int = 256 * 1024;
+
 class Env(
   refDir: String,
   outDir: String,
@@ -77,7 +79,7 @@ class Env(
   }
 }
 
-fun build(): Env {
+fun build(): Result<Env, IO.Error> {
   env = Env::create();
   includeDirs = Array[];
   #forEachFunction (@skbuild_include_dirs, #function, #functionName) {
@@ -122,43 +124,45 @@ fun build_harness(
   links: Array<String>,
   resources: Array<String>,
   resourceDirs: Array<String>,
-): Env {
+): Result<Env, IO.Error> {
   isWasm = env.isWasm32();
   resourceObjs = Array[];
   resourceInfos = mutable Map[];
-  resources.each(res -> {
+  for (res in resources) {
     resPath = env.resolve(res);
     if (FileSystem.exists(resPath)) {
       if (!isWasm) {
-        !resourceObjs = resourceObjs.concat(Array[buildResource(env, resPath)])
+        buildResource(env, resPath, false) match {
+        | Failure(err) -> return Failure(err)
+        | Success(object) -> !resourceObjs = resourceObjs.concat(Array[object])
+        }
       } else {
         saved = saveResource(env, res, resPath);
         resourceInfos.set(saved.i0, saved.i1)
       }
     }
-  });
-  resourceDirs.each(res -> {
+  };
+  for (res in resourceDirs) {
     resPath = env.resolve(res);
     if (FileSystem.exists(resPath)) {
+      resChecker = TimeChecker().add(resPath);
       name = Path.basename(resPath);
-      archiveDir = Path.parentname(resPath);
-      archive = Path.join(archiveDir, `${name}.tar.gz`);
-      env.run(
-        Array[
-          "bash",
-          "-c",
-          `cd ${archiveDir} && tar -zcvf ${name}.tar.gz ${name}/`,
-        ],
-      );
+      archive = env.targetPath(resPath, ".tar.gz");
+      if (resChecker.isYoungerThan(archive)) {
+        ensureDirectory(Path.dirname(archive), env.verbose);
+        env.run(Array["tar", "-zcvf", archive, name]);
+      };
       if (!isWasm) {
-        !resourceObjs = resourceObjs.concat(Array[buildResource(env, archive)]);
+        buildResource(env, archive, true) match {
+        | Failure(err) -> return Failure(err)
+        | Success(object) -> !resourceObjs = resourceObjs.concat(Array[object])
+        }
       } else {
         saved = saveResource(env, res, resPath);
         resourceInfos.set(saved.i0, saved.i1)
       };
-      env.run(Array["rm", archive])
     }
-  });
+  };
   if (!resourceInfos.isEmpty()) {
     rjson = JSON.Object(resourceInfos.map((_, v) -> JSON.String(v)));
     stream = mutable Vector[];
@@ -171,11 +175,11 @@ fun build_harness(
       !id = env.resolve(id)
     };
     if (FileSystem.exists(id)) {
-      FileSystem.readFilesRecursive(
+      !includeChecker = includeChecker.add(
         id,
         f ~> f.endsWith(".hpp") || f.endsWith(".h"),
         _f ~> false,
-      ).each(i -> !includeChecker = includeChecker.add(i));
+      )
     };
     id
   });
@@ -200,7 +204,7 @@ fun build_harness(
     })
     .each(print_preamble);
   links.each(print_link);
-  env;
+  Success(env)
 }
 
 fun buildLibrary(
@@ -248,34 +252,36 @@ fun buildLibrary(
   Some(target)
 }
 
-fun buildResource(env: Env, file: String): String {
+fun buildResource(
+  env: Env,
+  file: String,
+  relToOut: Bool,
+): Result<String, IO.Error> {
   checker = TimeChecker(mtime(file));
-  object = env.targetPath(file, ".o");
+  object = if (relToOut) mvExt(file, ".o") else env.targetPath(file, ".o");
   if (checker.isYoungerThan(object)) {
+    source = if (relToOut) mvExt(file, ".c") else env.targetPath(file, ".c");
     ensureDirectory(Path.dirname(object), env.verbose);
-    relative = env.relative(file);
-    nf = file.replace("/", "_").replace(".", "_");
-    nr = relative.replace("/", "_").replace(".", "_");
-    redefs = mutable Vector<String>[];
-    Array["start", "size", "end"].each(suffix -> {
-      redefs.push("--redefine-sym");
-      redefs.push(`_binary_${nf}_${suffix}=_binary_${nr}_${suffix}`);
-    });
-    (b, o) = copyObjOptions();
-    cmd = Array[
-      "objcopy",
-      "-B",
-      b,
-      "-I",
-      "binary",
-      "-O",
-      o,
-      file,
-      object,
-    ].concat(redefs.toArray());
-    run(cmd, env.verbose);
+    workDir = if (relToOut) env.outDir else env.refDir;
+    relative = relative(file, workDir).fromSome();
+    Environ.set_current_dir(workDir);
+    name = relative.replace("/", "_").replace(".", "_");
+    copyBinary(name, file, source) match {
+    | Failure(err) -> return Failure(err)
+    | _ -> void
+    };
+    Environ.set_current_dir(env.refDir);
+    _ = compileFile(env, false, source, TimeChecker(), Array[], Some(object))
   };
-  object
+  Success(object)
+}
+
+fun mvExt(file: String, suffix: String): String {
+  dirname = Path.dirname(file);
+  ext = Path.extname(file);
+  basename = Path.basename(file);
+  !basename = basename.take(basename.length() - ext.length());
+  Path.join(dirname, `${basename}${suffix}`);
 }
 
 fun targetPath(dir: String, file: String, suffix: String): String {
@@ -322,18 +328,53 @@ fun ensureDirectory(path: String, verbose: Bool): void {
   }
 }
 
-fun arch(): String {
-  p = System.subprocess(Array["gcc", "-dumpmachine"]);
-  p.stdout.trim();
-}
-
-fun copyObjOptions(): (String, String) {
-  arch().split("-").maybeGet(0) match {
-  | Some("x86_64") -> ("i386:x86-64", "elf64-x86-64")
-  | Some("aarch64")
-  | _ ->
-    ("aarch64", "elf64-littleaarch64")
-  }
+fun copyBinary(
+  name: String,
+  src: String,
+  target: String,
+): Result<void, IO.Error> {
+  srcFile = IO.File::open(src, IO.OpenOptions{read => true});
+  dstFile = IO.File::open(
+    target,
+    IO.OpenOptions{write => true, create => true},
+  );
+  _ = dstFile.write(`unsigned char ${name}[] = {`.bytes());
+  count = 0;
+  write = buf -> {
+    strs = buf.map(byte -> {
+      prefix = if (count == 0) {
+        "\n  "
+      } else if (count % 12 == 0) {
+        ",\n  "
+      } else {
+        ",  "
+      };
+      !count = count + 1;
+      `${prefix}0x${Chars.intToHexDigits(byte.toInt(), 2)}`
+    });
+    return dstFile.write(strs.join("").bytes());
+  };
+  buf = Array::mfill(kBUFFER_LEN, UInt8::truncate(0)).mbytes();
+  loop {
+    srcFile.read(buf) match {
+    | Failure(err) -> return Failure(err)
+    | Success(nbytes) if (nbytes == 0) -> break void
+    | Success(nbytes) if (nbytes < kBUFFER_LEN) ->
+      write(buf.slice(0, nbytes)) match {
+      | Failure(err) -> return Failure(err)
+      | Success _ -> void
+      }
+    | Success _ ->
+      write(buf.slice(0)) match {
+      | Failure(err) -> return Failure(err)
+      | Success _ -> void
+      }
+    }
+  };
+  _ = dstFile.write(`\n};\nunsigned int ${name}_len = ${count};\n`.bytes());
+  srcFile.close();
+  dstFile.close();
+  Success(void)
 }
 
 fun compileFile(
@@ -342,13 +383,14 @@ fun compileFile(
   source: String,
   includesChecker: TimeChecker,
   includes: Array<String>,
+  optObject: ?String = None(),
 ): String {
   ext = if (isWasm) ".bc" else ".o";
-  object = env.targetPath(source, ext);
+  object = optObject.default(env.targetPath(source, ext));
   if (includesChecker.add(source).isYoungerThan(object)) {
     ensureDirectory(Path.dirname(object), env.verbose);
     cmd = (if (source.endsWith(".c")) Array["clang"] else {
-      Array["clang++", "-std=c++17"]
+      Array["clang++"]
     })
       .concat(
         if (env.profile == "debug") {
