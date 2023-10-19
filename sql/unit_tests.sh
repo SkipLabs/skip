@@ -6,8 +6,8 @@ fi
 
 SKDB="skargo run --profile $SKARGO_PROFILE -- "
 
-pass() { printf "%-32s OK\n" "TEST $1:"; }
-fail() { printf "%-32s FAILED\n" "TEST $1:"; }
+pass() { printf "%-36s OK\n" "TEST $1:"; }
+fail() { printf "%-36s FAILED\n" "TEST $1:"; }
 
 if cat test/unit/test_unique.sql | $SKDB 2>&1 | grep -q UNIQUE
 then
