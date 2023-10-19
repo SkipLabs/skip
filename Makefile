@@ -117,6 +117,10 @@ test-wasm: build/sknpm $(SKDB_WASM) $(SDKMAN_DIR)
 	bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && cd sql/server/ && gradle --console plain build'
 	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
 
+.PHONY: test-client
+test-client: build/sknpm $(SKDB_WASM)
+	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG) client
+
 .PHONY: test-replication
 test-replication: build/skdb
 	./sql/test/replication/test_pk.py
