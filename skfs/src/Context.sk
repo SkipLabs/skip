@@ -315,13 +315,7 @@ mutable class Context{
     destinationSource: ?Int,
     dirSubs: Array<DirSub>,
   ): void {
-    sub = Sub(
-      mutexCreate(),
-      condCreate(),
-      cmd,
-      destinationSource,
-      dirSubs,
-    );
+    sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource, dirSubs);
 
     // TODO:
     if (init) {
@@ -793,11 +787,16 @@ mutable class Context{
     };
     if (this.tick == start) return void;
     for (_ => sub in this.sessions) {
-      // TODO: can we not do any of this if not necessary?
+      affected = for (dirSub in sub.dirSubs) {
+        if (changedDirNames.contains(dirSub.dirName)) break true
+      } else {
+        false
+      };
+      if (!affected) continue;
       lock = unfreezeLock(sub.lock);
+      mutexLock(lock);
       sub.cmd match {
       | NUpdates(filename) ->
-          mutexLock(lock);
         file = IO.File::open(
           filename,
           IO.OpenOptions{
@@ -816,7 +815,7 @@ mutable class Context{
           if (!changedDirNames.contains(dirName)) continue;
           this.unsafeMaybeGetDir(dirName) match {
           | Some(dir @ EagerDir _) ->
-              (isReset, changes) = dir.getChangesAfter(start);
+            (isReset, changes) = dir.getChangesAfter(start);
             ctx = this.clone();
             producedOutput = dir.writeDiff(
               ctx,
@@ -840,20 +839,16 @@ mutable class Context{
           flushStdout();
         };
 
-        file.close();
-        mutexUnlock(lock);
+        file.close()
       | NNotify(file) ->
-        // TODO: need to check if any of the dirsubs are affected
-          mutexLock(lock);
-        _ = unixNotify(file, Int32::truncate(start.value));
-        mutexUnlock(lock);
+        mutexLock(lock);
+        _ = unixNotify(file, Int32::truncate(start.value))
       | NTail() ->
-        // TODO: need to check if any of the dirsubs are affected
-          mutexLock(lock);
+        mutexLock(lock);
         cond = unfreezeCond(sub.cond);
-        _ = condBroadcast(cond);
-        mutexUnlock(lock);
-      }
+        _ = condBroadcast(cond)
+      };
+      mutexUnlock(lock)
     }
   }
 
