@@ -1,6 +1,9 @@
 #!/bin/bash
 
-trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
+pass() { printf "%-32s OK\n" "TEST $1:"; }
+fail() { printf "%-32s FAILED\n" "TEST $1:"; }
+
+trap "trap - SIGTERM && kill -- -$$ 2> /dev/null" SIGINT SIGTERM EXIT
 
 DBFILE=/tmp/test.db
 
@@ -46,18 +49,18 @@ echo "insert into skdb_group_permissions values ('myGroup', NULL, skdb_permissio
 echo "insert into skdb_user_permissions values (NULL, skdb_permission('r'));" | $SKDB
 
 if echo -e "1\t235,\"myGroup\"" | $SKDB write-csv t2 --user ID1 2>&1 | grep -q Error; then
-    echo -e "TEST USER PERMISSIONS:\tOK"
+    pass "USER PERMISSIONS"
 else
-    echo -e "TEST USER PERMISSIONS:\tFAILED"
+    fail "USER PERMISSIONS"
 fi
 
 # Let's check that user permissions are respected for a specific user
 echo "insert into skdb_user_permissions values ('ID1', skdb_permission('ri'));" | $SKDB
 
 if echo -e "1\t235,\"myGroup\"" | $SKDB write-csv t2 --user ID1 2>&1 | grep -q Error; then
-    echo -e "TEST USER PERMISSIONS2:\tFAILED"
+    fail "USER PERMISSIONS2"
 else
-    echo -e "TEST USER PERMISSIONS2:\tOK"
+    pass "USER PERMISSIONS2"
 fi
 
 ###############################################################################
@@ -73,30 +76,30 @@ echo "insert into skdb_group_permissions values ('ID22', 'ID3', skdb_permission(
 
 # Let's check user1 can write
 if echo -e "1\t238,\"ID22\"" | $SKDB write-csv t1 --user ID1 2>&1 | grep -q Error; then
-    echo -e "TEST GROUP PERMISSIONS:\tFAILED"
+    fail "GROUP PERMISSIONS"
 else
-    echo -e "TEST GROUP PERMISSIONS:\tOK"
+    pass "GROUP PERMISSIONS"
 fi
 
 # Let's check user2 cannot write
 if echo -e "1\t239,\"ID22\"" | $SKDB write-csv t1 --user ID2 2>&1 | grep -q Error; then
-    echo -e "TEST GROUP PERMISSIONS2:\tOK"
+    pass "GROUP PERMISSIONS2"
 else
-    echo -e "TEST GROUP PERMISSIONS2:\tFAILED"
+    fail "GROUP PERMISSIONS2"
 fi
 
 # Let's check user3 cannot write
 if echo -e "1\t239,\"ID22\"" | $SKDB write-csv t1 --user ID3 2>&1 | grep -q Error; then
-    echo -e "TEST GROUP PERMISSIONS3:\tOK"
+    pass "GROUP PERMISSIONS3"
 else
-    echo -e "TEST GROUP PERMISSIONS3:\tFAILED"
+    fail "GROUP PERMISSIONS3"
 fi
 
 # Let's check that user2 can read
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
-    echo -e "TEST GROUP PERMISSIONS4:\tOK"
+    pass "GROUP PERMISSIONS4"
 else
-    echo -e "TEST GROUP PERMISSIONS4:\tFAILED"
+    fail "GROUP PERMISSIONS4"
 fi
 
 # Let's change the user permissions and see what happens
@@ -104,18 +107,18 @@ echo "insert into skdb_user_permissions values ('ID2', skdb_permission(''))" | $
 
 # Let's check that user2 cannot read
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
-    echo -e "TEST GROUP PERMISSIONS6:\tFAILED"
+    fail "GROUP PERMISSIONS6"
 else
-    echo -e "TEST GROUP PERMISSIONS6:\tOK"
+    pass "GROUP PERMISSIONS6"
 fi
 
 echo "delete from skdb_user_permissions where userUUID='ID2';" | $SKDB
 
 # Let's check that user2 can read again
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
-    echo -e "TEST GROUP PERMISSIONS7:\tOK"
+    pass "GROUP PERMISSIONS7"
 else
-    echo -e "TEST GROUP PERMISSIONS7:\tFAILED"
+    fail "GROUP PERMISSIONS7"
 fi
 
 # Let's kick user2 out of the group
@@ -123,9 +126,9 @@ echo "delete from skdb_group_permissions where groupUUID='ID22' and userUUID='ID
 
 # Let's check that user2 cannot read (after being kicked out)
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
-    echo -e "TEST GROUP PERMISSIONS8:\tFAILED"
+    fail "GROUP PERMISSIONS8"
 else
-    echo -e "TEST GROUP PERMISSIONS8:\tOK"
+    pass "GROUP PERMISSIONS8"
 fi
 
 ###############################################################################
@@ -141,23 +144,23 @@ echo "insert into skdb_user_permissions values ('ID2', skdb_permission('ri'));" 
 
 # Let's check user2 can write
 if echo -e "1\t240,\"ID23\"" | $SKDB write-csv t1 --user ID2 2>&1 | grep -q Error; then
-    echo -e "TEST GROUP PERMISSIONS9:\tFAILED"
+    fail "GROUP PERMISSIONS9"
 else
-    echo -e "TEST GROUP PERMISSIONS9:\tOK"
+    pass "GROUP PERMISSIONS9"
 fi
 
 # Let's check user1 cannot write
 if echo -e "1\t241,\"ID23\"" | $SKDB write-csv t1 --user ID1 2>&1 | grep -q Error; then
-    echo -e "TEST GROUP PERMISSIONS10:\tOK"
+    pass "GROUP PERMISSIONS10"
 else
-    echo -e "TEST GROUP PERMISSIONS10:\tFAILED"
+    fail "GROUP PERMISSIONS10"
 fi
 
 # Let's check that user1 can read
 if $SKDB tail $subt1 --user ID1 2>&1 | grep -q "240|\"ID23\""; then
-    echo -e "TEST GROUP PERMISSIONS11:\tOK"
+    pass "GROUP PERMISSIONS11"
 else
-    echo -e "TEST GROUP PERMISSIONS11:\tFAILED"
+    fail "GROUP PERMISSIONS11"
 fi
 
 ###############################################################################
@@ -166,12 +169,12 @@ fi
 
 echo "create table t4 (id INTEGER, skdb_author STRING);" | $SKDB
 if echo -e "1\t240,\"ID23\"" | $SKDB write-csv t4 --user ID3 2>&1 | grep -q Error
-then echo -e "TEST AUTHOR:\tOK"
-else echo -e "TEST AUTHOR:\tFAILED"
+then pass "AUTHOR"
+else fail "AUTHOR"
 fi
 if echo -e "1\t240,\"ID3\"" | $SKDB write-csv t4 --user ID3 2>&1 | grep -q Error
-then echo -e "TEST AUTHOR2:\tOK"
-else echo -e "TEST AUTHOR2:\tFAILED"
+then pass "AUTHOR2"
+else fail "AUTHOR2"
 fi
 
 ###############################################################################
@@ -244,9 +247,9 @@ echo -e "0\t\"myAdminGroup\", \"daniell\",7, \"myAdminGroup\"" |
   grep -q 'Error'
 
 if [ "$?" -eq "0" ]; then
-  echo -e "TEST CHANGE OWNERSHIP:\tOK"
+  pass "CHANGE OWNERSHIP"
 else
-  echo -e "TEST CHANGE OWNERSHIP:\tFAILED"
+  fail "CHANGE OWNERSHIP"
 fi
 
 # Let's check if daniell can indeed modify the permissions of the group
@@ -256,9 +259,9 @@ echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"" |
   grep -q 'Error'
 
 if [ "$?" -eq "0" ]; then
-  echo -e "TEST CHANGE OWNERSHIP2:\tFAILED"
+  fail "CHANGE OWNERSHIP2"
 else
-  echo -e "TEST CHANGE OWNERSHIP2:\tOK"
+  pass "CHANGE OWNERSHIP2"
 fi
 
 ###############################################################################
@@ -285,7 +288,7 @@ while echo "select * from t3" | $SKDB | grep -q "238"; do
 done
 
 # The reset was successful
-echo -e "TEST GROUP PERMISSION UPDATE:\tOK"
+pass "GROUP PERMISSION UPDATE"
 
 # let's block the ID3 all together
 echo "insert into skdb_user_permissions values('ID3', skdb_permission(''));" | $SKDB
@@ -297,7 +300,7 @@ while echo "select * from t3" | $SKDB | grep -q "240"; do
 done
 
 # The reset was successful
-echo -e "TEST GROUP PERMISSION UPDATE2:\tOK"
+pass "GROUP PERMISSION UPDATE2"
 
 # let's reset all the permissions and make sure all the data is back
 
@@ -322,4 +325,4 @@ until echo "select * from t3" | $SKDB | grep -q "238"; do
 done
 
 # The reset was successful
-echo -e "TEST GROUP PERMISSION UPDATE3:\tOK"
+pass "GROUP PERMISSION UPDATE3"
