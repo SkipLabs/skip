@@ -39,6 +39,7 @@ export interface SKDB {
   connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
   connectedRemote: () => Promise<RemoteSKDB|undefined>;
   closeConnection: () => Promise<void>;
+  currentUser?: string;
 
   mirror: (tableName: string, filterExpr?: string) => Promise<void>;
 

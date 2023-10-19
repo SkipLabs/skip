@@ -122,7 +122,10 @@ export class SKDBWorker implements SKDB {
     return this.worker.post(new Function("closeConnection", []));
   }
 
+  currentUser?: string;
+
   connect = async (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => {
+    this.currentUser = accessKey;
     return this.worker.post(new Function("connect", [db, accessKey, privateKey, endpoint]));
   }
 

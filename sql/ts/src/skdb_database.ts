@@ -236,12 +236,15 @@ export class SKDBImpl implements SKDB {
     this.skdbSync = skdbSync;
   }
 
+  currentUser?: string;
+
   async connect(
     db: string,
     accessKey: string,
     privateKey: CryptoKey,
     endpoint?: string,
   ): Promise<void> {
+    this.currentUser = accessKey;
     return this.skdbSync.connect(db, accessKey, privateKey, endpoint);
   }
 
