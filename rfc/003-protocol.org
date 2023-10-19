@@ -180,20 +180,22 @@ Stream ids are
 
 *** (Conn) Auth/init
 
-- type = 0x0
-- stream id = 0x0
+(N: <field> means <field> starts at byte offset N)
+
+- 0: type = 0x0
+- 1: stream id = 0x0
 - payload
-  - mux protocol version (8)
-  - reserved (24) - must be zeroed
-  - access key (20 * 8 = 160) - ASCII encoded 20 char string or 0-terminated
-  - nonce (64)
-  - signature (256)
-  - uuid (36 * 8 = 288) - ASCII encoded UUID v4 string
-  - reserved (7) must be zeroed
+  - 4: mux protocol version (8)
+  - 5: reserved (24) - must be zeroed
+  - 8: access key (27 * 8 = 216) - ASCII encoded 27 char string or 0-terminated
+  - 35: nonce (64)
+  - 43: signature (256)
+  - 75: uuid (36 * 8 = 288) - ASCII encoded UUID v4 string
+  - 111: reserved (7) must be zeroed
   - iso length 0 for 24, 1 for 27 (1)
-  - iso date (24 * 8 = 192 or 27 * 8 = 216 depending on iso length flag)
-  - client_version_length (8)
-  - client_version (client_version_length * 8) - ASCII encoded string identifying this client
+  - 112: iso date (24 * 8 = 192 or 27 * 8 = 216 depending on iso length flag)
+  - 136/139: client_version_length (8)
+  - 137/140: client_version (client_version_length * 8) - ASCII encoded string identifying this client
 
 *** (Conn) Ping
 
@@ -338,7 +340,7 @@ Where not specified, strings are UTF-8.
 
 - credentials response
   - type = 0x80
-  - access key (20 * 8 = 160) - ASCII encoded 20 char string or 0-terminated
+  - access key (27 * 8 = 216) - ASCII encoded 27 char string or 0-terminated
   - private key (256)
 
 *** Data message
