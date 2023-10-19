@@ -59,7 +59,7 @@ export interface SkdbMechanism {
   getReplicationUid: (deviceUuid: string) => string;
   subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
   unsubscribe: (session: string) => void;
-  diff: (watermark: bigint, session: string) => ArrayBuffer | null;
+  diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => Array<any>;
   assertCanBeMirrored: (tableName: string) => void;

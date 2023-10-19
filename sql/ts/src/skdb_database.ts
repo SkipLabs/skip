@@ -9,7 +9,7 @@ class SkdbMechanismImpl implements SkdbMechanism {
   getReplicationUid: (deviceUuid: string) => string;
   subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
   unsubscribe: (session: string) => void;
-  diff: (watermark: bigint, session: string) => ArrayBuffer | null;
+  diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
   assertCanBeMirrored: (tableName: string) => void;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => Array<any>;
@@ -48,15 +48,20 @@ class SkdbMechanismImpl implements SkdbMechanism {
     this.unsubscribe = (session: string) => {
       client.runLocal(["disconnect", session], "").trim()
     };
-    this.diff = (watermark: bigint, session: string) => {
+    this.diff = (session: string, watermarks: Map<string, bigint>) => {
+      const acc = {};
+      for (const [table, wm] of watermarks.entries()) {
+        acc[table] = {since: wm}
+      }
+      const diffSpec = JSON.stringify(acc, (_key, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+      );
       let d = client.runLocal(
         [
           "diff", "--format=csv",
-          "--since",
-          watermark.toString(),
           session,
         ],
-        ""
+        diffSpec
       );
       if (d.trim() == "") {
         return null;

@@ -1468,22 +1468,21 @@ class SKDBServer implements RemoteSKDB {
 
     stream.onReconnect = () => {
       stream.send(encodeProtoMsg(request));
-      // TODO: uncomment once we have multi-table diff
-      // const diff = client.diff(
-      //   client.watermark(
-      //     this.replicationUid,
-      //     serverResponseTable(tableName)
-      //   ),
-      //   session
-      // );
-      // if (!diff) {
-      //   return;
-      // }
-      // stream.send(encodeProtoMsg({
-      //   type: "data",
-      //   payload: diff,
-      // }));
-      // stream.expectingData();
+      const diff = client.diff(
+        session,
+        new Map(tables.map(table => [table, client.watermark(
+          this.replicationUid,
+          serverResponseTable(table)
+        )])),
+      );
+      if (!diff) {
+        return;
+      }
+      stream.send(encodeProtoMsg({
+        type: "data",
+        payload: diff,
+      }));
+      stream.expectingData();
     };
 
     return session;
@@ -1498,12 +1497,13 @@ class SKDBServer implements RemoteSKDB {
     for (const table of this.mirroredTables) {
       // TODO: if we parse the diff output we can provide an object
       // model representing the rows not yet ack'd.
+      if (this.localTailSession === undefined) continue;
       const diff = this.client.diff(
-        this.client.watermark(
+        this.localTailSession,
+        new Map([[table, this.client.watermark(
           this.replicationUid,
           serverResponseTable(table)
-        ),
-        this.localTailSession || ""
+        )]]),
       );
       if (diff !== null) {
         acc.add(table);
