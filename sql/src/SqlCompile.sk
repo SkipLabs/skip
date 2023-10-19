@@ -866,7 +866,7 @@ mutable class Compiler{
     | VFloat(f) -> CFExpr(CFLiteral(f))
     | VString(s) -> CSExpr(CSLiteral(s))
     | VSeqNum _ -> invariant_violation("Unexpected SeqNum")
-    | VSId _ -> invariant_violation("Unexpected SID")
+    | VSId _ -> invariant_violation("Unexpected ID")
     | VTime _ -> invariant_violation("Unexpected TIME")
     | VParam(handle) ->
       this.params.maybeGet(handle) match {
@@ -1130,12 +1130,12 @@ mutable class Compiler{
           CIExpr(CILiteral(globals[varName]))
         | _ -> error(this.pos, "local_sequence_number expects a string literal")
         }
-      | "sid" ->
+      | "id" ->
         if (args.size() == 0) {
           return CSExpr(CSLiteral(Ksuid::create().toString()))
         };
         if (args.size() != 1) {
-          error(this.pos, "sid expects at most one argument")
+          error(this.pos, "id expects at most one argument")
         };
         args[0] match {
         | VString(varName) ->
@@ -1147,7 +1147,7 @@ mutable class Compiler{
             error(this.pos, "Unknown id " + varName)
           };
           CSExpr(CSLiteral(namedIDs[varName]))
-        | _ -> error(this.pos, "sid expects a string literal")
+        | _ -> error(this.pos, "id expects a string literal")
         }
       | "skdb_permission" ->
         if (args.size() != 1) {
