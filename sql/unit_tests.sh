@@ -138,10 +138,10 @@ else
     fail "LOCAL SEQUENCE NUMBER"
 fi
 
-if cat test/unit/test_sid.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
-    pass "SID"
+if cat test/unit/test_id.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
+    pass "ID"
 else
-    fail "SID"
+    fail "ID"
 fi
 
 if cat test/lower_upper.sql | $SKDB | grep -q "FOO|bar"; then
@@ -156,10 +156,10 @@ else
     fail "INSERT LOCAL SEQUENCE NUMBER"
 fi
 
-if cat test/unit/test_insert_sid.sql | $SKDB | grep -q "|22"; then
-    pass "INSERT SID"
+if cat test/unit/test_insert_id.sql | $SKDB | grep -q "|22"; then
+    pass "INSERT ID"
 else
-    fail "INSERT SID"
+    fail "INSERT ID"
 fi
 
 
