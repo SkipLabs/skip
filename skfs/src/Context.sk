@@ -317,13 +317,8 @@ mutable class Context{
   ): void {
     sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource, dirSubs);
 
-    // TODO:
     if (init) {
-      // tick0 = Tick(0);
-      // dir = this.unsafeGetEagerDir(dirName);
-      // (isReset, changes) = dir.getChangesAfter(tick0);
-      // dir.notify(context, sub, isReset, changes, tick0);
-      void
+      this.notifySub(sub, Tick(0))
     };
 
     context.!sessions[sessionId] = sub;
@@ -779,6 +774,64 @@ mutable class Context{
     }
   }
 
+  readonly fun notifySub(sub: Sub, start: Tick): void {
+    lock = unfreezeLock(sub.lock);
+    mutexLock(lock);
+    sub.cmd match {
+    | NUpdates(filename) ->
+      file = IO.File::open(
+        filename,
+        IO.OpenOptions{
+          write => true,
+          create => true,
+          append => true,
+          mode => 0o777,
+        },
+      );
+      o = x -> file.write_all(x);
+      writer = mutable Debug.BufferedWriter(o, 4096);
+
+      producedAnyOutput = false;
+      for (dirSub in sub.dirSubs) {
+        dirName = dirSub.dirName;
+        this.unsafeMaybeGetDir(dirName) match {
+        | Some(dir @ EagerDir _) ->
+          (isReset, changes) = dir.getChangesAfter(start);
+          ctx = this.clone();
+          producedOutput = dir.writeDiff(
+            ctx,
+            isReset,
+            changes,
+            writer,
+            dirSub.entity,
+            dirSub.format,
+            dirSub.filter,
+            dirSub.getDestinationWatermark(ctx),
+          );
+          !producedAnyOutput = producedAnyOutput || producedOutput
+        | _ -> void
+        }
+      };
+      if (producedAnyOutput) {
+        // then we need to produce a checkpoint for flushing and committing
+        ourTime = this.tick.value.toString();
+        writer.write(`:${ourTime}\n`);
+        writer.flush();
+        flushStdout();
+      };
+
+      file.close()
+    | NNotify(file) ->
+      mutexLock(lock);
+      _ = unixNotify(file, Int32::truncate(start.value))
+    | NTail() ->
+      mutexLock(lock);
+      cond = unfreezeCond(sub.cond);
+      _ = condBroadcast(cond)
+    };
+    mutexUnlock(lock)
+  }
+
   readonly fun notifyAll(start: Tick): void {
     changedDirNames = this.getGlobal("CHANGED_DIRS") match {
     | None() -> this.dirs.state.getChangesAfter(start)
@@ -793,62 +846,7 @@ mutable class Context{
         false
       };
       if (!affected) continue;
-      lock = unfreezeLock(sub.lock);
-      mutexLock(lock);
-      sub.cmd match {
-      | NUpdates(filename) ->
-        file = IO.File::open(
-          filename,
-          IO.OpenOptions{
-            write => true,
-            create => true,
-            append => true,
-            mode => 0o777,
-          },
-        );
-        o = x -> file.write_all(x);
-        writer = mutable Debug.BufferedWriter(o, 4096);
-
-        producedAnyOutput = false;
-        for (dirSub in sub.dirSubs) {
-          dirName = dirSub.dirName;
-          if (!changedDirNames.contains(dirName)) continue;
-          this.unsafeMaybeGetDir(dirName) match {
-          | Some(dir @ EagerDir _) ->
-            (isReset, changes) = dir.getChangesAfter(start);
-            ctx = this.clone();
-            producedOutput = dir.writeDiff(
-              ctx,
-              isReset,
-              changes,
-              writer,
-              dirSub.entity,
-              dirSub.format,
-              dirSub.filter,
-              dirSub.getDestinationWatermark(ctx),
-            );
-            !producedAnyOutput = producedAnyOutput || producedOutput
-          | _ -> void
-          }
-        };
-        if (producedAnyOutput) {
-          // then we need to produce a checkpoint for flushing and committing
-          ourTime = this.tick.value.toString();
-          writer.write(`:${ourTime}\n`);
-          writer.flush();
-          flushStdout();
-        };
-
-        file.close()
-      | NNotify(file) ->
-        mutexLock(lock);
-        _ = unixNotify(file, Int32::truncate(start.value))
-      | NTail() ->
-        mutexLock(lock);
-        cond = unfreezeCond(sub.cond);
-        _ = condBroadcast(cond)
-      };
-      mutexUnlock(lock)
+      this.notifySub(sub, start)
     }
   }
 
