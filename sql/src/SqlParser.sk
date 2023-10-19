@@ -1061,14 +1061,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
     !pos = lex.expect(pos, "(");
     (!pos, !tok) = lex.next(pos);
     if (lex.content[tok.posBegin] == ')') {
-      return (pos, VSId(None()));
+      return (pos, VId(None()));
     };
     if (lex.content[tok.posBegin] != '\'') {
       error(pos, "id expects a string literal");
     };
     (!pos, str) = parseString(lex, tok.posBegin);
     !pos = lex.expect(pos, ")");
-    return (pos, VSId(Some(str)));
+    return (pos, VId(Some(str)));
   };
 
   if (lex.isEqUpperAt(tok, "TIME")) {
@@ -1310,7 +1310,7 @@ fun parseTypeRest(lex: Lexer, pos: Int): (Int, Bool, Bool, ?Value, Bool) {
       | VString _ ->
         void
       | VSeqNum _
-      | VSId _
+      | VId _
       | VTime _
       | VParam _ ->
         error(pos, "Invalid expression for default value")
