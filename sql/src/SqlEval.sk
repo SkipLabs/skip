@@ -1570,8 +1570,24 @@ fun printContext(context: mutable SKStore.Context): void {
     for (selectDir in stdout.toArray().reversed()) {
       showSelect(context, format, selectDir)
     }
-  | Some(StdoutDiff(_spec)) -> invariant_violation("diff not yet implemented")
-
+  | Some(StdoutDiff(spec)) ->
+    writer = mutable Debug.BufferedWriter(print_raw, 4096);
+    for ((dirsub, tick) in spec) {
+      edir = context.unsafeGetEagerDir(dirsub.dirName);
+      (isReset, changes) = edir.getChangesAfter(tick);
+      _ = edir.writeDiff(
+        context,
+        isReset,
+        changes,
+        writer,
+        dirsub.entity,
+        dirsub.format,
+        dirsub.filter,
+        dirsub.getDestinationWatermark(context),
+      )
+    };
+    writer.write(`:${context.tick.value.toString()}\n`);
+    writer.flush();
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
   context.globals.maybeGet("Ack") match {
