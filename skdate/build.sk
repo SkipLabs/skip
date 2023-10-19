@@ -7,7 +7,10 @@ fun source_dirs(env: Skbuild.Env): Array<String> {
 
 @debug
 fun main(): void {
-  _ = Skbuild.build();
+  Skbuild.build() match {
+  | Failure(err) -> skipExit(err.code)
+  | _ -> void
+  }
 }
 
 module end;

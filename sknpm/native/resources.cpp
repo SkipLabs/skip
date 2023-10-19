@@ -4,12 +4,13 @@
 extern "C"
 {
 
-  extern uint8_t sk_tests_start[]      asm("_binary_resources_sk_tests_ts_start");
-  extern uint8_t sk_tests_end[]  asm("_binary_resources_sk_tests_ts_end");
+  extern unsigned char resources_sk_tests_ts[];
+  extern unsigned int resources_sk_tests_ts_len;
 
 
-  extern uint8_t tests_archice_start[]      asm("_binary_resources_tests_tar_gz_start");
-  extern uint8_t tests_archice_end[]  asm("_binary_resources_tests_tar_gz_end");
+  extern unsigned char resources_tests_tar_gz[];
+  extern unsigned int resources_tests_tar_gz_len;
+
 
   char* sk_string_create(const char* buffer, uint32_t size);
   uint32_t SKIP_String_byteSize(char*);
@@ -18,26 +19,26 @@ extern "C"
 extern "C"
 {
   char* SKIP_sknpm_sk_tests_ts() {
-    uint64_t size = tests_archice_end - tests_archice_start;
-    return sk_string_create((char *)sk_tests_start, size);
+    uint64_t size = resources_sk_tests_ts_len;
+    return sk_string_create((char *)resources_sk_tests_ts, size);
   }
 
   void SKIP_sknpm_save_sk_tests_ts(char * skTarget) {
-    uint64_t size = sk_tests_end - sk_tests_start;
+    uint64_t size = resources_sk_tests_ts_len;
     std::string target(skTarget, SKIP_String_byteSize(skTarget));
     std::string skTestsFile = target + "/sk_tests.ts";
     FILE *write_ptr = fopen(skTestsFile.c_str(),"w");
-    fwrite((char *)sk_tests_start, size, 1,write_ptr);
+    fwrite(resources_sk_tests_ts, size, 1,write_ptr);
     fclose(write_ptr);
   }
 
   void SKIP_sknpm_save_archive(char * skTarget) {
-    uint64_t size = tests_archice_end - tests_archice_start;
+    uint64_t size = resources_tests_tar_gz_len;
     std::string target(skTarget, SKIP_String_byteSize(skTarget));
     std::string archiveFile = target + "/tests.tar.gz";
     std::string command = "tar -zxf " + archiveFile + " -C " + target;
     FILE *write_ptr = fopen(archiveFile.c_str(),"wb");
-    fwrite((char *)tests_archice_start, size, 1,write_ptr);
+    fwrite((char *)resources_tests_tar_gz, size, 1,write_ptr);
     fclose(write_ptr);
     system(command.c_str());
   }

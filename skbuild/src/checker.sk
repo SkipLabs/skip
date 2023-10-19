@@ -2,8 +2,18 @@ module Skbuild;
 
 class TimeChecker(optTime: ?Int = None()) {
   //
-  fun add(file: String): TimeChecker {
-    !this.optTime = max(this.optTime, mtime(file));
+  fun add(
+    file: String,
+    fileFilter: String -> Bool = _ ~> true,
+    directoryFilter: String -> Bool = _ ~> true,
+  ): TimeChecker {
+    if (FileSystem.isDirectory(file)) {
+      FileSystem.readFilesRecursive(file, fileFilter, directoryFilter).each(
+        i -> !this.optTime = max(this.optTime, mtime(i)),
+      )
+    } else {
+      !this.optTime = max(this.optTime, mtime(file));
+    };
     this
   }
 
