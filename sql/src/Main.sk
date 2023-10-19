@@ -52,6 +52,22 @@ fun queryParams(options: SKDB.Options): Map<String, SKDB.Value> {
   }
 }
 
+fun slurpStdin(): String {
+  lines = mutable Vector[];
+  try {
+    loop {
+      read_line() match {
+      | None() -> break void
+      | Some(l) -> lines.push(l)
+      }
+    }
+  } catch {
+  | EndOfFile _ -> void
+  | exn -> throw exn
+  };
+  lines.join("\n")
+}
+
 /*****************************************************************************/
 /* Main */
 /*****************************************************************************/
@@ -144,9 +160,8 @@ untracked fun main(): void {
             .required()
             .about("Session id"),
         )
-        .arg(
-          Cli.StringArg("since").required().about("Starting time of the diff"),
-        ),
+        // if not specified, diff will read a multi-table spec from stdin.
+        .arg(Cli.StringArg("since").about("Starting time of the diff")),
     )
     .subcommand(
       Cli.Command("disconnect")
@@ -499,7 +514,7 @@ fun execSize(args: Cli.ParseResults, options: SKDB.Options): void {
 fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
-  time = args.getString("since").toInt();
+  since = args.maybeGetString("since").map(v -> v.toInt());
   SKDB.runSql(options, origContext ~> {
     context = origContext.mclone();
     sub = context.sessions.maybeGet(sessionID) match {
@@ -509,7 +524,22 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
     | Some(x) -> x
     };
 
-    origContext.setGlobal("Stdout", SKDB.StdoutDiff(SKStore.Tick(time), sub));
+    sinceForTable = since match {
+    | None() ->
+      input = slurpStdin();
+      spec = decodeDiffSpec(input);
+      (name -> spec.get(name))
+    | Some(v) -> (_ -> SKStore.Tick(v))
+    };
+
+    diffSpec = sub.dirSubs.map(dirsub -> {
+      tableName = SKDB.Name::create(
+        dirsub.dirName.dirName.stripPrefix("/").stripSuffix("/"),
+      );
+      (dirsub, sinceForTable(tableName))
+    });
+
+    origContext.setGlobal("Stdout", SKDB.StdoutDiff(diffSpec));
     SKStore.CStop(None())
   })
 }

@@ -36,7 +36,9 @@ class DirSub(
   dirName: DirName,
   entity: String,
   format: OutputFormat,
-  // TODO: once we're x-table everywhere, this should not be dir-specific
+  // the watermark is per-dir because tables can be added and removed
+  // from the mirror-set: they don't necessarily all move forward in
+  // lock-step.
   getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
   // this is a dir-specific filter
   filter: (SKStore.Context, Bool) ~> (Key -> Bool) = (_, _) ~> (_ -> true),
