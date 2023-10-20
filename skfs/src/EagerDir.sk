@@ -753,6 +753,14 @@ class EagerDir{
     };
 
     if (isReset) {
+      if (changesWritten % checkpointInterval == 0) {
+        // output a header for the dir
+        theirTime = destinationTime match {
+        | None() -> ""
+        | Some(t) -> " " + t.value.toString()
+        };
+        writer.write(`^${entity}${theirTime}\n`)
+      };
       // Indicates a reset, meaning all the data that was not in
       // this transaction should be removed.
       writer.write("\t\t\n");
