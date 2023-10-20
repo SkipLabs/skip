@@ -787,6 +787,7 @@ fun replayStdin(): Map<String, (Int, Int)> {
     };
     chars: mutable Vector<Char> = mutable Vector[];
     iter = line.getIter();
+    header = false;
     checkpoint = false;
     reset = false;
     loop {
@@ -794,6 +795,9 @@ fun replayStdin(): Map<String, (Int, Int)> {
       | None() ->
         print_error("Error, line " + lineNbr + ": unexpected end of line");
         skipExit(23)
+      | Some('^') ->
+        !header = true;
+        break void
       | Some(':') ->
         !checkpoint = true;
         break void
@@ -812,6 +816,9 @@ fun replayStdin(): Map<String, (Int, Int)> {
         skipExit(23)
       };
       chars.push(c);
+    };
+    if (header) {
+      continue;
     };
     if (reset) {
       all.clear();
