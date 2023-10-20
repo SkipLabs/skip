@@ -1649,6 +1649,7 @@ fun getQueryDepsHandle(
 
 fun printReactiveQueryResult(
   context: mutable SKStore.Context,
+  _queryID: Int,
   dirName: SKStore.DirName,
   fieldNames: Array<String>,
 ): void {
@@ -1663,6 +1664,50 @@ fun printReactiveQueryResult(
       }
     }
   }
+}
+
+fun printReactiveQueryChanges(
+  context: mutable SKStore.Context,
+  queryID: Int,
+  dirName: SKStore.DirName,
+  fieldNames: Array<String>,
+): void {
+  lastTick = lastTick(UInt32::truncate(queryID));
+  tick = SKStore.Tick(lastTick.toInt());
+  edir = context.unsafeGetEagerDir(dirName);
+  (_, changes) = edir.getChangesAfter(tick);
+  if (!changes.isEmpty()) {
+    format = SKStore.OJS(fieldNames);
+    RowValues::printHeader(format);
+    for (key in changes) {
+      values = edir.getArrayRaw(key);
+      if (values.size() == 0) {
+        switchTo(UInt32::truncate(1));
+        row = (key as RowKey _).row;
+        for (_ in Range(0, row.repeat)) {
+          RowValues::printItem(format, row);
+        }
+      } else {
+        switchTo(UInt32::truncate(0));
+        for (file in values) {
+          row = RowValues::type(file);
+          for (_ in Range(0, row.repeat)) {
+            RowValues::printItem(format, row);
+          }
+        }
+      }
+    };
+    printTick(context.tick.next());
+  }
+}
+
+private fun printTick(tick: SKStore.Tick): void {
+  switchTo(UInt32::truncate(2));
+  jsClearFieldNames();
+  jsPushFieldName("tick");
+  jsClearObject();
+  jsPushObjectFieldInt32(Int32::truncate(tick.value));
+  jsPushObject()
 }
 
 @cpp_extern("SKIP_js_user_fun")
@@ -1694,7 +1739,39 @@ fun reactiveQuery(
   query: String,
   encoded_params: String,
 ): void {
-  saved = SKStore.newObstack();
+  manageReactiveQuery(
+    queryID32,
+    query,
+    encoded_params,
+    printReactiveQueryResult,
+  )
+}
+
+@wasm_export("SKIP_reactive_query_changes")
+fun reactiveQueryChanges(
+  queryID32: Int32,
+  query: String,
+  encoded_params: String,
+): void {
+  manageReactiveQuery(
+    queryID32,
+    query,
+    encoded_params,
+    printReactiveQueryChanges,
+  )
+}
+
+fun manageReactiveQuery(
+  queryID32: Int32,
+  query: String,
+  encoded_params: String,
+  printResult: (
+    context: mutable SKStore.Context,
+    queryID: Int,
+    dirName: SKStore.DirName,
+    fieldNames: Array<String>,
+  ) ~> void,
+): void {
   try {
     SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
       context.!globals = SortedMap[];
@@ -1726,7 +1803,7 @@ fun reactiveQuery(
         cselect.params,
       );
       fieldNames = schema.map(x -> x.name.origName);
-      printReactiveQueryResult(context, selectDir.dirName, fieldNames);
+      printResult(context, queryID, selectDir.dirName, fieldNames);
 
       SKStore.EagerDir::apply(
         context,
@@ -1734,7 +1811,7 @@ fun reactiveQuery(
         SKStore.DirName::create(selectDir.dirName.toString() + "sink/"),
         (_context, _writer, _key, _valueIter) ~> {
           jsMarkQuery(queryID32, context ~> {
-            printReactiveQueryResult(context, selectDir.dirName, fieldNames);
+            printResult(context, queryID, selectDir.dirName, fieldNames);
             jsCallUserFun(queryID32);
           })
         },
@@ -1764,7 +1841,6 @@ fun reactiveQuery(
   } catch {
   | exn -> print_error(exn.getMessage())
   };
-  SKStore.destroyObstack(saved);
 }
 
 @wasm_export("SKIP_delete_reactive_query")

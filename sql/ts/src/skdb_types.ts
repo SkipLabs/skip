@@ -3,7 +3,8 @@ import { Shared } from "#std/sk_types";
 export interface SkdbHandle {
   runner: (fn: () => string) => Array<any>;
   main: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
+  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void },
+  watchChanges: (query: string, params: Params, onChange: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
 }
 
 export type MirrorDefn = {
@@ -15,6 +16,7 @@ export interface SKDBSync {
   // CLIENT
   exec: (query: string, params?: Params) => Array<any>;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, onChange: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
   insert: (tableName: string, values: Array<any>) => boolean;
 
   tableSchema: (tableName: string) => string;
@@ -40,6 +42,7 @@ export interface SKDBSync {
 export interface SKDB {
   exec: (query: string, params?: Params) => Promise<Array<any>>;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
+  watchChanges: (query: string, params: Params, onChange: (added: Array<any>, removed: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
 
   connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
   connectedRemote: () => Promise<RemoteSKDB|undefined>;

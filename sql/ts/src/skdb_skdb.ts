@@ -10,6 +10,7 @@ interface Exported {
   skip_main: () => void;
   //
   SKIP_reactive_query: (queryID: number, query: number, encoded_params: number) => void;
+  SKIP_reactive_query_changes: (queryID: number, query: number, encoded_params: number) => void;
   SKIP_delete_reactive_query: (queryID: number) => void;
   SKIP_js_notify_user: (notify: number) => void;
   getVersion: () => number;
@@ -19,15 +20,18 @@ class SkdbHamdleImpl implements SkdbHandle {
   runner: (fn: () => string) => Array<any>;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, onChanges: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
 
   constructor(
     main: (new_args: Array<string>, new_stdin: string) => string,
     runner: (fn: () => string) => Array<any>,
-    watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
+    watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void },
+    watchChanges: (query: string, params: Params, onChanges: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
   ) {
     this.runner = runner;
     this.main = main;
     this.watch = watch;
+    this.watchChanges = watchChanges;
   }
 
   init() {
@@ -36,6 +40,8 @@ class SkdbHamdleImpl implements SkdbHandle {
 }
 
 interface ToWasm {
+  SKIP_last_tick: (queryID: int) => int;
+  SKIP_switch_to: (stream: int) => void;
   SKIP_clear_field_names: () => void;
   SKIP_push_field_name: (skName: ptr) => void;
   SKIP_clear_object: () => void;
@@ -162,15 +168,19 @@ class LinksImpl implements Links, ToWasm {
   private state: ExternalFuns;
   private field_names: Array<string>;
   private objectIdx: number;
+  private stream: number;
   private object: { [k: string]: any };
-  private stdout_objects: Array<any>;
+  private stdout_objects: Array<Array<any>>;
   private storage?: Storage;
   //
   private queryID: number;
   private userFuns: Array<() => void>;
+  private funLastTick: Map<number, number>;
   private queriesToNotify: Map<number, number>;
   private freeQueryIDs: Array<number>;
 
+  SKIP_last_tick: (queryID: int) => int;
+  SKIP_switch_to: (stream: int) => void;
   SKIP_call_external_fun: (funId: int, skParam: ptr) => ptr;
   SKIP_clear_field_names: () => void;
   SKIP_push_field_name: (skName: ptr) => void;
@@ -195,10 +205,12 @@ class LinksImpl implements Links, ToWasm {
     this.queryID = 0;
     this.userFuns = new Array();
     this.freeQueryIDs = new Array();
+    this.funLastTick = new Map();
     this.queriesToNotify = new Map();
     this.objectIdx = 0;
     this.object = {};
-    this.stdout_objects = new Array();
+    this.stream = 0;
+    this.stdout_objects = [[],[],[]];
   }
 
   complete = (utils: Utils, exports: object) => {
@@ -216,6 +228,12 @@ class LinksImpl implements Links, ToWasm {
       )
       let strRes = JSON.stringify(res === undefined ? null : res);
       return utils.exportString(strRes);
+    };
+    this.SKIP_last_tick = (queryID: int) => {
+      return this.funLastTick.get(queryID) ?? 0;
+    };
+    this.SKIP_switch_to = (stream: int) => {
+      this.stream = stream;
     };
     this.SKIP_clear_field_names = () => {
       this.field_names = new Array();
@@ -246,15 +264,19 @@ class LinksImpl implements Links, ToWasm {
       let field_name: string = this.field_names[this.objectIdx]!;
       this.object[field_name] = parseFloat(utils.importString(skV));
       this.objectIdx++;
-    },
-      this.SKIP_push_object_field_string = (skV: ptr) => {
-        let field_name: string = this.field_names[this.objectIdx]!;
-        this.object[field_name] = utils.importString(skV);
-        this.objectIdx++;
-      },
-      this.SKIP_push_object = () => {
-        this.stdout_objects.push(this.object);
-      };
+    };
+    this.SKIP_push_object_field_string = (skV: ptr) => {
+      let field_name: string = this.field_names[this.objectIdx]!;
+      this.object[field_name] = utils.importString(skV);
+      this.objectIdx++;
+    };
+    this.SKIP_push_object = () => {
+      let objects = this.stdout_objects[this.stream];
+      if (!objects) {
+        this.stdout_objects[this.stream] = new Array();
+      }
+      this.stdout_objects[this.stream].push(this.object);
+    };
     this.SKIP_unix_unixepoch = (tm: ptr) => {
       return utils.exportString("TODO")
     };
@@ -268,10 +290,11 @@ class LinksImpl implements Links, ToWasm {
       this.queriesToNotify.set(queryID, notify);
     }
     let runner = (fn: () => string) => {
-      this.stdout_objects = new Array();
+      this.stdout_objects = [[],[],[]];
+      this.stream = 0;
       let stdout = fn();
       if (stdout == "") {
-        let result = this.stdout_objects;
+        let result = this.stdout_objects[0];
         return result;
       }
       throw new Error(stdout)
@@ -281,25 +304,25 @@ class LinksImpl implements Links, ToWasm {
       this.notifyAllJS();
       return res;
     }
-    let watch = (
+    let manageWatch = (
       query: string,
       params: Params,
-      onChange: (rows: Array<any>) => void,
+      reactive_query: (queryID: number, query: number, encoded_params: number) => void,
+      queryFun: (queryID: int) => void,
     ) => {
       if (params instanceof Map) {
         params = Object.fromEntries(params);
       }
-      this.stdout_objects = new Array();
+      this.stdout_objects = [[],[],[]];
+      this.stream = 0;
       const freeQueryID = this.freeQueryIDs.pop();
       const queryID = (freeQueryID === undefined ? this.queryID++ : freeQueryID);
-      let userFun = () => {
-        onChange(this.stdout_objects);
-        this.stdout_objects = new Array()
-      };
+      this.funLastTick.set(queryID, 0);
+      let userFun = () => queryFun(queryID);
       this.userFuns[queryID] = userFun;
       utils.runWithGc(() => {
         utils.runCheckError(() => {
-          exported.SKIP_reactive_query(
+          reactive_query(
             queryID,
             utils.exportString(query),
             utils.exportString(JSON.stringify(params))
@@ -311,11 +334,44 @@ class LinksImpl implements Links, ToWasm {
         close: () => {
           exported.SKIP_delete_reactive_query(queryID);
           this.userFuns[queryID] = () => { };
+          this.funLastTick.set(queryID, 0);
           this.freeQueryIDs.push(queryID);
         }
       }
+    };
+
+    let watch = (
+      query: string,
+      params: Params,
+      onChange: (rows: Array<any>) => void,
+    ) => {
+      return manageWatch(
+        query,
+        params,
+        exported.SKIP_reactive_query,
+        _queryID => {
+          onChange(this.stdout_objects[0]);
+          this.stdout_objects = [[],[],[]];
+        },
+      );
     }
-    let handle = new SkdbHamdleImpl(main, runner, watch);
+    let watchChanges = (
+      query: string,
+      params: Params,
+      onChanges: (added: Array<any>, removed: Array<any>) => void,
+    ) => {
+      return manageWatch(
+        query,
+        params,
+        exported.SKIP_reactive_query_changes,
+        queryID => {
+          onChanges(this.stdout_objects[0], this.stdout_objects[1]);
+          this.funLastTick.set(queryID, this.stdout_objects[2][0].tick);
+          this.stdout_objects = [[],[],[]];
+        },
+      );
+    }
+    let handle = new SkdbHamdleImpl(main, runner, watch, watchChanges);
     let createSync = async (dbName?: string) => {
       let save: () => Promise<boolean> = async () => true;
       let storeName = dbName ? "SKDBStore" : null;
@@ -353,6 +409,8 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_clear_field_names = () => links.SKIP_clear_field_names();
     toWasm.SKIP_push_field_name = (skName: ptr) => links.SKIP_push_field_name(skName);
     toWasm.SKIP_clear_object = () => links.SKIP_clear_object();
+    toWasm.SKIP_last_tick = (queryID: int) => links.SKIP_last_tick(queryID);
+    toWasm.SKIP_switch_to = (stream: int) => links.SKIP_switch_to(stream);
     toWasm.SKIP_push_object_field_null = () => links.SKIP_push_object_field_null();
     toWasm.SKIP_push_object_field_int32 = (field: int) => links.SKIP_push_object_field_int32(field);
     toWasm.SKIP_push_object_field_int64 = (field: ptr) => links.SKIP_push_object_field_int64(field);
