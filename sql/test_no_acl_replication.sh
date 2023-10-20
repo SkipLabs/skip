@@ -38,7 +38,7 @@ setup_local() {
 }
 
 replicate_to_server() {
-    $SKDB_BIN write-csv --data $SERVER_DB --user test_user test < $UPDATES > /dev/null
+    $SKDB_BIN write-csv --data $SERVER_DB --user test_user < $UPDATES > /dev/null
 }
 
 assert_line_count() {

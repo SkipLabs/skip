@@ -53,19 +53,19 @@ replicate_to_local() {
     table=$1
     sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 1234 "$table")
     $SKDB_BIN --data $SERVER_DB tail --user test_user --format=csv --since 0 "$sub" |
-        $SKDB_BIN write-csv "$table" --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
+        $SKDB_BIN write-csv --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
 }
 
 replicate_to_server() {
     table=$1
-    cat $UPDATES | $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
+    cat $UPDATES | $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
 }
 
 replicate_diff_to_server() {
     table=$1
     since=$2
     $SKDB_BIN --data $LOCAL_DB diff --format=csv --since "$since" "$(cat $SESSION)" |
-        $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
+        $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
 }
 
 setup_local2() {
@@ -85,12 +85,12 @@ replicate_to_local2() {
     table=$1
     sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 5678 "$table")
     $SKDB_BIN --data $SERVER_DB tail --user test_user --format=csv --since 0 "$sub" |
-        $SKDB_BIN write-csv "$table" --data $LOCAL2_DB --source 7777 > $WRITE_OUTPUT
+        $SKDB_BIN write-csv --data $LOCAL2_DB --source 7777 > $WRITE_OUTPUT
 }
 
 replicate_local2_to_server() {
     table=$1
-    cat $UPDATES2 | $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 5678 --user test_user > $WRITE_OUTPUT
+    cat $UPDATES2 | $SKDB_BIN write-csv --data $SERVER_DB --source 5678 --user test_user > $WRITE_OUTPUT
 }
 
 run_test() {

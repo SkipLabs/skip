@@ -6,8 +6,9 @@ fail() { printf "%-32s FAILED\n" "TEST $1:"; }
 trap "trap - SIGTERM && kill -- -$$ 2> /dev/null" SIGINT SIGTERM EXIT
 
 DBFILE=/tmp/test.db
+DBCOPYFILE=/tmp/test_copy.db
 
-rm -f $DBFILE
+rm -f $DBFILE $DBCOPYFILE
 
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
@@ -16,16 +17,19 @@ fi
 SKDB_CMD="skargo run --profile $SKARGO_PROFILE -- "
 
 $SKDB_CMD --init $DBFILE
+$SKDB_CMD --init $DBCOPYFILE
 
 SKDB="$SKDB_CMD --data $DBFILE"
+SKDB_COPY="$SKDB_CMD --data $DBCOPYFILE"
 
 cat privacy/init.sql | $SKDB
+cat privacy/init.sql | $SKDB_COPY
 
 echo "create table t1 (id INTEGER primary key, skdb_access STRING);" | $SKDB
+echo "create table t1 (id INTEGER primary key, skdb_access STRING);" | $SKDB_COPY
 subt1=`$SKDB subscribe t1`
 
 echo "create table t2 (id INTEGER primary key, skdb_access STRING);" | $SKDB
-echo "create table t3 (id INTEGER primary key, skdb_access STRING);" | $SKDB
 echo "create virtual view v1 as select id, id as skdb_access from t1 ;" | $SKDB
 
 ###############################################################################
@@ -48,7 +52,7 @@ echo "insert into skdb_group_permissions values ('myGroup', NULL, skdb_permissio
 # This should turn every user into "readonly"
 echo "insert into skdb_user_permissions values (NULL, skdb_permission('r'));" | $SKDB
 
-if echo -e "1\t235,\"myGroup\"" | $SKDB write-csv t2 --user ID1 2>&1 | grep -q Error; then
+if echo -e "^t2\n1\t235,\"myGroup\"\n:1" | $SKDB write-csv --user ID1 2>&1 | grep -q Error; then
     pass "USER PERMISSIONS"
 else
     fail "USER PERMISSIONS"
@@ -57,7 +61,7 @@ fi
 # Let's check that user permissions are respected for a specific user
 echo "insert into skdb_user_permissions values ('ID1', skdb_permission('ri'));" | $SKDB
 
-if echo -e "1\t235,\"myGroup\"" | $SKDB write-csv t2 --user ID1 2>&1 | grep -q Error; then
+if echo -e "^t2\n1\t235,\"myGroup\"\n:1" | $SKDB write-csv --user ID1 2>&1 | grep -q Error; then
     fail "USER PERMISSIONS2"
 else
     pass "USER PERMISSIONS2"
@@ -75,21 +79,21 @@ echo "insert into skdb_group_permissions values ('ID22', 'ID2', skdb_permission(
 echo "insert into skdb_group_permissions values ('ID22', 'ID3', skdb_permission('r'), 'root');" | $SKDB
 
 # Let's check user1 can write
-if echo -e "1\t238,\"ID22\"" | $SKDB write-csv t1 --user ID1 2>&1 | grep -q Error; then
+if echo -e "^t1\n1\t238,\"ID22\"\n:1" | $SKDB write-csv --user ID1 2>&1 | grep -q Error; then
     fail "GROUP PERMISSIONS"
 else
     pass "GROUP PERMISSIONS"
 fi
 
 # Let's check user2 cannot write
-if echo -e "1\t239,\"ID22\"" | $SKDB write-csv t1 --user ID2 2>&1 | grep -q Error; then
+if echo -e "^t1\n1\t239,\"ID22\"\n:1" | $SKDB write-csv --user ID2 2>&1 | grep -q Error; then
     pass "GROUP PERMISSIONS2"
 else
     fail "GROUP PERMISSIONS2"
 fi
 
 # Let's check user3 cannot write
-if echo -e "1\t239,\"ID22\"" | $SKDB write-csv t1 --user ID3 2>&1 | grep -q Error; then
+if echo -e "^t1\n1\t239,\"ID22\"\n:1" | $SKDB write-csv --user ID3 2>&1 | grep -q Error; then
     pass "GROUP PERMISSIONS3"
 else
     fail "GROUP PERMISSIONS3"
@@ -143,14 +147,14 @@ echo "insert into skdb_group_permissions values ('ID23', NULL, skdb_permission('
 echo "insert into skdb_user_permissions values ('ID2', skdb_permission('ri'));" | $SKDB
 
 # Let's check user2 can write
-if echo -e "1\t240,\"ID23\"" | $SKDB write-csv t1 --user ID2 2>&1 | grep -q Error; then
+if echo -e "^t1\n1\t240,\"ID23\"\n:1" | $SKDB write-csv --user ID2 2>&1 | grep -q Error; then
     fail "GROUP PERMISSIONS9"
 else
     pass "GROUP PERMISSIONS9"
 fi
 
 # Let's check user1 cannot write
-if echo -e "1\t241,\"ID23\"" | $SKDB write-csv t1 --user ID1 2>&1 | grep -q Error; then
+if echo -e "^t1\n1\t241,\"ID23\"\n:1" | $SKDB write-csv --user ID1 2>&1 | grep -q Error; then
     pass "GROUP PERMISSIONS10"
 else
     fail "GROUP PERMISSIONS10"
@@ -168,11 +172,11 @@ fi
 ###############################################################################
 
 echo "create table t4 (id INTEGER, skdb_author STRING);" | $SKDB
-if echo -e "1\t240,\"ID23\"" | $SKDB write-csv t4 --user ID3 2>&1 | grep -q Error
+if echo -e "^t4\n1\t240,\"ID23\"\n:1" | $SKDB write-csv --user ID3 2>&1 | grep -q Error
 then pass "AUTHOR"
 else fail "AUTHOR"
 fi
-if echo -e "1\t240,\"ID3\"" | $SKDB write-csv t4 --user ID3 2>&1 | grep -q Error
+if echo -e "^t4\n1\t240,\"ID3\"\n:1" | $SKDB write-csv --user ID3 2>&1 | grep -q Error
 then pass "AUTHOR2"
 else fail "AUTHOR2"
 fi
@@ -197,10 +201,10 @@ echo "insert into skdb_users VALUES ('julienv', 'pass');" | $SKDB
 echo "insert into skdb_users VALUES ('daniell', 'pass');" | $SKDB
 
 # Prepare a group with only one member, julienv
-echo -e "1\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"" |
-  $SKDB write-csv skdb_groups --user julienv --source 1234
-echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"julienv\"" |
-  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+echo -e "^skdb_groups\n1\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"\n:1" |
+  $SKDB write-csv --user julienv --source 1234 > /dev/null
+echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"julienv\",7, \"julienv\"\n:2" |
+  $SKDB write-csv --user julienv --source 1234 > /dev/null
 
 # Past this point, julienv can do anything in the group myAdminGroup
 
@@ -209,21 +213,21 @@ echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"julienv\"" |
 # not active because myAdminGroup is still pointing at julienv as an
 # admin, but the moment we switch, that will not longer be the case.
 
-echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"" |
-  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"\n:3" |
+  $SKDB write-csv --user julienv --source 1234 > /dev/null
 
 # Now let's make the switch! Let's make myAdminGroup use myAdmingGroup
 # (itself) as an admin. Note that the delete and the insert have to
 # happen in the same transaction, otherwise we would lose access after
 # the delete.
-(echo -e "0\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"";
- echo -e "1\t\"myAdminGroup\", \"julienv\",\"myAdminGroup\", \"myAdminGroup\"") |
-  $SKDB write-csv skdb_groups --user julienv --source 1234
+(echo -e "^skdb_groups\n0\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"";
+ echo -e "1\t\"myAdminGroup\", \"julienv\",\"myAdminGroup\", \"myAdminGroup\"\n:4") |
+  $SKDB write-csv --user julienv --source 1234 > /dev/null
 
 # Let's clean up after ourselves, this permission is no longer in use
 
-echo -e "0\t\"myAdminGroup\", \"julienv\",7, \"julienv\"" |
-  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+echo -e "^skdb_group_permissions\n0\t\"myAdminGroup\", \"julienv\",7, \"julienv\"\n:5" |
+  $SKDB write-csv --user julienv --source 1234 > /dev/null
 
 # We have successfully create a group that is controlled by
 # itself. And that contains one member, julienv.
@@ -231,19 +235,19 @@ echo -e "0\t\"myAdminGroup\", \"julienv\",7, \"julienv\"" |
 
 # First by adding the new user to the group
 
-echo -e "1\t\"myAdminGroup\", \"daniell\",7, \"myAdminGroup\"" |
-  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"daniell\",7, \"myAdminGroup\"\n:6" |
+  $SKDB write-csv --user julienv --source 1234 > /dev/null
 
 # And then by removing the original user
 
-echo -e "0\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"" |
-  $SKDB write-csv skdb_group_permissions --user julienv --source 1234
+echo -e "^skdb_group_permissions\n0\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"\n:7" |
+  $SKDB write-csv --user julienv --source 1234 > /dev/null
 
 # That's it! daniell is in control now. Let's see if julienv can still
 # modify the permissions (it should not be the case).
 
-echo -e "0\t\"myAdminGroup\", \"daniell\",7, \"myAdminGroup\"" |
-  $SKDB write-csv skdb_group_permissions --user julienv --source 1234 2>&1 |
+echo -e "^skdb_group_permissions\n0\t\"myAdminGroup\", \"daniell\",7, \"myAdminGroup\"\n:8" |
+  $SKDB write-csv --user julienv --source 1234 2>&1 |
   grep -q 'Error'
 
 if [ "$?" -eq "0" ]; then
@@ -254,8 +258,8 @@ fi
 
 # Let's check if daniell can indeed modify the permissions of the group
 
-echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"" |
-  $SKDB write-csv skdb_group_permissions --user daniell --source 1235 2>&1 |
+echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"\n:1" |
+  $SKDB write-csv --user daniell --source 1235 2>&1 |
   grep -q 'Error'
 
 if [ "$?" -eq "0" ]; then
@@ -270,7 +274,7 @@ fi
 
 tail -f /dev/null |
   $SKDB tail $subt1 --format=csv --user ID3 --follow |
-  $SKDB write-csv t3 > /dev/null &
+  $SKDB_COPY write-csv > /dev/null &
 
 tailerID=$!
 
@@ -283,7 +287,7 @@ sleep 1
 echo "delete from skdb_group_permissions where groupUUID='ID22' and userUUID='ID3';" | $SKDB
 
 # As long as the row (238,22) is still there, the update did not kick in
-while echo "select * from t3" | $SKDB | grep -q "238"; do
+while echo "select * from t1" | $SKDB_COPY | grep -q "238"; do
     sleep 1
 done
 
@@ -294,8 +298,8 @@ pass "GROUP PERMISSION UPDATE"
 echo "insert into skdb_user_permissions values('ID3', skdb_permission(''));" | $SKDB
 
 # As long as the row (240,22) is still there, the update did not kick in
-while echo "select * from t3" | $SKDB | grep -q "240"; do
-    echo "select * from t3" | $SKDB | grep -q "240"
+while echo "select * from t1" | $SKDB_COPY | grep -q "240"; do
+    echo "select * from t1" | $SKDB_COPY | grep -q "240"
     sleep 1
 done
 
@@ -313,14 +317,14 @@ pass "GROUP PERMISSION UPDATE2"
 
 sleep 1
 
-echo "select * from t3" | $SKDB
+echo "select * from t1" | $SKDB_COPY
 
 # wait for the data to arrive
-until echo "select * from t3" | $SKDB | grep -q "240"; do
+until echo "select * from t1" | $SKDB_COPY | grep -q "240"; do
     sleep 1
 done
 
-until echo "select * from t3" | $SKDB | grep -q "238"; do
+until echo "select * from t1" | $SKDB_COPY | grep -q "238"; do
     sleep 1
 done
 

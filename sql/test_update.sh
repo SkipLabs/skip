@@ -110,15 +110,15 @@ while ! cat $tailfile10 | tr '\t' 'Y' | egrep '[-]1' -q > /dev/null; do
     sleep 1
 done
 
-cat $tailfile2 | $skdb write-csv t2 > /dev/null
-cat $tailfile3 | $skdb write-csv t3 > /dev/null
-cat $tailfile4 | $skdb write-csv t4 > /dev/null
-cat $tailfile5 | $skdb write-csv t5 > /dev/null
-cat $tailfile6 | $skdb write-csv t6 > /dev/null
-cat $tailfile7 | $skdb write-csv t7 > /dev/null
-cat $tailfile8 | $skdb write-csv t8 > /dev/null
-cat $tailfile9 | $skdb write-csv t9 > /dev/null
-cat $tailfile10 | $skdb write-csv t10 > /dev/null
+cat $tailfile2 | $skdb write-csv > /dev/null
+cat $tailfile3 | $skdb write-csv > /dev/null
+cat $tailfile4 | $skdb write-csv > /dev/null
+cat $tailfile5 | $skdb write-csv > /dev/null
+cat $tailfile6 | $skdb write-csv > /dev/null
+cat $tailfile7 | $skdb write-csv > /dev/null
+cat $tailfile8 | $skdb write-csv > /dev/null
+cat $tailfile9 | $skdb write-csv > /dev/null
+cat $tailfile10 | $skdb write-csv > /dev/null
 
 echo "select * from t1;" | $skdb > $file1
 echo "select * from t2;" | $skdb > $file2
