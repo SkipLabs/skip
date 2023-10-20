@@ -32,7 +32,7 @@ export async function setup(credentials: string, port: number, crypto, asWorker:
   const remote = await skdb.connectedRemote();
   const testRootCreds = await remote!.createDatabase(dbName);
   skdb.closeConnection();
-  
+
   const rootSkdb = await createSkdb({ asWorker: asWorker });
   {
     const keyData = testRootCreds.privateKey;
@@ -151,8 +151,8 @@ async function testSchemaQueries(skdb: SKDB) {
 }
 
 async function testMirroring(skdb: SKDB) {
-  // mirror table
-  await skdb.mirror("test_pk");
+  await skdb.mirror("test_pk", "view_pk");
+
   const testPkRows = await waitSynch(
     skdb,
     "SELECT x,y FROM test_pk",
@@ -160,7 +160,6 @@ async function testMirroring(skdb: SKDB) {
   );
   expect(testPkRows).toEqual([{ x: 42, y: 21 }]);
 
-  await skdb.mirror("view_pk");
   const viewPkRows = await waitSynch(
     skdb,
     "SELECT x,y FROM view_pk",
@@ -169,7 +168,7 @@ async function testMirroring(skdb: SKDB) {
   expect(viewPkRows).toEqual([{ x: 42, y: 63 }]);
 
   // mirror already mirrored table is idempotent
-  await skdb.mirror("test_pk");
+  await skdb.mirror("test_pk", "view_pk");
   const testPkRows2 = await skdb.exec("SELECT x,y FROM test_pk");
   expect(testPkRows2).toEqual([{ x: 42, y: 21 }]);
 }
