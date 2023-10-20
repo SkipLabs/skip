@@ -4,7 +4,7 @@ COPY . /skfs
 
 WORKDIR /skfs
 
-RUN make clean && make build/skdb && make build/init.sql
+RUN make clean && make -C compiler clean && make build/skdb && make build/init.sql
 
 FROM eclipse-temurin:20 as skgw
 
