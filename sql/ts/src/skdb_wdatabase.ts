@@ -86,6 +86,13 @@ export class SKDBWorker implements SKDB {
     });
   }
 
+  watchChanges = async (query: string, params: Params, onChanges: (added: Array<any>, deleted: Array<any>) => void) => {
+    return this.worker.subscribe(new Function("watchChanges", [query, params], { wrap: true, autoremove: true }), onChanges).then(wrapped => {
+      let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
+      return { close: close };
+    });
+  }
+
   tableSchema = async (tableName: string) => {
     return this.worker.post(new Function("tableSchema", [tableName])) as Promise<string>;
   };

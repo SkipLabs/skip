@@ -83,6 +83,7 @@ export class SKDBSyncImpl implements SKDBSync {
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, onChange: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
 
   private runner: (fn: () => string) => Array<any>;
 
@@ -104,6 +105,7 @@ export class SKDBSyncImpl implements SKDBSync {
     client.clientUuid = env.crypto().randomUUID();
     client.runner = handle.runner;
     client.watch = handle.watch;
+    client.watchChanges = handle.watchChanges;
     return client;
   }
 
@@ -273,6 +275,12 @@ export class SKDBImpl implements SKDB {
     let closable = this.skdbSync.watch(query, params, onChange);
     return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
   }
+
+  async watchChanges(query: string, params: Params, onChanges: (added: Array<any>, deleted: Array<any>) => void) {
+    let closable = this.skdbSync.watchChanges(query, params, onChanges);
+    return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
+  }
+
 
   tableSchema = async (tableName: string) => {
     return this.skdbSync.tableSchema(tableName);
