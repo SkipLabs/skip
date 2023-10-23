@@ -13,6 +13,11 @@ RUN apt-get update && \
     npm install -g typescript@5.1 && \
     npx playwright install-deps
 
+RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
+RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
+    sdk install gradle && \
+    sdk install java 20.0.2-tem"
+
 RUN update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-15 100 && \
     update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-15 100 && \
     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && \
