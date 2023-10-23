@@ -6,6 +6,11 @@ export interface SkdbHandle {
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
 }
 
+export type MirrorDefn = {
+  table: string,
+  filterExpr?: string,
+} | string;
+
 export interface SKDBSync {
   // CLIENT
   exec: (query: string, params?: Params) => Array<any>;
@@ -20,7 +25,7 @@ export interface SKDBSync {
 
   // SERVER
   connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
-  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+  mirror: (...tables: MirrorDefn[]) => Promise<void>;
 
   connectedRemote?: RemoteSKDB;
   createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
@@ -41,27 +46,24 @@ export interface SKDB {
   closeConnection: () => Promise<void>;
   currentUser?: string;
 
-  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+  mirror: (...tables: MirrorDefn[]) => Promise<void>;
 
   schema: (tableName?: string) => Promise<string>;
   save: () => Promise<boolean>;
 }
 
 export interface SkdbMechanism {
-  writeCsv: (table: string, payload: string, source: string) => void;
+  writeCsv: (payload: string, source: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
-  subscribe: (replicationUid: string, table: string, updateFile: string) => string;
-  diff: (watermark: bigint, session: string) => ArrayBuffer | null;
+  subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
+  unsubscribe: (session: string) => void;
+  diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => Array<any>;
   assertCanBeMirrored: (tableName: string) => void;
   toggleView: (tableName: string) => void;
-}
-
-export var metadataTable = (tableName: string) => {
-  return `skdb__${tableName}_sync_metadata`;
 }
 
 export interface Storage {
@@ -86,7 +88,7 @@ export interface RemoteSKDB {
 
   createDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
 
-  mirror: (tableName: string, filterExpr?: string) => Promise<void>;
+  mirror: (...tables: MirrorDefn[]) => Promise<void>;
   exec: (query: string, params?: Params) => Promise<Array<any>>;
 
   isConnectionHealthy: () => Promise<boolean>;

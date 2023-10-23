@@ -18,15 +18,15 @@ echo "insert into skdb_table_permissions values ('items', 3);" | $SKDB
 
 # Let's create items
 
-echo -e "1\t44,\"OPEN\",\"LAMP\", 100, 33" | $SKDB write-csv items --user user33
-echo -e "1\t44,\"OPEN\",\"PAINTING\", 50, 33" | $SKDB write-csv items --user user33
+echo -e "1\t44,\"OPEN\",\"LAMP\", 100, 33" | $SKDB write-csv --user user33
+echo -e "1\t44,\"OPEN\",\"PAINTING\", 50, 33" | $SKDB write-csv --user user33
 
 # Let's bid!
 
 # echo "select * from skdb_table_permissions;" | $SKDB
 
-echo -e "1\t44, 1000, 34" | $SKDB write-csv bids --user user34
-echo -e "1\t44, 1100, 35" | $SKDB write-csv bids --user user35
+echo -e "1\t44, 1000, 34" | $SKDB write-csv --user user34
+echo -e "1\t44, 1100, 35" | $SKDB write-csv --user user35
 
 $SKDB tail `$SKDB subscribe bids_by_user` --user user34
 echo "select * from bids_by_user;" | $SKDB

@@ -4,7 +4,8 @@ pass() { printf "%-40s OK\n" "$1:"; }
 fail() { printf "%-40s FAILED\n" "$1:"; }
 
 db=$(mktemp)
-rm -f $db
+db_copy=$(mktemp)
+rm -f $db $db_copy
 tailfile=$(mktemp)
 out1=$(mktemp)
 out2=$(mktemp)
@@ -17,9 +18,12 @@ fi
 SKDB_BIN="skargo run --profile $SKARGO_PROFILE -- "
 
 $SKDB_BIN --init $db
+$SKDB_BIN --init $db_copy
 skdb="$SKDB_BIN --data $db"
+skdb_copy="$SKDB_BIN --data $db_copy"
 
 echo "create table t1 (a INTEGER);" | $skdb
+echo "create table t1 (a INTEGER);" | $skdb_copy
 
 sessionID=`$skdb subscribe t1 --connect`
 
@@ -34,11 +38,10 @@ done | $skdb
 
 sleep 1
 
-echo "create table t2 (a INTEGER);" | $skdb
-cat $tailfile | $skdb write-csv t2 > /dev/null
+cat $tailfile | $skdb_copy write-csv > /dev/null
 
 echo "select * from t1 where a > 500;" | $skdb > $out1
-echo "select * from t2;" | $skdb > $out2
+echo "select * from t1;" | $skdb_copy > $out2
 
 diff -q $out1 $out2
 if [ $? -eq 0 ]; then

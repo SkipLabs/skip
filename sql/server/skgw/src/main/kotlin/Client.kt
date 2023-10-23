@@ -132,7 +132,6 @@ class SkdbConnection(
     val proc =
         local.writeCsv(
             user = "root",
-            table,
             replicationId.toString(),
             { bytes, shouldFlush ->
               // client does not send acks back to the server. but
@@ -181,7 +180,7 @@ class SkdbConnection(
       throw RuntimeException("Could not create stream")
     }
 
-    val req = ProtoPushPromise(table)
+    val req = ProtoPushPromise()
     stream.send(encodeProtoMsg(req))
 
     val chan = consume(stream)

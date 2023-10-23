@@ -106,8 +106,10 @@ class Skdb(val name: String, private val dbPath: String) {
     return blockingRun(ProcessBuilder(ENV.skdbPath, "replication-id", deviceUuid, "--data", dbPath))
   }
 
-  fun dumpTable(table: String): ProcessOutput {
-    return blockingRun(ProcessBuilder(ENV.skdbPath, "dump-table", table, "--data", dbPath))
+  fun dumpTable(table: String, suffix: String): ProcessOutput {
+    return blockingRun(
+        ProcessBuilder(
+            ENV.skdbPath, "dump-table", table, "--data", dbPath, "--table-suffix", suffix))
   }
 
   fun dumpView(view: String): ProcessOutput {
@@ -127,22 +129,13 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun writeCsv(
       user: String,
-      table: String,
       replicationId: String,
       callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
       closed: () -> Unit,
   ): Process {
     val pb =
         ProcessBuilder(
-            ENV.skdbPath,
-            "write-csv",
-            table,
-            "--data",
-            dbPath,
-            "--user",
-            user,
-            "--source",
-            replicationId)
+            ENV.skdbPath, "write-csv", "--data", dbPath, "--user", user, "--source", replicationId)
 
     // TODO: for hacky debug
     pb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -158,7 +151,9 @@ class Skdb(val name: String, private val dbPath: String) {
         Thread({
           try {
             val encoder = StandardCharsets.UTF_8.newEncoder()
-            output.forEachLine { callback(encoder.encode(CharBuffer.wrap(it)), true) }
+            output.forEachLine {
+              callback(encoder.encode(CharBuffer.wrap(it + "\n")), it.startsWith(":"))
+            }
             closed()
           } catch (ex: Exception) {
             closed()

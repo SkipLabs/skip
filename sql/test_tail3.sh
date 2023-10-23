@@ -54,7 +54,7 @@ done
 
 wc $tailfile
 
-cat $tailfile | $skdb write-csv t2 > /dev/null
+cat $tailfile | $skdb write-csv > /dev/null
 
 echo "select * from t1;" | $skdb > $file1
 echo "select * from t2;" | $skdb > $file2

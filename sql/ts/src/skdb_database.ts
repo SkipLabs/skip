@@ -1,14 +1,15 @@
 import { Environment, FileSystem } from "#std/sk_types";
-import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
+import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync, MirrorDefn } from "#skdb/skdb_types";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
-  writeCsv: (table: string, payload: string, source: string) => void;
+  writeCsv: (payload: string, source: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
-  subscribe: (replicationUid: string, table: string, updateFile: string) => string;
-  diff: (watermark: bigint, session: string) => ArrayBuffer | null;
+  subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
+  unsubscribe: (session: string) => void;
+  diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
   assertCanBeMirrored: (tableName: string) => void;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => Array<any>;
@@ -21,8 +22,8 @@ class SkdbMechanismImpl implements SkdbMechanism {
     this.watermark = (replicationId: string, table: string) => {
       return BigInt(client.runLocal(["watermark", "--source", replicationId, table], ""));
     };
-    this.writeCsv = (table: string, payload: string, source: string) => {
-      return client.runLocal(["write-csv", table, "--source", source], payload + '\n');
+    this.writeCsv = (payload: string, source: string) => {
+      return client.runLocal(["write-csv", "--source", source], payload + '\n');
     };
     this.watchFile = (fileName: string, fn: (change: ArrayBuffer) => void) => {
       fs.watchFile(fileName, change => {
@@ -35,24 +36,32 @@ class SkdbMechanismImpl implements SkdbMechanism {
     this.getReplicationUid = (deviceUuid: string) => {
       return client.runLocal(["replication-id", deviceUuid], "").trim()
     };
-    this.subscribe = (replicationUid: string, table: string, updateFile: string) => {
+    this.subscribe = (replicationUid: string, tables: string[], updateFile: string) => {
       return client.runLocal(
         [
-          "subscribe", table, "--connect", "--format=csv",
+          "subscribe", "--format=csv",
           "--updates", updateFile, "--ignore-source", replicationUid
-        ],
+        ].concat(tables),
         ""
       ).trim()
     };
-    this.diff = (watermark: bigint, session: string) => {
+    this.unsubscribe = (session: string) => {
+      client.runLocal(["disconnect", session], "").trim()
+    };
+    this.diff = (session: string, watermarks: Map<string, bigint>) => {
+      const acc = {};
+      for (const [table, wm] of watermarks.entries()) {
+        acc[table] = {since: wm}
+      }
+      const diffSpec = JSON.stringify(acc, (_key, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+      );
       let d = client.runLocal(
         [
           "diff", "--format=csv",
-          "--since",
-          watermark.toString(),
           session,
         ],
-        ""
+        diffSpec
       );
       if (d.trim() == "") {
         return null;
@@ -225,7 +234,7 @@ export class SKDBSyncImpl implements SKDBSync {
 
   createServerDatabase = (dbName: string) => this.connectedRemote!.createDatabase(dbName);
   createServerUser = () => this.connectedRemote!.createUser();
-  mirror = (tableName: string, filterExpr?: string) => this.connectedRemote!.mirror(tableName, filterExpr);
+  mirror = (...tables: MirrorDefn[]) => this.connectedRemote!.mirror(...tables);
   serverClose = () => this.connectedRemote!.close();
 }
 
@@ -281,8 +290,8 @@ export class SKDBImpl implements SKDB {
     return this.skdbSync.insert(tableName, values);
   }
 
-  async mirror(tableName: string, filterExpr?: string) {
-    return this.skdbSync.mirror(tableName, filterExpr);
+  async mirror(...tables: MirrorDefn[]) {
+    return this.skdbSync.mirror(...tables);
   }
 
   async closeConnection() {

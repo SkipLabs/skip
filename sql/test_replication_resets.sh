@@ -66,11 +66,11 @@ test_ignore_source_ignored_on_reset() {
     # 710: binary searched to find the first point where the reset will be generated
     for i in $(seq 710)
     do
-        $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test > /dev/null << EOF
-
-
+        $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test
 0	$i,"a","GALL"
 1	$((i+1)),"a","GALL"
+:$i
 EOF
     done
 
@@ -91,19 +91,18 @@ test_server_should_apply_client_reset_to_their_subset_view_of_data() {
     setup_server
 
     # write a row as the source under test
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test_with_access > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test_with_access
 1	0,"foo","G1"
 :10
 EOF
 
     # write a row as another source, but with a private access value
-    $SKDB_BIN write-csv --data $SERVER_DB --source 999 --user U99 test_with_access << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 999 --user U99 > /dev/null << EOF
+^test_with_access
 1	6,"erase","G1"
 1	7,"keep","G2"
+:10
 EOF
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_access)
@@ -113,19 +112,19 @@ EOF
     assert_line_count "$SERVER_TAIL" 'erase' 1
     assert_line_count "$SERVER_TAIL" 'keep' 0
     # and that the server is at 70 and we sent up at 10
-    assert_line_count "$SERVER_TAIL" ':70 10' 1
+    assert_line_count "$SERVER_TAIL" 'test_with_access 10' 1
+    assert_line_count "$SERVER_TAIL" ':70' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value and the erase
     # from U99. but not the keep, because it can't see this
     # row.
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test_with_access > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test_with_access 70
 1	1,"baz","G1"
 1	2,"quux","G1"
 		
-:100 70
+:100
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_access" > $SERVER_TAIL
@@ -145,9 +144,8 @@ test_server_should_apply_client_reset_only_to_writes_seen() {
     setup_server
 
     # write a row as the source under test
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test
 1	0,"foo","GALL"
 :10
 EOF
@@ -159,18 +157,18 @@ EOF
     # if we did replicate now we would get the new row
     assert_line_count "$SERVER_TAIL" 'new' 1
     # sanity check the tick value - it's important for later - we're at 71 they're at 10
-    assert_line_count "$SERVER_TAIL" ':71 10' 1
+    assert_line_count "$SERVER_TAIL" 'test 10' 1
+    assert_line_count "$SERVER_TAIL" ':70' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value but not the new,
     # because it hasn't seen this row yet: 35 < 41.
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test 35
 1	1,"baz","GALL"
 1	2,"quux","GALL"
 		
-:22 35
+:22
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -190,9 +188,8 @@ test_server_write_csv_idempotent_even_when_bumped() {
     setup_server
 
     # write a row as the source under test
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test
 1	0,"foo","GALL"
 :10
 EOF
@@ -200,11 +197,10 @@ EOF
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test 1000
 1	0,"foo","GALL"
-:20 1000
+:20
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -220,9 +216,8 @@ test_server_write_csv_idempotent_even_when_bumped_and_reset() {
     setup_server
 
     # write a row as the source under test
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test
 1	0,"foo","GALL"
 :10
 EOF
@@ -230,12 +225,11 @@ EOF
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test 1000
 1	0,"foo","GALL"
 		
-:20 1000
+:20
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -263,24 +257,22 @@ test_resets_are_aggressively_nooped() {
 
     # server crashes and two clients that are up to speed reconnect with resets
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
+^test 73
 1	0,"foo","GALL"
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 		
-:10 73
+:10
 EOF
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test 73
 1	0,"foo","GALL"
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 		
-:10 73
+:10
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -308,24 +300,22 @@ test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update() {
 
     # server crashes and two clients that are up to speed reconnect with resets
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
+^test 73
 1	0,"foo","GALL"
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 		
-:10 73
+:10
 EOF
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test 73
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 1	3,"quux","GALL"
 		
-:10 73
+:10
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -354,24 +344,22 @@ test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update2() {
 
     # server crashes and two clients that are up to speed reconnect with resets
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test 73
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 1	3,"quux","GALL"
 		
-:10 73
+:10
 EOF
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
+^test 73
 1	0,"foo","GALL"
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 		
-:10 73
+:10
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -407,14 +395,13 @@ test_resets_no_op_repeat_count_logic() {
     # this is added concurrently and shouldn't be eligible
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test 91
 7	0,"foo","GALL"
 0	1,"bar","GALL"
 2	2,"baz","GALL"
 		
-:10 91
+:10
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -425,19 +412,18 @@ EOF
 
     $SKDB_BIN tail --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
     # we need to check the server tick so that the values provided in below resets are accurate
-    assert_line_count "$SERVER_TAIL" ':100' 1
+    assert_line_count "$SERVER_TAIL" ':99' 1
 
     # this is added concurrently and shouldn't be eligible
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test 99
 5	0,"foo","GALL"
 1	1,"bar","GALL"
 2	2,"baz","GALL"
 		
-:20 100
+:20
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
@@ -460,19 +446,18 @@ test_server_should_apply_client_reset_to_their_subset_view_of_data_pk() {
     setup_server
 
     # write a row as the source under test
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test_with_pk_with_access > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test_with_pk_with_access
 1	0,"foo","G1"
 :10
 EOF
 
     # write a row as another source, but with a private access value
-    $SKDB_BIN write-csv --data $SERVER_DB --source 999 --user U99 test_with_pk_with_access << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 999 --user U99 > /dev/null << EOF
+^test_with_pk_with_access
 1	6,"erase","G1"
 1	7,"keep","G2"
+:1
 EOF
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk_with_access)
@@ -482,19 +467,19 @@ EOF
     assert_line_count "$SERVER_TAIL" 'erase' 1
     assert_line_count "$SERVER_TAIL" 'keep' 0
     # and that the server is at 70 and we sent up at 10
-    assert_line_count "$SERVER_TAIL" ':70 10' 1
+    assert_line_count "$SERVER_TAIL" 'test_with_pk_with_access 10' 1
+    assert_line_count "$SERVER_TAIL" ':70' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value and the erase
     # from U99. but not the keep, because it can't see this
     # row.
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test_with_pk_with_access > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test_with_pk_with_access 70
 1	1,"baz","G1"
 1	2,"quux","G1"
 		
-:100 70
+:100
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk_with_access" > $SERVER_TAIL
@@ -513,9 +498,8 @@ test_server_should_apply_client_reset_only_to_writes_seen_pk() {
     setup_server
 
     # write a row as the source under test
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test_with_pk
 1	0,"foo","GALL"
 :10
 EOF
@@ -526,19 +510,19 @@ EOF
 
     # if we did replicate now we would get the new row
     assert_line_count "$SERVER_TAIL" 'new' 1
-    # sanity check the tick value - it's important for later - we're at 71 they're at 10
-    assert_line_count "$SERVER_TAIL" ':71 10' 1
+    # sanity check the tick value - it's important for later - we're at 70 they're at 10
+    assert_line_count "$SERVER_TAIL" 'test_with_pk 10' 1
+    assert_line_count "$SERVER_TAIL" ':70' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value but not the new,
-    # because it hasn't seen this row yet: 35 < 71.
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 test_with_pk > /dev/null << EOF
-
-
+    # because it hasn't seen this row yet: 35 < 70.
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
+^test_with_pk 35
 1	1,"baz","GALL"
 1	2,"quux","GALL"
 		
-:22 35
+:22
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
@@ -568,7 +552,7 @@ test_resets_are_aggressively_nooped_pk() {
 
     # server crashes and two clients that are up to speed reconnect with resets
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 test_with_pk > /dev/null << EOF
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 
 
 1	0,"foo","GALL"
@@ -578,7 +562,7 @@ test_resets_are_aggressively_nooped_pk() {
 :10 73
 EOF
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test_with_pk > /dev/null << EOF
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 
 
 1	0,"foo","GALL"
@@ -613,24 +597,22 @@ test_resets_are_aggressively_nooped_with_local_change_pk() {
 
     # server crashes and two clients that are up to speed reconnect with resets
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
+^test_with_pk 73
 1	0,"foo","GALL"
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 		
-:10 73
+:10
 EOF
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test_with_pk 73
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 1	3,"quux","GALL"
 		
-:10 73
+:10
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
@@ -659,24 +641,22 @@ test_resets_are_aggressively_nooped_with_local_change_pk_2() {
 
     # server crashes and two clients that are up to speed reconnect with resets
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test_with_pk 73
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 1	3,"quux","GALL"
 		
-:10 73
+:10
 EOF
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
+^test_with_pk 73
 1	0,"foo","GALL"
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 		
-:10 73
+:10
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
@@ -705,24 +685,22 @@ test_resets_conflicting_pk() {
 
     # server crashes and two clients that are up to speed reconnect with resets
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test_with_pk 73
 1	1,"win","GALL"
 1	2,"baz","GALL"
 1	3,"quux","GALL"
 		
-:10 73
+:10
 EOF
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
+^test_with_pk 73
 1	0,"foo","GALL"
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 		
-:10 73
+:10
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
@@ -751,24 +729,22 @@ test_resets_conflicting_reversed_pk() {
 
     # server crashes and two clients that are up to speed reconnect with resets
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
+^test_with_pk 73
 1	0,"foo","GALL"
 1	1,"bar","GALL"
 1	2,"baz","GALL"
 		
-:10 73
+:10
 EOF
 
-    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 test_with_pk > /dev/null << EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
+^test_with_pk 73
 1	1,"win","GALL"
 1	2,"baz","GALL"
 1	3,"quux","GALL"
 		
-:10 73
+:10
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL

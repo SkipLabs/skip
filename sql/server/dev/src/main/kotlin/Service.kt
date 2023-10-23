@@ -166,7 +166,7 @@ class RequestHandler(
         val result =
             when (request.scope) {
               SchemaScope.ALL -> skdb.dumpSchema()
-              SchemaScope.TABLE -> skdb.dumpTable(request.name!!)
+              SchemaScope.TABLE -> skdb.dumpTable(request.name!!, request.suffix!!)
               SchemaScope.VIEW -> skdb.dumpView(request.name!!)
             }
         if (result.exitSuccessfully()) {
@@ -208,7 +208,6 @@ class RequestHandler(
         val proc =
             skdb.writeCsv(
                 accessKey,
-                request.table,
                 replicationId,
                 { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
                 { stream.error(2000u, "Unexpected EOF") })
