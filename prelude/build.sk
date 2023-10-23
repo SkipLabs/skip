@@ -51,10 +51,11 @@ class Env(
       print_error(`>> ${args.join(" ")}`)
     };
     p = System.subprocess(args, print_string, this.printError);
+    if (!this.verbose) {
+      print_error_raw(p.stdout);
+      print_error_raw(p.stderr);
+    };
     if (!p.success()) {
-      if (!this.verbose) {
-        print_error_raw(p.stderr);
-      };
       throw RuntimeException(p.exitcode())
     };
   }
@@ -83,6 +84,10 @@ fun main(): void {
   };
   mkbuildPath = env.resolve(name);
   if (FileSystem.exists(mkbuildPath)) {
-    env.run(Array["make", "-f", mkbuildPath].concat(env.vars()))
+    env.run(
+      Array["make", "-r", "-f", mkbuildPath].concat(
+        if (env.verbose) Array["-d"] else Array[],
+      ).concat(env.vars()),
+    )
   }
 }

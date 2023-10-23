@@ -79,13 +79,13 @@ $(BUILD_DIR)libskip_runtime64.a: $(OFILES) $(BUILD_DIR)runtime/runtime64_specifi
 
 ifeq ($(LBT_EXISTS), 1)
 $(BUILD_DIR)libbacktrace.a:
-	@cp $(LIB_DIR)/libbacktrace.a $(BUILD_DIR)libbacktrace.a
+	cp $(LIB_DIR)/libbacktrace.a $(BUILD_DIR)libbacktrace.a
 else
 $(BUILD_DIR)libbacktrace.a:
 	@[ -d $(BUILD_DIR) ] || mkdir -p $(BUILD_DIR)
-	@(cd $(COMP_DIR)/runtime/libbacktrace && ./configure >> /dev/null) 
-	@$(MAKE) -C $(COMP_DIR)/runtime/libbacktrace 2>&1 >> /dev/null
-	@cp $(COMP_DIR)/runtime/libbacktrace/.libs/libbacktrace.a $(BUILD_DIR)libbacktrace.a
+	(cd $(COMP_DIR)/runtime/libbacktrace && ./configure) 
+	$(MAKE) -C $(COMP_DIR)/runtime/libbacktrace
+	cp $(COMP_DIR)/runtime/libbacktrace/.libs/libbacktrace.a $(BUILD_DIR)libbacktrace.a
 endif
 
 $(BUILD_DIR)runtime/runtime64_specific.o: $(COMP_DIR)/runtime/runtime64_specific.cpp
