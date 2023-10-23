@@ -16,7 +16,6 @@ dockerbuild () {
 }
 
 dockerbuild skiplabs/skdb-base .
-dockerbuild skgw sql/server/skgw
 dockerbuild skiplabs/skdb-dev-server sql/server/dev
 [[ -f $USER/Dockerfile ]] && dockerbuild $USER-skfs $USER
 
