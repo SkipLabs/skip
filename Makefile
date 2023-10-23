@@ -109,6 +109,7 @@ test-native: build/skdb
 
 .PHONY: test-wasm
 test-wasm: build/sknpm $(SKDB_WASM) $(SDKMAN_DIR)
+	bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && cd sql/server/ && gradle --console plain build'
 	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
 
 .PHONY: test-replication
