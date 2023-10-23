@@ -713,71 +713,30 @@ class EagerDir{
     this
   }
 
-  fun notify(
-    context: readonly SKStore.Context,
-    sub: Sub,
-    isReset: Bool,
-    changes: SortedSet<Key>,
-    tick: Tick,
-  ): void {
-    lock = unfreezeLock(sub.lock);
-    sub.cmd match {
-    | NUpdates(csv, filename) ->
-      mutexLock(lock);
-      file = IO.File::open(
-        filename,
-        IO.OpenOptions{
-          write => true,
-          create => true,
-          append => true,
-          mode => 0o777,
-        },
-      );
-      o = x -> file.write_all(x);
-      _ = this.writeDiffStdout(
-        context,
-        isReset,
-        changes,
-        o,
-        csv,
-        sub.filter,
-        sub.getDestinationWatermark(context),
-      );
-      file.close();
-      mutexUnlock(lock)
-    | NNotify(file) ->
-      mutexLock(lock);
-      _ = unixNotify(file, Int32::truncate(tick.value));
-      mutexUnlock(lock)
-    | NTail() ->
-      mutexLock(lock);
-      cond = unfreezeCond(sub.cond);
-      _ = condBroadcast(cond);
-      mutexUnlock(lock)
-    }
-  }
-
-  fun writeDiffStdout(
+  fun writeDiff(
     context: readonly SKStore.Context,
     isReset: Bool,
     changes: SortedSet<Key>,
-    o: String -> void,
+    writer: mutable Debug.BufferedWriter,
+    entity: String,             // the name that this dir goes under during replication
     format: OutputFormat,
     filter: (SKStore.Context, Bool) ~> (SKStore.Key -> Bool),
     destinationTime: ?Tick,
     checkpointInterval: Int = Int::max,
   ): Bool {
-    writer = mutable Debug.BufferedWriter(o, 1024);
     filterFun = filter(context.clone(), isReset);
-
-    producedDiffLine = false;
 
     changesWritten = 0;
 
     for (key in changes) {
       if (!filterFun(key)) continue;
-      if (!producedDiffLine) {
-        writer.write("\n\n");
+      if (changesWritten % checkpointInterval == 0) {
+        // output a header for the dir
+        theirTime = destinationTime match {
+        | None() -> ""
+        | Some(t) -> " " + t.value.toString()
+        };
+        writer.write(`^${entity}${theirTime}\n`)
       };
       values = this.getArrayRaw(key);
       if (values.size() == 0) {
@@ -785,36 +744,30 @@ class EagerDir{
       } else {
         key.writeKVString(writer.write, format, values);
       };
-      !producedDiffLine = true;
       !changesWritten = changesWritten + 1;
       if (changesWritten % checkpointInterval == 0) {
-        writer.write(`:0\n`);
+        writer.write(":0\n");
         writer.flush();
         flushStdout();
       };
     };
 
     if (isReset) {
+      if (changesWritten % checkpointInterval == 0) {
+        // output a header for the dir
+        theirTime = destinationTime match {
+        | None() -> ""
+        | Some(t) -> " " + t.value.toString()
+        };
+        writer.write(`^${entity}${theirTime}\n`)
+      };
       // Indicates a reset, meaning all the data that was not in
       // this transaction should be removed.
       writer.write("\t\t\n");
+      return true
     };
 
-    // TODO: this is sql specific
-    if (producedDiffLine || isReset) {
-      // output a checkpoint, indicated by the leading colon
-      ourTime = context.tick.value.toString();
-      theirTime = destinationTime match {
-      | None() -> ""
-      | Some(t) -> " " + t.value.toString()
-      };
-      writer.write(`:${ourTime}${theirTime}\n`);
-    };
-
-    writer.flush();
-    flushStdout();
-
-    producedDiffLine
+    changesWritten > 0
   }
 
   fun purgeOld(): FixedSingle<Source, MInfo> {

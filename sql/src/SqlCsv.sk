@@ -282,7 +282,14 @@ fun applyDiffStrategy(
     if (checkpoint is Some _) {
       checkpointTick = SKStore.Tick(checkpoint.fromSome());
       SKDB.setWatermark(context, table.name.lower, identity, checkpointTick);
-      delta.setGlobal("Ack", SKDB.StdoutCheckpointAck(checkpointTick));
+      delta.setGlobal(
+        "Ack",
+        SKDB.StdoutCheckpointAck(
+          table.name.origName,
+          checkpointTick,
+          delta.getGlobal("Ack").map(SKDB.StdoutCheckpointAck::type),
+        ),
+      );
     };
   };
 
@@ -510,29 +517,40 @@ fun applyDiffStrategy(
   assignRows
 }
 
-fun replayDiff(
+fun parseHeader(
   context: mutable SKStore.Context,
-  lineNbr: mutable Ref<Int>,
-  getLine: () -> String,
-  table: SKDB.DirDescr,
-  user: ?String,
+  line: String,
+): (SKDB.DirDescr, ?Int) {
+  if (!line.startsWith("^")) {
+    invariant_violation("Not a header")
+  };
+
+  tableAndSnapshot = line.stripPrefix("^").split(" ", 2);
+  table = tableAndSnapshot.maybeGet(0) match {
+  | None() -> invariant_violation("no table found")
+  | Some(t) -> SKDB.getTable(context, 0, SKDB.Name::create(t))
+  };
+
+  (table, tableAndSnapshot.maybeGet(1).map(x -> x.toInt()))
+}
+
+fun parseCheckpoint(line: String): Int {
+  if (!line.startsWith(":")) {
+    invariant_violation("Not a checkpoint")
+  };
+
+  line.stripPrefix(":").toInt()
+}
+
+fun parseTableChange(
   identity: Int,
-): SKStore.ContextOp {
-  userFileOpt = user.map(x -> SKDB.UserFile::create(context, x));
-  buffer: mutable Vector<SKDB.RowValues> = mutable Vector[];
-
-  // the tick of the sender that this update takes us in sync to
-  checkpoint: ?Int = None();
-  // our tick that the sender is in sync with - they applied this
-  // change to our snapshot at this time
-  snapshot: ?Int = None();
-  reset = false;
-
-  SKDB.getFinalState(context, Some(identity)) match {
-  | Some(SKDB.RSError()) ->
-    print_raw(":reboot\n");
-    return SKStore.CStop(None())
-  | _ -> void
+  userFileOpt: ?SKDB.UserFile,
+  context: mutable SKStore.Context,
+  table: SKDB.DirDescr,
+  line: String,
+): Array<SKDB.RowValues> {
+  if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
+    invariant_violation("Not a table change")
   };
 
   accessSolverOpt = userFileOpt.map(userFile ->
@@ -544,141 +562,202 @@ fun replayDiff(
     )
   );
 
+  chars: mutable Vector<Char> = mutable Vector[];
+  iter = line.getIter();
+  repeat = loop {
+    c = iter.next() match {
+    | None() ->
+      print_error("Error: unexpected end of line");
+      skipExit(23)
+    | Some(x) -> x
+    };
+    if (c == '\t') {
+      break String::fromChars(chars.toArray()).toInt()
+    };
+    if (c < '0' || c > '9') {
+      print_error("Error: expected an integer");
+      skipExit(23)
+    };
+    chars.push(c);
+  };
+
+  // parse out the remainder of the line - the csv values
+  str = line.sub(iter, line.length() - chars.size() - 1);
+  values = mutable Vector[];
+  strIter = str.getIter();
+  next = () -> {
+    val = strIter.next();
+    val match {
+    | None() -> '\n'
+    | Some(x) -> x
+    }
+  };
+  for (value in lex(next)) {
+    values.push(value);
+  };
+  cvalues = values.map(SKDB.parseCSVValue);
+  // empty params since no placeholders in skdb diff write-csv
+  params: Map<String, SKDB.Value> = Map[];
+  newRows = SKDB.computeInsert(
+    context,
+    params,
+    false,
+    0,
+    None(),
+    Array[cvalues.toArray()],
+    table,
+    repeat,
+  );
+
+  for (row in newRows) {
+    accessSolverOpt match {
+    | None() -> void
+    | Some((accessSolver, tableName, authorCol, accessCol)) ->
+      SKDB.checkUserCanWriteRow(
+        context,
+        accessSolver,
+        () ~> tableName,
+        authorCol,
+        accessCol,
+        row,
+      ) match {
+      | SKDB.AROK() -> void
+      | SKDB.ARError(err) ->
+        print_error("Error: " + err.toString());
+        // either a user is doing something nefarious or we've
+        // hit a race which currently will lead to diverging
+        // state that cannot heal. notify the client asap to
+        // prevent further divergence.
+        SKDB.setFinalState(context, identity, SKDB.RSError());
+        throw SKDB.IgnoreAndContinue() // will reboot on next iteration
+      }
+    }
+  };
+
+  newRows;
+}
+
+mutable class TableDiff(
+  table: SKDB.DirDescr,
+  snapshot: ?Int,
+  mutable reset: Bool,
+  rows: mutable Vector<SKDB.RowValues>,
+) {
+  static fun create(table: SKDB.DirDescr, snapshot: ?Int): mutable this {
+    mutable static(table, snapshot, false, mutable Vector[])
+  }
+}
+
+fun buildDiffChain(
+  tableDiffs: readonly Vector<mutable TableDiff>,
+  identity: Int,
+  userFileOpt: ?SKDB.UserFile,
+  checkpoint: Int,
+): ?((
+  mutable SKStore.Context,
+  mutable SKStore.Context,
+  SKStore.Context,
+) ~> void) {
+  strategies = tableDiffs.map(td -> {
+    applyDiffStrategy(
+      td.table,
+      identity,
+      userFileOpt,
+      td.reset,
+      td.rows.toArray(),
+      Some(checkpoint),
+      td.snapshot,
+    );
+  });
+  Some((newRoot, delta, root) ~> {
+    for (strategy in strategies) {
+      if (strategy is Some _) {
+        strategy.fromSome()(newRoot, delta, root)
+      }
+    }
+  })
+}
+
+mutable base class DiffParsingState
+
+mutable class DPInitial() extends DiffParsingState
+
+mutable class DPBuildingTableDiff(
+  tableDiffs: mutable Vector<mutable TableDiff>,
+  currentDiff: mutable TableDiff,
+) extends DiffParsingState
+
+fun replayDiff(
+  context: mutable SKStore.Context,
+  getLine: () -> String,
+  user: ?String,
+  identity: Int,
+): SKStore.ContextOp {
+  SKDB.getFinalState(context, Some(identity)) match {
+  | Some(SKDB.RSError()) ->
+    print_raw(":reboot\n");
+    return SKStore.CStop(None())
+  | _ -> void
+  };
+
+  userFileOpt = user.map(x -> SKDB.UserFile::create(context, x));
+  state: mutable DiffParsingState = mutable DPInitial();
   try {
     loop {
       line = getLine();
-      lineNbr.set(lineNbr.get() + 1);
-      if (line == "") continue;
+      !state = state match {
+      | DPInitial() if (!line.startsWith("^")) ->
+        mutable DPInitial()
 
-      chars: mutable Vector<Char> = mutable Vector[];
-      iter = line.getIter();
-      (repeatOpt, !reset, !checkpoint, !snapshot) = loop {
-        c = iter.next() match {
-        | None() ->
-          print_error(
-            "Error, line " + lineNbr.get() + ": unexpected end of line",
-          );
-          skipExit(23)
-        | Some(':') ->
-          if (line.trim() == ":reboot") {
-            // reboot should be handled by the orchestration layer.
-            // ensure we don't process further
-            print_error("Reboot received");
-            skipExit(1)
-          };
-          ticks = line
-            .sub(iter, line.length() - chars.size() - 1)
-            .split(" ")
-            .map(x -> x.toInt());
-          break (None(), reset, ticks.maybeGet(0), ticks.maybeGet(1))
-        | Some(x) -> x
-        };
-        if (c == '\t') {
-          if (chars.size() == 0 || chars[0] == '\t') {
-            break (None(), true, checkpoint, snapshot)
-          } else {
-            break (
-              Some(String::fromChars(chars.toArray()).toInt()),
-              reset,
-              checkpoint,
-              snapshot,
-            )
-          }
-        };
-        if (c < '0' || c > '9') {
-          print_error("Error, line " + lineNbr.get() + ": expected an integer");
-          skipExit(23)
-        };
-        chars.push(c);
-      };
-
-      if (repeatOpt is Some _) {
-        str = line.sub(iter, line.length() - chars.size() - 1);
-        values = mutable Vector[];
-        strIter = str.getIter();
-        next = () -> {
-          val = strIter.next();
-          val match {
-          | None() -> '\n'
-          | Some(x) -> x
-          }
-        };
-        for (value in lex(next)) {
-          values.push(value);
-        };
-        cvalues = values.map(SKDB.parseCSVValue);
-        // empty params since no placeholders in skdb diff write-csv
-        params: Map<String, SKDB.Value> = Map[];
-        pos = lineNbr.get();
-        newRows = SKDB.computeInsert(
-          context,
-          params,
-          false,
-          pos,
-          None(),
-          Array[cvalues.toArray()],
-          table,
-          repeatOpt.fromSome(),
-        );
-        for (row in newRows) {
-          accessSolverOpt match {
-          | None() -> void
-          | Some((accessSolver, tableName, authorCol, accessCol)) ->
-            SKDB.checkUserCanWriteRow(
-              context,
-              accessSolver,
-              () ~> tableName,
-              authorCol,
-              accessCol,
-              row,
-            ) match {
-            | SKDB.AROK() -> void
-            | SKDB.ARError(err) ->
-              print_error("Error: " + err.toString());
-              // either a user is doing something nefarious or we've
-              // hit a race which currently will lead to diverging
-              // state that cannot heal. notify the client asap to
-              // prevent further divergence.
-              SKDB.setFinalState(context, identity, SKDB.RSError());
-              throw SKDB.IgnoreAndContinue() // will reboot on next iteration
-            }
-          }
-        };
-        buffer.extend(newRows);
-      };
-
-      checkpoint match {
-      | None() -> void
-      | Some(_) ->
-        rows = buffer.toArray();
-        buffer.clear();
-        break SKStore.CContinue(
-          applyDiffStrategy(
-            table,
-            identity,
-            userFileOpt,
-            reset,
-            rows,
-            checkpoint,
-            snapshot,
-          ),
+      | DPInitial() ->
+        (table, snapshot) = parseHeader(context, line);
+        mutable DPBuildingTableDiff(
+          mutable Vector[],
+          TableDiff::create(table, snapshot),
         )
-      }
+
+      | DPBuildingTableDiff(
+        tableDiffs,
+        currentDiff,
+      ) if (line.startsWith("^")) ->
+        (table, snapshot) = parseHeader(context, line);
+        tableDiffs.push(currentDiff);
+        mutable DPBuildingTableDiff(
+          tableDiffs,
+          TableDiff::create(table, snapshot),
+        )
+
+      | DPBuildingTableDiff(
+        tableDiffs,
+        currentDiff,
+      ) if (line.startsWith(":")) ->
+        tableDiffs.push(currentDiff);
+        checkpoint = parseCheckpoint(line);
+        break SKStore.CContinue(
+          buildDiffChain(tableDiffs, identity, userFileOpt, checkpoint),
+        )
+
+      | current @ DPBuildingTableDiff(_, currentDiff) if (line == "\t\t") ->
+        currentDiff.!reset = true;
+        current
+
+      | current @ DPBuildingTableDiff(_, currentDiff) ->
+        rows = parseTableChange(
+          identity,
+          userFileOpt,
+          context,
+          currentDiff.table,
+          line,
+        );
+        currentDiff.rows.extend(rows);
+        current
+      };
     }
   } catch {
   | EndOfFile _ ->
-    rows = buffer.toArray();
-    SKStore.CStop(
-      applyDiffStrategy(
-        table,
-        identity,
-        userFileOpt,
-        reset,
-        rows,
-        checkpoint,
-        snapshot,
-      ),
-    )
+    // we expect streams to be cut, not an error. but let's not
+    // apply changes that aren't guaranteed complete and consistent.
+    SKStore.CStop(None())
   | SKDB.IgnoreAndContinue _ ->
     flushStdout();
     SKStore.CContinue(None())
@@ -708,6 +787,7 @@ fun replayStdin(): Map<String, (Int, Int)> {
     };
     chars: mutable Vector<Char> = mutable Vector[];
     iter = line.getIter();
+    header = false;
     checkpoint = false;
     reset = false;
     loop {
@@ -715,6 +795,9 @@ fun replayStdin(): Map<String, (Int, Int)> {
       | None() ->
         print_error("Error, line " + lineNbr + ": unexpected end of line");
         skipExit(23)
+      | Some('^') ->
+        !header = true;
+        break void
       | Some(':') ->
         !checkpoint = true;
         break void
@@ -733,6 +816,9 @@ fun replayStdin(): Map<String, (Int, Int)> {
         skipExit(23)
       };
       chars.push(c);
+    };
+    if (header) {
+      continue;
     };
     if (reset) {
       all.clear();

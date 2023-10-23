@@ -44,6 +44,30 @@ fun decodeParams(encoded_params: String): Map<String, Value> {
   }
 }
 
+fun decodeDiffSpec(input: String): Map<Name, SKStore.Tick> {
+  try {
+    JSON.decode(input) match {
+    | map @ JSON.Object _ ->
+      map.value.mapItems((key, val) -> {
+        val match {
+        | obj @ JSON.Object _ ->
+          (Name::create(key), SKStore.Tick(obj.getInt("since")))
+        | _ ->
+          print_error("Expected an object");
+          skipExit(2)
+        };
+      })
+    | _ ->
+      print_error("Expected an encoded JSON Object, got: " + input);
+      skipExit(2)
+    }
+  } catch {
+  | exn ->
+    print_error("Decoding JSON failed: \"" + input + "\"\n" + exn.getMessage());
+    skipExit(2)
+  }
+}
+
 fun computeTableDescr(name: Name, schema: Array<ColumnDefinition>): DirDescr {
   dirNameStr = "/" + name + "/";
   dirName = SKStore.DirName::create(dirNameStr);
@@ -1461,14 +1485,14 @@ class StdoutFile(
 ) extends SKStore.File
 
 class StdoutDiff(
-  format: SKStore.OutputFormat,
-  dirName: SKStore.DirName,
-  time: SKStore.Tick,
-  filter: (SKStore.Context, Bool) ~> (SKStore.Key -> Bool),
-  getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
+  diffSpec: Array<(SKStore.DirSub, SKStore.Tick)>,
 ) extends SKStore.File
 
-class StdoutCheckpointAck(time: SKStore.Tick) extends SKStore.File
+class StdoutCheckpointAck(
+  table: String,
+  time: SKStore.Tick,
+  acks: ?StdoutCheckpointAck,
+) extends SKStore.File
 
 const kMaxOutputRowsTable: Int = 1024;
 
@@ -1526,6 +1550,19 @@ fun showSelect(
   }
 }
 
+fun printConsumeDiffResponse(acks: ?StdoutCheckpointAck): void {
+  acks match {
+  | None() -> void
+  | Some(StdoutCheckpointAck(table, tick, rest)) ->
+    // WARNING: this must be kept in sync with the clients and how
+    // they create a table. the format of this table name forms part
+    // of the protocol.
+    print_raw("^" + table + "__skdb_mirror_feedback\n");
+    print_raw(":" + tick.value.toString() + "\n");
+    printConsumeDiffResponse(rest)
+  }
+}
+
 fun printContext(context: mutable SKStore.Context): void {
   context.globals.maybeGet("Stdout") match {
   | None() -> void
@@ -1533,25 +1570,29 @@ fun printContext(context: mutable SKStore.Context): void {
     for (selectDir in stdout.toArray().reversed()) {
       showSelect(context, format, selectDir)
     }
-  | Some(StdoutDiff(format, dirName, time, filter, getWatermark)) ->
-    edir = context.unsafeGetEagerDir(dirName);
-    (isReset, changes) = edir.getChangesAfter(time);
-    _ = edir.writeDiffStdout(
-      context,
-      isReset,
-      changes,
-      print_raw,
-      format,
-      filter,
-      getWatermark(context),
-    )
-
+  | Some(StdoutDiff(spec)) ->
+    writer = mutable Debug.BufferedWriter(print_raw, 4096);
+    for ((dirsub, tick) in spec) {
+      edir = context.unsafeGetEagerDir(dirsub.dirName);
+      (isReset, changes) = edir.getChangesAfter(tick);
+      _ = edir.writeDiff(
+        context,
+        isReset,
+        changes,
+        writer,
+        dirsub.entity,
+        dirsub.format,
+        dirsub.filter,
+        dirsub.getDestinationWatermark(context),
+      )
+    };
+    writer.write(`:${context.tick.value.toString()}\n`);
+    writer.flush();
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
   context.globals.maybeGet("Ack") match {
   | None() -> void
-  | Some(StdoutCheckpointAck(tick)) ->
-    print_raw(":" + tick.value.toString() + "\n")
+  | Some(acks @ StdoutCheckpointAck _) -> printConsumeDiffResponse(Some(acks))
   | Some _ -> invariant_violation("Unexpected Ack type")
   };
   flushStdout();

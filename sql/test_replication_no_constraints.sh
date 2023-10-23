@@ -47,19 +47,19 @@ replicate_to_local() {
     table=$1
     sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 1234 "$table")
     $SKDB_BIN --data $SERVER_DB tail --format=csv --since 0 "$sub" --user test_user |
-        $SKDB_BIN write-csv "$table" --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
+        $SKDB_BIN write-csv --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
 }
 
 replicate_to_server() {
     table=$1
-    cat $UPDATES | $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
+    cat $UPDATES | $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
 }
 
 replicate_diff_to_server() {
     table=$1
     since=$2
     $SKDB_BIN --data $LOCAL_DB diff --format=csv --since "$since" "$(cat $SESSION)" |
-        $SKDB_BIN write-csv "$table" --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
+        $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
 }
 
 run_test() {
@@ -406,10 +406,10 @@ test_replication_with_a_row_that_has_a_higher_than_two_repeat_count() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo','GALL');"
 
     # ensure that the row is written to the server with a repeat of 2
-    $SKDB_BIN write-csv --data $SERVER_DB "$table" --source 1234 > $WRITE_OUTPUT <<EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 > $WRITE_OUTPUT <<EOF
+^test_without_pk
 2	0,"foo","GALL"
+:1
 EOF
 
     output=$(mktemp)
@@ -441,10 +441,10 @@ test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dups() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
 
     # ensure that the row is written to the server with a repeat of 2
-    $SKDB_BIN write-csv --data $SERVER_DB "$table" --source 1234 > $WRITE_OUTPUT <<EOF
-
-
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 > $WRITE_OUTPUT <<EOF
+^test_without_pk
 2	0,"foo","GALL"
+:1
 EOF
 
     output=$(mktemp)

@@ -426,8 +426,7 @@ const localRepl = async function() {
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
-      console.log(".mirror-table <table> -- Mirror the remote table <table>.");
-      console.log(".mirror-table <table> <expr> -- Mirror the remote table <table> with filter <expr>.");
+      console.log(".mirror <table1> <table2> ... -- Mirror the remote tables.");
       continue;
     }
 
@@ -481,12 +480,11 @@ const localRepl = async function() {
 
     if (query.startsWith('.mirror')) {
       const args = query.split(" ");
-      const table = args[1];
-      const filter = args.slice(2).join(' ');
+      const tables = args.slice(1)
       try {
-        await skdb.mirror(table, filter);
+        await skdb.mirror(...tables);
       } catch (ex) {
-        console.error(`Could not mirror table ${table}.`);
+        console.error(`Could not mirror tables ${tables}.`);
         console.error(ex);
       }
       continue;

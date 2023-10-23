@@ -1,6 +1,6 @@
 import { Wrk } from "#std/sk_types";
 import { PromiseWorker, Function, Caller } from "#std/sk_worker";
-import { SKDB, ProtoResponseCreds, Params, RemoteSKDB, SkdbMechanism } from "#skdb/skdb_types";
+import { SKDB, ProtoResponseCreds, Params, RemoteSKDB, SkdbMechanism, MirrorDefn } from "#skdb/skdb_types";
 
 class WrappedRemote implements RemoteSKDB {
   private worker: PromiseWorker;
@@ -31,8 +31,8 @@ class WrappedRemote implements RemoteSKDB {
     return this.worker.post(new Caller(this.wrapped, "viewSchema", [viewName]));
   }
 
-  mirror(tableName: string, filterExpr?: string) {
-    return this.worker.post(new Caller(this.wrapped, "mirror", [tableName, filterExpr]));
+  mirror(...tables: MirrorDefn[]) {
+    return this.worker.post(new Caller(this.wrapped, "mirror", tables));
   }
 
   exec(query: string, params?: Params) {
@@ -114,8 +114,8 @@ export class SKDBWorker implements SKDB {
     return this.worker.post(new Function("createServerUser", [])) as Promise<ProtoResponseCreds>;
   }
 
-  mirror = async (tableName: string, filterExpr?: string) => {
-    return this.worker.post(new Function("mirror", [tableName, filterExpr]));
+  mirror = async (...tables: MirrorDefn[]) => {
+    return this.worker.post(new Function("mirror", tables));
   }
 
   closeConnection = async () => {

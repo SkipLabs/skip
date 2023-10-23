@@ -52,6 +52,22 @@ fun queryParams(options: SKDB.Options): Map<String, SKDB.Value> {
   }
 }
 
+fun slurpStdin(): String {
+  lines = mutable Vector[];
+  try {
+    loop {
+      read_line() match {
+      | None() -> break void
+      | Some(l) -> lines.push(l)
+      }
+    }
+  } catch {
+  | EndOfFile _ -> void
+  | exn -> throw exn
+  };
+  lines.join("\n")
+}
+
 /*****************************************************************************/
 /* Main */
 /*****************************************************************************/
@@ -144,9 +160,8 @@ untracked fun main(): void {
             .required()
             .about("Session id"),
         )
-        .arg(
-          Cli.StringArg("since").required().about("Starting time of the diff"),
-        ),
+        // if not specified, diff will read a multi-table spec from stdin.
+        .arg(Cli.StringArg("since").about("Starting time of the diff")),
     )
     .subcommand(
       Cli.Command("disconnect")
@@ -193,7 +208,6 @@ untracked fun main(): void {
     .subcommand(
       Cli.Command("write-csv")
         .about("Write data from stdin into a directory in CSV format")
-        .arg(Cli.StringArg("table").positional().required().about("Table name"))
         .arg(
           Cli.StringArg("source").about(
             "Globally unique identity of this write stream",
@@ -229,11 +243,10 @@ untracked fun main(): void {
           ),
         ),
     )
-    // TODO: Merge both subscribe and connect (add a boolean option to subscribe.
     .subcommand(
       Cli.Command("subscribe")
         .about("Subscribe to a directory change")
-        .arg(Cli.StringArg("view").positional().required().about("View name"))
+        .arg(Cli.ArrayArg("views").positional().required().about("Views"))
         .arg(Cli.BoolArg("connect").about("Send the initial state first"))
         .arg(
           Cli.StringArg("updates").about(
@@ -359,8 +372,9 @@ fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   SKDB.runSql(options, context ~> {
     for (id => sub in context.sessions) {
-      dirName = sub.dirName;
-      print_string(id.toString() + "\t" + dirName.toString());
+      print_string(
+        id.toString() + "\t" + sub.dirSubs.map(d -> d.entity).join(","),
+      );
     };
     SKStore.CStop(None())
   })
@@ -500,7 +514,7 @@ fun execSize(args: Cli.ParseResults, options: SKDB.Options): void {
 fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
-  time = args.getString("since").toInt();
+  since = args.maybeGetString("since").map(v -> v.toInt());
   SKDB.runSql(options, origContext ~> {
     context = origContext.mclone();
     sub = context.sessions.maybeGet(sessionID) match {
@@ -509,24 +523,23 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
       skipExit(2)
     | Some(x) -> x
     };
-    format = options.format match {
-    | SKDB.OFK_CSV() -> SKStore.OCSV()
-    | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, sub.dirName))
-    | SKDB.OFK_SQL() -> SKStore.OSQL()
-    | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, sub.dirName))
-    | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, sub.dirName))
+
+    sinceForTable = since match {
+    | None() ->
+      input = slurpStdin();
+      spec = decodeDiffSpec(input);
+      (name -> spec.get(name))
+    | Some(v) -> (_ -> SKStore.Tick(v))
     };
 
-    origContext.setGlobal(
-      "Stdout",
-      SKDB.StdoutDiff(
-        format,
-        sub.dirName,
-        SKStore.Tick(time),
-        sub.filter,
-        sub.getDestinationWatermark,
-      ),
-    );
+    diffSpec = sub.dirSubs.map(dirsub -> {
+      tableName = SKDB.Name::create(
+        dirsub.dirName.dirName.stripPrefix("/").stripSuffix("/"),
+      );
+      (dirsub, sinceForTable(tableName))
+    });
+
+    origContext.setGlobal("Stdout", SKDB.StdoutDiff(diffSpec));
     SKStore.CStop(None())
   })
 }
@@ -577,7 +590,11 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
   | None() ->
     print_error("Error: session not found");
     skipExit(2)
-  | Some(sub) -> (sub.filter, sub.dirName)
+  | Some(sub) if (sub.dirSubs.size() == 1) ->
+    (sub.dirSubs[0].filter, sub.dirSubs[0].dirName)
+  | Some(_) ->
+    print_error("Error: tail only supports a single dir sub currently");
+    skipExit(2)
   };
 
   tableName = SKDB.Name::create(
@@ -658,13 +675,16 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
   loop {
     localObstack = SKStore.newObstack();
     context = SKStore.gContextGet();
-    sub = context.sessions.maybeGet(sessionID) match {
+    (sub, dirSub) = context.sessions.maybeGet(sessionID) match {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)
-    | Some(x) -> x
+    | Some(s) if (s.dirSubs.size() == 1) -> (s, s.dirSubs[0])
+    | Some(_) ->
+      print_error("Error: tail only supports a single dir sub currently");
+      skipExit(2)
     };
-    invariant(dirName == sub.dirName);
+    invariant(dirName == dirSub.dirName);
 
     SKDB.getFinalState(context, sub.destinationSource) match {
     | Some(SKDB.RSError()) ->
@@ -691,23 +711,29 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
     // this value is chosen based on some unscientific local testing
     checkpointInterval = if (init) 512 else Int::max;
 
-    _ = edir.writeDiffStdout(
+    writer = mutable Debug.BufferedWriter(print_raw, 4096);
+    producedOutput = edir.writeDiff(
       context,
       isReset,
       changes,
-      print_raw,
+      writer,
+      dirSub.entity,
       format,
       filter,
-      sub.getDestinationWatermark(context),
+      dirSub.getDestinationWatermark(context),
       checkpointInterval,
     );
-    if (init && changes.isEmpty()) {
-      // on first iteration we ensure we output a checkpoint without
-      // delay so that the downstreams knows that it has received
-      // everything without waiting for the condvar timeout
-      print_raw(":" + context.tick.value.toString() + "\n");
+    // produce checkpoint for flushing and committing
+    if (init || producedOutput) {
+      // always do this on first iteration to ensure we output a
+      // checkpoint without delay so that the downstreams knows that
+      // it has received everything without waiting for the condvar
+      // timeout
+      writer.write(":" + context.tick.value.toString() + "\n");
+      writer.flush();
       flushStdout();
     };
+
     !tick = context.tick.value;
     !init = false;
     lock = SKStore.unfreezeLock(sub.lock);
@@ -795,23 +821,11 @@ fun execReplicationId(args: Cli.ParseResults, options: SKDB.Options): void {
 
 fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  name = SKDB.Name::create(args.getString("table"));
   source = args.maybeGetString("source") match {
   | Some(src) -> src.toInt()
   | None() -> SKStore.genSym(0)
   };
   SKDB.runSql(options, context ~> {
-    table = context.getGlobal("CSV_TABLE") match {
-    | None() ->
-      tableDescr = SKDB.getTable(context, 0, name);
-      context.setGlobal("CSV_TABLE", tableDescr);
-      tableDescr
-    | Some(x) -> SKDB.DirDescr::type(x)
-    };
-    line = context.getGlobal("Line") match {
-    | None() -> mutable Ref(1)
-    | Some(file) -> mutable Ref(SKStore.IntFile::type(file).value)
-    };
     user = args.maybeGetString("user");
     myReadLine = () -> {
       buffer = mutable Vector[];
@@ -821,25 +835,16 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
         buffer.push(c);
       }
     };
-    SKCSV.replayDiff(context, line, myReadLine, table, user, source)
+    SKCSV.replayDiff(context, myReadLine, user, source)
   })
 }
 
 fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  userViewName = args.getString("view").lowercase();
-  viewDirName = fixUpDirName(userViewName);
+  views = args.getArray("views").map(v -> v.lowercase());
   init = args.getBool("connect");
   SKDB.runLockedSql(options, context ~> {
-    viewName = userViewName.lowercase();
     SKDB.forbidNow(context);
-    format = options.format match {
-    | SKDB.OFK_CSV() -> SKStore.OCSV()
-    | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, viewDirName))
-    | SKDB.OFK_SQL() -> SKStore.OSQL()
-    | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, viewDirName))
-    | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, viewDirName))
-    };
     cmd = (
       args.maybeGetString("updates"),
       args.maybeGetString("notify"),
@@ -847,17 +852,19 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
     | (Some(_), Some(_)) ->
       print_error("Cannot have both --updates and --notify");
       skipExit(4)
-    | (Some(x), _) -> SKStore.NUpdates(format, x)
-    | (_, Some(x)) -> SKStore.NNotify(x)
+    | (Some(f), _) -> SKStore.NUpdates(f)
+    | (_, Some(f)) -> SKStore.NNotify(f)
     | _ -> SKStore.NTail()
     };
     (input, output) = SKDB.getSubsDirs(context);
-    viewKey = SKStore.SID(viewName);
+    viewKey = SKStore.SID(
+      views.maybeGet(0).fromSome("Must specify at least one view or table"),
+    );
     inputDir = context.unsafeGetEagerDir(input.dirName);
     sessionID = SKStore.genSym(0);
     request = SKDB.SubRequestFile(
-      viewName,
-      viewDirName,
+      views,
+      options.format,
       init,
       cmd,
       sessionID,
