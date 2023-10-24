@@ -1109,29 +1109,14 @@ fun parseValue(lex: Lexer, pos: Int): (Int, Value) {
   };
 
   if (lex.isEqUpperAt(tok, "SKDB_PERMISSION")) {
-    // translate calls to the builtin `skdb_permission` function
-    // to equivalent integer literals
-    !pos = lex.expect(pos, "(");
-    (!pos, !tok) = lex.next(pos);
-    if (lex.content[tok.posBegin] != '\'') {
-      error(pos, "skdb_permission expects a string literal");
-    };
-    (!pos, perm_str) = parseString(lex, tok.posBegin);
-    !pos = lex.expect(pos, ")");
-    res = 0;
-    if (perm_str.contains("r")) {
-      !res = res.or(kReadPermission)
-    };
-    if (perm_str.contains("i")) {
-      !res = res.or(kInsertPermission)
-    };
-    if (perm_str.contains("d")) {
-      !res = res.or(kDeletePermission)
-    };
-    if (perm_str.contains("w")) {
-      !res = res.or(kInsertPermission).or(kDeletePermission)
-    };
-    return (pos, VInt(res));
+    (!pos, arg) = parseExpr(lex, pos);
+    arg match {
+    | v @ VString _
+    | v @ VParam _ ->
+      return (pos, VPermission(v))
+    | _ ->
+      error(pos, "skdb_permission expects a string literal or query parameter")
+    }
   };
 
   if (Chars.isDigit(lex.content[tok.posBegin])) {
@@ -1312,7 +1297,8 @@ fun parseTypeRest(lex: Lexer, pos: Int): (Int, Bool, Bool, ?Value, Bool) {
       | VSeqNum _
       | VId _
       | VTime _
-      | VParam _ ->
+      | VParam _
+      | VPermission _ ->
         error(pos, "Invalid expression for default value")
       };
       !default = Some(e);
