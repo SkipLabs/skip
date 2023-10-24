@@ -117,7 +117,6 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   }
 }
 
-
 async function testSchemaQueries(skdb: SKDB) {
   const remote = (await skdb.connectedRemote())!;
   const expected = "CREATE TABLE test_pk (";
@@ -262,29 +261,39 @@ async function testReboot(root: SKDB, user: SKDB) {
   expect(rebooted).toEqual(true);
 }
 
+async function testPrivacyRejectedChange(root: SKDB, user: SKDB): Promise<void> {
+  return new Promise(async (resolve) => {
+    await user.watchChanges("select * from test_pk__skdb_mirror_feedback", {},
+      (added: Array<any>, removed: Array<any>) => {
+        expect(removed).toEqual([]);
+        expect(added).toEqual([
+          {x:1234, y:88, skdb_access:"does not exist"},
+        ]);
+        resolve();
+      });
+    await user.exec("insert into test_pk values (1234, 88, 'does not exist');");
+  })
+}
+
 export const apitests = (asWorker) => {
   return [
     {
       name: asWorker ? 'API in Worker' : 'API',
       fun: async (dbs: dbs) => {
 
-        // Queries Against The Server
         await testQueriesAgainstTheServer(dbs.root);
 
-        //Schema Queries
         await testSchemaQueries(dbs.user);
 
-        //Miroring
         await testMirroring(dbs.user);
 
-        // Server Tail
         await testServerTail(dbs.root, dbs.user);
 
-        // Client Tail
         await testClientTail(dbs.root, dbs.user);
 
+        await testPrivacyRejectedChange(dbs.root, dbs.user);
 
-        // Reboot
+        // must come last: puts replication in to a permanent state of failure
         await testReboot(dbs.root, dbs.user);
 
         dbs.root.closeConnection();
