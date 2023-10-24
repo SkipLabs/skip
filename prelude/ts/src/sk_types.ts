@@ -290,6 +290,8 @@ export class Utils {
           } else {
             return "Unknown";
           }
+        } else {
+          return line;
         }
       }).join("\n");
       throw new SkRuntimeExit(exitCode, message?.trim());
