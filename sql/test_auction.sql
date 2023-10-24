@@ -17,7 +17,7 @@ create virtual view bids_items as
   select bids.itemID as itemID,
          price as price,
          datetime('now') as time,
-         id() as tick,
+         local_sequence_number() as tick,
          status
   from bids, items
   where bids.itemID = items.itemID
