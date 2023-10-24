@@ -365,8 +365,13 @@ class LinksImpl implements Links, ToWasm {
         params,
         exported.SKIP_reactive_query_changes,
         queryID => {
-          onChanges(this.stdout_objects[0], this.stdout_objects[1]);
-          this.funLastTick.set(queryID, this.stdout_objects[2][0].tick);
+          const added = this.stdout_objects[0];
+          const removed = this.stdout_objects[1];
+          const tick = this.stdout_objects[2][0].tick;
+          if (added.length > 0 || removed.length > 0) {
+            onChanges(this.stdout_objects[0], this.stdout_objects[1]);
+          }
+          this.funLastTick.set(queryID, tick);
           this.stdout_objects = [[],[],[]];
         },
       );
