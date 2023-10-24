@@ -51,7 +51,7 @@ class Env(
       print_error(`>> ${args.join(" ")}`)
     };
     p = System.subprocess(args, print_string, this.printError);
-    if (!this.verbose) {
+    if (this.verbose || !p.success()) {
       print_error_raw(p.stdout);
       print_error_raw(p.stderr);
     };
