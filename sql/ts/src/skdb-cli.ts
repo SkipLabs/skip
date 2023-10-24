@@ -180,6 +180,7 @@ if (args.values['dev']) {
   let host: string = args.values['host'];
   if (host === "wss://api.skiplabs.io") {
     host = "ws://localhost:3456";
+    values.host = host;
   }
 
   const schemeAndRest = host.split("://", 2);
