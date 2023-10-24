@@ -190,7 +190,7 @@ export function SKDBDevConsoleProvider(
         setUsers(userRows.map(row => row.userUUID));
       });
     });
-  });
+  }, []);
 
   const addUser = async () => {
     const remote = await skdbAsRoot.connectedRemote();
