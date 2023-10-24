@@ -15,6 +15,22 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
   };
   return [
     {
+      name: wn('Test on empty table', asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+        let result: Array<any> = [];
+        let handle = await skdb.watch('SELECT * FROM t1;', {}, (changes: Array<any>) => result.push(changes));
+        await handle.close();
+        return result;
+      },
+      check: res => {
+        let expected = [
+          [],
+        ];
+        expect(res).toEqual(expected);
+      }
+    },
+    {
       name: wn('Test reactive query updated on insert and then closed', asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
@@ -507,12 +523,31 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
   ]
 }
 
-
 const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
   let wn = (name: string, asWorker: boolean) => {
     return n("WatchChanges: " + name, asWorker)
   };
   return [
+    {
+      name: wn('Test on empty table', asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec('CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);');
+        let result: Array<any> = [];
+        let handle = await skdb.watchChanges(
+          'SELECT * FROM t1;',
+          {},
+          (added: Array<any>, deleted: Array<any>,) => {
+            result.push({ added: added, deleted: deleted });
+          }
+        );
+        await handle.close();
+        return result;
+      },
+      check: res => {
+        let expected = [];
+        expect(res).toEqual(expected);
+      }
+    },
     {
       name: wn('Test reactive query updated on insert and then closed', asWorker),
       fun: async (skdb: SKDB) => {
