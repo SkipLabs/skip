@@ -67,6 +67,15 @@ else
     pass "USER PERMISSIONS2"
 fi
 
+# Let's check that permissions can also be specified as query parameters
+echo -e "{ \"perm\": \"rw\" }\ninsert into skdb_user_permissions values ('ID4', skdb_permission(@perm));" | $SKDB --expect-query-params
+
+if echo -e "^t2\n1\t236,\"myGroup\"\n:1" | $SKDB write-csv --user ID4 2>&1 | grep -q Error; then
+    fail "USER PERMISSIONS3"
+else
+    pass "USER PERMISSIONS3"
+fi
+
 ###############################################################################
 # GROUP PERMISSIONS
 ###############################################################################
