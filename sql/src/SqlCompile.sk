@@ -865,8 +865,8 @@ mutable class Compiler{
     | VInt(i) -> CIExpr(CILiteral(i))
     | VFloat(f) -> CFExpr(CFLiteral(f))
     | VString(s) -> CSExpr(CSLiteral(s))
+    | VSeqNum _ -> invariant_violation("Unexpected SeqNum")
     | VId _ -> invariant_violation("Unexpected ID")
-    | VSId _ -> invariant_violation("Unexpected SID")
     | VTime _ -> invariant_violation("Unexpected TIME")
     | VParam(handle) ->
       this.params.maybeGet(handle) match {
@@ -1110,31 +1110,32 @@ mutable class Compiler{
 
     | Call(fname, args, distinct) ->
       fname.lower match {
-      | "id" ->
+      | "local_sequence_number" ->
         if (args.size() == 0) {
           return CIExpr(CILiteral(SKStore.genSym(0)))
         };
         if (args.size() != 1) {
-          error(this.pos, "id expects at most one argument")
+          error(this.pos, "local_sequence_number expects at most one argument")
         };
         args[0] match {
         | VString(varName) ->
           globals = context.getGlobal(GLOBALS) match {
-          | None() -> error(this.pos, "Unknown id " + varName)
+          | None() ->
+            error(this.pos, "Unknown local_sequence_number name " + varName)
           | Some(file) -> Globals::type(file)
           };
           if (!globals.containsKey(varName)) {
-            error(this.pos, "Unknown id " + varName)
+            error(this.pos, "Unknown local_sequence_number name " + varName)
           };
           CIExpr(CILiteral(globals[varName]))
-        | _ -> error(this.pos, "id expects a string literal")
+        | _ -> error(this.pos, "local_sequence_number expects a string literal")
         }
-      | "sid" ->
+      | "id" ->
         if (args.size() == 0) {
           return CSExpr(CSLiteral(Ksuid::create().toString()))
         };
         if (args.size() != 1) {
-          error(this.pos, "sid expects at most one argument")
+          error(this.pos, "id expects at most one argument")
         };
         args[0] match {
         | VString(varName) ->
@@ -1146,7 +1147,7 @@ mutable class Compiler{
             error(this.pos, "Unknown id " + varName)
           };
           CSExpr(CSLiteral(namedIDs[varName]))
-        | _ -> error(this.pos, "sid expects a string literal")
+        | _ -> error(this.pos, "id expects a string literal")
         }
       | "skdb_permission" ->
         if (args.size() != 1) {

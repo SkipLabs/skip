@@ -132,16 +132,16 @@ else
     fail "INSERT AUTOINCREMENT"
 fi
 
+if cat test/unit/test_seqnum.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
+    pass "LOCAL SEQUENCE NUMBER"
+else
+    fail "LOCAL SEQUENCE NUMBER"
+fi
+
 if cat test/unit/test_id.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
     pass "ID"
 else
     fail "ID"
-fi
-
-if cat test/unit/test_sid.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
-    pass "SID"
-else
-    fail "SID"
 fi
 
 if cat test/lower_upper.sql | $SKDB | grep -q "FOO|bar"; then
@@ -150,16 +150,16 @@ else
     fail "LOWER/UPPER"
 fi
 
+if cat test/unit/test_insert_seqnum.sql | $SKDB | grep -q "|22"; then
+    pass "INSERT LOCAL SEQUENCE NUMBER"
+else
+    fail "INSERT LOCAL SEQUENCE NUMBER"
+fi
+
 if cat test/unit/test_insert_id.sql | $SKDB | grep -q "|22"; then
     pass "INSERT ID"
 else
     fail "INSERT ID"
-fi
-
-if cat test/unit/test_insert_sid.sql | $SKDB | grep -q "|22"; then
-    pass "INSERT SID"
-else
-    fail "INSERT SID"
 fi
 
 

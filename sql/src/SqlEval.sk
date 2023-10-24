@@ -207,7 +207,7 @@ fun valueToCValue(
   schema[idx].ty match {
   | INTEGER() ->
     val match {
-    | VId(isPositive, Some(varName)) ->
+    | VSeqNum(isPositive, Some(varName)) ->
       if (!inTransaction) {
         error(pos, "named id can only be used in a transaction");
       };
@@ -224,7 +224,7 @@ fun valueToCValue(
         Some(CInt(id))
       | Some(id) -> Some(CInt(id))
       }
-    | VId(isPositive, None()) ->
+    | VSeqNum(isPositive, None()) ->
       if (isPositive) {
         Some(CInt(SKStore.genSym(0)))
       } else {
@@ -267,7 +267,7 @@ fun valueToCValue(
     }
   | TEXT() ->
     val match {
-    | VSId(Some(varName)) ->
+    | VId(Some(varName)) ->
       if (!inTransaction) {
         error(pos, "named id can only be used in a transaction");
       };
@@ -283,7 +283,7 @@ fun valueToCValue(
         Some(CString(id))
       | Some(id) -> Some(CString(id))
       }
-    | VSId(None()) -> Some(CString(Ksuid::create().toString()))
+    | VId(None()) -> Some(CString(Ksuid::create().toString()))
     | VString(str) -> Some(CString(str))
     | v ->
       error(
