@@ -609,10 +609,11 @@ fun parseTableChange(
     repeat,
   );
 
-  for (row in newRows) {
-    accessSolverOpt match {
-    | None() -> void
-    | Some((accessSolver, tableName, authorCol, accessCol)) ->
+  accessSolverOpt match {
+  | None() -> newRows
+  | Some((accessSolver, tableName, authorCol, accessCol)) ->
+    privacyCheckedRows = mutable Vector[];
+    for (row in newRows) {
       SKDB.checkUserCanWriteRow(
         context,
         accessSolver,
@@ -621,7 +622,7 @@ fun parseTableChange(
         accessCol,
         row,
       ) match {
-      | SKDB.AROK() -> void
+      | SKDB.AROK() -> privacyCheckedRows.push(row)
       | SKDB.ARError(err) ->
         print_error("Error: " + err.toString());
         // either a user is doing something nefarious or we've
@@ -631,10 +632,9 @@ fun parseTableChange(
         SKDB.setFinalState(context, identity, SKDB.RSError());
         throw SKDB.IgnoreAndContinue() // will reboot on next iteration
       }
-    }
+    };
+    privacyCheckedRows.collect(Array)
   };
-
-  newRows;
 }
 
 mutable class TableDiff(
@@ -706,8 +706,7 @@ fun replayDiff(
     loop {
       line = getLine();
       !state = state match {
-      | DPInitial() if (!line.startsWith("^")) ->
-        mutable DPInitial()
+      | DPInitial() if (!line.startsWith("^")) -> mutable DPInitial()
 
       | DPInitial() ->
         (table, snapshot) = parseHeader(context, line);
