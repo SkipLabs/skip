@@ -95,9 +95,13 @@ class ExternalException(
   }
 
   fun getMessage(): String {
-    `external:${this.eptr.value}`
+    message = getExternalExceptionMessage(this.eptr.value);
+    `external:${this.eptr.value}\n${message}`
   }
 }
+
+@cpp_extern("SKIP_external_exception_message")
+native fun getExternalExceptionMessage(actor: UInt32): String;
 
 @cpp_extern("SKIP_delete_external_exception")
 native fun deleteExternalException(actor: UInt32): void;

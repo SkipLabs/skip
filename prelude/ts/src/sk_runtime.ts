@@ -36,11 +36,12 @@ class LinksImpl implements Links {
   SKIP_print_char: (code: int) => void;
   SKIP_print_string: (strPtr: ptr) => void;
   SKIP_etry: (f: ptr, exn_handler: ptr) => ptr;
-  __cxa_throw: (strPtr: ptr) => void;
+  js_throw: (strPtr: ptr, rethrow: int) => void;
   SKIP_throw_cruntime: (code: int) => void;
   SKIP_JS_timeStamp: () => float;
 
-  SKIP_delete_external_exception: (actor: int) => void;
+  SKIP_delete_external_exception: (exc: int) => void;
+  SKIP_external_exception_message: (exc: int) => ptr;
   SKIP_FileSystem_appendTextFile: (path: ptr, contents: ptr) => void;
   SKIP_js_time_ms_lo: () => int;
   SKIP_js_time_ms_hi: () => int;
@@ -83,13 +84,16 @@ class LinksImpl implements Links {
     this.SKIP_print_string = (msg: ptr) => {
       utils.sklog(msg, Stream.OUT, true);
     };
-    this.__cxa_throw = (exc: ptr) => utils.ethrow(exc);
+    this.js_throw = (exc: ptr, rethrow: int) => utils.ethrow(exc, rethrow != 0);
     this.SKIP_throw_cruntime = utils.exit;
     this.SKIP_print_char = (c: int) => {
       var str = String.fromCharCode(c);
       utils.log(str, Stream.OUT);
     };
     this.SKIP_delete_external_exception = utils.deleteException;
+    this.SKIP_external_exception_message = (exc : int) => {
+      return utils.exportString(utils.getExceptionMessage(exc));
+    }
 
     this.SKIP_js_time_ms_lo = () => {
       this.lastTime = Date.now();
@@ -179,7 +183,10 @@ class Manager implements ToWasmManager {
     toWasm.__setErrNo = (err: ptr) => {
       throw new Error("ErrNo " + err);
     };
-    toWasm.__cxa_throw = (strPtr: ptr) => links.__cxa_throw(strPtr);
+    toWasm.__cxa_throw = (exn: ptr, infi: ptr, dest: ptr) =>  {
+      throw new Error("Not managed exception");
+    }
+    toWasm.js_throw = (strPtr: ptr, rethrow: int) => links.js_throw(strPtr, rethrow);
     toWasm.SKIP_throw_cruntime = (code: int) => links.SKIP_throw_cruntime(code);
     toWasm.cos = Math.cos;
     toWasm.sin = Math.sin;
@@ -195,19 +202,16 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_Math_log10 = Math.log10;
     toWasm.SKIP_Math_exp = Math.exp;
     toWasm.SKIP_JS_timeStamp = () => links.SKIP_JS_timeStamp();
-    toWasm.SKIP_print_error = (strPtr: ptr) => links.SKIP_print_error(strPtr);
-    toWasm.SKIP_print_error_raw = (strPtr: ptr) =>
-      links.SKIP_print_error_raw(strPtr);
-    toWasm.SKIP_print_debug = (strPtr: ptr) => links.SKIP_print_debug(strPtr);
-    toWasm.SKIP_print_debug_raw = (strPtr: ptr) =>
-      links.SKIP_print_debug_raw(strPtr);
-    toWasm.SKIP_print_raw = (strPtr: ptr) => links.SKIP_print_raw(strPtr);
-    toWasm.SKIP_print_char = (strPtr: ptr) => links.SKIP_print_char(strPtr);
-    toWasm.SKIP_print_string = (strPtr: ptr) => links.SKIP_print_string(strPtr);
-    toWasm.SKIP_etry = (f: ptr, exn_handler: ptr) =>
-      links.SKIP_etry(f, exn_handler);
-    toWasm.SKIP_delete_external_exception = (actor: int) =>
-      links.SKIP_delete_external_exception(actor);
+    toWasm.SKIP_print_error =  (strPtr: ptr) => links.SKIP_print_error(strPtr);
+    toWasm.SKIP_print_error_raw =  (strPtr: ptr) => links.SKIP_print_error_raw(strPtr);
+    toWasm.SKIP_print_debug =  (strPtr: ptr) => links.SKIP_print_debug(strPtr);
+    toWasm.SKIP_print_debug_raw =  (strPtr: ptr) => links.SKIP_print_debug_raw(strPtr);
+    toWasm.SKIP_print_raw =  (strPtr: ptr) => links.SKIP_print_raw(strPtr);
+    toWasm.SKIP_print_char =  (strPtr: ptr) => links.SKIP_print_char(strPtr);
+    toWasm.SKIP_print_string =  (strPtr: ptr) => links.SKIP_print_string(strPtr);
+    toWasm.SKIP_etry =  (f: ptr, exn_handler: ptr) => links.SKIP_etry(f, exn_handler);
+    toWasm.SKIP_delete_external_exception = (actor: int) => links.SKIP_delete_external_exception(actor);
+    toWasm.SKIP_external_exception_message = (actor: int) => links.SKIP_external_exception_message(actor);
     toWasm.SKIP_js_time_ms_lo = () => links.SKIP_js_time_ms_lo();
     toWasm.SKIP_js_time_ms_hi = () => links.SKIP_js_time_ms_hi();
     toWasm.SKIP_js_get_entropy = () => links.SKIP_js_get_entropy();
@@ -236,7 +240,8 @@ interface ToWasm {
   abort: (err: ptr) => void;
   abortOnCannotGrowMemory: (err: ptr) => void;
   __setErrNo: (err: ptr) => void;
-  __cxa_throw: (strPtr: ptr) => void;
+  __cxa_throw: (exn: ptr, infi: ptr, dest: ptr) => void;
+  js_throw: (strPtr: ptr, rethrow: int) => void;
   SKIP_throw_cruntime: (code: int) => void;
   SKIP_JS_timeStamp: () => float;
   cos: (v: float) => float;
@@ -260,7 +265,8 @@ interface ToWasm {
   SKIP_print_char: (strPtr: ptr) => void;
   SKIP_print_string: (strPtr: ptr) => void;
   SKIP_etry: (f: ptr, exn_handler: ptr) => ptr;
-  SKIP_delete_external_exception: (actor: int) => void;
+  SKIP_delete_external_exception: (exc: int) => void;
+  SKIP_external_exception_message: (exc: int) => ptr;
   SKIP_js_time_ms_lo: () => int;
   SKIP_js_time_ms_hi: () => int;
   SKIP_js_get_entropy: () => int;
