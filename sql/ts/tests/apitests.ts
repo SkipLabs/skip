@@ -314,9 +314,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     await user.exec("insert into view_pk values (97,98,'GALL');");
     throw new Error("Shall throw exception.");
   } catch (exn: any) {
-    expect(getErrorMessage(exn)).toEqual(
-      "insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\nError: insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk",
-    );
+    expect(getErrorMessage(exn)).toEqual("insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\ninsert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
   }
   await new Promise((resolve) => setTimeout(resolve, 100));
   const vres = await remote!.exec(
