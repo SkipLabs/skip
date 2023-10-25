@@ -263,15 +263,47 @@ async function testReboot(root: SKDB, user: SKDB) {
 
 async function testPrivacyRejectedChange(root: SKDB, user: SKDB): Promise<void> {
   return new Promise(async (resolve) => {
-    await user.watchChanges("select * from test_pk__skdb_mirror_feedback", {},
-      (added: Array<any>, removed: Array<any>) => {
+    const h = await user.watchChanges("select * from test_pk__skdb_mirror_feedback", {},
+      async (added: Array<any>, removed: Array<any>) => {
         expect(removed).toEqual([]);
         expect(added).toEqual([
           {x:1234, y:88, skdb_access:"does not exist"},
         ]);
+        const remote = await root.connectedRemote();
+        // no need to wait, getting feedback means the server has processed
+        const rrows = await remote.exec("select * from test_pk where x = 1234 and y = 88;");
+        expect(rrows).toEqual([]);
+        h.close();
         resolve();
       });
     await user.exec("insert into test_pk values (1234, 88, 'does not exist');");
+  })
+}
+
+async function testPrivacyRejectedTxn(root: SKDB, user: SKDB): Promise<void> {
+  // check that the whole txn is rejected if some part is not ok
+  await user.exec("delete from test_pk__skdb_mirror_feedback;");
+  return new Promise(async (resolve) => {
+    const h = await user.watchChanges("select * from test_pk__skdb_mirror_feedback", {},
+      async (added: Array<any>, removed: Array<any>) => {
+        expect(removed).toEqual([]);
+        expect(added).toEqual([
+          {x:4321, y:6, skdb_access:"does not exist"},
+          {x:4322, y:6, skdb_access:"GALL"}, // even though this is ok
+        ]);
+        const remote = await root.connectedRemote();
+        // no need to wait, getting feedback means the server has processed
+        const rrows = await remote.exec("select * from test_pk where x in (4321, 4322) and y = 6;");
+        expect(rrows).toEqual([]);
+        h.close();
+        resolve();
+      });
+    await user.exec(
+      "begin transaction; " +
+      "insert into test_pk values (4321, 6, 'does not exist');" + // bad
+      "insert into test_pk values (4322, 6, 'GALL');" +           // ok
+      "commit;"
+    );
   })
 }
 
@@ -292,6 +324,8 @@ export const apitests = (asWorker) => {
         await testClientTail(dbs.root, dbs.user);
 
         await testPrivacyRejectedChange(dbs.root, dbs.user);
+
+        await testPrivacyRejectedTxn(dbs.root, dbs.user);
 
         // must come last: puts replication in to a permanent state of failure
         await testReboot(dbs.root, dbs.user);
