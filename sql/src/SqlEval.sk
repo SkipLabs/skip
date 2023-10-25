@@ -195,17 +195,18 @@ fun valueToCValue(
     | Some(v) -> v
     | None() -> error(pos, "Unbound parameter: " + handle)
     }
-  | VPermission(VParam(handle)) ->
-    params.maybeGet(handle) match {
-    | Some(VString(str)) -> VInt(compilePermissionLiteral(str))
-    | Some(_) -> error(pos, "argument to skdb_permission must be a string")
-    | None() -> error(pos, "Unbound parameter: " + handle)
-    }
   | VPermission(arg) ->
-    arg match {
-    | VString(str) -> VInt(compilePermissionLiteral(str))
+    perm_str = arg match {
+    | VParam(handle) ->
+      params.maybeGet(handle) match {
+      | Some(VString(str)) -> str
+      | Some(_) -> error(pos, "argument to skdb_permission must be a string")
+      | None() -> error(pos, "Unbound parameter: " + handle)
+      }
+    | VString(str) -> str
     | _ -> error(pos, "argument to skdb_permission must be a string")
-    }
+    };
+    VInt(compilePermissionLiteral(perm_str))
   | _ -> val
   };
   if (val is VNull _) {
