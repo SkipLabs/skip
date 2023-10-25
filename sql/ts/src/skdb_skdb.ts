@@ -369,7 +369,7 @@ class LinksImpl implements Links, ToWasm {
           const removed = this.stdout_objects[1];
           const tick = this.stdout_objects[2][0].tick;
           if (added.length > 0 || removed.length > 0) {
-            onChanges(this.stdout_objects[0], this.stdout_objects[1]);
+            onChanges(added, removed);
           }
           this.funLastTick.set(queryID, tick);
           this.stdout_objects = [[],[],[]];
