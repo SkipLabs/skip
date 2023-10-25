@@ -543,12 +543,11 @@ fun parseCheckpoint(line: String): Int {
 }
 
 fun parseTableChange(
-  identity: Int,
   userFileOpt: ?SKDB.UserFile,
   context: mutable SKStore.Context,
   table: SKDB.DirDescr,
   line: String,
-): Array<SKDB.RowValues> {
+): ?Array<SKDB.RowValues> {
   if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
     invariant_violation("Not a table change")
   };
@@ -610,9 +609,8 @@ fun parseTableChange(
   );
 
   accessSolverOpt match {
-  | None() -> newRows
+  | None() -> Some(newRows)
   | Some((accessSolver, tableName, authorCol, accessCol)) ->
-    privacyCheckedRows = mutable Vector[];
     for (row in newRows) {
       SKDB.checkUserCanWriteRow(
         context,
@@ -622,18 +620,14 @@ fun parseTableChange(
         accessCol,
         row,
       ) match {
-      | SKDB.AROK() -> privacyCheckedRows.push(row)
+      | SKDB.AROK() -> void
       | SKDB.ARError(err) ->
         print_error("Error: " + err.toString());
-        // either a user is doing something nefarious or we've
-        // hit a race which currently will lead to diverging
-        // state that cannot heal. notify the client asap to
-        // prevent further divergence.
-        SKDB.setFinalState(context, identity, SKDB.RSError());
-        throw SKDB.IgnoreAndContinue() // will reboot on next iteration
+        break None()
       }
-    };
-    privacyCheckedRows.collect(Array)
+    } else {
+      Some(newRows)
+    }
   };
 }
 
@@ -642,9 +636,10 @@ mutable class TableDiff(
   snapshot: ?Int,
   mutable reset: Bool,
   rows: mutable Vector<SKDB.RowValues>,
+  lines: mutable Vector<String>,
 ) {
   static fun create(table: SKDB.DirDescr, snapshot: ?Int): mutable this {
-    mutable static(table, snapshot, false, mutable Vector[])
+    mutable static(table, snapshot, false, mutable Vector[], mutable Vector[])
   }
 }
 
@@ -686,6 +681,18 @@ mutable class DPBuildingTableDiff(
   tableDiffs: mutable Vector<mutable TableDiff>,
   currentDiff: mutable TableDiff,
 ) extends DiffParsingState
+
+mutable class DPRejectingTxn(
+  writer: mutable Debug.BufferedWriter,
+) extends DiffParsingState
+
+fun nack(writer: mutable Debug.BufferedWriter, diff: readonly TableDiff): void {
+  writer.write("^" + SKDB.feedbackTable(diff.table.name.origName) + "\n");
+  for (line in diff.lines) {
+    writer.write(line);
+    writer.write("\n")
+  }
+}
 
 fun replayDiff(
   context: mutable SKStore.Context,
@@ -740,15 +747,36 @@ fun replayDiff(
         currentDiff.!reset = true;
         current
 
-      | current @ DPBuildingTableDiff(_, currentDiff) ->
-        rows = parseTableChange(
-          identity,
-          userFileOpt,
-          context,
-          currentDiff.table,
-          line,
-        );
-        currentDiff.rows.extend(rows);
+      | current @ DPBuildingTableDiff(tableDiffs, currentDiff) ->
+        currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
+
+        parseTableChange(userFileOpt, context, currentDiff.table, line) match {
+        | Some(rows) ->
+          currentDiff.rows.extend(rows);
+          current
+        | None() ->
+          writer = mutable Debug.BufferedWriter(print_raw, 4096);
+          tableDiffs.push(currentDiff);
+          for (diff in tableDiffs) {
+            nack(writer, diff)
+          };
+          mutable DPRejectingTxn(writer)
+        }
+
+      | current @ DPRejectingTxn(writer) if (line.startsWith("^")) ->
+        (table, snapshot) = parseHeader(context, line);
+        nack(writer, TableDiff::create(table, snapshot));
+        current
+
+      | DPRejectingTxn(writer) if (line.startsWith(":")) ->
+        writer.write(line);
+        writer.write("\n");
+        writer.flush();
+        break SKStore.CContinue(None())
+
+      | current @ DPRejectingTxn(writer) ->
+        writer.write(line);
+        writer.write("\n");
         current
       };
     }
