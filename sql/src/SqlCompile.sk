@@ -873,6 +873,12 @@ mutable class Compiler{
       | Some(val) -> this.compileExpr(context, val)
       | None() -> error(this.pos, "Unbound parameter: " + handle)
       }
+    | VPermission(arg) ->
+      this.compileExpr(context, arg) match {
+      | CSExpr(CSLiteral(str)) ->
+        CIExpr(CILiteral(compilePermissionLiteral(str)))
+      | _ -> error(this.pos, "Argument to skdb_permission must be a string")
+      }
     | id @ Identifier _ ->
       if (this.ambiguous.contains(id)) {
         error(this.pos, `Ambiguous name: ${id}`);
@@ -1153,24 +1159,11 @@ mutable class Compiler{
         if (args.size() != 1) {
           error(this.pos, "skdb_permission expects one argument")
         };
-        perm_str = args[0] match {
-        | VString(str) -> str
-        | _ -> error(this.pos, "skdb_permission expects a string literal")
-        };
-        res = 0;
-        if (perm_str.contains("r")) {
-          !res = res.or(kReadPermission)
-        };
-        if (perm_str.contains("i")) {
-          !res = res.or(kInsertPermission)
-        };
-        if (perm_str.contains("d")) {
-          !res = res.or(kDeletePermission)
-        };
-        if (perm_str.contains("w")) {
-          !res = res.or(kInsertPermission).or(kDeletePermission)
-        };
-        CIExpr(CILiteral(res))
+        this.compileExpr(context, args[0]) match {
+        | CSExpr(CSLiteral(str)) ->
+          CIExpr(CILiteral(compilePermissionLiteral(str)))
+        | _ -> error(this.pos, "Argument to skdb_permission must be a string")
+        }
       | "upper" ->
         if (args.size() != 1) {
           error(this.pos, "upper expects one argument")
@@ -2254,4 +2247,22 @@ fun parsePattern(str: Vector<Char>): Pattern {
   firstIsPercent = str.size() > 0 && str[0] == '%';
   lastIsPercent = str.size() > 0 && str[str.size() - 1] == '%';
   Pattern{hasUnderscore, firstIsPercent, lastIsPercent, subs => subs.toArray()}
+}
+
+// Translate `skdb_permission(arg)` to the corresponding permission mask integer
+fun compilePermissionLiteral(perm_str: String): Int {
+  res = 0;
+  if (perm_str.contains("r")) {
+    !res = res.or(kReadPermission)
+  };
+  if (perm_str.contains("i")) {
+    !res = res.or(kInsertPermission)
+  };
+  if (perm_str.contains("d")) {
+    !res = res.or(kDeletePermission)
+  };
+  if (perm_str.contains("w")) {
+    !res = res.or(kInsertPermission).or(kDeletePermission)
+  };
+  res
 }
