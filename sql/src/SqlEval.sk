@@ -195,7 +195,11 @@ fun valueToCValue(
     | Some(v) -> v
     | None() -> error(pos, "Unbound parameter: " + handle)
     }
-  | VPermission(arg) -> VInt(compilePermissionLiteral(arg, params, pos))
+  | VPermission(arg) ->
+    valueToCValue(context, params, inTransaction, pos, schema, idx, arg) match {
+    | Some(CString(str)) -> VInt(compilePermissionLiteral(str))
+    | _ -> error(pos, "argument to skdb_permission must be a string")
+    }
   | _ -> val
   };
   if (val is VNull _) {
