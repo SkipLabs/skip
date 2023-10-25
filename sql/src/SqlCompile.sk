@@ -874,8 +874,11 @@ mutable class Compiler{
       | None() -> error(this.pos, "Unbound parameter: " + handle)
       }
     | VPermission(arg) ->
-      res = compilePermissionLiteral(arg, this.params, this.pos);
-      CIExpr(CILiteral(res))
+      this.compileExpr(context, arg) match {
+      | CSExpr(CSLiteral(str)) ->
+        CIExpr(CILiteral(compilePermissionLiteral(str)))
+      | _ -> error(this.pos, "argument to skdb_permission must be a string")
+      }
     | id @ Identifier _ ->
       if (this.ambiguous.contains(id)) {
         error(this.pos, `Ambiguous name: ${id}`);
@@ -1156,17 +1159,10 @@ mutable class Compiler{
         if (args.size() != 1) {
           error(this.pos, "skdb_permission expects one argument")
         };
-        args[0] match {
-        | v @ VParam _
-        | v @ VString _ ->
-          res = compilePermissionLiteral(v, this.params, this.pos);
-          CIExpr(CILiteral(res))
-
-        | _ ->
-          error(
-            this.pos,
-            "skdb_permission expects a string literal or query parameter",
-          )
+        this.compileExpr(context, args[0]) match {
+        | CSExpr(CSLiteral(str)) ->
+          CIExpr(CILiteral(compilePermissionLiteral(str)))
+        | _ -> error(this.pos, "argument to skdb_permission must be a string")
         }
       | "upper" ->
         if (args.size() != 1) {
@@ -2254,26 +2250,7 @@ fun parsePattern(str: Vector<Char>): Pattern {
 }
 
 // Translate `skdb_permission(arg)` to the corresponding permission mask integer
-fun compilePermissionLiteral(
-  arg: Value,
-  query_params: Map<String, Value>,
-  pos: Int,
-): Int {
-  perm_str = arg match {
-  | VString(str) -> str
-  | VParam(handle) ->
-    query_params.maybeGet(handle) match {
-    | Some(VString(str)) -> str
-    | Some(_) ->
-      error(pos, "query parameter passed to skdb_permission must be a string.")
-    | None() -> error(pos, "Unbound parameter: " + handle)
-    }
-  | _ ->
-    error(
-      pos,
-      "argument to skdb_permission must be a string literal or query parameter",
-    )
-  };
+fun compilePermissionLiteral(perm_str: String): Int {
   res = 0;
   if (perm_str.contains("r")) {
     !res = res.or(kReadPermission)
