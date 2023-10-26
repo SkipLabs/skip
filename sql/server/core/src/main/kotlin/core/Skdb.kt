@@ -315,11 +315,15 @@ class Skdb(val name: String, private val dbPath: String) {
     return this
   }
 
-  fun createUser(accessKey: String, encryptedPrivateKey: String): ProcessOutput {
-    return sql(
-        "INSERT INTO skdb_users VALUES (@accessKey, @privateKey)",
-        mapOf("accessKey" to accessKey, "privateKey" to encryptedPrivateKey),
+  fun createUser(encryptedPrivateKey: String): String {
+    val accessKey =
+      sql(
+        "BEGIN TRANSACTION; INSERT INTO skdb_users VALUES (id('userID'), @privateKey); SELECT id('userID'); COMMIT;",
+        mapOf("privateKey" to encryptedPrivateKey),
         OutputFormat.RAW)
+      .decode()
+      .trim()
+    return accessKey
   }
 }
 
