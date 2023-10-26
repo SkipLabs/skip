@@ -343,6 +343,11 @@ const remoteRepl = async function() {
   while (true) {
     const query = await rl.question(`${accessKey}@${values.host}/${values.db}> `);
 
+    if (query.trim() === '.exit') {
+      rl.close();
+      process.exit(0);
+    }
+
     if (query.trim() === '.help') {
       console.log("Send input to the server to be executed as a query.");
       console.log("Multi-statement queries should (currently) be combined on a single line.");
@@ -350,7 +355,8 @@ const remoteRepl = async function() {
       console.log("Commands begin with '.'");
       console.log("");
       console.log(".help   -- This message.");
-      console.log(".local -- Switch to local repl.");
+      console.log(".exit   -- Exit this repl session.");
+      console.log(".local  -- Switch to local repl.");
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
@@ -416,12 +422,18 @@ const localRepl = async function() {
   while (true) {
     const query = await rl.question(`local> `);
 
+    if (query.trim() === '.exit') {
+      rl.close();
+      process.exit(0);
+    }
+
     if (query.trim() === '.help') {
       console.log("Evaluate input as a SQL query against a local database.");
       console.log("");
       console.log("Commands begin with '.'");
       console.log("");
       console.log(".help -- This message.");
+      console.log(".exit -- Exit this repl session.");
       console.log(".remote -- Switch to remote repl.");
       console.log(".js -- Switch to a javascript repl. There is a pre-configured `skdb` global. Currently this is a one-way trip.");
       console.log(".schema -- Output the schema.");
