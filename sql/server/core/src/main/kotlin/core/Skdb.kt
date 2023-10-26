@@ -288,7 +288,7 @@ class Skdb(val name: String, private val dbPath: String) {
   fun privateKeyAsStored(user: String): ByteArray {
     val key =
         sql(
-                "SELECT privateKey FROM skdb_users WHERE userUUID = @user;",
+                "SELECT privateKey FROM skdb_users WHERE userID = @user;",
                 mapOf("user" to user),
                 OutputFormat.RAW)
             .decode()

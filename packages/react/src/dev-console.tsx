@@ -186,8 +186,8 @@ export function SKDBDevConsoleProvider(
       if (remote === undefined) {
         throw new Error("SKDB not connected");
       }
-      remote.exec("SELECT userUUID FROM skdb_users").then((userRows) => {
-        setUsers(userRows.map(row => row.userUUID));
+      remote.exec("SELECT userID FROM skdb_users").then((userRows) => {
+        setUsers(userRows.map(row => row.userID));
       });
     });
   }, []);

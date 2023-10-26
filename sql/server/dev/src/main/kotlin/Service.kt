@@ -323,7 +323,7 @@ fun usersHandler(): HttpHandler {
             exchange.responseSender.send(
                 skdb!!
                     .sql(
-                        "SELECT userUUID as accessKey, privateKey FROM skdb_users",
+                        "SELECT userID as accessKey, privateKey FROM skdb_users",
                         OutputFormat.JSON)
                     .decodeOrThrow())
           } else {
