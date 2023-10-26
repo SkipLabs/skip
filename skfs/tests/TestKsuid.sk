@@ -78,4 +78,19 @@ fun testKsuid(): void {
   for (j in Range(0, 63)) {
     T.expectTrue(sextet_chars[j] < sextet_chars[j + 1]);
   };
+
+  // check that short strings round-trip
+  root_id0 = Ksuid::fromString("root");
+  root_str0 = root_id0.toString();
+  root_id1 = Ksuid::fromString(root_str0);
+  root_str1 = root_id1.toString();
+  T.expectEq(root_id0, root_id1);
+  T.expectEq(root_str0, root_str1);
+  // check that trailing '-' chars are trimmed
+  root___id0 = Ksuid::fromString("root--");
+  root___str0 = root___id0.toString();
+  root___id1 = Ksuid::fromString(root___str0);
+  root___str1 = root___id1.toString();
+  T.expectEq(root___id0, root___id1);
+  T.expectEq(root___str0, root___str1);
 }
