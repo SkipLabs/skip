@@ -12,7 +12,6 @@ import java.io.File
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.security.SecureRandom
-import java.util.Base64
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -23,15 +22,22 @@ fun Credentials.toProtoCredentials(): ProtoCredentials {
   return ProtoCredentials(accessKey, ByteBuffer.wrap(privateKey))
 }
 
-fun genPrivateKey(encryption: EncryptionTransform): Pair<ByteArray, ByteArray> {
+fun genAccessKey(): String {
   val csrng = SecureRandom()
-
-  // generate a 256 bit random key
-  val plaintextPrivateKey = ByteArray(32)
-  csrng.nextBytes(plaintextPrivateKey)
-  val encryptedPrivateKey = encryption.encrypt(plaintextPrivateKey)
-
-  return Pair(plaintextPrivateKey, encryptedPrivateKey)
+  val keyLength = 20
+  // build a string of keyLength chars: 0-9a-zA-Z, which is 62 symbols
+  val ints = csrng.ints(keyLength.toLong(), 0, 62)
+  val codePoints =
+      ints
+          .map({
+            when {
+              it < 10 -> it + 48 // offset for 0-9
+              it < 10 + 26 -> (it - 10) + 65 // offset for A-Z
+              else -> (it - 10 - 26) + 97 // offset for a-z
+            }
+          })
+          .toArray()
+  return String(codePoints, 0, keyLength)
 }
 
 fun genCredentials(accessKey: String, encryption: EncryptionTransform): Credentials {
@@ -159,10 +165,8 @@ class RequestHandler(
           stream.error(2002u, "Authorization error")
           return this
         }
-        val privateKey = genPrivateKey(encryption)
-        val b64encryptedKey = Base64.getEncoder().encodeToString(privateKey.second)
-        val userID = skdb.createUser(b64encryptedKey)
-        val creds = Credentials(userID, privateKey.first, privateKey.second)
+        val creds = genCredentials(genAccessKey(), encryption)
+        skdb.createUser(creds.accessKey, creds.b64encryptedKey())
         val payload = creds.toProtoCredentials()
         stream.send(payload)
         creds.clear()
