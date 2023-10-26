@@ -87,7 +87,7 @@ def subscribe(dbkey, subkey, table, user, dest, peerId):
     proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "subscribe", table, "--connect",
                                                 # TODO:
                                                 # "--user", user,
-                                                "--ignore-source", dest,
+                                                "--dest-peer", dest,
                                                 "--peer-id", peerId,
                                                 stdout=asyncio.subprocess.PIPE)
     (out, _) = await proc.communicate()
@@ -113,7 +113,7 @@ def startStreamingWriteCsv(dbkey, writecsvKey, table, user, source, peerId):
     proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "apply-diff", table,
                                                 # TODO:
                                                 # "--user", user,
-                                                "--source", source,
+                                                "--source-peer", source,
                                                 "--peer-id", peerId,
                                                 stdin=asyncio.subprocess.PIPE,
                                                 stdout=asyncio.subprocess.DEVNULL,)
@@ -323,7 +323,6 @@ class Client(SkdbPeer):
 class Topology:
 
   def __init__(self, scheduler):
-    self.replicationIdGen = 0
     self.schemaQueries = []
     self.peers = []
     self.scheduler = scheduler
@@ -341,19 +340,13 @@ class Topology:
     peer.lastTask = self.initTask
     return peer
 
-  def _genReplicationId(self):
-    self.replicationIdGen = self.replicationIdGen + 1
-    return str(self.replicationIdGen)
-
   def mirror(self, table, a, b):
-    aId = self._genReplicationId()
-    bId = self._genReplicationId()
     atob = HalfStream(a, b,
-                      a.tailTask(table, dest=bId, peerId=a.name),
-                      b.writeTask(table, source=aId, peerId=b.name))
+                      a.tailTask(table, dest=b.name, peerId=a.name),
+                      b.writeTask(table, source=a.name, peerId=b.name))
     btoa = HalfStream(b, a,
-                      b.tailTask(table, dest=aId, peerId=b.name),
-                      a.writeTask(table, source=bId, peerId=a.name))
+                      b.tailTask(table, dest=a.name, peerId=b.name),
+                      a.writeTask(table, source=b.name, peerId=a.name))
     atob.other = btoa
     btoa.other = atob
     self.initTask.add(atob.initTask())
