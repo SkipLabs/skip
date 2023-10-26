@@ -1581,10 +1581,11 @@ fun printContext(context: mutable SKStore.Context): void {
     }
   | Some(StdoutDiff(spec)) ->
     writer = mutable Debug.BufferedWriter(print_raw, 4096);
+    producedAnyOutput = false;
     for ((dirsub, tick) in spec) {
       edir = context.unsafeGetEagerDir(dirsub.dirName);
       (isReset, changes) = edir.getChangesAfter(tick);
-      _ = edir.writeDiff(
+      producedOutput = edir.writeDiff(
         context,
         isReset,
         changes,
@@ -1593,10 +1594,13 @@ fun printContext(context: mutable SKStore.Context): void {
         dirsub.format,
         dirsub.filter,
         dirsub.getDestinationWatermark(context),
-      )
+      );
+      !producedAnyOutput = producedAnyOutput || producedOutput
     };
-    writer.write(`:${context.tick.value.toString()}\n`);
-    writer.flush()
+    if (producedAnyOutput) {
+      writer.write(`:${context.tick.value.toString()}\n`);
+      writer.flush()
+    }
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
   context.globals.maybeGet("Ack") match {
