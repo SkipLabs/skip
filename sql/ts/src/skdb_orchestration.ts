@@ -201,16 +201,16 @@ class ProtoMsgDecoder {
     switch (type) {
       // credentials response
       case 0x80: {
-        const accessKeyFixedWidthBytes = new Uint8Array(msg, 1, 27);
+        const accessKeyFixedWidthBytes = new Uint8Array(msg, 1, 20);
         // access key is a fixed-width but potentially zero-terminated string
         const zeroIndex = accessKeyFixedWidthBytes.findIndex((x) => x == 0);
-        const accessKeyBytes = accessKeyFixedWidthBytes.slice(0, zeroIndex < 0 ? 27 : zeroIndex)
+        const accessKeyBytes = accessKeyFixedWidthBytes.slice(0, zeroIndex < 0 ? 20 : zeroIndex)
         const decoder = new TextDecoder();
         const accessKey = decoder.decode(accessKeyBytes)
         this.msgs.push({
           type: "credentials",
           accessKey: accessKey,
-          privateKey: new Uint8Array(msg, 28, 32),
+          privateKey: new Uint8Array(msg, 21, 32),
         })
         return true;
       }
@@ -931,11 +931,11 @@ export class MuxedSocket {
     const clientVersion = "js-" + npmVersion;
     const crypto = env.crypto();
     const enc = new TextEncoder();
-    const buf = new ArrayBuffer(140 + clientVersion.length);
+    const buf = new ArrayBuffer(133 + clientVersion.length);
     const uint8View = new Uint8Array(buf);
     const dataView = new DataView(buf);
     const now = (new Date()).toISOString()
-    const nonce = uint8View.subarray(35, 43);
+    const nonce = uint8View.subarray(28, 36);
     crypto.getRandomValues(nonce)
     const b64nonce = btoa(String.fromCharCode(...nonce));
     const bytesToSign = enc.encode("auth" + creds.accessKey + now + b64nonce)
@@ -945,26 +945,26 @@ export class MuxedSocket {
       bytesToSign
     )
 
-    dataView.setUint8(0, 0x0);  // type and stream
+    dataView.setUint8(0, 0x0);  // type
     dataView.setUint8(4, 0x0);  // version
     const encodeAccessKey = enc.encodeInto(creds.accessKey, uint8View.subarray(8));
-    if (!encodeAccessKey.written || encodeAccessKey.written > 27) {
+    if (!encodeAccessKey.written || encodeAccessKey.written > 20) {
       throw new Error("Unable to encode access key")
     }
-    uint8View.set(new Uint8Array(sig), 43);
-    const encodeDeviceId = enc.encodeInto(creds.deviceUuid, uint8View.subarray(75));
+    uint8View.set(new Uint8Array(sig), 36);
+    const encodeDeviceId = enc.encodeInto(creds.deviceUuid, uint8View.subarray(68));
     if (!encodeDeviceId.written || encodeDeviceId.written != 36) {
       throw new Error("Unable to encode device id")
     }
-    let pos = 112;
+    let pos = 105;
     const encodeIsoDate = enc.encodeInto(now, uint8View.subarray(pos));
     switch (encodeIsoDate.written) {
       case 24:
-        pos = 136;
+        pos = 129;
         break;
       case 27:
-        dataView.setUint8(111, 0x1);
-        pos = 139;
+        dataView.setUint8(104, 0x1);
+        pos = 132;
         break;
       default:
         throw new Error("Unexpected ISO date length");

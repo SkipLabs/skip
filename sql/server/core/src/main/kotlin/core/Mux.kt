@@ -770,11 +770,11 @@ class MuxedSocket(
 
   private fun encodeAuthMsg(msg: MuxAuthMsg): ByteBuffer {
     val encoder = StandardCharsets.US_ASCII.newEncoder()
-    val buf = ByteBuffer.allocate(140 + msg.clientVersion.length)
+    val buf = ByteBuffer.allocate(133 + msg.clientVersion.length)
     buf.putInt(0x0) // type 0 and stream 0
     buf.putInt(0x0) // mux protocol version
     // access key
-    if (msg.accessKey.length > 27) {
+    if (msg.accessKey.length > 20) {
       throw RuntimeException("accessKey ${msg.accessKey} too long")
     }
     var res = encoder.encode(CharBuffer.wrap(msg.accessKey), buf, true)
@@ -786,7 +786,7 @@ class MuxedSocket(
       res.throwException()
     }
     encoder.reset()
-    buf.position(35) // rely on buf being zeroed out and set position to support short keys
+    buf.position(28) // rely on buf being zeroed out and set position to support short keys
     // nonce
     buf.put(msg.nonce)
     // signature
@@ -922,7 +922,7 @@ class MuxedSocket(
           throw RuntimeException("Auth should happen on stream zero")
         }
         val version = (msg.getInt() ushr 24).toUInt()
-        val accessKeyBytes = ByteArray(27)
+        val accessKeyBytes = ByteArray(20)
         msg.get(accessKeyBytes)
         val zeroIdx = accessKeyBytes.indexOf(0)
         val accessKey =

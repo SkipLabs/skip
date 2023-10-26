@@ -139,7 +139,7 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
       buf.flip()
     }
     is ProtoCredentials -> {
-      val buf = ByteBuffer.allocate(60)
+      val buf = ByteBuffer.allocate(53)
       buf.put(0x80.toByte())
       val encoder = StandardCharsets.US_ASCII.newEncoder()
       var res = encoder.encode(CharBuffer.wrap(msg.accessKey), buf, true)
@@ -150,7 +150,7 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
       if (!res.isUnderflow()) {
         res.throwException()
       }
-      buf.position(28)
+      buf.position(21)
       buf.put(msg.privateKey)
       buf.flip()
     }
