@@ -1566,10 +1566,7 @@ fun printConsumeDiffResponse(acks: ?StdoutCheckpointAck): void {
   acks match {
   | None() -> void
   | Some(StdoutCheckpointAck(table, tick, rest)) ->
-    // WARNING: this must be kept in sync with the clients and how
-    // they create a table. the format of this table name forms part
-    // of the protocol.
-    print_raw("^" + table + "__skdb_mirror_feedback\n");
+    print_raw("^" + feedbackTable(table) + "\n");
     print_raw(":" + tick.value.toString() + "\n");
     printConsumeDiffResponse(rest)
   }
@@ -1599,7 +1596,7 @@ fun printContext(context: mutable SKStore.Context): void {
       )
     };
     writer.write(`:${context.tick.value.toString()}\n`);
-    writer.flush();
+    writer.flush()
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
   context.globals.maybeGet("Ack") match {
