@@ -86,11 +86,11 @@ def subscribe(dbkey, subkey, table, user, dest, peerId):
     db = schedule.getScheduleLocal(dbkey)
     if db is None:
       raise RuntimeError("could not get db")
-    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "subscribe", table, "--connect",
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "subscribe", table,
                                                 # TODO:
                                                 # "--user", user,
-                                                "--dest-peer", dest,
-                                                "--peer-id", peerId,
+                                                "--ignore-source", dest,
+                                                # "--peer-id", peerId,  # for multi-peer
                                                 stdout=asyncio.subprocess.PIPE)
     (out, _) = await proc.communicate()
     session = out.decode().rstrip()
@@ -100,24 +100,25 @@ def subscribe(dbkey, subkey, table, user, dest, peerId):
 
 async def tail(db, session, peerId, since):
   proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "tail",
-                                              session, "--since", str(since),
-                                              "--peer-id", peerId,
+                                              "--format=csv", session,
+                                              "--since", str(since),
+                                              # "--peer-id", peerId,  # for multi-peer
                                               stdout=asyncio.subprocess.PIPE,
                                               stderr=asyncio.subprocess.PIPE)
   (out, err) = await proc.communicate()
   return out, err
 
-def startStreamingWriteCsv(dbkey, writecsvKey, table, user, source, peerId, log):
+def startStreamingWriteCsv(dbkey, writecsvKey, user, source, peerId, log):
   async def f(schedule):
     db = schedule.getScheduleLocal(dbkey)
     if db is None:
       raise RuntimeError("could not get db")
 
-    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "apply-diff", table,
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "write-csv",
                                                 # TODO:
                                                 # "--user", user,
-                                                "--source-peer", source,
-                                                "--peer-id", peerId,
+                                                "--source", source,
+                                                # "--peer-id", peerId,  # for multi-peer
                                                 stdin=asyncio.subprocess.PIPE,
                                                 stdout=asyncio.subprocess.DEVNULL,
                                                 stderr=asyncio.subprocess.PIPE)
@@ -136,21 +137,19 @@ def startStreamingWriteCsv(dbkey, writecsvKey, table, user, source, peerId, log)
 
 def getOurLastCheckpoint(current, diffOutput):
   def parse(line: str):
-    event = json.loads(line)
-    if event.get('type') in ['commit', 'reset']:
-      return event.get('tick')
-    return 0
+    ticks = line.removeprefix(':').split(' ')
+    if len(ticks) < 1:
+      raise RuntimeError(f"Could not parse checkpoint from {line}")
+    return int(ticks[0])
   lines = diffOutput.split('\n')
-  cps = [parse(l) for l in lines if l.strip() != '']
+  cps = [parse(l) for l in lines if l.startswith(":")]
   cps.append(current)
   cps.append(0)
   return max(cps)
 
 def diffOutputIsSilent(diff):
   lines = diff.split('\n')
-  return all(l.strip() == "" or
-             json.loads(l).get('type') in ['commit', 'reset', 'heartbeat']
-             for l in lines)
+  return all(l.startswith(':') or l.strip() == "" for l in lines)
 
 class HalfStream:
 
@@ -328,12 +327,12 @@ class SkdbPeer:
       return Task(f"<{self} {table}> -> {stream}", pull)
     return factory
 
-  def writeTask(self, table, source, peerId):
+  def writeTask(self, source, peerId):
     def factory(stream, init):
       key = (self, stream, 'write')
       async def start(schedule):
         user = "todo"               # TODO:
-        start = startStreamingWriteCsv(self, key, table, user, source, peerId, schedule.debug)
+        start = startStreamingWriteCsv(self, key, user, source, peerId, schedule.debug)
         await start(schedule)
 
       async def stop(schedule):
@@ -347,8 +346,8 @@ class SkdbPeer:
         proc.stdin.write(payload)
 
       if init:
-        return Task(f"start write-csv for {self} {table} {stream}", start, stop)
-      return Task(f"{stream} -> <{self} {table}>", push)
+        return Task(f"start write-csv for {self} {stream}", start, stop)
+      return Task(f"{stream} -> <{self}>", push)
     return factory
 
 class Server(SkdbPeer):
@@ -366,6 +365,7 @@ class Client(SkdbPeer):
 class Topology:
 
   def __init__(self, scheduler):
+    self.replicationIdGen = 0
     self.schemaQueries = []
     self.peers = []
     self.scheduler = scheduler
@@ -383,13 +383,19 @@ class Topology:
     peer.lastTask = self.initTask
     return peer
 
+  def _genReplicationId(self):
+    self.replicationIdGen = self.replicationIdGen + 1
+    return str(self.replicationIdGen)
+
   def mirror(self, table, a, b):
+    repIdForA = self._genReplicationId()
+    repIdForB = self._genReplicationId()
     atob = HalfStream(a, b,
-                      a.tailTask(table, dest=b.name, peerId=a.name),
-                      b.writeTask(table, source=a.name, peerId=b.name))
+                      a.tailTask(table, dest=repIdForB, peerId=a.name),
+                      b.writeTask(source=repIdForA, peerId=b.name))
     btoa = HalfStream(b, a,
-                      b.tailTask(table, dest=a.name, peerId=b.name),
-                      a.writeTask(table, source=b.name, peerId=a.name))
+                      b.tailTask(table, dest=repIdForA, peerId=b.name),
+                      a.writeTask(source=repIdForB, peerId=a.name))
     atob.other = btoa
     btoa.other = atob
     self.initTask.add(atob.initTask())
