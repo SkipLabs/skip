@@ -25,6 +25,7 @@ async def runSchedules(schedules, log):
       await failLock.acquire() # just deal with first failure
       debugRun = schedule.clone()
       try:
+        print("> running debug test", file=sys.stderr)
         await debugRun.run(log)
       except AssertionError as err:
         sys.exit(1)
@@ -108,24 +109,78 @@ class MutableCompositeTask:
     for t in reversed(self.taskSeq):
       await t.finalise(schedule)
 
-class Scheduler:
-  def __init__(self):
-    self.t = []
+class AllTopoSortsScheduler():
+  def __init__(self, limit = 100, runAll = False):
+    self.taskLists = [[]]
     self.graph = defaultdict(set)
+    self.limit = limit
+    self.runAll = runAll
+
+  def _nodesWithNoIncomingEdge(self, nodeList, g):
+    acc = set()
+    for node in nodeList:
+      found = False
+      for (_, nodes) in g.items():
+        if node in nodes:
+          found = True
+          break
+      if not found:
+        acc.add(node)
+    return acc
+
+  def _schedules(self, nodes, schedule, candidates, g):
+    if candidates == set():
+      if any(g[n] != list() for n in nodes):
+        raise RuntimeError("Graph had a cycle")
+      yield Schedule(schedule)
+      return
+
+    for n in candidates:
+      ourSchedule = copy.copy(schedule)
+      ourG = copy.copy(g)
+      ourSchedule.append(n)
+      ourG[n] = list()
+      ourCandidates = candidates.union(self._nodesWithNoIncomingEdge(nodes, ourG)).difference(set(ourSchedule))
+      for s in self._schedules(nodes, ourSchedule, ourCandidates, ourG):
+        yield s
+
+  def schedules(self):
+    for nodes in self.taskLists:
+      schedule = []
+      g = {n: [x for x in self.graph[n] if x in nodes] for n in nodes}
+      candidates = self._nodesWithNoIncomingEdge(nodes, g)
+      for sched in self._schedules(nodes, schedule, candidates, g):
+        yield sched
+
+  def tasks(self):
+    for tasks in self.taskLists:
+      for t in tasks:
+        yield t
 
   def add(self, task):
-    self.t.append(task)
+    for t in self.taskLists:
+      t.append(task)
+
+  def choice(self, taskSets):
+    acc = []
+    for tasks in taskSets:
+      for prefix in self.taskLists:
+        t = copy.copy(prefix)
+        t.extend(tasks)
+        acc.append(t)
+    self.taskLists = acc
 
   def happensBefore(self, a, b):
     self.graph[a].add(b)
 
-  def schedules(self):
-    return []
-
-  def tasks(self):
-    return self.t
-
   async def run(self, log):
+    if not self.runAll:
+      i = 0
+      for _ in self.schedules():
+        i = i+1
+        if i > self.limit:
+          raise RuntimeError(f"There are more than {self.limit} schedules")
+
     return await runSchedules(self.schedules(), log)
 
 class Schedule:
@@ -149,108 +204,54 @@ class Schedule:
   def __str__(self):
     return self.__repr__()
 
+  def happensBefore(self, t1, t2) -> bool:
+    rest = itertools.dropwhile(lambda x: x!=t1, self.tasks)
+    return t2 in rest
+
   async def run(self, debug=nop):
     self.debug=debug
     for i,t in enumerate(self.tasks):
-      debug(f"{i}: {t}")
+      debug(f"> {i}: {t}")
       await t.run(self)
 
   async def finalise(self):
     for t in reversed(self.tasks):
       await t.finalise(self)
 
-class ArbitraryTopoSortScheduler(Scheduler):
-  def schedules(self):
-    # kahn's algo, we pick from multiple choices arbitrarily
-
-    g = copy.deepcopy(self.graph)
-
-    def nodesWithNoIncomingEdge():
-      acc = set()
-      for node in self.t:
-        found = False
-        for (_, nodes) in g.items():
-          if node in nodes:
-            found = True
-            break
-        if not found:
-          acc.add(node)
-      return acc
-
-    schedule = []
-    candidates = nodesWithNoIncomingEdge()
-    while candidates != set():
-      n = candidates.pop()
-      schedule.append(n)
-      g[n] = set()
-      candidates = candidates.union(nodesWithNoIncomingEdge()).difference(set(schedule))
-
-    def hasEdges(g):
-      any(x != list() for x in g.values())
-
-    if hasEdges(g):
-      raise RuntimeError("Graph had a cycle")
-
-    yield Schedule(schedule)
-
-class AllTopoSortsScheduler(Scheduler):
-  def __init__(self, limit = 100, runAll = False):
-    super().__init__()
-    self.limit = limit
-    self.runAll = runAll
-
-  def _nodesWithNoIncomingEdge(self, g):
-    acc = set()
-    for node in self.t:
-      found = False
-      for (_, nodes) in g.items():
-        if node in nodes:
-          found = True
-          break
-      if not found:
-        acc.add(node)
-    return acc
-
-  def _schedules(self, schedule, candidates, g):
-    if candidates == set():
-      if any(x != list() for x in g.values()):
-        raise RuntimeError("Graph had a cycle")
-      yield Schedule(schedule)
-      return
-
-    for n in candidates:
-      ourCandidates = copy.copy(candidates)
-      ourSchedule = copy.copy(schedule)
-      ourG = copy.copy(g)
-      ourSchedule.append(n)
-      ourG[n] = list()
-      ourCandidates = ourCandidates.union(self._nodesWithNoIncomingEdge(ourG)).difference(set(ourSchedule))
-      for s in self._schedules(ourSchedule, ourCandidates, ourG):
-        yield s
-
-  def schedules(self):
-    schedule = []
-    candidates = self._nodesWithNoIncomingEdge(self.graph)
-    return self._schedules(schedule, candidates, self.graph)
-
-  async def run(self, log):
-    if not self.runAll:
-      i = 0
-      for _ in self.schedules():
-        i = i+1
-        if i > self.limit:
-          raise RuntimeError(f"There are more than {self.limit} schedules")
-
-    return await super().run(log)
-
-class ReservoirSample():
+class FirstN():
   def __init__(self, scheduler, N):
-    super().__init__()
     self.scheduler = scheduler
     self.N = N
 
   def add(self, task):
     return self.scheduler.add(task)
+
+  def choice(self, taskSets):
+    return self.scheduler.choice(taskSets)
+
+  def happensBefore(self, a, b):
+    return self.scheduler.happensBefore(a,b)
+
+  def tasks(self):
+    return self.scheduler.tasks()
+
+  async def run(self, log):
+    return await runSchedules(self.schedules(log), log)
+
+  def schedules(self, log):
+    schedules = self.scheduler.schedules()
+    return itertools.islice(schedules, self.N)
+
+class ReservoirSample():
+  def __init__(self, scheduler, N):
+    self.scheduler = scheduler
+    self.N = N
+
+  def add(self, task):
+    return self.scheduler.add(task)
+
+  def choice(self, taskSets):
+    return self.scheduler.choice(taskSets)
 
   def happensBefore(self, a, b):
     return self.scheduler.happensBefore(a,b)
