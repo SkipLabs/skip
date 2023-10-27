@@ -51,16 +51,17 @@ class Expectations():
     self.checks.append(check)
     return check
 
-  def verifyChecks(self, peerResultMap, schedule):
-    # TODO: only need to do this for first peer if we've verified convergence
-    for peer, resultSet in peerResultMap.items():
-      for check in self.checks:
-        msg = check(resultSet, schedule)
-        if msg != "":
-          return f"{peer}: {msg}"
+  def _verifyChecks(self, peerResultMap, schedule):
+    # assumption: only do this for first peer because we've verified convergence
+    it = iter(peerResultMap.items())
+    peer, resultSet = next(it)
+    for check in self.checks:
+      msg = check(resultSet, schedule)
+      if msg != "":
+        return f"{peer}: {msg}"
     return ""
 
-  def verifyConvergence(self, peerResultMap):
+  def _verifyConvergence(self, peerResultMap):
     it = iter(peerResultMap.items())
     firstPeer, firstResultSet = next(it)        # do not catch, there should be one result
     for peer, resultSet in it:
@@ -69,9 +70,9 @@ class Expectations():
     return ""
 
   def check(self, peerResultMap, schedule):
-    firstFailure = self.verifyConvergence(peerResultMap)
+    firstFailure = self._verifyConvergence(peerResultMap)
     if firstFailure != "":
       raise AssertionError(firstFailure)
-    firstFailure = self.verifyChecks(peerResultMap, schedule)
+    firstFailure = self._verifyChecks(peerResultMap, schedule)
     if firstFailure != "":
       raise AssertionError(firstFailure)
