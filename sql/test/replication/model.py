@@ -1,10 +1,12 @@
 import asyncio
 import uuid
+import copy
 from collections import defaultdict, deque
 from scheduling import Task, MutableCompositeTask
 from expect import Expectations
 import os
 import json
+import itertools
 
 SKDB = "/skfs/build/skdb"
 INITSQL = "/skfs/sql/privacy/init.sql"
@@ -79,15 +81,16 @@ def runQuery(dbkey, query):
     return list(json.loads(x) for x in lines if x.strip() != '')
   return f
 
-def subscribe(dbkey, subkey, table, user, replicationId):
+def subscribe(dbkey, subkey, table, user, dest, peerId):
   async def f(schedule):
     db = schedule.getScheduleLocal(dbkey)
     if db is None:
       raise RuntimeError("could not get db")
-    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "subscribe", table, "--connect",
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "subscribe", table,
                                                 # TODO:
                                                 # "--user", user,
-                                                "--ignore-source", replicationId,
+                                                "--ignore-source", dest,
+                                                # "--peer-id", peerId,  # for multi-peer
                                                 stdout=asyncio.subprocess.PIPE)
     (out, _) = await proc.communicate()
     session = out.decode().rstrip()
@@ -95,26 +98,40 @@ def subscribe(dbkey, subkey, table, user, replicationId):
     return session
   return f
 
-async def tail(db, session, since):
+async def tail(db, session, peerId, since):
   proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "tail",
-                                              "--format=csv", session, "--since", str(since),
-                                              stdout=asyncio.subprocess.PIPE)
-  (out, _) = await proc.communicate()
-  return out
+                                              "--format=csv", session,
+                                              "--since", str(since),
+                                              # "--peer-id", peerId,  # for multi-peer
+                                              stdout=asyncio.subprocess.PIPE,
+                                              stderr=asyncio.subprocess.PIPE)
+  (out, err) = await proc.communicate()
+  return out, err
 
-def startStreamingWriteCsv(dbkey, writecsvKey, table, user, replicationId):
+def startStreamingWriteCsv(dbkey, writecsvKey, user, source, peerId, log):
   async def f(schedule):
     db = schedule.getScheduleLocal(dbkey)
     if db is None:
       raise RuntimeError("could not get db")
 
-    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "write-csv", table,
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "write-csv",
                                                 # TODO:
                                                 # "--user", user,
-                                                "--source", replicationId,
+                                                "--source", source,
+                                                # "--peer-id", peerId,  # for multi-peer
                                                 stdin=asyncio.subprocess.PIPE,
-                                                stdout=asyncio.subprocess.DEVNULL,)
+                                                stdout=asyncio.subprocess.DEVNULL,
+                                                stderr=asyncio.subprocess.PIPE)
     schedule.storeScheduleLocal(writecsvKey, proc)
+    async def logStderr():
+      stream = proc.stderr
+      if not stream:
+        return
+      buf = await stream.readline()
+      while len(buf) > 0:
+        log(buf.decode().rstrip())
+        buf = await stream.readline()
+    asyncio.create_task(logStderr())
     return proc
   return f
 
@@ -203,53 +220,82 @@ class SkdbPeer:
     self.streams[table].append(stream)
     return self
 
+  def _scheduleDmlTask(self, table, task):
+    self.scheduler.add(task)
+
+    # tasks on a peer are sequential
+    self.scheduler.happensBefore(self.lastTask, task)
+    self.lastTask = task
+
+    schedules = list()
+    deliveryTasks = defaultdict(list)
+    deliveryTasks[self.name].append(task)
+
+    def buildDeliverySchedules(candidateEdges, sched, tasks, deliveries):
+      def receivedFrom(edge, deliveries):
+        # has sender received from receiver? if so, this is a no-op
+        # delivery and can be pruned to avoid schedule explosion
+        return edge.receiver in deliveries[edge.sender]
+
+      def updateDeliveries(edge):
+        ds = copy.copy(deliveries)
+        ds[edge.receiver] = ds[edge.receiver].union({edge.sender})
+        return ds
+
+      def getNewCandidates(edge, deliveries):
+        node = edge.receiver
+        return [x for x in node.streams[table]
+                if not receivedFrom(x, deliveries) and x not in sched]
+
+      if candidateEdges == []:
+        for a,b in itertools.pairwise(tasks):
+          self.scheduler.happensBefore(a, b)
+        schedules.append(tasks)
+
+      for edge in candidateEdges:
+        ourCandidateEdges = copy.copy(candidateEdges)
+        ourCandidateEdges.remove(edge)
+        ourSched = sched
+        ourDeliveries = deliveries
+        ourTasks = tasks
+        if not receivedFrom(edge, deliveries):
+          ourSched = copy.copy(sched)
+          ourSched.append(edge)
+          ourDeliveries = updateDeliveries(edge)
+          ourCandidateEdges.extend(getNewCandidates(edge, ourDeliveries))
+          task = edge.clockTask()
+          ourTasks = copy.copy(tasks)
+          ourTasks.append(task)
+          deliveryTasks[edge.receiver.name].append(task)
+        buildDeliverySchedules(ourCandidateEdges, ourSched, ourTasks, ourDeliveries)
+
+    buildDeliverySchedules(self.streams[table], [], [task], defaultdict(set))
+
+    self.scheduler.choice(schedules)
+
+    return deliveryTasks
+
   def insertInto(self, table: str, row):
     rowStr = ", ".join(serialise(val) for val in row)
     q = f"INSERT INTO {table} VALUES ({rowStr});"
     insert = Task(f"insert {row} in to '{table}' on {self}", runDmlQuery(self, q))
-    self.scheduler.add(insert)
-    self.scheduler.happensBefore(self.lastTask, insert)
-    self.lastTask = insert
-    # we prime the visited set with the inverse streams. this has the
-    # effect of not sending echo responses. they are assumed to be
-    # filtered and so are always a no-op. this reduces schedule sizes
-    # dramatically (orders of magnitude), so is worth not testing
-    visited = set(s.other for s in self.streams[table] if s.other)
-    def traverse(before, streams):
-      for stream in streams:
-        if stream in visited:
-          continue
-        visited.add(stream)
-        send = stream.clockTask()
-        self.scheduler.add(send)
-        self.scheduler.happensBefore(before, send)
-        traverse(send, stream.receiver.streams[table])
-    traverse(insert, self.streams[table])
-    return insert
+    return self._scheduleDmlTask(table, insert)
 
   def insertOrReplace(self, table: str, row):
     rowStr = ", ".join(serialise(val) for val in row)
     q = f"INSERT OR REPLACE INTO {table} VALUES ({rowStr});"
     insert = Task(f"insert with replace {row} in to '{table}' on {self}", runDmlQuery(self, q))
-    self.scheduler.add(insert)
-    self.scheduler.happensBefore(self.lastTask, insert)
-    self.lastTask = insert
-    # we prime the visited set with the inverse streams. this has the
-    # effect of not sending echo responses. they are assumed to be
-    # filtered and so are always a no-op. this reduces schedule sizes
-    # dramatically (orders of magnitude), so is worth not testing
-    visited = set(s.other for s in self.streams[table] if s.other)
-    def traverse(before, streams):
-      for stream in streams:
-        if stream in visited:
-          continue
-        visited.add(stream)
-        send = stream.clockTask()
-        self.scheduler.add(send)
-        self.scheduler.happensBefore(before, send)
-        traverse(send, stream.receiver.streams[table])
-    traverse(insert, self.streams[table])
-    return insert
+    return self._scheduleDmlTask(table, insert)
+
+  def deleteFromWhere(self, table: str, where: str):
+    q = f"DELETE FROM {table} WHERE {where};"
+    t = Task(f"'{q}' on {self}", runDmlQuery(self, q))
+    return self._scheduleDmlTask(table, t)
+
+  def updateSetWhere(self, table: str, setExprs: str, where: str):
+    q = f"UPDATE {table} SET {setExprs} WHERE {where};"
+    t = Task(f"'{q}' on {self}", runDmlQuery(self, q))
+    return self._scheduleDmlTask(table, t)
 
   async def query(self, schedule, query):
     return await runQuery(self, query)(schedule)
@@ -257,13 +303,13 @@ class SkdbPeer:
   def initTask(self) -> Task:
     raise NotImplementedError()
 
-  def tailTask(self, table, replicationId):
+  def tailTask(self, table, dest, peerId):
     def factory(stream, init):
       subkey = (self, stream, 'sub')
 
       async def start(schedule):
         user = "todo"               # TODO:
-        start = subscribe(self, subkey, table, user, replicationId)
+        start = subscribe(self, subkey, table, user, dest, peerId)
         await start(schedule)
 
       async def pull(schedule):
@@ -271,7 +317,8 @@ class SkdbPeer:
         db = schedule.getScheduleLocal(self)
         session = schedule.getScheduleLocal(subkey)
         since = schedule.getScheduleLocal(sinceKey) or 0
-        payload = await tail(db, session, since)
+        payload, log = await tail(db, session, peerId, since)
+        schedule.debug(log.decode().rstrip())
         stream.send(schedule, payload)
         schedule.storeScheduleLocal(sinceKey, getOurLastCheckpoint(since, payload.decode()))
 
@@ -280,12 +327,12 @@ class SkdbPeer:
       return Task(f"<{self} {table}> -> {stream}", pull)
     return factory
 
-  def writeTask(self, table, replicationId):
+  def writeTask(self, source, peerId):
     def factory(stream, init):
       key = (self, stream, 'write')
       async def start(schedule):
         user = "todo"               # TODO:
-        start = startStreamingWriteCsv(self, key, table, user, replicationId)
+        start = startStreamingWriteCsv(self, key, user, source, peerId, schedule.debug)
         await start(schedule)
 
       async def stop(schedule):
@@ -299,8 +346,8 @@ class SkdbPeer:
         proc.stdin.write(payload)
 
       if init:
-        return Task(f"start write-csv for {self} {table} {stream}", start, stop)
-      return Task(f"{stream} -> <{self} {table}>", push)
+        return Task(f"start write-csv for {self} {stream}", start, stop)
+      return Task(f"{stream} -> <{self}>", push)
     return factory
 
 class Server(SkdbPeer):
@@ -341,10 +388,14 @@ class Topology:
     return str(self.replicationIdGen)
 
   def mirror(self, table, a, b):
-    aRepId = self._genReplicationId()
-    bRepId = self._genReplicationId()
-    atob = HalfStream(a, b, a.tailTask(table, aRepId), b.writeTask(table, bRepId))
-    btoa = HalfStream(b, a, b.tailTask(table, bRepId), a.writeTask(table, aRepId))
+    repIdForA = self._genReplicationId()
+    repIdForB = self._genReplicationId()
+    atob = HalfStream(a, b,
+                      a.tailTask(table, dest=repIdForB, peerId=a.name),
+                      b.writeTask(source=repIdForA, peerId=b.name))
+    btoa = HalfStream(b, a,
+                      b.tailTask(table, dest=repIdForA, peerId=b.name),
+                      a.writeTask(source=repIdForB, peerId=a.name))
     atob.other = btoa
     btoa.other = atob
     self.initTask.add(atob.initTask())
@@ -359,7 +410,7 @@ class Topology:
       results = await asyncio.gather(
         *[peer.query(schedule, query) for peer in self.peers]
       )
-      expectations.check(results)
+      expectations.check(dict(zip(self.peers, results)), schedule)
     checkTask = Task(f"Check {expectations} on {query}", f)
     for scheduled in self.scheduler.tasks():
       self.scheduler.happensBefore(scheduled, checkTask)
