@@ -39,4 +39,4 @@ $SKDB_BIN --init "$DB_FILE"
 # setup the base tables used for access-control
 $SKDB < "$SCRIPT_DIR/../../privacy/init.sql"
 
-echo "INSERT INTO skdb_users VALUES (0, 'root', '$ROOT_KEY')" | $SKDB
+echo "INSERT INTO skdb_users VALUES ('root', '$ROOT_KEY')" | $SKDB
