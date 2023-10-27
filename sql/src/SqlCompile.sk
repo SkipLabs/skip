@@ -353,6 +353,7 @@ mutable class Compiler{
     cselect = CSelect{
       id => Name::create(
         select.id.lower +
+          (if (this.options.virtual) "" else params.hash().toString()) +
           context.getGlobal("TableMap") match {
           | None() -> ""
           | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
