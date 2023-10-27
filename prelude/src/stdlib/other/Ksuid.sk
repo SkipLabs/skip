@@ -107,7 +107,7 @@ value class Ksuid(bytes: Array<UInt8>) uses Hashable, Orderable, Show {
     }
   }
 
-  fun to_sextets(): Array<Char> {
+  fun to_sextets(): mutable Vector<Char> {
     b = this.bytes;
     v = Vector::mcreate(27);
     push = (sextet -> v.push(static::sextet_to_char(sextet)));
@@ -135,10 +135,21 @@ value class Ksuid(bytes: Array<UInt8>) uses Hashable, Orderable, Show {
     push(n.shr(10).and(0x3F));
     push(n.shr(4).and(0x3F));
     push(n.and(0xF)); // only 4 bits of final sextet are used
-    v.toArray();
+    v;
   }
 
-  static fun of_sextets(sextets: Array<Int>): Array<UInt8> {
+  static fun of_sextets(sextets0: Vector<Int>): Vector<UInt8> {
+    size_diff = (27 - sextets0.size());
+    sextets = size_diff.compare(0) match {
+    | LT() ->
+      invariant_violation("Ksuid::of_sextets input length must be <= 27")
+    | EQ() -> sextets0
+    | GT() ->
+      // postpend 0s to ensure 27 elements
+      sextets = sextets0.clone(size_diff);
+      for (_ in Range(0, size_diff)) sextets.push(0);
+      sextets
+    };
     v = Vector::mcreate(20);
     push = (octet -> v.push(UInt8::truncate(octet)));
     i = 0;
@@ -164,18 +175,21 @@ value class Ksuid(bytes: Array<UInt8>) uses Hashable, Orderable, Show {
     // split 16-bit int into 2 octets
     push(n.shr(8).and(0xFF));
     push(n.and(0xFF));
-    v.toArray();
+    v.chill();
   }
 
   fun toString(): String {
-    String::fromChars(this.to_sextets());
+    sextets = this.to_sextets();
+    // trim trailing 0/'-' elements
+    while (sextets[sextets.size() - 1] == '-') _ = sextets.pop();
+    String::fromChars(sextets.toArray());
   }
 
   static fun fromString(s: String): this {
     Ksuid(
       static::of_sextets(
-        s.getIter().map(static::char_to_sextet).collect(Array),
-      ),
+        s.getIter().map(static::char_to_sextet).collect(Vector),
+      ).toArray(),
     );
   }
 }
