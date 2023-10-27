@@ -152,6 +152,38 @@ def test_two_clients_single_server_multiple_inserts_on_client1_insert_on_each():
   return scheduler
 
 
+def test_two_clients_insert_and_delete():
+  scheduler = sched.AllTopoSortsScheduler(limit=5000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_without_pk", client1, server)
+  cluster.mirror("test_without_pk", client2, server)
+
+  insert = client1.insertInto("test_without_pk", [0, 'foo'])
+  delete = server.deleteFromWhere("test_without_pk", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_without_pk;").match(
+    colnames=['id', 'note'],
+  ).clause(
+    # does s1 see the insert before it does its delete?
+    lambda schedule: any(schedule.happensBefore(delivery, delete['s1'][0])
+                         for delivery in insert['s1']),
+    []
+  ).elze(
+    [[0, "foo"]]
+  )
+
+  return scheduler
+
+
 # TODO: ignore - no multi-peer yet
 def ignore_test_full_mesh_two_conflicting_inserts():
   scheduler = sched.AllTopoSortsScheduler(limit=5000)
