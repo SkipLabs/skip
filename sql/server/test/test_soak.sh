@@ -23,6 +23,9 @@ if [ -z "$skdb_port" ]; then
     skdb_port=8080
 fi
 
+if [ -z "$skdb_databases" ]; then
+    skdb_databases=/var/db/
+fi
 SERVER_PID_FILE=$(mktemp)
 SERVER_DB="$skdb_databases"soak.db
 SOAK_SERVER_LOG=/tmp/soak-server-log
@@ -44,28 +47,28 @@ run_server() {
     DB_PREFIX=$skdb_databases "$SCRIPT_DIR"/../deploy/create_db.sh soak abcdef
 
     (echo "BEGIN TRANSACTION;";
-     echo "INSERT INTO skdb_users VALUES(1, 'test_user1', 'test');"
-     echo "INSERT INTO skdb_users VALUES(2, 'test_user2', 'test');"
+     echo "INSERT INTO skdb_users VALUES('test_user1', 'test');"
+     echo "INSERT INTO skdb_users VALUES('test_user2', 'test');"
      echo "COMMIT;"
     ) | $SKDB
 
     # these tables are for inserts only. there should be no conflict
-    echo "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
-    echo "CREATE TABLE pk_inserts (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    echo "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_inserts (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
 
     # these tables have two clients fighting over a single row
-    echo "CREATE TABLE no_pk_single_row (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
-    echo "INSERT INTO no_pk_single_row VALUES (0,0,0, -1);" | $SKDB
-    echo "CREATE TABLE pk_single_row (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
-    echo "INSERT INTO pk_single_row VALUES (0,0,0, -1);" | $SKDB
+    echo "CREATE TABLE no_pk_single_row (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "INSERT INTO no_pk_single_row VALUES (0,0,0, 'read-write');" | $SKDB
+    echo "CREATE TABLE pk_single_row (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "INSERT INTO pk_single_row VALUES (0,0,0, 'read-write');" | $SKDB
 
     # these are filtered - the clients do intersect over some rows, but also have some rows disjoint
-    echo "CREATE TABLE no_pk_filtered (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
-    echo "CREATE TABLE pk_filtered (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    echo "CREATE TABLE no_pk_filtered (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_filtered (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
 
     # clients manipulate these with random operations
-    echo "CREATE TABLE no_pk_random (id INTEGER, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
-    echo "CREATE TABLE pk_random (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access INTEGER NOT NULL);" | $SKDB
+    echo "CREATE TABLE no_pk_random (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_random (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
 
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > $SOAK_SERVER_LOG &
 
