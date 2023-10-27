@@ -1231,9 +1231,13 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
           if (lex.isEqUpper(pos, "COMMIT")) {
             !pos = lex.expectUpper(pos, "COMMIT");
             !pos = lex.expect(pos, ";");
-            context.getGlobal("GLOBALS") match {
+            context.getGlobal(GLOBALS) match {
             | None() -> void
             | Some(_) -> context.removeGlobal(GLOBALS)
+            };
+            context.getGlobal(NAMEDIDS) match {
+            | None() -> void
+            | Some(_) -> context.removeGlobal(NAMEDIDS)
             };
             break void;
           };
