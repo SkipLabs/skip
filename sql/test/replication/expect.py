@@ -37,12 +37,22 @@ class Expectations():
       return ""
     self.checks.append(check)
 
+  def isOneOf(self, setOfRows, colnames=[]):
+    def check(resultSet, _schedule):
+      for rows in setOfRows:
+        match = list({k: v for (k,v) in zip(colnames, row)} for row in rows)
+        if resultSet == match:
+          return ""
+      return f"{resultSet} did not match any of: {setOfRows}"
+    self.checks.append(check)
+
   def match(self, colnames=[]):
     check = MatchCheck(colnames)
     self.checks.append(check)
     return check
 
   def verifyChecks(self, peerResultMap, schedule):
+    # TODO: only need to do this for first peer if we've verified convergence
     for peer, resultSet in peerResultMap.items():
       for check in self.checks:
         msg = check(resultSet, schedule)
