@@ -318,7 +318,7 @@ class Skdb(val name: String, private val dbPath: String) {
   fun createUser(encryptedPrivateKey: String): String {
     val accessKey =
       sql(
-        "BEGIN TRANSACTION; INSERT INTO skdb_users VALUES (id('userID'), @privateKey); SELECT userUUID FROM skdb_users WHERE userUUID = id('userID'); COMMIT;",
+        "BEGIN TRANSACTION; INSERT INTO skdb_users VALUES (id('userID'), @privateKey); SELECT id('userID'); COMMIT;",
         mapOf("privateKey" to encryptedPrivateKey),
         OutputFormat.RAW)
       .decode()
