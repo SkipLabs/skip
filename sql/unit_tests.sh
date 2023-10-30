@@ -138,6 +138,12 @@ else
     fail "LOCAL SEQUENCE NUMBER"
 fi
 
+if cat test/unit/test_seqnum2.sql | $SKDB | tr '\n' S | grep -q "9S15S20S27"; then
+    pass "LOCAL SEQUENCE NUMBER 2"
+else
+    fail "LOCAL SEQUENCE NUMBER 2"
+fi
+
 if cat test/unit/test_id.sql | $SKDB | tr '\n' S | grep -q "123S122S"; then
     pass "ID"
 else

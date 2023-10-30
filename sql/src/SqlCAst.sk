@@ -8,7 +8,7 @@ value class Pattern{
   firstIsPercent: Bool,
   lastIsPercent: Bool,
   subs: Array<Array<Char>>,
-} uses Orderable
+} uses Orderable, Hashable
 
 base class AggrKind uses Orderable {
   children =
@@ -152,7 +152,7 @@ class CJoin{
   on: ?Array<(CGExpr, ?String)>,
 }
 
-base class CGExpr uses Orderable {
+base class CGExpr uses Orderable, Hashable {
   children =
   | CGNull()
   | CIExpr(CExpr<Int>)
@@ -182,7 +182,7 @@ base class CGExpr uses Orderable {
 @cpp_extern("SKIP_largest_string")
 native fun largestString(): String;
 
-base class CExpr<Value: frozen> uses Orderable
+base class CExpr<Value: frozen> uses Orderable, Hashable
 class CNull<T: frozen>() extends CExpr<T>
 class CISize(Int) extends CExpr<Int>
 
@@ -246,10 +246,26 @@ class CIIn(CExpr<Int>, Array<CExpr<Int>>) extends CExpr<Int>
 class CFIn(CExpr<Float>, Array<CExpr<Float>>) extends CExpr<Int>
 class CSIn(CExpr<String>, Array<CExpr<String>>) extends CExpr<Int>
 
-class CExists(CSelect) extends CExpr<Int>
-class CIQuery(CSelect) extends CExpr<Int>
-class CFQuery(CSelect) extends CExpr<Float>
-class CSQuery(CSelect) extends CExpr<String>
+class CExists(cselect: CSelect) extends CExpr<Int> {
+  fun hash(): Int {
+    this.cselect.id.hash()
+  }
+}
+class CIQuery(cselect: CSelect) extends CExpr<Int> {
+  fun hash(): Int {
+    this.cselect.id.hash()
+  }
+}
+class CFQuery(cselect: CSelect) extends CExpr<Float> {
+  fun hash(): Int {
+    this.cselect.id.hash()
+  }
+}
+class CSQuery(cselect: CSelect) extends CExpr<String> {
+  fun hash(): Int {
+    this.cselect.id.hash()
+  }
+}
 
 class CIAbs(CExpr<Int>) extends CExpr<Int>
 class CFAbs(CExpr<Float>) extends CExpr<Float>
