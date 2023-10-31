@@ -27,6 +27,10 @@ class WrappedRemote implements RemoteSKDB {
     return this.worker.post(new Caller(this.wrapped, "tableSchema", [tableName]));
   }
 
+  setUser(userName: string) {
+    return this.worker.post(new Caller(this.wrapped, "setUser", [userName]));
+  }
+
   viewSchema(viewName: string) {
     return this.worker.post(new Caller(this.wrapped, "viewSchema", [viewName]));
   }
@@ -98,6 +102,10 @@ export class SKDBWorker implements SKDB {
     return this.worker.post(new Function("tableSchema", [tableName])) as Promise<string>;
   };
 
+  setUser = async (userName: string) => {
+    return this.worker.post(new Function("setUser", [userName])) as Promise<void>;
+  };
+
   viewSchema = async (viewName: string) => {
     return this.worker.post(new Function("viewSchema", [viewName])) as Promise<string>;
   };
@@ -140,5 +148,9 @@ export class SKDBWorker implements SKDB {
   connectedRemote = async () => {
     return this.worker.post(new Function("connectedRemote", [], { wrap: true, autoremove: false }))
       .then(wrapped => new WrappedRemote(this.worker, wrapped.wrapped));
+  }
+
+  getUser = async () => {
+    return this.worker.post(new Function("getUser", []));
   }
 }

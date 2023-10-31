@@ -11,7 +11,8 @@ CREATE TABLE skdb_users(
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_user_permissions(
   userID STRING PRIMARY KEY,
-  permissions INTEGER NOT NULL
+  permissions INTEGER NOT NULL,
+  skdb_access STRING NOT NULL
 );
 
 -------------------------------------------------------------------------------
@@ -37,6 +38,10 @@ CREATE TABLE skdb_group_permissions(
   permissions INTEGER NOT NULL,
   skdb_access STRING NOT NULL
 );
+
+CREATE UNIQUE INDEX skdb_permissions_group_user ON
+  skdb_group_permissions(groupUUID, userUUID)
+;
 
 CREATE VIRTUAL VIEW skdb_groups_users AS
   SELECT userID AS groupID FROM skdb_users

@@ -984,6 +984,16 @@ class Evaluator{options: Options, user: ?UserFile} {
 
     _ = context.mkdir(x ~> x, RowValues::type, dirName);
 
+    context.writeChecker match {
+    | None() -> void
+    | Some(checker) ->
+      authorIdx = dirDescr.cols.maybeGet(skdbAuthorColName);
+      accessIdx = dirDescr.cols.maybeGet(skdbAccessColName);
+      if (authorIdx is Some _ || accessIdx is Some _) {
+        checker.addTable(dirDescr.dirName, authorIdx, accessIdx);
+      }
+    };
+
     getTableDir(context).writeArray(
       context,
       SKStore.SID::create(name.lower),

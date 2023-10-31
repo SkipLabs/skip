@@ -126,6 +126,13 @@ untracked fun main(): void {
         .arg(Cli.StringArg("table-suffix").about("Optional suffix")),
     )
     .subcommand(
+      Cli.Command("set-user")
+        .about("Sets the user of the database")
+        .arg(
+          Cli.StringArg("userUUID").positional().required().about("userUUID"),
+        ),
+    )
+    .subcommand(
       Cli.Command("dump-tables")
         .about("Dumps the tables in SQL format")
         .arg(Cli.StringArg("table-suffix").about("Optional suffix")),
@@ -331,6 +338,7 @@ untracked fun main(): void {
         | "replay" -> execReplay
         | "toggle-view" -> execToggleView
         | "debug" -> execDebug
+        | "set-user" -> execSetUser
         | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
         }
       )
@@ -356,9 +364,7 @@ untracked fun main(): void {
       });
     subcmd_handler(args, options);
   } catch {
-  | exn ->
-    SKStore.destroyObstack(saved);
-    throw exn
+  | exn -> print_error("Internal error: " + exn.getMessage())
   };
   SKStore.destroyObstack(saved);
 }
@@ -409,6 +415,20 @@ fun execDumpTable(args: Cli.ParseResults, options: SKDB.Options): void {
   SKDB.runSql(options, context ~> {
     SKDB.dumpTable(context, tableName.lowercase(), suffix);
     SKStore.CStop(None())
+  })
+}
+
+fun execSetUser(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  userUUID = args.getString("userUUID");
+  SKDB.runSql(options, _ ~> {
+    SKStore.CStop(
+      Some((context, _, _) ~> {
+        context.!writeChecker = Some(
+          SKDB.AccessSolver::create(context, userUUID),
+        )
+      }),
+    )
   })
 }
 
@@ -584,7 +604,7 @@ fun getSqlTableFromDirName(
   dirName: SKStore.DirName,
 ): SKDB.DirDescr {
   dirNameStr = dirName.toString();
-  !dirNameStr = dirName.toString().stripPrefix("/").stripSuffix("/");
+  !dirNameStr = dirNameStr.stripPrefix("/").stripSuffix("/");
   SKDB.getTable(context.mclone(), 0, SKDB.Name::create(dirNameStr))
 }
 

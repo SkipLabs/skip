@@ -1,7 +1,13 @@
 import { expect } from '@playwright/test';
-import { createSkdb, SKDB } from 'skdb';
+import { createSkdb, createGroup, SKDB } from 'skdb';
 
-type dbs = { root: SKDB, user: SKDB };
+type dbs = {
+  root: SKDB,
+  user: SKDB,
+  userID: string,
+  user2: SKDB,
+  userID2: string
+};
 
 function getErrorMessage(error: any) {
   if (typeof error == "string") {
@@ -51,7 +57,18 @@ export async function setup(credentials: string, port: number, crypto, asWorker:
       "raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     await userSkdb.connect(dbName, testUserCreds.accessKey, key, host);
   }
-  return { root: rootSkdb, user: userSkdb };
+
+  const testUserCreds2 = await rootRemote.createUser();
+
+  const userSkdb2 = await createSkdb({ asWorker: asWorker });
+  {
+    const keyData2 = testUserCreds2.privateKey;
+    const key2 = await crypto.subtle.importKey(
+      "raw", keyData2, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    await userSkdb2.connect(dbName, testUserCreds2.accessKey, key2, host);
+  }
+
+  return { root: rootSkdb, user: userSkdb, userID: testUserCreds.accessKey, user2: userSkdb2, userID2: testUserCreds2.accessKey };
 }
 
 async function testQueriesAgainstTheServer(skdb: SKDB) {
@@ -349,6 +366,12 @@ async function testPrivacyRejectedTxn(root: SKDB, user: SKDB): Promise<void> {
   })
 }
 
+async function testJSPrivacy(skdb: SKDB, userID: string, skdb2: SKDB, userID2: string) {
+  await createGroup(skdb, userID, 'myGroup');
+  console.log("HERE");
+  console.log(await skdb.getUser());
+}
+
 export const apitests = (asWorker) => {
   return [
     {
@@ -361,6 +384,10 @@ export const apitests = (asWorker) => {
 
         await testMirroring(dbs.user);
 
+        //Privacy
+        await testPrivacy(dbs.user, dbs.userID, dbs.user2, dbs.userID2);
+
+        // Server Tail
         await testServerTail(dbs.root, dbs.user);
 
         await testClientTail(dbs.root, dbs.user);
