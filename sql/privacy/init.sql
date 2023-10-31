@@ -4,13 +4,13 @@
 
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_users(
-  userUUID STRING PRIMARY KEY,
+  userID STRING PRIMARY KEY,
   privateKey STRING NOT NULL
 );
 
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_user_permissions(
-  userUUID STRING PRIMARY KEY,
+  userID STRING PRIMARY KEY,
   permissions INTEGER NOT NULL
 );
 
@@ -18,46 +18,46 @@ CREATE TABLE skdb_user_permissions(
 -- Groups
 -------------------------------------------------------------------------------
 
--- groupUUID: which group are we talking about?
+-- groupID: which group are we talking about?
 -- skdb_author: who is the creator of the group?
--- skdb_admin: who should be able to be admin of the group?
+-- adminID: who should be able to be admin of the group?
 -- skdb_access: who should be able to see/modify the administrators
 
 CREATE TABLE skdb_groups(
-  groupUUID STRING PRIMARY KEY,
+  groupID STRING PRIMARY KEY,
   skdb_author STRING,
-  adminUUID STRING NOT NULL,
+  adminID STRING NOT NULL,
   skdb_access STRING NOT NULL
 );
 
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_group_permissions(
-  groupUUID STRING NOT NULL,
-  userUUID STRING,
+  groupID STRING NOT NULL,
+  userID STRING,
   permissions INTEGER NOT NULL,
   skdb_access STRING NOT NULL
 );
 
 CREATE VIRTUAL VIEW skdb_groups_users as
-  SELECT userUUID as groupUUID from skdb_users UNION ALL
-  SELECT groupUUID from skdb_groups GROUP BY groupUUID
+  SELECT userID as groupID from skdb_users UNION ALL
+  SELECT groupID from skdb_groups GROUP BY groupID
 ;
 
-CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupUUID);
+CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
 
 CREATE VIRTUAL VIEW skdb_group_permissions_joined AS
   SELECT
-    skdb_group_permissions.groupUUID,
-    skdb_group_permissions.userUUID,
+    skdb_group_permissions.groupID,
+    skdb_group_permissions.userID,
     skdb_group_permissions.permissions,
     skdb_group_permissions.skdb_access
   FROM skdb_group_permissions, skdb_groups
- WHERE skdb_group_permissions.groupUUID = skdb_groups.groupUUID
-   AND skdb_group_permissions.skdb_access = skdb_groups.adminUUID
+ WHERE skdb_group_permissions.groupID = skdb_groups.groupID
+   AND skdb_group_permissions.skdb_access = skdb_groups.adminID
 ;
 
 CREATE UNIQUE INDEX skdb_group_permissions_joined_index on
-  skdb_group_permissions_joined(groupUUID, userUUID)
+  skdb_group_permissions_joined(groupID, userID)
 ;
 
 -------------------------------------------------------------------------------
