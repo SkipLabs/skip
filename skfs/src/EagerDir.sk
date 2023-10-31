@@ -1698,6 +1698,16 @@ class EagerDir{
       return this;
     };
 
+    context.writeChecker match {
+    | None() -> void
+    | Some(checker) ->
+      checker.tables.maybeGet(this.dirName) match {
+      | None() -> void
+      | Some(indexes) ->
+        checker.checkWrite(context, this.dirName, indexes, k, rvalues)
+      }
+    };
+
     if (this.data.nbrEntries >= this.fixedData.size()) {
       context.!toPurge = context.toPurge.set(this.dirName);
     };

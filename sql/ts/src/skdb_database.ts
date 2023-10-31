@@ -79,6 +79,7 @@ export class SKDBSyncImpl implements SKDBSync {
   private environment: Environment;
   private subscriptionCount: number = 0;
   private clientUuid: string = "";
+  private accessKey: string = "";
   private fs: FileSystem;
 
   save: () => Promise<boolean>;
@@ -131,6 +132,8 @@ export class SKDBSyncImpl implements SKDBSync {
       deviceUuid: this.clientUuid,
     };
 
+    this.accessKey = accessKey;
+
     this.connectedRemote = await connect(
       this.environment,
       new SkdbMechanismImpl(this, this.fs, this.environment.encodeUTF8),
@@ -138,6 +141,37 @@ export class SKDBSyncImpl implements SKDBSync {
       db,
       creds
     );
+
+    // Setting up local privacy checks
+    await this.mirror("skdb_user_permissions");
+    await this.mirror("skdb_groups");
+    await this.mirror("skdb_group_permissions");
+    await this.exec(
+      "CREATE UNIQUE INDEX skdb_permissions_group_user ON" +
+        "  skdb_group_permissions(groupUUID, userUUID);"
+    );
+    await this.exec(
+      "CREATE VIRTUAL VIEW skdb_group_permissions_joined AS\n" +
+        "  SELECT\n" +
+        "    skdb_group_permissions.groupUUID,\n" +
+        "    skdb_group_permissions.userUUID,\n" +
+        "    skdb_group_permissions.permissions,\n" +
+        "    skdb_group_permissions.skdb_access\n" +
+        "  FROM skdb_group_permissions, skdb_groups\n" +
+        " WHERE skdb_group_permissions.groupUUID = skdb_groups.groupUUID\n" +
+        "   AND skdb_group_permissions.skdb_access = skdb_groups.adminUUID\n" +
+        ";\n");
+
+    await this.exec(
+      "CREATE UNIQUE INDEX skdb_group_permissions_joined_index on\n" +
+        "  skdb_group_permissions_joined(groupUUID, userUUID)\n" +
+        ";\n"
+    );
+    await this.setUser(accessKey);
+  }
+
+  getUser(): string {
+    return this.accessKey;
   }
 
   watermark(replicationId: string, table: string): bigint {
@@ -176,6 +210,10 @@ export class SKDBSyncImpl implements SKDBSync {
 
   tableSchema = (tableName: string) => {
     return this.runLocal(["dump-table", tableName], "");
+  }
+
+  setUser = (userName: string) => {
+    return this.runLocal(["set-user", userName], "");
   }
 
   viewSchema = (viewName: string) => {
@@ -286,6 +324,10 @@ export class SKDBImpl implements SKDB {
 
   tableSchema = async (tableName: string) => {
     return this.skdbSync.tableSchema(tableName);
+  }
+
+  setUser = async (userName: string) => {
+    return this.skdbSync.setUser(userName);
   }
 
   viewSchema = async (viewName: string) => {

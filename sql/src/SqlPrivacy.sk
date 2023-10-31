@@ -487,7 +487,7 @@ mutable class AccessSolver private {
   userMask: Permission,
   private mutable cache: SortedMap<String, Permission>,
   private mutable currentTick: SKStore.Tick,
-} {
+} extends SKStore.WriteChecker {
   static fun create(
     context: readonly SKStore.Context,
     userID: String,
@@ -512,9 +512,19 @@ mutable class AccessSolver private {
     mutable static{
       userID,
       userMask => userPermissions,
+      tables => SortedMap[],
       cache => SortedMap[],
       currentTick => SKStore.Tick(-1),
     }
+  }
+
+  mutable fun addTable(
+    dirName: SKStore.DirName,
+    authorIdx: ?Int,
+    accessIdx: ?Int,
+  ): void {
+    tableIndexes = SKStore.TableIndexes(authorIdx, accessIdx);
+    this.!tables[dirName] = tableIndexes;
   }
 
   private mutable fun getPermissions(
@@ -582,6 +592,53 @@ mutable class AccessSolver private {
     groupID: String,
   ): Bool {
     this.getPermissions(context, groupID).canDelete()
+  }
+
+  mutable fun checkWrite(
+    context: readonly SKStore.Context,
+    dirName: SKStore.DirName,
+    indexes: SKStore.TableIndexes,
+    key: SKStore.Key,
+    files: Array<SKStore.File>,
+  ): void {
+    key match {
+    | RowKey(rowValues, _) ->
+      if (files.size() == 0) {
+        !rowValues = rowValues.setRepeat(0);
+      };
+      checkUserCanWriteRow(
+        context,
+        this,
+        () ~> dirName.toString().stripPrefix("/").stripSuffix("/"),
+        indexes.authorIdx,
+        indexes.accessIdx,
+        rowValues,
+      ) match {
+      | SKDB.AROK() -> void
+      | SKDB.ARError(err) -> throw Error(0, err.toString())
+      }
+    | _ -> void
+    }
+  }
+
+  readonly fun clone(): this {
+    static{
+      userID => this.userID,
+      userMask => this.userMask,
+      tables => this.tables,
+      cache => this.cache,
+      currentTick => this.currentTick,
+    }
+  }
+
+  readonly fun mclone(): mutable this {
+    mutable static{
+      userID => this.userID,
+      userMask => this.userMask,
+      tables => this.tables,
+      cache => this.cache,
+      currentTick => this.currentTick,
+    }
   }
 }
 

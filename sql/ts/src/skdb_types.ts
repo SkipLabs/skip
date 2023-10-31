@@ -21,6 +21,7 @@ export interface SKDBSync {
   insert: (tableName: string, values: Array<any>) => boolean;
 
   tableSchema: (tableName: string) => string;
+  setUser: (userName: string) => void;
   viewSchema: (viewName: string) => string;
   schema: (tableName?: string) => string;
   subscribe: (viewName: string, f: (change: string) => void) => void;
@@ -88,6 +89,7 @@ export interface RemoteSKDB {
   createUser(): Promise<ProtoResponseCreds>;
   schema: () => Promise<string>;
   tableSchema: (tableName: string) => Promise<string>;
+  setUser: (userName: string) => Promise<void>;
   viewSchema: (viewName: string) => Promise<string>;
 
   createDatabase: (dbName: string) => Promise<ProtoResponseCreds>;

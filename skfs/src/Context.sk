@@ -270,6 +270,33 @@ base class CanReuse {
 }
 
 /*****************************************************************************/
+/* Checks if a write should be allowed (only useful when using the
+/* database as a specific user). */
+/*****************************************************************************/
+
+value class TableIndexes(authorIdx: ?Int, accessIdx: ?Int)
+
+mutable base class WriteChecker private {
+  mutable tables: SortedMap<DirName, TableIndexes>,
+} {
+  mutable fun checkWrite(
+    context: readonly SKStore.Context,
+    dirName: DirName,
+    indexes: TableIndexes,
+    key: Key,
+    files: Array<File>,
+  ): void;
+
+  mutable fun addTable(
+    tableName: DirName,
+    authorIdxOpt: ?Int,
+    accessIdxOpt: ?Int,
+  ): void;
+  readonly fun clone(): WriteChecker;
+  readonly fun mclone(): mutable WriteChecker;
+}
+
+/*****************************************************************************/
 /* The context */
 /*****************************************************************************/
 
@@ -302,6 +329,7 @@ mutable class Context{
   mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
   mutable postWrites: List<ToWrite> = List[],
+  mutable writeChecker: ?(mutable WriteChecker) = None(),
 } {
   mutable fun postpone(toWrite: ToWrite): void {
     this.!postWrites = List.Cons(toWrite, this.postWrites);
@@ -367,6 +395,7 @@ mutable class Context{
       sessions => this.sessions,
       removeSubDirs => this.removeSubDirs,
       postWrites => this.postWrites,
+      writeChecker => this.writeChecker.map(x -> x.clone()),
     }
   }
 
@@ -400,6 +429,7 @@ mutable class Context{
       sessions => this.sessions,
       removeSubDirs => this.removeSubDirs,
       postWrites => this.postWrites,
+      writeChecker => this.writeChecker.map(x -> x.mclone()),
     }
   }
 
@@ -433,6 +463,7 @@ mutable class Context{
       sessions => ctx.sessions,
       removeSubDirs => ctx.removeSubDirs,
       postWrites => ctx.postWrites,
+      writeChecker => ctx.writeChecker.map(x -> x.mclone()),
     }
   }
 
@@ -465,6 +496,7 @@ mutable class Context{
     this.!sessions = ctx.sessions;
     this.!removeSubDirs = ctx.removeSubDirs;
     this.!postWrites = ctx.postWrites;
+    this.!writeChecker = ctx.writeChecker.map(x -> x.mclone());
   }
 
   mutable fun getReads(): SortedSet<Path> {
