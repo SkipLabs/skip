@@ -340,7 +340,7 @@ untracked fun main(): void {
         // TODO: If `--user` is actually needed, reinstate it. It was clashing with
         // other options and was removed for convenience.
         // user = argMap.maybeGet("user") match {
-        //   | Some(AP.StringValue{value => userUUID}) -> Some(userUUID)
+        //   | Some(AP.StringValue{value => userID}) -> Some(userID)
         //   | _ -> None()
         //   };
         params = queryParams(options);
@@ -475,7 +475,7 @@ fun execLoadCsv(args: Cli.ParseResults, options: SKDB.Options): void {
     };
     user = args.maybeGetString("user") match {
     | None() -> None()
-    | Some(userUUID) -> Some(SKDB.UserFile::create(context, userUUID))
+    | Some(userID) -> Some(SKDB.UserFile::create(context, userID))
     };
     try {
       contextOp = SKCSV.insert(context, line, options, table, user);
@@ -644,12 +644,12 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
     }
   };
 
-  userUUIDOpt = args.maybeGetString("user");
+  userIDOpt = args.maybeGetString("user");
   filter = args.maybeGetString("user") match {
   | None() -> filter1
-  | Some(userUUID) ->
+  | Some(userID) ->
     (context, isReset) ~> {
-      user = SKDB.UserFile::create(context, userUUID);
+      user = SKDB.UserFile::create(context, userID);
       sqlTable = getSqlTableFromDirName(context, dirName);
 
       oldFilter = filter1(context, isReset);
@@ -761,7 +761,7 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
       if (
         SKDB.userPrivacyChanged(
           SKStore.gContextGet(),
-          userUUIDOpt,
+          userIDOpt,
           SKStore.Tick(tick),
         )
       ) {

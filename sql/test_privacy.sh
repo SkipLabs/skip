@@ -125,7 +125,7 @@ else
     pass "GROUP PERMISSIONS6"
 fi
 
-echo "delete from skdb_user_permissions where userUUID='ID2';" | $SKDB
+echo "delete from skdb_user_permissions where userID='ID2';" | $SKDB
 
 # Let's check that user2 can read again
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
@@ -135,7 +135,7 @@ else
 fi
 
 # Let's kick user2 out of the group
-echo "delete from skdb_group_permissions where groupUUID='ID22' and userUUID='ID2';" | $SKDB
+echo "delete from skdb_group_permissions where groupID='ID22' and userID='ID2';" | $SKDB
 
 # Let's check that user2 cannot read (after being kicked out)
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
@@ -194,7 +194,7 @@ fi
 # Checking that we can encode a group ownership transfer.
 ###############################################################################
 
-echo "DELETE FROM skdb_user_permissions WHERE userUUID IS NULL" | $SKDB
+echo "DELETE FROM skdb_user_permissions WHERE userID IS NULL" | $SKDB
 
 # We want to make sure that we can create a group that we can later
 # transfer to someone else. The machinery is a little bit awkward.
@@ -293,7 +293,7 @@ tailerID=$!
 sleep 1
 
 # let's kick ID3 out of the group 22
-echo "delete from skdb_group_permissions where groupUUID='ID22' and userUUID='ID3';" | $SKDB
+echo "delete from skdb_group_permissions where groupID='ID22' and userID='ID3';" | $SKDB
 
 # As long as the row (238,22) is still there, the update did not kick in
 while echo "select * from t1" | $SKDB_COPY | grep -q "238"; do
@@ -320,7 +320,7 @@ pass "GROUP PERMISSION UPDATE2"
 # let's kick ID3 out of the group 22
 (echo "begin transaction;";
  echo "insert into skdb_group_permissions values('ID22', 'ID3', skdb_permission('rw'), 'root');";
- echo "delete from skdb_user_permissions where userUUID='ID3';"
+ echo "delete from skdb_user_permissions where userID='ID3';"
  echo "commit;"
 )| $SKDB
 
