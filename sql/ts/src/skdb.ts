@@ -74,7 +74,7 @@ class SKDBGroup {
   async transfer(skdb: SKDB, userID: string): Promise<void> {
     await skdb.exec(
       "BEGIN TRANSACTION;" +
-      "DELETE FROM skdb_group_permissions WHERE groupUUID=@ownerGroupID;" +
+      "DELETE FROM skdb_group_permissions WHERE groupID=@ownerGroupID;" +
       "INSERT INTO skdb_group_permissions VALUES(@ownerGroupID, @userID, 7, @ownerGroupID);" +
       "COMMIT;",
       {ownerGroupID: this.ownerGroupID, userID}
@@ -132,14 +132,14 @@ export async function createGroup(skdb: SKDB, userID: string, groupID: string): 
   // the delete.
 
   await skdb.exec(
-    "UPDATE skdb_groups SET adminUUID=@ownerGroupID, skdb_access=@ownerGroupID WHERE groupUUID=@ownerGroupID;",
+    "UPDATE skdb_groups SET adminID=@ownerGroupID, skdb_access=@ownerGroupID WHERE groupID=@ownerGroupID;",
     {ownerGroupID}
   );
 
   // Let's clean up after ourselves, this permission is no longer in use
 
   await skdb.exec(
-    "DELETE FROM skdb_group_permissions WHERE groupUUID=@ownerGroupID AND skdb_access=@userID;",
+    "DELETE FROM skdb_group_permissions WHERE groupID=@ownerGroupID AND skdb_access=@userID;",
     {ownerGroupID, userID}
   );
 
