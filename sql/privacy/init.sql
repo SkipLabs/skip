@@ -40,7 +40,7 @@ CREATE TABLE skdb_group_permissions(
 );
 
 CREATE UNIQUE INDEX skdb_permissions_group_user ON
-  skdb_group_permissions(groupUUID, userUUID)
+  skdb_group_permissions(groupID, userID)
 ;
 
 CREATE VIRTUAL VIEW skdb_groups_users AS

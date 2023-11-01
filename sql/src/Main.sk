@@ -128,9 +128,7 @@ untracked fun main(): void {
     .subcommand(
       Cli.Command("set-user")
         .about("Sets the user of the database")
-        .arg(
-          Cli.StringArg("userUUID").positional().required().about("userUUID"),
-        ),
+        .arg(Cli.StringArg("userID").positional().required().about("userID")),
     )
     .subcommand(
       Cli.Command("dump-tables")
@@ -420,13 +418,11 @@ fun execDumpTable(args: Cli.ParseResults, options: SKDB.Options): void {
 
 fun execSetUser(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  userUUID = args.getString("userUUID");
+  userID = args.getString("userID");
   SKDB.runSql(options, _ ~> {
     SKStore.CStop(
       Some((context, _, _) ~> {
-        context.!writeChecker = Some(
-          SKDB.AccessSolver::create(context, userUUID),
-        )
+        context.!writeChecker = Some(SKDB.AccessSolver::create(context, userID))
       }),
     )
   })

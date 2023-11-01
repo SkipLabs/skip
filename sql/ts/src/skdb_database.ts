@@ -148,23 +148,23 @@ export class SKDBSyncImpl implements SKDBSync {
     await this.mirror("skdb_group_permissions");
     await this.exec(
       "CREATE UNIQUE INDEX skdb_permissions_group_user ON" +
-        "  skdb_group_permissions(groupUUID, userUUID);"
+        "  skdb_group_permissions(groupID, userID);"
     );
     await this.exec(
       "CREATE VIRTUAL VIEW skdb_group_permissions_joined AS\n" +
         "  SELECT\n" +
-        "    skdb_group_permissions.groupUUID,\n" +
-        "    skdb_group_permissions.userUUID,\n" +
+        "    skdb_group_permissions.groupID,\n" +
+        "    skdb_group_permissions.userID,\n" +
         "    skdb_group_permissions.permissions,\n" +
         "    skdb_group_permissions.skdb_access\n" +
         "  FROM skdb_group_permissions, skdb_groups\n" +
-        " WHERE skdb_group_permissions.groupUUID = skdb_groups.groupUUID\n" +
-        "   AND skdb_group_permissions.skdb_access = skdb_groups.adminUUID\n" +
+        " WHERE skdb_group_permissions.groupID = skdb_groups.groupID\n" +
+        "   AND skdb_group_permissions.skdb_access = skdb_groups.adminID\n" +
         ";\n");
 
     await this.exec(
       "CREATE UNIQUE INDEX skdb_group_permissions_joined_index on\n" +
-        "  skdb_group_permissions_joined(groupUUID, userUUID)\n" +
+        "  skdb_group_permissions_joined(groupID, userID)\n" +
         ";\n"
     );
     await this.setUser(accessKey);
