@@ -1194,13 +1194,11 @@ fun evalWithContext(
 }
 
 fun makeSqlContext(): mutable SKStore.Context {
-  gcontext = mutable SKStore.Context{
+  mutable SKStore.Context{
     canReuse => SKStore.CRAlways(),
     failOnExn => true,
     removeSubDirs => true,
-  };
-  gcontext.setGlobal("Line", SKStore.IntFile(0));
-  gcontext
+  }
 }
 
 fun doOnError(options: Options, f: () -> void, error: Exception -> void): void {
@@ -1324,22 +1322,14 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
         if (isTTY) {
           print_raw("skdb> ");
         };
-        lineFile = SKStore.IntFile::type(context.getGlobal("Line").fromSome());
         context.!globals = SortedMap[];
         userOpt.each(_ -> {
           print_error("Cannot execute queries as user, use --connect instead");
           skipExit(88);
         });
-        context.setGlobal("Line", lineFile);
         context.removeGlobal("TableMap");
 
-        gline = lineFile.value;
-
-        line = 0;
-        lineStr = "";
-        buffer = Buffer(lineStr);
-        lex = Lexer(0, buffer);
-        pos = 0;
+        buffer = Buffer("");
         shouldContinue = false;
         underLockF: ?((
           mutable SKStore.Context,
@@ -1357,20 +1347,15 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
 
             loop {
               !underLockF = None();
-              (!line, !lineStr) = read(gline);
+              (_, lineStr) = read(0);
               !buffer = Buffer(lineStr);
-              !lex = Lexer(0, buffer);
-              !pos = 0;
+              lex = Lexer(0, buffer);
+              pos = 0;
 
               if (isEOF(lex, pos)) {
                 !shouldContinue = false;
                 if (isTransaction) {
-                  printErrorAndExit(
-                    line,
-                    buffer,
-                    pos,
-                    "Unfinished transaction",
-                  );
+                  printErrorAndExit(0, buffer, pos, "Unfinished transaction");
                 };
                 return void;
               };
@@ -1381,7 +1366,7 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
                 !pos = lex.expect(pos, ";");
 
                 if (isTransaction) {
-                  printErrorAndExit(line, buffer, pos, "Nested transaction");
+                  printErrorAndExit(0, buffer, pos, "Nested transaction");
                 };
                 !isTransaction = true;
                 continue;
@@ -1428,16 +1413,13 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
             err match {
             | IgnoreAndContinue() -> void
             | Error(posError, str) ->
-              printErrorAndExit(gline, buffer, posError, str)
+              printErrorAndExit(0, buffer, posError, str)
             | exn ->
               print_error(exn.getMessage());
               skipExit(44)
             }
           },
         );
-
-        !gline = line;
-        context.setGlobal("Line", SKStore.IntFile(gline));
 
         (underLockF, shouldContinue)
       });
