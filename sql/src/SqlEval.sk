@@ -1270,37 +1270,32 @@ private mutable class SQLContext(
   ): Bool {
     startTick = this.context.tick;
     pos = SKStore.newObstack();
-    (newContext, underLockF, shouldContinue) = try {
-      Some(f(this.context with {globals => this.globals}))
+
+    res = try {
+      (newContext, underLockF, shouldContinue) = f(
+        this.context with {globals => this.globals},
+      );
+      this.!context = SKStore.gContextSync(
+        startTick,
+        this.context,
+        newContext,
+        Some(this.synchronizer),
+        this.sync,
+        underLockF,
+      );
+      this.context.notifyAll(startTick);
+
+      this.!globals = this.context.globals;
+
+      shouldContinue
     } catch {
     | exn ->
       print_error(exn.getMessage());
-      None()
-    } match {
-    | Some(x) -> x
-    | None() ->
-      SKStore.destroyObstack(pos);
-      return false
+      false
     };
-    this.!context = SKStore.gContextSync(
-      startTick,
-      this.context,
-      newContext,
-      Some(this.synchronizer),
-      this.sync,
-      underLockF,
-    );
-    this.context.notifyAll(startTick);
 
-    if (!shouldContinue) {
-      SKStore.destroyObstack(pos);
-      return false
-    };
     SKStore.destroyObstack(pos);
-
-    this.!globals = this.context.globals;
-
-    true
+    res
   }
 
   mutable fun exec(
