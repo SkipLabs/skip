@@ -50,7 +50,7 @@ echo "insert into skdb_group_permissions values ('myGroup', NULL, skdb_permissio
 
 # Let's check that user permissions are respected
 # This should turn every user into "readonly"
-echo "insert into skdb_user_permissions values (NULL, skdb_permission('r'));" | $SKDB
+echo "insert into skdb_user_permissions values (NULL, skdb_permission('r'), 'root');" | $SKDB
 
 if echo -e "^t2\n1\t235,\"myGroup\"\n:1" | $SKDB write-csv --user ID1 2>&1 | grep -q Error; then
     pass "USER PERMISSIONS"
@@ -59,7 +59,7 @@ else
 fi
 
 # Let's check that user permissions are respected for a specific user
-echo "insert into skdb_user_permissions values ('ID1', skdb_permission('ri'));" | $SKDB
+echo "insert into skdb_user_permissions values ('ID1', skdb_permission('ri'), 'root');" | $SKDB
 
 if echo -e "^t2\n1\t235,\"myGroup\"\n:1" | $SKDB write-csv --user ID1 2>&1 | grep -q Error; then
     fail "USER PERMISSIONS2"
@@ -68,7 +68,8 @@ else
 fi
 
 # Let's check that permissions can also be specified as query parameters
-echo -e "{ \"perm\": \"rw\" }\ninsert into skdb_user_permissions values ('ID4', skdb_permission(@perm));" | $SKDB --expect-query-params
+echo -e "{ \"perm\": \"rw\" }\ninsert into skdb_user_permissions values ('ID4', skdb_permission(@perm), 'root');" \
+    | $SKDB --expect-query-params
 
 if echo -e "^t2\n1\t236,\"myGroup\"\n:1" | $SKDB write-csv --user ID4 2>&1 | grep -q Error; then
     fail "USER PERMISSIONS3"
@@ -116,7 +117,7 @@ else
 fi
 
 # Let's change the user permissions and see what happens
-echo "insert into skdb_user_permissions values ('ID2', skdb_permission(''))" | $SKDB
+echo "insert into skdb_user_permissions values ('ID2', skdb_permission(''), 'root')" | $SKDB
 
 # Let's check that user2 cannot read
 if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
@@ -153,7 +154,7 @@ fi
 echo "insert into skdb_groups values('ID23', NULL, 'root', 'root');" | $SKDB
 echo "insert into skdb_group_permissions values ('ID23', 'ID1', skdb_permission('r'), 'root');" | $SKDB
 echo "insert into skdb_group_permissions values ('ID23', NULL, skdb_permission('rw'), 'root');" | $SKDB
-echo "insert into skdb_user_permissions values ('ID2', skdb_permission('ri'));" | $SKDB
+echo "insert into skdb_user_permissions values ('ID2', skdb_permission('ri'), 'root');" | $SKDB
 
 # Let's check user2 can write
 if echo -e "^t1\n1\t240,\"ID23\"\n:1" | $SKDB write-csv --user ID2 2>&1 | grep -q Error; then
@@ -304,7 +305,7 @@ done
 pass "GROUP PERMISSION UPDATE"
 
 # let's block the ID3 all together
-echo "insert into skdb_user_permissions values('ID3', skdb_permission(''));" | $SKDB
+echo "insert into skdb_user_permissions values('ID3', skdb_permission(''), 'root');" | $SKDB
 
 # As long as the row (240,22) is still there, the update did not kick in
 while echo "select * from t1" | $SKDB_COPY | grep -q "240"; do
