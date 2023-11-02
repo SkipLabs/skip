@@ -60,7 +60,6 @@ CREATE VIRTUAL VIEW skdb_group_permissions_joined AS
     skdb_group_permissions.skdb_access
   FROM skdb_group_permissions, skdb_groups
  WHERE skdb_group_permissions.groupID = skdb_groups.groupID
-   AND skdb_group_permissions.skdb_access = skdb_groups.adminID
 ;
 
 CREATE UNIQUE INDEX skdb_group_permissions_joined_index ON
