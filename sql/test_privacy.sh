@@ -223,20 +223,18 @@ echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"julienv\",7, \"julienv\
 # not active because myAdminGroup is still pointing at julienv as an
 # admin, but the moment we switch, that will not longer be the case.
 
-echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"\n:3" |
+(echo -e "^skdb_group_permissions";
+ echo -e "0\t\"myAdminGroup\", \"julienv\",7, \"julienv\"";
+ echo -e "1\t\"myAdminGroup\", \"julienv\",7, \"myAdminGroup\"\n:3") |
   $SKDB write-csv --user julienv --source 1234 > /dev/null
 
-# Now let's make the switch! Let's make myAdminGroup use myAdmingGroup
+# Now let's make the switch! Let's make myAdminGroup use myAdminGroup
 # (itself) as an admin. Note that the delete and the insert have to
 # happen in the same transaction, otherwise we would lose access after
 # the delete.
-(echo -e "^skdb_groups\n0\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"";
+(echo -e "^skdb_groups";
+ echo -e "0\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"";
  echo -e "1\t\"myAdminGroup\", \"julienv\",\"myAdminGroup\", \"myAdminGroup\"\n:4") |
-  $SKDB write-csv --user julienv --source 1234 > /dev/null
-
-# Let's clean up after ourselves, this permission is no longer in use
-
-echo -e "^skdb_group_permissions\n0\t\"myAdminGroup\", \"julienv\",7, \"julienv\"\n:5" |
   $SKDB write-csv --user julienv --source 1234 > /dev/null
 
 # We have successfully create a group that is controlled by
