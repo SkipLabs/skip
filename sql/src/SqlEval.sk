@@ -1353,6 +1353,8 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
             !shouldContinue = true;
             isTransaction = false;
 
+            statements = mutable Vector[];
+
             loop {
               !underLockF = None();
               (!line, !lineStr) = read(gline);
@@ -1404,6 +1406,13 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
               | None() -> break void
               | Some(x) -> x
               };
+
+              statements.push(stmt);
+
+              if (!isTransaction) break void;
+            };
+
+            for (stmt in statements) {
               markIfRead(context, stmt);
 
               !underLockF = evalWithContext(
@@ -1413,8 +1422,6 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
                 stmt,
                 isTransaction,
               );
-
-              if (!isTransaction) break void;
             };
           },
           err -> {
