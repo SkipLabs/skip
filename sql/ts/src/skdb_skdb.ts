@@ -1,5 +1,6 @@
 import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types";
-import { PagedMemory, Page, Storage, SKDB, ExternalFuns, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
+import { PagedMemory, Page, Storage, SKDB, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
+import { ExternalFuns } from "#skdb/skdb_util";
 import { IDBStorage } from "#skdb/skdb_storage";
 import { SKDBImpl, SKDBSyncImpl } from "#skdb/skdb_database";
 
