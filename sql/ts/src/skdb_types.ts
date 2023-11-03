@@ -1,4 +1,5 @@
 import { Shared } from "#std/sk_types";
+import { SkdbTable } from "#skdb/skdb_util";
 
 export interface SkdbHandle {
   runner: (fn: () => string) => Array<any>;
@@ -40,7 +41,7 @@ export interface SKDBSync {
 }
 
 export interface SKDB {
-  exec: (query: string, params?: Params) => Promise<Array<any>>;
+  exec: (query: string, params?: Params) => Promise<SkdbTable>;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
   watchChanges: (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => Promise<{ close: () => Promise<void> }>
 

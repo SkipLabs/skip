@@ -1,5 +1,6 @@
 import { Environment, FileSystem } from "#std/sk_types";
 import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync, MirrorDefn } from "#skdb/skdb_types";
+import { SkdbTable } from "#skdb/skdb_util";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
@@ -268,7 +269,8 @@ export class SKDBImpl implements SKDB {
   }
 
   exec = async (stdin: string, params: Params = new Map()) => {
-    return this.skdbSync.exec(stdin, params);
+    const rows = await this.skdbSync.exec(stdin, params);
+    return new SkdbTable(...rows);
   }
 
   async watch(query: string, params: Params, onChange: (rows: Array<any>) => void) {
