@@ -960,8 +960,13 @@ class Evaluator{options: Options, user: ?UserFile} {
             if (!shouldContinue) break void
           }
         } else {
-          this.insertTable(context, table, rows);
-          context.update();
+          try {
+            this.insertTable(context, table, rows);
+            context.update();
+          } catch {
+          | Conflict(posError, msg, _, _) -> error(posError, msg)
+          | exn -> throw exn
+          }
         }
       })
     }
@@ -1269,31 +1274,31 @@ private mutable class SQLContext(
     startTick = this.context.tick;
     pos = SKStore.newObstack();
 
-    res = try {
-      (newContext, underLockF, shouldContinue) = f(
-        this.context with {globals => this.globals},
-      );
-      this.!context = SKStore.gContextSync(
-        startTick,
-        this.context,
-        newContext,
-        Some(this.synchronizer),
-        this.sync,
-        underLockF,
-      );
-      this.context.notifyAll(startTick);
-
-      this.!globals = this.context.globals;
-
-      shouldContinue
+    (newContext, underLockF, shouldContinue) = try {
+      f(this.context with {globals => this.globals})
     } catch {
-    | exn ->
-      print_error(exn.getMessage());
-      false
+    | err @ Error _ ->
+      (SKStore.cloneContextWithError(this.context, err), None(), false)
+    | exn -> throw exn
+    };
+    this.!context = SKStore.gContextSync(
+      startTick,
+      this.context,
+      newContext,
+      Some(this.synchronizer),
+      this.sync,
+      underLockF,
+    );
+    this.context.notifyAll(startTick);
+
+    this.!globals = this.context.globals;
+    if (this.globals.containsKey("Error")) {
+      !shouldContinue = false
     };
 
     SKStore.destroyObstack(pos);
-    res
+
+    shouldContinue
   }
 
   mutable fun exec(
@@ -1314,7 +1319,11 @@ private mutable class SQLContext(
   }
 }
 
-fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
+fun eval(
+  options: Options,
+  params: Map<String, Value>,
+  userOpt: ?String,
+): Result<void, Error> {
   isTTY = isATTY() != 0;
   SQLContext::withContext(options.sync, (ctx) ~> {
     loop {
@@ -1355,7 +1364,7 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
               if (isEOF(lex, pos)) {
                 !shouldContinue = false;
                 if (isTransaction) {
-                  printErrorAndExit(0, buffer, pos, "Unfinished transaction");
+                  error(pos, "Unfinished transaction");
                 };
                 return void;
               };
@@ -1366,7 +1375,7 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
                 !pos = lex.expect(pos, ";");
 
                 if (isTransaction) {
-                  printErrorAndExit(0, buffer, pos, "Nested transaction");
+                  error(pos, "Nested transaction");
                 };
                 !isTransaction = true;
                 continue;
@@ -1412,11 +1421,7 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
           err -> {
             err match {
             | IgnoreAndContinue() -> void
-            | Error(posError, str) ->
-              printErrorAndExit(0, buffer, posError, str)
-            | exn ->
-              print_error(exn.getMessage());
-              skipExit(44)
+            | _ -> throw err
             }
           },
         );
@@ -1426,8 +1431,18 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
       if (!shouldContinue) {
         break void
       }
+    };
+
+    ctx.globals.maybeGet("Error").map(f ->
+      SKStore.ErrorFile::type(f).value
+    ) match {
+    | Some(Error(pos, msg)) -> Failure(Error(pos, msg))
+    | Some(exn) ->
+      print_error(exn.getMessage());
+      skipExit(1)
+    | None() -> Success(void)
     }
-  })
+  });
 }
 
 fun slurpStmts(options: Options): Array<Stmt> {
@@ -1494,27 +1509,17 @@ fun importFromRoot(
   tick: SKStore.Tick,
   root: readonly SKStore.Context,
 ): void {
-  try {
-    shouldImport = delta.getGlobal("TableMap") match {
-    | None() ->
-      delta.getGlobal("IsRead") match {
-      | None() -> false
-      | Some(_) -> true
-      }
-    | Some(_tableMapFile) -> true
-    };
-    if (shouldImport) {
-      SKStore.import(delta, tick, root);
-      delta.update();
+  shouldImport = delta.getGlobal("TableMap") match {
+  | None() ->
+    delta.getGlobal("IsRead") match {
+    | None() -> false
+    | Some(_) -> true
     }
-  } catch {
-  | err ->
-    line = delta.getGlobal("Line") match {
-    | None() -> -1
-    | Some(x) -> SKStore.IntFile::type(x).value
-    };
-    print_error("Error, line " + line + ": " + err.getMessage());
-    skipExit(2)
+  | Some(_tableMapFile) -> true
+  };
+  if (shouldImport) {
+    SKStore.import(delta, tick, root);
+    delta.update();
   }
 }
 
@@ -1611,21 +1616,9 @@ fun exportToRoot(
   tick: SKStore.Tick,
   delta: readonly SKStore.Context,
 ): Bool {
-  rootCopy = root.clone();
-  try {
-    hasVersioning = importNext(root, tick, delta);
-    root.update();
-    hasVersioning
-  } catch {
-  | err ->
-    line = delta.getGlobal("Line") match {
-    | None() -> -1
-    | Some(x) -> SKStore.IntFile::type(x).value
-    };
-    root.replaceFromSaved(rootCopy);
-    print_error("Error, line " + line + ": " + err.getMessage());
-    skipExit(2)
-  }
+  hasVersioning = importNext(root, tick, delta);
+  root.update();
+  hasVersioning
 }
 
 fun updateTableMap(context: mutable SKStore.Context): void {
