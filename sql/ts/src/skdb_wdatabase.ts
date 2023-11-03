@@ -1,7 +1,7 @@
 import { Wrk } from "#std/sk_types";
 import { PromiseWorker, Function, Caller } from "#std/sk_worker";
 import { SKDB, ProtoResponseCreds, Params, RemoteSKDB, SkdbMechanism, MirrorDefn } from "#skdb/skdb_types";
-
+import { SkdbTable } from "#skdb/skdb_util";
 class WrappedRemote implements RemoteSKDB {
   private worker: PromiseWorker;
   private wrapped: number;
@@ -76,7 +76,8 @@ export class SKDBWorker implements SKDB {
   }
 
   exec = async (query: string, params: Params = new Map()) => {
-    return this.worker.post(new Function("exec", [query, params])) as Promise<Array<any>>;
+    const rows = await this.worker.post(new Function("exec", [query, params]));
+    return new SkdbTable(...rows);
   }
 
   watch = async (query: string, params: Params, onChange: (rows: Array<any>) => void) => {

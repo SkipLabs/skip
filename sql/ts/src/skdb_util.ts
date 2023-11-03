@@ -33,3 +33,46 @@ export class ExternalFuns {
     return this.externalFuns[funId]!(jso);
   }
 }
+
+/* ***************************************************************************/
+/* Class for query results, extending Array<Object> with some common selectors
+   and utility functions for ease of use. */
+/* ***************************************************************************/
+export class SkdbTable extends Array<Object> {
+  scalarValue() : any {
+    const row = this.onlyRow();
+    const cols = Object.keys(row);
+    if (cols.length != 1) {
+      throw new Error(`Can't extract scalar: query yielded ${cols.length} columns`);
+    }
+    return row[cols[0]];
+  }
+
+  onlyRow (): Object {
+    if (this.length != 1) {
+      throw new Error(`Can't extract only row: got ${this.length} rows`);
+    }
+    return this[0];
+  }
+
+  onlyColumn(): Array<any> {
+    let result = [] as Array<any>;
+    for(const row of this) {
+      const cols = Object.keys(row);
+      if (cols.length != 1){
+        throw new Error(`Can't extract only column: got ${cols.length} columns`);
+      }
+      result.push(row[cols[0]]);
+    };
+    return result;
+  }
+
+  column(col: string): Array<any> {
+    return this.map((row) => {
+      if(!row[col]) {
+        throw new Error("Missing column: " + col);
+      }
+      return row[col];
+    });
+  }
+}
