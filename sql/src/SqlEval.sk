@@ -1337,74 +1337,74 @@ fun eval(
         ) ~> void) = None();
 
         try {
-            !shouldContinue = true;
-            isTransaction = false;
+          !shouldContinue = true;
+          isTransaction = false;
 
-            statements = mutable Vector[];
+          statements = mutable Vector[];
 
-            loop {
-              !underLockF = None();
-              (_, lineStr) = read(0);
-              !buffer = Buffer(lineStr);
-              lex = Lexer(0, buffer);
-              pos = 0;
+          loop {
+            !underLockF = None();
+            (_, lineStr) = read(0);
+            !buffer = Buffer(lineStr);
+            lex = Lexer(0, buffer);
+            pos = 0;
 
-              if (isEOF(lex, pos)) {
-                !shouldContinue = false;
-                if (isTransaction) {
-                  error(pos, "Unfinished transaction");
-                };
-                break void;
+            if (isEOF(lex, pos)) {
+              !shouldContinue = false;
+              if (isTransaction) {
+                error(pos, "Unfinished transaction");
               };
-
-              if (lex.isEqUpper(pos, "BEGIN")) {
-                !pos = lex.expectUpper(pos, "BEGIN");
-                !pos = lex.expectUpper(pos, "TRANSACTION");
-                !pos = lex.expect(pos, ";");
-
-                if (isTransaction) {
-                  error(pos, "Nested transaction");
-                };
-                !isTransaction = true;
-                continue;
-              };
-
-              if (lex.isEqUpper(pos, "COMMIT")) {
-                !pos = lex.expectUpper(pos, "COMMIT");
-                !pos = lex.expect(pos, ";");
-                context.getGlobal(GLOBALS) match {
-                | None() -> void
-                | Some(_) -> context.removeGlobal(GLOBALS)
-                };
-                context.getGlobal(NAMEDIDS) match {
-                | None() -> void
-                | Some(_) -> context.removeGlobal(NAMEDIDS)
-                };
-                break void;
-              };
-
-              (!pos, stmtOpt) = parseStmt(lex, pos);
-              stmt = stmtOpt match {
-              | None() -> break void
-              | Some(x) -> x
-              };
-
-              statements.push(stmt);
-
-              if (!isTransaction) break void;
+              break void;
             };
 
-            for (stmt in statements) {
-              markIfRead(context, stmt);
+            if (lex.isEqUpper(pos, "BEGIN")) {
+              !pos = lex.expectUpper(pos, "BEGIN");
+              !pos = lex.expectUpper(pos, "TRANSACTION");
+              !pos = lex.expect(pos, ";");
 
-              !underLockF = evalWithContext(
-                options,
-                context,
-                params,
-                stmt,
-                isTransaction,
-              );
+              if (isTransaction) {
+                error(pos, "Nested transaction");
+              };
+              !isTransaction = true;
+              continue;
             };
+
+            if (lex.isEqUpper(pos, "COMMIT")) {
+              !pos = lex.expectUpper(pos, "COMMIT");
+              !pos = lex.expect(pos, ";");
+              context.getGlobal(GLOBALS) match {
+              | None() -> void
+              | Some(_) -> context.removeGlobal(GLOBALS)
+              };
+              context.getGlobal(NAMEDIDS) match {
+              | None() -> void
+              | Some(_) -> context.removeGlobal(NAMEDIDS)
+              };
+              break void;
+            };
+
+            (!pos, stmtOpt) = parseStmt(lex, pos);
+            stmt = stmtOpt match {
+            | None() -> break void
+            | Some(x) -> x
+            };
+
+            statements.push(stmt);
+
+            if (!isTransaction) break void;
+          };
+
+          for (stmt in statements) {
+            markIfRead(context, stmt);
+
+            !underLockF = evalWithContext(
+              options,
+              context,
+              params,
+              stmt,
+              isTransaction,
+            );
+          };
         } catch {
         | IgnoreAndContinue() -> void
         | exn -> throw exn
