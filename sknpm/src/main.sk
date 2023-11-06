@@ -555,17 +555,7 @@ fun buildIfNeeded(bc: Skargo.BuildContext, test: Bool): Bool {
     false
   };
   if (buildNeeded) {
-    Skargo.run(
-      Array[
-        "skargo",
-        if (test) "test" else "build",
-        "--target",
-        "wasm32",
-        "--profile",
-        bc.profile,
-      ],
-      bc.env.verbose,
-    );
+    skargo(!test, bc.profile, bc.env.verbose)
   };
   buildNeeded
 }
@@ -1383,3 +1373,33 @@ native fun saveSkTestsTs(targetDir: String): void;
 
 @cpp_extern("SKIP_sknpm_save_archive")
 native fun saveArchive(targetDir: String): void;
+
+private fun skargo(build: Bool, profile: String, verbose: Bool): void {
+  checkSuccess = p ~> {
+    if (build) {
+      p.success()
+    } else {
+      p.success() || p.exitcode() == 1 && p.stderr.isEmpty()
+    }
+  };
+  args = Array[
+    "skargo",
+    if (build) "build" else "test",
+    "--target",
+    "wasm32",
+    "--profile",
+    profile,
+  ];
+  if (verbose) {
+    print_error(`>> ${args.join(" ")}`)
+  };
+  p = System.subprocess(args);
+  success = checkSuccess(p);
+  if (verbose || !success) {
+    print_raw(p.stdout);
+    print_error_raw(p.stderr);
+  };
+  if (!success) {
+    throw Skargo.SystemCallException(p.exitcode());
+  }
+}
