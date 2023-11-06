@@ -7,6 +7,30 @@ class Test{
   lineno: Int = -1,
 } {}
 
+fun run_test(test: Test, res: TestResult): TestResult {
+  time = () ~> Time.time_ms().toFloat() / 1000.0;
+  start = time();
+  try {
+    _ = test.func();
+    res with {result => "success", time => time() - start}
+  } catch {
+  | ExpectationError(msg, _, _) ->
+    res with {
+      result => "failure",
+      time => time() - start,
+      failure_type => "ExpectationError",
+      failure_message => msg,
+    }
+  | exn ->
+    res with {
+      result => "error",
+      time => time() - start,
+      failure_type => inspect(exn).toString(),
+      failure_message => exn.getMessage(),
+    }
+  }
+}
+
 fun test_job(
   tests: readonly Map<String, readonly Sequence<Test>>,
   filter: String,
@@ -30,35 +54,15 @@ fun test_job(
       stderr_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
       Posix.dup2(stderr_file.fileno, IO.stderr().fileno);
 
-      res = TestResult{
-        name => test.name,
-        suite => testSuite,
-        file => test.file,
-        line => test.lineno,
-      };
-      start = Time.time_ms().toFloat() / 1000.0;
-      !res = try {
-        _ = test.func();
-        res with {
-          result => "success",
-          time => Time.time_ms().toFloat() / 1000.0 - start,
-        }
-      } catch {
-      | ExpectationError(msg, _, _) ->
-        res with {
-          result => "failure",
-          time => Time.time_ms().toFloat() - start,
-          failure_type => "ExpectationError",
-          failure_message => msg,
-        }
-      | exn ->
-        res with {
-          result => "error",
-          time => Time.time_ms().toFloat() / 1000.0 - start,
-          failure_type => inspect(exn).toString(),
-          failure_message => exn.getMessage(),
-        }
-      };
+      res = run_test(
+        test,
+        TestResult{
+          name => test.name,
+          suite => testSuite,
+          file => test.file,
+          line => test.lineno,
+        },
+      );
 
       flushStdout();
       _ = Posix.lseek(stdout_file.fileno, 0, Posix.SeekSet());
@@ -188,6 +192,75 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
   }
 }
 
+fun wtest_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
+  args = Cli.Command("tests")
+    .about("Run tests")
+    .arg(
+      Cli.StringArg("filter")
+        .positional()
+        .about(
+          "If specified, only run tests containing this string in their names",
+        ),
+    )
+    .arg(
+      Cli.BoolArg("strict").about(
+        "If specified with filter, only run tests with listed names",
+      ),
+    )
+    .arg(Cli.BoolArg("json").about("If specified, print output in json format"))
+    .arg(Cli.BoolArg("list").about("Display the list of available tests"))
+    .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report"))
+    .arg(
+      Cli.BoolArg("verbose")
+        .long("verbose")
+        .short("v")
+        .about("Use verbose output"),
+    )
+    .help()
+    .parseArgs();
+  if (args.getBool("list")) {
+    for (testSuite in tests.keys()) {
+      for (test in tests[testSuite]) {
+        print_string(testSuite + "." + test.name)
+      }
+    };
+    return void;
+  };
+  reporters = mutable Vector<mutable TestReporter>[mutable JSONTestReporter{}];
+  args.maybeGetString("junitxml").each(path ->
+    reporters.push(mutable XmlTestReporter{output => Some(path)})
+  );
+  filter = args.maybeGetString("filter").default("");
+  strict = args.getBool("strict");
+  valid = (name, filter) ->
+    if (strict) name == filter else name.contains(filter);
+  success = true;
+  for (testSuite in tests.keys()) {
+    for (test in tests[testSuite]) {
+      if (!valid(testSuite + "." + test.name, filter)) {
+        continue
+      };
+      res = run_test(
+        test,
+        TestResult{
+          name => test.name,
+          suite => testSuite,
+          file => test.file,
+          line => test.lineno,
+        },
+      );
+      if (res.result != "success") {
+        !success = false
+      };
+      reporters.each(r -> r.report(res));
+    }
+  };
+  reporters.each(r -> r.finish());
+  if (!success) {
+    skipExit(1)
+  }
+}
+
 fun main(): void {
   tests = mutable Map[];
   #forEachFunction (@test, #function, #functionName) {
@@ -198,5 +271,9 @@ fun main(): void {
     };
     tests[testSuite].push(Test{name => testName, func => #function})
   };
-  test_harness(tests)
+  if (SkargoVersion.kWasm32) {
+    wtest_harness(tests)
+  } else {
+    test_harness(tests)
+  }
 }
