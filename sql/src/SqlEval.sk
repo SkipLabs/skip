@@ -1206,16 +1206,6 @@ fun makeSqlContext(): mutable SKStore.Context {
   }
 }
 
-fun doOnError(options: Options, f: () -> void, error: Exception -> void): void {
-  if (options.backtrace) f() else {
-    try {
-      f()
-    } catch {
-    | exn -> error(exn)
-    }
-  }
-}
-
 class StmtFile(stmt: Stmt) extends SKStore.File
 class TickFile(tick: SKStore.Tick) extends SKStore.File
 
@@ -1346,9 +1336,7 @@ fun eval(
           SKStore.Context,
         ) ~> void) = None();
 
-        doOnError(
-          options,
-          () -> {
+        try {
             !shouldContinue = true;
             isTransaction = false;
 
@@ -1366,7 +1354,7 @@ fun eval(
                 if (isTransaction) {
                   error(pos, "Unfinished transaction");
                 };
-                return void;
+                break void;
               };
 
               if (lex.isEqUpper(pos, "BEGIN")) {
@@ -1417,14 +1405,10 @@ fun eval(
                 isTransaction,
               );
             };
-          },
-          err -> {
-            err match {
-            | IgnoreAndContinue() -> void
-            | _ -> throw err
-            }
-          },
-        );
+        } catch {
+        | IgnoreAndContinue() -> void
+        | exn -> throw exn
+        };
 
         (underLockF, shouldContinue)
       });
@@ -1445,7 +1429,7 @@ fun eval(
   });
 }
 
-fun slurpStmts(options: Options): Array<Stmt> {
+fun slurpStmts(_options: Options): Array<Stmt> {
   line = 0;
   lineStr = "";
   buffer = Buffer(lineStr);
@@ -1453,37 +1437,31 @@ fun slurpStmts(options: Options): Array<Stmt> {
   pos = 0;
   stmts = mutable Vector[];
 
-  doOnError(
-    options,
-    () -> {
-      loop {
-        (!line, !lineStr) = read(line);
-        !buffer = Buffer(lineStr);
-        !lex = Lexer(0, buffer);
-        !pos = 0;
+  try {
+    loop {
+      (!line, !lineStr) = read(line);
+      !buffer = Buffer(lineStr);
+      !lex = Lexer(0, buffer);
+      !pos = 0;
 
-        if (isEOF(lex, pos)) {
-          return void;
-        };
-
-        (!pos, stmtOpt) = parseStmt(lex, pos);
-        stmt = stmtOpt match {
-        | None() -> continue
-        | Some(x) -> x
-        };
-        stmts.push(stmt);
+      if (isEOF(lex, pos)) {
+        break void;
       };
-    },
-    err -> {
-      err match {
-      | IgnoreAndContinue() -> void
-      | Error(posError, str) -> printErrorAndExit(line, buffer, posError, str)
-      | exn ->
-        print_error(exn.getMessage());
-        skipExit(44)
-      }
-    },
-  );
+
+      (!pos, stmtOpt) = parseStmt(lex, pos);
+      stmt = stmtOpt match {
+      | None() -> continue
+      | Some(x) -> x
+      };
+      stmts.push(stmt);
+    };
+  } catch {
+  | IgnoreAndContinue() -> void
+  | Error(posError, str) -> printErrorAndExit(line, buffer, posError, str)
+  | exn ->
+    print_error(exn.getMessage());
+    skipExit(44)
+  };
 
   stmts.collect(Array)
 }
