@@ -83,8 +83,8 @@ export class SKDBSyncImpl implements SKDBSync {
 
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
+  watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
 
   private runner: (fn: () => string) => Array<any>;
 
@@ -168,10 +168,11 @@ export class SKDBSyncImpl implements SKDBSync {
   }
 
   exec = (stdin: string, params: Params = new Map()) => {
-    return this.runner(() => {
+    const result = this.runner(() => {
       let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
       return this.runLocal(args1, stdin1)
     });
+    return new SkdbTable(...result);
   }
 
   tableSchema = (tableName: string) => {
@@ -273,12 +274,12 @@ export class SKDBImpl implements SKDB {
     return new SkdbTable(...rows);
   }
 
-  async watch(query: string, params: Params, onChange: (rows: Array<any>) => void) {
+  async watch(query: string, params: Params, onChange: (rows: SkdbTable) => void) {
     let closable = this.skdbSync.watch(query, params, onChange);
     return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
   }
 
-  async watchChanges(query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) {
+  async watchChanges(query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) {
     let closable = this.skdbSync.watchChanges(query, params, init, update);
     return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
   }

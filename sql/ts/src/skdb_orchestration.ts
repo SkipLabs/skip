@@ -1,5 +1,6 @@
 import { Environment } from "#std/sk_types";
 import { SkdbMechanism, RemoteSKDB, Params, MirrorDefn } from "#skdb/skdb_types";
+import { SkdbTable } from "#skdb/skdb_util";
 
 const npmVersion = "";
 
@@ -1610,7 +1611,7 @@ class SKDBServer implements RemoteSKDB {
     await this.establishServerTail(tables);
   }
 
-  async exec(stdin: string, params: Params = new Map()): Promise<any[]> {
+  async exec(stdin: string, params: Params = new Map()): Promise<SkdbTable> {
     if (params instanceof Map) {
       params = Object.fromEntries(params);
     }
@@ -1619,11 +1620,12 @@ class SKDBServer implements RemoteSKDB {
       type: "query",
       query: stdin,
       format: "json",
-    }).then(result =>
-      result.split("\n")
-      .filter((x) => x != "")
-      .map((x) => JSON.parse(x))
-    );
+    }).then(result => {
+      const rows = result.split("\n")
+	.filter((x) => x != "")
+	.map((x) => JSON.parse(x));
+      return new SkdbTable(...rows);
+    });
   }
 
   async tableSchema(tableName: string, suffix: string = ""): Promise<string> {
