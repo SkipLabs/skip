@@ -80,14 +80,14 @@ export class SKDBWorker implements SKDB {
     return new SkdbTable(...rows);
   }
 
-  watch = async (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
+  watch = async (query: string, params: Params, onChange: (rows: SkdbTable) => void) => {
     return this.worker.post(new Function("watch", [query, params, onChange], { wrap: true, autoremove: true })).then(wrapped => {
       let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
       return { close: close };
     });
   }
 
-  watchChanges = async (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => {
+  watchChanges = async (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => {
     return this.worker.post(new Function("watchChanges", [query, params, init, update], { wrap: true, autoremove: true })).then(wrapped => {
       let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
       return { close: close };

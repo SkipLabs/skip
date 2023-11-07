@@ -1,6 +1,6 @@
 import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types";
 import { PagedMemory, Page, Storage, SKDB, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
-import { ExternalFuns } from "#skdb/skdb_util";
+import { ExternalFuns, SkdbTable } from "#skdb/skdb_util";
 import { IDBStorage } from "#skdb/skdb_storage";
 import { SKDBImpl, SKDBSyncImpl } from "#skdb/skdb_database";
 
@@ -20,14 +20,14 @@ interface Exported {
 class SkdbHandleImpl implements SkdbHandle {
   runner: (fn: () => string) => Array<any>;
   main: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
+  watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
 
   constructor(
     main: (new_args: Array<string>, new_stdin: string) => string,
     runner: (fn: () => string) => Array<any>,
-    watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void },
-    watchChanges: (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
+    watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void },
+    watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
   ) {
     this.runner = runner;
     this.main = main;
@@ -369,14 +369,14 @@ class LinksImpl implements Links, ToWasm {
     let watch = (
       query: string,
       params: Params,
-      onChange: (rows: Array<any>) => void,
+      onChange: (rows: SkdbTable) => void,
     ) => {
       return manageWatch(
         query,
         params,
         exported.SKIP_reactive_query,
         _queryID => {
-          onChange(this.stdout_objects[0]);
+          onChange(new SkdbTable(...this.stdout_objects[0]));
           this.stdout_objects = [[],[],[],[]];
         },
       );
@@ -384,17 +384,17 @@ class LinksImpl implements Links, ToWasm {
     let watchChanges = (
       query: string,
       params: Params,
-      init: (rows: Array<any>) => void,
-      update: (added: Array<any>, removed: Array<any>) => void,
+      init: (rows: SkdbTable) => void,
+      update: (added: SkdbTable, removed: SkdbTable) => void,
     ) => {
       return manageWatch(
         query,
         params,
         exported.SKIP_reactive_query_changes,
         queryID => {
-          const rows = this.stdout_objects[0];
-          const added = this.stdout_objects[1];
-          const removed = this.stdout_objects[2];
+          const rows = new SkdbTable(...this.stdout_objects[0]);
+          const added = new SkdbTable(...this.stdout_objects[1]);
+          const removed = new SkdbTable(...this.stdout_objects[2]);
           const tick = this.stdout_objects[3][0].tick;
           if (added.length > 0 || removed.length > 0) {
             update(added, removed);
