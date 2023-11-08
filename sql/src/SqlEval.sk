@@ -1417,20 +1417,22 @@ fun eval(
   options: Options,
   params: Map<String, Value>,
 ): Result<void, Error> {
-  SQLContext::withContext(options.sync, (ctx) ~> {
-    pos = 0;
-    loop {
-      (statements, isTransaction, !pos) = parseStatements(sql, pos) match {
-      | Success(Some(v)) -> v
-      | Success(None()) -> break Success(void)
-      | Failure(err) -> break Failure(err)
-      };
+  SKStore.withRegionValue(() ~> {
+    SQLContext::withContext(options.sync, (ctx) ~> {
+      pos = 0;
+      loop {
+        (statements, isTransaction, !pos) = parseStatements(sql, pos) match {
+        | Success(Some(v)) -> v
+        | Success(None()) -> break Success(void)
+        | Failure(err) -> break Failure(err)
+        };
 
-      ctx.eval(statements, options, params, isTransaction) match {
-      | res @ Failure _ -> break res
-      | Success _ -> void
+        ctx.eval(statements, options, params, isTransaction) match {
+        | res @ Failure _ -> break res
+        | Success _ -> void
+        }
       }
-    }
+    })
   });
 }
 
