@@ -1387,7 +1387,20 @@ fun readStatements(): Result<?(Array<Stmt>, Bool), Error> {
       break void;
     };
 
-    (!pos, stmtOpt) = parseStmt(lex, pos);
+    err: ?Error = None();
+    (!pos, stmtOpt) = try {
+      parseStmt(lex, pos)
+    } catch {
+    // NOTE: This is dirty but we have to cope with it until proper exceptions are back.
+    | exn @ Error _ ->
+      !err = Some(exn);
+      (0, None())
+    | exn -> throw exn
+    };
+    if (err is Some _) {
+      return Failure(err.fromSome())
+    };
+
     stmt = stmtOpt match {
     | None() -> break void
     | Some(x) -> x
@@ -1412,7 +1425,6 @@ fun eval(
   });
   SQLContext::withContext(options.sync, (ctx) ~> {
     loop {
-      // FIXME: Handle parse errors.
       (statements, isTransaction) = readStatements() match {
       | Success(Some(v)) -> v
       | Success(None()) -> break Success(void)
