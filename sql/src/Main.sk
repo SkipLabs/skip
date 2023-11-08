@@ -352,7 +352,24 @@ untracked fun main(): void {
           skipExit(2)
         };
         params = queryParams(options);
-        _ = SKDB.eval(options, params)
+        if (isATTY() == 0) {
+          input = IO.stdin().read_to_end();
+          _ = SKStore.withRegionValue(() ~> SKDB.eval(input, options, params))
+        } else {
+          loop {
+            SKStore.withRegionVoid(() ~> {
+              input = "";
+              loop {
+                print_raw("skdb> ");
+                !input = input + SKDB.read(0).i1;
+                SKDB.eval(input, options, params) match {
+                | Failure(Error(_, "Unfinished transaction")) -> continue
+                | _ -> break void
+                }
+              }
+            })
+          }
+        };
       });
     subcmd_handler(args, options);
   } catch {
