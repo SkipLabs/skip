@@ -1308,6 +1308,42 @@ private mutable class SQLContext(
       (context.clone(), underLockF);
     })
   }
+
+  mutable fun eval(
+    statements: Array<Stmt>,
+    options: Options,
+    params: Map<String, Value>,
+    isTransaction: Bool,
+  ): Result<void, Error> {
+    this.exec(context ~> {
+      context.!globals = SortedMap[];
+
+      underLockF: ?((
+        mutable SKStore.Context,
+        mutable SKStore.Context,
+        SKStore.Context,
+      ) ~> void) = None();
+
+      for (stmt in statements) {
+        markIfRead(context, stmt);
+
+        try {
+          !underLockF = evalWithContext(
+            options,
+            context,
+            params,
+            stmt,
+            isTransaction,
+          );
+        } catch {
+        | IgnoreAndContinue() -> void
+        | exn -> throw exn
+        };
+      };
+
+      underLockF
+    })
+  }
 }
 
 fun readStatements(): ?(Array<Stmt>, Bool) {
@@ -1382,37 +1418,9 @@ fun eval(
       | None() -> break Success(void)
       };
 
-      res = ctx.exec(context ~> {
-        context.!globals = SortedMap[];
-
-        underLockF: ?((
-          mutable SKStore.Context,
-          mutable SKStore.Context,
-          SKStore.Context,
-        ) ~> void) = None();
-
-        for (stmt in statements) {
-          markIfRead(context, stmt);
-
-          try {
-            !underLockF = evalWithContext(
-              options,
-              context,
-              params,
-              stmt,
-              isTransaction,
-            );
-          } catch {
-          | IgnoreAndContinue() -> void
-          | exn -> throw exn
-          };
-        };
-
-        underLockF
-      });
-
-      if (res is Failure _) {
-        break res
+      ctx.eval(statements, options, params, isTransaction) match {
+      | res @ Failure _ -> break res
+      | Success _ -> void
       }
     }
   });
