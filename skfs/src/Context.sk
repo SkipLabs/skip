@@ -1613,4 +1613,11 @@ fun withRegion<T>(
   }
 }
 
+fun withRegionValue<T>(f: () ~> T): T {
+  saved = newObstack();
+  fresult = f();
+  copied = destroyObstackWithValue(saved, List[fresult]);
+  copied.getHead();
+}
+
 module end;
