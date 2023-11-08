@@ -1346,7 +1346,7 @@ private mutable class SQLContext(
   }
 }
 
-fun readStatements(): ?(Array<Stmt>, Bool) {
+fun readStatements(): Result<?(Array<Stmt>, Bool), Error> {
   isTTY = isATTY() != 0;
   isTransaction = false;
   statements = mutable Vector[];
@@ -1362,10 +1362,10 @@ fun readStatements(): ?(Array<Stmt>, Bool) {
 
     if (isEOF(lex, pos)) {
       if (isTransaction) {
-        error(pos, "Unfinished transaction")
+        return Failure(Error(pos, "Unfinished transaction"))
       };
       if (statements.isEmpty()) {
-        return None()
+        return Success(None())
       }
     };
 
@@ -1375,7 +1375,7 @@ fun readStatements(): ?(Array<Stmt>, Bool) {
       !pos = lex.expect(pos, ";");
 
       if (isTransaction) {
-        error(pos, "Nested transaction");
+        return Failure(Error(pos, "Nested transaction"));
       };
       !isTransaction = true;
       continue;
@@ -1398,7 +1398,7 @@ fun readStatements(): ?(Array<Stmt>, Bool) {
     if (!isTransaction) break void;
   };
 
-  Some((statements.toArray(), isTransaction))
+  Success(Some((statements.toArray(), isTransaction)))
 }
 
 fun eval(
@@ -1414,8 +1414,9 @@ fun eval(
     loop {
       // FIXME: Handle parse errors.
       (statements, isTransaction) = readStatements() match {
-      | Some(v) -> v
-      | None() -> break Success(void)
+      | Success(Some(v)) -> v
+      | Success(None()) -> break Success(void)
+      | Failure(err) -> break Failure(err)
       };
 
       ctx.eval(statements, options, params, isTransaction) match {
