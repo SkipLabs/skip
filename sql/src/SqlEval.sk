@@ -1346,20 +1346,16 @@ private mutable class SQLContext(
   }
 }
 
-fun readStatements(): Result<?(Array<Stmt>, Bool), Error> {
-  isTTY = isATTY() != 0;
+// Parses either a single statement or a single transaction. This constraint will be relaxed with the new parser.
+fun parseStatements(sql: String): Result<?(Array<Stmt>, Bool), Error> {
   isTransaction = false;
   statements = mutable Vector[];
 
-  loop {
-    if (isTTY) {
-      print_raw("skdb> ");
-    };
-    (_, lineStr) = read(0);
-    buffer = Buffer(lineStr);
-    lex = Lexer(0, buffer);
-    pos = 0;
+  buffer = Buffer(sql);
+  lex = Lexer(0, buffer);
+  pos = 0;
 
+  loop {
     if (isEOF(lex, pos)) {
       if (isTransaction) {
         return Failure(Error(pos, "Unfinished transaction"))
@@ -1412,6 +1408,22 @@ fun readStatements(): Result<?(Array<Stmt>, Bool), Error> {
   };
 
   Success(Some((statements.toArray(), isTransaction)))
+}
+
+fun readStatements(): Result<?(Array<Stmt>, Bool), Error> {
+  isTTY = isATTY() != 0;
+  input = "";
+  loop {
+    if (isTTY) {
+      print_raw("skdb> ");
+    };
+    !input = input + read(0).i1;
+    x = input;
+    SKStore.withRegionValue(() ~> parseStatements(x)) match {
+    | Failure(Error(_, "Unfinished transaction")) -> continue
+    | v -> return v
+    }
+  }
 }
 
 fun eval(
