@@ -1258,17 +1258,16 @@ private mutable class SQLContext(
         mutable SKStore.Context,
         SKStore.Context,
       ) ~> void,
-      Bool,
     ),
-  ): Bool {
+  ): void {
     startTick = this.context.tick;
     pos = SKStore.newObstack();
 
-    (newContext, underLockF, shouldContinue) = try {
+    (newContext, underLockF) = try {
       f(this.context with {globals => this.globals})
     } catch {
     | err @ Error _ ->
-      (SKStore.cloneContextWithError(this.context, err), None(), false)
+      (SKStore.cloneContextWithError(this.context, err), None())
     | exn -> throw exn
     };
     this.!context = SKStore.gContextSync(
@@ -1282,31 +1281,78 @@ private mutable class SQLContext(
     this.context.notifyAll(startTick);
 
     this.!globals = this.context.globals;
-    if (this.globals.containsKey("Error")) {
-      !shouldContinue = false
-    };
 
     SKStore.destroyObstack(pos);
-
-    shouldContinue
   }
 
   mutable fun exec(
-    f: mutable SKStore.Context ~> (
-      ?(
-        mutable SKStore.Context,
-        mutable SKStore.Context,
-        SKStore.Context,
-      ) ~> void,
-      Bool,
-    ),
-  ): Bool {
+    f: mutable SKStore.Context ~> ?(
+      mutable SKStore.Context,
+      mutable SKStore.Context,
+      SKStore.Context,
+    ) ~> void,
+  ): void {
     this._exec(icontext ~> {
       context = SKStore.Context::fromSaved(icontext);
-      (underLockF, shouldContinue) = f(context);
-      (context.clone(), underLockF, shouldContinue);
+      underLockF = f(context);
+      (context.clone(), underLockF);
     })
   }
+}
+
+fun readStatements(): ?(Array<Stmt>, Bool) {
+  isTTY = isATTY() != 0;
+  isTransaction = false;
+  statements = mutable Vector[];
+
+  loop {
+    if (isTTY) {
+      print_raw("skdb> ");
+    };
+    (_, lineStr) = read(0);
+    buffer = Buffer(lineStr);
+    lex = Lexer(0, buffer);
+    pos = 0;
+
+    if (isEOF(lex, pos)) {
+      if (isTransaction) {
+        error(pos, "Unfinished transaction")
+      };
+      if (statements.isEmpty()) {
+        return None()
+      }
+    };
+
+    if (lex.isEqUpper(pos, "BEGIN")) {
+      !pos = lex.expectUpper(pos, "BEGIN");
+      !pos = lex.expectUpper(pos, "TRANSACTION");
+      !pos = lex.expect(pos, ";");
+
+      if (isTransaction) {
+        error(pos, "Nested transaction");
+      };
+      !isTransaction = true;
+      continue;
+    };
+
+    if (lex.isEqUpper(pos, "COMMIT")) {
+      !pos = lex.expectUpper(pos, "COMMIT");
+      !pos = lex.expect(pos, ";");
+      break void;
+    };
+
+    (!pos, stmtOpt) = parseStmt(lex, pos);
+    stmt = stmtOpt match {
+    | None() -> break void
+    | Some(x) -> x
+    };
+
+    statements.push(stmt);
+
+    if (!isTransaction) break void;
+  };
+
+  Some((statements.toArray(), isTransaction))
 }
 
 fun eval(
@@ -1314,89 +1360,31 @@ fun eval(
   params: Map<String, Value>,
   userOpt: ?String,
 ): Result<void, Error> {
-  isTTY = isATTY() != 0;
+  userOpt.each(_ -> {
+    print_error("Cannot execute queries as user, use --connect instead");
+    skipExit(88);
+  });
   SQLContext::withContext(options.sync, (ctx) ~> {
     loop {
-      shouldContinue = ctx.exec(context ~> {
-        if (isTTY) {
-          print_raw("skdb> ");
-        };
-        context.!globals = SortedMap[];
-        userOpt.each(_ -> {
-          print_error("Cannot execute queries as user, use --connect instead");
-          skipExit(88);
-        });
-        context.removeGlobal("TableMap");
+      // FIXME: Handle parse errors.
+      (statements, isTransaction) = readStatements() match {
+      | Some(v) -> v
+      | None() -> break void
+      };
 
-        buffer = Buffer("");
-        shouldContinue = false;
+      ctx.exec(context ~> {
+        context.!globals = SortedMap[];
+
         underLockF: ?((
           mutable SKStore.Context,
           mutable SKStore.Context,
           SKStore.Context,
         ) ~> void) = None();
 
-        try {
-          !shouldContinue = true;
-          isTransaction = false;
+        for (stmt in statements) {
+          markIfRead(context, stmt);
 
-          statements = mutable Vector[];
-
-          loop {
-            !underLockF = None();
-            (_, lineStr) = read(0);
-            !buffer = Buffer(lineStr);
-            lex = Lexer(0, buffer);
-            pos = 0;
-
-            if (isEOF(lex, pos)) {
-              !shouldContinue = false;
-              if (isTransaction) {
-                error(pos, "Unfinished transaction");
-              };
-              break void;
-            };
-
-            if (lex.isEqUpper(pos, "BEGIN")) {
-              !pos = lex.expectUpper(pos, "BEGIN");
-              !pos = lex.expectUpper(pos, "TRANSACTION");
-              !pos = lex.expect(pos, ";");
-
-              if (isTransaction) {
-                error(pos, "Nested transaction");
-              };
-              !isTransaction = true;
-              continue;
-            };
-
-            if (lex.isEqUpper(pos, "COMMIT")) {
-              !pos = lex.expectUpper(pos, "COMMIT");
-              !pos = lex.expect(pos, ";");
-              context.getGlobal(GLOBALS) match {
-              | None() -> void
-              | Some(_) -> context.removeGlobal(GLOBALS)
-              };
-              context.getGlobal(NAMEDIDS) match {
-              | None() -> void
-              | Some(_) -> context.removeGlobal(NAMEDIDS)
-              };
-              break void;
-            };
-
-            (!pos, stmtOpt) = parseStmt(lex, pos);
-            stmt = stmtOpt match {
-            | None() -> break void
-            | Some(x) -> x
-            };
-
-            statements.push(stmt);
-
-            if (!isTransaction) break void;
-          };
-
-          for (stmt in statements) {
-            markIfRead(context, stmt);
-
+          try {
             !underLockF = evalWithContext(
               options,
               context,
@@ -1404,17 +1392,14 @@ fun eval(
               stmt,
               isTransaction,
             );
+          } catch {
+          | IgnoreAndContinue() -> void
+          | exn -> throw exn
           };
-        } catch {
-        | IgnoreAndContinue() -> void
-        | exn -> throw exn
         };
 
-        (underLockF, shouldContinue)
+        underLockF
       });
-      if (!shouldContinue) {
-        break void
-      }
     };
 
     ctx.globals.maybeGet("Error").map(f ->
