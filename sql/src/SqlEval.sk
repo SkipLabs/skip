@@ -1259,7 +1259,7 @@ private mutable class SQLContext(
         SKStore.Context,
       ) ~> void,
     ),
-  ): void {
+  ): Result<void, Error> {
     startTick = this.context.tick;
     pos = SKStore.newObstack();
 
@@ -1283,6 +1283,16 @@ private mutable class SQLContext(
     this.!globals = this.context.globals;
 
     SKStore.destroyObstack(pos);
+
+    this.globals.maybeGet("Error").map(f ->
+      SKStore.ErrorFile::type(f).value
+    ) match {
+    | Some(Error(posError, msg)) -> Failure(Error(posError, msg))
+    | Some(exn) ->
+      print_error(exn.getMessage());
+      skipExit(1)
+    | None() -> Success(void)
+    }
   }
 
   mutable fun exec(
@@ -1291,7 +1301,7 @@ private mutable class SQLContext(
       mutable SKStore.Context,
       SKStore.Context,
     ) ~> void,
-  ): void {
+  ): Result<void, Error> {
     this._exec(icontext ~> {
       context = SKStore.Context::fromSaved(icontext);
       underLockF = f(context);
@@ -1369,10 +1379,10 @@ fun eval(
       // FIXME: Handle parse errors.
       (statements, isTransaction) = readStatements() match {
       | Some(v) -> v
-      | None() -> break void
+      | None() -> break Success(void)
       };
 
-      ctx.exec(context ~> {
+      res = ctx.exec(context ~> {
         context.!globals = SortedMap[];
 
         underLockF: ?((
@@ -1400,16 +1410,10 @@ fun eval(
 
         underLockF
       });
-    };
 
-    ctx.globals.maybeGet("Error").map(f ->
-      SKStore.ErrorFile::type(f).value
-    ) match {
-    | Some(Error(pos, msg)) -> Failure(Error(pos, msg))
-    | Some(exn) ->
-      print_error(exn.getMessage());
-      skipExit(1)
-    | None() -> Success(void)
+      if (res is Failure _) {
+        break res
+      }
     }
   });
 }
