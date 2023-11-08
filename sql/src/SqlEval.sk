@@ -1347,13 +1347,15 @@ private mutable class SQLContext(
 }
 
 // Parses either a single statement or a single transaction. This constraint will be relaxed with the new parser.
-fun parseStatements(sql: String): Result<?(Array<Stmt>, Bool), Error> {
+fun parseStatements(
+  sql: String,
+  pos: Int,
+): Result<?(Array<Stmt>, Bool, Int), Error> {
   isTransaction = false;
   statements = mutable Vector[];
 
   buffer = Buffer(sql);
   lex = Lexer(0, buffer);
-  pos = 0;
 
   loop {
     if (isEOF(lex, pos)) {
@@ -1407,29 +1409,18 @@ fun parseStatements(sql: String): Result<?(Array<Stmt>, Bool), Error> {
     if (!isTransaction) break void;
   };
 
-  Success(Some((statements.toArray(), isTransaction)))
+  Success(Some((statements.toArray(), isTransaction, pos)))
 }
 
-fun readStatements(): Result<?(Array<Stmt>, Bool), Error> {
-  isTTY = isATTY() != 0;
-  input = "";
-  loop {
-    if (isTTY) {
-      print_raw("skdb> ");
-    };
-    !input = input + read(0).i1;
-    x = input;
-    SKStore.withRegionValue(() ~> parseStatements(x)) match {
-    | Failure(Error(_, "Unfinished transaction")) -> continue
-    | v -> return v
-    }
-  }
-}
-
-fun eval(options: Options, params: Map<String, Value>): Result<void, Error> {
+fun eval(
+  sql: String,
+  options: Options,
+  params: Map<String, Value>,
+): Result<void, Error> {
   SQLContext::withContext(options.sync, (ctx) ~> {
+    pos = 0;
     loop {
-      (statements, isTransaction) = readStatements() match {
+      (statements, isTransaction, !pos) = parseStatements(sql, pos) match {
       | Success(Some(v)) -> v
       | Success(None()) -> break Success(void)
       | Failure(err) -> break Failure(err)
