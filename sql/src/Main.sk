@@ -351,14 +351,8 @@ untracked fun main(): void {
           print_error("cannot use capacity without init");
           skipExit(2)
         };
-        // TODO: If `--user` is actually needed, reinstate it. It was clashing with
-        // other options and was removed for convenience.
-        // user = argMap.maybeGet("user") match {
-        //   | Some(AP.StringValue{value => userID}) -> Some(userID)
-        //   | _ -> None()
-        //   };
         params = queryParams(options);
-        _ = SKDB.eval(options, params, /* user = */ None())
+        _ = SKDB.eval(options, params)
       });
     subcmd_handler(args, options);
   } catch {

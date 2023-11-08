@@ -1426,15 +1426,7 @@ fun readStatements(): Result<?(Array<Stmt>, Bool), Error> {
   }
 }
 
-fun eval(
-  options: Options,
-  params: Map<String, Value>,
-  userOpt: ?String,
-): Result<void, Error> {
-  userOpt.each(_ -> {
-    print_error("Cannot execute queries as user, use --connect instead");
-    skipExit(88);
-  });
+fun eval(options: Options, params: Map<String, Value>): Result<void, Error> {
   SQLContext::withContext(options.sync, (ctx) ~> {
     loop {
       (statements, isTransaction) = readStatements() match {
