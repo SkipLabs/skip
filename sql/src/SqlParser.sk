@@ -339,12 +339,17 @@ fun parseTableName(lex: Lexer, pos: Int): (Int, SelectSource) {
   !sfrom.asName = asStr;
 
   if (sfrom is FromTable _) {
-    indexed = if (lex.isEqUpper(pos, "NOT")) {
-      !pos = lex.expectUpper(pos, "NOT");
+    indexed = if (lex.isEqUpper(pos, "INDEXED")) {
       !pos = lex.expectUpper(pos, "INDEXED");
-      false
-    } else {
+      !pos = lex.expectUpper(pos, "BY");
+      (!pos, _) = lex.next(pos);
       true
+    } else {
+      if (lex.isEqUpper(pos, "NOT")) {
+        !pos = lex.expectUpper(pos, "NOT");
+        !pos = lex.expectUpper(pos, "INDEXED");
+      };
+      false
     };
     !sfrom = (sfrom as FromTable _) with {indexed}
   };
