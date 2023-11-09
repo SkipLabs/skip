@@ -359,22 +359,13 @@ fun parseTableNames(lex: Lexer, pos: Int): (Int, Array<SelectSource>) {
   (pos, tableNames.toArray())
 }
 
-fun parseJoin(
-  lex: Lexer,
-  pos: Int,
-): (Int, Array<SelectSource>, ?(Expr, Array<Expr>)) {
+fun parseJoin(lex: Lexer, pos: Int): (Int, Array<SelectSource>, ?Expr) {
   !pos = lex.expectUpper(pos, "JOIN");
   (!pos, names) = parseTableNames(lex, pos);
   on = if (lex.isEqUpper(pos, "ON")) {
     !pos = lex.expectUpper(pos, "ON");
-    (!pos, paramsOpt) = parseColNames(lex, pos);
-    paramsOpt.map(params -> {
-      clauses = params.map(x -> x.i0);
-      if (clauses.size() == 0) {
-        error(pos, "Expected ON clauses");
-      };
-      (clauses[0], clauses.slice(1, clauses.size()))
-    })
+    (!pos, expr) = parseExpr(lex, pos);
+    Some(expr)
   } else {
     None()
   };

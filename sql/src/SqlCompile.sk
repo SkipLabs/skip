@@ -725,12 +725,7 @@ mutable class Compiler{
         where = mergeConds(expandedLhs.i1, expandedRhs.i1);
         on match {
         | None() -> errorNbr(4, this.pos, "Expected ON after JOIN")
-        | Some((onClause, clauses)) ->
-          clauseIter = clauses.iterator();
-
-          for (clause in clauseIter) {
-            !onClause = BinOp(OAnd(), onClause, clause);
-          };
+        | Some(onClause) ->
           !where = where match {
           | None() -> Some(On(kind, onClause))
           | Some(cond) -> Some(BinOp(OAnd(), On(kind, onClause), cond))
