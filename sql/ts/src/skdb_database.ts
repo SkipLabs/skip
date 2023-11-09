@@ -13,7 +13,7 @@ class SkdbMechanismImpl implements SkdbMechanism {
   diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
   assertCanBeMirrored: (tableName: string) => void;
   tableExists: (tableName: string) => boolean;
-  exec: (query: string) => Array<any>;
+  exec: (query: string) => SkdbTable;
   toggleView: (tableName: string) => void;
 
   constructor(client: SKDBSyncImpl, fs: FileSystem, utf8Encode: (v: string) => Uint8Array) {
@@ -86,7 +86,7 @@ export class SKDBSyncImpl implements SKDBSync {
   watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void }
   watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
 
-  private runner: (fn: () => string) => Array<any>;
+  private runner: (fn: () => string) => SkdbTable;
 
   connectedRemote?: RemoteSKDB;
 
@@ -168,11 +168,10 @@ export class SKDBSyncImpl implements SKDBSync {
   }
 
   exec = (stdin: string, params: Params = new Map()) => {
-    const result = this.runner(() => {
+    return this.runner(() => {
       let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
       return this.runLocal(args1, stdin1)
     });
-    return new SkdbTable(...result);
   }
 
   tableSchema = (tableName: string) => {
