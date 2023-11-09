@@ -16,11 +16,13 @@ private class UserConfig{
   autoRemoveState: Bool = false,
   repositories: Array<String> = Array[],
 } {
-  fun update(json: JSON.Object): UserConfig {
+  fun update(json: JSON.Object, dir: String): UserConfig {
     json.maybeGetBool("auto-remove-state").each(v -> !this.autoRemoveState = v);
     json.maybeGetBool("format-on-check").each(v -> !this.formatOnCheck = v);
     json.maybeGetArray("repositories").each(v ->
-      !this.repositories = v.value.map(jv -> jv.expectString()).toArray()
+      !this.repositories = v.value
+        .map(jv -> Path.join(dir, jv.expectString()))
+        .toArray()
     );
     this;
   }
@@ -102,7 +104,7 @@ private fun findUserConfig(optPath: ?String = None()): UserConfig {
   configFiles.reversed().each(cFile ->
     try {
       json = JSON.decode(FileSystem.readTextFile(cFile)).expectObject();
-      !config = config.update(json);
+      !config = config.update(json, Path.parentname(cFile));
     } catch {
     | _exn -> void
     }
@@ -126,9 +128,9 @@ private fun run(args: Array<String>, verbose: Bool): void {
 }
 
 const errorMappingAbort: Int = 6;
-const errorMappingFailed: Int = 40;
-const errorMappingMemory: Int = 41;
-const errorMappingVersion: Int = 42;
+const errorMappingFailed: Int = 41;
+const errorMappingMemory: Int = 42;
+const errorMappingVersion: Int = 43;
 const errorChangingCont: Int = 22;
 
 fun isMappingError(code: Int): Bool {
@@ -358,7 +360,10 @@ fun checkBuildFile(
     Environ.set_var("PROFILE", bc.profile);
     Environ.set_var("VERBOSE", bc.env.verbose.toString());
     Environ.set_var("TEST", test.toString());
-    bc.target.each(t -> Environ.set_var("TARGET", t.toString()));
+    bc.target match {
+    | Some(t) -> Environ.set_var("TARGET", t.toString())
+    | _ -> Environ.remove_var("TARGET")
+    };
     Some(Array[binPath])
   } else {
     None()
