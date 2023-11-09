@@ -2320,3 +2320,86 @@ fun compilePermissionLiteral(perm_str: String): Int {
   };
   res
 }
+
+/*****************************************************************************/
+/* Looks for an aggregate function. */
+/*****************************************************************************/
+
+fun hasAggr(expr: Expr): Bool {
+  expr match {
+  | Value _ -> false
+  | Identifier _ -> false
+  | Between(e, _, _, _)
+  | UnOp(_, e) ->
+    hasAggr(e)
+  | In(e, InList(arr), _) ->
+    hasAggr(e) ||
+      for (x in arr) {
+        if (hasAggr(x)) break true;
+      } else {
+        false
+      }
+  | In(_, InSelect _, _) -> invariant_violation("IN SELECT not implemented")
+  | BinOp(_, e1, e2)
+  | Like(e1, e2, _, _) ->
+    hasAggr(e1) || hasAggr(e2)
+  | On(_, e) -> hasAggr(e)
+  | Subquery(_)
+  | Exists _ ->
+    false
+  | Case(condOpt, whenCases, elseCase) ->
+    condOpt match {
+    | Some(e) if (hasAggr(e)) -> return true
+    | _ -> void
+    };
+    for (kv in whenCases) {
+      (e1, e2) = kv;
+      if (hasAggr(e1) || hasAggr(e2)) return true;
+    };
+    elseCase match {
+    | Some(e) if (hasAggr(e)) -> true
+    | _ -> false
+    }
+  | Call(fname, args, _) ->
+    if (Array["min", "max", "sum", "avg", "count"].contains(fname.lower)) {
+      return true
+    };
+    for (e in args) {
+      if (hasAggr(e)) return true
+    };
+    false
+  | Cast(e, _) -> hasAggr(e)
+  | Tuple(values) -> values.any(hasAggr)
+  | Collate(e, _) -> hasAggr(e)
+  }
+}
+
+fun selectIsAggr(select: SelectCore): Bool {
+  select match {
+  | SelectCoreValues _ -> false
+  | SelectCoreQuery{groupBy, params} ->
+    groupBy is Some _ ||
+      {
+        for (param in params) {
+          param match {
+          | SelectExpr(e, _) if (hasAggr(e)) -> return true
+          | _ -> void
+          }
+        };
+        false
+      }
+  }
+}
+
+fun selectIsEmptyFrom(select: SelectCore): Bool {
+  select match {
+  | SelectCoreQuery{from => Some _} -> false
+  | _ -> true
+  }
+}
+
+fun selectOrRestIsAggrOrEmptyFrom(select: Select): Bool {
+  selectIsAggr(select.core) ||
+    selectIsEmptyFrom(select.core) ||
+    select.rest.any(x -> selectIsAggr(x.i1) || selectIsEmptyFrom(x.i1))
+}
