@@ -151,14 +151,18 @@ class Select{
   rest: Array<(CompoundOperator, SelectCore)>,
 } extends Stmt
 
-class SelectCore{
-  distinct: Bool,
-  params: Array<SelectResult>,
-  from: ?SelectFrom,
-  where: ?Expr,
-  groupBy: ?Array<Expr>,
-  having: ?Expr,
-} uses Equality
+base class SelectCore uses Equality {
+  children =
+  | SelectCoreQuery{
+    distinct: Bool,
+    params: Array<SelectResult>,
+    from: ?SelectFrom,
+    where: ?Expr,
+    groupBy: ?Array<Expr>,
+    having: ?Expr,
+  }
+  | SelectCoreValues{values: Array<Array<Expr>>}
+}
 
 base class SelectResult uses Equality {
   children =
@@ -411,20 +415,31 @@ fun hasAggr(expr: Expr): Bool {
 }
 
 fun selectIsAggr(select: SelectCore): Bool {
-  select.groupBy is Some _ ||
-    {
-      for (param in select.params) {
-        param match {
-        | SelectExpr(e, _) if (hasAggr(e)) -> return true
-        | _ -> void
-        }
-      };
-      false
-    }
+  select match {
+  | SelectCoreValues _ -> false
+  | SelectCoreQuery{groupBy, params} ->
+    groupBy is Some _ ||
+      {
+        for (param in params) {
+          param match {
+          | SelectExpr(e, _) if (hasAggr(e)) -> return true
+          | _ -> void
+          }
+        };
+        false
+      }
+  }
+}
+
+fun selectIsEmptyFrom(select: SelectCore): Bool {
+  select match {
+  | SelectCoreQuery{from => Some _} -> false
+  | _ -> true
+  }
 }
 
 fun selectOrRestIsAggrOrEmptyFrom(select: Select): Bool {
   selectIsAggr(select.core) ||
-    select.core.from is None() ||
-    select.rest.any(x -> selectIsAggr(x.i1) || x.i1.from is None())
+    selectIsEmptyFrom(select.core) ||
+    select.rest.any(x -> selectIsAggr(x.i1) || selectIsEmptyFrom(x.i1))
 }

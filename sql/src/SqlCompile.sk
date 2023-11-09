@@ -182,35 +182,38 @@ mutable class Compiler{
     mutable static{directMode, options, pos, params}
   }
 
-  mutable fun expandGroupBy(select: SelectCore): SelectCore {
+  mutable fun expandGroupBy(core: SelectCore): SelectCore {
     // Tranforms:
     // 'select ... from ... group by ...'
     // ==> 'select * from (select ... from ... group by ...)'
-
-    SelectCore{
-      distinct => select.distinct,
-      params => Array[SelectStar(None())],
-      from => Some(
-        FromQuery{
-          select => Select{
-            pos => 0,
-            core => select with {distinct => false},
-            orderBy => None(),
-            limit => None(),
-            rest => Array[],
+    core match {
+    | SelectCoreValues _ -> core
+    | select @ SelectCoreQuery _ ->
+      SelectCoreQuery{
+        distinct => select.distinct,
+        params => Array[SelectStar(None())],
+        from => Some(
+          FromQuery{
+            select => Select{
+              pos => 0,
+              core => select with {distinct => false},
+              orderBy => None(),
+              limit => None(),
+              rest => Array[],
+            },
+            asName => None(),
           },
-          asName => None(),
-        },
-      ),
-      where => None(),
-      groupBy => None(),
-      having => None(),
+        ),
+        where => None(),
+        groupBy => None(),
+        having => None(),
+      }
     }
   }
 
-  mutable fun compileSelectCore(
+  mutable fun compileSelectCoreQuery(
     context: mutable SKStore.Context,
-    select: SelectCore,
+    select: SelectCoreQuery,
     selectId: Name,
     sets: Array<UpdateSet> = Array[],
   ): CSelect {
@@ -311,11 +314,16 @@ mutable class Compiler{
     toplevel: Bool,
     sets: Array<UpdateSet> = Array[],
   ): CSelect {
+    if (select.core is SelectCoreValues _) {
+      error(select.pos, "VALUES() in SELECT not implemented.")
+    };
+    // TODO: This heuristic seems suspiciously biased towards the first term of
+    // a compound select.
     if (
-      select.core.distinct ||
+      (select.core as SelectCoreQuery _).distinct ||
       toplevel &&
         (select.orderBy is Some _ || select.limit is Some _) &&
-        (select.core.groupBy is Some _) ||
+        ((select.core as SelectCoreQuery _).groupBy is Some _) ||
       (!select.rest.isEmpty() || toplevel) &&
         selectOrRestIsAggrOrEmptyFrom(select)
     ) {
@@ -323,10 +331,15 @@ mutable class Compiler{
       !select.rest = select.rest.map(x -> (x.i0, this.expandGroupBy(x.i1)))
     };
 
-    core = this.compileSelectCore(context, select.core, selectId, sets);
+    core = this.compileSelectCoreQuery(
+      context,
+      select.core as SelectCoreQuery _,
+      selectId,
+      sets,
+    );
 
     orderBy = this.compileOrderBy(
-      select.core.params,
+      (select.core as SelectCoreQuery _).params,
       core.from,
       select.orderBy,
     );
@@ -366,7 +379,7 @@ mutable class Compiler{
       core.from.size() == 1 &&
       /* No index is involved (could change in the future?)  */
       core.from[0].i1 is None() &&
-      !select.core.distinct &&
+      !(select.core as SelectCoreQuery _).distinct &&
       core.having is None() &&
       orderBy is None() &&
       core.groupBy is None() &&
@@ -375,16 +388,28 @@ mutable class Compiler{
     format = this.options.format match {
     | OFK_CSV() -> SKStore.OCSV()
     | OFK_Table() ->
-      schema = static::getSchema(select.core.params, core.from, core.params);
+      schema = static::getSchema(
+        (select.core as SelectCoreQuery _).params,
+        core.from,
+        core.params,
+      );
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OTable(fieldNames)
     | OFK_JSON() ->
-      schema = static::getSchema(select.core.params, core.from, core.params);
+      schema = static::getSchema(
+        (select.core as SelectCoreQuery _).params,
+        core.from,
+        core.params,
+      );
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OJSON(fieldNames)
     | OFK_SQL() -> SKStore.OSQL()
     | OFK_JS() ->
-      schema = static::getSchema(select.core.params, core.from, core.params);
+      schema = static::getSchema(
+        (select.core as SelectCoreQuery _).params,
+        core.from,
+        core.params,
+      );
       fieldNames = schema.map(x -> x.name.origName);
       SKStore.OJS(fieldNames)
     };
@@ -581,10 +606,13 @@ mutable class Compiler{
     | FromTable{name => tableName} -> getTable(context, this.pos, tableName)
 
     | FromQuery{select} ->
+      if (select.core is SelectCoreValues _) {
+        error(select.pos, "SELECT ... FROM VALUES ... not implemented.")
+      };
       cselect = this.compileSelect(context, select, genSelectId(select), false);
       selectDir = evalSelect(context, cselect, None());
       static::getDirDescr(
-        select.core.params,
+        (select.core as SelectCoreQuery _).params,
         cselect.from,
         cselect.params,
         Name::create(selectDir.dirName.toString()),

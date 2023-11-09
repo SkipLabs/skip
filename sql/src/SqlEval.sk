@@ -528,6 +528,9 @@ class Evaluator{options: Options, user: ?UserFile} {
       virtual,
       text,
     } ->
+      if (selectAst.core is SelectCoreValues _) {
+        error(selectAst.pos, "CREATE VIEW AS VALUES ... not implemented")
+      };
       if (inTransaction) {
         error(pos, "Cannot create a view in a transaction");
       };
@@ -558,7 +561,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           viewName,
           virtual,
           text,
-          selectAst.core.params,
+          (selectAst.core as SelectCoreQuery _).params,
           cselect1,
         ),
       );
@@ -593,7 +596,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           cselect = compiler.compileSelect(context, selectAst, viewName, true);
           dirName = SKStore.DirName::create("/" + viewName + "/");
           dirDescr = SKDB.Compiler::getDirDescr(
-            selectAst.core.params,
+            (selectAst.core as SelectCoreQuery _).params,
             cselect.from,
             cselect.params,
             cselect.id,
@@ -721,7 +724,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     from = Some(FromTable{name, asName => None(), indexed => false});
     selectAst = Select{
       pos => pos,
-      core => SelectCore{
+      core => SelectCoreQuery{
         params => Array[SelectStar(None())],
         from,
         where,
@@ -1820,6 +1823,9 @@ fun manageReactiveQuery(
       selectAst = SKDB.parseQuery(lexer, 0).i1 match {
       | x @ Select _ -> x
       };
+      if (selectAst.core is SelectCoreValues _) {
+        error(selectAst.pos, "VALUES not implemented in SELECT.")
+      };
       skOptions = SKDB.Options{
         alwaysAllowJoins => false,
         backtrace => false,
@@ -1837,7 +1843,7 @@ fun manageReactiveQuery(
       );
       selectDir = SKDB.evalSelect(context, cselect, None());
       schema = SKDB.Compiler::getSchema(
-        selectAst.core.params,
+        (selectAst.core as SelectCoreQuery _).params,
         cselect.from,
         cselect.params,
       );
