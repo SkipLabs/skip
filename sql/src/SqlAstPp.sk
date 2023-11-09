@@ -1,0 +1,496 @@
+module SKDB;
+
+extension base class Stmt {
+  fun toString(): String
+  | BeginTransaction{kind} -> `BEGIN ${kind} TRANSACTION`
+  | EndTransaction{} -> "END TRANSACTION"
+  | CreateView{virtual, name, ifNotExists, query} ->
+    "CREATE " +
+      (if (virtual) "VIRTUAL " else "") +
+      "VIEW " +
+      (if (ifNotExists) "IF NOT EXISTS " else "") +
+      name.toString() +
+      " AS " +
+      query.toString()
+  | CreateIndex{ifNotExists, name, on, columns, unique, where} ->
+    "CREATE " +
+      (if (unique) "UNIQUE " else "") +
+      "INDEX " +
+      (if (ifNotExists) "IF NOT EXISTS " else "") +
+      name.toString() +
+      " ON " +
+      on.toString() +
+      "(" +
+      columns.map(c -> c.toString()).join(",") +
+      ")" +
+      (if (where is Some _) " WHERE " + where.fromSome().toString() else "")
+  | DropTable{name, ifExists} ->
+    "DROP TABLE " + (if (ifExists) "IF EXISTS " else "") + name.toString()
+  | DropView{name, ifExists} ->
+    "DROP VIEW " + (if (ifExists) "IF EXISTS " else "") + name.toString()
+  | DropIndex{name, ifExists} ->
+    "DROP INDEX " + (if (ifExists) "IF EXISTS " else "") + name.toString()
+  | Delete{name, alias, where, indexed} ->
+    "DELETE FROM " +
+      name.toString() +
+      (if (alias is Some _) " AS " + alias.fromSome().toString() else "") +
+      (if (indexed is Some _) {
+        " INDEXED BY " + indexed.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (where is Some _) " WHERE " + where.fromSome().toString() else "")
+  | Insert{onConflict, name, alias, paramsOpt, values} ->
+    "INSERT " +
+      (if (onConflict is Some _ && !(onConflict is Some(OCUpdate _))) {
+        onConflict.fromSome().toString()
+      } else {
+        ""
+      }) +
+      " " +
+      name.toString() +
+      (if (alias is Some _) ` AS ${alias.fromSome()} ` else "") +
+      (if (paramsOpt is Some _) {
+        "(" + paramsOpt.fromSome().map(p -> p.toString()).join(",") + ")"
+      } else {
+        ""
+      }) +
+      values.toString() +
+      (if (onConflict is Some(OCUpdate _)) {
+        onConflict.fromSome().toString()
+      } else {
+        ""
+      })
+  | Update{onConflict, name, alias, indexed, sets, from, where} ->
+    "UPDATE " +
+      (if (onConflict is Some _) {
+        "OR " + onConflict.fromSome().toString() + " "
+      } else {
+        ""
+      }) +
+      name.toString() +
+      (if (alias is Some _) " AS" + alias.fromSome().toString() else "") +
+      (if (indexed is Some _) {
+        " INDEXED BY " + indexed.fromSome().toString()
+      } else {
+        ""
+      }) +
+      " SET " +
+      sets.toString() +
+      (if (from is Some _) " FROM " + from.fromSome().toString() else "") +
+      (if (where is Some _) " WHERE " + where.fromSome().toString() else "")
+  | Pragma{name, value} ->
+    `PRAGMA ${name}` + (if (value is Some _) `(${value.fromSome()})` else "")
+  | Select{core, orderBy, limit, rest} ->
+    core.toString() +
+      rest.map(r -> " " + r.i0.toString() + " " + r.i1.toString()).join("") +
+      (if (orderBy is Some _) {
+        "ORDER BY " +
+          orderBy
+            .fromSome()
+            .map(o -> o.i0.toString() + " " + o.i1.toString())
+            .join(", ")
+      } else {
+        ""
+      }) +
+      (if (limit is Some _) "LIMIT " + limit.fromSome().toString() else "")
+  | CreateTableAs{ifNotExists, name, select} ->
+    "CREATE TABLE " +
+      (if (ifNotExists) "IF NOT EXISTS " else "") +
+      name.toString() +
+      " AS " +
+      select.toString()
+  | CreateTableSchema{ifNotExists, name, schema} ->
+    "CREATE TABLE " +
+      (if (ifNotExists) "IF NOT EXISTS " else "") +
+      name.toString() +
+      " (" +
+      schema.columns.map(c -> c.toString()).join(", ") +
+      ")"
+}
+
+extension class ColumnDefinition {
+  fun toString(): String {
+    this.name.toString() +
+      " " +
+      this.ty.toString() +
+      (if (this.primary is Some _) {
+        " " + this.primary.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (this.notNull is Some _) {
+        " " + this.notNull.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (this.unique is Some _) {
+        " " + this.unique.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (this.default is Some _) {
+        " " + this.default.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (this.check is Some _) {
+        " " + this.check.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (this.collate is Some _) {
+        " " + this.collate.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (this.foreignKey is Some _) {
+        " " + this.foreignKey.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (this.generated is Some _) {
+        " " + this.generated.fromSome().toString()
+      } else {
+        ""
+      })
+  }
+}
+
+extension base class ColumnConstraint {
+  fun toString(): String
+  | CCPrimaryKey{constraintName, order, autoincrement, onConflict} ->
+    (if (constraintName is Some _) {
+      "CONSTRAINT " + constraintName.fromSome().toString() + " "
+    } else {
+      ""
+    }) +
+      "PRIMARY KEY " +
+      order.toString() +
+      (if (onConflict is Some _) {
+        " ON CONFLICT " + onConflict.fromSome().toString()
+      } else {
+        ""
+      }) +
+      (if (autoincrement) " AUTOINCREMENT" else "")
+  | CCNotNull{constraintName, onConflict} ->
+    (if (constraintName is Some _) {
+      "CONSTRAINT " + constraintName.fromSome().toString() + " "
+    } else {
+      ""
+    }) +
+      "NOT NULL" +
+      (if (onConflict is Some _) {
+        " ON CONFLICT " + onConflict.fromSome().toString()
+      } else {
+        ""
+      })
+  | CCUnique{constraintName, onConflict} ->
+    (if (constraintName is Some _) {
+      "CONSTRAINT " + constraintName.fromSome().toString() + " "
+    } else {
+      ""
+    }) +
+      "UNIQUE" +
+      (if (onConflict is Some _) {
+        " ON CONFLICT " + onConflict.fromSome().toString()
+      } else {
+        ""
+      })
+  | CCCheck{constraintName, expr} ->
+    (if (constraintName is Some _) {
+      "CONSTRAINT " + constraintName.fromSome().toString() + " "
+    } else {
+      ""
+    }) +
+      "CHECK(" +
+      expr.toString() +
+      ")"
+  | CCDefault{constraintName, expr} ->
+    (if (constraintName is Some _) {
+      "CONSTRAINT " + constraintName.fromSome().toString() + " "
+    } else {
+      ""
+    }) +
+      "DEFAULT (" +
+      expr.toString() +
+      ")"
+  | CCCollate{constraintName, name} ->
+    (if (constraintName is Some _) {
+      "CONSTRAINT " + constraintName.fromSome().toString() + " "
+    } else {
+      ""
+    }) +
+      "COLLATE " +
+      name.toString()
+  | CCForeignKey _
+  | CCGenerated _ ->
+    invariant_violation("not implemented")
+}
+
+extension class UpdateSet {
+  fun toString(): String {
+    (if (this.columns.size() > 1) {
+      "(" + this.columns.map(c -> c.i1.toString()).join(", ") + ")"
+    } else {
+      invariant(!this.columns.isEmpty());
+      this.columns[0].toString()
+    }) +
+      " = " +
+      this.value.toString()
+  }
+}
+
+extension class IndexedColumn {
+  fun toString(): String {
+    this.expr.toString() +
+      (if (this.collate is Some _) {
+        " COLLATE " + this.collate.fromSome().toString()
+      } else {
+        ""
+      }) +
+      this.order.toString()
+  }
+}
+
+extension base class OnConflict {
+  fun toString(): String
+  | OCIgnore() -> "IGNORE"
+  | OCReplace() -> "REPLACE"
+  | OCUpdate(update) ->
+    "ON CONFLICT DO UPDATE SET " +
+      update.sets.map(s -> s.toString()).join(", ") +
+      (if (update.where is Some _) {
+        " WHERE " + update.where.fromSome().toString()
+      } else {
+        ""
+      })
+}
+
+extension base class InsertValues {
+  fun toString(): String
+  | IValues(vals) ->
+    "VALUES " +
+      vals
+        .map(v -> "(" + v.map(vi -> vi.toString()).join(", ") + ")")
+        .join(", ")
+  | IQuery(select) -> select.toString()
+  | IDefault() -> "DEFAULT VALUES"
+}
+
+extension base class IKind {
+  fun toString(): String
+  | INONE() -> ""
+  | IASC() -> "ASC"
+  | IDESC() -> "DESC"
+}
+
+extension base class SelectCore {
+  fun toString(): String
+  | SelectCoreQuery{distinct, params, from, where, groupBy, having} ->
+    "SELECT " +
+      (if (distinct) "DISTINCT " else "") +
+      params.map(p -> p.toString()).join(", ") +
+      (if (from is Some _) " FROM " + from.fromSome().toString() else "") +
+      (if (where is Some _) " WHERE " + where.fromSome().toString() else "") +
+      (if (groupBy is Some _) {
+        " GROUP BY " + groupBy.fromSome().map(e -> e.toString()).join(", ")
+      } else {
+        ""
+      }) +
+      (if (having is Some _) " HAVING " + having.fromSome().toString() else "")
+  | SelectCoreValues{values} ->
+    "VALUES " +
+      values
+        .map(vs -> "(" + vs.map(v -> v.toString()).join(", ") + ")")
+        .join(", ")
+}
+
+extension base class SelectResult {
+  fun toString(): String
+  | SelectStar(table) ->
+    table match {
+    | Some(t) -> `${t}.*`
+    // TODO: escape
+    | None() -> "*"
+    }
+  | SelectExpr(expr, alias) ->
+    expr.toString() +
+      (if (alias is Some _) " AS " + alias.fromSome().toString() else "")
+}
+
+extension base class SelectFrom {
+  fun toString(): String
+  | FromTable{name, asName, indexed} ->
+    name.toString() +
+      (if (asName is Some _) " AS " + asName.fromSome().toString() else "") +
+      (if (indexed) " INDEXED" else "")
+  | FromQuery{select, asName} ->
+    "(" +
+      select.toString() +
+      ")" +
+      (if (asName is Some _) " AS " + asName.fromSome().toString() else "")
+  | Join{kind, lhs, rhs, on, using} ->
+    "(" +
+      lhs.toString() +
+      " " +
+      kind.toString() +
+      " " +
+      rhs.toString() +
+      (if (on is Some _) " ON " + on.fromSome().toString() else "") +
+      (if (using is Some _) {
+        " USING " + using.fromSome().map(n -> n.toString()).join(", ")
+      } else {
+        ""
+      }) +
+      ")"
+}
+
+extension base class JoinKind {
+  fun toString(): String
+  | JRight(natural) -> (if (natural) "NATURAL " else "") + "RIGHT JOIN"
+  | JLeft(natural) -> (if (natural) "NATURAL " else "") + "LEFT JOIN"
+  | JFull(natural) -> (if (natural) "NATURAL " else "") + "FULL JOIN"
+  | JInner(natural) -> (if (natural) "NATURAL " else "") + "INNER JOIN"
+  | JCross() -> "CROSS JOIN"
+  | JComma() -> ","
+}
+
+extension base class CompoundOperator {
+  fun toString(): String
+  | COUnion _ -> "UNION"
+  | COUnionAll _ -> "UNION ALL"
+  | COIntersect _ -> "INTERSECT"
+  | COExcept _ -> "EXCEPT"
+}
+
+extension base class Value {
+  fun toString(): String
+  | VNull _ -> "NULL"
+  | VInt(n) -> n.toString()
+  | VFloat(f) -> f.toString()
+  | VString(s) -> `'${s.replace("'", "''")}'`
+  // TODO: escape quotes
+  | VSeqNum(negated, s) ->
+    (if (negated) "-" else "") +
+      "LOCAL_SEQUENCE_NUMBER(" +
+      (if (s is Some _) s.fromSome() else "") +
+      ")"
+  | VId(s) -> "ID(" + (if (s is Some _) s.fromSome() else "") + ")"
+  | VTime() -> "TIME()"
+  | VParam(handle) -> "@" + handle
+  | VPermission(s) -> "SKDB_PERMISSION(" + s + ")"
+}
+
+extension base class Expr {
+  fun toString(): String
+  | In(expr, values, negated) ->
+    expr.toString() +
+      (if (negated) " NOT" else "") +
+      " IN (" +
+      values.toString() +
+      ")"
+  | Between(e1, e2, e3, negated) ->
+    e1.toString() +
+      (if (negated) " NOT" else "") +
+      " BETWEEN " +
+      e2.toString() +
+      " AND " +
+      e3.toString()
+  | Like(e1, e2, escape, negated) ->
+    e1.toString() +
+      (if (negated) " NOT" else "") +
+      " LIKE " +
+      e2.toString() +
+      (if (escape is Some _) " ESCAPE " + escape.fromSome().toString() else "")
+  | BinOp(op, e1, e2) ->
+    e1.toString() + " " + op.toString() + " " + e2.toString()
+  | Subquery(select) -> "(" + select.toString() + ")"
+  | Exists(select, negated) ->
+    (if (negated) "NOT " else "") + "EXISTS (" + select.toString() + ")"
+  | UnOp(op, e) -> op.toString() + " " + e.toString()
+  | Tuple(exprs) -> "(" + exprs.map(e -> e.toString()).join(", ") + ")"
+  | Case(condOpt, whenCases, elseCase) ->
+    "CASE " +
+      (if (condOpt is Some _) condOpt.fromSome().toString() + " " else "") +
+      whenCases.map(w ->
+        "WHEN " + w.i0.toString() + " THEN " + w.i1.toString() + " "
+      ) +
+      (if (elseCase is Some _) " ELSE " + elseCase.fromSome().toString() else {
+        ""
+      }) +
+      "END"
+  | Call(name, args, distinct) ->
+    name.toString() +
+      "(" +
+      (if (distinct) "DISTINCT " else "") +
+      args.map(e -> e.toString()).join(", ") +
+      ")"
+  | Cast(e, ty) -> "CAST(" + e.toString() + " AS " + ty.toString() + ")"
+  | Collate(e, name) -> e.toString() + " COLLATE " + name.toString()
+  | On _ -> invariant_violation("not implemented")
+}
+
+extension class Identifier {
+  fun toString(): String {
+    this.table match {
+    | Some(table) -> `${table}.${this.name}`
+    | None() -> this.name.toString()
+    }
+  }
+}
+
+extension base class UnaryOperator {
+  fun toString(): String
+  | UnaryNot() -> "NOT"
+  | UnaryPlus() -> "+"
+  | UnaryMinus() -> "-"
+  | UnaryBitNot() -> "~"
+  | UnaryIsNull(negated) -> "IS " + (if (negated) "NOT " else "") + "NULL"
+}
+
+extension base class BinaryOperator {
+  fun toString(): String
+  | OPlus() -> "+"
+  | OMinus() -> "-"
+  | OConcat() -> "||"
+  | OMul() -> "*"
+  | ODiv() -> "/"
+  | OMod() -> "%"
+  | OBitAnd() -> "&"
+  | OBitOr() -> "|"
+  | OBitShiftLeft() -> "<<"
+  | OBitShiftRight() -> ">>"
+  | OAnd() -> "AND"
+  | OOr() -> "OR"
+  | OLt() -> "<"
+  | OLtEq() -> "<="
+  | OGt() -> ">"
+  | OGtEq() -> ">="
+  | OEq() -> "="
+  | ONeq() -> "<>"
+  | OIs(negated) -> if (negated) "IS NOT" else "IS"
+  | OGlob(negated) -> if (negated) "NOT GLOB" else "GLOB"
+  | ORegexp(negated) -> if (negated) "NOT REGEXP" else "REGEXP"
+  | OMatch(negated) -> if (negated) "NOT MATCH" else "MATCH"
+}
+
+extension base class InValues {
+  fun toString(): String
+  | InList(values) -> values.map(v -> v.toString()).join(", ")
+  | InSelect(select) -> "(" + select.toString() + ")"
+}
+
+extension base class Type {
+  fun toString(): String
+  | FLOAT() -> "FLOAT"
+  | INTEGER() -> "INTEGER"
+  | TEXT() -> "TEXT"
+}
+
+extension base class TransactionKind {
+  fun toString(): String
+  | TransactionDeferred() -> "DEFERRED"
+  | TransactionImmediate() -> "IMMEDIATE"
+  | TransactionExclusive() -> "EXCLUSIVE"
+}
