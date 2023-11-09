@@ -6,8 +6,6 @@ const tables = [
   "pk_inserts",
   "no_pk_single_row",
   "pk_single_row",
-  // "no_pk_random",
-  // "pk_random",
 ];
 
 const filtered_tables = [
@@ -103,11 +101,6 @@ setup(client, port).then((skdb) => {
     console.log(await skdb.exec('select * from no_pk_filtered order by id desc limit 20;'));
     console.log('> pk_filtered - most recent 20:');
     console.log(await skdb.exec('select * from pk_filtered order by id desc limit 20;'));
-
-    // console.log('> no_pk_random:');
-    // console.log(await skdb.exec('select * from no_pk_random'));
-    // console.log('> pk_random:');
-    // console.log(await skdb.exec('select * from pk_random'));
   });
 
   modify_rows(client, skdb, 0, async () => {
