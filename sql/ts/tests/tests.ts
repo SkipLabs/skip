@@ -1386,7 +1386,7 @@ export const tests = (asWorker: boolean) => {
         return await skdb.schema('v1');
       },
       check: res => {
-        expect(res).toMatch(/^create virtual view v1/);
+        expect(res).toMatch(/^CREATE VIRTUAL VIEW v1/);
       }
     },
   ];
