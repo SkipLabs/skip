@@ -21,6 +21,10 @@ class Env(
     )
   }
 
+  fun isWasm32(): Bool {
+    this.optTarget.map(t -> t.startsWith("wasm32")).default(false)
+  }
+
   fun resolve(path: String): String {
     Path.resolve(this.refDir, path)
   }
@@ -73,7 +77,7 @@ class Env(
   }
 }
 
-fun build(isWasm: Bool): Env {
+fun build(): Env {
   env = Env::create();
   includeDirs = Array[];
   #forEachFunction (@skbuild_include_dirs, #function, #functionName) {
@@ -101,7 +105,6 @@ fun build(isWasm: Bool): Env {
   };
   build_harness(
     env,
-    isWasm,
     includeDirs,
     sourceDirs,
     preambles,
@@ -113,7 +116,6 @@ fun build(isWasm: Bool): Env {
 
 fun build_harness(
   env: Env,
-  isWasm: Bool,
   includeDirs: Array<String>,
   sourceDirs: Array<String>,
   preambles: Array<String>,
@@ -121,6 +123,7 @@ fun build_harness(
   resources: Array<String>,
   resourceDirs: Array<String>,
 ): Env {
+  isWasm = env.isWasm32();
   resourceObjs = Array[];
   resourceInfos = mutable Map[];
   resources.each(res -> {
