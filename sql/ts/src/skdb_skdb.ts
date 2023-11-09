@@ -18,14 +18,14 @@ interface Exported {
 }
 
 class SkdbHandleImpl implements SkdbHandle {
-  runner: (fn: () => string) => Array<any>;
+  runner: (fn: () => string) => SkdbTable;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void }
   watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
 
   constructor(
     main: (new_args: Array<string>, new_stdin: string) => string,
-    runner: (fn: () => string) => Array<any>,
+    runner: (fn: () => string) => SkdbTable,
     watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void },
     watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
   ) {
@@ -323,7 +323,7 @@ class LinksImpl implements Links, ToWasm {
       let stdout = fn();
       if (stdout == "") {
         let result = this.stdout_objects[0];
-        return result;
+        return new SkdbTable(...result);
       }
       throw new Error(stdout)
     };

@@ -2,7 +2,7 @@ import { Shared } from "#std/sk_types";
 import { SkdbTable } from "#skdb/skdb_util";
 
 export interface SkdbHandle {
-  runner: (fn: () => string) => Array<any>;
+  runner: (fn: () => string) => SkdbTable;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void },
   watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
@@ -65,7 +65,7 @@ export interface SkdbMechanism {
   unsubscribe: (session: string) => void;
   diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
   tableExists: (tableName: string) => boolean;
-  exec: (query: string) => Array<any>;
+  exec: (query: string) => SkdbTable;
   assertCanBeMirrored: (tableName: string) => void;
   toggleView: (tableName: string) => void;
 }
