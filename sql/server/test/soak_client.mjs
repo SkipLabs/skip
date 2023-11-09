@@ -1,11 +1,13 @@
 import { createSkdb } from '../../../build/package/skdb/dist/skdb.mjs';
 import { webcrypto as crypto } from 'node:crypto';
+import assert from 'node:assert/strict';
 
 const tables = [
   "no_pk_inserts",
   "pk_inserts",
   "no_pk_single_row",
   "pk_single_row",
+  "checkpoints",
 ];
 
 const filtered_tables = [
@@ -44,7 +46,7 @@ const modify_rows = function(client, skdb, i, cb) {
     return;
   }
 
-  const f = async () => {
+  const regular_action = async () => {
     // monotonic inserts - should be no conflict here. just check that
     // replication works well in the happy case and we don't lose or
     // dup anything in the chaos
@@ -72,11 +74,115 @@ const modify_rows = function(client, skdb, i, cb) {
     setTimeout(() => modify_rows(client, skdb, i + 1, cb), 0);
   };
 
-  setTimeout(f, Math.random() * avgWriteMs);
+  const checkpoint_action = async () => {
+    await skdb.exec(
+      `BEGIN TRANSACTION;
+       INSERT INTO no_pk_inserts VALUES(${i}, ${client}, ${i}, 'read-write');
+       INSERT INTO pk_inserts VALUES(${i*2 + (client-1)}, ${client}, ${i}, 'read-write');
+       INSERT INTO no_pk_filtered VALUES(${i}, ${client}, ${i}, 'read-write');
+       INSERT INTO pk_filtered VALUES(${i*2 + (client-1)}, ${client}, ${i}, 'read-write');
+       UPDATE pk_single_row SET client = ${client}, value = ${i} WHERE id = 0;
+       DELETE FROM no_pk_single_row WHERE id = 0;
+       INSERT INTO no_pk_single_row VALUES (0,${client},${i}, 'read-write');
+       INSERT INTO checkpoints VALUES (id(), ${i}, ${client}, 'read-write');
+       COMMIT;
+    `);
+
+    setTimeout(() => modify_rows(client, skdb, i + 1, cb), 0);
+  };
+
+  // TODO: pick a value
+  if (i > 0 && i % 10 === 0) {
+    setTimeout(checkpoint_action, Math.random() * avgWriteMs);
+  } else {
+    setTimeout(regular_action, Math.random() * avgWriteMs);
+  }
 };
 
 const client = process.argv[2];
 const port = process.argv[3];
+
+const check_expectation = async function(skdb, client, latest_id) {
+  const params = { client, latest_id };
+
+  const check_no_pk_inserts = await skdb.exec(
+    `select sum(value) as total, count(*) as n, max(id) as last_id
+     from no_pk_inserts
+     where client = @client and id <= @latest_id`,
+    params
+  );
+  const expected_no_pk_inserts = {
+    total: latest_id * (latest_id + 1) / 2,
+    n: latest_id + 1,
+    last_id: latest_id,
+  };
+  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
+  // assert.deepStrictEqual(check_no_pk_inserts[0], expected_no_pk_inserts, "no_pk_inserts failed check");
+
+  const check_pk_inserts = await skdb.exec(
+    `select sum(value) as total, count(*) as n, max(value) as last_id
+     from pk_inserts
+     where client = @client and id <= @latest_id * 2 + (@client - 1)`,
+    params
+  );
+  const expected_pk_inserts = {
+    total: latest_id * (latest_id + 1) / 2,
+    n: latest_id + 1,
+    last_id: latest_id,
+  };
+  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
+  // assert.deepStrictEqual(check_pk_inserts[0], expected_pk_inserts, "pk_inserts failed check");
+
+  const check_no_pk_single_row = await skdb.exec(
+    `select client, value
+     from pk_single_row
+     where id = 0`,
+    params
+  );
+  const expected_no_pk_single_row = {
+    client: client,
+    value: latest_id,
+  };
+  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
+  // assert.deepStrictEqual(check_no_pk_single_row[0], expected_no_pk_single_row, "no_pk_single_row failed check");
+
+  const check_pk_single_row = await skdb.exec(
+    `select client, value
+     from pk_single_row
+     where id = 0`,
+    params
+  );
+  const expected_pk_single_row = {
+    client: client,
+    value: latest_id,
+  };
+  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
+  // assert.deepStrictEqual(check_pk_single_row[0], expected_pk_single_row, "pk_single_row failed check");
+
+  const check_no_pk_filtered = await skdb.exec(
+    `select count(*) as n
+     from no_pk_filtered
+     where client = @client and id <= @latest_id`,
+    params
+  );
+  const expected_no_pk_filtered = {
+    n: latest_id/2,
+  };
+  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
+  // assert.deepStrictEqual(check_no_pk_filtered[0], expected_no_pk_filtered, "no_pk_filtered failed check");
+
+  const check_pk_filtered = await skdb.exec(
+    `select count(*) as n
+     from pk_filtered
+     where client = @client and id <= @latest_id * 2 + (@client - 1)`,
+    params
+  );
+  const expected_pk_filtered = {
+    n: latest_id/2,
+  };
+  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
+  // assert.deepStrictEqual(check_pk_filtered[0], expected_pk_filtered, "pk_filtered failed check");
+};
 
 setup(client, port).then((skdb) => {
 
@@ -103,6 +209,24 @@ setup(client, port).then((skdb) => {
     console.log(await skdb.exec('select * from pk_filtered order by id desc limit 20;'));
   });
 
+  // check expectations on receiving a checkpoint
+  skdb.watch(
+    `SELECT client, max(latest_id) as latest_id
+     FROM checkpoints
+     WHERE client != @client
+     GROUP BY client`,
+    {client: parseInt(client)},
+    async (rows) => {
+      if (rows.length < 1) {
+        return;
+      }
+      const client = rows[0].client;
+      const latest_id = rows[0].latest_id;
+      // TODO: use timeout to work around watch bug. once fixed, should just call in line
+      setTimeout(() => check_expectation(skdb, client, latest_id), 0);
+    }
+  );
+
   modify_rows(client, skdb, 0, async () => {
     for (const table of tables) {
       console.log(table);
@@ -110,6 +234,8 @@ setup(client, port).then((skdb) => {
     }
     process.exit(0);
   });
+
+  // TODO: close the watch changes once we've written everything and received all last checkpoints
 }).catch(
   exn => console.error(exn)
 );

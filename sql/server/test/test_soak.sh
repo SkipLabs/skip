@@ -52,6 +52,9 @@ run_server() {
      echo "COMMIT;"
     ) | $SKDB
 
+    # for coordinating expectation checking
+    echo "CREATE TABLE checkpoints (checkpoint_id STRING PRIMARY KEY, latest_id INTEGER, client INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+
     # these tables are for inserts only. there should be no conflict
     echo "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
     echo "CREATE TABLE pk_inserts (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
