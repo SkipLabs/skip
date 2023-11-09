@@ -5,7 +5,7 @@ fun parseStmt(lex: Lexer, pos: Int): (Int, ?Stmt) {
   str = lex.wordAt(tok);
   (!pos, result) = str.uppercase() match {
   | "CREATE" ->
-    (!pos, x) = parseCreate(lex, tok.posBegin, pos);
+    (!pos, x) = parseCreate(lex, pos);
     (pos, Some(x))
   | "INSERT" ->
     (!pos, x) = parseInsert(lex, pos);
@@ -743,7 +743,7 @@ fun parseExprList(lex: Lexer, pos: Int): (Int, Array<Expr>) {
   }
 }
 
-fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
+fun parseCreate(lex: Lexer, pos: Int): (Int, Stmt) {
   if (lex.isEqUpper(pos, "TABLE")) {
     !pos = lex.expectUpper(pos, "TABLE");
     ifNotExists = false;
@@ -765,7 +765,7 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
       !pos = lex.expectUpper(pos, "EXISTS");
       !ifNotExists = true;
     };
-    return parseCreateIndex(lex, posBegin, pos, ifNotExists, true);
+    return parseCreateIndex(lex, pos, ifNotExists, true);
   };
   if (lex.isEqUpper(pos, "INDEX")) {
     !pos = lex.expectUpper(pos, "INDEX");
@@ -776,7 +776,7 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
       !pos = lex.expectUpper(pos, "EXISTS");
       !ifNotExists = true;
     };
-    return parseCreateIndex(lex, posBegin, pos, ifNotExists, false);
+    return parseCreateIndex(lex, pos, ifNotExists, false);
   };
   if (lex.isEqUpper(pos, "VIRTUAL")) {
     !pos = lex.expectUpper(pos, "VIRTUAL");
@@ -788,7 +788,7 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
       !pos = lex.expectUpper(pos, "EXISTS");
       !ifNotExists = true;
     };
-    return parseView(lex, posBegin, pos, ifNotExists, true);
+    return parseView(lex, pos, ifNotExists, true);
   };
   if (lex.isEqUpper(pos, "VIEW")) {
     !pos = lex.expectUpper(pos, "VIEW");
@@ -799,14 +799,13 @@ fun parseCreate(lex: Lexer, posBegin: Int, pos: Int): (Int, Stmt) {
       !pos = lex.expectUpper(pos, "EXISTS");
       !ifNotExists = true;
     };
-    return parseView(lex, posBegin, pos, ifNotExists, false);
+    return parseView(lex, pos, ifNotExists, false);
   };
   error(pos, "Unexpected token");
 }
 
 fun parseView(
   lex: Lexer,
-  posBegin: Int,
   pos: Int,
   ifNotExists: Bool,
   virtual: Bool,
@@ -817,23 +816,14 @@ fun parseView(
   };
   !pos = lex.expectUpper(pos, "SELECT");
   (!pos, query) = parseSelect(lex, pos);
-  text = lex.content.slice(posBegin, pos);
   (
     pos,
-    CreateView{
-      pos,
-      ifNotExists,
-      virtual,
-      name => Name::create(name),
-      query,
-      text,
-    },
+    CreateView{pos, ifNotExists, virtual, name => Name::create(name), query},
   )
 }
 
 fun parseCreateIndex(
   lex: Lexer,
-  posBegin: Int,
   pos: Int,
   ifNotExists: Bool,
   unique: Bool,
@@ -842,7 +832,6 @@ fun parseCreateIndex(
   (!pos, name) = lex.nextWord(pos);
   !pos = lex.expectUpper(pos, "ON");
   (!pos, fields) = parseIndexOn(lex, pos);
-  text = Some(lex.content.slice(posBegin, pos));
   (
     pos,
     CreateIndex{
@@ -859,7 +848,6 @@ fun parseCreateIndex(
       ),
       unique,
       where => None(),
-      text,
     },
   )
 }

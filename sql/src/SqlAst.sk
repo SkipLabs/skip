@@ -25,13 +25,7 @@ base class Stmt{pos: Int} uses Equality, Show {
   children =
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
-  | CreateView{
-    virtual: Bool,
-    name: Name,
-    ifNotExists: Bool,
-    query: Select,
-    text: String,
-  }
+  | CreateView{virtual: Bool, name: Name, ifNotExists: Bool, query: Select}
   | CreateIndex{
     ifNotExists: Bool,
     name: Name,
@@ -39,7 +33,6 @@ base class Stmt{pos: Int} uses Equality, Show {
     columns: Array<IndexedColumn>,
     unique: Bool,
     where: ?Expr,
-    text: ?String,
   }
   | DropTable{name: Name, ifExists: Bool}
   | DropView{name: Name, ifExists: Bool}
@@ -180,7 +173,8 @@ base class SelectFrom uses Equality, Show
 
 base class SelectSource{asName: ?Name} extends SelectFrom {
   children =
-  | FromTable{name: Name, indexed: Bool = true}
+  // TODO: Indexed should be an index name.
+  | FromTable{name: Name, indexed: Bool = false}
   | FromQuery{select: Select}
 }
 

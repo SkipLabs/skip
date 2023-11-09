@@ -520,13 +520,12 @@ class Evaluator{options: Options, user: ?UserFile} {
         this.makeIndex(context, index);
         context.update()
       })
-    | CreateView{
+    | view @ CreateView{
       pos,
       name => viewName,
       ifNotExists,
       query => selectAst @ Select _,
       virtual,
-      text,
     } ->
       if (selectAst.core is SelectCoreValues _) {
         error(selectAst.pos, "CREATE VIEW AS VALUES ... not implemented")
@@ -560,7 +559,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           context.tick.value,
           viewName,
           virtual,
-          text,
+          view.toString(),
           (selectAst.core as SelectCoreQuery _).params,
           cselect1,
         ),
@@ -992,7 +991,6 @@ class Evaluator{options: Options, user: ?UserFile} {
             ],
             unique => true,
             where => None(),
-            text => None(),
           },
         );
       }
