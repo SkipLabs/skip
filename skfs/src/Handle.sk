@@ -230,6 +230,8 @@ base class Handle<K: Key, +V: File> {
     this.type
   }
 
+  fun getKeyType(): SKStore.Key ~> K;
+
   fun getArray(context: mutable Context, key: K): Array<V> {
     dir = context.unsafeGetDir(this.getDirName());
     dir.getArray(context, key).map(this.getType())
@@ -298,6 +300,10 @@ class LHandle<K: Key, +V: File>(
       collect,
     );
     LHandle(typeKey, type, dir.getDirName())
+  }
+
+  fun getKeyType(): SKStore.Key ~> K {
+    this.typeKey
   }
 
   fun getArrayAsync(context: mutable Context, key: Key): Array<V> {
@@ -457,6 +463,10 @@ class EHandle<K: Key, V: File>(
       ),
     );
     EHandle(typeOutputKey, reducer.type, dirName)
+  }
+
+  fun getKeyType(): SKStore.Key ~> K {
+    this.keyType
   }
 
   fun map<K2: Key, V2: File>(
