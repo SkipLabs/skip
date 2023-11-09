@@ -1,0 +1,116 @@
+module SQLParser;
+
+// Represents a position while lexing some text.
+// Tracks absolute position.
+//
+mutable class LexingPosition private {
+  source: String,
+  mutable position: Int,
+  iter: mutable String.StringIterator,
+} {
+  // Create a new LexingPosition positioned at the start of source.
+  static fun create(source: String): mutable LexingPosition {
+    mutable LexingPosition{source, position => 0, iter => source.getIter()};
+  }
+
+  /* Create a new LexingPosition positioned where specified by the
+   * absolute position. The position has to match */
+  static fun createAt(state: LexingPosition): mutable LexingPosition {
+    mutable LexingPosition{
+      source => state.source,
+      position => state.position,
+      iter => state.iter.clone(),
+    }
+  }
+
+  readonly fun saveState(): LexingPosition {
+    LexingPosition{
+      source => this.source,
+      position => this.position,
+      iter => this.iter.chill(),
+    }
+  }
+
+  readonly fun clone(): mutable LexingPosition {
+    mutable LexingPosition{
+      source => this.source,
+      position => this.position,
+      iter => this.iter.clone(),
+    };
+  }
+
+  readonly fun atEnd(): Bool {
+    this.iter.atEnd();
+  }
+
+  // Peek operations.
+  readonly fun peekOffset(offset: Int): Char {
+    static::peekIterOffset(this.iter.clone(), offset);
+  }
+
+  private static fun peekIterCurrent(
+    iter: readonly String.StringIterator,
+  ): Char {
+    iter.current() match {
+    | None() -> Chars.null
+    | Some(ch) -> ch
+    }
+  }
+
+  private static fun peekIterOffset(
+    iter: mutable String.StringIterator,
+    offset: Int,
+  ): Char {
+    invariant(offset >= 0, "No peeking backwards");
+    if (offset == 0) {
+      static::peekIterCurrent(iter);
+    } else {
+      _ = iter.next();
+      static::peekIterOffset(iter, offset - 1);
+    };
+  }
+
+  // Returns the next char. Does not consume any characters.
+  readonly fun peek(): Char {
+    this.peekOffset(0);
+  }
+
+  // Returns true if the char at offset is ch.
+  readonly fun peekCharOffset(ch: Char, offset: Int): Bool {
+    this.peekOffset(offset) == ch;
+  }
+
+  // Returns true if the next char is ch.
+  readonly fun peekChar(ch: Char): Bool {
+    this.peekCharOffset(ch, 0);
+  }
+
+  // Consume a char and return the consumed char.
+  mutable fun next(): Char {
+    result = this.peek();
+    this.advance();
+    result;
+  }
+
+  // Consume a character.
+  mutable fun advance(): void {
+    if (this.atEnd()) {
+      return void
+    };
+    _ = this.iter.next();
+    this.!position = this.position + 1
+  }
+
+  // Consume `num` characters and return the resulting string.
+  mutable fun take(num: Int): String {
+    start = this.iter.clone();
+    for (_ in Range(0, num)) {
+      _ = this.iter.next();
+    };
+    start.substring(this.iter)
+  }
+
+  readonly fun getPosition(): Int {
+    this.position;
+  }
+}

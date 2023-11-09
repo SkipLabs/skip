@@ -1,0 +1,34 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parseBeginTransaction(): Stmt {
+    pos = this.current_pos();
+    this.expect_keyword(TBegin());
+
+    kind = if (this.parse_keyword(TImmediate())) {
+      TransactionImmediate()
+    } else if (this.parse_keyword(TExclusive())) {
+      TransactionExclusive()
+    } else if (this.parse_keyword(TDeferred())) {
+      TransactionDeferred()
+    } else {
+      TransactionDeferred()
+    };
+
+    // Optional
+    _ = this.parse_keyword(TTransaction());
+
+    BeginTransaction{pos, kind}
+  }
+
+  mutable fun parseEndTransaction(): Stmt {
+    if (this.parse_keyword(TCommit()) || this.parse_keyword(TEnd())) {
+      // Optional
+      _ = this.parse_keyword(TTransaction())
+    } else {
+      this.errorUnexpectedToken(Some("COMMIT or END"))
+    };
+
+    EndTransaction{}
+  }
+}
