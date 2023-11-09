@@ -66,10 +66,6 @@ run_server() {
     echo "CREATE TABLE no_pk_filtered (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
     echo "CREATE TABLE pk_filtered (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
 
-    # clients manipulate these with random operations
-    echo "CREATE TABLE no_pk_random (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
-    echo "CREATE TABLE pk_random (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
-
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > $SOAK_SERVER_LOG &
 
     echo $! > "$SERVER_PID_FILE"
