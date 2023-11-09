@@ -1,0 +1,298 @@
+module SQLParser;
+
+mutable class Parser(tokens: mutable Tokenizer) {
+  static fun create(str: String): mutable Parser {
+    mutable Parser(Tokenizer::create(str))
+  }
+
+  mutable fun next_stmt(): Result<?Stmt, Error> {
+    Result<?Stmt, Error>::guard(() -> {
+      this._next_stmt()
+    }) match {
+    | Success(v) -> Success(v)
+    | Failure(err @ Error _) -> Failure(err)
+    | Failure(exn) -> throw exn
+    }
+  }
+
+  mutable fun _next_stmt(): ?Stmt {
+    loop {
+      if (this.parse_token(TEOF())) {
+        return None()
+      };
+
+      // Discard empty statements.
+      if (this.parse_token(TSemiColon())) {
+        continue
+      };
+
+      break void
+    };
+
+    pos = this.current_pos();
+    stmt = this.peek_keyword() match {
+    | TCreate() -> this.parseCreate()
+    | TReplace() -> this.parseInsert()
+    | TInsert() -> this.parseInsert()
+    | TDelete() -> this.parseDelete()
+    | TDrop() -> this.parseDrop()
+    | TUpdate() -> this.parseUpdate()
+    | TSelect() -> this.parseSelect()
+    | TPragma() -> this.parsePragma()
+    | TBegin() -> this.parseBeginTransaction()
+    | TCommit() -> this.parseEndTransaction()
+    | TEnd() -> this.parseEndTransaction()
+    | TExplain()
+    | TAlter()
+    | TAnalyze()
+    | TAttach()
+    | TRollback()
+    | TDetach()
+    | TReindex()
+    | TVacuum()
+    | TWith()
+    | TSavePoint()
+    | TRelease() ->
+      this.errorNotImplemented()
+    | _ ->
+      throw UnexpectedTokenError(
+        pos,
+        `Unexpected SQL statement starting with '${this.peek_token()}'`,
+      )
+    } with {pos};
+
+    if (this.parse_token(TSemiColon()) || this.parse_token(TEOF())) {
+      Some(stmt)
+    } else {
+      this.errorUnexpectedToken(Some("semi-colon or EOF"))
+    }
+  }
+
+  mutable fun parseTypeName(): Type {
+    names = mutable Vector[];
+    loop {
+      this.parse_identifier() match {
+      | Some(id) -> names.push(Name::create(id))
+      | _ -> break void
+      }
+    };
+
+    if (names.size() > 0) {
+      // Discard possible parameters.
+      if (this.parse_token(TLParen())) {
+        _ = this.parseSignedNumber();
+        if (this.parse_token(TComma())) {
+          _ = this.parseSignedNumber();
+        };
+        this.expect_token(TRParen())
+      }
+    };
+
+    if (names.any(s -> s.lower.contains("int"))) {
+      INTEGER()
+    } else if (
+      names.any(s ->
+        s.lower.contains("char") ||
+          s.lower.contains("clob") ||
+          s.lower.contains("text") ||
+          s.lower.contains("string") // NOTE: This differs from SQLite.
+      )
+    ) {
+      TEXT()
+    } else if (names.any(s -> s.lower.contains("blob"))) {
+      // BLOB
+      this.errorNotImplemented()
+    } else if (
+      names.any(s ->
+        s.lower.contains("real") ||
+          s.lower.contains("floa") ||
+          s.lower.contains("doub")
+      )
+    ) {
+      FLOAT()
+    } else if (names.any(s -> s.lower.contains("bool"))) {
+      INTEGER()
+    } else {
+      // NUMERIC
+      this.errorNotImplemented()
+    }
+  }
+
+  mutable fun parseSignedNumber(): Value {
+    if (this.parse_token(TPlus())) {
+      this.parseNumericLiteral()
+    } else if (this.parse_token(TMinus())) {
+      this.parseNumericLiteral() match {
+      | VInt(n) -> VInt(-n)
+      | VFloat(f) -> VFloat(-f)
+      | _ ->
+        invariant_violation(
+          "unreachable: numeric literal should be Int or Float",
+        )
+      }
+    } else {
+      this.parseNumericLiteral()
+    }
+  }
+
+  mutable fun parseQualifiedName(max: Int): Array<(Name, Int)> {
+    res = mutable Vector[];
+    for (_ in Range(0, max)) {
+      pos = this.current_pos();
+      res.push((Name::create(this.expect_identifier()), pos));
+      if (!this.parse_token(TPeriod())) {
+        break void
+      }
+    };
+    res.toArray().reversed()
+  }
+
+  mutable fun parseIfNotExists(): Bool {
+    if (this.parse_keyword(TIf())) {
+      this.expect_keyword(TNot());
+      this.expect_keyword(TExists());
+
+      true
+    } else {
+      false
+    }
+  }
+
+  mutable fun parseNumericLiteral(): Value {
+    pos = this.current_pos();
+    this.next_token() match {
+    | TInteger(str) -> VInt(str.toInt())
+    | THexInteger(str) -> VInt(Chars.hexDigitsToInt(str))
+    | TFloat(str) -> VFloat(str.toFloat())
+    | _ -> throw UnexpectedTokenError(pos, "integer or float")
+    }
+  }
+
+  // Lexing
+
+  private mutable fun current_pos(): Int {
+    this.peek_token_with_pos().position
+  }
+
+  private mutable fun next_token_with_pos(): TokenWithPosition {
+    this.tokens.next() match {
+    | Failure(err) -> throw err
+    | Success(tok) -> tok
+    }
+  }
+
+  private mutable fun peek_token_with_pos(): TokenWithPosition {
+    this.peek_nth_token_with_pos(0)
+  }
+
+  private mutable fun peek_nth_token_with_pos(n: Int): TokenWithPosition {
+    this.tokens.peek_nth(n) match {
+    | Failure(err) -> throw err
+    | Success(tok) -> tok
+    }
+  }
+
+  private mutable fun peek_token(): Token {
+    this.peek_token_with_pos().token
+  }
+
+  private mutable fun peek_nth_token(n: Int): Token {
+    this.peek_nth_token_with_pos(n).token
+  }
+
+  private mutable fun next_token(): Token {
+    this.next_token_with_pos().token
+  }
+
+  private mutable fun parse_token(expected: Token): Bool {
+    if (this.peek_token() == expected) {
+      this.tokens.advance();
+      true
+    } else {
+      false
+    }
+  }
+
+  private mutable fun expect_token(expected: Token): void {
+    if (!this.parse_token(expected)) {
+      this.errorUnexpectedToken(Some(expected.name()))
+    }
+  }
+
+  private mutable fun peek_keyword(): Keyword {
+    this.peek_token() match {
+    | TWord(_, _, Some(kw)) -> kw
+    | _ -> TNoKeyword()
+    }
+  }
+
+  private mutable fun parse_keyword(expected: Keyword): Bool {
+    if (this.peek_keyword() == expected) {
+      this.tokens.advance();
+      true
+    } else {
+      false
+    }
+  }
+
+  private mutable fun expect_keyword(expected: Keyword): void {
+    if (!this.parse_keyword(expected)) {
+      this.errorUnexpectedToken(Some(expected.toString()))
+    };
+  }
+
+  mutable fun parse_identifier(acceptKeyword: Bool = false): ?String {
+    this.peek_token() match {
+    | TWord(name, _, kw) ->
+      if (!acceptKeyword && kw is Some _) {
+        return None()
+      };
+      this.tokens.advance();
+      Some(name)
+    | _ -> None()
+    }
+  }
+
+  mutable fun expect_identifier(acceptKeyword: Bool = false): String {
+    this.parse_identifier(acceptKeyword) match {
+    | Some(id) -> id
+    | _ -> this.errorUnexpectedToken(Some("identifier"))
+    }
+  }
+
+  private mutable fun parse_one_of_keywords<T>(
+    handlers: Map<Keyword, () -> T>,
+  ): ?T {
+    this.peek_token() match {
+    | TWord(_, _, Some(kw)) -> handlers.maybeGet(kw).map(h -> h())
+    | _ -> None()
+    }
+  }
+
+  private mutable fun expect_one_of_keywords<T>(
+    handlers: Map<Keyword, () -> T>,
+  ): T {
+    this.parse_one_of_keywords(handlers) match {
+    | Some(res) -> res
+    | None() ->
+      this.errorUnexpectedToken(
+        Some(
+          handlers.keys().map(t -> t.toString()).collect(Array).join(" or "),
+        ),
+      )
+    }
+  }
+
+  // Errors
+
+  private mutable fun errorUnexpectedToken<T>(expected: ?String): T {
+    tok = this.peek_token_with_pos();
+    msg = `Unexpected token ${tok.token.name()}`;
+    expected.each(t -> !msg = msg + `, expected ${t}`);
+    throw UnexpectedTokenError(tok.position, msg)
+  }
+
+  private mutable fun errorNotImplemented<T>(): T {
+    throw NotImplementedError(this.current_pos())
+  }
+}

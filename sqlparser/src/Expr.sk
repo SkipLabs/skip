@@ -1,0 +1,369 @@
+module SQLParser;
+
+extension class Parser {
+  const kMaximumPrec: Int = 110;
+  const kCollatePrec: Int = 100;
+  const kConcatPrec: Int = 90;
+  const kMulPrec: Int = 80;
+  const kPlusPrec: Int = 70;
+  const kAmpersandPrec: Int = 60;
+  const kEscapePrec: Int = 50;
+  const kLtPrec: Int = 40;
+  const kEqPrec: Int = 30;
+  const kUnaryNotPrec: Int = 25;
+  const kAndPrec: Int = 20;
+  const kLikePrec: Int = 19;
+  const kOrPrec: Int = 10;
+
+  // Cf. https://www.sqlite.org/lang_expr.html
+  // Only infix and postfix operators.
+  mutable fun peek_precedence(): Int {
+    this.peek_token() match {
+    | TWord(_, _, Some(TCollate())) -> static::kCollatePrec
+    | TStringConcat()
+    | TArrow()
+    | TLongArrow() ->
+      static::kConcatPrec
+    | TMul()
+    | TDiv()
+    | TMod() ->
+      static::kMulPrec
+    | TPlus()
+    | TMinus() ->
+      static::kPlusPrec
+    | TAmpersand()
+    | TPipe()
+    | TShiftLeft()
+    | TShiftRight() ->
+      static::kAmpersandPrec
+    | TWord(_, _, Some(TEscape())) -> static::kEscapePrec
+    | TLt()
+    | TLtEq()
+    | TGt()
+    | TGtEq() ->
+      static::kLtPrec
+    | TEq()
+    | TNeq() ->
+      static::kEqPrec
+    | TWord(_, _, Some(TIs()))
+    | TWord(_, _, Some(TBetween()))
+    | TWord(_, _, Some(TIn()))
+    | TWord(_, _, Some(TMatch()))
+    | TWord(_, _, Some(TGlob()))
+    | TWord(_, _, Some(TRegexp()))
+    | TWord(_, _, Some(TLike()))
+    // NOTE: `NOT` here corresponds only to `NOT BETWEEN`/`NOT IN`/`NOT MATCH`
+    // /`NOT LIKE`/`NOT REGEXP`/`NOT GLOB`/`NOT NULL`.
+    | TWord(_, _, Some(TNot()))
+    | TWord(_, _, Some(TIsNull()))
+    | TWord(_, _, Some(TNotNull())) ->
+      static::kEqPrec
+    | TWord(_, _, Some(TAnd())) -> static::kAndPrec
+    | TWord(_, _, Some(TOr())) -> static::kOrPrec
+    | _ -> 0
+    }
+  }
+
+  mutable fun parseExpr(): Expr {
+    this.parseSubExpr(0)
+  }
+
+  mutable fun parseSubExpr(precedence: Int): Expr {
+    expr = this.parsePrefixExpr();
+    loop {
+      next_precedence = this.peek_precedence();
+      if (precedence >= next_precedence) {
+        return expr
+      };
+      !expr = this.parseInfixOrSuffix(expr, next_precedence)
+    }
+  }
+
+  mutable fun parsePrefixExpr(): Expr {
+    pos = this.current_pos();
+    this.next_token() match {
+    | TSingleQuotedString(str) -> VString(str)
+    | THexStringLiteral _ -> throw NotImplementedError(pos)
+    | TInteger(str) -> VInt(str.toInt())
+    | THexInteger(str) -> VInt(Chars.hexDigitsToInt(str))
+    | TFloat(str) -> VFloat(str.toFloat())
+    | TPlaceholder(name) -> VParam(name)
+    | TPlus() -> UnOp(UnaryPlus(), this.parseSubExpr(static::kMaximumPrec))
+    | TMinus() -> UnOp(UnaryMinus(), this.parseSubExpr(static::kMaximumPrec))
+    | TTilde() -> UnOp(UnaryBitNot(), this.parseSubExpr(static::kMaximumPrec))
+    | TLParen() -> this.parseParenthesizedExpr()
+    | TWord(value, _, Some(kw)) ->
+      kw match {
+      | TNull() -> VNull()
+      | TCase() -> this.parseCaseExpr()
+      | TCast() -> this.parseCastExpr()
+      | TNot() ->
+        if (this.parse_keyword(TExists())) {
+          this.parseExistsExpr(true)
+        } else {
+          UnOp(UnaryNot(), this.parseSubExpr(static::kUnaryNotPrec))
+        }
+      | TExists() -> this.parseExistsExpr(false)
+      | TRaise() -> throw NotImplementedError(pos)
+      // TODO: CURRENT?
+      | TCurrentTime()
+      | TCurrentDate()
+      | TCurrentTimestamp() ->
+        throw NotImplementedError(pos)
+      | _ -> this.parseIdentifier(Name::create(value))
+      }
+    | TWord(value, Some _, None _) -> this.parseIdentifier(Name::create(value))
+    | TWord(value, None _, None _) -> this.parseIdentifierOrSpecialValue(value)
+    | _ -> throw UnexpectedTokenError(pos, "expression")
+    }
+  }
+
+  mutable fun parseParenthesizedExpr(): Expr {
+    res = if (
+      Array[TSelect(), TValues(), TWith()].contains(this.peek_keyword())
+    ) {
+      Subquery(this.parseSelect())
+    } else {
+      values = this.parseCommaSeparatedExprs();
+      if (values.size() == 1) {
+        values[0]
+      } else {
+        Tuple(values)
+      }
+    };
+    this.expect_token(TRParen());
+    res
+  }
+
+  mutable fun parseIdentifierOrSpecialValue(value: String): Expr {
+    value.uppercase() match {
+    | "TRUE" -> VInt(1)
+    | "FALSE" -> VInt(0)
+    | _ -> this.parseIdentifierOrFunctionCall(Name::create(value))
+    }
+  }
+
+  mutable fun parseIdentifier(first: Name): Identifier {
+    col = first;
+    table: ?Name = None();
+    // TODO: Schema-qualified identifier.
+    if (this.parse_token(TPeriod())) {
+      !table = Some(col);
+      !col = Name::create(this.expect_identifier())
+    };
+    Identifier(col, table)
+  }
+
+  mutable fun parseIdentifierOrFunctionCall(name: Name): Expr {
+    id = this.parseIdentifier(name);
+    if (this.parse_token(TLParen())) {
+      res = if (this.parse_token(TMul())) {
+        Call(id.name, Array[], false)
+      } else {
+        distinct = if (this.parse_keyword(TDistinct())) {
+          true
+        } else {
+          _ = this.parse_keyword(TAll());
+          false
+        };
+        Call(id.name, this.parseCommaSeparatedExprs(), distinct);
+      };
+      this.expect_token(TRParen());
+      res
+    } else {
+      id
+    }
+  }
+
+  mutable fun parseCaseExpr(): Case {
+    condOpt = if (!(this.peek_keyword() is TWhen _)) {
+      Some(this.parseExpr())
+    } else {
+      None()
+    };
+
+    whenCases = mutable Vector[];
+    loop {
+      if (!this.parse_keyword(TWhen())) {
+        break void
+      };
+      e1 = this.parseExpr();
+      this.expect_keyword(TThen());
+      e2 = this.parseExpr();
+      whenCases.push((e1, e2))
+    };
+
+    elseCase = if (this.parse_keyword(TElse())) {
+      Some(this.parseExpr())
+    } else {
+      None()
+    };
+
+    this.expect_keyword(TEnd());
+    Case(condOpt, whenCases.toArray(), elseCase)
+  }
+
+  mutable fun parseCastExpr(): Cast {
+    this.expect_token(TLParen());
+    e = this.parseExpr();
+    this.expect_keyword(TAs());
+    ty = this.parseTypeName();
+    this.expect_token(TRParen());
+    Cast(e, ty)
+  }
+
+  mutable fun parseCommaSeparatedExprs(): Array<Expr> {
+    res = mutable Vector[];
+
+    loop {
+      res.push(this.parseExpr());
+      if (!this.parse_token(TComma())) {
+        break void
+      }
+    };
+
+    res.toArray()
+  }
+
+  mutable fun parseExistsExpr(negated: Bool): Expr {
+    this.expect_token(TLParen());
+    query = this.parseSelect();
+    this.expect_token(TRParen());
+    Exists(query, negated)
+  }
+
+  mutable fun parseBinaryOperator(): BinaryOperator {
+    this.peek_token() match {
+    | TStringConcat() -> Some(OConcat())
+    | TArrow() -> this.errorNotImplemented()
+    | TLongArrow() -> this.errorNotImplemented()
+    | TMul() -> Some(OMul())
+    | TDiv() -> Some(ODiv())
+    | TMod() -> Some(OMod())
+    | TPlus() -> Some(OPlus())
+    | TMinus() -> Some(OMinus())
+    | TAmpersand() -> Some(OBitAnd())
+    | TPipe() -> Some(OBitOr())
+    | TShiftLeft() -> Some(OBitShiftLeft())
+    | TShiftRight() -> Some(OBitShiftRight())
+    | TLt() -> Some(OLt())
+    | TLtEq() -> Some(OLtEq())
+    | TGt() -> Some(OGt())
+    | TGtEq() -> Some(OGtEq())
+    | TEq() -> Some(OEq())
+    | TNeq() -> Some(ONeq())
+    | TWord(_, _, Some(TAnd())) -> Some(OAnd())
+    | TWord(_, _, Some(TOr())) -> Some(OOr())
+    | TWord(_, _, Some(TMatch())) -> Some(OMatch(false))
+    | TWord(_, _, Some(TRegexp())) -> Some(ORegexp(false))
+    | TWord(_, _, Some(TGlob())) -> Some(OGlob(false))
+    | _ -> None()
+    } match {
+    | Some(op) ->
+      this.tokens.advance();
+      return op
+    | _ -> void
+    };
+
+    if (this.parse_keyword(TIs())) {
+      if (this.parse_keyword(TDistinct())) {
+        // IS DISTINCT FROM
+        this.expect_keyword(TFrom());
+        OIs(true)
+      } else if (this.parse_keyword(TNot())) {
+        if (this.parse_keyword(TDistinct())) {
+          // IS NOT DISTINCT FROM
+          this.expect_keyword(TFrom());
+          OIs(false)
+        } else {
+          // IS NOT
+          OIs(true)
+        }
+      } else {
+        // IS
+        OIs(false)
+      }
+    } else if (this.parse_keyword(TNot())) {
+      this.peek_keyword() match {
+      | TMatch() -> OMatch(true)
+      | TRegexp() -> ORegexp(true)
+      | TGlob() -> OGlob(true)
+      | _ -> this.errorUnexpectedToken(Some("MATCH or REGEXP or GLOB"))
+      }
+    } else {
+      this.errorUnexpectedToken(Some("operator"))
+    }
+  }
+
+  mutable fun parseInfixOrSuffix(lhs_expr: Expr, precedence: Int): Expr {
+    this.peek_keyword() match {
+    | TCollate() -> this.errorNotImplemented()
+    | TEscape() -> this.errorNotImplemented()
+    | TBetween() ->
+      this.tokens.advance();
+      this.parseBetween(lhs_expr, false)
+    | TIn() ->
+      this.tokens.advance();
+      this.parseIn(lhs_expr, false)
+    | TLike() ->
+      this.tokens.advance();
+      this.parseLike(lhs_expr, false)
+    | TNot() ->
+      this.tokens.advance();
+      if (this.parse_keyword(TNull())) {
+        UnOp(UnaryIsNull(true), lhs_expr)
+      } else if (this.parse_keyword(TBetween())) {
+        this.parseBetween(lhs_expr, true)
+      } else if (this.parse_keyword(TIn())) {
+        this.parseIn(lhs_expr, true)
+      } else if (this.parse_keyword(TLike())) {
+        this.parseLike(lhs_expr, true)
+      } else {
+        this.errorUnexpectedToken(
+          Some("NULL, IN, LIKE, MATCH, REGEXP, GLOB, or BETWEEN"),
+        )
+      }
+    | TIsNull() ->
+      this.tokens.advance();
+      UnOp(UnaryIsNull(false), lhs_expr)
+    | TNotNull() ->
+      this.tokens.advance();
+      UnOp(UnaryIsNull(true), lhs_expr)
+    | TRaise() -> this.errorNotImplemented()
+    | _ ->
+      op = this.parseBinaryOperator();
+      rhs_expr = this.parseSubExpr(precedence);
+      BinOp(op, lhs_expr, rhs_expr)
+    }
+  }
+
+  // TODO: Is precedence ok?
+  mutable fun parseIn(lhs_expr: Expr, negated: Bool): Expr {
+    this.expect_token(TLParen());
+    values = this.peek_keyword() match {
+    | TSelect _
+    | TValues _ ->
+      InSelect(this.parseSelect())
+    | _ -> InList(this.parseCommaSeparatedExprs())
+    };
+    this.expect_token(TRParen());
+
+    In(lhs_expr, values, negated)
+  }
+
+  mutable fun parseLike(lhs_expr: Expr, negated: Bool): Expr {
+    rhs_expr = this.parseSubExpr(static::kLikePrec);
+    if (this.parse_keyword(TEscape())) {
+      this.errorNotImplemented()
+    };
+
+    Like(lhs_expr, rhs_expr, None(), negated)
+  }
+
+  mutable fun parseBetween(lhs_expr: Expr, negated: Bool): Expr {
+    e1 = this.parseSubExpr(static::kAndPrec);
+    this.expect_keyword(TAnd());
+    e2 = this.parseSubExpr(static::kAndPrec);
+    Between(lhs_expr, e1, e2, negated)
+  }
+}
