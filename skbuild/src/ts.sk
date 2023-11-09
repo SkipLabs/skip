@@ -7,18 +7,18 @@ fun saveResource(env: Env, res: String, resPath: String): (String, String) {
   if (!FileSystem.exists(tsDir)) {
     run(Array["mkdir", "-p", Path.dirname(ts)], env.verbose);
   };
-  cmd = Array["bash", "-c", `base64 ${resPath} | tr -d "\\n" > ${b64}`];
+  cmd = Array["sh", "-c", `base64 ${resPath} | tr -d "\\n" > ${b64}`];
   env.run(cmd);
   FileSystem.writeTextFile(
     ts,
-    tsResource(env.name, Path.dirname(res).replace("/", "_"), resPath),
+    tsResource(Path.dirname(res).replace("/", "_"), resPath),
   );
   (ts, b64)
 }
 
-fun tsResource(pckName: String, mName: String, path: String): String {
+fun tsResource(mName: String, path: String): String {
   name = Path.basename(path).replace(".", "_");
-  fn = `SKIP_${pckName}_${mName}_${name}`;
+  fn = `SKIP_${mName}_${name}`;
   Array[
     "// for distribution we replace this line with inlined base64-encoded bytes",
     `export var base64 = "";`,
