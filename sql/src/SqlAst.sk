@@ -21,7 +21,7 @@ value class Name private (
   }
 }
 
-base class Stmt{pos: Int} uses Equality {
+base class Stmt{pos: Int} uses Equality, Show {
   children =
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
@@ -64,7 +64,7 @@ base class Stmt{pos: Int} uses Equality {
   | Pragma{name: Name, value: ?Value}
 }
 
-class UpdateSet(columns: Array<(Int, Name)>, value: Expr) uses Equality
+class UpdateSet(columns: Array<(Int, Name)>, value: Expr) uses Equality, Show
 
 base class CreateTable{ifNotExists: Bool, name: Name} extends Stmt {
   children =
@@ -91,10 +91,12 @@ class ColumnDefinition{
   collate: ?CCCollate = None(),
   foreignKey: ?CCForeignKey = None(),
   generated: ?CCGenerated = None(),
-} uses Equality
+} uses Equality, Show
 
 // TODO: Add `pos` for better error messages.
-base class ColumnConstraint{constraintName: ?Name = None()} uses Equality {
+base class ColumnConstraint{
+  constraintName: ?Name = None(),
+} uses Equality, Show {
   children =
   | CCPrimaryKey{
     order: IKind,
@@ -118,26 +120,30 @@ base class TableConstraint{constraintName: ?String} uses Equality {
   | TCForeignKey{columns: Array<Name>, references: ?ForeignKeyClause}
 }
 
-class IndexedColumn{expr: Expr, collate: ?Name, order: IKind} uses Equality
+class IndexedColumn{
+  expr: Expr,
+  collate: ?Name,
+  order: IKind,
+} uses Equality, Show
 
 // TODO
 class ForeignKeyClause{} uses Equality
 
-base class OnConflict uses Equality {
+base class OnConflict uses Equality, Show {
   children =
   | OCIgnore()
   | OCReplace()
   | OCUpdate(Update)
 }
 
-base class InsertValues uses Equality {
+base class InsertValues uses Equality, Show {
   children =
   | IValues(Array<Array<Expr>>)
   | IQuery(Select)
   | IDefault()
 }
 
-base class IKind uses Orderable {
+base class IKind uses Orderable, Show {
   children =
   | INONE()
   | IASC()
@@ -151,7 +157,7 @@ class Select{
   rest: Array<(CompoundOperator, SelectCore)>,
 } extends Stmt
 
-base class SelectCore uses Equality {
+base class SelectCore uses Equality, Show {
   children =
   | SelectCoreQuery{
     distinct: Bool,
@@ -164,13 +170,13 @@ base class SelectCore uses Equality {
   | SelectCoreValues{values: Array<Array<Expr>>}
 }
 
-base class SelectResult uses Equality {
+base class SelectResult uses Equality, Show {
   children =
   | SelectStar(table: ?Name)
   | SelectExpr(expr: Expr, alias: ?Name)
 }
 
-base class SelectFrom uses Equality
+base class SelectFrom uses Equality, Show
 
 base class SelectSource{asName: ?Name} extends SelectFrom {
   children =
@@ -186,7 +192,7 @@ class Join{
   using: ?Array<Name>,
 } extends SelectFrom
 
-base class JoinKind uses Orderable, Hashable {
+base class JoinKind uses Orderable, Hashable, Show {
   children =
   | JLeft(natural: Bool)
   | JRight(natural: Bool)
@@ -196,7 +202,7 @@ base class JoinKind uses Orderable, Hashable {
   | JComma()
 }
 
-base class CompoundOperator uses Orderable {
+base class CompoundOperator uses Orderable, Show {
   children =
   | COUnion()
   | COUnionAll()
@@ -217,7 +223,7 @@ base class Value extends Expr {
   | VPermission(Value)
 }
 
-base class Expr uses Equality {
+base class Expr uses Equality, Show {
   children =
   | In(Expr, InValues, negated: Bool)
   | Between(Expr, Expr, Expr, negated: Bool)
@@ -237,16 +243,9 @@ base class Expr uses Equality {
 class Identifier(
   name: Name,
   table: ?Name = None(),
-) extends Expr uses Hashable, Show {
-  fun toString(): String {
-    this.table match {
-    | Some(table) -> `${table}.${this.name}`
-    | None() -> this.name.toString()
-    }
-  }
-}
+) extends Expr uses Hashable, Show
 
-base class UnaryOperator uses Equality {
+base class UnaryOperator uses Equality, Show {
   children =
   | UnaryNot()
   | UnaryPlus()
@@ -315,46 +314,22 @@ base class BinaryOperator uses Equality, Show {
     | _ -> invariant_violation("Unrecognized binary op: " + str)
     }
   }
-
-  fun toString(): String
-  | OPlus() -> "+"
-  | OMinus() -> "-"
-  | OConcat() -> "||"
-  | OMul() -> "*"
-  | ODiv() -> "/"
-  | OMod() -> "%"
-  | OBitAnd() -> "&"
-  | OBitOr() -> "|"
-  | OBitShiftLeft() -> "<<"
-  | OBitShiftRight() -> ">>"
-  | OAnd() -> "AND"
-  | OOr() -> "OR"
-  | OLt() -> "<"
-  | OLtEq() -> "<="
-  | OGt() -> ">"
-  | OGtEq() -> ">="
-  | OEq() -> "="
-  | ONeq() -> "<>"
-  | OIs(negated) -> if (negated) "IS NOT" else "IS"
-  | OGlob(negated) -> if (negated) "NOT GLOB" else "GLOB"
-  | ORegexp(negated) -> if (negated) "NOT REGEXP" else "REGEXP"
-  | OMatch(negated) -> if (negated) "NOT MATCH" else "MATCH"
 }
 
-base class InValues uses Equality {
+base class InValues uses Equality, Show {
   children =
   | InList(Array<Expr>)
   | InSelect(Select)
 }
 
-base class Type uses Orderable {
+base class Type uses Orderable, Show {
   children =
   | FLOAT()
   | INTEGER()
   | TEXT()
 }
 
-base class TransactionKind uses Equality {
+base class TransactionKind uses Equality, Show {
   children =
   | TransactionDeferred()
   | TransactionImmediate()
