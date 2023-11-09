@@ -1,0 +1,33 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parsePragma(): Stmt {
+    this.expect_keyword(TPragma());
+
+    // TODO: Schema-qualified name.
+    name = Name::create(this.expect_identifier());
+
+    value = if (this.parse_token(TEq())) {
+      Some(this.parsePragmaValue())
+    } else if (this.parse_token(TLParen())) {
+      res = Some(this.parsePragmaValue());
+      this.expect_token(TRParen());
+
+      res
+    } else {
+      None()
+    };
+
+    Pragma{name, value}
+  }
+
+  mutable fun parsePragmaValue(): Value {
+    this.peek_token() match {
+    | TPlus()
+    | TMinus() ->
+      this.parseSignedNumber()
+    | TSingleQuotedString(str) -> VString(str)
+    | _ -> this.parseNumericLiteral()
+    }
+  }
+}

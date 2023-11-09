@@ -1,0 +1,38 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parseDrop(): Stmt {
+    this.expect_keyword(TDrop());
+
+    kind = if (this.parse_keyword(TTable())) {
+      TTable()
+    } else if (this.parse_keyword(TIndex())) {
+      TIndex()
+    } else if (this.parse_keyword(TTrigger())) {
+      TTrigger()
+    } else if (this.parse_keyword(TView())) {
+      TView()
+    } else {
+      this.errorUnexpectedToken(Some("TABLE, INDEX, TRIGGER, or VIEW"))
+    };
+
+    ifExists = if (this.parse_keyword(TIf())) {
+      this.expect_keyword(TExists());
+
+      true
+    } else {
+      false
+    };
+
+    // TODO: Schema-qualified name.
+    name = Name::create(this.expect_identifier());
+
+    kind match {
+    | TIndex() -> DropIndex{name, ifExists}
+    | TTable() -> DropTable{name, ifExists}
+    | TView() -> DropView{name, ifExists}
+    | TTrigger() -> this.errorNotImplemented()
+    | _ -> invariant_violation("unreachable")
+    }
+  }
+}

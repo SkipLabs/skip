@@ -1,0 +1,30 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parseDelete(): Stmt {
+    this.expect_keyword(TDelete());
+    this.expect_keyword(TFrom());
+
+    // TODO: Schema-qualified name.
+    from = Name::create(this.expect_identifier());
+    alias = if (this.parse_keyword(TAs())) {
+      Some(Name::create(this.expect_identifier()))
+    } else {
+      None()
+    };
+
+    where = if (this.parse_keyword(TWhere())) {
+      Some(this.parseExpr())
+    } else {
+      None()
+    };
+
+    if (this.parse_keyword(TReturning())) {
+      this.errorNotImplemented()
+    };
+
+    // TODO: Support `DELETE FROM foo INDEXED BY bar`.
+
+    Delete{name => from, alias, where, indexed => None()}
+  }
+}
