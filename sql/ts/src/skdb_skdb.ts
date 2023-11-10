@@ -11,8 +11,8 @@ interface Exported {
   //
   SKIP_reactive_query: (queryID: number, query: number, encoded_params: number) => void;
   SKIP_reactive_query_changes: (queryID: number, query: number, encoded_params: number) => void;
+  SKIP_reactive_print_result: (queryID: number) => void;
   SKIP_delete_reactive_query: (queryID: number) => void;
-  SKIP_js_notify_user: (notify: number) => void;
   getVersion: () => number;
 }
 
@@ -53,8 +53,8 @@ interface ToWasm {
   SKIP_push_object: () => void;
   SKIP_unix_unixepoch: (tm: ptr) => ptr;
   SKIP_unix_strftime: (tm: ptr) => ptr;
-  SKIP_js_user_fun: (queryID: int) => void;
-  SKIP_js_mark_query: (queryID: int, notify: int) => void;
+  SKIP_js_mark_query: (queryID: int) => void;
+  SKIP_js_delete_fun: (queryID: int) => void;
 }
 
 class SKDBMemory implements PagedMemory {
@@ -176,7 +176,7 @@ class LinksImpl implements Links, ToWasm {
   private queryID: number;
   private userFuns: Array<() => void>;
   private funLastTick: Map<number, number>;
-  private queriesToNotify: Map<number, number>;
+  private queriesToNotify: Set<number>;
   private freeQueryIDs: Array<number>;
 
   SKIP_last_tick: (queryID: int) => int;
@@ -193,8 +193,8 @@ class LinksImpl implements Links, ToWasm {
   SKIP_push_object: () => void;
   SKIP_unix_unixepoch: (tm: ptr) => ptr;
   SKIP_unix_strftime: (tm: ptr) => ptr;
-  SKIP_js_user_fun: (queryID: int) => void;
-  SKIP_js_mark_query: (queryID: int, notify: int) => void;
+  SKIP_js_mark_query: (queryID: int) => void;
+  SKIP_js_delete_fun: (queryID: int) => void;
   // Utils
   notifyAllJS: () => void;
 
@@ -206,7 +206,7 @@ class LinksImpl implements Links, ToWasm {
     this.userFuns = new Array();
     this.freeQueryIDs = new Array();
     this.funLastTick = new Map();
-    this.queriesToNotify = new Map();
+    this.queriesToNotify = new Set();
     this.objectIdx = 0;
     this.object = {};
     this.stream = 0;
@@ -216,10 +216,11 @@ class LinksImpl implements Links, ToWasm {
   complete = (utils: Utils, exports: object) => {
     let exported = exports as Exported;
     this.notifyAllJS = () => {
-      this.queriesToNotify.forEach((value, key, map) => {
-        exported.SKIP_js_notify_user(value);
+      this.queriesToNotify.forEach(value => {
+        exported.SKIP_reactive_print_result(value);
+        this.userFuns[value]!()
       });
-      this.queriesToNotify = new Map();
+      this.queriesToNotify = new Set();
     }
     this.SKIP_call_external_fun = (funId: int, skParam: ptr) => {
       let res = this.state.call(
@@ -283,11 +284,12 @@ class LinksImpl implements Links, ToWasm {
     this.SKIP_unix_strftime = (tm: ptr) => {
       return utils.exportString("TODO")
     }
-    this.SKIP_js_user_fun = (queryID: int) => {
-      this.userFuns[queryID]!()
+    this.SKIP_js_mark_query = (queryID: int) => {
+      this.queriesToNotify.add(queryID);
     }
-    this.SKIP_js_mark_query = (queryID: int, notify: int) => {
-      this.queriesToNotify.set(queryID, notify);
+    this.SKIP_js_delete_fun = (queryID: int) => {
+      this.funLastTick.set(queryID, 0);
+      this.freeQueryIDs.push(queryID);
     }
     let runner = (fn: () => string) => {
       this.stdout_objects = [[],[],[]];
@@ -332,10 +334,8 @@ class LinksImpl implements Links, ToWasm {
       userFun();
       return {
         close: () => {
-          exported.SKIP_delete_reactive_query(queryID);
           this.userFuns[queryID] = () => { };
-          this.funLastTick.set(queryID, 0);
-          this.freeQueryIDs.push(queryID);
+          utils.runCheckError(() => exported.SKIP_delete_reactive_query(queryID));
         }
       }
     };
@@ -424,8 +424,8 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_push_object = () => links.SKIP_push_object();
     toWasm.SKIP_unix_unixepoch = (tm: ptr) => links.SKIP_unix_unixepoch(tm);
     toWasm.SKIP_unix_strftime = (tm: ptr) => links.SKIP_unix_strftime(tm);
-    toWasm.SKIP_js_user_fun = (id: int) => links.SKIP_js_user_fun(id);
-    toWasm.SKIP_js_mark_query = (id: int, notify: int) => links.SKIP_js_mark_query(id, notify);
+    toWasm.SKIP_js_mark_query = (id: int) => links.SKIP_js_mark_query(id);
+    toWasm.SKIP_js_delete_fun = (id: int) => links.SKIP_js_delete_fun(id);
     return links;
   }
 }
