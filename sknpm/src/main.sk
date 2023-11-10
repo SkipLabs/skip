@@ -420,7 +420,7 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
   tsDir = Path.join(bc.targetDir, "ts");
   optBinName: ?String = None();
   if (!customTests) {
-    _ = system("mkdir -p " + tsDir);
+    checkDir(tsDir);
     saveSkTestsTs(tsDir);
     !optBinName = Some("sk_tests")
   };
@@ -572,7 +572,7 @@ fun manage(
     Skargo.run(Array["rm", "-rf", Path.join(npmDir, "*")], bc.env.verbose);
   };
   tsDir = Path.join(bc.targetDir, "ts");
-  _ = system("mkdir -p " + tsDir);
+  checkDir(tsDir);
   dependencies = mutable Vector[];
   resources = mutable Map[];
   bc.deps.each((_k, v) -> {
@@ -585,7 +585,7 @@ fun manage(
       contents = FileSystem.readTextFile(depsResFile);
       json = JSON.decode(contents).expectObject();
       json.value.each((f, v) -> {
-        _ = system("cp " + f + " " + Path.join(tsDir, Path.basename(f)));
+        copy(f, Path.join(tsDir, Path.basename(f)));
         resources.add(f, v.expectString())
       })
     }
@@ -598,12 +598,7 @@ fun manage(
       f -> f.endsWith(".ts"),
       f -> Path.basename(f) != "node_modules",
     ).each(f ->
-      _ = system(
-        "cp " +
-          f +
-          " " +
-          Path.join(tsDir, relative(f, tsd).default(Path.basename(f))),
-      )
+      copy(f, Path.join(tsDir, relative(f, tsd).default(Path.basename(f))))
     );
     // TODO manage same package usage
     packageFile = Path.join(tsd, "package.json");
@@ -648,7 +643,7 @@ fun manage(
     _f ~> false,
   );
   distDir = Path.join(npmDir, "dist");
-  _ = system("mkdir -p " + distDir);
+  checkDir(distDir);
   jsResources = mutable Map[];
   resources.each((k, f) ->
     jsResources.add(
@@ -670,7 +665,7 @@ fun manage(
   );
   for (bin in bc.env.manifest.bin) {
     wasmFile = Path.join(bc.targetDir, bin.name + ".wasm");
-    Skargo.run(Array["cp", wasmFile, distDir], bc.env.verbose);
+    copy(wasmFile, distDir)
   };
   if (bc.env.verbose) {
     print_string(">> Copy mapping files associating '.mjs' instead of '.js'.");
@@ -704,7 +699,7 @@ fun manage(
   };
   declFiles.each(f -> copyToDir(f, distDir, ".mjs"));
   srcDir = Path.join(npmDir, "src");
-  _ = system("mkdir -p " + srcDir);
+  checkDir(srcDir);
   if (bc.env.verbose) {
     print_string(">> Copy source files.");
   };
@@ -1320,7 +1315,7 @@ fun syncDirs(
   exclude: Set<String>,
   verbose: Bool,
 ): void {
-  _ = system("mkdir -p " + toDir);
+  checkDir(toDir);
   FileSystem.readFilesRecursive(
     fromDir,
     _f -> true,
@@ -1328,7 +1323,7 @@ fun syncDirs(
       if (!exclude.contains(Path.basename(src))) {
         relative(src, fromDir).each(rp -> {
           dst = Path.join(toDir, rp);
-          _ = system("mkdir -p " + Path.basename(dst));
+          checkDir(Path.basename(dst));
         });
         true
       } else {
@@ -1339,11 +1334,7 @@ fun syncDirs(
     relative(src, fromDir).each(rp -> {
       dst = Path.join(toDir, rp);
       if (isYoungerThan(src, dst)) {
-        cmd = "cp " + src + " " + dst;
-        if (verbose) {
-          print_error(`>> ${cmd}`)
-        };
-        _ = system(cmd)
+        copy(src, dst, verbose)
       }
     })
   )
@@ -1402,4 +1393,16 @@ private fun skargo(build: Bool, profile: String, verbose: Bool): void {
   if (!success) {
     throw Skargo.SystemCallException(p.exitcode());
   }
+}
+
+fun checkDir(dir: String): void {
+  _ = System.subprocess(Array["mkdir", "-p", dir]);
+}
+
+fun copy(src: String, dst: String, verbose: Bool = false): void {
+  cmd = Array["cp", src, dst];
+  if (verbose) {
+    print_error(`>> ${cmd.join(" ")}`)
+  };
+  _ = System.subprocess(cmd);
 }
