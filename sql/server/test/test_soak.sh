@@ -71,7 +71,7 @@ run_server() {
 
     # for checking privacy updates propagate
     echo "CREATE TABLE pk_privacy_ro (client INTEGER PRIMARY KEY, skdb_access STRING NOT NULL);" | $SKDB
-    echo "CREATE TABLE pk_privacy_rw (client INTEGER PRIMARY KEY, updater STRING, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_privacy_rw (client INTEGER PRIMARY KEY, updater INTEGER, skdb_access STRING NOT NULL);" | $SKDB
 
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > $SOAK_SERVER_LOG &
 
