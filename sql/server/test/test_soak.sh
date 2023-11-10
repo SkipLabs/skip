@@ -69,6 +69,10 @@ run_server() {
     echo "CREATE TABLE no_pk_filtered (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
     echo "CREATE TABLE pk_filtered (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
 
+    # for checking privacy updates propagate
+    echo "CREATE TABLE pk_privacy_ro (client INTEGER PRIMARY KEY, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_privacy_rw (client INTEGER PRIMARY KEY, updater STRING, skdb_access STRING NOT NULL);" | $SKDB
+
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > $SOAK_SERVER_LOG &
 
     echo $! > "$SERVER_PID_FILE"

@@ -7,6 +7,8 @@ const tables = [
   "pk_inserts",
   "no_pk_single_row",
   "pk_single_row",
+  "pk_privacy_ro",
+  "pk_privacy_rw",
   "checkpoints",
 ];
 
@@ -40,6 +42,10 @@ const setup = async function(client) {
 const modify_rows = function(client, skdb, i) {
   const avgWriteMs = 500;
 
+  const check_every = 30;
+
+  const privacy = i % (check_every * 2) < check_every ? 'read-write' : skdb.currentUser;
+
   const regular_action = async () => {
     // monotonic inserts - should be no conflict here. just check that
     // replication works well in the happy case and we don't lose or
@@ -64,6 +70,9 @@ const modify_rows = function(client, skdb, i) {
        COMMIT;`
     );
 
+    // privacy updates.
+    await skdb.exec(`INSERT OR REPLACE INTO pk_privacy_ro VALUES(${client}, '${privacy}');`);
+
     // avoid stack overflow by using event loop
     setTimeout(() => modify_rows(client, skdb, i + 1), 0);
   };
@@ -78,6 +87,7 @@ const modify_rows = function(client, skdb, i) {
        UPDATE pk_single_row SET client = ${client}, value = ${i} WHERE id = 0;
        DELETE FROM no_pk_single_row WHERE id = 0;
        INSERT INTO no_pk_single_row VALUES (0,${client},${i}, 'read-write');
+       UPDATE pk_privacy_ro SET skdb_access = '${privacy}' WHERE client = ${client};
        INSERT INTO checkpoints VALUES (id(), ${i}, ${client}, 'read-write');
        COMMIT;
     `);
@@ -85,7 +95,7 @@ const modify_rows = function(client, skdb, i) {
     setTimeout(() => modify_rows(client, skdb, i + 1), 0);
   };
 
-  if (i > 0 && i % 30 === 0) {
+  if (i > 0 && i % check_every === 0) {
     setTimeout(checkpoint_action, Math.random() * avgWriteMs * 2);
   } else {
     setTimeout(regular_action, Math.random() * avgWriteMs * 2);
@@ -175,6 +185,18 @@ const check_expectation = async function(skdb, client, latest_id) {
   };
   // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
   // assert.deepStrictEqual(check_pk_filtered[0], expected_pk_filtered, "pk_filtered failed check");
+
+  const check_pk_privacy_ro = await skdb.exec(
+    `select count(*) as n
+     from pk_privacy_ro
+     where client = @client`,
+    params
+  );
+  const expected_pk_privacy_ro = {
+    n: latest_id % 60 < 30 ? 1 : 0,
+  };
+  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
+  // assert.deepStrictEqual(check_pk_privacy_ro[0], expected_pk_privacy_ro, "pk_privacy_ro failed check");
 };
 
 setup(client, port).then((skdb) => {
@@ -200,6 +222,9 @@ setup(client, port).then((skdb) => {
     console.log(await skdb.exec('select * from no_pk_filtered order by id desc limit 20;'));
     console.log('> pk_filtered - most recent 20:');
     console.log(await skdb.exec('select * from pk_filtered order by id desc limit 20;'));
+
+    console.log('> pk_privacy_ro - select *:');
+    console.log(await skdb.exec('select * from pk_privacy_ro;'));
   });
 
   // check expectations on receiving a checkpoint
