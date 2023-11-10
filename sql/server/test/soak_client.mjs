@@ -73,6 +73,9 @@ const modify_rows = function(client, skdb, i) {
     // privacy updates.
     await skdb.exec(`INSERT OR REPLACE INTO pk_privacy_ro VALUES(${client}, '${privacy}');`);
 
+    await skdb.exec(`INSERT OR REPLACE INTO pk_privacy_rw VALUES(${client}, ${client}, '${privacy}');`);
+    await skdb.exec(`UPDATE pk_privacy_rw SET updater = ${client};`);
+
     // avoid stack overflow by using event loop
     setTimeout(() => modify_rows(client, skdb, i + 1), 0);
   };
@@ -88,6 +91,8 @@ const modify_rows = function(client, skdb, i) {
        DELETE FROM no_pk_single_row WHERE id = 0;
        INSERT INTO no_pk_single_row VALUES (0,${client},${i}, 'read-write');
        UPDATE pk_privacy_ro SET skdb_access = '${privacy}' WHERE client = ${client};
+       UPDATE pk_privacy_rw SET skdb_access = '${privacy}' WHERE client = ${client};
+       UPDATE pk_privacy_rw SET updater = ${client};
        INSERT INTO checkpoints VALUES (id(), ${i}, ${client}, 'read-write');
        COMMIT;
     `);
@@ -197,6 +202,18 @@ const check_expectation = async function(skdb, client, latest_id) {
   };
   // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
   // assert.deepStrictEqual(check_pk_privacy_ro[0], expected_pk_privacy_ro, "pk_privacy_ro failed check");
+
+  const check_pk_privacy_rw = await skdb.exec(
+    `select count(*) as n
+     from pk_privacy_rw
+     where client = @client`,
+    params
+  );
+  const expected_pk_privacy_rw = {
+    n: latest_id % 60 < 30 ? 1 : 0,
+  };
+  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
+  // assert.deepStrictEqual(check_pk_privacy_rw[0], expected_pk_privacy_rw, "pk_privacy_rw failed check");
 };
 
 setup(client, port).then((skdb) => {
@@ -225,6 +242,9 @@ setup(client, port).then((skdb) => {
 
     console.log('> pk_privacy_ro - select *:');
     console.log(await skdb.exec('select * from pk_privacy_ro;'));
+
+    console.log('> pk_privacy_rw - select *:');
+    console.log(await skdb.exec('select * from pk_privacy_rw;'));
   });
 
   // check expectations on receiving a checkpoint
