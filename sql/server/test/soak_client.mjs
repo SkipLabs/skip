@@ -37,14 +37,8 @@ const setup = async function(client) {
   return skdb;
 };
 
-const modify_rows = function(client, skdb, i, cb) {
-  const avgWriteMs = 1000;
-  const twoHoursWorthOfWrites = 2 * 60 * 60 * 1000 / avgWriteMs;
-
-  if (i >= twoHoursWorthOfWrites) {
-    setTimeout(cb, 1000);
-    return;
-  }
+const modify_rows = function(client, skdb, i) {
+  const avgWriteMs = 500;
 
   const regular_action = async () => {
     // monotonic inserts - should be no conflict here. just check that
@@ -71,7 +65,7 @@ const modify_rows = function(client, skdb, i, cb) {
     );
 
     // avoid stack overflow by using event loop
-    setTimeout(() => modify_rows(client, skdb, i + 1, cb), 0);
+    setTimeout(() => modify_rows(client, skdb, i + 1), 0);
   };
 
   const checkpoint_action = async () => {
@@ -88,14 +82,13 @@ const modify_rows = function(client, skdb, i, cb) {
        COMMIT;
     `);
 
-    setTimeout(() => modify_rows(client, skdb, i + 1, cb), 0);
+    setTimeout(() => modify_rows(client, skdb, i + 1), 0);
   };
 
-  // TODO: pick a value
-  if (i > 0 && i % 10 === 0) {
-    setTimeout(checkpoint_action, Math.random() * avgWriteMs);
+  if (i > 0 && i % 30 === 0) {
+    setTimeout(checkpoint_action, Math.random() * avgWriteMs * 2);
   } else {
-    setTimeout(regular_action, Math.random() * avgWriteMs);
+    setTimeout(regular_action, Math.random() * avgWriteMs * 2);
   }
 };
 
@@ -227,15 +220,7 @@ setup(client, port).then((skdb) => {
     }
   );
 
-  modify_rows(client, skdb, 0, async () => {
-    for (const table of tables) {
-      console.log(table);
-      console.log(await skdb.exec(`select * from ${table} order by id, client`));
-    }
-    process.exit(0);
-  });
-
-  // TODO: close the watch changes once we've written everything and received all last checkpoints
+  modify_rows(client, skdb, 0);
 }).catch(
   exn => console.error(exn)
 );
