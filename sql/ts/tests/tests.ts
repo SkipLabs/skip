@@ -536,6 +536,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -557,6 +560,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -569,8 +575,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [{ "a": 13, "b": "9", "c": 42.1 }],
-            deleted: []
+            init: [{ "a": 13, "b": "9", "c": 42.1 }],
           },
           {
             added: [{ "a": 14, "b": "bar", "c": 44.5 }],
@@ -589,6 +594,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -601,8 +609,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [{ "a": 13, "b": "9", "c": 42.1 }],
-            deleted: []
+            init: [{ "a": 13, "b": "9", "c": 42.1 }],
           },
           {
             added: [{ "a": 13, "b": "foo", "c": 42.1 }],
@@ -622,6 +629,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -634,11 +644,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [
+            init: [
               { "a": 13, "b": "9", "c": 42.1 },
               { "a": 14, "b": "9", "c": 42.1 }
-            ],
-            deleted: []
+            ]
           },
           {
             added: [],
@@ -660,6 +669,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1 WHERE a > 13;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -675,12 +687,11 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
 
         let expected = [
           {
-            added: [
+            init: [
               { "a": 14, "b": "9", "c": 42.1 },
               { "a": 15, "b": "9", "c": 42.1 },
               { "a": 16, "b": "9", "c": 42.1 },
             ],
-            deleted: []
           },
           {
             added: [
@@ -707,6 +718,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1 where a = 13 or a = 14;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -719,8 +733,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [{ "a": 13, "b": 9, "c": 42 }],
-            deleted: []
+            init: [{ "a": 13, "b": 9, "c": 42 }],
           },
           {
             added: [{ "a": 14, "b": 9, "c": 44 }],
@@ -739,6 +752,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1 where a = 13 or a = 14;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -751,8 +767,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [{ "a": 13, "b": "9", "c": 42.1 }],
-            deleted: []
+            init: [{ "a": 13, "b": "9", "c": 42.1 }],
           },
           {
             added: [{ "a": 13, "b": "foo", "c": 42.1 }],
@@ -772,6 +787,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1 where a = 13 or a = 14;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -784,11 +802,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [
+            init: [
               { "a": 13, "b": "9", "c": 42.1 },
               { "a": 14, "b": "9", "c": 42.1 }
             ],
-            deleted: []
           },
           {
             added: [],
@@ -814,6 +831,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'select completed, count(*) as n from (select * from todos where id > 0) group by completed',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -827,11 +847,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [
+            init: [
               { completed: 0, n: 2 },
               { completed: 1, n: 1 }
             ],
-            deleted: []
           },
           {
             added: [{ completed: 1, n: 2 }],
@@ -852,6 +871,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'select w from test where x = @x and y = @y and z = @zed',
           new Map<string, string | number>([["x", 0], ["y", "foo"], ["zed", 1.2]]),
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -863,8 +885,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [{ w: 42 }],
-            deleted: []
+            init: [{ w: 42 }],
           },
           {
             added: [{ w: 21 }],
@@ -886,6 +907,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'select w from test where x = @x and y = @y and z = @zed',
           { x: 0, y: 'foo', zed: 1.2 },
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -897,8 +921,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [{ w: 42 }],
-            deleted: []
+            init: [{ w: 42 }],
           },
           {
             added: [{ w: 21 }],
@@ -917,6 +940,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1 where a = 13;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -926,6 +952,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         handle = await skdb.watchChanges(
           'SELECT * FROM t1 where a = 14;',
           {},
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -937,12 +966,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [{ "a": 13, "b": "9", "c": 42.1 }],
-            deleted: []
+            init: [{ "a": 13, "b": "9", "c": 42.1 }],
           },
           {
-            added: [{ "a": 14, "b": "bar", "c": 44.5 }],
-            deleted: []
+            init: [{ "a": 14, "b": "bar", "c": 44.5 }],
           }
         ];
         expect(res).toEqual(expected);
@@ -957,6 +984,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle = await skdb.watchChanges(
           'SELECT * FROM t1 where a = @a;',
           { a: 13 },
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -966,6 +996,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         handle = await skdb.watchChanges(
           'SELECT * FROM t1 where a = @a;',
           { a: 14 },
+          (rows: Array<any>) => {
+            result.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result.push({ added: added, deleted: deleted });
           }
@@ -977,12 +1010,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
       check: res => {
         let expected = [
           {
-            added: [{ "a": 13, "b": "9", "c": 42.1 }],
-            deleted: []
+            init: [{ "a": 13, "b": "9", "c": 42.1 }],
           },
           {
-            added: [{ "a": 14, "b": "bar", "c": 44.5 }],
-            deleted: []
+            init: [{ "a": 14, "b": "bar", "c": 44.5 }],
           }
         ];
         expect(res).toEqual(expected);
@@ -1003,6 +1034,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle1 = await skdb.watchChanges(
           'SELECT * FROM t1 where a = @a;',
           { a: 13 },
+          (rows: Array<any>) => {
+            result1.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result1.push({ added: added, deleted: deleted });
           }
@@ -1010,6 +1044,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle2 = await skdb.watchChanges(
           'SELECT * FROM t2 where a = @a;',
           { a: 13 },
+          (rows: Array<any>) => {
+            result2.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result2.push({ added: added, deleted: deleted });
           }
@@ -1026,8 +1063,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let expected = [
           [
             {
-              added: [{ "a": 13, "b": "9", "c": 42.1 }],
-              deleted: []
+              init: [{ "a": 13, "b": "9", "c": 42.1 }],
             },
             {
               added: [{ "a": 13, "b": "foo", "c": 42.1 }],
@@ -1036,8 +1072,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
           ],
           [
             {
-              added: [{ "a": 13, "b": "9", "c": 42.1 }],
-              deleted: []
+              init: [{ "a": 13, "b": "9", "c": 42.1 }],
             },
             {
               added: [{ "a": 13, "b": "bar", "c": 42.1 }],
@@ -1060,6 +1095,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle1 = await skdb.watchChanges(
           'SELECT * FROM t1 where a < @a;',
           { a: 15 },
+          (rows: Array<any>) => {
+            result1.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result1.push({ added: added, deleted: deleted });
           }
@@ -1067,6 +1105,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle2 = await skdb.watchChanges(
           'SELECT * FROM t1 where a > @a;',
           { a: 13 },
+          (rows: Array<any>) => {
+            result2.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result2.push({ added: added, deleted: deleted });
           }
@@ -1083,8 +1124,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let expected = [
           [
             {
-              added: [{ "a": 13, "b": "9", "c": 42.1 }],
-              deleted: []
+              init: [{ "a": 13, "b": "9", "c": 42.1 }],
             },
             {
               added: [{ "a": 13, "b": "foo", "c": 42.1 }],
@@ -1093,8 +1133,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
           ],
           [
             {
-              added: [{ "a": 15, "b": "9", "c": 42.1 }],
-              deleted: []
+              init: [{ "a": 15, "b": "9", "c": 42.1 }]
             },
             {
               added: [{ "a": 15, "b": "foo", "c": 42.1 }],
@@ -1119,6 +1158,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle1 = await skdb.watchChanges(
           'SELECT * FROM t1 where a < @a;',
           { a: 15 },
+          (rows: Array<any>) => {
+            result1.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result1.push({ added: added, deleted: deleted });
           }
@@ -1126,6 +1168,9 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let handle2 = await skdb.watchChanges(
           'SELECT * FROM t1 where a > @a;',
           { a: 13 },
+          (rows: Array<any>) => {
+            result2.push({ init: rows});
+          },
           (added: Array<any>, deleted: Array<any>,) => {
             result2.push({ added: added, deleted: deleted });
           }
@@ -1142,11 +1187,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
         let expected = [
           [
             {
-              added: [
+              init: [
                 { "a": 13, "b": "9", "c": 42.1 },
                 { "a": 14, "b": "9", "c": 42.1 }
-              ],
-              deleted: []
+              ]
             },
             {
               added: [
@@ -1161,11 +1205,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => 
           ],
           [
             {
-              added: [
+              init: [
                 { "a": 14, "b": "9", "c": 42.1 },
                 { "a": 15, "b": "9", "c": 42.1 },
-              ],
-              deleted: []
+              ]
             },
             {
               added: [

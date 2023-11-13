@@ -1731,13 +1731,8 @@ fun getReactiveQueryHandle(
             cselect.params,
           );
           fieldNames = schema.map(x -> x.name.origName);
-          printResult(
-            context,
-            queryID,
-            selectDir.dirName,
-            fieldNames,
-            queryInfo.onlyChanges,
-          );
+          printReactiveQueryResult(context, selectDir.dirName, fieldNames);
+          if (queryInfo.onlyChanges) printTick(context.tick.next());
           SKStore.EagerDir::apply(
             context,
             selectDir.dirName,
@@ -1779,6 +1774,7 @@ fun printReactiveQueryResult(
 ): void {
   format = SKStore.OJS(fieldNames);
   RowValues::printHeader(format);
+  switchTo(UInt32::truncate(0));
   for (kv in context.unsafeGetEagerDir(dirName).unsafeGetFileIter()) {
     (_, files) = kv;
     for (file in files) {
@@ -1799,34 +1795,38 @@ fun printReactiveQueryChanges(
   lastTick = lastTick(UInt32::truncate(queryID));
   tick = SKStore.Tick(lastTick.toInt());
   edir = context.unsafeGetEagerDir(dirName);
-  (_, changes) = edir.getChangesAfter(tick);
-  if (!changes.isEmpty()) {
-    format = SKStore.OJS(fieldNames);
-    RowValues::printHeader(format);
-    for (key in changes) {
-      values = edir.getArrayRaw(key);
-      if (values.size() == 0) {
-        switchTo(UInt32::truncate(1));
-        row = (key as RowKey _).row;
-        for (_ in Range(0, row.repeat)) {
-          RowValues::printItem(format, row);
-        }
-      } else {
-        switchTo(UInt32::truncate(0));
-        for (file in values) {
-          row = RowValues::type(file);
+  (isReset, changes) = edir.getChangesAfter(tick);
+  if (isReset) {
+    printReactiveQueryResult(context, dirName, fieldNames)
+  } else {
+    if (!changes.isEmpty()) {
+      format = SKStore.OJS(fieldNames);
+      RowValues::printHeader(format);
+      for (key in changes) {
+        values = edir.getArrayRaw(key);
+        if (values.size() == 0) {
+          switchTo(UInt32::truncate(2));
+          row = (key as RowKey _).row;
           for (_ in Range(0, row.repeat)) {
             RowValues::printItem(format, row);
           }
+        } else {
+          switchTo(UInt32::truncate(1));
+          for (file in values) {
+            row = RowValues::type(file);
+            for (_ in Range(0, row.repeat)) {
+              RowValues::printItem(format, row);
+            }
+          }
         }
       }
-    };
+    }
   };
   printTick(context.tick.next());
 }
 
 private fun printTick(tick: SKStore.Tick): void {
-  switchTo(UInt32::truncate(2));
+  switchTo(UInt32::truncate(3));
   jsClearFieldNames();
   jsPushFieldName("tick");
   jsClearObject();
