@@ -230,16 +230,21 @@ class LinksImpl implements Links, ToWasm {
     this.checkNotifications = () => {
       if (!this.notifying) {
         this.notifying = true;
-        while (this.notifications.length > 0) {
-          const toNotify = this.notifications.shift();
-          if (toNotify) {
-            toNotify.forEach(value => {
-              utils.runCheckError(() => exported.SKIP_reactive_print_result(value));
-              this.userFuns[value]!()
-            });
+        try {
+          while (this.notifications.length > 0) {
+            const toNotify = this.notifications.shift();
+            if (toNotify) {
+              toNotify.forEach(value => {
+                utils.runCheckError(() => exported.SKIP_reactive_print_result(value));
+                this.userFuns[value]!()
+              });
+            }
           }
+        } catch (exn) {
+          throw exn
+        } finally {
+          this.notifying = false;
         }
-        this.notifying = false;
       }
     }
     this.SKIP_call_external_fun = (funId: int, skParam: ptr) => {
