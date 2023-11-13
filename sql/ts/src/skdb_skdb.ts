@@ -20,13 +20,13 @@ class SkdbHamdleImpl implements SkdbHandle {
   runner: (fn: () => string) => Array<any>;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, onChanges: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
 
   constructor(
     main: (new_args: Array<string>, new_stdin: string) => string,
     runner: (fn: () => string) => Array<any>,
     watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void },
-    watchChanges: (query: string, params: Params, onChanges: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
+    watchChanges: (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
   ) {
     this.runner = runner;
     this.main = main;
@@ -215,7 +215,7 @@ class LinksImpl implements Links, ToWasm {
     this.objectIdx = 0;
     this.object = {};
     this.stream = 0;
-    this.stdout_objects = [[],[],[]];
+    this.stdout_objects = [[],[],[],[]];
   }
 
   complete = (utils: Utils, exports: object) => {
@@ -312,7 +312,7 @@ class LinksImpl implements Links, ToWasm {
       this.freeQueryIDs.push(queryID);
     }
     let runner = (fn: () => string) => {
-      this.stdout_objects = [[],[],[]];
+      this.stdout_objects = [[],[],[],[]];
       this.stream = 0;
       let stdout = fn();
       if (stdout == "") {
@@ -335,7 +335,7 @@ class LinksImpl implements Links, ToWasm {
       if (params instanceof Map) {
         params = Object.fromEntries(params);
       }
-      this.stdout_objects = [[],[],[]];
+      this.stdout_objects = [[],[],[],[]];
       this.stream = 0;
       const freeQueryID = this.freeQueryIDs.pop();
       const queryID = (freeQueryID === undefined ? this.queryID++ : freeQueryID);
@@ -371,28 +371,32 @@ class LinksImpl implements Links, ToWasm {
         exported.SKIP_reactive_query,
         _queryID => {
           onChange(this.stdout_objects[0]);
-          this.stdout_objects = [[],[],[]];
+          this.stdout_objects = [[],[],[],[]];
         },
       );
     }
     let watchChanges = (
       query: string,
       params: Params,
-      onChanges: (added: Array<any>, removed: Array<any>) => void,
+      init: (rows: Array<any>) => void,
+      update: (added: Array<any>, removed: Array<any>) => void,
     ) => {
       return manageWatch(
         query,
         params,
         exported.SKIP_reactive_query_changes,
         queryID => {
-          const added = this.stdout_objects[0];
-          const removed = this.stdout_objects[1];
-          const tick = this.stdout_objects[2][0].tick;
+          const rows = this.stdout_objects[0];
+          const added = this.stdout_objects[1];
+          const removed = this.stdout_objects[2];
+          const tick = this.stdout_objects[3][0].tick;
           if (added.length > 0 || removed.length > 0) {
-            onChanges(added, removed);
+            update(added, removed);
+          } else if (rows.length) {
+            init(rows);
           }
           this.funLastTick.set(queryID, tick);
-          this.stdout_objects = [[],[],[]];
+          this.stdout_objects = [[],[],[], []];
         },
       );
     }

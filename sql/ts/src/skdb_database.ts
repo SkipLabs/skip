@@ -83,7 +83,7 @@ export class SKDBSyncImpl implements SKDBSync {
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, onChange: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => { close: () => void }
 
   private runner: (fn: () => string) => Array<any>;
 
@@ -276,8 +276,8 @@ export class SKDBImpl implements SKDB {
     return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
   }
 
-  async watchChanges(query: string, params: Params, onChanges: (added: Array<any>, deleted: Array<any>) => void) {
-    let closable = this.skdbSync.watchChanges(query, params, onChanges);
+  async watchChanges(query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) {
+    let closable = this.skdbSync.watchChanges(query, params, init, update);
     return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
   }
 
