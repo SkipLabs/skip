@@ -177,6 +177,8 @@ class LinksImpl implements Links, ToWasm {
   private userFuns: Array<() => void>;
   private funLastTick: Map<number, number>;
   private queriesToNotify: Set<number>;
+  private notifications: Array<Set<number>>;
+  private notifying: boolean;
   private freeQueryIDs: Array<number>;
 
   SKIP_last_tick: (queryID: int) => int;
@@ -197,6 +199,7 @@ class LinksImpl implements Links, ToWasm {
   SKIP_js_delete_fun: (queryID: int) => void;
   // Utils
   notifyAllJS: () => void;
+  checkNotifications: () => void;
 
   constructor(environment: Environment) {
     this.environment = environment;
@@ -207,6 +210,8 @@ class LinksImpl implements Links, ToWasm {
     this.freeQueryIDs = new Array();
     this.funLastTick = new Map();
     this.queriesToNotify = new Set();
+    this.notifications = [];
+    this.notifying = false;
     this.objectIdx = 0;
     this.object = {};
     this.stream = 0;
@@ -216,11 +221,26 @@ class LinksImpl implements Links, ToWasm {
   complete = (utils: Utils, exports: object) => {
     let exported = exports as Exported;
     this.notifyAllJS = () => {
-      this.queriesToNotify.forEach(value => {
-        exported.SKIP_reactive_print_result(value);
-        this.userFuns[value]!()
-      });
-      this.queriesToNotify = new Set();
+      if (this.queriesToNotify.size > 0) {
+        this.notifications.push(this.queriesToNotify);
+        this.queriesToNotify = new Set();
+        this.checkNotifications();
+      }
+    }
+    this.checkNotifications = () => {
+      if (!this.notifying) {
+        this.notifying = true;
+        while (this.notifications.length > 0) {
+          const toNotify = this.notifications.shift();
+          if (toNotify) {
+            toNotify.forEach(value => {
+              utils.runCheckError(() => exported.SKIP_reactive_print_result(value));
+              this.userFuns[value]!()
+            });
+          }
+        }
+        this.notifying = false;
+      }
     }
     this.SKIP_call_external_fun = (funId: int, skParam: ptr) => {
       let res = this.state.call(
