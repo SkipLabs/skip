@@ -145,7 +145,7 @@ async function testSchemaQueries(skdb: SKDB) {
   const emptyView = await remote.viewSchema("nope");
   expect(emptyView).toEqual("");
 
-  const emptyTable = await remote.viewSchema("nope");
+  const emptyTable = await remote.tableSchema("nope");
   expect(emptyTable).toEqual("");
 }
 
