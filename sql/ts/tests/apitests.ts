@@ -401,6 +401,7 @@ export const apitests = (asWorker) => {
 
         dbs.root.closeConnection();
         dbs.user.closeConnection();
+        dbs.user2.closeConnection();
         return "";
       },
       check: res => {
