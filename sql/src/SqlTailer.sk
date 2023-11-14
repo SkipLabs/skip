@@ -1,42 +1,27 @@
 module SKDB;
 
-fun tailSub(
-  sessionID: Int,
-  userIDOpt: ?String,
-  follow: Bool,
+fun buildTailFilter(
+  context: readonly SKStore.Context,
   options: SKDB.Options,
-  tick: Int,
+  dirSub: SKStore.DirSub,
+  userId: ?String,
   filterExpr: ?String,
-): void {
-  init = true;
-
-  gContext = SKStore.gContextGet();
-  (subFilter, dirName) = gContext.sessions.maybeGet(sessionID) match {
-  | None() ->
-    print_error("Error: session not found");
-    skipExit(2)
-  | Some(sub) if (sub.dirSubs.size() == 1) ->
-    (sub.dirSubs[0].filter, sub.dirSubs[0].dirName)
-  | Some(_) ->
-    print_error("Error: tail only supports a single dir sub currently");
-    skipExit(2)
-  };
-
+): (SKStore.Context, Bool) ~> (SKStore.Key -> Bool) {
   tableName = SKDB.Name::create(
-    dirName.toString().stripPrefix("/").stripSuffix("/"),
+    dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
   );
-  filter1 = filterExpr match {
+  filter = filterExpr match {
   | None() ->
     if (options.expectQueryParams) {
       print_error("Cannot pass parameters without filter condition");
       skipExit(2)
     };
-    subFilter
+    dirSub.filter
   | Some(strCond) ->
     params = queryParams(options);
     compiler = SKDB.Compiler::create(false, options, 0, params);
     (_, ast) = SKDB.parseExpr(SKDB.Lexer(0, SKDB.Buffer(strCond)), 0);
-    compilerContext = gContext.mclone();
+    compilerContext = context.mclone();
     _ = compiler.compileFrom(
       compilerContext,
       Array[SKDB.FromTable{name => tableName, asName => None()}],
@@ -49,7 +34,7 @@ fun tailSub(
     };
     (context, isReset) ~> {
       mcontext = context.mclone();
-      conditionFilter = subFilter(context, isReset);
+      conditionFilter = dirSub.filter(context, isReset);
       baseName -> {
         inputRow = baseName match {
         | SKDB.RowKey(row, _) -> row
@@ -71,14 +56,14 @@ fun tailSub(
     }
   };
 
-  filter = userIDOpt match {
-  | None() -> filter1
+  userId match {
+  | None() -> filter
   | Some(userID) ->
     (context, isReset) ~> {
       user = SKDB.UserFile::create(context, userID);
-      sqlTable = getSqlTableFromDirName(context, dirName);
+      sqlTable = getSqlTableFromDirName(context, dirSub.dirName);
 
-      oldFilter = filter1(context, isReset);
+      oldFilter = filter(context, isReset);
 
       baseName -> {
         oldFilter(baseName) &&
@@ -95,22 +80,70 @@ fun tailSub(
       }
     }
   };
+}
 
+fun tailShouldWake(
+  context: readonly SKStore.Context,
+  sub: SKStore.Sub,
+  tick: SKStore.Tick,
+): Bool {
+  for (dirSub in sub.dirSubs) {
+    context.unsafeMaybeGetEagerDir(dirSub.dirName) match {
+    | None() -> void
+    | Some(dir) ->
+      (isReset, changes) = dir.getChangesAfter(tick);
+      if (isReset || !changes.isEmpty()) {
+        return true
+      }
+    }
+  };
+  false
+}
+
+fun tailSub(
+  options: SKDB.Options,
+  follow: Bool,
+  sessionID: Int,
+  userIDOpt: ?String,
+  tick: Int,
+  filterExpr: ?String,
+): void {
+  gContext = SKStore.gContextGet();
+
+  // rebuild the sub with extra filtering as supported by tail
+  sub = gContext.sessions.maybeGet(sessionID) match {
+  | None() ->
+    print_error("Error: session not found");
+    skipExit(2)
+  | Some(sub) ->
+    sub with {
+      dirSubs => sub.dirSubs.map(dirSub ->
+        dirSub with {
+          filter => buildTailFilter(
+            gContext,
+            options,
+            dirSub,
+            userIDOpt,
+            filterExpr,
+          ),
+        }
+      ),
+    }
+  };
+
+  init = true;
   forceReset = false;
 
   loop {
     localObstack = SKStore.newObstack();
     context = SKStore.gContextGet();
-    (sub, dirSub) = context.sessions.maybeGet(sessionID) match {
+
+    context.sessions.maybeGet(sessionID) match {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)
-    | Some(s) if (s.dirSubs.size() == 1) -> (s, s.dirSubs[0])
-    | Some(_) ->
-      print_error("Error: tail only supports a single dir sub currently");
-      skipExit(2)
+    | Some(_) -> void
     };
-    invariant(dirName == dirSub.dirName);
 
     SKDB.getFinalState(context, sub.destinationSource) match {
     | Some(SKDB.RSError()) ->
@@ -119,38 +152,43 @@ fun tailSub(
     | _ -> void
     };
 
-    edir = context.unsafeGetEagerDir(dirName);
-    format = options.format match {
-    | SKDB.OFK_CSV() -> SKStore.OCSV()
-    | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
-    | SKDB.OFK_SQL() -> SKStore.OSQL()
-    | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
-    | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
+    writer = mutable Debug.BufferedWriter(print_raw, 4096);
+
+    producedAnyOutput = false;
+    for (dirSub in sub.dirSubs) {
+      dirName = dirSub.dirName;
+      edir = context.unsafeGetEagerDir(dirName);
+      format = options.format match {
+      | SKDB.OFK_CSV() -> SKStore.OCSV()
+      | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
+      | SKDB.OFK_SQL() -> SKStore.OSQL()
+      | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
+      | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
+      };
+      (isReset, changes) = edir.getChangesAfter(SKStore.Tick(tick), forceReset);
+
+      // Write checkpoints out at least every `checkpointInterval` rows during
+      // initialization, so that the client can start processing without waiting
+      // for the full changeset.
+      // this value is chosen based on some unscientific local testing
+      checkpointInterval = if (init) 512 else Int::max;
+
+      producedOutput = edir.writeDiff(
+        context,
+        isReset,
+        changes,
+        writer,
+        dirSub.entity,
+        format,
+        dirSub.filter,
+        dirSub.getDestinationWatermark(context),
+        checkpointInterval,
+      );
+      !producedAnyOutput = producedAnyOutput || producedOutput
     };
 
-    (isReset, changes) = edir.getChangesAfter(SKStore.Tick(tick), forceReset);
-    !forceReset = false;
-
-    // Write checkpoints out at least every `checkpointInterval` rows during
-    // initialization, so that the client can start processing without waiting
-    // for the full changeset.
-    // this value is chosen based on some unscientific local testing
-    checkpointInterval = if (init) 512 else Int::max;
-
-    writer = mutable Debug.BufferedWriter(print_raw, 4096);
-    producedOutput = edir.writeDiff(
-      context,
-      isReset,
-      changes,
-      writer,
-      dirSub.entity,
-      format,
-      filter,
-      dirSub.getDestinationWatermark(context),
-      checkpointInterval,
-    );
     // produce checkpoint for flushing and committing
-    if (init || producedOutput) {
+    if (init || producedAnyOutput) {
       // always do this on first iteration to ensure we output a
       // checkpoint without delay so that the downstreams knows that
       // it has received everything without waiting for the condvar
@@ -162,6 +200,7 @@ fun tailSub(
 
     !tick = context.tick.value;
     !init = false;
+    !forceReset = false;
     lock = SKStore.unfreezeLock(sub.lock);
     cond = SKStore.unfreezeCond(sub.cond);
     SKStore.mutexLock(lock);
@@ -169,15 +208,7 @@ fun tailSub(
       !forceReset &&
         {
           newContext = SKStore.gContextGet();
-          follow &&
-            newContext.unsafeMaybeGetEagerDir(dirName) match {
-            | None() -> false
-            | Some(dir) ->
-              (newIsReset, newChanges) = dir.getChangesAfter(
-                SKStore.Tick(tick),
-              );
-              !newIsReset && newChanges.isEmpty()
-            }
+          follow && !tailShouldWake(newContext, sub, SKStore.Tick(tick));
         }
     }) {
       timeoutSecs = 10;
