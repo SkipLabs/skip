@@ -1498,6 +1498,7 @@ fun runWithGcIntern(
         gGlobalUnlock();
         context.notifyAll(startTick);
         gUnsafeFree(context);
+        destroyObstack(pos);
         return context
       | Some _ ->
         !context = gContextSync(
@@ -1510,6 +1511,7 @@ fun runWithGcIntern(
         );
         context.notifyAll(startTick);
         gUnsafeFree(context);
+        destroyObstack(pos);
         return context
       }
     };
@@ -1585,18 +1587,24 @@ fun withRegion<T>(
   context: mutable Context,
   f: (Obstack, mutable Context) ~> T,
 ): T {
-  saved = newObstack();
-  fresult = f(saved, context);
-  copied = destroyObstackWithValue(saved, List[(context.clone(), fresult)]);
-  (icontext, copiedResult) = copied.getHead();
-  context.replaceFromSaved(icontext);
-  copiedResult
-}
-
-fun withRegionVoid<T>(f: () ~> void): void {
-  saved = newObstack();
-  f();
-  destroyObstack(saved);
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    saved = optSaved.fromSome();
+    fresult = f(saved, context);
+    copied = destroyObstackWithValue(saved, List[(context.clone(), fresult)]);
+    (icontext, copiedResult) = copied.getHead();
+    context.replaceFromSaved(icontext);
+    copiedResult
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      throw cexn
+    | _ -> throw exn
+    }
+  }
 }
 
 module end;
