@@ -94,6 +94,22 @@ fun tailShouldWake(
   false
 }
 
+fun tailFrom(
+  spec: (Name -> TailSpec),
+  dirSub: SKStore.DirSub,
+  tailWatermark: ?Int,
+): SKStore.Tick {
+  tailWatermark match {
+  | Some(tick) -> SKStore.Tick(tick)
+  | None() ->
+    // we haven't caught up yet so honour the requested since value per table
+    tableName = SKDB.Name::create(
+      dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
+    );
+    SKStore.Tick(spec(tableName).since)
+  }
+}
+
 fun tailSub(
   options: SKDB.Options,
   follow: Bool,
@@ -128,7 +144,7 @@ fun tailSub(
     }
   };
 
-  tick = 0;                     // TODO:
+  tailWatermark: ?Int = None();
   init = true;
   forceReset = false;
 
@@ -163,7 +179,10 @@ fun tailSub(
       | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
       | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
       };
-      (isReset, changes) = edir.getChangesAfter(SKStore.Tick(tick), forceReset);
+      (isReset, changes) = edir.getChangesAfter(
+        tailFrom(spec, dirSub, tailWatermark),
+        forceReset,
+      );
 
       // Write checkpoints out at least every `checkpointInterval` rows during
       // initialization, so that the client can start processing without waiting
@@ -196,7 +215,7 @@ fun tailSub(
       flushStdout();
     };
 
-    !tick = context.tick.value;
+    !tailWatermark = Some(context.tick.value);
     !init = false;
     !forceReset = false;
     lock = SKStore.unfreezeLock(sub.lock);
@@ -206,18 +225,23 @@ fun tailSub(
       !forceReset &&
         {
           newContext = SKStore.gContextGet();
-          follow && !tailShouldWake(newContext, sub, SKStore.Tick(tick));
+          follow &&
+            !tailShouldWake(
+              newContext,
+              sub,
+              SKStore.Tick(tailWatermark.fromSome()),
+            );
         }
     }) {
       timeoutSecs = 10;
       _ = SKStore.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
-      print_raw(":" + tick.toString() + "\n");
+      print_raw(":" + tailWatermark.fromSome().toString() + "\n");
       flushStdout();
       if (
         SKDB.userPrivacyChanged(
           SKStore.gContextGet(),
           userIDOpt,
-          SKStore.Tick(tick),
+          SKStore.Tick(tailWatermark.fromSome()),
         )
       ) {
         !forceReset = true;
