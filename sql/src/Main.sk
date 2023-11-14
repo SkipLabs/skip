@@ -44,7 +44,16 @@ fun queryParams(options: SKDB.Options): Map<String, SKDB.Value> {
     return Map[];
   };
   read_line() match {
-  | Some(line) -> decodeParams(line)
+  | Some(line) ->
+    try {
+      decodeParams(JSON.decode(line))
+    } catch {
+    | exn ->
+      print_error(
+        "Decoding JSON failed: \"" + line + "\"\n" + exn.getMessage(),
+      );
+      skipExit(2)
+    }
 
   | None() ->
     print_error("Reading stdin for statement parameters failed\n");
@@ -224,7 +233,6 @@ untracked fun main(): void {
             .required()
             .about("Session id"),
         )
-        .arg(Cli.StringArg("filter").positional().about("SQL filter condition"))
         .arg(
           Cli.BoolArg("follow")
             .long("follow")
@@ -232,16 +240,16 @@ untracked fun main(): void {
             .about("Output appended data as the database grows"),
         )
         .arg(
+          Cli.BoolArg("read-spec").about(
+            "Read a tail spec for the subscription from stdin",
+          ),
+        )
+        .arg(
           Cli.StringArg("since")
             .long("since")
             .about("Starting time of the tail"),
         )
-        .arg(Cli.StringArg("user").about("Name of the user"))
-        .arg(
-          Cli.BoolArg("expect-query-params").about(
-            "Read values of named parameters which may appear in the filter condition. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
-          ),
-        ),
+        .arg(Cli.StringArg("user").about("Name of the user")),
     )
     .subcommand(
       Cli.Command("subscribe")
@@ -580,15 +588,24 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
   sessionID = args.getString("session-id").toInt();
   followMode = args.getBool("follow");
 
-  tick = args.maybeGetString("since") match {
+  defaultSince = args.maybeGetString("since") match {
   | Some(since) -> since.toInt()
   | _ -> 0
   };
 
   user = args.maybeGetString("user");
-  filter = args.maybeGetString("filter");
 
-  tailSub(options, followMode, sessionID, user, tick, filter)
+  spec = if (args.getBool("read-spec")) {
+    input = slurpStdin();
+    lookup = decodeTailSpec(input, defaultSince);
+    name -> lookup.get(name)
+  } else {
+    _ -> {
+      TailSpec{since => defaultSince, filter => None(), params => Map[]}
+    }
+  };
+
+  tailSub(options, followMode, sessionID, user, spec)
 }
 
 fun execWatermark(args: Cli.ParseResults, options: SKDB.Options): void {
