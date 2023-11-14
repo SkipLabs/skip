@@ -159,7 +159,6 @@ export class SKDBSyncImpl implements SKDBSync {
         "    skdb_group_permissions.skdb_access\n" +
         "  FROM skdb_group_permissions, skdb_groups\n" +
         " WHERE skdb_group_permissions.groupID = skdb_groups.groupID\n" +
-        "   AND skdb_group_permissions.skdb_access = skdb_groups.adminID\n" +
         ";\n");
 
     await this.exec(
