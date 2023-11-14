@@ -6,40 +6,32 @@ module SKDB;
 
 // Decode a string to a JSON Object, expected to be a map from key
 // strings (parameter names) to values.
-fun decodeParams(encoded_params: String): Map<String, Value> {
-  try {
-    JSON.decode(encoded_params) match {
-    | map @ JSON.Object _ ->
-      map.value.mapItems((key, val) -> {
-        !key = key.stripPrefix("@");
-        lit = val match {
-        | JSON.Null() -> SKDB.VNull()
-        | JSON.IntNumber(v) -> SKDB.VInt(v)
-        | JSON.Bool(v) -> if (v) SKDB.VInt(1) else SKDB.VInt(0)
-        | JSON.FloatNumber(v) -> SKDB.VFloat(v)
-        | JSON.String(v) -> SKDB.VString(v)
-        | JSON.Array _
-        | JSON.Object _ ->
-          print_error(
-            "Value " +
-              val +
-              " of statement parameter" +
-              key +
-              " expected to be a literal value",
-          );
-          skipExit(2)
-        };
-        (key, lit)
-      })
-    | _ ->
-      print_error("Expected an encoded JSON Object, got: " + encoded_params);
-      skipExit(2)
-    }
-  } catch {
-  | exn ->
-    print_error(
-      "Decoding JSON failed: \"" + encoded_params + "\"\n" + exn.getMessage(),
-    );
+fun decodeParams(input: JSON.Value): Map<String, Value> {
+  input match {
+  | map @ JSON.Object _ ->
+    map.value.mapItems((key, val) -> {
+      !key = key.stripPrefix("@");
+      lit = val match {
+      | JSON.Null() -> SKDB.VNull()
+      | JSON.IntNumber(v) -> SKDB.VInt(v)
+      | JSON.Bool(v) -> if (v) SKDB.VInt(1) else SKDB.VInt(0)
+      | JSON.FloatNumber(v) -> SKDB.VFloat(v)
+      | JSON.String(v) -> SKDB.VString(v)
+      | JSON.Array _
+      | JSON.Object _ ->
+        print_error(
+          "Value " +
+            val +
+            " of statement parameter" +
+            key +
+            " expected to be a literal value",
+        );
+        skipExit(2)
+      };
+      (key, lit)
+    })
+  | _ ->
+    print_error("Expected an encoded JSON Object, got: " + input);
     skipExit(2)
   }
 }
@@ -57,6 +49,40 @@ fun decodeDiffSpec(input: String): Map<Name, SKStore.Tick> {
           skipExit(2)
         };
       })
+    | _ ->
+      print_error("Expected an encoded JSON Object, got: " + input);
+      skipExit(2)
+    }
+  } catch {
+  | exn ->
+    print_error("Decoding JSON failed: \"" + input + "\"\n" + exn.getMessage());
+    skipExit(2)
+  }
+}
+
+fun decodeTailSpec(input: String, defaultSince: Int): Map<Name, TailSpec> {
+  try {
+    JSON.decode(input) match {
+    | map @ JSON.Object _ ->
+      map.value.mapItems((key, val) -> {
+        val match {
+        | obj @ JSON.Object _ ->
+          (
+            Name::create(key),
+            TailSpec{
+              since => obj.maybeGetInt("since").default(defaultSince),
+              filter => obj.maybeGetString("filter"),
+              params => obj
+                .maybeGetObject("params")
+                .map(o -> decodeParams(o))
+                .default(Map[]),
+            },
+          )
+        | _ ->
+          print_error("Expected an object");
+          skipExit(2)
+        };
+      });
     | _ ->
       print_error("Expected an encoded JSON Object, got: " + input);
       skipExit(2)
@@ -1658,7 +1684,7 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
 /* Support for reactive queries. */
 /*****************************************************************************/
 
-class QueryInfo(query: String, encoded_params: String, onlyChanges: Bool)
+class QueryInfo(query: String, params: JSON.Value, onlyChanges: Bool)
 class ReactiveQuery(
   selectDir: SelectDir,
   fieldNames: Array<String>,
@@ -1716,7 +1742,7 @@ fun getReactiveQueryHandle(
             virtual => false,
             showUsedIndexes => false,
           };
-          params = decodeParams(queryInfo.encoded_params);
+          params = decodeParams(queryInfo.params);
           compiler = SKDB.Compiler::create(false, skOptions, 0, params);
           cselect = compiler.compileSelect(
             context,
@@ -1885,7 +1911,7 @@ fun manageReactiveQuery(
         context,
         SKStore.IID(queryID),
         Array[
-          QueryInfoFile(Some(QueryInfo(query, encoded_params, onlyChanges))),
+          QueryInfoFile(Some(QueryInfo(query, JSON.decode(encoded_params), onlyChanges))),
         ],
       );
       context.update();

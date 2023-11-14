@@ -1,25 +1,19 @@
 module SKDB;
 
+class TailSpec{since: Int, filter: ?String, params: Map<String, Value>}
+
 fun buildTailFilter(
   context: readonly SKStore.Context,
   options: SKDB.Options,
   dirSub: SKStore.DirSub,
   userId: ?String,
-  filterExpr: ?String,
+  tailSpec: TailSpec,
+  tableName: Name,
 ): (SKStore.Context, Bool) ~> (SKStore.Key -> Bool) {
-  tableName = SKDB.Name::create(
-    dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
-  );
-  filter = filterExpr match {
-  | None() ->
-    if (options.expectQueryParams) {
-      print_error("Cannot pass parameters without filter condition");
-      skipExit(2)
-    };
-    dirSub.filter
+  filter = tailSpec.filter match {
+  | None() -> dirSub.filter
   | Some(strCond) ->
-    params = queryParams(options);
-    compiler = SKDB.Compiler::create(false, options, 0, params);
+    compiler = SKDB.Compiler::create(false, options, 0, tailSpec.params);
     (_, ast) = SKDB.parseExpr(SKDB.Lexer(0, SKDB.Buffer(strCond)), 0);
     compilerContext = context.mclone();
     _ = compiler.compileFrom(
@@ -105,8 +99,7 @@ fun tailSub(
   follow: Bool,
   sessionID: Int,
   userIDOpt: ?String,
-  tick: Int,
-  filterExpr: ?String,
+  spec: (Name -> TailSpec),
 ): void {
   gContext = SKStore.gContextGet();
 
@@ -117,20 +110,25 @@ fun tailSub(
     skipExit(2)
   | Some(sub) ->
     sub with {
-      dirSubs => sub.dirSubs.map(dirSub ->
+      dirSubs => sub.dirSubs.map(dirSub -> {
+        tableName = SKDB.Name::create(
+          dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
+        );
         dirSub with {
           filter => buildTailFilter(
             gContext,
             options,
             dirSub,
             userIDOpt,
-            filterExpr,
+            spec(tableName),
+            tableName,
           ),
         }
-      ),
+      }),
     }
   };
 
+  tick = 0;                     // TODO:
   init = true;
   forceReset = false;
 
