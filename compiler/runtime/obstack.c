@@ -57,6 +57,12 @@ __thread char* end = NULL;
 /* Obstack allocation. */
 /*****************************************************************************/
 
+typedef struct {
+  char* head;
+  char* page;
+  char* end;
+} sk_saved_obstack_t;
+
 size_t sk_page_size(char* page) {
   return *(size_t*)(page + sizeof(char*));
 }
@@ -71,7 +77,7 @@ void sk_obstack_attach_page(char* lpage) {
 }
 
 char* sk_large_page(size_t size) {
-  size_t block_size = size + sizeof(char*) + sizeof(size_t);
+  size_t block_size = size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t);
   block_size += 64;
   char* lpage = (char*)sk_malloc(block_size);
   if (lpage == NULL) {
@@ -84,7 +90,12 @@ char* sk_large_page(size_t size) {
   lpage += sizeof(char*);
   *(size_t*)lpage = block_size;
   lpage += sizeof(size_t);
-  // This space is needed in case the page gets interned.
+  sk_saved_obstack_t * saved = (sk_saved_obstack_t*)lpage;
+  saved->head = NULL;
+  saved->end = NULL;
+  saved->page = NULL;
+  lpage += sizeof(sk_saved_obstack_t);
+  // This space is needed in case the page gets interned (TO CHECK)
   lpage += 64;
   return lpage;
 }
@@ -109,6 +120,11 @@ void sk_new_page() {
   head += sizeof(char*);
   *(size_t*)head = block_size;
   head += sizeof(size_t);
+  sk_saved_obstack_t * saved = (sk_saved_obstack_t*)head;
+  saved->head = NULL;
+  saved->end = NULL;
+  saved->page = NULL;
+  head += sizeof(sk_saved_obstack_t);
 }
 
 char* SKIP_Obstack_alloc(size_t size) {
@@ -117,7 +133,7 @@ char* SKIP_Obstack_alloc(size_t size) {
   size = (size + 7) & ~7;
 
   if (head + size >= end) {
-    if (size + sizeof(char*) + sizeof(size_t) > PAGE_SIZE) {
+    if (size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t) > PAGE_SIZE) {
       result = sk_large_page(size);
       result += 8;
       return result;
@@ -155,15 +171,25 @@ char* SKIP_Obstack_shallowClone(size_t _size, char* obj) {
 /* Obstack creation/destruction. */
 /*****************************************************************************/
 
-typedef struct {
-  char* head;
-  char* page;
-  char* end;
-} sk_saved_obstack_t;
+
+sk_saved_obstack_t * sk_saved_obstack(char* page) {
+  return (sk_saved_obstack_t*)(page + sizeof(char*) + sizeof(size_t));
+}
 
 sk_saved_obstack_t* SKIP_new_Obstack() {
-  sk_saved_obstack_t* saved =
-      (sk_saved_obstack_t*)SKIP_Obstack_alloc(sizeof(sk_saved_obstack_t));
+  if (head == NULL && page == NULL && end == NULL) {
+    sk_new_page();
+  }
+
+  sk_saved_obstack_t* saved = sk_saved_obstack(page);
+
+  if (saved->head != NULL || saved->page != NULL || saved->end != NULL) {
+    #ifdef SKIP64
+    fprintf(stderr, "ERROR_OBSTACK_NOT_CLOSED\n");
+    #endif
+    SKIP_throw_cruntime(ERROR_OBSTACK_NOT_CLOSED);
+  }
+
   saved->head = head;
   saved->page = page;
   saved->end = end;
@@ -203,6 +229,12 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
   head = saved_head;
   page = saved_page;
   end = saved_end;
+
+  if (saved != NULL) {
+    saved->page = NULL;
+    saved->head = NULL;
+    saved->end = NULL;
+  }
 }
 
 void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
@@ -212,6 +244,10 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   page = saved->page;
   head = saved->head;
   end = saved->end;
+
+  saved->page = NULL;
+  saved->head = NULL;
+  saved->end = NULL;
 
   void* result = SKIP_copy_with_pages(toCopy, nbr_pages, pages);
 
