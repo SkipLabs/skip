@@ -98,14 +98,15 @@ def subscribe(dbkey, subkey, table, user, dest, peerId):
     return session
   return f
 
-async def tail(db, session, peerId, since):
+async def tail(db, session, peerId, spec):
   proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "tail",
                                               "--format=csv", session,
-                                              "--since", str(since),
+                                              "--read-spec",
                                               # "--peer-id", peerId,  # for multi-peer
+                                              stdin=asyncio.subprocess.PIPE,
                                               stdout=asyncio.subprocess.PIPE,
                                               stderr=asyncio.subprocess.PIPE)
-  (out, err) = await proc.communicate()
+  (out, err) = await proc.communicate(json.dumps(spec).encode())
   return out, err
 
 def startStreamingWriteCsv(dbkey, writecsvKey, user, source, peerId, log):
@@ -317,7 +318,8 @@ class SkdbPeer:
         db = schedule.getScheduleLocal(self)
         session = schedule.getScheduleLocal(subkey)
         since = schedule.getScheduleLocal(sinceKey) or 0
-        payload, log = await tail(db, session, peerId, since)
+        spec = { table: { "since": since } }
+        payload, log = await tail(db, session, peerId, spec)
         schedule.debug(log.decode().rstrip())
         stream.send(schedule, payload)
         schedule.storeScheduleLocal(sinceKey, getOurLastCheckpoint(since, payload.decode()))
@@ -388,6 +390,9 @@ class Topology:
     return str(self.replicationIdGen)
 
   def mirror(self, table, a, b):
+    # TODO: this should take a list of tables and only setup a single
+    # w-csv and tail. but currently all tests just work with one
+    # table.
     repIdForA = self._genReplicationId()
     repIdForB = self._genReplicationId()
     atob = HalfStream(a, b,
