@@ -147,7 +147,7 @@ class SkdbConnection(
 
       val chan = consume(stream)
 
-      val req = ProtoRequestTail(table, since, filterExpr)
+      val req = ProtoRequestTail(table, since, filterExpr, HashMap<String, Object>())
       stream.send(encodeProtoMsg(req))
 
       for (msg in chan) {
