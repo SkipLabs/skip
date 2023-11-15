@@ -502,6 +502,38 @@ test_tailing_dups_uses_repeat() {
     rm -f "$output"
 }
 
+test_replication_privacy_rejection_and_feedback() {
+    setup_server
+    setup_local test_without_pk
+
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO skdb_group_permissions VALUES ('GALL', 'test_user', 4, 'root');"
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(37, 'good', 'test_user');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(42, 'bad', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "CREATE TABLE test_without_pk__skdb_mirror_feedback (id INTEGER, note STRING, skdb_access STRING);"
+
+    cat $UPDATES \
+	| $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user 2>/dev/null \
+	| $SKDB_BIN write-csv --data $LOCAL_DB --source 9999 >/dev/null
+
+    server_rows=$(mktemp)
+    local_rows=$(mktemp)
+    local_feedback_rows=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_without_pk;' > "$server_rows"
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$local_rows"
+    $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk__skdb_mirror_feedback;' > "$local_feedback_rows"
+
+    # server should reject privacy-violating 'bad' row, and client should write the rejected row to corresponding feedback table
+    assert_line_count "$server_rows" good 1
+    assert_line_count "$server_rows" bad 0
+
+    assert_line_count "$local_rows" good 1
+    assert_line_count "$local_rows" bad 1
+
+    assert_line_count "$local_feedback_rows" good 0
+    assert_line_count "$local_feedback_rows" bad 1
+}
+
 ################################################################################
 # these tests replicate data around first so we build some notion of
 # the vector clock and test concurrency
@@ -848,6 +880,8 @@ run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count
 run_test test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dups
 
 run_test test_tailing_dups_uses_repeat
+
+run_test test_replication_privacy_rejection_and_feedback
 
 # local updates
 run_test test_seen_insert_deleted
