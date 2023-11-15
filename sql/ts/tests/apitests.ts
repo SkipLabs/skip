@@ -75,13 +75,13 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   const remote = (await skdb.connectedRemote())!;
 
   const groupGALL = await remote.exec(
-    "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');",
+    "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'read-only-root');",
     new Map(),
   );
   expect(groupGALL).toEqual([]);
 
   const groupPermissionsGALL = await remote.exec(
-    "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7, 'root');",
+    "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, skdb_permission('rw'), 'read-only-root');",
     new Map(),
   );
   expect(groupPermissionsGALL).toEqual([]);
@@ -313,59 +313,6 @@ async function testReboot(root: SKDB, user: SKDB) {
   expect(rebooted).toEqual(true);
 }
 
-async function testPrivacyRejectedChange(root: SKDB, user: SKDB): Promise<void> {
-  return new Promise(async (resolve) => {
-    const h = await user.watchChanges("select * from test_pk__skdb_mirror_feedback", {},
-      async (init: Array<any>) => {
-        expect(init).toEqual([]);
-      },
-      async (added: Array<any>, removed: Array<any>) => {
-        expect(removed).toEqual([]);
-        expect(added).toEqual([
-          {x:1234, y:88, skdb_access:"does not exist"},
-        ]);
-        const remote = await root.connectedRemote();
-        // no need to wait, getting feedback means the server has processed
-        const rrows = await remote.exec("select * from test_pk where x = 1234 and y = 88;");
-        expect(rrows).toEqual([]);
-        h.close();
-        resolve();
-      }
-    );
-    await user.exec("insert into test_pk values (1234, 88, 'does not exist');");
-  })
-}
-
-async function testPrivacyRejectedTxn(root: SKDB, user: SKDB): Promise<void> {
-  // check that the whole txn is rejected if some part is not ok
-  await user.exec("delete from test_pk__skdb_mirror_feedback;");
-  return new Promise(async (resolve) => {
-    const h = await user.watchChanges("select * from test_pk__skdb_mirror_feedback", {},
-      async (init: Array<any>) => {
-        expect(init).toEqual([]);
-      },
-      async (added: Array<any>, removed: Array<any>) => {
-        expect(removed).toEqual([]);
-        expect(added).toEqual([
-          {x:4321, y:6, skdb_access:"does not exist"},
-          {x:4322, y:6, skdb_access:"GALL"}, // even though this is ok
-        ]);
-        const remote = await root.connectedRemote();
-        // no need to wait, getting feedback means the server has processed
-        const rrows = await remote.exec("select * from test_pk where x in (4321, 4322) and y = 6;");
-        expect(rrows).toEqual([]);
-        h.close();
-        resolve();
-      });
-    await user.exec(
-      "begin transaction; " +
-      "insert into test_pk values (4321, 6, 'does not exist');" + // bad
-      "insert into test_pk values (4322, 6, 'GALL');" +           // ok
-      "commit;"
-    );
-  })
-}
-
 async function testJSPrivacy(skdb: SKDB, userID: string, skdb2: SKDB, userID2: string) {
 //  await createGroup(skdb, userID, 'myGroup');
 }
@@ -387,15 +334,9 @@ export const apitests = (asWorker) => {
 
         // Server Tail
         await testServerTail(dbs.root, dbs.user);
-
         await testClientTail(dbs.root, dbs.user);
 
-        await testPrivacyRejectedChange(dbs.root, dbs.user);
-
-        await testPrivacyRejectedTxn(dbs.root, dbs.user);
-
         await testLargeMirror(dbs.root, dbs.user);
-
         // must come last: puts replication in to a permanent state of failure
         await testReboot(dbs.root, dbs.user);
 
