@@ -1,12 +1,10 @@
 import { expect } from '@playwright/test';
-import { createSkdb, createGroup, SKDB } from 'skdb';
+import { createSkdb, SKDB } from 'skdb';
 
 type dbs = {
   root: SKDB,
   user: SKDB,
-  userID: string,
   user2: SKDB,
-  userID2: string
 };
 
 function getErrorMessage(error: any) {
@@ -68,7 +66,7 @@ export async function setup(credentials: string, port: number, crypto, asWorker:
     await userSkdb2.connect(dbName, testUserCreds2.accessKey, key2, host);
   }
 
-  return { root: rootSkdb, user: userSkdb, userID: testUserCreds.accessKey, user2: userSkdb2, userID2: testUserCreds2.accessKey };
+  return { root: rootSkdb, user: userSkdb, user2: userSkdb2 };
 }
 
 async function testQueriesAgainstTheServer(skdb: SKDB) {
@@ -303,20 +301,38 @@ async function testLargeMirror(root: SKDB, user: SKDB) {
   expect(localCntCopy).toEqual([{n: N}])
 }
 
-async function testReboot(root: SKDB, user: SKDB) {
+async function testReboot(root: SKDB, user: SKDB, user2: SKDB) {
   const remote = await user.connectedRemote();
-  let rebooted = false;
-  remote!.onReboot(() => rebooted = true);
+  let user_rebooted = false;
+  remote!.onReboot(() => user_rebooted = true);
+  const remote2 = await user2.connectedRemote();
+  let user2_rebooted = false;
+  remote2!.onReboot(() => user2_rebooted = true);
   const rremote = await root.connectedRemote();
   await rremote!.exec("DROP TABLE test_pk;");
   await new Promise(resolve => setTimeout(resolve, 100));
-  expect(rebooted).toEqual(true);
+  expect(user_rebooted).toEqual(true);
+  expect(user2_rebooted).toEqual(true);
 }
 
-async function testJSPrivacy(skdb: SKDB, userID: string, skdb2: SKDB, userID2: string) {
-//  await createGroup(skdb, userID, 'myGroup');
-}
+async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
+  await skdb2.mirror("test_pk", "view_pk");
 
+  await skdb.exec("INSERT INTO skdb_groups VALUES ('my_group', @uid, @uid, @uid);", {uid: skdb.currentUser});
+  await skdb.exec("INSERT INTO skdb_group_permissions VALUES ('my_group', @uid, skdb_permission('rw'), @uid);", {uid: skdb.currentUser});
+
+  await skdb.exec("INSERT INTO test_pk VALUES (37, 42, 'my_group');");
+
+  let user1_view = await skdb.exec("SELECT * FROM test_pk WHERE x = 37;");
+  let user2_view = await skdb2.exec("SELECT * FROM test_pk WHERE x = 37;");
+  expect(user1_view.length).toEqual(1);
+  expect(user2_view.length).toEqual(0);
+
+
+  await expect(async () =>
+    await skdb2.exec("INSERT INTO test_pk VALUES (47, 52, 'my_group');")
+	      ).rejects.toThrow();
+}
 export const apitests = (asWorker) => {
   return [
     {
@@ -330,7 +346,7 @@ export const apitests = (asWorker) => {
         await testMirroring(dbs.user);
 
         //Privacy
-        await testJSPrivacy(dbs.user, dbs.userID, dbs.user2, dbs.userID2);
+        await testJSPrivacy(dbs.user, dbs.user2);
 
         // Server Tail
         await testServerTail(dbs.root, dbs.user);
@@ -338,7 +354,7 @@ export const apitests = (asWorker) => {
 
         await testLargeMirror(dbs.root, dbs.user);
         // must come last: puts replication in to a permanent state of failure
-        await testReboot(dbs.root, dbs.user);
+        await testReboot(dbs.root, dbs.user, dbs.user2);
 
         dbs.root.closeConnection();
         dbs.user.closeConnection();
