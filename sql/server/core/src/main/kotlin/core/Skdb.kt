@@ -1,6 +1,7 @@
 package io.skiplabs.skdb
 
 import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.KotlinJsonAdapterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.adapter
@@ -41,6 +42,8 @@ data class ProcessOutput(val output: ByteArray, val exitCode: Int) {
     return String(getOrThrow(), StandardCharsets.UTF_8)
   }
 }
+
+data class TailSpec(val since: Int, val filterExpr: String, val filterParams: Map<String, Any?>)
 
 // super dumb, mostly synchronous, process facade
 class Skdb(val name: String, private val dbPath: String) {
@@ -164,28 +167,23 @@ class Skdb(val name: String, private val dbPath: String) {
     return proc
   }
 
+  @OptIn(kotlin.ExperimentalStdlibApi::class)
   fun tail(
       user: String,
-      table: String,
-      since: ULong,
-      filter: String?,
       replicationId: String,
+      spec: Map<String, TailSpec>,
       callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
       closed: () -> Unit,
   ): Process {
+    val connPb =
+        ProcessBuilder(
+            ENV.skdbPath, "subscribe", "--data", dbPath, "--ignore-source", replicationId)
+    for (table in spec.keys) {
+      connPb.command().add(table)
+    }
     // TODO: check for existing
-    val connection =
-        blockingRun(
-                ProcessBuilder(
-                    ENV.skdbPath,
-                    "subscribe",
-                    table,
-                    "--data",
-                    dbPath,
-                    "--ignore-source",
-                    replicationId))
-            .decode()
-    val pb =
+    val connection = blockingRun(connPb).decode()
+    val tailPb =
         ProcessBuilder(
             ENV.skdbPath,
             "tail",
@@ -196,16 +194,21 @@ class Skdb(val name: String, private val dbPath: String) {
             "--follow",
             "--user",
             user,
-            "--since",
-            (if (since < 0u) 0 else since).toString())
+            "--read-spec")
 
-    if (filter != null && !filter.isEmpty()) {
-      pb.command().add(filter)
-    }
+    val moshi: Moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+    val jsonAdapter: JsonAdapter<Map<String, TailSpec>> = moshi.adapter<Map<String, TailSpec>>()
+    val serialisedSpec = jsonAdapter.toJson(spec)
 
     // TODO: for hacky debug
-    pb.redirectError(ProcessBuilder.Redirect.INHERIT)
-    val proc = pb.start()
+    tailPb.redirectError(ProcessBuilder.Redirect.INHERIT)
+    val proc = tailPb.start()
+
+    val stdin = proc.outputStream
+    val writer = stdin.bufferedWriter()
+    writer.write(serialisedSpec)
+    writer.flush()
+    stdin.close()
 
     // TODO: working with text currently to detect checkpoint flush
     // markers. this should change as it is expensive. I particularly
@@ -317,12 +320,12 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun createUser(encryptedPrivateKey: String): String {
     val accessKey =
-      sql(
-        "BEGIN TRANSACTION; INSERT INTO skdb_users VALUES (id('userID'), @privateKey); SELECT id('userID'); COMMIT;",
-        mapOf("privateKey" to encryptedPrivateKey),
-        OutputFormat.RAW)
-      .decode()
-      .trim()
+        sql(
+                "BEGIN TRANSACTION; INSERT INTO skdb_users VALUES (id('userID'), @privateKey); SELECT id('userID'); COMMIT;",
+                mapOf("privateKey" to encryptedPrivateKey),
+                OutputFormat.RAW)
+            .decode()
+            .trim()
     return accessKey
   }
 }

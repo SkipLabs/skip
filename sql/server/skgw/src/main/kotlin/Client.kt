@@ -12,6 +12,7 @@ import io.skiplabs.skdb.QueryResponseFormat
 import io.skiplabs.skdb.SchemaScope
 import io.skiplabs.skdb.Skdb
 import io.skiplabs.skdb.Stream
+import io.skiplabs.skdb.TailSpec
 import io.skiplabs.skdb.connectMux
 import io.skiplabs.skdb.decodeProtoMsg
 import io.skiplabs.skdb.encodeProtoMsg
@@ -188,10 +189,8 @@ class SkdbConnection(
     val proc =
         local.tail(
             user = "root",
-            table,
-            since = 0u,
-            filter = null,
             replicationId.toString(),
+            mapOf(table to TailSpec(0, "", HashMap<String, Object>())),
             { bytes, shouldFlush ->
               val msg = encodeProtoMsg(ProtoData(bytes, shouldFlush))
               stream.send(msg)

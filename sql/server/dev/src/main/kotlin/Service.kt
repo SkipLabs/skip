@@ -20,6 +20,7 @@ import io.skiplabs.skdb.QueryResponseFormat
 import io.skiplabs.skdb.RevealableException
 import io.skiplabs.skdb.SchemaScope
 import io.skiplabs.skdb.Skdb
+import io.skiplabs.skdb.TailSpec
 import io.skiplabs.skdb.Stream
 import io.skiplabs.skdb.WebSocket
 import io.skiplabs.skdb.createSkdb
@@ -190,10 +191,11 @@ class RequestHandler(
         val proc =
             skdb.tail(
                 accessKey,
-                request.table,
-                request.since,
-                request.filterExpr,
                 replicationId,
+                mapOf(
+                    request.table to
+                        TailSpec(
+                            request.since.toInt(), request.filterExpr ?: "", request.filterParams)),
                 { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
                 { stream.error(2000u, "Unexpected EOF") },
             )
@@ -323,8 +325,7 @@ fun usersHandler(): HttpHandler {
             exchange.responseSender.send(
                 skdb!!
                     .sql(
-                        "SELECT userID as accessKey, privateKey FROM skdb_users",
-                        OutputFormat.JSON)
+                        "SELECT userID as accessKey, privateKey FROM skdb_users", OutputFormat.JSON)
                     .decodeOrThrow())
           } else {
             exchange.statusCode = StatusCodes.METHOD_NOT_ALLOWED
