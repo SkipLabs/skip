@@ -143,9 +143,7 @@ export class SKDBSyncImpl implements SKDBSync {
     );
 
     // Setting up local privacy checks
-    await this.mirror("skdb_user_permissions");
-    await this.mirror("skdb_groups");
-    await this.mirror("skdb_group_permissions");
+    await this.mirror("skdb_user_permissions", "skdb_groups", "skdb_group_permissions");
     await this.exec(
       "CREATE UNIQUE INDEX skdb_permissions_group_user ON" +
         "  skdb_group_permissions(groupID, userID);"
@@ -255,6 +253,14 @@ export class SKDBSyncImpl implements SKDBSync {
     }
     throw new Error(error);
   }
+  async mirror(...tables: MirrorDefn[]) {
+    const is_mirror_def_of = (table) => (mirror_def) => (mirror_def == table) || (mirror_def.table == table);
+    for (const metatable of ["skdb_user_permissions", "skdb_groups", "skdb_group_permissions"]) {
+      if (! tables.some(is_mirror_def_of(metatable)))
+	tables.push(metatable)
+    };
+    return this.connectedRemote!.mirror(...tables);
+  }
 
   async serverExec(query: string, params: Params) {
     return this.connectedRemote!.exec(query, params);
@@ -274,7 +280,6 @@ export class SKDBSyncImpl implements SKDBSync {
 
   createServerDatabase = (dbName: string) => this.connectedRemote!.createDatabase(dbName);
   createServerUser = () => this.connectedRemote!.createUser();
-  mirror = (...tables: MirrorDefn[]) => this.connectedRemote!.mirror(...tables);
   serverClose = () => this.connectedRemote!.close();
 }
 
