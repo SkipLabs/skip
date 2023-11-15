@@ -1413,13 +1413,31 @@ class SKDBServer implements RemoteSKDB {
     );
   }
 
-  private async establishServerTail(tableName: string, filterExpr: string): Promise<void> {
+  private async establishServerTail(mirrorDefs: MirrorDefn[]): Promise<void> {
     const stream = await this.connection.openResilientStream();
     this.mirrorStreams.add(stream);
     const client = this.client;
     const decoder = new ProtoMsgDecoder();
 
     let resolved = false;
+
+    const buildTailRequest = () => {
+      const reqs: ProtoRequestTail[] = mirrorDefs.map(def => {
+        const tableName = (typeof def === "string") ? def : def.table;
+        const filterExpr = (typeof def === "string") ? "" : (def.filterExpr || "");
+        return {
+          type: "tail",
+          table: tableName,
+          since: this.client.watermark(this.replicationUid, tableName),
+          filterExpr: filterExpr,
+          params: new Map(),
+        }
+      });
+      return encodeProtoMsg({
+        type: "tailBatch",
+        requests: reqs,
+      });
+    }
 
     return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
@@ -1430,7 +1448,7 @@ class SKDBServer implements RemoteSKDB {
             if (!resolved) {
               // a non-zero checkpoint indicates that we have received a fully consistent
               // snapshot of the remote table, so should resolve the promise
-              resolveSignalled = payload.split("\n").find(line => line.match(/^:[1-9]/g));
+              resolveSignalled = payload.split("\n").find((line: string) => line.match(/^:[1-9]/g));
             }
             return client.writeCsv(payload, this.replicationUid)
           });
@@ -1443,23 +1461,11 @@ class SKDBServer implements RemoteSKDB {
       }
 
       stream.onReconnect = () => {
-        stream.send(encodeProtoMsg({
-          type: "tail",
-          table: tableName,
-          since: this.client.watermark(this.replicationUid, tableName),
-          filterExpr: filterExpr,
-          params: new Map(),
-        }))
+        stream.send(buildTailRequest())
         stream.expectingData();
       };
 
-      stream.send(encodeProtoMsg({
-        type: "tail",
-        table: tableName,
-        since: this.client.watermark(this.replicationUid, tableName),
-        filterExpr: filterExpr,
-        params: new Map(),
-      }));
+      stream.send(buildTailRequest());
       stream.expectingData();
     });
   }
@@ -1597,15 +1603,11 @@ class SKDBServer implements RemoteSKDB {
       this.localTailSession = await this.establishLocalTail(Array.from(this.mirroredTables));
     }
 
-    await Promise.all(tables.map(mirrorDef => {
-      const tableName = (typeof mirrorDef === "string") ? mirrorDef : mirrorDef.table;
-      // TODO: changing the expression on a table that has already
-      // been mirrored is not going to work well currently. but when
-      // we have client-driven table reboots this can easily be
-      // accommodated.
-      const filterExpr = (typeof mirrorDef === "string") ? "" : (mirrorDef.filterExpr || "");
-      return this.establishServerTail(tableName, filterExpr);
-    }));
+    // TODO: changing the expression on a table that has already
+    // been mirrored is not going to work well currently. but when
+    // we have client-driven table reboots this can easily be
+    // accommodated.
+    await this.establishServerTail(tables);
   }
 
   async exec(stdin: string, params: Params = new Map()): Promise<any[]> {
