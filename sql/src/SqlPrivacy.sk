@@ -549,18 +549,10 @@ mutable class AccessSolver private {
     context: readonly SKStore.Context,
     groupID: String,
   ): Permission {
-    // Let's first check if the groupID is in fact our userID
-    userIndex = skdbUsersByName.getIndex(context);
-    if (userIndex.get(skdbUsersByName.makeKey(groupID)) is Some _) {
-      // We found the user!
-      // Is this data for us?
-      if (groupID == this.userID) {
-        return this.userMask;
-      } else {
-        return Permission::none()
-      };
+    if (groupID == this.userID) {
+      return this.userMask;
     };
-    // The Name is not a userID, let's lookup the groupID
+
     groupIndex = skdbGroupPermissions.getIndex(context);
     row = groupIndex.get(
       skdbGroupPermissions.makeKey(groupID, Some(this.userID)),
