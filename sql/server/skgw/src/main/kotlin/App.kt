@@ -172,10 +172,11 @@ class RequestHandler(
         val proc =
             skdb.tail(
                 accessKey,
-                request.table,
-                request.since,
-                request.filterExpr,
                 replicationId,
+                mapOf(
+                    request.table to
+                        TailSpec(
+                            request.since.toInt(), request.filterExpr ?: "", request.filterParams)),
                 { data, shouldFlush -> stream.send(ProtoData(data, shouldFlush)) },
                 { stream.error(2000u, "Unexpected EOF") },
             )
