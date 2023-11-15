@@ -409,7 +409,7 @@ export class Utils {
     if (message.startsWith("external:")) {
       let id = parseInt(message.substring(9));
       if (this.state.exceptions.has(id)) {
-        throw this.state.exceptions.get(id);
+        throw this.state.exceptions.get(id)!.err;
       } else {
         message = "SKFS Internal error";
       }
