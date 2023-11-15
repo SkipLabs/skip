@@ -25,6 +25,12 @@ type ProtoRequestTail = {
   table: string;
   since: bigint;
   filterExpr: string;
+  params: Params;
+}
+
+type ProtoRequestTailBatch = {
+  type: "tailBatch"
+  requests: ProtoRequestTail[];
 }
 
 type ProtoPushPromise = {
@@ -47,7 +53,7 @@ type ProtoResponseCreds = {
 }
 
 type ProtoCtrlMsg = ProtoQuery | ProtoQuerySchema | ProtoRequestCreateDb |
-  ProtoRequestTail | ProtoPushPromise | ProtoRequestCreateUser
+  ProtoRequestTail | ProtoPushPromise | ProtoRequestCreateUser | ProtoRequestTailBatch
 
 type ProtoData = {
   type: "data";
@@ -106,7 +112,12 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       return buf.slice(0, suffixIdx + 2 + (encodeResult.written || 0));
     }
     case "tail": {
-      const buf = new ArrayBuffer(16 + msg.table.length * 4 + msg.filterExpr.length * 4);
+      const params = (msg.params instanceof Map) ? Object.fromEntries(msg.params) : msg.params;
+      const serialisedParams = JSON.stringify(params);
+
+      const buf = new ArrayBuffer(
+        18 + msg.table.length * 4 + msg.filterExpr.length * 4 + serialisedParams.length * 4
+      );
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
       const textEncoder = new TextEncoder();
@@ -114,13 +125,37 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       dataView.setUint8(0, 0x2);  // type
       dataView.setBigUint64(4, msg.since, false);
       dataView.setUint16(12, encodeResult.written || 0, false);
+
       const filterExprOffset = 14 + (encodeResult.written || 0);
       encodeResult = textEncoder.encodeInto(
         msg.filterExpr,
         uint8View.subarray(filterExprOffset + 2),
       );
       dataView.setUint16(filterExprOffset, encodeResult.written || 0, false);
-      return buf.slice(0, filterExprOffset + 2 + (encodeResult.written || 0));
+
+      const paramsOffset = filterExprOffset + 2 + (encodeResult.written || 0);
+      encodeResult = textEncoder.encodeInto(
+        serialisedParams,
+        uint8View.subarray(paramsOffset + 2),
+      );
+      dataView.setUint16(paramsOffset, encodeResult.written || 0, false);
+
+      return buf.slice(0, paramsOffset + 2 + (encodeResult.written || 0));
+    }
+    case "tailBatch": {
+      const buffers = msg.requests.map(req => encodeProtoMsg(req));
+      const size = buffers.reduce((acc, b) => acc + b.byteLength, 0);
+      const buf = new ArrayBuffer(4 + size);
+      const uint8View = new Uint8Array(buf);
+      const dataView = new DataView(buf);
+      dataView.setUint8(0, 0x7);  // type
+      dataView.setUint16(2, msg.requests.length, false);
+      let offset = 4;
+      for (const tail of buffers) {
+        uint8View.set(new Uint8Array(tail), offset);
+        offset = offset + tail.byteLength;
+      }
+      return buf;
     }
     case "pushPromise": {
       const buf = new ArrayBuffer(4);
@@ -1413,6 +1448,7 @@ class SKDBServer implements RemoteSKDB {
           table: tableName,
           since: this.client.watermark(this.replicationUid, tableName),
           filterExpr: filterExpr,
+          params: new Map(),
         }))
         stream.expectingData();
       };
@@ -1422,6 +1458,7 @@ class SKDBServer implements RemoteSKDB {
         table: tableName,
         since: this.client.watermark(this.replicationUid, tableName),
         filterExpr: filterExpr,
+        params: new Map(),
       }));
       stream.expectingData();
     });
