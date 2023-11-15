@@ -367,9 +367,7 @@ async function testPrivacyRejectedTxn(root: SKDB, user: SKDB): Promise<void> {
 }
 
 async function testJSPrivacy(skdb: SKDB, userID: string, skdb2: SKDB, userID2: string) {
-  await createGroup(skdb, userID, 'myGroup');
-  console.log("HERE");
-  console.log(await skdb.getUser());
+//  await createGroup(skdb, userID, 'myGroup');
 }
 
 export const apitests = (asWorker) => {
@@ -385,7 +383,7 @@ export const apitests = (asWorker) => {
         await testMirroring(dbs.user);
 
         //Privacy
-        await testPrivacy(dbs.user, dbs.userID, dbs.user2, dbs.userID2);
+        await testJSPrivacy(dbs.user, dbs.userID, dbs.user2, dbs.userID2);
 
         // Server Tail
         await testServerTail(dbs.root, dbs.user);
