@@ -143,7 +143,7 @@ const check_expectation = async function(skdb, client, latest_id) {
 
   const check_no_pk_single_row = await skdb.exec(
     `select client, value
-     from pk_single_row
+     from no_pk_single_row
      where id = 0`,
     params
   );
@@ -254,8 +254,7 @@ setup(client, port).then((skdb) => {
       }
       const client = rows[0].client;
       const latest_id = rows[0].latest_id;
-      // TODO: use timeout to work around watch bug. once fixed, should just call in line
-      setTimeout(() => check_expectation(skdb, client, latest_id), 0);
+      check_expectation(skdb, client, latest_id);
     }
   );
 
