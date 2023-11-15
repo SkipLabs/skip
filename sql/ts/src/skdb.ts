@@ -7,9 +7,9 @@ export { Creds, MuxedSocket } from "#skdb/skdb_orchestration";
 export { Environment } from "#std/sk_types";
 
 var wasm64 = "skdb";
-var modules = [
-  /*--MODULES--*/
-];
+// sknpm searches for the modules line verbatim
+// prettier-ignore
+var modules = [ /*--MODULES--*/];
 var extensions = new Map();
 /*--EXTENSIONS--*/
 
