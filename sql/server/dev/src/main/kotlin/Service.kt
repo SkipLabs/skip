@@ -15,13 +15,14 @@ import io.skiplabs.skdb.ProtoMessage
 import io.skiplabs.skdb.ProtoPushPromise
 import io.skiplabs.skdb.ProtoQuery
 import io.skiplabs.skdb.ProtoRequestTail
+import io.skiplabs.skdb.ProtoRequestTailBatch
 import io.skiplabs.skdb.ProtoSchemaQuery
 import io.skiplabs.skdb.QueryResponseFormat
 import io.skiplabs.skdb.RevealableException
 import io.skiplabs.skdb.SchemaScope
 import io.skiplabs.skdb.Skdb
-import io.skiplabs.skdb.TailSpec
 import io.skiplabs.skdb.Stream
+import io.skiplabs.skdb.TailSpec
 import io.skiplabs.skdb.WebSocket
 import io.skiplabs.skdb.createSkdb
 import io.skiplabs.skdb.decodeProtoMsg
@@ -196,6 +197,23 @@ class RequestHandler(
                     request.table to
                         TailSpec(
                             request.since.toInt(), request.filterExpr ?: "", request.filterParams)),
+                { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
+                { stream.error(2000u, "Unexpected EOF") },
+            )
+        return ProcessPipe(proc)
+      }
+      is ProtoRequestTailBatch -> {
+        val spec = HashMap<String, TailSpec>()
+        for (tailreq in request.requests) {
+          spec.put(
+              tailreq.table,
+              TailSpec(tailreq.since.toInt(), tailreq.filterExpr ?: "", tailreq.filterParams))
+        }
+        val proc =
+            skdb.tail(
+                accessKey,
+                replicationId,
+                spec,
                 { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
                 { stream.error(2000u, "Unexpected EOF") },
             )
