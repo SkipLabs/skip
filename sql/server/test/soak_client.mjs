@@ -113,6 +113,8 @@ const port = process.argv[3];
 const check_expectation = async function(skdb, client, latest_id) {
   const params = { client, latest_id };
 
+  console.log("Running expectation checks for checkpoint", params);
+
   const check_no_pk_inserts = await skdb.exec(
     `select sum(value) as total, count(*) as n, max(id) as last_id
      from no_pk_inserts
@@ -124,8 +126,7 @@ const check_expectation = async function(skdb, client, latest_id) {
     n: latest_id + 1,
     last_id: latest_id,
   };
-  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
-  // assert.deepStrictEqual(check_no_pk_inserts[0], expected_no_pk_inserts, "no_pk_inserts failed check");
+  assert.deepStrictEqual(check_no_pk_inserts[0], expected_no_pk_inserts, "no_pk_inserts failed check");
 
   const check_pk_inserts = await skdb.exec(
     `select sum(value) as total, count(*) as n, max(value) as last_id
@@ -138,8 +139,7 @@ const check_expectation = async function(skdb, client, latest_id) {
     n: latest_id + 1,
     last_id: latest_id,
   };
-  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
-  // assert.deepStrictEqual(check_pk_inserts[0], expected_pk_inserts, "pk_inserts failed check");
+  assert.deepStrictEqual(check_pk_inserts[0], expected_pk_inserts, "pk_inserts failed check");
 
   const check_no_pk_single_row = await skdb.exec(
     `select client, value
@@ -151,8 +151,7 @@ const check_expectation = async function(skdb, client, latest_id) {
     client: client,
     value: latest_id,
   };
-  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
-  // assert.deepStrictEqual(check_no_pk_single_row[0], expected_no_pk_single_row, "no_pk_single_row failed check");
+  assert.deepStrictEqual(check_no_pk_single_row[0], expected_no_pk_single_row, "no_pk_single_row failed check");
 
   const check_pk_single_row = await skdb.exec(
     `select client, value
@@ -164,8 +163,7 @@ const check_expectation = async function(skdb, client, latest_id) {
     client: client,
     value: latest_id,
   };
-  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
-  // assert.deepStrictEqual(check_pk_single_row[0], expected_pk_single_row, "pk_single_row failed check");
+  assert.deepStrictEqual(check_pk_single_row[0], expected_pk_single_row, "pk_single_row failed check");
 
   const check_no_pk_filtered = await skdb.exec(
     `select count(*) as n
@@ -176,8 +174,7 @@ const check_expectation = async function(skdb, client, latest_id) {
   const expected_no_pk_filtered = {
     n: latest_id/2,
   };
-  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
-  // assert.deepStrictEqual(check_no_pk_filtered[0], expected_no_pk_filtered, "no_pk_filtered failed check");
+  assert.deepStrictEqual(check_no_pk_filtered[0], expected_no_pk_filtered, "no_pk_filtered failed check");
 
   const check_pk_filtered = await skdb.exec(
     `select count(*) as n
@@ -188,8 +185,7 @@ const check_expectation = async function(skdb, client, latest_id) {
   const expected_pk_filtered = {
     n: latest_id/2,
   };
-  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
-  // assert.deepStrictEqual(check_pk_filtered[0], expected_pk_filtered, "pk_filtered failed check");
+  assert.deepStrictEqual(check_pk_filtered[0], expected_pk_filtered, "pk_filtered failed check");
 
   const check_pk_privacy_ro = await skdb.exec(
     `select count(*) as n
@@ -200,8 +196,7 @@ const check_expectation = async function(skdb, client, latest_id) {
   const expected_pk_privacy_ro = {
     n: latest_id % 60 < 30 ? 1 : 0,
   };
-  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
-  // assert.deepStrictEqual(check_pk_privacy_ro[0], expected_pk_privacy_ro, "pk_privacy_ro failed check");
+  assert.deepStrictEqual(check_pk_privacy_ro[0], expected_pk_privacy_ro, "pk_privacy_ro failed check");
 
   const check_pk_privacy_rw = await skdb.exec(
     `select count(*) as n
@@ -212,8 +207,7 @@ const check_expectation = async function(skdb, client, latest_id) {
   const expected_pk_privacy_rw = {
     n: latest_id % 60 < 30 ? 1 : 0,
   };
-  // TODO: uncomment once this is called as part of watch changes and tail supports x-table replication
-  // assert.deepStrictEqual(check_pk_privacy_rw[0], expected_pk_privacy_rw, "pk_privacy_rw failed check");
+  assert.deepStrictEqual(check_pk_privacy_rw[0], expected_pk_privacy_rw, "pk_privacy_rw failed check");
 };
 
 setup(client, port).then((skdb) => {
