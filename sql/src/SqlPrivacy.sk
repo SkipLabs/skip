@@ -57,7 +57,7 @@ const permissionsColName: Name = Name::create("permissions");
 //
 // Some tables are "predefined" in the sense that fields are expected
 // to be found in a certain order, with a certain type etc ... This
-// class facilitate the creation of such tables.
+// class facilitates the creation of such tables.
 //
 // To use it: first, extend the class, then, define the schema that is
 // expected for this table, and the index you would like to use to
@@ -247,7 +247,7 @@ class SKDBUsersByName extends PredefinedTable {
 
   const schemaText: String = `(
     userID STRING PRIMARY KEY,
-    permissions INTEGER NOT NULL
+    privateKey STRING NOT NULL
   )`;
 
   // Be careful when changing this schema, make sure that the
@@ -271,7 +271,8 @@ class SKDBUserPermissions extends PredefinedTable {
 
   const schemaText: String = `(
     userID STRING PRIMARY KEY,
-    permissions INTEGER NOT NULL
+    permissions INTEGER NOT NULL,
+    skdb_access STRING NOT NULL
   )`;
 
   // Be careful when changing this schema, make sure that the
