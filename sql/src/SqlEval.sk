@@ -71,9 +71,11 @@ fun decodeTailSpec(input: String, defaultSince: Int): Map<Name, TailSpec> {
             Name::create(key),
             TailSpec{
               since => obj.maybeGetInt("since").default(defaultSince),
-              filter => obj.maybeGetString("filter"),
+              filter => obj.maybeGetString("filterExpr").flatMap(expr ->
+                if (expr.isEmpty()) None() else Some(expr)
+              ),
               params => obj
-                .maybeGetObject("params")
+                .maybeGetObject("filterParams")
                 .map(o -> decodeParams(o))
                 .default(Map[]),
             },
@@ -82,7 +84,7 @@ fun decodeTailSpec(input: String, defaultSince: Int): Map<Name, TailSpec> {
           print_error("Expected an object");
           skipExit(2)
         };
-      });
+      })
     | _ ->
       print_error("Expected an encoded JSON Object, got: " + input);
       skipExit(2)
@@ -1911,7 +1913,9 @@ fun manageReactiveQuery(
         context,
         SKStore.IID(queryID),
         Array[
-          QueryInfoFile(Some(QueryInfo(query, JSON.decode(encoded_params), onlyChanges))),
+          QueryInfoFile(
+            Some(QueryInfo(query, JSON.decode(encoded_params), onlyChanges)),
+          ),
         ],
       );
       context.update();
