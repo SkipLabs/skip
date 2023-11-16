@@ -1,0 +1,261 @@
+module SKDB;
+
+class TailSpec{since: Int, filter: ?String, params: Map<String, Value>}
+
+fun buildTailFilter(
+  context: readonly SKStore.Context,
+  options: SKDB.Options,
+  dirSub: SKStore.DirSub,
+  userId: ?String,
+  tailSpec: TailSpec,
+  tableName: Name,
+): (SKStore.Context, Bool) ~> (SKStore.Key -> Bool) {
+  filter = tailSpec.filter match {
+  | None() -> dirSub.filter
+  | Some(strCond) ->
+    compiler = SKDB.Compiler::create(false, options, 0, tailSpec.params);
+    (_, ast) = SKDB.parseExpr(SKDB.Lexer(0, SKDB.Buffer(strCond)), 0);
+    compilerContext = context.mclone();
+    _ = compiler.compileFrom(
+      compilerContext,
+      Array[SKDB.FromTable{name => tableName, asName => None()}],
+    );
+    e = compiler.compileExpr(compilerContext, ast) match {
+    | SKDB.CIExpr(x) -> x
+    | _ ->
+      print_error("Unexpected type for filter expression");
+      skipExit(2)
+    };
+    (context, isReset) ~> {
+      mcontext = context.mclone();
+      conditionFilter = dirSub.filter(context, isReset);
+      baseName -> {
+        inputRow = baseName match {
+        | SKDB.RowKey(row, _) -> row
+        | _ ->
+          print_error("Unexpected table entry type");
+          skipExit(2)
+        };
+        evaluator = SKDB.ExprEvaluator(Array[inputRow], Array[], None());
+
+        evaluator.evalCIExpr(mcontext, e) match {
+        | SKDB.ANull()
+        | SKDB.ADef(0) ->
+          false
+        | SKDB.AUndef()
+        | SKDB.ADef(_) ->
+          conditionFilter(baseName)
+        }
+      }
+    }
+  };
+
+  userId match {
+  | None() -> filter
+  | Some(userID) ->
+    (context, isReset) ~> {
+      user = SKDB.UserFile::create(context, userID);
+      sqlTable = getSqlTableFromDirName(context, dirSub.dirName);
+
+      oldFilter = filter(context, isReset);
+
+      baseName -> {
+        oldFilter(baseName) &&
+          baseName match {
+          | SKDB.RowKey(row, _) ->
+            SKDB.checkUserCanReadRow(context, user, sqlTable, row) match {
+            | SKDB.AROK() -> true
+            | _ -> false
+            }
+          | _ ->
+            print_error("Unexpected table entry type");
+            skipExit(2)
+          };
+      }
+    }
+  };
+}
+
+fun tailShouldWake(
+  context: readonly SKStore.Context,
+  sub: SKStore.Sub,
+  tick: SKStore.Tick,
+): Bool {
+  SKDB.getFinalState(context, sub.destinationSource) match {
+  | Some(SKDB.RSError()) -> return true
+  | _ -> void
+  };
+
+  for (dirSub in sub.dirSubs) {
+    context.unsafeMaybeGetEagerDir(dirSub.dirName) match {
+    | None() -> void
+    | Some(dir) ->
+      (isReset, changes) = dir.getChangesAfter(tick);
+      if (isReset || !changes.isEmpty()) {
+        return true
+      }
+    }
+  };
+  false
+}
+
+fun tailFrom(
+  spec: (Name -> TailSpec),
+  dirSub: SKStore.DirSub,
+  tailWatermark: ?Int,
+): SKStore.Tick {
+  tailWatermark match {
+  | Some(tick) -> SKStore.Tick(tick)
+  | None() ->
+    // we haven't caught up yet so honour the requested since value per table
+    tableName = SKDB.Name::create(
+      dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
+    );
+    SKStore.Tick(spec(tableName).since)
+  }
+}
+
+fun tailSub(
+  options: SKDB.Options,
+  follow: Bool,
+  sessionID: Int,
+  userIDOpt: ?String,
+  spec: (Name -> TailSpec),
+): void {
+  gContext = SKStore.gContextGet();
+
+  // rebuild the sub with extra filtering as supported by tail
+  sub = gContext.sessions.maybeGet(sessionID) match {
+  | None() ->
+    print_error("Error: session not found");
+    skipExit(2)
+  | Some(sub) ->
+    sub with {
+      dirSubs => sub.dirSubs.map(dirSub -> {
+        tableName = SKDB.Name::create(
+          dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
+        );
+        dirSub with {
+          filter => buildTailFilter(
+            gContext,
+            options,
+            dirSub,
+            userIDOpt,
+            spec(tableName),
+            tableName,
+          ),
+        }
+      }),
+    }
+  };
+
+  tailWatermark: ?Int = None();
+  init = true;
+  forceReset = false;
+
+  loop {
+    localObstack = SKStore.newObstack();
+    context = SKStore.gContextGet();
+
+    context.sessions.maybeGet(sessionID) match {
+    | None() ->
+      print_error("Error: session not found");
+      skipExit(2)
+    | Some(_) -> void
+    };
+
+    SKDB.getFinalState(context, sub.destinationSource) match {
+    | Some(SKDB.RSError()) ->
+      print_raw(":reboot\n");
+      break void
+    | _ -> void
+    };
+
+    writer = mutable Debug.BufferedWriter(print_raw, 4096);
+
+    producedAnyOutput = false;
+    for (dirSub in sub.dirSubs) {
+      dirName = dirSub.dirName;
+      edir = context.unsafeGetEagerDir(dirName);
+      format = options.format match {
+      | SKDB.OFK_CSV() -> SKStore.OCSV()
+      | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
+      | SKDB.OFK_SQL() -> SKStore.OSQL()
+      | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
+      | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
+      };
+      (isReset, changes) = edir.getChangesAfter(
+        tailFrom(spec, dirSub, tailWatermark),
+        forceReset,
+      );
+
+      // Write checkpoints out at least every `checkpointInterval` rows during
+      // initialization, so that the client can start processing without waiting
+      // for the full changeset.
+      // this value is chosen based on some unscientific local testing
+      checkpointInterval = if (init) 512 else Int::max;
+
+      producedOutput = edir.writeDiff(
+        context,
+        isReset,
+        changes,
+        writer,
+        dirSub.entity,
+        format,
+        dirSub.filter,
+        dirSub.getDestinationWatermark(context),
+        checkpointInterval,
+      );
+      !producedAnyOutput = producedAnyOutput || producedOutput
+    };
+
+    // produce checkpoint for flushing and committing
+    if (init || producedAnyOutput) {
+      // always do this on first iteration to ensure we output a
+      // checkpoint without delay so that the downstreams knows that
+      // it has received everything without waiting for the condvar
+      // timeout
+      writer.write(":" + context.tick.value.toString() + "\n");
+      writer.flush();
+      flushStdout();
+    };
+
+    !tailWatermark = Some(context.tick.value);
+    !init = false;
+    !forceReset = false;
+    lock = SKStore.unfreezeLock(sub.lock);
+    cond = SKStore.unfreezeCond(sub.cond);
+    SKStore.mutexLock(lock);
+    while ({
+      !forceReset &&
+        {
+          newContext = SKStore.gContextGet();
+          follow &&
+            !tailShouldWake(
+              newContext,
+              sub,
+              SKStore.Tick(tailWatermark.fromSome()),
+            );
+        }
+    }) {
+      timeoutSecs = 10;
+      _ = SKStore.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
+      print_raw(":" + tailWatermark.fromSome().toString() + "\n");
+      flushStdout();
+      if (
+        SKDB.userPrivacyChanged(
+          SKStore.gContextGet(),
+          userIDOpt,
+          SKStore.Tick(tailWatermark.fromSome()),
+        )
+      ) {
+        !forceReset = true;
+      };
+    };
+    SKStore.mutexUnlock(lock);
+    SKStore.destroyObstack(localObstack);
+    if (!follow) {
+      break void
+    }
+  }
+}

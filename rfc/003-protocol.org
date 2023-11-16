@@ -307,18 +307,18 @@ Where not specified, strings are UTF-8.
 
 - request tail
   - type = 0x2
-  - reserved (24) - padding if you like - must be zeroed
+  - reserved (24) - padding - must be zeroed
   - since (64)
   - table_name_length (16) - in bytes
   - table_name (table_name_length * 8)
-
-  - from here the fields are optional - they were not in the original spec
-    - filter_expr_length (16) - in bytes
-    - filter_expr (filter_expr_length * 8)
+  - filter_expr_length (16) - in bytes
+  - filter_expr (filter_expr_length * 8)
+  - params_json_length (16) - in bytes
+  - params_json (params_json_length * 8) - JSON-encoded query param map
 
 - push promise
   - type = 0x3
-  - reserved (24) - padding if you like - must be zeroed
+  - reserved (24) - padding - must be zeroed
 
 - schema
   - type = 0x4
@@ -337,6 +337,13 @@ Where not specified, strings are UTF-8.
 
 - create user
   - type = 0x6
+
+- request tail batch - fixed size batch, known ahead of time
+  - type = 0x7
+  - reserved (8) - padding - must be zeroed
+  - batch_size (16) - unsigned int specifying number of tail requests
+    that immediately follow this
+  - sequence of 'request tail' payloads
 
 - credentials response
   - type = 0x80

@@ -22,6 +22,7 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
   implementation("org.java-websocket:Java-WebSocket:1.5.3")
   implementation("com.squareup.moshi:moshi:1.14.0") // json
+  implementation("com.squareup.moshi:moshi-kotlin:1.14.0") // json
 }
 
 // Apply a specific Java toolchain to ease working on different environments.

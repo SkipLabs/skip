@@ -172,10 +172,28 @@ class RequestHandler(
         val proc =
             skdb.tail(
                 accessKey,
-                request.table,
-                request.since,
-                request.filterExpr,
                 replicationId,
+                mapOf(
+                    request.table to
+                        TailSpec(
+                            request.since.toInt(), request.filterExpr ?: "", request.filterParams)),
+                { data, shouldFlush -> stream.send(ProtoData(data, shouldFlush)) },
+                { stream.error(2000u, "Unexpected EOF") },
+            )
+        return ProcessPipe(proc)
+      }
+      is ProtoRequestTailBatch -> {
+        val spec = HashMap<String, TailSpec>()
+        for (tailreq in request.requests) {
+          spec.put(
+              tailreq.table,
+              TailSpec(tailreq.since.toInt(), tailreq.filterExpr ?: "", tailreq.filterParams))
+        }
+        val proc =
+            skdb.tail(
+                accessKey,
+                replicationId,
+                spec,
                 { data, shouldFlush -> stream.send(ProtoData(data, shouldFlush)) },
                 { stream.error(2000u, "Unexpected EOF") },
             )
