@@ -197,33 +197,33 @@ const check_expectations = async function(skdb, client, latest_id) {
     "pk_single_row"
   );
 
-  // check_expectation(
-  //   skdb,
-  //   `select count(*) as n
-  //    from no_pk_filtered
-  //    where client = @client and id <= @latest_id`,
-  //   params,
-  //   [
-  //     {
-  //       n: latest_id/2,
-  //     },
-  //   ],
-  //   "no_pk_filtered"
-  // );
+  check_expectation(
+    skdb,
+    `select count(*) as n
+     from no_pk_filtered
+     where client = @client and id <= @latest_id`,
+    params,
+    [
+      {
+        n: latest_id/2,
+      },
+    ],
+    "no_pk_filtered"
+  );
 
-  // check_expectation(
-  //   skdb,
-  //   `select count(*) as n
-  //    from pk_filtered
-  //    where client = @client and id <= @latest_id * 2 + (@client - 1)`,
-  //   params,
-  //   [
-  //     {
-  //       n: latest_id/2,
-  //     },
-  //   ],
-  //   "pk_filtered"
-  // );
+  check_expectation(
+    skdb,
+    `select count(*) as n
+     from pk_filtered
+     where client = @client and id <= @latest_id * 2 + (@client - 1)`,
+    params,
+    [
+      {
+        n: latest_id/2,
+      },
+    ],
+    "pk_filtered"
+  );
 
   check_expectation(
     skdb,
