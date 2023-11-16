@@ -1658,38 +1658,123 @@ fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
 /* Support for reactive queries. */
 /*****************************************************************************/
 
-// The directory where we keep track of what directories were created
-// for each reactive query. Useful to then later cleanup after ourselves.
+class QueryInfo(query: String, encoded_params: String, onlyChanges: Bool)
+class ReactiveQuery(
+  selectDir: SelectDir,
+  fieldNames: Array<String>,
+) extends SKStore.File
 
-class QueryDeps(dirNames: Array<SKStore.DirName>) extends SKStore.File
-const queryDepsDirName: SKStore.DirName = SKStore.DirName::create(
-  "/queries/deps/",
+class QueryInfoFile(value: ?QueryInfo) extends SKStore.File
+
+const reactiveQueriesDirName: SKStore.DirName = SKStore.DirName::create(
+  "/queries/reactive/",
 );
 
-fun getQueryDepsHandle(
+const reactiveSelectsDirName: SKStore.DirName = SKStore.DirName::create(
+  "/queries/reactive/select/",
+);
+
+fun getReactiveQueryHandle(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SKStore.IID, QueryDeps> {
-  context.maybeGetDir(queryDepsDirName) match {
+): (
+  SKStore.EHandle<SKStore.IID, QueryInfoFile>,
+  SKStore.EHandle<SKStore.IID, ReactiveQuery>,
+) {
+  context.maybeGetDir(reactiveQueriesDirName) match {
   | None() ->
-    context.mkdir(
+    handle = context.mkdir(
       SKStore.IID::keyType,
-      QueryDeps::type,
-      queryDepsDirName,
+      QueryInfoFile::type,
+      reactiveQueriesDirName,
       Array[],
-    )
+    );
+    selectDirs = handle.map(
+      SKStore.IID::keyType,
+      ReactiveQuery::type,
+      context,
+      reactiveSelectsDirName,
+      (context, writer, key, iterator) ~> {
+        current = context.canReuse;
+        globals = context.globals;
+        // We want canReuse set to CRNever, because we want a guarantee
+        // that no one will try to reuse our directories for something
+        // else. Otherwise we would not be able to remove them safely.
+        context.!canReuse = SKStore.CRNever();
+        context.!globals = SortedMap[];
+        queryID = key.value;
+        queryID32 = Int32::truncate(queryID);
+        iterator.first.value match {
+        | Some(queryInfo) ->
+          lexer = SKDB.Lexer(0, SKDB.Buffer(queryInfo.query));
+          selectAst = SKDB.parseQuery(lexer, 0).i1 match {
+          | x @ Select _ -> x
+          };
+          skOptions = SKDB.Options{
+            alwaysAllowJoins => false,
+            backtrace => false,
+            sync => false,
+            virtual => false,
+            showUsedIndexes => false,
+          };
+          params = decodeParams(queryInfo.encoded_params);
+          compiler = SKDB.Compiler::create(false, skOptions, 0, params);
+          cselect = compiler.compileSelect(
+            context,
+            selectAst,
+            genSelectId(selectAst),
+            true,
+          );
+          selectDir = SKDB.evalSelect(context, cselect, None());
+          schema = SKDB.Compiler::getSchema(
+            (selectAst.core as SelectCoreQuery _).params,
+            cselect.from,
+            cselect.params,
+          );
+          fieldNames = schema.map(x -> x.name.origName);
+          printReactiveQueryResult(context, selectDir.dirName, fieldNames);
+          if (queryInfo.onlyChanges) printTick(context.tick.next());
+          SKStore.EagerDir::apply(
+            context,
+            selectDir.dirName,
+            SKStore.DirName::create(selectDir.dirName.toString() + "sink/"),
+            (_ctx, _writer, _key, _valueIter) ~> jsMarkQuery(queryID32),
+            None(),
+            None(),
+            None(),
+            true,
+          );
+          writer.set(key, ReactiveQuery(selectDir, fieldNames));
+          context.!canReuse = current;
+          context.!globals = globals
+        | _ -> jsDeleteUserFun(queryID32)
+        }
+      },
+    );
+    (handle, selectDirs)
   | Some(dir) ->
-    SKStore.EHandle(SKStore.IID::keyType, QueryDeps::type, dir.getDirName())
+    (
+      SKStore.EHandle(
+        SKStore.IID::keyType,
+        QueryInfoFile::type,
+        dir.getDirName(),
+      ),
+      SKStore.EHandle(
+        SKStore.IID::keyType,
+        ReactiveQuery::type,
+        reactiveSelectsDirName,
+      ),
+    )
   };
 }
 
 fun printReactiveQueryResult(
   context: mutable SKStore.Context,
-  _queryID: Int,
   dirName: SKStore.DirName,
   fieldNames: Array<String>,
 ): void {
   format = SKStore.OJS(fieldNames);
   RowValues::printHeader(format);
+  switchTo(UInt32::truncate(0));
   for (kv in context.unsafeGetEagerDir(dirName).unsafeGetFileIter()) {
     (_, files) = kv;
     for (file in files) {
@@ -1698,7 +1783,7 @@ fun printReactiveQueryResult(
         RowValues::printItem(format, row);
       }
     }
-  }
+  };
 }
 
 fun printReactiveQueryChanges(
@@ -1710,34 +1795,38 @@ fun printReactiveQueryChanges(
   lastTick = lastTick(UInt32::truncate(queryID));
   tick = SKStore.Tick(lastTick.toInt());
   edir = context.unsafeGetEagerDir(dirName);
-  (_, changes) = edir.getChangesAfter(tick);
-  if (!changes.isEmpty()) {
-    format = SKStore.OJS(fieldNames);
-    RowValues::printHeader(format);
-    for (key in changes) {
-      values = edir.getArrayRaw(key);
-      if (values.size() == 0) {
-        switchTo(UInt32::truncate(1));
-        row = (key as RowKey _).row;
-        for (_ in Range(0, row.repeat)) {
-          RowValues::printItem(format, row);
-        }
-      } else {
-        switchTo(UInt32::truncate(0));
-        for (file in values) {
-          row = RowValues::type(file);
+  (isReset, changes) = edir.getChangesAfter(tick);
+  if (isReset) {
+    printReactiveQueryResult(context, dirName, fieldNames)
+  } else {
+    if (!changes.isEmpty()) {
+      format = SKStore.OJS(fieldNames);
+      RowValues::printHeader(format);
+      for (key in changes) {
+        values = edir.getArrayRaw(key);
+        if (values.size() == 0) {
+          switchTo(UInt32::truncate(2));
+          row = (key as RowKey _).row;
           for (_ in Range(0, row.repeat)) {
             RowValues::printItem(format, row);
           }
+        } else {
+          switchTo(UInt32::truncate(1));
+          for (file in values) {
+            row = RowValues::type(file);
+            for (_ in Range(0, row.repeat)) {
+              RowValues::printItem(format, row);
+            }
+          }
         }
       }
-    };
+    }
   };
   printTick(context.tick.next());
 }
 
 private fun printTick(tick: SKStore.Tick): void {
-  switchTo(UInt32::truncate(2));
+  switchTo(UInt32::truncate(3));
   jsClearFieldNames();
   jsPushFieldName("tick");
   jsClearObject();
@@ -1745,28 +1834,25 @@ private fun printTick(tick: SKStore.Tick): void {
   jsPushObject()
 }
 
-@cpp_extern("SKIP_js_user_fun")
-native fun jsCallUserFun(queryID32: Int32): void;
+fun printResult(
+  context: mutable SKStore.Context,
+  queryID: Int,
+  dirName: SKStore.DirName,
+  fieldNames: Array<String>,
+  onlyChanges: Bool,
+): void {
+  if (onlyChanges) {
+    printReactiveQueryChanges(context, queryID, dirName, fieldNames)
+  } else {
+    printReactiveQueryResult(context, dirName, fieldNames);
+  };
+}
+
+@cpp_extern("SKIP_js_delete_fun")
+native fun jsDeleteUserFun(queryID32: Int32): void;
 
 @cpp_extern("SKIP_js_mark_query")
-native fun jsMarkQuery(
-  queryID32: Int32,
-  notify: (mutable SKStore.Context) ~> void,
-): void;
-
-@wasm_export("SKIP_js_notify_user")
-fun notifyUser(notify: (mutable SKStore.Context) ~> void): void {
-  saved = SKStore.newObstack();
-  try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
-      notify(context);
-      SKStore.CStop(None())
-    })
-  } catch {
-  | exn -> print_error(exn.getMessage())
-  };
-  SKStore.destroyObstack(saved);
-}
+native fun jsMarkQuery(queryID32: Int32): void;
 
 @wasm_export("SKIP_reactive_query")
 fun reactiveQuery(
@@ -1774,12 +1860,7 @@ fun reactiveQuery(
   query: String,
   encoded_params: String,
 ): void {
-  manageReactiveQuery(
-    queryID32,
-    query,
-    encoded_params,
-    printReactiveQueryResult,
-  )
+  manageReactiveQuery(queryID32, query, encoded_params, false)
 }
 
 @wasm_export("SKIP_reactive_query_changes")
@@ -1788,96 +1869,25 @@ fun reactiveQueryChanges(
   query: String,
   encoded_params: String,
 ): void {
-  manageReactiveQuery(
-    queryID32,
-    query,
-    encoded_params,
-    printReactiveQueryChanges,
-  )
+  manageReactiveQuery(queryID32, query, encoded_params, true)
 }
 
 fun manageReactiveQuery(
   queryID32: Int32,
   query: String,
   encoded_params: String,
-  printResult: (
-    context: mutable SKStore.Context,
-    queryID: Int,
-    dirName: SKStore.DirName,
-    fieldNames: Array<String>,
-  ) ~> void,
+  onlyChanges: Bool,
 ): void {
   try {
     SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
-      context.!globals = SortedMap[];
-      context.!newDirs = SortedSet[];
-      tick = context.tick;
-      // We want canReuse set to CRNever, because we want a guarantee
-      // that no one will try to reuse our directories for something
-      // else. Otherwise we would not be able to remove them safely.
-      context.!canReuse = SKStore.CRNever();
       queryID = queryID32.toInt();
-      lexer = SKDB.Lexer(0, SKDB.Buffer(query));
-      selectAst = SKDB.parseQuery(lexer, 0).i1 match {
-      | x @ Select _ -> x
-      };
-      if (selectAst.core is SelectCoreValues _) {
-        error(selectAst.pos, "VALUES not implemented in SELECT.")
-      };
-      skOptions = SKDB.Options{
-        alwaysAllowJoins => false,
-        backtrace => false,
-        sync => false,
-        virtual => false,
-        showUsedIndexes => false,
-      };
-      params = decodeParams(encoded_params);
-      compiler = SKDB.Compiler::create(false, skOptions, 0, params);
-      cselect = compiler.compileSelect(
-        context,
-        selectAst,
-        genSelectId(selectAst),
-        true,
-      );
-      selectDir = SKDB.evalSelect(context, cselect, None());
-      schema = SKDB.Compiler::getSchema(
-        (selectAst.core as SelectCoreQuery _).params,
-        cselect.from,
-        cselect.params,
-      );
-      fieldNames = schema.map(x -> x.name.origName);
-      printResult(context, queryID, selectDir.dirName, fieldNames);
-
-      SKStore.EagerDir::apply(
-        context,
-        selectDir.dirName,
-        SKStore.DirName::create(selectDir.dirName.toString() + "sink/"),
-        (_context, _writer, _key, _valueIter) ~> {
-          jsMarkQuery(queryID32, context ~> {
-            printResult(context, queryID, selectDir.dirName, fieldNames);
-            jsCallUserFun(queryID32);
-          })
-        },
-        None(),
-        None(),
-        None(),
-        true,
-      );
-      prefix = selectDir.dirName.toString();
-      deps = context.dirs.state
-        .getChangesAfter(tick)
-        .filter(x -> x.toString().startsWith(prefix))
-        .collect(Array);
-
-      invariant(deps.size() > 0);
-
-      getQueryDepsHandle(context).writeArray(
+      getReactiveQueryHandle(context).i0.writeArray(
         context,
         SKStore.IID(queryID),
-        Array[QueryDeps(deps)],
+        Array[
+          QueryInfoFile(Some(QueryInfo(query, encoded_params, onlyChanges))),
+        ],
       );
-
-      context.!newDirs = SortedSet[];
       context.update();
       SKStore.CStop(None())
     })
@@ -1886,27 +1896,47 @@ fun manageReactiveQuery(
   };
 }
 
+@wasm_export("SKIP_reactive_print_result")
+fun printReactiveQuery(queryID32: Int32): void {
+  saved = SKStore.newObstack();
+  try {
+    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+      queryID = queryID32.toInt();
+      (rqs, sds) = getReactiveQueryHandle(context);
+      rqs
+        .maybeGet(context, SKStore.IID(queryID))
+        .flatMap(v ~> v.value)
+        .each(queryInfo ->
+          sds.maybeGet(context, SKStore.IID(queryID)).each(rq ->
+            printResult(
+              context,
+              queryID,
+              rq.selectDir.dirName,
+              rq.fieldNames,
+              queryInfo.onlyChanges,
+            )
+          )
+        );
+      SKStore.CStop(None())
+    })
+  } catch {
+  | exn -> print_error(exn.getMessage())
+  };
+  SKStore.destroyObstack(saved);
+}
+
 @wasm_export("SKIP_delete_reactive_query")
 fun deleteReactiveQuery(queryID32: Int32): void {
   saved = SKStore.newObstack();
   try {
     SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
-      queryID = SKStore.IID(queryID32.toInt());
-      depsDir = getQueryDepsHandle(context);
-      arr = depsDir.unsafeGetArray(context, queryID);
-      invariant(arr.size() == 1);
-      for (dirName in arr[0].dirNames) {
-        context.removeDir(dirName);
-        // Normally we would use a place-holder when removing a
-        // directory, because we typically want to be able to know what
-        // changed. But in this case we really want to pretend the
-        // directory never existed, so that we don't leak memory.  This
-        // is because reactive queries are not supposed to be used for
-        // anything else (other than serving the JS). If the JS doesn't
-        // need it anymore, we can pretend the directory never existed.
-        context.!dirs.state = context.dirs.state.remove(dirName);
-      };
-      depsDir.writeArray(context, queryID, Array[]);
+      queryID = queryID32.toInt();
+      getReactiveQueryHandle(context).i0.writeArray(
+        context,
+        SKStore.IID(queryID),
+        Array[QueryInfoFile(None())],
+      );
+      context.update();
       SKStore.CStop(None())
     })
   } catch {

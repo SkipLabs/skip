@@ -52,7 +52,7 @@ class WrappedRemote implements RemoteSKDB {
   }
 
   onReboot(fn: () => void): Promise<void> {
-    return this.worker.subscribe(new Caller(this.wrapped, "onReboot", []), fn);
+    return this.worker.post(new Caller(this.wrapped, "onReboot", [fn]));
   }
 
   connectedAs(): Promise<string> {
@@ -72,7 +72,7 @@ export class SKDBWorker implements SKDB {
   }
 
   subscribe = async (viewName: string, f: (change: string) => void) => {
-    return this.worker.subscribe(new Function("subscribe", [viewName]), f);
+    return this.worker.post(new Function("subscribe", [viewName, f]));
   }
 
   exec = async (query: string, params: Params = new Map()) => {
@@ -80,14 +80,14 @@ export class SKDBWorker implements SKDB {
   }
 
   watch = async (query: string, params: Params, onChange: (rows: Array<any>) => void) => {
-    return this.worker.subscribe(new Function("watch", [query, params], { wrap: true, autoremove: true }), onChange).then(wrapped => {
+    return this.worker.post(new Function("watch", [query, params, onChange], { wrap: true, autoremove: true })).then(wrapped => {
       let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
       return { close: close };
     });
   }
 
-  watchChanges = async (query: string, params: Params, onChanges: (added: Array<any>, deleted: Array<any>) => void) => {
-    return this.worker.subscribe(new Function("watchChanges", [query, params], { wrap: true, autoremove: true }), onChanges).then(wrapped => {
+  watchChanges = async (query: string, params: Params, init: (rows: Array<any>) => void, update: (added: Array<any>, removed: Array<any>) => void) => {
+    return this.worker.post(new Function("watchChanges", [query, params, init, update], { wrap: true, autoremove: true })).then(wrapped => {
       let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
       return { close: close };
     });

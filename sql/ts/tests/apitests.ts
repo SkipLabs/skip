@@ -264,6 +264,9 @@ async function testReboot(root: SKDB, user: SKDB) {
 async function testPrivacyRejectedChange(root: SKDB, user: SKDB): Promise<void> {
   return new Promise(async (resolve) => {
     const h = await user.watchChanges("select * from test_pk__skdb_mirror_feedback", {},
+      async (init: Array<any>) => {
+        expect(init).toEqual([]);
+      },
       async (added: Array<any>, removed: Array<any>) => {
         expect(removed).toEqual([]);
         expect(added).toEqual([
@@ -275,7 +278,8 @@ async function testPrivacyRejectedChange(root: SKDB, user: SKDB): Promise<void> 
         expect(rrows).toEqual([]);
         h.close();
         resolve();
-      });
+      }
+    );
     await user.exec("insert into test_pk values (1234, 88, 'does not exist');");
   })
 }
@@ -285,6 +289,9 @@ async function testPrivacyRejectedTxn(root: SKDB, user: SKDB): Promise<void> {
   await user.exec("delete from test_pk__skdb_mirror_feedback;");
   return new Promise(async (resolve) => {
     const h = await user.watchChanges("select * from test_pk__skdb_mirror_feedback", {},
+      async (init: Array<any>) => {
+        expect(init).toEqual([]);
+      },
       async (added: Array<any>, removed: Array<any>) => {
         expect(removed).toEqual([]);
         expect(added).toEqual([
