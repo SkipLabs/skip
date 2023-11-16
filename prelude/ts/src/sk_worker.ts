@@ -17,9 +17,7 @@ class UnmanagedMessage extends Error {
 export class Function implements Payload {
   fn: string;
   parameters: Array<any>;
-  subscription ?: MessageId;
   wrap?: { wrap: boolean, autoremove: boolean};
-
 
   constructor(fn: string, parameters: Array<any>, wrap?: { wrap: boolean, autoremove: boolean}) {
     this.fn = fn;
@@ -30,14 +28,12 @@ export class Function implements Payload {
 
   static as(obj: object) {
     if (!("fn" in obj) || !("parameters" in obj)) return null;
-    let subscription = "subscription" in obj ? MessageId.as(obj.subscription!) : null;
     let wrap = "wrap" in obj ? obj.wrap! as { wrap: boolean, autoremove: boolean} : undefined;
     let fn = new Function(
       obj.fn! as string,
       obj.parameters! as Array<any>,
       wrap
     );
-    fn.subscription = subscription ? subscription: undefined;
     return fn;
   }
 
@@ -51,7 +47,6 @@ export class Caller implements Payload {
   fn: string;
   parameters: Array<any>;
   remove: boolean;
-  subscription ?: MessageId;
 
   constructor(wrapped: number, fn: string, parameters: Array<any>, remove: boolean = false) {
     this.wrapped = wrapped;
@@ -63,14 +58,12 @@ export class Caller implements Payload {
 
   static convert(obj: object) {
     if (!("wrapped" in obj) ||  !("fn" in obj) || !("parameters" in obj) || !("remove" in obj)) return null;
-    let subscription = "subscription" in obj ? MessageId.as(obj.subscription!) : null;
     let fn = new Caller(
       obj.wrapped! as number,
       obj.fn! as string,
       obj.parameters! as Array<any>,
       obj.remove! as boolean,
     );
-    fn.subscription = subscription ? subscription: undefined;
     return fn;
   }
 
@@ -177,7 +170,6 @@ export class PromiseWorker {
   private subscriptions: Map<string, (...args: any[]) => void>;
 
   post : (fn: Function) => Promise<any>;
-  subscribe: (fn: Function, value: (...args: any[]) => void) => Promise<any>;
   onMessage: (message: MessageEvent) => void;
 
   constructor(worker: Wrk) {
@@ -187,8 +179,19 @@ export class PromiseWorker {
     this.callbacks = new Map();
     this.subscriptions = new Map();
     let self = this;
-    this.post = (fn: Function) => {
+    this.post = (fn: Function | Caller) => {
       let messageId = new MessageId(this.source, ++this.lastId);
+      const parameters = fn.parameters.map(p => {
+        if (typeof p == "function") {
+          let subscriptionId = new MessageId(this.source, ++this.lastId);
+          let wfn = (result: Return) => p.apply(null, result.value);
+          this.subscriptions.set(asKey(subscriptionId), wfn);
+          return subscriptionId;
+        } else {
+          return p;
+        }
+      });
+      fn.parameters = parameters;
       return new Promise(function (resolve, reject) {
         self.callbacks.set(asKey(messageId), (result: Return) => {
           if (result.success) {
@@ -203,13 +206,6 @@ export class PromiseWorker {
         self.worker.postMessage(message);
       })
     };
-    this.subscribe = (fn: Function | Caller, value: (...args: any[]) => void) => {
-      let subscriptionId = new MessageId(this.source, ++this.lastId);
-      let wfn = (result: Return) => value.apply(null, result.value);
-      this.subscriptions.set(asKey(subscriptionId), wfn);
-      fn.subscription = subscriptionId;
-      return this.post(fn);
-    }
     this.onMessage = (message: MessageEvent) => {
       let data = Message.asReturn(message.data ?? message);
       if (!data) {
@@ -254,12 +250,16 @@ export const onWorkerMessage = <T>(message: MessageEvent, post: (message: any) =
       post("Invalid worker message");
     } else {
       let fun = data.payload as Function;
-      let parameters = fun.parameters;
-      if (fun.subscription) {
-        parameters.push((...args: any[]) => {
-          post(new Message(fun.subscription!, new Return(true, args)))
-        })
-      }
+      let parameters = fun.parameters.map(p => {
+        const subscription = typeof p == "object" ? MessageId.as(p) : null;
+        if (subscription) {
+          return (...args: any[]) => {
+            post(new Message(subscription, new Return(true, args)))
+          }
+        } else {
+          return p;
+        }
+      });
       if (fun.fn == creator.getName()) {
         if (runner) {
           post(new Message(data.id, new Return(false, creator.getType() + " already created")));
@@ -296,14 +296,18 @@ export const onWorkerMessage = <T>(message: MessageEvent, post: (message: any) =
     }
   } else {
     let caller = data.payload as Caller;
-    let parameters = caller.parameters;
+    let parameters = caller.parameters.map(p => {
+      const subscription = typeof p == "object" ? MessageId.as(p) : null;
+      if (subscription) {
+        return (...args: any[]) => {
+          post(new Message(subscription, new Return(true, args)))
+        }
+      } else {
+        return p;
+      }
+    });
     let obj = wrapped.get(caller.wrapped);
     let fni = caller.fn == "" ? {fn: obj?.value, obj: null} : {fn: obj?.value[caller.fn] , obj: obj?.value};
-    if (caller.subscription) {
-      parameters.push((...args: any[]) => {
-        post(new Message(caller.subscription!, new Return(true, args)))
-      })
-    }
     if (typeof fni.fn !== "function") {
       post(new Message(data.id, new Return(false, "Invalid function " + caller.fn)));
     } else {
