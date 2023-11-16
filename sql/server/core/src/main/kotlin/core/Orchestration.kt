@@ -23,6 +23,11 @@ data class ProtoRequestTail(
     val table: String,
     val since: ULong = 0u,
     val filterExpr: String?,
+    val filterParams: Map<String, Any?>,
+) : ProtoMessage()
+
+data class ProtoRequestTailBatch(
+    val requests: List<ProtoRequestTail>,
 ) : ProtoMessage()
 
 enum class SchemaScope {
@@ -54,6 +59,14 @@ data class ProtoCredentials(val accessKey: String, val privateKey: ByteBuffer) :
 
 data class RevealableException(val code: UInt, val msg: String) : RuntimeException(msg)
 
+fun decodeParams(data: ByteBuffer): Map<String, Any?> {
+  val paramsLength = data.getShort()
+  val paramsBytes = ByteArray(paramsLength.toInt())
+  data.get(paramsBytes)
+  // TODO: decode json in to map
+  return HashMap<String, Object>()
+}
+
 fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
   val type = data.get().toUInt()
   return when (type) {
@@ -79,20 +92,15 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
       val tableNameLength = data.getShort()
       val tableNameBytes = ByteArray(tableNameLength.toInt())
       data.get(tableNameBytes)
-      if (!data.hasRemaining()) {
-        ProtoRequestTail(
-            table = String(tableNameBytes, StandardCharsets.UTF_8),
-            since = since.toULong(),
-            filterExpr = null)
-      } else {
-        val filterExprLength = data.getShort()
-        val filterBytes = ByteArray(filterExprLength.toInt())
-        data.get(filterBytes)
-        ProtoRequestTail(
-            String(tableNameBytes, StandardCharsets.UTF_8),
-            since.toULong(),
-            String(filterBytes, StandardCharsets.UTF_8))
-      }
+      val filterExprLength = data.getShort()
+      val filterBytes = ByteArray(filterExprLength.toInt())
+      data.get(filterBytes)
+      val params = decodeParams(data)
+      ProtoRequestTail(
+          String(tableNameBytes, StandardCharsets.UTF_8),
+          since.toULong(),
+          String(filterBytes, StandardCharsets.UTF_8),
+          params)
     }
     3u -> {
       ProtoPushPromise()
@@ -124,6 +132,20 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
     }
     6u -> {
       ProtoCreateUser()
+    }
+    7u -> {
+      val requests = ArrayList<ProtoRequestTail>()
+      data.position(data.position() + 1) // skip over reserved
+      val n = data.getShort()
+      for (i in 0..<n) {
+        val req = decodeProtoMsg(data)
+        if (req is ProtoRequestTail) {
+          requests.add(req)
+        } else {
+          throw RuntimeException("Unexpected proto message in tail batch")
+        }
+      }
+      ProtoRequestTailBatch(requests)
     }
     else -> throw RuntimeException("Could not decode orchestration msg")
   }

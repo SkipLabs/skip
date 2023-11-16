@@ -44,7 +44,16 @@ fun queryParams(options: SKDB.Options): Map<String, SKDB.Value> {
     return Map[];
   };
   read_line() match {
-  | Some(line) -> decodeParams(line)
+  | Some(line) ->
+    try {
+      decodeParams(JSON.decode(line))
+    } catch {
+    | exn ->
+      print_error(
+        "Decoding JSON failed: \"" + line + "\"\n" + exn.getMessage(),
+      );
+      skipExit(2)
+    }
 
   | None() ->
     print_error("Reading stdin for statement parameters failed\n");
@@ -224,7 +233,6 @@ untracked fun main(): void {
             .required()
             .about("Session id"),
         )
-        .arg(Cli.StringArg("filter").positional().about("SQL filter condition"))
         .arg(
           Cli.BoolArg("follow")
             .long("follow")
@@ -232,16 +240,16 @@ untracked fun main(): void {
             .about("Output appended data as the database grows"),
         )
         .arg(
+          Cli.BoolArg("read-spec").about(
+            "Read a tail spec for the subscription from stdin",
+          ),
+        )
+        .arg(
           Cli.StringArg("since")
             .long("since")
             .about("Starting time of the tail"),
         )
-        .arg(Cli.StringArg("user").about("Name of the user"))
-        .arg(
-          Cli.BoolArg("expect-query-params").about(
-            "Read values of named parameters which may appear in the filter condition. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
-          ),
-        ),
+        .arg(Cli.StringArg("user").about("Name of the user")),
     )
     .subcommand(
       Cli.Command("subscribe")
@@ -579,203 +587,25 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
   followMode = args.getBool("follow");
-  tick = args.maybeGetString("since") match {
+
+  defaultSince = args.maybeGetString("since") match {
   | Some(since) -> since.toInt()
   | _ -> 0
   };
-  init = true;
 
-  gContext = SKStore.gContextGet();
-  (subFilter, dirName) = gContext.sessions.maybeGet(sessionID) match {
-  | None() ->
-    print_error("Error: session not found");
-    skipExit(2)
-  | Some(sub) if (sub.dirSubs.size() == 1) ->
-    (sub.dirSubs[0].filter, sub.dirSubs[0].dirName)
-  | Some(_) ->
-    print_error("Error: tail only supports a single dir sub currently");
-    skipExit(2)
-  };
+  user = args.maybeGetString("user");
 
-  tableName = SKDB.Name::create(
-    dirName.toString().stripPrefix("/").stripSuffix("/"),
-  );
-  filter1 = args.maybeGetString("filter") match {
-  | None() ->
-    if (options.expectQueryParams) {
-      print_error("Cannot pass parameters without filter condition");
-      skipExit(2)
-    };
-    subFilter
-  | Some(strCond) ->
-    params = queryParams(options);
-    compiler = SKDB.Compiler::create(false, options, 0, params);
-    (_, ast) = SKDB.parseExpr(SKDB.Lexer(0, SKDB.Buffer(strCond)), 0);
-    compilerContext = gContext.mclone();
-    _ = compiler.compileFrom(
-      compilerContext,
-      Array[SKDB.FromTable{name => tableName, asName => None()}],
-    );
-    e = compiler.compileExpr(compilerContext, ast) match {
-    | SKDB.CIExpr(x) -> x
-    | _ ->
-      print_error("Unexpected type for filter expression");
-      skipExit(2)
-    };
-    (context, isReset) ~> {
-      mcontext = context.mclone();
-      conditionFilter = subFilter(context, isReset);
-      baseName -> {
-        inputRow = baseName match {
-        | SKDB.RowKey(row, _) -> row
-        | _ ->
-          print_error("Unexpected table entry type");
-          skipExit(2)
-        };
-        evaluator = SKDB.ExprEvaluator(Array[inputRow], Array[], None());
-
-        evaluator.evalCIExpr(mcontext, e) match {
-        | SKDB.ANull()
-        | SKDB.ADef(0) ->
-          false
-        | SKDB.AUndef()
-        | SKDB.ADef(_) ->
-          conditionFilter(baseName)
-        }
-      }
+  spec = if (args.getBool("read-spec")) {
+    input = slurpStdin();
+    lookup = decodeTailSpec(input, defaultSince);
+    name -> lookup.get(name)
+  } else {
+    _ -> {
+      TailSpec{since => defaultSince, filter => None(), params => Map[]}
     }
   };
 
-  userIDOpt = args.maybeGetString("user");
-  filter = args.maybeGetString("user") match {
-  | None() -> filter1
-  | Some(userID) ->
-    (context, isReset) ~> {
-      user = SKDB.UserFile::create(context, userID);
-      sqlTable = getSqlTableFromDirName(context, dirName);
-
-      oldFilter = filter1(context, isReset);
-
-      baseName -> {
-        oldFilter(baseName) &&
-          baseName match {
-          | SKDB.RowKey(row, _) ->
-            SKDB.checkUserCanReadRow(context, user, sqlTable, row) match {
-            | SKDB.AROK() -> true
-            | _ -> false
-            }
-          | _ ->
-            print_error("Unexpected table entry type");
-            skipExit(2)
-          };
-      }
-    }
-  };
-
-  forceReset = false;
-
-  loop {
-    localObstack = SKStore.newObstack();
-    context = SKStore.gContextGet();
-    (sub, dirSub) = context.sessions.maybeGet(sessionID) match {
-    | None() ->
-      print_error("Error: session not found");
-      skipExit(2)
-    | Some(s) if (s.dirSubs.size() == 1) -> (s, s.dirSubs[0])
-    | Some(_) ->
-      print_error("Error: tail only supports a single dir sub currently");
-      skipExit(2)
-    };
-    invariant(dirName == dirSub.dirName);
-
-    SKDB.getFinalState(context, sub.destinationSource) match {
-    | Some(SKDB.RSError()) ->
-      print_raw(":reboot\n");
-      break void
-    | _ -> void
-    };
-
-    edir = context.unsafeGetEagerDir(dirName);
-    format = options.format match {
-    | SKDB.OFK_CSV() -> SKStore.OCSV()
-    | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
-    | SKDB.OFK_SQL() -> SKStore.OSQL()
-    | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
-    | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
-    };
-
-    (isReset, changes) = edir.getChangesAfter(SKStore.Tick(tick), forceReset);
-    !forceReset = false;
-
-    // Write checkpoints out at least every `checkpointInterval` rows during
-    // initialization, so that the client can start processing without waiting
-    // for the full changeset.
-    // this value is chosen based on some unscientific local testing
-    checkpointInterval = if (init) 512 else Int::max;
-
-    writer = mutable Debug.BufferedWriter(print_raw, 4096);
-    producedOutput = edir.writeDiff(
-      context,
-      isReset,
-      changes,
-      writer,
-      dirSub.entity,
-      format,
-      filter,
-      dirSub.getDestinationWatermark(context),
-      checkpointInterval,
-    );
-    // produce checkpoint for flushing and committing
-    if (init || producedOutput) {
-      // always do this on first iteration to ensure we output a
-      // checkpoint without delay so that the downstreams knows that
-      // it has received everything without waiting for the condvar
-      // timeout
-      writer.write(":" + context.tick.value.toString() + "\n");
-      writer.flush();
-      flushStdout();
-    };
-
-    !tick = context.tick.value;
-    !init = false;
-    lock = SKStore.unfreezeLock(sub.lock);
-    cond = SKStore.unfreezeCond(sub.cond);
-    SKStore.mutexLock(lock);
-    while ({
-      !forceReset &&
-        {
-          newContext = SKStore.gContextGet();
-          followMode &&
-            newContext.unsafeMaybeGetEagerDir(dirName) match {
-            | None() -> false
-            | Some(dir) ->
-              (newIsReset, newChanges) = dir.getChangesAfter(
-                SKStore.Tick(tick),
-              );
-              !newIsReset && newChanges.isEmpty()
-            }
-        }
-    }) {
-      timeoutSecs = 10;
-      _ = SKStore.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
-      print_raw(":" + tick.toString() + "\n");
-      flushStdout();
-      if (
-        SKDB.userPrivacyChanged(
-          SKStore.gContextGet(),
-          userIDOpt,
-          SKStore.Tick(tick),
-        )
-      ) {
-        !forceReset = true;
-      };
-    };
-    SKStore.mutexUnlock(lock);
-    SKStore.destroyObstack(localObstack);
-    if (!followMode) {
-      break void
-    }
-  }
+  tailSub(options, followMode, sessionID, user, spec)
 }
 
 fun execWatermark(args: Cli.ParseResults, options: SKDB.Options): void {
