@@ -81,6 +81,11 @@ fun tailShouldWake(
   sub: SKStore.Sub,
   tick: SKStore.Tick,
 ): Bool {
+  SKDB.getFinalState(context, sub.destinationSource) match {
+  | Some(SKDB.RSError()) -> return true
+  | _ -> void
+  };
+
   for (dirSub in sub.dirSubs) {
     context.unsafeMaybeGetEagerDir(dirSub.dirName) match {
     | None() -> void
