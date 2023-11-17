@@ -38,9 +38,10 @@ CREATE TABLE skdb_group_permissions(
   skdb_access STRING NOT NULL
 );
 
-CREATE VIRTUAL VIEW skdb_groups_users as
-  SELECT userID as groupID from skdb_users UNION ALL
-  SELECT groupID from skdb_groups GROUP BY groupID
+CREATE VIRTUAL VIEW skdb_groups_users AS
+  SELECT userID AS groupID FROM skdb_users
+  UNION ALL
+  SELECT groupID FROM skdb_groups GROUP BY groupID
 ;
 
 CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
@@ -57,7 +58,7 @@ CREATE VIRTUAL VIEW skdb_group_permissions_joined AS
    AND skdb_group_permissions.skdb_access = skdb_groups.adminID
 ;
 
-CREATE UNIQUE INDEX skdb_group_permissions_joined_index on
+CREATE UNIQUE INDEX skdb_group_permissions_joined_index ON
   skdb_group_permissions_joined(groupID, userID)
 ;
 
