@@ -239,19 +239,21 @@ const check_expectations = async function(skdb, client, latest_id) {
     "pk_privacy_ro"
   );
 
-  // check_expectation(
-  //   skdb,
-  //   `select count(*) as n
-  //    from pk_privacy_rw
-  //    where client = @client`,
-  //   params,
-  //   [
-  //     {
-  //       n: latest_id % 60 < 30 ? 1 : 0,
-  //     },
-  //   ],
-  //   "pk_privacy_rw"
-  // );
+  // cannot just look at count here as we may have updated the row and
+  // so it will not be removed.
+  check_expectation(
+    skdb,
+    `select NOT (@latest_id % 60 < 30 AND count(*) <> 1) as check
+     from pk_privacy_rw
+     where client = @client`,
+    params,
+    [
+      {
+        check: 1,
+      },
+    ],
+    "pk_privacy_rw"
+  );
 
   pause_modifying = false;
 };
