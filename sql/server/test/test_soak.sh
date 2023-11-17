@@ -149,26 +149,18 @@ monitor() {
     cat $client2_out|tr -d '\0'
     truncate -s 0 $client2_out
 
-    wait $client1 $client2
+    wait -n $client1 $client2
 }
 trap 'monitor' SIGUSR1
 
 echo "To monitor progress send SIGUSR1 to $$."
 echo 'Or: kill -USR1 $(pgrep test_soak.sh)'
 
-wait $client1 $client2
+wait -n $client1 $client2
 
 kill "$(cat "$SERVER_PID_FILE")"
 
-if [[ -z $(diff -q $client1_out $client2_out) ]]
-then
-    echo PASS
-    exit 0
-else
-    echo FAIL
-    echo 1:
-    cat $client1_out
-    echo 2:
-    cat $client2_out
-    exit 1
-fi
+echo "===============================================================================>"
+echo "Something failed. Logs are at: $SERVER_LOG $client1_out $client2_out"
+echo "<==============================================================================="
+exit 1
