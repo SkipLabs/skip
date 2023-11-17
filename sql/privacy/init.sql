@@ -30,7 +30,7 @@ CREATE TABLE skdb_groups(
   skdb_access STRING NOT NULL
 );
 
--- INTERNAL TABLE: DO NOT CHANGE DEFINITION
+--- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_group_permissions(
   groupID STRING NOT NULL,
   userID STRING,
@@ -45,6 +45,7 @@ CREATE VIRTUAL VIEW skdb_groups_users as
 
 CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
 
+-- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE VIRTUAL VIEW skdb_group_permissions_joined AS
   SELECT
     skdb_group_permissions.groupID,
