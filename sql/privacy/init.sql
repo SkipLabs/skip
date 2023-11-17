@@ -41,7 +41,7 @@ CREATE TABLE skdb_group_permissions(
 CREATE VIRTUAL VIEW skdb_groups_users AS
   SELECT userID AS groupID FROM skdb_users
   UNION ALL
-  SELECT groupID FROM skdb_groups GROUP BY groupID
+  SELECT groupID FROM skdb_groups
 ;
 
 CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
