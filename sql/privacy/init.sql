@@ -73,7 +73,7 @@ INSERT INTO skdb_groups
 ;
 
 INSERT INTO skdb_group_permissions
-  VALUES ('read-only-root', NULL, 4, 'root')
+  VALUES ('read-only-root', NULL, skdb_permission('r'), 'root')
 ;
 
 -- read-only is visible by everyone, but only the root can change the
@@ -84,7 +84,7 @@ INSERT INTO skdb_groups
 ;
 
 INSERT INTO skdb_group_permissions
-  VALUES ('read-only', NULL, 4, 'read-only-root')
+  VALUES ('read-only', NULL, skdb_permission('r'), 'read-only-root')
 ;
 
 -- write-only is visible by everyone, but only the root can change the
@@ -95,7 +95,7 @@ INSERT INTO skdb_groups
 ;
 
 INSERT INTO skdb_group_permissions
-  VALUES ('write-only', NULL, 3, 'read-only-root')
+  VALUES ('write-only', NULL, skdb_permission('di'), 'read-only-root')
 ;
 
 -- read-write is visible by everyone, but only the root can change the
@@ -106,5 +106,5 @@ INSERT INTO skdb_groups
 ;
 
 INSERT INTO skdb_group_permissions
-  VALUES ('read-write', NULL, 7, 'read-only-root')
+  VALUES ('read-write', NULL, skdb_permission('dir'), 'read-only-root')
 ;
