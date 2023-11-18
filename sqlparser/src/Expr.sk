@@ -120,7 +120,7 @@ extension class Parser {
       }
     | TWord(value, Some _, None _) -> this.parseIdentifier(Name::create(value))
     | TWord(value, None _, None _) -> this.parseIdentifierOrSpecialValue(value)
-    | _ -> throw UnexpectedTokenError(pos, "expression")
+    | token -> throw UnexpectedTokenError(token, "expected expression", pos)
     }
   }
 
@@ -174,7 +174,7 @@ extension class Parser {
       error_pos = this.current_pos();
       arg = this.parseExpr() match {
       | x @ Value _ -> x
-      | _ -> throw UnexpectedTokenError(error_pos, "literal value")
+      | e -> throw UnexpectedExpressionError(e, error_pos)
       };
       this.expect_token(TRParen());
       VPermission(arg)
@@ -327,10 +327,10 @@ extension class Parser {
       | TMatch() -> OMatch(true)
       | TRegexp() -> ORegexp(true)
       | TGlob() -> OGlob(true)
-      | _ -> this.errorUnexpectedToken(Some("MATCH or REGEXP or GLOB"))
+      | _ -> this.errorUnexpectedToken("expected MATCH or REGEXP or GLOB")
       }
     } else {
-      this.errorUnexpectedToken(Some("operator"))
+      this.errorUnexpectedToken("expected OPERATOR")
     }
   }
 
@@ -359,7 +359,7 @@ extension class Parser {
         this.parseLike(lhs_expr, true)
       } else {
         this.errorUnexpectedToken(
-          Some("NULL, IN, LIKE, MATCH, REGEXP, GLOB, or BETWEEN"),
+          "expected NULL, IN, LIKE, MATCH, REGEXP, GLOB, or BETWEEN",
         )
       }
     | TIsNull() ->

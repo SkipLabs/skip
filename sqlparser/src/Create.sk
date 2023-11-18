@@ -163,7 +163,7 @@ extension class Parser {
     if (this.parse_keyword(TWithout())) {
       this.peek_token() match {
       | TWord(id, _, _) if (id.uppercase() == "ROWID") -> this.tokens.advance()
-      | _ -> this.errorUnexpectedToken(Some("ROWID"))
+      | _ -> this.errorUnexpectedToken("expected ROWID")
       };
       return (false, true)
     } else {
@@ -190,49 +190,49 @@ extension class Parser {
       // TODO: Proper error messages. This currently misses the correct position.
       | Some(c @ CCPrimaryKey _) ->
         if (res.primary is Some _) {
-          this.errorUnexpectedToken(Some("Duplicate PRIMARY KEY constraint"))
+          this.errorUnexpectedToken("Duplicate PRIMARY KEY constraint")
         } else {
           !res = res with {primary => Some(c)}
         }
       | Some(c @ CCNotNull _) ->
         if (res.notNull is Some _) {
-          this.errorUnexpectedToken(Some("Duplicate NOT NULL constraint"))
+          this.errorUnexpectedToken("Duplicate NOT NULL constraint")
         } else {
           !res = res with {notNull => Some(c)}
         }
       | Some(c @ CCUnique _) ->
         if (res.unique is Some _) {
-          this.errorUnexpectedToken(Some("Duplicate UNIQUE constraint"))
+          this.errorUnexpectedToken("Duplicate UNIQUE constraint")
         } else {
           !res = res with {unique => Some(c)}
         }
       | Some(c @ CCCheck _) ->
         if (res.check is Some _) {
-          this.errorUnexpectedToken(Some("Duplicate CHECK constraint"))
+          this.errorUnexpectedToken("Duplicate CHECK constraint")
         } else {
           !res = res with {check => Some(c)}
         }
       | Some(c @ CCDefault _) ->
         if (res.default is Some _) {
-          this.errorUnexpectedToken(Some("Duplicate DEFAULT constraint"))
+          this.errorUnexpectedToken("Duplicate DEFAULT constraint")
         } else {
           !res = res with {default => Some(c)}
         }
       | Some(c @ CCCollate _) ->
         if (res.collate is Some _) {
-          this.errorUnexpectedToken(Some("Duplicate COLLATE constraint"))
+          this.errorUnexpectedToken("Duplicate COLLATE constraint")
         } else {
           !res = res with {collate => Some(c)}
         }
       | Some(c @ CCForeignKey _) ->
         if (res.foreignKey is Some _) {
-          this.errorUnexpectedToken(Some("Duplicate FOREIGN KEY constraint"))
+          this.errorUnexpectedToken("Duplicate FOREIGN KEY constraint")
         } else {
           !res = res with {foreignKey => Some(c)}
         }
       | Some(c @ CCGenerated _) ->
         if (res.generated is Some _) {
-          this.errorUnexpectedToken(Some("Duplicate GENERATED constraint"))
+          this.errorUnexpectedToken("Duplicate GENERATED constraint")
         } else {
           !res = res with {generated => Some(c)}
         }

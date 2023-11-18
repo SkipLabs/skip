@@ -5,9 +5,11 @@ mutable class Parser(tokens: mutable Tokenizer) {
     mutable Parser(Tokenizer::create(str))
   }
 
-  mutable fun next_stmt(): Result<?Stmt, Error> {
+  mutable fun next_stmt(
+    requireFinalSemicolon: Bool = false,
+  ): Result<?Stmt, Error> {
     Result<?Stmt, Error>::guard(() -> {
-      this._next_stmt()
+      this._next_stmt(requireFinalSemicolon)
     }) match {
     | Success(v) -> Success(v)
     | Failure(err @ Error _) -> Failure(err)
@@ -15,7 +17,7 @@ mutable class Parser(tokens: mutable Tokenizer) {
     }
   }
 
-  mutable fun _next_stmt(): ?Stmt {
+  mutable fun _next_stmt(requireFinalSemicolon: Bool): ?Stmt {
     loop {
       if (this.parse_token(TEOF())) {
         return None()
@@ -55,16 +57,16 @@ mutable class Parser(tokens: mutable Tokenizer) {
     | TRelease() ->
       this.errorNotImplemented()
     | _ ->
-      throw UnexpectedTokenError(
-        pos,
-        `Unexpected SQL statement starting with '${this.peek_token()}'`,
-      )
+      throw UnexpectedTokenError(this.peek_token(), "expected STATEMENT", pos)
     } with {pos};
 
-    if (this.parse_token(TSemiColon()) || this.parse_token(TEOF())) {
+    if (requireFinalSemicolon) {
+      this.expect_token(TSemiColon());
+      Some(stmt)
+    } else if (this.parse_token(TSemiColon()) || this.parse_token(TEOF())) {
       Some(stmt)
     } else {
-      this.errorUnexpectedToken(Some("semi-colon or EOF"))
+      this.errorUnexpectedToken("expected SEMICOLON or EOF")
     }
   }
 
@@ -164,7 +166,8 @@ mutable class Parser(tokens: mutable Tokenizer) {
     | TInteger(str) -> VInt(str.toInt())
     | THexInteger(str) -> VInt(Chars.hexDigitsToInt(str))
     | TFloat(str) -> VFloat(str.toFloat())
-    | _ -> throw UnexpectedTokenError(pos, "integer or float")
+    | token ->
+      throw UnexpectedTokenError(token, "expected INTEGER or FLOAT", pos)
     }
   }
 
@@ -215,7 +218,7 @@ mutable class Parser(tokens: mutable Tokenizer) {
 
   private mutable fun expect_token(expected: Token): void {
     if (!this.parse_token(expected)) {
-      this.errorUnexpectedToken(Some(expected.name()))
+      this.errorUnexpectedToken("expected " + expected.name())
     }
   }
 
@@ -237,7 +240,7 @@ mutable class Parser(tokens: mutable Tokenizer) {
 
   private mutable fun expect_keyword(expected: Keyword): void {
     if (!this.parse_keyword(expected)) {
-      this.errorUnexpectedToken(Some(expected.toString()))
+      this.errorUnexpectedToken("expected " + expected.toString())
     };
   }
 
@@ -256,7 +259,7 @@ mutable class Parser(tokens: mutable Tokenizer) {
   mutable fun expect_identifier(acceptKeyword: Bool = false): String {
     this.parse_identifier(acceptKeyword) match {
     | Some(id) -> id
-    | _ -> this.errorUnexpectedToken(Some("identifier"))
+    | _ -> this.errorUnexpectedToken("expected IDENTIFIER")
     }
   }
 
@@ -276,20 +279,17 @@ mutable class Parser(tokens: mutable Tokenizer) {
     | Some(res) -> res
     | None() ->
       this.errorUnexpectedToken(
-        Some(
+        "expected " +
           handlers.keys().map(t -> t.toString()).collect(Array).join(" or "),
-        ),
       )
     }
   }
 
   // Errors
 
-  private mutable fun errorUnexpectedToken<T>(expected: ?String): T {
+  private mutable fun errorUnexpectedToken<T>(reason: String): T {
     tok = this.peek_token_with_pos();
-    msg = `Unexpected token ${tok.token.name()}`;
-    expected.each(t -> !msg = msg + `, expected ${t}`);
-    throw UnexpectedTokenError(tok.position, msg)
+    throw UnexpectedTokenError(tok.token, reason, tok.position)
   }
 
   private mutable fun errorNotImplemented<T>(): T {
