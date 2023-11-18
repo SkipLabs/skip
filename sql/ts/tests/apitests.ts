@@ -130,7 +130,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
     await remote.exec("bad query", {});
   } catch (error) {
     const lines = getErrorMessage(error).split('\n');
-    expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
+    expect(lines[lines.length - 1]).toEqual("Unexpected token IDENTIFIER: expected STATEMENT");
   }
 
   const rows = await remote.exec("SELECT x,y FROM test_pk WHERE x=@x;", { x: 42 });
@@ -140,7 +140,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
     await remote.exec("bad query", {});
   } catch (error) {
     const lines = getErrorMessage(error).split('\n');
-    expect(lines[lines.length - 1]).toEqual("Unexpected SQL statement starting with 'bad'");
+    expect(lines[lines.length - 1]).toEqual("Unexpected token IDENTIFIER: expected STATEMENT");
   }
 }
 
@@ -225,7 +225,7 @@ async function testServerTail(root: SKDB, user: SKDB) {
     await remote.exec("insert into view_pk values (87,88,'GALL');", new Map());
     throw new Error("Shall throw exception.");
   } catch (exn) {
-    expect(getErrorMessage(exn)).toEqual("insert into view_pk values (87,88,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
+    expect(getErrorMessage(exn)).toEqual("insert into view_pk values (87,88,'GALL');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk");
   }
   await new Promise(resolve => setTimeout(resolve, 100));
   const vres = await user.exec("select count(*) as cnt from view_pk where x = 87 and y = 88");
@@ -253,7 +253,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     await user.exec("insert into view_pk values (97,98,'GALL');");
     throw new Error("Shall throw exception.");
   } catch (exn: any) {
-    expect(getErrorMessage(exn)).toEqual("insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk");
+    expect(getErrorMessage(exn)).toEqual("insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk");
   }
   await new Promise(resolve => setTimeout(resolve, 100));
   const vres = await remote!.exec(

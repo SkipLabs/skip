@@ -6,15 +6,38 @@ class IgnoreAndContinue() extends Exception {
   }
 }
 
-base class Error extends Exception
+base class Error extends Exception {
+  fun getPosition(): Int;
+}
 
 class SqlError(pos: Int, msg: String) extends Error {
+  fun getPosition(): Int {
+    this.pos
+  }
   fun getMessage(): String {
     this.msg
   }
 }
 
-class ParserError(err: SQLParser.Error) extends Error
+class UnfinishedTransactionError(pos: Int) extends Error {
+  fun getPosition(): Int {
+    this.pos
+  }
+
+  fun getMessage(): String {
+    "Unfinished transaction"
+  }
+}
+
+class ParserError(err: SQLParser.Error) extends Error {
+  fun getPosition(): Int {
+    this.err.getPosition()
+  }
+
+  fun getMessage(): String {
+    this.err.getMessage()
+  }
+}
 
 class Conflict(
   pos: Int,
