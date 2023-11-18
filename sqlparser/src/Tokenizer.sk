@@ -94,16 +94,11 @@ fun next_token(pos: mutable LexingPosition): Result<Token, TokenizerError> {
     res = mutable Vector[];
     takeWhile(pos, Chars.isHexDigit, res.push);
     if (!pos.peekChar('\'')) {
-      return Failure(InvalidTokenError(error_pos, "Unfinished hex string"))
+      return Failure(InvalidTokenError(error_pos))
     };
     pos.advance();
     if (res.size() % 2 != 0) {
-      return Failure(
-        InvalidTokenError(
-          error_pos,
-          "Invalid hex string (expected an even number of digits)",
-        ),
-      )
+      return Failure(InvalidTokenError(error_pos))
     };
     THexStringLiteral(String::fromChars(res.toArray()))
   | '(' ->
@@ -158,8 +153,7 @@ fun next_token(pos: mutable LexingPosition): Result<Token, TokenizerError> {
     | '=' ->
       pos.advance();
       TNeq()
-    | _ ->
-      return Failure(InvalidTokenError(error_pos, "Unexpected character '!'"))
+    | _ -> return Failure(InvalidTokenError(error_pos))
     }
   | '<' ->
     pos.advance();
@@ -211,10 +205,7 @@ fun next_token(pos: mutable LexingPosition): Result<Token, TokenizerError> {
     );
     TPlaceholder(String::fromChars(res.toArray()))
   | c if (Chars.isLetter(c) || c == '_') -> return tokenize_word(pos)
-  | c ->
-    return Failure(
-      InvalidTokenError(pos.getPosition(), `Unexpected character '${c}'`),
-    )
+  | _ -> return Failure(InvalidTokenError(pos.getPosition()))
   };
   Success(tok)
 }
@@ -279,8 +270,7 @@ private fun tokenize_quoted_string(
   res = mutable Vector[];
   loop {
     pos.peek() match {
-    | Chars.null ->
-      return Failure(InvalidTokenError(error_pos, "Unfinished string literal"))
+    | Chars.null -> return Failure(InvalidTokenError(error_pos))
     | c if (c == quote) ->
       pos.advance();
       pos.peek() match {
@@ -317,12 +307,7 @@ private fun tokenize_number(
     res.push(pos.next());
     takeWhile(pos, Chars.isHexDigit, res.push);
     if (res.size() == 0) {
-      return Failure(
-        InvalidTokenError(
-          error_pos,
-          "Malformed hex integer, expected at least one digit",
-        ),
-      )
+      return Failure(InvalidTokenError(error_pos))
     };
     return Success(THexInteger(String::fromChars(res.toArray())))
   };
@@ -352,9 +337,7 @@ private fun tokenize_number(
       !has_exp_digit = true
     });
     if (!has_exp_digit) {
-      return Failure(
-        InvalidTokenError(pos.getPosition(), "Malformed FLOAT exponent"),
-      )
+      return Failure(InvalidTokenError(pos.getPosition()))
     }
   | _ -> void
   };

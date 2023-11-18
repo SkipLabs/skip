@@ -1084,28 +1084,23 @@ fun getLine(buffer: Buffer, pos: Int): Int {
   line
 }
 
-fun printErrorAndExit(
-  lineOffset: Int,
-  buffer: Buffer,
-  pos: Int,
-  msg: String,
-): void {
+fun printError(input: String, error: Error): void {
+  buffer = Buffer(input);
   leftSpaces = 0;
   cursor = 0;
   line = 0;
-  !pos = min(buffer.size() - 1, pos);
-  while (pos - cursor > 0) {
-    if (buffer[pos - cursor] == '\n') {
-      !line = line + 1;
-      if (line == 1) {
-        !leftSpaces = cursor;
-      };
-      if (line == 5) break void;
+  pos = error.getPosition();
+  while (cursor < pos) {
+    if (cursor == buffer.size()) {
+      break void
     };
-    !cursor = cursor + 1
-  };
-  if (pos - leftSpaces < 0) {
-    !leftSpaces = pos;
+    if (buffer[cursor] == '\n') {
+      !line = line + 1;
+      !leftSpaces = 0;
+    } else {
+      !leftSpaces = leftSpaces + 1;
+    };
+    !cursor = cursor + 1;
   };
   right = 0;
   while (pos + right < buffer.size() && buffer[pos + right] != '\n') {
@@ -1115,16 +1110,15 @@ fun printErrorAndExit(
   txtEnd = min(buffer.size(), pos + right);
   print_error(buffer.slice(txtBegin, txtEnd));
   spaceBuffer = mutable Vector[];
-  for (_ in Range(0, leftSpaces - 1)) spaceBuffer.push(' ');
+  for (_ in Range(0, leftSpaces)) spaceBuffer.push(' ');
   margin = String::fromChars(spaceBuffer.toArray());
   print_error(margin + "^");
   print_error(margin + "|");
   print_error(margin + " ----- ERROR");
-  errLine = lineOffset + getLine(buffer, pos);
-  charPos = `characters ${leftSpaces}-${leftSpaces}`;
+  errLine = getLine(buffer, pos);
+  charPos = `character ${leftSpaces}`;
   print_error(`Error: line ${errLine}, ${charPos}:`);
-  print_error(msg);
-  skipExit(2)
+  print_error(error.getMessage())
 }
 
 fun evalWithContext(
@@ -1295,6 +1289,7 @@ fun eval(
   sql: String,
   options: Options,
   params: Map<String, P.Value>,
+  requireFinalSemicolon: Bool = false,
 ): Result<void, Error> {
   SKStore.withRegionValue(() ~> {
     SQLContext::withContext(options.sync, (ctx) ~> {
@@ -1303,12 +1298,12 @@ fun eval(
         isTransaction = false;
         statements = mutable Vector[];
         loop {
-          parser.next_stmt() match {
+          parser.next_stmt(requireFinalSemicolon) match {
           | Failure(err) ->
             return (Failure(ParserError(err)) : Result<void, Error>)
           | Success(None()) ->
             if (isTransaction) {
-              return Failure(SqlError(sql.length(), "Unfinished transaction"))
+              return Failure(UnfinishedTransactionError(sql.length()))
             };
             if (statements.isEmpty()) {
               return (Success(void) : Result<void, Error>)
@@ -1355,8 +1350,9 @@ fun slurpStmts(_options: Options): Array<P.Stmt> {
     parser.next_stmt() match {
     | Success(None()) -> break void
     | Success(Some(stmt)) -> stmts.push(stmt)
-    // TODO: Put pos on base error message (and use getMessage()).
-    | Failure(_) -> printErrorAndExit(0, Buffer(input), 0, "TODO")
+    | Failure(err) ->
+      printError(input, ParserError(err));
+      skipExit(1)
     }
   };
 

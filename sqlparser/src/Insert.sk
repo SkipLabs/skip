@@ -11,7 +11,7 @@ extension class Parser {
         None()
       }
     } else {
-      this.errorUnexpectedToken(Some("INSERT or REPLACE"))
+      this.errorUnexpectedToken("expected INSERT or REPLACE")
     };
 
     this.expect_keyword(TInto());
@@ -36,7 +36,7 @@ extension class Parser {
         } else if (this.parse_token(TRParen())) {
           break void
         } else {
-          this.errorUnexpectedToken(Some("comma or rparen"))
+          this.errorUnexpectedToken("expected COMMA or RPAREN")
         }
       };
       !columns = Some(res.toArray())
@@ -53,7 +53,7 @@ extension class Parser {
           | Some(upserts) ->
             if (onConflict is Some _) {
               // TODO: Proper error position.
-              this.errorUnexpectedToken(Some("Extraneous ON CONFLICT"))
+              this.errorUnexpectedToken("extraneous ON CONFLICT")
             };
             !onConflict = Some(upserts)
           | _ -> void
@@ -99,7 +99,7 @@ extension class Parser {
       } else if (this.parse_token(TRParen())) {
         break void
       } else {
-        this.errorUnexpectedToken(Some("comma or rparen"))
+        this.errorUnexpectedToken("expected COMMA or RPAREN")
       }
     };
     res.toArray()

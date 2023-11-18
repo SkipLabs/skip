@@ -170,7 +170,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   } catch (error) {
     const lines = getErrorMessage(error).split("\n");
     expect(lines[lines.length - 1]).toEqual(
-      "Unexpected SQL statement starting with 'bad'",
+      "Unexpected token IDENTIFIER: expected STATEMENT"
     );
   }
 
@@ -184,7 +184,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   } catch (error) {
     const lines = getErrorMessage(error).split("\n");
     expect(lines[lines.length - 1]).toEqual(
-      "Unexpected SQL statement starting with 'bad'",
+      "Unexpected token IDENTIFIER: expected STATEMENT"
     );
   }
 }
@@ -283,7 +283,7 @@ async function testServerTail(root: SKDB, user: SKDB) {
     throw new Error("Shall throw exception.");
   } catch (exn) {
     expect(getErrorMessage(exn)).toEqual(
-      "insert into view_pk values (87,88,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk",
+      "insert into view_pk values (87,88,'GALL');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk"
     );
   }
   await new Promise((resolve) => setTimeout(resolve, 100));
@@ -317,7 +317,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     // The following error message is duplicated due to how the wasm runtime
     // translates `exit()` syscalls into exceptions.
     expect(getErrorMessage(exn)).toEqual(
-      "insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\nInternal error: insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk"
+      "insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk\nInternal error: insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk"
     );
   }
   await new Promise((resolve) => setTimeout(resolve, 100));

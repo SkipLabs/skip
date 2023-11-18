@@ -355,27 +355,31 @@ untracked fun main(): void {
         if (!IO.stdin().isatty()) {
           input = read_to_end();
           SKDB.eval(input, options, params) match {
-          | Failure(SKDB.ParserError(P.UnexpectedTokenError(pos, msg)))
-          | Failure(SKDB.SqlError(pos, msg)) ->
-            SKDB.printErrorAndExit(0, Buffer(input), pos, msg)
-          | Failure(SKDB.ParserError(P.NotImplementedError(pos))) ->
-            SKDB.printErrorAndExit(0, Buffer(input), pos, "not implemented")
-          | Failure(SKDB.ParserError(P.InvalidTokenError(pos, msg))) ->
-            SKDB.printErrorAndExit(0, Buffer(input), pos, msg)
+          | Failure(err) ->
+            SKDB.printError(input, err);
+            skipExit(1)
           | Success _ -> void
           }
         } else {
           loop {
             SKStore.withRegionVoid(() ~> {
               input = "";
+              print_raw("skdb> ");
               loop {
-                print_raw("skdb> ");
                 read_line() match {
-                | Some(l) -> !input = input + l
-                | _ -> void
+                | Some(l) -> !input = input + l + " "
+                | None() -> skipExit(0)
                 };
-                SKDB.eval(input, options, params) match {
-                | Failure(SqlError(_, "Unfinished transaction")) -> continue
+                SKDB.eval(input, options, params, true) match {
+                | Failure(UnfinishedTransactionError _)
+                | Failure(
+                  ParserError(P.UnexpectedTokenError(P.TEOF(), _, _)),
+                ) ->
+                  print_raw(" ...> ");
+                  continue
+                | Failure(err) ->
+                  printError(input, err);
+                  break void
                 | _ -> break void
                 }
               }
