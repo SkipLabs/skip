@@ -1334,7 +1334,7 @@ private native fun gContextInit(Context): void;
 
 @debug
 @cpp_extern("SKIP_context_get")
-native fun gContextGet(): Context;
+native fun gUnsafeContextGet(): Context;
 
 @debug
 @cpp_extern("SKIP_context_get_unsafe")
@@ -1361,11 +1361,32 @@ native fun gHasContext(): UInt32;
 native fun gUnsafeFree(Context): void;
 
 @debug
+@cpp_extern("SKIP_unsafe_context_incr_ref_count")
+native fun gUnsafeIncrRefCount(Context): void;
+
+@debug
 @cpp_extern("SKIP_should_GC")
 native fun shouldGC(Obstack): UInt32;
 
 @cpp_extern("SKIP_print_persistent_size")
 native fun printPersistentSize(): void;
+
+/*****************************************************************************/
+/* Safe way to use a context. */
+/*****************************************************************************/
+
+fun withContext<T>(f: Context -> T): T {
+  context = gUnsafeContextGet();
+  try {
+    result = f(context);
+    gUnsafeFree(context);
+    result
+  } catch {
+  | exn ->
+    gUnsafeFree(context);
+    throw exn
+  }
+}
 
 base class ContextOp {
   children =
@@ -1388,7 +1409,7 @@ fun runWithGcIntern(
   | None() ->
     gGlobalLock();
     gContextGetNoLock()
-  | Some _ -> gContextGet()
+  | Some _ -> gUnsafeContextGet()
   };
   globals = initCtx.globals;
   loop {
@@ -1416,8 +1437,10 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
+        gUnsafeIncrRefCount(context);
         gGlobalUnlock();
         context.notifyAll(startTick);
+        gUnsafeFree(context);
         destroyObstack(pos)
       | Some _ ->
         !context = gContextSync(
@@ -1442,6 +1465,7 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
+        gUnsafeIncrRefCount(context);
         gGlobalUnlock();
         context.notifyAll(startTick);
         gUnsafeFree(context);
@@ -1456,7 +1480,6 @@ fun runWithGcIntern(
           underLockF,
         );
         context.notifyAll(startTick);
-        gUnsafeFree(context);
         return context
       }
     };
@@ -1486,6 +1509,7 @@ fun runLocked(
     if (sync) UInt32::truncate(1) else UInt32::truncate(0),
     None(),
   );
+  gUnsafeIncrRefCount(newRoot);
   gGlobalUnlock();
   newRoot.notifyAll(start);
   gUnsafeFree(newRoot);

@@ -122,32 +122,32 @@ fun tailSub(
   userIDOpt: ?String,
   spec: (Name -> TailSpec),
 ): void {
-  gContext = SKStore.gContextGet();
-
-  // rebuild the sub with extra filtering as supported by tail
-  sub = gContext.sessions.maybeGet(sessionID) match {
-  | None() ->
-    print_error("Error: session not found");
-    skipExit(2)
-  | Some(sub) ->
-    sub with {
-      dirSubs => sub.dirSubs.map(dirSub -> {
-        tableName = SKDB.Name::create(
-          dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
-        );
-        dirSub with {
-          filter => buildTailFilter(
-            gContext,
-            options,
-            dirSub,
-            userIDOpt,
-            spec(tableName),
-            tableName,
-          ),
-        }
-      }),
-    }
-  };
+  sub = SKStore.withContext(gContext -> {
+    // rebuild the sub with extra filtering as supported by tail
+    gContext.sessions.maybeGet(sessionID) match {
+    | None() ->
+      print_error("Error: session not found");
+      skipExit(2)
+    | Some(sub) ->
+      sub with {
+        dirSubs => sub.dirSubs.map(dirSub -> {
+          tableName = SKDB.Name::create(
+            dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
+          );
+          dirSub with {
+            filter => buildTailFilter(
+              gContext,
+              options,
+              dirSub,
+              userIDOpt,
+              spec(tableName),
+              tableName,
+            ),
+          }
+        }),
+      }
+    };
+  });
 
   tailWatermark: ?Int = None();
   init = true;
@@ -155,72 +155,77 @@ fun tailSub(
 
   loop {
     localObstack = SKStore.newObstack();
-    context = SKStore.gContextGet();
-
-    context.sessions.maybeGet(sessionID) match {
-    | None() ->
-      print_error("Error: session not found");
-      skipExit(2)
-    | Some(_) -> void
-    };
-
-    SKDB.getFinalState(context, sub.destinationSource) match {
-    | Some(SKDB.RSError()) ->
-      print_raw(":reboot\n");
-      break void
-    | _ -> void
-    };
-
-    writer = mutable Debug.BufferedWriter(print_raw, 4096);
-
-    producedAnyOutput = false;
-    for (dirSub in sub.dirSubs) {
-      dirName = dirSub.dirName;
-      edir = context.unsafeGetEagerDir(dirName);
-      format = options.format match {
-      | SKDB.OFK_CSV() -> SKStore.OCSV()
-      | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
-      | SKDB.OFK_SQL() -> SKStore.OSQL()
-      | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
-      | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
+    tick = SKStore.withContext<?Int>(context -> {
+      context.sessions.maybeGet(sessionID) match {
+      | None() ->
+        print_error("Error: session not found");
+        skipExit(2)
+      | Some(_) -> void
       };
-      (isReset, changes) = edir.getChangesAfter(
-        tailFrom(spec, dirSub, tailWatermark),
-        forceReset,
-      );
 
-      // Write checkpoints out at least every `checkpointInterval` rows during
-      // initialization, so that the client can start processing without waiting
-      // for the full changeset.
-      // this value is chosen based on some unscientific local testing
-      checkpointInterval = if (init) 512 else Int::max;
+      SKDB.getFinalState(context, sub.destinationSource) match {
+      | Some(SKDB.RSError()) ->
+        print_raw(":reboot\n");
+        return None()
+      | _ -> void
+      };
 
-      producedOutput = edir.writeDiff(
-        context,
-        isReset,
-        changes,
-        writer,
-        dirSub.entity,
-        format,
-        dirSub.filter,
-        dirSub.getDestinationWatermark(context),
-        checkpointInterval,
-      );
-      !producedAnyOutput = producedAnyOutput || producedOutput
+      writer = mutable Debug.BufferedWriter(print_raw, 4096);
+
+      producedAnyOutput = false;
+      for (dirSub in sub.dirSubs) {
+        dirName = dirSub.dirName;
+        edir = context.unsafeGetEagerDir(dirName);
+        format = options.format match {
+        | SKDB.OFK_CSV() -> SKStore.OCSV()
+        | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
+        | SKDB.OFK_SQL() -> SKStore.OSQL()
+        | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
+        | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
+        };
+        (isReset, changes) = edir.getChangesAfter(
+          tailFrom(spec, dirSub, tailWatermark),
+          forceReset,
+        );
+
+        // Write checkpoints out at least every `checkpointInterval` rows during
+        // initialization, so that the client can start processing without waiting
+        // for the full changeset.
+        // this value is chosen based on some unscientific local testing
+        checkpointInterval = if (init) 512 else Int::max;
+
+        producedOutput = edir.writeDiff(
+          context,
+          isReset,
+          changes,
+          writer,
+          dirSub.entity,
+          format,
+          dirSub.filter,
+          dirSub.getDestinationWatermark(context),
+          checkpointInterval,
+        );
+        !producedAnyOutput = producedAnyOutput || producedOutput
+      };
+
+      // produce checkpoint for flushing and committing
+      if (init || producedAnyOutput) {
+        // always do this on first iteration to ensure we output a
+        // checkpoint without delay so that the downstreams knows that
+        // it has received everything without waiting for the condvar
+        // timeout
+        writer.write(":" + context.tick.value.toString() + "\n");
+        writer.flush();
+        flushStdout();
+      };
+
+      Some(context.tick.value)
+    });
+
+    !tailWatermark = tick match {
+    | None() -> break void
+    | Some(_) -> tick
     };
-
-    // produce checkpoint for flushing and committing
-    if (init || producedAnyOutput) {
-      // always do this on first iteration to ensure we output a
-      // checkpoint without delay so that the downstreams knows that
-      // it has received everything without waiting for the condvar
-      // timeout
-      writer.write(":" + context.tick.value.toString() + "\n");
-      writer.flush();
-      flushStdout();
-    };
-
-    !tailWatermark = Some(context.tick.value);
     !init = false;
     !forceReset = false;
     lock = SKStore.unfreezeLock(sub.lock);
@@ -229,13 +234,16 @@ fun tailSub(
     while ({
       !forceReset &&
         {
-          newContext = SKStore.gContextGet();
-          follow &&
-            !tailShouldWake(
-              newContext,
-              sub,
-              SKStore.Tick(tailWatermark.fromSome()),
-            );
+          SKStore.withContext(newContext -> {
+            shouldWait =
+              follow &&
+              !tailShouldWake(
+                newContext,
+                sub,
+                SKStore.Tick(tailWatermark.fromSome()),
+              );
+            shouldWait
+          })
         }
     }) {
       timeoutSecs = 10;
@@ -243,14 +251,16 @@ fun tailSub(
       print_raw(":" + tailWatermark.fromSome().toString() + "\n");
       flushStdout();
       if (
-        SKDB.userPrivacyChanged(
-          SKStore.gContextGet(),
-          userIDOpt,
-          SKStore.Tick(tailWatermark.fromSome()),
-        )
+        SKStore.withContext(privacyContext -> {
+          SKDB.userPrivacyChanged(
+            privacyContext,
+            userIDOpt,
+            SKStore.Tick(tailWatermark.fromSome()),
+          )
+        })
       ) {
         !forceReset = true;
-      };
+      }
     };
     SKStore.mutexUnlock(lock);
     SKStore.destroyObstack(localObstack);
