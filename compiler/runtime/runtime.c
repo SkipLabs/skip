@@ -102,14 +102,17 @@ char* SKIP_unsafe_get_local_context() {
 void SKIP_context_init(char* obj) {
   sk_global_lock();
   char* context = SKIP_intern_shared(obj);
-  sk_decr_ref_count(context);
   sk_context_set_unsafe(context);
   sk_global_unlock();
 }
 
+void SKIP_unsafe_context_incr_ref_count(char* obj) {
+  sk_incr_ref_count(obj);
+}
+
 void SKIP_unsafe_free(char* context) {
   sk_global_lock();
-  sk_decr_ref_count(context);
+  sk_free_root(context);
   sk_global_unlock();
 }
 

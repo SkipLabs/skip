@@ -233,6 +233,71 @@ ginfo_t** ginfo_root = NULL;
 ginfo_t** ginfo = NULL;
 
 /*****************************************************************************/
+/* Debugging support for contexts. Set CTX_TABLE to 1 to use. */
+/*****************************************************************************/
+
+#define CTX_TABLE_CAPACITY 256
+#define CTX_TABLE 1
+#ifdef CTX_TABLE
+char* ctx_table[CTX_TABLE_CAPACITY];
+size_t ctx_table_size = 0;
+
+int sk_find_ctx(char* context) {
+  int i;
+  for(i = 0; i < ctx_table_size; i++) {
+    if(context == ctx_table[i]) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void sk_clean_ctx_table() {
+  int i = 0;
+  int j = 0;
+  for(; j < ctx_table_size; j++) {
+    int rcount = sk_get_ref_count(ctx_table[j]);
+    if(rcount < 0) {
+      fprintf(stderr, "Error: CTX_TABLE found negative ref count");
+      exit(102);
+    }
+    if(rcount == 0) {
+      continue;
+    }
+    if(i != j) {
+      ctx_table[i] = ctx_table[j];
+    }
+    i++;
+  }
+  ctx_table_size = i;
+}
+
+void sk_print_ctx_table() {
+  int i = 0;
+  fprintf(stderr, "---- CTX TABLE BEGIN -----\n");
+  for(; i < ctx_table_size; i++) {
+    fprintf(stderr, "%p, REF_COUNT: %lu\n", ctx_table[i], sk_get_ref_count(ctx_table[i]));
+  }
+  fprintf(stderr, "---- CTX TABLE END -------\n");
+}
+
+void sk_add_ctx(char* context) {
+  fprintf(stderr, "context is: %p\n", context);
+  int i = sk_find_ctx(context);
+  if(i < 0) {
+    if(ctx_table_size >= CTX_TABLE_CAPACITY) {
+      fprintf(stderr, "Error: CTX_TABLE reached maximum capacity");
+      exit(102);
+    }
+    ctx_table[ctx_table_size] = context;
+    ctx_table_size++;
+  }
+}
+
+#endif
+
+
+/*****************************************************************************/
 /* Global context access primitives. */
 /*****************************************************************************/
 
@@ -275,15 +340,15 @@ char* SKIP_context_get() {
   return context;
 }
 
+void sk_context_set_unsafe(char* obj) {
+  void* vobj = (void*)obj;
+  (*ginfo)->context = obj;
+}
+
 void sk_context_set(char* obj) {
   sk_global_lock();
   (*ginfo)->context = obj;
   sk_global_unlock();
-}
-
-void sk_context_set_unsafe(char* obj) {
-  void* vobj = (void*)obj;
-  __atomic_store(&(*ginfo)->context, &vobj, __ATOMIC_RELAXED);
 }
 
 /*****************************************************************************/
