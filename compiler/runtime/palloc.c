@@ -305,9 +305,6 @@ char* SKIP_context_get_unsafe() {
 
   if (context != NULL) {
     sk_incr_ref_count(context);
-    if ((*ginfo)->fileName == NULL && sk_get_ref_count(context) > 2) {
-      SKIP_throwInvalidSynchronization();
-    }
   }
 
   return context;
