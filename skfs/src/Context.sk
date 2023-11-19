@@ -1437,10 +1437,8 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
-        gUnsafeIncrRefCount(context);
         gGlobalUnlock();
         context.notifyAll(startTick);
-        gUnsafeFree(context);
         destroyObstack(pos)
       | Some _ ->
         !context = gContextSync(
@@ -1465,7 +1463,6 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
-        gUnsafeIncrRefCount(context);
         gGlobalUnlock();
         context.notifyAll(startTick);
         gUnsafeFree(context);
@@ -1480,6 +1477,7 @@ fun runWithGcIntern(
           underLockF,
         );
         context.notifyAll(startTick);
+        gUnsafeFree(context);
         return context
       }
     };
@@ -1509,7 +1507,6 @@ fun runLocked(
     if (sync) UInt32::truncate(1) else UInt32::truncate(0),
     None(),
   );
-  gUnsafeIncrRefCount(newRoot);
   gGlobalUnlock();
   newRoot.notifyAll(start);
   gUnsafeFree(newRoot);

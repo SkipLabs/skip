@@ -36,6 +36,11 @@ typedef uint64_t SkipInt;
 #define WORDSIZE 8
 #endif
 
+#ifdef CTX_TABLE
+void sk_clean_ctx_table();
+void sk_print_ctx_table();
+#endif
+
 /*****************************************************************************/
 /* The error code thrown by the runtime. */
 /*****************************************************************************/

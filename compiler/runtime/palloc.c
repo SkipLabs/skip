@@ -281,7 +281,6 @@ void sk_print_ctx_table() {
 }
 
 void sk_add_ctx(char* context) {
-  fprintf(stderr, "context is: %p\n", context);
   int i = sk_find_ctx(context);
   if(i < 0) {
     if(ctx_table_size >= CTX_TABLE_CAPACITY) {
@@ -339,6 +338,9 @@ char* SKIP_context_get() {
 void sk_context_set_unsafe(char* obj) {
   void* vobj = (void*)obj;
   (*ginfo)->context = obj;
+#ifdef CTX_TABLE
+  sk_add_ctx(obj);
+#endif
 }
 
 void sk_context_set(char* obj) {

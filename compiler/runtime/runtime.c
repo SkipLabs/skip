@@ -163,7 +163,12 @@ void* SKIP_context_sync_no_lock(uint64_t txTime, char* old_root, char* delta,
   sk_commit(new_root, sync);
   sk_free_root(old_root);
   sk_free_root(root);
+  sk_free_root(root);
   sk_free_external_pointers();
+#ifdef CTX_TABLE
+  sk_print_ctx_table();
+#endif
+  sk_incr_ref_count(new_root);
   return new_root;
 }
 
