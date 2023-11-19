@@ -37,6 +37,7 @@ typedef uint64_t SkipInt;
 #endif
 
 #ifdef CTX_TABLE
+#define CTX_TABLE_CAPACITY 256
 void sk_clean_ctx_table();
 void sk_print_ctx_table();
 #endif
