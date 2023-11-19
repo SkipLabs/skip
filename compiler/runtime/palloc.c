@@ -237,7 +237,6 @@ ginfo_t** ginfo = NULL;
 /*****************************************************************************/
 
 #define CTX_TABLE_CAPACITY 256
-#define CTX_TABLE 1
 #ifdef CTX_TABLE
 char* ctx_table[CTX_TABLE_CAPACITY];
 size_t ctx_table_size = 0;
