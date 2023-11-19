@@ -148,6 +148,11 @@ void sk_free_obj(sk_stack_t* st, char* obj) {
 }
 
 void sk_free_root(char* obj) {
+  fprintf(stderr, "FREEING ROOT: %p %lu\n", obj, sk_get_ref_count(obj));
+  if(sk_get_ref_count(obj) > 10000) {
+    fprintf(stderr, "FOUND BUG\n");
+    exit(23);
+  }
   sk_stack_t st_holder;
   sk_stack_t* st = &st_holder;
 
@@ -169,6 +174,9 @@ void sk_free_root(char* obj) {
   }
 
   sk_stack_free(st);
+#ifdef CTX_TABLE
+  sk_clean_ctx_table();
+#endif
 }
 
 void sk_free_external_pointers() {
