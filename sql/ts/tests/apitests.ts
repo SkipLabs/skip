@@ -251,6 +251,41 @@ async function testClientTail(root: SKDB, user: SKDB) {
   expect(resv).toEqual([{ cnt: 1 }]);
 }
 
+async function testLargeMirror(root: SKDB, user: SKDB) {
+  const rootRemote = await root.connectedRemote();
+  rootRemote!.exec("CREATE TABLE large (t INTEGER, skdb_access STRING);");
+  rootRemote!.exec("CREATE TABLE large_copy (t INTEGER, skdb_access STRING);");
+  await user.mirror("test_pk", "view_pk", "large");
+
+  const N = 10000;
+
+  for (let i = 0; i < N; i++) {
+    await user.exec("INSERT INTO large VALUES (@i, 'read-write');", {i});
+  }
+
+  const userRemote = await user.connectedRemote();
+  while (true) {
+    const awaitingSync = await userRemote.tablesAwaitingSync();
+    if (awaitingSync.size < 1) {
+      break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  await rootRemote!.exec("insert into large_copy select * from large", {});
+
+  const cnt = await rootRemote!.exec("select count(*) as n from large_copy", {});
+  expect(cnt).toEqual([{n: N}])
+
+  await user.mirror("test_pk", "view_pk", "large", "large_copy");
+
+  const localCnt = await user.exec("select count(*) as n from large", {});
+  expect(localCnt).toEqual([{n: N}])
+
+  const localCntCopy = await user.exec("select count(*) as n from large_copy", {});
+  expect(localCntCopy).toEqual([{n: N}])
+}
+
 async function testReboot(root: SKDB, user: SKDB) {
   const remote = await user.connectedRemote();
   let rebooted = false;
@@ -333,6 +368,8 @@ export const apitests = (asWorker) => {
         await testPrivacyRejectedChange(dbs.root, dbs.user);
 
         await testPrivacyRejectedTxn(dbs.root, dbs.user);
+
+        await testLargeMirror(dbs.root, dbs.user);
 
         // must come last: puts replication in to a permanent state of failure
         await testReboot(dbs.root, dbs.user);
