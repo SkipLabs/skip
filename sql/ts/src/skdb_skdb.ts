@@ -16,7 +16,7 @@ interface Exported {
   getVersion: () => number;
 }
 
-class SkdbHamdleImpl implements SkdbHandle {
+class SkdbHandleImpl implements SkdbHandle {
   runner: (fn: () => string) => Array<any>;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: Array<any>) => void) => { close: () => void }
@@ -405,7 +405,7 @@ class LinksImpl implements Links, ToWasm {
         },
       );
     }
-    let handle = new SkdbHamdleImpl(main, runner, watch, watchChanges);
+    let handle = new SkdbHandleImpl(main, runner, watch, watchChanges);
     let createSync = async (dbName?: string) => {
       let save: () => Promise<boolean> = async () => true;
       let storeName = dbName ? "SKDBStore" : null;
