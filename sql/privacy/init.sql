@@ -51,21 +51,6 @@ CREATE VIRTUAL VIEW skdb_groups_users AS
 
 CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
 
--- INTERNAL TABLE: DO NOT CHANGE DEFINITION
-CREATE VIRTUAL VIEW skdb_group_permissions_joined AS
-  SELECT
-    skdb_group_permissions.groupID,
-    skdb_group_permissions.userID,
-    skdb_group_permissions.permissions,
-    skdb_group_permissions.skdb_access
-  FROM skdb_group_permissions, skdb_groups
- WHERE skdb_group_permissions.groupID = skdb_groups.groupID
-;
-
-CREATE UNIQUE INDEX skdb_group_permissions_joined_index ON
-  skdb_group_permissions_joined(groupID, userID)
-;
-
 -------------------------------------------------------------------------------
 -- Some default groups
 -------------------------------------------------------------------------------

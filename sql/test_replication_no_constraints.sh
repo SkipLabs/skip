@@ -532,6 +532,17 @@ test_replication_privacy_rejection_and_feedback() {
 
     assert_line_count "$local_feedback_rows" good 0
     assert_line_count "$local_feedback_rows" bad 1
+
+    #test_user can't manage permissions in GALL since they're not an admin
+    perms_stderr=$(mktemp)
+    perms_stdout=$(mktemp)
+    $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user >"$perms_stdout" 2>"$perms_stderr" <<EOF
+^skdb_group_permissions
+1	"GALL","test_user",7,"test_user"
+:1
+EOF
+    assert_line_count "$perms_stderr" "cannot manage permissions for group GALL" 1
+    assert_line_count "$perms_stdout" "skdb_group_permissions__skdb_mirror_feedback" 1
 }
 
 ################################################################################

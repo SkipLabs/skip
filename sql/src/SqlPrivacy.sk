@@ -50,6 +50,7 @@ const skdbAuthorColName: Name = Name::create("skdb_author");
 const skdbAccessColName: Name = Name::create("skdb_access");
 const groupIDColName: Name = Name::create("groupID");
 const userIDColName: Name = Name::create("userID");
+const adminIDColName: Name = Name::create("adminID");
 const permissionsColName: Name = Name::create("permissions");
 
 /*****************************************************************************/
@@ -288,13 +289,36 @@ class SKDBUserPermissions extends PredefinedTable {
 }
 
 /*****************************************************************************/
-/* The skdb_group_permissions_joined table. */
+/* The skdb_groups table. */
+/*****************************************************************************/
+
+const skdbGroups: SKDBGroups = SKDBGroups::create();
+
+class SKDBGroups extends PredefinedTable {
+  const name: Name = Name::create("skdb_groups");
+
+  const schemaText: String = `(
+  groupID STRING PRIMARY KEY,
+  skdb_author STRING,
+  adminID STRING NOT NULL,
+  skdb_access STRING NOT NULL
+  )`;
+
+  const indexedFields: Array<Name> = Array[groupIDColName];
+  fun makeKey(groupID: String): IndexProjKey {
+    IndexProjKey(
+      Array[(this.getColNbr(groupIDColName), Some(CString(groupID)))],
+    )
+  }
+}
+/*****************************************************************************/
+/* The skdb_group_permissions table. */
 /*****************************************************************************/
 
 const skdbGroupPermissions: SKDBGroupPermissions = SKDBGroupPermissions::create();
 
 class SKDBGroupPermissions extends PredefinedTable {
-  const name: Name = Name::create("skdb_group_permissions_joined");
+  const name: Name = Name::create("skdb_group_permissions");
 
   const schemaText: String = `(
     groupID STRING NOT NULL,
@@ -333,6 +357,7 @@ base class AccessResultError{userID: String} uses Show {
   | ARENullAuthor{}
   | AREWrongAuthor{foundUserName: String}
   | AREWrongAuthorType{}
+  | ARENotAdmin{groupID: String}
   | ARECannotDelete{groupID: String}
   | ARECannotInsert{groupID: String}
   | ARECannotDeleteFromTable{tableName: String}
@@ -359,6 +384,12 @@ base class AccessResultError{userID: String} uses Show {
       ")"
   | AREWrongAuthorType{} ->
     "skdb_author is expected to be a userID" + " (user " + this.userID + ")"
+  | ARENotAdmin{groupID} ->
+    "cannot manage permissions for group " +
+      groupID +
+      " (user " +
+      this.userID +
+      ")"
   | ARECannotDelete{groupID} ->
     "cannot delete with skdb_access set to " +
       groupID +
@@ -429,6 +460,38 @@ fun checkUserCanWriteRow(
   groupIdxOption: ?Int,
   row: RowValues,
 ): AccessResult {
+  if (makeTableName().lowercase() == SKDBGroupPermissions::name.lower) {
+    // Check that only group admins can insert/delete rows
+    // to SKDBGroupPermissions for that group
+    groupIDIdx = skdbGroupPermissions.getColNbr(groupIDColName);
+    groupID = row.getValue(groupIDIdx) match {
+    | Some(CString(groupID)) -> groupID
+    | _ ->
+      throw Error(0, "groupID is a non-null string in skdb_group_permissions")
+    };
+
+    groupIndex = skdbGroups.getIndex(context);
+    adminID = groupIndex.get(skdbGroups.makeKey(groupID)) match {
+    | Some(r) -> r.getString(adminIDColName)
+    | None() -> throw Error(0, "malformed predefined table skdb_groups")
+    };
+
+    groupPermIndex = skdbGroupPermissions.getIndex(context);
+    adminRow = groupPermIndex.get(
+      skdbGroupPermissions.makeKey(adminID, Some(access.userID)),
+    ) match {
+    | r @ Some(_) -> r
+    | None() ->
+      groupPermIndex.get(skdbGroupPermissions.makeKey(adminID, None()))
+    };
+    adminPerm = adminRow match {
+    | None() -> Permission::none()
+    | Some(r) -> Permission(r.getInt(permissionsColName))
+    };
+    if ((row.repeat == 0 && !adminPerm.canDelete()) || !adminPerm.canInsert()) {
+      return ARError(ARENotAdmin{userID => access.userID, groupID => groupID})
+    }
+  };
   authorIdxOption match {
   | None() -> void
   | Some(authorIdx) ->
