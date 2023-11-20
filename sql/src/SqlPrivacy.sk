@@ -475,20 +475,24 @@ fun checkUserCanWriteRow(
     | Some(r) -> r.getString(adminIDColName)
     | None() -> throw Error(0, "malformed predefined table skdb_groups")
     };
-
-    groupPermIndex = skdbGroupPermissions.getIndex(context);
-    adminRow = groupPermIndex.get(
-      skdbGroupPermissions.makeKey(adminID, Some(access.userID)),
-    ) match {
-    | r @ Some(_) -> r
-    | None() ->
-      groupPermIndex.get(skdbGroupPermissions.makeKey(adminID, None()))
-    };
-    adminPerm = adminRow match {
-    | None() -> Permission::none()
-    | Some(r) -> Permission(r.getInt(permissionsColName))
-    };
-    if ((row.repeat == 0 && !adminPerm.canDelete()) || !adminPerm.canInsert()) {
+    hasAdminPrivileges =
+      adminID == access.userID ||
+      {
+        groupPermIndex = skdbGroupPermissions.getIndex(context);
+        adminRow = groupPermIndex.get(
+          skdbGroupPermissions.makeKey(adminID, Some(access.userID)),
+        ) match {
+        | r @ Some(_) -> r
+        | None() ->
+          groupPermIndex.get(skdbGroupPermissions.makeKey(adminID, None()))
+        };
+        adminPerm = adminRow match {
+        | None() -> Permission::none()
+        | Some(r) -> Permission(r.getInt(permissionsColName))
+        };
+        (row.repeat == 0 && adminPerm.canDelete()) || adminPerm.canInsert()
+      };
+    if (!hasAdminPrivileges) {
       return ARError(ARENotAdmin{userID => access.userID, groupID => groupID})
     }
   };
