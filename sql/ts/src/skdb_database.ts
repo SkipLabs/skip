@@ -145,8 +145,7 @@ export class SKDBSyncImpl implements SKDBSync {
     // Setting up local privacy checks
     await this.mirror("skdb_user_permissions", "skdb_groups", "skdb_group_permissions");
     await this.exec(
-      "CREATE UNIQUE INDEX skdb_permissions_group_user ON" +
-        "  skdb_group_permissions(groupID, userID);"
+      "CREATE UNIQUE INDEX skdb_permissions_group_user ON skdb_group_permissions(groupID, userID);"
     );
     await this.exec(
       "CREATE VIRTUAL VIEW skdb_group_permissions_joined AS\n" +
