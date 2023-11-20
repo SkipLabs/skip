@@ -536,7 +536,13 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
     | None() ->
       input = slurpStdin();
       spec = decodeDiffSpec(input);
-      (name -> spec.get(name))
+      (name ->
+        spec.maybeGet(name) match {
+        | Some(x) -> x
+        | None() ->
+          print_error(`Could not find table ${name} in diff spec`);
+          skipExit(2)
+        })
     | Some(v) -> (_ -> SKStore.Tick(v))
     };
 

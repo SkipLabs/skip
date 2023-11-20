@@ -1532,23 +1532,23 @@ class SKDBServer implements RemoteSKDB {
   }
 
   async tablesAwaitingSync() {
-    const acc = new Set<string>();
-    for (const table of this.mirroredTables) {
-      // TODO: if we parse the diff output we can provide an object
-      // model representing the rows not yet ack'd.
-      if (this.localTailSession === undefined) continue;
-      const diff = this.client.diff(
-        this.localTailSession,
-        new Map([[table, this.client.watermark(
-          this.replicationUid,
-          serverResponseTable(table)
-        )]]),
-      );
-      if (diff !== null) {
-        acc.add(table);
-      }
+    if (this.localTailSession === undefined) {
+      return new Set<string>();
     }
-    return acc;
+
+    const spec = new Map();
+    for (const t of this.mirroredTables) {
+      spec.set(t, this.client.watermark(
+        this.replicationUid,
+        serverResponseTable(t)
+      ));
+    }
+    const diff = this.client.diff(this.localTailSession, spec);
+
+    if (diff !== null) {
+      return this.mirroredTables;
+    }
+    return new Set<string>();
   }
 
   async mirror(...tables: MirrorDefn[]): Promise<void> {
