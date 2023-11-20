@@ -34,10 +34,20 @@ extern "C" {
 #ifndef RELEASE
 #include <backtrace.h>
 
+typedef struct {
+  char* head;
+  char* page;
+  char* end;
+} sk_saved_obstack_t;
+
+
+
 extern "C" {
 char* sk2c_string(char* skStr);
 void* sk_get_exception_type(void* skExn);
 void* sk_get_exception_message(void* skExn);
+sk_saved_obstack_t* SKIP_new_Obstack();
+void SKIP_destroy_Obstack(sk_saved_obstack_t* saved);
 }
 
 namespace {
@@ -330,12 +340,15 @@ void __attribute__((constructor)) premain() {
 }
 
 int main(int pargc, char** pargv) {
+  sk_saved_obstack_t* saved;
   argc = pargc;
   argv = pargv;
   std::set_terminate(terminate);
   SKIP_memory_init(pargc, pargv);
+  saved = SKIP_new_Obstack();
   SKIP_initializeSkip();
   sk_persist_consts();
+  SKIP_destroy_Obstack(saved);
   skip_main();
 }
 

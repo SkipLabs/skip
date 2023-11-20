@@ -63,6 +63,8 @@ typedef struct {
   char* end;
 } sk_saved_obstack_t;
 
+sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
+
 size_t sk_page_size(char* page) {
   return *(size_t*)(page + sizeof(char*));
 }
@@ -177,11 +179,12 @@ sk_saved_obstack_t * sk_saved_obstack(char* page) {
 }
 
 sk_saved_obstack_t* SKIP_new_Obstack() {
+  sk_saved_obstack_t* saved;
   if (head == NULL && page == NULL && end == NULL) {
-    sk_new_page();
+    saved = &init_saved;
+  } else {
+    saved = sk_saved_obstack(page);
   }
-
-  sk_saved_obstack_t* saved = sk_saved_obstack(page);
 
   if (saved->head != NULL || saved->page != NULL || saved->end != NULL) {
     #ifdef SKIP64
