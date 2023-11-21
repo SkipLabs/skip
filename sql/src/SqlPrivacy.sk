@@ -48,7 +48,6 @@ value class Permission(private perm: Int) {
 
 const skdbAuthorColName: Name = Name::create("skdb_author");
 const skdbAccessColName: Name = Name::create("skdb_access");
-const tableNameColName: Name = Name::create("tableName");
 const groupIDColName: Name = Name::create("groupID");
 const userIDColName: Name = Name::create("userID");
 const permissionsColName: Name = Name::create("permissions");
@@ -358,7 +357,7 @@ base class AccessResultError{userID: String} uses Show {
       this.userID +
       ")"
   | AREWrongAuthorType{} ->
-    "skdb_author is expected to be an integer" + " (user " + this.userID + ")"
+    "skdb_author is expected to be a userID" + " (user " + this.userID + ")"
   | ARECannotDelete{groupID} ->
     "cannot delete with skdb_access set to " +
       groupID +
@@ -398,7 +397,7 @@ fun checkUserCanReadRow(
     // There is no skdb_access column, but we have access to the table
     AROK()
   | Some(colNbr) ->
-    // There is a skdb_access column, let's check that we have the rights
+    // There is an skdb_access column, let's check that we have the rights
     row.getString(colNbr) match {
     | None() ->
       // skdb_access is set to NULL: no access
