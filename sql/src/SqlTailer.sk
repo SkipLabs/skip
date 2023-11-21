@@ -183,10 +183,17 @@ fun tailSub(
         | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
         | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
         };
-        (isReset, changes) = edir.getChangesAfter(
-          tailFrom(spec, dirSub, tailWatermark),
-          forceReset,
-        );
+        since = tailFrom(spec, dirSub, tailWatermark);
+        (isReset, changes) = if (since.value > 0) {
+          (isReset, changes) = edir.getChangesAfter(since, forceReset);
+          (isReset, changes.iterator())
+        } else {
+          // if since is zero, the receiver is specifying that they
+          // have no data to tail since. to avoid a likely reset and
+          // allow chunking, we stream the current state of the table
+          // and begin tailing from here.
+          (false, edir.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
+        };
 
         // Write checkpoints out at least every `checkpointInterval` rows during
         // initialization, so that the client can start processing without waiting
