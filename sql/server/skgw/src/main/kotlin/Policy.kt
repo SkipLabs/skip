@@ -236,6 +236,10 @@ class LeakyBucket(val drainRatePerSecond: Double) {
     val tMillis = l / drainRatePerSecond * 1000
     return Duration.ofMillis(tMillis.toLong()) // truncate, we don't need too much resolution
   }
+
+  fun clear() {
+    level.set(0)
+  }
 }
 
 class RateLimitRequestsPerConnection(
@@ -332,9 +336,11 @@ class ThrottleDataTransferPerConnection(
         val wait = bucket.fill(request.data.remaining())
 
         // for anything <= threshold, let's not worry, otherwise pause
-        // and schedule resumption
-        val threshold = Duration.ofMillis(1)
+        // and schedule resumption. threshold is chosen based on
+        // empirical scheduling granularity
+        val threshold = Duration.ofMillis(10)
         if (wait.compareTo(threshold) > 0) {
+          bucket.clear()
           val user = socket.authenticatedWith?.msg?.accessKey
           logger.log(db, "data_rate_limit_suspension", user = user, metadata = wait.toString())
           socket.channel.suspendReceives()
