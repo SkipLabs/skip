@@ -1637,10 +1637,6 @@ class SKDBServer implements RemoteSKDB {
     });
   }
 
-  async setUser(userName: string): Promise<void> {
-   throw new Error("Cannot setUser on the remote");
-  }
-
   async viewSchema(viewName: string): Promise<string> {
     return this.makeStringRequest({
       type: "schema",

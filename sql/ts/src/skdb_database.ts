@@ -79,7 +79,7 @@ export class SKDBSyncImpl implements SKDBSync {
   private environment: Environment;
   private subscriptionCount: number = 0;
   private clientUuid: string = "";
-  private accessKey: string = "";
+  private accessKey: string;
   private fs: FileSystem;
 
   save: () => Promise<boolean>;
@@ -151,7 +151,7 @@ export class SKDBSyncImpl implements SKDBSync {
     await this.setUser(accessKey);
   }
 
-  getUser(): string {
+  getUser(): string|undefined {
     return this.accessKey;
   }
 
@@ -238,10 +238,10 @@ export class SKDBSyncImpl implements SKDBSync {
     throw new Error(error);
   }
   async mirror(...tables: MirrorDefn[]) {
-    const is_mirror_def_of = (table) => (mirror_def) => (mirror_def == table) || (mirror_def.table == table);
+    const is_mirror_def_of = (table) => (mirror_def) => (mirror_def === table) || (mirror_def.table === table);
     for (const metatable of ["skdb_user_permissions", "skdb_groups", "skdb_group_permissions"]) {
       if (! tables.some(is_mirror_def_of(metatable)))
-	tables.push(metatable)
+        tables.push(metatable)
     };
     return this.connectedRemote!.mirror(...tables);
   }
@@ -312,10 +312,6 @@ export class SKDBImpl implements SKDB {
 
   tableSchema = async (tableName: string) => {
     return this.skdbSync.tableSchema(tableName);
-  }
-
-  setUser = async (userName: string) => {
-    return this.skdbSync.setUser(userName);
   }
 
   viewSchema = async (viewName: string) => {
