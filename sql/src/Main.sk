@@ -536,18 +536,23 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
     | None() ->
       input = slurpStdin();
       spec = decodeDiffSpec(input);
-      (name -> spec.get(name))
-    | Some(v) -> (_ -> SKStore.Tick(v))
+      (name -> spec.maybeGet(name))
+    | Some(v) -> (_ -> Some(SKStore.Tick(v)))
     };
 
-    diffSpec = sub.dirSubs.map(dirsub -> {
-      tableName = SKDB.Name::create(
-        dirsub.dirName.dirName.stripPrefix("/").stripSuffix("/"),
-      );
-      (dirsub, sinceForTable(tableName))
-    });
+    diffSpec = mutable Vector[];
 
-    origContext.setGlobal("Stdout", SKDB.StdoutDiff(diffSpec));
+    for (dirSub in sub.dirSubs) {
+      tableName = SKDB.Name::create(
+        dirSub.dirName.dirName.stripPrefix("/").stripSuffix("/"),
+      );
+      sinceForTable(tableName) match {
+        | None() -> void
+        | Some(t) -> diffSpec.push((dirSub, t))
+      }
+    };
+
+    origContext.setGlobal("Stdout", SKDB.StdoutDiff(diffSpec.collect(Array)));
     SKStore.CStop(None())
   })
 }
