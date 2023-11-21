@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { SKDB, SkdbTable } from 'skdb';
+import { SKDB, SKDBTable } from 'skdb';
 
 type Test = { name: string, fun: (skdb: SKDB) => Promise<any>, check: (res: any) => void }
 
@@ -1402,7 +1402,7 @@ export const tests = (asWorker: boolean) => {
       }
     },
     {
-      name: n('SkdbTable selectors', asWorker),
+      name: n('SKDBTable selectors', asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec('CREATE TABLE t (a INTEGER, b INTEGER, c INTEGER);');
         await skdb.insert('t', [1, 2, 3])
@@ -1411,7 +1411,7 @@ export const tests = (asWorker: boolean) => {
       check: res => {
         // browser client tests clobber the prototype of the table returned by
         // skdb.exec in fun, so re-wrap if need be.
-        const resTable = (res instanceof SkdbTable) ? res : new SkdbTable(...res);
+        const resTable = (res instanceof SKDBTable) ? res : new SKDBTable(...res);
 
         expect(resTable).toEqual([{ "my_sum": 6 }]);
         expect(resTable.scalarValue()).toEqual(6);

@@ -1,11 +1,11 @@
 import { Shared } from "#std/sk_types";
-import { SkdbTable } from "#skdb/skdb_util";
+import { SKDBTable } from "#skdb/skdb_util";
 
 export interface SkdbHandle {
-  runner: (fn: () => string) => SkdbTable;
+  runner: (fn: () => string) => SKDBTable;
   main: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void },
-  watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
+  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void },
+  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => { close: () => void }
 }
 
 export type MirrorDefn = {
@@ -15,9 +15,9 @@ export type MirrorDefn = {
 
 export interface SKDBSync {
   // CLIENT
-  exec: (query: string, params?: Params) => SkdbTable;
-  watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
+  exec: (query: string, params?: Params) => SKDBTable;
+  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => { close: () => void }
   insert: (tableName: string, values: Array<any>) => boolean;
 
   tableSchema: (tableName: string) => string;
@@ -33,7 +33,7 @@ export interface SKDBSync {
   connectedRemote?: RemoteSKDB;
   createServerDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
   createServerUser: () => Promise<ProtoResponseCreds>;
-  serverExec: (query: string, params?: Params) => Promise<SkdbTable>;
+  serverExec: (query: string, params?: Params) => Promise<SKDBTable>;
   serverTableSchema: (tableName: string) => Promise<string>;
   serverViewSchema: (tableName: string) => Promise<string>;
   serverSchema: () => Promise<string>;
@@ -41,9 +41,9 @@ export interface SKDBSync {
 }
 
 export interface SKDB {
-  exec: (query: string, params?: Params) => Promise<SkdbTable>;
-  watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => Promise<{ close: () => Promise<void> }>
-  watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => Promise<{ close: () => Promise<void> }>
+  exec: (query: string, params?: Params) => Promise<SKDBTable>;
+  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => Promise<{ close: () => Promise<void> }>
+  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => Promise<{ close: () => Promise<void> }>
 
   connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
   connectedRemote: () => Promise<RemoteSKDB|undefined>;
@@ -65,7 +65,7 @@ export interface SkdbMechanism {
   unsubscribe: (session: string) => void;
   diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
   tableExists: (tableName: string) => boolean;
-  exec: (query: string) => SkdbTable;
+  exec: (query: string) => SKDBTable;
   assertCanBeMirrored: (tableName: string) => void;
   toggleView: (tableName: string) => void;
 }
@@ -93,7 +93,7 @@ export interface RemoteSKDB {
   createDatabase: (dbName: string) => Promise<ProtoResponseCreds>;
 
   mirror: (...tables: MirrorDefn[]) => Promise<void>;
-  exec: (query: string, params?: Params) => Promise<SkdbTable>;
+  exec: (query: string, params?: Params) => Promise<SKDBTable>;
 
   isConnectionHealthy: () => Promise<boolean>;
   tablesAwaitingSync: () => Promise<Set<string>>;

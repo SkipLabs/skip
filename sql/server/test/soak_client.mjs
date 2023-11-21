@@ -1,4 +1,4 @@
-import { createSkdb, SkdbTable } from '../../../build/package/skdb/dist/skdb.mjs';
+import { createSkdb, SKDBTable } from '../../../build/package/skdb/dist/skdb.mjs';
 import { webcrypto as crypto } from 'node:crypto';
 import assert from 'node:assert/strict';
 
@@ -135,7 +135,7 @@ const check_expectations = async function(skdb, client, latest_id) {
      from no_pk_inserts
      where client = @client and id <= @latest_id`,
     params,
-    new SkdbTable(
+    new SKDBTable(
       {
         total: latest_id * (latest_id + 1) / 2,
         n: latest_id + 1,
@@ -151,7 +151,7 @@ const check_expectations = async function(skdb, client, latest_id) {
      from pk_inserts
      where client = @client and id <= @latest_id * 2 + (@client - 1)`,
     params,
-    new SkdbTable(
+    new SKDBTable(
       {
         total: latest_id * (latest_id + 1) / 2,
         n: latest_id + 1,
@@ -169,7 +169,7 @@ const check_expectations = async function(skdb, client, latest_id) {
      from no_pk_single_row
      where id = 0 and client = @client`,
     params,
-    new SkdbTable(
+    new SKDBTable(
       {
         client: client,
         check: 1,
@@ -188,7 +188,7 @@ const check_expectations = async function(skdb, client, latest_id) {
      from pk_single_row
      where id = 0`,
     params,
-    new SkdbTable(
+    new SKDBTable(
       {
         client_bound: 1,
         check: 1,
@@ -203,7 +203,7 @@ const check_expectations = async function(skdb, client, latest_id) {
      from no_pk_filtered
      where client = @client and id <= @latest_id`,
     params,
-    new SkdbTable(
+    new SKDBTable(
       {
         n: latest_id/2,
       },
@@ -217,7 +217,7 @@ const check_expectations = async function(skdb, client, latest_id) {
      from pk_filtered
      where client = @client and id <= @latest_id * 2 + (@client - 1)`,
     params,
-    new SkdbTable(
+    new SKDBTable(
       {
         n: latest_id/2,
       },
@@ -231,7 +231,7 @@ const check_expectations = async function(skdb, client, latest_id) {
      from pk_privacy_ro
      where client = @client`,
     params,
-    new SkdbTable(
+    new SKDBTable(
       {
         n: latest_id % 60 < 30 ? 1 : 0,
       },
@@ -247,7 +247,7 @@ const check_expectations = async function(skdb, client, latest_id) {
      from pk_privacy_rw
      where client = @client`,
     params,
-    new SkdbTable(
+    new SKDBTable(
       {
         check: 1,
       },
