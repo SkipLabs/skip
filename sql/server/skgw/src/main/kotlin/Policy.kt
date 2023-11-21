@@ -454,11 +454,9 @@ class SkdbBackedLogger() : Logger {
 
   override fun log(db: String, event: String, user: String?, metadata: String?) {
     val t = Instant.now().getEpochSecond()
-    val u = if (user == null) "NULL" else "'${user}'"
-    val md = if (metadata == null) "NULL" else "'${metadata}'"
     skdb?.sql(
         "INSERT INTO server_events VALUES (@t, @db, @u, @event, @md);",
-        mapOf("t" to t, "db" to db, "u" to u, "event" to event, "md" to md),
+        mapOf("t" to t, "db" to db, "u" to user, "event" to event, "md" to metadata),
         OutputFormat.RAW)
   }
 }
