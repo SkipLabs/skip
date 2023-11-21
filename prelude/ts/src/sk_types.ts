@@ -227,6 +227,7 @@ export class Utils {
   }
   log = (str: string, kind?: Stream, newLine: boolean = false) => {
     kind = kind ? kind : Stream.OUT;
+    str += (newLine ? "\n" : "");
     if (kind == Stream.DEBUG) {
       this.stddebug.push(str);
     } else if (kind == Stream.ERR) {
@@ -236,7 +237,7 @@ export class Utils {
     }
   }
   sklog = (strPtr: ptr, kind?: Stream, newLine: boolean = false) => {
-    let str = this.importString(strPtr) + (newLine ? "\n" : "");
+    let str = this.importString(strPtr);
     this.log(str, kind, newLine);
   }
 
