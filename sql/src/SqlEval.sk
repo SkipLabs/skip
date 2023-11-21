@@ -1137,8 +1137,8 @@ fun evalWithContext(
   evaluator.stmt(context, params, stmt, inTransaction);
 }
 
-fun makeSqlContext(): mutable SKStore.Context {
-  mutable SKStore.Context{
+fun makeSqlContext(): SKStore.Context {
+  SKStore.Context{
     canReuse => SKStore.CRAlways(),
     failOnExn => true,
     removeSubDirs => true,
@@ -1174,7 +1174,7 @@ private mutable class SQLContext(
   mutable context: SKStore.Context,
 ) {
   static fun withContext<T>(sync: Bool, f: (mutable SQLContext) ~> T): T {
-    initCtx = SKDB.makeSqlContext().clone();
+    initCtx = SKDB.makeSqlContext();
     if (SKStore.gHasContext() == 0) {
       SKStore.gContextInit(initCtx)
     };
@@ -1198,7 +1198,7 @@ private mutable class SQLContext(
         SKStore.Context,
       ) ~> void,
     ),
-  ): Result<void, Error> {
+  ): void {
     startTick = this.context.tick;
     pos = SKStore.newObstack();
 
@@ -1217,21 +1217,12 @@ private mutable class SQLContext(
       this.sync,
       underLockF,
     );
+
     this.context.notifyAll(startTick);
 
     this.!globals = this.context.globals;
 
-    SKStore.destroyObstack(pos);
-
-    this.globals.maybeGet("Error").map(f ->
-      SKStore.ErrorFile::type(f).value
-    ) match {
-    | Some(err @ Error _) -> Failure(err)
-    | Some(exn) ->
-      print_error(exn.getMessage());
-      skipExit(1)
-    | None() -> Success(void)
-    }
+    SKStore.destroyObstack(pos)
   }
 
   mutable fun exec(
@@ -1245,7 +1236,17 @@ private mutable class SQLContext(
       context = SKStore.Context::fromSaved(icontext);
       underLockF = f(context);
       (context.clone(), underLockF);
-    })
+    });
+
+    this.globals.maybeGet("Error").map(f ->
+      SKStore.ErrorFile::type(f).value
+    ) match {
+    | Some(err @ Error _) -> Failure(err)
+    | Some(exn) ->
+      print_error(exn.getMessage());
+      skipExit(1)
+    | None() -> Success(void)
+    }
   }
 
   mutable fun eval(
@@ -1364,7 +1365,7 @@ fun runSql(
   f: mutable SKStore.Context ~> SKStore.ContextOp,
 ): void {
   SKStore.runWithGc(
-    SKDB.makeSqlContext().clone(),
+    SKDB.makeSqlContext(),
     f,
     Some(SKStore.Synchronizer(importFromRoot, exportToRoot, printContext)),
     options.sync,
@@ -1372,7 +1373,7 @@ fun runSql(
 }
 
 fun runLockedSql(options: Options, f: mutable SKStore.Context ~> void): void {
-  SKStore.runLocked(SKDB.makeSqlContext().clone(), f, options.sync)
+  SKStore.runLocked(SKDB.makeSqlContext(), f, options.sync)
 }
 
 fun importFromRoot(
@@ -1869,7 +1870,7 @@ fun manageReactiveQuery(
   onlyChanges: Bool,
 ): void {
   try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
       queryID = queryID32.toInt();
       getReactiveQueryHandle(context).i0.writeArray(
         context,
@@ -1892,7 +1893,7 @@ fun manageReactiveQuery(
 fun printReactiveQuery(queryID32: Int32): void {
   saved = SKStore.newObstack();
   try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
       queryID = queryID32.toInt();
       (rqs, sds) = getReactiveQueryHandle(context);
       rqs
@@ -1921,7 +1922,7 @@ fun printReactiveQuery(queryID32: Int32): void {
 fun deleteReactiveQuery(queryID32: Int32): void {
   saved = SKStore.newObstack();
   try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
       queryID = queryID32.toInt();
       getReactiveQueryHandle(context).i0.writeArray(
         context,
