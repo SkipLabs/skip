@@ -120,6 +120,16 @@ function asKey(messageId) {
   return "" + messageId.source + ":" + messageId.id;
 }
 
+export class Sender {
+  close: () => void;
+  send: () => Promise<any>;
+
+  constructor(close: () => void, send: () => Promise<any>) {
+    this.close = close;
+    this.send = send;
+  }
+}
+
 export class Message {
   id: MessageId;
   payload: Payload;
@@ -169,7 +179,7 @@ export class PromiseWorker {
   private callbacks: Map<string, (...args: any[]) => any>;
   private subscriptions: Map<string, (...args: any[]) => void>;
 
-  post : (fn: Function) => Promise<any>;
+  post : (fn: Function) => Sender;
   onMessage: (message: MessageEvent) => void;
 
   constructor(worker: Wrk) {
@@ -181,35 +191,43 @@ export class PromiseWorker {
     let self = this;
     this.post = (fn: Function | Caller) => {
       let messageId = new MessageId(this.source, ++this.lastId);
+      let subscribed = new Set<string>();
       const parameters = fn.parameters.map(p => {
         if (typeof p == "function") {
           let subscriptionId = new MessageId(this.source, ++this.lastId);
           let wfn = (result: Return) => p.apply(null, result.value);
-          this.subscriptions.set(asKey(subscriptionId), wfn);
+          let key =  asKey(subscriptionId);
+          this.subscriptions.set(key, wfn);
+          subscribed.add(key);
           return subscriptionId;
         } else {
           return p;
         }
       });
       fn.parameters = parameters;
-      return new Promise(function (resolve, reject) {
-        self.callbacks.set(asKey(messageId), (result: Return) => {
-          if (result.success) {
-            resolve(result.value);
-          } else if (result.value instanceof Error) {
-            reject(result.value);
-          } else {
-            reject(new Error(JSON.stringify(result.value)));
-          }
+      return new Sender(
+        () => {
+          subscribed.forEach(key => this.subscriptions.delete(key))
+        },
+        () => new Promise(function (resolve, reject) {
+          self.callbacks.set(asKey(messageId), (result: Return) => {
+            if (result.success) {
+              resolve(result.value);
+            } else if (result.value instanceof Error) {
+              reject(result.value);
+            } else {
+              reject(new Error(JSON.stringify(result.value)));
+            }
+          })
+          let message = new Message(messageId, fn);
+          self.worker.postMessage(message);
         })
-        let message = new Message(messageId, fn);
-        self.worker.postMessage(message);
-      })
+      )
     };
     this.onMessage = (message: MessageEvent) => {
       let data = Message.asReturn(message.data ?? message);
       if (!data) {
-        throw new UnmanagedMessage(data)
+        throw new UnmanagedMessage(message)
       } else {
         let result = data.payload as Return;
         let callback = this.callbacks.get(asKey(data.id));
