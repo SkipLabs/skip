@@ -273,20 +273,25 @@ class RateLimitRequestsPerConnection(
       stream: OrchestrationStream,
       db: String
   ): Boolean {
-    val socket = stream.stream.socket
-    val tokenBucket = openConns.get(socket)
-    if (tokenBucket == null) {
-      // something went really wrong
-      return true
+    when (request) {
+      is ProtoData -> return true
+      else -> {
+        val socket = stream.stream.socket
+        val tokenBucket = openConns.get(socket)
+        if (tokenBucket == null) {
+          // something went really wrong
+          return true
+        }
+        val wait = tokenBucket.requestTokens(1u)
+        if (wait == null) {
+          return true
+        }
+        val user = socket.authenticatedWith?.msg?.accessKey
+        logger.log(db, "req_rate_limit_rejection", user = user, metadata = request.toString())
+        stream.error(2000u, "Rate limit exceeded")
+        return false
+      }
     }
-    val wait = tokenBucket.requestTokens(1u)
-    if (wait == null) {
-      return true
-    }
-    val user = socket.authenticatedWith?.msg?.accessKey
-    logger.log(db, "req_rate_limit_rejection", user = user, metadata = request.toString())
-    stream.error(2000u, "Rate limit exceeded")
-    return false
   }
 }
 

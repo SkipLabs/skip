@@ -477,10 +477,10 @@ fun main(args: Array<String>) {
               config.getString("min_kt_client", "0.0.1")) then
           ThrottleDataTransferPerConnection(
               logger, config.getInt("max_conn_byte_rate", 100 * 1024 * 1024), taskPool) then
-          // RateLimitRequestsPerConnection(
-          //     logger,
-          //     config.getDouble("max_conn_qps", 20.0),
-          //     config.getInt("max_conn_req_spike", 50)) then
+          RateLimitRequestsPerConnection(
+              logger,
+              config.getDouble("max_conn_qps", 20.0),
+              config.getInt("max_conn_req_spike", 50)) then
           LimitConnectionsPerUser(logger, config.getInt("user_conns", 5)) then
           LimitConnectionsPerDb(logger, config.getInt("db_conns", 10)) then
           LimitGlobalConnections(logger, config.getInt("global_conns", 10_000))
