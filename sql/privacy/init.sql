@@ -30,7 +30,7 @@ CREATE TABLE skdb_groups(
   skdb_access STRING NOT NULL
 );
 
--- INTERNAL TABLE: DO NOT CHANGE DEFINITION
+--- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_group_permissions(
   groupID STRING NOT NULL,
   userID STRING,
@@ -38,13 +38,15 @@ CREATE TABLE skdb_group_permissions(
   skdb_access STRING NOT NULL
 );
 
-CREATE VIRTUAL VIEW skdb_groups_users as
-  SELECT userID as groupID from skdb_users UNION ALL
-  SELECT groupID from skdb_groups GROUP BY groupID
+CREATE VIRTUAL VIEW skdb_groups_users AS
+  SELECT userID AS groupID FROM skdb_users
+  UNION ALL
+  SELECT groupID FROM skdb_groups
 ;
 
 CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
 
+-- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE VIRTUAL VIEW skdb_group_permissions_joined AS
   SELECT
     skdb_group_permissions.groupID,
@@ -56,7 +58,7 @@ CREATE VIRTUAL VIEW skdb_group_permissions_joined AS
    AND skdb_group_permissions.skdb_access = skdb_groups.adminID
 ;
 
-CREATE UNIQUE INDEX skdb_group_permissions_joined_index on
+CREATE UNIQUE INDEX skdb_group_permissions_joined_index ON
   skdb_group_permissions_joined(groupID, userID)
 ;
 
@@ -72,7 +74,7 @@ INSERT INTO skdb_groups
 ;
 
 INSERT INTO skdb_group_permissions
-  VALUES ('read-only-root', NULL, 4, 'root')
+  VALUES ('read-only-root', NULL, skdb_permission('r'), 'root')
 ;
 
 -- read-only is visible by everyone, but only the root can change the
@@ -83,7 +85,7 @@ INSERT INTO skdb_groups
 ;
 
 INSERT INTO skdb_group_permissions
-  VALUES ('read-only', NULL, 4, 'read-only-root')
+  VALUES ('read-only', NULL, skdb_permission('r'), 'read-only-root')
 ;
 
 -- write-only is visible by everyone, but only the root can change the
@@ -94,7 +96,7 @@ INSERT INTO skdb_groups
 ;
 
 INSERT INTO skdb_group_permissions
-  VALUES ('write-only', NULL, 3, 'read-only-root')
+  VALUES ('write-only', NULL, skdb_permission('di'), 'read-only-root')
 ;
 
 -- read-write is visible by everyone, but only the root can change the
@@ -105,5 +107,5 @@ INSERT INTO skdb_groups
 ;
 
 INSERT INTO skdb_group_permissions
-  VALUES ('read-write', NULL, 7, 'read-only-root')
+  VALUES ('read-write', NULL, skdb_permission('dir'), 'read-only-root')
 ;
