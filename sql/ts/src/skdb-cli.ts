@@ -331,11 +331,6 @@ if (args.values['table-schema']) {
   console.log(schema.trim());
 }
 
-if (args.values['set-user']) {
-  const remote = await skdb.connectedRemote();
-  await remote!.setUser(args.values['set-user'] as string);
-}
-
 if (args.values['view-schema']) {
   const remote = await skdb.connectedRemote();
   const schema = await remote!.viewSchema(args.values['view-schema'] as string);
