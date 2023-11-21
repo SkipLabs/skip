@@ -1,6 +1,6 @@
 import { Wrk } from "#std/sk_types";
 import { PromiseWorker, Function, Caller } from "#std/sk_worker";
-import { SKDB, ProtoResponseCreds, Params, RemoteSKDB, SkdbMechanism, MirrorDefn } from "#skdb/skdb_types";
+import { SKDB, ProtoResponseCreds, Params, RemoteSKDB, SKDBMechanism, MirrorDefn } from "#skdb/skdb_types";
 import { SKDBTable } from "#skdb/skdb_util";
 class WrappedRemote implements RemoteSKDB {
   private worker: PromiseWorker;

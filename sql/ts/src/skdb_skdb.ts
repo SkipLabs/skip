@@ -1,5 +1,5 @@
 import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types";
-import { PagedMemory, Page, Storage, SKDB, SkdbHandle, Params, SKDBSync } from "#skdb/skdb_types";
+import { PagedMemory, Page, Storage, SKDB, SKDBHandle, Params, SKDBSync } from "#skdb/skdb_types";
 import { ExternalFuns, SKDBTable } from "#skdb/skdb_util";
 import { IDBStorage } from "#skdb/skdb_storage";
 import { SKDBImpl, SKDBSyncImpl } from "#skdb/skdb_database";
@@ -17,7 +17,7 @@ interface Exported {
   getVersion: () => number;
 }
 
-class SkdbHandleImpl implements SkdbHandle {
+class SKDBHandleImpl implements SKDBHandle {
   runner: (fn: () => string) => SKDBTable;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void }
@@ -406,7 +406,7 @@ class LinksImpl implements Links, ToWasm {
         },
       );
     }
-    let handle = new SkdbHandleImpl(main, runner, watch, watchChanges);
+    let handle = new SKDBHandleImpl(main, runner, watch, watchChanges);
     let createSync = async (dbName?: string) => {
       let save: () => Promise<boolean> = async () => true;
       let storeName = dbName ? "SKDBStore" : null;

@@ -1,9 +1,9 @@
 import { Environment, FileSystem } from "#std/sk_types";
-import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync, MirrorDefn } from "#skdb/skdb_types";
+import { SKDBMechanism, SKDB, RemoteSKDB, SKDBHandle, Params, SKDBSync, MirrorDefn } from "#skdb/skdb_types";
 import { SKDBTable } from "#skdb/skdb_util";
 import { connect } from "#skdb/skdb_orchestration";
 
-class SkdbMechanismImpl implements SkdbMechanism {
+class SKDBMechanismImpl implements SKDBMechanism {
   writeCsv: (payload: string, source: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
@@ -97,7 +97,7 @@ export class SKDBSyncImpl implements SKDBSync {
   }
 
   static create(
-    handle: SkdbHandle,
+    handle: SKDBHandle,
     env: Environment,
     save: () => Promise<boolean>
   ): SKDBSync {
@@ -136,7 +136,7 @@ export class SKDBSyncImpl implements SKDBSync {
 
     this.connectedRemote = await connect(
       this.environment,
-      new SkdbMechanismImpl(this, this.fs, this.environment.encodeUTF8),
+      new SKDBMechanismImpl(this, this.fs, this.environment.encodeUTF8),
       endpoint,
       db,
       creds

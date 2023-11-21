@@ -1,7 +1,7 @@
 import { Shared } from "#std/sk_types";
 import { SKDBTable } from "#skdb/skdb_util";
 
-export interface SkdbHandle {
+export interface SKDBHandle {
   runner: (fn: () => string) => SKDBTable;
   main: (new_args: Array<string>, new_stdin: string) => string;
   watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void },
@@ -56,7 +56,7 @@ export interface SKDB {
   save: () => Promise<boolean>;
 }
 
-export interface SkdbMechanism {
+export interface SKDBMechanism {
   writeCsv: (payload: string, source: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
