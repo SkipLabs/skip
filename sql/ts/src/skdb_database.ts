@@ -1,6 +1,6 @@
 import { Environment, FileSystem } from "#std/sk_types";
 import { SkdbMechanism, SKDB, RemoteSKDB, SkdbHandle, Params, SKDBSync, MirrorDefn } from "#skdb/skdb_types";
-import { SkdbTable } from "#skdb/skdb_util";
+import { SKDBTable } from "#skdb/skdb_util";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SkdbMechanismImpl implements SkdbMechanism {
@@ -13,7 +13,7 @@ class SkdbMechanismImpl implements SkdbMechanism {
   diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
   assertCanBeMirrored: (tableName: string) => void;
   tableExists: (tableName: string) => boolean;
-  exec: (query: string) => SkdbTable;
+  exec: (query: string) => SKDBTable;
   toggleView: (tableName: string) => void;
 
   constructor(client: SKDBSyncImpl, fs: FileSystem, utf8Encode: (v: string) => Uint8Array) {
@@ -84,10 +84,10 @@ export class SKDBSyncImpl implements SKDBSync {
 
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: SkdbTable) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => { close: () => void }
+  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void }
+  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => { close: () => void }
 
-  private runner: (fn: () => string) => SkdbTable;
+  private runner: (fn: () => string) => SKDBTable;
 
   connectedRemote?: RemoteSKDB;
 
@@ -296,15 +296,15 @@ export class SKDBImpl implements SKDB {
 
   exec = async (stdin: string, params: Params = new Map()) => {
     const rows = await this.skdbSync.exec(stdin, params);
-    return new SkdbTable(...rows);
+    return new SKDBTable(...rows);
   }
 
-  async watch(query: string, params: Params, onChange: (rows: SkdbTable) => void) {
+  async watch(query: string, params: Params, onChange: (rows: SKDBTable) => void) {
     let closable = this.skdbSync.watch(query, params, onChange);
     return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
   }
 
-  async watchChanges(query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) {
+  async watchChanges(query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) {
     let closable = this.skdbSync.watchChanges(query, params, init, update);
     return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
   }

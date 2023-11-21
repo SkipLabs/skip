@@ -1,7 +1,7 @@
 import { Wrk } from "#std/sk_types";
 import { PromiseWorker, Function, Caller } from "#std/sk_worker";
 import { SKDB, ProtoResponseCreds, Params, RemoteSKDB, SkdbMechanism, MirrorDefn } from "#skdb/skdb_types";
-import { SkdbTable } from "#skdb/skdb_util";
+import { SKDBTable } from "#skdb/skdb_util";
 class WrappedRemote implements RemoteSKDB {
   private worker: PromiseWorker;
   private wrapped: number;
@@ -81,17 +81,17 @@ export class SKDBWorker implements SKDB {
 
   exec = async (query: string, params: Params = new Map()) => {
     const rows = await this.worker.post(new Function("exec", [query, params]));
-    return new SkdbTable(...rows);
+    return new SKDBTable(...rows);
   }
 
-  watch = async (query: string, params: Params, onChange: (rows: SkdbTable) => void) => {
+  watch = async (query: string, params: Params, onChange: (rows: SKDBTable) => void) => {
     return this.worker.post(new Function("watch", [query, params, onChange], { wrap: true, autoremove: true })).then(wrapped => {
       let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
       return { close: close };
     });
   }
 
-  watchChanges = async (query: string, params: Params, init: (rows: SkdbTable) => void, update: (added: SkdbTable, removed: SkdbTable) => void) => {
+  watchChanges = async (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => {
     return this.worker.post(new Function("watchChanges", [query, params, init, update], { wrap: true, autoremove: true })).then(wrapped => {
       let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", []));
       return { close: close };
