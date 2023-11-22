@@ -38,7 +38,7 @@ export class ExternalFuns {
 /* Class for query results, extending Array<Object> with some common selectors
    and utility functions for ease of use. */
 /* ***************************************************************************/
-export class SkdbTable extends Array<Object> {
+export class SKDBTable extends Array<Object> {
   scalarValue() : any {
     const row = this.onlyRow();
     const cols = Object.keys(row);
