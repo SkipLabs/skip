@@ -21,7 +21,6 @@
 typedef uint64_t SkipInt;
 
 #ifdef SKIP32
-#define WORDSIZE 4
 #ifndef WASM_HEAP_SIZE
 #define WASM_HEAP_SIZE 1073741824
 #endif
@@ -33,7 +32,6 @@ typedef uint64_t SkipInt;
 
 #ifdef SKIP64
 #include <stdio.h>
-#define WORDSIZE 8
 #endif
 
 #ifdef CTX_TABLE
