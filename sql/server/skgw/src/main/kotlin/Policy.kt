@@ -236,6 +236,10 @@ class LeakyBucket(val drainRatePerSecond: Double) {
     val tMillis = l / drainRatePerSecond * 1000
     return Duration.ofMillis(tMillis.toLong()) // truncate, we don't need too much resolution
   }
+
+  fun clear() {
+    level.set(0)
+  }
 }
 
 class RateLimitRequestsPerConnection(
@@ -269,20 +273,25 @@ class RateLimitRequestsPerConnection(
       stream: OrchestrationStream,
       db: String
   ): Boolean {
-    val socket = stream.stream.socket
-    val tokenBucket = openConns.get(socket)
-    if (tokenBucket == null) {
-      // something went really wrong
-      return true
+    when (request) {
+      is ProtoData -> return true
+      else -> {
+        val socket = stream.stream.socket
+        val tokenBucket = openConns.get(socket)
+        if (tokenBucket == null) {
+          // something went really wrong
+          return true
+        }
+        val wait = tokenBucket.requestTokens(1u)
+        if (wait == null) {
+          return true
+        }
+        val user = socket.authenticatedWith?.msg?.accessKey
+        logger.log(db, "req_rate_limit_rejection", user = user, metadata = request.toString())
+        stream.error(2000u, "Rate limit exceeded")
+        return false
+      }
     }
-    val wait = tokenBucket.requestTokens(1u)
-    if (wait == null) {
-      return true
-    }
-    val user = socket.authenticatedWith?.msg?.accessKey
-    logger.log(db, "req_rate_limit_rejection", user = user, metadata = request.toString())
-    stream.error(2000u, "Rate limit exceeded")
-    return false
   }
 }
 
@@ -332,9 +341,11 @@ class ThrottleDataTransferPerConnection(
         val wait = bucket.fill(request.data.remaining())
 
         // for anything <= threshold, let's not worry, otherwise pause
-        // and schedule resumption
-        val threshold = Duration.ofMillis(1)
+        // and schedule resumption. threshold is chosen based on
+        // empirical scheduling granularity
+        val threshold = Duration.ofMillis(10)
         if (wait.compareTo(threshold) > 0) {
+          bucket.clear()
           val user = socket.authenticatedWith?.msg?.accessKey
           logger.log(db, "data_rate_limit_suspension", user = user, metadata = wait.toString())
           socket.channel.suspendReceives()
@@ -448,11 +459,9 @@ class SkdbBackedLogger() : Logger {
 
   override fun log(db: String, event: String, user: String?, metadata: String?) {
     val t = Instant.now().getEpochSecond()
-    val u = if (user == null) "NULL" else "'${user}'"
-    val md = if (metadata == null) "NULL" else "'${metadata}'"
     skdb?.sql(
         "INSERT INTO server_events VALUES (@t, @db, @u, @event, @md);",
-        mapOf("t" to t, "db" to db, "u" to u, "event" to event, "md" to md),
+        mapOf("t" to t, "db" to db, "u" to user, "event" to event, "md" to metadata),
         OutputFormat.RAW)
   }
 }
