@@ -134,7 +134,7 @@ test-soak-priv: $(SKNPM_BIN) build/skdb build/init.sql npm
 
 .PHONY: test-soak
 test-soak:
-	$(MAKE) SKARGO_PROFILE=dev test-soak-priv
+	$(MAKE) SKARGO_PROFILE=release test-soak-priv
 
 # run targets
 
