@@ -1,5 +1,4 @@
-import { createSkdb } from '../../../build/package/skdb/dist/skdb.mjs';
-import { SkdbTable } from '../../../build/package/skdb/dist/skdb_util.mjs';
+import { createSkdb, SkdbTable } from '../../../build/package/skdb/dist/skdb.mjs';
 import { webcrypto as crypto } from 'node:crypto';
 import assert from 'node:assert/strict';
 
