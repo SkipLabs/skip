@@ -52,8 +52,7 @@ int32_t sk_pop_dirty_page() {
 /* Interning primitives. */
 /*****************************************************************************/
 
-static char* shallow_intern(char* obj, size_t memsize, size_t leftsize,
-                            char* large_page) {
+static char* shallow_intern(char* obj, size_t memsize, size_t leftsize) {
   memsize += leftsize;
   size_t alloc_size = memsize + sizeof(uintptr_t);
   char* mem = sk_palloc(alloc_size);
@@ -136,12 +135,12 @@ uintptr_t sk_get_ref_count(void* obj) {
   return *count;
 }
 
-static char* SKIP_intern_class(sk_stack_t* st, char* obj, char* large_page) {
+static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
-  void** result = (void**)shallow_intern(obj, memsize, leftsize, large_page);
+  void** result = (void**)shallow_intern(obj, memsize, leftsize);
 
   if (epointer_ty != NULL && ty != epointer_ty &&
       (ty->m_refsHintMask & 1) != 0) {
@@ -171,13 +170,13 @@ static char* SKIP_intern_class(sk_stack_t* st, char* obj, char* large_page) {
   return (char*)result;
 }
 
-static char* SKIP_intern_array(sk_stack_t* st, char* obj, char* large_page) {
+static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
 
   size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
-  void** result = (void**)shallow_intern(obj, memsize, leftsize, large_page);
+  void** result = (void**)shallow_intern(obj, memsize, leftsize);
   size_t bitsize = sizeof(void*) * 8;
 
   if ((ty->m_refsHintMask & 1) != 0) {
@@ -211,9 +210,9 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj, char* large_page) {
   return (char*)result;
 }
 
-static char* SKIP_intern_string(char* obj, char* large_page) {
+static char* SKIP_intern_string(char* obj) {
   size_t len = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
-  char* result = shallow_intern(obj, len, 2 * sizeof(uint32_t), large_page);
+  char* result = shallow_intern(obj, len, 2 * sizeof(uint32_t));
   return result;
 }
 
@@ -221,17 +220,17 @@ uint32_t SKIP_is_string(char* obj) {
   return *(((uint32_t*)obj) - 1) & 0x80000000;
 }
 
-static char* SKIP_intern_obj(sk_stack_t* st, char* obj, char* large_page) {
+static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
   char* result;
 
   SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
 
   switch (ty->m_kind) {
     case 0:
-      result = SKIP_intern_class(st, obj, large_page);
+      result = SKIP_intern_class(st, obj);
       break;
     case 1:
-      result = SKIP_intern_array(st, obj, large_page);
+      result = SKIP_intern_array(st, obj);
       break;
     default:
       // NOT SUPPORTED
@@ -280,10 +279,7 @@ void* SKIP_intern_shared(void* obj) {
       continue;
     }
 
-    char* large_page = NULL;
-
     if (sk_is_large_page(pages[obstack_idx].key)) {
-      large_page = pages[obstack_idx].key;
       large_pages[obstack_idx] = 1;
     }
 
@@ -292,7 +288,7 @@ void* SKIP_intern_shared(void* obj) {
     if (SKIP_is_string(toCopy)) {
       sk_string_t* str = (sk_string_t*)((char*)toCopy - sizeof(uint32_t) * 2);
       if (str->size != -1 && str->size < sizeof(void*)) {
-        void* interned_ptr = SKIP_intern_string(toCopy, large_page);
+        void* interned_ptr = SKIP_intern_string(toCopy);
         *delayed.slot = interned_ptr;
         continue;
       }
@@ -303,7 +299,7 @@ void* SKIP_intern_shared(void* obj) {
         sk_incr_ref_count(interned_ptr);
         continue;
       }
-      void* interned_ptr = SKIP_intern_string(toCopy, large_page);
+      void* interned_ptr = SKIP_intern_string(toCopy);
       sk_stack3_push(st3, (void**)toCopy, *(void**)toCopy,
                      (void*)(uintptr_t)(str->size));
       str->size = (uint32_t)-1;
@@ -313,7 +309,7 @@ void* SKIP_intern_shared(void* obj) {
     }
 
     if (((uintptr_t) * ((void**)toCopy - 1) & 1) == 0) {
-      interned_ptr = SKIP_intern_obj(st, toCopy, large_page);
+      interned_ptr = SKIP_intern_obj(st, toCopy);
       sk_stack3_push(st3, ((void**)toCopy - 1), *((void**)toCopy - 1), NULL);
       *((void**)toCopy - 1) = (void*)((uintptr_t)interned_ptr | 1);
     } else {
