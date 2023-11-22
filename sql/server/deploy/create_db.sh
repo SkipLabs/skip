@@ -31,7 +31,7 @@ then
     exit 1
 fi
 
-SKDB_BIN="skargo run --path sql --"
+SKDB_BIN="skargo run --release --path sql --"
 SKDB="$SKDB_BIN --data $DB_FILE"
 
 $SKDB_BIN --init "$DB_FILE"
