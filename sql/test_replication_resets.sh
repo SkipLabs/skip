@@ -74,7 +74,8 @@ test_ignore_source_ignored_on_reset() {
 EOF
     done
 
-    $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
+    # since 1 to get the reset, 0 would just stream the data without the reset.
+    $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 1 > $SERVER_TAIL
 
     # we just output the final row: 1\t1001,"a" and a reset of course
     assert_line_count "$SERVER_TAIL" '710,"a","GALL"' 0

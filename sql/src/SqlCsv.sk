@@ -279,8 +279,14 @@ fun applyDiffStrategy(
   };
 
   checkpointAndAck = (context, delta) ~> {
-    if (checkpoint is Some _) {
-      checkpointTick = SKStore.Tick(checkpoint.fromSome());
+    checkpoint match {
+    // we do not checkpoint 0. this value communicates that you
+    // haven't received a full snapshot yet. it's used for e.g.
+    // chunking an initial mirror. once the value is > 0 we have
+    // received a consistent snapshot of the server and should
+    // checkpoint and ack.
+    | Some(val) if (val > 0) ->
+      checkpointTick = SKStore.Tick(val);
       SKDB.setWatermark(context, table.name.lower, identity, checkpointTick);
       delta.setGlobal(
         "Ack",
@@ -289,8 +295,9 @@ fun applyDiffStrategy(
           checkpointTick,
           delta.getGlobal("Ack").map(SKDB.StdoutCheckpointAck::type),
         ),
-      );
-    };
+      )
+    | _ -> void
+    }
   };
 
   primaryIdx = for ((i, type) in table.schema.items()) {
