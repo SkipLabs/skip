@@ -186,13 +186,6 @@ sk_saved_obstack_t* SKIP_new_Obstack() {
     saved = sk_saved_obstack(page);
   }
 
-  if (saved->head != NULL || saved->page != NULL || saved->end != NULL) {
-    #ifdef SKIP64
-    fprintf(stderr, "ERROR_OBSTACK_NOT_CLOSED\n");
-    #endif
-    SKIP_throw_cruntime(ERROR_OBSTACK_NOT_CLOSED);
-  }
-
   saved->head = head;
   saved->page = page;
   saved->end = end;
