@@ -1,6 +1,6 @@
 import { Environment } from "#std/sk_types";
-import { SkdbMechanism, RemoteSKDB, Params, MirrorDefn } from "#skdb/skdb_types";
-import { SkdbTable } from "#skdb/skdb_util";
+import { SKDBMechanism, RemoteSKDB, Params, MirrorDefn } from "#skdb/skdb_types";
+import { SKDBTable } from "#skdb/skdb_util";
 
 const npmVersion = "";
 
@@ -1281,7 +1281,7 @@ class Stream {
 
 export async function connect(
   env: Environment,
-  client: SkdbMechanism,
+  client: SKDBMechanism,
   endpoint: string,
   db: string,
   creds: Creds,
@@ -1302,7 +1302,7 @@ const serverResponseTable = (tableName: string) => {
 
 class SKDBServer implements RemoteSKDB {
   private env: Environment;
-  private client: SkdbMechanism;
+  private client: SKDBMechanism;
   private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
@@ -1313,7 +1313,7 @@ class SKDBServer implements RemoteSKDB {
 
   private constructor(
     env: Environment,
-    client: SkdbMechanism,
+    client: SKDBMechanism,
     connection: ResilientMuxedSocket,
     creds: Creds,
   ) {
@@ -1325,7 +1325,7 @@ class SKDBServer implements RemoteSKDB {
 
   static async connect(
     env: Environment,
-    client: SkdbMechanism,
+    client: SKDBMechanism,
     endpoint: string,
     db: string,
     creds: Creds,
@@ -1611,7 +1611,7 @@ class SKDBServer implements RemoteSKDB {
     await this.establishServerTail(tables);
   }
 
-  async exec(stdin: string, params: Params = new Map()): Promise<SkdbTable> {
+  async exec(stdin: string, params: Params = new Map()): Promise<SKDBTable> {
     if (params instanceof Map) {
       params = Object.fromEntries(params);
     }
@@ -1624,7 +1624,7 @@ class SKDBServer implements RemoteSKDB {
       const rows = result.split("\n")
 	.filter((x) => x != "")
 	.map((x) => JSON.parse(x));
-      return new SkdbTable(...rows);
+      return new SKDBTable(...rows);
     });
   }
 
