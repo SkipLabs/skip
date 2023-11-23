@@ -272,7 +272,7 @@ void SKIP_enable_GC() {
 }
 
 uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
-  return sk_gc_enabled && ((head < saved->page && head >= saved->end) ||
+  return sk_gc_enabled && ((head < saved->page || head >= saved->end) ||
                            (head >= (saved->head + PAGE_SIZE / 2)));
 }
 
