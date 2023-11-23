@@ -35,6 +35,18 @@ export async function setup(credentials: string, port: number, crypto, asWorker:
   }
   const remote = await skdb.connectedRemote();
   const testRootCreds = await remote!.createDatabase(dbName);
+  // avoid flaky integration tests by bumping the request rate
+  // limiting. usually you interact mostly with your local db so the
+  // limit is a little low, but the integration tests - by nature -
+  // have a different profile
+  await remote!.exec(
+    "INSERT INTO server_config (key, db, dblVal) VALUES (@key, @dbName, @limit);",
+    {
+      key: "max_conn_qps",
+      dbName,
+      limit: 100,
+    }
+  )
   skdb.closeConnection();
 
   const rootSkdb = await createSkdb({ asWorker: asWorker });
