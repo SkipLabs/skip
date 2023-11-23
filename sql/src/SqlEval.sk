@@ -917,31 +917,50 @@ class Evaluator{options: Options, user: ?UserFile} {
               context.update();
               false
             } catch {
-            | Conflict(_pos, _msg, conflictingValues) ->
+            | Conflict(_pos, _msg, conflictingValues, rowValues) ->
               context.replaceFromSaved(copy);
-              where: ?Expr = None();
-              for (idxValue in conflictingValues) {
-                (idx, conValue) = idxValue;
-                tyDescr = table.schema[idx];
-                clause = BinOp(
-                  OEq(),
-                  Identifier(tyDescr.name),
-                  conValue match {
-                  | None() -> VNull()
-                  | Some(CInt(n)) -> VInt(n)
-                  | Some(CString(s)) -> VString(s)
-                  | _ -> error(pos, "Unsupported type for OR IGNORE/REPLACE")
-                  },
-                );
-                !where = where match {
-                | None() -> Some(clause)
-                | Some(w) -> Some(BinOp(OAnd(), w, clause))
+              isDifferent = false;
+              for (row in rows) {
+                for (row2 in rowValues) {
+                  if (row != row2) {
+                    !isDifferent = true
+                  }
                 }
               };
-              tick = context.tick;
-              _ = this.delete(context, params, pos, table.name, where, Array[]);
-              _ = importNext(context, tick, context);
-              true
+              if (!isDifferent) {
+                false
+              } else {
+                where: ?Expr = None();
+                for (idxValue in conflictingValues) {
+                  (idx, conValue) = idxValue;
+                  tyDescr = table.schema[idx];
+                  clause = BinOp(
+                    OEq(),
+                    Identifier(tyDescr.name),
+                    conValue match {
+                    | None() -> VNull()
+                    | Some(CInt(n)) -> VInt(n)
+                    | Some(CString(s)) -> VString(s)
+                    | _ -> error(pos, "Unsupported type for OR IGNORE/REPLACE")
+                    },
+                  );
+                  !where = where match {
+                  | None() -> Some(clause)
+                  | Some(w) -> Some(BinOp(OAnd(), w, clause))
+                  }
+                };
+                tick = context.tick;
+                _ = this.delete(
+                  context,
+                  params,
+                  pos,
+                  table.name,
+                  where,
+                  Array[],
+                );
+                _ = importNext(context, tick, context);
+                true
+              }
             | exn -> throw exn
             };
             if (!shouldContinue) break void

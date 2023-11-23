@@ -75,10 +75,11 @@ fun createIndex(
         SKStore.DirName::create(indexName.lower + "unique/proj/"),
         (_, writer, _key, values) ~> {
           result = SortedMap<IndexProjKey, mutable Vector<RowValues>>[];
-          for (v in values) {
+          valuesArr = values.collect(Array);
+          for (v in valuesArr) {
             k = makeIndexProjKey(v, kinds, size);
             if (v.repeat != 1) {
-              throw Conflict(0, "UNIQUE constraint failed", k.values)
+              throw Conflict(0, "UNIQUE constraint failed", k.values, valuesArr)
             };
             if (!result.containsKey(k)) {
               !result[k] = mutable Vector[];
@@ -97,7 +98,8 @@ fun createIndex(
         SKStore.DirName::create(indexName.lower + "unique/sink/"),
         (_, _, key, values) ~> {
           repeat = 0;
-          for (r in values) {
+          valuesArr = values.collect(Array);
+          for (r in valuesArr) {
             !repeat = repeat + r.repeat;
           };
           if (repeat > 1) {
@@ -108,6 +110,7 @@ fun createIndex(
               | IndexProjKey(arr) -> arr
               | _ -> invariant_violation("Unexpected key type")
               },
+              valuesArr,
             )
           }
         },
