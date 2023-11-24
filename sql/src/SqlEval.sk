@@ -917,12 +917,12 @@ class Evaluator{options: Options, user: ?UserFile} {
               context.update();
               false
             } catch {
-            | Conflict(_pos, _msg, conflictingValues, rowValues) ->
+            | Conflict(_pos, _msg, _conflictingValues, rowValues) ->
               context.replaceFromSaved(copy);
               isDifferent = false;
               for (row in rows) {
                 for (row2 in rowValues) {
-                  if (row != row2) {
+                  if (row2.getRepeat() != 0 && row != row2) {
                     !isDifferent = true
                   }
                 }
@@ -930,35 +930,29 @@ class Evaluator{options: Options, user: ?UserFile} {
               if (!isDifferent) {
                 false
               } else {
-                where: ?Expr = None();
-                for (idxValue in conflictingValues) {
-                  (idx, conValue) = idxValue;
-                  tyDescr = table.schema[idx];
-                  clause = BinOp(
-                    OEq(),
-                    Identifier(tyDescr.name),
-                    conValue match {
-                    | None() -> VNull()
-                    | Some(CInt(n)) -> VInt(n)
-                    | Some(CString(s)) -> VString(s)
-                    | _ -> error(pos, "Unsupported type for OR IGNORE/REPLACE")
-                    },
-                  );
-                  !where = where match {
-                  | None() -> Some(clause)
-                  | Some(w) -> Some(BinOp(OAnd(), w, clause))
-                  }
-                };
-                tick = context.tick;
-                _ = this.delete(
-                  context,
-                  params,
-                  pos,
-                  table.name,
-                  where,
-                  Array[],
+                kinds = table.schema.mapWithIndex((idx, x) ->
+                  (idx, IASC(), x.ty)
                 );
-                _ = importNext(context, tick, context);
+                entries = mutable Vector[];
+                dir = context.unsafeGetEagerDir(table.dirName);
+                for (row in rowValues) {
+                  writerPath = SKStore.Path(
+                    table.dirName,
+                    SKStore.IID(SKStore.genSym(0)),
+                  );
+
+                  key: SKStore.Key = RowKey(row, kinds);
+                  for ((_, source, _) in dir.getDataIterWithoutTombs(
+                    context,
+                    key,
+                  )) {
+                    entries.push(
+                      (key, (source.path(), writerPath, Array<SKStore.File>[])),
+                    );
+                  };
+                };
+                dir.writeArraySourceMany(context, entries.iterator());
+                context.update();
                 true
               }
             | exn -> throw exn
