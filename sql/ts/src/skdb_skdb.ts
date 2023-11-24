@@ -323,6 +323,7 @@ class LinksImpl implements Links, ToWasm {
       let stdout = fn();
       if (stdout == "") {
         let result = this.stdout_objects[0];
+        this.stdout_objects = [[],[],[], []];
         return new SKDBTable(...result);
       }
       throw new Error(stdout)
