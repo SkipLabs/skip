@@ -272,7 +272,7 @@ native fun unixNotify(String, Int32): Int32;
 /*****************************************************************************/
 
 class DataMapValue{
-  map: DMap<Source, Array<File>> = DMap::empty(),
+  map: DMap<Source, (Source, Array<File>)> = DMap::empty(),
   tombs: DMap<Source, Source> = DMap::empty(),
 } {
   static fun empty(): this {
@@ -294,7 +294,11 @@ class DataMapValue{
     if (files.isEmpty()) {
       if (isMasking) {
         // mask out fixed data, for when you're iterating without tombs.
-        !this.map = this.map.set(TickRange::create(tick), origSource, files)
+        !this.map = this.map.set(
+          TickRange::create(tick),
+          origSource,
+          (writer, files),
+        )
       } else {
         this.map.maybeGet(origSource) match {
         | None() -> void
@@ -306,7 +310,11 @@ class DataMapValue{
       if (this.tombs.containsKey(origSource)) {
         !this.tombs = this.tombs.remove(origSource)
       };
-      !this.map = this.map.set(TickRange::create(tick), origSource, files);
+      !this.map = this.map.set(
+        TickRange::create(tick),
+        origSource,
+        (writer, files),
+      );
     };
     this
   }
@@ -324,11 +332,11 @@ class DataMapValue{
       | (None(), Some((tick, v, w))) ->
         yield (tick, v, w, Array[]);
         !right = tombsIter.next()
-      | (Some((tick, k, v)), None()) ->
-        yield (tick, k, k, v);
+      | (Some((tick, k, (w, v))), None()) ->
+        yield (tick, k, w, v);
         !left = mapIter.next()
-      | (Some((tick, k, v)), Some((_, k2, _))) if (k < k2) ->
-        yield (tick, k, k, v);
+      | (Some((tick, k, (w, v))), Some((_, k2, _))) if (k < k2) ->
+        yield (tick, k, w, v);
         !left = mapIter.next()
       | (Some((t1, k1, _)), Some((t2, k2, w))) if (k1 == k2 && t1 == t2) ->
         yield (t2, k2, w, Array[]);
@@ -352,13 +360,13 @@ class DataMapValue{
       | (None(), Some((v, w, tick))) ->
         yield ((tick.current, v, w), Array[]);
         !right = tombsIter.next()
-      | (Some((k, v, tick)), None()) ->
-        yield ((tick.current, k, k), v);
-        !left = mapIter.next()
-      | (Some((k, v, tick)), Some((k2, w, _))) if (k < k2) ->
+      | (Some((k, (w, v), tick)), None()) ->
         yield ((tick.current, k, w), v);
         !left = mapIter.next()
-      | (Some((k, v, tick)), Some((k2, w, _))) if (k == k2) ->
+      | (Some((k, (w, v), tick)), Some((k2, _, _))) if (k < k2) ->
+        yield ((tick.current, k, w), v);
+        !left = mapIter.next()
+      | (Some((k, (w, v), tick)), Some((k2, _, _))) if (k == k2) ->
         yield ((tick.current, k, w), v);
         !left = mapIter.next();
         !right = tombsIter.next()
@@ -372,13 +380,13 @@ class DataMapValue{
   fun maybeGet(source: Source): ?Array<File> {
     this.map.maybeGet(source) match {
     | None() -> if (this.tombs.containsKey(source)) Some(Array[]) else None()
-    | x @ Some(_) -> x
+    | Some(x) -> Some(x.i1)
     }
   }
 }
 
 class DataMap{
-  data: DMap<Key, DMap<Source, Array<File>>> = Nil(),
+  data: DMap<Key, DMap<Source, (Source, Array<File>)>> = Nil(),
   tombs: DMap<Key, DMap<Source, Source>> = Nil(),
   nbrEntries: Int = 0,
 } {
@@ -494,13 +502,13 @@ class DataMap{
 
   fun itemsAfterKeyHelper(
     lastSkippedOpt: ?Boundary<Key>,
-  ): mutable Iterator<(Key, DMap<Source, Array<File>>)> {
+  ): mutable Iterator<(Key, DMap<Source, (Source, Array<File>)>)> {
     this.data.itemsAfterKey(lastSkippedOpt).iter
   }
 
   fun itemsAfterKey(
     lastSkippedOpt: ?Boundary<Key>,
-  ): mutable IterHolder<Key, DMap<Source, Array<File>>> {
+  ): mutable IterHolder<Key, DMap<Source, (Source, Array<File>)>> {
     mutable IterHolder(this.itemsAfterKeyHelper(lastSkippedOpt))
   }
 
@@ -1451,7 +1459,7 @@ class EagerDir{
         yield row
       }
     | Some(modified) ->
-      fixed = FixedDataMapIterator::create(this.fixedData.getIter(key));
+      fixed = FixedDataMapIterator::create(fixedIter);
 
       for (tickSourceWriter => files in modified) {
         (tick, source, writer) = tickSourceWriter;
@@ -1486,7 +1494,7 @@ class EagerDir{
       fixed = FixedDataMapIterator::create(this.fixedData.getIter(key));
 
       for (sourceFilesTick in modified.map.itemsWithTick()) {
-        (source, files, tickRange) = sourceFilesTick;
+        (source, (_writer, files), tickRange) = sourceFilesTick;
         tick = tickRange.current;
         while (!fixed.isEnd() && fixed.current().i1 < source) {
           if (fixed.current().i3.size() > 0) {
