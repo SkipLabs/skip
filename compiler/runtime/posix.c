@@ -255,7 +255,8 @@ int64_t SKIP_posix_spawnp(char *skargv, char *skenvp, char *file_actionsp) {
                    NULL, argv, envp);
   if (rv != 0) {
     errno = rv;
-    perror("posix_spawn");
+    fprintf(stderr, "posix_spawnp (%s): ", argv[0]);
+    perror(NULL);
     exit(EXIT_FAILURE);
   }
 
