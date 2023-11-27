@@ -150,6 +150,35 @@ def test_two_clients_single_server_multiple_inserts_on_client1_insert_on_each():
   return scheduler
 
 
+def test_two_clients_single_server_multiple_inserts_on_client1_purge_on_1():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client1.purgeAllAtSomePointFromNow()
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").equals(
+    [0, "foo"],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
 def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
   cluster = create_cluster(scheduler)
