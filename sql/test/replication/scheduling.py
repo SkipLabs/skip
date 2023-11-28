@@ -25,7 +25,7 @@ async def runSchedules(schedules, log):
       await failLock.acquire() # just deal with first failure
       debugRun = schedule.clone()
       try:
-        print("> running debug test", file=sys.stderr)
+        print(f"> running debug test - schedule {hash(debugRun)}", file=sys.stderr)
         await debugRun.run(log)
       except AssertionError as err:
         sys.exit(1)
@@ -204,6 +204,9 @@ class Schedule:
   def __str__(self):
     return self.__repr__()
 
+  def __hash__(self) -> int:
+    return hash(tuple(self.tasks))
+
   def happensBefore(self, t1, t2) -> bool:
     rest = itertools.dropwhile(lambda x: x!=t1, self.tasks)
     return t2 in rest
@@ -275,5 +278,35 @@ class ReservoirSample():
       randIdx = random.randint(0, i)
       if randIdx < self.N:
         reservoir[randIdx] = schedule
-    log(f"WARN: We will run {N} of the {i+1} possible schedules. ~{int((N)/(i+1.0)*100)}%")
+    if N < i + 1:
+        log(f"WARN: We will run {N} of the {i+1} possible schedules. ~{int((N)/(i+1.0)*100)}%")
     return reservoir
+
+class SpecificSchedule():
+  def __init__(self, scheduler, hsh):
+    self.scheduler = scheduler
+    self.hsh = hsh
+
+  def add(self, task):
+    return self.scheduler.add(task)
+
+  def choice(self, taskSets):
+    return self.scheduler.choice(taskSets)
+
+  def happensBefore(self, a, b):
+    return self.scheduler.happensBefore(a,b)
+
+  def tasks(self):
+    return self.scheduler.tasks()
+
+  async def run(self, log):
+    return await runSchedules(self.schedules(log), log)
+
+  def schedules(self, log):
+    # just simple reservoir sample
+    schedules = self.scheduler.schedules(log)
+    for schedule in schedules:
+      if hash(schedule) == self.hsh:
+        return [schedule]
+    log(f"WARN: Could not find schedule with hash {self.hsh}, running 0 schedules!")
+    return []

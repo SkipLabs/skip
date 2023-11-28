@@ -81,6 +81,20 @@ def runQuery(dbkey, query):
     return list(json.loads(x) for x in lines if x.strip() != '')
   return f
 
+def compact(dbkey):
+  async def f(schedule):
+    db = schedule.getScheduleLocal(dbkey)
+    if db is None:
+      raise RuntimeError("could not get db")
+
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "compact")
+    await proc.communicate()
+    if proc.returncode is None or proc.returncode > 0:
+      raise RuntimeError(f"running '{query}' exited non-zero")
+
+    return []
+  return f
+
 def subscribe(dbkey, subkey, table, user, dest, peerId):
   async def f(schedule):
     db = schedule.getScheduleLocal(dbkey)
@@ -297,6 +311,15 @@ class SkdbPeer:
     q = f"UPDATE {table} SET {setExprs} WHERE {where};"
     t = Task(f"'{q}' on {self}", runDmlQuery(self, q))
     return self._scheduleDmlTask(table, t)
+
+  def purgeAllAtSomePointFromNow(self):
+    t = Task(f"Purge all dirs {self}", compact(self))
+    # we don't update self.lastTask as this is concurrent to other
+    # tasks the peer performs, but we do define happens before as it
+    # must happen at least after init (the db must be created)
+    self.scheduler.add(t)
+    self.scheduler.happensBefore(self.lastTask, t)
+    return t
 
   async def query(self, schedule, query):
     return await runQuery(self, query)(schedule)
