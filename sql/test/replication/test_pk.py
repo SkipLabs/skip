@@ -204,7 +204,7 @@ def test_two_clients_single_server_repeat_inserts_on_client1_purge_on_1():
 # | ins 0 foo | upd 0 bar | upd 0 |      2 |
 
 def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key():
-  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
   server = cluster.add(Server("s1", scheduler))
@@ -231,7 +231,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
 
 
 def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key_purge_1():
-  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
   server = cluster.add(Server("s1", scheduler))
@@ -260,7 +260,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
 
 
 def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key_purge_2():
-  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
   server = cluster.add(Server("s1", scheduler))
@@ -374,7 +374,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
 
 
 def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_same_key():
-  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
   server = cluster.add(Server("s1", scheduler))
@@ -401,7 +401,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
 
 
 def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_same_key_purge_1():
-  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
   server = cluster.add(Server("s1", scheduler))
@@ -430,7 +430,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
 
 
 def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_same_key_purge_2():
-  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
   server = cluster.add(Server("s1", scheduler))
