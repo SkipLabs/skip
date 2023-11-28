@@ -123,7 +123,7 @@ def test_two_clients_single_server_single_conflicting_insert_each():
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_insert_on_each():
+def test_two_clients_single_server_multiple_inserts_on_client1_insert_on_client2():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
   cluster = create_cluster(scheduler)
 
@@ -150,7 +150,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_insert_on_each():
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_purge_on_1():
+def test_two_clients_single_server_repeat_inserts_on_client1_purge_on_1():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
@@ -179,7 +179,31 @@ def test_two_clients_single_server_multiple_inserts_on_client1_purge_on_1():
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2():
+
+
+# | c1        | c1        | c2    | purge? |
+# |-----------+-----------+-------+--------|
+# | ins 0 foo | ins 0 bar | del 0 |      n |
+# | ins 0 foo | ins 0 bar | del 0 |      1 |
+# | ins 0 foo | ins 0 bar | del 0 |      2 |
+# |-----------+-----------+-------+--------|
+# | ins 0 foo | ins 1 bar | del 0 |      n |
+# | ins 0 foo | ins 1 bar | del 0 |      1 |
+# | ins 0 foo | ins 1 bar | del 0 |      2 |
+# |-----------+-----------+-------+--------|
+# | ins 0 foo | ins 0 bar | upd 0 |      n |
+# | ins 0 foo | ins 0 bar | upd 0 |      1 |
+# | ins 0 foo | ins 0 bar | upd 0 |      2 |
+# |-----------+-----------+-------+--------|
+# | ins 0 foo | ins 1 bar | upd 0 |      n |
+# | ins 0 foo | ins 1 bar | upd 0 |      1 |
+# | ins 0 foo | ins 1 bar | upd 0 |      2 |
+# |-----------+-----------+-------+--------|
+# | ins 0 foo | upd 0 bar | upd 0 |      n |
+# | ins 0 foo | upd 0 bar | upd 0 |      1 |
+# | ins 0 foo | upd 0 bar | upd 0 |      2 |
+
+def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
   cluster = create_cluster(scheduler)
 
@@ -206,8 +230,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_same_key_delete_on_client2_purge_happens_on1():
-  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
+def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key_purge_1():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
   cluster = create_cluster(scheduler)
 
   server = cluster.add(Server("s1", scheduler))
@@ -235,7 +259,63 @@ def test_two_clients_single_server_multiple_inserts_on_client1_same_key_delete_o
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_purge_happens_on1():
+def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key_purge_2():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client2.purgeAllAtSomePointFromNow()
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [0, 'bar'])
+  client2.deleteFromWhere("test_with_pk", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "bar"]], []],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_diff_key():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [1, 'bar'])
+  client2.deleteFromWhere("test_with_pk", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "foo"], [1, "bar"]], [[1, "bar"]]],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_diff_key_purge_1():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
@@ -264,7 +344,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_purge_happens_on2():
+def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_diff_key_purge_2():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
@@ -278,7 +358,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   client2.purgeAllAtSomePointFromNow()
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
-  client1.insertOrReplace("test_with_pk", [0, 'bar'])
+  client1.insertOrReplace("test_with_pk", [1, 'bar'])
   client2.deleteFromWhere("test_with_pk", "id = 0")
 
   # check once all tasks have run that the cluster is silent
@@ -286,7 +366,206 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
 
   # and that all nodes have reached this state
   cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
-    [[[0, "bar"]], []],
+    [[[0, "foo"], [1, "bar"]], [[1, "bar"]]],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_same_key():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [0, 'bar'])
+  client2.updateSetWhere("test_with_pk", "note = 'baz'", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "bar"]], [[0, "baz"]]],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_same_key_purge_1():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client1.purgeAllAtSomePointFromNow()
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [0, 'bar'])
+  client2.updateSetWhere("test_with_pk", "note = 'baz'", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "bar"]], [[0, "baz"]]],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_same_key_purge_2():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 5000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client2.purgeAllAtSomePointFromNow()
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [0, 'bar'])
+  client2.updateSetWhere("test_with_pk", "note = 'baz'", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "bar"]], [[0, "baz"]]],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_diff_key():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [1, 'bar'])
+  client2.updateSetWhere("test_with_pk", "note = 'baz'", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "foo"], [1, "bar"]], [[0, "baz"], [1, "bar"]]],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_diff_key_purge_1():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client1.purgeAllAtSomePointFromNow()
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [1, 'bar'])
+  client2.updateSetWhere("test_with_pk", "note = 'baz'", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "foo"], [1, "bar"]], [[0, "baz"], [1, "bar"]]],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_diff_key_purge_2():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client2.purgeAllAtSomePointFromNow()
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.insertOrReplace("test_with_pk", [1, 'bar'])
+  client2.updateSetWhere("test_with_pk", "note = 'baz'", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "foo"], [1, "bar"]], [[0, "baz"], [1, "bar"]]],
+    colnames=['id', 'note'],
+  )
+
+  return scheduler
+
+
+def test_two_clients_single_server_updates():
+  scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
+  cluster = create_cluster(scheduler)
+
+  server = cluster.add(Server("s1", scheduler))
+  client1 = cluster.add(Client("c1", scheduler))
+  client2 = cluster.add(Client("c2", scheduler))
+
+  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", client2, server)
+
+  client1.purgeAllAtSomePointFromNow()
+
+  client1.insertOrReplace("test_with_pk", [0, 'foo'])
+  client1.updateSetWhere("test_with_pk", "note = 'bar'", "id = 0")
+  client2.updateSetWhere("test_with_pk", "note = 'baz'", "id = 0")
+
+  # check once all tasks have run that the cluster is silent
+  cluster.isSilent()
+
+  # and that all nodes have reached this state
+  cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
+    [[[0, "bar"]], [[0, "baz"]]],
     colnames=['id', 'note'],
   )
 
