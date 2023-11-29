@@ -1,3 +1,5 @@
+module alias P = SQLParser;
+
 module SKCSV;
 
 base class Token {
@@ -133,6 +135,20 @@ fun parseCsv<T>(
   (eof, array.toArray())
 }
 
+fun parseCSVValue(kv: (Bool, String)): P.Value {
+  (isStr, str) = kv;
+  if (isStr) return P.VString(str);
+  if (str == "") return P.VNull();
+  str.toIntOption() match {
+  | None() ->
+    str.toFloatOption() match {
+    | None() -> P.VString(str)
+    | Some(f) -> P.VFloat(f)
+    }
+  | Some(x) -> P.VInt(x)
+  }
+}
+
 fun insert(
   context: mutable SKStore.Context,
   line: mutable Ref<Int>,
@@ -141,12 +157,12 @@ fun insert(
   user: ?SKDB.UserFile,
 ): SKStore.ContextOp {
   // empty params since no placeholders in input to skdb load-csv
-  params: Map<String, SKDB.Value> = Map[];
+  params: Map<String, P.Value> = Map[];
   eval = SKDB.Evaluator{options, user};
   pos = 0;
   inTransaction = false;
   paramsOpt = None();
-  (eof, array) = parseCsv(line, SKDB.parseCSVValue);
+  (eof, array) = parseCsv(line, parseCSVValue);
   f = eval.insert(
     context,
     params,
@@ -535,7 +551,7 @@ fun parseHeader(
   tableAndSnapshot = line.stripPrefix("^").split(" ", 2);
   table = tableAndSnapshot.maybeGet(0) match {
   | None() -> invariant_violation("no table found")
-  | Some(t) -> SKDB.getTable(context, 0, SKDB.Name::create(t))
+  | Some(t) -> SKDB.getTable(context, 0, P.Name::create(t))
   };
 
   (table, tableAndSnapshot.maybeGet(1).map(x -> x.toInt()))
@@ -601,9 +617,9 @@ fun parseTableChange(
   for (value in lex(next)) {
     values.push(value);
   };
-  cvalues = values.map(SKDB.parseCSVValue);
+  cvalues = values.map(parseCSVValue);
   // empty params since no placeholders in skdb diff write-csv
-  params: Map<String, SKDB.Value> = Map[];
+  params: Map<String, P.Value> = Map[];
   newRows = SKDB.computeInsert(
     context,
     params,

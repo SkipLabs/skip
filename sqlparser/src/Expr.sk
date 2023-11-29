@@ -89,7 +89,13 @@ extension class Parser {
     | TFloat(str) -> VFloat(str.toFloat())
     | TPlaceholder(name) -> VParam(name)
     | TPlus() -> UnOp(UnaryPlus(), this.parseSubExpr(static::kMaximumPrec))
-    | TMinus() -> UnOp(UnaryMinus(), this.parseSubExpr(static::kMaximumPrec))
+    | TMinus() ->
+      this.parseSubExpr(static::kMaximumPrec) match {
+      | VSeqNum(isPositive, s) -> VSeqNum(!isPositive, s)
+      | VFloat(f) -> VFloat(-f)
+      | VInt(n) -> VInt(-n)
+      | e -> UnOp(UnaryMinus(), e)
+      }
     | TTilde() -> UnOp(UnaryBitNot(), this.parseSubExpr(static::kMaximumPrec))
     | TLParen() -> this.parseParenthesizedExpr()
     | TWord(value, _, Some(kw)) ->
@@ -139,6 +145,39 @@ extension class Parser {
     value.uppercase() match {
     | "TRUE" -> VInt(1)
     | "FALSE" -> VInt(0)
+    // TODO: This is dirty. We should parse `LOCAL_SEQUENCE_NUMBER`/`ID` as simple function calls.
+    | "LOCAL_SEQUENCE_NUMBER" ->
+      this.expect_token(TLParen());
+      arg = this.peek_token() match {
+      | TSingleQuotedString(str) ->
+        this.tokens.advance();
+        Some(str)
+      | _ -> None()
+      };
+      this.expect_token(TRParen());
+      VSeqNum(true, arg)
+    | "ID" ->
+      if (this.parse_token(TLParen())) {
+        arg = this.peek_token() match {
+        | TSingleQuotedString(str) ->
+          this.tokens.advance();
+          Some(str)
+        | _ -> None()
+        };
+        this.expect_token(TRParen());
+        VId(arg)
+      } else {
+        this.parseIdentifier(Name::create(value))
+      }
+    | "SKDB_PERMISSION" ->
+      this.expect_token(TLParen());
+      error_pos = this.current_pos();
+      arg = this.parseExpr() match {
+      | x @ Value _ -> x
+      | _ -> throw UnexpectedTokenError(error_pos, "literal value")
+      };
+      this.expect_token(TRParen());
+      VPermission(arg)
     | _ -> this.parseIdentifierOrFunctionCall(Name::create(value))
     }
   }
