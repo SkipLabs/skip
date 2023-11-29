@@ -180,25 +180,25 @@ def test_two_clients_single_server_repeat_inserts_on_client1_purge_on_1():
 
 # | c1        | c1        | c2    | purge? |
 # |-----------+-----------+-------+--------|
-# | ins 0 foo | ins 0 bar | del 0 |      n |
-# | ins 0 foo | ins 0 bar | del 0 |      1 |
-# | ins 0 foo | ins 0 bar | del 0 |      2 |
+# | ins 0 foo | ins 0 bar | del 0 | no     |
+# | ins 0 foo | ins 0 bar | del 0 | c1     |
+# | ins 0 foo | ins 0 bar | del 0 | serv   |
 # |-----------+-----------+-------+--------|
-# | ins 0 foo | ins 1 bar | del 0 |      n |
-# | ins 0 foo | ins 1 bar | del 0 |      1 |
-# | ins 0 foo | ins 1 bar | del 0 |      2 |
+# | ins 0 foo | ins 1 bar | del 0 | no     |
+# | ins 0 foo | ins 1 bar | del 0 | c1     |
+# | ins 0 foo | ins 1 bar | del 0 | server |
 # |-----------+-----------+-------+--------|
-# | ins 0 foo | ins 0 bar | upd 0 |      n |
-# | ins 0 foo | ins 0 bar | upd 0 |      1 |
-# | ins 0 foo | ins 0 bar | upd 0 |      2 |
+# | ins 0 foo | ins 0 bar | upd 0 | no     |
+# | ins 0 foo | ins 0 bar | upd 0 | c1     |
+# | ins 0 foo | ins 0 bar | upd 0 | server |
 # |-----------+-----------+-------+--------|
-# | ins 0 foo | ins 1 bar | upd 0 |      n |
-# | ins 0 foo | ins 1 bar | upd 0 |      1 |
-# | ins 0 foo | ins 1 bar | upd 0 |      2 |
+# | ins 0 foo | ins 1 bar | upd 0 | no     |
+# | ins 0 foo | ins 1 bar | upd 0 | c1     |
+# | ins 0 foo | ins 1 bar | upd 0 | server |
 # |-----------+-----------+-------+--------|
-# | ins 0 foo | upd 0 bar | upd 0 |      n |
-# | ins 0 foo | upd 0 bar | upd 0 |      1 |
-# | ins 0 foo | upd 0 bar | upd 0 |      2 |
+# | ins 0 foo | upd 0 bar | upd 0 | no     |
+# | ins 0 foo | upd 0 bar | upd 0 | c1     |
+# | ins 0 foo | upd 0 bar | upd 0 | server |
 
 def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
@@ -253,7 +253,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key_purge_2():
+def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_same_key_purge_server():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
@@ -264,7 +264,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   cluster.mirror("test_with_pk", client1, server)
   cluster.mirror("test_with_pk", client2, server)
 
-  client2.purgeAllAtSomePointFromNow()
+  server.purgeAllAtSomePointFromNow()
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [0, 'bar'])
@@ -332,7 +332,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_diff_key_purge_2():
+def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2_diff_key_purge_server():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
@@ -343,7 +343,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   cluster.mirror("test_with_pk", client1, server)
   cluster.mirror("test_with_pk", client2, server)
 
-  client2.purgeAllAtSomePointFromNow()
+  server.purgeAllAtSomePointFromNow()
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [1, 'bar'])
@@ -411,7 +411,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_same_key_purge_2():
+def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_same_key_purge_server():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
@@ -422,7 +422,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
   cluster.mirror("test_with_pk", client1, server)
   cluster.mirror("test_with_pk", client2, server)
 
-  client2.purgeAllAtSomePointFromNow()
+  server.purgeAllAtSomePointFromNow()
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [0, 'bar'])
@@ -490,7 +490,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
   return scheduler
 
 
-def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_diff_key_purge_2():
+def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2_diff_key_purge_server():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
@@ -501,7 +501,7 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
   cluster.mirror("test_with_pk", client1, server)
   cluster.mirror("test_with_pk", client2, server)
 
-  client2.purgeAllAtSomePointFromNow()
+  server.purgeAllAtSomePointFromNow()
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [1, 'bar'])
@@ -568,7 +568,7 @@ def test_two_clients_single_server_updates_purge_happens_on1():
   return scheduler
 
 
-def test_two_clients_single_server_updates_purge_happens_on2():
+def test_two_clients_single_server_updates_purge_happens_on_server():
   scheduler = sched.ReservoirSample(sched.AllTopoSortsScheduler(runAll=True), 9000)
   cluster = create_cluster(scheduler)
 
@@ -579,7 +579,7 @@ def test_two_clients_single_server_updates_purge_happens_on2():
   cluster.mirror("test_with_pk", client1, server)
   cluster.mirror("test_with_pk", client2, server)
 
-  client2.purgeAllAtSomePointFromNow()
+  server.purgeAllAtSomePointFromNow()
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.updateSetWhere("test_with_pk", "note = 'bar'", "id = 0")
