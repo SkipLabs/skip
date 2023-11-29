@@ -1,3 +1,5 @@
+module alias P = SQLParser;
+
 module SKDB;
 
 /*****************************************************************************/
@@ -27,7 +29,7 @@ native fun jsPushObjectFieldString(String): void;
 native fun jsPushObject(): void;
 
 fun compareRows(
-  kinds: Array<(Int, IKind, Type)>,
+  kinds: Array<(Int, P.IKind, P.Type)>,
   x: RowValues,
   y: RowValues,
 ): Order {
@@ -44,20 +46,20 @@ fun compareRows(
     | (None(), None()) -> continue
     | (None(), _) ->
       return direction match {
-      | IDESC() -> GT()
+      | P.IDESC() -> GT()
       | _ -> LT()
       }
     | (_, None()) ->
       return direction match {
-      | IDESC() -> LT()
+      | P.IDESC() -> LT()
       | _ -> GT()
       }
     | (Some(v1), Some(v2)) ->
       cmp = direction match {
-      | INONE()
-      | IASC() ->
+      | P.INONE()
+      | P.IASC() ->
         v1.compare(v2)
-      | IDESC() -> v2.compare(v1)
+      | P.IDESC() -> v2.compare(v1)
       };
       if (cmp != EQ()) return cmp
     }
@@ -67,9 +69,12 @@ fun compareRows(
 
 class RowKey(
   row: RowValues,
-  kinds: Array<(Int, IKind, Type)>,
+  kinds: Array<(Int, P.IKind, P.Type)>,
 ) extends SKStore.Key {
-  static fun create(row: RowValues, kinds: Array<(Int, IKind, Type)>): this {
+  static fun create(
+    row: RowValues,
+    kinds: Array<(Int, P.IKind, P.Type)>,
+  ): this {
     static(row, kinds)
   }
 

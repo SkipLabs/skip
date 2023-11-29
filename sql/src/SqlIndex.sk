@@ -2,13 +2,15 @@
 /* Module handling Sql indexes. */
 /*****************************************************************************/
 
+module alias P = SQLParser;
+
 module SKDB;
 
 class IndexProjKey(values: Array<(Int, ?CValue)>) extends SKStore.Key
 
 fun makeIndexProjKey(
   v: RowValues,
-  kinds: Array<(Int, IKind, Type)>,
+  kinds: Array<(Int, P.IKind, P.Type)>,
   size: Int,
 ): IndexProjKey {
   indexedValues = mutable Vector[];
@@ -19,26 +21,26 @@ fun makeIndexProjKey(
 }
 
 fun createIndexName(
-  tableName: Name,
-  kinds: Array<(Int, IKind, Type)>,
+  tableName: P.Name,
+  kinds: Array<(Int, P.IKind, P.Type)>,
   size: Int,
-): Name {
+): P.Name {
   if (size != kinds.size()) !kinds = kinds.slice(0, size);
-  Name::create("/indexes/" + tableName.lower + "/" + hash(kinds) + "/")
+  P.Name::create("/indexes/" + tableName.lower + "/" + hash(kinds) + "/")
 }
 
 fun createIndex(
   context: mutable SKStore.Context,
-  userIndexNameOpt: ?Name,
-  tableName: Name,
+  userIndexNameOpt: ?P.Name,
+  tableName: P.Name,
   dirName: SKStore.DirName,
-  kinds: Array<(Int, IKind, Type)>,
+  kinds: Array<(Int, P.IKind, P.Type)>,
   size: Int,
   unique: Bool,
   text: ?String,
 ): IndexDescr {
   idxKinds = kinds.mapWithIndex((idx, field) -> {
-    (idx, IASC(), field.i2)
+    (idx, P.IASC(), field.i2)
   });
   indexName = createIndexName(tableName, kinds, size);
   needsReordering = false;
@@ -137,19 +139,19 @@ fun createIndex(
 
 fun createUserIndex(
   context: mutable SKStore.Context,
-  userIndexName: Name,
+  userIndexName: P.Name,
   pos: Int,
-  tableName: Name,
-  columns: Array<IndexedColumn>,
+  tableName: P.Name,
+  columns: Array<P.IndexedColumn>,
   unique: Bool,
   text: ?String,
 ): IndexDescr {
   colNames = columns.map(x -> {
     name = x.expr match {
-    | Identifier(name, None()) -> name
+    | P.Identifier(name, None()) -> name
     | _ -> error(pos, "Indexing on expressions not implemented")
     };
-    (name, IASC())
+    (name, P.IASC())
   });
   colSet = mutable Set[];
   for (colName in colNames) {
@@ -166,7 +168,7 @@ fun createUserIndex(
   additionalCols = mutable Vector[];
   for (ty in table.schema) {
     if (colSet.contains(ty.name)) continue;
-    additionalCols.push((ty.name, IASC()));
+    additionalCols.push((ty.name, P.IASC()));
   };
   !colNames = colNames.concat(additionalCols.toArray());
 
@@ -265,13 +267,13 @@ base class ColOp uses Orderable {
   | COLike(String)
   | CORange(CValue, CValue)
 
-  static fun create(op: BinaryOperator, value: CValue): ColOp {
+  static fun create(op: P.BinaryOperator, value: CValue): ColOp {
     op match {
-    | OEq() -> COEq(value)
-    | OLt() -> COLt(value)
-    | OLtEq() -> COLte(value)
-    | OGt() -> COGt(value)
-    | OGtEq() -> COGte(value)
+    | P.OEq() -> COEq(value)
+    | P.OLt() -> COLt(value)
+    | P.OLtEq() -> COLte(value)
+    | P.OGt() -> COGt(value)
+    | P.OGtEq() -> COGte(value)
     | _ -> invariant_violation("Unknown operation: " + op)
     }
   }

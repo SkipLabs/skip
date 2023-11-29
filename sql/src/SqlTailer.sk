@@ -1,6 +1,8 @@
+module alias P = SQLParser;
+
 module SKDB;
 
-class TailSpec{since: Int, filter: ?String, params: Map<String, Value>}
+class TailSpec{since: Int, filter: ?String, params: Map<String, P.Value>}
 
 fun buildTailFilter(
   context: readonly SKStore.Context,
@@ -8,17 +10,17 @@ fun buildTailFilter(
   dirSub: SKStore.DirSub,
   userId: ?String,
   tailSpec: TailSpec,
-  tableName: Name,
+  tableName: P.Name,
 ): (SKStore.Context, Bool) ~> (SKStore.Key -> Bool) {
   filter = tailSpec.filter match {
   | None() -> dirSub.filter
   | Some(strCond) ->
     compiler = SKDB.Compiler::create(false, options, 0, tailSpec.params);
-    (_, ast) = SKDB.parseExpr(SKDB.Lexer(0, SKDB.Buffer(strCond)), 0);
+    ast = P.Parser::create(strCond).parseExpr();
     compilerContext = context.mclone();
     _ = compiler.compileFrom(
       compilerContext,
-      Array[SKDB.FromTable{name => tableName, asName => None()}],
+      Array[P.FromTable{name => tableName, asName => None()}],
     );
     e = compiler.compileExpr(compilerContext, ast) match {
     | SKDB.CIExpr(x) -> x
@@ -100,7 +102,7 @@ fun tailShouldWake(
 }
 
 fun tailFrom(
-  spec: (Name -> TailSpec),
+  spec: (P.Name -> TailSpec),
   dirSub: SKStore.DirSub,
   tailWatermark: ?Int,
 ): SKStore.Tick {
@@ -108,7 +110,7 @@ fun tailFrom(
   | Some(tick) -> SKStore.Tick(tick)
   | None() ->
     // we haven't caught up yet so honour the requested since value per table
-    tableName = SKDB.Name::create(
+    tableName = P.Name::create(
       dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
     );
     SKStore.Tick(spec(tableName).since)
@@ -120,7 +122,7 @@ fun tailSub(
   follow: Bool,
   sessionID: Int,
   userIDOpt: ?String,
-  spec: (Name -> TailSpec),
+  spec: (P.Name -> TailSpec),
 ): void {
   sub = SKStore.withContext(gContext -> {
     // rebuild the sub with extra filtering as supported by tail
@@ -131,7 +133,7 @@ fun tailSub(
     | Some(sub) ->
       sub with {
         dirSubs => sub.dirSubs.map(dirSub -> {
-          tableName = SKDB.Name::create(
+          tableName = P.Name::create(
             dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
           );
           dirSub with {

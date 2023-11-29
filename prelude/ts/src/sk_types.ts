@@ -445,6 +445,15 @@ export class Utils {
     return lineBuffer;
   }
 
+  readStdInToEnd = () => {
+    let lineBuffer = new Array<int>();
+    while (this.current_stdin < this.stdin.length) {
+      lineBuffer.push(this.stdin.charCodeAt(this.current_stdin));
+      this.current_stdin++;
+    }
+    return lineBuffer;
+  }
+
   getStdInChar = () => {
     if (this.current_stdin >= this.stdin.length) {
       this.exports.SKIP_throw_EndOfFile();

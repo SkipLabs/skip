@@ -1,3 +1,5 @@
+module alias P = SQLParser;
+
 module SKDB;
 
 /*****************************************************************************/
@@ -39,7 +41,7 @@ fun fixUpDirName(dirNameStr: String): SKStore.DirName {
 
 // Read a single line from stdin, decode it to a JSON Object, expected
 // to be a map from key strings (parameter names) to values.
-fun queryParams(options: SKDB.Options): Map<String, SKDB.Value> {
+fun queryParams(options: SKDB.Options): Map<String, P.Value> {
   if (!options.expectQueryParams) {
     return Map[];
   };
@@ -93,7 +95,7 @@ untracked fun main(): void {
     .arg(Cli.BoolArg("sync").about("Sync to disk").global())
     .arg(
       Cli.StringArg("format")
-        .default(if (isATTY() != 0) "table" else "sql")
+        .default(if (IO.stdin().isatty()) "table" else "sql")
         .about("Output format (sql, csv, json, or table)")
         .global(),
     )
@@ -350,18 +352,30 @@ untracked fun main(): void {
           skipExit(2)
         };
         params = queryParams(options);
-        if (isATTY() == 0) {
-          input = IO.stdin().read_to_end();
-          _ = SKDB.eval(input, options, params)
+        if (!IO.stdin().isatty()) {
+          input = read_to_end();
+          SKDB.eval(input, options, params) match {
+          | Failure(SKDB.ParserError(P.UnexpectedTokenError(pos, msg)))
+          | Failure(SKDB.SqlError(pos, msg)) ->
+            SKDB.printErrorAndExit(0, Buffer(input), pos, msg)
+          | Failure(SKDB.ParserError(P.NotImplementedError(pos))) ->
+            SKDB.printErrorAndExit(0, Buffer(input), pos, "not implemented")
+          | Failure(SKDB.ParserError(P.InvalidTokenError(pos, msg))) ->
+            SKDB.printErrorAndExit(0, Buffer(input), pos, msg)
+          | Success _ -> void
+          }
         } else {
           loop {
             SKStore.withRegionVoid(() ~> {
               input = "";
               loop {
                 print_raw("skdb> ");
-                !input = input + SKDB.read(0).i1;
+                read_line() match {
+                | Some(l) -> !input = input + l
+                | _ -> void
+                };
                 SKDB.eval(input, options, params) match {
-                | Failure(Error(_, "Unfinished transaction")) -> continue
+                | Failure(SqlError(_, "Unfinished transaction")) -> continue
                 | _ -> break void
                 }
               }
@@ -493,7 +507,7 @@ fun execMigrate(args: Cli.ParseResults, options: SKDB.Options): void {
 }
 
 fun execLoadCsv(args: Cli.ParseResults, options: SKDB.Options): void {
-  name = SKDB.Name::create(args.getString("table"));
+  name = P.Name::create(args.getString("table"));
   SKDB.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
@@ -568,12 +582,12 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
     diffSpec = mutable Vector[];
 
     for (dirSub in sub.dirSubs) {
-      tableName = SKDB.Name::create(
+      tableName = P.Name::create(
         dirSub.dirName.dirName.stripPrefix("/").stripSuffix("/"),
       );
       sinceForTable(tableName) match {
-        | None() -> void
-        | Some(t) -> diffSpec.push((dirSub, t))
+      | None() -> void
+      | Some(t) -> diffSpec.push((dirSub, t))
       }
     };
 
@@ -610,7 +624,7 @@ fun getSqlTableFromDirName(
 ): SKDB.DirDescr {
   dirNameStr = dirName.toString();
   !dirNameStr = dirNameStr.stripPrefix("/").stripSuffix("/");
-  SKDB.getTable(context.mclone(), 0, SKDB.Name::create(dirNameStr))
+  SKDB.getTable(context.mclone(), 0, P.Name::create(dirNameStr))
 }
 
 fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
