@@ -288,7 +288,6 @@ untracked fun main(): void {
           Cli.StringArg("table").positional().required().about("Table name"),
         ),
     )
-    .subcommand(Cli.Command("debug").about("TODO"))
     .help();
 
   try {
@@ -335,7 +334,6 @@ untracked fun main(): void {
         | "can-mirror" -> execCanMirror
         | "replay" -> execReplay
         | "toggle-view" -> execToggleView
-        | "debug" -> execDebug
         | "set-user" -> execSetUser
         | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
         }
@@ -782,8 +780,4 @@ fun execToggleView(args: Cli.ParseResults, _options: SKDB.Options): void {
     };
     SKStore.CStop(None())
   })
-}
-
-untracked fun execDebug(_args: Cli.ParseResults, _options: SKDB.Options): void {
-  SKStore.toplevel(SKStore.Context{});
 }
