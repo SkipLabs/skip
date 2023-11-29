@@ -1613,6 +1613,12 @@ fun withRegion<T>(
   }
 }
 
+fun withRegionVoid<T>(f: () ~> void): void {
+  saved = newObstack();
+  f();
+  destroyObstack(saved);
+}
+
 fun withRegionValue<T>(f: () ~> T): T {
   saved = newObstack();
   fresult = f();

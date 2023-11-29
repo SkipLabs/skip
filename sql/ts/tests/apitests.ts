@@ -314,8 +314,10 @@ async function testClientTail(root: SKDB, user: SKDB) {
     await user.exec("insert into view_pk values (97,98,'GALL');");
     throw new Error("Shall throw exception.");
   } catch (exn: any) {
+    // The following error message is duplicated due to how the wasm runtime
+    // translates `exit()` syscalls into exceptions.
     expect(getErrorMessage(exn)).toEqual(
-      "insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\ninsert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk",
+      "insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk\nInternal error: insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, characters 0-0:\nCannot write in view: view_pk"
     );
   }
   await new Promise((resolve) => setTimeout(resolve, 100));

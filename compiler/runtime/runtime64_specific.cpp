@@ -205,6 +205,12 @@ int32_t SKIP_read_line_fill(void) {
   return lineBuffer.size();
 }
 
+int32_t SKIP_read_to_end_fill() {
+  std::istreambuf_iterator<char> begin(std::cin), end;
+  lineBuffer = std::string(begin, end);
+  return lineBuffer.size();
+}
+
 uint32_t SKIP_read_line_get(uint32_t i) {
   return lineBuffer[i];
 }
@@ -257,10 +263,6 @@ uint32_t SKIP_getchar(uint64_t) {
   fprintf(stderr, "Invalid utf8");
   exit(23);
   return 0;
-}
-
-uint32_t SKIP_isatty() {
-  return (uint32_t)isatty(fileno(stdin));
 }
 
 thread_local void* exn;
