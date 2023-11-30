@@ -87,11 +87,12 @@ def compact(dbkey):
     if db is None:
       raise RuntimeError("could not get db")
 
-    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "compact")
-    await proc.communicate()
+    proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "compact",
+                                                stderr=asyncio.subprocess.PIPE)
+    (_, err) = await proc.communicate()
+    schedule.debug(err.decode().rstrip())
     if proc.returncode is None or proc.returncode > 0:
       raise RuntimeError(f"running '{query}' exited non-zero")
-
     return []
   return f
 
