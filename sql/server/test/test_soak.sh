@@ -4,7 +4,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 SQL_PATH=$(realpath $SCRIPT_DIR/../..)
 
-SKDB_BIN="skargo run --path $SQL_PATH --"
+SKDB_BIN="skargo run --release --path $SQL_PATH --"
 
 if [ -f ~/.skdb/config.prop ];then
   file=$(realpath ~/.skdb/config.prop)
