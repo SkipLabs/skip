@@ -3,7 +3,7 @@
 ;; Author: Lucas Hosseini <lucas@skiplabs.io>
 ;; Keywords: skip
 ;; Package-Requires: ((flycheck) (skip))
-;; URL: https://github.com/skiplabs/skfs
+;; URL: https://github.com/skiplabs/skdb
 
 ;;; Commentary:
 

@@ -9,4 +9,4 @@
 # is a cold start
 mkdir -p /var/db || exit 1
 
-java -jar /skfs/build/server.jar "$@"
+java -jar /skdb/build/server.jar "$@"
