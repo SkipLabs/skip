@@ -88,6 +88,7 @@ def compact(dbkey):
       raise RuntimeError("could not get db")
 
     proc = await asyncio.create_subprocess_exec(SKDB, "--data", db, "compact",
+                                                "--sync",
                                                 stderr=asyncio.subprocess.PIPE)
     (_, err) = await proc.communicate()
     schedule.debug(err.decode().rstrip())
