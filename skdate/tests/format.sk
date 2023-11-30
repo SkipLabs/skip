@@ -1,0 +1,141 @@
+module alias T = SKTest;
+
+module SKDateTests;
+
+@test
+fun fmtparsing1(): void {
+  elems = SKDate.parseTimeFormat("%A");
+  T.expectEq(elems, Vector[SKDate.FmtDay(false, false)])
+}
+
+@test
+fun fmtparsing2(): void {
+  elems = SKDate.parseTimeFormat("%^A");
+  T.expectEq(elems, Vector[SKDate.FmtDay(false, true)])
+}
+
+@test
+fun fmtparsing3(): void {
+  elems = SKDate.parseTimeFormat("%B");
+  T.expectEq(elems, Vector[SKDate.FmtMonth(false, false)])
+}
+
+@test
+fun fmtparsing4(): void {
+  elems = SKDate.parseTimeFormat("%^B");
+  T.expectEq(elems, Vector[SKDate.FmtMonth(false, true)])
+}
+
+@test
+fun fmtparsing5(): void {
+  elems = SKDate.parseTimeFormat("%a%b");
+  T.expectEq(
+    elems,
+    Vector[SKDate.FmtDay(true, false), SKDate.FmtMonth(true, false)],
+  )
+}
+
+@test
+fun fmtparsing6(): void {
+  elems = SKDate.parseTimeFormat("%s");
+  T.expectEq(elems, Vector[SKDate.FmtSeconds(true, false)])
+}
+
+@test
+fun fmtparsing7(): void {
+  elems = SKDate.parseTimeFormat("%Y-%m-%d %H:%M:%S");
+  T.expectEq(
+    elems,
+    Vector[
+      SKDate.FmtYear(),
+      SKDate.FmtText("-"),
+      SKDate.FmtDigitMonth("0"),
+      SKDate.FmtText("-"),
+      SKDate.FmtDigitDay("0"),
+      SKDate.FmtText(" "),
+      SKDate.FmtDigitHour(false, '0'),
+      SKDate.FmtText(":"),
+      SKDate.FmtMinutes(),
+      SKDate.FmtText(":"),
+      SKDate.FmtSeconds(false, false),
+    ],
+  )
+}
+
+@test
+fun fmtparsing8(): void {
+  elems = SKDate.parseTimeFormat("%:c");
+  T.expectEq(elems, Vector[SKDate.calendarFormat()])
+}
+
+@test
+fun fmtpadded1(): void {
+  T.expectEq(SKDate.padded(1, 4, "0"), "0001")
+}
+
+@test
+fun fmtpadded2(): void {
+  T.expectEq(SKDate.padded(255, 4, "0", true), "-0255")
+}
+
+@test
+fun fmtpadded3(): void {
+  T.expectEq(SKDate.padded(0, 2, "0"), "00")
+}
+
+@test
+fun fmtformat1(): void {
+  name = SKDate.locale_('A', 1);
+  testFormat("%A", name)
+}
+
+@test
+fun fmtformat2(): void {
+  name = SKDate.locale_('B', 9);
+  testFormat("%B", name)
+}
+
+@test
+fun fmtformat3(): void {
+  testFormat("%Y-%m-%d %H:%M:%S", "2023-09-18 00:00:00")
+}
+
+@test
+fun fmtformat4(): void {
+  testFormat("%W", "37", -1)
+}
+
+@test
+fun fmtformat5(): void {
+  testFormat("%P", "am")
+}
+
+@test
+fun fmtformat6(): void {
+  testFormat("%P", "pm", 0, SKDate.Time::create(12, 0))
+}
+
+@test
+fun fmtformat7(): void {
+  testFormat(
+    "%:c",
+    "2023-09-18 13:06:58.512+00",
+    0,
+    SKDate.Time::create(13, 6, 58, 512),
+    true,
+  )
+}
+
+fun testFormat(
+  format: String,
+  expected: String,
+  add: Int = 0,
+  time: SKDate.Time = SKDate.Time::create(),
+  utc: Bool = false,
+): void {
+  date = SKDate.Calendar::create(SKDate.Date::create(2023, 9, 18 + add), time);
+  if (utc) !date = date.withTimeZone(SKDate.utc);
+  got = SKDate.format(format, date);
+  debug((got, expected));
+  T.expectEq(got, expected)
+}

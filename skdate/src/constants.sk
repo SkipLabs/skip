@@ -1,0 +1,127 @@
+module SKDate;
+
+base class DateConstant() uses Hashable, Orderable {
+  fun getName(): String;
+  fun getShort(): String;
+  fun getCode(): Int;
+
+  fun compare(other: DateConstant): Order {
+    this.getCode().compare(other.getCode())
+  }
+}
+
+base class Day extends DateConstant {
+  children =
+  | Monday()
+  | Tuesday()
+  | Wednesday()
+  | Thursday()
+  | Friday()
+  | Saturday()
+  | Sunday()
+
+  static fun dayForCode(code: Int): Day {
+    !code = ((code - 1) % 7) + 1;
+    code match {
+    | 1 -> Monday()
+    | 2 -> Tuesday()
+    | 3 -> Wednesday()
+    | 4 -> Thursday()
+    | 5 -> Friday()
+    | 6 -> Saturday()
+    | 7 -> Sunday()
+    | _ -> invariant_violation("Invalid day code")
+    }
+  }
+
+  fun toNext(day: Day): Int {
+    current = this.getCode();
+    next = day.getCode();
+    if (next >= current) next - current else 7 - (current - next)
+  }
+
+  fun getName(): String {
+    localDateName_(false, this.getCode(), false);
+  }
+  fun getShort(): String {
+    localDateName_(false, this.getCode(), true);
+  }
+
+  fun getCode(): Int
+  | Monday() -> 1
+  | Tuesday() -> 2
+  | Wednesday() -> 3
+  | Thursday() -> 4
+  | Friday() -> 5
+  | Saturday() -> 6
+  | Sunday() -> 7
+}
+
+base class Month extends DateConstant {
+  children =
+  | January()
+  | February()
+  | March()
+  | April()
+  | May()
+  | June()
+  | July()
+  | August()
+  | September()
+  | October()
+  | November()
+  | December()
+
+  static fun monthForCode(code: Int): Month {
+    !code = ((code - 1) % 12) + 1;
+    code match {
+    | 1 -> January()
+    | 2 -> February()
+    | 3 -> March()
+    | 4 -> April()
+    | 5 -> May()
+    | 6 -> June()
+    | 7 -> July()
+    | 8 -> August()
+    | 9 -> September()
+    | 10 -> October()
+    | 11 -> November()
+    | 12 -> December()
+    | _ -> invariant_violation("Invalid month code")
+    }
+  }
+
+  fun getName(): String {
+    localDateName_(true, this.getCode(), false);
+  }
+  fun getShort(): String {
+    localDateName_(true, this.getCode(), true);
+  }
+
+  fun getCode(): Int
+  | January() -> 1
+  | February() -> 2
+  | March() -> 3
+  | April() -> 4
+  | May() -> 5
+  | June() -> 6
+  | July() -> 7
+  | August() -> 8
+  | September() -> 9
+  | October() -> 10
+  | November() -> 11
+  | December() -> 12
+}
+
+base class WeekNumber {
+  children =
+  | WNMonday()
+  | WNSunday()
+  | WNISO()
+
+  fun isISO(): Bool
+  | WNMonday()
+  | WNSunday() ->
+    false
+  | WNISO() -> true
+}
