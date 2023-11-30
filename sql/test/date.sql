@@ -1,1 +1,0 @@
-select strftime('%s', 'now');
