@@ -1,0 +1,428 @@
+module SKDate;
+
+@cpp_extern("SKIP_locale")
+native fun locale(UInt32, Int32): String;
+
+fun locale_(c: Char, value: Int = 0): String {
+  locale(UInt32::truncate(c.code()), Int32::truncate(value))
+}
+
+fun localDateName_(month: Bool, code: Int, short: Bool): String {
+  locale_(
+    (month, short) match {
+    | (false, false) -> 'A'
+    | (false, true) -> 'a'
+    | (true, false) -> 'B'
+    | (true, true) -> 'b'
+    },
+    code,
+  )
+}
+
+@cpp_extern("SKIP_localetimezonename")
+native fun localeTimeZoneName(year: UInt32, month: UInt32, day: UInt32): String;
+
+class DateFormatException(message: String) extends Exception {
+  fun getMessage(): String {
+    this.message;
+  }
+}
+
+base class FmtElement {
+  children =
+  | FmtText(text: String)
+  | FmtDay(short: Bool, upper: Bool)
+  | FmtWeekNumber(kind: WeekNumber)
+  | FmtWeekDay(monday: Bool)
+  | FmtWeekYear(short: Bool)
+  | FmtMonth(short: Bool, upper: Bool)
+  | FmtYear()
+  | FmtMinutes()
+  | FmtSeconds(epoch: Bool, fractional: Bool)
+  | FmtMeridian(upper: Bool)
+  | FmtTimezone(timezone: Int)
+  | FmtTimezoneName()
+  | FmtCentury(year: Bool)
+  | FmtDigitMonth(padding: String)
+  | FmtDigitDay(padding: String)
+  | FmtYearDay()
+  | FmtDigitHour(meridian: Bool, padding: Char)
+  | FmtJulianDay()
+  | FmtGroup(elems: Vector<FmtElement>)
+
+  fun format(date: SKDate.Calendar): String
+  | FmtText(text) -> text
+  | FmtDay(short, upper) ->
+    day = date.date.getWeekDay();
+    name = if (short) day.getShort() else day.getName();
+    if (upper) name.uppercase() else name
+  | FmtWeekNumber(kind) -> padded(date.date.getWeekNumber(kind), 2, "0")
+  | FmtWeekDay(monday) ->
+    code = date.date.getWeekDay().getCode();
+    (if (monday) code else code % 7).toString()
+  | FmtWeekYear(short) ->
+    year = date.date.getWeekDate().year;
+    sy = Math.abs(year % 100);
+    sign = if (year >= 0) "" else "-";
+    if (short && sy < 10) sign + "0" + sy else if (short) sign + sy else {
+      year.toString()
+    }
+  | FmtMonth(short, upper) ->
+    month = date.date.getMonth();
+    name = if (short) month.getShort() else month.getName();
+    if (upper) name.uppercase() else name
+  | FmtYear() ->
+    y = date.date.getYear();
+    padded(Math.abs(y), 4, "0", y < 0)
+  | FmtMinutes() -> padded(date.time.getMinutes(), 2, "0")
+  | FmtSeconds(epoch, fractional) ->
+    res = if (epoch) date.toEpoch(true).toString() else {
+      padded(date.time.getSeconds(), 2, "0")
+    };
+    if (fractional) {
+      res + "." + padded(date.time.getMilliseconds(), 3, "0")
+    } else {
+      res
+    }
+  | FmtMeridian(upper) ->
+    v = if (date.time.getHours() < 12) 0 else 1;
+    m = locale_('p', v);
+    if (upper) m.uppercase() else m.lowercase()
+  | FmtCentury(year) ->
+    d = date.date;
+    if (year) padded(d.getYear() % 100, 2, "0") else {
+      padded(d.getYear() / 100, 2, "0")
+    }
+  | FmtDigitMonth(padding) -> padded(date.date.getMonth().getCode(), 2, padding)
+  | FmtDigitDay(padding) -> padded(date.date.getDayOfMonth(), 2, padding)
+  | FmtYearDay() -> padded(date.date.getDayOfYear(), 3, "0")
+  | FmtDigitHour(meridian, padding) ->
+    hour = date.time.getHours();
+    !hour = if (meridian && hour == 0) 12 else if (meridian && hour > 12) {
+      hour - 12
+    } else {
+      hour
+    };
+    padded(hour, 2, padding.toString())
+  | FmtGroup(elems) -> elems.map(e -> e.format(date)).join("")
+  | FmtJulianDay() -> date.toJulian().toString()
+  | FmtTimezone(tz) ->
+    timezone = date.timezone;
+    tzh = timezone.getHours();
+    tzm = timezone.getMinutes();
+    tzs = timezone.getSeconds();
+    sign = (if (timezone.neg) "-" else "+");
+    if (tz == 0) {
+      //Time zone as hour and minute offset from UTC (e.g. +0900)
+      sign + padded(tzh, 2, "0") + padded(tzm, 2, "0")
+    } else if (tz == 1) {
+      // hour and minute offset from UTC with a colon (e.g. +09:00)
+      sign + padded(tzh, 2, "0") + ":" + padded(tzm, 2, "0")
+    } else if (tz == 2) {
+      // hour, minute and second offset from UTC (e.g. +09:00:00)
+      sign +
+        padded(tzh, 2, "0") +
+        ":" +
+        padded(tzm, 2, "0") +
+        ":" +
+        padded(tzs, 2, "0")
+    } else {
+      // hour, minute and second offset from UTC (e.g. +09, +09:30, +09:30:30)
+      if (tzm == 0 && tzs == 0) {
+        sign + padded(tzh, 2, "0")
+      } else if (tzs == 0) {
+        sign + padded(tzh, 2, "0") + ":" + padded(tzm, 2, "0")
+      } else {
+        sign +
+          padded(tzh, 2, "0") +
+          ":" +
+          padded(tzm, 2, "0") +
+          ":" +
+          padded(tzs, 2, "0")
+      }
+    }
+  | FmtTimezoneName() ->
+    localeTimeZoneName(
+      UInt32::truncate(date.date.getYear()),
+      UInt32::truncate(date.date.getMonth().getCode()),
+      UInt32::truncate(date.date.getDayOfMonth()),
+    )
+}
+
+fun padded(value: Int, size: Int, padding: String, neg: Bool = false): String {
+  if (size == 0) return (if (neg) "-" else "") + size.toString();
+  pcs = padding.chars();
+  res = mutable Vector<Char>[];
+  if (neg) res.push('-');
+  pow = 1;
+  for (_i in Range(0, size - 1)) {
+    !pow = 10 * pow;
+  };
+  while (value < pow && (value > 0 || pow > 1)) {
+    pcs.each(res.push);
+    !pow = pow / 10;
+  };
+  String::fromChars(res.toArray()) + value.toString();
+}
+
+fun format(format: String, dateTime: SKDate.Calendar): String {
+  parseTimeFormat(format).map(fe -> fe.format(dateTime)).join("");
+}
+
+fun timeFormat(): FmtGroup {
+  FmtGroup(
+    Vector[
+      FmtDigitHour(false, '0'),
+      FmtText(":"),
+      FmtMinutes(),
+      FmtText(":"),
+      FmtSeconds(false, false),
+    ],
+  )
+}
+
+fun dayFormat(): FmtGroup {
+  FmtGroup(
+    Vector[
+      FmtDigitMonth("0"),
+      FmtText("/"),
+      FmtDigitDay("0"),
+      FmtText("/"),
+      FmtCentury(true),
+    ],
+  )
+}
+
+fun dateTimeFormat(): FmtGroup {
+  FmtGroup(
+    Vector[
+      FmtDay(true, false),
+      FmtText(" "),
+      FmtMonth(true, false),
+      FmtDigitDay("0"),
+      FmtText(" "),
+      FmtDigitHour(false, '0'),
+      FmtText(":"),
+      FmtMinutes(),
+      FmtText(":"),
+      FmtSeconds(false, false),
+      FmtText(" "),
+      FmtYear(),
+    ],
+  )
+}
+
+fun calendarFormat(): FmtGroup {
+  FmtGroup(
+    Vector[
+      FmtYear(),
+      FmtText("-"),
+      FmtDigitMonth("0"),
+      FmtText("-"),
+      FmtDigitDay("0"),
+      FmtText(" "),
+      FmtDigitHour(false, '0'),
+      FmtText(":"),
+      FmtMinutes(),
+      FmtText(":"),
+      FmtSeconds(false, true),
+      FmtTimezone(3),
+    ],
+  )
+}
+
+fun parseTimeFormat(format: String): Vector<FmtElement> {
+  lexer = mutable FormatLexer(format.chars());
+  lexer.lex();
+  lexer.elements.chill()
+}
+
+mutable class FormatLexer(
+  format: Vector<Char>,
+  elements: mutable Vector<FmtElement> = mutable Vector[],
+  mutable pos: Int = 0,
+  buffer: mutable Vector<Char> = mutable Vector[],
+  mutable isIn: Bool = false,
+  mutable padding: String = "0",
+  mutable mode: Int = 0,
+  mutable upper: Bool = false,
+) {
+  mutable fun lex(): void {
+    while (this.pos < this.format.size()) {
+      this.format.get(this.pos) match {
+      | '^' if (this.isIn) -> this.!upper = true
+      | '-' if (this.isIn) -> this.!padding = ""
+      | '_' if (this.isIn) -> this.!padding = " "
+      | '0' if (this.isIn) -> this.!padding = "0"
+      | ':' if (this.isIn) -> this.!mode = this.mode + 1
+      | '%' if (this.isIn) ->
+        this.buffer.push('%');
+        this.clearProps()
+      | 'A' if (this.isIn) -> // Full textual representation of the day
+        this.checkBufferAndPush(FmtDay(false, this.upper))
+      | 'B' if (this.isIn) -> // Full month name
+        this.checkBufferAndPush(FmtMonth(false, this.upper))
+      | 'C' if (this.isIn) -> // Two digit representation of the century
+        this.checkBufferAndPush(FmtCentury(false))
+      | 'D' if (this.isIn) -> // Same as "%m/%d/%y"
+        this.checkBufferAndPush(dayFormat())
+      | 'F' if (this.isIn) -> // Same as "%Y-%m-%d"
+        this.checkBufferAndPush(
+          FmtGroup(
+            Vector[
+              FmtYear(),
+              FmtText("-"),
+              FmtDigitMonth("0"),
+              FmtText("-"),
+              FmtDigitDay("0"),
+            ],
+          ),
+        )
+      | 'G' if (this.isIn) -> // The week-based year
+        this.checkBufferAndPush(FmtWeekYear(false))
+      | 'H' if (this.isIn) -> // Two digit representation of the hour in 24-hour format 00 through 23
+        this.checkBufferAndPush(FmtDigitHour(false, '0'))
+      | 'I' if (this.isIn) -> // Two digit representation of the hour in 12-hour format 01 through 12
+        this.checkBufferAndPush(FmtDigitHour(true, '0'))
+      | 'J' if (this.isIn) -> // Julian day number (fractional)
+        this.checkBufferAndPush(FmtJulianDay())
+      | 'M' if (this.isIn) -> // Minute of the hour (00..59)
+        this.checkBufferAndPush(FmtMinutes())
+      | 'P' if (this.isIn) -> // Meridian indicator, lowercase (``am'' or ``pm'')
+        this.checkBufferAndPush(FmtMeridian(false))
+      | 'R' if (this.isIn) -> // 24-hour time (%H:%M)
+        this.checkBufferAndPush(
+          FmtGroup(
+            Vector[FmtDigitHour(false, '0'), FmtText(":"), FmtMinutes()],
+          ),
+        )
+      | 'S' if (this.isIn) -> // Second of the minute (00..60)
+        this.checkBufferAndPush(FmtSeconds(false, false))
+      | 'T' if (this.isIn) -> // Same as "%H:%M:%S"
+        this.checkBufferAndPush(timeFormat())
+      | 'U' if (this.isIn) -> // Week number of the year. The week starts with Sunday.  (00..53)
+        this.checkBufferAndPush(FmtWeekNumber(WNSunday()))
+      | 'V' if (this.isIn) -> // Week number of year according to ISO 8601 (01..53)
+        this.checkBufferAndPush(FmtWeekNumber(WNISO()))
+      | 'W' if (this.isIn) -> // Week number of the year.  The week starts with Monday.  (00..53)
+        this.checkBufferAndPush(FmtWeekNumber(WNMonday()))
+      | 'X' if (this.isIn) -> // Time in the format of the locale.
+        format = parseTimeFormat(locale_('X'));
+        if (format.isEmpty()) this.checkBufferAndPush(timeFormat()) else {
+          this.checkBufferAndPush(FmtGroup(format))
+        }
+      | 'Y' if (this.isIn) -> // Year with century (can be negative, 4 digits at least) -0001, 0000, 1995, 2009, 14292, etc.
+        this.checkBufferAndPush(FmtYear())
+      | 'Z' if (this.isIn) -> // Locale time zone name.
+        this.checkBufferAndPush(FmtTimezoneName())
+      | 'a' if (this.isIn) -> // The abbreviated name (``Sun'') - %^a  uppercased (``SUN'')
+        this.checkBufferAndPush(FmtDay(true, this.upper))
+      | 'b' if (this.isIn) -> // The abbreviated month name (``Jan'') - %^b  uppercased (``JAN'')
+        this.checkBufferAndPush(FmtMonth(true, this.upper))
+      | 'c' if (this.isIn) -> // Date/Time in the format of the locale.
+        if (this.mode == 0) {
+          format = parseTimeFormat(locale_('c'));
+          if (format.isEmpty()) this.checkBufferAndPush(dateTimeFormat()) else {
+            this.checkBufferAndPush(FmtGroup(format))
+          }
+        } else {
+          this.checkBufferAndPush(calendarFormat())
+        }
+      | 'd' if (this.isIn) -> // Day of the month, zero-padded (01..31) - %-d  no-padded (1..31)
+        this.checkBufferAndPush(FmtDigitDay(this.padding))
+      | 'e' if (this.isIn) -> // Day of the month, blank-padded ( 1..31)
+        this.checkBufferAndPush(FmtDigitDay(" "))
+      | 'f' -> this.checkBufferAndPush(FmtSeconds(false, true))
+      | 'g' if (this.isIn) -> // The last 2 digits of the week-based year (00..99)
+        this.checkBufferAndPush(FmtWeekYear(true))
+      | 'h' if (this.isIn) -> // Equivalent to %b
+        this.checkBufferAndPush(FmtMonth(true, false))
+      | 'j' if (this.isIn) -> // Day of the year (001..366)
+        this.checkBufferAndPush(FmtYearDay())
+      | 'k' if (this.isIn) -> // Two digit representation of the hour in 24-hour format  0 through 23
+        this.checkBufferAndPush(FmtDigitHour(false, ' '))
+      | 'l' if (this.isIn) -> // Two digit representation of the hour in 12-hour format  1 through 12
+        this.checkBufferAndPush(FmtDigitHour(true, ' '))
+      | 'm' if (this.isIn) -> // Month of the year, zero-padded (01..12) | %_m  blank-padded ( 1..12) | %-m  no-padded (1..12)
+        this.checkBufferAndPush(FmtDigitMonth(this.padding))
+      | 'n' if (this.isIn) ->
+        this.buffer.push('\n');
+        this.clearProps()
+      | 'p' if (this.isIn) -> // Meridian indicator, uppercase (``AM'' or ``PM'')
+        this.checkBufferAndPush(FmtMeridian(true))
+      | 'r' if (this.isIn) -> // 12-hour time (%I:%M:%S %p)
+        format = parseTimeFormat(locale_('r'));
+        if (format.isEmpty()) {
+          this.checkBufferAndPush(
+            FmtGroup(
+              Vector[
+                FmtDigitHour(true, '0'),
+                FmtText(":"),
+                FmtMinutes(),
+                FmtText(":"),
+                FmtSeconds(false, false),
+                FmtText(" "),
+                FmtMeridian(true),
+              ],
+            ),
+          )
+        } else {
+          this.checkBufferAndPush(FmtGroup(format))
+        }
+      | 's' if (this.isIn) -> // Number of seconds since 1970-01-01 00:00:00 UTC.
+        this.checkBufferAndPush(FmtSeconds(true, false))
+      | 't' if (this.isIn) ->
+        this.buffer.push('\t');
+        this.clearProps()
+      | 'u' if (this.isIn) -> // Day of the week (Monday is 1, 1..7).
+        this.checkBufferAndPush(FmtWeekDay(true))
+      | 'w' if (this.isIn) -> // Day of the week (Sunday is 0, 0..6).
+        this.checkBufferAndPush(FmtWeekDay(false))
+      | 'x' if (this.isIn) -> // Date in the format of the locale.
+        format = parseTimeFormat(locale_('x'));
+        if (format.isEmpty()) this.checkBufferAndPush(dayFormat()) else {
+          this.checkBufferAndPush(FmtGroup(format))
+        }
+      | 'y' if (this.isIn) -> // Year without a century (00..99)
+        this.checkBufferAndPush(FmtCentury(true))
+      | 'z' if (this.isIn) -> // Time zone as hour and minute offset from UTC (e.g. +0900)
+        // %:z - hour and minute offset from UTC with a colon (e.g. +09:00)
+        // %::z - hour, minute and second offset from UTC (e.g. +09:00:00)
+        // %:::z - hour, minute and second offset from UTC (e.g. +09, +09:30, +09:30:30)
+        this.checkBufferAndPush(FmtTimezone(this.mode))
+      | c if (this.isIn) ->
+        this.buffer.push('%');
+        this.buffer.push(c);
+        this.clearProps(false)
+      | '%' ->
+        if (this.isIn) this.buffer.push('%');
+        this.clearProps(!this.isIn)
+      | c -> this.buffer.push(c)
+      };
+      this.!pos = this.pos + 1;
+    };
+    if (!this.buffer.isEmpty()) {
+      this.elements.push(FmtText(String::fromChars(this.buffer.toArray())));
+      this.buffer.clear();
+    };
+  }
+
+  protected mutable fun clearProps(isIn: Bool = false): void {
+    this.!isIn = isIn;
+    this.!padding = "0";
+    this.!mode = 0;
+    this.!upper = false
+  }
+
+  protected mutable fun checkBufferAndPush(
+    e: FmtElement,
+    isIn: Bool = false,
+  ): void {
+    if (!this.buffer.isEmpty()) {
+      this.elements.push(FmtText(String::fromChars(this.buffer.toArray())));
+      this.buffer.clear();
+    };
+    this.elements.push(e);
+    this.clearProps(isIn)
+  }
+}

@@ -1,0 +1,267 @@
+module SKDate;
+
+/*****************************************************************************/
+/*
+
+Group 1
+YYYY-MM-DD
+YYYY-MM-DD HH:MM
+YYYY-MM-DD HH:MM:SS
+YYYY-MM-DD HH:MM:SS.SSS
+YYYY-MM-DDTHH:MM
+YYYY-MM-DDTHH:MM:SS
+YYYY-MM-DDTHH:MM:SS.SSS
+
+Group 2
+HH:MM
+HH:MM:SS
+HH:MM:SS.SSS
+
+now
+DDDDDDDDDD
+*/
+/*****************************************************************************/
+
+const codeZero: Int = '0'.code();
+
+fun toInt(input: readonly Vector<Char>): Int {
+  result = 0;
+  power = 1;
+  size = input.size();
+  for (i in Range(0, size)) {
+    !result = result + (input[size - 1 - i].code() - codeZero) * power;
+    !power = power * 10;
+  };
+  result
+}
+
+fun toInt1(x: Char): Int {
+  toInt(Vector[x])
+}
+
+fun toInt2(x: Char, y: Char): Int {
+  toInt(Vector[x, y])
+}
+
+fun toInt3(x: Char, y: Char, z: Char): Int {
+  toInt(Vector[x, y, z])
+}
+
+fun toInt4(x: Char, y: Char, z: Char, u: Char): Int {
+  toInt(Vector[x, y, z, u])
+}
+
+fun parseFullDate(str: String): ?Entity {
+  iter = str.getIter();
+  x1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  x2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  x3 = iter.next() match {
+  | Some(':') -> return parseTime(iter, Vector[x1, x2]).map(i -> i.i0)
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  x4 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  iter.next() match {
+  | Some('-') -> parseDate(iter, Vector[x1, x2, x3, x4])
+  | _ -> None()
+  };
+}
+
+/*
+YYYY-MM-DD
+YYYY-MM-DD HH:MM
+YYYY-MM-DD HH:MM:SS
+YYYY-MM-DD HH:MM:SS.SSS
+YYYY-MM-DDTHH:MM
+YYYY-MM-DDTHH:MM:SS
+YYYY-MM-DDTHH:MM:SS.SSS
+*/
+
+fun parseDate(
+  iter: mutable Iterator<Char>,
+  yearV: readonly Vector<Char>,
+): ?Entity {
+  year = toInt(yearV);
+  month1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  month2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  iter.next() match {
+  | Some('-') -> void
+  | _ -> return None()
+  };
+  month = toInt(Vector[month1, month2]);
+  if (month > 12) return None();
+  day1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  day2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  day = toInt(Vector[day1, day2]);
+  if (day > 31) return None();
+  iter.next() match {
+  | None() -> return Some(Date::create(year, month, day))
+  | Some(' ')
+  | Some('T') ->
+    void
+  | _ -> return None()
+  };
+  hour1 = iter.next() match {
+  | Some(' ') -> return Some(Date::create(year, month, day))
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  hour2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  iter.next() match {
+  | Some(':') -> void
+  | _ -> return None()
+  };
+  parseTime(iter, Vector[hour1, hour2]).map(info ->
+    Calendar::create(Date::create(year, month, day), info.i0, info.i1)
+  )
+}
+
+/*
+HH:MM
+HH:MM:SS
+HH:MM:SS.SSS
+*/
+
+fun parseTime(
+  iter: mutable Iterator<Char>,
+  hoursV: readonly Vector<Char>,
+): ?(Time, TZKind) {
+  tz = TZLocal();
+  hours = toInt(hoursV);
+  if (hours > 23) return None();
+  minute1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  minute2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  minutes = toInt(Vector[minute1, minute2]);
+  if (minutes >= 60) return None();
+  iter.next() match {
+  | None() -> return Some((Time::create(hours, minutes), tz))
+  | Some(':') -> void
+  | _ -> return None()
+  };
+  second1 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  second2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  seconds = toInt(Vector[second1, second2]);
+  if (seconds >= 60) return None();
+  (ms, sign) = iter.next() match {
+  | None() -> return Some((Time::create(hours, minutes, seconds), tz))
+  | Some('.') -> (true, None())
+  | Some('+') -> (false, Some('+'))
+  | Some('-') -> (false, Some('-'))
+  | c ->
+    debug((c, hours, minutes, seconds));
+    return None()
+  };
+  mseconds = if (ms) {
+    msecond1 = iter.next() match {
+    | Some(x) if (x >= '0' && x <= '9') -> x
+    | _ -> return None()
+    };
+    msecond2 = iter.next() match {
+    | Some(x) if (x >= '0' && x <= '9') -> x
+    | _ -> return None()
+    };
+    msecond3 = iter.next() match {
+    | Some(x) if (x >= '0' && x <= '9') -> x
+    | _ -> return None()
+    };
+    !sign = iter.next() match {
+    | Some('+') -> Some('+')
+    | Some('-') -> Some('-')
+    | _ -> None()
+    };
+    Some(toInt(Vector[msecond1, msecond2, msecond3]));
+  } else {
+    None()
+  };
+  stimezone = sign.flatMap(s -> parseTimezone(iter, s));
+  Some(
+    (
+      Time::create(hours, minutes, seconds, mseconds.default(0)),
+      stimezone.map(t -> TZ(t)).default(tz),
+    ),
+  )
+}
+
+fun parseTimeZone(str: String): ?TimeZone {
+  iter = str.getIter();
+  sign = iter.next() match {
+  | Some('+') -> Some('+')
+  | Some('-') -> Some('-')
+  | _ -> None()
+  };
+  sign.flatMap(s -> parseTimezone(iter, s))
+}
+
+/*
+±T
+±TT
+±TTTT
+±TT:TT
+±TT:TT:TT
+*/
+fun parseTimezone(iter: mutable Iterator<Char>, sign: Char): ?TimeZone {
+  neg = sign == '-';
+  v1 = iter.next() match {
+  | Some(' ') -> return None()
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return None()
+  };
+  v2 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | _ -> return Some(TimeZone::create(neg, toInt1(v1)))
+  };
+  v3 = iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') -> x
+  | Some(':') ->
+    return parseTime(iter, Vector[v1, v2]).map(time ->
+      TimeZone::create(
+        neg,
+        time.i0.getHours(),
+        time.i0.getMinutes(),
+        time.i0.getSeconds(),
+      )
+    )
+  | _ -> return Some(TimeZone::create(neg, toInt2(v1, v2)))
+  };
+  iter.next() match {
+  | Some(x) if (x >= '0' && x <= '9') ->
+    Some(TimeZone::create(neg, toInt2(v1, v2), toInt2(v3, x)))
+  | _ -> Some(TimeZone::create(neg, toInt1(v1), toInt2(v2, v3)))
+  }
+}
