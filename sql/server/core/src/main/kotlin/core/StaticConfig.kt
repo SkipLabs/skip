@@ -19,11 +19,11 @@ class UserConfig(
 ) {
   companion object {
     val SKDB_PORT = 8080
-    val SKDB = "/skfs/build/skdb"
-    val SKDB_INIT = "/skfs/build/init.sql"
+    val SKDB = "/skdb/build/skdb"
+    val SKDB_INIT = "/skdb/build/init.sql"
     val SKDB_DATABASES = "/var/db"
     val SKDB_ADD_CRED =
-        "cd /skfs/build/package && npx skdb-cli --add-cred --host ws://localhost:%d --db %s --access-key %s <<< \"%s\""
+        "cd /skdb/build/package && npx skdb-cli --add-cred --host ws://localhost:%d --db %s --access-key %s <<< \"%s\""
 
     private fun userConfigFile(): Optional<String> {
       var path = Paths.get("").toAbsolutePath()

@@ -17,7 +17,7 @@ dockerbuild () {
 
 dockerbuild skiplabs/skdb-base .
 dockerbuild skiplabs/skdb-dev-server sql/server/dev
-[[ -f $USER/Dockerfile ]] && dockerbuild $USER-skfs $USER
+[[ -f $USER/Dockerfile ]] && dockerbuild $USER-skdb $USER
 
 git restore .dockerignore
 
