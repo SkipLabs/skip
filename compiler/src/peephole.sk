@@ -102,6 +102,7 @@ mutable class .Peephole{
     | ArrayClone _
     | ArrayUnsafeGet _
     | ArrayUnsafeSet _
+    | ArrayUnsafePtr _
     | Yield _ ->
       x
     }
@@ -495,6 +496,7 @@ private fun canModifyExistingMemory(
   | ArrayNew _
   | ArraySize _
   | ArrayUnsafeGet _
+  | ArrayUnsafePtr _
   | With _
   | ZeroExtend _ ->
     false
@@ -617,6 +619,8 @@ private fun canCSE(
   | ArrayAlloc _
   | ArrayClone _
   | ArrayUnsafeSet _
+  // TODO: Can this be safely CSEd?
+  | ArrayUnsafePtr _
   | Yield _ ->
     false
   }

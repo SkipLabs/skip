@@ -2557,6 +2557,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
   | ArraySize _
   | ArrayUnsafeGet _
   | ArrayUnsafeSet _
+  | ArrayUnsafePtr _
   | With _
   | ZeroExtend _ ->
     if (instr.prettyName.isEmpty()) {
@@ -2677,6 +2678,25 @@ private fun llvmWriteDefault(
   asm.print(", %D\n" % instr)
 }
 
+private fun llvmWriteGetAddr(
+  instr: LoadOrStore,
+  id: String,
+  asm: mutable FunAsmDefBuilder,
+): void {
+  optinfo = asm.optinfo();
+  asm.print("  %%%s = getelementptr inbounds " % id);
+
+  optinfo.getInstr(instr.addr) match {
+  | g @ ConstantGlobalSingleton _ ->
+    globalsType = asm.common.llvmGlobalsType();
+    asm.print("%s, %s* @%n, i64 0" % globalsType % globalsType % g)
+  | base -> asm.print("i8, %N" % base)
+  };
+
+  firstByteOffset = instr.bitOffset.shr(3);
+  asm.print(", i64 %s, %D\n" % firstByteOffset % instr);
+}
+
 // Shared code for llvmWriteLoad and llvmWriteStore. This is a bit tricky
 // to handle accessing bitfields.
 //
@@ -2693,7 +2713,6 @@ private fun llvmGetAddr(
   loadType: ScalarType,
   asm: mutable FunAsmDefBuilder,
 ): (String, String, Bool, Int, Int) {
-  optinfo = asm.optinfo();
   pos = instr.pos;
 
   bo = instr.bitOffset;
@@ -2760,17 +2779,7 @@ private fun llvmGetAddr(
 
   // Compute the raw address to be loaded.
   rawAddr = asm.llvmIdentifier();
-  asm.print("  %%%s = getelementptr inbounds " % rawAddr);
-
-  optinfo.getInstr(instr.addr) match {
-  | g @ ConstantGlobalSingleton _ ->
-    globalsType = asm.common.llvmGlobalsType();
-    asm.print("%s, %s* @%n, i64 0" % globalsType % globalsType % g)
-  | base -> asm.print("i8, %N" % base)
-  };
-
-  asm.print(", i64 %s, %D\n" % firstByteOffset % instr);
-
+  llvmWriteGetAddr(instr, rawAddr, asm);
   // Bitcast it to the right type.
   addr = asm.llvmIdentifier();
   asm.print(
@@ -3722,6 +3731,29 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     };
 
     llvmWriteStore(fakeStore, x, asm)
+
+  | ArrayUnsafePtr{id, pos, typ, obj, offset} ->
+    (addr, info, extraBitOffset, addrByteAlignment) = llvmComputeArrayAddress(
+      instr.pos,
+      obj,
+      offset,
+      asm,
+    );
+    // Dummy up a fake Load instruction and let it do the heavy lifting.
+    fakeLoad = Load{
+      id,
+      typ,
+      pos,
+      addr,
+      bitOffset => info.bitOffsets[0] + extraBitOffset,
+      addrByteAlignment,
+      canCSE => optinfo.getInstr(obj).typ.isDeepFrozen(),
+    };
+    llvmWriteGetAddr(
+      fakeLoad,
+      "r" + optinfo.getInstr(id).idValue().toString(),
+      asm,
+    )
 
   | AsyncReturn _
   | GetConst _

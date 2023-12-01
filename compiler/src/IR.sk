@@ -549,6 +549,9 @@ base class Instr{
     f(obj);
     f(index);
     f(value)
+  | ArrayUnsafePtr{obj, offset} ->
+    f(obj);
+    f(offset)
   | With{obj, fieldAssignments} ->
     f(obj);
     for (p in fieldAssignments) f(p.i1)
@@ -879,6 +882,10 @@ base class Stmt extends InstrWithPos {
     tupleIndex: Int, // index of field in element
     value: InstrID,
   }
+  | ArrayUnsafePtr{
+    obj: InstrID,
+    offset: InstrID, // index of element in array
+  }
   | Yield{values: Array<InstrID>}
 
   overridable fun getSuccessors(): Array<BlockSuccessor> {
@@ -1004,6 +1011,8 @@ base class Stmt extends InstrWithPos {
       index => remap(index),
       value => remap(value),
     }
+  | ArrayUnsafePtr{obj, offset} ->
+    this with {id, typ, obj => remap(obj), offset => remap(offset)}
   | With{obj, fieldAssignments} ->
     this with {
       id,

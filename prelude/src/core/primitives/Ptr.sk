@@ -1,0 +1,21 @@
+module Ptr;
+
+mutable value class .Ptr<T>(inner: Runtime.NonGCPointer) uses Show {
+  readonly fun toInt(): Int {
+    this.inner.toInt()
+  }
+
+  readonly fun toString(): String {
+    this.inner.toString()
+  }
+
+  fun cast<U>(): Ptr<U> {
+    Ptr<U>(this.inner)
+  }
+
+  mutable fun mcast<U>(): mutable Ptr<U> {
+    mutable Ptr<U>(this.inner)
+  }
+}
+
+module end;

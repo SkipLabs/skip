@@ -291,7 +291,6 @@ mutable private class Verifier(
 
   private mutable fun verifyBytePointerAdd(add: BytePointerAdd): void {
     this.verifyInstrType(add, tNonGCPointer);
-    this.verifyInstrType(this.getInstr(add.addr), tNonGCPointer);
     this.verifyInstrType(this.getInstr(add.offset), tInt);
   }
 
@@ -695,6 +694,7 @@ mutable private class Verifier(
     | ArrayNew _
     | ArrayUnsafeGet _
     | ArrayUnsafeSet _
+    | ArrayUnsafePtr _
     | With _
     | Yield _
     | YieldBreak _ ->

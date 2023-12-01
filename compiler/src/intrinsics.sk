@@ -302,6 +302,17 @@ mutable class .IntrinsicsInliner{
       };
 
       this.jumpIfInvoke(call)
+    | "Unsafe.array_ptr" ->
+      result = this.emitArrayUnsafePtr{
+        pos,
+        obj => call.args[0],
+        offset => call.args[2],
+        prettyName => call.prettyName,
+      };
+      this.optinfo.idToInstr.set(call.id, result);
+
+      this.jumpIfInvoke(call)
+    | "Runtime.NonGCPointer::toInt" -> this.makeUnaryOp(Reinterpret, call, a[0])
     | "intern" ->
       returnType = calledFunction.funType.returnType;
       isScalar = returnType.size() == 1;

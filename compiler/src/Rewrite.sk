@@ -1295,6 +1295,25 @@ mutable base class .RewriteBase{
     )
   }
 
+  mutable fun emitArrayUnsafePtr{
+    obj: InstrID,
+    offset: InstrID,
+    pos: Pos,
+    id: InstrID = this.iid(),
+    prettyName: String = "",
+  }: ArrayUnsafePtr {
+    this.emitStmt(
+      ArrayUnsafePtr{
+        id,
+        pos,
+        typ => Tclass(SClassID("Runtime.NonGCPointer"), DeepFrozen()),
+        prettyName,
+        obj,
+        offset,
+      },
+    )
+  }
+
   mutable fun emitWith{
     obj: InstrID,
     fieldAssignments: Array<(String, InstrID)>,
