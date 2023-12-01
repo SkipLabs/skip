@@ -15,7 +15,7 @@ function getErrorMessage(error: any) {
       return JSON.parse((error as Error).message).trim();
     } catch (e) {
       if (e instanceof SyntaxError) {
-        return (error as Error).message.trim();
+	return (error as Error).message.trim();
       }
       throw e;
     }
@@ -257,18 +257,18 @@ function waitSynch(
   const test = (resolve, reject) => {
     const cb = (value) => {
       if (check(value) || count == max) {
-        resolve(value);
+	resolve(value);
       } else {
-        count++;
-        setTimeout(() => test(resolve, reject), 100);
+	count++;
+	setTimeout(() => test(resolve, reject), 100);
       }
     };
     if (server) {
       skdb
-        .connectedRemote()
-        .then((remote) => remote!.exec(query, new Map()))
-        .then(cb)
-        .catch(reject);
+	.connectedRemote()
+	.then((remote) => remote!.exec(query, new Map()))
+	.then(cb)
+	.catch(reject);
     } else {
       skdb.exec(query, new Map()).then(cb).catch(reject);
     }
@@ -400,6 +400,7 @@ async function testReboot(root: SKDB, user: SKDB, user2: SKDB) {
 }
 
 async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
+  await skdb.mirror("test_pk", "view_pk");
   await skdb2.mirror("test_pk", "view_pk");
 
   await skdb.exec(
@@ -423,35 +424,115 @@ async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
       await skdb2.exec("INSERT INTO test_pk VALUES (47, 52, 'my_group');"),
   ).rejects.toThrow();
 }
+
+async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
+  await skdb1.mirror("test_pk", "view_pk");
+  await skdb2.mirror("test_pk", "view_pk");
+  const user1 = skdb1.currentUser!;
+  const user2 = skdb2.currentUser!;
+  const group = await skdb1.createGroup();
+
+  // user1 can insert, user2 can not
+
+  await skdb1.exec("INSERT INTO test_pk VALUES (1001, 1, @gid)", {
+    gid: group.groupID,
+  });
+
+  await expect(
+    async () =>
+      await skdb2.exec("INSERT INTO test_pk VALUES (1002, 2, @gid)", {
+	gid: group.groupID,
+      }),
+  ).rejects.toThrow();
+
+  // user1 can read, user2 can not
+
+  let user1_view = await skdb1.exec("SELECT * FROM test_pk WHERE x = 1001;");
+  let user2_view = await skdb2.exec("SELECT * FROM test_pk WHERE x = 1001;");
+  expect(user1_view.length).toEqual(1);
+  expect(user2_view.length).toEqual(0);
+
+  // user1 can grant read+write permissions to user2,
+  // after which user2 can insert & read
+  await group.setMemberPermission(skdb1, user2, "rw");
+
+  await new Promise((r) => setTimeout(r, 100));
+
+  await skdb2.exec("INSERT INTO test_pk VALUES (1003, 3, @gid)", {
+    gid: group.groupID,
+  });
+  await new Promise((r) => setTimeout(r, 100));
+  user1_view = await skdb1.exec("SELECT * FROM test_pk WHERE x > 1000;");
+  user2_view = await skdb2.exec("SELECT * FROM test_pk WHERE x > 1000;");
+  expect(user1_view.length).toEqual(2);
+  expect(user2_view.length).toEqual(2);
+
+  // user1 can grant admin permissions to user2, after which user2 can change member permissions
+
+  await group.addAdmin(skdb1, user2);
+  await new Promise((r) => setTimeout(r, 100));
+
+  await group.removeMember(skdb2, user1);
+
+  // user1 can transfer ownership to user2, after which user2 can remove them as an admin
+  await group.transferOwnership(skdb1, user2);
+  await new Promise((r) => setTimeout(r, 100));
+
+  await group.removeAdmin(skdb2, user1);
+  await new Promise((r) => setTimeout(r, 100));
+
+  let user1_view_owners = await skdb1.exec(
+    "SELECT * FROM skdb_group_permissions WHERE groupID=@ownerGroupID;",
+    { ownerGroupID: group.ownerGroupID },
+  );
+  let user2_view_owners = await skdb2.exec(
+    "SELECT * FROM skdb_group_permissions WHERE groupID=@ownerGroupID;",
+    { ownerGroupID: group.ownerGroupID },
+  );
+  let user1_view_admins = await skdb1.exec(
+    "SELECT * FROM skdb_group_permissions WHERE groupID=@adminGroupID;",
+    { adminGroupID: group.adminGroupID },
+  );
+  let user2_view_admins = await skdb2.exec(
+    "SELECT * FROM skdb_group_permissions WHERE groupID=@adminGroupID;",
+    { adminGroupID: group.adminGroupID },
+  );
+  expect(user1_view_owners).toHaveLength(0);
+  expect(user1_view_admins).toHaveLength(0);
+  expect(user2_view_owners).toHaveLength(1);
+  expect(user2_view_admins).toHaveLength(1);
+}
+
 export const apitests = (asWorker) => {
   return [
     {
       name: asWorker ? "API in Worker" : "API",
       fun: async (dbs: dbs) => {
-        await testQueriesAgainstTheServer(dbs.root);
+	await testQueriesAgainstTheServer(dbs.root);
 
-        await testSchemaQueries(dbs.user);
+	await testSchemaQueries(dbs.user);
 
-        await testMirroring(dbs.user);
+	await testMirroring(dbs.user);
 
         //Privacy
         await testJSPrivacy(dbs.user, dbs.user2);
+        await testJSGroups(dbs.user, dbs.user2);
 
-        // Server Tail
-        await testServerTail(dbs.root, dbs.user);
-        await testClientTail(dbs.root, dbs.user);
+	// Server Tail
+	await testServerTail(dbs.root, dbs.user);
+	await testClientTail(dbs.root, dbs.user);
 
-        await testLargeMirror(dbs.root, dbs.user);
-        // must come last: puts replication in to a permanent state of failure
-        await testReboot(dbs.root, dbs.user, dbs.user2);
+	await testLargeMirror(dbs.root, dbs.user);
+	// must come last: puts replication in to a permanent state of failure
+	await testReboot(dbs.root, dbs.user, dbs.user2);
 
-        dbs.root.closeConnection();
-        dbs.user.closeConnection();
-        dbs.user2.closeConnection();
-        return "";
+	dbs.root.closeConnection();
+	dbs.user.closeConnection();
+	dbs.user2.closeConnection();
+	return "";
       },
       check: (res) => {
-        expect(res).toEqual("");
+	expect(res).toEqual("");
       },
     },
   ];

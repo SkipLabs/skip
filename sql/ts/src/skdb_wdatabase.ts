@@ -8,6 +8,7 @@ import {
   MirrorDefn,
 } from "#skdb/skdb_types";
 import { SKDBTable } from "#skdb/skdb_util";
+import { SKDBGroupImpl } from "#skdb/skdb_group";
 
 class WrappedRemote implements RemoteSKDB {
   private worker: PromiseWorker;
@@ -227,5 +228,9 @@ export class SKDBWorker implements SKDB {
 
   getUser = async () => {
     return this.worker.post(new Function("getUser", [])).send();
+  };
+
+  createGroup = async () => {
+    return SKDBGroupImpl.create(this);
   };
 }
