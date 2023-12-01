@@ -1,14 +1,12 @@
 import { Storage, PagedMemory } from "#skdb/skdb_types";
 
-
-
 function makeSKDBStore(
   dbName: string,
   storeName: string,
   version: number,
   memory: PagedMemory,
 ): Promise<IDBDatabase> {
-  if (typeof indexedDB === 'undefined') {
+  if (typeof indexedDB === "undefined") {
     throw new Error("No indexedDB in this environment.");
   }
   return new Promise((resolve, reject) => {
@@ -30,18 +28,17 @@ function makeSKDBStore(
           reject(new Error("Unexpected null target"));
           return;
         }
-        let pages =
-          (
-            target as unknown as
-            { result: Array<{ pageid: number, content: ArrayBuffer }> }
-          ).result;
+        let pages = (
+          target as unknown as {
+            result: Array<{ pageid: number; content: ArrayBuffer }>;
+          }
+        ).result;
         if (pages.length == 0) {
-          memory.init(store.put)
-        }
-        else {
+          memory.init(store.put);
+        } else {
           memory.restore(pages);
         }
-      }
+      };
 
       tx.oncomplete = function () {
         resolve(db);
@@ -58,17 +55,12 @@ function makeSKDBStore(
   });
 }
 
-
 export class IDBStorage implements Storage {
   private storeName: string;
   private memory: PagedMemory;
   private db: IDBDatabase;
 
-  private constructor(
-    storeName: string,
-    db: IDBDatabase,
-    memory: PagedMemory,
-  ) {
+  private constructor(storeName: string, db: IDBDatabase, memory: PagedMemory) {
     this.storeName = storeName;
     this.memory = memory;
     this.db = db;
@@ -80,48 +72,40 @@ export class IDBStorage implements Storage {
     version: number,
     memory: PagedMemory,
   ): Promise<Storage> {
-    let db = await makeSKDBStore(
-      dbName,
-      storeName,
-      version,
-      memory,
-    );
-    return new IDBStorage(
-      storeName,
-      db,
-      memory
-    )
+    let db = await makeSKDBStore(dbName, storeName, version, memory);
+    return new IDBStorage(storeName, db, memory);
   }
 
-
   private async storePages(): Promise<boolean> {
-    if(this.storeName == null) {
+    if (this.storeName == null) {
       return new Promise((resolve, _) => resolve(true));
     }
     let storeName = this.storeName;
-    return new Promise((resolve, reject) => (async () => {
-      if(this.db == null) {
-        resolve(true);
-      }
-      let db = this.db!;
-      let tx = db.transaction(storeName, "readwrite");
-      tx.onabort = (err) => {
-        resolve(false);
-      }
-      tx.onerror = (err) => {
-        console.log("Error sync db: " + err);
-        resolve(false);
-      }
-      tx.oncomplete = () => {
-        this.memory.clear();
-        resolve(true);
-      }
-      let copiedPages = await this.memory.getPages();
-      let store = tx.objectStore(storeName);
-      for(let j = 0; j < copiedPages.length; j++) {
-        store.put(copiedPages[j]!);
-      }
-    })());
+    return new Promise((resolve, reject) =>
+      (async () => {
+        if (this.db == null) {
+          resolve(true);
+        }
+        let db = this.db!;
+        let tx = db.transaction(storeName, "readwrite");
+        tx.onabort = (err) => {
+          resolve(false);
+        };
+        tx.onerror = (err) => {
+          console.log("Error sync db: " + err);
+          resolve(false);
+        };
+        tx.oncomplete = () => {
+          this.memory.clear();
+          resolve(true);
+        };
+        let copiedPages = await this.memory.getPages();
+        let store = tx.objectStore(storeName);
+        for (let j = 0; j < copiedPages.length; j++) {
+          store.put(copiedPages[j]!);
+        }
+      })(),
+    );
   }
 
   async save() {
@@ -134,11 +118,8 @@ export class IDBStorage implements Storage {
 /* Primitives to connect to indexedDB. */
 /* ***************************************************************************/
 
-export function clear(
-  dbName: string,
-  storeName: string,
-): Promise<void> {
-  if (typeof indexedDB === 'undefined') {
+export function clear(dbName: string, storeName: string): Promise<void> {
+  if (typeof indexedDB === "undefined") {
     throw new Error("No indexedDB in this environment.");
   }
   return new Promise((resolve, reject) => {

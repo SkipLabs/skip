@@ -1,11 +1,11 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from "@playwright/test";
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 
 export default defineConfig({
-  testDir: './',
+  testDir: "./",
   testMatch: /.*\.play\.ts/,
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -16,43 +16,51 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://127.0.0.1:8085',
+    baseURL: "http://127.0.0.1:8085",
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    trace: "on-first-retry",
   },
 
   /* Configure projects for major browsers */
-    projects: [
+  projects: [
     {
-      name: 'nodejs',
+      name: "nodejs",
       testMatch: /node.play.ts/,
     },
 
     {
-      name: 'chromium',
+      name: "chromium",
       use: {
-        ...devices['Desktop Chrome'],
-        contextOptions: {logger: {
-          isEnabled: (name, severity) => name === 'browser' || severity == 'error',
-          log: (name, severity, message, args) => console.log(`${name} ${severity} ${message}`)
-        }}
+        ...devices["Desktop Chrome"],
+        contextOptions: {
+          logger: {
+            isEnabled: (name, severity) =>
+              name === "browser" || severity == "error",
+            log: (name, severity, message, args) =>
+              console.log(`${name} ${severity} ${message}`),
+          },
+        },
       },
       testMatch: /browser.play.ts/,
     },
 
     {
-      name: 'firefox',
+      name: "firefox",
       use: {
-        ...devices['Desktop Firefox'],
-        contextOptions: {logger: {
-          isEnabled: (name, severity) => name === 'browser' || severity == 'error',
-          log: (name, severity, message, args) => console.log(`${name} ${severity} ${message}`)
-        }}
+        ...devices["Desktop Firefox"],
+        contextOptions: {
+          logger: {
+            isEnabled: (name, severity) =>
+              name === "browser" || severity == "error",
+            log: (name, severity, message, args) =>
+              console.log(`${name} ${severity} ${message}`),
+          },
+        },
       },
       testMatch: /browser.play.ts/,
     },
@@ -86,7 +94,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npx http-server ./ -p 8085',
+    command: "npx http-server ./ -p 8085",
     port: 8085,
-  }
+  },
 });

@@ -4,6 +4,7 @@ var post = (message: any) => {
   postMessage(message);
 };
 
-var onMessage = (message: MessageEvent) => onDbWorkerMessage(message.data, post)
+var onMessage = (message: MessageEvent) =>
+  onDbWorkerMessage(message.data, post);
 
-addEventListener('message', onMessage);
+addEventListener("message", onMessage);

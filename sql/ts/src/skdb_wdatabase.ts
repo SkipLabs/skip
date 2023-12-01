@@ -1,6 +1,12 @@
 import { Wrk } from "#std/sk_types";
 import { PromiseWorker, Function, Caller } from "#std/sk_worker";
-import { SKDB, ProtoResponseCreds, Params, RemoteSKDB, MirrorDefn } from "#skdb/skdb_types";
+import {
+  SKDB,
+  ProtoResponseCreds,
+  Params,
+  RemoteSKDB,
+  MirrorDefn,
+} from "#skdb/skdb_types";
 import { SKDBTable } from "#skdb/skdb_util";
 
 class WrappedRemote implements RemoteSKDB {
@@ -13,7 +19,9 @@ class WrappedRemote implements RemoteSKDB {
   }
 
   createDatabase(dbName: string) {
-    return this.worker.post(new Caller(this.wrapped, "createDatabase", [dbName])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "createDatabase", [dbName]))
+      .send();
   }
 
   createUser() {
@@ -25,15 +33,21 @@ class WrappedRemote implements RemoteSKDB {
   }
 
   tableSchema(tableName: string) {
-    return this.worker.post(new Caller(this.wrapped, "tableSchema", [tableName])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "tableSchema", [tableName]))
+      .send();
   }
 
   setUser(userName: string) {
-    return this.worker.post(new Caller(this.wrapped, "setUser", [userName])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "setUser", [userName]))
+      .send();
   }
 
   viewSchema(viewName: string) {
-    return this.worker.post(new Caller(this.wrapped, "viewSchema", [viewName])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "viewSchema", [viewName]))
+      .send();
   }
 
   mirror(...tables: MirrorDefn[]) {
@@ -41,7 +55,9 @@ class WrappedRemote implements RemoteSKDB {
   }
 
   exec(query: string, params?: Params) {
-    return this.worker.post(new Caller(this.wrapped, "exec", [query, params])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "exec", [query, params]))
+      .send();
   }
 
   close() {
@@ -49,11 +65,15 @@ class WrappedRemote implements RemoteSKDB {
   }
 
   isConnectionHealthy() {
-    return this.worker.post(new Caller(this.wrapped, "isConnectionHealthy", [])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "isConnectionHealthy", []))
+      .send();
   }
 
   tablesAwaitingSync() {
-    return this.worker.post(new Caller(this.wrapped, "tablesAwaitingSync", [])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "tablesAwaitingSync", []))
+      .send();
   }
 
   onReboot(fn: () => void): Promise<void> {
@@ -74,82 +94,138 @@ export class SKDBWorker implements SKDB {
 
   create = async (dbName?: string): Promise<void> => {
     return this.worker.post(new Function("create", [dbName])).send();
-  }
+  };
 
   exec = async (query: string, params: Params = new Map()) => {
-    const rows = await this.worker.post(new Function("exec", [query, params])).send();
+    const rows = await this.worker
+      .post(new Function("exec", [query, params]))
+      .send();
     return new SKDBTable(...rows);
-  }
+  };
 
-  watch = async (query: string, params: Params, onChange: (rows: SKDBTable) => void) => {
-    let provider = this.worker.post(new Function("watch", [query, params, onChange], { wrap: true, autoremove: true }));
-    return provider.send().then(wrapped => {
-      let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", [])).send().then(provider.close);
+  watch = async (
+    query: string,
+    params: Params,
+    onChange: (rows: SKDBTable) => void,
+  ) => {
+    let provider = this.worker.post(
+      new Function("watch", [query, params, onChange], {
+        wrap: true,
+        autoremove: true,
+      }),
+    );
+    return provider.send().then((wrapped) => {
+      let close = () =>
+        this.worker
+          .post(new Caller(wrapped.wrapped, "close", []))
+          .send()
+          .then(provider.close);
       return { close: close };
     });
-  }
+  };
 
-  watchChanges = async (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => {
-    let provider = this.worker.post(new Function("watchChanges", [query, params, init, update], { wrap: true, autoremove: true }));
-    return provider.send().then(wrapped => {
-      let close = () => this.worker.post(new Caller(wrapped.wrapped, "close", [])).send().then(provider.close);
+  watchChanges = async (
+    query: string,
+    params: Params,
+    init: (rows: SKDBTable) => void,
+    update: (added: SKDBTable, removed: SKDBTable) => void,
+  ) => {
+    let provider = this.worker.post(
+      new Function("watchChanges", [query, params, init, update], {
+        wrap: true,
+        autoremove: true,
+      }),
+    );
+    return provider.send().then((wrapped) => {
+      let close = () =>
+        this.worker
+          .post(new Caller(wrapped.wrapped, "close", []))
+          .send()
+          .then(provider.close);
       return { close: close };
     });
-  }
+  };
 
   tableSchema = async (tableName: string) => {
-    return this.worker.post(new Function("tableSchema", [tableName])).send() as Promise<string>;
+    return this.worker
+      .post(new Function("tableSchema", [tableName]))
+      .send() as Promise<string>;
   };
 
   setUser = async (userName: string) => {
-    return this.worker.post(new Function("setUser", [userName])).send() as Promise<void>;
+    return this.worker
+      .post(new Function("setUser", [userName]))
+      .send() as Promise<void>;
   };
 
   viewSchema = async (viewName: string) => {
-    return this.worker.post(new Function("viewSchema", [viewName])).send() as Promise<string>;
+    return this.worker
+      .post(new Function("viewSchema", [viewName]))
+      .send() as Promise<string>;
   };
 
   schema = async (tableName?: string) => {
-    return this.worker.post(new Function("schema", [tableName])).send() as Promise<string>;
+    return this.worker
+      .post(new Function("schema", [tableName]))
+      .send() as Promise<string>;
   };
 
   insert = async (tableName: string, values: Array<any>) => {
-    return this.worker.post(new Function("insert", [tableName, values])).send() as Promise<boolean>;
+    return this.worker
+      .post(new Function("insert", [tableName, values]))
+      .send() as Promise<boolean>;
   };
 
   save = async () => {
-    return this.worker.post(new Function("save", [])).send() as Promise<boolean>;
-  }
+    return this.worker
+      .post(new Function("save", []))
+      .send() as Promise<boolean>;
+  };
 
   createServerDatabase = async (dbName: string) => {
-    return this.worker.post(new Function("createServerDatabase", [dbName])).send() as Promise<ProtoResponseCreds>;
-  }
+    return this.worker
+      .post(new Function("createServerDatabase", [dbName]))
+      .send() as Promise<ProtoResponseCreds>;
+  };
 
   createServerUser = async () => {
-    return this.worker.post(new Function("createServerUser", [])).send() as Promise<ProtoResponseCreds>;
-  }
+    return this.worker
+      .post(new Function("createServerUser", []))
+      .send() as Promise<ProtoResponseCreds>;
+  };
 
   mirror = async (...tables: MirrorDefn[]) => {
     return this.worker.post(new Function("mirror", tables)).send();
-  }
+  };
 
   closeConnection = async () => {
     return this.worker.post(new Function("closeConnection", [])).send();
-  }
+  };
 
   currentUser?: string;
 
-  connect = async (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => {
+  connect = async (
+    db: string,
+    accessKey: string,
+    privateKey: CryptoKey,
+    endpoint?: string,
+  ) => {
     this.currentUser = accessKey;
-    return this.worker.post(new Function("connect", [db, accessKey, privateKey, endpoint])).send();
-  }
+    return this.worker
+      .post(new Function("connect", [db, accessKey, privateKey, endpoint]))
+      .send();
+  };
 
   connectedRemote = async () => {
-    return this.worker.post(new Function("connectedRemote", [], { wrap: true, autoremove: false })).send()
-      .then(wrapped => new WrappedRemote(this.worker, wrapped.wrapped));
-  }
+    return this.worker
+      .post(
+        new Function("connectedRemote", [], { wrap: true, autoremove: false }),
+      )
+      .send()
+      .then((wrapped) => new WrappedRemote(this.worker, wrapped.wrapped));
+  };
 
   getUser = async () => {
     return this.worker.post(new Function("getUser", [])).send();
-  }
+  };
 }

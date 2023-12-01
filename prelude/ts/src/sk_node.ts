@@ -2,11 +2,11 @@ import { float, int, Environment, Wrk, Shared } from "#std/sk_types";
 import { MemFS, MemSys } from "#std/sk_mem_utils";
 
 import * as fs from "fs";
-import * as util from 'util';
-import * as perf_hooks from 'perf_hooks';
-import * as crypto from 'crypto';
-import { Worker } from 'worker_threads';
-import { WebSocket } from 'ws';
+import * as util from "util";
+import * as perf_hooks from "perf_hooks";
+import * as crypto from "crypto";
+import { Worker } from "worker_threads";
+import { WebSocket } from "ws";
 
 class WrkImpl implements Wrk {
   worker: Worker;
@@ -17,14 +17,14 @@ class WrkImpl implements Wrk {
 
   postMessage = (message: any) => {
     this.worker.postMessage(message);
-  }
+  };
 
   onMessage = (listener: (value: any) => void) => {
     this.worker.on("message", listener);
-  }
+  };
 }
 
-var decoder = new util.TextDecoder('utf8');
+var decoder = new util.TextDecoder("utf8");
 var encoder = new util.TextEncoder();
 
 class Env implements Environment {
@@ -66,7 +66,7 @@ class Env implements Environment {
     });
   }
   rootPath() {
-    let processPath = process.cwd()
+    let processPath = process.cwd();
     if (!processPath.startsWith("file://")) {
       processPath = "file://" + processPath;
     }
@@ -85,9 +85,10 @@ class Env implements Environment {
     this.throwRuntime = (code: int) => {
       this.onException();
       process.exit(code);
-    }
+    };
     this.createSocket = (uri: string) => new WebSocket(uri);
-    this.createWorker = (filename: string | URL, options?: WorkerOptions) => new WrkImpl(filename, options);
+    this.createWorker = (filename: string | URL, options?: WorkerOptions) =>
+      new WrkImpl(filename, options);
     this.crypto = () => crypto as Crypto;
   }
 }
