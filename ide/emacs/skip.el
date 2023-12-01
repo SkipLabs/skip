@@ -1,7 +1,7 @@
 ;;; skip.el --- Skip mode for GNU Emacs  -*- lexical-binding:t -*-
 
 ;; Package-Requires: ((derived) (cc-mode))
-;; URL: https://github.com/skiplabs/skfs
+;; URL: https://github.com/skiplabs/skdb
 
 ;;; Commentary:
 

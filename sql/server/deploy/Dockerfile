@@ -6,9 +6,9 @@
 # here - we can't reuse existing images that might be arm64
 FROM --platform=linux/amd64 skiplabs/skdb-base as skdb
 
-COPY . /skfs
+COPY . /skdb
 
-WORKDIR /skfs
+WORKDIR /skdb
 
 RUN make clean && make build/skdb && make build/init.sql
 
@@ -16,9 +16,9 @@ RUN make clean && make build/skdb && make build/init.sql
 # this is faster anyway
 FROM eclipse-temurin:20 as skgw
 
-COPY . /skfs
+COPY . /skdb
 
-WORKDIR /skfs/sql/server/skgw
+WORKDIR /skdb/sql/server/skgw
 RUN ../gradlew jar --no-daemon --console plain
 
 ################################################################################
@@ -27,10 +27,10 @@ RUN ../gradlew jar --no-daemon --console plain
 
 FROM --platform=linux/amd64 eclipse-temurin:20 as prod
 
-WORKDIR /skfs
+WORKDIR /skdb
 
-COPY --from=skdb /skfs/build ./build
-COPY --from=skgw /skfs/sql/server/skgw/build/libs/skgw.jar /skfs/build/server.jar
-COPY --from=skgw /skfs/sql/server/deploy/start_prod.sh /skfs/build/start.sh
+COPY --from=skdb /skdb/build ./build
+COPY --from=skgw /skdb/sql/server/skgw/build/libs/skgw.jar /skdb/build/server.jar
+COPY --from=skgw /skdb/sql/server/deploy/start_prod.sh /skdb/build/start.sh
 
-CMD /skfs/build/start.sh
+CMD /skdb/build/start.sh

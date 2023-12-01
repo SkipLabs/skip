@@ -8,8 +8,8 @@ import os
 import json
 import itertools
 
-SKDB = "/skfs/build/skdb"
-INITSQL = "/skfs/sql/privacy/init.sql"
+SKDB = "/skdb/build/skdb"
+INITSQL = "/skdb/sql/privacy/init.sql"
 
 def serialise(val):
   if isinstance(val, str):
