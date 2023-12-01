@@ -9,6 +9,7 @@ import {
   MirrorDefn,
 } from "#skdb/skdb_types";
 import { SKDBTable } from "#skdb/skdb_util";
+import { SKDBGroupImpl } from "#skdb/skdb_group";
 import { connect } from "#skdb/skdb_orchestration";
 
 class SKDBMechanismImpl implements SKDBMechanism {
@@ -392,5 +393,9 @@ export class SKDBImpl implements SKDB {
 
   async save() {
     return this.skdbSync.save();
+  }
+
+  async createGroup() {
+    return SKDBGroupImpl.create(this);
   }
 }
