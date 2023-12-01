@@ -87,6 +87,8 @@ export interface SKDB {
   ) => Promise<void>;
   connectedRemote: () => Promise<RemoteSKDB | undefined>;
   closeConnection: () => Promise<void>;
+
+  createGroup: () => Promise<SKDBGroup>;
   currentUser?: string;
 
   mirror: (...tables: MirrorDefn[]) => Promise<void>;
@@ -162,4 +164,22 @@ export interface PagedMemory {
 export interface SKDBShared extends Shared {
   create: (dbName?: string, asWorker?: boolean) => Promise<SKDB>;
   createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
+}
+
+export interface SKDBGroup {
+  setDefaultPermission: (skdb: SKDB, perm: string) => Promise<void>;
+  setMemberPermission: (
+    skdb: SKDB,
+    userID: string,
+    perm: string,
+  ) => Promise<void>;
+
+  addAdmin: (skdb: SKDB, userID: string) => Promise<void>;
+  removeAdmin: (skdb: SKDB, userID: string) => Promise<void>;
+
+  addOwner: (skdb: SKDB, userID: string) => Promise<void>;
+  removeOwner: (skdb: SKDB, userID: string) => Promise<void>;
+  transferOwnership: (skdb: SKDB, userID: string) => Promise<void>;
+
+  removeMember: (skdb: SKDB, userID: string) => Promise<void>;
 }
