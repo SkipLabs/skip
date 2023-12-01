@@ -1,11 +1,10 @@
-import { test } from '@playwright/test';
-import { ms_tests } from './muxed_socket';
-
+import { test } from "@playwright/test";
+import { ms_tests } from "./muxed_socket";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
-  page.on('console', msg => {
-    if (msg.type() === 'error') {
+  await page.goto("/");
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
       console.error(msg.text());
     } else {
       console.log(msg.text());
@@ -25,7 +24,7 @@ function runMS(t) {
         encodeUTF8 = (v) => encoder.encode(v);
       }
       // @ts-ignore
-      var mu = await import('./muxed_utils.mjs');
+      var mu = await import("./muxed_utils.mjs");
       // @ts-ignore
       return await window.test(new Env(), mu);
     });
@@ -33,4 +32,4 @@ function runMS(t) {
   });
 }
 
-ms_tests().forEach(t => runMS(t));
+ms_tests().forEach((t) => runMS(t));

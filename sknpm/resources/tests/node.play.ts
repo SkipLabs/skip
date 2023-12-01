@@ -1,6 +1,6 @@
-import { test } from '@playwright/test';
-import { tests } from './tests';
-import { load } from 'sk_tests';
+import { test } from "@playwright/test";
+import { tests } from "./tests";
+import { load } from "sk_tests";
 
 var main = await load();
 

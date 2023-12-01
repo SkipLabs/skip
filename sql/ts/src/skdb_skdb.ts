@@ -1,17 +1,40 @@
-import { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types";
-import { PagedMemory, Page, Storage, SKDB, SKDBHandle, Params, SKDBSync } from "#skdb/skdb_types";
+import {
+  int,
+  ptr,
+  Environment,
+  Links,
+  ToWasmManager,
+  Utils,
+  Shared,
+} from "#std/sk_types";
+import {
+  PagedMemory,
+  Page,
+  Storage,
+  SKDB,
+  SKDBHandle,
+  Params,
+  SKDBSync,
+} from "#skdb/skdb_types";
 import { ExternalFuns, SKDBTable } from "#skdb/skdb_util";
 import { IDBStorage } from "#skdb/skdb_storage";
 import { SKDBImpl, SKDBSyncImpl } from "#skdb/skdb_database";
-
 
 interface Exported {
   sk_pop_dirty_page: () => number;
   SKIP_get_version: () => number;
   skip_main: () => void;
   //
-  SKIP_reactive_query: (queryID: number, query: number, encoded_params: number) => void;
-  SKIP_reactive_query_changes: (queryID: number, query: number, encoded_params: number) => void;
+  SKIP_reactive_query: (
+    queryID: number,
+    query: number,
+    encoded_params: number,
+  ) => void;
+  SKIP_reactive_query_changes: (
+    queryID: number,
+    query: number,
+    encoded_params: number,
+  ) => void;
   SKIP_reactive_print_result: (queryID: number) => void;
   SKIP_delete_reactive_query: (queryID: number) => void;
   getVersion: () => number;
@@ -20,14 +43,32 @@ interface Exported {
 class SKDBHandleImpl implements SKDBHandle {
   runner: (fn: () => string) => SKDBTable;
   main: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => { close: () => void }
+  watch: (
+    query: string,
+    params: Params,
+    onChange: (rows: SKDBTable) => void,
+  ) => { close: () => void };
+  watchChanges: (
+    query: string,
+    params: Params,
+    init: (rows: SKDBTable) => void,
+    update: (added: SKDBTable, removed: SKDBTable) => void,
+  ) => { close: () => void };
 
   constructor(
     main: (new_args: Array<string>, new_stdin: string) => string,
     runner: (fn: () => string) => SKDBTable,
-    watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void },
-    watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => { close: () => void }
+    watch: (
+      query: string,
+      params: Params,
+      onChange: (rows: SKDBTable) => void,
+    ) => { close: () => void },
+    watchChanges: (
+      query: string,
+      params: Params,
+      init: (rows: SKDBTable) => void,
+      update: (added: SKDBTable, removed: SKDBTable) => void,
+    ) => { close: () => void },
   ) {
     this.runner = runner;
     this.main = main;
@@ -83,7 +124,7 @@ class SKDBMemory implements PagedMemory {
   clear = () => {
     this.dirtyPagesMap = [];
     this.dirtyPages = [];
-  }
+  };
 
   update = () => {
     while (true) {
@@ -103,7 +144,7 @@ class SKDBMemory implements PagedMemory {
         this.dirtyPages.push(dirtyPage);
       }
     }
-  }
+  };
 
   private async copyPage(start: number, end: number): Promise<ArrayBuffer> {
     return this.memory.slice(start, end);
@@ -111,7 +152,8 @@ class SKDBMemory implements PagedMemory {
 
   init(fn: (page: Page) => void) {
     // Let's round up the memorySize to be pageSize aligned
-    let memorySize = (this.persistentSize + (this.pageSize - 1)) & ~(this.pageSize - 1);
+    let memorySize =
+      (this.persistentSize + (this.pageSize - 1)) & ~(this.pageSize - 1);
     let i: number;
     let cursor = 0;
     for (i = 0; i < memorySize / this.pageSize; i++) {
@@ -153,13 +195,13 @@ class SKDBShared implements Shared {
   getName = () => "SKDB";
   createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
   constructor(
-    createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>
+    createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
   ) {
     this.createSync = createSync;
   }
 
   async create(dbName?: string, asWorker?: boolean) {
-    let skdbSync = await this.createSync(dbName)
+    let skdbSync = await this.createSync(dbName);
     return new SKDBImpl(skdbSync);
   }
 }
@@ -216,7 +258,7 @@ class LinksImpl implements Links, ToWasm {
     this.objectIdx = 0;
     this.object = {};
     this.stream = 0;
-    this.stdout_objects = [[],[],[],[]];
+    this.stdout_objects = [[], [], [], []];
   }
 
   complete = (utils: Utils, exports: object) => {
@@ -227,7 +269,7 @@ class LinksImpl implements Links, ToWasm {
         this.queriesToNotify = new Set();
         this.checkNotifications();
       }
-    }
+    };
     this.checkNotifications = () => {
       if (!this.notifying) {
         this.notifying = true;
@@ -235,24 +277,23 @@ class LinksImpl implements Links, ToWasm {
           while (this.notifications.length > 0) {
             const toNotify = this.notifications.shift();
             if (toNotify) {
-              toNotify.forEach(value => {
-                utils.runCheckError(() => exported.SKIP_reactive_print_result(value));
-                this.userFuns[value]!()
+              toNotify.forEach((value) => {
+                utils.runCheckError(() =>
+                  exported.SKIP_reactive_print_result(value),
+                );
+                this.userFuns[value]!();
               });
             }
           }
         } catch (exn) {
-          throw exn
+          throw exn;
         } finally {
           this.notifying = false;
         }
       }
-    }
+    };
     this.SKIP_call_external_fun = (funId: int, skParam: ptr) => {
-      let res = this.state.call(
-        funId,
-        JSON.parse(utils.importString(skParam))
-      )
+      let res = this.state.call(funId, JSON.parse(utils.importString(skParam)));
       let strRes = JSON.stringify(res === undefined ? null : res);
       return utils.exportString(strRes);
     };
@@ -266,7 +307,7 @@ class LinksImpl implements Links, ToWasm {
       this.field_names = new Array();
     };
     this.SKIP_push_field_name = (skName: ptr) => {
-      this.field_names.push(utils.importString(skName))
+      this.field_names.push(utils.importString(skName));
     };
     this.SKIP_clear_object = () => {
       this.objectIdx = 0;
@@ -305,47 +346,51 @@ class LinksImpl implements Links, ToWasm {
       this.stdout_objects[this.stream].push(this.object);
     };
     this.SKIP_unix_unixepoch = (tm: ptr) => {
-      return utils.exportString("TODO")
+      return utils.exportString("TODO");
     };
     this.SKIP_unix_strftime = (tm: ptr) => {
-      return utils.exportString("TODO")
-    }
+      return utils.exportString("TODO");
+    };
     this.SKIP_js_mark_query = (queryID: int) => {
       this.queriesToNotify.add(queryID);
-    }
+    };
     this.SKIP_js_delete_fun = (queryID: int) => {
       this.funLastTick.set(queryID, 0);
       this.freeQueryIDs.push(queryID);
-    }
+    };
     let runner = (fn: () => string) => {
-      this.stdout_objects = [[],[],[],[]];
+      this.stdout_objects = [[], [], [], []];
       this.stream = 0;
       let stdout = fn();
       if (stdout == "") {
         let result = this.stdout_objects[0];
-        this.stdout_objects = [[],[],[], []];
+        this.stdout_objects = [[], [], [], []];
         return new SKDBTable(...result);
       }
-      throw new Error(stdout)
+      throw new Error(stdout);
     };
     let main = (new_args: Array<string>, new_stdin: string) => {
       let res = utils.main(new_args, new_stdin);
       this.notifyAllJS();
       return res;
-    }
+    };
     let manageWatch = (
       query: string,
       params: Params,
-      reactive_query: (queryID: number, query: number, encoded_params: number) => void,
+      reactive_query: (
+        queryID: number,
+        query: number,
+        encoded_params: number,
+      ) => void,
       queryFun: (queryID: int) => void,
     ) => {
       if (params instanceof Map) {
         params = Object.fromEntries(params);
       }
-      this.stdout_objects = [[],[],[],[]];
+      this.stdout_objects = [[], [], [], []];
       this.stream = 0;
       const freeQueryID = this.freeQueryIDs.pop();
-      const queryID = (freeQueryID === undefined ? this.queryID++ : freeQueryID);
+      const queryID = freeQueryID === undefined ? this.queryID++ : freeQueryID;
       this.funLastTick.set(queryID, 0);
       let userFun = () => queryFun(queryID);
       this.userFuns[queryID] = userFun;
@@ -354,17 +399,19 @@ class LinksImpl implements Links, ToWasm {
           reactive_query(
             queryID,
             utils.exportString(query),
-            utils.exportString(JSON.stringify(params))
-          )
-        })
+            utils.exportString(JSON.stringify(params)),
+          );
+        });
       });
       userFun();
       return {
         close: () => {
-          this.userFuns[queryID] = () => { };
-          utils.runCheckError(() => exported.SKIP_delete_reactive_query(queryID));
-        }
-      }
+          this.userFuns[queryID] = () => {};
+          utils.runCheckError(() =>
+            exported.SKIP_delete_reactive_query(queryID),
+          );
+        },
+      };
     };
 
     let watch = (
@@ -376,12 +423,12 @@ class LinksImpl implements Links, ToWasm {
         query,
         params,
         exported.SKIP_reactive_query,
-        _queryID => {
+        (_queryID) => {
           onChange(new SKDBTable(...this.stdout_objects[0]));
-          this.stdout_objects = [[],[],[],[]];
+          this.stdout_objects = [[], [], [], []];
         },
       );
-    }
+    };
     let watchChanges = (
       query: string,
       params: Params,
@@ -392,7 +439,7 @@ class LinksImpl implements Links, ToWasm {
         query,
         params,
         exported.SKIP_reactive_query_changes,
-        queryID => {
+        (queryID) => {
           const rows = new SKDBTable(...this.stdout_objects[0]);
           const added = new SKDBTable(...this.stdout_objects[1]);
           const removed = new SKDBTable(...this.stdout_objects[2]);
@@ -403,10 +450,10 @@ class LinksImpl implements Links, ToWasm {
             init(rows);
           }
           this.funLastTick.set(queryID, tick);
-          this.stdout_objects = [[],[],[], []];
+          this.stdout_objects = [[], [], [], []];
         },
       );
-    }
+    };
     let handle = new SKDBHandleImpl(main, runner, watch, watchChanges);
     let createSync = async (dbName?: string) => {
       let save: () => Promise<boolean> = async () => true;
@@ -415,7 +462,7 @@ class LinksImpl implements Links, ToWasm {
         let memory = new SKDBMemory(
           utils.getMemoryBuffer(),
           utils.getPersistentSize(),
-          exported.sk_pop_dirty_page
+          exported.sk_pop_dirty_page,
         );
         this.storage = await IDBStorage.create(
           dbName!,
@@ -424,7 +471,7 @@ class LinksImpl implements Links, ToWasm {
           memory,
         );
         save = this.storage!.save;
-      };
+      }
       handle.init();
       return SKDBSyncImpl.create(handle, this.environment, save);
     };
@@ -443,24 +490,29 @@ class Manager implements ToWasmManager {
     let toWasm = wasm as ToWasm;
     let links = new LinksImpl(this.environment);
     toWasm.SKIP_clear_field_names = () => links.SKIP_clear_field_names();
-    toWasm.SKIP_push_field_name = (skName: ptr) => links.SKIP_push_field_name(skName);
+    toWasm.SKIP_push_field_name = (skName: ptr) =>
+      links.SKIP_push_field_name(skName);
     toWasm.SKIP_clear_object = () => links.SKIP_clear_object();
     toWasm.SKIP_last_tick = (queryID: int) => links.SKIP_last_tick(queryID);
     toWasm.SKIP_switch_to = (stream: int) => links.SKIP_switch_to(stream);
-    toWasm.SKIP_push_object_field_null = () => links.SKIP_push_object_field_null();
-    toWasm.SKIP_push_object_field_int32 = (field: int) => links.SKIP_push_object_field_int32(field);
-    toWasm.SKIP_push_object_field_int64 = (field: ptr) => links.SKIP_push_object_field_int64(field);
-    toWasm.SKIP_push_object_field_float = (field: ptr) => links.SKIP_push_object_field_float(field);
-    toWasm.SKIP_push_object_field_string = (field: ptr) => links.SKIP_push_object_field_string(field);
+    toWasm.SKIP_push_object_field_null = () =>
+      links.SKIP_push_object_field_null();
+    toWasm.SKIP_push_object_field_int32 = (field: int) =>
+      links.SKIP_push_object_field_int32(field);
+    toWasm.SKIP_push_object_field_int64 = (field: ptr) =>
+      links.SKIP_push_object_field_int64(field);
+    toWasm.SKIP_push_object_field_float = (field: ptr) =>
+      links.SKIP_push_object_field_float(field);
+    toWasm.SKIP_push_object_field_string = (field: ptr) =>
+      links.SKIP_push_object_field_string(field);
     toWasm.SKIP_push_object = () => links.SKIP_push_object();
     toWasm.SKIP_unix_unixepoch = (tm: ptr) => links.SKIP_unix_unixepoch(tm);
     toWasm.SKIP_unix_strftime = (tm: ptr) => links.SKIP_unix_strftime(tm);
     toWasm.SKIP_js_mark_query = (id: int) => links.SKIP_js_mark_query(id);
     toWasm.SKIP_js_delete_fun = (id: int) => links.SKIP_js_delete_fun(id);
     return links;
-  }
+  };
 }
-
 
 /** @sk init */
 export function init(env?: Environment) {

@@ -4,20 +4,40 @@ import { SKDBTable } from "#skdb/skdb_util";
 export interface SKDBHandle {
   runner: (fn: () => string) => SKDBTable;
   main: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void },
-  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => { close: () => void }
+  watch: (
+    query: string,
+    params: Params,
+    onChange: (rows: SKDBTable) => void,
+  ) => { close: () => void };
+  watchChanges: (
+    query: string,
+    params: Params,
+    init: (rows: SKDBTable) => void,
+    update: (added: SKDBTable, removed: SKDBTable) => void,
+  ) => { close: () => void };
 }
 
-export type MirrorDefn = {
-  table: string,
-  filterExpr?: string,
-} | string;
+export type MirrorDefn =
+  | {
+      table: string;
+      filterExpr?: string;
+    }
+  | string;
 
 export interface SKDBSync {
   // CLIENT
   exec: (query: string, params?: Params) => SKDBTable;
-  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => { close: () => void }
+  watch: (
+    query: string,
+    params: Params,
+    onChange: (rows: SKDBTable) => void,
+  ) => { close: () => void };
+  watchChanges: (
+    query: string,
+    params: Params,
+    init: (rows: SKDBTable) => void,
+    update: (added: SKDBTable, removed: SKDBTable) => void,
+  ) => { close: () => void };
   insert: (tableName: string, values: Array<any>) => boolean;
 
   tableSchema: (tableName: string) => string;
@@ -27,7 +47,12 @@ export interface SKDBSync {
   save: () => Promise<boolean>;
 
   // SERVER
-  connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
+  connect: (
+    db: string,
+    accessKey: string,
+    privateKey: CryptoKey,
+    endpoint?: string,
+  ) => Promise<void>;
   mirror: (...tables: MirrorDefn[]) => Promise<void>;
 
   connectedRemote?: RemoteSKDB;
@@ -42,11 +67,25 @@ export interface SKDBSync {
 
 export interface SKDB {
   exec: (query: string, params?: Params) => Promise<SKDBTable>;
-  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => Promise<{ close: () => Promise<void> }>
-  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => Promise<{ close: () => Promise<void> }>
+  watch: (
+    query: string,
+    params: Params,
+    onChange: (rows: SKDBTable) => void,
+  ) => Promise<{ close: () => Promise<void> }>;
+  watchChanges: (
+    query: string,
+    params: Params,
+    init: (rows: SKDBTable) => void,
+    update: (added: SKDBTable, removed: SKDBTable) => void,
+  ) => Promise<{ close: () => Promise<void> }>;
 
-  connect: (db: string, accessKey: string, privateKey: CryptoKey, endpoint?: string) => Promise<void>;
-  connectedRemote: () => Promise<RemoteSKDB|undefined>;
+  connect: (
+    db: string,
+    accessKey: string,
+    privateKey: CryptoKey,
+    endpoint?: string,
+  ) => Promise<void>;
+  connectedRemote: () => Promise<RemoteSKDB | undefined>;
   closeConnection: () => Promise<void>;
   currentUser?: string;
 
@@ -61,9 +100,16 @@ export interface SKDBMechanism {
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
-  subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
+  subscribe: (
+    replicationUid: string,
+    tables: string[],
+    updateFile: string,
+  ) => string;
   unsubscribe: (session: string) => void;
-  diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
+  diff: (
+    session: string,
+    watermarks: Map<string, bigint>,
+  ) => ArrayBuffer | null;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => SKDBTable;
   assertCanBeMirrored: (tableName: string) => void;
@@ -78,9 +124,9 @@ export type ProtoResponseCreds = {
   type: "credentials";
   accessKey: string;
   privateKey: Uint8Array;
-}
+};
 
-export type Params = Map<string, string|number> | Object;
+export type Params = Map<string, string | number> | Object;
 
 export interface RemoteSKDB {
   connectedAs(): Promise<string>;
@@ -103,18 +149,17 @@ export interface RemoteSKDB {
   close(): Promise<void>;
 }
 
-export type Page = { pageid: number, content: any };
-
+export type Page = { pageid: number; content: any };
 
 export interface PagedMemory {
   init(fn: (page: Page) => void): void;
   restore(pages: Array<Page>): void;
-  clear() : void;
-  update() : void;
+  clear(): void;
+  update(): void;
   getPages(): Promise<Array<Page>>;
 }
 
 export interface SKDBShared extends Shared {
-  create: (dbName ?: string, asWorker ?: boolean) => Promise<SKDB>;
-  createSync: (dbName ?: string, asWorker ?: boolean) => Promise<SKDBSync>;
+  create: (dbName?: string, asWorker?: boolean) => Promise<SKDB>;
+  createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
 }

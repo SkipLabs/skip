@@ -1,10 +1,10 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from "@playwright/test";
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: './',
+  testDir: "./",
   testMatch: /.*\.play\.ts/,
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -15,58 +15,58 @@ export default defineConfig({
   /* CI workers have 4 CPUs */
   workers: process.env.CI ? 4 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://127.0.0.1:8100',
+    baseURL: "http://127.0.0.1:8100",
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    trace: "on-first-retry",
   },
 
   /* Configure projects for major browsers */
-    projects: [
+  projects: [
     {
-      name: 'client_nodejs',
+      name: "client_nodejs",
       testMatch: /node.play.ts/,
     },
     {
-      name: 'server_nodejs',
+      name: "server_nodejs",
       testMatch: /node.play.server.ts/,
     },
     {
-      name: 'mux_nodejs',
+      name: "mux_nodejs",
       testMatch: /node.play.mux.ts/,
     },
     {
-      name: 'client_chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "client_chromium",
+      use: { ...devices["Desktop Chrome"] },
       testMatch: /browser.play.ts/,
     },
     {
-      name: 'server_chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "server_chromium",
+      use: { ...devices["Desktop Chrome"] },
       testMatch: /browser.play.server.ts/,
     },
     {
-      name: 'mux_chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "mux_chromium",
+      use: { ...devices["Desktop Chrome"] },
       testMatch: /browser.play.mux.ts/,
     },
     {
-      name: 'client_firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: "client_firefox",
+      use: { ...devices["Desktop Firefox"] },
       testMatch: /browser.play.ts/,
     },
     {
-      name: 'server_firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: "server_firefox",
+      use: { ...devices["Desktop Firefox"] },
       testMatch: /browser.play.server.ts/,
     },
     {
-      name: 'mux_firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: "mux_firefox",
+      use: { ...devices["Desktop Firefox"] },
       testMatch: /browser.play.mux.ts/,
     },
 
@@ -99,8 +99,8 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npx http-server ./ -p 8100',
+    command: "npx http-server ./ -p 8100",
     port: 8100,
-    reuseExistingServer:true,
-  }
+    reuseExistingServer: true,
+  },
 });

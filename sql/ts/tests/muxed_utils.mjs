@@ -1,6 +1,4 @@
-
-import { MuxedSocket } from './node_modules/skdb/dist/skdb_orchestration.mjs';
-
+import { MuxedSocket } from "./node_modules/skdb/dist/skdb_orchestration.mjs";
 
 export async function connect(env, uri, creds, timeoutMs = 60000) {
   return await MuxedSocket.connect(env, uri, creds, timeoutMs);
@@ -43,12 +41,24 @@ export function request_concurrent_streaming() {
 }
 
 export function toHex(buf) {
-  return '0x' + [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, '0')).join('');
+  return (
+    "0x" +
+    [...new Uint8Array(buf)]
+      .map((x) => x.toString(16).padStart(2, "0"))
+      .join("")
+  );
 }
 
 export async function connectAndAuth(env) {
-  const key = await env.crypto().subtle.importKey(
-    "raw", env.encodeUTF8("test"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await env
+    .crypto()
+    .subtle.importKey(
+      "raw",
+      env.encodeUTF8("test"),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
   const socket = await MuxedSocket.connect(env, "ws://localhost:8090", {
     accessKey: "ABCDEFGHIJKLMNOPQRST",
     privateKey: key,

@@ -5,33 +5,51 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { createSkdb } from "#skdb/skdb";
-import { webcrypto } from 'crypto';
-import * as readline from 'readline/promises';
-import * as process from 'process';
-import * as repl from 'repl';
+import { webcrypto } from "crypto";
+import * as readline from "readline/promises";
+import * as process from "process";
+import * as repl from "repl";
 
-const createConnectedSkdb = async function(endpoint, database, { accessKey, privateKey }) {
-  const skdb = await createSkdb({asWorker:false});
-  const keyBytes = Buffer.from(privateKey, 'base64');
+const createConnectedSkdb = async function (
+  endpoint,
+  database,
+  { accessKey, privateKey },
+) {
+  const skdb = await createSkdb({ asWorker: false });
+  const keyBytes = Buffer.from(privateKey, "base64");
   const key = await webcrypto.subtle.importKey(
-    "raw", keyBytes, { name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
+    "raw",
+    keyBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
 
   await skdb.connect(database, accessKey, key, endpoint);
 
   return skdb;
 };
 
-async function getCredsFromDevServer(host: string, port: number, database: string) {
+async function getCredsFromDevServer(
+  host: string,
+  port: number,
+  database: string,
+) {
   const creds = new Map();
   try {
-    const resp = await fetch(`http://${host}:${port}/dbs/${database}/users`)
+    const resp = await fetch(`http://${host}:${port}/dbs/${database}/users`);
     const data = await resp.text();
-    const users = data.split("\n").filter(line => line.trim() != '').map(line => JSON.parse(line))
+    const users = data
+      .split("\n")
+      .filter((line) => line.trim() != "")
+      .map((line) => JSON.parse(line));
     for (const user of users) {
-      creds.set(user.accessKey, user.privateKey)
+      creds.set(user.accessKey, user.privateKey);
     }
   } catch (ex: any) {
-    console.log("Could not fetch from the dev server, is it running? Trying because `--dev` was passed.");
+    console.log(
+      "Could not fetch from the dev server, is it running? Trying because `--dev` was passed.",
+    );
     process.exit(1);
   }
 
@@ -46,7 +64,7 @@ type Cmd = {
   valName: string;
   default: boolean;
   help: string;
-}
+};
 
 const argSchema = {
   help: {
@@ -57,18 +75,18 @@ const argSchema = {
   // connection params
   db: {
     type: "string",
-    valName: 'db',
-    help: "Name of database to connect to."
+    valName: "db",
+    help: "Name of database to connect to.",
   },
   host: {
     type: "string",
-    valName: 'host',
+    valName: "host",
     help: "URI to connect to.",
     default: "wss://api.skiplabs.io",
   },
-  'access-key': {
+  "access-key": {
     type: "string",
-    valName: 'key',
+    valName: "key",
     help: "Access key to use. Default: first specified in credentials file.",
   },
   dev: {
@@ -77,60 +95,60 @@ const argSchema = {
     default: false,
   },
   // formatting
-  'json-output': {
+  "json-output": {
     type: "boolean",
     help: "Rows are output as JSON objects. Default: false.",
     default: false,
   },
-  'pipe-separated-output': {
+  "pipe-separated-output": {
     type: "boolean",
     help: "SQL output is separated by a pipe. Default: false.",
     default: false,
   },
-  'simple-output': {
+  "simple-output": {
     type: "boolean",
     help: "No cute terminal usage. E.g. no readline.",
     default: false,
   },
   // operations
-  'add-cred': {
+  "add-cred": {
     type: "boolean",
     help: `Add a credential to ${credsFileName}. Pass the private key b64 on stdin.`,
     default: false,
   },
-  'create-db': {
+  "create-db": {
     type: "string",
-    valName: 'db',
+    valName: "db",
     help: "Create database.",
   },
-  'create-user': {
+  "create-user": {
     type: "boolean",
     help: "Create user.",
     default: false,
   },
-  'remote-repl': {
+  "remote-repl": {
     type: "boolean",
     help: "Interactively execute SQL queries against the server.",
     default: false,
   },
-  'local-repl': {
+  "local-repl": {
     type: "boolean",
     help: "Interactively execute SQL queries against a local db.",
     default: false,
   },
-  'schema': {
+  schema: {
     type: "boolean",
     help: "Dump the database schema as SQL DML.",
     default: false,
   },
-  'table-schema': {
+  "table-schema": {
     type: "string",
-    valName: 'table',
+    valName: "table",
     help: "Dump the table schema as SQL DML.",
   },
-  'view-schema': {
+  "view-schema": {
     type: "string",
-    valName: 'view',
+    valName: "view",
     help: "Dump the view schema as SQL DML.",
   },
 };
@@ -141,25 +159,28 @@ const args = parseArgs({
   tokens: true,
 });
 
-const printHelp = function() {
+const printHelp = function () {
   const thisBin = process.argv[1];
 
   const flags = Object.entries(argSchema)
-        .map(([key, def]) => {
-          const val = def.type === "string" ? ` <${(def as Cmd).valName}>` : '';
-          const help = def.help ? `  -- ${def.help}` : '';
-          const deflt = (def as Cmd).default ? ` Default: ${(def as Cmd).default}`: '';
-          return `[--${key}${val}]${help}${deflt}`;
-        })
-        .join('\n    ');
+    .map(([key, def]) => {
+      const val = def.type === "string" ? ` <${(def as Cmd).valName}>` : "";
+      const help = def.help ? `  -- ${def.help}` : "";
+      const deflt = (def as Cmd).default
+        ? ` Default: ${(def as Cmd).default}`
+        : "";
+      return `[--${key}${val}]${help}${deflt}`;
+    })
+    .join("\n    ");
 
   console.log(`Usage: ${thisBin} ${flags}`);
   console.log("");
-  console.log("Anything passed on stdin will be evaluated as sql by the remote db.");
+  console.log(
+    "Anything passed on stdin will be evaluated as sql by the remote db.",
+  );
 };
 
-const haveMandatoryValues = ['db', 'host']
-      .every(flag => flag in args.values);
+const haveMandatoryValues = ["db", "host"].every((flag) => flag in args.values);
 
 if ((args.values as any).help || !haveMandatoryValues) {
   printHelp();
@@ -172,19 +193,21 @@ let creds: any;
 let hostCreds: any;
 let dbCreds: any;
 
-if (args.values['dev']) {
-  if (args.values['add-cred']) {
-    console.log("Cannot add-cred when credentials are managed by the dev server (--dev was passed).");
+if (args.values["dev"]) {
+  if (args.values["add-cred"]) {
+    console.log(
+      "Cannot add-cred when credentials are managed by the dev server (--dev was passed).",
+    );
   }
 
-  let host: string = args.values['host'];
+  let host: string = args.values["host"];
   if (host === "wss://api.skiplabs.io") {
     host = "ws://localhost:3586";
     values.host = host;
   }
 
   const schemeAndRest = host.split("://", 2);
-  const hostAndPort = schemeAndRest[schemeAndRest.length - 1].split(":", 2)
+  const hostAndPort = schemeAndRest[schemeAndRest.length - 1].split(":", 2);
 
   if (hostAndPort.length < 1) {
     console.log("Invalid host");
@@ -195,7 +218,7 @@ if (args.values['dev']) {
     dbCreds = await getCredsFromDevServer(
       hostAndPort[0],
       parseInt(hostAndPort[1]),
-      values.db
+      values.db,
     );
   }
 } else {
@@ -214,14 +237,14 @@ if (args.values['dev']) {
   dbCreds = hostCreds[values.db as string] ?? {};
   hostCreds[values.db as string] = dbCreds;
 
-  if (args.values['add-cred']) {
-    if (!('access-key' in args.values)) {
+  if (args.values["add-cred"]) {
+    if (!("access-key" in args.values)) {
       console.log("Must pass --db --host and --access-key.");
       process.exit(1);
     }
 
-    const accessKey = (args.values['access-key'] as string).trim();
-    const privateKey = fs.readFileSync(process.stdin.fd, 'utf-8').trim();
+    const accessKey = (args.values["access-key"] as string).trim();
+    const privateKey = fs.readFileSync(process.stdin.fd, "utf-8").trim();
 
     dbCreds[accessKey] = privateKey;
 
@@ -236,12 +259,14 @@ if (args.values['dev']) {
 ////////////////////////////////////////////////////////////////////////////////
 
 if (!dbCreds || Object.entries(dbCreds).length < 1) {
-  console.log(`Could not find credentials for ${values.db} in ${credsFileName}`);
+  console.log(
+    `Could not find credentials for ${values.db} in ${credsFileName}`,
+  );
   process.exit(1);
 }
 
 const firstPair = Object.entries(dbCreds)[0];
-const accessKey = (args.values['access-key'] ?? firstPair[0]) as string;
+const accessKey = (args.values["access-key"] ?? firstPair[0]) as string;
 const privateKey = dbCreds[accessKey];
 
 if (!privateKey) {
@@ -254,15 +279,15 @@ const skdb = await createConnectedSkdb(values.host, values.db, {
   privateKey: privateKey,
 });
 
-const display = function(rows: Array<any>) {
-  if (args.values['json-output']) {
+const display = function (rows: Array<any>) {
+  if (args.values["json-output"]) {
     const acc: Array<string> = [];
     for (const row of rows) {
       acc.push(JSON.stringify(row));
     }
 
     console.log(acc.join("\n"));
-  } else if (args.values['pipe-separated-output']) {
+  } else if (args.values["pipe-separated-output"]) {
     if (rows.length < 1) {
       return;
     }
@@ -289,68 +314,84 @@ const display = function(rows: Array<any>) {
   }
 };
 
-if (args.values['create-db']) {
-  const db = args.values['create-db'] as string;
+if (args.values["create-db"]) {
+  const db = args.values["create-db"] as string;
   const remote = await skdb.connectedRemote();
   const result = await remote!.createDatabase(db);
   // b64 encode
-  result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
+  result.privateKey = Buffer.from(
+    String.fromCharCode(...result.privateKey),
+    "base64",
+  );
   console.log(`Successfully created database: ${db}.`);
   console.log(`Credentials for ${db}: `, result);
 
-  if (!args.values['dev']) {
+  if (!args.values["dev"]) {
     hostCreds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
     fs.writeFileSync(credsFileName, JSON.stringify(creds));
     console.log(`Credentials were added to ${credsFileName}.`);
   }
 }
 
-if (args.values['create-user']) {
+if (args.values["create-user"]) {
   const remote = await skdb.connectedRemote();
   const result = await remote!.createUser();
   // b64 encode
-  result.privateKey = Buffer.from(String.fromCharCode(...result.privateKey), 'base64');
-  console.log('Successfully created user: ', result);
+  result.privateKey = Buffer.from(
+    String.fromCharCode(...result.privateKey),
+    "base64",
+  );
+  console.log("Successfully created user: ", result);
 
-  if (!args.values['dev']) {
+  if (!args.values["dev"]) {
     dbCreds[result.accessKey] = result.privateKey;
     fs.writeFileSync(credsFileName, JSON.stringify(creds));
     console.log(`Credentials were added to ${credsFileName}.`);
   }
 }
 
-if (args.values['schema']) {
+if (args.values["schema"]) {
   const remote = await skdb.connectedRemote();
   const schema = await remote!.schema();
   console.log(schema.trim());
 }
 
-if (args.values['table-schema']) {
+if (args.values["table-schema"]) {
   const remote = await skdb.connectedRemote();
-  const schema = await remote!.tableSchema(args.values['table-schema'] as string);
+  const schema = await remote!.tableSchema(
+    args.values["table-schema"] as string,
+  );
   console.log(schema.trim());
 }
 
-if (args.values['view-schema']) {
+if (args.values["view-schema"]) {
   const remote = await skdb.connectedRemote();
-  const schema = await remote!.viewSchema(args.values['view-schema'] as string);
+  const schema = await remote!.viewSchema(args.values["view-schema"] as string);
   console.log(schema.trim());
 }
 
-const remoteRepl = async function() {
-  const rl = readline.createInterface(process.stdin, process.stdout, undefined,
-                                      !args.values['simple-output']);
+const remoteRepl = async function () {
+  const rl = readline.createInterface(
+    process.stdin,
+    process.stdout,
+    undefined,
+    !args.values["simple-output"],
+  );
   while (true) {
-    const query = await rl.question(`${accessKey}@${values.host}/${values.db}> `);
+    const query = await rl.question(
+      `${accessKey}@${values.host}/${values.db}> `,
+    );
 
-    if (query.trim() === '.exit') {
+    if (query.trim() === ".exit") {
       rl.close();
       process.exit(0);
     }
 
-    if (query.trim() === '.help') {
+    if (query.trim() === ".help") {
       console.log("Send input to the server to be executed as a query.");
-      console.log("Multi-statement queries should (currently) be combined on a single line.");
+      console.log(
+        "Multi-statement queries should (currently) be combined on a single line.",
+      );
       console.log("");
       console.log("Commands begin with '.'");
       console.log("");
@@ -363,13 +404,13 @@ const remoteRepl = async function() {
       continue;
     }
 
-    if (query.trim() === '.local') {
+    if (query.trim() === ".local") {
       rl.close();
       await localRepl();
       return;
     }
 
-    if (query.trim() === '.schema') {
+    if (query.trim() === ".schema") {
       try {
         const remote = await skdb.connectedRemote();
         const schema = await remote!.schema();
@@ -381,7 +422,7 @@ const remoteRepl = async function() {
       continue;
     }
 
-    if (query.startsWith('.table-schema')) {
+    if (query.startsWith(".table-schema")) {
       const [_, table] = query.split(" ", 2);
       try {
         const remote = await skdb.connectedRemote();
@@ -393,7 +434,7 @@ const remoteRepl = async function() {
       continue;
     }
 
-    if (query.startsWith('.view-schema')) {
+    if (query.startsWith(".view-schema")) {
       const [_, view] = query.split(" ", 2);
       try {
         const remote = await skdb.connectedRemote();
@@ -416,18 +457,22 @@ const remoteRepl = async function() {
   }
 };
 
-const localRepl = async function() {
-  const rl = readline.createInterface(process.stdin, process.stdout, undefined,
-                                      !args.values['simple-output']);
+const localRepl = async function () {
+  const rl = readline.createInterface(
+    process.stdin,
+    process.stdout,
+    undefined,
+    !args.values["simple-output"],
+  );
   while (true) {
     const query = await rl.question(`local> `);
 
-    if (query.trim() === '.exit') {
+    if (query.trim() === ".exit") {
       rl.close();
       process.exit(0);
     }
 
-    if (query.trim() === '.help') {
+    if (query.trim() === ".help") {
       console.log("Evaluate input as a SQL query against a local database.");
       console.log("");
       console.log("Commands begin with '.'");
@@ -435,7 +480,9 @@ const localRepl = async function() {
       console.log(".help -- This message.");
       console.log(".exit -- Exit this repl session.");
       console.log(".remote -- Switch to remote repl.");
-      console.log(".js -- Switch to a javascript repl. There is a pre-configured `skdb` global. Currently this is a one-way trip.");
+      console.log(
+        ".js -- Switch to a javascript repl. There is a pre-configured `skdb` global. Currently this is a one-way trip.",
+      );
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
@@ -443,22 +490,22 @@ const localRepl = async function() {
       continue;
     }
 
-    if (query.trim() === '.remote') {
+    if (query.trim() === ".remote") {
       rl.close();
       await remoteRepl();
       return;
     }
 
-    if (query.trim() === '.js') {
+    if (query.trim() === ".js") {
       rl.close();
       const replServer = repl.start({
-        terminal: !args.values['simple-output'],
+        terminal: !args.values["simple-output"],
       });
       replServer.context.skdb = skdb;
       return;
     }
 
-    if (query.trim() === '.schema') {
+    if (query.trim() === ".schema") {
       try {
         const schema = await skdb.schema();
         console.log(schema);
@@ -469,7 +516,7 @@ const localRepl = async function() {
       continue;
     }
 
-    if (query.startsWith('.table-schema')) {
+    if (query.startsWith(".table-schema")) {
       const [_, table] = query.split(" ", 2);
       try {
         const schema = await skdb.schema(table);
@@ -480,7 +527,7 @@ const localRepl = async function() {
       continue;
     }
 
-    if (query.startsWith('.view-schema')) {
+    if (query.startsWith(".view-schema")) {
       const [_, view] = query.split(" ", 2);
       try {
         const schema = await skdb.schema(view);
@@ -491,9 +538,9 @@ const localRepl = async function() {
       continue;
     }
 
-    if (query.startsWith('.mirror')) {
+    if (query.startsWith(".mirror")) {
       const args = query.split(" ");
-      const tables = args.slice(1)
+      const tables = args.slice(1);
       try {
         await skdb.mirror(...tables);
       } catch (ex) {
@@ -513,17 +560,17 @@ const localRepl = async function() {
   }
 };
 
-if (args.values['remote-repl']) {
+if (args.values["remote-repl"]) {
   await remoteRepl();
 }
 
-if (args.values['local-repl']) {
+if (args.values["local-repl"]) {
   await localRepl();
 }
 
 let query = "";
 try {
-  query = fs.readFileSync(process.stdin.fd, 'utf-8');
+  query = fs.readFileSync(process.stdin.fd, "utf-8");
 } catch {}
 
 if (query.trim() !== "") {
@@ -542,6 +589,6 @@ if (query.trim() !== "") {
 // interactively, you can drop to the js console and the control flow
 // ends up calling this, which you don't want. the user is going to
 // send an interrupt anyway to get out of the shell.
-if (!(args.values['remote-repl'] || args.values['local-repl'])) {
+if (!(args.values["remote-repl"] || args.values["local-repl"])) {
   await skdb.closeConnection();
 }

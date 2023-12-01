@@ -93,6 +93,7 @@ clean:
 .PHONY: fmt
 fmt:
 	find . -path ./compiler/tests -not -prune -or -name '*'.sk -exec sh -c 'echo {}; skfmt -i {}' \;
+	npx prettier . --write
 
 
 # test targets

@@ -29,7 +29,7 @@ export class Exception {
 class SkRuntimeExit extends Error {
   code: int;
 
-  constructor(code: int, message ?:string) {
+  constructor(code: int, message?: string) {
     super(message ?? "Runtime exit with code: " + code);
     this.code = code;
   }
@@ -37,7 +37,7 @@ class SkRuntimeExit extends Error {
 
 class SkException extends Error {
   constructor(msg: string) {
-      super(msg);
+    super(msg);
   }
 }
 
@@ -61,7 +61,14 @@ export class Options {
   create: boolean;
   create_new: boolean;
 
-  constructor(read: boolean = true, write: boolean = false, append: boolean = false, truncate: boolean = false, create: boolean = true, create_new: boolean = false) {
+  constructor(
+    read: boolean = true,
+    write: boolean = false,
+    append: boolean = false,
+    truncate: boolean = false,
+    create: boolean = true,
+    create_new: boolean = false,
+  ) {
     this.read = read;
     this.write = write;
     this.append = append;
@@ -71,11 +78,10 @@ export class Options {
   }
 
   static w() {
-    return new Options(false,true)
+    return new Options(false, true);
   }
 
   toFlags() {
-
     let res = 0;
     if (this.read && this.write) {
       res = O_RDWR;
@@ -113,7 +119,7 @@ export class Options {
       is(flags, O_TRUNC),
       is(flags, O_CREAT),
       is(flags, O_EXCL),
-    )
+    );
   }
 }
 
@@ -140,7 +146,7 @@ export interface Wrk {
 }
 
 export interface Environment {
-  shared: Map<string,Shared>;
+  shared: Map<string, Shared>;
   name: () => string;
   environment: Array<string>;
   createSocket: (uir: string) => WebSocket;
@@ -201,18 +207,15 @@ export class Utils {
   private stdout: Array<string>;
   private stderr: Array<string>;
   private stddebug: Array<string>;
-  private mainFn ?: string;
+  private mainFn?: string;
 
   exit = (code: int) => {
-    let message = (code != 0 && this.stderr.length > 0) ? this.stderr.join("") : undefined;
+    let message =
+      code != 0 && this.stderr.length > 0 ? this.stderr.join("") : undefined;
     throw new SkRuntimeExit(code, message);
   };
 
-  constructor(
-    exports: WebAssembly.Exports,
-    env: Environment,
-    mainFn ?: string,
-  ) {
+  constructor(exports: WebAssembly.Exports, env: Environment, mainFn?: string) {
     this.states = new Map();
     this.args = new Array();
     this.current_stdin = 0;
@@ -227,28 +230,31 @@ export class Utils {
   }
   log = (str: string, kind?: Stream, newLine: boolean = false) => {
     kind = kind ? kind : Stream.OUT;
-    str += (newLine ? "\n" : "");
+    str += newLine ? "\n" : "";
     if (kind == Stream.DEBUG) {
       this.stddebug.push(str);
     } else if (kind == Stream.ERR) {
-        this.stderr.push(str);
+      this.stderr.push(str);
     } else {
       this.stdout.push(str);
     }
-  }
+  };
   sklog = (strPtr: ptr, kind?: Stream, newLine: boolean = false) => {
     let str = this.importString(strPtr);
     this.log(str, kind, newLine);
-  }
+  };
 
-  clearMainEnvironment = (new_args: Array<string> = [], new_stdin: string = "") => {
+  clearMainEnvironment = (
+    new_args: Array<string> = [],
+    new_stdin: string = "",
+  ) => {
     this.args = [this.mainFn ?? "main"].concat(new_args);
     this.current_stdin = 0;
     this.stdin = new_stdin;
     this.stdout = new Array();
     this.stderr = new Array();
     this.stddebug = new Array();
-  }
+  };
 
   runCheckError = <T>(fn: () => T) => {
     this.clearMainEnvironment();
@@ -257,10 +263,10 @@ export class Utils {
       console.log(this.stddebug.join(""));
     }
     if (this.stderr.length > 0) {
-      throw new Error(this.stderr.join(""))
+      throw new Error(this.stderr.join(""));
     }
     return res;
-  }
+  };
 
   main = (new_args: Array<string>, new_stdin: string) => {
     let exitCode = 0;
@@ -275,7 +281,7 @@ export class Utils {
       if (exn instanceof SkRuntimeExit) {
         exitCode = exn.code;
       } else {
-        throw exn
+        throw exn;
       }
     }
     if (this.stddebug.length > 0) {
@@ -283,26 +289,29 @@ export class Utils {
     }
     if (exitCode != 0 || this.stderr.length > 0) {
       let message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
-      message = message?.split("\n").map(line => {
-        if (line.startsWith("external:")) {
-          let id = parseInt(line.substring(9));
-          if (this.state.exceptions.has(id)) {
-            return this.state.exceptions.get(id)!.err;
+      message = message
+        ?.split("\n")
+        .map((line) => {
+          if (line.startsWith("external:")) {
+            let id = parseInt(line.substring(9));
+            if (this.state.exceptions.has(id)) {
+              return this.state.exceptions.get(id)!.err;
+            } else {
+              return "Unknown";
+            }
           } else {
-            return "Unknown";
+            return line;
           }
-        } else {
-          return line;
-        }
-      }).join("\n");
+        })
+        .join("\n");
       throw new SkRuntimeExit(exitCode, message?.trim());
     }
     return this.stdout.join("");
-  }
+  };
 
   importOptString = (strPtr: ptr) => {
-    if (strPtr > 0)  {
-      return this.importString(strPtr)
+    if (strPtr > 0) {
+      return this.importString(strPtr);
     }
     return null;
   };
@@ -314,7 +323,8 @@ export class Utils {
   exportString: (s: string) => ptr = (s: string) => {
     var data = new Uint8Array(this.exports.memory.buffer);
     // @ts-ignore
-    var i = 0, addr = this.exports.SKIP_Obstack_alloc(s.length * 4);
+    var i = 0,
+      addr = this.exports.SKIP_Obstack_alloc(s.length * 4);
     for (var ci = 0; ci != s.length; ci++) {
       var c = s.charCodeAt(ci);
       if (c < 128) {
@@ -322,21 +332,27 @@ export class Utils {
         continue;
       }
       if (c < 2048) {
-        data[addr + i++] = c >> 6 | 192;
+        data[addr + i++] = (c >> 6) | 192;
       } else {
         if (c > 0xd7ff && c < 0xdc00) {
           if (++ci >= s.length)
-            throw new Error('UTF-8 encode: incomplete surrogate pair');
+            throw new Error("UTF-8 encode: incomplete surrogate pair");
           var c2 = s.charCodeAt(ci);
           if (c2 < 0xdc00 || c2 > 0xdfff)
-            throw new Error('UTF-8 encode: second surrogate character 0x' + c2.toString(16) + ' at index ' + ci + ' out of range');
+            throw new Error(
+              "UTF-8 encode: second surrogate character 0x" +
+                c2.toString(16) +
+                " at index " +
+                ci +
+                " out of range",
+            );
           c = 0x10000 + ((c & 0x03ff) << 10) + (c2 & 0x03ff);
-          data[addr + i++] = c >> 18 | 240;
-          data[addr + i++] = c >> 12 & 63 | 128;
-        } else data[addr + i++] = c >> 12 | 224;
-        data[addr + i++] = c >> 6 & 63 | 128;
+          data[addr + i++] = (c >> 18) | 240;
+          data[addr + i++] = ((c >> 12) & 63) | 128;
+        } else data[addr + i++] = (c >> 12) | 224;
+        data[addr + i++] = ((c >> 6) & 63) | 128;
       }
-      data[addr + i++] = c & 63 | 128;
+      data[addr + i++] = (c & 63) | 128;
     }
     return this.exports.sk_string_create(addr, i);
   };
@@ -346,10 +362,14 @@ export class Utils {
     let copy = new Uint8Array(size);
     copy.set(skData);
     return copy;
-  }
+  };
   exportBytes = (view: Uint8Array) => {
     let skArray = this.exports.SKIP_createByteArray(view.byteLength);
-    let data = new Uint8Array(this.exports.memory.buffer, skArray, view.byteLength);
+    let data = new Uint8Array(
+      this.exports.memory.buffer,
+      skArray,
+      view.byteLength,
+    );
     data.set(view);
     return skArray;
   };
@@ -359,10 +379,14 @@ export class Utils {
     let copy = new Uint32Array(size);
     copy.set(skData);
     return copy;
-  }
+  };
   exportUInt32s(array: Uint32Array) {
     let skArray = this.exports.SKIP_createUInt32Array(array.length);
-    let skData = new Uint32Array(this.exports.memory.buffer, skArray, array.length);
+    let skData = new Uint32Array(
+      this.exports.memory.buffer,
+      skArray,
+      array.length,
+    );
     skData.set(array);
     return skArray;
   }
@@ -372,10 +396,14 @@ export class Utils {
     let copy = new Float64Array(size);
     copy.set(skData);
     return copy;
-  }
+  };
   exportFloats(array: Float64Array) {
     let skArray = this.exports.SKIP_createFloatArray(array.length);
-    let skData = new Float64Array(this.exports.memory.buffer, skArray, array.length);
+    let skData = new Float64Array(
+      this.exports.memory.buffer,
+      skArray,
+      array.length,
+    );
     skData.set(array);
     return skArray;
   }
@@ -383,7 +411,10 @@ export class Utils {
     return this.exports.SKIP_call0(fnId);
   };
   callWithException = (fnId: ptr, exception: Exception | null) => {
-    return this.exports.SKIP_callWithException(fnId, exception ? exception.id : 0);
+    return this.exports.SKIP_callWithException(
+      fnId,
+      exception ? exception.id : 0,
+    );
   };
   getBytesFromBuffer = (dataPtr: ptr, length: int) => {
     return new Uint8ClampedArray(this.exports.memory.buffer, dataPtr, length);
@@ -394,19 +425,28 @@ export class Utils {
     this.exports.SKIP_skfs_init(size);
     this.exports.SKIP_initializeSkip();
     this.exports.SKIP_skfs_end_of_init();
-  }
+  };
   etry = (f: ptr, exn_handler: ptr) => {
     try {
       return this.call(f);
     } catch (exn) {
-      let exception = (exn instanceof SkException) ? null : new Exception(exn as Error, this.state);
+      let exception =
+        exn instanceof SkException
+          ? null
+          : new Exception(exn as Error, this.state);
       return this.callWithException(exn_handler, exception);
     }
-  }
+  };
   ethrow = (skExc: ptr) => {
     if (this.env && this.env.onException) this.env.onException();
-    let skMessage = skExc != null && skExc != 0 ? this.exports.SKIP_getExceptionMessage(skExc) : null;
-    let message = skMessage != null && skMessage != 0 ? this.importString(skMessage) : "SKFS Internal error";
+    let skMessage =
+      skExc != null && skExc != 0
+        ? this.exports.SKIP_getExceptionMessage(skExc)
+        : null;
+    let message =
+      skMessage != null && skMessage != 0
+        ? this.importString(skMessage)
+        : "SKFS Internal error";
     if (message.startsWith("external:")) {
       let id = parseInt(message.substring(9));
       if (this.state.exceptions.has(id)) {
@@ -416,10 +456,10 @@ export class Utils {
       }
     }
     throw new SkException(message);
-  }
+  };
   deleteException = (actor: int) => {
     this.state.exceptions.delete(actor);
-  }
+  };
   getPersistentSize = () => this.exports.SKIP_get_persistent_size();
   getVersion = () => this.exports.SKIP_get_version();
   getMemoryBuffer = () => this.exports.memory.buffer;
@@ -443,7 +483,7 @@ export class Utils {
     }
     this.current_stdin++;
     return lineBuffer;
-  }
+  };
 
   getStdInChar = () => {
     if (this.current_stdin >= this.stdin.length) {
@@ -452,7 +492,7 @@ export class Utils {
     let result = this.stdin.charCodeAt(this.current_stdin);
     this.current_stdin++;
     return result;
-  }
+  };
 
   runWithGc = <T>(fn: () => T) => {
     let obsPos = this.exports.SKIP_new_Obstack();
@@ -464,7 +504,7 @@ export class Utils {
       this.exports.SKIP_destroy_Obstack(obsPos);
       throw ex;
     }
-  }
+  };
 
   getState<T>(name: string, create: () => T): T {
     let state = this.states.get(name);
@@ -487,7 +527,7 @@ export interface ToWasmManager {
 enum I18N {
   RAW,
   LOCALE,
-  FORMAT
+  FORMAT,
 }
 
 export interface Text {
@@ -507,8 +547,8 @@ export class Raw implements Text {
       fields: {
         type: I18N.RAW,
         value: this.text,
-      }
-    }
+      },
+    };
   };
 }
 
@@ -528,26 +568,26 @@ export class Locale implements Text {
         type: I18N.LOCALE,
         value: this.text,
         category: this.category,
-      }
-    }
+      },
+    };
   };
 }
 
 export const l = (text: string, category?: string) => {
-  return new Locale(text, category)
-}
+  return new Locale(text, category);
+};
 
 export const f = (format: Text | string, parameters: Array<Text | string>) => {
-  return new Format(format, parameters)
-}
+  return new Format(format, parameters);
+};
 
-export const check : (value: Text | string) => Text = (value: Text | string) => {
+export const check: (value: Text | string) => Text = (value: Text | string) => {
   if (value instanceof Text) {
-    return value as Text
+    return value as Text;
   } else {
-    return new Raw(value as string)
+    return new Raw(value as string);
   }
-}
+};
 
 export class Format implements Text {
   format: Text | string;
@@ -564,9 +604,9 @@ export class Format implements Text {
       fields: {
         type: I18N.FORMAT,
         pattern: check(this.format),
-        parameters: this.parameters.map(check)
-      }
-    }
+        parameters: this.parameters.map(check),
+      },
+    };
   };
 }
 
@@ -574,7 +614,7 @@ export function resolve(path: string) {
   let elements = import.meta.url.split("/");
   elements.pop();
   let pelems = path.split("/");
-  pelems.forEach(e => {
+  pelems.forEach((e) => {
     if (e == "..") {
       if (elements.length == 1) {
         throw new Error("Invalid path: " + path);
@@ -590,8 +630,7 @@ export function resolve(path: string) {
 
 export function trimEndChar(str: string, ch: string) {
   var end = str.length;
-  while(end > 0 && str[end - 1] === ch)
-    --end;
+  while (end > 0 && str[end - 1] === ch) --end;
   return end < str.length ? str.substring(0, end) : str;
 }
 
@@ -600,7 +639,7 @@ function relativeto(path: string, ref: string) {
     return path;
   }
   if (path.startsWith(ref)) {
-    ref = trimEndChar(ref, '/');
+    ref = trimEndChar(ref, "/");
     return "." + path.substring(ref.length);
   }
   return path;
@@ -609,83 +648,90 @@ function relativeto(path: string, ref: string) {
 export function humanSize(bytes: int) {
   const thresh = 1024;
   if (Math.abs(bytes) < thresh) {
-    return bytes + ' B';
+    return bytes + " B";
   }
 
-  const units = ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  const units = ["kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
   let u = -1;
   const r = 10 ** 1;
   do {
     bytes /= thresh;
     ++u;
-  } while (Math.round(Math.abs(bytes) * r) / r >= thresh && u < units.length - 1);
+  } while (
+    Math.round(Math.abs(bytes) * r) / r >= thresh &&
+    u < units.length - 1
+  );
 
-  return bytes.toFixed(1) + ' ' + units[u];
+  return bytes.toFixed(1) + " " + units[u];
 }
 
 export function loadWasm(
   buffer: ArrayBuffer,
   managers: Array<ToWasmManager>,
-  environment : Environment,
-  main ?: string,
+  environment: Environment,
+  main?: string,
 ) {
   let wasm = {};
-  let links = managers.map(manager => manager.prepare(wasm));
-  return WebAssembly.instantiate(buffer, { env: wasm }).then(
-    result => {
-      let instance = result.instance;
-      let exports = instance.exports as any;
-      let utils = new Utils(instance.exports, environment, main);
-      utils.init();
-      links.forEach(link => {
-        if (link) {
-          link.complete(utils, exports);
-        }
-      });
-      return {environment: environment, main: utils.main};
-    }
-  );
+  let links = managers.map((manager) => manager.prepare(wasm));
+  return WebAssembly.instantiate(buffer, { env: wasm }).then((result) => {
+    let instance = result.instance;
+    let exports = instance.exports as any;
+    let utils = new Utils(instance.exports, environment, main);
+    utils.init();
+    links.forEach((link) => {
+      if (link) {
+        link.complete(utils, exports);
+      }
+    });
+    return { environment: environment, main: utils.main };
+  });
 }
 
 async function start(
   modules: Array<string>,
   buffer: Uint8Array,
   environment: Environment,
-  main ?: string,
+  main?: string,
 ) {
-  let promises = modules.map(name => import(name).then(module => {
-    if (module.init) {
-      return module.init(environment)
-    } else {
-      return null
-    }
-  }))
+  let promises = modules.map((name) =>
+    import(name).then((module) => {
+      if (module.init) {
+        return module.init(environment);
+      } else {
+        return null;
+      }
+    }),
+  );
   let cs = await Promise.all(promises);
-  let ms = cs.filter(c => c != null);
+  let ms = cs.filter((c) => c != null);
   return await loadWasm(buffer, ms, environment, main);
 }
 
 export function isNode() {
-  return typeof process !== 'undefined' && process.release.name == "node";
+  return typeof process !== "undefined" && process.release.name == "node";
 }
 
-
-export async function loadEnv(envExtends : Map<string, Array<string>>, envVals?: Array<string>) {
-  const envModule = (isNode() ? "./sk_node.mjs" : "./sk_browser.mjs");
+export async function loadEnv(
+  envExtends: Map<string, Array<string>>,
+  envVals?: Array<string>,
+) {
+  const envModule = isNode() ? "./sk_node.mjs" : "./sk_browser.mjs";
   const environment = await import(envModule);
   let env = environment.environment(envVals) as Environment;
   let extensions = envExtends.get(env.name());
   if (extensions) {
-    (await Promise.all(extensions.map(ext => import(ext)))).map(ext => ext.complete(env));
+    (await Promise.all(extensions.map((ext) => import(ext)))).map((ext) =>
+      ext.complete(env),
+    );
   }
   return env;
 }
 
 export async function run(
   wasm64: string,
-  modules : Array<string>,
-  envs : Map<string, Array<string>>,
-  main ?: string,
+  modules: Array<string>,
+  envs: Map<string, Array<string>>,
+  main?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
   let env = await loadEnv(envs);
@@ -693,7 +739,7 @@ export async function run(
   if (getWasmSource) {
     buffer = await getWasmSource();
   } else {
-    let path = relativeto(resolve("./" + wasm64 + '.wasm'), env.rootPath());
+    let path = relativeto(resolve("./" + wasm64 + ".wasm"), env.rootPath());
     buffer = await env.fetch(path);
   }
   return await start(modules, buffer, env, main);

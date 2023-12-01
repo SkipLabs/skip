@@ -1,7 +1,6 @@
-import { test } from '@playwright/test';
-import { setup, apitests } from './apitests';
-import { webcrypto as crypto } from 'crypto';
-
+import { test } from "@playwright/test";
+import { setup, apitests } from "./apitests";
+import { webcrypto as crypto } from "crypto";
 
 function gatherCredential() {
   // @ts-ignore
@@ -16,5 +15,5 @@ function runServer(t, asWorker, suffix: string = "") {
   });
 }
 
-apitests(false).forEach(t => runServer(t, false));
-apitests(true).forEach(t => runServer(t, true, "_node_worker"));
+apitests(false).forEach((t) => runServer(t, false));
+apitests(true).forEach((t) => runServer(t, true, "_node_worker"));

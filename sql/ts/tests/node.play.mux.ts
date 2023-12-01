@@ -1,9 +1,9 @@
-import { test } from '@playwright/test';
-import { ms_tests } from './muxed_socket';
-import { webcrypto as crypto } from 'crypto';
-import { WebSocket } from 'ws';
-import * as util from 'util';
-import * as mu from './muxed_utils.mjs';
+import { test } from "@playwright/test";
+import { ms_tests } from "./muxed_socket";
+import { webcrypto as crypto } from "crypto";
+import { WebSocket } from "ws";
+import * as util from "util";
+import * as mu from "./muxed_utils.mjs";
 
 var encoder = new util.TextEncoder();
 
@@ -20,4 +20,4 @@ function runMS(t) {
   });
 }
 
-ms_tests().forEach(t => runMS(t));
+ms_tests().forEach((t) => runMS(t));

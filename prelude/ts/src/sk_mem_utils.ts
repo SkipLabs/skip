@@ -1,12 +1,11 @@
-
 import { int, FileSystem, Options, System } from "#std/sk_types";
 
 class File {
   contents: string;
   changes: string;
-  options ?: Options;
+  options?: Options;
   cursor: int;
-  onChange?: (contents: string) => void
+  onChange?: (contents: string) => void;
   withChange: boolean;
 
   constructor(options?: Options) {
@@ -36,9 +35,9 @@ class File {
 
   write(contents: string, append: boolean = false) {
     if (!this.options || !this.options.write) {
-      throw new Error("The file cannot be written")
+      throw new Error("The file cannot be written");
     }
-    if (this.contents && this.options.append || append) {
+    if ((this.contents && this.options.append) || append) {
       this.contents += contents;
     } else {
       this.contents = contents;
@@ -51,7 +50,7 @@ class File {
 
   read(len: int) {
     if (!this.options || !this.options.read) {
-      throw new Error("The file cannot be read")
+      throw new Error("The file cannot be read");
     }
     let clen = this.contents ? this.contents.length : 0;
     if (this.cursor >= clen) {
@@ -64,10 +63,9 @@ class File {
   }
 
   isOpen() {
-    return this.options != undefined
+    return this.options != undefined;
   }
 }
-
 
 export class MemFS implements FileSystem {
   private fileDescrs: Map<string, number>;
@@ -88,7 +86,7 @@ export class MemFS implements FileSystem {
     let existing = this.fileDescrs[filename];
     if (existing != undefined) {
       if (options.create && options.create_new) {
-        throw new Error("The file '" + filename + "' already exist")
+        throw new Error("The file '" + filename + "' already exist");
       }
       this.files[existing].open(options);
       return existing;
@@ -150,7 +148,7 @@ export class MemSys implements System {
   }
 
   setenv(name: string, value: string) {
-    this.env.set(name, value)
+    this.env.set(name, value);
   }
 
   getenv(name: string) {
