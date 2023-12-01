@@ -3,13 +3,13 @@
 ;; Author: Benno Stein <benno@skiplabs.io>
 ;; Maintainer: Benno Stein <benno@skiplabs.io>
 ;; Package-Requires: ((reformatter "0.7"))
-;; URL: https://github.com/skiplabs/skfs
+;; URL: https://github.com/skiplabs/skdb
 
 ;;; Defines a minor mode skip-format-on-save-mode
 ;;; (along with skip-format-buffer and skip-format-region functions)
 
 ;;; To enable by default, add this to your .emacs file:
-;;; (require 'skip-formatter "<path to skfs>/ide/emacs/skip-formatter.el")
+;;; (require 'skip-formatter "<path to skdb>/ide/emacs/skip-formatter.el")
 ;;; (add-hook 'skip-mode-hook 'skip-format-on-save-mode)
 
 ;;; Optionally, configure to run skfmt in a docker container by setting
