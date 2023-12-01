@@ -1,11 +1,9 @@
-
 import { int, Wrk } from "#std/sk_types";
 
 interface Payload {}
 
-
 export class Wrappable {
-  wrappedId ?: int;
+  wrappedId?: int;
 }
 
 class UnmanagedMessage extends Error {
@@ -17,22 +15,28 @@ class UnmanagedMessage extends Error {
 export class Function implements Payload {
   fn: string;
   parameters: Array<any>;
-  wrap?: { wrap: boolean, autoremove: boolean};
+  wrap?: { wrap: boolean; autoremove: boolean };
 
-  constructor(fn: string, parameters: Array<any>, wrap?: { wrap: boolean, autoremove: boolean}) {
+  constructor(
+    fn: string,
+    parameters: Array<any>,
+    wrap?: { wrap: boolean; autoremove: boolean },
+  ) {
     this.fn = fn;
     this.parameters = parameters;
     this.wrap = wrap;
   }
 
-
   static as(obj: object) {
     if (!("fn" in obj) || !("parameters" in obj)) return null;
-    let wrap = "wrap" in obj ? obj.wrap! as { wrap: boolean, autoremove: boolean} : undefined;
+    let wrap =
+      "wrap" in obj
+        ? (obj.wrap! as { wrap: boolean; autoremove: boolean })
+        : undefined;
     let fn = new Function(
       obj.fn! as string,
       obj.parameters! as Array<any>,
-      wrap
+      wrap,
     );
     return fn;
   }
@@ -48,16 +52,26 @@ export class Caller implements Payload {
   parameters: Array<any>;
   remove: boolean;
 
-  constructor(wrapped: number, fn: string, parameters: Array<any>, remove: boolean = false) {
+  constructor(
+    wrapped: number,
+    fn: string,
+    parameters: Array<any>,
+    remove: boolean = false,
+  ) {
     this.wrapped = wrapped;
     this.fn = fn;
     this.parameters = parameters;
     this.remove = remove;
   }
 
-
   static convert(obj: object) {
-    if (!("wrapped" in obj) ||  !("fn" in obj) || !("parameters" in obj) || !("remove" in obj)) return null;
+    if (
+      !("wrapped" in obj) ||
+      !("fn" in obj) ||
+      !("parameters" in obj) ||
+      !("remove" in obj)
+    )
+      return null;
     let fn = new Caller(
       obj.wrapped! as number,
       obj.fn! as string,
@@ -86,7 +100,6 @@ export class Return implements Payload {
     return new Return(obj.success! as boolean, obj.value!);
   }
 }
-
 
 export class MessageId {
   source: number;
@@ -179,7 +192,7 @@ export class PromiseWorker {
   private callbacks: Map<string, (...args: any[]) => any>;
   private subscriptions: Map<string, (...args: any[]) => void>;
 
-  post : (fn: Function) => Sender;
+  post: (fn: Function) => Sender;
   onMessage: (message: MessageEvent) => void;
 
   constructor(worker: Wrk) {
@@ -192,11 +205,11 @@ export class PromiseWorker {
     this.post = (fn: Function | Caller) => {
       let messageId = new MessageId(this.source, ++this.lastId);
       let subscribed = new Set<string>();
-      const parameters = fn.parameters.map(p => {
+      const parameters = fn.parameters.map((p) => {
         if (typeof p == "function") {
           let subscriptionId = new MessageId(this.source, ++this.lastId);
           let wfn = (result: Return) => p.apply(null, result.value);
-          let key =  asKey(subscriptionId);
+          let key = asKey(subscriptionId);
           this.subscriptions.set(key, wfn);
           subscribed.add(key);
           return subscriptionId;
@@ -207,27 +220,28 @@ export class PromiseWorker {
       fn.parameters = parameters;
       return new Sender(
         () => {
-          subscribed.forEach(key => this.subscriptions.delete(key))
+          subscribed.forEach((key) => this.subscriptions.delete(key));
         },
-        () => new Promise(function (resolve, reject) {
-          self.callbacks.set(asKey(messageId), (result: Return) => {
-            if (result.success) {
-              resolve(result.value);
-            } else if (result.value instanceof Error) {
-              reject(result.value);
-            } else {
-              reject(new Error(JSON.stringify(result.value)));
-            }
-          })
-          let message = new Message(messageId, fn);
-          self.worker.postMessage(message);
-        })
-      )
+        () =>
+          new Promise(function (resolve, reject) {
+            self.callbacks.set(asKey(messageId), (result: Return) => {
+              if (result.success) {
+                resolve(result.value);
+              } else if (result.value instanceof Error) {
+                reject(result.value);
+              } else {
+                reject(new Error(JSON.stringify(result.value)));
+              }
+            });
+            let message = new Message(messageId, fn);
+            self.worker.postMessage(message);
+          }),
+      );
     };
     this.onMessage = (message: MessageEvent) => {
       let data = Message.asReturn(message.data ?? message);
       if (!data) {
-        throw new UnmanagedMessage(message)
+        throw new UnmanagedMessage(message);
       } else {
         let result = data.payload as Return;
         let callback = this.callbacks.get(asKey(data.id));
@@ -242,17 +256,18 @@ export class PromiseWorker {
           return;
         }
         if (result.value instanceof Error) {
-            throw result.value;
-        } else throw new Error("Return with no callback" + JSON.stringify(data));
+          throw result.value;
+        } else
+          throw new Error("Return with no callback" + JSON.stringify(data));
       }
-    }
+    };
     this.worker.onMessage(this.onMessage);
   }
 }
 
 var runner: object;
 var wrappedId = 0;
-var wrapped = new Map<number, { value: any, autoremove: boolean }>();
+var wrapped = new Map<number, { value: any; autoremove: boolean }>();
 
 export interface Creator<T> {
   getName: () => string;
@@ -260,7 +275,11 @@ export interface Creator<T> {
   create: (...args: any[]) => Promise<T>;
 }
 
-export const onWorkerMessage = <T>(message: MessageEvent, post: (message: any) => void, creator: Creator<T>) => {
+export const onWorkerMessage = <T>(
+  message: MessageEvent,
+  post: (message: any) => void,
+  creator: Creator<T>,
+) => {
   let data = Message.asCaller(message);
   if (!data) {
     data = Message.asFunction(message);
@@ -268,73 +287,98 @@ export const onWorkerMessage = <T>(message: MessageEvent, post: (message: any) =
       post("Invalid worker message");
     } else {
       let fun = data.payload as Function;
-      let parameters = fun.parameters.map(p => {
+      let parameters = fun.parameters.map((p) => {
         const subscription = typeof p == "object" ? MessageId.as(p) : null;
         if (subscription) {
           return (...args: any[]) => {
-            post(new Message(subscription, new Return(true, args)))
-          }
+            post(new Message(subscription, new Return(true, args)));
+          };
         } else {
           return p;
         }
       });
       if (fun.fn == creator.getName()) {
         if (runner) {
-          post(new Message(data.id, new Return(false, creator.getType() + " already created")));
+          post(
+            new Message(
+              data.id,
+              new Return(false, creator.getType() + " already created"),
+            ),
+          );
         } else {
-          creator.create.apply(creator, parameters).then(
-            created => {
+          creator.create
+            .apply(creator, parameters)
+            .then((created) => {
               runner = created as object;
-              post(new Message(data!.id, new Return(true, null)))
-            }
-          ).catch(e => post(new Message(data!.id, new Return(false, e))))
+              post(new Message(data!.id, new Return(true, null)));
+            })
+            .catch((e) => post(new Message(data!.id, new Return(false, e))));
         }
       } else if (!runner) {
-        post(new Message(data.id, new Return(false, "Database must be created")));
+        post(
+          new Message(data.id, new Return(false, "Database must be created")),
+        );
       } else {
         let fn = runner[fun.fn];
         if (typeof fn !== "function") {
-          post(new Message(data.id, new Return(false, "Invalid database function " + fun.fn)));
+          post(
+            new Message(
+              data.id,
+              new Return(false, "Invalid database function " + fun.fn),
+            ),
+          );
         } else {
-          fn.apply(runner, parameters).then(
-            result => {
+          fn.apply(runner, parameters)
+            .then((result) => {
               if (fun.wrap && fun.wrap) {
                 let wId = wrappedId++;
-                wrapped.set(wId, { value: result, autoremove: fun.wrap.autoremove });
+                wrapped.set(wId, {
+                  value: result,
+                  autoremove: fun.wrap.autoremove,
+                });
                 if (result instanceof Wrappable) {
                   result.wrappedId = wId;
                 }
                 result = new Wrapped(wId);
               }
-              post(new Message(data!.id, new Return(true, result)))
-            }
-          ).catch(e => post(new Message(data!.id, new Return(false, e))))
+              post(new Message(data!.id, new Return(true, result)));
+            })
+            .catch((e) => post(new Message(data!.id, new Return(false, e))));
         }
       }
     }
   } else {
     let caller = data.payload as Caller;
-    let parameters = caller.parameters.map(p => {
+    let parameters = caller.parameters.map((p) => {
       const subscription = typeof p == "object" ? MessageId.as(p) : null;
       if (subscription) {
         return (...args: any[]) => {
-          post(new Message(subscription, new Return(true, args)))
-        }
+          post(new Message(subscription, new Return(true, args)));
+        };
       } else {
         return p;
       }
     });
     let obj = wrapped.get(caller.wrapped);
-    let fni = caller.fn == "" ? {fn: obj?.value, obj: null} : {fn: obj?.value[caller.fn] , obj: obj?.value};
+    let fni =
+      caller.fn == ""
+        ? { fn: obj?.value, obj: null }
+        : { fn: obj?.value[caller.fn], obj: obj?.value };
     if (typeof fni.fn !== "function") {
-      post(new Message(data.id, new Return(false, "Invalid function " + caller.fn)));
+      post(
+        new Message(
+          data.id,
+          new Return(false, "Invalid function " + caller.fn),
+        ),
+      );
     } else {
-      fni.fn.apply(fni.obj, parameters).then(
-        result => post(new Message(data!.id, new Return(true, result)))
-      ).catch(e => post(new Message(data!.id, new Return(false, e))))
+      fni.fn
+        .apply(fni.obj, parameters)
+        .then((result) => post(new Message(data!.id, new Return(true, result))))
+        .catch((e) => post(new Message(data!.id, new Return(false, e))));
     }
     if (obj?.autoremove || caller.remove) {
       wrapped.delete(caller.wrapped);
     }
   }
-}
+};

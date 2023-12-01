@@ -10,11 +10,11 @@ class WrkImpl implements Wrk {
 
   postMessage = (message: any) => {
     this.worker.postMessage(message);
-  }
+  };
 
   onMessage = (listener: (value: any) => void) => {
     this.worker.onmessage = listener;
-  }
+  };
 }
 
 class Env implements Environment {
@@ -39,7 +39,7 @@ class Env implements Environment {
     if (code != 0) {
       throw new Error("Error with code: " + code);
     }
-  }
+  };
   fs() {
     return this.fileSystem;
   }
@@ -51,8 +51,10 @@ class Env implements Environment {
   }
 
   fetch(path: string) {
-    return fetch(path).then(res => res.arrayBuffer()).then(ab => new Uint8Array(ab));
-  } 
+    return fetch(path)
+      .then((res) => res.arrayBuffer())
+      .then((ab) => new Uint8Array(ab));
+  }
   rootPath() {
     return "";
   }
@@ -62,21 +64,23 @@ class Env implements Environment {
     this.fileSystem = new MemFS();
     this.system = new MemSys();
     this.environment = environment ?? [];
-    let global = (typeof window == "undefined") ? self : window;
+    let global = typeof window == "undefined" ? self : window;
     this.timestamp = () => global.performance.now();
-    var decoder = new TextDecoder('utf8');
+    var decoder = new TextDecoder("utf8");
     this.decodeUTF8 = (utf8: ArrayBuffer) => decoder.decode(utf8);
     var encoder = new TextEncoder(); // always utf-8
     this.encodeUTF8 = (str: string) => encoder.encode(str);
-    this.base64Decode = (base64: string) => Uint8Array.from(atob(base64), c => c.charCodeAt(0));;
+    this.base64Decode = (base64: string) =>
+      Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
     this.storage = () => localStorage;
-    this.onException = () => { };
+    this.onException = () => {};
     this.createSocket = (uri: string) => new WebSocket(uri);
-    this.createWorker = (filename: string | URL, options?: WorkerOptions) => new WrkImpl(filename, options);
+    this.createWorker = (filename: string | URL, options?: WorkerOptions) =>
+      new WrkImpl(filename, options);
     this.crypto = () => crypto;
-  };
+  }
 }
 
 export function environment(environment?: Array<string>) {
-  return new Env(environment)
+  return new Env(environment);
 }

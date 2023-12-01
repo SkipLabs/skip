@@ -1,5 +1,10 @@
 import { Environment } from "#std/sk_types";
-import { SKDBMechanism, RemoteSKDB, Params, MirrorDefn } from "#skdb/skdb_types";
+import {
+  SKDBMechanism,
+  RemoteSKDB,
+  Params,
+  MirrorDefn,
+} from "#skdb/skdb_types";
 import { SKDBTable } from "#skdb/skdb_util";
 
 const npmVersion = "";
@@ -12,14 +17,14 @@ type ProtoQuery = {
   type: "query";
   query: string;
   format: "json" | "raw" | "csv";
-}
+};
 
 type ProtoQuerySchema = {
   type: "schema";
   name?: string;
   scope: "all" | "table" | "view";
   suffix?: string;
-}
+};
 
 type ProtoRequestTail = {
   type: "tail";
@@ -27,43 +32,49 @@ type ProtoRequestTail = {
   since: bigint;
   filterExpr: string;
   params: Params;
-}
+};
 
 type ProtoRequestTailBatch = {
-  type: "tailBatch"
+  type: "tailBatch";
   requests: ProtoRequestTail[];
-}
+};
 
 type ProtoPushPromise = {
   type: "pushPromise";
-}
+};
 
 type ProtoRequestCreateDb = {
   type: "createDatabase";
   name: string;
-}
+};
 
 type ProtoRequestCreateUser = {
   type: "createUser";
-}
+};
 
 type ProtoResponseCreds = {
   type: "credentials";
   accessKey: string;
   privateKey: Uint8Array;
-}
+};
 
-type ProtoCtrlMsg = ProtoQuery | ProtoQuerySchema | ProtoRequestCreateDb |
-  ProtoRequestTail | ProtoPushPromise | ProtoRequestCreateUser | ProtoRequestTailBatch
+type ProtoCtrlMsg =
+  | ProtoQuery
+  | ProtoQuerySchema
+  | ProtoRequestCreateDb
+  | ProtoRequestTail
+  | ProtoPushPromise
+  | ProtoRequestCreateUser
+  | ProtoRequestTailBatch;
 
 type ProtoData = {
   type: "data";
   payload: ArrayBuffer;
-}
+};
 
-type ProtoResponse = ProtoResponseCreds | ProtoData
+type ProtoResponse = ProtoResponseCreds | ProtoData;
 
-type ProtoMsg = ProtoCtrlMsg | ProtoResponse
+type ProtoMsg = ProtoCtrlMsg | ProtoResponse;
 
 function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
   switch (msg.type) {
@@ -72,8 +83,11 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
       const textEncoder = new TextEncoder();
-      const encodeResult = textEncoder.encodeInto(msg.query, uint8View.subarray(6));
-      dataView.setUint8(0, 0x1);  // type
+      const encodeResult = textEncoder.encodeInto(
+        msg.query,
+        uint8View.subarray(6),
+      );
+      dataView.setUint8(0, 0x1); // type
       const formatLookup = new Map([
         ["json", 0x0],
         ["raw", 0x1],
@@ -96,7 +110,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       const textEncoder = new TextEncoder();
       let encodeResult = textEncoder.encodeInto(name, uint8View.subarray(4));
       const suffixIdx = 4 + (encodeResult.written || 0);
-      dataView.setUint8(0, 0x4);  // type
+      dataView.setUint8(0, 0x4); // type
       const scopeLookup = new Map([
         ["all", 0x0],
         ["table", 0x1],
@@ -108,22 +122,32 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       }
       dataView.setUint8(1, scope);
       dataView.setUint16(2, encodeResult.written || 0, false);
-      encodeResult = textEncoder.encodeInto(suffix, uint8View.subarray(suffixIdx + 2));
+      encodeResult = textEncoder.encodeInto(
+        suffix,
+        uint8View.subarray(suffixIdx + 2),
+      );
       dataView.setUint16(suffixIdx, encodeResult.written || 0, false);
       return buf.slice(0, suffixIdx + 2 + (encodeResult.written || 0));
     }
     case "tail": {
-      const params = (msg.params instanceof Map) ? Object.fromEntries(msg.params) : msg.params;
+      const params =
+        msg.params instanceof Map ? Object.fromEntries(msg.params) : msg.params;
       const serialisedParams = JSON.stringify(params);
 
       const buf = new ArrayBuffer(
-        18 + msg.table.length * 4 + msg.filterExpr.length * 4 + serialisedParams.length * 4
+        18 +
+          msg.table.length * 4 +
+          msg.filterExpr.length * 4 +
+          serialisedParams.length * 4,
       );
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
       const textEncoder = new TextEncoder();
-      let encodeResult = textEncoder.encodeInto(msg.table, uint8View.subarray(14));
-      dataView.setUint8(0, 0x2);  // type
+      let encodeResult = textEncoder.encodeInto(
+        msg.table,
+        uint8View.subarray(14),
+      );
+      dataView.setUint8(0, 0x2); // type
       dataView.setBigUint64(4, msg.since, false);
       dataView.setUint16(12, encodeResult.written || 0, false);
 
@@ -144,12 +168,12 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       return buf.slice(0, paramsOffset + 2 + (encodeResult.written || 0));
     }
     case "tailBatch": {
-      const buffers = msg.requests.map(req => encodeProtoMsg(req));
+      const buffers = msg.requests.map((req) => encodeProtoMsg(req));
       const size = buffers.reduce((acc, b) => acc + b.byteLength, 0);
       const buf = new ArrayBuffer(4 + size);
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
-      dataView.setUint8(0, 0x7);  // type
+      dataView.setUint8(0, 0x7); // type
       dataView.setUint16(2, msg.requests.length, false);
       let offset = 4;
       for (const tail of buffers) {
@@ -161,7 +185,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
     case "pushPromise": {
       const buf = new ArrayBuffer(4);
       const dataView = new DataView(buf);
-      dataView.setUint8(0, 0x3);  // type
+      dataView.setUint8(0, 0x3); // type
       return buf.slice(0, 4);
     }
     case "createDatabase": {
@@ -169,15 +193,18 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
       const textEncoder = new TextEncoder();
-      const encodeResult = textEncoder.encodeInto(msg.name, uint8View.subarray(3));
-      dataView.setUint8(0, 0x5);  // type
+      const encodeResult = textEncoder.encodeInto(
+        msg.name,
+        uint8View.subarray(3),
+      );
+      dataView.setUint8(0, 0x5); // type
       dataView.setUint16(1, encodeResult.written || 0, false);
       return buf.slice(0, 3 + (encodeResult.written || 0));
     }
     case "createUser": {
       const buf = new ArrayBuffer(1);
       const dataView = new DataView(buf);
-      dataView.setUint8(0, 0x6);  // type
+      dataView.setUint8(0, 0x6); // type
       return buf;
     }
     case "credentials": {
@@ -187,7 +214,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       const buf = new ArrayBuffer(2 + msg.payload.byteLength);
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
-      dataView.setUint8(0, 0x0);  // type
+      dataView.setUint8(0, 0x0); // type
       // fin flag always set - we currently assume that JS doesn't stream chunks
       dataView.setUint8(1, 0x1);
       uint8View.set(new Uint8Array(msg.payload), 2);
@@ -240,21 +267,24 @@ class ProtoMsgDecoder {
         const accessKeyFixedWidthBytes = new Uint8Array(msg, 1, 27);
         // access key is a fixed-width but potentially zero-terminated string
         const zeroIndex = accessKeyFixedWidthBytes.findIndex((x) => x == 0);
-        const accessKeyBytes = accessKeyFixedWidthBytes.slice(0, zeroIndex < 0 ? 27 : zeroIndex)
+        const accessKeyBytes = accessKeyFixedWidthBytes.slice(
+          0,
+          zeroIndex < 0 ? 27 : zeroIndex,
+        );
         const decoder = new TextDecoder();
-        const accessKey = decoder.decode(accessKeyBytes)
+        const accessKey = decoder.decode(accessKeyBytes);
         this.msgs.push({
           type: "credentials",
           accessKey: accessKey,
           privateKey: new Uint8Array(msg, 28, 32),
-        })
+        });
         return true;
       }
       // streaming data
       case 0x0: {
         const flags = dv.getUint8(1);
         const fin = (flags & 0x01) === 1;
-        this.bufs.push(new Uint8Array(msg, 2))
+        this.bufs.push(new Uint8Array(msg, 2));
         if (fin) {
           this.msgs.push({
             type: "data",
@@ -327,14 +357,14 @@ class ResilientMuxedSocket {
   }
 
   async closeSocket(): Promise<void> {
-    const socket = this.socket ?? await this.getSocket();
+    const socket = this.socket ?? (await this.getSocket());
     this.socket = undefined;
     this.socketQueue = new Array();
     socket.closeSocket();
   }
 
   async errorSocket(errorCode: number, msg: string): Promise<void> {
-    const socket = this.socket ?? await this.getSocket();
+    const socket = this.socket ?? (await this.getSocket());
     this.socket = undefined;
     this.socketQueue = new Array();
     socket.errorSocket(errorCode, msg);
@@ -351,7 +381,7 @@ class ResilientMuxedSocket {
     env: Environment,
     policy: ResiliencyPolicy,
     uri: string,
-    creds: Creds
+    creds: Creds,
   ): Promise<ResilientMuxedSocket> {
     const socket = await MuxedSocket.connect(env, uri, creds);
     return new ResilientMuxedSocket(env, policy, uri, creds, socket);
@@ -363,8 +393,10 @@ class ResilientMuxedSocket {
 
   private constructor(
     env: Environment,
-    policy: ResiliencyPolicy, uri: string,
-    creds: Creds, initialSocket: MuxedSocket
+    policy: ResiliencyPolicy,
+    uri: string,
+    creds: Creds,
+    initialSocket: MuxedSocket,
   ) {
     this.env = env;
     this.attachSocket(initialSocket);
@@ -441,16 +473,20 @@ class ResilientMuxedSocket {
     oldSocket.errorSocket(0, "Socket suspected to have failed");
 
     const backoffMs = 500 + Math.random() * 1000;
-    await new Promise(resolve => setTimeout(resolve, backoffMs));
+    await new Promise((resolve) => setTimeout(resolve, backoffMs));
 
     while (true) {
       try {
-        const socket = await MuxedSocket.connect(this.env, this.uri, this.creds);
+        const socket = await MuxedSocket.connect(
+          this.env,
+          this.uri,
+          this.creds,
+        );
         this.attachSocket(socket);
         return;
       } catch (error) {
         const backoffMs = 500 + Math.random() * 1000;
-        await new Promise(resolve => setTimeout(resolve, backoffMs));
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
     }
   }
@@ -475,7 +511,6 @@ class ResilientMuxedSocket {
 }
 
 class ResilientStream {
-
   private socket: ResilientMuxedSocket;
   private stream?: Stream;
 
@@ -485,7 +520,7 @@ class ResilientStream {
     this.failureDetectionTimeout = timeout;
   }
 
-  onData?: (data: ArrayBuffer) => void
+  onData?: (data: ArrayBuffer) => void;
 
   onReconnect?: () => void;
 
@@ -494,7 +529,7 @@ class ResilientStream {
       this.stream.onClose = undefined;
       this.stream.onData = undefined;
       this.stream.onError = undefined;
-      this.stream.close()
+      this.stream.close();
       this.stream = undefined;
     }
     this.setFailureDetectionTimeout(undefined);
@@ -523,7 +558,7 @@ class ResilientStream {
     const failureThresholdMs = 60000;
     const timeout = setTimeout(() => {
       this.replaceFailedStream();
-    }, failureThresholdMs)
+    }, failureThresholdMs);
     // TODO: Fix the following error.
     // @ts-ignore
     this.setFailureDetectionTimeout(timeout);
@@ -581,41 +616,46 @@ class ResilientStream {
 enum MuxedSocketState {
   IDLE,
   AUTH_SENT,
-  CLOSING,                      // can receive data
-  CLOSEWAIT,                    // can send data
+  CLOSING, // can receive data
+  CLOSEWAIT, // can send data
   CLOSED,
 }
 
 type MuxAuth = {
   type: "auth";
-}
+};
 type MuxGoaway = {
   type: "goaway";
   lastStream: number;
   errorCode: number;
   msg: string;
-}
+};
 type MuxStreamData = {
   type: "data";
   stream: number;
   payload: ArrayBuffer;
-}
+};
 type MuxStreamClose = {
   type: "close";
   stream: number;
-}
+};
 type MuxStreamReset = {
   type: "reset";
   stream: number;
   errorCode: number;
   msg: string;
-}
-type MuxMessage = MuxAuth | MuxGoaway | MuxStreamData | MuxStreamClose | MuxStreamReset;
+};
+type MuxMessage =
+  | MuxAuth
+  | MuxGoaway
+  | MuxStreamData
+  | MuxStreamClose
+  | MuxStreamReset;
 
 export interface Creds {
-  accessKey: string,
-  privateKey: CryptoKey,
-  deviceUuid: string,
+  accessKey: string;
+  privateKey: CryptoKey;
+  deviceUuid: string;
 }
 
 export class MuxedSocket {
@@ -626,14 +666,14 @@ export class MuxedSocket {
   private env: Environment;
 
   // state
-  private state: MuxedSocketState = MuxedSocketState.IDLE
+  private state: MuxedSocketState = MuxedSocketState.IDLE;
   private reauthTimer?: any;
   // streams in the open or closing state
-  private activeStreams: Map<number, Stream> = new Map()
-  private serverStreamWatermark = 0
-  private nextStream = 1
+  private activeStreams: Map<number, Stream> = new Map();
+  private serverStreamWatermark = 0;
+  private nextStream = 1;
 
-  private healthChecks: Array<(isOk: boolean) => void> = new Array()
+  private healthChecks: Array<(isOk: boolean) => void> = new Array();
 
   // user facing interface /////////////////////////////////////////////////////
 
@@ -672,7 +712,7 @@ export class MuxedSocket {
           return;
       }
     };
-    return new Promise(fn)
+    return new Promise(fn);
   }
 
   closeSocket(): void {
@@ -681,7 +721,7 @@ export class MuxedSocket {
       case MuxedSocketState.CLOSED:
         break;
       case MuxedSocketState.IDLE:
-        this.activeStreams.clear()
+        this.activeStreams.clear();
         clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         this.socket.close();
@@ -690,7 +730,7 @@ export class MuxedSocket {
         for (const stream of this.activeStreams.values()) {
           stream.close();
         }
-        this.activeStreams.clear()
+        this.activeStreams.clear();
         clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         this.socket.close();
@@ -712,7 +752,7 @@ export class MuxedSocket {
       case MuxedSocketState.IDLE:
       case MuxedSocketState.CLOSING:
       case MuxedSocketState.CLOSED:
-        this.activeStreams.clear()
+        this.activeStreams.clear();
         clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         break;
@@ -724,10 +764,13 @@ export class MuxedSocket {
           // this is because erroring is not reciprocated by the server
           stream.onStreamError(errorCode, msg);
         }
-        this.activeStreams.clear()
+        this.activeStreams.clear();
         clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
-        const lastStream = Math.max(this.nextStream - 2, this.serverStreamWatermark);
+        const lastStream = Math.max(
+          this.nextStream - 2,
+          this.serverStreamWatermark,
+        );
         this.socket.send(this.encodeGoawayMsg(lastStream, errorCode, msg));
         this.socket.close(4000);
         break;
@@ -756,7 +799,10 @@ export class MuxedSocket {
   }
 
   static async connect(
-    env: Environment, uri: string, creds: Creds, timeoutMs: number = 60000
+    env: Environment,
+    uri: string,
+    creds: Creds,
+    timeoutMs: number = 60000,
   ): Promise<MuxedSocket> {
     return new Promise((resolve, reject) => {
       let failed = false;
@@ -766,9 +812,11 @@ export class MuxedSocket {
       }, timeoutMs);
       const socket = env.createSocket(uri);
       socket.binaryType = "arraybuffer";
-      socket.onclose = (_event) => reject(new Error("Socket closed before open"));
+      socket.onclose = (_event) =>
+        reject(new Error("Socket closed before open"));
       socket.onerror = (event) => reject(event);
-      socket.onmessage = (_event) => reject(new Error("Socket messaged before open"));
+      socket.onmessage = (_event) =>
+        reject(new Error("Socket messaged before open"));
       socket.onopen = (_event) => {
         clearTimeout(timeout);
         if (failed) {
@@ -776,10 +824,13 @@ export class MuxedSocket {
           return;
         }
         const muxSocket = new MuxedSocket(socket, creds, env);
-        socket.onclose = (event) => muxSocket.onSocketClose(event)
-        socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error")
-        socket.onmessage = (event) => muxSocket.onSocketMessage(event)
-        muxSocket.sendAuth().then(() => resolve(muxSocket)).catch((reason) => reject(reason))
+        socket.onclose = (event) => muxSocket.onSocketClose(event);
+        socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error");
+        socket.onmessage = (event) => muxSocket.onSocketMessage(event);
+        muxSocket
+          .sendAuth()
+          .then(() => resolve(muxSocket))
+          .catch((reason) => reject(reason));
       };
     });
   }
@@ -853,7 +904,7 @@ export class MuxedSocket {
         if (this.onClose) {
           this.onClose();
         }
-        this.activeStreams.clear()
+        this.activeStreams.clear();
         clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
         break;
@@ -874,7 +925,7 @@ export class MuxedSocket {
         if (this.onError) {
           this.onError(errorCode, msg);
         }
-        this.activeStreams.clear()
+        this.activeStreams.clear();
         clearTimeout(this.reauthTimer);
         this.state = MuxedSocketState.CLOSED;
     }
@@ -911,7 +962,11 @@ export class MuxedSocket {
             // reuse streams but this doesn't allow for creating them with
             // non-deterministic scheduling. if we don't accept them,
             // should probably send a stream reset
-            if (stream === undefined && msg.stream % 2 == 0 && msg.stream > this.serverStreamWatermark) {
+            if (
+              stream === undefined &&
+              msg.stream % 2 == 0 &&
+              msg.stream > this.serverStreamWatermark
+            ) {
               // new server-initiated stream
               this.serverStreamWatermark = msg.stream;
               stream = new Stream(this, msg.stream);
@@ -930,7 +985,9 @@ export class MuxedSocket {
             }
             break;
           case "reset":
-            this.activeStreams.get(msg.stream)?.onStreamError(msg.errorCode, msg.msg);
+            this.activeStreams
+              .get(msg.stream)
+              ?.onStreamError(msg.errorCode, msg.msg);
             this.activeStreams.delete(msg.stream);
             break;
           default:
@@ -953,7 +1010,7 @@ export class MuxedSocket {
         this.state = MuxedSocketState.AUTH_SENT;
         clearTimeout(this.reauthTimer);
         this.reauthTimer = setTimeout(() => {
-          this.sendAuth()
+          this.sendAuth();
         }, this.reauthTimeoutMs);
         break;
       case MuxedSocketState.CLOSING:
@@ -963,34 +1020,39 @@ export class MuxedSocket {
     }
   }
 
-  private static async encodeAuthMsg(creds: Creds, env: Environment): Promise<ArrayBuffer> {
+  private static async encodeAuthMsg(
+    creds: Creds,
+    env: Environment,
+  ): Promise<ArrayBuffer> {
     const clientVersion = "js-" + npmVersion;
     const crypto = env.crypto();
     const enc = new TextEncoder();
     const buf = new ArrayBuffer(140 + clientVersion.length);
     const uint8View = new Uint8Array(buf);
     const dataView = new DataView(buf);
-    const now = (new Date()).toISOString()
+    const now = new Date().toISOString();
     const nonce = uint8View.subarray(35, 43);
-    crypto.getRandomValues(nonce)
+    crypto.getRandomValues(nonce);
     const b64nonce = btoa(String.fromCharCode(...nonce));
-    const bytesToSign = enc.encode("auth" + creds.accessKey + now + b64nonce)
-    const sig = await crypto.subtle.sign(
-      "HMAC",
-      creds.privateKey,
-      bytesToSign
-    )
+    const bytesToSign = enc.encode("auth" + creds.accessKey + now + b64nonce);
+    const sig = await crypto.subtle.sign("HMAC", creds.privateKey, bytesToSign);
 
-    dataView.setUint8(0, 0x0);  // type and stream
-    dataView.setUint8(4, 0x0);  // version
-    const encodeAccessKey = enc.encodeInto(creds.accessKey, uint8View.subarray(8));
+    dataView.setUint8(0, 0x0); // type and stream
+    dataView.setUint8(4, 0x0); // version
+    const encodeAccessKey = enc.encodeInto(
+      creds.accessKey,
+      uint8View.subarray(8),
+    );
     if (!encodeAccessKey.written || encodeAccessKey.written > 27) {
-      throw new Error("Unable to encode access key")
+      throw new Error("Unable to encode access key");
     }
     uint8View.set(new Uint8Array(sig), 43);
-    const encodeDeviceId = enc.encodeInto(creds.deviceUuid, uint8View.subarray(75));
+    const encodeDeviceId = enc.encodeInto(
+      creds.deviceUuid,
+      uint8View.subarray(75),
+    );
     if (!encodeDeviceId.written || encodeDeviceId.written != 36) {
-      throw new Error("Unable to encode device id")
+      throw new Error("Unable to encode device id");
     }
     let pos = 112;
     const encodeIsoDate = enc.encodeInto(now, uint8View.subarray(pos));
@@ -1005,16 +1067,23 @@ export class MuxedSocket {
       default:
         throw new Error("Unexpected ISO date length");
     }
-    const encodeClientVersion = enc.encodeInto(clientVersion, uint8View.subarray(pos + 1));
+    const encodeClientVersion = enc.encodeInto(
+      clientVersion,
+      uint8View.subarray(pos + 1),
+    );
     if (encodeClientVersion.written && encodeClientVersion.written > 255) {
-      throw new Error("Client version too long to encode")
+      throw new Error("Client version too long to encode");
     }
     dataView.setUint8(pos, encodeClientVersion.written || 0);
     pos = pos + 1 + (encodeClientVersion.written || 0);
     return buf.slice(0, pos);
   }
 
-  private encodeGoawayMsg(lastStream: number, errorCode: number, msg: string): ArrayBuffer {
+  private encodeGoawayMsg(
+    lastStream: number,
+    errorCode: number,
+    msg: string,
+  ): ArrayBuffer {
     if (lastStream >= 2 ** 24) {
       throw new Error("Cannot encode lastStream");
     }
@@ -1023,7 +1092,7 @@ export class MuxedSocket {
     const textEncoder = new TextEncoder();
     const encodeResult = textEncoder.encodeInto(msg, uint8View.subarray(16));
     const dataView = new DataView(buf);
-    dataView.setUint8(0, 0x1);  // type
+    dataView.setUint8(0, 0x1); // type
     dataView.setUint32(4, lastStream, false);
     dataView.setUint32(8, errorCode, false);
     dataView.setUint32(12, encodeResult.written || 0, false);
@@ -1033,14 +1102,14 @@ export class MuxedSocket {
   private encodePingMsg(): ArrayBuffer {
     const buf = new ArrayBuffer(4);
     const dataView = new DataView(buf);
-    dataView.setUint8(0, 0x5);  // type
+    dataView.setUint8(0, 0x5); // type
     return buf;
   }
 
   private encodePongMsg(): ArrayBuffer {
     const buf = new ArrayBuffer(4);
     const dataView = new DataView(buf);
-    dataView.setUint8(0, 0x6);  // type
+    dataView.setUint8(0, 0x6); // type
     return buf;
   }
 
@@ -1051,7 +1120,7 @@ export class MuxedSocket {
     const buf = new ArrayBuffer(4 + data.byteLength);
     const dataView = new DataView(buf);
     const uint8View = new Uint8Array(buf);
-    dataView.setUint32(0, 0x2 << 24 | stream, false);  // type and stream id
+    dataView.setUint32(0, (0x2 << 24) | stream, false); // type and stream id
     uint8View.set(new Uint8Array(data), 4);
     return buf;
   }
@@ -1062,11 +1131,15 @@ export class MuxedSocket {
     }
     const buf = new ArrayBuffer(4);
     const dataView = new DataView(buf);
-    dataView.setUint32(0, 0x3 << 24 | stream, false);  // type and stream id
+    dataView.setUint32(0, (0x3 << 24) | stream, false); // type and stream id
     return buf;
   }
 
-  private encodeStreamResetMsg(stream: number, errorCode: number, msg: string): ArrayBuffer {
+  private encodeStreamResetMsg(
+    stream: number,
+    errorCode: number,
+    msg: string,
+  ): ArrayBuffer {
     if (stream >= 2 ** 24) {
       throw new Error("Cannot encode stream");
     }
@@ -1075,7 +1148,7 @@ export class MuxedSocket {
     const uint8View = new Uint8Array(buf);
     const dataView = new DataView(buf);
 
-    dataView.setUint32(0, 0x4 << 24 | stream, false);  // type and stream id
+    dataView.setUint32(0, (0x4 << 24) | stream, false); // type and stream id
     dataView.setUint32(4, errorCode, false);
     const encodeResult = textEncoder.encodeInto(msg, uint8View.subarray(12));
     dataView.setUint32(8, encodeResult.written || 0, false);
@@ -1086,14 +1159,16 @@ export class MuxedSocket {
     const dv = new DataView(msg);
     const typeAndStream = dv.getUint32(0, false);
     const type = typeAndStream >>> 24;
-    const stream = typeAndStream & 0xFFFFFF;
+    const stream = typeAndStream & 0xffffff;
     switch (type) {
-      case 0: {                   // auth
+      case 0: {
+        // auth
         return {
           type: "auth",
         };
       }
-      case 1: {                   // goaway
+      case 1: {
+        // goaway
         const msgLength = dv.getUint32(12, false);
         const errorMsgBytes = new Uint8Array(msg, 16, msgLength);
         const td = new TextDecoder();
@@ -1105,20 +1180,23 @@ export class MuxedSocket {
           msg: errorMsg,
         };
       }
-      case 2: {                   // stream data
+      case 2: {
+        // stream data
         return {
           type: "data",
           stream: stream,
           payload: msg.slice(4),
         };
       }
-      case 3: {                   // stream close
+      case 3: {
+        // stream close
         return {
           type: "close",
           stream: stream,
         };
       }
-      case 4: {                   // stream reset
+      case 4: {
+        // stream reset
         const msgLength = dv.getUint32(8, false);
         const errorMsgBytes = new Uint8Array(msg, 12, msgLength);
         const td = new TextDecoder();
@@ -1130,7 +1208,8 @@ export class MuxedSocket {
           msg: errorMsg,
         };
       }
-      case 5: {                   // ping
+      case 5: {
+        // ping
         if (stream != 0) {
           return null;
         }
@@ -1146,7 +1225,8 @@ export class MuxedSocket {
         }
         return null;
       }
-      case 6: {                   // pong
+      case 6: {
+        // pong
         if (stream != 0) {
           return null;
         }
@@ -1170,17 +1250,17 @@ enum StreamState {
 
 class Stream {
   // constants
-  private socket: MuxedSocket
-  private streamId: number
+  private socket: MuxedSocket;
+  private streamId: number;
 
   // state
   private state: StreamState = StreamState.OPEN;
 
   // user facing interface ///////////////////////////////////
 
-  onClose?: () => void
-  onError?: (errorCode: number, msg: string) => void
-  onData?: (data: ArrayBuffer) => void
+  onClose?: () => void;
+  onError?: (errorCode: number, msg: string) => void;
+  onData?: (data: ArrayBuffer) => void;
 
   close(): void {
     switch (this.state) {
@@ -1226,8 +1306,8 @@ class Stream {
   // interface used by MuxedSocket ///////////////////////////
 
   constructor(socket: MuxedSocket, streamId: number) {
-    this.socket = socket
-    this.streamId = streamId
+    this.socket = socket;
+    this.streamId = streamId;
   }
 
   onStreamClose(): boolean {
@@ -1286,7 +1366,7 @@ export async function connect(
   db: string,
   creds: Creds,
 ): Promise<RemoteSKDB> {
-  return SKDBServer.connect(env, client, endpoint, db, creds)
+  return SKDBServer.connect(env, client, endpoint, db, creds);
 }
 
 /* ***************************************************************************/
@@ -1298,7 +1378,7 @@ export async function connect(
 const server_response_suffix = "__skdb_mirror_feedback";
 const serverResponseTable = (tableName: string) => {
   return `${tableName}${server_response_suffix}`;
-}
+};
 
 class SKDBServer implements RemoteSKDB {
   private env: Environment;
@@ -1306,10 +1386,10 @@ class SKDBServer implements RemoteSKDB {
   private connection: ResilientMuxedSocket;
   private creds: Creds;
   private replicationUid: string = "";
-  private localTailSession: string|undefined = undefined;
+  private localTailSession: string | undefined = undefined;
   private mirroredTables: Set<string> = new Set();
   private mirrorStreams: Set<ResilientStream> = new Set();
-  private onRebootFn ?: () => void;
+  private onRebootFn?: () => void;
 
   private constructor(
     env: Environment,
@@ -1333,17 +1413,17 @@ class SKDBServer implements RemoteSKDB {
     const uri = SKDBServer.getDbSocketUri(endpoint, db);
 
     const policy: ResiliencyPolicy = {
-      notifyFailedStream() { },
+      notifyFailedStream() {},
       async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
         // perform an active check
         return !socket.isSocketResponsive();
-      }
+      },
     };
     const conn = await ResilientMuxedSocket.connect(env, policy, uri, creds);
 
     const server = new SKDBServer(env, client, conn, creds);
     server.replicationUid = client.getReplicationUid(creds.deviceUuid);
-    return server
+    return server;
   }
 
   async connectedAs(): Promise<string> {
@@ -1368,26 +1448,35 @@ class SKDBServer implements RemoteSKDB {
     throw new Error(`Unexpected response: ${response}`);
   }
 
-  private deliverDataTransferProtoMsg(msg: ProtoMsg|null, deliver: (string) => void) {
+  private deliverDataTransferProtoMsg(
+    msg: ProtoMsg | null,
+    deliver: (string) => void,
+  ) {
     const txtPayload = this.env.decodeUTF8(this.strictCastData(msg).payload);
-    const rebootSignalled = txtPayload.split("\n").find(line => line.trim() == ":reboot");
+    const rebootSignalled = txtPayload
+      .split("\n")
+      .find((line) => line.trim() == ":reboot");
     if (rebootSignalled) {
       this.close();
       this.callOnReboot();
       return;
     }
-    deliver(txtPayload)
+    deliver(txtPayload);
   }
 
   private callOnReboot(): void {
     if (this.onRebootFn) {
       this.onRebootFn();
     } else {
-      throw new Error("Server signalled client should cold start to avoid diverging.");
+      throw new Error(
+        "Server signalled client should cold start to avoid diverging.",
+      );
     }
   }
 
-  private async makeRequest(request: ProtoCtrlMsg): Promise<ProtoResponse | null> {
+  private async makeRequest(
+    request: ProtoCtrlMsg,
+  ): Promise<ProtoResponse | null> {
     const stream = await this.connection.openStream();
     const decoder = new ProtoMsgDecoder();
     return new Promise((resolve, reject) => {
@@ -1396,7 +1485,10 @@ class SKDBServer implements RemoteSKDB {
       };
       stream.onClose = () => {
         const msg = decoder.tryPop();
-        if (msg === null || msg.type !== "credentials" && msg.type !== "data") {
+        if (
+          msg === null ||
+          (msg.type !== "credentials" && msg.type !== "data")
+        ) {
           resolve(null);
           return;
         }
@@ -1409,8 +1501,8 @@ class SKDBServer implements RemoteSKDB {
   }
 
   private async makeStringRequest(request: ProtoCtrlMsg): Promise<string> {
-    return this.makeRequest(request).then(
-      result => this.env.decodeUTF8(this.strictCastData(result).payload)
+    return this.makeRequest(request).then((result) =>
+      this.env.decodeUTF8(this.strictCastData(result).payload),
     );
   }
 
@@ -1423,35 +1515,37 @@ class SKDBServer implements RemoteSKDB {
     let resolved = false;
 
     const buildTailRequest = () => {
-      const reqs: ProtoRequestTail[] = mirrorDefs.map(def => {
-        const tableName = (typeof def === "string") ? def : def.table;
-        const filterExpr = (typeof def === "string") ? "" : (def.filterExpr || "");
+      const reqs: ProtoRequestTail[] = mirrorDefs.map((def) => {
+        const tableName = typeof def === "string" ? def : def.table;
+        const filterExpr = typeof def === "string" ? "" : def.filterExpr || "";
         return {
           type: "tail",
           table: tableName,
           since: this.client.watermark(this.replicationUid, tableName),
           filterExpr: filterExpr,
           params: new Map(),
-        }
+        };
       });
       return encodeProtoMsg({
         type: "tailBatch",
         requests: reqs,
       });
-    }
+    };
 
     return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
           const msg = decoder.pop();
-          let resolveSignalled = false
-          this.deliverDataTransferProtoMsg(msg, payload => {
+          let resolveSignalled = false;
+          this.deliverDataTransferProtoMsg(msg, (payload) => {
             if (!resolved) {
               // a non-zero checkpoint indicates that we have received a fully consistent
               // snapshot of the remote table, so should resolve the promise
-              resolveSignalled = payload.split("\n").find((line: string) => line.match(/^:[1-9]/g));
+              resolveSignalled = payload
+                .split("\n")
+                .find((line: string) => line.match(/^:[1-9]/g));
             }
-            return client.writeCsv(payload, this.replicationUid)
+            return client.writeCsv(payload, this.replicationUid);
           });
           if (!resolved && resolveSignalled) {
             resolved = true;
@@ -1459,10 +1553,10 @@ class SKDBServer implements RemoteSKDB {
           }
         }
         stream.expectingData();
-      }
+      };
 
       stream.onReconnect = () => {
-        stream.send(buildTailRequest())
+        stream.send(buildTailRequest());
         stream.expectingData();
       };
 
@@ -1480,13 +1574,13 @@ class SKDBServer implements RemoteSKDB {
     stream.onData = (data) => {
       if (decoder.push(data)) {
         const msg = decoder.pop();
-        this.deliverDataTransferProtoMsg(msg, payload => {
+        this.deliverDataTransferProtoMsg(msg, (payload) => {
           // we only expect acks back in the form of checkpoints.
           // let's store these as a watermark against the table.
           client.writeCsv(payload, this.replicationUid);
         });
       }
-    }
+    };
 
     const request: ProtoPushPromise = {
       type: "pushPromise",
@@ -1496,11 +1590,13 @@ class SKDBServer implements RemoteSKDB {
 
     let fileName = tables.join("_") + "_" + this.creds.accessKey;
 
-    client.watchFile(fileName, payload => {
-      stream.send(encodeProtoMsg({
-        type: "data",
-        payload: payload,
-      }));
+    client.watchFile(fileName, (payload) => {
+      stream.send(
+        encodeProtoMsg({
+          type: "data",
+          payload: payload,
+        }),
+      );
       stream.expectingData();
     });
 
@@ -1510,18 +1606,22 @@ class SKDBServer implements RemoteSKDB {
       stream.send(encodeProtoMsg(request));
       const diff = client.diff(
         session,
-        new Map(tables.map(table => [table, client.watermark(
-          this.replicationUid,
-          serverResponseTable(table)
-        )])),
+        new Map(
+          tables.map((table) => [
+            table,
+            client.watermark(this.replicationUid, serverResponseTable(table)),
+          ]),
+        ),
       );
       if (!diff) {
         return;
       }
-      stream.send(encodeProtoMsg({
-        type: "data",
-        payload: diff,
-      }));
+      stream.send(
+        encodeProtoMsg({
+          type: "data",
+          payload: diff,
+        }),
+      );
       stream.expectingData();
     };
 
@@ -1540,10 +1640,15 @@ class SKDBServer implements RemoteSKDB {
       if (this.localTailSession === undefined) continue;
       const diff = this.client.diff(
         this.localTailSession,
-        new Map([[table, this.client.watermark(
-          this.replicationUid,
-          serverResponseTable(table)
-        )]]),
+        new Map([
+          [
+            table,
+            this.client.watermark(
+              this.replicationUid,
+              serverResponseTable(table),
+            ),
+          ],
+        ]),
       );
       if (diff !== null) {
         acc.add(table);
@@ -1554,18 +1659,16 @@ class SKDBServer implements RemoteSKDB {
 
   async mirror(...tables: MirrorDefn[]): Promise<void> {
     if (tables.length < 1) {
-      throw new Error("Must specify at least one table to mirror")
+      throw new Error("Must specify at least one table to mirror");
     }
 
     const setupTable = async (tableName: string) => {
-      let isViewOnRemote = await this.viewSchema(tableName) != "";
+      let isViewOnRemote = (await this.viewSchema(tableName)) != "";
 
-      const [createTable, createResponseTable] = await Promise.all(
-        [
-          this.tableSchema(tableName),
-          this.tableSchema(tableName, server_response_suffix),
-        ]
-      );
+      const [createTable, createResponseTable] = await Promise.all([
+        this.tableSchema(tableName),
+        this.tableSchema(tableName, server_response_suffix),
+      ]);
       if (!this.client.tableExists(tableName)) {
         this.client.exec(createTable);
         if (isViewOnRemote) {
@@ -1573,7 +1676,8 @@ class SKDBServer implements RemoteSKDB {
         }
       }
 
-      if (!isViewOnRemote) {// if we'll be mirroring back to the server
+      if (!isViewOnRemote) {
+        // if we'll be mirroring back to the server
         if (!this.client.tableExists(serverResponseTable(tableName))) {
           this.client.exec(createResponseTable);
         }
@@ -1594,14 +1698,16 @@ class SKDBServer implements RemoteSKDB {
     this.mirrorStreams.clear();
     this.mirroredTables.clear();
 
-    const tableNames = tables.map(
-      mirrorDef => (typeof mirrorDef === "string") ? mirrorDef : mirrorDef.table
+    const tableNames = tables.map((mirrorDef) =>
+      typeof mirrorDef === "string" ? mirrorDef : mirrorDef.table,
     );
 
-    await Promise.all(tableNames.map(tableName => setupTable(tableName)));
+    await Promise.all(tableNames.map((tableName) => setupTable(tableName)));
 
     if (this.mirroredTables.size > 0) {
-      this.localTailSession = await this.establishLocalTail(Array.from(this.mirroredTables));
+      this.localTailSession = await this.establishLocalTail(
+        Array.from(this.mirroredTables),
+      );
     }
 
     // TODO: changing the expression on a table that has already
@@ -1615,15 +1721,16 @@ class SKDBServer implements RemoteSKDB {
     if (params instanceof Map) {
       params = Object.fromEntries(params);
     }
-    stdin = JSON.stringify(params) + '\n' + stdin;
+    stdin = JSON.stringify(params) + "\n" + stdin;
     return this.makeStringRequest({
       type: "query",
       query: stdin,
       format: "json",
-    }).then(result => {
-      const rows = result.split("\n")
-	.filter((x) => x != "")
-	.map((x) => JSON.parse(x));
+    }).then((result) => {
+      const rows = result
+        .split("\n")
+        .filter((x) => x != "")
+        .map((x) => JSON.parse(x));
       return new SKDBTable(...rows);
     });
   }
@@ -1657,7 +1764,7 @@ class SKDBServer implements RemoteSKDB {
     return this.makeRequest({
       type: "createDatabase",
       name: dbName,
-    }).then(result => {
+    }).then((result) => {
       if (result === null || result.type !== "credentials") {
         throw new Error("Unexpected response.");
       }
@@ -1668,7 +1775,7 @@ class SKDBServer implements RemoteSKDB {
   async createUser(): Promise<ProtoResponseCreds> {
     return this.makeRequest({
       type: "createUser",
-    }).then(result => {
+    }).then((result) => {
       if (result === null || result.type !== "credentials") {
         throw new Error("Unexpected response.");
       }
@@ -1678,5 +1785,5 @@ class SKDBServer implements RemoteSKDB {
 
   async onReboot(fn: () => void) {
     this.onRebootFn = fn;
-  };
+  }
 }
