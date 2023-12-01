@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react'
-import { createContext, useContext } from 'react';
-import type { SKDB } from 'skdb'
+import { useState, useEffect } from "react";
+import { createContext, useContext } from "react";
+import type { SKDB } from "skdb";
 
-export const SKDBContext = createContext<SKDB|undefined>(undefined);
+export const SKDBContext = createContext<SKDB | undefined>(undefined);
 
-export function SKDBProvider({ children, skdb }: { children: React.ReactNode, skdb: SKDB }) {
-  return (
-    <SKDBContext.Provider value={skdb}>
-      {children}
-    </SKDBContext.Provider>
-  )
+export function SKDBProvider({
+  children,
+  skdb,
+}: {
+  children: React.ReactNode;
+  skdb: SKDB;
+}) {
+  return <SKDBContext.Provider value={skdb}>{children}</SKDBContext.Provider>;
 }
 
 export function useSKDB(): SKDB {
@@ -37,14 +39,16 @@ export function useQuery(
   useEffect(() => {
     let removeQuery = false;
     const closeable = { close: () => {} };
-    skdb.watch(query, params, (rows: Array<any>) => {
-      setState(rows);
-    }).then(handle => {
-      if (removeQuery) {
-        return handle.close();
-      }
-      closeable.close = handle.close
-    });
+    skdb
+      .watch(query, params, (rows: Array<any>) => {
+        setState(rows);
+      })
+      .then((handle) => {
+        if (removeQuery) {
+          return handle.close();
+        }
+        closeable.close = handle.close;
+      });
     return () => {
       removeQuery = true;
       closeable.close();

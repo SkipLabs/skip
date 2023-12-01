@@ -5,7 +5,6 @@ var post = (message: any) => {
   parentPort?.postMessage(message);
 };
 
+var onMessage = (message: MessageEvent) => onDbWorkerMessage(message, post);
 
-var onMessage = (message: MessageEvent) => onDbWorkerMessage(message, post)
-
-parentPort?.on('message', onMessage);
+parentPort?.on("message", onMessage);

@@ -1,5 +1,13 @@
 import { Environment, FileSystem } from "#std/sk_types";
-import { SKDBMechanism, SKDB, RemoteSKDB, SKDBHandle, Params, SKDBSync, MirrorDefn } from "#skdb/skdb_types";
+import {
+  SKDBMechanism,
+  SKDB,
+  RemoteSKDB,
+  SKDBHandle,
+  Params,
+  SKDBSync,
+  MirrorDefn,
+} from "#skdb/skdb_types";
 import { SKDBTable } from "#skdb/skdb_util";
 import { connect } from "#skdb/skdb_orchestration";
 
@@ -8,26 +16,41 @@ class SKDBMechanismImpl implements SKDBMechanism {
   watermark: (replicationUid: string, table: string) => bigint;
   watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
   getReplicationUid: (deviceUuid: string) => string;
-  subscribe: (replicationUid: string, tables: string[], updateFile: string) => string;
+  subscribe: (
+    replicationUid: string,
+    tables: string[],
+    updateFile: string,
+  ) => string;
   unsubscribe: (session: string) => void;
-  diff: (session: string, watermarks: Map<string, bigint>) => ArrayBuffer | null;
+  diff: (
+    session: string,
+    watermarks: Map<string, bigint>,
+  ) => ArrayBuffer | null;
   assertCanBeMirrored: (tableName: string) => void;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => SKDBTable;
   toggleView: (tableName: string) => void;
 
-  constructor(client: SKDBSyncImpl, fs: FileSystem, utf8Encode: (v: string) => Uint8Array) {
-    this.tableExists = (tableName: string) => client.tableSchema(tableName) != "";
+  constructor(
+    client: SKDBSyncImpl,
+    fs: FileSystem,
+    utf8Encode: (v: string) => Uint8Array,
+  ) {
+    this.tableExists = (tableName: string) =>
+      client.tableSchema(tableName) != "";
     this.exec = (query: string) => client.exec(query);
-    this.assertCanBeMirrored = (tableName: string) => client.assertCanBeMirrored(tableName);
+    this.assertCanBeMirrored = (tableName: string) =>
+      client.assertCanBeMirrored(tableName);
     this.watermark = (replicationId: string, table: string) => {
-      return BigInt(client.runLocal(["watermark", "--source", replicationId, table], ""));
+      return BigInt(
+        client.runLocal(["watermark", "--source", replicationId, table], ""),
+      );
     };
     this.writeCsv = (payload: string, source: string) => {
-      return client.runLocal(["write-csv", "--source", source], payload + '\n');
+      return client.runLocal(["write-csv", "--source", source], payload + "\n");
     };
     this.watchFile = (fileName: string, fn: (change: ArrayBuffer) => void) => {
-      fs.watchFile(fileName, change => {
+      fs.watchFile(fileName, (change) => {
         if (change == "") {
           return;
         }
@@ -35,35 +58,39 @@ class SKDBMechanismImpl implements SKDBMechanism {
       });
     };
     this.getReplicationUid = (deviceUuid: string) => {
-      return client.runLocal(["replication-id", deviceUuid], "").trim()
+      return client.runLocal(["replication-id", deviceUuid], "").trim();
     };
-    this.subscribe = (replicationUid: string, tables: string[], updateFile: string) => {
-      return client.runLocal(
-        [
-          "subscribe", "--format=csv",
-          "--updates", updateFile, "--ignore-source", replicationUid
-        ].concat(tables),
-        ""
-      ).trim()
+    this.subscribe = (
+      replicationUid: string,
+      tables: string[],
+      updateFile: string,
+    ) => {
+      return client
+        .runLocal(
+          [
+            "subscribe",
+            "--format=csv",
+            "--updates",
+            updateFile,
+            "--ignore-source",
+            replicationUid,
+          ].concat(tables),
+          "",
+        )
+        .trim();
     };
     this.unsubscribe = (session: string) => {
-      client.runLocal(["disconnect", session], "").trim()
+      client.runLocal(["disconnect", session], "").trim();
     };
     this.diff = (session: string, watermarks: Map<string, bigint>) => {
       const acc = {};
       for (const [table, wm] of watermarks.entries()) {
-        acc[table] = {since: wm}
+        acc[table] = { since: wm };
       }
       const diffSpec = JSON.stringify(acc, (_key, value) =>
-        typeof value === 'bigint' ? Number(value) : value
+        typeof value === "bigint" ? Number(value) : value,
       );
-      let d = client.runLocal(
-        [
-          "diff", "--format=csv",
-          session,
-        ],
-        diffSpec
-      );
+      let d = client.runLocal(["diff", "--format=csv", session], diffSpec);
       if (d.trim() == "") {
         return null;
       }
@@ -84,8 +111,17 @@ export class SKDBSyncImpl implements SKDBSync {
 
   save: () => Promise<boolean>;
   runLocal: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (query: string, params: Params, onChange: (rows: SKDBTable) => void) => { close: () => void }
-  watchChanges: (query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) => { close: () => void }
+  watch: (
+    query: string,
+    params: Params,
+    onChange: (rows: SKDBTable) => void,
+  ) => { close: () => void };
+  watchChanges: (
+    query: string,
+    params: Params,
+    init: (rows: SKDBTable) => void,
+    update: (added: SKDBTable, removed: SKDBTable) => void,
+  ) => { close: () => void };
 
   private runner: (fn: () => string) => SKDBTable;
 
@@ -99,7 +135,7 @@ export class SKDBSyncImpl implements SKDBSync {
   static create(
     handle: SKDBHandle,
     env: Environment,
-    save: () => Promise<boolean>
+    save: () => Promise<boolean>,
   ): SKDBSync {
     let client = new SKDBSyncImpl(env);
     client.save = save;
@@ -118,12 +154,14 @@ export class SKDBSyncImpl implements SKDBSync {
     endpoint?: string,
   ): Promise<void> {
     if (!endpoint) {
-      if (typeof window === 'undefined') {
-        throw new Error("No endpoint passed to connect and no window object to infer from.");
+      if (typeof window === "undefined") {
+        throw new Error(
+          "No endpoint passed to connect and no window object to infer from.",
+        );
       }
       const loc = window.location;
-      const scheme = loc.protocol === "https:" ? "wss://" : "ws://"
-      endpoint = `${scheme}${loc.host}`
+      const scheme = loc.protocol === "https:" ? "wss://" : "ws://";
+      endpoint = `${scheme}${loc.host}`;
     }
 
     const creds = {
@@ -139,24 +177,30 @@ export class SKDBSyncImpl implements SKDBSync {
       new SKDBMechanismImpl(this, this.fs, this.environment.encodeUTF8),
       endpoint,
       db,
-      creds
+      creds,
     );
 
     // Setting up local privacy checks
-    await this.mirror("skdb_user_permissions", "skdb_groups", "skdb_group_permissions");
+    await this.mirror(
+      "skdb_user_permissions",
+      "skdb_groups",
+      "skdb_group_permissions",
+    );
     await this.exec(
-      "CREATE UNIQUE INDEX skdb_permissions_group_user ON skdb_group_permissions(groupID, userID);"
+      "CREATE UNIQUE INDEX skdb_permissions_group_user ON skdb_group_permissions(groupID, userID);",
     );
 
     await this.setUser(accessKey);
   }
 
-  getUser(): string|undefined {
+  getUser(): string | undefined {
     return this.accessKey;
   }
 
   watermark(replicationId: string, table: string): bigint {
-    return BigInt(this.runLocal(["watermark", "--source", replicationId, table], ""));
+    return BigInt(
+      this.runLocal(["watermark", "--source", replicationId, table], ""),
+    );
   }
 
   subscribe = (viewName: string, f: (change: string) => void) => {
@@ -165,41 +209,41 @@ export class SKDBSyncImpl implements SKDBSync {
     this.subscriptionCount++;
     this.runLocal(
       ["subscribe", viewName, "--format=csv", "--updates", fileName],
-      ""
+      "",
     );
-  }
+  };
 
   addParams = (
     args: Array<string>,
     params: Params,
-    stdin: string
+    stdin: string,
   ): [Array<string>, string] => {
     if (params instanceof Map) {
       params = Object.fromEntries(params);
     }
     let args1 = ["--expect-query-params"].concat(args);
-    let stdin1 = JSON.stringify(params) + '\n' + stdin;
+    let stdin1 = JSON.stringify(params) + "\n" + stdin;
     return [args1, stdin1];
-  }
+  };
 
   exec = (stdin: string, params: Params = new Map()) => {
     return this.runner(() => {
       let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
-      return this.runLocal(args1, stdin1)
+      return this.runLocal(args1, stdin1);
     });
-  }
+  };
 
   tableSchema = (tableName: string) => {
     return this.runLocal(["dump-table", tableName], "");
-  }
+  };
 
   setUser = (userName: string) => {
     return this.runLocal(["set-user", userName], "");
-  }
+  };
 
   viewSchema = (viewName: string) => {
-    return this.runLocal(["dump-view", viewName], "")
-  }
+    return this.runLocal(["dump-view", viewName], "");
+  };
 
   schema = (tableName?: string) => {
     if (tableName === undefined) {
@@ -209,40 +253,43 @@ export class SKDBSyncImpl implements SKDBSync {
     }
 
     const viewSchema = this.viewSchema(tableName);
-    if (viewSchema.trim() != '') {
-      return viewSchema
+    if (viewSchema.trim() != "") {
+      return viewSchema;
     }
 
     return this.tableSchema(tableName);
-  }
+  };
 
   insert = (tableName: string, values: Array<any>) => {
     let params = new Map();
-    let keys =
-      values.map((val, i) => {
-        let key = "@key" + i;
-        params.set(key, val);
-        return key;
-      });
+    let keys = values.map((val, i) => {
+      let key = "@key" + i;
+      params.set(key, val);
+      return key;
+    });
     let stdin =
       "insert into " + tableName + " values (" + keys.join(", ") + ");";
     let [args1, stdin1] = this.addParams([], params, stdin);
     return this.runLocal(args1, stdin1) == "";
-  }
+  };
 
   assertCanBeMirrored(tableName: string): void {
     const error = this.runLocal(["can-mirror", tableName], "");
     if (error === "") {
-      return
+      return;
     }
     throw new Error(error);
   }
   async mirror(...tables: MirrorDefn[]) {
-    const is_mirror_def_of = (table) => (mirror_def) => (mirror_def === table) || (mirror_def.table === table);
-    for (const metatable of ["skdb_user_permissions", "skdb_groups", "skdb_group_permissions"]) {
-      if (! tables.some(is_mirror_def_of(metatable)))
-        tables.push(metatable)
-    };
+    const is_mirror_def_of = (table) => (mirror_def) =>
+      mirror_def === table || mirror_def.table === table;
+    for (const metatable of [
+      "skdb_user_permissions",
+      "skdb_groups",
+      "skdb_group_permissions",
+    ]) {
+      if (!tables.some(is_mirror_def_of(metatable))) tables.push(metatable);
+    }
     return this.connectedRemote!.mirror(...tables);
   }
 
@@ -252,17 +299,18 @@ export class SKDBSyncImpl implements SKDBSync {
 
   async serverTableSchema(tableName: string) {
     return this.connectedRemote!.tableSchema(tableName);
-  };
+  }
 
   async serverViewSchema(tableName: string) {
     return this.connectedRemote!.viewSchema(tableName);
-  };
+  }
 
   async serverSchema() {
     return this.connectedRemote!.schema();
   }
 
-  createServerDatabase = (dbName: string) => this.connectedRemote!.createDatabase(dbName);
+  createServerDatabase = (dbName: string) =>
+    this.connectedRemote!.createDatabase(dbName);
   createServerUser = () => this.connectedRemote!.createUser();
   serverClose = () => this.connectedRemote!.close();
 }
@@ -288,39 +336,47 @@ export class SKDBImpl implements SKDB {
 
   connectedRemote = async () => {
     return this.skdbSync.connectedRemote;
-  }
+  };
 
   subscribe = async (viewName: string, f: (change: string) => void) => {
     return this.skdbSync.subscribe(viewName, f);
-  }
+  };
 
   exec = async (stdin: string, params: Params = new Map()) => {
     const rows = await this.skdbSync.exec(stdin, params);
     return new SKDBTable(...rows);
-  }
+  };
 
-  async watch(query: string, params: Params, onChange: (rows: SKDBTable) => void) {
+  async watch(
+    query: string,
+    params: Params,
+    onChange: (rows: SKDBTable) => void,
+  ) {
     let closable = this.skdbSync.watch(query, params, onChange);
-    return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
+    return Promise.resolve({ close: () => Promise.resolve(closable.close()) });
   }
 
-  async watchChanges(query: string, params: Params, init: (rows: SKDBTable) => void, update: (added: SKDBTable, removed: SKDBTable) => void) {
+  async watchChanges(
+    query: string,
+    params: Params,
+    init: (rows: SKDBTable) => void,
+    update: (added: SKDBTable, removed: SKDBTable) => void,
+  ) {
     let closable = this.skdbSync.watchChanges(query, params, init, update);
-    return Promise.resolve({ close: () => Promise.resolve(closable.close()) })
+    return Promise.resolve({ close: () => Promise.resolve(closable.close()) });
   }
-
 
   tableSchema = async (tableName: string) => {
     return this.skdbSync.tableSchema(tableName);
-  }
+  };
 
   viewSchema = async (viewName: string) => {
     return this.skdbSync.viewSchema(viewName);
-  }
+  };
 
   schema = async (tableName?: string) => {
     return this.skdbSync.schema(tableName);
-  }
+  };
 
   async insert(tableName: string, values: Array<any>) {
     return this.skdbSync.insert(tableName, values);
@@ -331,10 +387,10 @@ export class SKDBImpl implements SKDB {
   }
 
   async closeConnection() {
-    return this.skdbSync.serverClose()
+    return this.skdbSync.serverClose();
   }
 
   async save() {
-    return this.skdbSync.save()
+    return this.skdbSync.save();
   }
 }

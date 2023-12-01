@@ -1,12 +1,11 @@
-
-import { createMDConverter, Conf} from "#skmd/skmd";
+import { createMDConverter, Conf } from "#skmd/skmd";
 import * as fs from "fs";
 import * as path from "path";
 import * as chokidar from "chokidar";
-import * as http from 'http';
-import * as mime from 'mime-types';
-import * as sass from 'sass';
-import { exec } from 'child_process';
+import * as http from "http";
+import * as mime from "mime-types";
+import * as sass from "sass";
+import { exec } from "child_process";
 
 console.time("skmd ready");
 
@@ -34,7 +33,10 @@ var updates = new Set<string>();
 var count = 1;
 
 function addCheckVersion(buffer: Buffer) {
-  return Buffer.from(buffer.toString().replace("</head>", checkVersion + "</head>"), 'utf8');
+  return Buffer.from(
+    buffer.toString().replace("</head>", checkVersion + "</head>"),
+    "utf8",
+  );
 }
 
 function log(message: string) {
@@ -51,14 +53,14 @@ function log(message: string) {
 }
 
 function mvext(file: string, extension: string) {
-  const basename = path.basename(file, path.extname(file))
-  return path.join(path.dirname(file), basename + extension)
+  const basename = path.basename(file, path.extname(file));
+  return path.join(path.dirname(file), basename + extension);
 }
 
-const docsPath = './docs';
-const srcPath = './src';
-const distName = 'site';
-const distPath = './' + distName;
+const docsPath = "./docs";
+const srcPath = "./src";
+const distName = "site";
+const distPath = "./" + distName;
 if (!fs.existsSync(srcPath)) {
   fs.mkdirSync(srcPath);
 } else if (!fs.lstatSync(srcPath).isDirectory()) {
@@ -68,18 +70,19 @@ if (!fs.existsSync(srcPath)) {
 const relative = (ref: string, file: string, target: string) => {
   const relmd = path.relative(ref, file);
   return path.join(target, relmd);
-}
+};
 
 const clientAbsolute = (ref: string, file: string) => {
-  ref = ref.replace(/\/+$/, '');
+  ref = ref.replace(/\/+$/, "");
   if (!file.startsWith(ref + "/")) {
-    throw new Error("clientAbsolute: The file path does not contains base path");
+    throw new Error(
+      "clientAbsolute: The file path does not contains base path",
+    );
   }
   return file.substring(ref.length);
-}
+};
 
 const skmd = await createMDConverter();
-
 
 const dependencies: Map<string, Set<string>> = new Map();
 const allfiles: Set<string> = new Set();
@@ -96,11 +99,11 @@ const addDependency = (src: string, dep: string) => {
     dependencies.set(aSrc, cur);
   }
   cur.add(aDep);
-}
+};
 
 const absolute = (...args: string[]) => {
   return path.resolve.apply(null, [process.cwd()].concat(args));
-}
+};
 
 const overrideConf = (c1: Conf, c2: Conf) => {
   if (c2.title) c1.title = c2.title;
@@ -115,7 +118,7 @@ const overrideConf = (c1: Conf, c2: Conf) => {
   if (c2.charset) c1.charset = c2.charset;
   if (c2.tableOfContent != undefined) c1.tableOfContent = c2.tableOfContent;
   return c1;
-}
+};
 
 const manageMd = (md: string) => {
   let time = fs.statSync(md).atimeMs;
@@ -126,12 +129,9 @@ const manageMd = (md: string) => {
       js = JSON.parse(fs.readFileSync(conf).toString()) as Conf;
       time = Math.max(fs.statSync(conf).atimeMs, time);
     } catch (ex) {
-      console.error([
-        "Invalid json file: " + conf,
-        ex
-      ])
+      console.error(["Invalid json file: " + conf, ex]);
     }
-  };
+  }
   let dir = path.dirname(conf);
   while (js.extends) {
     let jsFile = js.extends;
@@ -143,10 +143,7 @@ const manageMd = (md: string) => {
       time = Math.max(fs.statSync(abs).atimeMs, time);
       js = overrideConf(tmp, js);
     } catch (ex) {
-      console.error([
-        "Invalid json file: " + jsFile,
-        ex
-      ])
+      console.error(["Invalid json file: " + jsFile, ex]);
     }
   }
   let config = js;
@@ -166,31 +163,27 @@ const manageMd = (md: string) => {
     config.customs = [];
   }
   if (config.customs.length > 0) {
-    config.customs = config.customs.map(
-      (custom) => {
-        const res = absolute(dir, custom);
-        addDependency(res, md);
-        time = Math.max(fs.statSync(res).atimeMs, time);
-        return fs.readFileSync(res).toString();
-      }
-    );
+    config.customs = config.customs.map((custom) => {
+      const res = absolute(dir, custom);
+      addDependency(res, md);
+      time = Math.max(fs.statSync(res).atimeMs, time);
+      return fs.readFileSync(res).toString();
+    });
   }
   if (config.styles && config.styles.length > 0) {
-    config.styles = (config.styles as string[]).map(
-      (style) => {
-        if (style.endsWith(".scss")) {
-          const scss = path.resolve(dir, style);
-          const css = relative("src", mvext(scss, ".css"), distPath);
-          time = Math.max(fs.statSync(scss).atimeMs, time);
-          return clientAbsolute(path.resolve(distName), path.resolve(css));
-        } else {
-          return style
-        }
+    config.styles = (config.styles as string[]).map((style) => {
+      if (style.endsWith(".scss")) {
+        const scss = path.resolve(dir, style);
+        const css = relative("src", mvext(scss, ".css"), distPath);
+        time = Math.max(fs.statSync(scss).atimeMs, time);
+        return clientAbsolute(path.resolve(distName), path.resolve(css));
+      } else {
+        return style;
       }
-    );
+    });
   }
   const dist = relative("src", md, distPath);
-  let html : string;
+  let html: string;
   if (dist.endsWith("/index.md")) {
     html = mvext(dist, ".html");
   } else {
@@ -206,7 +199,7 @@ const manageMd = (md: string) => {
     log("'" + html + "' updated");
     version = Date.now();
   }
-}
+};
 
 const manageScss = (scss: string, css: string) => {
   let d = path.dirname(css);
@@ -215,9 +208,9 @@ const manageScss = (scss: string, css: string) => {
   }
   try {
     let result = sass.compile(scss);
-    result.loadedUrls.forEach(f => {
+    result.loadedUrls.forEach((f) => {
       let abs = absolute(f.pathname);
-      if (abs != scss) addDependency(abs, scss)
+      if (abs != scss) addDependency(abs, scss);
     });
     fs.writeFile(css, result.css, function (err) {
       if (err) {
@@ -231,14 +224,14 @@ const manageScss = (scss: string, css: string) => {
   }
   const deps = dependencies.get(absolute(scss));
   if (deps) {
-    deps.forEach(f => {
+    deps.forEach((f) => {
       if (f.endsWith(".scss")) {
-        const css = relative("src", mvext(f, ".css"), distPath)
+        const css = relative("src", mvext(f, ".css"), distPath);
         manageScss(f, css);
       }
     });
   }
-}
+};
 
 const isAsset = (f: string) => {
   return path.resolve(f).startsWith(path.resolve("src/assets") + "/");
@@ -250,34 +243,34 @@ const onDocs = (f: string) => {
     clearTimeout(docsTimeout);
   }
   docsTimeout = setTimeout(onDocs2, 10, f);
-}
+};
 
 const onDocs2 = (f: string) => {
   exec("mkdocs build", (error, stdout, stderr) => {
-      if (error) {
-          console.log(`error: ${error.message}`);
-          return;
-      }
-      if (stdout) {
-        console.log(`stdout: ${stdout}`);
-      };
-      if (stderr) {
-        console.log(`stderr: ${stderr}`);
-      };
-      allfiles.forEach(onChange2);
-      loaded = true;
+    if (error) {
+      console.log(`error: ${error.message}`);
+      return;
+    }
+    if (stdout) {
+      console.log(`stdout: ${stdout}`);
+    }
+    if (stderr) {
+      console.log(`stderr: ${stderr}`);
+    }
+    allfiles.forEach(onChange2);
+    loaded = true;
   });
-}
+};
 
 const onChange = (f: string) => {
   setTimeout(onChange2, 10, f);
-}
+};
 
-var loaded : boolean = false;
+var loaded: boolean = false;
 
 const onAdd = (f: string) => {
   if (loaded) {
-    onChange(f)
+    onChange(f);
   } else {
     const ext = path.extname(f);
     if (ext == ".md") {
@@ -288,7 +281,7 @@ const onAdd = (f: string) => {
       allfiles.add(f);
     }
   }
-}
+};
 
 const onChange2 = (f: string) => {
   const ext = path.extname(f);
@@ -323,11 +316,11 @@ const onChange2 = (f: string) => {
       }
     });
   }
-}
+};
 
 const onUnlink = (f: string) => {
   setTimeout(onUnlink2, 10, f);
-}
+};
 
 const onUnlink2 = (f: string) => {
   const ext = path.extname(f);
@@ -353,73 +346,89 @@ const onUnlink2 = (f: string) => {
       });
     }
   }
-}
+};
 
 const post = (
   response: http.ServerResponse,
-  file: string, errorFile: string,
+  file: string,
+  errorFile: string,
   contentType: string,
-  check: (c: Buffer) => Buffer = v => v
+  check: (c: Buffer) => Buffer = (v) => v,
 ) => {
   fs.readFile(file, function (error, content) {
     if (error) {
-      if (error.code == 'ENOENT') {
+      if (error.code == "ENOENT") {
         fs.readFile(errorFile, function (error, content) {
           if (error) {
-            if (error.code == 'ENOENT') {
+            if (error.code == "ENOENT") {
               response.writeHead(404);
-              response.end('Not found\n\n');
+              response.end("Not found\n\n");
             }
           } else {
-            response.writeHead(200, { 'Content-Type': contentType });
-            response.end(content, 'utf-8');
+            response.writeHead(200, { "Content-Type": contentType });
+            response.end(content, "utf-8");
           }
         });
-      }
-      else {
+      } else {
         response.writeHead(500);
-        response.end('Internal error: ' + error.code + ' ..\n\n');
+        response.end("Internal error: " + error.code + " ..\n\n");
       }
-    }
-    else {
-      response.writeHead(200, { 'Content-Type': contentType });
-      response.end(check(content), 'utf-8');
+    } else {
+      response.writeHead(200, { "Content-Type": contentType });
+      response.end(check(content), "utf-8");
     }
   });
-}
+};
 
 if (fs.existsSync(docsPath)) {
-  var watcher = chokidar.watch('file or dir', { ignored: /^\./, persistent: true });
+  var watcher = chokidar.watch("file or dir", {
+    ignored: /^\./,
+    persistent: true,
+  });
   watcher
-    .on('add', onAdd)
-    .on('change', onChange)
-    .on('unlink', onUnlink)
-    .on('error', function (error) { console.error('Error happened', error); });
+    .on("add", onAdd)
+    .on("change", onChange)
+    .on("unlink", onUnlink)
+    .on("error", function (error) {
+      console.error("Error happened", error);
+    });
 
   watcher.add(srcPath);
-  
-  var watcher2 = chokidar.watch('file or dir', { ignored: /^\./, persistent: true });
+
+  var watcher2 = chokidar.watch("file or dir", {
+    ignored: /^\./,
+    persistent: true,
+  });
   watcher2
-    .on('add', onDocs)
-    .on('change', onDocs)
-    .on('error', function (error) { console.error('Error happened', error); });
+    .on("add", onDocs)
+    .on("change", onDocs)
+    .on("error", function (error) {
+      console.error("Error happened", error);
+    });
 
   watcher2.add(docsPath);
 } else {
-  var watcher = chokidar.watch('file or dir', { ignored: /^\./, persistent: true });
+  var watcher = chokidar.watch("file or dir", {
+    ignored: /^\./,
+    persistent: true,
+  });
   watcher
-    .on('add', onChange)
-    .on('change', onChange)
-    .on('unlink', onUnlink)
-    .on('error', function (error) { console.error('Error happened', error); });
+    .on("add", onChange)
+    .on("change", onChange)
+    .on("unlink", onUnlink)
+    .on("error", function (error) {
+      console.error("Error happened", error);
+    });
 
   watcher.add(srcPath);
 }
 
 const port = 5155;
 
-
-const requestHandler = (request: http.IncomingMessage, response: http.ServerResponse) => {
+const requestHandler = (
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+) => {
   const error = path.join(distPath, "404.html");
   if (request.url == "/__version__/") {
     response.setHeader("Content-Type", "application/json");
@@ -436,16 +445,16 @@ const requestHandler = (request: http.IncomingMessage, response: http.ServerResp
     }
     post(response, page, error, "text/html", addCheckVersion);
   }
-}
+};
 
-const server = http.createServer(requestHandler)
+const server = http.createServer(requestHandler);
 
-process.on('SIGINT', function () {
+process.on("SIGINT", function () {
   server.close();
   process.exit();
 });
 
-process.stdin.on("data", data => {
+process.stdin.on("data", (data) => {
   let d = data.toString().toLowerCase().trim();
   if (d == "q") {
     server.close();
@@ -461,4 +470,4 @@ server.listen(port, () => {
   console.timeEnd("skmd ready");
   console.log("➜  Local:   http://localhost:" + port + "/");
   console.log("➜  q or ctrl+c to quit");
-})
+});
