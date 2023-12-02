@@ -240,21 +240,21 @@ mutable native class .Array<+T>
   // # Selecting Portions of a Sequence
 
   readonly fun slice(start: Int, end: Int = Int::max): this {
-    sz = this.size();
-    if (start < 0) {
-      !start = max(0, sz + start);
-    };
-    if (end < 0) {
-      !end = max(0, sz + end);
-    };
-    !start = min(sz, start);
-    !end = min(sz, end);
-    if (end <= start) {
+    range = Range(0, this.size()).subrange(start, end);
+    if (range.isEmpty()) {
       Array[]
     } else {
-      capacity = end - start;
-      static::fillBy(capacity, i -> this.unsafe_get(start + i))
+      capacity = range.size();
+      static::fillBy(capacity, i -> this.unsafe_get(range.start + i))
     }
+  }
+
+  readonly fun as_slice<U>[T: U](): mutable .Slice<U> {
+    mutable Slice<U>(this, Range(0, this.size()))
+  }
+
+  mutable fun as_mslice(): mutable .MutableSlice<T> {
+    mutable MutableSlice<T>(this, Range(0, this.size()))
   }
 
   // # Aggregation
@@ -830,6 +830,150 @@ fun concatStringSequence(seq: readonly Sequence<String>): String {
   );
 
   String::fromChars(buf)
+}
+
+mutable class Slice<T>(
+  private inner: readonly Array<T>,
+  private range: Range,
+) extends .Slice<T> {
+  readonly fun ptr(): Ptr<T> {
+    Ptr<T>(Unsafe.array_ptr(this.inner, this.range.start))
+  }
+
+  readonly fun size(): Int {
+    this.range.size()
+  }
+
+  readonly fun get(index: Int): T {
+    Unsafe.array_get(this.inner, this.range.start + index)
+  }
+
+  readonly fun subslice(
+    start: Int = 0,
+    end: Int = Int::max,
+  ): readonly Slice<T> {
+    mutable Slice<T>(this.inner, this.range.subrange(start, end))
+  }
+}
+
+mutable class MutableSlice<T>(
+  private inner: mutable Array<T>,
+  private range: Range,
+) extends .MutableSlice<T> {
+  readonly fun ptr(): Ptr<T> {
+    Ptr<T>(Unsafe.array_ptr(this.inner, this.range.start))
+  }
+
+  mutable fun mptr(): mutable Ptr<T> {
+    mutable Ptr<T>(Unsafe.array_ptr(this.inner, this.range.start))
+  }
+
+  readonly fun size(): Int {
+    this.range.size()
+  }
+
+  readonly fun get(index: Int): T {
+    Unsafe.array_get(this.inner, this.range.start + index)
+  }
+
+  mutable fun set(index: Int, value: T): void {
+    Unsafe.array_set(this.inner, this.range.start + index, value)
+  }
+
+  readonly fun subslice(
+    start: Int = 0,
+    end: Int = Int::max,
+  ): readonly Slice<T> {
+    mutable Slice<T>(this.inner, this.range.subrange(start, end))
+  }
+
+  mutable fun msubslice(
+    start: Int = 0,
+    end: Int = Int::max,
+  ): mutable MutableSlice<T> {
+    mutable MutableSlice<T>(this.inner, this.range.subrange(start, end))
+  }
+}
+
+mutable class RawStorageSlice<T>(
+  private inner: readonly Slice<Unsafe.RawStorage<T>>,
+) extends .Slice<T> {
+  static fun create(
+    array: mutable Array<Unsafe.RawStorage<T>>,
+    start: Int = 0,
+    end: Int = Int::max,
+  ): mutable MutableRawStorageSlice<T> {
+    mutable MutableRawStorageSlice(
+      mutable MutableSlice(array, Range(start, end)),
+    )
+  }
+
+  readonly fun ptr(): Ptr<T> {
+    this.inner.ptr().cast<T>()
+  }
+
+  readonly fun size(): Int {
+    this.inner.size()
+  }
+
+  readonly fun get(index: Int): T {
+    Unsafe.RawStorage::unsafeGet(this.inner.get(index))
+  }
+
+  readonly fun subslice(
+    start: Int = 0,
+    end: Int = Int::max,
+  ): readonly RawStorageSlice<T> {
+    mutable RawStorageSlice<T>(this.inner.subslice(start, end))
+  }
+}
+
+mutable class MutableRawStorageSlice<T>(
+  private inner: mutable MutableSlice<Unsafe.RawStorage<T>>,
+) extends .MutableSlice<T> {
+  static fun create(
+    array: mutable Array<Unsafe.RawStorage<T>>,
+    start: Int = 0,
+    end: Int = Int::max,
+  ): mutable MutableRawStorageSlice<T> {
+    mutable MutableRawStorageSlice(
+      mutable MutableSlice(array, Range(start, end)),
+    )
+  }
+
+  readonly fun ptr(): Ptr<T> {
+    this.inner.ptr().cast<T>()
+  }
+
+  mutable fun mptr(): mutable Ptr<T> {
+    this.inner.mptr().mcast<T>()
+  }
+
+  readonly fun size(): Int {
+    this.inner.size()
+  }
+
+  readonly fun get(index: Int): T {
+    Unsafe.RawStorage::unsafeGet(this.inner.get(index))
+  }
+
+  mutable fun set(index: Int, value: T): void {
+    this.inner.set(index, Unsafe.RawStorage::make(value))
+  }
+
+  readonly fun subslice(
+    start: Int = 0,
+    end: Int = Int::max,
+  ): readonly RawStorageSlice<T> {
+    mutable RawStorageSlice<T>(this.inner.subslice(start, end))
+  }
+
+  mutable fun msubslice(
+    start: Int = 0,
+    end: Int = Int::max,
+  ): mutable MutableRawStorageSlice<T> {
+    mutable MutableRawStorageSlice<T>(this.inner.msubslice(start, end))
+  }
 }
 
 module end;

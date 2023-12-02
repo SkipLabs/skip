@@ -1,0 +1,59 @@
+module Slice;
+
+mutable base class .Slice<T> extends Sequence<T> {
+  readonly fun size(): Int;
+  readonly fun ptr(): Ptr<T>;
+  readonly fun get(index: Int): T;
+
+  readonly fun subslice(
+    start: Int = 0,
+    end: Int = Int::max,
+  ): readonly .Slice<T>;
+
+  overridable readonly fun values(): mutable Iterator<T> {
+    mutable SliceIterator<T>(this, 0, this.size())
+  }
+
+  // NOTE: We cannot inherit from IndexedSequence, which would give us
+  // `indexOf()` for free, for obscure reasons.
+  overridable readonly fun indexOf[T: Equality](predicate: T): ?Int {
+    index = -1;
+    this.find(x -> {
+      !index = index + 1;
+      x == predicate
+    }).map(_ -> index)
+  }
+}
+
+mutable base class .MutableSlice<T> extends .Slice<T> {
+  mutable fun mptr(): mutable Ptr<T>;
+  mutable fun set(index: Int, value: T): void;
+
+  mutable fun msubslice(
+    start: Int = 0,
+    end: Int = Int::max,
+  ): mutable .MutableSlice<T>;
+}
+
+private mutable class SliceIterator<T>(
+  container: readonly Slice<T>,
+  mutable start: Int,
+  mutable size: Int,
+) extends Iterator<T> {
+  readonly fun sizeHint(): ?Int {
+    Some(this.size)
+  }
+
+  mutable fun next(): ?T {
+    if (this.size > 0) {
+      cur = this.start;
+      this.!start = cur + 1;
+      this.!size = this.size - 1;
+      Some(this.container[cur])
+    } else {
+      None()
+    }
+  }
+}
+
+module end;

@@ -345,6 +345,10 @@ char SKIP_Unsafe_string_utf8_get(char* str, SkipInt n) {
   return str[n];
 }
 
+char* SKIP_Unsafe_string_ptr(char* str, SkipInt offset) {
+  return str + offset;
+}
+
 /*****************************************************************************/
 /* Multibyte utf8 string used for testing purposes. */
 /*****************************************************************************/

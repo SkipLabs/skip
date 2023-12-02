@@ -461,6 +461,10 @@ native class .String uses Hashable, Show, Orderable {
       for (ch in i) yield ch;
     });
   }
+
+  fun bytes(): Slice<UInt8> {
+    BytesSlice(this, Range(0, Unsafe.string_utf8_size(this)))
+  }
 }
 
 private fun toIntHelperRest(i: mutable StringIterator, value: Int): Int {
@@ -551,4 +555,25 @@ base class Encoding {
   | Utf16BE() -> "utf16be"
   | Iso8859_1() -> "iso8859-1"
   | CustomEncoding(name) -> name
+}
+
+private class BytesSlice(
+  private str: String,
+  private range: Range,
+) extends .Slice<UInt8> {
+  fun ptr(): Ptr<UInt8> {
+    Ptr<UInt8>(Unsafe.string_ptr(this.str, this.range.start))
+  }
+
+  fun size(): Int {
+    this.range.size()
+  }
+
+  fun get(index: Int): UInt8 {
+    Unsafe.string_utf8_get(this.str, this.range.start + index)
+  }
+
+  fun subslice(start: Int = 0, end: Int = Int::max): BytesSlice {
+    BytesSlice(this.str, this.range.subrange(start, end))
+  }
 }

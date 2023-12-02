@@ -36,6 +36,20 @@ class .Range(start: Int, end: Int) extends Sequence<Int> uses Equality, Show {
     Range(start, end)
   }
 
+  fun subrange(start: Int, end: Int = Int::max): Range {
+    sz = this.size();
+    if (start < 0) {
+      !start = max(0, sz + start)
+    };
+    if (end < 0) {
+      !end = max(0, sz + end)
+    };
+    !start = this.start + min(sz, start);
+    !end = this.start + min(sz, end);
+
+    static(start, end)
+  }
+
   fun inRange(pos: Int): Bool {
     pos >= this.start && pos < this.end
   }
