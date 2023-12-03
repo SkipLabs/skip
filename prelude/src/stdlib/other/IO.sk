@@ -35,12 +35,12 @@ class OpenOptions{
 }
 
 // TODO: How to handle String vs Bytes? type parameter?
-trait Readable {
+trait Read {
   mutable fun read(sz: Int): String;
   mutable fun read_to_end(): String;
 }
 
-trait Writable {
+trait Write {
   mutable fun write(s: String): Int;
   mutable fun write_all(s: String): void;
 }
@@ -53,7 +53,7 @@ trait IsTerminal {
 mutable class File(
   fileno: Int,
   path: String = "unknown",
-) uses Readable, Writable, IsTerminal {
+) uses Read, Write, IsTerminal {
   const kDefaultBufferSize: Int = 8192;
 
   static fun open(path: String, opts: OpenOptions): mutable File {
@@ -107,7 +107,7 @@ mutable class File(
 mutable class StringIO(
   mutable buffer: String = "",
   mutable pos: Int = 0,
-) uses Readable, Writable, IsTerminal {
+) uses Read, Write, IsTerminal {
   fun isatty(): Bool {
     false
   }
@@ -142,7 +142,7 @@ mutable class StringIO(
   }
 }
 
-mutable class BufferedReader<T: mutable Readable>(
+mutable class BufferedReader<T: mutable Read>(
   stream: T,
   mutable buffer: String = "",
 ) {
