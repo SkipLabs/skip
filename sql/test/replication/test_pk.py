@@ -272,7 +272,11 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
 
   # and that all nodes have reached this state
   cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
-    [[[0, "bar"]], []],
+    [
+      # TODO: lww logic with resets can revert to this - remove this
+      # once resets are removed from the protocol:
+      [[0, "foo"]],
+      [[0, "bar"]], []],
     colnames=['id', 'note'],
   )
 
@@ -430,7 +434,11 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
 
   # and that all nodes have reached this state
   cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
-    [[[0, "bar"]], [[0, "baz"]]],
+    [
+      # TODO: lww logic with resets can revert to this - remove this
+      # once resets are removed from the protocol:
+      [[0, "foo"]],
+      [[0, "bar"]], [[0, "baz"]]],
     colnames=['id', 'note'],
   )
 
@@ -587,7 +595,11 @@ def test_two_clients_single_server_updates_purge_happens_on_server():
 
   # and that all nodes have reached this state
   cluster.state("SELECT id, note FROM test_with_pk;").isOneOf(
-    [[[0, "bar"]], [[0, "baz"]]],
+    [
+      # TODO: lww logic with resets can revert to this - remove this
+      # once resets are removed from the protocol:
+      [[0, "foo"]],
+      [[0, "bar"]], [[0, "baz"]]],
     colnames=['id', 'note'],
   )
 

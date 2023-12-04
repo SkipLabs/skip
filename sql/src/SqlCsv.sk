@@ -193,7 +193,6 @@ fun lwwEdits(
   context: mutable SKStore.Context,
   dir: SKStore.EagerDir,
   row: SKDB.RowValues,
-  isReset: Bool,
 ): mutable Iterator<
   (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
 > {
@@ -233,13 +232,7 @@ fun lwwEdits(
       if (
         tick.value < snapshot ||
         source.path() == writer ||
-        // we break concurrent ties using the natural ordering of a
-        // tuple.
-        // we do not apply this rule for resets as they could
-        // revert a local change. this situation is currently ambiguous and
-        // could cause divergence, but resets are being removed from
-        // the protocol, so we use this as a heuristic for now.
-        (rowKey.row < row && !isReset)
+        rowKey.row < row
       ) {
         entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
       } else {
@@ -462,7 +455,6 @@ fun applyDiffStrategy(
         newRoot,
         dir,
         row,
-        false, // isReset
       )) {
         entries.push(change);
       }
@@ -497,7 +489,6 @@ fun applyDiffStrategy(
         newRoot,
         dir,
         row,
-        true, // isReset
       )) {
         entries.push(change);
       }

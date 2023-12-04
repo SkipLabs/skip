@@ -741,7 +741,7 @@ EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test_with_pk 70
-1	1,"lose","GALL"
+1	1,"win","GALL"
 1	2,"baz","GALL"
 1	3,"quux","GALL"
 		
@@ -751,10 +751,9 @@ EOF
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
 
     # just one of each. foo is still here as it was added concurrently and adds beat deletes
-    # 'lose' does not overwrite 'bar' because 70 < 72
     assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '1\|lose\|GALL' 0
+    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 0
+    assert_line_count "$SERVER_TAIL" '1\|win\|GALL' 1
     assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 1
     assert_line_count "$SERVER_TAIL" '3\|quux\|GALL' 1
 }
