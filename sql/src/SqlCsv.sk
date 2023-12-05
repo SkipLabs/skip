@@ -567,6 +567,8 @@ fun parseTableChange(
   table: SKDB.DirDescr,
   line: String,
 ): Array<SKDB.RowValues> {
+  saved = SKStore.newObstack();
+
   if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
     invariant_violation("Not a table change")
   };
@@ -607,7 +609,7 @@ fun parseTableChange(
   cvalues = values.map(parseCSVValue);
   // empty params since no placeholders in skdb diff write-csv
   params: Map<String, P.Value> = Map[];
-  SKDB.computeInsert(
+  ret = SKDB.computeInsert(
     context,
     params,
     false,
@@ -617,6 +619,11 @@ fun parseTableChange(
     table,
     repeat,
   );
+
+  SKStore.destroyObstackWithValue(
+    saved,
+    List[ret]
+  ).getHead()
 }
 
 mutable class TableDiff(
