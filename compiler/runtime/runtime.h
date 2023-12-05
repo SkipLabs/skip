@@ -61,6 +61,7 @@ void sk_print_ctx_table();
 #define ERROR_MAPPING_MEMORY 42
 #define ERROR_MAPPING_VERSION 43
 #define ERROR_LOCKING 44
+#define ERROR_FILE_IO 45
 #define ERROR_MEMORY_CHECK 88
 
 
@@ -191,9 +192,11 @@ typedef struct {
 /* Function signatures. */
 /*****************************************************************************/
 
+#ifndef __cplusplus
 int (memcmp)(const void* ptr1, const void* ptr2, size_t num);
 void* (memcpy)(void *restrict dst, const void *restrict src, size_t n);
 void* (memset)(void* b, int c, size_t len);
+#endif
 
 char* SKIP_Obstack_alloc(size_t size);
 uint32_t SKIP_String_byteSize(char* str);
