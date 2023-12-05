@@ -51,7 +51,7 @@ void sk_free_class(sk_stack_t* st, char* obj) {
     if (magic != 234566 && magic != 234567) {
 #ifdef SKIP64
       fprintf(stderr, "Invalid external pointer found\n");
-      exit(24);
+      exit(23);
 #endif
       SKIP_throw_cruntime(ERROR_INVALID_EXTERNAL_POINTER);
     }
