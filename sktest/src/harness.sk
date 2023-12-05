@@ -68,14 +68,14 @@ fun test_job(
       _ = Posix.lseek(stdout_file.fileno, 0, Posix.SeekSet());
       _ = Posix.lseek(stderr_file.fileno, 0, Posix.SeekSet());
       !res = res with {
-        stdout => stdout_file.read_to_end(),
-        stderr => stderr_file.read_to_end(),
+        stdout => stdout_file.read_to_string().fromSuccess(),
+        stderr => stderr_file.read_to_string().fromSuccess(),
       };
 
       stdout_file.close();
       stderr_file.close();
 
-      stdout.write_all(res.toJSON() + "\n");
+      stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
     }
   };
   skipExit(0)
@@ -152,33 +152,28 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
   while (open_fds > 0) {
     _ = Posix.poll(pollfds);
     for ((i, pfd) in pollfds.items()) {
-      eof = false;
       if (pfd.pollin()) {
         loop {
-          line = try {
-            readers[i].read_line()
-          } catch {
-          | EndOfFile _ ->
-            !eof = true;
-            ""
-          | exn -> throw exn
-          };
-          if (eof) {
-            break void
+          line = readers[i].read_line() match {
+          | Success(line) -> line
+          | Failure(err) -> throw err
           };
           res = TestResult::fromJSON(line);
           if (res.result != "success") {
             !success = false
           };
           reporters.each(x -> x.report(res));
-          if (readers[i].buffer.length() == 0) {
-            break void
+          // NOTE: This effectively forces sequential reading of subprocess
+          // output since `has_data_left()` will fill its internal buffer by
+          // calling `read()` if empty. Revisit when a suitable API is available
+          // from `BufferedReader`.
+          readers[i].has_data_left() match {
+          | Failure(err) -> throw err
+          | Success(false) -> break void
+          | Success _ -> void
           }
         }
       } else if (pfd.fd != -1 && (pfd.pollerr() || pfd.pollhup())) {
-        !eof = true
-      };
-      if (eof) {
         pollfds.set(i, Posix.Pollfd::create(-1));
         !open_fds = open_fds - 1
       }

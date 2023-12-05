@@ -64,29 +64,20 @@ void SKIP_posix_close(int64_t fd) {
   }
 }
 
-int64_t SKIP_posix_write(int64_t fd, char *buf) {
-  int rv = write((int)fd, buf, SKIP_String_byteSize(buf));
+int64_t SKIP_posix_write(int64_t fd, char *buf, int64_t len) {
+  int rv = write((int)fd, buf, (size_t)len);
   if (rv == -1) {
-    perror("write");
-    exit(EXIT_FAILURE);
+    return (int64_t)(-errno);
   }
   return (int64_t)rv;
 }
 
-char *SKIP_posix_read(int64_t fd, int64_t len) {
-  char *buf = (char *)malloc(len);
-  if (buf == NULL && len != 0) {
-    perror("malloc");
-    exit(EXIT_FAILURE);
-  }
-  int rv = read((int)fd, buf, len);
+int64_t SKIP_posix_read(int64_t fd, char* buf, int64_t len) {
+  int rv = read((int)fd, buf, (size_t)len);
   if (rv == -1) {
-    perror("read");
-    exit(EXIT_FAILURE);
+    return (int64_t)(-errno);
   }
-  char *str = sk_string_create(buf, rv);
-  free(buf);
-  return str;
+  return (int64_t)rv;
 }
 
 int64_t SKIP_posix_lseek(int64_t fd, int64_t offset, int64_t whence) {
