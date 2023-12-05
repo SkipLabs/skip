@@ -42,7 +42,7 @@ void sk_free_class(sk_stack_t* st, char* obj) {
 #ifdef SKIP64
     if (!sk_is_nofile_mode()) {
       fprintf(stderr, "You cannot use external pointers in persistent mode.\n");
-      exit(23);
+      exit(ERROR_INVALID_EXTERNAL_POINTER);
     }
 #endif
     char* destructor = sk_get_external_pointer_destructor(obj);
@@ -51,7 +51,7 @@ void sk_free_class(sk_stack_t* st, char* obj) {
     if (magic != 234566 && magic != 234567) {
 #ifdef SKIP64
       fprintf(stderr, "Invalid external pointer found\n");
-      exit(23);
+      exit(ERROR_INVALID_EXTERNAL_POINTER);
 #endif
       SKIP_throw_cruntime(ERROR_INVALID_EXTERNAL_POINTER);
     }
