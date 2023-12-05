@@ -102,7 +102,7 @@ void sk_global_lock() {
 #endif
 
   fprintf(stderr, "Internal error: locking failed\n");
-  exit(44);
+  exit(ERROR_LOCKING);
 }
 
 void sk_global_unlock() {
@@ -119,7 +119,7 @@ void sk_global_unlock() {
 
   fprintf(stderr, "Internal error: global unlocking failed, %s\n",
           strerror(errno));
-  exit(44);
+  exit(ERROR_LOCKING);
 }
 
 /*****************************************************************************/
@@ -155,7 +155,7 @@ void SKIP_mutex_lock(pthread_mutex_t* lock) {
 #endif
 
   fprintf(stderr, "Internal error: locking failed\n");
-  exit(44);
+  exit(ERROR_LOCKING);
 }
 
 void SKIP_mutex_unlock(pthread_mutex_t* lock) {
@@ -166,7 +166,7 @@ void SKIP_mutex_unlock(pthread_mutex_t* lock) {
   }
 
   fprintf(stderr, "Internal error: unlocking failed, %d\n", code);
-  exit(44);
+  exit(ERROR_LOCKING);
 }
 
 void SKIP_cond_init(pthread_cond_t* cond) {
