@@ -60,7 +60,7 @@ void sk_print_ctx_table();
 #define ERROR_MAPPING_FAILED 41
 #define ERROR_MAPPING_MEMORY 42
 #define ERROR_MAPPING_VERSION 43
-
+#define ERROR_LOCKING 44
 
 
 /*****************************************************************************/
