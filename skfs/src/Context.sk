@@ -1227,7 +1227,7 @@ fun resolveContext(
     context.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> void
     | Some(dir) ->
-      !dir = dir.purge(context);
+      !dir = dir.purge(context, Tick(context.tick.value - 1000));
       context.setDir(dirName, dir)
     }
   };
