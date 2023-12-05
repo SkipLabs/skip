@@ -101,7 +101,7 @@ void sk_global_lock() {
   }
 #endif
 
-  fprintf(stderr, "Internal error: locking failed\n");
+  perror("Internal error: locking failed");
   exit(ERROR_LOCKING);
 }
 
@@ -117,8 +117,7 @@ void sk_global_unlock() {
     return;
   }
 
-  fprintf(stderr, "Internal error: global unlocking failed, %s\n",
-          strerror(errno));
+  perror("Internal error: global unlocking failed");
   exit(ERROR_LOCKING);
 }
 
