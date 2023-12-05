@@ -1,3 +1,6 @@
+extern "C" {
+#include "runtime.h"
+}
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -410,7 +413,7 @@ char* SKIP_open_file(char* filename_obj) {
   if (f == (void*)MAP_FAILED) {
     perror("ERROR (MMap FAILED)");
     fprintf(stderr, "Could not open file: %s\n", filename);
-    exit(45);
+    exit(ERROR_FILE_IO);
   }
   result = sk_string_alloc(size);
   memcpy(result, f, size);
@@ -428,7 +431,7 @@ void SKIP_write_to_file(int64_t fd, char* str) {
     if (written < 0) {
       int err = errno;
       fprintf(stderr, "Could not write to file. %" PRId64 " (%d)\n", fd, err);
-      exit(45);
+      exit(ERROR_FILE_IO);
     }
     size -= written;
   }
