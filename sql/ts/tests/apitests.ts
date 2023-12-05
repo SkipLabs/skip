@@ -111,13 +111,13 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   const remote = (await skdb.connectedRemote())!;
 
   const groupGALL = await remote.exec(
-    "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'read-only-root');",
+    "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'read-only');",
     new Map(),
   );
   expect(groupGALL).toEqual([]);
 
   const groupPermissionsGALL = await remote.exec(
-    "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, skdb_permission('rw'), 'read-only-root');",
+    "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, skdb_permission('rw'), 'read-only');",
     new Map(),
   );
   expect(groupPermissionsGALL).toEqual([]);
