@@ -35,6 +35,13 @@ mutable base class .Bytes extends Sequence<UInt8> uses Show {
   // TODO: extends IndexedSequence<UInt8>
   readonly fun get(index: Int): UInt8;
   readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes;
+  readonly fun indexOf(predicate: UInt8): ?Int {
+    for (index in Range(0, this.size())) {
+      if (this[index] == predicate) break Some(index)
+    } else {
+      None()
+    }
+  }
 }
 
 mutable base class .MutableBytes extends Bytes {

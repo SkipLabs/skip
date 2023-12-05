@@ -405,6 +405,12 @@ export class Utils {
     copy.set(skData);
     return copy;
   };
+  importBytes2 = (skBytes: ptr, size: int = 1) => {
+    let skData = new Uint8Array(this.exports.memory.buffer, skBytes, size);
+    let copy = new Uint8Array(size);
+    copy.set(skData);
+    return copy;
+  };
   exportBytes = (view: Uint8Array) => {
     let skArray = this.exports.SKIP_createByteArray(view.byteLength);
     let data = new Uint8Array(
@@ -414,6 +420,14 @@ export class Utils {
     );
     data.set(view);
     return skArray;
+  };
+  exportBytes2 = (view: Uint8Array, skBytes: ptr) => {
+    let data = new Uint8Array(
+      this.exports.memory.buffer,
+      skBytes,
+      view.byteLength,
+    );
+    data.set(view);
   };
   importUInt32s = (skArray: ptr) => {
     let size = this.exports.SKIP_getArraySize(skArray);

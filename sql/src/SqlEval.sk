@@ -1837,7 +1837,10 @@ fun eval(
 
 fun slurpStmts(_options: Options): Array<P.Stmt> {
   // TODO: properly handle buffering.
-  input = IO.stdin().read_to_end();
+  input = IO.stdin().read_to_string() match {
+  | Success(input) -> input
+  | Failure(err) -> invariant_violation(`Error reading input: ${err}`)
+  };
   stmts = mutable Vector[];
 
   parser = P.Parser::create(input);
