@@ -231,16 +231,16 @@ void SKIP_posix_close(int64_t fd) {
   SKIP_js_close((int32_t)fd);
 }
 
-uint32_t SKIP_js_write(uint32_t fd, char* buf);
+uint32_t SKIP_js_write(uint32_t fd, char* buf, uint32_t len);
 
-int64_t SKIP_posix_write(int64_t fd, char* buf) {
-  return (int64_t)SKIP_js_write((uint32_t)fd, buf);
+int64_t SKIP_posix_write(int64_t fd, char* buf, int64_t len) {
+  return (int64_t)SKIP_js_write((uint32_t)fd, buf, (uint32_t)len);
 }
 
-char* SKIP_js_read(uint32_t fd, uint32_t len);
+int32_t SKIP_js_read(uint32_t fd, char* buf, uint32_t len);
 
-char* SKIP_posix_read(int64_t fd, int64_t len) {
-  return SKIP_js_read((uint32_t)fd, (uint32_t)len);
+int64_t SKIP_posix_read(int64_t fd, char* buf, int64_t len) {
+  return (int64_t)SKIP_js_read((uint32_t)fd, buf, (uint32_t)len);
 }
 
 int32_t SKIP_js_get_argc();
