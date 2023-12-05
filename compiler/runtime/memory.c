@@ -177,8 +177,8 @@ void* sk_malloc(size_t size) {
     size_t capacity = 1 << sk_malloc_table->bitcapacity;
 
     if (sk_malloc_table->size >= capacity / 2) {
-      fprintf(stderr, "MEMORY CHECK TABLE SIZE TO SMALL\n");
-      exit(88);
+      fprintf(stderr, "MEMORY CHECK TABLE SIZE TOO SMALL\n");
+      exit(ERROR_MEMORY_CHECK);
     }
 
     sk_htbl_add(sk_malloc_table, result, (uint64_t)alloc_count);
