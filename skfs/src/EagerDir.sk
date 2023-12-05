@@ -896,8 +896,11 @@ class EagerDir{
     FixedDataMap::create(data, tombs)
   }
 
-  fun purge(context: mutable Context): this {
-    limit = Tick(context.tick.value - 1000);
+  fun purge(context: mutable Context, limit: Tick): this {
+    this.tombLimit match { // tombLimit must be monotonic
+    | Some(tombLimit) if (limit.value <= tombLimit.value) -> return this
+    | _ -> void
+    };
     fixedOld = this.purgeOld();
     fixedData = this.flattenData(limit);
     context.!purgeLimit = Some(limit);

@@ -6,7 +6,7 @@ import multiprocessing as mp
 
 def run_test(args):
   name, f = args
-  prefix = f"> {name.replace('test_', '').replace('_', ' ')}......"
+  prefix = f"> {name}......"
   loop = asyncio.get_event_loop()
   log = []
   def collect(output):
