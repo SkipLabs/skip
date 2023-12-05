@@ -538,7 +538,7 @@ void sk_load_mapping(char* fileName) {
 
   if (fd == -1) {
     fprintf(stderr, "Error: could not open file (did you run --init?)\n");
-    exit(25);
+    exit(ERROR_FILE_IO);
   }
 
   void* addr;
