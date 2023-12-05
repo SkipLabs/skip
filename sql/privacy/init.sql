@@ -53,48 +53,21 @@ CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
 
 -------------------------------------------------------------------------------
 -- Some default groups
+-- (globally-visible) groups granting global privileges matching their groupID
 -------------------------------------------------------------------------------
 
--- First let's create read-only-root, it's a group where everybody can
--- read but nothing else.
-
-INSERT INTO skdb_groups
-  VALUES ('read-only-root', NULL, 'root', 'root')
+INSERT INTO skdb_groups VALUES
+  ('read-only', NULL, 'root', 'root'),
+  ('read-write', NULL, 'root', 'root'),
+  ('write-only', NULL, 'root', 'root')
 ;
 
-INSERT INTO skdb_group_permissions
-  VALUES ('read-only-root', NULL, skdb_permission('r'), 'root')
+INSERT INTO skdb_group_permissions VALUES
+       ('read-only', NULL, skdb_permission('r'), 'read-only'),
+       ('write-only', NULL, skdb_permission('w'), 'read-only'),
+       ('read-write', NULL, skdb_permission('rw'), 'read-only')
 ;
 
--- read-only is visible by everyone, but only the root can change the
--- permissions (which should never happen).
+UPDATE skdb_groups SET skdb_access='read-only'
+       WHERE groupID IN ('read-only', 'write-only', 'read-write');
 
-INSERT INTO skdb_groups
-  VALUES ('read-only', NULL, 'read-only-root', 'root')
-;
-
-INSERT INTO skdb_group_permissions
-  VALUES ('read-only', NULL, skdb_permission('r'), 'read-only-root')
-;
-
--- write-only is visible by everyone, but only the root can change the
--- permissions (which should never happen).
-
-INSERT INTO skdb_groups
-  VALUES ('write-only', NULL, 'read-only-root', 'root')
-;
-
-INSERT INTO skdb_group_permissions
-  VALUES ('write-only', NULL, skdb_permission('di'), 'read-only-root')
-;
-
--- read-write is visible by everyone, but only the root can change the
--- permissions (which should never happen).
-
-INSERT INTO skdb_groups
-  VALUES ('read-write', NULL, 'read-only-root', 'root')
-;
-
-INSERT INTO skdb_group_permissions
-  VALUES ('read-write', NULL, skdb_permission('dir'), 'read-only-root')
-;
