@@ -227,7 +227,7 @@ uint32_t SKIP_getchar(uint64_t) {
 
   if (c2 == EOF) {
     fprintf(stderr, "Invalid utf8");
-    exit(23);
+    exit(ERROR_INVALID_STRING);
   }
 
   if ((c1 & 0x20) == 0) {
@@ -238,7 +238,7 @@ uint32_t SKIP_getchar(uint64_t) {
 
   if (c3 == EOF) {
     fprintf(stderr, "Invalid utf8");
-    exit(23);
+    exit(ERROR_INVALID_STRING);
   }
 
   if ((c1 & 0x10) == 0) {
@@ -249,7 +249,7 @@ uint32_t SKIP_getchar(uint64_t) {
 
   if (c4 == EOF) {
     fprintf(stderr, "Invalid utf8");
-    exit(23);
+    exit(ERROR_INVALID_STRING);
   }
 
   if ((c1 & 0x8) == 0) {
@@ -258,7 +258,7 @@ uint32_t SKIP_getchar(uint64_t) {
   }
 
   fprintf(stderr, "Invalid utf8");
-  exit(23);
+  exit(ERROR_INVALID_STRING);
   return 0;
 }
 
@@ -540,7 +540,7 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
   uint32_t byteSize = SKIP_String_byteSize(formatp);
   if (byteSize >= 1024) {
     fprintf(stderr, "format string too large");
-    exit(23);
+    exit(ERROR_INVALID_STRING);
   }
   cformat[byteSize] = 0;
   memcpy(cformat, formatp, byteSize);
