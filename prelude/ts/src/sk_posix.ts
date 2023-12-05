@@ -13,8 +13,8 @@ interface ToWasm {
   SKIP_check_if_file_exists: (skPath: ptr) => boolean;
   SKIP_js_open: (skPath: ptr, flags: int, mode: int) => int;
   SKIP_js_close: (fd: int) => void;
-  SKIP_js_write: (fd: int, skContents: ptr) => int;
-  SKIP_js_read: (fd: int, len: int) => ptr;
+  SKIP_js_write: (fd: int, skContents: ptr, len: int) => int;
+  SKIP_js_read: (fd: int, skContents: ptr, len: int) => int;
   SKIP_js_open_flags: (
     read: boolean,
     write: boolean,
@@ -35,8 +35,8 @@ class LinksImpl implements Links, ToWasm {
   SKIP_check_if_file_exists!: (skPath: ptr) => boolean;
   SKIP_js_open!: (skPath: ptr, flags: int, mode: int) => int;
   SKIP_js_close!: (fd: int) => void;
-  SKIP_js_write!: (fd: int, skContents: ptr) => int;
-  SKIP_js_read!: (fd: int, len: int) => ptr;
+  SKIP_js_write!: (fd: int, skContents: ptr, len: int) => int;
+  SKIP_js_read!: (fd: int, skContents: ptr, len: int) => int;
   SKIP_js_open_flags!: (
     read: boolean,
     write: boolean,
@@ -72,15 +72,17 @@ class LinksImpl implements Links, ToWasm {
     this.SKIP_js_close = (fd: int) => {
       return this.fs.closeFile(fd);
     };
-    this.SKIP_js_write = (fd: int, skContents: ptr) => {
-      return this.fs.write(fd, utils.importString(skContents));
+    this.SKIP_js_write = (fd: int, skContents: ptr, len: int) => {
+      // TODO: Write bytes directly into fs.
+      this.fs.write(fd, new TextDecoder().decode(utils.importBytes2(skContents, len)));
+      return len;
     };
-    this.SKIP_js_read = (fd: int, len: int) => {
-      let read = this.fs.read(fd, len);
-      if (read == null) {
-        (exports as any).SKIP_throw_EndOfFile();
+    this.SKIP_js_read = (fd: int, skContents: ptr, len: int) => {
+      var res = this.fs.read(fd, len);
+      if (res !== null) {
+        utils.exportBytes2(new TextEncoder().encode(res), skContents);
       }
-      return utils.exportString(read!);
+      return len;
     };
     this.SKIP_js_open_flags = (
       read: boolean,
@@ -120,9 +122,9 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_js_open = (skPath: ptr, flags: int, mode: int) =>
       links.SKIP_js_open(skPath, flags, mode);
     toWasm.SKIP_js_close = (fd: int) => links.SKIP_js_close(fd);
-    toWasm.SKIP_js_write = (fd: int, skContents: ptr) =>
-      links.SKIP_js_write(fd, skContents);
-    toWasm.SKIP_js_read = (fd: int, len: int) => links.SKIP_js_read(fd, len);
+    toWasm.SKIP_js_write = (fd: int, skContents: ptr, len: int) =>
+      links.SKIP_js_write(fd, skContents, len);
+    toWasm.SKIP_js_read = (fd: int, skContents: ptr, len: int) => links.SKIP_js_read(fd, skContents, len);
     toWasm.SKIP_js_open_flags = (
       read: boolean,
       write: boolean,

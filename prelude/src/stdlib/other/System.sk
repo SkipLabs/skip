@@ -289,34 +289,31 @@ fun subprocess(
 ): CompletedProcess {
   p = Posix.Popen::create{args, stdout => true, stderr => true};
   streams = Array[p.stdout.fromSome(), p.stderr.fromSome()];
-  captured_stdout = "";
-  captured_stderr = "";
-  handlers = Array[
-    s -> {
-      !captured_stdout = captured_stdout + s;
-      stdout(s)
-    },
-    s -> {
-      !captured_stderr = captured_stderr + s;
-      stderr(s)
-    },
-  ];
+  captured = Array[mutable Vector[], mutable Vector[]];
+  handlers = Array[stdout, stderr];
   pollfds = Array::mcreateFromItems(
     streams.map(s -> Posix.Pollfd::create(s.fileno)),
   );
   open_fds = streams.size();
+  // TODO: Use uninitialized buffer.
+  buf = Array::mfill(4096, UInt8::truncate(0));
   while (open_fds > 0) {
     _ = Posix.poll(pollfds);
     for ((i, pfd) in pollfds.items()) {
+      if (pfd.fd == -1) continue;
       eof = false;
       if (pfd.pollin()) {
-        try {
-          handlers[i](streams[i].read(4096))
-        } catch {
-        | EndOfFile _ -> !eof = true
-        | exn -> throw exn
+        streams[i].read(buf.mbytes()) match {
+        | Failure(err) -> throw err
+        | Success(0) -> !eof = true
+        | Success(nbytes) ->
+          captured[i].extend(buf.slice(0, nbytes));
+          handlers[i](
+            // TODO: Get rid of `.collect(Array)`.
+            String::fromUtf8(buf.slice(0, nbytes).collect(Array)),
+          )
         }
-      } else if (pfd.fd != -1 && (pfd.pollerr() || pfd.pollhup())) {
+      } else if (pfd.pollerr() || pfd.pollhup()) {
         !eof = true
       };
       if (eof) {
@@ -326,7 +323,12 @@ fun subprocess(
     }
   };
   exitstatus = p.wait();
-  CompletedProcess(args, exitstatus, captured_stdout, captured_stderr)
+  CompletedProcess(
+    args,
+    exitstatus,
+    String::fromUtf8(captured[0].toArray()),
+    String::fromUtf8(captured[1].toArray()),
+  )
 }
 
 module end;

@@ -42,7 +42,13 @@ untracked fun main(): void {
   for (file in filenames) {
     contents = if (file == "-") {
       !file = "<stdin>";
-      IO.stdin().read_to_end()
+      buf = mutable Vector[];
+      IO.stdin().read_to_end(buf) match {
+      | Success _ -> String::fromUtf8(buf.collect(Array))
+      | Failure(err) ->
+        print_error(err.getMessage());
+        skipExit(1)
+      }
     } else {
       FileSystem.readTextFile(file)
     };
