@@ -256,6 +256,16 @@ mutable class .Vector<+T> private (
     this.inner.mbytes().mslice(0, this.size())
   }
 
+  mutable fun unsafeConsumeSpareCapacity(count: Int): void {
+    assert(this.sz + count <= this.inner.size());
+    this.!sz = this.sz + count;
+    this.invalidateIterators();
+  }
+
+  mutable fun unsafeSpareCapacityBytes(): mutable MutableBytes {
+    this.inner.mbytes().mslice(this.sz, this.inner.size())
+  }
+
   // # Accessing Items
 
   // Get the item at the given index, throws if the index is out of bounds.
