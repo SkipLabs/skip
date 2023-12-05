@@ -732,7 +732,7 @@ void* sk_palloc(size_t size) {
   }
   if ((*ginfo)->head + size >= (*ginfo)->end) {
     fprintf(stderr, "Error: out of persistent memory.\n");
-    exit(45);
+    exit(ERROR_OUT_OF_MEMORY);
   }
   void* result = (*ginfo)->head;
   (*ginfo)->head += size;
