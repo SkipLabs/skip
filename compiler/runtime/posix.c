@@ -26,6 +26,18 @@ int64_t SKIP_posix_open(char *path_obj, int64_t oflag, int64_t mode) {
   return (int64_t)fd;
 }
 
+int64_t SKIP_posix_unlink(char *path_obj) {
+  char *path = sk2c_string(path_obj);
+  int rv = unlink(path);
+  if (path != path_obj) free(path);
+
+  if (rv == -1) {
+    return (int64_t)(-errno);
+  }
+
+  return 0;
+}
+
 int64_t SKIP_posix_open_flags(int64_t read, int64_t write, int64_t append,
                               int64_t truncate, int64_t create,
                               int64_t create_new) {

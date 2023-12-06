@@ -77,6 +77,13 @@ mutable class File(
 @cpp_extern("SKIP_open_file")
 native fun open_file(fileName: String): String;
 
+fun remove_file(fileName: String): Result<void, IO.Error> {
+  Posix.unlink(fileName) match {
+  | rv if (rv < 0) -> Failure(IO.Error(-rv))
+  | _ -> Success(void)
+  }
+}
+
 // This is really broken - you can't read a file into a String without an
 // encoding!
 fun readTextFile(filename: String): String {
