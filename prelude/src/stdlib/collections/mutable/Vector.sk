@@ -24,6 +24,7 @@ mutable class .Vector<+T> private (
   uses
     IntoIterator<T>,
     FromIterator<T>,
+    AsSlice<T>,
     Show[T: readonly Show],
     Hashable[T: Hashable],
     Orderable[T: Orderable],
@@ -253,6 +254,10 @@ mutable class .Vector<+T> private (
 
   mutable fun unsafeSpareCapacitySlice(): mutable MutableSlice<T> {
     Array.MutableRawStorageSlice::create(this.inner, this.sz, this.inner.size())
+  }
+
+  readonly fun as_slice<U>[T: U](): mutable Slice<U> {
+    Array.RawStorageSlice::create<U>(this.inner, 0, this.size())
   }
 
   // # Accessing Items

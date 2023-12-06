@@ -8,12 +8,23 @@
 module String;
 
 native class .String uses Hashable, Show, Orderable {
-  @cpp_runtime
+  static fun fromChars<T>[T: readonly AsSlice<Char>](chars: T): String {
+    slice = chars.as_slice();
+    String::fromCharsImpl(slice.ptr(), slice.size())
+  }
+
   @may_alloc
-  native static fun fromChars(chars: readonly Sequence<Char>): String;
-  @cpp_extern
+  @cpp_extern("SKIP_String__fromChars")
+  private static native fun fromCharsImpl(chars: Ptr<Char>, size: Int): String;
+
+  static fun fromUtf8<T>[T: readonly AsSlice<UInt8>](bytes: T): String {
+    slice = bytes.as_slice();
+    String::fromUtf8Impl(slice.ptr(), slice.size())
+  }
+
   @may_alloc
-  native static fun fromUtf8(bytes: readonly Array<UInt8>): String;
+  @cpp_extern("SKIP_String__fromUtf8")
+  private static native fun fromUtf8Impl(bytes: Ptr<UInt8>, size: Int): String;
 
   private static fun fromGenerator(gen: () -> mutable Iterator<Char>): String {
     String::fromChars(Array::createFromIterator(gen()))
