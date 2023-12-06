@@ -57,9 +57,9 @@ CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
 -------------------------------------------------------------------------------
 
 INSERT INTO skdb_groups VALUES
-  ('read-only', NULL, 'root', 'root'),
-  ('read-write', NULL, 'root', 'root'),
-  ('write-only', NULL, 'root', 'root')
+  ('read-only', NULL, 'root', 'read-only'),
+  ('read-write', NULL, 'root', 'read-only'),
+  ('write-only', NULL, 'root', 'read-only')
 ;
 
 INSERT INTO skdb_group_permissions VALUES
@@ -67,7 +67,3 @@ INSERT INTO skdb_group_permissions VALUES
        ('write-only', NULL, skdb_permission('w'), 'read-only'),
        ('read-write', NULL, skdb_permission('rw'), 'read-only')
 ;
-
-UPDATE skdb_groups SET skdb_access='read-only'
-       WHERE groupID IN ('read-only', 'write-only', 'read-write');
-
