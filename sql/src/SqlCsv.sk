@@ -349,45 +349,35 @@ fun applyDiffStrategy(
     };
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
-    entries = mutable Vector[];
 
     for (row in rows) {
-      saved = SKStore.newObstack();
-      acc = mutable Vector[];
-      key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
-      for ((tick, source, _) in dir.unsafeGetDataIterWithoutTombs(key)) {
-        if (tick.value < snapshot.default(0) || source.path() == writer) {
-          acc.push((key, (source.path(), writer, Array<SKStore.File>[])));
-        }
-      };
-      rowEntries = SKStore.destroyObstackWithValue(
-        saved,
-        List[acc.collect(Array)],
-      ).getHead();
-      entries.extend(rowEntries);
-    };
-
-    if (!entries.isEmpty()) {
-      !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
-    };
-
-    // TODO: if this works well, combine with the obstack created above and just have one loop.
-    // TODO: rinse and repeat for the other strategies
-    for (row in rows) {
-      if (row.repeat < 1) {
-        continue;
-      };
-
       (ctx, !dir) = {
         saved = SKStore.newObstack();
+        newDir = dir;
         tmpContext = newRoot.mclone();
-        newDir = dir.writeEntry(
-          tmpContext,
-          writer,
-          writer,
-          SKDB.RowKey(row, table.kinds),
-          Array[row],
-        );
+        key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
+        for ((tick, source, _) in dir.unsafeGetDataIterWithoutTombs(key)) {
+          if (tick.value < snapshot.default(0) || source.path() == writer) {
+            !newDir = newDir.writeEntry(
+              tmpContext,
+              source.path(),
+              writer,
+              key,
+              Array<SKStore.File>[],
+            );
+          }
+        };
+
+        if (row.repeat > 0) {
+          !newDir = newDir.writeEntry(
+            tmpContext,
+            writer,
+            writer,
+            SKDB.RowKey(row, table.kinds),
+            Array[row],
+          );
+        };
+
         SKStore.destroyObstackWithValue(
           saved,
           List[(tmpContext, newDir)],
