@@ -203,23 +203,23 @@ fun lwwEdits(
   snapshot: Int,
   writer: SKStore.Path,
   primaryIdxOpt: ?Int,
-  context: mutable SKStore.Context,
+  context: readonly SKStore.Context,
   dir: SKStore.EagerDir,
   row: SKDB.RowValues,
 ): mutable Iterator<
   (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
 > {
-  !context = context.mclone();
+  mcontext = context.mclone();
   primaryIdx = primaryIdxOpt match {
   | None() -> invariant_violation("Using LWW without a primary key.")
   | Some(p) -> p
   };
   indexEntry = SKDB.makeIndexEntry(table.name, primaryIdx);
-  indexTable = SKDB.getIndexByColNbr(context);
-  indexes = indexTable.unsafeGetArray(context, indexEntry);
+  indexTable = SKDB.getIndexByColNbr(mcontext);
+  indexes = indexTable.unsafeGetArray(mcontext, indexEntry);
   invariant(indexes.size() > 0);
   index = indexes[0];
-  indexDir = context.unsafeGetEagerDir(index.dirName);
+  indexDir = mcontext.unsafeGetEagerDir(index.dirName);
   primaryKey = row.getValue(primaryIdx);
   startKey = SKDB.RowKey::create(
     SKDB.RowValues::create(Array[primaryKey], 1),
@@ -241,7 +241,7 @@ fun lwwEdits(
     };
     if (rowKey.row.getValue(0) != primaryKey) break void;
 
-    for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+    for ((tick, source, _) in dir.getDataIterWithoutTombs(mcontext, key)) {
       if (
         tick.value < snapshot ||
         source.path() == writer ||
@@ -352,12 +352,19 @@ fun applyDiffStrategy(
     entries = mutable Vector[];
 
     for (row in rows) {
+      saved = SKStore.newObstack();
+      acc = mutable Vector[];
       key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
-      for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
+      for ((tick, source, _) in dir.unsafeGetDataIterWithoutTombs(key)) {
         if (tick.value < snapshot.default(0) || source.path() == writer) {
-          entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
+          acc.push((key, (source.path(), writer, Array<SKStore.File>[])));
         }
-      }
+      };
+      rowEntries = SKStore.destroyObstackWithValue(
+        saved,
+        List[acc.collect(Array)],
+      ).getHead();
+      entries.extend(rowEntries);
     };
 
     if (!entries.isEmpty()) {
@@ -394,9 +401,11 @@ fun applyDiffStrategy(
       tick.value < snapshot.default(0) || source.path() == writer;
 
     for (row in rows) {
+      saved = SKStore.newObstack();
+      acc = mutable Vector[];
       key: SKStore.Key = SKDB.RowKey(row, table.kinds);
       keyRepeat = row.repeat;
-      for ((tick, source, files) in dir.getDataIterWithoutTombs(newRoot, key)) {
+      for ((tick, source, files) in dir.unsafeGetDataIterWithoutTombs(key)) {
         if (!isEligibleForTomb(tick, source)) {
           continue
         };
@@ -406,15 +415,21 @@ fun applyDiffStrategy(
         };
 
         if (keyRepeat - srcRepeat < 0) {
-          entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
+          acc.push((key, (source.path(), writer, Array<SKStore.File>[])));
         } else {
           !keyRepeat = keyRepeat - srcRepeat;
         }
       };
 
       if (keyRepeat != 0) {
-        entries.push((key, (writer, writer, Array[row.setRepeat(keyRepeat)])));
-      }
+        acc.push((key, (writer, writer, Array[row.setRepeat(keyRepeat)])));
+      };
+
+      rowEntries = SKStore.destroyObstackWithValue(
+        saved,
+        List[acc.collect(Array)],
+      ).getHead();
+      entries.extend(rowEntries);
     };
 
     if (!entries.isEmpty()) {
@@ -450,13 +465,21 @@ fun applyDiffStrategy(
     entries = mutable Vector[];
 
     for (row in rows) {
+      saved = SKStore.newObstack();
+      acc = mutable Vector[];
+
       if (row.repeat < 1) {
         key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
+        for ((tick, source, _) in dir.unsafeGetDataIterWithoutTombs(key)) {
           if (tick.value < snapshot.default(0) || source.path() == writer) {
-            entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
+            acc.push((key, (source.path(), writer, Array<SKStore.File>[])));
           }
         };
+        rowEntries = SKStore.destroyObstackWithValue(
+          saved,
+          List[acc.collect(Array)],
+        ).getHead();
+        entries.extend(rowEntries);
         continue;
       };
 
@@ -469,8 +492,14 @@ fun applyDiffStrategy(
         dir,
         row,
       )) {
-        entries.push(change);
-      }
+        acc.push(change);
+      };
+
+      rowEntries = SKStore.destroyObstackWithValue(
+        saved,
+        List[acc.collect(Array)],
+      ).getHead();
+      entries.extend(rowEntries);
     };
 
     !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
@@ -490,6 +519,9 @@ fun applyDiffStrategy(
     entries = mutable Vector[];
 
     for (row in rows) {
+      saved = SKStore.newObstack();
+      acc = mutable Vector[];
+
       if (row.repeat < 1) {
         continue;
       };
@@ -503,9 +535,16 @@ fun applyDiffStrategy(
         dir,
         row,
       )) {
-        entries.push(change);
-      }
+        acc.push(change);
+      };
+
+      rowEntries = SKStore.destroyObstackWithValue(
+        saved,
+        List[acc.collect(Array)],
+      ).getHead();
+      entries.extend(rowEntries);
     };
+
     !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
 
     !dir = dir.reset(
@@ -620,10 +659,7 @@ fun parseTableChange(
     repeat,
   );
 
-  SKStore.destroyObstackWithValue(
-    saved,
-    List[ret]
-  ).getHead()
+  SKStore.destroyObstackWithValue(saved, List[ret]).getHead()
 }
 
 mutable class TableDiff(
