@@ -370,16 +370,32 @@ fun applyDiffStrategy(
     if (!entries.isEmpty()) {
       !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
     };
-    !dir = dir.writeArraySourceManyReturnDir(
-      newRoot,
-      rows
-        .iterator()
-        .filter(row -> row.repeat != 0)
-        .map(row -> {
-          (k, v) = (SKDB.RowKey(row, table.kinds), Array[row]);
-          ((k : SKStore.Key), (writer, writer, (v : Array<SKStore.File>)))
-        }),
-    );
+
+    // TODO: if this works well, combine with the obstack created above and just have one loop.
+    // TODO: rinse and repeat for the other strategies
+    for (row in rows) {
+      if (row.repeat < 1) {
+        continue;
+      };
+
+      (ctx, !dir) = {
+        saved = SKStore.newObstack();
+        tmpContext = newRoot.mclone();
+        newDir = dir.writeEntry(
+          tmpContext,
+          writer,
+          writer,
+          SKDB.RowKey(row, table.kinds),
+          Array[row],
+        );
+        SKStore.destroyObstackWithValue(
+          saved,
+          List[(tmpContext, newDir)],
+        ).getHead();
+      };
+
+      newRoot.replaceFromSaved(ctx);
+    };
 
     newRoot.setDir(dir.dirName, dir);
     checkpointAndAck(newRoot, delta);
