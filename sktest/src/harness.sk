@@ -78,7 +78,8 @@ fun test_job(
 
       stdout_file.close();
       stderr_file.close();
-
+      FileSystem.remove_file(stdout_file.path).fromSuccess();
+      FileSystem.remove_file(stderr_file.path).fromSuccess();
       stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
     }
   };
