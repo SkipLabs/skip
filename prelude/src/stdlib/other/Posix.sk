@@ -233,9 +233,9 @@ mutable class Process(pid: Int) {
 // TODO: Properly handle redirecting to /dev/null.
 mutable class Popen(
   process: mutable Process,
-  stdin: ?mutable IO.File,
-  stdout: ?mutable IO.File,
-  stderr: ?mutable IO.File,
+  stdin: ?mutable FileSystem.File,
+  stdout: ?mutable FileSystem.File,
+  stderr: ?mutable FileSystem.File,
 ) {
   static fun create{
     args: Array<String>,
@@ -283,9 +283,9 @@ mutable class Popen(
 
     mutable Popen(
       p,
-      stdin_pipe.map(pipe -> mutable IO.File(pipe.input)),
-      stdout_pipe.map(pipe -> mutable IO.File(pipe.output)),
-      stderr_pipe.map(pipe -> mutable IO.File(pipe.output)),
+      stdin_pipe.map(pipe -> mutable FileSystem.File(pipe.input)),
+      stdout_pipe.map(pipe -> mutable FileSystem.File(pipe.output)),
+      stderr_pipe.map(pipe -> mutable FileSystem.File(pipe.output)),
     )
   }
 

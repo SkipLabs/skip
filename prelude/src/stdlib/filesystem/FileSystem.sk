@@ -14,6 +14,66 @@ native fun getcwd(): String;
 
 module FileSystem;
 
+class OpenOptions{
+  read: Bool = false,
+  write: Bool = false,
+  append: Bool = false,
+  truncate: Bool = false,
+  create: Bool = false,
+  create_new: Bool = false,
+  mode: Int = 0o777,
+} {
+  fun flags(): Int {
+    // TODO: Check validity of flags.
+    Posix.open_flags(
+      if (this.read) 1 else 0,
+      if (this.write) 1 else 0,
+      if (this.append) 1 else 0,
+      if (this.truncate) 1 else 0,
+      if (this.create) 1 else 0,
+      if (this.create_new) 1 else 0,
+    )
+  }
+}
+
+mutable class File(
+  fileno: Int,
+  path: String = "unknown",
+) uses IO.Read, IO.Write, IO.IsTerminal {
+  static fun open(
+    path: String,
+    opts: OpenOptions = OpenOptions{},
+  ): mutable File {
+    mutable File(Posix.open(path, opts.flags(), opts.mode), path)
+  }
+
+  readonly fun isatty(): Bool {
+    Posix.isatty(this.fileno)
+  }
+
+  mutable fun read(buf: mutable MutableSlice<UInt8>): Result<Int, IO.Error> {
+    rv = Posix.read(this.fileno, buf.mptr(), buf.size());
+    if (rv >= 0) {
+      Success(rv)
+    } else {
+      Failure(IO.Error(-rv))
+    }
+  }
+
+  mutable fun write(buf: readonly Slice<UInt8>): Result<Int, IO.Error> {
+    rv = Posix.write(this.fileno, buf.ptr(), buf.size());
+    if (rv >= 0) {
+      Success(rv)
+    } else {
+      Failure(IO.Error(-rv))
+    }
+  }
+
+  mutable fun close(): void {
+    Posix.close(this.fileno)
+  }
+}
+
 @cpp_extern("SKIP_open_file")
 native fun open_file(fileName: String): String;
 
