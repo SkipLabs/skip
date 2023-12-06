@@ -49,9 +49,13 @@ fun test_job(
         continue
       };
 
-      stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+      stdout_file = Posix.mkstemp(
+        Path.join(Environ.temp_dir(), "XXXXXX"),
+      ).fromSuccess();
       Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
-      stderr_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+      stderr_file = Posix.mkstemp(
+        Path.join(Environ.temp_dir(), "XXXXXX"),
+      ).fromSuccess();
       Posix.dup2(stderr_file.fileno, IO.stderr().fileno);
 
       res = run_test(

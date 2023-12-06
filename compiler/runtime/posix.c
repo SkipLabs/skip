@@ -305,16 +305,10 @@ char SKIP_posix_isatty(int64_t fd) {
   return (char)rv;
 }
 
-int64_t SKIP_posix_mkstemp(char *template_obj) {
-  char *template = sk2c_string(template_obj);
-
+int64_t SKIP_posix_mkstemp(char *template) {
   int rv = mkstemp(template);
   if (rv == -1) {
-    perror("mkstemp");
-    exit(EXIT_FAILURE);
-  }
-  if (template != template_obj) {
-    free(template);
+    return (int64_t)(-rv);
   }
 
   return rv;

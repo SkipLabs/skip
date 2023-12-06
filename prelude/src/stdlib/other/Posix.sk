@@ -94,11 +94,25 @@ native fun isatty(fd: Int): Bool;
 
 @debug
 @cpp_extern("SKIP_posix_mkstemp")
-native fun internalMkstemp(template: String): Int;
+native fun internalMkstemp(template: mutable Ptr<UInt8>): Int;
 
-fun mkstemp(template: String): mutable IO.File {
-  // TODO: Properly set filename.
-  mutable IO.File(internalMkstemp(template))
+// TODO: Move this wrapper out of Posix.
+fun mkstemp(template: String): Result<mutable FileSystem.File, IO.Error> {
+  // NOTE: A lot of copies happening here, because `mkstemp()` requires a
+  // null-terminated string template that it modifies.
+  c_str = Vector::mcreateFromItems(template.bytes());
+  c_str.push(UInt8::truncate(0));
+  buf = Array::mcreateFromItems(c_str);
+  internalMkstemp(buf.as_mslice().mptr()) match {
+  | rv if (rv < 0) -> Failure(IO.Error(-rv))
+  | fd ->
+    Success(
+      mutable FileSystem.File(
+        fd,
+        String::fromUtf8(buf.as_slice().subslice(0, -1).collect(Array)),
+      ),
+    )
+  }
 }
 
 class Pipe(output: Int, input: Int) {}
