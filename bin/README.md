@@ -6,17 +6,10 @@ and NPM artifacts.
 
 ## Release Docker images
 
-In order to update `skiplabs/skdb-base:latest` or
-`skiplabs/skdb-dev-server:latest` to the current state of your git clone, you
-can run `release_docker_skdb_base.sh` or `release_docker_skdb_dev_server.sh`
-respectively.
-
-If you want to update a different version tag
-(e.g. `skiplabs/skdb-dev-server:quickstart`) then first add the flag
-`-t skiplabs/skdb-dev-server:latest` to the build command in
-`release_docker_skdb_dev_server.sh`. (optionally, delete the
-`-t skiplabs/skdb-dev-server:latest` flag if you _only_ want to push the
-`quickstart` version)
+In order to update `skiplabs/skdb-base` or `skiplabs/skdb-dev-server` to the
+current state of your git clone, you can run `release_docker_skdb_base.sh` or
+`release_docker_skdb_dev_server.sh` respectively. For the `dev-server`, you can
+choose to release either or both of the `latest` and `quickstart` tags.
 
 ## Release NPM packages
 
@@ -29,7 +22,10 @@ If you want to update a different version tag
 3. Commit your changes with a message like `NPM versions: skdb@x.y.z,
    skdb-dev@a.b.c, skdb-react@1.2.3`, but don't push yet.
 
-4. Run `release_npm_skdb.sh` to release the base `skdb` package.
+4. Run `release_npm_skdb.sh` to release the base `skdb` package.  Note that this
+   script requires `skargo` and `sknpm`, so may need to run inside of a docker
+   environment.  If so, make sure to run `npm login` first so that the CLI can
+   authenticate.
 
 5. If you're also updating `skdb-dev` or `skdb-react`, then `(cd packages/dev &&
    rm -rf node_modules && yarn install)` and/or `(cd packages/react && rm -rf
