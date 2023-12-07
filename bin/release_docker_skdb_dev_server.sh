@@ -11,6 +11,21 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 cd "$SCRIPT_DIR/../" || exit 1
 
+read -r -p "Release 'latest' version? [y/N] " latest
+if [[ "$latest" =~ ^([yY]|[yY][eE][sS])$ ]]; then
+    push_latest="-t skiplabs/skdb-dev-server:latest"
+fi
+
+read -r -p "Release 'quickstart' version? [y/N] " quickstart
+if [[ "$quickstart" =~ ^([yY]|[yY][eE][sS])$ ]]; then
+    push_quickstart="-t skiplabs/skdb-dev-server:quickstart"
+fi
+
+if [[ -z "$push_latest" && -z "$push_quickstart" ]]; then
+    echo Nothing to do, exiting.
+    exit 0
+fi
+
 git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
 echo ".git" >> .dockerignore
 
@@ -20,7 +35,8 @@ docker buildx build \
        --no-cache \
        --progress=plain \
        --platform linux/amd64,linux/arm64 \
-       -t skiplabs/skdb-dev-server:latest \
+       $push_latest \
+       $push_quickstart \
        -f sql/server/dev/Dockerfile \
        --push \
        .
