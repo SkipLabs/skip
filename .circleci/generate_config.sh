@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# TODO: This is flaky as it relies on the fork's master branch state.
-git diff --quiet HEAD master -- compiler/ prelude/ skfs/
+# TODO: This is flaky as it relies on coarse directory-level diffs.
+git diff --quiet HEAD main -- compiler/ prelude/ skfs/
 skc=$?
-git diff --quiet HEAD master -- skfs/
+git diff --quiet HEAD main -- skfs/
 skfs=$?
-git diff --quiet HEAD master -- sql/
+git diff --quiet HEAD main -- sql/
 skdb=$?
 
 if (($skc == 0 && $skfs == 0 && $skdb == 0))
