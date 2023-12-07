@@ -210,7 +210,6 @@ export class Utils {
   private mainFn?: string;
   private exceptions: Error[];
 
-
   exit = (code: int) => {
     let message =
       code != 0 && this.stderr.length > 0 ? this.stderr.join("") : undefined;
@@ -260,8 +259,8 @@ export class Utils {
   };
 
   exnCause = () => {
-    let cause : Error | undefined = undefined;
-    while(this.exceptions.length > 0) {
+    let cause: Error | undefined = undefined;
+    while (this.exceptions.length > 0) {
       let exc = this.exceptions.pop();
       if (cause) {
         (exc as any).cause = cause;
@@ -269,7 +268,7 @@ export class Utils {
       cause = exc;
     }
     return cause;
-  }
+  };
 
   runCheckError = <T>(fn: () => T) => {
     this.clearMainEnvironment();
@@ -308,22 +307,24 @@ export class Utils {
     if (exitCode != 0 || this.stderr.length > 0) {
       let message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
       let tmp = "";
-      let lines : string[] = [];
-      message?.split("\n").forEach(line => {
-        const matches = [...line.matchAll(/external:([0-9]+)/g)].sort((v1: string[], v2: string[]) => {
-          const i1 = parseInt(v1[1]);
-          const i2 = parseInt(v2[1]);
-          if ( i2 < i1 ){
-            return 1;
-          }
-          if ( i2 > i1 ){
-            return -1;
-          }
-          return 0;
-        });
+      let lines: string[] = [];
+      message?.split("\n").forEach((line) => {
+        const matches = [...line.matchAll(/external:([0-9]+)/g)].sort(
+          (v1: string[], v2: string[]) => {
+            const i1 = parseInt(v1[1]);
+            const i2 = parseInt(v2[1]);
+            if (i2 < i1) {
+              return 1;
+            }
+            if (i2 > i1) {
+              return -1;
+            }
+            return 0;
+          },
+        );
         if (matches.length > 0) {
-          matches.forEach(match => {
-              line = line.replace(match[0], "");
+          matches.forEach((match) => {
+            line = line.replace(match[0], "");
           });
           tmp = line;
         } else {
@@ -337,7 +338,7 @@ export class Utils {
       message = lines.join("\n");
       let error = new SkRuntimeExit(exitCode, message?.trim());
       (error as any).cause = this.exnCause();
-      throw error
+      throw error;
     }
     return this.stdout.join("");
   };
@@ -464,7 +465,10 @@ export class Utils {
       return this.call(f);
     } catch (exn) {
       this.exceptions.push(exn);
-      let exception = (exn instanceof SkException) ? null : new Exception(exn as Error, this.state);
+      let exception =
+        exn instanceof SkException
+          ? null
+          : new Exception(exn as Error, this.state);
       return this.callWithException(exn_handler, exception);
     }
   };
@@ -473,8 +477,14 @@ export class Utils {
     if (rethrow && this.exceptions.length > 0) {
       throw this.exceptions.pop();
     } else {
-      let skMessage = skExc != null && skExc != 0 ? this.exports.SKIP_getExceptionMessage(skExc) : null;
-      let message = skMessage != null && skMessage != 0 ? this.importString(skMessage) : "SKFS Internal error";
+      let skMessage =
+        skExc != null && skExc != 0
+          ? this.exports.SKIP_getExceptionMessage(skExc)
+          : null;
+      let message =
+        skMessage != null && skMessage != 0
+          ? this.importString(skMessage)
+          : "SKFS Internal error";
       let lines = message.split("\n");
       if (lines[0].startsWith("external:")) {
         let external = lines.shift()!;
@@ -488,19 +498,18 @@ export class Utils {
       }
       throw new SkException(message);
     }
-  }
+  };
   deleteException = (exc: int) => {
     this.state.exceptions.delete(exc);
-  }
+  };
 
   getExceptionMessage = (exc: int) => {
     if (this.state.exceptions.has(exc)) {
       return this.state.exceptions.get(exc)!.err.message;
+    } else {
+      return "Unknown";
     }
-    else {
-      return"Unknown";
-    }
-  }
+  };
 
   getPersistentSize = () => this.exports.SKIP_get_persistent_size();
   getVersion = () => this.exports.SKIP_get_version();
