@@ -204,38 +204,37 @@ class FixedDir<T: frozen> private {
     result
   }
 
-  fun getKeyChangesAfterIter(
+  fun getKeyChangesAfter(
     after: Tick,
     key: Key,
     i: Int,
     j: Int,
-  ): mutable Iterator<(Tick, Source, T)> {
+    acc: mutable Vector<(Tick, Source, T)>,
+  ): void {
     if (i <= j) {
       pivot = i + (j - i) / 2;
       elt = this.data[pivot];
       tick = elt.tag;
       if (tick.max >= after) {
         if (key <= elt.key) {
-          for (item in this.getKeyChangesAfterIter(after, key, i, pivot - 1)) {
-            yield item
-          }
+          this.getKeyChangesAfter(after, key, i, pivot - 1, acc);
         };
         if (tick.current >= after) {
           if (elt.key.compare(key) is EQ()) {
-            yield ((tick.current, elt.value.i0, elt.value.i1));
+            acc.push((tick.current, elt.value.i0, elt.value.i1));
           }
         };
         if (key >= elt.key) {
-          for (item in this.getKeyChangesAfterIter(after, key, pivot + 1, j)) {
-            yield item
-          }
+          this.getKeyChangesAfter(after, key, pivot + 1, j, acc);
         }
       }
     }
   }
 
   fun getIterAfter(limit: Tick, key: Key): mutable Iterator<(Tick, Source, T)> {
-    this.getKeyChangesAfterIter(limit, key, 0, this.data.size() - 1)
+    acc = mutable Vector[];
+    this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc);
+    acc.iterator()
   }
 
   fun getTick(): ?Tick {
