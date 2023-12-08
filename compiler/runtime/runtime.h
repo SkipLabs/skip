@@ -47,6 +47,7 @@ void sk_print_ctx_table();
 /*****************************************************************************/
 
 #define ERROR_TODO 1
+#define ERROR_EXEC 4
 #define ERROR_CHANGING_CONST 22
 #define ERROR_INVALID_EXTERNAL_POINTER 23
 #define ERROR_OUT_OF_MEMORY 24
