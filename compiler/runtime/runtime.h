@@ -208,7 +208,6 @@ uint32_t SKIP_getArraySize(char*);
 char* SKIP_get_free_slot(uint32_t);
 void* SKIP_intern(void* obj);
 void* SKIP_intern_shared(void* obj);
-void SKIP_internalExit(uint64_t code);
 void SKIP_invalid_utf8();
 SkipInt SKIP_isEq(char* obj1, char* obj2);
 uint32_t SKIP_is_string(char* obj);

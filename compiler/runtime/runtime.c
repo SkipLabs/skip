@@ -45,10 +45,6 @@ char* SKIP_get_local_context() {
 
 void SKIP_Regex_initialize() {}
 
-void SKIP_internalExit(uint64_t code) {
-  SKIP_exit(code);
-}
-
 void SKIP_print_last_exception_stack_trace_and_exit() {
   todo();
 }
