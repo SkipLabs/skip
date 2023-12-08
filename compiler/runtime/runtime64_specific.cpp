@@ -688,11 +688,9 @@ char* SKIP_call_external_fun(int32_t, char*) {
 void SKIP_last_tick(uint32_t) {
   // Not implemented
 }
-
 void SKIP_switch_to(uint32_t) {
   // Not implemented
 }
-
 void SKIP_clear_field_names() {
   // Not implemented
 }
@@ -720,8 +718,8 @@ void SKIP_push_object_field_string(char*) {
 void SKIP_push_object() {
   // Not implemented
 }
-
 void SKIP_js_delete_fun() {
   // Not implemented
 }
+
 }
