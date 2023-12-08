@@ -674,40 +674,6 @@ void SKIP_exit(uint64_t code) {
   exit(code);
 }
 
-int32_t SKIP_stdin_has_data() {
-  fd_set rfds;
-  struct timeval tv;
-  int retval;
-
-  /* Watch stdin (fd 0) to see when it has input. */
-  FD_ZERO(&rfds);
-  FD_SET(0, &rfds);
-  tv.tv_sec = 0;
-  tv.tv_usec = 0;
-
-  retval = select(1, &rfds, NULL, NULL, &tv);
-  /* Don't rely on the value of tv now! */
-
-  if (retval) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
-void* wait_for_EOF(void*) {
-  char buf[256];
-  while (read(0, buf, 256) > 0)
-    ;
-  exit(0);
-  return NULL;
-}
-
-void SKIP_unix_die_on_EOF() {
-  pthread_t thread_id;
-  pthread_create(&thread_id, NULL, &wait_for_EOF, NULL);
-}
-
 char* SKIP_call_external_fun(int32_t, char*) {
   fprintf(stderr, "SKIP_call_external_fun not implemented in native mode");
   exit(2);
