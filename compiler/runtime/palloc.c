@@ -367,11 +367,11 @@ static char* parse_args(int argc, char** argv, int* is_init) {
       }
       if (i + 1 >= argc) {
         fprintf(stderr, "Error: --data/--init expects a file name");
-        exit(103);
+        exit(ERROR_ARG_PARSE);
       }
       if (idx != -1) {
         fprintf(stderr, "Error: incompatible --data/--init options");
-        exit(103);
+        exit(ERROR_ARG_PARSE);
       }
       idx = i + 1;
     }
