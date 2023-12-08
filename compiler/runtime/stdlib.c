@@ -17,7 +17,7 @@ void* SKIP_exec(char* cmd) {
 
   if (fstream == NULL) {
     perror("Could not execute command");
-    exit(4);
+    exit(ERROR_EXEC);
   }
 
   free(cstr);
