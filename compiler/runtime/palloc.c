@@ -256,7 +256,7 @@ void sk_clean_ctx_table() {
     int rcount = sk_get_ref_count(ctx_table[j]);
     if(rcount < 0) {
       fprintf(stderr, "Error: CTX_TABLE found negative ref count");
-      exit(102);
+      exit(ERROR_CONTEXT_CHECK);
     }
     if(rcount == 0) {
       continue;
@@ -283,7 +283,7 @@ void sk_add_ctx(char* context) {
   if(i < 0) {
     if(ctx_table_size >= CTX_TABLE_CAPACITY) {
       fprintf(stderr, "Error: CTX_TABLE reached maximum capacity");
-      exit(102);
+      exit(ERROR_CONTEXT_CHECK);
     }
     ctx_table[ctx_table_size] = context;
     ctx_table_size++;
