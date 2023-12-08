@@ -244,7 +244,7 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
       break;
     default:
       // NOT SUPPORTED
-      SKIP_internalExit(-1);
+      SKIP_exit(-1);
   }
 
   crc = sk_crc64_combine(crc, ty);
