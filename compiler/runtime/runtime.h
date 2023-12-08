@@ -64,6 +64,7 @@ void sk_print_ctx_table();
 #define ERROR_LOCKING 44
 #define ERROR_FILE_IO 45
 #define ERROR_MEMORY_CHECK 88
+#define ERROR_CONTEXT_CHECK 102
 
 
 /*****************************************************************************/
