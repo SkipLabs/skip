@@ -175,10 +175,6 @@ class RequestHandler(
         stream.error(2003u, "DB creation not supported. Use `--create-db <db>`.")
       }
       is ProtoCreateUser -> {
-        if (accessKey != DB_ROOT_USER) {
-          stream.error(2002u, "Authorization error")
-          return this
-        }
         val privateKey = genPrivateKey()
         val b64privateKey = Base64.getEncoder().encodeToString(privateKey)
         val userID = skdb.createUser(b64privateKey)
