@@ -47,6 +47,26 @@ native value class RawStorage<+T> {
   }
 }
 
+mutable value class Ptr<T>(inner: Runtime.NonGCPointer) uses Show {
+  @cpp_extern
+  native readonly fun toInt(): Int;
+
+  readonly fun toString(): String {
+    digits = mutable Vector[];
+    n = this.toInt();
+    while (n.ugt(0)) {
+      digits.push(Chars.intToHexDigit(n.and(0xF)));
+      !n = n.shr(4)
+    };
+    if (digits.isEmpty()) {
+      "0x0"
+    } else {
+      // TODO: Get rid of `.collect(Array)`.
+      "0x" + String::fromChars(digits.reversed().collect(Array))
+    }
+  }
+}
+
 // Native function to make an Array of a given size
 // Equivalent to calling Array.unsafe_make()
 @intrinsic
