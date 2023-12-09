@@ -129,3 +129,7 @@ void* SKIP_context_sync(uint64_t txTime, char* old_root, char* delta,
   SKIP_call_after_unlock(synchronizer, delta);
   return new_root;
 }
+
+int64_t SKIP_Unsafe_Ptr__toInt(char* ptr) {
+  return (int64_t)ptr;
+}
