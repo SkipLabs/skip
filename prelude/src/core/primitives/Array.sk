@@ -17,6 +17,8 @@ mutable native class .Array<+T>
     Hashable[T: Hashable],
     Orderable[T: Orderable],
     Equality[T: Equality],
+    AsBytes,
+    AsMutableBytes,
    {
   // # (Private) Native Methods
 
@@ -567,6 +569,14 @@ mutable native class .Array<+T>
     ValuesIterator::make(this)
   }
 
+  readonly fun bytes(): readonly Bytes {
+    mutable ArrayBytes(this, Range(0, Unsafe.array_byte_size(this)))
+  }
+
+  mutable fun mbytes(): mutable MutableBytes {
+    mutable MutableArrayBytes(this, Range(0, Unsafe.array_byte_size(this)))
+  }
+
   readonly fun reversedValues(): mutable Iterator<T> {
     ReversedValuesIterator::make(this)
   }
@@ -830,6 +840,60 @@ fun concatStringSequence(seq: readonly Sequence<String>): String {
   );
 
   String::fromChars(buf)
+}
+
+private mutable class ArrayBytes<T>(
+  private array: readonly Array<T>,
+  private range: Range,
+) extends Bytes {
+  readonly fun ptr(): Unsafe.Ptr<UInt8> {
+    Unsafe.Ptr<UInt8>(Unsafe.array_ptr(this.array, this.range.start))
+  }
+
+  readonly fun get(index: Int): UInt8 {
+    Unsafe.array_get_byte(this.array, this.range.start + index)
+  }
+
+  readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes {
+    mutable ArrayBytes(this.array, this.range.subrange(start, end))
+  }
+
+  readonly fun size(): Int {
+    this.range.size()
+  }
+}
+
+private mutable class MutableArrayBytes<T>(
+  private array: mutable Array<T>,
+  private range: Range,
+) extends MutableBytes {
+  readonly fun ptr(): Unsafe.Ptr<UInt8> {
+    Unsafe.Ptr<UInt8>(Unsafe.array_ptr(this.array, this.range.start))
+  }
+
+  mutable fun mptr(): mutable Unsafe.Ptr<UInt8> {
+    mutable Unsafe.Ptr<UInt8>(Unsafe.array_ptr(this.array, this.range.start))
+  }
+
+  readonly fun get(index: Int): UInt8 {
+    Unsafe.array_get_byte(this.array, this.range.start + index)
+  }
+
+  mutable fun set(index: Int, value: UInt8): void {
+    Unsafe.array_set_byte(this.array, this.range.start + index, value)
+  }
+
+  readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes {
+    mutable ArrayBytes(this.array, this.range.subrange(start, end))
+  }
+
+  mutable fun mslice(start: Int, end: Int = Int::max): mutable MutableBytes {
+    mutable MutableArrayBytes(this.array, this.range.subrange(start, end))
+  }
+
+  readonly fun size(): Int {
+    this.range.size()
+  }
 }
 
 module end;
