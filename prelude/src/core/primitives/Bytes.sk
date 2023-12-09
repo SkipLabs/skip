@@ -1,0 +1,52 @@
+module Bytes;
+
+trait .AsBytes {
+  readonly fun bytes(): readonly Bytes;
+}
+
+trait .AsMutableBytes {
+  mutable fun mbytes(): mutable MutableBytes;
+}
+
+mutable base class .Bytes extends Sequence<UInt8> {
+  readonly fun ptr(): Unsafe.Ptr<UInt8>;
+  readonly fun size(): Int;
+
+  readonly fun values(): mutable Iterator<UInt8> {
+    mutable BytesIterator(this)
+  }
+
+  // TODO: extends IndexedSequence<UInt8>
+  readonly fun get(index: Int): UInt8;
+  readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes;
+}
+
+mutable base class .MutableBytes extends Bytes {
+  mutable fun mptr(): mutable Unsafe.Ptr<UInt8>;
+
+  // TODO: extends MutableIndexedSequence<UInt8>
+  mutable fun set(index: Int, value: UInt8): void;
+  mutable fun mslice(start: Int, end: Int = Int::max): mutable MutableBytes;
+}
+
+private mutable class BytesIterator(
+  private b: readonly Bytes,
+  private mutable i: Int = 0,
+) extends Iterator<UInt8> {
+  readonly fun sizeHint(): ?Int {
+    Some(this.b.size() - this.i)
+  }
+
+  @always_inline
+  mutable fun next(): ?UInt8 {
+    i = this.i;
+    if (i.ult(this.b.size())) {
+      this.!i = i + 1;
+      Some(this.b[i])
+    } else {
+      None()
+    }
+  }
+}
+
+module end;
