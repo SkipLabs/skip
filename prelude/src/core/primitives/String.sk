@@ -7,7 +7,7 @@
 
 module String;
 
-native class .String uses Hashable, Show, Orderable {
+native class .String uses Hashable, Show, Orderable, AsBytes {
   @cpp_runtime
   @may_alloc
   native static fun fromChars(chars: readonly Array<Char>): String;
@@ -420,6 +420,10 @@ native class .String uses Hashable, Show, Orderable {
     StringIterator::make(this)
   }
 
+  fun bytes(): readonly Bytes {
+    StringBytes(this, Range(0, Unsafe.string_utf8_size(this)))
+  }
+
   @synonym("toUpperCase")
   @synonym("toUpper")
   @synonym("upper")
@@ -551,6 +555,27 @@ base class Encoding {
   | Utf16BE() -> "utf16be"
   | Iso8859_1() -> "iso8859-1"
   | CustomEncoding(name) -> name
+}
+
+private mutable class StringBytes(
+  private str: String,
+  private range: Range,
+) extends Bytes {
+  readonly fun ptr(): Unsafe.Ptr<UInt8> {
+    Unsafe.Ptr<UInt8>(Unsafe.string_ptr(this.str, this.range.start))
+  }
+
+  readonly fun get(index: Int): UInt8 {
+    Unsafe.string_utf8_get(this.str, this.range.start + index)
+  }
+
+  readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes {
+    mutable StringBytes(this.str, this.range.subrange(start, end))
+  }
+
+  readonly fun size(): Int {
+    this.range.size()
+  }
 }
 
 module end;
