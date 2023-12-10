@@ -36,6 +36,29 @@ class .Range(start: Int, end: Int) extends Sequence<Int> uses Equality, Show {
     Range(start, end)
   }
 
+  // Returns a sub-range (i.e. a range that is contained within this). The
+  // start/end values may be negative, in which case they refer to the nth
+  // index before the end of the range.
+  // For example, `x.subrange(0, -2)` is equivalent to
+  // `x.subrange(0, x.size() - 2)`.
+  fun subrange(start: Int, end: Int = Int::max): this {
+    sz = this.size();
+    if (start < 0) {
+      !start = max(0, sz + start);
+    };
+    if (end < 0) {
+      !end = max(0, sz + end);
+    };
+    !start = this.start + min(sz, start);
+    !end = this.start + min(sz, end);
+
+    if (start >= end) {
+      Range(0, 0)
+    } else {
+      Range(start, end)
+    }
+  }
+
   fun inRange(pos: Int): Bool {
     pos >= this.start && pos < this.end
   }
