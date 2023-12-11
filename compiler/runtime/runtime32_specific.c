@@ -2,13 +2,14 @@
 #include <stdbool.h>
 #include "xoroshiro128plus.h"
 
-void __cxa_throw(void*, void*, void*);
+void js_throw(void*, uint32_t);
 
 void* exn = (void*)0;
 
 void SKIP_throw(void* exc) {
+  uint32_t rethow = exn == exc;
   exn = exc;
-  __cxa_throw(exc, 0, 0);
+  js_throw(exc, rethow);
 }
 
 void SKIP_saveExn(void* exc) {
