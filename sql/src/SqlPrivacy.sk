@@ -462,12 +462,12 @@ fun getGroupIdx(table: DirDescr): ?Int {
 fun checkUserCanWriteRow(
   context: readonly SKStore.Context,
   access: mutable AccessSolver,
-  makeTableName: () ~> String,
+  tableName: String,
   authorIdxOption: ?Int,
   groupIdxOption: ?Int,
   row: RowValues,
 ): AccessResult {
-  if (makeTableName().lowercase() == SKDBGroupPermissions::name.lower) {
+  if (tableName.lowercase() == SKDBGroupPermissions::name.lower) {
     // Check that only group admins can insert/delete rows
     // to SKDBGroupPermissions for that group
     groupIDIdx = skdbGroupPermissions.getColNbr(groupIDColName);
@@ -524,17 +524,11 @@ fun checkUserCanWriteRow(
   | None() ->
     if (row.repeat == 0) {
       return ARError(
-        ARECannotDeleteFromTable{
-          userID => access.userID,
-          tableName => makeTableName(),
-        },
+        ARECannotDeleteFromTable{userID => access.userID, tableName},
       );
     } else {
       return ARError(
-        ARECannotInsertIntoTable{
-          userID => access.userID,
-          tableName => makeTableName(),
-        },
+        ARECannotInsertIntoTable{userID => access.userID, tableName},
       );
     }
   | Some(groupIdx) ->
@@ -679,7 +673,7 @@ mutable class AccessSolver private {
       checkUserCanWriteRow(
         context,
         this,
-        () ~> dirName.toString().stripPrefix("/").stripSuffix("/"),
+        dirName.toString().stripPrefix("/").stripSuffix("/"),
         indexes.authorIdx,
         indexes.accessIdx,
         rowValues,
