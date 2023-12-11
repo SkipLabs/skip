@@ -26,6 +26,7 @@ setup_server() {
     $SKDB < "$SCRIPT_DIR/privacy/init.sql"
 
     echo "INSERT INTO skdb_users VALUES('test_user', 'test');" | $SKDB
+    echo "INSERT INTO skdb_users VALUES('test_user2', 'test');" | $SKDB
 
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
     # out of first position and a string
@@ -40,29 +41,32 @@ setup_local() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
+    awk '/^INSERT/{exit} {print $0}' "$SCRIPT_DIR/privacy/init.sql" | $SKDB
+
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
     echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY, skdb_access STRING);" | $SKDB
 
-    $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" > $SESSION
+    $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" skdb_groups skdb_group_permissions skdb_users skdb_user_permissions > $SESSION
 }
 
 replicate_to_local() {
     table=$1
-    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 1234 "$table")
-    $SKDB_BIN --data $SERVER_DB tail --user test_user --format=csv --since 0 "$sub" |
-        $SKDB_BIN write-csv --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
+    user=$2
+    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 1234 "$table" skdb_groups skdb_group_permissions skdb_users skdb_user_permissions)
+    $SKDB_BIN --data $SERVER_DB tail --user $user --format=csv --since 0 "$sub" |
+	$SKDB_BIN write-csv --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
 }
 
 replicate_to_server() {
-    table=$1
-    cat $UPDATES | $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
+    user=$1
+    cat $UPDATES | $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user $user > $WRITE_OUTPUT
 }
 
 replicate_diff_to_server() {
     table=$1
     since=$2
     $SKDB_BIN --data $LOCAL_DB diff --format=csv --since "$since" "$(cat $SESSION)" |
-        $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
+	$SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user > $WRITE_OUTPUT
 }
 
 setup_local2() {
@@ -73,21 +77,24 @@ setup_local2() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
+    awk '/^INSERT/{exit} {print $0}' "$SCRIPT_DIR/privacy/init.sql" | $SKDB
+
     echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
 
-    $SKDB_BIN subscribe --data $LOCAL2_DB --connect --format=csv --updates $UPDATES2 --ignore-source 7777 "$table" > $SESSION2
+    $SKDB_BIN subscribe --data $LOCAL2_DB --connect --format=csv --updates $UPDATES2 --ignore-source 7777 "$table" skdb_groups skdb_group_permissions skdb_users skdb_user_permissions > $SESSION2
 }
 
 replicate_to_local2() {
     table=$1
-    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 5678 "$table")
-    $SKDB_BIN --data $SERVER_DB tail --user test_user --format=csv --since 0 "$sub" |
-        $SKDB_BIN write-csv --data $LOCAL2_DB --source 7777 > $WRITE_OUTPUT
+    user=$2
+    sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 5678 "$table"  skdb_groups skdb_group_permissions skdb_users skdb_user_permissions)
+    $SKDB_BIN --data $SERVER_DB tail --user $user --format=csv --since 0 "$sub" |
+	$SKDB_BIN write-csv --data $LOCAL2_DB --source 7777 > $WRITE_OUTPUT
 }
 
 replicate_local2_to_server() {
-    table=$1
-    cat $UPDATES2 | $SKDB_BIN write-csv --data $SERVER_DB --source 5678 --user test_user > $WRITE_OUTPUT
+    user=$1
+    cat $UPDATES2 | $SKDB_BIN write-csv --data $SERVER_DB --source 5678 --user $user > $WRITE_OUTPUT
 }
 
 run_test() {
@@ -102,6 +109,9 @@ debug() {
 
     echo current updates state:
     cat $UPDATES
+
+    echo current updates2 state:
+    cat $UPDATES2
 
     echo last write-csv response:
     cat $WRITE_OUTPUT
@@ -153,7 +163,7 @@ test_basic_replication_unique_rows() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz','read-write');"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -171,7 +181,7 @@ test_basic_replication_unique_rows_replayed() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(1,'bar','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(2,'baz','read-write');"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -181,7 +191,7 @@ test_basic_replication_unique_rows_replayed() {
     rm -f "$output"
 
     # simulate a reconnect - resend everything
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -208,7 +218,7 @@ test_basic_replication_unique_rows_server_state_different() {
     assert_line_count "$output" foo 1
     rm -f "$output"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     # different writers so they combine
     output=$(mktemp)
@@ -224,7 +234,7 @@ test_basic_replication_null_string() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = NULL WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
 
@@ -247,7 +257,7 @@ test_basic_replication_empty_string() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = '' WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
 
@@ -270,7 +280,7 @@ test_basic_replication_escaped_string() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = 'what''s up?' WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
 
@@ -290,7 +300,7 @@ test_basic_replication_escaped_string_alt() {
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_pk_alt VALUES(0,'foo','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_pk_alt SET id = 'what''s up?' WHERE x = 0;"
 
-    replicate_to_server test_pk_alt
+    replicate_to_server test_user
 
     output=$(mktemp)
 
@@ -308,22 +318,22 @@ test_basic_replication_with_deletes() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
     assert_server_rows_has 1 foo
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
     assert_server_rows_has 0 foo
 
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
     assert_server_rows_has 0 foo
 
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
     assert_server_rows_has 1 foo
 }
 
@@ -335,7 +345,7 @@ test_basic_replication_with_deletes_server_state_different() {
 
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     # we still have the record as this was concurrently written
     assert_server_rows_has 1 foo
@@ -352,12 +362,12 @@ test_seen_insert_deleted() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -371,7 +381,7 @@ test_unseen_insert_not_deleted() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     # but not this
@@ -380,7 +390,7 @@ test_unseen_insert_not_deleted() {
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -394,7 +404,7 @@ test_unseen_insert_added_to() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     # but not this
@@ -404,7 +414,7 @@ test_unseen_insert_added_to() {
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -418,12 +428,12 @@ test_seen_insert_clobbered() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -438,11 +448,11 @@ test_seen_insert_clobbered_alt() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_pk_alt VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_pk_alt
+    replicate_to_local test_pk_alt test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_pk_alt SET id='bar' WHERE x = 0;"
 
-    replicate_to_server test_pk_alt
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_pk_alt;' > "$output"
@@ -457,7 +467,7 @@ test_unseen_insert_not_updated() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     # but not this
@@ -466,7 +476,7 @@ test_unseen_insert_not_updated() {
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -482,7 +492,7 @@ test_unseen_update_is_updated() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     # but not this
@@ -490,7 +500,7 @@ test_unseen_update_is_updated() {
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -507,7 +517,7 @@ test_unseen_update_is_not_updated() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     # but not this
@@ -515,7 +525,7 @@ test_unseen_update_is_not_updated() {
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -532,7 +542,7 @@ test_unseen_insert_is_updated() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     # but not this
@@ -541,7 +551,7 @@ test_unseen_insert_is_updated() {
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -557,7 +567,7 @@ test_unseen_delete_gets_clobbered() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     # but not this
@@ -566,7 +576,7 @@ test_unseen_delete_gets_clobbered() {
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     # the client now asserts there should be two rows. our concurrency
     # model is that inserts always beat deletes and need to be
@@ -583,7 +593,7 @@ test_unseen_delete_does_not_affect_delete() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     # local has seen up to 0,'foo'
     # but not this
@@ -591,7 +601,7 @@ test_unseen_delete_does_not_affect_delete() {
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
 
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -606,16 +616,16 @@ test_concurrent_clients_updating_winner_gets_there_first() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
-    replicate_to_local2 test_with_pk
+    replicate_to_local test_with_pk test_user
+    replicate_to_local2 test_with_pk test_user
 
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
     $SKDB_BIN --data $LOCAL2_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
 
     # baz should win and gets there first:
-    replicate_local2_to_server test_with_pk
-    replicate_to_server test_with_pk
+    replicate_local2_to_server test_user
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -626,8 +636,8 @@ test_concurrent_clients_updating_winner_gets_there_first() {
 
     # and now check everything converges:
 
-    replicate_to_local test_with_pk
-    replicate_to_local2 test_with_pk
+    replicate_to_local test_with_pk test_user
+    replicate_to_local2 test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
     # tiebreak the concurrency: foo wins because the foo row > bar row
@@ -651,16 +661,16 @@ test_concurrent_clients_updating_winner_gets_there_second() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
-    replicate_to_local2 test_with_pk
+    replicate_to_local test_with_pk test_user
+    replicate_to_local2 test_with_pk test_user
 
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
     $SKDB_BIN --data $LOCAL2_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
 
     # baz should win and gets there second:
-    replicate_to_server test_with_pk
-    replicate_local2_to_server test_with_pk
+    replicate_to_server test_user
+    replicate_local2_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -671,8 +681,8 @@ test_concurrent_clients_updating_winner_gets_there_second() {
 
     # and now check everything converges:
 
-    replicate_to_local test_with_pk
-    replicate_to_local2 test_with_pk
+    replicate_to_local test_with_pk test_user
+    replicate_to_local2 test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
     # tiebreak the concurrency: foo wins because the foo row > bar row
@@ -696,13 +706,13 @@ test_reconnect_replayed() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_server test_with_pk
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -717,12 +727,12 @@ test_reconnect_replayed_with_update() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
 
-    replicate_to_server test_with_pk
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -737,15 +747,15 @@ test_replayed_with_more_local_data() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -759,13 +769,13 @@ test_replayed_with_further_updates() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -781,13 +791,13 @@ test_replayed_with_further_updates_lesser_row_value() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -805,11 +815,11 @@ test_reconnect_replayed_with_more_local_data() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
@@ -829,10 +839,10 @@ test_reconnect_replayed_with_further_updates() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
     # this is a reconnect, we figure out the diff
@@ -853,10 +863,10 @@ test_reconnect_replayed_with_further_updates_lesser_row_value() {
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
 
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
     # this is a reconnect, we figure out the diff
@@ -877,7 +887,7 @@ test_old_diff_replayed() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
@@ -887,11 +897,11 @@ test_old_diff_replayed() {
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     # restore and replay
     mv "$save" $UPDATES
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -906,7 +916,7 @@ test_reconnect_old_diff_replayed() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_with_pk WHERE id = 0;"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
@@ -920,7 +930,7 @@ test_reconnect_old_diff_replayed() {
 
     # restore and replay
     mv "$save" $UPDATES
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -935,7 +945,7 @@ test_old_diff_replayed_with_update() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
     # stash what would have been sent up
@@ -943,11 +953,11 @@ test_old_diff_replayed_with_update() {
     cp $UPDATES "$save"
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     # restore and replay
     mv "$save" $UPDATES
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -964,7 +974,7 @@ test_reconnect_old_diff_replayed_with_update() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
     # stash what would have been sent up
@@ -976,7 +986,7 @@ test_reconnect_old_diff_replayed_with_update() {
 
     # restore and replay
     mv "$save" $UPDATES
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -993,7 +1003,7 @@ test_old_diff_replayed_with_update_lesser_row_value() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
     # stash what would have been sent up
@@ -1001,11 +1011,11 @@ test_old_diff_replayed_with_update_lesser_row_value() {
     cp $UPDATES "$save"
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='bar' WHERE id = 0;"
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     # restore and replay
     mv "$save" $UPDATES
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -1023,7 +1033,7 @@ test_reconnect_old_diff_replayed_with_update_lesser_row_value() {
     setup_local test_with_pk
 
     $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
-    replicate_to_local test_with_pk
+    replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note='baz' WHERE id = 0;"
     # stash what would have been sent up
@@ -1035,7 +1045,7 @@ test_reconnect_old_diff_replayed_with_update_lesser_row_value() {
 
     # restore and replay
     mv "$save" $UPDATES
-    replicate_to_server test_with_pk
+    replicate_to_server test_user
 
     output=$(mktemp)
     $SKDB_BIN --data $SERVER_DB <<< 'SELECT * FROM test_with_pk;' > "$output"
@@ -1045,6 +1055,63 @@ test_reconnect_old_diff_replayed_with_update_lesser_row_value() {
     assert_line_count "$output" baz 0
     rm -f "$output"
     rm -f "$save"
+}
+
+test_user_privacy_control() {
+    setup_server
+    setup_local test_with_pk
+    setup_local2 test_with_pk
+
+    replicate_to_local skdb_groups test_user
+    replicate_to_local skdb_group_permissions test_user
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO skdb_groups VALUES('new_group', 'test_user', 'test_user','read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO skdb_group_permissions VALUES('new_group', 'test_user', skdb_permission('rw'), 'read-write');"
+    replicate_to_server test_user
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES (42, 'foo', 'new_group');"
+
+    replicate_to_server test_user
+    replicate_to_local2 test_with_pk test_user2
+
+    server_output=$(mktemp)
+    local_output=$(mktemp)
+    local2_output=$(mktemp)
+    $SKDB_BIN --data $SERVER_DB <<< 'select * from test_with_pk;' > "$server_output"
+    $SKDB_BIN --data $LOCAL_DB <<< 'select * from test_with_pk;' > "$local_output"
+    $SKDB_BIN --data $LOCAL2_DB <<< 'select * from test_with_pk;' > "$local2_output"
+    assert_line_count "$server_output" foo 1
+    assert_line_count "$local_output" foo 1
+    assert_line_count "$local2_output" foo 0
+
+    $SKDB_BIN --data $LOCAL2_DB <<< "INSERT INTO test_with_pk VALUES (43, 'bar', 'new_group');"
+    replicate_local2_to_server test_user2 2>/dev/null
+    replicate_to_local test_with_pk test_user
+
+    $SKDB_BIN --data $SERVER_DB <<< 'select * from test_with_pk;' > "$server_output"
+    $SKDB_BIN --data $LOCAL_DB <<< 'select * from test_with_pk;' > "$local_output"
+    $SKDB_BIN --data $LOCAL2_DB <<< 'select * from test_with_pk;' > "$local2_output"
+    assert_line_count "$server_output" bar 0
+    assert_line_count "$local_output" bar 0
+    assert_line_count "$local2_output" bar 1
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO skdb_group_permissions VALUES('new_group', 'test_user2', skdb_permission('rw'), 'read-write');"
+    replicate_to_server test_user
+    replicate_to_local2 test_with_pk test_user2
+
+    $SKDB_BIN --data $LOCAL2_DB <<< "INSERT INTO test_with_pk VALUES (44, 'baz', 'new_group');"
+
+    $SKDB_BIN --data $LOCAL2_DB diff --format=csv --since 23 $(cat $SESSION2) | $SKDB_BIN write-csv --data $SERVER_DB --source 3333 --user test_user2 > $WRITE_OUTPUT
+    replicate_to_local test_with_pk test_user
+
+    $SKDB_BIN --data $SERVER_DB <<< 'select * from test_with_pk;' > "$server_output"
+    $SKDB_BIN --data $LOCAL_DB <<< 'select * from test_with_pk;' > "$local_output"
+    $SKDB_BIN --data $LOCAL2_DB <<< 'select * from test_with_pk;' > "$local2_output"
+    assert_line_count "$server_output" bar 0
+    assert_line_count "$local_output" bar 0
+    assert_line_count "$server_output" baz 1
+    assert_line_count "$local_output" baz 1
+    assert_line_count "$local2_output" baz 1
 }
 
 # tests:
@@ -1075,6 +1142,7 @@ run_test test_unseen_delete_gets_clobbered
 run_test test_unseen_delete_does_not_affect_delete
 run_test test_concurrent_clients_updating_winner_gets_there_first
 run_test test_concurrent_clients_updating_winner_gets_there_second
+run_test test_user_privacy_control
 
 # still have idempotence and commutativity
 run_test test_reconnect_replayed
