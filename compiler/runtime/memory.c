@@ -163,22 +163,19 @@ void* sk_malloc(size_t size) {
   void* result = malloc(size);
   if (result == NULL) {
     perror("malloc");
-    exit(1);
-  }
-  sk_lower_static(result);
-
-  if (result == NULL) {
-    fprintf(stderr, "Out of memory\n");
     SKIP_throw_cruntime(ERROR_OUT_OF_MEMORY);
   }
+
+  sk_lower_static(result);
+
 #ifdef MEMORY_CHECK
   static size_t alloc_count = 0;
   if (sk_init_over) {
     size_t capacity = 1 << sk_malloc_table->bitcapacity;
 
     if (sk_malloc_table->size >= capacity / 2) {
-      fprintf(stderr, "MEMORY CHECK TABLE SIZE TO SMALL\n");
-      exit(88);
+      fprintf(stderr, "MEMORY CHECK TABLE SIZE TOO SMALL\n");
+      exit(ERROR_MEMORY_CHECK);
     }
 
     sk_htbl_add(sk_malloc_table, result, (uint64_t)alloc_count);

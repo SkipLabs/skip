@@ -1,3 +1,6 @@
+extern "C" {
+#include "runtime.h"
+}
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -224,7 +227,7 @@ uint32_t SKIP_getchar(uint64_t) {
 
   if (c2 == EOF) {
     fprintf(stderr, "Invalid utf8");
-    exit(23);
+    exit(ERROR_INVALID_STRING);
   }
 
   if ((c1 & 0x20) == 0) {
@@ -235,7 +238,7 @@ uint32_t SKIP_getchar(uint64_t) {
 
   if (c3 == EOF) {
     fprintf(stderr, "Invalid utf8");
-    exit(23);
+    exit(ERROR_INVALID_STRING);
   }
 
   if ((c1 & 0x10) == 0) {
@@ -246,7 +249,7 @@ uint32_t SKIP_getchar(uint64_t) {
 
   if (c4 == EOF) {
     fprintf(stderr, "Invalid utf8");
-    exit(23);
+    exit(ERROR_INVALID_STRING);
   }
 
   if ((c1 & 0x8) == 0) {
@@ -255,7 +258,7 @@ uint32_t SKIP_getchar(uint64_t) {
   }
 
   fprintf(stderr, "Invalid utf8");
-  exit(23);
+  exit(ERROR_INVALID_STRING);
   return 0;
 }
 
@@ -410,7 +413,7 @@ char* SKIP_open_file(char* filename_obj) {
   if (f == (void*)MAP_FAILED) {
     perror("ERROR (MMap FAILED)");
     fprintf(stderr, "Could not open file: %s\n", filename);
-    exit(45);
+    exit(ERROR_FILE_IO);
   }
   result = sk_string_alloc(size);
   memcpy(result, f, size);
@@ -428,7 +431,7 @@ void SKIP_write_to_file(int64_t fd, char* str) {
     if (written < 0) {
       int err = errno;
       fprintf(stderr, "Could not write to file. %" PRId64 " (%d)\n", fd, err);
-      exit(45);
+      exit(ERROR_FILE_IO);
     }
     size -= written;
   }
@@ -537,7 +540,7 @@ char* SKIP_unix_strftime(char* formatp, char* timep) {
   uint32_t byteSize = SKIP_String_byteSize(formatp);
   if (byteSize >= 1024) {
     fprintf(stderr, "format string too large");
-    exit(23);
+    exit(ERROR_INVALID_STRING);
   }
   cformat[byteSize] = 0;
   memcpy(cformat, formatp, byteSize);
@@ -671,40 +674,6 @@ void SKIP_exit(uint64_t code) {
   exit(code);
 }
 
-int32_t SKIP_stdin_has_data() {
-  fd_set rfds;
-  struct timeval tv;
-  int retval;
-
-  /* Watch stdin (fd 0) to see when it has input. */
-  FD_ZERO(&rfds);
-  FD_SET(0, &rfds);
-  tv.tv_sec = 0;
-  tv.tv_usec = 0;
-
-  retval = select(1, &rfds, NULL, NULL, &tv);
-  /* Don't rely on the value of tv now! */
-
-  if (retval) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
-void* wait_for_EOF(void*) {
-  char buf[256];
-  while (read(0, buf, 256) > 0)
-    ;
-  exit(0);
-  return NULL;
-}
-
-void SKIP_unix_die_on_EOF() {
-  pthread_t thread_id;
-  pthread_create(&thread_id, NULL, &wait_for_EOF, NULL);
-}
-
 char* SKIP_call_external_fun(int32_t, char*) {
   fprintf(stderr, "SKIP_call_external_fun not implemented in native mode");
   exit(2);
@@ -719,11 +688,9 @@ char* SKIP_call_external_fun(int32_t, char*) {
 void SKIP_last_tick(uint32_t) {
   // Not implemented
 }
-
 void SKIP_switch_to(uint32_t) {
   // Not implemented
 }
-
 void SKIP_clear_field_names() {
   // Not implemented
 }
@@ -751,8 +718,8 @@ void SKIP_push_object_field_string(char*) {
 void SKIP_push_object() {
   // Not implemented
 }
-
 void SKIP_js_delete_fun() {
   // Not implemented
 }
+
 }

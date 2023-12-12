@@ -21,7 +21,6 @@
 typedef uint64_t SkipInt;
 
 #ifdef SKIP32
-#define WORDSIZE 4
 #ifndef WASM_HEAP_SIZE
 #define WASM_HEAP_SIZE 1073741824
 #endif
@@ -33,7 +32,6 @@ typedef uint64_t SkipInt;
 
 #ifdef SKIP64
 #include <stdio.h>
-#define WORDSIZE 8
 #endif
 
 #ifdef CTX_TABLE
@@ -47,6 +45,7 @@ void sk_print_ctx_table();
 /*****************************************************************************/
 
 #define ERROR_TODO 1
+#define ERROR_EXEC 4
 #define ERROR_CHANGING_CONST 22
 #define ERROR_INVALID_EXTERNAL_POINTER 23
 #define ERROR_OUT_OF_MEMORY 24
@@ -56,11 +55,16 @@ void sk_print_ctx_table();
 #define ERROR_SYNC_SAME_CONTEXT 28
 #define ERROR_NOT_IMPLEMENTED 29
 #define ERROR_FLOAT_TOO_LARGE 30
+#define ERROR_INVALID_STRING 31
 #define ERROR_MAPPING_EXISTS 40
 #define ERROR_MAPPING_FAILED 41
 #define ERROR_MAPPING_MEMORY 42
 #define ERROR_MAPPING_VERSION 43
-
+#define ERROR_LOCKING 44
+#define ERROR_FILE_IO 45
+#define ERROR_MEMORY_CHECK 88
+#define ERROR_CONTEXT_CHECK 102
+#define ERROR_ARG_PARSE 103
 
 
 /*****************************************************************************/
@@ -190,9 +194,11 @@ typedef struct {
 /* Function signatures. */
 /*****************************************************************************/
 
+#ifndef __cplusplus
 int (memcmp)(const void* ptr1, const void* ptr2, size_t num);
 void* (memcpy)(void *restrict dst, const void *restrict src, size_t n);
 void* (memset)(void* b, int c, size_t len);
+#endif
 
 char* SKIP_Obstack_alloc(size_t size);
 uint32_t SKIP_String_byteSize(char* str);
@@ -202,7 +208,6 @@ uint32_t SKIP_getArraySize(char*);
 char* SKIP_get_free_slot(uint32_t);
 void* SKIP_intern(void* obj);
 void* SKIP_intern_shared(void* obj);
-void SKIP_internalExit(uint64_t code);
 void SKIP_invalid_utf8();
 SkipInt SKIP_isEq(char* obj1, char* obj2);
 uint32_t SKIP_is_string(char* obj);

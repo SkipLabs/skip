@@ -101,8 +101,8 @@ void sk_global_lock() {
   }
 #endif
 
-  fprintf(stderr, "Internal error: locking failed\n");
-  exit(44);
+  perror("Internal error: locking failed");
+  exit(ERROR_LOCKING);
 }
 
 void sk_global_unlock() {
@@ -117,9 +117,8 @@ void sk_global_unlock() {
     return;
   }
 
-  fprintf(stderr, "Internal error: global unlocking failed, %s\n",
-          strerror(errno));
-  exit(44);
+  perror("Internal error: global unlocking failed");
+  exit(ERROR_LOCKING);
 }
 
 /*****************************************************************************/
@@ -155,7 +154,7 @@ void SKIP_mutex_lock(pthread_mutex_t* lock) {
 #endif
 
   fprintf(stderr, "Internal error: locking failed\n");
-  exit(44);
+  exit(ERROR_LOCKING);
 }
 
 void SKIP_mutex_unlock(pthread_mutex_t* lock) {
@@ -166,7 +165,7 @@ void SKIP_mutex_unlock(pthread_mutex_t* lock) {
   }
 
   fprintf(stderr, "Internal error: unlocking failed, %d\n", code);
-  exit(44);
+  exit(ERROR_LOCKING);
 }
 
 void SKIP_cond_init(pthread_cond_t* cond) {
@@ -257,7 +256,7 @@ void sk_clean_ctx_table() {
     int rcount = sk_get_ref_count(ctx_table[j]);
     if(rcount < 0) {
       fprintf(stderr, "Error: CTX_TABLE found negative ref count");
-      exit(102);
+      exit(ERROR_CONTEXT_CHECK);
     }
     if(rcount == 0) {
       continue;
@@ -284,7 +283,7 @@ void sk_add_ctx(char* context) {
   if(i < 0) {
     if(ctx_table_size >= CTX_TABLE_CAPACITY) {
       fprintf(stderr, "Error: CTX_TABLE reached maximum capacity");
-      exit(102);
+      exit(ERROR_CONTEXT_CHECK);
     }
     ctx_table[ctx_table_size] = context;
     ctx_table_size++;
@@ -368,11 +367,11 @@ static char* parse_args(int argc, char** argv, int* is_init) {
       }
       if (i + 1 >= argc) {
         fprintf(stderr, "Error: --data/--init expects a file name");
-        exit(102);
+        exit(ERROR_ARG_PARSE);
       }
       if (idx != -1) {
         fprintf(stderr, "Error: incompatible --data/--init options");
-        exit(103);
+        exit(ERROR_ARG_PARSE);
       }
       idx = i + 1;
     }
@@ -539,7 +538,7 @@ void sk_load_mapping(char* fileName) {
 
   if (fd == -1) {
     fprintf(stderr, "Error: could not open file (did you run --init?)\n");
-    exit(25);
+    exit(ERROR_FILE_IO);
   }
 
   void* addr;
@@ -733,7 +732,7 @@ void* sk_palloc(size_t size) {
   }
   if ((*ginfo)->head + size >= (*ginfo)->end) {
     fprintf(stderr, "Error: out of persistent memory.\n");
-    exit(45);
+    exit(ERROR_OUT_OF_MEMORY);
   }
   void* result = (*ginfo)->head;
   (*ginfo)->head += size;
