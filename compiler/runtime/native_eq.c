@@ -160,7 +160,7 @@ SkipInt SKIP_native_eq_helper(sk_stack_t* st, char* obj1, char* obj2) {
       break;
     default:
       // NOT SUPPORTED
-      SKIP_internalExit(-1);
+      SKIP_exit(-1);
   }
 
   return 0;
