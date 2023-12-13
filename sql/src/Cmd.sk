@@ -210,37 +210,3 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
   | _ -> print_string("Unknown command")
   }
 }
-
-fun isSQL(str: String): Bool {
-  lex = SKDB.Lexer(0, SKDB.Buffer(str));
-  if (SKDB.isEOF(lex, 0)) return false;
-  lex.word(0).uppercase() match {
-  | "CREATE" | "INSERT" | "UPDATE" | "DROP" | "DELETE" | "REPLACE" | "SELECT" ->
-    true
-  | _ -> false
-  }
-}
-
-untracked fun toplevel(topContext: Context): void {
-  runWithGc(topContext, context ~> {
-    env = mutable CmdEnv{context, pwd => context.pwd};
-    prompt = env.pwd + "$ ";
-    print_raw(prompt);
-    cmd = read_line() match {
-    | None() -> ""
-    | Some(l) -> l
-    };
-    if (cmd == "") return CStop(None());
-    if (isSQL(cmd)) {
-      invariant_violation("TODO reenable toplevel");
-      /*
-            while (SKDB.evalWithContext(context) is Some _) {
-              eval(env, cmd);
-            }
-      */
-    };
-    context.!pwd = env.pwd;
-    context.update();
-    CContinue(None())
-  })
-}

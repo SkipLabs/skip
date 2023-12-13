@@ -1,0 +1,177 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parseInsert(): Stmt {
+    onConflict = if (this.parse_keyword(TReplace())) {
+      Some(OCReplace())
+    } else if (this.parse_keyword(TInsert())) {
+      if (this.parse_keyword(TOr())) {
+        Some(this.parseConflictClause())
+      } else {
+        None()
+      }
+    } else {
+      this.errorUnexpectedToken("expected INSERT or REPLACE")
+    };
+
+    this.expect_keyword(TInto());
+
+    // TODO: Schema-qualified name.
+    into = Name::create(this.expect_identifier());
+    alias = if (this.parse_keyword(TAs())) {
+      Some(Name::create(this.expect_identifier()))
+    } else {
+      None()
+    };
+
+    columns: ?Array<Name> = None();
+    if (this.parse_token(TLParen())) {
+      res = mutable Vector[];
+      loop {
+        name = Name::create(this.expect_identifier(true));
+        res.push(name);
+
+        if (this.parse_token(TComma())) {
+          continue
+        } else if (this.parse_token(TRParen())) {
+          break void
+        } else {
+          this.errorUnexpectedToken("expected COMMA or RPAREN")
+        }
+      };
+      !columns = Some(res.toArray())
+    };
+
+    values: InsertValues = IDefault();
+
+    this.expect_one_of_keywords(
+      Map[
+        TValues() => () -> {
+          this.tokens.advance();
+          !values = this.parseInsertValues();
+          this.maybeParseUpserts() match {
+          | Some(upserts) ->
+            if (onConflict is Some _) {
+              // TODO: Proper error position.
+              this.errorUnexpectedToken("extraneous ON CONFLICT")
+            };
+            !onConflict = Some(upserts)
+          | _ -> void
+          }
+        },
+        TDefault() => () -> {
+          this.errorNotImplemented()
+          // this.tokens.advance();
+          // this.expect_keyword(TValues());
+          // !default = true;
+        },
+        TSelect() => () -> {
+          !values = IQuery(this.parseSelect())
+        },
+      ],
+    );
+
+    if (this.parse_keyword(TReturning())) {
+      // RETURNING clause
+      this.errorNotImplemented()
+    };
+
+    Insert{onConflict, name => into, alias, paramsOpt => columns, values}
+  }
+
+  mutable fun parseInsertValues(): IValues {
+    res = mutable Vector[];
+    loop {
+      res.push(this.parseTupleExpr());
+      if (!this.parse_token(TComma())) {
+        return IValues(res.toArray())
+      }
+    }
+  }
+
+  mutable fun parseTupleExpr(): Array<Expr> {
+    this.expect_token(TLParen());
+    res = mutable Vector[];
+    loop {
+      res.push(this.parseExpr());
+      if (this.parse_token(TComma())) {
+        continue
+      } else if (this.parse_token(TRParen())) {
+        break void
+      } else {
+        this.errorUnexpectedToken("expected COMMA or RPAREN")
+      }
+    };
+    res.toArray()
+  }
+
+  // TODO: Support multiple upsert clauses with conflict targets.
+  mutable fun maybeParseUpserts(): ?OCUpdate {
+    // pos = this.peek_token().position;
+    if (!this.parse_keyword(TOn())) {
+      return None()
+    };
+    this.parseUpsert()
+    // upserts = mutable Vector[];
+    // loop {
+    //   if (!this.parse_keyword(TOn())) {
+    //     break void
+    //   };
+    //   upserts.push(this.parseUpsert())
+    // };
+    // if (!upserts.isEmpty()) {
+    //   Some(OCUpdate(upserts.toArray(), pos))
+    // } else {
+    //   None()
+    // }
+  }
+
+  // TODO: Support conflict targets.
+  mutable fun parseUpsert(): ?OCUpdate {
+    this.expect_keyword(TConflict());
+
+    // upsert = Upsert(None(), None());
+
+    if (this.peek_token() is TLParen _) {
+      // TODO: Actually use conflict target.
+      _columns = this.parseIndexedColumns();
+      if (this.parse_keyword(TWhere())) {
+        this.errorNotImplemented()
+      };
+      // where = if (this.parse_keyword(TWhere())) {
+      //   Some(this.parseExpr())
+      // } else {
+      //   None()
+      // };
+      // !upsert.target = Some(ConflictTarget(columns, where))
+    };
+
+    this.expect_keyword(TDo());
+    if (this.parse_keyword(TUpdate())) {
+      this.expect_keyword(TSet());
+      sets = this.parseUpdateSets();
+      where = if (this.parse_keyword(TWhere())) {
+        Some(this.parseExpr())
+      } else {
+        None()
+      };
+      Some(
+        OCUpdate(
+          Update{
+            sets,
+            where,
+            name => Name::create(""),
+            alias => None(),
+            from => None(),
+            indexed => None(),
+            onConflict => None(),
+          },
+        ),
+      )
+      // !upsert.update = Some(UpsertUpdate(sets, where))
+    } else {
+      this.expect_keyword(TNothing());
+      None()
+    }
+  }
+}

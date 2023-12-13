@@ -86,7 +86,10 @@ native fun poll(pollfds: mutable Array<mutable Pollfd>): Int;
 
 @debug
 @cpp_extern("SKIP_posix_isatty")
-native fun isatty(fd: Int): Bool;
+native fun internalIsatty(fd: Int): Int;
+fun isatty(fd: Int): Bool {
+  internalIsatty(fd) != 0
+}
 
 @debug
 @cpp_extern("SKIP_posix_mkstemp")

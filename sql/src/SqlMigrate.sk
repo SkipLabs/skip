@@ -1,3 +1,5 @@
+module alias P = SQLParser;
+
 module SKDB;
 
 base class SchemaChange {
@@ -8,13 +10,13 @@ base class SchemaChange {
 
 base class TableChange {
   children =
-  | TcNoChange(col: ColumnDefinition)
-  | TcNewCol(col: ColumnDefinition)
-  | TcChange(old: ColumnDefinition, new: ColumnDefinition)
+  | TcNoChange(col: P.ColumnDefinition)
+  | TcNewCol(col: P.ColumnDefinition)
+  | TcChange(old: P.ColumnDefinition, new: P.ColumnDefinition)
 }
 
 fun tableDiff(
-  desired: CreateTableSchema,
+  desired: P.CreateTableSchema,
   existing: DirDescr,
 ): Array<TableChange> {
   desiredCols = desired.schema;
@@ -39,13 +41,13 @@ fun tableDiff(
 }
 
 fun migrationDiff(
-  desired: Array<Stmt>,
+  desired: Array<P.Stmt>,
   existing: Array<DirDescr>,
-): Map<Name, SchemaChange> {
-  desiredTables: Array<CreateTableSchema> = desired
+): Map<P.Name, SchemaChange> {
+  desiredTables: Array<P.CreateTableSchema> = desired
     .map(x ->
       x match {
-      | t @ CreateTableSchema _ -> Some(t)
+      | t @ P.CreateTableSchema _ -> Some(t)
       | _ -> None()
       }
     )
@@ -70,7 +72,7 @@ fun migrationDiff(
 
 fun adjustSerialisedValues(
   row: RowValues,
-  nameToIndex: Map<Name, Int>,
+  nameToIndex: Map<P.Name, Int>,
   colChanges: Array<TableChange>,
 ): mutable Iterator<String> {
   for (newCol in colChanges) {
@@ -94,15 +96,15 @@ fun adjustSerialisedValues(
       v = row.values[nameToIndex.get(new.name)];
       yield (v, new.ty) match {
       | (None(), _) -> "NULL"
-      | (Some(CInt(n)), INTEGER()) -> n.toString()
-      | (Some(CInt(n)), FLOAT()) -> n.toString()
-      | (Some(CInt(n)), TEXT()) -> escapeStringStr(n.toString())
-      | (Some(CFloat(f)), INTEGER()) -> f.toInt().toString()
-      | (Some(CFloat(f)), FLOAT()) -> f.toString()
-      | (Some(CFloat(f)), TEXT()) -> escapeStringStr(f.toString())
-      | (Some(CString(s)), INTEGER()) -> s
-      | (Some(CString(s)), FLOAT()) -> s
-      | (Some(CString(s)), TEXT()) -> escapeStringStr(s)
+      | (Some(CInt(n)), P.INTEGER()) -> n.toString()
+      | (Some(CInt(n)), P.FLOAT()) -> n.toString()
+      | (Some(CInt(n)), P.TEXT()) -> escapeStringStr(n.toString())
+      | (Some(CFloat(f)), P.INTEGER()) -> f.toInt().toString()
+      | (Some(CFloat(f)), P.FLOAT()) -> f.toString()
+      | (Some(CFloat(f)), P.TEXT()) -> escapeStringStr(f.toString())
+      | (Some(CString(s)), P.INTEGER()) -> s
+      | (Some(CString(s)), P.FLOAT()) -> s
+      | (Some(CString(s)), P.TEXT()) -> escapeStringStr(s)
       }
     }
   }
@@ -110,7 +112,7 @@ fun adjustSerialisedValues(
 
 fun dumpAdjustedInserts(
   origContext: readonly SKStore.Context,
-  changes: Map<Name, SchemaChange>,
+  changes: Map<P.Name, SchemaChange>,
 ): void {
   context = SKStore.Context::fromSaved(origContext.clone());
   handle = getTableDir(context);

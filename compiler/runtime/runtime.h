@@ -213,6 +213,7 @@ SkipInt SKIP_isEq(char* obj1, char* obj2);
 uint32_t SKIP_is_string(char* obj);
 void SKIP_print_char(uint32_t);
 int32_t SKIP_read_line_fill();
+int32_t SKIP_read_to_end_fill();
 uint32_t SKIP_read_line_get(uint32_t);
 char* SKIP_resolve_context(uint64_t, char* context, char* obj,
                            char* synchronizer, char* lockedF);

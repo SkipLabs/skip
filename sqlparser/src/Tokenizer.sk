@@ -1,0 +1,367 @@
+module SQLParser;
+
+class TokenWithPosition(token: Token, position: Int)
+
+mutable class Tokenizer(
+  pos: mutable LexingPosition,
+  tokens: mutable Vector<TokenWithPosition> = mutable Vector[],
+  mutable index: Int = 0,
+) {
+  static fun create(str: String): mutable Tokenizer {
+    mutable Tokenizer(LexingPosition::create(str))
+  }
+
+  mutable fun peek(): Result<TokenWithPosition, TokenizerError> {
+    this.peek_nth(0)
+  }
+
+  mutable fun peek_nth(n: Int): Result<TokenWithPosition, TokenizerError> {
+    nth_index = this.index + n;
+    this.ensure_tokens(nth_index) match {
+    | Failure(err) -> return Failure(err)
+    | Success _ -> void
+    };
+
+    if (nth_index < this.tokens.size()) {
+      Success(this.tokens[nth_index])
+    } else {
+      // Past EOF
+      res = this.tokens[this.tokens.size() - 1];
+      invariant(res.token == TEOF());
+
+      Success(res)
+    }
+  }
+
+  mutable fun next(): Result<TokenWithPosition, TokenizerError> {
+    res = this.peek();
+    this.advance();
+
+    res
+  }
+
+  mutable fun advance(): void {
+    this.!index = this.index + 1
+  }
+
+  private mutable fun ensure_tokens(n: Int): Result<void, TokenizerError> {
+    while (n <= this.tokens.size()) {
+      this.load_token() match {
+      | err @ Failure _ -> return err
+      | Success(void) -> void
+      };
+
+      // Only push EOF once.
+      if (this.tokens[this.tokens.size() - 1].token == TEOF()) {
+        break void
+      }
+    };
+
+    Success(void)
+  }
+
+  private mutable fun load_token(): Result<void, TokenizerError> {
+    loop {
+      token_pos = this.pos.getPosition();
+      next_token(this.pos) match {
+      | Success(TWhitespace _)
+      | Success(TSingleLineComment _)
+      | Success(TMultiLineComment _) ->
+        continue
+      | Success(token) ->
+        this.tokens.push(TokenWithPosition(token, token_pos));
+        return Success(void)
+      | Failure(err) -> return Failure(err)
+      }
+    }
+  }
+}
+
+fun next_token(pos: mutable LexingPosition): Result<Token, TokenizerError> {
+  tok = pos.peek() match {
+  | Chars.null -> TEOF()
+  | c if (Chars.isWhitespace(c)) ->
+    res = mutable Vector[];
+    takeWhile(pos, Chars.isWhitespace, res.push);
+    TWhitespace(String::fromChars(res.toArray()))
+  | '\'' -> return tokenize_quoted_string(pos)
+  | '"' -> return tokenize_quoted_string(pos)
+  | c if (Chars.isDigit(c) || c == '.') -> return tokenize_number(pos)
+  | 'X' if (pos.peekCharOffset('\'', 1)) ->
+    error_pos = pos.getPosition();
+    pos.advance();
+    pos.advance();
+    res = mutable Vector[];
+    takeWhile(pos, Chars.isHexDigit, res.push);
+    if (!pos.peekChar('\'')) {
+      return Failure(InvalidTokenError(error_pos))
+    };
+    pos.advance();
+    if (res.size() % 2 != 0) {
+      return Failure(InvalidTokenError(error_pos))
+    };
+    THexStringLiteral(String::fromChars(res.toArray()))
+  | '(' ->
+    pos.advance();
+    TLParen()
+  | ')' ->
+    pos.advance();
+    TRParen()
+  | ',' ->
+    pos.advance();
+    TComma()
+  | '-' ->
+    pos.advance();
+    pos.peek() match {
+    | '-' ->
+      pos.advance();
+      return tokenize_single_line_comment(pos)
+    | _ -> TMinus()
+    }
+  | '/' ->
+    pos.advance();
+    pos.peek() match {
+    | '*' ->
+      pos.advance();
+      return tokenize_multi_line_comment(pos)
+    | _ -> TDiv()
+    }
+  | '+' ->
+    pos.advance();
+    TPlus()
+  | '*' ->
+    pos.advance();
+    TMul()
+  | '%' ->
+    pos.advance();
+    TMod()
+  | '|' ->
+    pos.advance();
+    pos.peek() match {
+    | '|' ->
+      pos.advance();
+      TStringConcat()
+    | _ -> TPipe()
+    }
+  | '=' ->
+    pos.advance();
+    TEq()
+  | '!' ->
+    error_pos = pos.getPosition();
+    pos.advance();
+    pos.peek() match {
+    | '=' ->
+      pos.advance();
+      TNeq()
+    | _ -> return Failure(InvalidTokenError(error_pos))
+    }
+  | '<' ->
+    pos.advance();
+    pos.peek() match {
+    | '=' ->
+      pos.advance();
+      TLtEq()
+    | '>' ->
+      pos.advance();
+      TNeq()
+    | '<' ->
+      pos.advance();
+      TShiftLeft()
+    | _ -> TLt()
+    }
+  | '>' ->
+    pos.advance();
+    pos.peek() match {
+    | '=' ->
+      pos.advance();
+      TGtEq()
+    | '>' ->
+      pos.advance();
+      TShiftRight()
+    | _ -> TGt()
+    }
+  | ';' ->
+    pos.advance();
+    TSemiColon()
+  | '\\' ->
+    pos.advance();
+    TBackslash()
+  | '&' ->
+    pos.advance();
+    TAmpersand()
+  | '^' ->
+    pos.advance();
+    TCaret()
+  | '~' ->
+    pos.advance();
+    TTilde()
+  | '@' ->
+    pos.advance();
+    res = mutable Vector[];
+    takeWhile(
+      pos,
+      c ~> Chars.isLetter(c) || Chars.isDigit(c) || c == '_',
+      res.push,
+    );
+    TPlaceholder(String::fromChars(res.toArray()))
+  | c if (Chars.isLetter(c) || c == '_') -> return tokenize_word(pos)
+  | _ -> return Failure(InvalidTokenError(pos.getPosition()))
+  };
+  Success(tok)
+}
+
+private fun tokenize_multi_line_comment(
+  pos: mutable LexingPosition,
+): Result<Token, TokenizerError> {
+  res = mutable Vector[];
+  loop {
+    pos.peek() match {
+    | '*' ->
+      pos.advance();
+      if (pos.peek() == '/') {
+        pos.advance();
+        break void
+      };
+      res.push('*')
+    | Chars.null -> break void
+    | c ->
+      res.push(c);
+      pos.advance()
+    }
+  };
+  Success(TMultiLineComment(String::fromChars(res.toArray())))
+}
+
+private fun tokenize_single_line_comment(
+  pos: mutable LexingPosition,
+): Result<Token, TokenizerError> {
+  res = mutable Vector[];
+  loop {
+    pos.next() match {
+    | '\r' ->
+      if (pos.peek() == '\n') pos.advance();
+      break void
+    | '\n' | Chars.null -> break void
+    | c -> res.push(c)
+    }
+  };
+  Success(TSingleLineComment(String::fromChars(res.toArray())))
+}
+
+private fun tokenize_word(
+  pos: mutable LexingPosition,
+): Result<Token, TokenizerError> {
+  res = mutable Vector[];
+  takeWhile(
+    pos,
+    c ~> Chars.isLetter(c) || Chars.isDigit(c) || c == '_',
+    res.push,
+  );
+  word = String::fromChars(res.toArray());
+  token = TWord(word, None(), Keyword::kwMap.maybeGet(word.uppercase()));
+  Success(token)
+}
+
+private fun tokenize_quoted_string(
+  pos: mutable LexingPosition,
+): Result<Token, TokenizerError> {
+  error_pos = pos.getPosition();
+  quote = pos.next();
+  res = mutable Vector[];
+  loop {
+    pos.peek() match {
+    | Chars.null -> return Failure(InvalidTokenError(error_pos))
+    | c if (c == quote) ->
+      pos.advance();
+      pos.peek() match {
+      | q if (q == quote) ->
+        pos.advance();
+        res.push(quote)
+      | _ -> break void
+      }
+    | c ->
+      res.push(c);
+      pos.advance()
+    }
+  };
+  str = String::fromChars(res.toArray());
+  quote match {
+  | '\'' -> Success(TSingleQuotedString(str))
+  | '"' -> Success(TWord(str, Some('"'), None()))
+  | c -> invariant_violation(`invalid quote ${c}`)
+  }
+}
+
+private fun tokenize_number(
+  pos: mutable LexingPosition,
+): Result<Token, TokenizerError> {
+  error_pos = pos.getPosition();
+  has_dot = false;
+  has_exp = false;
+  res = mutable Vector[];
+  takeWhile(pos, Chars.isDigit, res.push);
+  if (
+    res.size() == 1 && res[0] == '0' && pos.peek() == 'x' ||
+    pos.peek() == 'X'
+  ) {
+    res.push(pos.next());
+    takeWhile(pos, Chars.isHexDigit, res.push);
+    if (res.size() == 0) {
+      return Failure(InvalidTokenError(error_pos))
+    };
+    return Success(THexInteger(String::fromChars(res.toArray())))
+  };
+  if (pos.peek() == '.') {
+    !has_dot = true;
+    res.push('.');
+    pos.advance()
+  };
+  takeWhile(pos, Chars.isDigit, res.push);
+  if (res.size() == 1 && res[0] == '.') {
+    return Success(TPeriod())
+  };
+  pos.peek() match {
+  | exp if (exp == 'e' || exp == 'E') ->
+    !has_exp = true;
+    res.push(exp);
+    pos.advance();
+    pos.peek() match {
+    | sign if (sign == '-' || sign == '+') ->
+      res.push(sign);
+      pos.advance()
+    | _ -> void
+    };
+    has_exp_digit = false;
+    takeWhile(pos, Chars.isDigit, d -> {
+      res.push(d);
+      !has_exp_digit = true
+    });
+    if (!has_exp_digit) {
+      return Failure(InvalidTokenError(pos.getPosition()))
+    }
+  | _ -> void
+  };
+  // TODO: Ensure token is properly terminated?
+  val = String::fromChars(res.toArray());
+  if (has_dot || has_exp) {
+    Success(TFloat(val))
+  } else {
+    Success(TInteger(val))
+  }
+}
+
+private fun takeWhile(
+  pos: mutable LexingPosition,
+  pred: (Char) ~> Bool,
+  acc: (Char) -> void,
+): void {
+  loop {
+    pos.peek() match {
+    | Chars.null -> break void
+    | c if (pred(c)) ->
+      acc(c);
+      pos.advance()
+    | _ -> break void
+    }
+  }
+}

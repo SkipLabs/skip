@@ -1,3 +1,5 @@
+module alias P = SQLParser;
+
 module SKDB;
 
 /*****************************************************************************/
@@ -6,17 +8,17 @@ module SKDB;
 
 // Decode a string to a JSON Object, expected to be a map from key
 // strings (parameter names) to values.
-fun decodeParams(input: JSON.Value): Map<String, Value> {
+fun decodeParams(input: JSON.Value): Map<String, P.Value> {
   input match {
   | map @ JSON.Object _ ->
     map.value.mapItems((key, val) -> {
       !key = key.stripPrefix("@");
       lit = val match {
-      | JSON.Null() -> SKDB.VNull()
-      | JSON.IntNumber(v) -> SKDB.VInt(v)
-      | JSON.Bool(v) -> if (v) SKDB.VInt(1) else SKDB.VInt(0)
-      | JSON.FloatNumber(v) -> SKDB.VFloat(v)
-      | JSON.String(v) -> SKDB.VString(v)
+      | JSON.Null() -> P.VNull()
+      | JSON.IntNumber(v) -> P.VInt(v)
+      | JSON.Bool(v) -> if (v) P.VInt(1) else P.VInt(0)
+      | JSON.FloatNumber(v) -> P.VFloat(v)
+      | JSON.String(v) -> P.VString(v)
       | JSON.Array _
       | JSON.Object _ ->
         print_error(
@@ -36,14 +38,14 @@ fun decodeParams(input: JSON.Value): Map<String, Value> {
   }
 }
 
-fun decodeDiffSpec(input: String): Map<Name, SKStore.Tick> {
+fun decodeDiffSpec(input: String): Map<P.Name, SKStore.Tick> {
   try {
     JSON.decode(input) match {
     | map @ JSON.Object _ ->
       map.value.mapItems((key, val) -> {
         val match {
         | obj @ JSON.Object _ ->
-          (Name::create(key), SKStore.Tick(obj.getInt("since")))
+          (P.Name::create(key), SKStore.Tick(obj.getInt("since")))
         | _ ->
           print_error("Expected an object");
           skipExit(2)
@@ -60,7 +62,7 @@ fun decodeDiffSpec(input: String): Map<Name, SKStore.Tick> {
   }
 }
 
-fun decodeTailSpec(input: String, defaultSince: Int): Map<Name, TailSpec> {
+fun decodeTailSpec(input: String, defaultSince: Int): Map<P.Name, TailSpec> {
   try {
     JSON.decode(input) match {
     | map @ JSON.Object _ ->
@@ -68,7 +70,7 @@ fun decodeTailSpec(input: String, defaultSince: Int): Map<Name, TailSpec> {
         val match {
         | obj @ JSON.Object _ ->
           (
-            Name::create(key),
+            P.Name::create(key),
             TailSpec{
               since => obj.maybeGetInt("since").default(defaultSince),
               filter => obj.maybeGetString("filterExpr").flatMap(expr ->
@@ -96,7 +98,10 @@ fun decodeTailSpec(input: String, defaultSince: Int): Map<Name, TailSpec> {
   }
 }
 
-fun computeTableDescr(name: Name, schema: Array<ColumnDefinition>): DirDescr {
+fun computeTableDescr(
+  name: P.Name,
+  schema: Array<P.ColumnDefinition>,
+): DirDescr {
   dirNameStr = "/" + name + "/";
   dirName = SKStore.DirName::create(dirNameStr);
   colVec = mutable Vector[];
@@ -108,18 +113,18 @@ fun computeTableDescr(name: Name, schema: Array<ColumnDefinition>): DirDescr {
 
 fun computeInsert(
   context: mutable SKStore.Context,
-  params: Map<String, Value>,
+  params: Map<String, P.Value>,
   inTransaction: Bool,
   pos: Int,
-  columnParamsOpt: ?Array<Name>,
-  valuesArray: Array<Array<Expr>>,
+  columnParamsOpt: ?Array<P.Name>,
+  valuesArray: Array<Array<P.Expr>>,
   table: DirDescr,
   repeat: Int = 1,
 ): Array<RowValues> {
   valuesArray.map(vals -> {
     values = vals.mapWithIndex((idx, expr) -> {
       val = expr match {
-      | x @ Value _ -> x
+      | x @ P.Value _ -> x
       | _ -> error(pos, "Arbitrary expressions not supported for INSERT")
       };
       schemaIdx = columnParamsOpt match {
@@ -175,20 +180,22 @@ fun computeInsert(
         value = tyDescr.default match {
         | None() ->
           if (tyDescr.primary is Some _) {
-            if (tyDescr.ty is TEXT()) {
+            if (tyDescr.ty is P.TEXT()) {
               Some(CString(Ksuid::create().toString()))
             } else {
               Some(CInt(SKStore.genSym(0)))
             };
+          } else if (!tyDescr.notNull.isSome() && !tyDescr.unique.isSome()) {
+            None()
           } else {
             error(pos, "Missing value for column: " + tyDescr.name);
           }
-        | Some(CCDefault{expr}) ->
+        | Some(P.CCDefault{expr}) ->
           expr match {
-          | VNull() -> None()
-          | VInt(n) -> Some(CInt(n))
-          | VFloat(f) -> Some(CFloat(f))
-          | VString(x) -> Some(CString(x))
+          | P.VNull() -> None()
+          | P.VInt(n) -> Some(CInt(n))
+          | P.VFloat(f) -> Some(CFloat(f))
+          | P.VString(x) -> Some(CString(x))
           | _ -> error(pos, "Invalid expression for default value")
           }
         };
@@ -207,37 +214,37 @@ fun computeInsert(
 
 fun valueToCValue(
   context: mutable SKStore.Context,
-  params: Map<String, Value>,
+  params: Map<String, P.Value>,
   inTransaction: Bool,
   pos: Int,
-  schema: Array<ColumnDefinition>,
+  schema: Array<P.ColumnDefinition>,
   idx: Int,
-  val: Value,
+  val: P.Value,
 ): ?CValue {
   if (idx >= schema.size()) {
     error(pos, "Too many columns defined");
   };
   !val = val match {
-  | VParam(handle) ->
+  | P.VParam(handle) ->
     params.maybeGet(handle) match {
     | Some(v) -> v
     | None() -> error(pos, "Unbound parameter: " + handle)
     }
-  | VPermission(arg) ->
+  | P.VPermission(arg) ->
     perm_str = arg match {
-    | VParam(handle) ->
+    | P.VParam(handle) ->
       params.maybeGet(handle) match {
-      | Some(VString(str)) -> str
+      | Some(P.VString(str)) -> str
       | Some(_) -> error(pos, "Argument to skdb_permission must be a string")
       | None() -> error(pos, "Unbound parameter: " + handle)
       }
-    | VString(str) -> str
+    | P.VString(str) -> str
     | _ -> error(pos, "Argument to skdb_permission must be a string")
     };
-    VInt(compilePermissionLiteral(perm_str))
+    P.VInt(compilePermissionLiteral(perm_str))
   | _ -> val
   };
-  if (val is VNull _) {
+  if (val is P.VNull _) {
     if (schema[idx].notNull is Some _) {
       error(pos, "cannot insert NULL in column declared as NOT NULL")
     } else {
@@ -245,9 +252,9 @@ fun valueToCValue(
     }
   };
   schema[idx].ty match {
-  | INTEGER() ->
+  | P.INTEGER() ->
     val match {
-    | VSeqNum(isPositive, Some(varName)) ->
+    | P.VSeqNum(isPositive, Some(varName)) ->
       if (!inTransaction) {
         error(pos, "named id can only be used in a transaction");
       };
@@ -264,19 +271,19 @@ fun valueToCValue(
         Some(CInt(id))
       | Some(id) -> Some(CInt(id))
       }
-    | VSeqNum(isPositive, None()) ->
+    | P.VSeqNum(isPositive, None()) ->
       if (isPositive) {
         Some(CInt(SKStore.genSym(0)))
       } else {
         Some(CInt(-SKStore.genSym(0)))
       }
-    | VTime() ->
+    | P.VTime() ->
       if (inTransaction) {
         error(pos, "time can not be used in a transaction");
       };
       time = getUnixTime();
       Some(CInt(time))
-    | VInt(n) ->
+    | P.VInt(n) ->
       if (schema[idx].primary is Some _) {
         _ = SKStore.genSym(Math.abs(n));
       };
@@ -291,10 +298,10 @@ fun valueToCValue(
           ")",
       )
     }
-  | FLOAT() ->
+  | P.FLOAT() ->
     val match {
-    | VFloat(f) -> Some(CFloat(f))
-    | VInt(i) -> Some(CFloat(i.toFloat()))
+    | P.VFloat(f) -> Some(CFloat(f))
+    | P.VInt(i) -> Some(CFloat(i.toFloat()))
     | v ->
       error(
         pos,
@@ -305,9 +312,9 @@ fun valueToCValue(
           ")",
       )
     }
-  | TEXT() ->
+  | P.TEXT() ->
     val match {
-    | VId(Some(varName)) ->
+    | P.VId(Some(varName)) ->
       if (!inTransaction) {
         error(pos, "named id can only be used in a transaction");
       };
@@ -323,8 +330,8 @@ fun valueToCValue(
         Some(CString(id))
       | Some(id) -> Some(CString(id))
       }
-    | VId(None()) -> Some(CString(Ksuid::create().toString()))
-    | VString(str) -> Some(CString(str))
+    | P.VId(None()) -> Some(CString(Ksuid::create().toString()))
+    | P.VString(str) -> Some(CString(str))
     | v ->
       error(
         pos,
@@ -340,8 +347,8 @@ fun valueToCValue(
 
 fun computeKinds(
   params: Array<CGExpr>,
-  ekinds: Array<(Int, IKind)>,
-): Array<(Int, IKind, Type)> {
+  ekinds: Array<(Int, P.IKind)>,
+): Array<(Int, P.IKind, P.Type)> {
   size = params.size();
   paramTypes = params.map(x -> x.getType());
   colSet = mutable Set[];
@@ -361,12 +368,12 @@ fun computeKinds(
 }
 
 fun computeOrder(
-  paramTypes: Array<Type>,
-  ikinds: Array<(Int, IKind)>,
-): Array<(Int, IKind, Type)> {
+  paramTypes: Array<P.Type>,
+  ikinds: Array<(Int, P.IKind)>,
+): Array<(Int, P.IKind, P.Type)> {
   size = paramTypes.size();
-  defaultKinds = Array<?(Int, SKDB.IKind, SKDB.Type)>::mfillBy(size, i ->
-    Some((i, (INONE() : IKind), paramTypes[i]))
+  defaultKinds = Array<?(Int, P.IKind, P.Type)>::mfillBy(size, i ->
+    Some((i, (P.INONE() : P.IKind), paramTypes[i]))
   );
   kinds = mutable Vector[];
   for (ik in ikinds) {
@@ -385,10 +392,10 @@ fun computeOrder(
 
 class SelectFile(
   tick: Int,
-  name: Name,
+  name: P.Name,
   virtual: Bool,
   text: String,
-  sparams: Array<SelectResult>,
+  sparams: Array<P.SelectResult>,
   cselect: CSelect,
 ) extends SKStore.File
 
@@ -413,8 +420,8 @@ class Evaluator{options: Options, user: ?UserFile} {
 
   fun stmt(
     context: mutable SKStore.Context,
-    params: Map<String, Value>,
-    stmt: Stmt,
+    params: Map<String, P.Value>,
+    stmt: P.Stmt,
     inTransaction: Bool,
   ): ?((
     mutable SKStore.Context,
@@ -422,13 +429,13 @@ class Evaluator{options: Options, user: ?UserFile} {
     SKStore.Context,
   ) ~> void) {
     stmt match {
-    | Pragma _ -> invariant_violation("PRAGMA should be handled at top level")
-    | BeginTransaction _
-    | EndTransaction _ ->
+    | P.Pragma _ -> invariant_violation("PRAGMA should be handled at top level")
+    | P.BeginTransaction _
+    | P.EndTransaction _ ->
       invariant_violation(
         "BEGIN/END TRANSACTION should be handled at top level",
       )
-    | CreateTableSchema{pos, name, schema, ifNotExists} ->
+    | P.CreateTableSchema{pos, name, schema, ifNotExists} ->
       if (inTransaction) {
         error(pos, "Cannot create a table in a transaction");
       };
@@ -436,9 +443,9 @@ class Evaluator{options: Options, user: ?UserFile} {
         dirDescr = computeTableDescr(name, schema.columns);
         this.createTable(context, pos, name, dirDescr, ifNotExists);
       })
-    | CreateTableAs _ ->
+    | P.CreateTableAs _ ->
       invariant_violation("CREATE TABLE AS SELECT not implemented")
-    | Insert{pos, onConflict, name, alias, paramsOpt, values} ->
+    | P.Insert{pos, onConflict, name, alias, paramsOpt, values} ->
       if (alias is Some _) {
         error(pos, "INSERT INTO table AS not implemented")
       };
@@ -453,8 +460,8 @@ class Evaluator{options: Options, user: ?UserFile} {
         error(pos, "Cannot write in view: " + name);
       };
       values match {
-      | IDefault() -> error(pos, "DEFAULT VALUES not implemented")
-      | IQuery(selectAst @ Select _) ->
+      | P.IDefault() -> error(pos, "DEFAULT VALUES not implemented")
+      | P.IQuery(selectAst @ P.Select _) ->
         if (onConflict is Some _) {
           error(pos, "Can only use OR IGNORE/REPLACE with values");
         };
@@ -467,7 +474,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         select = compiler.compileSelect(
           context,
           selectAst,
-          Name::create(
+          P.Name::create(
             genSelectId(selectAst).origName + "_" + SKStore.genSym(0),
           ),
           true,
@@ -478,15 +485,15 @@ class Evaluator{options: Options, user: ?UserFile} {
         dir = getDir(table);
         sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
         sinkDirName = SKStore.DirName::create(sinkName);
-        kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
+        kinds = table.schema.mapWithIndex((idx, x) -> (idx, P.IASC(), x.ty));
         if (select.params.size() != kinds.size()) {
           error(pos, "Incompatible select size")
         };
         for (i => param in select.params) {
           (kinds[i].i2, param.getType()) match {
-          | (INTEGER(), INTEGER())
-          | (FLOAT(), FLOAT())
-          | (TEXT(), TEXT()) ->
+          | (P.INTEGER(), P.INTEGER())
+          | (P.FLOAT(), P.FLOAT())
+          | (P.TEXT(), P.TEXT()) ->
             void
           | _ -> error(pos, "Incompatible select type")
           }
@@ -504,7 +511,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         );
         None()
 
-      | IValues(vals) ->
+      | P.IValues(vals) ->
         table = getTable(context, pos, name);
         this.insert(
           context,
@@ -517,7 +524,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           vals,
         )
       }
-    | selectAst @ Select{} ->
+    | selectAst @ P.Select{} ->
       compiler = SKDB.Compiler::create(
         !inTransaction,
         this.options,
@@ -540,7 +547,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       context.setGlobal("Stdout", StdoutFile(select.format, stdout));
       None()
 
-    | index @ CreateIndex{pos, where} ->
+    | index @ P.CreateIndex{pos, where} ->
       if (where is Some _) {
         error(pos, "INDEX ... WHERE not implemented")
       };
@@ -548,14 +555,14 @@ class Evaluator{options: Options, user: ?UserFile} {
         this.makeIndex(context, index);
         context.update()
       })
-    | view @ CreateView{
+    | view @ P.CreateView{
       pos,
       name => viewName,
       ifNotExists,
-      query => selectAst @ Select _,
+      query => selectAst @ P.Select _,
       virtual,
     } ->
-      if (selectAst.core is SelectCoreValues _) {
+      if (selectAst.core is P.SelectCoreValues _) {
         error(selectAst.pos, "CREATE VIEW AS VALUES ... not implemented")
       };
       if (inTransaction) {
@@ -588,7 +595,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           viewName,
           virtual,
           view.toString(),
-          (selectAst.core as SelectCoreQuery _).params,
+          (selectAst.core as P.SelectCoreQuery _).params,
           cselect1,
         ),
       );
@@ -623,7 +630,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           cselect = compiler.compileSelect(context, selectAst, viewName, true);
           dirName = SKStore.DirName::create("/" + viewName + "/");
           dirDescr = SKDB.Compiler::getDirDescr(
-            (selectAst.core as SelectCoreQuery _).params,
+            (selectAst.core as P.SelectCoreQuery _).params,
             cselect.from,
             cselect.params,
             cselect.id,
@@ -638,7 +645,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       } else {
         None()
       }
-    | DropView{pos, name => viewName, ifExists} ->
+    | P.DropView{pos, name => viewName, ifExists} ->
       if (ifExists) {
         error(pos, "DROP VIEW IF EXISTS not implemented")
       };
@@ -661,8 +668,8 @@ class Evaluator{options: Options, user: ?UserFile} {
         }
       })
 
-    | DropIndex{pos} -> error(pos, "Drop index not supported")
-    | DropTable{pos, name, ifExists} ->
+    | P.DropIndex{pos} -> error(pos, "Drop index not supported")
+    | P.DropTable{pos, name, ifExists} ->
       if (ifExists) {
         error(pos, "DROP TABLE IF EXISTS not implemented")
       };
@@ -676,7 +683,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         );
         errorAllExistingSubs(context, dirName)
       })
-    | Delete{pos, name, where, alias, indexed} ->
+    | P.Delete{pos, name, where, alias, indexed} ->
       if (alias is Some _) {
         error(pos, "DELETE FROM table AS not implemented")
       };
@@ -686,7 +693,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       _ = this.delete(context, params, pos, name, where, Array[]);
       None()
 
-    | Update{pos, name, alias, indexed, sets, where, from, onConflict} ->
+    | P.Update{pos, name, alias, indexed, sets, where, from, onConflict} ->
       if (alias is Some _) {
         error(pos, "UPDATE table AS alias not implemented")
       };
@@ -724,7 +731,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     };
   }
 
-  fun makeIndex(context: mutable SKStore.Context, index: CreateIndex): void {
+  fun makeIndex(context: mutable SKStore.Context, index: P.CreateIndex): void {
     input = getIndexInputDir(context);
     key = SKStore.SID::create(index.name.lower);
     size = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key).size();
@@ -740,19 +747,19 @@ class Evaluator{options: Options, user: ?UserFile} {
 
   fun delete(
     context: mutable SKStore.Context,
-    params: Map<String, Value>,
+    params: Map<String, P.Value>,
     pos: Int,
-    name: Name,
-    where: ?Expr,
-    sets: Array<UpdateSet>,
+    name: P.Name,
+    where: ?P.Expr,
+    sets: Array<P.UpdateSet>,
   ): SKStore.DirName {
     sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
     sinkDirName = SKStore.DirName::create(sinkName);
-    from = Some(FromTable{name, asName => None(), indexed => false});
-    selectAst = Select{
+    from = Some(P.FromTable{name, asName => None(), indexed => false});
+    selectAst = P.Select{
       pos => pos,
-      core => SelectCoreQuery{
-        params => Array[SelectStar(None())],
+      core => P.SelectCoreQuery{
+        params => Array[P.SelectStar(None())],
         from,
         where,
         groupBy => None(),
@@ -772,7 +779,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     select = compiler.compileSelect(
       context,
       selectAst,
-      Name::create("SELECT_" + SKStore.genSym(pos)),
+      P.Name::create("SELECT_" + SKStore.genSym(pos)),
       true,
       sets,
     );
@@ -849,13 +856,13 @@ class Evaluator{options: Options, user: ?UserFile} {
 
   fun insert(
     context: mutable SKStore.Context,
-    params: Map<String, Value>,
+    params: Map<String, P.Value>,
     pos: Int,
-    onConflict: ?OnConflict,
+    onConflict: ?P.OnConflict,
     inTransaction: Bool,
     table: DirDescr,
-    paramsOpt: ?Array<Name>,
-    values: Array<Array<Expr>>,
+    paramsOpt: ?Array<P.Name>,
+    values: Array<Array<P.Expr>>,
   ): ?((
     mutable SKStore.Context,
     mutable SKStore.Context,
@@ -870,16 +877,16 @@ class Evaluator{options: Options, user: ?UserFile} {
       values,
       table,
     );
-    if (inTransaction && onConflict is Some(OCIgnore())) {
+    if (inTransaction && onConflict is Some(P.OCIgnore())) {
       error(pos, "OR IGNORE not supported in transactions")
-    } else if (inTransaction && onConflict is Some(OCReplace())) {
+    } else if (inTransaction && onConflict is Some(P.OCReplace())) {
       error(pos, "OR REPLACE not supported in transactions")
     } else if (inTransaction) {
       this.insertTable(context, table, rows);
       None()
-    } else if (onConflict is Some(OCUpdate(_))) {
+    } else if (onConflict is Some(P.OCUpdate(_))) {
       onConflict match {
-      | Some(OCUpdate(update)) ->
+      | Some(P.OCUpdate(update)) ->
         copy = context.clone();
         hasConflict = try {
           this.insertTable(context, table, rows);
@@ -892,7 +899,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         | exn -> throw exn
         };
         if (hasConflict) {
-          this.stmt(context, params, update, false)
+          this.stmt(context, params, update with {name => table.name}, false)
         } else {
           None()
         }
@@ -900,7 +907,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       }
     } else {
       Some((context, _, _) ~> {
-        if (onConflict is Some(OCIgnore())) {
+        if (onConflict is Some(P.OCIgnore())) {
           copy = context.clone();
           try {
             this.insertTable(context, table, rows);
@@ -909,7 +916,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           | Conflict _ -> context.replaceFromSaved(copy)
           | exn -> throw exn
           }
-        } else if (onConflict is Some(OCReplace())) {
+        } else if (onConflict is Some(P.OCReplace())) {
           loop {
             copy = context.clone();
             shouldContinue = try {
@@ -931,7 +938,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                 false
               } else {
                 kinds = table.schema.mapWithIndex((idx, x) ->
-                  (idx, IASC(), x.ty)
+                  (idx, P.IASC(), x.ty)
                 );
                 entries = mutable Vector[];
                 dir = context.unsafeGetEagerDir(table.dirName);
@@ -960,8 +967,13 @@ class Evaluator{options: Options, user: ?UserFile} {
             if (!shouldContinue) break void
           }
         } else {
-          this.insertTable(context, table, rows);
-          context.update();
+          try {
+            this.insertTable(context, table, rows);
+            context.update();
+          } catch {
+          | Conflict(posError, msg, _, _) -> error(posError, msg)
+          | exn -> throw exn
+          }
         }
       })
     }
@@ -974,7 +986,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   ): void {
     dir = getDir(table);
     newDir = context.unsafeGetEagerDir(dir.dirName);
-    kinds = table.schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
+    kinds = table.schema.mapWithIndex((idx, x) -> (idx, P.IASC(), x.ty));
     for (row in rows) {
       key = RowKey(row, kinds);
       source = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
@@ -986,7 +998,7 @@ class Evaluator{options: Options, user: ?UserFile} {
   fun createTable(
     context: mutable SKStore.Context,
     pos: Int,
-    name: Name,
+    name: P.Name,
     dirDescr: DirDescr,
     ifNotExists: Bool,
   ): void {
@@ -1020,7 +1032,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (hasPrimary) {
           error(pos, "multiple primary keys detected");
         };
-        if (!(tyDescr.ty is INTEGER()) && !(tyDescr.ty is TEXT())) {
+        if (!(tyDescr.ty is P.INTEGER()) && !(tyDescr.ty is P.TEXT())) {
           error(pos, "primary keys are expected to be integers or strings");
         };
         !hasPrimary = true;
@@ -1028,15 +1040,15 @@ class Evaluator{options: Options, user: ?UserFile} {
       if (tyDescr.unique is Some _ || tyDescr.primary is Some _) {
         this.makeIndex(
           context,
-          CreateIndex{
+          P.CreateIndex{
             pos => pos,
             ifNotExists => false,
-            name => Name::create(name.origName + "_" + tyDescr.name.origName),
+            name => P.Name::create(name.origName + "_" + tyDescr.name.origName),
             on => name,
             columns => Array[
-              IndexedColumn{
-                expr => Identifier(tyDescr.name),
-                order => IASC(),
+              P.IndexedColumn{
+                expr => P.Identifier(tyDescr.name),
+                order => P.IASC(),
                 collate => None(),
               },
             ],
@@ -1056,73 +1068,11 @@ class Evaluator{options: Options, user: ?UserFile} {
 @cpp_extern("SKIP_String_concatN")
 native fun concatArray(Array<String>): String;
 
-@cpp_extern("SKIP_isatty")
-native fun isATTY(): UInt32;
-
 @cpp_extern("SKIP_unsafe_compare_sets")
 native fun unsafeCompareSets(
   SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
   SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
 ): Int32;
-
-fun read(line: Int): (Int, String) {
-  i = 0;
-  chars = mutable Vector[];
-  try {
-    loop {
-      c = getChar();
-      !i = i + 1;
-
-      if (c == '\'') {
-        chars.push(c);
-        loop {
-          c2 = getChar();
-          chars.push(c2);
-          if (c2 == '\'') break void;
-        };
-        continue;
-      };
-
-      if (c == '-') {
-        c2 = getChar();
-        !i = i + 1;
-        if (c2 == '-') {
-          while (getChar() != '\n') {
-            !i = i + 1;
-          };
-          continue
-        } else {
-          chars.push(c);
-          chars.push(c2);
-        }
-      } else if (c == '/') {
-        c2 = getChar();
-        !i = i + 1;
-        if (c2 == '*') {
-          last = getChar();
-          !i = i + 1;
-          loop {
-            c3 = getChar();
-            !i = i + 1;
-            if (last == '*' && c3 == '/') break void;
-            !last = c3;
-          };
-          continue
-        } else {
-          chars.push(c);
-          chars.push(c2);
-        }
-      } else {
-        chars.push(c);
-      };
-
-      if (c == '\n') !line = line + 1;
-      if (c == ';') break (line, String::fromChars(chars.toArray()));
-    }
-  } catch {
-  | _endOfFile -> (line, String::fromChars(chars.toArray()))
-  }
-}
 
 fun getLine(buffer: Buffer, pos: Int): Int {
   line = 1;
@@ -1134,28 +1084,23 @@ fun getLine(buffer: Buffer, pos: Int): Int {
   line
 }
 
-fun printErrorAndExit(
-  lineOffset: Int,
-  buffer: Buffer,
-  pos: Int,
-  msg: String,
-): void {
+fun printError(input: String, error: Error): void {
+  buffer = Buffer(input);
   leftSpaces = 0;
   cursor = 0;
   line = 0;
-  !pos = min(buffer.size() - 1, pos);
-  while (pos - cursor > 0) {
-    if (buffer[pos - cursor] == '\n') {
-      !line = line + 1;
-      if (line == 1) {
-        !leftSpaces = cursor;
-      };
-      if (line == 5) break void;
+  pos = error.getPosition();
+  while (cursor < pos) {
+    if (cursor == buffer.size()) {
+      break void
     };
-    !cursor = cursor + 1
-  };
-  if (pos - leftSpaces < 0) {
-    !leftSpaces = pos;
+    if (buffer[cursor] == '\n') {
+      !line = line + 1;
+      !leftSpaces = 0;
+    } else {
+      !leftSpaces = leftSpaces + 1;
+    };
+    !cursor = cursor + 1;
   };
   right = 0;
   while (pos + right < buffer.size() && buffer[pos + right] != '\n') {
@@ -1165,23 +1110,22 @@ fun printErrorAndExit(
   txtEnd = min(buffer.size(), pos + right);
   print_error(buffer.slice(txtBegin, txtEnd));
   spaceBuffer = mutable Vector[];
-  for (_ in Range(0, leftSpaces - 1)) spaceBuffer.push(' ');
+  for (_ in Range(0, leftSpaces)) spaceBuffer.push(' ');
   margin = String::fromChars(spaceBuffer.toArray());
   print_error(margin + "^");
   print_error(margin + "|");
   print_error(margin + " ----- ERROR");
-  errLine = lineOffset + getLine(buffer, pos);
-  charPos = `characters ${leftSpaces}-${leftSpaces}`;
+  errLine = getLine(buffer, pos);
+  charPos = `character ${leftSpaces}`;
   print_error(`Error: line ${errLine}, ${charPos}:`);
-  print_error(msg);
-  skipExit(2)
+  print_error(error.getMessage())
 }
 
 fun evalWithContext(
   options: Options,
   context: mutable SKStore.Context,
-  params: Map<String, Value>,
-  stmt: Stmt,
+  params: Map<String, P.Value>,
+  stmt: P.Stmt,
   inTransaction: Bool,
 ): ?((
   mutable SKStore.Context,
@@ -1193,27 +1137,15 @@ fun evalWithContext(
   evaluator.stmt(context, params, stmt, inTransaction);
 }
 
-fun makeSqlContext(): mutable SKStore.Context {
-  gcontext = mutable SKStore.Context{
+fun makeSqlContext(): SKStore.Context {
+  SKStore.Context{
     canReuse => SKStore.CRAlways(),
     failOnExn => true,
     removeSubDirs => true,
-  };
-  gcontext.setGlobal("Line", SKStore.IntFile(0));
-  gcontext
-}
-
-fun doOnError(options: Options, f: () -> void, error: Exception -> void): void {
-  if (options.backtrace) f() else {
-    try {
-      f()
-    } catch {
-    | exn -> error(exn)
-    }
   }
 }
 
-class StmtFile(stmt: Stmt) extends SKStore.File
+class StmtFile(stmt: P.Stmt) extends SKStore.File
 class TickFile(tick: SKStore.Tick) extends SKStore.File
 
 base class OutputFormatKind {
@@ -1235,89 +1167,107 @@ class Options{
   expectQueryParams: Bool = false,
 } extends SKStore.File
 
-fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
-  isTTY = isATTY() != 0;
-  runSql(options, context ~> {
-    if (isTTY) {
-      print_raw("skdb> ");
+private mutable class SQLContext(
+  synchronizer: SKStore.Synchronizer,
+  sync: UInt32,
+  mutable globals: SortedMap<String, SKStore.File>,
+  mutable context: SKStore.Context,
+) {
+  static fun withContext<T>(sync: Bool, f: (mutable SQLContext) ~> T): T {
+    initCtx = SKDB.makeSqlContext();
+    if (SKStore.gHasContext() == 0) {
+      SKStore.gContextInit(initCtx)
     };
-    lineFile = SKStore.IntFile::type(context.getGlobal("Line").fromSome());
-    context.!globals = SortedMap[];
-    userOpt.each(_ -> {
-      print_error("Cannot execute queries as user, use --connect instead");
-      skipExit(88);
-    });
-    context.setGlobal("Line", lineFile);
-    context.removeGlobal("TableMap");
+    ctx = mutable SQLContext(
+      SKStore.Synchronizer(importFromRoot, exportToRoot, printContext),
+      UInt32::truncate(if (sync) 1 else 0),
+      initCtx.globals,
+      SKStore.gUnsafeContextGet(),
+    );
+    res = f(ctx);
+    SKStore.gUnsafeFree(ctx.context);
+    res
+  }
 
-    gline = lineFile.value;
+  private mutable fun _exec(
+    f: SKStore.Context ~> (
+      SKStore.Context,
+      ?(
+        mutable SKStore.Context,
+        mutable SKStore.Context,
+        SKStore.Context,
+      ) ~> void,
+    ),
+  ): void {
+    startTick = this.context.tick;
+    pos = SKStore.newObstack();
 
-    line = 0;
-    lineStr = "";
-    buffer = Buffer(lineStr);
-    lex = Lexer(0, buffer);
-    pos = 0;
-    shouldContinue = false;
-    underLockF: ?((
+    (newContext, underLockF) = try {
+      f(this.context with {globals => this.globals})
+    } catch {
+    | err @ Error _ ->
+      (SKStore.cloneContextWithError(this.context, err), None())
+    | exn -> throw exn
+    };
+    this.!context = SKStore.gContextSync(
+      startTick,
+      this.context,
+      newContext,
+      Some(this.synchronizer),
+      this.sync,
+      underLockF,
+    );
+
+    this.context.notifyAll(startTick);
+
+    this.!globals = this.context.globals;
+
+    SKStore.destroyObstack(pos)
+  }
+
+  mutable fun exec(
+    f: mutable SKStore.Context ~> ?(
       mutable SKStore.Context,
       mutable SKStore.Context,
       SKStore.Context,
-    ) ~> void) = None();
+    ) ~> void,
+  ): Result<void, Error> {
+    this._exec(icontext ~> {
+      context = SKStore.Context::fromSaved(icontext);
+      underLockF = f(context);
+      (context.clone(), underLockF);
+    });
 
-    doOnError(
-      options,
-      () -> {
-        !shouldContinue = true;
-        isTransaction = false;
+    this.globals.maybeGet("Error").map(f ->
+      SKStore.ErrorFile::type(f).value
+    ) match {
+    | Some(err @ Error _) -> Failure(err)
+    | Some(exn) ->
+      print_error(exn.getMessage());
+      skipExit(1)
+    | None() -> Success(void)
+    }
+  }
 
-        loop {
-          !underLockF = None();
-          (!line, !lineStr) = read(gline);
-          !buffer = Buffer(lineStr);
-          !lex = Lexer(0, buffer);
-          !pos = 0;
+  mutable fun eval(
+    statements: Array<P.Stmt>,
+    options: Options,
+    params: Map<String, P.Value>,
+    isTransaction: Bool,
+  ): Result<void, Error> {
+    this.exec(context ~> {
+      context.!globals = SortedMap[];
 
-          if (isEOF(lex, pos)) {
-            !shouldContinue = false;
-            if (isTransaction) {
-              printErrorAndExit(line, buffer, pos, "Unfinished transaction");
-            };
-            return void;
-          };
+      underLockF: ?((
+        mutable SKStore.Context,
+        mutable SKStore.Context,
+        SKStore.Context,
+      ) ~> void) = None();
 
-          if (lex.isEqUpper(pos, "BEGIN")) {
-            !pos = lex.expectUpper(pos, "BEGIN");
-            !pos = lex.expectUpper(pos, "TRANSACTION");
-            !pos = lex.expect(pos, ";");
+      for (stmt in statements) {
+        markIfRead(context, stmt);
 
-            if (isTransaction) {
-              printErrorAndExit(line, buffer, pos, "Nested transaction");
-            };
-            !isTransaction = true;
-            continue;
-          };
-
-          if (lex.isEqUpper(pos, "COMMIT")) {
-            !pos = lex.expectUpper(pos, "COMMIT");
-            !pos = lex.expect(pos, ";");
-            context.getGlobal(GLOBALS) match {
-            | None() -> void
-            | Some(_) -> context.removeGlobal(GLOBALS)
-            };
-            context.getGlobal(NAMEDIDS) match {
-            | None() -> void
-            | Some(_) -> context.removeGlobal(NAMEDIDS)
-            };
-            break void;
-          };
-
-          (!pos, stmtOpt) = parseStmt(lex, pos);
-          stmt = stmtOpt match {
-          | None() -> break void
-          | Some(x) -> x
-          };
-          markIfRead(context, stmt);
-
+        try {
           !underLockF = evalWithContext(
             options,
             context,
@@ -1325,72 +1275,87 @@ fun eval(options: Options, params: Map<String, Value>, userOpt: ?String): void {
             stmt,
             isTransaction,
           );
-
-          if (!isTransaction) break void;
-        };
-      },
-      err -> {
-        err match {
+        } catch {
         | IgnoreAndContinue() -> void
-        | Error(posError, str) ->
-          printErrorAndExit(gline, buffer, posError, str)
-        | exn ->
-          print_error(exn.getMessage());
-          skipExit(44)
-        }
-      },
-    );
+        | exn -> throw exn
+        };
+      };
 
-    !gline = line;
-    context.setGlobal("Line", SKStore.IntFile(gline));
-
-    if (shouldContinue) {
-      SKStore.CContinue(underLockF)
-    } else {
-      SKStore.CStop(underLockF)
-    }
-  })
+      underLockF
+    })
+  }
 }
 
-fun slurpStmts(options: Options): Array<Stmt> {
-  line = 0;
-  lineStr = "";
-  buffer = Buffer(lineStr);
-  lex = Lexer(0, buffer);
-  pos = 0;
+fun eval(
+  sql: String,
+  options: Options,
+  params: Map<String, P.Value>,
+  requireFinalSemicolon: Bool = false,
+): Result<void, Error> {
+  SKStore.withRegionValue(() ~> {
+    SQLContext::withContext(options.sync, (ctx) ~> {
+      parser = P.Parser::create(sql);
+      loop {
+        isTransaction = false;
+        statements = mutable Vector[];
+        loop {
+          parser.next_stmt(requireFinalSemicolon) match {
+          | Failure(err) ->
+            return (Failure(ParserError(err)) : Result<void, Error>)
+          | Success(None()) ->
+            if (isTransaction) {
+              return Failure(UnfinishedTransactionError(sql.length()))
+            };
+            if (statements.isEmpty()) {
+              return (Success(void) : Result<void, Error>)
+            }
+          | Success(Some(stmt)) ->
+            stmt match {
+            | P.BeginTransaction{pos} ->
+              if (isTransaction) {
+                return Failure(SqlError(pos, "Nested transaction"))
+              };
+              !isTransaction = true
+            | P.EndTransaction{pos} ->
+              if (!isTransaction) {
+                return (Failure(
+                  SqlError(pos, "Unexpected COMMIT/END TRANSACTION"),
+                ) : Result<void, Error>)
+              };
+              break void
+            | _ ->
+              statements.push(stmt);
+              if (!isTransaction) {
+                break void
+              }
+            }
+          }
+        };
+
+        ctx.eval(statements.toArray(), options, params, isTransaction) match {
+        | res @ Failure _ -> break res
+        | Success _ -> void
+        }
+      }
+    })
+  });
+}
+
+fun slurpStmts(_options: Options): Array<P.Stmt> {
+  // TODO: properly handle buffering.
+  input = IO.stdin().read_to_end();
   stmts = mutable Vector[];
 
-  doOnError(
-    options,
-    () -> {
-      loop {
-        (!line, !lineStr) = read(line);
-        !buffer = Buffer(lineStr);
-        !lex = Lexer(0, buffer);
-        !pos = 0;
-
-        if (isEOF(lex, pos)) {
-          return void;
-        };
-
-        (!pos, stmtOpt) = parseStmt(lex, pos);
-        stmt = stmtOpt match {
-        | None() -> continue
-        | Some(x) -> x
-        };
-        stmts.push(stmt);
-      };
-    },
-    err -> {
-      err match {
-      | IgnoreAndContinue() -> void
-      | Error(posError, str) -> printErrorAndExit(line, buffer, posError, str)
-      | exn ->
-        print_error(exn.getMessage());
-        skipExit(44)
-      }
-    },
-  );
+  parser = P.Parser::create(input);
+  loop {
+    parser.next_stmt() match {
+    | Success(None()) -> break void
+    | Success(Some(stmt)) -> stmts.push(stmt)
+    | Failure(err) ->
+      printError(input, ParserError(err));
+      skipExit(1)
+    }
+  };
 
   stmts.collect(Array)
 }
@@ -1400,7 +1365,7 @@ fun runSql(
   f: mutable SKStore.Context ~> SKStore.ContextOp,
 ): void {
   SKStore.runWithGc(
-    SKDB.makeSqlContext().clone(),
+    SKDB.makeSqlContext(),
     f,
     Some(SKStore.Synchronizer(importFromRoot, exportToRoot, printContext)),
     options.sync,
@@ -1408,7 +1373,7 @@ fun runSql(
 }
 
 fun runLockedSql(options: Options, f: mutable SKStore.Context ~> void): void {
-  SKStore.runLocked(SKDB.makeSqlContext().clone(), f, options.sync)
+  SKStore.runLocked(SKDB.makeSqlContext(), f, options.sync)
 }
 
 fun importFromRoot(
@@ -1416,27 +1381,17 @@ fun importFromRoot(
   tick: SKStore.Tick,
   root: readonly SKStore.Context,
 ): void {
-  try {
-    shouldImport = delta.getGlobal("TableMap") match {
-    | None() ->
-      delta.getGlobal("IsRead") match {
-      | None() -> false
-      | Some(_) -> true
-      }
-    | Some(_tableMapFile) -> true
-    };
-    if (shouldImport) {
-      SKStore.import(delta, tick, root);
-      delta.update();
+  shouldImport = delta.getGlobal("TableMap") match {
+  | None() ->
+    delta.getGlobal("IsRead") match {
+    | None() -> false
+    | Some(_) -> true
     }
-  } catch {
-  | err ->
-    line = delta.getGlobal("Line") match {
-    | None() -> -1
-    | Some(x) -> SKStore.IntFile::type(x).value
-    };
-    print_error("Error, line " + line + ": " + err.getMessage());
-    skipExit(2)
+  | Some(_tableMapFile) -> true
+  };
+  if (shouldImport) {
+    SKStore.import(delta, tick, root);
+    delta.update();
   }
 }
 
@@ -1533,21 +1488,9 @@ fun exportToRoot(
   tick: SKStore.Tick,
   delta: readonly SKStore.Context,
 ): Bool {
-  rootCopy = root.clone();
-  try {
-    hasVersioning = importNext(root, tick, delta);
-    root.update();
-    hasVersioning
-  } catch {
-  | err ->
-    line = delta.getGlobal("Line") match {
-    | None() -> -1
-    | Some(x) -> SKStore.IntFile::type(x).value
-    };
-    root.replaceFromSaved(rootCopy);
-    print_error("Error, line " + line + ": " + err.getMessage());
-    skipExit(2)
-  }
+  hasVersioning = importNext(root, tick, delta);
+  root.update();
+  hasVersioning
 }
 
 fun updateTableMap(context: mutable SKStore.Context): void {
@@ -1684,23 +1627,23 @@ fun printContext(context: mutable SKStore.Context): void {
   flushStdout();
 }
 
-fun markIfRead(context: mutable SKStore.Context, stmt: Stmt): void {
+fun markIfRead(context: mutable SKStore.Context, stmt: P.Stmt): void {
   stmt match {
-  | Insert{values => IQuery _}
-  | Update _
-  | Select _ ->
+  | P.Insert{values => P.IQuery _}
+  | P.Update _
+  | P.Select _ ->
     context.setGlobal("IsRead", SKStore.BoolFile(true))
-  | BeginTransaction _
-  | EndTransaction _
-  | Pragma _
-  | CreateTable _
-  | CreateView _
-  | CreateIndex _
-  | DropTable _
-  | DropView _
-  | DropIndex _
-  | Delete _
-  | Insert _ ->
+  | P.BeginTransaction _
+  | P.EndTransaction _
+  | P.Pragma _
+  | P.CreateTable _
+  | P.CreateView _
+  | P.CreateIndex _
+  | P.DropTable _
+  | P.DropView _
+  | P.DropIndex _
+  | P.Delete _
+  | P.Insert _ ->
     void
   }
 }
@@ -1756,10 +1699,7 @@ fun getReactiveQueryHandle(
         queryID32 = Int32::truncate(queryID);
         iterator.first.value match {
         | Some(queryInfo) ->
-          lexer = SKDB.Lexer(0, SKDB.Buffer(queryInfo.query));
-          selectAst = SKDB.parseQuery(lexer, 0).i1 match {
-          | x @ Select _ -> x
-          };
+          selectAst = P.Parser::create(queryInfo.query).parseSelect();
           skOptions = SKDB.Options{
             alwaysAllowJoins => false,
             backtrace => false,
@@ -1777,7 +1717,7 @@ fun getReactiveQueryHandle(
           );
           selectDir = SKDB.evalSelect(context, cselect, None());
           schema = SKDB.Compiler::getSchema(
-            (selectAst.core as SelectCoreQuery _).params,
+            (selectAst.core as P.SelectCoreQuery _).params,
             cselect.from,
             cselect.params,
           );
@@ -1930,7 +1870,7 @@ fun manageReactiveQuery(
   onlyChanges: Bool,
 ): void {
   try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
       queryID = queryID32.toInt();
       getReactiveQueryHandle(context).i0.writeArray(
         context,
@@ -1953,7 +1893,7 @@ fun manageReactiveQuery(
 fun printReactiveQuery(queryID32: Int32): void {
   saved = SKStore.newObstack();
   try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
       queryID = queryID32.toInt();
       (rqs, sds) = getReactiveQueryHandle(context);
       rqs
@@ -1982,7 +1922,7 @@ fun printReactiveQuery(queryID32: Int32): void {
 fun deleteReactiveQuery(queryID32: Int32): void {
   saved = SKStore.newObstack();
   try {
-    SKStore.runWithGc(SKDB.makeSqlContext().clone(), context ~> {
+    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
       queryID = queryID32.toInt();
       getReactiveQueryHandle(context).i0.writeArray(
         context,

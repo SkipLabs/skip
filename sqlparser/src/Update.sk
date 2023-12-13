@@ -1,0 +1,85 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parseUpdate(): Stmt {
+    this.expect_keyword(TUpdate());
+
+    onConflict = if (this.parse_keyword(TOr())) {
+      Some(this.parseConflictClause())
+    } else {
+      None()
+    };
+
+    // TODO: Schema-qualified name.
+    tableName = Name::create(this.expect_identifier());
+
+    alias = if (this.parse_keyword(TAs())) {
+      Some(Name::create(this.expect_identifier()))
+    } else {
+      None()
+    };
+
+    indexed = if (this.parse_keyword(TIndexed())) {
+      this.expect_keyword(TBy());
+      Some(Name::create(this.expect_identifier()))
+    } else {
+      if (this.parse_keyword(TNot())) {
+        this.expect_keyword(TIndexed())
+      };
+      None()
+    };
+
+    this.expect_keyword(TSet());
+
+    sets = this.parseUpdateSets();
+
+    from = if (this.parse_keyword(TFrom())) {
+      Some(this.parseSelectFrom())
+    } else {
+      None()
+    };
+
+    where = if (this.parse_keyword(TWhere())) {
+      Some(this.parseExpr())
+    } else {
+      None()
+    };
+
+    if (this.peek_keyword() == TReturning()) {
+      this.errorNotImplemented()
+    };
+
+    Update{onConflict, name => tableName, alias, indexed, sets, from, where}
+  }
+
+  mutable fun parseUpdateSets(): Array<UpdateSet> {
+    sets = mutable Vector[];
+    loop {
+      cols = if (this.parse_token(TLParen())) {
+        res = mutable Vector[];
+        loop {
+          pos = this.current_pos();
+          res.push((pos, Name::create(this.expect_identifier())));
+          if (!this.parse_token(TComma())) {
+            break void
+          }
+        };
+        this.expect_token(TRParen());
+        res.toArray()
+      } else {
+        pos = this.current_pos();
+        Array[(pos, Name::create(this.expect_identifier()))]
+      };
+
+      this.expect_token(TEq());
+
+      sets.push(UpdateSet(cols, this.parseExpr()));
+
+      if (!this.parse_token(TComma())) {
+        break void
+      }
+    };
+
+    sets.toArray()
+  }
+}

@@ -2,6 +2,8 @@
 /* SQL tables.*/
 /*****************************************************************************/
 
+module alias P = SQLParser;
+
 module SKDB;
 
 const tableInfo: SKStore.DirName = SKStore.DirName::create("/tablesInfo/");
@@ -126,11 +128,11 @@ fun errorAllExistingSubs(
 }
 
 class DirDescr{
-  colNames: Array<Name>,
-  schema: Array<ColumnDefinition>,
-  kinds: Array<(Int, IKind, Type)>,
-  cols: Map<Name, Int>,
-  alias: ?Name,
+  colNames: Array<P.Name>,
+  schema: Array<P.ColumnDefinition>,
+  kinds: Array<(Int, P.IKind, P.Type)>,
+  cols: Map<P.Name, Int>,
+  alias: ?P.Name,
   isInput: Bool,
   view: Bool,
 } extends SKStore.File, Descr uses Orderable {
@@ -139,10 +141,10 @@ class DirDescr{
   }
 
   static fun create{
-    name: Name,
-    schema: Array<ColumnDefinition>,
+    name: P.Name,
+    schema: Array<P.ColumnDefinition>,
     dirName: SKStore.DirName,
-    alias: ?Name,
+    alias: ?P.Name,
     isInput: Bool,
     view: Bool = false,
   }: this {
@@ -155,7 +157,7 @@ class DirDescr{
       name,
       colNames,
       schema,
-      kinds => schema.mapWithIndex((idx, ty) -> (idx, IASC(), ty.ty)),
+      kinds => schema.mapWithIndex((idx, ty) -> (idx, P.IASC(), ty.ty)),
       cols => cols.chill(),
       dirName,
       alias,
@@ -272,7 +274,7 @@ fun dirDescrCopy(
   nextName
 }
 
-base class Descr{name: Name, dirName: SKStore.DirName} {}
+base class Descr{name: P.Name, dirName: SKStore.DirName} {}
 
 fun getLatestDescr(context: mutable SKStore.Context, descr: Descr): Descr {
   baseName = SKStore.SID(descr.name.lower);
@@ -400,7 +402,7 @@ fun getSubsDirs(
             selectFile.sparams,
             cselect.from,
             cselect.params,
-            Name::create(selectDir.dirName.toString()),
+            P.Name::create(selectDir.dirName.toString()),
             selectDir.dirName,
           );
           (edir, dirDescr)
@@ -487,16 +489,21 @@ fun updateIsFromIgnoredSource(
   }
 }
 
+module end;
 /*****************************************************************************/
 /* Indexes. */
 /*****************************************************************************/
 
+module SQLParser;
 extension class CreateIndex extends SKStore.File
+module end;
+
+module SKDB;
 
 class IndexDescr{
-  tableName: Name,
+  tableName: P.Name,
   tableDirName: SKStore.DirName,
-  fields: Array<(Int, IKind, Type)>,
+  fields: Array<(Int, P.IKind, P.Type)>,
   unique: Bool,
   text: ?String,
 } extends SKStore.File, Descr uses Orderable {
@@ -507,9 +514,9 @@ class IndexDescr{
 
 fun getIndexInputDir(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SKStore.Key, CreateIndex> {
-  makeDir(CreateIndex::type, context, indexInput, () ->
-    context.mkdir(x ~> x, CreateIndex::type, indexInput, Array[])
+): SKStore.EHandle<SKStore.Key, P.CreateIndex> {
+  makeDir(P.CreateIndex::type, context, indexInput, () ->
+    context.mkdir(x ~> x, P.CreateIndex::type, indexInput, Array[])
   )
 }
 
@@ -542,7 +549,7 @@ fun getIndexOutputDir(
   })
 }
 
-fun makeIndexEntry(tableName: Name, colNbr: Int): SKStore.SID {
+fun makeIndexEntry(tableName: P.Name, colNbr: Int): SKStore.SID {
   SKStore.SID::create(tableName.lower + ":" + colNbr);
 }
 
@@ -600,7 +607,11 @@ fun getTables(origContext: readonly SKStore.Context): Array<DirDescr> {
     .collect(Array);
 }
 
-fun getTable(context: mutable SKStore.Context, pos: Int, name: Name): DirDescr {
+fun getTable(
+  context: mutable SKStore.Context,
+  pos: Int,
+  name: P.Name,
+): DirDescr {
   sid = SKStore.SID::create(name.lower);
   tableDir = getTableDir(context);
   tableDir.maybeGet(context, sid) match {
@@ -660,9 +671,9 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
     ty = dirDescr.schema[colIndex];
     o(
       ty.ty match {
-      | INTEGER() -> "INTEGER"
-      | FLOAT() -> "FLOAT"
-      | TEXT() -> "TEXT"
+      | P.INTEGER() -> "INTEGER"
+      | P.FLOAT() -> "FLOAT"
+      | P.TEXT() -> "TEXT"
       },
     );
     if (ty.unique is Some _) {
@@ -676,21 +687,21 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
     };
     ty.default match {
     | None() -> void
-    | Some(CCDefault{expr}) ->
+    | Some(P.CCDefault{expr}) ->
       expr match {
-      | v @ Value _ ->
+      | v @ P.Value _ ->
         v match {
-        | VNull() -> void
-        | VInt(x) -> o(` DEFAULT ${x.toString()}`)
-        | VFloat(x) -> o(` DEFAULT ${x.toString()}`)
-        | VString(s) ->
+        | P.VNull() -> void
+        | P.VInt(x) -> o(` DEFAULT ${x.toString()}`)
+        | P.VFloat(x) -> o(` DEFAULT ${x.toString()}`)
+        | P.VString(s) ->
           o(` DEFAULT `);
           escapeString(o, s)
-        | VSeqNum _
-        | VId _
-        | VTime()
-        | VParam _
-        | VPermission _ ->
+        | P.VSeqNum _
+        | P.VId _
+        | P.VTime()
+        | P.VParam _
+        | P.VPermission _ ->
           invariant_violation("Invalid expression for default value")
         }
       | _ -> invariant_violation("Invalid expression for default value")
