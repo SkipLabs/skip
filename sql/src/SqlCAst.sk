@@ -1,6 +1,8 @@
 /*****************************************************************************/
 /* The compiled abstract syntax tree. */
 /*****************************************************************************/
+module alias P = SQLParser;
+
 module SKDB;
 
 value class Pattern{
@@ -102,8 +104,8 @@ base class CValue uses Orderable, Show {
 
 base class CGroupByElt uses Orderable {
   children =
-  | CGBExpr(CGExpr, Type)
-  | CGBCol(Int, Type)
+  | CGBExpr(CGExpr, P.Type)
+  | CGBCol(Int, P.Type)
 }
 
 base class SubSelectTask uses Orderable {
@@ -119,25 +121,25 @@ base class SubSelectTask uses Orderable {
     rightIsUnique: Bool,
     rightRanges: ?Array<SKStore.KeyRange>,
     childName: SKStore.DirName,
-    kinds: Array<(Int, IKind, Type)>,
-    joinKind: JoinKind,
+    kinds: Array<(Int, P.IKind, P.Type)>,
+    joinKind: P.JoinKind,
     onlyLeftValues: Bool = false,
   }
 }
 
 class CSelect{
   isNoop: Bool = false,
-  id: Name,
+  id: P.Name,
   distinct: Bool,
   params: Array<CGExpr>,
   sets: Array<(Int, CGExpr)>,
   aggr: ?Array<(AggrKind, CGExpr)>,
-  kinds: Array<(Int, SKDB.IKind, SKDB.Type)>,
+  kinds: Array<(Int, P.IKind, P.Type)>,
   from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
   where: ?CExpr<Int>,
   groupBy: ?Array<CGroupByElt>,
   having: ?CExpr<Int>,
-  orderBy: ?Array<(Int, IKind)>,
+  orderBy: ?Array<(Int, P.IKind)>,
   limit: ?CExpr<Int>,
   rest: List<(QueryKind, CSelect)>,
   needUp: Bool,
@@ -147,8 +149,8 @@ class CSelect{
 } extends SKStore.File uses Orderable
 
 class CJoin{
-  kind: JoinKind,
-  names: Array<SelectSource>,
+  kind: P.JoinKind,
+  names: Array<P.SelectSource>,
   on: ?Array<(CGExpr, ?String)>,
 }
 
@@ -168,13 +170,13 @@ base class CGExpr uses Orderable, Hashable {
     }
   }
 
-  fun getType(): Type {
+  fun getType(): P.Type {
     this match {
     | CGNull _
     | CIExpr _ ->
-      INTEGER()
-    | CFExpr _ -> FLOAT()
-    | CSExpr _ -> TEXT()
+      P.INTEGER()
+    | CFExpr _ -> P.FLOAT()
+    | CSExpr _ -> P.TEXT()
     }
   }
 }
@@ -288,4 +290,4 @@ class CStrftime(
   Array<CExpr<String>>,
 ) extends CExpr<String>
 
-class COn(JoinKind, CExpr<Int>) extends CExpr<Int>
+class COn(P.JoinKind, CExpr<Int>) extends CExpr<Int>

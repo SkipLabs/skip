@@ -1,0 +1,29 @@
+module SQLParser;
+
+base class Error(pos: Int) extends Exception {
+  fun getPosition(): Int {
+    this.pos
+  }
+}
+
+base class TokenizerError extends Error {
+  children =
+  | InvalidTokenError()
+
+  fun getMessage(): String {
+    "Invalid token"
+  }
+}
+
+base class ParserError extends Error {
+  children =
+  | NotImplementedError()
+  | UnexpectedTokenError(token: Token, reason: String)
+  | UnexpectedExpressionError(expr: Expr)
+
+  fun getMessage(): String
+  | UnexpectedTokenError(token, reason, _) ->
+    `Unexpected token ${token.name()}: ${reason}`
+  | NotImplementedError _ -> "Construction not implemented"
+  | UnexpectedExpressionError _ -> "Unexpected expression"
+}

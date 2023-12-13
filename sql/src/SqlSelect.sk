@@ -2,6 +2,8 @@
 /* SQL SELECT */
 /*****************************************************************************/
 
+module alias P = SQLParser;
+
 module SKDB;
 
 base class QueryKind uses Orderable {
@@ -174,7 +176,7 @@ mutable class MultiWriter{
 
 class SelectDir(
   dirName: SKStore.DirName,
-  types: Array<Type>,
+  types: Array<P.Type>,
 ) extends SKStore.File
 
 /*****************************************************************************/
@@ -231,8 +233,8 @@ class SelectEvaluator{
   params: Array<CGExpr>,
   selectName1: SKStore.DirName,
   selectName2: SKStore.DirName,
-  kinds: Array<(Int, SKDB.IKind, Type)>,
-  types: Array<Type>,
+  kinds: Array<(Int, P.IKind, P.Type)>,
+  types: Array<P.Type>,
 } {
   fun evalStaticInt(context: mutable SKStore.Context, expr: CExpr<Int>): Int {
     emptyEval = ExprEvaluator(Array[], this.select.from, this.up);
@@ -1399,7 +1401,7 @@ fun makeGroupByKey(
     | CGBCol(n, ty) ->
       value = row.getValue(n);
       rowKey.push(value);
-      kinds.push((idx, IASC(), ty))
+      kinds.push((idx, P.IASC(), ty))
     | CGBExpr(e, ty) ->
       value = evaluator.evalCGExpr(context, e) match {
       | ANull() -> None()
@@ -1407,7 +1409,7 @@ fun makeGroupByKey(
       | _ -> invariant_violation("Should have successfully interpreted")
       };
       rowKey.push(value);
-      kinds.push((idx, IASC(), ty))
+      kinds.push((idx, P.IASC(), ty))
     }
   };
   result = RowKey(RowValues::create(rowKey.toArray()), kinds.toArray());
@@ -1420,8 +1422,8 @@ fun makeGroupByKey(
 
 fun makeJoinReducer(
   shardTable: SKStore.EHandle<SKStore.Key, ShardStats>,
-  joinKind: JoinKind,
-  kinds: Array<(Int, IKind, Type)>,
+  joinKind: P.JoinKind,
+  kinds: Array<(Int, P.IKind, P.Type)>,
   onlyLeftValues: Bool,
 ): (
   mutable SKStore.Context,
@@ -1475,7 +1477,10 @@ fun makeJoinReducer(
     };
     for (kv in leftRows) {
       (_, left) = kv;
-      if (rightRows.isEmpty() && (joinKind is JLeft _ || joinKind is JFull _)) {
+      if (
+        rightRows.isEmpty() &&
+        (joinKind is P.JLeft _ || joinKind is P.JFull _)
+      ) {
         values = if (onlyLeftValues) left.values else {
           right = Array::fill(kinds.size() - left.size(), None<CValue>());
           left.values.concat(right);
@@ -1493,7 +1498,7 @@ fun makeJoinReducer(
       }
     };
     if (
-      (joinKind is JRight _ || joinKind is JFull _) &&
+      (joinKind is P.JRight _ || joinKind is P.JFull _) &&
       !onlyLeftValues &&
       leftRows.size() == 0
     ) {

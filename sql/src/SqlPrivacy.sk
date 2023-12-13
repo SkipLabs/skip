@@ -1,3 +1,5 @@
+module alias P = SQLParser;
+
 module SKDB;
 
 /*****************************************************************************/
@@ -46,12 +48,12 @@ value class Permission(private perm: Int) {
 // Predefined columns.
 /*****************************************************************************/
 
-const skdbAuthorColName: Name = Name::create("skdb_author");
-const skdbAccessColName: Name = Name::create("skdb_access");
-const groupIDColName: Name = Name::create("groupID");
-const userIDColName: Name = Name::create("userID");
-const adminIDColName: Name = Name::create("adminID");
-const permissionsColName: Name = Name::create("permissions");
+const skdbAuthorColName: P.Name = P.Name::create("skdb_author");
+const skdbAccessColName: P.Name = P.Name::create("skdb_access");
+const groupIDColName: P.Name = P.Name::create("groupID");
+const userIDColName: P.Name = P.Name::create("userID");
+const adminIDColName: P.Name = P.Name::create("adminID");
+const permissionsColName: P.Name = P.Name::create("permissions");
 
 /*****************************************************************************/
 // Predefined tables.
@@ -73,34 +75,39 @@ const permissionsColName: Name = Name::create("permissions");
 base class PredefinedTable private final {
   private columns: Map<String, Int>,
   protected dirName: SKStore.DirName,
-  private schema: Array<ColumnDefinition>,
-  protected kinds: Array<(Int, IKind, Type)>,
+  private schema: Array<P.ColumnDefinition>,
+  protected kinds: Array<(Int, P.IKind, P.Type)>,
   private indexDirName: SKStore.DirName,
 } {
-  const name: Name;
+  const name: P.Name;
   const schemaText: String;
-  const indexedFields: Array<Name>;
+  const indexedFields: Array<P.Name>;
 
   static deferred fun create(): this {
-    lexer = Lexer(0, Buffer(static::schemaText));
-    (_, schema) = parseTableSchema(lexer, 0);
+    schema = P.Parser::create(static::schemaText).parseCreateTableSchema();
 
     columns = mutable Map[];
-    for (i => col in schema) {
+    for (i => col in schema.columns) {
       columns![col.name.lower] = i;
     };
     dirName = SKStore.DirName::create("/" + static::name + "/");
-    kinds = schema.mapWithIndex((idx, x) -> (idx, IASC(), x.ty));
+    kinds = schema.columns.mapWithIndex((idx, x) -> (idx, P.IASC(), x.ty));
 
     indexName = createIndexName(
       static::name,
       static::indexedFields.map(x ->
-        (columns[x.lower], IASC(), schema[columns[x.lower]].ty)
+        (columns[x.lower], P.IASC(), schema.columns[columns[x.lower]].ty)
       ),
       static::indexedFields.size(),
     );
     indexDirName = SKStore.DirName::create(indexName.lower + "unique/proj/");
-    static{columns => columns.chill(), dirName, schema, kinds, indexDirName}
+    static{
+      columns => columns.chill(),
+      dirName,
+      schema => schema.columns,
+      kinds,
+      indexDirName,
+    }
   }
 
   fun getIndex(context: readonly SKStore.Context): PredefinedIndex {
@@ -110,7 +117,7 @@ base class PredefinedTable private final {
     }
   }
 
-  fun getColNbr(name: Name): Int {
+  fun getColNbr(name: P.Name): Int {
     this.columns.maybeGet(name.lower) match {
     | None() ->
       print_error(
@@ -170,10 +177,10 @@ base class PredefinedTable private final {
 
 class PredefinedRow(
   rowValues: RowValues,
-  tableName: Name,
+  tableName: P.Name,
   columns: Map<String, Int>,
 ) {
-  private fun getCol(colName: Name): ?CValue {
+  private fun getCol(colName: P.Name): ?CValue {
     this.rowValues.getValue(
       this.columns.maybeGet(colName.lower) match {
       | None() ->
@@ -188,7 +195,7 @@ class PredefinedRow(
     )
   }
 
-  fun getInt(colName: Name): Int {
+  fun getInt(colName: P.Name): Int {
     this.getCol(colName) match {
     | Some(CInt(n)) -> n
     | v ->
@@ -198,7 +205,7 @@ class PredefinedRow(
     }
   }
 
-  fun getString(colName: Name): String {
+  fun getString(colName: P.Name): String {
     this.getCol(colName) match {
     | Some(CString(n)) -> n
     | v ->
@@ -210,7 +217,7 @@ class PredefinedRow(
 }
 
 class PredefinedIndex(
-  private tableName: Name,
+  private tableName: P.Name,
   private dir: SKStore.EagerDir,
   private columns: Map<String, Int>,
 ) {
@@ -244,7 +251,7 @@ class UserFile(name: String) extends SKStore.File {
 const skdbUsersByName: SKDBUsersByName = SKDBUsersByName::create();
 
 class SKDBUsersByName extends PredefinedTable {
-  const name: Name = Name::create("skdb_users");
+  const name: P.Name = P.Name::create("skdb_users");
 
   const schemaText: String = `(
     userID STRING PRIMARY KEY,
@@ -254,7 +261,7 @@ class SKDBUsersByName extends PredefinedTable {
   // Be careful when changing this schema, make sure that the
   // indexedFields match the function that creates the key.
 
-  const indexedFields: Array<Name> = Array[Name::create("userID")];
+  const indexedFields: Array<P.Name> = Array[P.Name::create("userID")];
 
   fun makeKey(userID: String): IndexProjKey {
     IndexProjKey(Array[(this.getColNbr(userIDColName), Some(CString(userID)))])
@@ -268,7 +275,7 @@ class SKDBUsersByName extends PredefinedTable {
 const skdbUserPermissions: SKDBUserPermissions = SKDBUserPermissions::create();
 
 class SKDBUserPermissions extends PredefinedTable {
-  const name: Name = Name::create("skdb_user_permissions");
+  const name: P.Name = P.Name::create("skdb_user_permissions");
 
   const schemaText: String = `(
     userID STRING PRIMARY KEY,
@@ -279,7 +286,7 @@ class SKDBUserPermissions extends PredefinedTable {
   // Be careful when changing this schema, make sure that the
   // indexedFields match the function that creates the key.
 
-  const indexedFields: Array<Name> = Array[Name::create("userID")];
+  const indexedFields: Array<P.Name> = Array[P.Name::create("userID")];
 
   fun makeKey(userID: ?String): IndexProjKey {
     IndexProjKey(
@@ -295,7 +302,7 @@ class SKDBUserPermissions extends PredefinedTable {
 const skdbGroups: SKDBGroups = SKDBGroups::create();
 
 class SKDBGroups extends PredefinedTable {
-  const name: Name = Name::create("skdb_groups");
+  const name: P.Name = P.Name::create("skdb_groups");
 
   const schemaText: String = `(
   groupID STRING PRIMARY KEY,
@@ -304,7 +311,7 @@ class SKDBGroups extends PredefinedTable {
   skdb_access STRING NOT NULL
   )`;
 
-  const indexedFields: Array<Name> = Array[groupIDColName];
+  const indexedFields: Array<P.Name> = Array[groupIDColName];
   fun makeKey(groupID: String): IndexProjKey {
     IndexProjKey(
       Array[(this.getColNbr(groupIDColName), Some(CString(groupID)))],
@@ -318,7 +325,7 @@ class SKDBGroups extends PredefinedTable {
 const skdbGroupPermissions: SKDBGroupPermissions = SKDBGroupPermissions::create();
 
 class SKDBGroupPermissions extends PredefinedTable {
-  const name: Name = Name::create("skdb_group_permissions");
+  const name: P.Name = P.Name::create("skdb_group_permissions");
 
   const schemaText: String = `(
     groupID STRING NOT NULL,
@@ -327,9 +334,9 @@ class SKDBGroupPermissions extends PredefinedTable {
     skdb_access STRING NOT NULL
   )`;
 
-  const indexedFields: Array<Name> = Array[
-    Name::create("groupID"),
-    Name::create("userID"),
+  const indexedFields: Array<P.Name> = Array[
+    P.Name::create("groupID"),
+    P.Name::create("userID"),
   ];
 
   fun makeKey(groupID: String, userID: ?String): IndexProjKey {
@@ -467,13 +474,16 @@ fun checkUserCanWriteRow(
     groupID = row.getValue(groupIDIdx) match {
     | Some(CString(groupID)) -> groupID
     | _ ->
-      throw Error(0, "groupID is a non-null string in skdb_group_permissions")
+      throw SqlError(
+        0,
+        "groupID is a non-null string in skdb_group_permissions",
+      )
     };
 
     groupIndex = skdbGroups.getIndex(context);
     adminID = groupIndex.get(skdbGroups.makeKey(groupID)) match {
     | Some(r) -> r.getString(adminIDColName)
-    | None() -> throw Error(0, "malformed predefined table skdb_groups")
+    | None() -> throw SqlError(0, "malformed predefined table skdb_groups")
     };
     hasAdminPrivileges =
       adminID == access.userID ||
@@ -675,7 +685,7 @@ mutable class AccessSolver private {
         rowValues,
       ) match {
       | SKDB.AROK() -> void
-      | SKDB.ARError(err) -> throw Error(0, err.toString())
+      | SKDB.ARError(err) -> throw SqlError(0, err.toString())
       }
     | _ -> void
     }

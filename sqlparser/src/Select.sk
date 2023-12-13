@@ -1,0 +1,320 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parseSelect(): Select {
+    core = this.parseSelectCore();
+
+    res = mutable Vector[];
+    loop {
+      op = this.parseCompoundOperator() match {
+      | Some(op) -> op
+      | _ -> break void
+      };
+
+      rhs = this.parseSelectCore();
+      res.push((op, rhs))
+    };
+
+    orderBy = if (this.parse_keyword(TOrder())) {
+      this.expect_keyword(TBy());
+      orderBy = mutable Vector[];
+      loop {
+        e = this.parseExpr();
+        if (this.parse_keyword(TCollate())) {
+          this.errorNotImplemented()
+        };
+        kind = if (this.parse_keyword(TDesc())) {
+          IDESC()
+        } else if (this.parse_keyword(TAsc())) {
+          IASC()
+        } else {
+          INONE()
+        };
+        if (this.parse_keyword(TNulls())) {
+          this.errorNotImplemented()
+        };
+        orderBy.push((e, kind));
+        if (!this.parse_token(TComma())) {
+          break void
+        }
+      };
+      Some(orderBy.toArray())
+    } else {
+      None()
+    };
+
+    limit = if (this.parse_keyword(TLimit())) {
+      limit = Some(this.parseExpr());
+      if (this.parse_token(TComma()) || this.parse_keyword(TOffset())) {
+        this.errorNotImplemented()
+      };
+      limit
+    } else {
+      None()
+    };
+
+    Select{core, rest => res.toArray(), orderBy, limit}
+  }
+
+  mutable fun parseCompoundOperator(): ?CompoundOperator {
+    if (this.parse_keyword(TUnion())) {
+      all = this.parse_keyword(TAll());
+      if (all) {
+        Some(COUnionAll())
+      } else {
+        Some(COUnion())
+      }
+    } else if (this.parse_keyword(TIntersect())) {
+      Some(COIntersect())
+    } else if (this.parse_keyword(TExcept())) {
+      Some(COExcept())
+    } else {
+      None()
+    }
+  }
+
+  mutable fun parseSelectCore(): SelectCore {
+    this.expect_one_of_keywords(
+      Map[
+        TSelect() => this.parseSelectCoreQuery,
+        TValues() => this.parseSelectCoreValues,
+      ],
+    )
+  }
+
+  mutable fun parseSelectCoreQuery(): SelectCoreQuery {
+    this.expect_keyword(TSelect());
+    distinct = if (this.parse_keyword(TDistinct())) {
+      true
+    } else {
+      // Ignore possible `ALL` noop.
+      _ = this.parse_keyword(TAll());
+      false
+    };
+
+    results = this.parseSelectResults();
+
+    from = if (this.parse_keyword(TFrom())) {
+      // NOTE: This gives same precedence to COMMA and JOIN, like sqlite does.
+      Some(this.parseSelectFrom())
+    } else {
+      None()
+    };
+
+    where = if (this.parse_keyword(TWhere())) {
+      Some(this.parseExpr())
+    } else {
+      None()
+    };
+
+    groupBy = if (this.parse_keyword(TGroup())) {
+      this.expect_keyword(TBy());
+      Some(this.parseCommaSeparatedExprs())
+    } else {
+      None()
+    };
+
+    having = if (this.parse_keyword(THaving())) {
+      Some(this.parseExpr())
+    } else {
+      None()
+    };
+
+    if (this.peek_keyword() == TWindow()) {
+      this.errorNotImplemented()
+    };
+
+    SelectCoreQuery{distinct, params => results, from, where, groupBy, having}
+  }
+
+  mutable fun parseJoinOperand(): SelectFrom {
+    if (this.parse_token(TLParen())) {
+      res = this.peek_keyword() match {
+      // TODO: Should we accept `WITH` here?
+      | TSelect()
+      | TValues() ->
+        select = this.parseSelect();
+        asName = if (this.parse_keyword(TAs())) {
+          Some(Name::create(this.expect_identifier()))
+        } else {
+          None()
+        };
+
+        FromQuery{select, asName}
+      | _ -> this.parseSelectFrom()
+      };
+      this.expect_token(TRParen());
+
+      return res
+    };
+
+    // TODO: Schema-qualified name.
+    name = Name::create(this.expect_identifier());
+    if (this.peek_token() == TLParen()) {
+      // table-function
+      this.errorNotImplemented()
+    } else {
+      asName = if (
+        this.parse_keyword(TAs()) ||
+        this.peek_token() is TWord(_, _, None _)
+      ) {
+        Some(Name::create(this.expect_identifier()))
+      } else {
+        None()
+      };
+
+      indexed = if (this.parse_keyword(TIndexed())) {
+        this.expect_keyword(TBy());
+        Some(Name::create(this.expect_identifier()))
+      } else {
+        if (this.parse_keyword(TNot())) {
+          this.expect_keyword(TIndexed())
+        };
+        None()
+      };
+
+      FromTable{name, asName, indexed => indexed.isSome()}
+    }
+  }
+
+  mutable fun parseSelectFrom(): SelectFrom {
+    res = this.parseJoinOperand();
+    loop {
+      this.parseJoin(res) match {
+      | Some(j) -> !res = j
+      | _ -> break void
+      }
+    };
+
+    res
+  }
+
+  mutable fun parseJoin(lhs: SelectFrom): ?Join {
+    kind = this.parseJoinOperator() match {
+    | Some(k) -> k
+    | _ -> return None()
+    };
+
+    rhs = this.parseJoinOperand();
+
+    on: ?Expr = None();
+    using: ?Array<Name> = None();
+
+    // NOTE: `NATURAL` joins cannot have an `ON` or `USING` clause.
+    if (
+      kind != JComma() &&
+      kind != JLeft(true) &&
+      kind != JRight(true) &&
+      kind != JFull(true) &&
+      kind != JInner(true)
+    ) {
+      if (this.parse_keyword(TOn())) {
+        !on = Some(this.parseExpr())
+      };
+
+      if (this.peek_keyword() == TUsing()) {
+        this.errorNotImplemented()
+      }
+    };
+
+    Some(Join{kind, lhs, rhs, on, using})
+  }
+
+  mutable fun parseJoinOperator(): ?JoinKind {
+    if (this.parse_token(TComma())) {
+      return Some(JComma())
+    } else if (this.parse_keyword(TCross())) {
+      this.expect_keyword(TJoin());
+      return Some(JCross())
+    };
+
+    natural = this.parse_keyword(TNatural());
+
+    if (this.parse_keyword(TJoin())) {
+      return Some(JInner(natural))
+    };
+
+    this.peek_keyword() match {
+    | TLeft() -> Some(JLeft(natural))
+    | TRight() -> Some(JRight(natural))
+    | TFull() -> Some(JFull(natural))
+    | TInner() -> Some(JInner(natural))
+    | _ -> None()
+    } match {
+    | Some(j) ->
+      this.tokens.advance();
+      if (!(j is JInner _)) {
+        _ = this.parse_keyword(TOuter())
+      };
+      this.expect_keyword(TJoin());
+      Some(j)
+    | _ -> None()
+    }
+  }
+
+  mutable fun parseSelectResults(): Array<SelectResult> {
+    res = mutable Vector[];
+    loop {
+      res.push(this.parseSelectResult());
+      if (!this.parse_token(TComma())) {
+        return res.toArray()
+      }
+    }
+  }
+
+  mutable fun parseSelectResult(): SelectResult {
+    if (this.parse_token(TMul())) {
+      return SelectStar(None())
+    };
+
+    // identifier . *
+    if (
+      this.peek_nth_token(1) == TPeriod() &&
+      this.peek_nth_token(2) == TMul()
+    ) {
+      table = Name::create(this.expect_identifier());
+      this.tokens.advance();
+      this.tokens.advance();
+      return SelectStar(Some(table))
+    };
+
+    expr = this.parseExpr();
+    alias = this.peek_token() match {
+    | TWord(id, _, None()) ->
+      this.tokens.advance();
+      Some(Name::create(id))
+    | _ ->
+      if (this.parse_keyword(TAs())) {
+        Some(Name::create(this.expect_identifier()))
+      } else {
+        None()
+      }
+    };
+    SelectExpr(expr, alias)
+  }
+
+  mutable fun parseSelectCoreValues(): SelectCoreValues {
+    this.expect_keyword(TValues());
+
+    values = mutable Vector[];
+    loop {
+      this.expect_token(TLParen());
+
+      tuple = mutable Vector[];
+      loop {
+        tuple.push(this.parseExpr());
+        if (!this.parse_token(TComma())) {
+          break void
+        }
+      };
+
+      this.expect_token(TRParen());
+
+      if (!this.parse_token(TComma())) {
+        break void
+      }
+    };
+
+    SelectCoreValues{values => values.toArray()}
+  }
+}

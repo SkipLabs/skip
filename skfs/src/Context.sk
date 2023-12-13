@@ -1163,19 +1163,10 @@ class Synchronizer(
 
 class ChangedDirs(value: SortedSet<DirName>) extends File
 
-fun withErrorHandler(delta: readonly Context, f: () -> void): Bool {
-  try {
-    f();
-    false
-  } catch {
-  | exn ->
-    line = delta.getGlobal("Line") match {
-    | None() -> -1
-    | Some(x) -> SKStore.IntFile::type(x).value
-    };
-    print_error("Error, line " + line + ": " + exn.getMessage());
-    true
-  }
+fun cloneContextWithError(context: Context, error: .Exception): Context {
+  newContext = Context::fromSaved(context);
+  newContext.setGlobal("Error", ErrorFile(error));
+  newContext.clone()
 }
 
 @export("SKIP_resolve_context")
@@ -1191,32 +1182,46 @@ fun resolveContext(
   | None() -> invariant_violation("Concurrent access without synchronizer")
   | Some(sync) ->
     changedDirs = delta.dirs.state.getChangesAfter(tick);
-    hasError = withErrorHandler(delta, () -> {
+    try {
       sync.importFromRoot(delta, tick, root);
-    });
-    if (hasError) return root;
+      None()
+    } catch {
+    | exn -> Some(exn)
+    } match {
+    | Some(exn) -> return cloneContextWithError(root, exn)
+    | _ -> void
+    };
 
     newRoot = Context::fromSaved(root);
     newRoot.!globals = delta.globals;
     hasVersioning = false;
 
-    !hasError = withErrorHandler(delta, () -> {
+    try {
       !hasVersioning = sync.exportToRoot(newRoot, tick, delta);
-    });
-
-    if (hasError) return root;
+      None()
+    } catch {
+    | exn -> Some(exn)
+    } match {
+    | Some(exn) -> return cloneContextWithError(root, exn)
+    | _ -> void
+    };
 
     lockF match {
     | None() -> void
     | Some(f) ->
-      !hasError = withErrorHandler(delta, () -> {
+      try {
         newRootTick = newRoot.tick;
         f(newRoot, delta, root);
         !changedDirs = changedDirs.union(
           newRoot.dirs.state.getChangesAfter(newRootTick),
         );
-      });
-      if (hasError) return root
+        None()
+      } catch {
+      | exn -> Some(exn)
+      } match {
+      | Some(exn) -> return cloneContextWithError(root, exn)
+      | _ -> void
+      }
     };
     if (!hasVersioning) {
       newRoot.setGlobal("CHANGED_DIRS", ChangedDirs(changedDirs));
@@ -1606,6 +1611,19 @@ fun withRegion<T>(
     | _ -> throw exn
     }
   }
+}
+
+fun withRegionVoid<T>(f: () ~> void): void {
+  saved = newObstack();
+  f();
+  destroyObstack(saved);
+}
+
+fun withRegionValue<T>(f: () ~> T): T {
+  saved = newObstack();
+  fresult = f();
+  copied = destroyObstackWithValue(saved, List[fresult]);
+  copied.getHead();
 }
 
 module end;

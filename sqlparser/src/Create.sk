@@ -1,0 +1,389 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parseCreate(): Stmt {
+    this.expect_keyword(TCreate());
+
+    if (this.parse_keyword(TTemp()) || this.parse_keyword(TTemporary())) {
+      this.expect_one_of_keywords(
+        Map[
+          TTable() => this.errorNotImplemented,
+          TIndex() => this.errorNotImplemented,
+          TView() => this.errorNotImplemented,
+        ],
+      )
+    } else if (this.parse_keyword(TVirtual())) {
+      this.parseCreateView(true)
+    } else if (this.parse_keyword(TUnique())) {
+      this.parseCreateIndex(true)
+    } else {
+      this.expect_one_of_keywords(
+        Map[
+          TTable() => () -> (this.parseCreateTable() : Stmt),
+          TIndex() => () -> (this.parseCreateIndex(false) : Stmt),
+          TView() => () -> (this.parseCreateView(false) : Stmt),
+        ],
+      )
+    }
+  }
+
+  mutable fun parseCreateView(virtual: Bool): CreateView {
+    this.expect_keyword(TView());
+
+    ifNotExists = this.parseIfNotExists();
+
+    // TODO: Schema-qualified name.
+    name = Name::create(this.expect_identifier());
+
+    if (this.parse_token(TLParen())) {
+      this.errorNotImplemented()
+    };
+
+    this.expect_keyword(TAs());
+
+    query = this.parseSelect();
+
+    CreateView{virtual, name, ifNotExists, query}
+  }
+
+  mutable fun parseCreateIndex(unique: Bool): CreateIndex {
+    this.expect_keyword(TIndex());
+
+    ifNotExists = this.parseIfNotExists();
+
+    // TODO: Schema-qualified name.
+    name = Name::create(this.expect_identifier());
+
+    this.expect_keyword(TOn());
+
+    on = Name::create(this.expect_identifier());
+
+    columns = this.parseIndexedColumns();
+
+    where = if (this.parse_keyword(TWhere())) {
+      Some(this.parseExpr())
+    } else {
+      None()
+    };
+
+    CreateIndex{unique, ifNotExists, name, on, columns, where}
+  }
+
+  mutable fun parseIndexedColumns(): Array<IndexedColumn> {
+    columns = mutable Vector[];
+    this.expect_token(TLParen());
+    loop {
+      columns.push(this.parseIndexedColumn());
+      if (!this.parse_token(TComma())) {
+        break void
+      }
+    };
+    this.expect_token(TRParen());
+
+    columns.toArray()
+  }
+
+  mutable fun parseIndexedColumn(): IndexedColumn {
+    // TODO: Ensure constraints on expression.
+    expr = this.parseExpr();
+
+    collate = if (this.parse_keyword(TCollate())) {
+      Some(Name::create(this.expect_identifier()))
+    } else {
+      None()
+    };
+
+    order = if (this.parse_keyword(TAsc())) {
+      IASC()
+    } else if (this.parse_keyword(TDesc())) {
+      IDESC()
+    } else {
+      INONE()
+    };
+
+    IndexedColumn{expr, collate, order}
+  }
+
+  mutable fun parseCreateTable(): CreateTable {
+    this.expect_keyword(TTable());
+
+    ifNotExists = this.parseIfNotExists();
+
+    // TODO: Schema-qualified name.
+    name = Name::create(this.expect_identifier());
+
+    if (this.parse_keyword(TAs())) {
+      this.errorNotImplemented()
+    } else {
+      schema = this.parseCreateTableSchema();
+      CreateTableSchema{name, schema, ifNotExists}
+    }
+  }
+
+  mutable fun parseCreateTableSchema(): TableSchema {
+    this.expect_token(TLParen());
+    columns = mutable Vector[];
+    loop {
+      columns.push(this.parseColumnDefinition());
+      if (!this.parse_token(TComma())) {
+        break void
+      }
+    };
+
+    // TODO: Table constraints
+
+    this.expect_token(TRParen());
+
+    (strict, withoutRowid) = this.parseTableOptions();
+
+    TableSchema{
+      columns => columns.toArray(),
+      constraints => Array[],
+      withoutRowid,
+      strict,
+    }
+  }
+
+  mutable fun parseTableOptions(): (Bool, Bool) {
+    (strict, withoutRowid) = this.parseTableOption();
+    loop {
+      if (!this.parse_token(TComma())) {
+        break void
+      };
+
+      (s, w) = this.parseTableOption();
+      !strict = strict || s;
+      !withoutRowid = withoutRowid || w;
+    };
+
+    (strict, withoutRowid)
+  }
+
+  mutable fun parseTableOption(): (Bool, Bool) {
+    if (this.parse_keyword(TWithout())) {
+      this.peek_token() match {
+      | TWord(id, _, _) if (id.uppercase() == "ROWID") -> this.tokens.advance()
+      | _ -> this.errorUnexpectedToken("expected ROWID")
+      };
+      return (false, true)
+    } else {
+      this.peek_token() match {
+      | TWord(id, _, _) if (id.uppercase() == "STRICT") ->
+        this.tokens.advance();
+        return (true, false)
+      | _ -> void
+      }
+    };
+
+    (false, false)
+  }
+
+  mutable fun parseColumnDefinition(): ColumnDefinition {
+    name = Name::create(this.expect_identifier(true));
+
+    // TODO: type name is optional.
+    ty = this.parseTypeName();
+
+    res = ColumnDefinition{name, ty};
+    loop {
+      this.parseColumnConstraint() match {
+      // TODO: Proper error messages. This currently misses the correct position.
+      | Some(c @ CCPrimaryKey _) ->
+        if (res.primary is Some _) {
+          this.errorUnexpectedToken("Duplicate PRIMARY KEY constraint")
+        } else {
+          !res = res with {primary => Some(c)}
+        }
+      | Some(c @ CCNotNull _) ->
+        if (res.notNull is Some _) {
+          this.errorUnexpectedToken("Duplicate NOT NULL constraint")
+        } else {
+          !res = res with {notNull => Some(c)}
+        }
+      | Some(c @ CCUnique _) ->
+        if (res.unique is Some _) {
+          this.errorUnexpectedToken("Duplicate UNIQUE constraint")
+        } else {
+          !res = res with {unique => Some(c)}
+        }
+      | Some(c @ CCCheck _) ->
+        if (res.check is Some _) {
+          this.errorUnexpectedToken("Duplicate CHECK constraint")
+        } else {
+          !res = res with {check => Some(c)}
+        }
+      | Some(c @ CCDefault _) ->
+        if (res.default is Some _) {
+          this.errorUnexpectedToken("Duplicate DEFAULT constraint")
+        } else {
+          !res = res with {default => Some(c)}
+        }
+      | Some(c @ CCCollate _) ->
+        if (res.collate is Some _) {
+          this.errorUnexpectedToken("Duplicate COLLATE constraint")
+        } else {
+          !res = res with {collate => Some(c)}
+        }
+      | Some(c @ CCForeignKey _) ->
+        if (res.foreignKey is Some _) {
+          this.errorUnexpectedToken("Duplicate FOREIGN KEY constraint")
+        } else {
+          !res = res with {foreignKey => Some(c)}
+        }
+      | Some(c @ CCGenerated _) ->
+        if (res.generated is Some _) {
+          this.errorUnexpectedToken("Duplicate GENERATED constraint")
+        } else {
+          !res = res with {generated => Some(c)}
+        }
+      | None _ -> break void
+      }
+    };
+
+    res
+  }
+
+  mutable fun parseColumnConstraint(): ?ColumnConstraint {
+    this.parse_one_of_keywords(
+      Map[
+        TPrimary() => this.parseColumnConstraintPrimaryKey,
+        TUnique() => this.parseColumnConstraintUnique,
+        TDefault() => this.parseColumnConstraintDefault,
+        TNot() => this.parseColumnConstraintNotNull,
+        TConstraint() => this.parseColumnConstraintNamedConstraint,
+        TCheck() => this.errorNotImplemented,
+        TCollate() => this.errorNotImplemented,
+        TGenerated() => this.errorNotImplemented,
+        TReferences() => this.errorNotImplemented,
+        TAs() => this.errorNotImplemented,
+      ],
+    );
+  }
+
+  mutable fun parseColumnConstraintNamedConstraint(): ColumnConstraint {
+    this.tokens.advance();
+    constraintName = Some(Name::create(this.expect_identifier()));
+    // TODO: This currently allows `CONSTRAINT foo CONSTRAINT bar ...`.
+    this.parseColumnConstraint().fromSome() with {constraintName}
+  }
+
+  mutable fun parseColumnConstraintPrimaryKey(): ColumnConstraint {
+    this.tokens.advance();
+    this.expect_keyword(TKey());
+
+    order = if (this.parse_keyword(TAsc())) {
+      IASC()
+    } else if (this.parse_keyword(TDesc())) {
+      IDESC()
+    } else {
+      INONE()
+    };
+
+    onConflict = if (this.parse_keyword(TOn())) {
+      this.expect_keyword(TConflict());
+      Some(this.parseConflictClause())
+    } else {
+      None()
+    };
+
+    autoincrement = this.parse_keyword(TAutoincrement());
+
+    CCPrimaryKey{order, onConflict, autoincrement, constraintName => None()}
+  }
+
+  mutable fun parseColumnConstraintDefault(): ColumnConstraint {
+    this.tokens.advance();
+
+    // TODO: Support blob default value.
+    expr = this.peek_token() match {
+    | TLParen() -> this.parseExpr()
+    | TWord(_, None(), Some(TNull())) ->
+      this.tokens.advance();
+      VNull()
+    | TSingleQuotedString(value) ->
+      this.tokens.advance();
+      VString(value)
+    | _ -> this.parseSignedNumber()
+    };
+    CCDefault{expr, constraintName => None()}
+  }
+
+  mutable fun parseColumnConstraintNotNull(): ColumnConstraint {
+    this.tokens.advance();
+    this.expect_keyword(TNull());
+
+    onConflict = if (this.parse_keyword(TOn())) {
+      this.expect_keyword(TConflict());
+      Some(this.parseConflictClause())
+    } else {
+      None()
+    };
+    CCNotNull{onConflict, constraintName => None()}
+  }
+
+  mutable fun parseColumnConstraintUnique(): ColumnConstraint {
+    this.tokens.advance();
+
+    onConflict = if (this.parse_keyword(TOn())) {
+      this.expect_keyword(TConflict());
+      Some(this.parseConflictClause())
+    } else {
+      None()
+    };
+    CCUnique{onConflict, constraintName => None()}
+  }
+
+  mutable fun parseConflictClause(): OnConflict {
+    this.expect_one_of_keywords(
+      Map<Keyword, () -> OnConflict>[
+        TRollback() => () -> {
+          this.tokens.advance();
+          // OCRollback()
+          this.errorNotImplemented()
+        },
+        TAbort() => () -> {
+          this.tokens.advance();
+          // OCAbort()
+          this.errorNotImplemented()
+        },
+        TFail() => () -> {
+          this.tokens.advance();
+          // OCFail()
+          this.errorNotImplemented()
+        },
+        TIgnore() => () -> {
+          this.tokens.advance();
+          OCIgnore()
+        },
+        TReplace() => () -> {
+          this.tokens.advance();
+          OCReplace()
+        },
+      ],
+    );
+    // this.peek_token() match {
+    // | TRollback() ->
+    //   this.tokens.advance();
+    //   // OCRollback()
+    //   this.errorNotImplemented()
+    // | TAbort() ->
+    //   this.tokens.advance();
+    //   // OCAbort()
+    //   this.errorNotImplemented()
+    // | TFail() ->
+    //   this.tokens.advance();
+    //   // OCFail()
+    //   this.errorNotImplemented()
+    // | TIgnore() ->
+    //   this.tokens.advance();
+    //   OCIgnore()
+    // | TReplace() ->
+    //   this.tokens.advance();
+    //   OCReplace()
+    // | _ ->
+    //   this.errorUnexpectedToken(
+    //     Some("ROLLBACK, ABORT, FAIL, IGNORE, or REPLACE"),
+    //   )
+    // }
+  }
+}

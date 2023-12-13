@@ -1,0 +1,314 @@
+module SQLParser;
+
+// Inspired from https://github.com/sqlparser-rs/sqlparser-rs
+base class Token uses Equality, Show, Hashable {
+  children =
+  | TEOF()
+  | TWord(value: String, quote: ?Char, ?Keyword)
+  /// `?`, a prepared statement arg placeholder
+  | TPlaceholder(String)
+  /// An unsigned numeric literal
+  | TInteger(String)
+  | THexInteger(String)
+  | TFloat(String)
+  /// Single quoted string: i.e: 'string'
+  | TSingleQuotedString(String)
+  // /// Double quoted string: i.e: "string"
+  // | DoubleQuotedString(String)
+  // /// Dollar quoted string: i.e: $$string$$ or $tag_name$string$tag_name$
+  // | DollarQuotedString(DollarQuotedString)
+  //  /// Byte string literal: i.e: b'string' or B'string'
+  // | SingleQuotedByteStringLiteral(String)
+  // /// Byte string literal: i.e: b"string" or B"string"
+  // | DoubleQuotedByteStringLiteral(String)
+  // /// Raw string literal: i.e: r'string' or R'string' or r"string" or R"string"
+  // | RawStringLiteral(String)
+  // /// "National" string literal: i.e: N'string'
+  // | NationalStringLiteral(String)
+  // /// "escaped" string literal, which are an extension to the SQL standard: i.e: e'first \n second' or E 'first \n second'
+  // | EscapedStringLiteral(String)
+  /// Hexadecimal string literal: i.e.: X'deadbeef'
+  | THexStringLiteral(String)
+  | TSingleLineComment(String)
+  | TMultiLineComment(String)
+  /// Whitespace (space, tab, etc)
+  | TWhitespace(String)
+  // | TSpace()
+  // | TNewline()
+  // | TTab()
+  /// Comma
+  | TComma()
+  /// Equality operator `=` (or `==`)
+  | TEq()
+  /// Not Equals operator `<>` (or `!=` in some dialects)
+  | TNeq()
+  /// Less Than operator `<`
+  | TLt()
+  /// Greater Than operator `>`
+  | TGt()
+  /// Less Than Or Equals operator `<=`
+  | TLtEq()
+  /// Greater Than Or Equals operator `>=`
+  | TGtEq()
+  // /// Spaceship operator <=>
+  // | Spaceship()
+  /// Plus operator `+`
+  | TPlus()
+  /// Minus operator `-`
+  | TMinus()
+  /// Multiplication operator `*`
+  | TMul()
+  /// Division operator `/`
+  | TDiv()
+  // /// Integer division operator `//` in DuckDB
+  // | DuckIntDiv()
+  /// Modulo Operator `%`
+  | TMod()
+  /// String concatenation `||`
+  | TStringConcat()
+  /// Left parenthesis `(`
+  | TLParen()
+  /// Right parenthesis `)`
+  | TRParen()
+  /// Period (used for compound identifiers or projections into nested types)
+  | TPeriod()
+  // /// Colon `:`
+  // | Colon()
+  // /// DoubleColon `::` (used for casting in postgresql)
+  // | DoubleColon()
+  // /// Assignment `:=` (used for keyword argument in DuckDB macros)
+  // | DuckAssignment()
+  /// SemiColon `;` used as separator for COPY and payload
+  | TSemiColon()
+  /// Backslash `\` used in terminating the COPY payload with `\.`
+  | TBackslash()
+  // /// Left bracket `[`
+  // | LBracket()
+  // /// Right bracket `]`
+  // | RBracket()
+  /// Ampersand `&`
+  | TAmpersand()
+  /// Pipe `|`
+  | TPipe()
+  /// Caret `^`
+  | TCaret()
+  // /// Left brace `{`
+  // | LBrace()
+  // /// Right brace `}`
+  // | RBrace()
+  // /// Right Arrow `=>`
+  // | RArrow()
+  // /// Sharp `#` used for PostgreSQL Bitwise XOR operator
+  // | Sharp()
+  /// Tilde `~` used for Bitwise NOT operator
+  | TTilde()
+  // /// `~*` , a case insensitive match regular expression operator in PostgreSQL
+  // | TildeAsterisk()
+  // /// `!~` , a case sensitive not match regular expression operator in PostgreSQL
+  // | ExclamationMarkTilde()
+  // /// `!~*` , a case insensitive not match regular expression operator in PostgreSQL
+  // ExclamationMarkTildeAsterisk()
+  /// `<<`, a bitwise shift left operator
+  | TShiftLeft()
+  /// `>>`, a bitwise shift right operator
+  | TShiftRight()
+  // /// '&&', an overlap operator in PostgreSQL
+  // | Overlap()
+  // /// Exclamation Mark `!` used for PostgreSQL factorial operator
+  // | ExclamationMark()
+  // /// Double Exclamation Mark `!!` used for PostgreSQL prefix factorial operator
+  // | DoubleExclamationMark()
+  // /// AtSign `@` used for PostgreSQL abs operator
+  // | AtSign()
+  // /// `|/`, a square root math operator in PostgreSQL
+  // | PGSquareRoot()
+  // /// `||/`, a cube root math operator in PostgreSQL
+  // | PGCubeRoot()
+  // /// ->, used as a operator to extract json field in PostgreSQL
+  | TArrow()
+  // /// ->>, used as a operator to extract json field as text in PostgreSQL
+  | TLongArrow()
+  // /// #> Extracts JSON sub-object at the specified path
+  // | HashArrow()
+  // /// #>> Extracts JSON sub-object at the specified path as text
+  // | HashLongArrow()
+  // /// jsonb @> jsonb -> boolean: Test whether left json contains the right json
+  // | AtArrow()
+  // /// jsonb <@ jsonb -> boolean: Test whether right json contains the left json
+  // | ArrowAt()
+  // /// jsonb #- text[] -> jsonb: Deletes the field or array element at the specified
+  // /// path, where path elements can be either field keys or array indexes.
+  // | HashMinus()
+  // /// jsonb @? jsonpath -> boolean: Does JSON path return any item for the specified
+  // /// JSON value?
+  // | AtQuestion()
+  // /// jsonb @@ jsonpath → boolean: Returns the result of a JSON path predicate check
+  // /// for the specified JSON value. Only the first item of the result is taken into
+  // /// account. If the result is not Boolean, then NULL is returned.
+  // | AtAt()
+
+  fun toString(): String
+  | TEOF() -> ""
+  | TWord(name, quote, kw) ->
+    kw match {
+    | Some(k) -> k.toString()
+    | None() ->
+      quote match {
+      // TODO: Proper escaping.
+      | Some(c) -> `${c}${name}${c}`
+      | None() -> name
+      }
+    }
+  | TInteger(n) -> n
+  | THexInteger(n) -> `0x${n}`
+  | TFloat(n) -> n
+  | TSingleQuotedString(s) -> `'${s}'`
+  // | DoubleQuotedString(String)
+  // | DollarQuotedString(DollarQuotedString)
+  // | SingleQuotedByteStringLiteral(String)
+  // | DoubleQuotedByteStringLiteral(String)
+  // | RawStringLiteral(String)
+  // | NationalStringLiteral(String)
+  // | EscapedStringLiteral(String)
+  | THexStringLiteral(h) -> `X'${h}'`
+  | TComma() -> ","
+  | TWhitespace(s) -> s
+  // | TSpace() -> " "
+  // | TNewline() -> "\n"
+  // | TTab() -> "\t"
+  | TSingleLineComment(c) -> `--${c}`
+  | TMultiLineComment(c) -> `/*${c}*/`
+  | TEq() -> "="
+  | TNeq() -> "<>"
+  | TLt() -> "<"
+  | TGt() -> ">"
+  | TLtEq() -> "<="
+  | TGtEq() -> ">="
+  // | Spaceship()
+  | TPlus() -> "+"
+  | TMinus() -> "-"
+  | TMul() -> "*"
+  | TDiv() -> "/"
+  // | DuckIntDiv()
+  | TMod() -> "%"
+  | TStringConcat() -> "||"
+  | TLParen() -> "("
+  | TRParen() -> ")"
+  | TPeriod() -> "."
+  // | Colon()
+  // | DoubleColon()
+  // | DuckAssignment()
+  | TSemiColon() -> ";"
+  | TBackslash() -> "\\"
+  // | LBracket()
+  // | RBracket()
+  | TAmpersand() -> "&"
+  | TPipe() -> "|"
+  | TCaret() -> "^"
+  // | LBrace()
+  // | RBrace()
+  // | RArrow()
+  // | Sharp()
+  | TTilde() -> "~"
+  // | TildeAsterisk()
+  // | ExclamationMarkTilde()
+  // | ExclamationMarkTildeAsterisk()
+  | TShiftLeft() -> "<<"
+  | TShiftRight() -> ">>"
+  // | Overlap()
+  // | ExclamationMark()
+  // | DoubleExclamationMark()
+  // | AtSign()
+  // | PGSquareRoot()
+  // | PGCubeRoot()
+  | TPlaceholder(s) -> `?${s}`
+  | TArrow() -> "->"
+  | TLongArrow() -> "->>"
+  // | HashArrow()
+  // | HashLongArrow()
+  // | AtArrow()
+  // | ArrowAt()
+  // | HashMinus()
+  // | AtQuestion()
+  // | AtAt()
+
+  fun name(): String
+  | TEOF _ -> "EOF"
+  | TWord(_, _, kw) ->
+    kw match {
+    | Some(k) -> k.toString()
+    | None() -> "IDENTIFIER"
+    }
+  | TInteger _ -> "INTEGER"
+  | THexInteger _ -> "INTEGER"
+  | TFloat _ -> "FLOAT"
+  | TSingleQuotedString _ -> "STRING"
+  // | DoubleQuotedString(String)
+  // | DollarQuotedString(DollarQuotedString)
+  // | SingleQuotedByteStringLiteral(String)
+  // | DoubleQuotedByteStringLiteral(String)
+  // | RawStringLiteral(String)
+  // | NationalStringLiteral(String)
+  // | EscapedStringLiteral(String)
+  | THexStringLiteral _ -> "BLOB"
+  | TComma _ -> "COMMA"
+  | TWhitespace _ -> "WHITESPACE"
+  // | TSpace() -> " "
+  // | TNewline() -> "\n"
+  // | TTab() -> "\t"
+  | TSingleLineComment _ -> "COMMENT"
+  | TMultiLineComment _ -> "COMMENT"
+  | TEq() -> "EQUAL"
+  | TNeq() -> "NOT_EQUAL"
+  | TLt() -> "LESS_THAN"
+  | TGt() -> "GREATER_THAN"
+  | TLtEq() -> "LESS_THAN_OR_EQUAL"
+  | TGtEq() -> "GREATER_THAN_OR_EQUAL"
+  // | Spaceship()
+  | TPlus() -> "PLUS"
+  | TMinus() -> "MINUS"
+  | TMul() -> "MUL"
+  | TDiv() -> "DIV"
+  // | DuckIntDiv()
+  | TMod() -> "MOD"
+  | TStringConcat() -> "CONCAT"
+  | TLParen() -> "LPAREN"
+  | TRParen() -> "RPAREN"
+  | TPeriod() -> "PERIOD"
+  // | Colon()
+  // | DoubleColon()
+  // | DuckAssignment()
+  | TSemiColon() -> "SEMICOLON"
+  | TBackslash() -> "BACKSLASH"
+  // | LBracket()
+  // | RBracket()
+  | TAmpersand() -> "AMPERSAND"
+  | TPipe() -> "PIPE"
+  | TCaret() -> "CARET"
+  // | LBrace()
+  // | RBrace()
+  // | RArrow()
+  // | Sharp()
+  | TTilde() -> "TILDE"
+  // | TildeAsterisk()
+  // | ExclamationMarkTilde()
+  // | ExclamationMarkTildeAsterisk()
+  | TShiftLeft() -> "SHIFT_LEFT"
+  | TShiftRight() -> "SHIFT_RIGHT"
+  // | Overlap()
+  // | ExclamationMark()
+  // | DoubleExclamationMark()
+  // | AtSign()
+  // | PGSquareRoot()
+  // | PGCubeRoot()
+  | TPlaceholder _ -> "PLACEHOLDER"
+  | TArrow _ -> "ARROW"
+  | TLongArrow _ -> "LONG_ARROW"
+  // | HashArrow()
+  // | HashLongArrow()
+  // | AtArrow()
+  // | ArrowAt()
+  // | HashMinus()
+  // | AtQuestion()
+  // | AtAt()
+}

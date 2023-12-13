@@ -1,3 +1,5 @@
+module alias P = SQLParser;
+
 module SKDB;
 
 /*****************************************************************************/
@@ -39,7 +41,7 @@ fun fixUpDirName(dirNameStr: String): SKStore.DirName {
 
 // Read a single line from stdin, decode it to a JSON Object, expected
 // to be a map from key strings (parameter names) to values.
-fun queryParams(options: SKDB.Options): Map<String, SKDB.Value> {
+fun queryParams(options: SKDB.Options): Map<String, P.Value> {
   if (!options.expectQueryParams) {
     return Map[];
   };
@@ -93,7 +95,7 @@ untracked fun main(): void {
     .arg(Cli.BoolArg("sync").about("Sync to disk").global())
     .arg(
       Cli.StringArg("format")
-        .default(if (isATTY() != 0) "table" else "sql")
+        .default(if (IO.stdin().isatty()) "table" else "sql")
         .about("Output format (sql, csv, json, or table)")
         .global(),
     )
@@ -288,7 +290,6 @@ untracked fun main(): void {
           Cli.StringArg("table").positional().required().about("Table name"),
         ),
     )
-    .subcommand(Cli.Command("debug").about("TODO"))
     .help();
 
   try {
@@ -335,7 +336,6 @@ untracked fun main(): void {
         | "can-mirror" -> execCanMirror
         | "replay" -> execReplay
         | "toggle-view" -> execToggleView
-        | "debug" -> execDebug
         | "set-user" -> execSetUser
         | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
         }
@@ -351,14 +351,41 @@ untracked fun main(): void {
           print_error("cannot use capacity without init");
           skipExit(2)
         };
-        // TODO: If `--user` is actually needed, reinstate it. It was clashing with
-        // other options and was removed for convenience.
-        // user = argMap.maybeGet("user") match {
-        //   | Some(AP.StringValue{value => userID}) -> Some(userID)
-        //   | _ -> None()
-        //   };
         params = queryParams(options);
-        SKDB.eval(options, params, /* user = */ None())
+        if (!IO.stdin().isatty()) {
+          input = read_to_end();
+          SKDB.eval(input, options, params) match {
+          | Failure(err) ->
+            SKDB.printError(input, err);
+            skipExit(1)
+          | Success _ -> void
+          }
+        } else {
+          loop {
+            SKStore.withRegionVoid(() ~> {
+              input = "";
+              print_raw("skdb> ");
+              loop {
+                read_line() match {
+                | Some(l) -> !input = input + l + " "
+                | None() -> skipExit(0)
+                };
+                SKDB.eval(input, options, params, true) match {
+                | Failure(UnfinishedTransactionError _)
+                | Failure(
+                  ParserError(P.UnexpectedTokenError(P.TEOF(), _, _)),
+                ) ->
+                  print_raw(" ...> ");
+                  continue
+                | Failure(err) ->
+                  printError(input, err);
+                  break void
+                | _ -> break void
+                }
+              }
+            })
+          }
+        };
       });
     subcmd_handler(args, options);
   } catch {
@@ -484,7 +511,7 @@ fun execMigrate(args: Cli.ParseResults, options: SKDB.Options): void {
 }
 
 fun execLoadCsv(args: Cli.ParseResults, options: SKDB.Options): void {
-  name = SKDB.Name::create(args.getString("table"));
+  name = P.Name::create(args.getString("table"));
   SKDB.runSql(options, context ~> {
     table = context.getGlobal("CSV_TABLE") match {
     | None() ->
@@ -559,7 +586,7 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
     diffSpec = mutable Vector[];
 
     for (dirSub in sub.dirSubs) {
-      tableName = SKDB.Name::create(
+      tableName = P.Name::create(
         dirSub.dirName.dirName.stripPrefix("/").stripSuffix("/"),
       );
       sinceForTable(tableName) match {
@@ -601,7 +628,7 @@ fun getSqlTableFromDirName(
 ): SKDB.DirDescr {
   dirNameStr = dirName.toString();
   !dirNameStr = dirNameStr.stripPrefix("/").stripSuffix("/");
-  SKDB.getTable(context.mclone(), 0, SKDB.Name::create(dirNameStr))
+  SKDB.getTable(context.mclone(), 0, P.Name::create(dirNameStr))
 }
 
 fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
@@ -771,8 +798,4 @@ fun execToggleView(args: Cli.ParseResults, _options: SKDB.Options): void {
     };
     SKStore.CStop(None())
   })
-}
-
-untracked fun execDebug(_args: Cli.ParseResults, _options: SKDB.Options): void {
-  SKStore.toplevel(SKStore.Context{});
 }
