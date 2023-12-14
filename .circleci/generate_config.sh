@@ -5,7 +5,7 @@ git diff --quiet HEAD main -- compiler/ prelude/ skfs/
 skc=$?
 git diff --quiet HEAD main -- skfs/
 skfs=$?
-git diff --quiet HEAD main -- sql/
+git diff --quiet HEAD main -- sql/ sqlparser/
 skdb=$?
 
 if (($skc == 0 && $skfs == 0 && $skdb == 0))
