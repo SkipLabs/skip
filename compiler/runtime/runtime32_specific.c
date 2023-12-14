@@ -104,7 +104,7 @@ char* sk_new_const(char* cst) {
 
 void SKIP_throw_EndOfFile();
 
-int64_t SKIP_posix_isatty(int64_t) {
+int64_t SKIP_posix_isatty(int64_t fd) {
   return 0;
 }
 
