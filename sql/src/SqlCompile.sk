@@ -1139,9 +1139,13 @@ mutable class Compiler{
         ),
       )
 
-    | P.In(_, P.InSelect _, _) -> error(this.pos, "IN SELECT not implemented")
     | e @ P.In(_, _, true) ->
       this.compileExpr(context, P.UnOp(P.UnaryNot(), e with {negated => false}))
+    | P.In(e, P.InSelect(sel), negated) ->
+      this.compileExpr(
+        context,
+        P.In(e, P.InList(Array[P.Subquery(sel)]), negated),
+      )
     | P.In(e, P.InList(arr), false) ->
       this.compileExpr(context, e) match {
       | CGNull() -> CGNull()
