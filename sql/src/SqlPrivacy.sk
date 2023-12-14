@@ -716,7 +716,9 @@ fun userPrivacyChanged(
   tick: SKStore.Tick,
 ): Bool {
   userID = userIDOpt match {
-  | None() -> return false
+  | None()
+  | Some("root") ->
+    return false
   | Some(x) -> x
   };
   user = UserFile::create(context, userID);
