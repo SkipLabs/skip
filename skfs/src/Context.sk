@@ -1626,4 +1626,61 @@ fun withRegionValue<T>(f: () ~> T): T {
   copied.getHead();
 }
 
+fun copyToParentObstack<T>(
+  contextOpt: ?mutable Context,
+  value: T,
+  saved: Obstack,
+): T {
+  (icontextOpt, !value) = SKStore.destroyObstackWithValue(
+    saved,
+    List[(contextOpt.map(ctx -> ctx.clone()), value)],
+  ).getHead();
+  icontextOpt.each(icontext ->
+    contextOpt.fromSome().replaceFromSaved(icontext)
+  );
+  value
+}
+
+fun withRegionFold<K, T>(
+  contextOpt: ?mutable Context,
+  it: mutable Iterator<K>,
+  value: T,
+  fn: (?mutable Context, K, T) ~> T,
+): T {
+  optSaved: ?Obstack = None();
+  valueInRegion = value;
+  try {
+    !optSaved = Some(newObstack());
+    loop {
+      saved = optSaved.fromSome();
+      it.next() match {
+      | Some(k) ->
+        !valueInRegion = fn(contextOpt, k, valueInRegion);
+        if (shouldGC(saved) != 0) {
+          !valueInRegion = copyToParentObstack(
+            contextOpt,
+            valueInRegion,
+            saved,
+          );
+          !optSaved = Some(SKStore.newObstack());
+        }
+      | _ -> break void
+      }
+    };
+    optSaved match {
+    | Some(saved) -> copyToParentObstack(contextOpt, valueInRegion, saved)
+    | _ -> value
+    }
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      saveExn(cexn);
+      throw cexn
+    | _ -> throw exn
+    }
+  }
+}
+
 module end;
