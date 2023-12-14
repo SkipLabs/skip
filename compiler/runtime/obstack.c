@@ -82,12 +82,6 @@ char* sk_large_page(size_t size) {
   size_t block_size = size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t);
   block_size += 64;
   char* lpage = (char*)sk_malloc(block_size);
-  if (lpage == NULL) {
-#ifdef SKIP64
-    fprintf(stderr, "Out of memory\n");
-#endif
-    SKIP_throw_cruntime(ERROR_OUT_OF_MEMORY);
-  }
   sk_obstack_attach_page(lpage);
   lpage += sizeof(char*);
   *(size_t*)lpage = block_size;
@@ -110,12 +104,6 @@ void sk_new_page() {
 #ifdef SKIP64
   head = (char*)sk_malloc(block_size);
 #endif
-  if (head == NULL) {
-#ifdef SKIP64
-    fprintf(stderr, "Out of memory\n");
-#endif
-    SKIP_throw_cruntime(ERROR_OUT_OF_MEMORY);
-  }
   end = head + block_size;
   *(char**)head = page;
   page = head;
