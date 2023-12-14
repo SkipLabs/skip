@@ -12,7 +12,6 @@ extension class Parser {
   const kEqPrec: Int = 30;
   const kUnaryNotPrec: Int = 25;
   const kAndPrec: Int = 20;
-  const kLikePrec: Int = 19;
   const kOrPrec: Int = 10;
 
   // Cf. https://www.sqlite.org/lang_expr.html
@@ -391,7 +390,7 @@ extension class Parser {
   }
 
   mutable fun parseLike(lhs_expr: Expr, negated: Bool): Expr {
-    rhs_expr = this.parseSubExpr(static::kLikePrec);
+    rhs_expr = this.parseSubExpr(static::kEqPrec);
     if (this.parse_keyword(TEscape())) {
       this.errorNotImplemented()
     };
