@@ -1558,15 +1558,16 @@ class EagerDir{
     parentMaps: Array<
       (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
     >,
-    child: EagerDir,
+    childRef: EagerDir,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
-    childName = child.dirName;
+    childName = childRef.dirName;
 
     dirty = SortedSet[];
     if (contextDirtyReaders.containsKey(parent.dirName)) {
       if (contextDirtyReaders[parent.dirName].containsKey(childName)) {
-        for (key in contextDirtyReaders[parent.dirName][childName]) {
+        keys = contextDirtyReaders[parent.dirName][childName].values();
+        !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
           for (p in parentMaps) {
             (_, rangeOpt, _) = p;
             rangeOpt match {
@@ -1576,14 +1577,16 @@ class EagerDir{
               !ranges.any(range -> range.start <= key && key <= range.end)
             ) ->
               void
-            | _ -> !dirty = dirty.set(key)
+            | _ -> !dirtyInRegion = dirtyInRegion.set(key)
             }
-          }
-        }
-      };
+          };
+          dirtyInRegion;
+        })
+      }
     };
     if (contextDirty.containsKey(parent.dirName)) {
-      for (key in contextDirty[parent.dirName]) {
+      keys = contextDirty[parent.dirName].values();
+      !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
         for (p in parentMaps) {
           (_, rangeOpt, _) = p;
           rangeOpt match {
@@ -1591,90 +1594,103 @@ class EagerDir{
             ranges,
           ) if (!ranges.any(range -> range.start <= key && key <= range.end)) ->
             void
-          | _ -> !dirty = dirty.set(key)
+          | _ -> !dirtyInRegion = dirtyInRegion.set(key)
           }
-        }
-      };
-    };
-
-    for (key in dirty) {
-      context.enter(ArrowKey(parentName, childName, key));
-      path = Path::create(parentName, key);
-      source = Source::create(path);
-      oldInfo = static::getOld(child, source);
-      oldKeys = SortedSet::createFromItems(oldInfo.getKeys());
-      newDirsCopy = context.newDirs;
-      readsCopy = context.reads;
-      context.!newDirs = SortedSet[];
-      context.!reads = SortedSet[];
-
-      keys = mutable Vector[];
-      mvalues = SortedMap[];
-
-      for (p in parentMaps) {
-        writer = mutable Writer{};
-        (mapFun, _, _) = p;
-        mapFun(context, writer, key, parent.getIterRaw(key));
-        mapped = writer.getWrites();
-        for (kv in mapped) {
-          (k, rvalues) = kv;
-
-          keys.push(k);
-          if (oldKeys.contains(k)) {
-            !oldKeys = oldKeys.remove(k);
-          };
-
-          if (!mvalues.containsKey(k)) {
-            !mvalues = mvalues.set(k, mutable Vector[]);
-          };
-          mvalues[k].extend(rvalues);
         };
-      };
-
-      newDirs = context.newDirs;
-      reads = context.getReads();
-      context.!newDirs = newDirsCopy;
-      context.!reads = readsCopy;
-
-      !child = child.updateNewDirs(context, source, newDirs);
-
-      for (read in reads) {
-        arrowKey = ArrowKey(parentName, child.dirName, key);
-        context.!deps = context.deps.set(read, arrowKey);
-      };
-
-      for (oldRead in oldInfo.getReads()) {
-        if (reads.contains(oldRead)) continue;
-        arrowKey = ArrowKey(parentName, child.dirName, key);
-        context.!deps = context.deps.remove(oldRead, arrowKey);
-      };
-
-      for (k => v in mvalues) {
-        !child = child.writeEntry(context, path, path, k, v.toArray());
-      };
-
-      // Let's remove the keys that no longer exist.
-      for (k in oldKeys) {
-        !child = child.writeEntry(context, path, path, k, Array[]);
-      };
-
-      // We need to remember what keys we produced for the next
-      // time around.
-      minfo = MInfo::create(keys.toArray(), newDirs.toArray(), reads.toArray());
-      if (
-        !minfo.getKeys().isEmpty() ||
-        !minfo.getNewDirs().isEmpty() ||
-        !minfo.getReads().isEmpty()
-      ) {
-        !child.old[source] = minfo
-      } else if (child.old.containsKey(source)) {
-        !child.old = child.old.remove(source);
-      };
-
-      context.leave(ArrowKey(parentName, childName, key));
+        dirtyInRegion;
+      })
     };
 
-    context.setDir(child.dirName, child);
+    it = dirty.iterator();
+    !childRef = withRegionFold(
+      Some(context),
+      it,
+      childRef,
+      (contextOpt, key, child) ~> {
+        ctx = contextOpt.fromSome();
+        ctx.enter(ArrowKey(parentName, childName, key));
+        path = Path::create(parentName, key);
+        source = Source::create(path);
+        oldInfo = static::getOld(child, source);
+        oldKeys = SortedSet<Key>::createFromItems(oldInfo.getKeys());
+        newDirsCopy = ctx.newDirs;
+        readsCopy = ctx.reads;
+        ctx.!newDirs = SortedSet[];
+        ctx.!reads = SortedSet[];
+
+        keys = mutable Vector<Key>[];
+        mvalues = SortedMap<Key, mutable Vector<File>>[];
+
+        for (p in parentMaps) {
+          writer = mutable Writer{};
+          (mapFun, _, _) = p;
+          mapFun(ctx, writer, key, parent.getIterRaw(key));
+          mapped = writer.getWrites();
+          for (kv in mapped) {
+            (k, rvalues) = kv;
+
+            keys.push(k);
+            if (oldKeys.contains(k)) {
+              !oldKeys = oldKeys.remove(k);
+            };
+
+            if (!mvalues.containsKey(k)) {
+              !mvalues = mvalues.set(k, mutable Vector[]);
+            };
+            mvalues[k].extend(rvalues);
+          };
+        };
+
+        newDirs = ctx.newDirs;
+        reads = ctx.getReads();
+        ctx.!newDirs = newDirsCopy;
+        ctx.!reads = readsCopy;
+
+        !child = child.updateNewDirs(ctx, source, newDirs);
+
+        for (read in reads) {
+          arrowKey = ArrowKey(parentName, child.dirName, key);
+          ctx.!deps = ctx.deps.set(read, arrowKey);
+        };
+
+        for (oldRead in oldInfo.getReads()) {
+          if (reads.contains(oldRead)) continue;
+          arrowKey = ArrowKey(parentName, child.dirName, key);
+          ctx.!deps = ctx.deps.remove(oldRead, arrowKey);
+        };
+
+        for (k => v in mvalues) {
+          !child = child.writeEntry(ctx, path, path, k, v.toArray());
+        };
+
+        // Let's remove the keys that no longer exist.
+        for (k in oldKeys) {
+          !child = child.writeEntry(ctx, path, path, k, Array[]);
+        };
+
+        // We need to remember what keys we produced for the next
+        // time around.
+        minfo = MInfo::create(
+          keys.toArray(),
+          newDirs.toArray(),
+          reads.toArray(),
+        );
+        if (
+          !minfo.getKeys().isEmpty() ||
+          !minfo.getNewDirs().isEmpty() ||
+          !minfo.getReads().isEmpty()
+        ) {
+          !child.old[source] = minfo
+        } else if (child.old.containsKey(source)) {
+          !child.old = child.old.remove(source);
+        };
+
+        ctx.leave(ArrowKey(parentName, childName, key));
+        child
+      },
+    );
+
+    context.setDir(childRef.dirName, childRef);
 
     for (p in parentMaps) {
       (_, _, onUpdate) = p;
