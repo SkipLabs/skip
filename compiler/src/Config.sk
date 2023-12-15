@@ -7,12 +7,43 @@
 
 module Config;
 
+private fun hostTarget(): String {
+  // TODO: invoke llvm-config --host-target
+  "x86_64-pc-linux-gnu"
+}
+
 private class Config{
   release: Bool,
   verbose: Bool,
   optConfig: Optimize.Config,
-  mainConfig: Main.Config,
   unknown: Array<String>,
+  exportedFunctions: UnorderedSet<String>,
+  exportedAsFunctions: UnorderedMap<String, String>,
+  disasmAll: Bool,
+  disasmAnnotated: Bool,
+  disasmFiles: UnorderedSet<String>,
+  disasmFunctions: UnorderedSet<String>,
+  output: String,
+  // profilePath: String,
+  emit: String,
+  target: String,
+  optLevel: Int,
+  asan: Bool,
+  autogc: Bool,
+  sampleRate: Int,
+  // NOTE: Using fully specialized class names yields more detailed stats
+  // info, but inhibits sharing, which increases compilation time and
+  // binary sizes.
+  useSpecializedNames: Bool,
+  version: Bool,
+  check: Bool,
+  stackAlign: Int,
+  stackAlignStr: String,
+  ptrByteSize: Int,
+  ptrBitSize: Int,
+  vtableByteSize: Int,
+  links: Array<String>,
+  preambles: Array<String>,
 } {
   static fun make(results: Cli.ParseResults): this {
     optConfig = Optimize.Config::make(
@@ -25,14 +56,138 @@ private class Config{
       results.getBool("goto"),
       results.getBool("verify"),
     );
-    mainConfig = Main.Config::make(results);
 
     release = results.getBool("release");
     verbose = results.getBool("verbose");
     // preserve legacy behavior of capturing all unmatched args in a single array
     unknown = results.getArray("files");
 
-    Config{release, verbose, optConfig, mainConfig, unknown}
+    disasmAll = results.getBool("disasm-all");
+    disasmAnnotated = results.getBool("disasm-annotated");
+    disasmFiles = UnorderedSet::createFromItems(
+      results.getArray("disasm-file"),
+    );
+    disasmFunctions = UnorderedSet::createFromItems(
+      results.getArray("disasm-function"),
+    );
+    exportedFunctions = UnorderedSet::createFromItems(
+      results.getArray("export-function"),
+    );
+    exportedAsFunctions = UnorderedSet::createFromItems(
+      results.getArray("export-function-as"),
+    );
+    output = results.maybeGetString("output").default("-");
+    // profilePath = results.getString("profile-path");
+    emit = results.getString("emit");
+    target = results.maybeGetString("target").default(hostTarget());
+    optLevel = results.getString("opt-level").toInt();
+    asan = results.getBool("asan");
+    autogc = results.getBool("autogc");
+    sampleRate = results.getString("sample-rate").toInt();
+    useSpecializedNames = results.getBool("use-specialized-names");
+    version = results.getBool("version");
+    check = results.getBool("check");
+
+    if (version) {
+      print_string(getBuildVersion());
+      skipExit(0);
+    };
+
+    exportAs = mutable UnorderedMap[];
+    for (f in exportedAsFunctions) {
+      vals = f.split("=");
+      if (vals.size() != 2 || vals[0].isEmpty() || vals[1].isEmpty()) {
+        print_error("Invalid --export-function-as: " + f + "\n");
+        skipExit(1)
+      };
+
+      skipName = vals[0];
+      cppName = vals[1];
+
+      if (!exportAs.maybeSet(skipName, cppName)) {
+        oldCppName = exportAs[skipName];
+        if (oldCppName != cppName) {
+          print_error(
+            "Conflicting --export-function-as for " +
+              skipName +
+              ": " +
+              oldCppName +
+              " and " +
+              cppName +
+              "\n",
+          );
+          skipExit(1)
+        }
+      }
+    };
+
+    // Mac Clang seems to align stack arrays mod 16 -- is that required to always
+    // keep the stack aligned or is 8 OK or what? Does Linux do that too?
+    // x86-64 ABI on linux and mac require 16 byte alignment.
+    // Does LLVM provide an portable abstraction?
+    // TODO: Make a proper `Target` class that holds the relevant platform-specific
+    // data, with a constructor that takes the target triple.
+    stackAlign = if (target == "wasm32-unknown-unknown") 8 else 16;
+    ptrByteSize = if (target == "wasm32-unknown-unknown") 4 else 8;
+    stackAlignStr = stackAlign.toString();
+    ptrBitSize = ptrByteSize * 8;
+    vtableByteSize = ptrByteSize;
+
+    basePath = Path.parentname(Path.dirname(Environ.current_exe()));
+    links = Environ.varOpt("SKC_LINK") match {
+    | Some(skcLink) if (!skcLink.trim().isEmpty()) ->
+      skcLink.split(Path.listSeparator).toArray()
+    | _ if (target.startsWith("wasm32")) ->
+      Array[Path.join(basePath, "lib", "libskip_runtime32.bc")]
+    | _ ->
+      // TODO: Link libbacktrace only when building with a debug/dev profile?
+      Array[
+        Path.join(basePath, "lib", "libskip_runtime64.a"),
+        Path.join(basePath, "lib", "libbacktrace.a"),
+        "-lpthread",
+      ]
+    };
+    preambles = Environ.varOpt("SKC_PREAMBLE") match {
+    | Some(skcPreamble) if (!skcPreamble.trim().isEmpty()) ->
+      skcPreamble.split(Path.listSeparator).toArray()
+    | _ if (target.startsWith("wasm32")) ->
+      Array[Path.join(basePath, "lib", "skip_preamble32.ll")]
+    | _ -> Array[Path.join(basePath, "lib", "skip_preamble64.ll")]
+    };
+    static{
+      release,
+      verbose,
+      optConfig,
+      unknown,
+      exportedFunctions,
+      exportedAsFunctions => exportAs.chill(),
+      disasmAll,
+      disasmAnnotated,
+      disasmFiles,
+      disasmFunctions,
+      output,
+      // profilePath,
+      emit,
+      target,
+      optLevel,
+      asan,
+      autogc,
+      sampleRate,
+      useSpecializedNames,
+      version,
+      check,
+      stackAlign,
+      stackAlignStr,
+      ptrByteSize,
+      ptrBitSize,
+      vtableByteSize,
+      links,
+      preambles,
+    }
+  }
+
+  fun isWasm(): Bool {
+    this.target.startsWith("wasm32");
   }
 }
 

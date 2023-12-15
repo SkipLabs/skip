@@ -1506,14 +1506,14 @@ mutable class Specializer{
         annotations => gclass.annotations,
         fields => Array[], // Computed later after being scalarized
         canInstantiate => gclass.canInstantiate,
-        ptrBitSize => this.config.mainConfig.ptrBitSize,
+        ptrBitSize => this.config.ptrBitSize,
         scalarType => gclass.scalarType match {
         | some @ Some _ -> some
         | None() ->
           kind match {
           | KBase()
           | KClass() ->
-            Some(ScalarType::gcPointer(this.config.mainConfig.ptrBitSize))
+            Some(ScalarType::gcPointer(this.config.ptrBitSize))
           | KValue() -> None()
           }
         },
@@ -1996,8 +1996,8 @@ mutable class Specializer{
               f.name,
               f.annotations,
               f.pos,
-              config.mainConfig.exportedAsFunctions,
-              config.mainConfig.isWasm(),
+              config.exportedAsFunctions,
+              config.isWasm(),
             ) || AsmOutput.cppIsImported(f, f.pos)),
           },
         )
@@ -2924,7 +2924,7 @@ mutable class FunSpecializer{
       !sentinelField = sentinelField.asInner(pos).getField(field, pos)
     };
     bits = this.emitReinterpret{
-      typ => tIntPtr(this.config.mainConfig.ptrByteSize),
+      typ => tIntPtr(this.config.ptrByteSize),
       pos,
       value => sentinelField.asLeaf(pos).value,
     };
@@ -2937,7 +2937,7 @@ mutable class FunSpecializer{
         InstrLeaf(
           this.emitIntCmpNe{
             rhs => this.constantTypedInt(
-              tIntPtr(this.config.mainConfig.ptrByteSize),
+              tIntPtr(this.config.ptrByteSize),
               style.pointer,
             ).id,
             pos,

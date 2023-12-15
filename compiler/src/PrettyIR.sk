@@ -1427,7 +1427,7 @@ mutable class .PrettyIR{
         VTable.kFrozenMask),
     };
 
-    header = if (this.config.mainConfig.vtableByteSize == 8) {
+    header = if (this.config.vtableByteSize == 8) {
       Array[StaticImageField(vtable, 0)]
     } else {
       // All object pointers (right after vtable) are aligned mod 8.
@@ -1438,7 +1438,7 @@ mutable class .PrettyIR{
     vtableField = header[headerSize - 1];
     firstFieldBitOffset =
       vtableField.bitOffset +
-      this.config.mainConfig.vtableByteSize * 8;
+      this.config.vtableByteSize * 8;
 
     layout = sc.layout match {
     | Some(l) -> l
@@ -1494,7 +1494,7 @@ mutable class .PrettyIR{
         VTable.kFrozenMask),
     };
 
-    header = if (this.config.mainConfig.vtableByteSize == 8) {
+    header = if (this.config.vtableByteSize == 8) {
       Array[
         StaticImageField(pad32, 0),
         StaticImageField(sizeConst, 32),
@@ -1506,9 +1506,7 @@ mutable class .PrettyIR{
 
     headerSize = header.size();
     vtableField = header[headerSize - 1];
-    firstSlotBitOffset =
-      vtableField.bitOffset +
-      this.config.mainConfig.vtableByteSize * 8;
+    firstSlotBitOffset = vtableField.bitOffset + this.config.vtableByteSize * 8;
 
     // Create the values and layout for the array elements.
     getField = if (logicalOrderedValues.isEmpty()) {
@@ -1629,9 +1627,7 @@ private fun prettyWriteName(instr: Instr, out: mutable PrettyDefBuilder): void {
       out.print("null")
     } else {
       out.print(
-        "inttoptr (i%s %s to i8*)" /
-          out.common.config.mainConfig.ptrBitSize /
-          value,
+        "inttoptr (i%s %s to i8*)" / out.common.config.ptrBitSize / value,
       )
     }
   | obj @ ConstantObject _ -> out.common.prettyWriteConstantObject(out, obj)
