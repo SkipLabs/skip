@@ -15,7 +15,7 @@ function getErrorMessage(error: any) {
       return JSON.parse((error as Error).message).trim();
     } catch (e) {
       if (e instanceof SyntaxError) {
-	return (error as Error).message.trim();
+        return (error as Error).message.trim();
       }
       throw e;
     }
@@ -110,18 +110,6 @@ export async function setup(
 async function testQueriesAgainstTheServer(skdb: SKDB) {
   const remote = (await skdb.connectedRemote())!;
 
-  const groupGALL = await remote.exec(
-    "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'read-only');",
-    new Map(),
-  );
-  expect(groupGALL).toEqual([]);
-
-  const groupPermissionsGALL = await remote.exec(
-    "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, skdb_permission('rw'), 'read-only');",
-    new Map(),
-  );
-  expect(groupPermissionsGALL).toEqual([]);
-
   const tableCreate = await remote.exec(
     "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER, skdb_access STRING);",
     new Map(),
@@ -129,24 +117,24 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   expect(tableCreate).toEqual([]);
 
   const viewCreate = await remote.exec(
-    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y, 'GALL' as skdb_access FROM test_pk;",
+    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y, 'read-write' as skdb_access FROM test_pk;",
     {},
   );
   expect(viewCreate).toEqual([]);
 
   const tableInsert = await remote.exec(
-    "INSERT INTO test_pk VALUES (42,21,'GALL');",
+    "INSERT INTO test_pk VALUES (42,21,'read-write');",
     {},
   );
   expect(tableInsert).toEqual([]);
 
   const tableInsertWithParam = await remote.exec(
-    "INSERT INTO test_pk VALUES (@x,@y,'GALL');",
+    "INSERT INTO test_pk VALUES (@x,@y,'read-write');",
     new Map().set("x", 43).set("y", 22),
   );
   expect(tableInsertWithParam).toEqual([]);
   const tableInsertWithOParam = await remote.exec(
-    "INSERT INTO test_pk VALUES (@x,@y,'GALL');",
+    "INSERT INTO test_pk VALUES (@x,@y,'read-write');",
     { x: 44, y: 23 },
   );
   expect(tableInsertWithOParam).toEqual([]);
@@ -257,18 +245,18 @@ function waitSynch(
   const test = (resolve, reject) => {
     const cb = (value) => {
       if (check(value) || count == max) {
-	resolve(value);
+        resolve(value);
       } else {
-	count++;
-	setTimeout(() => test(resolve, reject), 100);
+        count++;
+        setTimeout(() => test(resolve, reject), 100);
       }
     };
     if (server) {
       skdb
-	.connectedRemote()
-	.then((remote) => remote!.exec(query, new Map()))
-	.then(cb)
-	.catch(reject);
+        .connectedRemote()
+        .then((remote) => remote!.exec(query, new Map()))
+        .then(cb)
+        .catch(reject);
     } else {
       skdb.exec(query, new Map()).then(cb).catch(reject);
     }
@@ -279,11 +267,14 @@ function waitSynch(
 async function testServerTail(root: SKDB, user: SKDB) {
   const remote = (await root.connectedRemote())!;
   try {
-    await remote.exec("insert into view_pk values (87,88,'GALL');", new Map());
+    await remote.exec(
+      "insert into view_pk values (87,88,'read-write');",
+      new Map(),
+    );
     throw new Error("Shall throw exception.");
   } catch (exn) {
     expect(getErrorMessage(exn)).toEqual(
-      "insert into view_pk values (87,88,'GALL');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk"
+      "insert into view_pk values (87,88,'read-write');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk",
     );
   }
   await new Promise((resolve) => setTimeout(resolve, 100));
@@ -292,7 +283,10 @@ async function testServerTail(root: SKDB, user: SKDB) {
   );
   expect(vres).toEqual([{ cnt: 0 }]);
 
-  await remote.exec("insert into test_pk values (87,88,'GALL');", new Map());
+  await remote.exec(
+    "insert into test_pk values (87,88,'read-write');",
+    new Map(),
+  );
   const res = await waitSynch(
     user,
     "select count(*) as cnt from test_pk where x = 87 and y = 88",
@@ -311,13 +305,13 @@ async function testServerTail(root: SKDB, user: SKDB) {
 async function testClientTail(root: SKDB, user: SKDB) {
   const remote = await root.connectedRemote();
   try {
-    await user.exec("insert into view_pk values (97,98,'GALL');");
+    await user.exec("insert into view_pk values (97,98,'read-write');");
     throw new Error("Shall throw exception.");
   } catch (exn: any) {
     // The following error message is duplicated due to how the wasm runtime
     // translates `exit()` syscalls into exceptions.
     expect(getErrorMessage(exn)).toEqual(
-      "insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk\nInternal error: insert into view_pk values (97,98,'GALL');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk"
+      "insert into view_pk values (97,98,'read-write');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk\nInternal error: insert into view_pk values (97,98,'read-write');\n^\n|\n ----- ERROR\nError: line 1, character 0:\nCannot write in view: view_pk",
     );
   }
   await new Promise((resolve) => setTimeout(resolve, 100));
@@ -327,7 +321,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
   );
   expect(vres).toEqual([{ cnt: 0 }]);
 
-  await user.exec("insert into test_pk values (97,98,'GALL');");
+  await user.exec("insert into test_pk values (97,98,'read-write');");
   const res = await waitSynch(
     root,
     "select count(*) as cnt from test_pk where x = 97 and y = 98",
@@ -402,9 +396,8 @@ async function testReboot(root: SKDB, user: SKDB, user2: SKDB) {
 async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
   await skdb.mirror("test_pk", "view_pk");
   await skdb2.mirror("test_pk", "view_pk");
-
   await skdb.exec(
-    "INSERT INTO skdb_groups VALUES ('my_group', @uid, @uid, @uid);",
+    "INSERT INTO skdb_groups VALUES ('my_group', @uid, @uid, 'read-write');",
     { uid: skdb.currentUser },
   );
   await skdb.exec(
@@ -414,15 +407,37 @@ async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
 
   await skdb.exec("INSERT INTO test_pk VALUES (37, 42, 'my_group');");
 
-  let user1_view = await skdb.exec("SELECT * FROM test_pk WHERE x = 37;");
-  let user2_view = await skdb2.exec("SELECT * FROM test_pk WHERE x = 37;");
-  expect(user1_view.length).toEqual(1);
-  expect(user2_view.length).toEqual(0);
+  let user1_view = await skdb.exec(
+    "SELECT * FROM test_pk WHERE skdb_access='my_group';",
+  );
+  let user2_view = await skdb2.exec(
+    "SELECT * FROM test_pk WHERE skdb_access='my_group';",
+  );
+  expect(user1_view).toHaveLength(1);
+  expect(user2_view).toHaveLength(0);
 
   await expect(
     async () =>
       await skdb2.exec("INSERT INTO test_pk VALUES (47, 52, 'my_group');"),
   ).rejects.toThrow();
+
+  await skdb.exec(
+    "INSERT INTO skdb_group_permissions VALUES ('my_group', @uid, skdb_permission('rw'), 'read-write');",
+    { uid: skdb2.currentUser },
+  );
+
+  await new Promise((r) => setTimeout(r, 100));
+  await skdb2.exec("INSERT INTO test_pk VALUES (52, 0, 'my_group');");
+  await new Promise((r) => setTimeout(r, 100));
+
+  user1_view = await skdb.exec(
+    "SELECT * FROM test_pk WHERE skdb_access='my_group';",
+  );
+  user2_view = await skdb2.exec(
+    "SELECT * FROM test_pk WHERE skdb_access='my_group';",
+  );
+  expect(user1_view).toHaveLength(2);
+  expect(user2_view).toHaveLength(2);
 }
 
 async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
@@ -441,7 +456,7 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
   await expect(
     async () =>
       await skdb2.exec("INSERT INTO test_pk VALUES (1002, 2, @gid)", {
-	gid: group.groupID,
+        gid: group.groupID,
       }),
   ).rejects.toThrow();
 
@@ -449,30 +464,33 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
 
   let user1_view = await skdb1.exec("SELECT * FROM test_pk WHERE x = 1001;");
   let user2_view = await skdb2.exec("SELECT * FROM test_pk WHERE x = 1001;");
-  expect(user1_view.length).toEqual(1);
-  expect(user2_view.length).toEqual(0);
+  expect(user1_view).toHaveLength(1);
+  expect(user2_view).toHaveLength(0);
 
   // user1 can grant read+write permissions to user2,
   // after which user2 can insert & read
   await group.setMemberPermission(skdb1, user2, "rw");
 
   await new Promise((r) => setTimeout(r, 100));
-
-  await skdb2.exec("INSERT INTO test_pk VALUES (1003, 3, @gid)", {
+  await skdb1.exec("INSERT INTO test_pk VALUES (1003, 3, @gid)", {
+    gid: group.groupID,
+  });
+  await new Promise((r) => setTimeout(r, 100));
+  await skdb2.exec("INSERT INTO test_pk VALUES (1004, 4, @gid)", {
     gid: group.groupID,
   });
   await new Promise((r) => setTimeout(r, 100));
   user1_view = await skdb1.exec("SELECT * FROM test_pk WHERE x > 1000;");
   user2_view = await skdb2.exec("SELECT * FROM test_pk WHERE x > 1000;");
-  expect(user1_view.length).toEqual(2);
-  expect(user2_view.length).toEqual(2);
+  expect(user1_view).toHaveLength(3);
+  expect(user2_view).toHaveLength(3);
 
   // user1 can grant admin permissions to user2, after which user2 can change member permissions
 
   await group.addAdmin(skdb1, user2);
   await new Promise((r) => setTimeout(r, 100));
 
-  await group.removeMember(skdb2, user1);
+  await group.setMemberPermission(skdb2, user1, "rw");
 
   // user1 can transfer ownership to user2, after which user2 can remove them as an admin
   await group.transferOwnership(skdb1, user2);
@@ -508,31 +526,31 @@ export const apitests = (asWorker) => {
     {
       name: asWorker ? "API in Worker" : "API",
       fun: async (dbs: dbs) => {
-	await testQueriesAgainstTheServer(dbs.root);
+        await testQueriesAgainstTheServer(dbs.root);
 
-	await testSchemaQueries(dbs.user);
+        await testSchemaQueries(dbs.user);
 
-	await testMirroring(dbs.user);
+        await testMirroring(dbs.user);
 
         //Privacy
         await testJSPrivacy(dbs.user, dbs.user2);
         await testJSGroups(dbs.user, dbs.user2);
 
-	// Server Tail
-	await testServerTail(dbs.root, dbs.user);
-	await testClientTail(dbs.root, dbs.user);
+        // Server Tail
+        await testServerTail(dbs.root, dbs.user);
+        await testClientTail(dbs.root, dbs.user);
 
-	await testLargeMirror(dbs.root, dbs.user);
-	// must come last: puts replication in to a permanent state of failure
-	await testReboot(dbs.root, dbs.user, dbs.user2);
+        await testLargeMirror(dbs.root, dbs.user);
+        // must come last: puts replication in to a permanent state of failure
+        await testReboot(dbs.root, dbs.user, dbs.user2);
 
-	dbs.root.closeConnection();
-	dbs.user.closeConnection();
-	dbs.user2.closeConnection();
-	return "";
+        dbs.root.closeConnection();
+        dbs.user.closeConnection();
+        dbs.user2.closeConnection();
+        return "";
       },
       check: (res) => {
-	expect(res).toEqual("");
+        expect(res).toEqual("");
       },
     },
   ];
