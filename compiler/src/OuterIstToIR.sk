@@ -2587,11 +2587,10 @@ class Converter private (
     | "Int16" -> Some(ScalarType(16, 16, "i16", IntegerScalarKind()))
     | "Int32" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
     | "Float" -> Some(ScalarType(64, 64, "double", FloatScalarKind()))
-    | "Runtime.GCPointer" ->
-      Some(ScalarType::gcPointer(this.config.mainConfig.ptrBitSize))
+    | "Runtime.GCPointer" -> Some(ScalarType::gcPointer(this.config.ptrBitSize))
     | "Runtime.NonGCPointer" ->
-      Some(ScalarType::nonGCPointer(this.config.mainConfig.ptrBitSize))
-    | "String" -> Some(ScalarType::gcPointer(this.config.mainConfig.ptrBitSize))
+      Some(ScalarType::nonGCPointer(this.config.ptrBitSize))
+    | "String" -> Some(ScalarType::gcPointer(this.config.ptrBitSize))
     | _ -> None()
     };
 

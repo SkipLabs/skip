@@ -58,7 +58,7 @@ mutable class .LowerLocalGC{
     hasNoGC = annotationsContain(f.annotations, "@no_gc", pos);
     hasGC = !hasNoGC && annotationsContain(f.annotations, "@gc", pos);
 
-    if (!static::shouldGC(f, hasNoGC, hasGC, config.mainConfig.autogc)) {
+    if (!static::shouldGC(f, hasNoGC, hasGC, config.autogc)) {
       // No LocalGC, so nothing to do.
       (f, PassUnchanged(kNoFunctions))
     } else {
@@ -124,7 +124,7 @@ mutable class .LowerLocalGC{
   }
 
   protected readonly fun isSafepoint(instr: Stmt): Bool {
-    static::isGCInstr(instr, this.hasGC || this.config.mainConfig.autogc)
+    static::isGCInstr(instr, this.hasGC || this.config.autogc)
   }
 
   protected readonly fun isSaved(instr: Instr): Bool {
@@ -263,15 +263,14 @@ mutable class .LowerLocalGC{
         buf = this.emitAlloca{
           zero => false,
           pos,
-          byteAlignment => this.config.mainConfig.ptrByteSize,
-          byteSize => live.size() * this.config.mainConfig.ptrByteSize,
+          byteAlignment => this.config.ptrByteSize,
+          byteSize => live.size() * this.config.ptrByteSize,
           prettyName => "gcbuf",
         }.id;
 
         _ = this.emitNamedCall{
           args => Array[
-            this.constantInt(live.size() * this.config.mainConfig.ptrByteSize)
-              .id,
+            this.constantInt(live.size() * this.config.ptrByteSize).id,
             buf,
           ],
           typ => tVoid,
@@ -284,11 +283,11 @@ mutable class .LowerLocalGC{
         // Fill in the array with the the root set for the GC.
         live.eachWithIndex((i, ptr) ->
           _ = this.emitStackStore{
-            addrByteAlignment => this.config.mainConfig.ptrByteSize,
+            addrByteAlignment => this.config.ptrByteSize,
             pos,
             value => remap(ptr),
             addr => buf,
-            bitOffset => i * this.config.mainConfig.ptrBitSize,
+            bitOffset => i * this.config.ptrBitSize,
           }
         );
 
@@ -312,12 +311,12 @@ mutable class .LowerLocalGC{
           r = this.getInstr(ptr);
           load = this.emitLoad{
             typ => r.typ,
-            addrByteAlignment => this.config.mainConfig.ptrByteSize,
+            addrByteAlignment => this.config.ptrByteSize,
             pos,
             canCSE => false,
             prettyName => r.prettyName,
             addr => buf,
-            bitOffset => i * this.config.mainConfig.ptrBitSize,
+            bitOffset => i * this.config.ptrBitSize,
           };
 
           // Note each one as the relocated version of its input pointer.
@@ -326,8 +325,7 @@ mutable class .LowerLocalGC{
 
         _ = this.emitNamedCall{
           args => Array[
-            this.constantInt(live.size() * this.config.mainConfig.ptrByteSize)
-              .id,
+            this.constantInt(live.size() * this.config.ptrByteSize).id,
             buf,
           ],
           typ => tVoid,

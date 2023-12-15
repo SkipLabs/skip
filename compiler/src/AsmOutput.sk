@@ -1000,7 +1000,7 @@ fun writeOutputFiles(
   };
 
   sstr = mutable TextOutputStream.StringTextOutputStream{};
-  config.mainConfig.preambles.each(p -> sstr.write(FileSystem.readTextFile(p)));
+  config.preambles.each(p -> sstr.write(FileSystem.readTextFile(p)));
 
   // arbitrarily pick some unique input file as the CU for this output file.
   metadata = AsmOutput.Metadata::create(defs, inputFiles[0]);
@@ -2024,7 +2024,7 @@ mutable class .AsmOutput{
         VTable.kFrozenMask),
     };
 
-    header = if (this.config.mainConfig.vtableByteSize == 8) {
+    header = if (this.config.vtableByteSize == 8) {
       Array[StaticImageField(vtable, 0)]
     } else {
       // All object pointers (right after vtable) are aligned mod 8.
@@ -2035,7 +2035,7 @@ mutable class .AsmOutput{
     vtableField = header[headerSize - 1];
     firstFieldBitOffset =
       vtableField.bitOffset +
-      this.config.mainConfig.vtableByteSize * 8;
+      this.config.vtableByteSize * 8;
 
     layout = sc.layout match {
     | Some(l) -> l
@@ -2091,7 +2091,7 @@ mutable class .AsmOutput{
         VTable.kFrozenMask),
     };
 
-    header = if (this.config.mainConfig.vtableByteSize == 8) {
+    header = if (this.config.vtableByteSize == 8) {
       Array[
         StaticImageField(pad32, 0),
         StaticImageField(sizeConst, 32),
@@ -2103,9 +2103,7 @@ mutable class .AsmOutput{
 
     headerSize = header.size();
     vtableField = header[headerSize - 1];
-    firstSlotBitOffset =
-      vtableField.bitOffset +
-      this.config.mainConfig.vtableByteSize * 8;
+    firstSlotBitOffset = vtableField.bitOffset + this.config.vtableByteSize * 8;
 
     // Create the values and layout for the array elements.
     getField = if (logicalOrderedValues.isEmpty()) {
@@ -2460,9 +2458,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
       asm.print("null")
     } else {
       asm.print(
-        "inttoptr (i%s %s to i8*)" %
-          asm.common.config.mainConfig.ptrBitSize %
-          value,
+        "inttoptr (i%s %s to i8*)" % asm.common.config.ptrBitSize % value,
       )
     }
   | obj @ ConstantObject _ -> asm.common.llvmWriteConstantObject(asm, obj)
@@ -2875,7 +2871,7 @@ private fun llvmWriteStore(
   );
 
   if (!isBitfield) {
-    if (asm.common.config.mainConfig.asan) {
+    if (asm.common.config.asan) {
       tmp = asm.llvmIdentifier();
       asm.print(
         "  %%%s = bitcast %s* %%%s to i8*, %D\n" %
@@ -3435,7 +3431,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
         "  %s = alloca %s, align %s, %D\n" %
           bufVar %
           bufType %
-          common.config.mainConfig.stackAlignStr %
+          common.config.stackAlignStr %
           instr,
       );
 
@@ -3450,7 +3446,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       );
       lifetimeArgs = (
         "(i64 " +
-        (common.config.mainConfig.ptrByteSize * args.size()) +
+        (common.config.ptrByteSize * args.size()) +
         ", i8* " +
         lifetimeVar +
         ")"
@@ -3900,12 +3896,12 @@ fun llvmWriteFunctionDefinition(
       f.name,
       f.annotations,
       pos,
-      common.config.mainConfig.exportedAsFunctions,
-      common.config.mainConfig.isWasm(),
+      common.config.exportedAsFunctions,
+      common.config.isWasm(),
     );
 
   disasm = (
-    (f.isDisasm || common.config.mainConfig.disasmAll) &&
+    (f.isDisasm || common.config.disasmAll) &&
     !f.superpositions.isEmpty()
   );
 
@@ -3969,8 +3965,8 @@ fun llvmWriteFunctionDefinition(
       f.name,
       f.annotations,
       pos,
-      common.config.mainConfig.exportedAsFunctions,
-      common.config.mainConfig.isWasm(),
+      common.config.exportedAsFunctions,
+      common.config.isWasm(),
     )
   ) {
     asm.print(" unnamed_addr")
@@ -4064,8 +4060,8 @@ fun llvmWriteFunctionDeclaration(
 fun llvmWriteFunction(f: Function, common: mutable AsmOutput): void {
   symbol = cppExternalName(
     f,
-    common.config.mainConfig.exportedAsFunctions,
-    common.config.mainConfig.isWasm(),
+    common.config.exportedAsFunctions,
+    common.config.isWasm(),
   ) match {
   | Some(extName) -> extName
   | None() ->

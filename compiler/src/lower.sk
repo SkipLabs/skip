@@ -108,7 +108,7 @@ mutable private class .Lower{
       vtablePointer = this.emitLoadVTable(
         frz.value,
         pos,
-        tIntPtr(this.config.mainConfig.ptrByteSize),
+        tIntPtr(this.config.ptrByteSize),
       );
 
       vtable = this.emitZeroExtend{typ => tInt, pos, value => vtablePointer.id};
@@ -154,23 +154,23 @@ mutable private class .Lower{
         lhs => vtable.id,
       };
 
-      storeValue = if (tIntPtr(this.config.mainConfig.ptrByteSize) == tInt) {
+      storeValue = if (tIntPtr(this.config.ptrByteSize) == tInt) {
         withFlagSet
       } else {
         this.emitTruncate{
           value => withFlagSet.id,
           pos,
-          typ => tIntPtr(this.config.mainConfig.ptrByteSize),
+          typ => tIntPtr(this.config.ptrByteSize),
         }
       };
 
       // Write back the vtable with the flag set.
       _ = this.emitObstackInit{
-        addrByteAlignment => this.config.mainConfig.vtableByteSize,
+        addrByteAlignment => this.config.vtableByteSize,
         pos,
         value => storeValue.id,
         addr => frz.value,
-        bitOffset => this.config.mainConfig.vtableByteSize * -8,
+        bitOffset => this.config.vtableByteSize * -8,
       };
 
       if (doneSetFlagBlock != BlockID::none) {
@@ -238,7 +238,7 @@ mutable private class .Lower{
     // 1 obviously means we have no information.
     knownSizeMultiple = 1;
 
-    arrayMetadataByteSize = 4 + 4 + this.config.mainConfig.vtableByteSize;
+    arrayMetadataByteSize = 4 + 4 + this.config.vtableByteSize;
 
     (numBytes, numContentsBytes) = size.constantInteger() match {
     | Some(n) ->
@@ -290,7 +290,7 @@ mutable private class .Lower{
       pos,
       byteSize => this.emitTruncate{
         value => numBytes.id,
-        typ => tIntPtr(this.config.mainConfig.ptrByteSize),
+        typ => tIntPtr(this.config.ptrByteSize),
         pos,
       }.id,
     };
@@ -470,7 +470,7 @@ mutable private class .Lower{
   }
 
   private mutable fun lowerArraySize(vs: ArraySize): void {
-    this.loadInvariantUInt32(vs, -(this.config.mainConfig.vtableByteSize + 4))
+    this.loadInvariantUInt32(vs, -(this.config.vtableByteSize + 4))
   }
 
   private mutable fun lowerStringHash(sh: StringHash): Bool {
@@ -516,8 +516,7 @@ mutable private class .Lower{
     );
 
     // Every object has a vtable, and round sizes up to an 8 byte multiple.
-    numBytes =
-      roundUp(this.config.mainConfig.vtableByteSize * 8 + numFieldBits, 64) / 8;
+    numBytes = roundUp(this.config.vtableByteSize * 8 + numFieldBits, 64) / 8;
 
     mem = this.emitObstackAlloc{
       // We carefully zero struct padding ourselves, so we don't
@@ -526,7 +525,7 @@ mutable private class .Lower{
       typ => tNonGCPointer,
       pos,
       byteSize => this.constantTypedInt(
-        tIntPtr(this.config.mainConfig.ptrByteSize),
+        tIntPtr(this.config.ptrByteSize),
         numBytes,
       ).id,
       pinned => make.pinned,
@@ -550,7 +549,7 @@ mutable private class .Lower{
       typ => tNonGCPointer,
       pos,
       addr => mem.id,
-      offset => this.constantInt(this.config.mainConfig.vtableByteSize).id,
+      offset => this.constantInt(this.config.vtableByteSize).id,
     };
 
     obj = this.emitInstr(
@@ -671,11 +670,11 @@ mutable private class .Lower{
   ): Instr {
     this.emitLoad{
       typ,
-      addrByteAlignment => this.config.mainConfig.vtableByteSize,
+      addrByteAlignment => this.config.vtableByteSize,
       pos,
       canCSE => true,
       addr => obj,
-      bitOffset => this.config.mainConfig.vtableByteSize * -8,
+      bitOffset => this.config.vtableByteSize * -8,
     }
   }
 
@@ -1153,15 +1152,13 @@ mutable private class .Lower{
       );
 
       // Every object has a vtable, and round sizes up to an 8 byte multiple.
-      numBytes =
-        roundUp(this.config.mainConfig.vtableByteSize * 8 + numFieldBits, 64) /
-        8;
+      numBytes = roundUp(this.config.vtableByteSize * 8 + numFieldBits, 64) / 8;
 
       // Clone the object, but keep the same ID as the old "with".
       mem = this.emitInstr(
         ObstackShallowClone{
           byteSize => this.constantTypedInt(
-            tIntPtr(this.config.mainConfig.ptrByteSize),
+            tIntPtr(this.config.ptrByteSize),
             numBytes,
           ).id,
           id => w.id,
