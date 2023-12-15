@@ -631,23 +631,25 @@ fun parseTableChange(
   accessSolverOpt match {
   | None() -> Some(newRows)
   | Some((accessSolver, tableName, authorCol, accessCol)) ->
-    for (row in newRows) {
-      SKDB.checkUserCanWriteRow(
-        context,
-        accessSolver,
-        tableName,
-        authorCol,
-        accessCol,
-        row,
-      ) match {
-      | SKDB.AROK() -> void
-      | SKDB.ARError(err) ->
-        print_error("Error: " + err.toString());
-        break None()
+    SKStore.withContext(ctx ->
+      for (row in newRows) {
+        SKDB.checkUserCanWriteRow(
+          ctx,
+          accessSolver,
+          tableName,
+          authorCol,
+          accessCol,
+          row,
+        ) match {
+        | SKDB.AROK() -> void
+        | SKDB.ARError(err) ->
+          print_error("Error: " + err.toString());
+          break None()
+        }
+      } else {
+        Some(newRows)
       }
-    } else {
-      Some(newRows)
-    }
+    )
   };
 }
 
