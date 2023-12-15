@@ -5,168 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-module Main;
-
-private fun hostTarget(): String {
-  // TODO: invoke llvm-config --host-target
-  "x86_64-pc-linux-gnu"
-}
-
-class Config private {
-  exportedFunctions: UnorderedSet<String>,
-  exportedAsFunctions: UnorderedMap<String, String>,
-  disasmAll: Bool,
-  disasmAnnotated: Bool,
-  disasmFiles: UnorderedSet<String>,
-  disasmFunctions: UnorderedSet<String>,
-  output: String,
-  // profilePath: String,
-  emit: String,
-  target: String,
-  optLevel: Int,
-  asan: Bool,
-  autogc: Bool,
-  sampleRate: Int,
-  // NOTE: Using fully specialized class names yields more detailed stats
-  // info, but inhibits sharing, which increases compilation time and
-  // binary sizes.
-  useSpecializedNames: Bool,
-  version: Bool,
-  check: Bool,
-  stackAlign: Int,
-  stackAlignStr: String,
-  ptrByteSize: Int,
-  ptrBitSize: Int,
-  vtableByteSize: Int,
-  links: Array<String>,
-  preambles: Array<String>,
-} {
-  static fun make(result: Cli.ParseResults): this {
-    disasmAll = result.getBool("disasm-all");
-    disasmAnnotated = result.getBool("disasm-annotated");
-    disasmFiles = UnorderedSet::createFromItems(result.getArray("disasm-file"));
-    disasmFunctions = UnorderedSet::createFromItems(
-      result.getArray("disasm-function"),
-    );
-    exportedFunctions = UnorderedSet::createFromItems(
-      result.getArray("export-function"),
-    );
-    exportedAsFunctions = UnorderedSet::createFromItems(
-      result.getArray("export-function-as"),
-    );
-    output = result.maybeGetString("output").default("-");
-    // profilePath = result.getString("profile-path");
-    emit = result.getString("emit");
-    target = result.maybeGetString("target").default(hostTarget());
-    optLevel = result.getString("opt-level").toInt();
-    asan = result.getBool("asan");
-    autogc = result.getBool("autogc");
-    sampleRate = result.getString("sample-rate").toInt();
-    useSpecializedNames = result.getBool("use-specialized-names");
-    version = result.getBool("version");
-    check = result.getBool("check");
-
-    if (version) {
-      print_string(getBuildVersion());
-      skipExit(0);
-    };
-
-    exportAs = mutable UnorderedMap[];
-    for (f in exportedAsFunctions) {
-      vals = f.split("=");
-      if (vals.size() != 2 || vals[0].isEmpty() || vals[1].isEmpty()) {
-        print_error("Invalid --export-function-as: " + f + "\n");
-        skipExit(1)
-      };
-
-      skipName = vals[0];
-      cppName = vals[1];
-
-      if (!exportAs.maybeSet(skipName, cppName)) {
-        oldCppName = exportAs[skipName];
-        if (oldCppName != cppName) {
-          print_error(
-            "Conflicting --export-function-as for " +
-              skipName +
-              ": " +
-              oldCppName +
-              " and " +
-              cppName +
-              "\n",
-          );
-          skipExit(1)
-        }
-      }
-    };
-
-    // Mac Clang seems to align stack arrays mod 16 -- is that required to always
-    // keep the stack aligned or is 8 OK or what? Does Linux do that too?
-    // x86-64 ABI on linux and mac require 16 byte alignment.
-    // Does LLVM provide an portable abstraction?
-    // TODO: Make a proper `Target` class that holds the relevant platform-specific
-    // data, with a constructor that takes the target triple.
-    stackAlign = if (target == "wasm32-unknown-unknown") 8 else 16;
-    ptrByteSize = if (target == "wasm32-unknown-unknown") 4 else 8;
-    stackAlignStr = stackAlign.toString();
-    ptrBitSize = ptrByteSize * 8;
-    vtableByteSize = ptrByteSize;
-
-    basePath = Path.parentname(Path.dirname(Environ.current_exe()));
-    links = Environ.varOpt("SKC_LINK") match {
-    | Some(skcLink) if (!skcLink.trim().isEmpty()) ->
-      skcLink.split(Path.listSeparator).toArray()
-    | _ if (target.startsWith("wasm32")) ->
-      Array[Path.join(basePath, "lib", "libskip_runtime32.bc")]
-    | _ ->
-      // TODO: Link libbacktrace only when building with a debug/dev profile?
-      Array[
-        Path.join(basePath, "lib", "libskip_runtime64.a"),
-        Path.join(basePath, "lib", "libbacktrace.a"),
-        "-lpthread",
-      ]
-    };
-    preambles = Environ.varOpt("SKC_PREAMBLE") match {
-    | Some(skcPreamble) if (!skcPreamble.trim().isEmpty()) ->
-      skcPreamble.split(Path.listSeparator).toArray()
-    | _ if (target.startsWith("wasm32")) ->
-      Array[Path.join(basePath, "lib", "skip_preamble32.ll")]
-    | _ -> Array[Path.join(basePath, "lib", "skip_preamble64.ll")]
-    };
-    static{
-      exportedFunctions,
-      exportedAsFunctions => exportAs.chill(),
-      disasmAll,
-      disasmAnnotated,
-      disasmFiles,
-      disasmFunctions,
-      output,
-      // profilePath,
-      emit,
-      target,
-      optLevel,
-      asan,
-      autogc,
-      sampleRate,
-      useSpecializedNames,
-      version,
-      check,
-      stackAlign,
-      stackAlignStr,
-      ptrByteSize,
-      ptrBitSize,
-      vtableByteSize,
-      links,
-      preambles,
-    }
-  }
-
-  fun isWasm(): Bool {
-    this.target.startsWith("wasm32");
-  }
-}
-
-module end;
-
 fun createOptimizedFunctions(
   context: mutable SKStore.Context,
   env: GlobalEnv,
@@ -208,11 +46,11 @@ fun link(
   config: Config.Config,
   exports: Array<String> = Array[],
 ): void {
-  if (config.mainConfig.isWasm()) {
-    output = config.mainConfig.output;
+  if (config.isWasm()) {
+    output = config.output;
     bcFile = output + ".bc";
     runShell(
-      Array["llvm-link", llFile].concat(config.mainConfig.links).concat(
+      Array["llvm-link", llFile].concat(config.links).concat(
         Array["-o", bcFile],
       ),
       config.verbose,
@@ -222,7 +60,7 @@ fun link(
       Array[
         "llc",
         "-mtriple=wasm32-unknown-unknown",
-        `-O${config.mainConfig.optLevel}`,
+        `-O${config.optLevel}`,
         "-filetype=obj",
         bcFile,
         "-o",
@@ -280,13 +118,13 @@ fun link(
       Array[
         "clang++",
         "-no-pie",
-        `-O${config.mainConfig.optLevel}`,
+        `-O${config.optLevel}`,
         "-mllvm",
         "-inline-threshold=0",
         llFile,
         "-o",
-        config.mainConfig.output,
-      ].concat(config.mainConfig.links),
+        config.output,
+      ].concat(config.links),
       config.verbose,
     );
   }
@@ -395,7 +233,7 @@ fun compile(
           )
         };
 
-        if (conf.mainConfig.check) {
+        if (conf.check) {
           return void;
         };
 
@@ -406,17 +244,17 @@ fun compile(
               funDef.origName,
               funDef.annotations,
               funDef.getPos(),
-              conf.mainConfig.exportedAsFunctions,
-              conf.mainConfig.isWasm(),
+              conf.exportedAsFunctions,
+              conf.isWasm(),
             )
         );
 
         // Are we in "disassemble" mode?
         disasm = (
-          conf.mainConfig.disasmAll ||
-          conf.mainConfig.disasmAnnotated ||
-          !conf.mainConfig.disasmFiles.isEmpty() ||
-          !conf.mainConfig.disasmFunctions.isEmpty()
+          conf.disasmAll ||
+          conf.disasmAnnotated ||
+          !conf.disasmFiles.isEmpty() ||
+          !conf.disasmFunctions.isEmpty()
         );
 
         // Create a filter for what functions to disassemble.
@@ -427,8 +265,8 @@ fun compile(
         shouldDisasm = (
           funDef ~>
             disasm &&
-              (conf.mainConfig.disasmFunctions.contains(funDef.origName) ||
-                (conf.mainConfig.disasmAnnotated &&
+              (conf.disasmFunctions.contains(funDef.origName) ||
+                (conf.disasmAnnotated &&
                   annotationsContain(
                     funDef.annotations,
                     "@disasm",
@@ -460,19 +298,14 @@ fun compile(
           AsmOutput.assignFinalSymbols(defs)
         });
 
-        conf.mainConfig.emit match {
+        conf.emit match {
         | "llvm-ir" ->
           runCompilerPhase("native/write_asm_files", () -> {
-            AsmOutput.writeOutputFiles(
-              defs,
-              fileNames,
-              conf.mainConfig.output,
-              conf,
-            )
+            AsmOutput.writeOutputFiles(defs, fileNames, conf.output, conf)
           })
         | "link" ->
           // TODO: Use `mkstemp()` instead.
-          llFile = conf.mainConfig.output + ".ll";
+          llFile = conf.output + ".ll";
           runCompilerPhase("native/write_asm_files", () -> {
             AsmOutput.writeOutputFiles(defs, fileNames, llFile, conf)
           });
@@ -497,9 +330,7 @@ fun compile(
             link(llFile, conf, wasm_exports)
           })
         | _ ->
-          invariant_violation(
-            "Unsupported value for `--emit`: " + conf.mainConfig.emit,
-          )
+          invariant_violation("Unsupported value for `--emit`: " + conf.emit)
         }
       },
     );

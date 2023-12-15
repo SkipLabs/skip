@@ -259,7 +259,7 @@ private fun createVTableBuilders(
         gcTypes.add(tentative);
         tentative
       };
-      builder.insert(gct, config.mainConfig.ptrBitSize);
+      builder.insert(gct, config.ptrBitSize);
 
       // Lambdas and memoize thunks are callable from the runtime
       // so they need to have their code pointer at a predictable location,
@@ -498,8 +498,8 @@ private fun createGCType(
 
     // We need this many words for our bit mask.
     words = if (layout.any(x -> x.typ.isGCPointer())) {
-      (userSize / config.mainConfig.ptrByteSize +
-        (config.mainConfig.ptrBitSize - 1)) / config.mainConfig.ptrBitSize
+      (userSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
+        config.ptrBitSize
     } else {
       0
     };
@@ -514,7 +514,7 @@ private fun createGCType(
     } else {
       (
         0, // kSkipGcKindClass
-        3 * config.mainConfig.ptrByteSize,
+        3 * config.ptrByteSize,
       ) // sizeof(IObjMetadata)
     };
 
@@ -522,7 +522,7 @@ private fun createGCType(
       userSize, // userByteSize
       words, // numMaskWords
       1, // tilesPerMask
-      config.mainConfig.ptrByteSize, // sizeof(RObjMetadata)
+      config.ptrByteSize, // sizeof(RObjMetadata)
       internedMetaSize_,
       gcKindClass,
       isAllDeepFrozen,
@@ -547,14 +547,14 @@ private fun createGCType(
     words = if (numPointers == 0) {
       0
     } else {
-      (userSize / config.mainConfig.ptrByteSize +
-        (config.mainConfig.ptrBitSize - 1)) / config.mainConfig.ptrBitSize
+      (userSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
+        config.ptrBitSize
     };
 
     tiles = if (words == 0) {
       1
     } else {
-      max(1, 64 / (userSize / config.mainConfig.ptrByteSize))
+      max(1, 64 / (userSize / config.ptrByteSize))
     };
 
     // Set the GC bits. All pointers are at the beginning of each slot,
@@ -566,8 +566,8 @@ private fun createGCType(
       userSize, // userByteSize
       words, // numMaskWords
       tiles, // tilesPerMask
-      2 * config.mainConfig.ptrByteSize, // uninternedMetaSize
-      3 * config.mainConfig.ptrByteSize, // internedMetaSize
+      2 * config.ptrByteSize, // uninternedMetaSize
+      3 * config.ptrByteSize, // internedMetaSize
       1, // kSkipGcKindArray
       isAllDeepFrozen,
     ) // kSkipGcRefsHintFrozenRefs
@@ -649,7 +649,7 @@ private fun createGCType(
     },
   );
 
-  if (config.mainConfig.ptrBitSize == 32) {
+  if (config.ptrBitSize == 32) {
     // Emit alignment padding before the mask words.
     // TODO: Maybe use 32-bit mask words in this case.
     pushField(ConstantInt{id => InstrID::none, typ => tInt32, value => 0})
@@ -661,7 +661,7 @@ private fun createGCType(
     flags = Array::mfill(numMaskWords, 0);
 
     setBit = (bitOffset, isMutable) -> {
-      bitIndex = bitOffset / config.mainConfig.ptrBitSize;
+      bitIndex = bitOffset / config.ptrBitSize;
       wordIndex = 2 * (bitIndex / 64);
       bit = 1.shl(bitIndex % 64);
       flags.set(wordIndex, flags[wordIndex].or(bit));
@@ -705,7 +705,7 @@ private fun createGCType(
     // Append a 0-terminated name to the end of the struct.
 
     name = UTF8String::make(
-      if (config.mainConfig.useSpecializedNames) {
+      if (config.useSpecializedNames) {
         sc.toString()
       } else if (sc.superposition == ClassSuperpositionID::empty) {
         sc.gclassName.id
