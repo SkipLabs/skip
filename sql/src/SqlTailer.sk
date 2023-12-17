@@ -207,7 +207,9 @@ fun tailSub(
         // initialization, so that the client can start processing without waiting
         // for the full changeset.
         // this value is chosen based on some unscientific local testing
-        checkpointInterval = if (since.value == 0 && !isReset) 512 else Int::max;
+        checkpointInterval = if (since.value == 0 && !isReset) 512 else {
+          Int::max
+        };
 
         producedOutput = edir.writeDiff(
           context,
@@ -284,3 +286,5 @@ fun tailSub(
     }
   }
 }
+
+module end;
