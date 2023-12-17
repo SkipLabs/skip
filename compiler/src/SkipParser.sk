@@ -244,9 +244,8 @@ mutable class SkipParser{
   }
 
   // module-end:
-  //    module  end  ;
-  //    end-of-file
-  mutable fun parseModuleEndOpt(): ParseTree {
+  //    module  end
+  mutable fun parseModuleEnd(): ParseTree {
     this.peek() match {
     | TokenKind.MODULE() ->
       start = this.mark();
@@ -271,12 +270,7 @@ mutable class SkipParser{
           "Module declarations may not be nested.",
         );
       }
-    | TokenKind.END_OF_FILE() -> this.createEmptyTreeBefore()
-    | _ ->
-      this.errorResult(
-        errorModuleEndExpected,
-        "Expected 'module end;' or end of file",
-      )
+    | _ -> this.errorResult(errorModuleEndExpected, "Expected 'module end;'")
     }
   }
 
@@ -302,12 +296,12 @@ mutable class SkipParser{
         errorModuleWithCurly,
         "Unexpected '{'. Modules are declared with 'module " +
           name.token.value +
-          ";' and are optionally terminated with 'module end;'",
+          ";' and are terminated with 'module end;'",
       );
     } else {
       semiColon = this.eatTree(TokenKind.SEMI_COLON());
       declarations = this.parseModuleMemberList();
-      end = this.parseModuleEndOpt();
+      end = this.parseModuleEnd();
       ParseTree.ModuleTree{
         range => this.createRange(start),
         moduleKeyword,
