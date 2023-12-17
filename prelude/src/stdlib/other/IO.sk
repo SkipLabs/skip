@@ -95,7 +95,7 @@ trait IsTerminal {
 mutable class File(
   fileno: Int,
   path: String = "unknown",
-) uses Read, Write, IsTerminal {
+) uses Read, Write, Seek, IsTerminal {
   const kDefaultBufferSize: Int = 8192;
 
   static fun open(path: String, opts: OpenOptions): mutable File {
@@ -138,6 +138,20 @@ mutable class File(
         break void
       };
       !s = s.substring(s.getIter().forward(nbytes))
+    }
+  }
+
+  mutable fun seek(from: SeekFrom): Result<Int, Error> {
+    whence = from match {
+    | SeekFromCurrent _ -> Posix.SeekCur()
+    | SeekFromStart _ -> Posix.SeekSet()
+    | SeekFromEnd _ -> Posix.SeekEnd()
+    };
+    rv = Posix.lseek(this.fileno, from.offset, whence);
+    if (rv >= 0) {
+      Success(rv)
+    } else {
+      Failure(Error(-rv))
     }
   }
 
