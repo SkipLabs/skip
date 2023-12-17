@@ -1,0 +1,621 @@
+module ARParser;
+
+const kGLOBAL_HEADER: String = "!<arch>\n";
+const kGLOBAL_HEADER_LEN: Int = kGLOBAL_HEADER.length();
+const kENTRY_HEADER_LEN: Int = 60;
+const kENTRY_IDENTIFIER_OFFSET: Int = 0;
+const kENTRY_IDENTIFIER_LEN: Int = 16;
+const kENTRY_MTIME_OFFSET: Int = 16;
+const kENTRY_MTIME_LEN: Int = 12;
+const kENTRY_UID_OFFSET: Int = 28;
+const kENTRY_UID_LEN: Int = 6;
+const kENTRY_GID_OFFSET: Int = 34;
+const kENTRY_GID_LEN: Int = 6;
+const kENTRY_MODE_OFFSET: Int = 40;
+const kENTRY_MODE_LEN: Int = 8;
+const kENTRY_SIZE_OFFSET: Int = 48;
+const kENTRY_SIZE_LEN: Int = 10;
+const kENTRY_HEADER_TERMINATOR_OFFSET: Int = 58;
+const kENTRY_HEADER_TERMINATOR_LEN: Int = 2;
+const kENTRY_HEADER_TERMINATOR: String = "`\n";
+
+const kBSD_SYMBOL_LOOKUP_TABLE_ID: String = "__.SYMDEF";
+const kBSD_SORTED_SYMBOL_LOOKUP_TABLE_ID: String = "__.SYMDEF SORTED";
+const kBSD_EXTENDED_IDENTIFIER_PREFIX: String = "#1/";
+
+const kGNU_SYMBOL_LOOKUP_TABLE_ID: String = "/";
+const kGNU_NAME_TABLE_ID: String = "//";
+
+// An ar archive starts with the magic string "!<arch>\n", followed by a
+// sequence of header/data pairs.
+//
+// Each header is 60 bytes, divided as follows:
+// +------------+----------+---------+---------+---------+----------+------------+
+// | identifier |  mtime   |   uid   |   gid   |  mode   |   size   | end marker |
+// |  16 bytes  | 12 bytes | 6 bytes | 6 bytes | 8 bytes | 10 bytes |  2 bytes   |
+// |   ASCII    | decimal  | decimal | decimal |  octal  | decimal  |   ASCII    |
+// +------------+----------+---------+---------+---------+----------+------------+
+//
+// The decimal/octal numbers are written out in ASCII, padded (on the right)
+// with spaces (0x20).
+//
+// Each header starts at an even offset, and records with an odd size are padded
+// with a single newline (0x0a) byte.
+//
+// The `size` field represents the size of the data itself (excluding the header
+// and any possible padding).
+//
+// Since identifiers are at most 16 bytes, longer file names need a different
+// representation. The format is not standardized, but there are mainly two
+// flavors around: GNU/SysV and BSD.
+//
+// In the BSD flavor, file names longer than 16 bytes, or containing a space,
+// are stored directly after the header. The identifier is set to the string
+// "#1/" followed by the length of the file name written in decimal, and the
+// size is set to the decimal representation of the combined size of the data
+// and the file name.
+// File names up to 16 bytes and containing no space are stored directly in the
+// identifier, padded with spaces (0x20).
+//
+// In the GNU/SysV flavor, a special file named "//" is added to the archive
+// before any regular file. File names longer than 15 bytes are stored within
+// the "//" file. The identifier is set to the string "/" followed by the offset
+// in "//" at which the file name is stored, in decimal, followed by the string
+// "/\n".
+// File names up to 15 bytes (possibly containing spaces) are stored directly in
+// the identifier, followed by a "/".
+//
+// An optional symbol table can be present as a special file (named "/" in the
+// GNU/SysV flavor and "__.SYMDEF" in the BSD flavor). If present, it must be
+// the first member in the archive.
+
+private class Header{
+  identifier: String,
+  size: Int,
+  mtime: Int = 0,
+  uid: Int = 0,
+  gid: Int = 0,
+  mode: Int = 0o600,
+} {
+  static fun read<R: mutable IO.Read>(reader: R): Result<?Header, Error> {
+    buf = Array::mfill(kENTRY_HEADER_LEN, UInt8::truncate(0));
+
+    reader.read(buf.mbytes()) match {
+    | Failure(err) -> return Failure(IOError(err))
+    | Success(nbytes) if (nbytes == 0) -> return Success(None())
+    | Success(nbytes) if (nbytes < kENTRY_HEADER_LEN) ->
+      reader.read_exact(buf.mbytes().mslice(nbytes)) match {
+      | Failure(err) -> return Failure(IOError(err))
+      | Success _ -> void
+      }
+    | Success _ -> void
+    };
+
+    identifier_raw = Vector::mcreateFromItems(
+      buf.slice(
+        kENTRY_IDENTIFIER_OFFSET,
+        kENTRY_IDENTIFIER_OFFSET + kENTRY_IDENTIFIER_LEN,
+      ),
+    );
+
+    while (identifier_raw.maybeLast() == Some(UInt8::truncate(0x20))) {
+      _ = identifier_raw.pop()
+    };
+
+    // TODO: Explicit ASCII check.
+    identifier = String::fromUtf8(identifier_raw.collect(Array));
+
+    size = parse_number(
+      buf.slice(kENTRY_SIZE_OFFSET, kENTRY_SIZE_OFFSET + kENTRY_SIZE_LEN),
+      10,
+    ) match {
+    | Failure(err) -> return Failure(err)
+    | Success(v) -> v
+    };
+
+    mtime = parse_number(
+      buf.slice(kENTRY_MTIME_OFFSET, kENTRY_MTIME_OFFSET + kENTRY_MTIME_LEN),
+      10,
+    ) match {
+    | Failure(err) -> return Failure(err)
+    | Success(v) -> v
+    };
+
+    uid = parse_number(
+      buf.slice(kENTRY_UID_OFFSET, kENTRY_UID_OFFSET + kENTRY_UID_LEN),
+      10,
+    ) match {
+    | Failure(err) -> return Failure(err)
+    | Success(v) -> v
+    };
+
+    gid = parse_number(
+      buf.slice(kENTRY_GID_OFFSET, kENTRY_GID_OFFSET + kENTRY_GID_LEN),
+      10,
+    ) match {
+    | Failure(err) -> return Failure(err)
+    | Success(v) -> v
+    };
+
+    mode = parse_number(
+      buf.slice(kENTRY_MODE_OFFSET, kENTRY_MODE_OFFSET + kENTRY_MODE_LEN),
+      8,
+    ) match {
+    | Failure(err) -> return Failure(err)
+    | Success(v) -> v
+    };
+
+    // TODO: Compare bytes directly once `Bytes` implements `==`.
+    terminator = buf.slice(
+      kENTRY_HEADER_TERMINATOR_OFFSET,
+      kENTRY_HEADER_TERMINATOR_OFFSET + kENTRY_HEADER_TERMINATOR_LEN,
+    );
+    if (terminator != kENTRY_HEADER_TERMINATOR.bytes().collect(Array)) {
+      return Failure(
+        ParseError(
+          `Unexpected entry header terminator tag ${terminator.bytes()}, expected ${kENTRY_HEADER_TERMINATOR.bytes()}`,
+        ),
+      )
+    };
+
+    Success(Some(Header{identifier, mtime, uid, gid, mode, size}))
+  }
+
+  fun write<W: mutable IO.Write>(writer: W): Result<void, IO.Error> {
+    writer.write_all(
+      (this.identifier.padRight(kENTRY_IDENTIFIER_LEN) +
+        this.mtime.toString().padRight(kENTRY_MTIME_LEN) +
+        this.uid.toString().padRight(kENTRY_UID_LEN) +
+        this.gid.toString().padRight(kENTRY_GID_LEN) +
+        Chars.intToOctDigits(this.mode).padRight(kENTRY_MODE_LEN) +
+        this.size.toString().padRight(kENTRY_SIZE_LEN) +
+        kENTRY_HEADER_TERMINATOR).bytes(),
+    )
+  }
+}
+
+class HeaderAndLocation{header: Header, header_start: Int, data_start: Int}
+
+base class Variant {
+  children =
+  | VariantCommon()
+  | VariantBSD()
+  | VariantGNU()
+}
+
+mutable class Archive<R: mutable IO.Read & mutable IO.Seek> private (
+  private reader: R,
+  mutable variant: Variant = VariantCommon(),
+  private headers: mutable Vector<HeaderAndLocation> = mutable Vector[],
+  private name_table: mutable Vector<UInt8> = mutable Vector[],
+  private mutable symbol_table_header: ?HeaderAndLocation = None(),
+) {
+  static fun read(reader: R): Result<mutable Archive<R>, Error> {
+    ar = mutable Archive(reader);
+    ar.scan() match {
+    | Failure(err) -> return Failure(err)
+    | Success _ -> void
+    };
+
+    Success(ar)
+  }
+
+  mutable fun get(name: String): Result<?readonly Bytes, IOError> {
+    for (entry in this.headers) {
+      if (entry.header.identifier == name) {
+        buf = Array::mfill(entry.header.size, UInt8::truncate(0));
+        this.reader.seek(IO.SeekFromStart(entry.data_start)) match {
+        | Failure(err) -> return Failure(IOError(err))
+        | Success _ -> void
+        };
+        this.reader.read_exact(buf.mbytes()) match {
+        | Failure(err) -> return Failure(IOError(err))
+        | Success _ -> void
+        };
+        return Success(Some(buf.bytes()))
+      }
+    };
+
+    Success(None())
+  }
+
+  mutable fun values(): mutable Iterator<Header> {
+    for (entry in this.headers) {
+      yield entry.header
+    }
+  }
+
+  mutable fun items(): mutable Iterator<(Header, readonly Bytes)> {
+    for (header in this) {
+      data = this.get(header.identifier) match {
+      | Success(Some(data)) -> data
+      | _ -> break void
+      };
+      yield (header, data)
+    }
+  }
+
+  private mutable fun scan(): Result<void, Error> {
+    this.parse_global_header() match {
+    | Failure(err) -> return Failure(err)
+    | Success _ -> void
+    };
+
+    next_entry_start = kGLOBAL_HEADER_LEN;
+    has_symbol_lookup_table = false;
+    loop {
+      header_start = next_entry_start;
+
+      this.reader.seek(IO.SeekFromStart(header_start)) match {
+      | Failure(err) -> return Failure(IOError(err))
+      | Success _ -> void
+      };
+
+      header = Header::read(this.reader) match {
+      | Failure(err) -> return Failure(err)
+      | Success(None()) -> break void
+      | Success(Some(v)) -> v
+      };
+
+      !next_entry_start =
+        next_entry_start +
+        kENTRY_HEADER_LEN +
+        header.size +
+        (header.size % 2);
+
+      header_len = kENTRY_HEADER_LEN;
+      if (
+        !(this.variant is VariantBSD _) &&
+        header.identifier.startsWith("/")
+      ) {
+        this.!variant = VariantGNU();
+        if (header.identifier == kGNU_NAME_TABLE_ID) {
+          if (
+            !this.headers.isEmpty() &&
+            (!has_symbol_lookup_table || this.headers.size() != 1)
+          ) {
+            return Failure(
+              ParseError(
+                "Name table should be the second member if a symbol lookup" +
+                  " table is present, and the first otherwise.",
+              ),
+            )
+          };
+          this.name_table.resize(header.size, UInt8::truncate(0));
+          this.reader.read_exact(this.name_table.mbytes()) match {
+          | Failure(err) -> return Failure(IOError(err))
+          | Success _ -> void
+          };
+          continue
+        } else if (header.identifier == kGNU_SYMBOL_LOOKUP_TABLE_ID) {
+          if (!this.headers.isEmpty()) {
+            return Failure(
+              ParseError("Symbol lookup table should be the first member."),
+            )
+          }
+        } else {
+          !has_symbol_lookup_table = true;
+          !header.identifier = this.parse_gnu_extended_identifier(
+            header,
+          ) match {
+          | Failure(err) -> return Failure(err)
+          | Success(v) -> v
+          }
+        }
+      } else if (
+        !(this.variant is VariantBSD _) &&
+        header.identifier.endsWith("/")
+      ) {
+        this.!variant = VariantGNU();
+        !header.identifier = header.identifier.stripSuffix("/")
+      } else if (
+        !(this.variant is VariantGNU _) &&
+        header.identifier.startsWith(kBSD_EXTENDED_IDENTIFIER_PREFIX)
+      ) {
+        this.!variant = VariantBSD();
+        (
+          extended_identifier,
+          header_extra_len,
+        ) = this.parse_bsd_extended_identifier(header) match {
+        | Failure(err) -> return Failure(err)
+        | Success(v) -> v
+        };
+        !header.identifier = extended_identifier;
+        !header.size = header.size - header_extra_len;
+        !header_len = header_len + header_extra_len
+      };
+
+      entry = HeaderAndLocation{
+        header,
+        header_start,
+        data_start => header_start + header_len,
+      };
+
+      if (this.is_symbol_lookup_table_id(header.identifier)) {
+        this.!symbol_table_header = Some(entry)
+      } else {
+        this.headers.push(entry)
+      }
+    };
+
+    Success(void)
+  }
+
+  private mutable fun parse_gnu_extended_identifier(
+    header: Header,
+  ): Result<String, Error> {
+    start = parse_number(
+      header.identifier.bytes().slice(1, kENTRY_IDENTIFIER_LEN).collect(Array),
+      10,
+    ) match {
+    | Failure(err) -> return Failure(err)
+    | Success(v) -> v
+    };
+
+    end = this.name_table.slice(start).findIndex(ch ->
+      ch == UInt8::truncate('/'.code())
+    ) match {
+    | Some(len) -> start + len
+    | None _ -> this.name_table.size()
+    };
+
+    // TODO: Explicit ASCII check.
+    identifier = String::fromUtf8(
+      this.name_table.slice(start, end).collect(Array),
+    );
+
+    Success(identifier)
+  }
+
+  private mutable fun parse_bsd_extended_identifier(
+    header: Header,
+  ): Result<(String, Int), Error> {
+    id_len = parse_number(
+      header.identifier.bytes().slice(3, kENTRY_IDENTIFIER_LEN).collect(Array),
+      10,
+    ) match {
+    | Failure(err) -> return Failure(err)
+    | Success(v) -> v
+    };
+    if (header.size < id_len) {
+      return Failure(
+        ParseError(
+          `Entry size (${
+            header.size
+          }) smaller than extended entry identifier length (${id_len})`,
+        ),
+      )
+    };
+
+    id_buf = Array::mfill(id_len, UInt8::truncate(0));
+    this.reader.read_exact(id_buf.mbytes()) match {
+    | Failure(err) -> return Failure(IOError(err))
+    | Success _ -> void
+    };
+    // TODO: Explicit ASCII check.
+    identifier = String::fromUtf8(id_buf.collect(Array));
+
+    Success((identifier, id_len))
+  }
+
+  private readonly fun is_symbol_lookup_table_id(identifier: String): Bool {
+    this.variant match {
+    | VariantCommon() -> false
+    | VariantBSD() ->
+      identifier == kBSD_SYMBOL_LOOKUP_TABLE_ID ||
+        identifier == kBSD_SORTED_SYMBOL_LOOKUP_TABLE_ID
+    | VariantGNU() -> identifier == kGNU_SYMBOL_LOOKUP_TABLE_ID
+    }
+  }
+
+  private mutable fun parse_global_header(): Result<void, Error> {
+    this.parse_fixed_tag(kGLOBAL_HEADER) match {
+    | Failure(err) -> return Failure(err)
+    | Success _ -> void
+    };
+    Success(void)
+  }
+
+  private mutable fun parse_fixed_tag(tag: String): Result<void, Error> {
+    buf = Array<UInt8>::mfill(tag.length(), UInt8::truncate(0));
+    this.reader.read_exact(buf.mbytes()) match {
+    | Failure(err) -> return Failure(IOError(err))
+    | Success _ -> void
+    };
+    if (buf != tag.bytes().collect(Array)) {
+      Failure(ParseError(`Invalid tag ${buf.bytes()}, expected ${tag.bytes()}`))
+    } else {
+      Success(void)
+    }
+  }
+}
+
+mutable base class Builder<W: mutable IO.Write>{
+  writer: W,
+  mutable started: Bool = false,
+} {
+  static fun createBSD(writer: W): mutable BSDBuilder<W> {
+    mutable BSDBuilder{writer}
+  }
+
+  static fun createGNU(
+    writer: W,
+    identifiers: Array<String>,
+  ): mutable GNUBuilder<W> {
+    mutable GNUBuilder{identifiers, writer}
+  }
+
+  readonly fun is_extended_identifier(id: String): Bool;
+
+  mutable fun write_extended_identifier_header(
+    header: Header,
+  ): Result<Int, Error>;
+
+  overridable mutable fun write_extended_map(): Result<void, Error> {
+    Success(void)
+  }
+
+  mutable fun append<R: mutable IO.Read>(
+    header: Header,
+    data: R,
+  ): Result<void, Error> {
+    if (!this.started) {
+      this.write_global_header() match {
+      | Failure(err) -> return Failure(err)
+      | Success _ -> void
+      };
+      this.write_extended_map() match {
+      | Failure(err) -> return Failure(err)
+      | Success _ -> void
+      }
+    };
+
+    extra_size = 0;
+    if (this.is_extended_identifier(header.identifier)) {
+      !extra_size = this.write_extended_identifier_header(header) match {
+      | Success(v) -> v
+      | Failure(err) -> return Failure(err)
+      };
+    } else {
+      header.write(this.writer) match {
+      | Failure(err) -> return Failure(IOError(err))
+      | Success _ -> void
+      }
+    };
+
+    IO.copy(data, this.writer) match {
+    | Success(nbytes) if (nbytes == header.size) -> void
+    | Success(nbytes) ->
+      return Failure(
+        ParseError(`Header size mismatch (${nbytes} vs ${header.size}`),
+      )
+    | Failure(err) -> return Failure(IOError(err))
+    };
+
+    total_size = header.size + extra_size;
+    if (total_size % 2 != 0) {
+      this.writer.write_all("\n".bytes()) match {
+      | Failure(err) -> return Failure(IOError(err))
+      | Success _ -> void
+      }
+    };
+
+    Success(void)
+  }
+
+  mutable fun append_id(
+    identifier: String,
+    data: readonly Bytes,
+  ): Result<void, Error> {
+    // TODO: Proper metadata API for files.
+    this.append(
+      Header{identifier, size => data.size()},
+      Bytes.Cursor::create(data),
+    )
+  }
+
+  private mutable fun write_global_header(): Result<void, Error> {
+    this.writer.write_all(kGLOBAL_HEADER.bytes()) match {
+    | Failure(err) -> return Failure(IOError(err))
+    | Success _ -> void
+    };
+    this.!started = true;
+    Success(void)
+  }
+}
+
+mutable class GNUBuilder<W: mutable IO.Write>{
+  identifiers: Array<String>,
+  mutable identifier_offsets: Map<String, Int> = Map[],
+} extends Builder<W> {
+  mutable fun write_extended_map(): Result<void, Error> {
+    map = mutable Map[];
+    data = mutable Vector[];
+    prev_offset = 0;
+    for (id in this.identifiers) {
+      if (!this.is_extended_identifier(id)) continue;
+
+      data.push(`${id}/\n`);
+
+      map.set(id, prev_offset);
+      !prev_offset = prev_offset + data.last().length()
+    };
+
+    this.!identifier_offsets = map.chill();
+
+    this.append_id(kGNU_NAME_TABLE_ID, data.join("").bytes()) match {
+    | Success _ -> void
+    | Failure(err) -> return Failure(err)
+    };
+
+    Success(void)
+  }
+
+  readonly fun is_extended_identifier(id: String): Bool {
+    id.length() > 15
+  }
+
+  mutable fun write_extended_identifier_header(
+    header: Header,
+  ): Result<Int, Error> {
+    offset = this.identifier_offsets.maybeGet(header.identifier) match {
+    | Some(v) -> v
+    | None() ->
+      return Failure(
+        ParseError(`Could not find identifier offset for ${header.identifier}`),
+      )
+    };
+    (header with {identifier => `/${offset}`}).write(this.writer) match {
+    | Failure(err) -> return Failure(IOError(err))
+    | Success _ -> void
+    };
+
+    Success(0)
+  }
+}
+
+mutable class BSDBuilder<W: mutable IO.Write> extends Builder<W> {
+  readonly fun is_extended_identifier(id: String): Bool {
+    id.length() > 16 || id.contains(" ")
+  }
+
+  mutable fun write_extended_identifier_header(
+    header: Header,
+  ): Result<Int, Error> {
+    (header with {
+      identifier => `${kBSD_EXTENDED_IDENTIFIER_PREFIX}${header.identifier.length()}`,
+      size => header.size + header.identifier.length(),
+    }).write(this.writer) match {
+    | Failure(err) -> return Failure(IOError(err))
+    | Success _ -> void
+    };
+    this.writer.write_all(header.identifier.bytes()) match {
+    | Failure(err) -> return Failure(IOError(err))
+    | Success _ -> void
+    };
+
+    Success(header.identifier.length())
+  }
+}
+
+private fun parse_number(
+  buf: readonly Array<UInt8>,
+  base: Int = 10,
+): Result<Int, Error> {
+  res = 0;
+  for (b in buf) {
+    if (b == UInt8::truncate(0x20)) break void;
+    digit = b.toInt() - 0x30;
+    if (digit < 0 || digit >= base) {
+      return Failure(
+        ParseError(
+          `Invalid padded integer ${buf.bytes()}, expected base-${base} integer`,
+        ),
+      )
+    };
+    !res = base * res + digit
+  };
+  Success(res)
+}
+
+module end;
