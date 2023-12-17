@@ -28,6 +28,8 @@ mutable class .Vector<+T> private (
     Hashable[T: Hashable],
     Orderable[T: Orderable],
     Equality[T: Equality],
+    AsBytes,
+    AsMutableBytes,
    {
   // # Creating a Vector
 
@@ -244,6 +246,14 @@ mutable class .Vector<+T> private (
     // Always invalidate iterators for consistency
     this.!sz = newSize;
     this.invalidateIterators();
+  }
+
+  readonly fun bytes(): readonly Bytes {
+    this.inner.bytes().slice(0, this.size())
+  }
+
+  mutable fun mbytes(): mutable MutableBytes {
+    this.inner.mbytes().mslice(0, this.size())
   }
 
   // # Accessing Items
