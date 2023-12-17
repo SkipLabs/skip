@@ -1,5 +1,17 @@
 module Bytes;
 
+fun byteToString(b: UInt8): String {
+  if (b == '"'.code()) {
+    return "\""
+  };
+  if (Chars.isPrintableAscii(Char::fromCode(b.toInt()))) {
+    return String::tabulate(1, _ -> Char::fromCode(b.toInt()))
+  };
+  hi = Chars.intToHexDigit(b.ushr(0x10));
+  lo = Chars.intToHexDigit(b.and(0xF));
+  `\\x${hi}${lo}`
+}
+
 trait .AsBytes {
   readonly fun bytes(): readonly Bytes;
 }
@@ -8,12 +20,16 @@ trait .AsMutableBytes {
   mutable fun mbytes(): mutable MutableBytes;
 }
 
-mutable base class .Bytes extends Sequence<UInt8> {
+mutable base class .Bytes extends Sequence<UInt8> uses Show {
   readonly fun ptr(): Unsafe.Ptr<UInt8>;
   readonly fun size(): Int;
 
   readonly fun values(): mutable Iterator<UInt8> {
     mutable BytesIterator(this)
+  }
+
+  readonly fun toString(): String {
+    "b\"" + this.map(byteToString).join("") + "\""
   }
 
   // TODO: extends IndexedSequence<UInt8>
