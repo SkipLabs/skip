@@ -45,6 +45,48 @@ trait Write {
   mutable fun write_all(s: String): void;
 }
 
+base class SeekFrom(offset: Int) {
+  children =
+  | SeekFromStart()
+  | SeekFromCurrent()
+  | SeekFromEnd()
+}
+
+trait Seek {
+  mutable fun seek(pos: SeekFrom): Result<Int, Error>;
+
+  mutable fun rewind(): Result<void, Error> {
+    this.seek(SeekFromStart(0)).map(_ -> void)
+  }
+
+  mutable fun stream_len(): Result<Int, Error> {
+    old_pos = this.stream_position() match {
+    | Failure(err) -> return Failure(err)
+    | Success(pos) -> pos
+    };
+    len = this.seek(SeekFromEnd(0)) match {
+    | Failure(err) -> return Failure(err)
+    | Success(len) -> len
+    };
+    if (old_pos != len) {
+      this.seek(SeekFromStart(old_pos)) match {
+      | Failure(err) -> return Failure(err)
+      | Success _ -> void
+      }
+    };
+
+    Success(len)
+  }
+
+  mutable fun stream_position(): Result<Int, Error> {
+    this.seek(SeekFromCurrent(0))
+  }
+
+  mutable fun seek_relative(offset: Int): Result<void, Error> {
+    this.seek(SeekFromCurrent(offset)).map(_ -> void)
+  }
+}
+
 trait IsTerminal {
   fun isatty(): Bool;
 }
