@@ -615,60 +615,58 @@ fun parseTableChange(
   table: SKDB.DirDescr,
   line: String,
 ): Array<SKDB.RowValues> {
-  saved = SKStore.newObstack();
-
-  if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
-    invariant_violation("Not a table change")
-  };
-
-  chars: mutable Vector<Char> = mutable Vector[];
-  iter = line.getIter();
-  repeat = loop {
-    c = iter.next() match {
-    | None() ->
-      print_error("Error: unexpected end of line");
-      skipExit(23)
-    | Some(x) -> x
+  SKStore.withRegion(context, (_, context) ~> {
+    if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
+      invariant_violation("Not a table change")
     };
-    if (c == '\t') {
-      break String::fromChars(chars.toArray()).toInt()
-    };
-    if (c < '0' || c > '9') {
-      print_error("Error: expected an integer");
-      skipExit(23)
-    };
-    chars.push(c);
-  };
 
-  // parse out the remainder of the line - the csv values
-  str = line.sub(iter, line.length() - chars.size() - 1);
-  values = mutable Vector[];
-  strIter = str.getIter();
-  next = () -> {
-    val = strIter.next();
-    val match {
-    | None() -> '\n'
-    | Some(x) -> x
-    }
-  };
-  for (value in lex(next)) {
-    values.push(value);
-  };
-  cvalues = values.map(parseCSVValue);
-  // empty params since no placeholders in skdb diff write-csv
-  params: Map<String, P.Value> = Map[];
-  ret = SKDB.computeInsert(
-    context,
-    params,
-    false,
-    0,
-    None(),
-    Array[cvalues.toArray()],
-    table,
-    repeat,
-  );
+    chars: mutable Vector<Char> = mutable Vector[];
+    iter = line.getIter();
+    repeat = loop {
+      c = iter.next() match {
+      | None() ->
+        print_error("Error: unexpected end of line");
+        skipExit(23)
+      | Some(x) -> x
+      };
+      if (c == '\t') {
+        break String::fromChars(chars.toArray()).toInt()
+      };
+      if (c < '0' || c > '9') {
+        print_error("Error: expected an integer");
+        skipExit(23)
+      };
+      chars.push(c);
+    };
 
-  SKStore.destroyObstackWithValue(saved, List[ret]).getHead()
+    // parse out the remainder of the line - the csv values
+    str = line.sub(iter, line.length() - chars.size() - 1);
+    values = mutable Vector[];
+    strIter = str.getIter();
+    next = () -> {
+      val = strIter.next();
+      val match {
+      | None() -> '\n'
+      | Some(x) -> x
+      }
+    };
+    for (value in lex(next)) {
+      values.push(value);
+    };
+    cvalues = values.map(parseCSVValue);
+    // empty params since no placeholders in skdb diff write-csv
+    params: Map<String, P.Value> = Map[];
+    SKDB.computeInsert(
+      context,
+      params,
+      false,
+      0,
+      None(),
+      Array[cvalues.toArray()],
+      table,
+      repeat,
+    );
+  })
 }
 
 mutable class TableDiff(
