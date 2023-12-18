@@ -350,16 +350,16 @@ fun applyDiffStrategy(
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
 
-    for (row in rows) {
-      (ctx, !dir) = {
-        saved = SKStore.newObstack();
-        newDir = dir;
-        tmpContext = newRoot.mclone();
+    !dir = SKStore.withRegionFold(
+      Some(newRoot),
+      rows.iterator(),
+      dir,
+      (optContext, row, newDir) ~> {
         key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
-        for ((tick, source, _) in dir.unsafeGetDataIterWithoutTombs(key)) {
+        for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
           if (tick.value < snapshot.default(0) || source.path() == writer) {
             !newDir = newDir.writeEntry(
-              tmpContext,
+              optContext.fromSome(),
               source.path(),
               writer,
               key,
@@ -370,7 +370,7 @@ fun applyDiffStrategy(
 
         if (row.repeat > 0) {
           !newDir = newDir.writeEntry(
-            tmpContext,
+            optContext.fromSome(),
             writer,
             writer,
             SKDB.RowKey(row, table.kinds),
@@ -378,14 +378,9 @@ fun applyDiffStrategy(
           );
         };
 
-        SKStore.destroyObstackWithValue(
-          saved,
-          List[(tmpContext, newDir)],
-        ).getHead();
-      };
-
-      newRoot.replaceFromSaved(ctx);
-    };
+        newDir
+      },
+    );
 
     newRoot.setDir(dir.dirName, dir);
     checkpointAndAck(newRoot, delta);
@@ -405,14 +400,16 @@ fun applyDiffStrategy(
     isEligibleForTomb = (tick, source) ~>
       tick.value < snapshot.default(0) || source.path() == writer;
 
-    for (row in rows) {
-      (ctx, !dir) = {
-        saved = SKStore.newObstack();
-        newDir = dir;
-        tmpContext = newRoot.mclone();
+    !dir = SKStore.withRegionFold(
+      Some(newRoot),
+      rows.iterator(),
+      dir,
+      (optContext, row, newDir) ~> {
         key: SKStore.Key = SKDB.RowKey(row, table.kinds);
         keyRepeat = row.repeat;
-        for ((tick, source, files) in dir.unsafeGetDataIterWithoutTombs(key)) {
+        for ((tick, source, files) in newDir.unsafeGetDataIterWithoutTombs(
+          key,
+        )) {
           if (!isEligibleForTomb(tick, source)) {
             continue
           };
@@ -423,7 +420,7 @@ fun applyDiffStrategy(
 
           if (keyRepeat - srcRepeat < 0) {
             !newDir = newDir.writeEntry(
-              tmpContext,
+              optContext.fromSome(),
               source.path(),
               writer,
               key,
@@ -436,21 +433,16 @@ fun applyDiffStrategy(
 
         if (keyRepeat != 0) {
           !newDir = newDir.writeEntry(
-            tmpContext,
+            optContext.fromSome(),
             writer,
             writer,
             key,
             Array[row.setRepeat(keyRepeat)],
           );
         };
-
-        SKStore.destroyObstackWithValue(
-          saved,
-          List[(tmpContext, newDir)],
-        ).getHead();
-      };
-      newRoot.replaceFromSaved(ctx);
-    };
+        newDir
+      },
+    );
 
     !dir = dir.reset(
       newRoot,
@@ -479,18 +471,17 @@ fun applyDiffStrategy(
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
 
-    for (row in rows) {
-      (ctx, !dir) = {
-        saved = SKStore.newObstack();
-        newDir = dir;
-        tmpContext = newRoot.mclone();
-
+    !dir = SKStore.withRegionFold(
+      Some(newRoot),
+      rows.iterator(),
+      dir,
+      (optContext, row, newDir) ~> {
         if (row.repeat < 1) {
           key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
-          for ((tick, source, _) in dir.unsafeGetDataIterWithoutTombs(key)) {
+          for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
             if (tick.value < snapshot.default(0) || source.path() == writer) {
               !newDir = newDir.writeEntry(
-                tmpContext,
+                optContext.fromSome(),
                 source.path(),
                 writer,
                 key,
@@ -504,13 +495,13 @@ fun applyDiffStrategy(
             snapshot.default(0),
             writer,
             primaryIdx,
-            tmpContext,
+            optContext.fromSome(),
             newDir,
             row,
           )) {
             (editKey, (editSrc, editWriter, editFiles)) = edit;
             !newDir = newDir.writeEntry(
-              tmpContext,
+              optContext.fromSome(),
               editSrc,
               editWriter,
               editKey,
@@ -518,15 +509,9 @@ fun applyDiffStrategy(
             );
           };
         };
-
-        SKStore.destroyObstackWithValue(
-          saved,
-          List[(tmpContext, newDir)],
-        ).getHead();
-      };
-
-      newRoot.replaceFromSaved(ctx);
-    };
+        newDir
+      },
+    );
 
     newRoot.setDir(dir.dirName, dir);
     checkpointAndAck(newRoot, delta);
@@ -542,25 +527,24 @@ fun applyDiffStrategy(
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
 
-    for (row in rows) {
-      (ctx, !dir) = {
-        saved = SKStore.newObstack();
-        newDir = dir;
-        tmpContext = newRoot.mclone();
-
+    !dir = SKStore.withRegionFold(
+      Some(newRoot),
+      rows.iterator(),
+      dir,
+      (optContext, row, newDir) ~> {
         if (row.repeat > 0) {
           for (edit in lwwEdits(
             table,
             snapshot.default(0),
             writer,
             primaryIdx,
-            tmpContext,
+            optContext.fromSome(),
             newDir,
             row,
           )) {
             (editKey, (editSrc, editWriter, editFiles)) = edit;
             !newDir = newDir.writeEntry(
-              tmpContext,
+              optContext.fromSome(),
               editSrc,
               editWriter,
               editKey,
@@ -568,15 +552,9 @@ fun applyDiffStrategy(
             );
           };
         };
-
-        SKStore.destroyObstackWithValue(
-          saved,
-          List[(tmpContext, newDir)],
-        ).getHead();
-      };
-
-      newRoot.replaceFromSaved(ctx);
-    };
+        newDir
+      },
+    );
 
     !dir = dir.reset(
       newRoot,
