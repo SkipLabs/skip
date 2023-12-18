@@ -11,17 +11,17 @@ extension class Parser {
     };
 
     // TODO: Schema-qualified name.
-    tableName = Name::create(this.expect_identifier());
+    tableName = Name::create(this.expect_identifier(true));
 
     alias = if (this.parse_keyword(TAs())) {
-      Some(Name::create(this.expect_identifier()))
+      Some(Name::create(this.expect_identifier(true)))
     } else {
       None()
     };
 
     indexed = if (this.parse_keyword(TIndexed())) {
       this.expect_keyword(TBy());
-      Some(Name::create(this.expect_identifier()))
+      Some(Name::create(this.expect_identifier(true)))
     } else {
       if (this.parse_keyword(TNot())) {
         this.expect_keyword(TIndexed())
@@ -59,7 +59,7 @@ extension class Parser {
         res = mutable Vector[];
         loop {
           pos = this.current_pos();
-          res.push((pos, Name::create(this.expect_identifier())));
+          res.push((pos, Name::create(this.expect_identifier(true))));
           if (!this.parse_token(TComma())) {
             break void
           }
@@ -68,7 +68,7 @@ extension class Parser {
         res.toArray()
       } else {
         pos = this.current_pos();
-        Array[(pos, Name::create(this.expect_identifier()))]
+        Array[(pos, Name::create(this.expect_identifier(true)))]
       };
 
       this.expect_token(TEq());

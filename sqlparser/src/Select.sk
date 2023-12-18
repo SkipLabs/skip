@@ -135,7 +135,7 @@ extension class Parser {
       | TValues() ->
         select = this.parseSelect();
         asName = if (this.parse_keyword(TAs())) {
-          Some(Name::create(this.expect_identifier()))
+          Some(Name::create(this.expect_identifier(true)))
         } else {
           None()
         };
@@ -149,15 +149,14 @@ extension class Parser {
     };
 
     // TODO: Schema-qualified name.
-    name = Name::create(this.expect_identifier());
+    name = Name::create(this.expect_identifier(true));
     if (this.peek_token() == TLParen()) {
       // table-function
       this.errorNotImplemented()
     } else {
-      asName = if (
-        this.parse_keyword(TAs()) ||
-        this.peek_token() is TWord(_, _, None _)
-      ) {
+      asName = if (this.parse_keyword(TAs())) {
+        Some(Name::create(this.expect_identifier(true)))
+      } else if (this.peek_token() is TWord(_, _, None _)) {
         Some(Name::create(this.expect_identifier()))
       } else {
         None()
@@ -165,7 +164,7 @@ extension class Parser {
 
       indexed = if (this.parse_keyword(TIndexed())) {
         this.expect_keyword(TBy());
-        Some(Name::create(this.expect_identifier()))
+        Some(Name::create(this.expect_identifier(true)))
       } else {
         if (this.parse_keyword(TNot())) {
           this.expect_keyword(TIndexed())
@@ -285,7 +284,7 @@ extension class Parser {
       Some(Name::create(id))
     | _ ->
       if (this.parse_keyword(TAs())) {
-        Some(Name::create(this.expect_identifier()))
+        Some(Name::create(this.expect_identifier(true)))
       } else {
         None()
       }

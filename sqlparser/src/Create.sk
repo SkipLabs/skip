@@ -33,7 +33,7 @@ extension class Parser {
     ifNotExists = this.parseIfNotExists();
 
     // TODO: Schema-qualified name.
-    name = Name::create(this.expect_identifier());
+    name = Name::create(this.expect_identifier(true));
 
     if (this.parse_token(TLParen())) {
       this.errorNotImplemented()
@@ -52,11 +52,11 @@ extension class Parser {
     ifNotExists = this.parseIfNotExists();
 
     // TODO: Schema-qualified name.
-    name = Name::create(this.expect_identifier());
+    name = Name::create(this.expect_identifier(true));
 
     this.expect_keyword(TOn());
 
-    on = Name::create(this.expect_identifier());
+    on = Name::create(this.expect_identifier(true));
 
     columns = this.parseIndexedColumns();
 
@@ -88,7 +88,7 @@ extension class Parser {
     expr = this.parseExpr();
 
     collate = if (this.parse_keyword(TCollate())) {
-      Some(Name::create(this.expect_identifier()))
+      Some(Name::create(this.expect_identifier(true)))
     } else {
       None()
     };
@@ -110,7 +110,7 @@ extension class Parser {
     ifNotExists = this.parseIfNotExists();
 
     // TODO: Schema-qualified name.
-    name = Name::create(this.expect_identifier());
+    name = Name::create(this.expect_identifier(true));
 
     if (this.parse_keyword(TAs())) {
       this.errorNotImplemented()
@@ -262,7 +262,7 @@ extension class Parser {
 
   mutable fun parseColumnConstraintNamedConstraint(): ColumnConstraint {
     this.tokens.advance();
-    constraintName = Some(Name::create(this.expect_identifier()));
+    constraintName = Some(Name::create(this.expect_identifier(true)));
     // TODO: This currently allows `CONSTRAINT foo CONSTRAINT bar ...`.
     this.parseColumnConstraint().fromSome() with {constraintName}
   }
