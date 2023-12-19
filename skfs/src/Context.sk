@@ -1614,16 +1614,40 @@ fun withRegion<T>(
 }
 
 fun withRegionVoid<T>(f: () ~> void): void {
-  saved = newObstack();
-  f();
-  destroyObstack(saved);
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    f();
+    destroyObstack(optSaved.fromSome());
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      saveExn(cexn);
+      throw cexn
+    | _ -> throw exn
+    }
+  }
 }
 
 fun withRegionValue<T>(f: () ~> T): T {
-  saved = newObstack();
-  fresult = f();
-  copied = destroyObstackWithValue(saved, List[fresult]);
-  copied.getHead();
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    fresult = f();
+    copied = destroyObstackWithValue(optSaved.fromSome(), List[fresult]);
+    copied.getHead();
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      saveExn(cexn);
+      throw cexn
+    | _ -> throw exn
+    }
+  }
 }
 
 fun copyToParentObstack<T>(
