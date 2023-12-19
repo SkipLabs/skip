@@ -726,7 +726,7 @@ fun nack(writer: mutable Debug.BufferedWriter, diff: readonly TableDiff): void {
 
 fun replayDiff(
   context: mutable SKStore.Context,
-  getLine: () -> String,
+  getLine: () -> ?String,
   user: ?String,
   identity: Int,
 ): SKStore.ContextOp {
@@ -742,7 +742,10 @@ fun replayDiff(
   state: ?(mutable DiffParsingState) = None();
   try {
     loop {
-      line = getLine();
+      line = getLine() match {
+        | Some(l) -> l
+        | None() -> break SKStore.CStop(None())
+      };
       !state = state match {
       | None() if (!line.startsWith("^")) -> None()
 
