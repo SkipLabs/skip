@@ -661,14 +661,10 @@ fun buildDiffChain(
   })
 }
 
-mutable base class DiffParsingState
-
-mutable class DPInitial() extends DiffParsingState
-
-mutable class DPBuildingTableDiff(
+mutable class DiffParsingState(
   tableDiffs: mutable Vector<mutable TableDiff>,
   currentDiff: mutable TableDiff,
-) extends DiffParsingState
+)
 
 fun nack(writer: mutable Debug.BufferedWriter, diff: readonly TableDiff): void {
   writer.write("^" + SKDB.feedbackTable(diff.table.name.origName) + "\n");
@@ -692,34 +688,36 @@ fun replayDiff(
   };
 
   userFileOpt = user.map(x -> SKDB.UserFile::create(context, x));
-  state: mutable DiffParsingState = mutable DPInitial();
+  state: ?(mutable DiffParsingState) = None();
   try {
     loop {
       line = getLine();
       !state = state match {
-      | DPInitial() if (!line.startsWith("^")) -> mutable DPInitial()
+      | None() if (!line.startsWith("^")) -> None()
 
-      | DPInitial() ->
+      | None() ->
         (table, snapshot) = parseHeader(context, line);
-        mutable DPBuildingTableDiff(
-          mutable Vector[],
-          TableDiff::create(table, snapshot),
+        Some(
+          mutable DiffParsingState(
+            mutable Vector[],
+            TableDiff::create(table, snapshot),
+          ),
         )
 
-      | DPBuildingTableDiff(
-        tableDiffs,
-        currentDiff,
+      | Some(
+        DiffParsingState(tableDiffs, currentDiff),
       ) if (line.startsWith("^")) ->
         (table, snapshot) = parseHeader(context, line);
         tableDiffs.push(currentDiff);
-        mutable DPBuildingTableDiff(
-          tableDiffs,
-          TableDiff::create(table, snapshot),
+        Some(
+          mutable DiffParsingState(
+            tableDiffs,
+            TableDiff::create(table, snapshot),
+          ),
         )
 
-      | DPBuildingTableDiff(
-        tableDiffs,
-        currentDiff,
+      | Some(
+        DiffParsingState(tableDiffs, currentDiff),
       ) if (line.startsWith(":")) ->
         currentDiff.lines.push(line);
         tableDiffs.push(currentDiff);
@@ -771,11 +769,11 @@ fun replayDiff(
           )
         }
 
-      | current @ DPBuildingTableDiff(_, currentDiff) if (line == "\t\t") ->
+      | current @ Some(DiffParsingState(_, currentDiff)) if (line == "\t\t") ->
         currentDiff.!reset = true;
         current
 
-      | current @ DPBuildingTableDiff(_, currentDiff) ->
+      | current @ Some(DiffParsingState(_, currentDiff)) ->
         currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
         newRows = parseTableChange(context, currentDiff.table, line);
         currentDiff.rows.extend(newRows);
