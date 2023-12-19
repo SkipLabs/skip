@@ -743,11 +743,12 @@ fun replayDiff(
   try {
     loop {
       line = getLine() match {
-        | Some(l) -> l
-        | None() -> break SKStore.CStop(None())
+      | Some(l) -> l
+      | None() -> break SKStore.CStop(None())
       };
       !state = state match {
-      | None() if (!line.startsWith("^")) -> None()
+      | None() if (String.getByte(line, 0) != 94) -> // !startsWith("^")
+        None()
 
       | None() ->
         (table, snapshot) = parseHeader(context, line);
@@ -760,7 +761,7 @@ fun replayDiff(
 
       | Some(
         DiffParsingState(tableDiffs, currentDiff),
-      ) if (line.startsWith("^")) ->
+      ) if (String.getByte(line, 0) == 94) -> // startsWith("^")
         (table, snapshot) = parseHeader(context, line);
         tableDiffs.push(currentDiff);
         Some(
@@ -772,7 +773,7 @@ fun replayDiff(
 
       | Some(
         DiffParsingState(tableDiffs, currentDiff),
-      ) if (line.startsWith(":")) ->
+      ) if (String.getByte(line, 0) == 58) -> // startsWith(":")
         currentDiff.lines.push(line);
         tableDiffs.push(currentDiff);
         checkpoint = parseCheckpoint(line);
