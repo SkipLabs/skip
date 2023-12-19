@@ -563,23 +563,13 @@ fun parseCheckpoint(line: String): Int {
 }
 
 fun parseTableChange(
-  userFileOpt: ?SKDB.UserFile,
   context: mutable SKStore.Context,
   table: SKDB.DirDescr,
   line: String,
-): ?Array<SKDB.RowValues> {
+): Array<SKDB.RowValues> {
   if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
     invariant_violation("Not a table change")
   };
-
-  accessSolverOpt = userFileOpt.map(userFile ->
-    (
-      SKDB.AccessSolver::create(context, userFile.name),
-      table.name.origName,
-      SKDB.getAuthorIdx(table),
-      SKDB.getGroupIdx(table),
-    )
-  );
 
   chars: mutable Vector<Char> = mutable Vector[];
   iter = line.getIter();
@@ -617,7 +607,7 @@ fun parseTableChange(
   cvalues = values.map(parseCSVValue);
   // empty params since no placeholders in skdb diff write-csv
   params: Map<String, P.Value> = Map[];
-  newRows = SKDB.computeInsert(
+  SKDB.computeInsert(
     context,
     params,
     false,
@@ -627,30 +617,6 @@ fun parseTableChange(
     table,
     repeat,
   );
-
-  accessSolverOpt match {
-  | None() -> Some(newRows)
-  | Some((accessSolver, tableName, authorCol, accessCol)) ->
-    SKStore.withContext(ctx ->
-      for (row in newRows) {
-        SKDB.checkUserCanWriteRow(
-          ctx,
-          accessSolver,
-          tableName,
-          authorCol,
-          accessCol,
-          row,
-        ) match {
-        | SKDB.AROK() -> void
-        | SKDB.ARError(err) ->
-          print_error("Error: " + err.toString());
-          break None()
-        }
-      } else {
-        Some(newRows)
-      }
-    )
-  };
 }
 
 mutable class TableDiff(
@@ -761,29 +727,61 @@ fun replayDiff(
       ) if (line.startsWith(":")) ->
         tableDiffs.push(currentDiff);
         checkpoint = parseCheckpoint(line);
-        break SKStore.CContinue(
-          buildDiffChain(tableDiffs, identity, userFileOpt, checkpoint),
-        )
+
+        rejectedAnyDiff = false;
+        userFileOpt.each(userFile ->
+          SKStore.withContext(privacyContext -> {
+            accessSolver = SKDB.AccessSolver::create(
+              privacyContext,
+              userFile.name,
+            );
+            for (diff in tableDiffs) {
+              if (rejectedAnyDiff) {
+                break void
+              };
+              tableName = diff.table.name.origName;
+              authorCol = SKDB.getAuthorIdx(diff.table);
+              accessCol = SKDB.getAccessIdx(diff.table);
+              for (row in diff.rows) {
+                SKDB.checkUserCanWriteRow(
+                  privacyContext,
+                  accessSolver,
+                  tableName,
+                  authorCol,
+                  accessCol,
+                  row,
+                ) match {
+                | SKDB.AROK() -> void
+                | SKDB.ARError(err) ->
+                  print_error("Error: " + err.toString());
+                  !rejectedAnyDiff = true;
+                  break void
+                }
+              };
+            };
+          })
+        );
+        if (rejectedAnyDiff) {
+          writer = mutable Debug.BufferedWriter(print_raw, 4096);
+          for (tdiff in tableDiffs) {
+            nack(writer, tdiff)
+          };
+          mutable DPRejectingTxn(writer)
+        } else {
+          break SKStore.CContinue(
+            buildDiffChain(tableDiffs, identity, userFileOpt, checkpoint),
+          )
+        }
 
       | current @ DPBuildingTableDiff(_, currentDiff) if (line == "\t\t") ->
         currentDiff.!reset = true;
         current
 
-      | current @ DPBuildingTableDiff(tableDiffs, currentDiff) ->
+      | current @ DPBuildingTableDiff(_, currentDiff) ->
         currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
-
-        parseTableChange(userFileOpt, context, currentDiff.table, line) match {
-        | Some(rows) ->
-          currentDiff.rows.extend(rows);
-          current
-        | None() ->
-          writer = mutable Debug.BufferedWriter(print_raw, 4096);
-          tableDiffs.push(currentDiff);
-          for (diff in tableDiffs) {
-            nack(writer, diff)
-          };
-          mutable DPRejectingTxn(writer)
-        }
+        newRows = parseTableChange(context, currentDiff.table, line);
+        currentDiff.rows.extend(newRows);
+        current
 
       | current @ DPRejectingTxn(writer) if (line.startsWith("^")) ->
         (table, snapshot) = parseHeader(context, line);
