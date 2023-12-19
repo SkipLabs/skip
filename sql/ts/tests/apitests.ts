@@ -158,7 +158,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   } catch (error) {
     const lines = getErrorMessage(error).split("\n");
     expect(lines[lines.length - 1]).toEqual(
-      "Unexpected token IDENTIFIER: expected STATEMENT"
+      "Unexpected token IDENTIFIER: expected STATEMENT",
     );
   }
 
@@ -172,7 +172,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   } catch (error) {
     const lines = getErrorMessage(error).split("\n");
     expect(lines[lines.length - 1]).toEqual(
-      "Unexpected token IDENTIFIER: expected STATEMENT"
+      "Unexpected token IDENTIFIER: expected STATEMENT",
     );
   }
 }
