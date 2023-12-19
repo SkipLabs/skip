@@ -670,10 +670,6 @@ mutable class DPBuildingTableDiff(
   currentDiff: mutable TableDiff,
 ) extends DiffParsingState
 
-mutable class DPRejectingTxn(
-  writer: mutable Debug.BufferedWriter,
-) extends DiffParsingState
-
 fun nack(writer: mutable Debug.BufferedWriter, diff: readonly TableDiff): void {
   writer.write("^" + SKDB.feedbackTable(diff.table.name.origName) + "\n");
   for (line in diff.lines) {
@@ -725,6 +721,7 @@ fun replayDiff(
         tableDiffs,
         currentDiff,
       ) if (line.startsWith(":")) ->
+        currentDiff.lines.push(line);
         tableDiffs.push(currentDiff);
         checkpoint = parseCheckpoint(line);
 
@@ -766,7 +763,8 @@ fun replayDiff(
           for (tdiff in tableDiffs) {
             nack(writer, tdiff)
           };
-          mutable DPRejectingTxn(writer)
+          writer.flush();
+          break SKStore.CContinue(None())
         } else {
           break SKStore.CContinue(
             buildDiffChain(tableDiffs, identity, userFileOpt, checkpoint),
@@ -781,22 +779,6 @@ fun replayDiff(
         currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
         newRows = parseTableChange(context, currentDiff.table, line);
         currentDiff.rows.extend(newRows);
-        current
-
-      | current @ DPRejectingTxn(writer) if (line.startsWith("^")) ->
-        (table, snapshot) = parseHeader(context, line);
-        nack(writer, TableDiff::create(table, snapshot));
-        current
-
-      | DPRejectingTxn(writer) if (line.startsWith(":")) ->
-        writer.write(line);
-        writer.write("\n");
-        writer.flush();
-        break SKStore.CContinue(None())
-
-      | current @ DPRejectingTxn(writer) ->
-        writer.write(line);
-        writer.write("\n");
         current
       };
     }
