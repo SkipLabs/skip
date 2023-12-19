@@ -54,7 +54,8 @@ export class SKDBGroupImpl implements SKDBGroup {
       { groupID, adminGroupID },
     );
     await skdb.exec(
-      "UPDATE skdb_groups SET skdb_access=@adminGroupID WHERE groupID=@adminGroupID;",
+      "UPDATE skdb_groups SET skdb_access=@adminGroupID WHERE groupID=@adminGroupID;" +
+        "UPDATE skdb_group_permissions SET skdb_access=@adminGroupID WHERE groupID=@adminGroupID;",
       { adminGroupID },
     );
     await skdb.exec(
