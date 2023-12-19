@@ -611,11 +611,11 @@ fun parseCheckpoint(line: String): Int {
 }
 
 fun parseTableChange(
-  context: mutable SKStore.Context,
+  context: SKStore.Context,
   table: SKDB.DirDescr,
   line: String,
 ): Array<SKDB.RowValues> {
-  SKStore.withRegion(context, (_, context) ~> {
+  SKStore.withRegionValue(() ~> {
     if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
       invariant_violation("Not a table change")
     };
@@ -657,7 +657,7 @@ fun parseTableChange(
     // empty params since no placeholders in skdb diff write-csv
     params: Map<String, P.Value> = Map[];
     SKDB.computeInsert(
-      context,
+      context.mclone(),
       params,
       false,
       0,
@@ -737,6 +737,7 @@ fun replayDiff(
   | _ -> void
   };
 
+  immContext = context.clone();
   userFileOpt = user.map(x -> SKDB.UserFile::create(context, x));
   state: ?(mutable DiffParsingState) = None();
   try {
@@ -825,7 +826,7 @@ fun replayDiff(
 
       | current @ Some(DiffParsingState(_, currentDiff)) ->
         currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
-        newRows = parseTableChange(context, currentDiff.table, line);
+        newRows = parseTableChange(immContext, currentDiff.table, line);
         currentDiff.rows.extend(newRows);
         current
       };
