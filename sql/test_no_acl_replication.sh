@@ -20,8 +20,6 @@ setup_server() {
     $SKDB < privacy/init.sql
 
     echo "INSERT INTO skdb_users VALUES('test_user', 'pass');" | $SKDB
-    echo "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');" | $SKDB
-    echo "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7, 'root');" | $SKDB
     echo "CREATE TABLE test (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
 }
 
@@ -62,7 +60,7 @@ test_server_accepts_write_no_access_no_author_cols() {
     setup_local
 
     # write in to local
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','read-write');"
 
     replicate_to_server
 
@@ -78,7 +76,7 @@ test_server_tails_no_access_no_author_cols() {
     setup_local
 
     # write in to local
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test VALUES(0,'hello','read-write');"
 
     replicate_to_server
     # assume data is there

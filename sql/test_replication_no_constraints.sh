@@ -23,9 +23,6 @@ setup_server() {
 
     $SKDB < "$SCRIPT_DIR/privacy/init.sql"
 
-    echo "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');" | $SKDB
-    echo "INSERT INTO skdb_group_permissions VALUES('GALL', NULL, 7, 'root');" | $SKDB
-
     echo "INSERT INTO skdb_users VALUES('test_user', 'test');" | $SKDB
     echo "CREATE TABLE test_without_pk (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
 }
@@ -123,9 +120,9 @@ test_basic_replication_unique_rows() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(2,'baz', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(2,'baz', 'read-write');"
 
     replicate_to_server test_without_pk
 
@@ -141,9 +138,9 @@ test_basic_replication_unique_rows_replayed() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(2,'baz', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(2,'baz', 'read-write');"
 
     replicate_to_server test_without_pk
 
@@ -169,7 +166,7 @@ test_basic_replication_null_string() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note = NULL WHERE id = 0;"
 
     replicate_to_server test_without_pk
@@ -184,7 +181,7 @@ test_basic_replication_null_string() {
     session=$($SKDB_BIN --data $SERVER_DB subscribe test_without_pk --connect)
     $SKDB_BIN tail --data $SERVER_DB --format=csv "$session" --since 0 --user test_user > "$output"
     # we want the output to contain a null representation
-    assert_line_count "$output" "1	0,,\"GALL\"$" 1
+    assert_line_count "$output" "1	0,,\"read-write\"$" 1
     rm -f "$output"
 }
 
@@ -192,7 +189,7 @@ test_basic_replication_empty_string() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note = '' WHERE id = 0;"
 
     replicate_to_server test_without_pk
@@ -215,9 +212,9 @@ test_basic_replication_dup_rows() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     output=$(mktemp)
     $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
@@ -238,11 +235,11 @@ test_basic_replication_dup_rows_in_txn() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');"
     (
         echo "BEGIN TRANSACTION;";
-        echo "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');";
-        echo "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');";
+        echo "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');";
+        echo "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');";
         echo "COMMIT;";
     ) | $SKDB_BIN --data $LOCAL_DB
 
@@ -263,9 +260,9 @@ test_basic_replication_dup_rows_replayed() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_server test_without_pk
 
@@ -292,9 +289,9 @@ test_basic_replication_dup_rows_diff_full_replay_using_diff() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     output=$(mktemp)
     $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
@@ -327,10 +324,10 @@ test_basic_replication_dup_rows_server_state_different() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     output=$(mktemp)
     $SKDB_BIN --data $LOCAL_DB <<< 'SELECT * FROM test_without_pk;' > "$output"
@@ -355,7 +352,7 @@ test_basic_replication_with_deletes() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_server test_without_pk
     assert_server_rows_has 1 foo
 
@@ -363,32 +360,32 @@ test_basic_replication_with_deletes() {
     replicate_to_server test_without_pk
     assert_server_rows_has 0 foo
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
     replicate_to_server test_without_pk
     assert_server_rows_has 0 foo
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
     replicate_to_server test_without_pk
     assert_server_rows_has 0 foo
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_server test_without_pk
     assert_server_rows_has 1 foo
 }
 
 test_basic_replication_with_deletes_server_state_different() {
     setup_server
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
     replicate_to_server test_without_pk
 
@@ -403,12 +400,12 @@ test_replication_with_a_row_that_has_a_higher_than_two_repeat_count() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo','GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo','read-write');"
 
     # ensure that the row is written to the server with a repeat of 2
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 > $WRITE_OUTPUT <<EOF
 ^test_without_pk
-2	0,"foo","GALL"
+2	0,"foo","read-write"
 :1
 EOF
 
@@ -436,14 +433,14 @@ test_replication_with_a_row_that_has_a_higher_than_two_repeat_count_dups() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     # ensure that the row is written to the server with a repeat of 2
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 > $WRITE_OUTPUT <<EOF
 ^test_without_pk
-2	0,"foo","GALL"
+2	0,"foo","read-write"
 :1
 EOF
 
@@ -481,9 +478,9 @@ test_tailing_dups_uses_repeat() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'GALL');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(1,'bar', 'read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_server test_without_pk
 
@@ -506,10 +503,10 @@ test_replication_privacy_rejection_and_feedback() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO skdb_group_permissions VALUES ('GALL', 'test_user', 4, 'root');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO skdb_group_permissions VALUES ('read-write', 'test_user', 4, 'root');"
 
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(37, 'good', 'test_user');"
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(42, 'bad', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(42, 'bad', 'read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "CREATE TABLE test_without_pk__skdb_mirror_feedback (id INTEGER, note STRING, skdb_access STRING);"
 
     cat $UPDATES \
@@ -533,15 +530,15 @@ test_replication_privacy_rejection_and_feedback() {
     assert_line_count "$local_feedback_rows" good 0
     assert_line_count "$local_feedback_rows" bad 1
 
-    #test_user can't manage permissions in GALL since they're not an admin
+    #test_user can't manage permissions in read-write since they're not an admin
     perms_stderr=$(mktemp)
     perms_stdout=$(mktemp)
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user >"$perms_stdout" 2>"$perms_stderr" <<EOF
 ^skdb_group_permissions
-1	"GALL","test_user",7,"test_user"
+1	"read-write","test_user",7,"test_user"
 :1
 EOF
-    assert_line_count "$perms_stderr" "cannot manage permissions for group GALL" 1
+    assert_line_count "$perms_stderr" "cannot manage permissions for group read-write" 1
     assert_line_count "$perms_stdout" "skdb_group_permissions__skdb_mirror_feedback" 1
 }
 
@@ -554,7 +551,7 @@ test_seen_insert_deleted() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
@@ -573,13 +570,13 @@ test_unseen_insert_not_deleted() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
     # local has seen up to 0,'foo'
     # but not this
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
 
@@ -595,15 +592,15 @@ test_unseen_insert_added_to() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
     # local has seen up to 0,'foo'
     # but not this
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     # concurrently:
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_server test_without_pk
 
@@ -617,7 +614,7 @@ test_seen_insert_clobbered() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
@@ -637,13 +634,13 @@ test_unseen_insert_not_updated() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
     # local has seen up to 0,'foo'
     # but not this
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     # concurrently:
     $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_without_pk SET note='bar' WHERE id = 0;"
 
@@ -660,7 +657,7 @@ test_unseen_update_is_not_updated() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
@@ -685,7 +682,7 @@ test_unseen_update_is_not_updated_reversed() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
@@ -710,7 +707,7 @@ test_unseen_delete_gets_clobbered() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
@@ -718,7 +715,7 @@ test_unseen_delete_gets_clobbered() {
     # but not this
     $SKDB_BIN --data $SERVER_DB <<< "DELETE FROM test_without_pk WHERE id = 0;"
     # concurrently:
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_server test_without_pk
 
@@ -735,7 +732,7 @@ test_unseen_delete_does_not_affect_delete() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
@@ -758,11 +755,11 @@ test_reconnect_replayed() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_server test_without_pk
     replicate_to_server test_without_pk
@@ -778,13 +775,13 @@ test_replayed_with_more_local_data() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_server test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_server test_without_pk
 
     output=$(mktemp)
@@ -798,14 +795,14 @@ test_reconnect_replayed_with_more_local_data() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
 
     replicate_to_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_server test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     # this is a reconnect, we figure out the diff
     replicate_diff_to_server test_without_pk 0
 
@@ -820,15 +817,15 @@ test_old_diff_replayed() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     # stash what would have been sent up
     save=$(mktemp)
     cp $UPDATES "$save"
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_server test_without_pk
 
     # restore and replay
@@ -847,15 +844,15 @@ test_reconnect_old_diff_replayed() {
     setup_server
     setup_local test_without_pk
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_to_local test_without_pk
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     # stash what would have been sent up
     save=$(mktemp)
     cp $UPDATES "$save"
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'GALL');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(0,'foo', 'read-write');"
     replicate_diff_to_server test_without_pk 0
 
     # restore and replay

@@ -25,8 +25,6 @@ setup_server() {
     echo "INSERT INTO skdb_groups VALUES ('G1', NULL, 'root', 'root');" | $SKDB
     echo "INSERT INTO skdb_group_permissions VALUES ('G1', 'U99', 7, 'root');" | $SKDB
     echo "INSERT INTO skdb_group_permissions VALUES ('G1', 'U98', 7, 'root');" | $SKDB
-    echo "INSERT INTO skdb_groups VALUES ('GALL', NULL, 'root', 'root');" | $SKDB
-    echo "INSERT INTO skdb_group_permissions VALUES ('GALL', NULL, 7, 'root');" | $SKDB
 
     echo "CREATE TABLE test (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
     echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
@@ -68,8 +66,8 @@ test_ignore_source_ignored_on_reset() {
     do
         $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test
-0	$i,"a","GALL"
-1	$((i+1)),"a","GALL"
+0	$i,"a","read-write"
+1	$((i+1)),"a","read-write"
 :$i
 EOF
     done
@@ -78,8 +76,8 @@ EOF
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 1 > $SERVER_TAIL
 
     # we just output the final row: 1\t1001,"a" and a reset of course
-    assert_line_count "$SERVER_TAIL" '710,"a","GALL"' 0
-    assert_line_count "$SERVER_TAIL" '711,"a","GALL"' 1
+    assert_line_count "$SERVER_TAIL" '710,"a","read-write"' 0
+    assert_line_count "$SERVER_TAIL" '711,"a","read-write"' 1
     assert_line_count "$SERVER_TAIL" '		' 1
 }
 
@@ -147,11 +145,11 @@ test_server_should_apply_client_reset_only_to_writes_seen() {
     # write a row as the source under test
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test
-1	0,"foo","GALL"
+1	0,"foo","read-write"
 :10
 EOF
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(7,'new','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES(7,'new','read-write');"
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
 
@@ -166,8 +164,8 @@ EOF
     # because it hasn't seen this row yet: 35 < 41.
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test 35
-1	1,"baz","GALL"
-1	2,"quux","GALL"
+1	1,"baz","read-write"
+1	2,"quux","read-write"
 		
 :22
 EOF
@@ -191,7 +189,7 @@ test_server_write_csv_idempotent_even_when_bumped() {
     # write a row as the source under test
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test
-1	0,"foo","GALL"
+1	0,"foo","read-write"
 :10
 EOF
 
@@ -200,13 +198,13 @@ EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test 1000
-1	0,"foo","GALL"
+1	0,"foo","read-write"
 :20
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
 
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 1
 }
 
 run_test test_server_write_csv_idempotent_even_when_bumped
@@ -219,7 +217,7 @@ test_server_write_csv_idempotent_even_when_bumped_and_reset() {
     # write a row as the source under test
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test
-1	0,"foo","GALL"
+1	0,"foo","read-write"
 :10
 EOF
 
@@ -228,14 +226,14 @@ EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test 1000
-1	0,"foo","GALL"
+1	0,"foo","read-write"
 		
 :20
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
 
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 1
 }
 
 run_test test_server_write_csv_idempotent_even_when_bumped_and_reset
@@ -247,9 +245,9 @@ run_test test_server_write_csv_idempotent_even_when_bumped_and_reset
 test_resets_are_aggressively_nooped() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -260,18 +258,18 @@ test_resets_are_aggressively_nooped() {
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 ^test 43
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test 43
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10
 EOF
@@ -290,9 +288,9 @@ run_test test_resets_are_aggressively_nooped
 test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -303,18 +301,18 @@ test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update() {
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 ^test 43
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test 43
-1	1,"bar","GALL"
-1	2,"baz","GALL"
-1	3,"quux","GALL"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
+1	3,"quux","read-write"
 		
 :10
 EOF
@@ -322,10 +320,10 @@ EOF
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
 
     # just one of each.
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 0
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '3\|quux\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 0
+    assert_line_count "$SERVER_TAIL" '1\|bar\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|baz\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '3\|quux\|read-write' 1
 }
 
 run_test test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update
@@ -334,9 +332,9 @@ run_test test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update
 test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update2() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -347,18 +345,18 @@ test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update2() {
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test 43
-1	1,"bar","GALL"
-1	2,"baz","GALL"
-1	3,"quux","GALL"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
+1	3,"quux","read-write"
 		
 :10
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 ^test 43
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10
 EOF
@@ -366,10 +364,10 @@ EOF
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
 
     # just one of each. foo is still here as it was added concurrently and adds beat deletes
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '3\|quux\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '1\|bar\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|baz\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '3\|quux\|read-write' 1
 }
 
 run_test test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update2
@@ -378,15 +376,15 @@ run_test test_resets_are_aggressively_nooped_but_we_do_not_lose_an_update2
 test_resets_no_op_repeat_count_logic() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -394,13 +392,13 @@ test_resets_no_op_repeat_count_logic() {
     assert_line_count "$SERVER_TAIL" ':55' 1
 
     # this is added concurrently and shouldn't be eligible
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','read-write');"
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test 55
-7	0,"foo","GALL"
-0	1,"bar","GALL"
-2	2,"baz","GALL"
+7	0,"foo","read-write"
+0	1,"bar","read-write"
+2	2,"baz","read-write"
 		
 :10
 EOF
@@ -416,22 +414,22 @@ EOF
     assert_line_count "$SERVER_TAIL" ':61' 1
 
     # this is added concurrently and shouldn't be eligible
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test VALUES (2,'baz','read-write');"
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test 61
-5	0,"foo","GALL"
-1	1,"bar","GALL"
-2	2,"baz","GALL"
+5	0,"foo","read-write"
+1	1,"bar","read-write"
+2	2,"baz","read-write"
 		
 :20
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test" > $SERVER_TAIL
 
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 5
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 3
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 5
+    assert_line_count "$SERVER_TAIL" '1\|bar\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|baz\|read-write' 3
 }
 
 run_test test_resets_no_op_repeat_count_logic
@@ -501,11 +499,11 @@ test_server_should_apply_client_reset_only_to_writes_seen_pk() {
     # write a row as the source under test
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test_with_pk
-1	0,"foo","GALL"
+1	0,"foo","read-write"
 :10
 EOF
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(7,'new','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES(7,'new','read-write');"
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
 
@@ -520,18 +518,18 @@ EOF
     # because it hasn't seen this row yet: 35 < 42.
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test_with_pk 35
-1	1,"baz","GALL"
-1	2,"quux","GALL"
+1	1,"baz","read-write"
+1	2,"quux","read-write"
 		
 :22
 EOF
 
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
 
-    assert_line_count "$SERVER_TAIL" '1\|baz\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|quux\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 0
-    assert_line_count "$SERVER_TAIL" '7\|new\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '1\|baz\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|quux\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 0
+    assert_line_count "$SERVER_TAIL" '7\|new\|read-write' 1
 }
 
 run_test test_server_should_apply_client_reset_only_to_writes_seen_pk
@@ -542,9 +540,9 @@ run_test test_server_should_apply_client_reset_only_to_writes_seen_pk
 test_resets_are_aggressively_nooped_pk() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -556,9 +554,9 @@ test_resets_are_aggressively_nooped_pk() {
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 
 
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10 43
 EOF
@@ -566,9 +564,9 @@ EOF
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 
 
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10 73
 EOF
@@ -576,9 +574,9 @@ EOF
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
 
     # just one of each
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '1\|bar\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|baz\|read-write' 1
 }
 
 run_test test_resets_are_aggressively_nooped_pk
@@ -587,9 +585,9 @@ run_test test_resets_are_aggressively_nooped_pk
 test_resets_are_aggressively_nooped_with_local_change_pk() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -600,18 +598,18 @@ test_resets_are_aggressively_nooped_with_local_change_pk() {
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 ^test_with_pk 43
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test_with_pk 43
-1	1,"bar","GALL"
-1	2,"baz","GALL"
-1	3,"quux","GALL"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
+1	3,"quux","read-write"
 		
 :10
 EOF
@@ -619,10 +617,10 @@ EOF
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
 
     # just one of each.
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '3\|quux\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '1\|bar\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|baz\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '3\|quux\|read-write' 1
 }
 
 run_test test_resets_are_aggressively_nooped_with_local_change_pk
@@ -631,9 +629,9 @@ run_test test_resets_are_aggressively_nooped_with_local_change_pk
 test_resets_are_aggressively_nooped_with_local_change_pk_2() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -644,18 +642,18 @@ test_resets_are_aggressively_nooped_with_local_change_pk_2() {
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test_with_pk 43
-1	1,"bar","GALL"
-1	2,"baz","GALL"
-1	3,"quux","GALL"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
+1	3,"quux","read-write"
 		
 :10
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 ^test_with_pk 43
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10
 EOF
@@ -663,10 +661,10 @@ EOF
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
 
     # just one of each. foo is still here as it was added concurrently and adds beat deletes
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '3\|quux\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '1\|bar\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|baz\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '3\|quux\|read-write' 1
 }
 
 run_test test_resets_are_aggressively_nooped_with_local_change_pk_2
@@ -675,9 +673,9 @@ run_test test_resets_are_aggressively_nooped_with_local_change_pk_2
 test_resets_conflicting_pk() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -688,18 +686,18 @@ test_resets_conflicting_pk() {
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test_with_pk 43
-1	1,"win","GALL"
-1	2,"baz","GALL"
-1	3,"quux","GALL"
+1	1,"win","read-write"
+1	2,"baz","read-write"
+1	3,"quux","read-write"
 		
 :10
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 ^test_with_pk 43
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10
 EOF
@@ -707,11 +705,11 @@ EOF
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
 
     # just one of each. foo is still here as it was added concurrently and adds beat deletes
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 0
-    assert_line_count "$SERVER_TAIL" '1\|win\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '3\|quux\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '1\|bar\|read-write' 0
+    assert_line_count "$SERVER_TAIL" '1\|win\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|baz\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '3\|quux\|read-write' 1
 }
 
 run_test test_resets_conflicting_pk
@@ -719,9 +717,9 @@ run_test test_resets_conflicting_pk
 test_resets_conflicting_reversed_pk() {
     setup_server
 
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','GALL');"
-    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','GALL');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (0,'foo','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (1,'bar','read-write');"
+    $SKDB_BIN --data $SERVER_DB <<< "INSERT INTO test_with_pk VALUES (2,'baz','read-write');"
 
     server_session=$($SKDB_BIN subscribe --data $SERVER_DB --connect --ignore-source 1234 test_with_pk)
     $SKDB_BIN tail --user U98 --data $SERVER_DB --format=csv "$server_session" --since 0 > $SERVER_TAIL
@@ -732,18 +730,18 @@ test_resets_conflicting_reversed_pk() {
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 1 --user U98 > /dev/null << EOF
 ^test_with_pk 43
-1	0,"foo","GALL"
-1	1,"bar","GALL"
-1	2,"baz","GALL"
+1	0,"foo","read-write"
+1	1,"bar","read-write"
+1	2,"baz","read-write"
 		
 :10
 EOF
 
     $SKDB_BIN write-csv --data $SERVER_DB --source 2 --user U98 > /dev/null << EOF
 ^test_with_pk 42
-1	1,"win","GALL"
-1	2,"baz","GALL"
-1	3,"quux","GALL"
+1	1,"win","read-write"
+1	2,"baz","read-write"
+1	3,"quux","read-write"
 		
 :10
 EOF
@@ -751,11 +749,11 @@ EOF
     $SKDB_BIN --data $SERVER_DB <<< "SELECT * FROM test_with_pk" > $SERVER_TAIL
 
     # just one of each. foo is still here as it was added concurrently and adds beat deletes
-    assert_line_count "$SERVER_TAIL" '0\|foo\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '1\|bar\|GALL' 0
-    assert_line_count "$SERVER_TAIL" '1\|win\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '2\|baz\|GALL' 1
-    assert_line_count "$SERVER_TAIL" '3\|quux\|GALL' 1
+    assert_line_count "$SERVER_TAIL" '0\|foo\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '1\|bar\|read-write' 0
+    assert_line_count "$SERVER_TAIL" '1\|win\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '2\|baz\|read-write' 1
+    assert_line_count "$SERVER_TAIL" '3\|quux\|read-write' 1
 }
 
 run_test test_resets_conflicting_reversed_pk
