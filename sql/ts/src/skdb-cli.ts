@@ -378,6 +378,10 @@ const remoteRepl = async function () {
     !args.values["simple-output"],
   );
   while (true) {
+    if (process.stdin.closed) {
+      rl.close();
+      process.exit(0);
+    }
     const query = await rl.question(
       `${accessKey}@${values.host}/${values.db}> `,
     );
