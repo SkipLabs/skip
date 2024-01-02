@@ -13,7 +13,7 @@ choose to release either or both of the `latest` and `quickstart` tags.
 
 ## Release NPM packages
 
-1. Check out `master` and make sure your working copy is clean
+1. Check out `main` and make sure your working copy is clean
 
 2. Bump version numbers and/or dependencies for whichever packages you want to
    update, in `sql/npm.json`, `packages/dev/package.json`, and/or
