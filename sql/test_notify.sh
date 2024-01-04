@@ -1,7 +1,7 @@
 #!/bin/bash
 
-pass() { printf "%-32s OK\n" "TEST $1:"; }
-fail() { printf "%-32s FAILED\n" "TEST $1:"; }
+pass() { printf "%-36s OK\n" "TEST $1:"; }
+fail() { printf "%-36s FAILED\n" "TEST $1:"; }
 
 if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
