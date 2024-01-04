@@ -47,12 +47,17 @@ assert_line_count() {
     expected_cnt=$3
     cnt=$(grep -Ec "$pattern" "$file")
     if [[ ! $cnt -eq "$expected_cnt" ]]; then
-        echo "FAIL: looking for $pattern. Wanted $expected_cnt but got $cnt:"
+        echo -e "FAIL\nlooking for $pattern. Wanted $expected_cnt but got $cnt:"
         cat "$file"
         exit 1
     fi
 }
 
+run_test() {
+    printf '%-80s ' "$1"
+    eval "$1"
+    echo "PASS"
+}
 
 test_server_accepts_write_no_access_no_author_cols() {
     setup_server
@@ -89,5 +94,5 @@ test_server_tails_no_access_no_author_cols() {
     rm -f "$output"
 }
 
-test_server_accepts_write_no_access_no_author_cols
-test_server_tails_no_access_no_author_cols
+run_test test_server_accepts_write_no_access_no_author_cols
+run_test test_server_tails_no_access_no_author_cols
