@@ -46,10 +46,7 @@ assert_line_count() {
     pattern=$2
     expected_cnt=$3
     cnt=$(grep -Ec "$pattern" "$file")
-    if [[ $cnt -eq "$expected_cnt" ]]
-    then
-        echo "PASS: looking for $pattern. Wanted $expected_cnt and got $cnt."
-    else
+    if [[ ! $cnt -eq "$expected_cnt" ]]; then
         echo "FAIL: looking for $pattern. Wanted $expected_cnt but got $cnt:"
         cat "$file"
         exit 1
