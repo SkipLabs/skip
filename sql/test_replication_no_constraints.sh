@@ -63,7 +63,7 @@ replicate_diff_to_server() {
 }
 
 run_test() {
-    echo -n "$1.............."
+    printf '%-80s ' "$1"
     eval "$1"
     echo "PASS"
 }
@@ -99,8 +99,7 @@ assert_line_count() {
     cnt=$(grep -Ec "$pattern" "$file")
     if [[ ! $cnt -eq "$expected_cnt" ]]
     then
-        echo "FAIL: looking for $pattern. Wanted $expected_cnt but got $cnt:"
-        echo "This was the input:"
+        echo -e "FAIL\nlooking for $pattern. Wanted $expected_cnt but got $cnt:"
         cat "$file"
         exit 1
     fi
