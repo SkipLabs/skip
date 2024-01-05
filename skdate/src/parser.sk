@@ -62,7 +62,7 @@ fun parseFullDate(str: String): ?Entity {
   | _ -> return None()
   };
   x3 = iter.next() match {
-  | Some(':') -> return parseTime(iter, Vector[x1, x2]).map(i -> i.i0)
+  | Some(':') -> return parseTime(iter, toInt2(x1, x2)).map(i -> i.i0)
   | Some(x) if (x >= '0' && x <= '9') -> x
   | _ -> return None()
   };
@@ -71,7 +71,7 @@ fun parseFullDate(str: String): ?Entity {
   | _ -> return None()
   };
   iter.next() match {
-  | Some('-') -> parseDate(iter, Vector[x1, x2, x3, x4])
+  | Some('-') -> parseDate(iter, toInt4(x1, x2, x3, x4))
   | _ -> None()
   };
 }
@@ -86,11 +86,7 @@ YYYY-MM-DDTHH:MM:SS
 YYYY-MM-DDTHH:MM:SS.SSS
 */
 
-fun parseDate(
-  iter: mutable Iterator<Char>,
-  yearV: readonly Vector<Char>,
-): ?Entity {
-  year = toInt(yearV);
+fun parseDate(iter: mutable Iterator<Char>, year: Int): ?Entity {
   month1 = iter.next() match {
   | Some(x) if (x >= '0' && x <= '9') -> x
   | _ -> return None()
@@ -135,7 +131,7 @@ fun parseDate(
   | Some(':') -> void
   | _ -> return None()
   };
-  parseTime(iter, Vector[hour1, hour2]).map(info ->
+  parseTime(iter, toInt2(hour1, hour2)).map(info ->
     Calendar::create(Date::create(year, month, day), info.i0, info.i1)
   )
 }
@@ -146,12 +142,8 @@ HH:MM:SS
 HH:MM:SS.SSS
 */
 
-fun parseTime(
-  iter: mutable Iterator<Char>,
-  hoursV: readonly Vector<Char>,
-): ?(Time, TZKind) {
+fun parseTime(iter: mutable Iterator<Char>, hours: Int): ?(Time, TZKind) {
   tz = TZLocal();
-  hours = toInt(hoursV);
   if (hours > 23) return None();
   minute1 = iter.next() match {
   | Some(x) if (x >= '0' && x <= '9') -> x
@@ -220,12 +212,12 @@ fun parseTime(
 
 fun parseTimeZone(str: String): ?TimeZone {
   iter = str.getIter();
-  sign = iter.next() match {
-  | Some('+') -> Some('+')
-  | Some('-') -> Some('-')
+  iter.next() match {
+  | Some(sign @ '+')
+  | Some(sign @ '-') ->
+    parseTimezone(iter, sign)
   | _ -> None()
   };
-  sign.flatMap(s -> parseTimezone(iter, s))
 }
 
 /*
@@ -249,7 +241,7 @@ fun parseTimezone(iter: mutable Iterator<Char>, sign: Char): ?TimeZone {
   v3 = iter.next() match {
   | Some(x) if (x >= '0' && x <= '9') -> x
   | Some(':') ->
-    return parseTime(iter, Vector[v1, v2]).map(time ->
+    return parseTime(iter, toInt2(v1, v2)).map(time ->
       TimeZone::create(
         neg,
         time.i0.getHours(),

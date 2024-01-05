@@ -15,6 +15,18 @@ extern "C"
   uint32_t SKIP_String_byteSize(char *);
   char *sk_string_create(const char *buffer, uint32_t size);
 
+  /**
+   * Retrieves the local version of variables required for formatting using format specifier.
+   * A => Full weekday name.
+   * a => Abbreviated weekday name.
+   * B => Full month name.
+   * b => Abbreviated month name.
+   * c => Date/Time format string of the locale.
+   * x => Date format string of the locale.
+   * X => Time format string of the locale.
+   * r => AM/PM Time format string of the locale.
+   * p => AM or PM locale string.
+   */
   char *SKIP_locale(u_int32_t code, int32_t value)
   {
     char c = (char)code;
