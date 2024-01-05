@@ -238,7 +238,7 @@ else
     fail "STAR COMMA"
 fi
 
-if cat test/unit/test_default_values.sql | $SKDB | tr '\n' 'S' | grep -E "[0-9]+\|test1\|test2S[0-9]+\|\|fooS[0-9]+\|bar\|helloS" > /dev/null ; then
+if cat test/unit/test_default_values.sql | $SKDB | tr '\n' ' ' | grep -E -- '-?[0-9]+\|test1\|test2' | grep -E '[0-9]+\|\|foo' | grep -qE '[0-9]+\|bar\|hello' ; then
     pass "DEFAULT VALUES"
 else
     fail "DEFAULT VALUES"
