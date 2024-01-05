@@ -36,6 +36,18 @@ class LinksImpl implements Links {
       });
       return utils.exportString(timeZone);
     };
+    /**
+     * Retrieves the local version of variables required for formatting using format specifier.
+     * A => Full weekday name.
+     * a => Abbreviated weekday name.
+     * B => Full month name.
+     * b => Abbreviated month name.
+     * c => Date/Time format string of the locale.
+     * x => Date format string of the locale.
+     * X => Time format string of the locale.
+     * r => AM/PM Time format string of the locale.
+     * p => AM or PM locale string.
+     */
     this.SKIP_locale = (code: int, value: int) => {
       let str = String.fromCharCode(code);
       if (str == "B" || str == "b") {
@@ -64,6 +76,7 @@ class LinksImpl implements Links {
         return utils.exportString(m[m.length - 1]);
       }
       if (str == "c" || str == "X" || str == "x" || str == "r") {
+        // Not defined
         return utils.exportString("");
       }
       return utils.exportString("%%" + str);

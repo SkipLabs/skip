@@ -19,7 +19,7 @@ fun currentTimeMillis(): Int {
 
 class File(value: Calendar) extends SKStore.File
 
-const date_maxDaysInMonth: Array<Int> = Array[
+const daysInNonLeapYearMonth: Array<Int> = Array[
   31,
   28,
   31,
@@ -101,7 +101,7 @@ class Date private (
     year = this.year;
     weekNumber = if (kind.isISO()) {
       if (days < 0) {
-        !days = if (this.leapYear(this.year - 1)) {
+        !days = if (static::leapYear(this.year - 1)) {
           366
         } else {
           {
@@ -111,7 +111,7 @@ class Date private (
         !year = year - 1;
       };
       number = Math.floor(days.toFloat() / 7.0).toInt() + 1;
-      nbOfWeeks = this.weeks(year);
+      nbOfWeeks = static::weeks(year);
       if (number > nbOfWeeks) {
         if (this.year == year) {
           !year = year + 1;
@@ -136,21 +136,10 @@ class Date private (
     days = 0;
     month = 0;
     while (month < this.month.getCode() - 1) {
-      !days =
-        days +
-        (date_maxDaysInMonth[month] +
-          if (month == 1 && this.leapYear(this.year)) {
-            1
-          } else {
-            0
-          });
+      !days = days + static::daysInMonth(month, this.year);
       !month = month + 1;
     };
     days + this.day;
-  }
-
-  fun isLeapYear(): Bool {
-    this.leapYear(this.year);
   }
 
   fun addYears(years: Int): Date {
@@ -195,66 +184,45 @@ class Date private (
       this;
     } else if (days > 0) {
       // Maximum days in the month
-      nMaxDays = (
-        date_maxDaysInMonth[month] +
-        if (month == 1 && this.leapYear(year)) {
-          1
-        } else {
-          0
-        }
-      );
+      daysInMonth = static::daysInMonth(month, year);
       nDays = tday + days;
-      while (nDays >= nMaxDays) {
-        !nDays = nDays - nMaxDays;
+      while (nDays >= daysInMonth) {
+        !nDays = nDays - daysInMonth;
         (!year, !month) = if (month == 11) {
           (year + 1, 0)
         } else {
           (year, month + 1)
         };
-        !nMaxDays = (
-          date_maxDaysInMonth[month] +
-          if (month == 1 && this.leapYear(year)) {
-            1
-          } else {
-            0
-          }
-        );
+        !daysInMonth = static::daysInMonth(month, year);
       };
       Date(year, Month::monthForCode(month + 1), UInt8::truncate(nDays + 1));
     } else {
-      nMaxDays = tday;
+      daysInMonth = tday;
       nDays = days;
-      while (nDays < -nMaxDays) {
-        !nDays = nDays + nMaxDays;
+      while (nDays < -daysInMonth) {
+        !nDays = nDays + daysInMonth;
         (!year, !month) = if (month == 0) {
           (year - 1, 11)
         } else {
           (year, month - 1)
         };
-        !nMaxDays = (
-          date_maxDaysInMonth[month] +
-          if (month == 1 && this.leapYear(year)) {
-            1
-          } else {
-            0
-          }
-        );
+        !daysInMonth = static::daysInMonth(month, year)
       };
       Date(
         year,
         Month::monthForCode(month + 1),
-        UInt8::truncate(1 + nMaxDays + nDays),
+        UInt8::truncate(1 + daysInMonth + nDays),
       );
     };
   }
 
-  fun dayBetween(min: Int, max: Int): Int {
+  fun daysBetween(minYear: Int, maxYear: Int): Int {
     days = 0;
-    year = min;
-    while (year < max) {
+    year = minYear;
+    while (year < maxYear) {
       !days =
         days +
-        if (this.leapYear(year)) {
+        if (static::leapYear(year)) {
           366
         } else {
           365
@@ -269,14 +237,14 @@ class Date private (
       refYear <= this.year,
       "Expected date year greater than reference year",
     );
-    days = this.dayBetween(refYear, this.year);
+    days = this.daysBetween(refYear, this.year);
     days + this.getDayOfYear() - 1;
   }
 
   fun daysUntil(refYear: Int = 1970): Int {
-    days = this.dayBetween(this.year + 1, refYear);
+    days = this.daysBetween(this.year + 1, refYear);
     days +
-      if (this.leapYear(this.year)) {
+      if (static::leapYear(this.year)) {
         366 - this.getDayOfYear()
       } else {
         365 - this.getDayOfYear()
@@ -307,17 +275,26 @@ class Date private (
     }
   }
 
-  private fun leapYear(year: Int): Bool {
+  private static fun daysInMonth(month: Int, year: Int): Int {
+    days = daysInNonLeapYearMonth[month];
+    if (month == 1 && static::leapYear(year)) {
+      days + 1
+    } else {
+      days
+    }
+  }
+
+  private static fun leapYear(year: Int): Bool {
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
   }
 
-  private fun p(year: Int): Int {
+  private static fun p(year: Int): Int {
     (year + (year / 4) - (year / 100) + (year / 400)) % 7;
   }
 
-  private fun weeks(year: Int): Int {
+  private static fun weeks(year: Int): Int {
     52 +
-      if (this.p(year) == 4 || this.p(year - 1) == 3) {
+      if (static::p(year) == 4 || static::p(year - 1) == 3) {
         1
       } else {
         0
