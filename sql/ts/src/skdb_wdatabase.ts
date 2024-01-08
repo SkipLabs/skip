@@ -233,4 +233,7 @@ export class SKDBWorker implements SKDB {
   createGroup = async () => {
     return SKDBGroupImpl.create(this);
   };
+  lookupGroup = async (groupID) => {
+    return SKDBGroupImpl.lookup(this, groupID);
+  };
 }
