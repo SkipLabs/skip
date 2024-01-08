@@ -89,6 +89,8 @@ export interface SKDB {
   closeConnection: () => Promise<void>;
 
   createGroup: () => Promise<SKDBGroup>;
+  lookupGroup: (groupID: string) => Promise<SKDBGroup | undefined>;
+
   currentUser?: string;
 
   mirror: (...tables: MirrorDefn[]) => Promise<void>;
@@ -167,19 +169,18 @@ export interface SKDBShared extends Shared {
 }
 
 export interface SKDBGroup {
-  setDefaultPermission: (skdb: SKDB, perm: string) => Promise<void>;
+  setDefaultPermission: (perm: string) => Promise<void>;
   setMemberPermission: (
-    skdb: SKDB,
     userID: string,
     perm: string,
   ) => Promise<void>;
 
-  addAdmin: (skdb: SKDB, userID: string) => Promise<void>;
-  removeAdmin: (skdb: SKDB, userID: string) => Promise<void>;
+  addAdmin: (userID: string) => Promise<void>;
+  removeAdmin: (userID: string) => Promise<void>;
 
-  addOwner: (skdb: SKDB, userID: string) => Promise<void>;
-  removeOwner: (skdb: SKDB, userID: string) => Promise<void>;
-  transferOwnership: (skdb: SKDB, userID: string) => Promise<void>;
+  addOwner: (userID: string) => Promise<void>;
+  removeOwner: (userID: string) => Promise<void>;
+  transferOwnership: (userID: string) => Promise<void>;
 
-  removeMember: (skdb: SKDB, userID: string) => Promise<void>;
+  removeMember: (userID: string) => Promise<void>;
 }

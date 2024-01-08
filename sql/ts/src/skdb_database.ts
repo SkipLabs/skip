@@ -398,4 +398,8 @@ export class SKDBImpl implements SKDB {
   async createGroup() {
     return SKDBGroupImpl.create(this);
   }
+  async lookupGroup(groupID: string) {
+    return SKDBGroupImpl.lookup(this, groupID);
+  }
+
 }
