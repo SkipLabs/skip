@@ -469,7 +469,7 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
 
   // user1 can grant read+write permissions to user2,
   // after which user2 can insert & read
-  await group.setMemberPermission(skdb1, user2, "rw");
+  await group.setMemberPermission(user2, "rw");
 
   await new Promise((r) => setTimeout(r, 100));
   await skdb1.exec("INSERT INTO test_pk VALUES (1003, 3, @gid)", {
@@ -487,16 +487,18 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
 
   // user1 can grant admin permissions to user2, after which user2 can change member permissions
 
-  await group.addAdmin(skdb1, user2);
+  await group.addAdmin(user2);
   await new Promise((r) => setTimeout(r, 100));
 
-  await group.setMemberPermission(skdb2, user1, "rw");
+  const group_as_user2 = await skdb2.lookupGroup(group.groupID);
+
+  await group_as_user2.setMemberPermission(user1, "rw");
 
   // user1 can transfer ownership to user2, after which user2 can remove them as an admin
-  await group.transferOwnership(skdb1, user2);
+  await group.transferOwnership(user2);
   await new Promise((r) => setTimeout(r, 100));
 
-  await group.removeAdmin(skdb2, user1);
+  await group_as_user2.removeAdmin(user1);
   await new Promise((r) => setTimeout(r, 100));
 
   let user1_view_owners = await skdb1.exec(
