@@ -706,33 +706,14 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
   | None() -> SKStore.genSym(0)
   };
 
-  // block until we receive the first line of input, so that the subsequent
-  // `runSql` call executes under an up-to-date context.
-  firstLine = {
-    buffer = mutable Vector[];
-    loop {
-      c = getChar();
-      if (c == '\n') break String::fromChars(buffer.toArray());
-      buffer.push(c)
-    }
-  };
-
   SKDB.runSql(options, context ~> {
     user = args.maybeGetString("user");
-    isFirst = true;
     myReadLine = () -> {
-      if (isFirst) {
-        !isFirst = false;
-        return firstLine;
-      };
       buffer = mutable Vector[];
       loop {
         c = getChar();
-        if (c == '\n') {
-          if (buffer.size() > 0) return String::fromChars(buffer.toArray());
-        } else {
-          buffer.push(c)
-        };
+        if (c == '\n') return String::fromChars(buffer.toArray());
+        buffer.push(c);
       }
     };
     SKCSV.replayDiff(context, myReadLine, user, source)
