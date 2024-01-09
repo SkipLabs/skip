@@ -297,7 +297,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec(
           [
-            "create table if not exists test (x integer primary key, y string, z float, w integer);",
+            "create table if not exists test (x integer primary key, y text, z float, w integer);",
             "insert into test values (0, 'foo', 1.2, 42);",
           ].join("\n"),
         );
@@ -326,7 +326,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec(
           [
-            "create table if not exists test (x integer primary key, y string, z float, w integer);",
+            "create table if not exists test (x integer primary key, y text, z float, w integer);",
             "insert into test values (0, 'foo', 1.2, 42);",
           ].join("\n"),
         );
@@ -935,7 +935,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec(
           [
-            "create table if not exists test (x integer primary key, y string, z float, w integer);",
+            "create table if not exists test (x integer primary key, y text, z float, w integer);",
             "insert into test values (0, 'foo', 1.2, 42);",
           ].join("\n"),
         );
@@ -976,7 +976,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec(
           [
-            "create table if not exists test (x integer primary key, y string, z float, w integer);",
+            "create table if not exists test (x integer primary key, y text, z float, w integer);",
             "insert into test values (0, 'foo', 1.2, 42);",
           ].join("\n"),
         );
