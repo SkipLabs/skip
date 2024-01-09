@@ -104,8 +104,7 @@ class FixedDir<T: frozen> private {
   ): this {
     data.sortBy(row ~> (row.key, row.value.i0));
     result = data.toArray().clone();
-    cache = Array::mfill(result.size(), false);
-    _ = static::computeTags(cache, result, 0, result.size() - 1);
+    _ = static::computeTags(result, 0, result.size() - 1);
     FixedDir{data => result.chill()}
   }
 
@@ -155,7 +154,6 @@ class FixedDir<T: frozen> private {
   }
 
   static fun computeTags(
-    cache: mutable Array<Bool>,
     array: mutable Array<FixedRow<T>>,
     i: Int,
     j: Int,
@@ -166,11 +164,10 @@ class FixedDir<T: frozen> private {
     pivot = i + (j - i) / 2;
     elt = array[pivot];
     tag = elt.tag;
-    right = static::computeTags(cache, array, pivot + 1, j);
-    left = static::computeTags(cache, array, i, pivot - 1);
+    right = static::computeTags(array, pivot + 1, j);
+    left = static::computeTags(array, i, pivot - 1);
     !tag.max = max(tag.max, max(left.max, right.max));
     array![pivot] = elt with {tag};
-    cache![pivot] = true;
     tag
   }
 
