@@ -261,10 +261,9 @@ private fun createVTableBuilders(
       };
       builder.insert(gct, config.ptrBitSize);
 
-      // Lambdas and memoize thunks are callable from the runtime
-      // so they need to have their code pointer at a predictable location,
-      // vtable offset zero.
-      if (sclass.isLambda || sclass.isMemoizeThunk) {
+      // Lambdas are callable from the runtime so they need to have their
+      // code pointer at a predictable location, vtable offset zero.
+      if (sclass.isLambda) {
         // Only do this if we actually decided to compile a code pointer at all.
         key = MethodKey("call", MethodSuperpositionID::empty);
         sclass.methods.maybeGet(key) match {
@@ -506,27 +505,15 @@ private fun createGCType(
 
     isAllDeepFrozen = sc.fields.all(x -> x.typ.isDeepFrozen());
 
-    (gcKindClass, internedMetaSize_) = if (sc.isMemoizeThunk) {
-      (
-        2, // kSkipGcKindInvocation
-        56,
-      ) // FIXME: Bogus to hardcode this, see T21762773
-    } else {
-      (
-        0, // kSkipGcKindClass
-        3 * config.ptrByteSize,
-      ) // sizeof(IObjMetadata)
-    };
-
     (
       userSize, // userByteSize
       words, // numMaskWords
       1, // tilesPerMask
       config.ptrByteSize, // sizeof(RObjMetadata)
-      internedMetaSize_,
-      gcKindClass,
-      isAllDeepFrozen,
-    ) // kSkipGcRefsHintFrozenRefs
+      3 * config.ptrByteSize, // sizeof(IObjMetadata)
+      0, // kSkipGcKindClass
+      isAllDeepFrozen, // kSkipGcRefsHintFrozenRefs
+    )
   | Some(slotInfo) ->
     // This is a Vector type.
 
@@ -638,15 +625,7 @@ private fun createGCType(
 
   // m_onStateChange
   pushField(
-    if (sc.isMemoizeThunk) {
-      ConstantFun{
-        id => InstrID::none,
-        typ => tNonGCPointer,
-        value => env.runtimeFunctions["Runtime.invocationOnStateChange"],
-      }
-    } else {
-      ConstantPointer{id => InstrID::none, typ => tNonGCPointer, value => 0}
-    },
+    ConstantPointer{id => InstrID::none, typ => tNonGCPointer, value => 0},
   );
 
   if (config.ptrBitSize == 32) {

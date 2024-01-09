@@ -1815,12 +1815,10 @@ fun method_def(
   (tparams3, whenparams1) = infer_met_tparams_frozen(
     met.frozen_,
     met.async_,
-    met.memoized_,
     cla_tparams,
     whenparams,
     tparams2,
     params2,
-    return_1,
   );
   if (cd.isChilledOnly()) {
     (met.readonly_, met.mutable_) match {
@@ -1860,7 +1858,6 @@ fun method_def(
     visibility => visibility(met.visibility),
     annotations => met.annotations,
     overridable_ => met.overridable_,
-    memoized_ => met.memoized_,
     async_ => met.async_,
     macro_ => met.macro_,
     deferred_ => met.deferred_,
@@ -2174,13 +2171,7 @@ fun fun_def(
   check_default_last(params);
   params1 = params.map(p -> parameter(context, acc, env2, p));
   return_1 = type(context, classAcc, env2, return_);
-  tparams3 = infer_fun_tparams_frozen(
-    fd.async_,
-    fd.memoized_,
-    tparams2,
-    params1,
-    return_1,
-  );
+  tparams3 = infer_fun_tparams_frozen(fd.async_, tparams2, params1);
   (bound, params2) = check_locals_fun_parameters(empty_bound, params1);
 
   (localsErrors, body) = body(
@@ -2196,7 +2187,6 @@ fun fun_def(
 
   result = N.Fun_def{
     native_ => fd.native_,
-    memoized_ => fd.memoized_,
     async_ => fd.async_,
     untracked_ => fd.untracked_,
     visibility => fd.fun_private,
@@ -3033,32 +3023,28 @@ fun make_this_targs(sk_this: A.Class_def): Array<N.Type_> {
  */
 fun infer_fun_tparams_frozen(
   sk_async: ?FileRange,
-  sk_memoized: ?FileRange,
   tparams: Array<N.Type_parameter>,
   params: Parameters<N.Parameter>,
-  return_ty: N.Type_,
 ): Array<N.Type_parameter> {
-  if (sk_async.isNone() && sk_memoized.isNone()) return tparams;
+  if (sk_async.isNone()) return tparams;
 
-  final_map = infer_param_ret_frozen(sk_async, sk_memoized, params, return_ty);
+  final_map = infer_param_ret_frozen(sk_async, params);
   add_frozen_constraints(final_map, tparams)
 }
 
 fun infer_met_tparams_frozen(
   frozen_: ?FileRange,
   sk_async: ?FileRange,
-  sk_memoized: ?FileRange,
   cla_tparams: Array<N.Type_parameter>,
   whenparams: Array<N.Whenclause>,
   tparams: Array<N.Type_parameter>,
   params: Parameters<N.Parameter>,
-  return_ty: N.Type_,
 ): (Array<N.Type_parameter>, Array<N.Whenclause>) {
-  if (frozen_.isNone() && sk_async.isNone() && sk_memoized.isNone()) {
+  if (frozen_.isNone() && sk_async.isNone()) {
     return (tparams, whenparams)
   };
 
-  after_fun = infer_param_ret_frozen(sk_async, sk_memoized, params, return_ty);
+  after_fun = infer_param_ret_frozen(sk_async, params);
   final_map = frozen_ match {
   | None() -> after_fun
   | Some _ ->
@@ -3079,20 +3065,13 @@ fun infer_met_tparams_frozen(
 
 fun infer_param_ret_frozen(
   sk_async: ?FileRange,
-  sk_memoized: ?FileRange,
   params: Parameters<N.Parameter>,
-  return_ty: N.Type_,
 ): SMap<FileRange> {
   frozen_map = SortedMap[];
 
-  if (sk_async.isNone() && sk_memoized.isNone()) return frozen_map;
+  if (sk_async.isNone()) return frozen_map;
 
-  after_params = params.foldl(infer_tparams_frozen_parameter, frozen_map);
-  if (sk_memoized.isSome()) {
-    infer_frozen_type(after_params, return_ty)
-  } else {
-    after_params
-  }
+  params.foldl(infer_tparams_frozen_parameter, frozen_map)
 }
 
 fun infer_tparams_frozen_type_parameter(

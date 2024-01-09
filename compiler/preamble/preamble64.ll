@@ -82,18 +82,6 @@ define void @SKIP_awaitableThrow(ptr, ptr) {
   ret void
 }
 
-define void @SKIP_invocationOnStateChange(ptr, i64) {
-  ret void
-}
-
-define void @SKIP_memoValueBoxObject(ptr, ptr) {
-  ret void
-}
-
-define void @SKIP_memoizeCall(ptr, ptr) {
-  ret void
-}
-
 ; Obstack code
 
 ; Function Attrs: alwaysinline nounwind uwtable

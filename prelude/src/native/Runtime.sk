@@ -70,20 +70,6 @@ private fun throwInvariantViolation(msg: String): void {
   invariant_violation(msg);
 }
 
-// NOTE: Even if the runtime does not call this, its existence acts as a call
-// site, informing the compiler that closures with this signature are callable
-// and their "call" methods need to appear in their vtables.
-@cpp_export("SKIP_invokeMemoizeThunk")
-private fun invokeMemoizeThunk(func: () ~> void): void {
-  func()
-}
-
-@cpp_runtime("SKIP_invocationOnStateChange")
-private native fun invocationOnStateChange(
-  obj: GCPointer,
-  changeType: Int,
-): void;
-
 module end;
 
 // May return true if two objects are equal.

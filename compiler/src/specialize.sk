@@ -1498,7 +1498,6 @@ mutable class Specializer{
         isMutable => gclass.isMutable,
         isNative => gclass.isNative,
         isLambda => gclass.isLambda,
-        isMemoizeThunk => gclass.isMemoizeThunk,
         kind,
         subtypes => kEmptySClassSet, // Computed later from SClassInfo
         supertypes => kEmptySClassSet, // Computed later from SClassInfo
@@ -2194,7 +2193,6 @@ mutable class FunSpecializer{
       gfunction => gfi.gfunction,
       name,
       isNative => gfi.isNative,
-      isMemoized => gfi.isMemoized,
       annotations => gfi.annotations,
       pos => gfi.pos,
       funType => Tfun{
@@ -2209,21 +2207,6 @@ mutable class FunSpecializer{
           gfi.pos,
         ),
       },
-    };
-
-    // Memoized functions can only return frozen values, but an a special
-    // exception ^T is allowed if T is frozen.
-    if (
-      funInfo.isMemoized &&
-      !specReturnType.forEachTclass(tc ->
-        tc.isDeepFrozen() ||
-          specializer.awaitableType(tc).maybe(false, x -> x.isDeepFrozen())
-      )
-    ) {
-      gfi.pos.die(
-        "memoized functions can only return frozen values, but " +
-          `${name} is returning a value of type ${specReturnType}`,
-      )
     };
 
     optinfo = Emitter::emptyOptInfo(
