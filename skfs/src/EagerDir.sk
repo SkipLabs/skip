@@ -857,12 +857,11 @@ class EagerDir{
         !lastOpt = Some(fixedRow)
       };
 
-      for (key => _ in this.data) {
+      for (key => map in this.data) {
         while (!fixedIter.isEnd() && fixedIter.current().i3 < key) {
           add(fixedIter.current());
           fixedIter.next();
         };
-        map = this.data.maybeGet(key).fromSome();
         for (tickSource => values in map) {
           (tick, source, writer) = tickSource;
           while (
