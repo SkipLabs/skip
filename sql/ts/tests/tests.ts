@@ -20,7 +20,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
     {
       name: wn("Test on empty table", asWorker),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         let result: Array<any> = [];
         let handle = await skdb.watch(
           "SELECT * FROM t1;",
@@ -41,7 +41,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watch(
@@ -71,7 +71,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watch(
@@ -97,7 +97,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
         let result: Array<any> = [];
@@ -124,7 +124,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
     {
       name: wn("Test reactive query is not n^2", asWorker),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
@@ -193,7 +193,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watch(
@@ -221,7 +221,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
         let result: Array<any> = [];
@@ -352,7 +352,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watch(
@@ -385,7 +385,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
     {
       name: wn("A reactive query can be replaced with new params", asWorker),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watch(
@@ -423,8 +423,8 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec(
           [
-            "CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);",
-            "CREATE TABLE t2 (a INTEGER, b STRING, c FLOAT);",
+            "CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);",
+            "CREATE TABLE t2 (a INTEGER, b TEXT, c FLOAT);",
           ].join("\n"),
         );
         await skdb.insert("t1", [13, "9", 42.1]);
@@ -469,7 +469,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
 
@@ -511,7 +511,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
@@ -579,7 +579,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
     {
       name: wn("Test on empty table", asWorker),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         let result: Array<any> = [];
         let handle = await skdb.watchChanges(
           "SELECT * FROM t1;",
@@ -605,7 +605,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watchChanges(
@@ -642,7 +642,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watchChanges(
@@ -679,7 +679,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
         let result: Array<any> = [];
@@ -717,7 +717,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
     {
       name: wn("Test reactive query is not n^2", asWorker),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
@@ -808,7 +808,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watchChanges(
@@ -845,7 +845,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
         let result: Array<any> = [];
@@ -1015,7 +1015,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watchChanges(
@@ -1059,7 +1059,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
     {
       name: wn("A reactive query can be replaced with new params", asWorker),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         let result: Array<any> = [];
         let handle = await skdb.watchChanges(
@@ -1108,8 +1108,8 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec(
           [
-            "CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);",
-            "CREATE TABLE t2 (a INTEGER, b STRING, c FLOAT);",
+            "CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);",
+            "CREATE TABLE t2 (a INTEGER, b TEXT, c FLOAT);",
           ].join("\n"),
         );
         await skdb.insert("t1", [13, "9", 42.1]);
@@ -1175,7 +1175,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
 
@@ -1239,7 +1239,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         asWorker,
       ),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("CREATE TABLE t1 (a INTEGER, b STRING, c FLOAT);");
+        await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
@@ -1405,7 +1405,7 @@ export const tests = (asWorker: boolean) => {
     {
       name: n("Primary key", asWorker),
       fun: async (skdb: SKDB) => {
-        return await skdb.exec("create table t1 (a STRING PRIMARY KEY);");
+        return await skdb.exec("create table t1 (a TEXT PRIMARY KEY);");
       },
       check: (res) => {
         expect(res).toEqual([]);
@@ -1414,7 +1414,7 @@ export const tests = (asWorker: boolean) => {
     {
       name: n("Primary key 2", asWorker),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("create table t1 (a STRING PRIMARY KEY, b INTEGER);");
+        await skdb.exec("create table t1 (a TEXT PRIMARY KEY, b INTEGER);");
         try {
           await skdb.exec("insert into t1 (b) values (22);");
           return await skdb.exec("select b from t1;");

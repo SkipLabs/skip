@@ -449,10 +449,10 @@ class SkdbBackedLogger() : Logger {
         """CREATE TABLE IF NOT EXISTS
              server_events (
                t INTEGER,
-               db STRING,
-               user STRING,
-               event STRING,
-               metadata STRING
+               db TEXT,
+               user TEXT,
+               event TEXT,
+               metadata TEXT
              );""",
         OutputFormat.RAW)
   }
@@ -563,12 +563,12 @@ class Config() {
     skdb.sql(
         """
       CREATE TABLE IF NOT EXISTS server_config (
-        key STRING,
-        user STRING,
-        db STRING,
+        key TEXT,
+        user TEXT,
+        db TEXT,
         intVal INTEGER,
         dblVal FLOAT,
-        strVal STRING
+        strVal TEXT
       );""",
         OutputFormat.RAW)
 

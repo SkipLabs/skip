@@ -1,4 +1,4 @@
-create table t1(a STRING PRIMARY KEY, b INTEGER);
+create table t1(a TEXT PRIMARY KEY, b INTEGER);
 
 begin transaction;
 insert into t1 values (id('key1'), 123);

@@ -28,9 +28,9 @@ setup_server() {
     echo "INSERT INTO skdb_users VALUES('test_user', 'test');" | $SKDB
     echo "INSERT INTO skdb_users VALUES('test_user2', 'test');" | $SKDB
 
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note TEXT, skdb_access TEXT);" | $SKDB
     # out of first position and a string
-    echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test_pk_alt (x INTEGER, id TEXT PRIMARY KEY, skdb_access TEXT);" | $SKDB
 }
 
 setup_local() {
@@ -43,8 +43,8 @@ setup_local() {
 
     awk '/^INSERT/{exit} {print $0}' "$SCRIPT_DIR/privacy/init.sql" | $SKDB
 
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
-    echo "CREATE TABLE test_pk_alt (x INTEGER, id STRING PRIMARY KEY, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note TEXT, skdb_access TEXT);" | $SKDB
+    echo "CREATE TABLE test_pk_alt (x INTEGER, id TEXT PRIMARY KEY, skdb_access TEXT);" | $SKDB
 
     $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" skdb_groups skdb_group_permissions skdb_users skdb_user_permissions > $SESSION
 }
@@ -79,7 +79,7 @@ setup_local2() {
 
     awk '/^INSERT/{exit} {print $0}' "$SCRIPT_DIR/privacy/init.sql" | $SKDB
 
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note TEXT, skdb_access TEXT);" | $SKDB
 
     $SKDB_BIN subscribe --data $LOCAL2_DB --connect --format=csv --updates $UPDATES2 --ignore-source 7777 "$table" skdb_groups skdb_group_permissions skdb_users skdb_user_permissions > $SESSION2
 }

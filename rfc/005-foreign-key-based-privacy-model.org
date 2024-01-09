@@ -36,11 +36,11 @@ keys (FKs) - which we would need to build for this proposal. So we
 have:
 
 #+BEGIN_SRC sql
-  CREATE TABLE users (id STRING PRIMARY KEY, ...);
+  CREATE TABLE users (id TEXT PRIMARY KEY, ...);
   CREATE TABLE posts (
-    id STRING PRIMARY KEY,
-    authorID STRING REFERENCES users(id),
-    body STRING
+    id TEXT PRIMARY KEY,
+    authorID TEXT REFERENCES users(id),
+    body TEXT
   )
 #+END_SRC
 
@@ -53,11 +53,11 @@ We have a table ~skdb_access~:
 
 #+BEGIN_SRC sql
   CREATE TABLE skdb_access (
-    from_table STRING NOT NULL,   --e.g. posts
-    to_table STRING NOT NULL,     --e.g. users
-    from_col STRING NOT NULL,     --e.g. authorID
-    id STRING NOT NULL,           --e.g. 1234
-    permission STRING NOT NULL,   --read, insert, or delete
+    from_table TEXT NOT NULL,   --e.g. posts
+    to_table TEXT NOT NULL,     --e.g. users
+    from_col TEXT NOT NULL,     --e.g. authorID
+    id TEXT NOT NULL,           --e.g. 1234
+    permission TEXT NOT NULL,   --read, insert, or delete
     user_group INTEGER NOT NULL   --e.g. 4567 - encoded elsewhere, represents a list of users
   );
 #+END_SRC
@@ -98,10 +98,10 @@ So we have a comments table:
 
 #+BEGIN_SRC sql
     CREATE TABLE post_comments (
-      id STRING PRIMARY KEY,
-      postID STRING REFERENCES posts(id),
-      authorID STRING REFERENCES users(id),
-      body STRING
+      id TEXT PRIMARY KEY,
+      postID TEXT REFERENCES posts(id),
+      authorID TEXT REFERENCES users(id),
+      body TEXT
     )
 #+END_SRC
 
@@ -168,10 +168,10 @@ So we create a group posts table like this:
 
 #+BEGIN_SRC sql
   CREATE TABLE group_posts (
-    id STRING PRIMARY KEY,
-    authorID STRING REFERENCES users(id),
-    groupID STRING REFERENCES groups(id),
-    body STRING
+    id TEXT PRIMARY KEY,
+    authorID TEXT REFERENCES users(id),
+    groupID TEXT REFERENCES groups(id),
+    body TEXT
   )
 #+END_SRC
 
@@ -258,16 +258,16 @@ We have the following schema.
 
 #+BEGIN_SRC sql
   CREATE TABLE auctions (
-    id STRING PRIMARY KEY,
-    creator STRING REFERENCES users(id),
+    id TEXT PRIMARY KEY,
+    creator TEXT REFERENCES users(id),
     ends_at INTEGER NOT NULL,
     ...
   );
 
   CREATE TABLE bids (
-    id STRING PRIMARY KEY,
-    auction STRING REFERENCES auctions(id),
-    bidder STRING REFERENCES users(id),
+    id TEXT PRIMARY KEY,
+    auction TEXT REFERENCES auctions(id),
+    bidder TEXT REFERENCES users(id),
     amount INTEGER NOT NULL,
     ...
   );
@@ -303,7 +303,7 @@ rows in ~skdb_access~:
 | from_table | to_table | from_col | id         | permission | user_group                   |
 |------------+----------+----------+------------+------------+------------------------------|
 | auctions   | users    | creator  | $A_USER_ID | read       | GROUP_ID_FOR_EVERYONE        |
-| auctions   | users    | creator  | $A_USER_ID | insert     | GROUP_ID_FOR_JUST_$A_USER_ID |
+| auctions   | users    | creator  | $A_USER_ID | insert     | GROUP_ID_FOR_JUST_$A_USER_ID  |
 | auctions   | users    | creator  | $A_USER_ID | delete     | GROUP_ID_FOR_JUST_$A_USER_ID |
 | bids       | users    | bidder   | $A_USER_ID | read       | GROUP_ID_FOR_JUST_$A_USER_ID |
 | bids       | users    | bidder   | $A_USER_ID | insert     | GROUP_ID_FOR_JUST_$A_USER_ID |

@@ -25,7 +25,7 @@ insert into t_real values (@one), (@zero), (@null), (@true), (@false), (@life), 
 select * from t_real order by c_real asc;
 select * from t_real where c_real <> @pi order by c_real asc;
 
-create table t_string (c_string STRING);
+create table t_string (c_string TEXT);
 
 insert into t_string values (@one_string), (@zero_string), (@null), (@null_string), (@true_string), (@false_string), (@life_string), (@pi_string), (@expression_string), (@string), (@at_string), (@horns);
 

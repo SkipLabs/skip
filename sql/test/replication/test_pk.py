@@ -8,7 +8,7 @@ import sys
 def create_cluster(scheduler):
   cluster = (
     Topology(scheduler)
-    .schema("CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING);")
+    .schema("CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note TEXT);")
   )
   return cluster
 
