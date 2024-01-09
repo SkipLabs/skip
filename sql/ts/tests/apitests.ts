@@ -111,7 +111,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   const remote = (await skdb.connectedRemote())!;
 
   const tableCreate = await remote.exec(
-    "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER, skdb_access STRING);",
+    "CREATE TABLE test_pk (x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT);",
     new Map(),
   );
   expect(tableCreate).toEqual([]);
@@ -340,8 +340,8 @@ async function testClientTail(root: SKDB, user: SKDB) {
 
 async function testLargeMirror(root: SKDB, user: SKDB) {
   const rootRemote = await root.connectedRemote();
-  rootRemote!.exec("CREATE TABLE large (t INTEGER, skdb_access STRING);");
-  rootRemote!.exec("CREATE TABLE large_copy (t INTEGER, skdb_access STRING);");
+  rootRemote!.exec("CREATE TABLE large (t INTEGER, skdb_access TEXT);");
+  rootRemote!.exec("CREATE TABLE large_copy (t INTEGER, skdb_access TEXT);");
   await user.mirror("test_pk", "view_pk", "large");
 
   const N = 10000;

@@ -53,25 +53,25 @@ run_server() {
     ) | $SKDB
 
     # for coordinating expectation checking
-    echo "CREATE TABLE checkpoints (checkpoint_id STRING PRIMARY KEY, latest_id INTEGER, client INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE checkpoints (checkpoint_id TEXT PRIMARY KEY, latest_id INTEGER, client INTEGER, skdb_access TEXT NOT NULL);" | $SKDB
 
     # these tables are for inserts only. there should be no conflict
-    echo "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
-    echo "CREATE TABLE pk_inserts (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access TEXT NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_inserts (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access TEXT NOT NULL);" | $SKDB
 
     # these tables have two clients fighting over a single row
-    echo "CREATE TABLE no_pk_single_row (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE no_pk_single_row (id INTEGER, client INTEGER, value INTEGER, skdb_access TEXT NOT NULL);" | $SKDB
     echo "INSERT INTO no_pk_single_row VALUES (0,0,0, 'read-write');" | $SKDB
-    echo "CREATE TABLE pk_single_row (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_single_row (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access TEXT NOT NULL);" | $SKDB
     echo "INSERT INTO pk_single_row VALUES (0,0,0, 'read-write');" | $SKDB
 
     # these are filtered - the clients do intersect over some rows, but also have some rows disjoint
-    echo "CREATE TABLE no_pk_filtered (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
-    echo "CREATE TABLE pk_filtered (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE no_pk_filtered (id INTEGER, client INTEGER, value INTEGER, skdb_access TEXT NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_filtered (id INTEGER PRIMARY KEY, client INTEGER, value INTEGER, skdb_access TEXT NOT NULL);" | $SKDB
 
     # for checking privacy updates propagate
-    echo "CREATE TABLE pk_privacy_ro (client INTEGER PRIMARY KEY, skdb_access STRING NOT NULL);" | $SKDB
-    echo "CREATE TABLE pk_privacy_rw (client INTEGER PRIMARY KEY, updater INTEGER, skdb_access STRING NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_privacy_ro (client INTEGER PRIMARY KEY, skdb_access TEXT NOT NULL);" | $SKDB
+    echo "CREATE TABLE pk_privacy_rw (client INTEGER PRIMARY KEY, updater INTEGER, skdb_access TEXT NOT NULL);" | $SKDB
 
     "$SCRIPT_DIR"/../deploy/chaos.sh 90 > $SOAK_SERVER_LOG &
 

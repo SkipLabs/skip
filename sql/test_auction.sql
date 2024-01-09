@@ -1,8 +1,8 @@
 
 create table items(
   itemID INTEGER PRIMARY KEY,
-  status STRING,
-  descr STRING,
+  status TEXT,
+  descr TEXT,
   starting_price INTEGER,
   skdb_author INTEGER
 );

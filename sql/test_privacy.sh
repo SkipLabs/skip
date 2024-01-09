@@ -25,11 +25,11 @@ SKDB_COPY="$SKDB_CMD --data $DBCOPYFILE"
 cat privacy/init.sql | $SKDB
 cat privacy/init.sql | $SKDB_COPY
 
-echo "create table t1 (id INTEGER primary key, skdb_access STRING);" | $SKDB
-echo "create table t1 (id INTEGER primary key, skdb_access STRING);" | $SKDB_COPY
+echo "create table t1 (id INTEGER primary key, skdb_access TEXT);" | $SKDB
+echo "create table t1 (id INTEGER primary key, skdb_access TEXT);" | $SKDB_COPY
 subt1=`$SKDB subscribe t1`
 
-echo "create table t2 (id INTEGER primary key, skdb_access STRING);" | $SKDB
+echo "create table t2 (id INTEGER primary key, skdb_access TEXT);" | $SKDB
 echo "create virtual view v1 as select id, id as skdb_access from t1 ;" | $SKDB
 
 ###############################################################################
@@ -181,7 +181,7 @@ fi
 # SKDB_AUTHOR CHECK
 ###############################################################################
 
-echo "create table t4 (id INTEGER, skdb_author STRING);" | $SKDB
+echo "create table t4 (id INTEGER, skdb_author TEXT);" | $SKDB
 if echo -e "^t4\n1\t240,\"ID23\"\n:1" | $SKDB write-csv --user ID3 2>&1 | grep -q Error
 then pass "AUTHOR"
 else fail "AUTHOR"

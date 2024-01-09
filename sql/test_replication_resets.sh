@@ -26,10 +26,10 @@ setup_server() {
     echo "INSERT INTO skdb_group_permissions VALUES ('G1', 'U99', 7, 'root');" | $SKDB
     echo "INSERT INTO skdb_group_permissions VALUES ('G1', 'U98', 7, 'root');" | $SKDB
 
-    echo "CREATE TABLE test (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
-    echo "CREATE TABLE test_with_access (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
-    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
-    echo "CREATE TABLE test_with_pk_with_access (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test (id INTEGER, note TEXT, skdb_access TEXT);" | $SKDB
+    echo "CREATE TABLE test_with_access (id INTEGER, note TEXT, skdb_access TEXT);" | $SKDB
+    echo "CREATE TABLE test_with_pk (id INTEGER PRIMARY KEY, note TEXT, skdb_access TEXT);" | $SKDB
+    echo "CREATE TABLE test_with_pk_with_access (id INTEGER PRIMARY KEY, note TEXT, skdb_access TEXT);" | $SKDB
 }
 
 assert_line_count() {

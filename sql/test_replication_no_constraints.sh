@@ -24,7 +24,7 @@ setup_server() {
     $SKDB < "$SCRIPT_DIR/privacy/init.sql"
 
     echo "INSERT INTO skdb_users VALUES('test_user', 'test');" | $SKDB
-    echo "CREATE TABLE test_without_pk (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test_without_pk (id INTEGER, note TEXT, skdb_access TEXT);" | $SKDB
 }
 
 setup_local() {
@@ -35,7 +35,7 @@ setup_local() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
-    echo "CREATE TABLE test_without_pk (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test_without_pk (id INTEGER, note TEXT, skdb_access TEXT);" | $SKDB
 
     $SKDB_BIN subscribe --data $LOCAL_DB --connect --format=csv --updates $UPDATES --ignore-source 9999 "$table" > $SESSION
 }
@@ -506,7 +506,7 @@ test_replication_privacy_rejection_and_feedback() {
 
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(37, 'good', 'test_user');"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_without_pk VALUES(42, 'bad', 'read-write');"
-    $SKDB_BIN --data $LOCAL_DB <<< "CREATE TABLE test_without_pk__skdb_mirror_feedback (id INTEGER, note STRING, skdb_access STRING);"
+    $SKDB_BIN --data $LOCAL_DB <<< "CREATE TABLE test_without_pk__skdb_mirror_feedback (id INTEGER, note TEXT, skdb_access TEXT);"
 
     cat $UPDATES \
 	| $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user test_user 2>/dev/null \
