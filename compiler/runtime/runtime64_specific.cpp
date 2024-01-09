@@ -519,22 +519,6 @@ uint64_t SKIP_time_ms() {
       .count();
 }
 
-void SKIP_localtime(int64_t timep, char* resultp) {
-  localtime_r((time_t*)&timep, (struct tm*)resultp);
-}
-
-void SKIP_gmtime(int64_t timep, char* resultp) {
-  gmtime_r((time_t*)&timep, (struct tm*)resultp);
-}
-
-int64_t SKIP_mktime_local(char* timedate) {
-  return (int64_t)mktime((struct tm*)timedate);
-}
-
-int64_t SKIP_mktime_utc(char* timedate) {
-  return (int64_t)mktime((struct tm*)timedate) - timezone;
-}
-
 char* SKIP_unix_strftime(char* formatp, char* timep) {
   struct tm* tm = (struct tm*)timep;
   char buffer[1024];
@@ -554,17 +538,6 @@ char* SKIP_strftime(char* formatp, int64_t timestamp) {
   struct tm tm;
   localtime_r((time_t*)&timestamp, &tm);
   return SKIP_unix_strftime(formatp, (char*)&tm);
-}
-
-char* SKIP_unix_unixepoch(char* timep) {
-  struct tm* tm = (struct tm*)timep;
-  char buffer[50];
-  struct tm timeLocal;
-  time_t rawTime = mktime( tm );
-  localtime_r(&rawTime, &timeLocal);
-  rawTime += timeLocal.tm_gmtoff;
-  snprintf(buffer, 50, "%ld", rawTime);
-  return sk_string_create(buffer, strlen(buffer));
 }
 
 char* SKIP_getcwd() {

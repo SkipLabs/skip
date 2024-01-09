@@ -1,0 +1,734 @@
+module SKDate;
+
+@cpp_extern("SKIP_localetimezone")
+native fun localeTimeZone(year: UInt32, month: UInt32, day: UInt32): Int32;
+
+@cpp_extern("SKIP_currenttimemillis")
+native fun natCurrentTimeMillis(): Int;
+
+@cpp_extern("SKIP_JS_currenttimemillis")
+native fun jsCurrentTimeMillis(): Float;
+
+fun currentTimeMillis(): Int {
+  if (SkargoVersion.kWasm32) {
+    (jsCurrentTimeMillis() * 1000.0).toInt()
+  } else {
+    natCurrentTimeMillis()
+  }
+}
+
+class File(value: Calendar) extends SKStore.File
+
+const daysInNonLeapYearMonth: Array<Int> = Array[
+  31,
+  28,
+  31,
+  30,
+  31,
+  30,
+  31,
+  31,
+  30,
+  31,
+  30,
+  31,
+];
+
+class WeekDate(year: Int, week: Int, day: Day) uses Orderable {}
+
+base class Entity {
+  fun toCalendar(): Calendar;
+}
+
+class Date private (
+  private year: Int,
+  private month: Month,
+  private day: UInt8,
+) extends Entity uses Orderable {
+  //
+  static fun create(year: Int, month: Int, day: Int): Date {
+    date = Date(year, January(), UInt8::truncate(1));
+    !date = date.addMonths(month - 1);
+    date.addDays(day - 1);
+  }
+
+  fun toCalendar(): Calendar {
+    Calendar::create(this)
+  }
+
+  fun toNextWeekDay(day: Day): Date {
+    wd = this.getWeekDate();
+    this.addDays(wd.day.toNext(day))
+  }
+
+  fun getMonthStart(): Date {
+    !this.day = UInt8::truncate(1);
+    this
+  }
+
+  fun getYearStart(): Date {
+    !this.day = UInt8::truncate(1);
+    !this.month = January();
+    this
+  }
+
+  fun getYear(): Int {
+    this.year
+  }
+
+  fun getMonth(): Month {
+    this.month
+  }
+
+  fun getDayOfMonth(): Int {
+    this.day.toInt()
+  }
+
+  fun getWeekDate(kind: WeekNumber = WNISO()): WeekDate {
+    ref =
+      ((kind match {
+      | WNMonday() -> Monday()
+      | WNSunday() -> Sunday()
+      | WNISO() -> Thursday()
+      }).getCode() % 7) - 1;
+    firstDay = Date(this.year, January(), UInt8::truncate(1));
+    weekDay = firstDay.getWeekDay().getCode() - 1;
+    days = if (weekDay <= ref) {
+      this.getDayOfYear() - 1 + weekDay;
+    } else {
+      this.getDayOfYear() - 1 - (7 - weekDay);
+    };
+    year = this.year;
+    weekNumber = if (kind.isISO()) {
+      if (days < 0) {
+        !days = if (static::leapYear(this.year - 1)) {
+          366
+        } else {
+          {
+            365
+          } + (weekDay - ref)
+        };
+        !year = year - 1;
+      };
+      number = Math.floor(days.toFloat() / 7.0).toInt() + 1;
+      nbOfWeeks = static::weeks(year);
+      if (number > nbOfWeeks) {
+        if (this.year == year) {
+          !year = year + 1;
+          1;
+        } else {
+          nbOfWeeks
+        }
+      } else {
+        number
+      };
+    } else {
+      if (days < 0) {
+        0
+      } else {
+        Math.floor(days.toFloat() / 7.0).toInt() + 1;
+      }
+    };
+    WeekDate(year, weekNumber, this.getWeekDay());
+  }
+
+  fun getDayOfYear(): Int {
+    days = 0;
+    month = 0;
+    while (month < this.month.getCode() - 1) {
+      !days = days + static::daysInMonth(month, this.year);
+      !month = month + 1;
+    };
+    days + this.day;
+  }
+
+  fun addYears(years: Int): Date {
+    Date(this.year + years, this.month, this.day);
+  }
+
+  fun addMonths(months: Int): Date {
+    if (months == 0) {
+      this
+    } else if (months >= 0) {
+      tmonth = (this.month.getCode() - 1) + months;
+      amonth = tmonth % 12;
+      rmonth = amonth + 1;
+      year = this.year + tmonth / 12;
+      Date(year, Month::monthForCode(rmonth), UInt8::truncate(1)).addDays(
+        this.day.toInt() - 1,
+      )
+    } else {
+      tmonth = (this.month.getCode() - 1) + months;
+      if (tmonth >= 0) {
+        Date(
+          this.year,
+          Month::monthForCode(tmonth + 1),
+          UInt8::truncate(1),
+        ).addDays(this.day.toInt() - 1)
+      } else {
+        amonth = Math.abs(tmonth) % 12;
+        rmonth = 12 - amonth + 1;
+        year = this.year - (Math.abs(tmonth + 1) / 12) - 1;
+        Date(year, Month::monthForCode(rmonth), UInt8::truncate(1)).addDays(
+          this.day.toInt() - 1,
+        )
+      }
+    };
+  }
+
+  fun addDays(days: Int): Date {
+    tday = this.day.toInt() - 1;
+    month = this.month.getCode() - 1;
+    year = this.year;
+    if (days == 0) {
+      this;
+    } else if (days > 0) {
+      // Maximum days in the month
+      daysInMonth = static::daysInMonth(month, year);
+      nDays = tday + days;
+      while (nDays >= daysInMonth) {
+        !nDays = nDays - daysInMonth;
+        (!year, !month) = if (month == 11) {
+          (year + 1, 0)
+        } else {
+          (year, month + 1)
+        };
+        !daysInMonth = static::daysInMonth(month, year);
+      };
+      Date(year, Month::monthForCode(month + 1), UInt8::truncate(nDays + 1));
+    } else {
+      daysInMonth = tday;
+      nDays = days;
+      while (nDays < -daysInMonth) {
+        !nDays = nDays + daysInMonth;
+        (!year, !month) = if (month == 0) {
+          (year - 1, 11)
+        } else {
+          (year, month - 1)
+        };
+        !daysInMonth = static::daysInMonth(month, year)
+      };
+      Date(
+        year,
+        Month::monthForCode(month + 1),
+        UInt8::truncate(1 + daysInMonth + nDays),
+      );
+    };
+  }
+
+  fun daysBetween(minYear: Int, maxYear: Int): Int {
+    days = 0;
+    year = minYear;
+    while (year < maxYear) {
+      !days =
+        days +
+        if (static::leapYear(year)) {
+          366
+        } else {
+          365
+        };
+      !year = year + 1;
+    };
+    days;
+  }
+
+  fun daysSince(refYear: Int = 1970): Int {
+    invariant(
+      refYear <= this.year,
+      "Expected date year greater than reference year",
+    );
+    days = this.daysBetween(refYear, this.year);
+    days + this.getDayOfYear() - 1;
+  }
+
+  fun daysUntil(refYear: Int = 1970): Int {
+    days = this.daysBetween(this.year + 1, refYear);
+    days +
+      if (static::leapYear(this.year)) {
+        366 - this.getDayOfYear()
+      } else {
+        365 - this.getDayOfYear()
+      };
+  }
+
+  //ISO 8601 Standard
+  fun getWeekDay(): Day {
+    days = if (this.year >= 1970) this.daysSince() + 3 else {
+      this.daysUntil()
+    };
+    Day::dayForCode((days % 7) + 1);
+  }
+
+  fun getWeekNumber(kind: WeekNumber = WNISO()): Int {
+    this.getWeekDate(kind).week;
+  }
+
+  fun compare(other: Date): Order {
+    if (this.year == other.year) {
+      if (this.month == other.month) {
+        this.day.compare(other.day)
+      } else {
+        this.month.compare(other.month)
+      }
+    } else {
+      this.year.compare(other.year)
+    }
+  }
+
+  private static fun daysInMonth(month: Int, year: Int): Int {
+    days = daysInNonLeapYearMonth[month];
+    if (month == 1 && static::leapYear(year)) {
+      days + 1
+    } else {
+      days
+    }
+  }
+
+  private static fun leapYear(year: Int): Bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+  }
+
+  private static fun p(year: Int): Int {
+    (year + (year / 4) - (year / 100) + (year / 400)) % 7;
+  }
+
+  private static fun weeks(year: Int): Int {
+    52 +
+      if (static::p(year) == 4 || static::p(year - 1) == 3) {
+        1
+      } else {
+        0
+      };
+  }
+}
+
+base class TimeEntity private (
+  protected hours: Int,
+  protected minutes: UInt8,
+  protected seconds: UInt8,
+) {
+  //
+  fun getHours(): Int {
+    this.hours
+  }
+
+  fun getMinutes(): Int {
+    this.minutes.toInt()
+  }
+
+  fun getSeconds(): Int {
+    this.seconds.toInt()
+  }
+
+  fun addHours(hours: Int): this {
+    !this.hours = this.hours + hours;
+    this
+  }
+
+  fun addMinutes(minutes: Int): this {
+    if (minutes == 0) {
+      this
+    } else {
+      tminutes = this.minutes.toInt() + minutes;
+      aminutes = (Math.abs(tminutes) % 60);
+      rminutes = if (tminutes >= 0) {
+        aminutes
+      } else {
+        60 - aminutes
+      };
+      !this.minutes = UInt8::truncate(rminutes);
+      this.addHours(
+        if (tminutes >= 0) {
+          tminutes / 60
+        } else {
+          (tminutes / 60) - 1
+        },
+      );
+    };
+  }
+
+  fun addSeconds(second: Int): this {
+    if (second == 0) {
+      this
+    } else {
+      tsecond = this.seconds.toInt() + second;
+      asecond = (Math.abs(tsecond) % 60);
+      rsecond = if (tsecond >= 0) {
+        asecond
+      } else {
+        60 - asecond
+      };
+      !this.seconds = UInt8::truncate(rsecond);
+      this.addMinutes(
+        if (tsecond >= 0) {
+          tsecond / 60
+        } else {
+          (tsecond / 60) - 1
+        },
+      );
+    };
+  }
+}
+
+const utc: TZ = TZ(TimeZone::create());
+
+class TimeZone protected (neg: Bool) extends TimeEntity uses Orderable {
+  //
+  static fun create(
+    neg: Bool = false,
+    hours: Int = 0,
+    minutes: Int = 0,
+    seconds: Int = 0,
+  ): TimeZone {
+    tz = TimeZone(neg, hours, UInt8::truncate(0), UInt8::truncate(0));
+    !tz = tz.addMinutes(minutes);
+    tz.addSeconds(seconds);
+  }
+
+  static fun fromSeconds(secondsTz: Int): TimeZone {
+    neg = secondsTz < 0;
+    tzInSeconds = Math.abs(secondsTz);
+    hours = tzInSeconds / 3600;
+    remaining = tzInSeconds % 3600;
+    minutes = remaining / 60;
+    seconds = remaining % 60;
+    TimeZone::create(neg, hours, minutes, seconds)
+  }
+
+  fun toSeconds(): Int {
+    sds = this.hours * 3600 + this.minutes * 60 + this.seconds;
+    if (this.neg) -sds else sds
+  }
+}
+
+base class TZKind {
+  children =
+  | TZ(tz: TimeZone)
+  | TZLocal()
+
+  fun toTimeZone(date: Date): TimeZone
+  | TZ(value) -> value
+  | TZLocal() ->
+    ltz = localeTimeZone(
+      UInt32::truncate(date.getYear()),
+      UInt32::truncate(date.getMonth().getCode()),
+      UInt32::truncate(date.getDayOfMonth()),
+    );
+    TimeZone::fromSeconds(ltz.toInt())
+}
+
+class Time protected (
+  private milliseconds: UInt16,
+) extends TimeEntity, Entity uses Orderable {
+  //
+  static fun create(
+    hours: Int = 0,
+    minutes: Int = 0,
+    seconds: Int = 0,
+    milliseconds: Int = 0,
+  ): Time {
+    time = Time(
+      UInt16::truncate(0),
+      hours,
+      UInt8::truncate(0),
+      UInt8::truncate(0),
+    );
+    !time = time.addMinutes(minutes);
+    !time = time.addSeconds(seconds);
+    time.addMilliseconds(milliseconds);
+  }
+
+  fun toCalendar(): Calendar {
+    Calendar::current().setTime(this)
+  }
+
+  static fun fromMilliseconds(milliseconds: Int): Time {
+    time = Time(UInt16::truncate(0), 0, UInt8::truncate(0), UInt8::truncate(0));
+    time.addMilliseconds(milliseconds);
+  }
+
+  fun getMilliseconds(): Int {
+    this.milliseconds.toInt()
+  }
+
+  fun isMidnigth(): Bool {
+    this.hours == 0 &&
+      this.minutes == 0 &&
+      this.seconds == 0 &&
+      this.milliseconds == 0;
+  }
+
+  fun addMilliseconds(milliseconds: Int): Time {
+    if (milliseconds == 0) {
+      this
+    } else {
+      tmilliseconds = this.milliseconds.toInt() + milliseconds;
+      amilliseconds = (Math.abs(tmilliseconds) % 1000);
+      rmilliseconds = if (tmilliseconds >= 0) {
+        amilliseconds
+      } else {
+        1000 - amilliseconds
+      };
+      time = Time(
+        UInt16::truncate(rmilliseconds),
+        this.hours,
+        this.minutes,
+        this.seconds,
+      );
+      time.addSeconds(
+        if (tmilliseconds >= 0) {
+          tmilliseconds / 1000
+        } else {
+          (tmilliseconds / 1000) - 1
+        },
+      );
+    };
+  }
+
+  fun compare(other: Time): Order {
+    if (this.hours == other.hours) {
+      if (this.minutes == other.minutes) {
+        if (this.seconds == other.seconds) {
+          this.milliseconds.compare(other.milliseconds);
+        } else {
+          this.seconds.compare(other.seconds);
+        }
+      } else {
+        this.minutes.compare(other.minutes);
+      }
+    } else {
+      this.hours.compare(other.hours);
+    }
+  }
+
+  fun toMilliseconds(): Int {
+    secondes = this.hours * 3600 + this.minutes * 60 + this.seconds;
+    this.milliseconds.toInt() + secondes * 1000;
+  }
+
+  fun inv(): this {
+    static::fromMilliseconds((24 * 3600000) - this.toMilliseconds())
+  }
+}
+
+class Calendar private (
+  date: Date,
+  time: Time,
+  timezone: TimeZone,
+) extends Entity uses Orderable {
+  //
+  static fun create(
+    date: Date,
+    time: Time = Time::create(),
+    tz: TZKind = TZLocal(),
+  ): Calendar {
+    rtime = Time::create(
+      time.getHours() % 24,
+      time.getMinutes(),
+      time.getSeconds(),
+      time.getMilliseconds(),
+    );
+    rdate = date.addDays(time.getHours() / 24);
+    timezone = tz.toTimeZone(rdate);
+    Calendar(rdate, rtime, timezone);
+  }
+
+  static fun forDate(year: Int, month: Int, day: Int): Calendar {
+    static::create(Date::create(year, month, day))
+  }
+
+  static fun fromJulianDay(julianDay: Float, tz: TZKind = TZLocal()): Calendar {
+    julianReference = Calendar::create(
+      Date::create(-4713, 11, 24),
+      Time::create(12),
+      utc,
+    );
+    diff = julianDay * (1000.0 * 60.0 * 60.0 * 24.0);
+    epoch = julianReference.toEpoch() + diff.toInt();
+    static::epoch(epoch, tz);
+  }
+
+  static fun epoch(milliseconds: Int, tz: TZKind = TZLocal()): Calendar {
+    dt = Calendar::create(
+      Date::create(1970, 1, 1),
+      Time::fromMilliseconds(milliseconds),
+      TZ(TimeZone::create()),
+    );
+    dt.deriveTimeZone(tz);
+  }
+
+  static fun current(): Calendar {
+    Calendar::epoch(currentTimeMillis());
+  }
+
+  fun toCalendar(): Calendar {
+    this
+  }
+
+  fun setTime(time: Time): Calendar {
+    !this.time = time;
+    this
+  }
+
+  fun toNextWeekDay(day: Day): Calendar {
+    !this.date = this.date.toNextWeekDay(day);
+    this
+  }
+
+  fun getMonthStart(): Calendar {
+    !this.date = this.date.getMonthStart();
+    this
+  }
+
+  fun getYearStart(): Calendar {
+    !this.date = this.date.getYearStart();
+    this
+  }
+
+  fun isDay(): Bool {
+    this.time.isMidnigth()
+  }
+
+  fun addYears(years: Int): Calendar {
+    Calendar(this.date.addYears(years), this.time, this.timezone);
+  }
+
+  fun addMonths(months: Int): Calendar {
+    Calendar(this.date.addMonths(months), this.time, this.timezone);
+  }
+
+  fun addDays(days: Int): Calendar {
+    Calendar(this.date.addDays(days), this.time, this.timezone);
+  }
+
+  fun addHours(hours: Int): Calendar {
+    time = this.time.addHours(hours);
+    chours = time.getHours();
+    fhours = if (chours >= 0) {
+      chours % 24
+    } else {
+      24 - (Math.abs(chours) % 24);
+    };
+    rtime = Time::create(
+      fhours % 24,
+      time.getMinutes(),
+      time.getSeconds(),
+      time.getMilliseconds(),
+    );
+    fdays = if (chours >= 0) {
+      chours / 24
+    } else {
+      -(Math.abs(chours + 1) / 24) - 1;
+    };
+    rdate = this.date.addDays(fdays);
+    Calendar(rdate, rtime, this.timezone);
+  }
+
+  fun addMinutes(minutes: Int): Calendar {
+    time = this.time.addMinutes(minutes);
+    rtime = Time::create(
+      0,
+      time.getMinutes(),
+      time.getSeconds(),
+      time.getMilliseconds(),
+    );
+    date = Calendar(this.date, rtime, this.timezone);
+    date.addHours(time.getHours())
+  }
+
+  fun addSeconds(seconds: Int): Calendar {
+    time = this.time.addSeconds(seconds);
+    rtime = Time::create(
+      0,
+      time.getMinutes(),
+      time.getSeconds(),
+      time.getMilliseconds(),
+    );
+    date = Calendar(this.date, rtime, this.timezone);
+    date.addHours(time.getHours())
+  }
+
+  fun addMilliseconds(milliseconds: Int): Calendar {
+    time = this.time.addMilliseconds(milliseconds);
+    rtime = Time::create(
+      time.getHours() % 24,
+      time.getMinutes(),
+      time.getSeconds(),
+      time.getMilliseconds(),
+    );
+    rdate = this.date.addDays(time.getHours() / 24);
+    Calendar(rdate, rtime, this.timezone);
+  }
+
+  fun deriveTimeZone(tz: TZKind): Calendar {
+    timezone = tz.toTimeZone(this.date);
+    if (timezone == this.timezone) {
+      this;
+    } else {
+      calendar = this.addSeconds(
+        timezone.toSeconds() - this.timezone.toSeconds(),
+      );
+      Calendar(calendar.date, calendar.time, timezone);
+    }
+  }
+
+  fun withTimeZone(tz: TZKind): Calendar {
+    !this.timezone = tz.toTimeZone(this.date);
+    this
+  }
+
+  fun toEpoch(asSeconds: Bool = false): Int {
+    calendar = if (this.timezone != utc.tz) {
+      this.deriveTimeZone(utc);
+    } else {
+      this;
+    };
+    value = if (calendar.date.getYear() >= 1970) {
+      days = calendar.date.daysSince();
+      seconds =
+        calendar.time.getSeconds() +
+        60 * calendar.time.getMinutes() +
+        3600 * (calendar.time.getHours() + 24 * days);
+      1000 * seconds + calendar.time.getMilliseconds();
+    } else {
+      days = calendar.date.daysUntil();
+      time = calendar.time.inv();
+      seconds =
+        time.getSeconds() +
+        60 * time.getMinutes() +
+        3600 * (time.getHours() + 24 * days);
+      -(1000 * seconds + time.getMilliseconds());
+    };
+    if (asSeconds) value / 1000 else value
+  }
+
+  fun toJulian(): Float {
+    calendar = if (this.timezone != utc.tz) {
+      this.deriveTimeZone(utc);
+    } else {
+      this;
+    };
+    julianReference = Calendar::create(
+      Date::create(-4713, 11, 24),
+      Time::create(12),
+      utc,
+    );
+    diff = calendar.toEpoch() - julianReference.toEpoch();
+    diff.toFloat() / (1000.0 * 60.0 * 60.0 * 24.0);
+  }
+
+  fun compare(other: Calendar): Order {
+    !other = if (this.timezone != other.timezone) {
+      other.deriveTimeZone(TZ(this.timezone));
+    } else {
+      other
+    };
+    if (this.date == other.date) {
+      this.time.compare(other.time);
+    } else {
+      this.date.compare(other.date);
+    }
+  }
+}
+
+module end;

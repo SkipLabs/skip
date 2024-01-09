@@ -133,26 +133,6 @@ uint32_t SKIP_get_persistent_size() {
   return (uint32_t)bump_pointer;
 }
 
-void SKIP_mktime_utc() {
-  // Not implemented
-}
-
-void SKIP_mktime_local() {
-  // Not implemented
-}
-
-void SKIP_unix_strftime() {
-  // Not implemented
-}
-
-void SKIP_gmtime() {
-  // Not implemented
-}
-
-void SKIP_localtime() {
-  // Not implemented
-}
-
 void SKIP_time() {
   // Not implemented
 }
