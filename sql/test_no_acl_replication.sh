@@ -20,7 +20,7 @@ setup_server() {
     $SKDB < privacy/init.sql
 
     echo "INSERT INTO skdb_users VALUES('test_user', 'pass');" | $SKDB
-    echo "CREATE TABLE test (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test (id INTEGER PRIMARY KEY, note TEXT, skdb_access TEXT);" | $SKDB
 }
 
 setup_local() {
@@ -30,7 +30,7 @@ setup_local() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
-    echo "CREATE TABLE test (id INTEGER PRIMARY KEY, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test (id INTEGER PRIMARY KEY, note TEXT, skdb_access TEXT);" | $SKDB
 
     $SKDB_BIN subscribe --format=csv --data $LOCAL_DB --connect --updates $UPDATES test > /dev/null
 }

@@ -27,7 +27,7 @@ setup_server() {
     echo "INSERT INTO skdb_groups VALUES ('G2', NULL, 'root', 'root');" | $SKDB
     echo "INSERT INTO skdb_group_permissions VALUES ('G2', 'test_alt_user', 7, 'root');" | $SKDB
 
-    echo "CREATE TABLE test (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test (id INTEGER, note TEXT, skdb_access TEXT);" | $SKDB
 }
 
 setup_local() {
@@ -37,7 +37,7 @@ setup_local() {
     SKDB="$SKDB_BIN --data $db"
     $SKDB_BIN --init "$db"
 
-    echo "CREATE TABLE test (id INTEGER, note STRING, skdb_access STRING);" | $SKDB
+    echo "CREATE TABLE test (id INTEGER, note TEXT, skdb_access TEXT);" | $SKDB
 }
 
 assert_line_count() {

@@ -4,15 +4,15 @@
 
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_users(
-  userID STRING PRIMARY KEY,
-  privateKey STRING NOT NULL
+  userID TEXT PRIMARY KEY,
+  privateKey TEXT NOT NULL
 );
 
 -- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_user_permissions(
-  userID STRING PRIMARY KEY,
+  userID TEXT PRIMARY KEY,
   permissions INTEGER NOT NULL,
-  skdb_access STRING NOT NULL
+  skdb_access TEXT NOT NULL
 );
 
 -------------------------------------------------------------------------------
@@ -25,18 +25,18 @@ CREATE TABLE skdb_user_permissions(
 -- skdb_access: who should be able to see/modify the administrators
 
 CREATE TABLE skdb_groups(
-  groupID STRING PRIMARY KEY,
-  skdb_author STRING,
-  adminID STRING NOT NULL,
-  skdb_access STRING NOT NULL
+  groupID TEXT PRIMARY KEY,
+  skdb_author TEXT,
+  adminID TEXT NOT NULL,
+  skdb_access TEXT NOT NULL
 );
 
 --- INTERNAL TABLE: DO NOT CHANGE DEFINITION
 CREATE TABLE skdb_group_permissions(
-  groupID STRING NOT NULL,
-  userID STRING,
+  groupID TEXT NOT NULL,
+  userID TEXT,
   permissions INTEGER NOT NULL,
-  skdb_access STRING NOT NULL
+  skdb_access TEXT NOT NULL
 );
 
 CREATE UNIQUE INDEX skdb_permissions_group_user ON

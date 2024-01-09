@@ -26,7 +26,7 @@ fun main() = runBlocking {
       openSkdb(localDbName)
           ?: createSkdb(
               localDbName, genCredentials(localUser, NoEncryptionTransform()).b64encryptedKey())
-  skdb.sql("CREATE TABLE IF NOT EXISTS test (x INTEGER PRIMARY KEY, y STRING);", OutputFormat.RAW)
+  skdb.sql("CREATE TABLE IF NOT EXISTS test (x INTEGER PRIMARY KEY, y TEXT);", OutputFormat.RAW)
 
   val endpoint = "ws://localhost:8080"
   val db = "foo"
@@ -52,7 +52,7 @@ fun main() = runBlocking {
 
   val work = launch {
     launch {
-      val create = conn.sqlRaw("CREATE TABLE IF NOT EXISTS test (x INTEGER PRIMARY KEY, y STRING);")
+      val create = conn.sqlRaw("CREATE TABLE IF NOT EXISTS test (x INTEGER PRIMARY KEY, y TEXT);")
       println(": [ggyxt] create: ${create}")
 
       launch {
