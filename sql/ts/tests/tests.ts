@@ -1320,6 +1320,62 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
   ];
 };
 
+const dateTests = (asWorker: boolean) => {
+  let dn = (name: string, asWorker: boolean) => {
+    return n("Date: " + name, asWorker);
+  };
+  return [
+    {
+      name: dn("Add days", asWorker),
+      fun: async (skdb: SKDB) => {
+        const res = await skdb.exec(
+          "select strftime('%Y-%m-%d', '2023-01-01', '+2 day');",
+        );
+        return res.scalarValue();
+      },
+      check: (res) => {
+        expect(res).toEqual("2023-01-03");
+      },
+    },
+    {
+      name: dn("Add months", asWorker),
+      fun: async (skdb: SKDB) => {
+        const res = await skdb.exec(
+          "select strftime('%Y-%m-%d', '2023-01-01', '+2 month');",
+        );
+        return res.scalarValue();
+      },
+      check: (res) => {
+        expect(res).toEqual("2023-03-01");
+      },
+    },
+    {
+      name: dn("Epoch", asWorker),
+      fun: async (skdb: SKDB) => {
+        const res = await skdb.exec(
+          "select strftime('%s', '1995-01-01 00:00:00+00');",
+        );
+        return res.scalarValue();
+      },
+      check: (res) => {
+        expect(res).toEqual("788918400");
+      },
+    },
+    {
+      name: dn("Meridian hour", asWorker),
+      fun: async (skdb: SKDB) => {
+        const res = await skdb.exec(
+          "select strftime('%r', '2023-01-01 10:30:00');",
+        );
+        return res.scalarValue();
+      },
+      check: (res) => {
+        expect(res).toEqual("10:30:00 AM");
+      },
+    },
+  ];
+};
+
 export const tests = (asWorker: boolean) => {
   let tests = [
     {
@@ -1552,5 +1608,8 @@ export const tests = (asWorker: boolean) => {
       },
     },
   ];
-  return tests.concat(watchTests(asWorker)).concat(watchChangesTests(asWorker));
+  return tests
+    .concat(watchTests(asWorker))
+    .concat(watchChangesTests(asWorker))
+    .concat(dateTests(asWorker));
 };

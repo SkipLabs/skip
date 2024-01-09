@@ -1449,7 +1449,44 @@ mutable class Compiler{
           ),
         )
 
-      | "julianday" -> error(this.pos, "julianday not supported")
+      | "calendar" ->
+        if (args.size() < 1) {
+          error(this.pos, "Missing arguments");
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%:c")].concat(args),
+            false,
+          ),
+        )
+
+      | "unixepoch" ->
+        if (args.size() < 1) {
+          error(this.pos, "Missing arguments");
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%s")].concat(args),
+            false,
+          ),
+        )
+
+      | "julianday" ->
+        if (args.size() < 1) {
+          error(this.pos, "Missing arguments");
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%J")].concat(args),
+            false,
+          ),
+        )
 
       | "strftime" ->
         if (args.size() < 2) {
