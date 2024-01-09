@@ -814,86 +814,92 @@ class EagerDir{
   }
 
   private fun flattenData(limit: Tick): FixedDataMap {
-    fixedIter = FixedDataMapIterator::create(this.fixedData.getIterAll());
-    data = mutable Vector[];
-    tombs = mutable Vector[];
-    lastOpt: ?(Tick, Source, Source, Key, Array<File>) = None();
+    withRegionValue(() ~> {
+      fixedIter = FixedDataMapIterator::create(this.fixedData.getIterAll());
+      data = Vector::mcreate(
+        this.fixedData.data.size() + 1.shl(this.data.data.getHeight()),
+      );
+      tombs = Vector::mcreate(
+        this.fixedData.tombs.size() + 1.shl(this.data.tombs.getHeight()),
+      );
+      lastOpt: ?(Tick, Source, Source, Key, Array<File>) = None();
 
-    addHelper = lastRow -> {
-      if (lastRow.i4.size() > 0 || lastRow.i0 > limit) {
-        if (lastRow.i4.size() > 0) {
-          data.push(
-            FixedRow(
-              lastRow.i3,
-              (lastRow.i1, lastRow.i4),
-              TickRange::create(lastRow.i0),
-            ),
-          );
-        } else {
-          tombs.push(
-            FixedRow(
-              lastRow.i3,
-              (lastRow.i1, lastRow.i2),
-              TickRange::create(lastRow.i0),
-            ),
-          );
+      addHelper = lastRow -> {
+        if (lastRow.i4.size() > 0 || lastRow.i0 > limit) {
+          if (lastRow.i4.size() > 0) {
+            data.push(
+              FixedRow(
+                lastRow.i3,
+                (lastRow.i1, lastRow.i4),
+                TickRange::create(lastRow.i0),
+              ),
+            );
+          } else {
+            tombs.push(
+              FixedRow(
+                lastRow.i3,
+                (lastRow.i1, lastRow.i2),
+                TickRange::create(lastRow.i0),
+              ),
+            );
+          }
         }
-      }
-    };
-
-    add = fixedRow -> {
-      lastOpt match {
-      | Some(
-        lastRow,
-      ) if (fixedRow.i3 != lastRow.i3 || fixedRow.i1 != lastRow.i1) ->
-        addHelper(lastRow)
-      | _ -> void
       };
-      !lastOpt = Some(fixedRow)
-    };
 
-    for (key => _ in this.data) {
-      while (!fixedIter.isEnd() && fixedIter.current().i3 < key) {
-        add(fixedIter.current());
-        fixedIter.next();
+      add = fixedRow -> {
+        lastOpt match {
+        | Some(
+          lastRow,
+        ) if (fixedRow.i3 != lastRow.i3 || fixedRow.i1 != lastRow.i1) ->
+          addHelper(lastRow)
+        | _ -> void
+        };
+        !lastOpt = Some(fixedRow)
       };
-      map = this.data.maybeGet(key).fromSome();
-      for (tickSource => values in map) {
-        (tick, source, writer) = tickSource;
-        while (
-          !fixedIter.isEnd() &&
-          fixedIter.current().i3 == key &&
-          fixedIter.current().i1 < source
-        ) {
+
+      for (key => _ in this.data) {
+        while (!fixedIter.isEnd() && fixedIter.current().i3 < key) {
           add(fixedIter.current());
           fixedIter.next();
         };
-        add((tick, source, writer, key, values));
-        while (
-          !fixedIter.isEnd() &&
-          fixedIter.current().i3 == key &&
-          fixedIter.current().i1 == source
-        ) {
+        map = this.data.maybeGet(key).fromSome();
+        for (tickSource => values in map) {
+          (tick, source, writer) = tickSource;
+          while (
+            !fixedIter.isEnd() &&
+            fixedIter.current().i3 == key &&
+            fixedIter.current().i1 < source
+          ) {
+            add(fixedIter.current());
+            fixedIter.next();
+          };
+          add((tick, source, writer, key, values));
+          while (
+            !fixedIter.isEnd() &&
+            fixedIter.current().i3 == key &&
+            fixedIter.current().i1 == source
+          ) {
+            fixedIter.next();
+          };
+        };
+        while (!fixedIter.isEnd() && fixedIter.current().i3 == key) {
+          add(fixedIter.current());
           fixedIter.next();
         };
       };
-      while (!fixedIter.isEnd() && fixedIter.current().i3 == key) {
+
+      while (!fixedIter.isEnd()) {
         add(fixedIter.current());
         fixedIter.next();
       };
-    };
 
-    while (!fixedIter.isEnd()) {
-      add(fixedIter.current());
-      fixedIter.next();
-    };
+      lastOpt match {
+      | None() -> void
+      | Some(lastRow) -> addHelper(lastRow)
+      };
 
-    lastOpt match {
-    | None() -> void
-    | Some(lastRow) -> addHelper(lastRow)
-    };
-
-    FixedDataMap::create(data, tombs)
+      FixedDataMap::create(data, tombs)
+    });
   }
 
   fun purge(context: mutable Context, limit: Tick): this {
