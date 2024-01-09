@@ -102,10 +102,27 @@ class FixedDir<T: frozen> private {
   static fun create(
     data: mutable Vector<FixedRow<T>> = mutable Vector[],
   ): this {
-    data.sortBy(row ~> (row.key, row.value.i0));
-    result = data.toArray().clone();
-    _ = static::computeTags(result, 0, result.size() - 1);
-    FixedDir{data => result.chill()}
+    i = 0;
+    sz = data.size();
+    sorted = loop {
+      !i = i + 1;
+      if (i >= sz) break true;
+      keyComparison = data[i-1].key.compare(data[i].key);
+      keyComparison match {
+        | LT() -> continue;
+        | GT() -> break false;
+        | EQ() -> data[i-1].value.i0.compare(data[i].value.i0)
+      } match {
+        | LT() -> continue;
+        | EQ() -> continue;
+        | GT() -> break false;
+      };
+    };
+    if (!sorted) {
+      data.sortBy(row ~> (row.key, row.value.i0));
+    };
+    _ = static::computeTags(data, 0, data.size() - 1);
+    FixedDir{data => data.toArray()}
   }
 
   fun size(): Int {
@@ -154,7 +171,7 @@ class FixedDir<T: frozen> private {
   }
 
   static fun computeTags(
-    array: mutable Array<FixedRow<T>>,
+    array: mutable Vector<FixedRow<T>>,
     i: Int,
     j: Int,
   ): TickRange {
