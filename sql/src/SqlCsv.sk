@@ -355,11 +355,12 @@ fun applyDiffStrategy(
       rows.iterator(),
       dir,
       (optContext, row, newDir) ~> {
+        ctx = optContext.fromSome();
         key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
         for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
           if (tick.value < snapshot.default(0) || source.path() == writer) {
             !newDir = newDir.writeEntry(
-              optContext.fromSome(),
+              ctx,
               source.path(),
               writer,
               key,
@@ -370,13 +371,19 @@ fun applyDiffStrategy(
 
         if (row.repeat > 0) {
           !newDir = newDir.writeEntry(
-            optContext.fromSome(),
+            ctx,
             writer,
             writer,
             SKDB.RowKey(row, table.kinds),
             Array[row],
           );
         };
+
+        // update incrementally to keep memory usage down. this has a
+        // significant effect for large write sets and negligible
+        // impact on performance
+        ctx.setDir(newDir.dirName, newDir);
+        ctx.update();
 
         newDir
       },
@@ -476,12 +483,13 @@ fun applyDiffStrategy(
       rows.iterator(),
       dir,
       (optContext, row, newDir) ~> {
+        ctx = optContext.fromSome();
         if (row.repeat < 1) {
           key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
           for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
             if (tick.value < snapshot.default(0) || source.path() == writer) {
               !newDir = newDir.writeEntry(
-                optContext.fromSome(),
+                ctx,
                 source.path(),
                 writer,
                 key,
@@ -495,13 +503,13 @@ fun applyDiffStrategy(
             snapshot.default(0),
             writer,
             primaryIdx,
-            optContext.fromSome(),
+            ctx,
             newDir,
             row,
           )) {
             (editKey, (editSrc, editWriter, editFiles)) = edit;
             !newDir = newDir.writeEntry(
-              optContext.fromSome(),
+              ctx,
               editSrc,
               editWriter,
               editKey,
@@ -509,6 +517,13 @@ fun applyDiffStrategy(
             );
           };
         };
+
+        // update incrementally to keep memory usage down. this has a
+        // significant effect for large write sets and negligible
+        // impact on performance
+        ctx.setDir(newDir.dirName, newDir);
+        ctx.update();
+
         newDir
       },
     );
