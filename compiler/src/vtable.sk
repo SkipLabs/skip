@@ -623,10 +623,8 @@ private fun createGCType(
     ConstantInt{id => InstrID::none, typ => tInt, value => userByteSize},
   );
 
-  // m_onStateChange
-  pushField(
-    ConstantPointer{id => InstrID::none, typ => tNonGCPointer, value => 0},
-  );
+  // unused padding
+  pushField(ConstantInt{id => InstrID::none, typ => tNonGCPointer, value => 0});
 
   if (config.ptrBitSize == 32) {
     // Emit alignment padding before the mask words.
