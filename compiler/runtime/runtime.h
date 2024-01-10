@@ -155,6 +155,7 @@ sk_value3_t sk_stack3_pop(sk_stack3_t* st);
 /* The type information exposed by the Skip compiler for each object. */
 /*****************************************************************************/
 
+// vtable entries created by createGCType in vtable.sk
 typedef struct {
   uint8_t m_refsHintMask;
   uint8_t m_kind;
@@ -170,6 +171,8 @@ typedef struct {
   void (*m_onStateChange)(void*, long);
   size_t m_refMask[0];
 } SKIP_gc_type_t;
+
+SKIP_gc_type_t* get_gc_type(char* skip_object);
 
 /*****************************************************************************/
 /* SKIP String representation. */
