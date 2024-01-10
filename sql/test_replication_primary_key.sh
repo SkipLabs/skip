@@ -1101,7 +1101,7 @@ test_user_privacy_control() {
 
     $SKDB_BIN --data $LOCAL2_DB <<< "INSERT INTO test_with_pk VALUES (44, 'baz', 'new_group');"
 
-    $SKDB_BIN --data $LOCAL2_DB diff --format=csv --since 23 $(cat $SESSION2) | $SKDB_BIN write-csv --data $SERVER_DB --source 3333 --user test_user2 > $WRITE_OUTPUT
+    $SKDB_BIN --data $LOCAL2_DB diff --format=csv --since 31 $(cat $SESSION2) | $SKDB_BIN write-csv --data $SERVER_DB --source 3333 --user test_user2 > $WRITE_OUTPUT
     replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $SERVER_DB <<< 'select * from test_with_pk;' > "$server_output"

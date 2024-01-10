@@ -708,15 +708,7 @@ fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
 
   SKDB.runSql(options, context ~> {
     user = args.maybeGetString("user");
-    myReadLine = () -> {
-      buffer = mutable Vector[];
-      loop {
-        c = getChar();
-        if (c == '\n') return String::fromChars(buffer.toArray());
-        buffer.push(c);
-      }
-    };
-    SKCSV.replayDiff(context, myReadLine, user, source)
+    SKCSV.replayDiff(context, read_line, user, source)
   })
 }
 

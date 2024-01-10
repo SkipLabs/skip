@@ -467,7 +467,7 @@ mutable class Context{
     }
   }
 
-  mutable fun replaceFromSaved(ctx: Context): void {
+  mutable fun replaceFromSaved(ctx: readonly Context): void {
     this.!toPurge = ctx.toPurge;
     this.!purgeLimit = ctx.purgeLimit;
     this.!pwd = ctx.pwd;
@@ -1614,16 +1614,40 @@ fun withRegion<T>(
 }
 
 fun withRegionVoid<T>(f: () ~> void): void {
-  saved = newObstack();
-  f();
-  destroyObstack(saved);
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    f();
+    destroyObstack(optSaved.fromSome());
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      saveExn(cexn);
+      throw cexn
+    | _ -> throw exn
+    }
+  }
 }
 
 fun withRegionValue<T>(f: () ~> T): T {
-  saved = newObstack();
-  fresult = f();
-  copied = destroyObstackWithValue(saved, List[fresult]);
-  copied.getHead();
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    fresult = f();
+    copied = destroyObstackWithValue(optSaved.fromSome(), List[fresult]);
+    copied.getHead();
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      saveExn(cexn);
+      throw cexn
+    | _ -> throw exn
+    }
+  }
 }
 
 fun copyToParentObstack<T>(
@@ -1666,6 +1690,85 @@ fun withRegionFold<K, T>(
         }
       | _ -> break void
       }
+    };
+    optSaved match {
+    | Some(saved) -> copyToParentObstack(contextOpt, valueInRegion, saved)
+    | _ -> value
+    }
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      saveExn(cexn);
+      throw cexn
+    | _ -> throw exn
+    }
+  }
+}
+
+fun withRegionFoldRec<K, T>(
+  contextOpt: ?mutable Context,
+  it: mutable Iterator<K>,
+  value: T,
+  fn: (?mutable Context, K, T) ~> T,
+): T {
+  valueInRegion = value;
+  levels = 0;
+  loop {
+    it.next() match {
+    | Some(val) ->
+      !valueInRegion = withRegionFoldRecHelp(
+        contextOpt,
+        val,
+        it,
+        valueInRegion,
+        fn,
+        levels,
+      )
+    | None() -> break valueInRegion
+    };
+    !levels = levels + 1;
+  }
+}
+
+fun withRegionFoldRecHelp<K, T>(
+  contextOpt: ?mutable Context,
+  first: K,
+  it: mutable Iterator<K>,
+  value: T,
+  fn: (?mutable Context, K, T) ~> T,
+  level: Int,
+): T {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    valueInRegion = fn(contextOpt, first, value);
+    i = 0;
+    loop {
+      it.next() match {
+      | Some(k) ->
+        if (level < 1) {
+          !valueInRegion = fn(contextOpt, k, valueInRegion);
+          if (i > 64) {
+            break void
+          }
+        } else {
+          !valueInRegion = withRegionFoldRecHelp(
+            contextOpt,
+            k,
+            it,
+            valueInRegion,
+            fn,
+            level - 1,
+          );
+          if (i > 8) {
+            break void
+          };
+        }
+      | _ -> break void
+      };
+      !i = i + 1;
     };
     optSaved match {
     | Some(saved) -> copyToParentObstack(contextOpt, valueInRegion, saved)

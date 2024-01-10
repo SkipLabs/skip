@@ -110,16 +110,16 @@ EOF
     # just sanity check that U98 can see erase but not keep
     assert_line_count "$SERVER_TAIL" 'erase' 1
     assert_line_count "$SERVER_TAIL" 'keep' 0
-    # and that the server is at 39 and we sent up at 10
+    # and that the server is at 42 and we sent up at 10
     assert_line_count "$SERVER_TAIL" 'test_with_access 10' 1
-    assert_line_count "$SERVER_TAIL" ':39' 1
+    assert_line_count "$SERVER_TAIL" ':42' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value and the erase
     # from U99. but not the keep, because it can't see this
     # row.
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
-^test_with_access 39
+^test_with_access 42
 1	1,"baz","G1"
 1	2,"quux","G1"
 		
@@ -155,13 +155,13 @@ EOF
 
     # if we did replicate now we would get the new row
     assert_line_count "$SERVER_TAIL" 'new' 1
-    # sanity check the tick value - it's important for later - we're at 38 they're at 10
+    # sanity check the tick value - it's important for later - we're at 39 they're at 10
     assert_line_count "$SERVER_TAIL" 'test 10' 1
-    assert_line_count "$SERVER_TAIL" ':38' 1
+    assert_line_count "$SERVER_TAIL" ':39' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value but not the new,
-    # because it hasn't seen this row yet: 35 < 38.
+    # because it hasn't seen this row yet: 35 < 39.
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test 35
 1	1,"baz","read-write"
@@ -465,16 +465,16 @@ EOF
     # just sanity check that U98 can see erase but not keep
     assert_line_count "$SERVER_TAIL" 'erase' 1
     assert_line_count "$SERVER_TAIL" 'keep' 0
-    # and that the server is at 39 and we sent up at 10
+    # and that the server is at 42 and we sent up at 10
     assert_line_count "$SERVER_TAIL" 'test_with_pk_with_access 10' 1
-    assert_line_count "$SERVER_TAIL" ':39' 1
+    assert_line_count "$SERVER_TAIL" ':42' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value and the erase
     # from U99. but not the keep, because it can't see this
     # row.
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
-^test_with_pk_with_access 39
+^test_with_pk_with_access 42
 1	1,"baz","G1"
 1	2,"quux","G1"
 		
@@ -509,13 +509,13 @@ EOF
 
     # if we did replicate now we would get the new row
     assert_line_count "$SERVER_TAIL" 'new' 1
-    # sanity check the tick value - it's important for later - we're at 38 they're at 10
+    # sanity check the tick value - it's important for later - we're at 39 they're at 10
     assert_line_count "$SERVER_TAIL" 'test_with_pk 10' 1
-    assert_line_count "$SERVER_TAIL" ':38' 1
+    assert_line_count "$SERVER_TAIL" ':39' 1
 
     # now the source under test sends up a reset for whatever reason -
     # maybe reconnect. it wipes out its own foo value but not the new,
-    # because it hasn't seen this row yet: 35 < 38.
+    # because it hasn't seen this row yet: 35 < 39.
     $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user U98 > /dev/null << EOF
 ^test_with_pk 35
 1	1,"baz","read-write"

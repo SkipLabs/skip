@@ -203,23 +203,23 @@ fun lwwEdits(
   snapshot: Int,
   writer: SKStore.Path,
   primaryIdxOpt: ?Int,
-  context: mutable SKStore.Context,
+  context: readonly SKStore.Context,
   dir: SKStore.EagerDir,
   row: SKDB.RowValues,
 ): mutable Iterator<
   (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
 > {
-  !context = context.mclone();
+  mcontext = context.mclone();
   primaryIdx = primaryIdxOpt match {
   | None() -> invariant_violation("Using LWW without a primary key.")
   | Some(p) -> p
   };
   indexEntry = SKDB.makeIndexEntry(table.name, primaryIdx);
-  indexTable = SKDB.getIndexByColNbr(context);
-  indexes = indexTable.unsafeGetArray(context, indexEntry);
+  indexTable = SKDB.getIndexByColNbr(mcontext);
+  indexes = indexTable.unsafeGetArray(mcontext, indexEntry);
   invariant(indexes.size() > 0);
   index = indexes[0];
-  indexDir = context.unsafeGetEagerDir(index.dirName);
+  indexDir = mcontext.unsafeGetEagerDir(index.dirName);
   primaryKey = row.getValue(primaryIdx);
   startKey = SKDB.RowKey::create(
     SKDB.RowValues::create(Array[primaryKey], 1),
@@ -241,7 +241,7 @@ fun lwwEdits(
     };
     if (rowKey.row.getValue(0) != primaryKey) break void;
 
-    for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+    for ((tick, source, _) in dir.getDataIterWithoutTombs(mcontext, key)) {
       if (
         tick.value < snapshot ||
         source.path() == writer ||
@@ -349,34 +349,49 @@ fun applyDiffStrategy(
     };
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
-    entries = mutable Vector[];
 
-    for (row in rows) {
-      key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
-      for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
-        if (tick.value < snapshot.default(0) || source.path() == writer) {
-          entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
-        }
-      }
-    };
+    !dir = SKStore.withRegionFoldRec(
+      Some(newRoot),
+      rows.iterator(),
+      dir,
+      (optContext, row, newDir) ~> {
+        ctx = optContext.fromSome();
+        key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
+        for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
+          if (tick.value < snapshot.default(0) || source.path() == writer) {
+            !newDir = newDir.writeEntry(
+              ctx,
+              source.path(),
+              writer,
+              key,
+              Array<SKStore.File>[],
+            );
+          }
+        };
 
-    if (!entries.isEmpty()) {
-      !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
-    };
-    !dir = dir.writeArraySourceManyReturnDir(
-      newRoot,
-      rows
-        .iterator()
-        .filter(row -> row.repeat != 0)
-        .map(row -> {
-          (k, v) = (SKDB.RowKey(row, table.kinds), Array[row]);
-          ((k : SKStore.Key), (writer, writer, (v : Array<SKStore.File>)))
-        }),
+        if (row.repeat > 0) {
+          !newDir = newDir.writeEntry(
+            ctx,
+            writer,
+            writer,
+            SKDB.RowKey(row, table.kinds),
+            Array[row],
+          );
+        };
+
+        // update incrementally to keep memory usage down. this has a
+        // significant effect for large write sets and negligible
+        // impact on performance
+        ctx.setDir(newDir.dirName, newDir);
+        ctx.update();
+
+        newDir
+      },
     );
 
     newRoot.setDir(dir.dirName, dir);
-    checkpointAndAck(newRoot, delta);
-    newRoot.update()
+    newRoot.update();
+    checkpointAndAck(newRoot, delta)
   });
 
   // resetRows - if the update is communicating the entire current
@@ -387,39 +402,54 @@ fun applyDiffStrategy(
     };
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
-    entries = mutable Vector[];
 
     // we may only affect rows that have been seen
     isEligibleForTomb = (tick, source) ~>
       tick.value < snapshot.default(0) || source.path() == writer;
 
-    for (row in rows) {
-      key: SKStore.Key = SKDB.RowKey(row, table.kinds);
-      keyRepeat = row.repeat;
-      for ((tick, source, files) in dir.getDataIterWithoutTombs(newRoot, key)) {
-        if (!isEligibleForTomb(tick, source)) {
-          continue
+    !dir = SKStore.withRegionFold(
+      Some(newRoot),
+      rows.iterator(),
+      dir,
+      (optContext, row, newDir) ~> {
+        key: SKStore.Key = SKDB.RowKey(row, table.kinds);
+        keyRepeat = row.repeat;
+        for ((tick, source, files) in newDir.unsafeGetDataIterWithoutTombs(
+          key,
+        )) {
+          if (!isEligibleForTomb(tick, source)) {
+            continue
+          };
+          srcRepeat = 0;
+          for (file in files) {
+            !srcRepeat = srcRepeat + SKDB.RowValues::type(file).repeat
+          };
+
+          if (keyRepeat - srcRepeat < 0) {
+            !newDir = newDir.writeEntry(
+              optContext.fromSome(),
+              source.path(),
+              writer,
+              key,
+              Array[],
+            );
+          } else {
+            !keyRepeat = keyRepeat - srcRepeat;
+          }
         };
-        srcRepeat = 0;
-        for (file in files) {
-          !srcRepeat = srcRepeat + SKDB.RowValues::type(file).repeat
+
+        if (keyRepeat != 0) {
+          !newDir = newDir.writeEntry(
+            optContext.fromSome(),
+            writer,
+            writer,
+            key,
+            Array[row.setRepeat(keyRepeat)],
+          );
         };
-
-        if (keyRepeat - srcRepeat < 0) {
-          entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
-        } else {
-          !keyRepeat = keyRepeat - srcRepeat;
-        }
-      };
-
-      if (keyRepeat != 0) {
-        entries.push((key, (writer, writer, Array[row.setRepeat(keyRepeat)])));
-      }
-    };
-
-    if (!entries.isEmpty()) {
-      !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
-    };
+        newDir
+      },
+    );
 
     !dir = dir.reset(
       newRoot,
@@ -434,8 +464,8 @@ fun applyDiffStrategy(
     );
 
     newRoot.setDir(dir.dirName, dir);
-    checkpointAndAck(newRoot, delta);
-    newRoot.update()
+    newRoot.update();
+    checkpointAndAck(newRoot, delta)
   });
 
   // lwwRows - if there is a unique constraint on the table (e.g. a
@@ -447,36 +477,60 @@ fun applyDiffStrategy(
     };
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
-    entries = mutable Vector[];
 
-    for (row in rows) {
-      if (row.repeat < 1) {
-        key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
-        for ((tick, source, _) in dir.getDataIterWithoutTombs(newRoot, key)) {
-          if (tick.value < snapshot.default(0) || source.path() == writer) {
-            entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
-          }
+    !dir = SKStore.withRegionFoldRec(
+      Some(newRoot),
+      rows.iterator(),
+      dir,
+      (optContext, row, newDir) ~> {
+        ctx = optContext.fromSome();
+        if (row.repeat < 1) {
+          key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
+          for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
+            if (tick.value < snapshot.default(0) || source.path() == writer) {
+              !newDir = newDir.writeEntry(
+                ctx,
+                source.path(),
+                writer,
+                key,
+                Array[],
+              );
+            }
+          };
+        } else {
+          for (edit in lwwEdits(
+            table,
+            snapshot.default(0),
+            writer,
+            primaryIdx,
+            ctx,
+            newDir,
+            row,
+          )) {
+            (editKey, (editSrc, editWriter, editFiles)) = edit;
+            !newDir = newDir.writeEntry(
+              ctx,
+              editSrc,
+              editWriter,
+              editKey,
+              editFiles,
+            );
+          };
         };
-        continue;
-      };
 
-      for (change in lwwEdits(
-        table,
-        snapshot.default(0),
-        writer,
-        primaryIdx,
-        newRoot,
-        dir,
-        row,
-      )) {
-        entries.push(change);
-      }
-    };
+        // update incrementally to keep memory usage down. this has a
+        // significant effect for large write sets and negligible
+        // impact on performance
+        ctx.setDir(newDir.dirName, newDir);
+        ctx.update();
 
-    !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
+        newDir
+      },
+    );
+
     newRoot.setDir(dir.dirName, dir);
-    checkpointAndAck(newRoot, delta);
-    newRoot.update()
+    newRoot.update();
+    checkpointAndAck(newRoot, delta)
   });
 
   // lwwReset - if the update is communicating the entire current
@@ -487,26 +541,35 @@ fun applyDiffStrategy(
     };
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
-    entries = mutable Vector[];
 
-    for (row in rows) {
-      if (row.repeat < 1) {
-        continue;
-      };
-
-      for (change in lwwEdits(
-        table,
-        snapshot.default(0),
-        writer,
-        primaryIdx,
-        newRoot,
-        dir,
-        row,
-      )) {
-        entries.push(change);
-      }
-    };
-    !dir = dir.writeArraySourceManyReturnDir(newRoot, entries.iterator());
+    !dir = SKStore.withRegionFold(
+      Some(newRoot),
+      rows.iterator(),
+      dir,
+      (optContext, row, newDir) ~> {
+        if (row.repeat > 0) {
+          for (edit in lwwEdits(
+            table,
+            snapshot.default(0),
+            writer,
+            primaryIdx,
+            optContext.fromSome(),
+            newDir,
+            row,
+          )) {
+            (editKey, (editSrc, editWriter, editFiles)) = edit;
+            !newDir = newDir.writeEntry(
+              optContext.fromSome(),
+              editSrc,
+              editWriter,
+              editKey,
+              editFiles,
+            );
+          };
+        };
+        newDir
+      },
+    );
 
     !dir = dir.reset(
       newRoot,
@@ -523,8 +586,8 @@ fun applyDiffStrategy(
     );
 
     newRoot.setDir(dir.dirName, dir);
-    checkpointAndAck(newRoot, delta);
-    newRoot.update()
+    newRoot.update();
+    checkpointAndAck(newRoot, delta)
   });
 
   if (primaryIdx is Some _) {
@@ -563,60 +626,62 @@ fun parseCheckpoint(line: String): Int {
 }
 
 fun parseTableChange(
-  context: mutable SKStore.Context,
+  context: SKStore.Context,
   table: SKDB.DirDescr,
   line: String,
 ): Array<SKDB.RowValues> {
-  if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
-    invariant_violation("Not a table change")
-  };
+  SKStore.withRegionValue(() ~> {
+    if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
+      invariant_violation("Not a table change")
+    };
 
-  chars: mutable Vector<Char> = mutable Vector[];
-  iter = line.getIter();
-  repeat = loop {
-    c = iter.next() match {
-    | None() ->
-      print_error("Error: unexpected end of line");
-      skipExit(23)
-    | Some(x) -> x
+    chars: mutable Vector<Char> = mutable Vector[];
+    iter = line.getIter();
+    repeat = loop {
+      c = iter.next() match {
+      | None() ->
+        print_error("Error: unexpected end of line");
+        skipExit(23)
+      | Some(x) -> x
+      };
+      if (c == '\t') {
+        break String::fromChars(chars.toArray()).toInt()
+      };
+      if (c < '0' || c > '9') {
+        print_error("Error: expected an integer");
+        skipExit(23)
+      };
+      chars.push(c);
     };
-    if (c == '\t') {
-      break String::fromChars(chars.toArray()).toInt()
-    };
-    if (c < '0' || c > '9') {
-      print_error("Error: expected an integer");
-      skipExit(23)
-    };
-    chars.push(c);
-  };
 
-  // parse out the remainder of the line - the csv values
-  str = line.sub(iter, line.length() - chars.size() - 1);
-  values = mutable Vector[];
-  strIter = str.getIter();
-  next = () -> {
-    val = strIter.next();
-    val match {
-    | None() -> '\n'
-    | Some(x) -> x
-    }
-  };
-  for (value in lex(next)) {
-    values.push(value);
-  };
-  cvalues = values.map(parseCSVValue);
-  // empty params since no placeholders in skdb diff write-csv
-  params: Map<String, P.Value> = Map[];
-  SKDB.computeInsert(
-    context,
-    params,
-    false,
-    0,
-    None(),
-    Array[cvalues.toArray()],
-    table,
-    repeat,
-  );
+    // parse out the remainder of the line - the csv values
+    str = line.sub(iter, line.length() - chars.size() - 1);
+    values = mutable Vector[];
+    strIter = str.getIter();
+    next = () -> {
+      val = strIter.next();
+      val match {
+      | None() -> '\n'
+      | Some(x) -> x
+      }
+    };
+    for (value in lex(next)) {
+      values.push(value);
+    };
+    cvalues = values.map(parseCSVValue);
+    // empty params since no placeholders in skdb diff write-csv
+    params: Map<String, P.Value> = Map[];
+    SKDB.computeInsert(
+      context.mclone(),
+      params,
+      false,
+      0,
+      None(),
+      Array[cvalues.toArray()],
+      table,
+      repeat,
+    );
+  })
 }
 
 mutable class TableDiff(
@@ -676,7 +741,7 @@ fun nack(writer: mutable Debug.BufferedWriter, diff: readonly TableDiff): void {
 
 fun replayDiff(
   context: mutable SKStore.Context,
-  getLine: () -> String,
+  getLine: () -> ?String,
   user: ?String,
   identity: Int,
 ): SKStore.ContextOp {
@@ -687,13 +752,18 @@ fun replayDiff(
   | _ -> void
   };
 
+  immContext = context.clone();
   userFileOpt = user.map(x -> SKDB.UserFile::create(context, x));
   state: ?(mutable DiffParsingState) = None();
   try {
     loop {
-      line = getLine();
+      line = getLine() match {
+      | Some(l) -> l
+      | None() -> break SKStore.CStop(None())
+      };
       !state = state match {
-      | None() if (!line.startsWith("^")) -> None()
+      | None() if (String.getByte(line, 0) != 94) -> // !startsWith("^")
+        None()
 
       | None() ->
         (table, snapshot) = parseHeader(context, line);
@@ -706,7 +776,7 @@ fun replayDiff(
 
       | Some(
         DiffParsingState(tableDiffs, currentDiff),
-      ) if (line.startsWith("^")) ->
+      ) if (String.getByte(line, 0) == 94) -> // startsWith("^")
         (table, snapshot) = parseHeader(context, line);
         tableDiffs.push(currentDiff);
         Some(
@@ -718,7 +788,7 @@ fun replayDiff(
 
       | Some(
         DiffParsingState(tableDiffs, currentDiff),
-      ) if (line.startsWith(":")) ->
+      ) if (String.getByte(line, 0) == 58) -> // startsWith(":")
         currentDiff.lines.push(line);
         tableDiffs.push(currentDiff);
         checkpoint = parseCheckpoint(line);
@@ -775,7 +845,7 @@ fun replayDiff(
 
       | current @ Some(DiffParsingState(_, currentDiff)) ->
         currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
-        newRows = parseTableChange(context, currentDiff.table, line);
+        newRows = parseTableChange(immContext, currentDiff.table, line);
         currentDiff.rows.extend(newRows);
         current
       };

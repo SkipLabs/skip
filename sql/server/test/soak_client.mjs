@@ -203,13 +203,13 @@ const check_expectations = async function (skdb, client, latest_id) {
   // arrive as part of catching up.
   check_expectation(
     skdb,
-    `select client, value >= @latest_id as check
+    `select client, value >= @latest_id as test
      from no_pk_single_row
      where id = 0 and client = @client`,
     params,
     new SKDBTable({
       client: client,
-      check: 1,
+      test: 1,
     }),
     "no_pk_single_row",
   );
@@ -220,13 +220,13 @@ const check_expectations = async function (skdb, client, latest_id) {
   check_expectation(
     skdb,
     `select client >= @client as client_bound,
-            not (client = @client and value < @latest_id) as check
+            not (client = @client and value < @latest_id) as test
      from pk_single_row
      where id = 0`,
     params,
     new SKDBTable({
       client_bound: 1,
-      check: 1,
+      test: 1,
     }),
     "pk_single_row",
   );
@@ -271,12 +271,12 @@ const check_expectations = async function (skdb, client, latest_id) {
   // so it will not be removed.
   check_expectation(
     skdb,
-    `select NOT (@latest_id % 60 < 30 AND count(*) <> 1) as check
+    `select NOT (@latest_id % 60 < 30 AND count(*) <> 1) as test
      from pk_privacy_rw
      where client = @client`,
     params,
     new SKDBTable({
-      check: 1,
+      test: 1,
     }),
     "pk_privacy_rw",
   );
