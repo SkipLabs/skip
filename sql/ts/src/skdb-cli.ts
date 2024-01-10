@@ -319,15 +319,13 @@ if (args.values["create-db"]) {
   const remote = await skdb.connectedRemote();
   const result = await remote!.createDatabase(db);
   // b64 encode
-  result.privateKey = Buffer.from(
-    String.fromCharCode(...result.privateKey),
-    "base64",
-  );
+  const newDbCreds = {};
+  newDbCreds[result.accessKey] = Buffer.from(result.privateKey).toString('base64');
   console.log(`Successfully created database: ${db}.`);
-  console.log(`Credentials for ${db}: `, result);
+  console.log(`Credentials for ${db}: `, newDbCreds);
 
   if (!args.values["dev"]) {
-    hostCreds[db] = Object.fromEntries([[result.accessKey, result.privateKey]]);
+    hostCreds[db] = newDbCreds;
     fs.writeFileSync(credsFileName, JSON.stringify(creds));
     console.log(`Credentials were added to ${credsFileName}.`);
   }
@@ -337,14 +335,13 @@ if (args.values["create-user"]) {
   const remote = await skdb.connectedRemote();
   const result = await remote!.createUser();
   // b64 encode
-  result.privateKey = Buffer.from(
-    String.fromCharCode(...result.privateKey),
-    "base64",
-  );
-  console.log("Successfully created user: ", result);
+  const newDbCreds = {};
+  const b64pk = Buffer.from(result.privateKey).toString('base64');
+  newDbCreds[result.accessKey] = b64pk;
+  console.log("Successfully created user: ", newDbCreds);
 
   if (!args.values["dev"]) {
-    dbCreds[result.accessKey] = result.privateKey;
+    dbCreds[result.accessKey] = b64pk;
     fs.writeFileSync(credsFileName, JSON.stringify(creds));
     console.log(`Credentials were added to ${credsFileName}.`);
   }
