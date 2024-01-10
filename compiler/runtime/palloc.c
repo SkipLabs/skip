@@ -703,7 +703,7 @@ void SKIP_memory_init(int argc, char** argv) {
 #endif  // __APPLE__
 
   char* obj = sk_get_external_pointer();
-  epointer_ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
+  epointer_ty = get_gc_type(obj);
 }
 
 /*****************************************************************************/

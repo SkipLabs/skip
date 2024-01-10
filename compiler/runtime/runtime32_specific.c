@@ -37,7 +37,7 @@ void SKIP_skfs_init(uint32_t size) {
   end_of_static = (char*)bump_pointer;
   sk_ftable = sk_ftable_holder;
   char* obj = sk_get_external_pointer();
-  epointer_ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
+  epointer_ty = get_gc_type(obj);
 }
 
 void SKIP_destroy_Obstack(void*);
