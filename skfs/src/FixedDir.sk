@@ -102,11 +102,27 @@ class FixedDir<T: frozen> private {
   static fun create(
     data: mutable Vector<FixedRow<T>> = mutable Vector[],
   ): this {
-    data.sortBy(row ~> (row.key, row.value.i0));
-    result = data.toArray().clone();
-    cache = Array::mfill(result.size(), false);
-    _ = static::computeTags(cache, result, 0, result.size() - 1);
-    FixedDir{data => result.chill()}
+    i = 0;
+    sz = data.size();
+    sorted = loop {
+      !i = i + 1;
+      if (i >= sz) break true;
+      keyComparison = data[i-1].key.compare(data[i].key);
+      keyComparison match {
+        | LT() -> continue;
+        | GT() -> break false;
+        | EQ() -> data[i-1].value.i0.compare(data[i].value.i0)
+      } match {
+        | LT() -> continue;
+        | EQ() -> continue;
+        | GT() -> break false;
+      };
+    };
+    if (!sorted) {
+      data.sortBy(row ~> (row.key, row.value.i0));
+    };
+    _ = static::computeTags(data, 0, data.size() - 1);
+    FixedDir{data => data.toArray()}
   }
 
   fun size(): Int {
@@ -155,8 +171,7 @@ class FixedDir<T: frozen> private {
   }
 
   static fun computeTags(
-    cache: mutable Array<Bool>,
-    array: mutable Array<FixedRow<T>>,
+    array: mutable Vector<FixedRow<T>>,
     i: Int,
     j: Int,
   ): TickRange {
@@ -166,11 +181,10 @@ class FixedDir<T: frozen> private {
     pivot = i + (j - i) / 2;
     elt = array[pivot];
     tag = elt.tag;
-    right = static::computeTags(cache, array, pivot + 1, j);
-    left = static::computeTags(cache, array, i, pivot - 1);
+    right = static::computeTags(array, pivot + 1, j);
+    left = static::computeTags(array, i, pivot - 1);
     !tag.max = max(tag.max, max(left.max, right.max));
     array![pivot] = elt with {tag};
-    cache![pivot] = true;
     tag
   }
 
@@ -204,38 +218,37 @@ class FixedDir<T: frozen> private {
     result
   }
 
-  fun getKeyChangesAfterIter(
+  fun getKeyChangesAfter(
     after: Tick,
     key: Key,
     i: Int,
     j: Int,
-  ): mutable Iterator<(Tick, Source, T)> {
+    acc: mutable Vector<(Tick, Source, T)>,
+  ): void {
     if (i <= j) {
       pivot = i + (j - i) / 2;
       elt = this.data[pivot];
       tick = elt.tag;
       if (tick.max >= after) {
         if (key <= elt.key) {
-          for (item in this.getKeyChangesAfterIter(after, key, i, pivot - 1)) {
-            yield item
-          }
+          this.getKeyChangesAfter(after, key, i, pivot - 1, acc);
         };
         if (tick.current >= after) {
           if (elt.key.compare(key) is EQ()) {
-            yield ((tick.current, elt.value.i0, elt.value.i1));
+            acc.push((tick.current, elt.value.i0, elt.value.i1));
           }
         };
         if (key >= elt.key) {
-          for (item in this.getKeyChangesAfterIter(after, key, pivot + 1, j)) {
-            yield item
-          }
+          this.getKeyChangesAfter(after, key, pivot + 1, j, acc);
         }
       }
     }
   }
 
   fun getIterAfter(limit: Tick, key: Key): mutable Iterator<(Tick, Source, T)> {
-    this.getKeyChangesAfterIter(limit, key, 0, this.data.size() - 1)
+    acc = mutable Vector[];
+    this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc);
+    acc.iterator()
   }
 
   fun getTick(): ?Tick {
