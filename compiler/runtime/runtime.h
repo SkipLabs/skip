@@ -168,7 +168,7 @@ typedef struct {
   void* unused1;
   void* unused2;
 #endif
-  void (*m_onStateChange)(void*, long);
+  void* unused;
   size_t m_refMask[0];
 } SKIP_gc_type_t;
 
