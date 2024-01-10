@@ -79,7 +79,7 @@ void sk_incr_ref_count(void* obj) {
     count -= 3;
 #endif
   } else {
-    SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
+    SKIP_gc_type_t* ty = get_gc_type(obj);
 
     switch (ty->m_kind) {
       case 0:
@@ -105,7 +105,7 @@ static uintptr_t* sk_get_ref_count_addr(void* obj) {
     count -= 3;
 #endif
   } else {
-    SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
+    SKIP_gc_type_t* ty = get_gc_type(obj);
 
     switch (ty->m_kind) {
       case 0:
@@ -136,7 +136,7 @@ uintptr_t sk_get_ref_count(void* obj) {
 }
 
 static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
-  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
+  SKIP_gc_type_t* ty = get_gc_type(obj);
 
   size_t memsize = ty->m_userByteSize;
   size_t leftsize = ty->m_uninternedMetadataByteSize;
@@ -171,7 +171,7 @@ static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
 }
 
 static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
-  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
+  SKIP_gc_type_t* ty = get_gc_type(obj);
 
   size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
@@ -223,7 +223,7 @@ uint32_t SKIP_is_string(char* obj) {
 static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
   char* result;
 
-  SKIP_gc_type_t* ty = *(*(((SKIP_gc_type_t***)obj) - 1) + 1);
+  SKIP_gc_type_t* ty = get_gc_type(obj);
 
   switch (ty->m_kind) {
     case 0:

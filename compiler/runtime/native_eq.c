@@ -29,8 +29,8 @@
 SkipInt SKIP_native_eq_class(sk_stack_t* st, char* obj1, char* obj2) {
   if (obj1 == obj2) return 0;
 
-  SKIP_gc_type_t* ty1 = *(*(((SKIP_gc_type_t***)obj1) - 1) + 1);
-  SKIP_gc_type_t* ty2 = *(*(((SKIP_gc_type_t***)obj2) - 1) + 1);
+  SKIP_gc_type_t* ty1 = get_gc_type(obj1);
+  SKIP_gc_type_t* ty2 = get_gc_type(obj2);
 
   if (ty1 != ty2) {
     return 1;
@@ -69,8 +69,8 @@ SkipInt SKIP_native_eq_class(sk_stack_t* st, char* obj1, char* obj2) {
 }
 
 SkipInt SKIP_native_eq_array(sk_stack_t* st, char* obj1, char* obj2) {
-  SKIP_gc_type_t* ty1 = *(*(((SKIP_gc_type_t***)obj1) - 1) + 1);
-  SKIP_gc_type_t* ty2 = *(*(((SKIP_gc_type_t***)obj2) - 1) + 1);
+  SKIP_gc_type_t* ty1 = get_gc_type(obj1);
+  SKIP_gc_type_t* ty2 = get_gc_type(obj2);
 
   if (ty1 != ty2) {
     return 1;
@@ -144,8 +144,8 @@ SkipInt SKIP_native_eq_helper(sk_stack_t* st, char* obj1, char* obj2) {
     return 1;
   }
 
-  SKIP_gc_type_t* ty1 = *(*(((SKIP_gc_type_t***)obj1) - 1) + 1);
-  SKIP_gc_type_t* ty2 = *(*(((SKIP_gc_type_t***)obj2) - 1) + 1);
+  SKIP_gc_type_t* ty1 = get_gc_type(obj1);
+  SKIP_gc_type_t* ty2 = get_gc_type(obj2);
 
   if (ty1 != ty2) {
     return 1;

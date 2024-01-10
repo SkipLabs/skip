@@ -5,6 +5,20 @@
 #endif
 
 /*****************************************************************************/
+/* Operations on the runtime representation of skip values. */
+/*****************************************************************************/
+
+SKIP_gc_type_t* get_gc_type(char* skip_object) {
+  // a vtable pointer immediately precedes a pointer to each skip object
+  SKIP_gc_type_t*** vtable = ((SKIP_gc_type_t***)skip_object) - 1;
+  // the gc_type of each object is stored in slot 1 of the vtable,
+  // see createVTableBuilders in vtable.sk
+  SKIP_gc_type_t** slot1 = *(vtable) + 1;
+  return *slot1;
+}
+
+
+/*****************************************************************************/
 /* Saving/restoring context to thread locals.
  *
  * These primitives are very dangerous to use unless you really know what you
