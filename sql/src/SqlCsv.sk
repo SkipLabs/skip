@@ -177,6 +177,7 @@ fun insert(
 fun reasonSchemaUnsupported(
   origContext: readonly SKStore.Context,
   tableName: String,
+  schema: String,
 ): ?String {
   context = SKStore.Context::fromSaved(origContext.clone());
   SKDB.getTableDir(context).maybeGet(context, SKStore.SID(tableName)) match {
@@ -193,6 +194,25 @@ fun reasonSchemaUnsupported(
           SKDB.skdbAccessColName.origName
         } column.`,
       )
+    };
+    try {
+      Some(P.Parser::create(schema).parseCreateTableSchema().columns)
+    } catch {
+    | _exn -> None()
+    } match {
+    | None() ->
+      return Some(
+        "Malformed schema: expects parenthesized column-separated list of column definitions.",
+      )
+    | Some(requestSchema) ->
+      if (
+        requestSchema.size() != dirDescr.schema.size() ||
+        requestSchema.zip(dirDescr.schema).any(cols ~> cols.i0 != cols.i1)
+      ) {
+        return Some(
+          "Cannot mirror table: provided schema does not match database.",
+        )
+      }
     };
     None()
   };
