@@ -303,6 +303,15 @@ extension class Parser {
     | TSingleQuotedString(value) ->
       this.tokens.advance();
       VString(value)
+    | TWord(_, None(), Some(TCurrentTime())) ->
+      this.tokens.advance();
+      VCurrentTime()
+    | TWord(_, None(), Some(TCurrentDate())) ->
+      this.tokens.advance();
+      VCurrentDate()
+    | TWord(_, None(), Some(TCurrentTimestamp())) ->
+      this.tokens.advance();
+      VCurrentTimestamp()
     | _ -> this.parseSignedNumber()
     };
     CCDefault{expr, constraintName => None()}

@@ -697,12 +697,12 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
         | P.VString(s) ->
           o(` DEFAULT `);
           escapeString(o, s)
-        | P.VSeqNum _
-        | P.VId _
-        // TODO: These should be supported.
         | P.VCurrentTime()
         | P.VCurrentDate()
-        | P.VCurrentTimestamp()
+        | P.VCurrentTimestamp() ->
+          o(` DEFAULT ${v}`)
+        | P.VSeqNum _
+        | P.VId _
         | P.VParam _
         | P.VPermission _ ->
           invariant_violation("Invalid expression for default value")

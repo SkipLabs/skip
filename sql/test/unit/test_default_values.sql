@@ -1,4 +1,4 @@
-create table t1 (a INTEGER PRIMARY KEY, b TEXT, c TEXT default 'hello');
+create table t1 (a INTEGER PRIMARY KEY, b TEXT, c TEXT default 'hello', d TEXT default CURRENT_TIME);
 create table t2 (a INTEGER PRIMARY KEY, b TEXT, c TEXT not null default 'hello');
 create table t3 (a INTEGER PRIMARY KEY, b TEXT, c TEXT default 'hello' not null);
 create table t4 (a TEXT PRIMARY KEY, b TEXT, c TEXT default 'hello' not null);

@@ -196,6 +196,14 @@ fun computeInsert(
           | P.VInt(n) -> Some(CInt(n))
           | P.VFloat(f) -> Some(CFloat(f))
           | P.VString(x) -> Some(CString(x))
+          | P.VCurrentTime _ ->
+            Some(CString(strftime(context, "%H:%M:%S", "now", Array[])))
+          | P.VCurrentDate _ ->
+            Some(CString(strftime(context, "%Y-%m-%d", "now", Array[])))
+          | P.VCurrentTimestamp _ ->
+            Some(
+              CString(strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[])),
+            )
           | _ -> error(pos, "Invalid expression for default value")
           }
         };
