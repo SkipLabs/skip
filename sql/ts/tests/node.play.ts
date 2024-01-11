@@ -19,7 +19,7 @@ run({
   name: "Write-csv memory regression test",
   fun: async (skdb: SKDB) => {
     await skdb.exec(
-      "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access STRING NOT NULL);",
+      "CREATE TABLE no_pk_inserts (id INTEGER, client INTEGER, value INTEGER, skdb_access TEXT NOT NULL);",
       {},
     );
 
