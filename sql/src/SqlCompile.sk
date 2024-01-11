@@ -1418,8 +1418,8 @@ mutable class Compiler{
         }
 
       | "date" ->
-        if (args.size() < 1) {
-          error(this.pos, "Missing arguments");
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
         };
         this.compileExpr(
           context,
@@ -1431,8 +1431,8 @@ mutable class Compiler{
         )
 
       | "time" ->
-        if (args.size() < 1) {
-          error(this.pos, "Missing arguments");
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
         };
         this.compileExpr(
           context,
@@ -1445,7 +1445,7 @@ mutable class Compiler{
 
       | "datetime" ->
         if (args.isEmpty()) {
-          error(this.pos, "Missing arguments");
+          !args = Array[P.VString("now")]
         };
         this.compileExpr(
           context,
@@ -1470,8 +1470,8 @@ mutable class Compiler{
         )
 
       | "unixepoch" ->
-        if (args.size() < 1) {
-          error(this.pos, "Missing arguments");
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
         };
         this.compileExpr(
           context,
@@ -1483,8 +1483,8 @@ mutable class Compiler{
         )
 
       | "julianday" ->
-        if (args.size() < 1) {
-          error(this.pos, "Missing arguments");
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
         };
         this.compileExpr(
           context,
@@ -1496,8 +1496,10 @@ mutable class Compiler{
         )
 
       | "strftime" ->
-        if (args.size() < 2) {
-          error(this.pos, "Missing arguments strftime");
+        if (args.isEmpty()) {
+          error(this.pos, "Missing arguments")
+        } else if (args.size() == 1) {
+          !args = args.concat(Array[P.VString("now")])
         };
 
         isStatic = for (arg in args) {
@@ -1527,6 +1529,8 @@ mutable class Compiler{
           );
           CSExpr(CStrftime(sargs[0], sargs[1], sargs.slice(2, sargs.size())))
         }
+
+      | "timediff" -> error(this.pos, "timediff() not implemented")
 
       | "nullif" ->
         if (args.size() != 2) {
