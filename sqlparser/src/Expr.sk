@@ -194,7 +194,7 @@ extension class Parser {
   mutable fun parseIdentifierOrFunctionCall(name: Name): Expr {
     id = this.parseIdentifier(name);
     if (this.parse_token(TLParen())) {
-      res = if (this.parse_token(TMul())) {
+      res = if (this.parse_token(TMul()) || this.peek_token() == TRParen()) {
         Call(id.name, Array[], false)
       } else {
         distinct = if (this.parse_keyword(TDistinct())) {
