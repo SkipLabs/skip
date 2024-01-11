@@ -115,7 +115,7 @@ export interface SKDBMechanism {
   ) => ArrayBuffer | null;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => SKDBTable;
-  assertCanBeMirrored: (tableName: string) => void;
+  assertCanBeMirrored: (tableName: string, schema: string) => void;
   toggleView: (tableName: string) => void;
 }
 
