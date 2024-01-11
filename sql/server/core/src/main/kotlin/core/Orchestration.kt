@@ -21,6 +21,7 @@ data class ProtoQuery(val query: String, val format: QueryResponseFormat) : Prot
 
 data class ProtoRequestTail(
     val table: String,
+    val schema: String,
     val since: ULong = 0u,
     val filterExpr: String?,
     val filterParams: Map<String, Any?>,
@@ -92,12 +93,16 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
       val tableNameLength = data.getShort()
       val tableNameBytes = ByteArray(tableNameLength.toInt())
       data.get(tableNameBytes)
+      val schemaLength = data.getShort()
+      val schemaBytes = ByteArray(schemaLength.toInt())
+      data.get(schemaBytes)
       val filterExprLength = data.getShort()
       val filterBytes = ByteArray(filterExprLength.toInt())
       data.get(filterBytes)
       val params = decodeParams(data)
       ProtoRequestTail(
           String(tableNameBytes, StandardCharsets.UTF_8),
+	  String(schemaBytes, StandardCharsets.UTF_8),
           since.toULong(),
           String(filterBytes, StandardCharsets.UTF_8),
           params)
@@ -223,14 +228,16 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
       buf.flip()
     }
     is ProtoRequestTail -> {
-      val buf = ByteBuffer.allocate(16 + msg.table.length * 4 + (msg.filterExpr?.length ?: 0) * 4)
+      val variableWidth = msg.table.length + msg.schema.length + (msg.filterExpr?.length ?: 0)
+      val buf = ByteBuffer.allocate(16 + variableWidth * 4)
+      val encoder = StandardCharsets.UTF_8.newEncoder()
+
       buf.putInt(0x0)
       buf.put(0, 0x02.toByte())
       buf.putLong(msg.since.toLong())
 
       var pos = buf.position()
       buf.putShort(0x0)
-      val encoder = StandardCharsets.UTF_8.newEncoder()
       var res = encoder.encode(CharBuffer.wrap(msg.table), buf, true)
       if (!res.isUnderflow()) {
         res.throwException()
@@ -241,6 +248,20 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
       }
       val tableLengthEncoded = (buf.position() - pos - 2).toShort()
       buf.putShort(pos, tableLengthEncoded)
+      encoder.reset()
+
+      pos = buf.position()
+      buf.putShort(0x0)
+      res = encoder.encode(CharBuffer.wrap(msg.schema), buf, true)
+      if (!res.isUnderflow()) {
+        res.throwException()
+      }
+      res = encoder.flush(buf)
+      if (!res.isUnderflow()) {
+        res.throwException()
+      }
+      val schemaLengthEncoded = (buf.position() - pos - 2).toShort()
+      buf.putShort(pos, schemaLengthEncoded)
       encoder.reset()
 
       if (msg.filterExpr != null) {
