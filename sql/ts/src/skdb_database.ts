@@ -183,9 +183,21 @@ export class SKDBSyncImpl implements SKDBSync {
 
     // Setting up local privacy checks
     await this.mirror(
-      "skdb_user_permissions",
-      "skdb_groups",
-      "skdb_group_permissions",
+      {
+        table: "skdb_user_permissions",
+        schema:
+          "(userID TEXT PRIMARY KEY, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
+      },
+      {
+        table: "skdb_groups",
+        schema:
+          "(groupID TEXT PRIMARY KEY, skdb_author TEXT, adminID TEXT NOT NULL, skdb_access TEXT NOT NULL)",
+      },
+      {
+        table: "skdb_group_permissions",
+        schema:
+          "(groupID TEXT NOT NULL, userID TEXT, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
+      },
     );
     await this.exec(
       "CREATE UNIQUE INDEX skdb_permissions_group_user ON skdb_group_permissions(groupID, userID);",
@@ -283,11 +295,23 @@ export class SKDBSyncImpl implements SKDBSync {
   }
   async mirror(...tables: MirrorDefn[]) {
     const is_mirror_def_of = (table) => (mirror_def) =>
-      mirror_def === table || mirror_def.table === table;
+      mirror_def.table === table;
     for (const metatable of [
-      "skdb_user_permissions",
-      "skdb_groups",
-      "skdb_group_permissions",
+      {
+        table: "skdb_user_permissions",
+        schema:
+          "(userID TEXT PRIMARY KEY, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
+      },
+      {
+        table: "skdb_groups",
+        schema:
+          "(groupID TEXT PRIMARY KEY, skdb_author TEXT, adminID TEXT NOT NULL, skdb_access TEXT NOT NULL)",
+      },
+      {
+        table: "skdb_group_permissions",
+        schema:
+          "(groupID TEXT NOT NULL, userID TEXT, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
+      },
     ]) {
       if (!tables.some(is_mirror_def_of(metatable))) tables.push(metatable);
     }

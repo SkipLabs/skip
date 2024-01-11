@@ -17,12 +17,11 @@ export interface SKDBHandle {
   ) => { close: () => void };
 }
 
-export type MirrorDefn =
-  | {
-      table: string;
-      filterExpr?: string;
-    }
-  | string;
+export type MirrorDefn = {
+  table: string;
+  schema: string;
+  filterExpr?: string;
+};
 
 export interface SKDBSync {
   // CLIENT
@@ -170,10 +169,7 @@ export interface SKDBShared extends Shared {
 
 export interface SKDBGroup {
   setDefaultPermission: (perm: string) => Promise<void>;
-  setMemberPermission: (
-    userID: string,
-    perm: string,
-  ) => Promise<void>;
+  setMemberPermission: (userID: string, perm: string) => Promise<void>;
 
   addAdmin: (userID: string) => Promise<void>;
   removeAdmin: (userID: string) => Promise<void>;
