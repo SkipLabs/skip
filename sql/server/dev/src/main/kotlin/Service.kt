@@ -186,6 +186,10 @@ class RequestHandler(
         stream.close()
       }
       is ProtoRequestTail -> {
+        if (!skdb.canMirror(request.table, request.schema)) {
+          stream.error(2003u, "Schema mismatch")
+          return this
+        }
         val proc =
             skdb.tail(
                 accessKey,
