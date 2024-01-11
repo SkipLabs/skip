@@ -1662,7 +1662,10 @@ class SKDBServer implements RemoteSKDB {
       throw new Error("Must specify at least one table to mirror");
     }
 
-    const setupTable = async (tableName: string) => {
+    const setupTable = async (mirror_defn : MirrorDefn) => {
+      const tableName: string = mirror_defn.table;
+      const schema: string = mirror_defn.schema;
+
       let isViewOnRemote = (await this.viewSchema(tableName)) != "";
 
       const [createTable, createResponseTable] = await Promise.all([
@@ -1681,7 +1684,7 @@ class SKDBServer implements RemoteSKDB {
         if (!this.client.tableExists(serverResponseTable(tableName))) {
           this.client.exec(createResponseTable);
         }
-        this.client.assertCanBeMirrored(tableName);
+        this.client.assertCanBeMirrored(tableName, schema);
         this.mirroredTables.add(tableName);
       }
     };
@@ -1698,11 +1701,7 @@ class SKDBServer implements RemoteSKDB {
     this.mirrorStreams.clear();
     this.mirroredTables.clear();
 
-    const tableNames = tables.map((mirrorDef) =>
-      typeof mirrorDef === "string" ? mirrorDef : mirrorDef.table,
-    );
-
-    await Promise.all(tableNames.map((tableName) => setupTable(tableName)));
+    await Promise.all(tables.map(setupTable));
 
     if (this.mirroredTables.size > 0) {
       this.localTailSession = await this.establishLocalTail(
