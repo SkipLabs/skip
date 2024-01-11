@@ -277,12 +277,6 @@ fun valueToCValue(
       } else {
         Some(CInt(-SKStore.genSym(0)))
       }
-    | P.VTime() ->
-      if (inTransaction) {
-        error(pos, "time can not be used in a transaction");
-      };
-      time = getUnixTime();
-      Some(CInt(time))
     | P.VInt(n) ->
       if (schema[idx].primary is Some _) {
         _ = SKStore.genSym(Math.abs(n));
@@ -332,6 +326,21 @@ fun valueToCValue(
       }
     | P.VId(None()) -> Some(CString(Ksuid::create().toString()))
     | P.VString(str) -> Some(CString(str))
+    | P.VCurrentTime() ->
+      if (inTransaction) {
+        error(pos, "CURRENT_TIME cannot be used in a transaction")
+      };
+      Some(CString(strftime(context, "%H:%M:%S", "now", Array[])))
+    | P.VCurrentDate() ->
+      if (inTransaction) {
+        error(pos, "CURRENT_DATE cannot be used in a transaction")
+      };
+      Some(CString(strftime(context, "%Y-%m-%d", "now", Array[])))
+    | P.VCurrentTimestamp() ->
+      if (inTransaction) {
+        error(pos, "CURRENT_TIMESTAMP cannot be used in a transaction");
+      };
+      Some(CString(strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[])))
     | v ->
       error(
         pos,

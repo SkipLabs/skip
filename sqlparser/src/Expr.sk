@@ -111,10 +111,9 @@ extension class Parser {
       | TExists() -> this.parseExistsExpr(false)
       | TRaise() -> throw NotImplementedError(pos)
       // TODO: CURRENT?
-      | TCurrentTime()
-      | TCurrentDate()
-      | TCurrentTimestamp() ->
-        throw NotImplementedError(pos)
+      | TCurrentTime() -> VCurrentTime()
+      | TCurrentDate() -> VCurrentDate()
+      | TCurrentTimestamp() -> VCurrentTimestamp()
       | _ -> this.parseIdentifier(Name::create(value))
       }
     | TWord(value, Some _, None _) -> this.parseIdentifier(Name::create(value))
