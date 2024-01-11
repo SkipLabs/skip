@@ -487,7 +487,9 @@ const localRepl = async function () {
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
-      console.log(".mirror <table1> <table2> ... -- Mirror the remote tables.");
+      console.log(
+        ".mirror <table1> <schema1> <table2> <schema2> ... -- Mirror the remote tables.",
+      );
       continue;
     }
 
@@ -540,11 +542,32 @@ const localRepl = async function () {
     }
 
     if (query.startsWith(".mirror")) {
-      const args = query.split(" ");
-      const tables = args.slice(1);
+      let args = query.substring(7).trim();
+      let mirror_defns: Array<{ table: string; schema: string }> = [];
       try {
-        await skdb.mirror(...tables);
+        while (args.length > 0) {
+          const tablename_length = args.indexOf(" ");
+          if (tablename_length == -1) throw new Error();
+          const table = args.slice(0, tablename_length);
+          args = args.slice(tablename_length).trim();
+
+          const schema_length = args.indexOf(")");
+          if (schema_length == -1) throw new Error();
+          const schema = args.slice(0, schema_length);
+          args = args.slice(schema_length).trim();
+          mirror_defns.push({ table: table, schema: schema });
+        }
+      } catch {
+        console.error(`Malformed mirror command "${query}"`);
+        console.error(
+          'Expected: ".mirror <table1> <schema1> <table2> <schema2> ..."',
+        );
+        continue;
+      }
+      try {
+        await skdb.mirror(...mirror_defns);
       } catch (ex) {
+        const tables = mirror_defns.map((md) => md.table);
         console.error(`Could not mirror tables ${tables}.`);
         console.error(ex);
       }
