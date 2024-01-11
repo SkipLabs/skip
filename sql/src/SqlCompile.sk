@@ -1008,7 +1008,14 @@ mutable class Compiler{
         CIExpr(CILiteral(compilePermissionLiteral(str)))
       | _ -> error(this.pos, "Argument to skdb_permission must be a string")
       }
-    | P.VTime _ -> invariant_violation("Unexpected TIME")
+    | P.VCurrentTime _ ->
+      CSExpr(CStrftime(CSLiteral("%H:%M:%S"), CSLiteral("now"), Array[]))
+    | P.VCurrentDate _ ->
+      CSExpr(CStrftime(CSLiteral("%Y-%m-%d"), CSLiteral("now"), Array[]))
+    | P.VCurrentTimestamp _ ->
+      CSExpr(
+        CStrftime(CSLiteral("%Y-%m-%d %H:%M:%S"), CSLiteral("now"), Array[]),
+      )
     | P.VParam(handle) ->
       this.params.maybeGet(handle) match {
       | Some(val) -> this.compileExpr(context, val)
