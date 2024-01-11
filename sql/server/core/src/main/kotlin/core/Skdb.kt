@@ -328,6 +328,11 @@ class Skdb(val name: String, private val dbPath: String) {
             .trim()
     return accessKey
   }
+
+  fun canMirror(table: String, schema: String): Boolean {
+    val result = blockingRun(ProcessBuilder(ENV.skdbPath, "can-mirror", table, schema));
+    return result.decode() == "";
+  }
 }
 
 fun openSkdb(db: String?): Skdb? {
