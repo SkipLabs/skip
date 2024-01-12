@@ -21,9 +21,9 @@ data class ProtoQuery(val query: String, val format: QueryResponseFormat) : Prot
 
 data class ProtoRequestTail(
     val table: String,
-    val schema: String,
+    val expectedSchema: String,
     val since: ULong = 0u,
-    val filterExpr: String?,
+    val filterExpr: String,
     val filterParams: Map<String, Any?>,
 ) : ProtoMessage()
 
@@ -102,7 +102,7 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
       val params = decodeParams(data)
       ProtoRequestTail(
           String(tableNameBytes, StandardCharsets.UTF_8),
-	  String(schemaBytes, StandardCharsets.UTF_8),
+          String(schemaBytes, StandardCharsets.UTF_8),
           since.toULong(),
           String(filterBytes, StandardCharsets.UTF_8),
           params)
@@ -228,7 +228,7 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
       buf.flip()
     }
     is ProtoRequestTail -> {
-      val variableWidth = msg.table.length + msg.schema.length + (msg.filterExpr?.length ?: 0)
+      val variableWidth = msg.table.length + msg.expectedSchema.length + msg.filterExpr.length
       val buf = ByteBuffer.allocate(16 + variableWidth * 4)
       val encoder = StandardCharsets.UTF_8.newEncoder()
 
@@ -252,7 +252,7 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
 
       pos = buf.position()
       buf.putShort(0x0)
-      res = encoder.encode(CharBuffer.wrap(msg.schema), buf, true)
+      res = encoder.encode(CharBuffer.wrap(msg.expectedSchema), buf, true)
       if (!res.isUnderflow()) {
         res.throwException()
       }
@@ -264,19 +264,17 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
       buf.putShort(pos, schemaLengthEncoded)
       encoder.reset()
 
-      if (msg.filterExpr != null) {
-        pos = buf.position()
-        buf.putShort(0x0)
-        res = encoder.encode(CharBuffer.wrap(msg.filterExpr), buf, true)
-        if (!res.isUnderflow()) {
-          res.throwException()
-        }
-        res = encoder.flush(buf)
-        if (!res.isUnderflow()) {
-          res.throwException()
-        }
-        buf.putShort(pos, (buf.position() - pos - 2).toShort())
+      pos = buf.position()
+      buf.putShort(0x0)
+      res = encoder.encode(CharBuffer.wrap(msg.filterExpr), buf, true)
+      if (!res.isUnderflow()) {
+        res.throwException()
       }
+      res = encoder.flush(buf)
+      if (!res.isUnderflow()) {
+        res.throwException()
+      }
+      buf.putShort(pos, (buf.position() - pos - 2).toShort())
 
       buf.flip()
     }
