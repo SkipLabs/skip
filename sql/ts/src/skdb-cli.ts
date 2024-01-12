@@ -543,7 +543,7 @@ const localRepl = async function () {
 
     if (query.startsWith(".mirror")) {
       let args = query.substring(7).trim();
-      let mirror_defns: Array<{ table: string; schema: string }> = [];
+      let mirror_defns: Array<{ table: string; expectedColumns: string }> = [];
       try {
         while (args.length > 0) {
           const tablename_length = args.indexOf(" ");
@@ -551,11 +551,11 @@ const localRepl = async function () {
           const table = args.slice(0, tablename_length);
           args = args.slice(tablename_length).trim();
 
-          const schema_length = args.indexOf(")");
-          if (schema_length == -1) throw new Error();
-          const schema = args.slice(0, schema_length);
-          args = args.slice(schema_length).trim();
-          mirror_defns.push({ table: table, schema: schema });
+          const cols_length = args.indexOf(")");
+          if (cols_length == -1) throw new Error();
+          const cols = args.slice(0, cols_length);
+          args = args.slice(cols_length).trim();
+          mirror_defns.push({ table: table, expectedColumns: cols });
         }
       } catch {
         console.error(`Malformed mirror command "${query}"`);

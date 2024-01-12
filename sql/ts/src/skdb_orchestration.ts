@@ -1520,7 +1520,7 @@ class SKDBServer implements RemoteSKDB {
         return {
           type: "tail",
           table: def.table,
-          expectedSchema: def.schema,
+          expectedSchema: def.expectedColumns,
           since: this.client.watermark(this.replicationUid, def.table),
           filterExpr: def.filterExpr || "",
           params: new Map(),
@@ -1664,7 +1664,7 @@ class SKDBServer implements RemoteSKDB {
 
     const setupTable = async (mirror_defn : MirrorDefn) => {
       const tableName: string = mirror_defn.table;
-      const schema: string = mirror_defn.schema;
+      const expectedSchema: string = mirror_defn.expectedColumns;
 
       let isViewOnRemote = (await this.viewSchema(tableName)) != "";
 
@@ -1684,7 +1684,7 @@ class SKDBServer implements RemoteSKDB {
         if (!this.client.tableExists(serverResponseTable(tableName))) {
           this.client.exec(createResponseTable);
         }
-        this.client.assertCanBeMirrored(tableName, schema);
+        this.client.assertCanBeMirrored(tableName, expectedSchema);
         this.mirroredTables.add(tableName);
       }
     };
