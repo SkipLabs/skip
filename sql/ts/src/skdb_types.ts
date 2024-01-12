@@ -19,7 +19,7 @@ export interface SKDBHandle {
 
 export type MirrorDefn = {
   table: string;
-  schema: string;
+  expectedColumns: string;
   filterExpr?: string;
 };
 
