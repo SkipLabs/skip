@@ -634,6 +634,10 @@ private fun createGCType(
     pushField(ConstantInt{id => InstrID::none, typ => tInt32, value => 0})
   };
 
+  if (fieldBitOffset % 64 != 0) {
+    sc.die("bad vtable entry alignment")
+  };
+
   // m_refMask
   if (numMaskWords != 0) {
     // Create a memory image of the flag words array.
