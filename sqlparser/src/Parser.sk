@@ -34,12 +34,15 @@ mutable class Parser(tokens: mutable Tokenizer) {
     pos = this.current_pos();
     stmt = this.peek_keyword() match {
     | TCreate() -> this.parseCreate()
-    | TReplace() -> this.parseInsert()
-    | TInsert() -> this.parseInsert()
+    | TReplace()
+    | TInsert() ->
+      this.parseInsert()
     | TDelete() -> this.parseDelete()
     | TDrop() -> this.parseDrop()
     | TUpdate() -> this.parseUpdate()
-    | TSelect() -> this.parseSelect()
+    | TValues()
+    | TSelect() ->
+      this.parseSelect()
     | TPragma() -> this.parsePragma()
     | TBegin() -> this.parseBeginTransaction()
     | TCommit() -> this.parseEndTransaction()
