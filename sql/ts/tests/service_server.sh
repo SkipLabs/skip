@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 if [[ -z "$1" ]]; then
@@ -43,11 +42,11 @@ source $1/bin/sdkman-init.sh
 cd $2
 
 run_server () {
-    java -jar $4 --DANGEROUS-no-encryption --dev --config $2   &> $3/server.log & 
+    java -jar $4 --config $2   &> $3/server.log &
     pid1=$!
 
     host="http://localhost:$1"
-    
+
     i=0
     while [[ $i -lt 10 ]];
     do
