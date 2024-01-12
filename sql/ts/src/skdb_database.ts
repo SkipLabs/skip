@@ -185,17 +185,17 @@ export class SKDBSyncImpl implements SKDBSync {
     await this.mirror(
       {
         table: "skdb_user_permissions",
-        schema:
+        expectedColumns:
           "(userID TEXT PRIMARY KEY, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
       },
       {
         table: "skdb_groups",
-        schema:
+        expectedColumns:
           "(groupID TEXT PRIMARY KEY, skdb_author TEXT, adminID TEXT NOT NULL, skdb_access TEXT NOT NULL)",
       },
       {
         table: "skdb_group_permissions",
-        schema:
+        expectedColumns:
           "(groupID TEXT NOT NULL, userID TEXT, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
       },
     );
@@ -299,17 +299,17 @@ export class SKDBSyncImpl implements SKDBSync {
     for (const metatable of [
       {
         table: "skdb_user_permissions",
-        schema:
+        expectedColumns:
           "(userID TEXT PRIMARY KEY, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
       },
       {
         table: "skdb_groups",
-        schema:
+        expectedColumns:
           "(groupID TEXT PRIMARY KEY, skdb_author TEXT, adminID TEXT NOT NULL, skdb_access TEXT NOT NULL)",
       },
       {
         table: "skdb_group_permissions",
-        schema:
+        expectedColumns:
           "(groupID TEXT NOT NULL, userID TEXT, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
       },
     ]) {
