@@ -313,6 +313,56 @@ mutable class Compiler{
     cselect
   }
 
+  // Expand a `VALUES (foo1_1, foo2_1, ...), ..., (foo1_n, foo2_n, ...)`
+  // clause into its equivalent
+  // ```
+  // SELECT * FROM (
+  //   SELECT foo1_1, foo2_1, ... UNION ALL
+  //                          ... UNION ALL
+  //   SELECT foo1_n, foo2_n, ...
+  // )
+  // NOTE: This could be optimized.
+  readonly fun expandValuesClause(core: P.SelectCoreValues): P.SelectCoreQuery {
+    P.SelectCoreQuery{
+      distinct => false,
+      params => Array[P.SelectStar(None())],
+      from => Some(
+        P.FromQuery{
+          select => P.Select{
+            pos => 0,
+            core => P.SelectCoreQuery{
+              distinct => false,
+              params => core.values[0].map(e -> P.SelectExpr(e, None())),
+              from => None(),
+              where => None(),
+              groupBy => None(),
+              having => None(),
+            },
+            rest => core.values.drop(1).map(v ->
+              (
+                P.COUnionAll(),
+                P.SelectCoreQuery{
+                  distinct => false,
+                  params => v.map(e -> P.SelectExpr(e, None())),
+                  from => None(),
+                  where => None(),
+                  groupBy => None(),
+                  having => None(),
+                },
+              )
+            ),
+            orderBy => None(),
+            limit => None(),
+          },
+          asName => None(),
+        },
+      ),
+      where => None(),
+      groupBy => None(),
+      having => None(),
+    }
+  }
+
   mutable fun compileSelect(
     context: mutable SKStore.Context,
     select: P.Select,
@@ -320,9 +370,18 @@ mutable class Compiler{
     toplevel: Bool,
     sets: Array<P.UpdateSet> = Array[],
   ): CSelect {
-    if (select.core is P.SelectCoreValues _) {
-      error(select.pos, "VALUES() in SELECT not implemented.")
+    select.core match {
+    | core @ P.SelectCoreValues _ ->
+      return this.compileSelect(
+        context,
+        select with {core => this.expandValuesClause(core)},
+        selectId,
+        toplevel,
+        sets,
+      )
+    | _ -> void
     };
+
     // TODO: This heuristic seems suspiciously biased towards the first term of
     // a compound select.
     if (
